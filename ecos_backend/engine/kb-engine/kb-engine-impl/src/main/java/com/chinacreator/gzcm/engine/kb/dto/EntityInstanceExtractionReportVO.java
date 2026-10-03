@@ -78,6 +78,13 @@ public class EntityInstanceExtractionReportVO {
     /** 是否 dry-run 预览（true = 只统计不落库） */
     private boolean dryRun;
 
+    /**
+     * C3 属性完整性校验是否被跳过（F04-05 / REQ-KB-01）。
+     * 仅当 {@code ecos.kb.extract.c3_enabled=false} 显式关闭时置 true（禁静默关闭）；
+     * 判据集为空（分册 03 实体属性定义未就绪）产出零 C3 issue，但 <b>不</b> 置本标志。
+     */
+    private boolean c3Skipped;
+
     /** 结构化告警/失败明细（上限保护，避免报告无界膨胀） */
     private List<IssueVO> issues = new ArrayList<>();
 

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.ForbiddenException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
@@ -93,6 +94,7 @@ public class NavTaxonController {
      * 创建目录（一级：parentId=null；二级/三级：parentId 指向上一级节点）。
      */
     @PostMapping("/categories")
+    @RequirePermission(permission = "knowledge:nav:write")
     public ApiResponse<NavCategoryVO> createCategory(@RequestBody NavCategorySaveDTO dto) {
         try {
             return ApiResponse.success(navService.createCategory(dto));
@@ -110,6 +112,7 @@ public class NavTaxonController {
      * 更新目录（name / sortOrder，level 不可变更 — 移动走 /categories/move）。
      */
     @PutMapping("/categories/{id}")
+    @RequirePermission(permission = "knowledge:nav:write")
     public ApiResponse<NavCategoryVO> updateCategory(
             @PathVariable String id,
             @RequestBody NavCategorySaveDTO dto) {
@@ -132,6 +135,7 @@ public class NavTaxonController {
      * 有子目录时拒绝，请先删子。
      */
     @DeleteMapping("/categories/{id}")
+    @RequirePermission(permission = "knowledge:nav:write")
     public ApiResponse<Void> deleteCategory(@PathVariable String id) {
         try {
             navService.deleteCategory(id);
@@ -153,6 +157,7 @@ public class NavTaxonController {
      * 同批次失败 → 400，已移动部分回滚（业务内 @Transactional）。
      */
     @PostMapping("/categories/move")
+    @RequirePermission(permission = "knowledge:nav:write")
     public ApiResponse<List<NavCategoryVO>> moveCategories(@RequestBody Map<String, Object> body) {
         List<?> ids = body == null ? null : (List<?>) body.get("ids");
         Object targetRaw = body == null ? null : body.get("targetParentId");
@@ -214,6 +219,7 @@ public class NavTaxonController {
      * 创建标签（同 domain 下名唯一，撞名 400）。
      */
     @PostMapping("/tags")
+    @RequirePermission(permission = "knowledge:nav:write")
     public ApiResponse<NavTagVO> createTag(
             @RequestParam(value = "domain", required = false) String domain,
             @RequestParam(value = "tagName", required = true) String tagName) {
@@ -231,6 +237,7 @@ public class NavTaxonController {
 
     /** 逻辑删除标签（rel 行保留，视图按 is_deleted=0 隐藏）。 */
     @DeleteMapping("/tags/{tagId}")
+    @RequirePermission(permission = "knowledge:nav:write")
     public ApiResponse<Void> deleteTag(@PathVariable String tagId) {
         try {
             navService.deleteTag(tagId);
@@ -253,6 +260,7 @@ public class NavTaxonController {
      * 单选/替换 — 删除文章 scope=category 下全部 rel 行，插入新集合。
      */
     @PutMapping("/products/{articleId}/categories")
+    @RequirePermission(permission = "knowledge:nav:write")
     public ApiResponse<Map<String, Object>> setArticleCategories(
             @PathVariable String articleId,
             @RequestBody List<String> categoryIds) {
@@ -275,6 +283,7 @@ public class NavTaxonController {
      * 单选/替换 — 删除文章 scope=tag 下全部 rel 行，插入新集合。
      */
     @PutMapping("/products/{articleId}/tags")
+    @RequirePermission(permission = "knowledge:nav:write")
     public ApiResponse<Map<String, Object>> setArticleTags(
             @PathVariable String articleId,
             @RequestBody List<String> tagNames) {
@@ -297,6 +306,7 @@ public class NavTaxonController {
      * 多选新增（保留旧），UNION 语义。
      */
     @PostMapping("/products/{articleId}/categories")
+    @RequirePermission(permission = "knowledge:nav:write")
     public ApiResponse<Map<String, Object>> addArticleCategories(
             @PathVariable String articleId,
             @RequestBody List<String> categoryIds) {
@@ -319,6 +329,7 @@ public class NavTaxonController {
      * 多选新增（保留旧），UNION 语义。
      */
     @PostMapping("/products/{articleId}/tags")
+    @RequirePermission(permission = "knowledge:nav:write")
     public ApiResponse<Map<String, Object>> addArticleTags(
             @PathVariable String articleId,
             @RequestBody List<String> tagNames) {
@@ -341,6 +352,7 @@ public class NavTaxonController {
      * 单选/多选删除（保留剩余）。
      */
     @DeleteMapping("/products/{articleId}/categories")
+    @RequirePermission(permission = "knowledge:nav:write")
     public ApiResponse<Map<String, Object>> removeArticleCategories(
             @PathVariable String articleId,
             @RequestParam(value = "ids", required = false) List<String> categoryIds) {
@@ -363,6 +375,7 @@ public class NavTaxonController {
      * Undo — 删除文章在 scope（category 或 tag）下的全部 rel 行（回到未标记态）。
      */
     @PostMapping("/products/{articleId}/undo")
+    @RequirePermission(permission = "knowledge:nav:write")
     public ApiResponse<Map<String, Object>> undoArticle(
             @PathVariable String articleId,
             @RequestParam(value = "scope", defaultValue = "category") String scope) {

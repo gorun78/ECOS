@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.kb.service.KnowledgeRetrievalServiceImpl;
 import org.slf4j.Logger;
@@ -30,6 +31,7 @@ public class RagController {
      * RAG检索 — 向量相似度Top-K文档检索。
      */
     @PostMapping("/rag")
+    @RequirePermission(permission = "knowledge:rag:read")
     public ApiResponse<Map<String, Object>> ragQuery(@RequestBody Map<String, Object> request) {
         try {
             String query = (String) request.get("query");

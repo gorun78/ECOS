@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.kb.KnowledgeGraphService;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
@@ -74,6 +75,7 @@ public class KnowledgeGraphController {
     }
 
     @PostMapping("/nodes")
+    @RequirePermission(permission = "knowledge:graph:write")
     public ApiResponse<KnowledgeNode> createNode(@RequestBody Map<String, Object> body) {
         if (body == null) {
             return ApiResponse.badRequest("请求体不能为空");
@@ -91,6 +93,7 @@ public class KnowledgeGraphController {
     }
 
     @PostMapping("/edges")
+    @RequirePermission(permission = "knowledge:graph:write")
     public ApiResponse<KnowledgeEdge> createEdge(@RequestBody Map<String, Object> body) {
         if (body == null) {
             return ApiResponse.badRequest("请求体不能为空");

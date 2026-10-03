@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
@@ -98,6 +99,7 @@ public class KnowledgeIngestController {
      * @return 结构化结果（含状态/分块数/向量写入数）
      */
     @PostMapping(value = "/docs/ingest", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequirePermission(permission = "knowledge:ingest:write")
     public ApiResponse<KnowledgeDocIngestResultVO> ingestDocument(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "source", required = false) String source,
@@ -125,6 +127,7 @@ public class KnowledgeIngestController {
      * 未命中 → 走 INSERT，返回 {@code idempotent=false}。</p>
      */
     @PostMapping("/ingest")
+    @RequirePermission(permission = "knowledge:ingest:write")
     public ApiResponse<KnowledgeIngestResult> ingest(@RequestBody KnowledgeIngestRequest req) {
         try {
             if (req == null || req.getEntityId() == null || req.getEntityId().isBlank()) {
@@ -179,6 +182,7 @@ public class KnowledgeIngestController {
      * {@code mode} 缺省 FULL；{@code dryRun=true} 时只统计不落库（预览报告回填 {@code kg_sync_log.report}）。
      */
     @PostMapping("/graph/build")
+    @RequirePermission(permission = "knowledge:ingest:write")
     public ApiResponse<GraphBuildResponse> build(@RequestBody(required = false) GraphBuildRequest req) {
         try {
             String jobId = "build-" + System.currentTimeMillis();
@@ -208,6 +212,7 @@ public class KnowledgeIngestController {
      * @return dry-run 预览报告
      */
     @PostMapping("/graph/build/preview")
+    @RequirePermission(permission = "knowledge:ingest:read")
     public ApiResponse<GraphBuildPreviewVO> previewBuild(
             @RequestParam(value = "mode", required = false) String mode) {
         String jobId = "preview-" + System.currentTimeMillis();

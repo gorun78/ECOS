@@ -133,6 +133,11 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
 
         List<Map<String, Object>> sources = new ArrayList<>();
 
+        // F04-11（MC05/ADR-11）：向量降级显式标记 — 未尝试向量路径或降级关键词时置非 null，
+        // 落到响应 vectorDegraded/vectorDegradedReason/vectorDegradedImpact，禁止静默降级。
+        boolean vectorDegraded = false;
+        String vectorDegradedReason = null;
+
         if (queryText != null && !queryText.isBlank()) {
             if (pgVectorAvailable) {
                 // B4: 真实向量检索 — 嵌入走 llm-gateway（QueryEmbeddingHelper），
@@ -142,6 +147,8 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                 if (queryVector == null) {
                     log.warn("RAG 降级关键词检索：嵌入向量获取失败/为空（model={}, gatewayBase='{}', query='{}'）",
                             embeddingModel, llmGatewayBase, queryText);
+                    vectorDegraded = true;
+                    vectorDegradedReason = "嵌入向量获取失败/为空（llm-gateway 未返回向量）";
                 } else {
                     try {
                         // PMO-B T1: navFilter 时多取 5x 余量再按 navigation 收窄（避免误截断）
@@ -197,9 +204,15 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                         }
                     } catch (Exception e) {
                         log.warn("RAG 降级关键词检索：向量检索异常（query='{}'）: {}", queryText, e.getMessage(), e);
+                        vectorDegraded = true;
+                        vectorDegradedReason = "向量检索异常：" + e.getMessage();
                     }
                     if (!vectorSuccess) {
                         log.warn("RAG 降级关键词检索：向量检索无命中（query='{}'）", queryText);
+                        if (!vectorDegraded) {
+                            vectorDegraded = true;
+                            vectorDegradedReason = "向量检索无命中";
+                        }
                     }
                 }
                 if (!vectorSuccess) {
@@ -207,6 +220,8 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                     }
             } else {
                 log.warn("RAG 降级关键词检索：pgvector 扩展不可用（镜像需内置 pgvector，query='{}'）", queryText);
+                vectorDegraded = true;
+                vectorDegradedReason = "pgvector 扩展不可用（镜像需内置 pgvector），仅关键词全文兜底";
                 sources = fallbackKeywordSearch(queryText, effectiveTopK, subtreePaths, effectTags);
             }
         }
@@ -216,6 +231,13 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
         result.put("sourcesCount", sources.size());
         result.put("totalTokens", sources.size());
         result.put("latencyMs", latencyMs);
+
+        // F04-11：显式降级标记（未降级时向量形态为权威形态 → vectorDegraded=false，无原因/影响）
+        result.put("vectorDegraded", vectorDegraded);
+        if (vectorDegraded) {
+            result.put("vectorDegradedReason", vectorDegradedReason);
+            result.put("vectorDegradedImpact", "本次结果为关键词全文回退，非向量语义召回，召回精度与配额可能低于向量形态；pgvector 就绪前不覆盖向量索引");
+        }
 
         // PMO-50 T1: 拼 answer 字段（前端直接展示首段；topK>1 拼接分段）
         StringBuilder answerBuf = new StringBuilder();

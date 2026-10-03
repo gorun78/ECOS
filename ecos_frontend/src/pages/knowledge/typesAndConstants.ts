@@ -139,7 +139,7 @@ export interface RuleRepository {
   id: string;
   name: string;
   domain: string;
-  status: 'DRAFT' | 'IN_REVIEW' | 'ACTIVE' | 'DEPRECATED';
+  status: RuleStatus;
   priority: number;
   version: number;
   description?: string;
@@ -148,6 +148,16 @@ export interface RuleRepository {
   createdAt?: string;
   updatedAt?: string;
 }
+
+// ── P-11 校訂 (2026-09-30): 域内枚举单源（OpenAPI 未接通前的过渡态）─────────────────
+// 目标口径（PRD-04 §十一，K-64/W114）：一切 status/lifecycle 枚举应改由 OpenAPI schema
+// `enum` 特性 + `openapi-typescript` 生成到 `src/pages/knowledge/generated/` ，删手写漂移。
+// 当前未构造 OpenAPI 端点导出器，前端消费契约仍靠本文件（唯一手写真值源）。
+// 任何子组件/tab **不得**再手写同义字符串连字 (§'DRAFT'|...)——一律从这里 import。
+/** 规则状态（合规规则/画像/资产共享）。与后端 `RuleRepository.status` / `RuleStatus` 强对齐；
+ * 后端一旦发布 OpenAPI enum 时，本常量改由 generate 覆盖。 */
+export const RULE_STATUS_VALUES = ['DRAFT', 'IN_REVIEW', 'ACTIVE', 'DEPRECATED'] as const;
+export type RuleStatus = (typeof RULE_STATUS_VALUES)[number];
 
 export interface RuleVersion {
   id: string;
@@ -259,7 +269,8 @@ export interface EngineConfig {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-export const RULE_STATUS_OPTIONS = ['DRAFT', 'IN_REVIEW', 'ACTIVE', 'DEPRECATED'] as const;
+// P-11: 同 RULE_STATUS_VALUES 单源。保留别名以兼容既有 UI 组件 import 面（只删真重复字面值，不重写 import 句柄）。
+export const RULE_STATUS_OPTIONS = RULE_STATUS_VALUES;
 
 export const CHUNK_SIZE_OPTIONS = [256, 512, 1024, 2048] as const;
 

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.kb.KnowledgeRetrievalService;
@@ -56,6 +57,7 @@ public class KnowledgeArticleController {
     }
 
     @PostMapping
+    @RequirePermission(permission = "knowledge:article:write")
     public ApiResponse<KnowledgeArticle> createArticle(@RequestBody KnowledgeArticle article) {
         return ApiResponse.success(knowledgeRetrievalService.createArticle(article));
     }

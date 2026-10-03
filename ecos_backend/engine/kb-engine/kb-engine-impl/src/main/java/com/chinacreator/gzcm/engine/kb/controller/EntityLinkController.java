@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.kb.dto.EntityLinkRequestDTO;
 import com.chinacreator.gzcm.engine.kb.dto.EntityLinkResultVO;
@@ -18,7 +19,9 @@ import java.util.Map;
  * @group WIKI
  */
 @RestController
-@RequestMapping("/api/v1/knowledge/entity-link")
+// F04-02 (2026-09-30)：K-12 组合畸形修复——保留旧组合路径 /api/v1/knowledge/entity-link/entity/link，
+// 新正典路径 /api/v1/knowledge/entity/link 并入 /api/v1/knowledge 家族（方法级一律相对路径）。
+@RequestMapping({"/api/v1/knowledge/entity-link", "/api/v1/knowledge"})
 public class EntityLinkController {
 
     private static final Logger log = LoggerFactory.getLogger(EntityLinkController.class);
@@ -34,7 +37,8 @@ public class EntityLinkController {
      * <p>PMO-74 H11-T4：出入参由 {@code Map<String,Object>} 收口为
      * {@link EntityLinkRequestDTO} / {@link EntityLinkResultVO}（wire JSON 键名不变）。</p>
      */
-    @PostMapping("/entity/link")
+    @PostMapping({"/entity/link", "/entity-link/entity/link"})
+    @RequirePermission(permission = "knowledge:entity-link:write")
     public ApiResponse<EntityLinkResultVO> linkEntity(@RequestBody EntityLinkRequestDTO request) {
         try {
             String entityName = request.getEntityName();

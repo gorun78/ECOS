@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.kb.dto.EvalRunRequest;
 import com.chinacreator.gzcm.engine.kb.dto.KnowledgeEvalReportVO;
@@ -39,6 +40,7 @@ public class KnowledgeEvalController {
      * @return 评估报告
      */
     @PostMapping("/run")
+    @RequirePermission(permission = "knowledge:eval:run")
     public ApiResponse<KnowledgeEvalReportVO> run(@RequestBody(required = false) EvalRunRequest req) {
         try {
             return ApiResponse.success(evalService.runEval(req));

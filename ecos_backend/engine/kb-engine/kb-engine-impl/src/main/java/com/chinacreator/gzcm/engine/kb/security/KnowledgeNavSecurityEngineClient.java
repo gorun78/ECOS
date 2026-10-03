@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.security;
 
-import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.engine.kb.shared.KbActorSupport;
+import com.chinacreator.gzcm.engine.kb.shared.KbAuditPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,13 +12,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * 知识导航 (kb-nav) ABAC 客户端 — 走 security-engine REST（与 ontology-engine 同款范式）。
@@ -28,7 +29,9 @@ import java.util.UUID;
  * <ul>
  *   <li>所有写操作 ABAC 裁决（{@code POST /api/v1/security/policy-engine/evaluate}）</li>
  *   <li>不可用 → 默认 DENY（{@code returns false}，不降级放行）</li>
- *   <li>审计事件发 Kafka {@link KafkaTopics#AUDIT}（失败仅 log.warn，不阻塞业务）</li>
+ *   <li>审计事件经 {@link KbAuditPublisher}（F04-15 收口 runtime-event：
+ *       EventBusService → 本地 JDBC 兜底 → 双通路全失败即拒绝操作，纠正 K-44/K-45
+ *       "warn 后继续 = 静默丢审计"反例）</li>
  * </ul>
  *
  * <p>不直接负责 RLS/CLS/脱敏（kb-nav 是目录/标签维度，无敏感列，不涉及脱敏）。
@@ -43,20 +46,23 @@ public class KnowledgeNavSecurityEngineClient {
     private final String baseUrl;
     private final int timeoutMs;
     private final RestTemplate serviceRestTemplate;
-
-    /** 可选 — 容器中存在 KafkaTemplate Bean 时注入（required=false 保证缺失时静默 null）。 */
-    @Autowired(required = false)
-    @org.springframework.beans.factory.annotation.Qualifier("kafkaTemplate")
-    private Object kafkaTemplateBean;
+    private final KbAuditPublisher auditPublisher;
 
     public KnowledgeNavSecurityEngineClient(
             @Value("${service.security.base-url:http://localhost:18081}") String baseUrl,
             @Value("${service.security.timeout-ms:5000}") int timeoutMs,
-            @Autowired(required = false) RestTemplate serviceRestTemplate) {
+            @Value("${ecos.nav.tenant-id:ecos}") String tenantId,
+            @Autowired(required = false) RestTemplate serviceRestTemplate,
+            KbAuditPublisher auditPublisher) {
         this.baseUrl = baseUrl;
         this.timeoutMs = timeoutMs;
+        this.tenantId = tenantId;
         this.serviceRestTemplate = serviceRestTemplate;
+        this.auditPublisher = auditPublisher;
     }
+
+    /** 本租户标识 —— 由 yml 显式给出（默认 {@code ecos}），禁 {@code "default"} 硬编码（K-41/K-43，F04-16）。 */
+    private final String tenantId;
 
     /**
      * ABAC 裁决 — 调 security-engine 的 OPA evaluate。
@@ -81,9 +87,9 @@ public class KnowledgeNavSecurityEngineClient {
                 input.putAll(attrs);
             }
             input.put("subject", Map.of(
-                    "userId", currentUserIdOrAnonymous(),
-                    "tenantId", "default",
-                    "role", "user"));
+                    "userId", KbActorSupport.currentActor(),
+                    "tenantId", tenantId,
+                    "role", primaryRoleOrDefault()));
             body.put("input", input);
             Map<String, Object> resp = postJson("/api/v1/security/policy-engine/evaluate", body);
             if (resp == null || resp.get("data") == null) {
@@ -103,55 +109,44 @@ public class KnowledgeNavSecurityEngineClient {
     }
 
     /**
-     * 审计事件 — 发 Kafka {@link KafkaTopics#AUDIT} topic（不阻塞主流程，失败仅 warn）。
+     * 审计事件 — 经 {@link KbAuditPublisher} 发布（F04-15 收口）。
+     * EventBusService 首选 → JDBC 兜底 → 双通路全失败即抛 {@code KbErrorCodeException}
+     * （HTTP 503 / KB_022，默认 DENY），<b>纠正 K-44/K-45"warn 后继续 = 静默丢审计"反例</b>。
      *
      * @param action 业务动作（如 {@code kb.category.update}）
      * @param attr   关键属性（如 entityId / userId）
      */
     public void audit(String action, Object attr) {
-        try {
-            Map<String, Object> event = new LinkedHashMap<>();
-            event.put("eventId", UUID.randomUUID().toString());
-            event.put("timestamp", System.currentTimeMillis());
-            event.put("userId", currentUserIdOrAnonymous());
-            event.put("action", action);
-            event.put("resource", "kb-nav");
-            event.put("attr", attr == null ? Map.of() : attr);
-            if (kafkaTemplateBean == null) {
-                log.warn("KNavSecurityEngineClient.audit: KafkaTemplate 不可用，仅日志: action={}", action);
-                return;
-            }
-            // 通过 Object 反射调用 send，避免硬依赖 KafkaTemplate 类型（与 ontology 同款，兼容缺失时 classpath）
-            java.lang.reflect.Method send = kafkaTemplateBean.getClass().getMethod("send", String.class, Object.class);
-            Object future = send.invoke(kafkaTemplateBean, KafkaTopics.AUDIT, event);
-            if (future instanceof java.util.concurrent.CompletableFuture<?> cf) {
-                cf.whenComplete((r, ex) -> {
-                    if (ex != null) {
-                        log.warn("KNavSecurityEngineClient.audit async fail: action={} reason={}",
-                                action, ex.getMessage());
-                    }
-                });
-            }
-        } catch (Exception e) {
-            log.warn("KNavSecurityEngineClient.audit failed: action={} reason={}",
-                    action, e.getMessage());
-        }
+        Map<String, Object> extra = new LinkedHashMap<>();
+        extra.put("attr", attr == null ? Map.of() : attr);
+        extra.put("resource", "kb-nav");
+        // 双通路全失败抛 KbErrorCodeException 上抛给调用方；不再吞掉静默 log.warn
+        auditPublisher.emit(action, "nav", KbActorSupport.currentActor(), extra);
     }
 
     // ── helpers ─────────────────────────────────────────────
 
-    private String currentUserIdOrAnonymous() {
+    /**
+     * 主角色 —— 从 SecurityContext 取第一个 GrantedAuthority，剥离 {@code ROLE_} 前缀。
+     * 未认证/无授权 → {@code "anonymous"}（不是 "user" 硬编码，F04-16 K-42/K-43）。
+     */
+    private String primaryRoleOrDefault() {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.isAuthenticated()) {
-                Object principal = auth.getPrincipal();
-                if (principal instanceof String s) {
-                    return s;
+            if (auth != null && auth.isAuthenticated() && auth.getAuthorities() != null) {
+                for (GrantedAuthority ga : auth.getAuthorities()) {
+                    String a = ga == null ? null : ga.getAuthority();
+                    if (a == null || a.isBlank() || "ROLE_ANONYMOUS".equals(a)) {
+                        continue;
+                    }
+                    String stripped = a.startsWith("ROLE_") ? a.substring(5) : a;
+                    if (!stripped.isBlank()) {
+                        return stripped;
+                    }
                 }
-                return auth.getName();
             }
         } catch (Exception ignored) {
-            // 客户端解析失败返回 anonymous，不抛
+            // fall through
         }
         return "anonymous";
     }
@@ -167,3 +162,4 @@ public class KnowledgeNavSecurityEngineClient {
         return resp == null ? null : resp.getBody();
     }
 }
+

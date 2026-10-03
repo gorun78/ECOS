@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.kb.dto.KbImportTriggerVO;
 import com.chinacreator.gzcm.engine.kb.dto.ScheduledExtractCreatedVO;
@@ -59,6 +60,7 @@ public class ScheduledExtractController {
 
     /** 创建定时抽取任务（runtime-task scheduleTask + td_runtime_task_plan + fallback 镜像）。 */
     @PostMapping
+    @RequirePermission(permission = "knowledge:extract:schedule:write")
     public ApiResponse<ScheduledExtractCreatedVO> create(@RequestBody ScheduledExtractRequest req) {
         ScheduledExtractCreatedVO vo = scheduleService.create(req);
         return ApiResponse.success(vo);
@@ -89,6 +91,7 @@ public class ScheduledExtractController {
 
     /** 更新任务（name / cron / ontologyIds / enabled）。 */
     @PutMapping("/{id}")
+    @RequirePermission(permission = "knowledge:extract:schedule:write")
     public ApiResponse<ScheduledExtractVO> update(@PathVariable String id,
                                                   @RequestBody ScheduledExtractRequest req) {
         ScheduledExtractVO vo = scheduleService.update(id, req);
@@ -104,6 +107,7 @@ public class ScheduledExtractController {
 
     /** 软删除（td_runtime_task_plan.is_deleted=1 + cancelSchedule）。 */
     @DeleteMapping("/{id}")
+    @RequirePermission(permission = "knowledge:extract:schedule:write")
     public ApiResponse<Void> delete(@PathVariable String id) {
         scheduleService.delete(id);
         return ApiResponse.success();
@@ -121,6 +125,7 @@ public class ScheduledExtractController {
      * {@code td_runtime_task_status} 拉 progress / log / 导出（铁律 §1.6-3）。</p>
      */
     @PostMapping("/{id}/run")
+    @RequirePermission(permission = "knowledge:extract:schedule:run")
     public ApiResponse<KbImportTriggerVO> triggerNow(@PathVariable String id) {
         String taskId = scheduleService.triggerNow(id);
         KbImportTriggerVO vo = new KbImportTriggerVO();

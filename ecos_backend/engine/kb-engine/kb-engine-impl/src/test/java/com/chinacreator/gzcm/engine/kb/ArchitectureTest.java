@@ -93,6 +93,12 @@ public class ArchitectureTest {
 
     @Test
     void shouldNotDependOnOtherEngines() {
+        // 注意 (F04-18/K-51)：本规则<b>不</b>枚举 engine.ontology —— kb 主源码存在 10 处合法
+        // 直接 import (KGWriterService / KnowledgeExtractionService / RuleGraphService /
+        // kb-engine-api/model/ComplianceRule 中 ExtractedSubGraph.*)，是 ARCH §4.3 允许
+        // "图谱实例借助本体模型" 的共享契约。F04-18 用独立的
+        // {@code ModuleDependencyArchTest#kbMustNotDependOnOntologyInternals} 更精细地
+        // 拦截"内部实现类"（非 model.*）依赖，避免误伤此处合法的模型引用。
         ArchRule rule = noClasses().that()
             .resideInAPackage("com.chinacreator.gzcm.engine.kb..")
             .should().dependOnClassesThat()

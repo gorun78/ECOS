@@ -24,7 +24,7 @@ import java.util.UUID;
  *
  * <p>关键约束：
  * <ul>
- *   <li>嵌入统一走 llm-gateway（{@link QueryEmbeddingHelper} → {@code POST /api/v1/llm/embedding}），
+ *   <li>嵌入统一走 llm-gateway（{@link QueryEmbeddingHelper} 经 {@code LLMGateway} 接口 embed），
  *       禁止直连 Provider（架构铁律 §2.5-2）</li>
  *   <li>批量：一次 HTTP 批量嵌入 + 一条 SQL 多 VALUES upsert，禁止循环单条写库</li>
  *   <li>幂等：按主键 id upsert（id 为空时由 articleId#chunkIndex 生成确定性 UUID）</li>

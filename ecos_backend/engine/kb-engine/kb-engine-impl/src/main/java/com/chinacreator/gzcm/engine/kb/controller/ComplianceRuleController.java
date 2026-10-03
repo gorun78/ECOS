@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.kb.dto.RuleDeleteResultVO;
 import com.chinacreator.gzcm.engine.kb.dto.RuleVersionVO;
@@ -58,6 +59,7 @@ public class ComplianceRuleController {
     // ── POST / — 新增规则（UUID + DRAFT） ──────────
 
     @PostMapping
+    @RequirePermission(permission = "knowledge:compliance-rule:write")
     public ApiResponse<ComplianceRule> insert(@RequestBody ComplianceRule rule) {
         rule.setId(UUID.randomUUID().toString());
         if (rule.getStatus() == null || rule.getStatus().isEmpty()) {
@@ -78,6 +80,7 @@ public class ComplianceRuleController {
     // ── PUT /{id} — 更新规则（触发版本快照） ──────
 
     @PutMapping("/{id}")
+    @RequirePermission(permission = "knowledge:compliance-rule:write")
     public ApiResponse<ComplianceRule> update(@PathVariable String id, @RequestBody ComplianceRule incoming) {
         ComplianceRule existing = complianceRuleMapper.findById(id);
         if (existing == null) {
@@ -116,6 +119,7 @@ public class ComplianceRuleController {
     // ── DELETE /{id} — 删除规则 ────────────────────
 
     @DeleteMapping("/{id}")
+    @RequirePermission(permission = "knowledge:compliance-rule:write")
     public ApiResponse<RuleDeleteResultVO> delete(@PathVariable String id) {
         ComplianceRule existing = complianceRuleMapper.findById(id);
         if (existing == null) {

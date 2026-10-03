@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.kb.EcosKnowledgeGraphService;
 import com.chinacreator.gzcm.engine.kb.dto.KgGraphSnapshotVO;
@@ -50,6 +51,7 @@ public class EcosKnowledgeGraphController {
     }
 
     @PostMapping("/sync")
+    @RequirePermission(permission = "knowledge:graph:sync")
     public ApiResponse<KgNeo4jSyncResultVO> syncToNeo4j() {
         try {
             Map<String, Object> result = ecosKgService.syncToNeo4j();

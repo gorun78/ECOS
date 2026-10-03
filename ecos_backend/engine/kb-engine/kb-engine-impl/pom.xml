@@ -83,9 +83,12 @@
             <artifactId>sysman-impl</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
-        <!-- PMO-51 T3: @KafkaListener 在 EcosOntologyEventConsumer / KnowledgeIngestController 用到,
-             之前是"反序列化路径的 ConditionalOnClass 类条件装配"误靠 dccheng 反射用，
-             编译期必须显式 spring-kafka 依赖才能 resolve。生产 EventBus 走 PMO-50 统一接 runtime-event。 -->
+        <!-- PMO-51 T3: @KafkaListener 规划于 EcosOntologyEventConsumer 接管（当前仅 javadoc 声明,
+             尚未真正挂载 @KafkaListener 注解）; 编译期需 spring-kafka 依赖供类型 resolve。
+             生产 EventBus 统一走 runtime-event（PMO-50 收敛）。
+             【2026-09-30 校订 P-6】下方 sysman-impl 为【活依赖】（KnowledgeSettingsServiceImpl 引
+             com.chinacreator.gzcm.sysman），非死依赖，保留；spring-kafka 待事件底座收敛结论裁定去留,
+             本轮仅订正注释失真、不删依赖（删除会破坏 kb-impl 编译）。-->
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>

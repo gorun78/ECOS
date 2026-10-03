@@ -410,9 +410,19 @@ public class ModuleDependencyArchTest {
      *
      * <p>白名单：{@code com.chinacreator.gzcm.runtime.eventbus..}（Kafka 实现本体在底座）；
      * {@code com.chinacreator.gzcm.services.apigateway..}（api-gateway 微服务，另行治理）。
-     * security/ontology 引擎侧的 Object-反射审计（{@code SecurityEngineClient} /
-     * {@code KnowledgeNavSecurityEngineClient}）不含 spring-kafka 类型引用，
-     * 天然合规，无需豁免。</p>
+     *
+     * <p><b>检测边界（勿高估）</b>：本规则仅覆盖编译期类型引用（{@code import org.springframework.kafka.*}
+     * 与直接 {@code new KafkaTemplate(...)} 类构造）。以下为结构性盲区（同 C71 / W113 型）：
+     * <ol>
+     *   <li>{@code Class.forName("org.springframework.kafka...")} 反射引用 — 类型引用扫描不可见</li>
+     *   <li>Maven 依赖间接传递 — 只检查包引用检查不到反射加载入堆栈</li>
+     *   <li>security/ontology 侧 Object-反射审计（{@code SecurityEngineClient} /
+     *       {@code KnowledgeNavSecurityEngineClient}）虽然当前不含 spring-kafka 类型引用，
+     *       但同型反射调用（跨审计路径）本测试无法退化验证。</li>
+     * </ol>
+     * 本测试不能替代反射绕过专项检查，请勿以"通过本测试 ⇒ Kafka 出口收敛"下结论。<br>
+     * 【2026-09-30 校订 P-10 / K-51】原注释"不含 spring-kafka 类型引用，天然合规，无需豁免"
+     * 高估了 ArchUnit 覆盖范围，已订正。</p>
      */
     @Test
     void businessMustNotDependOnSpringKafkaDirectly() {

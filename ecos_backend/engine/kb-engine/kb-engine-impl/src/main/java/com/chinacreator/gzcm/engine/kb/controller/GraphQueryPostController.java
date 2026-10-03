@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.kb.dto.GraphNodeVO;
 import com.chinacreator.gzcm.engine.kb.dto.GraphPathQuery;
@@ -71,6 +72,7 @@ public class GraphQueryPostController {
      * <p>命中 top N 节点 + 邻接摘要（每个节点 outgoing/incoming 边数）。</p>
      */
     @PostMapping("/search")
+    @RequirePermission(permission = "knowledge:graph:read")
     public ApiResponse<List<GraphNodeVO>> search(@RequestBody GraphSearchQuery query) {
         try {
             if (query == null) {
@@ -132,6 +134,7 @@ public class GraphQueryPostController {
      * 路径不存在时按要求返回空 list（不抛 404，对齐契约 §4.8）。</p>
      */
     @PostMapping("/path")
+    @RequirePermission(permission = "knowledge:graph:read")
     public ApiResponse<List<String>> path(@RequestBody GraphPathQuery query) {
         try {
             if (query == null) {

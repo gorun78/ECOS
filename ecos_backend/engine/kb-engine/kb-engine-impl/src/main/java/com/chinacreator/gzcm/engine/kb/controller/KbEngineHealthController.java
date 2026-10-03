@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.engine.HealthCheck;
 import com.chinacreator.gzcm.common.engine.IEngine;
@@ -46,12 +47,14 @@ public class KbEngineHealthController {
     }
 
     @PostMapping("/start")
+    @RequirePermission(permission = "knowledge:engine:control")
     public ApiResponse<Map<String, Object>> start() {
         kbEngine.start();
         return ApiResponse.success(Map.of("name", kbEngine.getName(), "status", kbEngine.getStatus().name()));
     }
 
     @PostMapping("/stop")
+    @RequirePermission(permission = "knowledge:engine:control")
     public ApiResponse<Map<String, Object>> stop() {
         kbEngine.stop();
         return ApiResponse.success(Map.of("name", kbEngine.getName(), "status", kbEngine.getStatus().name()));

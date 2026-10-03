@@ -94,18 +94,28 @@ public class KbEntityInstanceExtractionService {
     /** ontology-engine REST 基址（直连 :18083，既有姿态）。 */
     private final String ontologyApiBase;
 
+    /** C3 属性完整性校验开关（F04-05 / REQ-KB-01；默认开）。 */
+    private boolean c3Enabled = true;
+
     /** 列定义缓存（resourceId → 字段列表），避免循环查库。 */
     private final Map<String, List<Map<String, Object>>> fieldsCache = new LinkedHashMap<>();
 
     public KbEntityInstanceExtractionService(
             JdbcTemplate jdbc,
             RestTemplate restTemplate,
-            @Value("${ecos.datanet.base-url:http://localhost:18082}") String datanetBaseUrl,
-            @Value("${ecos.ontology-api-base:http://localhost:8080/api/v1}") String ontologyApiBase) {
+            @Value("${ecos.datanet.base-url:http://localhost:8080}") String datanetBaseUrl,
+            @Value("${ecos.ontology-api-base:http://localhost:8080/api/v1}") String ontologyApiBase,
+            @Value("${ecos.kb.extract.c3_enabled:true}") boolean c3Enabled) {
         this.jdbc = jdbc;
         this.restTemplate = restTemplate;
         this.datanetBaseUrl = datanetBaseUrl;
         this.ontologyApiBase = ontologyApiBase;
+        this.c3Enabled = c3Enabled;
+    }
+
+    /** 设 C3 校验开关（供测试；生产由 {@code @Value("${ecos.kb.extract.c3_enabled:true}")} 注入）。 */
+    public void setC3Enabled(boolean c3Enabled) {
+        this.c3Enabled = c3Enabled;
     }
 
     /**
@@ -136,6 +146,8 @@ public class KbEntityInstanceExtractionService {
         report.setMode(incremental ? MODE_INCREMENTAL : MODE_FULL);
         report.setDryRun(dryRun);
         report.setOntologyId((ontologyId == null || ontologyId.isBlank()) ? "ALL" : ontologyId.trim());
+        // F04-05 / REQ-KB-01：c3_enabled=false 显式关闭 → report 标 c3Skipped=true（禁静默关闭）
+        markC3SkippedIfDisabled(report);
 
         // 0. 抽取范围：kb 自有快照表提供 ontologyId + version（版本对齐基准，D9）
         List<OntologySnapshot> snapshots = readSnapshots(ontologyId);
@@ -275,6 +287,10 @@ public class KbEntityInstanceExtractionService {
         String domain = truncate(text(mapping.get("sourceType")), SHORT_COLUMN_MAX);
         String description = text(mapping.get("sourceName"));
 
+        // C3 属性完整性判据（F04-05）：实体声明属性集（分册 03 抽取主流程实体定义供给）；
+        // 未就绪时为空 → 无判据、零 C3 issue（不等同 c3Skipped）。生产接缝见 resolveAttrDefs。
+        List<KbC3AttributeValidator.AttrDef> attrDefs = resolveAttrDefs(entityCode);
+
         // 4. 分页拉取 DW 实例行（水位线增量）
         String watermark = incremental ? readWatermark(snap.ontologyId(), entityCode, resourceId) : null;
         String lastWatermark = watermark;
@@ -307,6 +323,10 @@ public class KbEntityInstanceExtractionService {
                 }
                 rowsRead++;
                 String nodeId = buildNodeId(snap.ontologyId(), nodeType, pkValue);
+                // C3 属性完整性（F04-05）：C1 之后、节点 upsert 前，对候选属性集做 R1/R2/R3；
+                // 全 WARN 不阻断、issue 入 report，R3 命中的字段置 null 不写入（cleanedProperties）。
+                Map<String, Object> properties = runC3(entityCode, buildPropertiesMap(row, fieldRefs),
+                        attrDefs, report);
                 if (dryRun) {
                     // dry-run：用预查存在性集合判 created/updated（与真执行同口径）
                     if (existingForDryRun.contains(nodeId)) {
@@ -314,7 +334,7 @@ public class KbEntityInstanceExtractionService {
                     } else {
                         report.setNodeCreated(report.getNodeCreated() + 1);
                     }
-                } else if (upsertNode(nodeId, pkValue, nodeType, description, domain, row, fieldRefs, snap, resourceId)) {
+                } else if (upsertNode(nodeId, pkValue, nodeType, description, domain, properties, snap, resourceId)) {
                     report.setNodeCreated(report.getNodeCreated() + 1);
                 } else {
                     report.setNodeUpdated(report.getNodeUpdated() + 1);
@@ -464,9 +484,9 @@ public class KbEntityInstanceExtractionService {
      * @return {@code true} = 新建（INSERT），{@code false} = 更新既有（ON CONFLICT DO UPDATE）
      */
     private boolean upsertNode(String nodeId, String pkValue, String nodeType, String description,
-                               String domain, Map<String, Object> row, List<FieldRef> fieldRefs,
+                               String domain, Map<String, Object> properties,
                                OntologySnapshot snap, String resourceId) {
-        String propertiesJson = buildPropertiesJson(row, fieldRefs);
+        String propertiesJson = writePropertiesJson(properties);
         try {
             // RETURNING (xmax = 0)：PG 惯用法，区分 INSERT（true）与 ON CONFLICT UPDATE（false）
             List<Boolean> inserted = jdbc.queryForList(
@@ -795,20 +815,63 @@ public class KbEntityInstanceExtractionService {
         return refs;
     }
 
-    /** 组装节点属性 JSON（本体侧引用 → 行值；写库时显式 {@code ?::jsonb} 转换）。 */
-    private String buildPropertiesJson(Map<String, Object> row, List<FieldRef> fieldRefs) {
+    /** 组装节点属性集（本体侧引用 → 行值，未清洗；供 C3 校验前后复用）。 */
+    private Map<String, Object> buildPropertiesMap(Map<String, Object> row, List<FieldRef> fieldRefs) {
         Map<String, Object> properties = new LinkedHashMap<>();
         for (FieldRef ref : fieldRefs) {
             if (!ref.ontologyRef().isEmpty()) {
                 properties.put(ref.ontologyRef(), row.get(ref.dwColumn()));
             }
         }
+        return properties;
+    }
+
+    /** 序列化属性集为 JSON（写库时显式 {@code ?::jsonb} 转换）。 */
+    private String writePropertiesJson(Map<String, Object> properties) {
         try {
             return MAPPER.writeValueAsString(properties);
         } catch (Exception e) {
             log.warn("节点属性序列化失败，落空对象: {}", e.getMessage());
             return "{}";
         }
+    }
+
+    /**
+     * C3 属性完整性校验（F04-05）：委托 {@link KbC3AttributeValidator}，将每条 WARN 追加到
+     * {@code report.issues[]}（不阻断），返回清洗后属性集（R3 命中字段置 null 不写入）。
+     * {@code c3Enabled=false} 时跳过校验并返回原属性集（report 已在入口标 {@code c3Skipped=true}）。
+     * 包内可见：抽取主循环调用，亦供 F04-05 验收测试直接断言。
+     */
+    Map<String, Object> runC3(String entityCode, Map<String, Object> properties,
+                              List<KbC3AttributeValidator.AttrDef> attrDefs,
+                              EntityInstanceExtractionReportVO report) {
+        if (!c3Enabled) {
+            return properties;
+        }
+        KbC3AttributeValidator.Result result =
+                KbC3AttributeValidator.validate(entityCode, properties, attrDefs);
+        for (KbC3AttributeValidator.Issue issue : result.issues()) {
+            report.addIssue(entityCode, issue.code(), issue.message());
+        }
+        return result.cleanedProperties();
+    }
+
+    /** C3 实体属性判据（分册 03 G5 同期实体定义供给）；未就绪时返回空集 → 零 C3 issue。 */
+    private List<KbC3AttributeValidator.AttrDef> resolveAttrDefs(String entityCode) {
+        return Collections.emptyList();
+    }
+
+    /**
+     * c3_enabled=false 时，report 显式标 {@code c3Skipped=true} 并记一条 C3_SKIPPED issue（禁静默关闭）。
+     * {@link #extract} 入口调用；抽为包内方法供 F04-05 验收测试直接断言。
+     */
+    void markC3SkippedIfDisabled(EntityInstanceExtractionReportVO report) {
+        if (c3Enabled) {
+            return;
+        }
+        report.setC3Skipped(true);
+        report.addIssue(null, "C3_SKIPPED",
+                "C3 属性完整性校验被 ecos.kb.extract.c3_enabled=false 显式关闭");
     }
 
     /** 节点 id：{@code sha256(ontologyId::nodeType::pkValue)} 全量 32 hex 字符。

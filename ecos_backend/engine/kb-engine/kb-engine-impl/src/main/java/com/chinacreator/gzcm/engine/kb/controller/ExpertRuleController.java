@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.kb.ExpertRuleService;
 import com.chinacreator.gzcm.engine.kb.model.ExpertRule;
@@ -38,28 +39,33 @@ public class ExpertRuleController {
     }
 
     @PostMapping
+    @RequirePermission(permission = "knowledge:expert-rule:write")
     public ApiResponse<ExpertRule> createRule(@RequestBody ExpertRule rule) {
         return ApiResponse.success(expertRuleService.createRule(rule));
     }
 
     @PutMapping("/{ruleId}")
+    @RequirePermission(permission = "knowledge:expert-rule:write")
     public ApiResponse<ExpertRule> updateRule(@PathVariable String ruleId, @RequestBody ExpertRule rule) {
         return ApiResponse.success(expertRuleService.updateRule(ruleId, rule));
     }
 
     @DeleteMapping("/{ruleId}")
+    @RequirePermission(permission = "knowledge:expert-rule:write")
     public ApiResponse<Map<String, Object>> deleteRule(@PathVariable String ruleId) {
         expertRuleService.deleteRule(ruleId);
         return ApiResponse.success(Map.of("deleted", ruleId));
     }
 
     @PostMapping("/{ruleId}/execute")
+    @RequirePermission(permission = "knowledge:expert-rule:write")
     public ApiResponse<Map<String, Object>> executeRule(
             @PathVariable String ruleId, @RequestBody Map<String, Object> context) {
         return ApiResponse.success(expertRuleService.executeRule(ruleId, context));
     }
 
     @PostMapping("/batch-import")
+    @RequirePermission(permission = "knowledge:expert-rule:write")
     public ApiResponse<Map<String, Object>> batchImport(@RequestBody List<ExpertRule> rules) {
         int count = expertRuleService.batchImport(rules);
         return ApiResponse.success(Map.of("imported", count));

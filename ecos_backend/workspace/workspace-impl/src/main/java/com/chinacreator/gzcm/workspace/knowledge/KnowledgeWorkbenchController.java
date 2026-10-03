@@ -37,7 +37,7 @@ import java.util.Map;
  * @since PMO-55 批次 E-A
  */
 @RestController
-@RequestMapping("/api/v1/knowledge")
+@RequestMapping({"/api/v1/scenarios/knowledge", "/api/v1/knowledge"})
 @Tag(name = "Knowledge Workbench (Workspace)")
 public class KnowledgeWorkbenchController {
 

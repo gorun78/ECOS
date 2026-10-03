@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.kb.KnowledgeRetrievalService;
 import com.chinacreator.gzcm.engine.kb.model.dto.RagSearchRequest;
@@ -37,6 +38,7 @@ public class KnowledgeApiController {
     }
 
     @PostMapping("/sync")
+    @RequirePermission(permission = "knowledge:data:sync")
     public ApiResponse<Map<String, Object>> triggerSync() {
         log.info("Knowledge full sync triggered");
         knowledgeRetrievalService.triggerSync();
@@ -52,6 +54,7 @@ public class KnowledgeApiController {
      * 检索侧同样支持可选 {@code categoryIds} / {@code tags} 过滤。</p>
      */
     @PostMapping("/query")
+    @RequirePermission(permission = "knowledge:data:read")
     public ApiResponse<List<Object>> query(@RequestBody(required = false) RagSearchRequest req) {
         String queryText = req == null ? "" : (req.getQuery() == null ? "" : req.getQuery());
         log.info("Knowledge query: {}", queryText);
@@ -65,6 +68,7 @@ public class KnowledgeApiController {
      * 全量检索）。响应体追加 {@code categoryIds / tags} 字段让前端回放"刚选择了哪些导航节点"。</p>
      */
     @PostMapping("/rag")
+    @RequirePermission(permission = "knowledge:data:read")
     public ApiResponse<Map<String, Object>> rag(@RequestBody(required = false) RagSearchRequest req) {
         String query = req == null ? "" : (req.getQuery() == null ? "" : req.getQuery());
         int topK = req != null && req.getTopK() != null ? req.getTopK() : DEFAULT_TOP_K;

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.kb.dto.EntityInstanceExtractionReportVO;
@@ -124,6 +125,7 @@ public class StructuredExtractController {
      * 任务执行失败（如 ontology-engine 不可达）在 kb_extract_audit 标记 FAILED。</p>
      */
     @PostMapping
+    @RequirePermission(permission = "knowledge:extract:structured:write")
     public ApiResponse<?> extract(@RequestBody(required = false) StructuredExtractRequest body) {
         StructuredExtractRequest req = body == null ? new StructuredExtractRequest() : body;
         String mode = normalizeMode(req.getMode());
@@ -339,6 +341,7 @@ public class StructuredExtractController {
      * </ol>
      */
     @PostMapping("/export-log")
+    @RequirePermission(permission = "knowledge:extract:structured:read")
     public ResponseEntity<byte[]> exportLog(@RequestBody ExportLogRequest req) {
         if (req == null || req.getJobId() == null || req.getJobId().isBlank()) {
             return ResponseEntity.status(400).body("jobId is required".getBytes(StandardCharsets.UTF_8));

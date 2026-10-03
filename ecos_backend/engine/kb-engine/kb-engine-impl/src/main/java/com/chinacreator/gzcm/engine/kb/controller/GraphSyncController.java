@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.engine.kb.KgSyncService;
@@ -52,6 +53,7 @@ public class GraphSyncController {
     }
 
     @PostMapping("/trigger")
+    @RequirePermission(permission = "knowledge:sync:write")
     public ApiResponse<Map<String, Object>> triggerFullSync() {
         String syncId = "sync-" + System.currentTimeMillis();
         kgSyncService.triggerFullSync(syncId);
@@ -63,6 +65,7 @@ public class GraphSyncController {
     }
 
     @PostMapping("/object/{objectType}")
+    @RequirePermission(permission = "knowledge:sync:write")
     public ApiResponse<Map<String, Object>> triggerObjectSync(@PathVariable String objectType) {
         String syncId = "sync-" + System.currentTimeMillis();
         kgSyncService.triggerObjectSync(syncId, objectType);
@@ -94,6 +97,7 @@ public class GraphSyncController {
      * dry-run：返回本次 dry-run 将 create/update/skip 的对象计数（不落库）。
      */
     @PostMapping("/jobs/{jobId}/preview")
+    @RequirePermission(permission = "knowledge:sync:read")
     public ApiResponse<Map<String, Object>> previewJob(@PathVariable String jobId,
                                                        @RequestParam(defaultValue = "ALL") String type) {
         log.info("KG sync preview: jobId={} type={}", jobId, type);
@@ -107,6 +111,7 @@ public class GraphSyncController {
      * 回滚：按 jobId 前缀删除本 job 创建的 graph_node/graph_edge（V115 行反向计数）。
      */
     @PostMapping("/jobs/{jobId}/rollback")
+    @RequirePermission(permission = "knowledge:sync:write")
     public ApiResponse<Map<String, Object>> rollbackJob(@PathVariable String jobId) {
         log.info("KG sync rollback: jobId={}", jobId);
         Map<String, Object> result = kgMapper.rollback(jobId);

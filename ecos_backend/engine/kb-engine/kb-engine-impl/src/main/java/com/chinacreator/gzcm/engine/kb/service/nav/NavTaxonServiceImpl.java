@@ -12,6 +12,7 @@ import com.chinacreator.gzcm.engine.kb.nav.model.NavProductItemVO;
 import com.chinacreator.gzcm.engine.kb.nav.model.NavRecommendVO;
 import com.chinacreator.gzcm.engine.kb.nav.model.NavTagVO;
 import com.chinacreator.gzcm.engine.kb.security.KnowledgeNavSecurityEngineClient;
+import com.chinacreator.gzcm.engine.kb.shared.KbActorSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -147,15 +148,18 @@ public class NavTaxonServiceImpl implements INavService {
         checkAbac("kb.category.create", abac("domain", d, "name", name, "level", level));
 
         try {
+            String actor = KbActorSupport.currentActor();
             jdbc.update(
                     "INSERT INTO ecos_knowledge.kb_nav_category (id, domain, parent_id, name, path, level, sort_order, create_by, update_by) "
-                            + "VALUES (gen_random_uuid()::text, ?, ?, ?, ?, ?, ?, 'current-user', 'current-user')",
+                            + "VALUES (gen_random_uuid()::text, ?, ?, ?, ?, ?, ?, ?, ?)",
                     d,
                     parentBlank ? null : dto.getParentId(),
                     name,
                     computePath(parentBlank ? null : dto.getParentId(), name),
                     level,
-                    sortOrder);
+                    sortOrder,
+                    actor,
+                    actor);
         } catch (DuplicateKeyException e) {
             log.warn("kb-nav createCategory 唯一约束命中: domain={} name={}", d, name, e);
             throw new ValidationException("name", "同名目录已存在: " + name);
@@ -193,9 +197,9 @@ public class NavTaxonServiceImpl implements INavService {
         }
         jdbc.update(
                 "UPDATE ecos_knowledge.kb_nav_category SET name = ?, sort_order = ?, update_time = NOW(), "
-                        + "update_by = 'current-user', version_no = (CAST(version_no AS INTEGER) + 1)::text "
+                        + "update_by = ?, version_no = (CAST(version_no AS INTEGER) + 1)::text "
                         + "WHERE id = ? AND is_deleted = 0",
-                newName, sortOrder, id);
+                newName, sortOrder, KbActorSupport.currentActor(), id);
         NavCategoryVO updated = findByRow(findByIdRequired(d, newName == null ? currentName : newName));
         // 取精确 id（名改名场景下按 name 匹配可能不唯一，按 id 取）
         Map<String, Object> exact = fetchCategory(id);
@@ -221,8 +225,8 @@ public class NavTaxonServiceImpl implements INavService {
         }
         int affected = jdbc.update(
                 "UPDATE ecos_knowledge.kb_nav_category SET is_deleted = 1, update_time = NOW(), "
-                        + "update_by = 'current-user' WHERE id = ? AND is_deleted = 0",
-                id);
+                        + "update_by = ? WHERE id = ? AND is_deleted = 0",
+                KbActorSupport.currentActor(), id);
         securityClient.audit("kb.category.delete", Map.of("id", id, "affected", affected));
     }
 
@@ -256,6 +260,7 @@ public class NavTaxonServiceImpl implements INavService {
         checkAbac("kb.category.move", abac("ids", String.join(",", ids), "targetParentId", root ? "root" : targetParentId));
 
         List<NavCategoryVO> moved = new ArrayList<>(ids.size());
+        String actor = KbActorSupport.currentActor();
         for (String id : ids) {
             Map<String, Object> row = fetchCategory(id);
             String name = str(row.get("name"));
@@ -263,10 +268,10 @@ public class NavTaxonServiceImpl implements INavService {
             String newPath = root ? ("/" + name) : recomputePath(targetParentId, name);
             jdbc.update(
                     "UPDATE ecos_knowledge.kb_nav_category SET parent_id = ?, level = ?, path = ?, "
-                            + "update_time = NOW(), update_by = 'current-user', "
+                            + "update_time = NOW(), update_by = ?, "
                             + "version_no = (CAST(version_no AS INTEGER) + 1)::text "
                             + "WHERE id = ? AND is_deleted = 0",
-                    root ? null : targetParentId, newLevel, newPath, id);
+                    root ? null : targetParentId, newLevel, newPath, actor, id);
             refreshDescendantPath(id);
             Map<String, Object> exact = fetchCategory(id);
             moved.add(findByRow(exact));
@@ -348,10 +353,11 @@ public class NavTaxonServiceImpl implements INavService {
         String name = tagName.trim();
         checkAbac("kb.tag.create", abac("domain", d, "name", name));
         try {
+            String actor = KbActorSupport.currentActor();
             jdbc.update(
                     "INSERT INTO ecos_knowledge.kb_nav_tag (id, domain, tag_name, create_by, update_by) "
-                            + "VALUES (gen_random_uuid()::text, ?, ?, 'current-user', 'current-user')",
-                    d, name);
+                            + "VALUES (gen_random_uuid()::text, ?, ?, ?, ?)",
+                    d, name, actor, actor);
         } catch (DuplicateKeyException e) {
             log.warn("kb-nav createTag 唯一约束命中: domain={} name={}", d, name, e);
             throw new ValidationException("tagName", "同名标签已存在: " + name);
@@ -386,8 +392,8 @@ public class NavTaxonServiceImpl implements INavService {
         }
         checkAbac("kb.tag.delete", abac("id", tagId, "domain", str(row.get("domain"))));
         int affected = jdbc.update(
-                "UPDATE ecos_knowledge.kb_nav_tag SET is_deleted = 1, update_time = NOW(), update_by = 'current-user' WHERE id = ? AND is_deleted = 0",
-                tagId);
+                "UPDATE ecos_knowledge.kb_nav_tag SET is_deleted = 1, update_time = NOW(), update_by = ? WHERE id = ? AND is_deleted = 0",
+                KbActorSupport.currentActor(), tagId);
         securityClient.audit("kb.tag.delete", Map.of("id", tagId, "affected", affected));
     }
 
@@ -399,17 +405,18 @@ public class NavTaxonServiceImpl implements INavService {
         checkArticleExists(articleId);
         Set<String> normalized = normalizeCategoryIds(categoryIds);
         checkAbac("kb.article.categories.set", abac("articleId", articleId, "count", normalized.size()));
+        String actor = KbActorSupport.currentActor();
         // 全删再做 UNION（insert 不带限定，避免重复）
         int removed = jdbc.update(
-                "UPDATE ecos_knowledge.kb_nav_article_rel SET is_deleted = 1, update_time = NOW(), update_by = 'current-user' "
+                "UPDATE ecos_knowledge.kb_nav_article_rel SET is_deleted = 1, update_time = NOW(), update_by = ? "
                         + "WHERE article_id = ? AND scope = 'category' AND is_deleted = 0",
-                articleId);
+                actor, articleId);
         int added = 0;
         for (String cid : normalized) {
             added += jdbc.update(
                     "INSERT INTO ecos_knowledge.kb_nav_article_rel (article_id, node_id, scope, create_by, update_by) "
-                            + "VALUES (?, ?, 'category', 'current-user', 'current-user')",
-                    articleId, cid);
+                            + "VALUES (?, ?, 'category', ?, ?)",
+                    articleId, cid, actor, actor);
         }
         securityClient.audit("kb.article.categories.set",
                 Map.of("articleId", articleId, "removed", removed, "added", added));
@@ -421,16 +428,17 @@ public class NavTaxonServiceImpl implements INavService {
         checkArticleExists(articleId);
         Set<String> tagIds = normalizeTagIds(tagNames, normalizeDomain(null));
         checkAbac("kb.article.tags.set", abac("articleId", articleId, "count", tagIds.size()));
+        String actor = KbActorSupport.currentActor();
         int removed = jdbc.update(
-                "UPDATE ecos_knowledge.kb_nav_article_rel SET is_deleted = 1, update_time = NOW(), update_by = 'current-user' "
+                "UPDATE ecos_knowledge.kb_nav_article_rel SET is_deleted = 1, update_time = NOW(), update_by = ? "
                         + "WHERE article_id = ? AND scope = 'tag' AND is_deleted = 0",
-                articleId);
+                actor, articleId);
         int added = 0;
         for (String tid : tagIds) {
             added += jdbc.update(
                     "INSERT INTO ecos_knowledge.kb_nav_article_rel (article_id, node_id, scope, create_by, update_by) "
-                            + "VALUES (?, ?, 'tag', 'current-user', 'current-user')",
-                    articleId, tid);
+                            + "VALUES (?, ?, 'tag', ?, ?)",
+                    articleId, tid, actor, actor);
         }
         securityClient.audit("kb.article.tags.set",
                 Map.of("articleId", articleId, "removed", removed, "added", added));
@@ -445,14 +453,15 @@ public class NavTaxonServiceImpl implements INavService {
             return;
         }
         checkAbac("kb.article.categories.add", abac("articleId", articleId, "count", normalized.size()));
+        String actor = KbActorSupport.currentActor();
         int added = 0;
         for (String cid : normalized) {
             added += jdbc.update(
                     "INSERT INTO ecos_knowledge.kb_nav_article_rel (article_id, node_id, scope, create_by, update_by) "
-                            + "SELECT ?, ?, 'category', 'current-user', 'current-user' "
+                            + "SELECT ?, ?, 'category', ?, ? "
                             + "WHERE NOT EXISTS (SELECT 1 FROM ecos_knowledge.kb_nav_article_rel r2 "
                             + "  WHERE r2.article_id = ? AND r2.node_id = ? AND r2.scope = 'category' AND r2.is_deleted = 0)",
-                    articleId, cid, articleId, cid);
+                    articleId, cid, actor, actor, articleId, cid);
         }
         securityClient.audit("kb.article.categories.add", Map.of("articleId", articleId, "added", added));
     }
@@ -466,14 +475,15 @@ public class NavTaxonServiceImpl implements INavService {
             return;
         }
         checkAbac("kb.article.tags.add", abac("articleId", articleId, "count", tagIds.size()));
+        String actor = KbActorSupport.currentActor();
         int added = 0;
         for (String tid : tagIds) {
             added += jdbc.update(
                     "INSERT INTO ecos_knowledge.kb_nav_article_rel (article_id, node_id, scope, create_by, update_by) "
-                            + "SELECT ?, ?, 'tag', 'current-user', 'current-user' "
+                            + "SELECT ?, ?, 'tag', ?, ? "
                             + "WHERE NOT EXISTS (SELECT 1 FROM ecos_knowledge.kb_nav_article_rel r2 "
                             + "  WHERE r2.article_id = ? AND r2.node_id = ? AND r2.scope = 'tag' AND r2.is_deleted = 0)",
-                    articleId, tid, articleId, tid);
+                    articleId, tid, actor, actor, articleId, tid);
         }
         securityClient.audit("kb.article.tags.add", Map.of("articleId", articleId, "added", added));
     }
@@ -488,14 +498,15 @@ public class NavTaxonServiceImpl implements INavService {
             return;
         }
         checkAbac("kb.article.categories.remove", abac("articleId", articleId, "count", categoryIds.size()));
+        String actor = KbActorSupport.currentActor();
         for (String cid : categoryIds) {
             if (cid == null || cid.isBlank()) {
                 continue;
             }
             jdbc.update(
-                    "UPDATE ecos_knowledge.kb_nav_article_rel SET is_deleted = 1, update_time = NOW(), update_by = 'current-user' "
+                    "UPDATE ecos_knowledge.kb_nav_article_rel SET is_deleted = 1, update_time = NOW(), update_by = ? "
                             + "WHERE article_id = ? AND node_id = ? AND scope = 'category' AND is_deleted = 0",
-                    articleId, cid);
+                    actor, articleId, cid);
         }
         securityClient.audit("kb.article.categories.remove", Map.of("articleId", articleId, "count", categoryIds.size()));
     }
@@ -510,16 +521,17 @@ public class NavTaxonServiceImpl implements INavService {
             return;
         }
         checkAbac("kb.article.tags.remove", abac("articleId", articleId, "count", tagNames.size()));
+        String actor = KbActorSupport.currentActor();
         for (String name : tagNames) {
             if (name == null || name.isBlank()) {
                 continue;
             }
             jdbc.update(
-                    "UPDATE ecos_knowledge.kb_nav_article_rel r SET is_deleted = 1, update_time = NOW(), update_by = 'current-user' "
+                    "UPDATE ecos_knowledge.kb_nav_article_rel r SET is_deleted = 1, update_time = NOW(), update_by = ? "
                             + "FROM ecos_knowledge.kb_nav_tag t "
                             + "WHERE r.node_id = t.id AND t.tag_name = ? AND t.is_deleted = 0 "
                             + "AND r.article_id = ? AND r.scope = 'tag' AND r.is_deleted = 0",
-                    name.trim(), articleId);
+                    actor, name.trim(), articleId);
         }
         securityClient.audit("kb.article.tags.remove", Map.of("articleId", articleId, "count", tagNames.size()));
     }
@@ -536,9 +548,9 @@ public class NavTaxonServiceImpl implements INavService {
         checkArticleExists(articleId);
         checkAbac("kb.article.undo." + scope, abac("articleId", articleId, "scope", scope));
         int affected = jdbc.update(
-                "UPDATE ecos_knowledge.kb_nav_article_rel SET is_deleted = 1, update_time = NOW(), update_by = 'current-user' "
+                "UPDATE ecos_knowledge.kb_nav_article_rel SET is_deleted = 1, update_time = NOW(), update_by = ? "
                         + "WHERE article_id = ? AND scope = ? AND is_deleted = 0",
-                articleId, scope);
+                KbActorSupport.currentActor(), articleId, scope);
         securityClient.audit("kb.article.undo." + scope, Map.of("articleId", articleId, "affected", affected));
     }
 

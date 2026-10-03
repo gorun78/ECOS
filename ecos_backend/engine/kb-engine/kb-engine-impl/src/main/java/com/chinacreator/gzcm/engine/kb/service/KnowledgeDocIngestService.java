@@ -103,7 +103,7 @@ public class KnowledgeDocIngestService {
                                      KnowledgeVectorWriteService vectorWriteService,
                                      MinioStorageService minioStorageService,
                                      RestTemplate restTemplate,
-                                     @Value("${ecos.datanet.base-url:http://localhost:18082}") String datanetBaseUrl,
+                                     @Value("${ecos.datanet.base-url:http://localhost:8080}") String datanetBaseUrl,
                                      @Value("${ecos.kb.doc.chunk-size:512}") int defaultChunkSize,
                                      @Value("${ecos.kb.doc.chunk-overlap:64}") int defaultChunkOverlap) {
         this.kbDocMapper = kbDocMapper;

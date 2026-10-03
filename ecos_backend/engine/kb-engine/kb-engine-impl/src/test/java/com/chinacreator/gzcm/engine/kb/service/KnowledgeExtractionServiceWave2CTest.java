@@ -39,8 +39,15 @@ class KnowledgeExtractionServiceWave2CTest {
         mockDocParser = new DocumentParseService(new MinerUHttpParser());
         mockEntityLinker = org.mockito.Mockito.mock(EntityLinkerService.class);
 
+        // F04-13/14/15 收口后 constructor 追加 restTemplate + taskServiceProvider + auditPublisher；
+        // 契约测试（approve/reject）不涉及这三者，用 mock 或 null 占位。
+        org.springframework.web.client.RestTemplate restTemplate =
+                org.mockito.Mockito.mock(org.springframework.web.client.RestTemplate.class);
+        com.chinacreator.gzcm.engine.kb.shared.KbAuditPublisher auditPublisher =
+                org.mockito.Mockito.mock(com.chinacreator.gzcm.engine.kb.shared.KbAuditPublisher.class);
         service = new KnowledgeExtractionService(
-            mockJdbc, mockRuleMapper, mockKgWriter, mockDocParser, mockEntityLinker);
+            mockJdbc, mockRuleMapper, mockKgWriter, mockDocParser, mockEntityLinker,
+            restTemplate, null, auditPublisher);
     }
 
     // ── UT-6: reject 带 reason → 数据库写入 rejected_reason ──

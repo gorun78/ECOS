@@ -1,9 +1,11 @@
 package com.chinacreator.gzcm.engine.kb.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.kb.KnowledgeSettingsService;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractCandidateVO;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractFileVO;
+import com.chinacreator.gzcm.engine.kb.dto.ExtractUploadGateVO;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractionApproveResultVO;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteRequest;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteResultVO;
@@ -33,6 +35,12 @@ public class ExtractionController {
     /** 临时文件上传开关配置键（引擎配置 → 知识抽取）。 */
     private static final String KEY_ALLOW_DIRECT_UPLOAD = "extract.allow_direct_upload";
 
+    /** 未开启时的提示语。 */
+    private static final String HINT_DISABLED = "临时文件上传未开启：请在 引擎配置 → 知识抽取 中启用 allow_direct_upload";
+
+    /** 已开启时的提示语。 */
+    private static final String HINT_ENABLED = "临时文件上传已开启";
+
     private final KnowledgeExtractionService extractionService;
 
     private final KnowledgeSettingsService settingsService;
@@ -44,12 +52,39 @@ public class ExtractionController {
     }
 
     /**
+     * E2 / F04-02 K-11 — 临时文件上传门控查询：前端据此决定上传入口可用性。
+     *
+     * <p>本控制器类级前缀即 {@code /api/v1/knowledge/extract}，方法级一律相对路径，
+     * 最终落地为规范路径 {@code /api/v1/knowledge/extract/upload-enabled}
+     * （从 {@code KnowledgeSettingsController} 迁出，消除类级前缀 + 方法级全路径拼接的永不可达畸形）。
+     * 只读配置开关，业务数据端点默认 DENY，不写 permitAll。</p>
+     */
+    @GetMapping("/upload-enabled")
+    public ApiResponse<ExtractUploadGateVO> uploadEnabled() {
+        boolean allowed = parseBoolTrue(settingsService.getSetting(KEY_ALLOW_DIRECT_UPLOAD));
+        ExtractUploadGateVO vo = new ExtractUploadGateVO();
+        vo.setAllowed(allowed);
+        vo.setHint(allowed ? HINT_ENABLED : HINT_DISABLED);
+        return ApiResponse.success(vo);
+    }
+
+    /** 布尔配置解析：含 "true"（忽略大小写）或 "1" 视为 true，其余 false。 */
+    private static boolean parseBoolTrue(String raw) {
+        if (raw == null) {
+            return false;
+        }
+        String value = raw.trim();
+        return "true".equalsIgnoreCase(value) || "1".equals(value);
+    }
+
+    /**
      * 上传文档，启动抽取管道。
      *
      * <p>K1 gate：开关 {@code extract.allow_direct_upload} 关闭时直接 400 拒绝，
      * 非结构化快路径默认走 DW 层登记通道，不走临时文件直传。</p>
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequirePermission(permission = "knowledge:extract:write")
     public ApiResponse<Map<String, Object>> upload(@RequestParam("file") MultipartFile file) {
         boolean allowed = "true".equalsIgnoreCase(settingsService.getSetting(KEY_ALLOW_DIRECT_UPLOAD));
         if (!allowed) {
@@ -131,6 +166,7 @@ public class ExtractionController {
      * 审核通过后候选写入 graph_node/graph_edge（复用 build 台账，不重复实现写入逻辑）。
      */
     @PostMapping("/candidates/{fileId}/approve")
+    @RequirePermission(permission = "knowledge:extract:approve")
     public ApiResponse<ExtractionApproveResultVO> approveCandidates(@PathVariable String fileId) {
         try {
             return ApiResponse.success(toApproveResult(extractionService.approve(fileId)));
@@ -171,6 +207,7 @@ public class ExtractionController {
      * Wave-2C: 返回结构化 ApprovalOutcome { status, counts, rejectedReasons }
      */
     @PostMapping("/{id}/approve")
+    @RequirePermission(permission = "knowledge:extract:approve")
     public ApiResponse<Map<String, Object>> approve(@PathVariable String id) {
         try {
             Map<String, Object> result = extractionService.approve(id);
@@ -188,6 +225,7 @@ public class ExtractionController {
      * 请求体: { reason: "..." }, 可选。
      */
     @PostMapping("/{id}/reject")
+    @RequirePermission(permission = "knowledge:extract:approve")
     public ApiResponse<Map<String, Object>> reject(@PathVariable String id,
                                                     @RequestBody(required = false) Map<String, String> body) {
         try {
@@ -208,6 +246,7 @@ public class ExtractionController {
      * <p>单实体失败不中止整批，失败明细见返回体 {@code failures}。</p>
      */
     @PostMapping("/promote-to-candidate")
+    @RequirePermission(permission = "knowledge:extract:write")
     public ApiResponse<ExtractionPromoteResultVO> promoteToCandidate(@RequestBody ExtractionPromoteRequest request) {
         try {
             return ApiResponse.success(extractionService.promoteToCandidate(request));

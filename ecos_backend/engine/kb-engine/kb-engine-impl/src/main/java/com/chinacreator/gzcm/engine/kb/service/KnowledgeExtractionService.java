@@ -6,10 +6,15 @@ import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteRequest;
 import com.chinacreator.gzcm.engine.kb.dto.ExtractionPromoteResultVO;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.kb.repository.ComplianceRuleMapper;
+import com.chinacreator.gzcm.engine.kb.shared.KbActorSupport;
+import com.chinacreator.gzcm.engine.kb.shared.KbAuditPublisher;
+import com.chinacreator.gzcm.engine.kb.shared.KbErrorCode;
 import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedEntity;
 import com.chinacreator.gzcm.engine.ontology.model.ExtractedSubGraph.ExtractedRelation;
 import com.chinacreator.gzcm.runtime.access.document.DocumentParseResult;
 import com.chinacreator.gzcm.runtime.access.document.DocumentParseService;
+import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
+import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -86,18 +91,30 @@ public class KnowledgeExtractionService {
     /** 文档解析公共能力（runtime-access，B6-2 上移；kb 复用不再自建） */
     private final DocumentParseService documentParserService;
     private final EntityLinkerService entityLinkerService;
+    /** F04-14 收口：上传后解析+抽取走 runtime-task（K-38/K-39），禁自建 Executors */
+    private final ITaskManagementService taskManagementService;
+    /** F04-15 收口：审计走 runtime-event EventBusService（本地 JDBC 兜底），禁 CompletableFuture/反射 KafkaTemplate */
+    private final KbAuditPublisher auditPublisher;
+
+    public static final String TASK_TYPE_EXTRACT_PARSE = "KB_EXTRACT_PARSE";
 
     public KnowledgeExtractionService(JdbcTemplate jdbc,
                                       ComplianceRuleMapper ruleMapper,
                                       KGWriterService kgWriter,
                                       DocumentParseService documentParserService,
-                                      EntityLinkerService entityLinkerService) {
+                                      EntityLinkerService entityLinkerService,
+                                      RestTemplate restTemplate,
+                                      org.springframework.beans.factory.ObjectProvider<ITaskManagementService> taskServiceProvider,
+                                      KbAuditPublisher auditPublisher) {
         this.jdbc = jdbc;
         this.ruleMapper = ruleMapper;
         this.kgWriter = kgWriter;
         this.documentParserService = documentParserService;
         this.entityLinkerService = entityLinkerService;
-        this.restTemplate = new RestTemplate();
+        // F04-13 / K-35：RestTemplate 一律经容器注入（KbEngineRestConfig bean），禁裸 new RestTemplate()
+        this.restTemplate = restTemplate;
+        this.taskManagementService = taskServiceProvider == null ? null : taskServiceProvider.getIfAvailable();
+        this.auditPublisher = auditPublisher;
     }
 
     @PostConstruct
@@ -124,14 +141,65 @@ public class KnowledgeExtractionService {
             id, file.getOriginalFilename(), target.toString()
         );
 
-        // 异步启动解析
-        Executors.newSingleThreadExecutor().submit(() -> parseAndExtract(id, target));
-
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("extractionId", id);
         result.put("status", "UPLOADED");
         result.put("fileName", file.getOriginalFilename());
+        // F04-14 / K-38：解析+抽取委托 runtime-task（KB_EXTRACT_PARSE），禁自建 Executors/newSingleThreadExecutor。
+        String taskId = submitParseTask(id);
+        if (taskId != null) {
+            result.put("taskId", taskId);
+        }
         return result;
+    }
+
+    /**
+     * F04-14 收口：将"解析+抽取"提交为 runtime-task（{@link #TASK_TYPE_EXTRACT_PARSE}）。
+     * <ul>
+     *   <li>taskService 可用 → submitTask，返回 taskId（任务中心可反查 progress，K-38）；</li>
+     *   <li>taskService 不可用 → 同步兜底执行（不阻塞启动/契约测试），返回 null；
+     *       生产环境 runtime-task 应始终可用，兜底仅为健壮性。</li>
+     * </ul>
+     */
+    private String submitParseTask(String id) {
+        if (taskManagementService == null) {
+            log.warn("runtime-task 不可用 — 同步兜底执行解析+抽取（生产环境应经任务中心，K-38）");
+            parseAndExtract(id, Paths.get(resolveFilePath(id)));
+            return null;
+        }
+        TaskDescription td = new TaskDescription();
+        td.setTaskName("kb-extract-parse");
+        td.setTaskType(TASK_TYPE_EXTRACT_PARSE);
+        td.setDescription("知识抽取文档解析+LLM抽取（F04-14 收口 runtime-task）");
+        td.setCreatedBy(KbActorSupport.currentActor());
+        td.setPriority(0);
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("extractionId", id);
+        td.setParameters(params);
+        td.setAsync(Boolean.FALSE);
+        try {
+            return taskManagementService.submitTask(td);
+        } catch (ITaskManagementService.TaskManagementException e) {
+            log.warn("submitTask(KB_EXTRACT_PARSE) 失败: id={} err={}", id, e.getMessage());
+            throw KbErrorCode.ex(KbErrorCode.KB_021, "runtime-task 提交失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 按 id 重新执行解析+抽取（供 {@code KbExtractParseTaskExecutor} 复用；K-38 收口后的执行入口）。
+     * <p>文件路径从 {@code extraction_drafts.file_path} 读取（跨线程/进程安全，不依赖闭包 Path）。
+     */
+    public void parseById(String id) {
+        parseAndExtract(id, Paths.get(resolveFilePath(id)));
+    }
+
+    private String resolveFilePath(String id) {
+        try {
+            return jdbc.queryForObject(
+                    "SELECT file_path FROM extraction_drafts WHERE id = ?", String.class, id);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ── 解析 + 抽取 ──────────────────────────────────
@@ -222,50 +290,47 @@ public class KnowledgeExtractionService {
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
 
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<String> future = executor.submit(() ->
-            restTemplate.postForObject(AGENT_LOOP_URL, request, String.class));
-
+        // F04-14 / K-39：不再自建 Executors.newSingleThreadExecutor 包裹 future 超时——
+        // 超时应是传输层属性，统一由 KbEngineRestConfig 的 RestTemplate read-timeout 承担。
+        String response;
         try {
-            String response = future.get(LLM_TIMEOUT_SEC, TimeUnit.SECONDS);
-            if (response == null || response.isEmpty()) return Collections.emptyMap();
+            response = restTemplate.postForObject(AGENT_LOOP_URL, request, String.class);
+        } catch (Exception e) {
+            // 传输层超时（read-timeout）/ 网络失败统一上抛，由 parseAndExtract 的 retry 循环处理
+            throw new RuntimeException("LLM抽取调用失败: " + e.getMessage(), e);
+        }
+        if (response == null || response.isEmpty()) return Collections.emptyMap();
 
-            Map<String, Object> apiResp = mapper.readValue(response, new TypeReference<Map<String, Object>>() {});
-            Boolean topSuccess = (Boolean) apiResp.get("success");
-            if (topSuccess != null && !topSuccess) {
-                String msg = (String) apiResp.getOrDefault("message", "Agent调用失败");
-                throw new RuntimeException("Agent调用失败: " + msg);
+        Map<String, Object> apiResp = mapper.readValue(response, new TypeReference<Map<String, Object>>() {});
+        Boolean topSuccess = (Boolean) apiResp.get("success");
+        if (topSuccess != null && !topSuccess) {
+            String msg = (String) apiResp.getOrDefault("message", "Agent调用失败");
+            throw new RuntimeException("Agent调用失败: " + msg);
+        }
+        Object data = apiResp.get("data");
+        if (data instanceof Map) {
+            Map<?, ?> dataMap = (Map<?, ?>) data;
+            Boolean dataSuccess = (Boolean) dataMap.get("success");
+            if (dataSuccess != null && !dataSuccess) {
+                Object errObj = dataMap.get("errorMsg");
+                throw new RuntimeException("Agent推理失败: " + (errObj != null ? errObj : "未知"));
             }
-            Object data = apiResp.get("data");
-            if (data instanceof Map) {
-                Map<?, ?> dataMap = (Map<?, ?>) data;
-                Boolean dataSuccess = (Boolean) dataMap.get("success");
-                if (dataSuccess != null && !dataSuccess) {
-                    Object errObj = dataMap.get("errorMsg");
-                    throw new RuntimeException("Agent推理失败: " + (errObj != null ? errObj : "未知"));
-                }
-                Object content = dataMap.get("content");
-                if (content != null) {
-                    try {
-                        return mapper.readValue(content.toString(), new TypeReference<Map<String, Object>>() {});
-                    } catch (Exception e) {
-                        String jsonStr = content.toString();
-                        int start = jsonStr.indexOf('{');
-                        int end = jsonStr.lastIndexOf('}');
-                        if (start >= 0 && end > start) {
-                            return mapper.readValue(jsonStr.substring(start, end + 1),
-                                    new TypeReference<Map<String, Object>>() {});
-                        }
+            Object content = dataMap.get("content");
+            if (content != null) {
+                try {
+                    return mapper.readValue(content.toString(), new TypeReference<Map<String, Object>>() {});
+                } catch (Exception e) {
+                    String jsonStr = content.toString();
+                    int start = jsonStr.indexOf('{');
+                    int end = jsonStr.lastIndexOf('}');
+                    if (start >= 0 && end > start) {
+                        return mapper.readValue(jsonStr.substring(start, end + 1),
+                                new TypeReference<Map<String, Object>>() {});
                     }
                 }
             }
-            return Collections.emptyMap();
-        } catch (TimeoutException e) {
-            future.cancel(true);
-            throw new RuntimeException("LLM抽取超时(" + LLM_TIMEOUT_SEC + "s)");
-        } finally {
-            executor.shutdownNow();
         }
+        return Collections.emptyMap();
     }
 
     // ── 审核闭环 (Wave-2C PMO-24 补全) ───────────────
@@ -411,7 +476,7 @@ public class KnowledgeExtractionService {
         jdbc.update("UPDATE extraction_drafts SET status = 'APPROVED', updated_at = NOW() WHERE id = ?", id);
 
         // 5. 审计日志 (异步，不阻塞主流程)
-        auditAsync(id, "APPROVED", rulesWritten, entitiesWritten, linksWritten);
+        auditExtractionWrite(id, "APPROVED", rulesWritten, entitiesWritten, linksWritten);
 
         // 构建 ApprovalOutcome
         Map<String, Object> counts = new LinkedHashMap<>();
@@ -719,24 +784,19 @@ public class KnowledgeExtractionService {
         log.error("抽取失败 id={}: {}", id, errorMsg);
     }
 
-    /** 异步审计日志 (05 文档 §六: 不阻塞主流程) */
-    private void auditAsync(String extractionId, String action, int rules, int entities, int links) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                Map<String, Object> audit = new LinkedHashMap<>();
-                audit.put("entityType", "extraction");
-                audit.put("sourceType", "KB");
-                audit.put("activity", action);
-                audit.put("entityId", extractionId);
-                audit.put("rules", rules);
-                audit.put("entities", entities);
-                audit.put("links", links);
-                audit.put("timestamp", LocalDateTime.now().format(DT_FMT));
-                // 实际场景: POST /api/v1/security/audit/log
-                log.info("[AUDIT] extraction {}.{}: rules={} entities={} links={}", action, extractionId, rules, entities, links);
-            } catch (Exception e) {
-                log.warn("审计日志写入失败(不影响主流程): {}", e.getMessage());
-            }
-        });
+    /**
+     * 抽取写路径审计（F04-15 收口）— 经 {@link KbAuditPublisher} 优先走 EventBusService
+     * （Kafka / 内存 fallback），兜底本地 JDBC {@code kb_extract_audit}，双通路全失败即拒绝
+     * 操作（默认 DENY，纠正 K-44/K-45 "warn-后-继续"静默丢审计）。
+     *
+     * <p>同步执行（K-38 反例：既不用 {@code CompletableFuture.runAsync}，也不自建线程池），
+     * 让"审计失败 = 审批失败"成为可观测信号。
+     */
+    private void auditExtractionWrite(String extractionId, String action, int rules, int entities, int links) {
+        Map<String, Object> extra = new LinkedHashMap<>();
+        extra.put("rulesWritten", rules);
+        extra.put("entitiesWritten", entities);
+        extra.put("linksWritten", links);
+        auditPublisher.emit(action, "extraction", extractionId, extra);
     }
 }

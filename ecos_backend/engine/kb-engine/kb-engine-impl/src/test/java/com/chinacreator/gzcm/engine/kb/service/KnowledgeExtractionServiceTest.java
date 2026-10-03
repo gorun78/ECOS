@@ -55,7 +55,13 @@ class KnowledgeExtractionServiceTest {
     void setUp() {
         DocumentParseService parser =
                 new DocumentParseService(new MinerUHttpParser());
-        service = new KnowledgeExtractionService(jdbc, ruleMapper, kgWriter, parser, entityLinker);
+        // F04-13/14/15 收口后 constructor 追加 restTemplate + taskServiceProvider + auditPublisher
+        org.springframework.web.client.RestTemplate restTemplate =
+                mock(org.springframework.web.client.RestTemplate.class);
+        com.chinacreator.gzcm.engine.kb.shared.KbAuditPublisher auditPublisher =
+                mock(com.chinacreator.gzcm.engine.kb.shared.KbAuditPublisher.class);
+        service = new KnowledgeExtractionService(jdbc, ruleMapper, kgWriter, parser, entityLinker,
+                restTemplate, null, auditPublisher);
     }
 
     // ── approve 主流程 ──

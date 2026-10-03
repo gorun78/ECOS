@@ -44,7 +44,10 @@ spring:
 
 # MyBatis
 mybatis:
-  # kb 引擎 mapper 全部位于 classpath*:mapper/*.xml (kb-impl 已用 src/main/resources 打包)
+  # 【2026-09-30 校订 P-8】kb 引擎 mapper 全是注解制（kb-engine-impl 无 XML，0 命中），
+  # 但本 glob 跨 dccheng 全 classpath 生效，仍须保留以加载 runtime/llm-gateway 的 3 个 XML mapper
+  # (AgentCallLogRepository/LlmUsageMapper/ProfileConfigRepository)。删除本行会致 llm-gateway
+  # 表映射失效，故只订正注释、不删配置（原"kb XML 已打包"陈述失真）。
   mapper-locations: classpath*:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
@@ -75,6 +78,11 @@ ecos:
   rag:
     # B4: 须与 V137 的 embedding_vec 列维度一致，不一致时写入侧跳过并 log.warn
     embedding-model: ${ECOS_RAG_EMB_MODEL:text-embedding-3-small}
+    # 【2026-09-30 校订 P-9】空默认 = 显式降级路径（禁空串静默未落在代码层）：
+    # KnowledgeRetrievalServiceImpl / KnowledgeVectorWriteService / KnowledgeEvalService 均
+    # 以 @Value("${ecos.rag.llm-gateway-base:}") 消费，值空时 LLM/向量写路径显式跳过并 log.warn，
+    # UI 侧应显示 vectorDegraded=true（见 F04-11 双形态降级 §湖规 v2.0 "降级须显式标记"约定）。
+    # 生产环境须注入 ECOS_RAG_LLM_BASE 启用完整 RAG；dev 档允许空默认（RAG 端点仍可用，仅 LLM 生成降级）。
     llm-gateway-base: ${ECOS_RAG_LLM_BASE:}
     embedding-dimension: ${ECOS_RAG_EMB_DIM:1536}
   # 本体版本发布消费者: 微服务内网直连 buszhi 18083 (ADR-7 内网可达)

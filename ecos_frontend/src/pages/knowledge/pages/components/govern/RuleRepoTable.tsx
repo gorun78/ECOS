@@ -17,13 +17,14 @@ import {
 import { apiFetchData } from '../../../../../api';
 import { useLanguage } from '../../../../../components/LanguageContext';
 import { useTheme } from '../../../../../components/ThemeContext';
+import { RuleStatus } from '../../../typesAndConstants';
 
-/** 与 typesAndConstants.RuleRepository 对齐（字段子集） */
+/** 与 typesAndConstants.RuleRepository 对齐（字段子集）。status 复用 RuleStatus 单源（P-11）。 */
 interface RuleItem {
   id: string;
   name: string;
   domain: string;
-  status: 'DRAFT' | 'IN_REVIEW' | 'ACTIVE' | 'DEPRECATED';
+  status: RuleStatus;
   version: number;
   updatedAt?: string;
 }
