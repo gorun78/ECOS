@@ -737,4 +737,4 @@ CREATE INDEX IF NOT EXISTS idx_dsa_asset ON {control}.dq_score_asset(asset_type,
 
 **本册与 01 册的接缝**：`GET /api/v1/datanet/facts/**`、`/datalake/objects`、行采样、导出下载四处**必须**调用 01 册 `SecurityDecisionService#decide`，禁止在本域拼 RLS 字符串（承接 W31 的旁路禁令）；`staff_ref_hash` 脱敏属存储侧，`hourly_rate`/`amount` 列裁剪与掩码属 01 册管道侧。
 
-<!-- 详细设计-02-数据域 / 2026-09-28 / v1.1（2026-09-29 定版） / W41~W66 → C30~C50 / R-1 a、R-1b ②、R-2 a、R-3 ②+禁静默 已批准（报告 §十四.1） / Gate-1 已签字、Gate-2 已通过 / 本轮未实跑库、未改业务代码 -->
+<!-- 详细设计-02-数据域 / 2026-09-28 / v1.1（2026-09-29 定版） / W41~W66 → C30~C50 / R-1 a、R-1b ②、R-2 a、R-3 ②+禁静默 已批准（报告 §十四.1） / Gate-1 已签字、Gate-2 已通过 / 【校订 2026-10-03】 本轮补齐 4 项离线可验验收测试（W46 NoFourOhFourMaskingTest P0 / F02-06-4 PublishedRowImmutableTest P0 / F02-06-5 ClosedPeriodWriteDeniedTest P0 / F02-01 §2 CredentialPresentReadPathTest P0）+ DataSourceEntity 新增派生 getter isCredentialPresent()（API 只增不改）；仍**未实跑库**（存量 SQL / 迁移脚本未做库侧断言） / 全 mvn -o test 4 模块 3 类共 8 例全通过 -->

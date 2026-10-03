@@ -206,6 +206,17 @@ public class DataSourceEntity {
         this.passwordEncrypted = passwordEncrypted;
     }
 
+    /**
+     * F02-01 §2（详细设计-02）：读路径<b>永不回显密码</b>，对外的显式状态位是
+     * {@code credentialPresent: true|false}——前端凭此渲染"已配置 / 未配置密码"两态
+     * （B.1 ConnectionsTab 规格），而不是显示密文。
+     * <p>派生 getter（无 setter）：由 {@code passwordEncrypted} 内容派生，
+     * null/空 = 未配置；非空密文 = 已配置。API 只增不改（增量字段 Jackson 自动序列化）。</p>
+     */
+    public boolean isCredentialPresent() {
+        return passwordEncrypted != null && !passwordEncrypted.isBlank();
+    }
+
     public static class DataSourceType {
         public static final String DATABASE = "DATABASE";
         public static final String FILE = "FILE";
