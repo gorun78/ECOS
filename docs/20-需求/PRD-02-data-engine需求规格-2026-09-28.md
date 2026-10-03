@@ -133,6 +133,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_fis_run ON ecos_forecast_input_snapshot(f
 2. `fact_type=ACTUAL` 且期间已关账（PRD-09 FC-05 period lock）→ 拒绝写入/修改；
 3. `realization_rate` 与 `amount` 至少一项非空；两者同时存在时以 `amount` 为准，rate 仅作参考（消费方规则，写入不拦截）；
 4. 敏感列（staff_ref、hourly_rate、amount）按 ST03 加密评估：首期 staff_ref 脱敏存储（工号哈希），金额列走 CLS/RLS 控制而非列加密（经营分析需要聚合计算，加密列无法 SUM——**裁定：金额不列加密，以 RLS+CLS+mask 组合防护**，登记为 ST03 例外并附理由）。
+   > **【回写 2026-10-03 §7.2-2】**（源自 `详细设计-02` §7.1*D.2 / 设计行 139，R9 只追加）：本条"金额不列加密"单方例外表述**作废**为无条件放行——按《数据库访问规范》v1.2 L182，**任何金额列不列加密须先在 `docs/40-实现/列级加密豁免登记表-2026-09-28.md` 逐列登记 ST03-A 例外（列名 + 载体表 + 不加密理由 + 组合防护），未登记 = 视同 ST03 违规，启动校验 FAIL**。本 PRD 事实五表涉密金额列（`ecos_biz_stage_fact.amount`/`contract_base`、`ecos_biz_cost_fact.amount`、`ecos_biz_resource_fact.hourly_rate`）的逐列登记由 `AmountExemptionRegisteredTest` 护栏校验（护栏已绿），登记内容以该登记表为准。
 
 ### 1.4 API（datanet 新增，只增不改）
 
@@ -145,6 +146,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_fis_run ON ecos_forecast_input_snapshot(f
 | `/api/v1/datanet/facts/action-outcomes` | POST | W→D 反馈链写入（PRD-01 §2.2） |
 
 全部端点过三滤波器；写操作发 Kafka `ecos.audit`。
+> **【回写 2026-10-03 §7.2-5】**（源自 `详细设计-02` C.2.1，R9 只追加）：`/api/v1/datanet/facts/**` 需登记进 `route-manifest.json`（gateway/BFF/vite/tests 同源消费），并声明其归属 `/api/v1/datanet/**` 收敛前缀之间的关系（与既有 5 套前缀的关系见设计-02 C.2.1 前缀收敛表；本 PRD facts 前缀属 `/api/v1/datanet` 主承流线，不走 `/api/v1/data` 或 legacy `/api/datanet` 线）。
 
 ### 1.5 验收标准
 
@@ -152,6 +154,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_fis_run ON ecos_forecast_input_snapshot(f
 2. 坏数据三连拒：重复行（DQ-F01）、attribution_ratio=1.2（DQ-F02）、ALLOCATED 成本无 evidence_ref（DQ-F09）→ rejected 含行号/字段/规则 ID/修复建议；
 3. 已 PUBLISHED 行 UPDATE 业务字段被拒（409）；
 4. tsc/mvn 绿 + 端点 curl 验收表全过。
+> **【回写 2026-10-03 §7.2-6】**（源自 `详细设计-02` §七.1 F02-06 验收，R9 只追加）：本条 §1.5 各行点名的可执行验收标识（禁"人工确认"，对齐设计-02 第二章）：①216 行样例全 PUBLISHED → `FactImportAcceptRejectTest`；②坏数据三连拒（DQ-F01/F02/F09）→ `FactBadDataTripleRejectTest`（rejected 含 rowNo/field/ruleId/suggestion + 一律不入库）；③PUBLISHED 行 UPDATE 拒 409 → `PublishedRowImmutableTest`；④批量 ≤100/EN03 → `FactImportBatchCapTest`（101→拒/100→放行）；⑤活跃唯一（同键第二存活→索引拒，旧行置 NULL 后新行可入）前置 DDL 契约 → `ActiveFlagUniquenessDdlTest`（运行时活库 INSERT 属实跑库授权闸）；⑥金额列 ST03-A 登记 → `AmountExemptionRegisteredTest`。DQ 门禁 11 规则反例 → `DqRuleF01ToF11Test`；禁静默补默认 → `NoSilentDefaultFillArchTest`。
 
 ---
 
@@ -188,6 +191,17 @@ import → 行级校验(DQ-F01~F11) → rejected 直接返回（不入库）
 1. 11 条规则各有 1 正 1 反用例（单测）；
 2. 故意提交三类坏数据全部拦截且 rejected 信息含行号/字段/规则 ID/修复建议；
 3. 预测快照仅能引用 PUBLISHED 行（集成断言）。
+
+---
+
+## 二·补、REQ-DATA-09 DQ 治理单模型收敛与 404 掩蔽禁令（P0，本册新增）
+
+> **【回写 2026-10-03 §7.2-4】**（源自 `详细设计-02` §7.2 项 4 / §1.1 D-5/D-6，R9 只追加，本条为新立需求）：本 PRD 原 §二 REQ-DATA-02 仅覆盖"发布前门禁 11 规则"，**缺"DQ 双模型收敛 + 错误掩蔽"独立需求**，导致 F02-08/DATA-02 治理侧验收不可判定。新立 REQ-DATA-09：
+1. **治理单模型收敛**：DQ 治理以单模型承载（`dq_rule` 定义态 + `dq_rule_check` 运行态），legacy `public.ecos_dq_rule`/`ecos_dq_issue` 读端点保留 ≥2 迭代 + `deprecated=true`，写端点停用（转 410）；
+2. **404 掩蔽禁令**：数据层 SQL/映射异常**不得**被掩蔽为 404，改 `500 + ECOS-DATA-031`（附 traceId）；仅真 `NoHandlerFound/NoResourceFound` 才 404（`ECOS-DQ-111` 治理记录不存在的真实 404 与 031 严格区分）；
+3. **前端禁回落 legacy**：`pages/data-quality/api.ts` 删除"404 回落 legacy"分支，改为显式错误提示（R-3 ②+禁静默：兜底保留至 V166 完成，期间 UI 必须显式标注"旧模型数据"）。
+
+**验收**：`NoFourOhFourMaskingTest`、`WorkOrderListSqlContractTest`、`DqGovernanceEndpointReachabilityTest`、`DqLegacyMigrationParityTest`（详见设计-02 F02-08 验收标识）。
 
 ---
 
@@ -250,6 +264,7 @@ if (!target.startsWith(root)) { throw new ValidationException("illegal archive p
 3. 拒绝时 warn 日志（含 traceId）+ 业务异常，不裸 500。
 
 **验收用例**：`repoRoot=/data/repos`、`datasourceId=../../etc` → 拒绝；正常 UUID → 通过；单测覆盖 symlink 逃逸（toRealPath 可选加固）。
+> **【回写 2026-10-03 §7.2-3】**（源自 `详细设计-02` D-22，R9 只追加）：REQ-DATA-06 状态从"待实现"更正为"—**已实现，残余三处**："。本条路径穿越校验主体**已闭合**：`GitRepoRootResolver` 已具 `requireSafeRoot`（绝对路径 + 禁 `..` + normalize）/ `requireSafeSegment`（禁 `..`/`/`/`\`/`:`）/ `resolveUnderRoot`（逐段校验 + `startsWith(base)`）/ `requireInsideRoot`，`MetadataCollectGitArchive:81` 对 `datasourceId` 已调 `requireSafeSegment`（设计-02 D-22 实测）。**残余**（转 F02-12 加固项，本 PRD 需求语义不变、仅补覆盖）：① repoRoot **存在性校验**（`Files.exists/isDirectory/writable`，加载时）② `toRealPath` **symlink 解析**后再 `startsWith` ③ datanet **`GitController`** 与 pipeline 侧**三处调用方统一复用 resolver**（现仅归档侧已接入）。验收标识见 `详细设计-02` F02-12（`RepoRootSymlinkEscapeTest` / `RepoRootMissingDirectoryTest` / `AllGitCallersUseResolverArchTest`）。
 
 ---
 
@@ -290,5 +305,9 @@ if (!target.startsWith(root)) { throw new ValidationException("illegal archive p
 | DATA-06 | — | — | **PMO-73 G1** |
 | DATA-07 | runtime-access DuckDB | — | PMO-73 G5 |
 | DATA-08 | TRANSFORM_DOC_PARSE 生产可用 | — | PMO-73 G5 |
+| DATA-09（2026-10-03 §7.2-4 新增） | DATA-02 / ADR-15 | 09 册 DQ 门禁验收 | 场景批次 A（P0） |
+
+> **【回写 2026-10-03 §7.2-8】**（源自 `详细设计-02` C.1 / §7.2 项 8，R9 只追加）：本 PRD 涉及 datanet 承流的表述须与 **ADR-15 双口径一致化**——S0 现状 = 37 个 data-engine Controller 全由 gateway :8080 单体宿主（`@ComponentScan engine.data.*`）；S2/S3 目标态 = 路由切流至 datanet :18082 独立承流，但其切流前置（信任链 HeaderAuthInterceptor + 端点差集清零 + 匿名/准入清单登记）未满足前，datanet **不得**独立对外承流（设计-02 C.1 S2/S3 前置门禁 + `DatanetEndpointParityTest` 验收）。本 PRD 所有 `/api/v1/datanet/**` 端点在承流态切换**前后表现一致**（非 404 且响应体结构等价），不随承流切换改变签名（铁律 #9 API 只增不改）。
 
 <!-- PRD-02-data-engine需求规格 / 2026-09-28 / v1.1（2026-09-29 随需求检视报告 §十四 批量批准定版） -->
+<!-- 【回写 2026-10-03】依 `详细设计-02` §7.2「PRD 侧需回写清单」落六项：项2 §1.3-4 金额列 ST03-A 逐列登记（AmountExemptionRegisteredTest 护栏）、项4 新立 §二·补 REQ-DATA-09 DQ 治理单模型收敛 + 404 掩蔽禁令、项5 §1.4 route-manifest 登记声明、项6 §1.5 验收点名可执行 spec 标识、项3 §六 REQ-DATA-06 更正为"已实现 + 残余三处"、项8 datanet 承流 ADR-15 双口径一致化 + §九 DATA-09 追溯行。项1（§1.2 DDL 草案作废，v1.1 已按 G2-1/MC01-MC02 更正 gen_random_uuid×4→应用侧 UUID、JSONB→TEXT）与项7（PRD-07 §3.2 authHeaders，见 PRD-07）不在本文件。R9 只追加、不改既有行。 -->

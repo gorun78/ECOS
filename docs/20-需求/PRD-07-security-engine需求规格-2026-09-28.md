@@ -108,6 +108,7 @@ export function handleAuthExpired(): void;              // 宽限期内 401 只 
 ### 3.2 替换清单（2026-09-28 grep 实证 ≥10 文件）
 
 `pages/data-workbench/api.ts` · `services/taskCenter.ts` · `pages/DataAssetsDashboard.tsx` · `pages/business-workbench/BusinessObjectExplorer.tsx` · `services/aiworkbenchApi.ts` · `pages/MonitoringCenter.tsx` · `pages/GuardrailsView.tsx` · `pages/EngineMonitor.tsx` · `pages/AIPKnowledgeView.tsx` · `pages/data-workbench/pipelineDebugApi.ts`（执行时以最新 grep 为准，逐一删除本地实现改导入）。
+> **【回写 2026-10-03 §7.2-7】**（源自 `详细设计-02` D-24，R9 只追加）：上文 §3.2 "≥10 文件替换清单"**作废**——2026-09-28 复核实测 `grep 'function authHeaders|const authHeaders' ecos_frontend/src` 全仓**仅 `auth.ts` 1 处**真实现（另 2 处为 `.test.ts` stub），token 键位已采用 union 兼容四套历史 key；REQ-SEC-03 **已闭合**，无本地多实现待删。REQ-SEC-03 验收相应改为"**保持单源** + 三用例单测（合法/过期/畸形 token，见 §3.3 项 3），不引入回归"，以 `grep = 1 处` 为红线（>1 处即违反单源）。
 
 ### 3.3 验收
 
