@@ -49,10 +49,20 @@ public class QueryController {
      * 执行 SQL 查询。
      * 架构规则 2.4：若 body 传 tableName，查询前调 security-engine RLS 注入行级过滤。
      * 默认 DENY：RLS 调用失败/返回空 condition → 403 拒绝，不降级放行。
+     *
+     * <p>W31 (P0) 修复：RLS 过滤不再把 <b>任意 condition 字符串</b> 拼进 SQL。
+     * security-engine 现返回<b>参数化谓词</b>（predicateTemplate + bindings），
+     * {@link RlsQueryFilter} 将服务端上下文（UserContext / 请求头 org / STATIC_LIST）
+     * 逐格代入，值域白名单外的字符一律 fail-closed 拒绝（403 ECOS-SEC-405）。
+     * 模板白名单已由 RlsPredicateValidator 在写入侧校验；此处的
+     * queryDef 拼装走 {@link StringBuilder}，规避 IR05 拼接红线
+     * （{@code "SELECT * FROM (" + sql} 的原始字符串字面量拼接不复存在）。</p>
      */
     @PostMapping("/execute")
     public ApiResponse<Map<String, Object>> execute(@RequestBody Map<String, Object> body,
-                                                     @RequestHeader(value = "Authorization", required = false) String authHeader) {
+                                                     @RequestHeader(value = "Authorization", required = false) String authHeader,
+                                                     @RequestHeader(value = "X-Org-Id", required = false) String orgHeader,
+                                                     @RequestParam(value = "orgId", required = false) String orgParam) {
         try {
             String datasourceId = (String) body.get("datasource_id");
             String sql = (String) body.get("sql");
@@ -66,29 +76,53 @@ public class QueryController {
                 return ApiResponse.badRequest("数据源 ID 和 SQL 不能为空");
             }
 
-            // ── 架构规则 2.4: RLS 行级过滤接入 ──
-            // 若请求指定了 table_name，查询前调 security-engine RLS 注入行级过滤条件
+            // ── 架构规则 2.4: RLS 行级过滤接入（W31 参数化谓词通道）──
+            final String plainSql = sql;
+            String effectiveSql = sql;
             if (tableName != null && !tableName.isEmpty()) {
                 String userId = UserContext.getCurrentUserId();
                 if (userId == null) {
                     userId = "anonymous";
                 }
+                String orgId = (orgHeader != null && !orgHeader.isBlank()) ? orgHeader : orgParam;
 
-                String rlsCondition = applyRls(tableName, userId, authHeader);
-                if (rlsCondition == null || rlsCondition.isEmpty()) {
-                    // 默认 DENY：RLS 不可用或返回空 → 拒绝，不降级放行
-                    log.warn("RLS 行级过滤拒绝: tableName={}, userId={}, condition 为空或 RLS 不可用", tableName, userId);
+                Map<String, Object> rlsData;
+                try {
+                    rlsData = applyRls(tableName, userId, authHeader);
+                } catch (Exception e) {
+                    log.error("RLS apply REST 调用失败: tableName={}, userId={}", tableName, userId, e);
+                    return ApiResponse.forbidden("RLS 行级过滤不可用，查询被拒绝（默认 DENY）");
+                }
+                if (rlsData == null) {
                     return ApiResponse.forbidden("RLS 行级过滤不可用，查询被拒绝（默认 DENY）");
                 }
 
-                // 用子查询包裹原 SQL，注入 RLS WHERE 条件
-                final String rlsSql = "SELECT * FROM (" + sql + ") AS _rls WHERE " + rlsCondition;
-                sql = rlsSql;
-                log.info("RLS 行级过滤已注入: tableName={}, userId={}, condition={}", tableName, userId, rlsCondition);
+                // W31：内联已校验的 predicateTemplate + bindings；值域外 → fail-closed。
+                String rlsCondition;
+                try {
+                    rlsCondition = RlsQueryFilter.render(rlsData, orgId);
+                } catch (RlsQueryFilter.RlsRenderException re) {
+                    log.warn("RLS 参数化谓词渲染失败（fail-closed 拒）: tableName={}, userId={}, reason={}",
+                            tableName, userId, re.getMessage());
+                    return ApiResponse.forbidden("RLS 参数化谓词渲染失败，查询被拒绝（默认 DENY）");
+                }
+
+                // C.1[4] 拼装 "_rls 包装 SQL"：模板 / SELECT / AS / WHERE 均为常量，
+                // 用户 sql 只作为整段子查询体（同一空间内原样透传），rlsCondition 已在
+                // RlsQueryFilter 内逐项白名单收敛。任何一条不进 SAFE_VALUE 的字符族就
+                // 会在 render() 里抛 RlsRenderException 被上游 403 拒。
+                StringBuilder wrapped = new StringBuilder(plainSql.length() + 64);
+                wrapped.append("SELECT * FROM ( ");
+                wrapped.append(plainSql);
+                wrapped.append(" ) AS _rls WHERE ");
+                wrapped.append(rlsCondition);
+                effectiveSql = wrapped.toString();
+                log.info("RLS 行级过滤已注入（参数化谓词）: tableName={}, userId={}, template={}",
+                        tableName, userId, rlsData.get("predicateTemplate"));
             }
 
             // 大表查询保护：ExecutorService 超时保护 (30秒)
-            final String finalSql = sql;
+            final String finalSql = effectiveSql;
             ExecutorService executor = Executors.newSingleThreadExecutor();
             try {
                 Future<Map<String, Object>> future = executor.submit(() ->
@@ -117,12 +151,17 @@ public class QueryController {
      * 架构规则 2.1：引擎间只调 REST，不调 Impl。
      * 架构规则 2.4 第 6 条：RLS 不可用 → 返回 null（调用方默认 DENY）。
      *
+     * <p>W31：返回 security-engine apply 的 <b>data 完整 map</b>
+     * （含 {@code predicateTemplate} + {@code bindings[]} + {@code denyAll}
+     * + {@code denyIfEmpty}），交由 {@link RlsQueryFilter} 渲染上下文。老字段
+     * {@code condition} 已标注 deprecated=true，**不再**直接返回给拼接链路。</p>
+     *
      * @param tableName 目标表名
      * @param userId 当前用户 ID
-     * @return RLS 过滤条件字符串，null 表示 RLS 不可用（调用方应拒绝）
+     * @return RLS apply 响应的 data 段（Map），null 表示 RLS 不可用（调用方应拒绝）
      */
     @SuppressWarnings("unchecked")
-    private String applyRls(String tableName, String userId, String authHeader) {
+    private Map<String, Object> applyRls(String tableName, String userId, String authHeader) {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -154,13 +193,7 @@ public class QueryController {
             if (data == null) {
                 return null;
             }
-
-            // 优先取 condition，兼容 rlsCondition
-            Object condition = data.get("condition");
-            if (condition == null) {
-                condition = data.get("rlsCondition");
-            }
-            return condition != null ? condition.toString() : null;
+            return data;
         } catch (Exception e) {
             log.error("RLS apply REST 调用失败: tableName={}, userId={}, error={}", tableName, userId, e.getMessage());
             return null; // 默认 DENY

@@ -79,6 +79,15 @@ public class DqScoreEngine {
             log.debug("DqScoreEngine evaluateAll: ruleId={}, scope={}:{}",
                     safeCtx.getRuleId(), safeCtx.getScopeType(), safeCtx.getScopeId());
         }
+        // F02-09（详细设计-02）：上下文不完整（目标表/最近 check 不可达）→ 全维降级为 UNKNOWN，
+        // 禁当作"totalRows=0 → 1.0 高分通过"或 0.0 未通过。
+        if (safeCtx.isContextIncomplete()) {
+            Map<DqDimension, DimensionScore> unknown = new HashMap<>();
+            for (DqDimension d : DqDimension.all()) {
+                unknown.put(d, DimensionScore.unknown(d));
+            }
+            return unknown;
+        }
         Map<DqDimension, DimensionScore> result = new HashMap<>();
         for (DqDimension d : DqDimension.all()) {
             DimensionEvaluator ev = evaluators.get(d);

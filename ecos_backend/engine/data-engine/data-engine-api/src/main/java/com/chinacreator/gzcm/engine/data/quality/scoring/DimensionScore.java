@@ -57,6 +57,27 @@ public class DimensionScore {
         return s;
     }
 
+    /**
+     * F02-09（详细设计-02）上下文不完整时的降级结果：scoreValue 取哨兵
+     * {@link #UNKNOWN_SENTINEL}（-1.0，落在合法区间外以便消费端区分），
+     * details.status=UNKNOWN。代表"无法评估"，<b>不得</b>被解读为高分或零分通过。
+     */
+    public static DimensionScore unknown(DqDimension dim) {
+        DimensionScore s = new DimensionScore();
+        s.setDimension(dim);
+        s.setScoreValue(UNKNOWN_SENTINEL);
+        s.setSampleSize(0);
+        s.setRuleCount(0);
+        java.util.LinkedHashMap<String, Object> d = new java.util.LinkedHashMap<>();
+        d.put("status", "UNKNOWN");
+        d.put("reason", "contextIncomplete");
+        s.setDetails(d);
+        return s;
+    }
+
+    /** UNKNOWN 哨兵分值（-1.0，落在 [0,1] 外，供消费端区分"未通过"0.0 与"不可评估"）。 */
+    public static final double UNKNOWN_SENTINEL = -1.0D;
+
     /** 时间戳辅助：返回当前 epoch ms（detail 缓存用）。 */
     public static long nowEpochMs() {
         return System.currentTimeMillis();

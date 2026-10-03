@@ -320,7 +320,14 @@ public class DqScheduleServiceImpl implements DqScheduleService {
         }
     }
 
-    /** 组装 ScoringContext（参数经 DqSecurityService.maskParameters 脱敏 — 铁律 2.4 #3）。 */
+    /**
+     * 组装 ScoringContext（参数经 DqSecurityService.maskParameters 脱敏 — 铁律 2.4 #3）。
+     *
+     * <p>F02-09（详细设计-02，D-20/W61 评分上下文真实化）：从<b>上一次
+     * {@code ecos_dq.dq_rule_check} 行</b>回填 {@code totalRows/failedRows/sampleFailures/
+     * lastCheck/executedAt}，禁空 Map 空转；若无任何 check 历史（目标表不可达/从未检查）
+     * 则显式置 {@code contextIncomplete=true}，评分引擎据此降级为 UNKNOWN（非"高分通过"）。</p>
+     */
     private ScoringContext buildContext(DqRuleVO rule) {
         Map<String, Object> params = securityService.maskParameters(parseParamsJson(rule.getParametersJson()));
         ScoringContext ctx = new ScoringContext();
@@ -328,14 +335,86 @@ public class DqScheduleServiceImpl implements DqScheduleService {
         ctx.setScopeType(scopeOf(rule));
         ctx.setScopeId(scopeIdOf(rule));
         ctx.setParameters(params);
-        ctx.setConnectionConfig(new LinkedHashMap<>());
-        ctx.setSampleFailures(new LinkedHashMap<>());
-        ctx.setTotalRows(0L);
-        ctx.setFailedRows(0L);
-        ctx.setExecutedAt(LocalDateTime.now());
-        ctx.setLastCheck(new LinkedHashMap<>());
         ctx.setTargetField(rule.getTargetField());
+
+        Map<String, Object> lastCheck = latestCheckRow(rule.getId());
+        if (lastCheck.isEmpty()) {
+            // 无可读取的目标表统计（无 check 历史 / 表不可达）→ 上下文不完整
+            ctx.setConnectionConfig(new LinkedHashMap<>());
+            ctx.setSampleFailures(new LinkedHashMap<>());
+            ctx.setTotalRows(0L);
+            ctx.setFailedRows(0L);
+            ctx.setExecutedAt(LocalDateTime.now());
+            ctx.setLastCheck(new LinkedHashMap<>());
+            ctx.setContextIncomplete(true);
+            return ctx;
+        }
+
+        ctx.setConnectionConfig(connectionConfigOf(lastCheck, rule));
+        ctx.setSampleFailures(sampleFailuresOf(lastCheck));
+        ctx.setTotalRows(longOf(lastCheck.get("total_rows")));
+        ctx.setFailedRows(longOf(lastCheck.get("failed_rows")));
+        Object executedAt = lastCheck.get("executed_at");
+        ctx.setExecutedAt(executedAt instanceof LocalDateTime ldt ? ldt : LocalDateTime.now());
+        ctx.setLastCheck(lastCheck);
+        ctx.setContextIncomplete(false);
         return ctx;
+    }
+
+    /** 读该规则最近一次 dq_rule_check 行（按 executed_at DESC）；无行/异常返回空 Map。 */
+    private Map<String, Object> latestCheckRow(String ruleId) {
+        JdbcTemplate jdbc = jdbcTemplateProvider.getIfAvailable();
+        if (jdbc == null) {
+            return new LinkedHashMap<>();
+        }
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT total_rows, failed_rows, pass_rate, sample_size, sample_failures::text," +
+                    "  executed_at, error_message FROM ecos_dq.dq_rule_check" +
+                    " WHERE rule_id = ? ORDER BY executed_at DESC LIMIT 1",
+                    ruleId);
+            return rows.isEmpty() ? new LinkedHashMap<>() : rows.get(0);
+        } catch (RuntimeException e) {
+            log.warn("DqSchedule 读最近 dq_rule_check 失败（上下文降级为不完整）: ruleId={}, error={}",
+                    ruleId, e.getMessage());
+            return new LinkedHashMap<>();
+        }
+    }
+
+    /** 连接配置：控制域凭据不入评分上下文（铁律 2.4），仅回传非敏感 scope 定位。 */
+    private Map<String, Object> connectionConfigOf(Map<String, Object> lastCheck, DqRuleVO rule) {
+        Map<String, Object> cc = new LinkedHashMap<>();
+        cc.put("scopeType", scopeOf(rule));
+        cc.put("scopeId", scopeIdOf(rule));
+        return cc;
+    }
+
+    /** 样本失败明细：sample_failures 为 jsonb 文本，解析失败/空 → []（非必填项，不判不完整）。 */
+    private Map<String, Object> sampleFailuresOf(Map<String, Object> lastCheck) {
+        Object sf = lastCheck.get("sample_failures");
+        if (sf instanceof String s && !s.isBlank() && !s.equals("{}")) {
+            try {
+                return MAPPER.readValue(s, MAP_TYPE);
+            } catch (JsonProcessingException e) {
+                log.warn("DqSchedule sample_failures 解析失败（置空）: {}", e.getMessage());
+            }
+        }
+        return new LinkedHashMap<>();
+    }
+
+    /** 数值安全读取：Number → long；String 数字 → long；其余 → 0。 */
+    private static long longOf(Object v) {
+        if (v instanceof Number n) {
+            return n.longValue();
+        }
+        if (v instanceof String s && !s.isBlank()) {
+            try {
+                return (long) Double.parseDouble(s);
+            } catch (NumberFormatException e) {
+                return 0L;
+            }
+        }
+        return 0L;
     }
 
     /** 写 dq_rule_check（通过/未通过/评估失败统一语义）。 */

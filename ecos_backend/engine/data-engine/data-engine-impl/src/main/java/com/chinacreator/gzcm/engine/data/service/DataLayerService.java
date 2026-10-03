@@ -24,7 +24,11 @@ public class DataLayerService {
             Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM td_data_resource WHERE layer = ?", Integer.class, dl.name());
             int c = count != null ? count : 0;
-            summary.put(dl.name(), c);
+            // F02-05-2 / B.4：无已登记载体的层 declared=false（SEMANTIC/APPLICATION 现状 0 载体）
+            // 前端禁止显示为"有数据"；载体存在性 = 该层至少 1 条 td_data_resource 登记。
+            summary.put(dl.name(), Map.of(
+                    "count", c,
+                    "declared", c > 0));
             total += c;
         }
         summary.put("total", total);

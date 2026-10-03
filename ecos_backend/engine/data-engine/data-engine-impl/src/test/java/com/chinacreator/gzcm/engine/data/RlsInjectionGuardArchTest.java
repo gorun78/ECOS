@@ -59,7 +59,10 @@ public class RlsInjectionGuardArchTest {
         List<String> hits = new ArrayList<>();
         for (String off : offenders) {
             Path p = Paths.get(off);
-            String text = Files.readString(p, StandardCharsets.UTF_8);
+            String raw = Files.readString(p, StandardCharsets.UTF_8);
+            // Javadoc/注释引用同源违规字面量的说明（如 {@code "SELECT * FROM (" + sql}），
+            // 不属于"实际拼接代码"，剔除后再匹配，避免误报。
+            String text = stripComments(raw);
             if (SELECT_STAR_WRAP_CONCAT.matcher(text).find()) {
                 hits.add(off + ": SELECT * FROM ( + <var> 字面量拼接");
             }
@@ -69,6 +72,49 @@ public class RlsInjectionGuardArchTest {
         }
         assertTrue(hits.isEmpty(),
                 "发现 W31 违规（RLS 谓词 × user sql 字符串拼接）：\n" + String.join("\n", hits));
+    }
+
+    /**
+     * 剔除 Java 注释（块 {@code /* ... *\/} + {@code //} 行注释）后的字符串——保持
+     * 源顺序，避免 Javadoc 引用使抗扫描误报。简化解析：不处理字符串字面量内的 {@code //}
+     * 与 {@code /*}，因为本题域内的红线字节序列仅出现在代码不出现于字符串体。
+     */
+    static String stripComments(String src) {
+        final char APOSTROPHE = 39;
+        StringBuilder sb = new StringBuilder(src.length());
+        int i = 0, n = src.length();
+        boolean inBlock = false, inLine = false, inStr = false, inChar = false;
+        while (i < n) {
+            char ch = src.charAt(i);
+            char nxt = (i + 1 < n) ? src.charAt(i + 1) : '\0';
+            if (inBlock) {
+                if (ch == '*' && nxt == '/') { inBlock = false; i += 2; continue; }
+                i++; continue;
+            }
+            if (inLine) {
+                if (ch == '\n') { inLine = false; sb.append(ch); }
+                i++; continue;
+            }
+            if (inStr) {
+                sb.append(ch);
+                if (ch == '\\' && nxt != 0) { sb.append(nxt); i += 2; continue; }
+                if (ch == '"') { inStr = false; }
+                i++; continue;
+            }
+            if (inChar) {
+                sb.append(ch);
+                if (ch == '\\' && nxt != 0) { sb.append(nxt); i += 2; continue; }
+                if (ch == APOSTROPHE) { inChar = false; }
+                i++; continue;
+            }
+            if (ch == '"' && !inStr && !inChar) { inStr = true; sb.append(ch); i++; continue; }
+            if (ch == APOSTROPHE && !inStr && !inChar) { inChar = true; sb.append(ch); i++; continue; }
+            if (ch == '/' && nxt == '*') { inBlock = true; i += 2; continue; }
+            if (ch == '/' && nxt == '/') { inLine = true; i += 2; continue; }
+            sb.append(ch);
+            i++;
+        }
+        return sb.toString();
     }
 
     /** 限定 guard 范围：本模块 src/main/java；不含 test 目录（本测试自身也会提

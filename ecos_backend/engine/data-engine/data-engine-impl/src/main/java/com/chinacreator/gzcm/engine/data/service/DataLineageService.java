@@ -36,13 +36,14 @@ public class DataLineageService {
     /**
      * 根据 datasourceId 和 tableName 获取字段级血缘关系。
      * <p>
-     * 从 ecos_pipeline_task 表的 yaml_content 中提取包含目标表名的 SQL，
-     * 使用 JSqlParser 解析为 nodes/edges 图结构。
-     * </p>
+     * F02-11：血缘从 <b>derivation 持久化表</b>（{@link #rebuildAndPersist} 由管道执行
+     * source→node→sink 落的 {@code ecos_data_lineage_node/edge}）读取；按限定名精确/尾缀
+     * 参数化匹配，1 跳展开相邻边/节点 — 不再 ILIKE 全表扫 {@code yaml_content}，
+     * 不拼接 LIMIT。
      *
-     * @param datasourceId 数据源 ID
-     * @param tableName    表名
-     * @return 包含 nodes / edges / total_nodes / total_edges 的 Map
+     * @param datasourceId 数据源 ID（可选，命中节点表时用于精确过滤）
+     * @param tableName    表名（限定名或裸表名）
+     * @return 包含 nodes / edges / total_nodes / total_edges / pipeline_count 的 Map
      */
     public Map<String, Object> getLineage(String datasourceId, String tableName) {
         if (tableName == null || tableName.isBlank()) {
@@ -53,56 +54,85 @@ public class DataLineageService {
         List<Map<String, Object>> edges = new ArrayList<>();
         Set<String> seenNodeIds = new LinkedHashSet<>();
 
-        // 1. 从 pipeline_tasks 查找包含目标表名的任务
-        List<Map<String, Object>> tasks;
-        try {
-            tasks = jdbc.queryForList(
-                "SELECT id, name, yaml_content FROM ecos_pipeline_task WHERE yaml_content ILIKE ?",
-                "%" + tableName + "%");
-        } catch (Exception e) {
-            log.warn("查询 pipeline_tasks 失败: {}", e.getMessage());
-            tasks = List.of();
+        // F02-11 (W64)：血缘改从 derivation 持久化表读取（rebuildAndPersist 落的
+        // source→node→sink），按限定名<b>精确匹配</b> + 参数化占位符，
+        // 不再 ILIKE 全表扫 yaml_content（消除 ILIKE 全表扫 + 消除 LIMIT 拼接）。
+        List<Map<String, Object>> seedNodes = lineageRows(
+                "SELECT id, node_type AS type, table_name AS table, pipeline_task_id "
+                        + "FROM ecos_data.ecos_data_lineage_node WHERE table_name = ?",
+                tableName);
+        // 精确匹配落空回退：限定名嵌 schema（schema.table）时的尾缀参数化匹配（仍参数化，非拼接）。
+        if (seedNodes.isEmpty()) {
+            seedNodes = lineageRows(
+                    "SELECT id, node_type AS type, table_name AS table, pipeline_task_id "
+                            + "FROM ecos_data.ecos_data_lineage_node WHERE table_name LIKE ? LIMIT ?",
+                    "%." + tableName, 500);
         }
-
-        // 2. 如果是特定数据源，进一步过滤（通过 yaml_content 中 datasource 引用）
-        List<Map<String, Object>> filtered = new ArrayList<>();
         if (datasourceId != null && !datasourceId.isBlank()) {
-            for (Map<String, Object> task : tasks) {
-                String yaml = (String) task.get("yaml_content");
-                if (yaml != null && yaml.contains(datasourceId)) {
-                    filtered.add(task);
+            // datasource 精确过滤（表层属性查询失败时不过滤而非误删）
+            try {
+                Map<String, Object> ds = jdbc.queryForMap(
+                    "SELECT COALESCE(MAX(datasource_id::text),'') AS ds FROM ecos_data.ecos_data_lineage_node WHERE table_name = ?", tableName);
+                String got = (String) ds.get("ds");
+                if (got != null && !got.isBlank() && !got.equals(datasourceId)) {
+                    return emptyLineageResult();
                 }
-            }
-        } else {
-            filtered = tasks;
+            } catch (Exception ignore) { /* datasource 列不存在/不同步 → 不过滤 */ }
         }
 
-        // 3. 对每个任务提取 SQL 并解析
-        for (Map<String, Object> task : filtered) {
-            String taskId = (String) task.get("id");
-            String taskName = (String) task.get("name");
-            String yaml = (String) task.get("yaml_content");
-            if (yaml == null) continue;
-
-            // 从 yaml 中提取 SQL 块
-            List<String> sqlBlocks = extractSqlFromYaml(yaml);
-            if (sqlBlocks.isEmpty()) {
-                // 如果 YAML 没有显式 sql: 块，尝试将整个 yaml 作为 SQL 解析
-                // （某些简单任务可能直接存储 SQL）
-                parseAndMerge(taskId, taskName, yaml, tableName, nodes, edges, seenNodeIds);
-            } else {
-                for (String sql : sqlBlocks) {
-                    if (sql.contains(tableName)) {
-                        parseAndMerge(taskId, taskName, sql, tableName, nodes, edges, seenNodeIds);
-                    }
-                }
+        for (Map<String, Object> n : seedNodes) {
+            n.put("label", labelOf(n));
+            if (seenNodeIds.add((String) n.get("id"))) {
+                nodes.add(n);
             }
         }
-
-        // 4. 如果没有找到任何血缘，返回空结果（非错误）
         if (nodes.isEmpty()) {
             return emptyLineageResult();
         }
+
+        // 单跳展开：seed 节点连的所有边 + 对端节点（参数化 IN，占位符数动态生成，非拼接）。
+        Set<String> frontier = new LinkedHashSet<>(seenNodeIds);
+        String ph = String.join(",", Collections.nCopies(frontier.size(), "?"));
+        List<Object> params = new ArrayList<>(frontier);
+        params.addAll(frontier); // source IN(...) OR target IN(...) → 2N 占位符
+        try {
+            List<Map<String, Object>> edgeRows = jdbc.queryForList(
+                    "SELECT e.id, e.source_node_id AS source, e.target_node_id AS target, "
+                            + "e.edge_type AS transform, e.pipeline_task_id "
+                            + "FROM ecos_data.ecos_data_lineage_edge e "
+                            + "WHERE e.source_node_id IN (" + ph + ") OR e.target_node_id IN (" + ph + ")",
+                    params.toArray());
+            Set<String> endpoints = new LinkedHashSet<>();
+            for (Map<String, Object> e : edgeRows) {
+                edges.add(e);
+                if (e.get("source") != null) endpoints.add(e.get("source").toString());
+                if (e.get("target") != null) endpoints.add(e.get("target").toString());
+            }
+            // 补充对端节点
+            List<String> missing = new ArrayList<>();
+            for (String id : endpoints) {
+                if (!seenNodeIds.contains(id)) missing.add(id);
+            }
+            if (!missing.isEmpty()) {
+                String idPh = String.join(",", Collections.nCopies(missing.size(), "?"));
+                for (Map<String, Object> n : jdbc.queryForList(
+                        "SELECT id, node_type AS type, table_name AS table, pipeline_task_id "
+                                + "FROM ecos_data.ecos_data_lineage_node WHERE id IN (" + idPh + ")",
+                        missing.toArray())) {
+                    n.put("label", labelOf(n));
+                    if (seenNodeIds.add((String) n.get("id"))) {
+                        nodes.add(n);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("相邻血缘节点/边查询失败（返回 seed 子图）: {}", e.getMessage());
+        }
+
+        long pipelineCount = nodes.stream()
+                .map(n -> n.get("pipeline_task_id"))
+                .filter(Objects::nonNull)
+                .distinct().count();
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("datasource_id", datasourceId);
@@ -111,47 +141,25 @@ public class DataLineageService {
         result.put("edges", edges);
         result.put("total_nodes", nodes.size());
         result.put("total_edges", edges.size());
-        result.put("pipeline_count", filtered.size());
+        result.put("pipeline_count", pipelineCount);
         return result;
     }
 
-    private void parseAndMerge(String taskId, String taskName, String sql, String targetTable,
-                                List<Map<String, Object>> allNodes, List<Map<String, Object>> allEdges,
-                                Set<String> seenIds) {
+    /** 安全执行参数化查询，异常时返回空列表（表缺失/未迁移场景降级）。 */
+    private List<Map<String, Object>> lineageRows(String sql, Object... params) {
         try {
-            Map<String, Object> lineage = parser.parse(sql);
-            @SuppressWarnings("unchecked")
-            List<Map<String, String>> parsedNodes = (List<Map<String, String>>) lineage.get("nodes");
-            @SuppressWarnings("unchecked")
-            List<Map<String, String>> parsedEdges = (List<Map<String, String>>) lineage.get("edges");
-
-            if (parsedNodes != null) {
-                for (Map<String, String> n : parsedNodes) {
-                    String id = n.get("id");
-                    if (id == null || !seenIds.add(id)) continue;
-                    Map<String, Object> node = new LinkedHashMap<>();
-                    node.put("id", id);
-                    node.put("type", n.get("type"));
-                    node.put("table", n.get("table"));
-                    node.put("pipeline_task_id", taskId);
-                    node.put("pipeline_task_name", taskName);
-                    allNodes.add(node);
-                }
-            }
-
-            if (parsedEdges != null) {
-                for (Map<String, String> e : parsedEdges) {
-                    Map<String, Object> edge = new LinkedHashMap<>();
-                    edge.put("source", e.get("source"));
-                    edge.put("target", e.get("target"));
-                    edge.put("transform", e.getOrDefault("transform", "read"));
-                    edge.put("pipeline_task_id", taskId);
-                    allEdges.add(edge);
-                }
-            }
+            return jdbc.queryForList(sql, params);
         } catch (Exception e) {
-            log.debug("SQL 解析跳过 (taskId={}): {}", taskId, e.getMessage());
+            log.warn("血缘节点查询失败（持久化表可能未迁移）: {}", e.getMessage());
+            return List.of();
         }
+    }
+
+    private static String labelOf(Map<String, Object> n) {
+        Object table = n.get("table");
+        Object name = n.get("name");
+        return table != null && !table.toString().isBlank() ? table.toString()
+                : (name != null ? name.toString() : String.valueOf(n.get("id")));
     }
 
     /**
@@ -305,15 +313,20 @@ public class DataLineageService {
             nodes.add(node);
         }
 
-        for (Map.Entry<String, String[]> entry : nodeInfo.entrySet()) {
-            String nodeId = entry.getKey();
-            Pattern depPat = Pattern.compile("- id:\\s*" + Pattern.quote(nodeId) + ".*?dependsOn:\\s*\\[(.*?)\\]", Pattern.DOTALL);
-            Matcher dm = depPat.matcher(yaml);
+        // F02-11 (W64) —— dependsOn 匹配限定在 <b>本节点 block</b> 内，不再用整份 yaml 匹配：
+        // 旧实现在 root 节点未写 dependsOn 时会跨块贪心匹配到 <b>下一节点</b> 的 dependsOn，
+        // 产生 1 条假自环 / 假边；导致"3 节点 2 边"派生成"3 节点 3 边"，拓扑失准。
+        for (String block : blocks) {
+            Matcher idM = Pattern.compile("- id:\\s*(\\S+)").matcher(block);
+            if (!idM.find()) continue;
+            String nodeId = idM.group(1);
+            if (!nodeInfo.containsKey(nodeId)) continue;
+            Matcher dm = Pattern.compile("dependsOn:\\s*\\[(.*?)\\]", Pattern.DOTALL).matcher(block);
             if (dm.find()) {
                 String deps = dm.group(1);
                 for (String dep : deps.split(",")) {
                     String clean = dep.trim().replaceAll("[\\[\\]\\\"]", "");
-                    if (!clean.isEmpty()) {
+                    if (!clean.isEmpty() && !clean.equals(nodeId)) {
                         Map<String, Object> edge = new LinkedHashMap<>();
                         edge.put("source", clean);
                         edge.put("target", nodeId);
@@ -368,8 +381,10 @@ public class DataLineageService {
             List<Map<String, Object>> tasks;
             try {
                 if (taskLimit > 0) {
+                    // F02-11 W64: LIMIT 拼接改参数化占位符（IR05 禁 LIMIT 拼接）
                     tasks = jdbc.queryForList(
-                        "SELECT id, name, yaml_content FROM ecos_pipeline_task WHERE yaml_content IS NOT NULL ORDER BY updated_at DESC LIMIT " + taskLimit);
+                        "SELECT id, name, yaml_content FROM ecos_pipeline_task WHERE yaml_content IS NOT NULL ORDER BY updated_at DESC LIMIT ?",
+                        taskLimit);
                 } else {
                     tasks = jdbc.queryForList(
                         "SELECT id, name, yaml_content FROM ecos_pipeline_task WHERE yaml_content IS NOT NULL ORDER BY updated_at DESC");

@@ -2,7 +2,6 @@ package com.chinacreator.gzcm.engine.data.datasource.storage.adapter.jdbc;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -30,6 +29,7 @@ import com.chinacreator.gzcm.engine.data.datasource.storage.model.WriteRequest.W
 import com.chinacreator.gzcm.engine.data.datadescription.model.DataSchema;
 import com.chinacreator.gzcm.engine.data.datadescription.model.impl.DataSchemaImpl;
 import com.chinacreator.gzcm.engine.data.datadescription.model.impl.DataSchemaImpl.SchemaField;
+import com.chinacreator.gzcm.runtime.access.connector.JdbcAccessBridge;
 import com.chinacreator.gzcm.runtime.core.i18n.I18nUtils;
 import com.chinacreator.gzcm.runtime.core.i18n.LocaleResolver;
 
@@ -89,17 +89,18 @@ public abstract class BaseJdbcAdapter implements IStorageAdapter {
         this.config = config;
 
         try {
-            // 加载驱动
-            Class.forName(getDriverClassName());
-            
-            // 构建连接URL
+            // 构建连接URL（子类方言拼装）
             String url = buildConnectionUrl(config);
-            
-            // 建立连接
-            connection = DriverManager.getConnection(
+
+            // 建连一律收敛 runtime-access（ARCH-06 铁律 #4）：
+            // 业务侧禁直接 java.sql.DriverManager；经 bridge 取全仓唯一 JdbcConnector。
+            // 子类 getDriverClassName() 传入以显式选驱动（如 ClickHouse/ORACLE），
+            // 与 JdbcConnector 按 URL scheme 推断的兜底一致，语义不变。
+            connection = JdbcAccessBridge.shared().openConnection(
                     url,
                     config.getUsername(),
-                    config.getPassword()
+                    config.getPassword(),
+                    getDriverClassName()
             );
             
             // 设置连接属性
@@ -113,12 +114,6 @@ public abstract class BaseJdbcAdapter implements IStorageAdapter {
             logger.info(I18nUtils.getMessage("storage.connect.success", 
                     LocaleResolver.getDefaultLocaleCode()));
             
-        } catch (ClassNotFoundException e) {
-            connected = false;
-            String errorMsg = I18nUtils.getErrorMessage("connection.failed", 
-                    LocaleResolver.getDefaultLocaleCode(), getDriverClassName());
-            logger.error(errorMsg, e);
-            throw new Exception(errorMsg, e);
         } catch (SQLException e) {
             connected = false;
             String errorMsg = I18nUtils.getErrorMessage("connection.failed", 

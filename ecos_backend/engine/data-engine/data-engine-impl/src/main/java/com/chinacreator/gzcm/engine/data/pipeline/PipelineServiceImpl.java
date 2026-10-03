@@ -318,9 +318,12 @@ public class PipelineServiceImpl implements PipelineService {
             Set<String> seenNodeIds = new HashSet<>();
             for (PipelineSaveDTO.NodeSpec node : dto.getNodes()) {
                 if (node.getType() == null || !VALID_NODE_TYPES.contains(node.getType())) {
-                    throw new ValidationException("type", "非法节点类型: " + node.getType()
+                    throw new BusinessException(400, "ECOS-DATA-012: 非法节点类型: " + node.getType()
                             + "（合法值: " + String.join("/", VALID_NODE_TYPES) + "）");
                 }
+                // F02-04：目录 allowable=false 的节点在创建/保存时即拒（ECOS-DATA-012）
+                // 保留执行器抛 BusinessException 为第二道保险
+                PipelineNodeTypesCatalog.assertCreatable(node.getType());
                 String nodeId = node.getNodeId() != null && !node.getNodeId().isBlank()
                         ? node.getNodeId() : node.getId();
                 if (nodeId == null || nodeId.isBlank()) {

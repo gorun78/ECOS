@@ -63,6 +63,14 @@ public class ScoringContext {
     /** 目标字段（target_field；敏感字段判定时由评估器兜底 mask） */
     private String targetField;
 
+    /**
+     * F02-09（详细设计-02，D-20/W61）评分上下文完整性标记。
+     * <p>{@code true} = 目标表/最近 check 行不可达，上下文不完整 → 评分应降级为
+     * {@code UNKNOWN}（<b>不得</b>当作"0 失败高分通过"）。消费侧据此判为 UNKNOWN，
+     * 而非 {@code totalRows=0 → 1.0} 的既有兜底。</p>
+     */
+    private boolean contextIncomplete;
+
     /** 默认 fresh regex（保留给 FRESHNESS 评估器读参数 threshold.minutes；评估器自行 setDefault） */
     public static final String FRESHNESS_KEY = "freshness_minutes";
 }

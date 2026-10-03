@@ -239,7 +239,8 @@ public class DqWorkOrderServiceImpl implements DqWorkOrderService {
         pageArgs.add(pageSize);
         pageArgs.add((pageNum - 1) * pageSize);
         List<DqWorkOrderVO> page = jdbc.query(
-                "SELECT " + WO_COLUMNS + whereSql +
+                "SELECT " + WO_COLUMNS +
+                " FROM ecos_dq.dq_work_order" + whereSql +
                 " ORDER BY created_at DESC, id LIMIT ? OFFSET ?",
                 ROW_MAPPER,
                 pageArgs.toArray());
