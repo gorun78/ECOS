@@ -211,6 +211,55 @@ public class AiSecurityEngineClient {
     }
 
     /**
+     * F06-04 <b>文本内容审核咽喉</b>（输入/输出护栏改经 security-engine）。
+     *
+     * <p>铁律 §2.4-3/6/7 + 分册06 F06-04：护栏的两个拦截点（用户输入、模型输出）一律调
+     * security-engine 的文本审核端点，<b>引擎内禁本地正则充当放行依据</b>（X-16 收口）。
+     * 端点 = {@code POST /api/v1/security/guardrail/screen}（契约归分册 01 SEC，见 J-6 接缝登记）。</p>
+     *
+     * <p><b>失败语义（红线，fail-closed）</b>：security 不可用 / 超时 / 响应非成功 /
+     * {@code data.passed} 非显式 <b>true</b> / 响应不可解析 —— 一律上抛
+     * {@link EngineUnavailableException}。此处<b>从不返回一个"放行"信号</b>：
+     * 任何无法被 security 明确确认安全的文本都视为不安全，让调用方回 GUARDRAIL_FAIL_CLOSED
+     * （对应设计 §536「护栏不可用 → AI 操作已暂停，禁降级为本地正则放行」）。
+     * 正常路径：security 明确回 {@code passed=true} 时静默返回。</p>
+     *
+     * @param scope  审核面（"input"=用户输入前置 / "output"=模型输出后置），进载荷供 security 侧策略路由
+     * @param text   待审核文本（经该端点单通道送 security——审核即脱敏/消费方，与 applyMasking 承 data 同款；
+     *               <b>不落本地、不外传其它通道</b>；审计 detail 另见 F06-03 §299 禁带原文）
+     * @param userId 主体（token 上下文；禁 LLM/请求体自报，PMO-74 H9-T1）
+     * @throws EngineUnavailableException security 不可用 / 响应不可解析 / 未明确放行
+     */
+    @SuppressWarnings("unchecked")
+    public void screenOrThrow(String scope, String text, String userId) throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("scope", scope == null ? "input" : scope);
+        body.put("userId", userId == null ? "anonymous" : userId);
+        // 文本载体键 security 侧以 "text" 约定（分册01 SEC 契约扩展点，J-6）
+        body.put("text", text == null ? "" : text);
+        Map<String, Object> resp;
+        try {
+            resp = postJson("/api/v1/security/guardrail/screen", body);
+        } catch (Exception e) {
+            throw new EngineUnavailableException("guardrail/screen 调用异常（fail-closed）: " + e.getMessage(), e);
+        }
+        Object codeObj = resp == null ? null : resp.get("code");
+        if (resp == null || !(codeObj instanceof Number n) || n.intValue() != 0) {
+            throw new EngineUnavailableException(
+                    "guardrail/screen 非成功响应(code!=0)（fail-closed）: " + resp);
+        }
+        Object dataObj = resp.get("data");
+        if (!(dataObj instanceof Map<?, ?> dataMap)) {
+            throw new EngineUnavailableException("guardrail/screen data 段不可解析（fail-closed）");
+        }
+        // 只有 security 明确 passed=true 才放行；neg/缺失/其它一律 fail-closed
+        if (!Boolean.TRUE.equals(dataMap.get("passed"))) {
+            throw new EngineUnavailableException(
+                    "guardrail/screen 未明确放行（passed!=true，fail-closed，§2.4-6）");
+        }
+    }
+
+    /**
      * F06-02 契约：security-engine 方向端点不可用 / 响应不可解析上抛的本客户端异常。
      * applier 捕获该异常即执行"整条丢弃 + FAIL_CLOSED"（§2.4-6），不降级、不重试。
      */
