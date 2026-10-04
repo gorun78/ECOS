@@ -859,4 +859,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_caliber_ver ON {schema}.ecos_caliber_versio
 > * **离线性质不变**：本批零 live 库、零网络、零 Kafka broker；`EventBusService` 是 `runtime-event` 契约（`ontology-engine-impl` 已依赖，见 pom :80），fallback `MemoryEventBusServiceImpl` 在同 JVM 另一端，测里 mock 契约不进真实 bus；`ReflectiveKafkaBypassArchTest` 只走 file system。M1 剩余（双失败拒收、Kafka broker Liveness probe）挂授权闸不本批做。
 > * **F03-06 M0 批次侧统计**（截止本 commit `397b16e` + `33d275e` + 本批）：W81/C64 400 拒收（2 commits 前）/ W80/C63 function_name 归属反查（前 commit）/ W89/C71 单通道（本 commit）——F03-06 M0 三 P0 项全绿；**F03-06 剩余 M0（V171/V172 迁移实跑 + Kafka probe + W82 双失败拒收 M1）** 挂授权闸，按校订三十三~三十五衰减可信看本册 F03-06 M0 必达子集以此收口。
 
+> **【校订三十七】2026-10-04 · F03-03 W77/C61 "指标定义合规化 DDL 走查"落地**：A 章 F03-03 O-11（`metric_definition` `id VARCHAR(64)` 违 MC01 主键形态 + 缺 `caliber_id`/`formula_version`/`caliber_snapshot` 三字段 + 缺 DR06 审计五列 + DR07 version_no + DR08 domain）的补列与合规新表 V168.1 已在先批（cbc8cd5 前已落）——本批补**护栏**（本册 §七.1 命名单测 `MetricDefinitionConformTest` 未落地），全绿——**ontology-engine-impl 124 tests / 0 fail / 0 err / 0 skip**（含新增 5 例 + 前批 ArchUnit 5 例复检全绿）：
+>
+> * **`MetricDefinitionConformTest`（5 例，DDL 静态 text walk，不触库/不 Spring context）**：
+>   - `legacyTableAddColumnsConformant`：V168.1 §1 10 列（规范七 + O-11 三）每列 `ADD COLUMN IF NOT EXISTS <col>\b` 词边界 token 断言，防"改名换皮"绕过。
+>   - `newTableDefinitionBlockConformant`：锚定 `CREATE TABLE (IF NOT EXISTS)? [\w.]*ecos_metric_definition\b` 抽块至 `);`，断言块内 10 列 token + `ecos_ontology.ecos_metric_definition` schema 限定（ST07 5 引擎权威）+ PK 形态 `id VARCHAR(36) PRIMARY KEY`（MC01 应用侧 UUID）。
+>   - `noMcViolationsInV168Dot1`：非 `--` 前缀的正文行逐行断言**不**含 `::`（MC03 PG 私有转型）/ `jsonb`（MC02 快照须 TEXT）/ `BIGSERIAL`（MC01 主键红线）/ `gen_random_uuid()`（MC01 主键红线）/ `PARTITION BY` / `CREATE POLICY`（security 域专属，本域 DDL 面不收 row-level 策略）。
+>   - `oldTableMarkedStoppedWriting`：`COMMENT ON TABLE … metric_definition IS '…停写…'` 存在性走查—— 佐证 R-4 a+b"旧表停写，新写落 v2"。
+>   - `noConditionalUniqueIndex`：`CREATE UNIQUE INDEX … WHERE …`（partial index，MC03）非零存在则红——新表刚建上桌形态保持 `UNIQUE INDEX (code, is_deleted)` 复合，防有人改条件索引绕 R-4 语义。
+> * **反向白线（本项明列约束）**：本护栏**不**断言旧表 `id VARCHAR(64)` 已改（IR03 只加不删 + 存量只定性不擅改，`WHERE`-side 老列类型保持不变），只断言 新表 PK 形态。这区别于 W59/C48 `DdlComplianceLintTest`（各新表都要满合规）——本护栏两段式：**§1 旧表补列面（不加型不改名）** + **§2 新表满合规面**，符合 V168.1 头注"两步都落，忠实文档"。
+> * **F03-03 M0 批次补刀对齐**：W73 CaliberEntity / W74 ProposalLifecycle / W75 PublishGateV1/V2/V3 / W76 MetricCaliberBinding（前面 cbc8cd5 已 67 例全绿）+ W77 本批 5 例 → **本册 F03-03 M0 P0 六 W 项全落地**。F03-03 剩余 W78（`ecos_biz_metric` 孤表 75 演示种子归属断言）——按校订三十三挂下派 M1 处置，非 M0 必达子集模式，不重复。
+> * **代码侧已到位（本批实测核验，非授权闸）**：W77 描述的"新表终态 = `ecos_metric_definition` 唯一写入口"——`MetricDefinitionRepository`（`ontology-engine-impl`）**已**经构造注入 `OntologySchemaSupport`（`@Value("${ecos.schema.ontology:ecos_ontology}")`，缺省即 ST07 目标 schema）落 `ecos_ontology.ecos_metric_definition`，javadoc 明列"V168.1 唯一可写入口，F03-09"；**不存在** `TABLE_PREFIX="public"` 硬编码前缀（本批读源核验，避免误登记授权闸项）。故 W77 的 DDL + 代码切链 + 护栏三段**全落地**，M0 P0 收口，无剩余授权闸项。
+> * **离线性质不变**：DDL 静态 text walk，零 live 库、零网络；`resolveMigrationDir()` 用 `docs/ + ecos_backend/` 双同存锚定仓根，同 F03-05 合同护栏走法。
+> * **门禁状态回落校订**：本文件 footer 尾注释"本轮未改业务代码"（v1.1 定版行）自 cbc8cd5 起即失配（W73/W74/W75/W76 已改主码），本批不重写 header，改为校订追加登记对账——footer 尾注释重建留待全 M0 收口批一并处理，避免每次 commit 都 toggle 尾注释破坏单一语义。
+
+
 <!-- 详细设计-03-本体域 / 2026-09-29 / v1.1（2026-09-29 定版） / W67~W89 → C51~C71 / R-4 a+b 并行、R-5 ①+③、R-6 ①、R-7 归属①+模型 b 已批准（报告 §十四.1） / Gate-1 已签字、Gate-2 已通过 / 本轮未实跑库、未改业务代码 -->
