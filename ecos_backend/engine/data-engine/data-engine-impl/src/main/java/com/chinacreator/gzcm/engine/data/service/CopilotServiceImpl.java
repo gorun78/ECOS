@@ -9,7 +9,6 @@ import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -44,9 +43,6 @@ public class CopilotServiceImpl implements CopilotService {
     /** sysman 配置门面 (config_group 单表分组)；可选注入，缺 bean 时走代码默认值 */
     @Autowired(required = false)
     private SysConfigService sysConfigService;
-
-    @Value("${llm.deepseek.api-key:}")
-    private String copilotApiKey;
 
     public CopilotServiceImpl(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -95,20 +91,17 @@ public class CopilotServiceImpl implements CopilotService {
         }
 
         String model = cfg("dw.copilot.model", DEFAULT_MODEL);
-        String apiKey = copilotApiKey != null ? copilotApiKey.trim() : "";
-        if (apiKey.isEmpty()) {
-            return "API Key 未配置。请设置环境变量 DEEPSEEK_API_KEY。";
-        }
 
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(new ChatMessage("system", systemPrompt));
         messages.add(new ChatMessage("user", userPrompt));
 
+        // F06-05 要点 3（X-23）：引擎不再持 api-key，亦不再 request.setApiKey——
+        // llm-gateway 经 SecurityEngineBridge 按 apiKeyRef 服务端解密（缺配即 fail-closed DENY）
         ChatRequest request = new ChatRequest(model, messages,
                 cfgDouble("dw.copilot.temperature", 0.2),
                 cfgInt("dw.copilot.max_tokens", 4096),
                 false);
-        request.setApiKey(apiKey);
 
         try {
             ChatResponse response = llmGateway.call(request);

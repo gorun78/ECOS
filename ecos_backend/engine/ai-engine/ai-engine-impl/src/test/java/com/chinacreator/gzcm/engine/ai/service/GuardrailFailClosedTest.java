@@ -2,7 +2,6 @@ package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.engine.ai.GuardrailsService;
 import com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient;
-import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,14 +38,12 @@ class GuardrailFailClosedTest {
 
     private AgentLoopService svc;
     private GuardrailsService guardrails;
-    private LLMGatewayService llmGatewayService;
     private LLMGateway llmGateway;
     private AiSecurityEngineClient security;
 
     @BeforeEach
     void setUp() throws Exception {
         guardrails = mock(GuardrailsService.class);
-        llmGatewayService = mock(LLMGatewayService.class);
         llmGateway = mock(LLMGateway.class);
         security = mock(AiSecurityEngineClient.class);
         AgentConfigResolver cfg = mock(AgentConfigResolver.class);
@@ -54,7 +51,6 @@ class GuardrailFailClosedTest {
 
         svc = new AgentLoopService();
         inject(svc, "guardrailsService", guardrails);
-        inject(svc, "llmGatewayService", llmGatewayService);
         inject(svc, "llmGateway", llmGateway);
         inject(svc, "agentConfigResolver", cfg);
         inject(svc, "securityEngineClient", security);
@@ -94,8 +90,8 @@ class GuardrailFailClosedTest {
         assertNotNull(r.getErrorMsg());
         assertTrue(r.getErrorMsg().contains("GUARDRAIL_FAIL_CLOSED"),
                 "错误须带 FAIL_CLOSED 指纹（§1.5-2 可读消息），got=" + r.getErrorMsg());
-        // 关键：LLM 出口零交互——拒绝必须发生在调 LLM 之前
-        verifyNoInteractions(llmGatewayService, llmGateway);
+        // 关键：LLM 出口零交互——拒绝必须发生在调 LLM 之前（唯一 LLMGateway 出口）
+        verifyNoInteractions(llmGateway);
     }
 
     // ── 验收 2：guardrailBeanMissingIsNotSilentlySkipped ─────────────────

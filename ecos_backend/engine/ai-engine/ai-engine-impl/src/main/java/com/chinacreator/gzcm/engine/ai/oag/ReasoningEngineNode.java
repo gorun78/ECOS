@@ -1,13 +1,11 @@
 package com.chinacreator.gzcm.engine.ai.oag;
 
-import com.chinacreator.gzcm.engine.ai.service.LLMProvider;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -31,15 +29,13 @@ import java.util.Map;
  * {@code ecos.oag.model-fallback} 数组，例如
  * {@code [deepseek-chat, qwen-turbo, deepseek-v3-thinking]}。</p>
  *
- * <p>调用策略（参考 {@code AgentLoopService.callLLM}）：</p>
- * <ol>
- *   <li>优先 {@link LLMProvider}（直接调用 Provider API）</li>
- *   <li>兜底 {@link LLMGateway#call(ChatRequest)}</li>
- * </ol>
+ * <p>调用策略：唯一经 {@link LLMGateway#call(ChatRequest)}（F06-05 要点 1/2，X-22/X-23：
+ * 引擎侧不再有 {@code LLMProvider} 抽象，也不再向请求携明文 api-key——gateway 经
+ * security SecurityEngineBridge 解析 apiKeyRef，引擎不持 key）。</p>
  *
  * <p>若 {@code LLMGateway} Bean 缺失（独立引擎调试场景），fallback 到模拟路径。</p>
  *
- * <p>依赖：{@link LLMGateway} / {@link LLMProvider}（均 required=false）</p>
+ * <p>依赖：{@link LLMGateway}（required=false）</p>
  */
 @Component
 public class ReasoningEngineNode implements OagNode {
@@ -49,10 +45,6 @@ public class ReasoningEngineNode implements OagNode {
     /** 默认模型（fallback 链为空时使用） */
     private static final String DEFAULT_MODEL = "deepseek-chat";
 
-    /** 供 {@link LLMGateway} 兜底调用时的 api-key 透传 */
-    @Value("${llm.deepseek.api-key:}")
-    private String deepseekApiKey;
-
     /** LLM 模型 fallback 链（按优先级排列，第一项最先尝试） */
     @Value("${ecos.oag.model-fallback:'deepseek-chat'}")
     private String modelFallbackRaw;
@@ -60,10 +52,6 @@ public class ReasoningEngineNode implements OagNode {
     /** LLM 底层调用网关（required=false，缺失时走模拟路径） */
     @Autowired(required = false)
     private LLMGateway llmGateway;
-
-    /** LLM Provider 列表（required=false，供直接调用） */
-    @Autowired(required = false)
-    private ObjectProvider<List<LLMProvider>> llmProviderProvider;
 
     /**
      * 解析模型 fallback 链。
@@ -140,27 +128,9 @@ public class ReasoningEngineNode implements OagNode {
                         temperature != null ? temperature : 0.3,
                         maxTokens != null ? maxTokens : 4096);
 
-                // 1. 优先尝试 LLMProvider
-                LLMProvider provider = selectProvider();
-                if (provider != null) {
-                    log.info("[OAG:{}] First trying LLMProvider {} for model={}",
-                            ctx.getTraceId(), provider.getName(), model);
-                    ChatResponse resp = provider.chat(request);
-                    if (resp != null && resp.isSuccess()) {
-                        response = resp;
-                        usedModel = model;
-                        break;
-                    }
-                    log.warn("[OAG:{}] Provider {} returned failure for model={}: {} — trying next model",
-                            ctx.getTraceId(), provider.getName(), model,
-                            resp != null ? resp.getErrorMsg() : "null");
-                    errorLog.append(String.format("[%s] provider=%s: %s; ",
-                            model, provider.getName(),
-                            resp != null ? resp.getErrorMsg() : "null"));
-                }
-
-                // 2. Fallback: 使用 LLMGateway 路径
-                request.setApiKey(deepseekApiKey);
+                // F06-05 要点 1/2（X-22/X-23）：唯一经 LLMGateway 调用，不再试 LLMProvider，
+                // 也不再请求 setApiKey（LLMGatewayImpl 已明确忽略调用方自报明文 apiKey，
+                // X-23 的裸 api-key 明面已删除）
                 ChatResponse gwResp = llmGateway.call(request);
                 if (gwResp != null && gwResp.isSuccess()) {
                     response = gwResp;
@@ -251,26 +221,6 @@ public class ReasoningEngineNode implements OagNode {
         messages.add(new ChatMessage("system", systemPrompt));
         messages.add(new ChatMessage("user", userQuery));
         return new ChatRequest(model, messages, temperature, maxTokens, false);
-    }
-
-    /**
-     * 选取优先级最高的可用 LLM Provider。
-     *
-     * @return 选定的 Provider，无可用时返回 null
-     */
-    private LLMProvider selectProvider() {
-        if (llmProviderProvider == null) {
-            return null;
-        }
-        List<LLMProvider> providers = llmProviderProvider.getIfAvailable();
-        if (providers == null || providers.isEmpty()) {
-            return null;
-        }
-        return providers.stream()
-                .sorted(java.util.Comparator.comparingInt(LLMProvider::priority))
-                .filter(LLMProvider::isAvailable)
-                .findFirst()
-                .orElse(null);
     }
 
     /**
