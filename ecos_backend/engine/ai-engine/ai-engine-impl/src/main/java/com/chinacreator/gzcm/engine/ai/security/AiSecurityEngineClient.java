@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.security;
 
+import com.chinacreator.gzcm.common.event.EventTypes;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -230,21 +231,75 @@ public class AiSecurityEngineClient {
             event.put("action", action);
             event.put("resource", resource);
             event.put("result", result == null ? "OK" : String.valueOf(result));
-            publishAuditEvent(event);
+            doPublishAudit(event);
         } catch (Exception e) {
             log.warn("AiSecurityEngineClient.audit failed: action={} reason={}", action, e.getMessage());
         }
     }
 
-    private void publishAuditEvent(Map<String, Object> event) {
+    /**
+     * F06-03 红线咽喉 GUARDRAIL_EVAL 审计发布（<b>与 {@link #audit} 严格分离</b>）。
+     *
+     * <p>铁律 §2.4-5 + 分册 06 F06-03 §297：咽喉 {@code AgentToolPolicyGate.adjudicate}
+     * 每次裁决必发一条 {@code eventType=GUARDRAIL_EVAL} 事件到 Kafka {@code ecos.audit}；
+     * <b>发布失败 = 裁决整体失败</b>（护栏审计属红线，禁"尽力而为"失败沉默）。该路径：
+     * <ol>
+     *   <li>优先走 runtime-event {@code EventBusService}（类名反射查找，避免编译期依赖 runtime-event）；</li>
+     *   <li>runtime-event 未装配 → 反射 fallback 到 {@code kafkaTemplate.send}（与 ontology 侧先例同款）；</li>
+     *   <li>两通道均不可用 / 反射 publish 抛异常 → 上抛
+     *       {@link EngineUnavailableException}（本咽喉 catch 后转 DENY）。</li>
+     * </ol>
+     *
+     * <p><b>载荷纪律（F06-03 §299 / X-58）</b>：event {@code detail} 内禁带工具入参原文 /
+     * SQL 原文 / 结果原文；只准 tool 名 + decision 三态 + policyId + latencyMs +
+     * obligations 计数（防审计库变成新的敏感面）。用户主体从 token 上下文取（PMO-74 H9-T1）。</p>
+     *
+     * @param detail 已构造的摘要段（{@code tool}/{@code decision}/{@code policyId}/
+     *               {@code latencyMs}/{@code obligationsCount}），本方法只办 eventId/timestamp/channel 段
+     * @throws EngineUnavailableException 通道不可用 或 EventBus/Kafka 发布抛出
+     */
+    public void publishGuardrailEventOrThrow(String userId, Map<String, Object> detail) {
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("eventId", UUID.randomUUID().toString());
+        event.put("eventType", EventTypes.Guardrail.GUARDRAIL_EVAL);
+        event.put("timestamp", Instant.now().toString());
+        event.put("module", "ai-engine");
+        // channel 恒 AGENT（本裁判决定位；非 LLM 自报）
+        event.put("channel", "AGENT");
+        event.put("userId", userId == null ? "anonymous" : userId);
+        event.put("moduleTag", "GUARDRAIL");
+        // detail 由调用方按摘要纪律构造，本方法不再读原始入参
+        event.put("detail", detail);
+        doPublishAuditOrThrow(event);
+    }
+
+    /** 尽力而为发布（供 {@link #audit} 与历史调用点使用；失败仅 warn） */
+    private void doPublishAudit(Map<String, Object> event) {
+        ChannelResult r = selectAndPublish(event);
+        if (r == ChannelResult.NONE) {
+            log.warn("AiSecurityEngineClient.audit: EventBusService/KafkaTemplate 均不可用，审计仅记日志: action={}",
+                    event.get("action"));
+        }
+    }
+
+    /** 红线发布（F06-03）：任一通道抛/无通道 → 上抛 {@link EngineUnavailableException} */
+    private void doPublishAuditOrThrow(Map<String, Object> event) {
+        ChannelResult r = selectAndPublishOrThrow(event);
+        if (r == ChannelResult.NONE) {
+            throw new EngineUnavailableException(
+                    "GUARDRAIL_EVAL 审计无可发布通道（EventBusService 未装配 且 kafkaTemplate 未注入）");
+        }
+    }
+
+    private ChannelResult selectAndPublish(Map<String, Object> event) {
         // 1) runtime-event EventBusService 横切通道（类名反射查找，避免编译期依赖）
         try {
             Class<?> type = Class.forName(EVENTBUS_IMPL_FQN);
-            String[] names = applicationContext.getBeanNamesForType(type);
+            String[] names = applicationContext == null ? new String[0] : applicationContext.getBeanNamesForType(type);
             if (names.length > 0) {
                 Object bus = applicationContext.getBean(names[0]);
                 type.getMethod("publish", String.class, Object.class).invoke(bus, KafkaTopics.AUDIT, event);
-                return;
+                return ChannelResult.EVENT_BUS;
             }
         } catch (ClassNotFoundException ignored) {
             // runtime-event 不在 classpath → 走 kafkaTemplate 兜底
@@ -256,15 +311,64 @@ public class AiSecurityEngineClient {
             try {
                 Method send = kafkaTemplateBean.getClass().getMethod("send", String.class, Object.class);
                 send.invoke(kafkaTemplateBean, KafkaTopics.AUDIT, event);
-                return;
+                return ChannelResult.KAFKA_TEMPLATE;
             } catch (Exception e) {
                 log.debug("AiSecurityEngineClient: kafkaTemplate 兜底失败: {}", e.getMessage());
             }
         }
-        // 3) 无通道 → WARN 留痕
-        log.warn("AiSecurityEngineClient.audit: EventBusService/KafkaTemplate 均不可用，审计仅记日志: action={}",
-                event.get("action"));
+        return ChannelResult.NONE;
     }
+
+    private ChannelResult selectAndPublishOrThrow(Map<String, Object> event) throws EngineUnavailableException {
+        // 1) runtime-event EventBusService —— 反射失败/bean 缺失 → 上抛（红线，禁降级）
+        try {
+            Class<?> type = Class.forName(EVENTBUS_IMPL_FQN);
+            String[] names = applicationContext == null ? new String[0] : applicationContext.getBeanNamesForType(type);
+            if (names.length > 0) {
+                Object bus = applicationContext.getBean(names[0]);
+                try {
+                    type.getMethod("publish", String.class, Object.class).invoke(bus, KafkaTopics.AUDIT, event);
+                    return ChannelResult.EVENT_BUS;
+                } catch (java.lang.reflect.InvocationTargetException ite) {
+                    throw new EngineUnavailableException(
+                            "GUARDRAIL_EVAL EventBus.publish 上抛: " + describe(ite.getTargetException()), ite);
+                }
+            }
+        } catch (ClassNotFoundException ignored) {
+            // runtime-event 不在 classpath → 走 kafkaTemplate 兜底
+        } catch (EngineUnavailableException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new EngineUnavailableException(
+                    "GUARDRAIL_EVAL EventBusService 反射查找/取 bean 失败: " + describe(e), e);
+        }
+        // 2) kafkaTemplate 反射兜底 —— 未注入 → 直接抛；抛出/wrapping → 上抛
+        if (kafkaTemplateBean == null) {
+            throw new EngineUnavailableException(
+                    "GUARDRAIL_EVAL kafkaTemplate 未注入（runtime-event 亦不可用），审计发布失败");
+        }
+        try {
+            Method send = kafkaTemplateBean.getClass().getMethod("send", String.class, Object.class);
+            try {
+                send.invoke(kafkaTemplateBean, KafkaTopics.AUDIT, event);
+                return ChannelResult.KAFKA_TEMPLATE;
+            } catch (java.lang.reflect.InvocationTargetException ite) {
+                throw new EngineUnavailableException(
+                        "GUARDRAIL_EVAL kafkaTemplate.send 上抛: " + describe(ite.getTargetException()), ite);
+            }
+        } catch (EngineUnavailableException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new EngineUnavailableException(
+                    "GUARDRAIL_EVAL kafkaTemplate 反射失败: " + describe(e), e);
+        }
+    }
+
+    private static String describe(Throwable t) {
+        return t == null ? "unknown" : (t.getClass().getSimpleName() + ":" + t.getMessage());
+    }
+
+    private enum ChannelResult { EVENT_BUS, KAFKA_TEMPLATE, NONE }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private Map<String, Object> postJson(String path, Map<String, Object> body) {

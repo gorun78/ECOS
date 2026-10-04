@@ -57,4 +57,26 @@ public final class EventTypes {
         public static final String KNOWLEDGE_LINKED = "KnowledgeLinked";
         public static final String GLOSSARY_PUBLISHED = "GlossaryPublished";
     }
+
+    /**
+     * F06-03（详细设计-06 §294 + §297）— Agent 工具裁决 GUARDRAIL 事件族。
+     * <p>咽喉 {@code AgentToolPolicyGate.adjudicate} 的每次裁决（ALLOW/DENY/FAIL_CLOSED）
+     * 经 {@code EventBusService.publish(KafkaTopics.AUDIT, event)} 发出一条
+     * {@code eventType=GUARDRAIL_EVAL} 事件；detail 内的 {@code decision} 字段
+     * 区分三态（PRD-06 §1.4）。{@code GUARDRAIL_DENIED} / {@code GUARDRAIL_FAIL_CLOSED}
+     * 作为错误分类常量（F06-14 错误分类层复用），此处一并登记避免 ai-engine
+     * 侧自定义字符串（X-17 红线：事件类型必须在 common-api 单源）。</p>
+     */
+    public static final class Guardrail {
+        public static final String GUARDRAIL_EVAL = "GUARDRAIL_EVAL";
+        public static final String GUARDRAIL_DENIED = "GUARDRAIL_DENIED";
+        public static final String GUARDRAIL_FAIL_CLOSED = "GUARDRAIL_FAIL_CLOSED";
+
+        /** Detail 段 decision 取值（与 tool 类型/来源正交，仅表达裁决结论） */
+        public static final class Decision {
+            public static final String ALLOW = "ALLOW";
+            public static final String DENY = "DENY";
+            public static final String FAIL_CLOSED = "FAIL_CLOSED";
+        }
+    }
 }

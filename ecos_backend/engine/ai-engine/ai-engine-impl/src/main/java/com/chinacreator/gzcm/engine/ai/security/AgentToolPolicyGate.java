@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.security;
 
+import com.chinacreator.gzcm.common.event.EventTypes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -157,10 +158,16 @@ public class AgentToolPolicyGate {
                                ToolAdjudicationRequest.ActionKind op,
                                String userId, String tenantId) {
         // 0) 主体必须来自 token 上下文（无主体 → 无法裁决 → FAIL_CLOSED，禁匿名放行）
+        //    F06-03：此态也发 GUARDRAIL_EVAL（decision=FAIL_CLOSED）——审计对账 §1.5-1 需要"每次
+        //    工具执行 ↔ 恰好一条事件"，不允许"连主体都解析不到 → 静默 return"旁路
         if (userId == null || userId.isBlank() || "anonymousUser".equals(userId)) {
             log.warn("F06-01 FAIL_CLOSED: 缺少 token 主体（userId=null/anonymous），拒绝执行工具: tool={}",
                     toolName);
-            return Decision.deny("无 token 主体，禁止执行（GUARDRAIL_FAIL_CLOSED，fail-closed §2.4-6）");
+            emitGuardrailEvalOrFold(userId, toolName, EventTypes.Guardrail.Decision.FAIL_CLOSED,
+                    null, 0L, EventTypes.Guardrail.GUARDRAIL_FAIL_CLOSED,
+                    null);
+            return Decision.deny("无 token 主体，禁止执行（GUARDRAIL_FAIL_CLOSED，fail-closed §2.4-6）")
+                    .with(0L, null, null);
         }
         Map<String, Object> merged = new LinkedHashMap<>();
         merged.put("resource", "agent_tool:" + toolName);
@@ -171,25 +178,81 @@ public class AgentToolPolicyGate {
         boolean allowed = securityEngineClient.evaluate(userId, tenantId, ACTION, merged);
         long latencyMs = (System.nanoTime() - startNs) / 1_000_000;
 
-        // 2) 审计留痕（§2.4-5）：allow / deny 均经 client.audit 走 Kafka ecos.audit
-        String verdict = allowed ? "ALLOW" : "DENY";
-        try {
-            securityEngineClient.audit(userId, ACTION + ":" + toolName,
-                    "tool=" + toolName + " latencyMs=" + latencyMs, verdict);
-        } catch (Exception e) {
-            log.warn("F06-01 审计留痕发送失败（不阻塞裁决结果）: tool={}", toolName, e);
-        }
-
         // 分册 01 跨册接缝：security 的 policy-engine/evaluate 现网响应尚不扩 policyId/obligations
         // （设计-06 §5.3 显式登记为追加项，本册不为 design 其内部结构）。此处以诚实缺省
         // （null / 空 List）承载结果结构五段；security 契约扩展后即可透传，本闸不反解 OPA 输出。
+        String policyId = null;
+        List<Map<String, Object>> obligations =
+                allowed ? java.util.List.of() : java.util.List.of();
+
+        // 2) F06-03 红线审计：发 GUARDRAIL_EVAL 一条（decision 三态）——失败 = DENY（fail-closed）
+        String decision = allowed
+                ? EventTypes.Guardrail.Decision.ALLOW
+                : EventTypes.Guardrail.Decision.DENY;
+        String errorClass = allowed
+                ? null
+                : EventTypes.Guardrail.GUARDRAIL_DENIED;
+        try {
+            securityEngineClient.publishGuardrailEventOrThrow(userId, buildGuardrailDetail(
+                    toolName, decision, policyId, latencyMs,
+                    obligations == null ? 0 : obligations.size(), errorClass));
+        } catch (AiSecurityEngineClient.EngineUnavailableException e) {
+            // 审计发布失败 = 裁决整体失败（红线，禁降级放行；§2.4-6 + 分册06 F06-03 §297）
+            log.warn("F06-03 GUARDRAIL_EVAL 审计发布失败 → 裁决整体 FAIL_CLOSED: tool={} reason={}",
+                    toolName, e.getMessage());
+            return Decision.deny("GUARDRAIL_FAIL_CLOSED: GUARDRAIL_EVAL 审计无法发布（红线 fail-closed，"
+                    + "policyId=" + policyId + " latencyMs=" + latencyMs + "）")
+                    .with(latencyMs, policyId, obligations);
+        }
+
         if (!allowed) {
             log.warn("F06-01 裁决拒绝: tool={} user={} latencyMs={} (GUARDRAIL_DENIED / GUARDRAIL_FAIL_CLOSED, DENY)",
                     toolName, userId, latencyMs);
             return Decision.deny("security-engine policy-engine/evaluate 裁决为 DENY 或不可用（默认 DENY，fail-closed §2.4-6）")
-                    .with(latencyMs, null, null);
+                    .with(latencyMs, policyId, obligations);
         }
-        return Decision.allow().with(latencyMs, null, null);
+        return Decision.allow().with(latencyMs, policyId, obligations);
+    }
+
+    /**
+     * F06-03 §299 载荷纪律：detail 只含摘要与 ID（tool 名 / decision 三态 / policyId / latencyMs /
+     * obligations 计数）——<b>禁</b>带工具入参原文 / SQL 原文 / 结果原文，防审计库变敏感面
+     * （联动 X-58 的 {@code changes JSONB} 治理）。
+     */
+    static Map<String, Object> buildGuardrailDetail(String tool, String decision, String policyId,
+                                                     long latencyMs, int obligationsCount,
+                                                     String errorClass) {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("tool", tool);
+        detail.put("decision", decision);
+        detail.put("policyId", policyId);
+        detail.put("latencyMs", latencyMs);
+        detail.put("obligationsCount", obligationsCount);
+        if (errorClass != null && !errorClass.isBlank()) {
+            detail.put("errorClass", errorClass);
+        }
+        return detail;
+    }
+
+    /**
+     * 主体不可解析路径的 GUARDRAIL_EVAL 补发（auditOnly=false → 失败也仅留痕不退化）。
+     * <p>Rationale for auditOnly=false: 主体不可解析态下 {@code publishGuardrailEventOrThrow} 若上抛
+     * EngineUnavailableException，本方法 catch 后<b>不</b>改变裁决（另一红线已在主体校验阶段触发）。
+     * 之所以仍强制走 orThrow：与 {@code allowDenyAndFailClosedEachEmitOneEvent} 测试语义一致——
+     * 三态都必发事件，"发到哪一题/失败后是否降级"由调用粒度决定。</p>
+     */
+    private void emitGuardrailEvalOrFold(String userId, String toolName, String decision,
+                                         String policyId, long latencyMs,
+                                         String errorClass,
+                                         List<Map<String, Object>> obligations) {
+        try {
+            securityEngineClient.publishGuardrailEventOrThrow(userId, buildGuardrailDetail(
+                    toolName, decision, policyId, latencyMs,
+                    obligations == null ? 0 : obligations.size(), errorClass));
+        } catch (AiSecurityEngineClient.EngineUnavailableException e) {
+            log.warn("F06-03 GUARDRAIL_EVAL 补发失败（主体缺失态不额外改变裁决）: tool={} reason={}",
+                    toolName, e.getMessage());
+        }
     }
 
     /** 兼容旧 4 参入口（无四段载荷/op）—— 行为与新入口等价：payloadAttrs 仅 resource 段兜底、op=null→read。 */
