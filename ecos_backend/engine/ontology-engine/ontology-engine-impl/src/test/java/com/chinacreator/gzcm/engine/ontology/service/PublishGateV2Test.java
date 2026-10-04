@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class PublishGateV2Test {
 
-    @Mock CaliberService caliberService;
+    @Mock ICaliberService caliberService;
     @Mock DataNetResourceClient datanetClient;
 
     private GateContext ctx(GateContext.MetricRef... refs) {

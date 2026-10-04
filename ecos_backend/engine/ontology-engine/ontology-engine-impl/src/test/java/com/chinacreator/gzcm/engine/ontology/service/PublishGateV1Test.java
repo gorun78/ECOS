@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class PublishGateV1Test {
 
-    @Mock CaliberService caliberService;
+    @Mock ICaliberService caliberService;
     @Mock DataNetResourceClient datanetClient;
 
     private GateContext ctx(GateContext.MetricRef... refs) {

@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.ontology.gate;
 
-import com.chinacreator.gzcm.engine.ontology.service.CaliberService;
+import com.chinacreator.gzcm.engine.ontology.service.ICaliberService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,9 +17,9 @@ public class MetricCaliberGuard {
 
     public static final String CODE = "ECOS-ONTO-040";
 
-    private final CaliberService caliberService;
+    private final ICaliberService caliberService;
 
-    public MetricCaliberGuard(CaliberService caliberService) {
+    public MetricCaliberGuard(ICaliberService caliberService) {
         this.caliberService = caliberService;
     }
 

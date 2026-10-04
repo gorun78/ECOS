@@ -7,7 +7,7 @@ import com.chinacreator.gzcm.engine.ontology.dto.CaliberVO;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberVersionVO;
 import com.chinacreator.gzcm.engine.ontology.model.Caliber;
 import com.chinacreator.gzcm.engine.ontology.model.CaliberVersion;
-import com.chinacreator.gzcm.engine.ontology.service.CaliberService;
+import com.chinacreator.gzcm.engine.ontology.service.ICaliberService;
 import com.chinacreator.gzcm.engine.ontology.service.CaliberServiceImpl.BusinessException;
 
 import org.springframework.web.bind.annotation.*;
@@ -27,9 +27,9 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/v1/ontology/calibers")
 public class OntologyCaliberController {
 
-    private final CaliberService caliberService;
+    private final ICaliberService caliberService;
 
-    public OntologyCaliberController(CaliberService caliberService) {
+    public OntologyCaliberController(ICaliberService caliberService) {
         this.caliberService = caliberService;
     }
 

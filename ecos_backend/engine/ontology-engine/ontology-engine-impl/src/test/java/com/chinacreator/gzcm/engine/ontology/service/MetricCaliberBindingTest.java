@@ -37,7 +37,7 @@ import static org.mockito.Mockito.when;
 class MetricCaliberBindingTest {
 
     @Mock MetricDefinitionRepository repo;
-    @Mock CaliberService caliberService;
+    @Mock ICaliberService caliberService;
 
     private MetricDefinitionService svc() { return new MetricDefinitionService(repo, caliberService); }
 

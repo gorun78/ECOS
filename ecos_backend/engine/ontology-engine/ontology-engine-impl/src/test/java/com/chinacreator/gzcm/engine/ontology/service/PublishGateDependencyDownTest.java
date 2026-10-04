@@ -35,7 +35,7 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class PublishGateDependencyDownTest {
 
-    @Mock CaliberService caliberService;
+    @Mock ICaliberService caliberService;
     @Mock DataNetResourceClient datanetClient;
 
     @Test
@@ -57,7 +57,7 @@ class PublishGateDependencyDownTest {
     }
 
     @Test
-    @DisplayName("口径服务不可用：CaliberService.isAvailable=false → Validate 直接短路 500 ECOS-ONTO-042")
+    @DisplayName("口径服务不可用：ICaliberService.isAvailable=false → Validate 直接短路 500 ECOS-ONTO-042")
     void caliberUnavailable() {
         when(caliberService.isAvailable()).thenReturn(false);
         PublishGateService svc = new PublishGateService(new MetricUnitAnalyzer(), caliberService,

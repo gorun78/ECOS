@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.ontology.gate;
 
-import com.chinacreator.gzcm.engine.ontology.service.CaliberService;
+import com.chinacreator.gzcm.engine.ontology.service.ICaliberService;
 import com.chinacreator.gzcm.engine.ontology.service.MetricUnitAnalyzer;
 
 import org.slf4j.Logger;
@@ -30,10 +30,10 @@ public class PublishGateService {
     private final MetricCaliberGuard v1;
     private final MetricUnitDerivationGuard v2;
     private final DatanetColumnGuard v3;
-    private final CaliberService caliberService;
+    private final ICaliberService caliberService;
 
     public PublishGateService(MetricUnitAnalyzer unitAnalyzer,
-                              @Lazy CaliberService caliberService,
+                              @Lazy ICaliberService caliberService,
                               DatanetColumnGuard v3) {
         this.v1 = new MetricCaliberGuard(caliberService);
         this.v2 = new MetricUnitDerivationGuard(unitAnalyzer);

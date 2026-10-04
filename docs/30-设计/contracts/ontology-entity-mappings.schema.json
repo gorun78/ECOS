@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ontology-entity-mappings baseline contract (F03-05 / REQ-ONTO-03)",
+  "description": "GET /api/v1/ontology/entity-mappings 冻结契约基线（PRD-03 §3.1 / 设计-03 D.2）。字段集只增不改：删除/改名/类型变更 → 构建失败（EntityMappingContractFrozenTest / EntityMappingContractCasesTest）。",
+  "responseEnvelope": {
+    "code": { "type": "integer", "example": 0 },
+    "data": { "$ref": "#/definitions/entityMapping" },
+    "traceId": { "type": "string", "description": "分册 00 增量口径（属'增'）" }
+  },
+  "definitions": {
+    "entityMapping": {
+      "type": "object",
+      "frozenFields": [
+        "entityCode",
+        "datasetId",
+        "resourceName",
+        "materialized",
+        "fieldMappings"
+      ],
+      "required": ["entityCode", "fieldMappings"],
+      "properties": {
+        "entityCode": { "type": "string", "description": "实体编码（= entity_code）" },
+        "datasetId": { "description": "数据集 ID（= 扩展属性 datasetId，缺省 domain_code）" },
+        "resourceName": { "type": "string", "description": "目标 DW 表名（= resource_name）" },
+        "materialized": {
+          "description": "实例化开关裁度：null/''/'true'/'1'=true，其他=skip（Q2_SKIP）。",
+          "type": ["string", "boolean", "null"]
+        },
+        "fieldMappings": {
+          "type": "array",
+          "description": "字段映射元素。PRD-03 §3.1 语义名为 entityField/physicalColumn/transform；交付态沿用既有 {source,target}（API 只增不改，禁改名）。命名 delta 已回填 设计-03 §七.2 校订。",
+          "items": { "$ref": "#/definitions/fieldMapping" }
+        }
+      }
+    },
+    "fieldMapping": {
+      "type": "object",
+      "frozenFields": ["source", "target"],
+      "properties": {
+        "source": { "type": "string", "description": "实体侧字段（= entityField 语义）" },
+        "target": { "type": "string", "description": "DW 物理列（= physicalColumn 语义）" },
+        "transform": { "type": ["string", "null"], "description": "可选转换（交付态暂未产出，属'增'预留）" }
+      }
+    }
+  }
+}

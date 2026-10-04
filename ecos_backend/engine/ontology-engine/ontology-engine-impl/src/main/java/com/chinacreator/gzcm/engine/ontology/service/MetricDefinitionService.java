@@ -32,9 +32,9 @@ public class MetricDefinitionService {
     private static final Logger log = LoggerFactory.getLogger(MetricDefinitionService.class);
 
     private final MetricDefinitionRepository repo;
-    private final CaliberService caliberService;
+    private final ICaliberService caliberService;
 
-    public MetricDefinitionService(MetricDefinitionRepository repo, CaliberService caliberService) {
+    public MetricDefinitionService(MetricDefinitionRepository repo, ICaliberService caliberService) {
         this.repo = repo;
         this.caliberService = caliberService;
     }

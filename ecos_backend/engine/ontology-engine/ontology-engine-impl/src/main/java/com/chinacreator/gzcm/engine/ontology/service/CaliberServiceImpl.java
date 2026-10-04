@@ -27,7 +27,7 @@ import java.util.UUID;
  * </ul>
  */
 @Service
-public class CaliberServiceImpl implements CaliberService {
+public class CaliberServiceImpl implements ICaliberService {
 
     private static final Logger log = LoggerFactory.getLogger(CaliberServiceImpl.class);
 
