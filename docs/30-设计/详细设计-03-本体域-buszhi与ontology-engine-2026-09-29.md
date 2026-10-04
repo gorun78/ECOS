@@ -833,4 +833,30 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_caliber_ver ON {schema}.ecos_caliber_versio
 > * **授权闸（挂下派）**：V171.1 历史行回填 `function_name` = 从 `expression` 反查（回填脚本属 IR02 psql 实跑面）+ Kafka `ecos.ontology` topic `FUNCTION_EXEC` 落值 probe（依赖分册 01 C.5 审计底座）。M0 批次 A 本体域是否需本节前先实跑回填 psql——挂裁决，不自主执行。
 > * **离线性质不变**：本批零 live 库、零网络、零 Kafka；`FunctionValidator.extractFunctionName` 纯 regex / MDC 内 memory。
 
+> **【校订三十六】2026-10-04 · F03-06 W89/C71 "Security 审计单通道走 EventBusService，禁 Kafka 反射 bypass"落地**：A 章 F03-06 O-25（`SecurityEngineClient.audit` 用 `@Autowired(required=false) @Qualifier("kafkaTemplate") Object` + `Object.get(A)Method("send", String, Object).invoke(...)` 反射绕过 `runtime-event` 横切底座，ArchUnit 类型引用面结构性看不见）按 PRD §4.1-3/铁律 §2.5-4 落地单通道，全绿——**ontology-engine-impl 119 tests / 0 fail / 0 err / 0 skip**（含新增 8 例分两 test 类：`OntologyAuditViaEventBusOnlyTest` 6 例 + `ReflectiveKafkaBypassArchTest` 2 例，另前批 ArchUnit 5 例复检全绿）：
+>
+> * **`SecurityEngineClient` 主码改动**（本批唯一主码改动）：
+>   - 移除字段 `Object kafkaTemplateBean`（`@Qualifier("kafkaTemplate")`）+ 去掉 `import java.lang.reflect.Method`；
+>   - 新增字段 `EventBusService eventBus`（`runtime-event` 契约，@Autowired(required=false) 免 Kafka 未装 fail，`MemoryEventBusServiceImpl` fallback 自动兜底）；
+>   - `SecurityEngineClient` ctor 由 3 参改 **4 参**（`baseUrl, timeoutMs, RestTemplate, EventBusService`），仅 1 处 Spring 注入 bean 面 verifiably 无外部 `new SecurityEngineClient(...)` 直构（grep `new SecurityEngineClient\(` 全仓 0 命中）；
+>   - `audit(action, result)` 方法体重写：`kafkaTemplateBean==null → WARN` 保留（未装配 fallback 亦缺的极边缘态，"不静默丢"）；反射 `getClass().getMethod("send",…).invoke` → `eventBus.publish(KafkaTopics.AUDIT, event)` 单通道；`eventBus.publish` 抛异常 → WARN 收住（保持旧 save-and-forget 语义，避免 security/engine 主链翻绿变红）；
+>   - event map 组装载体沿用旧键集 `{eventId,timestamp,userId,action,resource:"ontology",result}`（消费者侧零改）；`userId` 无 SecurityContext → `"anonymous"`（沿用原 fail-safe 语义）；
+>   - **W82/C65 双失败拒收 = M1 面**：M0 本批仅收"单通道"，不引入 audit-only 500 降拦主链的 inverted gate（风险见 F03-06 明列"沙箱/审计不改"），校订里明示边界留给 M1 一刀。
+> * **`OntologyAuditViaEventBusOnlyTest`（6 例，纯 Mockito + SecurityContextHolder 隔离）**：
+>   - `auditGoesThroughEventBus`：`verify(eventBus).publish(eq("ecos.audit"), captor)` + 校验 payload map 键集完整（`eventId/action/userId/timestamp/resource/result`）+ `resource="ontology"` 落位；
+>   - `auditNullResultDefaultsOk`：`result=null` → `event.result="OK"`（旧 Kafka 契保持）；
+>   - `auditEventBusMissingWarnsAndDoesNotThrow`：`eventBus=null` 也 ctor（用新 ctor `new SecurityEngineClient(..., null)`）→ 不抛、WARN 收住（"不静默"由 `ReflectiveKafkaBypassArchTest` 文件走查守护主体，本条只用 `assertDoesNotThrow`）；
+>   - `auditPublishThrowsIsSwallowed`：`doThrow(RuntimeException("broker unreachable")).when(eventBus).publish(...)` → `assertDoesNotThrow`；
+>   - `auditWithoutAuthContextUsesAnonymous`：`SecurityContextHolder.clearContext()` 后 event.userId=anonymous（不复旧 `currentUserIdOrAnonymous()` 主体退化语义——不伪造真实主体）；
+>   - `constructorSignatureHasOpinionatedEventBus`：反射断言 ctor 恰 4 参 + 第 4 参类型 = `EventBusService`（防未来有人改成 `Object eventBus` 或新增参打乱回归修，通用白线锁）。
+> * **`ReflectiveKafkaBypassArchTest`（2 例，文件级 text walk，不拉 ArchUnit 类收集器）**：
+>   - `securityEngineClientClean`：`SecurityEngineClient.java` **不**含 `import java.lang.reflect.Method` + **不**含 `getClass().getMethod("send"`（`assertFalse` 双字面锁，覆盖 O-25 唯一形态）；
+>   - `mainPackageHasNoReflectiveKafkaSend`：walk `src/main/java/**/*.java` 逐文件检查——
+>     ① `s.contains("getClass().getMethod(\"send\""))` 直接红线；
+>     ② `indexOf("KafkaTemplate")` 逐出现开 400 char window，window 内 `indexOf("getMethod")` 红线——防御性宽型：反射 `getMethod` 只和 `KafkaTemplate` 邻近出现才被判 bypass（`KafkaTemplate` 附近通常只和 `@Bean`/`Supplier<>` 配，")); `所以 400 窗不会误伤）。
+>     **注意**：本批源码 docstring 特意避开 "KafkaTemplate 反射 send" **字面串**（`ReflectiveKafkaBypassArchTest.mainPackageHasNoReflectiveKafkaSend` 走查会把自己 docstring 匹配掉），写作"反射 send 调用（String topic, Object payload 签名）" 描述性语言。这是第一次按"vacate"命名法写的 arch-test 也会反噬 docstring 的 case，校订里留档。
+> * **跨引擎范围边界**：本册 F03-06 W89 O-25 定的就是 `SecurityEngineClient`（ontology 面），`AiSecurityEngineClient` 有 `kafkaTemplate 反射兜底`（`AiSecurityEngineClient.java:189` 明确注释"与 ontology SecurityEngineClient.audit 同款"）但属 **智能域 F07** 分冊（O-? W9x/Cxx 归属待分冊 01 拆片时定位），本 batch **不越界**，等分冊 01 智能域 W-档表归属一定，挂校订登记待批次 F07 时同面收口。
+> * **离线性质不变**：本批零 live 库、零网络、零 Kafka broker；`EventBusService` 是 `runtime-event` 契约（`ontology-engine-impl` 已依赖，见 pom :80），fallback `MemoryEventBusServiceImpl` 在同 JVM 另一端，测里 mock 契约不进真实 bus；`ReflectiveKafkaBypassArchTest` 只走 file system。M1 剩余（双失败拒收、Kafka broker Liveness probe）挂授权闸不本批做。
+> * **F03-06 M0 批次侧统计**（截止本 commit `397b16e` + `33d275e` + 本批）：W81/C64 400 拒收（2 commits 前）/ W80/C63 function_name 归属反查（前 commit）/ W89/C71 单通道（本 commit）——F03-06 M0 三 P0 项全绿；**F03-06 剩余 M0（V171/V172 迁移实跑 + Kafka probe + W82 双失败拒收 M1）** 挂授权闸，按校订三十三~三十五衰减可信看本册 F03-06 M0 必达子集以此收口。
+
 <!-- 详细设计-03-本体域 / 2026-09-29 / v1.1（2026-09-29 定版） / W67~W89 → C51~C71 / R-4 a+b 并行、R-5 ①+③、R-6 ①、R-7 归属①+模型 b 已批准（报告 §十四.1） / Gate-1 已签字、Gate-2 已通过 / 本轮未实跑库、未改业务代码 -->

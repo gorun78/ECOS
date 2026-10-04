@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ontology.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +16,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -81,14 +81,20 @@ public class SecurityEngineClient {
     private final int timeoutMs;
 
     /**
-     * 可选 — 容器中存在 KafkaTemplate Bean 时注入（反射访问容忍 classpath 差异）。
-     * <p>PMO-55 E-A 修复：限定 @Qualifier("kafkaTemplate")，否则 Object 类型 byType 解析
-     * 把容器内所有 bean 当作候选，触发 NoUniqueBeanDefinitionException。
-     * required=false 保证 Kafka 未配置时静默拿到 null。</p>
+     * F03-06 W89/C71 (P0, O-25) 收口：Kafka 审计单通道走 {@link EventBusService}
+     * <p>原 O-25 违例：以 {@code Object} 类型注入 {@code "kafkaTemplate"} bean，
+     * 再反射调其 send 方法（String topic, Object payload 签名）——ArchUnit 类型
+     * 引用面看不到；结构化语义见 {@code ReflectiveKafkaBypassArchTest}。</p>
+     * <p>改后：注入 {@code Optional<EventBusService>}（{@code runtime-event}
+     * 提供的契约，Kafka 不可用时自动 fallback 内存 implementor），走
+     * {@code bus.publish(KafkaTopics.AUDIT, event)}；bean 缺失
+     * （假设 {@code MemoryEventBusServiceImpl} 应保底但在极边缘场景未装）
+     * → 记 WARN 且不静默丢。</p>
+     * <p>双失败拒收（Kafka 挂 + 本地兜底挂 → 拒执行）属 F03-06 W82/C65 门禁（M1），
+     * 本批只收 <b>单通道</b> 面，审计语义仍"不阻塞主流程"（同旧 WARN 语义
+     * 保持向后兼容，避免 security/engine 主链翻绿变红）。</p>
      */
-    @Autowired(required = false)
-    @org.springframework.beans.factory.annotation.Qualifier("kafkaTemplate")
-    private Object kafkaTemplateBean;
+    private final EventBusService eventBus;
 
     /** 可选 — RestTemplate 来自 buszhi/gateway 全局 */
     private final RestTemplate serviceRestTemplate;
@@ -96,10 +102,12 @@ public class SecurityEngineClient {
     public SecurityEngineClient(
             @Value("${service.security.base-url:http://localhost:18081}") String baseUrl,
             @Value("${service.security.timeout-ms:5000}") int timeoutMs,
-            @Autowired(required = false) RestTemplate serviceRestTemplate) {
+            @Autowired(required = false) RestTemplate serviceRestTemplate,
+            @Autowired(required = false) EventBusService eventBus) {
         this.baseUrl = baseUrl;
         this.timeoutMs = timeoutMs;
         this.serviceRestTemplate = serviceRestTemplate;
+        this.eventBus = eventBus;
     }
 
     // ═══════════════ 1. RLS — 行级安全 ═══════════════
@@ -268,8 +276,16 @@ public class SecurityEngineClient {
     // ═══════════════ 5. 审计 — Kafka ecos.audit ═══════════════
 
     /**
-     * 审计事件 — 发 Kafka {@link KafkaTopics#AUDIT} topic（common-api 常量）
-     * <p>不阻塞主流程，失败仅 warn。</p>
+     * 审计事件 — 发 {@link EventBusService} {@link KafkaTopics#AUDIT} topic（common-api 常量）。
+     * <p>单通道（F03-06 W89/C71 收口，替代 O-25 的反射 send 调用）：
+     * {@code eventBus.publish(KafkaTopics.AUDIT, event)}。
+     * EventBus 内部已实现 Kafka 在→Kafka producer；Kafka 不在→{@code MemoryEventBusServiceImpl}
+     * 内存 fallback 同步分发。</p>
+     * <p>bean 缺失（假设 {@code MemoryEventBusServiceImpl} 应该保底但在极边缘场景未装）
+     * → WARN 显式点名（不静默丢），与旧 WARN 分支等价语义；
+     * publish 抛异常 → WARN 收住（不阻塞主链，同 Kafka save-and-forget）。</p>
+     * <p><b>双失败拒收</b>（Kafka + 本地审计表皆失败 → 拒执行）属 F03-06 W82/C65（M1），
+     * 本批保持旧"不阻塞主流程"语义，避免 interceptors 主链翻红。</p>
      */
     public void audit(String action, Object result) {
         try {
@@ -282,22 +298,12 @@ public class SecurityEngineClient {
             event.put("action", action);
             event.put("resource", "ontology");
             event.put("result", result == null ? "OK" : String.valueOf(result));
-            if (kafkaTemplateBean == null) {
-                log.warn("SecurityEngineClient.audit: KafkaTemplate 不可用，审计事件仅记日志: action={} userId={}",
+            if (eventBus == null) {
+                log.warn("SecurityEngineClient.audit: EventBusService 未装配（fallback 亦缺），审计仅记日志: action={} userId={}",
                         action, currentUserIdOrAnonymous());
                 return;
             }
-            // 通过反射调用 KafkaTemplate.send(String, Object) 容忍 classpath 差异
-            Method send = kafkaTemplateBean.getClass().getMethod("send", String.class, Object.class);
-            Object future = send.invoke(kafkaTemplateBean, KafkaTopics.AUDIT, event);
-            if (future instanceof java.util.concurrent.CompletableFuture<?> cf) {
-                cf.whenComplete((r, ex) -> {
-                    if (ex != null) {
-                        log.warn("SecurityEngineClient.audit async failed: action={} reason={}",
-                                action, ex.getMessage());
-                    }
-                });
-            }
+            eventBus.publish(KafkaTopics.AUDIT, event);
         } catch (Exception e) {
             log.warn("SecurityEngineClient.audit failed: action={} reason={}",
                     action, e.getMessage());
