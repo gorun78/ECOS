@@ -140,6 +140,13 @@
             <artifactId>spring-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- F06-22（X-87）：@SpringBootTest / TestRestTemplate / @MockBean 需要 spring-boot-test + autoconfigure；
+             版本由根 pom 引入的 spring-boot-dependencies BOM 管理，不加版本，不新增 Maven 模块。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
