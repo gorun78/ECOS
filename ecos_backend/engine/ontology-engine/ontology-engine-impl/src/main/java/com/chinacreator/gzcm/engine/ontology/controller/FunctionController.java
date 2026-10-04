@@ -77,6 +77,8 @@ public class FunctionController {
         String expression = req.getExpression();
         String entityName = req.getEntityName();
         String callerId = req.getCallerId() != null ? req.getCallerId() : "anonymous";
+        // F03-06 W80/C63：函数名归属反查（O-13）——替代旧实参 null/propertyId 错位
+        String funcName = FunctionValidator.extractFunctionName(expression);
 
         // 0. 审计上下文守卫（F03-06 W81）：无 operator/traceId → 400 ECOS-ONTO-060，不进入执行
         auditContextGuard.require(callerId);
@@ -84,7 +86,7 @@ public class FunctionController {
         // 1. 安全扫描
         String forbidden = validator.quickScan(expression);
         if (forbidden != null) {
-            cacheManager.writeAudit(null, expression, entityName, null,
+            cacheManager.writeAudit(funcName, expression, entityName, null,
                 0, callerId, "FORBIDDEN", forbidden);
             return ApiResponse.badRequest(forbidden);
         }
@@ -95,7 +97,7 @@ public class FunctionController {
             @SuppressWarnings("unchecked")
             List<String> errors = (List<String>) validation.getOrDefault("errors", List.of());
             String errMsg = String.join("; ", errors);
-            cacheManager.writeAudit(null, expression, entityName, null,
+            cacheManager.writeAudit(funcName, expression, entityName, null,
                 0, callerId, "FORBIDDEN", errMsg);
             return ApiResponse.badRequest(errMsg);
         }
@@ -114,17 +116,17 @@ public class FunctionController {
             // 5. 写缓存+审计
             cacheManager.put(expression, entityName, result);
             String resultStr = result.getValue() != null ? result.getValue().toString() : null;
-            cacheManager.writeAudit(null, expression, entityName, resultStr,
+            cacheManager.writeAudit(funcName, expression, entityName, resultStr,
                 result.getExecutionTimeMs(), callerId, "SUCCESS", null);
 
             return ApiResponse.success(result);
         } catch (IllegalArgumentException e) {
-            cacheManager.writeAudit(null, expression, entityName, null,
+            cacheManager.writeAudit(funcName, expression, entityName, null,
                 0, callerId, "ERROR", e.getMessage());
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             String errMsg = e.getMessage() != null ? e.getMessage() : "未知错误";
-            cacheManager.writeAudit(null, expression, entityName, null,
+            cacheManager.writeAudit(funcName, expression, entityName, null,
                 0, callerId, "ERROR", errMsg);
             log.error("Function test failed: expression={} entity={}", expression, entityName, e);
             return ApiResponse.internalError("Function执行失败: " + errMsg);
@@ -192,6 +194,8 @@ public class FunctionController {
             @RequestParam(value = "expression", required = true) String expression,
             @RequestParam(value = "entityName", required = false) String entityName) {
         String callerId = "api_execute_" + propertyId;
+        // F03-06 W80/C63：函数名归属反查（O-13）——替代旧实参 propertyId（把主体 ID 记成函数名）
+        String funcName = FunctionValidator.extractFunctionName(expression);
 
         // 0. 审计上下文守卫（F03-06 W81）：traceId 缺失 → 400 ECOS-ONTO-060，不进入执行
         auditContextGuard.require(callerId);
@@ -199,7 +203,7 @@ public class FunctionController {
         // 1. 安全扫描
         String forbidden = validator.quickScan(expression);
         if (forbidden != null) {
-            cacheManager.writeAudit(propertyId, expression, entityName, null,
+            cacheManager.writeAudit(funcName, expression, entityName, null,
                 0, callerId, "FORBIDDEN", forbidden);
             return ApiResponse.badRequest(forbidden);
         }
@@ -210,7 +214,7 @@ public class FunctionController {
             @SuppressWarnings("unchecked")
             List<String> errors = (List<String>) validation.getOrDefault("errors", List.of());
             String errMsg = String.join("; ", errors);
-            cacheManager.writeAudit(propertyId, expression, entityName, null,
+            cacheManager.writeAudit(funcName, expression, entityName, null,
                 0, callerId, "FORBIDDEN", errMsg);
             return ApiResponse.badRequest(errMsg);
         }
@@ -226,12 +230,12 @@ public class FunctionController {
             FunctionResult result = engine.test(expression, entityName, callerId);
             cacheManager.put(expression, entityName, result);
             String resultStr = result.getValue() != null ? result.getValue().toString() : null;
-            cacheManager.writeAudit(propertyId, expression, entityName, resultStr,
+            cacheManager.writeAudit(funcName, expression, entityName, resultStr,
                 result.getExecutionTimeMs(), callerId, "SUCCESS", null);
             return ApiResponse.success(result);
         } catch (Exception e) {
             String errMsg = e.getMessage() != null ? e.getMessage() : "未知错误";
-            cacheManager.writeAudit(propertyId, expression, entityName, null,
+            cacheManager.writeAudit(funcName, expression, entityName, null,
                 0, callerId, "ERROR", errMsg);
             log.error("Function execute failed: propertyId={}", propertyId, e);
             return ApiResponse.internalError("Function执行失败: " + errMsg);

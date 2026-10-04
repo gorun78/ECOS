@@ -821,4 +821,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_caliber_ver ON {schema}.ecos_caliber_versio
 > * **离线性质不变**：本批零 live 库、零网络、零 Kafka、零 Neo4j；`TraceContext` 仅走 MDC 内存；`AuditContextGuard` 单类零 Spring DI 依赖（仅 stdlib + slf4j + `HttpStatus` + `ResponseStatusException`），故 standalone 可 `new` 直测不拉 Spring context。
 > * **仍属授权闸（本批不做）**：F03-06 剩余——V171/V172 审计列迁移实跑（IR02 psql）+ Kafka `ecos.ontology` topic audit 落值 probe + W80 `FunctionAuditAttributionTest`（对应 doc §7.3 C63/C64 的 attribution 断言）；F03-04 / F03-07 W68 / F03-10~15 / B 章 UI 均按校订三十三挂下派不重复。
 
+> **【校订三十五】2026-10-04 · F03-06 W80/C63 "函数名归属反查实参错位"落地**：A 章 F03-06 O-13（`FunctionController` 九处 `writeAudit` 调用点第一参 `function_name` 传 `null`（`/test` 五处）或 `propertyId`（`/{propertyId}/execute` 四处）—— DB 列 `function_name` 恒空 + 把"主体 ID" 误存为"函数名"，两条并侵归因信息）按 doc §F03-06 表行 1 "函数名由 expression 归属反查"落地，全绿——**ontology-engine-impl 111 tests / 0 fail / 0 err / 0 skip**（含新增 9 例 `FunctionAuditAttributionTest` + 前批 102 例回归全绿 + ArchUnit 5 例复检）：
+>
+> * **`FunctionValidator.extractFunctionName(String)`（新增 static）**：复用既有 `FUNCTION_NAME_PATTERN` / `KEYWORD_PATTERN` 两条 private regex，跳过 SQL 关键字后取首个函数调用 token（大写规范化），长度 ≤ 20；无函数调用 token 时返回 `null`（不再误写 OBJECT_ID；白线对齐：`/execute` 端 `col_a FROM emp` 这种纯引用表达式 audit 首参也是 `null`，而非 `"col_a"` 或 `propertyId`）。static 方法零 Spring 依赖，可直接测。
+> * **`FunctionController` 9 处 `writeAudit` 调用点全部修订**：`/test` 在 `callerId` 派生后、守卫 require() 前派生 `String funcName = FunctionValidator.extractFunctionName(expression)`；`/{propertyId}/execute` 同样在其 `callerId = "api_execute_" + propertyId` 后紧接派生 `funcName`。9 × `writeAudit(funcName, …)`——不再传 null / propertyId；`caller_id` 参数位保持原语义（`/test` = 请求体 `callerId`，`/execute` = `"api_execute_" + propertyId`），与 W81 `AuditContextGuard` 的 400 拒收语义正交不稀释。
+> * **`FunctionAuditAttributionTest`（9 例，纯 Mockito + MDC 内设 traceId）**：
+>   - `extractFunctionName` 直接测 3 例：`SUM/AVG/CONCAT/COALESCE`（大小写不敏感）；`SELECT 1 FROM ...` 无函数 → `null` + `WHERE ... COALESCE(name, 'x')` 跳 SELECT 命中下一个真函数；`null/空/"col_a FROM emp"` → `null`。
+>   - Controller 白线 4 例（每例 `verify(cacheManager).writeAudit(eq(...), ...)` 强绑全部 8 参）：`/test` 合规 → 首参 `SUM` + `caller_id=pmo-user-1`；`/test` 白名单失败 → 首参 `EVALUATE` + `FORBIDDEN`（`evaluate(` 不在白名单，Matcher 抓 "EVALUATE" token，虽非白名单但 `extractFunctionName` 不做白名单过滤——归属反查只关心"跑了什么 token"，白名单拦截由 `quickScan`+`validate` 独立分支）；`/test` quickScan 命中 `; DROP` → 首参 `SUM` + `FORBIDDEN`；`/execute` 合规 → 首参 `AVG` **（不再为 `prop-42`）** + `caller_id=api_execute_prop-42`；`/execute` exception → 首参 `MIN` + `ERROR`。
+>   - **白线锁 O-13 反向证明**：“`/execute` 无函数调用 token → 首参 `null`（而不是 `propertyId`）”——直接证伪 O-13 根因：老代码把 `propertyId` 塞进函数名列一定必被此断言打红。
+> * **API 只增不改**：本批未变路径/参数签名；`writeAudit` 签名/ `FunctionCacheManager` 落库 SQL 未动，只更正调用点产物；`AuditContextGuard` 400 拒收序仍第一层（在 `quickScan` 之前）。
+> * **授权闸（挂下派）**：V171.1 历史行回填 `function_name` = 从 `expression` 反查（回填脚本属 IR02 psql 实跑面）+ Kafka `ecos.ontology` topic `FUNCTION_EXEC` 落值 probe（依赖分册 01 C.5 审计底座）。M0 批次 A 本体域是否需本节前先实跑回填 psql——挂裁决，不自主执行。
+> * **离线性质不变**：本批零 live 库、零网络、零 Kafka；`FunctionValidator.extractFunctionName` 纯 regex / MDC 内 memory。
+
 <!-- 详细设计-03-本体域 / 2026-09-29 / v1.1（2026-09-29 定版） / W67~W89 → C51~C71 / R-4 a+b 并行、R-5 ①+③、R-6 ①、R-7 归属①+模型 b 已批准（报告 §十四.1） / Gate-1 已签字、Gate-2 已通过 / 本轮未实跑库、未改业务代码 -->

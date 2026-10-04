@@ -136,6 +136,29 @@ public class FunctionValidator {
         return null;
     }
 
+    /**
+     * F03-06 O-13 函数名归属反查（W80/C63）：从表达式提取首个函数名（大写规范化），
+     * 用于审计表 {@code function_name} 列落值，替代旧实参错位（传入 null / propertyId）。
+     *
+     * <p>跳过 SQL 关键字（{@code FROM/SELECT/WHERE/...}——非函数调用）；长度 > 20 的
+     * 标识符视为列/表名，不视为函数。</p>
+     *
+     * @param expression 原始表达式
+     * @return 首个函数名（大写）；无函数调用时返回 null
+     */
+    public static String extractFunctionName(String expression) {
+        if (expression == null || expression.isBlank()) return null;
+        String upper = expression.toUpperCase();
+        Matcher m = FUNCTION_NAME_PATTERN.matcher(upper);
+        while (m.find()) {
+            String funcName = m.group(1);
+            if (KEYWORD_PATTERN.matcher(funcName).matches()) continue;
+            if (funcName.length() > 20) continue;
+            return funcName;
+        }
+        return null;
+    }
+
     // ── private helpers ────────────────────────────────
 
     private void checkForbiddenPatterns(String expression, List<String> errors) {
