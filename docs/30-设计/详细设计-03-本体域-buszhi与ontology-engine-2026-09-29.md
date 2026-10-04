@@ -873,5 +873,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_caliber_ver ON {schema}.ecos_caliber_versio
 > * **离线性质不变**：DDL 静态 text walk，零 live 库、零网络；`resolveMigrationDir()` 用 `docs/ + ecos_backend/` 双同存锚定仓根，同 F03-05 合同护栏走法。
 > * **门禁状态回落校订**：本文件 footer 尾注释"本轮未改业务代码"（v1.1 定版行）自 cbc8cd5 起即失配（W73/W74/W75/W76 已改主码），本批不重写 header，改为校订追加登记对账——footer 尾注释重建留待全 M0 收口批一并处理，避免每次 commit 都 toggle 尾注释破坏单一语义。
 
+> **【校订三十八】2026-10-04 · F03-07 W84/C68 "kb→ontology 跨引擎取数失败 fail-loud"落地**：A 章 F03-07 O-6（`KbEntityInstanceExtractionService.java:107` `@Value("${ecos.ontology-api-base:http://localhost:8080/api/v1}")` 默认指向 gateway 自身端口 = ADR-15 S0 态"进程内 HTTP 自环"，切 S3 后指向必错）的**可离线验证子集**——"失败不得静默"红线——补护栏（本册 §七.1 命名单测 `CrossEngineFailLoudTest`，分册 02 同名 `C8DegradationFailLoudTest` 扩展至 ontology 面）未落地，本批全绿——**kb-engine-impl 129 tests / 0 fail / 0 err / 0 skip**（含新增 3 例 + 全模块 ArchUnit/回归复检全绿）：
+>
+> * **`CrossEngineFailLoudTest`（3 例，纯 Mockito mock JdbcTemplate + RestTemplate，不触库/不 Spring/不联网）**：
+>   - `mappingEndpointUnavailable_isLoud`：`restTemplate.getForObject(startsWith("…/ontology/entity-mappings"), _)` 抛 `RuntimeException`（模拟自环指向未运行端口）→ 抽取报告 `issues` **必含** `MAPPING_UNAVAILABLE`，且 `nodeCreated==0 && nodeUpdated==0`（禁静默成功 / 禁假成功数据）。此为 fail-loud 主断言。
+>   - `mappingThreadedButEmpty_isNotUnavailable`（白线）：端点可达但返回空 `data:[]` → **不**落 `MAPPING_UNAVAILABLE`（真完成态 vs 降级态不混淆，防护栏过紧把"真无数据"误判为"探针挂了"）。
+>   - `noSnapshots_doesNotFalseReportMappingUnavailable`（白线）：`kb_ontology_snapshot` 空 → 抽取在进映射拉取前即 `NO_SNAPSHOT` 收口，**不**误报 `MAPPING_UNAVAILABLE`（判定范围与映射可用性解耦）。
+> * **寻址改码 = 授权闸（本批不动）**：W84 的"两态寻址（monolith :8080 / service :18083，经 gateway `ServiceEndpointResolver` + `route-manifest.json`，同分册 02 W55）"**改码**部分与 ADR-15 切 S3 同批，属授权闸项——引擎侧**不能** import gateway 的 `ServiceEndpointResolver`（引擎→gateway 反向依赖违架构），寻址字面量重排须与 route-manifest 切流同批授权；本批只锁可离线验证的"失败不可静默"语义底线。**注**：kb src/main 另有 `EcosOntologyEventConsumer:72`/`KnowledgeNavSecurityEngineClient:52` 存量 `@Value` `:18083`/`:18081` 默认值，属分册 01 智能域/安全域既有面，本批不越界收口（同校订三十六 O-25 跨分册纪律）。
+> * **Mockito 取巧留档**：`JdbcTemplate.queryForList` 有两重载（`<T>(String,Class<T>)` / `(String,Object...)`），stub 变长参数用 `ArgumentMatchers.<Object>any()` 消歧（类型目标是 `Object` 故落 varargs 重载，返回 `List<Map<String,Object>>`），不混用 `anyString()` matcher + 裸值（触发 Mockito "所有参数须 matcher" 红线）。
+> * **离线性质不变**：纯 mock，`JdbcTemplate`/`RestTemplate` 均契约桩；`emitAudit` 仅 log（无 EventBus 依赖），`flushEdges` 空候选 no-op，故全程零库零网。
+>
+
 
 <!-- 详细设计-03-本体域 / 2026-09-29 / v1.1（2026-09-29 定版） / W67~W89 → C51~C71 / R-4 a+b 并行、R-5 ①+③、R-6 ①、R-7 归属①+模型 b 已批准（报告 §十四.1） / Gate-1 已签字、Gate-2 已通过 / 本轮未实跑库、未改业务代码 -->
