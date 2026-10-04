@@ -132,6 +132,14 @@ public class ApiResponse<T> implements Serializable {
     public int getCode() { return code; }
     public void setCode(int code) { this.code = code; }
 
+    /**
+     * 错误码（串面，如 {@code ECOS-KB-050}）。业务成功/无错误码时为 null（NON_NULL 序列化省略）。
+     * 增量 getter（API 只增不改）：暴露已由 {@link #error(int, String, String)} 工厂设定的字段，
+     * 使 Jackson 可将串面码一并写入响应体——修复 D.5"错误码进响应体"的内部约定 P0 缺口。
+     */
+    public String getErrorCode() { return errorCode; }
+    public void setErrorCode(String errorCode) { this.errorCode = errorCode; }
+
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
 
