@@ -14,7 +14,7 @@ import java.util.Optional;
  *
  * <p>口径服务不可用（同 JVM 宿主下 = bean 异常）→ 指标发布 fail-closed，见 F03-01 异常与降级。
  */
-public interface CaliberService {
+public interface ICaliberService {
 
     // ── 读（口径主权：跨引擎只读入口）────────────────────
     List<Caliber> listCalibers();

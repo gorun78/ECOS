@@ -9,6 +9,7 @@ import com.chinacreator.gzcm.engine.ontology.engine.FunctionCacheManager;
 import com.chinacreator.gzcm.engine.ontology.engine.FunctionResult;
 import com.chinacreator.gzcm.engine.ontology.engine.FunctionSandboxEngine;
 import com.chinacreator.gzcm.engine.ontology.engine.FunctionValidator;
+import com.chinacreator.gzcm.engine.ontology.gate.AuditContextGuard;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,13 +52,16 @@ public class FunctionController {
     private final FunctionValidator validator;
     private final FunctionSandboxEngine engine;
     private final FunctionCacheManager cacheManager;
+    private final AuditContextGuard auditContextGuard;
 
     public FunctionController(FunctionValidator validator,
                               FunctionSandboxEngine engine,
-                              FunctionCacheManager cacheManager) {
+                              FunctionCacheManager cacheManager,
+                              AuditContextGuard auditContextGuard) {
         this.validator = validator;
         this.engine = engine;
         this.cacheManager = cacheManager;
+        this.auditContextGuard = auditContextGuard;
     }
 
     // ═══════════════ POST /test ═══════════════════
@@ -73,6 +77,9 @@ public class FunctionController {
         String expression = req.getExpression();
         String entityName = req.getEntityName();
         String callerId = req.getCallerId() != null ? req.getCallerId() : "anonymous";
+
+        // 0. 审计上下文守卫（F03-06 W81）：无 operator/traceId → 400 ECOS-ONTO-060，不进入执行
+        auditContextGuard.require(callerId);
 
         // 1. 安全扫描
         String forbidden = validator.quickScan(expression);
@@ -185,6 +192,9 @@ public class FunctionController {
             @RequestParam(value = "expression", required = true) String expression,
             @RequestParam(value = "entityName", required = false) String entityName) {
         String callerId = "api_execute_" + propertyId;
+
+        // 0. 审计上下文守卫（F03-06 W81）：traceId 缺失 → 400 ECOS-ONTO-060，不进入执行
+        auditContextGuard.require(callerId);
 
         // 1. 安全扫描
         String forbidden = validator.quickScan(expression);
