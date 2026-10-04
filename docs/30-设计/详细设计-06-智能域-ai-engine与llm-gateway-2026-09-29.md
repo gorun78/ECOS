@@ -1024,3 +1024,62 @@ CREATE INDEX IF NOT EXISTS idx_agdl_tool  ON ecos_ai.ecos_ai_guardrail_decision_
 **本册一句话结论**：智能域的实测形态是"咽喉已在、闸门未装，门面在、计量断，界面在、真值无"——PRD-06 五项主责能力一条都不达标，但改造路径清晰且**不需要新增平行入口**：把 `ToolExecutorService#execute` 的裁决面从"仅 SQL"扩到全工具类型并 fail-closed、把 LLM 出口与 api-key 收一于 llm-gateway、把压缩从"条数+截断+物理删除"改为"token+结构化摘要+逻辑归档"、把 traceId 从进程内 8 位串换成 MDC 全链贯通、把五个场景工具从硬编码白名单改为声明式注册表并强挂引用后校验；同时必须先建 AI 测试底座（P-1），否则这套 P0 红线的验收无载体。六项存量归属议题（R-18~R-23）交由裁决，本册不擅自迁移。
 
 <!-- 详细设计-06-智能域 / 2026-09-29 / v1.2（2026-09-29 定版） / W140~W164 → C122~C146 / R-18~R-23 与 R-37/R-39/R-41/R-47/R-50 已批准（报告 §十四.1） / Gate-1 已签字、Gate-2 已通过 / 本轮未实跑库、未改业务代码 -->
+
+---
+
+## 【校订·一】A-batch P0 咽喉+护栏 五连绿（2026-10-04，本地未 push）
+
+> **口径**：只增记，不动既文。本段为 A-batch P0 咽喉（F06-01~05）落地佐证，尚未触发 8.3「编号回填 ARCH_SPEC C122~C146」条款（条款纪律：本册**收卷即刻**回填，非每 F 项落即回填；本段证明 A-batch 侧 4/5 C 项已具备回填物质条件）。剩余 F06-06~21、B 章前端、跨分册截面全部**授权闸/跨分册**，维持红不 fake 本地测试假绿。
+
+### 一、commit 落点与全模块绿
+
+| commit | 主题 | C 项 | 全模块 surefire |
+|:--|:--|:--|:--|
+| `bf1efe9` | F06-01 P0 咽喉全工具类型（W140/W141, C122/C123 部分） | C122, (C127 半·超时 2000ms 落码) | ai-engine-impl 55/0/0 BUILD SUCCESS |
+| `caa45bb` | F06-02 裁决载荷四段 + obligations 脱敏接线（W144, C126） | C126 | ai-engine-impl 62/0/0 |
+| `7df9f80` | F06-03 GUARDRAIL_EVAL 审计事件红线接线 3 测试（W143, C125） | C125 | ai-engine-impl 68/0/0 |
+| `c5c71fb` | F06-04 输入/输出护栏改经 security-engine 且 fail-closed（W142, C124） | C124 | ai-engine-impl 72/0/0 |
+| `c64e90d` | F06-05 LLM 出口唯一化 + api-key 死线程清理 + provider 空目录护栏（W146, C128 咽喉侧） | C128（咽喉侧半） | ai-engine-impl 71/0/0, data-engine-impl 318/0/0/1 |
+
+### 二、C 项回填物质条件（A-batch 侧已备齐半）
+
+- **C122**（咽喉全工具类型）：**落码+护栏齐**——`ToolGuardrailChokepointTest`(3) 含 `everyToolTypeReceivesExactlyOneEvaluate`/`nonSqlToolsAreAlsoAdjudicated`；`ToolChokepointArchTest#noBypassOfToolExecutorService`（源码级冻结外咽喉直调）。
+- **C123**（sandbox fail-closed）：**落码+护栏齐**——`ToolGuardrailChokepointTest#sandboxReviewerFailureYieldsDenyNotPass`；`AgentToolPolicyGateTest#timeoutTwoSecondsFailClosed` 顺带覆盖了 C127（W145 超时 2000ms，X-19 已对齐 PRD）。
+- **C124**（输入/输出 fail-closed 经 security）：**落码+护栏齐**——`GuardrailFailClosedTest`(3) + `GuardrailComplianceArchTest`(1，源码级禁 `Pattern.compile`/`.matcher().find()` 充当放行依据)。
+- **C125**（GUARDRAIL_EVAL 一裁决一事件 + 发布上抛）：**落码+护栏齐**——`GuardrailAuditEventTest#allowDenyAndFailClosedEachEmitOneEvent` + `#auditPublishFailureFailsClosed` + `#eventCarriesNoRawPayload`（3 例）。
+- **C126**（payload 四段 + obligations 执行）：**落码+护栏齐**——`ToolAdjudicationPayloadTest`(6) + `ObligationsApplyTest`(4) + grep 门禁 8 正则命中零。
+- **C127**（2s 超时）：**落码**——`AgentToolPolicyGate` 缺省 2000ms + `AgentToolPolicyGateTest#timeoutTwoSecondsFailClosed`（后续 F06-01⑤ 已 commit `7ccae3a` 补外咽喉 0 直调 arch 护栏）。
+- **C128**（LLM 唯一出口）：**咽喉侧半已备齐**——`LlmSingleExitArchTest#engineMustNotOwnProviderAbstraction` + `#noRawApiKeyFieldInEngineSideRequest`（2 例源码级护栏，engine 侧 `LLMProvider` 引用 0 命中 + engine 侧 `.setApiKey(` 0 命中）；`AgentProviderControllerTest`(3) 空目录 501。**次级未落（诚实接缝）**：`LLMGatewayService` 全面 `@Deprecated` 需先迁 4 处 ai-engine consumer（AgentConfigService/AgentCallController/ClassificationController/NLQController）→ 跨窗口，归 F06 后续 P1 派生面（详见 §8.6 J-x 登记）。
+
+### 三、诚实接缝登记（J-1~J-7，带跳回代价）
+
+| J-n | 项 | 状态/跳回代价 |
+|:--|:--|:--|
+| J-1 | F06-02 分册 01 seam：security `/evaluate` 响应扩展 `policyId/obligations[]` | **阻塞**：分册 01 尚未扩字段 → 本落点现网恒拿 `null/[]`，本地测试用 stub。跳回：分册 01 需扩 `SecurityDecisionService.evaluate()` 返回体并同步本文中 8.5 接缝第一行契约。**不 fake 字段**——`AgentToolPolicyGate.Decision` 结构已预留位，只填真值。 |
+| J-2 | `ToolAdjudicationRequest` 落位 api 模块 vs impl 模块 | **落**：暂放 `ai-engine-impl/security` 包（api 无测试基建、铁律禁 api 内逻辑）；本册 doc 点名放 api 属跨册暂留共享面，本窗只服务 ai-engine 岔口。**跳回代价**：如认知域/workspace 后续复用需搬 api → 单点 rename + 双 consumer 切。 |
+| J-3 | F06-02 `rowFilter`/`row_filter` obligations 保守 fail-closed | **落**：现只支持 `mask`，`rowFilter` 行级谓词属 RLS 算法引擎侧不评估（[[project-data-domain-rules]] §三 铁律 3）。**跳回代价**：若下窗要求支持 → 需经 security 新增 `/api/v1/security/row-filter/apply` 端点（分册 01 新端点），非本册越权。 |
+| J-4 | F06-02 applier 只 log field 名不打值（防值索进日志） | **落**：`AgentToolObligationsApplier.summarize` 只 log `kind+field`。**跳回代价**：无——已是保守口径。 |
+| J-5 | F06-03 主体缺失态不得静默旁路（I-1「每次执行↔恰好一条事件」） | **落**：主体缺失走 `emitGuardrailEvalOrFold` 补发 FAIL_CLOSED 事件（catch 后不改变已定的 DENY 裁决，但事件仍发）。**跳回代价**：无——已锁 `I-1`。 |
+| J-6 | F06-04 security `/api/v1/security/guardrail/screen` 端点尚未入网（分册 01 文本审核端点） | **诚实阻塞**：现网恒抛 → 恒 fail-closed，本地不 fake 本地正则假绿。**跳回代价**：分册 01 需补该端点，见需求检视 §14.6；分册 06 侧已备齐 `SecurityEngineClient.screenOrThrow` 客户端+三态 `GUARDRAIL_EVAL` 事件，端点入场即点亮。 |
+| J-7 | F06-05 要点4 `SecurityEngineBridge` reflection→REST 转换（R-18 裁决默认 ① REST） | **未落（跨窗口）**：llm-gateway 侧改动，非本 ui-engine-impl 文件集范围；语义由要点 1/2 REST 单出口先行满足。**跳回代价**：下窗回 llm-gateway 收口，需切 `SecurityEngineBridge.resolveSecret` 从反射改 REST，同时删同 JVM 反射桥（分册 05 C113 同批口径，联动 R-18/R-16）。 |
+
+### 四、本窗新踩坑（跨窗复用，非本册特有）
+
+- **Javadoc 内嵌 `*/` 提前终止注释**：`{@code /*...*/}` 中 `*/` 会终止 Javadoc 块 → 「需要<标识符>」编译错（`GuardrailComplianceArchTest` 首版 / `LlmSingleExitArchTest` 首版各踩一次）。规则：写注释禁在 `{@code ...}` 中放 `*/`。
+- **`ApiResponse` 无 `error(int, Map)` 重载**：只有 `error(int, String)` / `error(int, String errorCode, String message)`。空目录 501 意图的负债：`ApiResponse.error(501, "llm-gateway provider 目录不可用或为空（stub=true 模式）")`——把 stub=true 编进 message 字面。
+- **`mvn|grep` 掩盖 maven 退出码**：末尾 `| grep` 返回 grep exit，maven 失败也显 0。**修**：`${PIPESTATUS[0]}` 或查 output 中 `BUILD SUCCESS/FAILURE`/`.java:[` 三选一。
+- **`StringBuilder.append(CharSequence, CharSequence)` 不存在**：链式 `append(src).append("\n")`。
+- **改 common-api 常量后必 `-am install` 非 `-am test`**：common-api 未被 install 时，ai-engine-impl 编译读的是 ~/.m2 旧 jar → `cannot find symbol`（F06-03 首次踩，F06-05 二次证伪）。
+- **`doThrow` 非 `when().thenThrow`**：Mockito void 方法必须用 `doThrow(e).when(mock).voidMethod(...)`；`when(voidReturning).thenThrow` 编译红（`thenThrow` 无 O 泛型 return）。
+
+### 五、非本册窗口同批落档提醒（跨窗协同）
+
+- **前端**（非本 goal owner）：`ecos_frontend/src/components/{LanguageContext,Sidebar}.tsx` + `main.tsx` 并发窗 WIP 未 commit，勿混入本册 doc 校订 commit。
+- **数据域**（非本 goal owner）：`docs/30-设计/详细设计-05-认知域-cognitive-engine与aiming-2026-09-29.md` 已 UPDATED，属他窗，本册不代改。
+- **sysman/jwt 相关工作**（非本 goal owner）：`sysman-boot/application.yml` + 未跟踪 `AnonymousEndpointInventoryTest`/`JwtDenyTest` + `gateway/routing/` 均属他窗。
+
+### 六、下一跳（非本 A-batch 收尾范围）
+
+- **B 批（M1/M2）**：F06-06/07/08（traceId/计量/回放）、F06-09/10（压缩+内存）、F06-11/12/13（场景工具+引用后校验）、F06-14/15（错误矩阵）、F06-16/18（持久化纪律+DDL）、F06-19/21（前端 B 章）、F06-20（文档真实性）。全部授权闸/跨分册/跨模块依赖项，非本窗 A-batch 可推进。
+- **编号回填**：C122~C146 待本册**完整收卷**后再一次性回填 ARCH_SPEC §十一（8.3 表 + §8.1 纪律）；本 【校订·一】只作 A-batch 侧落档佐证。
+- **未 push**：本 goal 全部 commit 在 local `release/v2.1-alpha`，`origin...HEAD` ≈**106 ahead**（含 c64e90d 与本 【校订·一】 commit）。**push 需用户显式授权**。
