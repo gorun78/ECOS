@@ -41,25 +41,25 @@ public class WorkflowApprovalRepository {
 
     public Optional<WorkflowApprovalEntity> findById(String id) {
         List<WorkflowApprovalEntity> list = jdbc.query(
-            "SELECT * FROM ecos_workflow_approval WHERE id = ?", ROW_MAPPER, id);
+            "SELECT * FROM ecos_ontology.ecos_workflow_approval WHERE id = ?", ROW_MAPPER, id);
         return list.isEmpty() ? Optional.empty() : Optional.of(list.get(0));
     }
 
     public List<WorkflowApprovalEntity> findByTaskId(String taskId) {
         return jdbc.query(
-            "SELECT * FROM ecos_workflow_approval WHERE task_id = ? ORDER BY created_at",
+            "SELECT * FROM ecos_ontology.ecos_workflow_approval WHERE task_id = ? ORDER BY created_at",
             ROW_MAPPER, taskId);
     }
 
     public List<WorkflowApprovalEntity> findByInstanceId(String instanceId) {
         return jdbc.query(
-            "SELECT * FROM ecos_workflow_approval WHERE instance_id = ? ORDER BY created_at",
+            "SELECT * FROM ecos_ontology.ecos_workflow_approval WHERE instance_id = ? ORDER BY created_at",
             ROW_MAPPER, instanceId);
     }
 
     public int insert(WorkflowApprovalEntity entity) {
         String sql = """
-            INSERT INTO ecos_workflow_approval
+            INSERT INTO ecos_ontology.ecos_workflow_approval
             (id, task_id, instance_id, approver, decision, opinion, form_data, created_at)
             VALUES (?,?,?,?,?,?,?::jsonb, NOW())
             """;

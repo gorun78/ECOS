@@ -882,6 +882,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_caliber_ver ON {schema}.ecos_caliber_versio
 > * **寻址改码 = 授权闸（本批不动）**：W84 的"两态寻址（monolith :8080 / service :18083，经 gateway `ServiceEndpointResolver` + `route-manifest.json`，同分册 02 W55）"**改码**部分与 ADR-15 切 S3 同批，属授权闸项——引擎侧**不能** import gateway 的 `ServiceEndpointResolver`（引擎→gateway 反向依赖违架构），寻址字面量重排须与 route-manifest 切流同批授权；本批只锁可离线验证的"失败不可静默"语义底线。**注**：kb src/main 另有 `EcosOntologyEventConsumer:72`/`KnowledgeNavSecurityEngineClient:52` 存量 `@Value` `:18083`/`:18081` 默认值，属分册 01 智能域/安全域既有面，本批不越界收口（同校订三十六 O-25 跨分册纪律）。
 > * **Mockito 取巧留档**：`JdbcTemplate.queryForList` 有两重载（`<T>(String,Class<T>)` / `(String,Object...)`），stub 变长参数用 `ArgumentMatchers.<Object>any()` 消歧（类型目标是 `Object` 故落 varargs 重载，返回 `List<Map<String,Object>>`），不混用 `anyString()` matcher + 裸值（触发 Mockito "所有参数须 matcher" 红线）。
 > * **离线性质不变**：纯 mock，`JdbcTemplate`/`RestTemplate` 均契约桩；`emitAudit` 仅 log（无 EventBus 依赖），`flushEdges` 空候选 no-op，故全程零库零网。
+
+> **【校订三十九】2026-10-04 · F03-13 W85/C69 "审批表 schema 漂移切链 + 走查护栏"落地**：A 章 F03-13（O-17）`ecos_workflow_approval` 跨 schema 漂移——V47 曾 `SET SCHEMA ecos_workflow`、V173 又在 `ecos_ontology` 重落合规形态，而 buszhi `WorkflowApprovalRepository` 源码仍以**裸表名**查询 → 最前 schema 搜索下结构必败（relation does not exist）。本批切链 + 护栏全绿——**ontology-engine-impl 128 tests / 0 fail / 0 err / 0 skip**（前批 124 + 新增 4 例 + 全模块 ArchUnit 复检）+ **buszhi-impl `mvn compile` 通过**（本次改的是 SQL 字符串，非架构面）：
+>
+> * **切链（主码，W85 范围内）**：`WorkflowApprovalRepository.java` 4 处 SQL（`findById`/`findByTaskId`/`findByInstanceId`/`insert`）裸名 `ecos_workflow_approval` → **`ecos_ontology.ecos_workflow_approval`**（与 V173 真源 `CREATE TABLE IF NOT EXISTS ecos_ontology.ecos_workflow_approval` 同 schema；V47 的 `ecos_workflow` 是历史，现存真源在 V173）。
+> * **`WorkflowApprovalTableReachableTest`（4 例，DDL/源码 file-walk，零 live 库，不 Spring）**——落 ontology-engine-impl 侧（V173 落真源 schema 是本册担管），以仓根相对路径走查 buszhi-impl：
+>   - `v173OfficialCreateTableAnchorPresent`：V173 含 `CREATE TABLE … ecos_ontology.ecos_workflow_approval (` 合规建表句（防未来挪真源）；
+>   - `buszhiImplCodeHasNoBareApprovalTableName`：buszhi-impl 全部 `src/main/java` 去注释后，禁**裸表名**（未被 `ecos_ontology.` 前缀修饰的审批表 token），任何非注释代码出现即红；
+>   - `repositoryReferencesSchemaQualifiedTableName`（正面）：审批仓库显式引用 schema 限定名 ≥ 3 处；
+>   - `v47HistoricalAltersAreOutOfScope`（白线）：V47 历史 `SET SCHEMA` 段不叠 V173 合规建表句（真源唯一性，防两处叠建同表）。
+> * **跨栏边界纪律（同校订三十六）**：① 本护栏**只锁审批表**，不扩 `ecos_workflow_*` 兄弟表（主表/实例/日志 v2 归 W86/O-18 双模型 + 物理删除面）；② 本项**只锁 schema 限定**，`SELECT *`(IR04) 与 `?::jsonb`(MC03 方言列) 归 **W86/C70**，不本项扩；③ **live-DB 版 `SchemaDriftLintTest`（§7.1 设计：`pg_tables` 实存集合差集）需真库，属授权闸项**——本批以离线 file-walk 走查（DDL 真源 vs 代码消费方）收口 O-17 的必败面，live-DB 差集版挂闸。
+> * **self-lock 陷阱留档（校订三十六同源）**：测试类表名常量拆 `"ecos_workflow" + "_approval"` 二段拼接、裸名 pattern 用 `(?<![\w.])TABLE(?![\w.])`（前瞻/后顾排除 `.`，schema 限定名不误判为裸名），且本文件不写裸表名连续可 hit 字面量——避免护栏把自己 docstring 咬红。
+> * **门禁对账**：F03-07（W84）+ F03-13（W85）两条 M0 P0 均落离线可验子集，F03-06 三 P0（W80/W81/W89）+ F03-03 六 P0（W73~W77）已在前批收口——**本册 A 章 M0 必达子集（W71~W76、W80、W81、W84、W85、W89）至此全部离线落地**；余 W77 后的 M1 项（V171/V172/V174 迁移实跑、Kafka probe、W82 双失败拒收、W83/W86、live-DB SchemaDrift）挂授权闸。
+>
 >
 
 
