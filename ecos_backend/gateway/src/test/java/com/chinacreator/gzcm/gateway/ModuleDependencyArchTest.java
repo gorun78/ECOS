@@ -92,6 +92,10 @@ public class ModuleDependencyArchTest {
         candidatePaths.add(Paths.get("services/aiming/target/classes"));
         candidatePaths.add(Paths.get("runtime/runtime-core/target/classes"));
         candidatePaths.add(Paths.get("runtime/common-api/target/classes"));
+        // F06-17①（X-26）：llm-gateway 此前不在任何 candidatePath，而主分支只要命中任一目录
+        // 就走 importPaths（classpath 兜底仅在 classPaths 为空时触发）→ 正常构建下 llm-gateway
+        // 类永不入宇宙，所有 noClasses() 规则对它不可见（X-26 盲区，本域 Runtime 底座逃逸 ArchUnit）。
+        candidatePaths.add(Paths.get("runtime/llm-gateway/target/classes"));
         candidatePaths.add(Paths.get("gateway/target/classes"));
 
         // 向上查找 ecos_backend 项目根
@@ -325,6 +329,25 @@ public class ModuleDependencyArchTest {
             .because("铁律 v1.6 §0.3.1：gateway 是顶层 facade，不向 engine/service/workspace 内嵌依赖")
             .allowEmptyShould(true);
         rule.check(allClasses);
+    }
+
+    /**
+     * F06-17①（X-26 / W150 → C132）：证明 llm-gateway 的类真正进入了本测试的
+     * ArchUnit 宇宙。此前它不在任何 candidatePath，正常构建下其类永不入宇宙，
+     * 所有 {@code noClasses()} 规则对 llm-gateway 内部违规（如 {@code AgentSchedulerImpl}
+     * 自建线程池）一律不可见。本断言以「宇宙内存在 llm-gateway 包类」为门禁：
+     * 一旦 candidatePath 再次被误删或该模块重建路径变更，本用例 FAIL，
+     * 而不是像过去那样静默判空放行。
+     */
+    @Test
+    void llmGatewayIsInsideTheUniverse() {
+        long gatewayClasses = allClasses.stream()
+                .filter(c -> c.getPackageName().matches("com\\.chinacreator\\.gzcm\\.runtime\\.llm\\..*"))
+                .count();
+        org.junit.jupiter.api.Assertions.assertTrue(gatewayClasses > 0,
+                "llm-gateway（com.chinacreator.gzcm.runtime.llm..）类未进入 ArchUnit 宇宙（X-26 盲区复发："
+                        + "candidatePaths 缺少 runtime/llm-gateway/target/classes 或该模块 target/classes 未构建）");
+        System.out.println("[ModuleDependencyArch] llm-gateway universe visible: " + gatewayClasses + " classes");
     }
 
     /**
