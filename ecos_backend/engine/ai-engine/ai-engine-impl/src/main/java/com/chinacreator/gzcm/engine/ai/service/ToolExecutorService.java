@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
-import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlSecurityGate;
+import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlWhitelist;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -68,15 +68,18 @@ public class ToolExecutorService {
     @Autowired
     private ToolRegistry toolRegistry;
 
-    // H8-T4 (PMO-74 L3): Agent 工具 SQL 安全闸 —— 表/列白名单 + security-engine
-    // policy-engine/evaluate 裁决（铁律 §2.4-4/§2.4-6；不可用/超时/不可解析 = DENY）。
+    // H8-T4 (PMO-74 L3) 升格 F06-01: Agent 工具裁决闸 —— 全工具类型 ABAC 裁决
+    //（咽喉 policyEvaluate 唯一入口）+ SQL 型静态/白名单子步骤（铁律 §2.4-4/§2.4-6；
+    // security 不可用/超时/不可解析 = 默认 DENY / FAIL_CLOSED）。
     // setter 注入与本类 jdbcTemplate 既有风格一致（字段注入存量清单归 H11-T3 统一整改）。
-    private AgentToolSqlSecurityGate sqlSecurityGate;
+    private AgentToolPolicyGate policyGate;
+
+    // SQL 生成路径查阅白名单（"按 schema 生成 SELECT"），与裁决闸不同职责
     private AgentToolSqlWhitelist sqlWhitelist;
 
     @Autowired(required = false)
-    public void setSqlSecurityGate(AgentToolSqlSecurityGate sqlSecurityGate) {
-        this.sqlSecurityGate = sqlSecurityGate;
+    public void setSqlSecurityGate(AgentToolPolicyGate policyGate) {
+        this.policyGate = policyGate;
     }
 
     @Autowired(required = false)
@@ -113,19 +116,22 @@ public class ToolExecutorService {
     private ToolResult execute(String toolName, Map<String, Object> arguments, String callId) {
         long startNs = System.nanoTime();
 
-        // ── R1.3: 高危指令沙盒审查 ──
+        // ── 6a F06-01: policyEvaluate —— 全工具类型唯一 ABAC 裁决（X-11，废止 SQL-only 前置） ──
+        // 主体一律取 token 上下文（UserContext/SecurityContext/TenantContextHolder），禁 LLM/请求体自报。
+        // 必须在调用方线程执行：dispatch 运行在独立 executor 线程，token ThreadLocal 不可见。
+        ToolResult policyDeny = policyEvaluate(toolName, arguments, callId, startNs);
+        if (policyDeny != null) {
+            return policyDeny;
+        }
+
+        // ── 6c R1.3: 高危指令沙盒审查（附加防御层；审查器异常→DENY，X-14） ──
         ToolResult sandboxBlock = sandboxReview(toolName, arguments, callId, startNs);
         if (sandboxBlock != null) {
             return sandboxBlock;
         }
 
-        // 优先走 ToolRegistry（统一工具管理）
+        // 6d 优先走 ToolRegistry（统一工具管理）—— 其 LLM 直供 SQL 已在 policyEvaluate 静态校验
         if (toolRegistry != null && toolRegistry.has(toolName)) {
-            // H8-T4: 注册表路径（如 query_db，sql 为 LLM 直供参数）同样先过安全闸
-            ToolResult registryDeny = guardSqlFromArguments(toolName, arguments, callId, startNs);
-            if (registryDeny != null) {
-                return registryDeny;
-            }
             return toolRegistry.execute(toolName, arguments);
         }
 
@@ -135,12 +141,10 @@ public class ToolExecutorService {
                 return buildError(callId, toolName, "工具未找到: " + toolName, startNs);
             }
 
-            // H8-T4: SQL 型工具在调用方线程完成「白名单 + security-engine 裁决」
-            // （dispatch 运行在独立 executor 线程，SecurityContext/TenantContextHolder
-            //  等 token 上下文 ThreadLocal 不可见，裁决必须在此取主体）
+            // 6d SQL 型：静态只读校验 + 表/列白名单（ABAC 已在 6a 完成，不重复，不变式 I-1）
             if ("SQL".equalsIgnoreCase(def.toolType)) {
                 String guardedSql = resolveToolSql(def, arguments);
-                ToolResult sqlDeny = guardSql(toolName, guardedSql,
+                ToolResult sqlDeny = guardSqlStatic(toolName, guardedSql,
                         extractBoundParamNames(def.schemaJson), callId, startNs);
                 if (sqlDeny != null) {
                     return sqlDeny;
@@ -232,10 +236,13 @@ public class ToolExecutorService {
             // 审查通过 → 放行
             return null;
         } catch (Exception e) {
-            // 审查器自身异常（高危判定前）：维持放行，但日志带堆栈（M15 空/裸日志治理）
-            log.warn("R1.3 沙盒审查异常（未达高危判定阶段，维持放行）: tool={}, error={}",
+            // F06-01 / X-14: 审查器自身异常 → DENY（fail-closed），废止原「维持放行」。
+            // 高危沙盒是附加防御层（ABAC 已在 6a 完成），但其审查路径异常不得静默放行。
+            log.warn("R1.3 沙盒审查异常 → 拒绝执行（fail-closed X-14）: tool={}, error={}",
                     toolName, e.getMessage(), e);
-            return null;
+            long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
+            return ToolResult.fail(callId, toolName,
+                    "沙盒审查异常，拒绝执行（fail-closed，X-14）", elapsedMs);
         }
     }
 
@@ -477,10 +484,11 @@ public class ToolExecutorService {
             throw new IllegalStateException("JdbcTemplate 不可用，无法执行 SQL 工具");
         }
 
-        // H8-T4: 防御纵深 —— 安全闸未装配时拒绝一切 SQL 工具（fail-closed，§2.4-6）
-        if (sqlSecurityGate == null) {
+        // F06-01: 防御纵深 —— 裁决闸未装配时拒绝一切 SQL 工具（fail-closed，§2.4-6）。
+        // （ABAC 已在 6a policyEvaluate 完成；此处仅守住"闸组件必须装配"的配置不变式）
+        if (policyGate == null) {
             throw new IllegalStateException(
-                    "[H8-T4] SQL 安全闸（AgentToolSqlSecurityGate）未装配，拒绝执行 SQL 工具（fail-closed）");
+                    "[F06-01] 工具裁决闸（AgentToolPolicyGate）未装配，拒绝执行 SQL 工具（fail-closed）");
         }
 
         Object schemaObj = def.schemaJson;
@@ -515,40 +523,87 @@ public class ToolExecutorService {
         return sql;
     }
 
-    /** 注册表路径：arguments 若携带 sql 参数（如 query_db，sql 由 LLM 直供），先过安全闸 */
-    private ToolResult guardSqlFromArguments(String toolName, Map<String, Object> arguments,
-                                             String callId, long startNs) {
-        Object arg = arguments != null ? arguments.get("sql") : null;
-        if (!(arg instanceof String s) || s.isBlank()) {
-            return null; // 非 SQL 类注册工具，维持原路径
-        }
-        return guardSql(toolName, s, Collections.emptyList(), callId, startNs);
-    }
+    // ── F06-01 全工具类型 ABAC 裁决（policyEvaluate 阶段） ──────────────────
 
     /**
-     * H8-T4: SQL 工具执行前统一安全闸（必须在调用方线程执行，以读取 token 上下文）。
-     * 主体一律取 SecurityContext / sysman UserContext（token 链路），禁止取参数自报值。
+     * 6a policyEvaluate：对所有工具类型（BUILTIN/REST/SQL）无条件做唯一 ABAC 裁决 +
+     * SQL 型工具的静态/白名单子步骤。主体取 token 上下文（UserContext/SecurityContext/
+     * TenantContextHolder），禁止取参数自报值（X-11 / PMO-74 H9-T1）。
      *
-     * @return 拒绝执行的 ToolResult；null = 裁决 ALLOW
+     * <p>返回值语义：</p>
+     * <ul>
+     *   <li>{@code null} — 裁决 ALLOW 且 SQL 静态/白名单通过 → 继续 sandboxReview → dispatch；</li>
+     *   <li>非空 ToolResult — 拒绝原因已写入 content，直接返回给 Agent Loop。</li>
+     * </ul>
+     *
+     * <p><b>不变式 I-1</b>：每次 execute() 恰好调一次 {@code policyGate.adjudicate}
+     * （SQL 工具不再二次调 ABAC，静态/白名单子步骤不涉及 ABAC）。</p>
      */
-    private ToolResult guardSql(String toolName, String sql, Collection<String> boundParams,
-                                String callId, long startNs) {
-        if (sqlSecurityGate == null) {
-            log.warn("H8-T4 SQL 安全闸未装配，拒绝执行（fail-closed）: tool={}", toolName);
+    private ToolResult policyEvaluate(String toolName, Map<String, Object> arguments,
+                                      String callId, long startNs) {
+        if (policyGate == null) {
+            log.warn("F06-01 裁决闸未装配，拒绝执行（fail-closed §2.4-6）: tool={}", toolName);
             return buildError(callId, toolName,
-                    "[H8-T4] SQL 安全闸不可用，拒绝执行（默认 DENY）", startNs);
-        }
-        if (sql == null || sql.isBlank()) {
-            return null; // 无 SQL 可裁决，交由 executeSql 报「缺少 SQL」原有错误
+                    "[F06-01] 工具裁决闸（AgentToolPolicyGate）不可用，拒绝执行（GUARDRAIL_FAIL_CLOSED）",
+                    startNs);
         }
         String userId = getCurrentUserId();
         String tenantId = TenantContextHolder.getTenantId();
-        AgentToolSqlSecurityGate.Decision decision =
-                sqlSecurityGate.review(toolName, sql, boundParams, userId, tenantId);
-        if (!decision.allowed()) {
-            log.warn("H8-T4 Agent SQL 工具被安全闸拒绝: tool={} user={} reason={}",
-                    toolName, userId, decision.reason());
-            return buildError(callId, toolName, "[H8-T4] SQL 被安全裁决拒绝: " + decision.reason(), startNs);
+
+        // ① 唯一 ABAC（所有工具类型，2s 截止，FAIL_CLOSED 见闸）
+        AgentToolPolicyGate.Decision abac = policyGate.adjudicate(toolName, null, userId, tenantId);
+        if (!abac.allowed()) {
+            log.warn("F06-01 policyEvaluate ABAC 拒绝: tool={} user={} reason={}",
+                    toolName, userId, abac.reason());
+            return buildError(callId, toolName,
+                    "[F06-01] 未过 ABAC 裁决: " + abac.reason(), startNs);
+        }
+
+        // ② SQL 型：解析最终 SQL 后做静态/白名单子步骤（复用现有 resolveToolSql）
+        String sql = extractSqlFromSchemaIfPresent(arguments);
+        if (sql != null && !sql.isBlank()) {
+            AgentToolPolicyGate.Decision sqlStatic = policyGate.reviewSqlStatic(
+                    sql, Collections.emptyList(), toolName, userId);
+            if (!sqlStatic.allowed()) {
+                log.warn("F06-01 SQL 静态/白名单拒绝: tool={} user={} reason={}",
+                        toolName, userId, sqlStatic.reason());
+                return buildError(callId, toolName,
+                        "[H8-T4] SQL 静态/白名单拒绝: " + sqlStatic.reason(), startNs);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 若 arguments 携带 sql 参数（LLM 直供，如 query_db），提取文本。
+     * 用于 policyEvaluate 阶段的 SQL 静态/白名单子步骤——与
+     * {@link #resolveToolSql(ToolDefinitionEntry, Map)} 的 LLM 侧取法对齐（不重复 schema 展开）。
+     */
+    private String extractSqlFromSchemaIfPresent(Map<String, Object> arguments) {
+        if (arguments == null) return null;
+        Object arg = arguments.get("sql");
+        return arg instanceof String s ? s : null;
+    }
+
+    /**
+     * 仅 SQL 型工具（fallback 路径，{@link #execute(ToolExecutorService.ToolDefinitionEntry, Map)}
+     * 走 dispatch 前）调用的静态/白名单子步骤。ABAC 已在 6a policyEvaluate 完成，不重复。
+     */
+    private ToolResult guardSqlStatic(String toolName, String sql, Collection<String> boundParams,
+                                      String callId, long startNs) {
+        if (policyGate == null) {
+            return buildError(callId, toolName,
+                    "[F06-01] 工具裁决闸不可用，拒绝执行 SQL（fail-closed）", startNs);
+        }
+        if (sql == null || sql.isBlank()) {
+            return null; // 无 SQL 可校验，交由 executeSql 报「缺少 SQL」原有错误
+        }
+        String userId = getCurrentUserId();
+        AgentToolPolicyGate.Decision d = policyGate.reviewSqlStatic(sql, boundParams, toolName, userId);
+        if (!d.allowed()) {
+            log.warn("H8-T4 Agent SQL 静态/白名单拒绝: tool={} user={} reason={}",
+                    toolName, userId, d.reason());
+            return buildError(callId, toolName, "[H8-T4] SQL 被静态/白名单拒绝: " + d.reason(), startNs);
         }
         return null;
     }

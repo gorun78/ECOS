@@ -3,13 +3,7 @@ package com.chinacreator.gzcm.engine.ai.security;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -21,46 +15,40 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * H8-T4（PMO-74 L3）— Agent 工具 SQL 安全闸：静态只读校验 + 表/列白名单 +
- * security-engine {@code POST /api/v1/security/policy-engine/evaluate} ABAC 裁决。
+ * F06-01 🔄（PMO-74 W140-5，§X.9.0）— Agent 工具<b>裁决咽喉闸</b>（由 H8-T4
+ * {@code AgentToolSqlSecurityGate} 升格：类语义从"SQL 安全闸" → "工具裁决闸"）。
  *
  * <p>铁律 §2.4：安全裁决外置到 security-engine，引擎内不重复实现权限判定；
- * <b>security-engine 不可用 / 超时 / 返回不可解析 → 一律 DENY（fail-closed，
- * §2.4-6 宁可误拒不可误放）</b>，并 {@code log.warn} 带堆栈。裁决 allow 与 deny
- * 均经 {@link AiSecurityEngineClient#audit} 发 Kafka {@code ecos.audit} 留痕
- * （§2.4-5），主体 userId/tenantId 由调用方从 token 上下文（SecurityContext /
- * UserContext / TenantContextHolder）传入，禁止取请求体自报值。</p>
+ * <b>security-engine 不可用 / 超时（2s）/ 响应不可解析 → 一律 FAIL_CLOSED（fail-closed，
+ * §2.4-6 宁可误拒不可误放）</b>。本闸只负责"该不该放行 + 为什么"；ALLOW / DENY /
+ * FAIL_CLOSED 三态的 GUARDRAIL_EVAL 审计事件由咽喉侧接线（F06-03，另批）。主体
+ * userId/tenantId 一律由调用方从 token 上下文
+ * （{@code UserContext}/{@code SecurityContext}/{@code TenantContextHolder}）
+ * 传入，禁取请求体/LLM 入参自报值（PMO-74 H9-T1）。</p>
  *
- * <p>REST 客户端写法参照本模块 {@link AiSecurityEngineClient#evaluate} 与
- * data-engine {@code PipelineSecurityService} 先例（自构带超时 RestTemplate，
- * gateway / aiming / ai-engine-boot 各进程均可装配）。与 AiSecurityEngineClient
- * 的差异：本闸保留并输出异常堆栈（H8-T4 验收要求 fail-closed 日志带堆栈）。</p>
- *
- * <p>闸内规则（全部 fail-closed，任一命中即拒）：</p>
+ * <h3>两段 API（严格分工，避免同仓两套裁决 + 多次裁决）</h3>
  * <ol>
- *   <li>只读约束：SQL 必须以 SELECT / WITH 开头；</li>
- *   <li>拒绝注释（{@code --} / {@code /* *}{@code /} / {@code #}），拒绝多条语句
- *       （仅允许结尾一个 {@code ;}）；</li>
- *   <li>拒绝 DML/DDL/权限/文件/危险函数关键字：DROP/ALTER/GRANT/REVOKE/COPY/
- *       INSERT/UPDATE/DELETE/TRUNCATE/CREATE/EXEC/CALL/SET/pg_read_file 等；</li>
- *       注意：SELECT 列名如 {@code updated_at} 属合法标识符（词边界不会误杀），
- *       被误拒的裸列名 {@code update}/{@code set} 等应在白名单侧改名或做列授权评审；</li>
- *   <li>FROM/JOIN 引用的每张表（CTE 别名除外）必须在 {@link AgentToolSqlWhitelist}
- *       中显式授权；</li>
- *   <li>列白名单：任一被引用表若为显式列清单（非 {@code "*"}），则 SQL 中出现的
- *       标识符必须 ∈ {授权列 ∪ 表名/别名/CTE ∪ SQL 关键字/函数}，未知标识符拒绝；</li>
- *   <li>schema 声明的绑定参数名同样须为授权列；</li>
- *   <li>security-engine ABAC 裁决（不可用/超时/不可解析 → DENY + 堆栈日志）。</li>
+ *   <li>{@link #adjudicate(String, Map, String, String)} — <b>对所有工具类型</b>的唯一
+ *       ABAC 裁决（§4.1 Y1 / §X.9.0-1）。ABS 咽喉 {@code policyEvaluate} 阶段对每个工具
+ *       恰好调一次（不变式 I-1：一次工具执行 ↔ 恰好一条 GUARDRAIL_EVAL）。此不做 SQL 校验。</li>
+ *   <li>{@link #reviewSqlStatic(String, String, Collection, String, String)} — <b>仅 SQL 型
+ *       工具</b>的静态只读校验 + 表/列白名单子步骤（不重复 ABAC；ABAC 已由 adjudicate 完成）。
+ *       把原"SQL 安全闸"的白名单校验降为其子步骤（§X.9.0-2）。</li>
  * </ol>
+ *
+ * <p>超时按 PRD 定 <b>2000ms</b>（原 5000ms，X-19）——由 {@link AiSecurityEngineClient}
+ * 经 {@code service.security.timeout-ms}（该值缺省已同步调为 2000ms）统一施加，本闸不再
+ * 自构 RestTemplate，ABAC 一律经 {@link AiSecurityEngineClient#evaluate}（§2.4-7 单通道）。</p>
  */
 @Component
-public class AgentToolSqlSecurityGate {
+public class AgentToolPolicyGate {
 
-    private static final Logger log = LoggerFactory.getLogger(AgentToolSqlSecurityGate.class);
+    private static final Logger log = LoggerFactory.getLogger(AgentToolPolicyGate.class);
 
-    /** ABAC 动作名（security 侧策略可按此授权/审计过滤） */
-    public static final String ACTION = "agent:tool:sql";
+    /** ABAC 动作名（security 侧策略可按此授权/审计过滤；SQL 静态校验不再独立调 ABAC） */
+    public static final String ACTION = "agent:tool";
 
+    // ── SQL 静态/白名单校验用正则（自 H8-T4 原闸逐字复用，语义不变） ──────────────
     private static final Pattern COMMENT_PATTERN = Pattern.compile("--|/\\*|\\*/|#");
     private static final Pattern TRAILING_SEMICOLON = Pattern.compile(";\\s*$");
     private static final Pattern STRING_LITERAL = Pattern.compile("'(?:''|[^'])*'");
@@ -104,60 +92,85 @@ public class AgentToolSqlSecurityGate {
 
     private final AgentToolSqlWhitelist whitelist;
     private final AiSecurityEngineClient securityEngineClient;
-    private final String securityBaseUrl;
-    private final RestTemplate restTemplate;
+    private final int effectiveTimeoutMs;
 
-    public AgentToolSqlSecurityGate(
+    public AgentToolPolicyGate(
             AgentToolSqlWhitelist whitelist,
             AiSecurityEngineClient securityEngineClient,
-            @Value("${service.security.base-url:http://localhost:18081}") String securityBaseUrl,
-            @Value("${service.security.timeout-ms:5000}") int timeoutMs) {
+            @Value("${service.security.timeout-ms:2000}") int timeoutMs) {
+        // ABAC 的实际 2s 截止由 AiSecurityEngineClient 经 service.security.timeout-ms
+        // 统一施加（§2.4-7 单通道）；此处记录 effective 值供诊断/验收断言（X-19 = 2000ms）。
         this.whitelist = whitelist;
         this.securityEngineClient = securityEngineClient;
-        this.securityBaseUrl = securityBaseUrl;
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Math.max(1000, timeoutMs));
-        factory.setReadTimeout(Math.max(1000, timeoutMs));
-        this.restTemplate = new RestTemplate(factory);
+        this.effectiveTimeoutMs = timeoutMs;
     }
 
-    /** 裁决结论 */
-    public record Decision(boolean allowed, String reason) {
-        static Decision deny(String reason) { return new Decision(false, reason); }
-        static Decision allow() { return new Decision(true, null); }
+    /** 生效 ABAC 截止（ms）——验收 X-19 断言其 = 2000 */
+    public int getEffectiveTimeoutMs() {
+        return effectiveTimeoutMs;
     }
+
+    /** 裁决结论：allowed + 人类可读 reason（deny/fail 路径非空） */
+    public record Decision(boolean allowed, String reason) {
+        static Decision allow() { return new Decision(true, null); }
+        static Decision deny(String reason) { return new Decision(false, reason); }
+    }
+
+    // ═══════════ ① 全工具类型 ABAC 裁决（唯一入口，X-11） ═══════════
 
     /**
-     * 完整安全闸：静态校验 → 白名单 → security-engine ABAC 裁决 → 审计留痕。
+     * 对所有工具类型执行唯一 ABAC 裁决 + 审计留痕。
      *
      * @param toolName    工具名（资源标识，非用户自报主体）
-     * @param sql         待执行 SQL 全文（不信任来源：schema 定义或 LLM 入参一律同等校验）
-     * @param boundParams schema 声明的绑定参数/列名（可空）
-     * @param userId      主体 —— 必须由调用方从 token 上下文取得（SecurityContext/UserContext）
+     * @param attrs       四段载荷投影后的 attributes（resource/environment/operation 等；可空）
+     * @param userId      主体 —— 必须由调用方从 token 上下文取得（禁请求体自报）
      * @param tenantId    租户 —— TenantContextHolder（token 链路），可为 null
+     * @return ALLOW / DENY / FAIL_CLOSED（不可用/超时/不可解析 → FAIL_CLOSED，§§4.2 + X-19）
      */
-    public Decision review(String toolName, String sql, Collection<String> boundParams,
-                           String userId, String tenantId) {
-        Decision d = doReview(toolName, sql, boundParams, userId, tenantId);
-        // §2.4-5：allow 与 deny 均留痕（Kafka ecos.audit，security 侧消费落库）
+    public Decision adjudicate(String toolName, Map<String, Object> attrs,
+                               String userId, String tenantId) {
+        // 0) 主体必须来自 token 上下文（无主体 → 无法裁决 → FAIL_CLOSED，禁匿名放行）
+        if (userId == null || userId.isBlank() || "anonymousUser".equals(userId)) {
+            log.warn("F06-01 FAIL_CLOSED: 缺少 token 主体（userId=null/anonymous），拒绝执行工具: tool={}",
+                    toolName);
+            return Decision.deny("无 token 主体，禁止执行（GUARDRAIL_FAIL_CLOSED，fail-closed §2.4-6）");
+        }
+        Map<String, Object> merged = new LinkedHashMap<>();
+        merged.put("resource", "agent_tool:" + toolName);
+        if (attrs != null) merged.putAll(attrs);
+
+        // 1) ABAC 裁决（不可用/超时/不可解析/明确 DENY → false，fail-closed）
+        boolean allowed = securityEngineClient.evaluate(userId, tenantId, ACTION, merged);
+
+        // 2) 审计留痕（§2.4-5）：allow / deny 均经 client.audit 走 Kafka ecos.audit
+        String verdict = allowed ? "ALLOW" : "DENY";
         try {
             securityEngineClient.audit(userId, ACTION + ":" + toolName,
-                    "sql_digest=" + digest(sql) + " tables=" + extractTablesForAudit(sql),
-                    d.allowed() ? "ALLOW" : "DENY:" + d.reason());
+                    "tool=" + toolName, verdict);
         } catch (Exception e) {
-            log.warn("H8-T4 审计留痕发送失败（不阻塞拒绝路径，允许路径继续）: tool={}", toolName, e);
+            log.warn("F06-01 审计留痕发送失败（不阻塞裁决结果）: tool={}", toolName, e);
         }
-        return d;
+        if (!allowed) {
+            log.warn("F06-01 裁决拒绝: tool={} user={} (GUARDRAIL_DENIED / GUARDRAIL_FAIL_CLOSED)",
+                    toolName, userId);
+            return Decision.deny("security-engine policy-engine/evaluate 裁决拒绝或不可用（默认 DENY）");
+        }
+        return Decision.allow();
     }
 
-    private Decision doReview(String toolName, String sql, Collection<String> boundParams,
-                              String userId, String tenantId) {
-        // 0) 主体必须来自 token 上下文
-        if (userId == null || userId.isBlank() || "anonymousUser".equals(userId)) {
-            log.warn("H8-T4 DENY: 缺少 token 主体（userId=null/anonymous），Agent SQL 工具拒绝匿名执行: tool={}",
-                    toolName);
-            return Decision.deny("无 token 主体，禁止执行 Agent SQL（fail-closed）");
-        }
+    // ═══════════ ② SQL 型工具静态+白名单子步骤（不再自做 ABAC） ═══════════
+
+    /**
+     * 仅 SQL 型工具的静态只读校验 + 表/列白名单。<b>不做 ABAC</b>（已 {@link #adjudicate} 完成），
+     * 避免同一执行两次裁决（不变式 I-1）。静态/白名单任一命中即拒。
+     *
+     * @param sql         待执行 SQL 全文（不信任来源：schema 定义或 LLM 入参一律同等校验）
+     * @param boundParams schema 声明的绑定参数/列名（可空）
+     * @param toolName    工具名（仅用于日志）
+     * @param userId      主体（仅用于日志；此处不再重复裁决）
+     */
+    public Decision reviewSqlStatic(String sql, Collection<String> boundParams,
+                                    String toolName, String userId) {
         // 1) 静态只读校验
         Decision staticD = staticCheck(sql);
         if (!staticD.allowed()) return staticD;
@@ -183,7 +196,7 @@ public class AgentToolSqlSecurityGate {
             }
             Set<String> cols = whitelist.allowedColumns(table);
             if (cols == null) {
-                log.warn("H8-T4 DENY: 表未列入白名单: tool={} table={}", toolName, table);
+                log.warn("F06-01 DENY: 表未列入白名单: tool={} user={} table={}", toolName, userId, table);
                 return Decision.deny("表未列入 Agent 工具 SQL 白名单: " + table);
             }
             if (cols.contains(AgentToolSqlWhitelist.ALL_COLUMNS)) {
@@ -225,19 +238,10 @@ public class AgentToolSqlSecurityGate {
                 }
             }
         }
-
-        // 5) security-engine ABAC 裁决（不可用/超时/不可解析 → DENY，§2.4-6）
-        Map<String, Object> attrs = new LinkedHashMap<>();
-        attrs.put("resource", "agent_tool:" + toolName);
-        attrs.put("tables", tables);
-        attrs.put("sql", sql);
-        if (!evaluateFailClosed(userId, tenantId, attrs)) {
-            return Decision.deny("security-engine policy-engine/evaluate 裁决为 DENY 或不可用（默认 DENY）");
-        }
         return Decision.allow();
     }
 
-    // ── 静态校验 ──────────────────────────────────────────────────────────
+    // ── 静态校验（自原 H8-T4 闸逐字复用） ────────────────────────────────
 
     private Decision staticCheck(String sql) {
         if (sql == null || sql.isBlank()) {
@@ -289,76 +293,5 @@ public class AgentToolSqlSecurityGate {
             }
         }
         return aliases;
-    }
-
-    private String extractTablesForAudit(String sql) {
-        if (sql == null) return "";
-        try {
-            String masked = maskLiterals(sql).toLowerCase(Locale.ROOT);
-            Set<String> cte = extractCteNames(masked);
-            Set<String> tables = new LinkedHashSet<>();
-            Matcher tm = TABLE_REF.matcher(masked);
-            while (tm.find()) {
-                if (tm.group(1) != null && !cte.contains(tm.group(1))) tables.add(tm.group(1));
-            }
-            return String.join(",", tables);
-        } catch (Exception e) {
-            return "?";
-        }
-    }
-
-    private String digest(String sql) {
-        if (sql == null) return "";
-        String s = sql.replaceAll("\\s+", " ").trim();
-        return s.length() > 120 ? s.substring(0, 120) + "..." : s;
-    }
-
-    // ── security-engine 裁决（fail-closed，日志带堆栈） ──────────────────
-
-    /**
-     * POST {securityBaseUrl}/api/v1/security/policy-engine/evaluate。
-     *
-     * @return true 仅当 security 明确返回 result=true；
-     *         不可用 / 超时 / HTTP 非 2xx / 响应不可解析 / 明确 DENY → false（默认 DENY，§2.4-6），
-     *         且每种 DENY 路径均 log.warn 携带异常堆栈。
-     */
-    @SuppressWarnings("unchecked")
-    private boolean evaluateFailClosed(String userId, String tenantId, Map<String, Object> attrs) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("policy", "rbac");
-        Map<String, Object> input = new LinkedHashMap<>();
-        input.put("action", ACTION);
-        if (attrs != null) input.putAll(attrs);
-        input.put("subject", Map.of(
-                "userId", userId,
-                "tenantId", tenantId == null ? "default" : tenantId,
-                "role", "user"));
-        body.put("input", input);
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            ResponseEntity<Map> resp = restTemplate.postForEntity(
-                    securityBaseUrl + "/api/v1/security/policy-engine/evaluate",
-                    new HttpEntity<>(body, headers), Map.class);
-            Map<String, Object> respBody = resp == null ? null : resp.getBody();
-            if (respBody == null || !(respBody.get("data") instanceof Map)) {
-                log.warn("H8-T4 security 裁决响应不可解析 → 默认 DENY: user={} resp={}",
-                        userId, respBody,
-                        new IllegalStateException("policy-engine/evaluate response unparsable"));
-                return false;
-            }
-            Object result = ((Map<String, Object>) respBody.get("data")).get("result");
-            boolean allowed = Boolean.TRUE.equals(result);
-            if (!allowed) {
-                log.warn("H8-T4 security-engine 明确裁决 DENY: user={} action={} data={}",
-                        userId, ACTION, respBody.get("data"));
-            }
-            return allowed;
-        } catch (Exception e) {
-            // 不可用 / 超时 / IO 异常 → fail-closed DENY（宁可误拒不可误放）
-            log.warn("H8-T4 security-engine 不可用/超时 → 默认 DENY: user={} action={}",
-                    userId, ACTION, e);
-            return false;
-        }
     }
 }

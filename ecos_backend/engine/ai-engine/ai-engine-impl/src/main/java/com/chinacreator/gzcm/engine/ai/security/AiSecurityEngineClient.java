@@ -53,7 +53,7 @@ public class AiSecurityEngineClient {
 
     public AiSecurityEngineClient(
             @Value("${service.security.base-url:http://localhost:18081}") String baseUrl,
-            @Value("${service.security.timeout-ms:5000}") int timeoutMs,
+            @Value("${service.security.timeout-ms:2000}") int timeoutMs,
             ApplicationContext applicationContext) {
         this.baseUrl = baseUrl;
         this.applicationContext = applicationContext;
