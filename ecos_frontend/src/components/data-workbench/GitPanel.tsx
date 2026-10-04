@@ -38,8 +38,10 @@ import {
   fetchCommits as fetchGitCommits,
   commit as gitCommit,
   createTag as gitCreateTag,
+  push as gitPush,
+  pull as gitPull,
+  postAction as gitPostAction,
 } from '../../services/gitService';
-import { apiFetchData } from '../../api';
 import { useTheme } from '../../components/ThemeContext';
 
 // ── TypeScript 接口 ──────────────────────────────────────────
@@ -200,13 +202,18 @@ export default function GitPanel({ repoId }: GitPanelProps) {
         case 'tag':
           await gitCreateTag(repoId);
           break;
+        // C181/W199 · Git 单通道（ADR-12 / 前端铁律 #6）：push/pull/default 全部改走
+        // services/gitService，本文件不再拼 `/api/v1/ecos/git/*` 字符串（此前 :206/:209
+        // 各有 1 处 raw apiFetchData 字面拼接，是 C181 违规点）。postAction 内部做 action
+        // 白名单校验，禁传入未预期动名词，防经本入口绕过单通道。
         case 'push':
+          await gitPush(repoId);
+          break;
         case 'pull':
-          // Generic POST actions not yet covered by dedicated service functions
-          await apiFetchData(`/api/v1/ecos/git/${action}?repoId=${encodeURIComponent(repoId)}`, { method: 'POST' });
+          await gitPull(repoId);
           break;
         default:
-          await apiFetchData(`/api/v1/ecos/git/${action}?repoId=${encodeURIComponent(repoId)}`, { method: 'POST' });
+          await gitPostAction(action, repoId);
       }
       // 操作成功后刷新状态
       await Promise.all([fetchStatus(), fetchCommits()]);

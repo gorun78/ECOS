@@ -33,11 +33,22 @@ const LOCAL_DIRECT_PROXY_ENABLED: boolean = (() => {
   return v === "true" || v === "1" || v === "yes" || v === "on";
 })();
 
+// C190/W208 (M2·A) 生产档拒绝直连：NODE_ENV=production 时若 ECOS_LOCAL_DIRECT_SERVICE_PROXY=true
+// 直接 process.exit(1) —— 与之对齐 ADR-10 "生产 BFF 不直连 service" 铁律，防误开造成
+// :8080 单端口契约被冲掉（PMO-B）。红色日志按"启动期可观测"口径打，不再静默处理。
+const _NODE_ENV_CURRENT = process.env.NODE_ENV || "";
+if (_NODE_ENV_CURRENT === "production" && LOCAL_DIRECT_PROXY_ENABLED) {
+  console.error(
+    "[BFF] FATAL: ECOS_LOCAL_DIRECT_SERVICE_PROXY=true is refused in production (ADR-10 PMO-B). " +
+      "Set ECOS_LOCAL_DIRECT_SERVICE_PROXY=false or run with NODE_ENV=development/undefined.",
+  );
+  process.exit(1);
+}
+
 const app = express();
 const PORT = parseInt(process.env.PORT || "3000", 10);
-// 兼容 /api/audit-logs 走 /sys-man 的兜底端点。
-const BACKEND = process.env.BACKEND_URL || "http://localhost:8081";
 // 🔴 gateway 是唯一权威出口（ADR-10 / v1.6）。生产必填变量。
+// C189/W207 收口：/api/audit-logs 已经改走 GATEWAY，不再需要 v1 时代 BACKEND_URL 兜底（:8081）。
 const GATEWAY = process.env.GATEWAY_URL || "http://localhost:8080";
 
 // 以下三个仅 LOCAL_DIRECT_PROXY_ENABLED=true 时被消费。生产/默认下变量设了也不被引用。
@@ -74,11 +85,37 @@ const forwardProxy =
         method,
         headers: upstreamHeaders,
       };
+      // C174/W192 (P-4 落点): 透传客户端 Last-Event-ID 以便 BFF 之下的 gateway/service 走 SSE 续传；
+      // 与 ADR-7 同属"透传不 strip"三段责任，BFF 不得静默吞掉该头（卷 00 属主：jwt/trust 三段）。
+      if (req.headers["last-event-id"]) {
+        (fetchOptions as any).headers = {
+          ...(fetchOptions.headers as Record<string, string>),
+          "Last-Event-ID": req.headers["last-event-id"] as string,
+        };
+      }
       if (withBody) fetchOptions.body = JSON.stringify(req.body);
       const upstream = await fetch(targetUrl, fetchOptions);
-      // 透传响应体 JSON/text + 状态码，不做任何字段改写（错误原样返回，401/403 必须正确传递）
       const contentType = upstream.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
+      // C174 (旧 :85 `await upstream.text()` 全缓冲 ⇒ SSE 死亡): SSE 走"逐块 pipe"分支，禁 join/text().
+      // 铁律 ADR-15（制品 ≠ 承流）：本层只做透传，不解析、不改写、不降级为轮询。
+      if (contentType.includes("text/event-stream")) {
+        res.writeHead(upstream.status, {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache, no-transform",
+          "X-Accel-Buffering": "no",
+          "Connection": "keep-alive",
+        });
+        const reader = upstream.body.getReader();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(value);
+          // 客户端断开即打断，防连接泄漏。
+          if (res.writableEnded) break;
+        }
+        res.end();
+        return;
+      } else if (contentType.includes("application/json")) {
         const data = await upstream.json();
         res.status(upstream.status).json(data);
       } else {
@@ -92,7 +129,13 @@ const forwardProxy =
     }
   };
 
-// ── 路由装配 ────────────────────────────────────────────────
+// ── 路由装配（顺序敏感！C175/W193） ────────────────────────
+// express 路由按注册顺序胜出；catch-all "/api" 必须在 vite.middlewares 之后注册，
+// 否则 vite dev server 的 /@vite、/@fs、/__open-in-editor、/src/* 等开发资源
+// 会被 /api 兜底吞掉（本窗口原本 catch-all 在 startServer 之前 ⇒ C175）。
+// 因此这里只注册：gateway 必选细节前缀 + ADR-10 直连分支；catch-all 与 vite 挂载
+// 挪到 startServer() 内部（vite 就绪后再挂），保持"vite 先，catch-all 后"的顺序。
+
 // 1) gateway 必选直连（🔴 架构铁律 v1.6：仅 :8080 对外可达；BFF 默认永不 bypass）
 //    /api/monitor 与 /api/twins 被 gateway Controller 持有，永远经 GATEWAY。
 app.use("/api/monitor", forwardProxy(GATEWAY, "gateway/monitor"));
@@ -116,46 +159,28 @@ if (LOCAL_DIRECT_PROXY_ENABLED) {
   console.log("[BFF] ECOS_LOCAL_DIRECT_SERVICE_PROXY=false — 所有 /api/* 经 GATEWAY (ADR-10)");
 }
 
-// 3) 残留特例：/api/audit-logs — 后端系统无对应端点，由 BFF 底层聚合，无 bypass gateway 行为。
-app.get("/api/audit-logs", async (_req, res): Promise<void> => {
-  try {
-    // 兼容旧源：兼容老 /sys-man 代理（BACKEND_URL :8081）的过渡端点。
-    const resp = await fetch(`${BACKEND}/sys-man/api/v1/ecos/agent/executions`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const body: any = await resp.json();
-    const executions: any[] = body.data || [];
-    const auditLogs = executions.map((exec: any) => ({
-      id: exec.id || `aud_${Date.now()}`,
-      timestamp: exec.createdAt || "Just now",
-      actor: `AI-Agent-${exec.agentId || "unknown"}`,
-      action: exec.missionType || "Agent Execution",
-      objectType: "agent_studio",
-      objectId: exec.agentId || "unknown",
-      details: `Status: ${exec.status || "completed"}. Input: ${(exec.input || "").substring(0, 100)}`,
-      status: exec.status === "FAILED" ? ("rejected" as const) : ("success" as const),
-    }));
-    res.json({ success: true, count: auditLogs.length, data: auditLogs });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.log(`[BFF] audit-logs fallback: ${msg}`);
-    res.json({ success: true, count: 0, data: [] });
-  }
-});
+// 3) C189/W207 收口：/api/audit-logs 不再在 BFF 内聚合（旧版走 BACKEND_URL :8081 兜底
+//    + 手写过 data[]，属"业务聚合"违反 ADR-15 承流口径 + ST06 审计链路属主=security-engine）。
+//    现在纯转发到 GATEWAY，与 audit 域其余路径同口径（SecController/auditLogs 属主在
+//    security-engine，BFF 无任何合成/兜底/降级路径）。
+app.use("/api/audit-logs", forwardProxy(GATEWAY, "gateway/audit-logs"));
 
-// 4) 兜底：另外所有 /api/* 一律 GATEWAY（ADR-10）。这是 default 唯一出口。
-app.use("/api", forwardProxy(GATEWAY, "gateway/default"));
-
-// ── Vite SPA ──────────────────────────────────────────────
+// ── Vite SPA + catch-all（顺序约束见上） ──────────────────
 const startServer = async () => {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true, hmr: false },
       appType: "spa",
     });
+    // C175: vite.middlewares 必须在 /api 兜底之前挂载（vite 的 /@vite、/src/* 等才被 vite 接住）
     app.use(vite.middlewares);
-    console.log("[BFF] Vite dev middleware mounted.");
+    console.log("[BFF] Vite dev middleware mounted (C175: before /api catch-all).");
+    // C175: catch-all 兜底放到 vite.middlewares 之后注册 — 顺序即"vite 先，兜底后"。
+    app.use("/api", forwardProxy(GATEWAY, "gateway/default"));
   } else {
     const distPath = path.join(process.cwd(), "dist");
+    // C175: /api 兜底必须在 SPA 静态与 get("*") 之前注册 — 顺序即"细节前缀 → /api 兜底 → 静态 → get('*')"。
+    app.use("/api", forwardProxy(GATEWAY, "gateway/default"));
     app.use(express.static(distPath));
     app.get("*", (_req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
