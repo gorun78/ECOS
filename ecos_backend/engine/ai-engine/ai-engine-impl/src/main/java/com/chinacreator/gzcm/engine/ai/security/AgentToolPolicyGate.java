@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -110,10 +111,29 @@ public class AgentToolPolicyGate {
         return effectiveTimeoutMs;
     }
 
-    /** 裁决结论：allowed + 人类可读 reason（deny/fail 路径非空） */
-    public record Decision(boolean allowed, String reason) {
-        static Decision allow() { return new Decision(true, null); }
-        static Decision deny(String reason) { return new Decision(false, reason); }
+    /**
+     * 裁决结论（F06-02 扩展为五段）。
+     *
+     * @param allowed     是否放行
+     * @param reason      人类可读原因（deny/fail 路径非空）
+     * @param policyId    命中的 security 策略 ID（§F06-02 结果结构；现网 security 响应尚未扩此字段，
+     *                    见分册 01 跨册接缝 —— 解析不到为 null，**不阻塞裁决**）
+     * @param obligations 返回的 obligations（{@code mask[]} / {@code rowFilter}），供 6e 阶段
+     *                    在结果回 LLM 前执行（§F06-02 要点 2；现网响应未扩时为空 List）
+     * @param latencyMs   本次 ABAC 裁决耗时（供 GUARDRAIL_EVAL 审计 detail，§F06-03）
+     */
+    public record Decision(boolean allowed, String reason, String policyId,
+                           List<Map<String, Object>> obligations, long latencyMs) {
+        static Decision allow() {
+            return new Decision(true, null, null, List.of(), 0L);
+        }
+        static Decision deny(String reason) {
+            return new Decision(false, reason, null, List.of(), 0L);
+        }
+        Decision with(long latencyMs, String policyId, List<Map<String, Object>> obligations) {
+            return new Decision(allowed, reason, policyId,
+                    obligations == null ? List.of() : obligations, latencyMs);
+        }
     }
 
     // ═══════════ ① 全工具类型 ABAC 裁决（唯一入口，X-11） ═══════════
@@ -121,13 +141,20 @@ public class AgentToolPolicyGate {
     /**
      * 对所有工具类型执行唯一 ABAC 裁决 + 审计留痕。
      *
+     * <p>F06-02：四段载荷（{@code subject/action/resource/environment}）由调用方以
+     * {@link ToolAdjudicationRequest} 从 <b>token 上下文</b> 构造后传入 {@code payloadAttrs}
+     * （其 {@code toWireBody()} 展开），本闸只做合并与裁决；禁把整段 LLM 参数直接塞进载荷
+     * （X-20，防参数注入式越权）。</p>
+     *
      * @param toolName    工具名（资源标识，非用户自报主体）
-     * @param attrs       四段载荷投影后的 attributes（resource/environment/operation 等；可空）
+     * @param payloadAttrs 四段载荷投影后的 attributes（可空 → 仅 resource 段兜底）
+     * @param op          操作模态（read/write，用于 operation 段；可空 → read）
      * @param userId      主体 —— 必须由调用方从 token 上下文取得（禁请求体自报）
      * @param tenantId    租户 —— TenantContextHolder（token 链路），可为 null
-     * @return ALLOW / DENY / FAIL_CLOSED（不可用/超时/不可解析 → FAIL_CLOSED，§§4.2 + X-19）
+     * @return ALLOW / DENY / FAIL_CLOSED（不可用/超时/不可解析 → DENY，§§4.2 + X-19）
      */
-    public Decision adjudicate(String toolName, Map<String, Object> attrs,
+    public Decision adjudicate(String toolName, Map<String, Object> payloadAttrs,
+                               ToolAdjudicationRequest.ActionKind op,
                                String userId, String tenantId) {
         // 0) 主体必须来自 token 上下文（无主体 → 无法裁决 → FAIL_CLOSED，禁匿名放行）
         if (userId == null || userId.isBlank() || "anonymousUser".equals(userId)) {
@@ -137,25 +164,38 @@ public class AgentToolPolicyGate {
         }
         Map<String, Object> merged = new LinkedHashMap<>();
         merged.put("resource", "agent_tool:" + toolName);
-        if (attrs != null) merged.putAll(attrs);
+        if (payloadAttrs != null) merged.putAll(payloadAttrs);
 
-        // 1) ABAC 裁决（不可用/超时/不可解析/明确 DENY → false，fail-closed）
+        // 1) ABAC 裁决（不可用/超时/不可解析/明确 DENY → false，fail-closed），计时供 Detail
+        long startNs = System.nanoTime();
         boolean allowed = securityEngineClient.evaluate(userId, tenantId, ACTION, merged);
+        long latencyMs = (System.nanoTime() - startNs) / 1_000_000;
 
         // 2) 审计留痕（§2.4-5）：allow / deny 均经 client.audit 走 Kafka ecos.audit
         String verdict = allowed ? "ALLOW" : "DENY";
         try {
             securityEngineClient.audit(userId, ACTION + ":" + toolName,
-                    "tool=" + toolName, verdict);
+                    "tool=" + toolName + " latencyMs=" + latencyMs, verdict);
         } catch (Exception e) {
             log.warn("F06-01 审计留痕发送失败（不阻塞裁决结果）: tool={}", toolName, e);
         }
+
+        // 分册 01 跨册接缝：security 的 policy-engine/evaluate 现网响应尚不扩 policyId/obligations
+        // （设计-06 §5.3 显式登记为追加项，本册不为 design 其内部结构）。此处以诚实缺省
+        // （null / 空 List）承载结果结构五段；security 契约扩展后即可透传，本闸不反解 OPA 输出。
         if (!allowed) {
-            log.warn("F06-01 裁决拒绝: tool={} user={} (GUARDRAIL_DENIED / GUARDRAIL_FAIL_CLOSED)",
-                    toolName, userId);
-            return Decision.deny("security-engine policy-engine/evaluate 裁决拒绝或不可用（默认 DENY）");
+            log.warn("F06-01 裁决拒绝: tool={} user={} latencyMs={} (GUARDRAIL_DENIED / GUARDRAIL_FAIL_CLOSED, DENY)",
+                    toolName, userId, latencyMs);
+            return Decision.deny("security-engine policy-engine/evaluate 裁决为 DENY 或不可用（默认 DENY，fail-closed §2.4-6）")
+                    .with(latencyMs, null, null);
         }
-        return Decision.allow();
+        return Decision.allow().with(latencyMs, null, null);
+    }
+
+    /** 兼容旧 4 参入口（无四段载荷/op）—— 行为与新入口等价：payloadAttrs 仅 resource 段兜底、op=null→read。 */
+    public Decision adjudicate(String toolName, Map<String, Object> attrs,
+                               String userId, String tenantId) {
+        return adjudicate(toolName, attrs, null, userId, tenantId);
     }
 
     // ═══════════ ② SQL 型工具静态+白名单子步骤（不再自做 ABAC） ═══════════

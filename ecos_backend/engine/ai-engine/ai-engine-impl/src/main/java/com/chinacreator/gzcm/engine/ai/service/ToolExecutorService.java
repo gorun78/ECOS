@@ -1,8 +1,10 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.engine.ai.security.AgentToolObligationsApplier;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlWhitelist;
+import com.chinacreator.gzcm.engine.ai.security.ToolAdjudicationRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,6 +89,16 @@ public class ToolExecutorService {
         this.sqlWhitelist = sqlWhitelist;
     }
 
+    // F06-02: obligations 执行器（6e）—— 在结果回 LLM 前把 mask/rowFilter 义务消费掉
+    //（security 单通道：mask 走 security REST、rowFilter 代数不实现于本域，见 Applier）。
+    // 未装配（离线/裁剪态）→ 若裁决带 obligations 则 6e 整条 FAIL_CLOSED，绝不放行未脱敏（X-18）。
+    private AgentToolObligationsApplier obligationsApplier;
+
+    @Autowired(required = false)
+    public void setObligationsApplier(AgentToolObligationsApplier obligationsApplier) {
+        this.obligationsApplier = obligationsApplier;
+    }
+
     public ToolExecutorService() {
         this.restTemplate = new RestTemplate();
         initFallbackTools();
@@ -116,13 +128,14 @@ public class ToolExecutorService {
     private ToolResult execute(String toolName, Map<String, Object> arguments, String callId) {
         long startNs = System.nanoTime();
 
-        // ── 6a F06-01: policyEvaluate —— 全工具类型唯一 ABAC 裁决（X-11，废止 SQL-only 前置） ──
+        // ── 6a F06-01/02: policyEvaluate —— 全工具类型唯一 ABAC 裁决 + 取回 obligations（X-11，废止 SQL-only 前置） ──
         // 主体一律取 token 上下文（UserContext/SecurityContext/TenantContextHolder），禁 LLM/请求体自报。
         // 必须在调用方线程执行：dispatch 运行在独立 executor 线程，token ThreadLocal 不可见。
-        ToolResult policyDeny = policyEvaluate(toolName, arguments, callId, startNs);
-        if (policyDeny != null) {
-            return policyDeny;
+        PolicyOutcome policy = policyEvaluate(toolName, arguments, callId, startNs);
+        if (policy.deny() != null) {
+            return policy.deny();
         }
+        List<Map<String, Object>> obligations = policy.obligations();
 
         // ── 6c R1.3: 高危指令沙盒审查（附加防御层；审查器异常→DENY，X-14） ──
         ToolResult sandboxBlock = sandboxReview(toolName, arguments, callId, startNs);
@@ -132,7 +145,8 @@ public class ToolExecutorService {
 
         // 6d 优先走 ToolRegistry（统一工具管理）—— 其 LLM 直供 SQL 已在 policyEvaluate 静态校验
         if (toolRegistry != null && toolRegistry.has(toolName)) {
-            return toolRegistry.execute(toolName, arguments);
+            ToolResult regResult = toolRegistry.execute(toolName, arguments);
+            return applyObligations(regResult, obligations, toolName, callId, startNs);
         }
 
         try {
@@ -159,7 +173,10 @@ public class ToolExecutorService {
                 result = result.substring(0, MAX_RESULT_LENGTH) + "...[truncated]";
             }
 
-            return buildSuccess(callId, toolName, result, elapsedMs);
+            // ── 6e F06-02: obligations 执行（mask/rowFilter），必须在 LLM 看到结果之前 ──
+            ToolResult guarded = applyObligations(
+                    buildSuccess(callId, toolName, result, elapsedMs), obligations, toolName, callId, startNs);
+            return guarded;
         } catch (TimeoutException e) {
             long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
             return buildError(callId, toolName, "工具执行超时 (" + TIMEOUT_SECONDS + "s)", elapsedMs);
@@ -169,6 +186,9 @@ public class ToolExecutorService {
             return buildError(callId, toolName, "工具执行失败: " + e.getMessage(), elapsedMs);
         }
     }
+
+    /** 6a 阶段产物：deny≠null → 拒绝（直接返回）；否则携带待 6e 执行的 obligations。 */
+    private record PolicyOutcome(ToolResult deny, List<Map<String, Object>> obligations) {}
 
     // ── R1.3 高危指令沙盒审查 ────────────────────────────────────────────
 
@@ -539,27 +559,51 @@ public class ToolExecutorService {
      * <p><b>不变式 I-1</b>：每次 execute() 恰好调一次 {@code policyGate.adjudicate}
      * （SQL 工具不再二次调 ABAC，静态/白名单子步骤不涉及 ABAC）。</p>
      */
-    private ToolResult policyEvaluate(String toolName, Map<String, Object> arguments,
+    /**
+     * F06-01 四段裁决（policyEvaluate）—— {@code policyGate.adjudicate} 恰好一次
+     * （不变式 I-1），并携带 obligations（供后续 6e 消费）。
+     *
+     * @return PolicyOutcome{deny, obligations}；deny!=null 即拒绝，obligations 供 6e。
+     */
+    private PolicyOutcome policyEvaluate(String toolName, Map<String, Object> arguments,
                                       String callId, long startNs) {
         if (policyGate == null) {
             log.warn("F06-01 裁决闸未装配，拒绝执行（fail-closed §2.4-6）: tool={}", toolName);
-            return buildError(callId, toolName,
+            return new PolicyOutcome(buildError(callId, toolName,
                     "[F06-01] 工具裁决闸（AgentToolPolicyGate）不可用，拒绝执行（GUARDRAIL_FAIL_CLOSED）",
-                    startNs);
+                    startNs), null);
         }
         String userId = getCurrentUserId();
         String tenantId = TenantContextHolder.getTenantId();
 
-        // ① 唯一 ABAC（所有工具类型，2s 截止，FAIL_CLOSED 见闸）
-        AgentToolPolicyGate.Decision abac = policyGate.adjudicate(toolName, null, userId, tenantId);
+        // ① 组装四段载荷（F06-02）：subject/action/resource/environment；
+        //    subject 只取 token 上下文（禁 LLM 自报）；resource 段仅白名单字段投影（X-20）。
+        Map<String, Object> payload;
+        try {
+            ToolAdjudicationRequest req = ToolAdjudicationRequest.fromServerSide(
+                    userId, null, null, toolName,
+                    ToolAdjudicationRequest.ActionKind.READ, null, arguments);
+            payload = req.toWireBody();
+        } catch (IllegalStateException ise) {
+            // 无有效 token 主体（当前 process anonymousUser akaan 由 adjudicate 前置拒绝），
+            // 至此而已 → 保守 FAIL_CLOSED；不作 additional ABAC（I-1 兜底）。
+            log.warn("F06-02 四段载荷构造 FAIL_CLOSED（无有效主体）: tool={} {}", toolName, ise.getMessage());
+            return new PolicyOutcome(buildError(callId, toolName,
+                    "[F06-02] 无有效 token 主体，禁止执行（GUARDRAIL_FAIL_CLOSED）", startNs), null);
+        }
+
+        // ② 唯一 ABAC（所有工具类型，2s 截止，FAIL_CLOSED 见闸）
+        AgentToolPolicyGate.Decision abac =
+                policyGate.adjudicate(toolName, payload,
+                        ToolAdjudicationRequest.ActionKind.READ, userId, tenantId);
         if (!abac.allowed()) {
             log.warn("F06-01 policyEvaluate ABAC 拒绝: tool={} user={} reason={}",
                     toolName, userId, abac.reason());
-            return buildError(callId, toolName,
-                    "[F06-01] 未过 ABAC 裁决: " + abac.reason(), startNs);
+            return new PolicyOutcome(buildError(callId, toolName,
+                    "[F06-01] 未过 ABAC 裁决 (DENY / FAIL_CLOSED): " + abac.reason(), startNs), null);
         }
 
-        // ② SQL 型：解析最终 SQL 后做静态/白名单子步骤（复用现有 resolveToolSql）
+        // ③ SQL 型：解析最终 SQL 后做静态/白名单子步骤（复用现有 resolveToolSql）
         String sql = extractSqlFromSchemaIfPresent(arguments);
         if (sql != null && !sql.isBlank()) {
             AgentToolPolicyGate.Decision sqlStatic = policyGate.reviewSqlStatic(
@@ -567,11 +611,83 @@ public class ToolExecutorService {
             if (!sqlStatic.allowed()) {
                 log.warn("F06-01 SQL 静态/白名单拒绝: tool={} user={} reason={}",
                         toolName, userId, sqlStatic.reason());
-                return buildError(callId, toolName,
-                        "[H8-T4] SQL 静态/白名单拒绝: " + sqlStatic.reason(), startNs);
+                return new PolicyOutcome(buildError(callId, toolName,
+                        "[H8-T4] SQL 静态/白名单拒绝: " + sqlStatic.reason(), startNs), null);
             }
         }
-        return null;
+        // ④ obligations 交 6e（现网 security evaluate 响应尚未扩展 → 空；跨册接缝见 doc §5.3）
+        return new PolicyOutcome(null, abac.obligations());
+    }
+
+    /**
+     * 6e F06-02 obligations 执行（mask/rowFilter）在结果回 LLM <b>之前</b>。
+     *
+     * <p>无义务 → no-op 直接放行；有义务但 applier 未装配 / 执行 fail-closed →
+     * 整条结果丢弃返回 {@link ToolResult#fail}，绝不把未脱敏内容交回 LLM（X-18 反向面）。</p>
+     */
+    @SuppressWarnings("unchecked")
+    private ToolResult applyObligations(ToolResult source, List<Map<String, Object>> obligations,
+                                        String toolName, String callId, long startNs) {
+        if (obligations == null || obligations.isEmpty()) {
+            return source;
+        }
+        if (!source.isSuccess()) {
+            return source; // 已失败：无对外可扩大任务；保留原始失败（含 fail-closed 类）
+        }
+        if (obligationsApplier == null) {
+            // X-18：载有 obligation 却无执行器 = 无法保证脱敏 → FAIL_CLOSED 整条丢弃
+            log.warn("F06-02 obligations 存在但执行器未装配 → 整条结果 FAIL_CLOSED 丢弃: tool={}", toolName);
+            long ms = (System.nanoTime() - startNs) / 1_000_000;
+            return ToolResult.fail(callId, toolName,
+                    "GUARDRAIL_FAIL_CLOSED: 存在 obligations 但执行器未装配（fail-closed，禁未脱敏回 LLM）", ms);
+        }
+        // 轻量行抽取：ToolRegistry/fallback 有时以 JSON 字符串返回，这里尽力解析；解析失败 → FAIL_CLOSED。
+        List<Map<String, Object>> rows;
+        String content = source.getContent();
+        try {
+            Object parsed = (content == null || content.isBlank()) ? null : objectMapper.readValue(content, Object.class);
+            if (parsed instanceof List<?> list) {
+                rows = new ArrayList<>(list.size());
+                for (Object item : list) {
+                    if (item instanceof Map<?, ?> m) rows.add(new LinkedHashMap<>((Map<String, Object>) m));
+                    else {
+                        // 非字典元素——tasks like scalar rows 无字段可 mask；保留原值但抛到可执行
+                        rows.add(Map.of("value", item == null ? "" : String.valueOf(item)));
+                    }
+                }
+            } else if (parsed instanceof Map<?, ?> m) {
+                // 单结果字典：不扩张字段语义；因为无行维度可 mask → 仍视为待 disclosures fail-closed
+                rows = null; // 使下方 FAIL_CLOSED 分支生效
+            } else {
+                // 标量/字符串：无字段可 mask → 保守 FAIL_CLOSED
+                rows = null;
+            }
+        } catch (Exception e) {
+            log.warn("F06-02 obligations 结果解析失败 → 整条 FAIL_CLOSED 丢弃: tool={} {}",
+                    toolName, e.getMessage());
+            long ms = (System.nanoTime() - startNs) / 1_000_000;
+            return ToolResult.fail(callId, toolName,
+                    "GUARDRAIL_FAIL_CLOSED: obligations 结果不可解析，整条丢弃", ms);
+        }
+        if (rows == null) {
+            long ms = (System.nanoTime() - startNs) / 1_000_000;
+            return ToolResult.fail(callId, toolName,
+                    "GUARDRAIL_FAIL_CLOSED: 该工具结果无字段维度可 mask/applier（fail-closed）", ms);
+        }
+        AgentToolObligationsApplier.Outcome outcome = obligationsApplier.apply(
+                obligations, rows, toolName, getCurrentUserId());
+        long ms = (System.nanoTime() - startNs) / 1_000_000;
+        if (!outcome.success()) {
+            return ToolResult.fail(callId, toolName, outcome.failClosedReason(), ms);
+        }
+        try {
+            String maskedJson = objectMapper.writeValueAsString(outcome.rows());
+            return ToolResult.ok(callId, toolName, maskedJson, ms);
+        } catch (Exception e) {
+            log.warn("F06-02 obligations 序列化回文失败 → FAIL_CLOSED: tool={}", toolName, e);
+            return ToolResult.fail(callId, toolName,
+                    "GUARDRAIL_FAIL_CLOSED: 脱敏结果不可序列化，整条丢弃", ms);
+        }
     }
 
     /**

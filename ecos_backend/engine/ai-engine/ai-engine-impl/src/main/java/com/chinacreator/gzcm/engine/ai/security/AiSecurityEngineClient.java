@@ -153,6 +153,71 @@ public class AiSecurityEngineClient {
         }
     }
 
+    // ═══════════════ 裁决载荷方向：mask（F06-02 obligations） ═══════════════
+
+    /**
+     * F06-02 脱敏 obligations —— 调 security-engine 方向 {@code POST /api/v1/security/masking/apply}，
+     * ai-engine 只传值清单与规则清单、<b>不实现任何脱敏算法</b>（分册 01 SEC-02 契约；§2.4-3 铁律）。
+     *
+     * <p><b>失败语义与 {@link #allowedColumns} 不同</b>：本方法一旦被调（即 security 已裁决
+     * 出 mask obligation），调用方依赖"要么获得等长脱敏结果、要么判定失败丢弃整条"——
+     * 因此返回空 List 会与"无可脱敏"混淆；此处以 <b>{@link EngineUnavailableException}</b>
+     * 显式表达"security 不可用/超时/响应不可解析/明确非成功"，让 applier 走 §2.4-6 丢弃整条。
+     * 正常路径始终返回与入参等长的 List。</p>
+     *
+     * @throws EngineUnavailableException 响应含异常、非 2xx、data 非 Map、results 缺失/不等长
+     */
+    @SuppressWarnings("unchecked")
+    public List<String> applyMasking(List<String> data, List<String> rules) {
+        try {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("data", data);
+            body.put("rules", rules);
+            Map<String, Object> resp = postJson("/api/v1/security/masking/apply", body);
+            // ApiResponse 契约：成功 = code==0（该信封无单独 success 布尔，见 common-api ApiResponse）
+            Object codeObj = resp == null ? null : resp.get("code");
+            if (resp == null || !(codeObj instanceof Number n) || n.intValue() != 0) {
+                throw new EngineUnavailableException("masking/apply 非成功响应 (code!=0): " + resp);
+            }
+            Object dataObj = resp.get("data");
+            if (!(dataObj instanceof Map<?, ?> dataMap)) {
+                throw new EngineUnavailableException("masking/apply data 段不可解析");
+            }
+            Object resultsObj = dataMap.get("results");
+            if (!(resultsObj instanceof List<?> raw)) {
+                throw new EngineUnavailableException("masking/apply results 缺失");
+            }
+            if (raw.size() != data.size()) {
+                throw new EngineUnavailableException(
+                        "masking/apply 结果与请求长度不一致（拒收）: got=" + raw.size()
+                                + " expected=" + data.size());
+            }
+            List<String> out = new ArrayList<>(raw.size());
+            for (Object item : raw) {
+                if (!(item instanceof Map<?, ?> m) || !(m.get("masked") instanceof String s)) {
+                    throw new EngineUnavailableException("masking/apply 单项 masked 缺失");
+                }
+                out.add(s);
+            }
+            return out;
+        } catch (EngineUnavailableException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("AiSecurityEngineClient.applyMasking 失败 (fail-closed, SEC-02): reason={}",
+                    e.getMessage());
+            throw new EngineUnavailableException("masking/apply 调用异常: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * F06-02 契约：security-engine 方向端点不可用 / 响应不可解析上抛的本客户端异常。
+     * applier 捕获该异常即执行"整条丢弃 + FAIL_CLOSED"（§2.4-6），不降级、不重试。
+     */
+    public static final class EngineUnavailableException extends RuntimeException {
+        public EngineUnavailableException(String m) { super(m); }
+        public EngineUnavailableException(String m, Throwable c) { super(m, c); }
+    }
+
     // ═══════════════ 审计 — Kafka ecos.audit（runtime 横切出口） ═══════════════
 
     public void audit(String userId, String action, String resource, Object result) {
