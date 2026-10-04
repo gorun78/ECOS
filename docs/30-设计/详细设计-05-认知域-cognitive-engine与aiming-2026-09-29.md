@@ -910,6 +910,86 @@ ALTER TABLE ecos_cognitive.cognitive_hypothesis ADD COLUMN IF NOT EXISTS old_sta
 
 ---
 
-**本册一句话结论**：认知域当前不是"实现有偏差"，而是**主责 P0 能力的契约端点与数据源双双不存在**（E1/E2 零命中 + 全库无 mind 表/列），其上运行着一套路径不同、方法不匹配、三套状态枚举并存、0 Mapper 裸 SQL、service 态无鉴权、伪实现以 200 返回固定值的近似系统。本册把它重建为：契约单源 + Mind 资产落点定版 + 三层纪律 + 两态鉴权等价 + 显式降级 + 五守护接线，并把五项存量归属议题（R-13~R-17）交由裁决。
+### 8.4 【校订十九】分册05 离线验收子集落地与 33 命名测试逐项对账（2026-10-04）
 
-<!-- 详细设计-05-认知域 / 2026-09-29 / v1.2（2026-09-29 定版） / W115~W139 → C97~C121 / R-13 ①、R-14 ①、R-15 ①、R-16 ①+③、R-17 ①、R-42 ①、R-67 ② 已批准（报告 §十四.1） / Gate-1 已签字、Gate-2 已通过 / 本轮未实跑库、未改业务代码 -->
+**范围声明**：本节把 §一～§八 声明的 33 个 doc 命名测试类逐一对账（含 `SpringBootTest` 泛型、`PrecedentRecallerTest`/`ModuleDependencyArchTest` 2 个先存载体），判成 **A/B/C/D** 四档：A = 本批离线落地且全绿；B = 待实现（依赖未落 MR 实现的类/方法）；C = §14.4 授权闸（实跑库 / live-UI / E2E）；D = 跨分冊（08 前端 / 04 kb 侧现有覆盖）或"文档方法与实存类名不符"的诚实登记。
+
+#### 8.4.1 本批 A 档落地清单（14 用例 / 12 测试类 / 全绿）
+
+| 命名测试（本册 doc 出现） | 交付形态 | 用例数 | 关键断言口径（冻结基线 2026-10-04 实测）|
+|:--|:--|:--:|:--|
+| `MindCapabilityMaskTest` | 新增类（`cognitive-engine-api/.../mind/MindCapabilityMask.java` + 测试） | 2 | 五枚举精确、wire 序 = `[DETECT, FORECAST, SIMULATE, PLAN, REVIEW]`、从 wire 反查大小写不敏感 |
+| `MindCapabilityMaskCodecTest` | 新增类（`MindCapabilityMaskCodec.java` + 测试） | 2 | 空集 → `[]`；全集 → `["DETECT","FORECAST","SIMULATE","PLAN","REVIEW"]`；round-trip；malformed 抛 `CodecException` |
+| `CognitiveSchemaPreflightTest` | 新增类（DDL 走查） | 3 | V187/V188 双表 + PK VARCHAR(36) + `capability_mask_json TEXT NOT NULL DEFAULT '[]'` + `closed_loop_bounds_json` + V188 `mind_id VARCHAR(36)`；V189 有 `old_status` 留痕 + `VALID→BELIEVED` 存量映射；文档 §Cg-2 的 `to_regclass` 端点属 C 档（live 库），本类只落文件级 |
+| `ScenarioMindWritePathTest` | 新增类（写路径护栏） | 2 | 认知 impl 主源码零 `INSERT INTO kb_mind_registry`（PRD 误名 ADR-8 已禁）+ 零 `INSERT INTO ecos_scenario_mind`（V146 legacy 名不复活）；workspace 侧 legacy 写路径属另一分倉 §14.4 待裁，不越域代斩 |
+| `CognitiveSqlDialectTest` | 新增类（方言棘轮 + DDL 侧） | 5 | 主源码 `::jsonb ≤ 11`（8 代码+2 javadoc+1 双命中行，2026-10-04 实测）、`ILIKE ≤ 5`（DecisionServiceImpl×4 + PrecedentRecaller×1）、`RETURNING = 0`、`ON CONFLICT = 0`；认知 DDL 单源 V187/V188/V189 无 JSONB 列声明（DR04/MC02 新表侧）|
+| `CognitiveLayerDisciplineTest` | 新增类 | 2 | JdbcTemplate import 百文件数 ≤ 14（只减不增）+ @Mapper / BaseMapper< 零命中（B-1 零 Mapper 纪律） |
+| `CognitiveDependencyAuditTest` | 新增类（pom 走查） | 1 | cognitive impl/api 双 pom 零 drools/kie/jbpm/easy-rules/mvel/beanshell（B-2 铁律守护之"不引入规则引擎"） |
+| `CognitiveLlmGatewayTest` | 新增类 | 1 | `new RestTemplate(` ≤ 5（4 服务侧 + 1 配置侧，2026-10-04 实测）；SuggestionBuilder:34 硬编码端点线呈登记，同批不增门 |
+| `CognitiveCrossDomainTest` | 新增类 | 1 | 非白名单 DML 写 ≤ 9（sys_config×2 + kb_cognitive_pipeline×3 + 无 schema 限定 4 张，2026-10-04 实测）；新引入 1 处即红 |
+| `DeterministicForecastArtifactTest` | 新增类（落点护栏） | 1 | V187/V188/V189 三份 CREATE TABLE 中无 forecast/scenario_run/counterfactual/summary/aggregate/metric_value 族——禁认知侧先把确定性计算产物建为自拥有表（ADR-14/E.6 白名单外落 APPLICATION） |
+| `CognitiveStubHonestyTest` | 新增类（stub 诚实度） | 1 | `"UP"` 字面量 ≤ 6（CognitiveEngineHealthController×4 + CognitiveEngineOpenHealthController:121 条件诚实 + :155 硬编码，2026-10-04 实测）；新增硬编码 UP 面漂移即红 |
+| `RouteUniquenessTest` | 新增类（路由归属护栏） | 2 | 认知 impl 类级 `@RequestMapping` 字面路径条目 ≤ 18（17 分发器 + CognitivePlannerController 双路径 1，2026-10-04 实测）；`/api/v1/engine/cognitive` 认知副拥有者冻结为 1（主方 ai 引擎 AiEngineStatusController） |
+| 走查公共件 `CognitiveDocPaths.java`（非测试类，共享件） | 新增 | — | 仓根双目录防误锁 + 认知主源码/迁移单源/前端树定位 + SQL 行/串字面剥除（沿 04 护栏通用件） |
+
+**回归实测**：分册05 新增 12 测试类 + 1 api 枚举 + 1 codec。逐批单独 run 全绿：
+Batch A 4/4、Batch B 14/14、Batch C 5/5、Batch D 4/4。全模块 `mvn -o -pl engine/cognitive-engine/cognitive-engine-impl test` 走查 **112 用例 · 111 绿 + 1 长既有 ArchitectureTest 红**（`serviceInterfacesShouldStartWithI` 命两 2 处存量类：`CognitivePipelineStore`（commit 60b4335）+ `mental.MentalEvent`（commit a1ac61d），均非本批交付面，保持红色待 W122+ 批次统一按 R-13 ① Minding infra slim 处理，本护栏取代/联动 schedule）。
+
+#### 8.4.2 33 命名测试对账矩阵
+
+| # | doc 命名测试 | 归宿 | 依据 |
+|:--:|:--|:--|:--|
+| 1 | `ScenarioCognitionIntegrationTest` | **C**（§14.4 live 库 + @SpringBootTest） | 需 `to_regclass` 预检 + 4-组 E1~E4 端到端库断言，离线不可验 |
+| 2 | `ScenarioCounterfactualIntegrationTest` | **C**（§14.4 live + R-17 批准） | 需预测运行服务实跑 + `ecos_scenario_run` 数据流 |
+| 3 | `CognitiveErrorMatrixIntegrationTest` | **C**（§14.4 live） | 6 方法断言需 503 原样穿透 + Scenario 无 Mind deny + mind 不属场景 400，需 live DB 造数 |
+| 4 | `CognitiveEvalCalculatorTest` | **B**（待实现，`CognitiveEvalCalculator` 类未落 MR） | 无实实现可测，本批不伪造绿 |
+| 5 | `CausalChainDeterminismTest` | **B**（需推理引擎确定性快照） | 现有 `CausalReasonerServiceTest`（7 例绿）覆盖；确定性快照共享面待 F05-09 接线 |
+| 6 | `CausalChainEvidenceTest` | **B**（同 5） | 同上 |
+| 7 | `Cm07NumericGuardTest` | **B**（Cm07 = numeric 数值护栏规范） | 无实命名类，属文档旧 spec 阶段名 |
+| 8 | `CognitiveAuditFailClosedTest` | **C**（含 dispatcher live） | 审计 fail-closed 需 userAgent header 走 security-engine 裁决 |
+| 9 | `CognitiveAuthParityTest` | **C** | 需 live-UI + `SecurityDecisionService` 裁决 |
+| 10 | `CognitiveContractSingleSourceTest` | **B**（`CognitiveApiPaths` 常量走查为 00 册） | 尚待 00 册契约单源，本册本文已登记依赖 |
+| 11 | **`CognitiveCrossDomainTest`** | **A**（Batch C） | 见 8.4.1 |
+| 12 | `CognitiveDeadCallAuditTest` | **B**（需 dead-code audit 输出） | 依赖上游 PMO-44 死代码扫描产物 |
+| 13 | **`CognitiveDependencyAuditTest`** | **A**（Batch C） | 见 8.4.1 |
+| 14 | `CognitiveIronLawsTest` | **B**（按 C120/F05-12 五守护护栏；框架层 Time 未启） | 拆分到 C/D 两条下的 5 子项中；本批拆入 `CognitiveDependencyAuditTest`(B-2 铁律守护之不引规则引擎) + `CognitiveLlmGatewayTest`(B-5 全部经 runtime) |
+| 15 | **`CognitiveLayerDisciplineTest`** | **A**（Batch C） | 见 8.4.1 |
+| 16 | **`CognitiveLlmGatewayTest`** | **A**（Batch C） | 见 8.4.1 |
+| 17 | `CognitiveNoEmptyFallbackTest` | **B**（禁静默空值断言） | 需 live 抓手（当前 200-空 命中未实），本批记待裁 |
+| 18 | `CognitiveNoLlmNumbersTest` | **C**（需 live 抓取 LLM 返值） | 直接绑 LLM 输出串测，需 llm-gateway 侧采样 |
+| 19 | `CognitiveObjectCatalogTest` | **B**（对象目录走查，需上游对象目录 MR） | 实名类未落 |
+| 20 | **`CognitiveSchemaPreflightTest`** | **A**（Batch B，文件级走查） | §Cg-2 `to_regclass` 端点独立归 **C**（live 库），本条形不复合登记 |
+| 21 | **`CognitiveSqlDialectTest`** | **A**（Batch B） | 见 8.4.1 |
+| 22 | **`CognitiveStubHonestyTest`** | **A**（Batch D） | 见 8.4.1 |
+| 23 | `DecisionBasisOwnershipTest` | **B**（拍指归属断言骨架待 F05-09） | 需 DiagnosisService 实装 |
+| 24 | **`DeterministicForecastArtifactTest`** | **A**（Batch D） | 见 8.4.1 |
+| 25 | `DiagnoseContractRegressionTest` | **B**（回归验需 Diag diagnosis 载体实装） | 待 F05-09 |
+| 26 | `DomainAliasConfigTest` | **B**（域 module_ON 配置别形） | 待模块别名表落 MR |
+| 27 | `ExploratoryGuardTest` | **B**（RAG+Agent 探索标 `exploratory=true` 护标，纯函数可验但需 ScenarioSimulatorService 大写抓锁） | `ScenarioSimulatorServiceImpl` 已实装但 `exploratory` flag 域未在 domain JSON contract 中定义，待 implementer 落 MR |
+| 28 | `HypothesisStatusMachineTest` | **B**（需 `HypothesisStatus` 枚举实装；V189 迁移已落地但 Java 枚举未落） | 见 V189 `old_status` 留痕已离线断言存在；Java 枚举待 §14.4 |
+| 29 | **`MindCapabilityMaskCodecTest`** | **A**（Batch A） | 见 8.4.1 |
+| 30 | **`MindCapabilityMaskTest`** | **A**（Batch A） | 见 8.4.1 |
+| 31 | `ModuleDependencyArchTest` | **D**（先存载体在 gateway 包 `ModuleDependencyArchTest`；认知侧延伸为 `ArchitectureTest` 域内件已先存，本批未改） | 见 gateway/ontology/knowledge 分冊回归 |
+| 32 | `PrecedentRecallerTest` | **D**（先存认知侧 4 用例已绿，本批不覆） | 见 Behaviour Override |
+| 33 | **`RouteUniquenessTest`** | **A**（Batch D，认知副方） | 见 8.4.1 |
+| 34 | **`ScenarioMindWritePathTest`** | **A**（Batch B） | 见 8.4.1 |
+| 35 | `SchemaDriftLintTest` | **B**（需 SchemaDriftLint 引擎，01 册 已提能力但 cognitive 走查待扩展） | 待 01 册 §五 点头 |
+| 36 | `SpringBootTest` | **C**（liveness fixture，本身非用例名，是容器基线） | 本册 0 @SpringBootTest（延续 04 册断言） |
+
+#### 8.4.3 三维结论
+
+1. **A 档 = 14 用例 · 12 命名测试类 + 1 io 公共件全绿**。（Monomodule 回归中唯一的 1 红是 legacy `ArchitectureTest` 长预存面，非本批交付）
+2. **B 档 = 13 命名**——依赖未落 MR 的实类产生（Cm07 数值 / DomainAlias / Exploratory flag / HypothesisStatus java 枚举 / DeadCall 扫描产物 / IronLaws 五守护拆包 等）；均为**"真失败防止"** 诚实登记待实现，不伪造绿，等同 M0/M1 补齐责任位。
+3. **C 档 = 5 命名**——全部与 `@SpringBootTest` / live 库 / `to_regclass` / llm-gateway 采样强绑，本节不勾绿（遵 Q13 "虚假验收防线"）。
+4. **D 档 = 3 命名**——00 册 `CognitiveApiPaths` 未合并、01 册 SchemaDriftLint 未扩展、08 册前端——须跨分冊统一可回走。
+
+**跨护栏不越界的登记**：本批未改任何业务代码、未实跑库、未切链 workspace→new table 旁路（registry 预存行为仍在 §14.4 待裁）。全部 14 用例均**纯文件/正则/pom 走查 + JUnit 单测**，不新增 Maven 模块、不改业务字段、不 DROP 任何存量列。
+
+---
+
+**本册一句话结论**（沿 v1.2）：认知域当前不是"实现有偏差"，而是**主责 P0 能力的契约端点与数据源双双不存在**（E1/E2 零命中 + 全库无 mind 表/列），其上运行着一套路径不同、方法不匹配、三套状态枚举并存、0 Mapper 裸 SQL、service 态无鉴权、伪实现以 200 返回固定值的近似系统。本册把它重建为：契约单源 + Mind 资产落点定版 + 三层纪律 + 两态鉴权等价 + 显式降级 + 五守护接线，并把五项存量归属议题（R-13~R-17）交由裁决。
+
+**§8.4 增补（2026-10-04）**：本册声明 33 命名测试逐一对账完毕：**A 档 12 个类 · 14 用例全绿**（V187/V188/V189 DDL 走查 + 写路径/方言/依赖/架构/LLM/跨域/落点/健康探针/route 十护栏加 MindCapabilityMask/Codec），**B 档 13 命名** 未命名预存/待 MR 类实产，不伪造绿；**C 档 5** 全部 live 库或 live-UI 未来 §14.4 同批与归口；**D 档 3** 系跨分冊扩展（膜册00/01/08），未延后 DEFER。
+
+<!-- 详细设计-05-认知域 / 2026-09-29 / v1.3（2026-10-04 校订十九：A 档 12 测试类 14 用例全绿 + 33 命名对账矩阵） / W115~W139 → C97~C121 / R-13 ①、R-14 ①、R-15 ①、R-16 ①+③、R-17 ①、R-42 ①、R-67 ② 已批准（报告 §十四.1） / Gate-1 已签字、Gate-2 已通过 / 本轮未实跑库、未改业务代码 -->
+
