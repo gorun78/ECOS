@@ -30,7 +30,8 @@ services:
       # postgresql-pgvector-0.6.2 包解出（Docker Hub 不可达时的离线替代，版本 0.8.1）。
       - ./postgres-extensions/vector.so:/usr/local/lib/postgresql/vector.so:ro
       - ./postgres-extensions/vector.control:/usr/share/postgresql/extension/vector.control:ro
-      - ./postgres-extensions/vector--0.8.1.sql:/usr/share/postgresql/extension/vector--0.8.1.sql:ro
+      # 基础 SQL 2026-10-05 归入 canonical 数据脚本 (L3, 详见 docs/50-db_script/数据层规范化治理落地指令-2026-10-05.md)
+      - ../docs/50-db_script/sql/runtime-access/vector--0.8.1.sql:/usr/share/postgresql/extension/vector--0.8.1.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U root -d sys_man"]
       interval: 10s
