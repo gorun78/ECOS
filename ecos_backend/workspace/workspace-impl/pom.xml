@@ -53,6 +53,12 @@
             <artifactId>runtime-access</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+        <!-- 分册09 F09-02/07/13：cognitive-engine-api（契约面，无 impl/DB 依赖）—— CaliberDsl 4 关校验 + FcRunCalc 确定性计算 + FcBacktestCalc 回测五指标 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>cognitive-engine-api</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>

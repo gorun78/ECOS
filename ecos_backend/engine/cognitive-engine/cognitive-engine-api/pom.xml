@@ -22,5 +22,11 @@
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+        <!-- 分册09 F09-02/07/13：CaliberDsl / FcRunCalc / FcBacktestCalc 离线单测底座 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
