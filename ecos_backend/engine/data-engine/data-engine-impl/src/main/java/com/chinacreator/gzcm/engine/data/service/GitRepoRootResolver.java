@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.data.service;
 import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
@@ -18,14 +19,33 @@ public class GitRepoRootResolver {
 
     public static final String KEY_REPO_ROOT = "ecos_git_repo_root";
 
-    private final SysConfigService sysConfigService;
+    /**
+     * {@code required=false}：跨 JAR 独立 boot 场景（datanet :18082 fat jar）里
+     * sysman-impl 的 {@code SysConfigService} 不在 component-scan 范围内时 provider 给 null，
+     * {@link #readConfig()} 直接落到 {@link #defaultRoot()}。
+     */
+    @Autowired(required = false)
+    private SysConfigService sysConfigService;
 
+    /** 单测/老调用便捷构造（保留 API 面；Spring 用默认 constructor + 字段注入）。 */
     public GitRepoRootResolver(SysConfigService sysConfigService) {
         this.sysConfigService = sysConfigService;
     }
 
+    public GitRepoRootResolver() {
+        // Spring componentScan 场景：走 @Autowired(required=false) 字段注入
+    }
+
+    private String readConfig() {
+        if (sysConfigService == null) {
+            log.debug("GitRepoRootResolver: SysConfigService 门面不可用（跨 JAR 独立 boot 场景） → defaultRoot()");
+            return null;
+        }
+        return sysConfigService.getString(KEY_REPO_ROOT);
+    }
+
     public String resolveRepoRoot() {
-        String configured = sysConfigService.getString(KEY_REPO_ROOT);
+        String configured = readConfig();
         String root = (configured == null || configured.trim().isEmpty()) ? defaultRoot() : configured.trim();
         return requireSafeRoot(root);
     }
@@ -38,7 +58,7 @@ public class GitRepoRootResolver {
      * 不裸 500。已在树-mount 后调用者可直接调用 {@link #resolveRepoRoot()}。</p>
      */
     public String resolveExistingRepoRoot() {
-        String cfg = sysConfigService.getString(KEY_REPO_ROOT);
+        String cfg = readConfig();
         String root = (cfg == null || cfg.trim().isEmpty()) ? defaultRoot() : cfg.trim();
         return requireSafeRootExisting(root);
     }

@@ -22,7 +22,7 @@ ecos:
       enabled: ${ECOS_EVENT_KAFKA_ENABLED:true}
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/sys_man?currentSchema=public
+    url: ${ECOS_DB_URL:jdbc:postgresql://localhost:5432/sys_man?currentSchema=public}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver

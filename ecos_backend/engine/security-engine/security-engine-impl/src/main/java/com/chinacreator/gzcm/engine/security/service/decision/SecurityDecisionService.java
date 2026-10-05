@@ -59,6 +59,7 @@ public class SecurityDecisionService {
     /** 可选注入：资产目录标记（F01-09）；null 时按"受保护资产"保守口径 */
     private final Object assetCatalogMarker;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public SecurityDecisionService(RowLevelSecurityServiceImpl rlsService,
                                    ColumnLevelSecurityServiceImpl clsService,
                                    OpaPolicyService opaService) {
