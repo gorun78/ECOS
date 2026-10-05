@@ -59,7 +59,7 @@ class PipelineDdlSingleSourcePairingTest {
                         .resolve("V170__pipeline_definition_single_source.sql"),
                 table, "单源 V170");
         String multiDb = readTableBlock(
-                repoRoot.resolve("ecos-sql/postgresql/03_ecos_data.sql"),
+                repoRoot.resolve("docs/50-db_script/sql/8split/postgresql/03_ecos_data.sql"),
                 table, "多库镜像 03_ecos_data.sql");
 
         Set<String> srcCols = columnNames(singleSource, table, "单源 V170");
@@ -77,8 +77,8 @@ class PipelineDdlSingleSourcePairingTest {
         assertTrue(Files.isRegularFile(repoRoot.resolve(
                 "ecos_backend/gateway/src/main/resources/db/migration/V170__pipeline_definition_single_source.sql")),
                 "单源目录缺失 V170__pipeline_definition_single_source.sql —— DDL 单源漂移，W58 违规");
-        assertTrue(Files.isRegularFile(repoRoot.resolve("ecos-sql/postgresql/03_ecos_data.sql")),
-                "多库镜像缺失 ecos-sql/postgresql/03_ecos_data.sql —— W58 配对前提不成立");
+        assertTrue(Files.isRegularFile(repoRoot.resolve("docs/50-db_script/sql/8split/postgresql/03_ecos_data.sql")),
+                "多库镜像缺失 docs/50-db_script/sql/8split/postgresql/03_ecos_data.sql —— W58 配对前提不成立 (P3 归集后路径)");
     }
 
     // ─────────────────────────── 工具 ───────────────────────────
