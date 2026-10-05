@@ -1,0 +1,13 @@
+ecos_knowledge.v_kb_doc_carrier_registry
+ecos_knowledge.v_kb_mirror_registry
+public.ecos_fc_caliber
+public.v_
+public.v_ecos_function_audit_log
+public.v_kb_cognitive_pipeline
+public.v_legacy_ecos_business_scenario
+public.v_legacy_ecos_decision_record
+public.v_legacy_ecos_scenario_binding
+public.v_legacy_ecos_scenario_binding_link
+public.v_legacy_ecos_scenario_mind
+public.v_legacy_ecos_scenario_run
+public.v_legacy_ecos_scenario_sandbox_layout
