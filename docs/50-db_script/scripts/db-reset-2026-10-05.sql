@@ -236,9 +236,14 @@ DECLARE cnt int;
 BEGIN
   SELECT count(*) INTO cnt FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
    WHERE n.nspname='public' AND c.relkind IN ('r','v','m','p') AND c.relname !~ '^pg_';
-  IF cnt > 5 THEN RAISE EXCEPTION 'rehome 后 public 仍余 % 对象 > 5 预期 stray — 中止事务需人工复核', cnt;
-  IF cnt > 0 THEN RAISE WARNING 'public 恰余 % 个演示 stray — 下一步 drop', cnt;
-  ELSE RAISE NOTICE 'public 已清空(ambitoscopic)'; END IF;
+  IF cnt > 5 THEN
+    RAISE EXCEPTION 'rehome 后 public 仍余 % 对象 > 5 预期 stray — 中止事务需人工复核', cnt;
+  END IF;
+  IF cnt > 0 THEN
+    RAISE WARNING 'public 恰余 % 个演示 stray — 下一步 drop', cnt;
+  ELSE
+    RAISE NOTICE 'public 已清空';
+  END IF;
 END $$;
 -- ---- 5) drop 演示域 (G3 授权口径: 非业务契约) ----
 DROP SCHEMA IF EXISTS ecos_demo CASCADE;
