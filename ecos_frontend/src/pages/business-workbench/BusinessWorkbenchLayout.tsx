@@ -198,6 +198,19 @@ export default function BusinessWorkbenchLayout({
   }, []);
 
   const loadOntologyData = async () => {
+    // W3-2：seed 属"回退种"非"初始态"，仅 dev 环境允许兜底；prod 后端不可用时呈空态而非假演示数据。
+    // 提升到 try 外：catch 回退路径同样要读 isDev / emptyOntology（原写法在 try 内声明导致 catch 不可见）。
+    const isDev = import.meta.env.DEV;
+    const emptyOntology = () => ({
+      objects: [] as ObjectType[],
+      links: [] as LinkType[],
+      actions: [] as ActionType[],
+      domains: [] as OntologyDomain[],
+      interfaces: [] as InterfaceType[],
+      sharedProperties: [] as SharedProperty[],
+      datasets: [] as Dataset[],
+      functionTypes: [] as FunctionType[],
+    });
     try {
       // Try loading from backend API
       const [objectsResp, linksResp, actionsResp, domainsResp] = await Promise.allSettled([
@@ -207,18 +220,6 @@ export default function BusinessWorkbenchLayout({
         apiFetch('/v1/ecos/domains') as Promise<any>,
       ]);
 
-      // W3-2：seed 属"回退种"非"初始态"，仅 dev 环境允许兜底；prod 后端不可用时呈空态而非航空演示数据。
-      const isDev = import.meta.env.DEV;
-      const emptyOntology = () => ({
-        objects: [] as ObjectType[],
-        links: [] as LinkType[],
-        actions: [] as ActionType[],
-        domains: [] as OntologyDomain[],
-        interfaces: [] as InterfaceType[],
-        sharedProperties: [] as SharedProperty[],
-        datasets: [] as Dataset[],
-        functionTypes: [] as FunctionType[],
-      });
       const seedOrEmpty = <T,>(seed: T[]): T[] => (isDev ? seed : []);
       const seedObjects = seedOrEmpty(mockObjectTypes);
       const seedLinks = seedOrEmpty(mockLinkTypes);
@@ -239,7 +240,7 @@ export default function BusinessWorkbenchLayout({
       // 仅当该端点 fulfilled 且带非空 data 数组时才尝试接管，否则整列回退 seed-or-empty。
       const dataOf = (res: PromiseSettledResult<any>): any[] =>
         res.status === 'fulfilled' && Array.isArray(res.value?.data) ? res.value.data : [];
-      const adoptIfUsable = <T>(res: PromiseSettledResult<any>, norm: (r: any) => T | null, fallback: T[]): T[] => {
+      const adoptIfUsable = <T,>(res: PromiseSettledResult<any>, norm: (r: any) => T | null, fallback: T[]): T[] => {
         const raw = dataOf(res);
         const { kept, dropped } = ingest(raw, norm);
         if (raw.length > 0) console.info(`[BusinessWorkbench] ingestion: kept ${kept.length}/${raw.length} (dropped ${dropped})`);
