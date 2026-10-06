@@ -108,8 +108,12 @@ class SqlDialectDerivationTest {
     }
 
     static String content(String dialect) throws IOException {
+        // D-4 (2026-10-06 数据层 P3 物理归集同步)：ecos-sql/{dialect} 目录已由 P3 批次整体归集至
+        // docs/50-db_script/sql/8split/{dialect}（银 L3 单源方言目录），本护栏只更切路径不落新断言。
+        // R9 只增改——原本指向 `ecos-sql/<dialect>/05_ecos_knowledge.sql` 的读入句保留 2026-09-29
+        // 采数口径的注释界桩不动。
         Path p = Mc02JsonbRetirementTest.repoRoot()
-            .resolve("ecos-sql/" + dialect + "/05_ecos_knowledge.sql");
+            .resolve("docs/50-db_script/sql/8split/" + dialect + "/05_ecos_knowledge.sql");
         if (!Files.isRegularFile(p)) fail("方言文件缺失: " + p);
         return new String(Files.readAllBytes(p), StandardCharsets.UTF_8);
     }

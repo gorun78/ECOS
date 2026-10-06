@@ -16,6 +16,7 @@ import com.chinacreator.gzcm.engine.ai.service.CognitiveService;
 import com.chinacreator.gzcm.sysman.config.I18nConfig;
 import com.chinacreator.gzcm.sysman.config.SysManRuntimeConfig;
 import com.chinacreator.gzcm.sysman.controller.SysConfigController;
+import com.chinacreator.gzcm.engine.cognitive2.controller.CognitiveEngineOpenHealthController;
 
 /**
  * ECOS Aiming 微服务 — 智能服务（火·W 智慧）
@@ -96,7 +97,14 @@ import com.chinacreator.gzcm.sysman.controller.SysConfigController;
                 SysConfigController.class,
                 I18nConfig.class,
                 SysManRuntimeConfig.class
-        })
+        }),
+        // R4 (D-3 / 2026-10-05): 镜像 gateway GatewayApplication 同条目排除。
+        // CognitiveEngineOpenHealthController (cognitive2 PMO-55 E-C 新副本) 与 ai-engine
+        // AiEngineStatusController 同占 GET /api/v1/engine/cognitive/health ⇒ Ambiguous mapping
+        // 导致独立 aiming-boot 启动即崩。gateway 裁定「保 ai 副本(整类 5 端点)、排 cognitive 新副本」
+        // (零行为变化原则)；aiming 独立侧同步同取舍，两进程对 /engine/cognitive/health 唯一解一致。
+        @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
+                classes = CognitiveEngineOpenHealthController.class)
 })
 @MapperScan({
         // ai-engine 主 repository (Skill/CronJob/Agent/Mission/Knowledge)
