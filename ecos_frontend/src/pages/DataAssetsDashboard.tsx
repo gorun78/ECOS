@@ -144,7 +144,9 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
           onChange={e => setFilter({ ...filter, category: e.target.value })}
         >
           <option value="">{t('dw.assets.allCategories')}</option>
-          {categories.filter(c => c.level === 2).map(c => <option key={c.categoryId} value={c.categoryId}>{c.name}</option>)}
+          {categories.filter(c => c.level === 2).map((c, i) => (
+            <option key={c.categoryId || `${c.name}#${i}`} value={c.categoryId}>{c.name}</option>
+          ))}
         </select>
         <input
           placeholder={t('dw.assets.keywords')}

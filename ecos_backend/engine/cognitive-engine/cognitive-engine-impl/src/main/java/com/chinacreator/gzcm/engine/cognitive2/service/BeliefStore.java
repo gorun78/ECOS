@@ -140,6 +140,18 @@ public class BeliefStore {
             variableName);
     }
 
+    /** 全局计数（未删除；status 可选过滤）——供认知总览 KPI 跨域聚合（P0-5）。 */
+    public int countAll(String status) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM ecos_cognitive_belief WHERE is_deleted = 0");
+        List<Object> args = new ArrayList<>();
+        if (status != null && !status.isBlank()) {
+            sql.append(" AND status = ?");
+            args.add(status.toUpperCase());
+        }
+        Integer c = jdbc.queryForObject(sql.toString(), Integer.class, args.toArray());
+        return c == null ? 0 : c;
+    }
+
     /**
      * 行 → VO 消费映射：distribution JSONB 归一为 List&lt;Map&gt;（每项 {outcome, prob(double)}），
      * 对齐 common-api {@code BeliefDistributionVO.OutcomeProb}。

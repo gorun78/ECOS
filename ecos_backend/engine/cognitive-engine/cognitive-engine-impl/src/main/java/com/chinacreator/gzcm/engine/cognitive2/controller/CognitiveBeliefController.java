@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 不确定性判断 REST API — 心智层 P 库（PMO-59 P2a / ADR-9 外部方案层3.2）。
@@ -73,6 +74,18 @@ public class CognitiveBeliefController {
             return ApiResponse.notFound("不确定性判断不存在: id=" + id);
         }
         return ApiResponse.success(vo);
+    }
+
+    /**
+     * P0-5 修 (2026-10-06)：全局计数（跨域聚合，domain 非必填）——供认知总览 KPI。
+     * 独立于 {@code GET /}（后者强制 domain，跨域重名变量隔离）：字面路径 {@code /count}
+     * 在 Spring 中优先于 {@code /{id}} 模板匹配，不与详情端点冲突。
+     */
+    @GetMapping("/count")
+    public ApiResponse<Map<String, Object>> count(
+            @RequestParam(required = false) String status) {
+        int total = beliefService.count(status);
+        return ApiResponse.success(Map.of("count", total));
     }
 
     /** 注册（强类型 DTO；Service 层校验 prob 和=1，同变量同域 version=max+1）。 */

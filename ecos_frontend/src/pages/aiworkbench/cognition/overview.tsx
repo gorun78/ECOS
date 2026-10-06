@@ -52,13 +52,16 @@ export default function overview() {
       const [models, hyps, beliefs, health] = await Promise.allSettled([
         apiFetchData<any[]>('/api/v1/cognitive/models'),
         apiFetchData<any[]>('/api/v1/cognitive/hypotheses?status=VALID'),
-        apiFetchData<any[]>('/api/v1/cognitive/beliefs'),
+        // P0-5 修 (2026-10-06)：`GET /cognitive/beliefs` 后端强制 domain（跨域重名变量隔离），
+        // 裸请求 400。总览"当前信念"是跨域聚合 KPI → 改走新增的 `GET /cognitive/beliefs/count`
+        // （domain 非必填，status=ACTIVE 表"当前"），读 `data.count`。
+        apiFetchData<any>('/api/v1/cognitive/beliefs/count?status=ACTIVE'),
         apiFetchData<any>('/api/v1/cognitive/health'),
       ]);
       setCounts({
         models: models.status === 'fulfilled' ? (Array.isArray(models.value) ? models.value.length : (models.value as any)?.length ?? 0) : 0,
         hypotheses: hyps.status === 'fulfilled' ? (Array.isArray(hyps.value) ? hyps.value.length : (hyps.value as any)?.length ?? 0) : 0,
-        beliefs: beliefs.status === 'fulfilled' ? (Array.isArray(beliefs.value) ? beliefs.value.length : (beliefs.value as any)?.length ?? 0) : 0,
+        beliefs: beliefs.status === 'fulfilled' ? (typeof (beliefs.value as any)?.count === 'number' ? (beliefs.value as any).count : 0) : 0,
       });
       if (health.status === 'fulfilled') {
         const h = health.value as any;
@@ -96,7 +99,9 @@ export default function overview() {
           <div key={m.label} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <m.icon className={`w-4 h-4 ${m.color}`} />
-              <span className="text-xs text-slate-500 dark:text-slate-400">{t(m.label, 'fallback')}</span>
+              {/* P2-F 修 (2026-10-06)：原第二参误写英文字面量 'fallback'，i18n 键缺时
+                  卡片直接显示 "fallback"。改用结构体里本已备好的中文 fallback（m.fallback）。 */}
+              <span className="text-xs text-slate-500 dark:text-slate-400">{t(m.label, m.fallback)}</span>
             </div>
             <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
               {loading ? '…' : String(counts?.[m.path === '/api/v1/cognitive/models' ? 'models' : m.path.includes('status=VALID') ? 'hypotheses' : 'beliefs'] ?? 0)}

@@ -102,7 +102,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
     setSavingOnly(true);
     setError(null);
     try {
-      await apiFetch(`/api/v1/engine/data/pipeline/tasks/${encodeURIComponent(pipelineId)}`, {
+      await apiFetch(`/v1/engine/data/pipeline/tasks/${encodeURIComponent(pipelineId)}`, {
         method: 'PUT',
         body: JSON.stringify({ name: pipelineName }),
       });

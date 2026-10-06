@@ -274,6 +274,48 @@ public class AgentLoopController {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    //  3b. GET /api/v1/agent-loop/sessions — 会话列表（只增不改：集合级 GET，可选 agentId 过滤）
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * P0-4 修 (2026-10-06)：前端 `fetchAgentSessions` 发 `GET /api/v1/agent-loop/sessions`（裸或
+     * `?agentId=`），本 Controller 原先只有 `POST /sessions` 与 `GET /sessions/{id}` → 集合级 GET
+     * 落到 `{id}` 模板 → 405/404。补集合级 GET（与前端 `api.ts:534 fetchAgentSessions` 对齐，
+     * 返回字段与其 `AgentSessionSaved` 契约一致）；排除 ARCHIVED（已软删）。
+     */
+    @GetMapping("/sessions")
+    public ApiResponse<List<Map<String, Object>>> listSessions(
+            @RequestParam(name = "agentId", required = false) String agentId) {
+        try {
+            List<AgentSessionService.AgentSession> sessions =
+                    (agentId == null || agentId.isBlank())
+                            ? sessionService.listActive()
+                            : sessionService.listByAgent(agentId);
+
+            List<Map<String, Object>> data = new java.util.ArrayList<>();
+            for (AgentSessionService.AgentSession s : sessions) {
+                if ("ARCHIVED".equals(s.getStatus())) {
+                    continue;
+                }
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", s.getId());
+                m.put("agentId", s.getAgentId());
+                m.put("userId", s.getUserId());
+                m.put("tenantId", s.getTenantId());
+                m.put("status", s.getStatus());
+                m.put("messageCount", s.getMessageCount());
+                m.put("createdAt", s.getCreatedAt());
+                m.put("lastActiveAt", s.getLastActiveAt());
+                data.add(m);
+            }
+            return ApiResponse.success(data);
+        } catch (Exception e) {
+            log.error("[AgentLoop] 查询会话列表失败", e);
+            return ApiResponse.internalError("查询会话列表失败");
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     //  4. GET /api/v1/agent-loop/sessions/{id} — 查会话详情
     // ═══════════════════════════════════════════════════════════════
 

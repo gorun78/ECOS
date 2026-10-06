@@ -99,6 +99,19 @@ public class CognitiveBeliefService {
             .map(this::toVo).toList();
     }
 
+    /**
+     * 全局计数（跨域聚合，domain 非必填）——供认知总览 KPI（P0-5）。与 {@link #list} 不同：
+     * 列表端点强制 domain（跨域重名变量隔离键），但总览的"当前信念张数"是跨域聚合指标，
+     * 走独立的只读计数语义，不破坏"查询必带 domain"的隔离契约。status 可选。
+     */
+    public int count(String status) {
+        if (status != null && !status.isBlank()
+            && !BeliefStore.STATUSES.contains(status.toUpperCase())) {
+            throw new BusinessException(400, "COG-400: 非法 status（" + String.join("/", BeliefStore.STATUSES) + "）");
+        }
+        return store.countAll(status);
+    }
+
     /** 按主键查询；无记录返回 null（由 Controller 转 404）。 */
     public BeliefDistributionVO getDetail(String id) {
         Map<String, Object> row = store.findById(id);

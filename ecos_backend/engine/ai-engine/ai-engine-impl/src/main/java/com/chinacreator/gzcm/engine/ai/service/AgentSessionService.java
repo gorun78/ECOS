@@ -240,6 +240,19 @@ public class AgentSessionService {
         );
     }
 
+    /**
+     * 查询全部未归档会话（跨 agent，排除 ARCHIVED 软删，按最近活跃倒序）。
+     * <p>供 {@code GET /api/v1/agent-loop/sessions} 集合级列表（P0-4）；ARCHIVED 已在
+     * Controller 侧二次过滤，此处仅按状态谓词回收，避免把已软删会话当有效列表项。</p>
+     */
+    public List<AgentSession> listActive() {
+        return jdbc.query(
+            "SELECT id, agent_id, user_id, tenant_id, status, message_count, created_at, last_active_at "
+            + "FROM sys_agent_session WHERE status <> 'ARCHIVED' ORDER BY last_active_at DESC",
+            new SessionRowMapper()
+        );
+    }
+
     // ═══════════════════════════════════════════════════
     //  上下文压缩
     // ═══════════════════════════════════════════════════

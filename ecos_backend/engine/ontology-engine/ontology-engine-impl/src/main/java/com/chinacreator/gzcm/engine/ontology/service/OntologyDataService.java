@@ -9,7 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /**
- * 本体数据实例持久化服务 — 承载 {@code public.ecos_ontology_data} 表的全部 JDBC 访问。
+ * 本体数据实例持久化服务 — 承载 {@code ecos_ontology_data} 表的全部 JDBC 访问。
  *
  * <p>由 {@code OntologyDataController} 调用：把数据记录（ObjectType 下的实例）
  * 的列表/详情/新增/更新/计数 SQL 从 Controller 抽到 Service 层
@@ -47,8 +47,8 @@ public class OntologyDataService {
                 ? "WHERE ontology_id = ? AND is_deleted = 0"
                 : "WHERE is_deleted = 0";
         return hasFilter
-                ? jdbc.queryForObject("SELECT COUNT(*) FROM public.ecos_ontology_data " + where, Integer.class, filterType)
-                : jdbc.queryForObject("SELECT COUNT(*) FROM public.ecos_ontology_data " + where, Integer.class);
+                ? jdbc.queryForObject("SELECT COUNT(*) FROM ecos_ontology_data " + where, Integer.class, filterType)
+                : jdbc.queryForObject("SELECT COUNT(*) FROM ecos_ontology_data " + where, Integer.class);
     }
 
     /**
@@ -67,12 +67,12 @@ public class OntologyDataService {
         return hasFilter
                 ? jdbc.queryForList(
                         SELECT_COLUMNS +
-                        "FROM public.ecos_ontology_data " + where + " " +
+                        "FROM ecos_ontology_data " + where + " " +
                         "ORDER BY create_time DESC LIMIT ? OFFSET ?",
                         filterType, limit, offset)
                 : jdbc.queryForList(
                         SELECT_COLUMNS +
-                        "FROM public.ecos_ontology_data " + where + " " +
+                        "FROM ecos_ontology_data " + where + " " +
                         "ORDER BY create_time DESC LIMIT ? OFFSET ?",
                         limit, offset);
     }
@@ -86,7 +86,7 @@ public class OntologyDataService {
     public List<Map<String, Object>> findRecordById(String id) {
         return jdbc.queryForList(
                 SELECT_COLUMNS +
-                "FROM public.ecos_ontology_data WHERE id = ? AND is_deleted = 0",
+                "FROM ecos_ontology_data WHERE id = ? AND is_deleted = 0",
                 id);
     }
 
@@ -98,7 +98,7 @@ public class OntologyDataService {
     public int insertRecord(String id, String objectTypeId, String objectTypeName,
                             String recordKey, String payloadJson, String createdBy) {
         return jdbc.update(
-                "INSERT INTO public.ecos_ontology_data " +
+                "INSERT INTO ecos_ontology_data " +
                 "(id, ontology_id, object_type, record_key, payload, status, " +
                 " create_time, update_time, create_by, update_by, is_deleted) " +
                 "VALUES (?, ?, ?, ?, ?, 'ACTIVE', now(), now(), ?, ?, 0)",
@@ -112,7 +112,7 @@ public class OntologyDataService {
      */
     public int updateRecord(String id, String objectTypeName, String createdBy, String payloadJson) {
         return jdbc.update(
-                "UPDATE public.ecos_ontology_data SET " +
+                "UPDATE ecos_ontology_data SET " +
                 "  object_type = COALESCE(?, object_type), " +
                 "  create_by   = COALESCE(?, create_by), " +
                 "  update_by   = COALESCE(?, update_by), " +
@@ -127,7 +127,7 @@ public class OntologyDataService {
      */
     public Integer countById(String id) {
         return jdbc.queryForObject(
-                "SELECT COUNT(*) FROM public.ecos_ontology_data WHERE id = ? AND is_deleted = 0",
+                "SELECT COUNT(*) FROM ecos_ontology_data WHERE id = ? AND is_deleted = 0",
                 Integer.class, id);
     }
 
@@ -136,7 +136,7 @@ public class OntologyDataService {
      */
     public Integer countByObjectType(String objectTypeId) {
         return jdbc.queryForObject(
-                "SELECT COUNT(*) FROM public.ecos_ontology_data " +
+                "SELECT COUNT(*) FROM ecos_ontology_data " +
                 "WHERE ontology_id = ? AND is_deleted = 0",
                 Integer.class, objectTypeId);
     }

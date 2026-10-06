@@ -88,7 +88,7 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
     }
     setRegistering(true);
     try {
-      await apiFetch('/api/v1/engine/data/udf/register', {
+      await apiFetch('/v1/engine/data/udf/register', {
         method: 'POST',
         body: JSON.stringify({
           name: udfName.trim(),
