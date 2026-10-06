@@ -93,7 +93,7 @@ export default function DataTable<T extends Record<string, any>>({
 
   if (loading) {
     return (
-      <div className={className}>
+      <div className={`${className} min-w-0`}>
         <LoadingSkeleton variant="table" rows={pageSize} />
       </div>
     );
@@ -101,7 +101,7 @@ export default function DataTable<T extends Record<string, any>>({
 
   if (!displayData.length) {
     return (
-      <div className={className}>
+      <div className={`${className} min-w-0`}>
         <EmptyState
           icon={emptyIcon}
           title={emptyTitle}
@@ -113,9 +113,9 @@ export default function DataTable<T extends Record<string, any>>({
   }
 
   return (
-    <div className={`${className} flex flex-col`}>
+    <div className={`${className} flex flex-col min-w-0`}>
       {/* Table */}
-      <div className="overflow-x-auto scrollbar-thin">
+      <div className="overflow-x-auto scrollbar-thin min-w-0">
         <table className={`w-full text-xs border-collapse ${styles.cardText}`}>
           <thead>
             <tr className={`border-b ${styles.cardBorder}`}>

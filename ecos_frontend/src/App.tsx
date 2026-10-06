@@ -12,6 +12,7 @@ import Topbar from "./components/Topbar";
 import CommandPalette from "./components/CommandPalette";
 import AIPCopilotDrawer from "./components/copilot/AIPCopilotDrawer";
 import { useMobileSidebar } from "./hooks/useMobileSidebar";
+import { usePolling } from "./hooks/usePolling";
 import { useTheme } from "./components/ThemeContext";
 import { useLanguage } from "./components/LanguageContext";
 import ErrorBoundary from "./components/common/ErrorBoundary";
@@ -103,21 +104,16 @@ export default function App() {
     total: 0, running: 0, pending: 0, succeeded: 0, failed: 0, cancelled: 0
   });
 
-  useEffect(() => {
-    const poll = () => {
-      apiTaskStats()
-        .then((s) => setTaskStats(s))
-        // PMO-43 T2: apiFetchData already dispatches `ecos-network-down` for
-        // real network failures (the global NetworkErrorBanner reacts). The
-        // catch here is defensive for non-transport errors (4xx/5xx business)
-        // — in that case the banner stays hidden and the UI just keeps the
-        // last known stats rather than the page blowing up.
-        .catch(() => {});
-    };
-    poll();
-    const interval = setInterval(poll, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  // Task stats polling — E4.5: 收敛到 usePolling (替代裸 setInterval)
+  // 语义不变: 立即 poll + 10s 间隔 + hidden Tab pause; 单次 poll 失败不打断下一轮
+  usePolling({
+    poll: () =>
+      apiTaskStats().then((s) => setTaskStats(s)).catch(() => {
+        /* 网络/业务错误保持前值；NetworkErrorBanner 由 apiFetchData 独立触发 */
+      }),
+    intervalMs: 10000,
+    immediate: true,
+  });
 
   // Health polling — network failures are surfaced via the global
   // NetworkErrorBanner (T5/G3); DOWN/UP transitions feed the Sidebar
@@ -126,8 +122,8 @@ export default function App() {
   const [serviceStatus, setServiceStatus] = useState("UP");
   const prevHealthUpRef = useRef(true);
 
-  useEffect(() => {
-    const poll = () => {
+  usePolling({
+    poll: () =>
       apiHealth()
         .then((s) => {
           const up = s !== "DOWN";
@@ -140,12 +136,10 @@ export default function App() {
           if (prevHealthUpRef.current) notifyNetworkUp(); // last UP → DOWN edge; banner re-raises on next DOWN
           prevHealthUpRef.current = false;
           setServiceStatus("DOWN");
-        });
-    };
-    poll();
-    const interval = setInterval(poll, 30000);
-    return () => clearInterval(interval);
-  }, []);
+        }),
+    intervalMs: 30000,
+    immediate: true,
+  });
 
   // Mobile sidebar hook
   const { isMobile, sidebarOpen, toggleSidebar, closeSidebar } = useMobileSidebar();
