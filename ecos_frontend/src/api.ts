@@ -54,9 +54,11 @@ export { ApiError } from "./services/apiError";
 export type { ApiErrorKind, ApiErrorBody } from "./services/apiError";
 
 // ── E4.1 域拆分 barrel 层 (P0 顶层共因) ──────────────────────────
-// 8 域拆分第 1 片: IAM / Tenant (原 L1494-1751 → src/api_iam.ts)。
+// 现有 2 片: ① IAM/Tenant → src/api_iam.ts (原 L1494-1751)
+//           ② Data Quality → src/api_dq.ts   (原 L1021-1071)
 // 通过 export * re-export 保持 168 个 importer `from "./api"` 契约零改动。
 export * from "./api_iam";
+export * from "./api_dq";
 
 
 // ── Datasets ────────────────────────────────────────────
@@ -1016,58 +1018,6 @@ export async function executePipeline(id: string): Promise<PipelineExecution> {
 /** GET /api/pipeline/executions/{id} — 执行状态 */
 export async function getExecution(executionId: string): Promise<PipelineExecution> {
   return apiFetchData(`/api/v1/pipeline/executions/${executionId}`);
-}
-
-// ── Data Quality Dashboard ────────────────────────────────────
-const DQ_BASE = "/api/v1/dq";
-
-export async function fetchDqRules(): Promise<any> {
-  const resp = await doFetch(`${DQ_BASE}/rules`);
-  const arr = resp?.data?.data;  // ApiResponse<{data:[...],total}>
-  if (Array.isArray(arr)) return arr;
-  return resp?.data || resp || [];
-}
-
-export async function fetchDqIssues(): Promise<any> {
-  const resp = await doFetch(`${DQ_BASE}/issues`);
-  const arr = resp?.data?.data;  // ApiResponse<{data:[...],total}>
-  if (Array.isArray(arr)) return arr;
-  return resp?.data || resp || [];
-}
-
-export async function fetchDqDashboard(): Promise<any> {
-  const resp = await doFetch(`${DQ_BASE}/dashboard`);
-  return resp?.data || resp || null;
-}
-
-export async function fetchDqAll(): Promise<[any, any, any]> {
-  const [r, i, d] = await Promise.allSettled([fetchDqRules(), fetchDqIssues(), fetchDqDashboard()]);
-  return [
-    r.status === "fulfilled" ? r.value : [],
-    i.status === "fulfilled" ? i.value : [],
-    d.status === "fulfilled" ? d.value : null,
-  ];
-}
-
-export async function createDqItem(type: string, body: any): Promise<any> {
-  return doFetch(`${DQ_BASE}/${type}`, { method: "POST", body: JSON.stringify(body) });
-}
-
-export async function updateDqItem(type: string, id: string, body: any): Promise<any> {
-  return doFetch(`${DQ_BASE}/${type}/${id}`, { method: "PUT", body: JSON.stringify(body) });
-}
-
-export async function deleteDqItem(type: string, id: string): Promise<any> {
-  return doFetch(`${DQ_BASE}/${type}/${id}`, { method: "DELETE" });
-}
-
-export async function runDqCheck(): Promise<any> {
-  return doFetch(`${DQ_BASE}/check`, { method: "POST" });
-}
-
-export async function resolveDqIssue(issueId: string, body: any): Promise<any> {
-  // Backend uses PUT /api/dq/issues/{id} with status in body
-  return doFetch(`${DQ_BASE}/issues/${issueId}`, { method: "PUT", body: JSON.stringify(body) });
 }
 
 // ── World Model Viewer ────────────────────────────────────────
