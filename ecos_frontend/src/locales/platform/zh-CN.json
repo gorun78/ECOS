@@ -195,5 +195,9 @@
   "platform.audit.field.duration": "耗时",
   "platform.audit.field.chainHash": "链哈希",
   "platform.audit.field.chainChecked": "已校验",
-  "platform.audit.field.detail": "明细 (JSON)"
+  "platform.audit.field.detail": "明细 (JSON)",
+  "platform.gateway.col.filter": "过滤器",
+  "platform.gateway.edition.standard": "标准档",
+  "platform.gateway.edition.enterprise": "企业档",
+  "platform.gateway.edition.ultimate": "旗舰档"
 }

@@ -195,5 +195,9 @@
   "platform.audit.field.duration": "Duration",
   "platform.audit.field.chainHash": "Chain hash",
   "platform.audit.field.chainChecked": "Checked",
-  "platform.audit.field.detail": "Detail (JSON)"
+  "platform.audit.field.detail": "Detail (JSON)",
+  "platform.gateway.col.filter": "Filter",
+  "platform.gateway.edition.standard": "Standard",
+  "platform.gateway.edition.enterprise": "Enterprise",
+  "platform.gateway.edition.ultimate": "Ultimate"
 }
