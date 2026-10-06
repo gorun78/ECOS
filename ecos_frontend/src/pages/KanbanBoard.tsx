@@ -4,16 +4,18 @@
 import React from "react";
 import { LayoutDashboard } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
+import { useTheme } from "../components/ThemeContext";
 
 export default function KanbanBoard() {
   const { t } = useLanguage();
+  const { styles } = useTheme();
   return (
     <div className="h-full flex flex-col">
       {/* Title bar */}
-      <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-        <LayoutDashboard size={20} className="text-indigo-500" />
-        <h1 className="text-lg font-bold">ECOS 项目看板</h1>
-        <span className="text-xs text-gray-400 ml-2">Sprint 4 — 系统重构 & 产品化</span>
+      <div className={`flex items-center gap-2 px-6 py-4 border-b ${styles.cardBorder}`}>
+        <LayoutDashboard size={20} className={styles.accentText} />
+        <h1 className={`text-lg font-bold ${styles.appText}`}>{t('kanban.title')}</h1>
+        <span className={`text-xs ml-2 ${styles.cardTextMuted}`}>{t('kanban.subtitle')}</span>
       </div>
       {/* Kanban iframe */}
       <iframe

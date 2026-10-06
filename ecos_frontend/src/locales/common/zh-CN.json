@@ -523,5 +523,13 @@
   "systemConfig.key.maxLoginAttempts": "最大登录尝试次数",
   "systemConfig.key.lockoutMins": "锁定持续时间（分钟）",
   "systemConfig.key.maxConcurrentSessions": "最大并发会话数",
-  "common.loading": "加载中..."
+  "common.loading": "加载中...",
+  "sql.query.error": "查询执行失败",
+  "sql.query.placeholder": "在此输入 SQL 查询...\nCtrl+Enter 执行",
+  "kanban.title": "ECOS 项目看板",
+  "kanban.subtitle": "Sprint 4 — 系统重构 & 产品化",
+  "biz.loading": "加载仪表盘数据...",
+  "biz.retry": "重试",
+  "biz.title": "经营仪表盘",
+  "biz.subtitle": "CEO晨会 · 项目型企业全景"
 }

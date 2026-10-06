@@ -523,5 +523,13 @@
   "systemConfig.key.maxLoginAttempts": "Max Login Attempts",
   "systemConfig.key.lockoutMins": "Lockout Duration (min)",
   "systemConfig.key.maxConcurrentSessions": "Max Concurrent Sessions",
-  "common.loading": "Loading..."
+  "common.loading": "Loading...",
+  "sql.query.error": "Query execution failed",
+  "sql.query.placeholder": "Enter SQL query here...\nCtrl+Enter to execute",
+  "kanban.title": "ECOS Project Kanban",
+  "kanban.subtitle": "Sprint 4 — System Refactor & Productization",
+  "biz.loading": "Loading dashboard data...",
+  "biz.retry": "Retry",
+  "biz.title": "Business Dashboard",
+  "biz.subtitle": "CEO Morning Brief · Project Enterprise Overview"
 }

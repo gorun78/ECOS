@@ -62,7 +62,7 @@ export default function BizDashboard() {
     <div className="h-full flex items-center justify-center">
       <div className="text-center space-y-3">
         <Loader2 className="w-8 h-8 text-[#3B82F6] animate-spin mx-auto" />
-        <p className={`text-sm ${styles.cardTextMuted}`}>加载仪表盘数据...</p>
+        <p className={`text-sm ${styles.cardTextMuted}`}>{t('biz.loading')}</p>
       </div>
     </div>
   );
@@ -71,7 +71,9 @@ export default function BizDashboard() {
       <div className="text-center max-w-sm">
         <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-2" />
         <p className={`text-sm ${styles.cardTextMuted}`}>{error}</p>
-        <button onClick={() => loadData()} className="mt-3 px-4 py-2 rounded bg-blue-500 text-white text-sm hover:bg-blue-600 transition">重试</button>
+        <button onClick={() => loadData()} className="mt-3 px-4 py-2 rounded ${styles.accentBg} text-white text-sm hover:opacity-90 transition">
+          {t('biz.retry')}
+        </button>
       </div>
     </div>
   );
@@ -107,8 +109,8 @@ export default function BizDashboard() {
     <div className="flex-1 overflow-auto p-6 lg:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className={`text-2xl font-bold ${styles.appText}`}>经营仪表盘</h1>
-          <p className={`text-sm ${styles.cardTextMuted} mt-1`}>CEO晨会 · 项目型企业全景</p>
+          <h1 className={`text-2xl font-bold ${styles.appText}`}>{t('biz.title')}</h1>
+          <p className={`text-sm ${styles.cardTextMuted} mt-1`}>{t('biz.subtitle')}</p>
         </div>
         <div className="flex items-center gap-3">
           <button
