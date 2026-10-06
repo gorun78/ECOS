@@ -18,12 +18,13 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
         // ── 引擎专属路由（优先级高于 Gateway fallback）──
-        // P0-4 修 (2026-10-06 复测)：AgentLoopController 的 `GET /sessions`（集合级，只增不改）
-        // 仅在 gateway monolith 里经 50-module reactor 全量装活；standalone aiming :18084
-        // 因 spring-boot repackage 反复卷进一份 stale 的 ai-engine-impl 传递依赖（缺失新方法 → 405
-        // Method Not Allowed）。与 P0-3 agent-mesh 同型处理：dev 直连 gateway :8080，
-        // 与生产 BFF→gateway 一致。gateway 实测 agent-loop/sessions=200。不越权改后端。
-        '/api/v1/agent-loop':    { target: 'http://localhost:8080', changeOrigin: true },
+        // P0-4 收口 (2026-10-06 独立批次)：AgentLoopController 的 `GET /sessions`（集合级，只增不改）。
+        // 曾误指向 gateway :8080 绕开 standalone——真因是上一轮 aiming fat-jar(04:54)早于
+        // 修复落 .m2(10:49)，repackage 卷进 stale ai-engine-impl(缺 listSessions → 405)。
+        // 已重打包新 fat-jar（boot jar 13:07 卷 659340 B 新字节，javap 证含 listSessions），
+        // standalone :18084 直连 agent-loop/sessions 实测 200。故 agent-loop 回归兄弟前缀
+        // 归属 :18084，撤销绕道 :8080 的临时措施，不越权改后端。
+        '/api/v1/agent-loop':    { target: 'http://localhost:18084', changeOrigin: true },
         // P0-3 修 (2026-10-06)：AgentMeshController 实际挂在 `/api/agent-mesh`（无 v1），
         // 前端统一发 `/api/v1/agent-mesh/*`。只有 gateway 的 VersionPrefixRewriteFilter
         // 会把 `/api/v1/agent-mesh/` 改写成 `/api/agent-mesh/`；standalone aiming :18084
