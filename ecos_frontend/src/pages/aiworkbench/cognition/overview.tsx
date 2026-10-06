@@ -148,7 +148,10 @@ export default function overview() {
 
         {/* Health */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-          <h2 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">{t('knowledge.cognition.chainHealth', '认知链健康度')}</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium text-slate-900 dark:text-slate-100">{t('knowledge.cognition.chainHealth', '认知链健康度')}</h2>
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400">{t('cognition.demo.sample', 'Sample')}</span>
+          </div>
           <div className="space-y-3">
             {HEALTH.map(h => (
               <div key={h.label} className="flex items-center gap-2">
@@ -165,7 +168,10 @@ export default function overview() {
 
       {/* Activity table */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
-        <h2 className="text-sm font-medium text-slate-900 dark:text-slate-100 px-4 pt-4 pb-2">{t('knowledge.cognition.recentActivities', '最近认知活动')}</h2>
+        <div className="flex items-center justify-between px-4 pt-4 pb-2">
+          <h2 className="text-sm font-medium text-slate-900 dark:text-slate-100">{t('knowledge.cognition.recentActivities', '最近认知活动')}</h2>
+          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400">{t('cognition.demo.sample', 'Sample')}</span>
+        </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-xs text-slate-500 dark:text-slate-400">

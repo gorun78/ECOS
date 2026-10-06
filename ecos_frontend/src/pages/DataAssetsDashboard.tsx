@@ -15,7 +15,7 @@
  * 卡片 min-w-0+overflow:hidden 防表格溢出， 字段名 truncate。
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { useTheme } from '../components/ThemeContext';
+import { useTheme, type ThemeStyles } from '../components/ThemeContext';
 import { dataAssetsRequest as api } from '../services/dataAssetsApi';
 import type { DataAssetVO, DataAssetFieldVO, DataLevelDef, DataCategoryTreeItem } from '../types/dataAssets';
 
@@ -26,6 +26,17 @@ interface Props {
 }
 
 const API = '/api/v1/datanet';
+
+/** 4 级敏感度 → 语义主题令牌（L1 低危=sucess / L2=info / L3 中危=warning / L4 高危=danger）。 */
+const levelClass = (code: string, s: ThemeStyles): string => {
+  const map: Record<string, string> = {
+    L1: `${s.successBg} ${s.successText}`,
+    L2: `${s.infoBg} ${s.infoText}`,
+    L3: `${s.warningBg} ${s.warningText}`,
+    L4: `${s.dangerBg} ${s.dangerText}`,
+  };
+  return map[code] || map.L1;
+};
 
 function CardBlock({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   const { styles } = useTheme();
@@ -104,19 +115,11 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
     })();
   }, [selectedAssetId]);
 
-  const levelBadge = (code: string, name?: string) => {
-    const map: Record<string, string> = {
-      L1: 'bg-emerald-100 text-emerald-800',
-      L2: 'bg-sky-100 text-sky-800',
-      L3: 'bg-amber-100 text-amber-800',
-      L4: 'bg-rose-100 text-rose-800',
-    };
-    return (
-      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${map[code] || map.L1}`}>
-        {code}{name ? ` ${name}` : ''}
-      </span>
-    );
-  };
+  const levelBadge = (code: string, name?: string) => (
+    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${levelClass(code, styles)}`}>
+      {code}{name ? ` ${name}` : ''}
+    </span>
+  );
 
   return (
     <div className="flex-1 flex flex-col min-h-0 p-4 gap-3 overflow-hidden">
@@ -130,7 +133,7 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
           value={filter.level}
           onChange={e => setFilter({ ...filter, level: e.target.value })}
         >
-          <option value="">{t('dw.assets.allLevels')}</option>
+          <option key="__all_levels" value="">{t('dw.assets.allLevels')}</option>
           {(levels.length ? levels : [
             { levelCode: 'L1', levelName: t('dw.assets.level.L1') },
             { levelCode: 'L2', levelName: t('dw.assets.level.L2') },
@@ -143,7 +146,7 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
           value={filter.category}
           onChange={e => setFilter({ ...filter, category: e.target.value })}
         >
-          <option value="">{t('dw.assets.allCategories')}</option>
+          <option key="__all_cat" value="">{t('dw.assets.allCategories')}</option>
           {categories.filter(c => c.level === 2).map((c, i) => (
             <option key={c.categoryId || `${c.name}#${i}`} value={c.categoryId}>{c.name}</option>
           ))}
@@ -229,17 +232,25 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
               <div className={`flex items-center justify-center text-xs opacity-60 h-full py-8`}>
                 {t('dw.assets.selectHint')}
               </div>
-            ) : (
-              <AssetDetail
-                asset={assets.find(a => a.assetId === selectedAssetId)!}
-                fields={fields}
-                levels={levels}
-                showToast={showToast}
-                t={t}
-                onChanged={loadAssets}
-                filter={filter}
-              />
-            )}
+            ) : (() => {
+              const sel = assets.find(a => a.assetId === selectedAssetId);
+              if (!sel) {
+                // 过滤切换后当前选中项可能已不在列表内 —— 复位而非崩溃
+                setSelectedAssetId(null);
+                return null;
+              }
+              return (
+                <AssetDetail
+                  asset={sel}
+                  fields={fields}
+                  levels={levels}
+                  showToast={showToast}
+                  t={t}
+                  onChanged={loadAssets}
+                  filter={filter}
+                />
+              );
+            })()}
           </CardBlock>
         </div>
       </div>
@@ -315,12 +326,7 @@ function AssetDetail({
           <span>{t('dw.assets.layer')}: {asset.layer} {asset.zone ? `· ${asset.zone}` : ''}</span>
         </div>
         <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-            (asset.sensitivityLevel || 'L1') === 'L1' ? 'bg-emerald-100 text-emerald-800'
-            : (asset.sensitivityLevel || 'L1') === 'L2' ? 'bg-sky-100 text-sky-800'
-            : (asset.sensitivityLevel || 'L1') === 'L3' ? 'bg-amber-100 text-amber-800'
-            : 'bg-rose-100 text-rose-800'
-          }`}>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${levelClass(asset.sensitivityLevel || 'L1', styles)}`}>
             {asset.sensitivityLevel || 'L1'} {asset.levelName}
           </span>
           {asset.categoryStatus && (

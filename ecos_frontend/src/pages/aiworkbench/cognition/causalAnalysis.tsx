@@ -141,7 +141,10 @@ export default function causalAnalysis({ onGoScenario }: CausalAnalysisProps) {
 
         {/* Reasoning conclusion */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-4">
-          <h2 className="text-sm font-medium text-slate-900 dark:text-slate-100">{t('causal.conclusion', '推理结论')}</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-slate-900 dark:text-slate-100">{t('causal.conclusion', '推理结论')}</h2>
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400">{t('cognition.demo.sample', 'Sample')}</span>
+          </div>
           <div>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('causal.mainPath', '主要解释路径')}</p>
             <p className="text-sm text-slate-700 dark:text-slate-300">

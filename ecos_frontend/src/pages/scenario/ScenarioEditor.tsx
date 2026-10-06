@@ -4,6 +4,7 @@
 import React from 'react';
 import LucideIcon from '../../components/LucideIcon';
 import type { ThemeStyles } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 import { AVAILABLE_DATASETS,AVAILABLE_OBJECTS,AVAILABLE_KNOWLEDGE,AVAILABLE_AGENTS,AVAILABLE_INTERFACES,AVAILABLE_SECURITY } from '../project-workbench/data';
 
 export interface WizardState { showWizardModal:boolean; wizardScenarioId:string|null; wizardStep:number; wName:string; wGoal:string; wDesc:string; wDept:string; wPriority:'CRITICAL'|'HIGH'|'MEDIUM'|'LOW'; wBudget:string; wStatus:'ACTIVE'|'DRAFT'|'COMPLETED'|'SUSPENDED'; wSafetyIndex:string; wDatasets:string[]; wObjectTypes:string[]; wKnowledgeBases:string[]; wAiAgents:string[]; wInterfaces:string[]; wSecurityPolicies:string[]; }
@@ -18,7 +19,7 @@ export interface ScenarioEditorProps {
   styles:ThemeStyles; toast:(t:string,m:string)=>void;
 }
 
-const STEPS=[{s:1,l:'1. 场景要素',i:'Briefcase'},{s:2,l:'2. 物理数据',i:'Database'},{s:3,l:'3. 联邦本体',i:'Network'},{s:4,l:'4. 合规知识',i:'BookOpen'},{s:5,l:'5. AI 智能体',i:'Cpu'},{s:6,l:'6. 应用工作台',i:'Layout'},{s:7,l:'7. 安全阻断',i:'ShieldCheck'}]as const;
+const STEPS=[{s:1,ak:'scenario.step.1',l:'1. 场景要素',i:'Briefcase'},{s:2,ak:'scenario.step.2',l:'2. 物理数据',i:'Database'},{s:3,ak:'scenario.step.3',l:'3. 联邦本体',i:'Network'},{s:4,ak:'scenario.step.4',l:'4. 合规知识',i:'BookOpen'},{s:5,ak:'scenario.step.5',l:'5. AI 智能体',i:'Cpu'},{s:6,ak:'scenario.step.6',l:'6. 应用工作台',i:'Layout'},{s:7,ak:'scenario.step.7',l:'7. 安全阻断',i:'ShieldCheck'}]as const;
 
 function CbList({items,selected,onChange,styles}:{items:{id:string;label:string;desc?:string}[];selected:string[];onChange:(v:string[])=>void;styles:ThemeStyles}){
   return <div className={`grid grid-cols-1 gap-2 max-h-[220px] overflow-y-auto p-2 ${styles.inputBg} border ${styles.inputBorder} rounded`}>
@@ -27,17 +28,18 @@ function CbList({items,selected,onChange,styles}:{items:{id:string;label:string;
 }
 
 export default function ScenarioEditor({wizard,onClose,onStepChange,onSave,setWName,setWGoal,setWDesc,setWDept,setWPriority,setWBudget,setWStatus,setWSafetyIndex,setWDatasets,setWObjectTypes,setWKnowledgeBases,setWAiAgents,setWInterfaces,setWSecurityPolicies,styles,toast}:ScenarioEditorProps){
+  const {t}=useLanguage();
   const {showWizardModal,wizardScenarioId,wizardStep,wName,wGoal,wDesc,wDept,wPriority,wBudget,wStatus,wSafetyIndex,wDatasets,wObjectTypes,wKnowledgeBases,wAiAgents,wInterfaces,wSecurityPolicies}=wizard;
   if(!showWizardModal)return null;
 
-  const next=()=>{if(wizardStep===1&&(!wName.trim()||!wGoal.trim())){toast('error','请先填写必填的场景名称与核心目标！');return;}onStepChange(wizardStep+1);};
+  const next=()=>{if(wizardStep===1&&(!wName.trim()||!wGoal.trim())){toast('error',t('scenario.validator.requiredFields'));return;}onStepChange(wizardStep+1);};
   const prev=()=>{if(wizardStep>1)onStepChange(wizardStep-1);};
   const Ic=(n:string,s:number)=>React.createElement(LucideIcon,{name:n,size:s});
 
   return <div className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn overflow-y-auto">
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl max-w-2xl w-full overflow-hidden shadow-2xl my-8`}>
       <div className={`p-4 ${styles.cardBg} border-b ${styles.cardBorder} flex items-center justify-between`}>
-        <span className="text-sm font-bold text-white flex items-center gap-1.5">{Ic('Briefcase',14)}<span className="text-indigo-400"/>{wizardScenarioId?'修改场景要素对接 (ECOS 全生命周期向导)':'创建全新 ECOS 业务融合场景 (全要素向导)'}</span>
+        <span className="text-sm font-bold text-white flex items-center gap-1.5">{Ic('Briefcase',14)}<span className="text-indigo-400"/>{wizardScenarioId?t('scenario.title.edit'):t('scenario.title.create')}</span>
         <button onClick={onClose} className={`${styles.cardTextMuted} hover:text-white cursor-pointer`}>{Ic('X',16)}</button>
       </div>
 
@@ -46,7 +48,7 @@ export default function ScenarioEditor({wizard,onClose,onStepChange,onSave,setWN
           {STEPS.map((it,idx,arr)=><React.Fragment key={it.s}>
             <div className="flex items-center gap-1.5">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${wizardStep===it.s?'bg-indigo-600 text-white ring-4 ring-indigo-950 shadow-md':wizardStep>it.s?'bg-emerald-600 text-white font-bold':`bg-[var(--card,#1E293B)] ${styles.cardTextMuted} border border-[var(--card,#334155)]`}`}>{wizardStep>it.s?'✓':it.s}</div>
-              <span className={`text-[11px] font-bold whitespace-nowrap transition-colors ${wizardStep===it.s?'text-indigo-400 font-extrabold':wizardStep>it.s?'text-emerald-500':styles.cardTextMuted}`}>{it.l}</span>
+              <span className={`text-[11px] font-bold whitespace-nowrap transition-colors ${wizardStep===it.s?'text-indigo-400 font-extrabold':wizardStep>it.s?'text-emerald-500':styles.cardTextMuted}`}>{t(it.ak,it.l)}</span>
             </div>
             {idx<arr.length-1&&<div className={`flex-1 h-[2px] mx-2 min-w-[12px] transition-all duration-300 ${wizardStep>it.s?'bg-emerald-600/60':'bg-[var(--card,#334155)]'}`}/>}
           </React.Fragment>)}
@@ -104,8 +106,8 @@ export default function ScenarioEditor({wizard,onClose,onStepChange,onSave,setWN
       <div className={`p-4 ${styles.cardBg} border-t ${styles.cardBorder} flex justify-between items-center shrink-0`}>
         <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>步进 {wizardStep} / 7 | ECOS Engine Active</span>
         <div className="flex gap-2">
-          {wizardStep>1&&<button onClick={prev} className={`px-3.5 py-1.5 ${styles.inputBg} ${styles.cardTextMuted} text-xs font-bold rounded cursor-pointer transition-all flex items-center gap-1`}>{Ic('ChevronLeft',12)}上一步</button>}
-          {wizardStep<7?<button onClick={next} className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded cursor-pointer transition-all flex items-center gap-1">下一步{Ic('ChevronRight',12)}</button>:<button onClick={onSave} className="px-5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded cursor-pointer transition-all flex items-center gap-1 shadow-lg shadow-emerald-900/20">{Ic('Check',12)}{wizardScenarioId?'保存全部要素绑定':'完成并初始化融合场景'}</button>}
+          {wizardStep>1&&<button type="button" onClick={prev} className={`px-3.5 py-1.5 ${styles.inputBg} ${styles.cardTextMuted} text-xs font-bold rounded cursor-pointer transition-all flex items-center gap-1`}>{Ic('ChevronLeft',12)}{t('scenario.nav.prev')}</button>}
+          {wizardStep<7?<button type="button" onClick={next} className={`px-4 py-1.5 text-white text-xs font-bold rounded cursor-pointer transition-all flex items-center gap-1 ${styles.accentBg}`}>{t('scenario.nav.next')}{Ic('ChevronRight',12)}</button>:<button type="button" onClick={onSave} className={`px-5 py-1.5 text-white text-xs font-bold rounded cursor-pointer transition-all flex items-center gap-1 shadow-lg ${styles.successBg}`}>{Ic('Check',12)}{wizardScenarioId?t('scenario.save.allBind'):t('scenario.save.init')}</button>}
         </div>
       </div>
     </div>

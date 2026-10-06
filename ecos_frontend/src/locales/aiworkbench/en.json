@@ -518,5 +518,17 @@
   "aiworkbench.model.evaluating": "Evaluating…",
   "aiworkbench.model.runEvaluation": "Run Evaluation",
   "aiworkbench.model.responseLabel": "Response",
-  "aiworkbench.model.selectModelHint": "Select a model first"
+  "aiworkbench.model.selectModelHint": "Select a model first",
+  "aiworkbench.model.evalDemoDone": "Evaluation demo complete",
+  "aiworkbench.model.evalDemoHint": "Following results are demo samples, shown only for interface illustration and alignment",
+  "aiworkbench.agent.loadFailed": "Failed to load agents: {msg} (click refresh on top right to retry)",
+  "aiworkbench.agent.deleteConfirm": "Confirm deleting this agent? Irreversible",
+  "aiworkbench.agent.deleted": "Agent deleted",
+  "aiworkbench.agent.updated": "Agent saved",
+  "aiworkbench.agent.created": "Agent created",
+  "aiworkbench.agent.execSuccess": "Agent execution complete",
+  "aiworkbench.agent.execFail": "Agent execution failed",
+  "aiworkbench.agent.execConnFail": "Agent execution error: connection/network failure",
+  "aiworkbench.agent.rejected": "Operation blocked by safety guardrail",
+  "aiworkbench.agent.selectHint": "Select or create an agent to get started"
 }

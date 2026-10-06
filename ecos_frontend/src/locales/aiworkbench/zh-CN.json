@@ -518,5 +518,17 @@
   "aiworkbench.model.evaluating": "评估中…",
   "aiworkbench.model.runEvaluation": "运行评估",
   "aiworkbench.model.responseLabel": "响应",
-  "aiworkbench.model.selectModelHint": "请先选择一个模型"
+  "aiworkbench.model.selectModelHint": "请先选择一个模型",
+  "aiworkbench.model.evalDemoDone": "评估演示完成",
+  "aiworkbench.model.evalDemoHint": "下列结果为演示样本，仅用于界面展示与对齐",
+  "aiworkbench.agent.loadFailed": "Agent 列表加载失败：{msg}（请点击右上角刷新重试）",
+  "aiworkbench.agent.deleteConfirm": "确认删除该 Agent？不可恢复",
+  "aiworkbench.agent.deleted": "Agent 已删除",
+  "aiworkbench.agent.updated": "Agent 已保存",
+  "aiworkbench.agent.created": "Agent 已创建",
+  "aiworkbench.agent.execSuccess": "Agent 执行完成",
+  "aiworkbench.agent.execFail": "Agent 执行失败",
+  "aiworkbench.agent.execConnFail": "Agent 执行异常：连接/网络错误",
+  "aiworkbench.agent.rejected": "该操作被安全护栏拦截",
+  "aiworkbench.agent.selectHint": "选择或新建一个 Agent 以开始"
 }

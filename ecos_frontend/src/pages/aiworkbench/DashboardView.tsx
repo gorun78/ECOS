@@ -239,8 +239,8 @@ export default function DashboardView({
   // ── Render: Overview Dashboard ────────────────────────────────
   const renderOverview = () => (
     <div className="space-y-6 overflow-y-auto h-full p-6">
-      {/* Welcome Banner */}
-      <div className={`${styles.appBg} text-white rounded-xl p-6 shadow-sm relative overflow-hidden`}>
+      {/* Welcome Banner — accentBg（深色 accent）+ text-white，4 主题下均保证白字可读（slate-light 不再使用 appBg 亮底） */}
+      <div className={`${styles.accentBg} text-white rounded-xl p-6 shadow-sm relative overflow-hidden`}>
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-600/20 to-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
@@ -249,7 +249,7 @@ export default function DashboardView({
               <span>{t('dashboard.welcome.badge')}</span>
             </div>
             <h2 className="text-xl font-extrabold text-white">{t('dashboard.welcome.title')}</h2>
-            <p className={`text-xs ${styles.cardTextMuted} max-w-2xl leading-relaxed`}>
+            <p className="text-xs text-white/80 max-w-2xl leading-relaxed">
               {t('dashboard.welcome.desc')}
             </p>
           </div>
@@ -298,6 +298,7 @@ export default function DashboardView({
                 <TrendingUp size={13} />
               </span>
               <h3 className={`text-xs font-bold ${styles.cardText}`}>{t('dashboard.trend.title')}</h3>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${styles.warningBg} ${styles.warningText}`}>Sample</span>
             </div>
             <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>{t('dashboard.trend.updated')}</span>
           </div>
@@ -341,6 +342,7 @@ export default function DashboardView({
                 <Layers size={13} />
               </span>
               <h3 className={`text-xs font-bold ${styles.cardText}`}>{t('dashboard.model.title')}</h3>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${styles.warningBg} ${styles.warningText}`}>Sample</span>
             </div>
             <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>{t('dashboard.model.byToken')}</span>
           </div>

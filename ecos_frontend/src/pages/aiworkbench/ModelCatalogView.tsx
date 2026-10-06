@@ -214,7 +214,7 @@ export default function ModelCatalogView({
 
     setEvalResults(results);
     setIsEvaluating(false);
-    showToast?.('success', '多大模型 side-by-side 对齐评测完成');
+    showToast?.('info', t('aiworkbench.model.evalDemoDone'));
   };
 
   const SUB_TABS: Array<{ id: SubTabId; labelKey: string }> = [
@@ -378,7 +378,12 @@ export default function ModelCatalogView({
 
                     {/* Evaluation side-by-side grids */}
                     {evalResults.length > 0 && (
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2">
+                      <>
+                        <div className={`flex items-center gap-2 text-[10px] mt-2 ${styles.cardTextMuted}`}>
+                          <span className={`px-1.5 py-0.5 rounded font-bold uppercase ${styles.warningBg} ${styles.warningText}`}>Demo Sample</span>
+                          <span>{t('aiworkbench.model.evalDemoHint')}</span>
+                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2">
                         {evalResults.map(res => (
                           <div key={res.modelId} className={`border ${styles.cardBorder} rounded-xl overflow-hidden shadow-xs ${styles.inputBg} flex flex-col`}>
 
@@ -402,7 +407,8 @@ export default function ModelCatalogView({
 
                           </div>
                         ))}
-                      </div>
+                        </div>
+                      </>
                     )}
 
                   </div>

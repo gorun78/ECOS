@@ -173,5 +173,6 @@
   "knowledge.cognition.state.fullTrace": "Full Trace",
   "knowledge.cognition.pending.high": "High",
   "knowledge.cognition.pending.mid": "Medium",
-  "knowledge.cognition.pending.low": "Low"
+  "knowledge.cognition.pending.low": "Low",
+  "cognition.demo.sample": "Sample"
 }

@@ -92,6 +92,10 @@ export default function scenarioSimulation() {
       </div>
 
       {/* Scenario cards */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{t('scenario.cardsTitle', '情景对比')}</span>
+        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400">{t('cognition.demo.sample', 'Sample')}</span>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {SCENARIOS.map(s => (
           <div key={s.key} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4">

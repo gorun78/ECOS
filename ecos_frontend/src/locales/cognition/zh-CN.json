@@ -173,5 +173,6 @@
   "knowledge.cognition.state.fullTrace": "完整追溯",
   "knowledge.cognition.pending.high": "高",
   "knowledge.cognition.pending.mid": "中",
-  "knowledge.cognition.pending.low": "低"
+  "knowledge.cognition.pending.low": "低",
+  "cognition.demo.sample": "示例"
 }
