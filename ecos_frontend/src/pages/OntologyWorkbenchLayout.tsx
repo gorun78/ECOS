@@ -53,6 +53,7 @@ import {
   fetchDwDatasets,
   fetchActionTypes,
 } from '../services/ontologyApi';
+import { ONTOLOGY_FUNCTIONS_API_PKG } from '../data/functionsApiPkg';
 import {
   DEMO_FUNCTION_TYPES,
   DEMO_INTERFACES,
@@ -91,6 +92,16 @@ export default function OntologyWorkbenchLayout() {
   const [exporting, setExporting] = useState(false);
   // T10: 新建导出任务后的列表刷新信号（ExportTasksView 监听自增即重拉任务列表）
   const [exportTasksSignal, setExportTasksSignal] = useState(0);
+  // P1 网络错误在 modal 内 30s 常驻 red banner（toast 只有 4s 太短无法传达"下次重试"提示）
+  const [exportErrorMsg, setExportErrorMsg] = useState<string | null>(null);
+  const exportErrorAutoClearRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissExportError = React.useCallback(() => {
+    if (exportErrorAutoClearRef.current) {
+      clearTimeout(exportErrorAutoClearRef.current);
+      exportErrorAutoClearRef.current = null;
+    }
+    setExportErrorMsg(null);
+  }, []);
   // 详情页「发起变更提案」信号：自增后 ProposalPanel 自动展开表单并锁定当前对象类型
   const [proposalFormSignal, setProposalFormSignal] = useState(0);
 
@@ -120,11 +131,22 @@ export default function OntologyWorkbenchLayout() {
         scope: exportScope,
       };
       await createExportTask(dto);
+      dismissExportError();
       showToast('success', t('ow.msg.exportStarted'));
       // T10: 创建成功后保持 Modal 打开，刷新右下任务列表并轮询状态闭环
       setExportTasksSignal(v => v + 1);
     } catch (e: any) {
-      showToast('error', t('ow.msg.exportFailed'));
+      const errText = t('ow.msg.exportFailed');
+      showToast('error', errText);
+      setExportErrorMsg(errText);
+      if (exportErrorAutoClearRef.current) {
+        clearTimeout(exportErrorAutoClearRef.current);
+        exportErrorAutoClearRef.current = null;
+      }
+      exportErrorAutoClearRef.current = setTimeout(() => {
+        exportErrorAutoClearRef.current = null;
+        setExportErrorMsg(null);
+      }, 30000);
     } finally {
       setExporting(false);
     }
@@ -338,7 +360,7 @@ export default function OntologyWorkbenchLayout() {
         description: t('ow.func.defaultDescription'),
         returnType: 'string',
         parameters: [],
-        code: `import { Function } from "@ecos/functions-api";\n\nexport class CustomFunctionClass_${defaultNum} {\n    @Function()\n    public async customFunction${defaultNum}(): Promise<string> {\n        return "Hello World";\n    }\n}`
+        code: `import { Function } from "${ONTOLOGY_FUNCTIONS_API_PKG}";\n\nexport class CustomFunctionClass_${defaultNum} {\n    @Function()\n    public async customFunction${defaultNum}(): Promise<string> {\n        return "Hello World";\n    }\n}`
       };
       updateFunctionTypes([...functionTypes, newFunc]);
       setSelectedCategory('function');
@@ -657,9 +679,16 @@ export default function OntologyWorkbenchLayout() {
 
       {/* Export Modal — T3 主题 token；T10 闭环：格式/范围创建 + 任务列表（轮询/下载/删除） */}
       {showExportModal && (
-        <div className={`fixed inset-0 ${styles.overlayBg} z-50 flex items-center justify-center`} onClick={() => setShowExportModal(false)}>
+        <div className={`fixed inset-0 ${styles.overlayBg} z-50 flex items-center justify-center`} onClick={() => { setShowExportModal(false); dismissExportError(); }}>
           <div className={`rounded-xl shadow-2xl border ${styles.cardBorder} p-5 w-[34rem] max-w-[92vw] max-h-[85vh] overflow-y-auto ${styles.cardBg} ${styles.cardText}`} onClick={e => e.stopPropagation()}>
             <h3 className={`text-sm font-bold mb-3 ${styles.cardText}`}>{t('ow.section.exportPanel')}</h3>
+            {exportErrorMsg && (
+              <div className={`mb-3 rounded-lg border px-3 py-2 text-[11px] font-medium flex items-start gap-2 ${styles.dangerBg} ${styles.dangerText}`} role="alert">
+                <span aria-hidden="true">⚠</span>
+                <span className="flex-1">{exportErrorMsg}</span>
+                <button type="button" onClick={dismissExportError} className="opacity-70 hover:opacity-100" aria-label="dismiss">{t('ow.btn.cancel')}</button>
+              </div>
+            )}
             <div className="space-y-3">
               <div>
                 <label className={`block text-[10px] font-semibold mb-1 ${styles.muted}`}>{t('ow.label.exportFormat')}</label>
@@ -684,7 +713,7 @@ export default function OntologyWorkbenchLayout() {
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setShowExportModal(false)} className={`px-3 py-1.5 rounded text-[10px] font-semibold ${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}>{t('ow.btn.cancel')}</button>
+                <button onClick={() => { setShowExportModal(false); dismissExportError(); }} className={`px-3 py-1.5 rounded text-[10px] font-semibold ${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}>{t('ow.btn.cancel')}</button>
                 <button onClick={handleExportOntology} disabled={exporting}
                   className={`px-3 py-1.5 rounded text-[10px] font-semibold ${styles.accentBg} text-white ${styles.accentHover} disabled:opacity-50`}>
                   {exporting ? t('ow.exportTask.creating') : t('ow.btn.exportOntology')}

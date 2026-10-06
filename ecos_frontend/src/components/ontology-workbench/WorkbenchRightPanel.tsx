@@ -133,7 +133,7 @@ function EntityBasicInfoForm({ entity }: EntityBasicInfoFormProps) {
           onChange={(e) => setName(e.target.value)}
           maxLength={100}
           className="w-full bg-[#0b0e14] border border-[#1E293B] rounded-lg px-3 py-2
-            text-xs text-white placeholder:${styles.muted}
+            text-xs text-white placeholder:opacity-50
             focus:outline-none focus:border-indigo-500/50 transition"
         />
       </div>
@@ -172,7 +172,7 @@ function EntityBasicInfoForm({ entity }: EntityBasicInfoFormProps) {
           maxLength={500}
           placeholder="实体描述（可选）"
           className="w-full bg-[#0b0e14] border border-[#1E293B] rounded-lg px-3 py-2
-            text-xs text-white placeholder:${styles.muted} resize-none
+            text-xs text-white placeholder:opacity-50 resize-none
             focus:outline-none focus:border-indigo-500/50 transition"
         />
       </div>

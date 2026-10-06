@@ -31,6 +31,7 @@ import {
   type Edge,
   type FitViewOptions,
   type OnConnectStart,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -140,19 +141,39 @@ export default function DomainGraphCanvas({
 
   // ── 画布引用 ──
   const flowRef = useRef<HTMLDivElement>(null);
+  // ReactFlow 实例引用：由 onInit 回填；供 handleFitView 调真实 instance.fitView（
+  // 替代原误用 syncCanvasFromData 会重置所有节点位置到 (0,0) 的副作用）
+  const flowInstanceRef = useRef<ReactFlowInstance | null>(null);
 
   // ── 当前缩放级别（通过 onMove 追踪） ──
   const [currentZoom, setCurrentZoom] = React.useState(1);
 
   // ══════════════════════════════════════════════════════════
   // 数据同步：当 store 中的 canvasNodes/canvasEdges 变更时，
-  // 同步到 ReactFlow 的本地节点/边状态
+  // 同步到 ReactFlow 的本地节点/边状态。
+  //
+  // 内容指纹判跳过：immer/zustand 每次 store 更新（含纯选中态变更）都会
+  // 产新引用，直接 setNodes 会覆盖用户在画布上的实时拖拽位置。故仅当
+  // 结构签名（节点 id+坐标 / 边 id+source+target+label）真正变化时才覆写。
   // ══════════════════════════════════════════════════════════
+  const lastNodeSig = useRef<string>("");
+  const lastEdgeSig = useRef<string>("");
+
   useEffect(() => {
+    const sig = (storeCanvasNodes as Node<EntityNodeData>[])
+      .map((n) => `${n.id}@${Math.round(n.position.x)},${Math.round(n.position.y)}`)
+      .join("|");
+    if (sig === lastNodeSig.current) return;
+    lastNodeSig.current = sig;
     setNodes(storeCanvasNodes as Node<EntityNodeData>[]);
   }, [storeCanvasNodes, setNodes]);
 
   useEffect(() => {
+    const sig = (storeCanvasEdges as Edge<RelationshipEdgeData>[])
+      .map((e) => `${e.id}:${e.source}->${e.target}:${(e.data as { label?: string })?.label ?? ""}`)
+      .join("|");
+    if (sig === lastEdgeSig.current) return;
+    lastEdgeSig.current = sig;
     setEdges(storeCanvasEdges as Edge<RelationshipEdgeData>[]);
   }, [storeCanvasEdges, setEdges]);
 
@@ -260,11 +281,10 @@ export default function DomainGraphCanvas({
   // 工具栏操作回调
   // ══════════════════════════════════════════════════════════
 
-  /** 自适应视图 */
+  /** 自适应视图：走 ReactFlow instance.fitView(),不再误用 syncCanvasFromData 复位 */
   const handleFitView = useCallback(() => {
-    // ReactFlow 的 fitView 方法通过 DOM 访问，使用存储的 viewport 重置
-    syncCanvasFromData();
-  }, [syncCanvasFromData]);
+    flowInstanceRef.current?.fitView();
+  }, []);
 
   /** 力导向布局 */
   const handleForceLayout = useCallback(() => {
@@ -456,6 +476,9 @@ export default function DomainGraphCanvas({
           onMove={(_event, viewport) =>
             setCurrentZoom(viewport.zoom)
           }
+          onInit={(instance) => {
+            flowInstanceRef.current = instance;
+          }}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           defaultEdgeOptions={defaultEdgeOptions}
@@ -500,9 +523,9 @@ export default function DomainGraphCanvas({
               !bg-[#0f1117] !border !border-[#1E293B] !rounded-xl
               !shadow-lg !shadow-black/30
               [&_button]:!bg-[#141924] [&_button]:!border-[#1E293B]
-              [&_button]:!${styles.cardTextMuted} [&_button]:hover:!bg-[#1A1F2E]
-              [&_button]:hover:!text-white [&_button]:!fill-${styles.cardTextMuted.replace('text-slate-', 'slate-')}
-              [&_button]:hover:!fill-white
+              [&_button]:!text-slate-400 [&_button]:hover:!bg-[#1A1F2E]
+              [&_button]:hover:!text-white
+              [&_button_svg]:!fill-slate-400 [&_button_svg]:hover:!fill-white
               [&_svg]:!w-3.5 [&_svg]:!h-3.5
             `}
             showInteractive={!readOnly}
