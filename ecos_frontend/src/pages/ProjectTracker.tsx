@@ -31,12 +31,14 @@ interface Project {
   [key: string]: any;
 }
 
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  active: { label: "进行中", color: "bg-green-100 text-green-700 border-green-300" },
-  completed: { label: "已完成", color: "bg-blue-100 text-blue-700 border-blue-300" },
-  paused: { label: "暂停", color: "bg-amber-100 text-amber-700 border-amber-300" },
-  planning: { label: "规划中", color: "styles.appBg styles.cardTextMuted styles.cardBorder" },
+const STATUS_COLORS: Record<string, string> = {
+  active: "bg-green-100 text-green-700 border-green-300",
+  completed: "bg-blue-100 text-blue-700 border-blue-300",
+  paused: "bg-amber-100 text-amber-700 border-amber-300",
+  planning: "bg-indigo-100 text-indigo-700 border-indigo-300",
 };
+
+const STATUS_FALLBACK = "bg-gray-100 text-gray-700 border-gray-300";
 
 const PAGE_SIZE = 10;
 
@@ -76,7 +78,7 @@ export default function ProjectTracker() {
         setTotal(0);
       }
     } catch (e: any) {
-      setError(e.message || "加载项目列表失败");
+      setError(e.message || t("projectTracker.loadFailed"));
       setProjects([]);
     } finally {
       setLoading(false);
@@ -97,7 +99,7 @@ export default function ProjectTracker() {
   const columns: ColumnConfig<Project>[] = [
     {
       key: "name",
-      label: locale === "zh" ? "项目名称" : "Project Name",
+      label: t("projectTracker.col.name"),
       render: (_v, record) => (
         <button
           className={`text-left font-medium hover:underline flex items-center gap-1 ${styles.cardText}`}
@@ -116,19 +118,20 @@ export default function ProjectTracker() {
     },
     {
       key: "status",
-      label: locale === "zh" ? "状态" : "Status",
+      label: t("projectTracker.col.status"),
       render: (_v, record) => {
-        const s = STATUS_MAP[record.status] || { label: record.status, color: "styles.appBg styles.cardTextMuted styles.cardBorder" };
+        const color = STATUS_COLORS[record.status] || STATUS_FALLBACK;
+        const label = t(`projectTracker.status.${record.status}`) || record.status;
         return (
-          <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded border ${s.color}`}>
-            {s.label}
+          <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded border ${color}`}>
+            {label}
           </span>
         );
       },
     },
     {
       key: "progress",
-      label: locale === "zh" ? "进度" : "Progress",
+      label: t("projectTracker.col.progress"),
       render: (_v, record) => {
         const pct = typeof record.progress === "number" ? record.progress : Number(record.progress) || 0;
         return (
@@ -146,7 +149,7 @@ export default function ProjectTracker() {
     },
     {
       key: "manager",
-      label: locale === "zh" ? "负责人" : "Manager",
+      label: t("projectTracker.col.manager"),
       render: (_v, record) => (
         <span className={`flex items-center gap-1 text-xs ${styles.cardText}`}>
           <User className={`w-3 h-3 ${styles.cardTextMuted}`} />
@@ -156,19 +159,19 @@ export default function ProjectTracker() {
     },
     {
       key: "amount",
-      label: locale === "zh" ? "合同金额" : "Amount",
+      label: t("projectTracker.col.amount"),
       align: "right",
       render: (_v, record) => {
         const v = record.amount;
         if (v == null) return "—";
         const n = Number(v);
         if (isNaN(n)) return String(v);
-        return n >= 10000 ? `${(n / 10000).toFixed(1)} 万` : n.toLocaleString();
+        return n >= 10000 ? t("projectTracker.unit10k", { v: (n / 10000).toFixed(1) }) : n.toLocaleString();
       },
     },
     {
       key: "startDate",
-      label: locale === "zh" ? "起止日期" : "Duration",
+      label: t("projectTracker.col.dates"),
       render: (_v, record) => (
         <span className={`text-xs whitespace-nowrap ${styles.cardTextMuted}`}>
           {record.startDate || "—"} ~ {record.endDate || "—"}
@@ -195,7 +198,7 @@ export default function ProjectTracker() {
         <div className="text-center space-y-3">
           <Loader2 className={`w-8 h-8 ${styles.accentText} animate-spin mx-auto`} />
           <p className={`text-sm ${styles.muted}`}>
-            {locale === "zh" ? "加载项目数据..." : "Loading projects..."}
+            {t("projectTracker.loading")}
           </p>
         </div>
       </div>
@@ -209,7 +212,7 @@ export default function ProjectTracker() {
         <div className="text-center max-w-sm">
           <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
           <p className="text-sm font-semibold text-red-600 mb-1">
-            {locale === "zh" ? "数据加载失败" : "Failed to load data"}
+            {t("projectTracker.error")}
           </p>
           <p className={`text-xs ${styles.muted} mb-4`}>{error}</p>
           <button
@@ -217,7 +220,7 @@ export default function ProjectTracker() {
             className={`inline-flex items-center gap-1.5 px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded-lg transition`}
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            {locale === "zh" ? "重试" : "Retry"}
+            {t("biz.retry")}
           </button>
         </div>
       </div>
@@ -232,10 +235,10 @@ export default function ProjectTracker() {
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Briefcase className={`w-5 h-5 ${styles.accentText}`} />
-            {locale === "zh" ? "项目跟踪" : "Project Tracker"}
+            {t("projectTracker.title")}
           </h1>
           <p className={`text-xs ${styles.muted} mt-1`}>
-            {locale === "zh" ? "高速信科工程项目全生命周期管理" : "GSXK project lifecycle management"}
+            {t("projectTracker.subtitle")}
           </p>
         </div>
         <button
@@ -244,7 +247,7 @@ export default function ProjectTracker() {
           className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} hover:opacity-80 transition disabled:opacity-50`}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          {loading ? (locale === "zh" ? "刷新中..." : "Refreshing...") : (locale === "zh" ? "刷新" : "Refresh")}
+          {loading ? t("projectTracker.refreshing") : t("projectTracker.refresh")}
         </button>
       </div>
 
@@ -257,7 +260,7 @@ export default function ProjectTracker() {
             type="text"
             value={searchQ}
             onChange={(e) => setSearchQ(e.target.value)}
-            placeholder={locale === "zh" ? "搜索项目名称..." : "Search projects..."}
+            placeholder={t("projectTracker.search")}
             className={`w-full pl-9 pr-3 py-2 text-xs rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition`}
           />
         </div>
@@ -268,21 +271,21 @@ export default function ProjectTracker() {
           onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
           className={`px-3 py-2 text-xs rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition`}
         >
-          <option value="all">{locale === "zh" ? "全部状态" : "All Status"}</option>
-          <option value="active">{locale === "zh" ? "进行中" : "Active"}</option>
-          <option value="completed">{locale === "zh" ? "已完成" : "Completed"}</option>
-          <option value="paused">{locale === "zh" ? "暂停" : "Paused"}</option>
-          <option value="planning">{locale === "zh" ? "规划中" : "Planning"}</option>
+          <option value="all">{t("projectTracker.all")}</option>
+          <option value="active">{t("projectTracker.status.active")}</option>
+          <option value="completed">{t("projectTracker.status.completed")}</option>
+          <option value="paused">{t("projectTracker.status.paused")}</option>
+          <option value="planning">{t("projectTracker.status.planning")}</option>
         </select>
       </div>
 
       {/* Summary stats */}
       {!loading && projects.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatPill icon={Briefcase} label={locale === "zh" ? "总项目" : "Total"} value={total} color={styles.accentText} styles={styles} />
-          <StatPill icon={Target} label={locale === "zh" ? "进行中" : "Active"} value={projects.filter(p => p.status === "active").length} color="text-green-500" styles={styles} />
-          <StatPill icon={Clock} label={locale === "zh" ? "已完成" : "Done"} value={projects.filter(p => p.status === "completed").length} color="text-blue-500" styles={styles} />
-          <StatPill icon={DollarSign} label={locale === "zh" ? "总金额(万)" : "Total (万)"} value={projects.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) / 10000} color="text-orange-500" fmt="money" styles={styles} />
+          <StatPill icon={Briefcase} label={t("projectTracker.total")} value={total} color={styles.accentText} styles={styles} />
+          <StatPill icon={Target} label={t("projectTracker.status.active")} value={projects.filter(p => p.status === "active").length} color="text-green-500" styles={styles} />
+          <StatPill icon={Clock} label={t("projectTracker.status.completed")} value={projects.filter(p => p.status === "completed").length} color="text-blue-500" styles={styles} />
+          <StatPill icon={DollarSign} label={t("projectTracker.totalAmount")} value={projects.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) / 10000} color="text-orange-500" fmt="money" unit={t("projectTracker.wan")} styles={styles} />
         </div>
       )}
 
@@ -299,8 +302,8 @@ export default function ProjectTracker() {
           total={total}
           onPageChange={setCurrentPage}
           onRowClick={(record) => setExpandedId(expandedId === record.id ? null : record.id)}
-          emptyTitle={locale === "zh" ? "暂无项目数据" : "No Projects"}
-          emptyDescription={locale === "zh" ? "当前没有符合条件的项目记录" : "No matching project records found"}
+          emptyTitle={t("projectTracker.empty.title")}
+          emptyDescription={t("projectTracker.empty.desc")}
           emptyIcon={<Briefcase className="w-12 h-12 opacity-40" />}
         />
       </div>
@@ -320,44 +323,44 @@ export default function ProjectTracker() {
                 onClick={() => setExpandedId(null)}
                 className={`text-xs ${styles.cardTextMuted} hover:opacity-70 transition`}
               >
-                {locale === "zh" ? "收起 ▲" : "Collapse ▲"}
+                {t("projectTracker.collapse")}
               </button>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
               <DetailField
                 icon={Target}
-                label={locale === "zh" ? "状态" : "Status"}
-                value={STATUS_MAP[proj.status]?.label || proj.status}
+                label={t("projectTracker.col.status")}
+                value={t(`projectTracker.status.${proj.status}`) || proj.status}
                 styles={styles}
               />
               <DetailField
                 icon={Target}
-                label={locale === "zh" ? "进度" : "Progress"}
+                label={t("projectTracker.col.progress")}
                 value={`${proj.progress ?? 0}%`}
                 styles={styles}
               />
               <DetailField
                 icon={User}
-                label={locale === "zh" ? "负责人" : "Manager"}
+                label={t("projectTracker.col.manager")}
                 value={proj.manager || "—"}
                 styles={styles}
               />
               <DetailField
                 icon={DollarSign}
-                label={locale === "zh" ? "合同金额" : "Amount"}
-                value={proj.amount != null ? `${(Number(proj.amount) / 10000).toFixed(1)} 万` : "—"}
+                label={t("projectTracker.col.amount")}
+                value={proj.amount != null ? t("projectTracker.unit10k", { v: (Number(proj.amount) / 10000).toFixed(1) }) : "—"}
                 styles={styles}
               />
               <DetailField
                 icon={Calendar}
-                label={locale === "zh" ? "开始日期" : "Start Date"}
+                label={t("projectTracker.start")}
                 value={proj.startDate || "—"}
                 styles={styles}
               />
               <DetailField
                 icon={Calendar}
-                label={locale === "zh" ? "结束日期" : "End Date"}
+                label={t("projectTracker.end")}
                 value={proj.endDate || "—"}
                 styles={styles}
               />
@@ -372,7 +375,7 @@ export default function ProjectTracker() {
             {proj.description && (
               <div>
                 <p className={`text-xs font-semibold ${styles.cardTextMuted} mb-1`}>
-                  {locale === "zh" ? "项目描述" : "Description"}
+                  {t("projectTracker.desc")}
                 </p>
                 <p className={`text-sm ${styles.cardText}`}>{proj.description}</p>
               </div>
@@ -385,10 +388,10 @@ export default function ProjectTracker() {
 }
 
 // ── Sub-components ─────────────────────────────────────
-function StatPill({ icon: Icon, label, value, color, fmt, styles }: {
-  icon: any; label: string; value: number; color: string; fmt?: string; styles: any;
+function StatPill({ icon: Icon, label, value, color, fmt, styles, unit }: {
+  icon: any; label: string; value: number; color: string; fmt?: string; styles: any; unit?: string;
 }) {
-  const display = fmt === "money" ? `${value.toFixed(1)} 万` : value;
+  const display = fmt === "money" ? `${value.toFixed(1)} ${unit ?? ""}`.trim() : value;
   return (
     <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${styles.cardBorder} ${styles.cardBg}`}>
       <Icon className={`w-4 h-4 ${color}`} />

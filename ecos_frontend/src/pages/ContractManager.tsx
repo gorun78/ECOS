@@ -33,29 +33,30 @@ interface Contract {
   [key: string]: any;
 }
 
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  active: { label: "履约中", color: "bg-green-100 text-green-700 border-green-300" },
-  completed: { label: "已完成", color: "bg-blue-100 text-blue-700 border-blue-300" },
-  pending: { label: "待签署", color: "bg-amber-100 text-amber-700 border-amber-300" },
-  terminated: { label: "已终止", color: "bg-red-100 text-red-700 border-red-300" },
-  draft: { label: "草稿", color: "styles.appBg styles.cardTextMuted styles.cardBorder" },
+const STATUS_COLORS: Record<string, string> = {
+  active: "bg-green-100 text-green-700 border-green-300",
+  completed: "bg-blue-100 text-blue-700 border-blue-300",
+  pending: "bg-amber-100 text-amber-700 border-amber-300",
+  terminated: "bg-red-100 text-red-700 border-red-300",
+  draft: "bg-indigo-100 text-indigo-700 border-indigo-300",
 };
+const STATUS_FALLBACK = "bg-gray-100 text-gray-700 border-gray-300";
 
 const PAGE_SIZE = 10;
 
 // ── Helpers ────────────────────────────────────────────
-function fmtAmount(v: number | string | undefined | null): string {
+function fmtAmount(v: number | string | undefined | null, t: (k: string, p?: Record<string, string | number>) => string): string {
   if (v == null) return "—";
   const n = Number(v);
   if (isNaN(n)) return String(v);
-  if (n >= 100000000) return `${(n / 100000000).toFixed(2)} 亿`;
-  if (n >= 10000) return `${(n / 10000).toFixed(1)} 万`;
+  if (n >= 100000000) return t("contract.unitYi", { v: (n / 100000000).toFixed(2) });
+  if (n >= 10000) return t("contract.unit10k", { v: (n / 10000).toFixed(1) });
   return n.toLocaleString();
 }
 
 // ── Component ──────────────────────────────────────────
 export default function ContractManager() {
-  const { locale } = useLanguage();
+  const { locale, t } = useLanguage();
   const { styles } = useTheme();
 
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -89,12 +90,12 @@ export default function ContractManager() {
         setTotal(0);
       }
     } catch (e: any) {
-      setError(e.message || (locale === "zh" ? "加载合同列表失败" : "Failed to load contracts"));
+      setError(e.message || t("contract.loadFailed"));
       setContracts([]);
     } finally {
       setLoading(false);
     }
-  }, [currentPage, statusFilter, searchQ, locale]);
+  }, [currentPage, statusFilter, searchQ, locale, t]);
 
   useEffect(() => { loadContracts(); }, [loadContracts]);
 
@@ -114,21 +115,21 @@ export default function ContractManager() {
   const columns: ColumnConfig<Contract>[] = [
     {
       key: "code",
-      label: locale === "zh" ? "合同编号" : "Contract No.",
+      label: t("contract.col.code"),
       render: (_v, record) => (
         <span className={`font-mono text-[11px] ${styles.cardText}`}>{record.code || record.contractNo || record.id || "—"}</span>
       ),
     },
     {
       key: "name",
-      label: locale === "zh" ? "合同名称" : "Contract Name",
+      label: t("contract.col.name"),
       render: (_v, record) => (
         <span className={`font-medium truncate max-w-[180px] block ${styles.cardText}`}>{record.name || "—"}</span>
       ),
     },
     {
       key: "partyA",
-      label: locale === "zh" ? "甲方" : "Party A",
+      label: t("contract.col.partyA"),
       render: (_v, record) => {
         const a = record.partyA || record.clientName;
         return (
@@ -141,15 +142,15 @@ export default function ContractManager() {
     },
     {
       key: "amount",
-      label: locale === "zh" ? "金额" : "Amount",
+      label: t("contract.col.amount"),
       align: "right",
       render: (_v, record) => (
-        <span className={`font-mono text-xs font-semibold ${styles.cardText}`}>{fmtAmount(record.amount)}</span>
+        <span className={`font-mono text-xs font-semibold ${styles.cardText}`}>{fmtAmount(record.amount, t)}</span>
       ),
     },
     {
       key: "signDate",
-      label: locale === "zh" ? "签署日期" : "Sign Date",
+      label: t("contract.col.signDate"),
       render: (_v, record) => (
         <span className={`flex items-center gap-1 text-xs whitespace-nowrap ${styles.cardTextMuted}`}>
           <Calendar className={`w-3 h-3 ${styles.cardTextMuted}`} />
@@ -159,12 +160,12 @@ export default function ContractManager() {
     },
     {
       key: "status",
-      label: locale === "zh" ? "状态" : "Status",
+      label: t("contract.col.status"),
       render: (_v, record) => {
-        const s = STATUS_MAP[record.status] || { label: record.status, color: "styles.appBg styles.cardTextMuted styles.cardBorder" };
+        const color = STATUS_COLORS[record.status] || STATUS_FALLBACK;
         return (
-          <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded border ${s.color}`}>
-            {s.label}
+          <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded border ${color}`}>
+            {t(`contract.status.${record.status}`)}
           </span>
         );
       },
@@ -189,7 +190,7 @@ export default function ContractManager() {
         <div className="text-center space-y-3">
           <Loader2 className={`w-8 h-8 ${styles.accentText} animate-spin mx-auto`} />
           <p className={`text-sm ${styles.muted}`}>
-            {locale === "zh" ? "加载合同数据..." : "Loading contracts..."}
+            {t("contract.loading")}
           </p>
         </div>
       </div>
@@ -203,7 +204,7 @@ export default function ContractManager() {
         <div className="text-center max-w-sm">
           <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
           <p className="text-sm font-semibold text-red-600 mb-1">
-            {locale === "zh" ? "数据加载失败" : "Failed to load data"}
+            {t("contract.error")}
           </p>
           <p className={`text-xs ${styles.muted} mb-4`}>{error}</p>
           <button
@@ -211,7 +212,7 @@ export default function ContractManager() {
             className={`inline-flex items-center gap-1.5 px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded-lg transition`}
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            {locale === "zh" ? "重试" : "Retry"}
+            {t("biz.retry")}
           </button>
         </div>
       </div>
@@ -226,10 +227,10 @@ export default function ContractManager() {
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
             <FileText className={`w-5 h-5 ${styles.accentText}`} />
-            {locale === "zh" ? "合同管理" : "Contract Manager"}
+            {t("contract.title")}
           </h1>
           <p className={`text-xs ${styles.muted} mt-1`}>
-            {locale === "zh" ? "高速信科合同全生命周期管理" : "GSXK contract lifecycle management"}
+            {t("contract.subtitle")}
           </p>
         </div>
         <button
@@ -238,7 +239,7 @@ export default function ContractManager() {
           className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} hover:opacity-80 transition disabled:opacity-50`}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          {loading ? (locale === "zh" ? "刷新中..." : "Refreshing...") : (locale === "zh" ? "刷新" : "Refresh")}
+          {loading ? t("projectTracker.refreshing") : t("projectTracker.refresh")}
         </button>
       </div>
 
@@ -247,28 +248,28 @@ export default function ContractManager() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <KpiCard
             icon={FileText}
-            label={locale === "zh" ? "合同总数" : "Total Contracts"}
+            label={t("contract.total")}
             value={totalCount}
             color={styles.accentText}
             styles={styles}
           />
           <KpiCard
             icon={DollarSign}
-            label={locale === "zh" ? "合同总金额" : "Total Amount"}
-            value={fmtAmount(totalAmount)}
+            label={t("contract.totalAmount")}
+            value={fmtAmount(totalAmount, t)}
             color="text-orange-500"
             styles={styles}
           />
           <KpiCard
             icon={CheckCircle}
-            label={locale === "zh" ? "履约中" : "Active"}
+            label={t("contract.status.active")}
             value={activeCount}
             color="text-green-500"
             styles={styles}
           />
           <KpiCard
             icon={TrendingUp}
-            label={locale === "zh" ? "已完成" : "Completed"}
+            label={t("contract.status.completed")}
             value={completedCount}
             color="text-blue-500"
             styles={styles}
@@ -284,7 +285,7 @@ export default function ContractManager() {
             type="text"
             value={searchQ}
             onChange={(e) => setSearchQ(e.target.value)}
-            placeholder={locale === "zh" ? "搜索合同编号、名称或甲方..." : "Search by number, name, or party..."}
+            placeholder={t("contract.search")}
             className={`w-full pl-9 pr-3 py-2 text-xs rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition`}
           />
         </div>
@@ -293,12 +294,12 @@ export default function ContractManager() {
           onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
           className={`px-3 py-2 text-xs rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition`}
         >
-          <option value="all">{locale === "zh" ? "全部状态" : "All Status"}</option>
-          <option value="active">{locale === "zh" ? "履约中" : "Active"}</option>
-          <option value="completed">{locale === "zh" ? "已完成" : "Completed"}</option>
-          <option value="pending">{locale === "zh" ? "待签署" : "Pending"}</option>
-          <option value="terminated">{locale === "zh" ? "已终止" : "Terminated"}</option>
-          <option value="draft">{locale === "zh" ? "草稿" : "Draft"}</option>
+          <option value="all">{t("projectTracker.all")}</option>
+          <option value="active">{t("contract.status.active")}</option>
+          <option value="completed">{t("contract.status.completed")}</option>
+          <option value="pending">{t("contract.status.pending")}</option>
+          <option value="terminated">{t("contract.status.terminated")}</option>
+          <option value="draft">{t("contract.status.draft")}</option>
         </select>
       </div>
 
@@ -314,8 +315,8 @@ export default function ContractManager() {
           currentPage={currentPage}
           total={total}
           onPageChange={setCurrentPage}
-          emptyTitle={locale === "zh" ? "暂无合同数据" : "No Contracts"}
-          emptyDescription={locale === "zh" ? "当前没有符合条件的合同记录，请调整筛选条件或刷新重试" : "No matching contract records. Adjust filters or refresh."}
+          emptyTitle={t("contract.empty.title")}
+          emptyDescription={t("contract.empty.desc")}
           emptyIcon={<FileText className="w-12 h-12 opacity-40" />}
         />
       </div>
@@ -326,7 +327,7 @@ export default function ContractManager() {
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
           <button onClick={loadContracts} className="ml-auto font-semibold underline hover:no-underline">
-            {locale === "zh" ? "重试" : "Retry"}
+            {t("biz.retry")}
           </button>
         </div>
       )}

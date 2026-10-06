@@ -267,7 +267,6 @@
   "scenario.sandbox.action.link": "Bind to hub",
   "scenario.sandbox.action.run": "Run",
   "scenario.sandbox.insight.ready": "Done",
-  "scenario.sandbox.insight.stub": "Stub (P3b active)",
   "scenario.sandbox.mind.activeRadio": "Set active",
   "scenario.sandbox.mind.remove": "Remove mind",
   "scenario.sandbox.modal.pick": "Pick {cat}",
@@ -376,5 +375,7 @@
   "scenario.wizard.st.draft": "DRAFT",
   "scenario.wizard.st.active": "ACTIVE",
   "scenario.wizard.st.completed": "COMPLETED",
-  "scenario.wizard.st.suspended": "SUSPENDED"
+  "scenario.wizard.st.suspended": "SUSPENDED",
+  "scenario.sim.safetyBaseline": "Safety Baseline",
+  "scenario.sim.postSim": "Post-Simulation"
 }

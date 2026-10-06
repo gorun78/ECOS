@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import LucideIcon from '../../components/LucideIcon';
+import { useLanguage } from '../../components/LanguageContext';
 import type { ThemeStyles } from '../../components/ThemeContext';
 
 export interface SimulationResultPanelProps {
@@ -33,6 +34,7 @@ export default function SimulationResultPanel({
   tl,
   safetyIndexActual,
 }: SimulationResultPanelProps) {
+  const { t } = useLanguage();
   return (
     <div className="space-y-4">
       {/* Query Input Area */}
@@ -136,11 +138,11 @@ export default function SimulationResultPanel({
             </span>
             <div className="grid grid-cols-2 gap-3 text-[10px]">
               <div className={`p-2 ${styles.inputBg} rounded text-center`}>
-                <span className={`block ${styles.cardTextMuted}`}>{tl('安全适航基线', 'Safety Baseline')}</span>
+                <span className={`block ${styles.cardTextMuted}`}>{t('scenario.sim.safetyBaseline')}</span>
                 <span className="text-sm font-bold text-indigo-400">{safetyIndexActual}</span>
               </div>
               <div className={`p-2 ${simResult.verdict === 'GRANTED' ? 'bg-emerald-950/30' : 'bg-rose-950/30'} rounded text-center`}>
-                <span className={`block ${styles.cardTextMuted}`}>{tl('推演后预测', 'Post-Simulation')}</span>
+                <span className={`block ${styles.cardTextMuted}`}>{t('scenario.sim.postSim')}</span>
                 <span className={`text-sm font-bold ${simResult.verdict === 'GRANTED' ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {simResult.verdict === 'GRANTED' ? '100.00%' : safetyIndexActual}
                 </span>

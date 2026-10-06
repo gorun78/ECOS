@@ -140,7 +140,7 @@ export default function AgentMesh() {
   };
 
   const createMission = async () => {
-    if (!newTitle.trim()) { setError("请输入任务标题"); return; }
+    if (!newTitle.trim()) { setError(t("agentMesh.errTitleReq")); return; }
     setLoading(true);
     setError("");
     try {
@@ -209,7 +209,7 @@ export default function AgentMesh() {
       <div className="w-full lg:w-72 border-r flex flex-col" style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
         <div className="p-4 border-b" style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
           <div className={`flex items-center gap-2 text-sm font-semibold ${styles.cardText}`}>
-            <Cpu size={16} /> Agent 注册表
+            <Cpu size={16} /> {t("agentMesh.registry")}
             {loadErrors.agents && (
               <button
                 onClick={loadAgents}
@@ -255,7 +255,7 @@ export default function AgentMesh() {
               </button>
             </div>
           ) : agents.length === 0 ? (
-            <p className={`text-xs ${styles.cardTextMuted} text-center py-8`}>无已注册Agent</p>
+            <p className={`text-xs ${styles.cardTextMuted} text-center py-8`}>{t("agentMesh.emptyAgent")}</p>
           ) : null}
         </div>
       </div>
@@ -270,19 +270,19 @@ export default function AgentMesh() {
                 type="text"
                 value={newTitle}
                 onChange={e => setNewTitle(e.target.value)}
-                placeholder="Mission 标题，如：供应商准入合规审查"
+                placeholder={t("agentMesh.placeholder.title")}
                 className={`w-full px-3 py-2 text-sm border rounded-lg ${styles.inputBg} ${styles.inputText} ${styles.inputBorder} focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none`}
               />
               <textarea
                 value={newDesc}
                 onChange={e => setNewDesc(e.target.value)}
-                placeholder="Mission 描述（可选）"
+                placeholder={t("agentMesh.placeholder.desc")}
                 rows={2}
                 className={`w-full px-3 py-2 text-sm border rounded-lg ${styles.inputBg} ${styles.inputText} ${styles.inputBorder} focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none`}
               />
               {/* Mode selector */}
               <div className="flex items-center gap-2">
-                <span className={`text-xs ${styles.cardTextMuted}`}>模式:</span>
+                <span className={`text-xs ${styles.cardTextMuted}`}>{t("agentMesh.mode")}</span>
                 <button onClick={() => setNewMode("SUPERVISOR")}
                   className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
                     newMode === "SUPERVISOR"
@@ -302,7 +302,7 @@ export default function AgentMesh() {
                 <div className="flex items-center gap-2 p-2 rounded bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800">
                   <Layers size={14} className="text-teal-600" />
                   <span className="text-[11px] text-teal-700 dark:text-teal-400">
-                    Supervisor 模式：Coordinator 自动拆解任务并分配给 Specialist Agent 执行
+                    {t("agentMesh.supervisorHint")}
                   </span>
                 </div>
               )}
@@ -322,7 +322,7 @@ export default function AgentMesh() {
                         }}
                         className={`w-full sm:w-40 px-2 py-1.5 text-xs border rounded ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
                       >
-                        <option value="">选择 Agent</option>
+                        <option value="">{t("agentMesh.selectAgent")}</option>
                         {agents.filter(a => a.status === "ACTIVE").map(a => (
                           <option key={a.id} value={a.id}>{a.name} ({a.role})</option>
                         ))}
@@ -335,7 +335,7 @@ export default function AgentMesh() {
                           updated[i].instruction = e.target.value;
                           setPipelineAgents(updated);
                         }}
-                        placeholder="子任务指令"
+                        placeholder={t("agentMesh.subtaskInstr")}
                         className={`flex-1 px-2 py-1.5 text-xs border rounded ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
                       />
                       {i === pipelineAgents.length - 1 ? (
@@ -359,7 +359,7 @@ export default function AgentMesh() {
               disabled={loading}
               className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
             >
-              <Send size={14} /> 创建
+              <Send size={14} /> {t("agentMesh.create")}
             </button>
           </div>
           {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
@@ -368,7 +368,7 @@ export default function AgentMesh() {
         {/* Mission List */}
         <div className="flex-1 overflow-auto p-4">
           <div className="flex items-center justify-between mb-3">
-            <h3 className={`text-sm font-semibold ${styles.cardText}`}>Mission 记录</h3>
+            <h3 className={`text-sm font-semibold ${styles.cardText}`}>{t("agentMesh.records")}</h3>
             <button onClick={loadMissions} className={`p-1 ${styles.cardTextMuted} hover:text-indigo-500`}><RefreshCw size={14} /></button>
           </div>
 
@@ -388,7 +388,7 @@ export default function AgentMesh() {
               </button>
             </div>
           ) : missions.length === 0 ? (
-            <p className={`text-sm ${styles.cardTextMuted} text-center py-16`}>暂无 Mission，创建一个开始协作</p>
+            <p className={`text-sm ${styles.cardTextMuted} text-center py-16`}>{t("agentMesh.empty")}</p>
           ) : null}
 
           {missions.map(mission => (
@@ -456,7 +456,7 @@ export default function AgentMesh() {
 
                   {/* Task detail list */}
                   <div className="mt-3 pt-3 border-t space-y-2" style={{ borderColor: 'var(--app-border, #E2E8F0)' }}>
-                    <h4 className={`text-[11px] font-semibold ${styles.cardTextMuted} uppercase tracking-wide`}>子任务详情</h4>
+                    <h4 className={`text-[11px] font-semibold ${styles.cardTextMuted} uppercase tracking-wide`}>{t("agentMesh.subtasks")}</h4>
                     {missionTasks.map(task => (
                       <div key={task.id} className="flex items-start gap-2 p-2 rounded" style={{ background: 'var(--overlay, rgba(0,0,0,0.04))' }}>
                         {statusIcon(task.status)}

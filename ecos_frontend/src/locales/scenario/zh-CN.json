@@ -267,7 +267,6 @@
   "scenario.sandbox.action.link": "绑定枢纽",
   "scenario.sandbox.action.run": "执行",
   "scenario.sandbox.insight.ready": "已返回",
-  "scenario.sandbox.insight.stub": "占位（P3b 激活）",
   "scenario.sandbox.mind.activeRadio": "设为激活",
   "scenario.sandbox.mind.remove": "删除心智",
   "scenario.sandbox.modal.pick": "选择 {cat}",
@@ -376,5 +375,7 @@
   "scenario.wizard.st.draft": "DRAFT",
   "scenario.wizard.st.active": "ACTIVE",
   "scenario.wizard.st.completed": "COMPLETED",
-  "scenario.wizard.st.suspended": "SUSPENDED"
+  "scenario.wizard.st.suspended": "SUSPENDED",
+  "scenario.sim.safetyBaseline": "安全适航基线",
+  "scenario.sim.postSim": "推演后预测"
 }
