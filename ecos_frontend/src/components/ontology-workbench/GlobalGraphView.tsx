@@ -1,8 +1,8 @@
 /**
  * GlobalGraphView — 全局知识图谱嵌入式视图
  */
-import React, { useState, useEffect } from 'react';
-import { Loader2, Network } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Loader2, Network, RefreshCw } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
 import { fetchEcosGraphJson } from '../../services/ontologyWorkbenchApi';
 
@@ -44,23 +44,64 @@ export default function GlobalGraphView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setKgData(null);
+    setError('');
+    setLoading(true);
     fetchEcosGraphJson()
       .then((data: unknown) => setKgData(((data as { data?: KGData })?.data ?? data) as KGData))
       .catch((e: unknown) => setError((e as { message?: string } | undefined)?.message ?? ""))
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    setKgData(null);
+    setError('');
+    setLoading(true);
+    fetchEcosGraphJson()
+      .then((data: unknown) => {
+        if (cancelled) return;
+        setKgData(((data as { data?: KGData })?.data ?? data) as KGData);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setError((e as { message?: string } | undefined)?.message ?? "");
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
   if (loading) return <div className={`flex-1 flex items-center justify-center ${styles.appBg}`}><Loader2 className={`w-5 h-5 ${styles.muted} animate-spin`} /></div>;
-  if (error) return <div className={`flex-1 flex items-center justify-center ${styles.appBg} text-[11px] text-red-400`}>{error}</div>;
+  if (error) return (
+    <div className={`flex-1 flex flex-col items-center justify-center gap-3 ${styles.appBg} text-[11px]`}>
+      <span className={styles.dangerText}>{error}</span>
+      <button
+        type="button"
+        onClick={load}
+        className={`inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-lg ${styles.accentBg} text-white`}
+      >
+        <RefreshCw size={12} /> retry
+      </button>
+    </div>
+  );
   if (!kgData || !kgData.nodes?.length) return <div className={`flex-1 flex items-center justify-center ${styles.appBg}`}><div className={`text-center ${styles.muted}`}><Network className="w-8 h-8 mx-auto mb-2 opacity-30" /><p className="text-[11px]">no data</p></div></div>;
 
   const positions = layoutNodes(kgData.nodes);
   const colors: Record<string, string> = { '采购域': '#f59e0b', '项目域': '#3b82f6', '资产域': '#10b981', '财务域': '#8b5cf6' };
 
+  // 内容驱动 viewBox：随节点包围盒自适应，100%/100% 填充视口，
+  // 去掉固定 minWidth/minHeight 强撑（会撑断容器 3px 边框且小屏强制横滚）。
+  let vbW = 1200, vbH = 600;
+  positions.forEach((p) => {
+    if (p.x + 150 + 20 > vbW) vbW = p.x + 170;
+    if (p.y + 50 + 20 > vbH) vbH = p.y + 70;
+  });
+  const viewBox = `0 0 ${vbW} ${vbH}`;
+
   return (
     <div className={`flex-1 ${styles.appBg} overflow-auto relative`}>
-      <svg width="100%" height="100%" style={{ minWidth: '1200px', minHeight: '600px' }}>
+      <svg width="100%" height="100%" viewBox={viewBox} preserveAspectRatio="xMinYMin meet">
         <defs><marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#64748b" /></marker></defs>
         {kgData.edges.map((e, i) => {
           const sp = positions.get(e.source), tp = positions.get(e.target);
