@@ -1629,6 +1629,7 @@
   "dw.facts.duplicateHint": "检测到重复上传（同业务键）——重传幂等。",
   "dw.facts.closedPeriod": "第 {n} 行被拦截：期间已关账（不可提交）。",
   "dw.facts.loadFailed": "事实向导加载失败: {msg}",
+  "dw.facts.pollFailed": "批次状态轮询连续 3 次失败（{msg}），已停止轮询。",
   "dw.facts.publishFailed": "发布失败: {msg}",
   "dw.facts.importFailed": "导入失败: {msg}",
   "dw.facts.batchesTitle": "最近批次",

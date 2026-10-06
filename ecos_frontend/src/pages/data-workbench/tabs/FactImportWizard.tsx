@@ -125,6 +125,11 @@ export default function FactImportWizard({ showToast, t }: Props) {
 
   const pollRef = useRef<number | null>(null);
   const stopRef = useRef<number | null>(null);
+  // §2.4 [P2] 原 `.catch(() => {})` 静默吞轮询错 → 断网/401/500 完全无信号。
+  // 3 次连失败触发 stopPolling + toast，避免"以为还在轮询但一直没网络"静默疑卡。
+  // startPolling 必先 stopPolling() 重置计数器；任何成功 poll 也 reset（保护瞬时抖动）。
+  const pollFailRef = useRef(0);
+  const pollToastedRef = useRef(false);
 
   useEffect(() => () => {
     if (pollRef.current) window.clearInterval(pollRef.current);
@@ -146,13 +151,26 @@ export default function FactImportWizard({ showToast, t }: Props) {
   const stopPolling = useCallback(() => {
     if (pollRef.current) { window.clearInterval(pollRef.current); pollRef.current = null; }
     if (stopRef.current) { window.clearTimeout(stopRef.current); stopRef.current = null; }
+    pollFailRef.current = 0;
+    pollToastedRef.current = false;
   }, []);
 
   const pollBatch = useCallback((fact: FactType, batchId: string) => {
     getFactBatch(fact, batchId)
-      .then(b => setBatch(b))
-      .catch(() => { /* 轮询失败静默 */ });
-  }, []);
+      .then(b => {
+        setBatch(b);
+        pollFailRef.current = 0;
+        pollToastedRef.current = false;
+      })
+      .catch((e: unknown) => {
+        pollFailRef.current += 1;
+        if (pollFailRef.current < 3 || pollToastedRef.current) return;
+        pollToastedRef.current = true;
+        stopPolling();
+        const msg = e instanceof Error ? e.message : String(e);
+        showToast('error', t('dw.facts.pollFailed').replace('{msg}', msg));
+      });
+  }, [showToast, t, stopPolling]);
 
   const startPolling = useCallback((fact: FactType, batchId: string) => {
     stopPolling();

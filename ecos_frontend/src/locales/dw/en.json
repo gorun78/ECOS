@@ -1624,6 +1624,7 @@
   "dw.facts.duplicateHint": "Duplicate upload detected (same business key) — re-upload is idempotent.",
   "dw.facts.closedPeriod": "Row {n} blocked: period is close-locked (not submittable).",
   "dw.facts.loadFailed": "Fact wizard load failed: {msg}",
+  "dw.facts.pollFailed": "Batch poll failed 3× in a row ({msg}); polling stopped.",
   "dw.facts.publishFailed": "Publish failed: {msg}",
   "dw.facts.importFailed": "Import failed: {msg}",
   "dw.facts.batchesTitle": "Recent batches",

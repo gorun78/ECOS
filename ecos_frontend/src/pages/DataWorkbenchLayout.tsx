@@ -56,7 +56,7 @@ type TabName = 'connections' | 'pipeline-builder' | 'health' | 'lineage' | 'data
 
 /** 侧边栏条目：切换工作台内 tab。 */
 interface SideTabItem {
-  id: string;
+  id: TabName;
   icon: string;
   i18nKey: string;
 }
@@ -105,9 +105,12 @@ export default function DataWorkbenchLayout({
   const initialLineageTable = searchParams.get('lineageTable') || undefined;
 
   // ── Tab navigation ──
+  // §2.4 [P3] 原 `setNcType as any` / `tab as TabName` 强转 = 类型护栏空缺。
+  // 声明 `SideTabItem.id: TabName` 后，renderSideTab 层 `tab.id` 已是 tab 类型；
+  // `setActiveTab` param 也从 string 收窄到 TabName（外层 URL 路由同源预定）。
   const [localActiveTab, setLocalActiveTab] = useState<TabName>('connections');
   const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
-  const setActiveTab = (tab: string) => onActiveTabChange ? onActiveTabChange(tab as TabName) : setLocalActiveTab(tab as TabName);
+  const setActiveTab = (tab: TabName) => onActiveTabChange ? onActiveTabChange(tab) : setLocalActiveTab(tab);
 
   // 当 ?lineageTable=X 存在时,自动切到血缘 tab(消费一次后清掉参数避免状态污染)
   useEffect(() => {
@@ -123,6 +126,14 @@ export default function DataWorkbenchLayout({
 
   // ── UI toggles ──
   const [showExtIfaces, setShowExtIfaces] = useState(false);
+
+  // §2.4 [P3] 原 L192 三处 `setNcType/setNsMode/setNsSched as any` 强转 = 消类型护栏。
+  // 本层收口：Modal 侧签名固定 `(v: string) => void`（<select> value 是 string）；
+  // hook 侧 setter 是细类型 union（ConnType/'snapshot'…）。
+  // 由 layout 提供 three 一次 as-cast，Modal 传 raw union setter，消掉 `as any` 散布。
+  const setNcTypeFromModal = (v: string) => dw.setNcType(v as import('./data-workbench/types').ConnType);
+  const setNsModeFromModal = (v: string) => dw.setNsMode(v as 'snapshot' | 'incremental' | 'append');
+  const setNsSchedFromModal = (v: string) => dw.setNsSched(v as 'manual' | 'hourly' | 'daily' | 'cron');
 
   /** 渲染一个侧边菜单按钮（主菜单与底部入口共用，保证样式与选中态一致）。 */
   const renderSideTab = (tab: SideTabItem) => {
@@ -189,8 +200,8 @@ export default function DataWorkbenchLayout({
         </div>
       </div>
       {/* Modals */}
-      {dw.showAddConn && <AddConnectionModal t={t} locale={locale} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.setNcType as any} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} newConnPassword={dw.ncPassword} setNewConnPassword={dw.setNcPassword} newConnDatabase={dw.ncDatabase} setNewConnDatabase={dw.setNcDatabase} ncExtra={dw.ncExtra} setNcExtraField={dw.setNcExtraField} onClose={() => dw.setShowAddConn(false)} onCreate={dw.createConnection} onTestConnection={dw.testConnectionRaw} />}
-      {dw.showAddSync && <AddSyncModal t={t} locale={locale} newSyncName={dw.nsName} setNewSyncName={dw.setNsName} newSyncConn={dw.nsConn} setNewSyncConn={dw.setNsConn} newSyncTable={dw.nsTable} setNewSyncTable={dw.setNsTable} newSyncMode={dw.nsMode} setNewSyncMode={dw.setNsMode as any} newSyncSched={dw.nsSched} setNewSyncSched={dw.setNsSched as any} connections={dw.connections} onClose={() => dw.setShowAddSync(false)} onCreate={dw.createSync} />}
+      {dw.showAddConn && <AddConnectionModal t={t} locale={locale} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={setNcTypeFromModal} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} newConnPassword={dw.ncPassword} setNewConnPassword={dw.setNcPassword} newConnDatabase={dw.ncDatabase} setNewConnDatabase={dw.setNcDatabase} ncExtra={dw.ncExtra} setNcExtraField={dw.setNcExtraField} onClose={() => dw.setShowAddConn(false)} onCreate={dw.createConnection} onTestConnection={dw.testConnectionRaw} />}
+      {dw.showAddSync && <AddSyncModal t={t} locale={locale} newSyncName={dw.nsName} setNewSyncName={dw.setNsName} newSyncConn={dw.nsConn} setNewSyncConn={dw.setNsConn} newSyncTable={dw.nsTable} setNewSyncTable={dw.setNsTable} newSyncMode={dw.nsMode} setNewSyncMode={setNsModeFromModal} newSyncSched={dw.nsSched} setNewSyncSched={setNsSchedFromModal} connections={dw.connections} onClose={() => dw.setShowAddSync(false)} onCreate={dw.createSync} />}
       {showExtIfaces && <ExternalInterfacesDrawer t={t} connections={dw.connections} onClose={() => setShowExtIfaces(false)} />}
     </div>
   );
