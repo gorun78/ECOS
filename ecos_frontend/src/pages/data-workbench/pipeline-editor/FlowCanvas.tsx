@@ -69,12 +69,18 @@ const StatusBadge: React.FC<{ status: NodeStatus }> = React.memo(({ status }) =>
 
 const NodeHandle: React.FC<HandleProps & { position: Position }> = React.memo(
   ({ position, ...rest }) => {
+    // 老式 `hover:!${styles.infoBg}` / `!${styles.sidebarBg}` 均有两坑：
+    // ① 运行时拼接出来的类名（JIT 无法静态生成）= 从未生效；
+    // ② `!` 是 Tailwind v4 的**后缀**语法，中缀 `!bg-...` 不识别。
+    // Handle 组件的 props 不含 HTML 鼠标事件（@xyflow/react 收窄了类型），
+    // 且原 :hover 分支本就从未渲染（JIT 未生成 → 线上视觉与"无 hover"完全等价），
+    // 故收敛为 static 字面 token 类，视觉与线上现状完全一致，仅清除死代码。
     const { styles } = useTheme();
     return (
     <Handle
       {...rest}
       position={position}
-      className={`!w-3 !h-3 !border-2 !${styles.cardBorder} !${styles.sidebarBg} hover:!${styles.infoBg} transition-colors`}
+      className={`w-3 h-3 border-2 ${styles.cardBorder} ${styles.sidebarBg}` }
     />
     );
   }
