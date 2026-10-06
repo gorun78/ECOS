@@ -1,6 +1,6 @@
 # archive/legacy/frontend — 死前端文件归档
 
-来源：《前端检视报告-2026-10-06》§E5.1 (P1 "Legacy 死文件") 一次性搬迁。
+来源：《前端检视报告-2026-10-06》§E5.1 (P1 "Legacy 死文件") 一次性搬迁 + Wave-4 Batch J 补收。
 归档日期：2026-10-07 · 分支 `release/v2.1-alpha` · 未推送。
 
 ## 判据（每个文件均已反向 grep 验证）
@@ -8,7 +8,7 @@
 2. `main.tsx` 路由要么 `<Navigate to="…">` 另投，要么根本未挂；
 3. 现役页面已由 `<domain>View.tsx` / `<domain>/index.tsx` 承接（详见下）。
 
-## 归档清单（13 文件 + 1 目录，均 0 真引用）
+## 归档清单（13 文件 + 1 目录 + 1 补收，均 0 真引用）
 | 归档路径 | 来源 | 死因 | 现役替代 |
 |---|---|---|---|
 | `ecos_frontend/src/pages/AgentStudio.tsx` (698) | main.tsx:171 | `agent_studio` → `/ai-workbench` | `pages/aiworkbench/AgentStudioView.tsx` |
@@ -25,9 +25,10 @@
 | `ecos_frontend/src/pages/SecurityConfigPanel.tsx` (533) | 无路由 | 0 引用 | — |
 | `ecos_frontend/src/pages/DataMaskingDemo.tsx` (318) | 无路由 | 0 引用 | — |
 | `ecos_frontend/src/pages/CryptoAuditPanel.tsx` (458) | 无路由 | 0 引用 | — |
+| `ecos_frontend/src/components/ontology-workbench/GlobalGraphView.tsx` (6 KB) | Wave-4 Batch E 修 P1/P2 后仍 0 挂载 | 全仓 grep 除自引用外**无任何引用**（OntologyWorkbenchLayout 走的是 `/ontology/ProposalPanel` + 本体画布，不引本组件）；`<ReactFlow>` 挂载路径从未接通 | 本体全景图走 `DomainGraphCanvas` (Batches E/F 修过内容指纹+fitView) |
 
 ## 撤销 / 恢复
-`git log --diff-filter=A -- archive/legacy/frontend/ecos_frontend/src/pages/*` 可查这批搬迁 commit；`git show HEAD` 追 rename 记录。若日后需恢复，`git mv` 回原路径即可。
+`git log --diff-filter=A -- archive/legacy/frontend/ecos_frontend/src/pages/*` 可查这批搬迁 commit；`git show HEAD` 追 rename 记录。GlobalGraphView 补收走 `archive/legacy/frontend/ecos_frontend/src/components/`（不同子路径，找该 rename 用 components 后缀 filter）。若日后需恢复，`git mv` 回原路径即可。
 
 ## 主要治理原则
 - **不删除 blob** — 保 git history 一次性回滚成本最低；
