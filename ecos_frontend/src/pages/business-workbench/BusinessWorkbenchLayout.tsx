@@ -106,27 +106,35 @@ export default function BusinessWorkbenchLayout({
       let loadedActions = mockActionTypes;
       let loadedDomains = mockDomains;
 
+      // 后端 /ecs/* 返回 ontology 摘要（id/name/code/version/status），
+      // 与前端 ObjectType/LinkType/ActionType UI 模型不完全同形（缺 properties/apiName/icon 等）。
+      // 仅在 payload 字段真正符合 UI 模型时接管，否则保留 seed（P0-1 复测暴露：直接 cast 会让下游
+      // .properties.length / .displayName 等访问抛 TypeError 崩整页）。200 端点仍算成功。
       if (objectsResp.status === 'fulfilled' && objectsResp.value?.data) {
         const apiData = objectsResp.value.data;
-        if (Array.isArray(apiData) && apiData.length > 0) {
+        if (Array.isArray(apiData) && apiData.length > 0 && Array.prototype.every.call(apiData, (r: any) => Array.isArray(r?.properties) && typeof r?.apiName === 'string')) {
           loadedObjects = apiData as ObjectType[];
         }
       }
       if (linksResp.status === 'fulfilled' && linksResp.value?.data) {
         const apiData = linksResp.value.data;
-        if (Array.isArray(apiData) && apiData.length > 0) {
+        // LinkType 全量形态需 sourcePropertyId/targetPropertyId + kind；/api/v1/ecos/relationships 返
+        // sourceEntityId/targetEntityId/relationshipType — 不同形，保留 seed 避免下游 .kind 崩。
+        if (Array.isArray(apiData) && apiData.length > 0 && Array.prototype.every.call(apiData, (r: any) => typeof r?.sourcePropertyId === 'string' && typeof r?.kind === 'string')) {
           loadedLinks = apiData as LinkType[];
         }
       }
       if (actionsResp.status === 'fulfilled' && actionsResp.value?.data) {
         const apiData = actionsResp.value.data;
-        if (Array.isArray(apiData) && apiData.length > 0) {
+        if (Array.isArray(apiData) && apiData.length > 0 && Array.prototype.every.call(apiData, (r: any) => Array.isArray(r?.parameters) && Array.isArray(r?.rules) && Array.isArray(r?.validationRules))) {
           loadedActions = apiData as ActionType[];
         }
       }
       if (domainsResp.status === 'fulfilled' && domainsResp.value?.data) {
         const apiData = domainsResp.value.data;
-        if (Array.isArray(apiData) && apiData.length > 0) {
+        // Domain 全量形态需 displayName + color(Tailwind 名) 供 getDomainColorClasses 使用；
+        // /api/v1/ecos/domains 只返 name/code — 直接 cast 会让 GraphPanel/DomainCardsGrid .split / getDomainColorClasses(undefined) 崩。
+        if (Array.isArray(apiData) && apiData.length > 0 && Array.prototype.every.call(apiData, (r: any) => typeof r?.displayName === 'string' && typeof r?.color === 'string')) {
           loadedDomains = apiData as OntologyDomain[];
         }
       }
@@ -311,10 +319,10 @@ export default function BusinessWorkbenchLayout({
   }, [objectTypes, linkTypes, actionTypes, interfaces, sharedProperties, functionTypes, updateObjectTypes, updateLinkTypes, updateActionTypes, updateFunctionTypes, showToast, t]);
 
   // --- Filtered lists for Sidebar ---
-  const filteredObjects = objectTypes.filter(o => o.displayName.includes(searchQuery));
-  const filteredLinks = linkTypes.filter(l => l.displayName.includes(searchQuery));
-  const filteredActions = actionTypes.filter(a => a.displayName.includes(searchQuery));
-  const filteredFunctions = functionTypes.filter(f => f.displayName.includes(searchQuery));
+  const filteredObjects = objectTypes.filter(o => (o.displayName ?? '').includes(searchQuery));
+  const filteredLinks = linkTypes.filter(l => (l.displayName ?? '').includes(searchQuery));
+  const filteredActions = actionTypes.filter(a => (a.displayName ?? '').includes(searchQuery));
+  const filteredFunctions = functionTypes.filter(f => (f.displayName ?? '').includes(searchQuery));
 
   // --- Tab bar ---
   const tabs: { id: ViewMode; label: string; icon: string }[] = [
