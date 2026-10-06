@@ -178,6 +178,7 @@
   "topbar.user.sandbox": "强制启动高危指令智能体沙盒审查",
   "topbar.user.save": "保存并重连核准通道",
   "topbar.user.save.success": "配置文件已写入本地内核缓存，通信通道双向热重连完成！",
+  "topbar.user.save.localOnly": "配置文件已写入本地内核缓存；同步后端失败已记录 console，请稍后重试。",
   "topbar.user.settings": "用户配置设置",
   "topbar.user.workstation": "绑定物理工作站",
   "user.batch.delete": "批量删除",

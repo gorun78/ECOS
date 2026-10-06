@@ -178,6 +178,7 @@
   "topbar.user.sandbox": "Mandatory Sandbox Verification for Actions",
   "topbar.user.save": "Verify & Save Profile",
   "topbar.user.save.success": "Local config stored securely. Connection hot-reloaded successfully!",
+  "topbar.user.save.localOnly": "Local config stored; backend sync failed (see console). Please retry later.",
   "topbar.user.settings": "Configuration Settings",
   "topbar.user.workstation": "Linked Safe Workstation",
   "user.batch.delete": "Batch Delete",

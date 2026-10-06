@@ -119,7 +119,10 @@ export default function Topbar({
         setSandbox(p.sandboxMandatory);
         localStorage.setItem("ecos_user_sandbox", String(p.sandboxMandatory));
       }
-    }).catch(() => {/* fallback to localStorage values */});
+    }).catch((e) => {
+      console.warn("Topbar: failed to load security profile, falling back to local cache", e);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const displayClearance = clearance || t("topbar.role.default");
@@ -144,6 +147,9 @@ export default function Topbar({
         });
       } catch (e) {
         console.warn("Topbar: failed to sync security profile to backend", e);
+        setToast(t("topbar.user.save.localOnly"));
+        setTimeout(() => { setToast(null); }, 4000);
+        return;
       }
     }
 
@@ -244,7 +250,7 @@ export default function Topbar({
       return [t("topbar.group.system"), t("topbar.tab.kanban")];
     if (currentView === "engine-tasks" || currentView === "task_center")
       return [t("topbar.group.system"), t("topbar.tab.engine_tasks")];
-    return [t("topbar.group.overview"), currentView];
+    return [t("topbar.group.overview"), t(`topbar.bc.${currentView}`, currentView)];
   };
 
   /** Translate existing tab labels (Chinese labels passed by App.tsx). */
