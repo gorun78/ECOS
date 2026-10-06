@@ -108,8 +108,10 @@ export default function App() {
   // 语义不变: 立即 poll + 10s 间隔 + hidden Tab pause; 单次 poll 失败不打断下一轮
   usePolling({
     poll: () =>
-      apiTaskStats().then((s) => setTaskStats(s)).catch(() => {
-        /* 网络/业务错误保持前值；NetworkErrorBanner 由 apiFetchData 独立触发 */
+      apiTaskStats().then((s) => setTaskStats(s)).catch((e) => {
+        // 单次 poll 失败不打断下一轮 (usePolling 语义); 用户侧走 NetworkErrorBanner。
+        // 空吞改 warn: 保留 401/500 区分供排查, 但保持前值不 toast 扰民。
+        console.warn("App: taskStats poll failed, keeping previous values", e);
       }),
     intervalMs: 10000,
     immediate: true,
