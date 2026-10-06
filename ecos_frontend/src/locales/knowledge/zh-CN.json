@@ -1111,6 +1111,8 @@
   "knowledge.graph.kpi_nodes": "实体 {n} 个",
   "knowledge.graph.kpi_edges": "关系 {m} 条",
   "knowledge.graph.current_view": "当前视图 {k} 个节点",
+  "knowledge.graph.tooManyNodes": "节点过多，仅渲染前 {shown} / {total}，请使用筛选缩小范围",
+  "knowledge.graph.loadFailed": "图加载失败：{msg}（保留上次数据，可重试）",
   "knowledge.graph.legend_entity": "实体",
   "knowledge.graph.legend_relation": "关系",
   "knowledge.graph.legend_document": "文档",

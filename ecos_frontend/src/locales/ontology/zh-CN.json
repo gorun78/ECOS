@@ -267,6 +267,8 @@
   "ow.biz.notFoundLink": "未找到该链接关系",
   "ow.biz.notFoundAction": "未找到该操作类型",
   "ow.biz.notFoundFunction": "未找到该逻辑函数",
+  "ow.biz.seedDemo": "当前展示为示例种子数据（仅开发环境回退），非真实本体。",
+  "ow.biz.noOntology": "未加载到本体数据，请在后端配置后重试。",
   "ow.biz.notFoundInterface": "未找到该接口类型",
   "ow.biz.notFoundSharedProperty": "未找到该共享属性",
   "ow.biz.notFoundDataset": "未找到该数据集",

@@ -16,7 +16,7 @@ import {
   ObjectType, LinkType, ActionType, InterfaceType, SharedProperty,
   Dataset, FunctionType, OntologyDomain, PropertyType,
   ActionParamDataType, ActionRuleType, ActionParameter, ActionRule, ActionValidationRule,
-  FunctionParameter,
+  FunctionParameter, ForeignKeyMapping,
 } from '../../types/ontology';
 
 // Seed data (fallback when API unavailable)
@@ -37,6 +37,112 @@ import BusinessObjectExplorer from './BusinessObjectExplorer';
 
 type ViewMode = 'ontology' | 'explorer';
 type SelectedCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function';
+
+// ================================================================
+// W3-1: per-item 形状归一化 ingestion
+// 后端 /ecs/* 返回摘要（id/name/code/…），与前端 UI 模型不同形。
+// 逐行 sniff + 兜底缺省下游必需字段（空字符串/空数组），绝不直接 cast 导致
+// 下游 .displayName / .properties.length / getDomainColorClasses(undefined) 抛 TypeError。
+// 仅当保留率 < 20%（丢 80%）才整列回退 seed；否则用可保留的行。
+// ================================================================
+const OBJ_STATUS_SET = new Set(['DRAFT', 'ACTIVE', 'PUBLISHED', 'DEPRECATED']);
+
+function normStr(r: any, ...keys: string[]): string {
+  for (const k of keys) {
+    const v = r?.[k];
+    if (typeof v === 'string' && v.trim() !== '') return v;
+  }
+  return '';
+}
+
+function normalizeObjectItem(r: any): ObjectType | null {
+  if (!r || typeof r !== 'object') return null;
+  const id = normStr(r, 'id', 'code', 'name');
+  if (!id) return null;
+  const displayName = normStr(r, 'displayName', 'name', 'code') || id;
+  const apiName = normStr(r, 'apiName', 'code', 'name') || id;
+  const properties: PropertyType[] = Array.isArray(r.properties) ? r.properties : [];
+  const primaryKey = properties.find((p: any) => p?.isPrimaryKey)?.id || normStr(r, 'primaryKey') || properties[0]?.id || '';
+  const status = (typeof r.status === 'string' && OBJ_STATUS_SET.has(r.status)) ? r.status : 'ACTIVE';
+  return {
+    id,
+    displayName,
+    apiName,
+    description: normStr(r, 'description'),
+    icon: r.icon || 'Circle',
+    color: r.color || 'border-slate-500 bg-slate-50 text-slate-700',
+    primaryKey,
+    titleProperty: normStr(r, 'titleProperty') || primaryKey,
+    properties,
+    mapping: r.mapping && typeof r.mapping === 'object' ? r.mapping : { datasetId: '', propertyMappings: {} },
+    status,
+    interfaces: Array.isArray(r.interfaces) ? r.interfaces : undefined,
+    domainId: normStr(r, 'domainId') || undefined,
+  };
+}
+
+function normalizeLinkItem(r: any): LinkType | null {
+  if (!r || typeof r !== 'object') return null;
+  const id = normStr(r, 'id', 'code', 'name');
+  if (!id) return null;
+  // 后端 relationships 返 sourceEntityId/relationshipType；seed/UI 用 sourceObjectType/displays。
+  const sourceObjectType = normStr(r, 'sourceObjectType', 'sourceEntityId', 'sourceEntity', 'sourceId');
+  const targetObjectType = normStr(r, 'targetObjectType', 'targetEntityId', 'targetEntity', 'targetId');
+  // sourceEntityId 正常应指向关系里的实体 id；若后端只给到对象类型 id 也能进图（find 不中则端点为 undefined，不崩）。
+  if (!sourceObjectType && !targetObjectType && !normStr(r, 'relationshipType', 'type', 'kind')) return null;
+  const relationshipType = normStr(r, 'relationshipType', 'kind', 'type');
+  const displayName = normStr(r, 'displayName', 'name') || relationshipType || id;
+  const apiName = normStr(r, 'apiName') || relationshipType || id;
+  const CARDINALITIES = ['1:1', '1:N', 'N:1', 'M:N'];
+  const cardinality: LinkType['cardinality'] = CARDINALITIES.includes(r.cardinality) ? (r.cardinality as LinkType['cardinality']) : 'N:1';
+  const fk: ForeignKeyMapping = {
+    sourceKey: normStr(r, 'sourceKey', 'sourceKeyColumn'),
+    targetKey: normStr(r, 'targetKey', 'targetKeyColumn'),
+  };
+  const mapping: LinkType['mapping'] = { type: 'foreign_key', foreignKeyMapping: fk };
+  return { id, displayName, apiName, description: normStr(r, 'description'), sourceObjectType, targetObjectType, cardinality, mapping };
+}
+
+function normalizeActionItem(r: any): ActionType | null {
+  if (!r || typeof r !== 'object') return null;
+  const id = normStr(r, 'id', 'code', 'name');
+  if (!id) return null;
+  return {
+    id,
+    displayName: normStr(r, 'displayName', 'name', 'code') || id,
+    apiName: normStr(r, 'apiName', 'code') || id,
+    description: normStr(r, 'description'),
+    parameters: Array.isArray(r.parameters) ? r.parameters : [],
+    rules: Array.isArray(r.rules) ? r.rules : [],
+    validationRules: Array.isArray(r.validationRules) ? r.validationRules : [],
+    formLayout: r.formLayout && typeof r.formLayout === 'object' ? r.formLayout : undefined,
+  };
+}
+
+function normalizeDomainItem(r: any): OntologyDomain | null {
+  if (!r || typeof r !== 'object') return null;
+  const id = normStr(r, 'id', 'code', 'name');
+  if (!id) return null;
+  return {
+    id,
+    displayName: normStr(r, 'displayName', 'name', 'code') || id,
+    description: normStr(r, 'description'),
+    color: normStr(r, 'color') || 'slate',
+    code: r.code ? String(r.code) : undefined,
+    status: r.status ? String(r.status) : undefined,
+  };
+}
+
+// 对候选集逐项归一化：返回 { kept, dropped }。kept.length/total < 0.2 → 调用方回退 seed。
+function ingest<Item>(raw: any, norm: (r: any) => Item | null): { kept: Item[]; dropped: number } {
+  if (!Array.isArray(raw) || raw.length === 0) return { kept: [], dropped: 0 };
+  const kept: Item[] = [];
+  for (const r of raw) {
+    const n = norm(r);
+    if (n) kept.push(n);
+  }
+  return { kept, dropped: raw.length - kept.length };
+}
 
 interface BusinessWorkbenchLayoutProps {
   showToast?: (type: 'success' | 'info' | 'error', message: string) => void;
@@ -68,6 +174,7 @@ export default function BusinessWorkbenchLayout({
   const [functionTypes, setFunctionTypes] = useState<FunctionType[]>([]);
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<'api' | 'seed' | 'empty'>('seed');
 
   // --- Active Selections ---
   const [selectedCategory, setSelectedCategory] = useState<SelectedCategory>('overview');
@@ -100,63 +207,83 @@ export default function BusinessWorkbenchLayout({
         apiFetch('/v1/ecos/domains') as Promise<any>,
       ]);
 
-      // Use seed data as fallback, merge API data if available
-      let loadedObjects = mockObjectTypes;
-      let loadedLinks = mockLinkTypes;
-      let loadedActions = mockActionTypes;
-      let loadedDomains = mockDomains;
+      // W3-2：seed 属"回退种"非"初始态"，仅 dev 环境允许兜底；prod 后端不可用时呈空态而非航空演示数据。
+      const isDev = import.meta.env.DEV;
+      const emptyOntology = () => ({
+        objects: [] as ObjectType[],
+        links: [] as LinkType[],
+        actions: [] as ActionType[],
+        domains: [] as OntologyDomain[],
+        interfaces: [] as InterfaceType[],
+        sharedProperties: [] as SharedProperty[],
+        datasets: [] as Dataset[],
+        functionTypes: [] as FunctionType[],
+      });
+      const seedOrEmpty = <T,>(seed: T[]): T[] => (isDev ? seed : []);
+      const seedObjects = seedOrEmpty(mockObjectTypes);
+      const seedLinks = seedOrEmpty(mockLinkTypes);
+      const seedActions = seedOrEmpty(mockActionTypes);
+      const seedDomains = seedOrEmpty(mockDomains);
+
+      let loadedObjects = seedObjects;
+      let loadedLinks = seedLinks;
+      let loadedActions = seedActions;
+      let loadedDomains = seedDomains;
+      let adoptedAny = false;
 
       // 后端 /ecs/* 返回 ontology 摘要（id/name/code/version/status），
       // 与前端 ObjectType/LinkType/ActionType UI 模型不完全同形（缺 properties/apiName/icon 等）。
-      // 仅在 payload 字段真正符合 UI 模型时接管，否则保留 seed（P0-1 复测暴露：直接 cast 会让下游
-      // .properties.length / .displayName 等访问抛 TypeError 崩整页）。200 端点仍算成功。
-      if (objectsResp.status === 'fulfilled' && objectsResp.value?.data) {
-        const apiData = objectsResp.value.data;
-        if (Array.isArray(apiData) && apiData.length > 0 && Array.prototype.every.call(apiData, (r: any) => Array.isArray(r?.properties) && typeof r?.apiName === 'string')) {
-          loadedObjects = apiData as ObjectType[];
-        }
-      }
-      if (linksResp.status === 'fulfilled' && linksResp.value?.data) {
-        const apiData = linksResp.value.data;
-        // LinkType 全量形态需 sourcePropertyId/targetPropertyId + kind；/api/v1/ecos/relationships 返
-        // sourceEntityId/targetEntityId/relationshipType — 不同形，保留 seed 避免下游 .kind 崩。
-        if (Array.isArray(apiData) && apiData.length > 0 && Array.prototype.every.call(apiData, (r: any) => typeof r?.sourcePropertyId === 'string' && typeof r?.kind === 'string')) {
-          loadedLinks = apiData as LinkType[];
-        }
-      }
-      if (actionsResp.status === 'fulfilled' && actionsResp.value?.data) {
-        const apiData = actionsResp.value.data;
-        if (Array.isArray(apiData) && apiData.length > 0 && Array.prototype.every.call(apiData, (r: any) => Array.isArray(r?.parameters) && Array.isArray(r?.rules) && Array.isArray(r?.validationRules))) {
-          loadedActions = apiData as ActionType[];
-        }
-      }
-      if (domainsResp.status === 'fulfilled' && domainsResp.value?.data) {
-        const apiData = domainsResp.value.data;
-        // Domain 全量形态需 displayName + color(Tailwind 名) 供 getDomainColorClasses 使用；
-        // /api/v1/ecos/domains 只返 name/code — 直接 cast 会让 GraphPanel/DomainCardsGrid .split / getDomainColorClasses(undefined) 崩。
-        if (Array.isArray(apiData) && apiData.length > 0 && Array.prototype.every.call(apiData, (r: any) => typeof r?.displayName === 'string' && typeof r?.color === 'string')) {
-          loadedDomains = apiData as OntologyDomain[];
-        }
-      }
+      // W3-1：逐项归一化 + 兜底缺省下游必需字段，不再「整列 every-门控 → 任一不合规就全回退 seed」。
+      // 仅当保留率 < 20%（丢 80%）时该列才回退 seed-or-empty，避免直接 cast 让下游
+      // .properties.length / .displayName / getDomainColorClasses(undefined) 抛 TypeError 崩整页。200 端点仍算成功。
+      // 仅当该端点 fulfilled 且带非空 data 数组时才尝试接管，否则整列回退 seed-or-empty。
+      const dataOf = (res: PromiseSettledResult<any>): any[] =>
+        res.status === 'fulfilled' && Array.isArray(res.value?.data) ? res.value.data : [];
+      const adoptIfUsable = <T>(res: PromiseSettledResult<any>, norm: (r: any) => T | null, fallback: T[]): T[] => {
+        const raw = dataOf(res);
+        const { kept, dropped } = ingest(raw, norm);
+        if (raw.length > 0) console.info(`[BusinessWorkbench] ingestion: kept ${kept.length}/${raw.length} (dropped ${dropped})`);
+        const total = raw.length;
+        const adopted = total > 0 && kept.length / total >= 0.2;
+        if (adopted) adoptedAny = true;
+        return adopted ? kept : fallback;
+      };
+
+      loadedObjects = adoptIfUsable(objectsResp, normalizeObjectItem, seedObjects);
+      loadedLinks = adoptIfUsable(linksResp, normalizeLinkItem, seedLinks);
+      loadedActions = adoptIfUsable(actionsResp, normalizeActionItem, seedActions);
+      loadedDomains = adoptIfUsable(domainsResp, normalizeDomainItem, seedDomains);
 
       setObjectTypes(loadedObjects);
       setLinkTypes(loadedLinks);
       setActionTypes(loadedActions);
-      setInterfaces(mockInterfaces);
-      setSharedProperties(mockSharedProperties);
-      setDatasets(mockDatasets);
-      setFunctionTypes(mockFunctionTypes);
+      setInterfaces(seedOrEmpty(mockInterfaces));
+      setSharedProperties(seedOrEmpty(mockSharedProperties));
+      setDatasets(seedOrEmpty(mockDatasets));
+      setFunctionTypes(seedOrEmpty(mockFunctionTypes));
       setDomains(loadedDomains);
+      setDataSource(adoptedAny ? 'api' : (isDev ? 'seed' : 'empty'));
     } catch (err) {
-      console.error('Failed to load ontology data, using seed data:', err);
-      setObjectTypes(mockObjectTypes);
-      setLinkTypes(mockLinkTypes);
-      setActionTypes(mockActionTypes);
-      setInterfaces(mockInterfaces);
-      setSharedProperties(mockSharedProperties);
-      setDatasets(mockDatasets);
-      setFunctionTypes(mockFunctionTypes);
-      setDomains(mockDomains);
+      console.error('Failed to load ontology data:', err);
+      const empty = isDev ? {
+        objects: mockObjectTypes,
+        links: mockLinkTypes,
+        actions: mockActionTypes,
+        domains: mockDomains,
+        interfaces: mockInterfaces,
+        sharedProperties: mockSharedProperties,
+        datasets: mockDatasets,
+        functionTypes: mockFunctionTypes,
+      } : emptyOntology();
+      setObjectTypes(empty.objects);
+      setLinkTypes(empty.links);
+      setActionTypes(empty.actions);
+      setInterfaces(empty.interfaces);
+      setSharedProperties(empty.sharedProperties);
+      setDatasets(empty.datasets);
+      setFunctionTypes(empty.functionTypes);
+      setDomains(empty.domains);
+      setDataSource(isDev ? 'seed' : 'empty');
     }
   };
 
@@ -222,14 +349,14 @@ export default function BusinessWorkbenchLayout({
         displayName: t('ow.biz.newLink', { n: defaultNum }),
         apiName: `customLink${defaultNum}`,
         description: t('ow.biz.newLinkDescription'),
-        sourceObjectType: objectTypes[0].id,
-        targetObjectType: objectTypes[1].id,
+        sourceObjectType: objectTypes[0]?.id ?? '',
+        targetObjectType: objectTypes[1]?.id ?? '',
         cardinality: '1:N',
         mapping: {
           type: 'foreign_key',
           foreignKeyMapping: {
-            sourceKey: objectTypes[0].primaryKey,
-            targetKey: objectTypes[1].primaryKey
+            sourceKey: objectTypes[0]?.primaryKey ?? '',
+            targetKey: objectTypes[1]?.primaryKey ?? ''
           }
         }
       };
@@ -370,6 +497,19 @@ export default function BusinessWorkbenchLayout({
         </button>
       </div>
 
+      {viewMode === 'ontology' && dataSource !== 'api' && (
+        <div
+          className="flex-0 px-4 py-1.5 text-[11px] min-w-0"
+          style={{
+            background: dataSource === 'empty' ? styles.dangerBg : styles.warningBg,
+            color: dataSource === 'empty' ? styles.dangerText : styles.warningText,
+          }}
+          role="note"
+        >
+          <span className="break-words">{dataSource === 'empty' ? t('ow.biz.noOntology') : t('ow.biz.seedDemo')}</span>
+        </div>
+      )}
+
       {/* Content — 桌面 flex-row；移动端 flex-col（Sidebar 落顶部，内容落下方） */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {viewMode === 'explorer' ? (
@@ -394,9 +534,9 @@ export default function BusinessWorkbenchLayout({
               allObjectTypes={objectTypes}
               linkTypes={filteredLinks}
               actionTypes={filteredActions}
-              interfaces={interfaces.filter(i => i.displayName.includes(searchQuery))}
-              sharedProperties={sharedProperties.filter(sp => sp.displayName.includes(searchQuery))}
-              datasets={datasets.filter(ds => ds.name.includes(searchQuery))}
+              interfaces={interfaces.filter(i => (i.displayName ?? '').includes(searchQuery))}
+              sharedProperties={sharedProperties.filter(sp => (sp.displayName ?? '').includes(searchQuery))}
+              datasets={datasets.filter(ds => (ds.name ?? '').includes(searchQuery))}
               functionTypes={filteredFunctions}
               domains={domains}
               selectedDomainId={selectedDomainId}

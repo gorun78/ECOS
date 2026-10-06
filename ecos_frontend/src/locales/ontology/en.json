@@ -267,6 +267,8 @@
   "ow.biz.notFoundLink": "Link relationship not found",
   "ow.biz.notFoundAction": "Action type not found",
   "ow.biz.notFoundFunction": "Function not found",
+  "ow.biz.seedDemo": "Showing sample seed data (dev-only fallback), not real ontology.",
+  "ow.biz.noOntology": "No ontology loaded — configure the backend and retry.",
   "ow.biz.notFoundInterface": "Interface type not found",
   "ow.biz.notFoundSharedProperty": "Shared property not found",
   "ow.biz.notFoundDataset": "Dataset not found",

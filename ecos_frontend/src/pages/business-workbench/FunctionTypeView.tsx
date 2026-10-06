@@ -625,37 +625,24 @@ export class ${className} {
                             </button>
                           </div>
                         ) : (p.dataType === 'ObjectType' || p.dataType === 'ObjectTypeSet') ? (
-                          <select
-                            value={value}
-                            onChange={e => setVal(e.target.value)}
-                            className={`w-full px-2 py-1 text-[11px] border ${styles.inputBorder} rounded ${styles.inputBg} mt-1`}
-                          >
-                            <option value="">-- 选择模拟对象实体 --</option>
-                            {p.dataType === 'ObjectTypeSet' ? (
-                              <option value="mock_set_all_records">所有对象实体集 (ObjectSet 全量)</option>
-                            ) : null}
-                            {p.objectTypeId === 'flight' && (
-                              <>
-                                <option value="UA102">Flight: UA102 (ON_TIME)</option>
-                                <option value="DL440">Flight: DL440 (DELAYED)</option>
-                                <option value="AA880">Flight: AA880 (ON_TIME)</option>
-                              </>
-                            )}
-                            {p.objectTypeId === 'aircraft' && (
-                              <>
-                                <option value="N101UA">Aircraft: N101UA (Boeing 737-800)</option>
-                                <option value="N204DL">Aircraft: N204DL (Airbus A321neo)</option>
-                                <option value="N309AA">Aircraft: N309AA (MAINTENANCE)</option>
-                              </>
-                            )}
-                            {p.objectTypeId === 'pilot' && (
-                              <>
-                                <option value="P01">Pilot: P01 (张建国)</option>
-                                <option value="P02">Pilot: P02 (李明华)</option>
-                              </>
-                            )}
-                            <option value="custom_mock_1">自定义测试对象 1</option>
-                          </select>
+                          (() => {
+                            const ot = objectTypes.find(o => o.id === p.objectTypeId);
+                            const sampleLabel = ot ? `${ot.apiName || ot.displayName}` : (p.objectTypeId || 'ObjectType');
+                            return (
+                              <select
+                                value={value}
+                                onChange={e => setVal(e.target.value)}
+                                className={`w-full px-2 py-1 text-[11px] border ${styles.inputBorder} rounded ${styles.inputBg} mt-1`}
+                              >
+                                <option value="">-- 选择模拟对象实体 --</option>
+                                {p.dataType === 'ObjectTypeSet' ? (
+                                  <option value="mock_set_all_records">所有对象实体集 (ObjectSet 全量)</option>
+                                ) : null}
+                                <option value={p.objectTypeId || ''}>{sampleLabel}（模拟实体）</option>
+                                <option value="custom_mock_1">自定义测试对象 1</option>
+                              </select>
+                            );
+                          })()
                         ) : p.dataType === 'integer' || p.dataType === 'decimal' ? (
                           <input
                             type="number"

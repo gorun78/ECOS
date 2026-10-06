@@ -39,14 +39,24 @@ interface GraphEdge {
   relation?: string;
 }
 
-/** 颜色 5 类 — 实体/关系/文档/向量/候选（PRD F5） */
-const NODE_TYPE_COLORS: Record<string, string> = {
-  entity: 'blue',
-  edge: 'gray',
-  document: 'green',
-  vector: 'purple',
-  pending: 'red',
+/**
+ * 颜色 5 类 — 实体/关系/文档/向量/候选（PRD F5）。
+ * W3-4: 用 useTheme token base-name 映射，去掉硬编码 Tailwind 类（emerald/purple/rose/slate/blue-500）。
+ * 消费者形如 `styles[`${nodeColorClass(type)}Text`]` → 传 base name（不带 Bg/Text 后缀）。
+ * 语义对应：info=蓝(entity) · muted=edge · success=绿(document)
+ *           warning=purple(vector) · danger=红(pending)。
+ */
+type NodeColorToken = 'info' | 'muted' | 'success' | 'warning' | 'danger';
+const NODE_TYPE_COLORS: Record<string, NodeColorToken> = {
+  entity: 'info',
+  edge: 'muted',
+  document: 'success',
+  vector: 'warning',
+  pending: 'danger',
 };
+
+/** 图节点可见上限：万节点白屏护栏（PRD F5 · W3-5） */
+const MAX_VISIBLE_GRAPH_NODES = 500;
 
 export default function GraphPage() {
   const { styles } = useTheme();
@@ -69,6 +79,8 @@ export default function GraphPage() {
   // ── 画布 ──
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
+  // W3-5: 非致命提示（截断 / 加载失败），带 dismiss 的 inline banner，替代原 void msg 全静默
+  const [graphNotice, setGraphNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [nodeDetail, setNodeDetail] = useState<GraphNode | null>(null);
@@ -116,19 +128,26 @@ export default function GraphPage() {
       };
       const rawNodes = (data?.nodes || []) as GraphNode[];
       const rawEdges = (data?.edges || data?.links || []) as GraphEdge[];
-      // PRD F5 验收：无前端 filter 逻辑，纯 rawNodes / rawEdges 直渲染
-      setNodes(rawNodes);
+      // W3-5: 万节点白屏护栏 — 渲染封顶 MAX_VISIBLE_GRAPH_NODES，超出给可 dismiss 提示
+      const visibleNodes = rawNodes.length > MAX_VISIBLE_GRAPH_NODES
+        ? rawNodes.slice(0, MAX_VISIBLE_GRAPH_NODES)
+        : rawNodes;
+      setNodes(visibleNodes);
       setEdges(rawEdges);
       setPathNodes(new Set());
       setPathEdges(new Set());
+      setGraphNotice(rawNodes.length > MAX_VISIBLE_GRAPH_NODES
+        ? t('knowledge.graph.tooManyNodes', { shown: MAX_VISIBLE_GRAPH_NODES, total: rawNodes.length })
+        : null);
     } catch (e) {
+      // W3-5: 不再全静默 — console.warn + inline 提示（保留上次数据不清空）
       const msg = e instanceof Error ? e.message : String(e);
-      // 静默失败，保留上次数据
-      void msg;
+      console.warn('[GraphPage] fetchGraph failed:', msg);
+      setGraphNotice(t('knowledge.graph.loadFailed', { msg }));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { void loadGraph(); }, [loadGraph]);
 
@@ -273,15 +292,15 @@ export default function GraphPage() {
   }));
   const canvasLinks = edges.map((e) => ({ id: e.id, source: e.source, target: e.target }));
 
-  /** 5 类颜色派生（PRD F5） */
-  const nodeColorClass = useCallback((type: string): string => {
-    const color = NODE_TYPE_COLORS[type] || 'blue';
-    if (color === 'green') return 'bg-emerald-500';
-    if (color === 'purple') return 'bg-purple-500';
-    if (color === 'red') return 'bg-rose-500';
-    if (color === 'gray') return 'bg-slate-400';
-    return 'bg-blue-500';
-  }, []);
+  /** 5 类颜色派生（PRD F5）— 返回 base name，消费者拼接 `${base}Text`/`${base}Bg` 取 token */
+  const nodeColorClass = useCallback((type: string): string =>
+    NODE_TYPE_COLORS[type] || 'info', []);
+
+  // W3-4: 圆点背景走主题 bg token，去掉硬编码 rgb()。edge/gray 无中性 bg token，落 badgeBg。
+  const nodeDotClass = useCallback((base: string): string => {
+    const bg = base === 'muted' ? styles.badgeBg : styles[`${base}Bg`];
+    return bg || styles.badgeBg;
+  }, [styles]);
 
   const showDetailPanel = !!detailDisplayNode;
 
@@ -488,23 +507,23 @@ export default function GraphPage() {
             </span>
             <div className="space-y-0.5 text-[10px]">
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full" style={{ background: 'rgb(59,130,246)' }} />
+                <span className={`w-2 h-2 rounded-full ${nodeDotClass(NODE_TYPE_COLORS.entity)}`} />
                 {t('knowledge.graph.legend_entity')}
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full" style={{ background: 'rgb(148,163,184)' }} />
+                <span className={`w-2 h-2 rounded-full ${nodeDotClass(NODE_TYPE_COLORS.edge)}`} />
                 {t('knowledge.graph.legend_relation')}
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full" style={{ background: 'rgb(16,185,129)' }} />
+                <span className={`w-2 h-2 rounded-full ${nodeDotClass(NODE_TYPE_COLORS.document)}`} />
                 {t('knowledge.graph.legend_document')}
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full" style={{ background: 'rgb(168,85,247)' }} />
+                <span className={`w-2 h-2 rounded-full ${nodeDotClass(NODE_TYPE_COLORS.vector)}`} />
                 {t('knowledge.graph.legend_vector')}
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full" style={{ background: 'rgb(244,63,94)' }} />
+                <span className={`w-2 h-2 rounded-full ${nodeDotClass(NODE_TYPE_COLORS.pending)}`} />
                 {t('knowledge.graph.legend_pending')}
               </div>
             </div>
@@ -518,6 +537,17 @@ export default function GraphPage() {
                  style={{ background: styles.sidebarBg, borderColor: styles.cardBorder, color: styles.cardText, border: `1px solid ${styles.cardBorder}` }}>
               <Loader2 className="w-3 h-3 animate-spin" />
               {t('knowledge.graph.loadingGraph')}
+            </div>
+          )}
+          {graphNotice && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 max-w-[80%] px-3 py-1.5 rounded-md flex items-center gap-2 text-[11px] shadow-md"
+                 style={{ background: styles.warningBg, color: styles.warningText, border: `1px solid ${styles.cardBorder}` }}>
+              <Info className="w-3 h-3 shrink-0" />
+              <span className="break-words">{graphNotice}</span>
+              <button type="button" aria-label={t('common.close')} onClick={() => setGraphNotice(null)}
+                      className="shrink-0 p-0.5 rounded opacity-70 hover:opacity-100 focus:outline-hidden">
+                <X className="w-3 h-3" />
+              </button>
             </div>
           )}
           {nodes.length === 0 && !loading ? (
@@ -547,11 +577,11 @@ export default function GraphPage() {
           <div className="absolute bottom-2 left-3 right-3 z-20 flex items-center gap-3 text-[10px] font-mono"
                style={{ color: styles.cardTextMuted }}>
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full" style={{ background: 'rgb(59,130,246)' }} />
+              <span className={`w-2 h-2 rounded-full ${nodeDotClass(NODE_TYPE_COLORS.entity)}`} />
               {t('knowledge.graph.kpi_nodes', { n: nodes.length })}
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full" style={{ background: 'rgb(148,163,184)' }} />
+              <span className={`w-2 h-2 rounded-full ${nodeDotClass(NODE_TYPE_COLORS.edge)}`} />
               {t('knowledge.graph.kpi_edges', { m: edges.length })}
             </span>
             <span className="ml-auto">{t('knowledge.graph.current_view', { k: nodes.length })}</span>
@@ -581,8 +611,7 @@ export default function GraphPage() {
               {/* 节点名 + 类型 + 颜色 chip */}
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ background: styles[`${nodeColorClass(mapCanvasNodeToPrimitiveType(detailDisplayNode.type))}Text`] || styles.accentText }} />
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${nodeDotClass(nodeColorClass(mapCanvasNodeToPrimitiveType(detailDisplayNode.type)))}`} />
                   <span className="font-bold truncate" style={{ color: styles.cardText }}>{detailDisplayNode.label}</span>
                 </div>
                 <div className="text-[10px] font-mono mt-0.5" style={{ color: styles.muted }}>

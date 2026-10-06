@@ -1118,6 +1118,8 @@
   "knowledge.graph.kpi_nodes": "{n} entities",
   "knowledge.graph.kpi_edges": "{m} relations",
   "knowledge.graph.current_view": "Current view: {k} nodes",
+  "knowledge.graph.tooManyNodes": "Too many nodes — showing first {shown} of {total}; narrow with filters",
+  "knowledge.graph.loadFailed": "Failed to load graph: {msg} (keeping last data, retry any time)",
   "knowledge.graph.legend_entity": "Entity",
   "knowledge.graph.legend_relation": "Relation",
   "knowledge.graph.legend_document": "Document",
