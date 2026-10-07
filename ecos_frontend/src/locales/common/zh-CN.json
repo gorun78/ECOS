@@ -551,6 +551,8 @@
   "agentMesh.placeholder.title": "Mission 标题，如：供应商准入合规审查",
   "agentMesh.placeholder.desc": "Mission 描述（可选）",
   "agentMesh.mode": "模式:",
+  "agentMesh.modeSupervisor": "Supervisor",
+  "agentMesh.modePipeline": "Pipeline",
   "agentMesh.supervisorHint": "Supervisor 模式：Coordinator 自动拆解任务并分配给 Specialist Agent 执行",
   "agentMesh.selectAgent": "选择 Agent",
   "agentMesh.subtaskInstr": "子任务指令",

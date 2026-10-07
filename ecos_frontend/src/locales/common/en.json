@@ -551,6 +551,8 @@
   "agentMesh.placeholder.title": "Mission title, e.g. supplier admission compliance review",
   "agentMesh.placeholder.desc": "Mission description (optional)",
   "agentMesh.mode": "Mode:",
+  "agentMesh.modeSupervisor": "Supervisor",
+  "agentMesh.modePipeline": "Pipeline",
   "agentMesh.supervisorHint": "Supervisor mode: the Coordinator auto-decomposes tasks and assigns them to Specialist Agents",
   "agentMesh.selectAgent": "Select Agent",
   "agentMesh.subtaskInstr": "Sub-task instruction",

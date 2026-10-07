@@ -288,13 +288,13 @@ export default function AgentMesh() {
                     newMode === "SUPERVISOR"
                       ? "bg-teal-100 text-teal-700"
                       : `${styles.badgeBg} ${styles.cardTextMuted}`
-                  }`}>SUPERVISOR</button>
+                  }`}>{t("agentMesh.modeSupervisor")}</button>
                 <button onClick={() => setNewMode("PIPELINE")}
                   className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
                     newMode === "PIPELINE"
                       ? "bg-indigo-100 text-indigo-700"
                       : `${styles.badgeBg} ${styles.cardTextMuted}`
-                  }`}>PIPELINE</button>
+                  }`}>{t("agentMesh.modePipeline")}</button>
               </div>
 
               {/* SUPERVISOR mode hint */}
