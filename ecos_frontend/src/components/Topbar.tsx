@@ -87,9 +87,9 @@ export default function Topbar({
 
   // Settings values loading from localStorage (cache) or default
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [email, setEmail] = useState(() => localStorage.getItem("ecos_user_email") || "guorongxiao@gmail.com");
+  const [email, setEmail] = useState(() => localStorage.getItem("ecos_user_email") || "");
   const [clearance, setClearance] = useState(() => localStorage.getItem("ecos_user_clearance") || "");
-  const [workstation, setWorkstation] = useState(() => localStorage.getItem("ecos_user_workstation") || "WS-COSMOS-09");
+  const [workstation, setWorkstation] = useState(() => localStorage.getItem("ecos_user_workstation") || "");
   const [auditMode, setAuditMode] = useState(() => localStorage.getItem("ecos_user_audit") || "full");
   const [sandbox, setSandbox] = useState(() => {
     const val = localStorage.getItem("ecos_user_sandbox");
@@ -166,9 +166,9 @@ export default function Topbar({
     localStorage.removeItem("ecos_user_audit");
     localStorage.removeItem("ecos_user_sandbox");
 
-    setEmail("guorongxiao@gmail.com");
+    setEmail("");
     setClearance("");
-    setWorkstation("WS-COSMOS-09");
+    setWorkstation("");
     setAuditMode("full");
     setSandbox(true);
 
@@ -178,7 +178,7 @@ export default function Topbar({
       try {
         await updateUserSecurityProfile(userId, {
           clearanceLevel: 0,
-          linkedWorkstation: "WS-COSMOS-09",
+          linkedWorkstation: "",
           auditMode: "full",
           sandboxMandatory: true,
         });
