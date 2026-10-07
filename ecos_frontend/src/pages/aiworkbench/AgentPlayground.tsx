@@ -358,8 +358,8 @@ export default function AgentPlayground({ agents: agentsFromProps, models: model
     const agentName = activeAgent?.name || 'agent';
     const lines: string[] = [];
     lines.push(`# Agent Playground — ${agentName}`);
-    lines.push(`> 导出时间: ${new Date().toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US')}`);
-    lines.push(`> 模型: ${selectedModel || '—'} · 温度: ${temperature}`);
+    lines.push(`> ${t('aiworkbench.playground.exportExportedAt')} ${new Date().toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US')}`);
+    lines.push(`> ${t('aiworkbench.playground.exportModelLabel')} ${selectedModel || '—'} · ${t('aiworkbench.playground.exportTemperatureLabel')} ${temperature}`);
     lines.push('');
     for (const m of messages) {
       lines.push(`## ${m.sender === 'user' ? t('aiworkbench.playground.exportUserLabel') : (activeAgent?.name || 'AI')} · ${new Date(m.timestamp).toLocaleTimeString(locale === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}`);

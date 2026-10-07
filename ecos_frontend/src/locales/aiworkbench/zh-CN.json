@@ -558,5 +558,8 @@
   "cos.kpi.safety.badge": "正常运行",
   "cos.sandbox.runPrompt": "加载前述可变变量配置至模拟引擎：",
   "aiworkbench.playground.bubbleUser": "我",
-  "aiworkbench.playground.exportUserLabel": "用户"
+  "aiworkbench.playground.exportUserLabel": "用户",
+  "aiworkbench.playground.exportExportedAt": "导出时间:",
+  "aiworkbench.playground.exportModelLabel": "模型:",
+  "aiworkbench.playground.exportTemperatureLabel": "温度:"
 }

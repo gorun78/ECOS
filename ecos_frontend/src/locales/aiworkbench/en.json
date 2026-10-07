@@ -558,5 +558,8 @@
   "cos.kpi.safety.badge": "On Track",
   "cos.sandbox.runPrompt": "Press play to invoke forecasting model:",
   "aiworkbench.playground.bubbleUser": "You",
-  "aiworkbench.playground.exportUserLabel": "**You**"
+  "aiworkbench.playground.exportUserLabel": "**You**",
+  "aiworkbench.playground.exportExportedAt": "Exported at:",
+  "aiworkbench.playground.exportModelLabel": "Model:",
+  "aiworkbench.playground.exportTemperatureLabel": "Temperature:"
 }
