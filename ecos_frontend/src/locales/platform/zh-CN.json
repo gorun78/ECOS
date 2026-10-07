@@ -451,5 +451,16 @@
   "platform.telemetry.duration": "耗时",
   "platform.telemetry.loadingSpans": "加载 Span 详情…",
   "platform.telemetry.noSpanData": "无 Span 数据",
-  "platform.telemetry.loadFailed": "加载链路数据失败"
+  "platform.telemetry.loadFailed": "加载链路数据失败",
+  "platform.alert.triggerAll": "全部触发",
+  "platform.alert.newRule": "新建规则",
+  "platform.alert.newAlertRule": "新建告警规则",
+  "platform.alert.liveAlerts": "实时告警",
+  "platform.alert.rules": "告警规则",
+  "platform.alert.fire": "触发",
+  "platform.alert.history": "告警历史",
+  "platform.alert.ack": "确认",
+  "platform.alert.noHistory": "暂无历史",
+  "platform.alert.loadFail": "加载失败",
+  "platform.alert.triggerFail": "触发失败"
 }

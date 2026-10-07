@@ -451,5 +451,16 @@
   "platform.telemetry.duration": "Duration",
   "platform.telemetry.loadingSpans": "Loading spans…",
   "platform.telemetry.noSpanData": "No span data",
-  "platform.telemetry.loadFailed": "Failed to load telemetry data"
+  "platform.telemetry.loadFailed": "Failed to load telemetry data",
+  "platform.alert.triggerAll": "Trigger All",
+  "platform.alert.newRule": "New Rule",
+  "platform.alert.newAlertRule": "New Rule",
+  "platform.alert.liveAlerts": "Live Alerts",
+  "platform.alert.rules": "Rules",
+  "platform.alert.fire": "Fire",
+  "platform.alert.history": "History",
+  "platform.alert.ack": "Ack",
+  "platform.alert.noHistory": "No history",
+  "platform.alert.loadFail": "Failed",
+  "platform.alert.triggerFail": "Trigger failed"
 }

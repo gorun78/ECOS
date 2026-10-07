@@ -38,7 +38,7 @@ interface AlertRecord {
 }
 
 export default function AlertPanel() {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   const [rules, setRules] = useState<AlertRule[]>([]);
@@ -62,7 +62,7 @@ export default function AlertPanel() {
       setRules(rData?.data || []);
       setHistory(hData?.data || []);
     } catch (e: any) {
-      setError(e?.message || "Failed");
+      setError(e?.message || t("platform.alert.loadFail"));
     } finally {
       setLoading(false);
     }
@@ -126,7 +126,7 @@ export default function AlertPanel() {
       await alertTest(body);
       fetchAll();
     } catch (e: any) {
-      setError(e?.message || "Trigger failed");
+      setError(e?.message || t("platform.alert.triggerFail"));
     }
   };
 
@@ -180,12 +180,12 @@ export default function AlertPanel() {
           <button onClick={() => triggerAlert()}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium transition-all bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:bg-amber-500/30`}>
             <Zap className="w-3.5 h-3.5" />
-            {locale === "zh" ? "全部触发" : "Trigger All"}
+            {t("platform.alert.triggerAll")}
           </button>
           <button onClick={() => setShowNewRule(true)}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium border transition-all ${styles.cardBorder} ${styles.cardBg}`}>
             <Plus className="w-3.5 h-3.5" />
-            {locale === "zh" ? "新建规则" : "New Rule"}
+            {t("platform.alert.newRule")}
           </button>
         </div>
         <div className="flex-1" />
@@ -203,7 +203,7 @@ export default function AlertPanel() {
       {showNewRule && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className={`w-full max-w-sm mx-4 rounded-lg p-5 ${styles.cardBg} border ${styles.cardBorder}`}>
-            <h3 className="text-sm font-semibold mb-3">{locale === "zh" ? "新建告警规则" : "New Rule"}</h3>
+            <h3 className="text-sm font-semibold mb-3">{t("platform.alert.newAlertRule")}</h3>
             <input className={`w-full px-3 py-1.5 rounded border text-xs mb-2 ${styles.inputBg} ${styles.inputBorder}`}
               placeholder="Name" value={newRule.name} onChange={e => setNewRule({ ...newRule, name: e.target.value })} />
             <div className="flex gap-2 mb-2">
@@ -228,11 +228,11 @@ export default function AlertPanel() {
             <div className="flex gap-2">
               <button onClick={createRule}
                 className={`flex-1 px-4 py-1.5 rounded text-xs font-medium ${styles.accentBg} ${styles.accentHover} text-white`}>
-                {locale === "zh" ? "保存" : "Save"}
+                {t("common.save")}
               </button>
               <button onClick={() => setShowNewRule(false)}
                 className={`flex-1 px-4 py-1.5 rounded border text-xs ${styles.cardBorder}`}>
-                {locale === "zh" ? "取消" : "Cancel"}
+                {t("common.cancel")}
               </button>
             </div>
           </div>
@@ -244,7 +244,7 @@ export default function AlertPanel() {
         <div className="mb-3 shrink-0">
           <h4 className="text-xs font-semibold mb-1.5 opacity-70 flex items-center gap-1">
             <Zap className="w-3 h-3 text-amber-400" />
-            {locale === "zh" ? "实时告警" : "Live Alerts"} ({liveAlerts.length})
+            {t("platform.alert.liveAlerts")} ({liveAlerts.length})
           </h4>
           <div className="space-y-1">
             {liveAlerts.slice(0, 3).map((a, i) => (
@@ -264,7 +264,7 @@ export default function AlertPanel() {
         <div className={`border rounded-lg p-3 ${styles.cardBorder} ${styles.cardBg}`}>
           <h4 className="text-xs font-semibold mb-2 opacity-70 flex items-center gap-1">
             <Bell className="w-3.5 h-3.5" />
-            {locale === "zh" ? "告警规则" : "Rules"} ({rules.length})
+            {t("platform.alert.rules")} ({rules.length})
           </h4>
           <div className="space-y-1.5">
             {rules.map(r => (
@@ -276,7 +276,7 @@ export default function AlertPanel() {
                 </div>
                 <button onClick={() => triggerAlert(r.id)}
                   className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20">
-                  {locale === "zh" ? "触发" : "Fire"}
+                  {t("platform.alert.fire")}
                 </button>
                 <button onClick={() => deleteRule(r.id)}
                   className="p-0.5 rounded hover:bg-red-500/10 text-red-400 opacity-50 hover:opacity-100">
@@ -291,7 +291,7 @@ export default function AlertPanel() {
         <div className={`border rounded-lg p-3 ${styles.cardBorder} ${styles.cardBg}`}>
           <h4 className="text-xs font-semibold mb-2 opacity-70 flex items-center gap-1">
             <History className="w-3.5 h-3.5" />
-            {locale === "zh" ? "告警历史" : "History"} ({history.length})
+            {t("platform.alert.history")} ({history.length})
           </h4>
           <div className="space-y-1">
             {history.map(h => (
@@ -304,7 +304,7 @@ export default function AlertPanel() {
                 {!h.acknowledged ? (
                   <button onClick={() => ackAlert(h.id)}
                     className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20">
-                    {locale === "zh" ? "确认" : "Ack"}
+                    {t("platform.alert.ack")}
                   </button>
                 ) : (
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -312,7 +312,7 @@ export default function AlertPanel() {
               </div>
             ))}
             {history.length === 0 && (
-              <p className="text-xs opacity-40 text-center py-4">{locale === "zh" ? "暂无历史" : "No history"}</p>
+              <p className="text-xs opacity-40 text-center py-4">{t("platform.alert.noHistory")}</p>
             )}
           </div>
         </div>
