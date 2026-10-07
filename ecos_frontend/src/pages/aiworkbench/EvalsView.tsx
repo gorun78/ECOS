@@ -72,14 +72,14 @@ export default function EvalsView({ agents, models, showToast }: EvalsViewProps)
         });
         setErrors(e);
       } catch (err: any) {
-        if (!cancelled) showToast?.('error', err?.message || 'Evals load failed');
+        if (!cancelled) showToast?.('error', err?.message || t('aiworkbench.evals.loadFail'));
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
     load();
     return () => { cancelled = true; };
-  }, [selectedAgent, agents, models]);
+  }, [selectedAgent, agents, models, t]);
 
   const trend = metrics?.trend24h || [];
   const maxTrend = Math.max(...trend, 1);
@@ -95,7 +95,7 @@ export default function EvalsView({ agents, models, showToast }: EvalsViewProps)
           className={`px-2 py-1.5 rounded-md border text-xs ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
           disabled={agents.length === 0}
         >
-          {agents.length === 0 && <option value="">— 未加载到 Agent —</option>}
+          {agents.length === 0 && <option value="">{t('aiworkbench.evals.noAgent')}</option>}
           {agents.map((a) => (
             <option key={a.id} value={a.id}>{a.name}</option>
           ))}
@@ -109,17 +109,17 @@ export default function EvalsView({ agents, models, showToast }: EvalsViewProps)
 
       {loading && (
         <div className="flex items-center gap-2 mb-4 text-xs opacity-60">
-          <Loader2 size={14} className="animate-spin" /> 加载中...
+          <Loader2 size={14} className="animate-spin" /> {t('aiworkbench.evals.loading')}
         </div>
       )}
 
       {/* KPI 卡片 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {[
-          { label: '24h 调用', value: metrics?.totalCalls?.toLocaleString?.() ?? '—', icon: BarChart3 },
-          { label: '成功率', value: metrics ? `${(metrics.successRate * 100).toFixed(1)}%` : '—', icon: TrendingUp },
-          { label: 'P50 延迟', value: metrics ? `${metrics.avgLatencyMs.toFixed(0)}ms` : '—', icon: BarChart3 },
-          { label: 'P99 延迟', value: metrics ? `${metrics.p99LatencyMs.toFixed(0)}ms` : '—', icon: AlertTriangle },
+          { label: t('aiworkbench.evals.kpi24h'), value: metrics?.totalCalls?.toLocaleString?.() ?? '—', icon: BarChart3 },
+          { label: t('aiworkbench.evals.kpiSuccess'), value: metrics ? `${(metrics.successRate * 100).toFixed(1)}%` : '—', icon: TrendingUp },
+          { label: t('aiworkbench.evals.kpiP50'), value: metrics ? `${metrics.avgLatencyMs.toFixed(0)}ms` : '—', icon: BarChart3 },
+          { label: t('aiworkbench.evals.kpiP99'), value: metrics ? `${metrics.p99LatencyMs.toFixed(0)}ms` : '—', icon: AlertTriangle },
         ].map((k) => {
           const Icon = k.icon;
           return (
@@ -136,7 +136,7 @@ export default function EvalsView({ agents, models, showToast }: EvalsViewProps)
 
       {/* 24h 趋势条形 */}
       <div className={`mb-4 p-3 rounded-lg border ${styles.cardBorder} ${styles.cardBg}`}>
-        <h3 className={`text-xs font-semibold mb-2 ${styles.cardText}`}>24h 调用趋势</h3>
+        <h3 className={`text-xs font-semibold mb-2 ${styles.cardText}`}>{t('aiworkbench.evals.trend24h')}</h3>
         {trend.length > 0 ? (
           <div className="flex items-end gap-0.5 h-20">
             {trend.map((v, i) => (
@@ -150,17 +150,17 @@ export default function EvalsView({ agents, models, showToast }: EvalsViewProps)
           </div>
         ) : (
           <div className={`text-xs font-mono px-2 py-3 rounded opacity-50 ${styles.cardTextMuted}`}>
-            暂无趋势数据
+            {t('aiworkbench.evals.noTrend')}
           </div>
         )}
       </div>
 
       {/* 错误列表 */}
       <div className={`p-3 rounded-lg border ${styles.cardBorder} ${styles.cardBg}`}>
-        <h3 className={`text-xs font-semibold mb-2 ${styles.cardText}`}>最近错误 ({errors.length})</h3>
+        <h3 className={`text-xs font-semibold mb-2 ${styles.cardText}`}>{t('aiworkbench.evals.recentErrors', { count: errors.length })}</h3>
         {errors.length === 0 ? (
           <div className={`text-xs font-mono px-2 py-3 opacity-50 ${styles.cardTextMuted}`}>
-            暂无错误
+            {t('aiworkbench.evals.noErrors')}
           </div>
         ) : (
           <div className="max-h-64 overflow-y-auto space-y-1.5">
@@ -180,7 +180,7 @@ export default function EvalsView({ agents, models, showToast }: EvalsViewProps)
 
       {/* Evals 雷达（复用 DashboardView 的 RadarChart，简化为占位说明）*/}
       <div className={`mt-4 p-3 rounded-lg border dashed ${styles.cardBorder} ${styles.cardBg} text-xs`}>
-        <div className="opacity-70">Evals 5 维评估雷达图见 Overview 仪表盘 Tab (DashboardView → Evaluation 面板)</div>
+        <div className="opacity-70">{t('aiworkbench.evals.radarNote')}</div>
       </div>
     </div>
   );

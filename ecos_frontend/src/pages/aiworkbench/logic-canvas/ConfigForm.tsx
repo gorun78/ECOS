@@ -44,21 +44,21 @@ export default function ConfigForm({
       return (
         <div className="p-3 space-y-3">
           <div>
-            <label className={labelClass}>Model</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.llm.model')}</label>
             <input className={inputClass} value={c.model} onChange={e => handleChange({ ...c, model: e.target.value })} />
           </div>
           <div>
-            <label className={labelClass}>Temperature ({c.temperature})</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.llm.temperature')} ({c.temperature})</label>
             <input className={inputClass} type="range" min="0" max="2" step="0.1" value={c.temperature}
               onChange={e => handleChange({ ...c, temperature: parseFloat(e.target.value) })} />
           </div>
           <div>
-            <label className={labelClass}>Max Tokens</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.llm.maxTokens')}</label>
             <input className={inputClass} type="number" value={c.maxTokens}
               onChange={e => handleChange({ ...c, maxTokens: parseInt(e.target.value) || 4096 })} />
           </div>
           <div>
-            <label className={labelClass}>System Prompt</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.llm.systemPrompt')}</label>
             <textarea className={textareaClass} rows={4} value={c.systemPrompt}
               onChange={e => handleChange({ ...c, systemPrompt: e.target.value })} />
           </div>
@@ -86,7 +86,7 @@ export default function ConfigForm({
       return (
         <div className="p-3 space-y-3">
           <div>
-            <label className={labelClass}>Object Type</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.ontology.objectType')}</label>
             <input className={inputClass} value={c.objectType} onChange={e => handleChange({ ...c, objectType: e.target.value })} />
           </div>
           <div>
@@ -100,7 +100,7 @@ export default function ConfigForm({
             </select>
           </div>
           <div>
-            <label className={labelClass}>Filter</label>
+            <label className={labelClass}>{t('aiworkbench.logic.config.ontology.filter')}</label>
             <input className={inputClass} value={c.filter} onChange={e => handleChange({ ...c, filter: e.target.value })} />
           </div>
         </div>
