@@ -1755,5 +1755,11 @@
   "dw.datasource.wz.cancel": "取消",
   "dw.datasource.wz.next": "下一步",
   "dw.datasource.wz.finish": "完成",
-  "dw.datasource.wz.registerImport": "注册并导入"
+  "dw.datasource.wz.registerImport": "注册并导入",
+  "dw.catalog.preview": "预览",
+  "dw.catalog.empty": "无预览数据",
+  "dw.catalog.page": "第",
+  "dw.catalog.menuPreview": "预览数据",
+  "dw.catalog.menuLineage": "查看血缘",
+  "dw.catalog.menuDq": "配置DQ规则"
 }

@@ -24,7 +24,7 @@ interface CatalogContextMenuProps {
 /* ── 预览弹窗 ── */
 function PreviewModal({ resourceId, resourceName, onClose }: { resourceId: string; resourceName: string; onClose: () => void }) {
   const { styles } = useTheme();
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -47,7 +47,7 @@ function PreviewModal({ resourceId, resourceName, onClose }: { resourceId: strin
         <div className={`flex items-center justify-between px-4 py-3 border-b ${styles.cardBorder}`}>
           <h3 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2`}>
             <Eye className={`w-4 h-4 ${styles.infoText}`} />
-            {locale === "zh" ? "预览" : "Preview"}: {resourceName}
+            {t("dw.catalog.preview")}: {resourceName}
           </h3>
           <button onClick={onClose} className="opacity-50 hover:opacity-100 transition"><X className="w-4 h-4" /></button>
         </div>
@@ -55,7 +55,7 @@ function PreviewModal({ resourceId, resourceName, onClose }: { resourceId: strin
           {loading ? (
             <div className="py-16 text-center"><Loader2 className="w-6 h-6 mx-auto animate-spin opacity-40" /></div>
           ) : columns.length === 0 ? (
-            <p className={`text-xs text-center py-16 ${styles.muted}`}>{locale === "zh" ? "无预览数据" : "No preview data"}</p>
+            <p className={`text-xs text-center py-16 ${styles.muted}`}>{t("dw.catalog.empty")}</p>
           ) : (
             <table className="w-full text-xs border-collapse">
               <thead>
@@ -84,7 +84,7 @@ function PreviewModal({ resourceId, resourceName, onClose }: { resourceId: strin
         {totalPages > 1 && (
           <div className={`flex items-center justify-between px-4 py-2 border-t ${styles.cardBorder} text-xs`}>
             <span className={styles.muted}>
-              {rows.length} {locale === "zh" ? "行" : "rows"} · {locale === "zh" ? "第" : "Page"} {page + 1}/{totalPages}
+              {rows.length} {t("dw.rowsUnit")} · {t("dw.catalog.page")} {page + 1}/{totalPages}
             </span>
             <div className="flex items-center gap-1">
               <button disabled={page === 0} onClick={() => setPage(p => Math.max(0, p - 1))} className="p-1 rounded opacity-60 hover:opacity-100 disabled:opacity-20 transition">
@@ -105,7 +105,7 @@ function PreviewModal({ resourceId, resourceName, onClose }: { resourceId: strin
 export default function CatalogContextMenu({ node, x, y, onClose }: CatalogContextMenuProps) {
   const navigate = useNavigate();
   const { styles } = useTheme();
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const menuRef = useRef<HTMLDivElement>(null);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -125,9 +125,9 @@ export default function CatalogContextMenu({ node, x, y, onClose }: CatalogConte
   };
 
   const items = [
-    { icon: Eye, label: locale === "zh" ? "预览数据" : "Preview Data", action: () => setShowPreview(true) },
-    { icon: GitBranch, label: locale === "zh" ? "查看血缘" : "View Lineage", action: () => openLineage(node.name) },
-    { icon: Shield, label: locale === "zh" ? "配置DQ规则" : "Configure DQ Rules", action: () => navigate(`/dq_dashboard?table=${encodeURIComponent(node.name)}`) },
+    { icon: Eye, label: t("dw.catalog.menuPreview"), action: () => setShowPreview(true) },
+    { icon: GitBranch, label: t("dw.catalog.menuLineage"), action: () => openLineage(node.name) },
+    { icon: Shield, label: t("dw.catalog.menuDq"), action: () => navigate(`/dq_dashboard?table=${encodeURIComponent(node.name)}`) },
   ];
 
   return (

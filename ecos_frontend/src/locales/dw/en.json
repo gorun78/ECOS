@@ -1750,5 +1750,11 @@
   "dw.datasource.wz.cancel": "Cancel",
   "dw.datasource.wz.next": "Next",
   "dw.datasource.wz.finish": "Finish",
-  "dw.datasource.wz.registerImport": "Register & Import"
+  "dw.datasource.wz.registerImport": "Register & Import",
+  "dw.catalog.preview": "Preview",
+  "dw.catalog.empty": "No preview data",
+  "dw.catalog.page": "Page",
+  "dw.catalog.menuPreview": "Preview Data",
+  "dw.catalog.menuLineage": "View Lineage",
+  "dw.catalog.menuDq": "Configure DQ Rules"
 }
