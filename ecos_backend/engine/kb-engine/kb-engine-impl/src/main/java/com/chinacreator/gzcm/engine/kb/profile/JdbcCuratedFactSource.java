@@ -1,7 +1,9 @@
 package com.chinacreator.gzcm.engine.kb.profile;
 
+import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +24,7 @@ import java.util.List;
  * @author ECOS KB Team
  */
 @Component
+@Primary
 public class JdbcCuratedFactSource implements CuratedFactSource {
 
     private static final Logger log = LoggerFactory.getLogger(JdbcCuratedFactSource.class);
@@ -34,6 +37,9 @@ public class JdbcCuratedFactSource implements CuratedFactSource {
 
     @Override
     public List<CuratedFactRow> fetch(String metricCode, String windowFrom, String windowTo, String sourceQueryRef) {
+        // 多租户消费（B7d）：物理 fact 表（V167）无 tenant_id 列， CURATED 层跨租户共享；
+        // 此处读取 TenantContextHolder 用于审计/追溯落画像表，不参与 SQL 过滤。
+        String tenantId = TenantContextHolder.getTenantId();
         // 只读 CURATED（dq_status='PUBLISHED'）；禁读 RAW。
         // 过滤语义：指标列名按 metric_code 落位（约定 fact 行有 metric_value + 四轴维度列）。
         String sql = "SELECT metric_value AS value, project_id AS project, project_type AS projectType, "
@@ -55,10 +61,12 @@ public class JdbcCuratedFactSource implements CuratedFactSource {
                 String stage = rs.getString(5);
                 return new CuratedFactRow(v, project, ptype, dept, stage);
             }, m, wf, wt);
-            log.debug("JdbcCuratedFactSource.fetch: ref={} rows={}", sourceQueryRef, rows.size());
+            log.debug("JdbcCuratedFactSource.fetch: tenant={} ref={} rows={}",
+                    tenantId == null ? "-" : tenantId, sourceQueryRef, rows.size());
             return rows;
         } catch (Exception e) {
-            log.error("JdbcCuratedFactSource.fetch 失败: ref={} err={}", sourceQueryRef, e.getMessage(), e);
+            log.error("JdbcCuratedFactSource.fetch 失败: tenant={} ref={} err={}",
+                    tenantId == null ? "-" : tenantId, sourceQueryRef, e.getMessage(), e);
             throw e;
         }
     }

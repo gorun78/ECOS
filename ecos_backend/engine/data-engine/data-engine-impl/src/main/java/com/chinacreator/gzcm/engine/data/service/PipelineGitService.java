@@ -11,7 +11,7 @@ import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
 import com.chinacreator.gzcm.runtime.access.git.GitService.GitException;
 import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -50,14 +50,14 @@ public class PipelineGitService {
 
     private final GitService gitService;
     private final JdbcTemplate jdbc;
-    private final SysConfigService sysConfigService;
+    private final ISysConfigService sysConfigService;
     private final GitRepositoryService gitRepositoryService;
     private final GitRepoRootResolver repoRootResolver;
     private final ObjectProvider<SecurityCryptoEgress> cryptoEgressProvider;
 
     public PipelineGitService(GitService gitService,
                               JdbcTemplate jdbc,
-                              SysConfigService sysConfigService,
+                              ISysConfigService sysConfigService,
                               GitRepositoryService gitRepositoryService,
                               GitRepoRootResolver repoRootResolver,
                               ObjectProvider<SecurityCryptoEgress> cryptoEgressProvider) {

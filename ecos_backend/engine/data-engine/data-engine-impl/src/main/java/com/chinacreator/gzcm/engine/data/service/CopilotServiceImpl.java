@@ -5,7 +5,7 @@ import com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,7 +42,7 @@ public class CopilotServiceImpl implements CopilotService {
 
     /** sysman 配置门面 (config_group 单表分组)；可选注入，缺 bean 时走代码默认值 */
     @Autowired(required = false)
-    private SysConfigService sysConfigService;
+    private ISysConfigService sysConfigService;
 
     public CopilotServiceImpl(JdbcTemplate jdbc) {
         this.jdbc = jdbc;

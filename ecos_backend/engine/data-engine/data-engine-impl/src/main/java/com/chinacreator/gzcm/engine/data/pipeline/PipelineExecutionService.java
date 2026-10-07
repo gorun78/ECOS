@@ -24,7 +24,7 @@ import com.chinacreator.gzcm.runtime.access.storage.MinioStorageService;
 import com.chinacreator.gzcm.runtime.core.alert.IAlertService;
 import com.chinacreator.gzcm.runtime.core.logging.ILoggingService;
 import com.chinacreator.gzcm.runtime.core.task.callback.ITaskStatusCallback;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -80,7 +80,7 @@ public class PipelineExecutionService {
 
     /** 系统配置（读取 dw.lake.partition_by / dw.lake.storage_format）；可选注入，无 bean 时走默认值 */
     @Autowired(required = false)
-    private SysConfigService sysConfigService;
+    private ISysConfigService sysConfigService;
 
     /** 文档解析公共能力（runtime-access，B6-2 上移）；可选注入，未装配时解析节点显式拒绝 */
     @Autowired(required = false)

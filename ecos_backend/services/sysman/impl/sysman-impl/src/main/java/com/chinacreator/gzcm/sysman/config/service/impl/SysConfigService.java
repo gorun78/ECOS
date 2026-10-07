@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
@@ -17,9 +18,12 @@ import java.util.*;
  * 启动时自动从 sys_config 表加载所有配置到 Caffeine 缓存，
  * 提供 getString / getInt / getLong / getBoolean 便捷取值方法。
  * 配置常驻不设过期，靠 refreshCache() 主动失效。
+ *
+ * <p>D-10/B7：实现 {@link ISysConfigService}（sysman-api 门面），
+ * 使引擎侧可依赖 api 门面（禁 import sysman-impl）。</p>
  */
 @Service
-public class SysConfigService {
+public class SysConfigService implements ISysConfigService {
 
     private static final Logger log = LoggerFactory.getLogger(SysConfigService.class);
 

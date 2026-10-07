@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.security;
 
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  *       <pre>[{"table":"ecos_dw.sales_order","columns":["id","customer","amount"]},
  *        {"table":"public.sys_dict","columns":"*"}]</pre>
  *       {@code columns} 为显式列名数组，或字面量 {@code "*"}（管理员显式授权全列）。
- *       经 {@link SysConfigService} 门面读取（Caffeine 缓存，refreshCache 后生效），
+ *       经 {@link ISysConfigService} 门面读取（Caffeine 缓存，refreshCache 后生效），
  *       配置写路径本身在 sysman 侧受控并有审计。</li>
  *   <li><b>同模块内置显式注册表</b>（{@link #BUILTIN}）：默认<b>为空</b> = 不授权任何表，
  *       fail-closed；管理员必须通过配置字典显式登记后 SQL 工具才可访问任何表。</li>
@@ -63,14 +63,14 @@ public class AgentToolSqlWhitelist {
     /** 内置显式注册表：默认空 = fail-closed，未配置白名单前不放行任何表 */
     private static final Map<String, Set<String>> BUILTIN = Collections.emptyMap();
 
-    private final ObjectProvider<SysConfigService> sysConfigProvider;
+    private final ObjectProvider<ISysConfigService> sysConfigProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** 解析快照缓存：配置原文 → 白名单（SysConfigService 缓存值变化时重解析） */
     private volatile String snapshotRaw;
     private volatile Map<String, Set<String>> snapshot = BUILTIN;
 
-    public AgentToolSqlWhitelist(ObjectProvider<SysConfigService> sysConfigProvider) {
+    public AgentToolSqlWhitelist(ObjectProvider<ISysConfigService> sysConfigProvider) {
         this.sysConfigProvider = sysConfigProvider;
     }
 
@@ -148,7 +148,7 @@ public class AgentToolSqlWhitelist {
 
     private String readConfigRaw() {
         try {
-            SysConfigService cfg = sysConfigProvider.getIfAvailable();
+            ISysConfigService cfg = sysConfigProvider.getIfAvailable();
             if (cfg == null) {
                 log.debug("H8-T4 SysConfigService 门面不可用，白名单按内置注册表判定（默认拒绝）");
                 return null;

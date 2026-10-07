@@ -10,7 +10,7 @@ import com.chinacreator.gzcm.engine.data.pipeline.PipelineService;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -56,7 +56,7 @@ public class DataIngestService {
 
     /** 系统配置（读取 dw.lake.partition_by）；可选注入，无 bean 时回退默认 dt */
     @Autowired(required = false)
-    private SysConfigService sysConfigService;
+    private ISysConfigService sysConfigService;
 
     public DataIngestService(PipelineService pipelineService,
                              ITaskManagementService taskManagementService,

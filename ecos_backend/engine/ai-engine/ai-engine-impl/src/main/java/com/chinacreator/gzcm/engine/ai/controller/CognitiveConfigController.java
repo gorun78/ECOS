@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,9 +27,9 @@ public class CognitiveConfigController {
         {"action-bridge.matchConfidenceThreshold", "0.7", "cognitive-engine", "float", "匹配置信度阈值"},
     };
 
-    private final SysConfigService sysConfigService;
+    private final ISysConfigService sysConfigService;
 
-    public CognitiveConfigController(SysConfigService sysConfigService) {
+    public CognitiveConfigController(ISysConfigService sysConfigService) {
         this.sysConfigService = sysConfigService;
     }
 

@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.engine.data.service;
 
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,10 +25,10 @@ public class GitRepoRootResolver {
      * {@link #readConfig()} 直接落到 {@link #defaultRoot()}。
      */
     @Autowired(required = false)
-    private SysConfigService sysConfigService;
+    private ISysConfigService sysConfigService;
 
     /** 单测/老调用便捷构造（保留 API 面；Spring 用默认 constructor + 字段注入）。 */
-    public GitRepoRootResolver(SysConfigService sysConfigService) {
+    public GitRepoRootResolver(ISysConfigService sysConfigService) {
         this.sysConfigService = sysConfigService;
     }
 

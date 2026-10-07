@@ -6,7 +6,7 @@ import com.chinacreator.gzcm.engine.ontology.dto.OntologyConfigItem;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyConfigRefreshVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyConfigSaveDTO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyConfigVO;
-import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
+import com.chinacreator.gzcm.sysman.config.service.ISysConfigService;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
  *   <li>{@code POST /refresh} 返回 {@link OntologyConfigRefreshVO}</li>
  * </ul>
  *
- * <p>说明：{@link SysConfigService} 在 sysman-impl 横切底座（不动），
+ * <p>说明：{@link ISysConfigService} 在 sysman 横切底座（不动），
  * 返回 raw {@code Map<String,Object>} PG 行；本 Controller 层从 Map
  * 重建 VO（白名单字段，未知列忽略）；{@code updateBatch} 在 Controller
  * 层组装 {@code List<Map<String,String>>} 透传 Service（C1 兼容路径）。
@@ -57,9 +57,9 @@ public class OntologyConfigController {
         {"ontology.workflow.engine", "buszhi", "ontology-engine", "string", "工作流引擎"},
     };
 
-    private final SysConfigService sysConfigService;
+    private final ISysConfigService sysConfigService;
 
-    public OntologyConfigController(SysConfigService sysConfigService) {
+    public OntologyConfigController(ISysConfigService sysConfigService) {
         this.sysConfigService = sysConfigService;
     }
 
