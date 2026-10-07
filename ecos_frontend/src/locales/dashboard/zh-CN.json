@@ -34,6 +34,7 @@
   "dashboard.audit.pending": "待签授权 (Pending)",
   "dashboard.audit.passed": "安全放行 (Passed)",
   "dashboard.eval.title": "智能体评估面板",
+  "dashboard.eval.demoBadge": "演示样本",
   "dashboard.eval.sub": "选择智能体与问题集，评估回答质量与能力雷达",
   "dashboard.eval.agentLabel": "选择评估智能体",
   "dashboard.eval.agentPlaceholder": "-- 请选择智能体 --",

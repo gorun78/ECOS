@@ -453,7 +453,12 @@ export default function DashboardView({
             <BarChart3 size={18} />
           </div>
           <div>
-            <h2 className={`text-sm font-extrabold ${styles.cardText}`}>{t('dashboard.eval.title')}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className={`text-sm font-extrabold ${styles.cardText}`}>{t('dashboard.eval.title')}</h2>
+              <span className={`text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${styles.cardBorder} ${styles.cardTextMuted}`}>
+                {t('dashboard.eval.demoBadge')}
+              </span>
+            </div>
             <p className={`text-[10px] ${styles.cardTextMuted}`}>{t('dashboard.eval.sub')}</p>
           </div>
         </div>

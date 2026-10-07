@@ -34,6 +34,7 @@
   "dashboard.audit.pending": "Pending Approval (Pending)",
   "dashboard.audit.passed": "Passed (Passed)",
   "dashboard.eval.title": "Agent Evaluation Panel",
+  "dashboard.eval.demoBadge": "Demo Sample",
   "dashboard.eval.sub": "Choose an agent and question set to evaluate response quality and capability radar",
   "dashboard.eval.agentLabel": "Select Evaluation Agent",
   "dashboard.eval.agentPlaceholder": "-- Please select an agent --",
