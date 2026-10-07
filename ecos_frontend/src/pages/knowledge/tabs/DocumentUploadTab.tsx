@@ -55,7 +55,7 @@ interface HistoryItem {
 }
 
 export default function DocumentUploadTab({ showToast: showToastFromProps }: { showToast?: (type: 'success' | 'info' | 'error', msg: string) => void }) {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const tl = (zh: string, en: string) => locale === 'zh' ? zh : en;
   const { styles } = useTheme();
   const toast = useCallback(
@@ -109,7 +109,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
       startPolling(fileId);
     } catch (e: unknown) {
       setPhase('failed');
-      toast('error', tl('上传失败: ', 'Upload failed: ') + ((e as { message?: string } | undefined)?.message || String(e)));
+      toast('error', t('knowledge.upload.uploadFailedPrefix') + ((e as { message?: string } | undefined)?.message || String(e)));
     }
   }, [uploadAllowed]);
 
@@ -215,17 +215,17 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
         <div className="space-y-1 min-w-0">
           <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
             <FileText size={16} className="text-indigo-600" />
-            {tl('知识抽取引擎（分片上传）', 'Knowledge Extraction (Chunked Upload)')}
+            {t('knowledge.upload.pageTitle')}
           </h2>
           <p className="text-[10px] text-slate-500">
-            {tl('上传 PDF/Word/TXT — 5MB 分片 + 状态机', 'PDF/Word/TXT upload — 5MB chunks + state machine')}
+            {t('knowledge.upload.pageSubtitle')}
           </p>
         </div>
         <button onClick={() => setShowHistory(!showHistory)}
           className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
             showHistory ? `${styles.accentBg} text-white border-transparent` : `bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100`
           }`}>
-          <History size={11} /> {tl('历史', 'History')}
+          <History size={11} /> {t('knowledge.upload.history')}
         </button>
       </div>
 
@@ -243,7 +243,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
         {phase === 'uploading' ? (
           <div className="space-y-3">
             <RotateCw size={32} className="animate-spin text-blue-500 mx-auto" />
-            <p className="text-xs font-bold text-slate-700">{tl('上传中...', 'Uploading...')}</p>
+            <p className="text-xs font-bold text-slate-700">{t('knowledge.upload.uploading')}</p>
             <p className="text-[10px] text-slate-500 font-mono">{fileName} · {(fileSize / 1024 / 1024).toFixed(1)}MB</p>
             <div className="mx-auto w-64 h-2 bg-slate-100 rounded-full overflow-hidden">
               <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${uploadRatio * 100}%` }} />
@@ -255,10 +255,10 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
             <div className="p-3 bg-indigo-50 rounded-2xl inline-block">
               <Upload size={28} className="text-indigo-500" />
             </div>
-            <p className="text-xs font-bold text-slate-700">{tl('拖拽文件到此处，或点击选择', 'Drag & drop file or click to browse')}</p>
-            <p className="text-[10px] text-slate-500">{tl('支持 PDF · Word · TXT（5MB/块分片上传）', 'PDF · Word · TXT (5MB per chunk)')}</p>
+            <p className="text-xs font-bold text-slate-700">{t('knowledge.upload.dropHint')}</p>
+            <p className="text-[10px] text-slate-500">{t('knowledge.upload.formatHint')}</p>
             <div className="flex items-center gap-1 justify-center text-[9px] text-indigo-600">
-              <Sparkles size={10} /> {tl('上传后自动解析 → 抽取 → 人工审核', 'Auto parse → extract → review')}
+              <Sparkles size={10} /> {t('knowledge.upload.pipelineHint')}
             </div>
           </div>
         )}
@@ -266,18 +266,18 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
         {!uploadAllowed && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl bg-black/50 text-white">
             <Lock size={20} />
-            <p className="text-[11px] font-bold">{tl('临时上传未开启', 'Direct upload disabled')}</p>
+            <p className="text-[11px] font-bold">{t('knowledge.upload.disabledTitle')}</p>
             <p className="text-[10px] font-mono max-w-[80%] text-center opacity-80 break-words">
               {uploadGate?.hint || 'backend unavailable / disabled'}
             </p>
             <button
               onClick={e => {
                 e.stopPropagation();
-                toast('info', tl('请切换到「引擎配置 → 知识抽取」开启 allow_direct_upload', 'Go to Engine Config → Extract and enable allow_direct_upload'));
+                toast('info', t('knowledge.upload.enableHint'));
               }}
               className="px-3 py-1.5 rounded-md text-[10px] font-bold border border-white/40 hover:bg-white/10 cursor-pointer"
             >
-              {tl('去引擎配置开启', 'Open in Engine Config')}
+              {t('knowledge.upload.goEnable')}
             </button>
           </div>
         )}
@@ -288,7 +288,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
         <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3 overflow-hidden">
           <div className="flex flex-wrap items-center gap-2">
             <FileText size={14} className="text-indigo-500 shrink-0" />
-            <span className="font-bold text-xs text-slate-800 truncate min-w-0 flex-1">{fileName || tl('处理中', 'Processing')}</span>
+            <span className="font-bold text-xs text-slate-800 truncate min-w-0 flex-1">{fileName || t('knowledge.upload.processing')}</span>
             <span className={`ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold ${phase === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-indigo-50 text-indigo-700'}`}>
               {tl(PHASE_LABELS[phase].zh, PHASE_LABELS[phase].en)}
             </span>
@@ -326,9 +326,9 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
 
           {phase === 'failed' && (
             <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 flex items-center justify-between gap-3 text-xs">
-              <span className="text-rose-700">{tl('处理失败，请重新上传', 'Processing failed. Retry?')}</span>
+              <span className="text-rose-700">{t('knowledge.upload.failedHint')}</span>
               <button onClick={handleReset} className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg cursor-pointer text-[10px]">
-                {tl('重试', 'Retry')}
+                {t('knowledge.upload.retry')}
               </button>
             </div>
           )}
@@ -339,7 +339,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
       {(phase === 'queued' || phase === 'parsing' || phase === 'extracting') && !taskId && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-[11px] text-blue-700 flex items-center gap-2">
           <Clock size={13} />
-          {tl('已入队，等待后端 /extract/upload 状态推进（PMO-56 待补 /extract/tasks/{id}）', 'Enqueued — waiting for backend /extract/upload progression (PMO-56: /extract/tasks/{id})')}
+          {t('knowledge.upload.enqueuedHint')}
         </div>
       )}
 
@@ -348,14 +348,14 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
         <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
             <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
-              <Clock size={12} className="text-indigo-500" /> {tl('抽取历史', 'Extraction History')}
+              <Clock size={12} className="text-indigo-500" /> {t('knowledge.upload.extractionHistory')}
             </h3>
             <span className="text-[9px] text-slate-400 font-mono">{history.length}</span>
           </div>
           {loadingHistory ? (
             <div className="flex justify-center py-8"><RotateCw size={20} className="animate-spin text-slate-300" /></div>
           ) : history.length === 0 ? (
-            <p className="text-[10px] text-center py-6 text-slate-400">{tl('暂无历史（/extract/history 尚未返回）', 'No history yet (/extract/history returns empty)')}</p>
+            <p className="text-[10px] text-center py-6 text-slate-400">{t('knowledge.upload.noHistory')}</p>
           ) : (
             <div className="space-y-1.5 max-h-56 overflow-y-auto">
               {history.map(item => (
@@ -373,7 +373,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
                     </div>
                   </div>
                   <span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-emerald-50 text-emerald-600">
-                    {item.status === 'COMPLETED' ? tl('完成', 'Done') : item.status}
+                    {item.status === 'COMPLETED' ? t('knowledge.upload.done') : item.status}
                   </span>
                 </div>
               ))}

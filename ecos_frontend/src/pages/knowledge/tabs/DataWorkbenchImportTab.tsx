@@ -43,9 +43,8 @@ const JOB_STATUS_STYLES: Record<string, string> = {
 };
 
 export default function DataWorkbenchImportTab({ showToast }: TabProps) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const tl = (zh: string, en: string) => locale === 'zh' ? zh : en;
 
   const [versions, setVersions] = useState<OntologyVersionOption[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
@@ -107,11 +106,11 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
       });
       setPreview(report);
     } catch (e) {
-      showToast?.('error', tl('Dry-run 预览失败: ', 'Dry-run failed: ') + (e as Error).message);
+      showToast?.('error', t('knowledge.import.dryRunErr') + (e as Error).message);
     } finally {
       setPreviewLoading(false);
     }
-  }, [selectedVersion, mode, tl, showToast]);
+  }, [selectedVersion, mode, t, showToast]);
 
   const handleTrigger = useCallback(async () => {
     setTriggering(true);
@@ -121,14 +120,14 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
         mode,
         dryRun: false,
       });
-      showToast?.('success', tl('抽取任务已提交', 'Extract job submitted'));
+      showToast?.('success', t('knowledge.import.jobSubmitted'));
       loadJobs();
     } catch (e) {
-      showToast?.('error', tl('触发抽取失败: ', 'Trigger failed: ') + (e as Error).message);
+      showToast?.('error', t('knowledge.import.triggerErr') + (e as Error).message);
     } finally {
       setTriggering(false);
     }
-  }, [selectedVersion, mode, tl, showToast, loadJobs]);
+  }, [selectedVersion, mode, t, showToast, loadJobs]);
 
   // ── 作业详情展开 ─────────────────────────────────────────────────────────
 
@@ -159,10 +158,10 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
         <div className="space-y-1">
           <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}>
             <Download size={16} className="text-indigo-600" />
-            {tl('本体数据来源与抽取任务', 'Ontology Source & Extract Jobs')}
+            {t('knowledge.import.title')}
           </h2>
           <p className={`text-[10px] ${styles.cardTextMuted}`}>
-            {tl('选择本体版本 → Dry-run 预览 → 触发结构化抽取', 'Pick ontology version → dry-run preview → trigger structured extract')}
+            {t('knowledge.import.subtitle')}
           </p>
         </div>
         <button
@@ -171,7 +170,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
           className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 border cursor-pointer disabled:opacity-50 ${styles.cardBorder} ${styles.inputBg}`}
         >
           {(versionsLoading || jobsLoading) ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
-          {tl('刷新', 'Refresh')}
+          {t('knowledge.import.refresh')}
         </button>
       </div>
 
@@ -181,7 +180,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
           {/* 本体版本 */}
           <div className="space-y-1">
             <label className={`text-[10px] font-extrabold ${styles.muted} uppercase`}>
-              {tl('本体版本', 'Ontology Version')}
+              {t('knowledge.import.ontologyVersion')}
             </label>
             <select
               value={selectedVersion}
@@ -189,20 +188,20 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
               disabled={versionsLoading}
               className={`w-full px-2.5 py-2 text-xs rounded-md border focus:outline-none ${styles.inputBg} ${styles.inputBorder}`}
             >
-              <option value="">{tl('全部本体（默认）', 'All ontologies (default)')}</option>
+              <option value="">{t('knowledge.import.allOntologies')}</option>
               {versions.map(v => (
                 <option key={v.id} value={v.ontologyId}>{versionLabel(v)}</option>
               ))}
             </select>
             {versionsLoading && (
-              <p className="text-[9px] font-mono opacity-50">{tl('加载版本中...', 'Loading versions...')}</p>
+              <p className="text-[9px] font-mono opacity-50">{t('knowledge.import.loadingVersions')}</p>
             )}
           </div>
 
           {/* 抽取模式 */}
           <div className="space-y-1">
             <label className={`text-[10px] font-extrabold ${styles.muted} uppercase`}>
-              {tl('抽取模式', 'Extract Mode')}
+              {t('knowledge.import.extractMode')}
             </label>
             <div className="flex rounded-md border overflow-hidden">
               {(['INCREMENTAL', 'FULL'] as ExtractMode[]).map(m => (
@@ -215,7 +214,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
                       : `${styles.inputBg} ${styles.cardText} hover:opacity-80`
                   }`}
                 >
-                  {m === 'FULL' ? tl('全量 (FULL)', 'Full') : tl('增量 (INCREMENTAL)', 'Incremental')}
+                  {m === 'FULL' ? t('knowledge.import.modeFull') : t('knowledge.import.modeIncr')}
                 </button>
               ))}
             </div>
@@ -229,7 +228,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
               className={`w-full px-3 py-2 rounded-md text-xs font-bold border flex items-center justify-center gap-1.5 transition disabled:opacity-50 ${styles.cardBorder} ${styles.inputBg}`}
             >
               {previewLoading ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
-              {tl('Dry-run 预览', 'Dry-run Preview')}
+              {t('knowledge.import.dryRunPreview')}
             </button>
             <button
               onClick={() => handleTrigger()}
@@ -237,7 +236,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
               className={`w-full px-3 py-2 rounded-md text-xs font-bold text-white flex items-center justify-center gap-1.5 transition disabled:opacity-50 ${styles.accentBg}`}
             >
               {triggering ? <Loader2 size={13} className="animate-spin" /> : <PlayCircle size={13} />}
-              {tl('触发抽取', 'Trigger Extract')}
+              {t('knowledge.import.triggerExtract')}
             </button>
           </div>
         </div>
@@ -246,18 +245,18 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
         {preview && (
           <div className={`border ${styles.cardBorder} rounded-lg p-3 space-y-2`}>
             <div className={`text-[10px] font-extrabold ${styles.muted} uppercase`}>
-              {tl('Dry-run 预览报告', 'Dry-run Report')} (mode: {preview.mode}, {preview.durationMs}ms)
+              {t('knowledge.import.dryRunReport')} (mode: {preview.mode}, {preview.durationMs}ms)
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {[
-                { label: tl('本体数', 'Ontologies'), value: preview.ontologyCount },
-                { label: tl('实体数', 'Entities'), value: preview.entityCount },
-                { label: tl('新建节点', 'Nodes Created'), value: preview.nodeCreated },
-                { label: tl('更新节点', 'Nodes Updated'), value: preview.nodeUpdated },
-                { label: tl('新建边', 'Edges Created'), value: preview.edgeCreated },
-                { label: tl('跳过', 'Skipped'), value: preview.nodeSkipped },
-                { label: tl('无效映射', 'Invalid Mappings'), value: preview.invalidMappings },
-                { label: tl('水位线', 'Watermark'), value: preview.nextWatermark ?? '—' },
+                { label: t('knowledge.import.ontologyCount'), value: preview.ontologyCount },
+                { label: t('knowledge.import.entityCount'), value: preview.entityCount },
+                { label: t('knowledge.import.nodesCreated'), value: preview.nodeCreated },
+                { label: t('knowledge.import.nodesUpdated'), value: preview.nodeUpdated },
+                { label: t('knowledge.import.edgesCreated'), value: preview.edgeCreated },
+                { label: t('knowledge.import.skipped'), value: preview.nodeSkipped },
+                { label: t('knowledge.import.invalidMappings'), value: preview.invalidMappings },
+                { label: t('knowledge.import.watermark'), value: preview.nextWatermark ?? '—' },
               ].map((item, i) => (
                 <div key={i} className={`p-2 rounded border ${styles.appBorder}`}>
                   <div className={`text-[9px] ${styles.muted}`}>{item.label}</div>
@@ -270,7 +269,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
             {preview.issues.length > 0 && (
               <div>
                 <span className={`text-[9px] font-bold ${styles.muted} uppercase`}>
-                  {tl('问题明细', 'Issues')} ({preview.issues.length})
+                  {t('knowledge.import.issues')} ({preview.issues.length})
                 </span>
                 <ul className="space-y-0.5 max-h-24 overflow-y-auto">
                   {preview.issues.map((iss, i) => (
@@ -290,7 +289,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
         <div className={`px-4 py-3 border-b ${styles.cardBorder} flex items-center justify-between`}>
           <span className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}>
             <ListOrdered size={13} className="text-indigo-500" />
-            {tl('抽取作业', 'Extract Jobs')} ({jobs.length})
+            {t('knowledge.import.jobs')} ({jobs.length})
           </span>
           <span className={`text-[9px] font-mono ${styles.muted}`}>/extract/structured/jobs</span>
         </div>
@@ -300,19 +299,19 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
               <tr className={`${styles.appBorder} border-b ${styles.cardBorder}`}>
                 <th className="p-3 text-left font-extrabold uppercase tracking-wider w-8"></th>
                 <th className="p-3 text-left font-extrabold uppercase tracking-wider">jobId</th>
-                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('模式', 'Mode')}</th>
-                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('状态', 'Status')}</th>
-                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('开始时间', 'Started At')}</th>
-                <th className="p-3 text-right font-extrabold uppercase tracking-wider">{tl('耗时 (ms)', 'Duration')}</th>
+                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{t('knowledge.import.colMode')}</th>
+                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{t('knowledge.import.colStatus')}</th>
+                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{t('knowledge.import.startedAt')}</th>
+                <th className="p-3 text-right font-extrabold uppercase tracking-wider">{t('knowledge.import.duration')}</th>
               </tr>
             </thead>
             <tbody>
               {jobsLoading ? (
-                <tr><td colSpan={6} className="p-8 text-center opacity-50">{tl('加载中...', 'Loading...')}</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center opacity-50">{t('knowledge.import.loading')}</td></tr>
               ) : jobs.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-10 text-center opacity-50 text-xs">
-                    {tl('暂无抽取作业。点击「Dry-run 预览」或「触发抽取」发起。', 'No extract jobs yet. Click Dry-run or Trigger to start.')}
+                    {t('knowledge.import.emptyJobs')}
                   </td>
                 </tr>
               ) : jobs.map((job, idx) => {
@@ -346,10 +345,10 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
                       <tr className={`border-b ${styles.appBorder}`}>
                         <td colSpan={6} className={`p-3 ${styles.appBorder} text-[10px] font-mono`}>
                           <div className={`text-[9px] font-bold ${styles.muted} uppercase mb-1`}>
-                            {tl('作业详情', 'Job Detail')} ({expandedJob?.status})
+                            {t('knowledge.import.jobDetail')} ({expandedJob?.status})
                           </div>
                           {detailLoading && expandedJob?.rowKey === rowKey
-                            ? <span className="opacity-50">{tl('加载详情中...', 'Loading detail...')}</span>
+                            ? <span className="opacity-50">{t('knowledge.import.loadingDetail')}</span>
                             : String(expandedJob?.detail ?? '')}
                         </td>
                       </tr>

@@ -58,9 +58,8 @@ const DEMO_RULES: RuleItem[] = [
 // ── Component ──────────────────────────────────────────────────
 
 export default function KnowledgeRuleRepositoryTab() {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const tl = (zh: string, en: string) => locale === 'zh' ? zh : en;
 
   const [rules, setRules] = useState<RuleItem[]>([]);
   const [search, setSearch] = useState('');
@@ -88,32 +87,32 @@ export default function KnowledgeRuleRepositoryTab() {
   const regTree = useMemo((): RegulationNode[] => {
     const map = new Map<string, RegulationNode>();
     for (const rule of rules) {
-      const regName = rule.regulation || tl('未分类', 'Uncategorized');
+      const regName = rule.regulation || t('knowledge.rule.unclassified');
       if (!map.has(regName)) map.set(regName, { name:regName, chapters:[], ruleIds:[] });
       const reg = map.get(regName)!;
       reg.ruleIds.push(rule.id);
       if (rule.chapter) {
         let chap = reg.chapters.find(c => c.name === rule.chapter);
         if (!chap) { chap = { name:rule.chapter, clauses:[] }; reg.chapters.push(chap); }
-        const clauseName = rule.clause || tl('通用条款', 'General');
+        const clauseName = rule.clause || t('knowledge.rule.general');
         let clause = chap.clauses.find(c => c.name === clauseName);
         if (!clause) { clause = { name:clauseName, ruleIds:[] }; chap.clauses.push(clause); }
         clause.ruleIds.push(rule.id);
       }
     }
     return Array.from(map.values());
-  }, [rules, locale]);
+  }, [rules, t]);
 
   // Filter rules based on selected clause + search
   const filteredRules = useMemo(() => {
     let result = rules;
-    if (selectedClause) result = result.filter(r => (r.clause || tl('通用条款', 'General')) === selectedClause);
+    if (selectedClause) result = result.filter(r => (r.clause || t('knowledge.rule.general')) === selectedClause);
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(r => r.name.toLowerCase().includes(q) || (r.domain||'').toLowerCase().includes(q));
     }
     return result;
-  }, [rules, selectedClause, search]);
+  }, [rules, selectedClause, search, t]);
 
   const toggleReg = useCallback((name: string) => {
     setExpandedRegs(prev => { const next = new Set(prev); next.has(name) ? next.delete(name) : next.add(name); return next; });
@@ -138,7 +137,7 @@ export default function KnowledgeRuleRepositoryTab() {
     }
   };
 
-  const ruleCountForClause = (clauseName: string) => filteredRules.filter(r => (r.clause || tl('通用条款', 'General')) === clauseName).length;
+  const ruleCountForClause = (clauseName: string) => filteredRules.filter(r => (r.clause || t('knowledge.rule.general')) === clauseName).length;
 
   return (
     <div className="space-y-4">
@@ -147,14 +146,14 @@ export default function KnowledgeRuleRepositoryTab() {
         <div className="flex items-center gap-3">
           <Scale size={20} className="text-amber-400" />
           <div>
-            <h2 className={`text-base font-bold ${styles.cardText}`}>{tl('规则库', 'Rule Repository')}</h2>
+            <h2 className={`text-base font-bold ${styles.cardText}`}>{t('knowledge.rule.title')}</h2>
             <p className={`text-[11px] ${styles.cardTextMuted}`}>
-              {tl('按法规层级浏览和管理知识治理规则', 'Browse and manage governance rules by regulation hierarchy')}
+              {t('knowledge.rule.subtitle')}
             </p>
           </div>
         </div>
         <button className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs rounded-lg transition cursor-pointer">
-          <Plus size={14} /> {tl('新建规则', 'New Rule')}
+          <Plus size={14} /> {t('knowledge.rule.newRule')}
         </button>
       </div>
 
@@ -163,7 +162,7 @@ export default function KnowledgeRuleRepositoryTab() {
         <Search size={14} className={styles.cardTextMuted} />
         <input type="text"
           className={`bg-transparent outline-none text-xs ${styles.inputText} placeholder:${styles.muted} w-full`}
-          placeholder={tl('搜索规则名或领域...', 'Search by name or domain...')}
+          placeholder={t('knowledge.rule.searchPh')}
           value={search} onChange={e => setSearch(e.target.value)}
         />
       </div>
@@ -173,12 +172,12 @@ export default function KnowledgeRuleRepositoryTab() {
         {/* Left: Regulation tree */}
         <div className={`lg:col-span-4 ${styles.cardBg} border ${styles.cardBorder} rounded-xl p-3 max-h-[600px] overflow-y-auto`}>
           <h3 className={`text-[10px] font-extrabold ${styles.cardTextMuted} uppercase mb-2 flex items-center gap-1.5`}>
-            <BookOpen size={11} /> {tl('法规层级', 'Regulation Hierarchy')}
+            <BookOpen size={11} /> {t('knowledge.rule.regulationHierarchy')}
           </h3>
           {loading ? (
-            <div className={`text-center py-8 text-[10px] ${styles.muted}`}>{tl('加载中...', 'Loading...')}</div>
+            <div className={`text-center py-8 text-[10px] ${styles.muted}`}>{t('knowledge.rule.loading')}</div>
           ) : regTree.length === 0 ? (
-            <div className={`text-center py-8 text-[10px] ${styles.muted}`}>{tl('无数据', 'No data')}</div>
+            <div className={`text-center py-8 text-[10px] ${styles.muted}`}>{t('knowledge.rule.noData')}</div>
           ) : (
             <div className="space-y-0.5">
               {regTree.map(reg => {
@@ -242,15 +241,15 @@ export default function KnowledgeRuleRepositoryTab() {
                 <FileText size={10} /> {selectedClause}
               </span>
               <button onClick={() => setSelectedClause(null)} className={`text-[9px] ${styles.cardTextMuted} hover:underline`}>
-                {tl('清除筛选', 'Clear')}
+                {t('knowledge.rule.clear')}
               </button>
             </div>
           )}
           {loading ? (
-            <div className={`text-center py-8 text-[10px] ${styles.muted}`}>{tl('加载中...', 'Loading...')}</div>
+            <div className={`text-center py-8 text-[10px] ${styles.muted}`}>{t('knowledge.rule.loading')}</div>
           ) : filteredRules.length === 0 ? (
             <div className={`text-center py-12 text-[10px] ${styles.cardTextMuted}`}>
-              {selectedClause ? tl('该条款下无匹配规则', 'No rules under this clause') : tl('无匹配规则', 'No matching rules')}
+              {selectedClause ? t('knowledge.rule.emptyForClause') : t('knowledge.rule.emptyNoMatch')}
             </div>
           ) : (
             filteredRules.map(rule => (
@@ -275,13 +274,13 @@ export default function KnowledgeRuleRepositoryTab() {
                   <div className={`px-4 py-3 border-t ${styles.cardBorder} space-y-2 text-xs`}>
                     {rule.chapter && (
                       <div className="flex gap-4">
-                        <span className={`${styles.cardTextMuted} w-16`}>{tl('章节', 'Chapter')}</span>
+                        <span className={`${styles.cardTextMuted} w-16`}>{t('knowledge.rule.clause')}</span>
                         <span className={styles.cardText}>{rule.chapter} · {rule.clause || '—'}</span>
                       </div>
                     )}
                     {rule.domain && (
                       <div className="flex gap-4">
-                        <span className={`${styles.cardTextMuted} w-16`}>{tl('领域', 'Domain')}</span>
+                        <span className={`${styles.cardTextMuted} w-16`}>{t('knowledge.rule.domain')}</span>
                         <span className={`font-mono ${styles.cardText}`}>{rule.domain}</span>
                       </div>
                     )}
@@ -299,7 +298,7 @@ export default function KnowledgeRuleRepositoryTab() {
                     )}
                     {rule.ontologyType && (
                       <div className="flex gap-4 items-center">
-                        <span className={`${styles.cardTextMuted} w-16`}>{tl('关联本体', 'Ontology')}</span>
+                        <span className={`${styles.cardTextMuted} w-16`}>{t('knowledge.rule.ontology')}</span>
                         <button onClick={e => { e.stopPropagation(); navigateToOntology(rule.ontologyTypeId); }}
                           className="flex items-center gap-1 text-[10px] text-indigo-500 hover:underline cursor-pointer">
                           {rule.ontologyType} <ExternalLink size={10} />
@@ -308,7 +307,7 @@ export default function KnowledgeRuleRepositoryTab() {
                     )}
                     <div className={`pt-1 border-t ${styles.cardBorder} flex gap-2`}>
                       <button className="flex items-center gap-1 text-[10px] text-indigo-500 hover:underline">
-                        <History size={12} /> {tl('版本历史', 'History')}
+                        <History size={12} /> {t('knowledge.rule.history')}
                       </button>
                     </div>
                   </div>
