@@ -104,7 +104,9 @@ export default function LogicView({
   const selectedPipeline = pipelines.find(p => p.id === selectedPipelineId);
 
   // ── Flow state ──
-  const initialGraph = useMemo(() => pipelineToGraph(selectedPipeline), []);
+  // initialGraph 只作 useNodesState/useEdgesState 的 mount-期 initialValues；
+  // 切换 pipeline 时的实际同步走下方 useEffect([selectedPipelineId, selectedPipeline])。
+  const initialGraph = useMemo(() => pipelineToGraph(selectedPipeline), [selectedPipeline]);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<LogicNodeData>>(initialGraph.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge<LogicEdgeData>>(initialGraph.edges);
 
