@@ -19,7 +19,7 @@ export interface ScenarioEditorProps {
   styles:ThemeStyles; toast:(t:string,m:string)=>void;
 }
 
-const STEPS=[{s:1,ak:'scenario.step.1',l:'1. 场景要素',i:'Briefcase'},{s:2,ak:'scenario.step.2',l:'2. 物理数据',i:'Database'},{s:3,ak:'scenario.step.3',l:'3. 联邦本体',i:'Network'},{s:4,ak:'scenario.step.4',l:'4. 合规知识',i:'BookOpen'},{s:5,ak:'scenario.step.5',l:'5. AI 智能体',i:'Cpu'},{s:6,ak:'scenario.step.6',l:'6. 应用工作台',i:'Layout'},{s:7,ak:'scenario.step.7',l:'7. 安全阻断',i:'ShieldCheck'}]as const;
+const STEPS=[{s:1,ak:'scenario.step.1',i:'Briefcase'},{s:2,ak:'scenario.step.2',i:'Database'},{s:3,ak:'scenario.step.3',i:'Network'},{s:4,ak:'scenario.step.4',i:'BookOpen'},{s:5,ak:'scenario.step.5',i:'Cpu'},{s:6,ak:'scenario.step.6',i:'Layout'},{s:7,ak:'scenario.step.7',i:'ShieldCheck'}]as const;
 
 function CbList({items,selected,onChange,styles}:{items:{id:string;label:string;desc?:string}[];selected:string[];onChange:(v:string[])=>void;styles:ThemeStyles}){
   return <div className={`grid grid-cols-1 gap-2 max-h-[220px] overflow-y-auto p-2 ${styles.inputBg} border ${styles.inputBorder} rounded`}>
@@ -48,7 +48,7 @@ export default function ScenarioEditor({wizard,onClose,onStepChange,onSave,setWN
           {STEPS.map((it,idx,arr)=><React.Fragment key={it.s}>
             <div className="flex items-center gap-1.5">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${wizardStep===it.s?'bg-indigo-600 text-white ring-4 ring-indigo-950 shadow-md':wizardStep>it.s?'bg-emerald-600 text-white font-bold':`bg-[var(--card,#1E293B)] ${styles.cardTextMuted} border border-[var(--card,#334155)]`}`}>{wizardStep>it.s?'✓':it.s}</div>
-              <span className={`text-[11px] font-bold whitespace-nowrap transition-colors ${wizardStep===it.s?'text-indigo-400 font-extrabold':wizardStep>it.s?'text-emerald-500':styles.cardTextMuted}`}>{t(it.ak,it.l)}</span>
+              <span className={`text-[11px] font-bold whitespace-nowrap transition-colors ${wizardStep===it.s?'text-indigo-400 font-extrabold':wizardStep>it.s?'text-emerald-500':styles.cardTextMuted}`}>{t(it.ak)}</span>
             </div>
             {idx<arr.length-1&&<div className={`flex-1 h-[2px] mx-2 min-w-[12px] transition-all duration-300 ${wizardStep>it.s?'bg-emerald-600/60':'bg-[var(--card,#334155)]'}`}/>}
           </React.Fragment>)}
