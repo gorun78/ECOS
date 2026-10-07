@@ -113,11 +113,11 @@ export default function CognitiveEngineView() {
       if (engineState === 'RUNNING' || engineState === 'running') {
         await stopEngine();
         setEngineState('STOPPED');
-        showToast('success', locale === 'zh' ? '引擎已停止' : 'Engine stopped');
+        showToast('success', t('cognition.engine.stopped'));
       } else {
         await startEngine();
         setEngineState('RUNNING');
-        showToast('success', locale === 'zh' ? '引擎已启动' : 'Engine started');
+        showToast('success', t('cognition.engine.started'));
       }
     } catch (e: unknown) {
       showToast('error', `${e instanceof Error ? e.message : String(e)}`);
@@ -140,7 +140,7 @@ export default function CognitiveEngineView() {
         result = await executeAction({ llmOutput: actionInput });
       }
       setTestResult(result as Record<string, unknown>);
-      showToast('success', locale === 'zh' ? '执行成功' : 'Executed');
+      showToast('success', t('cognition.engine.executed'));
     } catch (e: unknown) {
       showToast('error', `${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -158,10 +158,10 @@ export default function CognitiveEngineView() {
             <Brain className="w-7 h-7 text-amber-400" />
             <div>
               <h1 className={`text-2xl font-bold ${styles.cardText}`}>
-                {locale === 'zh' ? '认知引擎控制台' : 'Cognitive Engine Console'}
+                {t('cognition.engine.title')}
               </h1>
               <p className={`text-xs ${styles.muted}`}>
-                {locale === 'zh' ? '四子引擎：提示编译 → Agent协同 → 零信任护栏 → 行动桥接' : 'PromptCompiler → AgentMesh → Guardrails → ActionBridge'}
+                {t('cognition.engine.subtitle')}
               </p>
             </div>
           </div>
@@ -169,11 +169,11 @@ export default function CognitiveEngineView() {
             <button onClick={handleStartStop}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border
                 ${isRunning ? 'bg-red-900/40 border-red-700 text-red-300 hover:bg-red-800/60' : 'bg-emerald-900/40 border-emerald-700 text-emerald-300 hover:bg-emerald-800/60'}`}>
-              {isRunning ? <><Square className="w-3.5 h-3.5" />{locale === 'zh' ? '停止' : 'Stop'}</> : <><Play className="w-3.5 h-3.5" />{locale === 'zh' ? '启动' : 'Start'}</>}
+              {isRunning ? <><Square className="w-3.5 h-3.5" />{t('cognition.engine.stop')}</> : <><Play className="w-3.5 h-3.5" />{t('cognition.engine.start')}</>}
             </button>
             <button onClick={() => { loadEngine(); loadSubEngine(activeTab); }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1E2533] hover:bg-[#263147] text-gray-300 text-sm border border-[#2D3748]">
-              <RefreshCw className="w-3.5 h-3.5" />{locale === 'zh' ? '刷新' : 'Refresh'}
+              <RefreshCw className="w-3.5 h-3.5" />{t('cognition.engine.refresh')}
             </button>
           </div>
         </div>
@@ -212,13 +212,13 @@ export default function CognitiveEngineView() {
 
         {/* Sub-engine Content */}
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5`}>
-          {subLoading && <div className="flex items-center gap-2 text-zinc-400 text-sm mb-4"><Loader2 className="w-4 h-4 animate-spin" />{locale === 'zh' ? '加载中...' : 'Loading...'}</div>}
+          {subLoading && <div className="flex items-center gap-2 text-zinc-400 text-sm mb-4"><Loader2 className="w-4 h-4 animate-spin" />{t('cognition.engine.loading')}</div>}
 
           {/* PromptCompiler */}
           {activeTab === 'prompt' && (
             <div className="space-y-4">
               <h3 className={`text-sm font-semibold ${styles.cardText}`}>
-                {locale === 'zh' ? '联邦RAG上下文编译' : 'Federal RAG Context Compiler'}
+                {t('cognition.engine.promptTitle')}
               </h3>
               {indexStatus && (
                 <div className="space-y-1">
@@ -235,7 +235,7 @@ export default function CognitiveEngineView() {
                   className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} placeholder:text-zinc-500`} />
                 <button onClick={handleTest} disabled={!compileInput}
                   className="px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-600 text-white text-sm disabled:opacity-40">
-                  {locale === 'zh' ? '编译' : 'Compile'}
+                  {t('cognition.engine.promptBtn')}
                 </button>
               </div>
             </div>
@@ -245,18 +245,18 @@ export default function CognitiveEngineView() {
           {activeTab === 'mesh' && (
             <div className="space-y-4">
               <h3 className={`text-sm font-semibold ${styles.cardText}`}>
-                {locale === 'zh' ? '多Agent协同 & 意图路由' : 'Multi-Agent Orchestration & Intent Routing'}
+                {t('cognition.engine.meshTitle')}
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className={`text-xs ${styles.muted} mb-1`}>{locale === 'zh' ? '已注册Agents' : 'Registered Agents'} ({agents.length})</p>
+                  <p className={`text-xs ${styles.muted} mb-1`}>{t('cognition.engine.agentsLabel')} ({agents.length})</p>
                   <div className="space-y-1 max-h-32 overflow-y-auto">
                     {agents.map((a, i) => <div key={i} className={`text-xs ${styles.cardText}`}>{String(a.name || a.id || `agent-${i}`)}</div>)}
                     {agents.length === 0 && <p className={`text-xs ${styles.muted}`}>—</p>}
                   </div>
                 </div>
                 <div>
-                  <p className={`text-xs ${styles.muted} mb-1`}>{locale === 'zh' ? '活跃Missions' : 'Active Missions'} ({missions.length})</p>
+                  <p className={`text-xs ${styles.muted} mb-1`}>{t('cognition.engine.missionsLabel')} ({missions.length})</p>
                   <div className="space-y-1 max-h-32 overflow-y-auto">
                     {missions.map((m, i) => <div key={i} className={`text-xs ${styles.cardText}`}>{String(m.name || m.id || `mission-${i}`)}</div>)}
                     {missions.length === 0 && <p className={`text-xs ${styles.muted}`}>—</p>}
@@ -264,11 +264,11 @@ export default function CognitiveEngineView() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <input value={intentInput} onChange={e => setIntentInput(e.target.value)} placeholder={locale === 'zh' ? '输入意图...' : 'Enter intent...'}
+                <input value={intentInput} onChange={e => setIntentInput(e.target.value)} placeholder={t('cognition.engine.intentPh')}
                   className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} placeholder:text-zinc-500`} />
                 <button onClick={handleTest} disabled={!intentInput}
                   className="px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-600 text-white text-sm disabled:opacity-40">
-                  {locale === 'zh' ? '路由' : 'Route'}
+                  {t('cognition.engine.routeBtn')}
                 </button>
               </div>
             </div>
@@ -278,10 +278,10 @@ export default function CognitiveEngineView() {
           {activeTab === 'guard' && (
             <div className="space-y-4">
               <h3 className={`text-sm font-semibold ${styles.cardText}`}>
-                {locale === 'zh' ? '零信任护栏 — PII/幻觉/合规' : 'Zero-Trust Guardrails — PII / Hallucination / Compliance'}
+                {t('cognition.engine.guardTitle')}
               </h3>
               <div>
-                <p className={`text-xs ${styles.muted} mb-1`}>{locale === 'zh' ? '策略列表' : 'Policies'} ({policies.length})</p>
+                <p className={`text-xs ${styles.muted} mb-1`}>{t('cognition.engine.policiesLabel')} ({policies.length})</p>
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {policies.map((p, i) => (
                     <div key={i} className="flex items-center justify-between text-xs">
@@ -293,11 +293,11 @@ export default function CognitiveEngineView() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <input value={validateInput} onChange={e => setValidateInput(e.target.value)} placeholder={locale === 'zh' ? '输入检测文本...' : 'Enter text to validate...'}
+                <input value={validateInput} onChange={e => setValidateInput(e.target.value)} placeholder={t('cognition.engine.validatePh')}
                   className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} placeholder:text-zinc-500`} />
                 <button onClick={handleTest} disabled={!validateInput}
                   className="px-3 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-sm disabled:opacity-40">
-                  {locale === 'zh' ? '检测' : 'Validate'}
+                  {t('cognition.engine.validateBtn')}
                 </button>
               </div>
             </div>
@@ -307,10 +307,10 @@ export default function CognitiveEngineView() {
           {activeTab === 'action' && (
             <div className="space-y-4">
               <h3 className={`text-sm font-semibold ${styles.cardText}`}>
-                {locale === 'zh' ? '行动桥接 — LLM输出→本体Action' : 'ActionBridge — LLM Output → Ontology Action'}
+                {t('cognition.engine.actionTitle')}
               </h3>
               <div>
-                <p className={`text-xs ${styles.muted} mb-1`}>{locale === 'zh' ? '可用Actions' : 'Available Actions'} ({actions.length})</p>
+                <p className={`text-xs ${styles.muted} mb-1`}>{t('cognition.engine.actionsLabel')} ({actions.length})</p>
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {actions.map((a, i) => (
                     <div key={i} className="flex items-center justify-between text-xs">
@@ -322,11 +322,11 @@ export default function CognitiveEngineView() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <input value={actionInput} onChange={e => setActionInput(e.target.value)} placeholder={locale === 'zh' ? '输入LLM输出文本...' : 'Enter LLM output text...'}
+                <input value={actionInput} onChange={e => setActionInput(e.target.value)} placeholder={t('cognition.engine.actionInputPh')}
                   className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} placeholder:text-zinc-500`} />
                 <button onClick={handleTest} disabled={!actionInput}
                   className="px-3 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-600 text-white text-sm disabled:opacity-40">
-                  {locale === 'zh' ? '执行' : 'Execute'}
+                  {t('cognition.engine.executeBtn')}
                 </button>
               </div>
             </div>
@@ -335,7 +335,7 @@ export default function CognitiveEngineView() {
           {/* Test Result */}
           {testResult && (
             <div className="mt-4 border-t border-[#1E293B] pt-4">
-              <h4 className={`text-xs font-semibold ${styles.muted} mb-2`}>{locale === 'zh' ? '执行结果' : 'Result'}</h4>
+              <h4 className={`text-xs font-semibold ${styles.muted} mb-2`}>{t('cognition.engine.resultTitle')}</h4>
               <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-3 overflow-x-auto max-h-48`}>
                 {JSON.stringify(testResult, null, 2)}
               </pre>
@@ -346,7 +346,7 @@ export default function CognitiveEngineView() {
         {/* Raw Data Panel */}
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5`}>
           <h3 className={`text-xs font-semibold uppercase tracking-wider ${styles.muted}`}>
-            {locale === 'zh' ? '原始响应数据' : 'Raw API Responses'}
+            {t('cognition.engine.rawTitle')}
           </h3>
           <div className="grid grid-cols-2 gap-4 mt-3">
             <div className="space-y-1">
