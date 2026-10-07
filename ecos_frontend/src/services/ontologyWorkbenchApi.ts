@@ -2,31 +2,23 @@
  * 本体工作台 REST 收口 (H6-T2) — 自 ontology-workbench 组件与 BusinessObjectExplorer 迁入。
  * 原语义保持（含各自的错误消息与解包方式）。
  */
-import { getAuthToken, authHeaders } from "./auth";
+import { doFetch, apiFetchData } from "./httpClient";
 
-/** GET /api/v1/knowledge/ecos-graph — 可选 Bearer；非 2xx 抛 Error(String(status)) */
-export async function fetchEcosGraphJson(): Promise<any> {
-  const t = getAuthToken();
-  const headers: Record<string, string> = {};
-  if (t) headers["Authorization"] = "Bearer " + t;
-  const r = await fetch("/api/v1/knowledge/ecos-graph", { headers });
-  if (!r.ok) throw new Error(String(r.status));
-  return r.json();
+/**
+ * 本体工作台 REST 收口 (H6-T2) — 自 ontology-workbench 组件与 BusinessObjectExplorer 迁入。
+ * Wave-3 W3 raw-fetch 收口：两个具名助手此前是裸 fetch（绕开共享 httpClient 的
+ * 401/403、network-down/up、auth-expired 处理）。现委托基线共享函数，语义等价：
+ *   - ontologyDomainApiFetch(path, opts) → apiFetchData（解包 .data ?? 整包，同原 `json.data ?? json`）
+ *   - fetchOntologyDataJson()            → doFetch（ok-check + 整包 JSON，caller 读 resp.code，
+ *     对 null 已在成功路径容忍，故无行为回归）
+ */
+
+/** 本体域 CRUD JSON 助手（原 OntologyDomainPanel 本地 apiFetch）。解包 .data，日志用 route reason。 */
+export function ontologyDomainApiFetch(path: string, options?: RequestInit): Promise<any> {
+  return apiFetchData(path, options);
 }
 
-/** 本体域 CRUD JSON 助手（原 OntologyDomainPanel 本地 apiFetch）。 */
-export async function ontologyDomainApiFetch(path: string, options?: RequestInit): Promise<any> {
-  const token = getAuthToken();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(path, { ...options, headers });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
-  return json.data ?? json;
-}
-
-/** GET /api/v1/ontology/data — Bearer + JSON，返回整包（normalizeObjectTypes 留在页面层）。 */
-export async function fetchOntologyDataJson(): Promise<any> {
-  const res = await fetch('/api/v1/ontology/data', { headers: authHeaders() });
-  return res.json();
+/** GET /api/v1/ontology/data — ok-check + 整包 JSON（normalizeObjectTypes 留在页面层）。 */
+export function fetchOntologyDataJson(): Promise<any> {
+  return doFetch("/api/v1/ontology/data");
 }
