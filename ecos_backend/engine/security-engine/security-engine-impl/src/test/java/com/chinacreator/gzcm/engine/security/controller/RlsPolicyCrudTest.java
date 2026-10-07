@@ -92,7 +92,8 @@ class RlsPolicyCrudTest {
 
     @Test
     void deletePolicy_success_shouldReturnSuccess() {
-        when(rlsService.deletePolicy("p1")).thenReturn(true);
+        // §5.2：DELETE 语义 = 停用（is_deleted=1），controller 走 disablePolicy
+        when(rlsService.disablePolicy("p1")).thenReturn(Map.of("id", "p1", "disabled", true));
 
         ApiResponse<?> resp = controller.deletePolicy("p1");
 
@@ -101,7 +102,8 @@ class RlsPolicyCrudTest {
 
     @Test
     void deletePolicy_notFound_shouldReturnNotFound() {
-        when(rlsService.deletePolicy("gone")).thenReturn(false);
+        // 策略不存在 → disablePolicy 返回 null → 404
+        when(rlsService.disablePolicy("gone")).thenReturn(null);
 
         ApiResponse<?> resp = controller.deletePolicy("gone");
 

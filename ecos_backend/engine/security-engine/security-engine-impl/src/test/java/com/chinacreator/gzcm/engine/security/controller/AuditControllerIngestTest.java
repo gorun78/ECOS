@@ -141,6 +141,63 @@ class AuditControllerIngestTest {
     }
 
     @Test
+    @DisplayName("B4: details.ingestActor 持久化已认证主体（服务端字段，无论 detail 是否提供都存在）")
+    void detailsIngestActorCapturesAuthenticatedSubject() {
+        authenticate("u-21", "alice");
+
+        controller.writeLog(body("u-1", "export"), request);
+
+        AuditEvent event = captureLoggedEvent();
+        Map<String, Object> details = event.getDetails();
+        assertNotNull(details);
+        assertEquals("u-21", details.get("ingestActor"), "服务端已认证主体写入 details");
+    }
+
+    @Test
+    @DisplayName("B4: detail 为 null 时 details 仍存在（只含 ingestActor，非空引用）")
+    void detailsAlwaysPresentEvenWhenDetailNull() {
+        authenticate("u-9", "carol");
+
+        Map<String, Object> body = body("u-1", "export");
+        body.remove("detail");
+        controller.writeLog(body, request);
+
+        AuditEvent event = captureLoggedEvent();
+        Map<String, Object> details = event.getDetails();
+        assertNotNull(details, "B4 契约：details 非空调（至少含服务端字段）");
+        assertEquals("u-9", details.get("ingestActor"));
+    }
+
+    @Test
+    @DisplayName("B4: 客户端在 body 里伪造 ingestActor 会被剔除，服务端值内部覆盖（fail-closed）")
+    void clientFakedIngestActorDoesNotOverwriteServerValue() {
+        authenticate("u-21", "alice");
+        Map<String, Object> body = body("u-1", "export");
+        body.put("ingestActor", "self-reported-admin");
+
+        controller.writeLog(body, request);
+
+        AuditEvent event = captureLoggedEvent();
+        Map<String, Object> details = event.getDetails();
+        assertEquals("u-21", details.get("ingestActor"),
+                "客户端伪造的 ingestActor 不得覆盖服务端已认证主体");
+    }
+
+    @Test
+    @DisplayName("B4: 无认证上下文时 details.ingestActor=anonymous（不伪装 admin/system）")
+    void detailsIngestActorDefaultsToAnonymousWhenNoContext() {
+        Map<String, Object> body = body("u-1", "export");
+
+        controller.writeLog(body, request);
+
+        AuditEvent event = captureLoggedEvent();
+        Map<String, Object> details = event.getDetails();
+        assertEquals(AuditController.ANONYMOUS_OPERATOR, details.get("ingestActor"));
+        assertNotEquals("admin", details.get("ingestActor"));
+        assertNotEquals("system", details.get("ingestActor"));
+    }
+
+    @Test
     @DisplayName("写路径异常细节不回显客户端（N-25 本文件清零）")
     void writeFailureDoesNotLeakDetailToClient() {
         doThrow(new RuntimeException("jdbc:postgresql://10.0.0.7 password=Pa55"))

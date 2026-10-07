@@ -175,7 +175,8 @@ class AuditHashChainServiceTest {
         assertTrue((Boolean) result.get("valid"));
         assertEquals(4, ((Number) result.get("totalChecked")).intValue());
         assertEquals("SHA-256", result.get("algorithm"));
-        assertEquals(null, result.get("brokenAt"));
+        // 完整链 → brokenAt 空列表（非 null）
+        assertTrue(((java.util.List<?>) result.get("brokenAt")).isEmpty());
     }
 
     @Test
@@ -190,6 +191,7 @@ class AuditHashChainServiceTest {
 
         Map<String, Object> result = service.verifyHashChain();
         assertFalse((Boolean) result.get("valid"));
-        assertEquals(2L, ((Number) result.get("brokenAt")).longValue());
+        // brokenAt 是断裂点 id 列表（最多 10 处），篡改第 2 条应含 2L
+        assertTrue(((java.util.List<Long>) result.get("brokenAt")).contains(2L));
     }
 }

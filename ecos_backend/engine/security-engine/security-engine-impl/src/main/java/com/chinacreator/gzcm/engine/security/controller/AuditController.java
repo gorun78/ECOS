@@ -218,26 +218,29 @@ public class AuditController {
             event.setIpAddress(request != null ? request.getRemoteAddr() : null);
             event.setUserAgent(request != null ? request.getHeader("User-Agent") : null);
 
-            // detail 放入 details Map
+            // detail 放入 details Map；B4：服务端已认证主体 ingestActor 一并持久化（非自报），
+            // 供 Q15 主体信任模型裁决后的对账/取证使用；未被 Q15 收回前不改写入库的自报主体
+            String ingestActor = resolveIngestActor();
+            Map<String, Object> details = new LinkedHashMap<>();
             Object detail = body.get("detail");
             if (detail != null) {
-                Map<String, Object> details = new LinkedHashMap<>();
                 details.put("detail", detail);
-                // 透传调用方提供的额外字段
+                // 透传调用方提供的额外字段；ingestActor 属服务端字段，不受客户端覆盖
                 for (Map.Entry<String, Object> e : body.entrySet()) {
                     String k = e.getKey();
                     if (!"userId".equals(k) && !"action".equals(k) && !"resource".equals(k)
-                            && !"result".equals(k) && !"detail".equals(k)) {
+                            && !"result".equals(k) && !"detail".equals(k) && !"ingestActor".equals(k)) {
                         details.put(k, e.getValue());
                     }
                 }
-                event.setDetails(details);
             }
+            details.put("ingestActor", ingestActor);
+            event.setDetails(details);
 
             // 异步写入（IAuditLogService.log 内部已用 CompletableFuture.runAsync 异步落库）
-            // N-24 取证：主体仍由调用方自报（信任模型待裁 Q15），此处旁录服务端已认证主体供对账
+            // N-24 取证：主体仍由调用方自报（信任模型待裁 Q15），服务端已认证主体经 details.ingestActor 落库
             log.info("审计摄取: claimedUserId={} action={} ingestActor={} eventId={}",
-                    event.getUserId(), event.getAction(), resolveIngestActor(), event.getEventId());
+                    event.getUserId(), event.getAction(), ingestActor, event.getEventId());
             auditLogService.log(event);
 
             return ApiResponse.success(Map.of("status", "accepted"));

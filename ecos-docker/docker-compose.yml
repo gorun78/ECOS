@@ -142,13 +142,13 @@ services:
     image: openpolicyagent/opa:0.63.0
     container_name: ecos-opa
     restart: unless-stopped
-    command: run --server --log-level=info --addr=:8181
+    command: ["run", "--server", "--log-level=info", "--addr=:8181", "/policies/rbac.rego", "/policies/abac.rego"]
     ports:
       - "8181:8181"
     volumes:
       - ./opa-policies:/policies:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8181/v1/data || exit 1"]
+      test: ["CMD", "opa", "eval", "-f", "raw", "-d", "/policies/rbac.rego", "data.ecos.rbac.allow"]
       interval: 5s
       timeout: 5s
       retries: 5

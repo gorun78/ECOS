@@ -17,9 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * RlsControllerTest — 行级安全应用端点。
  *
- * <p>Wave-5.1 T-05：验证 tableName/userId 校验与 WHERE 子句 snippet 透传。
+ * <p>Wave-5.1 T-05：验证 tableName/userId 校验 + DB 不可用时 fail-closed DENY（铁律 :3）。
  * 使用真实 {@link RowLevelSecurityServiceImpl}，但抛异常的 JdbcTemplate
- * 让它返回空策略，确保不连 PG。
+ * 让它走 fail-closed 分支，确保不连 PG。
  */
 class RlsControllerTest {
 
@@ -45,8 +45,8 @@ class RlsControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/security/rls/apply — 正常返回 WHERE 子句 snippet")
-    void applyReturnsWhereSnippet() {
+    @DisplayName("POST /api/security/rls/apply — DB 不可用时 fail-closed DENY（铁律 :3）")
+    void applyReturnsDenyWhenDbUnavailable() {
         Map<String, Object> body = Map.of(
                 "tableName", "td_user",
                 "userId", "alice",
@@ -55,10 +55,11 @@ class RlsControllerTest {
         ApiResponse<Map<String, Object>> resp = controller.apply(body);
         assertTrue(resp.isSuccess(), "apply 应 code=0");
         assertNotNull(resp.getData());
-        // 空策略下返回 1=1
-        assertEquals("1=1", resp.getData().get("condition"));
-        assertTrue(resp.getData().containsKey("tableName"));
-        assertEquals("td_user", resp.getData().get("tableName"));
+        // DB 不可用（测试 JdbcTemplate 抛异常）⇒ 铁律 :3 安全 fail-closed ⇒ DENY(1=0)，绝不放行(1=1)
+        assertEquals("1=0", resp.getData().get("condition"));
+        assertEquals(true, resp.getData().get("denyAll"), "DB 读取失败必须 deny-all（不允许 1=1 放行）");
+        assertEquals(true, resp.getData().get("denyIfEmpty"), "DB 读取失败必须 denyIfEmpty");
+        assertNotNull(resp.getData().get("deniedReason"), "fail-closed 应带拒绝原因");
     }
 
     @Test
