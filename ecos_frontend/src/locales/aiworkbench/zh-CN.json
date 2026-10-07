@@ -436,6 +436,7 @@
   "aiworkbench.agent.sim.latency": "耗时",
   "aiworkbench.agent.sim.tracesLog": "全链路节点决策追踪 (Decision Traces Log)",
   "aiworkbench.agent.sim.stepLogs": "策略执行步骤日志 (Trace Logs)",
+  "aiworkbench.agent.chatWelcome": "您好！我是 **{name}**。\n{role}。\n我被授权调用多路航空本体资源（包含执行相关的 Ontology Actions）。请问现在有什么我能帮您调配、查询或审计的吗？",
   "aiworkbench.logic.list.title": "逻辑流列表 ({count})",
   "aiworkbench.logic.list.add": "新增逻辑流",
   "aiworkbench.logic.list.ready": "已就绪",

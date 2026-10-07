@@ -164,7 +164,7 @@ export default function AgentStudioView({
         {
           id: 'welcome',
           sender: 'agent',
-          content: `您好！我是 **${selectedAgent.name}**。\n${selectedAgent.role}。\n我被授权调用多路航空本体资源（包含执行相关的 Ontology Actions）。请问现在有什么我能帮您调配、查询或审计的吗？`,
+          content: t('aiworkbench.agent.chatWelcome', { name: selectedAgent.name, role: selectedAgent.role }),
           timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
         }
       ]);

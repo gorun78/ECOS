@@ -436,6 +436,7 @@
   "aiworkbench.agent.sim.latency": "Latency",
   "aiworkbench.agent.sim.tracesLog": "Full-chain Node Decision Traces",
   "aiworkbench.agent.sim.stepLogs": "Policy execution step logs",
+  "aiworkbench.agent.chatWelcome": "Hello! I am **{name}**.\n{role}.\nI am authorized to invoke multi-path aviation ontology resources (including execution-relevant Ontology Actions). How can I help you dispatch, query, or audit right now?",
   "aiworkbench.logic.list.title": "Logic Flows ({count})",
   "aiworkbench.logic.list.add": "New logic flow",
   "aiworkbench.logic.list.ready": "Ready",
