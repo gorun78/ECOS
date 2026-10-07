@@ -251,8 +251,8 @@ export default function App() {
         id="sidebar-drag-handle"
         className={`hidden md:block w-1 hover:w-1.5 active:w-1.5 h-full cursor-col-resize shrink-0 transition-all duration-150 relative z-30 ${
           isResizing
-            ? "bg-indigo-500/80 w-1.5 shadow-[0_0_8px_rgba(99,102,241,0.5)]"
-            : `border-r ${styles.appBorder} hover:bg-indigo-500/30`
+            ? `${styles.accentBg} w-1.5`
+            : `border-r ${styles.appBorder} ${styles.sidebarHoverBg}`
         }`}
         onMouseDown={(e) => {
           e.preventDefault();
@@ -295,7 +295,7 @@ export default function App() {
         type="button"
         aria-label={t("app.copilot.open")}
         onClick={() => setCopilotOpen(true)}
-        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-[var(--card)] hover:bg-[var(--muted)] dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white shadow-lg shadow-black/30 flex items-center justify-center transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2"
+        className={`fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full ${styles.accentBg} ${styles.accentHover} text-white shadow-lg shadow-black/30 flex items-center justify-center transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2`}
       >
         <Bot className="h-7 w-7" />
       </button>
