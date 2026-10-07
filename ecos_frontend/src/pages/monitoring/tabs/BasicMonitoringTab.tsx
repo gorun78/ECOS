@@ -47,10 +47,8 @@ import { ICON_MAP } from "../helpers";
 
 // ── Basic Monitoring Tab ────────────────────────────────────
 export default function BasicMonitoringTab() {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-
-  const tl = (zh: string, en: string) => locale === "zh" ? zh : en;
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [diagnosticResult, setDiagnosticResult] = useState<string | null>(null);
@@ -88,14 +86,14 @@ export default function BasicMonitoringTab() {
     try {
       const result = await runSystemDiagnostics();
       const formatted = [
-        `${tl("状态", "Status")}: ${result.status}`,
-        `${tl("数据库", "DB")}: ${result.database.status}`,
-        `${tl("运行时间", "Uptime")}: ${Math.round(result.uptime_ms / 1000)}s`,
-        `${tl("版本", "Version")}: ${result.version}`,
+        `${t("platform.monitoring.basic.diag.status")}: ${result.status}`,
+        `${t("platform.monitoring.basic.diag.db")}: ${result.database.status}`,
+        `${t("platform.monitoring.basic.uptime")}: ${Math.round(result.uptime_ms / 1000)}s`,
+        `${t("platform.monitoring.basic.diag.version")}: ${result.version}`,
       ].join(" | ");
       setDiagnosticResult(formatted);
     } catch (e: any) {
-      setDiagnosticError(e.message || tl("诊断服务不可用。", "Diagnostics service unavailable."));
+      setDiagnosticError(e.message || t("platform.monitoring.basic.diag.unavail"));
     } finally {
       setIsRefreshing(false);
     }
@@ -114,9 +112,9 @@ export default function BasicMonitoringTab() {
         {/* Title and Controls */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold tracking-tight">{tl("系统监控", "System Monitoring")}</h1>
+            <h1 className="text-xl font-bold tracking-tight">{t("platform.monitoring.basic.title")}</h1>
             <p className={`text-xs ${styles.cardTextMuted} mt-1`}>
-              {tl("实时系统指标、进程与告警概览", "Real-time system metrics, processes & alerts overview")}
+              {t("platform.monitoring.basic.subtitle")}
             </p>
           </div>
 
@@ -125,10 +123,10 @@ export default function BasicMonitoringTab() {
               onClick={loadData}
               disabled={loading}
               className={`flex items-center gap-1.5 px-3 py-1.5 border ${styles.cardBorder} ${styles.cardTextMuted} ${styles.sidebarHoverBg} cursor-pointer disabled:opacity-50 text-xs font-bold rounded-lg transition h-8`}
-              title={tl("刷新", "Refresh")}
+              title={t("platform.monitoring.basic.refresh")}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>{tl("刷新", "Refresh")}</span>
+              <span>{t("platform.monitoring.basic.refresh")}</span>
             </button>
             <button 
               onClick={runDiagnostics}
@@ -136,7 +134,7 @@ export default function BasicMonitoringTab() {
               className={`flex items-center gap-1.5 px-3 py-1.5 border border-indigo-500 text-indigo-500 hover:bg-indigo-500/10 cursor-pointer disabled:opacity-50 text-xs font-bold rounded-lg transition h-8`}
             >
               <FileCheck className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>{tl("运行诊断", "Run Diagnostics")}</span>
+              <span>{t("platform.monitoring.basic.diagnostics")}</span>
             </button>
           </div>
         </div>
@@ -146,7 +144,7 @@ export default function BasicMonitoringTab() {
           <div className="flex items-center justify-center py-16">
             <div className="flex flex-col items-center gap-3">
               <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
-              <p className={`text-sm ${styles.cardTextMuted}`}>{tl("加载监控数据...", "Loading monitoring data...")}</p>
+              <p className={`text-sm ${styles.cardTextMuted}`}>{t("platform.monitoring.basic.loading")}</p>
             </div>
           </div>
         )}
@@ -177,10 +175,10 @@ export default function BasicMonitoringTab() {
               <BarChart3 className={`w-10 h-10 ${styles.cardTextMuted}`} />
             </div>
             <h3 className={`font-bold text-sm ${styles.cardTextMuted} mb-2`}>
-              {tl("实时监控数据尚未就绪", "Real-time monitoring data not ready")}
+              {t("platform.monitoring.basic.emptyTitle")}
             </h3>
             <p className={`text-xs ${styles.cardTextMuted} max-w-md leading-relaxed`}>
-              {tl("实时监控数据尚未就绪。后台服务连接后，系统指标、图表和告警将在此展示。点击刷新按钮重试。", "Real-time monitoring data is not yet available. Once the backend service is connected, system metrics, charts, and alerts will appear here. Click the refresh button to retry.")}
+              {t("platform.monitoring.basic.emptyHint")}
             </p>
           </div>
         )}
@@ -216,7 +214,7 @@ export default function BasicMonitoringTab() {
               <div className={`border ${styles.cardBorder} ${styles.cardBg} rounded-xl p-6 shadow-2xs`}>
                 <div className="flex items-center gap-2 mb-4">
                   <Radio className="w-4 h-4 text-indigo-500 shrink-0" />
-                  <h3 className="font-bold text-sm">{tl("系统指标", "System Metrics")}</h3>
+                  <h3 className="font-bold text-sm">{t("platform.monitoring.basic.metrics")}</h3>
                 </div>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
@@ -254,16 +252,16 @@ export default function BasicMonitoringTab() {
               <div className={`border ${styles.cardBorder} ${styles.cardBg} rounded-xl p-6 shadow-2xs`}>
                 <div className="flex items-center gap-2 mb-4">
                   <Activity className="w-4 h-4 text-indigo-500 shrink-0" />
-                  <h3 className="font-bold text-sm">{tl("进程监控", "Process Monitor")}</h3>
+                  <h3 className="font-bold text-sm">{t("platform.monitoring.basic.process")}</h3>
                 </div>
                 <div className={`overflow-x-auto rounded border ${styles.cardBorder} text-xs`}>
                   <table className="w-full border-collapse">
                     <thead className="bg-[var(--card,#334155)] text-[var(--card,#E2E8F0)] font-mono text-[9px] uppercase tracking-wider">
                       <tr>
-                        <th className="p-2 text-left">{tl("进程", "Job")}</th>
-                        <th className="p-2 text-left">{tl("类型", "Type")}</th>
-                        <th className="p-2 text-left">{tl("运行时间", "Uptime")}</th>
-                        <th className="p-2 text-right">{tl("计数", "Count")}</th>
+                        <th className="p-2 text-left">{t("platform.monitoring.basic.col.job")}</th>
+                        <th className="p-2 text-left">{t("platform.monitoring.basic.col.type")}</th>
+                        <th className="p-2 text-left">{t("platform.monitoring.basic.uptime")}</th>
+                        <th className="p-2 text-right">{t("platform.monitoring.basic.col.count")}</th>
                       </tr>
                     </thead>
                     <tbody className="font-mono">
@@ -289,7 +287,7 @@ export default function BasicMonitoringTab() {
             {alerts.length > 0 && (
               <div className={`border ${styles.cardBorder} ${styles.cardBg} rounded-xl p-4 shadow-3xs space-y-4`}>
                 <h4 className={`text-xs font-extrabold uppercase font-mono tracking-wider ${styles.cardTextMuted} flex items-center gap-2`}>
-                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" /> {tl("最近告警", "Recent Alerts")}
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" /> {t("platform.monitoring.basic.alerts")}
                 </h4>
                 <div className="space-y-3">
                   {alerts.map((al, idx) => (
