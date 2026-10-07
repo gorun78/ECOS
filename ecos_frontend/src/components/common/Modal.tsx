@@ -135,7 +135,7 @@ export default function Modal({
 
       {/* Panel */}
       <div
-        className={`relative z-10 w-full ${SIZE_MAP[size]} rounded-xl border ${styles.cardBorder} ${styles.cardBg} shadow-2xl animate-in fade-in zoom-in-95 duration-150 max-h-[85vh] flex flex-col ${className}`}
+        className={`relative z-10 w-full ${SIZE_MAP[size]} rounded-xl border ${styles.cardBorder} ${styles.cardBg} shadow-2xl animate-in fade-in zoom-in-95 duration-150 max-h-[85vh] flex flex-col max-lg:h-full max-lg:max-h-none max-lg:rounded-none max-lg:shadow-none ${className}`}
       >
         {/* Header */}
         {title && (
