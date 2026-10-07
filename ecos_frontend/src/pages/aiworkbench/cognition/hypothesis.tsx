@@ -12,7 +12,7 @@ const STATUS_STYLES: Record<string, string> = {
   REJECTED: 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300',
 };
 
-const STATUS_LABELS: Record<string, string> = { VALID: '有效', TESTING: '测试中', SUPPORTED: '已支持', REJECTED: '已拒绝' };
+const STATUS_KEYS = ['VALID', 'TESTING', 'SUPPORTED', 'REJECTED'];
 
 export default function hypothesis() {
   const { t } = useLanguage();
@@ -136,7 +136,7 @@ export default function hypothesis() {
         <select className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300"
           value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="">{t('hypo.status.all', '全部状态')}</option>
-          {Object.keys(STATUS_LABELS).map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+          {STATUS_KEYS.map(s => <option key={s} value={s}>{t(`hypo.status.${s.toLowerCase()}`, s)}</option>)}
         </select>
         <select className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300"
           value={impactFilter} onChange={e => setImpactFilter(e.target.value)}>
@@ -176,7 +176,7 @@ export default function hypothesis() {
                 <td className="px-4 py-2 text-slate-500 dark:text-slate-400">{h.domain ?? '—'}</td>
                 <td className="px-4 py-2">
                   <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_STYLES[h.status] ?? 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
-                    {STATUS_LABELS[h.status] ?? h.status}
+                    {t(`hypo.status.${(h.status ?? '').toLowerCase()}`, h.status ?? '—')}
                   </span>
                 </td>
                 <td className="px-4 py-2 text-slate-700 dark:text-slate-300">{h.isValid ? '—' : '—'}</td>
@@ -197,7 +197,7 @@ export default function hypothesis() {
       {selected && (
         <div className="fixed inset-y-0 right-0 w-[380px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-xl flex flex-col z-50">
           <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{selected.code} · {t('hypo.title', '假设')}</h2>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{selected.code} · {t('hypo.drawer.title', '假设')}</h2>
             <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
