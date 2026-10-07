@@ -264,7 +264,7 @@ export default function DashboardView({
             </button>
             <button
               onClick={() => onNavigateToView('logic')}
-              className={`px-3.5 py-1.5 bg-[var(--muted)] hover:bg-[var(--card)] text-[var(--text-primary)] border ${styles.inputBorder} font-semibold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5`}
+              className={`px-3.5 py-1.5 bg-[var(--muted,#1E293B)] hover:bg-[var(--card,#334155)] text-[var(--text-primary,#E2E8F0)] border ${styles.inputBorder} font-semibold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5`}
             >
               <Cpu size={13} />
               <span>{t('dashboard.welcome.btnLogic')}</span>
@@ -318,7 +318,7 @@ export default function DashboardView({
                 const heightPercent = (val / maxUsage) * 100;
                 return (
                   <div key={idx} className="flex-1 flex flex-col items-center justify-end h-full px-1.5 group relative">
-                    <span className="absolute -top-6 bg-[var(--muted)] text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap">
+                    <span className="absolute -top-6 bg-[var(--muted,#1E293B)] text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 whitespace-nowrap">
                       {t('dashboard.trend.calls', { n: val })}
                     </span>
                     <div
@@ -563,7 +563,7 @@ export default function DashboardView({
               {session.progress}%
             </span>
           </div>
-          <div className="w-full rounded-full h-2 overflow-hidden" style={{ backgroundColor: "color-mix(in srgb, var(--muted-foreground) 25%, transparent)" }}>
+          <div className="w-full rounded-full h-2 overflow-hidden" style={{ backgroundColor: "color-mix(in srgb, var(--muted-foreground, #64748B) 25%, transparent)" }}>
             <div
               className={`h-full rounded-full transition-all duration-500 ${
                 session.status === 'completed' ? 'bg-emerald-500' : 'bg-blue-500'
@@ -636,7 +636,7 @@ export default function DashboardView({
                 })}
               </span>
             </div>
-            <div className="max-h-[420px] overflow-y-auto divide-y divide-[var(--card-border)]">
+            <div className="max-h-[420px] overflow-y-auto divide-y divide-[var(--card-border,#E2E8F0)]">
               {session.results.map((r, i) => (
                 <div key={r.questionId} className="p-4 space-y-2">
                   <div className="flex items-start justify-between gap-3">
