@@ -52,9 +52,8 @@ interface OntologyMappingsPayload {
 type OntologyExportPayload = { knowledgeMarkdown?: string } | string;
 
 export default function OntologyModelTab() {
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const tl = (zh: string, en: string) => locale === 'zh' ? zh : en;
   const [ontologyMappings, setOntologyMappings] = useState<OntologyEntity[]>([]);
   const [availableTables, setAvailableTables] = useState<PhysicalTable[]>([]);
   const [editingOntology, setEditingOntology] = useState<OntologyEntity | null>(null);
@@ -156,7 +155,7 @@ export default function OntologyModelTab() {
             onClick={() => { window.location.hash = `#/ontology-workbench/entity?from=kb`; }}
             className={`px-3.5 py-1.5 ${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardText} font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-all`}
           >
-            <ExternalLink size={12} /><span>{tl('跳转本体工作台', 'Open buszhi')}</span>
+            <ExternalLink size={12} /><span>{t('knowledge.ontology_model.openBuszhi')}</span>
           </button>
           <button onClick={handleExport} disabled={isExporting} className="px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-all">
             <Download size={12} /><span>{isExporting ? (t("knowledge.ontologytab.导出中")) : (t("knowledge.ontologytab.导出_rag_知识包"))}</span>

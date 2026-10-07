@@ -1645,5 +1645,6 @@
   "knowledge.upload.enqueuedHint": "Enqueued — waiting for backend /extract/upload progression (PMO-56: /extract/tasks/{id})",
   "knowledge.upload.extractionHistory": "Extraction History",
   "knowledge.upload.noHistory": "No history yet (/extract/history returns empty)",
-  "knowledge.upload.done": "Done"
+  "knowledge.upload.done": "Done",
+  "knowledge.ontology_model.openBuszhi": "Open buszhi"
 }

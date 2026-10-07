@@ -226,5 +226,17 @@
   "cognition.engine.actionInputPh": "Enter LLM output text...",
   "cognition.engine.executeBtn": "Execute",
   "cognition.engine.resultTitle": "Result",
-  "cognition.engine.rawTitle": "Raw API Responses"
+  "cognition.engine.rawTitle": "Raw API Responses",
+  "cognition.cos.evolution.title": "Autonomous Evolution Engine",
+  "cognition.cos.evolution.completed": "Evolution cycle completed",
+  "cognition.cos.evolution.interrupted": "Evolution cycle interrupted",
+  "cognition.cos.evolution.stageRunning": "Stage {current}/{total} in progress",
+  "cognition.cos.evolution.ready": "Ready — awaiting trigger",
+  "cognition.cos.evolution.reset": "Reset",
+  "cognition.cos.evolution.trigger": "Trigger Evolution",
+  "cognition.cos.evolution.stagesDone": "Stages Done",
+  "cognition.cos.evolution.logTitle": "Evolution Log",
+  "cognition.cos.evolution.mission": "Mission",
+  "cognition.cos.evolution.noRecords": "No evolution records",
+  "cognition.cos.evolution.recentMissions": "Recent Missions"
 }

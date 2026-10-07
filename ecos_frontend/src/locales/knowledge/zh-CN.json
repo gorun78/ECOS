@@ -1645,5 +1645,6 @@
   "knowledge.upload.enqueuedHint": "已入队，等待后端 /extract/upload 状态推进（PMO-56 待补 /extract/tasks/{id}）",
   "knowledge.upload.extractionHistory": "抽取历史",
   "knowledge.upload.noHistory": "暂无历史（/extract/history 尚未返回）",
-  "knowledge.upload.done": "完成"
+  "knowledge.upload.done": "完成",
+  "knowledge.ontology_model.openBuszhi": "跳转本体工作台"
 }

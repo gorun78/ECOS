@@ -226,5 +226,17 @@
   "cognition.engine.actionInputPh": "输入LLM输出文本...",
   "cognition.engine.executeBtn": "执行",
   "cognition.engine.resultTitle": "执行结果",
-  "cognition.engine.rawTitle": "原始响应数据"
+  "cognition.engine.rawTitle": "原始响应数据",
+  "cognition.cos.evolution.title": "自治进化引擎",
+  "cognition.cos.evolution.completed": "进化周期已完成",
+  "cognition.cos.evolution.interrupted": "进化周期异常中断",
+  "cognition.cos.evolution.stageRunning": "阶段 {current}/{total} 执行中",
+  "cognition.cos.evolution.ready": "就绪 — 等待触发",
+  "cognition.cos.evolution.reset": "重置",
+  "cognition.cos.evolution.trigger": "触发进化",
+  "cognition.cos.evolution.stagesDone": "阶段完成",
+  "cognition.cos.evolution.logTitle": "进化日志",
+  "cognition.cos.evolution.mission": "当前任务",
+  "cognition.cos.evolution.noRecords": "暂无进化记录",
+  "cognition.cos.evolution.recentMissions": "历史任务"
 }

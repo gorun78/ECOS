@@ -16,7 +16,7 @@ const RING_CENTER = 130;
 const STAGE_ANGLES = STAGES.map((_, i) => (i * 2 * Math.PI / STAGES.length) - Math.PI / 2);
 
 export default function CognitiveOperatingSystem() {
-  const { locale } = useLanguage();
+  const { locale, t } = useLanguage();
   const { styles } = useTheme();
   const [missionId, setMissionId] = useState<string | null>(null);
   const [logEntries, setLogEntries] = useState<any[]>([]);
@@ -98,12 +98,12 @@ export default function CognitiveOperatingSystem() {
             <Zap className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-bold">{tl('自治进化引擎', 'Autonomous Evolution Engine')}</h2>
+            <h2 className="text-sm font-bold">{t('cognition.cos.evolution.title')}</h2>
             <div className="text-[10px] text-[var(--muted-foreground)]">
-              {allComplete ? tl('进化周期已完成', 'Evolution cycle completed') :
-               hasFailure ? tl('进化周期异常中断', 'Evolution cycle interrupted') :
-               missionId ? tl(`阶段 ${completedCount + 1}/${STAGES.length} 执行中`, `Stage ${completedCount + 1}/${STAGES.length} in progress`) :
-               tl('就绪 — 等待触发', 'Ready — awaiting trigger')}
+              {allComplete ? t('cognition.cos.evolution.completed') :
+               hasFailure ? t('cognition.cos.evolution.interrupted') :
+               missionId ? t('cognition.cos.evolution.stageRunning', { current: completedCount + 1, total: STAGES.length }) :
+               t('cognition.cos.evolution.ready')}
             </div>
           </div>
         </div>
@@ -114,7 +114,7 @@ export default function CognitiveOperatingSystem() {
               className="flex items-center gap-1 px-2 py-1 text-[10px] rounded border border-[var(--border)] hover:bg-[var(--muted)]"
             >
               <RotateCcw className="w-3 h-3" />
-              {tl('重置', 'Reset')}
+              {t('cognition.cos.evolution.reset')}
             </button>
           )}
           <button
@@ -123,7 +123,7 @@ export default function CognitiveOperatingSystem() {
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 shadow-lg shadow-indigo-500/20"
           >
             {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-            {tl('触发进化', 'Trigger Evolution')}
+            {t('cognition.cos.evolution.trigger')}
           </button>
         </div>
       </div>
@@ -197,7 +197,7 @@ export default function CognitiveOperatingSystem() {
               {completedCount}/{STAGES.length}
             </text>
             <text x={RING_CENTER} y={RING_CENTER + 10} textAnchor="middle" fill="#94a3b8" fontSize="9">
-              {tl('阶段完成', 'Stages Done')}
+              {t('cognition.cos.evolution.stagesDone')}
             </text>
           </svg>
 
@@ -226,7 +226,7 @@ export default function CognitiveOperatingSystem() {
         <div className="w-72 flex flex-col bg-[var(--card)] rounded-xl border border-[var(--border)] overflow-hidden shrink-0">
           <div className="px-3 py-2 border-b border-[var(--border)] flex items-center justify-between shrink-0">
             <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-              {tl('进化日志', 'Evolution Log')}
+              {t('cognition.cos.evolution.logTitle')}
             </div>
             {missionId && (
               <button onClick={() => fetchLog(missionId)} className="p-1 hover:bg-[var(--muted)] rounded">
@@ -238,12 +238,12 @@ export default function CognitiveOperatingSystem() {
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {missionId && (
               <div className="text-[10px] text-[var(--muted-foreground)] px-1 pb-1">
-                {tl('当前任务', 'Mission')}: <span className="font-mono">{missionId.slice(0, 16)}</span>
+                {t('cognition.cos.evolution.mission')}: <span className="font-mono">{missionId.slice(0, 16)}</span>
               </div>
             )}
             {logEntries.length === 0 && (
               <div className="text-xs text-[var(--muted-foreground)] py-8 text-center">
-                {tl('暂无进化记录', 'No evolution records')}
+                {t('cognition.cos.evolution.noRecords')}
               </div>
             )}
             {logEntries.map((entry: any, i: number) => {
@@ -272,7 +272,7 @@ export default function CognitiveOperatingSystem() {
           {recentMissions.length > 1 && (
             <div className="border-t border-[var(--border)] p-2 space-y-1 shrink-0 max-h-32 overflow-y-auto">
               <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
-                {tl('历史任务', 'Recent Missions')}
+                {t('cognition.cos.evolution.recentMissions')}
               </div>
               {recentMissions.filter(m => m !== missionId).slice(0, 5).map(mid => (
                 <button key={mid} onClick={() => { setMissionId(mid); fetchLog(mid); }}
