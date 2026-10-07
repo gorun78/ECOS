@@ -53,7 +53,7 @@ function fmtPercent(v: number | string | undefined | null): string {
 
 // ── Component ──────────────────────────────────────────
 export default function OperationsDashboard() {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   const [data, setData] = useState<DashboardData | null>(null);
@@ -76,11 +76,11 @@ export default function OperationsDashboard() {
         contractTrend: raw.contractTrend || raw.contract_trend || [],
       });
     } catch (e: any) {
-      setError(e.message || (locale === "zh" ? "加载看板数据失败" : "Failed to load dashboard"));
+      setError(e.message || t("dashboard.ops.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [locale]);
+  }, [t]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -93,7 +93,7 @@ export default function OperationsDashboard() {
         <div className="text-center space-y-3">
           <Loader2 className={`w-8 h-8 ${styles.accentText} animate-spin mx-auto`} />
           <p className={`text-sm ${styles.muted}`}>
-            {locale === "zh" ? "加载看板数据..." : "Loading dashboard..."}
+            {t("dashboard.ops.loading")}
           </p>
         </div>
       </div>
@@ -107,7 +107,7 @@ export default function OperationsDashboard() {
         <div className="text-center max-w-sm">
           <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
           <p className="text-sm font-semibold text-red-600 mb-1">
-            {locale === "zh" ? "看板数据加载失败" : "Dashboard load failed"}
+            {t("dashboard.ops.loadErrorTitle")}
           </p>
           <p className={`text-xs ${styles.muted} mb-4`}>{error}</p>
           <button
@@ -115,7 +115,7 @@ export default function OperationsDashboard() {
             className={`inline-flex items-center gap-1.5 px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded-lg transition`}
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            {locale === "zh" ? "重试" : "Retry"}
+            {t("dashboard.ops.retry")}
           </button>
         </div>
       </div>
@@ -142,10 +142,10 @@ export default function OperationsDashboard() {
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2">
             <BarChart3 className={`w-5 h-5 ${styles.accentText}`} />
-            {locale === "zh" ? "产值分配看板" : "Operations Dashboard"}
+            {t("dashboard.ops.title")}
           </h1>
           <p className={`text-xs ${styles.muted} mt-1`}>
-            {locale === "zh" ? "高速信科养护产值、工程项目与设备运营总览" : "GSXK maintenance output, projects & equipment overview"}
+            {t("dashboard.ops.subtitle")}
           </p>
         </div>
         <button
@@ -154,7 +154,7 @@ export default function OperationsDashboard() {
           className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} hover:opacity-80 transition disabled:opacity-50`}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          {loading ? (locale === "zh" ? "刷新中..." : "Refreshing...") : (locale === "zh" ? "刷新" : "Refresh")}
+          {loading ? t("dashboard.ops.refreshing") : t("dashboard.ops.refresh")}
         </button>
       </div>
 
@@ -162,28 +162,28 @@ export default function OperationsDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiTile
           icon={TrendingUp}
-          label={locale === "zh" ? "养护产值" : "Maint. Output"}
+          label={t("dashboard.ops.kpi.maintOutput")}
           value={fmtMoney(data?.maintenanceOutput)}
           color="text-emerald-500"
           styles={styles}
         />
         <KpiTile
           icon={Briefcase}
-          label={locale === "zh" ? "工程项目数" : "Projects"}
+          label={t("dashboard.ops.kpi.projects")}
           value={data?.projectCount ?? 0}
           color="text-blue-500"
           styles={styles}
         />
         <KpiTile
           icon={FileCheck}
-          label={locale === "zh" ? "合同履约率" : "Fulfillment Rate"}
+          label={t("dashboard.ops.kpi.fulfillment")}
           value={fmtPercent(data?.contractFulfillmentRate)}
           color="text-violet-500"
           styles={styles}
         />
         <KpiTile
           icon={Wrench}
-          label={locale === "zh" ? "设备完好率" : "Equipment Health"}
+          label={t("dashboard.ops.kpi.equipHealth")}
           value={fmtPercent(data?.equipmentHealthRate)}
           color="text-amber-500"
           styles={styles}
@@ -195,10 +195,10 @@ export default function OperationsDashboard() {
         <div className={`text-center py-16 rounded-xl border border-dashed ${styles.cardBorder}`}>
           <Building2 className={`w-10 h-10 ${styles.cardTextMuted} mx-auto mb-3`} />
           <p className={`text-sm font-semibold ${styles.muted}`}>
-            {locale === "zh" ? "暂无业务数据" : "No business data"}
+            {t("dashboard.ops.empty")}
           </p>
           <p className={`text-xs ${styles.cardTextMuted} mt-1`}>
-            {locale === "zh" ? "请确认后端服务已启动，或稍后刷新重试" : "Please verify backend is running, or refresh later"}
+            {t("dashboard.ops.emptyHint")}
           </p>
         </div>
       )}
@@ -211,7 +211,7 @@ export default function OperationsDashboard() {
             <div className={`rounded-lg border ${styles.cardBorder} ${styles.cardBg} p-4`}>
               <h3 className={`text-sm font-bold mb-3 flex items-center gap-2 ${styles.cardText}`}>
                 <Activity className={`w-4 h-4 ${styles.accentText}`} />
-                {locale === "zh" ? "月度产值趋势" : "Monthly Output Trend"}
+                {t("dashboard.ops.monthlyTrend")}
               </h3>
               <div className="h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -230,7 +230,7 @@ export default function OperationsDashboard() {
                     <Line
                       type="monotone"
                       dataKey="value"
-                      name={locale === "zh" ? "产值" : "Output"}
+                      name={t("dashboard.ops.output")}
                       stroke="#6366F1"
                       strokeWidth={2}
                       dot={{ r: 3, fill: "#6366F1" }}
@@ -240,7 +240,7 @@ export default function OperationsDashboard() {
                       <Line
                         type="monotone"
                         dataKey="projects"
-                        name={locale === "zh" ? "项目数" : "Projects"}
+                        name={t("dashboard.ops.projects")}
                         stroke="#10B981"
                         strokeWidth={2}
                         dot={{ r: 3, fill: "#10B981" }}
@@ -257,7 +257,7 @@ export default function OperationsDashboard() {
             <div className={`rounded-lg border ${styles.cardBorder} ${styles.cardBg} p-4`}>
               <h3 className={`text-sm font-bold mb-3 flex items-center gap-2 ${styles.cardText}`}>
                 <Building2 className={`w-4 h-4 ${styles.accentText}`} />
-                {locale === "zh" ? "部门产值分布" : "Department Output Distribution"}
+                {t("dashboard.ops.deptDist")}
               </h3>
               <div className="h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -283,7 +283,7 @@ export default function OperationsDashboard() {
                         borderRadius: "8px",
                         fontSize: "12px",
                       }}
-                      formatter={(value: any) => [fmtMoney(value), locale === "zh" ? "产值" : "Output"]}
+                      formatter={(value: any) => [fmtMoney(value), t("dashboard.ops.output")]}
                     />
                     <Legend
                       wrapperStyle={{ fontSize: "11px" }}
@@ -301,7 +301,7 @@ export default function OperationsDashboard() {
         <div className={`rounded-lg border ${styles.cardBorder} ${styles.cardBg} p-4`}>
           <h3 className={`text-sm font-bold mb-3 flex items-center gap-2 ${styles.cardText}`}>
             <FileCheck className={`w-4 h-4 ${styles.accentText}`} />
-            {locale === "zh" ? "合同履约率趋势" : "Contract Fulfillment Rate Trend"}
+            {t("dashboard.ops.contractTrend")}
           </h3>
           <div className="h-[180px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -316,11 +316,11 @@ export default function OperationsDashboard() {
                     borderRadius: "8px",
                     fontSize: "12px",
                   }}
-                  formatter={(value: any) => [`${value}%`, locale === "zh" ? "履约率" : "Rate"]}
+                  formatter={(value: any) => [`${value}%`, t("dashboard.ops.rate")]}
                 />
                 <Bar
                   dataKey="rate"
-                  name={locale === "zh" ? "履约率" : "Fulfillment Rate"}
+                  name={t("dashboard.ops.fulfillmentRate")}
                   fill="#8B5CF6"
                   radius={[4, 4, 0, 0]}
                 />
@@ -336,20 +336,20 @@ export default function OperationsDashboard() {
           <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
             <h3 className={`text-sm font-bold flex items-center gap-2 ${styles.cardText}`}>
               <PieChart className={`w-4 h-4 ${styles.accentText}`} />
-              {locale === "zh" ? "部门产值明细" : "Department Output Details"}
+              {t("dashboard.ops.deptDetails")}
             </h3>
           </div>
           <table className="w-full text-xs">
             <thead>
               <tr className={`border-b ${styles.cardBorder}`}>
                 <th className={`text-left px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider ${styles.cardTextMuted}`}>
-                  {locale === "zh" ? "部门" : "Department"}
+                  {t("dashboard.ops.col.dept")}
                 </th>
                 <th className={`text-right px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider ${styles.cardTextMuted}`}>
-                  {locale === "zh" ? "产值" : "Output"}
+                  {t("dashboard.ops.col.output")}
                 </th>
                 <th className={`text-right px-4 py-2.5 font-bold uppercase text-[10px] tracking-wider ${styles.cardTextMuted}`}>
-                  {locale === "zh" ? "占比" : "Share"}
+                  {t("dashboard.ops.col.share")}
                 </th>
               </tr>
             </thead>
@@ -398,7 +398,7 @@ export default function OperationsDashboard() {
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
           <button onClick={loadData} className="ml-auto font-semibold underline hover:no-underline">
-            {locale === "zh" ? "重试" : "Retry"}
+            {t("dashboard.ops.retry")}
           </button>
         </div>
       )}

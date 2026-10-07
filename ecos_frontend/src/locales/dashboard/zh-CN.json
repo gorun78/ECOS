@@ -4,7 +4,6 @@
   "dashboard.welcome.desc": "将大规模语言模型(LLM)无缝绑定于航空核心本体(Aviation Core)。在此配置决策逻辑流(AIP Logic)、部署会话交互智能体(AIP Agents)，并受到企业级私有边界与数据安全护栏(Guardrails)的完全实时审计和守护。",
   "dashboard.welcome.btnAgent": "定制智能体",
   "dashboard.welcome.btnLogic": "编排逻辑流",
-
   "dashboard.kpi.pipeline.title": "激活逻辑编排 (Pipelines)",
   "dashboard.kpi.pipeline.sub": "已绑定为 Ontology 函数",
   "dashboard.kpi.agent.title": "在线智能体 (AIP Agents)",
@@ -14,7 +13,6 @@
   "dashboard.kpi.model.unit": "台",
   "dashboard.kpi.guardrail.title": "安全护栏拦截率 (PII/Hallu)",
   "dashboard.kpi.guardrail.sub": "近 24H 自动防御审计 142 次",
-
   "dashboard.trend.title": "AIP API 运行负载趋势 (24小时批次)",
   "dashboard.trend.updated": "2026-07-03 最新汇总",
   "dashboard.trend.calls": "{n} 次调用",
@@ -25,11 +23,9 @@
   "dashboard.trend.friday": "周五",
   "dashboard.trend.saturday": "周六",
   "dashboard.trend.sunday": "周日",
-
   "dashboard.model.title": "大模型(LLM)算力消耗占比",
   "dashboard.model.byToken": "按 Token 计算",
   "dashboard.model.total": "总 Token",
-
   "dashboard.audit.title": "AIP 平台运行审计与安全阻断日志",
   "dashboard.audit.manage": "管理安全护栏",
   "dashboard.audit.operator": "操作人: {user}",
@@ -37,7 +33,6 @@
   "dashboard.audit.flagged": "待人工校对 (Flagged)",
   "dashboard.audit.pending": "待签授权 (Pending)",
   "dashboard.audit.passed": "安全放行 (Passed)",
-
   "dashboard.eval.title": "智能体评估面板",
   "dashboard.eval.sub": "选择智能体与问题集，评估回答质量与能力雷达",
   "dashboard.eval.agentLabel": "选择评估智能体",
@@ -62,10 +57,8 @@
   "dashboard.eval.scoreLabel": "分",
   "dashboard.eval.latency": "⏱ {ms}ms",
   "dashboard.eval.responseTemplate": "模拟回答：关于 \"{q}\" 的评估结果。得分: {score}/100",
-
   "dashboard.tab.overview": "总览仪表盘",
   "dashboard.tab.evaluation": "评估面板",
-
   "dashboard.radar.accuracy": "准确度",
   "dashboard.radar.relevance": "相关性",
   "dashboard.radar.completeness": "完整性",
@@ -73,32 +66,27 @@
   "dashboard.radar.efficiency": "效率",
   "dashboard.radar.creativity": "创造性",
   "dashboard.radar.totalScore": "综合评分",
-
   "dashboard.qset.qs1.name": "航空合规知识集",
   "dashboard.qset.qs1.desc": "航空领域合规、安全、运营知识评估",
   "dashboard.qset.qs2.name": "客服场景知识集",
   "dashboard.qset.qs2.desc": "机票退改签、行李、特殊旅客服务等客服场景",
   "dashboard.qset.qs3.name": "数据分析知识集",
   "dashboard.qset.qs3.desc": "航班数据、旅客行为、收入分析等数据分析场景",
-
   "dashboard.qset.qs1.q1": "航班延误超过4小时，航空公司应承担哪些责任？",
   "dashboard.qset.qs1.q2": "描述飞机起飞前必须完成的5项安全检查流程。",
   "dashboard.qset.qs1.q3": "在航空领域中，MEL（最低设备清单）的作用是什么？",
   "dashboard.qset.qs1.q4": "如何定义和计算航空公司的准点率？",
   "dashboard.qset.qs1.q5": "航空数据治理中，PII数据脱敏的最佳实践有哪些？",
   "dashboard.qset.qs1.q6": "描述ADS-B技术在航空监控中的应用与局限性。",
-
   "dashboard.qset.qs2.q1": "旅客要求非自愿退票，客票状态为已使用部分航段，如何处理？",
   "dashboard.qset.qs2.q2": "无成人陪伴儿童（UM）服务的申请条件与流程是什么？",
   "dashboard.qset.qs2.q3": "行李丢失赔偿标准：国内航线与国际航线的区别？",
   "dashboard.qset.qs2.q4": "旅客因身体原因需申请轮椅服务，有哪些步骤？",
   "dashboard.qset.qs2.q5": "航班超售时，旅客权益保障及赔偿流程？",
-
   "dashboard.qset.qs3.q1": "如何计算某条航线的客座率及同比变化趋势？",
   "dashboard.qset.qs3.q2": "解释航空公司常旅客计划的积分价值模型。",
   "dashboard.qset.qs3.q3": "航班时刻资源分配中需要考虑哪些关键因素？",
   "dashboard.qset.qs3.q4": "利用机器学习预测航班延误，需收集哪些特征数据？",
-
   "dashboard.cat.compliance": "合规",
   "dashboard.cat.safety": "安全",
   "dashboard.cat.operation": "运营",
@@ -108,5 +96,30 @@
   "dashboard.cat.specialService": "特殊服务",
   "dashboard.cat.baggage": "行李",
   "dashboard.cat.analysis": "分析",
-  "dashboard.cat.revenue": "收入"
+  "dashboard.cat.revenue": "收入",
+  "dashboard.ops.title": "产值分配看板",
+  "dashboard.ops.subtitle": "高速信科养护产值、工程项目与设备运营总览",
+  "dashboard.ops.loading": "加载看板数据...",
+  "dashboard.ops.loadFailed": "加载看板数据失败",
+  "dashboard.ops.loadErrorTitle": "看板数据加载失败",
+  "dashboard.ops.retry": "重试",
+  "dashboard.ops.refresh": "刷新",
+  "dashboard.ops.refreshing": "刷新中...",
+  "dashboard.ops.kpi.maintOutput": "养护产值",
+  "dashboard.ops.kpi.projects": "工程项目数",
+  "dashboard.ops.kpi.fulfillment": "合同履约率",
+  "dashboard.ops.kpi.equipHealth": "设备完好率",
+  "dashboard.ops.empty": "暂无业务数据",
+  "dashboard.ops.emptyHint": "请确认后端服务已启动，或稍后刷新重试",
+  "dashboard.ops.monthlyTrend": "月度产值趋势",
+  "dashboard.ops.output": "产值",
+  "dashboard.ops.projects": "项目数",
+  "dashboard.ops.deptDist": "部门产值分布",
+  "dashboard.ops.contractTrend": "合同履约率趋势",
+  "dashboard.ops.rate": "履约率",
+  "dashboard.ops.fulfillmentRate": "履约率",
+  "dashboard.ops.deptDetails": "部门产值明细",
+  "dashboard.ops.col.dept": "部门",
+  "dashboard.ops.col.output": "产值",
+  "dashboard.ops.col.share": "占比"
 }
