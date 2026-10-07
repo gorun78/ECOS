@@ -212,22 +212,25 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Wave-8 兜底：所有未识别的 Exception → 404 Not Found (而非传统 500)。
-     * <p>Wave-7 G4 已把 NullPointerException / IllegalStateException 分别归 400。本补充继承同一思路：
-     * 部署范围内"功能未就绪 / 依赖 Bean 缺失 / 未合规二级 controller"抛出的裸 RuntimeException，
-     * 若仍裸露 500 则违反架构铁律 §1.4。映射为 404 (Not Found) 让前端 / smoke 脚本能区分
-     * "路由不存在/功能未就绪" 和 "Server 内部错误"。</p>
-     * <p>日志级别保留 error，便于运维在运行日志里定位真实的根因；响应体只给出通用提示，
-     * 不暴露异常类型或堆栈细节（避免技术侦察）。</p>
+     * R1.6（详细设计-02 W47）兜底：所有未识别的 Exception → 500 + ECOS-SYS-500。
+     * <p>
+     * 旧版（Wave-8）曾将 catch-all 映射为 404 Not Found，理由是"让前端能区分路由不存在/功能未就绪"。该策略存在
+     * 严重副作用：所有真实的 5xx 内部错误（NPE、依赖不可用、事务未回滚、下游服务 500 序列化失败等）都被
+     * 掩蔽成 404，前端会静默回落 legacy 路由或误报"端点尚未开放"——D-6 a/b/c 三处实测根因已在
+     * {@link #handleSpringDaoAccess} 修复数据层同一问题（500 + ECOS-DATA-031）。<b>本 handler 是同一
+     * 治理的最后一环</b>：不再用 404 掩盖内部错误。真路由不存在场景由 Spring DispatcherExceptionResolver
+     * 的 {@code NoHandlerFoundException}（若开启）或 {@code NoResourceFoundException} 走 404，不经本 handler。
+     * </p>
+     * <p>响应体保持通用提示，不暴露异常类型或堆栈（避免技术侦察）；traceId 由 {@link ApiResponse}
+     * 从 MDC 自动回填，运维凭 traceId 定位真实根因。</p>
      */
     @ExceptionHandler(Exception.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     @ResponseBody
     public ApiResponse<Void> handleAny(Exception ex) {
-        // 只取异常类型和第一行 message，避免把 DATA 转成路径信息
         String type = ex.getClass().getSimpleName();
         String msg = ex.getMessage() != null ? ex.getMessage() : "";
-        log.error("Unhandled exception (routing/not-ready): type={}, msg={}", type, msg, ex);
-        return ApiResponse.error(404, "404", "端点暂未开放或服务未就绪，请稍后重试或联系管理员");
+        log.error("Unhandled exception (interal server error, NOT masked as 404): type={}, msg={}", type, msg, ex);
+        return ApiResponse.error(500, "ECOS-SYS-500", "服务器内部错误，请稍后重试或联系管理员");
     }
 }

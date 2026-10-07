@@ -58,6 +58,13 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
             throw new IllegalArgumentException("数据源不存在: " + datasourceId);
         }
 
+        // B6: 建连一律走 getResolvedConnectionConfig（密码回填 + URL 白名单前置校验），
+        // 不得直接持有 raw getConnectionConfig (PasswordEncrypted 双存, 转 secret)
+        String resolvedConnConfig = dataSourceService.getResolvedConnectionConfig(datasourceId);
+        if (resolvedConnConfig == null) {
+            throw new IllegalArgumentException("数据源不可用（连接配置未解析）: " + datasourceId);
+        }
+
         String historyId = UUID.randomUUID().toString();
         insertHistoryStart(historyId, datasourceId, sql);
         runningQueries.put(historyId, java.util.concurrent.CompletableFuture.completedFuture(null)); // ConcurrentHashMap 不允许 null value
@@ -74,7 +81,7 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
             // H2-T6：建连与受保护查询一律经 runtime-access 的 JdbcConnector（数据库访问规范 IR 系列），
             // 引擎侧只负责把 GuardedResult 组装成既有响应契约（columns/rows/rowCount/elapsedMs/historyId[/truncated]）。
             JdbcConnector.GuardedResult guarded = jdbcConnector.executeQueryGuarded(
-                    ds.getConnectionConfig(), resolvedSql, maxRows, timeoutSeconds, 10000);
+                    resolvedConnConfig, resolvedSql, maxRows, timeoutSeconds, 10000);
 
             List<Map<String, String>> columns = new ArrayList<>();
             for (JdbcConnector.ColumnDescriptor cd : guarded.columns()) {
@@ -119,13 +126,19 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
             throw new IllegalArgumentException("数据源不存在: " + datasourceId);
         }
 
+        // B6: 与 execute 一致 —— 建连走 resolved 通道（密码回填 + URL 白名单前置）
+        String resolvedConnConfig = dataSourceService.getResolvedConnectionConfig(datasourceId);
+        if (resolvedConnConfig == null) {
+            throw new IllegalArgumentException("数据源不可用（连接配置未解析）: " + datasourceId);
+        }
+
         // schema 覆盖项仍从连接配置 JSON 取（JdbcConnector 不暴露 schema 参数）
-        Map<String, String> connConfig = parseConnectionConfig(ds.getConnectionConfig());
+        Map<String, String> connConfig = parseConnectionConfig(resolvedConnConfig);
 
         List<Map<String, Object>> schemas = new ArrayList<>();
 
         // H2-T6：建连经 JdbcConnector；DatabaseMetaData 遍历（表/列树）留在引擎侧（合规形态）
-        try (Connection conn = jdbcConnector.openConnection(ds.getConnectionConfig())) {
+        try (Connection conn = jdbcConnector.openConnection(resolvedConnConfig)) {
 
             DatabaseMetaData meta = conn.getMetaData();
             String catalog = conn.getCatalog();
