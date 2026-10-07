@@ -47,7 +47,7 @@ import ParetoTab from "./worldmodel/tabs/ParetoTab";
 
 // ── Main Component ───────────────────────────
 export default function WorldModelViewer() {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
 
   const [tab, setTab] = useState(0);
@@ -266,7 +266,7 @@ export default function WorldModelViewer() {
       const problems = await fetchParetoProblems();
       setParetoHistory(problems);
     } catch (e: any) {
-      setParetoError(e.message || "Optimization failed");
+      setParetoError(e.message || t("platform.wm.viewer.paretoOptimizeFailed"));
     } finally {
       setParetoLoading(false);
     }
@@ -286,7 +286,7 @@ export default function WorldModelViewer() {
       const res = await fetchParetoResult(problemId);
       setParetoResult(res);
     } catch (e: any) {
-      setParetoError(e.message || "Failed to load result");
+      setParetoError(e.message || t("platform.wm.viewer.paretoLoadFailed"));
     } finally {
       setParetoLoading(false);
     }
@@ -309,13 +309,13 @@ export default function WorldModelViewer() {
 
   // ── Tab definitions ──────────────────────
   const tabs = [
-    { label: locale === "zh" ? "目标树" : "Goal Tree", icon: Target, emoji: "🌳" },
-    { label: locale === "zh" ? "执行追踪" : "Track", icon: TrendingUp, emoji: "📊" },
-    { label: locale === "zh" ? "因果图谱" : "Causal", icon: Network, emoji: "🕸️" },
-    { label: locale === "zh" ? "情景对比" : "Scenarios", icon: GitBranch, emoji: "🎯" },
-    { label: locale === "zh" ? "复盘报告" : "Review", icon: ClipboardList, emoji: "📝" },
-    { label: locale === "zh" ? "决策模拟" : "Simulation", icon: BarChart3, emoji: "🧪" },
-    { label: locale === "zh" ? "帕累托寻优" : "Pareto", icon: Zap, emoji: "⚡" },
+    { label: t("platform.wm.tabs.goalTree"), icon: Target, emoji: "🌳" },
+    { label: t("platform.wm.tabs.track"), icon: TrendingUp, emoji: "📊" },
+    { label: t("platform.wm.tabs.causal"), icon: Network, emoji: "🕸️" },
+    { label: t("platform.wm.tabs.scenarios"), icon: GitBranch, emoji: "🎯" },
+    { label: t("platform.wm.tabs.review"), icon: ClipboardList, emoji: "📝" },
+    { label: t("platform.wm.tabs.simulation"), icon: BarChart3, emoji: "🧪" },
+    { label: t("platform.wm.tabs.pareto"), icon: Zap, emoji: "⚡" },
   ];
 
   // ── Render ──────────────────────────────
@@ -326,12 +326,10 @@ export default function WorldModelViewer() {
         <div>
           <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
             <Target className="text-indigo-500 w-5 h-5 shrink-0" />
-            {locale === "zh" ? "战略目标" : "Strategic Goals"}
+            {t("platform.wm.viewer.title")}
           </h1>
           <p className={`text-xs mt-0.5 ${styles.cardTextMuted}`}>
-            {locale === "zh"
-              ? `目标金字塔 · 因果图谱 · 情景对比 · 决策模拟${showHistory ? " · 历史数据" : ""}`
-              : `Goal Pyramid · Causal Graph · Scenarios · Simulation${showHistory ? " · Historical" : ""}`}
+            {t("platform.wm.viewer.subtitle")}{showHistory ? t("platform.wm.viewer.historySuffix") : ""}
           </p>
         </div>
 
@@ -345,7 +343,7 @@ export default function WorldModelViewer() {
               className={`text-xs font-medium rounded px-2 py-1.5 border ${styles.cardBorder} ${styles.cardBg} ${styles.appText} cursor-pointer outline-hidden`}
             >
               {Array.from({ length: 5 }, (_, i) => currentYear - i).map(y => (
-                <option key={y} value={y}>{y}{y === currentYear ? (locale === "zh" ? " (本年)" : " (Current)") : ""}</option>
+                <option key={y} value={y}>{y}{y === currentYear ? t("platform.wm.viewer.currentYear") : ""}</option>
               ))}
             </select>
           </div>
@@ -360,7 +358,7 @@ export default function WorldModelViewer() {
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            {locale === "zh" ? "历史" : "History"}
+            {t("platform.wm.viewer.history")}
           </button>
 
           <button
@@ -370,7 +368,7 @@ export default function WorldModelViewer() {
               ${styles.accentBg} ${styles.accentHover} text-white disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            {loading ? (locale === "zh" ? "加载中..." : "Loading...") : (locale === "zh" ? "刷新" : "Refresh")}
+            {loading ? t("platform.wm.viewer.loading") : t("platform.wm.viewer.refresh")}
           </button>
         </div>
       </div>
@@ -469,9 +467,7 @@ export default function WorldModelViewer() {
           {showHistory && (
             <div className="px-3 py-2 rounded text-xs bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center gap-2">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              {locale === "zh"
-                ? `正在查看 ${selectedYear} 年历史模拟记录。切换年份或关闭"历史"按钮返回当前数据。`
-                : `Viewing historical simulation records for ${selectedYear}. Toggle "History" off for current data.`}
+              {t("platform.wm.viewer.historyBanner", { year: selectedYear })}
             </div>
           )}
           <ErrorBoundary>
