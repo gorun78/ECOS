@@ -123,11 +123,11 @@ export default function TenantManager() {
         setSelectedTenantId(normalized[0].id);
       }
     } catch (e: any) {
-      showToast("error", `加载租户失败: ${e.message}`);
+      showToast("error", t("platform.tenant.host.loadFail", { msg: e?.message }));
     } finally {
       setLoadingTenants(false);
     }
-  }, [selectedTenantId, showToast]);
+  }, [selectedTenantId, showToast, t]);
 
   useEffect(() => { loadTenants(); }, []);
 
@@ -136,7 +136,7 @@ export default function TenantManager() {
     setSaving(true);
     try {
       await createTenant({ tenantName: data.tenantName });
-      showToast("success", locale === "zh" ? "租户创建成功" : "Tenant created");
+      showToast("success", t("platform.tenant.host.created"));
       await loadTenants(tenantSearch, tenantPage, statusFilter);
     } catch (e: any) {
       throw e;
@@ -150,7 +150,7 @@ export default function TenantManager() {
     setSaving(true);
     try {
       await updateTenant(String(editTenant.id), data as any);
-      showToast("success", locale === "zh" ? "租户更新成功" : "Tenant updated");
+      showToast("success", t("platform.tenant.host.updated"));
       await loadTenants(tenantSearch, tenantPage, statusFilter);
     } catch (e: any) {
       throw e;
@@ -164,11 +164,11 @@ export default function TenantManager() {
     setSaving(true);
     try {
       await deleteTenant(String(deleteTarget.id));
-      showToast("success", locale === "zh" ? "租户已删除" : "Tenant deleted");
+      showToast("success", t("platform.tenant.host.deleted"));
       setDeleteTarget(null);
       await loadTenants(tenantSearch, tenantPage, statusFilter);
     } catch (e: any) {
-      showToast("error", `删除失败: ${e.message}`);
+      showToast("error", t("platform.tenant.host.deleteFail", { msg: e?.message }));
     } finally {
       setSaving(false);
     }
@@ -286,10 +286,10 @@ export default function TenantManager() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className={`text-xl font-bold ${styles.cardText}`}>
-              {locale === "zh" ? "租户管理" : "Tenant Manager"}
+              {t("platform.tenant.host.title")}
             </h1>
             <p className={`text-xs mt-1 ${styles.cardTextMuted}`}>
-              {locale === "zh" ? "租户CRUD、配额管理、用量监控与账单查看" : "Tenant CRUD, quota, usage & billing"}
+              {t("platform.tenant.host.subtitle")}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -299,7 +299,7 @@ export default function TenantManager() {
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover}`}
               >
                 <Plus className="w-3.5 h-3.5" />
-                {locale === "zh" ? "新建租户" : "New Tenant"}
+                {t("platform.tenant.host.newTenant")}
               </button>
             )}
             <button
@@ -312,7 +312,7 @@ export default function TenantManager() {
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${styles.accentBg} text-white ${styles.accentHover}`}
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              {locale === "zh" ? "刷新" : "Refresh"}
+              {t("platform.tenant.host.refresh")}
             </button>
           </div>
         </div>

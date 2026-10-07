@@ -462,5 +462,14 @@
   "platform.alert.ack": "Ack",
   "platform.alert.noHistory": "No history",
   "platform.alert.loadFail": "Failed",
-  "platform.alert.triggerFail": "Trigger failed"
+  "platform.alert.triggerFail": "Trigger failed",
+  "platform.tenant.host.title": "Tenant Manager",
+  "platform.tenant.host.subtitle": "Tenant CRUD, quota, usage & billing",
+  "platform.tenant.host.newTenant": "New Tenant",
+  "platform.tenant.host.refresh": "Refresh",
+  "platform.tenant.host.created": "Tenant created",
+  "platform.tenant.host.updated": "Tenant updated",
+  "platform.tenant.host.deleted": "Tenant deleted",
+  "platform.tenant.host.loadFail": "Failed to load tenants: {msg}",
+  "platform.tenant.host.deleteFail": "Delete failed: {msg}"
 }
