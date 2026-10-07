@@ -6,10 +6,12 @@ import React, { memo } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { Brain } from 'lucide-react';
 import { useTheme } from '../../ThemeContext';
+import { useLanguage } from '../../LanguageContext';
 import type { LogicNodeData, LogicLLMConfig } from '../../../types/aiworkbench';
 
 function LLMNode({ data, selected }: NodeProps<Node<LogicNodeData>>) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const config = data.config as LogicLLMConfig;
   const statusColor = {
     idle: 'bg-gray-400',
@@ -43,7 +45,7 @@ function LLMNode({ data, selected }: NodeProps<Node<LogicNodeData>>) {
         </div>
         {data.duration != null && (
           <div className="flex justify-between">
-            <span className="font-semibold">耗时:</span>
+            <span className="font-semibold">{t('aiworkbench.logic.node.duration')}</span>
             <span className={`font-mono ${styles.cardText}`}>{data.duration}ms</span>
           </div>
         )}

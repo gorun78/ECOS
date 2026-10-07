@@ -6,11 +6,13 @@ import React, { memo } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { Database } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../LanguageContext';
 import type { LogicNodeData, LogicOntologyConfig } from '../../../types/aiworkbench';
 
 function OntologyNode({ data, selected }: NodeProps<Node<LogicNodeData>>) {
   const config = data.config as LogicOntologyConfig;
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const statusColor = {
     idle: 'bg-gray-400',
     running: 'bg-blue-500 animate-pulse',
@@ -43,7 +45,7 @@ function OntologyNode({ data, selected }: NodeProps<Node<LogicNodeData>>) {
         </div>
         {data.duration != null && (
           <div className="flex justify-between">
-            <span className="font-semibold">耗时:</span>
+            <span className="font-semibold">{t('aiworkbench.logic.node.duration')}</span>
             <span className={`font-mono ${styles.cardText}`}>{data.duration}ms</span>
           </div>
         )}
