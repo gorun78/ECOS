@@ -165,7 +165,7 @@ function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
           <div className={`flex items-center justify-end px-3 py-1.5 border-b ${styles.cardBorder}`}>
             <button onClick={() => { onRefresh(); load(); }} className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold ${styles.appBg} ${styles.cardTextMuted} ${styles.sidebarHoverBg} transition-colors`}>
               <RefreshCw className="w-3 h-3" />
-              {locale === "zh" ? "刷新" : "Refresh"}
+              {t("platform.monitoring.cardRefresh")}
             </button>
           </div>
           <EngineMonitor engine={def.engine} initialHealth={health} initialStatus={status} />
@@ -176,7 +176,7 @@ function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
 }
 
 export default function MonitoringCenter() {
-  const { locale } = useLanguage();
+  const { locale, t } = useLanguage();
   const { styles } = useTheme();
   const [activeTab, setActiveTab] = useState(TABS[0].id);
   const [expandedEngines, setExpandedEngines] = useState<Set<string>>(() => new Set(ENGINES.map(e => e.id)));
@@ -218,12 +218,12 @@ export default function MonitoringCenter() {
           <div className="p-4 space-y-3">
             <div className="flex items-center justify-between mb-3">
               <div className={`text-sm font-semibold ${styles.cardTextMuted}`}>
-                {tl("六引擎健康状态监控 — 点击展开查看详情", "Six-engine health monitoring — click to expand details")}
+                {t("platform.monitoring.enginesHeader")}
               </div>
               <button onClick={() => setRefreshKey(k => k + 1)}
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold ${styles.appBg} ${styles.cardTextMuted} ${styles.sidebarHoverBg} transition-colors`}>
                 <RefreshCw className="w-3 h-3" />
-                {tl("刷新全部", "Refresh All")}
+                {t("platform.monitoring.refreshAll")}
               </button>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

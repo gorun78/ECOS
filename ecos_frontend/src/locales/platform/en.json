@@ -471,5 +471,8 @@
   "platform.tenant.host.updated": "Tenant updated",
   "platform.tenant.host.deleted": "Tenant deleted",
   "platform.tenant.host.loadFail": "Failed to load tenants: {msg}",
-  "platform.tenant.host.deleteFail": "Delete failed: {msg}"
+  "platform.tenant.host.deleteFail": "Delete failed: {msg}",
+  "platform.monitoring.cardRefresh": "Refresh",
+  "platform.monitoring.enginesHeader": "Six-engine health monitoring — click to expand details",
+  "platform.monitoring.refreshAll": "Refresh All"
 }

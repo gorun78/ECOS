@@ -471,5 +471,8 @@
   "platform.tenant.host.updated": "租户更新成功",
   "platform.tenant.host.deleted": "租户已删除",
   "platform.tenant.host.loadFail": "加载租户失败: {msg}",
-  "platform.tenant.host.deleteFail": "删除失败: {msg}"
+  "platform.tenant.host.deleteFail": "删除失败: {msg}",
+  "platform.monitoring.cardRefresh": "刷新",
+  "platform.monitoring.enginesHeader": "六引擎健康状态监控 — 点击展开查看详情",
+  "platform.monitoring.refreshAll": "刷新全部"
 }
