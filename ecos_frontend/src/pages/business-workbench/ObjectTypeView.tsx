@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { ObjectType, PropertyType, Dataset, LinkType, ActionType, SharedProperty, InterfaceType, OntologyDomain } from '../../types/ontology';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 
 interface ObjectTypeViewProps {
   objectType: ObjectType;
@@ -38,6 +39,7 @@ export default function ObjectTypeView({
   onExploreData
 }: ObjectTypeViewProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'metadata' | 'properties' | 'mapping' | 'links' | 'actions'>('properties');
   const [newPropName, setNewPropName] = useState('');
   const [newPropType, setNewPropType] = useState<'string' | 'integer' | 'decimal' | 'boolean' | 'date' | 'timestamp' | 'geopoint'>('string');
@@ -118,7 +120,7 @@ export default function ObjectTypeView({
       apiName: propId.charAt(0).toLowerCase() + propId.slice(1),
       dataType: newPropType,
       isPrimaryKey: false,
-      description: `关于 ${newPropName} 的详细描述。`
+      description: t('ow.object.newPropDesc', { name: newPropName })
     };
 
     onUpdate({
@@ -131,7 +133,7 @@ export default function ObjectTypeView({
   // Remove property
   const handleRemoveProperty = (propId: string) => {
     if (propId === objectType.primaryKey) {
-      alert('无法删除主键属性！');
+      alert(t('ow.object.cannotDeletePk'));
       return;
     }
     const updatedProps = objectType.properties.filter(p => p.id !== propId);
@@ -196,10 +198,10 @@ export default function ObjectTypeView({
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                 objectType.status === 'ACTIVE' ? `${styles.successBg} ${styles.successText}` : `${styles.warningBg} ${styles.warningText}`
               }`}>
-                {objectType.status === 'ACTIVE' ? '已发布' : '草稿'}
+                {objectType.status === 'ACTIVE' ? t('ow.object.status_active') : t('ow.object.status_draft')}
               </span>
             </div>
-            <p className={`text-xs ${styles.cardTextMuted} mt-0.5`}>{objectType.description || '无详细描述'}</p>
+            <p className={`text-xs ${styles.cardTextMuted} mt-0.5`}>{objectType.description || t('ow.object.noDescription')}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -209,7 +211,7 @@ export default function ObjectTypeView({
               className={`text-xs ${styles.successText} hover:bg-blue-50 px-2.5 py-1.5 rounded border ${styles.infoBorder} transition-colors flex items-center gap-1.5 font-semibold`}
             >
               <LucideIcon name="Compass" size={13} />
-              探索数据 (Explore)
+              {t('ow.object.exploreData')}
             </button>
           )}
           <button
@@ -217,7 +219,7 @@ export default function ObjectTypeView({
             className={`text-xs ${styles.dangerText} hover:bg-red-50 px-2.5 py-1.5 rounded border ${styles.dangerBorder} transition-colors flex items-center gap-1.5`}
           >
             <LucideIcon name="Trash2" size={13} />
-            删除对象
+            {t('ow.object.deleteObject')}
           </button>
         </div>
       </div>
@@ -225,12 +227,12 @@ export default function ObjectTypeView({
       {/* Detail Tabs */}
       <div className={`flex px-6 border-b ${styles.appBorder} ${styles.cardBg}`}>
         {(['properties', 'mapping', 'metadata', 'links', 'actions'] as const).map(tab => {
-          const tabLabels = {
-            properties: '属性定义',
-            mapping: '数据源映射',
-            metadata: '元数据配置',
-            links: '关联链接',
-            actions: '应用操作'
+          const tabLabels: Record<typeof tab, string> = {
+            properties: t('ow.object.tab_properties'),
+            mapping: t('ow.object.tab_mapping'),
+            metadata: t('ow.object.tab_metadata'),
+            links: t('ow.object.tab_links'),
+            actions: t('ow.object.tab_actions')
           };
           return (
             <button
@@ -255,12 +257,12 @@ export default function ObjectTypeView({
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <div className={`text-xs ${styles.cardTextMuted}`}>
-                定义构成此对象类型的所有核心属性。其中必须设定唯一的主键 (Primary Key)。
+                {t('ow.object.props_hint')}
               </div>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
-                  placeholder="新属性中文名"
+                  placeholder={t('ow.object.new_prop_placeholder')}
                   value={newPropName}
                   onChange={e => setNewPropName(e.target.value)}
                   className="px-3 py-1 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden"
@@ -270,20 +272,20 @@ export default function ObjectTypeView({
                   onChange={e => setNewPropType(e.target.value as any)}
                   className={`px-2 py-1 text-xs border border-gray-300 rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
                 >
-                  <option value="string">String (字符串)</option>
-                  <option value="integer">Integer (整型)</option>
-                  <option value="decimal">Decimal (高精度浮点)</option>
-                  <option value="boolean">Boolean (布尔)</option>
-                  <option value="date">Date (日期)</option>
-                  <option value="timestamp">Timestamp (时间戳)</option>
-                  <option value="geopoint">Geopoint (地理坐标)</option>
+                  <option value="string">{t('ow.object.dt_string')}</option>
+                  <option value="integer">{t('ow.object.dt_integer')}</option>
+                  <option value="decimal">{t('ow.object.dt_decimal')}</option>
+                  <option value="boolean">{t('ow.object.dt_boolean')}</option>
+                  <option value="date">{t('ow.object.dt_date')}</option>
+                  <option value="timestamp">{t('ow.object.dt_timestamp')}</option>
+                  <option value="geopoint">{t('ow.object.dt_geopoint')}</option>
                 </select>
                 <button
                   onClick={handleAddProperty}
                   className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition-colors flex items-center gap-1"
                 >
                   <LucideIcon name="Plus" size={13} />
-                  添加属性
+                  {t('ow.object.add_property')}
                 </button>
               </div>
             </div>
@@ -292,13 +294,13 @@ export default function ObjectTypeView({
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className={`${styles.appBg} border-b ${styles.appBorder} ${styles.cardText} font-medium`}>
-                    <th className="py-2.5 px-4 w-12 text-center">主键</th>
-                    <th className="py-2.5 px-4">显示名称</th>
-                    <th className="py-2.5 px-4">API 字段名</th>
-                    <th className="py-2.5 px-4">数据类型</th>
-                    <th className="py-2.5 px-4">描述说明</th>
-                    <th className="py-2.5 px-4">共享属性绑定</th>
-                    <th className="py-2.5 px-4 text-center">操作</th>
+                    <th className="py-2.5 px-4 w-12 text-center">{t('ow.object.th_pk')}</th>
+                    <th className="py-2.5 px-4">{t('ow.object.th_display')}</th>
+                    <th className="py-2.5 px-4">{t('ow.object.th_api')}</th>
+                    <th className="py-2.5 px-4">{t('ow.object.th_type')}</th>
+                    <th className="py-2.5 px-4">{t('ow.object.th_desc')}</th>
+                    <th className="py-2.5 px-4">{t('ow.object.th_shared_bind')}</th>
+                    <th className="py-2.5 px-4 text-center">{t('ow.object.th_actions')}</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y divide-gray-100 ${styles.cardText}`}>
@@ -312,7 +314,7 @@ export default function ObjectTypeView({
                               ? 'text-amber-500 hover:bg-amber-50'
                               : `${styles.cardTextMuted} hover:opacity-70`
                           }`}
-                          title={objectType.primaryKey === prop.id ? '当前为主键' : '设为主键'}
+                          title={objectType.primaryKey === prop.id ? t('ow.object.pk_current') : t('ow.object.pk_set')}
                         >
                           <LucideIcon name="Key" size={14} className={objectType.primaryKey === prop.id ? 'fill-amber-500' : ''} />
                         </button>
@@ -354,7 +356,7 @@ export default function ObjectTypeView({
                           value={prop.description}
                           onChange={e => handlePropertyFieldChange(prop.id, 'description', e.target.value)}
                           className={`text-xs ${styles.cardTextMuted} border-b border-transparent focus:border-blue-500 focus:outline-hidden py-0.5 px-1 w-full`}
-                          placeholder="暂无描述"
+                          placeholder={t('ow.object.no_desc_ph')}
                         />
                       </td>
                       <td className="py-2.5 px-4">
@@ -363,7 +365,7 @@ export default function ObjectTypeView({
                           onChange={e => handlePropertyFieldChange(prop.id, 'sharedPropertyId', e.target.value || undefined)}
                           className={`bg-transparent border ${styles.appBorder} rounded px-1.5 py-0.5 focus:border-blue-500 focus:outline-hidden ${styles.cardText}`}
                         >
-                          <option value="">未绑定 (无)</option>
+                          <option value="">{t('ow.object.bind_none')}</option>
                           {sharedProperties.map(sp => (
                             <option key={sp.id} value={sp.id}>{sp.displayName} ({sp.apiName})</option>
                           ))}
@@ -373,7 +375,7 @@ export default function ObjectTypeView({
                         <button
                           onClick={() => handleRemoveProperty(prop.id)}
                           className={`text-xs ${styles.cardTextMuted} hover:text-red-500 p-1 rounded hover:bg-blue-50/20 transition-colors`}
-                          title="删除属性"
+                          title={t('ow.object.delete_prop')}
                         >
                           <LucideIcon name="X" size={14} />
                         </button>
@@ -391,7 +393,7 @@ export default function ObjectTypeView({
           <div className="space-y-6 max-w-2xl">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className={`text-xs font-semibold ${styles.cardText}`}>对象显示名称 (Display Name)</label>
+                <label className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.object.meta_display')}</label>
                 <input
                   type="text"
                   value={objectType.displayName}
@@ -400,7 +402,7 @@ export default function ObjectTypeView({
                 />
               </div>
               <div className="space-y-1.5">
-                <label className={`text-xs font-semibold ${styles.cardText}`}>API 标识名 (API Name)</label>
+                <label className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.object.meta_api')}</label>
                 <input
                   type="text"
                   value={objectType.apiName}
@@ -411,33 +413,33 @@ export default function ObjectTypeView({
             </div>
 
             <div className="space-y-1.5">
-              <label className={`text-xs font-semibold ${styles.cardText}`}>对象描述信息 (Description)</label>
+              <label className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.object.meta_description')}</label>
               <textarea
                 value={objectType.description}
                 onChange={e => handleMetaChange('description', e.target.value)}
                 className="w-full h-20 px-3 py-1.5 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden"
-                placeholder="为此实体对象输入详细的业务背景和使用建议。"
+                placeholder={t('ow.object.meta_description_ph')}
               />
             </div>
 
             <div className="space-y-1.5 border-t border-gray-100 pt-4">
-              <label className={`text-xs font-semibold ${styles.cardText}`}>划分业务域 (Ontology Domain Hierarchy)</label>
+              <label className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.object.meta_domain')}</label>
               <select
                 value={objectType.domainId || ''}
                 onChange={e => handleMetaChange('domainId', e.target.value || undefined)}
                 className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
               >
-                <option value="">-- 未分类 (不属于任何业务域) --</option>
+                <option value="">{t('ow.object.meta_domain_none')}</option>
                 {domains.map(d => (
                   <option key={d.id} value={d.id}>{d.displayName}</option>
                 ))}
               </select>
-              <p className={`text-[10px] ${styles.cardTextMuted}`}>选择该实体所属的顶级业务大类。可前往“本体全景与总览”页面创建和维护更多业务域分级。</p>
+              <p className={`text-[10px] ${styles.cardTextMuted}`}>{t('ow.object.meta_domain_hint')}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-4">
               <div className="space-y-1.5">
-                <label className={`text-xs font-semibold ${styles.cardText}`}>标题展示属性 (Title Property)</label>
+                <label className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.object.meta_title_prop')}</label>
                 <select
                   value={objectType.titleProperty}
                   onChange={e => handleMetaChange('titleProperty', e.target.value)}
@@ -447,62 +449,62 @@ export default function ObjectTypeView({
                     <option key={p.id} value={p.id}>{p.displayName} ({p.apiName})</option>
                   ))}
                 </select>
-                <p className={`text-[10px] ${styles.cardTextMuted}`}>用于在图谱、搜索结果和关系列表里展示此对象的默认文本标题。</p>
+                <p className={`text-[10px] ${styles.cardTextMuted}`}>{t('ow.object.meta_title_prop_hint')}</p>
               </div>
 
               <div className="space-y-1.5">
-                <label className={`text-xs font-semibold ${styles.cardText}`}>运营状态 (Status)</label>
+                <label className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.object.meta_status')}</label>
                 <select
                   value={objectType.status}
                   onChange={e => handleMetaChange('status', e.target.value)}
                   className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
                 >
-                  <option value="DRAFT">草稿 (DRAFT)</option>
-                  <option value="ACTIVE">启用 (ACTIVE)</option>
-                  <option value="DEPRECATED">弃用 (DEPRECATED)</option>
+                  <option value="DRAFT">{t('ow.object.status_draft')}</option>
+                  <option value="ACTIVE">{t('ow.object.status_active')}</option>
+                  <option value="DEPRECATED">{t('ow.object.status_deprecated')}</option>
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className={`text-xs font-semibold ${styles.cardText}`}>界面显示图标 (Lucide Icon)</label>
+                <label className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.object.meta_icon')}</label>
                 <select
                   value={objectType.icon}
                   onChange={e => handleMetaChange('icon', e.target.value)}
                   className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded bg-white focus:border-blue-500 focus:outline-hidden"
                 >
-                  <option value="Plane">Plane (飞机)</option>
-                  <option value="Building2">Building2 (机场/楼宇)</option>
-                  <option value="Navigation">Navigation (导航/指针)</option>
-                  <option value="UserSquare2">UserSquare2 (飞行员/人员)</option>
-                  <option value="Database">Database (数据源)</option>
-                  <option value="ShieldAlert">ShieldAlert (安全性)</option>
-                  <option value="FileText">FileText (文档)</option>
-                  <option value="Heart">Heart (健康度)</option>
+                  <option value="Plane">Plane ({t('ow.object.icon_plane')})</option>
+                  <option value="Building2">Building2 ({t('ow.object.icon_building')})</option>
+                  <option value="Navigation">Navigation ({t('ow.object.icon_navigation')})</option>
+                  <option value="UserSquare2">UserSquare2 ({t('ow.object.icon_user')})</option>
+                  <option value="Database">Database ({t('ow.object.icon_database')})</option>
+                  <option value="ShieldAlert">ShieldAlert ({t('ow.object.icon_shield')})</option>
+                  <option value="FileText">FileText ({t('ow.object.icon_file')})</option>
+                  <option value="Heart">Heart ({t('ow.object.icon_heart')})</option>
                 </select>
               </div>
 
               <div className="space-y-1.5">
-                <label className={`text-xs font-semibold ${styles.cardText}`}>视觉主题颜色 (Color Theme)</label>
+                <label className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.object.meta_color')}</label>
                 <select
                   value={objectType.color}
                   onChange={e => handleMetaChange('color', e.target.value)}
                   className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded bg-white focus:border-blue-500 focus:outline-hidden"
                 >
-                  <option value="border-blue-500 bg-blue-50 text-blue-700">皇家蓝 (Blue)</option>
-                  <option value="border-emerald-500 bg-emerald-50 text-emerald-700">活力绿 (Emerald)</option>
-                  <option value="border-purple-500 bg-purple-50 text-purple-700">星空紫 (Purple)</option>
-                  <option value="border-orange-500 bg-orange-50 text-orange-700">温暖橘 (Orange)</option>
-                  <option value="border-red-500 bg-red-50 text-red-700">警戒红 (Red)</option>
-                  <option value="border-slate-500 bg-slate-50 text-slate-700">中性灰 (Slate)</option>
+                  <option value="border-blue-500 bg-blue-50 text-blue-700">{t('ow.object.color_blue')}</option>
+                  <option value="border-emerald-500 bg-emerald-50 text-emerald-700">{t('ow.object.color_emerald')}</option>
+                  <option value="border-purple-500 bg-purple-50 text-purple-700">{t('ow.object.color_purple')}</option>
+                  <option value="border-orange-500 bg-orange-50 text-orange-700">{t('ow.object.color_orange')}</option>
+                  <option value="border-red-500 bg-red-50 text-red-700">{t('ow.object.color_red')}</option>
+                  <option value="border-slate-500 bg-slate-50 text-slate-700">{t('ow.object.color_slate')}</option>
                 </select>
               </div>
             </div>
 
             {/* Implements Interfaces */}
             <div className="space-y-2 border-t border-gray-100 pt-4">
-              <label className={`text-xs font-semibold ${styles.cardText} block`}>实现的接口 (Implements Interfaces)</label>
+              <label className={`text-xs font-semibold ${styles.cardText} block`}>{t('ow.object.meta_interfaces')}</label>
               <div className="flex flex-wrap gap-2">
                 {interfaces.map(intf => {
                   const isChecked = (objectType.interfaces || []).includes(intf.id);
@@ -528,7 +530,7 @@ export default function ObjectTypeView({
                   );
                 })}
               </div>
-              <p className={`text-[10px] ${styles.cardTextMuted}`}>对象类型通过实现特定接口，将继承该接口规范的一系列属性和行为逻辑。</p>
+              <p className={`text-[10px] ${styles.cardTextMuted}`}>{t('ow.object.meta_interfaces_hint')}</p>
             </div>
           </div>
         )}
@@ -540,7 +542,7 @@ export default function ObjectTypeView({
               <div className="flex items-center gap-3">
                 <LucideIcon name="Database" className={styles.cardTextMuted} size={18} />
                 <div>
-                  <div className={`text-xs font-semibold ${styles.cardText}`}>当前绑定的原始数据集</div>
+                  <div className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.object.map_bound_dataset')}</div>
                   <div className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>{selectedDataset?.path}</div>
                 </div>
               </div>
@@ -559,7 +561,7 @@ export default function ObjectTypeView({
                   className={`bg-[var(--card,#94A3B8)] hover:bg-[var(--card,#64748B)] ${styles.cardText} text-xs px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1`}
                 >
                   <LucideIcon name="Wand2" size={13} />
-                  智能映射
+                  {t('ow.object.map_auto')}
                 </button>
               </div>
             </div>
@@ -571,10 +573,10 @@ export default function ObjectTypeView({
                 <div className="flex items-center justify-between">
                   <div className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1`}>
                     <LucideIcon name="Table" size={14} />
-                    原始表字段 (Schema)
+                    {t('ow.object.map_schema')}
                   </div>
                   <span className={`text-[10px] ${styles.sidebarBg} ${styles.cardTextMuted} px-1.5 py-0.5 rounded font-mono`}>
-                    {selectedDataset?.columns.length} 列
+                    {selectedDataset?.columns.length} {t('ow.object.map_columns')}
                   </span>
                 </div>
                 <div className={`border ${styles.appBorder} rounded-lg ${styles.cardBg} overflow-hidden divide-y ${styles.divider}`}>
@@ -594,10 +596,10 @@ export default function ObjectTypeView({
                 <div className="flex items-center justify-between">
                   <div className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1`}>
                     <LucideIcon name="Layers" size={14} />
-                    对象属性映射关系
+                    {t('ow.object.map_props')}
                   </div>
                   <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono">
-                    {Object.keys(objectType.mapping.propertyMappings).length} / {objectType.properties.length} 已映射
+                    {Object.keys(objectType.mapping.propertyMappings).length} / {objectType.properties.length} {t('ow.object.map_mapped')}
                   </span>
                 </div>
                 <div className={`border ${styles.appBorder} rounded-lg ${styles.cardBg} overflow-hidden divide-y ${styles.divider}`}>
@@ -625,7 +627,7 @@ export default function ObjectTypeView({
                               mappedCol ? 'border-emerald-300 bg-emerald-50/30' : 'border-amber-300 bg-amber-50/10'
                             }`}
                           >
-                            <option value="">-- 未映射 (不填) --</option>
+                            <option value="">{t('ow.object.map_unmapped')}</option>
                             {selectedDataset?.columns.map(col => (
                               <option key={col.name} value={col.name}>{col.name}</option>
                             ))}
@@ -644,11 +646,11 @@ export default function ObjectTypeView({
         {activeTab === 'links' && (
           <div className="space-y-4">
             <div className={`text-xs ${styles.cardTextMuted}`}>
-              在此查看与 {objectType.displayName} 相关联的所有多维链接关系模式。
+              {t('ow.object.links_hint', { name: objectType.displayName })}
             </div>
             {relatedLinks.length === 0 ? (
               <div className={`text-center py-8 border border-dashed ${styles.sidebarBorder} rounded-lg ${styles.cardTextMuted} text-xs`}>
-                暂无任何链接关系定义关联到此对象。
+                {t('ow.object.links_empty')}
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">
@@ -677,16 +679,16 @@ export default function ObjectTypeView({
                         <p className={`text-[10px] ${styles.cardTextMuted}`}>{link.description}</p>
                         <div className={`flex items-center gap-1.5 text-[10px] ${styles.sidebarText} pt-1`}>
                           <span className={isSource ? 'font-semibold text-blue-600' : ''}>
-                            {isSource ? '源' : '源(' + link.sourceObjectType + ')'}
+                            {isSource ? t('ow.object.links_source') : t('ow.object.links_source_id', { id: link.sourceObjectType })}
                           </span>
                           <span>→</span>
                           <span className={!isSource ? 'font-semibold text-blue-600' : ''}>
-                            {!isSource ? '目标' : '目标(' + link.targetObjectType + ')'}
+                            {!isSource ? t('ow.object.links_target') : t('ow.object.links_target_id', { id: link.targetObjectType })}
                           </span>
                         </div>
                       </div>
                       <div className="flex items-center gap-1 text-[10px] text-blue-500 group-hover:translate-x-0.5 transition-transform">
-                        <span>跳转配置</span>
+                        <span>{t('ow.object.jump_config')}</span>
                         <LucideIcon name="ChevronRight" size={12} />
                       </div>
                     </div>
@@ -701,11 +703,11 @@ export default function ObjectTypeView({
         {activeTab === 'actions' && (
           <div className="space-y-4">
             <div className={`text-xs ${styles.cardTextMuted}`}>
-              在此查看能够被应用、修改或实例化 {objectType.displayName} 对象的有界业务操作。
+              {t('ow.object.actions_hint', { name: objectType.displayName })}
             </div>
             {relatedActions.length === 0 ? (
               <div className={`text-center py-8 border border-dashed ${styles.sidebarBorder} rounded-lg ${styles.cardTextMuted} text-xs`}>
-                目前尚无操作类型注册针对此对象的操作修改。
+                {t('ow.object.actions_empty')}
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">
@@ -727,12 +729,12 @@ export default function ObjectTypeView({
                       <p className={`text-[10px] ${styles.cardTextMuted}`}>{action.description}</p>
                       <div className={`flex items-center gap-2 font-mono text-[9px] ${styles.cardTextMuted} ${styles.appBg} p-1.5 rounded border ${styles.divider}`}>
                         <div>
-                          <strong>参数:</strong> {action.parameters.length} | <strong>副作用:</strong> {action.rules.length} 条
+                          <strong>{t('ow.object.action_params')}:</strong> {action.parameters.length} | <strong>{t('ow.object.action_side_effects')}:</strong> {action.rules.length} {t('ow.object.action_rules_unit')}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 text-[10px] text-blue-500 group-hover:translate-x-0.5 transition-transform">
-                      <span>跳转配置</span>
+                      <span>{t('ow.object.jump_config')}</span>
                       <LucideIcon name="ChevronRight" size={12} />
                     </div>
                   </div>
