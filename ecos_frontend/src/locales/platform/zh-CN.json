@@ -439,5 +439,17 @@
   "platform.tokens.byModel": "按模型",
   "platform.tokens.byOperation": "按操作",
   "platform.tokens.noData": "暂无数据",
-  "platform.tokens.loadFailed": "加载 Token 数据失败"
+  "platform.tokens.loadFailed": "加载 Token 数据失败",
+  "platform.telemetry.title": "链路追踪",
+  "platform.telemetry.subtitle": "查看分布式链路追踪与 Span 详情",
+  "platform.telemetry.refresh": "刷新",
+  "platform.telemetry.systemHealth": "系统状态",
+  "platform.telemetry.recentTraces": "最近链路",
+  "platform.telemetry.loading": "加载中…",
+  "platform.telemetry.noTraces": "暂无链路数据",
+  "platform.telemetry.rootOperation": "根操作",
+  "platform.telemetry.duration": "耗时",
+  "platform.telemetry.loadingSpans": "加载 Span 详情…",
+  "platform.telemetry.noSpanData": "无 Span 数据",
+  "platform.telemetry.loadFailed": "加载链路数据失败"
 }

@@ -121,7 +121,7 @@ function SpanTree({ rootSpans, allSpans }: { rootSpans: SpanDetail[]; allSpans: 
 // ── Main Component ─────────────────────────────────────────────
 
 export default function TelemetryViewer() {
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   const [health, setHealth] = useState<HealthData | null>(null);
@@ -144,7 +144,7 @@ export default function TelemetryViewer() {
       setHealth(healthData);
       setTraces(Array.isArray(tracesData) ? tracesData : []);
     } catch (e: any) {
-      setError(e.message || "Failed to load telemetry data");
+      setError(e.message || t("platform.telemetry.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -183,10 +183,10 @@ export default function TelemetryViewer() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-xl font-bold ${styles.cardText}`}>
-            {locale === "zh" ? "链路追踪" : "Telemetry Viewer"}
+            {t("platform.telemetry.title")}
           </h1>
           <p className={`text-xs mt-1 ${styles.cardTextMuted}`}>
-            {locale === "zh" ? "查看分布式链路追踪与 Span 详情" : "Distributed tracing and span inspection"}
+            {t("platform.telemetry.subtitle")}
           </p>
         </div>
         <button
@@ -195,7 +195,7 @@ export default function TelemetryViewer() {
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${styles.accentBg} text-white ${styles.accentHover}`}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          {locale === "zh" ? "刷新" : "Refresh"}
+          {t("platform.telemetry.refresh")}
         </button>
       </div>
 
@@ -211,7 +211,7 @@ export default function TelemetryViewer() {
           <div className="flex items-center gap-2 mb-3">
             <Radio className="w-4 h-4 text-emerald-500" />
             <span className={`text-sm font-semibold ${styles.cardText}`}>
-              {locale === "zh" ? "系统状态" : "System Health"}
+              {t("platform.telemetry.systemHealth")}
             </span>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-500">
               <CheckCircle2 className="w-3 h-3" />
@@ -252,7 +252,7 @@ export default function TelemetryViewer() {
         <div className={`px-4 py-3 border-b ${styles.cardBorder} flex items-center gap-2`}>
           <Layers className={`w-4 h-4 ${styles.cardTextMuted}`} />
           <span className={`text-sm font-semibold ${styles.cardText}`}>
-            {locale === "zh" ? "最近链路" : "Recent Traces"}
+            {t("platform.telemetry.recentTraces")}
           </span>
           <span className={`text-[10px] ${styles.cardTextMuted}`}>
             ({traceList.length})
@@ -263,14 +263,14 @@ export default function TelemetryViewer() {
           <div className="p-8 text-center">
             <Activity className={`w-6 h-6 mx-auto mb-2 animate-spin ${styles.accentText}`} />
             <p className={`text-xs ${styles.cardTextMuted}`}>
-              {locale === "zh" ? "加载中…" : "Loading…"}
+              {t("platform.telemetry.loading")}
             </p>
           </div>
         ) : traceList.length === 0 ? (
           <div className="p-8 text-center">
             <Search className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
             <p className={`text-xs ${styles.cardTextMuted}`}>
-              {locale === "zh" ? "暂无链路数据" : "No traces found"}
+              {t("platform.telemetry.noTraces")}
             </p>
           </div>
         ) : (
@@ -279,11 +279,11 @@ export default function TelemetryViewer() {
               <tr className={`border-b text-[11px] uppercase tracking-wider ${styles.cardBorder} ${styles.cardTextMuted}`}>
                 <th className="py-2.5 px-4 font-medium">Trace ID</th>
                 <th className="py-2.5 px-4 font-medium">
-                  {locale === "zh" ? "根操作" : "Root Operation"}
+                  {t("platform.telemetry.rootOperation")}
                 </th>
                 <th className="py-2.5 px-4 font-medium text-right">Spans</th>
                 <th className="py-2.5 px-4 font-medium text-right">
-                  {locale === "zh" ? "耗时" : "Duration"}
+                  {t("platform.telemetry.duration")}
                 </th>
               </tr>
             </thead>
@@ -326,7 +326,7 @@ export default function TelemetryViewer() {
                             {detailLoading ? (
                               <div className={`flex items-center gap-2 text-xs ${styles.cardTextMuted} py-2`}>
                                 <Activity className="w-3.5 h-3.5 animate-spin" />
-                                {locale === "zh" ? "加载 Span 详情…" : "Loading spans…"}
+                                {t("platform.telemetry.loadingSpans")}
                               </div>
                             ) : traceDetail && traceDetail.spans ? (
                               <table className="w-full text-left">
@@ -344,7 +344,7 @@ export default function TelemetryViewer() {
                               </table>
                             ) : (
                               <p className={`text-xs ${styles.cardTextMuted} py-2`}>
-                                {locale === "zh" ? "无 Span 数据" : "No span data"}
+                                {t("platform.telemetry.noSpanData")}
                               </p>
                             )}
                           </div>

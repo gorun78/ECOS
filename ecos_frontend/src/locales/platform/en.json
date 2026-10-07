@@ -439,5 +439,17 @@
   "platform.tokens.byModel": "By Model",
   "platform.tokens.byOperation": "By Operation",
   "platform.tokens.noData": "No data",
-  "platform.tokens.loadFailed": "Failed to load token data"
+  "platform.tokens.loadFailed": "Failed to load token data",
+  "platform.telemetry.title": "Telemetry Viewer",
+  "platform.telemetry.subtitle": "Distributed tracing and span inspection",
+  "platform.telemetry.refresh": "Refresh",
+  "platform.telemetry.systemHealth": "System Health",
+  "platform.telemetry.recentTraces": "Recent Traces",
+  "platform.telemetry.loading": "Loading…",
+  "platform.telemetry.noTraces": "No traces found",
+  "platform.telemetry.rootOperation": "Root Operation",
+  "platform.telemetry.duration": "Duration",
+  "platform.telemetry.loadingSpans": "Loading spans…",
+  "platform.telemetry.noSpanData": "No span data",
+  "platform.telemetry.loadFailed": "Failed to load telemetry data"
 }
