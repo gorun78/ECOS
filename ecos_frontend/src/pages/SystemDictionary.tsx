@@ -35,7 +35,7 @@ function groupByType(items: DictItem[]): DictTypeGroup[] {
 }
 
 export default function SystemDictionary() {
-  const { locale } = useLanguage() as any;
+  const { t, locale } = useLanguage() as any;
   const { styles } = useTheme() as any;
   const isZh = locale !== 'en';
 
@@ -69,7 +69,7 @@ export default function SystemDictionary() {
         <div className="flex items-center gap-2 px-1 mb-2">
           <BookOpen size={14} className={styles.muted} />
           <h3 className={`text-xs font-semibold ${styles.muted} uppercase`}>
-            {isZh ? '字典分类' : 'Dict Types'} ({groups.length})
+            {t("platform.dictionary.types")} ({groups.length})
           </h3>
         </div>
         {loading ? (
@@ -89,7 +89,7 @@ export default function SystemDictionary() {
           ))
         )}
         <div className={`mt-auto pt-3 border-t ${styles.sidebarBorder} text-[10px] ${styles.muted} px-1`}>
-          {isZh ? `共 ${totalItems} 条` : `Total ${totalItems} items`}
+          {t("platform.dictionary.total", { count: totalItems })}
         </div>
       </div>
 
@@ -98,7 +98,7 @@ export default function SystemDictionary() {
         {loading && (
           <div className="flex items-center gap-3 p-12 justify-center">
             <Loader2 size={24} className="animate-spin text-indigo-400" />
-            <span className={styles.muted}>{isZh ? '加载中...' : 'Loading...'}</span>
+            <span className={styles.muted}>{t("platform.dictionary.loading")}</span>
           </div>
         )}
 
@@ -115,7 +115,7 @@ export default function SystemDictionary() {
               <Tag size={18} className="text-indigo-500" />
               <h2 className={`text-lg font-semibold ${styles.text}`}>{activeGroup.dictType}</h2>
               <span className={`text-xs px-2 py-0.5 rounded-full ${styles.muted} bg-gray-100 dark:bg-gray-800`}>
-                {activeGroup.items.length} {isZh ? '项' : 'items'}
+                {activeGroup.items.length} {t("platform.dictionary.itemsUnit")}
               </span>
             </div>
 
@@ -173,7 +173,7 @@ export default function SystemDictionary() {
           <div className="flex flex-col items-center justify-center h-full">
             <BookOpen size={40} className={`${styles.muted} mb-3 opacity-30`} />
             <p className={`text-sm ${styles.muted}`}>
-              {isZh ? '← 选择左侧字典分类查看数据' : '← Select a dict type to view items'}
+              {t("platform.dictionary.emptyHint")}
             </p>
           </div>
         )}
