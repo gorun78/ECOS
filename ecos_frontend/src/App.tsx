@@ -70,10 +70,29 @@ const TAB_LABEL_KEY: Record<string, string> = {
   "engine-tasks": "app.tab.engine_tasks",
   telemetry: "app.tab.telemetry",
   tokens: "app.tab.tokens",
+  // BC2 (E1.5): 10 route ids that shipped in main.tsx without a TAB_LABEL_KEY
+  // entry — previously the workspace tab strip rendered the raw route id
+  // (e.g. `engine-cognitive`) because t(key) hit a key that no locale file
+  // defined. Each maps to its tab i18n key so the label localizes.
+  chatbot_studio: "app.tab.chatbot_studio",
+  case_library: "app.tab.case_library",
+  alerts: "app.tab.alerts",
+  tenants: "app.tab.tenants",
+  "engine-security": "app.tab.engine_security",
+  "engine-data": "app.tab.engine_data",
+  "engine-ontology": "app.tab.engine_ontology",
+  "engine-cognitive": "app.tab.engine_cognitive",
+  "engine-knowledge": "app.tab.engine_knowledge",
+  "engine-ai": "app.tab.engine_ai",
 };
-/** Default tab label: return the raw route id for unknown views (keep prior behaviour). */
-const getTabLabel = (t: (k: string) => string, id: string): string =>
-  t(TAB_LABEL_KEY[id] ?? `app.tab.${id}`);
+/**
+ * Default tab label: resolve `TAB_LABEL_KEY[id]` via t(). For unknown ids we
+ * still synthesize `app.tab.${id}` and pass `id` as the t() string fallback so
+ * a missing key renders the raw route id (keeps pre-BC2 behaviour when a
+ * locale value is absent — no silent blank).
+ */
+const getTabLabel = (t: (k: string, fallback?: string) => string, id: string): string =>
+  t(TAB_LABEL_KEY[id] ?? `app.tab.${id}`, id);
 
 interface Tab {
   id: string;
