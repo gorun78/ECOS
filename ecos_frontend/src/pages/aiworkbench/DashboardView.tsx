@@ -82,7 +82,8 @@ function useQuestionSets(): EvaluationQuestionSet[] {
  * since the dashboard's radar chart keys are English (accuracy, relevance, etc).
  */
 function categoryToRadarKey(t: (k: string) => string, cat: string): string {
-  if (cat === t('dashboard.cat.compliance') || cat === t('dashboard.cat.safety')) return 'accuracy';
+  // safety 唯一归属 safety 维度（下方分支）；避免与 compliance 同列 accuracy 造成双命中阴影
+  if (cat === t('dashboard.cat.compliance')) return 'accuracy';
   if (cat === t('dashboard.cat.operation') || cat === t('dashboard.cat.rebooking')) return 'relevance';
   if (cat === t('dashboard.cat.tech') || cat === t('dashboard.cat.analysis')) return 'completeness';
   if (cat === t('dashboard.cat.safety') || cat === t('dashboard.cat.specialService')) return 'safety';
