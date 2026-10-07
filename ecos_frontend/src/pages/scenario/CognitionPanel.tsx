@@ -216,6 +216,7 @@ export default function CognitionPanel({
         {SUB_TABS.map((st) => (
           <button
             key={st.key}
+            data-testid={`cognition-subtab-${st.key}`}
             onClick={() => setSubTab(st.key)}
             className={`text-[10px] font-bold px-2.5 py-1 rounded border transition-colors cursor-pointer flex items-center gap-1.5 ${
               subTab === st.key
