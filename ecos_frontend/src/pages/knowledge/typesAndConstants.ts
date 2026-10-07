@@ -403,3 +403,11 @@ export const DEFAULT_SETTINGS: KnowledgeSettings = {
   autoSyncEnabled: false,
   maxRetrievalResults: 5,
 };
+
+/**
+ * KB 统计刷新事件名 —— 派发方 DatasyncTab / ClassificationTab，
+ * 订阅方 OverviewPage / OverviewDashboard。跨文件共享同一字符串，
+ * 事件名漂移 = 静默 no-op（当前订阅方缺席时 dispatch 无报错）。
+ * 常量冻结：值即契约，改动须同步跨这 4 文件。
+ */
+export const KB_STATS_REFRESH_EVENT = 'kb:stats:refresh';

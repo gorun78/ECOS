@@ -18,6 +18,7 @@ import {
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { knowledgeApi, type GraphStats } from '../services/knowledgeApi';
+import { KB_STATS_REFRESH_EVENT } from '../typesAndConstants';
 
 const RAG_HISTORY_KEY = 'kb_rag_top_queries';
 
@@ -71,7 +72,7 @@ export default function OverviewDashboard() {
     }
   }, []);
 
-  /** 萃取落地后 DatasyncTab 发 'kb:stats:refresh' 事件让总览重拉（同 tab 内 refresh 亦生效） */
+  /** 萃取落地后 DatasyncTab / ClassificationTab 发 KB_STATS_REFRESH_EVENT 事件让总览重拉（同 tab 内 refresh 亦生效） */
   const onStatsRefresh = useCallback(() => { void loadStats(); }, [loadStats]);
 
   useEffect(() => {
@@ -108,9 +109,9 @@ export default function OverviewDashboard() {
 
   // W3：监听萃取成功事件，重拉 stats（与 DatasyncTab notifyStatsRefresh 对应）
   useEffect(() => {
-    window.addEventListener('kb:stats:refresh', onStatsRefresh);
+    window.addEventListener(KB_STATS_REFRESH_EVENT, onStatsRefresh);
     return () => {
-      window.removeEventListener('kb:stats:refresh', onStatsRefresh);
+      window.removeEventListener(KB_STATS_REFRESH_EVENT, onStatsRefresh);
     };
   }, [onStatsRefresh]);
 
