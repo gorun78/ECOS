@@ -36,12 +36,12 @@ export default function BizDashboard() {
       const raw = await fetchBizDashboard();
       setData(raw);
     } catch (e: any) {
-      setError(e.message || "加载失败");
+      setError(e.message || t("biz.loadFail"));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -49,10 +49,10 @@ export default function BizDashboard() {
     setDiagnosing(true);
     setDiagnosticOpen(true);
     try {
-      const result = await callDiagnosticAgent("浙北路桥项目进度滞后的根因是什么？");
+      const result = await callDiagnosticAgent(t("biz.diagnosticPrompt"));
       setDiagnosticResult(result);
     } catch (e: any) {
-      setDiagnosticResult({ error: e.message || "诊断失败" });
+      setDiagnosticResult({ error: e.message || t("biz.diagnosticFail") });
     } finally {
       setDiagnosing(false);
     }
@@ -71,7 +71,7 @@ export default function BizDashboard() {
       <div className="text-center max-w-sm">
         <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-2" />
         <p className={`text-sm ${styles.cardTextMuted}`}>{error}</p>
-        <button onClick={() => loadData()} className="mt-3 px-4 py-2 rounded ${styles.accentBg} text-white text-sm hover:opacity-90 transition">
+        <button onClick={() => loadData()} className={`mt-3 px-4 py-2 rounded ${styles.accentBg} text-white text-sm hover:opacity-90 transition`}>
           {t('biz.retry')}
         </button>
       </div>
