@@ -695,5 +695,9 @@
   "marketplace.publish.descPlaceholder": "请描述此资产的内容和用途…",
   "marketplace.publish.tagsLabel": "标签（逗号分隔）",
   "marketplace.publish.tagsPlaceholder": "如：金融, 风控, 高价值",
-  "marketplace.publish.publishBtn": "发布"
+  "marketplace.publish.publishBtn": "发布",
+  "common.copilot.title": "智能助手",
+  "common.copilot.quickQ": "快捷提问",
+  "common.copilot.placeholder": "输入消息...",
+  "common.copilot.fetchFail": "错误：获取响应失败"
 }

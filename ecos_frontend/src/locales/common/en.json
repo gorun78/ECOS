@@ -695,5 +695,9 @@
   "marketplace.publish.descPlaceholder": "Describe the asset content and purpose...",
   "marketplace.publish.tagsLabel": "Tags (comma separated)",
   "marketplace.publish.tagsPlaceholder": "e.g.: finance, risk, high-value",
-  "marketplace.publish.publishBtn": "Publish"
+  "marketplace.publish.publishBtn": "Publish",
+  "common.copilot.title": "Copilot",
+  "common.copilot.quickQ": "Quick Questions",
+  "common.copilot.placeholder": "Type a message...",
+  "common.copilot.fetchFail": "Error: Failed to get response"
 }

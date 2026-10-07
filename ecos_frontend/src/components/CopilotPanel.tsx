@@ -16,7 +16,7 @@ interface Message {
 }
 
 export const CopilotPanel: React.FC<CopilotPanelProps> = ({ agentType }) => {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -62,7 +62,7 @@ export const CopilotPanel: React.FC<CopilotPanelProps> = ({ agentType }) => {
         setMessages(prev => [...prev, assistantMsg]);
       }
     } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: locale === 'zh' ? '错误：获取响应失败' : 'Error: Failed to get response' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: t('common.copilot.fetchFail') }]);
     }
     setLoading(false);
   };
@@ -83,7 +83,7 @@ export const CopilotPanel: React.FC<CopilotPanelProps> = ({ agentType }) => {
       <div className="p-3 border-b border-[var(--border)] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-[var(--primary)]" />
-          <span className="text-sm font-medium">{locale === 'zh' ? '智能助手' : 'Copilot'}</span>
+          <span className="text-sm font-medium">{t('common.copilot.title')}</span>
         </div>
         <button onClick={exportChat} className="p-1 hover:bg-[var(--muted)] rounded">
           <Download className="w-3 h-3" />
@@ -93,7 +93,7 @@ export const CopilotPanel: React.FC<CopilotPanelProps> = ({ agentType }) => {
       {quickQuestions.length > 0 && messages.length === 0 && (
         <div className="p-3 border-b border-[var(--border)]">
           <div className="text-xs text-[var(--muted-foreground)] mb-2">
-            {locale === 'zh' ? '快捷提问' : 'Quick Questions'}
+            {t('common.copilot.quickQ')}
           </div>
           <div className="flex flex-wrap gap-1">
             {quickQuestions.map((q, i) => (
@@ -145,7 +145,7 @@ export const CopilotPanel: React.FC<CopilotPanelProps> = ({ agentType }) => {
           <input value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sendMessage(input)}
             className="flex-1 text-sm p-2 border border-[var(--border)] rounded bg-[var(--background)]"
-            placeholder={locale === 'zh' ? '输入消息...' : 'Type a message...'} />
+            placeholder={t('common.copilot.placeholder')} />
           <button onClick={() => sendMessage(input)} disabled={loading}
             className="p-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded hover:opacity-90 disabled:opacity-50">
             <Send className="w-4 h-4" />
