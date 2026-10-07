@@ -651,5 +651,9 @@
   "common.error.desc": "应用程序遇到了意外错误。请尝试刷新页面，如果问题持续存在，请联系管理员。",
   "common.error.details": "查看错误详情",
   "common.error.retry": "重试",
-  "common.error.reload": "刷新页面"
+  "common.error.reload": "刷新页面",
+  "common.workbook.history.title": "执行历史",
+  "common.workbook.history.refresh": "刷新",
+  "common.workbook.history.close": "关闭",
+  "common.workbook.history.empty": "暂无执行记录。执行代码后将在此显示。"
 }

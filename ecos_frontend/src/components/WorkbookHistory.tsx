@@ -5,6 +5,7 @@
 
 import React from "react";
 import { RotateCw, Clock, History, X } from "lucide-react";
+import { useLanguage } from "./LanguageContext";
 
 interface HistoryEntry {
   language: string;
@@ -33,12 +34,12 @@ interface WorkbookHistoryProps {
 export default function WorkbookHistory({
   history,
   loading,
-  locale,
   styles,
   visible,
   onRefresh,
   onClose,
 }: WorkbookHistoryProps) {
+  const { t } = useLanguage();
   if (!visible) return null;
 
   return (
@@ -51,14 +52,14 @@ export default function WorkbookHistory({
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-indigo-500" />
           <span className="text-xs font-bold uppercase tracking-wider">
-            {locale === "zh" ? "执行历史" : "History"}
+            {t("common.workbook.history.title")}
           </span>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={onRefresh}
             className={`p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 ${styles.cardTextMuted}`}
-            title={locale === "zh" ? "刷新" : "Refresh"}
+            title={t("common.workbook.history.refresh")}
           >
             <RotateCw
               className={`w-3.5 h-3.5 ${
@@ -69,7 +70,7 @@ export default function WorkbookHistory({
           <button
             onClick={onClose}
             className={`p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 ${styles.cardTextMuted}`}
-            title={locale === "zh" ? "关闭" : "Close"}
+            title={t("common.workbook.history.close")}
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -87,9 +88,7 @@ export default function WorkbookHistory({
               <History className={`w-6 h-6 ${styles.cardTextMuted}`} />
             </div>
             <p className={`text-xs ${styles.cardTextMuted} leading-relaxed`}>
-              {locale === "zh"
-                ? "暂无执行记录。执行代码后将在此显示。"
-                : "No execution history yet. Run some code to see records here."}
+              {t("common.workbook.history.empty")}
             </p>
           </div>
         ) : (

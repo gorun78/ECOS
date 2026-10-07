@@ -651,5 +651,9 @@
   "common.error.desc": "The application encountered an unexpected error. Try refreshing the page, or contact your administrator if the issue persists.",
   "common.error.details": "Error details",
   "common.error.retry": "Try Again",
-  "common.error.reload": "Refresh Page"
+  "common.error.reload": "Refresh Page",
+  "common.workbook.history.title": "History",
+  "common.workbook.history.refresh": "Refresh",
+  "common.workbook.history.close": "Close",
+  "common.workbook.history.empty": "No execution history yet. Run some code to see records here."
 }
