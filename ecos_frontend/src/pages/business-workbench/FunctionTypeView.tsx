@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { FunctionType, FunctionParameter, ObjectType } from '../../types/ontology';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 
 interface FunctionTypeViewProps {
   func: FunctionType;
@@ -22,6 +23,7 @@ export default function FunctionTypeView({
   onDelete
 }: FunctionTypeViewProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'signature' | 'code' | 'test'>('code');
   const [newParamName, setNewParamName] = useState('');
   const [newParamType, setNewParamType] = useState<string>('string');
@@ -66,7 +68,7 @@ export default function FunctionTypeView({
       name,
       dataType: newParamType,
       isRequired: true,
-      description: `关于参数 ${name} 的描述信息。`,
+      description: t('ow.function.newParamDesc', { name }),
       objectTypeId: (newParamType === 'ObjectType' || newParamType === 'ObjectTypeSet') ? newParamObjType : undefined
     };
 
@@ -100,24 +102,25 @@ export default function FunctionTypeView({
     let codeTemplate = '';
     const className = func.apiName.charAt(0).toUpperCase() + func.apiName.slice(1) + 'Class';
 
-    if (type === 'validation') {
+            if (type === 'validation') {
       codeTemplate = `import { Function } from "@foundry/functions-api";
 import { Aircraft } from "../objects";
 
 export class ${className} {
     /**
-     * 自定义验证逻辑：检查飞机最近适航维护日期是否符合飞行任务的强制安全周期要求（例如不晚于180天）
+     * Custom validation: check whether the aircraft's last maintenance date
+     * meets the safety-interval requirement (e.g. within the last 180 days).
      */
     @Function()
     public async validateMaintenancePeriod(aircraft: Aircraft, safetyIntervalDays: number): Promise<boolean> {
         if (!aircraft.lastMaintenanceDate) {
             return false;
         }
-        
+
         const lastMaint = new Date(aircraft.lastMaintenanceDate).getTime();
         const now = Date.now();
         const diffDays = (now - lastMaint) / (1000 * 60 * 60 * 24);
-        
+
         return diffDays <= safetyIntervalDays;
     }
 }`;
@@ -126,15 +129,16 @@ export class ${className} {
 
 export class ${className} {
     /**
-     * 动态默认值提供：根据当前航班出发地及时区计算建议的滑行道耗时 (分钟)
+     * Dynamic default value: compute the suggested taxi duration (minutes)
+     * based on the departure airport code / timezone.
      */
     @Function()
     public getDefaultTaxiDuration(airportCode: string): Integer {
         const busyAirports = ["ATL", "ORD", "SFO", "PEK"];
         if (busyAirports.includes(airportCode)) {
-            return 25; // 繁忙大机场默认滑行25分钟
+            return 25; // Busy mega-airport: default to 25 min
         }
-        return 10; // 普通中型机场默认滑行10分钟
+        return 10; // Regular midway airport: default to 10 min
     }
 }`;
     } else if (type === 'computed') {
@@ -143,15 +147,16 @@ import { Pilot } from "../objects";
 
 export class ${className} {
     /**
-     * 对象派生属性计算：根据飞行员总安全飞行小时数，计算并返回其对应的技术等级星级评定
+     * Derived attribute: given the pilot's total safe flight hours,
+     * compute and return the corresponding technical star level.
      */
     @Function()
     public computePilotStarLevel(pilot: Pilot): string {
         const hours = pilot.hoursFlown || 0;
-        if (hours >= 10000) return "⭐⭐⭐⭐⭐ (金牌资深航线机长)";
-        if (hours >= 5000) return "⭐⭐⭐⭐ (资深特级机长)";
-        if (hours >= 3000) return "⭐⭐⭐ (普通一类机长)";
-        return "⭐⭐ (高级副驾驶)";
+        if (hours >= 10000) return "⭐⭐⭐⭐⭐ (Gold senior line captain)";
+        if (hours >= 5000) return "⭐⭐⭐⭐ (Senior special-class captain)";
+        if (hours >= 3000) return "⭐⭐⭐ (Standard first-class captain)";
+        return "⭐⭐ (Senior first officer)";
     }
 }`;
     } else {
@@ -160,11 +165,12 @@ import { Aircraft } from "../objects";
 
 export class ${className} {
     /**
-     * 统计聚合：返回给定飞机集合中，处于特定在勤维护状态 (MAINTENANCE) 的数量
+     * Aggregation: return, within the given set of aircraft, the count of
+     * those currently in the MAINTENANCE status.
      */
     @Function()
     public countAircraftsInMaintenance(aircrafts: ObjectSet<Aircraft>): Integer {
-        // 利用 Foundry ObjectSet 的过滤器进行快速服务端筛选并统计
+        // Use Foundry ObjectSet inline filter for fast server-side counting
         return aircrafts
             .filter(ac => ac.status.exactMatch("MAINTENANCE"))
             .count();
@@ -188,18 +194,18 @@ export class ${className} {
       }, delay);
     };
 
-    addLog(`[Foundry Compiler] 🔍 正在检索 TypeScript 源码并进行类型安全检测...`, 200);
-    addLog(`[Foundry Compiler] ⚙️ 发现主入口函数：@Function() public async ${func.apiName}()`, 500);
-    addLog(`[Foundry Compiler] ✅ 编译成功，输出：${func.apiName}.js (ES2022 Target)`, 800);
-    
+    addLog(t('ow.function.log_compiler_scan'), 200);
+    addLog(t('ow.function.log_compiler_entry', { name: func.apiName }), 500);
+    addLog(t('ow.function.log_compiler_success', { name: func.apiName }), 800);
+
     // Stringify inputs
     const inputsStr = Object.entries(testInputs)
       .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
       .join(', ');
 
-    addLog(`[Foundry Runner] 🚀 开始载入本地 Sandbox 运行沙盒...`, 1100);
-    addLog(`[Foundry Runner] 📥 注入运行实参：{ ${inputsStr} }`, 1300);
-    addLog(`[Foundry Runner] 📡 自动连线 Ontology 本地实例服务并执行动态逻辑...`, 1600);
+    addLog(t('ow.function.log_runner_sandbox'), 1100);
+    addLog(t('ow.function.log_runner_inject', { inputs: inputsStr }), 1300);
+    addLog(t('ow.function.log_runner_bind'), 1600);
 
     setTimeout(() => {
       let output: any = null;
@@ -221,8 +227,8 @@ export class ${className} {
 
       setTestLogs(prev => [
         ...prev,
-        `[Foundry Runner] 💾 沙盒计算完成 (耗时: 38ms, 占用内存: 12.4MB)`,
-        `[Foundry Runner] 🎉 执行结束，输出结果已捕获：`
+        t('ow.function.log_runner_done'),
+        t('ow.function.log_runner_result')
       ]);
       setTestResult(output);
       setIsTesting(false);
@@ -249,7 +255,7 @@ export class ${className} {
                 {func.apiName}
               </span>
               <span className={`text-xs ${styles.appBg} ${styles.cardTextMuted} px-2 py-0.5 rounded-full font-mono`}>
-                Returns {func.returnType === 'ObjectTypeSet' ? `Set<${func.returnObjectTypeId}>` : func.returnType}
+                {t('ow.function.returnsPrefix')} {func.returnType === 'ObjectTypeSet' ? `Set<${func.returnObjectTypeId}>` : func.returnType}
               </span>
             </div>
             <input
@@ -257,7 +263,7 @@ export class ${className} {
               value={func.description}
               onChange={e => handleFieldChange('description', e.target.value)}
               className={`text-xs ${styles.cardTextMuted} mt-1 border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-full max-w-[500px]`}
-              placeholder="添加函数的功能与作用描述"
+              placeholder={t('ow.function.descPlaceholder')}
             />
           </div>
         </div>
@@ -266,17 +272,17 @@ export class ${className} {
           className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"
         >
           <LucideIcon name="Trash2" size={13} />
-          删除函数
+          {t('ow.function.deleteFunction')}
         </button>
       </div>
 
       {/* Tab bar */}
       <div className={`flex px-6 border-b ${styles.appBorder} ${styles.cardBg}`}>
         {(['signature', 'code', 'test'] as const).map(tab => {
-          const labels = {
-            signature: '1. 签名与参数 (Signature)',
-            code: '2. TS 代码编辑 (TypeScript Code)',
-            test: '3. 沙盒测试运行 (Sandbox Runner)'
+          const tabLabels: Record<typeof tab, string> = {
+            signature: t('ow.function.tab_signature'),
+            code: t('ow.function.tab_code'),
+            test: t('ow.function.tab_test')
           };
           return (
             <button
@@ -288,7 +294,7 @@ export class ${className} {
                   : `border-transparent ${styles.cardTextMuted} hover:opacity-100 opacity-80`
               }`}
             >
-              {labels[tab]}
+              {tabLabels[tab]}
             </button>
           );
         })}
@@ -303,30 +309,30 @@ export class ${className} {
             
             {/* Signature Basic configuration */}
             <div className={`${styles.appBg} border ${styles.cardBorder} rounded-xl p-5 space-y-4`}>
-              <h3 className={`text-xs font-semibold ${styles.cardText}`}>函数出参及归属 (Return Type / Output)</h3>
+              <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.function.sig_returnTitle')}</h3>
               <div className="grid grid-cols-2 gap-4 text-xs">
                 <div className="space-y-1">
-                  <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>返回参数类型 (Return Type)</label>
+                  <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>{t('ow.function.sig_returnType')}</label>
                   <select
                     value={func.returnType}
                     onChange={e => handleFieldChange('returnType', e.target.value)}
                     className={`px-2.5 py-1.5 border ${styles.inputBorder} rounded ${styles.inputBg} w-full font-mono`}
                   >
-                    <option value="string">string (字符串)</option>
-                    <option value="integer">integer (整数)</option>
-                    <option value="decimal">decimal (小数)</option>
-                    <option value="boolean">boolean (布尔值)</option>
-                    <option value="date">date (日期)</option>
-                    <option value="timestamp">timestamp (时间戳)</option>
-                    <option value="ObjectType">ObjectType (特定对象实例)</option>
-                    <option value="ObjectTypeSet">ObjectTypeSet (对象集合)</option>
+                    <option value="string">{t('ow.function.rt_string')}</option>
+                    <option value="integer">{t('ow.function.rt_integer')}</option>
+                    <option value="decimal">{t('ow.function.rt_decimal')}</option>
+                    <option value="boolean">{t('ow.function.rt_boolean')}</option>
+                    <option value="date">{t('ow.function.rt_date')}</option>
+                    <option value="timestamp">{t('ow.function.rt_timestamp')}</option>
+                    <option value="ObjectType">{t('ow.function.rt_objectType')}</option>
+                    <option value="ObjectTypeSet">{t('ow.function.rt_objectTypeSet')}</option>
                   </select>
                 </div>
 
                 {/* Bind to Object Type if returning Object/ObjectSet */}
                 {(func.returnType === 'ObjectType' || func.returnType === 'ObjectTypeSet') && (
                   <div className="space-y-1">
-                    <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>返回对象类型 (Target Object Type)</label>
+                    <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>{t('ow.function.sig_returnObjType')}</label>
                     <select
                       value={func.returnObjectTypeId || ''}
                       onChange={e => handleFieldChange('returnObjectTypeId', e.target.value)}
@@ -342,7 +348,7 @@ export class ${className} {
 
               <div className="grid grid-cols-2 gap-4 text-xs">
                 <div className="space-y-1">
-                  <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>API标识名称 (API Name)</label>
+                  <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>{t('ow.function.sig_apiName')}</label>
                   <input
                     type="text"
                     value={func.apiName}
@@ -351,13 +357,13 @@ export class ${className} {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>关联的核心对象 (Associated Object Type)</label>
+                  <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>{t('ow.function.sig_associated')}</label>
                   <select
                     value={func.associatedObjectType || ''}
                     onChange={e => handleFieldChange('associatedObjectType', e.target.value)}
                     className={`px-2.5 py-1.5 border ${styles.inputBorder} rounded ${styles.inputBg} w-full`}
                   >
-                    <option value="">-- 无特定关联对象 (全局函数) --</option>
+                    <option value="">{t('ow.function.sig_associated_none')}</option>
                     {objectTypes.map(ot => (
                       <option key={ot.id} value={ot.id}>{ot.displayName} ({ot.id})</option>
                     ))}
@@ -369,11 +375,11 @@ export class ${className} {
             {/* Input parameters configuration */}
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className={`text-xs font-semibold ${styles.cardText}`}>定义函数入参 (Input Parameters)</h3>
+                <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.function.params_title')}</h3>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    placeholder="新参数变量名 (e.g. airportCode)"
+                    placeholder={t('ow.function.params_namePlaceholder')}
                     value={newParamName}
                     onChange={e => setNewParamName(e.target.value)}
                     className={`px-2.5 py-1 text-xs border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden font-mono`}
@@ -389,8 +395,8 @@ export class ${className} {
                     <option value="boolean">boolean</option>
                     <option value="date">date</option>
                     <option value="timestamp">timestamp</option>
-                    <option value="ObjectType">ObjectType (对象实例)</option>
-                    <option value="ObjectTypeSet">ObjectTypeSet (对象集合)</option>
+                    <option value="ObjectType">{t('ow.function.pt_objectType')}</option>
+                    <option value="ObjectTypeSet">{t('ow.function.pt_objectTypeSet')}</option>
                   </select>
                   {(newParamType === 'ObjectType' || newParamType === 'ObjectTypeSet') && (
                     <select
@@ -408,7 +414,7 @@ export class ${className} {
                     className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition-colors flex items-center gap-1"
                   >
                     <LucideIcon name="Plus" size={13} />
-                    添加参数
+                    {t('ow.function.add_param')}
                   </button>
                 </div>
               </div>
@@ -417,19 +423,19 @@ export class ${className} {
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className={`${styles.appBg} border-b ${styles.appBorder} ${styles.cardText} font-medium`}>
-                      <th className="py-2.5 px-4 w-12">必选</th>
-                      <th className="py-2.5 px-4">变量标识</th>
-                      <th className="py-2.5 px-4">参数类型</th>
-                      <th className="py-2.5 px-4">绑定实体类型</th>
-                      <th className="py-2.5 px-4">参数业务描述</th>
-                      <th className="py-2.5 px-4 text-center">操作</th>
+                      <th className="py-2.5 px-4 w-12">{t('ow.function.th_required')}</th>
+                      <th className="py-2.5 px-4">{t('ow.function.th_name')}</th>
+                      <th className="py-2.5 px-4">{t('ow.function.th_type')}</th>
+                      <th className="py-2.5 px-4">{t('ow.function.th_bind')}</th>
+                      <th className="py-2.5 px-4">{t('ow.function.th_desc')}</th>
+                      <th className="py-2.5 px-4 text-center">{t('ow.function.th_actions')}</th>
                     </tr>
                   </thead>
                   <tbody className={`divide-y ${styles.divider} ${styles.cardTextMuted}`}>
                     {func.parameters.length === 0 ? (
                       <tr>
                         <td colSpan={6} className={`text-center py-8 ${styles.cardTextMuted} italic`}>
-                          当前函数无输入参数，只能执行无参静态逻辑。
+                          {t('ow.function.params_empty')}
                         </td>
                       </tr>
                     ) : (
@@ -466,7 +472,7 @@ export class ${className} {
                               value={p.description}
                               onChange={e => handleParamFieldChange(p.name, 'description', e.target.value)}
                               className={`${styles.cardTextMuted} border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-full`}
-                              placeholder="配置描述信息"
+                              placeholder={t('ow.function.params_descPlaceholder')}
                             />
                           </td>
                           <td className="py-2.5 px-4 text-center">
@@ -493,8 +499,8 @@ export class ${className} {
             {/* Template selector side sidebar */}
             <div className={`w-56 border-r ${styles.sidebarBorder} ${styles.sidebarBg} p-4 flex flex-col gap-4 overflow-y-auto select-none`}>
               <div>
-                <h4 className={`text-xs font-semibold ${styles.cardText}`}>Foundry 函数模板</h4>
-                <p className={`text-[10px] ${styles.cardTextMuted} mt-0.5`}>选择契合您业务目标的TS模板一键生成标准代码结构。</p>
+                <h4 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.function.code_tplTitle')}</h4>
+                <p className={`text-[10px] ${styles.cardTextMuted} mt-0.5`}>{t('ow.function.code_tplHint')}</p>
               </div>
               <div className="space-y-2">
                 <button
@@ -503,8 +509,8 @@ export class ${className} {
                 >
                   <LucideIcon name="Shield" size={14} className="text-emerald-500 mt-0.5 shrink-0" />
                   <div>
-                    <div className="text-[11px] font-semibold">拦截校验模板</div>
-                    <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>限制Action提交</div>
+                    <div className="text-[11px] font-semibold">{t('ow.function.tpl_validation_title')}</div>
+                    <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>{t('ow.function.tpl_validation_desc')}</div>
                   </div>
                 </button>
                 <button
@@ -513,8 +519,8 @@ export class ${className} {
                 >
                   <LucideIcon name="Sparkles" size={14} className="text-amber-500 mt-0.5 shrink-0" />
                   <div>
-                    <div className="text-[11px] font-semibold">动态入参默认值</div>
-                    <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>默认值公式计算</div>
+                    <div className="text-[11px] font-semibold">{t('ow.function.tpl_default_title')}</div>
+                    <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>{t('ow.function.tpl_default_desc')}</div>
                   </div>
                 </button>
                 <button
@@ -523,8 +529,8 @@ export class ${className} {
                 >
                   <LucideIcon name="Calculator" size={14} className="text-blue-500 mt-0.5 shrink-0" />
                   <div>
-                    <div className="text-[11px] font-semibold">派生计算属性</div>
-                    <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>实体派生衍生指标</div>
+                    <div className="text-[11px] font-semibold">{t('ow.function.tpl_computed_title')}</div>
+                    <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>{t('ow.function.tpl_computed_desc')}</div>
                   </div>
                 </button>
                 <button
@@ -533,17 +539,17 @@ export class ${className} {
                 >
                   <LucideIcon name="TrendingUp" size={14} className="text-indigo-500 mt-0.5 shrink-0" />
                   <div>
-                    <div className="text-[11px] font-semibold">对象集统计聚合</div>
-                    <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>多实体合并聚合计算</div>
+                    <div className="text-[11px] font-semibold">{t('ow.function.tpl_aggregation_title')}</div>
+                    <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>{t('ow.function.tpl_aggregation_desc')}</div>
                   </div>
                 </button>
               </div>
               <div className="mt-auto bg-blue-50 border border-blue-100 rounded-lg p-3 text-[11px] text-blue-700 leading-relaxed">
                 <div className="font-semibold flex items-center gap-1 mb-1">
                   <LucideIcon name="Info" size={12} />
-                  <span>TS代码要求:</span>
+                  <span>{t('ow.function.code_req_title')}</span>
                 </div>
-                必须通过 <code>@Function()</code> 装饰器公开核心函数，以使 Workshop 应用和操作 (Actions) 能够发现并进行远程绑定。
+                {t('ow.function.code_req_body')}
               </div>
             </div>
 
@@ -589,8 +595,8 @@ export class ${className} {
             <div className={`w-1/3 border-r ${styles.sidebarBorder} p-5 ${styles.sidebarBg} flex flex-col justify-between overflow-y-auto select-none`}>
               <div className="space-y-4 text-xs">
                 <div>
-                  <h4 className={`text-xs font-semibold ${styles.cardText}`}>沙盒测试参数输入</h4>
-                  <p className={`text-[10px] ${styles.cardTextMuted} mt-0.5`}>请为该函数的输入参数填入测试值以模拟执行。</p>
+                  <h4 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.function.test_title')}</h4>
+                  <p className={`text-[10px] ${styles.cardTextMuted} mt-0.5`}>{t('ow.function.test_hint')}</p>
                 </div>
 
                 <div className="space-y-3">
@@ -634,12 +640,12 @@ export class ${className} {
                                 onChange={e => setVal(e.target.value)}
                                 className={`w-full px-2 py-1 text-[11px] border ${styles.inputBorder} rounded ${styles.inputBg} mt-1`}
                               >
-                                <option value="">-- 选择模拟对象实体 --</option>
+                                <option value="">{t('ow.function.test_select_entity')}</option>
                                 {p.dataType === 'ObjectTypeSet' ? (
-                                  <option value="mock_set_all_records">所有对象实体集 (ObjectSet 全量)</option>
+                                  <option value="mock_set_all_records">{t('ow.function.test_set_all')}</option>
                                 ) : null}
-                                <option value={p.objectTypeId || ''}>{sampleLabel}（模拟实体）</option>
-                                <option value="custom_mock_1">自定义测试对象 1</option>
+                                <option value={p.objectTypeId || ''}>{t('ow.function.test_mock_entity', { name: sampleLabel })}</option>
+                                <option value="custom_mock_1">{t('ow.function.test_custom_mock')}</option>
                               </select>
                             );
                           })()
@@ -663,7 +669,7 @@ export class ${className} {
                             value={value}
                             onChange={e => setVal(e.target.value)}
                             className={`w-full px-2.5 py-1 text-[11px] border ${styles.inputBorder} rounded focus:outline-hidden ${styles.inputBg}`}
-                            placeholder="请输入文本"
+                            placeholder={t('ow.function.test_textPlaceholder')}
                           />
                         )}
                       </div>
@@ -681,12 +687,12 @@ export class ${className} {
                 {isTesting ? (
                   <>
                     <span className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                    <span>正在沙盒中执行计算...</span>
+                    <span>{t('ow.function.test_running')}</span>
                   </>
                 ) : (
                   <>
                     <LucideIcon name="Play" size={14} className="fill-white" />
-                    <span>运行测试 (Run Function)</span>
+                    <span>{t('ow.function.test_run')}</span>
                   </>
                 )}
               </button>
@@ -695,7 +701,7 @@ export class ${className} {
             {/* Runner output & logs */}
             <div className="flex-1 bg-[var(--card,#020617)] p-5 flex flex-col text-xs font-mono overflow-y-auto text-[var(--card,#CBD5E1)] select-none">
               <h4 className="text-[10px] text-[var(--card,#64748B)] tracking-wider uppercase font-semibold mb-3 border-b border-[var(--card,#1E293B)] pb-2 flex justify-between items-center">
-                <span>函数模拟输出终端 (Foundry Console)</span>
+                <span>{t('ow.function.test_console_title')}</span>
                 {testResult !== null && (
                   <span className="text-emerald-500 font-semibold flex items-center gap-1 bg-emerald-500/10 px-1.5 py-0.5 rounded">
                     <LucideIcon name="CheckCircle" size={11} /> SUCCESS
@@ -707,15 +713,15 @@ export class ${className} {
               {testLogs.length === 0 ? (
                 <div className="flex-1 flex flex-col justify-center items-center text-[var(--card,#64748B)] italic">
                   <LucideIcon name="Terminal" size={24} className="mb-2 text-[var(--card,#475569)]" />
-                  <div>配置完左侧测试入参后，点击下方 "运行测试" 按钮。</div>
-                  <div>系统将在编译并在虚拟沙盒中运行您的 TS 代码。</div>
+                  <div>{t('ow.function.test_console_line1')}</div>
+                  <div>{t('ow.function.test_console_line2')}</div>
                 </div>
               ) : (
                 <div className="flex-1 space-y-1.5 select-text">
                   {testLogs.map((log, i) => (
                     <div key={i} className={
-                      log.includes('SUCCESS') || log.includes('捕获') ? 'text-emerald-400' :
-                      log.includes('注入') ? 'text-blue-400' :
+                      log.includes('SUCCESS') || log.includes('🎉') ? 'text-emerald-400' :
+                      log.includes('📥') ? 'text-blue-400' :
                       log.includes('⚙️') || log.includes('✅') ? 'text-[var(--card,#94A3B8)]' :
                       'text-[var(--card,#CBD5E1)]'
                     }>
@@ -727,7 +733,7 @@ export class ${className} {
                   {testResult !== null && (
                     <div className="mt-4 p-4 rounded bg-[var(--card,#0B0F19)]/60 border border-[var(--card,#1E293B)] text-emerald-300">
                       <div className="text-[10px] text-[var(--card,#64748B)] mb-1 font-sans uppercase tracking-wider font-semibold">
-                        返回值 (Return Value):
+                        {t('ow.function.test_returnValue')}
                       </div>
                         <pre className="text-xs leading-relaxed">
                         {typeof testResult === 'object' ? JSON.stringify(testResult, null, 4) : String(testResult)}
