@@ -45,9 +45,8 @@ type Tab = "users" | "roles" | "orgs" | "permissions";
 // ═══════════════════════════════════════════════════════════════
 
 export default function UserManagement() {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const isZh = locale === "zh";
 
   const [tab, setTab] = useState<Tab>("users");
 
@@ -158,18 +157,18 @@ export default function UserManagement() {
     if (newUserId && roleIds.length > 0) {
       await assignUserRoles(newUserId, roleIds).catch(() => {});
     }
-    showToast("success", isZh ? "用户创建成功" : "User created");
+    showToast("success", t("platform.user.host.created"));
     loadUsers();
-  }, [isZh, showToast, loadUsers]);
+  }, [t, showToast, loadUsers]);
 
   const handleUpdateUser = useCallback(async (data: Record<string, any>, roleIds: string[]) => {
     const userId = data.userId;
     const { userId: _, password, ...payload } = data;
     await updateUser(userId, payload);
     await assignUserRoles(userId, roleIds).catch(() => {});
-    showToast("success", isZh ? "用户更新成功" : "User updated");
+    showToast("success", t("platform.user.host.updated"));
     loadUsers();
-  }, [isZh, showToast, loadUsers]);
+  }, [t, showToast, loadUsers]);
 
   const handleDeleteUser = useCallback(async () => {
     if (!confirmAction?.id) return;
@@ -177,44 +176,44 @@ export default function UserManagement() {
     setConfirmAction(null);
     try {
       await deleteUser(userId);
-      showToast("success", isZh ? "用户已删除" : "User deleted");
+      showToast("success", t("platform.user.host.deleted"));
       loadUsers();
     } catch (e: any) { showToast("error", e.message); }
-  }, [confirmAction, isZh, showToast, loadUsers]);
+  }, [confirmAction, t, showToast, loadUsers]);
 
   const handleToggleStatus = useCallback(async (userId: string, currentStatus: string) => {
     const newStatus = currentStatus === "ACTIVE" ? "DISABLED" : "ACTIVE";
     try {
       await toggleUserStatus(userId, newStatus);
-      showToast("success", isZh ? "状态已更新" : "Status updated");
+      showToast("success", t("platform.user.host.statusUpdated"));
       loadUsers();
     } catch (e: any) { showToast("error", e.message); }
-  }, [isZh, showToast, loadUsers]);
+  }, [t, showToast, loadUsers]);
 
   // ── Batch operations ──────────────────────────────────
   const handleBatchEnable = useCallback(async (userIds: string[]) => {
     try {
       await Promise.all(userIds.map(id => toggleUserStatus(id, "ACTIVE")));
-      showToast("success", isZh ? `已启用 ${userIds.length} 个用户` : `${userIds.length} users enabled`);
+      showToast("success", t("platform.user.host.batchEnabled", { n: userIds.length }));
       loadUsers();
     } catch (e: any) { showToast("error", e.message); }
-  }, [isZh, showToast, loadUsers]);
+  }, [t, showToast, loadUsers]);
 
   const handleBatchDisable = useCallback(async (userIds: string[]) => {
     try {
       await Promise.all(userIds.map(id => toggleUserStatus(id, "DISABLED")));
-      showToast("success", isZh ? `已禁用 ${userIds.length} 个用户` : `${userIds.length} users disabled`);
+      showToast("success", t("platform.user.host.batchDisabled", { n: userIds.length }));
       loadUsers();
     } catch (e: any) { showToast("error", e.message); }
-  }, [isZh, showToast, loadUsers]);
+  }, [t, showToast, loadUsers]);
 
   const handleBatchDelete = useCallback(async (userIds: string[]) => {
     try {
       await Promise.all(userIds.map(id => deleteUser(id)));
-      showToast("success", isZh ? `已删除 ${userIds.length} 个用户` : `${userIds.length} users deleted`);
+      showToast("success", t("platform.user.host.batchDeleted", { n: userIds.length }));
       loadUsers();
     } catch (e: any) { showToast("error", e.message); }
-  }, [isZh, showToast, loadUsers]);
+  }, [t, showToast, loadUsers]);
 
   const handleForceLogout = useCallback((userId: string) => {
     setDetailUser(null);
@@ -226,9 +225,9 @@ export default function UserManagement() {
     setConfirmAction(null);
     try {
       await forceLogoutUser(confirmAction.userId);
-      showToast("success", isZh ? "用户已强制下线" : "User force logged out");
+      showToast("success", t("platform.user.host.forceLogoutToast"));
     } catch (e: any) { showToast("error", e.message || "Force logout failed"); }
-  }, [confirmAction, isZh, showToast]);
+  }, [confirmAction, t, showToast]);
 
   const handleResetPassword = useCallback((userId: string) => {
     setDetailUser(null);
@@ -242,20 +241,20 @@ export default function UserManagement() {
       const res: any = await resetPasswordGenerate(confirmAction.userId);
       const tempPwd = res?.tempPassword || res?.password || "ECOS@2026";
       setResetPwdResult({ userId: confirmAction.userId, tempPassword: tempPwd });
-      showToast("success", isZh ? "密码已重置" : "Password reset");
+      showToast("success", t("platform.user.host.passwordResetToast"));
     } catch (e: any) { showToast("error", e.message || "Reset failed"); }
-  }, [confirmAction, isZh, showToast]);
+  }, [confirmAction, t, showToast]);
 
   const handleCsvImport = useCallback(async (rows: Record<string, string>[]) => {
     await batchCreateUsers(rows);
-    showToast("success", isZh ? `成功导入 ${rows.length} 个用户` : `Successfully imported ${rows.length} users`);
+    showToast("success", t("platform.user.host.csvImported", { n: rows.length }));
     setShowCsvImport(false);
     loadUsers();
-  }, [isZh, showToast, loadUsers]);
+  }, [t, showToast, loadUsers]);
 
   const handleCsvExport = useCallback(() => {
     if (users.length === 0) {
-      showToast("error", isZh ? "没有可导出的数据" : "No data to export");
+      showToast("error", t("platform.user.host.exportEmpty"));
       return;
     }
     const headers = ["username", "realName", "email", "phone", "orgId", "status"];
@@ -270,72 +269,72 @@ export default function UserManagement() {
     a.href = url; a.download = `users_export_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast("success", isZh ? "导出成功" : "Export successful");
-  }, [users, isZh, showToast]);
+    showToast("success", t("platform.user.host.exportDone"));
+  }, [users, t, showToast]);
 
   // Role CRUD
   const handleCreateRole = useCallback(async (data: Record<string, any>) => {
     await createRole(data);
-    showToast("success", isZh ? "角色创建成功" : "Role created");
+    showToast("success", t("platform.user.host.roleCreated"));
     loadRoles();
-  }, [isZh, showToast, loadRoles]);
+  }, [t, showToast, loadRoles]);
   const handleUpdateRole = useCallback(async (data: Record<string, any>) => {
     await updateRole(data.roleId, data);
-    showToast("success", isZh ? "角色更新成功" : "Role updated");
+    showToast("success", t("platform.user.host.roleUpdated"));
     loadRoles();
-  }, [isZh, showToast, loadRoles]);
+  }, [t, showToast, loadRoles]);
   const handleDeleteRole = useCallback(async () => {
     if (!confirmAction?.id) return;
     setConfirmAction(null);
-    try { await deleteRole(confirmAction.id); showToast("success", isZh ? "角色已删除" : "Role deleted"); loadRoles(); }
+    try { await deleteRole(confirmAction.id); showToast("success", t("platform.user.host.roleDeleted")); loadRoles(); }
     catch (e: any) { showToast("error", e.message); }
-  }, [confirmAction, isZh, showToast, loadRoles]);
+  }, [confirmAction, t, showToast, loadRoles]);
   const handleSaveRolePermissions = useCallback(async (permIds: string[]) => {
     if (!permPanelRole) return;
     await assignRolePermissions(permPanelRole.roleId, permIds);
-    showToast("success", isZh ? "权限分配成功" : "Permissions saved");
+    showToast("success", t("platform.user.host.permAssigned"));
     setPermPanelRole(null);
-  }, [permPanelRole, isZh, showToast]);
+  }, [permPanelRole, t, showToast]);
   const handleCreateOrg = useCallback(async (data: Record<string, any>) => {
     await createOrg(data);
-    showToast("success", isZh ? "机构创建成功" : "Org created");
+    showToast("success", t("platform.user.host.orgCreated"));
     loadOrgs();
-  }, [isZh, showToast, loadOrgs]);
+  }, [t, showToast, loadOrgs]);
   const handleUpdateOrg = useCallback(async (data: Record<string, any>) => {
     await updateOrg(data.orgId, data);
-    showToast("success", isZh ? "机构更新成功" : "Org updated");
+    showToast("success", t("platform.user.host.orgUpdated"));
     loadOrgs();
-  }, [isZh, showToast, loadOrgs]);
+  }, [t, showToast, loadOrgs]);
   const handleDeleteOrg = useCallback(async () => {
     if (!confirmAction?.id) return;
     setConfirmAction(null);
-    try { await deleteOrg(confirmAction.id); showToast("success", isZh ? "机构已删除" : "Org deleted"); loadOrgs(); }
+    try { await deleteOrg(confirmAction.id); showToast("success", t("platform.user.host.orgDeleted")); loadOrgs(); }
     catch (e: any) { showToast("error", e.message); }
-  }, [confirmAction, isZh, showToast, loadOrgs]);
+  }, [confirmAction, t, showToast, loadOrgs]);
   const handleCreatePerm = useCallback(async (data: Record<string, any>) => {
     await createPermission(data);
-    showToast("success", isZh ? "权限创建成功" : "Permission created");
+    showToast("success", t("platform.user.host.permCreated"));
     loadPermissions();
-  }, [isZh, showToast, loadPermissions]);
+  }, [t, showToast, loadPermissions]);
   const handleUpdatePerm = useCallback(async (data: Record<string, any>) => {
     await updatePermission(data.permissionId, data);
-    showToast("success", isZh ? "权限更新成功" : "Permission updated");
+    showToast("success", t("platform.user.host.permUpdated"));
     loadPermissions();
-  }, [isZh, showToast, loadPermissions]);
+  }, [t, showToast, loadPermissions]);
   const handleDeletePerm = useCallback(async () => {
     if (!confirmAction?.id) return;
     setConfirmAction(null);
-    try { await deletePermission(confirmAction.id); showToast("success", isZh ? "权限已删除" : "Permission deleted"); loadPermissions(); }
+    try { await deletePermission(confirmAction.id); showToast("success", t("platform.user.host.permDeleted")); loadPermissions(); }
     catch (e: any) { showToast("error", e.message); }
-  }, [confirmAction, isZh, showToast, loadPermissions]);
+  }, [confirmAction, t, showToast, loadPermissions]);
 
   // ── Tab configuration ─────────────────────────────────────
 
   const tabs: { id: Tab; label: string; icon: React.FC<any> }[] = [
-    { id: "users", label: isZh ? "用户" : "Users", icon: Users },
-    { id: "roles", label: isZh ? "角色" : "Roles", icon: Shield },
-    { id: "orgs", label: isZh ? "组织机构" : "Orgs", icon: Building2 },
-    { id: "permissions", label: isZh ? "权限" : "Permissions", icon: Key },
+    { id: "users", label: t("platform.user.host.tabUsers"), icon: Users },
+    { id: "roles", label: t("platform.user.host.tabRoles"), icon: Shield },
+    { id: "orgs", label: t("platform.user.host.tabOrgs"), icon: Building2 },
+    { id: "permissions", label: t("platform.user.host.tabPermissions"), icon: Key },
   ];
 
   const totalPages = Math.max(1, Math.ceil(userTotal / pageSize));
@@ -358,19 +357,19 @@ export default function UserManagement() {
             <div className="flex items-center justify-between mb-3">
               <h3 className={`text-sm font-semibold ${styles.cardText}`}>
                 <CheckCircle2 className="w-4 h-4 text-green-500 inline mr-1.5" />
-                {isZh ? "密码已重置" : "Password Reset"}
+                {t("platform.user.host.resetPwdResultTitle")}
               </h3>
               <button onClick={() => setResetPwdResult(null)} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
             </div>
             <p className={`text-xs mb-2 ${styles.cardTextMuted}`}>
-              {isZh ? "临时密码 (请妥善保管):" : "Temporary password (keep safe):"}
+              {t("platform.user.host.tempPwdPrompt")}
             </p>
             <div className="flex items-center gap-2 mb-4">
               <code className="flex-1 px-3 py-2 rounded text-sm font-mono bg-gray-100 dark:bg-gray-800 select-all">
                 {resetPwdResult.tempPassword}
               </code>
               <button
-                onClick={() => { navigator.clipboard.writeText(resetPwdResult!.tempPassword); showToast("success", isZh ? "已复制" : "Copied"); }}
+                onClick={() => { navigator.clipboard.writeText(resetPwdResult!.tempPassword); showToast("success", t("platform.user.host.copied")); }}
                 className={`p-2 rounded border ${styles.cardBorder} ${styles.cardText} hover:bg-gray-50 dark:hover:bg-white/5`}
               >
                 <Copy className="w-4 h-4" />
@@ -378,7 +377,7 @@ export default function UserManagement() {
             </div>
             <button onClick={() => setResetPwdResult(null)}
               className={`w-full px-4 py-2 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover}`}>
-              {isZh ? "我知道了" : "Got it"}
+              {t("platform.user.host.gotIt")}
             </button>
           </div>
         </div>
@@ -387,9 +386,9 @@ export default function UserManagement() {
       {/* Confirm Dialogs */}
       {confirmAction?.type === "delete" && (
         <ConfirmDialog
-          title={isZh ? "确认删除" : "Confirm Delete"}
-          message={isZh ? `确定要删除「${confirmAction.name}」吗？此操作不可撤销。` : `Delete "${confirmAction.name}"? This cannot be undone.`}
-          confirmLabel={isZh ? "删除" : "Delete"}
+          title={t("platform.user.host.confirmDeleteTitle")}
+          message={t("platform.user.host.confirmDeleteMsg", { name: confirmAction!.name || "" })}
+          confirmLabel={t("platform.user.host.confirmDeleteBtn")}
           onConfirm={() => {
             if (confirmAction?.tab === "users") handleDeleteUser();
             else if (confirmAction?.tab === "roles") handleDeleteRole();
@@ -402,9 +401,9 @@ export default function UserManagement() {
       {confirmAction?.type === "logout" && (
         <ConfirmDialog
           variant="warning"
-          title={isZh ? "强制下线" : "Force Logout"}
-          message={isZh ? "确定要强制该用户下线吗？用户将立即失去所有会话。" : "Force this user to log out? All sessions will be terminated."}
-          confirmLabel={isZh ? "确认下线" : "Force Logout"}
+          title={t("platform.user.host.forceLogoutTitle")}
+          message={t("platform.user.host.forceLogoutMsg")}
+          confirmLabel={t("platform.user.host.forceLogoutConfirm")}
           confirmClass="px-4 py-1.5 rounded text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600"
           onConfirm={executeForceLogout}
           onCancel={() => setConfirmAction(null)}
@@ -413,9 +412,9 @@ export default function UserManagement() {
       {confirmAction?.type === "resetPwd" && (
         <ConfirmDialog
           variant="warning"
-          title={isZh ? "重置密码" : "Reset Password"}
-          message={isZh ? "确定要重置该用户的密码吗？系统将生成临时密码。" : "Reset password for this user? A temporary password will be generated."}
-          confirmLabel={isZh ? "确认重置" : "Reset"}
+          title={t("platform.user.host.resetPwdTitle")}
+          message={t("platform.user.host.resetPwdMsg")}
+          confirmLabel={t("platform.user.host.resetPwdConfirm")}
           confirmClass="px-4 py-1.5 rounded text-xs font-semibold bg-indigo-500 text-white hover:bg-indigo-600"
           onConfirm={executeResetPassword}
           onCancel={() => setConfirmAction(null)}
@@ -486,7 +485,7 @@ export default function UserManagement() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className={`text-xl font-bold ${styles.cardText}`}>
-          {isZh ? "身份与访问管理 (IAM)" : "Identity & Access Management (IAM)"}
+          {t("platform.user.host.pageTitle")}
         </h1>
         <div className="flex gap-2">
           {tab !== "permissions" && (
@@ -497,18 +496,18 @@ export default function UserManagement() {
                 else if (tab === "orgs") setOrgForm({ mode: "create" });
               }}
               className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover}`}>
-              <Plus size={14} /> {isZh ? "新建" : "New"}
+              <Plus size={14} /> {t("platform.user.host.newButton")}
             </button>
           )}
           {tab === "permissions" && (
             <button onClick={() => setPermForm({ mode: "create" })}
               className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover}`}>
-              <Plus size={14} /> {isZh ? "新建" : "New"}
+              <Plus size={14} /> {t("platform.user.host.newButton")}
             </button>
           )}
           <button onClick={loadData}
             className="flex items-center gap-1 px-3 py-1.5 rounded text-xs border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5">
-            <RefreshCw size={14} /> {isZh ? "刷新" : "Refresh"}
+            <RefreshCw size={14} /> {t("platform.user.host.refresh")}
           </button>
         </div>
       </div>
@@ -575,12 +574,12 @@ export default function UserManagement() {
       {tab === "users" && !loading && users.length === 0 && (
         <EmptyState
           icon={UserX}
-          title={isZh ? "暂无用户" : "No users"}
-          description={isZh ? "还没有任何用户，点击下方按钮创建或导入用户" : "No users yet. Create or import users below."}
+          title={t("platform.user.host.emptyUsers")}
+          description={t("platform.user.host.emptyUsersDesc")}
           onCreate={() => setUserForm({ mode: "create" })}
           onImport={() => setShowCsvImport(true)}
-          createLabel={isZh ? "创建用户" : "Create User"}
-          importLabel={isZh ? "CSV导入" : "CSV Import"}
+          createLabel={t("platform.user.host.emptyUsersCreate")}
+          importLabel={t("platform.user.host.emptyUsersImport")}
         />
       )}
 
@@ -589,11 +588,11 @@ export default function UserManagement() {
         <div className="overflow-auto flex-1">
           <table className="w-full border-collapse">
             <thead><tr>
-              <th className={th}>{isZh ? "角色名" : "Role Name"}</th>
-              <th className={th}>{isZh ? "编码" : "Code"}</th>
-              <th className={th}>{isZh ? "类型" : "Type"}</th>
-              <th className={th}>{isZh ? "描述" : "Description"}</th>
-              <th className={th}>{isZh ? "操作" : "Actions"}</th>
+              <th className={th}>{t("platform.user.host.roleColName")}</th>
+              <th className={th}>{t("platform.user.host.roleColCode")}</th>
+              <th className={th}>{t("platform.user.host.roleColType")}</th>
+              <th className={th}>{t("platform.user.host.roleColDesc")}</th>
+              <th className={th}>{t("platform.user.host.roleColActions")}</th>
             </tr></thead>
             <tbody>
               {roles.map(r => (
@@ -621,12 +620,12 @@ export default function UserManagement() {
         <div className="overflow-auto flex-1">
           <div className="border rounded overflow-hidden">
             <div className="flex items-center gap-2 px-3 py-2 border-b bg-gray-50 dark:bg-gray-800/30 text-[11px] font-semibold uppercase tracking-wider opacity-60">
-              <span className="w-4" /><span className="flex-1">{isZh ? "机构名" : "Org Name"}</span>
-              <span className="w-20 shrink-0">{isZh ? "编码" : "Code"}</span>
-              <span className="w-16 shrink-0">{isZh ? "状态" : "Status"}</span>
-              <span className="w-14 shrink-0">{isZh ? "类型" : "Type"}</span>
-              <span className="w-[120px] shrink-0">{isZh ? "描述" : "Description"}</span>
-              <span className="w-16 shrink-0">{isZh ? "操作" : "Actions"}</span>
+              <span className="w-4" /><span className="flex-1">{t("platform.user.host.orgColName")}</span>
+              <span className="w-20 shrink-0">{t("platform.user.host.roleColCode")}</span>
+              <span className="w-16 shrink-0">{t("platform.user.host.orgColStatus")}</span>
+              <span className="w-14 shrink-0">{t("platform.user.host.roleColType")}</span>
+              <span className="w-[120px] shrink-0">{t("platform.user.host.roleColDesc")}</span>
+              <span className="w-16 shrink-0">{t("platform.user.host.roleColActions")}</span>
             </div>
             {orgTree.map(o => <OrgTreeRow key={o.orgId} org={o} depth={0}
               onEdit={org => setOrgForm({ mode: "edit", org })}
@@ -640,11 +639,11 @@ export default function UserManagement() {
         <div className="overflow-auto flex-1">
           <table className="w-full border-collapse">
             <thead><tr>
-              <th className={th}>{isZh ? "资源" : "Resource"}</th>
-              <th className={th}>{isZh ? "操作" : "Action"}</th>
-              <th className={th}>{isZh ? "条件" : "Condition"}</th>
-              <th className={th}>{isZh ? "描述" : "Description"}</th>
-              <th className={th}>{isZh ? "操作" : "Actions"}</th>
+              <th className={th}>{t("platform.user.host.permColResource")}</th>
+              <th className={th}>{t("platform.user.host.permColAction")}</th>
+              <th className={th}>{t("platform.user.host.permColCondition")}</th>
+              <th className={th}>{t("platform.user.host.roleColDesc")}</th>
+              <th className={th}>{t("platform.user.host.roleColActions")}</th>
             </tr></thead>
             <tbody>
               {permissions.map(p => (
@@ -671,7 +670,7 @@ export default function UserManagement() {
       {tab === "users" && userTotal > 0 && (
         <div className="flex items-center justify-between pt-1">
           <span className={`text-xs ${styles.cardTextMuted}`}>
-            {isZh ? `第 ${userPage}/${totalPages} 页，共 ${userTotal} 条` : `Page ${userPage}/${totalPages}, total ${userTotal}`}
+            {t("platform.user.host.pager", { page: userPage, total: totalPages, count: userTotal })}
           </span>
           <div className="flex gap-1">
             <button disabled={userPage <= 1} onClick={() => setUserPage(p => Math.max(1, p - 1))}
