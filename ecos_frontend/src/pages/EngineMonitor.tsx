@@ -197,7 +197,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
             <div>
               <h1 className={`text-2xl font-bold ${styles.cardText}`}>{title}</h1>
               <p className={`text-xs ${styles.muted} mt-0.5`}>
-                {locale === 'zh' ? '引擎健康监控、配置信息与运行状态' : 'Engine health, configuration & runtime status'}
+                {t("platform.monitoring.em.subtitle")}
               </p>
             </div>
           </div>
@@ -206,7 +206,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${styles.inputBg} ${styles.inputText} text-sm transition-colors border ${styles.inputBorder} ${styles.sidebarHoverBg}`}
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            {locale === 'zh' ? '刷新全部' : 'Refresh All'}
+            {t("platform.monitoring.refreshAll")}
           </button>
         </div>
 
@@ -218,14 +218,14 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
             <div className="flex items-center gap-2">
               <Activity className={`w-4 h-4 ${styles.cardTextMuted}`} />
               <h3 className={`text-sm font-semibold uppercase tracking-wider ${styles.muted}`}>
-                {locale === 'zh' ? '引擎状态' : 'Engine Health'}
+                {t("platform.monitoring.em.healthTitle")}
               </h3>
             </div>
 
             {healthLoading ? (
               <div className={`flex items-center gap-2 ${styles.cardTextMuted} text-sm`}>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                {locale === 'zh' ? '加载中...' : 'Loading...'}
+                {t("platform.monitoring.em.loading")}
               </div>
             ) : healthError ? (
               <div className="flex items-center gap-2 text-red-400 text-sm">
@@ -266,7 +266,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
                 )}
               </div>
             ) : (
-              <p className={`text-xs ${styles.muted}`}>{locale === 'zh' ? '无数据' : 'No data'}</p>
+              <p className={`text-xs ${styles.muted}`}>{t("platform.monitoring.em.noHealth")}</p>
             )}
           </div>
 
@@ -275,14 +275,14 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
             <div className="flex items-center gap-2">
               <Settings className={`w-4 h-4 ${styles.cardTextMuted}`} />
               <h3 className={`text-sm font-semibold uppercase tracking-wider ${styles.muted}`}>
-                {locale === 'zh' ? '配置信息' : 'Configuration'}
+                {t("platform.monitoring.em.configTitle")}
               </h3>
             </div>
 
             {configLoading ? (
               <div className={`flex items-center gap-2 ${styles.cardTextMuted} text-sm`}>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                {locale === 'zh' ? '加载中...' : 'Loading...'}
+                {t("platform.monitoring.em.loading")}
               </div>
             ) : configError ? (
               <div className="flex items-center gap-2 text-red-400 text-sm">
@@ -304,7 +304,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
                 })}
               </div>
             ) : (
-              <p className={`text-xs ${styles.muted}`}>{locale === 'zh' ? '无配置数据' : 'No config data'}</p>
+              <p className={`text-xs ${styles.muted}`}>{t("platform.monitoring.em.noConfig")}</p>
             )}
           </div>
 
@@ -313,14 +313,14 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
             <div className="flex items-center gap-2">
               <Server className={`w-4 h-4 ${styles.cardTextMuted}`} />
               <h3 className={`text-sm font-semibold uppercase tracking-wider ${styles.muted}`}>
-                {locale === 'zh' ? '运行状态' : 'Runtime Status'}
+                {t("platform.monitoring.em.statusTitle")}
               </h3>
             </div>
 
             {statusLoading ? (
               <div className={`flex items-center gap-2 ${styles.cardTextMuted} text-sm`}>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                {locale === 'zh' ? '加载中...' : 'Loading...'}
+                {t("platform.monitoring.em.loading")}
               </div>
             ) : statusError ? (
               <div className="flex items-center gap-2 text-red-400 text-sm">
@@ -330,7 +330,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
             ) : status ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className={`${styles.muted}`}>{locale === 'zh' ? '名称' : 'Name'}</span>
+                  <span className={`${styles.muted}`}>{t("platform.monitoring.em.name")}</span>
                   <span className={`font-semibold ${styles.cardText}`}>{statusName}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
@@ -353,7 +353,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
                   ))}
               </div>
             ) : (
-              <p className={`text-xs ${styles.muted}`}>{locale === 'zh' ? '无状态数据' : 'No status data'}</p>
+              <p className={`text-xs ${styles.muted}`}>{t("platform.monitoring.em.noStatus")}</p>
             )}
           </div>
         </div>
@@ -361,7 +361,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
         {/* ── Raw Data Panel ── */}
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 space-y-3`}>
           <h3 className={`text-xs font-semibold uppercase tracking-wider ${styles.muted}`}>
-            {locale === 'zh' ? '原始响应数据' : 'Raw API Responses'}
+            {t("platform.monitoring.em.rawTitle")}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
