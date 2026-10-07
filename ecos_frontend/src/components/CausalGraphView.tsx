@@ -27,7 +27,7 @@ interface PathData {
 
 // ── Main Component ─────────────────────────────
 export default function CausalGraphView() {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
@@ -62,11 +62,11 @@ export default function CausalGraphView() {
         edgeCount: d.edgeCount || 0,
       });
     } catch (e: any) {
-      setError("加载因果图失败: " + (e?.message || "Unknown"));
+      setError(t("platform.wm.causal.loadFailed", { msg: e?.message || "Unknown" }));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // ── Path query ───────────────────────────────
   const queryPath = useCallback(async () => {
@@ -97,11 +97,11 @@ export default function CausalGraphView() {
         }
       }
     } catch (e: any) {
-      setError("路径查询失败: " + (e?.message || "Unknown"));
+      setError(t("platform.wm.causal.pathFailed", { msg: e?.message || "Unknown" }));
     } finally {
       setPathLoading(false);
     }
-  }, [pathFrom, pathTo]);
+  }, [pathFrom, pathTo, t]);
 
   // ── Init Cytoscape ───────────────────────────
   useEffect(() => {
@@ -237,11 +237,11 @@ export default function CausalGraphView() {
     const mb = whatIfVars.maintenanceBudget || 0;
     const al = whatIfVars.automationLevel || 0;
     return [
-      { dimension: "通行效率", impact: +(dq * 0.5 + al * 0.4 + mb * 0.1).toFixed(2) },
-      { dimension: "养护成本", impact: +(mb * 0.6 + dq * 0.3 + al * 0.1).toFixed(2) },
-      { dimension: "应急响应", impact: +(dq * 0.4 + al * 0.3 + mb * 0.3).toFixed(2) },
-      { dimension: "用户满意度", impact: +(dq * 0.3 + mb * 0.3 + al * 0.4).toFixed(2) },
-      { dimension: "营收", impact: +(dq * 0.2 + mb * 0.3 + al * 0.5).toFixed(2) },
+      { dimension: t("platform.wm.causal.dim.flowEfficiency"), impact: +(dq * 0.5 + al * 0.4 + mb * 0.1).toFixed(2) },
+      { dimension: t("platform.wm.causal.dim.maintenanceCost"), impact: +(mb * 0.6 + dq * 0.3 + al * 0.1).toFixed(2) },
+      { dimension: t("platform.wm.causal.dim.emergencyResponse"), impact: +(dq * 0.4 + al * 0.3 + mb * 0.3).toFixed(2) },
+      { dimension: t("platform.wm.causal.dim.userSatisfaction"), impact: +(dq * 0.3 + mb * 0.3 + al * 0.4).toFixed(2) },
+      { dimension: t("platform.wm.causal.dim.revenue"), impact: +(dq * 0.2 + mb * 0.3 + al * 0.5).toFixed(2) },
     ];
   };
 
@@ -259,10 +259,10 @@ export default function CausalGraphView() {
             ${styles.accentBg} ${styles.accentHover} text-white disabled:opacity-50`}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          {loading ? "加载中..." : locale === "zh" ? "刷新" : "Refresh"}
+          {loading ? t("platform.wm.causal.loading") : t("platform.wm.causal.refresh")}
         </button>
         <span className="text-xs opacity-60">
-          {data.nodeCount} {locale === "zh" ? "节点" : "nodes"} · {data.edgeCount} {locale === "zh" ? "边" : "edges"}
+          {data.nodeCount} {t("platform.wm.causal.nodes")} · {data.edgeCount} {t("platform.wm.causal.edges")}
         </span>
       </div>
 
@@ -280,7 +280,7 @@ export default function CausalGraphView() {
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center opacity-50">
                 <Network className="w-10 h-10 mx-auto mb-2" />
-                <p className="text-sm">{locale === "zh" ? "暂无因果图数据" : "No causal graph data"}</p>
+                <p className="text-sm">{t("platform.wm.causal.empty")}</p>
               </div>
             </div>
           ) : (
@@ -294,12 +294,12 @@ export default function CausalGraphView() {
           <div className={`border rounded-lg p-3 shrink-0 ${styles.cardBorder} ${styles.cardBg}`}>
             <h4 className="flex items-center gap-1.5 text-xs font-semibold mb-2 opacity-80">
               <Sliders className="w-3.5 h-3.5" />
-              {locale === "zh" ? "What-If 推演" : "What-If"}
+              {t("platform.wm.causal.whatIf")}
             </h4>
             <div className="space-y-2">
               <div>
                 <div className="flex justify-between text-[10px] opacity-60 mb-0.5">
-                  <span>{locale === "zh" ? "数据质量" : "Data Quality"}</span>
+                  <span>{t("platform.wm.causal.dataQuality")}</span>
                   <span>{(whatIfVars.dataQuality * 100).toFixed(0)}%</span>
                 </div>
                 <input type="range" min="0" max="1" step="0.05"
@@ -309,7 +309,7 @@ export default function CausalGraphView() {
               </div>
               <div>
                 <div className="flex justify-between text-[10px] opacity-60 mb-0.5">
-                  <span>{locale === "zh" ? "养护预算" : "Budget"}</span>
+                  <span>{t("platform.wm.causal.budget")}</span>
                   <span>{(whatIfVars.maintenanceBudget * 100).toFixed(0)}%</span>
                 </div>
                 <input type="range" min="0" max="1" step="0.05"
@@ -319,7 +319,7 @@ export default function CausalGraphView() {
               </div>
               <div>
                 <div className="flex justify-between text-[10px] opacity-60 mb-0.5">
-                  <span>{locale === "zh" ? "自动化水平" : "Automation"}</span>
+                  <span>{t("platform.wm.causal.automation")}</span>
                   <span>{(whatIfVars.automationLevel * 100).toFixed(0)}%</span>
                 </div>
                 <input type="range" min="0" max="1" step="0.05"
@@ -331,7 +331,7 @@ export default function CausalGraphView() {
             {/* Impact preview */}
             <div className="mt-3 pt-2 border-t border-white/5">
               <h5 className="text-[10px] font-semibold opacity-60 mb-1">
-                {locale === "zh" ? "预估影响" : "Predicted Impact"}
+                {t("platform.wm.causal.predictedImpact")}
               </h5>
               <div className="space-y-1">
                 {impacts.map((item) => (
@@ -357,14 +357,14 @@ export default function CausalGraphView() {
           <div className={`border rounded-lg p-3 shrink-0 ${styles.cardBorder} ${styles.cardBg}`}>
             <h4 className="flex items-center gap-1.5 text-xs font-semibold mb-2 opacity-80">
               <Search className="w-3.5 h-3.5" />
-              {locale === "zh" ? "路径查询" : "Path Query"}
+              {t("platform.wm.causal.pathQuery")}
             </h4>
             <select
               className={`w-full px-2 py-1.5 rounded border text-xs mb-1.5 outline-none ${styles.inputBg} ${styles.inputBorder}`}
               value={pathFrom}
               onChange={e => { setPathFrom(e.target.value); setPathResult(null); }}
             >
-              <option value="">{locale === "zh" ? "选择起点" : "From"}</option>
+              <option value="">{t("platform.wm.causal.from")}</option>
               {data.nodes.map((n: any) => (
                 <option key={n.name} value={n.name}>{n.name}</option>
               ))}
@@ -374,7 +374,7 @@ export default function CausalGraphView() {
               value={pathTo}
               onChange={e => { setPathTo(e.target.value); setPathResult(null); }}
             >
-              <option value="">{locale === "zh" ? "选择终点" : "To"}</option>
+              <option value="">{t("platform.wm.causal.to")}</option>
               {data.nodes.map((n: any) => (
                 <option key={n.name} value={n.name}>{n.name}</option>
               ))}
@@ -385,7 +385,7 @@ export default function CausalGraphView() {
               className={`w-full px-3 py-1.5 rounded text-xs font-medium transition-all
                 ${styles.accentBg} ${styles.accentHover} text-white disabled:opacity-30`}
             >
-              {pathLoading ? "..." : locale === "zh" ? "查询路径" : "Find Path"}
+              {pathLoading ? "..." : t("platform.wm.causal.findPath")}
             </button>
             {pathResult && (
               <div className="mt-2 p-2 rounded bg-amber-500/5 border border-amber-500/20 text-[10px]">
@@ -393,7 +393,7 @@ export default function CausalGraphView() {
                   {pathResult.from} → {pathResult.to}
                 </p>
                 <p className="opacity-60 mt-0.5">
-                  {locale === "zh" ? "步数" : "Hops"}: {pathResult.hops} · {pathResult.nodes.length} {locale === "zh" ? "节点" : "nodes"}
+                  {t("platform.wm.causal.hops")}: {pathResult.hops} · {pathResult.nodes.length} {t("platform.wm.causal.nodes")}
                 </p>
               </div>
             )}
@@ -403,12 +403,12 @@ export default function CausalGraphView() {
           {selectedNode && (
             <div className={`border rounded-lg p-3 shrink-0 ${styles.cardBorder} ${styles.cardBg}`}>
               <h4 className="text-xs font-semibold mb-1.5 opacity-80">
-                {locale === "zh" ? "节点详情" : "Node Detail"}
+                {t("platform.wm.causal.nodeDetail")}
               </h4>
               <div className="text-[10px] space-y-1">
-                <p><span className="opacity-50">Name:</span> {selectedNode.name}</p>
-                <p><span className="opacity-50">Category:</span> {selectedNode.category}</p>
-                <p><span className="opacity-50">Degree:</span> {selectedNode.degree}</p>
+                <p><span className="opacity-50">{t("platform.wm.causal.name")}:</span> {selectedNode.name}</p>
+                <p><span className="opacity-50">{t("platform.wm.causal.category")}:</span> {selectedNode.category}</p>
+                <p><span className="opacity-50">{t("platform.wm.causal.degree")}:</span> {selectedNode.degree}</p>
               </div>
             </div>
           )}
