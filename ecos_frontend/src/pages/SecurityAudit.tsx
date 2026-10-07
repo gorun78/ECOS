@@ -20,7 +20,7 @@ const ACTION_OPTIONS = ["LOGIN", "QUERY", "MODIFY", "DELETE", "EXPORT"] as const
 const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
 export default function SecurityAudit() {
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   // ── Data state ────────────────────────────────────
@@ -227,7 +227,7 @@ export default function SecurityAudit() {
             className={`flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer ${styles.cardTextMuted} hover:${styles.cardText}`}
           >
             <Filter size={13} />
-            {locale === "zh" ? "筛选条件" : "Filters"}
+            {t("sec.audit.filters")}
             {showFilters ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
         </div>
@@ -349,7 +349,7 @@ export default function SecurityAudit() {
                       {group.label}
                     </span>
                     <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>
-                      {group.events.length} {locale === "zh" ? "条" : "items"}
+                      {group.events.length} {t("sec.audit.unit")}
                     </span>
                   </div>
 
@@ -390,7 +390,7 @@ export default function SecurityAudit() {
                           </div>
 
                           <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono ${styles.cardTextMuted}`}>
-                            <span>{locale === "zh" ? "操作者: " : "Actor: "}
+                            <span>{t("sec.audit.actor")}
                               <span className="text-blue-400 font-semibold">{log.userId}</span>
                             </span>
                             {log.ipAddress && (
@@ -407,7 +407,7 @@ export default function SecurityAudit() {
                           {/* Expand indicator */}
                           <div className={`text-[10px] mt-1.5 flex items-center gap-1 ${styles.cardTextMuted}`}>
                             {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                            <span className="opacity-60">{isExpanded ? t("sec.detail.close") : (locale === "zh" ? "展开详情" : "Details")}</span>
+                            <span className="opacity-60">{isExpanded ? t("sec.detail.close") : t("sec.audit.details")}</span>
                           </div>
 
                           {/* Expanded detail content */}
@@ -431,8 +431,8 @@ export default function SecurityAudit() {
                                 <span className={`text-[9px] font-mono uppercase ${styles.cardTextMuted}`}>{t("sec.detail.response")}</span>
                                 <p className={`text-[10px] font-mono mt-0.5 ${styles.cardText}`}>
                                   {log.result === "SUCCESS"
-                                    ? (locale === "zh" ? "操作执行成功，凭证已写入不可篡改审计区块。" : "Operation completed successfully. Voucher committed to immutable audit ledger.")
-                                    : (locale === "zh" ? "操作被拦截或待审批。" : "Operation blocked or pending approval.")}
+                                    ? t("sec.audit.successVoucher")
+                                    : t("sec.audit.blocked")}
                                 </p>
                               </div>
 
@@ -505,8 +505,8 @@ export default function SecurityAudit() {
                 <span className={`text-[9px] font-mono uppercase ${styles.cardTextMuted}`}>{t("sec.detail.response")}</span>
                 <p className={`text-[10px] font-mono mt-0.5 ${styles.cardText}`}>
                   {expandedEvent.result === "SUCCESS"
-                    ? (locale === "zh" ? "操作执行成功。" : "Operation completed successfully.")
-                    : (locale === "zh" ? "操作被拦截或待审批。" : "Operation blocked or pending approval.")}
+                    ? t("sec.audit.success")
+                    : t("sec.audit.blocked")}
                 </p>
               </div>
 

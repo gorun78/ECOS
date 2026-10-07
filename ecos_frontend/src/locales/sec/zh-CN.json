@@ -197,5 +197,12 @@
   "security.prevent.description": "统一身份认证、角色分配与权限策略配置",
   "security.prevent.title": "身份与访问管理",
   "security.under_construction": "功能建设中",
-  "security.under_construction.desc": "该功能正在开发中，敬请期待"
+  "security.under_construction.desc": "该功能正在开发中，敬请期待",
+  "sec.audit.filters": "筛选条件",
+  "sec.audit.unit": "条",
+  "sec.audit.actor": "操作者: ",
+  "sec.audit.details": "展开详情",
+  "sec.audit.successVoucher": "操作执行成功，凭证已写入不可篡改审计区块。",
+  "sec.audit.success": "操作执行成功。",
+  "sec.audit.blocked": "操作被拦截或待审批。"
 }
