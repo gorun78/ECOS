@@ -66,7 +66,7 @@ export default function MarketplaceHeader({
   onSearchSubmit,
   onPublishClick,
 }: MarketplaceHeaderProps) {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
   const tl = (zh: string, en: string) => (locale === "zh" ? zh : en);
 
@@ -108,13 +108,10 @@ export default function MarketplaceHeader({
           <h1
             className={`text-2xl font-bold ${styles.cardText} tracking-tight`}
           >
-            {tl("数据市场", "Data Marketplace")}
+            {t("marketplace.title")}
           </h1>
           <p className="text-sm mt-0.5 opacity-60">
-            {tl(
-              "浏览、搜索数据资产，发布您的数据产品",
-              "Browse, search and publish data assets"
-            )}
+            {t("marketplace.subtitle")}
           </p>
         </div>
         <button
@@ -123,7 +120,7 @@ export default function MarketplaceHeader({
             text-white text-sm font-medium transition-colors duration-150 shadow-lg shadow-indigo-500/20"
         >
           <Plus className="w-4 h-4" />
-          {tl("发布资产", "Publish Asset")}
+          {t("marketplace.publishBtn")}
         </button>
       </div>
 
@@ -166,10 +163,7 @@ export default function MarketplaceHeader({
             type="text"
             value={keyword}
             onChange={(e) => onKeywordChange(e.target.value)}
-            placeholder={tl(
-              "搜索资产名称、描述、标签…",
-              "Search by name, description, tags..."
-            )}
+            placeholder={t("marketplace.searchPlaceholder")}
             className={`w-full pl-9 pr-3 py-2.5 rounded-lg border ${styles.sidebarBorder}
               ${styles.cardBg} ${styles.cardText} text-sm
               focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/40
@@ -199,7 +193,7 @@ export default function MarketplaceHeader({
             transition-colors duration-150 flex items-center gap-1.5"
         >
           <Search className="w-4 h-4" />
-          {tl("搜索", "Search")}
+          {t("marketplace.searchBtn")}
         </button>
       </form>
     </div>

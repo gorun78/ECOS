@@ -31,9 +31,8 @@ export default function MarketplaceAccessModal({
   onSubmit,
   onClose,
 }: MarketplaceAccessModalProps) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const tl = (zh: string, en: string) => (locale === "zh" ? zh : en);
 
   if (!asset) return null;
 
@@ -53,7 +52,7 @@ export default function MarketplaceAccessModal({
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className={`text-lg font-semibold ${styles.cardText}`}>
-            {tl("申请访问权限", "Request Access")}
+            {t("marketplace.access.title")}
           </h2>
           <button
             onClick={onClose}
@@ -78,15 +77,12 @@ export default function MarketplaceAccessModal({
         <label
           className={`block text-sm font-medium mb-1.5 ${styles.cardText}`}
         >
-          {tl("申请原因", "Reason")}
+          {t("marketplace.access.reason")}
         </label>
         <textarea
           value={reason}
           onChange={(e) => onReasonChange(e.target.value)}
-          placeholder={tl(
-            "请描述您需要访问此数据资产的原因…",
-            "Describe why you need access to this asset..."
-          )}
+          placeholder={t("marketplace.access.reasonPlaceholder")}
           rows={3}
           className={`w-full px-3 py-2.5 rounded-lg border ${styles.sidebarBorder}
             ${styles.cardBg} ${styles.cardText} text-sm resize-none
@@ -103,7 +99,7 @@ export default function MarketplaceAccessModal({
             className={`flex-1 py-2.5 rounded-lg text-sm font-medium border ${styles.sidebarBorder}
               ${styles.sidebarHoverBg} transition-colors disabled:opacity-50`}
           >
-            {tl("取消", "Cancel")}
+            {t("common.cancel")}
           </button>
           <button
             onClick={onSubmit}
@@ -117,7 +113,7 @@ export default function MarketplaceAccessModal({
             ) : (
               <Send className="w-3.5 h-3.5" />
             )}
-            {tl("提交申请", "Submit")}
+            {t("marketplace.access.submit")}
           </button>
         </div>
       </div>

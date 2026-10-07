@@ -43,7 +43,7 @@ export default function MarketplacePublishModal({
   onSubmit,
   onClose,
 }: MarketplacePublishModalProps) {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
   const tl = (zh: string, en: string) => (locale === "zh" ? zh : en);
 
@@ -70,9 +70,8 @@ export default function MarketplacePublishModal({
             className={`text-lg font-semibold ${styles.cardText} flex items-center gap-2`}
           >
             <Upload className="w-5 h-5 text-indigo-400" />
-            {tl("发布资产", "Publish Asset")}
-          </h2>
-          <button
+            {t("marketplace.publishBtn")}
+          </h2>          <button
             onClick={onClose}
             disabled={submitting}
             className="opacity-50 hover:opacity-100 transition-opacity disabled:opacity-30"
@@ -85,14 +84,14 @@ export default function MarketplacePublishModal({
         <label
           className={`block text-sm font-medium mb-1.5 ${styles.cardText}`}
         >
-          {tl("资产名称", "Asset Name")}{" "}
+          {t("marketplace.publish.nameLabel")}{" "}
           <span className="text-red-400">*</span>
         </label>
         <input
           type="text"
           value={name}
           onChange={(e) => onNameChange(e.target.value)}
-          placeholder={tl("请输入资产名称", "Enter asset name")}
+          placeholder={t("marketplace.publish.namePlaceholder")}
           className={`w-full px-3 py-2.5 rounded-lg border ${styles.sidebarBorder}
             ${styles.cardBg} ${styles.cardText} text-sm mb-4
             focus:outline-none focus:ring-2 focus:ring-indigo-500/40
@@ -104,7 +103,7 @@ export default function MarketplacePublishModal({
         <label
           className={`block text-sm font-medium mb-1.5 ${styles.cardText}`}
         >
-          {tl("分类", "Category")}
+          {t("marketplace.publish.categoryLabel")}
         </label>
         <select
           value={category}
@@ -125,16 +124,13 @@ export default function MarketplacePublishModal({
         <label
           className={`block text-sm font-medium mb-1.5 ${styles.cardText}`}
         >
-          {tl("描述", "Description")}{" "}
+          {t("marketplace.publish.descLabel")}{" "}
           <span className="text-red-400">*</span>
         </label>
         <textarea
           value={description}
           onChange={(e) => onDescriptionChange(e.target.value)}
-          placeholder={tl(
-            "请描述此资产的内容和用途…",
-            "Describe the asset content and purpose..."
-          )}
+          placeholder={t("marketplace.publish.descPlaceholder")}
           rows={3}
           className={`w-full px-3 py-2.5 rounded-lg border ${styles.sidebarBorder}
             ${styles.cardBg} ${styles.cardText} text-sm resize-none mb-4
@@ -147,16 +143,13 @@ export default function MarketplacePublishModal({
         <label
           className={`block text-sm font-medium mb-1.5 ${styles.cardText}`}
         >
-          {tl("标签（逗号分隔）", "Tags (comma separated)")}
+          {t("marketplace.publish.tagsLabel")}
         </label>
         <input
           type="text"
           value={tags}
           onChange={(e) => onTagsChange(e.target.value)}
-          placeholder={tl(
-            "如：金融, 风控, 高价值",
-            "e.g.: finance, risk, high-value"
-          )}
+          placeholder={t("marketplace.publish.tagsPlaceholder")}
           className={`w-full px-3 py-2.5 rounded-lg border ${styles.sidebarBorder}
             ${styles.cardBg} ${styles.cardText} text-sm mb-5
             focus:outline-none focus:ring-2 focus:ring-indigo-500/40
@@ -172,7 +165,7 @@ export default function MarketplacePublishModal({
             className={`flex-1 py-2.5 rounded-lg text-sm font-medium border ${styles.sidebarBorder}
               ${styles.sidebarHoverBg} transition-colors disabled:opacity-50`}
           >
-            {tl("取消", "Cancel")}
+            {t("common.cancel")}
           </button>
           <button
             onClick={onSubmit}
@@ -186,7 +179,7 @@ export default function MarketplacePublishModal({
             ) : (
               <Upload className="w-4 h-4" />
             )}
-            {tl("发布", "Publish")}
+            {t("marketplace.publish.publishBtn")}
           </button>
         </div>
       </div>
