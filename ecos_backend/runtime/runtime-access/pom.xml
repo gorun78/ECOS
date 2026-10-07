@@ -59,6 +59,13 @@
              JdbcConnector loads drivers on-demand via Class.forName; if a driver class
              is absent at runtime the test-connection call returns "driver not in runtime". -->
 
+        <!-- R1.3: 单元测试（JdbcUrlPolicy 白名单反证）—— spring-boot-starter-test（父 pom 已管版本） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <!-- ================================================================

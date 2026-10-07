@@ -124,10 +124,14 @@ public class JdbcConnector implements Connector {
 
     /**
      * 按数据源类型拼装 JDBC URL。优先使用 config.jdbcUrl；缺失时按 host/port 拼装。
+     * <p>R1.3: 用户直传的 {@code cfg.jdbcUrl} 过 {@link JdbcUrlPolicy#validate} 白名单（拒绝反序列化/TLS 关闭等危险参数）；
+     * 拼装分支（下方 switch 产出）不动——拼装项是白名单子集，不存在风险。</p>
      */
     private String buildJdbcUrl(String type, Map<String, String> cfg) {
         String direct = cfg.get("jdbcUrl");
-        if (direct != null && !direct.isBlank()) return direct;
+        if (direct != null && !direct.isBlank()) {
+            return JdbcUrlPolicy.validate(direct);
+        }
         String host = cfg.get("host");
         String port = cfg.get("port");
         if (host == null || host.isBlank()) return null;
@@ -485,6 +489,12 @@ public class JdbcConnector implements Connector {
         if (jdbcUrl == null || jdbcUrl.isBlank()) {
             throw new SQLException("jdbcUrl 为空，拒绝建连");
         }
+        // R1.3: 显式 raw-URL 入口 亦过白名单（openConnection(String connectionConfig) 走 readConnectionConfig 已拦）
+        try {
+            JdbcUrlPolicy.validate(jdbcUrl);
+        } catch (IllegalArgumentException iae) {
+            throw new SQLException(iae.getMessage());
+        }
         String driver = (driverClass == null || driverClass.isBlank())
             ? resolveDriverClass("JDBC", jdbcUrl) : driverClass;
         if (driver != null && !driver.isBlank()) {
@@ -580,11 +590,19 @@ public class JdbcConnector implements Connector {
             // 后续 cfg.get("port") 触发 ClassCastException 导致 testConnectionDetailed 全量不可用。
             // 统一 coerce 为 String，与 buildJdbcUrl/props.setProperty 的 String 契约一致。
             Map<String, Object> raw = mapper.readValue(connectionConfig, Map.class);
+            // R1.3: 用户直传 URL 白名单校验（拒绝反序列化 / TLS 关闭 / 文件加载类危险参数）
+            Object rawUrl = raw.get("jdbcUrl");
+            if (rawUrl instanceof String s && !s.isBlank()) {
+                JdbcUrlPolicy.validate(s);
+            }
             Map<String, String> r = new java.util.LinkedHashMap<>();
             for (Map.Entry<String, Object> e : raw.entrySet()) {
                 r.put(e.getKey(), e.getValue() == null ? null : e.getValue().toString());
             }
             return r;
+        } catch (IllegalArgumentException iae) {
+            // 白名单违规：透传原始 IAE（含 key 名，不回显 URL 原文）
+            throw iae;
         } catch (Exception e) {
             // H10-T4：原实现把整段 connectionConfig 拼进异常消息，password 随日志外泄；只保留失败原因
             throw new IllegalArgumentException(
