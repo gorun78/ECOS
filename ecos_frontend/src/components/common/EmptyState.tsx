@@ -32,15 +32,10 @@ export default function EmptyState({
   className = "",
 }: EmptyStateProps) {
   const { styles } = useTheme();
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
 
-  const defaultTitle =
-    title ?? (locale === "zh" ? "暂无数据" : "No Data");
-  const defaultDescription =
-    description ??
-    (locale === "zh"
-      ? "当前没有可显示的内容"
-      : "Nothing to display here yet.");
+  const defaultTitle = title ?? t("common.empty.title");
+  const defaultDescription = description ?? t("common.empty.desc");
 
   return (
     <div

@@ -34,14 +34,13 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const isZh = locale === "zh";
 
   if (!visible) return null;
 
-  const defaultConfirm = confirmText || (isZh ? "确认" : "Confirm");
-  const defaultCancel = cancelText || (isZh ? "取消" : "Cancel");
+  const defaultConfirm = confirmText || t("common.confirm");
+  const defaultCancel = cancelText || t("common.cancel");
 
   const _danger = danger ?? variant === "danger";
 

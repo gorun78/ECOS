@@ -38,6 +38,8 @@
   "common.create": "Create",
   "common.delete": "Delete",
   "common.edit": "Edit",
+  "common.empty.title": "No Data",
+  "common.empty.desc": "Nothing to display here yet.",
   "common.export": "Export",
   "common.save": "Save",
   "common.search": "Search",

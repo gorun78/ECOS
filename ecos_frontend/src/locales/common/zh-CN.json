@@ -38,6 +38,8 @@
   "common.create": "新建",
   "common.delete": "删除",
   "common.edit": "编辑",
+  "common.empty.title": "暂无数据",
+  "common.empty.desc": "当前没有可显示的内容",
   "common.export": "导出",
   "common.save": "保存",
   "common.search": "搜索",
