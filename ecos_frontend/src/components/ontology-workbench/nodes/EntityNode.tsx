@@ -249,7 +249,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
         type="source"
         position={Position.Left}
         id="left"
-        className={`!w-2 !h-2 !${styles.appBg} !border-2 !border-[#0f1117] !left-[-4px]`}
+        className={`!w-2 !h-2 ${styles.appBg} !border-2 !border-[#0f1117] !left-[-4px]`}
       />
 
       {/* ── 右侧 Handle ── */}
@@ -257,7 +257,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
         type="source"
         position={Position.Right}
         id="right"
-        className={`!w-2 !h-2 !${styles.appBg} !border-2 !border-[#0f1117] !right-[-4px]`}
+        className={`!w-2 !h-2 ${styles.appBg} !border-2 !border-[#0f1117] !right-[-4px]`}
       />
     </div>
   );
