@@ -1756,5 +1756,8 @@
   "dw.catalog.page": "Page",
   "dw.catalog.menuPreview": "Preview Data",
   "dw.catalog.menuLineage": "View Lineage",
-  "dw.catalog.menuDq": "Configure DQ Rules"
+  "dw.catalog.menuDq": "Configure DQ Rules",
+  "dw.catalog.tree.search": "Search datasources, tables, fields...",
+  "dw.catalog.tree.noMatch": "No matching resources",
+  "dw.catalog.tree.empty": "No data resources"
 }

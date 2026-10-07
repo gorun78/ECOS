@@ -1761,5 +1761,8 @@
   "dw.catalog.page": "第",
   "dw.catalog.menuPreview": "预览数据",
   "dw.catalog.menuLineage": "查看血缘",
-  "dw.catalog.menuDq": "配置DQ规则"
+  "dw.catalog.menuDq": "配置DQ规则",
+  "dw.catalog.tree.search": "搜索数据源、表、字段...",
+  "dw.catalog.tree.noMatch": "未找到匹配的资源",
+  "dw.catalog.tree.empty": "暂无数据资源"
 }

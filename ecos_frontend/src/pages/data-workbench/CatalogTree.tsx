@@ -88,7 +88,7 @@ interface CatalogTreeProps {
 
 export default function CatalogTree({ onContextMenu }: CatalogTreeProps) {
   const { styles } = useTheme();
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
 
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -198,7 +198,7 @@ export default function CatalogTree({ onContextMenu }: CatalogTreeProps) {
         <input
           type="text"
           className={`bg-transparent border-0 outline-none flex-1 text-xs ${styles.inputText} placeholder:opacity-40`}
-          placeholder={locale === "zh" ? "搜索数据源、表、字段..." : "Search datasources, tables, fields..."}
+          placeholder={t("dw.catalog.tree.search")}
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -207,15 +207,15 @@ export default function CatalogTree({ onContextMenu }: CatalogTreeProps) {
         {loading ? (
           <div className="py-8 text-center">
             <Loader2 className="w-5 h-5 mx-auto animate-spin opacity-40" />
-            <p className={`text-xs mt-2 ${styles.muted}`}>{locale === "zh" ? "加载中..." : "Loading..."}</p>
+            <p className={`text-xs mt-2 ${styles.muted}`}>{t("dw.loading")}</p>
           </div>
         ) : matches.length === 0 ? (
           <div className="py-8 text-center">
             <Database className="w-6 h-6 mx-auto opacity-20" />
             <p className={`text-xs mt-2 ${styles.muted}`}>
               {search.trim()
-                ? (locale === "zh" ? "未找到匹配的资源" : "No matching resources")
-                : (locale === "zh" ? "暂无数据资源" : "No data resources")}
+                ? t("dw.catalog.tree.noMatch")
+                : t("dw.catalog.tree.empty")}
             </p>
           </div>
         ) : (
