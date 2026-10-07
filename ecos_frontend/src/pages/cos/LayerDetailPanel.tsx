@@ -13,7 +13,7 @@ export default function LayerDetailPanel({
 }: {
   activeInfoLayer: BlueprintLayer;
 }) {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
 
   return (
@@ -37,7 +37,7 @@ export default function LayerDetailPanel({
         {/* Matching Code Location and Links */}
         <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${styles.badgeBg} ${styles.cardBorder}`}>
           <div className="space-y-1">
-            <span className={`text-[9px] uppercase font-bold font-mono tracking-wider block ${styles.cardTextMuted}`}>{locale === "zh" ? "匹配的实际系统业务功能页面" : "Core Handshake Application Match"}</span>
+            <span className={`text-[9px] uppercase font-bold font-mono tracking-wider block ${styles.cardTextMuted}`}>{t("cognition.cos.layer.matchedPage")}</span>
             <strong className="text-xs font-bold uppercase tracking-tight flex items-center gap-1.5" style={{ color: "var(--cardText)" }}>
               <Globe className="w-3.5 h-3.5 text-indigo-650" />
               {locale === "zh" ? activeInfoLayer.matchedCodePage : activeInfoLayer.matchedCodePageEn}
@@ -48,7 +48,7 @@ export default function LayerDetailPanel({
         {/* List of sub-elements defined in the blueprint diagram nodes */}
         <div className="space-y-2">
           <span className={`text-[10px] font-mono font-bold uppercase tracking-wider block ${styles.cardTextMuted}`}>
-            {locale === "zh" ? "蓝图定义的核心功能模块 (Constituent Entities)" : "Blueprint Elements Checked"}
+            {t("cognition.cos.layer.blueprintItems")}
           </span>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {(locale === "zh" ? activeInfoLayer.blueprintItemsZh : activeInfoLayer.blueprintItemsEn).map((item, id) => (

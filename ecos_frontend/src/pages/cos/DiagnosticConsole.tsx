@@ -20,7 +20,7 @@ export default function DiagnosticConsole({
   diagnosticLogs: string[];
   onRun: (layerId: string) => void;
 }) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   return (
@@ -40,7 +40,7 @@ export default function DiagnosticConsole({
         {diagnosticActive === activeInfoLayer.id ? (
           <div className="w-full text-xs p-3 rounded-lg border bg-indigo-500/10 text-indigo-600 border-indigo-500/25 font-mono flex items-center justify-center gap-2 font-bold uppercase leading-none h-10 select-none">
             <RefreshCw className="w-4 h-4 animate-spin text-indigo-600 dark:text-indigo-400" />
-            <span>{locale === "zh" ? "架构链路校验审计中..." : "ALIGNING CORES..."}</span>
+            <span>{t("cognition.cos.diagnostic.aligning")}</span>
           </div>
         ) : (
           <button
@@ -48,7 +48,7 @@ export default function DiagnosticConsole({
             className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold leading-none cursor-pointer transition flex items-center justify-center gap-2 shadow-xs"
           >
             <Zap className="w-3.5 h-3.5" />
-            <span>{locale === "zh" ? "对齐一致性审计与热加载" : "Run Alignment Diagnostic"}</span>
+            <span>{t("cognition.cos.diagnostic.run")}</span>
           </button>
         )}
 
@@ -58,9 +58,7 @@ export default function DiagnosticConsole({
 
           {diagnosticLogs.length === 0 ? (
             <p className="text-emerald-700 italic select-none">
-              {locale === "zh" 
-                ? "诊断审计终端空闲。请点击上方按钮验证当前架构层与系统蓝图的对齐细节。" 
-                : "Audit terminal idle. Execute verification check above."}
+              {t("cognition.cos.diagnostic.idle")}
             </p>
           ) : (
             <div className="space-y-2">

@@ -17,7 +17,7 @@ export default function MetricsCards({
   completedDiagnostics: Record<string, boolean>;
   cogHealth: { activeStreams?: number; status?: string; uptime?: string } | null;
 }) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   return (
@@ -27,7 +27,7 @@ export default function MetricsCards({
       <div className={`border rounded-xl p-4 flex items-center justify-between shadow-2xs ${styles.cardBg} ${styles.cardBorder}`}>
         <div className="space-y-1">
           <span className={`text-[10px] font-mono font-bold uppercase tracking-wider block ${styles.cardTextMuted}`}>
-            {locale === "zh" ? "蓝图一致性评级" : "Blueprint Alignment Score"}
+            {t("cognition.cos.metrics.alignmentScore")}
           </span>
           <strong className="text-xl font-extrabold tracking-tight" style={{ color: "var(--cardText)" }}>
             {globalComplianceVal}%
@@ -46,7 +46,7 @@ export default function MetricsCards({
       <div className={`border rounded-xl p-4 flex items-center justify-between shadow-2xs ${styles.cardBg} ${styles.cardBorder}`}>
         <div className="space-y-1">
           <span className={`text-[10px] font-mono font-bold uppercase tracking-wider block ${styles.cardTextMuted}`}>
-            {locale === "zh" ? "已对齐验证架构层" : "Architecture Layers Verified"}
+            {t("cognition.cos.metrics.layersVerified")}
           </span>
           <strong className="text-xl font-extrabold tracking-tight" style={{ color: "var(--cardText)" }}>
             {Object.values(completedDiagnostics).filter(Boolean).length} / 6 Layers
@@ -61,7 +61,7 @@ export default function MetricsCards({
       <div className={`border rounded-xl p-4 flex items-center justify-between shadow-2xs ${styles.cardBg} ${styles.cardBorder}`}>
         <div className="space-y-1">
           <span className={`text-[10px] font-mono font-bold uppercase tracking-wider block ${styles.cardTextMuted}`}>
-            {locale === "zh" ? "系统注册功能组件" : "Framework Blueprints Monitored"}
+            {t("cognition.cos.metrics.blueprintsMonitored")}
           </span>
           <strong className="text-xl font-extrabold tracking-tight" style={{ color: "var(--cardText)" }}>
             36 Components
@@ -76,7 +76,7 @@ export default function MetricsCards({
       <div className={`border rounded-xl p-4 flex items-center justify-between shadow-2xs ${styles.cardBg} ${styles.cardBorder}`}>
         <div className="space-y-1">
           <span className={`text-[10px] font-mono font-bold uppercase tracking-wider block ${styles.cardTextMuted}`}>
-            {locale === "zh" ? "认知系统链路负载" : "Cognitive Network Threads"}
+            {t("cognition.cos.metrics.networkThreads")}
           </span>
           <strong className="text-xl font-extrabold tracking-tight text-emerald-500">
             {cogHealth?.activeStreams != null ? `${cogHealth.activeStreams} Active Streams` : '-- Active Streams'}

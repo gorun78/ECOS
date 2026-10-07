@@ -17,7 +17,7 @@ export default function ParetoOptimizerCard({
   optimizeResult: any;
   onOptimize: () => void;
 }) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   return (
@@ -25,17 +25,15 @@ export default function ParetoOptimizerCard({
       <div className="flex items-center justify-between border-b border-dashed pb-3" style={{ borderColor: "var(--cardBorder)" }}>
         <h4 className="text-sm font-extrabold tracking-tight flex items-center gap-2" style={{ color: "var(--cardText)" }}>
           <TrendingUp className="w-4 h-4 text-amber-500" />
-          <span>{locale === "zh" ? "帕累托优化器" : "Pareto Optimizer"}</span>
+          <span>{t("cognition.cos.pareto.title")}</span>
         </h4>
         <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>
-          {locale === "zh" ? "多目标寻优" : "Multi-Objective Optimization"}
+          {t("cognition.cos.pareto.subtitle")}
         </span>
       </div>
 
       <p className={`text-xs leading-relaxed ${styles.cardTextMuted}`}>
-        {locale === "zh"
-          ? "基于认知引擎执行多目标帕累托前沿解集搜索，在预算、延迟、质量等约束下寻找最优权衡方案。"
-          : "Execute multi-objective Pareto frontier search via the cognitive engine, finding optimal trade-offs under budget, latency, and quality constraints."}
+        {t("cognition.cos.pareto.desc")}
       </p>
 
       <button
@@ -46,12 +44,12 @@ export default function ParetoOptimizerCard({
         {optimizeLoading ? (
           <>
             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-            <span>{locale === "zh" ? "优化计算中..." : "Optimizing..."}</span>
+            <span>{t("cognition.cos.pareto.optimizing")}</span>
           </>
         ) : (
           <>
             <Zap className="w-3.5 h-3.5" />
-            <span>{locale === "zh" ? "执行帕累托优化" : "Run Pareto Optimizer"}</span>
+            <span>{t("cognition.cos.pareto.run")}</span>
           </>
         )}
       </button>
@@ -62,19 +60,19 @@ export default function ParetoOptimizerCard({
             <thead>
               <tr className="border-b" style={{ borderColor: "var(--cardBorder)" }}>
                 <th className="text-left py-1.5 px-2 font-mono font-bold uppercase text-[10px] tracking-wider" style={{ color: "var(--cardText)" }}>
-                  {locale === "zh" ? "方案ID" : "Solution ID"}
+                  {t("cognition.cos.pareto.col.solutionId")}
                 </th>
                 <th className="text-left py-1.5 px-2 font-mono font-bold uppercase text-[10px] tracking-wider" style={{ color: "var(--cardText)" }}>
-                  {locale === "zh" ? "层级" : "Rank"}
+                  {t("cognition.cos.pareto.col.rank")}
                 </th>
                 <th className="text-left py-1.5 px-2 font-mono font-bold uppercase text-[10px] tracking-wider" style={{ color: "var(--cardText)" }}>
-                  {locale === "zh" ? "X目标" : "X Objective"}
+                  {t("cognition.cos.pareto.col.x")}
                 </th>
                 <th className="text-left py-1.5 px-2 font-mono font-bold uppercase text-[10px] tracking-wider" style={{ color: "var(--cardText)" }}>
-                  {locale === "zh" ? "Y目标" : "Y Objective"}
+                  {t("cognition.cos.pareto.col.y")}
                 </th>
                 <th className="text-left py-1.5 px-2 font-mono font-bold uppercase text-[10px] tracking-wider" style={{ color: "var(--cardText)" }}>
-                  {locale === "zh" ? "Z目标" : "Z Objective"}
+                  {t("cognition.cos.pareto.col.z")}
                 </th>
               </tr>
             </thead>

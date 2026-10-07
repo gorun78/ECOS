@@ -19,7 +19,7 @@ export default function RuleReasoningCard({
   showReasonPanel: boolean;
   onReason: () => void;
 }) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   return (
@@ -27,7 +27,7 @@ export default function RuleReasoningCard({
       <div className="flex items-center justify-between border-b border-dashed pb-3" style={{ borderColor: "var(--cardBorder)" }}>
         <h4 className="text-sm font-extrabold tracking-tight flex items-center gap-2" style={{ color: "var(--cardText)" }}>
           <Brain className="w-4 h-4 text-purple-500" />
-          <span>{locale === "zh" ? "规则推理" : "Rule Reasoning"}</span>
+          <span>{t("cognition.cos.reason.title")}</span>
         </h4>
         <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>
           mode=rule
@@ -35,9 +35,7 @@ export default function RuleReasoningCard({
       </div>
 
       <p className={`text-xs leading-relaxed ${styles.cardTextMuted}`}>
-        {locale === "zh"
-          ? "对当前选中的蓝图架构层执行规则推理，匹配ECOS知识库中的合规性规则与决策导则，输出匹配的规则列表。"
-          : "Execute rule-based reasoning on the selected blueprint layer, matching compliance rules and decision guidelines from the ECOS knowledge base."}
+        {t("cognition.cos.reason.desc")}
       </p>
 
       <button
@@ -48,12 +46,12 @@ export default function RuleReasoningCard({
         {reasonLoading ? (
           <>
             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-            <span>{locale === "zh" ? "推理分析中..." : "Reasoning..."}</span>
+            <span>{t("cognition.cos.reason.reasoning")}</span>
           </>
         ) : (
           <>
             <Cpu className="w-3.5 h-3.5" />
-            <span>{locale === "zh" ? "执行规则推理" : "Run Rule Reasoning"}</span>
+            <span>{t("cognition.cos.reason.run")}</span>
           </>
         )}
       </button>
@@ -61,7 +59,7 @@ export default function RuleReasoningCard({
       {showReasonPanel && reasonResult && !reasonResult.error && (
         <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-thin">
           <span className={`text-[10px] font-mono font-bold uppercase tracking-wider block ${styles.cardTextMuted}`}>
-            {locale === "zh" ? "匹配的规则列表" : "Matched Rules"}
+            {t("cognition.cos.reason.matchedRules")}
           </span>
           {(Array.isArray(reasonResult.matchedRules) ? reasonResult.matchedRules : (Array.isArray(reasonResult) ? reasonResult : [])).map((rule: any, idx: number) => (
             <div key={idx} className={`border rounded-lg p-2.5 ${styles.cardBorder} bg-black/5 dark:bg-white/5`}>

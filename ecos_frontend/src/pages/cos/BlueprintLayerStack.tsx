@@ -20,7 +20,7 @@ export default function BlueprintLayerStack({
   completedDiagnostics: Record<string, boolean>;
   onSelect: (layerId: string) => void;
 }) {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
 
   return (
@@ -28,7 +28,7 @@ export default function BlueprintLayerStack({
       <div className="flex items-center justify-between border-b border-dashed pb-3" style={{ borderColor: "var(--cardBorder)" }}>
         <h3 className="font-bold text-sm tracking-tight flex items-center gap-2" style={{ color: "var(--cardText)" }}>
           <Layers className="w-4 h-4 text-indigo-505" />
-          <span>{locale === "zh" ? "企业认知操作系统 (ECOS) 六层拓扑核心设计蓝图" : "ECOS Six-Layer Cognitive Structural System Blueprint"}</span>
+          <span>{t("cognition.cos.stack.title")}</span>
         </h3>
         <span className="font-mono text-[9px] uppercase tracking-wider opacity-60">High-Density Cognitive Diagram Blueprint</span>
       </div>
@@ -85,7 +85,7 @@ export default function BlueprintLayerStack({
               <div className="flex items-center gap-4 relative z-10 shrink-0 select-none">
                 <div className="text-right font-mono">
                   <div className="text-xs font-extrabold" style={{ color: "var(--cardText)" }}>{layer.coverage}%</div>
-                  <div className={`text-[8px] uppercase tracking-wider ${styles.cardTextMuted}`}>{locale === "zh" ? "对齐完整度" : "Alignment"}</div>
+                  <div className={`text-[8px] uppercase tracking-wider ${styles.cardTextMuted}`}>{t("cognition.cos.stack.alignment")}</div>
                 </div>
                 <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isFinished ? "#22C55E" : "#EAB308" }}></div>
               </div>
