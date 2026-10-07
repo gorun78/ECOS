@@ -134,9 +134,9 @@ export default function overview() {
             <select className="w-full px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
               value={currentObject} onChange={e => setCurrentObject(e.target.value)}>
               <option value="">{t('knowledge.cognition.selectObject', '选择业务对象…')}</option>
-              <option value="P1">P1 — 项目</option>
-              <option value="C1">C1 — 客户</option>
-              <option value="S1">S1 — 供应商</option>
+              <option value="P1">{`P1 — ${t('knowledge.cognition.situation.object.project', '项目')}`}</option>
+              <option value="C1">{`C1 — ${t('knowledge.cognition.situation.object.client', '客户')}`}</option>
+              <option value="S1">{`S1 — ${t('knowledge.cognition.situation.object.supplier', '供应商')}`}</option>
             </select>
             <div className="flex gap-2">
               <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">D ✓</span>
