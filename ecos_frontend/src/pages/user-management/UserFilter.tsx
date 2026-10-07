@@ -45,9 +45,8 @@ export default function UserFilter({
   totalCount,
   loading,
 }: UserFilterProps) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const isZh = locale === "zh";
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") onSearch();
@@ -63,7 +62,7 @@ export default function UserFilter({
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={handleKeyDown}
           className={`w-full pl-8 pr-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
-          placeholder={isZh ? "搜索用户名、姓名或邮箱…" : "Search username, name or email…"}
+          placeholder={t("platform.user.filter.searchPh")}
         />
       </div>
 
@@ -73,9 +72,9 @@ export default function UserFilter({
         onChange={(e) => { onStatusChange(e.target.value); }}
         className={`px-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
       >
-        <option value="">{isZh ? "全部状态" : "All Status"}</option>
-        <option value="ACTIVE">{isZh ? "正常" : "Active"}</option>
-        <option value="DISABLED">{isZh ? "锁定" : "Locked"}</option>
+        <option value="">{t("platform.user.filter.allStatus")}</option>
+        <option value="ACTIVE">{t("platform.user.filter.statusActive")}</option>
+        <option value="DISABLED">{t("platform.user.filter.statusLocked")}</option>
       </select>
 
       {/* Role filter */}
@@ -84,7 +83,7 @@ export default function UserFilter({
         onChange={(e) => { onRoleChange(e.target.value); }}
         className={`px-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
       >
-        <option value="">{isZh ? "全部角色" : "All Roles"}</option>
+        <option value="">{t("platform.user.filter.allRoles")}</option>
         {roles.map((r) => (
           <option key={r.roleId} value={r.roleId}>
             {r.roleName}
@@ -99,7 +98,7 @@ export default function UserFilter({
         className={`px-3 py-2 rounded text-xs font-medium text-white flex items-center gap-1.5 ${styles.accentBg} ${styles.accentHover} disabled:opacity-50`}
       >
         <Search size={14} />
-        {isZh ? "搜索" : "Search"}
+        {t("platform.user.filter.search")}
       </button>
 
       {/* CSV Import */}
@@ -108,7 +107,7 @@ export default function UserFilter({
         className="flex items-center gap-1 px-3 py-2 rounded text-xs border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5"
       >
         <Upload size={14} />
-        {isZh ? "CSV导入" : "CSV Import"}
+        {t("platform.user.filter.csvImport")}
       </button>
 
       {/* CSV Export */}
@@ -117,12 +116,12 @@ export default function UserFilter({
         className="flex items-center gap-1 px-3 py-2 rounded text-xs border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5"
       >
         <Download size={14} />
-        {isZh ? "CSV导出" : "CSV Export"}
+        {t("platform.user.filter.csvExport")}
       </button>
 
       {/* Total count */}
       <span className={`text-xs ml-auto opacity-60 ${styles.cardTextMuted}`}>
-        {isZh ? `共 ${totalCount} 条` : `Total: ${totalCount}`}
+        {t("platform.user.filter.total", { n: totalCount })}
       </span>
     </div>
   );

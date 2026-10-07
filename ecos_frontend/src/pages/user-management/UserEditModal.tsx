@@ -43,9 +43,8 @@ export default function UserEditModal({
   onSave,
   onClose,
 }: UserEditModalProps) {
-  const { locale, t } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const isZh = locale === "zh";
 
   const [tab, setTab] = useState<EditTab>("basic");
 
@@ -152,7 +151,7 @@ export default function UserEditModal({
 
   async function handleSave() {
     if (!form.username?.trim()) {
-      setError(isZh ? "用户名不能为空" : "Username is required");
+      setError(t("platform.user.edit.usernameRequired"));
       return;
     }
     setSaving(true);
@@ -168,10 +167,10 @@ export default function UserEditModal({
   }
 
   const tabs: { id: EditTab; label: string; icon: React.FC<any> }[] = [
-    { id: "basic", label: isZh ? "基本信息" : "Basic", icon: User },
-    { id: "roles", label: isZh ? "角色绑定" : "Roles", icon: Shield },
+    { id: "basic", label: t("platform.user.edit.tabBasic"), icon: User },
+    { id: "roles", label: t("platform.user.edit.tabRoles"), icon: Shield },
     ...(mode === "edit"
-      ? [{ id: "security" as EditTab, label: isZh ? "安全配置" : "Security", icon: Key }]
+      ? [{ id: "security" as EditTab, label: t("platform.user.edit.tabSecurity"), icon: Key }]
       : []),
   ];
 
@@ -184,8 +183,8 @@ export default function UserEditModal({
         <div className="flex items-center justify-between px-6 pt-5 pb-2">
           <h3 className={`text-sm font-semibold ${styles.cardText}`}>
             {mode === "create"
-              ? isZh ? "新建用户" : "Create User"
-              : isZh ? "编辑用户" : "Edit User"}
+              ? t("platform.user.edit.titleCreate")
+              : t("platform.user.edit.titleEdit")}
           </h3>
           <button onClick={onClose} className="opacity-60 hover:opacity-100">
             <X className="w-4 h-4" />
@@ -229,31 +228,31 @@ export default function UserEditModal({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
-                    {isZh ? "用户名 *" : "Username *"}
+                    {t("platform.user.edit.usernameLabel")}
                   </label>
                   <input
                     value={form.username}
                     onChange={(e) => update("username", e.target.value)}
                     className={`w-full px-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
-                    placeholder={isZh ? "登录用户名" : "Login username"}
+                    placeholder={t("platform.user.edit.usernamePh")}
                   />
                 </div>
                 <div>
                   <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
-                    {isZh ? "真实姓名" : "Real Name"}
+                    {t("platform.user.edit.realName")}
                   </label>
                   <input
                     value={form.realName}
                     onChange={(e) => update("realName", e.target.value)}
                     className={`w-full px-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
-                    placeholder={isZh ? "真实姓名" : "Real name"}
+                    placeholder={t("platform.user.edit.realNamePh")}
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
-                    {isZh ? "邮箱" : "Email"}
+                    {t("platform.user.edit.email")}
                   </label>
                   <input
                     value={form.email}
@@ -264,7 +263,7 @@ export default function UserEditModal({
                 </div>
                 <div>
                   <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
-                    {isZh ? "手机" : "Phone"}
+                    {t("platform.user.edit.phone")}
                   </label>
                   <input
                     value={form.phone}
@@ -276,7 +275,7 @@ export default function UserEditModal({
               </div>
               <div>
                 <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
-                  {isZh ? "所属组织" : "Organization"}
+                  {t("platform.user.edit.org")}
                 </label>
                 <select
                   value={form.orgId}
@@ -284,7 +283,7 @@ export default function UserEditModal({
                   className={`w-full px-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
                 >
                   <option value="">
-                    -- {isZh ? "选择组织" : "Select Org"} --
+                    -- {t("platform.user.edit.selectOrg")} --
                   </option>
                   {flattenTree(orgTree).map((o) => (
                     <option key={o.orgId} value={o.orgId}>
@@ -297,14 +296,14 @@ export default function UserEditModal({
               {mode === "create" && (
                 <div>
                   <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
-                    {isZh ? "密码" : "Password"}
+                    {t("platform.user.edit.password")}
                   </label>
                   <input
                     type="password"
                     value={form.password}
                     onChange={(e) => update("password", e.target.value)}
                     className={`w-full px-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
-                    placeholder={isZh ? "留空则使用默认密码" : "Leave empty for default"}
+                    placeholder={t("platform.user.edit.passwordPh")}
                   />
                   {/* ── Password strength indicator ────── */}
                   {form.password && (
@@ -429,7 +428,7 @@ export default function UserEditModal({
                         disabled={secSaving}
                         className={`px-4 py-2 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover} disabled:opacity-50`}
                       >
-                        {secSaving ? (isZh ? "保存中…" : "Saving…") : (isZh ? "保存安全配置" : "Save Security")}
+                        {secSaving ? t("platform.user.edit.saving") : t("platform.user.edit.saveSecurity")}
                       </button>
                       {secToast && (
                         <span className="text-xs text-emerald-500">{secToast}</span>
@@ -444,7 +443,7 @@ export default function UserEditModal({
                 <div className="flex items-center justify-between">
                   <div>
                     <div className={`text-xs mb-1 ${styles.cardTextMuted}`}>
-                      {isZh ? "账户状态" : "Account Status"}
+                      {t("platform.user.edit.accountStatus")}
                     </div>
                     <div
                       className={`text-sm font-semibold ${
@@ -455,8 +454,8 @@ export default function UserEditModal({
                     >
                       ●{" "}
                       {user.status === "ACTIVE"
-                        ? isZh ? "正常" : "Active"
-                        : isZh ? "锁定" : "Locked"}
+                        ? t("platform.user.edit.statusActive")
+                        : t("platform.user.edit.statusLocked")}
                     </div>
                   </div>
                   <div
@@ -472,8 +471,8 @@ export default function UserEditModal({
                       <Unlock className="w-3 h-3 inline mr-1" />
                     )}
                     {user.status === "ACTIVE"
-                      ? isZh ? "可被锁定" : "Can be locked"
-                      : isZh ? "可被解锁" : "Can be unlocked"}
+                      ? t("platform.user.edit.canLock")
+                      : t("platform.user.edit.canUnlock")}
                   </div>
                 </div>
               </div>
@@ -481,27 +480,27 @@ export default function UserEditModal({
               <div className={`p-4 rounded-lg border space-y-3`}>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="opacity-50">{isZh ? "用户ID" : "User ID"}:</span>
+                    <span className="opacity-50">{t("platform.user.edit.userId")}:</span>
                     <div className="font-mono text-[11px] mt-0.5 opacity-70">
                       {user.userId}
                     </div>
                   </div>
                   <div>
-                    <span className="opacity-50">{isZh ? "最后登录" : "Last Login"}:</span>
+                    <span className="opacity-50">{t("platform.user.edit.lastLogin")}:</span>
                     <div className="mt-0.5 opacity-70">
                       {user.lastLoginTime || "-"}
                     </div>
                   </div>
                   <div>
-                    <span className="opacity-50">{isZh ? "创建时间" : "Created"}:</span>
+                    <span className="opacity-50">{t("platform.user.edit.created")}:</span>
                     <div className="mt-0.5 opacity-70">
                       {user.createdTime || "-"}
                     </div>
                   </div>
                   <div>
-                    <span className="opacity-50">{isZh ? "锁定状态" : "Lock State"}:</span>
+                    <span className="opacity-50">{t("platform.user.edit.lockState")}:</span>
                     <div className="mt-0.5 opacity-70">
-                      {user.locked === "1" ? (isZh ? "已锁定" : "Locked") : (isZh ? "未锁定" : "Unlocked")}
+                      {user.locked === "1" ? t("platform.user.edit.lockLocked") : t("platform.user.edit.lockUnlocked")}
                     </div>
                   </div>
                 </div>
@@ -516,7 +515,7 @@ export default function UserEditModal({
             onClick={onClose}
             className={`px-4 py-2 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}
           >
-            {isZh ? "取消" : "Cancel"}
+            {t("platform.user.edit.cancel")}
           </button>
           <button
             onClick={handleSave}
@@ -524,7 +523,7 @@ export default function UserEditModal({
             className={`px-4 py-2 rounded text-xs font-medium text-white flex items-center gap-1.5 ${styles.accentBg} ${styles.accentHover} disabled:opacity-50`}
           >
             <Check className="w-3.5 h-3.5" />
-            {saving ? (isZh ? "保存中…" : "Saving…") : (isZh ? "保存" : "Save")}
+            {saving ? t("platform.user.edit.saving") : t("platform.user.edit.save")}
           </button>
         </div>
       </div>
