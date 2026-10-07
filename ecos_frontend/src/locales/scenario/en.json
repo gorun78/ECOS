@@ -377,5 +377,18 @@
   "scenario.wizard.st.completed": "COMPLETED",
   "scenario.wizard.st.suspended": "SUSPENDED",
   "scenario.sim.safetyBaseline": "Safety Baseline",
-  "scenario.sim.postSim": "Post-Simulation"
+  "scenario.sim.postSim": "Post-Simulation",
+  "scenario.list.enterSandbox": "Enter Sandbox",
+  "scenario.list.sandbox": "Sandbox",
+  "scenario.zt.title": "Zero-Trust Reconciliation Sandbox",
+  "scenario.zt.queryPh": "Enter query to simulate...",
+  "scenario.zt.simulating": "Simulating...",
+  "scenario.zt.run": "Run",
+  "scenario.zt.role": "Role",
+  "scenario.zt.roleAoc": "AOC Director",
+  "scenario.zt.roleContractor": "External Contractor",
+  "scenario.zt.resultTitle": "Simulation Result",
+  "scenario.zt.groundedDocs": "Grounded Documents",
+  "scenario.zt.baselineVsPrediction": "Baseline vs Prediction",
+  "scenario.zt.emptyHint": "Click \"Run\" to start zero-trust reconciliation simulation"
 }

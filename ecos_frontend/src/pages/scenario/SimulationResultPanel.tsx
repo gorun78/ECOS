@@ -31,7 +31,6 @@ export default function SimulationResultPanel({
   onRun,
   styles,
   locale,
-  tl,
   safetyIndexActual,
 }: SimulationResultPanelProps) {
   const { t } = useLanguage();
@@ -42,7 +41,7 @@ export default function SimulationResultPanel({
         <div className="flex items-center gap-2">
           <LucideIcon name="FlaskConical" size={14} className="text-amber-400" />
           <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-            {tl('零信任对账仿真推演沙箱', 'Zero-Trust Reconciliation Sandbox')}
+            {t('scenario.zt.title')}
           </span>
         </div>
 
@@ -50,7 +49,7 @@ export default function SimulationResultPanel({
         <div className="flex gap-2">
           <input
             type="text"
-            placeholder={tl('输入要推演的查询，如：查询机长资质与薪资', 'Enter query to simulate...')}
+            placeholder={t('scenario.zt.queryPh')}
             value={simQuery}
             onChange={(e) => setSimQuery(e.target.value)}
             className={`flex-1 p-2 text-xs ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:border-indigo-500`}
@@ -65,24 +64,24 @@ export default function SimulationResultPanel({
             ) : (
               <LucideIcon name="Play" size={12} />
             )}
-            {isSimulating ? tl('推演中...', 'Simulating...') : tl('运行推演', 'Run')}
+            {isSimulating ? t('scenario.zt.simulating') : t('scenario.zt.run')}
           </button>
         </div>
 
         {/* Role Selector */}
         <div className="flex items-center gap-3">
           <span className={`text-[10px] ${styles.cardTextMuted} font-bold`}>
-            {tl('模拟角色', 'Role')}:
+            {t('scenario.zt.role')}:
           </span>
           <label className={`flex items-center gap-1.5 text-[11px] cursor-pointer ${simRole === 'AOC_DIRECTOR' ? 'text-emerald-400 font-bold' : styles.cardTextMuted}`}>
             <input type="radio" name="simRole" checked={simRole === 'AOC_DIRECTOR'}
               onChange={() => setSimRole('AOC_DIRECTOR')} className="accent-indigo-500" />
-            {tl('签派总监 (王凯)', 'AOC Director')}
+            {t('scenario.zt.roleAoc')}
           </label>
           <label className={`flex items-center gap-1.5 text-[11px] cursor-pointer ${simRole === 'EXTERNAL_CONTRACTOR' ? 'text-rose-400 font-bold' : styles.cardTextMuted}`}>
             <input type="radio" name="simRole" checked={simRole === 'EXTERNAL_CONTRACTOR'}
               onChange={() => setSimRole('EXTERNAL_CONTRACTOR')} className="accent-indigo-500" />
-            {tl('外部承包商', 'External Contractor')}
+            {t('scenario.zt.roleContractor')}
           </label>
         </div>
       </div>
@@ -93,7 +92,7 @@ export default function SimulationResultPanel({
           {/* Verdict */}
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-white">
-              {tl('推演结果', 'Simulation Result')}
+              {t('scenario.zt.resultTitle')}
             </span>
             <span
               className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
@@ -117,7 +116,7 @@ export default function SimulationResultPanel({
           {simResult.groundedDocs && simResult.groundedDocs.length > 0 && (
             <div className="space-y-1.5">
               <span className={`text-[10px] ${styles.cardTextMuted} font-bold`}>
-                {tl('关联知识库文档', 'Grounded Documents')}
+                {t('scenario.zt.groundedDocs')}
               </span>
               {simResult.groundedDocs.map((doc: any, i: number) => (
                 <div key={i} className={`flex items-center justify-between p-2 ${styles.cardBg} border ${styles.cardBorder} rounded text-[10px]`}>
@@ -134,7 +133,7 @@ export default function SimulationResultPanel({
           <div className={`p-3 ${styles.cardBg} border ${styles.cardBorder} rounded-lg space-y-2`}>
             <span className={`text-[10px] ${styles.cardTextMuted} font-bold flex items-center gap-1`}>
               <LucideIcon name="BarChart3" size={11} className="text-indigo-400" />
-              {tl('基线 vs 预测对比', 'Baseline vs Prediction')}
+              {t('scenario.zt.baselineVsPrediction')}
             </span>
             <div className="grid grid-cols-2 gap-3 text-[10px]">
               <div className={`p-2 ${styles.inputBg} rounded text-center`}>
@@ -165,7 +164,7 @@ export default function SimulationResultPanel({
         <div className={`p-8 ${styles.cardBg} border ${styles.cardBorder} rounded-lg text-center`}>
           <LucideIcon name="FlaskConical" size={24} className={`mx-auto mb-2 ${styles.cardTextMuted}`} />
           <p className={`text-xs ${styles.cardTextMuted}`}>
-            {tl('点击「运行推演」开始零信任对账仿真', 'Click "Run" to start zero-trust reconciliation simulation')}
+            {t('scenario.zt.emptyHint')}
           </p>
         </div>
       )}

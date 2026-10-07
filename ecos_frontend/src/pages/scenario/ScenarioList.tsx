@@ -5,6 +5,7 @@
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import LucideIcon from '../../components/LucideIcon';
+import { useLanguage } from '../../components/LanguageContext';
 import type { ThemeStyles } from '../../components/ThemeContext';
 import type { BusinessScenario } from '../project-workbench/types';
 
@@ -27,6 +28,7 @@ export default function ScenarioList({
   locale,
   tl,
 }: ScenarioListProps) {
+  const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredScenarios = useMemo(() => {
@@ -48,14 +50,14 @@ export default function ScenarioList({
         <div className="flex items-center justify-between">
           <span className={`text-xs font-bold ${styles.cardTextMuted} flex items-center gap-1.5`}>
             <LucideIcon name="ListCollapse" size={12} className="text-indigo-500" />
-            {tl('业务场景库', 'Scenarios')}
+            {t('scenario.list.title')}
           </span>
           <button
             onClick={onCreateNew}
             className="text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-1 rounded flex items-center gap-1 transition-all cursor-pointer"
           >
             <LucideIcon name="Plus" size={10} />
-            {tl('创建新场景', 'New Scenario')}
+            {t('scenario.list.new')}
           </button>
         </div>
 
@@ -68,7 +70,7 @@ export default function ScenarioList({
           />
           <input
             type="text"
-            placeholder={tl('搜索场景名称、部门...', 'Search scenarios...')}
+            placeholder={t('scenario.list.search')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={`w-full pl-7 pr-2 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:border-indigo-500 transition-colors`}
@@ -81,8 +83,8 @@ export default function ScenarioList({
         {filteredScenarios.length === 0 && (
           <div className={`text-center py-8 text-xs ${styles.cardTextMuted}`}>
             {searchQuery.trim()
-              ? tl('未找到匹配的场景', 'No matching scenarios')
-              : tl('暂无场景', 'No scenarios yet')}
+              ? t('scenario.list.noMatch')
+              : t('scenario.list.empty')}
           </div>
         )}
         {filteredScenarios.map((scen) => {
@@ -146,10 +148,10 @@ export default function ScenarioList({
                   onClick={(e) => e.stopPropagation()}
                   className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded border transition-all opacity-60 hover:opacity-100"
                   style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
-                  title={tl('进沙盘', 'Enter Sandbox')}
+                  title={t('scenario.list.enterSandbox')}
                 >
                   <LucideIcon name="Layers" size={10} />
-                  {tl('沙盘', 'Sandbox')}
+                  {t('scenario.list.sandbox')}
                 </Link>
               </div>
             </div>
@@ -163,13 +165,10 @@ export default function ScenarioList({
       >
         <p className={`flex items-center gap-1 font-semibold ${styles.cardTextMuted}`}>
           <LucideIcon name="Info" size={11} className="text-indigo-400" />
-          {tl('如何起作用？', 'How it works?')}
+          {t('scenario.list.howTitle')}
         </p>
         <p className="leading-relaxed">
-          {tl(
-            '管理者在此定义高维业务场景，绑定不同层级的系统底座（数据、实体、知识与安全规则），最终形成高合规的企业级智能流闭环。',
-            'Define high-dimensional business scenarios, bind system layers (data, entities, knowledge, security rules), forming a compliant enterprise intelligence loop.'
-          )}
+          {t('scenario.list.howText')}
         </p>
       </div>
     </div>

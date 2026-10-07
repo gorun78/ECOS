@@ -377,5 +377,18 @@
   "scenario.wizard.st.completed": "COMPLETED",
   "scenario.wizard.st.suspended": "SUSPENDED",
   "scenario.sim.safetyBaseline": "安全适航基线",
-  "scenario.sim.postSim": "推演后预测"
+  "scenario.sim.postSim": "推演后预测",
+  "scenario.list.enterSandbox": "进沙盘",
+  "scenario.list.sandbox": "沙盘",
+  "scenario.zt.title": "零信任对账仿真推演沙箱",
+  "scenario.zt.queryPh": "输入要推演的查询，如：查询机长资质与薪资",
+  "scenario.zt.simulating": "推演中...",
+  "scenario.zt.run": "运行推演",
+  "scenario.zt.role": "模拟角色",
+  "scenario.zt.roleAoc": "签派总监 (王凯)",
+  "scenario.zt.roleContractor": "外部承包商",
+  "scenario.zt.resultTitle": "推演结果",
+  "scenario.zt.groundedDocs": "关联知识库文档",
+  "scenario.zt.baselineVsPrediction": "基线 vs 预测对比",
+  "scenario.zt.emptyHint": "点击「运行推演」开始零信任对账仿真"
 }

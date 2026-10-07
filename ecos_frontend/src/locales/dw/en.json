@@ -1535,10 +1535,8 @@
   "dw.dqRule.report.gradeC": "Fair",
   "dw.dqRule.report.gradeD": "Poor",
   "dw.dqRule.report.gradeF": "Critical",
-
   "dw.tab.layer_carriers": "Layer Carriers",
   "dw.tab.fact_import": "Fact Import",
-
   "dw.layers.title": "Data Lake — Five Layers / Carriers",
   "dw.layers.refresh": "Refresh",
   "dw.layers.noPerm": "No permission (decide denied): {msg}",
@@ -1583,7 +1581,6 @@
   "dw.layers.carrierCount": "Carrier Count",
   "dw.layers.sampleCount": "Sample Rows",
   "dw.layers.lastUpdated": "Last Updated",
-
   "dw.facts.title": "Business Fact Import Wizard",
   "dw.facts.stepType": "Type",
   "dw.facts.stepTemplate": "Template",
@@ -1759,5 +1756,15 @@
   "dw.catalog.menuDq": "Configure DQ Rules",
   "dw.catalog.tree.search": "Search datasources, tables, fields...",
   "dw.catalog.tree.noMatch": "No matching resources",
-  "dw.catalog.tree.empty": "No data resources"
+  "dw.catalog.tree.empty": "No data resources",
+  "dw.ruleTpl.selectTable": "Please select a target table",
+  "dw.ruleTpl.title": "DQ Rule Template Library",
+  "dw.ruleTpl.back": "Back",
+  "dw.ruleTpl.targetTable": "Target Table",
+  "dw.ruleTpl.selectTablePlaceholder": "-- Select table --",
+  "dw.ruleTpl.fields": "Fields",
+  "dw.ruleTpl.params": "Parameters",
+  "dw.ruleTpl.cancel": "Cancel",
+  "dw.ruleTpl.creating": "Creating...",
+  "dw.ruleTpl.confirmCreate": "Confirm"
 }

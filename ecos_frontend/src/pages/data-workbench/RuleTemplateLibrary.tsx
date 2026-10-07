@@ -48,9 +48,8 @@ function buildExpr(tplId: string, params: DqTemplateParams, fields: string[]): s
 interface Props { onClose: () => void; onApplied: () => void; }
 
 export default function RuleTemplateLibrary({ onClose, onApplied }: Props) {
-  const { locale } = useLanguage();
+  const { locale, t } = useLanguage();
   const { styles } = useTheme();
-  const tl = (zh: string, en: string) => locale === 'zh' ? zh : en;
   const [step, setStep] = useState(0);
   const [tpl, setTpl] = useState<DqTemplate | null>(null);
   const [datasets, setDatasets] = useState<DataAsset[]>([]);
@@ -69,7 +68,7 @@ export default function RuleTemplateLibrary({ onClose, onApplied }: Props) {
   function toggleField(name: string) { setFields(p => p.includes(name) ? p.filter(f => f !== name) : [...p, name]); }
 
   async function confirm() {
-    if (!tpl || !table) { setError(tl('请选择目标表','Please select a target table')); return; }
+    if (!tpl || !table) { setError(t('dw.ruleTpl.selectTable')); return; }
     setSaving(true); setError('');
     try {
       const expr = buildExpr(tpl.id, params, fields.length ? fields : [table]);
@@ -88,20 +87,20 @@ export default function RuleTemplateLibrary({ onClose, onApplied }: Props) {
   // ── Cards view ──
   if (step === 0) return (
     <div className="space-y-4">
-      <h3 className={`text-sm font-bold ${styles.cardText}`}>{tl('DQ规则模板库','DQ Rule Template Library')}</h3>
+      <h3 className={`text-sm font-bold ${styles.cardText}`}>{t('dw.ruleTpl.title')}</h3>
       <div className="grid grid-cols-1 gap-2">
-        {TEMPLATES.map(t => {
-          const Icon = t.icon;
+        {TEMPLATES.map(tpl => {
+          const Icon = tpl.icon;
           return (
-            <div key={t.id} onClick={() => selectTpl(t)}
+            <div key={tpl.id} onClick={() => selectTpl(tpl)}
               className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3 flex items-center gap-3 hover:shadow-md transition-shadow cursor-pointer`}>
               <Icon className={`w-5 h-5 ${styles.infoText} shrink-0`} />
               <div className="flex-1 min-w-0">
                 <div className={`text-xs font-semibold ${styles.cardText}`}>
-                  {locale === 'zh' ? t.nameZh : t.nameEn}
-                  <span className={`ml-2 text-[10px] ${styles.cardTextMuted} font-mono`}>{t.type}</span>
+                  {locale === 'zh' ? tpl.nameZh : tpl.nameEn}
+                  <span className={`ml-2 text-[10px] ${styles.cardTextMuted} font-mono`}>{tpl.type}</span>
                 </div>
-                <div className={`text-[10px] ${styles.cardTextMuted} mt-0.5 truncate`}>{locale === 'zh' ? t.descriptionZh : t.descriptionEn}</div>
+                <div className={`text-[10px] ${styles.cardTextMuted} mt-0.5 truncate`}>{locale === 'zh' ? tpl.descriptionZh : tpl.descriptionEn}</div>
               </div>
               <ChevronRight className={`w-4 h-4 ${styles.cardTextMuted}`} />
             </div>
@@ -115,7 +114,7 @@ export default function RuleTemplateLibrary({ onClose, onApplied }: Props) {
   const TIcon = tpl?.icon;
   return (
     <div className="space-y-4">
-      <button onClick={() => setStep(0)} className={`text-xs ${styles.infoText} hover:${styles.infoText}`}>← {tl('返回','Back')}</button>
+      <button onClick={() => setStep(0)} className={`text-xs ${styles.infoText} hover:${styles.infoText}`}>← {t('dw.ruleTpl.back')}</button>
       {tpl && TIcon && (
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3 flex items-center gap-2`}>
           <TIcon className={`w-4 h-4 ${styles.infoText}`} />
@@ -124,16 +123,16 @@ export default function RuleTemplateLibrary({ onClose, onApplied }: Props) {
         </div>
       )}
       <div>
-        <label className={`text-[11px] font-semibold ${styles.cardText} block mb-1`}>{tl('目标表','Target Table')}</label>
+        <label className={`text-[11px] font-semibold ${styles.cardText} block mb-1`}>{t('dw.ruleTpl.targetTable')}</label>
         <select className={`w-full border ${styles.inputBorder} ${styles.inputBg} rounded-lg px-3 py-2 text-xs outline-none focus:${styles.infoBorder}`}
           value={table} onChange={e => { setTable(e.target.value); setFields([]); }}>
-          <option value="">{tl('-- 选择表 --','-- Select table --')}</option>
+          <option value="">{t('dw.ruleTpl.selectTablePlaceholder')}</option>
           {datasets.map((d) => <option key={d.id||d.name} value={d.name||d.id}>{d.name||d.id}</option>)}
         </select>
       </div>
       {cols.length > 0 && (
         <div>
-          <label className={`text-[11px] font-semibold ${styles.cardText} block mb-1`}>{tl('选择字段','Fields')} ({fields.length})</label>
+          <label className={`text-[11px] font-semibold ${styles.cardText} block mb-1`}>{t('dw.ruleTpl.fields')} ({fields.length})</label>
           <div className={`border ${styles.cardBorder} rounded-lg max-h-32 overflow-y-auto p-2`}>
             {cols.map(c => (
               <label key={c.name} className={`flex items-center gap-2 py-1 cursor-pointer hover:${styles.cardBg} rounded px-1`}>
@@ -147,7 +146,7 @@ export default function RuleTemplateLibrary({ onClose, onApplied }: Props) {
       )}
       {tpl && Object.keys(tpl.defaultParams).length > 0 && (
         <div>
-          <label className={`text-[11px] font-semibold ${styles.cardText} block mb-1`}>{tl('参数配置','Parameters')}</label>
+          <label className={`text-[11px] font-semibold ${styles.cardText} block mb-1`}>{t('dw.ruleTpl.params')}</label>
           <div className="space-y-2">
             {Object.entries(tpl.defaultParams).map(([k, v]) => (
               <div key={k} className="flex items-center gap-2">
@@ -162,10 +161,10 @@ export default function RuleTemplateLibrary({ onClose, onApplied }: Props) {
       )}
       {error && <div className={`text-[11px] ${styles.dangerText} ${styles.dangerBg} rounded px-3 py-2`}>{error}</div>}
       <div className="flex justify-end gap-2 pt-2">
-        <button onClick={onClose} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.sidebarBg} rounded-lg`}>{tl('取消','Cancel')}</button>
+        <button onClick={onClose} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.sidebarBg} rounded-lg`}>{t('dw.ruleTpl.cancel')}</button>
         <button onClick={confirm} disabled={saving}
           className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} rounded-lg flex items-center gap-1.5 disabled:opacity-50`}>
-          <Check className="w-3 h-3" /> {saving ? tl('创建中...','Creating...') : tl('确认创建','Confirm')}
+          <Check className="w-3 h-3" /> {saving ? t('dw.ruleTpl.creating') : t('dw.ruleTpl.confirmCreate')}
         </button>
       </div>
     </div>

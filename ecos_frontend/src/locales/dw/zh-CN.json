@@ -1540,10 +1540,8 @@
   "dw.dqRule.report.gradeC": "一般",
   "dw.dqRule.report.gradeD": "较差",
   "dw.dqRule.report.gradeF": "危险",
-
   "dw.tab.layer_carriers": "分层载体",
   "dw.tab.fact_import": "导入事实",
-
   "dw.layers.title": "数据湖五层 · 载体浏览",
   "dw.layers.refresh": "刷新",
   "dw.layers.noPerm": "无权（decide 拒绝）: {msg}",
@@ -1588,7 +1586,6 @@
   "dw.layers.carrierCount": "载体数",
   "dw.layers.sampleCount": "样例行",
   "dw.layers.lastUpdated": "最近更新时间",
-
   "dw.facts.title": "业务事实导入向导",
   "dw.facts.stepType": "选类型",
   "dw.facts.stepTemplate": "下载模板",
@@ -1764,5 +1761,15 @@
   "dw.catalog.menuDq": "配置DQ规则",
   "dw.catalog.tree.search": "搜索数据源、表、字段...",
   "dw.catalog.tree.noMatch": "未找到匹配的资源",
-  "dw.catalog.tree.empty": "暂无数据资源"
+  "dw.catalog.tree.empty": "暂无数据资源",
+  "dw.ruleTpl.selectTable": "请选择目标表",
+  "dw.ruleTpl.title": "DQ规则模板库",
+  "dw.ruleTpl.back": "返回",
+  "dw.ruleTpl.targetTable": "目标表",
+  "dw.ruleTpl.selectTablePlaceholder": "-- 选择表 --",
+  "dw.ruleTpl.fields": "选择字段",
+  "dw.ruleTpl.params": "参数配置",
+  "dw.ruleTpl.cancel": "取消",
+  "dw.ruleTpl.creating": "创建中...",
+  "dw.ruleTpl.confirmCreate": "确认创建"
 }
