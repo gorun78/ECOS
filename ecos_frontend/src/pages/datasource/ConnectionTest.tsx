@@ -30,7 +30,7 @@ export default function ConnectionTest({
   password,
   datasourceType,
 }: ConnectionTestProps) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<TestResult | null>(null);
 
@@ -51,8 +51,8 @@ export default function ConnectionTest({
       setResult({
         success: r.success,
         message: r.success
-          ? (locale === "zh" ? "连接测试成功！" : "Connection test successful!")
-          : (r.message || (locale === "zh" ? "连接测试失败" : "Connection test failed")),
+          ? t("dw.datasource.conn.testSuccess")
+          : (r.message || t("dw.datasource.conn.testFail")),
       });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Test failed";
@@ -72,12 +72,12 @@ export default function ConnectionTest({
         {testing ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            {locale === "zh" ? "测试中..." : "Testing..."}
+            {t("dw.datasource.conn.testing")}
           </>
         ) : (
           <>
             <Zap className="w-4 h-4" />
-            {locale === "zh" ? "测试连接" : "Test Connection"}
+            {t("dw.datasource.conn.testBtn")}
           </>
         )}
       </button>
@@ -98,12 +98,8 @@ export default function ConnectionTest({
           <div className="flex-1 min-w-0">
             <p className="font-semibold">
               {result.success
-                ? locale === "zh"
-                  ? "成功"
-                  : "Success"
-                : locale === "zh"
-                  ? "失败"
-                  : "Failed"}
+                ? t("dw.datasource.conn.success")
+                : t("dw.datasource.conn.failed")}
             </p>
             <p className="mt-0.5 whitespace-pre-wrap break-all">{result.message}</p>
           </div>
@@ -113,9 +109,7 @@ export default function ConnectionTest({
       {/* Hint for empty JDBC URL */}
       {!jdbcUrl.trim() && (
         <p className="text-[10px] text-amber-600">
-          {locale === "zh"
-            ? "请先在 Step 1 中输入 JDBC URL"
-            : "Please enter JDBC URL in Step 1 first"}
+          {t("dw.datasource.conn.urlHint")}
         </p>
       )}
     </div>

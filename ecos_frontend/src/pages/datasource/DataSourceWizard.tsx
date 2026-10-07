@@ -24,16 +24,15 @@ const EMPTY_FORM: FormState = { name: "", jdbcUrl: "", username: "", password: "
 interface DataSourceWizardProps { onClose: () => void; onSuccess: () => void; }
 
 const STEPS = [
-  { zh: "连接信息", en: "Connection Info" },
-  { zh: "测试连接", en: "Test Connection" },
-  { zh: "导入表结构", en: "Import Tables" },
-];
+  "dw.datasource.wz.step1",
+  "dw.datasource.wz.step2",
+  "dw.datasource.wz.step3",
+] as const;
 
 export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizardProps) {
   const { styles } = useTheme();
-  const { locale } = useLanguage();
+  const { locale, t } = useLanguage();
   const { getLabel: getDsTypeLabel } = useDict("datasource_type", locale);
-
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>({ ...EMPTY_FORM });
   const [formError, setFormError] = useState<string | null>(null);
@@ -41,8 +40,8 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
   const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const canGoStep2 = () => {
-    if (!form.name.trim()) { setFormError(locale === "zh" ? "请输入数据源名称" : "Please enter data source name"); return false; }
-    if (!form.jdbcUrl.trim()) { setFormError(locale === "zh" ? "请输入 JDBC URL" : "Please enter JDBC URL"); return false; }
+    if (!form.name.trim()) { setFormError(t("dw.datasource.wz.nameRequired")); return false; }
+    if (!form.jdbcUrl.trim()) { setFormError(t("dw.datasource.wz.jdbcRequired")); return false; }
     setFormError(null); return true;
   };
 
@@ -59,10 +58,10 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
       });
       setImportResult({
         success: true,
-        message: locale === "zh" ? "数据源注册成功！请关闭向导后在列表中采集元数据。" : "Registered! Close wizard and collect metadata from the list.",
+        message: t("dw.datasource.wz.registered"),
       });
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : (locale === "zh" ? "导入失败" : "Import failed");
+      const msg = e instanceof Error ? e.message : t("dw.datasource.wz.importFail");
       setImportResult({ success: false, message: msg }); setFormError(msg);
     } finally { setSubmitting(false); }
   };
@@ -76,7 +75,7 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
           <React.Fragment key={idx}>
             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition ${done ? "bg-green-50 text-green-700 border border-green-200" : active ? `${styles.accentBg} text-white` : `${styles.appBorder} ${styles.cardTextMuted}`}`}>
               {done ? <CheckCircle className="w-3 h-3" /> : <span className="w-4 h-4 rounded-full border border-current flex items-center justify-center text-[9px]">{idx + 1}</span>}
-              <span className="hidden sm:inline">{locale === "zh" ? s.zh : s.en}</span>
+              <span className="hidden sm:inline">{t(s)}</span>
             </div>
             {idx < 2 && <ChevronRight className={`w-3 h-3 ${idx < step ? "text-green-400" : styles.muted}`} />}
           </React.Fragment>
@@ -98,10 +97,10 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
   // ── Step contents ──────────────────────────────────────
   const renderStep1 = () => (
     <div className="space-y-3">
-      <Field label={locale === "zh" ? "数据源名称" : "Data Source Name"} required>
-        <input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className={inputClass} placeholder={locale === "zh" ? "如: 生产数据库" : "e.g. Production DB"} />
+      <Field label={t("dw.datasource.wz.name")} required>
+        <input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className={inputClass} placeholder={t("dw.datasource.wz.namePH")} />
       </Field>
-      <Field label={locale === "zh" ? "数据库类型" : "Database Type"}>
+      <Field label={t("dw.datasource.wz.dbType")}>
         <select value={form.databaseType} onChange={(e) => setForm(p => ({ ...p, databaseType: e.target.value as DbType }))} className={`${inputClass} cursor-pointer`}>
           {DB_TYPES.map(db => <option key={db} value={db}>{getDsTypeLabel(db)}</option>)}
         </select>
@@ -109,10 +108,10 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
       <Field label="JDBC URL" required>
         <input type="text" value={form.jdbcUrl} onChange={(e) => setForm(p => ({ ...p, jdbcUrl: e.target.value }))} className={`${inputClass} font-mono`} placeholder="jdbc:postgresql://localhost:5432/mydb" />
       </Field>
-      <Field label={locale === "zh" ? "用户名" : "Username"}>
+      <Field label={t("dw.datasource.wz.username")}>
         <input type="text" value={form.username} onChange={(e) => setForm(p => ({ ...p, username: e.target.value }))} className={inputClass} placeholder="root" />
       </Field>
-      <Field label={locale === "zh" ? "密码" : "Password"}>
+      <Field label={t("dw.datasource.wz.password")}>
         <input type="password" value={form.password} onChange={(e) => setForm(p => ({ ...p, password: e.target.value }))} className={inputClass} placeholder="••••••••" />
       </Field>
     </div>
@@ -120,7 +119,7 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
 
   const renderStep2 = () => (
     <div>
-      <p className={`text-xs ${styles.muted} mb-4`}>{locale === "zh" ? "测试当前填写的连接配置是否可用" : "Test whether the current connection configuration is valid"}</p>
+      <p className={`text-xs ${styles.muted} mb-4`}>{t("dw.datasource.wz.testHint")}</p>
       <ConnectionTest jdbcUrl={form.jdbcUrl} username={form.username} password={form.password} datasourceType={form.databaseType} />
     </div>
   );
@@ -130,15 +129,15 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
       {!importResult ? (
         <div className="text-center py-8">
           <Database className={`w-12 h-12 mx-auto ${styles.muted} mb-3`} />
-          <p className={`text-sm font-bold ${styles.cardText}`}>{locale === "zh" ? "确认导入" : "Confirm Import"}</p>
-          <p className={`text-xs ${styles.muted} mt-1.5 max-w-xs mx-auto`}>{locale === "zh" ? `将注册数据源「${form.name}」并保存连接配置` : `Register data source "${form.name}" and save connection config`}</p>
-          <p className={`text-[10px] ${styles.muted} mt-1`}>{locale === "zh" ? "注册完成后可在列表中采集元数据" : "After registration you can collect metadata from the list"}</p>
+          <p className={`text-sm font-bold ${styles.cardText}`}>{t("dw.datasource.wz.confirmImport")}</p>
+          <p className={`text-xs ${styles.muted} mt-1.5 max-w-xs mx-auto`}>{t("dw.datasource.wz.willRegister", { name: form.name })}</p>
+          <p className={`text-[10px] ${styles.muted} mt-1`}>{t("dw.datasource.wz.afterRegister")}</p>
         </div>
       ) : (
         <div className={`rounded-lg p-4 flex items-start gap-3 text-sm ${importResult.success ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
           {importResult.success ? <CheckCircle className="w-5 h-5 shrink-0 mt-0.5" /> : <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />}
           <div className="flex-1 min-w-0">
-            <p className="font-bold">{importResult.success ? (locale === "zh" ? "注册成功" : "Registration Successful") : (locale === "zh" ? "注册失败" : "Registration Failed")}</p>
+            <p className="font-bold">{importResult.success ? t("dw.datasource.wz.regSuccess") : t("dw.datasource.wz.regFail")}</p>
             <p className="mt-1 text-xs whitespace-pre-wrap break-all">{importResult.message}</p>
           </div>
         </div>
@@ -155,7 +154,7 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
       <div className={`${styles.cardBg} rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 border ${styles.cardBorder}`}>
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h2 className={`text-lg font-bold ${styles.cardText} flex items-center gap-2`}><Database className={`w-5 h-5 ${styles.accentText}`} />{locale === "zh" ? "注册数据源" : "Register Data Source"}</h2>
+          <h2 className={`text-lg font-bold ${styles.cardText} flex items-center gap-2`}><Database className={`w-5 h-5 ${styles.accentText}`} />{t("dw.datasource.wz.title")}</h2>
           <button onClick={onClose} className={`p-1 hover:${styles.appBg}/50 rounded transition cursor-pointer`}><X className={`w-5 h-5 ${styles.muted}`} /></button>
         </div>
 
@@ -173,15 +172,15 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
 
         {/* Navigation */}
         <div className="flex justify-between gap-2 mt-5">
-          <div>{step > 0 && <button onClick={goPrev} disabled={submitting} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.appBg}/50 rounded-lg transition flex items-center gap-1 cursor-pointer`}><ChevronLeft className="w-3.5 h-3.5" />{locale === "zh" ? "上一步" : "Back"}</button>}</div>
+          <div>{step > 0 && <button onClick={goPrev} disabled={submitting} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.appBg}/50 rounded-lg transition flex items-center gap-1 cursor-pointer`}><ChevronLeft className="w-3.5 h-3.5" />{t("dw.datasource.wz.back")}</button>}</div>
           <div className="flex gap-2">
-            <button onClick={onClose} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.appBg}/50 rounded-lg transition cursor-pointer`}>{locale === "zh" ? "取消" : "Cancel"}</button>
+            <button onClick={onClose} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.appBg}/50 rounded-lg transition cursor-pointer`}>{t("dw.datasource.wz.cancel")}</button>
             {step < 2 ? (
-              <button onClick={goNext} className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} ${styles.accentHover} text-white rounded-lg transition flex items-center gap-1.5 cursor-pointer`}>{locale === "zh" ? "下一步" : "Next"}<ChevronRight className="w-3.5 h-3.5" /></button>
+              <button onClick={goNext} className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} ${styles.accentHover} text-white rounded-lg transition flex items-center gap-1.5 cursor-pointer`}>{t("dw.datasource.wz.next")}<ChevronRight className="w-3.5 h-3.5" /></button>
             ) : importResult?.success ? (
-              <button onClick={() => { onSuccess(); onClose(); }} className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} ${styles.accentHover} text-white rounded-lg transition cursor-pointer`}>{locale === "zh" ? "完成" : "Finish"}</button>
+              <button onClick={() => { onSuccess(); onClose(); }} className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} ${styles.accentHover} text-white rounded-lg transition cursor-pointer`}>{t("dw.datasource.wz.finish")}</button>
             ) : (
-              <button onClick={handleImport} disabled={submitting} className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} ${styles.accentHover} disabled:opacity-50 text-white rounded-lg transition flex items-center gap-1.5 cursor-pointer`}>{submitting && <Loader2 className="w-3 h-3 animate-spin" />}<ArrowRight className="w-3.5 h-3.5" />{locale === "zh" ? "注册并导入" : "Register & Import"}</button>
+              <button onClick={handleImport} disabled={submitting} className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} ${styles.accentHover} disabled:opacity-50 text-white rounded-lg transition flex items-center gap-1.5 cursor-pointer`}>{submitting && <Loader2 className="w-3 h-3 animate-spin" />}<ArrowRight className="w-3.5 h-3.5" />{t("dw.datasource.wz.registerImport")}</button>
             )}
           </div>
         </div>

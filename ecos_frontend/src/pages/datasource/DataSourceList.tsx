@@ -22,7 +22,7 @@ const getJdbcUrl = (ds: DataSource): string => {
 
 export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
   const { styles } = useTheme();
-  const { locale } = useLanguage();
+  const { locale, t } = useLanguage();
   const { getLabel: getDsTypeLabel } = useDict("datasource_type", locale);
   const { getLabel: getDsStatusLabel, getColor: getDsStatusColor } = useDict("datasource_status", locale);
 
@@ -46,8 +46,8 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
   const loadDataSources = useCallback(() => {
     setLoading(true); setError(null);
     fetchDataSources().then((d) => { setDataSources(d); setLoading(false); })
-      .catch((e: Error) => { setError(e.message || (locale === "zh" ? "加载数据源失败" : "Failed to load data sources")); setLoading(false); });
-  }, [locale]);
+      .catch((e: Error) => { setError(e.message || t("dw.datasource.list.loadFail")); setLoading(false); });
+  }, [t]);
 
   useEffect(() => { loadDataSources(); }, [loadDataSources]);
 
@@ -61,7 +61,7 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
     setTestingId(id); setActionError(null);
     try {
       const r = await testDataSourceConnection(id);
-      setTestResults(prev => ({ ...prev, [id]: { success: r.success, message: r.success ? (locale === "zh" ? "连接测试成功" : "Connection test successful") : (locale === "zh" ? "连接测试失败" : "Connection test failed") } }));
+      setTestResults(prev => ({ ...prev, [id]: { success: r.success, message: r.success ? t("dw.datasource.list.testSuccess") : t("dw.datasource.list.testFail") } }));
     } catch (e: unknown) {
       setTestResults(prev => ({ ...prev, [id]: { success: false, message: e instanceof Error ? e.message : "Test failed" } }));
     } finally { setTestingId(null); }
@@ -71,7 +71,7 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
     setCollectingId(id); setActionError(null);
     try {
       const r = await collectMetadata(id);
-      setCollectResults(prev => ({ ...prev, [id]: { success: true, message: locale === "zh" ? `元数据采集完成，共 ${r.resourcesCollected} 个资源 (${r.elapsedMs}ms)` : `Metadata collection complete, ${r.resourcesCollected} resources (${r.elapsedMs}ms)` } }));
+      setCollectResults(prev => ({ ...prev, [id]: { success: true, message: t("dw.datasource.list.collectDone", { n: r.resourcesCollected, ms: r.elapsedMs }) } }));
     } catch (e: unknown) {
       setCollectResults(prev => ({ ...prev, [id]: { success: false, message: e instanceof Error ? e.message : "Collection failed" } }));
     } finally { setCollectingId(null); }
@@ -90,9 +90,9 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(locale === "zh" ? `确认删除数据源「${name}」？此操作不可撤销。` : `Confirm delete data source "${name}"? This action cannot be undone.`)) return;
+    if (!window.confirm(t("dw.datasource.list.confirmDelete", { name }))) return;
     setDeletingId(id); setActionError(null);
-    try { await deleteDataSource(id); loadDataSources(); } catch (e: unknown) { setActionError(e instanceof Error ? e.message : (locale === "zh" ? "删除失败" : "Delete failed")); } finally { setDeletingId(null); }
+    try { await deleteDataSource(id); loadDataSources(); } catch (e: unknown) { setActionError(e instanceof Error ? e.message : t("dw.datasource.list.deleteFail")); } finally { setDeletingId(null); }
   };
 
   const statusBadge = (status: string) => {
@@ -119,7 +119,7 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
   const ErrorBanner = ({ msg, onRetry, onDismiss }: { msg: string | null; onRetry?: () => void; onDismiss: () => void }) => !msg ? null : (
     <div className="rounded-lg p-3 mb-4 flex items-center gap-2 text-sm bg-red-50 border border-red-200 text-red-700">
       <AlertCircle className="w-4 h-4 shrink-0" /><span className="flex-1">{msg}</span>
-      {onRetry && <button onClick={onRetry} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold bg-white border border-current/20 rounded hover:bg-opacity-80 transition cursor-pointer"><RefreshCw className="w-3 h-3" />{locale === "zh" ? "重试" : "Retry"}</button>}
+      {onRetry && <button onClick={onRetry} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold bg-white border border-current/20 rounded hover:bg-opacity-80 transition cursor-pointer"><RefreshCw className="w-3 h-3" />{t("dw.datasource.list.retry")}</button>}
       <button onClick={onDismiss} className="text-current/60 hover:text-current cursor-pointer">&times;</button>
     </div>
   );
@@ -132,41 +132,41 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
       {/* Page Header */}
       <div className="flex items-center justify-between mb-6 shrink-0">
         <div>
-          <h1 className={`text-xl font-bold tracking-tight ${styles.cardText} flex items-center gap-2`}><Database className={`w-5 h-5 ${styles.accentText}`} />{locale === "zh" ? "数据源管理" : "Data Source Manager"}</h1>
-          <p className={`text-xs ${styles.muted} mt-1.5`}>{locale === "zh" ? "注册、测试和管理 JDBC 数据源连接，采集数据库元数据" : "Register, test and manage JDBC data sources, collect database metadata"}</p>
+          <h1 className={`text-xl font-bold tracking-tight ${styles.cardText} flex items-center gap-2`}><Database className={`w-5 h-5 ${styles.accentText}`} />{t("dw.datasource.list.title")}</h1>
+          <p className={`text-xs ${styles.muted} mt-1.5`}>{t("dw.datasource.list.subtitle")}</p>
         </div>
-        <button onClick={onOpenWizard} className={`${styles.accentBg} ${styles.accentHover} text-white rounded-lg px-4 py-2 text-xs font-semibold flex items-center gap-2 cursor-pointer transition shadow-xs`}><Plus className="w-3.5 h-3.5" />{locale === "zh" ? "注册数据源" : "Register Data Source"}</button>
+        <button onClick={onOpenWizard} className={`${styles.accentBg} ${styles.accentHover} text-white rounded-lg px-4 py-2 text-xs font-semibold flex items-center gap-2 cursor-pointer transition shadow-xs`}><Plus className="w-3.5 h-3.5" />{t("dw.datasource.list.register")}</button>
       </div>
 
       {/* Search Bar */}
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 mb-5 flex items-center gap-3 shrink-0 shadow-xs`}>
         <div className={`flex-1 ${styles.inputBg} border ${styles.inputBorder} rounded-lg px-3.5 py-2 flex items-center gap-2 text-xs`}>
           <Search className={`w-3.5 h-3.5 ${styles.muted} shrink-0`} />
-          <input type="text" className={`bg-transparent border-0 outline-hidden w-full ${styles.cardText} placeholder:${styles.cardTextMuted}`} placeholder={locale === "zh" ? "搜索数据源名称、类型..." : "Search data source name, type..."} value={searchKeyword} onChange={e => setSearchKeyword(e.target.value)} />
+          <input type="text" className={`bg-transparent border-0 outline-hidden w-full ${styles.cardText} placeholder:${styles.cardTextMuted}`} placeholder={t("dw.datasource.list.searchPH")} value={searchKeyword} onChange={e => setSearchKeyword(e.target.value)} />
         </div>
-        <button onClick={loadDataSources} className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold ${styles.muted} hover:${styles.cardText} hover:${styles.appBg}/50 rounded-lg transition cursor-pointer`} title={locale === "zh" ? "刷新列表" : "Refresh list"}><RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /></button>
+        <button onClick={loadDataSources} className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold ${styles.muted} hover:${styles.cardText} hover:${styles.appBg}/50 rounded-lg transition cursor-pointer`} title={t("dw.datasource.list.refresh")}><RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /></button>
       </div>
 
       {/* Table / States */}
       <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin">
         {loading ? (
-          <div className="py-16 text-center"><Loader2 className={`w-8 h-8 mx-auto ${styles.muted} animate-spin mb-3`} /><p className={`text-xs ${styles.muted}`}>{locale === "zh" ? "加载中..." : "Loading..."}</p></div>
+          <div className="py-16 text-center"><Loader2 className={`w-8 h-8 mx-auto ${styles.muted} animate-spin mb-3`} /><p className={`text-xs ${styles.muted}`}>{t("dw.datasource.list.loading")}</p></div>
         ) : filtered.length === 0 ? (
           <div className={`py-24 text-center ${styles.cardBg} border border-dashed ${styles.cardBorder} rounded-xl shadow-xs`}>
             <Database className={`w-10 h-10 mx-auto ${styles.muted} mb-2`} />
-            <p className={`text-sm ${styles.cardTextMuted} font-bold`}>{searchKeyword.trim() ? (locale === "zh" ? "没有匹配的数据源" : "No matching data sources") : (locale === "zh" ? "暂无数据源，请点击右上角注册" : "No data sources yet, click Register to add one")}</p>
+            <p className={`text-sm ${styles.cardTextMuted} font-bold`}>{searchKeyword.trim() ? t("dw.datasource.list.noMatch") : t("dw.datasource.list.empty")}</p>
           </div>
         ) : (
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-xs overflow-hidden`}>
             <table className="w-full text-xs">
               <thead>
                 <tr className={`${styles.appBg} border-b ${styles.cardBorder}`}>
-                  <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>{locale === "zh" ? "名称" : "Name"}</th>
-                  <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>{locale === "zh" ? "数据库类型" : "DB Type"}</th>
+                  <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>{t("dw.datasource.list.name")}</th>
+                  <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>{t("dw.datasource.list.dbType")}</th>
                   <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>JDBC URL</th>
-                  <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>{locale === "zh" ? "状态" : "Status"}</th>
-                  <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>{locale === "zh" ? "创建时间" : "Created"}</th>
-                  <th className={`text-right px-4 py-3 font-bold ${styles.cardText}`}>{locale === "zh" ? "操作" : "Actions"}</th>
+                  <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>{t("dw.datasource.list.status")}</th>
+                  <th className={`text-left px-4 py-3 font-bold ${styles.cardText}`}>{t("dw.datasource.list.created")}</th>
+                  <th className={`text-right px-4 py-3 font-bold ${styles.cardText}`}>{t("dw.datasource.list.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -183,9 +183,9 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
                       <td className={`px-4 py-3.5 ${styles.muted} font-mono text-[11px] whitespace-nowrap`}>{ds.createdAt || "—"}</td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center justify-end gap-1.5">
-                          <ActionBtn label={locale === "zh" ? "测试连接" : "Test"} loading={isT} icon={Play} color="blue" onClick={() => handleTest(dsId)} />
-                          <ActionBtn label={locale === "zh" ? "采集元数据" : "Collect"} loading={isC} icon={Zap} color="purple" onClick={() => handleCollect(dsId)} />
-                          <ActionBtn label={locale === "zh" ? "浏览资源" : "Browse"} loading={false} icon={Database} color="green" active={expandedDs === dsId} onClick={() => handleBrowseResources(dsId)} />
+                          <ActionBtn label={t("dw.datasource.list.test")} loading={isT} icon={Play} color="blue" onClick={() => handleTest(dsId)} />
+                          <ActionBtn label={t("dw.datasource.list.collect")} loading={isC} icon={Zap} color="purple" onClick={() => handleCollect(dsId)} />
+                          <ActionBtn label={t("dw.datasource.list.browse")} loading={false} icon={Database} color="green" active={expandedDs === dsId} onClick={() => handleBrowseResources(dsId)} />
                           <ActionBtn label="" loading={isD} icon={Trash2} color="red" onClick={() => handleDelete(dsId, ds.datasourceName || dsId)} />
                         </div>
                       </td>
@@ -200,12 +200,12 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
               <div className="border-t-2 border-green-100 bg-green-50/30 p-4 animate-fade-in">
                 <div className="flex items-center gap-2 mb-3">
                   <Database className="w-4 h-4 text-green-600" />
-                  <h3 className={`text-sm font-bold ${styles.cardText}`}>{locale === "zh" ? "数据资源列表" : "Data Resources"}</h3>
+                  <h3 className={`text-sm font-bold ${styles.cardText}`}>{t("dw.datasource.list.resources")}</h3>
                   <span className={`text-[10px] ${styles.cardTextMuted}`}>({resources.length})</span>
                   {resourcesLoading && <Loader2 className="w-3 h-3 animate-spin text-green-500" />}
                 </div>
                 {resources.length === 0 && !resourcesLoading ? (
-                  <p className={`text-xs ${styles.muted} py-4 text-center`}>{locale === "zh" ? "暂无资源，请先采集元数据" : "No resources yet, collect metadata first"}</p>
+                  <p className={`text-xs ${styles.muted} py-4 text-center`}>{t("dw.datasource.list.noResources")}</p>
                 ) : (
                   <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
                     {resources.map(r => (
@@ -213,17 +213,17 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
                         <button onClick={() => handleBrowseFields(r.resourceId)} className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center gap-2 transition cursor-pointer ${expandedResource === r.resourceId ? "bg-green-100 border border-green-300" : `${styles.cardBg} border ${styles.cardBorder} hover:border-green-300 hover:bg-green-50`}`}>
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.resourceType === "TABLE" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>{r.resourceType || "?"}</span>
                           <span className={`font-bold ${styles.cardText} flex-1`}>{r.resourceName}</span>
-                          <span className={`text-[10px] ${styles.cardTextMuted}`}>{r.fieldCount ?? "?"} {locale === "zh" ? "字段" : "fields"}</span>
+                          <span className={`text-[10px] ${styles.cardTextMuted}`}>{r.fieldCount ?? "?"} {t("dw.datasource.list.fields")}</span>
                         </button>
                         {expandedResource === r.resourceId && (
                           <div className="mt-1 ml-4 border-l-2 border-green-200 pl-4 animate-fade-in">
                             {fieldsLoading ? (
-                              <div className={`py-2 flex items-center gap-2 text-xs ${styles.muted}`}><Loader2 className="w-3 h-3 animate-spin" />{locale === "zh" ? "加载字段..." : "Loading fields..."}</div>
+                              <div className={`py-2 flex items-center gap-2 text-xs ${styles.muted}`}><Loader2 className="w-3 h-3 animate-spin" />{t("dw.datasource.list.loadingFields")}</div>
                             ) : fields.length === 0 ? (
-                              <p className={`text-xs ${styles.muted} py-2`}>{locale === "zh" ? "无字段" : "No fields"}</p>
+                              <p className={`text-xs ${styles.muted} py-2`}>{t("dw.datasource.list.noFields")}</p>
                             ) : (
                               <table className="w-full text-[10px]">
-                                <thead><tr className={`${styles.muted} border-b border-green-200`}><th className="text-left py-1.5 font-semibold w-6" /><th className="text-left py-1.5 font-semibold">{locale === "zh" ? "字段名" : "Field"}</th><th className="text-left py-1.5 font-semibold">{locale === "zh" ? "类型" : "Type"}</th><th className="text-left py-1.5 font-semibold">{locale === "zh" ? "可空" : "Nullable"}</th><th className="text-left py-1.5 font-semibold">{locale === "zh" ? "长度" : "Length"}</th></tr></thead>
+                                <thead><tr className={`${styles.muted} border-b border-green-200`}><th className="text-left py-1.5 font-semibold w-6" /><th className="text-left py-1.5 font-semibold">{t("dw.datasource.list.field")}</th><th className="text-left py-1.5 font-semibold">{t("dw.datasource.list.type")}</th><th className="text-left py-1.5 font-semibold">{t("dw.datasource.list.nullable")}</th><th className="text-left py-1.5 font-semibold">{t("dw.datasource.list.length")}</th></tr></thead>
                                 <tbody>
                                   {fields.map(f => (
                                     <tr key={f.fieldId} className="border-b border-green-100/50 hover:bg-green-50/50">
@@ -251,8 +251,8 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
 
       {/* Count badge */}
       <div className={`mt-3 text-[10px] ${styles.muted} text-right shrink-0`}>
-        {locale === "zh" ? "共" : "Total"} <span className={`font-bold ${styles.cardTextMuted}`}>{filtered.length}</span> {locale === "zh" ? "个数据源" : " data sources"}
-        {searchKeyword.trim() && dataSources.length !== filtered.length ? ` (${locale === "zh" ? "已过滤" : "filtered from"} ${dataSources.length})` : ""}
+        {t("dw.datasource.list.total")} <span className={`font-bold ${styles.cardTextMuted}`}>{filtered.length}</span> {t("dw.datasource.list.unit")}
+        {searchKeyword.trim() && dataSources.length !== filtered.length ? ` (${t("dw.datasource.list.filteredFrom")} ${dataSources.length})` : ""}
       </div>
     </div>
   );
