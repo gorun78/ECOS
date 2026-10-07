@@ -436,7 +436,6 @@
   "aiworkbench.agent.sim.latency": "耗时",
   "aiworkbench.agent.sim.tracesLog": "全链路节点决策追踪 (Decision Traces Log)",
   "aiworkbench.agent.sim.stepLogs": "策略执行步骤日志 (Trace Logs)",
-
   "aiworkbench.logic.list.title": "逻辑流列表 ({count})",
   "aiworkbench.logic.list.add": "新增逻辑流",
   "aiworkbench.logic.list.ready": "已就绪",
@@ -534,5 +533,7 @@
   "cos.kpi.delay.badge": "运行滞后",
   "cos.kpi.delay.val": "6.0% 停机率",
   "cos.kpi.safety.badge": "正常运行",
-  "cos.sandbox.runPrompt": "加载前述可变变量配置至模拟引擎："
+  "cos.sandbox.runPrompt": "加载前述可变变量配置至模拟引擎：",
+  "aiworkbench.playground.bubbleUser": "我",
+  "aiworkbench.playground.exportUserLabel": "用户"
 }

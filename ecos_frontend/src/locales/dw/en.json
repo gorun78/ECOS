@@ -1766,5 +1766,10 @@
   "dw.ruleTpl.params": "Parameters",
   "dw.ruleTpl.cancel": "Cancel",
   "dw.ruleTpl.creating": "Creating...",
-  "dw.ruleTpl.confirmCreate": "Confirm"
+  "dw.ruleTpl.confirmCreate": "Confirm",
+  "dw.modal.previewing": "Previewing…",
+  "dw.modal.testing": "Testing…",
+  "dw.modal.saveAndConnect": "Save & Connect",
+  "dw.modal.cancel": "Cancel",
+  "dw.modal.createSyncTask": "Create Sync Task"
 }

@@ -362,7 +362,7 @@ export default function AgentPlayground({ agents: agentsFromProps, models: model
     lines.push(`> 模型: ${selectedModel || '—'} · 温度: ${temperature}`);
     lines.push('');
     for (const m of messages) {
-      lines.push(`## ${m.sender === 'user' ? (locale === 'zh' ? '用户' : '**You**') : (activeAgent?.name || 'AI')} · ${new Date(m.timestamp).toLocaleTimeString(locale === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}`);
+      lines.push(`## ${m.sender === 'user' ? t('aiworkbench.playground.exportUserLabel') : (activeAgent?.name || 'AI')} · ${new Date(m.timestamp).toLocaleTimeString(locale === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}`);
       lines.push('');
       if (m.oagSteps && m.oagSteps.length > 0) {
         const doneSteps = m.oagSteps.filter((s) => s.stepState === 'done').map((s) => `**${s.node}** (${typeof s.nodeElapsedMs === 'number' ? s.nodeElapsedMs : 0}ms)`);

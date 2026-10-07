@@ -436,7 +436,6 @@
   "aiworkbench.agent.sim.latency": "Latency",
   "aiworkbench.agent.sim.tracesLog": "Full-chain Node Decision Traces",
   "aiworkbench.agent.sim.stepLogs": "Policy execution step logs",
-
   "aiworkbench.logic.list.title": "Logic Flows ({count})",
   "aiworkbench.logic.list.add": "New logic flow",
   "aiworkbench.logic.list.ready": "Ready",
@@ -534,5 +533,7 @@
   "cos.kpi.delay.badge": "Behind",
   "cos.kpi.delay.val": "6.0% Downtime",
   "cos.kpi.safety.badge": "On Track",
-  "cos.sandbox.runPrompt": "Press play to invoke forecasting model:"
+  "cos.sandbox.runPrompt": "Press play to invoke forecasting model:",
+  "aiworkbench.playground.bubbleUser": "You",
+  "aiworkbench.playground.exportUserLabel": "**You**"
 }

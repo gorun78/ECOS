@@ -38,7 +38,7 @@ interface AddConnectionModalProps {
 }
 
 export function AddConnectionModal({
-  t, locale,
+  t,
   newConnName, setNewConnName,
   newConnType, setNewConnType,
   newConnHost, setNewConnHost,
@@ -362,7 +362,7 @@ export function AddConnectionModal({
               disabled={previewLoading}
               className={`px-2.5 py-1 border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.appBg} rounded text-[10px] font-mono transition-colors cursor-pointer ${previewLoading ? 'opacity-50' : ''}`}
             >
-              {previewLoading ? (locale === 'zh' ? '预览中…' : 'Previewing…') : t('dw.conn.previewSchema')}
+              {previewLoading ? t('dw.modal.previewing') : t('dw.conn.previewSchema')}
             </button>
             {previewVisible && previewResult && (
               <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>
@@ -390,15 +390,15 @@ export function AddConnectionModal({
         <div className={`px-5 py-3 border-t ${styles.cardBorder} flex justify-end gap-2 ${styles.cardBg}`}>
           <button onClick={onClose}
             className={`px-3 py-1.5 ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.appBg} rounded text-xs transition-colors cursor-pointer`}>
-            {locale === 'zh' ? '取消' : 'Cancel'}
+            {t('dw.modal.cancel')}
           </button>
           <button onClick={handleTest} disabled={testing}
             className={`px-3.5 py-1.5 border ${styles.cardBorder} ${styles.cardText} hover:${styles.appBg} rounded text-xs transition-colors cursor-pointer ${testing ? 'opacity-50' : ''}`}>
-            {testing ? (locale === 'zh' ? '测试中…' : 'Testing…') : t('dw.conn.testConn')}
+            {testing ? t('dw.modal.testing') : t('dw.conn.testConn')}
           </button>
           <button onClick={onCreate}
             className={`px-3.5 py-1.5 ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} font-semibold rounded text-xs transition-colors cursor-pointer`}>
-            {locale === 'zh' ? '保存并连线' : 'Save & Connect'}
+            {t('dw.modal.saveAndConnect')}
           </button>
         </div>
       </div>
@@ -440,8 +440,8 @@ export function AddSyncModal({ t, locale, newSyncName, setNewSyncName, newSyncCo
           </div>
         </div>
         <div className={`px-5 py-3 border-t ${styles.cardBorder} flex justify-end gap-2 ${styles.cardBg}`}>
-          <button onClick={onClose} className={`px-3 py-1.5 ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardBg} rounded text-xs cursor-pointer`}>{locale === 'zh' ? '取消' : 'Cancel'}</button>
-          <button onClick={onCreate} className={`px-3.5 py-1.5 ${styles.successBg} hover:${styles.successBg} ${styles.cardText} font-semibold rounded text-xs cursor-pointer`}>{locale === 'zh' ? '初始化同步任务' : 'Create Sync Task'}</button>
+          <button onClick={onClose} className={`px-3 py-1.5 ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardBg} rounded text-xs cursor-pointer`}>{t('dw.modal.cancel')}</button>
+          <button onClick={onCreate} className={`px-3.5 py-1.5 ${styles.successBg} hover:${styles.successBg} ${styles.cardText} font-semibold rounded text-xs cursor-pointer`}>{t('dw.modal.createSyncTask')}</button>
         </div>
       </div>
     </div>

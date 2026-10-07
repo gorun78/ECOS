@@ -1771,5 +1771,10 @@
   "dw.ruleTpl.params": "参数配置",
   "dw.ruleTpl.cancel": "取消",
   "dw.ruleTpl.creating": "创建中...",
-  "dw.ruleTpl.confirmCreate": "确认创建"
+  "dw.ruleTpl.confirmCreate": "确认创建",
+  "dw.modal.previewing": "预览中…",
+  "dw.modal.testing": "测试中…",
+  "dw.modal.saveAndConnect": "保存并连线",
+  "dw.modal.cancel": "取消",
+  "dw.modal.createSyncTask": "初始化同步任务"
 }
