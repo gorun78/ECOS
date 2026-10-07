@@ -407,7 +407,7 @@ export default function AgentMesh() {
                     mission.mode === "PIPELINE"
                       ? "bg-purple-100 text-purple-700"
                       : "bg-teal-100 text-teal-700"
-                  }`}>{mission.mode}</span>
+                  }`}>{mission.mode === "PIPELINE" ? t("agentMesh.modePipeline") : t("agentMesh.modeSupervisor")}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${statusColor(mission.status)}`}>
