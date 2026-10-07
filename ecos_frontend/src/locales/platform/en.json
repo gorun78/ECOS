@@ -427,5 +427,17 @@
   "platform.tenant.eqq.validationErr": "Invalid: daily must not exceed monthly",
   "platform.tenant.eqq.title": "Edit Quota",
   "platform.tenant.eqq.dailyLabel": "Daily Limit",
-  "platform.tenant.eqq.monthlyLabel": "Monthly Limit"
+  "platform.tenant.eqq.monthlyLabel": "Monthly Limit",
+  "platform.tokens.title": "Token Dashboard",
+  "platform.tokens.subtitle": "Monitor LLM token usage by model and operation",
+  "platform.tokens.range.1d": "Last 1 day",
+  "platform.tokens.range.7d": "Last 7 days",
+  "platform.tokens.range.30d": "Last 30 days",
+  "platform.tokens.refresh": "Refresh",
+  "platform.tokens.grandTotal": "Grand Total",
+  "platform.tokens.loading": "Loading…",
+  "platform.tokens.byModel": "By Model",
+  "platform.tokens.byOperation": "By Operation",
+  "platform.tokens.noData": "No data",
+  "platform.tokens.loadFailed": "Failed to load token data"
 }

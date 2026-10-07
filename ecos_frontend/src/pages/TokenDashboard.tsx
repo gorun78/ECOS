@@ -51,7 +51,7 @@ function formatTokens(n: number): string {
 // ── Main Component ─────────────────────────────────────────────
 
 export default function TokenDashboard() {
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   const [data, setData] = useState<TokenSummary | null>(null);
@@ -68,7 +68,7 @@ export default function TokenDashboard() {
       );
       setData(result);
     } catch (e: any) {
-      setError(e.message || "Failed to load token data");
+      setError(e.message || t("platform.tokens.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -89,12 +89,10 @@ export default function TokenDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-xl font-bold ${styles.cardText}`}>
-            {locale === "zh" ? "Token 审计" : "Token Dashboard"}
+            {t("platform.tokens.title")}
           </h1>
           <p className={`text-xs mt-1 ${styles.cardTextMuted}`}>
-            {locale === "zh"
-              ? "监控 LLM Token 用量，按模型与操作维度统计"
-              : "Monitor LLM token usage by model and operation"}
+            {t("platform.tokens.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -104,9 +102,9 @@ export default function TokenDashboard() {
             onChange={(e) => setRange(e.target.value)}
             className={`px-3 py-1.5 rounded text-xs border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
           >
-            <option value="1d">{locale === "zh" ? "最近 1 天" : "Last 1 day"}</option>
-            <option value="7d">{locale === "zh" ? "最近 7 天" : "Last 7 days"}</option>
-            <option value="30d">{locale === "zh" ? "最近 30 天" : "Last 30 days"}</option>
+            <option value="1d">{t("platform.tokens.range.1d")}</option>
+            <option value="7d">{t("platform.tokens.range.7d")}</option>
+            <option value="30d">{t("platform.tokens.range.30d")}</option>
           </select>
           <button
             onClick={fetchData}
@@ -114,7 +112,7 @@ export default function TokenDashboard() {
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${styles.accentBg} text-white ${styles.accentHover}`}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            {locale === "zh" ? "刷新" : "Refresh"}
+            {t("platform.tokens.refresh")}
           </button>
         </div>
       </div>
@@ -130,7 +128,7 @@ export default function TokenDashboard() {
         <div className="flex items-center gap-2 mb-1">
           <Coins className={`w-5 h-5 ${styles.accentText}`} />
           <span className={`text-sm font-semibold ${styles.cardText}`}>
-            {locale === "zh" ? "Token 总量" : "Grand Total"}
+            {t("platform.tokens.grandTotal")}
           </span>
         </div>
         <div className="mt-2">
@@ -138,7 +136,7 @@ export default function TokenDashboard() {
             <div className="flex items-center gap-2">
               <RefreshCw className={`w-4 h-4 animate-spin ${styles.cardTextMuted}`} />
               <span className={`text-xs ${styles.cardTextMuted}`}>
-                {locale === "zh" ? "加载中…" : "Loading…"}
+                {t("platform.tokens.loading")}
               </span>
             </div>
           ) : (
@@ -159,14 +157,14 @@ export default function TokenDashboard() {
           <div className={`px-4 py-3 border-b flex items-center gap-2 ${styles.cardBorder}`}>
             <Cpu className={`w-4 h-4 ${styles.cardTextMuted}`} />
             <span className={`text-sm font-semibold ${styles.cardText}`}>
-              {locale === "zh" ? "按模型" : "By Model"}
+              {t("platform.tokens.byModel")}
             </span>
           </div>
           {byModel.length === 0 ? (
             <div className="p-6 text-center">
               <BarChart3 className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
               <p className={`text-xs ${styles.cardTextMuted}`}>
-                {locale === "zh" ? "暂无数据" : "No data"}
+                {t("platform.tokens.noData")}
               </p>
             </div>
           ) : (
@@ -204,14 +202,14 @@ export default function TokenDashboard() {
           <div className={`px-4 py-3 border-b flex items-center gap-2 ${styles.cardBorder}`}>
             <Layers className={`w-4 h-4 ${styles.cardTextMuted}`} />
             <span className={`text-sm font-semibold ${styles.cardText}`}>
-              {locale === "zh" ? "按操作" : "By Operation"}
+              {t("platform.tokens.byOperation")}
             </span>
           </div>
           {byOperation.length === 0 ? (
             <div className="p-6 text-center">
               <TrendingUp className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
               <p className={`text-xs ${styles.cardTextMuted}`}>
-                {locale === "zh" ? "暂无数据" : "No data"}
+                {t("platform.tokens.noData")}
               </p>
             </div>
           ) : (

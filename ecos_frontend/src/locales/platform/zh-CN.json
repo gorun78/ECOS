@@ -427,5 +427,17 @@
   "platform.tenant.eqq.validationErr": "请输入有效数值，日限额不能超过月限额",
   "platform.tenant.eqq.title": "编辑配额",
   "platform.tenant.eqq.dailyLabel": "日限额",
-  "platform.tenant.eqq.monthlyLabel": "月限额"
+  "platform.tenant.eqq.monthlyLabel": "月限额",
+  "platform.tokens.title": "Token 审计",
+  "platform.tokens.subtitle": "监控 LLM Token 用量，按模型与操作维度统计",
+  "platform.tokens.range.1d": "最近 1 天",
+  "platform.tokens.range.7d": "最近 7 天",
+  "platform.tokens.range.30d": "最近 30 天",
+  "platform.tokens.refresh": "刷新",
+  "platform.tokens.grandTotal": "Token 总量",
+  "platform.tokens.loading": "加载中…",
+  "platform.tokens.byModel": "按模型",
+  "platform.tokens.byOperation": "按操作",
+  "platform.tokens.noData": "暂无数据",
+  "platform.tokens.loadFailed": "加载 Token 数据失败"
 }
