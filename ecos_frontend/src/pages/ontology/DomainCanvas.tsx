@@ -262,10 +262,7 @@ export default function DomainCanvas({
     (e: React.MouseEvent) => {
       // ── 结束拖拽 ──
       if (dragState) {
-        setNodePositions((prev) => {
-          persistPositions(prev);
-          return prev;
-        });
+        persistPositions(nodePositions);
         setDragState(null);
         return;
       }
@@ -352,10 +349,7 @@ export default function DomainCanvas({
   useEffect(() => {
     const up = () => {
       if (dragState) {
-        setNodePositions((prev) => {
-          persistPositions(prev);
-          return prev;
-        });
+        persistPositions(nodePositions);
         setDragState(null);
       }
       if (selectionBox) {
