@@ -220,7 +220,11 @@ public class AuthServiceImpl implements IAuthService {
     
     /**
      * 获取用户所属租户ID。
-     * 优先从 TD_USER.TENANT_ID 列查询，若表中无此列或未配置则默认返回 "tenant-a"。
+     * <p>R1.10（详细设计-02 W48）：仅从 TD_USER.TENANT_ID 列查询；缺失/异常时<b>不</b>再回落到
+     * 字面默认租户。上游 {@code JwtAuthenticationFilter} 对缺 tenant_id 的 claim 会按
+     * {@code ECOS-AUTH-006} 403 显式拒绝（见 {@code JwtDenyTest} 缺租户包络），从而让配置错误
+     * 立刻在授权层暴露，而不是被字面默认租户静默吞掉（旧行为 {@code return "tenant-a"} 会掩盖
+     * 部署/租户初始化问题，并污染审计 reader 身份）。</p>
      */
     private String getUserTenantId(String username) {
         try {
@@ -233,10 +237,9 @@ public class AuthServiceImpl implements IAuthService {
                 }
             }
         } catch (Exception e) {
-            log.debug("Failed to query TENANT_ID from TD_USER for {}: {}. Falling back to default.", 
-                username, e.getMessage());
+            log.warn("Failed to query TENANT_ID from TD_USER for {}: {}", username, e.getMessage());
         }
-        // 默认租户
-        return "tenant-a";
+        // R1.10: 不再字面回落 tenant-a；缺失 → null → 下游按 ECOS-AUTH-006 显式拒绝
+        return null;
     }
 }

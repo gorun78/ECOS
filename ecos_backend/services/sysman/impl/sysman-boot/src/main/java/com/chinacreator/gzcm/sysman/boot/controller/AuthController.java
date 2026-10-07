@@ -197,9 +197,9 @@ public class AuthController {
         } catch (Exception e) {
             log.debug("Failed to query tenant for {}: {}", username, e.getMessage());
         }
-        if (!extraClaims.containsKey("tenant_id")) {
-            extraClaims.put("tenant_id", "tenant-a");
-        }
+        // R1.10: 不再字面回落 "tenant-a"。若用户未配置租户 → claim 缺 tenant_id →
+        // JwtAuthenticationFilter 后续请求按 ECOS-AUTH-006 403 显式拒绝（见 JwtDenyTest 缺租户
+        // 包络），把部署/租户初始化错误第一时间暴露，而不是被字面默认租户静默吞掉。
 
         // 签发 JWT
         String accessToken = jwtTokenProvider.createAccessToken(userId, roles, extraClaims);
