@@ -1,23 +1,27 @@
 package com.chinacreator.gzcm.services.agent.runtime.toolrouter.tools;
 
+import com.chinacreator.gzcm.services.agent.runtime.toolrouter.AgentGatewayClient;
 import com.chinacreator.gzcm.services.agent.runtime.toolrouter.ToolExecutor;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
 
+/**
+ * 权限裁决。走 {@link AgentGatewayClient} → security-engine
+ * {@code POST /api/v1/policy-engine/evaluate}（透传租户/鉴权）。
+ */
 @Component
 public class CheckPermissionTool implements ToolExecutor {
 
-    private final RestTemplate restTemplate;
+    private final AgentGatewayClient gateway;
 
-    public CheckPermissionTool(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
+    public CheckPermissionTool(AgentGatewayClient gateway) {
+        this.gateway = gateway;
     }
 
     @Override
     public Object execute(String toolCode, Map<String, Object> params) {
-        return restTemplate.postForObject("http://localhost:8080/api/v1/policy-engine/evaluate", params, Object.class);
+        return gateway.post("/api/v1/policy-engine/evaluate", params);
     }
 
     @Override

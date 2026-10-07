@@ -1,32 +1,38 @@
 package com.chinacreator.gzcm.services.agent.runtime.toolrouter.tools;
 
+import com.chinacreator.gzcm.services.agent.runtime.toolrouter.AgentGatewayClient;
 import com.chinacreator.gzcm.services.agent.runtime.toolrouter.ToolExecutor;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 经数据源执行物理表查询。走 {@link AgentGatewayClient} → data-engine
+ * {@code POST /api/v1/engine/data/query/execute}（该端点内建 RLS 行级过滤、
+ * B2 JdbcUrlPolicy 白名单预检与超时保护），不再自建 JDBC 直读 + 字符串拼 LIMIT。
+ * 行上限经 {@code max_rows} 参数交给 data-engine 统一管控。
+ */
 @Component
 public class QueryPhysicalTableTool implements ToolExecutor {
 
-    private final JdbcTemplate jdbc;
+    private final AgentGatewayClient gateway;
 
-    public QueryPhysicalTableTool(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public QueryPhysicalTableTool(AgentGatewayClient gateway) {
+        this.gateway = gateway;
     }
 
     @Override
     public Object execute(String toolCode, Map<String, Object> params) {
-        String datasourceId = (String) params.get("datasourceId");
-        String sql = (String) params.get("sql");
-        int maxRows = params.containsKey("maxRows") ? ((Number) params.get("maxRows")).intValue() : 1000;
-        jdbc.update(
-            "INSERT INTO ecos_query_log (id, datasource_id, sql_text, max_rows, status, created_at) " +
-            "VALUES (?, ?, ?, ?, 'SUBMITTED', NOW())",
-            java.util.UUID.randomUUID().toString(), datasourceId, sql, maxRows);
-        List<Map<String, Object>> rows = jdbc.queryForList(sql + " LIMIT " + maxRows);
-        return Map.of("datasourceId", datasourceId, "rows", rows, "rowCount", rows.size());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("datasource_id", params.get("datasourceId"));
+        body.put("sql", params.get("sql"));
+        Object tableName = params.get("tableName");
+        if (tableName != null) {
+            body.put("table_name", tableName);
+        }
+        body.put("max_rows", params.containsKey("maxRows") ? params.get("maxRows") : 1000);
+        return gateway.post("/api/v1/engine/data/query/execute", body);
     }
 
     @Override
