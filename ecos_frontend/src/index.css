@@ -414,3 +414,32 @@
   background-color: #6d28d9 !important;
 }
 
+/* ------------------------------------------
+   BT: ghost scale classes → visible (additive, single-file)
+   ------------------------------------------
+   Tailwind v4 内建调色板语义层级仅 50/100/200/300/400/500/600/700/800/900/950，不含 350/450/650。
+   ThemeContext.tsx + 3 处 TSX 使用如 bg-emerald-650 / text-purple-450 / border-l-indigo-650 /
+   ring-indigo-650\/15 等 "ghost-class"（数级不存在于默认 scale），build 后 CSS 无对应规则 →
+   3 主题（cyber-terminal 5 处 / royal-purple 3 处 / slate-light + deep-space 各 1~2 处）accent
+   填充、muted 文本、border、ring 全部透明 (P0 视觉回归)。
+
+   本块镜像 L116/L198/L285/L382 已有 .border-gray-850 & L211/L304/L399 .text-slate-450
+   同款手补模式，为每一个 ghost class 提供 valid CSS 声明，用该色"相邻档"的十六进制色值
+   （650→700, 450→300/400, 350→300）近似有效 Tailwind utility, 使 4 主题下所有使用该
+   class 的元素恢复可见。additive, !important 与已建立 pattern 一致, 不碰 ThemeContext /
+   不新增 @theme token (E2.3 令牌单源架构收口另批)。
+*/
+.bg-indigo-650     { background-color: #4338ca !important; }
+.bg-purple-650     { background-color: #7c3aed !important; }
+.bg-emerald-650    { background-color: #059669 !important; }
+
+.text-indigo-650   { color: #4338ca !important; }
+.text-emerald-650  { color: #059669 !important; }
+.text-blue-450     { color: #93c5fd !important; }
+.text-purple-450   { color: #c084fc !important; }
+.text-purple-350   { color: #d8b4fe !important; }
+
+.border-emerald-650   { border-color: #059669 !important; }
+.border-l-indigo-650  { border-left-color: #4338ca !important; }
+.ring-indigo-650\/15  { --tw-ring-color: rgb(67 56 202 / 0.15) !important; }
+
