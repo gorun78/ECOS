@@ -530,5 +530,9 @@
   "aiworkbench.agent.execFail": "Agent execution failed",
   "aiworkbench.agent.execConnFail": "Agent execution error: connection/network failure",
   "aiworkbench.agent.rejected": "Operation blocked by safety guardrail",
-  "aiworkbench.agent.selectHint": "Select or create an agent to get started"
+  "aiworkbench.agent.selectHint": "Select or create an agent to get started",
+  "cos.kpi.delay.badge": "Behind",
+  "cos.kpi.delay.val": "6.0% Downtime",
+  "cos.kpi.safety.badge": "On Track",
+  "cos.sandbox.runPrompt": "Press play to invoke forecasting model:"
 }

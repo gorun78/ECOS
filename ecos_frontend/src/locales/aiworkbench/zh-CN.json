@@ -530,5 +530,9 @@
   "aiworkbench.agent.execFail": "Agent 执行失败",
   "aiworkbench.agent.execConnFail": "Agent 执行异常：连接/网络错误",
   "aiworkbench.agent.rejected": "该操作被安全护栏拦截",
-  "aiworkbench.agent.selectHint": "选择或新建一个 Agent 以开始"
+  "aiworkbench.agent.selectHint": "选择或新建一个 Agent 以开始",
+  "cos.kpi.delay.badge": "运行滞后",
+  "cos.kpi.delay.val": "6.0% 停机率",
+  "cos.kpi.safety.badge": "正常运行",
+  "cos.sandbox.runPrompt": "加载前述可变变量配置至模拟引擎："
 }

@@ -18,7 +18,7 @@ import { useTheme } from "./ThemeContext";
 import ErrorBoundary from "./common/ErrorBoundary";
 
 export default function ScenarioSandbox() {
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   // ── Data ──────────────────────────────
@@ -162,7 +162,7 @@ export default function ScenarioSandbox() {
                 {t("cos.kpi.rev")}
               </span>
               <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-500 font-mono font-bold leading-none uppercase">
-                {locale === "zh" ? "存在偏离风险" : "At Risk"}
+                {t("cos.kpi.rev.status")}
               </span>
             </div>
             <div className="flex items-baseline justify-between mt-2.5 min-h-[32px]">
@@ -182,12 +182,12 @@ export default function ScenarioSandbox() {
                 {t("cos.kpi.delay")}
               </span>
               <span className="text-[10px] px-2 py-0.5 rounded-md bg-red-500/10 border border-red-500/20 text-red-500 font-mono font-bold leading-none uppercase">
-                {locale === "zh" ? "运行滞后" : "Behind"}
+                {t("cos.kpi.delay.badge")}
               </span>
             </div>
             <div className="flex items-baseline justify-between mt-2.5 min-h-[32px]">
               <strong className="text-2xl font-extrabold text-red-500 tracking-tight">
-                {locale === "zh" ? "6.0% 停机率" : "6.0% Downtime"}
+                {t("cos.kpi.delay.val")}
               </strong>
               <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>{t("cos.kpi.delay.target")}</span>
             </div>
@@ -204,7 +204,7 @@ export default function ScenarioSandbox() {
                 {t("cos.kpi.safety")}
               </span>
               <span className="text-[10px] px-2 py-0.5 rounded-md bg-green-500/10 border border-green-500/20 text-green-500 font-mono font-bold leading-none uppercase">
-                {locale === "zh" ? "正常运行" : "On Track"}
+                {t("cos.kpi.safety.badge")}
               </span>
             </div>
             <div className="flex items-baseline justify-between mt-2.5 min-h-[32px]">
@@ -312,7 +312,7 @@ export default function ScenarioSandbox() {
               {/* Run simulation */}
               <div className="flex items-center justify-between border-t border-dashed pt-4" style={{ borderColor: "var(--cardBorder)" }}>
                 <span className="text-[10.5px] opacity-75">
-                  {locale === "zh" ? "加载前述可变变量配置至模拟引擎：" : "Press play to invoke forecasting model:"}
+                  {t("cos.sandbox.runPrompt")}
                 </span>
                 <button onClick={runScenarioSimulation} disabled={simulationActive}
                   className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-xs font-semibold flex items-center gap-2 cursor-pointer transition shadow-xs shrink-0">
