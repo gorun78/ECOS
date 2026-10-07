@@ -630,5 +630,21 @@
   "agentBuilder.precise": "Precise",
   "agentBuilder.balanced": "Balanced",
   "agentBuilder.creative": "Creative",
-  "agentBuilder.save": "Save Changes"
+  "agentBuilder.save": "Save Changes",
+  "common.case.searchPh": "Search cases...",
+  "common.case.new": "New",
+  "common.case.newCase": "New Case",
+  "common.case.title": "Title",
+  "common.case.scenario": "Scenario",
+  "common.case.tags": "Tags (comma separated)",
+  "common.case.source": "Source",
+  "common.case.feedback": "Feedback",
+  "common.case.time": "Time",
+  "common.case.decision": "Decision",
+  "common.case.result": "Result",
+  "common.case.relevance": "Relevance",
+  "common.case.empty": "No cases yet",
+  "common.case.loadFailed": "Load failed: {msg}",
+  "common.case.searchFailed": "Search failed: {msg}",
+  "common.case.recordFailed": "Record failed: {msg}"
 }

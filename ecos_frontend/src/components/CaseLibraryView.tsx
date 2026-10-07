@@ -28,7 +28,7 @@ interface CaseItem {
 
 // ── Main Component ─────────────────────────────
 export default function CaseLibraryView() {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   const [cases, setCases] = useState<CaseItem[]>([]);
@@ -46,11 +46,11 @@ export default function CaseLibraryView() {
       const data = await fetchCaseLibrary();
       setCases(data?.data || []);
     } catch (e: any) {
-      setError("加载失败: " + (e?.message || "Unknown"));
+      setError(t("common.case.loadFailed", { msg: e?.message || "Unknown" }));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const doSearch = useCallback(async () => {
     if (!query.trim()) { fetchCases(); return; }
@@ -59,11 +59,11 @@ export default function CaseLibraryView() {
       const data = await searchCaseLibrary(query, 10);
       setCases(data?.data?.results || []);
     } catch (e: any) {
-      setError("搜索失败: " + (e?.message || "Unknown"));
+      setError(t("common.case.searchFailed", { msg: e?.message || "Unknown" }));
     } finally {
       setLoading(false);
     }
-  }, [query, fetchCases]);
+  }, [query, fetchCases, t]);
 
   const viewDetail = useCallback(async (id: number) => {
     try {
@@ -82,9 +82,9 @@ export default function CaseLibraryView() {
       setNewForm({ title: "", scenario: "", tags: "", source: "manual" });
       fetchCases();
     } catch (e: any) {
-      setError("记录失败: " + (e?.message || "Unknown"));
+      setError(t("common.case.recordFailed", { msg: e?.message || "Unknown" }));
     }
-  }, [newForm, fetchCases]);
+  }, [newForm, fetchCases, t]);
 
   useEffect(() => { fetchCases(); }, [fetchCases]);
 
@@ -102,7 +102,7 @@ export default function CaseLibraryView() {
           <Search className="w-4 h-4 opacity-50 shrink-0" />
           <input
             className={`flex-1 px-3 py-1.5 rounded border text-xs outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
-            placeholder={locale === "zh" ? "搜索案例..." : "Search cases..."}
+            placeholder={t("common.case.searchPh")}
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={e => e.key === "Enter" && doSearch()}
@@ -110,12 +110,12 @@ export default function CaseLibraryView() {
         </div>
         <button onClick={doSearch}
           className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${styles.accentBg} ${styles.accentHover} text-white`}>
-          {locale === "zh" ? "搜索" : "Search"}
+          {t("common.search")}
         </button>
         <button onClick={() => setShowNew(true)}
           className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium border transition-all ${styles.cardBorder} ${styles.cardBg} hover:opacity-80`}>
           <Plus className="w-3.5 h-3.5" />
-          {locale === "zh" ? "新建" : "New"}
+          {t("common.case.new")}
         </button>
         <button onClick={fetchCases} disabled={loading}
           className={`p-1.5 rounded border transition-all ${styles.cardBorder} hover:opacity-80 disabled:opacity-30`}>
@@ -133,24 +133,24 @@ export default function CaseLibraryView() {
       {showNew && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className={`w-full max-w-md mx-4 rounded-lg p-5 ${styles.cardBg} border ${styles.cardBorder}`}>
-            <h3 className="text-sm font-semibold mb-3">{locale === "zh" ? "新建案例" : "New Case"}</h3>
+            <h3 className="text-sm font-semibold mb-3">{t("common.case.newCase")}</h3>
             <input className={`w-full px-3 py-1.5 rounded border text-xs mb-2 outline-none ${styles.inputBg} ${styles.inputBorder}`}
-              placeholder={locale === "zh" ? "标题" : "Title"} value={newForm.title}
+              placeholder={t("common.case.title")} value={newForm.title}
               onChange={e => setNewForm({ ...newForm, title: e.target.value })} />
             <textarea className={`w-full px-3 py-1.5 rounded border text-xs mb-2 outline-none resize-none ${styles.inputBg} ${styles.inputBorder}`}
-              rows={3} placeholder={locale === "zh" ? "情景描述" : "Scenario"}
+              rows={3} placeholder={t("common.case.scenario")}
               value={newForm.scenario} onChange={e => setNewForm({ ...newForm, scenario: e.target.value })} />
             <input className={`w-full px-3 py-1.5 rounded border text-xs mb-3 outline-none ${styles.inputBg} ${styles.inputBorder}`}
-              placeholder={locale === "zh" ? "标签 (逗号分隔)" : "Tags (comma separated)"}
+              placeholder={t("common.case.tags")}
               value={newForm.tags} onChange={e => setNewForm({ ...newForm, tags: e.target.value })} />
             <div className="flex gap-2">
               <button onClick={recordCase}
                 className={`flex-1 px-4 py-1.5 rounded text-xs font-medium ${styles.accentBg} ${styles.accentHover} text-white`}>
-                {locale === "zh" ? "保存" : "Save"}
+                {t("common.save")}
               </button>
               <button onClick={() => setShowNew(false)}
                 className={`flex-1 px-4 py-1.5 rounded border text-xs ${styles.cardBorder}`}>
-                {locale === "zh" ? "取消" : "Cancel"}
+                {t("common.cancel")}
               </button>
             </div>
           </div>
@@ -171,26 +171,26 @@ export default function CaseLibraryView() {
               ))}
             </div>
             <div className="grid grid-cols-2 gap-2 text-[10px] opacity-70 mb-2">
-              <span>{locale === "zh" ? "来源" : "Source"}: {detail.source}</span>
-              <span className="flex items-center gap-1">{locale === "zh" ? "反馈" : "Feedback"}: {feedbackIcon(detail.feedback)} {detail.feedback}</span>
-              <span>{locale === "zh" ? "时间" : "Time"}: {detail.created_at?.slice(0, 16)}</span>
-              {detail.relevance !== undefined && <span>Relevance: {detail.relevance}</span>}
+              <span>{t("common.case.source")}: {detail.source}</span>
+              <span className="flex items-center gap-1">{t("common.case.feedback")}: {feedbackIcon(detail.feedback)} {detail.feedback}</span>
+              <span>{t("common.case.time")}: {detail.created_at?.slice(0, 16)}</span>
+              {detail.relevance !== undefined && <span>{t("common.case.relevance")}: {detail.relevance}</span>}
             </div>
             {detail.decision && (
               <details className="mb-1">
-                <summary className="text-xs font-medium cursor-pointer opacity-80">{locale === "zh" ? "决策" : "Decision"}</summary>
+                <summary className="text-xs font-medium cursor-pointer opacity-80">{t("common.case.decision")}</summary>
                 <pre className="text-[10px] mt-1 p-2 rounded bg-black/20 overflow-auto max-h-32">{detail.decision}</pre>
               </details>
             )}
             {detail.result && (
               <details>
-                <summary className="text-xs font-medium cursor-pointer opacity-80">{locale === "zh" ? "结果" : "Result"}</summary>
+                <summary className="text-xs font-medium cursor-pointer opacity-80">{t("common.case.result")}</summary>
                 <pre className="text-[10px] mt-1 p-2 rounded bg-black/20 overflow-auto max-h-32">{detail.result}</pre>
               </details>
             )}
             <button onClick={() => setDetail(null)}
               className={`mt-3 w-full px-4 py-1.5 rounded border text-xs ${styles.cardBorder}`}>
-              {locale === "zh" ? "关闭" : "Close"}
+              {t("common.close")}
             </button>
           </div>
         </div>
@@ -202,7 +202,7 @@ export default function CaseLibraryView() {
           <div className="flex items-center justify-center h-full">
             <div className="text-center opacity-50">
               <BookOpen className="w-10 h-10 mx-auto mb-2" />
-              <p className="text-sm">{locale === "zh" ? "暂无案例" : "No cases yet"}</p>
+              <p className="text-sm">{t("common.case.empty")}</p>
             </div>
           </div>
         ) : (

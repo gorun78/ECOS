@@ -630,5 +630,21 @@
   "agentBuilder.precise": "精确",
   "agentBuilder.balanced": "平衡",
   "agentBuilder.creative": "创意",
-  "agentBuilder.save": "保存修改"
+  "agentBuilder.save": "保存修改",
+  "common.case.searchPh": "搜索案例...",
+  "common.case.new": "新建",
+  "common.case.newCase": "新建案例",
+  "common.case.title": "标题",
+  "common.case.scenario": "情景描述",
+  "common.case.tags": "标签 (逗号分隔)",
+  "common.case.source": "来源",
+  "common.case.feedback": "反馈",
+  "common.case.time": "时间",
+  "common.case.decision": "决策",
+  "common.case.result": "结果",
+  "common.case.relevance": "相关度",
+  "common.case.empty": "暂无案例",
+  "common.case.loadFailed": "加载失败: {msg}",
+  "common.case.searchFailed": "搜索失败: {msg}",
+  "common.case.recordFailed": "记录失败: {msg}"
 }
