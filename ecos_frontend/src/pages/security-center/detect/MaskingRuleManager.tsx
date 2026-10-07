@@ -94,7 +94,7 @@ export default function MaskingRuleManager({ t, locale, styles }: { t: (k: strin
           {masking ? <Loader2 size={14} className="animate-spin" /> : t('sec.mask.btn')}
         </button>
         <button onClick={handleDemoMask} disabled={!input.trim()} className={btnSecondary(styles)}>
-          {locale === 'zh' ? '本地演示' : 'Local Demo'}
+          {t('sec.mask.localDemo')}
         </button>
       </div>
 

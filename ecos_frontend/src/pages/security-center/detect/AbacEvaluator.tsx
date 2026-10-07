@@ -124,7 +124,7 @@ export default function AbacEvaluator({ t, locale, styles }: { t: (k: string) =>
         className={btnPrimary(styles)}
       >
         {evaluating ? (
-          <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" />{locale === 'zh' ? '评估中...' : 'Evaluating...'}</span>
+          <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" />{t('sec.abac.evaluating')}</span>
         ) : (
           t('sec.abac.evalBtn')
         )}

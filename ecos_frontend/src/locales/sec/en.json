@@ -204,5 +204,13 @@
   "sec.audit.details": "Details",
   "sec.audit.successVoucher": "Operation completed successfully. Voucher committed to immutable audit ledger.",
   "sec.audit.success": "Operation completed successfully.",
-  "sec.audit.blocked": "Operation blocked or pending approval."
+  "sec.audit.blocked": "Operation blocked or pending approval.",
+  "sec.abac.evaluating": "Evaluating...",
+  "sec.abac.crud.subtitle": "Manage ABAC attribute-based access control policies",
+  "sec.abac.crud.searchPh": "Search policy name...",
+  "sec.cls.subtitle": "Manage column-level security policies",
+  "sec.cls.searchTablePh": "Search table name...",
+  "sec.mask.localDemo": "Local Demo",
+  "sec.rls.subtitle": "Manage row-level security filter policies",
+  "sec.rls.searchTablePh": "Search table name..."
 }

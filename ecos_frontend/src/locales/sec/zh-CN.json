@@ -204,5 +204,13 @@
   "sec.audit.details": "展开详情",
   "sec.audit.successVoucher": "操作执行成功，凭证已写入不可篡改审计区块。",
   "sec.audit.success": "操作执行成功。",
-  "sec.audit.blocked": "操作被拦截或待审批。"
+  "sec.audit.blocked": "操作被拦截或待审批。",
+  "sec.abac.evaluating": "评估中...",
+  "sec.abac.crud.subtitle": "管理ABAC属性访问控制策略",
+  "sec.abac.crud.searchPh": "搜索策略名...",
+  "sec.cls.subtitle": "管理列级安全配置策略",
+  "sec.cls.searchTablePh": "搜索表名...",
+  "sec.mask.localDemo": "本地演示",
+  "sec.rls.subtitle": "管理行级安全过滤策略",
+  "sec.rls.searchTablePh": "搜索表名..."
 }

@@ -101,7 +101,7 @@ export default function RlsPolicyManager({ t, locale, styles }: { t: (k: string)
       <div className="flex items-center justify-between">
         <div>
           <h3 className={`text-lg font-bold ${styles.cardText}`}>{t('sec.rls.title')}</h3>
-          <p className={`text-xs ${styles.muted}`}>{locale === 'zh' ? '管理行级安全过滤策略' : 'Manage row-level security filter policies'}</p>
+          <p className={`text-xs ${styles.muted}`}>{t('sec.rls.subtitle')}</p>
         </div>
         <button onClick={openCreate} className={`flex items-center gap-1.5 ${btnPrimary(styles)}`}>
           <Plus size={14} />{t('sec.rls.create')}
@@ -116,7 +116,7 @@ export default function RlsPolicyManager({ t, locale, styles }: { t: (k: string)
             type="text"
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
-            placeholder={locale === 'zh' ? '搜索表名...' : 'Search table name...'}
+            placeholder={t('sec.rls.searchTablePh')}
             className={`${inputClasses(styles)} pl-9`}
           />
         </div>

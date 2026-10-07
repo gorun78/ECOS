@@ -101,7 +101,7 @@ export default function AbacPolicyManager({ t, locale, styles }: { t: (k: string
       <div className="flex items-center justify-between">
         <div>
           <h3 className={`text-lg font-bold ${styles.cardText}`}>{t('sec.abac.crud.title')}</h3>
-          <p className={`text-xs ${styles.muted}`}>{locale === 'zh' ? '管理ABAC属性访问控制策略' : 'Manage ABAC attribute-based access control policies'}</p>
+          <p className={`text-xs ${styles.muted}`}>{t('sec.abac.crud.subtitle')}</p>
         </div>
         <button onClick={openCreate} className={`flex items-center gap-1.5 ${btnPrimary(styles)}`}>
           <Plus size={14} />{t('sec.abac.crud.create')}
@@ -111,7 +111,7 @@ export default function AbacPolicyManager({ t, locale, styles }: { t: (k: string
       <form onSubmit={handleSearch} className="flex gap-2">
         <div className="relative flex-1">
           <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${styles.muted}`} />
-          <input type="text" value={searchText} onChange={e => setSearchText(e.target.value)} placeholder={locale === 'zh' ? '搜索策略名...' : 'Search policy name...'} className={`${inputClasses(styles)} pl-9`} />
+          <input type="text" value={searchText} onChange={e => setSearchText(e.target.value)} placeholder={t('sec.abac.crud.searchPh')} className={`${inputClasses(styles)} pl-9`} />
         </div>
         <button type="submit" className={btnSecondary(styles)}>{t('common.search')}</button>
       </form>
