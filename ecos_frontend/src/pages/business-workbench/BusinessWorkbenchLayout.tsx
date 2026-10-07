@@ -10,6 +10,7 @@ import { showToastGlobal } from '../../components/common/Toast';
 import { apiFetch } from '../../api';
 import { CopilotPanel } from '../../components/CopilotPanel';
 import { useTheme } from '../../components/ThemeContext';
+import { BUSINESS_FUNCTIONS_API_PKG } from '../../data/functionsApiPkg';
 
 // Types
 import {
@@ -417,7 +418,7 @@ export default function BusinessWorkbenchLayout({
         description: t('ow.biz.newFunctionDescription'),
         returnType: 'string',
         parameters: [],
-        code: `import { Function } from "@foundry/functions-api";\n\nexport class CustomFunctionClass_${defaultNum} {\n    @Function()\n    public async customFunction${defaultNum}(): Promise<string> {\n        return "Hello World";\n    }\n}`,
+        code: `import { Function } from "${BUSINESS_FUNCTIONS_API_PKG}";\n\nexport class CustomFunctionClass_${defaultNum} {\n    @Function()\n    public async customFunction${defaultNum}(): Promise<string> {\n        return "Hello World";\n    }\n}`,
       };
       updateFunctionTypes([...functionTypes, newFunc]);
       setSelectedCategory('function');

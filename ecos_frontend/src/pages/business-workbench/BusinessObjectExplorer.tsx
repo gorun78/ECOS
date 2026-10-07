@@ -106,8 +106,12 @@ export default function BusinessObjectExplorer({
   const [detailTab, setDetailTab] = useState<'properties' | 'relations' | 'activity'>('properties');
 
   useEffect(() => {
-    if (initialActiveObjectTypeId !== undefined) {
-      setActiveObjectTypeId(initialActiveObjectTypeId);
+    // truthy guard: null (default) and undefined both mean "no pre-selection";
+    // null !== undefined was the old bug — any parent re-render with null cleared user selection.
+    if (initialActiveObjectTypeId) {
+      setActiveObjectTypeId(prev =>
+        prev === initialActiveObjectTypeId ? prev : initialActiveObjectTypeId
+      );
     }
   }, [initialActiveObjectTypeId]);
 

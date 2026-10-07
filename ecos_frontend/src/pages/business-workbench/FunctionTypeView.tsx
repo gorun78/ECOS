@@ -8,6 +8,7 @@ import { FunctionType, FunctionParameter, ObjectType } from '../../types/ontolog
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
+import { BUSINESS_FUNCTIONS_API_PKG } from '../../data/functionsApiPkg';
 
 interface FunctionTypeViewProps {
   func: FunctionType;
@@ -103,7 +104,7 @@ export default function FunctionTypeView({
     const className = func.apiName.charAt(0).toUpperCase() + func.apiName.slice(1) + 'Class';
 
             if (type === 'validation') {
-      codeTemplate = `import { Function } from "@foundry/functions-api";
+      codeTemplate = `import { Function } from "${BUSINESS_FUNCTIONS_API_PKG}";
 import { Aircraft } from "../objects";
 
 export class ${className} {
@@ -125,7 +126,7 @@ export class ${className} {
     }
 }`;
     } else if (type === 'default') {
-      codeTemplate = `import { Function, Integer } from "@foundry/functions-api";
+      codeTemplate = `import { Function, Integer } from "${BUSINESS_FUNCTIONS_API_PKG}";
 
 export class ${className} {
     /**
@@ -142,7 +143,7 @@ export class ${className} {
     }
 }`;
     } else if (type === 'computed') {
-      codeTemplate = `import { Function } from "@foundry/functions-api";
+      codeTemplate = `import { Function } from "${BUSINESS_FUNCTIONS_API_PKG}";
 import { Pilot } from "../objects";
 
 export class ${className} {
@@ -160,7 +161,7 @@ export class ${className} {
     }
 }`;
     } else {
-      codeTemplate = `import { Function, Integer, ObjectSet } from "@foundry/functions-api";
+      codeTemplate = `import { Function, Integer, ObjectSet } from "${BUSINESS_FUNCTIONS_API_PKG}";
 import { Aircraft } from "../objects";
 
 export class ${className} {
