@@ -54,7 +54,7 @@ interface DataLineageProps {
 }
 
 export default function DataLineage({ initialTable }: DataLineageProps = {}) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   // ── 视图模式 ──────────────────────────────────────────
@@ -118,11 +118,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
       })));
       setFromDb(topo.from_db);
       if (topo.total_nodes === 0) {
-        setEmptyHint(
-          locale === "zh"
-            ? "暂无血缘数据。点击「重新生成」从管道任务 SQL 解析血缘，或在「单表查询」中搜索特定表。"
-            : "No lineage data. Click 'Rebuild' to parse from pipeline SQL, or use single-table query."
-        );
+        setEmptyHint(t("dw.lineage.empty"));
       } else {
         setEmptyHint(null);
       }
@@ -132,7 +128,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locale]);
+  }, [t]);
 
   // ── 重新生成血缘（pipelines 全量解析 + 持久化） ───────
   const handleRebuild = useCallback(async () => {
@@ -143,9 +139,10 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
       const stats = await rebuildLineage(0);
       if (stats.total_nodes === 0 && stats.tasks_parsed === 0) {
         setEmptyHint(
-          locale === "zh"
-            ? `扫描了 ${stats.definitions_scanned ?? 0} 个管道定义与 ${stats.tasks_scanned} 个旧管道任务，但没有发现任何 SQL 节点。请在「管道 Builder」中创建至少一个 TRANSFORM_SQL 或 SOURCE_JDBC 节点（config.sql 含 SELECT/INSERT/...），再重新生成血缘。`
-            : `Scanned ${stats.definitions_scanned ?? 0} pipeline definitions + ${stats.tasks_scanned} legacy tasks but found no SQL nodes. Add at least one TRANSFORM_SQL / SOURCE_JDBC node (config.sql) in Pipeline Builder, then Rebuild.`
+          t("dw.lineage.rebuildEmpty", {
+            defs: stats.definitions_scanned ?? 0,
+            tasks: stats.tasks_scanned,
+          })
         );
       }
       await loadTopology();
@@ -155,13 +152,13 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
       setRebuilding(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadTopology, locale]);
+  }, [loadTopology, t]);
 
   // ── 单表查询（实时解析） ─────────────────────────────
   const handleQueryTable = useCallback(async () => {
     const tbl = tableName.trim();
     if (!tbl) {
-      setQueryMsg(locale === "zh" ? "输入表名以查询单表血缘" : "Enter a table name to query lineage");
+      setQueryMsg(t("dw.lineage.enterTable"));
       return;
     }
     setMode("table");
@@ -189,19 +186,18 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
         setNodes([]);
         setEdges([]);
         setEmptyHint(
-          data?.message ||
-          (locale === "zh" ? `未找到表 ${tbl} 的血缘关系` : `No lineage found for table ${tbl}`)
+          data?.message || t("dw.lineage.notFound", { table: tbl })
         );
       }
     } catch (e) {
       setNodes([]);
       setEdges([]);
-      setEmptyHint((e as Error).message || (locale === "zh" ? "查询失败" : "Query failed"));
+      setEmptyHint((e as Error).message || t("dw.lineage.queryFailed"));
     } finally {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableName, locale]);
+  }, [tableName, t]);
 
   // 初次挂载即拉全局拓扑
   useEffect(() => { loadTopology(); }, [loadTopology]);
@@ -288,13 +284,13 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
         <div>
           <h1 className={`text-lg font-bold ${styles.cardText} flex items-center gap-2`}>
             <GitBranch className="text-indigo-600 w-5 h-5" />
-            {locale === "zh" ? "智能数据血缘" : "Data Lineage"}
+            {t("dw.lineage.title")}
           </h1>
           <p className={`text-[11px] ${styles.muted} mt-0.5`}>
-            {nodes.length} {locale === "zh" ? "节点" : "nodes"} · {edges.length} {locale === "zh" ? "边" : "edges"}
+            {nodes.length} {t("dw.lineage.nodes")} · {edges.length} {t("dw.lineage.edges")}
             {fromDb !== undefined && mode === "topology" && (
               <span className={fromDb ? " text-emerald-500" : " text-amber-500"}>
-                {" "}· {fromDb ? (locale === "zh" ? "已持久化" : "persisted") : (locale === "zh" ? "实时" : "live")}
+                {" "}· {fromDb ? t("dw.lineage.persisted") : t("dw.lineage.live")}
               </span>
             )}
           </p>
@@ -305,13 +301,13 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
             <button onClick={() => switchMode("topology")} className={tabClass(mode === "topology")}>
               <span className="inline-flex items-center gap-1">
                 <Package className="w-3 h-3" />
-                {locale === "zh" ? "全局拓扑" : "Topology"}
+                {t("dw.lineage.topology")}
               </span>
             </button>
             <button onClick={() => switchMode("table")} className={tabClass(mode === "table")}>
               <span className="inline-flex items-center gap-1">
                 <Table2 className="w-3 h-3" />
-                {locale === "zh" ? "单表查询" : "Table Query"}
+                {t("dw.lineage.tableQuery")}
               </span>
             </button>
           </div>
@@ -330,8 +326,8 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                 <Wand2 className="w-3.5 h-3.5" />
               )}
               {rebuilding
-                ? (locale === "zh" ? "重建中..." : "Rebuilding...")
-                : (locale === "zh" ? "重新生成" : "Rebuild")}
+                ? t("dw.lineage.rebuilding")
+                : t("dw.lineage.rebuild")}
             </button>
           )}
 
@@ -341,7 +337,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
               <input
                 type="text"
                 className={`bg-transparent outline-none text-[11px] border rounded px-2 py-1 w-40 ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
-                placeholder={locale === "zh" ? "输入表名 (如 raw_orders)" : "Table name"}
+                placeholder={t("dw.lineage.tablePH")}
                 value={tableName}
                 onChange={e => setTableName(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleQueryTable()}
@@ -353,7 +349,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                 style={{ borderColor: styles.cardBorder, color: styles.cardText }}
               >
                 <Search className="w-3.5 h-3.5" />
-                {locale === "zh" ? "查询" : "Query"}
+                {t("dw.lineage.query")}
               </button>
             </>
           )}
@@ -364,7 +360,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
             <input
               type="text"
               className={`bg-transparent outline-none text-[11px] ${styles.inputText} w-28`}
-              placeholder={locale === "zh" ? "搜索节点..." : "Search..."}
+              placeholder={t("dw.lineage.searchPH")}
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -374,7 +370,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
           <button
             onClick={() => (mode === "topology" ? loadTopology() : handleQueryTable())}
             className="p-1.5 rounded hover:opacity-70 transition"
-            title={locale === "zh" ? "刷新" : "Refresh"}
+            title={t("dw.lineage.refresh")}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${styles.muted} ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -408,7 +404,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
               className="px-2 py-0.5 rounded border text-[10px] font-semibold transition disabled:opacity-40"
               style={{ borderColor: styles.cardBorder, color: styles.cardText }}
             >
-              {rebuilding ? (locale === "zh" ? "重建中..." : "Rebuilding...") : (locale === "zh" ? "重新生成" : "Rebuild now")}
+              {rebuilding ? t("dw.lineage.rebuilding") : t("dw.lineage.rebuildNow")}
             </button>
           )}
         </div>
@@ -438,13 +434,13 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
           <div className={`w-full lg:w-[320px] ${styles.cardBg} border-l ${styles.cardBorder} p-4 overflow-y-auto shrink-0 shadow-lg`}>
             <div className="flex items-center justify-between mb-4">
               <h3 className={`text-sm font-bold ${styles.cardText}`}>
-                {locale === "zh" ? "节点详情" : "Node Detail"}
+                {t("dw.lineage.nodeDetail")}
               </h3>
               <button
                 onClick={() => { setSelectedNodeId(null); setSelectedEdge(null); }}
                 className={`text-[11px] ${styles.muted} hover:opacity-80 transition`}
               >
-                {locale === "zh" ? "关闭" : "Close"}
+                {t("dw.lineage.close")}
               </button>
             </div>
 
@@ -455,13 +451,13 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
               </div>
               <div>
                 <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block`}>
-                  {locale === "zh" ? "名称" : "Name"}
+                  {t("dw.lineage.name")}
                 </span>
                 <span className={`font-semibold ${styles.cardText}`}>{selectedNode.label}</span>
               </div>
               <div>
                 <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block`}>
-                  {locale === "zh" ? "类型" : "Type"}
+                  {t("dw.lineage.type")}
                 </span>
                 <span className={`px-2 py-0.5 rounded-full ${styles.badgeBg} ${styles.badgeText} text-[10px] font-semibold`}>
                   {selectedNode.type}
@@ -472,7 +468,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
               {selectedNode.fields?.length > 0 && (
                 <div className={`pt-2 border-t ${styles.divider}`}>
                   <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block mb-2`}>
-                    {locale === "zh" ? "字段列表" : "Fields"} ({selectedNode.fields.length})
+                    {t("dw.lineage.fields")} ({selectedNode.fields.length})
                   </span>
                   <div className="space-y-1 max-h-40 overflow-y-auto">
                     {selectedNode.fields.map((f: any, i: number) => (
@@ -488,11 +484,11 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
               {/* 上下游关系 */}
               <div className={`pt-3 border-t ${styles.divider}`}>
                 <span className={`text-[10px] ${styles.muted} uppercase tracking-wider block mb-2`}>
-                  {locale === "zh" ? "上下游关系" : "Up/Downstream"} ({relatedEdges.length})
+                  {t("dw.lineage.upDown")} ({relatedEdges.length})
                 </span>
                 {relatedEdges.length === 0 ? (
                   <div className={`text-[10px] ${styles.muted}`}>
-                    {locale === "zh" ? "无关联血缘" : "No related edges"}
+                    {t("dw.lineage.noRelated")}
                   </div>
                 ) : (
                   <div className="space-y-1.5 max-h-60 overflow-y-auto">
@@ -529,7 +525,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
               {selectedEdge?.transform && (
                 <div className={`pt-3 border-t ${styles.divider}`}>
                   <span className={`text-[10px] text-blue-600 uppercase tracking-wider block mb-1`}>
-                    {locale === "zh" ? "变换 / SQL" : "Transform / SQL"}
+                    {t("dw.lineage.transform")}
                   </span>
                   <pre className={`text-[10px] ${styles.cardTextMuted} ${styles.appBg} rounded p-2 whitespace-pre-wrap break-all font-mono`}>
                     {selectedEdge.transform}
@@ -541,7 +537,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
               <div className={`pt-3 border-t ${styles.divider}`}>
                 <div className="flex items-center justify-between mb-2">
                   <span className={`text-[10px] uppercase tracking-wider font-semibold ${styles.muted}`}>
-                    {locale === "zh" ? "影响度分析" : "Impact Analysis"}
+                    {t("dw.lineage.impact")}
                   </span>
                   {impactLoading && (
                     <RefreshCw className={`w-3 h-3 ${styles.muted} animate-spin`} />
@@ -551,7 +547,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                 {/* 层数选择 */}
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`text-[10px] ${styles.muted}`}>
-                    {locale === "zh" ? "追溯层数" : "Depth"}
+                    {t("dw.lineage.depth")}
                   </span>
                   <select
                     value={impactDepth}
@@ -563,7 +559,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                     ))}
                   </select>
                   <span className={`text-[10px] ${styles.muted}`}>
-                    ({selectedNodeId ? (impactData ? (impactData.matched ? (locale === "zh" ? "已匹配" : "matched") : (locale === "zh" ? "节点未命中" : "not matched")) : (locale === "zh" ? "加载中..." : "loading...")) : (locale === "zh" ? "未选择节点" : "no node")})
+                    ({selectedNodeId ? (impactData ? (impactData.matched ? t("dw.lineage.matched") : t("dw.lineage.notMatched")) : t("dw.lineage.loading")) : t("dw.lineage.noNode")})
                   </span>
                 </div>
 
@@ -572,8 +568,8 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                   <div className={`flex items-center justify-between mb-3 px-2 py-1.5 rounded-lg border ${styles.appBg} ${focusMode ? styles.accentBorder : styles.cardBorder}`}>
                     <span className={`text-[10px] ${focusMode ? "text-indigo-600 font-semibold" : styles.muted}`}>
                       {focusMode
-                        ? (locale === "zh" ? `已聚焦 ${impactDepth} 层子图` : `Focused: ${impactDepth}-hop subgraph`)
-                        : (locale === "zh" ? "仅看 N 层" : "Focus N hops")}
+                        ? t("dw.lineage.focused", { n: impactDepth })
+                        : t("dw.lineage.focus")}
                     </span>
                     <button
                       onClick={() => setFocusMode(v => !v)}
@@ -581,8 +577,8 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                         focusMode ? styles.accentBg : styles.appBg
                       }`}
                       title={focusMode
-                        ? (locale === "zh" ? "切回全量" : "Show all")
-                        : (locale === "zh" ? "只看 N 层" : "Focus N hops")}
+                        ? t("dw.lineage.showAll")
+                        : t("dw.lineage.focusToggle")}
                     >
                       <span className={`inline-block h-3 w-3 rounded-full bg-white transition transform ${
                         focusMode ? "translate-x-3.5" : "translate-x-0.5"
@@ -624,13 +620,13 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                     <div className="space-y-2 max-h-60 overflow-y-auto">
                       {impactData.downstream.length === 0 && impactData.upstream.length === 0 && (
                         <div className={`text-[10px] ${styles.muted}`}>
-                          {locale === "zh" ? "该节点在 N 层内无可达节点（无血缘边）" : "No reachable nodes within N hops"}
+                          {t("dw.lineage.noReachable")}
                         </div>
                       )}
                       {impactData.downstream.length > 0 && (
                         <div>
                           <div className={`text-[9px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1`}>
-                            ↓ {locale === "zh" ? "下游 N 层可达" : "Downstream"} ({impactData.downstream.length})
+                            ↓ {t("dw.lineage.downstream")} ({impactData.downstream.length})
                           </div>
                           {impactData.downstream.slice(0, 20).map((n, i) => (
                             <button
@@ -647,7 +643,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                           ))}
                           {impactData.downstream.length > 20 && (
                             <div className={`text-[9px] ${styles.muted} px-1 mt-0.5`}>
-                              {locale === "zh" ? `还有 ${impactData.downstream.length - 20} 个...` : `+${impactData.downstream.length - 20} more...`}
+                              {t("dw.lineage.more", { n: impactData.downstream.length - 20 })}
                             </div>
                           )}
                         </div>
@@ -655,7 +651,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                       {impactData.upstream.length > 0 && (
                         <div>
                           <div className={`text-[9px] font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400 mb-1`}>
-                            ↑ {locale === "zh" ? "上游 N 层可达" : "Upstream"} ({impactData.upstream.length})
+                            ↑ {t("dw.lineage.upstream")} ({impactData.upstream.length})
                           </div>
                           {impactData.upstream.slice(0, 20).map((n, i) => (
                             <button
@@ -672,7 +668,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                           ))}
                           {impactData.upstream.length > 20 && (
                             <div className={`text-[9px] ${styles.muted} px-1 mt-0.5`}>
-                              {locale === "zh" ? `还有 ${impactData.upstream.length - 20} 个...` : `+${impactData.upstream.length - 20} more...`}
+                              {t("dw.lineage.more", { n: impactData.upstream.length - 20 })}
                             </div>
                           )}
                         </div>
