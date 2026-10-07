@@ -30,7 +30,7 @@ export function QuotaTab({
   quotaError,
   setEditQuota,
 }: QuotaTabProps) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   return (
@@ -40,14 +40,14 @@ export function QuotaTab({
         <div className="flex items-center gap-3">
           <Building className={`w-4 h-4 ${styles.cardTextMuted}`} />
           <span className={`text-xs font-medium ${styles.cardTextMuted}`}>
-            {locale === "zh" ? "选择租户" : "Select Tenant"}:
+            {t("platform.tenant.quota.selectTenant")}:
           </span>
           <select
             value={selectedTenantId ?? ""}
             onChange={(e) => setSelectedTenantId(e.target.value ? Number(e.target.value) : null)}
             className={`px-3 py-1.5 rounded text-xs border min-w-[220px] ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
           >
-            <option value="">{locale === "zh" ? "— 请选择 —" : "— Select —"}</option>
+            <option value="">{t("platform.tenant.common.select")}</option>
             {tenants.map((t) => (
               <option key={t.id} value={t.id}>{t.tenantName} (#{t.id})</option>
             ))}
@@ -62,29 +62,29 @@ export function QuotaTab({
       {!selectedTenantId ? (
         <div className={`rounded-lg border p-8 text-center ${styles.cardBg} ${styles.cardBorder}`}>
           <Gauge className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
-          <p className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "请先选择租户" : "Select a tenant first"}</p>
+          <p className={`text-xs ${styles.cardTextMuted}`}>{t("platform.tenant.quota.selectHint")}</p>
         </div>
       ) : loadingQuotas ? (
         <div className="flex items-center gap-2 p-4">
           <RefreshCw className={`w-4 h-4 animate-spin ${styles.cardTextMuted}`} />
-          <span className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "加载配额…" : "Loading quotas…"}</span>
+          <span className={`text-xs ${styles.cardTextMuted}`}>{t("platform.tenant.quota.loading")}</span>
         </div>
       ) : quotas.length === 0 ? (
         <div className={`rounded-lg border p-8 text-center ${styles.cardBg} ${styles.cardBorder}`}>
           <AlertTriangle className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
-          <p className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "该租户暂无配额数据" : "No quota data"}</p>
+          <p className={`text-xs ${styles.cardTextMuted}`}>{t("platform.tenant.quota.empty")}</p>
         </div>
       ) : (
         <div className={`rounded-lg border overflow-hidden ${styles.cardBg} ${styles.cardBorder} overflow-x-auto md:overflow-visible`}>
           <table className="w-full text-xs">
             <thead>
               <tr className={`border-b ${styles.cardBorder} opacity-60`}>
-                <th className="text-left px-4 py-2.5 font-medium">{locale === "zh" ? "配额类型" : "Quota Type"}</th>
-                <th className="text-right px-4 py-2.5 font-medium">{locale === "zh" ? "日限额" : "Daily Limit"}</th>
-                <th className="text-right px-4 py-2.5 font-medium">{locale === "zh" ? "月限额" : "Monthly Limit"}</th>
-                <th className="text-right px-4 py-2.5 font-medium">{locale === "zh" ? "已用量" : "Used"}</th>
-                <th className="text-center px-4 py-2.5 font-medium">{locale === "zh" ? "使用率" : "Usage %"}</th>
-                <th className="text-center px-4 py-2.5 font-medium">{locale === "zh" ? "操作" : "Action"}</th>
+                <th className="text-left px-4 py-2.5 font-medium">{t("platform.tenant.quota.typeCol")}</th>
+                <th className="text-right px-4 py-2.5 font-medium">{t("platform.tenant.quota.dailyLimitCol")}</th>
+                <th className="text-right px-4 py-2.5 font-medium">{t("platform.tenant.quota.monthlyLimitCol")}</th>
+                <th className="text-right px-4 py-2.5 font-medium">{t("platform.tenant.quota.usedCol")}</th>
+                <th className="text-center px-4 py-2.5 font-medium">{t("platform.tenant.quota.usagePctCol")}</th>
+                <th className="text-center px-4 py-2.5 font-medium">{t("platform.tenant.quota.actionCol")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -111,7 +111,7 @@ export function QuotaTab({
                         className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border transition-colors ${styles.cardBorder} hover:bg-white/5`}
                       >
                         <Edit3 className="w-3 h-3" />
-                        {locale === "zh" ? "编辑" : "Edit"}
+                        {t("platform.tenant.mgmt.edit")}
                       </button>
                     </td>
                   </tr>

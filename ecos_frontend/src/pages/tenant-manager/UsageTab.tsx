@@ -33,7 +33,7 @@ export function UsageTab({
   loadingUsage,
   usageChartGroups,
 }: UsageTabProps) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   return (
@@ -44,28 +44,28 @@ export function UsageTab({
           <div className="flex items-center gap-2">
             <Building className={`w-4 h-4 ${styles.cardTextMuted}`} />
             <span className={`text-xs font-medium ${styles.cardTextMuted}`}>
-              {locale === "zh" ? "租户" : "Tenant"}:
+              {t("platform.tenant.invoice.tenant")}:
             </span>
             <select
               value={selectedTenantId ?? ""}
               onChange={(e) => setSelectedTenantId(e.target.value ? Number(e.target.value) : null)}
               className={`px-3 py-1.5 rounded text-xs border min-w-[180px] ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
             >
-              <option value="">{locale === "zh" ? "— 请选择 —" : "— Select —"}</option>
+              <option value="">{t("platform.tenant.common.select")}</option>
               {tenants.map((t) => (
                 <option key={t.id} value={t.id}>{t.tenantName} (#{t.id})</option>
               ))}
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "范围" : "Range"}:</span>
+            <span className={`text-xs ${styles.cardTextMuted}`}>{t("platform.tenant.usage.range")}:</span>
             <select
               value={usageRange}
               onChange={(e) => setUsageRange(e.target.value)}
               className={`px-3 py-1.5 rounded text-xs border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
             >
               {RANGE_OPTIONS.map((r) => (
-                <option key={r.value} value={r.value}>{locale === "zh" ? r.label : r.labelEn}</option>
+                <option key={r.value} value={r.value}>{t(`platform.tenant.range.${r.value}`)}</option>
               ))}
             </select>
           </div>
@@ -79,17 +79,17 @@ export function UsageTab({
       {!selectedTenantId ? (
         <div className={`rounded-lg border p-8 text-center ${styles.cardBg} ${styles.cardBorder}`}>
           <BarChart3 className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
-          <p className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "请先选择租户" : "Select a tenant first"}</p>
+          <p className={`text-xs ${styles.cardTextMuted}`}>{t("platform.tenant.invoice.selectHint")}</p>
         </div>
       ) : loadingUsage ? (
         <div className="flex items-center gap-2 p-4">
           <RefreshCw className={`w-4 h-4 animate-spin ${styles.cardTextMuted}`} />
-          <span className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "加载用量…" : "Loading usage…"}</span>
+          <span className={`text-xs ${styles.cardTextMuted}`}>{t("platform.tenant.usage.loading")}</span>
         </div>
       ) : Object.keys(usageChartGroups).length === 0 ? (
         <div className={`rounded-lg border p-8 text-center ${styles.cardBg} ${styles.cardBorder}`}>
           <AlertTriangle className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
-          <p className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "暂无用量数据" : "No usage data"}</p>
+          <p className={`text-xs ${styles.cardTextMuted}`}>{t("platform.tenant.usage.empty")}</p>
         </div>
       ) : (
         <div className="space-y-4">

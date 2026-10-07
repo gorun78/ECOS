@@ -34,7 +34,7 @@ export function InvoiceTab({
   loadingInvoice,
   invoice,
 }: InvoiceTabProps) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   return (
@@ -45,21 +45,21 @@ export function InvoiceTab({
           <div className="flex items-center gap-2">
             <Building className={`w-4 h-4 ${styles.cardTextMuted}`} />
             <span className={`text-xs font-medium ${styles.cardTextMuted}`}>
-              {locale === "zh" ? "租户" : "Tenant"}:
+              {t("platform.tenant.invoice.tenant")}:
             </span>
             <select
               value={selectedTenantId ?? ""}
               onChange={(e) => setSelectedTenantId(e.target.value ? Number(e.target.value) : null)}
               className={`px-3 py-1.5 rounded text-xs border min-w-[180px] ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
             >
-              <option value="">{locale === "zh" ? "— 请选择 —" : "— Select —"}</option>
+              <option value="">{t("platform.tenant.common.select")}</option>
               {tenants.map((t) => (
                 <option key={t.id} value={t.id}>{t.tenantName} (#{t.id})</option>
               ))}
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "月份" : "Month"}:</span>
+            <span className={`text-xs ${styles.cardTextMuted}`}>{t("platform.tenant.invoice.month")}:</span>
             <select
               value={invoiceMonth}
               onChange={(e) => setInvoiceMonth(e.target.value)}
@@ -78,17 +78,17 @@ export function InvoiceTab({
       {!selectedTenantId ? (
         <div className={`rounded-lg border p-8 text-center ${styles.cardBg} ${styles.cardBorder}`}>
           <Receipt className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
-          <p className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "请先选择租户" : "Select a tenant first"}</p>
+          <p className={`text-xs ${styles.cardTextMuted}`}>{t("platform.tenant.invoice.selectHint")}</p>
         </div>
       ) : loadingInvoice ? (
         <div className="flex items-center gap-2 p-4">
           <RefreshCw className={`w-4 h-4 animate-spin ${styles.cardTextMuted}`} />
-          <span className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "加载账单…" : "Loading invoice…"}</span>
+          <span className={`text-xs ${styles.cardTextMuted}`}>{t("platform.tenant.invoice.loading")}</span>
         </div>
       ) : !invoice ? (
         <div className={`rounded-lg border p-8 text-center ${styles.cardBg} ${styles.cardBorder}`}>
           <Receipt className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
-          <p className={`text-xs ${styles.cardTextMuted}`}>{locale === "zh" ? "该月份暂无账单" : "No invoice for this month"}</p>
+          <p className={`text-xs ${styles.cardTextMuted}`}>{t("platform.tenant.invoice.empty")}</p>
         </div>
       ) : (
         <>
@@ -96,10 +96,10 @@ export function InvoiceTab({
             <table className="w-full text-xs">
               <thead>
                 <tr className={`border-b ${styles.cardBorder} opacity-60`}>
-                  <th className="text-left px-4 py-2.5 font-medium">{locale === "zh" ? "项目" : "Item"}</th>
-                  <th className="text-right px-4 py-2.5 font-medium">{locale === "zh" ? "用量" : "Usage"}</th>
-                  <th className="text-right px-4 py-2.5 font-medium">{locale === "zh" ? "单价" : "Unit Price"}</th>
-                  <th className="text-right px-4 py-2.5 font-medium">{locale === "zh" ? "费用" : "Cost"}</th>
+                  <th className="text-left px-4 py-2.5 font-medium">{t("platform.tenant.invoice.itemCol")}</th>
+                  <th className="text-right px-4 py-2.5 font-medium">{t("platform.tenant.invoice.usageCol")}</th>
+                  <th className="text-right px-4 py-2.5 font-medium">{t("platform.tenant.invoice.unitPriceCol")}</th>
+                  <th className="text-right px-4 py-2.5 font-medium">{t("platform.tenant.invoice.costCol")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -113,13 +113,13 @@ export function InvoiceTab({
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={4} className="px-4 py-8 text-center opacity-60">{locale === "zh" ? "暂无账单明细" : "No line items"}</td></tr>
+                  <tr><td colSpan={4} className="px-4 py-8 text-center opacity-60">{t("platform.tenant.invoice.noLineItems")}</td></tr>
                 )}
               </tbody>
             </table>
           </div>
           <div className={`rounded-lg border p-4 flex items-center justify-between ${styles.cardBg} ${styles.cardBorder}`}>
-            <span className={`text-sm font-semibold ${styles.cardText}`}>{locale === "zh" ? "合计费用" : "Total Cost"}</span>
+            <span className={`text-sm font-semibold ${styles.cardText}`}>{t("platform.tenant.invoice.totalCost")}</span>
             <span className={`text-lg font-bold ${styles.accentText}`}>{invoice.total_cost_display}</span>
           </div>
         </>

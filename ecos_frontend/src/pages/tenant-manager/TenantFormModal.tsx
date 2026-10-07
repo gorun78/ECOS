@@ -20,7 +20,7 @@ export interface TenantFormModalProps {
 }
 
 export function TenantFormModal({ mode, tenant, onSave, onClose }: TenantFormModalProps) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
   const [tenantName, setTenantName] = useState(tenant?.tenantName ?? "");
   const [tenantCode, setTenantCode] = useState(tenant?.tenantCode ?? "");
@@ -34,7 +34,7 @@ export function TenantFormModal({ mode, tenant, onSave, onClose }: TenantFormMod
 
   const handleSave = async () => {
     if (!tenantName.trim()) {
-      setError(locale === "zh" ? "租户名称不能为空" : "Tenant name is required");
+      setError(t("platform.tenant.form.nameRequired"));
       return;
     }
     setSaving(true);
@@ -63,8 +63,8 @@ export function TenantFormModal({ mode, tenant, onSave, onClose }: TenantFormMod
         <div className="flex items-center justify-between mb-4">
           <h3 className={`text-sm font-semibold ${styles.cardText}`}>
             {mode === "create"
-              ? locale === "zh" ? "新建租户" : "Create Tenant"
-              : locale === "zh" ? "编辑租户" : "Edit Tenant"}
+              ? t("platform.tenant.form.create")
+              : t("platform.tenant.form.edit")}
           </h3>
           <button onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
         </div>
@@ -76,45 +76,45 @@ export function TenantFormModal({ mode, tenant, onSave, onClose }: TenantFormMod
         <div className="space-y-3 max-h-[60vh] overflow-y-auto">
           <div>
             <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
-              {locale === "zh" ? "租户名称 *" : "Tenant Name *"}
+              {t("platform.tenant.form.nameLabel")}
             </label>
             <input
               value={tenantName}
               onChange={(e) => setTenantName(e.target.value)}
               className={`w-full px-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
-              placeholder={locale === "zh" ? "例如：Acme Corp" : "e.g. Acme Corp"}
+              placeholder={t("platform.tenant.form.namePh")}
             />
           </div>
           <div>
             <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
-              {locale === "zh" ? "租户编码" : "Tenant Code"}
+              {t("platform.tenant.form.codeLabel")}
             </label>
             <input
               value={tenantCode}
               onChange={(e) => setTenantCode(e.target.value)}
               className={`w-full px-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
               disabled={mode === "edit"}
-              placeholder={locale === "zh" ? "例如：acme" : "e.g. acme"}
+              placeholder={t("platform.tenant.form.codePh")}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
-                {locale === "zh" ? "状态" : "Status"}
+                {t("platform.tenant.form.statusLabel")}
               </label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 className={`w-full px-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
               >
-                <option value="ACTIVE">{locale === "zh" ? "活跃" : "Active"}</option>
-                <option value="SUSPENDED">{locale === "zh" ? "已暂停" : "Suspended"}</option>
-                <option value="DELETED">{locale === "zh" ? "已删除" : "Deleted"}</option>
+                <option value="ACTIVE">{t("platform.tenant.status.ACTIVE")}</option>
+                <option value="SUSPENDED">{t("platform.tenant.status.SUSPENDED")}</option>
+                <option value="DELETED">{t("platform.tenant.status.DELETED")}</option>
               </select>
             </div>
             <div>
               <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
-                {locale === "zh" ? "隔离模式" : "Isolation Mode"}
+                {t("platform.tenant.form.isolationLabel")}
               </label>
               <select
                 value={isolationMode}
@@ -130,7 +130,7 @@ export function TenantFormModal({ mode, tenant, onSave, onClose }: TenantFormMod
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
-                {locale === "zh" ? "最大用户数" : "Max Users"}
+                {t("platform.tenant.form.maxUsersLabel")}
               </label>
               <input
                 type="number"
@@ -142,7 +142,7 @@ export function TenantFormModal({ mode, tenant, onSave, onClose }: TenantFormMod
             </div>
             <div>
               <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
-                {locale === "zh" ? "最大存储(MB)" : "Max Storage(MB)"}
+                {t("platform.tenant.form.maxStorageLabel")}
               </label>
               <input
                 type="number"
@@ -154,7 +154,7 @@ export function TenantFormModal({ mode, tenant, onSave, onClose }: TenantFormMod
             </div>
             <div>
               <label className={`block text-xs mb-1 ${styles.cardTextMuted}`}>
-                {locale === "zh" ? "日API限额" : "API/Day"}
+                {t("platform.tenant.form.apiDayLabel")}
               </label>
               <input
                 type="number"
@@ -169,7 +169,7 @@ export function TenantFormModal({ mode, tenant, onSave, onClose }: TenantFormMod
 
         <div className="flex justify-end gap-2 mt-4">
           <button onClick={onClose} className={`px-4 py-2 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>
-            {locale === "zh" ? "取消" : "Cancel"}
+            {t("platform.tenant.common.cancel")}
           </button>
           <button
             onClick={handleSave}
@@ -177,7 +177,7 @@ export function TenantFormModal({ mode, tenant, onSave, onClose }: TenantFormMod
             className={`px-4 py-2 rounded text-xs font-medium text-white flex items-center gap-1.5 ${styles.accentBg} ${styles.accentHover}`}
           >
             <Check className="w-3.5 h-3.5" />
-            {saving ? (locale === "zh" ? "保存中…" : "Saving…") : (locale === "zh" ? "保存" : "Save")}
+            {saving ? t("platform.tenant.common.saving") : t("platform.tenant.common.save")}
           </button>
         </div>
       </div>
