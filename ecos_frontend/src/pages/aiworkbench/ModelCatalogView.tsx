@@ -251,7 +251,7 @@ export default function ModelCatalogView({
             <div className={`w-56 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col h-full shrink-0`}>
               <div className={`p-3 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between`}>
                 <span className={`font-bold ${styles.cardText}`}>{t('aiworkbench.model.catalogTitle')} ({models.length})</span>
-                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 font-bold rounded text-[9px] uppercase">SECURE</span>
+                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 font-bold rounded text-[9px] uppercase">{t('aiworkbench.model.secureBadge')}</span>
               </div>
 
               <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
@@ -341,7 +341,7 @@ export default function ModelCatalogView({
                         </span>
                         <h3 className={`text-xs font-bold ${styles.cardText}`}>{t('aiworkbench.model.evaluationSandbox')}</h3>
                       </div>
-                      <span className={`text-[9px] ${styles.cardTextMuted} font-bold ${styles.appBg} px-2 py-0.5 rounded uppercase`}>PROMPT DEBUGGER</span>
+                      <span className={`text-[9px] ${styles.cardTextMuted} font-bold ${styles.appBg} px-2 py-0.5 rounded uppercase`}>{t('aiworkbench.model.promptDebugger')}</span>
                     </div>
 
                     {/* Prompt Textarea */}
@@ -380,7 +380,7 @@ export default function ModelCatalogView({
                     {evalResults.length > 0 && (
                       <>
                         <div className={`flex items-center gap-2 text-[10px] mt-2 ${styles.cardTextMuted}`}>
-                          <span className={`px-1.5 py-0.5 rounded font-bold uppercase ${styles.warningBg} ${styles.warningText}`}>Demo Sample</span>
+                          <span className={`px-1.5 py-0.5 rounded font-bold uppercase ${styles.warningBg} ${styles.warningText}`}>{t('aiworkbench.model.demoSample')}</span>
                           <span>{t('aiworkbench.model.evalDemoHint')}</span>
                         </div>
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2">
@@ -390,13 +390,13 @@ export default function ModelCatalogView({
                             {/* Grid header */}
                             <div className={`px-3 py-2 border-b ${styles.cardBorder} ${styles.appBg} flex items-center justify-between`}>
                               <span className={`font-bold ${styles.cardText} text-[11px]`}>{res.displayName}</span>
-                              <span className={`px-1.5 py-0.5 ${styles.badgeBg} ${styles.accentText} ${styles.accentBorder} border rounded text-[9px] font-mono font-bold`}>ALLOW</span>
+                              <span className={`px-1.5 py-0.5 ${styles.badgeBg} ${styles.accentText} ${styles.accentBorder} border rounded text-[9px] font-mono font-bold`}>{t('aiworkbench.model.allowBadge')}</span>
                             </div>
 
                             {/* Performance metrics tag */}
                             <div className={`p-2 border-b ${styles.cardBorder} ${styles.appBg} flex items-center justify-between font-mono text-[9px] ${styles.cardTextMuted}`}>
                               <span>{t('aiworkbench.model.responseLabel')}: {res.latencyMs}ms</span>
-                              <span>Token: {res.tokensUsed}T</span>
+                              <span>{t('aiworkbench.model.tokenLabel')}: {res.tokensUsed}T</span>
                               <span className="text-emerald-600 font-bold">{res.cost}</span>
                             </div>
 
