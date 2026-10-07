@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import type { Goal, Scenario } from "../../../types";
 import EmptyState from "../EmptyState";
+import { useLanguage } from "../../../components/LanguageContext";
 
 export interface ScenariosTabProps {
   scenarios: Scenario[];
@@ -24,11 +25,12 @@ export default function ScenariosTab({
   scenarios, goals, loading, locale, styles,
   openDlg, handleDelete, compareIds, setCompareIds, doCompare, compareResult,
 }: ScenariosTabProps) {
+  const { t } = useLanguage();
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex items-center gap-2 mb-4 shrink-0 flex-wrap">
         <span className="text-sm font-semibold opacity-80">
-          {locale === "zh" ? "情景规划" : "Scenarios"} ({scenarios.length})
+          {t("platform.wm.scenario.title")} ({scenarios.length})
         </span>
         <button
           onClick={() => openDlg("scenarios")}
@@ -36,7 +38,7 @@ export default function ScenariosTab({
             ${styles.accentBg} ${styles.accentHover} text-white`}
         >
           <Plus className="w-3.5 h-3.5" />
-          {locale === "zh" ? "新建情景" : "New Scenario"}
+          {t("platform.wm.scenario.new")}
         </button>
         <button
           onClick={doCompare}
@@ -44,13 +46,13 @@ export default function ScenariosTab({
           className={`px-2.5 py-1.5 rounded border text-xs font-medium transition-all
             ${styles.cardBorder} ${styles.cardBg} hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed`}
         >
-          {locale === "zh" ? "对比" : "Compare"} ({compareIds.length})
+          {t("platform.wm.scenario.compare")} ({compareIds.length})
         </button>
       </div>
 
       <div className="flex-1 overflow-auto">
         {scenarios.length === 0 && !loading ? (
-          <EmptyState icon={GitBranch} msg={locale === "zh" ? "暂无情景规划" : "No scenarios yet"} />
+          <EmptyState icon={GitBranch} msg={t("platform.wm.scenario.empty")} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {scenarios.map((sc) => {
@@ -74,12 +76,12 @@ export default function ScenariosTab({
                     {sc.description || "—"}
                   </p>
                   <div className="flex items-center gap-3 text-[11px] opacity-60 mb-3">
-                    <span>{locale === "zh" ? "概率" : "Prob"}: {Math.round((sc.probability || 0) * 100)}%</span>
-                    <span>{locale === "zh" ? "影响分" : "Impact"}: {sc.impactScore ?? "—"}</span>
+                    <span>{t("platform.wm.scenario.prob")}: {Math.round((sc.probability || 0) * 100)}%</span>
+                    <span>{t("platform.wm.scenario.impact")}: {sc.impactScore ?? "—"}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className={sel ? "text-indigo-400" : "opacity-30"}>
-                      {sel ? (locale === "zh" ? "✓ 已选" : "✓ Selected") : (locale === "zh" ? "点击选择" : "Click to select")}
+                      {sel ? t("platform.wm.scenario.selected") : t("platform.wm.scenario.clickToSelect")}
                     </span>
                     <div className="flex gap-1">
                       <button onClick={(e) => { e.stopPropagation(); openDlg("scenarios", sc); }}
@@ -101,13 +103,13 @@ export default function ScenariosTab({
         {/* Compare result */}
         {compareResult && (
           <div className={`mt-4 border rounded-lg p-4 ${styles.cardBorder} ${styles.cardBg}`}>
-            <h3 className="text-sm font-bold mb-3">{locale === "zh" ? "📊 情景对比" : "Scenario Comparison"}</h3>
+            <h3 className="text-sm font-bold mb-3">{t("platform.wm.scenario.comparison")}</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className={`border-b ${styles.cardBorder} text-left`}>
                     <th className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider opacity-60">
-                      {locale === "zh" ? "目标" : "Goal"}
+                      {t("platform.wm.scenario.goal")}
                     </th>
                     {compareResult.scenarios?.map((sc: any, i: number) => (
                       <th key={i} className="px-3 py-2 font-mono text-[10px] uppercase tracking-wider opacity-60">

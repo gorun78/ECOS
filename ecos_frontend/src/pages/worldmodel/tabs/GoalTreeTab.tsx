@@ -7,6 +7,7 @@ import type { Goal } from "../../../types";
 import GoalTreeNode from "../GoalTreeNode";
 import EmptyState from "../EmptyState";
 import { computeProgress, trafficBg, getGoalTypeConfig } from "../helpers";
+import { useLanguage } from "../../../components/LanguageContext";
 
 export interface GoalTreeTabProps {
   topLevelGoals: Goal[];
@@ -29,12 +30,13 @@ export default function GoalTreeTab({
   expandedIds, toggleExpand, setSelectedGoal, selectedGoal,
   openDlg, handleDelete, expandAll, collapseAll,
 }: GoalTreeTabProps) {
+  const { t } = useLanguage();
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Toolbar */}
       <div className="flex items-center gap-2 mb-4 shrink-0 flex-wrap">
         <span className="text-sm font-semibold opacity-80">
-          {locale === "zh" ? "目标金字塔" : "Goal Pyramid"} ({topLevelGoals.length})
+          {t("platform.wm.goal.pyramid")} ({topLevelGoals.length})
         </span>
 
         <button
@@ -43,22 +45,22 @@ export default function GoalTreeTab({
             ${styles.accentBg} ${styles.accentHover} text-white`}
         >
           <Plus className="w-3.5 h-3.5" />
-          {locale === "zh" ? "新建目标" : "New Goal"}
+          {t("platform.wm.goal.newGoal")}
         </button>
 
         <div className="flex-1" />
 
         <button onClick={expandAll}
           className={`px-2 py-1 rounded border text-[11px] transition-all ${styles.cardBorder} ${styles.cardBg} hover:opacity-80`}
-          title={locale === "zh" ? "展开全部" : "Expand All"}>
+          title={t("platform.wm.goal.expandAll")}>
           <Maximize2 className="w-3 h-3 inline mr-1" />
-          {locale === "zh" ? "展开全部" : "Expand"}
+          {t("platform.wm.goal.expand")}
         </button>
         <button onClick={collapseAll}
           className={`px-2 py-1 rounded border text-[11px] transition-all ${styles.cardBorder} ${styles.cardBg} hover:opacity-80`}
-          title={locale === "zh" ? "收起全部" : "Collapse All"}>
+          title={t("platform.wm.goal.collapseAll")}>
           <Minimize2 className="w-3 h-3 inline mr-1" />
-          {locale === "zh" ? "收起全部" : "Collapse"}
+          {t("platform.wm.goal.collapse")}
         </button>
       </div>
 
@@ -67,10 +69,10 @@ export default function GoalTreeTab({
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400" /> ≥80%</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" /> 50-79%</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> &lt;50%</span>
-        <span className="flex items-center gap-1 ml-2"><Flag className="w-3 h-3 text-indigo-400" />战略</span>
+        <span className="flex items-center gap-1 ml-2"><Flag className="w-3 h-3 text-indigo-400" />{t("platform.wm.goal.strategic")}</span>
         <span className="flex items-center gap-1"><Building2 className="w-3 h-3 text-violet-400" />OKR</span>
         <span className="flex items-center gap-1"><Gauge className="w-3 h-3 text-cyan-400" />KPI</span>
-        <span className="flex items-center gap-1"><Workflow className="w-3 h-3 text-amber-400" />工作流</span>
+        <span className="flex items-center gap-1"><Workflow className="w-3 h-3 text-amber-400" />{t("platform.wm.goal.workflow")}</span>
         <span className="flex items-center gap-1"><Bot className="w-3 h-3 text-emerald-400" />Agent</span>
       </div>
 
@@ -81,7 +83,7 @@ export default function GoalTreeTab({
             <Loader2 className="w-6 h-6 animate-spin opacity-40" />
           </div>
         ) : topLevelGoals.length === 0 ? (
-          <EmptyState icon={Target} msg={locale === "zh" ? "暂无目标，点击「新建目标」创建" : "No goals yet. Click 'New Goal' to create."} />
+          <EmptyState icon={Target} msg={t("platform.wm.goal.empty")} />
         ) : (
           topLevelGoals.map((node) => (
             <GoalTreeNode
@@ -133,7 +135,7 @@ export default function GoalTreeTab({
           )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
             <div>
-              <span className="opacity-50">{locale === "zh" ? "进度" : "Progress"}</span>
+              <span className="opacity-50">{t("platform.wm.goal.progress")}</span>
               <div className="flex items-center gap-2 mt-1">
                 <div className="flex-1 h-2 rounded-full bg-white/10 overflow-hidden">
                   <div className={`h-full rounded-full ${trafficBg(computeProgress(selectedGoal))}`}
@@ -143,7 +145,7 @@ export default function GoalTreeTab({
               </div>
             </div>
             <div>
-              <span className="opacity-50">{locale === "zh" ? "当前/目标" : "Current/Target"}</span>
+              <span className="opacity-50">{t("platform.wm.goal.currentTarget")}</span>
               <p className="font-mono mt-1">
                 {typeof selectedGoal.current_value === "number" ? selectedGoal.current_value
                   : typeof selectedGoal.currentValue === "number" ? selectedGoal.currentValue
@@ -154,11 +156,11 @@ export default function GoalTreeTab({
               </p>
             </div>
             <div>
-              <span className="opacity-50">{locale === "zh" ? "权重" : "Weight"}</span>
+              <span className="opacity-50">{t("platform.wm.goal.weight")}</span>
               <p className="font-mono mt-1">{selectedGoal.weight ?? "—"}</p>
             </div>
             <div>
-              <span className="opacity-50">{locale === "zh" ? "日期" : "Date"}</span>
+              <span className="opacity-50">{t("platform.wm.goal.date")}</span>
               <p className="font-mono mt-1 text-[11px]">
                 {selectedGoal.start_date ? selectedGoal.start_date.slice(0, 10) : "—"}
                 {" → "}

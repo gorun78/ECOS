@@ -5,6 +5,7 @@ import {
 import ReactECharts from "echarts-for-react";
 import type { ParetoOptimizeResult, ParetoProblem, ParetoSolution } from "../../../api";
 import { useMediaQuery } from "../../../hooks/useMediaQuery";
+import { useLanguage } from "../../../components/LanguageContext";
 
 export interface ParetoTabProps {
   locale: string;
@@ -37,6 +38,7 @@ export default function ParetoTab({
   paretoLoading, paretoError, setParetoError,
   runParetoOptimize, loadParetoResult,
 }: ParetoTabProps) {
+  const { t } = useLanguage();
   // 移动端断言: 视口 ≤ 767px 时, 左侧历史侧栏从 fixed 224px 折叠, 图表宽耦合变化,
   // 需重新调 resize 以重新布局 canvas
   const isMobile = useMediaQuery("(max-width: 767px)");
@@ -53,14 +55,14 @@ export default function ParetoTab({
         <div className="flex items-center gap-2 mb-3 shrink-0">
           <Clock className="w-3.5 h-3.5 opacity-50" />
           <span className="text-xs font-semibold opacity-70">
-            {locale === "zh" ? "历史优化" : "History"}
+            {t("platform.wm.pareto.history")}
           </span>
           <span className="text-[10px] opacity-40 ml-auto">{paretoHistory.length}</span>
         </div>
         <div className="flex-1 overflow-y-auto space-y-1">
           {paretoHistory.length === 0 ? (
             <p className="text-[11px] opacity-40 text-center py-6">
-              {locale === "zh" ? "暂无历史记录" : "No history yet"}
+              {t("platform.wm.pareto.noHistory")}
             </p>
           ) : (
             paretoHistory.map((p) => (
@@ -75,7 +77,7 @@ export default function ParetoTab({
               >
                 <div className="font-medium truncate">{p.problemName || p.problemId}</div>
                 <div className="opacity-50 flex items-center gap-2 mt-0.5">
-                  <span>{locale === "zh" ? "前沿" : "Front"}: {p.frontSize}</span>
+                  <span>{t("platform.wm.pareto.front")}: {p.frontSize}</span>
                   <span>{p.timestamp?.slice(0, 10)}</span>
                 </div>
               </button>
@@ -102,13 +104,13 @@ export default function ParetoTab({
           <div className="flex items-center gap-2 mb-3">
             <Zap className="w-4 h-4 text-amber-400" />
             <h3 className="text-sm font-bold">
-              {locale === "zh" ? "优化参数" : "Optimization Parameters"}
+              {t("platform.wm.pareto.params")}
             </h3>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
             <div>
               <label className="text-[10px] opacity-50 block mb-1">
-                {locale === "zh" ? "目标数量" : "Objectives"} (1-3)
+                {t("platform.wm.pareto.objectives")} (1-3)
               </label>
               <input
                 type="number"
@@ -120,7 +122,7 @@ export default function ParetoTab({
             </div>
             <div>
               <label className="text-[10px] opacity-50 block mb-1">
-                {locale === "zh" ? "变量数量" : "Variables"} (1-5)
+                {t("platform.wm.pareto.variables")} (1-5)
               </label>
               <input
                 type="number"
@@ -132,7 +134,7 @@ export default function ParetoTab({
             </div>
             <div>
               <label className="text-[10px] opacity-50 block mb-1">
-                {locale === "zh" ? "种群大小" : "Pop Size"}
+                {t("platform.wm.pareto.popSize")}
               </label>
               <input
                 type="number"
@@ -144,7 +146,7 @@ export default function ParetoTab({
             </div>
             <div>
               <label className="text-[10px] opacity-50 block mb-1">
-                {locale === "zh" ? "世代数" : "Generations"}
+                {t("platform.wm.pareto.generations")}
               </label>
               <input
                 type="number"
@@ -162,9 +164,9 @@ export default function ParetoTab({
               ${styles.accentBg} ${styles.accentHover} text-white disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             {paretoLoading ? (
-              <><Loader2 className="w-3.5 h-3.5 animate-spin" />{locale === "zh" ? "优化中..." : "Optimizing..."}</>
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" />{t("platform.wm.pareto.optimizing")}</>
             ) : (
-              <><Zap className="w-3.5 h-3.5" />{locale === "zh" ? "执行优化" : "Run Optimization"}</>
+              <><Zap className="w-3.5 h-3.5" />{t("platform.wm.pareto.run")}</>
             )}
           </button>
         </div>
@@ -178,17 +180,17 @@ export default function ParetoTab({
                 Problem: <span className="font-mono text-indigo-400">{paretoResult.problemId}</span>
               </span>
               <span className="opacity-50">
-                {locale === "zh" ? "前沿解" : "Front"}: <span className="font-mono text-amber-400">{paretoResult.frontSize}</span>
+                {t("platform.wm.pareto.frontSolutions")}: <span className="font-mono text-amber-400">{paretoResult.frontSize}</span>
               </span>
               <span className="opacity-50">
-                {locale === "zh" ? "耗时" : "Time"}: <span className="font-mono">{paretoResult.elapsed_ms}ms</span>
+                {t("platform.wm.pareto.time")}: <span className="font-mono">{paretoResult.elapsed_ms}ms</span>
               </span>
             </div>
 
             {/* ECharts scatter plot */}
             <div className={`border rounded-lg p-4 shrink-0 ${styles.cardBorder} ${styles.cardBg}`}>
               <h3 className="text-xs font-semibold mb-3 opacity-70">
-                {locale === "zh" ? "帕累托前沿散点图" : "Pareto Front Scatter"}
+                {t("platform.wm.pareto.scatter")}
               </h3>
               <ReactECharts
                 style={{ height: 280 }}
@@ -217,7 +219,7 @@ export default function ParetoTab({
                   },
                   series: [
                     {
-                      name: locale === "zh" ? "帕累托前沿" : "Pareto Front",
+                      name: t("platform.wm.pareto.paretoFront"),
                       type: "scatter",
                       data: paretoResult.solutions.map((s: ParetoSolution) => {
                         const fKeys = Object.keys(s.objectives).sort();
@@ -244,7 +246,7 @@ export default function ParetoTab({
             {/* Solutions table */}
             <div className={`border rounded-lg p-4 shrink-0 ${styles.cardBorder} ${styles.cardBg}`}>
               <h3 className="text-xs font-semibold mb-3 opacity-70">
-                {locale === "zh" ? "帕累托前沿解详情" : "Pareto Front Solutions"}
+                {t("platform.wm.pareto.solutions")}
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
@@ -292,14 +294,10 @@ export default function ParetoTab({
             <div className="text-center opacity-50">
               <Zap className="w-10 h-10 mb-3 mx-auto opacity-30" />
               <p className="text-sm">
-                {locale === "zh"
-                  ? "配置参数并点击「执行优化」开始帕累托寻优"
-                  : "Configure parameters and click 'Run Optimization' to start Pareto search"}
+                {t("platform.wm.pareto.empty1")}
               </p>
               <p className="text-xs mt-1">
-                {locale === "zh"
-                  ? "将使用 NSGA-II 算法搜索多目标最优解"
-                  : "Uses NSGA-II algorithm for multi-objective optimization"}
+                {t("platform.wm.pareto.empty2")}
               </p>
             </div>
           </div>
