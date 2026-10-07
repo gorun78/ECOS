@@ -370,9 +370,9 @@ export default function LogicView({
                 deleteKeyCode={['Delete', 'Backspace']}
                 className={`${styles.inputBg}`}
               >
-                <Controls className={`!${styles.cardBg} !border !${styles.appBorder} !rounded-lg !shadow-sm`} />
+                <Controls className={`${styles.cardBg} !border ${styles.appBorder} !rounded-lg !shadow-sm`} />
                 <MiniMap
-                  className={`!rounded-lg !shadow-sm !border !${styles.appBorder}`}
+                  className={`!rounded-lg !shadow-sm !border ${styles.appBorder}`}
                   nodeColor={(n: Node<LogicNodeData>) => {
                     const c: Record<LogicNodeType, string> = {
                       llm: '#a855f7', tool: '#f59e0b', ontology: '#06b6d4',
