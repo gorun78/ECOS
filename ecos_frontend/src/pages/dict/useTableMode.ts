@@ -7,7 +7,10 @@ import {
 } from "../../services/dict";
 import { STATUS_META, emptyColumnForm, type ColumnFormState } from "./constants";
 
-export function useTableMode(showToast: (type: "success" | "error", msg: string) => void) {
+export function useTableMode(
+  showToast: (type: "success" | "error", msg: string) => void,
+  t: (key: string, params?: Record<string, string | number>) => string
+) {
   const [tables, setTables] = useState<DictTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,23 +36,23 @@ export function useTableMode(showToast: (type: "success" | "error", msg: string)
       const result = await getDictTables(status ? { status } : undefined);
       setTables(result.items);
     } catch (e: any) {
-      showToast("error", `加载失败: ${e.message}`);
+      showToast("error", t("dict.toast.loadTablesFailed", { msg: e.message }));
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   useEffect(() => { loadTables(); }, [loadTables]);
 
   const loadTableDetail = useCallback(async (id: string) => {
     try {
-      const t = await getDictTable(id);
-      setSelectedTable(t);
-      setTables(prev => prev.map(x => x.id === id ? { ...x, columns: t.columns } : x));
+      const detail = await getDictTable(id);
+      setSelectedTable(detail);
+      setTables(prev => prev.map(x => x.id === id ? { ...x, columns: detail.columns } : x));
     } catch (e: any) {
-      showToast("error", `加载表详情失败: ${e.message}`);
+      showToast("error", t("dict.toast.loadTableDetailFailed", { msg: e.message }));
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   const handleStatusFilter = (v: string) => {
     setStatusFilter(v);
@@ -92,7 +95,7 @@ export function useTableMode(showToast: (type: "success" | "error", msg: string)
   const handleCancel = () => { setTableMode("view"); setSelectedTable(null); };
 
   const handleSaveTable = async () => {
-    if (!tableFormName.trim()) { showToast("error", "表名不能为空"); return; }
+    if (!tableFormName.trim()) { showToast("error", t("dict.toast.tableNameRequired")); return; }
     setSaving(true);
     try {
       const tags = tableFormTags.split(",").map(s => s.trim()).filter(Boolean);
@@ -102,7 +105,7 @@ export function useTableMode(showToast: (type: "success" | "error", msg: string)
           schema: tableFormSchema.trim(), description: tableFormDesc.trim(),
           source: tableFormSource || undefined,
         });
-        showToast("success", "数据表创建成功");
+        showToast("success", t("dict.toast.tableCreated"));
         await loadTables(statusFilter || undefined);
         await loadTableDetail(res.id);
         setTableMode("edit");
@@ -111,11 +114,11 @@ export function useTableMode(showToast: (type: "success" | "error", msg: string)
           name: tableFormName.trim(), nameZh: tableFormNameZh.trim(),
           description: tableFormDesc.trim(), tags: tags.length > 0 ? tags : undefined,
         });
-        showToast("success", "数据表更新成功");
+        showToast("success", t("dict.toast.tableUpdated"));
         await loadTables(statusFilter || undefined);
         await loadTableDetail(selectedTable.id);
       }
-    } catch (e: any) { showToast("error", `保存失败: ${e.message}`); }
+    } catch (e: any) { showToast("error", t("dict.toast.saveTableFailed", { msg: e.message })); }
     finally { setSaving(false); }
   };
 
@@ -124,10 +127,10 @@ export function useTableMode(showToast: (type: "success" | "error", msg: string)
     setSaving(true);
     try {
       await updateDictTable(selectedTable.id, { status: newStatus });
-      showToast("success", `状态已变更为「${STATUS_META[newStatus]?.label ?? newStatus}」`);
+      showToast("success", t("dict.toast.statusChanged", { name: STATUS_META[newStatus]?.label ?? newStatus }));
       await loadTables(statusFilter || undefined);
       await loadTableDetail(selectedTable.id);
-    } catch (e: any) { showToast("error", `状态变更失败: ${e.message}`); }
+    } catch (e: any) { showToast("error", t("dict.toast.transitionFailed", { msg: e.message })); }
     finally { setSaving(false); }
   };
 
@@ -137,11 +140,11 @@ export function useTableMode(showToast: (type: "success" | "error", msg: string)
     setSaving(true);
     try {
       await deleteDictTable(deleteTarget.id);
-      showToast("success", `「${name}」已删除`);
+      showToast("success", t("dict.toast.tableDeleted", { name }));
       setDeleteTarget(null);
       if (selectedTable?.id === deleteTarget.id) { setSelectedTable(null); setTableMode("view"); }
       await loadTables(statusFilter || undefined);
-    } catch (e: any) { showToast("error", `删除失败: ${e.message}`); }
+    } catch (e: any) { showToast("error", t("dict.toast.deleteTableFailed", { msg: e.message })); }
     finally { setSaving(false); }
   };
 
@@ -157,7 +160,7 @@ export function useTableMode(showToast: (type: "success" | "error", msg: string)
 
   const handleSaveColumn = async () => {
     if (!selectedTable) return;
-    if (!colForm.name.trim()) { showToast("error", "字段名不能为空"); return; }
+    if (!colForm.name.trim()) { showToast("error", t("dict.toast.columnNameRequired")); return; }
     setSaving(true);
     try {
       const payload = { name: colForm.name.trim(), type: colForm.type,
@@ -166,10 +169,10 @@ export function useTableMode(showToast: (type: "success" | "error", msg: string)
         scale: colForm.scale ? parseInt(colForm.scale, 10) : undefined,
         nullable: colForm.nullable, primaryKey: colForm.primaryKey,
         defaultValue: colForm.defaultValue || undefined, description: colForm.description.trim() };
-      if (colForm.id) { await updateDictColumn(selectedTable.id, colForm.id, payload); showToast("success", "字段更新成功"); }
-      else { await createDictColumn(selectedTable.id, payload); showToast("success", "字段添加成功"); }
+      if (colForm.id) { await updateDictColumn(selectedTable.id, colForm.id, payload); showToast("success", t("dict.toast.columnUpdated")); }
+      else { await createDictColumn(selectedTable.id, payload); showToast("success", t("dict.toast.columnCreated")); }
       await loadTableDetail(selectedTable.id); cancelColumnForm();
-    } catch (e: any) { showToast("error", `保存字段失败: ${e.message}`); }
+    } catch (e: any) { showToast("error", t("dict.toast.saveColumnFailed", { msg: e.message })); }
     finally { setSaving(false); }
   };
 
@@ -178,19 +181,19 @@ export function useTableMode(showToast: (type: "success" | "error", msg: string)
     setSaving(true);
     try {
       await deleteDictColumn(selectedTable.id, deleteTarget.id);
-      showToast("success", `字段「${deleteTarget.name}」已删除`);
+      showToast("success", t("dict.toast.columnDeleted", { name: deleteTarget.name }));
       setDeleteTarget(null); await loadTableDetail(selectedTable.id);
-    } catch (e: any) { showToast("error", `删除字段失败: ${e.message}`); }
+    } catch (e: any) { showToast("error", t("dict.toast.deleteColumnFailed", { msg: e.message })); }
     finally { setSaving(false); }
   };
 
   const transitions = selectedTable
     ? (selectedTable.status === "DRAFT"
-        ? [{ label: "发布", status: "PUBLISHED", variant: "primary" as const }]
+        ? [{ label: t("dict.transition.publish"), status: "PUBLISHED", variant: "primary" as const }]
         : selectedTable.status === "PUBLISHED"
-        ? [{ label: "废弃", status: "DEPRECATED", variant: "danger" as const }]
+        ? [{ label: t("dict.transition.deprecate"), status: "DEPRECATED", variant: "danger" as const }]
         : selectedTable.status === "DEPRECATED"
-        ? [{ label: "重新启用", status: "DRAFT", variant: "secondary" as const }]
+        ? [{ label: t("dict.transition.reactivate"), status: "DRAFT", variant: "secondary" as const }]
         : [])
     : [];
 

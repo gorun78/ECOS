@@ -26,8 +26,8 @@ export default function DictManager() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const table = useTableMode(showToast);
-  const dict = useDictMode(showToast);
+  const table = useTableMode(showToast, t);
+  const dict = useDictMode(showToast, t);
 
   // Merge deleteTarget from both hooks (they each have their own)
   const deleteTarget = table.deleteTarget || dict.deleteTarget;

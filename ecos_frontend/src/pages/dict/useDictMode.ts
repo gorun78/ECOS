@@ -5,7 +5,10 @@ import {
   type DictType, type DictItem,
 } from "../../api";
 
-export function useDictMode(showToast: (type: "success" | "error", msg: string) => void) {
+export function useDictMode(
+  showToast: (type: "success" | "error", msg: string) => void,
+  t: (key: string, params?: Record<string, string | number>) => string
+) {
   const [viewMode, setViewMode] = useState<"table" | "dict">("dict");
   const [dictTypes, setDictTypes] = useState<DictType[]>([]);
   const [dictLoading, setDictLoading] = useState(false);
@@ -37,16 +40,16 @@ export function useDictMode(showToast: (type: "success" | "error", msg: string) 
       try {
         const types = await listDictTypes();
         setDictTypes(types);
-      } catch (e: any) { showToast("error", `加载字典类型失败: ${e.message}`); }
+      } catch (e: any) { showToast("error", t("dict.toast.loadTypesFailed", { msg: e.message })); }
     } finally { setDictLoading(false); }
-  }, [showToast]);
+  }, [showToast, t]);
 
   const loadDictItems = useCallback(async (dictType: string) => {
     setDictLoading(true);
     try { const items = await getDictItems(dictType); setDictItems(items); }
-    catch (e: any) { showToast("error", `加载字典项失败: ${e.message}`); setDictItems([]); }
+    catch (e: any) { showToast("error", t("dict.toast.loadItemsFailed", { msg: e.message })); setDictItems([]); }
     finally { setDictLoading(false); }
-  }, [showToast]);
+  }, [showToast, t]);
 
   const handleSelectDictType = (dictType: string) => {
     setSelectedDictType(dictType); setDictItemFormOpen(false); loadDictItems(dictType);
@@ -72,7 +75,7 @@ export function useDictMode(showToast: (type: "success" | "error", msg: string) 
 
   const handleSaveDictItem = async (savingFn: (b: boolean) => void) => {
     if (!selectedDictType) return;
-    if (!dictItemForm.dictCode.trim() || !dictItemForm.dictLabel.trim()) { showToast("error", "编码和标签不能为空"); return; }
+    if (!dictItemForm.dictCode.trim() || !dictItemForm.dictLabel.trim()) { showToast("error", t("dict.toast.emptyRequired")); return; }
     savingFn(true);
     try {
       if (dictItemForm.editCode) {
@@ -80,17 +83,17 @@ export function useDictMode(showToast: (type: "success" | "error", msg: string) 
           extValue: dictItemForm.extValue.trim() || undefined, dictLabel: dictItemForm.dictLabel.trim(),
           status: dictItemForm.status, sortOrder: dictItemForm.sortOrder ? parseInt(dictItemForm.sortOrder, 10) : undefined,
         });
-        showToast("success", "字典项更新成功");
+        showToast("success", t("dict.toast.itemUpdated"));
       } else {
         await createDictItem({
           dictType: selectedDictType, dictCode: dictItemForm.dictCode.trim(),
           extValue: dictItemForm.extValue.trim() || undefined, dictLabel: dictItemForm.dictLabel.trim(),
           status: dictItemForm.status, sortOrder: dictItemForm.sortOrder ? parseInt(dictItemForm.sortOrder, 10) : undefined,
         });
-        showToast("success", "字典项创建成功");
+        showToast("success", t("dict.toast.itemCreated"));
       }
       await loadDictItems(selectedDictType); cancelDictItemForm();
-    } catch (e: any) { showToast("error", `保存字典项失败: ${e.message}`); }
+    } catch (e: any) { showToast("error", t("dict.toast.saveItemFailed", { msg: e.message })); }
     finally { savingFn(false); }
   };
 
@@ -99,9 +102,9 @@ export function useDictMode(showToast: (type: "success" | "error", msg: string) 
     savingFn(true);
     try {
       await deleteDictItem(selectedDictType, deleteTarget.id);
-      showToast("success", `字典项「${deleteTarget.name}」已删除`);
+      showToast("success", t("dict.toast.itemDeleted", { name: deleteTarget.name }));
       setDeleteTarget(null); await loadDictItems(selectedDictType);
-    } catch (e: any) { showToast("error", `删除字典项失败: ${e.message}`); }
+    } catch (e: any) { showToast("error", t("dict.toast.deleteItemFailed", { msg: e.message })); }
     finally { savingFn(false); }
   };
 
