@@ -81,7 +81,6 @@ function FallbackInner({
 }) {
   let styles: Record<string, string> = {};
   let t: (key: string) => string = (k) => k;
-  let locale = "en";
 
   try {
     const theme = useTheme();
@@ -104,7 +103,6 @@ function FallbackInner({
   try {
     const lang = useLanguage();
     t = lang.t;
-    locale = lang.locale;
   } catch {
     // LanguageContext not available
     t = (k) => k;
@@ -119,12 +117,10 @@ function FallbackInner({
       </div>
 
       <h2 className={`text-lg font-bold mb-1.5 ${styles.cardText}`}>
-        {locale === "zh" ? "页面渲染出错" : "Something went wrong"}
+        {t("common.error.title")}
       </h2>
       <p className={`text-xs max-w-md text-center leading-relaxed mb-4 ${styles.cardTextMuted}`}>
-        {locale === "zh"
-          ? "应用程序遇到了意外错误。请尝试刷新页面，如果问题持续存在，请联系管理员。"
-          : "The application encountered an unexpected error. Try refreshing the page, or contact your administrator if the issue persists."}
+        {t("common.error.desc")}
       </p>
 
       {/* Error details (collapsible) */}
@@ -132,7 +128,7 @@ function FallbackInner({
         <summary
           className={`text-[10px] font-mono cursor-pointer ${styles.cardTextMuted} hover:${styles.cardText} transition`}
         >
-          {locale === "zh" ? "查看错误详情" : "Error details"}
+          {t("common.error.details")}
         </summary>
         <pre
           className={`mt-2 p-3 rounded-lg text-[10px] font-mono leading-relaxed overflow-auto max-h-32 whitespace-pre-wrap break-all ${
@@ -150,14 +146,14 @@ function FallbackInner({
           className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition ${styles.accentBg} text-white hover:opacity-90 shadow-xs`}
         >
           <RefreshCw className="w-3.5 h-3.5" />
-          {locale === "zh" ? "重试" : "Try Again"}
+          {t("common.error.retry")}
         </button>
         <button
           onClick={() => window.location.reload()}
           className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition`}
         >
           <Home className="w-3.5 h-3.5" />
-          {locale === "zh" ? "刷新页面" : "Refresh Page"}
+          {t("common.error.reload")}
         </button>
       </div>
     </div>

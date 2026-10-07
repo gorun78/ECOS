@@ -646,5 +646,10 @@
   "common.case.empty": "暂无案例",
   "common.case.loadFailed": "加载失败: {msg}",
   "common.case.searchFailed": "搜索失败: {msg}",
-  "common.case.recordFailed": "记录失败: {msg}"
+  "common.case.recordFailed": "记录失败: {msg}",
+  "common.error.title": "页面渲染出错",
+  "common.error.desc": "应用程序遇到了意外错误。请尝试刷新页面，如果问题持续存在，请联系管理员。",
+  "common.error.details": "查看错误详情",
+  "common.error.retry": "重试",
+  "common.error.reload": "刷新页面"
 }

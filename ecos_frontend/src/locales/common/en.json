@@ -646,5 +646,10 @@
   "common.case.empty": "No cases yet",
   "common.case.loadFailed": "Load failed: {msg}",
   "common.case.searchFailed": "Search failed: {msg}",
-  "common.case.recordFailed": "Record failed: {msg}"
+  "common.case.recordFailed": "Record failed: {msg}",
+  "common.error.title": "Something went wrong",
+  "common.error.desc": "The application encountered an unexpected error. Try refreshing the page, or contact your administrator if the issue persists.",
+  "common.error.details": "Error details",
+  "common.error.retry": "Try Again",
+  "common.error.reload": "Refresh Page"
 }
