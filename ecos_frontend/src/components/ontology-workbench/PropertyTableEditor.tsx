@@ -23,16 +23,17 @@ import {
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../stores/useWorkbenchStore';
 import { useTheme } from '../ThemeContext';
+import { useLanguage } from '../LanguageContext';
 import type { Property } from '../../types/workbench';
 
 // ── 属性类型选项 ──────────────────────────────────────────────
 
-const PROPERTY_TYPES: { value: string; label: string }[] = [
-  { value: 'STRING',   label: '字符串' },
-  { value: 'NUMBER',   label: '数字' },
-  { value: 'BOOLEAN',  label: '布尔' },
-  { value: 'DATETIME', label: '日期时间' },
-  { value: 'JSON',     label: 'JSON' },
+const PROPERTY_TYPES: { value: string; labelKey: string }[] = [
+  { value: 'STRING',   labelKey: 'ow.proptbl.type.string' },
+  { value: 'NUMBER',   labelKey: 'ow.proptbl.type.number' },
+  { value: 'BOOLEAN',  labelKey: 'ow.proptbl.type.boolean' },
+  { value: 'DATETIME', labelKey: 'ow.proptbl.type.datetime' },
+  { value: 'JSON',     labelKey: 'ow.proptbl.type.json' },
 ];
 
 // ── 属性类型颜色映射 ──────────────────────────────────────────
@@ -56,6 +57,7 @@ interface NewRowFormProps {
 
 function NewRowForm({ onSave, onCancel }: NewRowFormProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [propertyType, setPropertyType] = useState('STRING');
@@ -92,7 +94,7 @@ function NewRowForm({ onSave, onCancel }: NewRowFormProps) {
           ref={codeInputRef}
           value={code}
           onChange={(e) => setCode(e.target.value)}
-          placeholder="编码"
+          placeholder={t('ow.proptbl.ph.code')}
           maxLength={64}
           className="w-full bg-[#0b0e14] border border-indigo-500/30 rounded px-2 py-1
               text-[11px] text-white placeholder:${styles.muted} font-mono
@@ -103,7 +105,7 @@ function NewRowForm({ onSave, onCancel }: NewRowFormProps) {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="名称"
+          placeholder={t('ow.proptbl.ph.name')}
           maxLength={100}
           className="w-full bg-[#0b0e14] border border-indigo-500/30 rounded px-2 py-1
             text-[11px] text-white placeholder:${styles.muted}
@@ -118,7 +120,7 @@ function NewRowForm({ onSave, onCancel }: NewRowFormProps) {
             text-[11px] text-white focus:outline-none focus:border-indigo-500/60 transition"
         >
           {PROPERTY_TYPES.map((pt) => (
-            <option key={pt.value} value={pt.value}>{pt.label}</option>
+            <option key={pt.value} value={pt.value}>{t(pt.labelKey)}</option>
           ))}
         </select>
       </td>
@@ -128,19 +130,21 @@ function NewRowForm({ onSave, onCancel }: NewRowFormProps) {
       <td className="px-2 py-1.5">
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={handleSave}
             disabled={!isValid || saving}
             className="p-1 rounded text-emerald-400 hover:bg-emerald-500/10 transition
               disabled:opacity-30 disabled:cursor-not-allowed"
-            title="保存"
+            title={t('common.save')}
           >
             {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
           </button>
           <button
+            type="button"
             onClick={onCancel}
             disabled={saving}
             className={`p-1 rounded ${styles.muted} hover:${styles.cardText} hover:bg-white/5 transition`}
-            title="取消"
+            title={t('common.cancel')}
           >
             <X size={12} />
           </button>
@@ -163,6 +167,7 @@ interface EditableRowProps {
 
 function EditableRow({ prop, onSave, onCancel, onDelete }: EditableRowProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const [name, setName] = useState(prop.name || '');
   const [propertyType, setPropertyType] = useState(prop.propertyType || 'STRING');
   const [saving, setSaving] = useState(false);
@@ -209,32 +214,34 @@ function EditableRow({ prop, onSave, onCancel, onDelete }: EditableRowProps) {
             text-[11px] text-white focus:outline-none focus:border-indigo-500/60 transition"
         >
           {PROPERTY_TYPES.map((pt) => (
-            <option key={pt.value} value={pt.value}>{pt.label}</option>
+            <option key={pt.value} value={pt.value}>{t(pt.labelKey)}</option>
           ))}
         </select>
       </td>
       <td className="px-2 py-1.5 text-center">
         {prop.requiredFlag === 1 ? (
-          <span className="text-[10px] text-red-400">是</span>
+          <span className="text-[10px] text-red-400">{t('ow.proptbl.badge.yes')}</span>
         ) : (
-          <span className={`text-[10px] ${styles.muted}`}>否</span>
+          <span className={`text-[10px] ${styles.muted}`}>{t('ow.proptbl.badge.no')}</span>
         )}
       </td>
       <td className="px-2 py-1.5">
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={handleSave}
             disabled={!isDirty || saving}
             className="p-1 rounded text-emerald-400 hover:bg-emerald-500/10 transition
               disabled:opacity-30 disabled:cursor-not-allowed"
-            title="保存"
+            title={t('common.save')}
           >
             {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
           </button>
           <button
+            type="button"
             onClick={onCancel}
             className={`p-1 rounded ${styles.muted} hover:${styles.cardText} hover:bg-white/5 transition`}
-            title="取消编辑"
+            title={t('ow.proptbl.title.cancelEdit')}
           >
             <X size={12} />
           </button>
@@ -254,6 +261,7 @@ interface PropertyTableEditorProps {
 
 export default function PropertyTableEditor({ entityId }: PropertyTableEditorProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const store = useWorkbenchStore();
 
   // 从 store 中读取属性列表
@@ -307,13 +315,14 @@ export default function PropertyTableEditor({ entityId }: PropertyTableEditorPro
       <div className="flex items-center justify-between mb-3">
         <h4 className={`text-[11px] font-semibold ${styles.text} flex items-center gap-1.5`}>
           <SlidersHorizontal size={11} className={styles.muted} />
-          属性列表
+          {t('ow.proptbl.title')}
           <span className={`text-[10px] font-normal ${styles.muted} ml-1`}>
             ({properties.length})
           </span>
         </h4>
         {!showNewRow && (
           <button
+            type="button"
             onClick={() => { setShowNewRow(true); setEditingPropId(null); }}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px]
               font-medium text-indigo-400 hover:text-indigo-300
@@ -321,7 +330,7 @@ export default function PropertyTableEditor({ entityId }: PropertyTableEditorPro
               bg-indigo-500/5 hover:bg-indigo-500/10 transition"
           >
             <Plus size={10} />
-            添加属性
+            {t('ow.proptbl.addBtn')}
           </button>
         )}
       </div>
@@ -331,11 +340,11 @@ export default function PropertyTableEditor({ entityId }: PropertyTableEditorPro
         <table className="w-full text-[11px]">
           <thead>
             <tr className="border-b border-[#1E293B]">
-              <th className={`text-left px-2 py-2 text-[10px] font-medium ${styles.muted} w-[30%]`}>编码</th>
-              <th className={`text-left px-2 py-2 text-[10px] font-medium ${styles.muted} w-[30%]`}>名称</th>
-              <th className={`text-left px-2 py-2 text-[10px] font-medium ${styles.muted} w-[20%]`}>类型</th>
-              <th className={`text-center px-2 py-2 text-[10px] font-medium ${styles.muted} w-[10%]`}>必填</th>
-              <th className={`text-center px-2 py-2 text-[10px] font-medium ${styles.muted} w-[10%]`}>操作</th>
+              <th className={`text-left px-2 py-2 text-[10px] font-medium ${styles.muted} w-[30%]`}>{t('ow.proptbl.hdr.code')}</th>
+              <th className={`text-left px-2 py-2 text-[10px] font-medium ${styles.muted} w-[30%]`}>{t('ow.proptbl.hdr.name')}</th>
+              <th className={`text-left px-2 py-2 text-[10px] font-medium ${styles.muted} w-[20%]`}>{t('ow.proptbl.hdr.type')}</th>
+              <th className={`text-center px-2 py-2 text-[10px] font-medium ${styles.muted} w-[10%]`}>{t('ow.proptbl.hdr.required')}</th>
+              <th className={`text-center px-2 py-2 text-[10px] font-medium ${styles.muted} w-[10%]`}>{t('ow.proptbl.hdr.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -352,7 +361,7 @@ export default function PropertyTableEditor({ entityId }: PropertyTableEditorPro
               <tr>
                 <td colSpan={5} className="text-center py-8">
                   <SlidersHorizontal size={20} className={`mx-auto mb-1 opacity-20 ${styles.muted}`} />
-                  <p className={`text-[10px] ${styles.muted}`}>暂无属性，点击「添加属性」开始</p>
+                  <p className={`text-[10px] ${styles.muted}`}>{t('ow.proptbl.empty')}</p>
                 </td>
               </tr>
             ) : (
@@ -391,19 +400,20 @@ export default function PropertyTableEditor({ entityId }: PropertyTableEditorPro
                     </td>
                     <td className="px-2 py-1.5 text-center">
                       {prop.requiredFlag === 1 ? (
-                        <span className="text-[10px] text-red-400">是</span>
+                        <span className="text-[10px] text-red-400">{t('ow.proptbl.badge.yes')}</span>
                       ) : (
-                        <span className={`text-[10px] ${styles.muted}`}>否</span>
+                        <span className={`text-[10px] ${styles.muted}`}>{t('ow.proptbl.badge.no')}</span>
                       )}
                     </td>
                     <td className="px-2 py-1.5">
                       <div className="flex items-center justify-center gap-1">
                         <button
+                          type="button"
                           onClick={(e) => { e.stopPropagation(); handleDelete(prop.id); }}
                           disabled={isDeleting}
                           className={`p-1 rounded hover:bg-red-500/10 ${styles.muted} hover:text-red-400 transition
                             disabled:opacity-30`}
-                          title="删除属性"
+                          title={t('ow.proptbl.title.delete')}
                         >
                           {isDeleting ? (
                             <Loader2 size={11} className="animate-spin" />
@@ -423,7 +433,7 @@ export default function PropertyTableEditor({ entityId }: PropertyTableEditorPro
 
       {/* 底部提示 */}
       <p className={`text-[9px] ${styles.muted} mt-2 px-2`}>
-        双击行可编辑 · 输入完成后按 Enter 或点击 ✓ 保存
+        {t('ow.proptbl.footerHint')}
       </p>
     </div>
   );
