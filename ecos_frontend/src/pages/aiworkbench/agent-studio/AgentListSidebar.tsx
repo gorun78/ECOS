@@ -6,6 +6,7 @@
  */
 import { AIPAgent } from '../../../types/aiworkbench';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 import { Icon } from './Icon';
 
 export default function AgentListSidebar({
@@ -20,15 +21,17 @@ export default function AgentListSidebar({
   onCreate: () => void;
 }) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`w-56 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col h-full shrink-0`}>
       <div className={`p-3 border-b ${styles.cardBorder} flex items-center justify-between ${styles.inputBg}`}>
-        <span className={`font-bold ${styles.cardText}`}>智能助手工坊 ({agents.length})</span>
+        <span className={`font-bold ${styles.cardText}`}>{t('aiworkbench.as.listTitle')} ({agents.length})</span>
         <button
+          type="button"
           onClick={onCreate}
           className={`p-1 ${styles.badgeBg} hover:opacity-80 ${styles.accentText} ${styles.accentBorder} border rounded-md transition-colors cursor-pointer`}
-          title="新增智能体"
+          title={t('aiworkbench.as.addNew')}
         >
           <Icon name="Plus" size={12} />
         </button>
