@@ -7,6 +7,7 @@ import React from 'react';
 import { ObjectType, OntologyDomain } from '../../../types/ontology';
 import LucideIcon from '../LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 import DomainFormBlock from './DomainFormBlock';
 import DomainCardsGrid from './DomainCardsGrid';
 
@@ -60,6 +61,7 @@ export default function DomainManagerDeck({
   onQuickNavigate
 }: DomainManagerDeckProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs space-y-4`}>
@@ -67,17 +69,18 @@ export default function DomainManagerDeck({
         <div>
           <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
             <LucideIcon name="Settings" size={15} className={styles.cardTextMuted} />
-            业务分级域维护中心 (Business Domain Manager)
+            {t('ow.dommgr.title')}
           </h3>
-          <p className={`text-[11px] ${styles.cardTextMuted} mt-0.5`}>创建、编辑和删除业务分级域，直观进行本体对象归宿分配 (即多对多关系绑定)。</p>
+          <p className={`text-[11px] ${styles.cardTextMuted} mt-0.5`}>{t('ow.dommgr.subtitle')}</p>
         </div>
         {!isAddingNew && (
           <button
+            type="button"
             onClick={handleStartAdd}
             className="bg-[var(--card,#0F172A)] hover:bg-[var(--muted,#1E293B)] text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 shadow-xs"
           >
             <LucideIcon name="PlusCircle" size={14} />
-            新建业务域分级
+            {t('ow.dommgr.createNew')}
           </button>
         )}
       </div>

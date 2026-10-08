@@ -1597,5 +1597,8 @@
   "ow.graph.subtitle": "Show the current entity relationship network. Switch domains above to scope and focus the view.",
   "ow.graph.filterLabel": "Filter view by domain:",
   "ow.graph.globalPano": "All ({count})",
-  "ow.graph.unassigned": "Unassigned ({count})"
+  "ow.graph.unassigned": "Unassigned ({count})",
+  "ow.dommgr.title": "Business Domain Manager",
+  "ow.dommgr.subtitle": "Create, edit and delete business domain tiers and bind object attribution (many-to-many relations).",
+  "ow.dommgr.createNew": "New Domain Tier"
 }

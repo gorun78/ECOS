@@ -1597,5 +1597,8 @@
   "ow.graph.subtitle": "显示当前实体关联网络。可在上方切换不同业务域以进行视窗隔离和动态聚焦。",
   "ow.graph.filterLabel": "视图按域过滤:",
   "ow.graph.globalPano": "全局全景 ({count})",
-  "ow.graph.unassigned": "未归域 ({count})"
+  "ow.graph.unassigned": "未归域 ({count})",
+  "ow.dommgr.title": "业务分级域维护中心 (Business Domain Manager)",
+  "ow.dommgr.subtitle": "创建、编辑和删除业务分级域，直观进行本体对象归宿分配 (即多对多关系绑定)。",
+  "ow.dommgr.createNew": "新建业务域分级"
 }
