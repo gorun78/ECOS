@@ -445,5 +445,12 @@
   "scenario.decision.sandbox.run": "Run Zero-Trust Auth Check",
   "scenario.decision.sandbox.simulating": "Simulating...",
   "scenario.decision.sandbox.subtitle": "Simulates the real access outcome of different functional roles reaching this scenario's data from specific network terminals, testing PBAC/DAC and PII-masking blocking.",
-  "scenario.decision.sandbox.title": "Executive Zero-Trust Access Sandbox (Access Tester)"
+  "scenario.decision.sandbox.title": "Executive Zero-Trust Access Sandbox (Access Tester)",
+  "scenario.git.signedBadge": "ECOS Zero-Trust Signed Auth ✓",
+  "scenario.git.pushing": "Pushing...",
+  "scenario.git.historyEmpty": "No version commits yet. Create the scenario via the 7-step wizard first.",
+  "scenario.git.rollback": "Roll to This Version",
+  "scenario.git.manualCommitTitle": "Manually Freeze Config Version (Manual Commit)",
+  "scenario.git.commitPlaceholder": "Enter the commit message for this config change...",
+  "scenario.git.switchBranchTitle": "Switch Branch"
 }

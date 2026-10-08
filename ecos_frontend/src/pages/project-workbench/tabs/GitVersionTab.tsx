@@ -10,6 +10,7 @@
 
 import React from 'react';
 import LucideIcon from '../../../components/LucideIcon';
+import { useLanguage } from '../../../components/LanguageContext';
 
 interface GitVersionTabProps {
   /** 所有场景的 commit 历史 */
@@ -46,6 +47,8 @@ export default function GitVersionTab(props: GitVersionTabProps) {
     handleGitCommitManual, handleGitCheckoutCommit, handleSwitchGitBranch, handleGitPushRemote
   } = props;
 
+  const { t } = useLanguage();
+
   const currentCommits = gitCommits[selectedScenarioId] || [];
   const currentBranch = gitBranches[selectedScenarioId] || 'main';
   const selectedCommit = currentCommits.find(c => c.id === selectedCommitId) || null;
@@ -69,16 +72,17 @@ export default function GitVersionTab(props: GitVersionTabProps) {
         <div className="text-xs text-[var(--card,#94A3B8)] font-mono flex items-center gap-4">
           <span>{currentCommits.length} commits</span>
           <span className="text-[var(--card,#64748B)]">|</span>
-          <span>ECOS Zero-Trust 签名认证 ✓</span>
+          <span>{t('scenario.git.signedBadge')}</span>
         </div>
         <div className="ml-auto">
           <button
+            type="button"
             onClick={handleGitPushRemote}
             disabled={isGitPushing}
             className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded flex items-center gap-1 transition-all cursor-pointer"
           >
             <LucideIcon name="Upload" size={11} />
-            {isGitPushing ? '正在推送...' : 'Push to Remote'}
+            {isGitPushing ? t('scenario.git.pushing') : 'Push to Remote'}
           </button>
         </div>
       </div>
@@ -92,10 +96,12 @@ export default function GitVersionTab(props: GitVersionTabProps) {
           </span>
           <div className="flex gap-1">
             <button
+              type="button"
               onClick={() => setGitViewMode('visual')}
               className={`px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer ${gitViewMode === 'visual' ? 'bg-indigo-600 text-white' : 'bg-[var(--card,#1E293B)] text-[var(--card,#94A3B8)]'}`}
             >Visual</button>
             <button
+              type="button"
               onClick={() => setGitViewMode('json')}
               className={`px-2 py-0.5 text-[10px] font-bold rounded cursor-pointer ${gitViewMode === 'json' ? 'bg-indigo-600 text-white' : 'bg-[var(--card,#1E293B)] text-[var(--card,#94A3B8)]'}`}
             >JSON</button>
@@ -105,7 +111,7 @@ export default function GitVersionTab(props: GitVersionTabProps) {
         {currentCommits.length === 0 ? (
           <div className="p-8 text-center text-[var(--card,#64748B)]">
             <LucideIcon name="GitCommit" size={32} className="mx-auto opacity-30 mb-2" />
-            <p className="text-xs">暂无版本提交记录。请先通过 7 步向导创建场景。</p>
+            <p className="text-xs">{t('scenario.git.historyEmpty')}</p>
           </div>
         ) : gitViewMode === 'visual' ? (
           <div className="divide-y divide-[var(--card,#1E293B)]/60 max-h-72 overflow-y-auto">
@@ -131,11 +137,12 @@ export default function GitVersionTab(props: GitVersionTabProps) {
                 {selectedCommitId === commit.id && (
                   <div className="mt-2 pt-2 border-t border-[var(--card,#1E293B)] flex gap-2">
                     <button
+                      type="button"
                       onClick={(e) => { e.stopPropagation(); handleGitCheckoutCommit(commit); }}
                       className="px-2 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold rounded cursor-pointer flex items-center gap-1"
                     >
                       <LucideIcon name="RotateCcw" size={10} />
-                      回滚至此版本
+                      {t('scenario.git.rollback')}
                     </button>
                     <div className="flex-1 bg-[var(--card,#020617)] rounded p-2 text-[10px] font-mono text-[var(--card,#94A3B8)] overflow-x-auto">
                       <span className="text-[var(--card,#64748B)]">bindings:</span>{' '}
@@ -157,14 +164,14 @@ export default function GitVersionTab(props: GitVersionTabProps) {
       <div className="bg-[var(--card,#0F172A)] border border-[var(--card,#1E293B)] rounded-xl p-4">
         <span className="text-xs font-bold text-white flex items-center gap-2 mb-3">
           <LucideIcon name="PlusCircle" size={13} className="text-indigo-400" />
-          手动冻结配置版本 (Manual Commit)
+          {t('scenario.git.manualCommitTitle')}
         </span>
         <form onSubmit={onSubmitCommit} className="flex gap-2">
           <input
             type="text"
             value={gitCommitMsg}
             onChange={(e) => setGitCommitMsg(e.target.value)}
-            placeholder="输入本次配置变更的 commit message..."
+            placeholder={t('scenario.git.commitPlaceholder')}
             className="flex-1 p-2 bg-[var(--card,#020617)] border border-[var(--card,#1E293B)] rounded text-xs text-white outline-none font-mono"
           />
           <button
@@ -181,11 +188,12 @@ export default function GitVersionTab(props: GitVersionTabProps) {
       <div className="bg-[var(--card,#0F172A)] border border-[var(--card,#1E293B)] rounded-xl p-4">
         <span className="text-xs font-bold text-white flex items-center gap-2 mb-2">
           <LucideIcon name="GitFork" size={13} className="text-indigo-400" />
-          分支切换 (Switch Branch)
+          {t('scenario.git.switchBranchTitle')}
         </span>
         <div className="flex gap-1.5 flex-wrap">
           {['main', 'develop', 'feature/safety-audit', 'release/v2.1'].map(branch => (
             <button
+              type="button"
               key={branch}
               onClick={() => handleSwitchGitBranch(branch)}
               className={`px-2.5 py-1 rounded text-[10px] font-mono font-bold cursor-pointer transition-all ${

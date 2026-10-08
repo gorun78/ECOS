@@ -445,5 +445,12 @@
   "scenario.decision.sandbox.run": "运行零信任鉴权验证",
   "scenario.decision.sandbox.simulating": "正在模拟计算...",
   "scenario.decision.sandbox.subtitle": "模拟不同职能角色从特定网络终端访问本场景数据的真实准入结果，测试 PBAC/DAC 和 PII 脱敏逻辑的阻断能力。",
-  "scenario.decision.sandbox.title": "管理者零信任准入拦截沙箱 (Executive Zero-Trust Access Tester)"
+  "scenario.decision.sandbox.title": "管理者零信任准入拦截沙箱 (Executive Zero-Trust Access Tester)",
+  "scenario.git.signedBadge": "ECOS Zero-Trust 签名认证 ✓",
+  "scenario.git.pushing": "正在推送...",
+  "scenario.git.historyEmpty": "暂无版本提交记录。请先通过 7 步向导创建场景。",
+  "scenario.git.rollback": "回滚至此版本",
+  "scenario.git.manualCommitTitle": "手动冻结配置版本 (Manual Commit)",
+  "scenario.git.commitPlaceholder": "输入本次配置变更的 commit message...",
+  "scenario.git.switchBranchTitle": "分支切换 (Switch Branch)"
 }
