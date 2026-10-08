@@ -1,4 +1,5 @@
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 import { Binary, Play, RefreshCw, Terminal, Clock } from 'lucide-react';
 import type { GuardrailPolicy, PreviewData } from './types';
 import { Spinner } from './UiPrimitives';
@@ -16,13 +17,14 @@ export default function CompilePreviewTab({
   onRefreshPreview: (p: GuardrailPolicy) => void;
 }) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="flex-1 flex flex-col min-h-0 gap-4">
       {!policy ? (
         <div className={`flex-1 flex flex-col items-center justify-center ${styles.cardTextMuted} space-y-2`}>
           <Binary size={28} className={styles.cardTextMuted} />
-          <p className="font-bold">请先在「策略管理」中选择一条策略</p>
+          <p className="font-bold">{t('gw.compile.pickFirst')}</p>
         </div>
       ) : (
         <>
@@ -33,7 +35,7 @@ export default function CompilePreviewTab({
                 <Binary size={18} />
               </div>
               <div className="space-y-0.5">
-                <span className="text-[9px] text-[var(--muted-foreground,#94A3B8)] font-bold uppercase tracking-wider block">安全策略编译器 (Security Policy Compiler)</span>
+                <span className="text-[9px] text-[var(--muted-foreground,#94A3B8)] font-bold uppercase tracking-wider block">{t('gw.compile.title')}</span>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-sm text-[var(--text-primary,#F8FAFC)]">{policy.name}</span>
                   <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-black uppercase inline-flex items-center gap-1 ${policy.status === 'COMPILED' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse'}`}>
@@ -47,19 +49,20 @@ export default function CompilePreviewTab({
             <div className="flex items-center gap-3 shrink-0">
               {policy.compiledAt && (
                 <div className="text-right hidden sm:block">
-                  <p className="text-[10px] text-[var(--muted-foreground,#94A3B8)] font-semibold flex items-center gap-1 justify-end"><Clock size={9} /> 上次编译</p>
+                  <p className="text-[10px] text-[var(--muted-foreground,#94A3B8)] font-semibold flex items-center gap-1 justify-end"><Clock size={9} /> {t('gw.compile.last')}</p>
                   <p className="font-mono text-[10px] text-[var(--muted-foreground,#CBD5E1)] font-bold">{policy.compiledAt}</p>
                 </div>
               )}
               <button
+                type="button"
                 onClick={() => onCompile(policy)}
                 disabled={isCompiling}
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-75 text-white font-bold rounded-lg shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 {isCompiling ? (
-                  <><Spinner /><span>策略编译部署中...</span></>
+                  <><Spinner /><span>{t('gw.compile.compiling')}</span></>
                 ) : (
-                  <><Play size={12} /><span>🛠️ 编译并部署 (Compile & Deploy)</span></>
+                  <><Play size={12} /><span>{t('gw.compile.deploy')}</span></>
                 )}
               </button>
             </div>
@@ -78,7 +81,7 @@ export default function CompilePreviewTab({
               </div>
               <div className="space-y-1.5 max-h-72 overflow-y-auto text-[10px] leading-relaxed select-text">
                 {compileLogs.length === 0 ? (
-                  <p className="text-[var(--card,#64748B)] italic">等待编译指令... 点击上方「编译并部署」启动。</p>
+                  <p className="text-[var(--card,#64748B)] italic">{t('gw.compile.waitPrompt')}</p>
                 ) : (
                   compileLogs.map((log, idx) => (
                     <p key={idx} className={
@@ -100,28 +103,29 @@ export default function CompilePreviewTab({
                 <div className="space-y-0.5">
                   <span className={`font-extrabold ${styles.cardText} flex items-center gap-1.5 text-xs`}>
                     <RefreshCw size={13} className="text-emerald-500" />
-                    <span>策略编译干跑沙箱 (Dry-Run Compliance Preview)</span>
+                    <span>{t('gw.preview.title')}</span>
                   </span>
-                  <p className={`text-[10px] ${styles.cardTextMuted}`}>左侧对比原始明文，右侧输出经脱敏/隔离编译后的安全视图。</p>
+                  <p className={`text-[10px] ${styles.cardTextMuted}`}>{t('gw.preview.sub')}</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => onRefreshPreview(policy)}
                   disabled={loadingPreview}
                   className={`px-2.5 py-1 border ${styles.cardBorder} ${styles.sidebarHoverBg} rounded-md text-[10px] font-bold ${styles.cardText} flex items-center gap-1 cursor-pointer`}
                 >
-                  <RefreshCw size={10} className={loadingPreview ? 'animate-spin' : ''} /> 刷新预览
+                  <RefreshCw size={10} className={loadingPreview ? 'animate-spin' : ''} /> {t('gw.preview.refresh')}
                 </button>
               </div>
 
               {loadingPreview ? (
                 <div className={`flex-1 flex items-center justify-center ${styles.cardTextMuted} gap-2`}>
-                  <Spinner className="w-4 h-4" /><span>正在生成实时干跑数据...</span>
+                  <Spinner className="w-4 h-4" /><span>{t('gw.preview.generating')}</span>
                 </div>
               ) : previewData ? (
                 <PreviewComparison data={previewData} />
               ) : (
                 <div className={`flex-1 flex items-center justify-center ${styles.cardTextMuted}`}>
-                  <span>暂无预览数据，请先编译策略。</span>
+                  <span>{t('gw.preview.empty')}</span>
                 </div>
               )}
             </div>

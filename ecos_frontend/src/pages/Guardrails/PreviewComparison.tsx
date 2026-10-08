@@ -1,4 +1,5 @@
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 import { LockOpen, Lock } from 'lucide-react';
 import type { PreviewData } from './types';
 import { getPreviewRows } from './helpers';
@@ -12,6 +13,7 @@ export default function PreviewComparison({ data }: { data: PreviewData }) {
   const compiled = getPreviewRows(data.compiled);
   const columns = data.columns && data.columns.length > 0 ? data.columns : (raw.columns.length > 0 ? raw.columns : compiled.columns);
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0 overflow-hidden text-[10px]">
@@ -19,13 +21,13 @@ export default function PreviewComparison({ data }: { data: PreviewData }) {
       <div className={`flex flex-col border ${styles.cardBorder} rounded-xl overflow-hidden min-h-0 ${styles.appBg}`}>
         <div className={`p-2 border-b ${styles.cardBorder} ${styles.appBg} flex items-center justify-between`}>
           <span className={`font-bold ${styles.cardText} flex items-center gap-1`}>
-            <LockOpen size={10} className={styles.cardTextMuted} /> 原始明文视图 (Raw - Unsecured)
+            <LockOpen size={10} className={styles.cardTextMuted} /> {t('gw.preview.rawTitle')}
           </span>
           <span className={`px-1 py-0.5 rounded ${styles.badgeBg} ${styles.cardTextMuted} text-[8px] font-mono`}>PLAIN_TEXT</span>
         </div>
         <div className="flex-1 overflow-auto p-2">
           {raw.rows.length === 0 ? (
-            <p className={`text-center ${styles.cardTextMuted} py-4 italic`}>无原始数据</p>
+            <p className={`text-center ${styles.cardTextMuted} py-4 italic`}>{t('gw.preview.noRaw')}</p>
           ) : (
             <DataTable rows={raw.rows} columns={columns} />
           )}
@@ -36,13 +38,13 @@ export default function PreviewComparison({ data }: { data: PreviewData }) {
       <div className="flex flex-col border border-rose-200 bg-rose-50/5 rounded-xl overflow-hidden min-h-0">
         <div className="p-2 border-b border-rose-100 bg-rose-500/5 flex items-center justify-between">
           <span className="font-extrabold text-rose-800 flex items-center gap-1">
-            <Lock size={10} className="text-rose-600" /> 合规安全视图 (Compiled - Secure)
+            <Lock size={10} className="text-rose-600" /> {t('gw.preview.secureTitle')}
           </span>
           <span className="px-1 py-0.5 rounded bg-rose-600 text-white text-[8px] font-mono">MASKED & SLICED</span>
         </div>
         <div className="flex-1 overflow-auto p-2">
           {compiled.rows.length === 0 ? (
-            <p className={`text-center ${styles.cardTextMuted} py-4 italic`}>🚫 行级过滤生效：无符合安全条件的数据行</p>
+            <p className={`text-center ${styles.cardTextMuted} py-4 italic`}>{t('gw.preview.noMatch')}</p>
           ) : (
             <DataTable rows={compiled.rows} columns={columns} rawRows={raw.rows} />
           )}
