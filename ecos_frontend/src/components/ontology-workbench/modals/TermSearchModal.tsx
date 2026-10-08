@@ -18,16 +18,17 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { X, Search, Filter, BookOpen, Loader2, Check } from "lucide-react";
 import { fetchTerms } from "../../../services/glossary";
 import { useTheme } from "../../ThemeContext";
+import { useLanguage } from "../../LanguageContext";
 import type { GlossaryTerm, GlossaryFilter } from "../../../types/workbench";
 
 // ── 状态选项 ──────────────────────────────────────────────────
 
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: "", label: "全部状态" },
-  { value: "PUBLISHED", label: "已发布" },
-  { value: "DRAFT", label: "草稿" },
-  { value: "DEPRECATED", label: "已废弃" },
-  { value: "ARCHIVED", label: "已归档" },
+const STATUS_OPTIONS: { value: string; key: string }[] = [
+  { value: "", key: "ow.term.status.all" },
+  { value: "PUBLISHED", key: "ow.term.status.published" },
+  { value: "DRAFT", key: "ow.term.status.draft" },
+  { value: "DEPRECATED", key: "ow.term.status.deprecated" },
+  { value: "ARCHIVED", key: "ow.term.status.archived" },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -39,14 +40,14 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function getStatusLabel(status: string): string {
-  const map: Record<string, string> = {
-    active: "已发布",
-    PUBLISHED: "已发布",
-    DRAFT: "草稿",
-    DEPRECATED: "已废弃",
-    ARCHIVED: "已归档",
+  const key: Record<string, string> = {
+    active: "ow.term.status.published",
+    PUBLISHED: "ow.term.status.published",
+    DRAFT: "ow.term.status.draft",
+    DEPRECATED: "ow.term.status.deprecated",
+    ARCHIVED: "ow.term.status.archived",
   };
-  return map[status] || status;
+  return key[status] || status;
 }
 
 // ── 组件接口 ──────────────────────────────────────────────────
@@ -73,6 +74,7 @@ export default function TermSearchModal({
   alreadyBoundIds,
 }: TermSearchModalProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   // ── 数据 ────────────────────────────────────────────────────
   const [allTerms, setAllTerms] = useState<GlossaryTerm[]>([]);
   const [loading, setLoading] = useState(false);
@@ -109,7 +111,7 @@ export default function TermSearchModal({
       setAllTerms(terms);
     } catch (err: unknown) {
       const msg = (err as { message?: string } | undefined)?.message;
-      setError(msg || "获取术语列表失败");
+      setError(msg || t("ow.term.err.loadFailed", "获取术语列表失败"));
     } finally {
       setLoading(false);
     }
@@ -213,9 +215,9 @@ export default function TermSearchModal({
               <BookOpen size={16} className="text-indigo-400" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">关联术语</h3>
+              <h3 className="text-sm font-semibold text-white">{t("ow.term.title", "关联术语")}</h3>
               <p className={`text-[10px] ${styles.muted}`}>
-                从术语库中选择术语进行关联
+                {t("ow.term.subtitle", "从术语库中选择术语进行关联")}
               </p>
             </div>
           </div>
@@ -239,7 +241,7 @@ export default function TermSearchModal({
               <input
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
-                placeholder="搜索术语名称或编码..."
+                placeholder={t("ow.term.searchPlaceholder", "搜索术语名称或编码...")}
                 className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg pl-9 pr-3 py-2
                   text-xs text-white placeholder:${styles.muted}
                   focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30
@@ -253,7 +255,7 @@ export default function TermSearchModal({
                   ? "bg-indigo-500/15 border-indigo-500/30 text-indigo-400"
                   : `bg-[#0b0e14] border-[#2a3040] ${styles.muted} hover:${styles.cardText}`
               }`}
-              title="筛选"
+              title={t("ow.term.filter", "筛选")}
             >
               <Filter size={13} />
             </button>
@@ -265,7 +267,7 @@ export default function TermSearchModal({
               {/* 域筛选 */}
               <div className="flex-1">
                 <label className={`block text-[10px] ${styles.muted} mb-1`}>
-                  域
+                  {t("ow.term.domain", "域")}
                 </label>
                 <select
                   value={domainFilter}
@@ -274,7 +276,7 @@ export default function TermSearchModal({
                     text-xs ${styles.cardText}
                     focus:outline-none focus:border-indigo-500/50 transition"
                 >
-                  <option value="">全部域</option>
+                  <option value="">{t("ow.term.domain.all", "全部域")}</option>
                   {domainOptions.map((d) => (
                     <option key={d} value={d}>
                       {d}
@@ -286,7 +288,7 @@ export default function TermSearchModal({
               {/* 状态筛选 */}
               <div className="flex-1">
                 <label className={`block text-[10px] ${styles.muted} mb-1`}>
-                  状态
+                  {t("ow.term.status", "状态")}
                 </label>
                 <select
                   value={statusFilter}
@@ -297,7 +299,7 @@ export default function TermSearchModal({
                 >
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s.value} value={s.value}>
-                      {s.label}
+                      {t(s.key)}
                     </option>
                   ))}
                 </select>
@@ -311,7 +313,7 @@ export default function TermSearchModal({
           {loading ? (
             <div className={`flex items-center justify-center py-12 ${styles.muted}`}>
               <Loader2 size={18} className="animate-spin mr-2" />
-              <span className="text-xs">加载术语中...</span>
+              <span className="text-xs">{t("ow.term.loading", "加载术语中...")}</span>
             </div>
           ) : error ? (
             <div className={`flex flex-col items-center justify-center py-12 ${styles.muted}`}>
@@ -320,19 +322,19 @@ export default function TermSearchModal({
                 onClick={loadTerms}
                 className="mt-2 text-[10px] text-indigo-400 hover:text-indigo-300 transition"
               >
-                点击重试
+                {t("ow.term.retry", "点击重试")}
               </button>
             </div>
           ) : filteredTerms.length === 0 ? (
             <div className={`flex flex-col items-center justify-center py-12 ${styles.muted}`}>
               <BookOpen size={28} className="mb-2 opacity-20" />
               <p className="text-xs">
-                {searchKeyword ? "无匹配结果" : "暂无术语"}
+                {searchKeyword ? t("ow.term.empty.noMatch", "无匹配结果") : t("ow.term.empty.noTerms", "暂无术语")}
               </p>
               <p className="text-[10px] mt-0.5 opacity-50">
                 {searchKeyword
-                  ? "尝试其他关键词"
-                  : "请在术语管理页面添加术语"}
+                  ? t("ow.term.empty.tryOther", "尝试其他关键词")
+                  : t("ow.term.empty.addHint", "请在术语管理页面添加术语")}
               </p>
             </div>
           ) : (
@@ -376,7 +378,7 @@ export default function TermSearchModal({
                         <span
                           className={`text-[9px] px-1.5 py-0.5 rounded border ${statusColor} shrink-0`}
                         >
-                          {getStatusLabel(term.status)}
+                          {t(getStatusLabel(term.status))}
                         </span>
                       </div>
                       {term.domain && (
@@ -389,7 +391,7 @@ export default function TermSearchModal({
                     {/* 已绑定标识 */}
                     {isBound && (
                       <span className={`text-[9px] ${styles.muted} shrink-0`}>
-                        已关联
+                        {t("ow.term.bound", "已关联")}
                       </span>
                     )}
                   </label>
@@ -404,23 +406,26 @@ export default function TermSearchModal({
           {/* 选中计数 */}
           <span className={`text-[10px] ${styles.muted}`}>
             {alreadyBoundIds
-              ? `已关联 ${alreadyBoundIds.size} 个 · 新增 ${
-                  Array.from(selectedIds).filter(
+              ? t("ow.term.count", {
+                  bound: alreadyBoundIds.size,
+                  n: Array.from(selectedIds).filter(
                     (id) => !alreadyBoundIds.has(id)
                   ).length
-                } 个`
-              : `已选 ${selectedIds.size} 个`}
+                })
+              : t("ow.term.selected", { count: selectedIds.size })}
           </span>
 
           <div className="flex items-center gap-2.5">
             <button
+              type="button"
               onClick={onClose}
               className={`px-4 py-2 rounded-lg text-xs font-medium ${styles.sidebarText}
                 bg-[#2a3040] hover:bg-[#3a4050] transition`}
             >
-              取消
+              {t("common.cancel", "取消")}
             </button>
             <button
+              type="button"
               onClick={handleConfirm}
               disabled={loading}
               className="px-5 py-2 rounded-lg text-xs font-semibold text-white
@@ -429,7 +434,7 @@ export default function TermSearchModal({
                 transition flex items-center gap-2"
             >
               {loading && <Loader2 size={13} className="animate-spin" />}
-              确认关联
+              {t("ow.term.confirm", "确认关联")}
             </button>
           </div>
         </div>
