@@ -156,7 +156,7 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-[var(--overlay)] backdrop-blur-xs">
-      <div className={`w-full max-w-2xl overflow-hidden ${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-2xl animate-fade-in-down text-[#1E293B] font-sans`}>
+      <div className={`w-full max-w-2xl overflow-hidden ${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-2xl animate-fade-in-down ${styles.cardText} font-sans`}>
 
         {/* Search header */}
         <div className={`flex items-center px-5 py-4 border-b ${styles.cardBorder} ${styles.appBg}`}>

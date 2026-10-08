@@ -195,7 +195,7 @@ export default function CognitiveEngineView() {
         </div>
 
         {/* Sub-engine Tabs */}
-        <div className="flex gap-1 border-b border-[#1E293B] pb-0">
+        <div className={`flex gap-1 border-b ${styles.cardBorder} pb-0`}>
           {SUB_ENGINES.map(se => {
             const Icon = se.icon;
             const active = activeTab === se.key;
@@ -334,7 +334,7 @@ export default function CognitiveEngineView() {
 
           {/* Test Result */}
           {testResult && (
-            <div className="mt-4 border-t border-[#1E293B] pt-4">
+            <div className={`mt-4 border-t ${styles.cardBorder} pt-4`}>
               <h4 className={`text-xs font-semibold ${styles.muted} mb-2`}>{t('cognition.engine.resultTitle')}</h4>
               <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-3 overflow-x-auto max-h-48`}>
                 {JSON.stringify(testResult, null, 2)}
