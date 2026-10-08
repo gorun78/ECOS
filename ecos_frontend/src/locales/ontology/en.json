@@ -1470,5 +1470,17 @@
   "ow.act.val.listTitle": "Effective Validations",
   "ow.act.val.empty": "No validation rules yet; this action has no input-safety restriction when invoked.",
   "ow.act.val.warnLabel": "Warning",
-  "ow.act.val.removeTitle": "Remove rule"
+  "ow.act.val.removeTitle": "Remove rule",
+  "ow.act.param.intro": "Define the inputs required to run this action. They can be primitive types (String, Integer) or in-system object instances (Object Type).",
+  "ow.act.param.namePlaceholder": "New parameter name",
+  "ow.act.param.objectOption": "object (object instance)",
+  "ow.act.param.addBtn": "Configure Parameter",
+  "ow.act.param.colRequired": "Required",
+  "ow.act.param.colName": "Display Name",
+  "ow.act.param.colId": "Param Variable ID",
+  "ow.act.param.colType": "Data Type",
+  "ow.act.param.colObjBinding": "Bound Object Type",
+  "ow.act.param.colDesc": "Description",
+  "ow.act.param.colAction": "Action",
+  "ow.act.param.descPlaceholder": "Description"
 }

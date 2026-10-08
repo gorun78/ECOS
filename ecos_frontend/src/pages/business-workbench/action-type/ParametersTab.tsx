@@ -7,6 +7,7 @@ import React from 'react';
 import { ActionType, ActionParameter, ObjectType, ActionParamDataType } from '../../../types/ontology';
 import LucideIcon from '../LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 
 interface ParametersTabProps {
   actionType: ActionType;
@@ -38,17 +39,18 @@ export default function ParametersTab({
   onNavigateToObject
 }: ParametersTabProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <p className={`text-xs ${styles.cardTextMuted}`}>
-          定义运行该操作所必需的输入。可以是基本类型 (String, Integer) 或本系统内的对象实例 (Object Type)。
+          {t('ow.act.param.intro')}
         </p>
         <div className="flex items-center gap-2">
           <input
             type="text"
-            placeholder="新参数中文名称"
+            placeholder={t('ow.act.param.namePlaceholder')}
             value={newParamName}
             onChange={e => setNewParamName(e.target.value)}
             className={`px-3 py-1 text-xs border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
@@ -63,7 +65,7 @@ export default function ParametersTab({
             <option value="decimal">decimal</option>
             <option value="boolean">boolean</option>
             <option value="date">date</option>
-            <option value="object">object (对象实例)</option>
+            <option value="object">{t('ow.act.param.objectOption')}</option>
           </select>
           {newParamType === 'object' && (
             <select
@@ -77,11 +79,12 @@ export default function ParametersTab({
             </select>
           )}
           <button
+            type="button"
             onClick={handleAddParam}
             className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition-colors flex items-center gap-1"
           >
             <LucideIcon name="Plus" size={13} />
-            配置参数
+            {t('ow.act.param.addBtn')}
           </button>
         </div>
       </div>
@@ -90,13 +93,13 @@ export default function ParametersTab({
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className={`${styles.appBg} border-b ${styles.appBorder} ${styles.cardText} font-medium`}>
-              <th className="py-2.5 px-4 w-12">必填</th>
-              <th className="py-2.5 px-4">显示名称</th>
-              <th className="py-2.5 px-4">参数变量 ID</th>
-              <th className="py-2.5 px-4">参数数据类型</th>
-              <th className="py-2.5 px-4">对象绑定类型</th>
-              <th className="py-2.5 px-4">作用描述</th>
-              <th className="py-2.5 px-4 text-center">操作</th>
+              <th className="py-2.5 px-4 w-12">{t('ow.act.param.colRequired')}</th>
+              <th className="py-2.5 px-4">{t('ow.act.param.colName')}</th>
+              <th className="py-2.5 px-4">{t('ow.act.param.colId')}</th>
+              <th className="py-2.5 px-4">{t('ow.act.param.colType')}</th>
+              <th className="py-2.5 px-4">{t('ow.act.param.colObjBinding')}</th>
+              <th className="py-2.5 px-4">{t('ow.act.param.colDesc')}</th>
+              <th className="py-2.5 px-4 text-center">{t('ow.act.param.colAction')}</th>
             </tr>
           </thead>
           <tbody className={`divide-y ${styles.divider} ${styles.cardTextMuted}`}>
@@ -136,11 +139,12 @@ export default function ParametersTab({
                     value={param.description}
                     onChange={e => handleParamFieldChange(param.id, 'description', e.target.value)}
                     className={`${styles.cardTextMuted} border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-full`}
-                    placeholder="配置描述信息"
+                    placeholder={t('ow.act.param.descPlaceholder')}
                   />
                 </td>
                 <td className="py-2.5 px-4 text-center">
                   <button
+                    type="button"
                     onClick={() => handleRemoveParam(param.id)}
                     className={`p-1 ${styles.cardTextMuted} opacity-70 hover:opacity-100 hover:text-red-500 rounded transition-opacity`}
                   >

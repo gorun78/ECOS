@@ -1470,5 +1470,17 @@
   "ow.act.val.listTitle": "已生效的验证列表",
   "ow.act.val.empty": "暂无拦截验证规则，该操作在调用时无入参安全性限制。",
   "ow.act.val.warnLabel": "警告文案",
-  "ow.act.val.removeTitle": "删除规则"
+  "ow.act.val.removeTitle": "删除规则",
+  "ow.act.param.intro": "定义运行该操作所必需的输入。可以是基本类型 (String, Integer) 或本系统内的对象实例 (Object Type)。",
+  "ow.act.param.namePlaceholder": "新参数中文名称",
+  "ow.act.param.objectOption": "object (对象实例)",
+  "ow.act.param.addBtn": "配置参数",
+  "ow.act.param.colRequired": "必填",
+  "ow.act.param.colName": "显示名称",
+  "ow.act.param.colId": "参数变量 ID",
+  "ow.act.param.colType": "参数数据类型",
+  "ow.act.param.colObjBinding": "对象绑定类型",
+  "ow.act.param.colDesc": "作用描述",
+  "ow.act.param.colAction": "操作",
+  "ow.act.param.descPlaceholder": "配置描述信息"
 }
