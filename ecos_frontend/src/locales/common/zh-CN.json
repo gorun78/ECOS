@@ -713,5 +713,12 @@
   "common.copilot.title": "智能助手",
   "common.copilot.quickQ": "快捷提问",
   "common.copilot.placeholder": "输入消息...",
-  "common.copilot.fetchFail": "错误：获取响应失败"
+  "common.copilot.fetchFail": "错误：获取响应失败",
+  "common.cmdpalette.searchPh": "实时搜索…",
+  "common.cmdpalette.searching": "搜索中…",
+  "common.cmdpalette.unavailable": "搜索暂不可用",
+  "common.cmdpalette.results": "结果 ({count})",
+  "common.cmdpalette.noResults": "无结果",
+  "common.cmdpalette.footerHint": "↵ 选择 · ESC 关闭",
+  "common.cmdpalette.title": "C2EOS 命令面板"
 }

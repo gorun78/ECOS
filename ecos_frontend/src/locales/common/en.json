@@ -713,5 +713,12 @@
   "common.copilot.title": "Copilot",
   "common.copilot.quickQ": "Quick Questions",
   "common.copilot.placeholder": "Type a message...",
-  "common.copilot.fetchFail": "Error: Failed to get response"
+  "common.copilot.fetchFail": "Error: Failed to get response",
+  "common.cmdpalette.searchPh": "Live search…",
+  "common.cmdpalette.searching": "Searching…",
+  "common.cmdpalette.unavailable": "Search unavailable",
+  "common.cmdpalette.results": "Results ({count})",
+  "common.cmdpalette.noResults": "No results",
+  "common.cmdpalette.footerHint": "↵ Select · ESC Close",
+  "common.cmdpalette.title": "C2EOS Command Palette"
 }

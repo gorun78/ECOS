@@ -84,7 +84,7 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
   const zh = locale === "zh";
 
@@ -165,7 +165,7 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
             ref={inputRef}
             type="text"
             className={`flex-1 text-sm bg-transparent border-0 outline-hidden ${styles.cardText} placeholder:${styles.cardTextMuted}`}
-            placeholder={zh ? "实时搜索…" : "Live search…"}
+            placeholder={t('common.cmdpalette.searchPh')}
             autoFocus
             value={search}
             onChange={(e) => onInput(e.target.value)}
@@ -177,27 +177,27 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
           {loading && (
             <div className={`py-8 text-center ${styles.cardTextMuted}`}>
               <Loader2 className="w-5 h-5 mx-auto mb-2 animate-spin" />
-              <p className="text-xs">{zh ? "搜索中…" : "Searching…"}</p>
+              <p className="text-xs">{t('common.cmdpalette.searching')}</p>
             </div>
           )}
 
           {!loading && error && (
             <div className={`py-8 text-center ${styles.cardTextMuted}`}>
               <HelpCircle className="w-6 h-6 mx-auto mb-2 text-amber-400" />
-              <p className="text-xs">{zh ? "搜索暂不可用" : "Search unavailable"}</p>
+              <p className="text-xs">{t('common.cmdpalette.unavailable')}</p>
             </div>
           )}
 
           {!loading && hasResults && (
             <div className="space-y-1 mb-3">
               <div className="px-3 py-1 text-[9px] font-mono tracking-widest uppercase text-indigo-500 font-bold">
-                {zh ? `结果 (${hits.length})` : `Results (${hits.length})`}
+                {t('common.cmdpalette.results', { count: hits.length })}
               </div>
               {hits.map((hit, i) => {
                 const meta = hitMeta(hit.type);
                 const IconC = meta.icon;
                 return (
-                  <button key={`h-${i}`} onClick={() => navHit(hit)}
+                  <button key={`h-${i}`} type="button" onClick={() => navHit(hit)}
                     className="w-full text-left flex items-start p-2.5 rounded-lg hover:bg-indigo-50 group transition cursor-pointer">
                     <div className="p-2 mr-3 bg-indigo-50 border border-indigo-100 rounded-md">
                       <IconC className="w-4 h-4 text-indigo-400 group-hover:text-indigo-600" />
@@ -228,7 +228,7 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
                     {catItems.map((item) => {
                       const IconC = item.icon;
                       return (
-                        <button key={item.id} onClick={() => { onNavigate(item.id); onClose(); }}
+                        <button key={item.id} type="button" onClick={() => { onNavigate(item.id); onClose(); }}
                           className={`w-full text-left flex items-start p-2.5 rounded-lg ${styles.sidebarHoverBg} group transition cursor-pointer`}>
                           <div className={`p-2 mr-3 ${styles.appBg} border ${styles.cardBorder} rounded-md`}>
                             <IconC className={`w-4 h-4 ${styles.cardTextMuted} group-hover:text-[#3B82F6]`} />
@@ -249,14 +249,14 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
           {!loading && !hasStatic && !hasResults && (
             <div className={`py-12 text-center ${styles.cardTextMuted}`}>
               <HelpCircle className={`w-8 h-8 mx-auto mb-2 ${styles.cardTextMuted}`} />
-              <p className="text-sm font-semibold">{zh ? "无结果" : "No results"}</p>
+              <p className="text-sm font-semibold">{t('common.cmdpalette.noResults')}</p>
             </div>
           )}
         </div>
 
         <div className={`flex items-center justify-between px-5 py-3 border-t ${styles.cardBorder} ${styles.appBg} text-[10px] ${styles.cardTextMuted} font-mono`}>
-          <span>{zh ? "↵ 选择 · ESC 关闭" : "↵ Select · ESC Close"}</span>
-          <span className={`font-semibold ${styles.cardTextMuted}`}>{zh ? "C2EOS 命令面板" : "C2EOS Command Palette"}</span>
+          <span>{t('common.cmdpalette.footerHint')}</span>
+          <span className={`font-semibold ${styles.cardTextMuted}`}>{t('common.cmdpalette.title')}</span>
         </div>
       </div>
     </div>
