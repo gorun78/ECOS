@@ -1195,5 +1195,10 @@
   "ow.proptbl.title.cancelEdit": "Cancel Edit",
   "ow.proptbl.title.delete": "Delete Property",
   "ow.proptbl.empty": "No properties yet. Click \"Add Property\" to start.",
-  "ow.proptbl.footerHint": "Double-click a row to edit · Press Enter or click ✓ to save"
+  "ow.proptbl.footerHint": "Double-click a row to edit · Press Enter or click ✓ to save",
+  "ow.canvas.footer.createRel": "Drag links to create relationships",
+  "ow.canvas.footer.addEntity": "Double-click blank to add an entity",
+  "ow.canvas.empty.title": "Canvas is empty",
+  "ow.canvas.empty.readonly": "No entity data in this domain",
+  "ow.canvas.empty.editable": "Click the 'Add Entity' button above or double-click the canvas to create your first entity"
 }

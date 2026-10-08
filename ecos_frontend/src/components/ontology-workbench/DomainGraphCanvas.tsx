@@ -41,6 +41,7 @@ import CanvasToolbar from "./CanvasToolbar";
 
 import { useWorkbenchStore } from "../../stores/useWorkbenchStore";
 import { useTheme } from "../ThemeContext";
+import { useLanguage } from "../LanguageContext";
 import { mapEntitiesToFlow, applyForceLayout } from "../../adapters/flowAdapter";
 import type { EntityNodeData } from "../../adapters/flowAdapter";
 import type { RelationshipEdgeData } from "../../adapters/flowAdapter";
@@ -119,6 +120,7 @@ export default function DomainGraphCanvas({
   className = "",
 }: DomainGraphCanvasProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   // ── 从 Store 获取状态 ──
   const entities = useWorkbenchStore((s) => s.entities);
   const relationships = useWorkbenchStore((s) => s.relationships);
@@ -544,9 +546,9 @@ export default function DomainGraphCanvas({
             select-none
           `}
         >
-          <span>拖拽连线创建关系</span>
+          <span>{t('ow.canvas.footer.createRel')}</span>
           <span className={`mx-1.5 ${styles.cardTextMuted}`}>|</span>
-          <span>双击空白添加实体</span>
+          <span>{t('ow.canvas.footer.addEntity')}</span>
         </div>
       </div>
 
@@ -570,12 +572,12 @@ export default function DomainGraphCanvas({
               </svg>
             </div>
             <h3 className={`text-sm font-medium ${styles.muted} mb-1`}>
-              画布为空
+              {t('ow.canvas.empty.title')}
             </h3>
             <p className={`text-[11px] ${styles.muted} max-w-[240px]`}>
               {readOnly
-                ? "当前域暂无实体数据"
-                : '点击上方「添加实体」按钮或双击画布空白区域，开始创建第一个本体实体'}
+                ? t('ow.canvas.empty.readonly')
+                : t('ow.canvas.empty.editable')}
             </p>
           </div>
         </div>

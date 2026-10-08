@@ -1195,5 +1195,10 @@
   "ow.proptbl.title.cancelEdit": "取消编辑",
   "ow.proptbl.title.delete": "删除属性",
   "ow.proptbl.empty": "暂无属性，点击「添加属性」开始",
-  "ow.proptbl.footerHint": "双击行可编辑 · 输入完成后按 Enter 或点击 ✓ 保存"
+  "ow.proptbl.footerHint": "双击行可编辑 · 输入完成后按 Enter 或点击 ✓ 保存",
+  "ow.canvas.footer.createRel": "拖拽连线创建关系",
+  "ow.canvas.footer.addEntity": "双击空白添加实体",
+  "ow.canvas.empty.title": "画布为空",
+  "ow.canvas.empty.readonly": "当前域暂无实体数据",
+  "ow.canvas.empty.editable": "点击上方「添加实体」按钮或双击画布空白区域，开始创建第一个本体实体"
 }
