@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { CheckCircle2, Layers } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
+import { useLanguage } from '../LanguageContext';
 
 type ToastFn = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -17,6 +18,7 @@ export function usePublishStep(
   toast: ToastFn,
   handleCommitToGit: (message: string, filesChanged: string[]) => void,
 ) {
+  const { t } = useLanguage();
   // --- STEP 5: ONTOLOGY STATE ---
   const [publishedOntology, setPublishedOntology] = useState<boolean>(false);
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
@@ -26,7 +28,7 @@ export function usePublishStep(
     setTimeout(() => {
       setIsPublishing(false);
       setPublishedOntology(true);
-      toast('success', '🏆 发布成功！业务实体 Flight 和 Link [Flight_to_Pilot] 已同步到全局 Ontology 中！');
+      toast('success', t('dw.pub.toast.published'));
       handleCommitToGit('feat(ontology): 全量发布并更新逻辑航空业务实体 Object Type: Flight (Silver-To-Ontology映射)', ['ontology_schema.json']);
     }, 1500);
   };
@@ -46,12 +48,13 @@ export default function StepPublish({
   publishOntology,
 }: StepPublishProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-4 font-sans">
       <div className={`p-4 ${styles.appBg} border ${styles.cardBorder} rounded-xl space-y-3`}>
         <span className={`text-[10px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono block`}>
-          Ontology 物理-逻辑属性映射引擎 (Ontology Mapping Core)
+          {t('dw.pub.engine.title')}
         </span>
 
         <div className="grid grid-cols-12 gap-4 items-center">
@@ -82,7 +85,7 @@ export default function StepPublish({
             <span className="text-[9px] bg-indigo-800 text-indigo-100 font-mono font-bold px-1.5 py-0.2 rounded uppercase">ONTOLOGY LOGIC OBJECT</span>
             <div className="font-extrabold text-white text-xs flex items-center gap-1">
               <Layers size={11} className="text-amber-400 animate-spin" style={{ animationDuration: '4s' }} />
-              <span>Flight (航班实体)</span>
+              <span>{t('dw.pub.flightEntity')}</span>
             </div>
             <div className="text-[9px] text-indigo-300 space-y-0.5 font-mono">
               <div>• Primary ID ➔ Object UUID</div>
@@ -96,14 +99,15 @@ export default function StepPublish({
 
       <div className={`p-4 ${styles.cardBg} border ${styles.cardBorder} rounded-xl flex flex-col md:flex-row justify-between items-center gap-4`}>
         <div className="space-y-1">
-          <div className={`text-xs font-bold ${styles.cardText}`}>将物理银/金牌数据集物化同步至业务 Ontology</div>
+          <div className={`text-xs font-bold ${styles.cardText}`}>{t('dw.pub.publish.title')}</div>
           <p className={`text-[10px] ${styles.cardTextMuted} leading-relaxed max-w-xl`}>
-            发布完成后，业务决策人员可在 Foundry Object Explorer 或 Workshop 中，完全绕过 SQL 代码，直接检索到以面向对象的形式封装的 <code>Flight</code> 航班对象。
+            {t('dw.pub.publish.intro1')}<code>Flight</code>{t('dw.pub.publish.intro2')}
           </p>
         </div>
 
         <div className="flex gap-3 items-center shrink-0">
           <button
+            type="button"
             onClick={publishOntology}
             disabled={isPublishing || publishedOntology}
             className={`px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:${styles.inputBg} disabled:text-${styles.cardTextMuted}`}
@@ -111,17 +115,17 @@ export default function StepPublish({
             {isPublishing ? (
               <>
                 <span className={`h-3.5 w-3.5 border-2 ${styles.cardBorder} border-t-transparent rounded-full animate-spin`}></span>
-                <span>元数据同步中...</span>
+                <span>{t('dw.pub.btn.syncing')}</span>
               </>
             ) : publishedOntology ? (
               <>
                 <CheckCircle2 size={13} className="text-emerald-400 animate-bounce" />
-                <span>已全量发布成功</span>
+                <span>{t('dw.pub.state.published')}</span>
               </>
             ) : (
               <>
                 <Layers size={13} />
-                <span>编译并一键发布至 Ontology 实体层</span>
+                <span>{t('dw.pub.btn.publish')}</span>
               </>
             )}
           </button>

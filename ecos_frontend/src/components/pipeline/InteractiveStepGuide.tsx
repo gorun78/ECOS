@@ -22,6 +22,7 @@ import React, { useCallback } from 'react';
 import { Clock, Sparkles } from 'lucide-react';
 import { commit as gitCommit } from '../../services/gitService';
 import { useTheme } from '../ThemeContext';
+import { useLanguage } from '../LanguageContext';
 import { PipelineBuilderOutput, STUB_PIPELINE_OUTPUT } from './stepGuideData';
 import StepIngest, { useIngestStep } from './StepIngest';
 import StepTransform, { useTransformStep } from './StepTransform';
@@ -60,6 +61,7 @@ export default function InteractiveStepGuide({
   // Toast 静默降级
   const toast = showToast ?? (() => undefined);
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   // Git 提交：父组件提供回调则委托；否则直接对接 POST /api/v1/ecos/git/commit，
   // 端点不可用时降级为 stub（演示流程不中断）。
@@ -97,11 +99,11 @@ export default function InteractiveStepGuide({
             <div className="flex items-center gap-1.5 text-emerald-800">
               <Sparkles size={14} className="text-emerald-600 animate-spin" style={{ animationDuration: '3s' }} />
               <span className="font-semibold">
-                已成功决策：无缝集成 Tool 1 (Pipeline Builder) 的物理产物 <code>/aviation/silver/ds_flights_clean</code>
+                {t('dw.guide.banner.integrated')}<code>/aviation/silver/ds_flights_clean</code>
               </span>
             </div>
             <div className="text-[10px] bg-emerald-100 text-emerald-700 font-mono font-bold px-2 py-0.5 rounded">
-              已读取: {pipelineOutput.rowCount} 行 · {pipelineOutput.expressionsCount} 个公式
+              {t('dw.guide.banner.readStats', { rows: pipelineOutput.rowCount, exprs: pipelineOutput.expressionsCount })}
             </div>
           </div>
         )}
@@ -113,23 +115,15 @@ export default function InteractiveStepGuide({
             </span>
             <div>
               <h4 className={`font-extrabold ${styles.cardText} text-xs`}>
-                {activeStep === 1 && '步骤 1: 物理异构源拉取与轻量入湖 (Ingest)'}
-                {activeStep === 2 && '步骤 2: 算子表达式与级联物理关联 (Transform)'}
-                {activeStep === 3 && '步骤 3: 管道血缘分支控制与 Git PR 协同 (Verify)'}
-                {activeStep === 4 && '步骤 4: 调度生命周期与 Data Health 熔断控制 (Schedule)'}
-                {activeStep === 5 && '步骤 5: Ontology 逻辑实体绑定与全栈发布 (Publish)'}
+                {t(`dw.guide.stepTitle.${activeStep}`)}
               </h4>
               <p className={`text-[10px] ${styles.cardTextMuted} mt-0.5 font-sans`}>
-                {activeStep === 1 && 'Data Connections 凭证托管 + 分布式 Magritte Agent 增量拉取'}
-                {activeStep === 2 && 'Pipeline Builder 无代码算子 + Doris 算子下推高速计算引擎'}
-                {activeStep === 3 && 'Git-First 冷分支演练 + 自动化 CI/CD Doris/内存 单元测试流水线'}
-                {activeStep === 4 && 'Job Scheduler 事务编排 + Data Health Checks 质量时效防污染断言'}
-                {activeStep === 5 && 'Ontology Manager 逻辑属性绑定 + Functions on Objects 指标统一'}
+                {t(`dw.guide.stepSub.${activeStep}`)}
               </p>
             </div>
           </div>
           <span className="text-[9px] bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono font-bold px-2 py-0.5 rounded">
-            Foundry 生产级原型
+            {t('dw.guide.prototypeBadge')}
           </span>
         </div>
       </div>
@@ -209,12 +203,12 @@ export default function InteractiveStepGuide({
       <div className={`border-t ${styles.appBorder} pt-3 flex justify-between items-center select-none text-[10px]`}>
         <div className={`flex items-center gap-1.5 ${styles.cardTextMuted} font-mono`}>
           <Clock size={11} className={styles.cardTextMuted} />
-          <span>最新状态时间: 刚刚</span>
+          <span>{t('dw.guide.footer.lastUpdated')}</span>
         </div>
 
-        {activeStep === 2 && <div className={`text-[10px] ${styles.cardTextMuted}`}>算子联动机制: 改变延误限度，下方 In-Memory/Doris 预览数据立刻响应</div>}
-        {activeStep === 3 && <div className={`text-[10px] ${styles.cardTextMuted}`}>版本管理规范: 强制 CI 单元校验保障生产分支的绝对高可用</div>}
-        {activeStep === 4 && <div className={`text-[10px] ${styles.cardTextMuted}`}>质量控制标准: 高容错 Data Health 校验，自动熔断异常下游</div>}
+        {activeStep === 2 && <div className={`text-[10px] ${styles.cardTextMuted}`}>{t('dw.guide.footer.hint2')}</div>}
+        {activeStep === 3 && <div className={`text-[10px] ${styles.cardTextMuted}`}>{t('dw.guide.footer.hint3')}</div>}
+        {activeStep === 4 && <div className={`text-[10px] ${styles.cardTextMuted}`}>{t('dw.guide.footer.hint4')}</div>}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@
 import React, { useState } from 'react';
 import { Code, Database, GitBranch, Plus, RefreshCw, Sliders, AlertTriangle, X } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
+import { useLanguage } from '../LanguageContext';
 import {
   IngressRow,
   Operator,
@@ -21,6 +22,7 @@ import {
 type ToastFn = (type: 'success' | 'error' | 'info', message: string) => void;
 
 export function useTransformStep(toast: ToastFn) {
+  const { t } = useLanguage();
   // --- STEP 2: TRANSFORM DRAG-AND-DROP STATE ---
   const [appliedOperators, setAppliedOperators] = useState<Operator[]>([
     { id: 'op-filter', name: 'Row Filter (行过滤算子)', desc: '筛选 delay_minutes 大于特定数值的异常飞行记录。', icon: 'Sliders', color: 'bg-blue-100 text-blue-700 border-blue-200', type: 'filter' },
@@ -32,16 +34,16 @@ export function useTransformStep(toast: ToastFn) {
 
   const addOperator = (op: Operator) => {
     if (appliedOperators.some((o) => o.id === op.id)) {
-      toast('info', `${op.name} 已经存在于当前变换流中`);
+      toast('info', t('dw.xf.toast.opExists', { name: op.name }));
       return;
     }
     setAppliedOperators((prev) => [...prev, op]);
-    toast('success', `已添加算子: ${op.name}`);
+    toast('success', t('dw.xf.toast.opAdded', { name: op.name }));
   };
 
   const removeOperator = (id: string) => {
     setAppliedOperators((prev) => prev.filter((o) => o.id !== id));
-    toast('info', '算子已移除');
+    toast('info', t('dw.xf.toast.opRemoved'));
   };
 
   const handleDragStart = (id: string) => {
@@ -102,13 +104,14 @@ export default function StepTransform({
   getTransformedData,
 }: StepTransformProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-4 font-sans select-none">
       <div className="grid grid-cols-12 gap-4">
         {/* Operators Left (cols 4) */}
         <div className={`col-span-4 border ${styles.cardBorder} rounded-xl p-3 ${styles.appBg} space-y-2`}>
-          <span className={`text-[9px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono`}>拖拽或点击添加清洗算子 (Operators)</span>
+          <span className={`text-[9px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono`}>{t('dw.xf.opsPanel.title')}</span>
 
           <div className="space-y-2 max-h-72 overflow-y-auto">
             {STATIC_OPERATORS.map((op) => {
@@ -152,15 +155,15 @@ export default function StepTransform({
           <div>
             <div className={`flex justify-between items-center mb-2 pb-1.5 border-b ${styles.appBorder}`}>
               <span className={`text-[9px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono`}>
-                活动加工拓扑管道 (Applied Transformations)
+                {t('dw.xf.canvas.title')}
               </span>
-              <span className={`text-[8px] ${styles.cardTextMuted}`}>支持 HTML5 拖放算子入仓，或直接在算子内微调属性</span>
+              <span className={`text-[8px] ${styles.cardTextMuted}`}>{t('dw.xf.canvas.hint')}</span>
             </div>
 
             {appliedOperators.length === 0 ? (
               <div className={`border-2 border-dashed ${styles.cardBorder} rounded-lg p-6 flex flex-col items-center justify-center ${styles.cardTextMuted} gap-1.5 text-xs text-center min-h-[140px]`}>
                 <Sliders size={20} className={`${styles.terminalText} animate-bounce`} />
-                <span>请从左侧拖拽或点击算子加入此处物理建模管道</span>
+                <span>{t('dw.xf.canvas.empty')}</span>
               </div>
             ) : (
               <div className={`flex flex-wrap gap-2 max-h-[160px] overflow-y-auto p-1 ${styles.appBg}/50 rounded-lg`}>
@@ -168,7 +171,7 @@ export default function StepTransform({
                   <div key={op.id} className={`p-2 ${styles.cardBg} rounded-lg border ${styles.cardBorder} flex flex-col gap-1.5 shadow-2xs text-[10px] w-[180px] shrink-0 animate-in zoom-in-95`}>
                     <div className={`flex justify-between items-center border-b ${styles.appBorder} pb-1`}>
                       <span className={`font-extrabold ${styles.cardText} truncate pr-2`}>{op.name.split(' ')[0]}</span>
-                      <button onClick={() => removeOperator(op.id)} className={`${styles.cardTextMuted} hover:${styles.cardText} cursor-pointer`}>
+                      <button type="button" onClick={() => removeOperator(op.id)} className={`${styles.cardTextMuted} hover:${styles.cardText} cursor-pointer`}>
                         <X size={10} />
                       </button>
                     </div>
@@ -176,8 +179,8 @@ export default function StepTransform({
                     {op.type === 'filter' && (
                       <div className="space-y-1">
                         <div className={`flex justify-between text-[8px] ${styles.cardTextMuted}`}>
-                          <span>过滤延误 &gt;= </span>
-                          <span className="font-bold text-blue-600">{filterMinutes} 分钟</span>
+                          <span>{t('dw.xf.filter.label')}</span>
+                          <span className="font-bold text-blue-600">{t('dw.xf.filter.unit', { minutes: filterMinutes })}</span>
                         </div>
                         <input
                           type="range"
@@ -192,7 +195,7 @@ export default function StepTransform({
 
                     {op.type === 'nulls' && (
                       <div className="space-y-1">
-                        <span className={`text-[8px] ${styles.cardTextMuted} block`}>空值默认填充值:</span>
+                        <span className={`text-[8px] ${styles.cardTextMuted} block`}>{t('dw.xf.nulls.label')}</span>
                         <input
                           type="text"
                           value={nullFillerValue}
@@ -210,7 +213,7 @@ export default function StepTransform({
 
                     {op.type === 'join' && (
                       <div className="flex items-center gap-1">
-                        <span className={`text-[8px] ${styles.cardTextMuted}`}>关联维度表:</span>
+                        <span className={`text-[8px] ${styles.cardTextMuted}`}>{t('dw.xf.join.label')}</span>
                         <span className="text-[8px] bg-purple-100 text-purple-700 font-bold px-1 rounded font-mono">pilots_raw</span>
                       </div>
                     )}
@@ -236,7 +239,7 @@ export default function StepTransform({
         <div className={`${styles.appBg} px-3 py-1.5 border-b ${styles.cardBorder} flex justify-between items-center`}>
           <span className={`text-[10px] font-extrabold ${styles.cardText} flex items-center gap-1 font-sans`}>
             <Database size={11} className={styles.cardTextMuted} />
-            <span>实时过滤计算动态数据预览 (Reactive In-Memory/Doris Preview)</span>
+            <span>{t('dw.xf.preview.title')}</span>
           </span>
           <span className={`text-[8px] ${styles.inputBg} ${styles.cardText} px-1.5 py-0.2 rounded font-mono`}>
             Rows count: {getTransformedData().length}
@@ -254,7 +257,7 @@ export default function StepTransform({
                 <th className={`p-2 border-r ${styles.cardBorder}`}>delay_minutes</th>
                 <th className={`p-2 border-r ${styles.cardBorder}`}>pilot_id</th>
                 {appliedOperators.some((op) => op.type === 'join' || op.type === 'nulls') && (
-                  <th className="p-2 text-indigo-700 font-extrabold">pilot_name (关联字段)</th>
+                  <th className="p-2 text-indigo-700 font-extrabold">{t('dw.xf.preview.pilotNameCol')}</th>
                 )}
               </tr>
             </thead>
