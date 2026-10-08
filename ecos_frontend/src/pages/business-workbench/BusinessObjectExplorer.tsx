@@ -6,6 +6,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ObjectType, LinkType, ActionType, Dataset } from '../../types/ontology';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 // 鉴权头单源定义见 services/auth.ts (H6-T1)
 import { fetchOntologyDataJson } from '../../services/ontologyWorkbenchApi';
 import {
@@ -57,6 +58,7 @@ export default function BusinessObjectExplorer({
   const [apiLoading, setApiLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   // Effective object types = props ∪ API extras (deduped by id).
   const objectTypes = useMemo<ObjectType[]>(() => {
@@ -78,11 +80,11 @@ export default function BusinessObjectExplorer({
           const items = normalizeObjectTypes(resp.data);
           if (items.length > 0) {
             setApiObjectTypes(items);
-            showToast('success', `已从后端加载 ${items.length} 个对象类型`);
+            showToast('success', t('ow.boe.loaded', { n: items.length }));
           }
         } else if (resp && resp.code && resp.code !== 0 && resp.code !== 200) {
           // Explicit backend error code — surface it but keep seed data.
-          setApiError(resp.message || `后端返回错误码 ${resp.code}`);
+          setApiError(resp.message || t('ow.boe.backendErr', { code: String(resp.code) }));
           console.error('Failed to load ontology data:', resp.message || resp);
         }
         setApiLoading(false);
@@ -326,7 +328,7 @@ export default function BusinessObjectExplorer({
 
     const distribution: Record<string, number> = {};
     processedInstances.forEach(inst => {
-      const key = String(inst[groupProp.id] || '未指定/Null');
+      const key = String(inst[groupProp.id] || t('ow.boe.unspecified'));
       distribution[key] = (distribution[key] || 0) + 1;
     });
 
@@ -356,13 +358,13 @@ export default function BusinessObjectExplorer({
     setNewFilterProp('');
     setNewFilterVal('');
     setShowFilterCreator(false);
-    showToast('info', '已成功添加筛选过滤器');
+    showToast('info', t('ow.boe.filterAdded'));
   };
 
   const handleRemoveFilter = (index: number) => {
     const updated = activeFilters.filter((_, idx) => idx !== index);
     setActiveFilters(updated);
-    showToast('info', '筛选过滤器已移除');
+    showToast('info', t('ow.boe.filterRemoved'));
   };
 
   // 5. Saved Searches Manager
@@ -381,7 +383,7 @@ export default function BusinessObjectExplorer({
     saveSearches([...savedSearches, newSearch]);
     setNewSearchName('');
     setShowSaveModal(false);
-    showToast('success', `成功保存对象列表:「${newSearch.name}」`);
+    showToast('success', t('ow.boe.savedSearchSaved', { name: newSearch.name }));
   };
 
   const handleLoadSavedSearch = (search: SavedSearch) => {
@@ -389,14 +391,14 @@ export default function BusinessObjectExplorer({
     setActiveFilters(search.filters);
     setSortBy(search.sortBy);
     setSortOrder(search.sortOrder);
-    showToast('success', `已载入保存的筛选:「${search.name}」`);
+    showToast('success', t('ow.boe.savedSearchLoaded', { name: search.name }));
   };
 
   const handleDeleteSavedSearch = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const updated = savedSearches.filter(s => s.id !== id);
     saveSearches(updated);
-    showToast('info', '已移除保存的对象列表');
+    showToast('info', t('ow.boe.savedSearchRemoved'));
   };
 
   // 6. Relational Connection Traversal Parser
@@ -493,7 +495,7 @@ export default function BusinessObjectExplorer({
     if (targetInst) {
       setSelectedInstance(targetInst);
       setDetailTab('properties');
-      showToast('info', `已穿透跳转至 ${ot.displayName}: ${instId}`);
+      showToast('info', t('ow.boe.drillDown', { object: ot.displayName, id: instId }));
     }
   };
 
@@ -554,7 +556,7 @@ export default function BusinessObjectExplorer({
 
     if (!valid) {
       setActionError(errMessage);
-      showToast('error', '校验未通过：' + errMessage);
+      showToast('error', t('ow.boe.validationFailed', { msg: errMessage }));
       return;
     }
 
@@ -601,7 +603,7 @@ export default function BusinessObjectExplorer({
     const otId = activeObjectType.id;
     const pk = selectedInstance[activeObjectType.primaryKey];
     
-    showToast('success', `🚀 操作「${selectedAction.displayName}」执行成功并提交写回底层数据集！`);
+    showToast('success', t('ow.boe.actionExecuted', { name: selectedAction.displayName }));
     
     // Close modal
     setSelectedAction(null);
@@ -646,7 +648,7 @@ export default function BusinessObjectExplorer({
   const handleDrillFilter = (propertyId: string, value: string) => {
     setActiveFilters([...activeFilters, { propertyId, operator: 'equals', value }]);
     setActiveTab('table');
-    showToast('info', `已通过图表下钻筛选 ${propertyId} = "${value}"`);
+    showToast('info', t('ow.boe.drillFilter', { prop: propertyId, val: value }));
   };
 
   return (

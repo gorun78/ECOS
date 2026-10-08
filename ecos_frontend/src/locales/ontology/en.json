@@ -1491,5 +1491,17 @@
   "ow.act.type.tabParameters": "1. Parameters",
   "ow.act.type.tabRules": "2. Rules / Effects",
   "ow.act.type.tabValidation": "3. Validation",
-  "ow.act.type.tabLayout": "4. Form & Layout"
+  "ow.act.type.tabLayout": "4. Form & Layout",
+  "ow.boe.loaded": "Loaded {n} object types from the backend",
+  "ow.boe.backendErr": "Backend returned error code {code}",
+  "ow.boe.unspecified": "Unspecified/Null",
+  "ow.boe.filterAdded": "Filter added successfully",
+  "ow.boe.filterRemoved": "Filter removed",
+  "ow.boe.savedSearchSaved": "Saved object list: \"{name}\"",
+  "ow.boe.savedSearchLoaded": "Loaded saved filter: \"{name}\"",
+  "ow.boe.savedSearchRemoved": "Removed saved object list",
+  "ow.boe.drillDown": "Drilled down to {object}: {id}",
+  "ow.boe.validationFailed": "Validation failed: {msg}",
+  "ow.boe.actionExecuted": "Action \"{name}\" executed and written to the base dataset.",
+  "ow.boe.drillFilter": "Drilled down from chart: {prop} = \"{val}\""
 }

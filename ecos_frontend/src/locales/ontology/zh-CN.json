@@ -1491,5 +1491,17 @@
   "ow.act.type.tabParameters": "1. 参数定义 (Parameters)",
   "ow.act.type.tabRules": "2. 副作用逻辑 (Rules / Effects)",
   "ow.act.type.tabValidation": "3. 提交前验证 (Validation)",
-  "ow.act.type.tabLayout": "4. 表单与布局 (Form & Layout)"
+  "ow.act.type.tabLayout": "4. 表单与布局 (Form & Layout)",
+  "ow.boe.loaded": "已从后端加载 {n} 个对象类型",
+  "ow.boe.backendErr": "后端返回错误码 {code}",
+  "ow.boe.unspecified": "未指定/Null",
+  "ow.boe.filterAdded": "已成功添加筛选过滤器",
+  "ow.boe.filterRemoved": "筛选过滤器已移除",
+  "ow.boe.savedSearchSaved": "成功保存对象列表:「{name}」",
+  "ow.boe.savedSearchLoaded": "已载入保存的筛选:「{name}」",
+  "ow.boe.savedSearchRemoved": "已移除保存的对象列表",
+  "ow.boe.drillDown": "已穿透跳转至 {object}: {id}",
+  "ow.boe.validationFailed": "校验未通过: {msg}",
+  "ow.boe.actionExecuted": "🚀 操作「{name}」执行成功并提交写回底层数据集!",
+  "ow.boe.drillFilter": "已通过图表下钻筛选 {prop} = \"{val}\""
 }
