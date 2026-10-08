@@ -1539,5 +1539,20 @@
   "ow.domainmodal.multiSelectHint": "Multi-select",
   "ow.domainmodal.emptyList": "No object types available to assign",
   "ow.domainmodal.cancel": "Cancel",
-  "ow.domainmodal.save": "Save"
+  "ow.domainmodal.save": "Save",
+  "ow.domainform.editTitle": "Edit Business Domain: {name}",
+  "ow.domainform.newTitle": "New Business Domain",
+  "ow.domainform.idLabel": "Unique Key ID (no spaces)",
+  "ow.domainform.idPlaceholder": "e.g. flight_ops",
+  "ow.domainform.nameLabel": "Display Name",
+  "ow.domainform.namePlaceholder": "e.g. Operations Control Domain",
+  "ow.domainform.colorLabel": "Theme Color",
+  "ow.domainform.descLabel": "Description",
+  "ow.domainform.descPlaceholder": "Briefly describe this domain's core functions, owning team, or data flow scope.",
+  "ow.domainform.assignLabel": "Bound Object Types (Assignment)",
+  "ow.domainform.assignHint": "Check the entity types belonging to this domain. Each entity may belong to only one domain at a time.",
+  "ow.domainform.boundTitle": "Bound to domain \"{name}\"",
+  "ow.domainform.cancel": "Cancel",
+  "ow.domainform.saveChanges": "Save Changes",
+  "ow.domainform.createDomain": "Create Domain"
 }

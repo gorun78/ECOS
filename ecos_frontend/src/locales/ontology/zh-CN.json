@@ -1539,5 +1539,20 @@
   "ow.domainmodal.multiSelectHint": "多选指派",
   "ow.domainmodal.emptyList": "暂无对象类型可供指派",
   "ow.domainmodal.cancel": "取消",
-  "ow.domainmodal.save": "保存"
+  "ow.domainmodal.save": "保存",
+  "ow.domainform.editTitle": "编辑业务域: {name}",
+  "ow.domainform.newTitle": "新建业务域分级",
+  "ow.domainform.idLabel": "唯一标识 ID (不可包含空格)",
+  "ow.domainform.idPlaceholder": "如: flight_ops",
+  "ow.domainform.nameLabel": "显示名称 (Display Name)",
+  "ow.domainform.namePlaceholder": "如: 运行控制域",
+  "ow.domainform.colorLabel": "代表色调 (Theme Color)",
+  "ow.domainform.descLabel": "业务描述信息 (Description)",
+  "ow.domainform.descPlaceholder": "简述该业务域所承载的核心职能、负责团队或数据流转范围。",
+  "ow.domainform.assignLabel": "绑定关联的实体对象 (Object Types Assignment)",
+  "ow.domainform.assignHint": "直接勾选属于该业务域的实体类型。一个实体同一时间仅可归属一个业务域。",
+  "ow.domainform.boundTitle": "已被域 \"{name}\" 绑定",
+  "ow.domainform.cancel": "取消",
+  "ow.domainform.saveChanges": "保存修改",
+  "ow.domainform.createDomain": "创建业务域"
 }

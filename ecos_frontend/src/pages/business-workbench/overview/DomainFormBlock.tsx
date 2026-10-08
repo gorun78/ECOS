@@ -7,6 +7,7 @@ import React from 'react';
 import { ObjectType, OntologyDomain } from '../../../types/ontology';
 import LucideIcon from '../LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 import { getDomainColorClasses } from './domainColorClasses';
 
 interface DomainFormBlockProps {
@@ -49,6 +50,7 @@ export default function DomainFormBlock({
   setEditingDomain
 }: DomainFormBlockProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     /* Domain Creation/Edit Form Block */
@@ -56,7 +58,7 @@ export default function DomainFormBlock({
       <div className={`flex items-center justify-between border-b ${styles.divider} pb-2`}>
         <h4 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
           <LucideIcon name="Edit3" size={14} className="text-blue-500" />
-          <span>{editingDomain ? `编辑业务域: ${editingDomain.displayName}` : '新建业务域分级'}</span>
+          <span>{editingDomain ? t('ow.domainform.editTitle', { name: editingDomain.displayName }) : t('ow.domainform.newTitle')}</span>
         </h4>
         <button
           type="button"
@@ -76,30 +78,30 @@ export default function DomainFormBlock({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-1 md:col-span-1">
-          <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>唯一标识 ID (不可包含空格)</label>
+          <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>{t('ow.domainform.idLabel')}</label>
           <input
             type="text"
             disabled={!!editingDomain}
             value={formId}
             onChange={e => setFormId(e.target.value)}
-            placeholder="如: flight_ops"
+            placeholder={t('ow.domainform.idPlaceholder')}
             className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden disabled:bg-blue-50/20 ${styles.cardTextMuted} font-mono`}
           />
         </div>
 
         <div className="space-y-1 md:col-span-1">
-          <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>显示名称 (Display Name)</label>
+          <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>{t('ow.domainform.nameLabel')}</label>
           <input
             type="text"
             value={formName}
             onChange={e => setFormName(e.target.value)}
-            placeholder="如: 运行控制域"
+            placeholder={t('ow.domainform.namePlaceholder')}
             className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
           />
         </div>
 
         <div className="space-y-1 md:col-span-1">
-          <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>代表色调 (Theme Color)</label>
+          <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>{t('ow.domainform.colorLabel')}</label>
           <div className="flex items-center gap-1.5 py-1">
             {['blue', 'emerald', 'amber', 'purple', 'rose', 'indigo', 'slate'].map(color => {
               const isSelected = formColor === color;
@@ -121,11 +123,11 @@ export default function DomainFormBlock({
       </div>
 
       <div className="space-y-1">
-        <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>业务描述信息 (Description)</label>
+        <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>{t('ow.domainform.descLabel')}</label>
         <textarea
           value={formDesc}
           onChange={e => setFormDesc(e.target.value)}
-          placeholder="简述该业务域所承载的核心职能、负责团队或数据流转范围。"
+          placeholder={t('ow.domainform.descPlaceholder')}
           className={`w-full h-16 px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
         />
       </div>
@@ -133,9 +135,9 @@ export default function DomainFormBlock({
       {/* Object types assignment in the form */}
       <div className={`space-y-2 border-t ${styles.divider} pt-3`}>
         <label className={`text-[11px] font-bold ${styles.cardTextMuted} uppercase tracking-wider block`}>
-          绑定关联的实体对象 (Object Types Assignment)
+          {t('ow.domainform.assignLabel')}
         </label>
-        <div className={`text-[10px] ${styles.cardTextMuted} -mt-1`}>直接勾选属于该业务域的实体类型。一个实体同一时间仅可归属一个业务域。</div>
+        <div className={`text-[10px] ${styles.cardTextMuted} -mt-1`}>{t('ow.domainform.assignHint')}</div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1.5">
           {objectTypes.map(ot => {
             const isChecked = formAssignedObjects.includes(ot.id);
@@ -162,7 +164,7 @@ export default function DomainFormBlock({
                 </div>
                 <div className="flex items-center">
                   {isMappedToOther ? (
-                    <span className={`text-[9px] ${styles.sidebarBg} ${styles.cardTextMuted} px-1 py-0.2 rounded font-mono truncate max-w-[65px]`} title={`已被域 "${otherDomain?.displayName}" 绑定`}>
+                    <span className={`text-[9px] ${styles.sidebarBg} ${styles.cardTextMuted} px-1 py-0.2 rounded font-mono truncate max-w-[65px]`} title={t('ow.domainform.boundTitle', { name: otherDomain?.displayName })}>
                       {otherDomain?.displayName.split(' (')[0]}
                     </span>
                   ) : (
@@ -184,13 +186,13 @@ export default function DomainFormBlock({
           onClick={() => { setIsAddingNew(false); setEditingDomain(null); }}
           className={`px-3.5 py-1.5 rounded-lg border ${styles.cardBorder} ${styles.cardTextMuted} text-xs font-semibold ${styles.cardBg} hover:bg-blue-50/20`}
         >
-          取消
+          {t('ow.domainform.cancel')}
         </button>
         <button
           type="submit"
           className="px-4 py-1.5 rounded-lg text-white text-xs font-semibold bg-blue-600 hover:bg-blue-700 shadow-sm"
         >
-          {editingDomain ? '保存修改' : '创建业务域'}
+          {editingDomain ? t('ow.domainform.saveChanges') : t('ow.domainform.createDomain')}
         </button>
       </div>
     </form>
