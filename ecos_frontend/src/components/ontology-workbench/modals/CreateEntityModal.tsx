@@ -14,15 +14,16 @@ import React, { useState, useEffect } from 'react';
 import { X, Box, Loader2, AlertCircle } from 'lucide-react';
 import { useWorkbenchStore } from '../../../stores/useWorkbenchStore';
 import { useTheme } from '../../ThemeContext';
+import { useLanguage } from '../../LanguageContext';
 import type { CreateEntityDTO } from '../../../types/workbench';
 
 // ── 实体类型选项 ────────────────────────────────────────────
 
-const ENTITY_TYPES: { value: string; label: string; desc: string }[] = [
-  { value: 'MASTER', label: '主数据 (MASTER)', desc: '核心业务主数据，如客户、产品、供应商' },
-  { value: 'TRANSACTION', label: '事务 (TRANSACTION)', desc: '业务交易记录，如订单、支付、发票' },
-  { value: 'EVENT', label: '事件 (EVENT)', desc: '业务事件/日志，如登录、操作审计' },
-  { value: 'REFERENCE', label: '引用 (REFERENCE)', desc: '字典/配置等引用数据，如国家、币种' },
+const ENTITY_TYPES: { value: string; labelKey: string; descKey: string }[] = [
+  { value: 'MASTER', labelKey: 'ow.entity.type.master', descKey: 'ow.entity.type.master.desc' },
+  { value: 'TRANSACTION', labelKey: 'ow.entity.type.transaction', descKey: 'ow.entity.type.transaction.desc' },
+  { value: 'EVENT', labelKey: 'ow.entity.type.event', descKey: 'ow.entity.type.event.desc' },
+  { value: 'REFERENCE', labelKey: 'ow.entity.type.reference', descKey: 'ow.entity.type.reference.desc' },
 ];
 
 // ── 组件接口 ────────────────────────────────────────────────
@@ -38,6 +39,7 @@ interface CreateEntityModalProps {
 
 export default function CreateEntityModal({ open, onClose, domainCode }: CreateEntityModalProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   // 本地表单状态
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
@@ -69,7 +71,7 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
     if (!isValid || submitting) return;
 
     if (!codeRegex.test(code)) {
-      setError('编码仅支持英文字母、数字和下划线，且必须以字母开头');
+      setError(t('ow.entity.err.codeFormat'));
       return;
     }
 
@@ -88,7 +90,7 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
       await store.createEntity(dto);
       onClose();
     } catch (err: unknown) {
-      setError((err as { message?: string } | undefined)?.message || '创建实体失败');
+      setError((err as { message?: string } | undefined)?.message || t('ow.entity.err.createFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -119,8 +121,8 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
               <Box size={16} className="text-indigo-400" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">创建实体</h3>
-              <p className={`text-[10px] ${styles.muted}`}>新建本体实体定义</p>
+              <h3 className="text-sm font-semibold text-white">{t('ow.entity.title')}</h3>
+              <p className={`text-[10px] ${styles.muted}`}>{t('ow.entity.subtitle')}</p>
             </div>
           </div>
           <button
@@ -136,12 +138,12 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
           {/* 编码 */}
           <div>
             <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>
-              编码 <span className="text-red-400">*</span>
+              {t('ow.entity.label.code')} <span className="text-red-400">*</span>
             </label>
             <input
               value={code}
               onChange={(e) => { setCode(e.target.value); setError(''); }}
-              placeholder="英文字母开头，如 Customer、SalesOrder"
+              placeholder={t('ow.entity.placeholder.code')}
               maxLength={64}
               autoFocus
               className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg px-3 py-2.5
@@ -149,18 +151,18 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
                 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30
                 transition"
             />
-            <p className={`text-[10px] ${styles.muted} mt-1`}>英文字母开头，支持字母、数字、下划线</p>
+            <p className={`text-[10px] ${styles.muted} mt-1`}>{t('ow.entity.hint.code')}</p>
           </div>
 
           {/* 名称 */}
           <div>
             <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>
-              名称 <span className="text-red-400">*</span>
+              {t('ow.entity.label.name')} <span className="text-red-400">*</span>
             </label>
             <input
               value={name}
               onChange={(e) => { setName(e.target.value); setError(''); }}
-              placeholder="中文名称，如 客户、销售订单"
+              placeholder={t('ow.entity.placeholder.name')}
               maxLength={100}
               className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg px-3 py-2.5
                 text-sm text-white placeholder:${styles.muted}
@@ -171,7 +173,7 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
 
           {/* 实体类型 */}
           <div>
-            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>实体类型</label>
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>{t('ow.entity.label.entityType')}</label>
             <div className="space-y-1.5">
               {ENTITY_TYPES.map((et) => (
                 <label
@@ -191,8 +193,8 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
                     className="mt-0.5 accent-indigo-500"
                   />
                   <div className="flex-1 min-w-0">
-                    <span className={`text-xs font-medium ${styles.sidebarText}`}>{et.label}</span>
-                    <p className={`text-[10px] ${styles.muted} mt-0.5`}>{et.desc}</p>
+                    <span className={`text-xs font-medium ${styles.sidebarText}`}>{t(et.labelKey)}</span>
+                    <p className={`text-[10px] ${styles.muted} mt-0.5`}>{t(et.descKey)}</p>
                   </div>
                 </label>
               ))}
@@ -201,11 +203,11 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
 
           {/* 描述 */}
           <div>
-            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>描述</label>
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>{t('ow.entity.label.description')}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="实体描述（可选）"
+              placeholder={t('ow.entity.placeholder.description')}
               rows={3}
               maxLength={500}
               className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg px-3 py-2.5
@@ -227,14 +229,16 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
         {/* ── 底部按钮 ── */}
         <div className="flex items-center justify-end gap-2.5 px-5 py-4 border-t border-[#2a3040]">
           <button
+            type="button"
             onClick={onClose}
             disabled={submitting}
             className={`px-4 py-2 rounded-lg text-xs font-medium ${styles.sidebarText}
               bg-[#2a3040] hover:bg-[#3a4050] disabled:opacity-50 transition`}
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
+            type="button"
             onClick={handleSubmit}
             disabled={!isValid || submitting}
             className="px-5 py-2 rounded-lg text-xs font-semibold text-white
@@ -243,7 +247,7 @@ export default function CreateEntityModal({ open, onClose, domainCode }: CreateE
               transition flex items-center gap-2"
           >
             {submitting && <Loader2 size={13} className="animate-spin" />}
-            {submitting ? '创建中...' : '创建实体'}
+            {submitting ? t('ow.entity.creating') : t('ow.entity.title')}
           </button>
         </div>
       </div>
