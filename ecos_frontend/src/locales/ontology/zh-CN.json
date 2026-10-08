@@ -1213,5 +1213,13 @@
   "ow.sidebar.ungrouped": "未分组",
   "ow.sidebar.statsDomains": "{d} 域",
   "ow.sidebar.statsObjects": "{o} 对象类型",
-  "ow.sidebar.loadFail": "加载本体数据失败"
+  "ow.sidebar.loadFail": "加载本体数据失败",
+  "ow.node.type.master": "主数据",
+  "ow.node.type.transaction": "事务",
+  "ow.node.type.event": "事件",
+  "ow.node.type.reference": "引用",
+  "ow.node.type.default": "实体",
+  "ow.node.propsCount": "{n} 属性",
+  "ow.node.moreProps": "+{n} 更多属性...",
+  "ow.node.emptyProps": "暂无属性"
 }

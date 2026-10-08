@@ -1213,5 +1213,13 @@
   "ow.sidebar.ungrouped": "Ungrouped",
   "ow.sidebar.statsDomains": "{d} domains",
   "ow.sidebar.statsObjects": "{o} object types",
-  "ow.sidebar.loadFail": "Failed to load ontology data"
+  "ow.sidebar.loadFail": "Failed to load ontology data",
+  "ow.node.type.master": "Master",
+  "ow.node.type.transaction": "Transaction",
+  "ow.node.type.event": "Event",
+  "ow.node.type.reference": "Reference",
+  "ow.node.type.default": "Entity",
+  "ow.node.propsCount": "{n} props",
+  "ow.node.moreProps": "+{n} more props...",
+  "ow.node.emptyProps": "No properties yet"
 }
