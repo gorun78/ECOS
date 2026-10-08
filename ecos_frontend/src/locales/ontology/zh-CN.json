@@ -1315,5 +1315,22 @@
   "ow.preview.summary": "共 {rows} 行 · {cols} 列",
   "ow.preview.refreshTitle": "刷新预览",
   "ow.preview.refresh": "刷新",
-  "ow.preview.page": "第 {cur} / {total} 页"
+  "ow.preview.page": "第 {cur} / {total} 页",
+  "ow.ds.view": "视图",
+  "ow.ds.table": "表",
+  "ow.ds.fields": "{n} 字段",
+  "ow.ds.previewTitle": "预览数据",
+  "ow.ds.unbindTitle": "解绑",
+  "ow.ds.bindFail": "绑定资源失败: {rid}",
+  "ow.ds.noEntity": "未找到当前实体",
+  "ow.ds.noMatch": "未发现匹配的物理表，请手动映射",
+  "ow.ds.loading": "加载数据资源...",
+  "ow.ds.unavail": "数据底座暂不可用",
+  "ow.ds.retry": "重试",
+  "ow.ds.mapPhysical": "映射物理表",
+  "ow.ds.discovering": "发现中...",
+  "ow.ds.autoDiscover": "自动发现",
+  "ow.ds.unmapped": "尚未映射物理表",
+  "ow.ds.unmappedHint": "点击「映射物理表」关联数据底座中的表/视图",
+  "ow.ds.mapped": "已映射 {n} 个物理表"
 }

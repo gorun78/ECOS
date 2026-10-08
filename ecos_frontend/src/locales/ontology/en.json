@@ -1315,5 +1315,22 @@
   "ow.preview.summary": "{rows} rows · {cols} columns",
   "ow.preview.refreshTitle": "Refresh preview",
   "ow.preview.refresh": "Refresh",
-  "ow.preview.page": "Page {cur} / {total}"
+  "ow.preview.page": "Page {cur} / {total}",
+  "ow.ds.view": "View",
+  "ow.ds.table": "Table",
+  "ow.ds.fields": "{n} fields",
+  "ow.ds.previewTitle": "Preview data",
+  "ow.ds.unbindTitle": "Unbind",
+  "ow.ds.bindFail": "Failed to bind resource: {rid}",
+  "ow.ds.noEntity": "Current entity not found",
+  "ow.ds.noMatch": "No matching physical table found, map manually",
+  "ow.ds.loading": "Loading data resources...",
+  "ow.ds.unavail": "Data service temporarily unavailable",
+  "ow.ds.retry": "Retry",
+  "ow.ds.mapPhysical": "Map physical table",
+  "ow.ds.discovering": "Discovering...",
+  "ow.ds.autoDiscover": "Auto discover",
+  "ow.ds.unmapped": "No physical table mapped yet",
+  "ow.ds.unmappedHint": "Click \"Map physical table\" to link a table/view from the data service",
+  "ow.ds.mapped": "{n} physical tables mapped"
 }

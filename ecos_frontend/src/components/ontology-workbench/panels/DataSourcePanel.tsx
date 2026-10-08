@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../../stores/useWorkbenchStore';
 import { useTheme } from '../../ThemeContext';
+import { useLanguage } from '../../LanguageContext';
 import type { BulkResource } from '../../../types/workbench';
 import DataResourcePickerModal from '../modals/DataResourcePickerModal';
 import { DATA_CATALOG_UNAVAILABLE } from '../../../services/dataCatalogClient';
@@ -48,7 +49,8 @@ interface TableChipProps {
 
 function TableChip({ resource, onUnbind, onPreview }: TableChipProps) {
   const { styles } = useTheme();
-  const typeLabel = resource.resourceType === 'VIEW' ? '视图' : '表';
+  const { t } = useLanguage();
+  const typeLabel = resource.resourceType === 'VIEW' ? t('ow.ds.view') : t('ow.ds.table');
 
   return (
     <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#0b0e14] border border-[#1E293B]
@@ -71,22 +73,24 @@ function TableChip({ resource, onUnbind, onPreview }: TableChipProps) {
         <div className={`flex items-center gap-2 mt-0.5 text-[10px] ${styles.muted}`}>
           <span className="truncate">{resource.datasourceName}</span>
           <span>·</span>
-          <span>{resource.fieldCount} 字段</span>
+          <span>{t('ow.ds.fields', { n: resource.fieldCount })}</span>
         </div>
       </div>
 
       {/* 操作按钮 */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
         <button
+          type="button"
           onClick={(e) => { e.stopPropagation(); onPreview(); }}
-          title="预览数据"
+          title={t('ow.ds.previewTitle')}
           className={`p-1 rounded hover:bg-indigo-500/10 ${styles.muted} hover:text-indigo-400 transition`}
         >
           <Eye size={13} />
         </button>
         <button
+          type="button"
           onClick={(e) => { e.stopPropagation(); onUnbind(); }}
-          title="解绑"
+          title={t('ow.ds.unbindTitle')}
           className={`p-1 rounded hover:bg-red-500/10 ${styles.muted} hover:text-red-400 transition`}
         >
           <X size={13} />
@@ -100,6 +104,7 @@ function TableChip({ resource, onUnbind, onPreview }: TableChipProps) {
 
 export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const store = useWorkbenchStore();
   const {
     dataResources,
@@ -163,11 +168,11 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
         try {
           await bindEntityToTable(entityId, rid);
         } catch (err: unknown) {
-          setError((err as { message?: string } | undefined)?.message || `绑定资源失败: ${rid}`);
+          setError((err as { message?: string } | undefined)?.message || t('ow.ds.bindFail', { rid }));
         }
       }
     },
-    [entityId, bindEntityToTable]
+    [entityId, bindEntityToTable, t]
   );
 
   // ── 自动发现 ──
@@ -185,7 +190,7 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
       // 实际生产环境中应调用后端自动发现 API
       const entity = store.entities.find((e) => e.id === entityId);
       if (!entity) {
-        setError('未找到当前实体');
+        setError(t('ow.ds.noEntity'));
         setAutoDiscovering(false);
         return;
       }
@@ -203,7 +208,7 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
       });
 
       if (candidates.length === 0) {
-        setError('未发现匹配的物理表，请手动映射');
+        setError(t('ow.ds.noMatch'));
         setAutoDiscovering(false);
         return;
       }
@@ -221,14 +226,14 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
     } finally {
       setAutoDiscovering(false);
     }
-  }, [entityId, dataResources.length, fetchDataResources, bindEntityToTable, store.entities, store.dataResources]);
+  }, [entityId, dataResources.length, fetchDataResources, bindEntityToTable, store.entities, store.dataResources, t]);
 
   // ── 加载态 ──
   if (dataResourcesLoading && mappedResources.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 size={20} className={`animate-spin ${styles.muted}`} />
-        <span className={`ml-2 text-xs ${styles.muted}`}>加载数据资源...</span>
+        <span className={`ml-2 text-xs ${styles.muted}`}>{t('ow.ds.loading')}</span>
       </div>
     );
   }
@@ -240,17 +245,18 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
         <div className="flex items-start gap-2 px-3 py-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
           <AlertTriangle size={14} className="text-amber-400 mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-amber-300 font-medium">数据底座暂不可用</p>
+            <p className="text-xs text-amber-300 font-medium">{t('ow.ds.unavail')}</p>
             <p className="text-[10px] text-amber-500/70 mt-1">{error}</p>
           </div>
         </div>
 
         <button
+          type="button"
           onClick={() => { setError(null); fetchDataResources().catch(() => {}); }}
           className="w-full py-2 rounded-lg text-xs text-indigo-400 border border-indigo-500/20
             hover:bg-indigo-500/10 transition"
         >
-          重试
+          {t('ow.ds.retry')}
         </button>
       </div>
     );
@@ -261,14 +267,16 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
       {/* ── 操作按钮行 ── */}
       <div className="flex items-center gap-2">
         <button
+          type="button"
           onClick={() => setPickerOpen(true)}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium
             bg-indigo-600 hover:bg-indigo-500 text-white transition"
         >
           <Plus size={12} />
-          映射物理表
+          {t('ow.ds.mapPhysical')}
         </button>
         <button
+          type="button"
           onClick={handleAutoDiscover}
           disabled={autoDiscovering}
           className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium
@@ -280,7 +288,7 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
           ) : (
             <Zap size={12} />
           )}
-          {autoDiscovering ? '发现中...' : '自动发现'}
+          {autoDiscovering ? t('ow.ds.discovering') : t('ow.ds.autoDiscover')}
         </button>
       </div>
 
@@ -296,9 +304,9 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
       {mappedResources.length === 0 && !error && (
         <div className={`flex flex-col items-center justify-center py-8 ${styles.muted}`}>
           <Database size={28} className="mb-2 opacity-20" />
-          <p className="text-xs">尚未映射物理表</p>
+          <p className="text-xs">{t('ow.ds.unmapped')}</p>
           <p className="text-[10px] mt-1 opacity-60">
-            点击「映射物理表」关联数据底座中的表/视图
+            {t('ow.ds.unmappedHint')}
           </p>
         </div>
       )}
@@ -308,7 +316,7 @@ export default function DataSourcePanel({ entityId }: DataSourcePanelProps) {
         <div className="space-y-1.5">
           <div className="flex items-center justify-between mb-2">
             <span className={`text-[10px] font-medium ${styles.muted}`}>
-              已映射 {mappedResources.length} 个物理表
+              {t('ow.ds.mapped', { n: mappedResources.length })}
             </span>
           </div>
           {mappedResources.map((res) => (
