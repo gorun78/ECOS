@@ -1586,5 +1586,11 @@
   "ow.create.action": "新建操作类型 (Action Type)",
   "ow.create.interface": "新建接口定义 (Interface)",
   "ow.create.sharedProp": "新建共享属性 (Shared Property)",
-  "ow.create.function": "新建逻辑函数 (Function)"
+  "ow.create.function": "新建逻辑函数 (Function)",
+  "ow.domhdr.overviewTitle": "本体全景与总览",
+  "ow.domhdr.globalAll": "全局全景 (All)",
+  "ow.domhdr.editDomain": "修改业务域",
+  "ow.domhdr.deleteDomain": "删除业务域",
+  "ow.domhdr.addDomain": "添加业务分级域",
+  "ow.domhdr.overviewTab": "配置全景"
 }

@@ -1586,5 +1586,11 @@
   "ow.create.action": "New Action Type",
   "ow.create.interface": "New Interface",
   "ow.create.sharedProp": "New Shared Property",
-  "ow.create.function": "New Function"
+  "ow.create.function": "New Function",
+  "ow.domhdr.overviewTitle": "Ontology Panorama & Overview",
+  "ow.domhdr.globalAll": "Global Panorama (All)",
+  "ow.domhdr.editDomain": "Edit domain",
+  "ow.domhdr.deleteDomain": "Delete domain",
+  "ow.domhdr.addDomain": "Add domain tier",
+  "ow.domhdr.overviewTab": "Overview"
 }
