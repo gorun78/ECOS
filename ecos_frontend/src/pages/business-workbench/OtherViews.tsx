@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { InterfaceType, SharedProperty, Dataset, ObjectType } from '../../types/ontology';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 
 // ==========================================
 // 1. Interface View Component
@@ -20,6 +21,7 @@ interface InterfaceViewProps {
 
 export function InterfaceView({ intf, objectTypes, onDelete, onNavigateToObject }: InterfaceViewProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const implementingObjects = objectTypes.filter(ot => ot.interfaces?.includes(intf.id));
 
   return (
@@ -40,29 +42,30 @@ export function InterfaceView({ intf, objectTypes, onDelete, onNavigateToObject 
           </div>
         </div>
         <button
+          type="button"
           onClick={() => onDelete(intf.id)}
           className={`text-xs ${styles.dangerText} hover:bg-red-50 px-2.5 py-1.5 rounded border ${styles.dangerBorder}`}
         >
-          删除接口
+          {t('ow.ip.delete')}
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         <div className="space-y-3">
-          <h3 className={`text-xs font-semibold ${styles.cardText}`}>1. 规定接口属性 (Interface Properties)</h3>
+          <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.ip.propSection')}</h3>
           <p className={`text-[11px] ${styles.cardTextMuted}`}>
-            任何实现此接口的对象类型都必须具备以下声明的属性，以保证其行为能够以抽象接口的形式在各种微应用中通用。
+            {t('ow.ip.propDesc')}
           </p>
 
           <div className={`border ${styles.appBorder} rounded-lg overflow-hidden`}>
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className={`${styles.appBg} border-b ${styles.appBorder} ${styles.cardText} font-medium`}>
-                  <th className="py-2.5 px-4">必填</th>
-                  <th className="py-2.5 px-4">显示名称</th>
-                  <th className="py-2.5 px-4">API 标识</th>
-                  <th className="py-2.5 px-4">规定数据类型</th>
-                  <th className="py-2.5 px-4">规格描述</th>
+                  <th className="py-2.5 px-4">{t('ow.ip.col.required')}</th>
+                  <th className="py-2.5 px-4">{t('ow.ip.col.displayName')}</th>
+                  <th className="py-2.5 px-4">{t('ow.ip.col.apiName')}</th>
+                  <th className="py-2.5 px-4">{t('ow.ip.col.dataType')}</th>
+                  <th className="py-2.5 px-4">{t('ow.ip.col.description')}</th>
                 </tr>
               </thead>
               <tbody className={`divide-y divide-gray-100 ${styles.cardText}`}>
@@ -85,10 +88,10 @@ export function InterfaceView({ intf, objectTypes, onDelete, onNavigateToObject 
         </div>
 
         <div className="space-y-3 border-t border-gray-100 pt-6">
-          <h3 className={`text-xs font-semibold ${styles.cardText}`}>2. 实现此接口的对象类型 ({implementingObjects.length})</h3>
+          <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.ip.implSection', { count: implementingObjects.length })}</h3>
           {implementingObjects.length === 0 ? (
             <div className={`text-center py-6 border border-dashed ${styles.appBorder} rounded-lg ${styles.cardTextMuted} text-xs`}>
-              当前没有对象类型实现该接口，请在对象的「元数据配置」中勾选实现。
+              {t('ow.ip.implEmpty')}
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-4">
@@ -125,6 +128,7 @@ interface SharedPropertyViewProps {
 
 export function SharedPropertyView({ sp, objectTypes, onDelete, onNavigateToObject }: SharedPropertyViewProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const referencedObjects = objectTypes.filter(ot =>
     ot.properties.some(prop => prop.sharedPropertyId === sp.id)
   );
@@ -147,42 +151,41 @@ export function SharedPropertyView({ sp, objectTypes, onDelete, onNavigateToObje
           </div>
         </div>
         <button
+          type="button"
           onClick={() => onDelete(sp.id)}
           className={`text-xs ${styles.dangerText} bg-red-50 px-2.5 py-1.5 rounded border ${styles.dangerBorder}`}
         >
-          删除共享属性
+          {t('ow.sprop.delete')}
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         <div className={`${styles.appBg} border ${styles.appBorder} rounded-xl p-4 space-y-2`}>
-          <h4 className={`text-xs font-semibold ${styles.cardText}`}>共享属性的作用机制</h4>
+          <h4 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.sprop.mechTitle')}</h4>
           <p className={`text-[11px] ${styles.cardText} leading-relaxed`}>
-            在 Foundry 中，<strong>共享属性类型 (Shared Property Types)</strong> 用于在整个系统层面上标准化业务术语。
-            例如，“状态”或“创建时间”字段在许多对象中都有。一旦定义了共享属性，你就可以将其与多个不同对象类型的本地字段进行绑定，
-            这让跨实体联合查询和通用前端组件呈现变得更轻量和统一。
+            {t('ow.sprop.mechDesc')}
           </p>
         </div>
 
         <div className="space-y-3">
-          <h3 className={`text-xs font-semibold ${styles.cardText}`}>数据规范</h3>
+          <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.sprop.spec')}</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className={`p-3 border ${styles.appBorder} rounded-lg`}>
-              <span className={`text-[10px] ${styles.cardTextMuted} uppercase block`}>共享属性 API 标识</span>
+              <span className={`text-[10px] ${styles.cardTextMuted} uppercase block`}>{t('ow.sprop.apiNameLabel')}</span>
               <span className={`font-mono text-xs font-semibold ${styles.cardText} mt-1 block`}>{sp.apiName}</span>
             </div>
             <div className={`p-3 border ${styles.appBorder} rounded-lg`}>
-              <span className={`text-[10px] ${styles.cardTextMuted} uppercase block`}>标准数据格式 (DataType)</span>
+              <span className={`text-[10px] ${styles.cardTextMuted} uppercase block`}>{t('ow.sprop.dataTypeLabel')}</span>
               <span className="font-mono text-xs font-semibold text-teal-600 mt-1 block uppercase">{sp.dataType}</span>
             </div>
           </div>
         </div>
 
         <div className="space-y-3 border-t border-gray-100 pt-6">
-          <h3 className={`text-xs font-semibold ${styles.cardText}`}>绑定了此共享属性的对象类型 ({referencedObjects.length})</h3>
+          <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.sprop.bindSection', { count: referencedObjects.length })}</h3>
           {referencedObjects.length === 0 ? (
             <div className={`text-center py-6 border border-dashed ${styles.appBorder} rounded-lg ${styles.cardTextMuted} text-xs`}>
-              当前尚无任何对象类型绑定此共享属性。您可以在对象「属性定义」中为其设置关联。
+              {t('ow.sprop.bindEmpty')}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
@@ -203,7 +206,7 @@ export function SharedPropertyView({ sp, objectTypes, onDelete, onNavigateToObje
                     <div className={`text-[10px] ${styles.cardTextMuted} space-y-1`}>
                       {boundLocalProps.map(lp => (
                         <div key={lp.id} className={`flex justify-between font-mono ${styles.appBg} p-1.5 rounded`}>
-                          <span>本地属性：{lp.displayName} ({lp.id})</span>
+                          <span>{t('ow.sprop.localProp', { lpName: lp.displayName, lpId: lp.id })}</span>
                           <span className={styles.cardTextMuted}>{lp.dataType}</span>
                         </div>
                       ))}
@@ -230,6 +233,7 @@ interface DatasetViewProps {
 
 export function DatasetView({ dataset, objectTypes, onNavigateToObject }: DatasetViewProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const mappedObject = objectTypes.find(ot => ot.mapping.datasetId === dataset.id);
 
   return (
@@ -243,10 +247,10 @@ export function DatasetView({ dataset, objectTypes, onNavigateToObject }: Datase
             <div className="flex items-center gap-2">
               <h2 className={`text-sm font-semibold font-mono ${styles.cardText}`}>{dataset.name}</h2>
               <span className={`text-[10px] font-bold ${styles.sidebarBg} ${styles.cardText} px-1.5 py-0.5 rounded font-mono uppercase`}>
-                原始数据表
+                {t('ow.dsv.raw')}
               </span>
             </div>
-            <p className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>Foundry 路径: {dataset.path}</p>
+            <p className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>{t('ow.dsv.pathLabel')}: {dataset.path}</p>
           </div>
         </div>
 
@@ -256,7 +260,7 @@ export function DatasetView({ dataset, objectTypes, onNavigateToObject }: Datase
             className={`px-3 py-1.5 rounded-lg border text-xs cursor-pointer hover:shadow-xs transition-shadow flex items-center gap-1.5 ${mappedObject.color}`}
           >
             <LucideIcon name="Layers" size={13} />
-            <span>映射至对象：<strong>{mappedObject.displayName}</strong></span>
+            <span>{t('ow.dsv.mappedTo')}：<strong>{mappedObject.displayName}</strong></span>
           </div>
         )}
       </div>
@@ -264,7 +268,7 @@ export function DatasetView({ dataset, objectTypes, onNavigateToObject }: Datase
       <div className="flex-1 overflow-hidden flex flex-col p-6 space-y-6">
         {/* Schema Summary */}
         <div className="space-y-2">
-          <h3 className={`text-xs font-semibold ${styles.cardText}`}>表结构定义 (Schema)</h3>
+          <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.dsv.schema')}</h3>
           <div className="flex flex-wrap gap-2">
             {dataset.columns.map(col => (
               <div key={col.name} className={`flex items-center gap-1.5 ${styles.appBg} border ${styles.appBorder} px-2 py-1 rounded font-mono text-[10px]`}>
@@ -279,7 +283,7 @@ export function DatasetView({ dataset, objectTypes, onNavigateToObject }: Datase
         <div className={`flex-1 flex flex-col space-y-2 overflow-hidden border ${styles.appBorder} rounded-lg`}>
           <div className={`${styles.appBg} px-4 py-2 text-xs font-semibold ${styles.cardText} border-b ${styles.appBorder} flex items-center gap-1.5`}>
             <LucideIcon name="Table" size={14} className={styles.cardTextMuted} />
-            数据预览 (前 10 行记录)
+            {t('ow.dsv.preview')}
           </div>
           <div className={`flex-1 overflow-auto ${styles.cardBg}`}>
             <table className="w-full text-left border-collapse font-mono text-[11px]">
