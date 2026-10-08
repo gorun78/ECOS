@@ -11,6 +11,7 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw, ShieldAlert } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
+import { useLanguage } from '../LanguageContext';
 
 type ToastFn = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -18,6 +19,7 @@ export function useScheduleStep(
   toast: ToastFn,
   handleCommitToGit: (message: string, filesChanged: string[]) => void,
 ) {
+  const { t } = useLanguage();
   // --- STEP 4: SCHEDULE & DATA HEALTH STATE ---
   const [scheduleTrigger] = useState<string>('ON_DATASET_UPDATE');
   const [nullTolerance, setNullTolerance] = useState<number>(1); // 1%
@@ -47,7 +49,7 @@ export function useScheduleStep(
             ]);
             setIsMelted(true);
             setStreamActive(false);
-            toast('error', '⚠️ 步骤 4 Data Health 报警：发现大量空值，安全断言失败，物理管道自动熔断！');
+            toast('error', t('dw.psl.toast.incident'));
             handleCommitToGit('fix(health-breaker): 自动触发调度生命周期熔断逻辑，终止下游构建，保护物理 Gold 表', ['dhc-telemetry.log']);
           } else {
             setHealthLogs((curr) => [
@@ -72,7 +74,7 @@ export function useScheduleStep(
       setIncidentActive(false);
       setStreamDataRows(4500);
       setHealthLogs(['[SCHEDULER] 🔄 系统熔断已人工复位，清除 Data Health 异常事件，正在准备重新启动流监控。']);
-      toast('info', '熔断警报已手动复位！');
+      toast('info', t('dw.psl.toast.reset'));
       return;
     }
     setStreamActive(!streamActive);
@@ -87,11 +89,11 @@ export function useScheduleStep(
 
   const triggerIncident = () => {
     if (!streamActive) {
-      toast('error', '请先开启实时高并发调度，才可模拟注入脏数据！');
+      toast('error', t('dw.psl.toast.incidentNotReady'));
       return;
     }
     setIncidentActive(true);
-    toast('info', '脏数据已注入流！等待下一轮 Data Health 断言核验...');
+    toast('info', t('dw.psl.toast.incidentInjected'));
   };
 
   return {
@@ -139,16 +141,17 @@ export default function StepSchedule({
   triggerIncident,
 }: StepScheduleProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-4 font-sans select-none">
       <div className={`p-4 ${styles.appBg} border ${styles.cardBorder} rounded-xl space-y-3`}>
         <div className={`flex justify-between items-center pb-1.5 border-b ${styles.cardBorder}`}>
           <span className={`text-[10px] font-extrabold ${styles.cardText} uppercase tracking-wider font-mono`}>
-            高时效调度与异常熔断安全设定 (SLA Rules)
+            {t('dw.psl.sla.title')}
           </span>
           <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${isMelted ? 'bg-rose-100 text-rose-800 animate-pulse' : 'bg-emerald-100 text-emerald-800'}`}>
-            {isMelted ? '🛑 物理管道处于熔断保护中' : '🟢 质量监控引擎运作中'}
+            {isMelted ? t('dw.psl.sla.melted') : t('dw.psl.sla.healthy')}
           </span>
         </div>
 
@@ -156,7 +159,7 @@ export default function StepSchedule({
         <div className="grid grid-cols-3 gap-4 text-xs">
           <div className={`${styles.cardBg} p-2.5 rounded-lg border ${styles.cardBorder} flex flex-col gap-1.5`}>
             <div className={`flex justify-between font-mono text-[9px] ${styles.cardTextMuted}`}>
-              <span>空值上限 (Null Limit)</span>
+              <span>{t('dw.psl.slider.nullLimit')}</span>
               <span className={`font-bold ${styles.cardText}`}>{nullTolerance}%</span>
             </div>
             <input
@@ -168,13 +171,13 @@ export default function StepSchedule({
               disabled={isMelted}
               className={`w-full h-1 ${styles.inputBg} rounded-lg appearance-none cursor-pointer accent-slate-800`}
             />
-            <p className={`text-[8px] ${styles.cardTextMuted}`}>若 pilot_id 缺漏率超出此上限，触发自动熔断保护。</p>
+            <p className={`text-[8px] ${styles.cardTextMuted}`}>{t('dw.psl.slider.nullLimitDesc')}</p>
           </div>
 
           <div className={`${styles.cardBg} p-2.5 rounded-lg border ${styles.cardBorder} flex flex-col gap-1.5`}>
             <div className={`flex justify-between font-mono text-[9px] ${styles.cardTextMuted}`}>
-              <span>行数底限 (Min Rows)</span>
-              <span className={`font-bold ${styles.cardText}`}>{minRowCount} 行</span>
+              <span>{t('dw.psl.slider.minRows')}</span>
+              <span className={`font-bold ${styles.cardText}`}>{minRowCount} {t('dw.psl.unit.rows')}</span>
             </div>
             <input
               type="range"
@@ -186,13 +189,13 @@ export default function StepSchedule({
               disabled={isMelted}
               className={`w-full h-1 ${styles.inputBg} rounded-lg appearance-none cursor-pointer accent-slate-800`}
             />
-            <p className={`text-[8px] ${styles.cardTextMuted}`}>输出结果行数低于此阀值时报错，发送SLA警报。</p>
+            <p className={`text-[8px] ${styles.cardTextMuted}`}>{t('dw.psl.slider.minRowsDesc')}</p>
           </div>
 
           <div className={`${styles.cardBg} p-2.5 rounded-lg border ${styles.cardBorder} flex flex-col gap-1.5`}>
             <div className={`flex justify-between font-mono text-[9px] ${styles.cardTextMuted}`}>
-              <span>时效延迟 (Freshness)</span>
-              <span className={`font-bold ${styles.cardText}`}>{freshnessDelay} 分钟</span>
+              <span>{t('dw.psl.slider.freshness')}</span>
+              <span className={`font-bold ${styles.cardText}`}>{freshnessDelay} {t('dw.psl.unit.minutes')}</span>
             </div>
             <input
               type="range"
@@ -204,7 +207,7 @@ export default function StepSchedule({
               disabled={isMelted}
               className={`w-full h-1 ${styles.inputBg} rounded-lg appearance-none cursor-pointer accent-slate-800`}
             />
-            <p className={`text-[8px] ${styles.cardTextMuted}`}>入湖至 Gold 延迟超出时启动 SLA 故障分级。</p>
+            <p className={`text-[8px] ${styles.cardTextMuted}`}>{t('dw.psl.slider.freshnessDesc')}</p>
           </div>
         </div>
       </div>
@@ -212,15 +215,16 @@ export default function StepSchedule({
       <div className="flex gap-4 items-stretch">
         <div className={`flex-1 border ${styles.cardBorder} rounded-xl p-4 ${styles.cardBg} flex flex-col justify-between gap-3`}>
           <div className="space-y-1">
-            <div className={`text-xs font-bold ${styles.cardText}`}>高频流式微批接收测试沙箱 (Scheduler Monitor)</div>
+            <div className={`text-xs font-bold ${styles.cardText}`}>{t('dw.psl.sandbox.title')}</div>
             <p className={`text-[10px] ${styles.cardTextMuted} leading-relaxed`}>
-              点击开启流接收，模拟高吞吐量写入。你可以模拟<strong>注入脏数据异常事件</strong>，查看 Data Health Checks 探针是如何敏锐拦截 Null 并实施微毫秒级
-              <strong className="text-rose-600 font-extrabold ml-1">自动熔断 (Circuit Breaker)</strong>。
+              {t('dw.psl.sandbox.intro1')}<strong>{t('dw.psl.sandbox.injectDirty')}</strong>{t('dw.psl.sandbox.intro2')}
+              <strong className="text-rose-600 font-extrabold ml-1">{t('dw.psl.sandbox.circuitBreaker')}</strong>
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={toggleStream}
               className={`flex-1 py-2 font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer shadow-xs ${
                 isMelted
@@ -231,16 +235,17 @@ export default function StepSchedule({
               }`}
             >
               <RefreshCw size={12} className={streamActive ? 'animate-spin' : ''} />
-              <span>{isMelted ? '⚠️ 熔断已生效：点击一键报警复位' : streamActive ? '暂停实时流写入' : '开启高频流式调度'}</span>
+              <span>{isMelted ? t('dw.psl.btn.meltedReset') : streamActive ? t('dw.psl.btn.pauseStream') : t('dw.psl.btn.startStream')}</span>
             </button>
 
             <button
+              type="button"
               onClick={triggerIncident}
               disabled={!streamActive || isMelted}
               className={`py-2 px-3 bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer disabled:${styles.appBorder} disabled:text-${styles.cardTextMuted}`}
             >
               <ShieldAlert size={12} />
-              <span>注入脏数据</span>
+              <span>{t('dw.psl.btn.injectDirty')}</span>
             </button>
           </div>
         </div>
@@ -253,7 +258,7 @@ export default function StepSchedule({
         >
           {healthLogs.length === 0 ? (
             <div className={`${styles.cardTextMuted} italic h-full flex items-center justify-center text-center`}>
-              等待开启高频流式调度以注入监测流日志...
+              {t('dw.psl.logs.empty')}
             </div>
           ) : (
             <div className="space-y-1">
