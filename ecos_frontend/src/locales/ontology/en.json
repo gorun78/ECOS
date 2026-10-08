@@ -1440,5 +1440,22 @@
   "ow.bod.actMaintenanceDesc": "Aircraft operational state switched to MAINTENANCE and maintenance stamp updated.",
   "ow.bod.justNow": "Just now",
   "ow.bod.actDelayed": "Flight Status Set to DELAYED",
-  "ow.bod.actDelayedDesc": "Side effect triggered: runtime status change written back to the corresponding flight physical data row."
+  "ow.bod.actDelayedDesc": "Side effect triggered: runtime status change written back to the corresponding flight physical data row.",
+  "ow.act.layout.defaultSectionTitle": "Basic Parameters",
+  "ow.act.layout.defaultButtonText": "Confirm: {name}",
+  "ow.act.layout.intro": "Configure the modal form layout and copy that users see when running this action from the Workshop or Object Explorer.",
+  "ow.act.layout.behaviorTitle": "Form Behavior Copy",
+  "ow.act.layout.submitText": "Submit Button Label (Submit Text)",
+  "ow.act.layout.submitTextPlaceholder": "e.g. Confirm status change",
+  "ow.act.layout.addSection": "Add a New Form Section",
+  "ow.act.layout.sectionNamePlaceholder": "Section name (e.g. Extra options)",
+  "ow.act.layout.addSectionBtn": "+ Section",
+  "ow.act.layout.sectionTitle": "Section Layout & Field Assignment",
+  "ow.act.layout.removeSectionTitle": "Remove this section and return its fields to the first section",
+  "ow.act.layout.fieldUnit": "fields",
+  "ow.act.layout.sectionEmpty": "This section is empty. Use the selector below to move fields in.",
+  "ow.act.layout.requiredTag": "Required",
+  "ow.act.layout.optionalTag": "Optional",
+  "ow.act.layout.moveField": "Move field into this section:",
+  "ow.act.layout.optSelect": "-- Select a variable to move --"
 }

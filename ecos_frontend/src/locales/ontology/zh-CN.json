@@ -1440,5 +1440,22 @@
   "ow.bod.actMaintenanceDesc": "飞机运营状态转设为 MAINTENANCE 并更新检修戳记。",
   "ow.bod.justNow": "刚刚",
   "ow.bod.actDelayed": "修改航班运行状态为 DELAYED",
-  "ow.bod.actDelayedDesc": "触发副作用：运行状态修改写回至对应航班物理数据行中。"
+  "ow.bod.actDelayedDesc": "触发副作用：运行状态修改写回至对应航班物理数据行中。",
+  "ow.act.layout.defaultSectionTitle": "基本参数信息",
+  "ow.act.layout.defaultButtonText": "确认执行: {name}",
+  "ow.act.layout.intro": "配置当用户在主应用 Workshop 或 Object Explorer 中运行此操作时，所呈现的操作弹窗表单布局与文案。",
+  "ow.act.layout.behaviorTitle": "表单行为文案",
+  "ow.act.layout.submitText": "提交按钮文字 (Submit Text)",
+  "ow.act.layout.submitTextPlaceholder": "如：确认修改状态",
+  "ow.act.layout.addSection": "添加新的表单区块 (Section)",
+  "ow.act.layout.sectionNamePlaceholder": "区块名称 (e.g. 附加选项)",
+  "ow.act.layout.addSectionBtn": "+ 区块",
+  "ow.act.layout.sectionTitle": "区块划分与字段归属",
+  "ow.act.layout.removeSectionTitle": "移除此区块并将字段退回第一区块",
+  "ow.act.layout.fieldUnit": "字段",
+  "ow.act.layout.sectionEmpty": "该区块目前为空，请在下方选择参数移入此区。",
+  "ow.act.layout.requiredTag": "必填",
+  "ow.act.layout.optionalTag": "选填",
+  "ow.act.layout.moveField": "划转字段入此区:",
+  "ow.act.layout.optSelect": "-- 选择可移入的变量 --"
 }
