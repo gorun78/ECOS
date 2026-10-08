@@ -466,6 +466,7 @@ export default function BusinessWorkbenchLayout({
         {tabs.map(tab => (
           <button
             key={tab.id}
+            type="button"
             onClick={() => {
               setViewMode(tab.id);
               onActiveTabChange?.(tab.id);
@@ -488,6 +489,7 @@ export default function BusinessWorkbenchLayout({
           className={`px-3 py-1 text-xs border ${styles.inputBorder} rounded-md w-48 focus:outline-none focus:ring-1 ${styles.accentBorder}`}
         />
         <button
+          type="button"
           onClick={() => setShowCopilot(!showCopilot)}
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded border transition-colors cursor-pointer text-xs ${
             showCopilot
