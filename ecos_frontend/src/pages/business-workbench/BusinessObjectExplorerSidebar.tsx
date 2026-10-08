@@ -10,6 +10,7 @@ import React from 'react';
 import { ObjectType, Dataset } from '../../types/ontology';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 import { SavedSearch } from './businessObjectExplorerTypes';
 
 interface ExplorerSidebarProps {
@@ -36,6 +37,7 @@ export function ExplorerSidebar({
   apiError,
 }: ExplorerSidebarProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`w-64 border-r ${styles.appBorder} ${styles.cardBg} flex flex-col shrink-0 text-xs`}>
@@ -43,27 +45,27 @@ export function ExplorerSidebar({
       <div className={`p-4 border-b ${styles.divider} flex items-center justify-between`}>
         <div className={`font-semibold ${styles.cardText} flex items-center gap-1.5`}>
           <LucideIcon name="Compass" size={14} className="text-blue-600" />
-          <span>对象浏览器目录</span>
+          <span>{t('ow.boe.sidebarTitle')}</span>
           {apiLoading && (
             <span className="ml-1 inline-flex items-center gap-1 text-[9px] font-normal text-blue-500">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-              同步后端…
+              {t('ow.boe.syncing')}
             </span>
           )}
         </div>
         {apiError && (
           <span
-            title={`后端同步失败：${apiError}（已降级为本地种子数据）`}
+            title={t('ow.boe.syncFailed', { msg: apiError })}
             className="text-[9px] text-amber-500 cursor-help"
           >
-            离线
+            {t('ow.boe.offline')}
           </span>
         )}
       </div>
 
       {/* Object Types list */}
       <div className="p-3 space-y-1">
-        <span className={`text-[10px] ${styles.cardTextMuted} font-bold uppercase tracking-wider block px-2 mb-2`}>对象实体 (Objects)</span>
+        <span className={`text-[10px] ${styles.cardTextMuted} font-bold uppercase tracking-wider block px-2 mb-2`}>{t('ow.boe.objectsSection')}</span>
         {objectTypes.map(ot => {
           const isActive = ot.id === activeObjectTypeId;
           // Get mock instances count
@@ -73,6 +75,7 @@ export function ExplorerSidebar({
           return (
             <button
               key={ot.id}
+              type="button"
               onClick={() => onSelectObjectType(ot.id)}
               className={`w-full text-left py-2 px-2.5 rounded-lg flex items-center justify-between transition-all group ${
                 isActive
@@ -97,14 +100,14 @@ export function ExplorerSidebar({
       {/* Saved Search Lists */}
       <div className={`flex-1 border-t ${styles.divider} p-3 space-y-1.5 overflow-y-auto`}>
         <div className="flex justify-between items-center px-2 mb-1">
-          <span className={`text-[10px] ${styles.cardTextMuted} font-bold uppercase tracking-wider`}>我的保存列表 (Object Lists)</span>
+          <span className={`text-[10px] ${styles.cardTextMuted} font-bold uppercase tracking-wider`}>{t('ow.boe.savedListTitle')}</span>
           <span className={`text-[10px] ${styles.sidebarBg} ${styles.cardTextMuted} px-1 py-0.2 rounded-sm font-mono`}>{savedSearches.length}</span>
         </div>
 
         {savedSearches.length === 0 ? (
           <div className={`p-4 text-center ${styles.cardTextMuted} border border-dashed ${styles.sidebarBorder} rounded-lg text-[10px]`}>
-            暂无保存的对象列表。
-            可以在筛选过滤后，将其保存。
+            {t('ow.boe.savedEmptyTitle')}
+            {t('ow.boe.savedEmptyDesc')}
           </div>
         ) : (
           <div className="space-y-1">
@@ -119,6 +122,7 @@ export function ExplorerSidebar({
                   <span className={`font-medium ${styles.accentText} truncate`}>{search.name}</span>
                 </div>
                 <button
+                  type="button"
                   onClick={(e) => onDeleteSavedSearch(search.id, e)}
                   className={`opacity-0 group-hover:opacity-100 hover:text-red-500 ${styles.cardTextMuted} transition-opacity p-0.5`}
                 >
@@ -141,16 +145,16 @@ interface ExplorerWelcomeProps {
 
 export function ExplorerWelcome({ objectTypes, datasets, onSelectObjectType }: ExplorerWelcomeProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`flex flex-col items-center justify-center h-full p-8 text-center ${styles.appBg}`}>
       <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 mb-4 animate-pulse">
         <LucideIcon name="Compass" size={32} />
       </div>
-      <h2 className={`text-sm font-semibold ${styles.cardText}`}>欢迎使用 Palantir Foundry 对象浏览器 (Object Explorer)</h2>
+      <h2 className={`text-sm font-semibold ${styles.cardText}`}>{t('ow.boe.welcomeTitle')}</h2>
       <p className={`text-xs ${styles.cardTextMuted} max-w-lg leading-relaxed mt-2`}>
-        对象浏览器是围绕底层异构数据源构建的数据模型透视工作台。
-        在此您可以全局探索所有数字孪生实例、设定复杂的交叉筛选条件、跨对象级联穿透挖掘、以及触发运行微事务 Action。
+        {t('ow.boe.welcomeDesc')}
       </p>
 
       {/* Grid of quick choices */}
@@ -171,7 +175,7 @@ export function ExplorerWelcome({ objectTypes, datasets, onSelectObjectType }: E
                 <div className={`text-xs font-semibold ${styles.cardText} group-hover:text-blue-600`}>{ot.displayName}</div>
                 <p className={`text-[10px] ${styles.cardTextMuted} line-clamp-1`}>{ot.description}</p>
                 <div className={`text-[10px] font-mono ${styles.cardTextMuted} mt-1`}>
-                  <strong>{count}</strong> 个当前运行实体
+                  {t('ow.boe.runningEntities', { n: count })}
                 </div>
               </div>
             </div>

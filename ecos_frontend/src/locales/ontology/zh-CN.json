@@ -1503,5 +1503,16 @@
   "ow.boe.drillDown": "已穿透跳转至 {object}: {id}",
   "ow.boe.validationFailed": "校验未通过: {msg}",
   "ow.boe.actionExecuted": "🚀 操作「{name}」执行成功并提交写回底层数据集!",
-  "ow.boe.drillFilter": "已通过图表下钻筛选 {prop} = \"{val}\""
+  "ow.boe.drillFilter": "已通过图表下钻筛选 {prop} = \"{val}\"",
+  "ow.boe.sidebarTitle": "对象浏览器目录",
+  "ow.boe.syncing": "同步后端…",
+  "ow.boe.syncFailed": "后端同步失败：{msg}（已降级为本地种子数据）",
+  "ow.boe.offline": "离线",
+  "ow.boe.objectsSection": "对象实体 (Objects)",
+  "ow.boe.savedListTitle": "我的保存列表 (Object Lists)",
+  "ow.boe.savedEmptyTitle": "暂无保存的对象列表。",
+  "ow.boe.savedEmptyDesc": "可以在筛选过滤后，将其保存。",
+  "ow.boe.welcomeTitle": "欢迎使用 Palantir Foundry 对象浏览器 (Object Explorer)",
+  "ow.boe.welcomeDesc": "对象浏览器是围绕底层异构数据源构建的数据模型透视工作台。在此您可以全局探索所有数字孪生实例、设定复杂的交叉筛选条件、跨对象级联穿透挖掘、以及触发运行微事务 Action。",
+  "ow.boe.runningEntities": "{n} 个当前运行实体"
 }

@@ -1503,5 +1503,16 @@
   "ow.boe.drillDown": "Drilled down to {object}: {id}",
   "ow.boe.validationFailed": "Validation failed: {msg}",
   "ow.boe.actionExecuted": "Action \"{name}\" executed and written to the base dataset.",
-  "ow.boe.drillFilter": "Drilled down from chart: {prop} = \"{val}\""
+  "ow.boe.drillFilter": "Drilled down from chart: {prop} = \"{val}\"",
+  "ow.boe.sidebarTitle": "Object Explorer Catalog",
+  "ow.boe.syncing": "Syncing backend…",
+  "ow.boe.syncFailed": "Backend sync failed: {msg} (degraded to local seed data)",
+  "ow.boe.offline": "Offline",
+  "ow.boe.objectsSection": "Object Instances (Objects)",
+  "ow.boe.savedListTitle": "My Saved Lists (Object Lists)",
+  "ow.boe.savedEmptyTitle": "No saved object lists.",
+  "ow.boe.savedEmptyDesc": "You can save a list after applying filters.",
+  "ow.boe.welcomeTitle": "Welcome to the Palantir Foundry Object Explorer",
+  "ow.boe.welcomeDesc": "The Object Explorer is a data-model lens built around heterogeneous underlying data sources. Explore all digital-twin instances globally, set complex cross-filters, cascade-drill across objects, and trigger micro-transaction actions.",
+  "ow.boe.runningEntities": "{n} active instances"
 }
