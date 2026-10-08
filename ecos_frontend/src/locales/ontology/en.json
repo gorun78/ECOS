@@ -1579,5 +1579,12 @@
   "ow.side.functionLabel": "Functions",
   "ow.side.interfaceLabel": "Interfaces",
   "ow.side.sharedPropLabel": "Shared Properties",
-  "ow.side.datasetLabel": "Datasets"
+  "ow.side.datasetLabel": "Datasets",
+  "ow.create.menuTitle": "New Ontology Element",
+  "ow.create.object": "New Object Type",
+  "ow.create.link": "New Link Type",
+  "ow.create.action": "New Action Type",
+  "ow.create.interface": "New Interface",
+  "ow.create.sharedProp": "New Shared Property",
+  "ow.create.function": "New Function"
 }

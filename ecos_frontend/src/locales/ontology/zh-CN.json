@@ -1579,5 +1579,12 @@
   "ow.side.functionLabel": "逻辑函数 (Functions)",
   "ow.side.interfaceLabel": "接口规范 (Interfaces)",
   "ow.side.sharedPropLabel": "共享属性 (Shared Properties)",
-  "ow.side.datasetLabel": "原始数据集 (Datasets)"
+  "ow.side.datasetLabel": "原始数据集 (Datasets)",
+  "ow.create.menuTitle": "新建本体元素",
+  "ow.create.object": "新建对象类型 (Object Type)",
+  "ow.create.link": "新建链接关系 (Link Type)",
+  "ow.create.action": "新建操作类型 (Action Type)",
+  "ow.create.interface": "新建接口定义 (Interface)",
+  "ow.create.sharedProp": "新建共享属性 (Shared Property)",
+  "ow.create.function": "新建逻辑函数 (Function)"
 }
