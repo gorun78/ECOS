@@ -1285,5 +1285,22 @@
   "ow.stats.details": "Metric Details",
   "ow.stats.relDensity": "Relationship Density",
   "ow.stats.avgPerDomain": "Avg Entities / Domain",
-  "ow.stats.graphDensity": "Graph Density"
+  "ow.stats.graphDensity": "Graph Density",
+  "ow.rightpanel.lbl.code": "Code",
+  "ow.rightpanel.lbl.name": "Name",
+  "ow.rightpanel.lbl.entityType": "Entity Type",
+  "ow.rightpanel.lbl.description": "Description",
+  "ow.rightpanel.form.descPh": "Entity description (optional)",
+  "ow.rightpanel.form.saving": "Saving...",
+  "ow.rightpanel.form.save": "Save Changes",
+  "ow.rightpanel.meta.createdAt": "Created",
+  "ow.rightpanel.meta.updatedAt": "Updated",
+  "ow.rightpanel.empty.title": "Select an entity to view details",
+  "ow.rightpanel.empty.hint": "Click a canvas node or the entity tree on the left",
+  "ow.rightpanel.tab.basic": "Basic Info",
+  "ow.rightpanel.tab.properties": "Properties",
+  "ow.rightpanel.tab.relationships": "Relationships",
+  "ow.rightpanel.tab.glossary": "Glossary",
+  "ow.rightpanel.tab.datasource": "Data Mapping",
+  "ow.rightpanel.saveSuccess": "Saved successfully"
 }

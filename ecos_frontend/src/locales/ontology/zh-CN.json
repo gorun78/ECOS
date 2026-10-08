@@ -1285,5 +1285,22 @@
   "ow.stats.details": "指标明细",
   "ow.stats.relDensity": "关系密度",
   "ow.stats.avgPerDomain": "域均实体",
-  "ow.stats.graphDensity": "图密度"
+  "ow.stats.graphDensity": "图密度",
+  "ow.rightpanel.lbl.code": "编码",
+  "ow.rightpanel.lbl.name": "名称",
+  "ow.rightpanel.lbl.entityType": "实体类型",
+  "ow.rightpanel.lbl.description": "描述",
+  "ow.rightpanel.form.descPh": "实体描述（可选）",
+  "ow.rightpanel.form.saving": "保存中...",
+  "ow.rightpanel.form.save": "保存修改",
+  "ow.rightpanel.meta.createdAt": "创建时间",
+  "ow.rightpanel.meta.updatedAt": "更新时间",
+  "ow.rightpanel.empty.title": "选择实体查看详情",
+  "ow.rightpanel.empty.hint": "点击画布节点或左侧实体树",
+  "ow.rightpanel.tab.basic": "基本信息",
+  "ow.rightpanel.tab.properties": "属性列表",
+  "ow.rightpanel.tab.relationships": "关联关系",
+  "ow.rightpanel.tab.glossary": "术语关联",
+  "ow.rightpanel.tab.datasource": "数据映射",
+  "ow.rightpanel.saveSuccess": "保存成功"
 }

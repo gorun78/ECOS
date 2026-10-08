@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../stores/useWorkbenchStore';
 import { useTheme } from '../ThemeContext';
+import { useLanguage } from '../LanguageContext';
 import type { Entity } from '../../types/workbench';
 import PropertyTableEditor from './PropertyTableEditor';
 import RelationshipListPanel from './RelationshipListPanel';
@@ -35,17 +36,13 @@ import GlossaryBindingPanel from './panels/GlossaryBindingPanel';
 
 // ── 实体类型标签映射 ──────────────────────────────────────────
 
-const ENTITY_TYPE_CONFIG: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
-  MASTER:   { icon: <Database size={12} className="text-amber-400" />,  color: 'text-amber-400',  label: '主数据' },
-  TRANSACTION: { icon: <List size={12} className="text-emerald-400" />, color: 'text-emerald-400', label: '事务' },
-  EVENT:    { icon: <Layers size={12} className="text-blue-400" />,   color: 'text-blue-400',   label: '事件' },
-  REFERENCE:{ icon: <Globe size={12} className="text-purple-400" />,  color: 'text-purple-400',  label: '引用' },
-  default:  { icon: <Box size={12} className="text-slate-400" />,     color: 'text-slate-400',   label: '未知' },
+const ENTITY_TYPE_CONFIG: Record<string, { icon: React.ReactNode; color: string; labelKey: string }> = {
+  MASTER:   { icon: <Database size={12} className="text-amber-400" />,  color: 'text-amber-400',  labelKey: 'ow.node.type.master' },
+  TRANSACTION: { icon: <List size={12} className="text-emerald-400" />, color: 'text-emerald-400', labelKey: 'ow.node.type.transaction' },
+  EVENT:    { icon: <Layers size={12} className="text-blue-400" />,   color: 'text-blue-400',   labelKey: 'ow.node.type.event' },
+  REFERENCE:{ icon: <Globe size={12} className="text-purple-400" />,  color: 'text-purple-400',  labelKey: 'ow.node.type.reference' },
+  default:  { icon: <Box size={12} className="text-slate-400" />,     color: 'text-slate-400',   labelKey: 'ow.node.type.default' },
 };
-
-function getEntityTypeLabel(et: string): string {
-  return ENTITY_TYPE_CONFIG[et]?.label || et;
-}
 
 // ── 标签页定义 ────────────────────────────────────────────────
 
@@ -53,16 +50,16 @@ type TabKey = 'basic' | 'properties' | 'relationships' | 'glossary' | 'datasourc
 
 interface TabDef {
   key: TabKey;
-  label: string;
+  labelKey: string;
   icon: React.ReactNode;
 }
 
 const TABS: TabDef[] = [
-  { key: 'basic', label: '基本信息', icon: <Edit3 size={11} /> },
-  { key: 'properties', label: '属性列表', icon: <List size={11} /> },
-  { key: 'relationships', label: '关联关系', icon: <GitBranch size={11} /> },
-  { key: 'glossary', label: '术语关联', icon: <BookOpen size={11} /> },
-  { key: 'datasource', label: '数据映射', icon: <Database size={11} /> },
+  { key: 'basic', labelKey: 'ow.rightpanel.tab.basic', icon: <Edit3 size={11} /> },
+  { key: 'properties', labelKey: 'ow.rightpanel.tab.properties', icon: <List size={11} /> },
+  { key: 'relationships', labelKey: 'ow.rightpanel.tab.relationships', icon: <GitBranch size={11} /> },
+  { key: 'glossary', labelKey: 'ow.rightpanel.tab.glossary', icon: <BookOpen size={11} /> },
+  { key: 'datasource', labelKey: 'ow.rightpanel.tab.datasource', icon: <Database size={11} /> },
 ];
 
 // ── 实体类型选项 ──────────────────────────────────────────────
@@ -79,6 +76,7 @@ interface EntityBasicInfoFormProps {
 
 function EntityBasicInfoForm({ entity }: EntityBasicInfoFormProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const store = useWorkbenchStore();
   const { savingEntity } = store;
 
@@ -103,20 +101,20 @@ function EntityBasicInfoForm({ entity }: EntityBasicInfoFormProps) {
         entityType,
         description: description.trim() || undefined,
       });
-      setSuccessMsg('保存成功');
+      setSuccessMsg(t("ow.rightpanel.saveSuccess"));
       setTimeout(() => setSuccessMsg(''), 2000);
     } catch {
       // error handled by store
     } finally {
       setSaving(false);
     }
-  }, [isDirty, saving, savingEntity, entity.id, name, entityType, description, store]);
+  }, [isDirty, saving, savingEntity, entity.id, name, entityType, description, store, t]);
 
   return (
     <div className="space-y-3">
       {/* 编码（只读） */}
       <div>
-        <label className={`block text-[10px] font-medium ${styles.muted} mb-1`}>编码</label>
+        <label className={`block text-[10px] font-medium ${styles.muted} mb-1`}>{t("ow.rightpanel.lbl.code")}</label>
         <input
           value={entity.code}
           readOnly
@@ -127,7 +125,7 @@ function EntityBasicInfoForm({ entity }: EntityBasicInfoFormProps) {
 
       {/* 名称 */}
       <div>
-        <label className={`block text-[10px] font-medium ${styles.muted} mb-1`}>名称</label>
+        <label className={`block text-[10px] font-medium ${styles.muted} mb-1`}>{t("ow.rightpanel.lbl.name")}</label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -140,13 +138,14 @@ function EntityBasicInfoForm({ entity }: EntityBasicInfoFormProps) {
 
       {/* 实体类型 */}
       <div>
-        <label className={`block text-[10px] font-medium ${styles.muted} mb-1.5`}>实体类型</label>
+        <label className={`block text-[10px] font-medium ${styles.muted} mb-1.5`}>{t("ow.rightpanel.lbl.entityType")}</label>
         <div className="grid grid-cols-2 gap-1.5">
           {ENTITY_TYPES.map((et) => {
             const cfg = ENTITY_TYPE_CONFIG[et] || ENTITY_TYPE_CONFIG.default;
             return (
               <button
                 key={et}
+                type="button"
                 onClick={() => setEntityType(et)}
                 className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-[10px] font-medium transition border ${
                   entityType === et
@@ -155,7 +154,7 @@ function EntityBasicInfoForm({ entity }: EntityBasicInfoFormProps) {
                 }`}
               >
                 {cfg.icon}
-                <span>{getEntityTypeLabel(et)}</span>
+                <span>{t(cfg.labelKey)}</span>
               </button>
             );
           })}
@@ -164,13 +163,13 @@ function EntityBasicInfoForm({ entity }: EntityBasicInfoFormProps) {
 
       {/* 描述 */}
       <div>
-        <label className={`block text-[10px] font-medium ${styles.muted} mb-1`}>描述</label>
+        <label className={`block text-[10px] font-medium ${styles.muted} mb-1`}>{t("ow.rightpanel.lbl.description")}</label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
           maxLength={500}
-          placeholder="实体描述（可选）"
+          placeholder={t("ow.rightpanel.form.descPh")}
           className="w-full bg-[#0b0e14] border border-[#1E293B] rounded-lg px-3 py-2
             text-xs text-white placeholder:opacity-50 resize-none
             focus:outline-none focus:border-indigo-500/50 transition"
@@ -181,13 +180,13 @@ function EntityBasicInfoForm({ entity }: EntityBasicInfoFormProps) {
       <div className="pt-2 border-t border-[#1E293B] space-y-1.5 text-[10px]">
         {entity.createdAt && (
           <div className="flex justify-between">
-            <span className={styles.muted}>创建时间</span>
+            <span className={styles.muted}>{t("ow.rightpanel.meta.createdAt")}</span>
             <span className={styles.cardTextMuted}>{entity.createdAt}</span>
           </div>
         )}
         {entity.updatedAt && (
           <div className="flex justify-between">
-            <span className={styles.muted}>更新时间</span>
+            <span className={styles.muted}>{t("ow.rightpanel.meta.updatedAt")}</span>
             <span className={styles.cardTextMuted}>{entity.updatedAt}</span>
           </div>
         )}
@@ -200,6 +199,7 @@ function EntityBasicInfoForm({ entity }: EntityBasicInfoFormProps) {
       {/* 保存按钮 */}
       <div className="flex items-center gap-2 pt-1">
         <button
+          type="button"
           onClick={handleSave}
           disabled={!isDirty || saving || savingEntity}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[11px] font-semibold
@@ -207,7 +207,7 @@ function EntityBasicInfoForm({ entity }: EntityBasicInfoFormProps) {
             disabled:opacity-40 disabled:cursor-not-allowed transition"
         >
           {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-          {saving ? '保存中...' : '保存修改'}
+          {saving ? t("ow.rightpanel.form.saving") : t("ow.rightpanel.form.save")}
         </button>
         {successMsg && (
           <span className="text-[10px] text-emerald-400">{successMsg}</span>
@@ -229,6 +229,7 @@ export default function WorkbenchRightPanel({
   ontologyId?: string;
 } = {}) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const store = useWorkbenchStore();
   const selectedEntityId = externalSelectedId ?? store.selectedEntityId;
   const ontologyId = externalOntologyId ?? 'ont001';
@@ -244,9 +245,9 @@ export default function WorkbenchRightPanel({
       <div className={`flex-1 flex items-center justify-center ${styles.muted}`}>
         <div className="text-center p-6">
           <Eye size={32} className="mx-auto mb-2 opacity-20" />
-          <p className="text-xs">选择实体查看详情</p>
+          <p className="text-xs">{t("ow.rightpanel.empty.title")}</p>
           <p className="text-[10px] mt-1 opacity-60">
-            点击画布节点或左侧实体树
+            {t("ow.rightpanel.empty.hint")}
           </p>
         </div>
       </div>
@@ -270,7 +271,7 @@ export default function WorkbenchRightPanel({
         <p className={`text-[10px] font-mono ${styles.cardTextMuted} truncate`}>{selectedEntity.code}</p>
         <div className="flex items-center gap-1.5 mt-2">
           <span className={`text-[10px] px-2 py-0.5 rounded ${styles.badgeBg} ${styles.muted}`}>
-            {getEntityTypeLabel(selectedEntity.entityType)}
+            {t(config.labelKey)}
           </span>
         </div>
       </div>
@@ -280,6 +281,7 @@ export default function WorkbenchRightPanel({
         {TABS.map((tab) => (
           <button
             key={tab.key}
+            type="button"
             onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-[11px] font-medium transition border-b-2 -mb-[1px] ${
               activeTab === tab.key
@@ -288,7 +290,7 @@ export default function WorkbenchRightPanel({
             }`}
           >
             {tab.icon}
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>
