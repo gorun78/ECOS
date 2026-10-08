@@ -160,7 +160,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
     <div
       className={`
         relative w-[220px] rounded-xl border
-        bg-[#141924] border-[#1E293B]
+        ${styles.cardBg} ${styles.cardBorder}
         shadow-lg shadow-black/20
         transition-all duration-150
         cursor-grab active:cursor-grabbing
@@ -219,7 +219,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
 
       {/* ── 属性预览区 ── */}
       {previewProps.length > 0 && (
-        <div className="px-3.5 pb-2.5 space-y-1 border-t border-[#1E293B] pt-2">
+        <div className={`px-3.5 pb-2.5 space-y-1 border-t ${styles.cardBorder} pt-2`}>
           {previewProps.map((prop, idx) => (
             <PropertyPreviewRow
               key={`${prop.code}-${idx}`}
@@ -239,7 +239,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
 
       {/* ── 空属性提示 ── */}
       {previewProps.length === 0 && (
-        <div className="px-3.5 pb-3 border-t border-[#1E293B] pt-2">
+        <div className={`px-3.5 pb-3 border-t ${styles.cardBorder} pt-2`}>
           <p className={`text-[9px] ${styles.muted} italic`}>{t("ow.node.emptyProps")}</p>
         </div>
       )}
