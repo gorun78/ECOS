@@ -1482,5 +1482,14 @@
   "ow.act.param.colObjBinding": "对象绑定类型",
   "ow.act.param.colDesc": "作用描述",
   "ow.act.param.colAction": "操作",
-  "ow.act.param.descPlaceholder": "配置描述信息"
+  "ow.act.param.descPlaceholder": "配置描述信息",
+  "ow.act.od.defaultDesc": "关于参数 {name} 的用途。",
+  "ow.act.ov.defaultError": "验证未通过，请检查您的输入参数。",
+  "ow.act.type.rulesUnit": "副作用规则",
+  "ow.act.type.noDesc": "无详细描述",
+  "ow.act.type.deleteBtn": "删除操作",
+  "ow.act.type.tabParameters": "1. 参数定义 (Parameters)",
+  "ow.act.type.tabRules": "2. 副作用逻辑 (Rules / Effects)",
+  "ow.act.type.tabValidation": "3. 提交前验证 (Validation)",
+  "ow.act.type.tabLayout": "4. 表单与布局 (Form & Layout)"
 }

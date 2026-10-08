@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { ActionType, ActionParameter, ActionRule, ActionValidationRule, ObjectType, ActionParamDataType, ActionRuleType } from '../../types/ontology';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 import ParametersTab from './action-type/ParametersTab';
 import RulesTab from './action-type/RulesTab';
 import ValidationTab from './action-type/ValidationTab';
@@ -29,6 +30,7 @@ export default function ActionTypeView({
   onNavigateToObject
 }: ActionTypeViewProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'parameters' | 'rules' | 'validation' | 'layout'>('parameters');
   const [newParamName, setNewParamName] = useState('');
   const [newParamType, setNewParamType] = useState<ActionParamDataType>('string');
@@ -74,7 +76,8 @@ export default function ActionTypeView({
     newValError,
     setNewValName,
     setNewValExpression,
-    setNewValError
+    setNewValError,
+    t
   });
 
   return (
@@ -92,32 +95,34 @@ export default function ActionTypeView({
                 {actionType.apiName}
               </span>
               <span className={`text-xs ${styles.appBg} ${styles.cardTextMuted} px-2 py-0.5 rounded-full font-mono`}>
-                {actionType.rules.length} 副作用规则
+                {actionType.rules.length} {t('ow.act.type.rulesUnit')}
               </span>
             </div>
-            <p className={`text-xs ${styles.cardTextMuted} mt-0.5`}>{actionType.description || '无详细描述'}</p>
+            <p className={`text-xs ${styles.cardTextMuted} mt-0.5`}>{actionType.description || t('ow.act.type.noDesc')}</p>
           </div>
         </div>
         <button
+          type="button"
           onClick={() => onDelete(actionType.id)}
           className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"
         >
           <LucideIcon name="Trash2" size={13} />
-          删除操作
+          {t('ow.act.type.deleteBtn')}
         </button>
       </div>
 
       {/* Tab bar */}
       <div className={`flex px-6 border-b ${styles.appBorder} ${styles.cardBg}`}>
         {(['parameters', 'rules', 'validation', 'layout'] as const).map(tab => {
-          const labels = {
-            parameters: '1. 参数定义 (Parameters)',
-            rules: '2. 副作用逻辑 (Rules / Effects)',
-            validation: '3. 提交前验证 (Validation)',
-            layout: '4. 表单与布局 (Form & Layout)'
+          const labels: Record<typeof tab, string> = {
+            parameters: t('ow.act.type.tabParameters'),
+            rules: t('ow.act.type.tabRules'),
+            validation: t('ow.act.type.tabValidation'),
+            layout: t('ow.act.type.tabLayout')
           };
           return (
             <button
+              type="button"
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`py-3 px-4 text-xs font-medium border-b-2 -mb-px transition-colors ${

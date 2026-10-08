@@ -1482,5 +1482,14 @@
   "ow.act.param.colObjBinding": "Bound Object Type",
   "ow.act.param.colDesc": "Description",
   "ow.act.param.colAction": "Action",
-  "ow.act.param.descPlaceholder": "Description"
+  "ow.act.param.descPlaceholder": "Description",
+  "ow.act.od.defaultDesc": "Purpose of parameter {name}.",
+  "ow.act.ov.defaultError": "Validation failed. Please check your input parameters.",
+  "ow.act.type.rulesUnit": "side-effect rules",
+  "ow.act.type.noDesc": "No detailed description",
+  "ow.act.type.deleteBtn": "Delete Action",
+  "ow.act.type.tabParameters": "1. Parameters",
+  "ow.act.type.tabRules": "2. Rules / Effects",
+  "ow.act.type.tabValidation": "3. Validation",
+  "ow.act.type.tabLayout": "4. Form & Layout"
 }
