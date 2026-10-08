@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import * as Icons from 'lucide-react';
 import Editor, { type OnMount } from '@monaco-editor/react';
@@ -53,6 +54,7 @@ interface SQLQueryConsoleProps {
 
 export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   // 移动端断言: 视口 ≤ 767px 时, Monaco 单行/复杂手势过于较重, 降级为只读 textarea 仅用于查看
   const isMobile = useMediaQuery("(max-width: 767px)");
 
@@ -97,11 +99,11 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
   // ── 执行查询 ──
   const handleExecute = useCallback(async (page: number = 1) => {
     if (!selectedDsId) {
-      if (showToast) showToast('error', '请先选择数据源');
+      if (showToast) showToast('error', t('dw.sql.err.noDatasource', '请先选择数据源'));
       return;
     }
     if (!sql.trim()) {
-      if (showToast) showToast('error', '请输入 SQL 语句');
+      if (showToast) showToast('error', t('dw.sql.err.noSql', '请输入 SQL 语句'));
       return;
     }
 
@@ -136,10 +138,10 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
       setExecutionTimeMs(elapsedMs);
 
       if (showToast) {
-        showToast('success', `查询完成，返回 ${rowCount} 行 (${elapsedMs}ms)`);
+        showToast('success', t('dw.sql.ok.done', { rows: rowCount, ms: elapsedMs }));
       }
     } catch (e: unknown) {
-      const msg = (e as { message?: string } | undefined)?.message || '查询执行失败';
+      const msg = (e as { message?: string } | undefined)?.message || t('dw.sql.err.failed', '查询执行失败');
       setErrorMessage(msg);
       setColumns([]);
       setRows([]);
@@ -148,7 +150,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
     } finally {
       setIsExecuting(false);
     }
-  }, [selectedDsId, sql, pagination.pageSize, showToast]);
+  }, [selectedDsId, sql, pagination.pageSize, showToast, t]);
 
   // ── 分页切换 ──
   const handlePageChange = useCallback((page: number) => {
@@ -195,8 +197,8 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
     if (template.datasourceId) {
       setSelectedDsId(template.datasourceId);
     }
-    if (showToast) showToast('info', `已加载模板: ${template.name}`);
-  }, [showToast]);
+    if (showToast) showToast('info', t('dw.sql.ok.templateLoaded', { name: template.name }));
+  }, [showToast, t]);
 
   // ── 加载历史 SQL ──
   const handleLoadHistory = useCallback((historySql: string, dsId: string) => {
@@ -208,24 +210,24 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
 
   // ── 导出 CSV ──
   const handleExportCsv = useCallback(() => {
-    if (showToast) showToast('success', 'CSV 文件已导出');
-  }, [showToast]);
+    if (showToast) showToast('success', t('dw.sql.ok.csvExported', 'CSV 文件已导出'));
+  }, [showToast, t]);
 
   // ── 打开保存模板对话框 ──
   const handleOpenSaveDialog = useCallback(() => {
     if (!sql.trim()) {
-      if (showToast) showToast('error', 'SQL 不能为空');
+      if (showToast) showToast('error', t('dw.sql.err.sqlEmpty', 'SQL 不能为空'));
       return;
     }
     setSaveName('');
     setSaveDesc('');
     setShowSaveDialog(true);
-  }, [sql, showToast]);
+  }, [sql, showToast, t]);
 
   // ── 保存模板 ──
   const handleSaveTemplateConfirm = useCallback(async () => {
     if (!saveName.trim()) {
-      if (showToast) showToast('error', '请输入模板名称');
+      if (showToast) showToast('error', t('dw.sql.err.nameRequired', '请输入模板名称'));
       return;
     }
 
@@ -238,17 +240,17 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
         datasourceId: selectedDsId || undefined,
       };
       await saveTemplate(req);
-      if (showToast) showToast('success', '模板保存成功');
+      if (showToast) showToast('success', t('dw.sql.ok.saved', '模板保存成功'));
       setShowSaveDialog(false);
       // 刷新模板列表
       const refresh = (window as WindowWithTemplateRefresh).__templateRefresh;
       if (refresh) refresh();
     } catch {
-      if (showToast) showToast('error', '保存模板失败');
+      if (showToast) showToast('error', t('dw.sql.err.saveFailed', '保存模板失败'));
     } finally {
       setIsSaving(false);
     }
-  }, [saveName, saveDesc, sql, selectedDsId, showToast]);
+  }, [saveName, saveDesc, sql, selectedDsId, showToast, t]);
 
   // ── Monaco Editor 挂载 ──
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
@@ -257,7 +259,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
     // 注册 Ctrl+Enter 快捷键执行查询
     editor.addAction({
       id: 'execute-query',
-      label: '执行 SQL 查询',
+      label: t('dw.sql.edit.actionExecute', '执行 SQL 查询'),
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
       run: () => {
         handleExecute();
@@ -265,7 +267,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
     });
 
     editor.focus();
-  }, [handleExecute]);
+  }, [handleExecute, t]);
 
   // ── Monaco Editor 配置 ──
   const editorOptions: Record<string, unknown> = {
@@ -303,7 +305,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
         className={`absolute top-1/2 -translate-y-1/2 z-20 w-4 h-12 flex items-center justify-center ${styles.sidebarBg} border ${styles.cardBorder} rounded-r ${styles.cardTextMuted} hover:text-indigo-400 cursor-pointer transition-colors ${
           showLeftPanel ? 'left-[240px]' : 'left-0'
         }`}
-        title={showLeftPanel ? '收起面板' : '展开面板'}
+        title={showLeftPanel ? t('dw.sql.panel.collapse', '收起面板') : t('dw.sql.panel.expand', '展开面板')}
       >
         <Icon name={showLeftPanel ? 'ChevronLeft' : 'ChevronRight'} size={10} />
       </button>
@@ -331,7 +333,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
                 readOnly
                 spellCheck={false}
                 value={sql}
-                placeholder="移动端只读查看"
+                placeholder={t('dw.sql.mobile.placeholder', '移动端只读查看')}
                 className={`w-full h-full min-h-[240px] p-2 font-mono text-xs bg-black/5 dark:bg-white/5 rounded resize-none outline-none ${styles.appText}`}
               />
             ) : (
@@ -387,7 +389,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
         className={`absolute top-1/2 -translate-y-1/2 z-20 w-4 h-12 flex items-center justify-center ${styles.sidebarBg} border ${styles.cardBorder} rounded-l ${styles.cardTextMuted} hover:text-indigo-400 cursor-pointer transition-colors ${
           showRightPanel ? 'right-[256px]' : 'right-0'
         }`}
-        title={showRightPanel ? '收起面板' : '展开面板'}
+        title={showRightPanel ? t('dw.sql.panel.collapse', '收起面板') : t('dw.sql.panel.expand', '展开面板')}
       >
         <Icon name={showRightPanel ? 'ChevronRight' : 'ChevronLeft'} size={10} />
       </button>
@@ -410,35 +412,35 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
           <div className={`w-96 rounded-lg ${styles.cardBg} border ${styles.cardBorder} shadow-2xl p-5`}>
             <h3 className={`text-sm font-bold ${styles.cardText} mb-4 flex items-center gap-2`}>
               <Icon name="Save" size={15} className="text-amber-400" />
-              保存查询模板
+              {t('dw.sql.save.title', '保存查询模板')}
             </h3>
             <div className="space-y-3">
               <div>
-                <label className={`text-[11px] ${styles.cardTextMuted} mb-1 block`}>模板名称 *</label>
+                <label className={`text-[11px] ${styles.cardTextMuted} mb-1 block`}>{t('dw.sql.save.nameLabel', '模板名称 *')}</label>
                 <input
                   type="text"
                   value={saveName}
                   onChange={e => setSaveName(e.target.value)}
-                  placeholder="输入模板名称..."
+                  placeholder={t('dw.sql.save.namePlaceholder', '输入模板名称...')}
                   className={`w-full px-2 py-1.5 text-xs rounded ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} outline-none focus:border-blue-500/50 transition-colors`}
                   autoFocus
                   onKeyDown={e => e.key === 'Enter' && handleSaveTemplateConfirm()}
                 />
               </div>
               <div>
-                <label className={`text-[11px] ${styles.cardTextMuted} mb-1 block`}>描述（可选）</label>
+                <label className={`text-[11px] ${styles.cardTextMuted} mb-1 block`}>{t('dw.sql.save.descLabel', '描述（可选）')}</label>
                 <input
                   type="text"
                   value={saveDesc}
                   onChange={e => setSaveDesc(e.target.value)}
-                  placeholder="可选描述..."
+                  placeholder={t('dw.sql.save.descPlaceholder', '可选描述...')}
                   className={`w-full px-2 py-1.5 text-xs rounded ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} outline-none focus:border-blue-500/50 transition-colors`}
                   onKeyDown={e => e.key === 'Enter' && handleSaveTemplateConfirm()}
                 />
               </div>
               <div className={`px-2 py-2 rounded text-[10px] ${styles.inputBg} border ${styles.inputBorder} max-h-24 overflow-auto`}>
-                <span className={styles.cardTextMuted}>SQL 预览：</span>
-                <pre className={`text-[var(--card,#CBD5E1)] mt-0.5 whitespace-pre-wrap break-all font-mono`}>{sql || '(空)'}</pre>
+                <span className={styles.cardTextMuted}>{t('dw.sql.save.sqlPreview', 'SQL 预览：')}</span>
+                <pre className={`text-[var(--card,#CBD5E1)] mt-0.5 whitespace-pre-wrap break-all font-mono`}>{sql || t('dw.sql.save.emptySql', '(空)')}</pre>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">
@@ -446,7 +448,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
                 onClick={() => setShowSaveDialog(false)}
                 className={`px-4 py-1.5 text-xs rounded ${styles.sidebarBg} ${styles.cardText} hover:opacity-80 transition-colors cursor-pointer`}
               >
-                取消
+                {t('common.cancel', '取消')}
               </button>
               <button
                 onClick={handleSaveTemplateConfirm}
@@ -458,7 +460,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
                 }`}
               >
                 {isSaving && <Icon name="Loader2" size={11} className="animate-spin" />}
-                保存
+                {t('common.save', '保存')}
               </button>
             </div>
           </div>
