@@ -187,22 +187,22 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-4 gap-3">
+      <div className={`flex flex-col md:flex-row md:items-center justify-between border-b ${styles.cardBorder} pb-4 gap-3`}>
         <div className="space-y-1">
-          <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
+          <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}>
             <Gauge size={16} className="text-amber-600" />
             {t('knowledge.eval.pageTitle')}
           </h2>
-          <p className="text-xs text-slate-500">{t('knowledge.eval.pageSubtitle')}</p>
+          <p className={`text-xs ${styles.muted}`}>{t('knowledge.eval.pageSubtitle')}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         {/* 左侧：seed 集合 */}
         <div className="lg:col-span-2 space-y-4 min-w-0">
-          <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h3 className="font-extrabold text-slate-700 text-xs flex items-center gap-1.5">
+          <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-3`}>
+            <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-2`}>
+              <h3 className={`font-extrabold ${styles.cardText} text-xs flex items-center gap-1.5`}>
                 <Upload size={13} className="text-amber-500" /> {t('knowledge.eval.seedSet')} ({seeds.length})
               </h3>
               <label className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-[11px] cursor-pointer">
@@ -217,22 +217,22 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
                 />
               </label>
             </div>
-            <div className="text-[9px] text-slate-400 font-mono">
+            <div className={`text-[9px] ${styles.muted} font-mono`}>
               {t('knowledge.eval.formatHint')}
             </div>
             <div className="space-y-1.5 max-h-96 overflow-y-auto">
               {seeds.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs">{t('knowledge.eval.noSeeds')}</div>
+                <div className={`py-8 text-center ${styles.muted} text-xs`}>{t('knowledge.eval.noSeeds')}</div>
               ) : seeds.map(s => (
-                <div key={s.id} className="p-2 bg-slate-50 border border-slate-150 rounded-lg flex items-center gap-2 hover:bg-slate-100/70 transition">
+                <div key={s.id} className={`p-2 ${styles.appBg} border ${styles.cardBorder} rounded-lg flex items-center gap-2 ${styles.sidebarHoverBg} transition`}>
                   <ListChecks size={12} className="text-amber-500 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-bold text-slate-800 truncate">{s.question}</p>
+                    <p className={`text-[11px] font-bold ${styles.cardText} truncate`}>{s.question}</p>
                     {s.labeledChunkIds && s.labeledChunkIds.length > 0 && (
-                      <p className="text-[9px] font-mono text-slate-400 truncate">{s.labeledChunkIds.join(', ')}</p>
+                      <p className={`text-[9px] font-mono ${styles.muted} truncate`}>{s.labeledChunkIds.join(', ')}</p>
                     )}
                   </div>
-                  <button onClick={() => handleDeleteSeed(s.id)} className="p-1 text-slate-400 hover:text-rose-500 cursor-pointer text-xs">✕</button>
+                  <button type="button" onClick={() => handleDeleteSeed(s.id)} className={`p-1 ${styles.muted} hover:text-rose-500 cursor-pointer text-xs`}>✕</button>
                 </div>
               ))}
             </div>
@@ -244,7 +244,7 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
           <button
             onClick={handleRun}
             disabled={isRunning || seeds.length === 0}
-            className="w-full py-3 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold rounded-xl text-xs cursor-pointer flex items-center justify-center gap-2 disabled:cursor-not-allowed shadow-sm"
+            className={`w-full py-3 bg-amber-600 hover:bg-amber-700 disabled:${styles.sidebarBg} disabled:${styles.muted} text-white font-bold rounded-xl text-xs cursor-pointer flex items-center justify-center gap-2 disabled:cursor-not-allowed shadow-sm`}
           >
             {isRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
             {isRunning ? t('knowledge.eval.runningState') : t('knowledge.eval.runEval')}
@@ -252,16 +252,16 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
 
           {activeReport && (
             <div className={`border rounded-xl p-4 space-y-3 ${
-              activeReport.degraded ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'
+              activeReport.degraded ? `${styles.warningBg} ${styles.warningBorder}` : `${styles.cardBg} ${styles.cardBorder}`
             }`}>
-              <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
-                <h3 className="font-extrabold text-slate-700 text-xs flex items-center gap-1.5">
+              <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-2`}>
+                <h3 className={`font-extrabold ${styles.cardText} text-xs flex items-center gap-1.5`}>
                   <FlaskConical size={13} className="text-amber-500" /> {t('knowledge.eval.latestReport')}
                 </h3>
-                <span className="text-[9px] font-mono text-slate-400">{activeReport.reportId}</span>
+                <span className={`text-[9px] font-mono ${styles.muted}`}>{activeReport.reportId}</span>
               </div>
               {activeReport.degraded && (
-                <p className="text-[10px] text-amber-700 bg-amber-100 border border-amber-200 rounded p-1.5">
+                <p className={`text-[10px] ${styles.warningText} ${styles.warningBg} border ${styles.warningBorder} rounded p-1.5`}>
                   {t('knowledge.eval.degradedNotice')}
                 </p>
               )}
@@ -272,45 +272,46 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold">{t('knowledge.eval.hallucinationRate')}</span>
-                    <span className="text-[10px] font-mono font-bold text-slate-600">
+                    <span className={`text-[10px] font-mono font-bold ${styles.cardText}`}>
                       {activeReport.hallucinationRate != null ? (activeReport.hallucinationRate * 100).toFixed(1) + '%' : t('knowledge.eval.awaitingBackend')}
                     </span>
                   </div>
-                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`w-full h-2 ${styles.sidebarBg} rounded-full overflow-hidden`}>
                     <div className="h-full bg-rose-400 rounded-full" style={{ width: `${(activeReport.hallucinationRate ?? 0) * 100}%` }} />
                   </div>
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold">{t('knowledge.eval.citationRate')}</span>
-                    <span className="text-[10px] font-mono font-bold text-slate-600">
+                    <span className={`text-[10px] font-mono font-bold ${styles.cardText}`}>
                       {activeReport.citationRate != null ? (activeReport.citationRate * 100).toFixed(1) + '%' : t('knowledge.eval.awaitingBackend')}
                     </span>
                   </div>
-                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`w-full h-2 ${styles.sidebarBg} rounded-full overflow-hidden`}>
                     <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(activeReport.citationRate ?? 0) * 100}%` }} />
                   </div>
                 </div>
               </div>
-              <p className="text-[10px] text-slate-400 font-mono">{new Date(activeReport.printedAt).toLocaleString()}</p>
+              <p className={`text-[10px] ${styles.muted} font-mono`}>{new Date(activeReport.printedAt).toLocaleString()}</p>
             </div>
           )}
 
           {reports.length > 0 && (
-            <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
-              <h3 className="font-extrabold text-slate-700 text-xs border-b border-slate-100 pb-2">{t('knowledge.eval.history')} ({reports.length})</h3>
+            <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-2`}>
+              <h3 className={`font-extrabold ${styles.cardText} text-xs border-b ${styles.cardBorder} pb-2`}>{t('knowledge.eval.history')} ({reports.length})</h3>
               <div className="space-y-1 max-h-48 overflow-y-auto">
                 {reports.map((r, i) => (
                   <button
                     key={r.reportId}
+                    type="button"
                     onClick={() => setActiveReport(r)}
-                    className={`w-full text-left p-2 rounded-lg hover:bg-slate-50 transition flex items-center justify-between gap-2 ${
-                      activeReport?.reportId === r.reportId ? 'bg-amber-50 border border-amber-200' : ''
+                    className={`w-full text-left p-2 rounded-lg ${styles.sidebarHoverBg} transition flex items-center justify-between gap-2 ${
+                      activeReport?.reportId === r.reportId ? `${styles.warningBg} border ${styles.warningBorder}` : ''
                     }`}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-mono text-slate-500 truncate">{r.seedSetName}</p>
-                      <p className="text-[9px] text-slate-400">{new Date(r.printedAt).toISOString().substring(0, 16)}</p>
+                      <p className={`text-[10px] font-mono ${styles.muted} truncate`}>{r.seedSetName}</p>
+                      <p className={`text-[9px] ${styles.muted}`}>{new Date(r.printedAt).toISOString().substring(0, 16)}</p>
                     </div>
                     <div className="flex gap-1 shrink-0">
                       <span className="text-[9px] font-mono text-amber-600">R{(r.recallAt5 * 100).toFixed(0)}</span>
@@ -329,14 +330,15 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
 }
 
 function MetricBar({ label, value }: { label: string; value: number }) {
+  const { styles } = useTheme();
   const display = value != null ? `${(value * 100).toFixed(1)}%` : '-';
   return (
     <div>
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-bold">{label}</span>
-        <span className="text-[10px] font-mono font-bold text-slate-700">{display}</span>
+        <span className={`text-[10px] font-mono font-bold ${styles.cardText}`}>{display}</span>
       </div>
-      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+      <div className={`w-full h-2 ${styles.sidebarBg} rounded-full overflow-hidden`}>
         <div className="h-full bg-amber-500 rounded-full" style={{ width: `${(value ?? 0) * 100}%` }} />
       </div>
     </div>
