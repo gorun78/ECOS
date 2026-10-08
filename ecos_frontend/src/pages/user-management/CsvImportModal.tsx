@@ -98,7 +98,7 @@ export default function CsvImportModal({ onImport, onClose }: CsvImportModalProp
             <div className="overflow-auto max-h-64 border rounded mb-3">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-800/50">
+                  <tr className={styles.sidebarBg}>
                     {preview.headers.map(h => (
                       <th key={h} className="text-left px-2 py-1.5 font-semibold opacity-70 border-b">{h}</th>
                     ))}
@@ -106,7 +106,7 @@ export default function CsvImportModal({ onImport, onClose }: CsvImportModalProp
                 </thead>
                 <tbody>
                   {preview.rows.slice(0, 20).map((row, i) => (
-                    <tr key={i} className="border-b border-gray-100 dark:border-gray-700/20">
+                    <tr key={i} className={`border-b ${styles.cardBorder}`}>
                       {preview.headers.map(h => (
                         <td key={h} className="px-2 py-1.5 opacity-70">{row[h] || "-"}</td>
                       ))}

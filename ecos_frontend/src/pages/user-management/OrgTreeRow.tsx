@@ -6,22 +6,24 @@
 import { useState } from "react";
 import { Edit3, Trash2 } from "lucide-react";
 import type { IamOrg } from "../../api";
+import { useTheme } from "../../components/ThemeContext";
 
 export default function OrgTreeRow({ org, depth, onEdit, onDelete }: {
   org: IamOrg; depth: number; onEdit: (o: IamOrg) => void; onDelete: (o: IamOrg) => void;
 }) {
+  const { styles } = useTheme();
   const [expanded, setExpanded] = useState(true);
   const hasChildren = org.children && org.children.length > 0;
   return (
     <>
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-gray-700/30 text-[13px] hover:bg-gray-50 dark:hover:bg-gray-800/20"
+      <div className={`flex items-center gap-2 px-3 py-2 border-b ${styles.cardBorder} text-[13px] ${styles.sidebarHoverBg}`}
         style={{ paddingLeft: `${depth * 24 + 12}px` }}>
-        <span className="w-4 text-center shrink-0 text-gray-400">
-          {hasChildren ? <button onClick={e => { e.stopPropagation(); setExpanded(!expanded); }} className="hover:text-gray-600 dark:hover:text-gray-300 text-xs">{expanded ? '▼' : '▶'}</button>
-            : <span className="text-gray-300">•</span>}
+        <span className={`w-4 text-center shrink-0 ${styles.muted}`}>
+          {hasChildren ? <button type="button" onClick={e => { e.stopPropagation(); setExpanded(!expanded); }} className="text-xs hover:opacity-70">{expanded ? '▼' : '▶'}</button>
+            : <span className={styles.muted}>•</span>}
         </span>
         <span className="flex-1 truncate font-medium">{org.orgName}</span>
-        <code className="text-[11px] bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{org.orgCode}</code>
+        <code className={`text-[11px] ${styles.sidebarBg} px-1.5 py-0.5 rounded`}>{org.orgCode}</code>
         <span className={`text-xs shrink-0 ${org.status === 'ACTIVE' ? 'text-green-500' : 'text-red-500'}`}>● {org.status}</span>
         <span className="text-xs opacity-50 shrink-0">{org.orgType}</span>
         <span className="text-xs opacity-40 shrink-0 max-w-[120px] truncate">{org.description || '-'}</span>

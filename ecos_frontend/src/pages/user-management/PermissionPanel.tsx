@@ -46,7 +46,7 @@ export default function PermissionPanel({ role, allPermissions, onSave, onClose 
               {available.map(p => (
                 <div key={p.permissionId} onClick={() => { setAvailable(prev => prev.filter(x => x.permissionId !== p.permissionId)); setAssigned(prev => [...prev, p]); }}
                   className="flex items-center justify-between px-2 py-1.5 rounded text-xs cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/20">
-                  <span className="truncate"><code className="text-[11px] bg-gray-100 dark:bg-gray-800 px-1 rounded mr-1.5">{p.resource}</code><span className="opacity-70">{p.action}</span></span>
+                  <span className="truncate"><code className={`text-[11px] ${styles.sidebarBg} px-1 rounded mr-1.5`}>{p.resource}</code><span className="opacity-70">{p.action}</span></span>
                   <ChevronRight className="w-3 h-3 opacity-30 shrink-0" /></div>))}
               {!available.length && <div className="text-xs opacity-30 text-center py-4">{t("platform.user.permpanel.noAvailable")}</div>}
             </div>

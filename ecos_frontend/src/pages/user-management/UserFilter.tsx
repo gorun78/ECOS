@@ -103,8 +103,9 @@ export default function UserFilter({
 
       {/* CSV Import */}
       <button
+        type="button"
         onClick={onImportClick}
-        className="flex items-center gap-1 px-3 py-2 rounded text-xs border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5"
+        className={`flex items-center gap-1 px-3 py-2 rounded text-xs border ${styles.cardBorder} ${styles.sidebarText} ${styles.sidebarHoverBg}`}
       >
         <Upload size={14} />
         {t("platform.user.filter.csvImport")}
@@ -112,8 +113,9 @@ export default function UserFilter({
 
       {/* CSV Export */}
       <button
+        type="button"
         onClick={onExportClick}
-        className="flex items-center gap-1 px-3 py-2 rounded text-xs border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5"
+        className={`flex items-center gap-1 px-3 py-2 rounded text-xs border ${styles.cardBorder} ${styles.sidebarText} ${styles.sidebarHoverBg}`}
       >
         <Download size={14} />
         {t("platform.user.filter.csvExport")}

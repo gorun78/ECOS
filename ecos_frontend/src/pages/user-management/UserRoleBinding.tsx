@@ -72,15 +72,17 @@ export default function UserRoleBinding({
           />
         </div>
         <button
+          type="button"
           onClick={onSelectAll}
-          className={`text-xs px-2 py-1 rounded border ${styles.cardBorder} ${styles.cardText} hover:bg-gray-50 dark:hover:bg-white/5`}
+          className={`text-xs px-2 py-1 rounded border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`}
         >
           <CheckSquare size={12} className="inline mr-1" />
           {t("platform.user.bind.selectAll")}
         </button>
         <button
+          type="button"
           onClick={onClearAll}
-          className={`text-xs px-2 py-1 rounded border ${styles.cardBorder} ${styles.cardText} hover:bg-gray-50 dark:hover:bg-white/5`}
+          className={`text-xs px-2 py-1 rounded border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`}
         >
           <Square size={12} className="inline mr-1" />
           {t("platform.user.bind.clear")}
@@ -109,7 +111,7 @@ export default function UserRoleBinding({
               className={`flex items-center gap-2 px-2.5 py-2 rounded text-xs cursor-pointer transition-colors ${
                 isSelected
                   ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
-                  : "hover:bg-gray-50 dark:hover:bg-gray-800/30"
+                  : styles.sidebarHoverBg
               }`}
             >
               <input

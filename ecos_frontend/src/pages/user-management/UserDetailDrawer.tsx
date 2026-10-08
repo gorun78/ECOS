@@ -49,7 +49,7 @@ export default function UserDetailDrawer({ user, allRoles, orgMap, onForceLogout
     <>
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
       <div className={`fixed right-0 top-0 h-full w-full max-w-[400px] z-50 shadow-2xl flex flex-col ${styles.cardBg} border-l ${styles.cardBorder}`}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700/30">
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${styles.cardBorder}`}>
           <div>
             <h3 className={`text-sm font-semibold ${styles.cardText}`}>{user.username}</h3>
             <p className={`text-xs opacity-50`}>{user.realName || user.email || "-"}</p>
@@ -65,7 +65,7 @@ export default function UserDetailDrawer({ user, allRoles, orgMap, onForceLogout
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-t transition-colors ${
                   tab === t.id
                     ? `${styles.accentBg} text-white`
-                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+                    : `${styles.sidebarHoverBg} ${styles.muted}`
                 }`}>
                 <Icon size={12} />{t.label}
               </button>
@@ -87,7 +87,7 @@ export default function UserDetailDrawer({ user, allRoles, orgMap, onForceLogout
                 [t("platform.user.detail.lastLogin"), user.lastLoginTime || "-"],
                 [t("platform.user.detail.created"), user.createdTime || "-"],
               ].map(([label, value], i) => (
-                <div key={i} className="flex justify-between items-center py-1.5 border-b border-gray-100 dark:border-gray-700/20 last:border-0">
+                <div key={i} className={`flex justify-between items-center py-1.5 border-b ${styles.cardBorder} last:border-0`}>
                   <span className="text-xs opacity-50">{label}</span>
                   <span className="text-xs font-medium ml-4 text-right break-all">{value}</span>
                 </div>
@@ -133,17 +133,19 @@ export default function UserDetailDrawer({ user, allRoles, orgMap, onForceLogout
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700/30 space-y-2">
+        <div className={`px-5 py-4 border-t ${styles.cardBorder} space-y-2`}>
           <button
+            type="button"
             onClick={() => onForceLogout(user.userId)}
-            className="w-full px-3 py-2 rounded text-xs font-medium border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 flex items-center justify-center gap-1.5"
+            className={`w-full px-3 py-2 rounded text-xs font-medium border ${styles.warningBorder} ${styles.warningText} ${styles.warningBg} hover:opacity-80 flex items-center justify-center gap-1.5`}
           >
             <LogOut className="w-3.5 h-3.5" />
             {t("platform.user.detail.forceLogout")}
           </button>
           <button
+            type="button"
             onClick={() => onResetPassword(user.userId)}
-            className="w-full px-3 py-2 rounded text-xs font-medium border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 flex items-center justify-center gap-1.5"
+            className={`w-full px-3 py-2 rounded text-xs font-medium border border-indigo-200 dark:border-indigo-800 ${styles.badgeText} ${styles.badgeBg} hover:opacity-80 flex items-center justify-center gap-1.5`}
           >
             <KeyRound className="w-3.5 h-3.5" />
             {t("platform.user.detail.resetPassword")}

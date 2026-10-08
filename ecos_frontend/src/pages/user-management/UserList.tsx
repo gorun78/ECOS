@@ -71,11 +71,11 @@ function BatchConfirmDialog({
         </div>
         <p className={`text-sm mb-5 ${styles.cardTextMuted}`}>{message}</p>
         <div className="flex gap-2 justify-end">
-          <button onClick={onCancel}
-            className={`px-4 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText} hover:bg-gray-50 dark:hover:bg-white/5`}>
+          <button type="button" onClick={onCancel}
+            className={`px-4 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`}>
             {t("platform.user.list.cancel")}
           </button>
-          <button onClick={onConfirm}
+          <button type="button" onClick={onConfirm}
             className="px-4 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700">
             {t("platform.user.list.confirmDelete")}
           </button>
@@ -146,10 +146,10 @@ export default function UserList({
 
   const selectedArr = Array.from(selectedIds);
 
-  const th = "text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wider opacity-60 border-b border-gray-200 dark:border-gray-700/30";
-  const td = "px-3 py-2 text-[13px] border-b border-gray-100 dark:border-gray-700/20";
-  const chkCol = "px-3 py-2 border-b border-gray-100 dark:border-gray-700/20 text-center";
-  const chkTh = "text-center px-3 py-2 text-[11px] font-semibold uppercase tracking-wider opacity-60 border-b border-gray-200 dark:border-gray-700/30";
+  const th = `text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wider opacity-60 border-b ${styles.cardBorder}`;
+  const td = `px-3 py-2 text-[13px] border-b ${styles.cardBorder}`;
+  const chkCol = `px-3 py-2 border-b ${styles.cardBorder} text-center`;
+  const chkTh = `text-center px-3 py-2 text-[11px] font-semibold uppercase tracking-wider opacity-60 border-b ${styles.cardBorder}`;
 
   // Loading skeleton
   if (loading) {
@@ -167,11 +167,11 @@ export default function UserList({
           <tbody>
             {Array.from({ length: 5 }).map((_, i) => (
               <tr key={i}>
-                <td className="px-3 py-3 border-b border-gray-100 dark:border-gray-700/20">
+                <td className={`px-3 py-3 border-b ${styles.cardBorder}`}>
                   <div className="h-3.5 w-3.5 mx-auto bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
                 </td>
                 {Array.from({ length: 7 }).map((_, j) => (
-                  <td key={j} className="px-3 py-3 border-b border-gray-100 dark:border-gray-700/20">
+                  <td key={j} className={`px-3 py-3 border-b ${styles.cardBorder}`}>
                     <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ width: `${60 + Math.random() * 40}%` }} />
                   </td>
                 ))}
@@ -198,7 +198,7 @@ export default function UserList({
         {users.map(u => {
           const expanded = expandedId === u.userId;
           return (
-            <div key={u.userId} className="rounded-md bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10">
+            <div key={u.userId} className={`rounded-md ${styles.cardBg} border border-black/10 dark:border-white/10`}>
               {/* 卡片头：checkbox + 用户名 + 状态徽章 + 展开钮 */}
               <div className="flex items-center gap-2 px-2.5 py-2.5">
                 <input
@@ -295,7 +295,7 @@ export default function UserList({
         </thead>
         <tbody>
           {users.map(u => (
-            <tr key={u.userId} className="hover:bg-gray-50 dark:hover:bg-gray-800/20 cursor-pointer"
+            <tr key={u.userId} className={`${styles.sidebarHoverBg} cursor-pointer`}
               onClick={(e) => handleRowClick(e, u)}>
               <td className={chkCol} onClick={e => e.stopPropagation()}>
                 <input
@@ -338,7 +338,7 @@ export default function UserList({
 
       {/* ── Batch toolbar (floating at bottom) ─────────────── */}
       {someSelected && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-4 py-2.5 rounded-lg shadow-xl border bg-white dark:bg-gray-900 border-indigo-200 dark:border-indigo-800">
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-4 py-2.5 rounded-lg shadow-xl border ${styles.cardBg} border-indigo-200 dark:border-indigo-800`}>
           <span className="text-xs font-medium opacity-70">
             {t("user.batch.selected").replace("{count}", String(selectedIds.size))}
           </span>
