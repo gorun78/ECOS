@@ -7,6 +7,7 @@
 import React from 'react';
 
 import LucideIcon from '../../../components/LucideIcon';
+import { useLanguage } from '../../../components/LanguageContext';
 import type { BusinessScenario } from '../types';
 
 interface Props {
@@ -31,6 +32,7 @@ export default function DecisionDeskTab({
   handleApproveProposal, handleRejectProposal, resolvingProposalId,
   simQuery, setSimQuery, simRole, setSimRole, simResult, isSimulating, handleRunSandbox
 }: Props) {
+  const { t } = useLanguage();
   return (
 <div className="space-y-4">
 
@@ -43,26 +45,27 @@ export default function DecisionDeskTab({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
           </span>
-          AOC 核心签派动作待审批提案 (Pending Write-back Proposals)
+          {t('scenario.decision.proposals.title')}
         </h3>
-        <p className="text-xs text-[var(--card,#94A3B8)] mt-1">此处汇总了由 AI 智能体/分析员在沙箱中触发的写回事务，需 AOC 签派总监（王凯）二次签名授权即可物理同步落库物理表。</p>
+        <p className="text-xs text-[var(--card,#94A3B8)] mt-1">{t('scenario.decision.proposals.subtitle')}</p>
       </div>
 
       <button
+        type="button"
         onClick={fetchProposalsList}
         disabled={isLoadingProposals}
         className="px-3 py-1.5 bg-[var(--card,#1E293B)] hover:bg-[var(--card,#334155)] disabled:opacity-50 text-[var(--card,#E2E8F0)] text-xs font-bold rounded flex items-center gap-1 transition-all cursor-pointer"
       >
         <LucideIcon name="RefreshCw" size={11} className={isLoadingProposals ? 'animate-spin' : ''} />
-        刷新列表
+        {t('scenario.decision.proposals.refresh')}
       </button>
     </div>
 
     {proposals.length === 0 ? (
       <div className="p-8 text-center text-[var(--card,#64748B)] space-y-2">
         <LucideIcon name="Inbox" size={32} className="mx-auto opacity-30 text-[var(--card,#94A3B8)]" />
-        <p className="text-xs">暂无待审批或已归档的 Ontology Action 提案。</p>
-        <p className="text-[10px] text-[var(--card,#64748B)]">您可以在「AI工作台」运行 Chatbot 智能对话并输入“延误”以发起全新修改提案！</p>
+        <p className="text-xs">{t('scenario.decision.proposals.empty')}</p>
+        <p className="text-[10px] text-[var(--card,#64748B)]">{t('scenario.decision.proposals.emptyHint')}</p>
       </div>
     ) : (
       <div className="divide-y divide-[var(--card,#1E293B)]/80 max-h-96 overflow-y-auto">
@@ -93,11 +96,11 @@ export default function DecisionDeskTab({
                 <div className="flex items-center gap-4 text-[10px] text-[var(--card,#94A3B8)] font-mono">
                   <span className="flex items-center gap-1">
                     <LucideIcon name="User" size={10} className="text-[var(--card,#64748B)]" />
-                    提议源: {prop.proposedBy || '智能体沙箱'}
+                    {t('scenario.decision.proposals.proposedBy', { by: prop.proposedBy || t('scenario.decision.proposals.sandboxAgent') })}
                   </span>
                   {prop.rejectReason && (
                     <span className="text-rose-400 font-sans">
-                      🔴 拒绝理由: {prop.rejectReason}
+                      🔴 {t('scenario.decision.proposals.rejectReason', { reason: prop.rejectReason })}
                     </span>
                   )}
                 </div>
@@ -107,13 +110,15 @@ export default function DecisionDeskTab({
                 {isPending ? (
                   <>
                     <button
+                      type="button"
                       onClick={() => handleRejectProposal(prop.id, prop.actionId)}
                       disabled={resolvingProposalId === prop.id}
                       className="px-2.5 py-1.5 bg-red-950/40 hover:bg-red-900/50 border border-red-900/60 text-red-400 text-xs font-bold rounded cursor-pointer transition-all disabled:opacity-50"
                     >
-                      安全拒绝
+                      {t('scenario.decision.proposals.reject')}
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleApproveProposal(prop.id, prop.actionId)}
                       disabled={resolvingProposalId === prop.id}
                       className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded flex items-center gap-1 cursor-pointer transition-all disabled:opacity-50 shadow-sm shadow-indigo-900/30"
@@ -121,12 +126,12 @@ export default function DecisionDeskTab({
                       {resolvingProposalId === prop.id ? (
                         <>
                           <LucideIcon name="RefreshCw" size={11} className="animate-spin" />
-                          <span>正在物理写入...</span>
+                          <span>{t('scenario.decision.proposals.writing')}</span>
                         </>
                       ) : (
                         <>
                           <LucideIcon name="Check" size={12} />
-                          <span>总监审核放行</span>
+                          <span>{t('scenario.decision.proposals.approve')}</span>
                         </>
                       )}
                     </button>
@@ -134,7 +139,7 @@ export default function DecisionDeskTab({
                 ) : (
                   <span className="text-[11px] text-[var(--card,#64748B)] font-bold flex items-center gap-1">
                     <LucideIcon name="Archive" size={12} />
-                    该对账已归档
+                    {t('scenario.decision.proposals.archived')}
                   </span>
                 )}
               </div>
@@ -150,30 +155,30 @@ export default function DecisionDeskTab({
     <div>
       <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
         <LucideIcon name="Laptop" size={14} className="text-indigo-400" />
-        管理者零信任准入拦截沙箱 (Executive Zero-Trust Access Tester)
+        {t('scenario.decision.sandbox.title')}
       </h3>
-      <p className="text-xs text-[var(--card,#94A3B8)] mt-1">模拟不同职能角色从特定网络终端访问本场景数据的真实准入结果，测试 PBAC/DAC 和 PII 脱敏逻辑的阻断能力。</p>
+      <p className="text-xs text-[var(--card,#94A3B8)] mt-1">{t('scenario.decision.sandbox.subtitle')}</p>
     </div>
 
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       {/* Simulator Inputs */}
       <div className="space-y-3 p-3 bg-[var(--card,#020617)]/40 border border-[var(--card,#1E293B)] rounded-lg">
-        <span className="text-[11px] font-bold text-[var(--card,#CBD5E1)] block border-b border-[var(--card,#1E293B)] pb-1.5">参数装配 (Simulation Profile)</span>
+        <span className="text-[11px] font-bold text-[var(--card,#CBD5E1)] block border-b border-[var(--card,#1E293B)] pb-1.5">{t('scenario.decision.sandbox.params')}</span>
 
         <div className="space-y-1">
-          <label className="text-[10px] text-[var(--card,#94A3B8)] font-semibold block">模拟访问主体角色 (Subject Role)</label>
+          <label className="text-[10px] text-[var(--card,#94A3B8)] font-semibold block">{t('scenario.decision.sandbox.roleLabel')}</label>
           <select
             value={simRole}
             onChange={(e) => setSimRole(e.target.value as any)}
             className="w-full p-2 bg-[var(--card,#0F172A)] border border-[var(--card,#1E293B)] rounded text-xs font-bold text-white outline-none"
           >
-            <option value="AOC_DIRECTOR">王凯 (AOC 签派总监 - 白名单 IP 段)</option>
-            <option value="EXTERNAL_CONTRACTOR">张杰 (外部承包商 - 阻断非白名单 IP / 涉敏感 PII)</option>
+            <option value="AOC_DIRECTOR">{t('scenario.decision.sandbox.roleAoc')}</option>
+            <option value="EXTERNAL_CONTRACTOR">{t('scenario.decision.sandbox.roleContractor')}</option>
           </select>
         </div>
 
         <div className="space-y-1">
-          <label className="text-[10px] text-[var(--card,#94A3B8)] font-semibold block">检索提问 (Retrieval Query Target)</label>
+          <label className="text-[10px] text-[var(--card,#94A3B8)] font-semibold block">{t('scenario.decision.sandbox.queryLabel')}</label>
           <input
             type="text"
             value={simQuery}
@@ -196,6 +201,7 @@ export default function DecisionDeskTab({
         </div>
 
         <button
+          type="button"
           onClick={handleRunSandbox}
           disabled={isSimulating}
           className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded transition-all cursor-pointer flex items-center justify-center gap-1.5"
@@ -203,12 +209,12 @@ export default function DecisionDeskTab({
           {isSimulating ? (
             <>
               <LucideIcon name="RefreshCw" size={12} className="animate-spin" />
-              <span>正在模拟计算...</span>
+              <span>{t('scenario.decision.sandbox.simulating')}</span>
             </>
           ) : (
             <>
               <LucideIcon name="Play" size={12} />
-              <span>运行零信任鉴权验证</span>
+              <span>{t('scenario.decision.sandbox.run')}</span>
             </>
           )}
         </button>
@@ -219,7 +225,7 @@ export default function DecisionDeskTab({
         <div className="flex items-center justify-between border-b border-[var(--card,#1E293B)] pb-2 mb-2">
           <span className="text-[11px] font-bold text-[var(--card,#CBD5E1)] flex items-center gap-1">
             <LucideIcon name="Terminal" size={11} className="text-emerald-500" />
-            沙箱零信任控制流输出 (Console Logs)
+            {t('scenario.decision.sandbox.console')}
           </span>
           {simResult && (
             <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded ${
@@ -234,7 +240,7 @@ export default function DecisionDeskTab({
           {simResult ? (
             <>
               <div className="space-y-1">
-                <span className="text-[10px] text-indigo-400 block font-bold">// 1. Cognitive RAG Output (大模型零信任答复)</span>
+                <span className="text-[10px] text-indigo-400 block font-bold">{t('scenario.decision.sandbox.ragTitle')}</span>
                 <div className="bg-[var(--card,#0F172A)] p-2.5 rounded border border-[var(--card,#1E293B)] text-[var(--card,#CBD5E1)] font-sans whitespace-pre-wrap">
                   {simResult.answer}
                 </div>
@@ -242,7 +248,7 @@ export default function DecisionDeskTab({
 
               {simResult.groundedDocs && simResult.groundedDocs.length > 0 && (
                 <div className="space-y-1">
-                  <span className="text-[10px] text-amber-400 block font-bold">// 2. Grounded Prior Knowledge Chunks (向量相似度召回)</span>
+                  <span className="text-[10px] text-amber-400 block font-bold">{t('scenario.decision.sandbox.groundedTitle')}</span>
                   <div className="space-y-1">
                     {simResult.groundedDocs.map((doc: any, i: number) => (
                       <div key={i} className="bg-[var(--card,#0F172A)]/50 p-1.5 rounded border border-[var(--card,#1E293B)] flex items-center justify-between text-[var(--card,#94A3B8)]">
@@ -261,7 +267,7 @@ export default function DecisionDeskTab({
             </>
           ) : (
             <div className="h-full flex items-center justify-center text-[var(--card,#64748B)] text-xs">
-              点击左侧「运行零信任鉴权验证」查看仿真结果。
+              {t('scenario.decision.sandbox.empty')}
             </div>
           )}
         </div>
