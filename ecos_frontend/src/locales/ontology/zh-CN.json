@@ -1572,5 +1572,12 @@
   "ow.domaincards.noObjects": "暂无绑定的业务实体",
   "ow.domaincards.unassignedTitle": "未分类实体池",
   "ow.domaincards.unassignedCount": "{count} 对象",
-  "ow.domaincards.unassignedDesc": "当前声明的某些本体实体还未绑定到具体的业务划分域中。未分类对象在全景关系拓扑中可以继续存在，但在业务域治理上未形成职责分级。"
+  "ow.domaincards.unassignedDesc": "当前声明的某些本体实体还未绑定到具体的业务划分域中。未分类对象在全景关系拓扑中可以继续存在，但在业务域治理上未形成职责分级。",
+  "ow.side.objectLabel": "对象类型 (Object Types)",
+  "ow.side.linkLabel": "链接关系 (Link Types)",
+  "ow.side.actionLabel": "操作类型 (Action Types)",
+  "ow.side.functionLabel": "逻辑函数 (Functions)",
+  "ow.side.interfaceLabel": "接口规范 (Interfaces)",
+  "ow.side.sharedPropLabel": "共享属性 (Shared Properties)",
+  "ow.side.datasetLabel": "原始数据集 (Datasets)"
 }
