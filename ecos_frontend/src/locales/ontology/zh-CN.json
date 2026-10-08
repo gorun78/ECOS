@@ -1302,5 +1302,18 @@
   "ow.rightpanel.tab.relationships": "关联关系",
   "ow.rightpanel.tab.glossary": "术语关联",
   "ow.rightpanel.tab.datasource": "数据映射",
-  "ow.rightpanel.saveSuccess": "保存成功"
+  "ow.rightpanel.saveSuccess": "保存成功",
+  "ow.preview.loading": "加载数据预览...",
+  "ow.preview.error.title": "数据底座暂不可用",
+  "ow.preview.error.retry": "重试",
+  "ow.preview.error.dismiss": "关闭",
+  "ow.preview.empty.nodata": "暂无预览数据",
+  "ow.preview.empty.unmapped": "未映射物理表",
+  "ow.preview.empty.nodataHint": "该实体已映射物理表，但无可用预览。请确认数据底座连接正常。",
+  "ow.preview.empty.unmappedHint": "请先在「数据源」标签页中映射物理表",
+  "ow.preview.empty.reload": "重新加载",
+  "ow.preview.summary": "共 {rows} 行 · {cols} 列",
+  "ow.preview.refreshTitle": "刷新预览",
+  "ow.preview.refresh": "刷新",
+  "ow.preview.page": "第 {cur} / {total} 页"
 }

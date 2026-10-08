@@ -1302,5 +1302,18 @@
   "ow.rightpanel.tab.relationships": "Relationships",
   "ow.rightpanel.tab.glossary": "Glossary",
   "ow.rightpanel.tab.datasource": "Data Mapping",
-  "ow.rightpanel.saveSuccess": "Saved successfully"
+  "ow.rightpanel.saveSuccess": "Saved successfully",
+  "ow.preview.loading": "Loading data preview...",
+  "ow.preview.error.title": "Data service temporarily unavailable",
+  "ow.preview.error.retry": "Retry",
+  "ow.preview.error.dismiss": "Dismiss",
+  "ow.preview.empty.nodata": "No preview data available",
+  "ow.preview.empty.unmapped": "No physical table mapped",
+  "ow.preview.empty.nodataHint": "This entity has a mapped physical table but no preview is available. Verify the data service connection.",
+  "ow.preview.empty.unmappedHint": "First map a physical table in the \"Data Mapping\" tab",
+  "ow.preview.empty.reload": "Reload",
+  "ow.preview.summary": "{rows} rows · {cols} columns",
+  "ow.preview.refreshTitle": "Refresh preview",
+  "ow.preview.refresh": "Refresh",
+  "ow.preview.page": "Page {cur} / {total}"
 }
