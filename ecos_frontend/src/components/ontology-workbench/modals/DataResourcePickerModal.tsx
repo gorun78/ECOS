@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import type { BulkResource } from '../../../types/workbench';
 import { useTheme } from '../../ThemeContext';
+import { useLanguage } from '../../LanguageContext';
 import {
   fetchAllResources,
   DATA_CATALOG_UNAVAILABLE,
@@ -51,10 +52,10 @@ interface DataResourcePickerModalProps {
 
 // ── 资源类型常量 ────────────────────────────────────────────
 
-const RESOURCE_TYPES = [
-  { value: '', label: '全部类型' },
-  { value: 'TABLE', label: '表 (TABLE)' },
-  { value: 'VIEW', label: '视图 (VIEW)' },
+const RESOURCE_TYPES: { value: string; key: string }[] = [
+  { value: '', key: 'ow.drp.type.all' },
+  { value: 'TABLE', key: 'ow.drp.type.table' },
+  { value: 'VIEW', key: 'ow.drp.type.view' },
 ];
 
 // ── 主组件 ──────────────────────────────────────────────────
@@ -66,6 +67,7 @@ export default function DataResourcePickerModal({
   excludeIds = [],
 }: DataResourcePickerModalProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   // 资源列表
   const [resources, setResources] = useState<BulkResource[]>([]);
   const [loading, setLoading] = useState(false);
@@ -205,9 +207,9 @@ export default function DataResourcePickerModal({
               <Database size={16} className="text-indigo-400" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">选择物理表</h3>
+              <h3 className="text-sm font-semibold text-white">{t("ow.drp.title")}</h3>
               <p className={`text-[10px] ${styles.muted}`}>
-                从数据底座中选择要映射的物理表或视图
+                {t("ow.drp.subtitle")}
               </p>
             </div>
           </div>
@@ -230,7 +232,7 @@ export default function DataResourcePickerModal({
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索资源名称、数据源或路径..."
+              placeholder={t("ow.drp.searchPlaceholder")}
               className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg pl-9 pr-3 py-2
                 text-xs text-white placeholder:${styles.muted}
                 focus:outline-none focus:border-indigo-500/50 transition"
@@ -250,7 +252,7 @@ export default function DataResourcePickerModal({
                 focus:outline-none focus:border-indigo-500/50 transition
                 min-w-0 max-w-[140px]"
             >
-              <option value="">全部数据源</option>
+              <option value="">{t("ow.drp.source.all")}</option>
               {datasources.map((ds) => (
                 <option key={ds} value={ds}>
                   {ds}
@@ -269,14 +271,14 @@ export default function DataResourcePickerModal({
             >
               {RESOURCE_TYPES.map((rt) => (
                 <option key={rt.value} value={rt.value}>
-                  {rt.label}
+                  {t(rt.key)}
                 </option>
               ))}
             </select>
 
             {/* 结果计数 */}
             <span className={`text-[10px] ${styles.muted} ml-auto`}>
-              {filtered.length} 个结果
+              {t("ow.drp.resultCount", { count: filtered.length })}
             </span>
           </div>
         </div>
@@ -287,7 +289,7 @@ export default function DataResourcePickerModal({
           {loading && (
             <div className="flex items-center justify-center py-16">
               <Loader2 size={22} className="animate-spin text-indigo-400" />
-              <span className={`ml-3 text-xs ${styles.cardTextMuted}`}>加载数据资源...</span>
+              <span className={`ml-3 text-xs ${styles.cardTextMuted}`}>{t("ow.drp.loading")}</span>
             </div>
           )}
 
@@ -297,16 +299,17 @@ export default function DataResourcePickerModal({
               <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
                 <AlertTriangle size={15} className="text-amber-400 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-xs text-amber-300 font-medium">数据底座暂不可用</p>
+                  <p className="text-xs text-amber-300 font-medium">{t("ow.drp.error.title")}</p>
                   <p className="text-[10px] text-amber-500/70 mt-1">{error}</p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={loadResources}
                 className="px-4 py-2 rounded-lg text-xs text-indigo-400
                   border border-indigo-500/20 hover:bg-indigo-500/10 transition"
               >
-                重试
+                {t("ow.drp.retry")}
               </button>
             </div>
           )}
@@ -315,11 +318,11 @@ export default function DataResourcePickerModal({
           {!loading && !error && filtered.length === 0 && (
             <div className={`flex flex-col items-center justify-center py-12 ${styles.muted}`}>
               <Search size={28} className="mb-2 opacity-20" />
-              <p className="text-xs">未找到匹配的资源</p>
+              <p className="text-xs">{t("ow.drp.empty.none")}</p>
               <p className="text-[10px] mt-1 opacity-60">
                 {search || typeFilter || sourceFilter
-                  ? '请尝试调整搜索或筛选条件'
-                  : '数据底座中暂无可用资源'}
+                  ? t("ow.drp.empty.filtered")
+                  : t("ow.drp.empty.noData")}
               </p>
             </div>
           )}
@@ -330,21 +333,22 @@ export default function DataResourcePickerModal({
               {/* 全选操作 */}
               <div className="flex items-center justify-between mb-1 px-1">
                 <button
+                  type="button"
                   onClick={toggleSelectAll}
                   className="text-[10px] text-indigo-400 hover:text-indigo-300 transition"
                 >
                   {filtered.every((r) => selectedIds.has(r.resourceId))
-                    ? '取消全选'
-                    : '全选当前结果'}
+                    ? t("ow.drp.deselectAll")
+                    : t("ow.drp.selectAll")}
                 </button>
                 <span className={`text-[10px] ${styles.muted}`}>
-                  已选 {selectedIds.size} 项
+                  {t("ow.drp.selectedSummary", { count: selectedIds.size })}
                 </span>
               </div>
 
               {filtered.map((res) => {
                 const isSelected = selectedIds.has(res.resourceId);
-                const typeLabel = res.resourceType === 'VIEW' ? '视图' : '表';
+                const typeLabel = res.resourceType === 'VIEW' ? t("ow.drp.type.view") : t("ow.drp.type.table");
 
                 return (
                   <button
@@ -387,7 +391,7 @@ export default function DataResourcePickerModal({
                         <span>·</span>
                         <span className="font-mono text-[9px] truncate">{res.sourcePath}</span>
                         <span>·</span>
-                        <span>{res.fieldCount} 字段</span>
+                        <span>{res.fieldCount} {t("ow.drp.fields")}</span>
                       </div>
                     </div>
                   </button>
@@ -400,17 +404,19 @@ export default function DataResourcePickerModal({
         {/* ── 底部操作 ── */}
         <div className="flex items-center justify-between px-5 py-4 border-t border-[#2a3040] shrink-0">
           <span className={`text-[10px] ${styles.muted}`}>
-            已选择 {selectedIds.size} 个资源
+            {t("ow.drp.bottomSelected", { count: selectedIds.size })}
           </span>
           <div className="flex items-center gap-2.5">
             <button
+              type="button"
               onClick={onClose}
               className={`px-4 py-2 rounded-lg text-xs font-medium ${styles.sidebarText}
                 bg-[#2a3040] hover:bg-[#3a4050] transition`}
             >
-              取消
+              {t("common.cancel")}
             </button>
             <button
+              type="button"
               onClick={handleConfirm}
               disabled={selectedIds.size === 0}
               className="px-5 py-2 rounded-lg text-xs font-semibold text-white
@@ -418,7 +424,7 @@ export default function DataResourcePickerModal({
                 disabled:opacity-40 disabled:cursor-not-allowed
                 transition flex items-center gap-2"
             >
-              确认映射 ({selectedIds.size})
+              {t("ow.drp.confirm", { count: selectedIds.size })}
             </button>
           </div>
         </div>
