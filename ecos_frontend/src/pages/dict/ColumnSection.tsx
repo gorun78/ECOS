@@ -4,6 +4,7 @@ import { ColumnTypeSelect } from "./SharedComponents";
 import { typeBadge, type ColumnFormState } from "./constants";
 import type { DictTable, DictColumn } from "../../services/dict";
 import { useTheme } from "../../components/ThemeContext";
+import { useLanguage } from "../../components/LanguageContext";
 
 export interface ColumnSectionProps {
   selectedTable: DictTable;
@@ -25,6 +26,7 @@ export const ColumnSection: React.FC<ColumnSectionProps> = ({
   openNewColumn, openEditColumn, cancelColumnForm, handleSaveColumn,
   expandedColId, setExpandedColId, setDeleteTarget,
 }) => {
+  const { t } = useLanguage();
   const { styles } = useTheme();
   return (
     <>
@@ -32,78 +34,78 @@ export const ColumnSection: React.FC<ColumnSectionProps> = ({
         <div className="flex items-center justify-between mb-4">
           <h3 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2`}>
             <Columns3 size={16} className="text-indigo-500" />
-            字段列表
-            <span className={`text-xs font-normal ${styles.cardTextMuted}`}>{selectedTable.columns?.length ?? 0} 个字段</span>
+            {t('platform.dictionary.fieldList')}
+            <span className={`text-xs font-normal ${styles.cardTextMuted}`}>{selectedTable.columns?.length ?? 0} {t('platform.dictionary.columnsUnit')}</span>
           </h3>
-          <button className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold transition disabled:opacity-50 flex items-center gap-1"
+          <button type="button" className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold transition disabled:opacity-50 flex items-center gap-1"
             onClick={openNewColumn} disabled={saving || colFormOpen}>
             <Plus size={14} />
-            添加字段
+            {t('platform.dictionary.addField')}
           </button>
         </div>
 
         {colFormOpen && (
           <div className="mb-4 p-4 rounded-xl border-2 border-indigo-200 bg-indigo-50/30">
-            <div className={`text-xs font-semibold ${styles.cardText} mb-3`}>{colForm.id ? "编辑字段" : "添加新字段"}</div>
+            <div className={`text-xs font-semibold ${styles.cardText} mb-3`}>{colForm.id ? t('platform.dictionary.editField') : t('platform.dictionary.addNewField')}</div>
             <div className="grid grid-cols-4 gap-3">
               <div>
-                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>字段名 *</div>
+                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>{t('platform.dictionary.fieldName')} *</div>
                 <input className={`w-full px-2.5 py-1.5 rounded border ${styles.inputBorder} ${styles.inputBg} text-xs ${styles.cardText} outline-none focus:border-indigo-400 font-mono`}
                   placeholder="column_name" value={colForm.name} onChange={e => setColForm(p => ({ ...p, name: e.target.value }))} disabled={saving} />
               </div>
               <div>
-                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>类型</div>
+                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>{t('platform.dictionary.type')}</div>
                 <ColumnTypeSelect value={colForm.type} onChange={v => setColForm(p => ({ ...p, type: v }))} disabled={saving} />
               </div>
               <div>
-                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>长度</div>
+                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>{t('platform.dictionary.length')}</div>
                 <input className={`w-full px-2.5 py-1.5 rounded border ${styles.inputBorder} ${styles.inputBg} text-xs ${styles.cardText} outline-none focus:border-indigo-400 font-mono`}
                   placeholder="255" value={colForm.length} onChange={e => setColForm(p => ({ ...p, length: e.target.value }))} disabled={saving} />
               </div>
               <div className="flex gap-1.5">
                 <div className="flex-1">
-                  <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>精度</div>
+                  <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>{t('platform.dictionary.precision')}</div>
                   <input className={`w-full px-2.5 py-1.5 rounded border ${styles.inputBorder} ${styles.inputBg} text-xs ${styles.cardText} outline-none focus:border-indigo-400 font-mono`}
                     placeholder="10" value={colForm.precision} onChange={e => setColForm(p => ({ ...p, precision: e.target.value }))} disabled={saving} />
                 </div>
                 <div className="flex-1">
-                  <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>标度</div>
+                  <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>{t('platform.dictionary.scale')}</div>
                   <input className={`w-full px-2.5 py-1.5 rounded border ${styles.inputBorder} ${styles.inputBg} text-xs ${styles.cardText} outline-none focus:border-indigo-400 font-mono`}
                     placeholder="2" value={colForm.scale} onChange={e => setColForm(p => ({ ...p, scale: e.target.value }))} disabled={saving} />
                 </div>
               </div>
               <div>
-                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>默认值</div>
+                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>{t('platform.dictionary.defaultValue')}</div>
                 <input className={`w-full px-2.5 py-1.5 rounded border ${styles.inputBorder} ${styles.inputBg} text-xs ${styles.cardText} outline-none focus:border-indigo-400 font-mono`}
                   placeholder="NULL" value={colForm.defaultValue} onChange={e => setColForm(p => ({ ...p, defaultValue: e.target.value }))} disabled={saving} />
               </div>
               <div className="col-span-2">
-                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>描述</div>
+                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>{t('platform.dictionary.desc')}</div>
                 <input className={`w-full px-2.5 py-1.5 rounded border ${styles.inputBorder} ${styles.inputBg} text-xs ${styles.cardText} outline-none focus:border-indigo-400`}
-                  placeholder="字段说明..." value={colForm.description} onChange={e => setColForm(p => ({ ...p, description: e.target.value }))} disabled={saving} />
+                  placeholder={t('platform.dictionary.fieldDescPh')} value={colForm.description} onChange={e => setColForm(p => ({ ...p, description: e.target.value }))} disabled={saving} />
               </div>
               <div className="flex items-end gap-3 pb-1">
                 <label className={`flex items-center gap-1 text-[10px] ${styles.cardText} cursor-pointer`}>
                   <input type="checkbox" className="w-3.5 h-3.5 rounded accent-indigo-500" checked={colForm.nullable}
                     onChange={e => setColForm(p => ({ ...p, nullable: e.target.checked }))} disabled={saving} />
-                  可为空
+                  {t('platform.dictionary.nullable')}
                 </label>
                 <label className={`flex items-center gap-1 text-[10px] ${styles.cardText} cursor-pointer`}>
                   <input type="checkbox" className="w-3.5 h-3.5 rounded accent-amber-500" checked={colForm.primaryKey}
                     onChange={e => setColForm(p => ({ ...p, primaryKey: e.target.checked }))} disabled={saving} />
-                  主键
+                  {t('platform.dictionary.primaryKey')}
                 </label>
               </div>
             </div>
             <div className="flex gap-2 mt-3 pt-3 border-t border-indigo-100">
-              <button className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold transition disabled:opacity-50 flex items-center gap-1"
+              <button type="button" className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold transition disabled:opacity-50 flex items-center gap-1"
                 onClick={handleSaveColumn} disabled={saving}>
                 {saving ? <RotateCw size={12} className="animate-spin" /> : null}
-                {colForm.id ? "更新字段" : "添加字段"}
+                {colForm.id ? t('platform.dictionary.updateField') : t('platform.dictionary.addField')}
               </button>
-              <button className={`px-3 py-1.5 rounded-lg ${styles.appBg} hover:${styles.sidebarBg} ${styles.cardText} text-[11px] font-semibold transition`}
+              <button type="button" className={`px-3 py-1.5 rounded-lg ${styles.appBg} hover:${styles.sidebarBg} ${styles.cardText} text-[11px] font-semibold transition`}
                 onClick={cancelColumnForm} disabled={saving}>
-                取消
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -111,12 +113,12 @@ export const ColumnSection: React.FC<ColumnSectionProps> = ({
 
         {!selectedTable.columns || selectedTable.columns.length === 0 ? (
           <div className={`text-center py-8 ${styles.cardTextMuted} text-xs`}>
-            {colFormOpen ? null : "暂无字段，点击「添加字段」开始定义表结构"}
+            {colFormOpen ? null : t('platform.dictionary.emptyColumns')}
           </div>
         ) : (
           <div className={`border ${styles.appBorder} rounded-xl overflow-hidden`}>
             <div className={`grid grid-cols-[1fr_120px_80px_70px_100px_80px] gap-2 px-4 py-2 ${styles.appBg} text-[10px] font-semibold ${styles.cardTextMuted} uppercase`}>
-              <span>字段名</span><span>类型</span><span>可空</span><span>主键</span><span>默认值</span><span>操作</span>
+              <span>{t('platform.dictionary.fieldName')}</span><span>{t('platform.dictionary.type')}</span><span>{t('platform.dictionary.nullCol')}</span><span>{t('platform.dictionary.primaryKey')}</span><span>{t('platform.dictionary.defaultValue')}</span><span>{t('platform.dictionary.actions')}</span>
             </div>
             {[...selectedTable.columns].sort((a, b) => a.sortOrder - b.sortOrder).map(col => (
               <div key={col.id}>
@@ -134,11 +136,11 @@ export const ColumnSection: React.FC<ColumnSectionProps> = ({
                   <span>{col.primaryKey ? <Key size={13} className="text-amber-500" /> : <span className={styles.appBg}>—</span>}</span>
                   <span className={`font-mono ${styles.cardTextMuted} truncate`}>{col.defaultValue ?? <span className={`italic ${styles.appBg}`}>NULL</span>}</span>
                   <span className="flex items-center gap-1">
-                    <button className={`p-0.5 hover:${styles.sidebarBg} rounded`} title="编辑"
+                    <button type="button" className={`p-0.5 hover:${styles.sidebarBg} rounded`} title={t('platform.dictionary.edit')}
                       onClick={e => { e.stopPropagation(); openEditColumn(col); }}>
                       <Edit3 size={12} className={styles.cardTextMuted} />
                     </button>
-                    <button className="p-0.5 hover:bg-red-50 rounded" title="删除"
+                    <button type="button" className="p-0.5 hover:bg-red-50 rounded" title={t('platform.dictionary.delete')}
                       onClick={e => { e.stopPropagation(); setDeleteTarget({ type: "column", id: col.id, name: col.name }); }}>
                       <Trash2 size={12} className="text-red-400" />
                     </button>
@@ -146,12 +148,12 @@ export const ColumnSection: React.FC<ColumnSectionProps> = ({
                 </div>
                 {expandedColId === col.id && (
                   <div className={`px-4 py-3 ${styles.appBg} border-t ${styles.appBorder} text-[11px] ${styles.cardTextMuted} grid grid-cols-2 gap-x-6 gap-y-1`}>
-                    <div><span className={`font-semibold ${styles.cardTextMuted}`}>字段名:</span> <span className={`font-mono ${styles.cardText}`}>{col.name}</span></div>
-                    <div><span className={`font-semibold ${styles.cardTextMuted}`}>类型:</span> <span className={`font-mono ${styles.cardText}`}>{col.type}{col.length ? `(${col.length})` : ""}{col.precision != null ? `(${col.precision},${col.scale ?? 0})` : ""}</span></div>
-                    <div><span className={`font-semibold ${styles.cardTextMuted}`}>可为空:</span> <span className={styles.cardText}>{col.nullable ? "是" : "否"}</span></div>
-                    <div><span className={`font-semibold ${styles.cardTextMuted}`}>主键:</span> <span className={styles.cardText}>{col.primaryKey ? "是" : "否"}</span></div>
-                    {col.defaultValue && <div className="col-span-2"><span className={`font-semibold ${styles.cardTextMuted}`}>默认值:</span> <span className={`font-mono ${styles.cardText}`}>{col.defaultValue}</span></div>}
-                    {col.description && <div className="col-span-2"><span className={`font-semibold ${styles.cardTextMuted}`}>描述:</span> <span className={styles.cardText}>{col.description}</span></div>}
+                    <div><span className={`font-semibold ${styles.cardTextMuted}`}>{t('platform.dictionary.fieldName')}:</span> <span className={`font-mono ${styles.cardText}`}>{col.name}</span></div>
+                    <div><span className={`font-semibold ${styles.cardTextMuted}`}>{t('platform.dictionary.type')}:</span> <span className={`font-mono ${styles.cardText}`}>{col.type}{col.length ? `(${col.length})` : ""}{col.precision != null ? `(${col.precision},${col.scale ?? 0})` : ""}</span></div>
+                    <div><span className={`font-semibold ${styles.cardTextMuted}`}>{t('platform.dictionary.nullable')}:</span> <span className={styles.cardText}>{col.nullable ? t('platform.dictionary.yes') : t('platform.dictionary.no')}</span></div>
+                    <div><span className={`font-semibold ${styles.cardTextMuted}`}>{t('platform.dictionary.primaryKey')}:</span> <span className={styles.cardText}>{col.primaryKey ? t('platform.dictionary.yes') : t('platform.dictionary.no')}</span></div>
+                    {col.defaultValue && <div className="col-span-2"><span className={`font-semibold ${styles.cardTextMuted}`}>{t('platform.dictionary.defaultValue')}:</span> <span className={`font-mono ${styles.cardText}`}>{col.defaultValue}</span></div>}
+                    {col.description && <div className="col-span-2"><span className={`font-semibold ${styles.cardTextMuted}`}>{t('platform.dictionary.desc')}:</span> <span className={styles.cardText}>{col.description}</span></div>}
                   </div>
                 )}
               </div>
@@ -161,11 +163,11 @@ export const ColumnSection: React.FC<ColumnSectionProps> = ({
       </div>
 
       <div className={`border-t ${styles.appBorder} pt-4 mt-2 flex flex-wrap gap-x-6 gap-y-1 text-[11px] ${styles.cardTextMuted}`}>
-        {selectedTable.code && <span className="flex items-center gap-1"><Hash size={11} /> 编码: <span className={`font-mono ${styles.cardTextMuted}`}>{selectedTable.code}</span></span>}
+        {selectedTable.code && <span className="flex items-center gap-1"><Hash size={11} /> {t('platform.dictionary.code')}: <span className={`font-mono ${styles.cardTextMuted}`}>{selectedTable.code}</span></span>}
         {selectedTable.schema && <span className="flex items-center gap-1"><Layers size={11} /> Schema: <span className={`font-mono ${styles.cardTextMuted}`}>{selectedTable.schema}</span></span>}
-        {selectedTable.source && <span className="flex items-center gap-1"><HardDrive size={11} /> 数据源: <span className={styles.cardTextMuted}>{selectedTable.source}</span></span>}
-        {selectedTable.owner && <span className="flex items-center gap-1"><User size={11} /> 负责人: <span className={styles.cardTextMuted}>{selectedTable.owner}</span></span>}
-        {selectedTable.createdAt && <span className="flex items-center gap-1"><Calendar size={11} /> 创建: <span className={styles.cardTextMuted}>{new Date(selectedTable.createdAt).toLocaleDateString("zh-CN")}</span></span>}
+        {selectedTable.source && <span className="flex items-center gap-1"><HardDrive size={11} /> {t('platform.dictionary.source')}: <span className={styles.cardTextMuted}>{selectedTable.source}</span></span>}
+        {selectedTable.owner && <span className="flex items-center gap-1"><User size={11} /> {t('platform.dictionary.owner')}: <span className={styles.cardTextMuted}>{selectedTable.owner}</span></span>}
+        {selectedTable.createdAt && <span className="flex items-center gap-1"><Calendar size={11} /> {t('platform.dictionary.created')}: <span className={styles.cardTextMuted}>{new Date(selectedTable.createdAt).toLocaleDateString("zh-CN")}</span></span>}
         {selectedTable.tags && selectedTable.tags.length > 0 && (
           <span className="flex items-center gap-1 flex-wrap">
             <Tag size={11} />

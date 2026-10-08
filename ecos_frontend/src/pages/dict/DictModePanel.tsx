@@ -2,6 +2,7 @@ import React from "react";
 import { BookOpen, FolderTree, Plus, Search, RotateCw, Edit3, Trash2 } from "lucide-react";
 import type { DictType, DictItem } from "../../api";
 import { useTheme } from "../../components/ThemeContext";
+import { useLanguage } from "../../components/LanguageContext";
 
 export interface DictModePanelProps {
   selectedDictType: string | null;
@@ -30,13 +31,14 @@ export const DictModePanel: React.FC<DictModePanelProps> = ({
   handleSaveDictItem, cancelDictItemForm, dictLoading, filteredDictItems,
   openEditDictItem, setDeleteTarget,
 }) => {
+  const { t } = useLanguage();
   const { styles } = useTheme();
   if (!selectedDictType) {
     return (
       <div className={`flex-1 ${styles.cardBg} overflow-y-auto`}>
         <div className={`flex flex-col items-center justify-center h-full ${styles.cardTextMuted} text-xs gap-3`}>
           <BookOpen size={48} className="opacity-25" />
-          <div className="text-center">从左侧选择一个字典类型查看其字典项</div>
+          <div className="text-center">{t('platform.dictionary.selectDictTypeHint')}</div>
         </div>
       </div>
     );
@@ -54,63 +56,63 @@ export const DictModePanel: React.FC<DictModePanelProps> = ({
           <button className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold transition disabled:opacity-50 flex items-center gap-1"
             onClick={openNewDictItem} disabled={saving || dictItemFormOpen}>
             <Plus size={14} />
-            新增字典项
+            {t('platform.dictionary.addItem')}
           </button>
         </div>
 
         <div className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border ${styles.appBorder} ${styles.cardBg} text-xs w-64`}>
           <Search size={14} className={`${styles.cardTextMuted} shrink-0`} />
-          <input placeholder="搜索字典项..." value={dictSearch} onChange={e => setDictSearch(e.target.value)}
+          <input placeholder={t('platform.dictionary.searchItem')} value={dictSearch} onChange={e => setDictSearch(e.target.value)}
             className={`border-none outline-none flex-1 bg-transparent text-xs ${styles.inputText} placeholder:opacity-50`} />
         </div>
 
         {dictItemFormOpen && (
           <div className="p-4 rounded-xl border-2 border-emerald-200 bg-emerald-50/30">
-            <div className={`text-xs font-semibold ${styles.cardText} mb-3`}>{dictItemForm.editCode ? "编辑字典项" : "新增字典项"}</div>
+            <div className={`text-xs font-semibold ${styles.cardText} mb-3`}>{dictItemForm.editCode ? t('platform.dictionary.editItem') : t('platform.dictionary.addItem')}</div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>编码 *</div>
+                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>{t('platform.dictionary.code')} *</div>
                 <input className={`w-full px-2.5 py-1.5 rounded border ${styles.inputBorder} ${styles.inputBg} text-xs ${styles.cardText} outline-none focus:border-emerald-400 font-mono disabled:opacity-40`}
                   placeholder="dict_code" value={dictItemForm.dictCode} onChange={e => setDictItemForm(p => ({ ...p, dictCode: e.target.value }))} disabled={saving || !!dictItemForm.editCode} />
               </div>
               <div>
-                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>值</div>
+                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>{t('platform.dictionary.value')}</div>
                 <input className={`w-full px-2.5 py-1.5 rounded border ${styles.inputBorder} ${styles.inputBg} text-xs ${styles.cardText} outline-none focus:border-emerald-400 font-mono`}
                   placeholder="dict_value" value={dictItemForm.extValue} onChange={e => setDictItemForm(p => ({ ...p, extValue: e.target.value }))} disabled={saving} />
               </div>
               <div>
-                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>标签 *</div>
+                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>{t('platform.dictionary.label')} *</div>
                 <input className={`w-full px-2.5 py-1.5 rounded border ${styles.inputBorder} ${styles.inputBg} text-xs ${styles.cardText} outline-none focus:border-emerald-400`}
-                  placeholder="显示名称" value={dictItemForm.dictLabel} onChange={e => setDictItemForm(p => ({ ...p, dictLabel: e.target.value }))} disabled={saving} />
+                  placeholder={t('platform.dictionary.labelPh')} value={dictItemForm.dictLabel} onChange={e => setDictItemForm(p => ({ ...p, dictLabel: e.target.value }))} disabled={saving} />
               </div>
               <div>
-                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>状态</div>
+                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>{t('platform.dictionary.status')}</div>
                 <select className={`w-full px-2.5 py-1.5 rounded border ${styles.inputBorder} ${styles.inputBg} text-xs ${styles.cardText} outline-none focus:border-emerald-400`}
                   value={dictItemForm.status} onChange={e => setDictItemForm(p => ({ ...p, status: e.target.value }))} disabled={saving}>
-                  <option value="active">启用</option>
-                  <option value="inactive">禁用</option>
+                  <option value="active">{t('platform.dictionary.active')}</option>
+                  <option value="inactive">{t('platform.dictionary.inactive')}</option>
                 </select>
               </div>
               <div>
-                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>排序</div>
+                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>{t('platform.dictionary.order')}</div>
                 <input className={`w-full px-2.5 py-1.5 rounded border ${styles.inputBorder} ${styles.inputBg} text-xs ${styles.cardText} outline-none focus:border-emerald-400 font-mono`}
                   placeholder="0" value={dictItemForm.sortOrder} onChange={e => setDictItemForm(p => ({ ...p, sortOrder: e.target.value }))} disabled={saving} />
               </div>
               <div>
-                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>描述</div>
+                <div className={`text-[10px] font-semibold ${styles.cardTextMuted} mb-0.5`}>{t('platform.dictionary.desc')}</div>
                 <input className={`w-full px-2.5 py-1.5 rounded border ${styles.inputBorder} ${styles.inputBg} text-xs ${styles.cardText} outline-none focus:border-emerald-400`}
-                  placeholder="备注说明..." value={dictItemForm.description} onChange={e => setDictItemForm(p => ({ ...p, description: e.target.value }))} disabled={saving} />
+                  placeholder={t('platform.dictionary.descPh')} value={dictItemForm.description} onChange={e => setDictItemForm(p => ({ ...p, description: e.target.value }))} disabled={saving} />
               </div>
             </div>
             <div className="flex gap-2 mt-3 pt-3 border-t border-emerald-100">
-              <button className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold transition disabled:opacity-50 flex items-center gap-1"
+              <button type="button" className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold transition disabled:opacity-50 flex items-center gap-1"
                 onClick={() => handleSaveDictItem(() => {})} disabled={saving}>
                 {saving ? <RotateCw size={12} className="animate-spin" /> : null}
-                {dictItemForm.editCode ? "更新" : "创建"}
+                {dictItemForm.editCode ? t('platform.dictionary.update') : t('platform.dictionary.create')}
               </button>
-              <button className={`px-3 py-1.5 rounded-lg ${styles.appBg} hover:${styles.sidebarBg} ${styles.cardText} text-[11px] font-semibold transition`}
+              <button type="button" className={`px-3 py-1.5 rounded-lg ${styles.appBg} hover:${styles.sidebarBg} ${styles.cardText} text-[11px] font-semibold transition`}
                 onClick={cancelDictItemForm} disabled={saving}>
-                取消
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -119,16 +121,16 @@ export const DictModePanel: React.FC<DictModePanelProps> = ({
         {dictLoading ? (
           <div className={`flex flex-col items-center justify-center py-12 ${styles.cardTextMuted} text-xs gap-2`}>
             <RotateCw size={18} className="animate-spin" />
-            <div>加载中...</div>
+            <div>{t('platform.dictionary.loading')}</div>
           </div>
         ) : filteredDictItems.length === 0 ? (
           <div className={`text-center py-12 ${styles.cardTextMuted} text-xs`}>
-            {dictSearch ? `未找到匹配「${dictSearch}」的字典项` : "暂无字典项，点击「新增字典项」开始添加"}
+            {dictSearch ? t('platform.dictionary.noMatch', { q: dictSearch }) : t('platform.dictionary.emptyList')}
           </div>
         ) : (
           <div className={`border ${styles.appBorder} rounded-xl overflow-hidden`}>
             <div className={`grid grid-cols-[1fr_1fr_1.5fr_80px_80px_100px] gap-2 px-4 py-2 ${styles.appBg} text-[10px] font-semibold ${styles.cardTextMuted} uppercase`}>
-              <span>编码</span><span>值</span><span>标签</span><span>排序</span><span>状态</span><span>操作</span>
+              <span>{t('platform.dictionary.code')}</span><span>{t('platform.dictionary.value')}</span><span>{t('platform.dictionary.label')}</span><span>{t('platform.dictionary.order')}</span><span>{t('platform.dictionary.status')}</span><span>{t('platform.dictionary.actions')}</span>
             </div>
             {filteredDictItems.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map(item => (
               <div key={item.dictCode} className={`grid grid-cols-[1fr_1fr_1.5fr_80px_80px_100px] gap-2 px-4 py-2.5 border-t ${styles.appBorder} text-xs hover:${styles.appBg}`}>
@@ -138,14 +140,14 @@ export const DictModePanel: React.FC<DictModePanelProps> = ({
                 <span className={styles.cardTextMuted}>{item.sortOrder ?? 0}</span>
                 <span>
                   <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${item.status === "active" ? "bg-green-50 text-green-600" : `${styles.appBg} ${styles.cardTextMuted}`}`}>
-                    {item.status === "active" ? "启用" : "禁用"}
+                    {item.status === "active" ? t('platform.dictionary.active') : t('platform.dictionary.inactive')}
                   </span>
                 </span>
                 <span className="flex items-center gap-1">
-                  <button className={`p-0.5 hover:${styles.sidebarBg} rounded`} title="编辑" onClick={() => openEditDictItem(item)}>
+                  <button type="button" className={`p-0.5 hover:${styles.sidebarBg} rounded`} title={t('platform.dictionary.edit')} onClick={() => openEditDictItem(item)}>
                     <Edit3 size={12} className={styles.cardTextMuted} />
                   </button>
-                  <button className="p-0.5 hover:bg-red-50 rounded" title="删除"
+                  <button type="button" className="p-0.5 hover:bg-red-50 rounded" title={t('platform.dictionary.delete')}
                     onClick={() => setDeleteTarget({ type: "dictItem", id: item.dictCode, name: item.dictLabel })}>
                     <Trash2 size={12} className="text-red-400" />
                   </button>
@@ -159,7 +161,7 @@ export const DictModePanel: React.FC<DictModePanelProps> = ({
           <div className={`border-t ${styles.appBorder} pt-3 mt-2 text-[11px] ${styles.cardTextMuted}`}>
             {(() => {
               const dt = dictTypes.find(d => d.dictType === selectedDictType);
-              return dt?.description ? <span>说明: {dt.description}</span> : null;
+              return dt?.description ? <span>{t('platform.dictionary.descPrefix')}{dt.description}</span> : null;
             })()}
           </div>
         )}

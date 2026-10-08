@@ -127,7 +127,7 @@ export function useTableMode(
     setSaving(true);
     try {
       await updateDictTable(selectedTable.id, { status: newStatus });
-      showToast("success", t("dict.toast.statusChanged", { name: STATUS_META[newStatus]?.label ?? newStatus }));
+      showToast("success", t("dict.toast.statusChanged", { name: STATUS_META[newStatus] ? t(STATUS_META[newStatus].labelKey) : newStatus }));
       await loadTables(statusFilter || undefined);
       await loadTableDetail(selectedTable.id);
     } catch (e: any) { showToast("error", t("dict.toast.transitionFailed", { msg: e.message })); }

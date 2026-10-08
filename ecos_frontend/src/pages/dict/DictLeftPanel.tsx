@@ -8,6 +8,7 @@ import { STATUS_OPTIONS, STATUS_META, G1_G5_LABELS } from "./constants";
 import type { DictTable, DictColumn } from "../../services/dict";
 import type { DictType } from "../../api";
 import { useTheme } from "../../components/ThemeContext";
+import { useLanguage } from "../../components/LanguageContext";
 
 export interface DictLeftPanelProps {
   viewMode: "table" | "dict";
@@ -43,25 +44,26 @@ export const DictLeftPanel: React.FC<DictLeftPanelProps> = (props) => {
     dictTypes, dictSearch, setDictSearch, dictLoading,
     subsystemGroups, expandedGroups, toggleGroup, handleSelectDictType, selectedDictType,
   } = props;
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   return (
     <div className={`w-full lg:w-[340px] min-w-[280px] border-r ${styles.appBorder} ${styles.cardBg} flex flex-col shrink-0`}>
       <div className={`p-4 border-b ${styles.appBorder}`}>
         <div className={`flex mb-3 rounded-lg ${styles.appBg} p-0.5`}>
-          <button
+          <button type="button"
             className={`flex-1 py-1.5 rounded-md text-xs font-semibold transition ${viewMode === "table" ? `${styles.cardBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} hover:${styles.sidebarText}`}`}
             onClick={() => handleSwitchMode("table")}
           >
             <Database size={13} className="inline mr-1" />
-            数据表管理
+            {t('platform.dictionary.tableMgmtTab')}
           </button>
-          <button
+          <button type="button"
             className={`flex-1 py-1.5 rounded-md text-xs font-semibold transition ${viewMode === "dict" ? `${styles.cardBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} hover:${styles.sidebarText}`}`}
             onClick={() => handleSwitchMode("dict")}
           >
             <BookOpen size={13} className="inline mr-1" />
-            字典项管理
+            {t('platform.dictionary.dictMgmtTab')}
           </button>
         </div>
 
@@ -69,29 +71,29 @@ export const DictLeftPanel: React.FC<DictLeftPanelProps> = (props) => {
           <>
             <div className={`text-base font-bold ${styles.cardText} mb-3 flex items-center gap-2`}>
               <Database size={18} className="text-indigo-500" />
-              数据字典
-              <span className={`text-xs font-normal ${styles.cardTextMuted}`}>{counts.all} 张表</span>
+              {t('platform.dictionary.dataDict')}
+              <span className={`text-xs font-normal ${styles.cardTextMuted}`}>{t('platform.dictionary.nTables', { n: counts.all })}</span>
             </div>
             <div className="flex gap-2 mb-2.5">
               <div className={`flex items-center gap-1.5 flex-1 px-3 py-2 rounded-lg border ${styles.appBorder} ${styles.cardBg} text-xs`}>
                 <Search size={14} className={`${styles.cardTextMuted} shrink-0`} />
-                <input placeholder="搜索表名..." value={search} onChange={e => handleSearchChange(e.target.value)}
+                <input placeholder={t('platform.dictionary.searchTable')} value={search} onChange={e => handleSearchChange(e.target.value)}
                   className={`border-none outline-none flex-1 bg-transparent text-xs ${styles.inputText} placeholder:opacity-50`} />
               </div>
               <select className={`px-2.5 py-2 rounded-lg border ${styles.appBorder} ${styles.cardBg} text-xs ${styles.inputText} min-w-[110px] outline-none`}
                 value={statusFilter} onChange={e => handleStatusFilter(e.target.value)}>
-                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{t(o.labelKey)}</option>)}
               </select>
             </div>
-            <button className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition disabled:opacity-50"
+            <button type="button" className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition disabled:opacity-50"
               onClick={handleCreate} disabled={saving}>
               <Plus size={16} />
-              新建数据表
+              {t('platform.dictionary.newTable')}
             </button>
             <div className={`flex gap-3 mt-2.5 text-[11px] ${styles.cardTextMuted}`}>
-              <span>草稿 {counts.draft}</span>
-              <span>已发布 {counts.published}</span>
-              <span>已废弃 {counts.deprecated}</span>
+              <span>{t('platform.dictionary.draft')} {counts.draft}</span>
+              <span>{t('platform.dictionary.published')} {counts.published}</span>
+              <span>{t('platform.dictionary.deprecated')} {counts.deprecated}</span>
             </div>
           </>
         )}
@@ -100,12 +102,12 @@ export const DictLeftPanel: React.FC<DictLeftPanelProps> = (props) => {
           <>
             <div className={`text-base font-bold ${styles.cardText} mb-3 flex items-center gap-2`}>
               <BookOpen size={18} className="text-emerald-500" />
-              字典分组
-              <span className={`text-xs font-normal ${styles.cardTextMuted}`}>{dictTypes.length} 个类型</span>
+              {t('platform.dictionary.dictGroups')}
+              <span className={`text-xs font-normal ${styles.cardTextMuted}`}>{t('platform.dictionary.nTypes', { n: dictTypes.length })}</span>
             </div>
             <div className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border ${styles.appBorder} ${styles.cardBg} text-xs mb-2.5`}>
               <Search size={14} className={`${styles.cardTextMuted} shrink-0`} />
-              <input placeholder="搜索字典类型..." value={dictSearch} onChange={e => setDictSearch(e.target.value)}
+              <input placeholder={t('platform.dictionary.searchDictType')} value={dictSearch} onChange={e => setDictSearch(e.target.value)}
                 className={`border-none outline-none flex-1 bg-transparent text-xs ${styles.inputText} placeholder:opacity-50`} />
             </div>
           </>
@@ -117,38 +119,38 @@ export const DictLeftPanel: React.FC<DictLeftPanelProps> = (props) => {
           {loading ? (
             <div className={`flex flex-col items-center justify-center py-12 ${styles.cardTextMuted} text-xs gap-2`}>
               <RotateCw size={18} className="animate-spin" />
-              <div>加载中...</div>
+              <div>{t('platform.dictionary.loading')}</div>
             </div>
           ) : filteredTables.length === 0 ? (
             <div className={`flex items-center justify-center py-12 ${styles.cardTextMuted} text-xs px-4 text-center`}>
-              {search ? `未找到匹配「${search}」的数据表` : "暂无数据表，点击上方「+ 新建数据表」开始创建"}
+              {search ? t('platform.dictionary.tableNoMatch', { q: search }) : t('platform.dictionary.noTables')}
             </div>
           ) : (
-            filteredTables.map(t => {
-              const meta = STATUS_META[t.status] ?? STATUS_META.DRAFT;
-              const isActive = t.id === selectedTable?.id;
-              const colCount = t.columns?.length ?? 0;
+            filteredTables.map(tb => {
+              const meta = STATUS_META[tb.status] ?? STATUS_META.DRAFT;
+              const isActive = tb.id === selectedTable?.id;
+              const colCount = tb.columns?.length ?? 0;
               return (
-                <div key={t.id}
+                <div key={tb.id}
                   className={`flex flex-col gap-1 px-3 py-2.5 border-b ${styles.cardBorder} cursor-pointer transition text-xs ${isActive ? "bg-indigo-50 border-l-2 border-l-indigo-500" : `hover:${styles.appBg}`}`}
-                  onClick={() => selectTable(t)}>
+                  onClick={() => selectTable(tb)}>
                   <div className="flex items-center gap-2">
                     <Database size={13} className={`${styles.cardTextMuted} shrink-0`} />
-                    <span className={`flex-1 font-semibold ${styles.cardText} truncate`}>{t.name}</span>
-                    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${meta.bg} ${meta.text}`}>{meta.label}</span>
+                    <span className={`flex-1 font-semibold ${styles.cardText} truncate`}>{tb.name}</span>
+                    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${meta.bg} ${meta.text}`}>{t(meta.labelKey)}</span>
                   </div>
                   <div className={`flex items-center gap-3 text-[10px] ${styles.cardTextMuted} pl-5`}>
-                    {t.schema && <span className="flex items-center gap-0.5"><Layers size={10} />{t.schema}</span>}
-                    {t.source && <span className="flex items-center gap-0.5"><HardDrive size={10} />{t.source}</span>}
-                    <span className="flex items-center gap-0.5"><Columns3 size={10} />{colCount} 字段</span>
+                    {tb.schema && <span className="flex items-center gap-0.5"><Layers size={10} />{tb.schema}</span>}
+                    {tb.source && <span className="flex items-center gap-0.5"><HardDrive size={10} />{tb.source}</span>}
+                    <span className="flex items-center gap-0.5"><Columns3 size={10} />{colCount} {t('platform.dictionary.columnsUnit')}</span>
                   </div>
                   <div className="flex gap-1 pl-5">
-                    <button className={`p-0.5 hover:${styles.sidebarBg} rounded`} title="编辑"
-                      onClick={e => { e.stopPropagation(); selectTable(t); }}>
+                    <button type="button" className={`p-0.5 hover:${styles.sidebarBg} rounded`} title={t('platform.dictionary.edit')}
+                      onClick={e => { e.stopPropagation(); selectTable(tb); }}>
                       <Edit3 size={12} className={styles.cardTextMuted} />
                     </button>
-                    <button className="p-0.5 hover:bg-red-50 rounded" title="删除"
-                      onClick={e => { e.stopPropagation(); setDeleteTarget({ type: "table", id: t.id, name: t.name }); }}>
+                    <button type="button" className="p-0.5 hover:bg-red-50 rounded" title={t('platform.dictionary.delete')}
+                      onClick={e => { e.stopPropagation(); setDeleteTarget({ type: "table", id: tb.id, name: tb.name }); }}>
                       <Trash2 size={12} className="text-red-400" />
                     </button>
                   </div>
@@ -164,17 +166,17 @@ export const DictLeftPanel: React.FC<DictLeftPanelProps> = (props) => {
           {dictLoading ? (
             <div className={`flex flex-col items-center justify-center py-12 ${styles.cardTextMuted} text-xs gap-2`}>
               <RotateCw size={18} className="animate-spin" />
-              <div>加载中...</div>
+              <div>{t('platform.dictionary.loading')}</div>
             </div>
           ) : Object.keys(subsystemGroups).length === 0 && dictTypes.length === 0 ? (
             <div className={`flex items-center justify-center py-12 ${styles.cardTextMuted} text-xs px-4 text-center`}>
-              暂无可用的字典类型
+              {t('platform.dictionary.noDictTypes')}
             </div>
           ) : (
             (Object.keys(subsystemGroups).length > 0 ? Object.keys(subsystemGroups).sort() : ["G1","G2","G3","G4","G5"]).map(groupKey => {
               const groupTypes = subsystemGroups[groupKey] || [];
               const isExpanded = expandedGroups.has(groupKey);
-              const gMeta = G1_G5_LABELS[groupKey] || { zh: groupKey, color: "text-slate-600", border: "border-slate-200", bg: "bg-slate-50" }; /* FIXME:theme-fallback 留尾清理 */
+              const gMeta = G1_G5_LABELS[groupKey] || { labelKey: "", color: "text-slate-600", border: "border-slate-200", bg: "bg-slate-50" }; /* FIXME:theme-fallback 留尾清理 */
               const visibleTypes = groupTypes.filter(dt =>
                 !dictSearch || (dt.dictName || dt.dictType).toLowerCase().includes(dictSearch.toLowerCase()) ||
                 dt.dictType.toLowerCase().includes(dictSearch.toLowerCase()));
@@ -185,8 +187,8 @@ export const DictLeftPanel: React.FC<DictLeftPanelProps> = (props) => {
                   <div className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition text-xs ${gMeta.bg} border-l-2 ${gMeta.border}`}
                     onClick={() => toggleGroup(groupKey)}>
                     <ChevronDown size={12} className={`transition ${isExpanded ? "" : "-rotate-90"} ${styles.cardTextMuted}`} />
-                    <span className={`font-bold ${gMeta.color}`}>{gMeta.zh}</span>
-                    <span className={styles.cardTextMuted}>{groupTypes.length} 类型 · {totalItems} 项</span>
+                    <span className={`font-bold ${gMeta.color}`}>{gMeta.labelKey ? t(gMeta.labelKey) : groupKey}</span>
+                    <span className={styles.cardTextMuted}>{t('platform.dictionary.groupSummary', { nTypes: groupTypes.length, nItems: totalItems })}</span>
                   </div>
                   {isExpanded && visibleTypes.map(dt => {
                     const isActive = dt.dictType === selectedDictType;

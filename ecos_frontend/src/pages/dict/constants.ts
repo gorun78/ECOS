@@ -1,19 +1,28 @@
 // ── DictManager constants & types ──
 
-export const STATUS_OPTIONS = [
-  { value: "", label: "全部" },
-  { value: "DRAFT", label: "Draft" },
-  { value: "PUBLISHED", label: "Published" },
-  { value: "DEPRECATED", label: "Deprecated" },
+export const STATUS_OPTIONS: Array<{ value: string; labelKey: string }> = [
+  { value: "", labelKey: "platform.dictionary.status.all" },
+  { value: "DRAFT", labelKey: "platform.dictionary.draft" },
+  { value: "PUBLISHED", labelKey: "platform.dictionary.published" },
+  { value: "DEPRECATED", labelKey: "platform.dictionary.status.deprecated" },
 ];
 
-export const STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
-  DRAFT:      { label: "草稿",     bg: "bg-slate-100",  text: "text-slate-600" },
-  PUBLISHED:  { label: "已发布",   bg: "bg-green-50",   text: "text-green-600" },
-  DEPRECATED: { label: "已废弃",   bg: "bg-amber-50",   text: "text-amber-600" },
+export const STATUS_META: Record<string, { labelKey: string; bg: string; text: string }> = {
+  DRAFT:      { labelKey: "platform.dictionary.draft",      bg: "bg-slate-100",  text: "text-slate-600" },
+  PUBLISHED:  { labelKey: "platform.dictionary.published",  bg: "bg-green-50",   text: "text-green-600" },
+  DEPRECATED: { labelKey: "platform.dictionary.status.deprecated", bg: "bg-amber-50",   text: "text-amber-600" },
 };
 
-export const SOURCE_OPTIONS = ["MySQL", "PostgreSQL", "Oracle", "Hive", "ClickHouse", "其他"];
+// note: `value` is the raw API payload for the `source` column — must stay byte-identical to existing stored
+// data; `labelKey` is display-only. Change `value` only after a data migration.
+export const SOURCE_OPTIONS: Array<{ value: string; labelKey?: string }> = [
+  { value: "MySQL" },
+  { value: "PostgreSQL" },
+  { value: "Oracle" },
+  { value: "Hive" },
+  { value: "ClickHouse" },
+  { value: "其他", labelKey: "platform.dictionary.source.other" },
+];
 
 export const SQL_TYPES = [
   "VARCHAR", "CHAR", "TEXT", "LONGTEXT",
@@ -23,11 +32,11 @@ export const SQL_TYPES = [
   "BOOLEAN", "JSON", "BLOB",
 ];
 
-export const COLUMN_TYPE_CATEGORIES: Record<string, string[]> = {
-  "字符串": ["VARCHAR", "CHAR", "TEXT", "LONGTEXT"],
-  "数值": ["INT", "BIGINT", "SMALLINT", "TINYINT", "DECIMAL", "FLOAT", "DOUBLE"],
-  "日期时间": ["DATE", "DATETIME", "TIMESTAMP"],
-  "其他": ["BOOLEAN", "JSON", "BLOB"],
+export const COLUMN_TYPE_CATEGORIES: Record<string, { labelKey: string; types: string[] }> = {
+  string:   { labelKey: "platform.dictionary.coltypes.string",   types: ["VARCHAR", "CHAR", "TEXT", "LONGTEXT"] },
+  number:   { labelKey: "platform.dictionary.coltypes.number",   types: ["INT", "BIGINT", "SMALLINT", "TINYINT", "DECIMAL", "FLOAT", "DOUBLE"] },
+  datetime: { labelKey: "platform.dictionary.coltypes.datetime", types: ["DATE", "DATETIME", "TIMESTAMP"] },
+  other:    { labelKey: "platform.dictionary.coltypes.other",    types: ["BOOLEAN", "JSON", "BLOB"] },
 };
 
 // ── Column Form State ──
@@ -56,12 +65,12 @@ export const emptyColumnForm = (): ColumnFormState => ({
   description: "",
 });
 
-export const G1_G5_LABELS: Record<string, { zh: string; color: string; border: string; bg: string }> = {
-  G1: { zh: "G1 数据集成", color: "text-blue-700", border: "border-blue-300", bg: "bg-blue-50" },
-  G2: { zh: "G2 数据治理", color: "text-emerald-700", border: "border-emerald-300", bg: "bg-emerald-50" },
-  G3: { zh: "G3 数据资产", color: "text-purple-700", border: "border-purple-300", bg: "bg-purple-50" },
-  G4: { zh: "G4 AI智能体", color: "text-amber-700", border: "border-amber-300", bg: "bg-amber-50" },
-  G5: { zh: "G5 系统管理", color: "text-slate-700", border: "border-slate-300", bg: "bg-slate-50" },
+export const G1_G5_LABELS: Record<string, { labelKey: string; color: string; border: string; bg: string }> = {
+  G1: { labelKey: "platform.dictionary.group.G1", color: "text-blue-700", border: "border-blue-300", bg: "bg-blue-50" },
+  G2: { labelKey: "platform.dictionary.group.G2", color: "text-emerald-700", border: "border-emerald-300", bg: "bg-emerald-50" },
+  G3: { labelKey: "platform.dictionary.group.G3", color: "text-purple-700", border: "border-purple-300", bg: "bg-purple-50" },
+  G4: { labelKey: "platform.dictionary.group.G4", color: "text-amber-700", border: "border-amber-300", bg: "bg-amber-50" },
+  G5: { labelKey: "platform.dictionary.group.G5", color: "text-slate-700", border: "border-slate-300", bg: "bg-slate-50" },
 };
 
 // ── Column type badge color ──
