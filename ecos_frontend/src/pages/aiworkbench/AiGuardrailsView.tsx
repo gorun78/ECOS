@@ -8,6 +8,7 @@ import { AIPGuardrail } from '../../types/aiworkbench';
 import { authHeaders, convertPolicyToGuardrail } from '../../services/aiworkbenchApi';
 import type { GuardrailPolicyRaw } from '../../services/aiworkbenchApi';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 // H6-T4 拆分：Icon 与领域类型收敛至 AiGuardrailsShared，三个 Tab 各自独立文件。
 import { Icon, PhysicalFlight, PhysicalPilot, Proposal } from './AiGuardrailsShared';
 import AiGuardrailsWorkflowTab from './AiGuardrailsWorkflowTab';
@@ -26,6 +27,7 @@ export default function AiGuardrailsView({
   showToast,
 }: GuardrailsViewProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const [activeSubTab, setActiveSubTab] = useState<'guardrails' | 'workflow' | 'policy_compiler'>('policy_compiler');
 
   const [columnPolicies, setColumnPolicies] = useState<any[]>([]);
@@ -147,7 +149,7 @@ export default function AiGuardrailsView({
         const createdId = saveData?.data?.id || saveData?.id;
         if (!createdId) {
           setIsCompiling(false);
-          showToast?.('error', '安全策略保存未返回策略ID，无法编译');
+          showToast?.('error', t('aiworkbench.gv.saveNoId'));
           return;
         }
         return fetch(`/api/v1/guardrails/policies/${createdId}/compile`, {
@@ -157,7 +159,7 @@ export default function AiGuardrailsView({
           .then(res => res.json())
           .then(data => {
             setIsCompiling(false);
-            showToast?.('success', '🛡️ 安全策略重新编译成功，已热部署到 Doris 查询引擎！');
+            showToast?.('success', t('aiworkbench.gv.recompileSuccess'));
             const policies = data?.policies || data?.data?.policies || {};
             if (Array.isArray(policies.columnMasking)) setColumnPolicies(policies.columnMasking);
             if (Array.isArray(policies.rowFiltering)) setRowPolicies(policies.rowFiltering);
@@ -178,7 +180,7 @@ export default function AiGuardrailsView({
       .catch(err => {
         console.error(err);
         setIsCompiling(false);
-        showToast?.('error', '安全策略编译异常，请检查 SQL 语法结构');
+        showToast?.('error', t('aiworkbench.gv.compileError'));
       });
   };
 
@@ -256,7 +258,7 @@ export default function AiGuardrailsView({
       return g;
     });
     onUpdateGuardrails(updated);
-    showToast?.('success', '安全护栏状态已动态更新');
+    showToast?.('success', t('aiworkbench.gv.guardrailUpdated'));
   };
 
   const handleRunSimulator = async () => {
@@ -296,7 +298,7 @@ export default function AiGuardrailsView({
     setExecutionResult(null);
 
     if (!approved) {
-      showToast?.('info', '已安全拒绝写回提案！');
+      showToast?.('info', t('aiworkbench.gv.rejectedWrite'));
       setExecutionLoading(false);
       fetchProposalsAndDb();
       return;
@@ -315,16 +317,16 @@ export default function AiGuardrailsView({
         setExecutionLoading(false);
         setExecutionResult(data);
         if (data.success) {
-          showToast?.('success', '写入提案物理更新成功！完成双向核对对账。');
+          showToast?.('success', t('aiworkbench.gv.writeSuccess'));
           fetchProposalsAndDb();
         } else {
-          showToast?.('error', `授权失败: ${data.message || data.error}`);
+          showToast?.('error', `${t('aiworkbench.gv.authFailPrefix')}: ${data.message || data.error}`);
         }
       })
       .catch(err => {
         console.error(err);
         setExecutionLoading(false);
-        showToast?.('error', '与执行引擎交互时发生网络异常');
+        showToast?.('error', t('aiworkbench.gv.networkError'));
       });
   };
 
@@ -340,14 +342,15 @@ export default function AiGuardrailsView({
             <span className="p-1 rounded bg-rose-600 text-white">
               <Icon name="ShieldCheck" size={14} />
             </span>
-            <span>AIP 智能安全护栏与合规授权工作流控制台</span>
+            <span>{t('aiworkbench.gv.title')}</span>
           </h2>
-          <p className={`text-xs ${styles.cardTextMuted}`}>双向核对、多角色 RBAC 授权以及智能护栏动态脱敏审计的多维合规网格。</p>
+          <p className={`text-xs ${styles.cardTextMuted}`}>{t('aiworkbench.gv.subtitle')}</p>
         </div>
 
         {/* Tab switcher */}
         <div className={`flex ${styles.inputBg} p-0.5 rounded-lg border ${styles.cardBorder} shrink-0`}>
           <button
+            type="button"
             onClick={() => setActiveSubTab('workflow')}
             className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${
               activeSubTab === 'workflow'
@@ -356,9 +359,10 @@ export default function AiGuardrailsView({
             }`}
           >
             <Icon name="GitPullRequest" size={12} />
-            <span>审批与双向核对 (Workflow Center)</span>
+            <span>{t('aiworkbench.gv.tabWorkflow')}</span>
           </button>
           <button
+            type="button"
             onClick={() => setActiveSubTab('policy_compiler')}
             className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${
               activeSubTab === 'policy_compiler'
@@ -367,9 +371,10 @@ export default function AiGuardrailsView({
             }`}
           >
             <Icon name="Binary" size={12} />
-            <span>安全判定编译器 (Policy Compiler)</span>
+            <span>{t('aiworkbench.gv.tabPolicy')}</span>
           </button>
           <button
+            type="button"
             onClick={() => setActiveSubTab('guardrails')}
             className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${
               activeSubTab === 'guardrails'
@@ -378,7 +383,7 @@ export default function AiGuardrailsView({
             }`}
           >
             <Icon name="ShieldAlert" size={12} />
-            <span>智能护栏与脱敏沙箱 (Guardrail Rules)</span>
+            <span>{t('aiworkbench.gv.tabGuardrails')}</span>
           </button>
         </div>
       </div>
