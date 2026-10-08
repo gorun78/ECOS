@@ -1273,5 +1273,17 @@
   "ow.tree.empty.none": "No entities yet",
   "ow.tree.empty.search": "No matching entities",
   "ow.tree.empty.hint": "Click the button below to create your first entity",
-  "ow.tree.newEntity": "New Entity"
+  "ow.tree.newEntity": "New Entity",
+  "ow.stats.title": "Graph Stats",
+  "ow.stats.entities": "Total Entities",
+  "ow.stats.relationships": "Total Relationships",
+  "ow.stats.domains": "Domains",
+  "ow.stats.health": "Health Score",
+  "ow.stats.healthGood": "KG structure is healthy; entity and relationship distribution is well-balanced",
+  "ow.stats.healthMid": "KG structure is reasonable; consider adding more relationships",
+  "ow.stats.healthLow": "KG has limited data; consider adding more entities and relationships",
+  "ow.stats.details": "Metric Details",
+  "ow.stats.relDensity": "Relationship Density",
+  "ow.stats.avgPerDomain": "Avg Entities / Domain",
+  "ow.stats.graphDensity": "Graph Density"
 }

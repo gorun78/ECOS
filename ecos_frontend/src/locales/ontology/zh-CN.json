@@ -1273,5 +1273,17 @@
   "ow.tree.empty.none": "暂无实体",
   "ow.tree.empty.search": "无匹配实体",
   "ow.tree.empty.hint": "点击下方按钮创建第一个实体",
-  "ow.tree.newEntity": "新建实体"
+  "ow.tree.newEntity": "新建实体",
+  "ow.stats.title": "图谱统计",
+  "ow.stats.entities": "实体总数",
+  "ow.stats.relationships": "关系总数",
+  "ow.stats.domains": "业务域数",
+  "ow.stats.health": "健康度评分",
+  "ow.stats.healthGood": "知识图谱结构良好，实体与关系分布合理",
+  "ow.stats.healthMid": "图谱结构基本合理，建议补充更多关系连线",
+  "ow.stats.healthLow": "图谱数据量较少，建议添加更多实体和关系",
+  "ow.stats.details": "指标明细",
+  "ow.stats.relDensity": "关系密度",
+  "ow.stats.avgPerDomain": "域均实体",
+  "ow.stats.graphDensity": "图密度"
 }
