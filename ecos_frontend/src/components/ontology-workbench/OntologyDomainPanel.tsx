@@ -10,6 +10,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Globe, Box, Database, Layers, Plus, Pencil, Trash2, X, Save, Loader2 } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
+import { useLanguage } from '../LanguageContext';
 import { ontologyDomainApiFetch as apiFetch } from '../../services/ontologyWorkbenchApi';
 
 // ── 本体 → 图标映射 ──
@@ -61,6 +62,7 @@ export default function OntologyDomainPanel({
   selectedEntityId,
 }: OntologyDomainPanelProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const [ontologies, setOntologies] = useState<OntologyItem[]>([]);
   const [entityCounts, setEntityCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
@@ -91,12 +93,12 @@ export default function OntologyDomainPanel({
       );
       setEntityCounts(Object.fromEntries(counts));
     } catch (err: unknown) {
-      setError((err as { message?: string } | undefined)?.message || '加载本体列表失败');
+      setError((err as { message?: string } | undefined)?.message || t("ow.domain.loadFail"));
       // 回退到硬编码数据
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadOntologies();
@@ -117,7 +119,7 @@ export default function OntologyDomainPanel({
       setFormDescription('');
       await loadOntologies();
     } catch (err: unknown) {
-      setError((err as { message?: string } | undefined)?.message || '创建失败');
+      setError((err as { message?: string } | undefined)?.message || t("ow.domain.createFail"));
     } finally {
       setSaving(false);
     }
@@ -135,7 +137,7 @@ export default function OntologyDomainPanel({
       setEditingId(null);
       await loadOntologies();
     } catch (err: unknown) {
-      setError((err as { message?: string } | undefined)?.message || '更新失败');
+      setError((err as { message?: string } | undefined)?.message || t("ow.domain.updateFail"));
     } finally {
       setSaving(false);
     }
@@ -155,7 +157,7 @@ export default function OntologyDomainPanel({
       }
       await loadOntologies();
     } catch (err: unknown) {
-      setError((err as { message?: string } | undefined)?.message || '删除失败');
+      setError((err as { message?: string } | undefined)?.message || t("ow.domain.deleteFail"));
     } finally {
       setSaving(false);
     }
@@ -176,8 +178,8 @@ export default function OntologyDomainPanel({
 
   // 回退数据（API 失败时）
   const displayOntologies = ontologies.length > 0 ? ontologies : [
-    { id: 'ont001', code: 'supply_chain', name: '供应链本体' },
-    { id: 'ont002', code: 'finance', name: '财务本体' },
+    { id: 'ont001', code: 'supply_chain', name: t("ow.domain.fbSupplyChain") },
+    { id: 'ont002', code: 'finance', name: t("ow.domain.fbFinance") },
   ];
 
   return (
@@ -187,13 +189,14 @@ export default function OntologyDomainPanel({
         <div className="flex items-center gap-2">
           <Database className="w-4 h-4 text-indigo-400" />
           <div>
-            <div className={`text-xs font-semibold ${styles.cardText}`}>本体 / 业务域</div>
+            <div className={`text-xs font-semibold ${styles.cardText}`}>{t("ow.domain.title")}</div>
             <div className={`text-[9px] ${styles.muted} font-mono mt-0.5`}>
-              {displayOntologies.length} 个本体
+              {t("ow.domain.count", { n: displayOntologies.length })}
             </div>
           </div>
         </div>
         <button
+          type="button"
           onClick={() => {
             setFormCode('');
             setFormName('');
@@ -201,7 +204,7 @@ export default function OntologyDomainPanel({
             setShowCreate(true);
           }}
           className={`p-1.5 rounded-lg hover:bg-indigo-500/10 ${styles.cardTextMuted} hover:text-indigo-400 transition`}
-          title="创建本体"
+          title={t("ow.domain.createTitle")}
         >
           <Plus size={14} />
         </button>
@@ -211,7 +214,7 @@ export default function OntologyDomainPanel({
       {error && (
         <div className="px-3 py-2 bg-red-500/10 border-b border-red-500/20 text-[10px] text-red-400 flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={() => setError('')} className="hover:text-red-300"><X size={12} /></button>
+          <button type="button" onClick={() => setError('')} className="hover:text-red-300"><X size={12} /></button>
         </div>
       )}
 
@@ -220,7 +223,7 @@ export default function OntologyDomainPanel({
         {loading && ontologies.length === 0 ? (
           <div className={`flex items-center justify-center py-8 ${styles.muted}`}>
             <Loader2 size={16} className="animate-spin mr-2" />
-            <span className="text-[11px]">加载中...</span>
+            <span className="text-[11px]">{t("ow.domain.loading")}</span>
           </div>
         ) : (
           displayOntologies.map((o) => {
@@ -266,7 +269,7 @@ export default function OntologyDomainPanel({
                       <span className={`font-semibold ${styles.sidebarText}`}>
                         {count ?? '—'}
                       </span>
-                      <span className={`${styles.muted} ml-0.5`}>个实体</span>
+                      <span className={`${styles.muted} ml-0.5`}>{t("ow.domain.entities")}</span>
                     </span>
                   </div>
 
@@ -274,7 +277,7 @@ export default function OntologyDomainPanel({
                   {isSelected && (
                     <div className="mt-2 flex items-center gap-1 text-[9px] text-indigo-400">
                       <div className="w-1 h-1 rounded-full bg-indigo-400" />
-                      当前选中
+                      {t("ow.domain.selected")}
                     </div>
                   )}
                 </button>
@@ -282,16 +285,18 @@ export default function OntologyDomainPanel({
                 {/* 操作按钮（hover 显示） */}
                 <div className="absolute top-2 right-2 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
+                    type="button"
                     onClick={(e) => { e.stopPropagation(); openEdit(o); }}
                     className={`p-1 rounded hover:bg-indigo-500/20 ${styles.muted} hover:text-indigo-400 transition`}
-                    title="编辑"
+                    title={t("ow.domain.editTitle")}
                   >
                     <Pencil size={11} />
                   </button>
                   <button
+                    type="button"
                     onClick={(e) => { e.stopPropagation(); setDeletingId(o.id); }}
                     className={`p-1 rounded hover:bg-red-500/20 ${styles.muted} hover:text-red-400 transition`}
-                    title="删除"
+                    title={t("ow.domain.deleteTitle")}
                   >
                     <Trash2 size={11} />
                   </button>
@@ -307,29 +312,29 @@ export default function OntologyDomainPanel({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => { setShowCreate(false); setEditingId(null); }}>
           <div className="bg-[#1a2030] border border-[#2a3040] rounded-xl p-5 w-full sm:w-[380px] mx-4 sm:mx-auto shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-white mb-4">
-              {editingId ? '编辑本体' : '创建本体'}
+              {editingId ? t("ow.domain.modal.edit") : t("ow.domain.modal.create")}
             </h3>
             <div className="space-y-3">
               {!editingId && (
                 <input value={formCode} onChange={e => setFormCode(e.target.value)}
-                  placeholder="编码 (英文, 必填)" className={`w-full ${styles.inputBg} border ${styles.inputBorder} rounded px-3 py-2 text-xs ${styles.inputText} focus:border-indigo-500 outline-none`} />
+                  placeholder={t("ow.domain.form.codePh")} className={`w-full ${styles.inputBg} border ${styles.inputBorder} rounded px-3 py-2 text-xs ${styles.inputText} focus:border-indigo-500 outline-none`} />
               )}
               {editingId && (
                 <input value={formCode} readOnly
                   className={`w-full ${styles.inputBg} border ${styles.inputBorder} rounded px-3 py-2 text-xs ${styles.muted} font-mono cursor-not-allowed`} />
               )}
               <input value={formName} onChange={e => setFormName(e.target.value)}
-                placeholder="名称 (必填)" className={`w-full ${styles.inputBg} border ${styles.inputBorder} rounded px-3 py-2 text-xs ${styles.inputText} focus:border-indigo-500 outline-none`} />
+                placeholder={t("ow.domain.form.namePh")} className={`w-full ${styles.inputBg} border ${styles.inputBorder} rounded px-3 py-2 text-xs ${styles.inputText} focus:border-indigo-500 outline-none`} />
               <textarea value={formDescription} onChange={e => setFormDescription(e.target.value)}
-                placeholder="描述 (可选)" rows={2} className={`w-full ${styles.inputBg} border ${styles.inputBorder} rounded px-3 py-2 text-xs ${styles.inputText} resize-none focus:border-indigo-500 outline-none`} />
+                placeholder={t("ow.domain.form.descPh")} rows={2} className={`w-full ${styles.inputBg} border ${styles.inputBorder} rounded px-3 py-2 text-xs ${styles.inputText} resize-none focus:border-indigo-500 outline-none`} />
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={editingId ? handleEdit : handleCreate} disabled={saving || !formName}
+              <button type="button" onClick={editingId ? handleEdit : handleCreate} disabled={saving || !formName}
                 className="flex-1 bg-indigo-600 text-white rounded-lg px-4 py-2 text-xs font-medium hover:bg-indigo-500 disabled:opacity-50 flex items-center justify-center gap-1.5">
-                {saving ? <><Loader2 size={12} className="animate-spin" />保存中...</> : (editingId ? '保存修改' : '创建本体')}
+                {saving ? <><Loader2 size={12} className="animate-spin" />{t("ow.domain.modal.saving")}</> : (editingId ? t("ow.domain.modal.save") : t("ow.domain.modal.create"))}
               </button>
-              <button onClick={() => { setShowCreate(false); setEditingId(null); }}
-                className={`px-4 py-2 ${styles.inputBg} ${styles.muted} rounded-lg text-xs hover:opacity-80`}>取消</button>
+              <button type="button" onClick={() => { setShowCreate(false); setEditingId(null); }}
+                className={`px-4 py-2 ${styles.inputBg} ${styles.muted} rounded-lg text-xs hover:opacity-80`}>{t("common.cancel")}</button>
             </div>
           </div>
         </div>
@@ -339,17 +344,17 @@ export default function OntologyDomainPanel({
       {deletingId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeletingId(null)}>
           <div className="bg-[#1a2030] border border-[#2a3040] rounded-xl p-5 w-full sm:w-[360px] mx-4 sm:mx-auto shadow-2xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-sm font-bold text-white mb-2">删除本体</h3>
+            <h3 className="text-sm font-bold text-white mb-2">{t("ow.domain.deleteModal.title")}</h3>
             <p className={`text-xs ${styles.cardTextMuted} mb-4`}>
-              确定要删除「{ontologies.find(o => o.id === deletingId)?.name || deletingId}」吗？删除后其下实体将无法访问。
+              {t("ow.domain.deleteModal.confirm", { name: ontologies.find(o => o.id === deletingId)?.name || deletingId })}
             </p>
             <div className="flex gap-2">
-              <button onClick={handleDelete} disabled={saving}
+              <button type="button" onClick={handleDelete} disabled={saving}
                 className="flex-1 bg-red-600 text-white rounded-lg px-4 py-2 text-xs font-medium hover:bg-red-500 disabled:opacity-50 flex items-center justify-center gap-1.5">
-                {saving ? <><Loader2 size={12} className="animate-spin" />删除中...</> : '确认删除'}
+                {saving ? <><Loader2 size={12} className="animate-spin" />{t("ow.domain.deleteModal.deleting")}</> : t("ow.domain.deleteModal.confirmBtn")}
               </button>
-              <button onClick={() => setDeletingId(null)}
-                className={`px-4 py-2 ${styles.inputBg} ${styles.muted} rounded-lg text-xs hover:opacity-80`}>取消</button>
+              <button type="button" onClick={() => setDeletingId(null)}
+                className={`px-4 py-2 ${styles.inputBg} ${styles.muted} rounded-lg text-xs hover:opacity-80`}>{t("common.cancel")}</button>
             </div>
           </div>
         </div>
