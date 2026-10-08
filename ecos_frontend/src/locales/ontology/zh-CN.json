@@ -1230,5 +1230,15 @@
   "ow.rellist.deleteTitle": "删除关系",
   "ow.rellist.unknown": "未知",
   "ow.rellist.dialog.confirmDelete": "确定要删除关系「{name}」吗？",
-  "ow.rellist.dialog.confirmBtn": "确认删除"
+  "ow.rellist.dialog.confirmBtn": "确认删除",
+  "ow.toolbar.entities": "实体",
+  "ow.toolbar.relationships": "关系",
+  "ow.toolbar.addEntity": "添加实体",
+  "ow.toolbar.layout.force": "力导向",
+  "ow.toolbar.layout.hierarchical": "层级",
+  "ow.toolbar.layout.circular": "圆形",
+  "ow.toolbar.layoutTitle": "{name}布局",
+  "ow.toolbar.zoomOut": "缩小",
+  "ow.toolbar.zoomIn": "放大",
+  "ow.toolbar.fitView": "自适应视图"
 }

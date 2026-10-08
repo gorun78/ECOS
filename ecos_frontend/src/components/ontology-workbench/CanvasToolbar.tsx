@@ -23,6 +23,7 @@ import {
   Layers,
 } from "lucide-react";
 import { useTheme } from "../ThemeContext";
+import { useLanguage } from "../LanguageContext";
 
 // ── Props ────────────────────────────────────────────────────
 
@@ -54,11 +55,11 @@ export interface CanvasToolbarProps {
 const LAYOUT_OPTIONS: {
   id: "force" | "hierarchical" | "circular";
   icon: React.FC<{ size?: number; className?: string }>;
-  label: string;
+  labelKey: string;
 }[] = [
-  { id: "force", icon: Network, label: "力导向" },
-  { id: "hierarchical", icon: LayoutList, label: "层级" },
-  { id: "circular", icon: Circle, label: "圆形" },
+  { id: "force", icon: Network, labelKey: "ow.toolbar.layout.force" },
+  { id: "hierarchical", icon: LayoutList, labelKey: "ow.toolbar.layout.hierarchical" },
+  { id: "circular", icon: Circle, labelKey: "ow.toolbar.layout.circular" },
 ];
 
 // ── 主组件 ──────────────────────────────────────────────────
@@ -76,6 +77,7 @@ export default function CanvasToolbar({
   editable = true,
 }: CanvasToolbarProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   // 布局按钮选中态
   const [activeLayout, setActiveLayout] = React.useState<
     "force" | "hierarchical" | "circular" | null
@@ -116,14 +118,14 @@ export default function CanvasToolbar({
           <span className={`flex items-center gap-1 ${styles.cardTextMuted}`}>
             <Box size={11} className="text-indigo-400" />
             <span className="font-mono text-indigo-300">{entityCount}</span>
-            <span className={styles.muted}>实体</span>
+            <span className={styles.muted}>{t("ow.toolbar.entities")}</span>
           </span>
           <span className={`flex items-center gap-1 ${styles.cardTextMuted}`}>
             <GitBranch size={11} className="text-emerald-400" />
             <span className="font-mono text-emerald-300">
               {relationshipCount}
             </span>
-            <span className={styles.muted}>关系</span>
+            <span className={styles.muted}>{t("ow.toolbar.relationships")}</span>
           </span>
         </div>
       </div>
@@ -133,6 +135,7 @@ export default function CanvasToolbar({
       {/* 添加实体按钮（仅可编辑模式） */}
       {editable && (
         <button
+          type="button"
           onClick={onAddEntity}
           className="
             flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
@@ -141,18 +144,19 @@ export default function CanvasToolbar({
             transition-colors duration-150
             cursor-pointer
           "
-          title="添加实体"
+          title={t("ow.toolbar.addEntity")}
         >
           <Plus size={13} />
-          <span>添加实体</span>
+          <span>{t("ow.toolbar.addEntity")}</span>
         </button>
       )}
 
       {/* 布局选择按钮组 */}
       <div className="flex items-center gap-0.5 bg-[#1A1F2E] rounded-lg p-0.5 border border-[#1E293B]">
-        {LAYOUT_OPTIONS.map(({ id, icon: Icon, label }) => (
+        {LAYOUT_OPTIONS.map(({ id, icon: Icon, labelKey }) => (
           <button
             key={id}
+            type="button"
             onClick={() => handleLayoutClick(id)}
             className={`
               flex items-center gap-1 px-2 py-1 rounded-md
@@ -165,10 +169,10 @@ export default function CanvasToolbar({
                   : `${styles.cardTextMuted} hover:text-white hover:bg-[#2A3040]`
               }
             `}
-            title={`${label}布局`}
+            title={t("ow.toolbar.layoutTitle", { name: t(labelKey) })}
           >
             <Icon size={12} />
-            <span>{label}</span>
+            <span>{t(labelKey)}</span>
           </button>
         ))}
       </div>
@@ -176,6 +180,7 @@ export default function CanvasToolbar({
       {/* 缩放控制 */}
       <div className="flex items-center gap-0.5 bg-[#1A1F2E] rounded-lg p-0.5 border border-[#1E293B]">
         <button
+          type="button"
           onClick={onZoomOut}
           className={`
             p-1.5 rounded-md
@@ -183,7 +188,7 @@ export default function CanvasToolbar({
             transition-colors duration-150
             cursor-pointer
           `}
-          title="缩小"
+          title={t("ow.toolbar.zoomOut")}
         >
           <ZoomOut size={13} />
         </button>
@@ -194,6 +199,7 @@ export default function CanvasToolbar({
         </span>
 
         <button
+          type="button"
           onClick={onZoomIn}
           className={`
             p-1.5 rounded-md
@@ -201,7 +207,7 @@ export default function CanvasToolbar({
             transition-colors duration-150
             cursor-pointer
           `}
-          title="放大"
+          title={t("ow.toolbar.zoomIn")}
         >
           <ZoomIn size={13} />
         </button>
@@ -209,6 +215,7 @@ export default function CanvasToolbar({
 
       {/* 自适应视图 */}
       <button
+        type="button"
         onClick={onFitView}
         className={`
           p-1.5 rounded-lg
@@ -217,7 +224,7 @@ export default function CanvasToolbar({
           transition-all duration-150
           cursor-pointer
         `}
-        title="自适应视图"
+        title={t("ow.toolbar.fitView")}
       >
         <Maximize2 size={14} />
       </button>

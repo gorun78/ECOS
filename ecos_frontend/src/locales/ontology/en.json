@@ -1230,5 +1230,15 @@
   "ow.rellist.deleteTitle": "Delete relationship",
   "ow.rellist.unknown": "Unknown",
   "ow.rellist.dialog.confirmDelete": "Delete relationship \"{name}\"?",
-  "ow.rellist.dialog.confirmBtn": "Confirm delete"
+  "ow.rellist.dialog.confirmBtn": "Confirm delete",
+  "ow.toolbar.entities": "Entities",
+  "ow.toolbar.relationships": "Relations",
+  "ow.toolbar.addEntity": "Add entity",
+  "ow.toolbar.layout.force": "Force",
+  "ow.toolbar.layout.hierarchical": "Hierarchical",
+  "ow.toolbar.layout.circular": "Circular",
+  "ow.toolbar.layoutTitle": "{name} layout",
+  "ow.toolbar.zoomOut": "Zoom out",
+  "ow.toolbar.zoomIn": "Zoom in",
+  "ow.toolbar.fitView": "Fit to view"
 }
