@@ -1457,5 +1457,18 @@
   "ow.act.layout.requiredTag": "必填",
   "ow.act.layout.optionalTag": "选填",
   "ow.act.layout.moveField": "划转字段入此区:",
-  "ow.act.layout.optSelect": "-- 选择可移入的变量 --"
+  "ow.act.layout.optSelect": "-- 选择可移入的变量 --",
+  "ow.act.val.intro": "定义执行操作前的拦截限制条件。只有当验证表达式 (Validation Expression) 计算结果为真 (True) 时，该操作才允许被提交到本体。",
+  "ow.act.val.newRuleTitle": "新建验证安全规则",
+  "ow.act.val.nameLabel": "验证项名称",
+  "ow.act.val.namePlaceholder": "如：状态合法性校验",
+  "ow.act.val.exprLabel": "验证公式/表达式 (Logic Expression)",
+  "ow.act.val.exprPlaceholder": "如：parameter.new_status_param IN [\"ON_TIME\", \"DELAYED\"]",
+  "ow.act.val.errorLabel": "验证不通过时的报错警告信息 (Error Message)",
+  "ow.act.val.errorPlaceholder": "如：状态代码错误，航班状态必须设定为合法选项。",
+  "ow.act.val.addBtn": "添加拦截验证规则",
+  "ow.act.val.listTitle": "已生效的验证列表",
+  "ow.act.val.empty": "暂无拦截验证规则，该操作在调用时无入参安全性限制。",
+  "ow.act.val.warnLabel": "警告文案",
+  "ow.act.val.removeTitle": "删除规则"
 }

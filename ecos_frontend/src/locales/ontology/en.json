@@ -1457,5 +1457,18 @@
   "ow.act.layout.requiredTag": "Required",
   "ow.act.layout.optionalTag": "Optional",
   "ow.act.layout.moveField": "Move field into this section:",
-  "ow.act.layout.optSelect": "-- Select a variable to move --"
+  "ow.act.layout.optSelect": "-- Select a variable to move --",
+  "ow.act.val.intro": "Define the pre-execution interception constraints. The action is only allowed to be submitted to the ontology when its validation expression evaluates to true.",
+  "ow.act.val.newRuleTitle": "New Validation Rule",
+  "ow.act.val.nameLabel": "Validation Name",
+  "ow.act.val.namePlaceholder": "e.g. status legality check",
+  "ow.act.val.exprLabel": "Validation Expression (Logic Expression)",
+  "ow.act.val.exprPlaceholder": "e.g. parameter.new_status_param IN [\"ON_TIME\", \"DELAYED\"]",
+  "ow.act.val.errorLabel": "Error Message on Validation Failure",
+  "ow.act.val.errorPlaceholder": "e.g. Invalid status code; flight status must be a legal option.",
+  "ow.act.val.addBtn": "Add Validation Rule",
+  "ow.act.val.listTitle": "Effective Validations",
+  "ow.act.val.empty": "No validation rules yet; this action has no input-safety restriction when invoked.",
+  "ow.act.val.warnLabel": "Warning",
+  "ow.act.val.removeTitle": "Remove rule"
 }
