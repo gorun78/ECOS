@@ -14,15 +14,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, GitBranch, Loader2, AlertCircle, ArrowRight, Search } from 'lucide-react';
 import { useWorkbenchStore } from '../../../stores/useWorkbenchStore';
 import { useTheme } from '../../ThemeContext';
+import { useLanguage } from '../../LanguageContext';
 import type { CreateRelationshipDTO, Entity } from '../../../types/workbench';
 
 // ── 关系类型选项 ────────────────────────────────────────────
 
-const RELATIONSHIP_TYPES: { value: string; label: string; icon: string }[] = [
-  { value: 'ONE_TO_ONE', label: '一对一 (1:1)', icon: '1—1' },
-  { value: 'ONE_TO_MANY', label: '一对多 (1:N)', icon: '1—N' },
-  { value: 'MANY_TO_ONE', label: '多对一 (N:1)', icon: 'N—1' },
-  { value: 'MANY_TO_MANY', label: '多对多 (N:M)', icon: 'N—M' },
+const RELATIONSHIP_TYPES: { value: string; labelKey: string; icon: string }[] = [
+  { value: 'ONE_TO_ONE', labelKey: 'ow.rel.type.oneToOne', icon: '1—1' },
+  { value: 'ONE_TO_MANY', labelKey: 'ow.rel.type.oneToMany', icon: '1—N' },
+  { value: 'MANY_TO_ONE', labelKey: 'ow.rel.type.manyToOne', icon: 'N—1' },
+  { value: 'MANY_TO_MANY', labelKey: 'ow.rel.type.manyToMany', icon: 'N—M' },
 ];
 
 // ── 组件接口 ────────────────────────────────────────────────
@@ -45,6 +46,7 @@ export default function CreateRelationshipModal({
   entities,
 }: CreateRelationshipModalProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   // 本地表单状态
   const [targetEntityId, setTargetEntityId] = useState('');
   const [code, setCode] = useState('');
@@ -99,7 +101,7 @@ export default function CreateRelationshipModal({
     if (!isValid || submitting) return;
 
     if (code.trim() && !codeRegex.test(code)) {
-      setError('关系编码仅支持英文字母、数字和下划线，且必须以字母开头');
+      setError(t('ow.rel.err.codeFormat'));
       return;
     }
 
@@ -111,14 +113,14 @@ export default function CreateRelationshipModal({
         sourceEntityId,
         targetEntityId: targetEntityId.trim(),
         code: code.trim() || `rel_${sourceEntityId}_${targetEntityId}`.slice(0, 64),
-        name: name.trim() || `关系_${sourceEntityId}_${targetEntityId}`.slice(0, 100),
+        name: name.trim() || t('ow.rel.nameAuto', { a: sourceEntityId, b: targetEntityId }).slice(0, 100),
         relationshipType,
       };
 
       await store.createRelationship(dto);
       onClose();
     } catch (err: unknown) {
-      setError((err as { message?: string } | undefined)?.message || '创建关系失败');
+      setError((err as { message?: string } | undefined)?.message || t('ow.rel.err.createFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -146,8 +148,8 @@ export default function CreateRelationshipModal({
               <GitBranch size={16} className="text-emerald-400" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">创建关系</h3>
-              <p className={`text-[10px] ${styles.muted}`}>定义实体间的关联关系</p>
+              <h3 className="text-sm font-semibold text-white">{t('ow.rel.title')}</h3>
+              <p className={`text-[10px] ${styles.muted}`}>{t('ow.rel.subtitle')}</p>
             </div>
           </div>
           <button
@@ -162,7 +164,7 @@ export default function CreateRelationshipModal({
         <div className="px-5 py-4 space-y-4">
           {/* 源实体（只读） */}
           <div>
-            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>源实体</label>
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>{t('ow.rel.label.sourceEntity')}</label>
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[#0b0e14] border border-[#2a3040]">
               <span className="text-xs font-mono font-semibold text-indigo-400">
                 {sourceEntity?.code || sourceEntityId}
@@ -177,7 +179,7 @@ export default function CreateRelationshipModal({
           <div className={`flex items-center justify-center gap-2 text-[10px] ${styles.muted}`}>
             <div className="flex-1 h-px bg-[#2a3040]" />
             <ArrowRight size={14} className={styles.muted} />
-            <span>指向</span>
+            <span>{t('ow.rel.pointsTo')}</span>
             <ArrowRight size={14} className={styles.muted} />
             <div className="flex-1 h-px bg-[#2a3040]" />
           </div>
@@ -185,7 +187,7 @@ export default function CreateRelationshipModal({
           {/* 目标实体 */}
           <div>
             <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>
-              目标实体 <span className="text-red-400">*</span>
+              {t('ow.rel.label.targetEntity')} <span className="text-red-400">*</span>
             </label>
 
             {/* 搜索框 */}
@@ -194,7 +196,7 @@ export default function CreateRelationshipModal({
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜索实体..."
+                placeholder={t('ow.rel.searchPlaceholder')}
                 className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg pl-8 pr-3 py-2
                   text-xs text-white placeholder:${styles.muted}
                   focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/30
@@ -206,7 +208,7 @@ export default function CreateRelationshipModal({
             <div className="max-h-40 overflow-y-auto rounded-lg border border-[#2a3040] bg-[#0b0e14]">
               {candidateTargets.length === 0 ? (
                 <div className={`px-3 py-4 text-center text-xs ${styles.muted}`}>
-                  {entities.length <= 1 ? '当前域仅有一个实体，无法创建关系' : '无匹配实体'}
+                  {entities.length <= 1 ? t('ow.rel.empty.onlyOne') : t('ow.rel.empty.noMatch')}
                 </div>
               ) : (
                 candidateTargets.map((entity) => (
@@ -245,7 +247,7 @@ export default function CreateRelationshipModal({
 
           {/* 关系类型 */}
           <div>
-            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>关系类型</label>
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>{t('ow.rel.label.relType')}</label>
             <div className="grid grid-cols-2 gap-2">
               {RELATIONSHIP_TYPES.map((rt) => (
                 <button
@@ -259,7 +261,7 @@ export default function CreateRelationshipModal({
                   }`}
                 >
                   <span className={`text-[10px] font-mono ${styles.muted} w-8`}>{rt.icon}</span>
-                  {rt.label}
+                  {t(rt.labelKey)}
                 </button>
               ))}
             </div>
@@ -267,11 +269,11 @@ export default function CreateRelationshipModal({
 
           {/* 编码 */}
           <div>
-            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>关系编码</label>
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>{t('ow.rel.label.code')}</label>
             <input
               value={code}
               onChange={(e) => { setCode(e.target.value); setError(''); }}
-              placeholder="英文字母开头，如 has_order、belongs_to"
+              placeholder={t('ow.rel.placeholder.code')}
               maxLength={64}
               className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg px-3 py-2.5
                 text-sm text-white placeholder:${styles.muted}
@@ -282,11 +284,11 @@ export default function CreateRelationshipModal({
 
           {/* 名称 */}
           <div>
-            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>关系名称</label>
+            <label className={`block text-xs font-medium ${styles.cardTextMuted} mb-1.5`}>{t('ow.rel.label.name')}</label>
             <input
               value={name}
               onChange={(e) => { setName(e.target.value); setError(''); }}
-              placeholder="中文名称，如 拥有订单、归属于"
+              placeholder={t('ow.rel.placeholder.name')}
               maxLength={100}
               className="w-full bg-[#0b0e14] border border-[#2a3040] rounded-lg px-3 py-2.5
                 text-sm text-white placeholder:${styles.muted}
@@ -307,14 +309,16 @@ export default function CreateRelationshipModal({
         {/* ── 底部按钮 ── */}
         <div className="flex items-center justify-end gap-2.5 px-5 py-4 border-t border-[#2a3040]">
           <button
+            type="button"
             onClick={onClose}
             disabled={submitting}
             className={`px-4 py-2 rounded-lg text-xs font-medium ${styles.sidebarText}
               bg-[#2a3040] hover:bg-[#3a4050] disabled:opacity-50 transition`}
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
+            type="button"
             onClick={handleSubmit}
             disabled={!isValid || submitting}
             className="px-5 py-2 rounded-lg text-xs font-semibold text-white
@@ -323,7 +327,7 @@ export default function CreateRelationshipModal({
               transition flex items-center gap-2"
           >
             {submitting && <Loader2 size={13} className="animate-spin" />}
-            {submitting ? '创建中...' : '创建关系'}
+            {submitting ? t('ow.rel.creating') : t('ow.rel.title')}
           </button>
         </div>
       </div>
