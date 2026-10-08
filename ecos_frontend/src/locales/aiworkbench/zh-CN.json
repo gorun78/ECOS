@@ -911,5 +911,12 @@
   "aiworkbench.ws.ls.brandLabel": "应用品牌名",
   "aiworkbench.ws.ls.descLabel": "应用描述",
   "aiworkbench.ws.ls.accentColor": "主色调 (Accent Color)",
-  "aiworkbench.ws.ls.darkMode": "深色主题 (Dark Mode)"
+  "aiworkbench.ws.ls.darkMode": "深色主题 (Dark Mode)",
+  "aiworkbench.ws.vw.newAppName": "新建应用",
+  "aiworkbench.ws.vw.newAppDesc": "点击编辑应用描述...",
+  "aiworkbench.ws.vw.homePage": "首页",
+  "aiworkbench.ws.vw.confirmDeleteApp": "确定删除应用「{name}」吗？",
+  "aiworkbench.ws.vw.newPage": "新页面",
+  "aiworkbench.ws.vw.appPublished": "应用已发布",
+  "aiworkbench.ws.vw.appUnpublished": "应用已下架"
 }

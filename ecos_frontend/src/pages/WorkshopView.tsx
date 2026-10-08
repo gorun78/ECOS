@@ -97,11 +97,11 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
 
   const handleCreateNewApp = () => {
     const newApp: WorkshopApp = {
-      id: 'app_' + Date.now(), name: '新建应用', description: '点击编辑应用描述...',
+      id: 'app_' + Date.now(), name: t('aiworkbench.ws.vw.newAppName'), description: t('aiworkbench.ws.vw.newAppDesc'),
       lastModified: new Date().toISOString().slice(0, 16).replace('T', ' '),
       isPublished: false,
       theme: { primaryColor: 'indigo', isDark: false, title: 'New Workshop', logo: 'LayoutGrid' },
-      pages: [{ id: 'p1', title: '首页', icon: 'LayoutDashboard', widgets: [] }],
+      pages: [{ id: 'p1', title: t('aiworkbench.ws.vw.homePage'), icon: 'LayoutDashboard', widgets: [] }],
       variables: [],
     };
     saveAppsState([...apps, newApp]);
@@ -109,14 +109,14 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
   };
 
   const handleDeleteApp = (id: string, name: string) => {
-    if (!confirm(`确定删除应用「${name}」吗？`)) return;
+    if (!confirm(t('aiworkbench.ws.vw.confirmDeleteApp', { name }))) return;
     saveAppsState(apps.filter(a => a.id !== id));
     if (activeAppId === id) setActiveAppId(null);
   };
 
   const handleAddPage = () => {
     if (!activeApp) return;
-    const newPage: { id: string; title: string; icon: string; widgets: WorkshopWidget[] } = { id: 'p_' + Date.now(), title: '新页面', icon: 'LayoutGrid', widgets: [] };
+    const newPage: { id: string; title: string; icon: string; widgets: WorkshopWidget[] } = { id: 'p_' + Date.now(), title: t('aiworkbench.ws.vw.newPage'), icon: 'LayoutGrid', widgets: [] };
     saveAppsState(apps.map(a => a.id === activeApp.id ? { ...a, pages: [...a.pages, newPage] } : a));
     setActivePageId(newPage.id);
   };
@@ -132,7 +132,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
   const handlePublishApp = () => {
     if (!activeApp) return;
     saveAppsState(apps.map(a => a.id === activeApp.id ? { ...a, isPublished: !a.isPublished } : a));
-    showToast('success', activeApp.isPublished ? '应用已下架' : '应用已发布');
+    showToast('success', activeApp.isPublished ? t('aiworkbench.ws.vw.appUnpublished') : t('aiworkbench.ws.vw.appPublished'));
   };
 
   const vm = {

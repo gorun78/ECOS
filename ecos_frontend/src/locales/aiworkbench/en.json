@@ -911,5 +911,12 @@
   "aiworkbench.ws.ls.brandLabel": "Brand Name",
   "aiworkbench.ws.ls.descLabel": "Description",
   "aiworkbench.ws.ls.accentColor": "Accent Color",
-  "aiworkbench.ws.ls.darkMode": "Dark Mode"
+  "aiworkbench.ws.ls.darkMode": "Dark Mode",
+  "aiworkbench.ws.vw.newAppName": "New App",
+  "aiworkbench.ws.vw.newAppDesc": "Click to edit the description...",
+  "aiworkbench.ws.vw.homePage": "Home",
+  "aiworkbench.ws.vw.confirmDeleteApp": "Delete app \"{name}\"?",
+  "aiworkbench.ws.vw.newPage": "New Page",
+  "aiworkbench.ws.vw.appPublished": "App published",
+  "aiworkbench.ws.vw.appUnpublished": "App unpublished"
 }
