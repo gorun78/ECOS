@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { CheckCircle, AlertCircle, Loader, ChevronDown } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
+import { useTheme } from '../../../components/ThemeContext';
 import { cognitiveEngineApi } from '../../../services/cognitiveEngineApi';
 import { showToastGlobal } from '../../../components/common/Toast';
 import CognitionView from '../CognitionView';
@@ -28,6 +29,7 @@ interface SituationDiagnosisProps {
 
 export default function situationDiagnosis({ onBackToOverview }: SituationDiagnosisProps) {
   const { t } = useLanguage();
+  const { styles } = useTheme();
   const [step, setStep] = useState(0);
   const [objectType, setObjectType] = useState('');
   const [businessObject, setBusinessObject] = useState('');
@@ -81,10 +83,10 @@ export default function situationDiagnosis({ onBackToOverview }: SituationDiagno
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <button onClick={() => onBackToOverview?.()} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+        <button type="button" onClick={() => onBackToOverview?.()} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
           {t('diagnosis.back', '← 返回总览')}
         </button>
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('diagnosis.title', '情境诊断')}</h1>
+        <h1 className={`text-lg font-semibold ${styles.cardText}`}>{t('diagnosis.title', '情境诊断')}</h1>
         <div className="w-20" />
       </div>
 
@@ -94,20 +96,20 @@ export default function situationDiagnosis({ onBackToOverview }: SituationDiagno
           <React.Fragment key={s}>
             <div className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => goStep(i)}>
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                i === step ? 'bg-blue-600 text-white' : i < step ? 'bg-blue-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                i === step ? 'bg-blue-600 text-white' : i < step ? 'bg-blue-500 text-white' : `${styles.sidebarBg} ${styles.muted}`
               }`}>{i + 1}</div>
-              <span className="text-xs text-slate-500 dark:text-slate-400">{t(`diagnosis.step.${i}`, s)}</span>
+              <span className={`text-xs ${styles.muted}`}>{t(`diagnosis.step.${i}`, s)}</span>
             </div>
-            {i < STEPS.length - 1 && <div className={`flex-1 h-0.5 mx-1 ${i < step ? 'bg-blue-500' : 'bg-slate-200 dark:bg-slate-700'}`} />}
+            {i < STEPS.length - 1 && <div className={`flex-1 h-0.5 mx-1 ${i < step ? 'bg-blue-500' : styles.sidebarBg}`} />}
           </React.Fragment>
         ))}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-6 max-w-2xl">
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-6 max-w-2xl`}>
         {step === 0 && (
           <div className="space-y-4">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">{t('diagnosis.objectType', '对象类型')}</label>
-            <select className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+            <label className={`block text-sm font-medium ${styles.cardText}`}>{t('diagnosis.objectType', '对象类型')}</label>
+            <select className={`w-full px-3 py-2 text-sm border ${styles.inputBorder} rounded-md ${styles.inputBg} ${styles.inputText}`}
               value={objectType} onChange={e => setObjectType(e.target.value)}>
               <option value="">{t('common.select', '选择…')}</option>
               <option value="PROJECT">{t('diagnosis.type.project', '项目')}</option>
@@ -115,18 +117,18 @@ export default function situationDiagnosis({ onBackToOverview }: SituationDiagno
               <option value="PRODUCT">{t('diagnosis.type.product', '产品')}</option>
               <option value="SUPPLIER">{t('diagnosis.type.supplier', '供应商')}</option>
             </select>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">{t('diagnosis.businessObject', '业务对象')}</label>
-            <input className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+            <label className={`block text-sm font-medium ${styles.cardText}`}>{t('diagnosis.businessObject', '业务对象')}</label>
+            <input className={`w-full px-3 py-2 text-sm border ${styles.inputBorder} rounded-md ${styles.inputBg} ${styles.inputText}`}
               placeholder={t('diagnosis.objectPlaceholder', '输入业务对象名称…')} value={businessObject} onChange={e => setBusinessObject(e.target.value)} />
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('diagnosis.startDate', '开始时间')}</label>
-                <input type="date" className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                <label className={`block text-sm font-medium ${styles.cardText} mb-1`}>{t('diagnosis.startDate', '开始时间')}</label>
+                <input type="date" className={`w-full px-3 py-2 text-sm border ${styles.inputBorder} rounded-md ${styles.inputBg} ${styles.inputText}`}
                   value={startDate} onChange={e => setStartDate(e.target.value)} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('diagnosis.endDate', '结束时间')}</label>
-                <input type="date" className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                <label className={`block text-sm font-medium ${styles.cardText} mb-1`}>{t('diagnosis.endDate', '结束时间')}</label>
+                <input type="date" className={`w-full px-3 py-2 text-sm border ${styles.inputBorder} rounded-md ${styles.inputBg} ${styles.inputText}`}
                   value={endDate} onChange={e => setEndDate(e.target.value)} />
               </div>
             </div>
@@ -135,16 +137,16 @@ export default function situationDiagnosis({ onBackToOverview }: SituationDiagno
 
         {step === 1 && (
           <div className="space-y-4">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">{t('diagnosis.question', '诊断问题')}</label>
-            <textarea className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-[100px]"
+            <label className={`block text-sm font-medium ${styles.cardText}`}>{t('diagnosis.question', '诊断问题')}</label>
+            <textarea className={`w-full px-3 py-2 text-sm border ${styles.inputBorder} rounded-md ${styles.inputBg} ${styles.inputText} min-h-[100px]`}
               placeholder={t('diagnosis.questionPlaceholder', '描述你要分析的问题…')} value={question} onChange={e => setQuestion(e.target.value)} />
             <div className="flex gap-2">
               {['因果归因', '风险', '情景'].map(tag => (
-                <button key={tag} onClick={() => toggleTag(tag)}
+                <button key={tag} type="button" onClick={() => toggleTag(tag)}
                   className={`px-3 py-1 rounded-full text-xs font-medium border ${
                     selectedTags.includes(tag)
                       ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                      : `${styles.appBg} ${styles.sidebarText} ${styles.cardBorder}`
                   }`}>
                   {tag}
                 </button>
@@ -160,10 +162,10 @@ export default function situationDiagnosis({ onBackToOverview }: SituationDiagno
               { label: 'I — Information', count: 8, readonly: true },
               { label: 'K — Knowledge', count: 5, readonly: true },
             ].map(c => (
-              <div key={c.label} className="border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-center">
-                <p className="text-xs text-slate-500 dark:text-slate-400">{c.label}</p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 my-1">{c.count}</p>
-                <span className="inline-block px-2 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+              <div key={c.label} className={`border ${styles.cardBorder} rounded-lg p-3 text-center`}>
+                <p className={`text-xs ${styles.muted}`}>{c.label}</p>
+                <p className={`text-2xl font-bold ${styles.cardText} my-1`}>{c.count}</p>
+                <span className={`inline-block px-2 py-0.5 rounded text-xs ${styles.sidebarBg} ${styles.muted}`}>
                   {t('diagnosis.readonly', '只读')}
                 </span>
               </div>
@@ -173,17 +175,17 @@ export default function situationDiagnosis({ onBackToOverview }: SituationDiagno
 
         {step === 3 && (
           <div className="space-y-3">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('diagnosis.selectMode', '选择推理方式')}</p>
+            <p className={`text-sm font-medium ${styles.cardText}`}>{t('diagnosis.selectMode', '选择推理方式')}</p>
             {MODE_OPTIONS.map(opt => (
               <label key={opt.id} className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition ${
-                reasoningMode === opt.id ? 'border-blue-400 bg-blue-50 dark:bg-blue-950' : 'border-slate-200 dark:border-slate-700'
+                reasoningMode === opt.id ? `${styles.infoBorder} ${styles.infoBg}` : styles.cardBorder
               }`}>
                 <input type="radio" name="mode" value={opt.id} checked={reasoningMode === opt.id}
                   onChange={() => setReasoningMode(opt.id)} className="mt-0.5" />
                 <div>
-                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{t(opt.labelKey, opt.label)}</span>
-                  {opt.recommended && <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-300">{t('diagnosis.recommended', '推荐作为默认模式')}</span>}
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t(opt.descKey, opt.desc)}</p>
+                  <span className={`text-sm font-medium ${styles.cardText}`}>{t(opt.labelKey, opt.label)}</span>
+                  {opt.recommended && <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${styles.infoBg} ${styles.infoText}`}>{t('diagnosis.recommended', '推荐作为默认模式')}</span>}
+                  <p className={`text-xs ${styles.muted} mt-0.5`}>{t(opt.descKey, opt.desc)}</p>
                 </div>
               </label>
             ))}
@@ -192,16 +194,16 @@ export default function situationDiagnosis({ onBackToOverview }: SituationDiagno
 
         {step === 4 && (
           <div className="space-y-4">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('diagnosis.preflight', '预检结果')}</p>
+            <p className={`text-sm font-medium ${styles.cardText}`}>{t('diagnosis.preflight', '预检结果')}</p>
             <div className="space-y-2">
               {PREFLIGHT_CHECKS.map(c => (
                 <div key={c.key} className="flex items-center gap-2">
                   {preflight?.[c.key]
                     ? <CheckCircle className="w-4 h-4 text-green-500" />
                     : <AlertCircle className="w-4 h-4 text-yellow-500" />}
-                  <span className="text-sm text-slate-700 dark:text-slate-300">{t(c.key, c.fallback)}</span>
+                  <span className={`text-sm ${styles.cardText}`}>{t(c.key, c.fallback)}</span>
                   <span className={`ml-auto text-xs px-2 py-0.5 rounded ${
-                    preflight?.[c.key] ? 'bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300' : 'bg-yellow-100 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300'
+                    preflight?.[c.key] ? `${styles.successBg} ${styles.successText}` : `${styles.warningBg} ${styles.warningText}`
                   }`}>
                     {preflight?.[c.key] ? t('diagnosis.pass', '通过') : t('diagnosis.warn', '警告')}
                   </span>
@@ -212,19 +214,19 @@ export default function situationDiagnosis({ onBackToOverview }: SituationDiagno
         )}
 
         {/* Footer buttons */}
-        <div className="flex justify-between mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
-          <button disabled={step === 0}
-            className="px-3 py-1.5 rounded-md text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 hover:bg-slate-200 dark:hover:bg-slate-700"
+        <div className={`flex justify-between mt-6 pt-4 border-t ${styles.cardBorder}`}>
+          <button type="button" disabled={step === 0}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium ${styles.sidebarBg} ${styles.sidebarText} disabled:opacity-40 ${styles.sidebarHoverBg}`}
             onClick={() => step > 0 && setStep(step - 1)}>
             {t('common.prev', '上一步')}
           </button>
           {step < STEPS.length - 1 ? (
-            <button className="px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+            <button type="button" className="px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
               onClick={handleNext}>
               {t('common.next', '下一步')}
             </button>
           ) : (
-            <button onClick={handleRun} disabled={running}
+            <button type="button" onClick={handleRun} disabled={running}
               className="px-4 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50">
               {running ? <Loader className="w-4 h-4 inline mr-1 animate-spin" /> : null}
               {t('diagnosis.run', '运行认知推理')}
@@ -233,7 +235,7 @@ export default function situationDiagnosis({ onBackToOverview }: SituationDiagno
         </div>
 
         {runResult !== null && (
-          <div className="mt-4 p-3 rounded bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-200 text-sm">
+          <div className={`mt-4 p-3 rounded ${styles.infoBg} ${styles.infoText} text-sm`}>
             {t('diagnosis.resultLabel', '诊断结果：')}
             <pre className="mt-1 text-xs max-h-40 overflow-auto">{JSON.stringify(runResult, null, 2)}</pre>
           </div>
@@ -243,20 +245,20 @@ export default function situationDiagnosis({ onBackToOverview }: SituationDiagno
       {/* PMO-60 场景认知执行（四件套）— the retained scenario+mind driven hub
           (formerly the standalone AI-Workbench cognition tab). Folded into the
           situation-diagnosis sub-page instead of staying a parallel cognition entry. */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg">
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg`}>
         <button
           type="button"
           onClick={() => setShowExecPanel(v => !v)}
           aria-expanded={showExecPanel}
           className="w-full flex items-center justify-between px-4 py-3 text-left cursor-pointer"
         >
-          <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+          <span className={`text-sm font-medium ${styles.cardText}`}>
             {t('knowledge.cognition.exec.title', '场景认知执行（四件套）')}
           </span>
-          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showExecPanel ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-4 h-4 ${styles.muted} transition-transform ${showExecPanel ? 'rotate-180' : ''}`} />
         </button>
         {showExecPanel && (
-          <div className="border-t border-slate-200 dark:border-slate-700">
+          <div className={`border-t ${styles.cardBorder}`}>
             <CognitionView />
           </div>
         )}
