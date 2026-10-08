@@ -1514,5 +1514,16 @@
   "ow.boe.savedEmptyDesc": "可以在筛选过滤后，将其保存。",
   "ow.boe.welcomeTitle": "欢迎使用 Palantir Foundry 对象浏览器 (Object Explorer)",
   "ow.boe.welcomeDesc": "对象浏览器是围绕底层异构数据源构建的数据模型透视工作台。在此您可以全局探索所有数字孪生实例、设定复杂的交叉筛选条件、跨对象级联穿透挖掘、以及触发运行微事务 Action。",
-  "ow.boe.runningEntities": "{n} 个当前运行实体"
+  "ow.boe.runningEntities": "{n} 个当前运行实体",
+  "ow.boe.distTitle": "分布聚合分析 (Categorical Distribution)",
+  "ow.boe.analyIntroA": "智能分析当前筛选规则下的数据集。基于标准关键枚举属性「",
+  "ow.boe.analyIntroB": "」进行快速分组及分布统计。",
+  "ow.boe.emptyDist": "暂无数据用以绘图统计。",
+  "ow.boe.barChartTitle": "条形占比统计图 (点击柱体可直接追加筛选)",
+  "ow.boe.barRow": "{count} 个 ({pct}%)",
+  "ow.boe.distTableTitle": "分组计数表",
+  "ow.boe.colCategory": "分组类别",
+  "ow.boe.colInstances": "实例数",
+  "ow.boe.colPercent": "所占比例",
+  "ow.boe.totalLabel": "总计 (Total)"
 }

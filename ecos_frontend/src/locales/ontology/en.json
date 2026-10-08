@@ -1514,5 +1514,16 @@
   "ow.boe.savedEmptyDesc": "You can save a list after applying filters.",
   "ow.boe.welcomeTitle": "Welcome to the Palantir Foundry Object Explorer",
   "ow.boe.welcomeDesc": "The Object Explorer is a data-model lens built around heterogeneous underlying data sources. Explore all digital-twin instances globally, set complex cross-filters, cascade-drill across objects, and trigger micro-transaction actions.",
-  "ow.boe.runningEntities": "{n} active instances"
+  "ow.boe.runningEntities": "{n} active instances",
+  "ow.boe.distTitle": "Categorical Distribution Analysis",
+  "ow.boe.analyIntroA": "Smart analysis of the dataset under the current filters, grouped and distributed by the key enum property \"",
+  "ow.boe.analyIntroB": "\" for rapid grouping and distribution.",
+  "ow.boe.emptyDist": "No data available to plot.",
+  "ow.boe.barChartTitle": "Share Bar Chart (click a bar to add a filter)",
+  "ow.boe.barRow": "{count} ({pct}%)",
+  "ow.boe.distTableTitle": "Group Count Table",
+  "ow.boe.colCategory": "Category",
+  "ow.boe.colInstances": "Instances",
+  "ow.boe.colPercent": "Share",
+  "ow.boe.totalLabel": "Total"
 }
