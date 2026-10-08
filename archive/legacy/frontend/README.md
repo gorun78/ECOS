@@ -8,7 +8,7 @@
 2. `main.tsx` 路由要么 `<Navigate to="…">` 另投，要么根本未挂；
 3. 现役页面已由 `<domain>View.tsx` / `<domain>/index.tsx` 承接（详见下）。
 
-## 归档清单（13 文件 + 1 目录 + 1 补收，均 0 真引用）
+## 归档清单（13 文件 + 1 目录 + 1 补收 + 1 死对 2 文件〔Batch E5.1-DEAD lineage nodes.tsx+types.ts〕，均 0 真引用）
 | 归档路径 | 来源 | 死因 | 现役替代 |
 |---|---|---|---|
 | `ecos_frontend/src/pages/AgentStudio.tsx` (698) | main.tsx:171 | `agent_studio` → `/ai-workbench` | `pages/aiworkbench/AgentStudioView.tsx` |
@@ -26,6 +26,7 @@
 | `ecos_frontend/src/pages/DataMaskingDemo.tsx` (318) | 无路由 | 0 引用 | — |
 | `ecos_frontend/src/pages/CryptoAuditPanel.tsx` (458) | 无路由 | 0 引用 | — |
 | `ecos_frontend/src/components/ontology-workbench/GlobalGraphView.tsx` (6 KB) | Wave-4 Batch E 修 P1/P2 后仍 0 挂载 | 全仓 grep 除自引用外**无任何引用**（OntologyWorkbenchLayout 走的是 `/ontology/ProposalPanel` + 本体画布，不引本组件）；`<ReactFlow>` 挂载路径从未接通 | 本体全景图走 `DomainGraphCanvas` (Batches E/F 修过内容指纹+fitView) |
+| `ecos_frontend/src/pages/data-workbench/lineage/nodes.tsx` (15 KB) + `lineage/types.ts` (1.3 KB) | Wave-4 Batch E5.1-DEAD 补收（本批） | 老 lineage **ReactFlow 自定义节点**（`LineageSourceNode`/`Ingest`/`Pipeline`/`Dataset`/`Ontology` + `nodeTypes` 聚合 + 5 配套 data 接口）；全仓 `grep` 除 nodes.tsx 自引用外 **0 importer**，`types.ts` 唯一消费者即 nodes.tsx（其余 `nodeTypes` 命中均为别处同名 local const） | `pages/DataLineage.tsx`（Batch M ca4d0fe i18n 收口）已重写为**内联自绘** topology：`fetchLineageTopology` + 自管 `nodes`/`edges` state + node detail panel，**不走** ReactFlow `nodeTypes` |
 
 ## 撤销 / 恢复
 `git log --diff-filter=A -- archive/legacy/frontend/ecos_frontend/src/pages/*` 可查这批搬迁 commit；`git show HEAD` 追 rename 记录。GlobalGraphView 补收走 `archive/legacy/frontend/ecos_frontend/src/components/`（不同子路径，找该 rename 用 components 后缀 filter）。若日后需恢复，`git mv` 回原路径即可。
