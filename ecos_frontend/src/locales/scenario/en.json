@@ -452,5 +452,15 @@
   "scenario.git.rollback": "Roll to This Version",
   "scenario.git.manualCommitTitle": "Manually Freeze Config Version (Manual Commit)",
   "scenario.git.commitPlaceholder": "Enter the commit message for this config change...",
-  "scenario.git.switchBranchTitle": "Switch Branch"
+  "scenario.git.switchBranchTitle": "Switch Branch",
+  "scenario.metrics.radarTitle": "Monthly Security Interception Audit Categories (Blocked Policy Violations)",
+  "scenario.metrics.radarSource": "* Data exported in real time and aggregated by the underlying security audit controller `app.get('/api/security/audit-logs')`.",
+  "scenario.metrics.trendTitle": "Thunderstorm Diversion Decision Efficiency Trend (Minutes)",
+  "scenario.metrics.legendManual": "Legacy Manual Reconciliation Duration",
+  "scenario.metrics.legendAuto": "ECOS Ontology Automated Approval Duration",
+  "scenario.metrics.trendFootnote": "* After the dual-engine automated reconciliation signature flow, the average bad-weather dispatch duration on peak season dropped from 45 minutes to a ~3.5-second scale.",
+  "scenario.metrics.execTitle": "Corporate Executive Assessment",
+  "scenario.metrics.execDataFlow": "1. Data flow is healthy: this month the main reconciliation chain (Doris cleaned wide table ds_flights_clean to the ontology logical AviationFlight) held mapping consistency at an excellent 98%. No write anomalies caused by logic contract breakage.",
+  "scenario.metrics.execSecurity": "2. Security boundary holds: with the mandatory zero-trust gr-pii and gr-approval blocking rules, the plaintext pilot SSN and payroll records that an external maintenance contractor (EXTERNAL_CONTRACTOR) tried to brute-force export from a non-whitelisted gateway were 100% masked by the RUST shield layer.",
+  "scenario.metrics.execOptimization": "3. To optimize: the eVTOL low-altitude scenario is still in DRAFT. Next, build a physical survey/remote-sensing table for the new eVTOL UAVs and design the many-to-many ontology alignment between the City Meteo Entity (MeteoEntity) and the Airport Vertiport Stand (Vertiport)."
 }
