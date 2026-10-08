@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as Icons from 'lucide-react';
 import { useTheme } from '../../ThemeContext';
+import { useLanguage } from '../../LanguageContext';
 import type { AIPAgentTemplate, AIPAgent } from '../../../types/aiworkbench';
 import { fetchAgentTemplates, instantiateAgent } from '../../../pages/aiworkbench/api';
 
@@ -101,6 +102,7 @@ interface AgentMarketProps {
 
 export default function AgentMarket({ onAgentInstantiated, showToast }: AgentMarketProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const [templates, setTemplates] = useState<AIPAgentTemplate[]>(BUILTIN_TEMPLATES);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -148,7 +150,7 @@ export default function AgentMarket({ onAgentInstantiated, showToast }: AgentMar
       setTemplates(prev => prev.map(t =>
         t.id === selectedTemplate.id ? { ...t, isInstantiated: true } : t
       ));
-      showToast?.('success', `Agent「${instanceName.trim()}」实例化成功！`);
+      showToast?.('success', t('aiworkbench.agentm.instanceSuccess', { name: instanceName.trim() }));
       setShowModal(false);
       setInstanceName('');
       setSelectedTemplate(null);
@@ -158,7 +160,7 @@ export default function AgentMarket({ onAgentInstantiated, showToast }: AgentMar
       setTemplates(prev => prev.map(t =>
         t.id === selectedTemplate.id ? { ...t, isInstantiated: true } : t
       ));
-      showToast?.('success', `Agent「${instanceName.trim()}」已创建（本地模式）`);
+      showToast?.('success', t('aiworkbench.agentm.instanceLocal', { name: instanceName.trim() }));
       setShowModal(false);
       setInstanceName('');
       setSelectedTemplate(null);
@@ -178,7 +180,7 @@ export default function AgentMarket({ onAgentInstantiated, showToast }: AgentMar
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="搜索Agent模板名称或描述..."
+              placeholder={t('aiworkbench.agentm.searchPh')}
               className={`w-full pl-8 pr-3 py-1.5 border ${styles.inputBorder} rounded-lg text-xs ${styles.cardBg} ${styles.cardText} focus:outline-none focus:ring-1 focus:ring-blue-400/50`}
             />
           </div>
@@ -187,14 +189,14 @@ export default function AgentMarket({ onAgentInstantiated, showToast }: AgentMar
             onChange={e => setCategoryFilter(e.target.value)}
             className={`px-3 py-1.5 border ${styles.inputBorder} rounded-lg text-xs ${styles.cardBg} ${styles.cardText}`}
           >
-            <option value="all">全部类型</option>
-            {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>{label.zh} / {label.en}</option>
+            <option value="all">{t('aiworkbench.agentm.catAll')}</option>
+            {Object.entries(CATEGORY_LABELS).map(([key]) => (
+              <option key={key} value={key}>{t(`aiworkbench.agentm.cat.${key}`)}</option>
             ))}
           </select>
         </div>
         <div className={`text-[10px] ${styles.cardTextMuted}`}>
-          共 {filtered.length} 个模板
+          {t('aiworkbench.agentm.count', { count: filtered.length })}
         </div>
       </div>
 
@@ -216,7 +218,7 @@ export default function AgentMarket({ onAgentInstantiated, showToast }: AgentMar
                   <div className="flex-1 min-w-0">
                     <h3 className={`text-sm font-bold ${styles.cardText} truncate`}>{tpl.name}</h3>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${styles.badgeBg} ${styles.accentText} font-medium`}>
-                      {CATEGORY_LABELS[tpl.category]?.zh || tpl.category}
+                      {t(`aiworkbench.agentm.cat.${tpl.category}`)}
                     </span>
                   </div>
                 </div>
@@ -238,7 +240,7 @@ export default function AgentMarket({ onAgentInstantiated, showToast }: AgentMar
                   </span>
                   <span className="flex items-center gap-1">
                     <Icon name="Repeat" size={10} />
-                    {tpl.maxIterations}轮
+                    {t('aiworkbench.agentm.rounds', { n: tpl.maxIterations })}
                   </span>
                 </div>
 
@@ -247,15 +249,16 @@ export default function AgentMarket({ onAgentInstantiated, showToast }: AgentMar
                   {isInstantiated ? (
                     <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-green-500/10 text-green-600 border border-green-200/50`}>
                       <Icon name="CheckCircle2" size={12} />
-                      已创建
+                      {t('aiworkbench.agentm.instantiated')}
                     </span>
                   ) : (
                     <button
+                      type="button"
                       onClick={() => handleInstantiateClick(tpl)}
                       className={`w-full px-3 py-1.5 ${styles.accentBg} hover:opacity-90 text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5`}
                     >
                       <Icon name="Rocket" size={12} />
-                      实例化部署
+                      {t('aiworkbench.agentm.instantiate')}
                     </button>
                   )}
                 </div>
@@ -265,7 +268,7 @@ export default function AgentMarket({ onAgentInstantiated, showToast }: AgentMar
           {filtered.length === 0 && (
             <div className="col-span-full flex flex-col items-center justify-center py-16 gap-3">
               <Icon name="PackageOpen" size={32} className={styles.cardTextMuted} />
-              <p className={`text-xs ${styles.cardTextMuted}`}>没有匹配的Agent模板</p>
+              <p className={`text-xs ${styles.cardTextMuted}`}>{t('aiworkbench.agentm.noMatch')}</p>
             </div>
           )}
         </div>
@@ -276,8 +279,9 @@ export default function AgentMarket({ onAgentInstantiated, showToast }: AgentMar
         <div className={`fixed inset-0 z-50 flex items-center justify-center ${styles.appBg}/40 backdrop-blur-xs`}>
           <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.cardBorder} w-full max-w-sm overflow-hidden`}>
             <div className={`px-4 py-3 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between`}>
-              <h3 className={`font-bold ${styles.cardText} text-xs`}>实例化 Agent</h3>
+              <h3 className={`font-bold ${styles.cardText} text-xs`}>{t('aiworkbench.agentm.modalTitle')}</h3>
               <button
+                type="button"
                 onClick={() => { setShowModal(false); setInstanceName(''); }}
                 className={`${styles.cardTextMuted} cursor-pointer`}
               >
@@ -298,13 +302,13 @@ export default function AgentMarket({ onAgentInstantiated, showToast }: AgentMar
 
               <div className="space-y-1">
                 <label className={`block text-[11px] ${styles.cardTextMuted} font-semibold`}>
-                  Agent名称 <span className="text-red-500">*</span>
+                  Agent {t('aiworkbench.agentm.nameLabel')} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={instanceName}
                   onChange={e => setInstanceName(e.target.value)}
-                  placeholder="输入Agent实例名称..."
+                  placeholder={t('aiworkbench.agentm.namePh')}
                   className={`w-full px-3 py-2 border ${styles.inputBorder} rounded-lg text-xs ${styles.cardBg} ${styles.cardText}`}
                   autoFocus
                   onKeyDown={e => e.key === 'Enter' && handleInstantiate()}
@@ -314,17 +318,19 @@ export default function AgentMarket({ onAgentInstantiated, showToast }: AgentMar
 
             <div className={`px-4 py-3 border-t ${styles.cardBorder} flex justify-end gap-2`}>
               <button
+                type="button"
                 onClick={() => { setShowModal(false); setInstanceName(''); }}
                 className={`px-3 py-1.5 border ${styles.cardBorder} rounded-lg hover:${styles.inputBg} ${styles.cardTextMuted} transition-colors cursor-pointer text-[11px] font-semibold`}
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
+                type="button"
                 onClick={handleInstantiate}
                 disabled={!instanceName.trim() || instantiating}
                 className={`px-4 py-1.5 ${styles.accentBg} hover:opacity-90 text-white rounded-lg transition-all font-bold cursor-pointer text-[11px] disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                {instantiating ? '部署中...' : '确认部署'}
+                {instantiating ? t('aiworkbench.agentm.deploying') : t('aiworkbench.agentm.confirmDeploy')}
               </button>
             </div>
           </div>
