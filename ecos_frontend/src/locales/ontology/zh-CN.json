@@ -1200,5 +1200,18 @@
   "ow.canvas.footer.addEntity": "双击空白添加实体",
   "ow.canvas.empty.title": "画布为空",
   "ow.canvas.empty.readonly": "当前域暂无实体数据",
-  "ow.canvas.empty.editable": "点击上方「添加实体」按钮或双击画布空白区域，开始创建第一个本体实体"
+  "ow.canvas.empty.editable": "点击上方「添加实体」按钮或双击画布空白区域，开始创建第一个本体实体",
+  "ow.sidebar.defaultTitle": "本体 / 业务域",
+  "ow.sidebar.topStats": "{d} 域 · {o} 对象类型",
+  "ow.sidebar.refresh": "刷新",
+  "ow.sidebar.searchPh": "搜索域或对象类型...",
+  "ow.sidebar.loading": "加载中...",
+  "ow.sidebar.noMatch": "无匹配结果",
+  "ow.sidebar.emptyData": "暂无本体数据",
+  "ow.sidebar.emptyHint": "请确认后端 /api/v1/ontology 服务可用",
+  "ow.sidebar.propsCount": "{n}属性",
+  "ow.sidebar.ungrouped": "未分组",
+  "ow.sidebar.statsDomains": "{d} 域",
+  "ow.sidebar.statsObjects": "{o} 对象类型",
+  "ow.sidebar.loadFail": "加载本体数据失败"
 }

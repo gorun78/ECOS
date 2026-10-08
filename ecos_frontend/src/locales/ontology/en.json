@@ -1200,5 +1200,18 @@
   "ow.canvas.footer.addEntity": "Double-click blank to add an entity",
   "ow.canvas.empty.title": "Canvas is empty",
   "ow.canvas.empty.readonly": "No entity data in this domain",
-  "ow.canvas.empty.editable": "Click the 'Add Entity' button above or double-click the canvas to create your first entity"
+  "ow.canvas.empty.editable": "Click the 'Add Entity' button above or double-click the canvas to create your first entity",
+  "ow.sidebar.defaultTitle": "Ontology / Business Domains",
+  "ow.sidebar.topStats": "{d} domains · {o} object types",
+  "ow.sidebar.refresh": "Refresh",
+  "ow.sidebar.searchPh": "Search domain or object types...",
+  "ow.sidebar.loading": "Loading...",
+  "ow.sidebar.noMatch": "No matching results",
+  "ow.sidebar.emptyData": "No ontology data yet",
+  "ow.sidebar.emptyHint": "Please verify the /api/v1/ontology backend service is available",
+  "ow.sidebar.propsCount": "{n} props",
+  "ow.sidebar.ungrouped": "Ungrouped",
+  "ow.sidebar.statsDomains": "{d} domains",
+  "ow.sidebar.statsObjects": "{o} object types",
+  "ow.sidebar.loadFail": "Failed to load ontology data"
 }
