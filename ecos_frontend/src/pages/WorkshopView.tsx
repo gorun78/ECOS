@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTheme } from "../components/ThemeContext";
+import { useLanguage } from "../components/LanguageContext";
 import { showToastGlobal } from "../components/common/Toast";
 
 import type { WorkshopApp, WorkshopWidget } from './workshop/types';
@@ -25,6 +26,7 @@ export type { WorkshopApp, WorkshopWidget, WorkshopVariable } from './workshop/t
 
 export default function WorkshopView({ showToast: propShowToast }: { showToast?: (type: 'success' | 'info' | 'error', message: string) => void }) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const showToast = propShowToast || ((type: 'success' | 'info' | 'error', msg: string) => showToastGlobal(type, msg));
 
   const [apps, setApps] = useState<WorkshopApp[]>(() => {
@@ -134,7 +136,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
   };
 
   const vm = {
-    styles, activeApp, activePage, activePageId, setActivePageId, activeAppId,
+    styles, t, activeApp, activePage, activePageId, setActivePageId, activeAppId,
     apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId,
     leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot,
     showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType,
