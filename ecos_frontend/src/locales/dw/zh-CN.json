@@ -1824,5 +1824,15 @@
   "dw.sql.save.descLabel": "描述（可选）",
   "dw.sql.save.descPlaceholder": "可选描述...",
   "dw.sql.save.sqlPreview": "SQL 预览：",
-  "dw.sql.save.emptySql": "(空)"
+  "dw.sql.save.emptySql": "(空)",
+  "gp.title": "Git 版本",
+  "gp.refresh": "刷新",
+  "gp.branch": "分支",
+  "gp.noBranches": "无分支数据",
+  "gp.synced": "已同步",
+  "gp.uncommitted": "未提交变更",
+  "gp.clean": "工作区干净",
+  "gp.recentCommits": "最近提交",
+  "gp.noCommits": "无提交记录",
+  "gp.refreshAll": "刷新全部"
 }

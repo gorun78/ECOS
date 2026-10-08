@@ -1819,5 +1819,15 @@
   "dw.sql.save.descLabel": "Description (optional)",
   "dw.sql.save.descPlaceholder": "Optional description...",
   "dw.sql.save.sqlPreview": "SQL Preview:",
-  "dw.sql.save.emptySql": "(empty)"
+  "dw.sql.save.emptySql": "(empty)",
+  "gp.title": "Git Version",
+  "gp.refresh": "Refresh",
+  "gp.branch": "Branch",
+  "gp.noBranches": "No branch data",
+  "gp.synced": "Synced",
+  "gp.uncommitted": "Uncommitted changes",
+  "gp.clean": "Workspace clean",
+  "gp.recentCommits": "Recent commits",
+  "gp.noCommits": "No commit history",
+  "gp.refreshAll": "Refresh all"
 }
