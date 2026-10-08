@@ -1221,5 +1221,7 @@
   "ow.node.type.default": "实体",
   "ow.node.propsCount": "{n} 属性",
   "ow.node.moreProps": "+{n} 更多属性...",
-  "ow.node.emptyProps": "暂无属性"
+  "ow.node.emptyProps": "暂无属性",
+  "ow.edge.nameFallback": "关联",
+  "ow.edge.deleteTitle": "删除关系"
 }

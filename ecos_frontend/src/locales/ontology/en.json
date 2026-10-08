@@ -1221,5 +1221,7 @@
   "ow.node.type.default": "Entity",
   "ow.node.propsCount": "{n} props",
   "ow.node.moreProps": "+{n} more props...",
-  "ow.node.emptyProps": "No properties yet"
+  "ow.node.emptyProps": "No properties yet",
+  "ow.edge.nameFallback": "Related",
+  "ow.edge.deleteTitle": "Delete relationship"
 }
