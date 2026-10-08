@@ -720,5 +720,9 @@
   "common.cmdpalette.results": "Results ({count})",
   "common.cmdpalette.noResults": "No results",
   "common.cmdpalette.footerHint": "↵ Select · ESC Close",
-  "common.cmdpalette.title": "C2EOS Command Palette"
+  "common.cmdpalette.title": "C2EOS Command Palette",
+  "common.mobile.expand": "Expand details",
+  "common.mobile.collapse": "Collapse details",
+  "common.mobile.prev": "Previous",
+  "common.mobile.next": "Next"
 }

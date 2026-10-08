@@ -22,6 +22,7 @@
 import React, { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useTheme } from "../ThemeContext";
+import { useLanguage } from "../LanguageContext";
 import DataTable, {ColumnConfig, DataTableProps} from "./DataTable";
 import EmptyState from "./EmptyState";
 import LoadingSkeleton from "./LoadingSkeleton";
@@ -143,6 +144,7 @@ function MobileCardRows<T extends Record<string, any>>({
 }) {
   const [innerPage, setInnerPage] = useState(1);
   const [expanded, setExpanded] = useState<boolean>(false); // 当前卡片是否展开
+  const { t } = useLanguage();
   const isControlled = currentPage !== undefined;
   const page = isControlled ? currentPage : innerPage;
   const allTotal = total ?? data.length;
@@ -214,7 +216,7 @@ function MobileCardRows<T extends Record<string, any>>({
               </div>
               <button
                 type="button"
-                aria-label={expanded ? "收起详情" : "展开详情"}
+                aria-label={expanded ? t("common.mobile.collapse") : t("common.mobile.expand")}
                 onClick={() => setExpanded((v) => !v)}
                 className="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/10 transition shrink-0"
               >
@@ -263,7 +265,7 @@ function MobileCardRows<T extends Record<string, any>>({
               onClick={() => setPage(page - 1)}
               className="px-2.5 py-1 border rounded text-xs disabled:opacity-40"
             >
-              上一页
+              {t("common.mobile.prev")}
             </button>
             <span className="px-2 select-none">{page}/{totalPages}</span>
             <button
@@ -272,7 +274,7 @@ function MobileCardRows<T extends Record<string, any>>({
               onClick={() => setPage(page + 1)}
               className="px-2.5 py-1 border rounded text-xs disabled:opacity-40"
             >
-              下一页
+              {t("common.mobile.next")}
             </button>
           </div>
         </div>

@@ -720,5 +720,9 @@
   "common.cmdpalette.results": "结果 ({count})",
   "common.cmdpalette.noResults": "无结果",
   "common.cmdpalette.footerHint": "↵ 选择 · ESC 关闭",
-  "common.cmdpalette.title": "C2EOS 命令面板"
+  "common.cmdpalette.title": "C2EOS 命令面板",
+  "common.mobile.expand": "展开详情",
+  "common.mobile.collapse": "收起详情",
+  "common.mobile.prev": "上一页",
+  "common.mobile.next": "下一页"
 }
