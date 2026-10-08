@@ -1554,5 +1554,14 @@
   "ow.domainform.boundTitle": "Bound to domain \"{name}\"",
   "ow.domainform.cancel": "Cancel",
   "ow.domainform.saveChanges": "Save Changes",
-  "ow.domainform.createDomain": "Create Domain"
+  "ow.domainform.createDomain": "Create Domain",
+  "ow.summary.objEntity": "Object Types",
+  "ow.summary.objAssigned": "{count} assigned",
+  "ow.summary.objUnassigned": "{count} unassigned",
+  "ow.summary.linkTitle": "Link Count",
+  "ow.summary.linkSub": "Intra-domain and cross-domain links",
+  "ow.summary.domainTitle": "Business Domains",
+  "ow.summary.domainSub": "Domain-level isolation and maintenance",
+  "ow.summary.combinedTitle": "Interfaces & Properties",
+  "ow.summary.combinedMeta": "{i} interfaces · {s} shared properties"
 }

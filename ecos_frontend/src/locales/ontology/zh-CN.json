@@ -1554,5 +1554,14 @@
   "ow.domainform.boundTitle": "已被域 \"{name}\" 绑定",
   "ow.domainform.cancel": "取消",
   "ow.domainform.saveChanges": "保存修改",
-  "ow.domainform.createDomain": "创建业务域"
+  "ow.domainform.createDomain": "创建业务域",
+  "ow.summary.objEntity": "业务对象实体",
+  "ow.summary.objAssigned": "{count} 个已归域",
+  "ow.summary.objUnassigned": "{count} 个未归类",
+  "ow.summary.linkTitle": "关系链接数量",
+  "ow.summary.linkSub": "包含域内关联与跨域多维关联",
+  "ow.summary.domainTitle": "系统业务域",
+  "ow.summary.domainSub": "支持按域进行对象隔离与维护",
+  "ow.summary.combinedTitle": "接口与属性指标",
+  "ow.summary.combinedMeta": "{i} 契约规范 · {s} 共享属性"
 }
