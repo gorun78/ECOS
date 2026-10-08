@@ -7,6 +7,7 @@ import React from 'react';
 import { ObjectType, OntologyDomain } from '../../../types/ontology';
 import LucideIcon from '../LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 
 interface DomainModalProps {
   editingDomain: OntologyDomain | null;
@@ -46,6 +47,7 @@ export default function DomainModal({
   toggleObjectAssignment
 }: DomainModalProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--muted,#0F172A)]/40 backdrop-blur-xs">
@@ -58,7 +60,7 @@ export default function DomainModal({
               <LucideIcon name="Layers" size={14} />
             </span>
             <h3 className={`text-sm font-bold ${styles.cardText}`}>
-              {editingDomain ? '编辑业务域' : '新建业务域'}
+              {editingDomain ? t('ow.domainmodal.editTitle') : t('ow.domainmodal.newTitle')}
             </h3>
           </div>
           <button
@@ -85,14 +87,14 @@ export default function DomainModal({
           {/* ID Input (Only shown on Create) */}
           <div className="space-y-1">
             <label className={`block ${styles.cardTextMuted} font-semibold text-[11px]`}>
-              业务域标识 (ID/Key) <span className="text-red-500">*</span>
+              {t('ow.domainmodal.idLabel')} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               disabled={!!editingDomain}
               value={formId}
               onChange={e => setFormId(e.target.value)}
-              placeholder="例如: customer_domain (英文/数字/下划线)"
+              placeholder={t('ow.domainmodal.idPlaceholder')}
               className={`w-full px-3 py-2 border ${styles.inputBorder} rounded-lg focus:outline-hidden focus:border-blue-500 font-mono text-xs ${styles.inputBg} disabled:bg-blue-50/20 ${styles.cardTextMuted}`}
               required
             />
@@ -101,13 +103,13 @@ export default function DomainModal({
           {/* Display Name Input */}
           <div className="space-y-1">
             <label className={`block ${styles.cardTextMuted} font-semibold text-[11px]`}>
-              业务域名称 (Display Name) <span className="text-red-500">*</span>
+              {t('ow.domainmodal.nameLabel')} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formName}
               onChange={e => setFormName(e.target.value)}
-              placeholder="例如: 客户域"
+              placeholder={t('ow.domainmodal.namePlaceholder')}
               className={`w-full px-3 py-2 border ${styles.inputBorder} rounded-lg focus:outline-hidden focus:border-blue-500 text-xs ${styles.inputBg}`}
               required
             />
@@ -116,12 +118,12 @@ export default function DomainModal({
           {/* Description Input */}
           <div className="space-y-1">
             <label className={`block ${styles.cardTextMuted} font-semibold text-[11px]`}>
-              描述 (Description)
+              {t('ow.domainmodal.descLabel')}
             </label>
             <textarea
               value={formDesc}
               onChange={e => setFormDesc(e.target.value)}
-              placeholder="对该业务分级域的业务范围和职责进行说明"
+              placeholder={t('ow.domainmodal.descPlaceholder')}
               rows={2}
               className={`w-full px-3 py-2 border ${styles.inputBorder} rounded-lg focus:outline-hidden focus:border-blue-500 text-xs resize-none ${styles.inputBg}`}
             />
@@ -130,7 +132,7 @@ export default function DomainModal({
           {/* Color Theme Selector */}
           <div className="space-y-1.5">
             <label className={`block ${styles.cardTextMuted} font-semibold text-[11px]`}>
-              视觉主题色 (Color Accent)
+              {t('ow.domainmodal.colorLabel')}
             </label>
             <div className="flex flex-wrap gap-2">
               {['blue', 'emerald', 'amber', 'purple', 'rose', 'indigo', 'slate'].map(color => {
@@ -162,8 +164,8 @@ export default function DomainModal({
           {/* Assign Object Types Checklist */}
           <div className="space-y-1.5">
             <label className={`block ${styles.cardTextMuted} font-semibold flex justify-between items-center text-[11px]`}>
-              <span>包含的对象类型 ({formAssignedObjects.length})</span>
-              <span className={`text-[9px] ${styles.muted} font-normal`}>多选指派</span>
+              <span>{t('ow.domainmodal.assignLabel')} ({formAssignedObjects.length})</span>
+              <span className={`text-[9px] ${styles.muted} font-normal`}>{t('ow.domainmodal.multiSelectHint')}</span>
             </label>
             <div className={`border ${styles.sidebarBorder} rounded-lg max-h-36 overflow-y-auto p-1 ${styles.sidebarBg} divide-y ${styles.divider}`}>
               {allObjectTypes.map(ot => {
@@ -192,7 +194,7 @@ export default function DomainModal({
               })}
               {allObjectTypes.length === 0 && (
                 <div className={`p-4 text-center ${styles.cardTextMuted}`}>
-                  暂无对象类型可供指派
+                  {t('ow.domainmodal.emptyList')}
                 </div>
               )}
             </div>
@@ -208,13 +210,13 @@ export default function DomainModal({
               }}
               className={`px-3 py-1.5 border ${styles.cardBorder} rounded-lg hover:bg-blue-50/20 ${styles.cardText} transition-colors font-semibold cursor-pointer text-xs ${styles.cardBg}`}
             >
-              取消
+              {t('ow.domainmodal.cancel')}
             </button>
             <button
               type="submit"
               className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-bold shadow-sm cursor-pointer text-xs"
             >
-              保存
+              {t('ow.domainmodal.save')}
             </button>
           </div>
         </form>

@@ -1525,5 +1525,19 @@
   "ow.boe.colCategory": "分组类别",
   "ow.boe.colInstances": "实例数",
   "ow.boe.colPercent": "所占比例",
-  "ow.boe.totalLabel": "总计 (Total)"
+  "ow.boe.totalLabel": "总计 (Total)",
+  "ow.domainmodal.editTitle": "编辑业务域",
+  "ow.domainmodal.newTitle": "新建业务域",
+  "ow.domainmodal.idLabel": "业务域标识 (ID/Key)",
+  "ow.domainmodal.idPlaceholder": "例如: customer_domain (英文/数字/下划线)",
+  "ow.domainmodal.nameLabel": "业务域名称 (Display Name)",
+  "ow.domainmodal.namePlaceholder": "例如: 客户域",
+  "ow.domainmodal.descLabel": "描述 (Description)",
+  "ow.domainmodal.descPlaceholder": "对该业务分级域的业务范围和职责进行说明",
+  "ow.domainmodal.colorLabel": "视觉主题色 (Color Accent)",
+  "ow.domainmodal.assignLabel": "包含的对象类型",
+  "ow.domainmodal.multiSelectHint": "多选指派",
+  "ow.domainmodal.emptyList": "暂无对象类型可供指派",
+  "ow.domainmodal.cancel": "取消",
+  "ow.domainmodal.save": "保存"
 }

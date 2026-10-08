@@ -1525,5 +1525,19 @@
   "ow.boe.colCategory": "Category",
   "ow.boe.colInstances": "Instances",
   "ow.boe.colPercent": "Share",
-  "ow.boe.totalLabel": "Total"
+  "ow.boe.totalLabel": "Total",
+  "ow.domainmodal.editTitle": "Edit Business Domain",
+  "ow.domainmodal.newTitle": "New Business Domain",
+  "ow.domainmodal.idLabel": "Domain Key (ID/Key)",
+  "ow.domainmodal.idPlaceholder": "e.g. customer_domain (letters/digits/underscore)",
+  "ow.domainmodal.nameLabel": "Domain Display Name",
+  "ow.domainmodal.namePlaceholder": "e.g. Customer Domain",
+  "ow.domainmodal.descLabel": "Description",
+  "ow.domainmodal.descPlaceholder": "Describe the business scope and responsibilities of this domain",
+  "ow.domainmodal.colorLabel": "Color Accent",
+  "ow.domainmodal.assignLabel": "Contained Object Types",
+  "ow.domainmodal.multiSelectHint": "Multi-select",
+  "ow.domainmodal.emptyList": "No object types available to assign",
+  "ow.domainmodal.cancel": "Cancel",
+  "ow.domainmodal.save": "Save"
 }
