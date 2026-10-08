@@ -33,6 +33,21 @@ export function authOnlyHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/**
+ * 登出/会话过期单源清理（X-51 收口新增，只增不改既有签名）：
+ * 清除 getAuthToken 联合读取的全部三 key（localStorage token/accessToken/jwt + sessionStorage jwt）。
+ */
+export function clearAuthToken(): void {
+  try {
+    localStorage.removeItem("token");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("jwt");
+    sessionStorage.removeItem("jwt");
+  } catch {
+    /* storage 不可用（SSR/隐私模式）忽略 */
+  }
+}
+
 /** RequireAuth 会话探测: GET /api/v1/auth/me — 返回状态码与原始 JSON，不做跳转副作用。 */
 export async function authMeProbe(
   token: string,

@@ -12,7 +12,7 @@ import com.chinacreator.gzcm.engine.cognitive2.service.NewsFeedReader;
 import com.chinacreator.gzcm.engine.cognitive2.service.NewsFeedReader.ExtractedEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,6 +34,11 @@ import java.util.*;
  *     - decision: {decisionId}
  * </pre>
  *
+ * <p>F05-16 / X-44：本控制器输出内置 demo markdown（{@code # Wave-4.1 fallback …}），属演示素材
+ * 不是业务数据 ⇒ 整类挂 {@code demo=true} 标记，并只在 {@code ecos.cognitive.demo=true}
+ * （dev profile，例：{@code ECOS_COGNITIVE_DEMO=true}）下装配；默认/生产 bean 不存在，
+ * 该路径真实 404（禁 200 + 内置 demo 内容）。</p>
+ *
  * <p>铁律约束：
  * <ul>
  *   <li>不新增 DB 表（所有推理结果纯内存）</li>
@@ -48,24 +53,34 @@ import java.util.*;
  */
 @RestController
 @RequestMapping("/api/v1/cognitive/demo/wave3")
+@ConditionalOnProperty(name = Wave3DemoController.DEMO_FLAG, havingValue = "true")
 public class Wave3DemoController {
+
+    /** demo 内容开关配置键（未配置 = false = 不装配本控制器）。 */
+    static final String DEMO_FLAG = "ecos.cognitive.demo";
 
     private static final Logger log = LoggerFactory.getLogger(Wave3DemoController.class);
 
-    @Autowired
-    private CausalReasonerService causalReasonerService;
-    @Autowired
-    private DecisionService decisionService;
-    @Autowired
-    private EntityLinker entityLinker;
-    @Autowired
-    private NewsFeedReader newsFeedReader;
+    private final CausalReasonerService causalReasonerService;
+    private final DecisionService decisionService;
+    private final EntityLinker entityLinker;
+    private final NewsFeedReader newsFeedReader;
+
+    public Wave3DemoController(CausalReasonerService causalReasonerService,
+                               DecisionService decisionService,
+                               EntityLinker entityLinker,
+                               NewsFeedReader newsFeedReader) {
+        this.causalReasonerService = causalReasonerService;
+        this.decisionService = decisionService;
+        this.entityLinker = entityLinker;
+        this.newsFeedReader = newsFeedReader;
+    }
 
     /**
      * 端到端 Demo：Markdown → 实体抽取 + 链接 → 因果诊断 → 推理路径 → 决策。
      *
      * @param body { markdown, domain, maxDepth }
-     * @return 完整链路产物
+     * @return 完整链路产物（顶层 {@code demo=true}）
      */
     @PostMapping
     public ApiResponse<Map<String, Object>> demo(@RequestBody Map<String, Object> body) {
@@ -84,6 +99,7 @@ public class Wave3DemoController {
         }
 
         Map<String, Object> response = new LinkedHashMap<>();
+        response.put("demo", true);
 
         // ── Step 1: 解析 Markdown 抽实体（纯规则，不依赖 LLM） ──
         NewsFeedReader.MarkdownParseResult parsed = newsFeedReader.parseMarkdown(markdown);

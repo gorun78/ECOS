@@ -58,6 +58,24 @@
             <artifactId>runtime-monitor</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+        <!-- F05-15 公共底座收口（铁律 §2.5）：跨服务寻址唯一经 runtime-access ServiceEndpointResolver；
+             LLM 调用唯一经 runtime/llm-gateway LLMGatewayService（X-34/X-35） -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-access</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>llm-gateway</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- F05-13 跨域读写收口：sys_config 一律经 sysman 配置门面 SysConfigService（与 data-engine 同款声明） -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>sysman-impl</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
         <!-- PMO-59 P2a: SaveDTO 强类型入参与 Service 构造器按后端规范用 Lombok (与 data-engine-impl 同款声明) -->
         <dependency>
             <groupId>org.projectlombok</groupId>

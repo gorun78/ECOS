@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.cognitive2.config;
 
+import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.engine.cognitive.api.CognitiveErrorCode;
 import com.chinacreator.gzcm.engine.kb.ComplianceRuleProvider;
 import com.chinacreator.gzcm.engine.kb.KnowledgeGraphService;
 import com.chinacreator.gzcm.engine.kb.KnowledgeRetrievalService;
@@ -7,10 +9,13 @@ import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeArticle;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEdge;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
+import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
@@ -18,7 +23,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URLEncoder;
@@ -26,7 +30,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Optional;
 
 /**
@@ -67,24 +70,38 @@ public class KbRestClientConfig {
     private static final Logger log = LoggerFactory.getLogger(KbRestClientConfig.class);
 
     /**
-     * KB 引擎 REST 基础 URL（aiming 进程内访问 kb 引擎，经 gateway :8080 转发或直连 dccheng :18086）。
-     * <p>通过 {@code ecos.kb-base} 配置项覆盖，默认走 gateway。
+     * KB 引擎 REST 基础 URL 覆盖项（仅作运维逃生口；默认留空 → 经 runtime-access
+     * {@link ServiceEndpointResolver} 双模寻址解析 dccheng 基址，禁止自建客户端/硬编码 localhost — X-35/F05-15）。
      */
-    @Value("${ecos.kb-base:http://localhost:8080/api/v1}")
+    @Value("${ecos.kb-base:}")
     private String kbBase;
 
     /** REST 代理共享的 ObjectMapper（节点/规则/文章 JSON 反序列化）。 */
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /** route-manifest 中 /api/v1/knowledge/** 的归属服务。 */
+    private static final String KB_OWNER_SERVICE = "dccheng";
+
     /**
-     * 共享 RestTemplate（connect 3s / read 10s，与 EntityLinker 同款超时）。
-     * <p>包内可见，供单元测试反射替换为 MockRestTemplate。
+     * 解析 KB 基址：显式覆盖项优先 → ServiceEndpointResolver 双模寻址 → 双双不可得则
+     * fail-loud（ECOS-COG-504，装配期暴露配置缺失；F05-15/X-35 禁静默回落硬编码地址）。
+     * <p>包内可见，供单元测试反射校验。
      */
-    RestTemplate buildRestTemplate() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3000);
-        factory.setReadTimeout(10000);
-        return new RestTemplate(factory);
+    String resolveKbBase(ObjectProvider<ServiceEndpointResolver> endpointProvider) {
+        if (kbBase != null && !kbBase.isBlank()) {
+            return kbBase.trim();
+        }
+        ServiceEndpointResolver resolver = endpointProvider.getIfAvailable();
+        if (resolver != null) {
+            String host = resolver.resolve(KB_OWNER_SERVICE,
+                    ServiceEndpointResolver.RouteMode.MONOLITH).orElse(null);
+            if (host != null) {
+                return host + "/api/v1";
+            }
+        }
+        throw new BusinessException(500, CognitiveErrorCode.E504_INTERNAL
+                + ": KB 基址不可解析——ecos.kb-base 未配置且 route-manifest 未登记服务 "
+                + KB_OWNER_SERVICE + "（fail-loud，禁止回落硬编码地址）");
     }
 
     // ═══════════════ Bean 1: KnowledgeGraphService ═══════════════
@@ -99,8 +116,9 @@ public class KbRestClientConfig {
      */
     @Bean("kbGraphRestService")
     @ConditionalOnMissingBean(KnowledgeGraphService.class)
-    public KnowledgeGraphService kbGraphRestService() {
-        RestTemplate rt = buildRestTemplate();
+    public KnowledgeGraphService kbGraphRestService(@Qualifier("cognitiveRestTemplate") RestTemplate rt,
+                                                    ObjectProvider<ServiceEndpointResolver> endpointProvider) {
+        final String kbBase = resolveKbBase(endpointProvider);
         return new KnowledgeGraphService() {
 
             @Override
@@ -235,8 +253,9 @@ public class KbRestClientConfig {
      */
     @Bean("kbRetrievalRestService")
     @ConditionalOnMissingBean(KnowledgeRetrievalService.class)
-    public KnowledgeRetrievalService kbRetrievalRestService() {
-        RestTemplate rt = buildRestTemplate();
+    public KnowledgeRetrievalService kbRetrievalRestService(@Qualifier("cognitiveRestTemplate") RestTemplate rt,
+                                                             ObjectProvider<ServiceEndpointResolver> endpointProvider) {
+        final String kbBase = resolveKbBase(endpointProvider);
         return new KnowledgeRetrievalService() {
 
             @Override
@@ -325,13 +344,14 @@ public class KbRestClientConfig {
      */
     @Bean("kbComplianceRuleRestService")
     @ConditionalOnMissingBean(ComplianceRuleProvider.class)
-    public ComplianceRuleProvider kbComplianceRuleRestService() {
-        RestTemplate rt = buildRestTemplate();
+    public ComplianceRuleProvider kbComplianceRuleRestService(@Qualifier("cognitiveRestTemplate") RestTemplate rt,
+                                                               ObjectProvider<ServiceEndpointResolver> endpointProvider) {
+        final String kbBase = resolveKbBase(endpointProvider);
         return new ComplianceRuleProvider() {
 
             @Override
             public List<ComplianceRule> findByDomain(String domain) {
-                List<ComplianceRule> all = fetchAllRules(rt);
+                List<ComplianceRule> all = fetchAllRules(rt, kbBase);
                 if (all.isEmpty()) {
                     return Collections.emptyList();
                 }
@@ -342,7 +362,7 @@ public class KbRestClientConfig {
 
             @Override
             public List<ComplianceRule> findAll() {
-                return fetchAllRules(rt);
+                return fetchAllRules(rt, kbBase);
             }
 
             @Override
@@ -367,13 +387,14 @@ public class KbRestClientConfig {
     /**
      * 拉取全量合规规则（GET /knowledge/compliance-rules 返回 Map 包裹层，剥 data 段）。
      *
-     * @param rt RestTemplate
+     * @param rt     RestTemplate（共享 bean）
+     * @param base   已解析的 KB 基址（经 resolveKbBase 双模寻址，不用字段 kbBase 以免覆盖项为空时失配）
      * @return 规则列表（失败返回空列表，不抛异常）
      */
-    private List<ComplianceRule> fetchAllRules(RestTemplate rt) {
+    private List<ComplianceRule> fetchAllRules(RestTemplate rt, String base) {
         try {
             Map<String, Object> resp = rt.getForObject(
-                    kbBase + "/knowledge/compliance-rules", Map.class);
+                    base + "/knowledge/compliance-rules", Map.class);
             if (resp == null) {
                 log.warn("KB REST findAll 返回空 body");
                 return Collections.emptyList();

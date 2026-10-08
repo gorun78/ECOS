@@ -61,8 +61,13 @@ ecos:
       enabled: ${ECOS_EVENT_KAFKA_ENABLED:true}
   mybatis:
     type-aliases-package: com.chinacreator.gzcm.engine.ai
-  header-auth:
-    enabled: false
+  # F05-14/R-16 ①+③ 裁定：aiming service 态独立裁决。属性必须落
+  # ecos.security.header-auth 前缀（common-api HeaderAuthAutoConfiguration 唯一认的键；
+  # 旧条目曾误置 ecos.header-auth——auto-config 读不到，等同常关）。
+  # 缺 X-ECOS-USER/X-ECOS-TENANT → 403 ECOS-AUTH-010（fail-closed 内网契约）。
+  security:
+    header-auth:
+      enabled: true
   neo4j:
     enabled: ${ECOS_NEO4J_ENABLED:false}
 

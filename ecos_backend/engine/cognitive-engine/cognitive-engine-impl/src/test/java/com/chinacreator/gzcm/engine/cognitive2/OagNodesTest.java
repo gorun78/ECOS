@@ -117,7 +117,10 @@ class OagNodesTest {
         var intake = new OagIntakeService();
         var plan = new OagPlannerService();
         var strategy = new StrategyGeneratorService();
-        EngineCapabilityRegistryImpl reg = new EngineCapabilityRegistryImpl(decision, intake, plan, strategy);
+        EngineCapabilityRegistryImpl reg = new EngineCapabilityRegistryImpl(
+                decision, intake, plan, strategy,
+                new org.springframework.web.client.RestTemplate(),
+                new com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver());
         assertNotNull(reg);
 
         // 执行 OAG_INTAKE 节点

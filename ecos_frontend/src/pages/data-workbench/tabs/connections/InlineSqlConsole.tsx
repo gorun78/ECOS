@@ -4,6 +4,7 @@ import LucideIcon from '../../LucideIcon';
 import { getErrorMessage } from '../../helpers';
 import { useTheme } from "../../../../components/ThemeContext";
 import { useLanguage } from "../../../../components/LanguageContext";
+import { getAuthToken } from "../../../../services/auth";
 
 // Inline SQL Query Console (embedded, reuses datasource ID)
 /** 后端 QueryExecutionServiceImpl.execute 返回 Map：columns[{name,label,type}] / rows(以列 label 为键) / rowCount / elapsedMs */
@@ -32,7 +33,7 @@ export default function InlineSqlConsole({ datasourceId }: { datasourceId: strin
   const execute = async () => {
     setLoading(true); setError(null);
     try {
-      const token = localStorage.getItem('token') || '';
+      const token = getAuthToken();
       const res = await fetch('/api/v1/engine/data/query/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },

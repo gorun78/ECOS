@@ -31,8 +31,9 @@ import java.util.UUID;
  * {@code ecos.cognitive} 失效事件 + 经 {@link IWarnLogService}（runtime-monitor）告警
  * （warn 正文含 faultContext 结构化字段，周一故障复盘预留），杜绝双路径双发。</p>
  *
- * <p>写操作审计（铁律 §2.4#5）：经 {@link EventBusService} 发 Kafka {@code ecos.audit}；
- * 未装配/异常降级 WARN 不阻塞。</p>
+ * <p>写操作审计（铁律 §2.4#5，F05-15/X-39 fail-closed 收口）：经 {@link EventBusService} 发 Kafka
+ * {@code ecos.audit}；主通道不可用 → {@link CognitiveAuditFallback} 本地兜底落盘；兜底也失败 →
+ * 拒绝业务动作（抛 {@link BusinessException}），禁止降级放行。</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -45,6 +46,8 @@ public class CognitiveHypothesisService {
     private final ObjectMapper objectMapper;
     /** P2b: 心智事件发布器（失效事件单点发布，与 Detector 单向依赖无环） */
     private final MentalEventPublisher eventPublisher;
+    /** F05-15 X-39: 审计兜底通道（fail-closed 第二级，与主通道同不可退让） */
+    private final CognitiveAuditFallback auditFallback;
 
     /** P2b: 告警通道 — runtime-monitor 公共底座（铁律 §2.5）；可选装配（Bean 由 P2b config 注册），未装配 WARN 兜底 */
     @Autowired(required = false)
@@ -200,22 +203,35 @@ public class CognitiveHypothesisService {
         return v == null || v.isBlank() ? null : v.trim();
     }
 
+    /**
+     * 审计单点（X-39 fail-closed）：主通道 ecos.audit → 本地兜底 → 双通道均不可记录则拒绝业务动作。
+     * <p>兜底失败时禁止"log.warn + continue"——审计不可记 = 动作不可做（铁律 §2.4#5）。
+     */
     private void audit(String action, String resource, String result, String detail) {
-        if (eventBusService == null) {
-            log.warn("认知假设审计无法发送: EventBusService 未装配, action={}", action);
-            return;
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("action", action);
+        event.put("resource", resource);
+        event.put("result", result);
+        event.put("detail", detail);
+        event.put("userId", "system");
+        event.put("timestamp", LocalDateTime.now().toString());
+        if (eventBusService != null) {
+            try {
+                eventBusService.publish(KafkaTopics.AUDIT, event);
+                return;
+            } catch (Exception e) {
+                log.warn("认知假设审计 (EventBus) 失败，转本地兜底: action={} err={}", action, e.getMessage());
+            }
+        } else {
+            log.warn("EventBusService 未装配，认知假设审计转本地兜底: action={}", action);
         }
         try {
-            Map<String, Object> event = new LinkedHashMap<>();
-            event.put("action", action);
-            event.put("resource", resource);
-            event.put("result", result);
-            event.put("detail", detail);
-            event.put("userId", "system");
-            event.put("timestamp", LocalDateTime.now().toString());
-            eventBusService.publish(KafkaTopics.AUDIT, event);
-        } catch (Exception e) {
-            log.warn("认知假设审计 (EventBus) failed (ignored): {}", e.getMessage());
+            auditFallback.write(event);
+        } catch (Exception fe) {
+            log.error("认知假设审计兜底同样失败，按 fail-closed 拒绝业务动作: action={} err={}",
+                action, fe.getMessage());
+            throw new BusinessException(503,
+                "COG-503: 审计通道与本地兜底均不可用，操作已拒绝（fail-closed）: action=" + action);
         }
     }
 }

@@ -279,7 +279,7 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
             "SELECT COUNT(1) FROM ecos_business_scenario WHERE id = ? AND is_deleted = 0", Integer.class, id);
     }
 
-    // ═══════════════ 场景心智（ecos_scenario_mind） ═══════════════
+    // ═══════════════ 场景心智（ecos_scenario_mind — 只读；写面已按设计-05 F05-02/W116 停写删除） ═══════════════
 
     /** 心智行映射 — 对应 ScenarioMindService 内部 MIND_MAPPER；行对象由
      * {@link ScenarioMindService} 的私有 PO 承载，此处仅以原始列序列暴露，
@@ -301,55 +301,6 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
         return r;
     };
 
-    public List<Long> listMindIdsByScenarioAndLabel(String scenarioId, String label) {
-        return jdbcTemplate.queryForList(
-            "SELECT id FROM ecos_scenario_mind WHERE scenario_id = ? AND mind_label = ? AND is_deleted = 0",
-            Long.class, scenarioId, label);
-    }
-
-    public Integer selectMindActiveFlag(Long mindId) {
-        List<Integer> rows = jdbcTemplate.query(
-            "SELECT active_mind FROM ecos_scenario_mind WHERE id = ?",
-            (rs, rowNum) -> rs.getInt("active_mind"), mindId);
-        return rows.isEmpty() ? null : rows.get(0);
-    }
-
-    public int updateMindUpsert(String label, int activeMind, String beliefJson, String evidenceJson,
-                                String hypothesisJson, String modelJson, String endpointsJson,
-                                Double confidence, String operator, Long mindId) {
-        return jdbcTemplate.update(
-            "UPDATE ecos_scenario_mind SET mind_label=?, active_mind=?, initial_belief_jsonb=?::jsonb, " +
-            "evidence_refs=?::jsonb, hypothesis_refs=?::jsonb, model_refs=?::jsonb, " +
-            "cognitive_endpoints=?::jsonb, initial_confidence=?, update_time=NOW(), update_by=? " +
-            "WHERE id=? AND is_deleted=0",
-            label, activeMind, beliefJson, evidenceJson, hypothesisJson, modelJson,
-            endpointsJson, confidence, operator, mindId);
-    }
-
-    public int deactivateAllMindsOfScenario(String scenarioId) {
-        return jdbcTemplate.update(
-            "UPDATE ecos_scenario_mind SET active_mind=0, update_time=NOW() WHERE scenario_id=? AND is_deleted=0 AND active_mind=1",
-            scenarioId);
-    }
-
-    public int insertMind(String scenarioId, String label, int activeMind, String beliefJson,
-                          String evidenceJson, String hypothesisJson, String modelJson,
-                          String endpointsJson, Double confidence, String operator) {
-        return jdbcTemplate.update(
-            "INSERT INTO ecos_scenario_mind (scenario_id, mind_label, active_mind, initial_belief_jsonb, " +
-            "evidence_refs, hypothesis_refs, model_refs, cognitive_endpoints, initial_confidence, create_by, update_by) " +
-            "VALUES (?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?)",
-            scenarioId, label, activeMind, beliefJson, evidenceJson, hypothesisJson,
-            modelJson, endpointsJson, confidence, operator, operator);
-    }
-
-    public Long selectLatestMindId(String scenarioId, String label) {
-        List<Long> rows = jdbcTemplate.queryForList(
-            "SELECT id FROM ecos_scenario_mind WHERE scenario_id=? AND mind_label=? AND is_deleted=0 ORDER BY id DESC LIMIT 1",
-            Long.class, scenarioId, label);
-        return rows.isEmpty() ? null : rows.get(0);
-    }
-
     public List<ScenarioMindService.ScenarioMindRawRef> listMindsOfScenario(String scenarioId) {
         return jdbcTemplate.query(
             "SELECT id, scenario_id, mind_label, active_mind, initial_belief_jsonb, " +
@@ -357,55 +308,6 @@ public class WorkspaceDataDao extends JdbcTemplateDaoSupport {
             "create_time, update_time " +
             "FROM ecos_scenario_mind WHERE scenario_id=? AND is_deleted=0 " +
             "ORDER BY (active_mind=1) DESC, mind_label", MIND_ROW_MAPPER, scenarioId);
-    }
-
-    public Integer countMindBelongsToScenario(Long mindId, String scenarioId) {
-        return jdbcTemplate.queryForObject(
-            "SELECT COUNT(1) FROM ecos_scenario_mind WHERE id=? AND scenario_id=? AND is_deleted=0",
-            Integer.class, mindId, scenarioId);
-    }
-
-    public int deactivateScenarioMinds(String operator, String scenarioId) {
-        return jdbcTemplate.update(
-            "UPDATE ecos_scenario_mind SET active_mind=0, update_time=NOW(), update_by=? WHERE scenario_id=? AND is_deleted=0 AND active_mind=1",
-            operator, scenarioId);
-    }
-
-    public int activateMindById(String operator, Long mindId, String scenarioId) {
-        return jdbcTemplate.update(
-            "UPDATE ecos_scenario_mind SET active_mind=1, update_time=NOW(), update_by=? WHERE id=? AND scenario_id=? AND is_deleted=0",
-            operator, mindId, scenarioId);
-    }
-
-    public String selectMindLabel(Long mindId, String scenarioId) {
-        List<String> rows = jdbcTemplate.queryForList(
-            "SELECT mind_label FROM ecos_scenario_mind WHERE id=? AND scenario_id=? AND is_deleted=0",
-            String.class, mindId, scenarioId);
-        return rows.isEmpty() ? null : rows.get(0);
-    }
-
-    public int logicDeleteMind(String operator, Long mindId, String scenarioId) {
-        return jdbcTemplate.update(
-            "UPDATE ecos_scenario_mind SET is_deleted=1, update_time=NOW(), update_by=? WHERE id=? AND scenario_id=? AND is_deleted=0",
-            operator, mindId, scenarioId);
-    }
-
-    public List<Long> listActiveMindIds(String scenarioId) {
-        return jdbcTemplate.queryForList(
-            "SELECT id FROM ecos_scenario_mind WHERE scenario_id=? AND is_deleted=0 AND active_mind=1 LIMIT 1",
-            Long.class, scenarioId);
-    }
-
-    public List<Long> listFirstMindId(String scenarioId) {
-        return jdbcTemplate.queryForList(
-            "SELECT id FROM ecos_scenario_mind WHERE scenario_id=? AND is_deleted=0 ORDER BY create_time LIMIT 1",
-            Long.class, scenarioId);
-    }
-
-    public int activateMindByIdOnly(String operator, Long mindId) {
-        return jdbcTemplate.update(
-            "UPDATE ecos_scenario_mind SET active_mind=1, update_time=NOW(), update_by=? WHERE id=?",
-            operator, mindId);
     }
 
     public List<ScenarioMindService.ScenarioMindRawRef> listActiveMind(String scenarioId) {

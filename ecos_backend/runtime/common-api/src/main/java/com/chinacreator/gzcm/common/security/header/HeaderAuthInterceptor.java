@@ -149,6 +149,8 @@ public class HeaderAuthInterceptor implements HandlerInterceptor {
         if (path.startsWith("/api/v1/health")) return true;
         if (path.startsWith("/api/v1/knowledge/health")) return true;
         if (path.startsWith("/api/v1/engine/health")) return true;
+        // route-manifest：aiming 宿主 GET /api/v1/engine/cognitive/health 匿名面（健康检查匿名）
+        if (path.equals("/api/v1/engine/cognitive/health")) return true;
         return false;
     }
 

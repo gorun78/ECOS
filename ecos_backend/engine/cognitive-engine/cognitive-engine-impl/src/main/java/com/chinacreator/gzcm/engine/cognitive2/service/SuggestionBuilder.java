@@ -3,23 +3,24 @@ package com.chinacreator.gzcm.engine.cognitive2.service;
 import com.chinacreator.gzcm.engine.cognitive2.model.CausalChainNode;
 import com.chinacreator.gzcm.engine.cognitive2.model.CausalChainResult;
 import com.chinacreator.gzcm.engine.cognitive2.model.DiagnosisRequest;
+import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
+import com.chinacreator.gzcm.runtime.llm.scheduler.AgentResult;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * LLM因果推理构建器 — KG覆盖不足时调用ai-engine Agent Loop补充因果链。
+ * LLM因果推理构建器 — KG覆盖不足时经 llm-gateway 补充因果链。
  *
  * <p>从 CausalReasonerServiceImpl 拆出，职责：LLM提示词构建 + Agent调用 + 响应解析 + 工具方法。
+ * <p>F05-15 X-34：LLM 调用唯一通道 = {@code runtime/llm-gateway}（铁律 §2.5-2），
+ * 禁自建 HTTP 客户端直连 agent-loop。
  */
 @Component
 public class SuggestionBuilder {
@@ -30,18 +31,18 @@ public class SuggestionBuilder {
     static final double LLM_CONFIDENCE_MIN = 0.50;
     static final double LLM_CONFIDENCE_MAX = 0.70;
 
-    /** ai-engine Agent Loop 端点 */
-    private static final String AGENT_LOOP_URL = "http://localhost:8080/api/v1/agent-loop/chat";
+    /** llm-gateway 归属子系统 / Agent profile（与 kb-nav 同款 profile 语义） */
+    private static final String LLM_SUBSYSTEM = "aiming";
+    private static final String LLM_PROFILE = "cognitive-causal-supplement";
 
-    private final RestTemplate restTemplate;
+    private static final String SYSTEM_PREAMBLE =
+            "你是一个企业经营诊断专家。根据输入的因果推理提示，分析指标的深层原因，输出JSON格式的因果链。";
+
+    private final ObjectProvider<LLMGatewayService> llmGatewayProvider;
     private final ObjectMapper objectMapper;
 
-    public SuggestionBuilder() {
-        this.restTemplate = new RestTemplate();
-        this.restTemplate.setRequestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
-            setConnectTimeout(30_000);
-            setReadTimeout(120_000);
-        }});
+    public SuggestionBuilder(ObjectProvider<LLMGatewayService> llmGatewayProvider) {
+        this.llmGatewayProvider = llmGatewayProvider;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -99,59 +100,32 @@ public class SuggestionBuilder {
     }
 
     /**
-     * 调用 ai-engine Agent Loop（经营诊断Agent）进行推理。
+     * 经 llm-gateway 执行因果补充 Agent（铁律 §2.5-2；失败抛错，由上层 diagnose 链路降级）。
      */
     String callLlm(String prompt) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("message", prompt);
-        body.put("systemPrompt", "你是一个企业经营诊断专家。根据输入的因果推理提示，分析指标的深层原因，输出JSON格式的因果链。");
-        body.put("temperature", 0.3);
-        body.put("maxTokens", 2048);
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-
+        LLMGatewayService gateway = llmGatewayProvider.getIfAvailable();
+        if (gateway == null) {
+            log.warn("llm-gateway 未装配，因果补充通道不可用");
+            throw new RuntimeException("llm-gateway 不可用: LLMGatewayService 未装配");
+        }
         try {
-            String response = restTemplate.postForObject(AGENT_LOOP_URL, request, String.class);
-            if (response != null) {
-                try {
-                    Map<String, Object> apiResp = objectMapper.readValue(response,
-                            new TypeReference<Map<String, Object>>() {});
-                    Boolean topSuccess = (Boolean) apiResp.get("success");
-                    if (topSuccess != null && !topSuccess) {
-                        String msg = (String) apiResp.getOrDefault("message", "Agent调用失败");
-                        log.warn("ai-engine Agent调用失败: {}", msg);
-                        throw new RuntimeException("Agent调用失败: " + msg);
-                    }
-                    Object data = apiResp.get("data");
-                    if (data instanceof Map) {
-                        Map<?, ?> dataMap = (Map<?, ?>) data;
-                        Boolean dataSuccess = (Boolean) dataMap.get("success");
-                        if (dataSuccess != null && !dataSuccess) {
-                            Object errObj = dataMap.get("errorMsg");
-                            String errMsg = errObj != null ? String.valueOf(errObj) : "Agent推理未完成";
-                            log.warn("ai-engine Agent推理失败: {}", errMsg);
-                            throw new RuntimeException("Agent推理失败: " + errMsg);
-                        }
-                        Object content = dataMap.get("content");
-                        if (content != null && !content.toString().isEmpty()) {
-                            return content.toString();
-                        }
-                    }
-                } catch (RuntimeException e) {
-                    throw e;
-                } catch (Exception e) {
-                    log.debug("解析Agent响应失败: {}", e.getMessage());
-                }
-                return response;
+            AgentResult result = gateway.execute(LLM_SUBSYSTEM, LLM_PROFILE,
+                    SYSTEM_PREAMBLE + "\n\n" + prompt);
+            if (result == null) {
+                throw new RuntimeException("llm-gateway 返回空结果");
             }
-            return "";
+            if (!result.isSuccess()) {
+                String msg = result.getErrorMsg() != null ? result.getErrorMsg() : "Agent推理未完成";
+                log.warn("llm-gateway Agent推理失败: {}", msg);
+                throw new RuntimeException("Agent推理失败: " + msg);
+            }
+            String content = result.getContent();
+            return content != null ? content : "";
+        } catch (RuntimeException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("ai-engine Agent调用失败: {}", e.getMessage());
-            throw new RuntimeException("ai-engine Agent不可用: " + e.getMessage());
+            log.warn("llm-gateway Agent调用异常: {}", e.getMessage());
+            throw new RuntimeException("llm-gateway Agent不可用: " + e.getMessage(), e);
         }
     }
 

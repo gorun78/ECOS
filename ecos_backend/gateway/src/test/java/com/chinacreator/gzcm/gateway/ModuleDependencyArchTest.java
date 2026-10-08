@@ -70,6 +70,22 @@ public class ModuleDependencyArchTest {
     /** H11-T3：字段注入存量基线（gateway/src/test/resources/archunit/field-injection-baseline.txt）。 */
     private static final Set<String> FIELD_INJECTION_BASELINE = loadFieldInjectionBaseline();
 
+    /**
+     * F05-15 X-35：业务包自建 RestTemplate 存量基线
+     * （gateway/src/test/resources/archunit/rest-template-baseline.txt，只减不增；
+     * cognitive2 收口类禁止登记）。
+     */
+    private static final Set<String> REST_TEMPLATE_BASELINE =
+            loadBaseline("archunit/rest-template-baseline.txt");
+
+    /**
+     * F05-15 X-36：业务包自建并发（Executors 工厂 / new Thread）存量基线
+     * （gateway/src/test/resources/archunit/self-schedule-baseline.txt，只减不增；
+     * CognitivePipelineExecutor 已迁 runtime-task 扇出，禁止登记）。
+     */
+    private static final Set<String> SELF_SCHEDULE_BASELINE =
+            loadBaseline("archunit/self-schedule-baseline.txt");
+
     @BeforeAll
     static void setUp() {
         // 1) 优先扫 target/classes（编译态精准）
@@ -400,6 +416,116 @@ public class ModuleDependencyArchTest {
                         "任何赋值/字段声明都会命中此断言）。")
                 .allowEmptyShould(true);
         noScheduledPool.check(allClasses);
+
+        // ── F05-15 X-36 规则 C（字节码）：业务包禁用 Executors 工厂自建线程池 ──
+        // CognitivePipelineExecutor 的 Executors.newFixedThreadPool(4) 已迁 CognitiveRuntimeFanout
+        // （runtime-task 通道），禁止回潮：该类不得登记基线。存量以基线文件登记，只减不增。
+        DescribedPredicate<JavaClass> notInSelfScheduleBaseline =
+                new DescribedPredicate<JavaClass>("不在 F05-15 自建并发存量基线内") {
+                    @Override
+                    public boolean test(JavaClass input) {
+                        return !inBaseline(SELF_SCHEDULE_BASELINE, input.getName());
+                    }
+                };
+        DescribedPredicate<JavaClass> executorsFactory =
+                new DescribedPredicate<JavaClass>("java.util.concurrent.Executors 工厂类") {
+                    @Override
+                    public boolean test(JavaClass input) {
+                        return "java.util.concurrent.Executors".equals(input.getName());
+                    }
+                };
+        ArchRule noExecutorsFactory = noClasses()
+                .that().resideInAnyPackage(businessPackages)
+                .and(notInSelfScheduleBaseline)
+                .should().dependOnClassesThat(executorsFactory)
+                .because("F05-15 X-36 / 铁律 §2.5-3：业务包禁 Executors.new* 自建线程池；" +
+                        "同步扇出经 runtime-task（TaskSchedulerService/ITaskManagementService）或" +
+                        "底座统一 Executor Bean。存量以 self-schedule-baseline.txt 登记，只减不增。")
+                .allowEmptyShould(true);
+        noExecutorsFactory.check(allClasses);
+
+        // ── F05-15 X-36 规则 D（源码兜网）：业务源码禁裸 new Thread( ──
+        // 字节码先行（规则 A/B/C 已覆盖调度与池）；本半区补源码面：Executors 之外的裸线程。
+        // 扫描前跳过注释行（scanForLiteral skipCommentLines=true），Javadoc 里的禁令散文不误报；
+        // archive/legacy 目录不参与。存量登记 self-schedule-baseline.txt（FQCN 由路径推导）。
+        List<Path> threadRoots = businessConcurrencySourceRoots();
+        if (threadRoots.isEmpty()) {
+            System.out.println("[ModuleDependencyArch] SKIP new Thread 源码半区 — backendRoot 未定位");
+        } else {
+            List<String> threadOffenders = new ArrayList<>();
+            for (String hit : scanForLiteral(threadRoots, "new Thread(", true)) {
+                String filePart = hit.substring(0, hit.indexOf(':')).replace('\\', '/');
+                // 只判业务主源码；测试源与 archive/legacy 归档不参与
+                if (!filePart.contains("/src/main/java/")
+                        || filePart.contains("/archive/") || filePart.contains("/legacy/")) {
+                    continue;
+                }
+                String fqcn = sourcePathToFqcn(filePart);
+                if (fqcn != null && inBaseline(SELF_SCHEDULE_BASELINE, fqcn)) {
+                    continue;
+                }
+                threadOffenders.add(hit);
+            }
+            org.junit.jupiter.api.Assertions.assertTrue(threadOffenders.isEmpty(),
+                    "F05-15 X-36 业务源码存在裸 new Thread(（基线外）：\n"
+                            + String.join("\n", threadOffenders));
+        }
+    }
+
+    /**
+     * F05-15（X-35）：业务包禁止自建 {@code org.springframework.web.client.RestTemplate}。
+     *
+     * <p>收口口径（唯一方案，禁第二套）：base-url 一律经 runtime-access
+     * {@code ServiceEndpointResolver.resolve(service, RouteMode)} 双模寻址（route-manifest 单源），
+     * 客户端一律注入各模块 config 包共享 Bean 工厂产出的 RestTemplate
+     * （如 cognitive2 {@code CognitiveRestClientConfig#cognitiveRestTemplate}，
+     * connect 3s / read 10s 超时口径由工厂统一下发）。</p>
+     *
+     * <p><b>豁免</b>：{@code ..config..} 包——共享客户端 Bean 工厂是铁律允许的唯一集中构造点，
+     * 业务 Service 只准构造器注入复用；判据取字节码 {@code getConstructorCallsFromSelf()}
+     * 的调用目标 owner（覆盖 RestTemplate 全部构造重载），比源码 grep 精确且不受注释干扰。</p>
+     *
+     * <p>存量以 {@code archunit/rest-template-baseline.txt} 登记（只减不增）；
+     * cognitive2 收口类（EngineCapabilityRegistryImpl / EntityLinker）禁止登记——
+     * 违者本门禁 FAIL。</p>
+     */
+    @Test
+    void businessMustNotConstructRestTemplate() {
+        DescribedPredicate<JavaClass> subject =
+                new DescribedPredicate<JavaClass>("业务包且非 config 共享客户端工厂、非 RestTemplate 存量基线") {
+                    @Override
+                    public boolean test(JavaClass input) {
+                        String pkg = input.getPackageName();
+                        if (pkg.endsWith(".config") || pkg.contains(".config.")) {
+                            return false; // 共享 Bean 工厂豁免（见方法 Javadoc）
+                        }
+                        return !inBaseline(REST_TEMPLATE_BASELINE, input.getName());
+                    }
+                };
+
+        ArchCondition<JavaClass> noSelfRestTemplate =
+                new ArchCondition<JavaClass>("不 new org.springframework.web.client.RestTemplate") {
+                    @Override
+                    public void check(JavaClass item, ConditionEvents events) {
+                        for (JavaConstructorCall call : item.getConstructorCallsFromSelf()) {
+                            if ("org.springframework.web.client.RestTemplate"
+                                    .equals(call.getTarget().getOwner().getName())) {
+                                events.add(SimpleConditionEvent.violated(item,
+                                        item.getName() + " 自建 RestTemplate（应注入共享 Bean + " +
+                                                "ServiceEndpointResolver 双模寻址，X-35）"));
+                            }
+                        }
+                    }
+                };
+
+        ArchRule rule = noClasses()
+                .that().resideInAnyPackage(businessPackagesForInjection())
+                .and(subject)
+                .should(noSelfRestTemplate)
+                .because("F05-15 X-35：业务包禁自建 RestTemplate/硬编码 localhost 基址；" +
+                        "存量以 rest-template-baseline.txt 登记，只减不增；cognitive2 收口类不在基线")
+                .allowEmptyShould(true);
+        rule.check(allClasses);
     }
 
     /**
@@ -629,11 +755,15 @@ public class ModuleDependencyArchTest {
     // ── H11-T3 基线工具 ─────────────────────────────────────────────────────
 
     private static boolean inFieldInjectionBaseline(String fqcn) {
-        if (FIELD_INJECTION_BASELINE.contains(fqcn)) {
+        return inBaseline(FIELD_INJECTION_BASELINE, fqcn);
+    }
+
+    /** 通用基线成员判定：FQCN 精确命中或内部类（{@code 基线类名$} 前缀）归并命中。 */
+    private static boolean inBaseline(Set<String> baseline, String fqcn) {
+        if (baseline.contains(fqcn)) {
             return true;
         }
-        // 内部类 Outer$Inner 归并到基线登记的 Outer
-        for (String entry : FIELD_INJECTION_BASELINE) {
+        for (String entry : baseline) {
             if (fqcn.startsWith(entry + "$")) {
                 return true;
             }
@@ -641,13 +771,13 @@ public class ModuleDependencyArchTest {
         return false;
     }
 
-    private static Set<String> loadFieldInjectionBaseline() {
+    /** 从 classpath 读取 archunit 基线文件（# 注释行与空行忽略；缺失即启动失败，禁静默空基线）。 */
+    private static Set<String> loadBaseline(String resource) {
         Set<String> out = new HashSet<>();
         try (InputStream in = ModuleDependencyArchTest.class.getClassLoader()
-                .getResourceAsStream("archunit/field-injection-baseline.txt")) {
+                .getResourceAsStream(resource)) {
             if (in == null) {
-                throw new IllegalStateException(
-                        "缺少 H11-T3 基线文件 gateway/src/test/resources/archunit/field-injection-baseline.txt");
+                throw new IllegalStateException("缺少基线文件 gateway/src/test/resources/" + resource);
             }
             try (BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
                 String line;
@@ -659,10 +789,52 @@ public class ModuleDependencyArchTest {
                 }
             }
         } catch (IOException e) {
-            throw new IllegalStateException("读取字段注入基线失败", e);
+            throw new IllegalStateException("读取基线失败: " + resource, e);
         }
-        System.out.println("[ModuleDependencyArch] field-injection baseline entries: " + out.size());
+        System.out.println("[ModuleDependencyArch] baseline " + resource + " entries: " + out.size());
         return out;
+    }
+
+    private static Set<String> loadFieldInjectionBaseline() {
+        return loadBaseline("archunit/field-injection-baseline.txt");
+    }
+
+    /**
+     * F05-15 X-36 源码半区扫描根：engine/services/workspace/gateway 的全部
+     * {@code src/main/java} 目录（runtime 底座与 archive/legacy 不参与，跨平台定位 backendRoot）。
+     */
+    private static List<Path> businessConcurrencySourceRoots() {
+        List<Path> out = new ArrayList<>();
+        Path cur = Paths.get("").toAbsolutePath();
+        Path backendRoot = null;
+        while (cur != null) {
+            if (Files.exists(cur.resolve("pom.xml")) && Files.exists(cur.resolve("gateway"))) {
+                backendRoot = cur;
+                break;
+            }
+            cur = cur.getParent();
+        }
+        if (backendRoot == null) {
+            return out;
+        }
+        for (String rel : new String[]{"engine", "services", "workspace", "gateway"}) {
+            Path dir = backendRoot.resolve(rel).normalize();
+            if (Files.isDirectory(dir)) {
+                out.add(dir);
+            }
+        }
+        return out;
+    }
+
+    /** {@code .../src/main/java/a/b/C.java}（相对或绝对路径均可，用 / 归一）→ FQCN；非 src/main/java 下返回 null。 */
+    private static String sourcePathToFqcn(String path) {
+        String s = path.replace('\\', '/');
+        int idx = s.indexOf("/src/main/java/");
+        if (idx < 0 || !s.endsWith(".java")) {
+            return null;
+        }
+        return s.substring(idx + "/src/main/java/".length(), s.length() - ".java".length())
+                .replace('/', '.');
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -769,6 +941,156 @@ public class ModuleDependencyArchTest {
                 "F04-15 kb 禁反射 Kafka send：kb MAIN 源码含 getMethod(\"send\")（非注释）：\n"
                         + offenders.stream().limit(20).reduce("", (a, b) -> a + "\n" + b)
                         + (offenders.size() > 20 ? "\n... (+" + (offenders.size() - 20) + " more)" : ""));
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // REQ-COG-09 认知域产物写权威单源（PRD-05 §6.4 第四冻结项 · 2026-10-08 详设-05 批）
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * 业务域 {@code ecos_dw} 的写语句形态（DR01 语义下的"直连"：INSERT INTO / UPDATE / DELETE FROM
+     * 直接点名 ecos_dw 本体或 ecos_dw 下的表）。
+     */
+    private static final java.util.regex.Pattern DW_WRITE_SQL = java.util.regex.Pattern.compile(
+            "(?i)\\b(?:INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\s+ecos_dw(?:\\.[a-z0-9_]+)?\\b");
+
+    /** 定位 cognitive 源码根（impl/src/main + api/src/main，与 kbSourceRoots 同纪律）。 */
+    private static List<Path> cognitiveSourceRoots() {
+        List<Path> out = new ArrayList<>();
+        Path cur = Paths.get("").toAbsolutePath();
+        Path backendRoot = null;
+        while (cur != null) {
+            if (Files.exists(cur.resolve("pom.xml")) && Files.exists(cur.resolve("gateway"))) {
+                backendRoot = cur;
+                break;
+            }
+            cur = cur.getParent();
+        }
+        if (backendRoot == null) {
+            return out;
+        }
+        Path impl = backendRoot.resolve("engine/cognitive-engine/cognitive-engine-impl/src/main").normalize();
+        Path api = backendRoot.resolve("engine/cognitive-engine/cognitive-engine-api/src/main").normalize();
+        if (Files.isDirectory(impl)) out.add(impl);
+        if (Files.isDirectory(api)) out.add(api);
+        return out;
+    }
+
+    /**
+     * PRD-05 §6.4 REQ-COG-09 规格 2（第四冻结项，验收标识
+     * {@code mvn -Dtest=ModuleDependencyArchTest#cognitiveDoesNotWriteEcosDwDirectly}）：
+     * 认知域确定性产物只准经 <b>data-engine 唯一写通道</b>
+     * （{@code POST /api/v1/datanet/write-channel}）提交落 {@code ecos_dw}，
+     * cognitive 侧既不能在编译期耦合写通道 owner 的内部类，也不能在源码里写 ecos_dw 的 SQL。
+     *
+     * <p>两半区（与 kb 系列同纪律）：
+     * <ol>
+     *   <li><b>字节码</b>：{@code engine.cognitive..} / {@code engine.cognitive2..} 不得依赖
+     *       {@code engine.data..} 或 {@code services.datanet..}
+     *       （跨引擎写权限 = owner 独有；cognitive 只用 REST 说话）；</li>
+     *   <li><b>源码</b>：cognitive src/main（注释剥离后）零 {@code ecos_dw} 写语句。</li>
+     * </ol>
+     *
+     * <p><b>本门禁能证什么、不能证什么（诚实边界）</b>：钉的是"不经 Java 依赖或 SQL 直连 ecos_dw"
+     * 这条静态不变量；产物表 V197 的库侧落点实测（SELECT catalog / 行数）属需求检视报告 §14.4
+     * 未授权项 ⇒ 该半项记<b>「未执行」</b>，静态面由
+     * {@code DeterministicForecastArtifactTest#resultsLandInEcosDwNotEngineSchema} 承担。
+     */
+    @Test
+    void cognitiveDoesNotWriteEcosDwDirectly() {
+        ArchRule rule = noClasses()
+            .that().resideInAnyPackage(
+                    "com.chinacreator.gzcm.engine.cognitive..",
+                    "com.chinacreator.gzcm.engine.cognitive2..")
+            .should().dependOnClassesThat()
+            .resideInAnyPackage(
+                    "com.chinacreator.gzcm.engine.data..",
+                    "com.chinacreator.gzcm.services.datanet..")
+            .because("REQ-COG-09 规格 2 / ADR-14 / ST08：确定性产物只经 data-engine 唯一写通道 REST 提交，"
+                    + "cognitive 禁编译期依赖 data-engine 或 datanet 内部类以直写 ecos_dw")
+            .allowEmptyShould(true);
+        rule.check(allClasses);
+
+        List<Path> roots = cognitiveSourceRoots();
+        if (roots.isEmpty()) {
+            System.out.println("[cognitiveDoesNotWriteEcosDwDirectly] SKIP — cognitive 源码根未找到（未构建）");
+            return;
+        }
+        List<String> offenders = new ArrayList<>();
+        for (Path root : roots) {
+            try (java.util.stream.Stream<Path> walk = Files.walk(root)) {
+                List<Path> files = walk.filter(Files::isRegularFile)
+                        .filter(p -> p.toString().endsWith(".java") || p.toString().endsWith(".xml"))
+                        .toList();
+                for (Path p : files) {
+                    String code = stripCommentsForScan(p, readSourceUtf8(p));
+                    java.util.regex.Matcher m = DW_WRITE_SQL.matcher(code);
+                    while (m.find()) {
+                        offenders.add(root.relativize(p) + ":" + lineNumberOf(code, m.start())
+                                + " | " + m.group());
+                    }
+                }
+            } catch (IOException e) {
+                // 根目录不可读 — 视为无内容（与 scanForLiteral 同口径）
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertTrue(offenders.isEmpty(),
+                "REQ-COG-09 cognitive 直写 ecos_dw（绕 data-engine 唯一写通道，ST08）：\n"
+                        + offenders.stream().limit(20).reduce("", (a, b) -> a + "\n" + b)
+                        + (offenders.size() > 20 ? "\n... (+" + (offenders.size() - 20) + " more)" : ""));
+    }
+
+    /**
+     * 注释剥离后返回可扫描文本：{@code .java} 去单行/块注释，{@code .xml}（Mapper）去
+     * {@code <!-- -->} 文档注释。目的只有一个 —— 避免 Javadoc/注释里的历史性写法造成假阳。
+     */
+    private static String stripCommentsForScan(Path p, String src) {
+        boolean xml = p.toString().endsWith(".xml");
+        StringBuilder sb = new StringBuilder(src.length());
+        int i = 0;
+        while (i < src.length()) {
+            char c = src.charAt(i);
+            if (!xml && c == '/' && i + 1 < src.length() && src.charAt(i + 1) == '/') {
+                while (i < src.length() && src.charAt(i) != '\n') {
+                    i++;
+                }
+                continue;
+            }
+            if (xml && c == '<' && src.startsWith("<!--", i)) {
+                int end = src.indexOf("-->", i + 4);
+                i = (end < 0) ? src.length() : end + 3;
+                sb.append(' ');
+                continue;
+            }
+            if (!xml && c == '/' && i + 1 < src.length() && src.charAt(i + 1) == '*') {
+                int end = src.indexOf("*/", i + 2);
+                i = (end < 0) ? src.length() : end + 2;
+                sb.append(' ');
+                continue;
+            }
+            sb.append(c);
+            i++;
+        }
+        return sb.toString();
+    }
+
+    private static int lineNumberOf(String src, int offset) {
+        int line = 1;
+        for (int i = 0; i < offset && i < src.length(); i++) {
+            if (src.charAt(i) == '\n') {
+                line++;
+            }
+        }
+        return line;
+    }
+
+    /** 宽松 UTF-8 读（存量 pom.xml 非 UTF-8，严格解码会抛 MalformedInputException 使门禁假崩）。 */
+    private static String readSourceUtf8(Path p) {
+        try {
+            return new String(Files.readAllBytes(p), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return "";
+        }
     }
 
     /**

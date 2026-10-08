@@ -2,7 +2,7 @@
  * 引擎监控探针 REST 收口 (H6-T2) — 自 EngineMonitor / MonitoringCenter /
  * DataAssetsDashboard 迁入，401/403/解包语义逐字保持。
  */
-import { authHeaders } from "./auth";
+import { authHeaders, clearAuthToken } from "./auth";
 import { NoAccessError } from "./httpClient";
 
 /** 原 EngineMonitor.apiFetch */
@@ -11,7 +11,7 @@ export async function engineMonitorFetch<T = any>(url: string): Promise<T> {
   if (res.status === 401) {
     // Token expired/invalid → clear auth & re-login (AM-30 event,
     // PMO-43 T4, same behaviour as api.ts handleAuthExpired).
-    localStorage.removeItem('token');
+    clearAuthToken();
     window.location.hash = '#/login';
     throw new Error('HTTP_401');
   }
@@ -39,7 +39,7 @@ export async function monitoringCenterFetch<T>(url: string, id?: string): Promis
     const res = await fetch(url, { headers: authHeaders() });
     if (res.status === 401) {
       // Login expired — force re-login (PMO-43 T4).
-      localStorage.removeItem("token");
+      clearAuthToken();
       window.location.hash = "#/login";
       return null;
     }

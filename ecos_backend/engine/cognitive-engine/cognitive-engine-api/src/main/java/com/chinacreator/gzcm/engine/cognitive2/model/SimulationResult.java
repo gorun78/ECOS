@@ -16,6 +16,10 @@ public class SimulationResult {
     private List<String> assumptions;
     private double confidence;
     private String summary;
+    /** 设计-05 F05-10 要点2：RAG 推演通道一律探索式非核算口径，金额字段禁出现在本响应。 */
+    private boolean exploratory = true;
+    /** 设计-05 D.3：探索通道口径声明，恒 {@code NON_ACCOUNTING}（UI 据此显示"非核算口径"）。 */
+    private String caliber = com.chinacreator.gzcm.engine.cognitive.api.CognitiveContractSchema.CALIBER_NON_ACCOUNTING;
     public SimulationResult() {}
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -41,4 +45,8 @@ public class SimulationResult {
     public void setConfidence(double confidence) { this.confidence = confidence; }
     public String getSummary() { return summary; }
     public void setSummary(String summary) { this.summary = summary; }
+    public boolean isExploratory() { return exploratory; }
+    public void setExploratory(boolean exploratory) { this.exploratory = exploratory; }
+    public String getCaliber() { return caliber; }
+    public void setCaliber(String caliber) { this.caliber = caliber; }
 }

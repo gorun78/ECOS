@@ -514,5 +514,8 @@
   "systemConfig.key.maxLoginAttempts": "Max Login Attempts",
   "systemConfig.key.lockoutMins": "Lockout Duration (min)",
   "systemConfig.key.maxConcurrentSessions": "Max Concurrent Sessions",
-  "common.loading": "Loading..."
+  "common.loading": "Loading...",
+  "common.select": "Select",
+  "common.prev": "Previous",
+  "common.next": "Next"
 }

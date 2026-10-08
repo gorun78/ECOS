@@ -17,20 +17,28 @@ import java.util.concurrent.*;
  *
  * <p>对齐 Semantica pipeline/，翻译成 Java。复用 data-engine Kahn 拓扑思路，
  * 补重试/并行/验证三件。编排的是 KAG 已有能力，不新建引擎。</p>
+ *
+ * <p>F05-15（铁律 §2.5.3）：层内并行统一委托 {@link CognitiveRuntimeFanout}（runtime-task 通道），
+ * 移除自建 {@code Executors.newFixedThreadPool(4)}（X-36）；execute() 保持同步返回契约。</p>
  */
 @Service
 public class CognitivePipelineExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(CognitivePipelineExecutor.class);
 
+    /** 单层扇出的整体等待上限（毫秒）：跨引擎 REST 节点自带降级，留足重试余量（3 次 × 退避 + 网络）。 */
+    private static final long LAYER_TIMEOUT_MS = 120_000L;
+
     private final EngineCapabilityRegistry capabilityRegistry;
-    private final ExecutorService parallelPool = Executors.newFixedThreadPool(4);
+    private final CognitiveRuntimeFanout fanout;
 
     /** 执行记录存储（内存，后续可持久化） */
     private final Map<String, PipelineExecution> executions = new ConcurrentHashMap<>();
 
-    public CognitivePipelineExecutor(EngineCapabilityRegistry capabilityRegistry) {
+    public CognitivePipelineExecutor(EngineCapabilityRegistry capabilityRegistry,
+                                     CognitiveRuntimeFanout fanout) {
         this.capabilityRegistry = capabilityRegistry;
+        this.fanout = fanout;
     }
 
     // ════════════════════════════════════════════════════
@@ -55,19 +63,18 @@ public class CognitivePipelineExecutor {
         List<String> topoOrder = kahnTopologicalSort(pipeline);
         exec.log("Topological order: " + topoOrder);
 
-        // 3. 按拓扑层级并行执行
+        // 3. 按拓扑层级并行执行（按入度分层，同层经 runtime-task 扇出并行）
         Map<String, Map<String, Object>> nodeOutputs = new ConcurrentHashMap<>();
         Map<String, String> nodeStatuses = exec.getNodeStatuses();
 
-        // 按入度分层，同层并行
         List<List<String>> layers = computeLayers(pipeline, topoOrder);
         for (int i = 0; i < layers.size(); i++) {
             List<String> layer = layers.get(i);
             exec.log("Executing layer " + i + ": " + layer + (layer.size() > 1 ? " (parallel)" : ""));
 
-            List<CompletableFuture<Void>> futures = new ArrayList<>();
+            CognitiveRuntimeFanout.Group group = fanout.group("layer-" + i);
             for (String nodeId : layer) {
-                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                group.step(nodeId, () -> {
                     CognitivePipelineNode node = findNode(pipeline, nodeId);
                     nodeStatuses.put(nodeId, "RUNNING");
                     exec.log("Node " + nodeId + " (" + node.getNodeType() + ") -> RUNNING");
@@ -90,13 +97,19 @@ public class CognitivePipelineExecutor {
                         nodeStatuses.put(nodeId, "FAILED");
                         exec.log("Node " + nodeId + " -> FAILED (all retries exhausted)");
                     }
-                }, parallelPool);
-
-                futures.add(future);
+                    return Boolean.TRUE;
+                });
             }
 
-            // 等待本层全部完成
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            // 等待本层全部完成（扇出通道内收敛，保持同步契约）
+            Map<String, CognitiveRuntimeFanout.StepResult> stepResults = group.awaitAll(LAYER_TIMEOUT_MS);
+            for (String nodeId : layer) {
+                CognitiveRuntimeFanout.StepResult sr = stepResults.get(nodeId);
+                if (sr != null && !sr.isOk() && !"SUCCEEDED".equals(nodeStatuses.get(nodeId))) {
+                    nodeStatuses.put(nodeId, "FAILED");
+                    exec.log("Node " + nodeId + " -> FAILED (fanout " + sr.getState() + ")");
+                }
+            }
 
             // 检查本层是否有失败节点 → 整体失败
             boolean layerFailed = layer.stream().anyMatch(id -> "FAILED".equals(nodeStatuses.get(id)));
@@ -105,7 +118,13 @@ public class CognitivePipelineExecutor {
                 return exec;
             }
 
-            // 收集本层输出（在 executeWithRetry 中已存入 nodeOutputs）
+            // 收集本层输出（executeWithRetry 写入 exec.nodeOutputs，汇入供下游节点 context 消费）
+            for (String nodeId : layer) {
+                Map<String, Object> out = exec.getNodeOutputs().get(nodeId);
+                if (out != null) {
+                    nodeOutputs.put(nodeId, out);
+                }
+            }
         }
 
         exec.succeed();

@@ -54,17 +54,20 @@ public class KnowledgeReasonerService {
     private final KnowledgeGraphService graphService;
     private final SpelConditionEvaluator spelEvaluator;
     private final ReasoningPathBuilder reasoningPathBuilder;
+    private final CognitiveRuntimeFanout fanout;
 
     public KnowledgeReasonerService(ComplianceRuleProvider ruleMapper,
                                     KnowledgeRetrievalService retrievalService,
                                     KnowledgeGraphService graphService,
                                     SpelConditionEvaluator spelEvaluator,
-                                    ReasoningPathBuilder reasoningPathBuilder) {
+                                    ReasoningPathBuilder reasoningPathBuilder,
+                                    CognitiveRuntimeFanout fanout) {
         this.ruleMapper = ruleMapper;
         this.retrievalService = retrievalService;
         this.graphService = graphService;
         this.spelEvaluator = spelEvaluator;
         this.reasoningPathBuilder = reasoningPathBuilder;
+        this.fanout = fanout;
     }
 
     /**
@@ -327,37 +330,18 @@ public class KnowledgeReasonerService {
         long hybridStart = System.currentTimeMillis();
         log.info("HYBRID: objectType={}, semanticQuery={}", sq.getObjectType(), sq.getSemanticQuery());
 
-        // 并行三路执行（CompletableFuture + 超时10秒）
-        CompletableFuture<ReasonerResult> kgFuture = CompletableFuture
-                .supplyAsync(() -> executeKgQuery(sq))
-                .orTimeout(HYBRID_TIMEOUT_SEC, TimeUnit.SECONDS)
-                .exceptionally(ex -> {
-                    log.warn("HYBRID KG 路超时或异常: {}", ex.getMessage());
-                    return degradedResult("KG", ex, sq.getCypher() != null ? sq.getCypher() : "", KG_WEIGHT);
-                });
+        // F05-15（铁律 §2.5.3）：三路并行统一经 runtime-task 扇出通道，移除 CompletableFuture.supplyAsync 隐式公共池
+        CognitiveRuntimeFanout.Group group = fanout.group("hybrid");
+        group.step("KG", () -> executeKgQuery(sq));
+        group.step("RULE", () -> executeRuleCheck(sq));
+        group.step("RAG", () -> executeVectorRag(sq));
+        Map<String, CognitiveRuntimeFanout.StepResult> hybridSteps =
+                group.awaitAll(HYBRID_TIMEOUT_SEC * 1000L);
 
-        CompletableFuture<ReasonerResult> ruleFuture = CompletableFuture
-                .supplyAsync(() -> executeRuleCheck(sq))
-                .orTimeout(HYBRID_TIMEOUT_SEC, TimeUnit.SECONDS)
-                .exceptionally(ex -> {
-                    log.warn("HYBRID RULE 路超时或异常: {}", ex.getMessage());
-                    return degradedResult("RULE", ex, sq.getObjectType(), RULE_WEIGHT);
-                });
-
-        CompletableFuture<ReasonerResult> ragFuture = CompletableFuture
-                .supplyAsync(() -> executeVectorRag(sq))
-                .orTimeout(HYBRID_TIMEOUT_SEC, TimeUnit.SECONDS)
-                .exceptionally(ex -> {
-                    log.warn("HYBRID RAG 路超时或异常: {}", ex.getMessage());
-                    return degradedResult("RAG", ex, sq.getSemanticQuery(), RAG_WEIGHT);
-                });
-
-        // 等待全部完成（或降级）
-        CompletableFuture.allOf(kgFuture, ruleFuture, ragFuture).join();
-
-        ReasonerResult kgResult   = kgFuture.join();
-        ReasonerResult ruleResult = ruleFuture.join();
-        ReasonerResult ragResult  = ragFuture.join();
+        ReasonerResult kgResult   = hybridRouteResult(hybridSteps, "KG",
+                sq.getCypher() != null ? sq.getCypher() : "", KG_WEIGHT);
+        ReasonerResult ruleResult = hybridRouteResult(hybridSteps, "RULE", sq.getObjectType(), RULE_WEIGHT);
+        ReasonerResult ragResult  = hybridRouteResult(hybridSteps, "RAG", sq.getSemanticQuery(), RAG_WEIGHT);
 
         // 汇总子查询
         List<String> allSubQueries = new ArrayList<>();
@@ -469,6 +453,27 @@ public class KnowledgeReasonerService {
                 target.add(new LinkedHashMap<>(s));
             }
         }
+    }
+
+    /**
+     * 取扇出单路结果：OK → 原结果；TIMEOUT/FAILED/缺失 → 既有降级结果语义
+     * （F05-15 收敛：并行统一走 runtime-task 通道，超时/异常口径与原 orTimeout+exceptionally 一致）。
+     */
+    private ReasonerResult hybridRouteResult(Map<String, CognitiveRuntimeFanout.StepResult> steps,
+                                             String route, String context, double weight) {
+        CognitiveRuntimeFanout.StepResult sr = steps.get(route);
+        if (sr != null && sr.isOk() && sr.getValue() instanceof ReasonerResult ok) {
+            return ok;
+        }
+        Throwable ex;
+        if (sr == null || sr.getState() == CognitiveRuntimeFanout.StepState.TIMEOUT) {
+            ex = new TimeoutException("hybrid route timeout: " + route);
+        } else {
+            ex = sr.getError() != null ? sr.getError()
+                    : new IllegalStateException("hybrid route failed: " + route);
+        }
+        log.warn("HYBRID {} 路超时或异常: {}", route, ex.getMessage());
+        return degradedResult(route, ex, context, weight);
     }
 
     /** 构造降级结果（超时或异常时使用） */

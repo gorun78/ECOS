@@ -514,5 +514,8 @@
   "systemConfig.key.maxLoginAttempts": "最大登录尝试次数",
   "systemConfig.key.lockoutMins": "锁定持续时间（分钟）",
   "systemConfig.key.maxConcurrentSessions": "最大并发会话数",
-  "common.loading": "加载中..."
+  "common.loading": "加载中...",
+  "common.select": "请选择",
+  "common.prev": "上一页",
+  "common.next": "下一页"
 }

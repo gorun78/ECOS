@@ -24,6 +24,7 @@
  */
 
 import { apiFetchData } from "../api";
+import { getAuthToken } from "./auth";
 import type {
   KnowledgeGraphResponse,
   Entity,
@@ -777,7 +778,8 @@ export async function createExportTask(data: CreateExportDTO) {
 }
 
 export async function downloadExport(id: string): Promise<void> {
-  const token = localStorage.getItem("token") || "";
+  // auth 单源（X-51）
+  const token = getAuthToken();
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${EXPORT_BASE}/${id}/download`, { headers });

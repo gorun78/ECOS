@@ -2,8 +2,11 @@
  * ECOS 场景与项目综合调度中心（PMO-53 T1/T2：真实 API + scenario i18n namespace）。
  *
  * <p>场景数据来自 {@code /api/v1/workspace/scenarios}（ecos_business_scenario 表），
- * 不再使用 localStorage mock；新增「认知诊断与预测」Tab（CognitionPanel）发起
- * {@code POST /api/v1/workspace/scenarios/{id}/runs} 运行编排。</p>
+ * 不再使用 localStorage mock；「认知」Tab 双区并置：左侧 {@code CognitionPanel} 经
+ * {@code POST /api/v1/workspace/scenarios/{id}/runs} 发起运行编排，右侧
+ * {@code CognitiveRightPanel} 是认知四卡（E1~E4 契约）唯一渲染入口（design-05 B.0/B.5）。
+ * Git 版本 UI 一律走 {@code services/gitService} 单一通道（经 GitPanel，只传 repositoryId），
+ * 原假 git push 动画与 {@code ecos_cached_git_*} localStorage 伪持久化已删除（F05-17/B.9-5）。</p>
  */
 import React, { useEffect, useState } from 'react';
 import LucideIcon from '../components/LucideIcon';
@@ -11,6 +14,7 @@ import { useLanguage } from '../components/LanguageContext';
 import { showToastGlobal } from '../components/common/Toast';
 import { useTheme } from '../components/ThemeContext';
 import { CopilotPanel } from '../components/CopilotPanel';
+import GitPanel from '../components/data-workbench/GitPanel';
 import { apiFetchData } from '../api';
 import type { BusinessScenario } from './project-workbench/types';
 import { calcMetrics } from './project-workbench/helpers';
@@ -18,11 +22,12 @@ import { threatRadarData, efficiencyData } from './project-workbench/data';
 import FusionMatrixTab from './project-workbench/tabs/FusionMatrixTab';
 import DecisionDeskTab from './project-workbench/tabs/DecisionDeskTab';
 import MetricsTab from './project-workbench/tabs/MetricsTab';
-import GitVersionTab from './project-workbench/tabs/GitVersionTab';
 import ScenarioList from './scenario/ScenarioList';
 import ScenarioEditor, { type WizardState } from './scenario/ScenarioEditor';
 import SimulationResultPanel from './scenario/SimulationResultPanel';
 import CognitionPanel from './scenario/CognitionPanel';
+import CognitiveRightPanel from './scenario/cognition/CognitiveRightPanel';
+import { COGNITION_POLL_INTERVAL_MS } from '../services/cognitiveClient';
 
 /** 后端场景 VO（含业务目标，前端 BusinessScenario 展示同形） */
 interface ScenarioApiVO {
@@ -98,7 +103,6 @@ function toVM(vo: ScenarioApiVO): BusinessScenario {
   };
 }
 
-const BRANCH_DEFAULTS: Record<string, string> = { scen_summer_rush: 'main', scen_pilot_audit: 'main', scen_evtol_sandbox: 'main' };
 const TABS = ['fusion', 'decision', 'metrics', 'cognition', 'git'] as const;
 type TabKey = (typeof TABS)[number];
 
@@ -135,17 +139,6 @@ export default function ScenarioManagementView({
   const [wAiAgents, setWAiAgents] = useState<string[]>([]);
   const [wInterfaces, setWInterfaces] = useState<string[]>([]);
   const [wSecurityPolicies, setWSecurityPolicies] = useState<string[]>([]);
-  const [gitCommits, setGitCommits] = useState<{ [scenarioId: string]: any[] }>(() =>
-    JSON.parse(localStorage.getItem('ecos_cached_git_commits') || '{}') || {},
-  );
-  const [gitBranches, setGitBranches] = useState<{ [scenarioId: string]: string }>(() =>
-    JSON.parse(localStorage.getItem('ecos_cached_git_branches') || '{}') || BRANCH_DEFAULTS,
-  );
-  const [selectedCommitId, setSelectedCommitId] = useState<string | null>(null);
-  const [gitCommitMsg, setGitCommitMsg] = useState('');
-  const [gitTerminalLogs, setGitTerminalLogs] = useState<string[]>([]);
-  const [isGitPushing, setIsGitPushing] = useState(false);
-  const [gitViewMode, setGitViewMode] = useState<'visual' | 'json'>('visual');
   const [proposals, setProposals] = useState<any[]>([]);
   const [isLoadingProposals, setIsLoadingProposals] = useState(false);
   const [resolvingProposalId, setResolvingProposalId] = useState<string | null>(null);
@@ -178,13 +171,6 @@ export default function ScenarioManagementView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('ecos_cached_git_commits', JSON.stringify(gitCommits));
-  }, [gitCommits]);
-  useEffect(() => {
-    localStorage.setItem('ecos_cached_git_branches', JSON.stringify(gitBranches));
-  }, [gitBranches]);
-
   // ── Proposals（对账提案，走后端实时接口） ──
   const fetchProposalsList = async () => {
     setIsLoadingProposals(true);
@@ -199,7 +185,7 @@ export default function ScenarioManagementView({
   };
   useEffect(() => {
     fetchProposalsList();
-    const timer = setInterval(fetchProposalsList, 10000);
+    const timer = setInterval(fetchProposalsList, COGNITION_POLL_INTERVAL_MS);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -383,20 +369,6 @@ export default function ScenarioManagementView({
         });
         toast('success', t('scenario.cog.createSuccess', { name: wName }));
         setSelectedScenarioId(created?.id ?? '');
-        setGitCommits((prev) => ({
-          ...prev,
-          [created?.id ?? '']: [
-            {
-              id: `c_${Date.now()}`,
-              hash: Math.random().toString(16).substring(2, 9),
-              author: 'Wizard_Init',
-              date: new Date().toISOString().replace('T', ' ').substring(0, 19),
-              message: `feat: 初始化场景「${wName}」`,
-              bindings: body,
-            },
-          ],
-        }));
-        setGitBranches((prev) => ({ ...prev, [created?.id ?? '']: 'main' }));
       }
       await refreshScenarios();
       setShowWizardModal(false);
@@ -406,77 +378,8 @@ export default function ScenarioManagementView({
     }
   };
 
-  // ── Git 版本控制（演示数据，仅本地状态） ──
-  const handleGitCommitManual = (msg: string) => {
-    if (!msg.trim() || !activeScenario) {
-      return;
-    }
-    const nc = {
-      id: `c_${Date.now()}`,
-      hash: Math.random().toString(16).substring(2, 9),
-      author: 'AOC_Admin',
-      date: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      message: msg.trim(),
-      bindings: { ...activeScenario.bindings },
-    };
-    setGitCommits((prev) => ({ ...prev, [selectedScenarioId]: [...(prev[selectedScenarioId] || []), nc] }));
-    setGitCommitMsg('');
-    toast('success', `📦 Git 提交成功！${nc.hash}`);
-  };
-
-  const handleGitCheckoutCommit = (commit: any) => {
-    if (!commit || !activeScenario) return;
-    const wB = commit.bindings ?? {};
-    const m = calcMetrics(
-      wB.datasets || [], wB.objectTypes || [], wB.knowledgeBases || [],
-      wB.aiAgents || [], wB.interfaces || [], wB.securityPolicies || [],
-    );
-    setScenarios((prev) =>
-      prev.map((s) =>
-        s.id === selectedScenarioId
-          ? {
-              ...s,
-              bindings: {
-                datasets: wB.datasets || [],
-                objectTypes: wB.objectTypes || [],
-                knowledgeBases: wB.knowledgeBases || [],
-                aiAgents: wB.aiAgents || [],
-                interfaces: wB.interfaces || [],
-                securityPolicies: wB.securityPolicies || [],
-              },
-              metrics: m,
-            }
-          : s,
-      ),
-    );
-    toast('success', `🔮 已回滚至 ${commit.hash}`);
-  };
-
-  const handleSwitchGitBranch = (branchName: string) => {
-    setGitBranches((prev) => ({ ...prev, [selectedScenarioId]: branchName }));
-    toast('info', `🔀 已切换至分支 [${branchName}]`);
-  };
-
-  const handleGitPushRemote = () => {
-    if (isGitPushing) return;
-    setIsGitPushing(true);
-    setGitTerminalLogs([
-      '$ git remote -v',
-      'origin  gitlab.ecos.internal:aviation-dispatch/scenarios.git (fetch)',
-      'origin  gitlab.ecos.internal:aviation-dispatch/scenarios.git (push)',
-      '$ git status',
-      `On branch ${gitBranches[selectedScenarioId] || 'main'}`,
-      `Your branch is ahead by ${gitCommits[selectedScenarioId]?.length || 1} commits.`,
-      `$ git push origin ${gitBranches[selectedScenarioId] || 'main'}`,
-      '🔐 [MFA Signature Verified] AOC_DIRECTOR certificate approved.',
-    ]);
-    setTimeout(() => setGitTerminalLogs((prev) => [...prev, 'Enumerating objects: 7, done.', 'Counting objects: 100% (7/7), done.', 'Compressing objects: 100% (4/4), done.']), 1000);
-    setTimeout(() => {
-      setGitTerminalLogs((prev) => [...prev, 'Writing objects: 100% (4/4), done.', 'To gitlab.ecos.internal:aviation-dispatch/scenarios.git', '🟢 ECOS 云底座要素库配置冻结成功！']);
-      setIsGitPushing(false);
-      toast('success', '🚀 ECOS 云端同步完成！');
-    }, 2500);
-  };
+  // ── Git 版本控制：一律经 services/gitService 单一通道（GitPanel，只传 repositoryId），
+  //    原假 push 动画 / 本地伪造 commit / localStorage 缓存已全部删除（design-05 B.9-5）──
 
   const wizard: WizardState = {
     showWizardModal,
@@ -528,12 +431,12 @@ export default function ScenarioManagementView({
       <div className={`p-4 ${styles.cardBg} border-b ${styles.cardBorder} shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4`}>
         <div>
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-md bg-indigo-600 text-white flex items-center justify-center">
+            <span className={`p-1.5 rounded-md ${styles.accentBg} ${styles.cardText} flex items-center justify-center`}>
               <LucideIcon name="Briefcase" size={16} />
             </span>
-            <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            <h1 className={`text-lg font-bold tracking-tight ${styles.appText} flex items-center gap-2`}>
               {t('scenario.page.title')}{' '}
-              <span className="text-[10px] bg-indigo-900/60 border border-indigo-700/50 px-2 py-0.5 rounded text-indigo-300 font-bold tracking-widest uppercase">
+              <span className={`text-[10px] border px-2 py-0.5 rounded font-bold tracking-widest uppercase ${styles.badgeBg} ${styles.accentText} ${styles.cardBorder}`}>
                 Executive Cockpit
               </span>
             </h1>
@@ -541,14 +444,14 @@ export default function ScenarioManagementView({
           <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{t('scenario.page.subtitle')}</p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center max-w-2xl w-full md:w-auto">
-          <KpiBox styles={styles} label={t('scenario.kpi.total')} value={`${scenarios.length}`} suffix={t('scenario.kpi.unit')} extra={t('scenario.kpi.activeExtra', { n: activeCount })} color="text-blue-400" />
-          <KpiBox styles={styles} label={t('scenario.kpi.budget')} value="¥2.85M" color="text-indigo-400" />
-          <KpiBox styles={styles} label={t('scenario.kpi.block')} value="100%" color="text-emerald-400" />
-          <KpiBox styles={styles} label={t('scenario.kpi.settle')} value="2.8s" suffix={<span className="text-xs font-normal text-emerald-400">(-93.7%)</span>} color="text-amber-400" />
+          <KpiBox styles={styles} label={t('scenario.kpi.total')} value={`${scenarios.length}`} suffix={t('scenario.kpi.unit')} extra={t('scenario.kpi.activeExtra', { n: activeCount })} color={styles.infoText} />
+          <KpiBox styles={styles} label={t('scenario.kpi.budget')} value="¥2.85M" color={styles.accentText} />
+          <KpiBox styles={styles} label={t('scenario.kpi.block')} value="100%" color={styles.successText} />
+          <KpiBox styles={styles} label={t('scenario.kpi.settle')} value="2.8s" suffix={<span className={`text-xs font-normal ${styles.successText}`}>(-93.7%)</span>} color={styles.warningText} />
           <div className="col-span-2 sm:col-span-4 flex justify-end mt-1">
             <button
               onClick={() => setShowCopilot(!showCopilot)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded border transition-colors cursor-pointer text-xs font-bold ${showCopilot ? 'bg-blue-600 text-white border-blue-500' : `${styles.cardBg} ${styles.cardTextMuted} border-[var(--border)] hover:opacity-80`}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded border transition-colors cursor-pointer text-xs font-bold ${showCopilot ? `${styles.accentBg} ${styles.cardText} ${styles.accentBorder}` : `${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder} hover:opacity-80`}`}
             >
               <LucideIcon name="MessageSquare" size={12} />
               {showCopilot ? t('scenario.copilot.close') : t('scenario.copilot.open')}
@@ -580,26 +483,26 @@ export default function ScenarioManagementView({
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] bg-emerald-950 border border-emerald-900 px-2 py-0.5 rounded text-emerald-400 font-mono font-bold">
+                    <span className={`text-[10px] border px-2 py-0.5 rounded font-mono font-bold ${styles.successBg} ${styles.successText} ${styles.successBorder}`}>
                       ACTIVE SCENARIO
                     </span>
                     <span className={`text-xs font-semibold ${styles.cardTextMuted} font-mono`}>ID: {activeScenario.id}</span>
                   </div>
-                  <h2 className="text-base font-extrabold text-white mt-1">{activeScenario.name}</h2>
+                  <h2 className={`text-base font-extrabold ${styles.cardText} mt-1`}>{activeScenario.name}</h2>
                   <p className={`text-xs ${styles.cardTextMuted} mt-1 max-w-4xl leading-relaxed`}>{activeScenario.description}</p>
                 </div>
                 <div className="flex flex-col gap-2 items-end self-end sm:self-start shrink-0">
                   <span className={`text-xs ${styles.cardTextMuted}`}>
                     {t('scenario.dept')}：{' '}
-                    <span className="text-xs bg-[var(--card,#1E293B)] border border-[var(--card,#334155)] px-2.5 py-1 rounded font-bold text-[var(--card,#E2E8F0)]">
+                    <span className={`text-xs border px-2.5 py-1 rounded font-bold ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}>
                       {activeScenario.department}
                     </span>
                   </span>
                   <button
                     onClick={() => openEditWizard(activeScenario)}
-                    className="px-3 py-1 bg-indigo-600/20 hover:bg-indigo-600 border border-indigo-500/30 text-indigo-300 hover:text-white text-[11px] font-bold rounded flex items-center gap-1 transition-all cursor-pointer shadow-xs"
+                    className={`px-3 py-1 border ${styles.accentBorder} ${styles.accentBg} ${styles.cardText} text-[11px] font-bold rounded flex items-center gap-1 transition-all cursor-pointer shadow-xs hover:opacity-90`}
                   >
-                    <LucideIcon name="Settings" size={11} className="text-indigo-400" />
+                    <LucideIcon name="Settings" size={11} />
                     {t('scenario.editBtn')}
                   </button>
                 </div>
@@ -607,15 +510,15 @@ export default function ScenarioManagementView({
               <div className={`grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4 pt-3 border-t ${styles.cardBorder} text-xs font-mono`}>
                 <div>
                   <span className={`${styles.cardTextMuted} text-[10px] block`}>{t('scenario.budget')}</span>
-                  <span className="text-sm font-bold text-indigo-400">{activeScenario.budget}</span>
+                  <span className={`text-sm font-bold ${styles.accentText}`}>{activeScenario.budget}</span>
                 </div>
                 <div>
                   <span className={`${styles.cardTextMuted} text-[10px] block`}>{t('scenario.safetyTarget')}</span>
-                  <span className="text-sm font-bold text-teal-400">{activeScenario.safetyIndexTarget}</span>
+                  <span className={`text-sm font-bold ${styles.infoText}`}>{activeScenario.safetyIndexTarget}</span>
                 </div>
                 <div>
                   <span className={`${styles.cardTextMuted} text-[10px] block`}>{t('scenario.safetyActual')}</span>
-                  <span className="text-sm font-bold text-emerald-400">{activeScenario.actualSafetyIndex}</span>
+                  <span className={`text-sm font-bold ${styles.successText}`}>{activeScenario.actualSafetyIndex}</span>
                 </div>
                 <div>
                   <span className={`${styles.cardTextMuted} text-[10px] block`}>{t('scenario.createdAt')}</span>
@@ -630,19 +533,19 @@ export default function ScenarioManagementView({
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-4 h-10 border-b-2 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === tab ? 'border-indigo-500 text-indigo-400' : `border-transparent ${styles.cardTextMuted} hover:text-[var(--card,#E2E8F0)]`}`}
+                    className={`px-4 h-10 border-b-2 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === tab ? `${styles.accentBorder} ${styles.accentText}` : `border-transparent ${styles.cardTextMuted} hover:opacity-80`}`}
                   >
                     <LucideIcon name={tabIcon[tab]} size={13} />
                     <span>{tabLabel[tab]}</span>
                     {tab === 'decision' && pendingCount > 0 && (
-                      <span className="bg-rose-500 text-white text-[9px] px-1.5 py-0.2 rounded-full animate-bounce">
+                      <span className={`${styles.dangerBg} ${styles.dangerText} text-[9px] px-1.5 py-0.2 rounded-full animate-bounce`}>
                         {pendingCount} {t('scenario.pendingCount')}
                       </span>
                     )}
                   </button>
                 ))}
               </div>
-              <div className="text-[10px] text-indigo-400 font-mono font-bold bg-indigo-950/60 border border-indigo-900/60 px-2 py-0.5 rounded">
+              <div className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${styles.accentText} ${styles.badgeBg} border ${styles.cardBorder}`}>
                 {tabHint[activeTab]}
               </div>
             </div>
@@ -683,25 +586,27 @@ export default function ScenarioManagementView({
                 </>
               )}
               {activeTab === 'metrics' && <MetricsTab threatRadarData={threatRadarData} efficiencyData={efficiencyData} />}
-              {activeTab === 'cognition' && <CognitionPanel scenario={activeScenario} onRunFinished={refreshScenarios} />}
+              {activeTab === 'cognition' && (
+                <div className="flex flex-col lg:flex-row gap-4 min-h-0">
+                  <div className="flex-1 min-w-0 space-y-4">
+                    <CognitionPanel scenario={activeScenario} onRunFinished={refreshScenarios} />
+                  </div>
+                  {/* design-05 B.0：认知四卡（E1~E4）唯一入口 = CognitiveRightPanel，自场景管理视图挂载；
+                      <768px 由组件内部紧凑模式 + 下方堆叠（B.8） */}
+                  <aside
+                    className={`w-full lg:w-[380px] shrink-0 rounded-lg border overflow-hidden ${styles.cardBg} ${styles.cardBorder}`}
+                    aria-label={t('scenario.tab.cognition')}
+                  >
+                    <CognitiveRightPanel scenarioId={activeScenario.id} />
+                  </aside>
+                </div>
+              )}
               {activeTab === 'git' && (
-                <GitVersionTab
-                  gitCommits={gitCommits}
-                  gitBranches={gitBranches}
-                  selectedScenarioId={selectedScenarioId}
-                  gitCommitMsg={gitCommitMsg}
-                  setGitCommitMsg={setGitCommitMsg}
-                  gitTerminalLogs={gitTerminalLogs}
-                  isGitPushing={isGitPushing}
-                  gitViewMode={gitViewMode}
-                  setGitViewMode={setGitViewMode}
-                  selectedCommitId={selectedCommitId}
-                  setSelectedCommitId={setSelectedCommitId}
-                  handleGitCommitManual={handleGitCommitManual}
-                  handleGitCheckoutCommit={handleGitCheckoutCommit}
-                  handleSwitchGitBranch={handleSwitchGitBranch}
-                  handleGitPushRemote={handleGitPushRemote}
-                />
+                // Git UI 单一通道：services/gitService（只传 repositoryId = 场景 ID），
+                // 数据/错误态由 GitPanel 内部按真实 API 渲染，禁本地伪造。
+                <div className={`h-[560px] rounded-lg border overflow-hidden ${styles.cardBg} ${styles.cardBorder}`}>
+                  <GitPanel repoId={activeScenario.id} />
+                </div>
               )}
             </div>
           </div>

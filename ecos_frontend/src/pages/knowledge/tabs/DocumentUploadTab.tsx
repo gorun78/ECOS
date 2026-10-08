@@ -17,6 +17,7 @@ import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { apiFetchData } from '../../../api';
 import { knowledgeApi } from '../services/knowledgeApi';
+import { getAuthToken } from '../../../services/auth';
 import type { ExtractUploadGate } from '../typesAndConstants';
 import ExtractionReviewPanel from '../components/ExtractionReviewPanel';
 
@@ -120,7 +121,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
       try {
         // PMO-54 — 任务状态查询端点；未就绪时回退到本地阶段推进
         const res = await fetch(`/api/v1/knowledge/extract/tasks/${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token') || ''}` },
+          headers: { Authorization: `Bearer ${getAuthToken()}` },
         });
         if (!res.ok) throw new Error(`status ${res.status}`);
         const json = await res.json();

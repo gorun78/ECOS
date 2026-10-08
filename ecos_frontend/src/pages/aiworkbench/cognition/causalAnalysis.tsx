@@ -1,25 +1,54 @@
-import React, { useState } from 'react';
-import { ArrowRight, Loader, GitBranch, Radar } from 'lucide-react';
+/**
+ * 因果分析（认知工作台 Tab）— design-05 B.0 / B.5 / F05-16。
+ *
+ * <p>本文件不再持有任何硬编码 mock 因果链（原 NODES/EDGE_PAIRS/固定 0.82/87% 等
+ * 假数据已按 F05-16「禁 200 伪数据」删除）。因果图复用全仓唯一 cytoscape 图组件
+ * {@link CausalGraphView}（其内部经 `fetchCausalGraph` 读真实世界模型因果边）；
+ * 诊断结论区仅渲染 `POST /api/v1/cognitive/diagnose` 的真实响应，
+ * 无数据时按 B.5 走空态（`role=status` 灰色占位，不是错误、不是假数）。</p>
+ *
+ * <p>主题全部走 `useTheme()` token；文案全部走 `useLanguage()`（无内联中文 fallback）；
+ * 图标仅 lucide-react。stub/错误态经 CognitiveApiError 显式渲染。</p>
+ *
+ * @license Apache-2.0
+ */
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Brain, Loader2 } from 'lucide-react';
+import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
-import { cognitiveEngineApi } from '../../../services/cognitiveEngineApi';
-import { showToastGlobal } from '../../../components/common/Toast';
-import type { ReasoningMode } from './types';
+import { CognitiveEmptyState, CognitiveErrorState, CognitiveSkeleton, cognitiveErrorTitleKey } from '../../../pages/scenario/cognition/CognitionStateViews';
+import CausalGraphView from '../../../components/CausalGraphView';
+import {
+  runDiagnosis,
+  CognitiveApiError,
+  isCognitiveApiError,
+  debounce,
+  COGNITION_DEBOUNCE_MS,
+} from '../../../services/cognitiveClient';
 
-interface CausalNode { id: string; label: string; labelKey: string; pos: string; }
+/** diagnose 响应的因果链节点（后端 schema 之外的字段一律忽略，禁前端补数）。 */
+interface DiagnosisChainNode {
+  depth?: number;
+  node?: string;
+  description?: string;
+  confidence?: number;
+  source?: string;
+}
 
-const NODES: CausalNode[] = [
-  { id: 'center', label: '项目毛利下降', labelKey: 'causal.node.center', pos: 'left-[38%] top-[40%]' },
-  { id: 'cost', label: '采购成本↑', labelKey: 'causal.node.cost', pos: 'left-[10%] top-[10%]' },
-  { id: 'change', label: '需求变更', labelKey: 'causal.node.change', pos: 'left-[8%] top-[70%]' },
-  { id: 'delay', label: '工期延长', labelKey: 'causal.node.delay', pos: 'left-[60%] top-[12%]' },
-  { id: 'labor', label: '人力成本↑', labelKey: 'causal.node.labor', pos: 'left-[60%] top-[72%]' },
-];
+interface DiagnosisResult {
+  degraded?: boolean;
+  degradeReason?: string;
+  rootCause?: string;
+  causalChain?: DiagnosisChainNode[];
+  suggestions?: string[];
+}
 
-const EDGE_PAIRS: [string, string][] = [
-  ['cost', 'center'], ['change', 'center'], ['delay', 'center'], ['labor', 'center'],
-];
-
-const TRACE_NODES = ['D', 'I', 'K', 'Evidence', 'Hypothesis', 'Belief', 'C', 'W'];
+type DiagStatus =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'empty' }
+  | { kind: 'ok'; data: DiagnosisResult }
+  | { kind: 'error'; error: CognitiveApiError };
 
 interface CausalAnalysisProps {
   /** Switch the workbench to the scenario-simulation sub-page (in-page cross-link). */
@@ -27,160 +56,168 @@ interface CausalAnalysisProps {
 }
 
 export default function causalAnalysis({ onGoScenario }: CausalAnalysisProps) {
+  const { styles } = useTheme();
   const { t } = useLanguage();
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [reRunning, setReRunning] = useState(false);
-  const [reasoningMode] = useState<ReasoningMode>('HYBRID');
+  const [objectId, setObjectId] = useState('');
+  const [question, setQuestion] = useState('');
+  const [status, setStatus] = useState<DiagStatus>({ kind: 'idle' });
+  const reqSeq = useRef(0);
 
-  const handleReRun = async () => {
-    if (reRunning) return;
-    setReRunning(true);
+  const handleRun = useCallback(async () => {
+    if (!objectId.trim() || !question.trim()) return;
+    const seq = ++reqSeq.current;
+    setStatus({ kind: 'loading' });
     try {
-      await cognitiveEngineApi.runDiagnosis({ objectId: 'project-margin', question: '项目毛利下降原因', reasoningMode });
-      showToastGlobal('success', t('causal.reRunOk', '重新推理完成'));
+      const data = (await runDiagnosis({
+        objectId: objectId.trim(),
+        question: question.trim(),
+      })) as DiagnosisResult | null;
+      if (seq !== reqSeq.current) return;
+      if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) {
+        setStatus({ kind: 'empty' });
+        return;
+      }
+      setStatus({ kind: 'ok', data });
     } catch (e) {
-      showToastGlobal('error', `${t('causal.reRunFailed', '重新推理失败')}: ${(e as Error)?.message ?? e}`);
-    } finally {
-      setReRunning(false);
+      if (seq !== reqSeq.current) return;
+      const err = isCognitiveApiError(e)
+        ? e
+        : new CognitiveApiError({
+            code: 'NETWORK',
+            status: 0,
+            message: e instanceof Error ? e.message : String(e),
+          });
+      setStatus({ kind: 'error', error: err });
     }
-  };
+  }, [objectId, question]);
 
-  const selectedNodeData = NODES.find(n => n.id === selectedNode);
+  // 连点合并为末次（契约 debounce 100–300ms）
+  const runDebounced = useMemo(() => debounce(() => void handleRun(), COGNITION_DEBOUNCE_MS), [handleRun]);
+
+  const canRun = !!objectId.trim() && !!question.trim() && status.kind !== 'loading';
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('causal.title', '因果分析')}</h1>
-        <div className="flex gap-2">
-          <button onClick={handleReRun} disabled={reRunning}
-            className="px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50">
-            {reRunning ? <Loader className="w-3.5 h-3.5 inline mr-1 animate-spin" /> : null}
-            {t('causal.reRun', '重新推理')}
-          </button>
-          <button onClick={() => onGoScenario?.()}
-            className="px-3 py-1.5 rounded-md text-sm font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700">
-            {t('causal.toScenario', '进入情景推演 →')}
-          </button>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className={`text-lg font-semibold ${styles.cardText}`}>{t('causal.title')}</h1>
+        <button
+          type="button"
+          onClick={() => onGoScenario?.()}
+          aria-label={t('causal.toScenario')}
+          className={`px-3 py-1.5 rounded-md text-sm font-medium cursor-pointer border ${styles.inputBorder} ${styles.inputBg} ${styles.cardText} hover:opacity-80 transition-opacity`}
+        >
+          {t('causal.toScenario')}
+        </button>
+      </div>
+
+      {/* Diagnosis request (real API only; no preset question, no mock notice) */}
+      <div className={`rounded-lg border p-4 space-y-3 ${styles.cardBg} ${styles.cardBorder}`}>
+        <div className="flex items-center gap-2">
+          <Brain size={14} className={styles.accentText} />
+          <span className={`text-sm font-semibold ${styles.cardText}`}>{t('causal.conclusion')}</span>
         </div>
-      </div>
-
-      {/* Notice bar */}
-      <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-2.5">
-        <Radar className="w-4 h-4 text-blue-500 flex-shrink-0" />
-        <span className="text-sm text-blue-800 dark:text-blue-200">{t('causal.notice', '当前问题')}: 项目毛利为何下降？</span>
-        <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-blue-600 text-white">{reasoningMode}</span>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Causal graph */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 relative">
-          <h2 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">{t('causal.graph', '因果图')}</h2>
-          <div className="relative h-[400px]">
-            {/* Edges */}
-            {EDGE_PAIRS.map(([from, to], i) => (
-              <div key={i} className="absolute w-px h-full bg-slate-300 dark:bg-slate-600"
-                style={{
-                  left: from === 'cost' ? '30%' : from === 'change' ? '28%' : from === 'delay' ? '70%' : '72%',
-                  top: from === 'cost' || from === 'delay' ? '22%' : '55%',
-                  height: from === 'cost' || from === 'delay' ? '38%' : '45%',
-                }} />
-            ))}
-            {/* Nodes */}
-            {NODES.map(n => (
-              <button key={n.id}
-                onClick={() => setSelectedNode(n.id)}
-                className={`absolute px-3 py-1.5 rounded-md text-xs font-medium border transition ${n.pos} ${
-                  selectedNode === n.id
-                    ? 'bg-blue-600 text-white border-blue-500'
-                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600 hover:border-blue-400'
-                }`}>
-                {t(n.labelKey, n.label)}
-              </button>
-            ))}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_2fr_auto] gap-2">
+          <label className="flex flex-col gap-1">
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>
+              {t('causal.objectIdLabel')}
+            </span>
+            <input
+              value={objectId}
+              onChange={(e) => setObjectId(e.target.value)}
+              placeholder={t('causal.objectIdPh')}
+              aria-label={t('causal.objectIdLabel')}
+              className={`px-2 py-1.5 text-[12px] rounded border outline-none ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>
+              {t('causal.questionLabel')}
+            </span>
+            <input
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder={t('causal.questionPh')}
+              aria-label={t('causal.questionLabel')}
+              className={`px-2 py-1.5 text-[12px] rounded border outline-none ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
+            />
+          </label>
+          <div className="flex items-end">
+            <button
+              type="button"
+              onClick={runDebounced}
+              disabled={!canRun}
+              aria-label={t('causal.reRun')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium cursor-pointer inline-flex items-center gap-1.5 border ${styles.accentBorder} ${styles.accentBg} ${styles.cardText} disabled:opacity-50 transition-opacity`}
+            >
+              {status.kind === 'loading' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+              {t('causal.reRun')}
+            </button>
           </div>
+        </div>
 
-          {/* Drawer */}
-          {selectedNodeData && (
-            <div className="absolute right-0 top-0 h-full w-[300px] bg-slate-50 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 p-4 shadow-lg">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{t(selectedNodeData.labelKey, selectedNodeData.label)}</h3>
-                <button onClick={() => setSelectedNode(null)} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+        {/* B.5 seven states for the diagnosis result area */}
+        {status.kind === 'idle' && <CognitiveEmptyState labelKey="causal.empty" testId="causal-idle" />}
+        {status.kind === 'loading' && <CognitiveSkeleton rows={2} />}
+        {status.kind === 'empty' && <CognitiveEmptyState labelKey="causal.empty" testId="causal-empty" />}
+        {status.kind === 'error' && (
+          <CognitiveErrorState error={status.error} titleKey={cognitiveErrorTitleKey(status.error)} onRetry={runDebounced} />
+        )}
+        {status.kind === 'ok' && (
+          <div className="space-y-2 text-[12px]" data-testid="causal-result">
+            {status.data.degraded && status.data.degradeReason && (
+              <div className={`rounded p-2 text-[11px] border ${styles.warningBorder} ${styles.warningBg} ${styles.warningText}`} role="status">
+                {status.data.degradeReason}
               </div>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('causal.evidence', '证据')}</p>
-                  <ul className="space-y-1">
-                    {[1, 2, 3].map(i => (
-                      <li key={i} className="text-xs text-slate-700 dark:text-slate-300 px-2 py-1 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700">
-                        E-{String(i).padStart(3, '0')} · {50 + i * 15}%
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('causal.linkedHypotheses', '关联假设')}</p>
-                  <span className="text-xs px-2 py-1 inline-block bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 rounded border border-amber-200 dark:border-amber-800">
-                    H-003 · VALID
-                  </span>
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('causal.dataSource', '数据来源追溯链')}</p>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {['D', 'I', 'K', 'E', 'H', 'B', 'C'].map((n, i) => (
-                      <React.Fragment key={n}>
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{n}</span>
-                        {i < 6 && <ArrowRight className="w-3 h-3 text-slate-400" />}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </div>
+            )}
+            {status.data.rootCause && (
+              <div>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>{t('causal.rootCause')}</span>
+                <p className={`font-semibold ${styles.cardText}`}>{status.data.rootCause}</p>
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Reasoning conclusion */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-4">
-          <h2 className="text-sm font-medium text-slate-900 dark:text-slate-100">{t('causal.conclusion', '推理结论')}</h2>
-          <div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('causal.mainPath', '主要解释路径')}</p>
-            <p className="text-sm text-slate-700 dark:text-slate-300">
-              采购成本↑ → 项目毛利下降（权重大，置信度 0.82）
-            </p>
+            )}
+            {Array.isArray(status.data.causalChain) && status.data.causalChain.length > 0 && (
+              <div>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>{t('causal.chain')}</span>
+                <ul className="mt-1 space-y-1">
+                  {status.data.causalChain.map((n, i) => (
+                    <li key={`${n.depth ?? i}-${i}`} className={`flex items-center gap-2 text-[11px] ${styles.cardText}`}>
+                      <span className={`font-mono text-[10px] ${styles.accentText}`}>L{n.depth ?? i + 1}</span>
+                      <span className={styles.cardText}>{n.node || n.description}</span>
+                      {typeof n.confidence === 'number' && (
+                        <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>
+                          {t('causal.confidence')} {n.confidence.toFixed(2)}
+                        </span>
+                      )}
+                      {n.source && <span className={`font-mono text-[10px] ${styles.muted}`}>{n.source}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {Array.isArray(status.data.suggestions) && status.data.suggestions.length > 0 && (
+              <div>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>{t('scenario.cog.suggestions')}</span>
+                <ul className="mt-1 space-y-0.5">
+                  {status.data.suggestions.map((s, i) => (
+                    <li key={i} className={`text-[11px] ${styles.cardText}`}>
+                      · {s}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3">
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t('causal.confidence', '置信度')}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">0.82</p>
-            </div>
-            <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3">
-              <p className="text-xs text-slate-500 dark:text-slate-400">{t('causal.evidenceCoverage', '证据覆盖')}</p>
-              <p className="text-xl font-bold text-slate-900 dark:text-slate-100">87%</p>
-            </div>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('causal.alternative', '替代解释')}</p>
-            <p className="text-sm text-slate-700 dark:text-slate-300">需求变更 → 工期延长 → 人力成本↑（置信度 0.54）</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('causal.counterfactual', '反事实检查')}</p>
-            <p className="text-sm text-slate-700 dark:text-slate-300">若采购成本不上涨，毛利预计维持在 12.3% 水平。</p>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Trace bar */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-3">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          <GitBranch className="w-4 h-4 text-slate-400 flex-shrink-0" />
-          <span className="text-xs text-slate-400 flex-shrink-0 mr-2">{t('causal.trace', '可追溯链')}</span>
-          {TRACE_NODES.map((n, i) => (
-            <React.Fragment key={n}>
-              <span className="text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 whitespace-nowrap font-medium">{n}</span>
-              {i < TRACE_NODES.length - 1 && <ArrowRight className="w-3 h-3 text-slate-300 dark:text-slate-600 flex-shrink-0" />}
-            </React.Fragment>
-          ))}
+      {/* Real causal graph — single-source cytoscape component reading the world-model API */}
+      <div className={`rounded-lg border p-4 space-y-2 ${styles.cardBg} ${styles.cardBorder}`}>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className={`text-sm font-medium ${styles.cardText}`}>{t('causal.graph')}</h2>
+          <span className={`text-[10px] ${styles.muted}`}>{t('causal.graphHint')}</span>
         </div>
+        <CausalGraphView showWhatIf={false} />
       </div>
     </div>
   );

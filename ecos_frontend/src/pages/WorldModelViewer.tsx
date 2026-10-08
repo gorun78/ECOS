@@ -44,6 +44,7 @@ import CausalTab from "./worldmodel/tabs/CausalTab";
 import ScenariosTab from "./worldmodel/tabs/ScenariosTab";
 import ReviewTab from "./worldmodel/tabs/ReviewTab";
 import ParetoTab from "./worldmodel/tabs/ParetoTab";
+import { getAuthToken } from "../services/auth";
 
 // ── Main Component ───────────────────────────
 export default function WorldModelViewer() {
@@ -210,7 +211,7 @@ export default function WorldModelViewer() {
 
   async function fetchOrgs() {
     try {
-      const token = localStorage.getItem("token") || "";
+      const token = getAuthToken();
       const r = await fetch("/api/v1/system/organizations/tree", {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       });
@@ -221,7 +222,7 @@ export default function WorldModelViewer() {
 
   async function fetchUsers() {
     try {
-      const token = localStorage.getItem("token") || "";
+      const token = getAuthToken();
       const r = await fetch("/api/v1/system/users?pageSize=200", {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       });

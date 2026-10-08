@@ -1,17 +1,24 @@
 package com.chinacreator.gzcm.engine.cognitive2.controller;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.engine.cognitive.api.CognitiveErrorCode;
 import com.chinacreator.gzcm.engine.cognitive2.dto.CognitiveConfigItemVO;
 import com.chinacreator.gzcm.engine.cognitive2.dto.CognitiveConfigSaveDTO;
 import com.chinacreator.gzcm.engine.cognitive2.dto.CognitiveConfigSaveResult;
+import com.chinacreator.gzcm.engine.cognitive2.service.CognitiveAuditFallback;
 import com.chinacreator.gzcm.engine.cognitive2.service.CognitiveConfigQueryService;
+import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -29,7 +36,9 @@ import org.springframework.web.bind.annotation.RestController;
  * 读写全部下沉 {@link CognitiveConfigQueryService}（架构铁律 §3.6：Controller
  * 不得直接访问数据库），避免跨模块 import sysman 包
  * （架构铁律：引擎层不依赖服务层）。
- * 写入完成发 {@code ecos.audit} 审计日志（log 兜底；正式 Kafka 接 PMO-50 EventBus 后切换）。</p>
+ * 写入完成经 runtime-event {@link EventBusService} 发 Kafka {@code ecos.audit} 真实审计事件
+ * （F05-15/X-40：移除假审计 log；主通道 → 本地兜底 → 双失败拒绝动作的 fail-closed 三段式，
+ * 与 cognitive2 假设链 {@code CognitiveHypothesisService#audit} 同款口径）。</p>
  *
  * <p>路径池：</p>
  * <ul>
@@ -51,9 +60,15 @@ public class CognitiveConfigController {
     static final String GROUP = "cognitive";
 
     private final CognitiveConfigQueryService cognitiveConfigQueryService;
+    private final ObjectProvider<EventBusService> eventBusProvider;
+    private final CognitiveAuditFallback auditFallback;
 
-    public CognitiveConfigController(CognitiveConfigQueryService cognitiveConfigQueryService) {
+    public CognitiveConfigController(CognitiveConfigQueryService cognitiveConfigQueryService,
+                                     ObjectProvider<EventBusService> eventBusProvider,
+                                     CognitiveAuditFallback auditFallback) {
         this.cognitiveConfigQueryService = cognitiveConfigQueryService;
+        this.eventBusProvider = eventBusProvider;
+        this.auditFallback = auditFallback;
     }
 
     /**
@@ -76,7 +91,8 @@ public class CognitiveConfigController {
             return ApiResponse.success(vos);
         } catch (DataAccessException e) {
             log.error("Failed to fetch cognitive config rows: {}", e.getMessage(), e);
-            return ApiResponse.internalError("认知引擎配置拉取失败: " + e.getMessage());
+            // F05-07 #4：异常细节只入日志，响应体不泄漏 e.getMessage()
+            return ApiResponse.internalError("认知引擎配置拉取失败，请稍后重试或查看服务端日志");
         }
     }
 
@@ -108,7 +124,7 @@ public class CognitiveConfigController {
             }
         }
         log.info("CognitiveConfig save: updated={}, inserted={}, group={}", updated, inserted, GROUP);
-        emitAudit("cognitiveConfig.save",
+        emitAudit("cognitiveConfig.save", "sys_config",
                 "updated=" + updated + " inserted=" + inserted + " size=" + items.size());
         return ApiResponse.success(new CognitiveConfigSaveResult(updated, inserted, items.size()));
     }
@@ -117,12 +133,51 @@ public class CognitiveConfigController {
         return o == null ? "" : String.valueOf(o);
     }
 
-    /** 审计事件：写操作落 log 兜底；正式 Kafka 发件走 PMO-50 EventBus 统一接入后切换。 */
-    private void emitAudit(String action, String detail) {
+    /**
+     * 真实审计事件（X-40 fail-closed 收口）：三段式——
+     * 主通道经 runtime-event {@link EventBusService} 发布 {@code ecos.audit}（KafkaTopics 单源）→
+     * 主通道不可用/发布失败 → {@link CognitiveAuditFallback} 本地兜底落盘（JSONL，供运维补投）→
+     * 兜底也失败 → 抛 {@link BusinessException}（ECOS-COG-504）拒绝本次动作，
+     * 禁止"log.warn + continue"式假审计（铁律 §2.4#5）。
+     */
+    private void emitAudit(String action, String resource, String detail) {
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("action", action);
+        event.put("resource", resource);
+        event.put("result", "success");
+        event.put("detail", detail);
+        event.put("userId", "system");
+        event.put("timestamp", LocalDateTime.now().toString());
+        String topic = KafkaTopics.AUDIT;
+        if (tryPublish(topic, event)) {
+            return;
+        }
         try {
-            log.info("AUDIT topic=ecos.audit action={} detail={}", action, detail);
+            auditFallback.write(event);
+        } catch (Exception fe) {
+            log.error("认知配置审计兜底同样失败，按 fail-closed 拒绝业务动作: action={} err={}",
+                    action, fe.getMessage());
+            throw new BusinessException(500, CognitiveErrorCode.E504_INTERNAL
+                    + ": 审计主通道与本地兜底均不可用，操作已拒绝（fail-closed）: action=" + action);
+        }
+    }
+
+    /**
+     * 主通道投递（单点封装）：EventBusService 未装配或发布异常均返回 false，
+     * 由调用方进入本地兜底段；本方法不做吞掉后的"视为已审计"处理。
+     */
+    private boolean tryPublish(String topic, Map<String, Object> event) {
+        EventBusService bus = eventBusProvider.getIfAvailable();
+        if (bus == null) {
+            log.warn("认知配置审计主通道未装配（EventBusService 缺失），转本地兜底: topic={}", topic);
+            return false;
+        }
+        try {
+            bus.publish(topic, event);
+            return true;
         } catch (Exception e) {
-            log.warn("emitAudit fallback log failed: {}", e.getMessage());
+            log.warn("认知配置审计主通道发布失败，转本地兜底: topic={} err={}", topic, e.getMessage());
+            return false;
         }
     }
 }

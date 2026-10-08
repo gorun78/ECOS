@@ -26,8 +26,16 @@ interface PathData {
 }
 
 // ── Main Component ─────────────────────────────
-export default function CausalGraphView() {
-  const { locale } = useLanguage();
+export interface CausalGraphViewProps {
+  /**
+   * 是否渲染 What-If 推演面板（前端本地线性估算，非后端确定性核算）。
+   * 认知域（design-05 F05-16 禁伪数据）入口应传 `false`；世界模型页保持默认 `true`。
+   */
+  showWhatIf?: boolean;
+}
+
+export default function CausalGraphView({ showWhatIf = true }: CausalGraphViewProps = {}) {
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
@@ -62,7 +70,7 @@ export default function CausalGraphView() {
         edgeCount: d.edgeCount || 0,
       });
     } catch (e: any) {
-      setError("加载因果图失败: " + (e?.message || "Unknown"));
+      setError(t("causal.graphLoadFailed", { msg: e?.message || "Unknown" }));
     } finally {
       setLoading(false);
     }
@@ -97,7 +105,7 @@ export default function CausalGraphView() {
         }
       }
     } catch (e: any) {
-      setError("路径查询失败: " + (e?.message || "Unknown"));
+      setError(t("causal.pathQueryFailed", { msg: e?.message || "Unknown" }));
     } finally {
       setPathLoading(false);
     }
@@ -256,7 +264,7 @@ export default function CausalGraphView() {
           onClick={loadData}
           disabled={loading}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-all
-            ${styles.accentBg} ${styles.accentHover} text-white disabled:opacity-50`}
+            ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-50`}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
           {loading ? "加载中..." : locale === "zh" ? "刷新" : "Refresh"}
@@ -267,7 +275,7 @@ export default function CausalGraphView() {
       </div>
 
       {error && (
-        <div className="mb-3 px-3 py-2 rounded text-xs bg-red-500/10 border border-red-500/30 text-red-400 flex items-center gap-2 shrink-0">
+        <div className={`mb-3 px-3 py-2 rounded text-xs ${styles.dangerBg} border ${styles.dangerBorder} ${styles.dangerText} flex items-center gap-2 shrink-0`} role="alert">
           <AlertCircle className="w-3.5 h-3.5" />{error}
         </div>
       )}
@@ -290,7 +298,8 @@ export default function CausalGraphView() {
 
         {/* Right side panels */}
         <div className="flex flex-col gap-3 min-h-0 overflow-auto">
-          {/* What-If Panel */}
+          {/* What-If Panel (local linear estimate only; hidden for cognitive-domain entries per F05-16) */}
+          {showWhatIf && (
           <div className={`border rounded-lg p-3 shrink-0 ${styles.cardBorder} ${styles.cardBg}`}>
             <h4 className="flex items-center gap-1.5 text-xs font-semibold mb-2 opacity-80">
               <Sliders className="w-3.5 h-3.5" />
@@ -305,7 +314,7 @@ export default function CausalGraphView() {
                 <input type="range" min="0" max="1" step="0.05"
                   value={whatIfVars.dataQuality}
                   onChange={e => setWhatIfVars({ ...whatIfVars, dataQuality: +e.target.value })}
-                  className="w-full h-1 accent-indigo-500" />
+                  className="w-full h-1" style={{ accentColor: "currentColor" }} />
               </div>
               <div>
                 <div className="flex justify-between text-[10px] opacity-60 mb-0.5">
@@ -315,7 +324,7 @@ export default function CausalGraphView() {
                 <input type="range" min="0" max="1" step="0.05"
                   value={whatIfVars.maintenanceBudget}
                   onChange={e => setWhatIfVars({ ...whatIfVars, maintenanceBudget: +e.target.value })}
-                  className="w-full h-1 accent-indigo-500" />
+                  className="w-full h-1" style={{ accentColor: "currentColor" }} />
               </div>
               <div>
                 <div className="flex justify-between text-[10px] opacity-60 mb-0.5">
@@ -325,11 +334,11 @@ export default function CausalGraphView() {
                 <input type="range" min="0" max="1" step="0.05"
                   value={whatIfVars.automationLevel}
                   onChange={e => setWhatIfVars({ ...whatIfVars, automationLevel: +e.target.value })}
-                  className="w-full h-1 accent-indigo-500" />
+                  className="w-full h-1" style={{ accentColor: "currentColor" }} />
               </div>
             </div>
             {/* Impact preview */}
-            <div className="mt-3 pt-2 border-t border-white/5">
+            <div className={`mt-3 pt-2 border-t ${styles.divider}`}>
               <h5 className="text-[10px] font-semibold opacity-60 mb-1">
                 {locale === "zh" ? "预估影响" : "Predicted Impact"}
               </h5>
@@ -337,7 +346,7 @@ export default function CausalGraphView() {
                 {impacts.map((item) => (
                   <div key={item.dimension} className="flex items-center gap-1.5 text-[10px]">
                     <span className="w-14 opacity-70 truncate">{item.dimension}</span>
-                    <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
+                    <div className={`flex-1 h-1.5 rounded-full ${styles.inputBg} overflow-hidden`}>
                       <div
                         className="h-full rounded-full transition-all duration-300"
                         style={{
@@ -352,6 +361,7 @@ export default function CausalGraphView() {
               </div>
             </div>
           </div>
+          )}
 
           {/* Path Query Panel */}
           <div className={`border rounded-lg p-3 shrink-0 ${styles.cardBorder} ${styles.cardBg}`}>
@@ -383,13 +393,13 @@ export default function CausalGraphView() {
               onClick={queryPath}
               disabled={!pathFrom || !pathTo || pathLoading}
               className={`w-full px-3 py-1.5 rounded text-xs font-medium transition-all
-                ${styles.accentBg} ${styles.accentHover} text-white disabled:opacity-30`}
+                ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-30`}
             >
               {pathLoading ? "..." : locale === "zh" ? "查询路径" : "Find Path"}
             </button>
             {pathResult && (
-              <div className="mt-2 p-2 rounded bg-amber-500/5 border border-amber-500/20 text-[10px]">
-                <p className="font-medium text-amber-400">
+              <div className={`mt-2 p-2 rounded border text-[10px] ${styles.warningBg} ${styles.warningBorder} ${styles.warningText}`}>
+                <p className="font-medium">
                   {pathResult.from} → {pathResult.to}
                 </p>
                 <p className="opacity-60 mt-0.5">

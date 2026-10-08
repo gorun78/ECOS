@@ -1,12 +1,16 @@
 package com.chinacreator.gzcm.engine.cognitive2.service;
 
+import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.engine.cognitive.api.CognitiveErrorCode;
 import com.chinacreator.gzcm.engine.cognitive2.DecisionService;
 import com.chinacreator.gzcm.engine.cognitive2.model.CognitivePipelineNode;
 import com.chinacreator.gzcm.engine.cognitive2.model.NodeType;
+import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -34,28 +38,35 @@ public class EngineCapabilityRegistryImpl implements EngineCapabilityRegistry {
     private static final Logger log = LoggerFactory.getLogger(EngineCapabilityRegistryImpl.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /** Gateway 内部调用基址 */
-    private static final String INTERNAL_BASE = "http://localhost:8080";
+    /** kb/cognitive REST 归属服务（route-manifest owner 字段）；未登记即 fail-loud，禁止静默回落 */
+    private static final String INTERNAL_OWNER_SERVICE = "dccheng";
 
     private final DecisionService decisionService;
     private final OagIntakeService oagIntakeService;
     private final OagPlannerService oagPlannerService;
     private final StrategyGeneratorService strategyGeneratorService;
     private final RestTemplate restTemplate;
+    private final String internalBase;
 
     @Autowired
     public EngineCapabilityRegistryImpl(DecisionService decisionService,
                                          OagIntakeService oagIntakeService,
                                          OagPlannerService oagPlannerService,
-                                         StrategyGeneratorService strategyGeneratorService) {
+                                         StrategyGeneratorService strategyGeneratorService,
+                                         @Qualifier("cognitiveRestTemplate") RestTemplate restTemplate,
+                                         ServiceEndpointResolver endpointResolver) {
         this.decisionService = decisionService;
         this.oagIntakeService = oagIntakeService;
         this.oagPlannerService = oagPlannerService;
         this.strategyGeneratorService = strategyGeneratorService;
-        this.restTemplate = new RestTemplate();
-        // 防 XML 响应解析
-        this.restTemplate.getMessageConverters().removeIf(c ->
-            c instanceof org.springframework.http.converter.xml.MappingJackson2XmlHttpMessageConverter);
+        // F05-15：共享 RestTemplate bean + runtime-access 双模寻址，禁止自建客户端与硬编码 localhost（X-35）；
+        // route-manifest 未登记 owner → fail-loud（ECOS-COG-504），装配期即暴露配置缺失
+        this.restTemplate = restTemplate;
+        this.internalBase = endpointResolver
+                .resolve(INTERNAL_OWNER_SERVICE, ServiceEndpointResolver.RouteMode.MONOLITH)
+                .orElseThrow(() -> new BusinessException(500, CognitiveErrorCode.E504_INTERNAL
+                        + ": route-manifest 未登记服务 " + INTERNAL_OWNER_SERVICE
+                        + "，认知管线跨引擎 REST 基址无法解析（fail-loud）"));
     }
 
     @Override
@@ -109,7 +120,7 @@ public class EngineCapabilityRegistryImpl implements EngineCapabilityRegistry {
     private Map<String, Object> executeReason(CognitivePipelineNode node, Map<String, Object> config,
                                               Map<String, Object> context) {
         String query = (String) config.getOrDefault("query", config.getOrDefault("q", ""));
-        String url = INTERNAL_BASE + "/api/v1/knowledge/reason";
+        String url = internalBase + "/api/v1/knowledge/reason";
 
         HttpHeaders headers = jsonHeaders();
         Map<String, Object> body = new HashMap<>();
@@ -168,7 +179,7 @@ public class EngineCapabilityRegistryImpl implements EngineCapabilityRegistry {
 
     private Map<String, Object> callKbEngine(CognitivePipelineNode node, String path,
                                              Map<String, Object> config, Map<String, Object> context) {
-        String url = INTERNAL_BASE + path;
+        String url = internalBase + path;
         HttpHeaders headers = jsonHeaders();
         Map<String, Object> body = new HashMap<>();
         body.putAll(config);

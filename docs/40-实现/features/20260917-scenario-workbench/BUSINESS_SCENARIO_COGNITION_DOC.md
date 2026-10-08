@@ -10,9 +10,12 @@
 
 场景侧的四端点（E1–E4）从 cognitive 域**只读**取数。本文档把这条**单向读**的契约里 cognitive 承担的三件事说死：
 
-1. **检测检测器要拿到的 Mind 身份**（E1 在 `kb_mind_registry` 投影）
-2. **假设记录如何匹配场景**（E3 在 `kb_cognitive_hypothesis.scenario_id` 上）
-3. **信念记录如何匹配场景 + Mind**（E4 在 `kb_cognitive_belief.scenario_id` + `mind_id`）
+> **[2026-10-02 详设-05 回收] Cg-3**：E1~E4 端点方法定版为 **GET 只读**（历史实现曾为 POST——4 个 handler 仅接受 POST；按"只增不改"保留 POST 作 Deprecation 别名，新接入方一律 GET，禁在 POST 上继续加功能）。详细设计-05 §7.1 Cg-3 订正，2026-10-08。
+
+1. **检测检测器要拿到的 Mind 身份**（E1 在 `ecos_cognitive_mind` 投影 — 详细设计-05 §7.1 Cg-2 订正，2026-10-08）
+   > **[2026-10-02 详设-05 回收] Cg-2**：数据源 `kb_mind_registry` 改为 `ecos_cognitive_mind`（ADR-8 正名，`kb_*` 为禁用误名；V187/188 已建表），E1 响应字段来源说明同步。
+2. **假设记录如何匹配场景**（E3 在 `ecos_cognitive.ecos_cognitive_hypothesis.scenario_id` 上 — 详细设计-05 §7.1 Cg-2 正名，原 `kb_*` 系禁用误名，2026-10-08）
+3. **信念记录如何匹配场景 + Mind**（E4 在 `ecos_cognitive.ecos_cognitive_belief` 的 `scenario_id` + `mind_id` 上 — Cg-2 正名同上）
 
 > **禁忌**：cognitive 域**不反向**写回 business 表，也不订阅场景 CRUD 事件。这是 ADR-P0 定案的推理结果不落盘 + 心智层不持久化场景元信息的延伸。
 
@@ -23,18 +26,14 @@
 ### 2.1 直接数据源
 
 ```sql
--- 场景下挂的 Mind 集合（绑定表名待 P5-0 查 DDL 后再敲，见 §八-1）
+-- 场景下挂的 Mind 集合（表名已定版，见下）
 SELECT m.*, b.scenario_id
-FROM {mind_registry_table} m
-JOIN {scenario_mind_binding} b ON b.mind_id = m.mind_id
+FROM ecos_cognitive.ecos_cognitive_mind m
+JOIN ecos_cognitive.ecos_cognitive_scenario_mind b ON b.mind_id = m.mind_id
 WHERE b.scenario_id = ${id} AND m.is_active
 ```
 
-> **绑定表名候选**（provisional，需 T5 前 Pg 实测确认）：
-> - `kb_scenario_mind_binding`（最贴命名）
-> - `ecos_mind_binding`
-> - 或 Mind 上直接 `scenario_id` 字段（无 binding 表）
-> 三个候选**不进入本批 DDL**，要候着 Pg 直查做
+> **数据源定版**（详细设计-05 §7.1 Cg-2 订正，2026-10-08）：E1 响应字段来源 = `ecos_cognitive.ecos_cognitive_mind`（Mind 注册）+ `ecos_cognitive.ecos_cognitive_scenario_mind`（场景×Mind 绑定），随 **R-13 ①** 落 `ecos_cognitive` schema（V187/V188 建表）。原候选名 `kb_scenario_mind_binding`/`kb_mind_registry` 系 `kb_*` 误名，**ADR-8 §5 明令禁用**，不得出现在新文档与新代码中；表未建时 E1 必须先 `to_regclass` 预检并返 503 `ECOS-COG-501`（禁 200 空数组蒙过）。
 
 ### 2.2 capabilityMask 约定枚举
 
@@ -48,7 +47,7 @@ WHERE b.scenario_id = ${id} AND m.is_active
 
 ### 2.3 Mind 未启用（503 穿透）
 
-`kb_mind_registry` 挂了 Mind，但 cognitive 服务只有 stub 没装 LLM -> 后端按 A3 规则返 `503`，不走 200 空 body。
+`ecos_cognitive_mind` 挂了 Mind，但 cognitive 服务只有 stub 没装 LLM -> 后端按 A3 规则返 `503`，不走 200 空 body。
 
 ---
 
@@ -62,7 +61,7 @@ WHERE b.scenario_id = ${id} AND m.is_active
 
 ### 3.2 状态机对齐
 
-`kb_cognitive_hypothesis.status` 枚举（源自 PMO-59 Phase 1）：
+`ecos_cognitive.ecos_cognitive_hypothesis.status`（详细设计-05 §7.1 Cg-2 正名，2026-10-08；文档/契约旧别名 `kb_cognitive_hypothesis` 系 ADR-8 §5 禁用误名，与 Cg-2 同源，只准作为 R-12 映射输入出现）枚举 —— **v2.0 定版 4 值**（详细设计-05 §7.1 Cg-1 订正，2026-10-08）：
 
 | status | 中文 | 说明 |
 |---|---|---|
@@ -72,6 +71,18 @@ WHERE b.scenario_id = ${id} AND m.is_active
 | `REFUTED` | 已证伪 | 反向证据累计推翻 |
 
 前端 E3 响应里的 `status` 字段必须与上表字符串一一对应；新枚举值必须先入此文档。
+
+**存量只读别名映射（R-15 ①，2026-09-29 已批准）**：库内实存旧值 7 行按下列映射在**读侧**转换（`HypothesisStatusLegacyAlias`，只读、禁写回旧值），旧原值以 `old_status` 审计列留痕，不伪造历史：
+
+| 存量旧值 | 定版终态 |
+|---|---|
+| `VALID` | `BELIEVED` |
+| `INVALIDATED` | `REFUTED` |
+| `ARCHIVED` | `REFUTED` |
+
+`CHECK` 约束延后至应用全量切换（详细设计-05 E.2 V189）。
+
+> **[2026-10-02 详设-05 回收] Cg-1**：假设枚举终态定版 PROPOSED/EVIDENCED/BELIEVED/REFUTED（R-15 ①）；库内存量 VALID→BELIEVED / INVALIDATED→REFUTED / ARCHIVED→REFUTED 走只读别名映射，本文自上表标"v2.0 定版"。
 
 ### 3.3 confidence 取值约定
 
@@ -83,12 +94,12 @@ WHERE b.scenario_id = ${id} AND m.is_active
 
 ### 4.1 belief ↔ capability 投影
 
-`kb_cognitive_belief` 表字段（从 PMO-59 Phase 2 记住）：`belief_id / scenario_id / domain / probability / strength / mind_id`。
+`ecos_cognitive.ecos_cognitive_belief` 表字段（从 PMO-59 Phase 2 记住；Cg-2 正名，旧误名 `kb_cognitive_belief` 禁用）：`belief_id / scenario_id / domain / probability / strength / mind_id`。
 
 **"运营执行功能"这个名字的来源**：E4 返回的 `capability` 字段就是 **belief.domain 映射到 E1 的 capabilityMask 之一**。映射规则来自 Mind 的 `capabilityMask`：
 
 ```
-profile = mind.mind_registry.capability_mask
+profile = mind(ecos_cognitive_mind).capability_mask
 belief = belief 行
 result.capability = profile ∩ belief.domain   // 取交集
 ```
@@ -142,5 +153,5 @@ E2 与 E4 的区别：
 ## 八、待确认项
 
 1. **`belief.domain` 与 `capabilityMask` 语义同层性**（第三点已描述：本批字符串直等，正式版需知识库 recode）
-2. **未来 Mind 漂移场景**（Mind 注册后 scope 扩展到场景变化）：本批不支持事件反写，按"每次请求都重新读 kb_mind_registry"的实现
+2. **未来 Mind 漂移场景**（Mind 注册后 scope 扩展到场景变化）：本批不支持事件反写，按"每次请求都重新读 `ecos_cognitive_mind`"的实现（原写作 `kb_mind_registry`，详细设计-05 §7.1 Cg-2 订正，2026-10-08）
 3. **E2 trend_weight = 1** 的默认值是否能被配置（如走 `ecos.cognition.eval.trend_weight`）— 预留 Properties 入口，本期不实现

@@ -1,0 +1,28 @@
+# F05-15 X-35 业务包自建 RestTemplate 存量基线（ModuleDependencyArchTest#businessMustNotConstructRestTemplate）
+# 口径：只登记本批前既有违规 FQCN；基线只减不增。cognitive2 收口类
+# （EngineCapabilityRegistryImpl / EntityLinker / KbRestClientConfig）已迁共享 Bean
+# （cognitiveRestTemplate）+ ServiceEndpointResolver 双模寻址，禁止登记本基线。
+# config 包共享客户端工厂（CognitiveRestClientConfig / KbEngineRestConfig /
+# AimingInfrastructureConfig）由门禁谓词直接豁免，不在此登记。
+# 备注：实测扫描未发现 archive/legacy/services-ghost 形态存量命中，无需剔除条目。
+com.chinacreator.gzcm.engine.ai.controller.DiagnosticAgentController
+com.chinacreator.gzcm.engine.ai.security.AgentToolSqlSecurityGate
+com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient
+com.chinacreator.gzcm.engine.ai.service.ToolExecutorService
+com.chinacreator.gzcm.engine.ai.service.ToolRegistry
+com.chinacreator.gzcm.engine.data.controller.QueryController
+com.chinacreator.gzcm.engine.data.pipeline.PipelineSecurityService
+com.chinacreator.gzcm.engine.data.quality.service.DqRcaServiceImpl
+com.chinacreator.gzcm.engine.data.quality.service.DqSecurityService
+com.chinacreator.gzcm.engine.data.service.QualityServiceImpl
+com.chinacreator.gzcm.engine.kb.service.KnowledgeExtractionService
+com.chinacreator.gzcm.engine.ontology.client.DataNetResourceClient
+com.chinacreator.gzcm.engine.ontology.client.KbEngineGraphSyncClient
+com.chinacreator.gzcm.engine.ontology.service.PublishGateService
+com.chinacreator.gzcm.sysman.service.PortalSearchQueryService
+com.chinacreator.gzcm.workspace.controller.ScenarioOptionsController
+com.chinacreator.gzcm.workspace.controller.ScenarioPreValidateController
+com.chinacreator.gzcm.workspace.knowledge.service.KnowledgeConfigAggregator
+com.chinacreator.gzcm.workspace.knowledge.service.KnowledgeHealthAggregator
+com.chinacreator.gzcm.workspace.scenario.DcchengClient
+com.chinacreator.gzcm.workspace.security.WorkspaceSecurityEngineClient

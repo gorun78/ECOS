@@ -5,6 +5,7 @@
  */
 
 import { apiFetchData } from '../../api';
+import { getAuthToken } from '../../services/auth';
 import type {
   DataSource,
   TreeNode,
@@ -26,7 +27,7 @@ const TEMPLATE_SAVE_URL = '/api/v1/engine/data/query/template';
 
 /** 通用 GET 请求辅助函数 */
 async function get<T>(url: string): Promise<T> {
-  const token = localStorage.getItem('token') || '';
+  const token = getAuthToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(url, { headers });
@@ -46,7 +47,7 @@ async function get<T>(url: string): Promise<T> {
 
 /** 通用 POST 请求辅助函数 */
 async function post<T>(url: string, body: unknown): Promise<T> {
-  const token = localStorage.getItem('token') || '';
+  const token = getAuthToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(url, {
@@ -70,7 +71,7 @@ async function post<T>(url: string, body: unknown): Promise<T> {
 
 /** 通用 DELETE 请求辅助函数 */
 async function del<T>(url: string): Promise<T> {
-  const token = localStorage.getItem('token') || '';
+  const token = getAuthToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const res = await fetch(url, {

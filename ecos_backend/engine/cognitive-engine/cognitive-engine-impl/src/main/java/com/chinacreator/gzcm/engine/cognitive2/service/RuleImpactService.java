@@ -1,7 +1,8 @@
 package com.chinacreator.gzcm.engine.cognitive2.service;
 
-import com.chinacreator.gzcm.engine.cognitive2.dao.RuleDao;
 import com.chinacreator.gzcm.engine.cognitive2.model.ImpactAnalysisResult;
+import com.chinacreator.gzcm.engine.kb.ComplianceRuleProvider;
+import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -11,19 +12,19 @@ import java.util.*;
 /**
  * 规则影响分析服务 — 分析指定规则变更后，哪些下游规则会受到波及影响。
  *
- * <p>简化实现：通过 sys_compliance_rule 表的 description 字段文本匹配，
- * 查找所有 description 中引用了目标规则名称/ID 的其他规则。
- * SQL 落点已收口至 {@link RuleDao}（架构铁律 §2.5 #1 / IR06，B2-b，与 RuleCausalService 共用）。</p>
+ * <p>F05-13 收口：sys_compliance_rule 不再自持 DAO 直读他域表（旧 {@code RuleDao}），
+ * 统一经 kb-engine-api sanctioned 门面 {@link ComplianceRuleProvider} 读取。
+ * description 文本匹配逻辑留在 Service 层。</p>
  */
 @Service
 public class RuleImpactService {
 
     private static final Logger log = LoggerFactory.getLogger(RuleImpactService.class);
 
-    private final RuleDao ruleDao;
+    private final ComplianceRuleProvider ruleProvider;
 
-    public RuleImpactService(RuleDao ruleDao) {
-        this.ruleDao = ruleDao;
+    public RuleImpactService(ComplianceRuleProvider ruleProvider) {
+        this.ruleProvider = ruleProvider;
     }
 
     /**
@@ -36,29 +37,28 @@ public class RuleImpactService {
         log.info("Analyzing rule impact for: {}", ruleId);
 
         // 1. 查询源规则
-        List<Map<String, Object>> rootRows = ruleDao.findRuleById(ruleId);
-        if (rootRows.isEmpty()) {
+        ComplianceRule sourceRule = ruleProvider.findById(ruleId).orElse(null);
+        if (sourceRule == null) {
             log.warn("Rule not found: {}", ruleId);
             return new ImpactAnalysisResult(ruleId, null);
         }
 
-        Map<String, Object> rootRow = rootRows.get(0);
-        String sourceName = (String) rootRow.get("name");
-        String sourceDomain = (String) rootRow.get("domain");
+        String sourceName = sourceRule.getName();
+        String sourceDomain = sourceRule.getDomain();
 
         // 2. 加载全量规则
-        List<Map<String, Object>> allRows = ruleDao.findAllRules();
+        List<ComplianceRule> allRules = ruleProvider.findAll();
 
         // 3. 文本匹配：找出 description 中引用源规则的所有规则
         ImpactAnalysisResult result = new ImpactAnalysisResult(ruleId, sourceName);
 
-        for (Map<String, Object> row : allRows) {
-            String otherId = (String) row.get("id");
+        for (ComplianceRule rule : allRules) {
+            String otherId = rule.getId();
             if (otherId.equals(ruleId)) continue; // 跳过自身
 
-            String otherName = (String) row.get("name");
-            String otherDomain = (String) row.get("domain");
-            String otherDesc = (String) row.get("description");
+            String otherName = rule.getName();
+            String otherDomain = rule.getDomain();
+            String otherDesc = rule.getDescription();
 
             String matchReason = findMatchReason(otherDesc, sourceName, ruleId);
             if (matchReason != null) {

@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Copy, Loader, Send } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
+import { useTheme } from '../../../components/ThemeContext';
 import { cognitiveEngineApi } from '../../../services/cognitiveEngineApi';
 import { showToastGlobal } from '../../../components/common/Toast';
+import Button from '../../../components/common/Button';
+import Badge from '../../../components/common/Badge';
 
 interface Variable { key: string; label: string; labelKey: string; min: number; max: number; unit: string; step: number; }
 
@@ -25,6 +28,7 @@ const SENSITIVITY_ROWS = [
 ];
 
 export default function scenarioSimulation() {
+  const { styles } = useTheme();
   const { t } = useLanguage();
   const [values, setValues] = useState<Record<string, number>>({ procurementCost: 0, duration: 0, laborCost: 0 });
   const [calculating, setCalculating] = useState(false);
@@ -38,9 +42,9 @@ export default function scenarioSimulation() {
     try {
       const variables = Object.fromEntries(VARS.map(v => [v.key, values[v.key]]));
       await cognitiveEngineApi.runScenario({ scenarioType: 'A', variables });
-      showToastGlobal('success', t('scenario.recalcOk', '重新计算完成'));
+      showToastGlobal('success', t('scenario.recalcOk'));
     } catch (e) {
-      showToastGlobal('error', `${t('scenario.recalcFailed', '重新计算失败')}: ${(e as Error)?.message ?? e}`);
+      showToastGlobal('error', `${t('scenario.recalcFailed')}: ${(e as Error)?.message ?? e}`);
     } finally {
       setCalculating(false);
     }
@@ -55,9 +59,9 @@ export default function scenarioSimulation() {
         decisionType: 'COGNITIVE_SCENARIO',
         payload: { variables, scenario: 'A' },
       });
-      showToastGlobal('success', t('scenario.decisionSubmitted', 'W 决策输入已提交'));
+      showToastGlobal('success', t('scenario.decisionSubmitted'));
     } catch (e) {
-      showToastGlobal('error', `${t('scenario.decisionFailed', '提交失败')}: ${(e as Error)?.message ?? e}`);
+      showToastGlobal('error', `${t('scenario.decisionFailed')}: ${(e as Error)?.message ?? e}`);
     } finally {
       setSubmitting(false);
     }
@@ -67,100 +71,99 @@ export default function scenarioSimulation() {
     try {
       const text = JSON.stringify({ values, timestamp: new Date().toISOString() }, null, 2);
       await navigator.clipboard.writeText(text);
-      showToastGlobal('success', t('scenario.copied', '情景已复制到剪贴板'));
+      showToastGlobal('success', t('scenario.copied'));
     } catch {
-      showToastGlobal('error', t('scenario.copyFailed', '复制失败'));
+      showToastGlobal('error', t('scenario.copyFailed'));
     }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('scenario.title', '情景推演')}</h1>
+        <h1 className={`text-lg font-semibold ${styles.cardText}`}>{t('scenario.title')}</h1>
         <div className="flex gap-2">
-          <button onClick={handleSubmitDecision} disabled={submitting}
-            className="px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50">
-            {submitting ? <Loader className="w-3.5 h-3.5 inline mr-1 animate-spin" /> : <Send className="w-3.5 h-3.5 inline mr-1" />}
-            {t('scenario.submitDecision', '提交 W 决策输入')}
-          </button>
-          <button onClick={handleCopy}
-            className="px-3 py-1.5 rounded-md text-sm font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-1">
-            <Copy className="w-3.5 h-3.5" />
-            {t('scenario.copy', '复制情景')}
-          </button>
+          <Button variant="primary" size="md" onClick={handleSubmitDecision} disabled={submitting} aria-label={t('scenario.submitDecision')}>
+            {submitting ? <Loader className="w-3.5 h-3.5 inline mr-1 animate-spin" aria-hidden /> : <Send className="w-3.5 h-3.5 inline mr-1" aria-hidden />}
+            {t('scenario.submitDecision')}
+          </Button>
+          <Button variant="secondary" size="md" onClick={handleCopy} aria-label={t('scenario.copy')}>
+            <Copy className="w-3.5 h-3.5" aria-hidden />
+            {t('scenario.copy')}
+          </Button>
         </div>
       </div>
 
       {/* Scenario cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" role="group" aria-label={t('scenario.title')}>
         {SCENARIOS.map(s => (
-          <div key={s.key} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{t(s.nameKey, s.name)}</p>
+          <div key={s.key} className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4`}>
+            <p className={`text-sm font-medium ${styles.cardText}`}>{t(s.nameKey, s.name)}</p>
             <div className="flex items-baseline gap-2 mt-2">
-              <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">{s.metric}</span>
+              <span className={`text-2xl font-bold ${styles.cardText}`}>{s.metric}</span>
               {s.change !== 0 && (
-                <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                  s.change > 0 ? 'bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300'
-                }`}>
+                // 涨跌双通道：箭头字形（↑/↓）+ 语义徽标色，不依赖颜色单一通道（B.7）
+                <Badge variant={s.change > 0 ? 'success' : 'danger'}>
                   {s.change > 0 ? '↑' : '↓'} {Math.abs(s.change)}
-                </span>
+                </Badge>
               )}
             </div>
-            <p className="text-xs text-slate-400 mt-1">{t(s.metricKey, '毛利')}</p>
+            <p className={`text-xs ${styles.muted} mt-1`}>{t(s.metricKey, '毛利')}</p>
           </div>
         ))}
       </div>
 
       {/* Variable controls + sensitivity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-4">
-          <h2 className="text-sm font-medium text-slate-900 dark:text-slate-100">{t('scenario.varControls', '变量控制')}</h2>
+        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4 space-y-4`}>
+          <h2 className={`text-sm font-medium ${styles.cardText}`}>{t('scenario.varControls')}</h2>
           {VARS.map(v => (
             <div key={v.key} className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-sm text-slate-700 dark:text-slate-300">{t(v.labelKey, v.label)}</label>
-                <span className="text-sm font-mono text-slate-500 dark:text-slate-400">{values[v.key]}{v.unit}</span>
+                <label className={`text-sm ${styles.cardText}`}>{t(v.labelKey, v.label)}</label>
+                <span className={`text-sm font-mono ${styles.muted}`}>{values[v.key]}{v.unit}</span>
               </div>
               <input type="range" min={v.min} max={v.max} step={v.step} value={values[v.key]}
+                aria-label={t(v.labelKey, v.label)}
                 onChange={e => handleChange(v.key, Number(e.target.value))}
-                className="w-full h-1.5 rounded bg-slate-200 dark:bg-slate-700 appearance-none cursor-pointer accent-blue-600" />
-              <div className="flex justify-between text-xs text-slate-400">
+                className={`w-full h-1.5 rounded ${styles.inputBg} appearance-none cursor-pointer`}
+                style={{ accentColor: 'currentColor' }} />
+              <div className={`flex justify-between text-xs ${styles.muted}`}>
                 <span>{v.min}{v.unit}</span>
                 <span>{v.max}{v.unit}</span>
               </div>
             </div>
           ))}
-          <button onClick={handleRecalc} disabled={calculating}
-            className="w-full px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50">
-            {calculating ? <Loader className="w-3.5 h-3.5 inline mr-1 animate-spin" /> : null}
-            {t('scenario.recalculate', '重新计算')}
-          </button>
+          <Button variant="primary" size="md" onClick={handleRecalc} disabled={calculating} className="w-full" aria-label={t('scenario.recalculate')}>
+            {calculating ? <Loader className="w-3.5 h-3.5 inline mr-1 animate-spin" aria-hidden /> : null}
+            {t('scenario.recalculate')}
+          </Button>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-          <h2 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">{t('scenario.sensitivity', '敏感性与解释')}</h2>
-          <table className="w-full text-sm">
+        <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4`}>
+          <h2 className={`text-sm font-medium ${styles.cardText} mb-3`}>{t('scenario.sensitivity')}</h2>
+          <table className="w-full text-sm" aria-label={t('scenario.sensitivity')}>
             <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-xs text-slate-500 dark:text-slate-400">
-                <th className="py-1.5 font-medium">{t('scenario.col.var', '变量')}</th>
-                <th className="py-1.5 font-medium">{t('scenario.col.impact', '影响')}</th>
-                <th className="py-1.5 font-medium">{t('scenario.col.direction', '方向')}</th>
+              <tr className={`border-b ${styles.cardBorder} text-left text-xs ${styles.muted}`}>
+                <th scope="col" className="py-1.5 font-medium">{t('scenario.col.var')}</th>
+                <th scope="col" className="py-1.5 font-medium">{t('scenario.col.impact')}</th>
+                <th scope="col" className="py-1.5 font-medium">{t('scenario.col.direction')}</th>
               </tr>
             </thead>
             <tbody>
               {SENSITIVITY_ROWS.map(r => (
-                <tr key={r.varKey} className="border-b border-slate-100 dark:border-slate-800 last:border-0">
-                  <td className="py-2 text-slate-700 dark:text-slate-300">{t(r.varKey, r.varLabel)}</td>
-                  <td className="py-2 text-slate-500 dark:text-slate-400">{r.impact.toFixed(2)}</td>
+                <tr key={r.varKey} className={`border-b ${styles.divider} last:border-0`}>
+                  <td className={`py-2 ${styles.cardText}`}>{t(r.varKey, r.varLabel)}</td>
+                  <td className={`py-2 ${styles.muted}`}>{r.impact.toFixed(2)}</td>
                   <td className="py-2">
-                    <span className={`text-xs font-medium ${r.direction === '↑' ? 'text-red-500' : 'text-green-500'}`}>{r.direction}</span>
+                    {/* 方向双通道：↑/↓ 字形本体即非颜色通道，语义色仅做增强（B.7） */}
+                    <span className={`text-xs font-medium ${r.direction === '↑' ? styles.dangerText : styles.successText}`}>{r.direction}</span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
-            {t('scenario.explanation', '采购成本是研发投入波动的主要驱动因素，其次是工期延长导致的运营成本增加。')}
+          <p className={`text-xs ${styles.muted} mt-3`}>
+            {t('scenario.explanation')}
           </p>
         </div>
       </div>

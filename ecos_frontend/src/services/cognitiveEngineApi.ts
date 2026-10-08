@@ -1,7 +1,11 @@
-import { apiFetchData } from "../api";
+// apiFetchData 直接取自传输原语单源 services/httpClient.ts（不再经 src/api.ts shim，
+// 避免 api ↔ cognitiveEngineApi ↔ cognitiveClient 的求值环；design-05 B.9-1/B.9-2）
+import { apiFetchData } from "./httpClient";
+import { COGNITIVE_BASE, COGNITIVE_ENGINE_BASE } from "./cognitiveClient";
 
-const ENGINE_BASE = "/api/v1/engine/cognitive";
-const COGNITIVE_BASE = "/api/v1/cognitive";
+// 路径常量单源（X-47/X-50 收敛）：`/api/v1/cognitive` 与 `/api/v1/engine/cognitive`
+// 唯一定义处 = services/cognitiveClient.ts，此处仅引用，不再重复字面量。
+const ENGINE_BASE = COGNITIVE_ENGINE_BASE;
 
 // ── Diagnosis ────────────────────────────────────────────
 

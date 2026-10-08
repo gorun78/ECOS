@@ -68,9 +68,11 @@ export default function CognitionWorkbench() {
                 key={item.id}
                 type="button"
                 onClick={() => setActive(item.id)}
+                aria-pressed={isActive}
+                aria-label={t(item.labelKey)}
                 className={`h-9 px-3 rounded-t-md border-t-2 flex items-center gap-2 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer transition ${
                   isActive
-                    ? `bg-transparent border-transparent ${styles.cardText} font-bold ${styles.accentBorder} border-t-indigo-500 dark:border-t-emerald-500 dark:text-emerald-400`
+                    ? `bg-transparent border-transparent ${styles.accentText} font-bold border-t-current`
                     : `border-transparent opacity-70 hover:opacity-100 ${styles.cardTextMuted}`
                 }`}
               >

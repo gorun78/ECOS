@@ -1,7 +1,9 @@
 package com.chinacreator.gzcm.engine.cognitive2;
 
 import com.chinacreator.gzcm.engine.cognitive2.service.EntityLinker;
+import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
 
@@ -12,7 +14,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class EntityLinkerTest {
 
-    private final EntityLinker linker = new EntityLinker();
+    // F05-15：客户端由调用方注入（共享 RestTemplate bean）+ runtime-access 寻址，测试同款装配
+    private final EntityLinker linker = new EntityLinker(new RestTemplate(), new ServiceEndpointResolver());
 
     @Test
     void invalidInputReturnsInvalidStatus() {

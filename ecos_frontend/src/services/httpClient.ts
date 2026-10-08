@@ -1,7 +1,12 @@
 /**
  * HTTP 传输原语单源层 (PMO-74.6 H6-T2) — 自 src/api.ts 逐字迁入，行为不变。
  * src/api.ts 通过 re-export 保持既有 `from "./api"` 导入面。
+ *
+ * auth 单源 (design-05 X-51 / B.9-2)：三处 fetch 的 Bearer token 一律经
+ * `services/auth.ts#getAuthToken()`（三 key union）读取，禁直读 `localStorage['token']`。
  */
+
+import { clearAuthToken, getAuthToken } from "./auth";
 
 export const API_BASE = "/api";
 
@@ -155,7 +160,8 @@ export function handleAuthExpired(): never {
     // 宽限期内：只 throw，不清 token、不跳 #/login
     throw new Error("Session refresh in progress. Please try again.");
   }
-  localStorage.removeItem('token');
+  // token 清理走 services/auth 单源通道（X-51），username/roles 为展示侧信息
+  clearAuthToken();
   localStorage.removeItem('username');
   localStorage.removeItem('roles');
   // Hash-based redirect avoids React Router race conditions
@@ -240,7 +246,7 @@ export function encodeQueryString(path: string): string {
  */
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const finalPath = encodeQueryString(path);
-  const token = localStorage.getItem('token') || '';
+  const token = getAuthToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   let res: Response;
@@ -267,7 +273,7 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
  * and {code,data} response formats.
  */
 export async function apiFetchData<T>(url: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('token') || '';
+  const token = getAuthToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   let res: Response;
@@ -294,11 +300,11 @@ export async function apiFetchData<T>(url: string, options?: RequestInit): Promi
 
 /**
  * Simple doFetch – returns full JSON body from arbitrary URL.
- * Includes Authorization Bearer token from localStorage when available.
+ * Includes Authorization Bearer token via `services/auth#getAuthToken()` when available.
  * Network failures are normalized to NetworkError + ecos-network-down event.
  */
 export async function doFetch(url: string, opts: RequestInit = {}): Promise<any> {
-  const token = localStorage.getItem('token') || '';
+  const token = getAuthToken();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   let r: Response;

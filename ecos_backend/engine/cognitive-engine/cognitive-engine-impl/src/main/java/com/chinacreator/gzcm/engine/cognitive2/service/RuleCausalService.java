@@ -1,9 +1,10 @@
 package com.chinacreator.gzcm.engine.cognitive2.service;
 
-import com.chinacreator.gzcm.engine.cognitive2.dao.RuleDao;
 import com.chinacreator.gzcm.engine.cognitive2.model.CausalChainNode;
 import com.chinacreator.gzcm.engine.cognitive2.model.CausalChainResult;
 import com.chinacreator.gzcm.engine.cognitive2.model.CausalEdge;
+import com.chinacreator.gzcm.engine.kb.ComplianceRuleProvider;
+import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -12,21 +13,22 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 规则因果链服务 — 通过 sys_compliance_rule 表的 description 字段文本匹配构建因果链。
+ * 规则因果链服务 — 通过合规规则的 description 字段文本匹配构建因果链。
  *
- * <p>简化实现：使用 PG SQL 直接查询 sys_compliance_rule，通过 description 中的规则名称/ID 引用
- * 发现因果依赖关系，递归构建因果链节点和边。
- * SQL 落点已收口至 {@link RuleDao}（架构铁律 §2.5 #1 / IR06，B2-b，与 RuleImpactService 共用）。</p>
+ * <p>F05-13 收口：sys_compliance_rule 不再自持 DAO 直读他域表（旧 {@code RuleDao}），
+ * 统一经 kb-engine-api sanctioned 门面 {@link ComplianceRuleProvider} 读取
+ * （gateway 宿主=kb-impl 本地 Bean，aiming 宿主=KbRestClientConfig REST 代理，双态同源）。
+ * description 文本引用匹配逻辑留在 Service 层。</p>
  */
 @Service
 public class RuleCausalService {
 
     private static final Logger log = LoggerFactory.getLogger(RuleCausalService.class);
 
-    private final RuleDao ruleDao;
+    private final ComplianceRuleProvider ruleProvider;
 
-    public RuleCausalService(RuleDao ruleDao) {
-        this.ruleDao = ruleDao;
+    public RuleCausalService(ComplianceRuleProvider ruleProvider) {
+        this.ruleProvider = ruleProvider;
     }
 
     /**
@@ -39,22 +41,21 @@ public class RuleCausalService {
         log.info("Building causal chain for rule: {}", ruleId);
 
         // 1. 查询目标规则
-        List<Map<String, Object>> rootRows = ruleDao.findRuleById(ruleId);
-        if (rootRows.isEmpty()) {
+        ComplianceRule rootRule = ruleProvider.findById(ruleId).orElse(null);
+        if (rootRule == null) {
             log.warn("Rule not found: {}", ruleId);
             return new CausalChainResult(ruleId);
         }
 
-        Map<String, Object> rootRow = rootRows.get(0);
-        String rootName = (String) rootRow.get("name");
-        String rootDomain = (String) rootRow.get("domain");
-        String rootDesc = (String) rootRow.get("description");
+        String rootName = rootRule.getName();
+        String rootDomain = rootRule.getDomain();
+        String rootDesc = rootRule.getDescription();
 
         // 2. 加载全量规则
-        List<Map<String, Object>> allRows = ruleDao.findAllRules();
-        Map<String, Map<String, Object>> ruleMap = new HashMap<>();
-        for (Map<String, Object> row : allRows) {
-            ruleMap.put((String) row.get("id"), row);
+        List<ComplianceRule> allRules = ruleProvider.findAll();
+        Map<String, ComplianceRule> ruleMap = new HashMap<>();
+        for (ComplianceRule rule : allRules) {
+            ruleMap.put(rule.getId(), rule);
         }
 
         // 3. 构建因果链 (BFS)
@@ -82,18 +83,18 @@ public class RuleCausalService {
             String[] current = queue.poll();
             String curRuleId = current[0];
             String curNodeId = current[1];
-            Map<String, Object> curRow = ruleMap.get(curRuleId);
-            if (curRow == null) continue;
+            ComplianceRule curRule = ruleMap.get(curRuleId);
+            if (curRule == null) continue;
 
-            String curName = (String) curRow.get("name");
-            String curDesc = (String) curRow.get("description");
+            String curName = curRule.getName();
+            String curDesc = curRule.getDescription();
 
             // 遍历所有规则，查找 description 中引用了当前规则名称或ID的规则
-            for (Map.Entry<String, Map<String, Object>> entry : ruleMap.entrySet()) {
+            for (Map.Entry<String, ComplianceRule> entry : ruleMap.entrySet()) {
                 String otherId = entry.getKey();
-                Map<String, Object> otherRow = entry.getValue();
-                String otherName = (String) otherRow.get("name");
-                String otherDesc = (String) otherRow.get("description");
+                ComplianceRule otherRule = entry.getValue();
+                String otherName = otherRule.getName();
+                String otherDesc = otherRule.getDescription();
 
                 // 跳过自身；检查 otherDesc 是否引用 curName 或 curRuleId
                 if (otherId.equals(curRuleId)) continue;
@@ -120,7 +121,7 @@ public class RuleCausalService {
                             "node_" + nodeCounter.getAndIncrement(),
                             otherId,
                             otherName,
-                            (String) otherRow.get("domain"),
+                            otherRule.getDomain(),
                             truncate(otherDesc, 200)
                     );
                     result.getNodes().add(childNode);

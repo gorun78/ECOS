@@ -39,9 +39,11 @@ class ConfigSingleSourceArchTest {
      * data-engine DQ 定时任务 + Git 归档 / workspace 知识配置聚合）的 SQL 已下沉到各模块
      * {@code dao} 层（继承 {@code JdbcTemplateDaoSupport}）。基线同步替换为收口后的 DAO 文件。
      * 口径仍为 <b>no-new-violation</b>（存量只减不增，待后续批次经 sysman 面切断时逐项删除）。
+     *
+     * <p>详设-05 F05-13 已把 cognitive 侧 {@code ConfigQueryDao} 切断到 sysman 配置门面并删除该 DAO
+     * —— 按本类第 2 条反证语义（"已收口即删基线行"）同步移除该登记项，非放宽红线。
      */
     private static final Set<String> KNOWN_VIOLATION_BASELINE = new TreeSet<>(Set.of(
-            "engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/dao/ConfigQueryDao.java",
             "engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/dao/DqScheduleRunDao.java",
             "engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/dao/MetadataGitArchiveConfigDao.java",
             "workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/dao/WorkspaceDataDao.java"

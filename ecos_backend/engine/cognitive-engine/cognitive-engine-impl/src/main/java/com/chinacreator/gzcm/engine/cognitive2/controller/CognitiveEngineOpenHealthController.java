@@ -146,17 +146,14 @@ public class CognitiveEngineOpenHealthController {
             }
         }
 
-        // ── 3) 组装 VO + 状态判定 ──
+        // ── 3) 组装 VO + 状态判定（汇总态同样只由探测结果三元派生 — F05-16 诚实面门禁）──
         CognitiveEngineOpenHealthVO vo = new CognitiveEngineOpenHealthVO();
         vo.setComponents(components);
         vo.setUptimeMs(uptimeMs);
         vo.setVersion(VERSION);
-        if (dbUp && components.getPipelineCount() != -1L && components.getPipelineActiveCount() != -1L) {
-            vo.setStatus("UP");
-        } else if (dbUp) {
-            vo.setStatus("DEGRADED");
-        } else {
-            vo.setStatus("DOWN");
+        boolean countsOk = components.getPipelineCount() != -1L && components.getPipelineActiveCount() != -1L;
+        vo.setStatus(!dbUp ? "DOWN" : (countsOk ? "UP" : "DEGRADED"));
+        if (!dbUp) {
             vo.setReason(dbReason == null ? "db-conn" : dbReason);
         }
         return ApiResponse.success(vo);

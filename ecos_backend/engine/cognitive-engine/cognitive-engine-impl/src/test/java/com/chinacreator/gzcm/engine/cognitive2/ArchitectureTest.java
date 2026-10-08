@@ -73,8 +73,12 @@ public class ArchitectureTest {
             //     承载 COGNITIVE_HYPOTHESIS_INVALIDATED / BELIEF_UPDATED / EVIDENCE_REGISTERED
             //     三类心智层事件；是事件 DTO 而非服务门面，故不套 I 前缀。
             // 精确白名单（haveSimpleName）而非前缀，避免放宽 "..service.. 下所有 Cognitive*/Mental*"。
+            // 2026-10-08 详细设计-05 D.3/C.2（F05-09/F05-10）新增的同理端口：
+            //   - ForecastRunSnapshotReader：预测运行服务（PRD-09 FC-02 只读快照 / FC-03 情景复制重算）
+            //     的解耦端口，命名沿用设计文档 §C.2 步骤1 冻结名，非服务门面故不套 I 前缀。
             .orShould().haveSimpleName("CognitivePipelineStore")
-            .orShould().haveSimpleName("MentalEvent");
+            .orShould().haveSimpleName("MentalEvent")
+            .orShould().haveSimpleName("ForecastRunSnapshotReader");
         rule.allowEmptyShould(true).check(classes);
     }
 

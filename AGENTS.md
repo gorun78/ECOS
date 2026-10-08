@@ -168,6 +168,7 @@ ECOS/（Windows D:\workspace\javaprojects\ECOS）
 ├─ ecos_backend/  Java 17 / SB 3.2.2 微服务 v2 (7 JAR)，入口 gateway/GatewayApplication.java
 │  ├─ gateway/            :8080 唯一 monolith fat-JAR（组织/认证 facade，聚合全部模块）
 │  ├─ engine/             六引擎（api/impl/boot 三模块制）：security-护18081 / data-土D18082 / ontology-金I18083 / ai-火W18084 / cognitive-木C18089 / kb-水K18086
+│    > **[2026-10-02 详设-05 回收] Cg-11**：ADR-15 制品≠承流注记——cognitive-boot :18089 从未独立承流；认知 17 Controller 由 gateway + aiming 双宿主承载。
 │  ├─ runtime/            器·横切底座 7 模块：common-api / runtime-core / runtime-access / runtime-task / runtime-monitor / runtime-event / llm-gateway
 │  ├─ services/           v2 五微服务：sysman:18081 / datanet:18082 / buszhi:18083 / aiming:18084 / dccheng:18086（sysman/impl、buszhi/impl 为 P8 内阁目录；`agent-service` 经 PMO-74 H11-T2 挂回根 reactor，不再是遗留；api-gateway/identity-service/ontology-service 三个幽灵 pom 经 Q3 批次 A 归档至 `ecos_backend/archive/legacy/services-ghost/`）
 │  ├─ workspace/          场景层 :18090（workspace-impl + workspace-service）

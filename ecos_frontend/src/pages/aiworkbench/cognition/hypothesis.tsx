@@ -1,20 +1,26 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Search, Plus, X, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
+import { useTheme } from '../../../components/ThemeContext';
 import { cognitiveEngineApi } from '../../../services/cognitiveEngineApi';
 import { showToastGlobal } from '../../../components/common/Toast';
+import Button from '../../../components/common/Button';
+import Badge, { type BadgeVariant } from '../../../components/common/Badge';
 import type { Hypothesis, Evidence } from './types';
 
-const STATUS_STYLES: Record<string, string> = {
-  VALID: 'bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-300',
-  TESTING: 'bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300',
-  SUPPORTED: 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300',
-  REJECTED: 'bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300',
+// 主题合规（前端规范 §七.1 / design-05 B.9-4）：状态色一律走 Badge 语义变体，
+// 具体明暗形态由 useTheme() token 层提供，页面不再出现 Tailwind 色字面量。
+const STATUS_BADGE: Record<string, BadgeVariant> = {
+  VALID: 'success',
+  TESTING: 'warning',
+  SUPPORTED: 'info',
+  REJECTED: 'danger',
 };
 
 const STATUS_LABELS: Record<string, string> = { VALID: '有效', TESTING: '测试中', SUPPORTED: '已支持', REJECTED: '已拒绝' };
 
 export default function hypothesis() {
+  const { styles } = useTheme();
   const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -38,7 +44,7 @@ export default function hypothesis() {
       const list: Hypothesis[] = Array.isArray(data) ? data : ((data as any)?.data ?? (data as any)?.records ?? []);
       setHypotheses(list);
     } catch (e) {
-      showToastGlobal('error', `${t('hypo.loadFail', '加载假设列表失败')}: ${(e as Error)?.message ?? e}`);
+      showToastGlobal('error', `${t('hypo.loadFail')}: ${(e as Error)?.message ?? e}`);
     } finally {
       setLoading(false);
     }
@@ -61,14 +67,14 @@ export default function hypothesis() {
     try {
       const firstEvidence = evidence[0]?.id;
       if (!firstEvidence) {
-        showToastGlobal('error', t('hypo.noEvidence', '暂无关联证据'));
+        showToastGlobal('error', t('hypo.noEvidence'));
         return;
       }
       await cognitiveEngineApi.updateBeliefByEvidence(selected.code ?? selected.id, { evidenceId: firstEvidence });
-      showToastGlobal('success', t('hypo.supported', '已标记支持'));
+      showToastGlobal('success', t('hypo.supported'));
       loadData();
     } catch (e) {
-      showToastGlobal('error', `${t('hypo.supportFail', '操作失败')}: ${(e as Error)?.message ?? e}`);
+      showToastGlobal('error', `${t('hypo.supportFail')}: ${(e as Error)?.message ?? e}`);
     }
   };
 
@@ -76,17 +82,17 @@ export default function hypothesis() {
     if (!selected) return;
     try {
       await cognitiveEngineApi.invalidateHypothesis(selected.id);
-      showToastGlobal('success', t('hypo.rejected', '已标记反驳'));
+      showToastGlobal('success', t('hypo.rejected'));
       loadData();
     } catch (e) {
-      showToastGlobal('error', `${t('hypo.rejectFail', '操作失败')}: ${(e as Error)?.message ?? e}`);
+      showToastGlobal('error', `${t('hypo.rejectFail')}: ${(e as Error)?.message ?? e}`);
     }
   };
 
   const handleCreate = async () => {
     if (creating) return;
     if (!newStatement.trim()) {
-      showToastGlobal('error', t('hypo.statementRequired', '请填写假设描述'));
+      showToastGlobal('error', t('hypo.statementRequired'));
       return;
     }
     setCreating(true);
@@ -96,14 +102,14 @@ export default function hypothesis() {
         domain: newDomain.trim() || undefined,
         evidenceIds: newEvidenceIds.trim() ? newEvidenceIds.trim().split(',').map(s => s.trim()) : undefined,
       });
-      showToastGlobal('success', t('hypo.created', '假设已创建'));
+      showToastGlobal('success', t('hypo.created'));
       setShowModal(false);
       setNewStatement('');
       setNewDomain('');
       setNewEvidenceIds('');
       loadData();
     } catch (e) {
-      showToastGlobal('error', `${t('hypo.createFail', '创建失败')}: ${(e as Error)?.message ?? e}`);
+      showToastGlobal('error', `${t('hypo.createFail')}: ${(e as Error)?.message ?? e}`);
     } finally {
       setCreating(false);
     }
@@ -115,32 +121,39 @@ export default function hypothesis() {
     return true;
   });
 
+  const modalInput = `mt-1 w-full px-3 py-2 text-sm border ${styles.cardBorder} rounded-md ${styles.inputBg} ${styles.inputText}`;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('hypo.title', '假设管理')}</h1>
-        <button onClick={() => setShowModal(true)}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+        <h1 className={`text-lg font-semibold ${styles.cardText}`}>{t('hypo.title')}</h1>
+        <Button variant="primary" size="md" onClick={() => setShowModal(true)} aria-label={t('hypo.new')}>
           <Plus className="w-4 h-4" />
-          {t('hypo.new', '新建假设')}
-        </button>
+          {t('hypo.new')}
+        </Button>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input className="w-full pl-9 pr-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
-            placeholder={t('hypo.search', '搜索假设…')} value={search} onChange={e => setSearch(e.target.value)} />
+        <div className={`relative flex-1 min-w-[200px]`}>
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${styles.muted}`} aria-hidden />
+          <input
+            aria-label={t('hypo.search')}
+            className={`w-full pl-9 pr-3 py-1.5 text-sm border ${styles.cardBorder} rounded-md ${styles.inputBg} ${styles.inputText}`}
+            placeholder={t('hypo.search')} value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <select className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300"
+        <select
+          aria-label={t('hypo.status.all')}
+          className={`px-3 py-1.5 text-sm border ${styles.cardBorder} rounded-md ${styles.inputBg} ${styles.inputText}`}
           value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-          <option value="">{t('hypo.status.all', '全部状态')}</option>
+          <option value="">{t('hypo.status.all')}</option>
           {Object.keys(STATUS_LABELS).map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
         </select>
-        <select className="px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300"
+        <select
+          aria-label={t('hypo.impact.all')}
+          className={`px-3 py-1.5 text-sm border ${styles.cardBorder} rounded-md ${styles.inputBg} ${styles.inputText}`}
           value={impactFilter} onChange={e => setImpactFilter(e.target.value)}>
-          <option value="">{t('hypo.impact.all', '全部影响级别')}</option>
+          <option value="">{t('hypo.impact.all')}</option>
           <option value="HIGH">High</option>
           <option value="MEDIUM">Medium</option>
           <option value="LOW">Low</option>
@@ -148,43 +161,45 @@ export default function hypothesis() {
       </div>
 
       {/* Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg overflow-x-auto`}>
+        <table className="w-full text-sm" aria-label={t('hypo.title')}>
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-700 text-left text-xs text-slate-500 dark:text-slate-400">
-              <th className="px-4 py-2 font-medium">{t('hypo.col.hypothesis', '假设')}</th>
-              <th className="px-4 py-2 font-medium">{t('hypo.col.object', '对象')}</th>
-              <th className="px-4 py-2 font-medium">{t('hypo.col.status', '状态')}</th>
-              <th className="px-4 py-2 font-medium">{t('hypo.col.support', '支持度')}</th>
-              <th className="px-4 py-2 font-medium">{t('hypo.col.evidence', '证据')}</th>
-              <th className="px-4 py-2 font-medium">{t('hypo.col.updated', '更新时间')}</th>
-              <th className="px-4 py-2 font-medium">{t('hypo.col.action', '操作')}</th>
+            <tr className={`border-b ${styles.cardBorder} text-left text-xs ${styles.muted}`}>
+              <th scope="col" className="px-4 py-2 font-medium">{t('hypo.col.hypothesis')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('hypo.col.object')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('hypo.col.status')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('hypo.col.support')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('hypo.col.evidence')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('hypo.col.updated')}</th>
+              <th scope="col" className="px-4 py-2 font-medium">{t('hypo.col.action')}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-400">Loading…</td></tr>
+              <tr><td colSpan={7} className={`px-4 py-6 text-center ${styles.muted}`} role="status">{t('common.loading')}</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-400">{t('hypo.empty', '暂无假设')}</td></tr>
+              <tr><td colSpan={7} className={`px-4 py-6 text-center ${styles.muted}`}>{t('hypo.empty')}</td></tr>
             ) : filtered.map(h => (
-              <tr key={h.id} className="border-b border-slate-100 dark:border-slate-800 last:border-0 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
+              <tr key={h.id} className={`border-b ${styles.divider} last:border-0 cursor-pointer ${styles.sidebarHoverBg}`}
                 onClick={() => handleSelect(h)}>
                 <td className="px-4 py-2">
-                  <span className="text-xs text-slate-400 font-mono">{h.code}</span>
-                  <p className="text-slate-900 dark:text-slate-100 truncate max-w-[200px]">{h.statement}</p>
+                  <span className={`text-xs ${styles.muted} font-mono`}>{h.code}</span>
+                  <p className={`${styles.cardText} truncate max-w-[200px]`}>{h.statement}</p>
                 </td>
-                <td className="px-4 py-2 text-slate-500 dark:text-slate-400">{h.domain ?? '—'}</td>
+                <td className={`px-4 py-2 ${styles.muted}`}>{h.domain ?? '—'}</td>
                 <td className="px-4 py-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_STYLES[h.status] ?? 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                  <Badge variant={STATUS_BADGE[h.status] ?? 'neutral'}>
                     {STATUS_LABELS[h.status] ?? h.status}
-                  </span>
+                  </Badge>
                 </td>
-                <td className="px-4 py-2 text-slate-700 dark:text-slate-300">{h.isValid ? '—' : '—'}</td>
-                <td className="px-4 py-2 text-slate-500 dark:text-slate-400">—</td>
-                <td className="px-4 py-2 text-slate-400 text-xs">{(h as any).updatedAt ?? '—'}</td>
+                <td className={`px-4 py-2 ${styles.cardText}`}>{h.isValid ? '—' : '—'}</td>
+                <td className={`px-4 py-2 ${styles.muted}`}>—</td>
+                <td className={`px-4 py-2 ${styles.muted} text-xs`}>{(h as any).updatedAt ?? '—'}</td>
                 <td className="px-4 py-2" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => handleSelect(h)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">
-                    {t('hypo.view', '查看')}
+                  <button type="button" onClick={() => handleSelect(h)}
+                    aria-label={t('hypo.view')}
+                    className={`text-xs ${styles.accentText} hover:underline font-medium`}>
+                    {t('hypo.view')}
                   </button>
                 </td>
               </tr>
@@ -195,98 +210,100 @@ export default function hypothesis() {
 
       {/* Drawer */}
       {selected && (
-        <div className="fixed inset-y-0 right-0 w-[380px] bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-xl flex flex-col z-50">
-          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{selected.code} · {t('hypo.title', '假设')}</h2>
-            <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+        <div className={`fixed inset-y-0 right-0 w-[380px] ${styles.cardBg} border-l ${styles.cardBorder} shadow-xl flex flex-col z-50`}
+          role="dialog" aria-label={t('hypo.title')} aria-modal="true">
+          <div className={`flex items-center justify-between p-4 border-b ${styles.cardBorder}`}>
+            <h2 className={`text-sm font-semibold ${styles.cardText}`}>{selected.code} · {t('hypo.title')}</h2>
+            <button type="button" onClick={() => setSelected(null)} aria-label={t('common.close')}
+              className={`p-1 rounded ${styles.muted} hover:opacity-70 cursor-pointer`}><X className="w-4 h-4" /></button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            <p className="text-sm text-slate-700 dark:text-slate-300">{selected.statement}</p>
+            <p className={`text-sm ${styles.cardText}`}>{selected.statement}</p>
             <div>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">{t('hypo.supportEvidence', '支持证据')}</p>
+              <p className={`text-xs font-medium ${styles.muted} mb-2`}>{t('hypo.supportEvidence')}</p>
               {evidence.filter(e => !e.isConflict).length === 0 ? (
-                <p className="text-xs text-slate-400">{t('hypo.noEvidenceShort', '暂无')}</p>
+                <p className={`text-xs ${styles.muted}`}>{t('hypo.noEvidenceShort')}</p>
               ) : evidence.filter(e => !e.isConflict).map(e => (
-                <div key={e.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 dark:bg-slate-800 rounded text-xs text-slate-700 dark:text-slate-300 mb-1">
-                  <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                <div key={e.id} className={`flex items-center gap-2 px-2 py-1.5 ${styles.inputBg} rounded text-xs ${styles.cardText} mb-1`}>
+                  <CheckCircle className={`w-3.5 h-3.5 ${styles.successText} flex-shrink-0`} aria-hidden />
                   <span className="font-mono">{e.code}</span>
-                  <span className="ml-auto text-slate-400">{(e.confidence * 100).toFixed(0)}%</span>
+                  <span className={`ml-auto ${styles.muted}`}>{(e.confidence * 100).toFixed(0)}%</span>
                 </div>
               ))}
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">{t('hypo.rebuttalEvidence', '反驳证据')}</p>
+              <p className={`text-xs font-medium ${styles.muted} mb-2`}>{t('hypo.rebuttalEvidence')}</p>
               {evidence.filter(e => e.isConflict).length === 0 ? (
-                <p className="text-xs text-slate-400">{t('hypo.noEvidenceShort', '暂无')}</p>
+                <p className={`text-xs ${styles.muted}`}>{t('hypo.noEvidenceShort')}</p>
               ) : evidence.filter(e => e.isConflict).map(e => (
-                <div key={e.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 dark:bg-slate-800 rounded text-xs text-slate-700 dark:text-slate-300 mb-1">
-                  <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                <div key={e.id} className={`flex items-center gap-2 px-2 py-1.5 ${styles.inputBg} rounded text-xs ${styles.cardText} mb-1`}>
+                  <AlertTriangle className={`w-3.5 h-3.5 ${styles.dangerText} flex-shrink-0`} aria-hidden />
                   <span className="font-mono">{e.code}</span>
-                  <span className="ml-auto text-slate-400">{(e.confidence * 100).toFixed(0)}%</span>
+                  <span className={`ml-auto ${styles.muted}`}>{(e.confidence * 100).toFixed(0)}%</span>
                 </div>
               ))}
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('hypo.currentBelief', '当前 Belief')}</p>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded p-2">
-                <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 mb-1">
+              <p className={`text-xs font-medium ${styles.muted} mb-1`}>{t('hypo.currentBelief')}</p>
+              <div className={`${styles.inputBg} rounded p-2`}>
+                <div className={`flex items-center justify-between text-xs ${styles.cardText} mb-1`}>
                   <span>{selected.code}: belief</span>
                   <span className="font-mono">0.72</span>
                 </div>
-                <div className="h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full" style={{ width: '72%' }} />
+                <div className={`h-1.5 ${styles.sidebarBg} rounded-full overflow-hidden`}>
+                  <div className={`h-full ${styles.accentBg} rounded-full`} style={{ width: '72%' }} />
                 </div>
               </div>
             </div>
           </div>
-          <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex gap-2">
-            <button onClick={handleSupport}
-              className="flex-1 px-3 py-1.5 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700">
-              {t('hypo.markSupport', '标记支持')}
+          <div className={`p-4 border-t ${styles.cardBorder} flex gap-2`}>
+            <button type="button" onClick={handleSupport}
+              aria-label={t('hypo.markSupport')}
+              className={`flex-1 rounded-md border px-3 py-1.5 text-sm font-medium transition-opacity hover:opacity-90 cursor-pointer ${styles.successBg} ${styles.successText} ${styles.successBorder}`}>
+              {t('hypo.markSupport')}
             </button>
-            <button onClick={handleReject}
-              className="flex-1 px-3 py-1.5 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700">
-              {t('hypo.markReject', '标记反驳')}
-            </button>
+            <Button variant="danger" onClick={handleReject} className="flex-1" aria-label={t('hypo.markReject')}>
+              {t('hypo.markReject')}
+            </Button>
           </div>
         </div>
       )}
 
       {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className={`fixed inset-0 ${styles.overlayBg} flex items-center justify-center z-50 p-4`} onClick={() => setShowModal(false)}>
+          <div className={`${styles.cardBg} rounded-lg shadow-xl w-full max-w-md p-6 space-y-4`} onClick={e => e.stopPropagation()}
+            role="dialog" aria-label={t('hypo.new')} aria-modal="true">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">{t('hypo.new', '新建假设')}</h2>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
+              <h2 className={`text-base font-semibold ${styles.cardText}`}>{t('hypo.new')}</h2>
+              <button type="button" onClick={() => setShowModal(false)} aria-label={t('common.close')}
+                className={`p-1 rounded ${styles.muted} hover:opacity-70 cursor-pointer`}><X className="w-4 h-4" /></button>
             </div>
             <div className="space-y-3">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                {t('hypo.statement', '假设描述')}
-                <textarea className="mt-1 w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 min-h-[80px]"
+              <label className={`block text-sm font-medium ${styles.cardText}`}>
+                {t('hypo.statement')}
+                <textarea className={modalInput}
                   value={newStatement} onChange={e => setNewStatement(e.target.value)} />
               </label>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                {t('hypo.domain', '业务域')}
-                <input className="mt-1 w-full px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+              <label className={`block text-sm font-medium ${styles.cardText}`}>
+                {t('hypo.domain')}
+                <input className={modalInput}
                   value={newDomain} onChange={e => setNewDomain(e.target.value)} />
               </label>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                {t('hypo.evidenceIds', '证据 ID 列表（逗号分隔）')}
-                <input className="mt-1 w-full px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+              <label className={`block text-sm font-medium ${styles.cardText}`}>
+                {t('hypo.evidenceIds')}
+                <input className={modalInput}
                   placeholder="E-001, E-002" value={newEvidenceIds} onChange={e => setNewEvidenceIds(e.target.value)} />
               </label>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setShowModal(false)}
-                className="px-3 py-1.5 rounded-md text-sm font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">
-                {t('common.cancel', '取消')}
-              </button>
-              <button onClick={handleCreate} disabled={creating}
-                className="px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50">
-                {creating ? <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin mr-1" /> : null}
-                {t('common.save', '保存')}
-              </button>
+              <Button variant="secondary" onClick={() => setShowModal(false)} aria-label={t('common.cancel')}>
+                {t('common.cancel')}
+              </Button>
+              <Button variant="primary" onClick={handleCreate} disabled={creating} aria-label={t('common.save')}>
+                {creating ? <span className="inline-block w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin mr-1" aria-hidden /> : null}
+                {t('common.save')}
+              </Button>
             </div>
           </div>
         </div>

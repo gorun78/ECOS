@@ -39,27 +39,27 @@
 |---|---|---|
 | `kb_cognitive_pipeline` | 认知管线持久化主表 | `pipeline_id/name/status/config(JSONB)/created_by/created_at/updated_at/result/is_deleted` |
 | `business_scenario`（引用） | 业务场景表 | 既有，`id/name/description/shadow_scope/...` |
-| `kb_cognitive_hypothesis` | 假设表（PMO-59 P0a 产物） | `hypothesis_id/scenario_id/mind_id/belief/confidence/...` |
-| `kb_cognitive_belief` | 信念表（PMO-59 P0b 产物） | `belief_id/scenario_id/domain/probability/...` |
-| `kb_mind_registry` | Mind 注册表 | `mind_id/name/closed_loop_bounds/...` |
+| `ecos_cognitive.ecos_cognitive_hypothesis` | 假设表（PMO-59 P0a 产物；详细设计-05 §7.1 Cg-2 正名，旧误名 `kb_cognitive_hypothesis` 系 ADR-8 §5 禁用，只准作 R-12 映射输入，2026-10-08） | `hypothesis_id/scenario_id/mind_id/belief/confidence/...` |
+| `ecos_cognitive.ecos_cognitive_belief` | 信念表（PMO-59 P0b 产物；Cg-2 正名，旧误名 `kb_cognitive_belief` 禁用） | `belief_id/scenario_id/domain/probability/...` |
+| `ecos_cognitive_mind` | Mind 注册表（原误名 `kb_mind_registry`，全库无该表；ADR-8 禁用 `kb_*` 误名 — 详细设计-05 §7.1 Cg-2 订正，2026-10-08） | `mind_id/name/closed_loop_bounds/...` |
 
 ### 2.2 场景侧新增字段（**无新增列**）
 
 场景自身两问都已用现字段回答，**无需 ALTER**：
 
-1. **认知原因** → 走 `kb_cognitive_hypothesis.scenario_id = {id}` 查
-2. **运营执行功能** → 走 `kb_cognitive_belief.scenario_id = {id}` + `kb_cognitive_pipeline` 查
+1. **认知原因** → 走 `ecos_cognitive.ecos_cognitive_hypothesis.scenario_id = {id}` 查
+2. **运营执行功能** → 走 `ecos_cognitive.ecos_cognitive_belief.scenario_id = {id}` + `kb_cognitive_pipeline` 查
 
 ### 2.3 JOIN 语义
 
 ```
 business_scenario.id
-  └─ kb_cognitive_hypothesis.scenario_id    （1..n，认知原因）
-  └─ kb_cognitive_belief.scenario_id        （1..n，运营执行功能）
+  └─ ecos_cognitive.ecos_cognitive_hypothesis.scenario_id （1..n，认知原因）
+  └─ ecos_cognitive.ecos_cognitive_belief.scenario_id     （1..n，运营执行功能）
   └─ kb_cognitive_pipeline（如果 pipeline 挂了 Mind，conversation 层桥接）
 ```
 
-> **疑义记录**：`kb_cognitive_hypothesis` 与 `kb_cognitive_belief` 的 DDL 在 PMO-59 Phase 1/P2 时落过迁移（`V127~V129`），但**本次 rebase 后没找到本地对应 .sql 文件** — 执行时需到 Pg 实例直查；QA 侧须先 `SELECT to_regclass` 验证存在再走四端点 curl。
+> **疑义记录**（2026-10-08 订正，详细设计-05 §7.1 Cg-2）：旧写的两个 `kb_*` 名系 ADR-8 §5 禁用误名，真身载体 = `ecos_cognitive.ecos_cognitive_hypothesis` / `ecos_cognitive.ecos_cognitive_belief`（V191 建表，Belief 的 `probability` 由 V262 补列）。PMO-59 Phase 1/P2 记的迁移号（`V127~V129`）**本次 rebase 后本地已无对应 .sql 文件** — 执行时仍须到 Pg 实例直查；QA 侧须先 `SELECT to_regclass(...)` 验证存在再走四端点 curl。
 
 ---
 
@@ -75,6 +75,8 @@ business_scenario.id
 | E2 | `GET business.scenarios/{id}/cognition/operation-eval` | GET+Q | 评估当前 Mind 可执行的运营操作指标 | `{mindId, metrics:[{metricId, name, score, trend}]}` |
 | E3 | `GET business.scenarios/{id}/cognition/hypotheses` | GET+Q | 列出场景关联的所有认知原因（假设） | `[{hypothesisId, reason, confidence, belief, status}]` |
 | E4 | `GET business.scenarios/{id}/cognition/beliefs` | GET+Q | 列出场景关联的运营执行功能（信念） | `[{beliefId, capability, domain, probability, updatedAt}]` |
+
+> **端点方法定版**：E1~E4 = **GET 只读**；历史实现曾为 POST（认知侧近似体 4 个 handler 仅接受 POST），按"只增不改"保留 POST 作 Deprecation 别名，新接入方一律 GET（详细设计-05 §7.1 Cg-3 订正，2026-10-08）。
 
 #### E1 请求 / 响应
 
@@ -101,10 +103,11 @@ business_scenario.id
 {
   "code": 0,
   "data": [
-    {"hypothesisId":"H003","reason":"毛利被采购成本侵蚀","confidence":0.82,"belief":"BELIEVED","status":"VALID"}
+    {"hypothesisId":"H003","reason":"毛利被采购成本侵蚀","confidence":0.82,"belief":"BELIEVED","status":"BELIEVED"}
   ]
 }
 ```
+> **[2026-10-02 详设-05 回收] Cg-4**：上方示例原写 `"status":"VALID"`，与详设-05 Cg-1 冲突（同文档内自相矛盾），收敛为 4 值枚举 PROPOSED/EVIDENCED/BELIEVED/REFUTED。存量旧值按 **R-15 ①** 只读别名映射 `VALID→BELIEVED`、`INVALIDATED→REFUTED`、`ARCHIVED→REFUTED`（禁写回旧值，原值以 `old_status` 列留痕），详见 BUSINESS_SCENARIO_COGNITION_DOC §3.2（详细设计-05 §7.1 Cg-1/Cg-4 订正，2026-10-08）。
 
 #### E4 响应（运营执行功能）
 
@@ -200,6 +203,6 @@ business_scenario.id
 
 | 项 | 何时确认 |
 |---|---|
-| Pg 中 `kb_cognitive_hypothesis` / `kb_cognitive_belief` 表是否本环境存在（PMO-59 那条 DB 迁移是否已跑到本环境） | QA 开测前 `psql` 一次 |
+| Pg 中 `ecos_cognitive.ecos_cognitive_hypothesis` / `ecos_cognitive.ecos_cognitive_belief` 表是否本环境存在（PMO-59 那条 DB 迁移是否已跑到本环境；Cg-2 正名后按真身名核验） | QA 开测前 `psql` 一次 |
 | `business_scenario` 接 scenario_id 是否需要 cascade 到 hypothesis / belief（场景软删时子记录保留策略） | 今位 PM-was，涉及数据生命周期，属跨 PMO 契约——**不在本批** |
 | 是否将 E1–E4 纳入 `ScenarioOpenApi` 公共契约文档（archive-trace） | 批次结束前补 |

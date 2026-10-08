@@ -8,6 +8,7 @@
  * 端点：/api/v1/ontology/glossary/**
  */
 
+import { getAuthToken } from "./auth";
 import type {
   GlossaryFilter,
   GlossaryTerm as WorkbenchGlossaryTerm,
@@ -168,7 +169,8 @@ interface ApiResponse<T> {
  * 统一请求封装：带 Bearer token，解 ApiResponse 包装，业务错误透出后端 message。
  */
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("token") || "";
+  // auth 单源（X-51）：token 一律经 services/auth.ts#getAuthToken() 读取
+  const token = getAuthToken();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;

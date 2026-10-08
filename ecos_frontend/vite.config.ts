@@ -5,6 +5,10 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
+  // F05-14/R-16: aiming service 态启用 X-ECOS-* 信任头 fail-closed 校验（ecos.security.header-auth）。
+  // vite dev 直连 :18084 属受信内网 dev 通道，注入 dev 信任头等价模拟 gateway 下行注入；
+  // 生产无 vite 路径（Express BFF → gateway :8080），未登录访问仍被拒绝。
+  const aimingDevTrustHeaders = { 'X-ECOS-USER': 'admin', 'X-ECOS-TENANT': 'default' };
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -18,10 +22,10 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
         // ── 引擎专属路由（优先级高于 Gateway fallback）──
-        '/api/v1/agent-loop':    { target: 'http://localhost:18084', changeOrigin: true },
-        '/api/v1/agent-mesh':    { target: 'http://localhost:18084', changeOrigin: true },
-        '/api/v1/agent':         { target: 'http://localhost:18084', changeOrigin: true },
-        '/api/v1/agent-call':    { target: 'http://localhost:18084', changeOrigin: true },
+        '/api/v1/agent-loop':    { target: 'http://localhost:18084', changeOrigin: true, headers: aimingDevTrustHeaders },
+        '/api/v1/agent-mesh':    { target: 'http://localhost:18084', changeOrigin: true, headers: aimingDevTrustHeaders },
+        '/api/v1/agent':         { target: 'http://localhost:18084', changeOrigin: true, headers: aimingDevTrustHeaders },
+        '/api/v1/agent-call':    { target: 'http://localhost:18084', changeOrigin: true, headers: aimingDevTrustHeaders },
         '/api/v1/knowledge':     { target: 'http://localhost:18086', changeOrigin: true }, // 仅 dev; 生产 BFF→gateway→kb (:8080 分派, dccheng jar :18086)
         '/api/v1/security':      { target: 'http://localhost:18081', changeOrigin: true },
         '/api/v1/audit':         { target: 'http://localhost:18081', changeOrigin: true },
@@ -33,7 +37,7 @@ export default defineConfig(() => {
         '/api/v1/ecos':          { target: 'http://localhost:18083', changeOrigin: true },
         // PMO-60: workspace routing + cognitive merged into aiming
         '/api/v1/workspace':     { target: 'http://localhost:18090', changeOrigin: true },
-        '/api/v1/cognitive':     { target: 'http://localhost:18084', changeOrigin: true },
+        '/api/v1/cognitive':     { target: 'http://localhost:18084', changeOrigin: true, headers: aimingDevTrustHeaders },
         '/api/v1/world-model':   { target: 'http://localhost:18089', changeOrigin: true },
         '/api/v1/rules':         { target: 'http://localhost:18086', changeOrigin: true },
         '/api/v1/kb':            { target: 'http://localhost:18086', changeOrigin: true },
@@ -63,7 +67,8 @@ export default defineConfig(() => {
       globals: true,
       environment: 'jsdom',
       setupFiles: './src/test/setup.ts',
-      include: ['**/*.test.{ts,tsx}'],
+      // design-05 F05-17 验收用例文件名用 .spec.ts（vitest 默认只收 .test.*，此处显式补 .spec.*）
+      include: ['**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],
     },
   };
 });

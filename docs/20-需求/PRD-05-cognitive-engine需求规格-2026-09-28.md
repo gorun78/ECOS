@@ -26,18 +26,23 @@
 ```
 - 场景无 Mind → `data: []`（200，不是 404）；
 - Mind 行存在但 `is_active=0` → 不返回该 Mind；
-- 数据源（v1.1 更正，按 **Q11 / ADR-8 §5**）：Mind 注册表真身**不存在**——全库无名字含 `mind` 的表、`mind_id` 列 0 个（ARCH_SPEC **C98** / 详细设计-05 **X-19**）；`kb_mind_registry` 与 `kb_cognitive_*` 均为 PRD 误名，**禁止在任何新文档中继续使用**。本项契约以详细设计-05 §Cg-2 新建的 `cognitive_mind` + `cognitive_scenario_mind` 为目标载体（表未建 → E1 在 QA 前必须 `to_regclass` 预检并判"未执行"，禁写 200 空数组蒙过）。
+- 数据源（v1.1 更正，按 **Q11 / ADR-8 §5**）：Mind 注册表真身**不存在**——全库无名字含 `mind` 的表、`mind_id` 列 0 个（ARCH_SPEC **C98** / 详细设计-05 **X-19**）；`kb_mind_registry` 与 `kb_cognitive_*` 均为 PRD 误名，**禁止在任何新文档中继续使用**。本项契约以详细设计-05 §Cg-2（**R-13 ①** 已批准，落 `ecos_cognitive` schema，V187/V188 建表）新建的 `ecos_cognitive.ecos_cognitive_mind` + `ecos_cognitive.ecos_cognitive_scenario_mind` 为目标载体（表未建 → E1 在 QA 前必须 `to_regclass` 预检并判"未执行"，禁写 200 空数组蒙过；缺失语义见 §1.2 末行 `ECOS-COG-501`）。
 
 **E2 `GET .../cognition/operation-eval?mind={mindId}`**
 
 ```json
-{"code":0,"data":{"mindId":"M001","metrics":[
+{"code":0,"data":{"mindId":"M001","limit":10,"truncated":false,
+  "trendWeight":1,"trendWeightSource":"ecos.cognition.eval.trend_weight",
+  "trendSource":"NOT_IMPLEMENTED",
+  "metrics":[
   {"metricId":"op-1","name":"验收治理","capability":"DETECT","score":0.83,"trend":"FLAT"}
 ]}}
 ```
 - 计算：`score(belief_i) = belief.probability × trend_weight(belief.domain, scenario)`；**trend_weight 本期固定 1**，预留配置 `ecos.cognition.eval.trend_weight`（Properties 入口，不实现动态）；
-- 排序：score desc，Top-N（默认 N=10，`?limit=` 可调，上限 50）；
-- trend 枚举：`UP/FLAT/DOWN`（本期无外部时序预测，全部 FLAT——响应必须真实标注，禁伪造趋势）。
+- 排序：score desc，Top-N（`limit` 取值区间 **[1,50]，默认 10**；`limit<=0` 回落默认 10；**`limit>50` 截断至 50 并在响应置 `truncated=true`，禁静默丢数据**）；
+- trend 枚举：`UP/FLAT/DOWN`（本期无外部时序预测，全部 FLAT——响应必须真实标注，禁伪造趋势）：`trend` 恒 `FLAT` 由常量枚举给出，响应体必带 **`trendSource="NOT_IMPLEMENTED"`**（详细设计-05 §D.3 响应字段，`truncated`/`trendSource` 为本项定版必备字段，缺字段即契约违例）。
+
+> **[2026-10-02 详设-05 回收] Cg-6**：E2 `trend_weight` 恒 1、trend 恒 FLAT 保留（本册按此实现）；本次实现补 `truncated`/`trendSource` 响应字段（D.3）。
 
 **E3 `GET .../cognition/hypotheses?mind={mindId}`**
 
@@ -71,13 +76,17 @@
 | `mind` 参数不属于该场景 | 400 | 400 | mind not found on this scenario（**禁静默兜底返回全部**） |
 | `mind` 指向不存在的 Mind（E1 detect 带参时） | 400 | 400 | mind not found |
 | cognitive 引擎未启用/stub 无 LLM | 503 | 503 | cognitive engine not enabled（**原样穿透，禁 200 空 body**，用户裁定 A3） |
-| kb 三表缺失（迁移未跑） | 503 | 503 | cognitive schema not ready（区别于 not enabled，便于运维定位） |
+| kb 三表**或认知资产表**（`ecos_cognitive.ecos_cognitive_mind` / `ecos_cognitive.ecos_cognitive_scenario_mind`）缺失（迁移未跑） | 503 | `ECOS-COG-501` | cognitive schema not ready（**schema not ready** 语义，区别于 not enabled 便于运维定位；码表见详细设计-05 §D.5 — 详细设计-05 §7.1 Cg-5 订正，2026-10-08） |
+
+> **[2026-10-02 详设-05 回收] Cg-5**：末行"kb 三表缺失 503"并入"或认知资产表（`ecos_cognitive_mind`/`ecos_cognitive_scenario_mind`）缺失" → 统一返回 `ECOS-COG-501`。
 
 ### 1.3 横切要求
 
 1. traceId：从 `X-Request-Id` 读并写入 MDC；日志格式 `EVT=CognitiveAxB op={detect|eval|hyp|belief} agent={} scenario={} mind={} cost={}ms`；
 2. 只读：四端点仅 SELECT kb 三表 + mind registry，无任何写操作；
-3. 鉴权：业务数据端点**不写 permitAll**（默认 DENY），过三滤波器；
+3. 鉴权：业务数据端点**不写 permitAll**；**gateway 态与 aiming:18084 service 态均默认 DENY**（service 态须内置同等裁决，经 security-engine / X-ECOS 信任头 **fail-closed**，禁出现"gateway 要 JWT、service 裸奔"的两态落差——详细设计-05 F05-14 / **R-16 ①+③ 已批准**）；**两态鉴权等价测试**（`CognitiveAuthParityTest#sameEndpointsDenyInBothModes`）为 **S3 切流前置门禁**；过三滤波器（`VersionPrefixRewriteFilter` + `SecurityConfig` + `ClearanceInterceptor`，双路径 `/api/v1/` 与 `/api/` 各写一遍）（详细设计-05 §7.1 Cg-9 订正，2026-10-08）；
+
+> **[2026-10-02 详设-05 回收] Cg-9**：鉴权补"两态（monolith/service）均须默认 DENY"（aiming:18084 service 态实测完全无鉴权，C113），纳入 S3 前置门禁。
 4. 前端继承 apiFetch，不改调用方。
 
 ### 1.4 验收标准
@@ -154,6 +163,8 @@ workspace 情景复制 → 预测运行服务：baselineRunId + overrides → �
                   → cognitive：对 (baselineRun, scenarioRun) diff 做归因（COG-02 链）与解释
 ```
 
+**禁令落点（详细设计-05 F05-10 要点 2，§7.1 Cg-7 订正，2026-10-08）**：认知 RAG 推演通道（`ScenarioSimulatorServiceImpl`）**所有出口恒置 `exploratory=true`**（无例外、不可被入参关闭），响应体**禁含任何金额字段**（贡献额、利润差、金额差一律只能来自预测运行服务的确定性重算），UI 显示"非核算口径"；违反即 `ExploratoryGuardTest#ragSimulatorOutputHasNoMonetaryFields` FAIL。金额核算主体**始终是预测运行服务**，认知侧只做归因与解释。
+
 **overrides 结构**：
 
 ```json
@@ -165,7 +176,9 @@ workspace 情景复制 → 预测运行服务：baselineRunId + overrides → �
 ### 3.3 规则（禁令）
 
 1. 新情景运行**只覆盖 overrides 命中的项目/部门/期间输入**，其余全部继承基准快照（逐项 diff 仅限目标范围）；
-2. `ScenarioSimulatorServiceImpl`（RAG 基线 + Agent 推演）**禁止**作为本链路金额来源——保留为探索式 What-if 交互，其输出必须带 `exploratory=true` 标记且 UI 显示"非核算口径"；
+2. `ScenarioSimulatorServiceImpl`（RAG 基线 + Agent 推演）**禁止**作为本链路金额来源——保留为探索式 What-if 交互，其输出必须带 `exploratory=true` 标记（恒真，不可关闭）且响应内**不得出现金额字段**（贡献额、利润差一律由预测运行服务给出），UI 显示"非核算口径"；
+
+> **[2026-10-02 详设-05 回收] Cg-7**：反事实金额唯一来源 = 预测运行服务；认知侧 `ScenarioSimulatorServiceImpl` 强制 `exploratory=true` 且无金额字段（F05-10）。
 3. 情景运行同样满足六要素（PRD-09 FC-03）：独立 forecastRunId + 快照 + 口径版本；
 4. 归因输出 contribution 合计 = 情景与基准利润差（±精度容差 0.01），不平即 FAIL。
 
@@ -181,7 +194,9 @@ workspace 情景复制 → 预测运行服务：baselineRunId + overrides → �
 
 ### 4.1 枚举落点
 
-`com.chinacreator.gzcm.engine.cognitive.api.mind.MindCapabilityMask`（cognitive-engine-api 包内，唯一权威）：
+`com.chinacreator.gzcm.engine.cognitive.api.mind.MindCapabilityMask`（cognitive-engine-api 包内）—— **唯一权威定义**：5 值枚举只此一处，DB 存 TEXT JSON 数组且序列化**只经单一 `MindCapabilityMaskCodec`**；**禁止**任何并行的新用法（impl 侧私有 enum/字符串常量、逗号分隔串、前端 `string[]` 各自解析），存量并行定义按详细设计-05 F05-11 收敛删除（§7.1 Cg-8 订正，2026-10-08）：
+
+> **[2026-10-02 详设-05 回收] Cg-8**：`MindCapabilityMask` 唯一权威 = cognitive-engine.api 包 + `MindCapabilityMaskCodec` 单序列化（代码内现存 enum/逗号串/前端 string[] 三套并行定义收敛）。
 
 | 值 | 语义 | 算子来源 |
 |---|---|---|
@@ -206,15 +221,17 @@ workspace 情景复制 → 预测运行服务：baselineRunId + overrides → �
 
 ## 五、REQ-COG-05 铁律守护（P0，守护型）
 
-| 守护项 | 机制 |
-|---|---|
-| 推理结果不落盘 | 集成断言（PRD-01 §2.3-2）：diagnose/forecast/simulate 调用前后 DB 行数不变 |
-| 不新增业务事实表 | ARCH-07（PRD-01 §1.4）+ DDL 评审：cognitive 域仅 4 表 |
-| 不引入规则引擎 | 依赖审查：cognitive pom 无 drools/easy-rules 等；SpEL 即可 |
-| 禁止 LLM 直接承担推理职责 | 评审红线：LLM 输出仅可作解释文本/假设候选，凡进入 chains/contribution/score 的数值必须确定性可复算；llm 调用走 llm-gateway |
-| Context 不建表 | 运行时上下文（forecastContext 等）仅内存/请求态，禁 cognitive_context 表 |
+| 守护项 | 机制 | 可执行标识（详细设计-05 §F05-12 表逐项绑定，§7.1 Cg-10 订正，2026-10-08） |
+|---|---|---|
+| 推理结果不落盘 | 集成断言（PRD-01 §2.3-2）：diagnose/forecast/simulate 调用前后 DB 行数不变（三端点前后对 kb 三表 + 认知四表 count 比对） | `mvn -Dtest=CognitiveIronLawsTest#diagnoseForecastSimulateLeaveRowCountUnchanged` |
+| 不新增业务事实表 | ARCH-07（PRD-01 §1.4）+ DDL 评审：cognitive 域仅 4 表 | ArchUnit `cognitiveDomainMayNotCreateTablesOutsideFour`（扫 DDL 单源目录，新表须登记白名单）+ DDL 评审 checklist，配合分册 02 `SchemaInventoryGateTest` |
+| 不引入规则引擎 | 依赖审查：cognitive pom 无 drools/easy-rules 等；SpEL 即可 | `mvn -Dtest=CognitiveDependencyAuditTest#noRuleEngineOnClasspath`（pom 扫描 drools/easy-rules/mvel 等） |
+| 禁止 LLM 直接承担推理职责 | 评审红线：LLM 输出仅可作解释文本/假设候选，凡进入 chains/contribution/score 的数值必须确定性可复算；llm 调用走 llm-gateway | `mvn -Dtest=CognitiveNoLlmNumbersTest#chainsContributionScoreNeverFromLlmResponse`（LLM 出口响应仅允许落 `explanation`/`candidate`）+ 评审 checklist |
+| Context 不建表 | 运行时上下文（forecastContext 等）仅内存/请求态，禁 cognitive_context 表 | `mvn -Dtest=CognitiveIronLawsTest#noCognitiveContextTable`（断言 `to_regclass('…cognitive_context*')` 恒为 null） |
 
-**验收**：ArchUnit + 评审 checklist + 上述集成断言全绿。
+**验收**：上述 5 个可执行标识全绿并纳入 CI `pr-gate`（ArchUnit + 评审 checklist + 集成断言同批）。
+
+> **[2026-10-02 详设-05 回收] Cg-10**：五项守护每项绑定一个 `mvn -Dtest=类#方法` 标识（F05-12 表），非零接线才算交付（当前零接线，C121）。
 
 ---
 

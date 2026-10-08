@@ -7,23 +7,19 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
- * 场景心智变体服务 — 场景授权心智 1:N CRUD（PMO-60 v2.0 P1）。
+ * 场景心智变体服务 — 读面保留、写面停写（设计-05 F05-02 / W116）。
  *
- * <p>对应表 {@code ecos_scenario_mind}（DDL V146）。
- * cognitive 三表（evidence/hypothesis/belief）写入走后续 P3b T25，本次仅落 workspace 侧。</p>
+ * <p>legacy {@code ecos_scenario_mind}（V146）库内不存在且不重建 legacy 名，
+ * upsert/activate/delete 统一抛 501；场景↔Mind 绑定改经 cognitive 注册门面写
+ * {@code ecos_cognitive.ecos_cognitive_scenario_mind}（V188）。</p>
  *
  * <p>B6a 收口（R2 架构铁律 §2.5 / IR06）：raw-SQL + RowMapper 下沉 {@link WorkspaceDataDao}；
  * 行对象由本服务公开嵌套类 {@link ScenarioMindRawRef} 承载（DAO 侧 RowMapper 需可见）。</p>
@@ -32,6 +28,12 @@ import java.util.Map;
 public class ScenarioMindService {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioMindService.class);
+
+    /** F05-02/W116 停写：legacy V146 表库内不存在且不重建，写面统一拒绝。 */
+    private static final String STOPPED_WRITE_MSG =
+            "MIND-501: legacy ecos_scenario_mind 写面已停写"
+            + "（设计-05 F05-02/W116：V146 表库内不存在且不重建 legacy 名；场景↔Mind 绑定一律改经"
+            + " cognitive 注册门面写 ecos_cognitive.ecos_cognitive_scenario_mind）";
 
     private final WorkspaceDataDao dao;
     private final ObjectMapper objectMapper;
@@ -66,58 +68,7 @@ public class ScenarioMindService {
      */
     @Transactional
     public ScenarioMindVO upsertMind(String scenarioId, MindSaveDTO dto, String forceLabel, boolean activateIfNew) {
-        if (scenarioId == null || scenarioId.isBlank()) {
-            throw new BusinessException(400, "MIND-400: scenarioId 必填");
-        }
-        String label = (forceLabel != null) ? forceLabel
-                : (dto != null && dto.getMindLabel() != null && !dto.getMindLabel().isBlank())
-                        ? dto.getMindLabel().trim() : "base";
-        String operator = currentOperator();
-        Double confidence = (dto != null && dto.getInitialConfidence() != null) ? dto.getInitialConfidence() : 0.5;
-        String beliefJson = toJson(dto != null ? dto.getInitialBelief() : null, "{}");
-        String evidenceJson = toJsonList(dto != null ? dto.getEvidenceIds() : null);
-        String hypothesisJson = toJsonList(dto != null ? dto.getHypothesisIds() : null);
-        String modelJson = toJsonList(dto != null ? dto.getModelIds() : null);
-        String endpointsJson = toJson(dto != null ? dto.getCognitiveEndpoints() : null, "{}");
-
-        // 查已有（同 scenario + label 未删除）
-        List<Long> existing = dao.listMindIdsByScenarioAndLabel(scenarioId, label);
-
-        if (!existing.isEmpty()) {
-            // UPDATE 已有
-            Long mindId = existing.get(0);
-            boolean isActive = (label.equals("base"));
-            if (!isActive) {
-                Integer current = dao.selectMindActiveFlag(mindId);
-                isActive = current != null && current == 1;
-            }
-            int n = dao.updateMindUpsert(
-                label, isActive ? 1 : 0, beliefJson, evidenceJson, hypothesisJson, modelJson,
-                endpointsJson, confidence, operator, mindId);
-            if (n == 0) {
-                throw new NotFoundException("MIND-404: 心智不存在或已删除: id=" + mindId);
-            }
-            log.info("更新场景心智 {} label={} by={}", mindId, label, operator);
-            return getMind(mindId);
-        }
-
-        // INSERT 新 mind
-        boolean willBeActive = activateIfNew || label.equals("base");
-        if (willBeActive) {
-            // 先全清 active_mind（与 activateMind 同一语义，但纳入本事务）
-            dao.deactivateAllMindsOfScenario(scenarioId);
-        }
-        try {
-            dao.insertMind(scenarioId, label, willBeActive ? 1 : 0, beliefJson, evidenceJson, hypothesisJson,
-                modelJson, endpointsJson, confidence, operator);
-        } catch (DataIntegrityViolationException e) {
-            log.warn("upsertMind 唯一约束冲突: scenario={} label={}", scenarioId, label);
-            throw new BusinessException(409, "MIND-409: same scenario already has another active mind 或 label 重复: " + label);
-        }
-        // 取回新插入的 id
-        Long newId = dao.selectLatestMindId(scenarioId, label);
-        log.info("新建场景心智 {} label={} active={} by={}", newId, label, willBeActive, operator);
-        return getMind(newId);
+        throw new BusinessException(501, STOPPED_WRITE_MSG);
     }
 
     /** 查询场景下所有心智（未删除，激活优先排序）。 */
@@ -142,32 +93,7 @@ public class ScenarioMindService {
      */
     @Transactional
     public ScenarioMindVO activateMind(String scenarioId, Long mindId) {
-        if (scenarioId == null || scenarioId.isBlank()) {
-            throw new BusinessException(400, "MIND-400: scenarioId 必填");
-        }
-        if (mindId == null) {
-            throw new BusinessException(400, "MIND-400: mindId 必填");
-        }
-        // 验证 mind 属于该场景
-        Integer n = dao.countMindBelongsToScenario(mindId, scenarioId);
-        if (n == null || n == 0) {
-            throw new NotFoundException("MIND-404: 心智不存在或不属于该场景: id=" + mindId);
-        }
-        String operator = currentOperator();
-        try {
-            // 全清
-            dao.deactivateScenarioMinds(operator, scenarioId);
-            // 设 1
-            int updated = dao.activateMindById(operator, mindId, scenarioId);
-            if (updated == 0) {
-                throw new NotFoundException("MIND-404: 心智不存在或已删除: id=" + mindId);
-            }
-        } catch (DataIntegrityViolationException e) {
-            log.warn("activateMind 唯一约束冲突: scenario={} mindId={}", scenarioId, mindId);
-            throw new BusinessException(409, "MIND-409: 激活心智切换失败（唯一约束）");
-        }
-        log.info("切换激活心智 scenario={} mindId={} by={}", scenarioId, mindId, operator);
-        return getMind(mindId);
+        throw new BusinessException(501, STOPPED_WRITE_MSG);
     }
 
     /**
@@ -179,36 +105,7 @@ public class ScenarioMindService {
      */
     @Transactional
     public boolean deleteMind(String scenarioId, Long mindId) {
-        if (scenarioId == null || scenarioId.isBlank()) {
-            throw new BusinessException(400, "MIND-400: scenarioId 必填");
-        }
-        if (mindId == null) {
-            throw new BusinessException(400, "MIND-400: mindId 必填");
-        }
-        String operator = currentOperator();
-        // 先查被删 mind 的 label
-        String label = dao.selectMindLabel(mindId, scenarioId);
-        if (label == null) {
-            throw new NotFoundException("MIND-404: 心智不存在或不属于该场景: id=" + mindId);
-        }
-        int n = dao.logicDeleteMind(operator, mindId, scenarioId);
-        if (n == 0) {
-            throw new NotFoundException("MIND-404: 心智不存在或已删除: id=" + mindId);
-        }
-        // 若删的是 base，自动补位
-        if ("base".equals(label)) {
-            List<Long> remaining = dao.listActiveMindIds(scenarioId);
-            if (remaining.isEmpty()) {
-                // 找一个未删 mind 设为 active
-                List<Long> candidates = dao.listFirstMindId(scenarioId);
-                if (!candidates.isEmpty()) {
-                    dao.activateMindByIdOnly(operator, candidates.get(0));
-                    log.info("删除 base mind 后自动补位: scenario={} newActive={}", scenarioId, candidates.get(0));
-                }
-            }
-        }
-        log.info("逻辑删除场景心智 scenario={} mindId={} by={}", scenarioId, mindId, operator);
-        return true;
+        throw new BusinessException(501, STOPPED_WRITE_MSG);
     }
 
     /**
@@ -310,21 +207,6 @@ public class ScenarioMindService {
         return vo;
     }
 
-    private String toJson(Object obj, String defaultStr) {
-        if (obj == null) {
-            return defaultStr;
-        }
-        try {
-            return objectMapper.writeValueAsString(obj);
-        } catch (Exception e) {
-            throw new BusinessException(500, "MIND-500: JSON 序列化失败: " + e.getMessage());
-        }
-    }
-
-    private String toJsonList(List<String> list) {
-        return toJson(list != null ? list : new ArrayList<>(), "[]");
-    }
-
     private Object parseJson(String json) {
         if (json == null || json.isBlank()) {
             return new LinkedHashMap<String, Object>();
@@ -335,17 +217,5 @@ public class ScenarioMindService {
             log.warn("mind JSONB 解析失败，返 raw: {}", e.getMessage());
             return json;
         }
-    }
-
-    private String currentOperator() {
-        try {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof String) {
-                return (String) auth.getPrincipal();
-            }
-        } catch (Exception e) {
-            log.debug("无法从 SecurityContext 取操作人，回退 system: {}", e.getMessage());
-        }
-        return "system";
     }
 }

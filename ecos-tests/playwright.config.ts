@@ -43,5 +43,13 @@ export default defineConfig({
       testDir: './tests/e2e',
       use: { ...devices['Desktop Chrome'], baseURL: ECOS_BASE, viewport: { width: 1600, height: 1000 } },
     },
+    {
+      // design-05 F05-01~07/B.9-7 冻结验收用例（tests/scenario-cognition.spec.ts）：
+      // API 面走 request 直连 gateway :8080；UI 面 page.goto 绝对地址 :3000（离线时 skip）。
+      name: 'scenario-cognition',
+      testDir: './tests',
+      testMatch: /scenario-cognition\.spec\.ts$/,
+      use: { ...devices['Desktop Chrome'], baseURL: ECOS_API, viewport: { width: 1600, height: 1000 } },
+    },
   ],
 });

@@ -219,8 +219,8 @@ export default function CognitionPanel({
             onClick={() => setSubTab(st.key)}
             className={`text-[10px] font-bold px-2.5 py-1 rounded border transition-colors cursor-pointer flex items-center gap-1.5 ${
               subTab === st.key
-                ? 'bg-indigo-600 text-white border-indigo-500'
-                : `${styles.inputBg} ${styles.inputBorder} ${styles.cardTextMuted} hover:border-indigo-500/50`
+                ? `${styles.accentBg} ${styles.cardText} ${styles.accentBorder}`
+                : `${styles.inputBg} ${styles.inputBorder} ${styles.cardTextMuted} hover:opacity-80`
             }`}
           >
             <LucideIcon name={st.icon} size={11} />
@@ -256,8 +256,8 @@ export default function CognitionPanel({
                     onClick={() => toggleRunType(rt.key)}
                     className={`text-[10px] font-bold px-2 py-1 rounded border transition-colors cursor-pointer ${
                       on
-                        ? 'bg-indigo-600 text-white border-indigo-500'
-                        : `${styles.inputBg} ${styles.inputBorder} ${styles.cardTextMuted} hover:border-indigo-500/50`
+                        ? `${styles.accentBg} ${styles.cardText} ${styles.accentBorder}`
+                        : `${styles.inputBg} ${styles.inputBorder} ${styles.cardTextMuted} hover:opacity-80`
                     }`}
                   >
                     {rt.key}
@@ -274,7 +274,7 @@ export default function CognitionPanel({
               value={metric}
               onChange={(e) => setMetric(e.target.value)}
               placeholder={t('scenario.cog.metricPh')}
-              className={`w-full mt-1 px-2 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:border-indigo-500 transition-colors`}
+              className={`w-full mt-1 px-2 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:${styles.accentBorder} transition-colors`}
             />
           </div>
           <div>
@@ -285,14 +285,14 @@ export default function CognitionPanel({
               type="number"
               value={deviation}
               onChange={(e) => setDeviation(Number(e.target.value) || 0)}
-              className={`w-full mt-1 px-2 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:border-indigo-500 transition-colors`}
+              className={`w-full mt-1 px-2 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:${styles.accentBorder} transition-colors`}
             />
           </div>
           <div className="flex items-end">
             <button
               onClick={handleRun}
               disabled={running || !scenario || runTypes.length === 0}
-              className="w-full px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[11px] font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              className={`w-full px-3 py-1.5 rounded ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-50 text-[11px] font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5`}
             >
               <LucideIcon name="Play" size={12} className={running ? 'animate-pulse' : ''} />
               {running ? t('scenario.cog.running') : t('scenario.cog.run')}
@@ -313,7 +313,7 @@ export default function CognitionPanel({
       {result && (
         <div className="space-y-4">
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3 flex flex-wrap items-center gap-3`}>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">
+            <span className={`text-[10px] font-bold uppercase tracking-wider ${styles.accentText}`}>
               {t('scenario.cog.resultTitle')}
             </span>
             <StatusChip status={result.status ?? 'ERROR'} degraded={result.degraded} text={t} />
@@ -330,7 +330,7 @@ export default function CognitionPanel({
               <SectionHeader icon="Search" title={t('scenario.cog.diagnosis')} />
               <div className="p-4 space-y-3">
                 {diagnosis.degraded && diagnosis.degradeReason && (
-                  <div className="text-[11px] text-amber-400 border border-amber-700/40 bg-amber-950/30 rounded p-2">
+                  <div className={`text-[11px] ${styles.warningText} border ${styles.warningBorder} ${styles.warningBg} rounded p-2`}>
                     {diagnosis.degradeReason}
                   </div>
                 )}
@@ -349,7 +349,7 @@ export default function CognitionPanel({
                     </span>
                     {diagnosis.causalChain.map((n, i) => (
                       <div key={`${n.depth}-${i}`} className={`flex items-center gap-2 text-xs ${i > 0 ? 'pl-6' : ''}`}>
-                        <span className="font-mono text-[10px] text-indigo-400 w-8">L{n.depth ?? i + 1}</span>
+                        <span className={`font-mono text-[10px] ${styles.accentText} w-8`}>L{n.depth ?? i + 1}</span>
                         <span className={styles.cardText}>{n.node || n.description}</span>
                         <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>
                           conf {(n.confidence ?? 0).toFixed(2)} · {n.source ?? '-'}
@@ -371,12 +371,12 @@ export default function CognitionPanel({
                           onClick={() => setActiveStepId(active ? null : s.stepId ?? null)}
                           className={`w-full text-left p-2.5 rounded border transition-colors cursor-pointer ${
                             active
-                              ? 'border-indigo-500 bg-indigo-950/30'
-                              : `${styles.inputBg} ${styles.inputBorder} hover:border-indigo-500/40`
+                              ? `${styles.accentBorder} ${styles.badgeBg}`
+                              : `${styles.inputBg} ${styles.inputBorder} hover:opacity-80`
                           }`}
                         >
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-[10px] text-indigo-400">
+                            <span className={`font-mono text-[10px] ${styles.accentText}`}>
                               {t('scenario.cog.step')} {i + 1} · {s.sourceType ?? '-'}
                             </span>
                             {typeof s.confidence === 'number' && (
@@ -423,7 +423,7 @@ export default function CognitionPanel({
                     <ul className="space-y-1">
                       {diagnosis.suggestions.map((sg, i) => (
                         <li key={i} className={`text-[11px] ${styles.cardText} flex gap-1.5`}>
-                          <span className="text-indigo-400">›</span>
+                          <span className={styles.accentText}>›</span>
                           {sg}
                         </li>
                       ))}
@@ -448,7 +448,7 @@ export default function CognitionPanel({
                       {t('scenario.cog.conf')} {(forecast.confidence * 100).toFixed(0)}%
                     </span>
                   )}
-                  {forecast.kgAdjusted && <span className="text-teal-400">KG ×</span>}
+                  {forecast.kgAdjusted && <span className={styles.infoText}>KG ×</span>}
                 </div>
                 <ForecastChart points={forecast.points} />
                 {forecast.summary && <p className={`text-[11px] ${styles.cardTextMuted}`}>{forecast.summary}</p>}
@@ -505,7 +505,7 @@ export default function CognitionPanel({
                     <td className={`px-3 py-1.5 ${styles.cardText}`}>
                       {h.metric ?? '-'}
                       {h.deviation != null && h.deviation !== 0 && (
-                        <span className="text-amber-400 font-mono"> ({h.deviation}%)</span>
+                        <span className={`${styles.warningText} font-mono`}> ({h.deviation}%)</span>
                       )}
                     </td>
                     <td className="px-3 py-1.5">
@@ -545,7 +545,7 @@ export default function CognitionPanel({
                     <td className={`px-3 py-1.5 font-mono ${styles.cardTextMuted}`}>
                       {m.backtest_score != null ? Number(m.backtest_score).toFixed(2) : '-'}
                     </td>
-                    <td className={`px-3 py-1.5 font-mono ${m.status === 'active' ? 'text-emerald-400' : styles.cardTextMuted}`}>
+                    <td className={`px-3 py-1.5 font-mono ${m.status === 'active' ? styles.successText : styles.cardTextMuted}`}>
                       {m.status ?? '-'}
                     </td>
                   </tr>
@@ -573,16 +573,17 @@ function StatusChip({
   degraded?: boolean;
   text: (k: string) => string;
 }) {
+  const { styles } = useTheme();
   const ok = status === 'SUCCEEDED';
   const deg = status === 'SUCCEEDED_DEGRADED' || degraded;
   return (
     <span
-      className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
+      className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono border ${
         ok
-          ? 'bg-emerald-950 text-emerald-400 border border-emerald-900/50'
+          ? `${styles.successBg} ${styles.successText} ${styles.successBorder}`
           : deg
-            ? 'bg-amber-950 text-amber-400 border border-amber-900/50'
-            : 'bg-rose-950 text-rose-400 border border-rose-900/50'
+            ? `${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`
+            : `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`
       }`}
     >
       {status}
@@ -623,7 +624,7 @@ function RuleRefChip({
           e.stopPropagation();
           onToggle();
         }}
-        className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800/50 hover:border-blue-500/70 transition-colors cursor-pointer"
+        className={`text-[10px] font-bold px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${styles.infoBg} ${styles.infoText} ${styles.infoBorder}`}
       >
         {t('scenario.cog.rule')}: {rule.ruleName}
       </button>
@@ -657,7 +658,7 @@ function PrecedentRefChip({
           e.stopPropagation();
           onToggle();
         }}
-        className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800/50 hover:border-purple-500/70 transition-colors cursor-pointer"
+        className={`text-[10px] font-bold px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${styles.badgeBg} ${styles.cardText} ${styles.cardBorder}`}
       >
         {t('scenario.cog.precedent')}: {ref_.precedentId ?? ref_.decisionId ?? '-'}
       </button>
@@ -674,45 +675,29 @@ function PrecedentRefChip({
   );
 }
 
-/** 预测置信区间图 — 纯 SVG，历史点 + 预测点 + 上下界带 */
+/** 预测置信区间摘要 — 合规替代：lucide 图标 + 数值读数（禁自绘 SVG，规范 §十.1 / B.8） */
 function ForecastChart({ points }: { points: NonNullable<ForecastResult['points']> }) {
-  const W = 560;
-  const H = 140;
-  const PAD = 24;
+  const { styles } = useTheme();
+  const { t } = useLanguage();
   if (!points.length) return null;
   const values = points.flatMap((p) => [p.value ?? 0, p.lowerBound ?? 0, p.upperBound ?? 0]);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const range = max - min || 1;
-  const x = (i: number) => PAD + (i * (W - PAD * 2)) / Math.max(points.length - 1, 1);
-  const y = (v: number) => H - PAD - ((v - min) * (H - PAD * 2)) / range;
-  const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.value ?? 0).toFixed(1)}`).join(' ');
-  const upper = points.map((p, i) => `${x(i).toFixed(1)},${y(p.upperBound ?? p.value ?? 0).toFixed(1)}`).join(' ');
-  const lower = [...points].reverse().map((p, i) => {
-    const idx = points.length - 1 - i;
-    return `${x(idx).toFixed(1)},${y(p.lowerBound ?? p.value ?? 0).toFixed(1)}`;
-  }).join(' ');
-  const firstForecastIdx = Math.max(points.length - 3, 0);
+  const last = points[points.length - 1];
+  const band = `${(last?.lowerBound ?? last?.value ?? 0).toFixed(2)} ~ ${(last?.upperBound ?? last?.value ?? 0).toFixed(2)}`;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
-      <polygon points={`${upper} ${lower}`} className="fill-indigo-500/15" />
-      <path d={line} fill="none" className="stroke-indigo-500" strokeWidth={2} />
-      <line
-        x1={x(firstForecastIdx)}
-        y1={PAD - 8}
-        x2={x(firstForecastIdx)}
-        y2={H - PAD + 8}
-        className="stroke-amber-500/60"
-        strokeDasharray="4 3"
-      />
-      {points.map((p, i) => (
-        <circle key={i} cx={x(i)} cy={y(p.value ?? 0)} r={3} className={i >= firstForecastIdx ? 'fill-amber-400' : 'fill-indigo-500'} />
-      ))}
-      <text x={PAD} y={H - 6} className="fill-slate-500 text-[9px] font-mono">min {min.toFixed(2)}</text>
-      <text x={W - PAD} y={H - 6} textAnchor="end" className="fill-slate-500 text-[9px] font-mono">
-        max {max.toFixed(2)}
-      </text>
-    </svg>
+    <div
+      className={`flex flex-wrap items-center gap-3 rounded-md border p-3 text-[11px] ${styles.cardBg} ${styles.cardBorder}`}
+      role="img"
+      aria-label={`${t('scenario.cog.forecast')}: min ${min.toFixed(2)}, max ${max.toFixed(2)}, band ${band}`}
+    >
+      <LucideIcon name="TrendingUp" size={16} className={styles.cardTextMuted} />
+      <span className={`font-mono ${styles.cardTextMuted}`}>min {min.toFixed(2)}</span>
+      <span className={`font-mono ${styles.cardTextMuted}`}>max {max.toFixed(2)}</span>
+      <span className={`font-mono ${styles.cardText}`}>
+        {t('scenario.cog.forecast')} CI {band}
+      </span>
+    </div>
   );
 }
 

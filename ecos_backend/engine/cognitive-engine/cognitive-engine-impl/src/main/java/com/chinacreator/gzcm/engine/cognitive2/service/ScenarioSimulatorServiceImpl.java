@@ -3,16 +3,16 @@ package com.chinacreator.gzcm.engine.cognitive2.service;
 import com.chinacreator.gzcm.engine.cognitive2.ScenarioSimulatorService;
 import com.chinacreator.gzcm.engine.cognitive2.model.*;
 import com.chinacreator.gzcm.engine.kb.KnowledgeRetrievalService;
+import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
+import com.chinacreator.gzcm.runtime.llm.scheduler.AgentResult;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
  * <ol>
  *   <li>从知识库拉取当前本体对象状态作为基线</li>
  *   <li>构造 LLM prompt（基线 + 变量变更）</li>
- *   <li>调用 Agent completion 端点获取预测</li>
+ *   <li>经 llm-gateway Agent 获取预测（F05-15 X-35：禁自建 RestTemplate 直连 agent-loop）</li>
  *   <li>对比基线生成 Δ 值 + 趋势方向</li>
  *   <li>综合 LLM 确定性 + KG 覆盖度计算置信度</li>
  * </ol>
@@ -34,16 +34,18 @@ public class ScenarioSimulatorServiceImpl implements ScenarioSimulatorService {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioSimulatorServiceImpl.class);
 
+    /** llm-gateway 归属子系统 / Agent profile */
+    private static final String LLM_SUBSYSTEM = "aiming";
+    private static final String LLM_PROFILE = "cognitive-what-if-simulator";
+
     private final KnowledgeRetrievalService retrievalService;
-    private final RestTemplate restTemplate;
+    private final ObjectProvider<LLMGatewayService> llmGatewayProvider;
     private final ObjectMapper objectMapper;
 
-    @Value("${ecos.agent.completion.url:http://localhost:8080/api/v1/agent-loop/chat}")
-    private String agentCompletionUrl;
-
-    public ScenarioSimulatorServiceImpl(KnowledgeRetrievalService retrievalService) {
+    public ScenarioSimulatorServiceImpl(KnowledgeRetrievalService retrievalService,
+                                        ObjectProvider<LLMGatewayService> llmGatewayProvider) {
         this.retrievalService = retrievalService;
-        this.restTemplate = new RestTemplate();
+        this.llmGatewayProvider = llmGatewayProvider;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -79,6 +81,7 @@ public class ScenarioSimulatorServiceImpl implements ScenarioSimulatorService {
                 request.getName(), request.getDomain(), request.getVariables());
 
         SimulationResult result = new SimulationResult();
+        result.setExploratory(true);
         result.setStatus(SimulationStatus.RUNNING);
         result.setSummary("Simulating: " + request.getName());
 
@@ -166,59 +169,61 @@ public class ScenarioSimulatorServiceImpl implements ScenarioSimulatorService {
     // ──────────── LLM Agent 调用 ────────────
 
     /**
-     * 调用 ai-engine Agent Loop 进行 What-if 推演预测。
+     * 经 llm-gateway 执行 What-if 推演 Agent（铁律 §2.5-2 LLM 唯一出口）。
      */
     private Map<String, Object> callAgentCompletion(Map<String, Object> baseline,
                                                      SimRequest request) {
+        LLMGatewayService gateway = llmGatewayProvider.getIfAvailable();
+        if (gateway == null) {
+            log.warn("llm-gateway 未装配，使用降级预测");
+            return buildFallbackResponse(baseline, request);
+        }
         String prompt = buildPrompt(baseline, request);
-
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("message", prompt);
-        payload.put("systemPrompt", "你是一个业务推演引擎。根据当前业务基线和变量变更，预测变化后的业务指标。只输出JSON。");
-        payload.put("temperature", 0.3);
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(payload, headers);
-
-        log.debug("POST {} with prompt length={}", agentCompletionUrl, prompt.length());
-
+        log.debug("llm-gateway what-if 推演: profile={} promptLength={}", LLM_PROFILE, prompt.length());
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
-                    agentCompletionUrl,
-                    HttpMethod.POST,
-                    entity,
-                    Map.class);
-
-            if (response.getBody() == null) {
-                log.warn("Agent返回空body，使用降级预测");
+            AgentResult agentResult = gateway.execute(LLM_SUBSYSTEM, LLM_PROFILE, prompt);
+            if (agentResult == null || !agentResult.isSuccess()
+                    || agentResult.getContent() == null || agentResult.getContent().isBlank()) {
+                log.warn("llm-gateway 推演失败，使用降级预测: {}",
+                        agentResult == null ? "null" : agentResult.getErrorMsg());
                 return buildFallbackResponse(baseline, request);
             }
-
-            // 解析 ApiResponse 包装，提取 data.content
-            @SuppressWarnings("unchecked")
-            Map<String, Object> respBody = response.getBody();
-            Object data = respBody.get("data");
-            if (data instanceof Map) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> dataMap = (Map<String, Object>) data;
-                Object content = dataMap.get("content");
-                if (content != null) {
-                    log.info("Agent推演完成: content长度={}", content.toString().length());
-                    // 包装为统一格式返回
-                    Map<String, Object> wrapped = new LinkedHashMap<>();
-                    wrapped.put("predicted", content.toString());
-                    wrapped.put("llmConfidence", 0.65);
-                    return wrapped;
-                }
+            String content = agentResult.getContent();
+            Map<String, Object> parsed = extractJsonMap(content);
+            if (parsed != null && (parsed.containsKey("predicted") || parsed.containsKey("assumptions"))) {
+                return parsed;
             }
-
-            log.info("Agent completion OK: keys={}", respBody.keySet());
-            return respBody;
+            Map<String, Object> wrapped = new LinkedHashMap<>();
+            wrapped.put("predicted", content);
+            wrapped.put("llmConfidence", 0.65);
+            log.info("Agent推演完成: content长度={}", content.length());
+            return wrapped;
         } catch (Exception e) {
-            log.warn("ai-engine Agent调用失败，使用降级预测: {}", e.getMessage());
+            log.warn("llm-gateway Agent调用失败，使用降级预测: {}", e.getMessage());
             return buildFallbackResponse(baseline, request);
+        }
+    }
+
+    /** LLM 输出为纯 JSON 时直接采用其结构（predicted/assumptions/llmConfidence）。 */
+    private Map<String, Object> extractJsonMap(String content) {
+        String trimmed = content.trim();
+        if (trimmed.startsWith("```")) {
+            int start = trimmed.indexOf("\n");
+            int end = trimmed.lastIndexOf("```");
+            if (start > 0 && end > start) {
+                trimmed = trimmed.substring(start, end).trim();
+            }
+        }
+        int brace = trimmed.indexOf('{');
+        if (brace < 0) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(trimmed.substring(brace),
+                    new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.debug("推演响应非 JSON: {}", e.getMessage());
+            return null;
         }
     }
 

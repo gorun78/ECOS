@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -48,6 +49,28 @@ class BusinessDomainWriteArchTest {
             // 出现 "ecos_dw.doc_chunk"（作为跨库写通道 REST 端点契约的字符串宣言），非 SQL 直读。
             "NoKbChunkWriteArchTest.java",
             "KbChunkWriteGoneArchTest.java");
+
+    /**
+     * <b>逐行</b>豁免（严于上面的文件名白名单）：只读载体描述符。
+     *
+     * <p>详细设计-05 §8.1 要求 C 层对象目录对每类对象给出「物理载体或引用态二选一」，
+     * PREDICTION 的物理载体即 data-engine 侧 {@code ecos_dw.ecos_application_forecast_run}。
+     * 该字面量是目录描述符、不是 SQL；cognitive 直写 ecos_dw 由
+     * {@code ModuleDependencyArchTest#cognitiveDoesNotWriteEcosDwDirectly} 独立守卫
+     * （ADR-14 / ST08，写入只经 data-engine 唯一写通道）。</p>
+     *
+     * <p>生效条件 = 命中行自带 {@link #READ_ONLY_CARRIER_TOKEN} <b>且</b>文件在
+     * {@link #READ_ONLY_CARRIER_FILES} 内；同文件其它 {@code ecos_dw.} 字面量照旧 FAIL。
+     * 豁免是否为死豁免由 {@code readOnlyCarrierExemptionStillLive} 反向守卫。</p>
+     */
+    private static final String READ_ONLY_CARRIER_TOKEN = "read-only-carrier-descriptor";
+
+    /** 只读载体描述符豁免的唯一登记面（相对 ecos_backend/，路径须逐字命中）。 */
+    private static final Set<String> READ_ONLY_CARRIER_FILES = Set.of(
+            "engine/cognitive-engine/cognitive-engine-api/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/cognitive/api/objects/CognitiveObjectClass.java",
+            "engine/cognitive-engine/cognitive-engine-impl/src/test/java/com/chinacreator/gzcm/"
+                    + "engine/cognitive2/seam/CognitiveObjectCatalogTest.java");
 
     @Test
     @DisplayName("非 data-engine 模块禁 ecos_dw 限定表名直读直查（Java + XML 同扫）")
@@ -106,6 +129,36 @@ class BusinessDomainWriteArchTest {
                 "data-engine-impl 内 ecos_dw 限定名应 ≥2 处（write-channel fact mapper 家族），实际 " + hits);
     }
 
+    @Test
+    @DisplayName("只读载体描述符豁免不得沦为死豁免或越权扩面")
+    void readOnlyCarrierExemptionStillLive() throws IOException {
+        Path backend = repoRoot().resolve("ecos_backend");
+        List<String> stale = new ArrayList<>();
+        for (String rel : READ_ONLY_CARRIER_FILES) {
+            Path f = backend.resolve(Path.of(rel.replace('/', java.io.File.separatorChar)));
+            if (!Files.isRegularFile(f)) {
+                stale.add(rel + " :: 登记文件已不存在（豁免须随之删除）");
+                continue;
+            }
+            int marked = 0;
+            int unmarked = 0;
+            int lin = 0;
+            for (String raw : Files.readString(f, StandardCharsets.UTF_8).split("\\R", -1)) {
+                lin++;
+                String t = raw.trim();
+                if (t.isEmpty() || t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")) continue;
+                if (!ECOS_DW_QUALIFIED.matcher(raw).find()) continue;
+                if (raw.contains(READ_ONLY_CARRIER_TOKEN)) marked++;
+                else unmarked++;
+            }
+            if (marked == 0) stale.add(rel + " :: 无任何带标记的 ecos_dw 描述符行（死豁免）");
+            // 未标记行本应被 noEcosDwOutsideDataEngine 拦下；此处冗余断言，防豁免面被放宽
+            assertEquals(0, unmarked,
+                    rel + " :: 存在未带标记的 ecos_dw 限定名（只读描述符豁免不得覆盖）");
+        }
+        assertTrue(stale.isEmpty(), "只读载体描述符登记面失真:\n" + String.join("\n", stale));
+    }
+
     /** 单文件扫描：Java 忽略 行首 // * /* 注释；XML 忽略 行首 <!--。 */
     private static final class FileCheck {
         static void check(String rel, String name, Path f, List<String> violations)
@@ -122,6 +175,10 @@ class BusinessDomainWriteArchTest {
                 }
                 // 仅 -File 文档纯叙述（.md 不进入）；.java / .xml 只信实际字面量
                 if (ECOS_DW_QUALIFIED.matcher(raw).find()) {
+                    // 逐行豁免：只读载体描述符必须自带标记，缺标记照旧记违规
+                    if (READ_ONLY_CARRIER_FILES.contains(rel) && raw.contains(READ_ONLY_CARRIER_TOKEN)) {
+                        continue;
+                    }
                     violations.add(name + ":" + lin + " (" + rel + "): " + t);
                     return; // 每文件只记首个（长行降噪）
                 }

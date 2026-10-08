@@ -1,7 +1,11 @@
 package com.chinacreator.gzcm.engine.cognitive2.service;
 
+import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.engine.cognitive.api.CognitiveErrorCode;
+import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -38,18 +42,24 @@ public class EntityLinker {
 
     private static final Logger log = LoggerFactory.getLogger(EntityLinker.class);
 
-    /** kb 实体链接 REST 端点 */
-    private static final String KB_ENTITY_LINK_URL =
-            "http://localhost:8080/api/v1/knowledge/entity-link/entity/link";
+    /** kb 实体链接 REST 路径（基址经 runtime-access 双模寻址解析，禁止硬编码 localhost — X-35） */
+    private static final String KB_ENTITY_LINK_PATH = "/api/v1/knowledge/entity-link/entity/link";
+    private static final String KB_OWNER_SERVICE = "dccheng";
 
     private final RestTemplate restTemplate;
+    private final String kbEntityLinkUrl;
 
-    public EntityLinker() {
-        this.restTemplate = new RestTemplate();
-        this.restTemplate.setRequestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
-            setConnectTimeout(3_000);
-            setReadTimeout(10_000);
-        }});
+    public EntityLinker(@Qualifier("cognitiveRestTemplate") RestTemplate restTemplate,
+                        ServiceEndpointResolver endpointResolver) {
+        // F05-15：复用共享 RestTemplate bean；超时等策略由宿主客户端 bean 统一下发。
+        // route-manifest 未登记 owner → fail-loud（ECOS-COG-504）；REST 调用期失败仍按既有契约降级 fallback。
+        this.restTemplate = restTemplate;
+        String base = endpointResolver
+                .resolve(KB_OWNER_SERVICE, ServiceEndpointResolver.RouteMode.MONOLITH)
+                .orElseThrow(() -> new BusinessException(500, CognitiveErrorCode.E504_INTERNAL
+                        + ": route-manifest 未登记服务 " + KB_OWNER_SERVICE
+                        + "，kb 实体链接 REST 基址无法解析（fail-loud）"));
+        this.kbEntityLinkUrl = base + KB_ENTITY_LINK_PATH;
     }
 
     /**
@@ -78,7 +88,7 @@ public class EntityLinker {
 
         try {
             Map<String, Object> resp = restTemplate.postForObject(
-                    KB_ENTITY_LINK_URL, new HttpEntity<>(body, headers), Map.class);
+                    kbEntityLinkUrl, new HttpEntity<>(body, headers), Map.class);
             if (resp == null) {
                 result.put("status", "fallback");
                 result.put("error", "kb entity-link endpoint returned null");
