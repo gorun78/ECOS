@@ -31,14 +31,17 @@ interface Project {
   [key: string]: any;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  active: "bg-green-100 text-green-700 border-green-300",
-  completed: "bg-blue-100 text-blue-700 border-blue-300",
-  paused: "bg-amber-100 text-amber-700 border-amber-300",
-  planning: "bg-indigo-100 text-indigo-700 border-indigo-300",
+// 状态徽章走 ThemeContext 语义令牌（success/info/warning/badge/neutral），4 主题可翻；
+// 不再硬编 bg-*-100 / text-*-700 / border-*-300 浅色档（dark 主题下浅底深字塌陷）
+const statusBadgeClass = (status: string, styles: Record<string, string>): string => {
+  switch (status) {
+    case "active": return `${styles.successBg} ${styles.successText} ${styles.successBorder}`;
+    case "completed": return `${styles.infoBg} ${styles.infoText} ${styles.infoBorder}`;
+    case "paused": return `${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`;
+    case "planning": return `${styles.badgeBg} ${styles.badgeText} ${styles.accentBorder}`;
+    default: return `${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`;
+  }
 };
-
-const STATUS_FALLBACK = "bg-gray-100 text-gray-700 border-gray-300";
 
 const PAGE_SIZE = 10;
 
@@ -120,7 +123,7 @@ export default function ProjectTracker() {
       key: "status",
       label: t("projectTracker.col.status"),
       render: (_v, record) => {
-        const color = STATUS_COLORS[record.status] || STATUS_FALLBACK;
+        const color = statusBadgeClass(record.status, styles);
         const label = t(`projectTracker.status.${record.status}`) || record.status;
         return (
           <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded border ${color}`}>

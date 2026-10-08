@@ -33,14 +33,18 @@ interface Contract {
   [key: string]: any;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  active: "bg-green-100 text-green-700 border-green-300",
-  completed: "bg-blue-100 text-blue-700 border-blue-300",
-  pending: "bg-amber-100 text-amber-700 border-amber-300",
-  terminated: "bg-red-100 text-red-700 border-red-300",
-  draft: "bg-indigo-100 text-indigo-700 border-indigo-300",
+// 状态徽章走 ThemeContext 语义令牌（success/info/warning/danger/badge/neutral），4 主题可翻；
+// 不再硬编 bg-*-100 / text-*-700 / border-*-300 浅色档（dark 主题下浅底深字塌陷）
+const statusBadgeClass = (status: string, styles: Record<string, string>): string => {
+  switch (status) {
+    case "active": return `${styles.successBg} ${styles.successText} ${styles.successBorder}`;
+    case "completed": return `${styles.infoBg} ${styles.infoText} ${styles.infoBorder}`;
+    case "pending": return `${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`;
+    case "terminated": return `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`;
+    case "draft": return `${styles.badgeBg} ${styles.badgeText} ${styles.accentBorder}`;
+    default: return `${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`;
+  }
 };
-const STATUS_FALLBACK = "bg-gray-100 text-gray-700 border-gray-300";
 
 const PAGE_SIZE = 10;
 
@@ -162,7 +166,7 @@ export default function ContractManager() {
       key: "status",
       label: t("contract.col.status"),
       render: (_v, record) => {
-        const color = STATUS_COLORS[record.status] || STATUS_FALLBACK;
+        const color = statusBadgeClass(record.status, styles);
         return (
           <span className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded border ${color}`}>
             {t(`contract.status.${record.status}`)}
@@ -323,7 +327,7 @@ export default function ContractManager() {
 
       {/* Error banner (when data exists but refresh fails) */}
       {error && contracts.length > 0 && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+        <div className={`flex items-center gap-2 px-4 py-3 ${styles.dangerBg} border ${styles.dangerBorder} rounded-lg text-xs ${styles.dangerText}`}>
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
           <button onClick={loadContracts} className="ml-auto font-semibold underline hover:no-underline">
