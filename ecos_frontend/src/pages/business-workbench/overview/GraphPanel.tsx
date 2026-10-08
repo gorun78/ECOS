@@ -8,6 +8,7 @@ import { ObjectType, LinkType, OntologyDomain } from '../../../types/ontology';
 import OntologyGraph from '../OntologyGraph';
 import LucideIcon from '../LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 import { getDomainColorClasses } from './domainColorClasses';
 
 interface GraphPanelProps {
@@ -32,6 +33,7 @@ export default function GraphPanel({
   onSelectEdge
 }: GraphPanelProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs space-y-4`}>
@@ -39,15 +41,16 @@ export default function GraphPanel({
         <div className="space-y-0.5">
           <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
             <LucideIcon name="Network" size={15} className="text-blue-600" />
-            关系拓扑图谱 (Ontology ER Diagram)
+            {t('ow.graph.title')}
           </h3>
-          <p className={`text-[11px] ${styles.cardTextMuted}`}>显示当前实体关联网络。可在上方切换不同业务域以进行视窗隔离和动态聚焦。</p>
+          <p className={`text-[11px] ${styles.cardTextMuted}`}>{t('ow.graph.subtitle')}</p>
         </div>
 
         {/* Dynamic Filter Controls */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className={`${styles.cardTextMuted} font-bold uppercase text-[9px] tracking-wider`}>视图按域过滤:</span>
+          <span className={`${styles.cardTextMuted} font-bold uppercase text-[9px] tracking-wider`}>{t('ow.graph.filterLabel')}</span>
           <button
+            type="button"
             onClick={() => onSelectDomainFilter(null)}
             className={`px-2.5 py-1 rounded-full transition-all border font-medium cursor-pointer text-[11px] ${
               !selectedDomainFilter
@@ -55,7 +58,7 @@ export default function GraphPanel({
                 : `${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder} hover:bg-blue-50/20`
             }`}
           >
-            全局全景 ({objectTypes.length})
+            {t('ow.graph.globalPano', { count: objectTypes.length })}
           </button>
           {domains.map(d => {
             const isSelected = selectedDomainFilter === d.id;
@@ -63,6 +66,7 @@ export default function GraphPanel({
             const classes = getDomainColorClasses(d.color);
             return (
               <button
+                type="button"
                 key={d.id}
                 onClick={() => onSelectDomainFilter(d.id)}
                 className={`px-2.5 py-1 rounded-full transition-all border font-medium cursor-pointer flex items-center gap-1.5 text-[11px] ${
@@ -81,6 +85,7 @@ export default function GraphPanel({
           })}
           {objectTypes.some(ot => !ot.domainId) && (
             <button
+              type="button"
               onClick={() => onSelectDomainFilter('unassigned')}
               className={`px-2.5 py-1 rounded-full transition-all border font-medium cursor-pointer text-[11px] ${
                 selectedDomainFilter === 'unassigned'
@@ -88,7 +93,7 @@ export default function GraphPanel({
                   : `${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder} hover:bg-blue-50/20`
               }`}
             >
-              未归域 ({objectTypes.filter(ot => !ot.domainId).length})
+              {t('ow.graph.unassigned', { count: objectTypes.filter(ot => !ot.domainId).length })}
             </button>
           )}
         </div>

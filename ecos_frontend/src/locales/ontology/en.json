@@ -1592,5 +1592,10 @@
   "ow.domhdr.editDomain": "Edit domain",
   "ow.domhdr.deleteDomain": "Delete domain",
   "ow.domhdr.addDomain": "Add domain tier",
-  "ow.domhdr.overviewTab": "Overview"
+  "ow.domhdr.overviewTab": "Overview",
+  "ow.graph.title": "Relationship Topology (Ontology ER Diagram)",
+  "ow.graph.subtitle": "Show the current entity relationship network. Switch domains above to scope and focus the view.",
+  "ow.graph.filterLabel": "Filter view by domain:",
+  "ow.graph.globalPano": "All ({count})",
+  "ow.graph.unassigned": "Unassigned ({count})"
 }

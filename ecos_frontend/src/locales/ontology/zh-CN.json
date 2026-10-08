@@ -1592,5 +1592,10 @@
   "ow.domhdr.editDomain": "修改业务域",
   "ow.domhdr.deleteDomain": "删除业务域",
   "ow.domhdr.addDomain": "添加业务分级域",
-  "ow.domhdr.overviewTab": "配置全景"
+  "ow.domhdr.overviewTab": "配置全景",
+  "ow.graph.title": "关系拓扑图谱 (Ontology ER Diagram)",
+  "ow.graph.subtitle": "显示当前实体关联网络。可在上方切换不同业务域以进行视窗隔离和动态聚焦。",
+  "ow.graph.filterLabel": "视图按域过滤:",
+  "ow.graph.globalPano": "全局全景 ({count})",
+  "ow.graph.unassigned": "未归域 ({count})"
 }
