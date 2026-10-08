@@ -4,7 +4,7 @@ import { mockActionTypes } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderCenterAside(vm: any) {
-  const { styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
+  const { t, styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
   return (
     <>
                   {/* RIGHT ASIDE VIEW (Object View and Actions) */}
@@ -24,9 +24,9 @@ export function renderCenterAside(vm: any) {
                           } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : '${styles.cardBorder}'}`}
                         >
                           {editorMode === 'design' && (
-                            <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
+                              <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
                               <span>ObjectView</span>
-                              <button onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
+                              <button type="button" onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
                             </div>
                           )}
                           <h3 className={`font-bold ${styles.cardText} border-b ${styles.cardBorder} pb-2 mb-3 text-[11px]`}>{w.title}</h3>
@@ -45,15 +45,15 @@ export function renderCenterAside(vm: any) {
                                   </div>
                                   <div className={`grid grid-cols-2 gap-2 text-[11px] ${styles.appBg} p-2.5 rounded-lg border ${styles.cardBorder} font-mono`}>
                                     <div>
-                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>执飞机尾号</p>
+                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>{t('aiworkbench.ws.ca.tailNumber')}</p>
                                       <p className={`font-bold ${styles.cardText}`}>{currentSelection.tailNumber}</p>
                                     </div>
                                     <div>
-                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>飞行员编号</p>
+                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>{t('aiworkbench.ws.ca.pilotId')}</p>
                                       <p className={`font-bold ${styles.cardText}`}>{currentSelection.assignedPilotId}</p>
                                     </div>
                                     <div className={`col-span-2 border-t ${styles.cardBorder}/50 pt-1.5`}>
-                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>起降枢纽港</p>
+                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>{t('aiworkbench.ws.ca.hubPort')}</p>
                                       <p className={`font-bold ${styles.cardText}`}>{currentSelection.depAirport} ✈ {currentSelection.arrAirport}</p>
                                     </div>
                                   </div>
@@ -68,15 +68,15 @@ export function renderCenterAside(vm: any) {
                                   </div>
                                   <div className={`grid grid-cols-2 gap-2 text-[11px] ${styles.appBg} p-2.5 rounded-lg border ${styles.cardBorder} font-mono`}>
                                     <div>
-                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>客机型号</p>
+                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>{t('aiworkbench.ws.ca.model')}</p>
                                       <p className={`font-bold ${styles.cardText}`}>{currentSelection.model}</p>
                                     </div>
                                     <div>
-                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>制造厂商</p>
+                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>{t('aiworkbench.ws.ca.manufacturer')}</p>
                                       <p className={`font-bold ${styles.cardText}`}>{currentSelection.manufacturer}</p>
                                     </div>
                                     <div className={`col-span-2 border-t ${styles.cardBorder}/50 pt-1.5`}>
-                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>最近检修</p>
+                                      <p className={`text-[9px] ${styles.cardTextMuted}`}>{t('aiworkbench.ws.ca.lastMaintenance')}</p>
                                       <p className={`font-bold ${styles.cardText}`}>{currentSelection.lastMaintenance}</p>
                                     </div>
                                   </div>
@@ -86,7 +86,7 @@ export function renderCenterAside(vm: any) {
                           ) : (
                             <div className={`py-8 text-center ${styles.cardTextMuted} flex flex-col items-center justify-center`}>
                               <Inbox size={20} className={`stroke-1 ${styles.cardText} mb-1`} />
-                              <span>请从表格中选中任意实体查看本体卡片详情</span>
+                              <span>{t('aiworkbench.ws.ca.selectFromTable')}</span>
                             </div>
                           )}
                         </div>
@@ -111,10 +111,11 @@ export function renderCenterAside(vm: any) {
                           {editorMode === 'design' && (
                             <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
                               <span>Action</span>
-                              <button onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
+                              <button type="button" onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
                             </div>
                           )}
                           <button
+                            type="button"
                             disabled={editorMode === 'design' || !boundObject}
                             onClick={() => {
                               const act = mockActionTypes.find(a => a.id === boundActionId);
@@ -129,7 +130,7 @@ export function renderCenterAside(vm: any) {
                             <span>{w.title}</span>
                           </button>
                           {!boundObject && editorMode === 'preview' && (
-                            <p className={`text-[9px] ${styles.cardTextMuted} text-center mt-1.5 leading-tight`}>需要选中一个本体实例后方能触发本项操作</p>
+                            <p className={`text-[9px] ${styles.cardTextMuted} text-center mt-1.5 leading-tight`}>{t('aiworkbench.ws.ca.selectFirstToTrigger')}</p>
                           )}
                         </div>
                       );
@@ -137,11 +138,12 @@ export function renderCenterAside(vm: any) {
 
                     {editorMode === 'design' && activePage?.widgets.filter((w: any) => w.slot === 'aside').length === 0 && (
                       <button
+                        type="button"
                         onClick={() => { setAddWidgetSlot('aside'); setShowAddWidgetModal(true); }}
                         className={`border-2 border-dashed ${styles.divider} rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} transition-all cursor-pointer min-h-[140px] w-full`}
                       >
                         <Plus size={15} />
-                        <span className="text-[10px] mt-1 font-semibold">放置侧边面板栏</span>
+                        <span className="text-[10px] mt-1 font-semibold">{t('aiworkbench.ws.ca.addAsidePanel')}</span>
                       </button>
                     )}
                   </div>

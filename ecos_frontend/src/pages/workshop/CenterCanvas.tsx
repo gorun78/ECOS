@@ -4,7 +4,7 @@ import { DynamicIcon } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderCenterCanvas(vm: any) {
-  const { styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
+  const { styles, t, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
   return (
     <>
               
@@ -23,6 +23,7 @@ export function renderCenterCanvas(vm: any) {
                 <div className="flex items-center gap-1.5">
                   {activeApp.pages.map((p: any) => (
                     <button
+                      type="button"
                       key={p.id}
                       onClick={() => {
                         setActivePageId(p.id);
@@ -76,22 +77,23 @@ export function renderCenterCanvas(vm: any) {
                         {editorMode === 'design' && (
                           <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
                             <span>Hash</span>
-                            <button onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
+                            <button type="button" onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
                           </div>
                         )}
                         <p className={`text-[10px] uppercase font-bold ${styles.cardTextMuted} tracking-wider`}>{w.title}</p>
-                        <h2 className={`text-2xl font-black ${styles.cardText} mt-1`}>{metricValue} <span className={`text-xs font-semibold ${styles.cardTextMuted}`}>条记录</span></h2>
+                        <h2 className={`text-2xl font-black ${styles.cardText} mt-1`}>{metricValue} <span className={`text-xs font-semibold ${styles.cardTextMuted}`}>{t('aiworkbench.ws.cc.records')}</span></h2>
                       </div>
                     );
                   })}
 
                   {editorMode === 'design' && (
                     <button
+                      type="button"
                       onClick={() => { setAddWidgetSlot('main_top'); setShowAddWidgetModal(true); }}
                       className={`border-2 border-dashed ${styles.divider} rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} transition-all cursor-pointer min-h-[80px]`}
                     >
                       <Plus size={15} />
-                      <span className="text-[10px] mt-1 font-semibold">添加指标卡</span>
+                      <span className="text-[10px] mt-1 font-semibold">{t('aiworkbench.ws.cc.addMetricCard')}</span>
                     </button>
                   )}
                 </div>
