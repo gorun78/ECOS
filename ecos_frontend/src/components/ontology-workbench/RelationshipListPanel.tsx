@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../stores/useWorkbenchStore';
 import { useTheme } from '../ThemeContext';
+import { useLanguage } from '../LanguageContext';
 import type { Relationship } from '../../types/workbench';
 
 // ── 关系类型颜色映射 ──────────────────────────────────────────
@@ -56,16 +57,18 @@ interface ConfirmDeleteProps {
 
 function ConfirmDelete({ rel, sourceName, targetName, onConfirm, onCancel, loading }: ConfirmDeleteProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   return (
     <div className="px-3 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 mx-2 my-1">
       <p className="text-[10px] text-red-400 mb-2">
-        确定要删除关系「{rel.name || rel.code}」吗？
+        {t('ow.rellist.dialog.confirmDelete', { name: rel.name || rel.code })}
       </p>
       <p className={`text-[9px] ${styles.muted} mb-2 font-mono`}>
         {sourceName} → {targetName}
       </p>
       <div className="flex items-center gap-2">
         <button
+          type="button"
           onClick={onConfirm}
           disabled={loading}
           className="flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-medium
@@ -73,16 +76,17 @@ function ConfirmDelete({ rel, sourceName, targetName, onConfirm, onCancel, loadi
             hover:bg-red-600/30 disabled:opacity-40 transition"
         >
           {loading && <Loader2 size={10} className="animate-spin" />}
-          确认删除
+          {t('ow.rellist.dialog.confirmBtn')}
         </button>
         <button
+          type="button"
           onClick={onCancel}
           disabled={loading}
           className={`px-2.5 py-1 rounded text-[10px] ${styles.sidebarText}
             hover:${styles.cardText} hover:bg-white/5 transition
             disabled:opacity-40`}
         >
-          取消
+          {t('common.cancel')}
         </button>
       </div>
     </div>
@@ -99,6 +103,7 @@ interface RelationshipListPanelProps {
 
 export default function RelationshipListPanel({ entityId }: RelationshipListPanelProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const store = useWorkbenchStore();
   const { relationships, entities } = store;
 
@@ -114,8 +119,8 @@ export default function RelationshipListPanel({ entityId }: RelationshipListPane
   const getOtherEntityName = useCallback((rel: Relationship): string => {
     const otherId = rel.sourceEntityId === entityId ? rel.targetEntityId : rel.sourceEntityId;
     const otherEntity = entities.find((e) => e.id === otherId);
-    return otherEntity?.name || otherEntity?.code || otherId?.slice(0, 12) || '未知';
-  }, [entityId, entities]);
+    return otherEntity?.name || otherEntity?.code || otherId?.slice(0, 12) || t('ow.rellist.unknown');
+  }, [entityId, entities, t]);
 
   // ── 获取方向说明 ────────────────────────────────────────────
   const getDirection = useCallback((rel: Relationship): { isSource: boolean; sourceName: string; targetName: string } => {
@@ -147,7 +152,7 @@ export default function RelationshipListPanel({ entityId }: RelationshipListPane
       {/* 标题 */}
       <h4 className={`text-[11px] font-semibold ${styles.sidebarText} mb-3 flex items-center gap-1.5`}>
         <GitBranch size={11} className={styles.muted} />
-        关联关系
+        {t('ow.rellist.title')}
         <span className={`text-[10px] font-normal ${styles.muted} ml-1`}>
           ({entityRelationships.length})
         </span>
@@ -157,9 +162,9 @@ export default function RelationshipListPanel({ entityId }: RelationshipListPane
       {entityRelationships.length === 0 ? (
         <div className={`flex flex-col items-center justify-center py-10 ${styles.muted}`}>
           <GitBranch size={24} className="mb-2 opacity-20" />
-          <p className="text-[11px]">暂无关系</p>
+          <p className="text-[11px]">{t('ow.rellist.emptyTitle')}</p>
           <p className="text-[9px] mt-0.5 opacity-50">
-            在画布中拖拽连线创建实体间关系
+            {t('ow.rellist.emptyHint')}
           </p>
         </div>
       ) : (
@@ -203,11 +208,12 @@ export default function RelationshipListPanel({ entityId }: RelationshipListPane
 
                   {/* 删除按钮 */}
                   <button
+                    type="button"
                     onClick={() => setConfirmingDeleteId(isConfirming ? null : rel.id)}
                     className={`p-1 rounded opacity-0 group-hover:opacity-100
                       hover:bg-red-500/10 ${styles.muted} hover:text-red-400
                       transition-opacity shrink-0`}
-                    title="删除关系"
+                    title={t('ow.rellist.deleteTitle')}
                   >
                     <Trash2 size={11} />
                   </button>

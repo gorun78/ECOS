@@ -1223,5 +1223,12 @@
   "ow.node.moreProps": "+{n} 更多属性...",
   "ow.node.emptyProps": "暂无属性",
   "ow.edge.nameFallback": "关联",
-  "ow.edge.deleteTitle": "删除关系"
+  "ow.edge.deleteTitle": "删除关系",
+  "ow.rellist.title": "关联关系",
+  "ow.rellist.emptyTitle": "暂无关系",
+  "ow.rellist.emptyHint": "在画布中拖拽连线创建实体间关系",
+  "ow.rellist.deleteTitle": "删除关系",
+  "ow.rellist.unknown": "未知",
+  "ow.rellist.dialog.confirmDelete": "确定要删除关系「{name}」吗？",
+  "ow.rellist.dialog.confirmBtn": "确认删除"
 }

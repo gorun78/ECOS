@@ -1223,5 +1223,12 @@
   "ow.node.moreProps": "+{n} more props...",
   "ow.node.emptyProps": "No properties yet",
   "ow.edge.nameFallback": "Related",
-  "ow.edge.deleteTitle": "Delete relationship"
+  "ow.edge.deleteTitle": "Delete relationship",
+  "ow.rellist.title": "Relationships",
+  "ow.rellist.emptyTitle": "No relationships",
+  "ow.rellist.emptyHint": "Drag on the canvas to draw a relationship between entities",
+  "ow.rellist.deleteTitle": "Delete relationship",
+  "ow.rellist.unknown": "Unknown",
+  "ow.rellist.dialog.confirmDelete": "Delete relationship \"{name}\"?",
+  "ow.rellist.dialog.confirmBtn": "Confirm delete"
 }
