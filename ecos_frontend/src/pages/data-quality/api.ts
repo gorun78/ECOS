@@ -27,6 +27,47 @@ const DQ_GOV_BASE = "/api/v1/dq";
 /** legacy 只读端点前缀 — 与数据工作台「数据质量」页同源 (DqController) */
 const DQ_LEGACY_BASE = "/api/v1/ecos/dq";
 
+/**
+ * 报告 §2.4 [P2]「data-quality 静默 null + catch→null/空对象 混 403/404/'真无数据'」收口分类器。
+ *
+ * apiFetchData 的实际抛出形态（见 services/httpClient.apiFetchData）：
+ *   - 403 → NoAccessError（自带 `status=403` / `name="NoAccessError"`）
+ *   - 其余非 2xx（含 404 / 405 / 5xx）→ 裸 `new Error("HTTP <n>")`，状态码**只在 message 里**，无 `status` 字段
+ *   - body `success:false` / `code≠200` → `new Error(<后端 message>)`
+ *   - fetch 抛异常（断网/超时/中止）→ NetworkError，且已触发全局 NetworkErrorBanner
+ *
+ * 原 ~13 处读端点 `catch { return null/[]/默认 }` 把上述全部塌成"空数据"，UI 分不出
+ * "后端 500" 与 "真·空表"。本分类器按抛出形态归一 kind，配合 {@link warnDqReadFallback}
+ * 在 console 留痕；**返回契约保持不变**（仍 null/[]/默认），Phase-1 只读兜底 UI 不回归。
+ */
+type DqFailKind = "auth403" | "notFound404" | "biz405" | "server5xx" | "network" | "other";
+
+function classifyDqError(e: unknown): { kind: DqFailKind; status?: number } {
+  const err = e as { status?: number; name?: string; message?: string };
+  let status: number | undefined =
+    typeof err?.status === "number" ? err.status : undefined;
+  const msg = String(err?.message ?? e);
+  if (status === undefined) {
+    const m = /HTTP\s+(\d{3})/.exec(msg);
+    if (m) status = Number(m[1]);
+  }
+  if (err?.name === "NoAccessError" || status === 403) return { kind: "auth403", status: status ?? 403 };
+  if (status === 404 || /404/.test(msg)) return { kind: "notFound404", status: status ?? 404 };
+  if (status === 405) return { kind: "biz405", status };
+  if (typeof status === "number" && status >= 500) return { kind: "server5xx", status };
+  if (/network|failed to fetch|load failed|abort|timeout|ERR_[A-Z]/i.test(msg)) return { kind: "network" };
+  return { kind: "other", status };
+}
+
+/** 读端点静默兜底前的统一留痕（不改返回值，仅使 403/404/405/5xx/network 与"真无数据"在观测层可分辨） */
+function warnDqReadFallback(endpoint: string, e: unknown): void {
+  const { kind, status } = classifyDqError(e);
+  console.warn(
+    `[dq.api] ${endpoint} failed → kind=${kind}${status ? ` status=${status}` : ""}; ` +
+      `returned empty fallback (distinguish 403/404/405/5xx/network from "no data" via this line)`,
+  );
+}
+
 /** T3 规则 VO — 与后端 DqRuleVO 字段对齐(驼峰) */
 export interface DqRuleVO {
   id: string;
@@ -206,7 +247,8 @@ export async function fetchDqDimensionRegistry(): Promise<DqDimensionRegistryVO[
     if (Array.isArray(resp)) return resp;
     return resp?.data ?? null;
   } catch (e) {
-    // 端点未就绪/权限异常 → 占位, UI 显示 placeholder
+    // 端点未就绪/权限异常 → 占位, UI 显示 placeholder（403/404/5xx 见 console 分类，不静默）
+    warnDqReadFallback("fetchDqDimensionRegistry", e);
     return null;
   }
 }
@@ -283,8 +325,10 @@ export async function fetchDqScoreAsset(
     }
     return r.data;
   } catch (e) {
-    // 404 → null (前端展示 "未评分" + 手动重算); 其它错误抛
-    if (e instanceof Error && /404/.test(e.message)) return null;
+    // 404 (后端 {code:404, DQ_SCORE_NOT_FOUND}) → null 让 UI 展示"未评分" + 手动重算；其它错误留痕后抛给调用方
+    // （分类经 classifyDqError，兼容 apiFetchData 把状态码放在 message 的裸 Error 形态）
+    if (classifyDqError(e).kind === "notFound404") return null;
+    warnDqReadFallback("fetchDqScoreAsset", e);
     throw e;
   }
 }
@@ -303,7 +347,8 @@ export async function fetchDqScoreTrend(
     );
     if (Array.isArray(resp)) return resp;
     return (resp as { data?: DqScoreTrendVO[] })?.data ?? [];
-  } catch {
+  } catch (e) {
+    warnDqReadFallback("fetchDqScoreTrend", e);
     return [];
   }
 }
@@ -317,7 +362,8 @@ export async function fetchDqScoreGrade(grade: string): Promise<DqAssetScoreVO[]
     );
     if (Array.isArray(resp)) return resp;
     return (resp as { data?: DqAssetScoreVO[] })?.data ?? [];
-  } catch {
+  } catch (e) {
+    warnDqReadFallback("fetchDqScoreGrade", e);
     return [];
   }
 }
@@ -335,7 +381,8 @@ export async function fetchDqScoreSystem(): Promise<DqScoreSystemVO> {
       if (direct && typeof direct.overallScore === "number") return direct as DqScoreSystemVO;
     }
     return { overallScore: 0, count: 0, grade: "F", perDimension: {} };
-  } catch {
+  } catch (e) {
+    warnDqReadFallback("fetchDqScoreSystem", e);
     return { overallScore: 0, count: 0, grade: "F", perDimension: {} };
   }
 }
@@ -358,7 +405,8 @@ export async function recomputeDqScore(
     return direct && (direct.rolledScore !== undefined || direct.assetId !== undefined)
       ? (direct as DqAssetScoreVO)
       : null;
-  } catch {
+  } catch (e) {
+    warnDqReadFallback("recomputeDqScore", e);
     return null;
   }
 }
@@ -451,7 +499,8 @@ export async function fetchDqGovernanceVersions(id: string): Promise<DqRuleVersi
       if (Array.isArray(inner)) return inner as DqRuleVersionVO[];
     }
     return [];
-  } catch {
+  } catch (e) {
+    warnDqReadFallback("fetchDqGovernanceVersions", e);
     return [];
   }
 }
@@ -493,7 +542,8 @@ export async function fetchDqSchedules(): Promise<DqScheduleVO[] | null> {
     const resp = await apiFetchData<unknown>(`${DQ_GOV_BASE}/schedules`);
     const arr = Array.isArray(resp) ? resp : (resp as { data?: unknown })?.data;
     return (Array.isArray(arr) ? arr : null) as DqScheduleVO[] | null;
-  } catch {
+  } catch (e) {
+    warnDqReadFallback("fetchDqSchedules", e);
     return null;
   }
 }
@@ -552,7 +602,8 @@ export async function fetchDqAlerts(
     const resp = await apiFetchData<unknown>(`${DQ_GOV_BASE}/alerts${qs ? `?${qs}` : ""}`);
     const arr = Array.isArray(resp) ? resp : (resp as { data?: unknown })?.data;
     return (Array.isArray(arr) ? arr : null) as DqAlertVO[] | null;
-  } catch {
+  } catch (e) {
+    warnDqReadFallback("fetchDqAlerts", e);
     return null;
   }
 }
@@ -635,7 +686,8 @@ export async function fetchDqWorkOrders(
     const resp = await apiFetchData<unknown>(`${DQ_GOV_BASE}/work-orders${qs ? `?${qs}` : ""}`);
     const arr = Array.isArray(resp) ? resp : (resp as { data?: unknown })?.data;
     return (Array.isArray(arr) ? arr : null) as DqWorkOrderVO[] | null;
-  } catch {
+  } catch (e) {
+    warnDqReadFallback("fetchDqWorkOrders", e);
     return null;
   }
 }
@@ -652,7 +704,8 @@ export async function fetchDqWorkOrderDetail(id: string): Promise<DqWorkOrderVO 
     const direct = resp as unknown as DqWorkOrderVO;
     if (direct && (direct.id !== undefined || direct.orderNo !== undefined)) return direct as DqWorkOrderVO;
     return null;
-  } catch {
+  } catch (e) {
+    warnDqReadFallback("fetchDqWorkOrderDetail", e);
     return null;
   }
 }
@@ -704,7 +757,8 @@ export async function fetchDqWorkOrderRank(grade: string): Promise<DqWorkOrderVO
     const resp = await apiFetchData<unknown>(`${DQ_GOV_BASE}/work-orders/rank${qs}`);
     const arr = Array.isArray(resp) ? resp : (resp as { data?: unknown })?.data;
     return (Array.isArray(arr) ? arr : []) as DqWorkOrderVO[];
-  } catch {
+  } catch (e) {
+    warnDqReadFallback("fetchDqWorkOrderRank", e);
     return [];
   }
 }
@@ -843,7 +897,8 @@ export async function fetchDqReports(query?: DqReportQuery): Promise<DqReportPag
       pageNum: typeof r.pageNum === "number" ? r.pageNum : 1,
       pageSize: typeof r.pageSize === "number" ? r.pageSize : data.length,
     };
-  } catch {
+  } catch (e) {
+    warnDqReadFallback("fetchDqReports", e);
     return null;
   }
 }
