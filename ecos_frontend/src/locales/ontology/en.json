@@ -1563,5 +1563,14 @@
   "ow.summary.domainTitle": "Business Domains",
   "ow.summary.domainSub": "Domain-level isolation and maintenance",
   "ow.summary.combinedTitle": "Interfaces & Properties",
-  "ow.summary.combinedMeta": "{i} interfaces · {s} shared properties"
+  "ow.summary.combinedMeta": "{i} interfaces · {s} shared properties",
+  "ow.domaincards.domainId": "Domain ID: {id}",
+  "ow.domaincards.editTitle": "Edit this domain",
+  "ow.domaincards.deleteTitle": "Delete this domain",
+  "ow.domaincards.noDescFallback": "No description provided.",
+  "ow.domaincards.assignedLabel": "Associated objects ({count})",
+  "ow.domaincards.noObjects": "No bound business entities",
+  "ow.domaincards.unassignedTitle": "Unassigned Entity Pool",
+  "ow.domaincards.unassignedCount": "{count} objects",
+  "ow.domaincards.unassignedDesc": "Some declared ontology entities are not yet bound to a specific business sub-domain. Unassigned objects continue to exist in the global relationship topology but do not carry a governance tier."
 }
