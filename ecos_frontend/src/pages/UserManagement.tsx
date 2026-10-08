@@ -338,8 +338,8 @@ export default function UserManagement() {
   ];
 
   const totalPages = Math.max(1, Math.ceil(userTotal / pageSize));
-  const th = "text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wider opacity-60 border-b border-gray-200 dark:border-gray-700/30";
-  const td = "px-3 py-2 text-[13px] border-b border-gray-100 dark:border-gray-700/20";
+  const th = `text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wider opacity-60 border-b ${styles.cardBorder}`;
+  const td = `px-3 py-2 text-[13px] border-b ${styles.cardBorder}`;
 
   // ═══════════════════════════════════════════════════════════
   // Render
@@ -365,12 +365,13 @@ export default function UserManagement() {
               {t("platform.user.host.tempPwdPrompt")}
             </p>
             <div className="flex items-center gap-2 mb-4">
-              <code className="flex-1 px-3 py-2 rounded text-sm font-mono bg-gray-100 dark:bg-gray-800 select-all">
+              <code className={`flex-1 px-3 py-2 rounded text-sm font-mono ${styles.sidebarBg} select-all`}>
                 {resetPwdResult.tempPassword}
               </code>
               <button
+                type="button"
                 onClick={() => { navigator.clipboard.writeText(resetPwdResult!.tempPassword); showToast("success", t("platform.user.host.copied")); }}
-                className={`p-2 rounded border ${styles.cardBorder} ${styles.cardText} hover:bg-gray-50 dark:hover:bg-white/5`}
+                className={`p-2 rounded border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`}
               >
                 <Copy className="w-4 h-4" />
               </button>
@@ -505,8 +506,8 @@ export default function UserManagement() {
               <Plus size={14} /> {t("platform.user.host.newButton")}
             </button>
           )}
-          <button onClick={loadData}
-            className="flex items-center gap-1 px-3 py-1.5 rounded text-xs border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5">
+          <button type="button" onClick={loadData}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.sidebarText} ${styles.sidebarHoverBg}`}>
             <RefreshCw size={14} /> {t("platform.user.host.refresh")}
           </button>
         </div>
@@ -517,9 +518,9 @@ export default function UserManagement() {
         {tabs.map(t => {
           const Icon = t.icon;
           return (
-            <button key={t.id} onClick={() => { setTab(t.id); setUserPage(1); }}
+            <button type="button" key={t.id} onClick={() => { setTab(t.id); setUserPage(1); }}
               className={`flex items-center gap-1.5 px-4 py-2 text-sm rounded-t transition-colors ${
-                tab === t.id ? `${styles.accentBg} text-white` : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400"
+                tab === t.id ? `${styles.accentBg} text-white` : `${styles.sidebarHoverBg} ${styles.sidebarText}`
               }`}>
               <Icon size={14} /> {t.label}
             </button>
@@ -529,7 +530,7 @@ export default function UserManagement() {
 
       {/* Error */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-3 rounded text-sm">{error}</div>
+        <div className={`${styles.dangerBg} ${styles.dangerText} p-3 rounded text-sm`}>{error}</div>
       )}
 
       {/* Users: Filter bar */}
@@ -596,10 +597,10 @@ export default function UserManagement() {
             </tr></thead>
             <tbody>
               {roles.map(r => (
-                <tr key={r.roleId} className="hover:bg-gray-50 dark:hover:bg-gray-800/20 cursor-pointer" onClick={() => { if (permissions.length === 0) loadPermissions(); setPermPanelRole(r); }}>
+                <tr key={r.roleId} className={`${styles.sidebarHoverBg} cursor-pointer`} onClick={() => { if (permissions.length === 0) loadPermissions(); setPermPanelRole(r); }}>
                   <td className={td}><span className="font-medium text-indigo-600 dark:text-indigo-400">{r.roleName}</span></td>
-                  <td className={td}><code className="text-[11px] bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{r.roleCode}</code></td>
-                  <td className={td}><span className={`text-xs px-1.5 py-0.5 rounded ${r.roleType === "SYSTEM" ? "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400" : "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"}`}>{r.roleType}</span></td>
+                  <td className={td}><code className={`text-[11px] ${styles.sidebarBg} px-1.5 py-0.5 rounded`}>{r.roleCode}</code></td>
+                  <td className={td}><span className={`text-xs px-1.5 py-0.5 rounded ${r.roleType === "SYSTEM" ? `${styles.warningBg} ${styles.warningText}` : `${styles.infoBg} ${styles.infoText}`}`}>{r.roleType}</span></td>
                   <td className={td}><span className="text-xs opacity-60 max-w-[200px] truncate block">{r.description || "-"}</span></td>
                   <td className={td} onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1">
@@ -619,7 +620,7 @@ export default function UserManagement() {
       {tab === "orgs" && (
         <div className="overflow-auto flex-1">
           <div className="border rounded overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 border-b bg-gray-50 dark:bg-gray-800/30 text-[11px] font-semibold uppercase tracking-wider opacity-60">
+            <div className={`flex items-center gap-2 px-3 py-2 border-b ${styles.sidebarBg} text-[11px] font-semibold uppercase tracking-wider opacity-60`}>
               <span className="w-4" /><span className="flex-1">{t("platform.user.host.orgColName")}</span>
               <span className="w-20 shrink-0">{t("platform.user.host.roleColCode")}</span>
               <span className="w-16 shrink-0">{t("platform.user.host.orgColStatus")}</span>
@@ -647,8 +648,8 @@ export default function UserManagement() {
             </tr></thead>
             <tbody>
               {permissions.map(p => (
-                <tr key={p.permissionId} className="hover:bg-gray-50 dark:hover:bg-gray-800/20">
-                  <td className={td}><code className="text-[11px] bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded font-medium">{p.resource}</code></td>
+                <tr key={p.permissionId} className={styles.sidebarHoverBg}>
+                  <td className={td}><code className={`text-[11px] ${styles.sidebarBg} px-1.5 py-0.5 rounded font-medium`}>{p.resource}</code></td>
                   <td className={td}><span className="text-xs font-mono">{p.action}</span></td>
                   <td className={td}><span className="text-xs opacity-50 font-mono">{p.conditionExpr || "-"}</span></td>
                   <td className={td}><span className="text-xs opacity-60 max-w-[200px] truncate block">{p.description || "-"}</span></td>
