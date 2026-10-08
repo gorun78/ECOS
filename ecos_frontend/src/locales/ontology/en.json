@@ -1265,5 +1265,13 @@
   "ow.domain.deleteModal.title": "Delete Ontology",
   "ow.domain.deleteModal.confirm": "Delete \"{name}\"? Entities under it will become inaccessible.",
   "ow.domain.deleteModal.deleting": "Deleting...",
-  "ow.domain.deleteModal.confirmBtn": "Confirm Delete"
+  "ow.domain.deleteModal.confirmBtn": "Confirm Delete",
+  "ow.tree.props": "props",
+  "ow.tree.stats": "{e} entities · {r} relationships",
+  "ow.tree.back": "Back to domains",
+  "ow.tree.search": "Search entities...",
+  "ow.tree.empty.none": "No entities yet",
+  "ow.tree.empty.search": "No matching entities",
+  "ow.tree.empty.hint": "Click the button below to create your first entity",
+  "ow.tree.newEntity": "New Entity"
 }

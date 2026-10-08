@@ -1265,5 +1265,13 @@
   "ow.domain.deleteModal.title": "删除本体",
   "ow.domain.deleteModal.confirm": "确定要删除「{name}」吗？删除后其下实体将无法访问。",
   "ow.domain.deleteModal.deleting": "删除中...",
-  "ow.domain.deleteModal.confirmBtn": "确认删除"
+  "ow.domain.deleteModal.confirmBtn": "确认删除",
+  "ow.tree.props": "属性",
+  "ow.tree.stats": "{e} 实体 · {r} 关系",
+  "ow.tree.back": "返回域列表",
+  "ow.tree.search": "搜索实体...",
+  "ow.tree.empty.none": "暂无实体",
+  "ow.tree.empty.search": "无匹配实体",
+  "ow.tree.empty.hint": "点击下方按钮创建第一个实体",
+  "ow.tree.newEntity": "新建实体"
 }
