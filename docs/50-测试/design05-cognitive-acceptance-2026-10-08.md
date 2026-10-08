@@ -262,4 +262,17 @@ ST03-A 豁免登记：见 `../40-实现/列级加密豁免登记表-2026-09-28.m
 
 **结论**：设计件 §二 A 章 F05-01~17 与 §五 REQ-COG-01~09、§三 B 章认知域范围、D.5 错误码、C.6 降级矩阵、C.7 可观测性、E.2 合规 DDL 的**代码/脚本/门禁制品已全部落地**；认知模块 240 用例与前端 35 用例实测通过，全 reactor Gate B 经 r2→r3→r4 三轮续跑后 **`BUILD SUCCESS`**（1.4），gateway 侧 `ModuleDependencyArchTest` 16/16 实测绿（含 F05-15 三门禁）；第 4 节 15 项**须真库 / 须运行时 / 须 CI 设施 / 超本册范围**的条目按"未执行"登记，**未以绿灯表述**。制品交付以本批 commit hash 为 DONE 凭证，未 push。
 
+## 七、交付凭证（本批 commit，分支 `release/v2.1-alpha`，**未 push**）
+
+| hash | 内容 | 清点 |
+|:--|:--|:--|
+| `954ebf8b` | `feat(cognitive,aiming,gateway,runtime,workspace,frontend,docs): 实现详细设计-05 认知域 F05-01~17 全量落地` | 212 条目 = 新增 130 / 修改 75 / 删除 7（删除件均为本册归一或收口的死轨，逐件有测试锁定：`sevenStates.matrix.spec.tsx` 断言 `GitVersionTab.tsx` 不存在；4 个前端旧件 tsc 无悬挂引用；2 个 DAO 由 F05-13 门禁证明改道） |
+| `02821b48` | `docs(db-script): 补 V200 schema 引用收口完成性核查记录` | 1 件（上一 V200 任务遗留的未跟踪核查记录，与本册分事提交） |
+| `05bd6b49` | `chore(gitignore): 忽略 Qoder CLI 内部 worktree 临时目录` | 1 件 |
+
+提交前后核对（留痕）：
+- `git add -An -A` 干跑清点 214 条 → 显式路径 staging 212 条（余 2 条延后至上述两个独立提交）→ `git diff --cached --name-status` 复核 = 130A/75M/7D。
+- 泄漏扫描：staged diff 全文对 `C:\Users\<机主>` / `/mnt/<盘>` / `sk-*` / `AKIA*` / `BEGIN *PRIVATE KEY` **零命中**；无 `target/`、`node_modules`、`.env`、`*.pem` 入库。
+- `ecos_backend/.flattened-pom.xml`（构建会写入本机 `.m2` 绝对路径）在 r4 构建结束后 `git checkout --` 复原，**未入库**。
+
 <!-- 详细设计-05 落地验收记录 / 2026-10-08 / v1.0 / fullstack / 口径：批准≠已实现≠已验收；未执行项全部显式 -->
