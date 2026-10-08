@@ -1600,5 +1600,9 @@
   "ow.graph.unassigned": "Unassigned ({count})",
   "ow.dommgr.title": "Business Domain Manager",
   "ow.dommgr.subtitle": "Create, edit and delete business domain tiers and bind object attribution (many-to-many relations).",
-  "ow.dommgr.createNew": "New Domain Tier"
+  "ow.dommgr.createNew": "New Domain Tier",
+  "ow.qnav.title": "Entity Quick-Nav by Domain",
+  "ow.qnav.unassigned": "Unassigned Object Pool",
+  "ow.actlog.title": "Lifecycle & Audit Log (Foundry Activity Stream)",
+  "ow.actlog.operator": "Operator: {name}"
 }

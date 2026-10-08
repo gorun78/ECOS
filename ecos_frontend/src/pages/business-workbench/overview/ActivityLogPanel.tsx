@@ -6,16 +6,18 @@
 import React from 'react';
 import LucideIcon from '../LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 import { auditLogs } from './auditLogs';
 
 export default function ActivityLogPanel() {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs lg:col-span-2 space-y-3`}>
       <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
         <LucideIcon name="History" size={14} className={styles.cardTextMuted} />
-        生命周期与审计日志 (Foundry Activity Stream)
+        {t('ow.actlog.title')}
       </h3>
       <div className={`divide-y ${styles.divider} max-h-[260px] overflow-y-auto pr-1`}>
         {auditLogs.map(log => (
@@ -32,7 +34,7 @@ export default function ActivityLogPanel() {
                 <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>{log.time}</span>
               </div>
               <p className={`${styles.cardTextMuted} text-[11px] leading-relaxed`}>{log.detail}</p>
-              <div className={`text-[10px] ${styles.cardTextMuted} font-mono`}>操作员: {log.user}</div>
+              <div className={`text-[10px] ${styles.cardTextMuted} font-mono`}>{t('ow.actlog.operator', { name: log.user })}</div>
             </div>
           </div>
         ))}
