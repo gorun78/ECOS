@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ObjectType, LinkType } from '../../types/ontology';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 
 interface Node {
   id: string;
@@ -40,6 +41,7 @@ export default function OntologyGraph({
   onSelectEdge
 }: OntologyGraphProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -154,8 +156,8 @@ export default function OntologyGraph({
       }} />
 
       <div className={`absolute top-3 left-3 flex flex-col gap-1 ${styles.cardBg} backdrop-blur-sm px-3 py-2 rounded border ${styles.appBorder} shadow-xs z-10`}>
-        <span className={`text-xs font-semibold ${styles.cardText}`}>本体画布 (Interactive Canvas)</span>
-        <span className={`text-[10px] ${styles.cardTextMuted}`}>提示：可拖拽对象节点进行微调排版</span>
+        <span className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.oant.canvasTitle')}</span>
+        <span className={`text-[10px] ${styles.cardTextMuted}`}>{t('ow.oant.dragHint')}</span>
       </div>
 
       <svg className="w-full h-full pointer-events-none absolute inset-0">
@@ -240,7 +242,7 @@ export default function OntologyGraph({
         const originalObj = objectTypes.find(o => o.id === node.id);
         const hasDomain = originalObj?.domainId;
         const bgClass = hasDomain === 'assets' ? 'bg-blue-600 border-blue-500' : hasDomain === 'operations' ? 'bg-purple-600 border-purple-500' : 'bg-[var(--card,#475569)] border-[var(--card,#64748B)]';
-        const domainLabel = hasDomain === 'assets' ? '资产域' : hasDomain === 'operations' ? '运行域' : '业务域';
+        const domainLabel = hasDomain === 'assets' ? t('ow.oant.domainAssets') : hasDomain === 'operations' ? t('ow.oant.domainOperations') : t('ow.oant.domainBusiness');
 
         return (
           <div
@@ -269,7 +271,7 @@ export default function OntologyGraph({
               <span>{node.label}</span>
             </div>
             <div className={`text-[10px] ${styles.cardTextMuted} font-mono mt-1 opacity-80`}>
-              {node.propertiesCount} 属性 · {node.id}
+              {t('ow.oant.nodeMeta', { count: node.propertiesCount, id: node.id })}
             </div>
           </div>
         );

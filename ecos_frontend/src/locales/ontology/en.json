@@ -1604,5 +1604,15 @@
   "ow.qnav.title": "Entity Quick-Nav by Domain",
   "ow.qnav.unassigned": "Unassigned Object Pool",
   "ow.actlog.title": "Lifecycle & Audit Log (Foundry Activity Stream)",
-  "ow.actlog.operator": "Operator: {name}"
+  "ow.actlog.operator": "Operator: {name}",
+  "ow.oant.canvasTitle": "Ontology Canvas (Interactive)",
+  "ow.oant.dragHint": "Tip: drag nodes to fine-tune the layout",
+  "ow.oant.domainAssets": "Assets Domain",
+  "ow.oant.domainOperations": "Operations Domain",
+  "ow.oant.domainBusiness": "Business Domain",
+  "ow.oant.nodeMeta": "{count} props · {id}",
+  "ow.exptbl.searchPlaceholder": "Search displayed data instances...",
+  "ow.exptbl.showing": "Showing",
+  "ow.exptbl.instances": "instances",
+  "ow.exptbl.noResults": "No data instances matched the current filters (No results)"
 }

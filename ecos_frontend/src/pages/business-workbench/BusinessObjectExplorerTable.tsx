@@ -9,6 +9,7 @@ import React from 'react';
 import { ObjectType } from '../../types/ontology';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 
 interface ExplorerTableProps {
   activeObjectType: ObjectType | null;
@@ -36,6 +37,7 @@ export function ExplorerTable({
   onSelectInstance,
 }: ExplorerTableProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`flex-1 flex flex-col overflow-hidden ${styles.cardBg}`}>
@@ -47,14 +49,14 @@ export function ExplorerTable({
           </span>
           <input
             type="text"
-            placeholder="局部搜索当前展示的数据实例..."
+            placeholder={t('ow.exptbl.searchPlaceholder')}
             value={localSearch}
             onChange={e => onLocalSearchChange(e.target.value)}
             className={`w-full h-7 pl-7 pr-3 text-[10px] ${styles.inputBg} border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden ${styles.inputText}`}
           />
         </div>
         <div className={`text-[10px] ${styles.cardTextMuted} font-mono`}>
-          正在展示 <strong>{processedInstances.length}</strong> / {totalInstanceCount} 个实例化对象
+          {t('ow.exptbl.showing')} <strong>{processedInstances.length}</strong> / {totalInstanceCount} {t('ow.exptbl.instances')}
         </div>
       </div>
 
@@ -89,7 +91,7 @@ export function ExplorerTable({
             {processedInstances.length === 0 ? (
               <tr>
                 <td colSpan={(activeObjectType?.properties.length || 0) + 1} className={`text-center py-24 ${styles.cardTextMuted} font-medium italic`}>
-                  未能查询到符合任何当前筛选条件的实例化对象 (No results)
+                  {t('ow.exptbl.noResults')}
                 </td>
               </tr>
             ) : (

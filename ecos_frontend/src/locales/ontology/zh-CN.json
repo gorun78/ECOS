@@ -1604,5 +1604,15 @@
   "ow.qnav.title": "实体清单快速分级导航",
   "ow.qnav.unassigned": "未归类业务对象 (Pool)",
   "ow.actlog.title": "生命周期与审计日志 (Foundry Activity Stream)",
-  "ow.actlog.operator": "操作员: {name}"
+  "ow.actlog.operator": "操作员: {name}",
+  "ow.oant.canvasTitle": "本体画布 (Interactive Canvas)",
+  "ow.oant.dragHint": "提示：可拖拽对象节点进行微调排版",
+  "ow.oant.domainAssets": "资产域",
+  "ow.oant.domainOperations": "运行域",
+  "ow.oant.domainBusiness": "业务域",
+  "ow.oant.nodeMeta": "{count} 属性 · {id}",
+  "ow.exptbl.searchPlaceholder": "局部搜索当前展示的数据实例...",
+  "ow.exptbl.showing": "正在展示",
+  "ow.exptbl.instances": "个实例化对象",
+  "ow.exptbl.noResults": "未能查询到符合任何当前筛选条件的实例化对象 (No results)"
 }
