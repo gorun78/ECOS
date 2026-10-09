@@ -1654,5 +1654,22 @@
   "knowledge.upload.extractionHistory": "Extraction History",
   "knowledge.upload.noHistory": "No history yet (/extract/history returns empty)",
   "knowledge.upload.done": "Done",
-  "knowledge.ontology_model.openBuszhi": "Open buszhi"
+  "knowledge.ontology_model.openBuszhi": "Open buszhi",
+  "knowledge.graph.nodeLabel": "Node Label",
+  "knowledge.graph.nodeLabelPlaceholder": "Enter node display name",
+  "knowledge.graph.nodeType": "Node Type",
+  "knowledge.graph.nodeTypePlaceholder": "Select or enter node type",
+  "knowledge.graph.nodeDescription": "Description",
+  "knowledge.graph.nodeDescriptionPlaceholder": "Briefly describe this node",
+  "knowledge.graph.nodeProperties": "Properties",
+  "knowledge.graph.cancel": "Cancel",
+  "knowledge.graph.create": "Create",
+  "knowledge.graph.sourceNode": "Source Node",
+  "knowledge.graph.selectNode": "Select node",
+  "knowledge.graph.targetNode": "Target Node",
+  "knowledge.graph.relationship": "Relationship",
+  "knowledge.graph.relationshipPlaceholder": "Select relationship type",
+  "knowledge.graph.weight": "Weight",
+  "knowledge.graph.noNodeSelected": "No node selected",
+  "knowledge.nav.tree_new_node": "New Node"
 }

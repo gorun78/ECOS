@@ -1920,5 +1920,10 @@
   "dw.guide.footer.lastUpdated": "最新状态时间: 刚刚",
   "dw.guide.footer.hint2": "算子联动机制: 改变延误限度，下方 In-Memory/Doris 预览数据立刻响应",
   "dw.guide.footer.hint3": "版本管理规范: 强制 CI 单元校验保障生产分支的绝对高可用",
-  "dw.guide.footer.hint4": "质量控制标准: 高容错 Data Health 校验，自动熔断异常下游"
+  "dw.guide.footer.hint4": "质量控制标准: 高容错 Data Health 校验，自动熔断异常下游",
+  "dw.conn.previewFailed": "预览失败",
+  "dw.conn.previewFields": "字段",
+  "dw.conn.previewTables": "数据表",
+  "dw.txt.collapse": "收起",
+  "dw.txt.expand": "展开"
 }

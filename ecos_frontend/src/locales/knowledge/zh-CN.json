@@ -1654,5 +1654,22 @@
   "knowledge.upload.extractionHistory": "抽取历史",
   "knowledge.upload.noHistory": "暂无历史（/extract/history 尚未返回）",
   "knowledge.upload.done": "完成",
-  "knowledge.ontology_model.openBuszhi": "跳转本体工作台"
+  "knowledge.ontology_model.openBuszhi": "跳转本体工作台",
+  "knowledge.graph.nodeLabel": "节点标签",
+  "knowledge.graph.nodeLabelPlaceholder": "输入节点显示名称",
+  "knowledge.graph.nodeType": "节点类型",
+  "knowledge.graph.nodeTypePlaceholder": "选择或输入节点类型",
+  "knowledge.graph.nodeDescription": "节点描述",
+  "knowledge.graph.nodeDescriptionPlaceholder": "简要描述该节点",
+  "knowledge.graph.nodeProperties": "节点属性",
+  "knowledge.graph.cancel": "取消",
+  "knowledge.graph.create": "创建",
+  "knowledge.graph.sourceNode": "起始节点",
+  "knowledge.graph.selectNode": "选择节点",
+  "knowledge.graph.targetNode": "目标节点",
+  "knowledge.graph.relationship": "关系类型",
+  "knowledge.graph.relationshipPlaceholder": "选择关系类型",
+  "knowledge.graph.weight": "权重",
+  "knowledge.graph.noNodeSelected": "未选择节点",
+  "knowledge.nav.tree_new_node": "新建节点"
 }

@@ -1199,5 +1199,22 @@
   "aiworkbench.chatbot.defaultThread": "新对话",
   "aiworkbench.chatbot.oagSimExecuting": "正在执行 {label}…",
   "aiworkbench.chatbot.oagSimGenerating": "正在生成回答…",
-  "aiworkbench.chatbot.threadSavePrefix": "已保存"
+  "aiworkbench.chatbot.threadSavePrefix": "已保存",
+  "aiworkbench.guardrail.dutySecurity": "安全中心",
+  "aiworkbench.guardrail.dutySecurityBody": "策略定义 · 执行 · RLS/CLS/脱敏 · 审计日志",
+  "aiworkbench.guardrail.dutyAIP": "AI 工作台（本 Tab）",
+  "aiworkbench.guardrail.dutyAIPBody": "Agent 与护栏绑定关系的只读视图",
+  "aiworkbench.guardrail.dutyExec": "执行入口",
+  "aiworkbench.guardrail.dutyExecBody": "编辑经安全中心 → 护栏策略 Tab；拦截事件见审计日志 Tab",
+  "aiworkbench.guardrail.readOnlyBadger": "只读",
+  "aiworkbench.guardrail.readOnlyHint": "不做任何写操作，绑定关系仅供查看",
+  "aiworkbench.guardrail.bindingMatrixTitle": "Agent ↔ 护栏 绑定矩阵",
+  "aiworkbench.guardrail.boundBadge": "已绑定",
+  "aiworkbench.guardrail.unboundHint": "未绑定护栏",
+  "aiworkbench.guardrail.policySummaryTitle": "护栏策略汇总",
+  "aiworkbench.guardrail.enabled": "已启用",
+  "aiworkbench.guardrail.disabled": "已停用",
+  "aiworkbench.playground.messagesSent": "条消息",
+  "aiworkbench.playground.guardrailBinding": "护栏绑定",
+  "aiworkbench.ws.wiParamLabel": "目标实体"
 }

@@ -1915,5 +1915,10 @@
   "dw.guide.footer.lastUpdated": "Latest status time: just now",
   "dw.guide.footer.hint2": "Operator linkage: change the delay threshold and the In-Memory/Doris preview data below responds instantly",
   "dw.guide.footer.hint3": "Version control standard: mandatory CI unit checks guarantee absolute high availability of the production branch",
-  "dw.guide.footer.hint4": "Quality control standard: high-fault-tolerance Data Health checks, auto circuit-breach abnormal downstream"
+  "dw.guide.footer.hint4": "Quality control standard: high-fault-tolerance Data Health checks, auto circuit-breach abnormal downstream",
+  "dw.conn.previewFailed": "Preview failed",
+  "dw.conn.previewFields": "Fields",
+  "dw.conn.previewTables": "Tables",
+  "dw.txt.collapse": "Collapse",
+  "dw.txt.expand": "Expand"
 }

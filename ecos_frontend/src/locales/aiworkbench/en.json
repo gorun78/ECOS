@@ -1199,5 +1199,22 @@
   "aiworkbench.chatbot.defaultThread": "New conversation",
   "aiworkbench.chatbot.oagSimExecuting": "Executing {label}…",
   "aiworkbench.chatbot.oagSimGenerating": "Generating response…",
-  "aiworkbench.chatbot.threadSavePrefix": "Saved"
+  "aiworkbench.chatbot.threadSavePrefix": "Saved",
+  "aiworkbench.guardrail.dutySecurity": "Security Center",
+  "aiworkbench.guardrail.dutySecurityBody": "Policy definition · enforcement · RLS/CLS/masking · audit logs",
+  "aiworkbench.guardrail.dutyAIP": "AI Workbench (this tab)",
+  "aiworkbench.guardrail.dutyAIPBody": "Read-only view of Agent↔guardrail bindings",
+  "aiworkbench.guardrail.dutyExec": "Execution Entry",
+  "aiworkbench.guardrail.dutyExecBody": "Edit in Security Center → Guardrail Policy Tab; interception events in Audit Log Tab",
+  "aiworkbench.guardrail.readOnlyBadger": "READ-ONLY",
+  "aiworkbench.guardrail.readOnlyHint": "No write operations; bindings shown for reference only",
+  "aiworkbench.guardrail.bindingMatrixTitle": "Agent ↔ Guardrail Binding Matrix",
+  "aiworkbench.guardrail.boundBadge": "Bound",
+  "aiworkbench.guardrail.unboundHint": "no guardrails bound",
+  "aiworkbench.guardrail.policySummaryTitle": "Guardrail Policy Summary",
+  "aiworkbench.guardrail.enabled": "Enabled",
+  "aiworkbench.guardrail.disabled": "Disabled",
+  "aiworkbench.playground.messagesSent": "messages sent",
+  "aiworkbench.playground.guardrailBinding": "Guardrail Binding",
+  "aiworkbench.ws.wiParamLabel": "Target Entity"
 }
