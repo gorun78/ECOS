@@ -184,7 +184,7 @@ export default function CognitiveEngineView() {
             {isRunning ? <CheckCircle2 className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
             <span className={`font-bold ${isRunning ? 'text-emerald-400' : 'text-red-400'}`}>{engineState}</span>
           </div>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin text-zinc-400" /> : (
+          {loading ? <Loader2 className={`w-4 h-4 animate-spin ${styles.muted}`} /> : (
             <>
               {status?.subEngines && <span className={`text-xs ${styles.muted}`}>Sub-engines: {String(status.subEngines)}</span>}
               {status?.agentCount != null && <span className={`text-xs ${styles.muted}`}>Agents: {String(status.agentCount)}</span>}
@@ -212,7 +212,7 @@ export default function CognitiveEngineView() {
 
         {/* Sub-engine Content */}
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5`}>
-          {subLoading && <div className="flex items-center gap-2 text-zinc-400 text-sm mb-4"><Loader2 className="w-4 h-4 animate-spin" />{t('cognition.engine.loading')}</div>}
+          {subLoading && <div className={`flex items-center gap-2 ${styles.muted} text-sm mb-4`}><Loader2 className="w-4 h-4 animate-spin" />{t('cognition.engine.loading')}</div>}
 
           {/* PromptCompiler */}
           {activeTab === 'prompt' && (
@@ -350,13 +350,13 @@ export default function CognitiveEngineView() {
           </h3>
           <div className="grid grid-cols-2 gap-4 mt-3">
             <div className="space-y-1">
-              <span className="text-[10px] font-mono text-zinc-500">/health</span>
+              <span className={`text-[10px] font-mono ${styles.muted}`}>/health</span>
               <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-2 overflow-x-auto max-h-32`}>
                 {health ? JSON.stringify(health, null, 2) : '—'}
               </pre>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] font-mono text-zinc-500">/status</span>
+              <span className={`text-[10px] font-mono ${styles.muted}`}>/status</span>
               <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-2 overflow-x-auto max-h-32`}>
                 {status ? JSON.stringify(status, null, 2) : '—'}
               </pre>
