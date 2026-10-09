@@ -77,9 +77,20 @@ public class AgentTracer {
         if (traceId == null || op == null) {
             return;
         }
-        TraceBucket bucket = traces.get(traceId);
-        if (bucket == null) {
-            bucket = traces.computeIfAbsent(traceId, id -> new TraceBucket(insertSeqGen.incrementAndGet()));
+        boolean[] newlyRegistered = new boolean[1];
+        TraceBucket bucket = traces.computeIfAbsent(traceId, id -> {
+            newlyRegistered[0] = true;
+            return new TraceBucket(insertSeqGen.incrementAndGet());
+        });
+        if (newlyRegistered[0]) {
+            // 上限在两个登记点都判（只在 newTrace 判会留下 record 直接建桶的绕过面 ⇒ 视图仍可无界，X-34 同源问题）
+            evictIfOverCapacity();
+            bucket = traces.get(traceId);
+            if (bucket == null) {
+                // 本 trace 刚登记就被淘汰（视图已满且它最久未登记）⇒ 禁往孤儿桶里写
+                log.debug("[AgentTracer] Debug view registered then immediately evicted by capacity: {}", traceId);
+                return;
+            }
         }
         bucket.steps.add(new TurnRecord(traceId, step, op.wire(), latencyMs,
                 promptTokens, completionTokens, toolName,

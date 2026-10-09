@@ -112,6 +112,14 @@ llm:
   # 运维覆盖面：llm.models.catalog.<model-name>.context-limit: <token 数>
   models:
     default-context-limit: 0
+  # 详细设计-06 F06-10/W152：llm-gateway 会话内存视图的有界化参数（X-34 无界 ConcurrentHashMap 已废）。
+  # 清扫由 runtime-task 的 SessionMemorySweepTask 每 60s 驱动（铁律 §2.5-4，本模块禁自建调度器）。
+  # 与 models 同边界口径：进程内存活/容量属部署期形态 ⇒ 留 yml 面，不落 sys_config 业务字典。
+  sessions:
+    # expireAfterAccess 空闲时长（秒）；<=0 视为配置错误 ⇒ 回落 1800 并 ERROR（禁解释成"永不过期"）
+    ttl-seconds: 1800
+    # 驻留硬上限，超限按最久未访问淘汰并 WARN；<=0 回落 2000 并 ERROR
+    max-active-sessions: 2000
 
 # Agent Default Configuration (L1)
 agent:

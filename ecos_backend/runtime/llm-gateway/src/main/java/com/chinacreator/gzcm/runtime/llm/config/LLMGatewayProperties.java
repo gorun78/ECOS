@@ -27,10 +27,14 @@ public class LLMGatewayProperties {
     /** 模型目录（详细设计-06 F06-09 要点 1：上下文上限唯一来源，禁引擎内硬编码） */
     private final Models models = new Models();
 
+    /** 会话内存治理（详细设计-06 F06-10 / W152：TTL + 容量上限，清扫由 runtime-task 驱动） */
+    private final Sessions sessions = new Sessions();
+
     public Engine getEngine() { return engine; }
     public Gateway getGateway() { return gateway; }
     public Profile getProfile() { return profile; }
     public Models getModels() { return models; }
+    public Sessions getSessions() { return sessions; }
 
     /**
      * 引擎配置
@@ -158,5 +162,30 @@ public class LLMGatewayProperties {
 
         public int getContextLimit() { return contextLimit; }
         public void setContextLimit(int contextLimit) { this.contextLimit = contextLimit; }
+    }
+
+    /**
+     * 会话内存治理配置（详细设计-06 F06-10 / W152 / X-34）。
+     *
+     * <p>与 {@link Models} 同一边界口径：<b>进程内容量与存活时长属部署期形态</b>（受 JVM 堆、
+     * 并发档位影响），故留在 Spring yml 面，不落 sys_config 业务字典；业务侧可调项
+     * （压缩阈值/保留窗口/配额）仍由字典单源管（V264）。</p>
+     *
+     * <p>{@code ttlSeconds} 是 {@code expireAfterAccess} 的空闲时长：读/写会话都重置计时，
+     * 超时条目由 runtime-task 的清扫任务回收（本模块不自建调度器，铁律 §2.5-4 / X-25）。
+     * {@code maxActiveSessions} 是驻留硬上限，超限按最久未访问淘汰并 WARN（禁静默丢会话）。</p>
+     */
+    public static class Sessions {
+        /** 空闲存活时长（秒），默认 30 分钟（与既有会话超时口径一致） */
+        private long ttlSeconds = 1800L;
+        /** 进程内驻留会话上限 */
+        private int maxActiveSessions = 2000;
+
+        public long getTtlSeconds() { return ttlSeconds; }
+        public void setTtlSeconds(long ttlSeconds) { this.ttlSeconds = ttlSeconds; }
+        public int getMaxActiveSessions() { return maxActiveSessions; }
+        public void setMaxActiveSessions(int maxActiveSessions) {
+            this.maxActiveSessions = maxActiveSessions;
+        }
     }
 }
