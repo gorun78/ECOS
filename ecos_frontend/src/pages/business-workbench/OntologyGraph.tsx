@@ -144,7 +144,7 @@ export default function OntologyGraph({
   return (
     <div
       ref={containerRef}
-      className={`relative w-full h-[450px] border border-gray-200 rounded-lg ${styles.appBg} overflow-hidden select-none cursor-default`}
+      className={`relative w-full h-[450px] border ${styles.appBorder} rounded-lg ${styles.appBg} overflow-hidden select-none cursor-default`}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}

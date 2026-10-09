@@ -87,7 +87,7 @@ export function InterfaceView({ intf, objectTypes, onDelete, onNavigateToObject 
           </div>
         </div>
 
-        <div className="space-y-3 border-t border-gray-100 pt-6">
+        <div className={`space-y-3 border-t ${styles.divider} pt-6`}>
           <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.ip.implSection', { count: implementingObjects.length })}</h3>
           {implementingObjects.length === 0 ? (
             <div className={`text-center py-6 border border-dashed ${styles.appBorder} rounded-lg ${styles.cardTextMuted} text-xs`}>
@@ -181,7 +181,7 @@ export function SharedPropertyView({ sp, objectTypes, onDelete, onNavigateToObje
           </div>
         </div>
 
-        <div className="space-y-3 border-t border-gray-100 pt-6">
+        <div className={`space-y-3 border-t ${styles.divider} pt-6`}>
           <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.sprop.bindSection', { count: referencedObjects.length })}</h3>
           {referencedObjects.length === 0 ? (
             <div className={`text-center py-6 border border-dashed ${styles.appBorder} rounded-lg ${styles.cardTextMuted} text-xs`}>
@@ -296,10 +296,10 @@ export function DatasetView({ dataset, objectTypes, onNavigateToObject }: Datase
               </thead>
               <tbody className={`divide-y ${styles.divider} ${styles.cardText}`}>
                 {dataset.sampleData.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50/30">
+                  <tr key={idx} className={styles.sidebarHoverBg}>
                     {dataset.columns.map(col => (
                       <td key={col.name} className="py-2.5 px-3 truncate max-w-[150px]" title={String(row[col.name] ?? '')}>
-                        {row[col.name] === undefined ? <span className="text-gray-400">null</span> : String(row[col.name])}
+                        {row[col.name] === undefined ? <span className={styles.muted}>null</span> : String(row[col.name])}
                       </td>
                     ))}
                   </tr>
