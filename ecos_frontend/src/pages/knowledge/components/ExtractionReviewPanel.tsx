@@ -139,7 +139,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
   if (done) {
     return (
       <div className={`flex flex-col items-center justify-center py-16 space-y-4 ${styles.cardBg} border ${styles.cardBorder} rounded-xl`}>
-        <div className="p-4 bg-emerald-100 rounded-2xl"><Check size={32} className="text-emerald-600" /></div>
+        <div className={`p-4 ${styles.successBg} rounded-2xl`}><Check size={32} className={styles.successText} /></div>
         <p className={`text-sm font-extrabold ${styles.cardText}`}>{t('extractReview.complete.title')}</p>
         <p className={`text-[11px] ${styles.cardTextMuted}`}>{t('extractReview.complete.subtitle')}</p>
         <button type="button" onClick={onBack} className={`px-4 py-2 ${styles.accentBg} text-white font-bold rounded-lg text-xs cursor-pointer`}>
@@ -202,7 +202,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
             {activeTab==='entities' && entities.map(entity => (
               <div key={entity.id} className="px-3 py-2.5 flex items-start gap-2.5 hover:bg-opacity-20 data-[hover]:hover:bg-black /[0.02]">
                 <button type="button" onClick={() => toggleEntity(entity.id)} className="mt-0.5 shrink-0 cursor-pointer">
-                  {entity.selected ? <CheckSquare size={14} className="text-emerald-500" /> : <Square size={14} className="text-zinc-300" />}
+                  {entity.selected ? <CheckSquare size={14} className="text-emerald-500" /> : <Square size={14} className={styles.muted} />}
                 </button>
                 <div className="flex-1 min-w-0">
                   {editingId===entity.id ? (
@@ -212,12 +212,12 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
                       <input value={editType} onChange={e=>setEditType(e.target.value)}
                         className={`w-20 px-2 py-1 ${styles.inputBg} ${styles.inputBorder} border rounded text-[10px] font-bold ${styles.inputText}`} />
                       <button type="button" onClick={saveEdit} className="px-2 py-1 bg-emerald-500 text-white rounded text-[10px]"><Check size={10}/></button>
-                      <button type="button" onClick={()=>setEditingId(null)} className="px-2 py-1 bg-zinc-200 rounded text-[10px]"><X size={10}/></button>
+                      <button type="button" onClick={()=>setEditingId(null)} className={`px-2 py-1 ${styles.sidebarBg} rounded text-[10px]`}><X size={10}/></button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`text-[11px] font-bold ${styles.cardText}`}>{entity.name}</span>
-                      <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 text-[9px] font-bold rounded">{entity.type}</span>
+                      <span className={`px-1.5 py-0.5 ${styles.successBg} ${styles.successText} text-[9px] font-bold rounded`}>{entity.type}</span>
                       {entity.properties && Object.entries(entity.properties).map(([k,v]) => (
                         <span key={k} className={`text-[8px] font-mono ${styles.cardTextMuted} ${styles.cardBg} px-1 py-0.5 rounded`}>{k}:{String(v)}</span>
                       ))}
@@ -233,17 +233,17 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
             {activeTab==='relations' && relations.map(rel => (
               <div key={rel.id} className="px-3 py-2.5 flex items-center gap-2.5 hover:bg-black/5">
                 <button type="button" onClick={() => toggleRelation(rel.id)} className="shrink-0 cursor-pointer">
-                  {rel.selected ? <CheckSquare size={14} className="text-emerald-500" /> : <Square size={14} className="text-zinc-300" />}
+                  {rel.selected ? <CheckSquare size={14} className="text-emerald-500" /> : <Square size={14} className={styles.muted} />}
                 </button>
                 <span className={`text-[10px] font-bold ${styles.cardText}`}>{rel.source}</span>
-                <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold rounded-full">{rel.type}</span>
+                <span className={`px-1.5 py-0.5 ${styles.infoBg} ${styles.infoText} text-[9px] font-bold rounded-full`}>{rel.type}</span>
                 <span className={`text-[10px] font-bold ${styles.cardText}`}>{rel.target}</span>
               </div>
             ))}
             {activeTab==='rules' && rules.map(rule => (
               <div key={rule.id} className="px-3 py-2.5 flex items-start gap-2.5 hover:bg-black/5">
                 <button type="button" onClick={() => toggleRule(rule.id)} className="mt-0.5 shrink-0 cursor-pointer">
-                  {rule.selected ? <CheckSquare size={14} className="text-emerald-500" /> : <Square size={14} className="text-zinc-300" />}
+                  {rule.selected ? <CheckSquare size={14} className="text-emerald-500" /> : <Square size={14} className={styles.muted} />}
                 </button>
                 <div className="flex-1 min-w-0">
                   <span className={`text-[11px] font-bold ${styles.cardText}`}>{rule.name}</span>
