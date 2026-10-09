@@ -1920,5 +1920,10 @@
   "dw.conn.previewFields": "Fields",
   "dw.conn.previewTables": "Tables",
   "dw.txt.collapse": "Collapse",
-  "dw.txt.expand": "Expand"
+  "dw.txt.expand": "Expand",
+"dw.pipeline.validation.field.transformSql": "SQL Transform",
+"dw.pipeline.debug.title": "Debug / Breakpoints",
+"dw.pipeline.debug.toggleTooltip": "Open / collapse debug panel",
+"dw.pipeline.debug.breakpoint.addTitle": "Add Breakpoint",
+"dw.pipeline.debug.breakpoint.addHint": "Select a node, then expand the debug panel on the right, or right-click a node on the canvas → Add breakpoint"
 }
