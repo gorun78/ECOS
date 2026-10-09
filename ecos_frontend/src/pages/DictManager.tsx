@@ -9,6 +9,7 @@
 
 import React, { useState, useCallback } from "react";
 import { useLanguage } from "../components/LanguageContext";
+import { useTheme } from "../components/ThemeContext";
 import { Toast, DeleteConfirm } from "./dict/SharedComponents";
 import { DictLeftPanel } from "./dict/DictLeftPanel";
 import { TableModePanel } from "./dict/TableModePanel";
@@ -19,6 +20,7 @@ import { useDictMode } from "./dict/useDictMode";
 
 export default function DictManager() {
   const { t } = useLanguage();
+  const { styles } = useTheme();
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   const showToast = useCallback((type: "success" | "error", msg: string) => {
@@ -37,7 +39,7 @@ export default function DictManager() {
   };
 
   return (
-    <div className="flex-1 bg-[#F8FAFC] flex h-full overflow-hidden font-sans">
+    <div className={`flex-1 ${styles.appBg} flex h-full overflow-hidden font-sans`}>
       {toast && <Toast toast={toast} onClose={() => setToast(null)} />}
 
       {deleteTarget && (

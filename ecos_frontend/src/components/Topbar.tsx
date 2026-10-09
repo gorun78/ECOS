@@ -280,7 +280,7 @@ export default function Topbar({
         {breadcrumbs.map((bc, idx) => (
           <React.Fragment key={idx}>
             <ChevronRight className="w-3.5 h-3.5 opacity-40 mx-0.5 shrink-0" />
-            <span className={idx === breadcrumbs.length - 1 ? "text-[#3B82F6] font-bold" : "opacity-75"}>
+            <span className={idx === breadcrumbs.length - 1 ? `${styles.accentText} font-bold` : "opacity-75"}>
               {bc}
             </span>
           </React.Fragment>
