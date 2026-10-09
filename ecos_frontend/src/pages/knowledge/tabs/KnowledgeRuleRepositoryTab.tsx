@@ -133,7 +133,7 @@ export default function KnowledgeRuleRepositoryTab() {
       case 'ACTIVE': return 'bg-emerald-50 text-emerald-700';
       case 'DRAFT': return 'bg-amber-50 text-amber-700';
       case 'DEPRECATED': return 'bg-rose-50 text-rose-700';
-      default: return `bg-slate-50 ${styles.muted}`;
+      default: return `${styles.appBg} ${styles.muted}`;
     }
   };
 

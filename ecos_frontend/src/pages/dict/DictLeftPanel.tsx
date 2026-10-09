@@ -176,7 +176,7 @@ export const DictLeftPanel: React.FC<DictLeftPanelProps> = (props) => {
             (Object.keys(subsystemGroups).length > 0 ? Object.keys(subsystemGroups).sort() : ["G1","G2","G3","G4","G5"]).map(groupKey => {
               const groupTypes = subsystemGroups[groupKey] || [];
               const isExpanded = expandedGroups.has(groupKey);
-              const gMeta = G1_G5_LABELS[groupKey] || { labelKey: "", color: "text-slate-600", border: "border-slate-200", bg: "bg-slate-50" }; /* FIXME:theme-fallback 留尾清理 */
+              const gMeta = G1_G5_LABELS[groupKey] || { labelKey: "", color: styles.cardText, border: styles.cardBorder, bg: styles.appBg };
               const visibleTypes = groupTypes.filter(dt =>
                 !dictSearch || (dt.dictName || dt.dictType).toLowerCase().includes(dictSearch.toLowerCase()) ||
                 dt.dictType.toLowerCase().includes(dictSearch.toLowerCase()));
