@@ -152,7 +152,7 @@ export default function KnowledgeRuleRepositoryTab() {
             </p>
           </div>
         </div>
-        <button className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs rounded-lg transition cursor-pointer">
+        <button type="button" className="flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs rounded-lg transition cursor-pointer">
           <Plus size={14} /> {t('knowledge.rule.newRule')}
         </button>
       </div>
@@ -306,7 +306,7 @@ export default function KnowledgeRuleRepositoryTab() {
                       </div>
                     )}
                     <div className={`pt-1 border-t ${styles.cardBorder} flex gap-2`}>
-                      <button className="flex items-center gap-1 text-[10px] text-indigo-500 hover:underline">
+                      <button type="button" className="flex items-center gap-1 text-[10px] text-indigo-500 hover:underline">
                         <History size={12} /> {t('knowledge.rule.history')}
                       </button>
                     </div>

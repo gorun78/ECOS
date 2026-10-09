@@ -73,7 +73,7 @@ export default function ExtractionStreamingTab() {
         {/* 发起萃取（Stub：Wave1/2 后端端点上线前禁用） */}
         <div className={`border rounded-xl p-4 flex items-center justify-between flex-wrap gap-3 ${styles.cardBg} ${styles.cardBorder}`}>
           {/* TODO Wave1/2: 接通 kb-engine 萃取触发端点（结构化走 /extract/structured，非结构化走文档解析管道） */}
-          <button
+          <button type="button"
             disabled
             title={t('knowledge.streaming.run_stub_hint')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold opacity-50 cursor-not-allowed transition"

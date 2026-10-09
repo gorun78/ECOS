@@ -108,7 +108,7 @@ export default function Sidebar({
         <div className="flex items-center gap-1.5">
           {/* Custom Dropdown Trigger */}
           <div className="relative flex-1">
-            <button
+            <button type="button"
               onClick={() => {
                 setShowDomainDropdown(!showDomainDropdown);
                 setStatusMenuFor(null);
@@ -146,7 +146,7 @@ export default function Sidebar({
           </div>
 
           {/* Plus button to add domain */}
-          <button
+          <button type="button"
             onClick={domainManager.handleStartAddDomain}
             className={`p-2 ${styles.sidebarActiveBg} ${styles.sidebarHoverBg} ${styles.accentText} border ${styles.accentBorder} rounded-lg hover:shadow-xs transition-all cursor-pointer shrink-0`}
             title={t('ow.btn.addDomain')}
@@ -157,7 +157,7 @@ export default function Sidebar({
 
         {/* Core Sub-view Switcher inside Workbench */}
         <div className={`flex ${styles.sidebarBg} p-0.5 rounded-lg border ${styles.sidebarBorder} mt-2`}>
-          <button
+          <button type="button"
             onClick={() => {
               onSelectCategory('overview', null);
             }}
@@ -219,7 +219,7 @@ export default function Sidebar({
 
       {/* 📖 术语（Glossary）快速入口 — T4: 原硬编码结构色已替换为 theme tokens */}
       <div className={`border-t ${styles.appBorder} px-3 py-3`}>
-        <button
+        <button type="button"
           onClick={() => onSelectCategory('glossary', null)}
           className={`w-full flex items-center gap-2 py-2 px-3 rounded-lg font-semibold text-xs transition-colors ${
             selectedCategory === 'glossary'
