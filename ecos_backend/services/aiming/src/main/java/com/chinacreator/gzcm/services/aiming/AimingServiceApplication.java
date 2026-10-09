@@ -111,7 +111,8 @@ import com.chinacreator.gzcm.sysman.controller.SysConfigController;
         "com.chinacreator.gzcm.services.agent.**.repository",
         "com.chinacreator.gzcm.services.agent.**.dao",
         "com.chinacreator.gzcm.services.agent.**.mapper",
-        // llm-gateway 横切底座 (AgentCallLogRepository)
+        // F06-20⑥ (X-8)：llm-gateway 横切底座三档一致（standard/enterprise/ultimate 均需扫描），
+        // 本 JAR 承 AI 主链路；缺失则 AgentLoopService/AgentMetricsImpl 构造注入 AgentCallLogRepository 失败。
         "com.chinacreator.gzcm.runtime.llm.repository",
         // 木·C 认知引擎 心智状态三表 DAO (V127~V129, PMO-60 T0b)
         "com.chinacreator.gzcm.engine.cognitive2.**.dao",

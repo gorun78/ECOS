@@ -4,8 +4,8 @@
 > 上层: 见 ../AGENTS.md（ai-engine 顶层）
 
 ## 本模块干什么
-- **实现层（业务）**：Agent 循环 (AgentLoopService) + 工具执行 (ToolExecutorService) + 会话 (AgentSessionService) + 委托 (AgentDelegationService) + KAG 知识抽取 (KnowledgeExtractorService) + LLM 网关适配 + SSE 流式 + 6 个核心测试。
-- 测试充分（6 个 test class / 40 case）：`AgentMemoryTest` / `LLMProviderServiceTest` / `KnowledgeAgentContextTestCase` / `AgentCircuitBreakerTest` / `AgentLoopResultContractTest` / `ArchitectureTest`。
+- **实现层（业务）**：Agent 循环 (AgentLoopService) + 工具执行 (ToolExecutorService) + 会话 (AgentSessionService) + 委托 (AgentDelegationService) + OAG 管线 (OagPipelineEngine/SecurityCheckerNode/AgentToolPolicyGate) + LLM 网关适配 + SSE 流式。
+- **测试充分（2026-10-09 实测：33 个 test 类 / 144 个 {@code @Test} 用例）**：以目录为准（`src/test/java/.../ai/**/*Test*.java`），文档禁手写闭包清单。门禁 `ModuleDocTruthfulnessTest` 会实测并对账，漂移即 FAIL。
 
 ## 主要 code（控制器/服务/实体）
 - `AgentLoopController` — Agent 对话 (stream=false→JSON / stream=true→**SSE** 流式) + 会话 CRUD (`GET/POST /api/v1/agent-loop/chat`, `/api/v1/agent-loop/sessions/{id}/chat`)。
@@ -17,7 +17,7 @@
 - `CopilotController` — Copilot 集成（`/api/v1/copilot/...`）。
 - `CronJobController` / `EvolutionController` / `GuardrailsApiController` / `ActionBridgeController` / `PromptCompilerController` — 调度/进化/Guardrail/Action 桥/Prompt 编译。
 - `ClassificationController` / `CognitiveConfigController` / `AiEngineStatusController` / `AiEngineAliasController` — 分类/认知配置/状态/别名。
-- 服务：`AgentLoopService`（多轮工具调用循环，think→act→observe→think, **上限 5 轮**）/ `ToolExecutorService`（SQL/REST/**BUILTIN** 三种执行模式, 30s 超时）/ `AgentSessionService`（PG 持久化会话, 30 min 空闲过期）/ `AgentDelegationService`（`delegate_to_agent` 委托子 Agent, **单层禁止递归**）/ `KnowledgeExtractorService`（KAG 抽取: LLM→实体+关系+规则→SubGraph）/ `AgentMemory` + `CircuitBreaker`（熔断：LLM 失败 3 次降级）/ `KnowledgeAgentContext`（上下文）。
+- 服务：`AgentLoopService`（多轮工具调用循环，think→act→observe→think, **上限 5 轮**）/ `ToolExecutorService`（SQL/REST/**BUILTIN** 三种执行模式, 30s 超时）/ `AgentSessionService`（PG 持久化会话, 30 min 空闲过期）/ `AgentDelegationService`（`delegate_to_agent` 委托子 Agent, **单层禁止递归**）/ `AgentCircuitBreaker`（LLM 失败熔断降级）/ `CognitiveService`（cognitive 契约代理）/ `NLQService` + `SemanticQueryService`（NLQ）/ `AgentMetricsService` + `AgentMetricsCollector` + `AgentEvaluator`（度量/评估）。
 - 实体表：`sys_agent_session` / `sys_agent_message`（MyBatis DAO 在 `com.chinacreator.gzcm.engine.ai.session` / `.message` 子包）。
 - ⚠️ 现状合规风险：`agent/mesh/knowledge/Neo4jQueryService.java` `import org.neo4j.driver.*`（**未直接 new**，通过注入 `Neo4jClient` 共用 runtime-access，新代码不得再 `import org.neo4j.driver.*`）。
 - PG 复用表：`compliance_rules`（**只读**，cognitive-engine 用）；本 impl 内禁止写该表。
@@ -27,15 +27,17 @@
 - → llm-gateway: 走 `LLMGatewayService`（架构铁律 2.5：禁止每个引擎直接调 LLM Provider API）。
 - → cognitive-engine: REST `POST :18089/api/v1/knowledge/reason`（委托 `CognitiveService`，不 import cognitive-engine-impl，架构铁律 2.1）。
 - → kb-engine: REST `POST :18086/api/v1/kb/graph/{query,nodes,edges}` + `POST :18086/api/v1/kb/rag`（KAG 抽取后 SubGraph 同步 KG）。
-- → security-engine: 写操作前调 `POST :18081/api/v1/security/policy-engine/evaluate`（ABAC）+ `POST :18081/api/v1/audit`（审计）；同时 `security` 不可用时**默认 DENY**（架构铁律 2.4）。
-- ← 被调用方: gateway 聚合加载、前端 `/api/v1/agent-loop/*`、`/api/v1/knowledge/extract/*` 等多个 API。
-- 数据流：上游 `KnowledgeOptimizerService`（KAG）→ 抽取实体/关系/规则 → 调 kb-engine KG 同步；自身不持久化抽取结果（只有 Agent session/message 持久化）。
+- → security-engine: 两条独立通道接入裁决 ——
+  (a) **工具执行**走 `AgentToolPolicyGate`：主体校验 → SQL 本地地板 → ABAC `POST :18081/api/v1/security/policy-engine/evaluate` → 三态判定 → `POST :18081/api/v1/audit` 审计；security 不可用/超时 → **FAIL_CLOSED**（工具不执行）。
+  (b) **OAG 管线**走 `SecurityCheckerNode`：ACTION 意图 ABAC + RLS 派生条件，不可用 → BLOCKED。
+  其余"数据写通道"涉密/合规裁决统一走 security REST；本引擎侧禁重复实现（架构铁律 2.4）。F06-02 外更宽写路径的接线在 W140 排期内，未落地前仅以上两条通道为准。
+- ← 被调用方: gateway 聚合加载、前端 `/api/v1/agent-loop/*` 等多个 API。
+- 数据流：Agent session/message 是唯一持久化；OAG 管线里检索由 kb-engine 承接，本 impl 不持久化知识抽取结果。
 
 ## 端点 / 补丁
 - 路径池：
   - `/api/v1/agent-loop/chat` — Agent 对话（stream=true 走 SSE）。
   - `/api/v1/agent-loop/sessions` + `/api/v1/agent-loop/sessions/{id}` + `/api/v1/agent-loop/sessions/{id}/chat` — Session CRUD + 会话内对话。
-  - `/api/v1/knowledge/extract` + `/sources`（GET）+ `/history`（GET）— 知识抽取三件套。
   - `/api/v1/knowledge/reason` — 混合推理委托（cognitive-engine）。
   - `/api/v1/ai-engine/skill/*` — Skill CRUD。
   - `/api/v1/copilot/*` — Copilot。

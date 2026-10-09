@@ -72,10 +72,12 @@ ecos:
     enabled: ${ECOS_NEO4J_ENABLED:false}
 
 # LLM 配置 (llm-gateway 收敛)
-# F06-05：明文 api-key 配置面已删除 —— provider 密钥只由 llm-gateway 服务端经 security-engine
-# 密钥服务按「引用」解析；引用为空即默认 DENY（不回退明文、不放行直连）。
+# F06-05 / F06-20⑤：llm.* 单源 = gateway/application.yml；aiming 只保留进程级
+# env 注入边界 —— provider 密钥引用（LLM_GATEWAY_DEFAULT_API_KEY_REF）在此透传给
+# gateway（真实密钥由 llm-gateway 服务端经 security-engine 密钥服务解析）。
+# default-provider 等静态配置项对齐 gateway 域，禁在此重复声明（否则触发
+# LlmConfigSingleSourceTest 红）。
 llm:
-  default-provider: ${LLM_PROVIDER:deepseek}
   gateway:
     default-api-key-ref: ${LLM_GATEWAY_DEFAULT_API_KEY_REF:}
 

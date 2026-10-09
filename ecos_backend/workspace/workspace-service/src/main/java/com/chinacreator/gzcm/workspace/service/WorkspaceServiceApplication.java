@@ -82,7 +82,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.chinacreator.gzcm.buszhi.**.repository",
         "com.chinacreator.gzcm.buszhi.**.dao",
         "com.chinacreator.gzcm.buszhi.**.mapper",
-        // llm-gateway 横切底座
+        // F06-20⑥ (X-8)：llm-gateway 横切底座 @Mapper 接口 (AgentCallLogRepository / ProfileConfigRepository)，
+        // 落在 .repository 后缀而非 .mapper/.dao，与 "runtime.**.mapper" / "runtime.**.dao" 通配不重叠，必须显式列出
         "com.chinacreator.gzcm.runtime.llm.repository",
         // runtime 横切底座
         "com.chinacreator.gzcm.runtime.**.mapper",

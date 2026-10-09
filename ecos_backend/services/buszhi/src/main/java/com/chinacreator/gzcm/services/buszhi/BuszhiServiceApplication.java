@@ -63,7 +63,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.chinacreator.gzcm.buszhi.**.repository",
         "com.chinacreator.gzcm.runtime.**.mapper",
         "com.chinacreator.gzcm.runtime.**.dao",
-        // runtime.llm.repository 横切底座
+        // F06-20⑥ (X-8)：llm-gateway 横切底座（AgentCallLogRepository / ProfileConfigRepository）三档一致扫描；
+        // 本 JAR 若未扫，凡承载 LLM 调用取数（含 metric 落库 / profile 缓存）的路径都会因 bean 缺失启动失败。
         "com.chinacreator.gzcm.runtime.llm.repository"
 })
 public class BuszhiServiceApplication {

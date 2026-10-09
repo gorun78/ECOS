@@ -25,6 +25,8 @@ import org.mybatis.spring.annotation.MapperScan;
 @MapperScan({
     "com.chinacreator.gzcm.sysman.**.mapper",
     "com.chinacreator.gzcm.runtime.**.mapper",
+    // F06-20⑥ (X-8)：llm-gateway 横切底座 @Mapper 接口 (AgentCallLogRepository / ProfileConfigRepository)，
+    // 落在 .repository 后缀而非 .mapper/.dao，与 "runtime.**.mapper" 通配不重叠，必须显式列出
     "com.chinacreator.gzcm.runtime.llm.repository",
     "com.chinacreator.gzcm.engine.ai.agent.mesh.repository",
     "com.chinacreator.gzcm.engine.ai.agent.mesh.knowledge.repository"

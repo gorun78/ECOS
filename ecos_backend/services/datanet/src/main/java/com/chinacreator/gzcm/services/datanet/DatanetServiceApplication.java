@@ -74,7 +74,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // 横切底座
         "com.chinacreator.gzcm.runtime.**.mapper",
         "com.chinacreator.gzcm.runtime.**.dao",
-        // runtime.llm.repository 横切底座 (AgentCallLogRepository 等)
+        // F06-20⑥ (X-8)：llm-gateway 横切底座（AgentCallLogRepository / ProfileConfigRepository）
+        // —— 落在 .repository 后缀而非 .mapper/.dao，与 "runtime.**.mapper"/"runtime.**.dao" 通配不重叠，
+        // 必须显式列出；否则 LlmUsageMeter / ProfileManagerImpl 构造注入 bean 缺失即启动失败。
         "com.chinacreator.gzcm.runtime.llm.repository"
 })
 public class DatanetServiceApplication {

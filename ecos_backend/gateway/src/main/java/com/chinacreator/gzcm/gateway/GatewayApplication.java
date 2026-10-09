@@ -127,6 +127,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     // runtime.core.config.dao.ConfigDao 与 sysman 版本冲突，exclude runtime 包中的副本
     "com.chinacreator.gzcm.runtime.core.config.dao!",
     "com.chinacreator.gzcm.runtime.**.mapper",
+    // F06-20⑥ (X-8)：llm-gateway 横切底座，gateway 是 monolith fat-JAR 主承流宿主（enterprise 档）；
+    // 本 JAR 内所有 runtime/llm-gateway 的 @Mapper（AgentCallLogRepository / ProfileConfigRepository）
+    // 必须自扫，否则 AgentMetricsImpl / ProfileManagerImpl 构造注入失败即启动失败。
     "com.chinacreator.gzcm.runtime.llm.repository",
     "com.chinacreator.gzcm.engine.ai.agent.mesh.repository",
     "com.chinacreator.gzcm.engine.ai.agent.mesh.knowledge.repository",

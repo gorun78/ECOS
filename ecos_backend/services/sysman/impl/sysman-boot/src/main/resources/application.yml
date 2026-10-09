@@ -51,23 +51,9 @@ auth:
   # archive/legacy/services-ghost（不在 reactor），本清单僵尸化且比 SecurityConfig 更宽。
   # 匿名端点的唯一事实源 = services/sysman/impl/sysman-impl 的 SecurityConfig permitAll（铁律 §1.2①）。
 
-# LLM Configuration
-llm:
-  deepseek:
-    base-url: https://api.deepseek.com
-    model: deepseek-chat
-  engine:
-    running: false
-    default-provider: openrouter
-    default-model: deepseek/deepseek-chat
-    max-concurrency: 5
-    default-timeout: 600
-  gateway:
-    retry-max-attempts: 3
-    request-timeout: 60s
-  profile:
-    cache-enabled: false
-    cache-ttl-minutes: 30
+# F06-20⑤：llm.* 单源 = gateway/application.yml（旧 `llm:` 块 + 错挂在 llm 下的 `level:` 一并清除）。
+# 原 `llm.level.*` 属日志级别（历史笔误压在 llm 前缀下），恢复为顶层 logging.level。
+logging:
   level:
     root: INFO
     com.chinacreator.gzcm: DEBUG
