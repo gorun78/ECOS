@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ai.dao;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -102,13 +103,6 @@ public class AgentSessionDao extends JdbcTemplateDaoSupport {
             sessionId, role, content, toolCallsJson, toolResultsJson, threadId, now);
     }
 
-    public void insertSummaryMessage(String sessionId, String summary, long now) {
-        jdbcTemplate.update(
-            "INSERT INTO sys_agent_message (session_id, role, content, thread_id, created_at) " +
-            "VALUES (?::varchar, 'system', ?::text, 'main', ?)",
-            sessionId, summary, now);
-    }
-
     public List<AgentSessionService.AgentMessage> findMessages(String sessionId, String threadId) {
         return jdbcTemplate.query(
             "SELECT id, session_id, role, content, tool_calls, tool_results, tokens, thread_id, created_at " +
@@ -116,28 +110,99 @@ public class AgentSessionDao extends JdbcTemplateDaoSupport {
             MESSAGE_ROW_MAPPER, sessionId, threadId);
     }
 
-    public Integer countMessages(String sessionId) {
-        return jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM sys_agent_message WHERE session_id = ?",
-            Integer.class, sessionId);
+    // ── F06-09 压缩治理（逻辑归档，禁物理 DELETE；列面见迁移脚本 V202）──
+
+    /** 治理列探测结果缓存：一旦就位不再重复探测（未就位时每次重探，V202 落库后免重启）。 */
+    private volatile Boolean governanceColumnsPresent;
+
+    /** 上下文读取面：治理列就位 ⇒ 只取活行；未就位 ⇒ 回落全量（见 {@link #findContextMessages}）。 */
+    public boolean governanceColumnsReady() {
+        if (Boolean.TRUE.equals(governanceColumnsPresent)) {
+            return true;
+        }
+        Integer present = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM information_schema.columns " +
+            "WHERE table_schema = current_schema() AND table_name = 'sys_agent_message' " +
+            "AND column_name IN ('compressed','is_deleted','compression_batch_id','key_refs','token_count','tool_call_ref_ids')",
+            Integer.class);
+        boolean ready = present != null && present >= 6;
+        if (ready) {
+            governanceColumnsPresent = Boolean.TRUE;
+        }
+        return ready;
     }
 
-    public List<AgentSessionService.AgentMessage> findOldestMessages(String sessionId, int limit) {
+    /**
+     * 上下文组装/压缩判定的统一读取面。
+     *
+     * <p>治理列就位后归档原件（{@code compressed=1}）不得再进上下文，否则压缩等于没做；
+     * V202 尚未对库执行时活行谓词会让整条读路径报错，故回落全量读 —— 此时压缩链路自身
+     * 已在 {@code SCHEMA_UNAVAILABLE} 处停止判定，库内不会出现归档行，回落是等价的。</p>
+     */
+    public List<AgentSessionService.AgentMessage> findContextMessages(String sessionId, String threadId) {
+        return governanceColumnsReady()
+                ? findActiveMessages(sessionId, threadId)
+                : findMessages(sessionId, threadId);
+    }
+
+    /** 活消息（未压缩归档、未逻辑删）正序 —— 压缩判定的唯一严格读取面。 */
+    public List<AgentSessionService.AgentMessage> findActiveMessages(String sessionId, String threadId) {
         return jdbcTemplate.query(
             "SELECT id, session_id, role, content, tool_calls, tool_results, tokens, thread_id, created_at " +
-            "FROM sys_agent_message WHERE session_id = ? ORDER BY id ASC LIMIT ?",
-            MESSAGE_ROW_MAPPER, sessionId, limit);
+            "FROM sys_agent_message " +
+            "WHERE session_id = ? AND thread_id = ? " +
+            "AND COALESCE(compressed, 0) = 0 AND COALESCE(is_deleted, 0) = 0 " +
+            "ORDER BY id ASC",
+            MESSAGE_ROW_MAPPER, sessionId, threadId);
     }
 
-    public int deleteMessagesUpTo(String sessionId, long maxId) {
+    /**
+     * 逻辑归档（替代旧 {@code DELETE FROM sys_agent_message}，X-31）。
+     *
+     * <p>只置标记 + 挂批次号，历史原件保留 —— 这是 F06-08 回放与 §2.2-2 语义抽检的前提。
+     * 幂等：已归档行不再命中（WHERE 带活消息谓词）。</p>
+     */
+    public int archiveMessagesByIds(String sessionId, List<Long> messageIds, String batchId) {
+        if (messageIds == null || messageIds.isEmpty()) {
+            return 0;
+        }
+        String placeholders = String.join(", ", Collections.nCopies(messageIds.size(), "?"));
+        Object[] args = new Object[messageIds.size() + 2];
+        args[0] = batchId;
+        args[1] = sessionId;
+        for (int i = 0; i < messageIds.size(); i++) {
+            args[i + 2] = messageIds.get(i);
+        }
         return jdbcTemplate.update(
-            "DELETE FROM sys_agent_message WHERE session_id = ? AND id <= ?",
-            sessionId, maxId);
+            "UPDATE sys_agent_message SET compressed = 1, is_deleted = 1, compression_batch_id = ? " +
+            "WHERE session_id = ? AND compressed = 0 AND id IN (" + placeholders + ")",
+            args);
+    }
+
+    /**
+     * 插入摘要行（引用式，非替换式）：{@code key_refs} 为逗号分引用串（MC02 禁 jsonb），
+     * {@code token_count} 记本行估算 token，供下一轮阈值判定。
+     */
+    public int insertSummaryMessage(String sessionId, String summary, String keyRefs,
+                                    String batchId, int tokenCount, long now) {
+        return jdbcTemplate.update(
+            "INSERT INTO sys_agent_message (session_id, role, content, thread_id, " +
+            "compression_batch_id, key_refs, token_count, created_at) " +
+            "VALUES (?::varchar, 'system', ?::text, 'main', ?::varchar, ?::text, ?, ?)",
+            sessionId, summary, batchId, keyRefs, tokenCount, now);
+    }
+
+    /** 会话面压缩模式（LLM_SUMMARY | TRUNCATE_FALLBACK，SSE done 帧同源）。 */
+    public int updateSessionCompressionMode(String sessionId, String mode) {
+        return jdbcTemplate.update(
+            "UPDATE sys_agent_session SET compression_mode = ? WHERE id = ?", mode, sessionId);
     }
 
     public int recalcMessageCount(String sessionId) {
         return jdbcTemplate.update(
-            "UPDATE sys_agent_session SET message_count = (SELECT COUNT(*) FROM sys_agent_message WHERE session_id = ?) WHERE id = ?",
+            "UPDATE sys_agent_session SET message_count = (" +
+            "SELECT CAST(COUNT(*) AS INTEGER) FROM sys_agent_message " +
+            "WHERE session_id = ? AND COALESCE(compressed, 0) = 0 AND COALESCE(is_deleted, 0) = 0) WHERE id = ?",
             sessionId, sessionId);
     }
 

@@ -3,6 +3,8 @@ package com.chinacreator.gzcm.runtime.llm.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Hermes 引擎配置属性
@@ -22,9 +24,13 @@ public class LLMGatewayProperties {
     /** Profile 缓存相关配置 */
     private final Profile profile = new Profile();
 
+    /** 模型目录（详细设计-06 F06-09 要点 1：上下文上限唯一来源，禁引擎内硬编码） */
+    private final Models models = new Models();
+
     public Engine getEngine() { return engine; }
     public Gateway getGateway() { return gateway; }
     public Profile getProfile() { return profile; }
+    public Models getModels() { return models; }
 
     /**
      * 引擎配置
@@ -94,5 +100,63 @@ public class LLMGatewayProperties {
         public void setCacheEnabled(boolean cacheEnabled) { this.cacheEnabled = cacheEnabled; }
         public int getCacheTtlMinutes() { return cacheTtlMinutes; }
         public void setCacheTtlMinutes(int cacheTtlMinutes) { this.cacheTtlMinutes = cacheTtlMinutes; }
+    }
+
+    /**
+     * 模型目录配置（详细设计-06 F06-09 要点 1）。
+     *
+     * <p>压缩触发式 {@code estimatedContextTokens > modelLimit × threshold} 里的 {@code modelLimit}
+     * <b>只能</b>从本目录读：引擎侧不得出现任何模型上限常量（联动 X-71 配置单源）。
+     * 目录属部署期形态（provider 侧事实），故留在 Spring yml 面而非 sys_config 字典，
+     * 边界口径见迁移脚本 V264 头注。</p>
+     *
+     * <p><b>未登记模型</b>：{@link #defaultContextLimit} 默认 0 = 目录不可用，调用方须按
+     * "不判定"处理并留痕，禁据此推断"无需压缩"。</p>
+     */
+    public static class Models {
+        /** 目录外模型的上下文上限；{@code <=0} = 未登记模型一律不判定（禁引擎侧兜底常量） */
+        private int defaultContextLimit = 0;
+
+        /**
+         * 模型名 → 目录条目；key 为 provider 侧模型名（如 {@code deepseek-chat}）。
+         *
+         * <p>这里的代码默认值是<b>目录属主（llm-gateway）</b>的出厂目录，不是引擎侧兜底常量：
+         * 任何消费方都只能经 {@code LLMGateway#modelContextLimit} 取数，禁自行抄写数值
+         * （F06-09 要点 1 / X-71 配置单源）。运维可用 {@code llm.models.catalog.*} 覆盖。</p>
+         */
+        private Map<String, Model> catalog = defaultCatalog();
+
+        /**
+         * 出厂目录：DeepSeek V3 系公开上下文窗口 64K token（输入+输出合计口径）。
+         * 目录外模型不猜值 —— {@link #defaultContextLimit} 保持 0，读数即不可用。
+         */
+        private static Map<String, Model> defaultCatalog() {
+            Map<String, Model> map = new LinkedHashMap<>();
+            map.put("deepseek-chat", model(64_000));
+            map.put("deepseek-reasoner", model(64_000));
+            return map;
+        }
+
+        private static Model model(int contextLimit) {
+            Model m = new Model();
+            m.setContextLimit(contextLimit);
+            return m;
+        }
+
+        public int getDefaultContextLimit() { return defaultContextLimit; }
+        public void setDefaultContextLimit(int defaultContextLimit) {
+            this.defaultContextLimit = defaultContextLimit;
+        }
+        public Map<String, Model> getCatalog() { return catalog; }
+        public void setCatalog(Map<String, Model> catalog) { this.catalog = catalog; }
+    }
+
+    /** 单个模型的目录条目 */
+    public static class Model {
+        /** 上下文窗口上限（token，输入+输出合计口径） */
+        private int contextLimit = 0;
+
+        public int getContextLimit() { return contextLimit; }
+        public void setContextLimit(int contextLimit) { this.contextLimit = contextLimit; }
     }
 }

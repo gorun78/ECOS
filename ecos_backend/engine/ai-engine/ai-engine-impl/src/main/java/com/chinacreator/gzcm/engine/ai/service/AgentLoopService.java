@@ -102,15 +102,19 @@ public class AgentLoopService {
     @Autowired(required = false)
     private AgentMetricsCollector metricsCollector;
 
-    @Autowired(required = false)
-    private AgentSessionService sessionService;
-
     /**
      * 会话 token 配额（F06-07 要点 3）。必填语义由本类 {@link #checkSessionQuota} 承担：
      * 未装配 = 无法判定，按"不启用"处理并在首轮 WARN 一次（配额是成本控制，非安全红线）。
      */
     @Autowired(required = false)
     private SessionTokenQuotaService sessionTokenQuota;
+
+    /**
+     * 会话上下文压缩（F06-09）。required=false 只服务单测装配；生产缺失时
+     * {@link #assessCompression} 记 ERROR 并以 {@code compressSkipped=true} 上报（禁静默）。
+     */
+    @Autowired(required = false)
+    private SessionCompressionService sessionCompression;
 
     /** 正则：匹配 function_name(arg1=val1, arg2=val2) 模式 */
     private static final Pattern FUNCTION_CALL_PATTERN =
@@ -127,6 +131,15 @@ public class AgentLoopService {
      * @return AgentLoopResult 推理结果
      */
     public AgentLoopResult run(AgentLoopConfig config, String userMessage, AgentSession session) {
+        // F06-09 ⑥：压缩判定在循环内产生，结果统一附着到本轮返回的 AgentLoopResult（done 帧/状态条）
+        CompressionReport compression = new CompressionReport();
+        AgentLoopResult result = doRun(config, userMessage, session, compression);
+        compression.applyTo(result);
+        return result;
+    }
+
+    private AgentLoopResult doRun(AgentLoopConfig config, String userMessage, AgentSession session,
+                                  CompressionReport compression) {
         long startTime = System.currentTimeMillis();
         String sessionId = session != null ? session.getSessionId() : null;
         String agentId = session != null ? session.getProfileName() : "default";
@@ -179,19 +192,15 @@ public class AgentLoopService {
             }
         }
 
-        // T0c-1: 上下文压缩
-        if (sessionService != null && sessionId != null) {
-            try {
-                sessionService.compressHistory(sessionId, 20);
-            } catch (Exception e) {
-                log.warn("[AgentLoop] History compression failed: {}", e.getMessage());
-            }
-        }
+        // T0c-1: 上下文压缩 —— 已改为 token 阈值语义，须在模型解析后判定（见下方 assessCompression）
 
         // ── 三层配置解析：L1(yaml) → L2(builtin模板) → L3(实例) → 运行时覆盖 ──
         Map<String, Object> requestOverrides = configToOverrides(config);
         AgentLoopConfig resolvedConfig = agentConfigResolver.resolve(agentId, requestOverrides);
         log.info("[AgentLoop] Resolved config for agent '{}': {}", agentId, resolvedConfig);
+
+        // F06-09：入模前唯一压缩判定点（modelLimit 经 llm-gateway 目录读，禁引擎侧兜底常量）
+        assessCompression(compression, sessionId, resolvedConfig.getModel(), traceId);
 
         // 使用解析后的 maxIterations 和 timeout
         int maxTurns = resolvedConfig.getMaxIterations() != null ? resolvedConfig.getMaxIterations() : MAX_TURNS;
@@ -394,6 +403,67 @@ public class AgentLoopService {
                     System.currentTimeMillis() - startTime, 0, 0, traceId);
         }
         return addTrace(AgentLoopResult.maxTurnsExceeded(sessionId, totalTokens, toolCallRecords));
+    }
+
+    // ─── F06-09 上下文压缩 ─────────────────────────────────────────────
+
+    /**
+     * 每轮入模前的唯一压缩判定点。
+     *
+     * <p>压缩不是安全门，但"未判定"必须留痕：服务缺失、会话无作用域、异常抛出三种面
+     * 一律以 {@code compressSkipped=true} 上报（F06-09 要点 1 禁静默关闭），且绝不把异常
+     * 抛穿推理主链（旧实现的 {@code catch → warn} 吞错形态同时被 X-35 记账）。</p>
+     */
+    private void assessCompression(CompressionReport compression, String sessionId,
+                                   String model, String traceId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            return;
+        }
+        if (sessionCompression == null) {
+            log.error("[AgentLoop] SessionCompressionService 未装配 ⇒ 上下文压缩无法判定，"
+                    + "compressSkipped=true: session={} model={} trace={}", sessionId, model, traceId);
+            compression.recordSkipped();
+            return;
+        }
+        try {
+            compression.record(sessionCompression.compress(sessionId, model, traceId));
+        } catch (Exception e) {
+            log.error("[AgentLoop] 上下文压缩异常 ⇒ 本轮跳过压缩（不阻断推理）: session={} trace={} err={}",
+                    sessionId, traceId, e.getMessage(), e);
+            compression.recordSkipped();
+        }
+    }
+
+    /** 本轮压缩判定快照，run 结束时统一附着到结果。 */
+    private static final class CompressionReport {
+        private boolean assessed;
+        private String mode;
+        private int turns;
+        private boolean skipped;
+
+        void record(SessionCompressionService.Outcome outcome) {
+            if (outcome == null) {
+                recordSkipped();
+                return;
+            }
+            this.assessed = true;
+            this.mode = outcome.compressionMode();
+            this.turns = outcome.compressedTurns();
+            this.skipped = outcome.compressSkipped();
+        }
+
+        void recordSkipped() {
+            this.assessed = true;
+            this.mode = null;
+            this.turns = 0;
+            this.skipped = true;
+        }
+
+        void applyTo(AgentLoopResult result) {
+            if (result != null && assessed) {
+                result.applyCompression(mode, turns, skipped);
+            }
+        }
     }
 
     // ─── Message 构建 ──────────────────────────────────────────────────

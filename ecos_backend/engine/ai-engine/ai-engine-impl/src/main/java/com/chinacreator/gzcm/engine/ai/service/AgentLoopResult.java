@@ -22,6 +22,16 @@ public class AgentLoopResult {
     private String errorClass;
     private boolean retryable;
 
+    /**
+     * F06-09 ⑥：本轮压缩判定快照（供 SSE done 帧与前端压缩状态条）。
+     * {@code compressionAssessed=false} 表示本轮未做判定（如无会话作用域），
+     * done 帧不带压缩键 —— 前端按"未上报"渲染，禁伪造默认值。
+     */
+    private boolean compressionAssessed;
+    private String compressionMode;
+    private int compressedTurns;
+    private boolean compressSkipped;
+
     public AgentLoopResult() {}
 
     /** 成功终止 — LLM 返回了最终回复 */
@@ -133,6 +143,25 @@ public class AgentLoopResult {
     public boolean isRetryable() { return retryable; }
     public void setRetryable(boolean retryable) { this.retryable = retryable; }
 
+    /**
+     * 附着本轮压缩判定（F06-09 ⑥）。
+     *
+     * @param compressionMode {@code LLM_SUMMARY} / {@code TRUNCATE_FALLBACK}，未压缩时 null
+     * @param compressedTurns 实际归档的轮数
+     * @param compressSkipped true = 未压缩（开关关闭/不可判定/无可压缩段），必须原样上报
+     */
+    public void applyCompression(String compressionMode, int compressedTurns, boolean compressSkipped) {
+        this.compressionAssessed = true;
+        this.compressionMode = compressionMode;
+        this.compressedTurns = compressedTurns;
+        this.compressSkipped = compressSkipped;
+    }
+
+    public boolean isCompressionAssessed() { return compressionAssessed; }
+    public String getCompressionMode() { return compressionMode; }
+    public int getCompressedTurns() { return compressedTurns; }
+    public boolean isCompressSkipped() { return compressSkipped; }
+
     // ─── Serialisation ──────────────────────────────────────────────────
 
     public Map<String, Object> toMap() {
@@ -153,6 +182,11 @@ public class AgentLoopResult {
             map.put("errorCode", errorCode);
             map.put("errorClass", errorClass);
             map.put("retryable", retryable);
+        }
+        if (compressionAssessed) {
+            map.put("compressionMode", compressionMode);
+            map.put("compressedTurns", compressedTurns);
+            map.put("compressSkipped", compressSkipped);
         }
         return map;
     }

@@ -106,6 +106,12 @@ llm:
     # F06-05：只允许配置密钥「引用」（secret:<id> / enc:<keyId>:<cipher>），明文密钥禁入配置；
     # 真实密钥由 llm-gateway 服务端经 security-engine 密钥服务解析，未配置即默认 DENY。
     default-api-key-ref: ${LLM_GATEWAY_DEFAULT_API_KEY_REF:}
+  # 详细设计-06 F06-09 要点 1：压缩触发式里的 modelLimit 唯一来源（目录属主 = llm-gateway，
+  # 出厂目录见 LLMGatewayProperties.Models#defaultCatalog，禁引擎侧抄写数值）。
+  # default-context-limit <=0 ⇒ 目录外模型「不判定」压缩并留痕（禁兜底常量、禁据此推断无需压缩）。
+  # 运维覆盖面：llm.models.catalog.<model-name>.context-limit: <token 数>
+  models:
+    default-context-limit: 0
 
 # Agent Default Configuration (L1)
 agent:

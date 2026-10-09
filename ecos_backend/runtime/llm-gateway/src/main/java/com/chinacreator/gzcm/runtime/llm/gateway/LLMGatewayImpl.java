@@ -188,6 +188,35 @@ public class LLMGatewayImpl implements LLMGateway {
         return llmUsageMeter.sessionTokenUsage(sessionId);
     }
 
+    /**
+     * 模型上下文上限（详细设计-06 F06-09 要点 1）—— 只读 {@code llm.models.*} 目录，
+     * 目录外模型回落 {@code default-context-limit}；两者皆不可用（属性缺失或 {@code <=0}）时
+     * 返回 {@link ModelLimit#unavailable}，<b>不</b>在本网关兜底任何常量。
+     */
+    @Override
+    public ModelLimit modelContextLimit(String model) {
+        if (llmGatewayProperties == null) {
+            return ModelLimit.unavailable(model);
+        }
+        LLMGatewayProperties.Models catalog = llmGatewayProperties.getModels();
+        String key = model == null ? null : model.trim();
+        if (key != null && !key.isEmpty()) {
+            LLMGatewayProperties.Model entry = catalog.getCatalog().get(key);
+            if (entry == null && key.contains("/")) {
+                // 目录以 provider 侧短名登记（deepseek-chat），调用方可能带前缀（deepseek/deepseek-chat）
+                entry = catalog.getCatalog().get(key.substring(key.lastIndexOf('/') + 1));
+            }
+            if (entry != null && entry.getContextLimit() > 0) {
+                return new ModelLimit(model, entry.getContextLimit(), true, true);
+            }
+        }
+        int fallback = catalog.getDefaultContextLimit();
+        if (fallback > 0) {
+            return new ModelLimit(model, fallback, false, true);
+        }
+        return ModelLimit.unavailable(model);
+    }
+
     @Override
     public ChatResponse callWithRetry(ChatRequest request, int maxRetries) {
         int attempt = 0;

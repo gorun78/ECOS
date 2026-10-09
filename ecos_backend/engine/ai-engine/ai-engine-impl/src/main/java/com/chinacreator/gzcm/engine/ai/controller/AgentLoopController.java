@@ -210,6 +210,12 @@ public class AgentLoopController {
                 if (result.getErrorMsg() != null) {
                     doneEvent.put("errorMsg", result.getErrorMsg());
                 }
+                // F06-09 ⑥：压缩状态只在上游已判定时下发，未判定 ⇒ 键缺席（前端渲染"未上报"，禁伪造）
+                if (result.isCompressionAssessed()) {
+                    doneEvent.put("compressionMode", result.getCompressionMode());
+                    doneEvent.put("compressedTurns", result.getCompressedTurns());
+                    doneEvent.put("compressSkipped", result.isCompressSkipped());
+                }
                 sendEvent(emitter, "done", doneEvent);
 
                 emitter.complete();

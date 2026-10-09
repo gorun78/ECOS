@@ -79,4 +79,18 @@ public final class EventTypes {
     public static final class Llm {
         public static final String LLM_USAGE = "LLM_USAGE";
     }
+
+    /**
+     * 详细设计-06 F06-09（卷 06 REQ-AI-02）—— 会话压缩治理事件类型。
+     *
+     * <p>两者都落 {@code KafkaTopics.AUDIT}（不新增 topic，容器/主题基线不变）。
+     * 载荷只带批次 ID、模式、token 前后可读数与引用 ID 串，
+     * <b>禁</b>带消息原文 / 摘要原文（回放与语义抽检经批次表取，不在事件面铺原文）。</p>
+     */
+    public static final class Session {
+        /** 摘要失败降级为截断归档（{@code compression_mode=TRUNCATE_FALLBACK}，§2.2-3 抽检验据） */
+        public static final String COMPRESSION_FALLBACK = "SESSION_COMPRESSION_FALLBACK";
+        /** 压缩开关关闭 ⇒ 显式上报 {@code compressSkipped=true}（F06-09 要点 1，禁静默关闭） */
+        public static final String COMPRESSION_SKIPPED = "SESSION_COMPRESSION_SKIPPED";
+    }
 }

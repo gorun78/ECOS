@@ -24,6 +24,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *   sys_agent_message  — 消息表
  *
  * 数据访问统一收口至 {@link AgentSessionDao}（R2-B4-ai / 架构铁律 §2.5 #1 / IR06）。
+ *
+ * <p>上下文压缩不在本类：详见 {@link SessionCompressionService}（F06-09 token 阈值语义）。
+ * 本类的消息读取走 {@code findContextMessages}，归档原件不进上下文组装。</p>
  */
 @Service
 public class AgentSessionService {
@@ -33,9 +36,6 @@ public class AgentSessionService {
 
     /** 30分钟空闲阈值 (毫秒) */
     private static final long IDLE_THRESHOLD_MS = 30 * 60 * 1000L;
-
-    /** 上下文压缩阈值 — 消息条数超过此值时触发压缩 */
-    private static final int COMPRESS_THRESHOLD = 20;
 
     private final AgentSessionDao agentSessionDao;
 
@@ -147,7 +147,7 @@ public class AgentSessionService {
      */
     public List<AgentMessage> getMessages(String sessionId, String threadId) {
         String tid = threadId != null && !threadId.isBlank() ? threadId : "main";
-        return agentSessionDao.findMessages(sessionId, tid);
+        return agentSessionDao.findContextMessages(sessionId, tid);
     }
 
     // ═══════════════════════════════════════════════════
@@ -205,74 +205,12 @@ public class AgentSessionService {
     }
 
     // ═══════════════════════════════════════════════════
-    //  上下文压缩
+    //  上下文压缩 — 已迁出本类（详见 SessionCompressionService）
     // ═══════════════════════════════════════════════════
 
-    /**
-     * 压缩会话历史 — 当消息数超过阈值时，将旧消息压缩为摘要。
-     * <p>
-     * 当前实现为简化版：取前 20 条旧消息拼接为摘要文本，
-     * 删除旧消息，插入一条 system 摘要消息。
-     * 后续可替换为 LLM 摘要调用。
-     * </p>
-     *
-     * @param sessionId 会话 ID
-     * @param threshold 压缩阈值（消息数），默认 20
-     */
-    public void compressHistory(String sessionId, int threshold) {
-        if (sessionId == null || threshold <= 0) {
-            return;
-        }
-        try {
-            // 统计该会话的总消息数
-            Integer count = agentSessionDao.countMessages(sessionId);
-            if (count == null || count < threshold) {
-                return; // 未达阈值，无需压缩
-            }
-
-            // 取最早 20 条消息，拼接为摘要
-            List<AgentMessage> oldMessages = agentSessionDao.findOldestMessages(sessionId, threshold);
-
-            if (oldMessages.isEmpty()) return;
-
-            StringBuilder summary = new StringBuilder("[会话历史摘要]\n");
-            for (AgentMessage msg : oldMessages) {
-                if (msg.getContent() != null && !msg.getContent().isBlank()) {
-                    String role = "user".equals(msg.getRole()) ? "用户" : "助手";
-                    String snippet = msg.getContent().length() > 200
-                            ? msg.getContent().substring(0, 197) + "..."
-                            : msg.getContent();
-                    summary.append(role).append(": ").append(snippet).append("\n");
-                }
-            }
-
-            // 删除旧消息
-            Long maxId = oldMessages.stream()
-                    .mapToLong(AgentMessage::getId)
-                    .max().orElse(0);
-            agentSessionDao.deleteMessagesUpTo(sessionId, maxId);
-
-            // 插入摘要 system 消息
-            long now = System.currentTimeMillis();
-            agentSessionDao.insertSummaryMessage(sessionId, summary.toString(), now);
-
-            // 重新校准 message_count
-            agentSessionDao.recalcMessageCount(sessionId);
-
-            log.info("[AgentSession] Compressed history for session={}, removed {} old messages",
-                    sessionId, oldMessages.size());
-        } catch (Exception e) {
-            log.warn("[AgentSession] Failed to compress history for session={}: {}",
-                    sessionId, e.getMessage());
-        }
-    }
-
-    /**
-     * 使用默认阈值（20）压缩会话历史。
-     */
-    public void compressHistory(String sessionId) {
-        compressHistory(sessionId, COMPRESS_THRESHOLD);
-    }
+    // X-29~X-33 消灭：本类不再保留"条数阈值 + 200 字截断 + 物理 DELETE"形态的 compressHistory。
+    // 压缩判定/执行单源 = {@link SessionCompressionService#compress}（token 阈值 + LLM 结构化摘要
+    // + 引用保护 + 逻辑归档），由 AgentLoopService 每轮入模前调用。本类只管会话生命周期与消息读写。
 
     // ═══════════════════════════════════════════════════
     //  内部工具

@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.chinacreator.gzcm.engine.ai.dao.AgentSessionDao;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 
@@ -81,25 +82,23 @@ class AgentMemoryTest {
     }
 
     @Test
-    @DisplayName("T-09-2-3: 取历史 — 按默认 main 线程查询，消息对象透传")
+    @DisplayName("T-09-2-3: 取历史 — 按默认 main 线程查活行（归档原件不进上下文）")
     void getMessagesUsesMainThreadByDefault() {
         AgentSessionService service = newService();
 
         service.getMessages("sess-1");
 
-        verify(agentSessionDao).findMessages(eq("sess-1"), eq("main"));
+        verify(agentSessionDao).findContextMessages(eq("sess-1"), eq("main"));
     }
 
     @Test
-    @DisplayName("T-09-2-4: 压缩历史 — 未达阈值时不删除旧消息")
-    void compressHistorySkipsWhenBelowThreshold() {
-        AgentSessionService service = newService();
-        when(agentSessionDao.countMessages("sess-1")).thenReturn(3);
-
-        service.compressHistory("sess-1", 5);
-
-        verify(agentSessionDao).countMessages("sess-1");
-        verify(agentSessionDao, never()).deleteMessagesUpTo(anyString(), anyLong());
+    @DisplayName("T-09-2-4: 上下文压缩已收口到 SessionCompressionService — 本类无 compressHistory")
+    void compressionIsNoLongerOwnedBySessionService() {
+        for (Method method : AgentSessionService.class.getDeclaredMethods()) {
+            assertNotEquals("compressHistory", method.getName(),
+                    "条数阈值 + 物理 DELETE 的旧压缩形态必须消灭（X-29/X-31），压缩单源 = "
+                            + "SessionCompressionService");
+        }
     }
 
     @Test
