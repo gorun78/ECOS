@@ -146,7 +146,7 @@ export default function OverviewDashboard() {
           </h2>
           <p className={`text-xs ${styles.cardTextMuted}`}>{t('knowledge.dashboard.subtitle')}</p>
         </div>
-        <span className="text-[10px] font-mono text-slate-500">
+        <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>
           {graphStats.lastUpdatedAt || t('knowledge.overview.stats_offline')}
         </span>
       </div>
@@ -262,7 +262,7 @@ export default function OverviewDashboard() {
               <Activity size={13} className={styles.accentText} />
               {t('knowledge.dashboard.trend.week_label')}
             </h3>
-            <span className="text-[10px] font-mono text-slate-400">/sync/logs · group by day</span>
+            <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>/sync/logs · group by day</span>
           </div>
           <div className="h-32 flex items-end gap-2 pt-4">
             {dailyCounts.map((c, i) => (
@@ -274,7 +274,7 @@ export default function OverviewDashboard() {
                     title={`${c}`}
                   />
                 </div>
-                <span className="text-[8px] font-mono text-slate-400">{i === 6 ? new Date().toISOString().substring(0, 10) : ''}</span>
+                <span className={`text-[8px] font-mono ${styles.cardTextMuted}`}>{i === 6 ? new Date().toISOString().substring(0, 10) : ''}</span>
                 <span className={`text-[8px] font-bold ${styles.cardTextMuted}`}>{c}</span>
               </div>
             ))}
@@ -288,7 +288,7 @@ export default function OverviewDashboard() {
               <HeartPulse size={13} className={styles.successText} />
               {t('knowledge.overview.engine_status')}
             </h3>
-            <span className="text-[9px] font-mono text-slate-400">/api/v1/knowledge/health</span>
+            <span className={`text-[9px] font-mono ${styles.cardTextMuted}`}>/api/v1/knowledge/health</span>
           </div>
           {healthAvailable === null || !healthAvailable ? (
             <div className={`py-6 text-center space-y-2 ${styles.cardTextMuted}`}>
@@ -305,7 +305,7 @@ export default function OverviewDashboard() {
                   }`}>
                   <span className={`font-bold ${styles.cardText}`}>{name}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-slate-500">{h.latencyMs ? `${h.latencyMs}ms` : '—'}</span>
+                    <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{h.latencyMs ? `${h.latencyMs}ms` : '—'}</span>
                     <span className={`w-2 h-2 rounded-full ${h.ok ? styles.accentBg : styles.dangerBg}`} />
                   </div>
                 </div>
@@ -322,7 +322,7 @@ export default function OverviewDashboard() {
             <Search size={13} className={styles.warningText} />
             {t('knowledge.dashboard.top.title', {n: 10})}
           </h3>
-          <span className="text-[10px] font-mono text-slate-400">{topQueries.length}</span>
+          <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{topQueries.length}</span>
         </div>
         {topQueries.length === 0 ? (
           <div className={`py-8 text-center space-y-2 ${styles.cardTextMuted}`}>
@@ -337,7 +337,7 @@ export default function OverviewDashboard() {
                 <div className="flex-1 min-w-0">
                   <span className={`text-[11px] font-bold truncate block ${styles.cardText}`}>{q.query}</span>
                 </div>
-                <span className="text-[9px] font-mono text-slate-400 shrink-0">{new Date(q.when).toLocaleString(t('knowledge.knowledgerulerepository.zh_cn'))}</span>
+                <span className={`text-[9px] font-mono ${styles.cardTextMuted} shrink-0`}>{new Date(q.when).toLocaleString(t('knowledge.knowledgerulerepository.zh_cn'))}</span>
               </div>
             ))}
           </div>
