@@ -148,7 +148,7 @@ export default function AgentTestConsole() {
       <div className="mt-2 ml-2 mr-6">
         <button type="button"
           onClick={() => toggleTrace(idx)}
-          className={`flex items-center gap-1.5 text-[10px] ${styles.cardTextMuted} hover:text-gray-300 transition-colors cursor-pointer select-none`}
+          className={`flex items-center gap-1.5 text-[10px] ${styles.islandMuted} ${styles.islandHoverText} transition-colors cursor-pointer select-none`}
         >
           {collapsed ? (
             <ChevronDown className="w-3 h-3" />
@@ -159,11 +159,11 @@ export default function AgentTestConsole() {
           <span className="font-bold uppercase tracking-wider">
             {g(locale, "Tool Calls", "工具调用")}
           </span>
-          <span className={styles.cardTextMuted}>({toolCalls.length})</span>
+          <span className={styles.islandMuted}>({toolCalls.length})</span>
         </button>
 
         {!collapsed && (
-          <div className="mt-2 space-y-2 ml-1 border-l-2 border-[#1E293B] pl-3">
+          <div className={`mt-2 space-y-2 ml-1 border-l-2 ${styles.islandBorder} pl-3`}>
             {toolCalls.map((tc, i) => (
               <div
                 key={i}
@@ -173,7 +173,7 @@ export default function AgentTestConsole() {
                   <span className="font-bold uppercase text-amber-400">
                     [{tc.toolName}]
                   </span>
-                  <span className={`${styles.cardTextMuted} flex items-center gap-1`}>
+                  <span className={`${styles.islandMuted} flex items-center gap-1`}>
                     <Clock className="w-2.5 h-2.5" />
                     {tc.durationMs}ms
                   </span>
@@ -182,10 +182,10 @@ export default function AgentTestConsole() {
                 {/* Input */}
                 {tc.input && Object.keys(tc.input).length > 0 && (
                   <div className="mt-1">
-                    <span className={`${styles.cardTextMuted} font-bold uppercase text-[9px]`}>
+                    <span className={`${styles.islandMuted} font-bold uppercase text-[9px]`}>
                       {g(locale, "Input:", "输入:")}
                     </span>
-                    <pre className="text-gray-300 font-mono text-[9px] mt-0.5 bg-black/30 rounded p-1.5 overflow-x-auto whitespace-pre-wrap">
+                    <pre className={`${styles.islandText} font-mono text-[9px] mt-0.5 bg-black/30 rounded p-1.5 overflow-x-auto whitespace-pre-wrap`}>
                       {JSON.stringify(tc.input, null, 2)}
                     </pre>
                   </div>
@@ -194,10 +194,10 @@ export default function AgentTestConsole() {
                 {/* Output */}
                 {tc.output && (
                   <div className="mt-1">
-                    <span className={`${styles.cardTextMuted} font-bold uppercase text-[9px]`}>
+                    <span className={`${styles.islandMuted} font-bold uppercase text-[9px]`}>
                       {g(locale, "Output:", "输出:")}
                     </span>
-                    <pre className="text-gray-300 font-mono text-[9px] mt-0.5 bg-black/30 rounded p-1.5 overflow-x-auto whitespace-pre-wrap max-h-32 overflow-y-auto">
+                    <pre className={`${styles.islandText} font-mono text-[9px] mt-0.5 bg-black/30 rounded p-1.5 overflow-x-auto whitespace-pre-wrap max-h-32 overflow-y-auto`}>
                       {tc.output}
                     </pre>
                   </div>
@@ -283,18 +283,18 @@ export default function AgentTestConsole() {
       </div>
 
       {/* Chat area */}
-      <div className="flex-1 flex flex-col min-h-0 bg-[#0B0F19]">
+      <div className={`flex-1 flex flex-col min-h-0 ${styles.islandBg}`}>
         {/* Messages */}
         <div className="flex-1 overflow-y-auto scrollbar-thin p-4 sm:p-6 space-y-4">
           {chatHistory.length === 0 ? (
-            <div className={`flex flex-col items-center justify-center h-full ${styles.cardTextMuted} select-none`}>
+            <div className={`flex flex-col items-center justify-center h-full ${styles.islandMuted} select-none`}>
               <Bot className="w-12 h-12 mb-3 opacity-30" />
               <p className="text-sm italic">
                 {agent
                   ? g(locale, `Start a conversation with ${agent.name}`, `开始与 ${agent.name} 对话`)
                   : g(locale, "Agent not available", "Agent不可用")}
               </p>
-              <p className={`text-[10px] ${styles.cardTextMuted} mt-1`}>
+              <p className={`text-[10px] ${styles.islandMuted} mt-1`}>
                 {g(locale, "Type a message and press Send to test the agent", "输入消息并点击发送以测试Agent")}
               </p>
             </div>
@@ -308,11 +308,11 @@ export default function AgentTestConsole() {
                       ? "bg-indigo-900/30 border-indigo-500/40 ml-4 sm:ml-12"
                       : entry.role === "error"
                       ? "bg-red-900/30 border-red-500/40"
-                      : "bg-[#1E293B]/40 border-[#1E293B] border-l-2 border-l-green-500 mr-4 sm:mr-12"
+                      : `${styles.islandCardSoft} ${styles.islandBorder} border-l-2 border-l-green-500 mr-4 sm:mr-12`
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-1.5">
-                    <span className="text-[10px] font-bold uppercase text-zinc-400">
+                    <span className={`text-[10px] font-bold uppercase ${styles.islandMuted}`}>
                       {entry.role === "user" ? (
                         <span className="flex items-center gap-1">
                           <User className="w-3 h-3" />
@@ -330,9 +330,9 @@ export default function AgentTestConsole() {
                         </span>
                       )}
                     </span>
-                    <span className="text-[9px] text-zinc-500">{entry.timestamp}</span>
+                    <span className={`text-[9px] ${styles.islandMuted}`}>{entry.timestamp}</span>
                   </div>
-                  <p className="text-gray-200 font-sans text-[13px] leading-relaxed whitespace-pre-wrap">
+                  <p className={`${styles.islandText} font-sans text-[13px] leading-relaxed whitespace-pre-wrap`}>
                     {entry.text}
                   </p>
                 </div>
@@ -349,7 +349,7 @@ export default function AgentTestConsole() {
         </div>
 
         {/* Input area */}
-        <div className="shrink-0 border-t border-[#1E293B] p-3 sm:p-4 bg-[#0B0F19]">
+        <div className={`shrink-0 border-t ${styles.islandBorder} p-3 sm:p-4 ${styles.islandBg}`}>
           <div className="flex items-center gap-2 max-w-3xl mx-auto">
             <input
               type="text"
@@ -367,12 +367,12 @@ export default function AgentTestConsole() {
                   ? g(locale, `Message ${agent.name}...`, `向 ${agent.name} 发送消息...`)
                   : g(locale, "Agent not available", "Agent不可用")
               }
-              className="flex-1 bg-[#1E2533] border border-[#2D3748] rounded-lg px-4 py-2.5 text-sm text-gray-200 placeholder-zinc-500 outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition font-sans"
+              className={`flex-1 ${styles.islandInput} border ${styles.islandInputBorder} rounded-lg px-4 py-2.5 text-sm ${styles.islandText} ${styles.islandPlaceholder} outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition font-sans`}
             />
             <button type="button"
               onClick={handleSend}
               disabled={isSending || !message.trim() || !agent}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg px-4 py-2.5 text-sm font-semibold flex items-center gap-2 cursor-pointer transition shadow-xs shrink-0"
+              className={`bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 ${styles.islandText} rounded-lg px-4 py-2.5 text-sm font-semibold flex items-center gap-2 cursor-pointer transition shadow-xs shrink-0`}
             >
               {isSending ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />
@@ -382,7 +382,7 @@ export default function AgentTestConsole() {
               {g(locale, "Send", "发送")}
             </button>
           </div>
-          <div className="text-[9px] text-zinc-500 text-center mt-2 max-w-3xl mx-auto">
+          <div className={`text-[9px] ${styles.islandMuted} text-center mt-2 max-w-3xl mx-auto`}>
             <Zap className="w-2.5 h-2.5 inline mr-0.5 text-amber-500" />
             {g(
               locale,

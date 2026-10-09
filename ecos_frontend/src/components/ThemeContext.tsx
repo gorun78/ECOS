@@ -54,6 +54,22 @@ export interface ThemeStyles {
   divider: string;
   /** Primary text (aliased default highlight text) — used by Login / AIPKnowledgeView etc. */
   text: string;
+  /**
+   * Dark-constancy "island" palette (G1). True console/terminal surfaces stay dark
+   * in ALL four themes, so these tokens carry identical dark values per preset. Text
+   * tokens use arbitrary-value hex (not named gray/slate/white) so the slate-light
+   * CSS override whitelist cannot flip them to dark ink on the still-dark island
+   * (fixes the pre-existing dark-on-dark contrast inversion).
+   */
+  islandBg: string;
+  islandBorder: string;
+  islandCardSoft: string;
+  islandInput: string;
+  islandInputBorder: string;
+  islandText: string;
+  islandMuted: string;
+  islandHoverText: string;
+  islandPlaceholder: string;
   [key: string]: string;
 }
 
@@ -103,7 +119,16 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     infoBorder: "border-blue-200",
     overlayBg: "bg-slate-900/40",
     divider: "border-[#E2E8F0]",
-    text: "text-slate-800"
+    text: "text-slate-800",
+    islandBg: "bg-[#0B0F19]",
+    islandBorder: "border-[#1E293B]",
+    islandCardSoft: "bg-[#1E293B]/40",
+    islandInput: "bg-[#1E2533]",
+    islandInputBorder: "border-[#2D3748]",
+    islandText: "text-[#e2e8f0]",
+    islandMuted: "text-[#94a3b8]",
+    islandHoverText: "hover:text-[#cbd5e1]",
+    islandPlaceholder: "placeholder:text-[#64748b]"
   },
   "deep-space": {
     appBg: "bg-[#0B0F19]",
@@ -144,7 +169,16 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     infoBorder: "border-blue-500/30",
     overlayBg: "bg-slate-950/50",
     divider: "border-[#1E293B]",
-    text: "text-slate-100"
+    text: "text-slate-100",
+    islandBg: "bg-[#0B0F19]",
+    islandBorder: "border-[#1E293B]",
+    islandCardSoft: "bg-[#1E293B]/40",
+    islandInput: "bg-[#1E2533]",
+    islandInputBorder: "border-[#2D3748]",
+    islandText: "text-[#e2e8f0]",
+    islandMuted: "text-[#94a3b8]",
+    islandHoverText: "hover:text-[#cbd5e1]",
+    islandPlaceholder: "placeholder:text-[#64748b]"
   },
   "cyber-terminal": {
     appBg: "bg-[#020202]",
@@ -185,7 +219,16 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     infoBorder: "border-cyan-500/40",
     overlayBg: "bg-black/60",
     divider: "border-emerald-650/50",
-    text: "text-emerald-500"
+    text: "text-emerald-500",
+    islandBg: "bg-[#0B0F19]",
+    islandBorder: "border-[#1E293B]",
+    islandCardSoft: "bg-[#1E293B]/40",
+    islandInput: "bg-[#1E2533]",
+    islandInputBorder: "border-[#2D3748]",
+    islandText: "text-[#e2e8f0]",
+    islandMuted: "text-[#94a3b8]",
+    islandHoverText: "hover:text-[#cbd5e1]",
+    islandPlaceholder: "placeholder:text-[#64748b]"
   },
   "royal-purple": {
     appBg: "bg-[#0F0C1B]",
@@ -226,7 +269,16 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     infoBorder: "border-blue-500/30",
     overlayBg: "bg-purple-950/50",
     divider: "border-purple-900/40",
-    text: "text-purple-100"
+    text: "text-purple-100",
+    islandBg: "bg-[#0B0F19]",
+    islandBorder: "border-[#1E293B]",
+    islandCardSoft: "bg-[#1E293B]/40",
+    islandInput: "bg-[#1E2533]",
+    islandInputBorder: "border-[#2D3748]",
+    islandText: "text-[#e2e8f0]",
+    islandMuted: "text-[#94a3b8]",
+    islandHoverText: "hover:text-[#cbd5e1]",
+    islandPlaceholder: "placeholder:text-[#64748b]"
   }
 };
 
