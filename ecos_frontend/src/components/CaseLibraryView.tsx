@@ -103,6 +103,7 @@ export default function CaseLibraryView() {
           <input
             className={`flex-1 px-3 py-1.5 rounded border text-xs outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
             placeholder={t("common.case.searchPh")}
+            aria-label={t("common.case.searchPh")}
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={e => e.key === "Enter" && doSearch()}
@@ -135,13 +136,13 @@ export default function CaseLibraryView() {
           <div className={`w-full max-w-md mx-4 rounded-lg p-5 ${styles.cardBg} border ${styles.cardBorder}`}>
             <h3 className="text-sm font-semibold mb-3">{t("common.case.newCase")}</h3>
             <input className={`w-full px-3 py-1.5 rounded border text-xs mb-2 outline-none ${styles.inputBg} ${styles.inputBorder}`}
-              placeholder={t("common.case.title")} value={newForm.title}
+              placeholder={t("common.case.title")} aria-label={t("common.case.title")} value={newForm.title}
               onChange={e => setNewForm({ ...newForm, title: e.target.value })} />
             <textarea className={`w-full px-3 py-1.5 rounded border text-xs mb-2 outline-none resize-none ${styles.inputBg} ${styles.inputBorder}`}
-              rows={3} placeholder={t("common.case.scenario")}
+              rows={3} placeholder={t("common.case.scenario")} aria-label={t("common.case.scenario")}
               value={newForm.scenario} onChange={e => setNewForm({ ...newForm, scenario: e.target.value })} />
             <input className={`w-full px-3 py-1.5 rounded border text-xs mb-3 outline-none ${styles.inputBg} ${styles.inputBorder}`}
-              placeholder={t("common.case.tags")}
+              placeholder={t("common.case.tags")} aria-label={t("common.case.tags")}
               value={newForm.tags} onChange={e => setNewForm({ ...newForm, tags: e.target.value })} />
             <div className="flex gap-2">
               <button type="button" onClick={recordCase}

@@ -216,6 +216,7 @@ export default function ConfigPanel({
                   </div>
                   <input
                     type="range"
+                    aria-label={t('aiworkbench.chatbot.temperature')}
                     min="0"
                     max="1"
                     step="0.05"
@@ -234,6 +235,7 @@ export default function ConfigPanel({
                   </div>
                   <input
                     type="range"
+                    aria-label={t('aiworkbench.chatbot.topP')}
                     min="0"
                     max="1"
                     step="0.05"
@@ -252,6 +254,7 @@ export default function ConfigPanel({
                   </div>
                   <input
                     type="range"
+                    aria-label={t('aiworkbench.chatbot.maxTokens')}
                     min="256"
                     max="8192"
                     step="256"

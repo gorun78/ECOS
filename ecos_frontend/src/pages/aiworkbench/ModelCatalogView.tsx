@@ -305,6 +305,7 @@ export default function ModelCatalogView({
                       </div>
                       <input
                         type="range"
+                        aria-label={t('aiworkbench.model.temperature')}
                         min="0.0"
                         max="1.0"
                         step="0.1"

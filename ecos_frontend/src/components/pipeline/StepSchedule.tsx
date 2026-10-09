@@ -164,6 +164,7 @@ export default function StepSchedule({
             </div>
             <input
               type="range"
+              aria-label={t('dw.psl.slider.nullLimit')}
               min={1}
               max={10}
               value={nullTolerance}
@@ -181,6 +182,7 @@ export default function StepSchedule({
             </div>
             <input
               type="range"
+              aria-label={t('dw.psl.slider.minRows')}
               min={500}
               max={2000}
               step={100}
@@ -199,6 +201,7 @@ export default function StepSchedule({
             </div>
             <input
               type="range"
+              aria-label={t('dw.psl.slider.freshness')}
               min={60}
               max={300}
               step={30}

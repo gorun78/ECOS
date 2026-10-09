@@ -175,7 +175,8 @@ export default function AlertPanel() {
             className={`w-20 px-2 py-1.5 rounded border text-xs outline-none ${styles.inputBg} ${styles.inputBorder}`}
             value={testValue}
             onChange={e => setTestValue(e.target.value)}
-            placeholder="Value"
+            aria-label={t("platform.alert.field.testValue")}
+            placeholder={t("platform.alert.field.testValue")}
           />
           <button type="button" onClick={() => triggerAlert()}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium transition-all bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:bg-amber-500/30`}>
@@ -205,11 +206,14 @@ export default function AlertPanel() {
           <div className={`w-full max-w-sm mx-4 rounded-lg p-5 ${styles.cardBg} border ${styles.cardBorder}`}>
             <h3 className="text-sm font-semibold mb-3">{t("platform.alert.newAlertRule")}</h3>
             <input className={`w-full px-3 py-1.5 rounded border text-xs mb-2 ${styles.inputBg} ${styles.inputBorder}`}
-              placeholder="Name" value={newRule.name} onChange={e => setNewRule({ ...newRule, name: e.target.value })} />
+              aria-label={t("platform.alert.field.name")}
+              placeholder={t("platform.alert.field.name")} value={newRule.name} onChange={e => setNewRule({ ...newRule, name: e.target.value })} />
             <div className="flex gap-2 mb-2">
               <input className={`flex-1 px-3 py-1.5 rounded border text-xs ${styles.inputBg} ${styles.inputBorder}`}
-                placeholder="Metric" value={newRule.metric} onChange={e => setNewRule({ ...newRule, metric: e.target.value })} />
+                aria-label={t("platform.alert.field.metric")}
+                placeholder={t("platform.alert.field.metric")} value={newRule.metric} onChange={e => setNewRule({ ...newRule, metric: e.target.value })} />
               <select className={`w-20 px-2 py-1.5 rounded border text-xs ${styles.inputBg} ${styles.inputBorder}`}
+                aria-label={t("platform.alert.field.operator")}
                 value={newRule.operator} onChange={e => setNewRule({ ...newRule, operator: e.target.value })}>
                 <option value="<">&lt;</option>
                 <option value=">">&gt;</option>
@@ -217,9 +221,11 @@ export default function AlertPanel() {
                 <option value=">=">≥</option>
               </select>
               <input className={`w-20 px-3 py-1.5 rounded border text-xs ${styles.inputBg} ${styles.inputBorder}`}
-                placeholder="Threshold" value={newRule.threshold} onChange={e => setNewRule({ ...newRule, threshold: e.target.value })} />
+                aria-label={t("platform.alert.field.threshold")}
+                placeholder={t("platform.alert.field.threshold")} value={newRule.threshold} onChange={e => setNewRule({ ...newRule, threshold: e.target.value })} />
             </div>
             <select className={`w-full px-2 py-1.5 rounded border text-xs mb-3 ${styles.inputBg} ${styles.inputBorder}`}
+              aria-label={t("platform.alert.field.level")}
               value={newRule.level} onChange={e => setNewRule({ ...newRule, level: e.target.value })}>
               <option value="INFO">INFO</option>
               <option value="WARN">WARN</option>

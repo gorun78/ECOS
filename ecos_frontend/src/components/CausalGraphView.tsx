@@ -303,6 +303,7 @@ export default function CausalGraphView() {
                   <span>{(whatIfVars.dataQuality * 100).toFixed(0)}%</span>
                 </div>
                 <input type="range" min="0" max="1" step="0.05"
+                  aria-label={t("platform.wm.causal.dataQuality")}
                   value={whatIfVars.dataQuality}
                   onChange={e => setWhatIfVars({ ...whatIfVars, dataQuality: +e.target.value })}
                   className="w-full h-1 accent-indigo-500" />
@@ -313,6 +314,7 @@ export default function CausalGraphView() {
                   <span>{(whatIfVars.maintenanceBudget * 100).toFixed(0)}%</span>
                 </div>
                 <input type="range" min="0" max="1" step="0.05"
+                  aria-label={t("platform.wm.causal.budget")}
                   value={whatIfVars.maintenanceBudget}
                   onChange={e => setWhatIfVars({ ...whatIfVars, maintenanceBudget: +e.target.value })}
                   className="w-full h-1 accent-indigo-500" />
@@ -323,6 +325,7 @@ export default function CausalGraphView() {
                   <span>{(whatIfVars.automationLevel * 100).toFixed(0)}%</span>
                 </div>
                 <input type="range" min="0" max="1" step="0.05"
+                  aria-label={t("platform.wm.causal.automation")}
                   value={whatIfVars.automationLevel}
                   onChange={e => setWhatIfVars({ ...whatIfVars, automationLevel: +e.target.value })}
                   className="w-full h-1 accent-indigo-500" />

@@ -50,6 +50,7 @@ export default function ConfigForm({
           <div>
             <label className={labelClass}>{t('aiworkbench.logic.config.llm.temperature')} ({c.temperature})</label>
             <input className={inputClass} type="range" min="0" max="2" step="0.1" value={c.temperature}
+              aria-label={`${t('aiworkbench.logic.config.llm.temperature')} ${c.temperature}`}
               onChange={e => handleChange({ ...c, temperature: parseFloat(e.target.value) })} />
           </div>
           <div>

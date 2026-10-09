@@ -128,6 +128,7 @@ export default function scenarioSimulation() {
                 <span className={`text-sm font-mono ${styles.muted}`}>{values[v.key]}{v.unit}</span>
               </div>
               <input type="range" min={v.min} max={v.max} step={v.step} value={values[v.key]}
+                aria-label={t(v.labelKey, v.label)}
                 onChange={e => handleChange(v.key, Number(e.target.value))}
                 className={`w-full h-1.5 rounded ${styles.sidebarBg} appearance-none cursor-pointer accent-blue-600`} />
               <div className={`flex justify-between text-xs ${styles.muted}`}>

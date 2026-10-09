@@ -233,6 +233,7 @@ export function LeftToolbar({
         </label>
         <input
           type="range"
+          aria-label={t('knowledge.graph.neighborDegree')}
           min={1}
           max={3}
           value={neighborDegree}

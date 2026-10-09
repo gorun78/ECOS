@@ -184,6 +184,7 @@ export default function StepTransform({
                         </div>
                         <input
                           type="range"
+                          aria-label={t('dw.xf.filter.label')}
                           min={0}
                           max={40}
                           value={filterMinutes}
@@ -198,6 +199,7 @@ export default function StepTransform({
                         <span className={`text-[8px] ${styles.cardTextMuted} block`}>{t('dw.xf.nulls.label')}</span>
                         <input
                           type="text"
+                          aria-label={t('dw.xf.nulls.label')}
                           value={nullFillerValue}
                           onChange={(e) => setNullFillerValue(e.target.value)}
                           className={`w-full text-[9px] px-1.5 py-0.5 border ${styles.cardBorder} rounded focus:outline-none focus:border-indigo-500 ${styles.inputBg}`}

@@ -294,7 +294,7 @@ export default function ScenarioSandbox() {
                       <span>Active Shipping Shifts / Week</span>
                       <strong className="text-indigo-500 font-sans text-xs font-bold">{extraShifts} extra shifts</strong>
                     </div>
-                    <input type="range" min="1" max="7" className="w-full accent-indigo-600 h-1 rounded-lg cursor-pointer"
+                    <input type="range" min="1" max="7" aria-label="Active Shipping Shifts / Week" className="w-full accent-indigo-600 h-1 rounded-lg cursor-pointer"
                       value={extraShifts} onChange={(e) => setExtraShifts(Number(e.target.value))} />
                   </div>
                 ) : (
@@ -303,7 +303,7 @@ export default function ScenarioSandbox() {
                       <span>Planned Weekend Outage Duration</span>
                       <strong className="text-indigo-500 font-sans text-xs font-bold">{plannedOutageHours} continuous hours</strong>
                     </div>
-                    <input type="range" min="12" max="72" step="12" className="w-full accent-indigo-600 h-1 rounded-lg cursor-pointer"
+                    <input type="range" min="12" max="72" step="12" aria-label="Planned Weekend Outage Duration" className="w-full accent-indigo-600 h-1 rounded-lg cursor-pointer"
                       value={plannedOutageHours} onChange={(e) => setPlannedOutageHours(Number(e.target.value))} />
                   </div>
                 )}

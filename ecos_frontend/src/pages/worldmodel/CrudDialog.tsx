@@ -240,6 +240,7 @@ export default function CrudDialog({
                   {t("platform.wm.crud.probability")}: {Math.round((form.probability || 0.5) * 100)}%
                 </span>
                 <input type="range" min="0" max="1" step="0.05"
+                  aria-label={t("platform.wm.crud.probability")}
                   value={form.probability || 0.5}
                   onChange={e => setForm({ ...form, probability: parseFloat(e.target.value) })}
                   className="w-full" />
@@ -247,6 +248,7 @@ export default function CrudDialog({
               <input
                 className={`w-full px-3 py-2 rounded border text-sm outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder} focus:border-indigo-500`}
                 type="number" placeholder={t("platform.wm.crud.impactScore")}
+                aria-label={t("platform.wm.crud.impactScore")}
                 value={form.impactScore ?? ""}
                 onChange={e => setForm({ ...form, impactScore: parseInt(e.target.value) || 0 })}
               />
@@ -266,6 +268,7 @@ export default function CrudDialog({
               <input
                 className={`w-full px-3 py-2 rounded border text-sm outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder} focus:border-indigo-500`}
                 placeholder={t("platform.wm.crud.sourceId")}
+                aria-label={t("platform.wm.crud.sourceId")}
                 value={form.sourceId || ""}
                 onChange={e => setForm({ ...form, sourceId: e.target.value })}
               />
@@ -280,6 +283,7 @@ export default function CrudDialog({
               <input
                 className={`w-full px-3 py-2 rounded border text-sm outline-none ${styles.inputBg} ${styles.inputText} ${styles.inputBorder} focus:border-indigo-500`}
                 placeholder={t("platform.wm.crud.targetId")}
+                aria-label={t("platform.wm.crud.targetId")}
                 value={form.targetId || ""}
                 onChange={e => setForm({ ...form, targetId: e.target.value })}
               />
@@ -298,6 +302,7 @@ export default function CrudDialog({
                   {t("platform.wm.crud.strength")}: {form.strength || 0.5}
                 </span>
                 <input type="range" min="0" max="1" step="0.05"
+                  aria-label={t("platform.wm.crud.strength")}
                   value={form.strength || 0.5}
                   onChange={e => setForm({ ...form, strength: parseFloat(e.target.value) })}
                   className="w-full" />
