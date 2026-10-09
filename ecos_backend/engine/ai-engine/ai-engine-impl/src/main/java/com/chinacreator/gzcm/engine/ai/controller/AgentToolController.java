@@ -6,6 +6,7 @@ import com.chinacreator.gzcm.engine.ai.service.ToolSchema;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -101,8 +102,9 @@ public class AgentToolController {
         Map<String, Object> argMap;
         try {
             argMap = parseJson(args);
-        } catch (Exception e) {
-            return ApiResponse.badRequest("args 参数不是合法的 JSON: " + e.getMessage());
+        } catch (IOException ignored) {
+            // F06-15：仅窄捕 parseJson 声明的受检 IOException；异常原文不外泄，只回固定 400 提示。
+            return ApiResponse.badRequest("args 参数不是合法的 JSON");
         }
 
         List<String> missingRequired = new ArrayList<>();
@@ -154,7 +156,7 @@ public class AgentToolController {
     // ─── Helpers ───────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> parseJson(String json) throws Exception {
+    private static Map<String, Object> parseJson(String json) throws IOException {
         // 使用 Jackson（项目中已有 ObjectMapper）
         com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
         return mapper.readValue(json, Map.class);

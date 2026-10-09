@@ -49,17 +49,12 @@ public class EvolutionController {
         } catch (AgentRuntimeCapabilityUnavailableException e) {
             return unavailable(e);
         }
-        try {
-            String trigger = (String) request.getOrDefault("trigger", "MANUAL");
-            @SuppressWarnings("unchecked")
-            Map<String, Object> context = (Map<String, Object>) request.getOrDefault("context", Map.of());
-            String missionId = evolution.triggerEvolution(trigger, context);
-            log.info("Evolution triggered: missionId={}", missionId);
-            return ApiResponse.success(Map.of("missionId", missionId, "status", "STARTED"));
-        } catch (Exception e) {
-            log.error("Evolution trigger failed", e);
-            return ApiResponse.internalError("Evolution trigger failed");
-        }
+        String trigger = (String) request.getOrDefault("trigger", "MANUAL");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> context = (Map<String, Object>) request.getOrDefault("context", Map.of());
+        String missionId = evolution.triggerEvolution(trigger, context);
+        log.info("Evolution triggered: missionId={}", missionId);
+        return ApiResponse.success(Map.of("missionId", missionId, "status", "STARTED"));
     }
 
     @GetMapping("/log/{missionId}")
@@ -72,9 +67,6 @@ public class EvolutionController {
                     e.getCapability(), e.getReason());
             return ApiResponse.error(CODE_RUNTIME_NOT_ASSEMBLED, ERROR_CODE_RUNTIME_ABSENT,
                     "Agent 运行时能力 " + e.getCapability() + " 不可用: " + e.getReason());
-        } catch (Exception e) {
-            log.error("Get evolution log failed: missionId={}", missionId, e);
-            return ApiResponse.internalError("Get evolution log failed");
         }
     }
 

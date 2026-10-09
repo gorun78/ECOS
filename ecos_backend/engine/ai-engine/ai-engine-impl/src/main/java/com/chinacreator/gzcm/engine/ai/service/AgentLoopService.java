@@ -11,6 +11,7 @@ import com.chinacreator.gzcm.engine.ai.tool.CitationPostCheckService;
 import com.chinacreator.gzcm.engine.ai.tool.RefusalRulesService;
 import com.chinacreator.gzcm.engine.ai.tool.ScenarioToolCatalog;
 import com.chinacreator.gzcm.engine.ai.tool.ToolCitation;
+import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
@@ -179,8 +180,8 @@ public class AgentLoopService {
                     AgentLoopTrace.UNKNOWN, AgentLoopTrace.UNKNOWN,
                     AgentLoopTrace.UNKNOWN, AgentLoopTrace.Decision.FAIL_CLOSED);
             AgentLoopResult r = AgentLoopResult.error(sessionId, "LLM Gateway 未就绪", 0);
-            r.setTraceId(traceId);
-            return r;
+            // F06-14：网关未装配属下游服务故障（502），终止态必须带分类，禁无码失败上浮
+            return withClassification(r, AiErrorClass.TOOL_BACKEND_ERROR, traceId);
         }
 
         // T0b-1: 输入护栏 —— 必经 security-engine（F06-04：判空跳过与 catch→warn 两个 fail-open 分支已消灭）
@@ -266,25 +267,22 @@ public class AgentLoopService {
             emitLlmCallStep(agentId, traceId, resolvedConfig, turn, resp, thinkElapsed);
 
             if (resp == null || !resp.isSuccess()) {
-                String err = resp != null ? resp.getErrorMsg() : "LLM 调用返回 null";
-                log.error("[AgentLoop] LLM call failed at turn {}: {}", turn, err);
-                // LLM 返回格式错误 → 重试一次
-                if (turn == 1 && resp != null) {
-                    log.info("[AgentLoop] Retrying LLM call once after format error");
-                    long retryStart = System.currentTimeMillis();
-                    resp = callLLM(messages, resolvedConfig, sessionId);
-                    emitLlmCallStep(agentId, traceId, resolvedConfig, turn, resp,
-                            System.currentTimeMillis() - retryStart);
-                    if (resp == null || !resp.isSuccess()) {
-                        // T0c-2: 友好错误文案
-                        String friendlyErr = "LLM 调用失败（已重试）: " + (resp != null ? resp.getErrorMsg() : "null");
-                        return setErrMsg(AgentLoopResult.error(sessionId, friendlyErr, totalTokens), traceId);
-                    }
-                } else {
-                    // T0c-2: 友好错误文案
-                    String friendlyErr = "LLM 调用失败: " + err;
-                    return setErrMsg(AgentLoopResult.error(sessionId, friendlyErr, totalTokens), traceId);
-                }
+                // F06-14 要点 2：LLM 出口的有界退避与降备用 provider 已在网关单源结算，
+                // 引擎侧禁再自旋（X-47/X-88 的一次性 ad-hoc 重试已废）。失败面只渲染分类模板
+                // （含诊断码），原始原因仅入日志（X-49）。
+                AiError llmError = ErrorCodeMapper.classify(resp, traceId);
+                AiErrorClass llmClass = llmError.errorClass();
+                logAtDeclaredLevel(llmClass,
+                        "[AgentLoop] LLM call failed at turn={}: class={} code={} gatewayRetries={} raw={}",
+                        null, turn, llmClass.name(), llmError.errorCode(),
+                        llmError.attemptsMade(), llmError.rawReason());
+                AgentLoopResult failure = AgentLoopResult.error(sessionId, llmError.userMessage(),
+                        totalTokens);
+                failure.setErrorCode(llmError.errorCode());
+                failure.setErrorClass(llmClass.name());
+                failure.setRetryable(llmError.retryable());
+                failure.setTraceId(traceId);
+                return failure;
             }
 
             if (resp.hasUsage()) {
@@ -508,7 +506,22 @@ public class AgentLoopService {
             metricsCollector.record(agentId, "run", false,
                     System.currentTimeMillis() - startTime, 0, 0, traceId);
         }
-        return setErrMsg(AgentLoopResult.maxTurnsExceeded(sessionId, totalTokens, toolCallRecords), traceId);
+        return withClassification(
+                setErrMsg(AgentLoopResult.maxTurnsExceeded(sessionId, totalTokens, toolCallRecords), traceId),
+                AiErrorClass.LLM_TIMEOUT, traceId);
+    }
+
+    /**
+     * 为既有终止态补 D.5 分类字段（{@code AgentLoopResultContractTest} 冻结了文本，故只补码不改文案）。
+     * D.5 无"轮次耗尽/依赖未就绪"专用类 —— 就近取可重试 5xx，偏差已登记 WP11 偏差台账。
+     */
+    private static AgentLoopResult withClassification(AgentLoopResult r, AiErrorClass errorClass,
+                                                      String traceId) {
+        r.setErrorCode(errorClass.errorCode());
+        r.setErrorClass(errorClass.name());
+        r.setRetryable(errorClass.retryable());
+        r.setTraceId(traceId);
+        return r;
     }
 
     // ─── F06-09 上下文压缩 ─────────────────────────────────────────────
@@ -854,8 +867,12 @@ public class AgentLoopService {
         try {
             return llmGateway.call(request);
         } catch (Exception e) {
-            log.error("[AgentLoop] LLM gateway call exception", e);
-            return ChatResponse.fail("LLM gateway exception: " + e.getMessage());
+            // F06-15 边界才捕、捕后必分类：网关抛出异常（非失败响应）也必须带类上浮，
+            // 禁把 e.getMessage() 原文交给响应面（X-49）
+            AiError error = ErrorCodeMapper.classify(e, ErrorCodeMapper.Context.llm("llm-gateway"), null);
+            log.error("[AgentLoop] LLM gateway call exception: class={} raw={}",
+                    error.errorClass().name(), error.rawReason(), e);
+            return ChatResponse.fail(error.errorClass(), error.rawReason());
         }
     }
 
@@ -1302,7 +1319,8 @@ public class AgentLoopService {
     /**
      * 执行工具调用 — 带超时、截断保护和工具白名单。
      * <p>
-     * 若未注入 ToolExecutorService 则返回 mock 结果。
+     * 未注入 ToolExecutorService 或工具抛异常一律归 {@code TOOL_BACKEND_ERROR} 结构化失败
+     * （F06-14 要点 3，禁 mock-success），并按矩阵登记做 ≤1 次固定退避重试。
      * </p>
      */
     private ToolExecutorService.ToolResult executeTool(ToolCall tc, AgentLoopConfig config) {
@@ -1339,35 +1357,112 @@ public class AgentLoopService {
         }
 
         if (toolExecutorService == null) {
+            // F06-14 要点 3（X-50）：执行器未装配 = 真实失败，归 TOOL_BACKEND_ERROR；
+            // 旧的 mock-success 构造（success=false 却在 content 里塞成功字样）已删除。
             log.error("[AgentLoop] ToolExecutorService 未装配，工具无法真实执行: tool={}", tc.getName());
-            return buildMockToolResult(tc);
+            return toolBackendFailure(tc, "ToolExecutorService 未装配，工具未真实执行", 0L);
         }
 
-        try {
-            ToolExecutorService.ToolResult raw = toolExecutorService.execute(tc.getName(), tc.getArguments());
-
-            // 截断过长的结果
-            if (raw.getContent() != null && raw.getContent().length() > TOOL_RESULT_MAX_CHARS) {
-                raw.setContent(raw.getContent().substring(0, TOOL_RESULT_MAX_CHARS)
-                        + "\n\n[结果已截断，原始长度: " + raw.getContent().length() + " 字符]");
+        // F06-14 要点 2：TOOL_BACKEND_ERROR ≤1 次固定退避，上限与形态都取自冻结矩阵（不自造参数）
+        AiErrorClass toolClass = AiErrorClass.TOOL_BACKEND_ERROR;
+        int attempts = 0;
+        long toolStartNs = System.nanoTime();
+        ToolExecutorService.ToolResult raw = attemptTool(tc);
+        while (isToolBackendFailure(raw) && toolClass.canRetry(attempts)) {
+            attempts++;
+            if (!sleepMillis(toolClass.backoffMillis(attempts - 1))) {
+                log.warn("[AgentLoop] 工具重试退避等待被中断，终止重试: tool={} attempts={}",
+                        tc.getName(), attempts);
+                break;
             }
+            log.warn("[AgentLoop] TOOL_BACKEND_ERROR 有界重试: tool={} attempt={}/{}",
+                    tc.getName(), attempts, toolClass.maxRetries());
+            raw = attemptTool(tc);
+        }
+        if (raw == null) {
+            return toolBackendFailure(tc, "工具执行未返回结果",
+                    (System.nanoTime() - toolStartNs) / 1_000_000);
+        }
 
-            return raw;
+        // 截断过长的结果
+        if (raw.getContent() != null && raw.getContent().length() > TOOL_RESULT_MAX_CHARS) {
+            raw.setContent(raw.getContent().substring(0, TOOL_RESULT_MAX_CHARS)
+                    + "\n\n[结果已截断，原始长度: " + raw.getContent().length() + " 字符]");
+        }
+        return raw;
+    }
+
+    /** 单次工具执行：异常必须分类上浮（F06-15「捕后必分类」），禁 log.warn 后返回语义成功值。 */
+    private ToolExecutorService.ToolResult attemptTool(ToolCall tc) {
+        long startNs = System.nanoTime();
+        try {
+            return toolExecutorService.execute(tc.getName(), tc.getArguments());
         } catch (Exception e) {
-            log.error("[AgentLoop] Tool execution failed: tool={}", tc.getName(), e);
-            return buildMockToolResult(tc);
+            AiError error = ErrorCodeMapper.classify(e,
+                    ErrorCodeMapper.Context.tool(tc.getName()), AiTraceSupport.currentTraceId());
+            logAtDeclaredLevel(error.errorClass(),
+                    "[AgentLoop] Tool execution failed: tool={} class={} raw={}",
+                    e, tc.getName(), error.errorClass().name(), error.rawReason());
+            return toolBackendFailure(tc, error.rawReason(), (System.nanoTime() - startNs) / 1_000_000);
         }
     }
 
-    private ToolExecutorService.ToolResult buildMockToolResult(ToolCall tc) {
-        ToolExecutorService.ToolResult tr = new ToolExecutorService.ToolResult();
-        tr.setToolCallId(tc.getId());
-        tr.setToolName(tc.getName());
-        tr.setSuccess(false);
-        tr.setContent("{\"status\":\"success\",\"message\":\"ToolExecutorService 未就绪，返回模拟结果\"}");
-        tr.setError("ToolExecutorService not available");
-        tr.setElapsedMs(0);
+    /**
+     * 工具侧失败的唯一构造点（F06-14 要点 3）：结构化 502 + 模板消息 + 诊断码；
+     * {@code content} 只放 {@code "ERROR: "} 前缀的可读消息，禁出现任何 success 语义（X-50）。
+     */
+    private static ToolExecutorService.ToolResult toolBackendFailure(ToolCall tc, String rawReason,
+                                                                     long elapsedMs) {
+        AiError error = AiError.toolBackend(AiTraceSupport.currentTraceId(), tc.getName(), rawReason);
+        ToolExecutorService.ToolResult tr = ToolExecutorService.ToolResult.fail(
+                tc.getId(), tc.getName(), error.userMessage(), elapsedMs);
+        tr.setErrorCode(error.errorCode());
+        tr.setErrorClass(error.errorClass().name());
+        tr.setTraceId(error.traceId());
         return tr;
+    }
+
+    /** 仅 {@code TOOL_BACKEND_ERROR} 类失败参与重试；护栏 DENY/FAIL_CLOSED 与引用缺失都不重跑工具。 */
+    private static boolean isToolBackendFailure(ToolExecutorService.ToolResult tr) {
+        return tr != null && !tr.isSuccess()
+                && AiErrorClass.TOOL_BACKEND_ERROR.name().equals(tr.getErrorClass());
+    }
+
+    /**
+     * F06-14 四元组之「日志级别」的消费点：按冻结矩阵登记的级别落日志。
+     * 原始原因只进日志通道，绝不参与响应体渲染（X-49）。
+     */
+    private static void logAtDeclaredLevel(AiErrorClass errorClass, String message,
+                                           Throwable cause, Object... args) {
+        AiErrorClass.Level level = errorClass == null
+                ? AiErrorClass.Level.ERROR : errorClass.logLevel();
+        Object[] payload = cause == null ? args : appendCause(args, cause);
+        switch (level) {
+            case TRACE -> log.trace(message, payload);
+            case DEBUG -> log.debug(message, payload);
+            case INFO -> log.info(message, payload);
+            case WARN -> log.warn(message, payload);
+            case ERROR -> log.error(message, payload);
+        }
+    }
+
+    private static Object[] appendCause(Object[] args, Throwable cause) {
+        Object[] out = new Object[args.length + 1];
+        System.arraycopy(args, 0, out, 0, args.length);
+        out[args.length] = cause;
+        return out;
+    }
+
+    /** 退避等待；返回 false 表示等待中被中断（已复位中断标记）。 */
+    private static boolean sleepMillis(long waitMs) {
+        if (waitMs <= 0) return true;
+        try {
+            Thread.sleep(waitMs);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────

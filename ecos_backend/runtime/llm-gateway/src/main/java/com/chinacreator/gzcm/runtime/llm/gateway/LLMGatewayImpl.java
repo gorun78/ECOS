@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.runtime.llm.gateway;
 
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.common.trace.EcosTraceContext;
 import com.chinacreator.gzcm.runtime.llm.config.LLMGatewayProperties;
 import com.chinacreator.gzcm.runtime.llm.metrics.LlmUsageMeter;
@@ -21,6 +22,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -32,7 +34,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>
  * 支持 provider: openrouter, deepseek, openai, anthropic
  * 支持 streaming (SSE) 和 non-streaming 两种模式
- * 重试机制: 指数退避
+ * 重试（F06-14 要点 2）：按 {@link AiErrorClass} 逐类有界退避，配额在网关单源结算；
+ * 限流类用尽后退备用 provider（只经本网关内部路由，X-22 禁引擎侧绕行）。
  * </p>
  */
 @Primary
@@ -96,6 +99,116 @@ public class LLMGatewayImpl implements LLMGateway {
 
     @Override
     public ChatResponse call(ChatRequest request) {
+        // 配置项只能收紧、不能放大冻结矩阵（与类上限取小在 callWithPolicy 内结算）
+        Integer configuredCap = llmGatewayProperties == null
+                ? null : llmGatewayProperties.getGateway().getRetryMaxAttempts();
+        return callWithPolicy(request, configuredCap);
+    }
+
+    /**
+     * F06-14 要点 2：LLM 出口的有界退避重试<b>只在网关内部结算</b>（X-22 禁引擎侧绕行）。
+     *
+     * <p>逐类规则：{@code LLM_TIMEOUT} 指数退避 ≤3；{@code LLM_RATE_LIMITED} 指数退避 ≤3 后
+     * 按配置降备用 provider（同属网关内部路由）；{@code GUARDRAIL_DENIED}/{@code GUARDRAIL_FAIL_CLOSED}
+     * 与未分类面一律 0 次（护栏态重试等于绕过面）；{@code CONTEXT_OVERFLOW} 不重试（截断降级属
+     * F06-09，引擎侧）；{@code PARSE_FAILURE} 的重生成配额属引擎侧 F06-12，网关不代扣。</p>
+     *
+     * @param callerCap 调用方附加上限（{@code callWithRetry} 参数），与类上限取小，禁放大冻结矩阵
+     */
+    private ChatResponse callWithPolicy(ChatRequest request, Integer callerCap) {
+        int attempts = 0;
+        ChatResponse response = attemptOnce(request);
+        AiErrorClass errorClass = response.aiErrorClass();
+
+        while (!response.isSuccess() && gatewayOwnedRetry(errorClass)) {
+            int bound = callerCap == null
+                    ? errorClass.maxRetries()
+                    : Math.min(callerCap, errorClass.maxRetries());
+            if (attempts >= bound || !errorClass.canRetry(attempts)) {
+                break;
+            }
+            long waitMs = errorClass.backoffMillis(attempts);
+            attempts++;
+            log.warn("[llm-gateway] 有界退避重试 #{}/{} class={} waitMs={} model={}",
+                    attempts, bound, errorClass.name(), waitMs, request.getModel());
+            if (!sleepMillis(waitMs)) {
+                response = ChatResponse.fail(AiErrorClass.LLM_TIMEOUT, "调用在退避等待中被中断");
+                errorClass = AiErrorClass.LLM_TIMEOUT;
+                break;
+            }
+            response = attemptOnce(request);
+            errorClass = response.aiErrorClass();
+        }
+
+        if (!response.isSuccess() && attempts > 0) {
+            response.setRetriesAttempted(attempts);
+        }
+
+        if (!response.isSuccess() && errorClass == AiErrorClass.LLM_RATE_LIMITED) {
+            ChatResponse degraded = tryFallbackProvider(request, response);
+            if (degraded != null) {
+                degraded.setRetriesAttempted(attempts);
+                return degraded;
+            }
+        }
+        return response;
+    }
+
+    /**
+     * 传输面重试是否归本网关结算（F06-14 要点 2 的<b>不叠加</b>约束）。
+     *
+     * <p>{@code PARSE_FAILURE} 的重生成配额属引擎侧 F06-12（与引用后校验共用 ≤2），网关若再代扣
+     * 一次就把配额翻倍；{@code CONTEXT_OVERFLOW} 走截断降级（F06-09 引擎侧）、
+     * {@code TOOL_BACKEND_ERROR} 是工具下游面 —— 三者网关一律 0 次重试，直接原样上浮分类。</p>
+     */
+    private static boolean gatewayOwnedRetry(AiErrorClass errorClass) {
+        return errorClass == AiErrorClass.LLM_TIMEOUT || errorClass == AiErrorClass.LLM_RATE_LIMITED;
+    }
+
+    /**
+     * 备用 provider 降级（F06-14 要点 2）：仅在限流类用尽退避后触发一次，
+     * 目标由 {@code llm.gateway.fallback-model} 配置；未配置即不降级并原样返回限流失败
+     * （禁在代码里兜底任何备用模型常量）。
+     */
+    private ChatResponse tryFallbackProvider(ChatRequest request, ChatResponse rateLimited) {
+        String fallbackModel = llmGatewayProperties == null
+                ? null : llmGatewayProperties.getGateway().getFallbackModel();
+        if (fallbackModel == null || fallbackModel.isBlank() || fallbackModel.equals(request.getModel())) {
+            log.warn("[llm-gateway] 限流且未配置备用 provider（llm.gateway.fallback-model），按原失败返回: model={}",
+                    request.getModel());
+            return null;
+        }
+        ChatRequest copy = request.copyWithModel(fallbackModel);
+        ChatResponse degraded = attemptOnce(copy);
+        if (degraded.isSuccess()) {
+            degraded.setFallbackProviderUsed(true);
+            log.warn("[llm-gateway] 限流降级备用 provider 成功（网关内部路由，引擎侧无感）: from={} to={}",
+                    request.getModel(), fallbackModel);
+            return degraded;
+        }
+        log.error("[llm-gateway] 限流降级备用 provider 仍失败: from={} to={} class={}",
+                request.getModel(), fallbackModel, degraded.getErrorClass());
+        return null;
+    }
+
+    /** 退避等待；被中断返回 false（调用方必须把它当失败处理，禁静默继续）。 */
+    private static boolean sleepMillis(long waitMs) {
+        if (waitMs <= 0) {
+            return true;
+        }
+        try {
+            TimeUnit.MILLISECONDS.sleep(waitMs);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    /**
+     * 单次 provider 调用（无重试）。护栏态与非护栏失败均带 {@link AiErrorClass} 分类返回。
+     */
+    private ChatResponse attemptOnce(ChatRequest request) {
         // 获取 config
         String provider = detectProvider(request.getModel());
         Double temperature = request.getTemperature();
@@ -120,7 +233,7 @@ public class LLMGatewayImpl implements LLMGateway {
                     temperature, maxTokens, stream);
         } catch (JsonProcessingException e) {
             log.error("Failed to build request body JSON", e);
-            return ChatResponse.fail("Failed to serialize request: " + e.getMessage());
+            return ChatResponse.fail(AiErrorClass.INVALID_ARGUMENT, "请求体序列化失败");
         }
 
         // ── H10-T1 (PMO-74 N14 / 铁律 §2.4)：密钥一律服务端经 security-engine 密钥服务解析 ──
@@ -136,14 +249,16 @@ public class LLMGatewayImpl implements LLMGateway {
 
         // ABAC 裁决（security 不可用/未放行 → 默认 DENY）
         if (!abacAllowLlmCall(caller, provider, request.getModel())) {
-            return ChatResponse.fail("LLM 调用被拒绝：security-engine ABAC 裁决未放行（默认 DENY，不降级放行）");
+            return ChatResponse.fail(AiErrorClass.GUARDRAIL_DENIED,
+                    "LLM 调用被拒绝：security-engine ABAC 裁决未放行（默认 DENY，不降级放行）");
         }
 
         String apiKey = resolveProviderApiKey(request.getApiKeyRef(), caller,
                 provider + ":" + request.getModel());
         if (apiKey == null) {
-            return ChatResponse.fail("LLM 调用被拒绝：未取得 security-engine 密钥服务下发的 provider 密钥"
-                    + "（默认 DENY — 不放行直连、不回退明文，详见 server 日志）");
+            return ChatResponse.fail(AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                    "LLM 调用被拒绝：未取得 security-engine 密钥服务下发的 provider 密钥"
+                            + "（默认 DENY — 不放行直连、不回退明文，详见 server 日志）");
         }
 
         if (stream) {
@@ -158,6 +273,7 @@ public class LLMGatewayImpl implements LLMGateway {
             return response;
         }
     }
+
 
     /**
      * 计量点转引（F06-07 要点 1：响应返回前记账，恰一条 {@code LLM_USAGE}）。
@@ -219,33 +335,7 @@ public class LLMGatewayImpl implements LLMGateway {
 
     @Override
     public ChatResponse callWithRetry(ChatRequest request, int maxRetries) {
-        int attempt = 0;
-        long baseDelay = 1000L; // 初始延迟 1 秒
-
-        while (true) {
-            ChatResponse response = call(request);
-            if (response.isSuccess()) {
-                return response;
-            }
-
-            attempt++;
-            if (attempt > maxRetries) {
-                log.warn("All {} retries exhausted for model [{}]. Last error: {}",
-                        maxRetries, request.getModel(), response.getErrorMsg());
-                return response;
-            }
-
-            // 指数退避: 1s, 2s, 4s, 8s, ...
-            long delay = baseDelay * (1L << (attempt - 1));
-            log.info("Retry #{}/{} for model [{}] after {}ms. Error: {}",
-                    attempt, maxRetries, request.getModel(), delay, response.getErrorMsg());
-            try {
-                TimeUnit.MILLISECONDS.sleep(delay);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return ChatResponse.fail("Retry interrupted: " + e.getMessage());
-            }
-        }
+        return callWithPolicy(request, Math.max(0, maxRetries));
     }
 
     @Override
@@ -513,7 +603,7 @@ public class LLMGatewayImpl implements LLMGateway {
                 String errorBody = response.body() != null ? response.body().string() : "";
                 log.error("LLM API error: HTTP {} {} | Body: {} | Duration: {}ms",
                         response.code(), response.message(), errorBody, duration);
-                return ChatResponse.fail(
+                return ChatResponse.fail(classifyHttpStatus(response.code()),
                         String.format("HTTP %d: %s", response.code(),
                                 errorBody.isEmpty() ? response.message() : errorBody));
             }
@@ -521,11 +611,36 @@ public class LLMGatewayImpl implements LLMGateway {
             String responseBody = response.body() != null ? response.body().string() : "";
             return parseNonStreamingResponse(responseBody);
 
+        } catch (SocketTimeoutException e) {
+            log.error("LLM API timed out after {}ms", System.currentTimeMillis() - startTime, e);
+            return ChatResponse.fail(AiErrorClass.LLM_TIMEOUT, "provider 连接/读取超时: " + e.getMessage());
         } catch (IOException e) {
             long duration = System.currentTimeMillis() - startTime;
             log.error("LLM API call failed after {}ms: {}", duration, e.getMessage());
-            return ChatResponse.fail("IO error: " + e.getMessage());
+            return ChatResponse.fail(AiErrorClass.LLM_TIMEOUT, "IO error: " + e.getMessage());
         }
+    }
+
+    /**
+     * provider HTTP 状态码 → F06-14 分类（429 限流 / 413 上下文超限 / 5xx 超时族 / 4xx 参数族）。
+     *
+     * <p>401/403 由 provider 侧密钥问题引起，属配置面，不当作护栏 DENY（护栏语义只归 security-engine），
+     * 归入不可重试的 {@code INVALID_ARGUMENT}，文案由调用方按类渲染。</p>
+     */
+    static AiErrorClass classifyHttpStatus(int status) {
+        if (status == 429) {
+            return AiErrorClass.LLM_RATE_LIMITED;
+        }
+        if (status == 413) {
+            return AiErrorClass.CONTEXT_OVERFLOW;
+        }
+        if (status >= 500) {
+            return AiErrorClass.LLM_TIMEOUT;
+        }
+        if (status == 408) {
+            return AiErrorClass.LLM_TIMEOUT;
+        }
+        return AiErrorClass.INVALID_ARGUMENT;
     }
 
     /**
@@ -690,11 +805,11 @@ public class LLMGatewayImpl implements LLMGateway {
         try {
             boolean completed = latch.await(600, TimeUnit.SECONDS); // 最长等待 10 分钟
             if (!completed) {
-                return ChatResponse.fail("Streaming request timed out after 600s");
+                return ChatResponse.fail(AiErrorClass.LLM_TIMEOUT, "Streaming request timed out after 600s");
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return ChatResponse.fail("Streaming interrupted: " + e.getMessage());
+            return ChatResponse.fail(AiErrorClass.LLM_TIMEOUT, "Streaming interrupted");
         }
 
         if (success.get()) {
@@ -705,7 +820,7 @@ public class LLMGatewayImpl implements LLMGateway {
             ok.setUsageReported(usageSeen.get());
             return ok;
         } else {
-            return ChatResponse.fail(errorMsg.get());
+            return ChatResponse.fail(AiErrorClass.PARSE_FAILURE, errorMsg.get());
         }
     }
 
@@ -719,7 +834,7 @@ public class LLMGatewayImpl implements LLMGateway {
             if (root.has("error") && !root.get("error").isNull()) {
                 JsonNode errorNode = root.get("error");
                 String errorMsg = errorNode.has("message") ? errorNode.get("message").asText() : responseBody;
-                return ChatResponse.fail(errorMsg);
+                return ChatResponse.fail(AiErrorClass.PARSE_FAILURE, errorMsg);
             }
 
             String content = "";
@@ -749,7 +864,7 @@ public class LLMGatewayImpl implements LLMGateway {
 
         } catch (Exception e) {
             log.error("Failed to parse LLM response: {}", responseBody, e);
-            return ChatResponse.fail("Failed to parse response: " + e.getMessage());
+            return ChatResponse.fail(AiErrorClass.PARSE_FAILURE, "Failed to parse response: " + e.getMessage());
         }
     }
 }

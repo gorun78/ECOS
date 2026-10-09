@@ -36,14 +36,13 @@ public class CognitiveConfigController {
     @PostConstruct
     public void init() {
         if (defaultsLoaded.compareAndSet(false, true)) {
-            try {
+            // 启动期尽力而为：失败经 AiAsyncSupport 分类留痕（AiErrorAdvice 不接管生命周期钩子），不阻断启动
+            AiAsyncSupport.runQuietly("cognitive-config-defaults-load", () -> {
                 for (String[] row : DEFAULTS) {
                     sysConfigService.upsertValue(row[0], row[1], row[2], row[3], row[4]);
                 }
                 log.info("Cognitive engine config defaults loaded ({} items)", DEFAULTS.length);
-            } catch (Exception e) {
-                log.warn("Failed to load cognitive defaults: {}", e.getMessage());
-            }
+            });
         }
     }
 

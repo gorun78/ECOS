@@ -4,9 +4,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.engine.ai.service.AgentStudioService;
 import com.chinacreator.gzcm.engine.ai.service.AgentStudioService.AgentCompareResult;
 import com.chinacreator.gzcm.engine.ai.service.AgentStudioService.AgentTestResult;
@@ -39,12 +40,14 @@ import com.chinacreator.gzcm.engine.ai.service.AgentStudioService.PipelineExecut
  *
  * <h3>注入：</h3>
  * {@link AgentStudioService} — 统一服务入口
+ *
+ * <h3>错误语义（F06-15）：</h3>
+ * <p>控制器层禁兜底吞异常；未预期异常经 {@code AiErrorAdvice} 分类为
+ * {@code ECOS-AI-*}。依赖未装配则经 {@code AiResponseSupport.dependencyUnavailable} 返回 502。</p>
  */
 @RestController
 @RequestMapping("/api/v1/aip/studio")
 public class AgentStudioController {
-
-    private static final Logger log = LoggerFactory.getLogger(AgentStudioController.class);
 
     @Autowired(required = false)
     private AgentStudioService studioService;
@@ -53,14 +56,15 @@ public class AgentStudioController {
 
     /**
      * POST /api/v1/aip/studio/agents/{id}/test
-     * <p>对指定 Agent 发送测试消息并返回结果。</p>
+     * <p>对指定 Agent 发送测试消息并返回结果。失败经 {@code AiErrorAdvice} 分类为 {@code ECOS-AI-*}。</p>
      */
     @PostMapping("/agents/{id}/test")
-    public ApiResponse<Map<String, Object>> testAgent(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> testAgent(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
         if (studioService == null) {
-            return ApiResponse.internalError("AgentStudioService 未就绪");
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(AiResponseSupport.<Map<String, Object>>dependencyUnavailable("AgentStudioService"));
         }
 
         String testMessage = String.valueOf(body.getOrDefault("testMessage",
@@ -73,27 +77,23 @@ public class AgentStudioController {
         agentDef.putIfAbsent("temperature", body.getOrDefault("temperature", 0.7));
         agentDef.putIfAbsent("maxTokens", body.getOrDefault("maxTokens", 4096));
 
-        try {
-            AgentTestResult result = studioService.createAndTest(agentDef, testMessage);
-            Map<String, Object> data = result.toMap();
-            data.put("agentId", id); // 使用路径中的 agentId
+        AgentTestResult result = studioService.createAndTest(agentDef, testMessage);
+        Map<String, Object> data = result.toMap();
+        data.put("agentId", id); // 使用路径中的 agentId
 
-            if (result.isSuccess()) {
-                return ApiResponse.success(data);
-            } else {
-                return ApiResponse.success("Agent 测试未成功完成", data);
-            }
-        } catch (Exception e) {
-            log.error("[AgentStudio] testAgent failed for id={}", id, e);
-            return ApiResponse.internalError("Agent 测试失败");
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(ApiResponse.success(data));
         }
+        // F06-14/15：失败态走 D.5 分类状态，禁 ApiResponse.success(...) 伪成功（A3）
+        return AiResponseSupport.failure(result.getErrorClass(), result.getErrorCode(),
+                result.getErrorMsg(), result.getErrorTraceId(), data);
     }
 
     // ═══════════════ Agent 对比 ═══════════════════
 
     /**
      * POST /api/v1/aip/studio/agents/compare
-     * <p>对比两个 Agent 在相同测试消息集上的表现。</p>
+     * <p>对比两个 Agent 在相同测试消息集上的表现。失败经 {@code AiErrorAdvice} 分类为 {@code ECOS-AI-*}。</p>
      *
      * <pre>
      * {
@@ -104,59 +104,56 @@ public class AgentStudioController {
      * </pre>
      */
     @PostMapping("/agents/compare")
-    public ApiResponse<Map<String, Object>> compareAgents(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> compareAgents(
+            @RequestBody Map<String, Object> body) {
         if (studioService == null) {
-            return ApiResponse.internalError("AgentStudioService 未就绪");
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(AiResponseSupport.<Map<String, Object>>dependencyUnavailable("AgentStudioService"));
         }
 
         String agentIdA = String.valueOf(body.getOrDefault("agentIdA", "")).trim();
         String agentIdB = String.valueOf(body.getOrDefault("agentIdB", "")).trim();
 
         if (agentIdA.isEmpty()) {
-            return ApiResponse.badRequest("AIP-010: 'agentIdA' is required");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(AiResponseSupport.<Map<String, Object>>classified(
+                            AiErrorClass.INVALID_ARGUMENT, "AIP-010: 'agentIdA' is required"));
         }
         if (agentIdB.isEmpty()) {
-            return ApiResponse.badRequest("AIP-011: 'agentIdB' is required");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(AiResponseSupport.<Map<String, Object>>classified(
+                            AiErrorClass.INVALID_ARGUMENT, "AIP-011: 'agentIdB' is required"));
         }
 
         @SuppressWarnings("unchecked")
         List<String> testMessages = (List<String>) body.get("testMessages");
 
-        try {
-            AgentCompareResult result = studioService.compare(agentIdA, agentIdB, testMessages);
-            if (result.isSuccess()) {
-                return ApiResponse.success(result.toMap());
-            } else {
-                return ApiResponse.internalError(result.getErrorMsg());
-            }
-        } catch (Exception e) {
-            log.error("[AgentStudio] compareAgents failed: {} vs {}", agentIdA, agentIdB, e);
-            return ApiResponse.internalError("Agent 对比失败");
+        AgentCompareResult result = studioService.compare(agentIdA, agentIdB, testMessages);
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(ApiResponse.success(result.toMap()));
         }
+        // F06-14/15：禁 internalError（code=-1 无 D.5 码）与 200 伪成功
+        return AiResponseSupport.failure(result.getErrorClass(), result.getErrorCode(),
+                result.getErrorMsg(), result.getErrorTraceId(), result.toMap());
     }
 
     // ═══════════════ 流水线执行 ═══════════════════
 
     /**
      * POST /api/v1/aip/studio/pipelines/{id}/execute
-     * <p>启动指定流水线的异步执行，返回执行ID用于后续查询。</p>
+     * <p>启动指定流水线的异步执行，返回执行ID用于后续查询。失败经 {@code AiErrorAdvice} 分类为 {@code ECOS-AI-*}。</p>
      */
     @PostMapping("/pipelines/{id}/execute")
     public ApiResponse<Map<String, Object>> executePipeline(
             @PathVariable String id,
             @RequestBody(required = false) Map<String, Object> params) {
         if (studioService == null) {
-            return ApiResponse.internalError("AgentStudioService 未就绪");
+            return AiResponseSupport.dependencyUnavailable("AgentStudioService");
         }
 
-        try {
-            Map<String, Object> effectiveParams = params != null ? params : new LinkedHashMap<>();
-            PipelineExecution exec = studioService.startPipeline(id, effectiveParams);
-            return ApiResponse.success(exec.toMap());
-        } catch (Exception e) {
-            log.error("[AgentStudio] executePipeline failed for id={}", id, e);
-            return ApiResponse.internalError("流水线执行失败");
-        }
+        Map<String, Object> effectiveParams = params != null ? params : new LinkedHashMap<>();
+        PipelineExecution exec = studioService.startPipeline(id, effectiveParams);
+        return ApiResponse.success(exec.toMap());
     }
 
     /**
@@ -166,7 +163,7 @@ public class AgentStudioController {
     @GetMapping("/pipelines/{id}/executions")
     public ApiResponse<Map<String, Object>> getPipelineExecutions(@PathVariable String id) {
         if (studioService == null) {
-            return ApiResponse.internalError("AgentStudioService 未就绪");
+            return AiResponseSupport.dependencyUnavailable("AgentStudioService");
         }
 
         PipelineExecution exec = studioService.getPipelineStatus(id);
@@ -180,7 +177,7 @@ public class AgentStudioController {
 
     /**
      * POST /api/v1/aip/studio/orchestrate
-     * <p>多Agent智能编排 — 根据用户消息路由到合适的Agent。</p>
+     * <p>多Agent智能编排 — 根据用户消息路由到合适的Agent。失败经 {@code AiErrorAdvice} 分类为 {@code ECOS-AI-*}。</p>
      *
      * <pre>
      * {
@@ -190,29 +187,29 @@ public class AgentStudioController {
      * </pre>
      */
     @PostMapping("/orchestrate")
-    public ApiResponse<Map<String, Object>> orchestrate(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> orchestrate(
+            @RequestBody Map<String, Object> body) {
         if (studioService == null) {
-            return ApiResponse.internalError("AgentStudioService 未就绪");
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(AiResponseSupport.<Map<String, Object>>dependencyUnavailable("AgentStudioService"));
         }
 
         String message = String.valueOf(body.getOrDefault("message",
                 body.getOrDefault("userMessage", ""))).trim();
         if (message.isEmpty()) {
-            return ApiResponse.badRequest("AIP-012: 'message' is required");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(AiResponseSupport.<Map<String, Object>>classified(
+                            AiErrorClass.INVALID_ARGUMENT, "AIP-012: 'message' is required"));
         }
 
         String sessionId = String.valueOf(body.getOrDefault("sessionId", ""));
 
-        try {
-            OrchestrationResult result = studioService.orchestrate(message, sessionId);
-            if (result.isSuccess()) {
-                return ApiResponse.success(result.toMap());
-            } else {
-                return ApiResponse.success("编排未成功完成", result.toMap());
-            }
-        } catch (Exception e) {
-            log.error("[AgentStudio] orchestrate failed", e);
-            return ApiResponse.internalError("编排失败");
+        OrchestrationResult result = studioService.orchestrate(message, sessionId);
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(ApiResponse.success(result.toMap()));
         }
+        // F06-14/15：编排失败态走 D.5 分类状态，禁 success(...) 伪成功（A3）
+        return AiResponseSupport.failure(result.getErrorClass(), result.getErrorCode(),
+                result.getErrorMsg(), result.getErrorTraceId(), result.toMap());
     }
 }

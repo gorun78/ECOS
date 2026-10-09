@@ -3,8 +3,6 @@ package com.chinacreator.gzcm.engine.ai.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.runtime.llm.model.ProfileConfig;
 import com.chinacreator.gzcm.sysman.llm.service.IAgentProfileService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,171 +15,130 @@ import java.util.Map;
  * <p>
  * 遵循 Sys-Man 已有 Controller 模式（参考 AbacController）:
  * - @Autowired(required=false)
- * - try-catch 包装，返回 ApiResponse
+ * - 未预期异常经 {@code AiErrorAdvice} 分类为 {@code ECOS-AI-*} 响应，控制器层禁兜底吞异常（F06-15）
  * </p>
  */
 @RestController
 @RequestMapping("/api/v1/agent/profiles")
 public class AgentProfileController {
 
-    private static final Logger log = LoggerFactory.getLogger(AgentProfileController.class);
-
     @Autowired(required = false)
     private IAgentProfileService agentProfileService;
 
     /**
-     * 查询所有 profile 列表
+     * 查询所有 profile 列表。失败经 {@code AiErrorAdvice} 分类为 {@code ECOS-AI-*}。
      */
     @GetMapping
     public ApiResponse<List<ProfileConfig>> listAll() {
-        try {
-            if (agentProfileService == null) {
-                return ApiResponse.internalError("Agent Profile 服务未就绪");
-            }
-            List<ProfileConfig> list = agentProfileService.listAll();
-            return ApiResponse.success(list);
-        } catch (Exception e) {
-            log.error("查询所有 Profile 失败", e);
-            return ApiResponse.internalError("查询失败");
+        if (agentProfileService == null) {
+            return AiResponseSupport.dependencyUnavailable("Agent Profile 服务");
         }
+        List<ProfileConfig> list = agentProfileService.listAll();
+        return ApiResponse.success(list);
     }
 
     /**
-     * 按子系统查询 profile 列表
+     * 按子系统查询 profile 列表。失败经 {@code AiErrorAdvice} 分类为 {@code ECOS-AI-*}。
      */
     @GetMapping("/{subsystem}")
     public ApiResponse<List<ProfileConfig>> listBySubsystem(@PathVariable String subsystem) {
-        try {
-            if (agentProfileService == null) {
-                return ApiResponse.internalError("Agent Profile 服务未就绪");
-            }
-            List<ProfileConfig> list = agentProfileService.listBySubsystem(subsystem);
-            return ApiResponse.success(list);
-        } catch (Exception e) {
-            log.error("按子系统查询 Profile 失败: subsystem={}", subsystem, e);
-            return ApiResponse.internalError("查询失败");
+        if (agentProfileService == null) {
+            return AiResponseSupport.dependencyUnavailable("Agent Profile 服务");
         }
+        List<ProfileConfig> list = agentProfileService.listBySubsystem(subsystem);
+        return ApiResponse.success(list);
     }
 
     /**
-     * 按 ID 查询 profile 详情
+     * 按 ID 查询 profile 详情。失败经 {@code AiErrorAdvice} 分类为 {@code ECOS-AI-*}。
      */
     @GetMapping("/detail/{id}")
     public ApiResponse<?> getById(@PathVariable String id) {
-        try {
-            if (agentProfileService == null) {
-                return ApiResponse.internalError("Agent Profile 服务未就绪");
-            }
-            ProfileConfig config = agentProfileService.getById(id);
-            if (config == null) {
-                return ApiResponse.notFound("Profile 不存在: " + id);
-            }
-            return ApiResponse.success(config);
-        } catch (Exception e) {
-            log.error("查询 Profile 详情失败: id={}", id, e);
-            return ApiResponse.internalError("查询失败");
+        if (agentProfileService == null) {
+            return AiResponseSupport.dependencyUnavailable("Agent Profile 服务");
         }
+        ProfileConfig config = agentProfileService.getById(id);
+        if (config == null) {
+            return ApiResponse.notFound("Profile 不存在: " + id);
+        }
+        return ApiResponse.success(config);
     }
 
     /**
-     * 创建 profile
+     * 创建 profile。失败经 {@code AiErrorAdvice} 分类为 {@code ECOS-AI-*}。
      */
     @PostMapping
     public ApiResponse<?> create(@RequestBody ProfileConfig config) {
-        try {
-            if (agentProfileService == null) {
-                return ApiResponse.internalError("Agent Profile 服务未就绪");
-            }
-            if (config == null) {
-                return ApiResponse.badRequest("请求体不能为空");
-            }
-            ProfileConfig created = agentProfileService.create(config);
-            return ApiResponse.success(created);
-        } catch (Exception e) {
-            log.error("创建 Profile 失败", e);
-            return ApiResponse.internalError("创建失败");
+        if (agentProfileService == null) {
+            return AiResponseSupport.dependencyUnavailable("Agent Profile 服务");
         }
+        if (config == null) {
+            return ApiResponse.badRequest("请求体不能为空");
+        }
+        ProfileConfig created = agentProfileService.create(config);
+        return ApiResponse.success(created);
     }
 
     /**
-     * 更新 profile
+     * 更新 profile。失败经 {@code AiErrorAdvice} 分类为 {@code ECOS-AI-*}。
      */
     @PutMapping("/{id}")
     public ApiResponse<?> update(@PathVariable String id, @RequestBody ProfileConfig config) {
-        try {
-            if (agentProfileService == null) {
-                return ApiResponse.internalError("Agent Profile 服务未就绪");
-            }
-            if (config == null) {
-                return ApiResponse.badRequest("请求体不能为空");
-            }
-            config.setId(id);
-            ProfileConfig updated = agentProfileService.update(config);
-            return ApiResponse.success(updated);
-        } catch (Exception e) {
-            log.error("更新 Profile 失败: id={}", id, e);
-            return ApiResponse.internalError("更新失败");
+        if (agentProfileService == null) {
+            return AiResponseSupport.dependencyUnavailable("Agent Profile 服务");
         }
+        if (config == null) {
+            return ApiResponse.badRequest("请求体不能为空");
+        }
+        config.setId(id);
+        ProfileConfig updated = agentProfileService.update(config);
+        return ApiResponse.success(updated);
     }
 
     /**
-     * 删除 profile
+     * 删除 profile。失败经 {@code AiErrorAdvice} 分类为 {@code ECOS-AI-*}。
      */
     @DeleteMapping("/{id}")
     public ApiResponse<?> delete(@PathVariable String id) {
-        try {
-            if (agentProfileService == null) {
-                return ApiResponse.internalError("Agent Profile 服务未就绪");
-            }
-            agentProfileService.delete(id);
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("success", true);
-            return ApiResponse.success(m);
-        } catch (Exception e) {
-            log.error("删除 Profile 失败: id={}", id, e);
-            return ApiResponse.internalError("删除失败");
+        if (agentProfileService == null) {
+            return AiResponseSupport.dependencyUnavailable("Agent Profile 服务");
         }
+        agentProfileService.delete(id);
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("success", true);
+        return ApiResponse.success(m);
     }
 
     /**
-     * 启用/禁用 profile
+     * 启用/禁用 profile。失败经 {@code AiErrorAdvice} 分类为 {@code ECOS-AI-*}。
      * <p>请求体示例: {"enabled": true}</p>
      */
     @PatchMapping("/{id}/toggle")
     public ApiResponse<?> toggleEnabled(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        try {
-            if (agentProfileService == null) {
-                return ApiResponse.internalError("Agent Profile 服务未就绪");
-            }
-            boolean enabled = Boolean.TRUE.equals(body.get("enabled"));
-            agentProfileService.toggleEnabled(id, enabled);
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", id);
-            m.put("enabled", enabled);
-            return ApiResponse.success(m);
-        } catch (Exception e) {
-            log.error("切换 Profile 启用状态失败: id={}", id, e);
-            return ApiResponse.internalError("操作失败");
+        if (agentProfileService == null) {
+            return AiResponseSupport.dependencyUnavailable("Agent Profile 服务");
         }
+        boolean enabled = Boolean.TRUE.equals(body.get("enabled"));
+        agentProfileService.toggleEnabled(id, enabled);
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", id);
+        m.put("enabled", enabled);
+        return ApiResponse.success(m);
     }
 
     /**
-     * 测试连接 — 校验 LLM 配置连通性
+     * 测试连接 — 校验 LLM 配置连通性。
+     * <p>失败经 {@code AiErrorAdvice} 分类为 {@code ECOS-AI-*}（禁再回落 {@code internalError} 掩蔽）。</p>
      */
     @PostMapping("/{id}/test")
     public ApiResponse<?> testConnection(@PathVariable String id) {
-        try {
-            if (agentProfileService == null) {
-                return ApiResponse.internalError("Agent Profile 服务未就绪");
-            }
-            agentProfileService.testConnection(id);
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("success", true);
-            m.put("message", "连接测试通过");
-            return ApiResponse.success(m);
-        } catch (Exception e) {
-            log.error("测试连接失败: id={}", id, e);
-            return ApiResponse.internalError("连接测试失败");
+        if (agentProfileService == null) {
+            return AiResponseSupport.dependencyUnavailable("Agent Profile 服务");
         }
+        agentProfileService.testConnection(id);
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("success", true);
+        m.put("message", "连接测试通过");
+        return ApiResponse.success(m);
     }
 }

@@ -56,27 +56,23 @@ public class AgentEvalController {
      *   }
      * }
      * </pre>
+     * <p>启动失败不再返回 internalError，由 {@link AiErrorAdvice} 分类为 ECOS-AI-* 响应。</p>
      */
     @PostMapping("/run")
     public ApiResponse<Map<String, Object>> runEvaluation(@RequestBody(required = false) Map<String, Object> body) {
-        try {
-            String questionSet = null;
-            if (body != null && body.containsKey("questionSet")) {
-                questionSet = String.valueOf(body.get("questionSet"));
-            }
-            String evalId = agentEvaluator.startEvaluation(questionSet);
-
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("evalId", evalId);
-            data.put("questionSet", questionSet != null ? questionSet : "default");
-            data.put("message", "评估已启动，通过 GET /api/v1/aip/eval/" + evalId + "/report 查询结果");
-
-            log.info("Eval run triggered: evalId={} questionSet={}", evalId, questionSet);
-            return ApiResponse.success(data);
-        } catch (Exception e) {
-            log.error("Failed to start evaluation", e);
-            return ApiResponse.internalError("启动评估失败");
+        String questionSet = null;
+        if (body != null && body.containsKey("questionSet")) {
+            questionSet = String.valueOf(body.get("questionSet"));
         }
+        String evalId = agentEvaluator.startEvaluation(questionSet);
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("evalId", evalId);
+        data.put("questionSet", questionSet != null ? questionSet : "default");
+        data.put("message", "评估已启动，通过 GET /api/v1/aip/eval/" + evalId + "/report 查询结果");
+
+        log.info("Eval run triggered: evalId={} questionSet={}", evalId, questionSet);
+        return ApiResponse.success(data);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -108,36 +104,32 @@ public class AgentEvalController {
      *   }
      * }
      * </pre>
+     * <p>查询失败不再返回 internalError，由 {@link AiErrorAdvice} 分类为 ECOS-AI-* 响应。</p>
      */
     @GetMapping("/list")
     public ApiResponse<Map<String, Object>> listEvaluations() {
-        try {
-            List<EvalReport> reports = agentEvaluator.listReports();
+        List<EvalReport> reports = agentEvaluator.listReports();
 
-            List<Map<String, Object>> items = new ArrayList<>();
-            for (EvalReport report : reports) {
-                Map<String, Object> summary = new LinkedHashMap<>();
-                summary.put("evalId", report.getEvalId());
-                summary.put("questionSet", report.getQuestionSet());
-                summary.put("status", report.getStatus());
-                summary.put("totalQuestions", report.getTotalQuestions());
-                summary.put("avgScore", report.getAvgScore());
-                summary.put("grade", report.getGrade());
-                summary.put("startedAt", report.getStartedAt());
-                summary.put("completedAt", report.getCompletedAt());
-                summary.put("totalDurationMs", report.getTotalDurationMs());
-                items.add(summary);
-            }
-
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("total", items.size());
-            data.put("items", items);
-
-            return ApiResponse.success(data);
-        } catch (Exception e) {
-            log.error("Failed to list evaluations", e);
-            return ApiResponse.internalError("查询评估列表失败");
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (EvalReport report : reports) {
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("evalId", report.getEvalId());
+            summary.put("questionSet", report.getQuestionSet());
+            summary.put("status", report.getStatus());
+            summary.put("totalQuestions", report.getTotalQuestions());
+            summary.put("avgScore", report.getAvgScore());
+            summary.put("grade", report.getGrade());
+            summary.put("startedAt", report.getStartedAt());
+            summary.put("completedAt", report.getCompletedAt());
+            summary.put("totalDurationMs", report.getTotalDurationMs());
+            items.add(summary);
         }
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("total", items.size());
+        data.put("items", items);
+
+        return ApiResponse.success(data);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -187,47 +179,43 @@ public class AgentEvalController {
      *   }
      * }
      * </pre>
+     * <p>查询失败不再返回 internalError，由 {@link AiErrorAdvice} 分类为 ECOS-AI-* 响应。</p>
      */
     @GetMapping("/{id}/report")
     public ApiResponse<Map<String, Object>> getReport(@PathVariable String id) {
-        try {
-            EvalReport report = agentEvaluator.getReport(id);
+        EvalReport report = agentEvaluator.getReport(id);
 
-            if (report == null) {
-                return ApiResponse.notFound("评估 " + id + " 不存在");
-            }
-
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("evalId", report.getEvalId());
-            data.put("questionSet", report.getQuestionSet());
-            data.put("status", report.getStatus());
-            data.put("totalQuestions", report.getTotalQuestions());
-            data.put("totalScore", report.getTotalScore());
-            data.put("avgScore", report.getAvgScore());
-            data.put("grade", report.getGrade());
-            data.put("totalDurationMs", report.getTotalDurationMs());
-            data.put("startedAt", report.getStartedAt());
-            data.put("completedAt", report.getCompletedAt());
-
-            // 5维汇总均分
-            if (report.getDimensionAvgs() != null) {
-                data.put("dimensionAvgs", dimensionsToMap(report.getDimensionAvgs()));
-            }
-
-            if (report.getItems() != null) {
-                data.put("items", report.getItems().stream().map(this::itemToMap).collect(Collectors.toList()));
-            }
-
-            // 如果还在运行中，返回提示
-            if ("running".equals(report.getStatus())) {
-                data.put("hint", "评估仍在运行中，请稍后重新查询");
-            }
-
-            return ApiResponse.success(data);
-        } catch (Exception e) {
-            log.error("Failed to get eval report: id={}", id, e);
-            return ApiResponse.internalError("查询评估报告失败");
+        if (report == null) {
+            return ApiResponse.notFound("评估 " + id + " 不存在");
         }
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("evalId", report.getEvalId());
+        data.put("questionSet", report.getQuestionSet());
+        data.put("status", report.getStatus());
+        data.put("totalQuestions", report.getTotalQuestions());
+        data.put("totalScore", report.getTotalScore());
+        data.put("avgScore", report.getAvgScore());
+        data.put("grade", report.getGrade());
+        data.put("totalDurationMs", report.getTotalDurationMs());
+        data.put("startedAt", report.getStartedAt());
+        data.put("completedAt", report.getCompletedAt());
+
+        // 5维汇总均分
+        if (report.getDimensionAvgs() != null) {
+            data.put("dimensionAvgs", dimensionsToMap(report.getDimensionAvgs()));
+        }
+
+        if (report.getItems() != null) {
+            data.put("items", report.getItems().stream().map(this::itemToMap).collect(Collectors.toList()));
+        }
+
+        // 如果还在运行中，返回提示
+        if ("running".equals(report.getStatus())) {
+            data.put("hint", "评估仍在运行中，请稍后重新查询");
+        }
+
+        return ApiResponse.success(data);
     }
 
     // ═══════════════════════════════════════════════════════════════

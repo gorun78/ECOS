@@ -9,11 +9,17 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.AiError;
+import com.chinacreator.gzcm.engine.ai.service.ErrorCodeMapper;
+import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
 import com.chinacreator.gzcm.runtime.llm.scheduler.AgentResult;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -62,10 +68,12 @@ public class ClassificationController {
      * </pre>
      */
     @PostMapping("/assets/{assetId}/auto-classify")
-    public ApiResponse<Map<String, Object>> autoClassify(@PathVariable String assetId,
-                                                          @RequestBody(required = false) Map<String, Object> body) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> autoClassify(
+            @PathVariable String assetId,
+            @RequestBody(required = false) Map<String, Object> body) {
         if (llmGatewayService == null) {
-            return ApiResponse.internalError("Hermes 引擎未就绪，请确认 Agent Runtime 已启动");
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(AiResponseSupport.<Map<String, Object>>dependencyUnavailable("Hermes 引擎"));
         }
 
         // 构造扫描 prompt
@@ -77,54 +85,51 @@ public class ClassificationController {
 
         log.info("Auto-classify agent invoked for asset: {}", assetId);
 
-        try {
-            AgentResult result = llmGatewayService.execute("sysman", "sysman-assistant", prompt);
+        AgentResult result = llmGatewayService.execute("sysman", "sysman-assistant", prompt);
 
-            if (!result.isSuccess()) {
-                log.warn("Agent classify failed: {}", result.getErrorMsg());
-                // 返回基础退化结果
-                Map<String, Object> fallback = new LinkedHashMap<>();
-                fallback.put("assetId", assetId);
-                fallback.put("level", "内部");
-                fallback.put("tags", List.of());
-                fallback.put("summary", "Agent 调用失败，降级为默认内部级: " + result.getErrorMsg());
-                fallback.put("fallback", true);
-                return ApiResponse.success(fallback);
-            }
-
-            // 解析 Agent 返回的 JSON
-            String content = result.getContent();
-            Map<String, Object> parsed = parseAgentResponse(content, assetId);
-
-            // 如果解析结果是包装对象（含 fields 数组），从 fields 合成结果
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> extractedFields = extractFieldsList(parsed);
-            if (extractedFields != null) {
-                Map<String, Object> synthesized = synthesizeFromArray(extractedFields);
-                parsed.put("level", synthesized.get("level"));
-                parsed.put("tags", synthesized.get("tags"));
-                parsed.put("summary", synthesized.get("summary"));
-            }
-
-            Map<String, Object> resp = new LinkedHashMap<>();
-            resp.put("assetId", assetId);
-            resp.put("level", parsed.getOrDefault("level", "内部"));
-            resp.put("tags", parsed.getOrDefault("tags", List.of()));
-            resp.put("summary", parsed.getOrDefault("summary", "Agent 分析完成"));
-            resp.put("rawContent", content);
-            resp.put("tokensInput", result.getTokensInput());
-            resp.put("tokensOutput", result.getTokensOutput());
-            resp.put("durationMs", result.getDurationMs());
-
-            return ApiResponse.success(resp);
-
-        } catch (Exception e) {
-            log.error("Auto-classify 执行异常: assetId={}", assetId, e);
-            Map<String, Object> error = new LinkedHashMap<>();
-            error.put("assetId", assetId);
-            error.put("error", e.getMessage());
-            return ApiResponse.internalError("自动分类执行异常");
+        if (!result.isSuccess()) {
+            // F06-14/15：分类是安全语义，禁"未分类即默认内部级"的 200 退化（fail-open）；
+            // 按 LLM 出口面分类渲染，原文只入日志（X-49）
+            AiError error = ErrorCodeMapper.classify(null,
+                    ErrorCodeMapper.Context.llm("hermes-agent"), AiTraceSupport.currentTraceId());
+            log.warn("Agent classify failed: class={} code={} traceId={} raw={}",
+                    error.errorClass().name(), error.errorCode(), error.traceId(), result.getErrorMsg());
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("assetId", assetId);
+            return AiResponseSupport.failure(error.errorClass().name(), error.errorCode(),
+                    null, error.traceId(), data);
         }
+
+        // 解析 Agent 返回的 JSON
+        String content = result.getContent();
+        Map<String, Object> parsed = parseAgentResponse(content, assetId);
+
+        // 如果解析结果是包装对象（含 fields 数组），从 fields 合成结果
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> extractedFields = extractFieldsList(parsed);
+        if (extractedFields != null) {
+            Map<String, Object> synthesized = synthesizeFromArray(extractedFields);
+            parsed.put("level", synthesized.get("level"));
+            parsed.put("tags", synthesized.get("tags"));
+            parsed.put("summary", synthesized.get("summary"));
+        }
+
+        Object level = parsed.get("level");
+        if (level == null || String.valueOf(level).isBlank()) {
+            throw outputUnparseable("解析结果缺少 level 字段");
+        }
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("assetId", assetId);
+        resp.put("level", level);
+        resp.put("tags", parsed.getOrDefault("tags", List.of()));
+        resp.put("summary", parsed.getOrDefault("summary", "Agent 分析完成"));
+        resp.put("rawContent", content);
+        resp.put("tokensInput", result.getTokensInput());
+        resp.put("tokensOutput", result.getTokensOutput());
+        resp.put("durationMs", result.getDurationMs());
+
+        return ResponseEntity.ok(ApiResponse.success(resp));
     }
 
     // ═══════════════ 工具方法 ═══════════════════════════
@@ -135,7 +140,7 @@ public class ClassificationController {
         if (body != null && body.containsKey("fields")) {
             try {
                 return mapper.writeValueAsString(body.get("fields"));
-            } catch (Exception e) {
+            } catch (JsonProcessingException e) {
                 log.warn("序列化自定义字段失败", e);
             }
         }
@@ -156,7 +161,7 @@ public class ClassificationController {
 
         try {
             return mapper.writeValueAsString(mockFields);
-        } catch (Exception e) {
+        } catch (JsonProcessingException e) {
             return "[]";
         }
     }
@@ -165,7 +170,7 @@ public class ClassificationController {
     @SuppressWarnings("unchecked")
     private Map<String, Object> parseAgentResponse(String content, String assetId) {
         if (content == null || content.isBlank()) {
-            return Map.of("level", "内部", "tags", List.of(), "summary", "Agent 返回空内容");
+            throw outputUnparseable("Agent 返回空内容");
         }
 
         // 提取 JSON：找到第一个 { 或 [ 到最后一个 } 或 ]
@@ -175,38 +180,39 @@ public class ClassificationController {
         int jsonStart = (braceStart >= 0 && (bracketStart < 0 || braceStart < bracketStart))
                 ? braceStart : bracketStart;
         if (jsonStart < 0) {
-            return fallbackResult(content);
+            throw outputUnparseable("输出中无 JSON 结构");
         }
 
         int braceEnd = s.lastIndexOf('}');
         int bracketEnd = s.lastIndexOf(']');
         int jsonEnd = Math.max(braceEnd, bracketEnd);
         if (jsonEnd <= jsonStart) {
-            return fallbackResult(content);
+            throw outputUnparseable("JSON 结构不完整");
         }
 
         String json = s.substring(jsonStart, jsonEnd + 1).trim();
 
         try {
             return mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-        } catch (Exception e1) {
+        } catch (JsonProcessingException e1) {
             try {
                 List<Map<String, Object>> arr = mapper.readValue(json,
                         new TypeReference<List<Map<String, Object>>>() {});
                 return synthesizeFromArray(arr);
-            } catch (Exception e2) {
-                log.warn("Agent JSON parse failed: json={}", json.length() > 200 ? json.substring(0, 200) : json);
-                return fallbackResult(content);
+            } catch (JsonProcessingException e2) {
+                throw outputUnparseable("JSON 解析失败");
             }
         }
     }
 
-    private Map<String, Object> fallbackResult(String content) {
-        Map<String, Object> fallback = new LinkedHashMap<>();
-        fallback.put("level", "内部");
-        fallback.put("tags", List.of());
-        fallback.put("summary", content.length() > 100 ? content.substring(0, 100) + "..." : content);
-        return fallback;
+    /**
+     * 分类结果不可解析 → {@code PARSE_FAILURE}（由 {@code AiErrorAdvice} 渲染 500 + 诊断码）。
+     *
+     * <p>禁"解析失败即默认内部级"的兜底：数据分级是安全语义，静默降级等于 fail-open。</p>
+     */
+    private IllegalStateException outputUnparseable(String reason) {
+        log.warn("Agent 分类输出不可解析: reason={} traceId={}", reason, AiTraceSupport.currentTraceId());
+        return new IllegalStateException("LLM_OUTPUT_PARSE: " + reason);
     }
 
     /** 从 Agent 返回的数组格式合成 {level, tags, summary} */

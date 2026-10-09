@@ -62,13 +62,8 @@ public class CronJobController {
             return unavailable(new AgentRuntimeCapabilityUnavailableException(
                     AgentRuntimeCapability.MCP, "MCP channel not connected"));
         }
-        try {
-            String result = mcp.callTool("cronjob_list", null);
-            return ApiResponse.success(result);
-        } catch (Exception e) {
-            log.error("cronjob_list failed: {}", e.getMessage());
-            return ApiResponse.badRequest("Cron job list failed: " + e.getMessage());
-        }
+        String result = mcp.callTool("cronjob_list", null);
+        return ApiResponse.success(result);
     }
 
     /** Create a new cron job */
@@ -86,17 +81,12 @@ public class CronJobController {
         } catch (AgentRuntimeCapabilityUnavailableException e) {
             return unavailable(e);
         }
-        try {
-            Map<String, Object> args = new HashMap<>();
-            args.put("name", name);
-            args.put("schedule", schedule);
-            args.put("prompt", prompt);
-            String result = mcp.callTool("cronjob_create", args);
-            return ApiResponse.success(result);
-        } catch (Exception e) {
-            log.error("cronjob_create failed: {}", e.getMessage());
-            return ApiResponse.badRequest("Create failed: " + e.getMessage());
-        }
+        Map<String, Object> args = new HashMap<>();
+        args.put("name", name);
+        args.put("schedule", schedule);
+        args.put("prompt", prompt);
+        String result = mcp.callTool("cronjob_create", args);
+        return ApiResponse.success(result);
     }
 
     /** Pause a cron job */
@@ -108,15 +98,10 @@ public class CronJobController {
         } catch (AgentRuntimeCapabilityUnavailableException e) {
             return unavailable(e);
         }
-        try {
-            Map<String, Object> args = new HashMap<>();
-            args.put("job_id", jobId);
-            String result = mcp.callTool("cronjob_pause", args);
-            return ApiResponse.success(result);
-        } catch (Exception e) {
-            log.error("cronjob_pause failed: {}", e.getMessage());
-            return ApiResponse.badRequest("Pause failed: " + e.getMessage());
-        }
+        Map<String, Object> args = new HashMap<>();
+        args.put("job_id", jobId);
+        String result = mcp.callTool("cronjob_pause", args);
+        return ApiResponse.success(result);
     }
 
     private AgentMcpCapability resolveMcp() {

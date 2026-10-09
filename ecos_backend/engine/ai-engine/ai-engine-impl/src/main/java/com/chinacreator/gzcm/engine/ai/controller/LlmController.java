@@ -66,34 +66,30 @@ public class LlmController {
      * 文本向量化
      *
      * @param req 强类型请求（input 单条 / texts 多条 二选一 + model 可选）
-     * @return OpenAI 兼容嵌入响应；失败时 success=false + errorMsg，code=500
+     * @return OpenAI 兼容嵌入响应；网关业务失败走 500 + errorMsg，未预期异常经 {@code AiErrorAdvice}
+     *         渲染为 {@code ECOS-AI-*} 分类响应
      */
     @PostMapping("/embedding")
     public ApiResponse<EmbeddingResponse> embedding(@Valid @RequestBody EmbeddingRequest req) {
-        try {
-            if ((req.getInput() == null || req.getInput().isBlank())
-                    && (req.getTexts() == null || req.getTexts().length == 0)) {
-                return ApiResponse.badRequest("input 或 texts 不能同时为空");
-            }
-            log.debug("llm/embedding req: model={}, singleInput={}, texts={}",
-                    req.getModel(),
-                    req.getInput() != null,
-                    req.getTexts() != null ? req.getTexts().length : 0);
-            EmbeddingResponse resp = llmGateway.embed(req);
-            if (resp == null) {
-                return ApiResponse.internalError("embed 调用返回空");
-            }
-            if (!resp.isSuccess()) {
-                log.warn("llm/embedding failed: {}", resp.getErrorMsg());
-                ApiResponse<EmbeddingResponse> fail = ApiResponse.error(500, "LLM_EMBED_FAIL", resp.getErrorMsg());
-                fail.setData(resp);
-                return fail;
-            }
-            return ApiResponse.success(resp);
-        } catch (Exception e) {
-            log.error("llm/embedding 异常: {}", e.getMessage(), e);
-            return ApiResponse.internalError("嵌入调用异常");
+        if ((req.getInput() == null || req.getInput().isBlank())
+                && (req.getTexts() == null || req.getTexts().length == 0)) {
+            return ApiResponse.badRequest("input 或 texts 不能同时为空");
         }
+        log.debug("llm/embedding req: model={}, singleInput={}, texts={}",
+                req.getModel(),
+                req.getInput() != null,
+                req.getTexts() != null ? req.getTexts().length : 0);
+        EmbeddingResponse resp = llmGateway.embed(req);
+        if (resp == null) {
+            return AiResponseSupport.dependencyUnavailable("嵌入网关");
+        }
+        if (!resp.isSuccess()) {
+            log.warn("llm/embedding failed: {}", resp.getErrorMsg());
+            ApiResponse<EmbeddingResponse> fail = ApiResponse.error(500, "LLM_EMBED_FAIL", resp.getErrorMsg());
+            fail.setData(resp);
+            return fail;
+        }
+        return ApiResponse.success(resp);
     }
 
     /**
@@ -102,28 +98,24 @@ public class LlmController {
      * <p>用于 RAG answer 生成等下游场景；agent 编排类需求建议走 agent-service。
      *
      * @param req 强类型请求（messages + model 可选）
-     * @return 对话响应；失败时 success=false + errorMsg，code=500
+     * @return 对话响应；网关业务失败走 500 + errorMsg，未预期异常经 {@code AiErrorAdvice}
+     *         渲染为 {@code ECOS-AI-*} 分类响应
      */
     @PostMapping("/chat")
     public ApiResponse<ChatResponse> chat(@Valid @RequestBody ChatRequest req) {
-        try {
-            if (req.getMessages() == null || req.getMessages().isEmpty()) {
-                return ApiResponse.badRequest("messages 不能为空");
-            }
-            ChatResponse resp = llmGateway.call(req);
-            if (resp == null) {
-                return ApiResponse.internalError("chat 调用返回空");
-            }
-            if (!resp.isSuccess()) {
-                log.warn("llm/chat failed: {}", resp.getErrorMsg());
-                ApiResponse<ChatResponse> fail = ApiResponse.error(500, "LLM_CHAT_FAIL", resp.getErrorMsg());
-                fail.setData(resp);
-                return fail;
-            }
-            return ApiResponse.success(resp);
-        } catch (Exception e) {
-            log.error("llm/chat 异常: {}", e.getMessage(), e);
-            return ApiResponse.internalError("对话调用异常");
+        if (req.getMessages() == null || req.getMessages().isEmpty()) {
+            return ApiResponse.badRequest("messages 不能为空");
         }
+        ChatResponse resp = llmGateway.call(req);
+        if (resp == null) {
+            return AiResponseSupport.dependencyUnavailable("对话网关");
+        }
+        if (!resp.isSuccess()) {
+            log.warn("llm/chat failed: {}", resp.getErrorMsg());
+            ApiResponse<ChatResponse> fail = ApiResponse.error(500, "LLM_CHAT_FAIL", resp.getErrorMsg());
+            fail.setData(resp);
+            return fail;
+        }
+        return ApiResponse.success(resp);
     }
 }

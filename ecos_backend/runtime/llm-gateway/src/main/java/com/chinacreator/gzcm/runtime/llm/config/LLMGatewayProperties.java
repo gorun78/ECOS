@@ -71,7 +71,10 @@ public class LLMGatewayProperties {
      * 网关配置
      */
     public static class Gateway {
-        /** 重试最大次数 */
+        /**
+         * 重试次数<b>上限</b>（F06-14 要点 2）：与错误类冻结上限取小，只能收紧、不能放大矩阵。
+         * 真正的逐类退避规则在 {@code LLMGatewayImpl.callWithPolicy} 单源结算。
+         */
         private int retryMaxAttempts = 3;
         /** 请求超时 */
         private Duration requestTimeout = Duration.ofSeconds(60);
@@ -82,6 +85,12 @@ public class LLMGatewayProperties {
          * 环境注入：{@code LLM_GATEWAY_DEFAULT_API_KEY_REF}。
          */
         private String defaultApiKeyRef;
+        /**
+         * 限流降级备用 provider 的目标模型（F06-14 要点 2，仅 {@code LLM_RATE_LIMITED} 用尽退避后使用，
+         * 且只在网关内部路由 —— 引擎侧不得感知或绕行，X-22）。
+         * 默认空 = <b>不降级</b>；代码内禁兜底任何备用模型常量。
+         */
+        private String fallbackModel = "";
 
         public int getRetryMaxAttempts() { return retryMaxAttempts; }
         public void setRetryMaxAttempts(int retryMaxAttempts) { this.retryMaxAttempts = retryMaxAttempts; }
@@ -89,6 +98,8 @@ public class LLMGatewayProperties {
         public void setRequestTimeout(Duration requestTimeout) { this.requestTimeout = requestTimeout; }
         public String getDefaultApiKeyRef() { return defaultApiKeyRef; }
         public void setDefaultApiKeyRef(String defaultApiKeyRef) { this.defaultApiKeyRef = defaultApiKeyRef; }
+        public String getFallbackModel() { return fallbackModel; }
+        public void setFallbackModel(String fallbackModel) { this.fallbackModel = fallbackModel; }
     }
 
     /**

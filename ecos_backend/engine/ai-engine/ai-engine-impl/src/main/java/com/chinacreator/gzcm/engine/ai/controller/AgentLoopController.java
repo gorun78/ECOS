@@ -1,16 +1,22 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.AiError;
+import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopConfig;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopResult;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopService;
 import com.chinacreator.gzcm.engine.ai.service.AgentSessionService;
 import com.chinacreator.gzcm.engine.ai.service.AgentCircuitBreaker;
+import com.chinacreator.gzcm.engine.ai.service.ErrorCodeMapper;
+import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.runtime.llm.session.AgentSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -71,48 +77,39 @@ public class AgentLoopController {
      * @param thread 会话线程标识，默认 "main"，支持同一会话下多线程对话
      */
     @PostMapping("/chat")
-    public ApiResponse<Map<String, Object>> chat(@RequestBody Map<String, Object> body,
+    public ResponseEntity<ApiResponse<Map<String, Object>>> chat(@RequestBody Map<String, Object> body,
                                                   @RequestParam(name = "thread", defaultValue = "main") String thread) {
-        try {
-            String message = (String) body.get("message");
-            if (message == null || message.isBlank()) {
-                return ApiResponse.badRequest("message 不能为空");
-            }
-
-            // T0c-3: 熔断器检查
-            String agentId = (String) body.getOrDefault("agentId", "default");
-            if (!circuitBreaker.isAllowed(agentId)) {
-                return ApiResponse.internalError("Agent 服务暂时不可用（熔断保护），请稍后重试");
-            }
-
-            // 构建 AgentLoopConfig
-            AgentLoopConfig config = buildConfig(body);
-
-            // 构建运行时 AgentSession（用于 systemPrompt 兜底）
-            AgentSession session = buildRuntimeSession(body);
-
-            // 执行推理循环
-            AgentLoopResult result = agentLoopService.run(config, message, session);
-
-            // T0c-3: 记录结果
-            if (result.isSuccess()) {
-                circuitBreaker.recordSuccess(agentId);
-            } else {
-                circuitBreaker.recordFailure(agentId);
-            }
-
-            // 转换为响应 Map
-            Map<String, Object> data = resultToMap(result);
-
-            if (result.isSuccess()) {
-                return ApiResponse.success(data);
-            } else {
-                return ApiResponse.success("Agent 推理未成功完成", data);
-            }
-        } catch (Exception e) {
-            log.error("[AgentLoop] 非流式对话失败", e);
-            return ApiResponse.internalError("Agent 推理失败");
+        // F06-15：控制器不 catch(Exception) —— 未预期异常交由 AiErrorAdvice 分类渲染（errorCode + traceId）
+        String message = (String) body.get("message");
+        if (message == null || message.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.badRequest("message 不能为空"));
         }
+
+        // T0c-3: 熔断器检查（可重试的服务不可用态，D.5 就近取 LLM_TIMEOUT 504）
+        String agentId = (String) body.getOrDefault("agentId", "default");
+        if (!circuitBreaker.isAllowed(agentId)) {
+            return ResponseEntity.status(HttpStatus.valueOf(AiErrorClass.LLM_TIMEOUT.httpStatus()))
+                    .body(AiResponseSupport.serviceUnavailable(AiErrorClass.LLM_TIMEOUT,
+                            "Agent 服务暂时不可用（熔断保护），请稍后重试"));
+        }
+
+        // 构建 AgentLoopConfig
+        AgentLoopConfig config = buildConfig(body);
+
+        // 构建运行时 AgentSession（用于 systemPrompt 兜底）
+        AgentSession session = buildRuntimeSession(body);
+
+        // 执行推理循环
+        AgentLoopResult result = agentLoopService.run(config, message, session);
+
+        // T0c-3: 记录结果
+        if (result.isSuccess()) {
+            circuitBreaker.recordSuccess(agentId);
+        } else {
+            circuitBreaker.recordFailure(agentId);
+        }
+
+        return AiResponseSupport.fromLoopResult(result, resultToMap(result));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -207,8 +204,15 @@ public class AgentLoopController {
                 doneEvent.put("turns", result.getTurns());
                 doneEvent.put("totalTokens", result.getTotalTokens());
                 doneEvent.put("success", result.isSuccess());
-                if (result.getErrorMsg() != null) {
-                    doneEvent.put("errorMsg", result.getErrorMsg());
+                if (!result.isSuccess()) {
+                    // F06-14/15：失败帧只出分类码 + 渲染消息 + 诊断码，异常原文不外泄（X-49）
+                    AiErrorClass errorClass = AiResponseSupport.resolveClass(result);
+                    doneEvent.put("errorCode", result.getErrorCode() == null
+                            ? errorClass.errorCode() : result.getErrorCode());
+                    doneEvent.put("errorClass", errorClass.name());
+                    doneEvent.put("retryable", errorClass.retryable());
+                    doneEvent.put("message", result.getErrorMsg() == null
+                            ? errorClass.renderMessage(result.getTraceId()) : result.getErrorMsg());
                 }
                 // F06-09 ⑥：压缩状态只在上游已判定时下发，未判定 ⇒ 键缺席（前端渲染"未上报"，禁伪造）
                 if (result.isCompressionAssessed()) {
@@ -219,13 +223,19 @@ public class AgentLoopController {
                 sendEvent(emitter, "done", doneEvent);
 
                 emitter.complete();
-            } catch (Exception e) {
-                log.error("[AgentLoop] SSE 流式对话失败", e);
-                try {
-                    sendEvent(emitter, "error", Map.of("message", "Agent 推理失败"));
-                } catch (Exception ignored) {
-                    // emitter may already be closed
-                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("[AgentLoop] SSE 流式对话被中断", e);
+                sendErrorQuietly(emitter, Map.of("message", "推理被中断，请稍后重试"));
+                emitter.completeWithError(e);
+            } catch (RuntimeException | IOException e) {
+                // F06-15：控制器不写 catch(Exception)；此处只兜 SSE 通道（异步线程内异常无人接管），
+                // 且外泄面只有 D.5 分类码 + 诊断码
+                AiError error = ErrorCodeMapper.classify(e, ErrorCodeMapper.Context.generic(),
+                        AiTraceSupport.currentTraceId());
+                log.error("[AgentLoop] SSE 流式对话失败: class={} code={} traceId={}",
+                        error.errorClass().name(), error.errorCode(), error.traceId(), e);
+                sendErrorQuietly(emitter, error.toSseErrorFrame());
                 emitter.completeWithError(e);
             }
         });
@@ -255,28 +265,23 @@ public class AgentLoopController {
      */
     @PostMapping("/sessions")
     public ApiResponse<Map<String, Object>> createSession(@RequestBody Map<String, Object> body) {
-        try {
-            String agentId = (String) body.getOrDefault("agentId", "default");
-            String userId = (String) body.getOrDefault("userId", "anonymous");
-            String tenantId = (String) body.getOrDefault("tenantId", "default");
+        String agentId = (String) body.getOrDefault("agentId", "default");
+        String userId = (String) body.getOrDefault("userId", "anonymous");
+        String tenantId = (String) body.getOrDefault("tenantId", "default");
 
-            AgentSessionService.AgentSession session = sessionService.createSession(agentId, userId, tenantId);
+        AgentSessionService.AgentSession session = sessionService.createSession(agentId, userId, tenantId);
 
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("id", session.getId());
-            data.put("agentId", session.getAgentId());
-            data.put("userId", session.getUserId());
-            data.put("tenantId", session.getTenantId());
-            data.put("status", session.getStatus());
-            data.put("messageCount", session.getMessageCount());
-            data.put("createdAt", session.getCreatedAt());
-            data.put("lastActiveAt", session.getLastActiveAt());
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("id", session.getId());
+        data.put("agentId", session.getAgentId());
+        data.put("userId", session.getUserId());
+        data.put("tenantId", session.getTenantId());
+        data.put("status", session.getStatus());
+        data.put("messageCount", session.getMessageCount());
+        data.put("createdAt", session.getCreatedAt());
+        data.put("lastActiveAt", session.getLastActiveAt());
 
-            return ApiResponse.success(data);
-        } catch (Exception e) {
-            log.error("[AgentLoop] 创建会话失败", e);
-            return ApiResponse.internalError("创建会话失败");
-        }
+        return ApiResponse.success(data);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -291,54 +296,49 @@ public class AgentLoopController {
     @GetMapping("/sessions/{id}")
     public ApiResponse<Map<String, Object>> getSession(@PathVariable String id,
                                                         @RequestParam(name = "thread", defaultValue = "main") String thread) {
-        try {
-            AgentSessionService.AgentSession session = sessionService.getSession(id);
+        AgentSessionService.AgentSession session = sessionService.getSession(id);
 
-            if (session == null) {
-                return ApiResponse.notFound("会话 " + id + " 不存在");
-            }
-
-            // 按线程加载消息
-            List<AgentSessionService.AgentMessage> messages;
-            if ("*".equals(thread)) {
-                // 不按线程过滤 — 仍用默认 getMessages (回退到 main)
-                messages = sessionService.getMessages(id);
-            } else {
-                messages = sessionService.getMessages(id, thread);
-            }
-            session.setMessages(messages);
-
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("id", session.getId());
-            data.put("agentId", session.getAgentId());
-            data.put("userId", session.getUserId());
-            data.put("tenantId", session.getTenantId());
-            data.put("status", session.getStatus());
-            data.put("messageCount", session.getMessageCount());
-            data.put("createdAt", session.getCreatedAt());
-            data.put("lastActiveAt", session.getLastActiveAt());
-
-            // 消息列表
-            if (session.getMessages() != null) {
-                data.put("messages", session.getMessages().stream().map(m -> {
-                    Map<String, Object> msgMap = new LinkedHashMap<>();
-                    msgMap.put("id", m.getId());
-                    msgMap.put("role", m.getRole());
-                    msgMap.put("content", m.getContent());
-                    msgMap.put("toolCalls", m.getToolCalls());
-                    msgMap.put("toolResults", m.getToolResults());
-                    msgMap.put("tokens", m.getTokens());
-                    msgMap.put("threadId", m.getThreadId());
-                    msgMap.put("createdAt", m.getCreatedAt());
-                    return msgMap;
-                }).toList());
-            }
-
-            return ApiResponse.success(data);
-        } catch (Exception e) {
-            log.error("[AgentLoop] 查询会话失败 id={}", id, e);
-            return ApiResponse.internalError("查询会话失败");
+        if (session == null) {
+            return ApiResponse.notFound("会话 " + id + " 不存在");
         }
+
+        // 按线程加载消息
+        List<AgentSessionService.AgentMessage> messages;
+        if ("*".equals(thread)) {
+            // 不按线程过滤 — 仍用默认 getMessages (回退到 main)
+            messages = sessionService.getMessages(id);
+        } else {
+            messages = sessionService.getMessages(id, thread);
+        }
+        session.setMessages(messages);
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("id", session.getId());
+        data.put("agentId", session.getAgentId());
+        data.put("userId", session.getUserId());
+        data.put("tenantId", session.getTenantId());
+        data.put("status", session.getStatus());
+        data.put("messageCount", session.getMessageCount());
+        data.put("createdAt", session.getCreatedAt());
+        data.put("lastActiveAt", session.getLastActiveAt());
+
+        // 消息列表
+        if (session.getMessages() != null) {
+            data.put("messages", session.getMessages().stream().map(m -> {
+                Map<String, Object> msgMap = new LinkedHashMap<>();
+                msgMap.put("id", m.getId());
+                msgMap.put("role", m.getRole());
+                msgMap.put("content", m.getContent());
+                msgMap.put("toolCalls", m.getToolCalls());
+                msgMap.put("toolResults", m.getToolResults());
+                msgMap.put("tokens", m.getTokens());
+                msgMap.put("threadId", m.getThreadId());
+                msgMap.put("createdAt", m.getCreatedAt());
+                return msgMap;
+            }).toList());
+        }
+
+        return ApiResponse.success(data);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -362,66 +362,58 @@ public class AgentLoopController {
      * @param thread 会话线程标识，默认 "main"
      */
     @PostMapping("/sessions/{id}/chat")
-    public ApiResponse<Map<String, Object>> chatInSession(@PathVariable String id,
+    public ResponseEntity<ApiResponse<Map<String, Object>>> chatInSession(@PathVariable String id,
                                                            @RequestBody Map<String, Object> body,
                                                            @RequestParam(name = "thread", defaultValue = "main") String thread) {
-        try {
-            // 校验会话存在
-            AgentSessionService.AgentSession persistedSession = sessionService.getSession(id);
-            if (persistedSession == null) {
-                return ApiResponse.notFound("会话 " + id + " 不存在");
-            }
-
-            String message = (String) body.get("message");
-            if (message == null || message.isBlank()) {
-                return ApiResponse.badRequest("message 不能为空");
-            }
-
-            // T0c-3: 熔断器检查
-            String agentId = (String) body.getOrDefault("agentId", "default");
-            if (!circuitBreaker.isAllowed(agentId)) {
-                return ApiResponse.internalError("Agent 服务暂时不可用（熔断保护），请稍后重试");
-            }
-
-            // 构建配置（systemPrompt 优先使用请求参数，fallback 到持久化 session 的 agentId）
-            AgentLoopConfig config = buildConfig(body);
-
-            // 构建运行时 AgentSession，绑定 sessionId
-            AgentSession runtimeSession = buildRuntimeSession(body);
-            runtimeSession.setSessionId(id);
-
-            // 执行推理循环
-            AgentLoopResult result = agentLoopService.run(config, message, runtimeSession);
-
-            // T0c-3: 记录结果
-            if (result.isSuccess()) {
-                circuitBreaker.recordSuccess(agentId);
-            } else {
-                circuitBreaker.recordFailure(agentId);
-            }
-
-            // 持久化消息（非流式场景简化：仅记录用户消息 + 最终回复），使用指定线程
-            sessionService.appendMessage(id, "user", message, null, null, thread);
-            if (result.isSuccess() && result.getContent() != null) {
-                List<Map<String, Object>> tcJsons = null;
-                if (result.getToolCalls() != null && !result.getToolCalls().isEmpty()) {
-                    tcJsons = result.getToolCalls();
-                }
-                sessionService.appendMessage(id, "assistant", result.getContent(), tcJsons, null, thread);
-            }
-
-            Map<String, Object> data = resultToMap(result);
-            data.put("sessionId", id);
-
-            if (result.isSuccess()) {
-                return ApiResponse.success(data);
-            } else {
-                return ApiResponse.success("Agent 推理未成功完成", data);
-            }
-        } catch (Exception e) {
-            log.error("[AgentLoop] 会话内对话失败 sessionId={}", id, e);
-            return ApiResponse.internalError("会话内对话失败");
+        // 校验会话存在
+        AgentSessionService.AgentSession persistedSession = sessionService.getSession(id);
+        if (persistedSession == null) {
+            return ResponseEntity.ok(ApiResponse.notFound("会话 " + id + " 不存在"));
         }
+
+        String message = (String) body.get("message");
+        if (message == null || message.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.badRequest("message 不能为空"));
+        }
+
+        // T0c-3: 熔断器检查（可重试的服务不可用态，D.5 就近取 LLM_TIMEOUT 504）
+        String agentId = (String) body.getOrDefault("agentId", "default");
+        if (!circuitBreaker.isAllowed(agentId)) {
+            return ResponseEntity.status(HttpStatus.valueOf(AiErrorClass.LLM_TIMEOUT.httpStatus()))
+                    .body(AiResponseSupport.serviceUnavailable(AiErrorClass.LLM_TIMEOUT,
+                            "Agent 服务暂时不可用（熔断保护），请稍后重试"));
+        }
+
+        // 构建配置（systemPrompt 优先使用请求参数，fallback 到持久化 session 的 agentId）
+        AgentLoopConfig config = buildConfig(body);
+
+        // 构建运行时 AgentSession，绑定 sessionId
+        AgentSession runtimeSession = buildRuntimeSession(body);
+        runtimeSession.setSessionId(id);
+
+        // 执行推理循环
+        AgentLoopResult result = agentLoopService.run(config, message, runtimeSession);
+
+        // T0c-3: 记录结果
+        if (result.isSuccess()) {
+            circuitBreaker.recordSuccess(agentId);
+        } else {
+            circuitBreaker.recordFailure(agentId);
+        }
+
+        // 持久化消息（非流式场景简化：仅记录用户消息 + 最终回复），使用指定线程
+        sessionService.appendMessage(id, "user", message, null, null, thread);
+        if (result.isSuccess() && result.getContent() != null) {
+            List<Map<String, Object>> tcJsons = null;
+            if (result.getToolCalls() != null && !result.getToolCalls().isEmpty()) {
+                tcJsons = result.getToolCalls();
+            }
+            sessionService.appendMessage(id, "assistant", result.getContent(), tcJsons, null, thread);
+        }
+
+        Map<String, Object> data = resultToMap(result);
+        data.put("sessionId", id);
+        return AiResponseSupport.fromLoopResult(result, data);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -469,12 +461,31 @@ public class AgentLoopController {
         data.put("totalTokens", result.getTotalTokens());
         data.put("success", result.isSuccess());
         if (result.getErrorMsg() != null) {
+            // F06-14：该文本恒为 D.5 模板渲染结果（含诊断码），异常原文已在 Service 层止步于日志
             data.put("errorMsg", result.getErrorMsg());
+        }
+        if (result.getErrorCode() != null) {
+            data.put("errorCode", result.getErrorCode());
+        }
+        if (result.getErrorClass() != null) {
+            data.put("errorClass", result.getErrorClass());
+        }
+        if (!result.isSuccess()) {
+            data.put("retryable", AiResponseSupport.resolveClass(result).retryable());
         }
         if (result.getToolCalls() != null && !result.getToolCalls().isEmpty()) {
             data.put("toolCalls", result.getToolCalls());
         }
         return data;
+    }
+
+    /** 错误帧尽力下发：连接可能已关闭，下发失败只记 debug（不再向外抛，避免 SSE 线程二次异常）。 */
+    private void sendErrorQuietly(SseEmitter emitter, Map<String, Object> frame) {
+        try {
+            sendEvent(emitter, "error", frame);
+        } catch (IOException | RuntimeException ignored) {
+            log.debug("[AgentLoop] SSE 错误帧下发失败（连接已关闭）");
+        }
     }
 
     /**

@@ -60,17 +60,12 @@ public class SkillController {
             return unavailable(new AgentRuntimeCapabilityUnavailableException(
                     AgentRuntimeCapability.MCP, "MCP channel not connected"));
         }
-        try {
-            Map<String, Object> args = new HashMap<>();
-            if (category != null) {
-                args.put("category", category);
-            }
-            String result = mcp.callTool("skills_list", args);
-            return ApiResponse.success(result);
-        } catch (Exception e) {
-            log.error("skills_list failed", e);
-            return ApiResponse.internalError("Skills list failed");
+        Map<String, Object> args = new HashMap<>();
+        if (category != null) {
+            args.put("category", category);
         }
+        String result = mcp.callTool("skills_list", args);
+        return ApiResponse.success(result);
     }
 
     /** Health check */

@@ -19,9 +19,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.chinacreator.gzcm.common.error.AiError;
+import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
 import com.chinacreator.gzcm.engine.ai.agent.vo.PipelineNodeTraceVO;
+import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.runtime.llm.session.AgentSession;
 
 /**
@@ -82,7 +85,9 @@ public class AgentStudioService {
         long startTime = System.currentTimeMillis();
 
         if (agentLoopService == null) {
-            return AgentTestResult.error(null, "AgentLoopService 未就绪", 0, System.currentTimeMillis() - startTime);
+            return AgentTestResult.error(null, "AgentLoopService 未就绪", 0,
+                            System.currentTimeMillis() - startTime)
+                    .withError(dependency("AgentLoopService"));
         }
 
         try {
@@ -122,12 +127,16 @@ public class AgentStudioService {
                         loopResult.getErrorMsg() != null ? loopResult.getErrorMsg() : "Agent 推理未成功完成",
                         loopResult.getTotalTokens(),
                         duration
-                );
+                ).withError(fromLoopResult(loopResult, "agent-studio"));
             }
         } catch (Exception e) {
-            log.error("[AgentStudio] createAndTest failed", e);
-            return AgentTestResult.error(null, "Agent测试异常: " + e.getMessage(), 0,
-                    System.currentTimeMillis() - startTime);
+            // F06-15：Service 层 catch 必按 F06-14 分类；原文只入日志（X-49），禁拼进对外消息
+            AiError error = classify(e, ErrorCodeMapper.Context.llm("agent-studio"));
+            log.error("[AgentStudio] createAndTest failed: class={} code={} traceId={} raw={}",
+                    error.errorClass().name(), error.errorCode(), error.traceId(), error.rawReason(), e);
+            return AgentTestResult.error(null, error.userMessage(), 0,
+                            System.currentTimeMillis() - startTime)
+                    .withError(error);
         }
     }
 
@@ -143,20 +152,24 @@ public class AgentStudioService {
      */
     public AgentCompareResult compare(String agentIdA, String agentIdB, List<String> testMessages) {
         if (agentRepo == null) {
-            return AgentCompareResult.error("AgentRegistryRepository 未就绪");
+            return AgentCompareResult.error("AgentRegistryRepository 未就绪")
+                    .withError(dependency("AgentRegistryRepository"));
         }
         if (agentLoopService == null) {
-            return AgentCompareResult.error("AgentLoopService 未就绪");
+            return AgentCompareResult.error("AgentLoopService 未就绪")
+                    .withError(dependency("AgentLoopService"));
         }
 
         AgentRegistryEntity agentA = agentRepo.findById(agentIdA);
         AgentRegistryEntity agentB = agentRepo.findById(agentIdB);
 
         if (agentA == null) {
-            return AgentCompareResult.error("Agent A (" + agentIdA + ") 不存在");
+            return AgentCompareResult.error("Agent A (" + agentIdA + ") 不存在")
+                    .withError(AiError.of(AiErrorClass.NOT_FOUND, AiTraceSupport.currentTraceId()));
         }
         if (agentB == null) {
-            return AgentCompareResult.error("Agent B (" + agentIdB + ") 不存在");
+            return AgentCompareResult.error("Agent B (" + agentIdB + ") 不存在")
+                    .withError(AiError.of(AiErrorClass.NOT_FOUND, AiTraceSupport.currentTraceId()));
         }
 
         // 选择第一条测试消息执行
@@ -167,6 +180,12 @@ public class AgentStudioService {
         AgentTestResult resultA = runAgentTest(agentA, message);
         // 测试 Agent B
         AgentTestResult resultB = runAgentTest(agentB, message);
+
+        // 双方都失败 ⇒ 整体失败：禁 success=true 的伪对比（F06-15 禁 log.warn 后返回语义成功值）
+        if (!resultA.isSuccess() && !resultB.isSuccess()) {
+            AiError error = errorOf(resultA, resultB);
+            return AgentCompareResult.error(error.userMessage()).withError(error);
+        }
 
         // 对比分析
         String comparison = buildComparison(resultA, resultB);
@@ -214,12 +233,17 @@ public class AgentStudioService {
                         loopResult.getErrorMsg() != null ? loopResult.getErrorMsg() : "推理失败",
                         loopResult.getTotalTokens(),
                         duration
-                );
+                ).withError(fromLoopResult(loopResult, "agent-studio-compare"));
             }
         } catch (Exception e) {
-            log.error("[AgentStudio] runAgentTest failed for agent={}", agent.getId(), e);
-            return AgentTestResult.error(agent.getId(), "测试异常: " + e.getMessage(), 0,
-                    System.currentTimeMillis() - startTime);
+            // F06-15：捕后必分类，原文只入日志（X-49）
+            AiError error = classify(e, ErrorCodeMapper.Context.llm("agent-studio-compare"));
+            log.error("[AgentStudio] runAgentTest failed for agent={}: class={} code={} traceId={} raw={}",
+                    agent.getId(), error.errorClass().name(), error.errorCode(), error.traceId(),
+                    error.rawReason(), e);
+            return AgentTestResult.error(agent.getId(), error.userMessage(), 0,
+                            System.currentTimeMillis() - startTime)
+                    .withError(error);
         }
     }
 
@@ -417,7 +441,8 @@ public class AgentStudioService {
      */
     public OrchestrationResult orchestrate(String userMessage, String sessionId) {
         if (agentLoopService == null) {
-            return OrchestrationResult.error(sessionId, "AgentLoopService 未就绪");
+            return OrchestrationResult.error(sessionId, "AgentLoopService 未就绪")
+                    .withError(dependency("AgentLoopService"));
         }
 
         long startTime = System.currentTimeMillis();
@@ -454,20 +479,63 @@ public class AgentStudioService {
 
             long duration = System.currentTimeMillis() - startTime;
 
+            // Loop 失败 ⇒ 整体失败：禁把 errorMsg 塞进 finalResponse 后报 success=true（F06-15 伪成功）
+            if (!result.isSuccess()) {
+                AiError error = fromLoopResult(result, "agent-studio-orchestrate");
+                return OrchestrationResult.error(effectiveSessionId, error.userMessage())
+                        .withError(error);
+            }
+
             return OrchestrationResult.of(
                     effectiveSessionId,
                     agentCalls,
-                    result.isSuccess() ? result.getContent() : (result.getErrorMsg() != null ? result.getErrorMsg() : "编排未成功完成"),
+                    result.getContent(),
                     result.getTotalTokens(),
                     duration
             );
         } catch (Exception e) {
-            log.error("[AgentStudio] orchestrate failed", e);
-            return OrchestrationResult.error(effectiveSessionId, "编排异常: " + e.getMessage());
+            // F06-15：捕后必分类，原文只入日志（X-49）
+            AiError error = classify(e, ErrorCodeMapper.Context.llm("agent-studio-orchestrate"));
+            log.error("[AgentStudio] orchestrate failed: class={} code={} traceId={} raw={}",
+                    error.errorClass().name(), error.errorCode(), error.traceId(), error.rawReason(), e);
+            return OrchestrationResult.error(effectiveSessionId, error.userMessage()).withError(error);
         }
     }
 
     // ═══════════════ 辅助方法 ═══════════════════
+
+    /** 异常 → D.5 分类（F06-14 单源；traceId 与 MDC 同源）。 */
+    private static AiError classify(Throwable e, ErrorCodeMapper.Context ctx) {
+        return ErrorCodeMapper.classify(e, ctx, AiTraceSupport.currentTraceId());
+    }
+
+    /** 依赖未装配：D.5 无专用类，就近 {@code TOOL_BACKEND_ERROR}（502，可重试），禁 200 伪成功。 */
+    private static AiError dependency(String service) {
+        return AiError.toolBackend(AiTraceSupport.currentTraceId(), service, service + " 未装配");
+    }
+
+    /** Loop 失败态 → 分类（沿用 Loop 已上报的分类，禁二次猜测）。 */
+    private static AiError fromLoopResult(AgentLoopResult loopResult, String service) {
+        AiErrorClass errorClass = ErrorCodeMapper.aiErrorClassOf(loopResult.getErrorClass());
+        if (errorClass != null) {
+            return new AiError(errorClass, loopResult.getTraceId(), 0, loopResult.getErrorMsg(), service);
+        }
+        return new AiError(AiErrorClass.TOOL_BACKEND_ERROR, loopResult.getTraceId(), 0,
+                "Loop 未上报错误分类: " + loopResult.getErrorMsg(), service);
+    }
+
+    /** 取第一个已分类的失败态（两 Agent 都失败时的整体分类）。 */
+    private static AiError errorOf(AgentTestResult a, AgentTestResult b) {
+        AiErrorClass cls = ErrorCodeMapper.aiErrorClassOf(a.getErrorClass());
+        if (cls != null) {
+            return new AiError(cls, a.getErrorTraceId(), 0, a.getErrorMsg(), "agent-studio-compare");
+        }
+        cls = ErrorCodeMapper.aiErrorClassOf(b.getErrorClass());
+        if (cls != null) {
+            return new AiError(cls, b.getErrorTraceId(), 0, b.getErrorMsg(), "agent-studio-compare");
+        }
+        return dependency("agent-studio-compare");
+    }
 
     private Double getDouble(Map<String, Object> map, String key, Double defaultValue) {
         Object val = map.get(key);
@@ -494,6 +562,10 @@ public class AgentStudioService {
         private int tokens;
         private long durationMs;
         private String errorMsg;
+        /** D.5 分类（F06-14）：失败态必填，控制器据此渲染状态，禁 200 伪成功 */
+        private String errorClass;
+        private String errorCode;
+        private String errorTraceId;
         private List<Map<String, Object>> toolCalls = new ArrayList<>();
 
         public static AgentTestResult success(String agentId, String response, int turns, int tokens,
@@ -516,6 +588,10 @@ public class AgentStudioService {
             r.errorMsg = errorMsg;
             r.tokens = tokens;
             r.durationMs = durationMs;
+            // 失败态必带分类：未显式归类时兜底 TOOL_BACKEND_ERROR，禁控制器回落 200
+            r.errorClass = AiErrorClass.TOOL_BACKEND_ERROR.name();
+            r.errorCode = AiErrorClass.TOOL_BACKEND_ERROR.errorCode();
+            r.errorTraceId = AiTraceSupport.currentTraceId();
             return r;
         }
 
@@ -533,6 +609,18 @@ public class AgentStudioService {
         public void setDurationMs(long durationMs) { this.durationMs = durationMs; }
         public String getErrorMsg() { return errorMsg; }
         public void setErrorMsg(String errorMsg) { this.errorMsg = errorMsg; }
+        public String getErrorClass() { return errorClass; }
+        public String getErrorCode() { return errorCode; }
+        public String getErrorTraceId() { return errorTraceId; }
+
+        /** 附 D.5 分类（链式返回本类型，供控制器按分类渲染状态）。 */
+        public AgentTestResult withError(AiError error) {
+            this.errorClass = error.errorClass().name();
+            this.errorCode = error.errorCode();
+            this.errorTraceId = error.traceId();
+            return this;
+        }
+
         public List<Map<String, Object>> getToolCalls() { return toolCalls; }
         public void setToolCalls(List<Map<String, Object>> toolCalls) { this.toolCalls = toolCalls; }
 
@@ -545,6 +633,11 @@ public class AgentStudioService {
             m.put("tokens", tokens);
             m.put("durationMs", durationMs);
             if (errorMsg != null) m.put("errorMsg", errorMsg);
+            if (errorClass != null) {
+                m.put("errorCode", errorCode);
+                m.put("errorClass", errorClass);
+                m.put("traceId", errorTraceId == null ? "-" : errorTraceId);
+            }
             if (toolCalls != null && !toolCalls.isEmpty()) m.put("toolCalls", toolCalls);
             return m;
         }
@@ -558,6 +651,9 @@ public class AgentStudioService {
         private String winner;
         private boolean success;
         private String errorMsg;
+        private String errorClass;
+        private String errorCode;
+        private String errorTraceId;
 
         public static AgentCompareResult of(AgentTestResult a, AgentTestResult b,
                                              String comparison, String winner) {
@@ -574,6 +670,9 @@ public class AgentStudioService {
             AgentCompareResult r = new AgentCompareResult();
             r.success = false;
             r.errorMsg = errorMsg;
+            r.errorClass = AiErrorClass.TOOL_BACKEND_ERROR.name();
+            r.errorCode = AiErrorClass.TOOL_BACKEND_ERROR.errorCode();
+            r.errorTraceId = AiTraceSupport.currentTraceId();
             return r;
         }
 
@@ -589,11 +688,26 @@ public class AgentStudioService {
         public void setWinner(String winner) { this.winner = winner; }
         public String getErrorMsg() { return errorMsg; }
         public void setErrorMsg(String errorMsg) { this.errorMsg = errorMsg; }
+        public String getErrorClass() { return errorClass; }
+        public String getErrorCode() { return errorCode; }
+        public String getErrorTraceId() { return errorTraceId; }
+
+        public AgentCompareResult withError(AiError error) {
+            this.errorClass = error.errorClass().name();
+            this.errorCode = error.errorCode();
+            this.errorTraceId = error.traceId();
+            return this;
+        }
 
         public Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("success", success);
             if (errorMsg != null) m.put("errorMsg", errorMsg);
+            if (errorClass != null) {
+                m.put("errorCode", errorCode);
+                m.put("errorClass", errorClass);
+                m.put("traceId", errorTraceId == null ? "-" : errorTraceId);
+            }
             if (agentAResult != null) m.put("agentAResult", agentAResult.toMap());
             if (agentBResult != null) m.put("agentBResult", agentBResult.toMap());
             if (comparison != null) m.put("comparison", comparison);
@@ -664,6 +778,9 @@ public class AgentStudioService {
         private int totalTokens;
         private long durationMs;
         private String errorMsg;
+        private String errorClass;
+        private String errorCode;
+        private String errorTraceId;
 
         public static OrchestrationResult of(String sessionId, List<Map<String, Object>> agentCalls,
                                               String finalResponse, int totalTokens, long durationMs) {
@@ -682,6 +799,9 @@ public class AgentStudioService {
             r.success = false;
             r.sessionId = sessionId;
             r.errorMsg = errorMsg;
+            r.errorClass = AiErrorClass.TOOL_BACKEND_ERROR.name();
+            r.errorCode = AiErrorClass.TOOL_BACKEND_ERROR.errorCode();
+            r.errorTraceId = AiTraceSupport.currentTraceId();
             return r;
         }
 
@@ -699,6 +819,16 @@ public class AgentStudioService {
         public void setDurationMs(long durationMs) { this.durationMs = durationMs; }
         public String getErrorMsg() { return errorMsg; }
         public void setErrorMsg(String errorMsg) { this.errorMsg = errorMsg; }
+        public String getErrorClass() { return errorClass; }
+        public String getErrorCode() { return errorCode; }
+        public String getErrorTraceId() { return errorTraceId; }
+
+        public OrchestrationResult withError(AiError error) {
+            this.errorClass = error.errorClass().name();
+            this.errorCode = error.errorCode();
+            this.errorTraceId = error.traceId();
+            return this;
+        }
 
         public Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -709,6 +839,11 @@ public class AgentStudioService {
             m.put("totalTokens", totalTokens);
             m.put("durationMs", durationMs);
             if (errorMsg != null) m.put("errorMsg", errorMsg);
+            if (errorClass != null) {
+                m.put("errorCode", errorCode);
+                m.put("errorClass", errorClass);
+                m.put("traceId", errorTraceId == null ? "-" : errorTraceId);
+            }
             return m;
         }
     }

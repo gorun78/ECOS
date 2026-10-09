@@ -196,7 +196,9 @@ public class ToolExecutorService {
         ToolDefinitionEntry def = viaRegistry ? null : loadToolDefinition(toolName);
         if (!viaRegistry && def == null) {
             // 工具不存在 → 不执行，也就没有"未裁决的执行"（§1.5-1 对账口径）
-            return buildError(callId, toolName, "工具未找到: " + toolName, startNs);
+            // D.5：未注册工具属客户端可修正态（400 INVALID_ARGUMENT），禁记 502 后端故障
+            return buildClassifiedError(callId, toolName, AiErrorClass.INVALID_ARGUMENT,
+                    "工具未找到: " + toolName, (System.nanoTime() - startNs) / 1_000_000);
         }
 
         // ── 阶段 1: policyEvaluate —— 无条件、一次且仅一次（F06-01 要点 1） ──
@@ -226,7 +228,8 @@ public class ToolExecutorService {
             return obligationsApply(toolName, raw, decision, adjudication.subject(), startNs);
         } catch (TimeoutException e) {
             long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
-            return buildError(callId, toolName, "工具执行超时 (" + TIMEOUT_SECONDS + "s)", elapsedMs);
+            return buildClassifiedError(callId, toolName, AiErrorClass.TOOL_BACKEND_ERROR,
+                    "工具执行超时 (" + TIMEOUT_SECONDS + "s)", elapsedMs);
         } catch (ScenarioArgumentsException badArgs) {
             // F06-11 入参地板：缺参属客户端可修正态（INVALID_ARGUMENT），不得伪装成后端故障（502）
             long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
@@ -234,9 +237,14 @@ public class ToolExecutorService {
             return buildClassifiedError(callId, toolName, AiErrorClass.INVALID_ARGUMENT,
                     badArgs.getMessage(), elapsedMs);
         } catch (Exception e) {
+            // F06-15「捕后必分类」：异常原文只入日志，上浮面必须是结构化分类（TOOL_BACKEND_ERROR）
             long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
-            log.error("Tool execution failed: tool={}, error={}", toolName, e.getMessage(), e);
-            return buildError(callId, toolName, "工具执行失败: " + e.getMessage(), elapsedMs);
+            AiError error = ErrorCodeMapper.classify(e, ErrorCodeMapper.Context.tool(toolName),
+                    AiTraceSupport.currentTraceId());
+            log.error("Tool execution failed: tool={} class={} raw={} traceId={}",
+                    toolName, error.errorClass().name(), error.rawReason(), error.traceId(), e);
+            return buildClassifiedError(callId, toolName, error.errorClass(),
+                    error.rawReason(), elapsedMs);
         }
     }
 
@@ -1178,11 +1186,6 @@ public class ToolExecutorService {
 
     private ToolResult buildSuccess(String callId, String toolName, String content, long elapsedMs) {
         return ToolResult.ok(callId, toolName, content, elapsedMs);
-    }
-
-    private ToolResult buildError(String callId, String toolName, String errorMessage, long startNs) {
-        long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
-        return ToolResult.fail(callId, toolName, errorMessage, elapsedMs);
     }
 
     /**

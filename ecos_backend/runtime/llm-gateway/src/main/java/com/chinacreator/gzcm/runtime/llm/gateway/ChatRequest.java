@@ -78,4 +78,16 @@ public class ChatRequest {
 
     public String getSessionId() { return sessionId; }
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }
+
+    /**
+     * 以备用 model/provider 复制请求（F06-14 要点 2 的网关内部降级用）。
+     * 除 {@code model} 外全部字段原样携带（会话、主体、密钥引用不变），禁在降级时丢主体造成审计断链。
+     */
+    public ChatRequest copyWithModel(String fallbackModel) {
+        ChatRequest copy = new ChatRequest(fallbackModel, messages, temperature, maxTokens, stream);
+        copy.setApiKeyRef(apiKeyRef);
+        copy.setCallerId(callerId);
+        copy.setSessionId(sessionId);
+        return copy;
+    }
 }

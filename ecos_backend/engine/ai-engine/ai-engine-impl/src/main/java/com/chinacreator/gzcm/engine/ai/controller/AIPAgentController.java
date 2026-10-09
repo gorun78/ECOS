@@ -10,6 +10,8 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,11 +22,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.engine.ai.service.AgentStudioService;
 import com.chinacreator.gzcm.engine.ai.service.AgentStudioService.AgentTestResult;
 import com.chinacreator.gzcm.engine.ai.service.AgentTemplateService;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -61,7 +65,7 @@ public class AIPAgentController {
 
     @GetMapping("/agents")
     public ApiResponse<List<Map<String, Object>>> listAgents() {
-        if (agentRepo == null) return ApiResponse.internalError("AgentRegistryRepository 未就绪");
+        if (agentRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
         List<Map<String, Object>> result = agentRepo.findAll().stream()
             .map(this::toSummaryMap)
             .collect(Collectors.toList());
@@ -72,7 +76,7 @@ public class AIPAgentController {
 
     @GetMapping("/agents/{id}")
     public ApiResponse<Map<String, Object>> getAgent(@PathVariable String id) {
-        if (agentRepo == null) return ApiResponse.internalError("AgentRegistryRepository 未就绪");
+        if (agentRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
         AgentRegistryEntity a = agentRepo.findById(id);
         if (a == null) return ApiResponse.notFound("Agent " + id + " 不存在");
         return ApiResponse.success(toDetailMap(a));
@@ -81,8 +85,9 @@ public class AIPAgentController {
     // ═══════════════ 创建 ═══════════════════
 
     @PostMapping("/agents")
-    public ApiResponse<Map<String, Object>> createAgent(@RequestBody Map<String, Object> body) {
-        if (agentRepo == null) return ApiResponse.internalError("AgentRegistryRepository 未就绪");
+    public ApiResponse<Map<String, Object>> createAgent(@RequestBody Map<String, Object> body)
+            throws JsonProcessingException {
+        if (agentRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
 
         String name = String.valueOf(body.getOrDefault("name", "")).trim();
         if (name.isEmpty()) {
@@ -102,21 +107,12 @@ public class AIPAgentController {
         meta.put("modelProvider", String.valueOf(body.getOrDefault("modelProvider", "deepseek")));
         meta.put("modelName", String.valueOf(body.getOrDefault("modelName", "deepseek-v4-flash")));
         meta.put("systemPrompt", String.valueOf(body.getOrDefault("systemPrompt", "")));
-        try {
-            entity.setMetadata(mapper.writeValueAsString(meta));
-        } catch (Exception e) {
-            log.warn("[AIPAgent] metadata 序列化失败，本次创建将落空对象: id={}", id, e);
-            entity.setMetadata("{}");
-        }
+        // F06-15：序列化失败不再落「{}」掩蔽，直接上抛经 AiErrorAdvice 分类
+        entity.setMetadata(mapper.writeValueAsString(meta));
 
         // Store tools in capability JSONB
         Object tools = body.getOrDefault("tools", List.of());
-        try {
-            entity.setCapability(mapper.writeValueAsString(Map.of("tools", tools)));
-        } catch (Exception e) {
-            log.warn("[AIPAgent] capability 序列化失败，本次创建将落空对象: id={}", id, e);
-            entity.setCapability("{}");
-        }
+        entity.setCapability(mapper.writeValueAsString(Map.of("tools", tools)));
 
         agentRepo.insert(entity);
         log.info("AIP Agent created: {} [{}]", id, name);
@@ -128,8 +124,8 @@ public class AIPAgentController {
     @PutMapping("/agents/{id}")
     public ApiResponse<Map<String, Object>> updateAgent(
             @PathVariable String id,
-            @RequestBody Map<String, Object> body) {
-        if (agentRepo == null) return ApiResponse.internalError("AgentRegistryRepository 未就绪");
+            @RequestBody Map<String, Object> body) throws JsonProcessingException {
+        if (agentRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
 
         AgentRegistryEntity existing = agentRepo.findById(id);
         if (existing == null) return ApiResponse.notFound("Agent " + id + " 不存在");
@@ -137,25 +133,17 @@ public class AIPAgentController {
         if (body.containsKey("name")) existing.setName(String.valueOf(body.get("name")));
         if (body.containsKey("status")) existing.setStatus(String.valueOf(body.get("status")));
 
-        // Merge metadata
+        // Merge metadata — F06-15：序列化失败直接上抛，不再静默保留旧值
         Map<String, Object> meta = parseMetadata(existing.getMetadata());
         if (body.containsKey("description")) meta.put("description", String.valueOf(body.get("description")));
         if (body.containsKey("modelProvider")) meta.put("modelProvider", String.valueOf(body.get("modelProvider")));
         if (body.containsKey("modelName")) meta.put("modelName", String.valueOf(body.get("modelName")));
         if (body.containsKey("systemPrompt")) meta.put("systemPrompt", String.valueOf(body.get("systemPrompt")));
-        try {
-            existing.setMetadata(mapper.writeValueAsString(meta));
-        } catch (Exception e) {
-            log.warn("AIP Agent metadata 序列化失败，本次更新将保留旧 metadata: id={} reason={}", id, e.getMessage());
-        }
+        existing.setMetadata(mapper.writeValueAsString(meta));
 
         // Merge tools in capability
         if (body.containsKey("tools")) {
-            try {
-                existing.setCapability(mapper.writeValueAsString(Map.of("tools", body.get("tools"))));
-            } catch (Exception e) {
-                log.warn("AIP Agent capability 序列化失败，本次更新将保留旧 capability: id={} reason={}", id, e.getMessage());
-            }
+            existing.setCapability(mapper.writeValueAsString(Map.of("tools", body.get("tools"))));
         }
 
         agentRepo.update(existing);
@@ -167,7 +155,7 @@ public class AIPAgentController {
 
     @DeleteMapping("/agents/{id}")
     public ApiResponse<Map<String, Object>> deleteAgent(@PathVariable String id) {
-        if (agentRepo == null) return ApiResponse.internalError("AgentRegistryRepository 未就绪");
+        if (agentRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
 
         // 内置 Agent 删除保护
         AgentRegistryEntity existing = agentRepo.findById(id);
@@ -189,7 +177,7 @@ public class AIPAgentController {
 
     @GetMapping("/agent-templates")
     public ApiResponse<List<Map<String, Object>>> listTemplates() {
-        if (templateService == null) return ApiResponse.internalError("AgentTemplateService 未就绪");
+        if (templateService == null) return AiResponseSupport.dependencyUnavailable("AgentTemplateService");
         return ApiResponse.success(templateService.getTemplates());
     }
 
@@ -197,7 +185,7 @@ public class AIPAgentController {
 
     @PostMapping("/agents/instantiate")
     public ApiResponse<Map<String, Object>> instantiateAgent(@RequestBody Map<String, Object> body) {
-        if (templateService == null) return ApiResponse.internalError("AgentTemplateService 未就绪");
+        if (templateService == null) return AiResponseSupport.dependencyUnavailable("AgentTemplateService");
 
         String templateId = String.valueOf(body.getOrDefault("templateId", "")).trim();
         if (templateId.isEmpty()) {
@@ -222,7 +210,8 @@ public class AIPAgentController {
 
     /**
      * POST /api/v1/aip/agents/{id}/test
-     * <p>对指定 Agent 发送一条测试消息，委托 {@link AgentStudioService#createAndTest}。</p>
+     * <p>对指定 Agent 发送一条测试消息，委托 {@link AgentStudioService#createAndTest}。
+     * 执行失败不再返回 internalError，由 {@link AiErrorAdvice} 分类为 ECOS-AI-* 响应。</p>
      *
      * <pre>
      * {
@@ -234,19 +223,24 @@ public class AIPAgentController {
      * </pre>
      */
     @PostMapping("/agents/{id}/test")
-    public ApiResponse<Map<String, Object>> testAgent(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> testAgent(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
         if (studioService == null) {
-            return ApiResponse.internalError("AgentStudioService 未就绪");
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(AiResponseSupport.<Map<String, Object>>dependencyUnavailable("AgentStudioService"));
         }
         if (agentRepo == null) {
-            return ApiResponse.internalError("AgentRegistryRepository 未就绪");
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(AiResponseSupport.<Map<String, Object>>dependencyUnavailable("AgentRegistryRepository"));
         }
 
         AgentRegistryEntity agent = agentRepo.findById(id);
         if (agent == null) {
-            return ApiResponse.notFound("Agent " + id + " 不存在");
+            // D.5 NOT_FOUND 只用于真实"资源不存在"（禁拿 404 掩蔽服务端失败，分册 01 接缝）
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(AiResponseSupport.<Map<String, Object>>classified(
+                            AiErrorClass.NOT_FOUND, "Agent " + id + " 不存在"));
         }
 
         String testMessage = String.valueOf(body.getOrDefault("testMessage",
@@ -264,20 +258,16 @@ public class AIPAgentController {
         agentDef.put("maxTokens",
                 body.getOrDefault("maxTokens", meta.getOrDefault("maxTokens", 4096)));
 
-        try {
-            AgentTestResult result = studioService.createAndTest(agentDef, testMessage);
-            Map<String, Object> data = result.toMap();
-            data.put("agentId", id);
+        AgentTestResult result = studioService.createAndTest(agentDef, testMessage);
+        Map<String, Object> data = result.toMap();
+        data.put("agentId", id);
 
-            if (result.isSuccess()) {
-                return ApiResponse.success(data);
-            } else {
-                return ApiResponse.success("Agent 测试未成功完成", data);
-            }
-        } catch (Exception e) {
-            log.error("[AIPAgent] testAgent failed for id={}", id, e);
-            return ApiResponse.internalError("Agent 测试失败");
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(ApiResponse.success(data));
         }
+        // F06-14/15：失败态走 D.5 分类状态，禁 ApiResponse.success(...) 伪成功（A3）
+        return AiResponseSupport.failure(result.getErrorClass(), result.getErrorCode(),
+                result.getErrorMsg(), result.getErrorTraceId(), data);
     }
 
     // ═══════════════ 内部方法 ═══════════════════
@@ -310,7 +300,7 @@ public class AIPAgentController {
         detail.put("modelName", meta.getOrDefault("modelName", "deepseek-v4-flash"));
         detail.put("systemPrompt", meta.getOrDefault("systemPrompt", ""));
 
-        // Parse tools from capability JSON
+        // Parse tools from capability JSON — F06-15：解析失败重抛（受检异常仅按具体类型接），禁空列表掩蔽
         try {
             if (entity.getCapability() != null && !entity.getCapability().isEmpty()) {
                 var node = mapper.readTree(entity.getCapability());
@@ -319,8 +309,8 @@ public class AIPAgentController {
             } else {
                 detail.put("tools", List.of());
             }
-        } catch (Exception e) {
-            detail.put("tools", List.of());
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Agent capability 反序列化失败: id=" + entity.getId(), e);
         }
 
         detail.put("createdAt", entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null);
@@ -331,10 +321,11 @@ public class AIPAgentController {
     @SuppressWarnings("unchecked")
     private Map<String, Object> parseMetadata(String metadataJson) {
         if (metadataJson == null || metadataJson.isEmpty()) return new LinkedHashMap<>();
+        // F06-15：解析失败重抛（仅按具体受检类型接），禁空 Map 掩蔽坏数据
         try {
             return mapper.readValue(metadataJson, LinkedHashMap.class);
-        } catch (Exception e) {
-            return new LinkedHashMap<>();
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Agent metadata 反序列化失败", e);
         }
     }
 }

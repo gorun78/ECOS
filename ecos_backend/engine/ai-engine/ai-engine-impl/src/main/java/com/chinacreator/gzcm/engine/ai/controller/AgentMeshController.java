@@ -20,6 +20,7 @@ import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryReposi
 import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.MissionRepository;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.MissionTaskRepository;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.MissionExecutionEngine;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -68,14 +69,14 @@ public class AgentMeshController {
     /** 1. GET /api/agent-mesh/agents — 列出所有Agent */
     @GetMapping("/agents")
     public ApiResponse<List<AgentRegistryEntity>> listAgents() {
-        if (agentRegistryRepo == null) return ApiResponse.internalError("AgentRegistryRepository 未就绪");
+        if (agentRegistryRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
         return ApiResponse.success(agentRegistryRepo.findAll());
     }
 
     /** 2. GET /api/agent-mesh/agents/{id} — 查询单个Agent */
     @GetMapping("/agents/{id}")
     public ApiResponse<AgentRegistryEntity> getAgent(@PathVariable String id) {
-        if (agentRegistryRepo == null) return ApiResponse.internalError("AgentRegistryRepository 未就绪");
+        if (agentRegistryRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
         AgentRegistryEntity agent = agentRegistryRepo.findById(id);
         if (agent == null) return ApiResponse.notFound("Agent " + id + " 不存在");
         return ApiResponse.success(agent);
@@ -84,7 +85,7 @@ public class AgentMeshController {
     /** 3. POST /api/agent-mesh/agents — 注册Agent */
     @PostMapping("/agents")
     public ApiResponse<AgentRegistryEntity> createAgent(@RequestBody AgentRegistryEntity agent) {
-        if (agentRegistryRepo == null) return ApiResponse.internalError("AgentRegistryRepository 未就绪");
+        if (agentRegistryRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
         // Wave-7 T-29 (R5): 防御空 body / null 字段, 避免 PG NOT NULL 违表 5xx
         if (agent == null) return ApiResponse.badRequest("请求体不能为空");
         if (agent.getName() == null || agent.getName().trim().isEmpty()) {
@@ -115,7 +116,7 @@ public class AgentMeshController {
     @PutMapping("/agents/{id}")
     public ApiResponse<AgentRegistryEntity> updateAgent(@PathVariable String id,
                                                          @RequestBody AgentRegistryEntity agent) {
-        if (agentRegistryRepo == null) return ApiResponse.internalError("AgentRegistryRepository 未就绪");
+        if (agentRegistryRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
         AgentRegistryEntity existing = agentRegistryRepo.findById(id);
         if (existing == null) return ApiResponse.notFound("Agent " + id + " 不存在");
         agent.setId(id);
@@ -126,7 +127,7 @@ public class AgentMeshController {
     /** 5. DELETE /api/agent-mesh/agents/{id} — 删除Agent */
     @DeleteMapping("/agents/{id}")
     public ApiResponse<String> deleteAgent(@PathVariable String id) {
-        if (agentRegistryRepo == null) return ApiResponse.internalError("AgentRegistryRepository 未就绪");
+        if (agentRegistryRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
         int rows = agentRegistryRepo.delete(id);
         return rows > 0 ? ApiResponse.success("Agent " + id + " 已删除")
                         : ApiResponse.notFound("Agent " + id + " 不存在");
@@ -138,14 +139,14 @@ public class AgentMeshController {
     @GetMapping("/missions")
     public ApiResponse<List<MissionEntity>> listMissions(
             @RequestParam(defaultValue = "20") int limit) {
-        if (missionRepo == null) return ApiResponse.internalError("MissionRepository 未就绪");
+        if (missionRepo == null) return AiResponseSupport.dependencyUnavailable("MissionRepository");
         return ApiResponse.success(missionRepo.findRecent(Math.min(limit, 100)));
     }
 
     /** 7. GET /api/agent-mesh/missions/{id} — 查询Mission详情 */
     @GetMapping("/missions/{id}")
     public ApiResponse<Map<String, Object>> getMission(@PathVariable String id) {
-        if (missionRepo == null) return ApiResponse.internalError("MissionRepository 未就绪");
+        if (missionRepo == null) return AiResponseSupport.dependencyUnavailable("MissionRepository");
         MissionEntity mission = missionRepo.findById(id);
         if (mission == null) return ApiResponse.notFound("Mission " + id + " 不存在");
 
@@ -159,8 +160,9 @@ public class AgentMeshController {
 
     /** 8. POST /api/agent-mesh/missions — 创建Mission */
     @PostMapping("/missions")
-    public ApiResponse<MissionEntity> createMission(@RequestBody Map<String, Object> body) {
-        if (missionRepo == null) return ApiResponse.internalError("MissionRepository 未就绪");
+    public ApiResponse<MissionEntity> createMission(@RequestBody Map<String, Object> body)
+            throws JsonProcessingException {
+        if (missionRepo == null) return AiResponseSupport.dependencyUnavailable("MissionRepository");
 
         MissionEntity mission = new MissionEntity();
         mission.setId(UUID.randomUUID().toString().replace("-", ""));
@@ -169,13 +171,9 @@ public class AgentMeshController {
         mission.setMode((String) body.getOrDefault("mode", "SUPERVISOR"));
         mission.setStatus("PENDING");
 
-        try {
-            Object params = body.get("inputParams");
-            mission.setInputParams(params != null ? mapper.writeValueAsString(params) : "{}");
-        } catch (Exception e) {
-            log.warn("[AgentMesh] mission inputParams 序列化失败，本次将以空参数落库", e);
-            mission.setInputParams("{}");
-        }
+        // F06-15：序列化失败不再落「{}」掩蔽，直接上抛经 AiErrorAdvice 分类
+        Object params = body.get("inputParams");
+        mission.setInputParams(params != null ? mapper.writeValueAsString(params) : "{}");
         missionRepo.insert(mission);
 
         // PIPELINE 模式：解析 tasks 数组预创建子任务
@@ -202,28 +200,23 @@ public class AgentMeshController {
         return ApiResponse.success(mission);
     }
 
-    /** 9. POST /api/agent-mesh/missions/{id}/execute — 执行Mission */
+    /** 9. POST /api/agent-mesh/missions/{id}/execute — 执行Mission（执行期异常由 {@link AiErrorAdvice} 分类为 ECOS-AI-* 响应） */
     @PostMapping("/missions/{id}/execute")
-    public ApiResponse<MissionEntity> executeMission(@PathVariable String id) {
-        if (missionEngine == null) return ApiResponse.internalError("MissionExecutionEngine 未就绪");
+    public ApiResponse<MissionEntity> executeMission(@PathVariable String id) throws Exception {
+        if (missionEngine == null) return AiResponseSupport.dependencyUnavailable("MissionExecutionEngine");
         MissionEntity mission = missionRepo.findById(id);
         if (mission == null) return ApiResponse.notFound("Mission " + id + " 不存在");
         if (!"PENDING".equals(mission.getStatus())) {
             return ApiResponse.badRequest("Mission 状态为 " + mission.getStatus() + "，无法执行");
         }
-        try {
-            MissionEntity result = missionEngine.execute(mission);
-            return ApiResponse.success(result);
-        } catch (Exception e) {
-            log.error("Mission {} 执行失败", id, e);
-            return ApiResponse.internalError("任务执行失败");
-        }
+        MissionEntity result = missionEngine.execute(mission);
+        return ApiResponse.success(result);
     }
 
     /** 10. GET /api/agent-mesh/missions/{id}/tasks — 查询Mission子任务 */
     @GetMapping("/missions/{id}/tasks")
     public ApiResponse<List<MissionTaskEntity>> getMissionTasks(@PathVariable String id) {
-        if (taskRepo == null) return ApiResponse.internalError("MissionTaskRepository 未就绪");
+        if (taskRepo == null) return AiResponseSupport.dependencyUnavailable("MissionTaskRepository");
         return ApiResponse.success(taskRepo.findByMissionId(id));
     }
 

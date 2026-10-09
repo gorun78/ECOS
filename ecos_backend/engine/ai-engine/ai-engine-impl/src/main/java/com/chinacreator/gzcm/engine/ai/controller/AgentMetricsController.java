@@ -2,8 +2,6 @@ package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.service.AgentMetricsService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -23,8 +21,6 @@ import java.util.Map;
 @RequestMapping("/api/v1/aip/agent-metrics")
 public class AgentMetricsController {
 
-    private static final Logger log = LoggerFactory.getLogger(AgentMetricsController.class);
-
     private final AgentMetricsService agentMetricsService;
 
     public AgentMetricsController(AgentMetricsService agentMetricsService) {
@@ -42,37 +38,33 @@ public class AgentMetricsController {
      */
     @GetMapping("/{agentId}")
     public ApiResponse<Map<String, Object>> getMetrics(@PathVariable String agentId) {
-        try {
-            // 总计
-            Map<String, Object> total = agentMetricsService.queryTotal(agentId);
+        // F06-15：本层未预期异常经 AiErrorAdvice 分类为 ECOS-AI-*，禁再兜底吞异常或回落 internalError。
+        // 总计
+        Map<String, Object> total = agentMetricsService.queryTotal(agentId);
 
-            // P50 / P99 — 需要单独查询
-            Map<String, Object> pct = agentMetricsService.queryPercentiles(agentId);
+        // P50 / P99 — 需要单独查询
+        Map<String, Object> pct = agentMetricsService.queryPercentiles(agentId);
 
-            // 成功率
-            long totalCount = ((Number) total.getOrDefault("total_count", 0L)).longValue();
-            long successCount = ((Number) total.getOrDefault("success_count", 0L)).longValue();
-            double successRate = totalCount > 0
-                ? Math.round(successCount * 10000.0 / totalCount) / 100.0
-                : 0.0;
+        // 成功率
+        long totalCount = ((Number) total.getOrDefault("total_count", 0L)).longValue();
+        long successCount = ((Number) total.getOrDefault("success_count", 0L)).longValue();
+        double successRate = totalCount > 0
+            ? Math.round(successCount * 10000.0 / totalCount) / 100.0
+            : 0.0;
 
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("agentId", agentId);
-            data.put("totalCount", totalCount);
-            data.put("successCount", successCount);
-            data.put("failureCount", ((Number) total.getOrDefault("failure_count", 0L)).longValue());
-            data.put("successRate", successRate);
-            data.put("avgElapsedMs", total.get("avg_elapsed_ms"));
-            data.put("p50Ms", pct.get("p50_ms"));
-            data.put("p99Ms", pct.get("p99_ms"));
-            data.put("totalTokensIn", ((Number) total.getOrDefault("total_tokens_in", 0L)).longValue());
-            data.put("totalTokensOut", ((Number) total.getOrDefault("total_tokens_out", 0L)).longValue());
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("agentId", agentId);
+        data.put("totalCount", totalCount);
+        data.put("successCount", successCount);
+        data.put("failureCount", ((Number) total.getOrDefault("failure_count", 0L)).longValue());
+        data.put("successRate", successRate);
+        data.put("avgElapsedMs", total.get("avg_elapsed_ms"));
+        data.put("p50Ms", pct.get("p50_ms"));
+        data.put("p99Ms", pct.get("p99_ms"));
+        data.put("totalTokensIn", ((Number) total.getOrDefault("total_tokens_in", 0L)).longValue());
+        data.put("totalTokensOut", ((Number) total.getOrDefault("total_tokens_out", 0L)).longValue());
 
-            return ApiResponse.success(data);
-        } catch (Exception e) {
-            log.error("Failed to get metrics for agentId={}", agentId, e);
-            return ApiResponse.internalError("查询 Agent 指标失败");
-        }
+        return ApiResponse.success(data);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -88,18 +80,14 @@ public class AgentMetricsController {
     public ApiResponse<Map<String, Object>> getErrors(
             @PathVariable String agentId,
             @RequestParam(defaultValue = "50") int limit) {
-        try {
-            List<Map<String, Object>> rows = agentMetricsService.queryErrors(agentId, limit);
+        // F06-15：本层未预期异常经 AiErrorAdvice 分类为 ECOS-AI-*，禁再兜底吞异常或回落 internalError。
+        List<Map<String, Object>> rows = agentMetricsService.queryErrors(agentId, limit);
 
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("agentId", agentId);
-            data.put("total", rows.size());
-            data.put("errors", rows);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("agentId", agentId);
+        data.put("total", rows.size());
+        data.put("errors", rows);
 
-            return ApiResponse.success(data);
-        } catch (Exception e) {
-            log.error("Failed to get errors for agentId={}", agentId, e);
-            return ApiResponse.internalError("查询 Agent 错误失败");
-        }
+        return ApiResponse.success(data);
     }
 }

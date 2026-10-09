@@ -102,12 +102,10 @@ public class AgentChatController {
 
             return ApiResponse.success(resp);
         } catch (AgentRuntimeCapabilityUnavailableException e) {
+            // F06-15：仅保留具体类型捕获；其余未捕获异常由 AiErrorAdvice 分类为 ECOS-AI-* 响应
             log.warn("Agent chat 依赖的运行时能力不可用: capability={} reason={}",
                     e.getCapability(), e.getReason());
             return capabilityUnavailable(e);
-        } catch (Exception e) {
-            log.error("Agent chat 执行失败", e);
-            return ApiResponse.internalError("Agent 执行失败");
         }
     }
 

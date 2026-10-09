@@ -61,97 +61,71 @@ public class NLQController {
      */
     @PostMapping("/nlq")
     public ApiResponse<Map<String, Object>> nlq(@RequestBody Map<String, Object> body) {
-        try {
-            // 1. 提取问题
-            Object questionObj = body.get("question");
-            if (questionObj == null || questionObj.toString().trim().isEmpty()) {
-                return ApiResponse.badRequest("缺少 question 字段");
-            }
-            String question = questionObj.toString().trim();
-            log.info("NLQ 查询: {}", question);
-
-            // 2. 语义翻译 → ObjectQL
-            Map<String, Object> objectQL = semanticQueryService.translate(question);
-
-            // 3. 词典无匹配 → Agent Runtime fallback（调用 LLMGatewayService）
-            if (objectQL == null) {
-                log.warn("NLQ 词典无匹配: {}，进入 Agent Runtime fallback", question);
-                try {
-                    AgentResult agentResult = llmGatewayService.execute("sysman", "nlq-fallback", question);
-                    Map<String, Object> fallbackResult = new LinkedHashMap<>();
-                    if (agentResult.isSuccess()) {
-                        log.info("Agent Runtime fallback 成功: session={}, duration={}ms",
-                                agentResult.getSessionId(), agentResult.getDurationMs());
-                        fallbackResult.put("translated", null);
-                        fallbackResult.put("results", Collections.emptyList());
-                        fallbackResult.put("agent_answer", agentResult.getContent());
-                        fallbackResult.put("message", "词典无匹配，已通过 Agent Runtime 解析。");
-                    } else {
-                        log.warn("Agent Runtime fallback 失败: {}", agentResult.getErrorMsg());
-                        fallbackResult.put("translated", null);
-                        fallbackResult.put("results", Collections.emptyList());
-                        fallbackResult.put("message", "词典无匹配，Agent Runtime 解析失败: " + agentResult.getErrorMsg());
-                    }
-                    return ApiResponse.success(fallbackResult);
-                } catch (Exception e) {
-                    log.error("Agent Runtime fallback 异常", e);
-                    Map<String, Object> fallbackResult = new LinkedHashMap<>();
-                    fallbackResult.put("translated", null);
-                    fallbackResult.put("results", Collections.emptyList());
-                    fallbackResult.put("message", "Agent Runtime 调用异常: " + e.getMessage());
-                    return ApiResponse.success(fallbackResult);
-                }
-            }
-
-            // 4. 规范化 ObjectQL 格式（复合 filter → filters 数组）
-            Map<String, Object> normalizedQL = normalizeObjectQL(objectQL);
-            log.info("NLQ normalized QL: {}", normalizedQL);
-            String objectQLJson = toJson(normalizedQL);
-            log.info("NLQ ObjectQL JSON: {}", objectQLJson);
-            ObjectQLParser.ParsedQuery pq = ObjectQLParser.parse(objectQLJson);
-            log.info("NLQ → ObjectQL: {} | SQL: {} | params={}", objectQLJson, pq.getSql(), pq.getParams());
-
-            // 5. 执行 SQL
-            List<Map<String, Object>> rows;
-            try {
-                if (pq.getParams().isEmpty()) {
-                    rows = nlqService.queryForList(pq.getSql());
-                } else {
-                    rows = nlqService.queryForList(pq.getSql(), pq.getParamsArray());
-                }
-            } catch (Exception ex) {
-                // 表不存在等场景优雅降级
-                log.warn("NLQ SQL 执行失败: {} — {}", pq.getSql(), ex.getMessage());
-                Map<String, Object> gracefulResult = new LinkedHashMap<>();
-                gracefulResult.put("translated", objectQLJson);
-                gracefulResult.put("results", Collections.emptyList());
-                gracefulResult.put("message", "SQL 执行失败（表可能不存在）: " + ex.getMessage());
-                return ApiResponse.success(gracefulResult);
-            }
-
-            // 6. 字段名转小写
-            List<Map<String, Object>> normalized = new ArrayList<>();
-            for (Map<String, Object> row : rows) {
-                Map<String, Object> m = new LinkedHashMap<>();
-                for (Map.Entry<String, Object> e : row.entrySet()) {
-                    m.put(e.getKey() != null ? e.getKey().toLowerCase() : null, e.getValue());
-                }
-                normalized.add(m);
-            }
-
-            // 7. 组装响应
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("translated", objectQLJson);
-            result.put("results", normalized);
-            return ApiResponse.success(result);
-
-        } catch (IllegalArgumentException e) {
-            log.warn("NLQ 参数错误: {}", e.getMessage());
-            return ApiResponse.badRequest(e.getMessage());
-        } catch (Exception e) {
-            log.error("NLQ 查询失败", e);
-            return ApiResponse.internalError("查询执行失败");
+        // F06-15：控制器禁 catch(Exception) —— 未预期异常交由 AiErrorAdvice 分类渲染（errorCode + traceId）；
+        // 表缺失/SQL 失败一律 5xx，绝不回落 200 伪装成功（X-50）
+        // 1. 提取问题
+        Object questionObj = body.get("question");
+        if (questionObj == null || questionObj.toString().trim().isEmpty()) {
+            return ApiResponse.badRequest("缺少 question 字段");
         }
+        String question = questionObj.toString().trim();
+        log.info("NLQ 查询: {}", question);
+
+        // 2. 语义翻译 → ObjectQL
+        Map<String, Object> objectQL = semanticQueryService.translate(question);
+
+        // 3. 词典无匹配 → Agent Runtime fallback（调用 LLMGatewayService）
+        if (objectQL == null) {
+            log.warn("NLQ 词典无匹配: {}，进入 Agent Runtime fallback", question);
+            AgentResult agentResult = llmGatewayService.execute("sysman", "nlq-fallback", question);
+            Map<String, Object> fallbackResult = new LinkedHashMap<>();
+            if (agentResult.isSuccess()) {
+                log.info("Agent Runtime fallback 成功: session={}, duration={}ms",
+                        agentResult.getSessionId(), agentResult.getDurationMs());
+                fallbackResult.put("translated", null);
+                fallbackResult.put("results", Collections.emptyList());
+                fallbackResult.put("agent_answer", agentResult.getContent());
+                fallbackResult.put("message", "词典无匹配，已通过 Agent Runtime 解析。");
+            } else {
+                log.warn("Agent Runtime fallback 失败: {}", agentResult.getErrorMsg());
+                fallbackResult.put("translated", null);
+                fallbackResult.put("results", Collections.emptyList());
+                fallbackResult.put("message", "词典无匹配，Agent Runtime 解析失败");
+            }
+            return ApiResponse.success(fallbackResult);
+        }
+
+        // 4. 规范化 ObjectQL 格式（复合 filter → filters 数组）
+        Map<String, Object> normalizedQL = normalizeObjectQL(objectQL);
+        log.info("NLQ normalized QL: {}", normalizedQL);
+        String objectQLJson = toJson(normalizedQL);
+        log.info("NLQ ObjectQL JSON: {}", objectQLJson);
+        ObjectQLParser.ParsedQuery pq = ObjectQLParser.parse(objectQLJson);
+        log.info("NLQ → ObjectQL: {} | SQL: {} | params={}", objectQLJson, pq.getSql(), pq.getParams());
+
+        // 5. 执行 SQL（表不存在等故障交由 AiErrorAdvice 渲染 5xx，不再 200 掩蔽）
+        List<Map<String, Object>> rows;
+        if (pq.getParams().isEmpty()) {
+            rows = nlqService.queryForList(pq.getSql());
+        } else {
+            rows = nlqService.queryForList(pq.getSql(), pq.getParamsArray());
+        }
+
+        // 6. 字段名转小写
+        List<Map<String, Object>> normalized = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : row.entrySet()) {
+                m.put(entry.getKey() != null ? entry.getKey().toLowerCase() : null, entry.getValue());
+            }
+            normalized.add(m);
+        }
+
+        // 7. 组装响应
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("translated", objectQLJson);
+        result.put("results", normalized);
+        return ApiResponse.success(result);
     }
 
     // ═══════════════════════════════════════════════════════
