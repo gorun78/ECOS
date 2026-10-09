@@ -9,6 +9,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -45,6 +47,19 @@ class SchemaInventoryGateTest {
     private static final Path MIGRATION_DIR_REL =
             Paths.get("docs/50-db_script/02-flyway-migration/gateway");
     private static final String CARRIER_TABLE = "td_data_resource";
+
+    /**
+     * F06-18（详细设计-06 数据层归位）AI 新表 —— 权威归属 schema = {@code ecos_ai}（ST07 +
+     * ARCH_SPEC §4.3：ai-engine 写 {@code ecos_ai}）。四张新表必须在单源 DDL 里以
+     * {@code ecos_ai.<table>} 显式限定建出（V202 是既有真身的 ADD COLUMN，属 ALTER-only，
+     * 不在此"新表归属"断言面内）。
+     */
+    private static final String[] AI_NEW_TABLES = {
+            "ecos_ai_tool_registry",
+            "ecos_ai_tool_permission_binding",
+            "ecos_ai_compression_batch",
+            "ecos_ai_guardrail_decision_ledger"
+    };
 
     private static Path repoRoot() throws IOException {
         Path p = Paths.get("").toAbsolutePath();
@@ -184,5 +199,35 @@ class SchemaInventoryGateTest {
         }
         assertTrue(hits == 0,
                 "data-engine-impl 出现硬编码 TableRef(\"...\") 字面量 " + hits + " 处（应走 runtime-access 封装）:\n" + detail);
+    }
+
+    @Test
+    @DisplayName("F06-18: AI 新表以 ecos_ai.<table> 显式限定建出（归属权威落在处理器之前可判）")
+    void aiTablesResideInEcosAiBeforeHandlers() throws IOException {
+        Path migrationDir = repoRoot().resolve(MIGRATION_DIR_REL);
+        assertTrue(Files.isDirectory(migrationDir), "迁移单源目录缺失: " + migrationDir);
+
+        StringBuilder combined = new StringBuilder();
+        try (Stream<Path> s = Files.list(migrationDir)) {
+            List<Path> files = s
+                    .filter(Files::isRegularFile)
+                    .filter(f -> f.getFileName().toString().matches("V20[0-4]__ai_.*\\.sql"))
+                    .sorted()
+                    .collect(Collectors.toList());
+            for (Path f : files) {
+                combined.append(Files.readString(f, StandardCharsets.UTF_8)).append('\n');
+            }
+        }
+        String ddl = combined.toString().toLowerCase();
+        assertTrue(ddl.length() > 0, "迁移单源目录缺 AI 新表脚本（V200~V204 命中 0 条）");
+
+        for (String table : AI_NEW_TABLES) {
+            // 表名内部含 schema 前缀 ecos_ai（与权威 schema 同名），DDL 已 lowercased，
+            // 直接把表名 lower 后逐字符压缩空白比对即可，"create table if not exists <schema>.<table>" 一次命中。
+            String needle = "create table if not exists ecos_ai." + table.toLowerCase();
+            assertTrue(ddl.contains(needle),
+                    "AI 新表 `" + table + "` 未以 `ecos_ai." + table + "` 显式限定建出"
+                            + "（ST07 权威 schema = ecos_ai，供处理器之外可判归属）");
+        }
     }
 }

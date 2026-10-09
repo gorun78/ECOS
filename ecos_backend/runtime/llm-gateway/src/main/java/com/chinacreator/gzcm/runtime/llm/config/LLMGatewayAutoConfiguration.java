@@ -16,7 +16,11 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Hermes 引擎自动装配配置
@@ -78,6 +82,28 @@ public class LLMGatewayAutoConfiguration {
                 gateway.getRequestTimeout(), gateway.getRetryMaxAttempts());
 
         return builder.build();
+    }
+
+    /**
+     * Agent 调度线程池（F06-17 收口：由 config 工厂统一集中构造，
+     * AgentSchedulerImpl 注入此 Bean 而非自建；core=4 / max=32 / SynchronousQueue /
+     * CallerRunsPolicy 沿用原语义；Thread 命名保留以便日志追踪）。
+     */
+    @Bean("llmGatewaySchedulerExecutor")
+    public ThreadPoolExecutor llmGatewaySchedulerExecutor() {
+        return new ThreadPoolExecutor(
+                4, 32, 60L, TimeUnit.SECONDS,
+                new SynchronousQueue<>(),
+                new ThreadFactory() {
+                    private final AtomicInteger counter = new AtomicInteger(0);
+                    @Override
+                    public Thread newThread(Runnable r) {
+                        Thread t = new Thread(r, "hermes-scheduler-" + counter.incrementAndGet());
+                        t.setDaemon(true);
+                        return t;
+                    }
+                },
+                new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
     /**

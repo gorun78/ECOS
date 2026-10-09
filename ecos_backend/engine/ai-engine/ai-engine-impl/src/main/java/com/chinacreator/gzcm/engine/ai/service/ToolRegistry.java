@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -55,8 +56,8 @@ public class ToolRegistry {
         this.toolDao = toolDao;
     }
 
-    public ToolRegistry() {
-        this.restTemplate = new RestTemplate();
+    public ToolRegistry(@Qualifier("aiRestTemplate") RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
         initBuiltinTools();
     }
 

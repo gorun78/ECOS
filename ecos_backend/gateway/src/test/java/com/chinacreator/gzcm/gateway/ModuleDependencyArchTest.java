@@ -108,6 +108,8 @@ public class ModuleDependencyArchTest {
         candidatePaths.add(Paths.get("services/aiming/target/classes"));
         candidatePaths.add(Paths.get("runtime/runtime-core/target/classes"));
         candidatePaths.add(Paths.get("runtime/common-api/target/classes"));
+        // F06-17 X-26：llm-gateway 此前不在扫描宇宙，llm 域并发/RestTemplate 违规无法被捕获
+        candidatePaths.add(Paths.get("runtime/llm-gateway/target/classes"));
         candidatePaths.add(Paths.get("gateway/target/classes"));
 
         // 向上查找 ecos_backend 项目根
@@ -376,6 +378,31 @@ public class ModuleDependencyArchTest {
     }
 
     /**
+     * F06-17 X-26 / 验收命令命名入口（详细设计-06 §F06-17）：llm-gateway 必须在扫描宇宙内。
+     *
+     * <p>此前 candidatePaths 缺 {@code runtime/llm-gateway/target/classes}，llm 域违规
+     * （内置调度池自建、RestTemplate 直连）永远判不出来（X-26 / X-25 一部分）。
+     * 本用例只做宇宙归属断言 —— 是 X-26 缺失行为的防倒退守卫：
+     * 若 llm-gateway 未构建 → target/classes 缺失 → 直接 FAIL（禁止静默空宇宙）；
+     * 若已构建但未并入 allClasses（例如未来重构走 fallback 分支时丢失）→ FAIL。
+     * 真正并发/RestTemplate 违规断言在 {@link #businessMustNotSelfSchedule()} 与
+     * {@code SelfScheduleArchTest#noExecutorFactoryNoRunAsyncNoRawThreadInBusiness} 承接。</p>
+     *
+     * <p>验收：{@code mvn -f ecos_backend/pom.xml -pl gateway -am test -Dtest='ModuleDependencyArchTest#llmGatewayIsInsideTheUniverse'}
+     */
+    @Test
+    void llmGatewayIsInsideTheUniverse() {
+        long llmClasses = allClasses.stream()
+                .filter(c -> c.getPackageName().startsWith("com.chinacreator.gzcm.runtime.llm"))
+                .count();
+        org.junit.jupiter.api.Assertions.assertTrue(llmClasses > 0,
+                "X-26 未达：llm-gateway 类数量 = " + llmClasses
+                        + "，runtime/llm-gateway/target/classes 未进入扫描宇宙。"
+                        + "检查 setUp candidatePaths 是否保留 llm-gateway 路径。");
+        System.out.println("[ModuleDependencyArch] llm-gateway 在宇宙内：" + llmClasses + " classes");
+    }
+
+    /**
      * 辅助：从 services 数组里排除 self，返回 String[]。
      */
     private static String[] except(String[] all, String self) {
@@ -480,26 +507,35 @@ public class ModuleDependencyArchTest {
         // 字节码先行（规则 A/B/C 已覆盖调度与池）；本半区补源码面：Executors 之外的裸线程。
         // 扫描前跳过注释行（scanForLiteral skipCommentLines=true），Javadoc 里的禁令散文不误报；
         // archive/legacy 目录不参与。存量登记 self-schedule-baseline.txt（FQCN 由路径推导）。
+        // F06-17 X-27：扩展检测面至 CompletableFuture.runAsync/supplyAsync 与 java.lang.Thread
+        // （含 .start() 调用），使"借用公共池"与"裸线程隐式启动"三类漏检形态均被断言覆盖。
         List<Path> threadRoots = businessConcurrencySourceRoots();
+        // X-26：businessConcurrencySourceRoots 此前不含 runtime/，
+        // llm-gateway 包内的新线程源码在此才正式进入扫描面。
         if (threadRoots.isEmpty()) {
             System.out.println("[ModuleDependencyArch] SKIP new Thread 源码半区 — backendRoot 未定位");
         } else {
             List<String> threadOffenders = new ArrayList<>();
-            for (String hit : scanForLiteral(threadRoots, "new Thread(", true)) {
-                String filePart = hit.substring(0, hit.indexOf(':')).replace('\\', '/');
-                // 只判业务主源码；测试源与 archive/legacy 归档不参与
-                if (!filePart.contains("/src/main/java/")
-                        || filePart.contains("/archive/") || filePart.contains("/legacy/")) {
-                    continue;
+            for (String literal : new String[]{
+                    "new Thread(",
+                    "CompletableFuture.runAsync(",
+                    "CompletableFuture.supplyAsync("}) {
+                for (String hit : scanForLiteral(threadRoots, literal, true)) {
+                    String filePart = hit.substring(0, hit.indexOf(':')).replace('\\', '/');
+                    if (!filePart.contains("/src/main/java/")
+                            || filePart.contains("/archive/") || filePart.contains("/legacy/")
+                            || filePart.contains("/config/")) {
+                        continue;
+                    }
+                    String fqcn = sourcePathToFqcn(filePart);
+                    if (fqcn != null && inBaseline(SELF_SCHEDULE_BASELINE, fqcn)) {
+                        continue;
+                    }
+                    threadOffenders.add(hit);
                 }
-                String fqcn = sourcePathToFqcn(filePart);
-                if (fqcn != null && inBaseline(SELF_SCHEDULE_BASELINE, fqcn)) {
-                    continue;
-                }
-                threadOffenders.add(hit);
             }
             org.junit.jupiter.api.Assertions.assertTrue(threadOffenders.isEmpty(),
-                    "F05-15 X-36 业务源码存在裸 new Thread(（基线外）：\n"
+                    "F05-15/F06-17 X-36/X-27 业务源码存在自建并发（基线外）：\n"
                             + String.join("\n", threadOffenders));
         }
     }
@@ -854,6 +890,14 @@ public class ModuleDependencyArchTest {
             if (Files.isDirectory(dir)) {
                 out.add(dir);
             }
+        }
+        // F06-17 X-26：llm-gateway 的调度/并发违规此前因不在扫描面被判不出（AgentSchedulerImpl）；
+        // 此处精确加入 runtime/llm-gateway（而非整个 runtime/），其余 runtime 模块
+        // （runtime-core/runtime-access/runtime-task/runtime-event/runtime-monitor）
+        // 是线程基础设施提供者，其自有线程池属合法服务实现，不适用业务包禁令。
+        Path llmGwDir = backendRoot.resolve("runtime/llm-gateway").normalize();
+        if (Files.isDirectory(llmGwDir)) {
+            out.add(llmGwDir);
         }
         return out;
     }

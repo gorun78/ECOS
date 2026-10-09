@@ -5,10 +5,8 @@
 # config 包共享客户端工厂（CognitiveRestClientConfig / KbEngineRestConfig /
 # AimingInfrastructureConfig）由门禁谓词直接豁免，不在此登记。
 # 备注：实测扫描未发现 archive/legacy/services-ghost 形态存量命中，无需剔除条目。
-com.chinacreator.gzcm.engine.ai.controller.DiagnosticAgentController
 com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient
 com.chinacreator.gzcm.engine.ai.service.ToolExecutorService
-com.chinacreator.gzcm.engine.ai.service.ToolRegistry
 com.chinacreator.gzcm.engine.data.controller.QueryController
 com.chinacreator.gzcm.engine.data.pipeline.PipelineSecurityService
 com.chinacreator.gzcm.engine.data.quality.service.DqRcaServiceImpl

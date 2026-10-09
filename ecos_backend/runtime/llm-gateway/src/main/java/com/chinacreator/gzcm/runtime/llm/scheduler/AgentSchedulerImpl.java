@@ -15,19 +15,19 @@ import com.chinacreator.gzcm.runtime.llm.session.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * AgentScheduler 实现 — 基于 Semaphore 的并发控制和 LinkedBlockingQueue 排队
  * <p>
  * 每个 subsystem 独立控制并发度。超出并发限制的请求进入 FIFO 队列等待。
- * 使用 CompletableFuture.supplyAsync 异步执行。
+ * 使用 CompletableFuture.supplyAsync 异步执行（线程池由 config 工厂统一供给，F06-17）。
  * </p>
  */
 @Primary
@@ -45,21 +45,8 @@ public class AgentSchedulerImpl implements AgentScheduler {
     /** 子系统级排队队列: subsystem → LinkedBlockingQueue<Runnable> */
     private final ConcurrentHashMap<String, LinkedBlockingQueue<Runnable>> queues = new ConcurrentHashMap<>();
 
-    /** 公共线程池 */
-    private final ThreadPoolExecutor executor = new ThreadPoolExecutor(
-            4, 32, 60L, TimeUnit.SECONDS,
-            new SynchronousQueue<>(),
-            new ThreadFactory() {
-                private final AtomicInteger counter = new AtomicInteger(0);
-                @Override
-                public Thread newThread(Runnable r) {
-                    Thread t = new Thread(r, "hermes-scheduler-" + counter.incrementAndGet());
-                    t.setDaemon(true);
-                    return t;
-                }
-            },
-            new ThreadPoolExecutor.CallerRunsPolicy()
-    );
+    /** 共享线程池（F06-17 收口：由 LLMGatewayAutoConfiguration 统一构造并注入，禁自建） */
+    private final ThreadPoolExecutor executor;
 
     @Autowired
     private LLMGateway llmGateway;
@@ -75,6 +62,11 @@ public class AgentSchedulerImpl implements AgentScheduler {
 
     @Autowired
     private ProfileManager profileManager;
+
+    public AgentSchedulerImpl(
+            @Qualifier("llmGatewaySchedulerExecutor") ThreadPoolExecutor executor) {
+        this.executor = executor;
+    }
 
     @TokenMeter(operation = "agent_schedule")
     @Override

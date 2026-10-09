@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
@@ -21,12 +22,15 @@ import com.chinacreator.gzcm.engine.ai.service.DiagnosticAgentService;
 @RequestMapping("/api/v1/agent")
 public class DiagnosticAgentController {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final DiagnosticAgentService diagnosticAgentService;
 
 
-    public DiagnosticAgentController(DiagnosticAgentService diagnosticAgentService) {
+    public DiagnosticAgentController(
+            DiagnosticAgentService diagnosticAgentService,
+            @Qualifier("aiRestTemplate") RestTemplate restTemplate) {
         this.diagnosticAgentService = diagnosticAgentService;
+        this.restTemplate = restTemplate;
     }
 
     // ═══════════════ 工具列表 ═══════════════════
