@@ -77,7 +77,7 @@ export default function SyncTab() {
 
   const handleSyncAll = async () => {
     setIsSyncingAll(true);
-    setSyncLogs(['🔄 [0.0s] 启动 AIP Closed-Loop 元数据提取与向量化索引计算管道...']);
+    setSyncLogs([`🔄 [0.0s] ${t('knowledge.synctab.sync_start')}`]);
     try {
       const result = await knowledgeApi.syncVectors({
         embeddingModel: 'text-embedding-004',
@@ -90,9 +90,9 @@ export default function SyncTab() {
         await new Promise(r => setTimeout(r, 150));
         setSyncLogs(prev => [...prev, logs[i]]);
       }
-      if (logs.length === 0) setSyncLogs(prev => [...prev, '✅ 同步任务已提交']);
+      if (logs.length === 0) setSyncLogs(prev => [...prev, `✅ ${t('knowledge.synctab.sync_submitted')}`]);
     } catch (e: unknown) {
-      setSyncLogs(prev => [...prev, `❌ 同步异常: ${(e as { message?: string } | undefined)?.message}`]);
+      setSyncLogs(prev => [...prev, `❌ ${t('knowledge.synctab.sync_error', { msg: (e as { message?: string } | undefined)?.message ?? '' })}`]);
     } finally {
       setIsSyncingAll(false);
     }
@@ -137,12 +137,12 @@ export default function SyncTab() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 space-y-4 min-w-0">
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-4`}>
-            <div className="flex items-center justify-between border-b border-slate-150 pb-2">
+            <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-2`}>
               <h3 className={`font-extrabold ${styles.cardText} text-xs flex items-center gap-1.5 text-rose-600`}>
                 <ShieldAlert size={13} /><span>{t("knowledge.synctab.物理元数据漂移与调度_sla_仿真中心")}</span>
               </h3>
-              <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${isSchemaDrift || isSlaBreach ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : `bg-slate-50 ${styles.cardBorder} ${styles.muted}`}`}>
-                {isSchemaDrift || isSlaBreach ? '● 异常激活' : '● 稳定'}
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${isSchemaDrift || isSlaBreach ? 'bg-rose-50 border-rose-200 text-rose-600 animate-pulse' : `${styles.appBg} ${styles.cardBorder} ${styles.muted}`}`}>
+                {isSchemaDrift || isSlaBreach ? `● ${t('knowledge.synctab.status_anomaly_active')}` : `● ${t('knowledge.synctab.status_stable')}`}
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -159,17 +159,17 @@ export default function SyncTab() {
           </div>
 
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-2.5`}>
-            <h4 className={`font-extrabold ${styles.cardText} text-[11px] flex items-center gap-1 text-slate-700 border-b border-slate-150 pb-2`}>
+            <h4 className={`font-extrabold ${styles.cardText} text-[11px] flex items-center gap-1 border-b ${styles.cardBorder} pb-2`}>
               <FileClock size={12} /><span>{t("knowledge.synctab.审计记录")} ({auditLogs.length})</span>
             </h4>
             <div className="space-y-1.5 max-h-36 overflow-y-auto font-mono text-[9px]">
               {auditLogs.length === 0
                 ? <p className={`${styles.muted} py-4 text-center`}>{t("knowledge.synctab.暂无审计事件")}</p>
                 : auditLogs.map((log, i: number) => (
-                  <div key={i} className={`p-2 rounded-lg bg-slate-50 border border-slate-150 flex items-start justify-between gap-4`}>
+                  <div key={i} className={`p-2 rounded-lg ${styles.appBg} border ${styles.cardBorder} flex items-start justify-between gap-4`}>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className={`px-1.5 py-0.2 rounded-xs font-bold text-[8px] uppercase ${log.severity === 'HIGH' ? 'bg-rose-100 text-rose-700' : `bg-slate-100 ${styles.cardText}`}`}>{log.severity}</span>
+                        <span className={`px-1.5 py-0.2 rounded-xs font-bold text-[8px] uppercase ${log.severity === 'HIGH' ? 'bg-rose-100 text-rose-700' : `${styles.appBg} ${styles.cardText}`}`}>{log.severity}</span>
                         <span className={`${styles.cardText} font-bold`}>{log.event}</span>
                       </div>
                       <p className={`${styles.muted} font-sans leading-relaxed`}>{log.details}</p>
@@ -188,7 +188,7 @@ export default function SyncTab() {
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden shadow-xs overflow-x-auto`}>
             <table className="w-full text-left border-collapse whitespace-nowrap">
               <thead>
-                <tr className={`bg-slate-50 ${styles.muted} text-[10px] font-extrabold uppercase tracking-wider border-b ${styles.cardBorder}`}>
+                <tr className={`${styles.appBg} ${styles.muted} text-[10px] font-extrabold uppercase tracking-wider border-b ${styles.cardBorder}`}>
                   <th className="p-3">{t("knowledge.synctab.资产名称")}</th>
                   <th className="p-3">{t("knowledge.synctab.来源")}</th>
                   <th className="p-3">{t("knowledge.synctab.类型")}</th>
@@ -197,7 +197,7 @@ export default function SyncTab() {
                   <th className="p-3 text-right">{t("knowledge.synctab.状态_操作")}</th>
                 </tr>
               </thead>
-              <tbody className={`divide-y divide-slate-150`}>
+              <tbody className="divide-y divide-black/5 dark:divide-white/10">
                 {metaLoading ? (
                   <tr><td colSpan={6} className={`p-8 text-center ${styles.muted}`}>{t('knowledge.synctab.loading_metadata')}</td></tr>
                 ) : assets.length === 0 ? (
