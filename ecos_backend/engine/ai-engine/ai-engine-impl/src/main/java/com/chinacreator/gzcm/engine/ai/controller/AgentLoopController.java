@@ -34,6 +34,7 @@ import java.util.concurrent.CompletableFuture;
  *   POST /api/v1/agent-loop/chat              — 非流式对话
  *   POST /api/v1/agent-loop/chat              — SSE流式（produces=text/event-stream）
  *   POST /api/v1/agent-loop/sessions          — 创建会话
+ *   GET  /api/v1/agent-loop/sessions          — 列会话（F06-21 死调用承接，只增不改）
  *   GET  /api/v1/agent-loop/sessions/{id}     — 查会话详情
  *   POST /api/v1/agent-loop/sessions/{id}/chat — 会话内对话
  * </pre>
@@ -281,6 +282,49 @@ public class AgentLoopController {
         data.put("createdAt", session.getCreatedAt());
         data.put("lastActiveAt", session.getLastActiveAt());
 
+        return ApiResponse.success(data);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  3b. GET /api/v1/agent-loop/sessions — 列会话（F06-21 死调用改指真端点）
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * F06-21 要点③处置①（AI 面死调用改指真端点，遵"只增不改"铁律）：
+     * 前端 {@code ecosystem_frontend/src/pages/aiworkbench/api.ts} 已有的
+     * {@code fetch('/api/v1/agent-loop/sessions?agentId=…')} 调用原来无后端承接（404），
+     * 本方法<b>新增</b>（不改动任何既有签名 / 路径），承接该死调用。
+     *
+     * <p>参数（全部可选）：
+     * <ul>
+     *   <li>{@code agentId} — 按 Agent 过滤（前端传）；缺省 → 列出所有 ACTIVE 会话</li>
+     *   <li>{@code status}  — Java 侧再过滤（ACTIVE/IDLE/EXPIRED/ARCHIVED）</li>
+     *   <li>{@code limit}   — 只取前 N 条（DAO 已按 {@code last_active_at DESC} 排），默认 50</li>
+     * </ul>
+     * 不新增 DAO SQL：复用 {@code AgentSessionDao.listByAgent}/{@code listByStatus} 原语，
+     * 命中"不重复 SQL / 单源节点"约束。
+     */
+    @GetMapping("/sessions")
+    public ApiResponse<Map<String, Object>> listSessions(
+            @RequestParam(name = "agentId", required = false) String agentId,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "limit", defaultValue = "50") int limit) {
+        List<AgentSessionService.AgentSession> rows = sessionService.listSessions(agentId, status, limit);
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("total", rows.size());
+        data.put("sessions", rows.stream().map(s -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", s.getId());
+            m.put("agentId", s.getAgentId());
+            m.put("userId", s.getUserId());
+            m.put("tenantId", s.getTenantId());
+            m.put("status", s.getStatus());
+            m.put("messageCount", s.getMessageCount());
+            m.put("createdAt", s.getCreatedAt());
+            m.put("lastActiveAt", s.getLastActiveAt());
+            return m;
+        }).toList());
         return ApiResponse.success(data);
     }
 

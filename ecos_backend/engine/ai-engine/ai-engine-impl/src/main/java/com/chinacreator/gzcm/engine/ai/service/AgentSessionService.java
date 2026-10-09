@@ -204,6 +204,35 @@ public class AgentSessionService {
         return agentSessionDao.listByAgent(agentId);
     }
 
+    /**
+     * F06-21 三滤波器 add-GET：会话列表（前端 aiworkbench/api.ts 死调用改指真端点；只增不改）。
+     *
+     * <p>单源委托 DAO 既有 {@code listByAgent} / {@code listByStatus}：<br/>
+     * <ul>
+     *   <li>agentId 非空 → 按 agent 过滤</li>
+     *   <li>agentId 为空 → 默认列出所有 ACTIVE 会话（运维/前端首屏友好）</li>
+     * </ul>
+     * status 非空 → Java 侧再过滤一次（DAO 已有按 status / 按 agent 两个原语，避免重复 SQL）。
+     * limit &gt;= 0 → 截取前 limit 行（保持 last_active_at DESC 顺序，DAO 已排序）。
+     */
+    public List<AgentSession> listSessions(String agentId, String status, int limit) {
+        List<AgentSession> base;
+        if (agentId != null && !agentId.isBlank()) {
+            base = agentSessionDao.listByAgent(agentId);
+        } else {
+            base = agentSessionDao.listByStatus("ACTIVE");
+        }
+        if (base == null || base.isEmpty()) return base;
+        if (status != null && !status.isBlank()) {
+            String s = status.toUpperCase();
+            base = base.stream().filter(x -> s.equalsIgnoreCase(x.getStatus())).collect(java.util.stream.Collectors.toList());
+        }
+        if (limit > 0 && base.size() > limit) {
+            base = base.subList(0, limit);
+        }
+        return base;
+    }
+
     // ═══════════════════════════════════════════════════
     //  上下文压缩 — 已迁出本类（详见 SessionCompressionService）
     // ═══════════════════════════════════════════════════
