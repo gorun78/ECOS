@@ -443,3 +443,27 @@
 .border-l-indigo-650  { border-left-color: #4338ca !important; }
 .ring-indigo-650\/15  { --tw-ring-color: rgb(67 56 202 / 0.15) !important; }
 
+/* ------------------------------------------
+   E3.5: 全局键盘焦点环（additive · 横切 a11y 共因单点修）
+   ------------------------------------------
+   §一 切面 E3.5[P1]: 全仓 outline-none 268 处 / 107 文件，focus-visible 修复仅
+   Button.tsx 1 处 → 裸 input/select/a/button 等 Tab 键盘导航时焦点不可见
+   (WCAG 1.4.11 Focus Visible)。
+   单点全局修复（承横切共因先做，同 E3.2 DataTable min-w-0 单点一改全仓受益；
+   避免对 107 文件逐处补 focus-visible:ring，多触并行窗 in-flight 文件）。
+   只作用于 :focus-visible（仅键盘导航触发，鼠标点击无残留描边）。
+   颜色取 currentColor → 随各元素语义前景 token per-theme 自适应，不硬编任何
+   色阶（不越 §E2 硬编色红线 · 不新增 @theme token · 不碰 ThemeContext）。
+   additive：不删任何现有 class；对已自带 focus-visible ring 的元素本规则为
+   严格增强，无视觉回归。
+*/
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
