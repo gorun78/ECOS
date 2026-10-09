@@ -39,6 +39,8 @@ public class ScenarioVO {
     private String createdAt;
     /** 六类绑定（camelCase key：datasets/objectTypes/knowledgeBases/aiAgents/securityPolicies/interfaces） */
     private Map<String, List<String>> bindings;
+    /** 服务端计算的结构可达态集（卷07 F07-07 A2 附加字段，前端按钮态唯一来源；列表态可为 null） */
+    private List<String> allowedTransitions;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -66,6 +68,8 @@ public class ScenarioVO {
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
     public Map<String, List<String>> getBindings() { return bindings; }
     public void setBindings(Map<String, List<String>> bindings) { this.bindings = bindings; }
+    public List<String> getAllowedTransitions() { return allowedTransitions; }
+    public void setAllowedTransitions(List<String> allowedTransitions) { this.allowedTransitions = allowedTransitions; }
 
     /** 把 PO 转 VO（不含 bindings/metrics 聚合，由 Service 填充） */
     public static ScenarioVO fromEntity(BusinessScenario e) {

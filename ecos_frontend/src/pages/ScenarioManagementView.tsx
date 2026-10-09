@@ -12,10 +12,11 @@ import React, { useEffect, useState } from 'react';
 import LucideIcon from '../components/LucideIcon';
 import { useLanguage } from '../components/LanguageContext';
 import { showToastGlobal } from '../components/common/Toast';
-import { useTheme } from '../components/ThemeContext';
+import { useTheme, type ThemeStyles } from '../components/ThemeContext';
 import { CopilotPanel } from '../components/CopilotPanel';
 import GitPanel from '../components/data-workbench/GitPanel';
 import { apiFetchData } from '../api';
+import logger from '../services/logger';
 import type { BusinessScenario } from './project-workbench/types';
 import { calcMetrics } from './project-workbench/helpers';
 import { threatRadarData, efficiencyData } from './project-workbench/data';
@@ -113,7 +114,7 @@ export default function ScenarioManagementView({
 }) {
   const toast = showToast || ((t: 'success' | 'info' | 'error', m: string) => showToastGlobal(t, m));
   const { t, locale } = useLanguage();
-  /** 子组件兼容 tl(zh,en) 内联双语 */
+  /** 兼容旧内联双语助手（仅 ScenarioList 仍依赖；待 ScenarioList 迁移 t() 后删除） */
   const tl = (zh: string, en: string) => (locale === 'zh' ? zh : en);
   const { styles } = useTheme();
 
@@ -139,13 +140,9 @@ export default function ScenarioManagementView({
   const [wAiAgents, setWAiAgents] = useState<string[]>([]);
   const [wInterfaces, setWInterfaces] = useState<string[]>([]);
   const [wSecurityPolicies, setWSecurityPolicies] = useState<string[]>([]);
-  const [proposals, setProposals] = useState<any[]>([]);
+  const [proposals, setProposals] = useState<unknown[]>([]);
   const [isLoadingProposals, setIsLoadingProposals] = useState(false);
   const [resolvingProposalId, setResolvingProposalId] = useState<string | null>(null);
-  const [simQuery, setSimQuery] = useState('查询 UA102 机长张建国资质与保底工资');
-  const [simRole, setSimRole] = useState<'AOC_DIRECTOR' | 'EXTERNAL_CONTRACTOR'>('AOC_DIRECTOR');
-  const [simResult, setSimResult] = useState<any>(null);
-  const [isSimulating, setIsSimulating] = useState(false);
 
   const activeScenario = scenarios.find((s) => s.id === selectedScenarioId) || scenarios[0];
 
@@ -159,7 +156,7 @@ export default function ScenarioManagementView({
         setSelectedScenarioId(list[0].id);
       }
     } catch (e) {
-      console.error('Failed to fetch scenarios', e);
+      logger.error('scenarios', e);
       toast('error', t('scenario.cog.refreshFailed', { msg: String(e) }));
     } finally {
       setLoadingScenarios(false);
@@ -175,10 +172,10 @@ export default function ScenarioManagementView({
   const fetchProposalsList = async () => {
     setIsLoadingProposals(true);
     try {
-      const d = await apiFetchData<any[]>('/api/v1/ontology/proposals');
+      const d = await apiFetchData<unknown[]>('/api/v1/ontology/proposals');
       setProposals(Array.isArray(d) ? d : []);
     } catch (e) {
-      console.error('Failed to fetch proposals', e);
+      logger.error('proposals', e);
     } finally {
       setIsLoadingProposals(false);
     }
@@ -193,15 +190,14 @@ export default function ScenarioManagementView({
   const handleApproveProposal = async (id: string, actionId: string) => {
     setResolvingProposalId(id);
     try {
-      await apiFetchData(`/api/v1/ontology/proposals/${id}/approve`, {
-        method: 'POST',
-        body: JSON.stringify({ userRole: '签派总监', userName: '王凯' }),
-      });
+      // 零信任身份由后端从 SSO 会话解析；前端不再内联伪造 userRole/userName（F07-22）
+      await apiFetchData(`/api/v1/ontology/proposals/${id}/approve`, { method: 'POST' });
       toast('success', t('scenario.proposal.approveOk', { actionId }));
       fetchProposalsList();
       refreshScenarios();
-    } catch (e: any) {
-      toast('error', e?.message || t('scenario.proposal.approveErr'));
+    } catch (e) {
+      const err = e as Error | undefined;
+      toast('error', err?.message || t('scenario.proposal.approveErr'));
     } finally {
       setResolvingProposalId(null);
     }
@@ -217,54 +213,21 @@ export default function ScenarioManagementView({
     try {
       await apiFetchData(`/api/v1/ontology/proposals/${id}/reject`, {
         method: 'POST',
-        body: JSON.stringify({ userName: '王凯', reason }),
+        body: JSON.stringify({ reason }),
       });
       toast('info', t('scenario.proposal.rejectOk', { actionId }));
       fetchProposalsList();
-    } catch (e: any) {
-      toast('error', e?.message || t('scenario.proposal.networkErr', { msg: e?.message ?? e }));
+    } catch (e) {
+      const err = e as Error | undefined;
+      toast('error', err?.message || t('scenario.proposal.networkErr', { msg: String(err?.message ?? e) }));
     } finally {
       setResolvingProposalId(null);
     }
   };
 
-  // ── Simulation（沙箱校验，走知识查询接口） ──
-  const handleRunSandbox = async () => {
-    setIsSimulating(true);
-    const empty: BusinessScenario['bindings'] = {
-      datasets: [], objectTypes: [], knowledgeBases: [], aiAgents: [], securityPolicies: [], interfaces: [],
-    };
-    const bindings = activeScenario?.bindings ?? empty;
-    const params = {
-      query: simQuery,
-      userId: simRole === 'AOC_DIRECTOR' ? 'analyst_li' : 'contractor_xiao',
-      orgId: simRole === 'AOC_DIRECTOR' ? 'org_aviation_hq' : 'org_contractor',
-      clientIp: simRole === 'AOC_DIRECTOR' ? '10.120.5.23' : '222.22.22.22',
-      projectId: bindings.securityPolicies[1] || 'proj_aviation_core',
-      datasetId: bindings.datasets[0] || 'ds_flight_schedules',
-      purposeId: bindings.securityPolicies[0] || 'purpose_fleet_opt_2026',
-      distanceMetric: 'cosine',
-    };
-    try {
-      const d = await apiFetchData<any>('/api/v1/knowledge/query', {
-        method: 'POST',
-        body: JSON.stringify(params),
-      });
-      setSimResult(d);
-      toast(d.verdict === 'DENIED' ? 'error' : 'success', d.verdict === 'DENIED' ? t('scenario.sim.denied') : t('scenario.sim.granted'));
-    } catch (e: any) {
-      setSimResult({
-        verdict: simRole === 'AOC_DIRECTOR' ? 'GRANTED' : 'DENIED',
-        answer:
-          simRole === 'AOC_DIRECTOR'
-            ? `[本地沙箱] 已在「${activeScenario?.name ?? ''}」场景下执行。`
-            : '⚠️ 外部承包商访问限制级 PII 被阻断。',
-        groundedDocs: [{ title: 'CAAC 121部', score: 0.92 }],
-      });
-    } finally {
-      setIsSimulating(false);
-    }
-  };
+  // ── 沙箱推演（旧知识查询假真理链路已删除，F07-22）。
+  //    现由 SimulationResultPanel 自持 useCognition(scenarioId) 只读订阅 E1~E4，
+  //    503 时仅提示不可用、绝不合成 verdict。
 
   // ── Wizard（创建/编辑 → 真实 API） ──
   const openCreateWizard = () => {
@@ -372,9 +335,10 @@ export default function ScenarioManagementView({
       }
       await refreshScenarios();
       setShowWizardModal(false);
-    } catch (e: any) {
-      console.error('Save scenario failed', e);
-      toast('error', t('scenario.cog.updateFailed', { msg: e?.message ?? e }));
+    } catch (e) {
+      const err = e as Error | undefined;
+      logger.error('scenario-save', err ?? e);
+      toast('error', t('scenario.cog.updateFailed', { msg: String(err?.message ?? e) }));
     }
   };
 
@@ -402,7 +366,7 @@ export default function ScenarioManagementView({
   };
 
   const activeCount = scenarios.filter((s) => s.status === 'ACTIVE').length;
-  const pendingCount = proposals.filter((p: any) => p.status === 'pending').length;
+  const pendingCount = proposals.filter((p) => (p as { status?: string }).status === 'pending').length;
   const tabHint: Record<TabKey, string> = {
     fusion: t('scenario.hint.fusion'),
     decision: t('scenario.hint.decision'),
@@ -554,19 +518,7 @@ export default function ScenarioManagementView({
               {activeTab === 'fusion' && <FusionMatrixTab activeScenario={activeScenario} />}
               {activeTab === 'decision' && (
                 <>
-                  <SimulationResultPanel
-                    simQuery={simQuery}
-                    setSimQuery={setSimQuery}
-                    simRole={simRole}
-                    setSimRole={setSimRole}
-                    simResult={simResult}
-                    isSimulating={isSimulating}
-                    onRun={handleRunSandbox}
-                    styles={styles}
-                    locale={locale}
-                    tl={tl}
-                    safetyIndexActual={activeScenario.actualSafetyIndex}
-                  />
+                  <SimulationResultPanel scenarioId={activeScenario.id} styles={styles} />
                   <DecisionDeskTab
                     activeScenario={activeScenario}
                     proposals={proposals}
@@ -575,13 +527,6 @@ export default function ScenarioManagementView({
                     handleApproveProposal={handleApproveProposal}
                     handleRejectProposal={handleRejectProposal}
                     resolvingProposalId={resolvingProposalId}
-                    simQuery={simQuery}
-                    setSimQuery={setSimQuery}
-                    simRole={simRole}
-                    setSimRole={setSimRole}
-                    simResult={simResult}
-                    isSimulating={isSimulating}
-                    handleRunSandbox={handleRunSandbox}
                   />
                 </>
               )}
@@ -654,7 +599,7 @@ function KpiBox({
   extra,
   color,
 }: {
-  styles: any;
+  styles: ThemeStyles;
   label: string;
   value: string;
   suffix?: React.ReactNode;

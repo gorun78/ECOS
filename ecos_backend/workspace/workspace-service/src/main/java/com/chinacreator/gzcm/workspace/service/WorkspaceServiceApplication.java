@@ -68,16 +68,21 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         @ComponentScan.Filter(type = FilterType.REGEX,
                 pattern = "com\\.chinacreator\\.gzcm\\.gateway\\..*"),
         // buszhi 侧 WorkflowController 与 engine.ontology 侧同名 bean 冲突
-        // (gateway 已镜像排除 buszhi 版本, 保留 engine.ontology 版本)
-        @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
-                com.chinacreator.gzcm.buszhi.workflow.controller.WorkflowController.class
-        })
+        // (gateway 已镜像排除 buszhi 版本, 保留 engine.ontology 版本)。
+        // 卷07 F07-16：原写法是 FilterType.ASSIGNABLE_TYPE + WorkflowController.class
+        // 的编译期引用 —— 那会让本 boot 类**必须**编译期看见 buszhi-impl，
+        // 三层纪律（workspace 不得依赖 *-impl）就永远拆不掉。改 REGEX 后
+        // 排除效果不变，buszhi-impl 退化为纯运行期装配事实。
+        @ComponentScan.Filter(type = FilterType.REGEX,
+                pattern = "com\\.chinacreator\\.gzcm\\.buszhi\\.workflow\\.controller\\.WorkflowController")
 })
 @MapperScan({
-        // workspace 库自带 mapper/dao (查询历史, PgObjectStorage 等)
-        "com.chinacreator.gzcm.workspace.**.repository",
-        "com.chinacreator.gzcm.workspace.**.dao",
-        "com.chinacreator.gzcm.workspace.**.mapper",
+        // 卷07 F07-01/X-7：原三条 workspace 通配（**.repository / **.dao / **.mapper）
+        // 全部指向**不存在**的包 —— workspace 目前 0 个 MyBatis Mapper 接口
+        // （数据访问走 dao.WorkspaceDataDao，是 JdbcTemplate DAO 不是 mapper）。
+        // 通配 @MapperScan 扫空包不会报错，但把"没有 mapper"伪装成"已收口"，
+        // 故收成一个显式包名：新增 mapper 必须落在这里才被子产品扫描到。
+        "com.chinacreator.gzcm.workspace.mapper",
         // buszhi (ObjectRuntime/State Machine 库)
         "com.chinacreator.gzcm.buszhi.**.repository",
         "com.chinacreator.gzcm.buszhi.**.dao",

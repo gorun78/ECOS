@@ -8,6 +8,12 @@ spring:
   main:
     allow-bean-definition-overriding: true
   autoconfigure:
+    # 卷07 F07-01：这两条 Security 排除项与 aiming/datanet/buszhi/dccheng 四个独立 JAR
+    # 完全一致 —— 鉴权不在这里做，由 common-api `ecos.security.header-auth`
+    # 信任链拦截器承担（缺 X-ECOS-* → 403 ECOS-AUTH-010，fail-closed）。
+    # 排除的只是 Boot 的"生成随机密码 + 全站 basic 登录页"默认链，
+    # 不是认证本身；把它删掉而没有挂 SecurityFilterChain 会变成 401 全屏蔽。
+    # 仅 dev profile（文末）允许整面关闭，默认 profile 强制鉴权。
     exclude:
       - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
       - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
@@ -66,8 +72,17 @@ ecos:
       enabled: ${ECOS_EVENT_KAFKA_ENABLED:true}
   mybatis:
     type-aliases-package: com.chinacreator.gzcm.workspace
-  header-auth:
-    enabled: false
+  # ── 卷07 F07-01 要点 3（R-24 已批准为 B 案）：两态鉴权等价 ──────────────────
+  # 键名收口：原 `ecos.header-auth.enabled` 是死键（全仓 0 读取方，
+  # HeaderAuthAutoConfiguration 只认 `ecos.security.header-auth`），
+  # 因此 ":65-66 header-auth: false" 从未生效，等同常关（X-19 的实测根因）。
+  # 现按 aiming/datanet/buszhi/dccheng 四个独立 JAR 的同一口径启用信任链：
+  # ADR-7 端口隔离 ⇒ :18090 仅内网可达，身份由 gateway EcosTrustHeaderFilter 注入
+  # X-ECOS-USER / X-ECOS-TENANT；缺头一律 403 ECOS-AUTH-010（fail-closed），
+  # 消灭"匿名请求得 200"的裸奔面。默认 profile 强制 true，只有 dev 可关。
+  security:
+    header-auth:
+      enabled: ${ECOS_WS_HEADER_AUTH:true}
   neo4j:
     enabled: ${ECOS_NEO4J_ENABLED:false}
 
@@ -85,3 +100,17 @@ logging:
     com.chinacreator.gzcm: INFO
     org.apache.kafka: WARN
     org.springframework: INFO
+---
+# 卷07 F07-01 要点 3：dev 是**唯一**允许免鉴权的 profile。
+# 生产/默认 profile 不加载本段 ⇒ ecos.security.header-auth.enabled 恒为 true。
+spring:
+  config:
+    activate:
+      on-profile: dev
+ecos:
+  security:
+    header-auth:
+      # dev 直连 :18090（浏览器无 gateway 注入的 X-ECOS-* 信任头）时才允许关。
+      # 启动期自检 `_win_tasks/test-workspace-auth-baseline.ps1` 会在此配置下跳过，
+      # 在默认 profile 下必须断言"匿名请求 401/403，得 200 即 FAIL"。
+      enabled: ${ECOS_INSECURE_DEV:false}

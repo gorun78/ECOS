@@ -364,5 +364,16 @@
   "scenario.col.var": "变量",
   "scenario.col.impact": "影响",
   "scenario.col.direction": "方向",
-  "scenario.explanation": "解释"
+  "scenario.explanation": "解释",
+  "scenario.decision.title": "Pending Write-back Proposals",
+  "scenario.decision.subtitle": "Write-back transactions triggered in scenario “{scenario}”, synced after authorization.",
+  "scenario.decision.refresh": "Refresh",
+  "scenario.decision.empty": "No pending or archived Ontology Action proposals.",
+  "scenario.decision.source": "Proposed by",
+  "scenario.decision.sourceAgent": "Agent Sandbox",
+  "scenario.decision.rejectReason": "Reject reason",
+  "scenario.decision.reject": "Reject",
+  "scenario.decision.approve": "Approve",
+  "scenario.decision.writing": "Writing",
+  "scenario.decision.archived": "Archived"
 }

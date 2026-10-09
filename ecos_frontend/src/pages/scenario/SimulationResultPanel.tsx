@@ -1,170 +1,114 @@
 /**
- * @license
- * SPDX-License-Identifier: Apache-2.0
+ * SimulationResultPanel — 认知推演结果面板（详细设计-07 F07-22 / F07-12）。
+ *
+ * <p>本面板原为「零信任对账沙箱演练」：走旧的本地知识查询接口，失败时本地伪造
+ * {@code verdict: GRANTED/DENIED}、固定 clientIp 并内联硬编码身份，属 P0 虚假验收族。
+ * 现整体删除伪造分支：认知结论<b>只来自</b> {@link useCognition}（F07-12 四端点唯一通道）。
+ * 引擎不可用（503）→ 横幅 + 重试，<b>禁 fallback 造数据</b>（3.3 六态矩阵：空/加载/错误/边界/权限/离线）。</p>
+ *
+ * @license Apache-2.0
  */
 import React from 'react';
 import LucideIcon from '../../components/LucideIcon';
 import type { ThemeStyles } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
+import { useCognition } from '../../hooks/useCognition';
+import type { CognitionSlice } from '../../hooks/useCognition';
 
 export interface SimulationResultPanelProps {
-  simQuery: string;
-  setSimQuery: (v: string) => void;
-  simRole: 'AOC_DIRECTOR' | 'EXTERNAL_CONTRACTOR';
-  setSimRole: (v: 'AOC_DIRECTOR' | 'EXTERNAL_CONTRACTOR') => void;
-  simResult: any;
-  isSimulating: boolean;
-  onRun: () => void;
+  /** 目标场景 ID — 认知四端点据此只读取数，禁组件内自造身份/角色/IP。 */
+  scenarioId: string;
   styles: ThemeStyles;
-  locale: string;
-  tl: (zh: string, en: string) => string;
-  safetyIndexActual: string;
 }
 
-export default function SimulationResultPanel({
-  simQuery,
-  setSimQuery,
-  simRole,
-  setSimRole,
-  simResult,
-  isSimulating,
-  onRun,
-  styles,
-  locale,
-  tl,
-  safetyIndexActual,
-}: SimulationResultPanelProps) {
+/** 单个认知切片的状态提示映射到六态矩阵文案。 */
+function stateLabelKey(slice: CognitionSlice<unknown>): string | null {
+  if (slice.loading) return 'scenario.cognition.loading';
+  if (slice.unavailable) return 'scenario.cognition.notEnabled';
+  if (slice.error) return 'scenario.cognition.error';
+  return null;
+}
+
+export default function SimulationResultPanel({ scenarioId, styles }: SimulationResultPanelProps) {
+  const { t } = useLanguage();
+  const { detect } = useCognition(scenarioId);
+
+  const minds = detect.data ?? [];
+
   return (
     <div className="space-y-4">
-      {/* Query Input Area */}
-      <div className={`p-3 ${styles.cardBg} border ${styles.cardBorder} rounded-lg space-y-3`}>
+      <div className={`p-3 ${styles.cardBg} border ${styles.cardBorder} rounded-lg`}>
         <div className="flex items-center gap-2">
-          <LucideIcon name="FlaskConical" size={14} className="text-amber-400" />
-          <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-            {tl('零信任对账仿真推演沙箱', 'Zero-Trust Reconciliation Sandbox')}
-          </span>
+          <LucideIcon name="BrainCircuit" size={14} className={styles.accentText} />
+          <span className={`text-xs font-bold ${styles.cardText}`}>{t('scenario.cognition.detect')}</span>
         </div>
-
-        {/* Query Input */}
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder={tl('输入要推演的查询，如：查询机长资质与薪资', 'Enter query to simulate...')}
-            value={simQuery}
-            onChange={(e) => setSimQuery(e.target.value)}
-            className={`flex-1 p-2 text-xs ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:border-indigo-500`}
-          />
-          <button
-            onClick={onRun}
-            disabled={isSimulating}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded cursor-pointer transition-all flex items-center gap-1.5"
-          >
-            {isSimulating ? (
-              <LucideIcon name="Loader" size={12} className="animate-spin" />
-            ) : (
-              <LucideIcon name="Play" size={12} />
-            )}
-            {isSimulating ? tl('推演中...', 'Simulating...') : tl('运行推演', 'Run')}
-          </button>
-        </div>
-
-        {/* Role Selector */}
-        <div className="flex items-center gap-3">
-          <span className={`text-[10px] ${styles.cardTextMuted} font-bold`}>
-            {tl('模拟角色', 'Role')}:
-          </span>
-          <label className={`flex items-center gap-1.5 text-[11px] cursor-pointer ${simRole === 'AOC_DIRECTOR' ? 'text-emerald-400 font-bold' : styles.cardTextMuted}`}>
-            <input type="radio" name="simRole" checked={simRole === 'AOC_DIRECTOR'}
-              onChange={() => setSimRole('AOC_DIRECTOR')} className="accent-indigo-500" />
-            {tl('签派总监 (王凯)', 'AOC Director')}
-          </label>
-          <label className={`flex items-center gap-1.5 text-[11px] cursor-pointer ${simRole === 'EXTERNAL_CONTRACTOR' ? 'text-rose-400 font-bold' : styles.cardTextMuted}`}>
-            <input type="radio" name="simRole" checked={simRole === 'EXTERNAL_CONTRACTOR'}
-              onChange={() => setSimRole('EXTERNAL_CONTRACTOR')} className="accent-indigo-500" />
-            {tl('外部承包商', 'External Contractor')}
-          </label>
-        </div>
+        <p className={`text-[11px] ${styles.cardTextMuted} mt-1`}>{t('scenario.cog.desc')}</p>
       </div>
 
-      {/* Results Area */}
-      {simResult && (
-        <div className={`p-4 ${styles.cardBg} border ${styles.cardBorder} rounded-lg space-y-3`}>
-          {/* Verdict */}
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-white">
-              {tl('推演结果', 'Simulation Result')}
-            </span>
-            <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
-                simResult.verdict === 'GRANTED'
-                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-900/50'
-                  : 'bg-rose-950 text-rose-400 border border-rose-900/50'
-              }`}
-            >
-              {simResult.verdict === 'GRANTED' ? '✅ GRANTED' : '🛡️ DENIED'}
-            </span>
+      {/* 加载态 */}
+      {detect.loading && (
+        <div className={`p-6 ${styles.cardBg} border ${styles.cardBorder} rounded-lg flex items-center justify-center gap-2 text-xs ${styles.cardTextMuted}`}>
+          <LucideIcon name="Loader" size={14} className="animate-spin" />
+          {t(stateLabelKey(detect) ?? 'scenario.cognition.loading')}
+        </div>
+      )}
+
+      {/* 引擎不可用（503）：横幅 + 重试，禁伪造数据 */}
+      {!detect.loading && detect.unavailable && (
+        <div className={`p-4 ${styles.cardBg} border ${styles.warningBorder ?? styles.cardBorder} ${styles.warningBg ?? styles.cardBg} rounded-lg flex items-start justify-between gap-3`}>
+          <div className="flex items-start gap-2">
+            <LucideIcon name="AlertTriangle" size={16} className={styles.warningText} />
+            <div>
+              <p className={`text-xs font-bold ${styles.warningText}`}>{t('scenario.cognition.notEnabled')}</p>
+              {detect.traceId && (
+                <p className={`text-[10px] ${styles.cardTextMuted} font-mono mt-1`}>
+                  {t('scenario.cognition.traceId')}: {detect.traceId}
+                </p>
+              )}
+            </div>
           </div>
+          <button
+            onClick={detect.reload}
+            className={`shrink-0 px-3 py-1 rounded border ${styles.accentBorder} ${styles.accentText} text-[11px] font-bold cursor-pointer hover:opacity-80`}
+          >
+            {t('scenario.cognition.retry')}
+          </button>
+        </div>
+      )}
 
-          {/* Answer */}
-          <div className={`p-3 ${styles.inputBg} border ${styles.inputBorder} rounded`}>
-            <pre className={`text-xs ${styles.cardText} font-mono whitespace-pre-wrap leading-relaxed`}>
-              {simResult.answer || simResult.message}
-            </pre>
-          </div>
-
-          {/* Grounded docs */}
-          {simResult.groundedDocs && simResult.groundedDocs.length > 0 && (
-            <div className="space-y-1.5">
-              <span className={`text-[10px] ${styles.cardTextMuted} font-bold`}>
-                {tl('关联知识库文档', 'Grounded Documents')}
-              </span>
-              {simResult.groundedDocs.map((doc: any, i: number) => (
-                <div key={i} className={`flex items-center justify-between p-2 ${styles.cardBg} border ${styles.cardBorder} rounded text-[10px]`}>
-                  <span className={`${styles.cardTextMuted} font-mono`}>{doc.title}</span>
-                  <span className="text-emerald-400 font-bold">
-                    {(doc.score * 100).toFixed(0)}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Metrics Comparison: Baseline vs Prediction */}
-          <div className={`p-3 ${styles.cardBg} border ${styles.cardBorder} rounded-lg space-y-2`}>
-            <span className={`text-[10px] ${styles.cardTextMuted} font-bold flex items-center gap-1`}>
-              <LucideIcon name="BarChart3" size={11} className="text-indigo-400" />
-              {tl('基线 vs 预测对比', 'Baseline vs Prediction')}
-            </span>
-            <div className="grid grid-cols-2 gap-3 text-[10px]">
-              <div className={`p-2 ${styles.inputBg} rounded text-center`}>
-                <span className={`block ${styles.cardTextMuted}`}>{tl('安全适航基线', 'Safety Baseline')}</span>
-                <span className="text-sm font-bold text-indigo-400">{safetyIndexActual}</span>
-              </div>
-              <div className={`p-2 ${simResult.verdict === 'GRANTED' ? 'bg-emerald-950/30' : 'bg-rose-950/30'} rounded text-center`}>
-                <span className={`block ${styles.cardTextMuted}`}>{tl('推演后预测', 'Post-Simulation')}</span>
-                <span className={`text-sm font-bold ${simResult.verdict === 'GRANTED' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {simResult.verdict === 'GRANTED' ? '100.00%' : safetyIndexActual}
-                </span>
-              </div>
-            </div>
-            {/* Delta indicator */}
-            <div className={`text-center text-[10px] font-mono font-bold ${simResult.verdict === 'GRANTED' ? 'text-emerald-400' : 'text-rose-400'}`}>
-              Δ = {simResult.verdict === 'GRANTED' ? '+' : ''}
-              {simResult.verdict === 'GRANTED'
-                ? (100 - parseFloat(safetyIndexActual)).toFixed(1)
-                : '0.00'}
-              %
-            </div>
+      {/* 普通错误态（400/404/403）：诚实文案，不白屏 */}
+      {!detect.loading && !detect.unavailable && detect.error && (
+        <div className={`p-4 ${styles.cardBg} border ${styles.cardBorder} rounded-lg flex items-start gap-2`}>
+          <LucideIcon name="XCircle" size={16} className={styles.dangerText} />
+          <div>
+            <p className={`text-xs font-bold ${styles.dangerText}`}>{t('scenario.cognition.error')}</p>
+            <p className={`text-[11px] ${styles.cardTextMuted} mt-0.5`}>{detect.error}</p>
           </div>
         </div>
       )}
 
-      {/* Empty state */}
-      {!simResult && !isSimulating && (
+      {/* 空态 */}
+      {!detect.loading && !detect.unavailable && !detect.error && minds.length === 0 && (
         <div className={`p-8 ${styles.cardBg} border ${styles.cardBorder} rounded-lg text-center`}>
-          <LucideIcon name="FlaskConical" size={24} className={`mx-auto mb-2 ${styles.cardTextMuted}`} />
-          <p className={`text-xs ${styles.cardTextMuted}`}>
-            {tl('点击「运行推演」开始零信任对账仿真', 'Click "Run" to start zero-trust reconciliation simulation')}
-          </p>
+          <LucideIcon name="BrainCircuit" size={24} className={`mx-auto mb-2 ${styles.cardTextMuted}`} />
+          <p className={`text-xs ${styles.cardTextMuted}`}>{t('scenario.cognition.empty')}</p>
+        </div>
+      )}
+
+      {/* 数据态：只渲染后端真实返回，禁本地合成 verdict/answer */}
+      {!detect.loading && minds.length > 0 && (
+        <div className={`p-4 ${styles.cardBg} border ${styles.cardBorder} rounded-lg space-y-2`}>
+          <span className={`text-[10px] ${styles.cardTextMuted} font-bold`}>{t('scenario.cognition.mindLabel')}</span>
+          <ul className="space-y-1.5">
+            {minds.map((m) => (
+              <li key={m.mindId} className={`flex items-center justify-between p-2 ${styles.inputBg} border ${styles.inputBorder} rounded text-[11px]`}>
+                <span className={`${styles.cardText} font-mono`}>{m.name}</span>
+                {m.isActive && (
+                  <span className={`${styles.successText} text-[9px] font-bold uppercase`}>{t('scenario.cognition.active')}</span>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

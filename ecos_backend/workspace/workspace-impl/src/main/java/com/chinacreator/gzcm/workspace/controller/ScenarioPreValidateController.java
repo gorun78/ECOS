@@ -2,6 +2,11 @@ package com.chinacreator.gzcm.workspace.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.workspace.scenario.BindingNode;
+import com.chinacreator.gzcm.workspace.scenario.CompletenessDataLoader;
+import com.chinacreator.gzcm.workspace.scenario.CompletenessReport;
+import com.chinacreator.gzcm.workspace.scenario.LinkEdge;
+import com.chinacreator.gzcm.workspace.scenario.ScenarioCompletenessService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioMindService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioSandboxLayoutService;
 import com.chinacreator.gzcm.workspace.scenario.SandboxLayoutVO;
@@ -32,14 +37,20 @@ public class ScenarioPreValidateController {
 
     private final ScenarioMindService mindService;
     private final ScenarioSandboxLayoutService sandboxLayoutService;
+    private final CompletenessDataLoader loader;
+    private final ScenarioCompletenessService completenessService;
     private final RestTemplate rt;
 
     public ScenarioPreValidateController(
             ScenarioMindService mindService,
             ScenarioSandboxLayoutService sandboxLayoutService,
+            CompletenessDataLoader loader,
+            ScenarioCompletenessService completenessService,
             @org.springframework.beans.factory.annotation.Value("${ecos.gateway-base:http://localhost:8080}") String gatewayBase) {
         this.mindService = mindService;
         this.sandboxLayoutService = sandboxLayoutService;
+        this.loader = loader;
+        this.completenessService = completenessService;
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(3000);
         factory.setReadTimeout(5000);
@@ -91,8 +102,22 @@ public class ScenarioPreValidateController {
     }
 
     private PreValidateCheckVO checkResources(String scenarioId) {
-        // 简化：检查 binding 记录非空即可（具体 6 类 resource reachability 由 Options Controller 联查保障）
-        return new PreValidateCheckVO("bindings_exist", true,
-                "bindings check delegated to /available/* endpoints (deferred reachability check)");
+        // 卷07 F07-04 / X-27：删除硬编码 pass=true 桩，改由完整度单源（连边覆盖 + 孤岛可达性）判定。
+        List<BindingNode> bindings = loader.bindingsOf(scenarioId);
+        List<LinkEdge> links = loader.linksOf(scenarioId);
+        CompletenessReport report = completenessService.compute(scenarioId, bindings, links);
+        boolean hasIsland = !report.getIslands().isEmpty();
+        boolean empty = report.getVerdict() == CompletenessReport.Verdict.EMPTY_SCENARIO;
+        boolean pass = !bindings.isEmpty() && !hasIsland && !empty;
+        String detail;
+        if (empty) {
+            detail = "空场景：无任何绑定";
+        } else if (hasIsland) {
+            detail = "存在 " + report.getIslands().size() + " 个孤岛绑定，禁止激活";
+        } else {
+            detail = "覆盖 " + report.getPresentEdges().size() + "/" + report.getRequiredEdges().size()
+                    + "，verdict=" + report.getVerdict();
+        }
+        return new PreValidateCheckVO("bindings_reachability", pass, detail);
     }
 }

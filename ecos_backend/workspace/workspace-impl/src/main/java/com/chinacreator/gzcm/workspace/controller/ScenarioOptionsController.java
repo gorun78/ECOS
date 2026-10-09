@@ -204,8 +204,11 @@ public class ScenarioOptionsController {
     }
 
     private ApiResponse<?> unavailable(String serviceName, String reason) {
-        return ApiResponse.error(503, "service_unreachable",
-                serviceName + " unreachable: " + (reason != null && reason.length() > 128 ? reason.substring(0, 128) : reason));
+        // 卷07 F07-12 / X-17：禁把 503 包成 HTTP 200（A3 红线）。抛领域异常，真实 503 由
+        // WorkspaceExceptionHandler（F07-13 advice）映射；本层绝不再返回 ApiResponse.error(503,…)。
+        String clipped = reason != null && reason.length() > 128 ? reason.substring(0, 128) : reason;
+        throw new com.chinacreator.gzcm.workspace.scenario.CognitiveEngineUnavailableException(
+                serviceName + " unreachable: " + clipped);
     }
 
     /** 安全字段白名单——仅这些 key 允许透传到前端 extra（防 host/port/username/jdbcUrl/password 泄漏） */

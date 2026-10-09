@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.workspace.controller;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -8,8 +9,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.workspace.scenario.BindingNode;
+import com.chinacreator.gzcm.workspace.scenario.CompletenessDataLoader;
+import com.chinacreator.gzcm.workspace.scenario.CompletenessReport;
+import com.chinacreator.gzcm.workspace.scenario.LinkEdge;
+import com.chinacreator.gzcm.workspace.scenario.ScenarioCompletenessService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioSaveDTO;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioService;
+import com.chinacreator.gzcm.workspace.scenario.ScenarioStatusTransitionService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioVO;
 
 /**
@@ -17,8 +24,8 @@ import com.chinacreator.gzcm.workspace.scenario.ScenarioVO;
  *
  * <p>路径契约保持不变（只增不改）：
  * <pre>
- * GET    /api/v1/workspace/scenarios           — 场景列表
- * GET    /api/v1/workspace/scenarios/{id}      — 场景详情（含绑定+指标聚合）
+ * GET    /api/v1/workspace/scenarios           — 场景列表（附加 {@code ?purpose=forecast} 过滤，F07-14）
+ * GET    /api/v1/workspace/scenarios/{id}      — 场景详情（附加 allowedTransitions，F07-07）
  * POST   /api/v1/workspace/scenarios           — 创建场景
  * PUT    /api/v1/workspace/scenarios/{id}      — 更新场景
  * DELETE /api/v1/workspace/scenarios/{id}      — 删除场景（逻辑删除）
@@ -32,21 +39,45 @@ public class ScenarioController {
     private static final Logger log = LoggerFactory.getLogger(ScenarioController.class);
 
     private final ScenarioService scenarioService;
+    private final ScenarioStatusTransitionService transitionService;
+    private final CompletenessDataLoader loader;
+    private final ScenarioCompletenessService completenessService;
 
-    public ScenarioController(ScenarioService scenarioService) {
+    public ScenarioController(ScenarioService scenarioService,
+                              ScenarioStatusTransitionService transitionService,
+                              CompletenessDataLoader loader,
+                              ScenarioCompletenessService completenessService) {
         this.scenarioService = scenarioService;
+        this.transitionService = transitionService;
+        this.loader = loader;
+        this.completenessService = completenessService;
     }
 
-    /** 场景列表。 */
+    /**
+     * 场景列表。附加 {@code ?purpose=forecast} 只返回 ACTIVE 且无孤岛的场景（口径同 F07-04-5，
+     * 不改既有签名，无参调用行为不变）。
+     */
     @GetMapping
-    public ApiResponse<List<ScenarioVO>> list() {
-        return ApiResponse.success(scenarioService.list());
+    public ApiResponse<List<ScenarioVO>> list(@RequestParam(name = "purpose", required = false) String purpose) {
+        List<ScenarioVO> all = scenarioService.list();
+        if (!"forecast".equalsIgnoreCase(purpose)) {
+            return ApiResponse.success(all);
+        }
+        List<ScenarioVO> filtered = new ArrayList<>();
+        for (ScenarioVO vo : all) {
+            if (isActiveWithoutIsland(vo)) {
+                filtered.add(vo);
+            }
+        }
+        return ApiResponse.success(filtered);
     }
 
-    /** 场景详情（含绑定 + 指标聚合）。 */
+    /** 场景详情（含绑定 + 指标聚合 + allowedTransitions 附加字段）。 */
     @GetMapping("/{id}")
     public ApiResponse<ScenarioVO> get(@PathVariable String id) {
-        return ApiResponse.success(scenarioService.get(id));
+        ScenarioVO vo = scenarioService.get(id);
+        vo.setAllowedTransitions(transitionService.allowedTransitionsFor(id));
+        return ApiResponse.success(vo);
     }
 
     /** 创建场景（含可选绑定）。 */
@@ -72,5 +103,15 @@ public class ScenarioController {
     @GetMapping("/{id}/bindings")
     public ApiResponse<Map<String, List<String>>> bindings(@PathVariable String id) {
         return ApiResponse.success(scenarioService.bindings(id));
+    }
+
+    private boolean isActiveWithoutIsland(ScenarioVO vo) {
+        if (!"ACTIVE".equalsIgnoreCase(vo.getStatus())) {
+            return false;
+        }
+        List<BindingNode> bindings = loader.bindingsOf(vo.getId());
+        List<LinkEdge> links = loader.linksOf(vo.getId());
+        CompletenessReport report = completenessService.compute(vo.getId(), bindings, links);
+        return report.getIslands().isEmpty();
     }
 }

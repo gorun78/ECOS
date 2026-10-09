@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chinacreator.gzcm.workspace.mapper.DecisionRecordMapper">
+
+    <insert id="insert" parameterType="java.util.Map">
+        INSERT INTO #{schema}.ecos_scenario_decision_record
+            (id, scenario_id, mind_id, forecast_run_id, run_mode, verdict,
+             owner_user_id, due_date, approver_user_id, expected_impact, control_metric,
+             action_plan_json, source_refs_json, compliance_verdict, compliance_detail_json,
+             create_by, create_time, update_by, update_time, is_deleted, version_no, domain)
+        VALUES
+            (#{row.id}, #{row.scenarioId}, #{row.mindId}, #{row.forecastRunId}, #{row.runMode}, #{row.verdict},
+             #{row.ownerUserId}, #{row.dueDate}, #{row.approverUserId}, #{row.expectedImpact}, #{row.controlMetric},
+             #{row.actionPlanJson}, #{row.sourceRefsJson}, #{row.complianceVerdict}, #{row.complianceDetailJson},
+             #{row.createBy}, NOW(), #{row.updateBy}, NOW(), 0, 0, #{row.domain})
+    </insert>
+
+    <select id="selectByScenario" resultType="java.util.LinkedHashMap">
+        SELECT id, scenario_id, forecast_run_id, run_mode, verdict,
+               owner_user_id, due_date, approver_user_id, expected_impact, control_metric, create_time
+        FROM #{schema}.ecos_scenario_decision_record
+        WHERE scenario_id = #{scenarioId} AND is_deleted = 0
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectById" resultType="java.util.LinkedHashMap">
+        SELECT id, scenario_id, forecast_run_id, run_mode, verdict,
+               owner_user_id, due_date, approver_user_id, expected_impact, control_metric
+        FROM #{schema}.ecos_scenario_decision_record
+        WHERE id = #{decisionId} AND is_deleted = 0
+    </select>
+
+    <select id="selectMandatoryColumns" resultType="java.util.LinkedHashMap">
+        SELECT owner_user_id, due_date, approver_user_id, expected_impact, control_metric
+        FROM #{schema}.ecos_scenario_decision_record
+        WHERE id = #{decisionId} AND is_deleted = 0
+    </select>
+
+</mapper>

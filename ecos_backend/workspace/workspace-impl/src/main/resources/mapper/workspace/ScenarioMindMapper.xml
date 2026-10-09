@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chinacreator.gzcm.workspace.mapper.ScenarioMindMapper">
+
+    <select id="selectByScenario" resultType="java.util.LinkedHashMap">
+        SELECT id, scenario_id, mind_label, initial_belief_json, deleted_guard, create_time, update_time
+        FROM #{schema}.ecos_scenario_mind_variant
+        WHERE scenario_id = #{scenarioId} AND is_deleted = 0
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectById" resultType="java.util.LinkedHashMap">
+        SELECT id, scenario_id, mind_label, initial_belief_json, deleted_guard, create_time, update_time
+        FROM #{schema}.ecos_scenario_mind_variant
+        WHERE id = #{mindId} AND is_deleted = 0
+    </select>
+
+</mapper>

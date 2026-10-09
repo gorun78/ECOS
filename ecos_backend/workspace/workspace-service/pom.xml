@@ -75,10 +75,25 @@
             <artifactId>ontology-engine-impl</artifactId>
             <version>${databridge.version}</version>
         </dependency>
+        <!-- ★ 卷07 F07-16 分层纪律：本模块的 4 个 *-impl 依赖是"过渡态"，删除前置条件 =
+             workspace-impl 侧 ObjectController/ObjectActionController 的
+             IFunctionPropertyEvaluator / IActionHookExecutor / ObjectRuntimeService /
+             StateMachineEngine 注入点改走 DecisionGateway（gateway 态 LocalApiInvoker /
+             独立态 RestApiInvoker）。当前该重构尚未落地，删依赖会让 :18090 直接启动失败。
+             守门由 workspace-impl WorkspaceLayeringArchTest 承担（workspace 源码 0 import
+             engine/buszhi/sysman 包）；sysman-impl 另承担 F07-01 鉴权等价（sysman.security
+             SecurityConfig + JwtAuthenticationFilter + ClearanceInterceptor），
+             与 aiming/datanet/buszhi 三个独立 JAR 同一口径。 -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>buszhi-impl</artifactId>
             <version>${databridge.version}</version>
+        </dependency>
+        <!-- 测试底座（卷07 F07-24 / W188）：双形态启动薄切片 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

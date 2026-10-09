@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.workspace.scenario.ScenarioRunRequestValidator;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioRunService;
 
 /**
@@ -27,16 +28,25 @@ public class ScenarioRunController {
     private static final Logger log = LoggerFactory.getLogger(ScenarioRunController.class);
 
     private final ScenarioRunService scenarioRunService;
+    private final ScenarioRunRequestValidator requestValidator;
 
-    public ScenarioRunController(ScenarioRunService scenarioRunService) {
+    public ScenarioRunController(ScenarioRunService scenarioRunService,
+                                 ScenarioRunRequestValidator requestValidator) {
         this.scenarioRunService = scenarioRunService;
+        this.requestValidator = requestValidator;
     }
 
-    /** 发起场景运行：body 需 runTypes[]（DIAGNOSE/FORECAST/SIMULATE/STRATEGY 组合），可选 metric/deviation/series/simulateVariables。 */
+    /**
+     * 发起场景运行：body 需 runTypes[]（DIAGNOSE/FORECAST/SIMULATE/STRATEGY 组合），
+     * 可选 metric/deviation/series/simulateVariables；附加可选字段 runMode（默认 FORMAL）/scenarioId/baselineRunId
+     * （卷07 F07-08/09/14，旧 body 行为不变）。
+     */
     @PostMapping("/{id}/runs")
     public ApiResponse<Map<String, Object>> run(@PathVariable String id,
                                                 @RequestBody Map<String, Object> param) {
-        log.info("发起场景运行 scenario={} params={}", id, param);
+        ScenarioRunRequestValidator.RunCommand command = requestValidator.validate(id, param);
+        log.info("发起场景运行 scenario={} runMode={} baselineRunId={} params={}",
+                command.getScenarioId(), command.getRunMode(), command.getBaselineRunId(), param);
         return ApiResponse.success(scenarioRunService.run(id, param));
     }
 

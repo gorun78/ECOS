@@ -55,6 +55,11 @@ const AIWorkbench = lazy(() => import('./pages/aiworkbench/index.tsx'));
 const ChatbotStudioRouterPage = lazy(() => import('./pages/aiworkbench/ChatbotStudioRouterPage.tsx'));
 const WorkshopView = lazy(() => import('./pages/WorkshopView.tsx'));
 const ScenarioManagementView = lazy(() => import('./pages/ScenarioManagementView.tsx'));
+// F07-06 workbench 3-tier IA
+const WorkbenchHome = lazy(() => import('./pages/workbench/index.tsx'));
+const WorkbenchScenarioDetail = lazy(() => import('./pages/workbench/[scenarioId]/index.tsx'));
+const WorkbenchForecast = lazy(() => import('./pages/workbench/[scenarioId]/forecast.tsx'));
+const NotFoundWorkbench = lazy(() => import('./pages/workbench/NotFoundWorkbench.tsx'));
 const DataQualityDashboard = lazy(() => import('./pages/DataQualityDashboard.tsx'));
 const GatewayDiagnosticsPage = lazy(() => import('./pages/platform/GatewayDiagnosticsPage.tsx'));
 const AlertsPage = lazy(() => import('./pages/platform/AlertsPage.tsx'));
@@ -159,6 +164,10 @@ createRoot(document.getElementById('root')!).render(
                 {/* K · 知识层 */}
                 <Route path="workflow_designer" element={<WorkshopView />} />
                 <Route path="project_workbench" element={<ScenarioManagementView />} />
+                {/* F07-06 工作台三层 IA：我的场景 → 场景详情 → 预测推演 */}
+                <Route path="workbench" element={<WorkbenchHome />} />
+                <Route path="workbench/:scenarioId" element={<WorkbenchScenarioDetail />} />
+                <Route path="workbench/:scenarioId/forecast" element={<WorkbenchForecast />} />
                 <Route path="scenario-sandbox/:scenarioId" element={
                     <Suspense fallback={<RouteFallback />}>
                         <SandboxRouteWrapper />
@@ -196,8 +205,8 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="engine-knowledge" element={<EngineMonitorRoute engine="knowledge" />} />
                 <Route path="engine-ai" element={<EngineMonitorRoute engine="ai" />} />
                 <Route path="engine-tasks" element={<TasksCenterRoute />} />
-                {/* 404 fallback */}
-                <Route path="*" element={<WorldModelViewer />} />
+                {/* 404 fallback — F07-06 工作台兜底页 */}
+                <Route path="*" element={<NotFoundWorkbench />} />
               </Route>
             </Routes>
           </Suspense>

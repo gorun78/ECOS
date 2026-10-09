@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chinacreator.gzcm.workspace.mapper.ScenarioBindingMapper">
+
+    <resultMap id="BindingMap" type="com.chinacreator.gzcm.workspace.scenario.ScenarioBinding">
+        <id property="id" column="id"/>
+        <result property="scenarioId" column="scenario_id"/>
+        <result property="bindingType" column="binding_type"/>
+        <result property="targetRef" column="target_ref"/>
+        <result property="targetId" column="target_id"/>
+        <result property="targetType" column="target_type"/>
+        <result property="remark" column="remark"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <select id="selectByScenario" resultMap="BindingMap">
+        SELECT id, scenario_id, binding_type, target_ref, target_id, target_type, remark, create_time
+        FROM #{schema}.ecos_scenario_asset_binding
+        WHERE scenario_id = #{scenarioId} AND is_deleted = 0
+    </select>
+
+    <insert id="insert" parameterType="java.util.Map">
+        INSERT INTO #{schema}.ecos_scenario_asset_binding
+            (id, scenario_id, binding_type, target_ref, target_id, target_type, remark, is_island, island_reason,
+             create_by, create_time, update_by, update_time, is_deleted, version_no, domain)
+        VALUES
+            (#{row.id}, #{row.scenarioId}, #{row.bindingType}, #{row.targetRef}, #{row.targetId},
+             #{row.targetType}, #{row.remark}, FALSE, NULL,
+             #{row.createBy}, NOW(), #{row.updateBy}, NOW(), 0, 0, #{row.domain})
+    </insert>
+
+    <update id="softDeleteByScenario">
+        UPDATE #{schema}.ecos_scenario_asset_binding
+        SET is_deleted = 1, update_time = NOW()
+        WHERE scenario_id = #{scenarioId} AND is_deleted = 0
+    </update>
+
+    <update id="markIsland">
+        UPDATE #{schema}.ecos_scenario_asset_binding
+        SET is_island = #{isIsland}, island_reason = #{islandReason}, update_time = NOW()
+        WHERE id = #{bindingId} AND is_deleted = 0
+    </update>
+
+    <update id="batchClearIslands">
+        UPDATE #{schema}.ecos_scenario_asset_binding
+        SET is_island = FALSE, island_reason = NULL, update_time = NOW()
+        WHERE scenario_id = #{scenarioId} AND is_deleted = 0
+    </update>
+
+</mapper>

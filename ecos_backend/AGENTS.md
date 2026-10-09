@@ -41,7 +41,7 @@ services/sysman:18081  services/datanet:18082
     └─→ services/buszhi:18083 (本体/工作流)
         services/dccheng:18086 (KB/知识图谱/RAG/规则)
         services/aiming:18084 (Agent/Loop/LLM + 认知木C)
-        workspace:18090 (场景层, 调全部 5 service)
+        workspace:18090 (场景层, 仅 ScenarioOptionsController 一处聚合探测)
 ```
 
 **端口隔离铁律 (ADR-7)**：service 端口**仅内网可达**，前端/BFF 走 gateway :8080。
@@ -177,7 +177,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File D:\workspace\javaprojects\EC
 
 - **后端**: ✅ 编译绿 (7 JAR) + gateway :8080 UP
 - **5 service 双跑**: ✅ sysman:18081 UP, datanet:18082 UP, buszhi:18083 UP, aiming:18084 UP, dccheng:18086 UP — JAR 已 build, 按需启动
-- **workspace 场景层**: ✅ :18090 UP, 封装 Twin/Alert/Task/EngineTask/EcosKnowledgeGraph (P3-C 迁入)
+- **workspace 场景层**: ✅ :18090 UP。实态：承载场景域 REST 面（约 68 端点，含既有 A 系列 32 条）+ `ScenarioOptionsController` 一处聚合探测；**不封装** Twin/Alert/Task/EngineTask/EcosKnowledgeGraph（旧「P3-C 迁入」表述系虚构，本层无这些控制器）。
 - **PG Schema 预备**: ✅ 5 schema 建库验证
 - **Phase 推荐下线单档**: standard (PG only) — 默认 profile
 - **目标结构附录 A 对齐**: ⏸ Phase 8 Sprint 独立 Sprint 做 (3 个 Sprint 分级) — 不动代码保持可运行, 文档先对齐 (架构铁律 v2.0 + 本 AGENTS)

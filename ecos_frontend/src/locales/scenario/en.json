@@ -364,5 +364,16 @@
   "scenario.col.var": "Variable",
   "scenario.col.impact": "Impact",
   "scenario.col.direction": "Direction",
-  "scenario.explanation": "Explanation"
+  "scenario.explanation": "Explanation",
+  "scenario.decision.title": "Pending Write-back Proposals",
+  "scenario.decision.subtitle": "Write-back transactions triggered in scenario “{scenario}”, synced after authorization.",
+  "scenario.decision.refresh": "Refresh",
+  "scenario.decision.empty": "No pending or archived Ontology Action proposals.",
+  "scenario.decision.source": "Proposed by",
+  "scenario.decision.sourceAgent": "Agent Sandbox",
+  "scenario.decision.rejectReason": "Reject reason",
+  "scenario.decision.reject": "Reject",
+  "scenario.decision.approve": "Approve",
+  "scenario.decision.writing": "Writing",
+  "scenario.decision.archived": "Archived"
 }

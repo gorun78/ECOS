@@ -33,7 +33,7 @@ public class ScenarioMindService {
     private static final String STOPPED_WRITE_MSG =
             "MIND-501: legacy ecos_scenario_mind 写面已停写"
             + "（设计-05 F05-02/W116：V146 表库内不存在且不重建 legacy 名；场景↔Mind 绑定一律改经"
-            + " cognitive 注册门面写 ecos_cognitive.ecos_cognitive_scenario_mind）";
+            + " cognitive 注册门面写认知域场景-Mind 绑定表（V188）";
 
     private final WorkspaceDataDao dao;
     private final ObjectMapper objectMapper;

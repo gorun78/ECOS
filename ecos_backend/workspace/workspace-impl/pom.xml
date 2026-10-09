@@ -67,6 +67,11 @@
 
         <!-- 测试（H10-T1b：AbacQueryFilter 默认 DENY 用例；版本由根 pom dependencyManagement 单源管理） -->
         <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chinacreator.gzcm.workspace.mapper.ScenarioMapper">
+
+    <resultMap id="ScenarioMap" type="com.chinacreator.gzcm.workspace.scenario.BusinessScenario">
+        <id property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="description" column="description"/>
+        <result property="businessGoal" column="business_goal"/>
+        <result property="department" column="department"/>
+        <result property="priority" column="priority"/>
+        <result property="status" column="status"/>
+        <result property="budget" column="budget"/>
+        <result property="safetyIndexTarget" column="safety_index_target"/>
+        <result property="actualSafetyIndex" column="actual_safety_index"/>
+        <result property="metricsJson" column="metrics_json"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="isDeleted" column="is_deleted"/>
+    </resultMap>
+
+    <select id="selectList" resultMap="ScenarioMap">
+        SELECT id, name, description, business_goal, department, priority, status, budget,
+               safety_index_target, actual_safety_index, metrics_json,
+               create_time, update_time, create_by, update_by, is_deleted
+        FROM #{schema}.ecos_scenario_definition
+        WHERE is_deleted = 0
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectById" resultMap="ScenarioMap">
+        SELECT id, name, description, business_goal, department, priority, status, budget,
+               safety_index_target, actual_safety_index, metrics_json,
+               create_time, update_time, create_by, update_by, is_deleted
+        FROM #{schema}.ecos_scenario_definition
+        WHERE id = #{id} AND is_deleted = 0
+    </select>
+
+    <select id="countById" resultType="int">
+        SELECT COUNT(1)
+        FROM #{schema}.ecos_scenario_definition
+        WHERE id = #{id} AND is_deleted = 0
+    </select>
+
+    <insert id="insert" parameterType="java.util.Map">
+        INSERT INTO #{schema}.ecos_scenario_definition
+            (id, name, description, business_goal, department, priority, status, budget,
+             safety_index_target, actual_safety_index, metrics_json,
+             create_by, create_time, update_by, update_time, is_deleted, version_no, domain)
+        VALUES
+            (#{row.id}, #{row.name}, #{row.description}, #{row.businessGoal}, #{row.department},
+             #{row.priority}, #{row.status}, #{row.budget},
+             #{row.safetyIndexTarget}, #{row.actualSafetyIndex}, #{row.metricsJson},
+             #{row.createBy}, NOW(), #{row.updateBy}, NOW(), 0, 0, #{row.domain})
+    </insert>
+
+    <update id="updateStatus">
+        UPDATE #{schema}.ecos_scenario_definition
+        SET status = #{status}, update_by = #{operator}, update_time = NOW(), version_no = version_no + 1
+        WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <update id="softDelete">
+        UPDATE #{schema}.ecos_scenario_definition
+        SET is_deleted = 1, update_by = #{operator}, update_time = NOW()
+        WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <select id="selectActiveWithoutIslandIds" resultType="string">
+        SELECT s.id
+        FROM #{schema}.ecos_scenario_definition s
+        WHERE s.is_deleted = 0
+          AND s.status = 'ACTIVE'
+          AND NOT EXISTS (
+              SELECT 1 FROM #{schema}.ecos_scenario_asset_binding b
+              WHERE b.scenario_id = s.id AND b.is_deleted = 0 AND b.is_island = TRUE
+          )
+    </select>
+
+</mapper>

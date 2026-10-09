@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.chinacreator.gzcm.workspace.mapper.SandboxLayoutMapper">
+
+    <select id="selectByScenario" resultType="java.util.LinkedHashMap">
+        SELECT id, scenario_id, layout_json, layout_version, version_no, domain, create_time, update_time
+        FROM #{schema}.ecos_scenario_canvas_layout
+        WHERE scenario_id = #{scenarioId} AND is_deleted = 0
+        ORDER BY update_time DESC
+    </select>
+
+    <insert id="insert" parameterType="java.util.Map">
+        INSERT INTO #{schema}.ecos_scenario_canvas_layout
+            (id, scenario_id, layout_json, layout_version,
+             create_by, create_time, update_by, update_time, is_deleted, version_no, domain)
+        VALUES
+            (#{row.id}, #{row.scenarioId}, #{row.layoutJson}, #{row.layoutVersion},
+             #{row.createBy}, NOW(), #{row.updateBy}, NOW(), 0, 0, #{row.domain})
+    </insert>
+
+    <update id="updateWithVersion" parameterType="java.util.Map">
+        UPDATE #{schema}.ecos_scenario_canvas_layout
+        SET layout_json = #{row.layoutJson},
+            layout_version = layout_version + 1,
+            version_no = version_no + 1,
+            update_by = #{row.updateBy},
+            update_time = NOW()
+        WHERE id = #{row.id}
+          AND scenario_id = #{row.scenarioId}
+          AND layout_version = #{row.expectedVersion}
+          AND is_deleted = 0
+    </update>
+
+</mapper>

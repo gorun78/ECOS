@@ -14,12 +14,12 @@
 
 | 决策项 | 裁定 | 落地点 |
 |---|---|---|
-| 主数据源：实体树 from `/workbench` vs `/tree` | **从 `/tree`**（建议 ①） | 前端 `ScenarioWorkbenchPanel` 初始化取数 |
-| 三栏右栏：认知策略合成 vs 实体属性 | **认知策略合成可视化**（建议 ②） | 前端 `ScenarioCognitionPanel` |
-| 认知策略计算时机：实时 vs 滚动间隔 | **滚动间隔 30s + Mind 变化即触发**（建议 ③，混合） | 前端 debounce（100–300ms 已做）+ setInterval 30s |
+| 主数据源：实体树 from `/workbench` vs `/tree` | **从 `/tree`**（建议 ①） | 前端工作台/场景视图初始化取数 |
+| 三栏右栏：认知策略合成 vs 实体属性 | **认知策略合成可视化**（建议 ②） | 前端 `CognitiveRightPanel`（E1~E4 唯一渲染入口，F07-12） |
+| 认知策略计算时机：实时 vs 滚动间隔 | **滚动间隔 30s + Mind 变化即触发**（建议 ③，混合） | 前端 `useCognition`（F07-12）+ `COGNITION_POLL_INTERVAL_MS` |
 | 能力约束机制：显式 UI vs 隐形 | **隐形 — 后端按 Mind 自动过滤**（建议 ④） | 后端 `ScenarioServiceImpl` 三栏接入点 |
 | 权限模型：场景设计者 vs 工作台高危 | **沿用既有分域**（建议 ⑤） | 复用 `@PreAuthorize` |
-| "场景认知自由基" 下拉 | 保留，作为快速附加入口，不当主接口 | 前端 `CognitionRadicalButton` |
+| "场景认知自由基" 下拉 | 保留，作为快速附加入口，不当主接口 | 前端附加入口，主链路走 `useCognition` |
 | "识别-Operation 评估" | 并入主"运行"，不独立落 L2 | 与"运行"复用同一 `mindId/mindThreadId` |
 
 ### 1.2 不变铁律清单
@@ -144,7 +144,7 @@ business_scenario.id
               +---------------------------------------------------+
               |                     中栏（实体/服务/工作流）                        |
               |                 +--------------------------------------------------------------------+
-              |                 |  右栏 — 认知策略合成 (ScenarioCognitionPanel)                      |
+              |                 |  右栏 — 认知策略合成 (CognitiveRightPanel)                         |
               |                 |  - Mind chip + capabilityMask badge                                 |
               |                 |  - E3 "原因" 列表 + confidence 进度条                               |
               |                 |  - E4 "功能" 列表 + probability 热力                                 |
@@ -154,19 +154,21 @@ business_scenario.id
               +---------------------------------------------------+
 ```
 
-### 4.2 三个新增组件
+### 4.2 前端组件（真实存在，订正 F07-15）
+
+> 早期草案设想的 `ScenarioCognitionPanel.tsx` / `ScenarioHypothesisList.tsx` / `ScenarioBeliefList.tsx` **从未落地**，属虚构组件名，现予以更正。E1~E4 的唯一渲染入口是 `CognitiveRightPanel`，取数统一经 `hooks/useCognition`（F07-12）。
 
 | 路径 | 职责 |
 |---|---|
-| `ecos_frontend/src/pages/project-workbench/ScenarioCognitionPanel.tsx` | 右栏主视图，按 Mind 订阅，debounce + 30s 轮询 |
-| `ecos_frontend/src/pages/project-workbench/ScenarioHypothesisList.tsx` | E3 列表子组件 |
-| `ecos_frontend/src/pages/project-workbench/ScenarioBeliefList.tsx` | E4 列表子组件 |
+| `ecos_frontend/src/pages/scenario/cognition/CognitiveRightPanel.tsx` | E1~E4 四卡唯一渲染入口，按场景 ID 订阅 |
+| `ecos_frontend/src/hooks/useCognition.ts` | 四端点只读通道聚合（detect/operation-eval/hypotheses/beliefs），单源实现在 `services/cognitiveClient.ts` |
+| `ecos_frontend/src/pages/scenario/SimulationResultPanel.tsx` | 推演/沙箱结果只读展示，消费 `useCognition`，禁本地伪造 verdict |
 
-### 4.3 降级策略
+### 4.3 降级策略（订正 F07-12/F07-15：503 只显式暴露，绝不伪造）
 
-- **后端未启 Mind**：E1 返 503 -> 右栏置灰 + banner"认知引擎未启用"
-- **场景无 Mind**：E1 返 `data: []` -> 右栏显示"未关联 Mind，可先到 Mind 工作台关联"
-- **E2/E4 部分失败**：单卡 toast，不全栏崩
+- **后端未启 Mind / schema 未就绪**：E1~E4 任一返 **503**（`CognitiveApiError` code `ENGINE_DISABLED`/`SCHEMA_NOT_READY`）→ `useCognition` 置 `unavailable=true`，右栏渲染横幅 + traceId + 重试，**不得**把 503 掩成 200 或本地合成结论（§3.3 离线/错误态）。
+- **场景无 Mind**：E1 返 `data: []` → 右栏显示"未关联 Mind，可先到 Mind 工作台关联"（空态，非错误）。
+- **E2/E4 部分失败**：单卡降级为该切片横幅，其余切片正常渲染，不全栏崩。
 
 ---
 
@@ -181,11 +183,11 @@ business_scenario.id
 - [ ] 503 穿透（`cognitive-engine` 未装时）
 - [ ] 单测覆盖：空场景 / 多 Mind / 无 Mind / 503 四种状态
 
-### 5.2 前端
+### 5.2 前端（订正：真实入口 = `CognitiveRightPanel` + `useCognition`）
 
-- [ ] `ScenarioWorkbenchPanel` 打开场景时三栏挂载
-- [ ] 右栏在 Mind 变化 / 100ms debounce / 30s 轮询 三种条件下都能刷新
-- [ ] 右栏 503 / 404 / 空 Mind 三个 fallback 分支均有真实渲染
+- [ ] `CognitiveRightPanel` 打开场景时以 `scenarioId` 挂载 `useCognition`，四端点各自 loading/error/empty/权限/offline 全覆盖（§3.3）
+- [ ] 认知引擎 503（`ENGINE_DISABLED` / `SCHEMA_NOT_READY`）→ 横幅 + traceId，**不得合成 verdict/answer**（F07-12/F07-22）
+- [ ] 空 Mind（`data: []`）→ 渲染"未关联 Mind"空态而非错误态
 
 ### 5.3 E2E
 

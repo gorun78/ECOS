@@ -77,7 +77,6 @@ public class ScenarioBindingLinkService {
         }
 
         List<ScenarioGraphNodeVO> nodes = new ArrayList<>(bindings.size());
-        int totalObjects = 0, objectsMapped = 0, totalAgents = 0, agentsConnected = 0;
 
         for (Map<String, Object> b : bindings) {
             String id = (String) b.get("id");
@@ -86,27 +85,15 @@ public class ScenarioBindingLinkService {
             nodes.add(new ScenarioGraphNodeVO(
                 id, bt, (String) b.get("target_ref"), (String) b.get("target_id"),
                 (String) b.get("target_type"), connected, "AI_AGENT".equals(bt)));
-
-            if ("OBJECT_TYPE".equals(bt)) {
-                totalObjects++;
-                if (connected) objectsMapped++;
-            }
-            if ("AI_AGENT".equals(bt)) {
-                totalAgents++;
-                if (connected) agentsConnected++;
-            }
         }
 
-        double d2i = totalObjects == 0 ? 1.0 : (double) objectsMapped / totalObjects;
-        double k2w = totalAgents  == 0 ? 1.0 : (double) agentsConnected / totalAgents;
+        // 完整度（连边覆盖率）唯一来源是 ScenarioCompletenessService（F07-02），
+        // 本拓扑仅供画布着色（connected 节点标记），不再产出任何节点占比口径的 coverage（X-23 已删除）。
+        Map<String, Object> topology = new LinkedHashMap<>();
+        topology.put("totalNodes", nodes.size());
+        topology.put("totalLinks", links.size());
 
-        Map<String, Object> coverage = new LinkedHashMap<>();
-        coverage.put("d2iCoverage", round2(d2i));
-        coverage.put("k2wCoverage", round2(k2w));
-        coverage.put("totalNodes", nodes.size());
-        coverage.put("totalLinks", links.size());
-
-        return new ScenarioGraphVO(scenarioId, nodes, links, coverage);
+        return new ScenarioGraphVO(scenarioId, nodes, links, topology);
     }
 
     // ── 写入 ──────────────────────────────────────────────
@@ -131,7 +118,7 @@ public class ScenarioBindingLinkService {
         if ("MAPPING".equals(linkType)
                 && (dto.getSourceContract() == null || dto.getSourceContract().isBlank())) {
             throw new BusinessException(400,
-                "LINK-400: MAPPING 边必带 sourceContract（§0.6.2.2，指向 ecos_entity_table_mapping.id）");
+                "LINK-400: MAPPING 边必带 sourceContract（§0.6.2.2，指向本体↔物理表映射契约记录 id）");
         }
         requireBindingInScenario(scenarioId, source);
         requireBindingInScenario(scenarioId, target);
