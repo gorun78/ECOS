@@ -21,7 +21,8 @@ public @interface TokenMeter {
     String operation() default "llm_call";
 
     /**
-     * 模型名称（可选，默认为 "hermes-agent"）。
+     * 模型名称（可选）。未指定时由 {@code TokenMeterAspect} 回落到配置单源
+     * {@code llm.default-model}（权威契约见 gateway application.yml），禁硬编码供应商标识。
      */
     String model() default "";
 }

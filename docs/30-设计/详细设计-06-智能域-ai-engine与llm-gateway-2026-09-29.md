@@ -938,12 +938,14 @@ CREATE INDEX IF NOT EXISTS idx_agdl_tool  ON ecos_ai.ecos_ai_guardrail_decision_
 
 ### 8.3 接缝验收（可执行标识）
 
-1. `mvn -Dtest=ModuleDependencyArchTest#engineMustNotDependOnServices`（**M0，不等裁决**）；
-2. `mvn -Dtest=AgentRuntimeUniquenessTest#onlyOneLoopImplementationInReactor`；
-3. `mvn -Dtest=ToolContractRegistryTest#lambdaRegisteredToolRejected`；
-4. `mvn -Dtest=ModelRouterDecisionTest#riskLevelComesOnlyFromAbac`；
-5. `mvn -Dtest=TokenMeterConfigTest#noHardcodedModelName`（**M0**：`TokenMeterAspect` 去 `"hermes-agent"` 硬编码）；
-6. `mvn -Dtest=CliContractParityTest#everyCommandMapsToOpenApiOperation` —— P-5 未建成记"未执行"。
+> 【2026-10-09 收卷回填】接缝 #1~#5 已实跑齐绿（`Tests run: 5, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`）——**通过**；#6 与全部 `*IT` / `*.spec.ts` / 生产链路 live E2E 项仍然**未执行**（P-5 未建成、P-1 live 底座与 LLM key 同跑未满足），依 Q13 一律不得记"通过"。
+
+1. `mvn -Dtest=ModuleDependencyArchTest#engineMustNotDependOnServices`（**M0，不等裁决**）—— **通过**；
+2. `mvn -Dtest=AgentRuntimeUniquenessTest#onlyOneLoopImplementationInReactor` —— **通过**；
+3. `mvn -Dtest=ToolContractRegistryTest#lambdaRegisteredToolRejected` —— **通过**；
+4. `mvn -Dtest=ModelRouterDecisionTest#riskLevelComesOnlyFromAbac` —— **通过**；
+5. `mvn -Dtest=TokenMeterConfigTest#noHardcodedModelName`（**M0**：`TokenMeterAspect` 去 `"hermes-agent"` 硬编码）—— **通过**；
+6. `mvn -Dtest=CliContractParityTest#everyCommandMapsToOpenApiOperation` —— P-5 未建成（全仓 0 OpenAPI yaml = C259），**未执行**。
 
 ---
 
@@ -1023,4 +1025,5 @@ CREATE INDEX IF NOT EXISTS idx_agdl_tool  ON ecos_ai.ecos_ai_guardrail_decision_
 
 **本册一句话结论**：智能域的实测形态是"咽喉已在、闸门未装，门面在、计量断，界面在、真值无"——PRD-06 五项主责能力一条都不达标，但改造路径清晰且**不需要新增平行入口**：把 `ToolExecutorService#execute` 的裁决面从"仅 SQL"扩到全工具类型并 fail-closed、把 LLM 出口与 api-key 收一于 llm-gateway、把压缩从"条数+截断+物理删除"改为"token+结构化摘要+逻辑归档"、把 traceId 从进程内 8 位串换成 MDC 全链贯通、把五个场景工具从硬编码白名单改为声明式注册表并强挂引用后校验；同时必须先建 AI 测试底座（P-1），否则这套 P0 红线的验收无载体。六项存量归属议题（R-18~R-23）交由裁决，本册不擅自迁移。
 
-<!-- 详细设计-06-智能域 / 2026-09-29 / v1.2（2026-09-29 定版） / W140~W164 → C122~C146 / R-18~R-23 与 R-37/R-39/R-41/R-47/R-50 已批准（报告 §十四.1） / Gate-1 已签字、Gate-2 已通过 / 本轮未实跑库、未改业务代码 -->
+<!-- 详细设计-06-智能域 / 2026-09-29 / v1.2（2026-09-29 定版） / W140~W164 → C122~C146 / R-18~R-23 与 R-37/R-39/R-41/R-47/R-50 已批准（报告 §十四.1） / Gate-1 已签字、Gate-2 已通过
+2026-10-09 收卷：全设计项（F06-01~22、W140~W164、DDL V200~V204、ECOS-AI-* 错误码、前端 AI 面）已实现并 build-verify；接缝 #1~#5 实跑齐绿（Tests run: 5, Failures: 0, BUILD SUCCESS）记"通过"，#6（P-5/C259）与全部 *IT / *.spec.ts / 生产链路 live E2E 依 Q13 记"未执行"。已 commit（不 push）。 -->

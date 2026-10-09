@@ -8,6 +8,7 @@ import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
@@ -20,6 +21,10 @@ import java.util.concurrent.CompletableFuture;
  * 使用反射从返回值中提取 sessionId、tokensInput、tokensOutput 字段，兼容
  * hermes-engine 和 runtime-core 的 AgentResult 类（避免模块间耦合）。
  * </p>
+ *
+ * <p>详细设计-06 §八 接缝义务 5（M0 直改）：模型名称<b>不再硬编码供应商标识</b>，
+ * 未显式指定时回落到配置单源 {@code llm.default-model}（权威契约见
+ * gateway application.yml），补齐"无模型标识"漏洞的同时消除双源。</p>
  */
 @Aspect
 @Component
@@ -27,10 +32,15 @@ public class TokenMeterAspect {
 
     private static final Logger log = LoggerFactory.getLogger(TokenMeterAspect.class);
 
+    /** 详细设计-06 §八 接缝义务 5：未显式 {@code model()} 时的回落值 = 配置单源 {@code llm.default-model}，禁硬编码供应商标识。 */
+    private final String defaultModel;
+
     private final TokenAuditService auditService;
 
-    public TokenMeterAspect(TokenAuditService auditService) {
+    public TokenMeterAspect(TokenAuditService auditService,
+                            @Value("${llm.default-model:unknown}") String defaultModel) {
         this.auditService = auditService;
+        this.defaultModel = defaultModel;
     }
 
     @Pointcut("@annotation(com.chinacreator.gzcm.common.annotation.TokenMeter)")
@@ -48,7 +58,7 @@ public class TokenMeterAspect {
             operation = "llm_call";
         }
         String modelExpr = annotation.model();
-        String model = modelExpr != null && !modelExpr.isEmpty() ? modelExpr : "hermes-agent";
+        String model = modelExpr != null && !modelExpr.isEmpty() ? modelExpr : defaultModel;
 
         long startTime = System.currentTimeMillis();
 
