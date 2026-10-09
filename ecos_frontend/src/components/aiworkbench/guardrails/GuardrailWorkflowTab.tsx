@@ -387,7 +387,7 @@ export default function GuardrailWorkflowTab({
                                   <td className="p-2 text-emerald-600 font-bold bg-emerald-500/5">{m.readbackValue}</td>
                                   <td className="p-2 text-right">
                                     <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 font-black rounded-sm text-[8px] border border-emerald-200">
-                                      ✅ 强一致对齐
+                                      ✅ {t("aiworkbench.guardrails.strongConsistencyAligned")}
                                     </span>
                                   </td>
                                 </tr>
