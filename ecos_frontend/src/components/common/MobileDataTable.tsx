@@ -195,7 +195,7 @@ function MobileCardRows<T extends Record<string, any>>({
         return (
           <div
             key={rowId}
-            className="border rounded-md bg-white dark:bg-neutral-900 border-black/10 dark:border-white/10"
+            className={`border rounded-md ${styles.cardBg} ${styles.cardBorder}`}
           >
             {/* 卡片头 */}
             <div className="flex items-center justify-between px-3 py-2.5">
@@ -226,7 +226,7 @@ function MobileCardRows<T extends Record<string, any>>({
 
             {/* 详情区（折叠） */}
             {expanded && (
-              <div className="border-t px-3 py-2.5 border-black/10 dark:border-white/10 flex flex-col gap-2">
+              <div className={`border-t px-3 py-2.5 ${styles.cardBorder} flex flex-col gap-2`}>
                 {detailKeys.map((k) => {
                   const col = columns.find((c) => c.key === k);
                   if (!col) return null;
@@ -243,7 +243,7 @@ function MobileCardRows<T extends Record<string, any>>({
 
             {/* 操作底部 */}
             {actionCol && (
-              <div className="border-t px-3 py-2 border-black/10 dark:border-white/10 flex items-center justify-end gap-1.5 flex-wrap">
+              <div className={`border-t px-3 py-2 ${styles.cardBorder} flex items-center justify-end gap-1.5 flex-wrap`}>
                 {typeof actionCol.render === "function"
                   ? actionCol.render(r[actionCol.key], r, i)
                   : r[actionCol.key] == null
