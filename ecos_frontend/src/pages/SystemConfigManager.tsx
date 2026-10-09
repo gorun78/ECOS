@@ -174,7 +174,7 @@ export default function SystemConfigManager() {
     const modifiedAt = (cfg as any).modifiedAt || (cfg as any).modified_at || (cfg as any).updatedAt || '—';
 
     return (
-      <tr key={cfg.key} className={`border-b ${styles.sidebarBorder} ${styles.text} hover:bg-gray-50/50 dark:hover:bg-white/[0.03] transition-colors`}>
+      <tr key={cfg.key} className={`border-b ${styles.sidebarBorder} ${styles.text} ${styles.sidebarHoverBg} transition-colors`}>
         {/* Key */}
         <td className="py-3 px-3">
           <code className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--accent-bg)', color: 'var(--text-muted)' }}>{cfg.key}</code>

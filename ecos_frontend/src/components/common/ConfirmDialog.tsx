@@ -56,8 +56,9 @@ export default function ConfirmDialog({
         <p className={`text-sm mb-5 ${styles.cardTextMuted}`}>{message}</p>
         <div className="flex gap-2 justify-end">
           <button
+            type="button"
             onClick={onCancel}
-            className={`px-4 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText} hover:bg-gray-50 dark:hover:bg-white/5`}
+            className={`px-4 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`}
           >
             {defaultCancel}
           </button>

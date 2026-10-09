@@ -78,7 +78,7 @@ export default function SystemDictionary() {
           groups.map(g => (
             <button key={g.dictType} onClick={() => { setActiveType(g.dictType); setExpandedItem(null); }}
               className={`text-left px-3 py-2 rounded text-sm transition-colors flex items-center justify-between
-                ${activeType === g.dictType ? 'bg-indigo-600 text-white' : `${styles.muted} hover:bg-gray-100 dark:hover:bg-gray-800`}`}
+                ${activeType === g.dictType ? 'bg-indigo-600 text-white' : `${styles.muted} ${styles.sidebarHoverBg}`}`}
             >
               <span className="truncate text-xs">{g.dictType}</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono
@@ -114,7 +114,7 @@ export default function SystemDictionary() {
             <div className="flex items-center gap-3 mb-4">
               <Tag size={18} className="text-indigo-500" />
               <h2 className={`text-lg font-semibold ${styles.text}`}>{activeGroup.dictType}</h2>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${styles.muted} bg-gray-100 dark:bg-gray-800`}>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${styles.muted} ${styles.sidebarBg}`}>
                 {activeGroup.items.length} {t("platform.dictionary.itemsUnit")}
               </span>
             </div>
@@ -128,7 +128,7 @@ export default function SystemDictionary() {
                   >
                     {/* Row */}
                     <div
-                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                      className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${styles.sidebarHoverBg}`}
                       onClick={() => setExpandedItem(isExpanded ? null : item.id)}
                     >
                       <Hash size={14} className={`${styles.cardTextMuted} shrink-0`} />
@@ -152,7 +152,7 @@ export default function SystemDictionary() {
 
                     {/* Expanded detail */}
                     {isExpanded && (
-                      <div className={`px-4 py-3 border-t ${styles.sidebarBorder} bg-gray-50 dark:bg-gray-900/30 text-xs space-y-1`}>
+                      <div className={`px-4 py-3 border-t ${styles.sidebarBorder} ${styles.appBg} text-xs space-y-1`}>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                           <div><span className={styles.muted}>ID:</span> <span className="font-mono">{item.id}</span></div>
                           <div><span className={styles.muted}>Sort:</span> {item.sortOrder}</div>
