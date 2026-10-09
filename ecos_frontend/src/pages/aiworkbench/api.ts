@@ -9,6 +9,7 @@
  * @license Apache-2.0
  */
 import { apiFetchData } from '../../api';
+import { authHeaders } from '../../services/auth';
 import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel, AIPActionType, ExecuteActionResult, AIPAgentTemplate, AIPAgentMetrics, AIPAgentError, AIPAgentVersion } from '../../types/aiworkbench';
 
 // ── AgentMesh ──────────────────────────────────────────────────
@@ -446,14 +447,12 @@ interface OagPlaygroundParams {
 export async function oagPlaygroundStream(params: OagPlaygroundParams): Promise<void> {
   const res = await fetch('/api/v1/oag/chat/stream', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({
       message: params.message,
       model: params.model,
       temperature: params.temperature,
       maxTokens: params.maxTokens,
-      userId: 'admin',
-      tenantId: 'default',
       sessionId: params.sessionId,
     }),
     signal: params.abortSignal,
