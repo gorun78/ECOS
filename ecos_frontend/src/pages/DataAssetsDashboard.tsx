@@ -192,7 +192,7 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
                   <div className="text-xs opacity-60 py-4 text-center">{t('dw.assets.empty')}</div>
                 ) : (
                   assets.map(a => (
-                    <button
+                    <button type="button"
                       key={a.assetId}
                       onClick={() => setSelectedAssetId(a.assetId === selectedAssetId ? null : a.assetId)}
                       className={`w-full text-left rounded-md p-2 border transition-colors ${
@@ -376,7 +376,7 @@ function AssetDetail({
                   <td className="px-2 py-1">{f.fieldSensitivity}</td>
                   <td className="px-2 py-1">{t(`dw.assets.maskStrategy.${f.maskStrategy}`) || f.maskStrategy}</td>
                   <td className="px-2 py-1 text-right">
-                    <button
+                    <button type="button"
                       className="text-xs underline hover:text-rose-600"
                       onClick={() => {
                         setEditingFieldId(f.fieldId);
@@ -442,13 +442,13 @@ function AssetDetail({
               <span className="text-[11px]">{t('dw.assets.confirmed')}</span>
             </label>
             <div className="flex-1" />
-            <button
+            <button type="button"
               className="px-2.5 py-1 text-xs rounded bg-black/5 hover:bg-black/10"
               onClick={() => setEditingFieldId(null)}
             >
               {t('dw.assets.cancelBtn')}
             </button>
-            <button
+            <button type="button"
               className="px-2.5 py-1 text-xs rounded bg-black/10 hover:bg-black/20 font-semibold"
               onClick={confirmTag}
             >

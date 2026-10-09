@@ -66,7 +66,7 @@ export default function ParetoTab({
             </p>
           ) : (
             paretoHistory.map((p) => (
-              <button
+              <button type="button"
                 key={p.problemId}
                 onClick={() => loadParetoResult(p.problemId)}
                 className={`w-full text-left px-2 py-1.5 rounded text-[11px] transition-all cursor-pointer border
@@ -93,7 +93,7 @@ export default function ParetoTab({
           <div className="px-3 py-2 rounded text-xs bg-red-500/10 border border-red-500/30 text-red-400 flex items-center gap-2 shrink-0">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             {paretoError}
-            <button onClick={() => setParetoError("")} className="ml-auto hover:opacity-80">
+            <button type="button" onClick={() => setParetoError("")} className="ml-auto hover:opacity-80">
               <XCircle className="w-3 h-3" />
             </button>
           </div>
@@ -157,7 +157,7 @@ export default function ParetoTab({
               />
             </div>
           </div>
-          <button
+          <button type="button"
             onClick={runParetoOptimize}
             disabled={paretoLoading}
             className={`flex items-center gap-1.5 px-4 py-2 rounded text-xs font-medium transition-all

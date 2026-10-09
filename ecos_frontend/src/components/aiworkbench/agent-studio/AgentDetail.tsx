@@ -47,14 +47,14 @@ export default function AgentDetail({
         </div>
 
         <div className="flex gap-2">
-          <button
+          <button type="button"
             onClick={() => onStartEdit(selectedAgent)}
             className={`px-2.5 py-1.5 ${styles.appBg} ${styles.accentHover} ${styles.cardTextMuted} border ${styles.cardBorder} rounded-lg transition-all cursor-pointer flex items-center gap-1`}
           >
             <Icon name="Settings2" size={11} />
             <span>{t("aiworkbench.agentStudio.manageAgent")}</span>
           </button>
-          <button
+          <button type="button"
             onClick={() => onDelete(selectedAgent.id)}
             className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-all cursor-pointer flex items-center gap-1"
           >

@@ -54,7 +54,7 @@ export default function MarketplaceAccessModal({
           <h2 className={`text-lg font-semibold ${styles.cardText}`}>
             {t("marketplace.access.title")}
           </h2>
-          <button
+          <button type="button"
             onClick={onClose}
             disabled={submitting}
             className="opacity-50 hover:opacity-100 transition-opacity disabled:opacity-30"
@@ -93,7 +93,7 @@ export default function MarketplaceAccessModal({
 
         {/* Buttons */}
         <div className="flex gap-2.5 mt-4">
-          <button
+          <button type="button"
             onClick={onClose}
             disabled={submitting}
             className={`flex-1 py-2.5 rounded-lg text-sm font-medium border ${styles.sidebarBorder}
@@ -101,7 +101,7 @@ export default function MarketplaceAccessModal({
           >
             {t("common.cancel")}
           </button>
-          <button
+          <button type="button"
             onClick={onSubmit}
             disabled={submitting || !reason.trim()}
             className="flex-1 py-2.5 rounded-lg text-sm font-medium text-white

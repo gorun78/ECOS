@@ -298,13 +298,13 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
         <div className="flex items-center gap-2 flex-wrap">
           {/* 视图切换 */}
           <div className={`flex items-center gap-1 ${styles.cardBg} border ${styles.cardBorder} rounded-lg p-1`}>
-            <button onClick={() => switchMode("topology")} className={tabClass(mode === "topology")}>
+            <button type="button" onClick={() => switchMode("topology")} className={tabClass(mode === "topology")}>
               <span className="inline-flex items-center gap-1">
                 <Package className="w-3 h-3" />
                 {t("dw.lineage.topology")}
               </span>
             </button>
-            <button onClick={() => switchMode("table")} className={tabClass(mode === "table")}>
+            <button type="button" onClick={() => switchMode("table")} className={tabClass(mode === "table")}>
               <span className="inline-flex items-center gap-1">
                 <Table2 className="w-3 h-3" />
                 {t("dw.lineage.tableQuery")}
@@ -314,7 +314,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
 
           {/* 重新生成（仅拓扑视图） */}
           {mode === "topology" && (
-            <button
+            <button type="button"
               onClick={handleRebuild}
               disabled={rebuilding}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40"
@@ -342,7 +342,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                 onChange={e => setTableName(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && handleQueryTable()}
               />
-              <button
+              <button type="button"
                 onClick={handleQueryTable}
                 disabled={loading}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border transition disabled:opacity-40"
@@ -367,7 +367,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
           </div>
 
           {/* 刷新（等价 reload 当前视图） */}
-          <button
+          <button type="button"
             onClick={() => (mode === "topology" ? loadTopology() : handleQueryTable())}
             className="p-1.5 rounded hover:opacity-70 transition"
             title={t("dw.lineage.refresh")}
@@ -398,7 +398,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
             <AlertCircle className="w-3 h-3" /> {emptyHint}
           </span>
           {mode === "topology" && (
-            <button
+            <button type="button"
               onClick={handleRebuild}
               disabled={rebuilding}
               className="px-2 py-0.5 rounded border text-[10px] font-semibold transition disabled:opacity-40"
@@ -436,7 +436,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
               <h3 className={`text-sm font-bold ${styles.cardText}`}>
                 {t("dw.lineage.nodeDetail")}
               </h3>
-              <button
+              <button type="button"
                 onClick={() => { setSelectedNodeId(null); setSelectedEdge(null); }}
                 className={`text-[11px] ${styles.muted} hover:opacity-80 transition`}
               >
@@ -496,7 +496,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                       const isSource = e.source === selectedNode.id;
                       const other = isSource ? e.target : e.source;
                       return (
-                        <button
+                        <button type="button"
                           key={e.id}
                           onClick={() => setSelectedEdge(e)}
                           className={`w-full text-left rounded px-1.5 py-1 text-[10px] cursor-pointer transition ${
@@ -571,7 +571,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                         ? t("dw.lineage.focused", { n: impactDepth })
                         : t("dw.lineage.focus")}
                     </span>
-                    <button
+                    <button type="button"
                       onClick={() => setFocusMode(v => !v)}
                       className={`relative inline-flex items-center h-4 w-7 rounded-full transition ${
                         focusMode ? styles.accentBg : styles.appBg
@@ -629,7 +629,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                             ↓ {t("dw.lineage.downstream")} ({impactData.downstream.length})
                           </div>
                           {impactData.downstream.slice(0, 20).map((n, i) => (
-                            <button
+                            <button type="button"
                               key={`d_${i}`}
                               onClick={() => setSelectedNodeId(n.id)}
                               className={`w-full flex items-center gap-1.5 text-left px-1.5 py-0.5 rounded ${styles.sidebarHoverBg} transition text-[10px]`}
@@ -654,7 +654,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
                             ↑ {t("dw.lineage.upstream")} ({impactData.upstream.length})
                           </div>
                           {impactData.upstream.slice(0, 20).map((n, i) => (
-                            <button
+                            <button type="button"
                               key={`u_${i}`}
                               onClick={() => setSelectedNodeId(n.id)}
                               className={`w-full flex items-center gap-1.5 text-left px-1.5 py-0.5 rounded ${styles.sidebarHoverBg} transition text-[10px]`}

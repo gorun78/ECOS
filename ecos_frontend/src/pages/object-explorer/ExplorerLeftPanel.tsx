@@ -57,7 +57,7 @@ export default function ExplorerLeftPanel({
           const count = (ot.id === activeObjectTypeId && instanceData.length > 0) ? dataTotal : (relatedInstanceCache[ot.id]?.length ?? 0);
 
           return (
-            <button
+            <button type="button"
               key={ot.id}
               onClick={() => {
                 setActiveObjectTypeId(ot.id);
@@ -107,7 +107,7 @@ export default function ExplorerLeftPanel({
                   <Bookmark size={11} className="text-blue-500 shrink-0" />
                   <span className={`font-medium ${styles.cardTextMuted} truncate`}>{search.name}</span>
                 </div>
-                <button
+                <button type="button"
                   onClick={(e) => handleDeleteSavedSearch(search.id, e)}
                   className={`opacity-0 group-hover:opacity-100 hover:text-red-500 ${styles.muted} transition-opacity p-0.5`}
                 >

@@ -41,7 +41,7 @@ export function TaskPanelDetailDrawer({ detailTask, detailLoading, onClose }: Ta
             {/* Header */}
             <div className="flex items-center justify-between">
               <h3 className={`text-base font-bold ${styles.cardText}`}>{t("taskPanel.detail.title")}</h3>
-              <button onClick={onClose} className={`p-1.5 rounded ${styles.sidebarHoverBg} transition`}>
+              <button type="button" onClick={onClose} className={`p-1.5 rounded ${styles.sidebarHoverBg} transition`}>
                 <X className={`w-4 h-4 ${styles.cardTextMuted}`} />
               </button>
             </div>

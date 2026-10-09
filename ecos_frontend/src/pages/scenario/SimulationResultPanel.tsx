@@ -54,7 +54,7 @@ export default function SimulationResultPanel({
             onChange={(e) => setSimQuery(e.target.value)}
             className={`flex-1 p-2 text-xs ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:border-indigo-500`}
           />
-          <button
+          <button type="button"
             onClick={onRun}
             disabled={isSimulating}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded cursor-pointer transition-all flex items-center gap-1.5"

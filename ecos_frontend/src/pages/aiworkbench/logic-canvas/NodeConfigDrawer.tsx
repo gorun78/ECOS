@@ -36,7 +36,7 @@ export default function NodeConfigDrawer({
           {t('aiworkbench.logic.config.title', { label: node.data.label })}
         </span>
         <div className="flex items-center gap-2">
-          <button
+          <button type="button"
             onClick={onToggleTrace}
             className={`${traceOpen ? `${styles.infoText} ${styles.infoBg}` : `${styles.cardTextMuted} ${styles.badgeBg}`} px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-colors`}
             title={t('aiworkbench.logic.trace.toggle')}
@@ -46,7 +46,7 @@ export default function NodeConfigDrawer({
               {t('aiworkbench.logic.trace.tab')}
             </span>
           </button>
-          <button
+          <button type="button"
             onClick={onClose}
             className={`${styles.cardTextMuted} hover:opacity-70 cursor-pointer transition-opacity`}
           >

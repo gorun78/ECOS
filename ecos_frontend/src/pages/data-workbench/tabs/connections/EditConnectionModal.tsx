@@ -52,11 +52,11 @@ export default function EditConnectionModal({ conn, onSave, onCancel }: {
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onCancel}
+          <button type="button" onClick={onCancel}
             className={`px-4 py-1.5 text-xs rounded border ${styles.cardBorder} ${styles.cardTextMuted} cursor-pointer hover:${styles.appBg}`}>
             {t('dw.conn.cancel')}
           </button>
-          <button onClick={() => onSave({ ...conn, name, config: { ...conn.config, host, port, username, password: password || conn.config.password } })}
+          <button type="button" onClick={() => onSave({ ...conn, name, config: { ...conn.config, host, port, username, password: password || conn.config.password } })}
             className={`px-4 py-1.5 text-xs rounded ${styles.accentBg} ${styles.accentHover} ${styles.cardText} font-semibold cursor-pointer`}>
             {t('dw.conn.save')}
           </button>

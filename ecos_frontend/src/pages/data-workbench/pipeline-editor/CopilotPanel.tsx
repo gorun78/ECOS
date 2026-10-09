@@ -150,7 +150,7 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
           </span>
         </div>
         <div className="flex items-center gap-1">
-          <button
+          <button type="button"
             onClick={handleClear}
             className={`p-1 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} hover:${styles.cardTextMuted} transition-colors`}
             title="清空对话"
@@ -158,7 +158,7 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
             <Trash2 size={13} />
           </button>
           {onClose && (
-            <button
+            <button type="button"
               onClick={onClose}
               className={`p-1 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} transition-colors`}
             >
@@ -181,7 +181,7 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
       <div className={`px-3 py-2 border-t ${styles.cardBorder} shrink-0 overflow-x-auto`}>
         <div className="flex gap-1.5">
           {QUICK_ACTIONS.map((action, i) => (
-            <button
+            <button type="button"
               key={i}
               onClick={() => handleSend(action.prompt)}
               className={`text-[10px] px-2 py-1 rounded-full border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.infoBg} hover:${styles.infoBorder} hover:${styles.infoText} whitespace-nowrap transition-colors`}
@@ -205,7 +205,7 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
             className={`flex-1 px-3 py-1.5 text-xs border ${styles.cardBorder} rounded-lg resize-none focus:${styles.infoBorder} focus:ring-1 focus:${styles.infoBorder} outline-none transition-colors ${styles.cardBg} ${styles.cardText}`}
             disabled={loading}
           />
-          <button
+          <button type="button"
             onClick={() => handleSend()}
             disabled={!inputValue.trim() || loading}
             className={`shrink-0 flex items-center justify-center w-9 h-9 ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} rounded-lg transition-colors disabled:opacity-50 self-end`}

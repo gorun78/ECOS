@@ -39,7 +39,7 @@ export function TaskPanelFilterBar({
       {/* 分类 Tab 按钮 */}
       <div className="flex items-center gap-1.5">
         <span className={`text-xs ${styles.cardTextMuted} mr-1`}>{t("taskPanel.filter.category")}</span>
-        <button
+        <button type="button"
           onClick={() => setFilterCategory("")}
           className={`px-2.5 py-1 text-xs rounded-full transition ${
             filterCategory === ""
@@ -50,7 +50,7 @@ export function TaskPanelFilterBar({
           {t("taskPanel.filterAll")}
         </button>
         {CATEGORIES.map(cat => (
-          <button
+          <button type="button"
             key={cat.key}
             onClick={() => setFilterCategory(cat.key)}
             className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full transition ${
@@ -99,7 +99,7 @@ export function TaskPanelFilterBar({
             ))}
           </select>
         )}
-        <button
+        <button type="button"
           onClick={() => setSearchType(filterType.trim())}
           className="flex items-center gap-1.5 px-4 py-1.5 text-sm rounded-lg transition"
           style={{ backgroundColor: "var(--accent)", color: "#fff" }}

@@ -394,18 +394,18 @@ export default function ObjectTypeView({
         </div>
         <div className="flex items-center gap-2">
           {onCreateProposal && (
-            <button onClick={() => onCreateProposal(objectType.id)}
+            <button type="button" onClick={() => onCreateProposal(objectType.id)}
               className={`text-xs ${styles.accentText} hover:bg-blue-50 px-2.5 py-1.5 rounded border ${styles.accentBorder} transition-colors flex items-center gap-1.5 font-semibold`}>
               <GitPullRequest size={13} />{t('ow.btn.createProposal')}
             </button>
           )}
           {onExploreData && (
-            <button onClick={() => onExploreData(objectType.id)}
+            <button type="button" onClick={() => onExploreData(objectType.id)}
               className={`text-xs ${styles.accentText} hover:bg-blue-50 px-2.5 py-1.5 rounded border ${styles.accentBorder} transition-colors flex items-center gap-1.5 font-semibold`}>
               <Compass size={13} />{t('ow.btn.exploreData')}
             </button>
           )}
-          <button onClick={() => onDelete(objectType.id)}
+          <button type="button" onClick={() => onDelete(objectType.id)}
             className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5">
             <Trash2 size={13} />{t('ow.btn.deleteObject')}
           </button>
@@ -421,7 +421,7 @@ export default function ObjectTypeView({
             glossary: t('ow.tab.glossary')
           };
           return (
-            <button key={tab} onClick={() => setActiveTab(tab)}
+            <button type="button" key={tab} onClick={() => setActiveTab(tab)}
               className={`py-3 px-4 text-xs font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === tab ? `${styles.accentBorder} ${styles.accentText}` : `border-transparent ${styles.cardTextMuted} hover:opacity-100 opacity-80`
               }`}>{tabLabels[tab]}</button>
@@ -478,7 +478,7 @@ export default function ObjectTypeView({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className={`text-sm font-semibold ${styles.cardText}`}>{t('ow.section.impactAnalysis')}</h3>
-              <button onClick={handleImpactAnalysis} disabled={impactLoading}
+              <button type="button" onClick={handleImpactAnalysis} disabled={impactLoading}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-semibold bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50`}>
                 <AlertTriangle size={12} />{impactLoading ? '...' : t('ow.btn.impactAnalysis')}
               </button>

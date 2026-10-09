@@ -18,7 +18,7 @@ const CollapseToggle: React.FC<{
   const { styles } = useTheme();
   const { t } = useLanguage();
   return (
-    <button
+    <button type="button"
       onClick={onToggle}
       className={`flex items-center gap-1 px-2 py-1 text-xs ${styles.cardTextMuted} hover:${styles.cardText} transition-colors`}
       title={expanded ? t('dw.txt.collapse') : t('dw.txt.expand')}

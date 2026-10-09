@@ -54,7 +54,7 @@ export default function AgentQuickActions({ viewMode, isExecuting, onRun }: Agen
       </span>
       <div className="grid grid-cols-1 gap-2">
         {visible.map((s) => (
-          <button
+          <button type="button"
             key={s.type}
             onClick={() => { if (!isExecuting) onRun(s.type); }}
             disabled={isExecuting}

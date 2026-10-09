@@ -77,7 +77,7 @@ export default function GuardrailWorkflowTab({
         {/* Switch role button */}
         <div className={`flex items-center gap-2 ${styles.inputBg} p-1.5 rounded-lg border ${styles.inputBorder}`}>
           <span className={`text-[10px] font-bold ${styles.cardTextMuted}`}>{t("aiworkbench.guardrails.switchTestIdentity")}</span>
-          <button
+          <button type="button"
             onClick={() => {
               setUserRole("dispatchDirector");
               showToast?.('info', t("aiworkbench.guardrails.toastDirectorSwitched"));
@@ -90,7 +90,7 @@ export default function GuardrailWorkflowTab({
           >
             {t("aiworkbench.guardrails.dispatchDirector")}
           </button>
-          <button
+          <button type="button"
             onClick={() => {
               setUserRole("dispatchDispatcher");
               showToast?.('info', t("aiworkbench.guardrails.toastDispatcherSwitched"));
@@ -131,7 +131,7 @@ export default function GuardrailWorkflowTab({
               proposals.map(prop => {
                 const isSelected = prop.id === selectedProposalId;
                 return (
-                  <button
+                  <button type="button"
                     key={prop.id}
                     onClick={() => setSelectedProposalId(prop.id)}
                     className={`w-full text-left p-3 rounded-xl border transition-all cursor-pointer flex flex-col gap-2 ${
@@ -312,7 +312,7 @@ export default function GuardrailWorkflowTab({
                   </div>
 
                   <div className="flex gap-2">
-                    <button
+                    <button type="button"
                       onClick={() => handleExecuteProposal(true)}
                       disabled={executionLoading}
                       className={`flex-1 py-2 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer`}
@@ -329,7 +329,7 @@ export default function GuardrailWorkflowTab({
                         </>
                       )}
                     </button>
-                    <button
+                    <button type="button"
                       onClick={() => handleExecuteProposal(false)}
                       className={`px-4 py-2 border ${styles.cardBorder} hover:${styles.inputBg} font-bold rounded-lg transition-colors ${styles.cardTextMuted} cursor-pointer`}
                     >

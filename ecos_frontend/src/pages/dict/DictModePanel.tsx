@@ -53,7 +53,7 @@ export const DictModePanel: React.FC<DictModePanelProps> = ({
             {dictTypes.find(dt => dt.dictType === selectedDictType)?.dictName ?? selectedDictType}
             <span className={`text-sm font-normal ${styles.cardTextMuted} font-mono`}>({selectedDictType})</span>
           </h2>
-          <button className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold transition disabled:opacity-50 flex items-center gap-1"
+          <button type="button" className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold transition disabled:opacity-50 flex items-center gap-1"
             onClick={openNewDictItem} disabled={saving || dictItemFormOpen}>
             <Plus size={14} />
             {t('platform.dictionary.addItem')}

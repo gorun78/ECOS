@@ -394,14 +394,14 @@ export default function GraphExplorerTab() {
 
         {/* Bottom action bar */}
         <div className="absolute bottom-3 left-3 right-3 z-20 flex gap-2">
-          <button
+          <button type="button"
             onClick={() => setShowCreateForm('node')}
             className="px-3 py-1.5 text-[11px] font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-lg"
           >
             <Plus size={12} />
             {t('knowledge.graph.newNode')}
           </button>
-          <button
+          <button type="button"
             onClick={() => setShowCreateForm('edge')}
             className="px-3 py-1.5 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg flex items-center gap-1.5 transition cursor-pointer shadow-lg"
           >

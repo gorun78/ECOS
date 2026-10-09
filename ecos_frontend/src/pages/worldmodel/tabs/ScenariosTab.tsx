@@ -32,7 +32,7 @@ export default function ScenariosTab({
         <span className="text-sm font-semibold opacity-80">
           {t("platform.wm.scenario.title")} ({scenarios.length})
         </span>
-        <button
+        <button type="button"
           onClick={() => openDlg("scenarios")}
           className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium transition-all
             ${styles.accentBg} ${styles.accentHover} text-white`}
@@ -40,7 +40,7 @@ export default function ScenariosTab({
           <Plus className="w-3.5 h-3.5" />
           {t("platform.wm.scenario.new")}
         </button>
-        <button
+        <button type="button"
           onClick={doCompare}
           disabled={compareIds.length < 2}
           className={`px-2.5 py-1.5 rounded border text-xs font-medium transition-all
@@ -84,11 +84,11 @@ export default function ScenariosTab({
                       {sel ? t("platform.wm.scenario.selected") : t("platform.wm.scenario.clickToSelect")}
                     </span>
                     <div className="flex gap-1">
-                      <button onClick={(e) => { e.stopPropagation(); openDlg("scenarios", sc); }}
+                      <button type="button" onClick={(e) => { e.stopPropagation(); openDlg("scenarios", sc); }}
                         className={`p-1 rounded border text-[10px] transition-all ${styles.cardBorder} ${styles.cardBg} hover:opacity-80`}>
                         <Edit3 className="w-3 h-3" />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete("scenarios", sc.id); }}
+                      <button type="button" onClick={(e) => { e.stopPropagation(); handleDelete("scenarios", sc.id); }}
                         className="p-1 rounded border text-[10px] text-red-400 border-red-500/20 hover:bg-red-500/10 transition-all">
                         <Trash2 className="w-3 h-3" />
                       </button>

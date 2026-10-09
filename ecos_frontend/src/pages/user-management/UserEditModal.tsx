@@ -186,7 +186,7 @@ export default function UserEditModal({
               ? t("platform.user.edit.titleCreate")
               : t("platform.user.edit.titleEdit")}
           </h3>
-          <button onClick={onClose} className="opacity-60 hover:opacity-100">
+          <button type="button" onClick={onClose} className="opacity-60 hover:opacity-100">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -204,7 +204,7 @@ export default function UserEditModal({
           {tabs.map((t) => {
             const Icon = t.icon;
             return (
-              <button
+              <button type="button"
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={`flex items-center gap-1.5 px-3 py-2 text-xs rounded-t transition-colors ${
@@ -511,13 +511,13 @@ export default function UserEditModal({
 
         {/* Footer */}
         <div className="flex justify-end gap-2 px-6 pb-5 pt-2">
-          <button
+          <button type="button"
             onClick={onClose}
             className={`px-4 py-2 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}
           >
             {t("platform.user.edit.cancel")}
           </button>
-          <button
+          <button type="button"
             onClick={handleSave}
             disabled={saving}
             className={`px-4 py-2 rounded text-xs font-medium text-white flex items-center gap-1.5 ${styles.accentBg} ${styles.accentHover} disabled:opacity-50`}

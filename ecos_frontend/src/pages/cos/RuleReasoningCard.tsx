@@ -38,7 +38,7 @@ export default function RuleReasoningCard({
         {t("cognition.cos.reason.desc")}
       </p>
 
-      <button
+      <button type="button"
         onClick={onReason}
         disabled={reasonLoading}
         className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-lg text-xs font-bold py-2.5 transition flex items-center justify-center gap-2"

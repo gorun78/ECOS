@@ -546,7 +546,7 @@ export default function ScenarioManagementView({
           <KpiBox styles={styles} label={t('scenario.kpi.block')} value="100%" color="text-emerald-400" />
           <KpiBox styles={styles} label={t('scenario.kpi.settle')} value="2.8s" suffix={<span className="text-xs font-normal text-emerald-400">(-93.7%)</span>} color="text-amber-400" />
           <div className="col-span-2 sm:col-span-4 flex justify-end mt-1">
-            <button
+            <button type="button"
               onClick={() => setShowCopilot(!showCopilot)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded border transition-colors cursor-pointer text-xs font-bold ${showCopilot ? 'bg-blue-600 text-white border-blue-500' : `${styles.cardBg} ${styles.cardTextMuted} border-[var(--border)] hover:opacity-80`}`}
             >
@@ -595,7 +595,7 @@ export default function ScenarioManagementView({
                       {activeScenario.department}
                     </span>
                   </span>
-                  <button
+                  <button type="button"
                     onClick={() => openEditWizard(activeScenario)}
                     className="px-3 py-1 bg-indigo-600/20 hover:bg-indigo-600 border border-indigo-500/30 text-indigo-300 hover:text-white text-[11px] font-bold rounded flex items-center gap-1 transition-all cursor-pointer shadow-xs"
                   >
@@ -627,7 +627,7 @@ export default function ScenarioManagementView({
             <div className={`h-10 ${styles.cardBg} px-4 border-b ${styles.cardBorder} shrink-0 flex items-center justify-between`}>
               <div className="flex gap-2 overflow-x-auto">
                 {TABS.map((tab) => (
-                  <button
+                  <button type="button"
                     key={tab}
                     onClick={() => setActiveTab(tab)}
                     className={`px-4 h-10 border-b-2 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === tab ? 'border-indigo-500 text-indigo-400' : `border-transparent ${styles.cardTextMuted} hover:text-[var(--card,#E2E8F0)]`}`}

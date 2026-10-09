@@ -71,7 +71,7 @@ export default function BizDashboard() {
       <div className="text-center max-w-sm">
         <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-2" />
         <p className={`text-sm ${styles.cardTextMuted}`}>{error}</p>
-        <button onClick={() => loadData()} className={`mt-3 px-4 py-2 rounded ${styles.accentBg} text-white text-sm hover:opacity-90 transition`}>
+        <button type="button" onClick={() => loadData()} className={`mt-3 px-4 py-2 rounded ${styles.accentBg} text-white text-sm hover:opacity-90 transition`}>
           {t('biz.retry')}
         </button>
       </div>
@@ -113,7 +113,7 @@ export default function BizDashboard() {
           <p className={`text-sm ${styles.cardTextMuted} mt-1`}>{t('biz.subtitle')}</p>
         </div>
         <div className="flex items-center gap-3">
-          <button
+          <button type="button"
             onClick={runDiagnostic}
             disabled={diagnosing}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
@@ -125,7 +125,7 @@ export default function BizDashboard() {
             <Stethoscope className={`w-4 h-4 ${diagnosing ? "animate-spin" : ""}`} />
             {hasCriticalDeviation ? "⚠️ 经营诊断" : "经营诊断"}
           </button>
-          <button
+          <button type="button"
             onClick={() => loadData(true)}
             disabled={refreshing}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg ${styles.inputBg} border ${styles.cardBorder} text-sm ${styles.cardText} ${styles.sidebarHoverBg} transition disabled:opacity-50`}
@@ -167,7 +167,7 @@ export default function BizDashboard() {
             <p className="text-xs text-red-600 dark:text-red-400 mt-1">
               营收月达标率{revenuePct}%（低于80%）· 利润月达标率{profitPct}% · 供应商华强钢构准时率67%
             </p>
-            <button onClick={runDiagnostic} className="mt-2 text-xs font-medium text-red-600 dark:text-red-400 underline hover:text-red-800">
+            <button type="button" onClick={runDiagnostic} className="mt-2 text-xs font-medium text-red-600 dark:text-red-400 underline hover:text-red-800">
               点击进行AI诊断 →
             </button>
           </div>

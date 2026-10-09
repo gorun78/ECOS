@@ -177,19 +177,19 @@ export default function AlertPanel() {
             onChange={e => setTestValue(e.target.value)}
             placeholder="Value"
           />
-          <button onClick={() => triggerAlert()}
+          <button type="button" onClick={() => triggerAlert()}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium transition-all bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:bg-amber-500/30`}>
             <Zap className="w-3.5 h-3.5" />
             {t("platform.alert.triggerAll")}
           </button>
-          <button onClick={() => setShowNewRule(true)}
+          <button type="button" onClick={() => setShowNewRule(true)}
             className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium border transition-all ${styles.cardBorder} ${styles.cardBg}`}>
             <Plus className="w-3.5 h-3.5" />
             {t("platform.alert.newRule")}
           </button>
         </div>
         <div className="flex-1" />
-        <button onClick={fetchAll} disabled={loading}
+        <button type="button" onClick={fetchAll} disabled={loading}
           className={`p-1.5 rounded border transition-all ${styles.cardBorder}`}>
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
         </button>
@@ -226,11 +226,11 @@ export default function AlertPanel() {
               <option value="CRITICAL">CRITICAL</option>
             </select>
             <div className="flex gap-2">
-              <button onClick={createRule}
+              <button type="button" onClick={createRule}
                 className={`flex-1 px-4 py-1.5 rounded text-xs font-medium ${styles.accentBg} ${styles.accentHover} text-white`}>
                 {t("common.save")}
               </button>
-              <button onClick={() => setShowNewRule(false)}
+              <button type="button" onClick={() => setShowNewRule(false)}
                 className={`flex-1 px-4 py-1.5 rounded border text-xs ${styles.cardBorder}`}>
                 {t("common.cancel")}
               </button>
@@ -274,11 +274,11 @@ export default function AlertPanel() {
                   <div className="font-medium truncate">{r.name}</div>
                   <div className="text-[10px] opacity-60">{r.metric} {r.operator} {r.threshold}</div>
                 </div>
-                <button onClick={() => triggerAlert(r.id)}
+                <button type="button" onClick={() => triggerAlert(r.id)}
                   className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20">
                   {t("platform.alert.fire")}
                 </button>
-                <button onClick={() => deleteRule(r.id)}
+                <button type="button" onClick={() => deleteRule(r.id)}
                   className="p-0.5 rounded hover:bg-red-500/10 text-red-400 opacity-50 hover:opacity-100">
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -302,7 +302,7 @@ export default function AlertPanel() {
                   <div className="text-[10px] opacity-50">{h.created_at?.slice(0, 16)}</div>
                 </div>
                 {!h.acknowledged ? (
-                  <button onClick={() => ackAlert(h.id)}
+                  <button type="button" onClick={() => ackAlert(h.id)}
                     className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20">
                     {t("platform.alert.ack")}
                   </button>

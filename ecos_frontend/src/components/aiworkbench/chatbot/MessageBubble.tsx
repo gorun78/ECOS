@@ -130,14 +130,14 @@ export default function MessageBubble({
 
             {msg.actionProposal.status === 'pending' && (
               <div className="flex gap-2 text-[10px] font-bold">
-                <button
+                <button type="button"
                   onClick={() => onProposalConsent(msg.id, true)}
                   className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1"
                 >
                   <Icon name="Check" size={11} />
                   <span>{t('aiworkbench.chatbot.proposalApprove')}</span>
                 </button>
-                <button
+                <button type="button"
                   onClick={() => onProposalConsent(msg.id, false)}
                   className={`px-3 py-1.5 ${styles.cardBg} ${styles.accentHover} ${styles.cardTextMuted} border ${styles.cardBorder} rounded-lg transition-colors cursor-pointer`}
                 >

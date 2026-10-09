@@ -108,7 +108,7 @@ export default function LinkTypeView({
             <p className={`text-xs ${styles.muted} mt-0.5`}>{linkType.description || t('ow.empty.noDescription')}</p>
           </div>
         </div>
-        <button
+        <button type="button"
           onClick={() => onDelete(linkType.id)}
           className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"
         >

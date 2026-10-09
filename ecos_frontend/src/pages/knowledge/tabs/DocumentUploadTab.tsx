@@ -221,7 +221,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
             {t('knowledge.upload.pageSubtitle')}
           </p>
         </div>
-        <button onClick={() => setShowHistory(!showHistory)}
+        <button type="button" onClick={() => setShowHistory(!showHistory)}
           className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
             showHistory ? `${styles.accentBg} text-white border-transparent` : `${styles.appBg} ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`
           }`}>
@@ -270,7 +270,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
             <p className="text-[10px] font-mono max-w-[80%] text-center opacity-80 break-words">
               {uploadGate?.hint || 'backend unavailable / disabled'}
             </p>
-            <button
+            <button type="button"
               onClick={e => {
                 e.stopPropagation();
                 toast('info', t('knowledge.upload.enableHint'));
@@ -327,7 +327,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
           {phase === 'failed' && (
             <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 flex items-center justify-between gap-3 text-xs">
               <span className="text-rose-700">{t('knowledge.upload.failedHint')}</span>
-              <button onClick={handleReset} className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg cursor-pointer text-[10px]">
+              <button type="button" onClick={handleReset} className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg cursor-pointer text-[10px]">
                 {t('knowledge.upload.retry')}
               </button>
             </div>

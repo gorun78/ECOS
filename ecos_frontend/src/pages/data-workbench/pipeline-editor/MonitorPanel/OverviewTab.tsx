@@ -131,7 +131,7 @@ export default function OverviewTab({ session }: Props) {
               const isBreak = status === 'BROKEN';
               return (
                 <React.Fragment key={s.nodeId}>
-                  <button
+                  <button type="button"
                     onClick={() => emitNavigate(s.nodeId)}
                     className={`flex items-center gap-1.5 px-2 py-1 rounded border ${styles.cardBorder} ${styles.sidebarBg} ${
                       status === 'SUCCEEDED'

@@ -92,7 +92,7 @@ export default function UserFilter({
       </select>
 
       {/* Search button */}
-      <button
+      <button type="button"
         onClick={onSearch}
         disabled={loading}
         className={`px-3 py-2 rounded text-xs font-medium text-white flex items-center gap-1.5 ${styles.accentBg} ${styles.accentHover} disabled:opacity-50`}

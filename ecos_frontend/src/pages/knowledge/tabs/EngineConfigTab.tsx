@@ -174,7 +174,7 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
         {/* scope 切换栏 — 4 scope sub-section 用 i18nKey 渲染 */}
         <div className={`border rounded-lg flex items-center gap-1 p-1 ${styles.cardBg} ${styles.cardBorder}`}>
           {SCOPES.map(({ scope: s, Icon, i18nKey }) => (
-            <button
+            <button type="button"
               key={s}
               onClick={() => setScope(s)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
@@ -191,7 +191,7 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
           {loading
             ? <Loader2 className="w-4 h-4 animate-spin opacity-60" />
             : null}
-          <button
+          <button type="button"
             onClick={() => void loadScope(scope)}
             className={`px-2 py-1 rounded border text-[11px] ${styles.cardBorder} hover:opacity-70`}
             title={t("knowledge.common.refresh")}
@@ -259,7 +259,7 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
                       />
                     )}
                     {isChanged && (
-                      <button
+                      <button type="button"
                         onClick={() => resetField(f.key)}
                         className="text-[11px] px-2 py-1 rounded border hover:opacity-70"
                         style={{ borderColor: styles.cardBorder }}
@@ -282,7 +282,7 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
               {t("knowledge.engine_config.dirty_hint")} ({changes.length})
             </span>
           )}
-          <button
+          <button type="button"
             onClick={() => void save()}
             disabled={!dirty || saving || !afterSaveCheck && !dirty}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold text-white disabled:opacity-40 transition-opacity ${styles.accentBg}`}

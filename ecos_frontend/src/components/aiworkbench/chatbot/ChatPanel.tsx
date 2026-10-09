@@ -424,7 +424,7 @@ export default function ChatPanel({
         </div>
         <div className="flex items-center gap-1 relative">
           {/* Thread toggle (T7-1) */}
-          <button
+          <button type="button"
             onClick={() => setShowThreadPanel(!showThreadPanel)}
             className={`p-1 ${showThreadPanel ? styles.accentText : styles.cardTextMuted} rounded cursor-pointer transition-colors`}
             title={t('aiworkbench.chatbot.threadPanel')}
@@ -433,7 +433,7 @@ export default function ChatPanel({
           </button>
           {/* Export dropdown (T7-2) */}
           <div className="relative">
-            <button
+            <button type="button"
               onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
               className={`p-1 ${styles.cardTextMuted} rounded cursor-pointer transition-colors`}
               title={t('aiworkbench.chatbot.exportTitle')}
@@ -442,14 +442,14 @@ export default function ChatPanel({
             </button>
             {exportDropdownOpen && (
               <div className={`absolute right-0 top-full mt-1 z-50 ${styles.cardBg} border ${styles.cardBorder} rounded-lg shadow-lg py-1 min-w-[120px]`}>
-                <button
+                <button type="button"
                   onClick={() => handleExport('md')}
                   className={`w-full text-left px-3 py-1.5 text-[10px] ${styles.cardText} hover:${styles.inputBg} flex items-center gap-1.5`}
                 >
                   <Icon name="FileText" size={10} />
                   <span>{t('aiworkbench.chatbot.exportMd')}</span>
                 </button>
-                <button
+                <button type="button"
                   onClick={() => handleExport('json')}
                   className={`w-full text-left px-3 py-1.5 text-[10px] ${styles.cardText} hover:${styles.inputBg} flex items-center gap-1.5`}
                 >
@@ -459,7 +459,7 @@ export default function ChatPanel({
               </div>
             )}
           </div>
-          <button
+          <button type="button"
             onClick={onResetChat}
             className={`p-1 ${styles.cardTextMuted} rounded cursor-pointer transition-colors`}
             title={t('aiworkbench.chatbot.clearHistory')}
@@ -477,7 +477,7 @@ export default function ChatPanel({
             <span>{t('aiworkbench.chatbot.savedThreadViewing').replace('{name}', activeThread.name)}</span>
             <span className={styles.cardTextMuted}>{t('aiworkbench.chatbot.savedThreadMsgCount').replace('{count}', String(activeThread.messages.length))}</span>
           </span>
-          <button
+          <button type="button"
             onClick={() => setActiveThreadId(null)}
             className={`${styles.cardTextMuted} hover:${styles.accentText} transition-colors text-[9px] font-bold`}
           >

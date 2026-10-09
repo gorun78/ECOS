@@ -62,7 +62,7 @@ export default function ConfirmDialog({
           >
             {defaultCancel}
           </button>
-          <button
+          <button type="button"
             onClick={onConfirm}
             className={
               confirmClass ||

@@ -46,7 +46,7 @@ const Toast: React.FC<{
       ? <CheckCircle2 className="w-4 h-4 shrink-0" />
       : <AlertCircle className="w-4 h-4 shrink-0" />}
     <span>{toast.msg}</span>
-    <button onClick={onClose} className="ml-2 opacity-60 hover:opacity-100">
+    <button type="button" onClick={onClose} className="ml-2 opacity-60 hover:opacity-100">
       <X className="w-3.5 h-3.5" />
     </button>
   </div>
@@ -72,14 +72,14 @@ const DeleteConfirm: React.FC<{
           {t("glossary.delete_confirm_msg", { name: termName })}
         </p>
         <div className="flex gap-2 justify-end">
-          <button
+          <button type="button"
             onClick={onCancel}
             className={`px-4 py-1.5 rounded-lg border bg-transparent cursor-pointer text-sm
               ${styles.cardBorder} ${styles.cardTextMuted} hover:opacity-80`}
           >
             {t("glossary.cancel")}
           </button>
-          <button
+          <button type="button"
             onClick={onConfirm}
             className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white cursor-pointer
               text-sm font-semibold"
@@ -299,7 +299,7 @@ export default function GlossaryManager() {
             </select>
           </div>
 
-          <button
+          <button type="button"
             className={`w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center
               gap-1.5 cursor-pointer transition disabled:opacity-50 text-white
               ${styles.accentBg} ${styles.accentHover}`}
@@ -344,14 +344,14 @@ export default function GlossaryManager() {
                   <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${color}`}>
                     {label}
                   </span>
-                  <button
+                  <button type="button"
                     className={`p-1 rounded ${styles.sidebarHoverBg}`}
                     title={t("glossary.edit")}
                     onClick={(e) => { e.stopPropagation(); selectTerm(term); }}
                   >
                     <Edit3 size={14} className={styles.muted} />
                   </button>
-                  <button
+                  <button type="button"
                     className="p-1 rounded hover:bg-red-500/10"
                     title={t("glossary.delete")}
                     onClick={(e) => { e.stopPropagation(); setDeleteTarget(term); }}
@@ -380,7 +380,7 @@ export default function GlossaryManager() {
                 const disabled = item.key !== "detail" && !hasSelection;
                 const active = tab === item.key;
                 return (
-                  <button
+                  <button type="button"
                     key={item.key}
                     className={`px-3 py-1.5 rounded-t-lg text-xs font-semibold transition
                       disabled:opacity-40 disabled:cursor-not-allowed

@@ -221,7 +221,7 @@ export default function TermSearchModal({
               </p>
             </div>
           </div>
-          <button
+          <button type="button"
             onClick={onClose}
             className={`p-1.5 rounded-lg hover:bg-white/5 ${styles.cardTextMuted} hover:${styles.cardText} transition`}
           >
@@ -248,7 +248,7 @@ export default function TermSearchModal({
                   transition"
               />
             </div>
-            <button
+            <button type="button"
               onClick={() => setShowFilters(!showFilters)}
               className={`p-2 rounded-lg border transition ${
                 showFilters
@@ -318,7 +318,7 @@ export default function TermSearchModal({
           ) : error ? (
             <div className={`flex flex-col items-center justify-center py-12 ${styles.muted}`}>
               <p className="text-xs text-red-400">{error}</p>
-              <button
+              <button type="button"
                 onClick={loadTerms}
                 className="mt-2 text-[10px] text-indigo-400 hover:text-indigo-300 transition"
               >

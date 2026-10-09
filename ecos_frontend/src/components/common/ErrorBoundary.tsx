@@ -141,14 +141,14 @@ function FallbackInner({
       </details>
 
       <div className="flex items-center gap-3">
-        <button
+        <button type="button"
           onClick={onReset}
           className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition ${styles.accentBg} text-white hover:opacity-90 shadow-xs`}
         >
           <RefreshCw className="w-3.5 h-3.5" />
           {t("common.error.retry")}
         </button>
-        <button
+        <button type="button"
           onClick={() => window.location.reload()}
           className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition`}
         >

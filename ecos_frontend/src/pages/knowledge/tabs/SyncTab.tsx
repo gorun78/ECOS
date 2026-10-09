@@ -126,7 +126,7 @@ export default function SyncTab() {
             {t("knowledge.synctab.动态监控_抓取和转换物理数据集_逻辑本体语义以及最高安全规则")}
           </p>
         </div>
-        <button onClick={handleSyncAll} disabled={isSyncingAll} className={`px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer ${isSyncingAll ? 'opacity-70 cursor-not-allowed' : ''}`}>
+        <button type="button" onClick={handleSyncAll} disabled={isSyncingAll} className={`px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer ${isSyncingAll ? 'opacity-70 cursor-not-allowed' : ''}`}>
           {isSyncingAll
             ? <><span className="w-3.5 h-3.5 border-2 border-slate-100 border-t-transparent rounded-full animate-spin" /><span>{t("knowledge.synctab.联邦网格抓取中")}</span></>
             : <><RefreshCw size={12} /><span>{t("knowledge.synctab.一键全站元数据同步")}</span></>
@@ -146,13 +146,13 @@ export default function SyncTab() {
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => handleToggleSimulation('drift')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${isSchemaDrift ? 'bg-rose-50 border-rose-300 text-rose-700' : `${styles.cardBg} ${styles.cardBorder} ${styles.cardText} hover:bg-slate-50`}`}>
+              <button type="button" onClick={() => handleToggleSimulation('drift')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${isSchemaDrift ? 'bg-rose-50 border-rose-300 text-rose-700' : `${styles.cardBg} ${styles.cardBorder} ${styles.cardText} hover:bg-slate-50`}`}>
                 <AlertTriangle size={11} className={isSchemaDrift ? 'animate-bounce' : ''} /><span>{t("knowledge.synctab.注入_schema_漂移")}</span>
               </button>
-              <button onClick={() => handleToggleSimulation('sla')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${isSlaBreach ? 'bg-amber-50 border-amber-300 text-amber-700' : `${styles.cardBg} ${styles.cardBorder} ${styles.cardText} hover:bg-slate-50`}`}>
+              <button type="button" onClick={() => handleToggleSimulation('sla')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${isSlaBreach ? 'bg-amber-50 border-amber-300 text-amber-700' : `${styles.cardBg} ${styles.cardBorder} ${styles.cardText} hover:bg-slate-50`}`}>
                 <Clock size={11} className={isSlaBreach ? 'animate-pulse' : ''} /><span>{t("knowledge.synctab.注入_sla_断流")}</span>
               </button>
-              <button onClick={() => handleToggleSimulation('reset')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} cursor-pointer transition-all flex items-center gap-1 border ${styles.cardBorder} ml-auto`}>
+              <button type="button" onClick={() => handleToggleSimulation('reset')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} cursor-pointer transition-all flex items-center gap-1 border ${styles.cardBorder} ml-auto`}>
                 <Check size={11} /><span>{t("knowledge.synctab.复位")}</span>
               </button>
             </div>
@@ -226,14 +226,14 @@ export default function SyncTab() {
                       {asset.syncStatus === 'synced' ? (
                         <div className="flex items-center justify-end gap-1.5">
                           <span className="text-emerald-600 font-bold text-[10px] flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{t("knowledge.synctab.已对齐")}</span>
-                          <button onClick={() => handleSyncAsset(asset.id)} className={`p-1 ${styles.muted} hover:text-white cursor-pointer`}><RotateCw size={10} /></button>
+                          <button type="button" onClick={() => handleSyncAsset(asset.id)} className={`p-1 ${styles.muted} hover:text-white cursor-pointer`}><RotateCw size={10} /></button>
                         </div>
                       ) : asset.syncStatus === 'out_of_date' ? (
-                        <button onClick={() => handleSyncAsset(asset.id)} className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-md transition-colors cursor-pointer text-[9px] flex items-center gap-1 ml-auto">
+                        <button type="button" onClick={() => handleSyncAsset(asset.id)} className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-md transition-colors cursor-pointer text-[9px] flex items-center gap-1 ml-auto">
                           <AlertCircle size={9} />{t("knowledge.synctab.更新")}
                         </button>
                       ) : (
-                        <button onClick={() => handleSyncAsset(asset.id)} className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md transition-colors cursor-pointer text-[9px] flex items-center gap-1 ml-auto">
+                        <button type="button" onClick={() => handleSyncAsset(asset.id)} className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-md transition-colors cursor-pointer text-[9px] flex items-center gap-1 ml-auto">
                           <Download size={9} />{t("knowledge.synctab.拉取")}
                         </button>
                       )}

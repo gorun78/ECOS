@@ -46,7 +46,7 @@ export default function ExtractionStreamingTab() {
               const Icon = opt.icon === 'Network' ? Network : opt.icon === 'Layers' ? Layers : Workflow;
               const active = channel === opt.value;
               return (
-                <button
+                <button type="button"
                   key={opt.value}
                   onClick={() => setChannel(opt.value)}
                   className={`p-3 rounded-lg border transition hover:opacity-80 text-left ${

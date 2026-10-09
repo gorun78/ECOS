@@ -85,7 +85,7 @@ export const CopilotPanel: React.FC<CopilotPanelProps> = ({ agentType }) => {
           <MessageSquare className="w-4 h-4 text-[var(--primary)]" />
           <span className="text-sm font-medium">{t('common.copilot.title')}</span>
         </div>
-        <button onClick={exportChat} className="p-1 hover:bg-[var(--muted)] rounded">
+        <button type="button" onClick={exportChat} className="p-1 hover:bg-[var(--muted)] rounded">
           <Download className="w-3 h-3" />
         </button>
       </div>
@@ -97,7 +97,7 @@ export const CopilotPanel: React.FC<CopilotPanelProps> = ({ agentType }) => {
           </div>
           <div className="flex flex-wrap gap-1">
             {quickQuestions.map((q, i) => (
-              <button key={i} onClick={() => sendMessage(q)}
+              <button type="button" key={i} onClick={() => sendMessage(q)}
                 className="text-xs px-2 py-1 rounded border border-[var(--border)] hover:bg-[var(--muted)]">
                 {q}
               </button>
@@ -146,7 +146,7 @@ export const CopilotPanel: React.FC<CopilotPanelProps> = ({ agentType }) => {
             onKeyDown={e => e.key === 'Enter' && sendMessage(input)}
             className="flex-1 text-sm p-2 border border-[var(--border)] rounded bg-[var(--background)]"
             placeholder={t('common.copilot.placeholder')} />
-          <button onClick={() => sendMessage(input)} disabled={loading}
+          <button type="button" onClick={() => sendMessage(input)} disabled={loading}
             className="p-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded hover:opacity-90 disabled:opacity-50">
             <Send className="w-4 h-4" />
           </button>

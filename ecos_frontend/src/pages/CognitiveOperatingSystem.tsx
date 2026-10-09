@@ -246,7 +246,7 @@ export default function CognitiveOperatingSystem() {
           <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-center gap-2 text-red-700 dark:text-red-400 text-sm">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{wmError}</span>
-            <button onClick={() => setWmError(null)} className="ml-auto text-red-400 hover:text-red-600">&times;</button>
+            <button type="button" onClick={() => setWmError(null)} className="ml-auto text-red-400 hover:text-red-600">&times;</button>
           </div>
         )}
 

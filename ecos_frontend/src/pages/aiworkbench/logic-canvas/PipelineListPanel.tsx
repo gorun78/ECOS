@@ -26,7 +26,7 @@ export default function PipelineListPanel({
     <div className={`w-56 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col h-full shrink-0`}>
       <div className={`p-3 border-b ${styles.cardBorder} flex items-center justify-between ${styles.inputBg}`}>
         <span className={`font-bold ${styles.cardText}`}>{t('aiworkbench.logic.list.title', { count: pipelines.length })}</span>
-        <button
+        <button type="button"
           onClick={onCreate}
           className={`p-1 ${styles.accentBg} ${styles.accentHover} ${styles.accentText} border ${styles.accentBorder} rounded-md transition-colors cursor-pointer`}
           title={t('aiworkbench.logic.list.add')}

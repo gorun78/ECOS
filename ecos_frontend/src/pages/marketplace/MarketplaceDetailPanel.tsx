@@ -115,7 +115,7 @@ export default function MarketplaceDetailPanel({
               <h2 className={`text-lg font-bold ${styles.cardText}`}>
                 {t("marketplace.detail.title")}
               </h2>
-              <button
+              <button type="button"
                 onClick={onClose}
                 className="p-1.5 rounded-lg hover:bg-[var(--muted,rgba(100,116,139,0.2))] transition-colors opacity-60 hover:opacity-100"
               >
@@ -206,7 +206,7 @@ export default function MarketplaceDetailPanel({
             </div>
 
             {/* Request Access button */}
-            <button
+            <button type="button"
               onClick={() => onRequestAccess(asset)}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg
                 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium

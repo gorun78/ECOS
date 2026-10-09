@@ -32,7 +32,7 @@ const Toast: React.FC<{
         {type === 'error' && <AlertCircle size={16} />}
         {type === 'info' && <AlertCircle size={16} />}
         <span>{message}</span>
-        <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100">
+        <button type="button" onClick={onClose} className="ml-2 opacity-70 hover:opacity-100">
           <X size={14} />
         </button>
       </div>

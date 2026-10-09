@@ -221,7 +221,7 @@ export default function DebugTab({ session, debugPayload }: Props) {
       <div
         className={`flex items-center gap-2 px-2 py-1.5 border ${styles.cardBorder} ${styles.sidebarBg}`}
       >
-        <button
+        <button type="button"
           onClick={handleContinue}
           disabled={!canContinue}
           className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-semibold ${
@@ -234,7 +234,7 @@ export default function DebugTab({ session, debugPayload }: Props) {
           <SkipForward size={14} />
           {t('dw.monitor.debug.continue')}
         </button>
-        <button
+        <button type="button"
           onClick={handleStep}
           disabled={!canStep}
           className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-semibold ${
@@ -247,7 +247,7 @@ export default function DebugTab({ session, debugPayload }: Props) {
           <SkipForward size={14} className="rotate-180" />
           {t('dw.monitor.debug.step')}
         </button>
-        <button
+        <button type="button"
           onClick={handleStop}
           disabled={isTerminal || !sessionId}
           className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-semibold ${
@@ -260,7 +260,7 @@ export default function DebugTab({ session, debugPayload }: Props) {
           <Square size={14} />
           {t('dw.monitor.debug.stop')}
         </button>
-        <button
+        <button type="button"
           onClick={handleReset}
           disabled={isTerminal && !sessionId}
           className={`flex items-center gap-1 px-3 py-1 rounded text-xs ${

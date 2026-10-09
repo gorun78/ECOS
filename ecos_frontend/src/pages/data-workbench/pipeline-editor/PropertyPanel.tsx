@@ -37,7 +37,7 @@ const SectionToggle: React.FC<{
   // 用 state 切换应用字面量 token 类（ThemeContext 内已声明 → JIT 必生成）。
   const [hover, setHover] = useState(false);
   return (
-    <button onClick={onClick}
+    <button type="button" onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       className={`flex items-center justify-between w-full px-3 py-2 text-xs font-semibold ${styles.muted} transition-colors ${hover ? styles.sidebarBg : ''}`}
@@ -122,14 +122,14 @@ const UdfForm: React.FC<FormSharedProps> = React.memo(({ styles, t, nodeConfig, 
         <div className="flex items-center justify-between mb-1 gap-1">
           <FieldLabel styles={styles}>{t('dw.pipeline.prop.udfId')}</FieldLabel>
           <div className="flex items-center gap-1">
-            <button
+            <button type="button"
               onClick={loadUdfs}
               className={`text-[10px] ${styles.infoText} hover:${styles.infoBorder} transition-colors px-1`}
               title={t('dw.pipeline.prop.udfRefresh')}
             >
               ↻
             </button>
-            <button
+            <button type="button"
               onClick={() => setBuilderOpen(true)}
               className={`flex items-center gap-1 px-1.5 py-0.5 text-[10px] ${styles.infoText} border ${styles.infoBorder} rounded hover:${styles.infoBg} transition-colors`}
               title={t('dw.pipeline.prop.udfCreateNew')}
@@ -175,7 +175,7 @@ const UdfForm: React.FC<FormSharedProps> = React.memo(({ styles, t, nodeConfig, 
                 }}
                 className={`${inputCls(styles)} flex-1`}
                 placeholder={t('dw.pipeline.prop.paramValue')} />
-              <button
+              <button type="button"
                 onClick={() => setParamRows(paramRows.filter((_, i) => i !== idx))}
                 className={`px-1 ${styles.dangerText} hover:${styles.dangerText} transition-colors`}
                 title={t('dw.pipeline.prop.removeParam')}
@@ -184,7 +184,7 @@ const UdfForm: React.FC<FormSharedProps> = React.memo(({ styles, t, nodeConfig, 
               </button>
             </div>
           ))}
-          <button
+          <button type="button"
             onClick={() => setParamRows([...paramRows, { key: '', value: '' }])}
             className={`w-full flex items-center justify-center gap-1 px-2 py-1 text-[11px] ${styles.infoText} border border-dashed ${styles.infoBorder} rounded hover:${styles.infoBg} transition-colors`}
           >
@@ -201,7 +201,7 @@ const UdfForm: React.FC<FormSharedProps> = React.memo(({ styles, t, nodeConfig, 
               <span className={`text-xs font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
                 {t('dw.pipeline.prop.udfCreateNew')}
               </span>
-              <button onClick={closeBuilder} className={`p-1 ${styles.cardTextMuted} hover:${styles.dangerText}`} title={t('dw.pipeline.prop.closePanel')}>
+              <button type="button" onClick={closeBuilder} className={`p-1 ${styles.cardTextMuted} hover:${styles.dangerText}`} title={t('dw.pipeline.prop.closePanel')}>
                 <X size={14} />
               </button>
             </div>
@@ -327,10 +327,10 @@ const PropertyPanel: React.FC<PropertyPanelProps> = React.memo(
             {paletteLabel} {t('dw.pipeline.prop.properties')}
           </span>
           <div className="flex gap-1">
-            <button onClick={() => onDeleteNode(node.id)} className={`p-1 hover:${styles.dangerBg} rounded ${styles.dangerText} transition-colors`} title={t('dw.pipeline.prop.deleteNode')}>
+            <button type="button" onClick={() => onDeleteNode(node.id)} className={`p-1 hover:${styles.dangerBg} rounded ${styles.dangerText} transition-colors`} title={t('dw.pipeline.prop.deleteNode')}>
               <Trash2 size={14} />
             </button>
-            <button onClick={onClose} className={`p-1 hover:${styles.sidebarBg} rounded ${styles.muted} transition-colors`} title={t('dw.pipeline.prop.closePanel')}>
+            <button type="button" onClick={onClose} className={`p-1 hover:${styles.sidebarBg} rounded ${styles.muted} transition-colors`} title={t('dw.pipeline.prop.closePanel')}>
               <X size={14} />
             </button>
           </div>

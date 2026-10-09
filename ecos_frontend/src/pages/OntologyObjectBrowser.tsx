@@ -309,7 +309,7 @@ export default function OntologyObjectBrowser() {
           <div className="mx-4 mt-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg px-3 py-2 text-xs flex items-center gap-2">
             <AlertCircle size={14} className="shrink-0" />
             <span className="flex-1">{error}</span>
-            <button onClick={() => setError("")} className="hover:text-red-300">
+            <button type="button" onClick={() => setError("")} className="hover:text-red-300">
               <X size={12} />
             </button>
           </div>

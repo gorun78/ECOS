@@ -164,7 +164,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
             {t('knowledge.import.subtitle')}
           </p>
         </div>
-        <button
+        <button type="button"
           onClick={() => { loadVersions(); loadJobs(); }}
           disabled={versionsLoading || jobsLoading}
           className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 border cursor-pointer disabled:opacity-50 ${styles.cardBorder} ${styles.inputBg}`}
@@ -205,7 +205,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
             </label>
             <div className="flex rounded-md border overflow-hidden">
               {(['INCREMENTAL', 'FULL'] as ExtractMode[]).map(m => (
-                <button
+                <button type="button"
                   key={m}
                   onClick={() => setMode(m)}
                   className={`flex-1 px-3 py-2 text-[11px] font-bold transition ${
@@ -222,7 +222,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
 
           {/* 操作按钮 */}
           <div className="flex flex-col justify-end gap-2">
-            <button
+            <button type="button"
               onClick={() => handleDryRun()}
               disabled={previewLoading || triggering}
               className={`w-full px-3 py-2 rounded-md text-xs font-bold border flex items-center justify-center gap-1.5 transition disabled:opacity-50 ${styles.cardBorder} ${styles.inputBg}`}
@@ -230,7 +230,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
               {previewLoading ? <Loader2 size={13} className="animate-spin" /> : <Eye size={13} />}
               {t('knowledge.import.dryRunPreview')}
             </button>
-            <button
+            <button type="button"
               onClick={() => handleTrigger()}
               disabled={previewLoading || triggering}
               className={`w-full px-3 py-2 rounded-md text-xs font-bold text-white flex items-center justify-center gap-1.5 transition disabled:opacity-50 ${styles.accentBg}`}

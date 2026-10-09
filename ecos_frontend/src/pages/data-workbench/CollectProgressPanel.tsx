@@ -128,7 +128,7 @@ export default function CollectProgressPanel({ taskId, status, onClose }: Props)
         <span className="text-[10px] font-mono" style={{ color: styles.cardTextMuted }}>
           task: <span className={styles.accentText}>{taskId.slice(0, 8)}…</span>
         </span>
-        <button
+        <button type="button"
           onClick={onClose}
           disabled={!canClose}
           className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${styles.cardBorder} flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed`}

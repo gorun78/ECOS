@@ -37,7 +37,7 @@ export default function PermissionPanel({ role, allPermissions, onSave, onClose 
       <div className={`rounded-lg border p-6 w-full max-w-3xl max-h-[80vh] flex flex-col ${styles.cardBg} ${styles.cardBorder}`}>
         <div className="flex items-center justify-between mb-3">
           <h3 className={`text-sm font-semibold ${styles.cardText}`}>{t("platform.user.permpanel.title")} — {role.roleName}</h3>
-          <button onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
+          <button type="button" onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
         </div>
         <div className="flex-1 flex gap-3 min-h-0">
           <div className="flex-1 flex flex-col min-w-0">
@@ -67,8 +67,8 @@ export default function PermissionPanel({ role, allPermissions, onSave, onClose 
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-3">
-          <button onClick={onClose} className={`px-4 py-2 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>{t("platform.user.permpanel.cancel")}</button>
-          <button onClick={async () => { setSaving(true); try { await onSave(assigned.map(p => p.permissionId)); onClose(); } catch {} finally { setSaving(false); } }}
+          <button type="button" onClick={onClose} className={`px-4 py-2 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>{t("platform.user.permpanel.cancel")}</button>
+          <button type="button" onClick={async () => { setSaving(true); try { await onSave(assigned.map(p => p.permissionId)); onClose(); } catch {} finally { setSaving(false); } }}
             disabled={saving} className={`px-4 py-2 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover} disabled:opacity-50`}>
             {saving ? t("platform.user.permpanel.saving") : t("platform.user.permpanel.save")}</button>
         </div>

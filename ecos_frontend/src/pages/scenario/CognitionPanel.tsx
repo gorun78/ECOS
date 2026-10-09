@@ -214,7 +214,7 @@ export default function CognitionPanel({
       {/* ── 心智层子视图切换（PMO-59 P4b 人机干预面板入口） ── */}
       <div className="flex flex-wrap items-center gap-1.5">
         {SUB_TABS.map((st) => (
-          <button
+          <button type="button"
             key={st.key}
             data-testid={`cognition-subtab-${st.key}`}
             onClick={() => setSubTab(st.key)}
@@ -252,7 +252,7 @@ export default function CognitionPanel({
               {RUN_TYPES.map((rt) => {
                 const on = runTypes.includes(rt.key);
                 return (
-                  <button
+                  <button type="button"
                     key={rt.key}
                     onClick={() => toggleRunType(rt.key)}
                     className={`text-[10px] font-bold px-2 py-1 rounded border transition-colors cursor-pointer ${
@@ -290,7 +290,7 @@ export default function CognitionPanel({
             />
           </div>
           <div className="flex items-end">
-            <button
+            <button type="button"
               onClick={handleRun}
               disabled={running || !scenario || runTypes.length === 0}
               className="w-full px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[11px] font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
@@ -367,7 +367,7 @@ export default function CognitionPanel({
                     {steps.map((s, i) => {
                       const active = activeStepId === s.stepId;
                       return (
-                        <button
+                        <button type="button"
                           key={s.stepId ?? i}
                           onClick={() => setActiveStepId(active ? null : s.stepId ?? null)}
                           className={`w-full text-left p-2.5 rounded border transition-colors cursor-pointer ${
@@ -619,7 +619,7 @@ function RuleRefChip({
   const { styles } = useTheme();
   return (
     <span className="inline-flex flex-col">
-      <button
+      <button type="button"
         onClick={(e) => {
           e.stopPropagation();
           onToggle();
@@ -653,7 +653,7 @@ function PrecedentRefChip({
   const { styles } = useTheme();
   return (
     <span className="inline-flex flex-col">
-      <button
+      <button type="button"
         onClick={(e) => {
           e.stopPropagation();
           onToggle();

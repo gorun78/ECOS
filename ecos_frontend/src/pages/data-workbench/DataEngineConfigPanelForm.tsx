@@ -57,7 +57,7 @@ const DataEngineConfigPanelForm: React.FC<Props> = ({
         <div className="flex flex-col items-center justify-center flex-1 gap-2">
           <AlertCircle size={24} className={`${styles.warningText}`} />
           <span className={`text-sm ${styles.cardTextMuted}`}>{loadError}</span>
-          <button
+          <button type="button"
             onClick={onRetry}
             className={`px-3 py-1 text-xs ${styles.accentText} hover:${styles.infoBg} rounded-md transition-colors`}
           >

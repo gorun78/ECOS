@@ -119,7 +119,7 @@ export default function BasicMonitoringTab() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button 
+            <button type="button" 
               onClick={loadData}
               disabled={loading}
               className={`flex items-center gap-1.5 px-3 py-1.5 border ${styles.cardBorder} ${styles.cardTextMuted} ${styles.sidebarHoverBg} cursor-pointer disabled:opacity-50 text-xs font-bold rounded-lg transition h-8`}
@@ -128,7 +128,7 @@ export default function BasicMonitoringTab() {
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
               <span>{t("platform.monitoring.basic.refresh")}</span>
             </button>
-            <button 
+            <button type="button" 
               onClick={runDiagnostics}
               disabled={isRefreshing}
               className={`flex items-center gap-1.5 px-3 py-1.5 border border-indigo-500 text-indigo-500 hover:bg-indigo-500/10 cursor-pointer disabled:opacity-50 text-xs font-bold rounded-lg transition h-8`}

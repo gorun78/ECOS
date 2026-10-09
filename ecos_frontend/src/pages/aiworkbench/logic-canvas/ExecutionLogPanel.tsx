@@ -30,7 +30,7 @@ export default function ExecutionLogPanel({
             <span className={`font-mono text-[9px] ${styles.cardTextMuted} ml-2`}>{t('aiworkbench.logic.run.totalDuration', { ms: totalDuration })}</span>
           )}
         </span>
-        <button
+        <button type="button"
           onClick={onClose}
           className={`${styles.cardTextMuted} hover:opacity-70 cursor-pointer transition-opacity`}
         >

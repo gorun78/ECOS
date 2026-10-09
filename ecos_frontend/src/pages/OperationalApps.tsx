@@ -138,7 +138,7 @@ export default function OperationalApps() {
           
           <div className={`flex items-center gap-1.5 p-1 ${styles.appBg} rounded-lg shrink-0 border ${styles.cardBorder}`}>
             {(["crm", "maint", "fin"] as const).map((portal) => (
-              <button
+              <button type="button"
                 key={portal}
                 onClick={() => setActivePortal(portal)}
                 className={`px-3 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${
@@ -255,7 +255,7 @@ export default function OperationalApps() {
                             onChange={(e) => setCreditIncrement(e.target.value)}
                             className={`flex-1 text-xs font-mono p-1 px-2 rounded border ${styles.inputBorder} ${styles.inputBg} ${styles.cardText}`}
                           />
-                          <button 
+                          <button type="button" 
                             onClick={() => handleAdjustCredit(currentCust.id)}
                             className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold leading-none cursor-pointer"
                           >
@@ -267,7 +267,7 @@ export default function OperationalApps() {
 
                       <div className="p-4 rounded-lg border border-red-500/10 bg-red-500/[0.01] space-y-3">
                         <div className="text-xs font-bold text-red-500 flex items-center gap-1.5"><Lock className="w-4 h-4 text-red-500" /> {t("ops.crm.control.freeze")}</div>
-                        <button 
+                        <button type="button" 
                           onClick={() => handleFreezeAccount(currentCust.id)}
                           disabled={!currentCust.isActive}
                           className="w-full py-2 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white text-xs font-bold rounded cursor-pointer"
@@ -331,7 +331,7 @@ export default function OperationalApps() {
                             </td>
                             <td className="p-2 text-right">
                               {m.has_fault ? (
-                                <button 
+                                <button type="button" 
                                   onClick={() => handleDispatchRepair(m.machine_id)}
                                   className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold cursor-pointer"
                                 >

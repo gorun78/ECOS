@@ -194,7 +194,7 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
   }, [setSearchParams]);
 
   const renderPageNav = (item: ActivePage, isActive: boolean, Icon: LucideIcon) => (
-    <button
+    <button type="button"
       key={item}
       onClick={() => navigateToPage(item)}
       className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs transition-colors border-l-2 ${
@@ -216,7 +216,7 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
         >
           {/* Header — ◆ ECOS Knowledge */}
           <div className="h-14 flex items-center gap-2 px-4 border-b" style={{ borderColor: styles.sidebarBorder }}>
-            <button
+            <button type="button"
               onClick={onBack}
               className="p-1 rounded hover:opacity-70 cursor-pointer"
               style={{ color: styles.sidebarText }}
@@ -252,7 +252,7 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
           <div className="px-4 pb-2 text-[10px] font-mono tracking-wider uppercase opacity-50" style={{ color: styles.sidebarText }}>
             {t('knowledge.nav.section_config')}
           </div>
-          <button
+          <button type="button"
             onClick={navigateToEngineConfig}
             className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs transition-colors border-l-2 ${
               activeTab === 'engine_config' && route.kind === 'tab'
@@ -337,7 +337,7 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
       {/* ── Mobile: horizontal scroll tab bar (below md) ───────────────── */}
       <div className="md:hidden flex flex-col h-full min-h-0">
         <div className="h-14 flex-shrink-0 flex items-center gap-2 px-4 border-b" style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
-          <button
+          <button type="button"
             onClick={onBack}
             className="p-1 rounded hover:opacity-70 cursor-pointer"
             style={{ color: styles.cardTextMuted }}
@@ -361,7 +361,7 @@ export default function KnowledgeView({ onBack, activeTab: controlledTab }: Know
               const isActive = activePage === page && route.kind === 'page';
               const Icon = ACTIVE_PAGE_ICONS[page];
               return (
-                <button
+                <button type="button"
                   key={page}
                   onClick={() => navigateToPage(page)}
                   className={`h-9 px-3 rounded-t-md border-t-2 flex items-center gap-2 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer transition ${

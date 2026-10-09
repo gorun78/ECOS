@@ -211,7 +211,7 @@ export default function ContractManager() {
             {t("contract.error")}
           </p>
           <p className={`text-xs ${styles.muted} mb-4`}>{error}</p>
-          <button
+          <button type="button"
             onClick={loadContracts}
             className={`inline-flex items-center gap-1.5 px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded-lg transition`}
           >
@@ -237,7 +237,7 @@ export default function ContractManager() {
             {t("contract.subtitle")}
           </p>
         </div>
-        <button
+        <button type="button"
           onClick={() => { setCurrentPage(1); loadContracts(); }}
           disabled={loading}
           className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} hover:opacity-80 transition disabled:opacity-50`}
@@ -330,7 +330,7 @@ export default function ContractManager() {
         <div className={`flex items-center gap-2 px-4 py-3 ${styles.dangerBg} border ${styles.dangerBorder} rounded-lg text-xs ${styles.dangerText}`}>
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
-          <button onClick={loadContracts} className="ml-auto font-semibold underline hover:no-underline">
+          <button type="button" onClick={loadContracts} className="ml-auto font-semibold underline hover:no-underline">
             {t("biz.retry")}
           </button>
         </div>

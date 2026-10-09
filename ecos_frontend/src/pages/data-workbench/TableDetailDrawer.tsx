@@ -162,7 +162,7 @@ export default function TableDetailDrawer({ table, connId, onClose }: Props) {
               )}
             </div>
           </div>
-          <button onClick={onClose} className={`text-[10px] px-2 py-1 rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardText} cursor-pointer transition-colors`}>
+          <button type="button" onClick={onClose} className={`text-[10px] px-2 py-1 rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardText} cursor-pointer transition-colors`}>
             {t('common.close') || '关闭'} (Esc)
           </button>
         </div>

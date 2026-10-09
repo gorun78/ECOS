@@ -271,7 +271,7 @@ export function AddConnectionModal({
             <LucideIcon name="Database" size={14} className={styles.infoText} />
             <span>{t('dw.txt.332103')}</span>
           </h3>
-          <button onClick={onClose} className={`${styles.cardTextMuted} p-1`}>
+          <button type="button" onClick={onClose} className={`${styles.cardTextMuted} p-1`}>
             <LucideIcon name="X" size={14} />
           </button>
         </div>
@@ -330,7 +330,7 @@ export function AddConnectionModal({
 
           {/* PMO-48-T5: Schema Preview 按钮 + 结果 */}
           <div className="flex items-center gap-2">
-            <button
+            <button type="button"
               onClick={async () => {
                 setPreviewLoading(true);
                 setPreviewResult(null);
@@ -388,15 +388,15 @@ export function AddConnectionModal({
         </div>
 
         <div className={`px-5 py-3 border-t ${styles.cardBorder} flex justify-end gap-2 ${styles.cardBg}`}>
-          <button onClick={onClose}
+          <button type="button" onClick={onClose}
             className={`px-3 py-1.5 ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.appBg} rounded text-xs transition-colors cursor-pointer`}>
             {t('dw.modal.cancel')}
           </button>
-          <button onClick={handleTest} disabled={testing}
+          <button type="button" onClick={handleTest} disabled={testing}
             className={`px-3.5 py-1.5 border ${styles.cardBorder} ${styles.cardText} hover:${styles.appBg} rounded text-xs transition-colors cursor-pointer ${testing ? 'opacity-50' : ''}`}>
             {testing ? t('dw.modal.testing') : t('dw.conn.testConn')}
           </button>
-          <button onClick={onCreate}
+          <button type="button" onClick={onCreate}
             className={`px-3.5 py-1.5 ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} font-semibold rounded text-xs transition-colors cursor-pointer`}>
             {t('dw.modal.saveAndConnect')}
           </button>
@@ -426,7 +426,7 @@ export function AddSyncModal({ t, locale, newSyncName, setNewSyncName, newSyncCo
       <div className={`${styles.cardBg} rounded-xl shadow-lg border ${styles.cardBorder} max-w-md w-full overflow-hidden flex flex-col`}>
         <div className={`px-5 py-4 border-b ${styles.cardBorder} flex justify-between items-center ${styles.cardBg}`}>
           <h3 className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}><LucideIcon name="Import" size={14} className={`${styles.successText}`} /><span>{t('dw.txt.ca4caf')}</span></h3>
-          <button onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} p-1`}><LucideIcon name="X" size={14} /></button>
+          <button type="button" onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} p-1`}><LucideIcon name="X" size={14} /></button>
         </div>
         <div className="p-5 space-y-3 text-xs">
           <div className="grid grid-cols-2 gap-3">
@@ -440,8 +440,8 @@ export function AddSyncModal({ t, locale, newSyncName, setNewSyncName, newSyncCo
           </div>
         </div>
         <div className={`px-5 py-3 border-t ${styles.cardBorder} flex justify-end gap-2 ${styles.cardBg}`}>
-          <button onClick={onClose} className={`px-3 py-1.5 ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardBg} rounded text-xs cursor-pointer`}>{t('dw.modal.cancel')}</button>
-          <button onClick={onCreate} className={`px-3.5 py-1.5 ${styles.successBg} hover:${styles.successBg} ${styles.cardText} font-semibold rounded text-xs cursor-pointer`}>{t('dw.modal.createSyncTask')}</button>
+          <button type="button" onClick={onClose} className={`px-3 py-1.5 ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardBg} rounded text-xs cursor-pointer`}>{t('dw.modal.cancel')}</button>
+          <button type="button" onClick={onCreate} className={`px-3.5 py-1.5 ${styles.successBg} hover:${styles.successBg} ${styles.cardText} font-semibold rounded text-xs cursor-pointer`}>{t('dw.modal.createSyncTask')}</button>
         </div>
       </div>
     </div>
@@ -460,7 +460,7 @@ export function ExternalInterfacesDrawer({ t, connections, onClose }: ExternalIn
     <div className={`absolute top-12 right-0 bottom-0 w-96 ${styles.overlayBg} ${styles.cardText} border-l ${styles.cardBorder} shadow-2xl z-40 flex flex-col overflow-hidden select-none`}>
       <div className={`px-5 py-4 border-b ${styles.cardBorder} flex justify-between items-center ${styles.overlayBg} shrink-0`}>
         <h3 className={`text-xs font-bold ${styles.cardText} flex items-center gap-2`}><LucideIcon name="Layers" size={14} className={`${styles.warningText} animate-pulse`} /><span>{t('dw.txt.c5dda0')}</span></h3>
-        <button onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.cardText} p-1`}><LucideIcon name="X" size={14} /></button>
+        <button type="button" onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.cardText} p-1`}><LucideIcon name="X" size={14} /></button>
       </div>
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
         <p className={`text-[11px] ${styles.cardTextMuted} leading-relaxed font-sans`}>以下是当前 ECOS 集成平台与外界各大物理系统、调度系统、云对象存储以及 ERP 财务系统的注册接口。</p>

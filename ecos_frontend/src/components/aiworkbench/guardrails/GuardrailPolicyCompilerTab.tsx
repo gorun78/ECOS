@@ -84,7 +84,7 @@ export default function GuardrailPolicyCompilerTab({
               <p className={`font-mono text-[10px] ${styles.cardTextMuted} font-bold`}>{compiledAt}</p>
             </div>
           )}
-          <button
+          <button type="button"
             onClick={handleSaveAndCompilePolicy}
             disabled={isCompiling}
             className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-75 text-white font-bold rounded-lg shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
@@ -148,7 +148,7 @@ export default function GuardrailPolicyCompilerTab({
                       </select>
                     )}
                     
-                    <button
+                    <button type="button"
                       onClick={() => handleToggleColumnPolicy(pol.id)}
                       className={`relative inline-flex h-4.5 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
                         pol.isEnabled ? styles.accentBg : `${styles.inputBorder}`
@@ -185,7 +185,7 @@ export default function GuardrailPolicyCompilerTab({
                       </span>
                     </div>
                     
-                    <button
+                    <button type="button"
                       onClick={() => handleToggleRowPolicy(pol.id)}
                       className={`relative inline-flex h-4.5 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
                         pol.isEnabled ? 'bg-amber-500' : `${styles.inputBorder}`
@@ -219,19 +219,19 @@ export default function GuardrailPolicyCompilerTab({
                         <span className={`text-[8px] ${styles.cardTextMuted} font-bold uppercase`}>{t("aiworkbench.guardrails.recommendedTemplates")}</span>
                         {pol.table === 'ds_pilots_biography' ? (
                           <>
-                            <button
+                            <button type="button"
                               onClick={() => { handleUpdateRowFilterCondition(pol.id, 'hours_flown > 6000'); }}
                               className={`px-1.5 py-0.5 ${styles.inputBg} hover:opacity-80 rounded font-mono text-[8px] font-bold ${styles.cardTextMuted} cursor-pointer`}
                             >
                               hours_flown &gt; 6000
                             </button>
-                            <button
+                            <button type="button"
                               onClick={() => { handleUpdateRowFilterCondition(pol.id, "licence_rating = 'B737-MAX'"); }}
                               className={`px-1.5 py-0.5 ${styles.inputBg} hover:opacity-80 rounded font-mono text-[8px] font-bold ${styles.cardTextMuted} cursor-pointer`}
                             >
                               licence_rating='B737-MAX'
                             </button>
-                            <button
+                            <button type="button"
                               onClick={() => { handleUpdateRowFilterCondition(pol.id, 'base_salary < 80000'); }}
                               className={`px-1.5 py-0.5 ${styles.inputBg} hover:opacity-80 rounded font-mono text-[8px] font-bold ${styles.cardTextMuted} cursor-pointer`}
                             >
@@ -240,13 +240,13 @@ export default function GuardrailPolicyCompilerTab({
                           </>
                         ) : (
                           <>
-                            <button
+                            <button type="button"
                               onClick={() => { handleUpdateRowFilterCondition(pol.id, "status = 'ON_TIME'"); }}
                               className={`px-1.5 py-0.5 ${styles.inputBg} hover:opacity-80 rounded font-mono text-[8px] font-bold ${styles.cardTextMuted} cursor-pointer`}
                             >
                               status='ON_TIME'
                             </button>
-                            <button
+                            <button type="button"
                               onClick={() => { handleUpdateRowFilterCondition(pol.id, 'delay_minutes > 0'); }}
                               className={`px-1.5 py-0.5 ${styles.inputBg} hover:opacity-80 rounded font-mono text-[8px] font-bold ${styles.cardTextMuted} cursor-pointer`}
                             >
@@ -304,7 +304,7 @@ export default function GuardrailPolicyCompilerTab({
               </div>
 
               <div className={`flex ${styles.appBg} p-0.5 rounded-lg border ${styles.cardBorder} shrink-0`}>
-                <button
+                <button type="button"
                   onClick={() => setPreviewTable('pilots')}
                   className={`px-2.5 py-1 rounded font-bold text-[9px] cursor-pointer transition-colors ${
                     previewTable === 'pilots' ? `${styles.cardBg} ${styles.cardText} shadow-xs` : styles.cardTextMuted
@@ -312,7 +312,7 @@ export default function GuardrailPolicyCompilerTab({
                 >
                   ds_pilots_biography
                 </button>
-                <button
+                <button type="button"
                   onClick={() => setPreviewTable('flights')}
                   className={`px-2.5 py-1 rounded font-bold text-[9px] cursor-pointer transition-colors ${
                     previewTable === 'flights' ? `${styles.cardBg} ${styles.cardText} shadow-xs` : styles.cardTextMuted

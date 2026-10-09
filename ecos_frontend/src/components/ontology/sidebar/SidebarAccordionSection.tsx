@@ -38,7 +38,7 @@ export default function SidebarAccordionSection({
 
   return (
     <div className={outerClassName}>
-      <button
+      <button type="button"
         onClick={() => onToggle(sectionKey)}
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.muted} hover:${styles.cardText} font-semibold uppercase tracking-wider text-[10px]`}
       >

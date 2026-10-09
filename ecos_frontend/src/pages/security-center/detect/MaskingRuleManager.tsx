@@ -61,7 +61,7 @@ export default function MaskingRuleManager({ t, locale, styles }: { t: (k: strin
       {/* Mask type cards */}
       <div className="grid grid-cols-5 gap-3">
         {maskTypes.map(mt => (
-          <button
+          <button type="button"
             key={mt.id}
             onClick={() => { setMaskType(mt.id); setResult(null); setError(null); }}
             className={`p-4 rounded-xl text-center transition-all cursor-pointer border-2 ${
@@ -90,10 +90,10 @@ export default function MaskingRuleManager({ t, locale, styles }: { t: (k: strin
 
       {/* Buttons */}
       <div className="flex gap-2">
-        <button onClick={handleMask} disabled={masking || !input.trim()} className={btnPrimary(styles)}>
+        <button type="button" onClick={handleMask} disabled={masking || !input.trim()} className={btnPrimary(styles)}>
           {masking ? <Loader2 size={14} className="animate-spin" /> : t('sec.mask.btn')}
         </button>
-        <button onClick={handleDemoMask} disabled={!input.trim()} className={btnSecondary(styles)}>
+        <button type="button" onClick={handleDemoMask} disabled={!input.trim()} className={btnSecondary(styles)}>
           {t('sec.mask.localDemo')}
         </button>
       </div>

@@ -359,7 +359,7 @@ export default function UserManagement() {
                 <CheckCircle2 className="w-4 h-4 text-green-500 inline mr-1.5" />
                 {t("platform.user.host.resetPwdResultTitle")}
               </h3>
-              <button onClick={() => setResetPwdResult(null)} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
+              <button type="button" onClick={() => setResetPwdResult(null)} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
             </div>
             <p className={`text-xs mb-2 ${styles.cardTextMuted}`}>
               {t("platform.user.host.tempPwdPrompt")}
@@ -376,7 +376,7 @@ export default function UserManagement() {
                 <Copy className="w-4 h-4" />
               </button>
             </div>
-            <button onClick={() => setResetPwdResult(null)}
+            <button type="button" onClick={() => setResetPwdResult(null)}
               className={`w-full px-4 py-2 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover}`}>
               {t("platform.user.host.gotIt")}
             </button>
@@ -490,7 +490,7 @@ export default function UserManagement() {
         </h1>
         <div className="flex gap-2">
           {tab !== "permissions" && (
-            <button
+            <button type="button"
               onClick={() => {
                 if (tab === "users") { if (!orgTree.length) loadOrgs(); setUserForm({ mode: "create" }); }
                 else if (tab === "roles") setRoleForm({ mode: "create" });
@@ -501,7 +501,7 @@ export default function UserManagement() {
             </button>
           )}
           {tab === "permissions" && (
-            <button onClick={() => setPermForm({ mode: "create" })}
+            <button type="button" onClick={() => setPermForm({ mode: "create" })}
               className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover}`}>
               <Plus size={14} /> {t("platform.user.host.newButton")}
             </button>
@@ -604,8 +604,8 @@ export default function UserManagement() {
                   <td className={td}><span className="text-xs opacity-60 max-w-[200px] truncate block">{r.description || "-"}</span></td>
                   <td className={td} onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1">
-                      <button onClick={() => { if (permissions.length === 0) loadPermissions(); setRoleForm({ mode: "edit", role: r }); }} className="text-indigo-500 hover:text-indigo-700 p-1"><Edit3 size={14} /></button>
-                      <button onClick={() => setConfirmAction({ type: "delete", tab: "roles", id: r.roleId, name: r.roleName })}
+                      <button type="button" onClick={() => { if (permissions.length === 0) loadPermissions(); setRoleForm({ mode: "edit", role: r }); }} className="text-indigo-500 hover:text-indigo-700 p-1"><Edit3 size={14} /></button>
+                      <button type="button" onClick={() => setConfirmAction({ type: "delete", tab: "roles", id: r.roleId, name: r.roleName })}
                         className="text-red-500 hover:text-red-700 p-1"><Trash2 size={14} /></button>
                     </div>
                   </td>
@@ -655,8 +655,8 @@ export default function UserManagement() {
                   <td className={td}><span className="text-xs opacity-60 max-w-[200px] truncate block">{p.description || "-"}</span></td>
                   <td className={td}>
                     <div className="flex gap-1">
-                      <button onClick={() => setPermForm({ mode: "edit", perm: p })} className="text-indigo-500 hover:text-indigo-700 p-1"><Edit3 size={14} /></button>
-                      <button onClick={() => setConfirmAction({ type: "delete", tab: "permissions", id: p.permissionId, name: `${p.resource}:${p.action}` })}
+                      <button type="button" onClick={() => setPermForm({ mode: "edit", perm: p })} className="text-indigo-500 hover:text-indigo-700 p-1"><Edit3 size={14} /></button>
+                      <button type="button" onClick={() => setConfirmAction({ type: "delete", tab: "permissions", id: p.permissionId, name: `${p.resource}:${p.action}` })}
                         className="text-red-500 hover:text-red-700 p-1"><Trash2 size={14} /></button>
                     </div>
                   </td>
@@ -674,17 +674,17 @@ export default function UserManagement() {
             {t("platform.user.host.pager", { page: userPage, total: totalPages, count: userTotal })}
           </span>
           <div className="flex gap-1">
-            <button disabled={userPage <= 1} onClick={() => setUserPage(p => Math.max(1, p - 1))}
+            <button type="button" disabled={userPage <= 1} onClick={() => setUserPage(p => Math.max(1, p - 1))}
               className={`px-2 py-1 rounded text-xs border ${styles.cardBorder} ${styles.cardText} disabled:opacity-30`}>
               <ChevronLeft className="w-3.5 h-3.5" /></button>
             {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
               const start = Math.max(1, Math.min(userPage - 2, totalPages - 4));
               const page = start + i;
               if (page > totalPages) return null;
-              return <button key={page} onClick={() => setUserPage(page)}
+              return <button type="button" key={page} onClick={() => setUserPage(page)}
                 className={`px-2.5 py-1 rounded text-xs border ${page === userPage ? `${styles.accentBg} text-white` : `${styles.cardBorder} ${styles.cardText}`}`}>{page}</button>;
             })}
-            <button disabled={userPage >= totalPages} onClick={() => setUserPage(p => Math.min(totalPages, p + 1))}
+            <button type="button" disabled={userPage >= totalPages} onClick={() => setUserPage(p => Math.min(totalPages, p + 1))}
               className={`px-2 py-1 rounded text-xs border ${styles.cardBorder} ${styles.cardText} disabled:opacity-30`}>
               <ChevronRight className="w-3.5 h-3.5" /></button>
           </div>

@@ -307,11 +307,11 @@ export default function CrudDialog({
         </div>
 
         <div className="flex gap-2 mt-6">
-          <button onClick={onSave}
+          <button type="button" onClick={onSave}
             className={`flex-1 px-4 py-2 rounded text-sm font-medium transition-all ${styles.accentBg} ${styles.accentHover} text-white`}>
             {t("platform.wm.crud.save")}
           </button>
-          <button onClick={onClose}
+          <button type="button" onClick={onClose}
             className={`flex-1 px-4 py-2 rounded border text-sm font-medium transition-all ${styles.cardBorder} ${styles.cardBg} ${styles.cardText}`}>
             {t("platform.wm.crud.cancel")}
           </button>

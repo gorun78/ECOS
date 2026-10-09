@@ -321,7 +321,7 @@ export default function AgentMonitor({ showToast }: AgentMonitorProps) {
                 </h3>
                 <div className="flex gap-1">
                   {(['24h', '7d', '30d'] as TrendPeriod[]).map(p => (
-                    <button
+                    <button type="button"
                       key={p}
                       onClick={() => setPeriod(p)}
                       className={`px-2.5 py-1 rounded text-[10px] font-semibold transition-colors cursor-pointer ${

@@ -524,7 +524,7 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
       <div className={`flex items-center justify-between px-4 py-2 border-b shrink-0 ${styles.appBg} ${styles.appText} ${styles.appBorder}`}>
         <div className="flex items-center gap-3">
           {onBack && (
-            <button onClick={onBack} className={`flex items-center gap-1 text-xs ${styles.cardTextMuted} hover:${styles.infoText} transition-colors`} title={t('dw.pipeline.editor.backToList')}>
+            <button type="button" onClick={onBack} className={`flex items-center gap-1 text-xs ${styles.cardTextMuted} hover:${styles.infoText} transition-colors`} title={t('dw.pipeline.editor.backToList')}>
               <ArrowLeft size={14} /> {t('dw.pipeline.editor.backToList')}
             </button>
           )}
@@ -582,10 +582,10 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={clearCanvas} className={`flex items-center gap-1 px-2.5 py-1 text-xs transition-colors ${styles.cardTextMuted} hover:${styles.cardText}`} title={t('dw.pipeline.editor.clearCanvas')}>
+          <button type="button" onClick={clearCanvas} className={`flex items-center gap-1 px-2.5 py-1 text-xs transition-colors ${styles.cardTextMuted} hover:${styles.cardText}`} title={t('dw.pipeline.editor.clearCanvas')}>
             <Trash2 size={13} /> {t('dw.pipeline.editor.clear')}
           </button>
-          <button onClick={() => setDebugOpen((v) => !v)}
+          <button type="button" onClick={() => setDebugOpen((v) => !v)}
             className={`flex items-center gap-1 px-2.5 py-1 text-xs transition-colors rounded ${
               debugOpen
                 ? `${styles.accentBg} ${styles.accentText}`
@@ -598,10 +598,10 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
               <span className={`text-[9px] font-mono ${debugOpen ? styles.accentText : styles.cardTextMuted}`}>{breakpoints.length}</span>
             )}
           </button>
-          <button onClick={handleExecute} className={`flex items-center gap-1.5 px-3 py-1 ${styles.successBg} hover:${styles.successBg} ${styles.cardText} rounded-lg text-xs font-medium transition-colors`}>
+          <button type="button" onClick={handleExecute} className={`flex items-center gap-1.5 px-3 py-1 ${styles.successBg} hover:${styles.successBg} ${styles.cardText} rounded-lg text-xs font-medium transition-colors`}>
             <Play size={13} /> {t('dw.pipeline.editor.execute')}
           </button>
-          <button onClick={handleSave} className={`flex items-center gap-1.5 px-3 py-1 ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} rounded-lg text-xs font-medium transition-colors`}>
+          <button type="button" onClick={handleSave} className={`flex items-center gap-1.5 px-3 py-1 ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} rounded-lg text-xs font-medium transition-colors`}>
             <Save size={13} /> {t('dw.pipeline.editor.save')}
           </button>
         </div>

@@ -155,7 +155,7 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className={`text-lg font-bold ${styles.cardText} flex items-center gap-2`}><Database className={`w-5 h-5 ${styles.accentText}`} />{t("dw.datasource.wz.title")}</h2>
-          <button onClick={onClose} className={`p-1 hover:${styles.appBg}/50 rounded transition cursor-pointer`}><X className={`w-5 h-5 ${styles.muted}`} /></button>
+          <button type="button" onClick={onClose} className={`p-1 hover:${styles.appBg}/50 rounded transition cursor-pointer`}><X className={`w-5 h-5 ${styles.muted}`} /></button>
         </div>
 
         {stepIndicator}
@@ -172,15 +172,15 @@ export default function DataSourceWizard({ onClose, onSuccess }: DataSourceWizar
 
         {/* Navigation */}
         <div className="flex justify-between gap-2 mt-5">
-          <div>{step > 0 && <button onClick={goPrev} disabled={submitting} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.appBg}/50 rounded-lg transition flex items-center gap-1 cursor-pointer`}><ChevronLeft className="w-3.5 h-3.5" />{t("dw.datasource.wz.back")}</button>}</div>
+          <div>{step > 0 && <button type="button" onClick={goPrev} disabled={submitting} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.appBg}/50 rounded-lg transition flex items-center gap-1 cursor-pointer`}><ChevronLeft className="w-3.5 h-3.5" />{t("dw.datasource.wz.back")}</button>}</div>
           <div className="flex gap-2">
-            <button onClick={onClose} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.appBg}/50 rounded-lg transition cursor-pointer`}>{t("dw.datasource.wz.cancel")}</button>
+            <button type="button" onClick={onClose} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.appBg}/50 rounded-lg transition cursor-pointer`}>{t("dw.datasource.wz.cancel")}</button>
             {step < 2 ? (
-              <button onClick={goNext} className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} ${styles.accentHover} text-white rounded-lg transition flex items-center gap-1.5 cursor-pointer`}>{t("dw.datasource.wz.next")}<ChevronRight className="w-3.5 h-3.5" /></button>
+              <button type="button" onClick={goNext} className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} ${styles.accentHover} text-white rounded-lg transition flex items-center gap-1.5 cursor-pointer`}>{t("dw.datasource.wz.next")}<ChevronRight className="w-3.5 h-3.5" /></button>
             ) : importResult?.success ? (
-              <button onClick={() => { onSuccess(); onClose(); }} className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} ${styles.accentHover} text-white rounded-lg transition cursor-pointer`}>{t("dw.datasource.wz.finish")}</button>
+              <button type="button" onClick={() => { onSuccess(); onClose(); }} className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} ${styles.accentHover} text-white rounded-lg transition cursor-pointer`}>{t("dw.datasource.wz.finish")}</button>
             ) : (
-              <button onClick={handleImport} disabled={submitting} className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} ${styles.accentHover} disabled:opacity-50 text-white rounded-lg transition flex items-center gap-1.5 cursor-pointer`}>{submitting && <Loader2 className="w-3 h-3 animate-spin" />}<ArrowRight className="w-3.5 h-3.5" />{t("dw.datasource.wz.registerImport")}</button>
+              <button type="button" onClick={handleImport} disabled={submitting} className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} ${styles.accentHover} disabled:opacity-50 text-white rounded-lg transition flex items-center gap-1.5 cursor-pointer`}>{submitting && <Loader2 className="w-3 h-3 animate-spin" />}<ArrowRight className="w-3.5 h-3.5" />{t("dw.datasource.wz.registerImport")}</button>
             )}
           </div>
         </div>

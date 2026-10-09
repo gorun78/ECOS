@@ -206,7 +206,7 @@ export default function ObjectTypeView({
         </div>
         <div className="flex items-center gap-2">
           {onExploreData && (
-            <button
+            <button type="button"
               onClick={() => onExploreData(objectType.id)}
               className={`text-xs ${styles.successText} hover:bg-blue-50 px-2.5 py-1.5 rounded border ${styles.infoBorder} transition-colors flex items-center gap-1.5 font-semibold`}
             >
@@ -214,7 +214,7 @@ export default function ObjectTypeView({
               {t('ow.object.exploreData')}
             </button>
           )}
-          <button
+          <button type="button"
             onClick={() => onDelete(objectType.id)}
             className={`text-xs ${styles.dangerText} hover:bg-red-50 px-2.5 py-1.5 rounded border ${styles.dangerBorder} transition-colors flex items-center gap-1.5`}
           >
@@ -235,7 +235,7 @@ export default function ObjectTypeView({
             actions: t('ow.object.tab_actions')
           };
           return (
-            <button
+            <button type="button"
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`py-3 px-4 text-xs font-medium border-b-2 -mb-px transition-colors ${
@@ -280,7 +280,7 @@ export default function ObjectTypeView({
                   <option value="timestamp">{t('ow.object.dt_timestamp')}</option>
                   <option value="geopoint">{t('ow.object.dt_geopoint')}</option>
                 </select>
-                <button
+                <button type="button"
                   onClick={handleAddProperty}
                   className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition-colors flex items-center gap-1"
                 >
@@ -307,7 +307,7 @@ export default function ObjectTypeView({
                   {objectType.properties.map(prop => (
                     <tr key={prop.id} className={`${styles.sidebarHoverBg} transition-colors`}>
                       <td className="py-2.5 px-4 text-center">
-                        <button
+                        <button type="button"
                           onClick={() => handleTogglePrimaryKey(prop.id)}
                           className={`p-1.5 rounded-full transition-colors ${
                             objectType.primaryKey === prop.id
@@ -372,7 +372,7 @@ export default function ObjectTypeView({
                         </select>
                       </td>
                       <td className="py-2.5 px-4 text-center">
-                        <button
+                        <button type="button"
                           onClick={() => handleRemoveProperty(prop.id)}
                           className={`text-xs ${styles.cardTextMuted} hover:text-red-500 p-1 rounded hover:bg-blue-50/20 transition-colors`}
                           title={t('ow.object.delete_prop')}
@@ -556,7 +556,7 @@ export default function ObjectTypeView({
                     <option key={ds.id} value={ds.id}>{ds.name}</option>
                   ))}
                 </select>
-                <button
+                <button type="button"
                   onClick={handleAutoMap}
                   className={`bg-[var(--card,#94A3B8)] hover:bg-[var(--card,#64748B)] ${styles.cardText} text-xs px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1`}
                 >

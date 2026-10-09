@@ -294,7 +294,7 @@ export default function TenantManager() {
           </div>
           <div className="flex items-center gap-2">
             {activeTab === "management" && (
-              <button
+              <button type="button"
                 onClick={() => { setFormMode("create"); setEditTenant(null); }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover}`}
               >
@@ -302,7 +302,7 @@ export default function TenantManager() {
                 {t("platform.tenant.host.newTenant")}
               </button>
             )}
-            <button
+            <button type="button"
               onClick={() => {
                 loadTenants(tenantSearch, tenantPage, statusFilter);
                 if (activeTab === "quota") loadQuotas();
@@ -320,7 +320,7 @@ export default function TenantManager() {
         {/* Tabs */}
         <div className="flex border-b border-white/10 gap-1">
           {tabs.map((tab) => (
-            <button
+            <button type="button"
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${

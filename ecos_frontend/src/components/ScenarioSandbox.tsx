@@ -251,7 +251,7 @@ export default function ScenarioSandbox() {
                 <h2 className="text-sm font-bold mt-1 uppercase font-mono" style={{ color: "var(--cardText)" }}>Interactive Sandbox Playground</h2>
               </div>
               {/* Pareto frontier toggle */}
-              <button
+              <button type="button"
                 onClick={() => setShowParetoFrontier(!showParetoFrontier)}
                 className={`px-2.5 py-1.5 font-mono text-[9px] font-bold border rounded-md tracking-wider cursor-pointer transition-all duration-150 ${
                   showParetoFrontier ? "bg-green-500/10 border-green-500/30 text-green-500 font-bold shadow-2xs" : `bg-black/10 dark:bg-white/5 ${styles.cardBorder} opacity-60 hover:opacity-100`
@@ -270,7 +270,7 @@ export default function ScenarioSandbox() {
                   <div className="text-xs opacity-60 py-4 text-center flex-1">No scenarios available</div>
                 ) : (
                   scenarios.map((sc) => (
-                  <button
+                  <button type="button"
                     key={sc.id}
                     onClick={() => setSelectedScenarioId(sc.id)}
                     className={`flex-1 text-left p-3 rounded-lg border transition-all cursor-pointer ${
@@ -314,7 +314,7 @@ export default function ScenarioSandbox() {
                 <span className="text-[10.5px] opacity-75">
                   {t("cos.sandbox.runPrompt")}
                 </span>
-                <button onClick={runScenarioSimulation} disabled={simulationActive}
+                <button type="button" onClick={runScenarioSimulation} disabled={simulationActive}
                   className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-xs font-semibold flex items-center gap-2 cursor-pointer transition shadow-xs shrink-0">
                   {simulationActive ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
                   <span>{t("cos.btn.simulate")}</span>

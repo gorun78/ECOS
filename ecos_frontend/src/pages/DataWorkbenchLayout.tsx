@@ -139,7 +139,7 @@ export default function DataWorkbenchLayout({
   const renderSideTab = (tab: SideTabItem) => {
     const active = activeTab === tab.id;
     return (
-      <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+      <button type="button" key={tab.id} onClick={() => setActiveTab(tab.id)}
           className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${active ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} border-l-2 ${styles.accentBorder} font-extrabold shadow-sm` : `${styles.cardTextMuted} hover:opacity-80`}`}>
           <LucideIcon name={tab.icon} size={14} className={active ? styles.accentText : styles.cardTextMuted} />
           <span className="truncate">{t(tab.i18nKey)}</span>

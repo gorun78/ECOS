@@ -213,7 +213,7 @@ export default function DataResourcePickerModal({
               </p>
             </div>
           </div>
-          <button
+          <button type="button"
             onClick={onClose}
             className={`p-1.5 rounded-lg hover:bg-white/5 ${styles.cardTextMuted} hover:${styles.cardText} transition`}
           >
@@ -351,7 +351,7 @@ export default function DataResourcePickerModal({
                 const typeLabel = res.resourceType === 'VIEW' ? t("ow.drp.type.view") : t("ow.drp.type.table");
 
                 return (
-                  <button
+                  <button type="button"
                     key={res.resourceId}
                     onClick={() => toggleSelect(res.resourceId)}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition ${

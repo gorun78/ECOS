@@ -233,7 +233,7 @@ export default function OntologyDomainPanel({
 
             return (
               <div key={o.id} className="relative group">
-                <button
+                <button type="button"
                   onClick={() => handleClick(o.id)}
                   className={`w-full text-left p-3 rounded-lg border transition-all duration-150
                     ${

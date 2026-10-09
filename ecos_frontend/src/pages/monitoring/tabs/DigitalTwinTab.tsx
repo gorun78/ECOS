@@ -174,7 +174,7 @@ export default function DigitalTwinTab() {
                 <span className={styles.cardTextMuted}>{t("platform.monitoring.twin.deviceCount")}: {health.device_count}</span>
               </div>
             )}
-            <button
+            <button type="button"
               onClick={loadDevices}
               className={`flex items-center gap-1.5 px-3 py-1.5 border ${styles.cardBorder} ${styles.cardTextMuted} ${styles.sidebarHoverBg} cursor-pointer text-xs font-bold rounded-lg transition h-8`}
             >
@@ -200,7 +200,7 @@ export default function DigitalTwinTab() {
                 const isSelected = dev.deviceId === selectedDeviceId;
                 const TypeIcon = DEVICE_TYPE_ICON[dev.type] || DEVICE_TYPE_ICON.default;
                 return (
-                  <button
+                  <button type="button"
                     key={dev.deviceId}
                     onClick={() => setSelectedDeviceId(dev.deviceId)}
                     className={`border rounded-xl p-3 text-left transition-all cursor-pointer ${
@@ -292,7 +292,7 @@ export default function DigitalTwinTab() {
                       className={`w-full px-3 py-2 text-xs rounded-lg outline-none font-mono transition resize-none ${styles.inputBg} ${styles.inputBorder} ${styles.inputText} focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500`}
                     />
                   </div>
-                  <button
+                  <button type="button"
                     onClick={handleSendCommand}
                     disabled={sending || !command.trim()}
                     className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition cursor-pointer disabled:cursor-not-allowed"

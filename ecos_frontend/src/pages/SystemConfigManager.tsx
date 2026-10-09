@@ -54,7 +54,7 @@ const Toast: React.FC<{
   >
     {toast.type === "success" ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
     <span>{toast.msg}</span>
-    <button onClick={onClose} className="ml-2 opacity-60 hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
+    <button type="button" onClick={onClose} className="ml-2 opacity-60 hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
   </div>
 );
 
@@ -207,7 +207,7 @@ export default function SystemConfigManager() {
                 className="px-2 py-1.5 rounded text-sm w-40"
                 style={{ background: 'var(--input-bg, #0f172a)', color: 'var(--text, #e2e8f0)', border: '1px solid var(--border, #334155)' }}
               />
-              <button
+              <button type="button"
                 onClick={() => handleSave(cfg.key)}
                 disabled={isSaving}
                 className="p-1.5 rounded text-white transition-colors disabled:opacity-50"
@@ -225,7 +225,7 @@ export default function SystemConfigManager() {
         <td className={`py-3 px-3 text-xs ${styles.muted}`}>{modifiedAt}</td>
         {/* Reset to default */}
         <td className="py-3 px-3">
-          <button
+          <button type="button"
             onClick={() => handleReset(cfg.key)}
             disabled={isResetting}
             className={`flex items-center gap-1 px-2 py-1 rounded text-xs border transition-colors disabled:opacity-50 ${styles.warningBg} ${styles.warningText} ${styles.warningBorder} hover:opacity-80`}
@@ -299,7 +299,7 @@ export default function SystemConfigManager() {
               {t('systemConfig.title')}
             </h2>
           </div>
-          <button onClick={handleAudit}
+          <button type="button" onClick={handleAudit}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded text-white text-sm transition-colors"
             style={{ backgroundColor: 'var(--accent)' }}
           >
@@ -348,7 +348,7 @@ export default function SystemConfigManager() {
                   <Shield size={18} className="text-indigo-400" />
                   <h3 className={`font-semibold ${styles.text}`}>{t('systemConfig.paraAudit.title')}</h3>
                 </div>
-                <button onClick={() => setAuditOpen(false)} className={`p-1 rounded hover:bg-gray-600/30 ${styles.muted}`}>
+                <button type="button" onClick={() => setAuditOpen(false)} className={`p-1 rounded hover:bg-gray-600/30 ${styles.muted}`}>
                   <X size={18} />
                 </button>
               </div>

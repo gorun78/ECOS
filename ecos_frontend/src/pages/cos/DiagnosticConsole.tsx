@@ -43,7 +43,7 @@ export default function DiagnosticConsole({
             <span>{t("cognition.cos.diagnostic.aligning")}</span>
           </div>
         ) : (
-          <button
+          <button type="button"
             onClick={() => onRun(activeInfoLayer.id)}
             className="w-full h-10 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold leading-none cursor-pointer transition flex items-center justify-center gap-2 shadow-xs"
           >

@@ -45,7 +45,7 @@ export default function DetectTab() {
           const Icon = st.icon;
           const isActive = activeSubTab === st.id;
           return (
-            <button
+            <button type="button"
               key={st.id}
               onClick={() => setActiveSubTab(st.id)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer

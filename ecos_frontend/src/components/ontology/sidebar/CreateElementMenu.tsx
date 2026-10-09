@@ -31,7 +31,7 @@ export default function CreateElementMenu({
   // Bottom Action bar — T4: 替换原来的 白底/黑底 硬编码 → theme tokens
   return (
     <div className={`p-3 border-t ${styles.appBorder} ${styles.cardBg} relative`}>
-      <button
+      <button type="button"
         onClick={() => setShowCreateDropdown(!showCreateDropdown)}
         className={`w-full ${styles.accentBg} text-white ${styles.accentHover} font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-xs`}
       >
@@ -43,7 +43,7 @@ export default function CreateElementMenu({
       {/* Create Dropdown */}
       {showCreateDropdown && (
         <div className={`absolute bottom-14 left-3 right-3 ${styles.cardBg} border ${styles.appBorder} rounded-lg shadow-lg py-1 z-30 divide-y ${styles.divider}`}>
-          <button
+          <button type="button"
             onClick={() => {
               onCreateNew('object');
               setShowCreateDropdown(false);
@@ -55,7 +55,7 @@ export default function CreateElementMenu({
             </span>
             <span>{t('ow.btn.newObjectType')}</span>
           </button>
-          <button
+          <button type="button"
             onClick={() => {
               onCreateNew('link');
               setShowCreateDropdown(false);
@@ -67,7 +67,7 @@ export default function CreateElementMenu({
             </span>
             <span>{t('ow.btn.newLinkType')}</span>
           </button>
-          <button
+          <button type="button"
             onClick={() => {
               onCreateNew('action');
               setShowCreateDropdown(false);
@@ -79,7 +79,7 @@ export default function CreateElementMenu({
             </span>
             <span>{t('ow.btn.newActionType')}</span>
           </button>
-          <button
+          <button type="button"
             onClick={() => {
               onCreateNew('interface');
               setShowCreateDropdown(false);
@@ -91,7 +91,7 @@ export default function CreateElementMenu({
             </span>
             <span>{t('ow.btn.newInterface')}</span>
           </button>
-          <button
+          <button type="button"
             onClick={() => {
               onCreateNew('shared_property');
               setShowCreateDropdown(false);
@@ -103,7 +103,7 @@ export default function CreateElementMenu({
             </span>
             <span>{t('ow.btn.newSharedProperty')}</span>
           </button>
-          <button
+          <button type="button"
             onClick={() => {
               onCreateNew('function');
               setShowCreateDropdown(false);

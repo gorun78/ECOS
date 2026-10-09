@@ -209,7 +209,7 @@ export default function OverrideTab() {
               >
                 Σprob={formatNum(probSum)}
               </span>
-              <button
+              <button type="button"
                 onClick={addDraft}
                 className={`text-[10px] font-bold px-2 py-1 rounded border ${styles.inputBorder} ${styles.cardTextMuted} hover:border-indigo-500/50 transition-colors cursor-pointer flex items-center gap-1`}
               >
@@ -239,7 +239,7 @@ export default function OverrideTab() {
                 placeholder="0.00"
                 className={`col-span-4 px-2 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:border-indigo-500 transition-colors`}
               />
-              <button
+              <button type="button"
                 onClick={() => removeDraft(i)}
                 title={t('scenario.iv.ov.removeOutcome')}
                 className={`col-span-1 flex items-center justify-center py-1.5 rounded border ${styles.inputBorder} ${styles.cardTextMuted} hover:border-red-500/60 hover:text-red-400 transition-colors cursor-pointer`}
@@ -276,7 +276,7 @@ export default function OverrideTab() {
         </div>
 
         <div className="flex justify-end">
-          <button
+          <button type="button"
             onClick={handleSubmit}
             disabled={submitting}
             className="px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1.5"

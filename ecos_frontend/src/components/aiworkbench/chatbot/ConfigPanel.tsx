@@ -139,14 +139,14 @@ export default function ConfigPanel({
           </div>
 
           <div className="flex gap-1.5 shrink-0">
-            <button
+            <button type="button"
               onClick={onEditConfig}
               className={`p-1.5 ${styles.appBg} ${styles.accentHover} ${styles.cardTextMuted} border ${styles.cardBorder} rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center`}
               title={t('aiworkbench.chatbot.configMetadata')}
             >
               <Icon name="Settings2" size={12} />
             </button>
-            <button
+            <button type="button"
               onClick={onDelete}
               className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg font-bold transition-all cursor-pointer flex items-center justify-center"
               title={t('aiworkbench.chatbot.deleteAgent')}
@@ -167,7 +167,7 @@ export default function ConfigPanel({
           ].map(tab => {
             const isActive = activeWorkspaceTab === tab.id;
             return (
-              <button
+              <button type="button"
                 key={tab.id}
                 onClick={() => setActiveWorkspaceTab(tab.id as any)}
                 className={`flex-1 py-1 px-2 rounded-md font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
@@ -394,7 +394,7 @@ export default function ConfigPanel({
               <h4 className={`font-extrabold ${styles.cardTextMuted} text-[11px] uppercase tracking-wider font-mono`}>
                 {t('aiworkbench.chatbot.mountedDocs')} ({ragDocs.length})
               </h4>
-              <button
+              <button type="button"
                 onClick={handleSyncRAG}
                 disabled={isSyncingRAG || !ragDocs.some(d => d.status === 'pending')}
                 className={`px-3 py-1 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg transition-all text-[10px] flex items-center gap-1 cursor-pointer ${
@@ -444,7 +444,7 @@ export default function ConfigPanel({
                         <span>{t('aiworkbench.chatbot.waitVectorize')}</span>
                       </span>
                     )}
-                    <button
+                    <button type="button"
                       onClick={() => setRagDocs(prev => prev.filter(x => x.id !== doc.id))}
                       className={`p-1 ${styles.cardTextMuted} hover:text-red-500 rounded-md transition-colors cursor-pointer`}
                       title={t('aiworkbench.chatbot.unmountFile')}
@@ -566,7 +566,7 @@ export default function ConfigPanel({
                   {t('aiworkbench.chatbot.publishDesc')}
                 </p>
               </div>
-              <button
+              <button type="button"
                 onClick={handlePublishChatbot}
                 disabled={isPublishing}
                 className={`px-4 py-2 styles.cardBg hover:styles.appBg styles.cardText font-extrabold rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
@@ -614,19 +614,19 @@ export default function ConfigPanel({
               </div>
 
               <div className={`flex ${styles.appBg} p-0.5 rounded-lg border ${styles.cardBorder} text-[9px] font-bold`}>
-                <button
+                <button type="button"
                   onClick={() => setEmbedTab('iframe')}
                   className={`flex-1 py-1 rounded-md transition-all cursor-pointer ${embedTab === 'iframe' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : styles.cardTextMuted}`}
                 >
                   {t('aiworkbench.chatbot.embedIframe')}
                 </button>
-                <button
+                <button type="button"
                   onClick={() => setEmbedTab('web-component')}
                   className={`flex-1 py-1 rounded-md transition-all cursor-pointer ${embedTab === 'web-component' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : styles.cardTextMuted}`}
                 >
                   {t('aiworkbench.chatbot.embedWebComponent')}
                 </button>
-                <button
+                <button type="button"
                   onClick={() => setEmbedTab('widget-json')}
                   className={`flex-1 py-1 rounded-md transition-all cursor-pointer ${embedTab === 'widget-json' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : styles.cardTextMuted}`}
                 >
@@ -672,13 +672,13 @@ export default function ConfigPanel({
                 <div className="flex items-center justify-between">
                   <span className={`text-[11px] font-bold ${styles.cardTextMuted}`}>{t('aiworkbench.chatbot.apiIntegration')}</span>
                   <div className="flex gap-1">
-                    <button
+                    <button type="button"
                       onClick={() => setApiLang('curl')}
                       className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${apiLang === 'curl' ? `${styles.accentBg} text-white` : `${styles.inputBg} ${styles.cardTextMuted}`}`}
                     >
                       cURL
                     </button>
-                    <button
+                    <button type="button"
                       onClick={() => setApiLang('typescript')}
                       className={`px-1.5 py-0.5 text-[8px] font-bold rounded ${apiLang === 'typescript' ? `${styles.accentBg} text-white` : `${styles.inputBg} ${styles.cardTextMuted}`}`}
                     >

@@ -116,7 +116,7 @@ export default function MetadataStrategyPanel({
 
                   <div className="flex gap-2 flex-wrap items-center">
                     {/* 保存参数：仅保存策略配置并同步一次资源，不触发采集任务 */}
-                    <button
+                    <button type="button"
                       disabled={collecting || collectTaskId !== null}
                       onClick={async () => {
                         try {
@@ -159,7 +159,7 @@ export default function MetadataStrategyPanel({
                     </button>
 
                     {/* 立即采集（结构源主档口，走 triggerCollectSync 异步任务；fs 走 collectFolderFiles 全量采集） */}
-                    <button
+                    <button type="button"
                       disabled={collecting || collectTaskId !== null}
                       onClick={async () => {
                         setCollecting(true);
@@ -236,7 +236,7 @@ export default function MetadataStrategyPanel({
                           )}
                         </div>
                       ))}
-                      <button
+                      <button type="button"
                         onClick={() => window.open('#/task-center', '_blank')}
                         className={`text-[10px] ${styles.accentText} hover:underline cursor-pointer flex items-center gap-1`}
                       >

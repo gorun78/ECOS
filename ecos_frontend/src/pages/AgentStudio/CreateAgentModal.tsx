@@ -34,7 +34,7 @@ export default function CreateAgentModal({ form, onChange, onConfirm, onClose }:
             <Bot className="w-5 h-5 text-indigo-600" />
             {t("agent.create.title")}
           </h2>
-          <button onClick={onClose} className={`p-1 ${styles.cardTextMuted} hover:text-indigo-500 rounded`}>
+          <button type="button" onClick={onClose} className={`p-1 ${styles.cardTextMuted} hover:text-indigo-500 rounded`}>
             <X className={`w-5 h-5 ${styles.cardTextMuted}`} />
           </button>
         </div>
@@ -69,11 +69,11 @@ export default function CreateAgentModal({ form, onChange, onConfirm, onClose }:
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onClose}
+          <button type="button" onClick={onClose}
             className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.appBorder} rounded-lg transition`}>
             {g(locale, "Cancel", "取消")}
           </button>
-          <button onClick={onConfirm} disabled={!form.name.trim()}
+          <button type="button" onClick={onConfirm} disabled={!form.name.trim()}
             className="px-4 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition">
             {t("agent.create.confirm")}
           </button>

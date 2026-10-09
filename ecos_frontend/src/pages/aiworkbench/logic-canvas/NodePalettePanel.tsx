@@ -18,7 +18,7 @@ export default function NodePalettePanel({ onAddNode }: { onAddNode: (type: Logi
       {/* Add nodes dropdown */}
       <div className={`flex ${styles.cardBg} ${styles.appBorder} border rounded-lg shadow-sm overflow-hidden`}>
         {(['llm', 'tool', 'ontology', 'approval', 'condition', 'trigger'] as LogicNodeType[]).map(nodeType => (
-          <button
+          <button type="button"
             key={nodeType}
             onClick={() => onAddNode(nodeType)}
             className={`px-2 py-1.5 text-[10px] font-bold ${styles.cardTextMuted} ${styles.cardBorder} border-r last:border-r-0 cursor-pointer transition-opacity hover:opacity-80`}

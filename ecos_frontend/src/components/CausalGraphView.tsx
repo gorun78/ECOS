@@ -252,7 +252,7 @@ export default function CausalGraphView() {
     <div className="flex-1 flex flex-col min-h-0">
       {/* Toolbar */}
       <div className="flex items-center gap-2 mb-3 shrink-0 flex-wrap">
-        <button
+        <button type="button"
           onClick={loadData}
           disabled={loading}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-all
@@ -379,7 +379,7 @@ export default function CausalGraphView() {
                 <option key={n.name} value={n.name}>{n.name}</option>
               ))}
             </select>
-            <button
+            <button type="button"
               onClick={queryPath}
               disabled={!pathFrom || !pathTo || pathLoading}
               className={`w-full px-3 py-1.5 rounded text-xs font-medium transition-all

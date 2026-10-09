@@ -98,7 +98,7 @@ export function LeftToolbar({
             placeholder={t('knowledge.graph.searchPlaceholder')}
             className={`flex-1 px-2.5 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded-lg ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-blue-500`}
           />
-          <button
+          <button type="button"
             onClick={onSearchSubmit}
             className="px-2 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg cursor-pointer transition"
           >
@@ -109,7 +109,7 @@ export function LeftToolbar({
         {showSearchResults && searchResults.length > 0 && (
           <div className={`${styles.sidebarBg} border ${styles.sidebarBorder} rounded-lg shadow-xl max-h-48 overflow-y-auto`}>
             {searchResults.map((r) => (
-              <button
+              <button type="button"
                 key={r.id}
                 onClick={() => onSearchResultClick(r.id)}
                 className={`w-full text-left px-2.5 py-1.5 text-[11px] ${styles.sidebarText} ${styles.sidebarHoverBg} border-b ${styles.cardBorder} last:border-0 flex items-center gap-2 transition cursor-pointer`}
@@ -142,7 +142,7 @@ export function LeftToolbar({
             placeholder={t('knowledge.graph.pathTargetPlaceholder')}
             className={`w-[70px] px-2 py-1 text-[10px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} placeholder:${styles.muted} outline-none focus:border-amber-500`}
           />
-          <button
+          <button type="button"
             onClick={() => { if (pathSource && pathTarget) onComputePath(); else onPathMissing(); }}
             disabled={isComputingPath}
             className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-[10px] font-bold cursor-pointer transition disabled:opacity-50"
@@ -217,7 +217,7 @@ export function LeftToolbar({
       </div>
 
       {/* Load Full Graph */}
-      <button
+      <button type="button"
         onClick={onLoadFullGraph}
         disabled={isLoading}
         className={`w-full px-3 py-2 text-[11px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} rounded-lg border ${styles.cardBorder} flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50`}

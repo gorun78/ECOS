@@ -22,7 +22,7 @@ export const DeleteConfirm: React.FC<{
         <p className={`text-sm ${styles.cardTextMuted} mb-5`}>确定要删除租户「{targetName}」吗？此操作不可撤销。</p>
         <div className="flex gap-2 justify-end">
           <button type="button" onClick={onCancel} className={`px-4 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-white/5`}>取消</button>
-          <button onClick={onConfirm} className="px-4 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700">删除</button>
+          <button type="button" onClick={onConfirm} className="px-4 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700">删除</button>
         </div>
       </div>
     </div>

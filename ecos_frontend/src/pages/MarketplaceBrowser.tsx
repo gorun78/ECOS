@@ -311,7 +311,7 @@ export default function MarketplaceBrowser() {
             <AlertCircle className="w-4 h-4 shrink-0" />
           )}
           <span>{toast.msg}</span>
-          <button
+          <button type="button"
             onClick={() => setToast(null)}
             className="ml-2 opacity-60 hover:opacity-100"
           >

@@ -52,7 +52,7 @@ export default function ScenarioList({
             <LucideIcon name="ListCollapse" size={12} className="text-indigo-500" />
             {t('scenario.list.title')}
           </span>
-          <button
+          <button type="button"
             onClick={onCreateNew}
             className="text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-1 rounded flex items-center gap-1 transition-all cursor-pointer"
           >

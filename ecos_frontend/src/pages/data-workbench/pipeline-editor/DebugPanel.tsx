@@ -89,31 +89,31 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
               : <CircleDot size={10} className={`${styles.dangerText}`} />}
           {t(`dw.pipeline.debug.${state === 'idle' ? 'idle' : 'active'}`)}
         </span>
-        <button onClick={onStart} disabled={!canStart}
+        <button type="button" onClick={onStart} disabled={!canStart}
           className={iconBtn(canStart, t('dw.pipeline.debug.tooltip.start'))}
           title={t('dw.pipeline.debug.tooltip.start')}
         >
           <Play size={12} /> {t('dw.pipeline.debug.start')}
         </button>
-        <button onClick={onStepOver} disabled={!canStepOver}
+        <button type="button" onClick={onStepOver} disabled={!canStepOver}
           className={iconBtn(canStepOver, t('dw.pipeline.debug.tooltip.stepOver'))}
           title={t('dw.pipeline.debug.tooltip.stepOver')}
         >
           <SkipForward size={12} /> {t('dw.pipeline.debug.stepOver')}
         </button>
-        <button onClick={onContinue} disabled={!canContinue}
+        <button type="button" onClick={onContinue} disabled={!canContinue}
           className={iconBtn(canContinue, t('dw.pipeline.debug.tooltip.continue'))}
           title={t('dw.pipeline.debug.tooltip.continue')}
         >
           <PlayMini size={12} /> {t('dw.pipeline.debug.continue')}
         </button>
-        <button onClick={onStop} disabled={!canStop}
+        <button type="button" onClick={onStop} disabled={!canStop}
           className={iconBtn(canStop, t('dw.pipeline.debug.tooltip.stop'))}
           title={t('dw.pipeline.debug.tooltip.stop')}
         >
           <Square size={12} /> {t('dw.pipeline.debug.stop')}
         </button>
-        <button onClick={onReset} disabled={!canReset}
+        <button type="button" onClick={onReset} disabled={!canReset}
           className={`flex items-center gap-1 ml-auto px-2 py-1 text-[11px] rounded transition-colors ${
             canReset ? `${styles.cardTextMuted} hover:${styles.dangerBg} hover:${styles.dangerText}` : 'opacity-50 cursor-not-allowed'
           }`} title={t('dw.pipeline.debug.tooltip.reset')}
@@ -132,7 +132,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
         </div>
 
         <div className="px-2 pt-2">
-          <button onClick={addBreakpointForSelected} disabled={!currentNodeId}
+          <button type="button" onClick={addBreakpointForSelected} disabled={!currentNodeId}
             className={`w-full flex items-center justify-center gap-1 px-2 py-1 text-[11px] rounded transition-colors ${
               currentNodeId
                 ? `${styles.dangerBg} ${styles.dangerText} hover:opacity-80 border ${styles.dangerBorder}`
@@ -153,7 +153,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
             {breakpoints.map((bp) => (
               <li key={bp.id} className={row}>
                 <div className={`flex items-center gap-2 ${bp.enabled ? '' : 'opacity-50'}`}>
-                  <button onClick={() => onToggleBreakpoint(bp.id, !bp.enabled)}
+                  <button type="button" onClick={() => onToggleBreakpoint(bp.id, !bp.enabled)}
                     className={iconBtn(bp.enabled, t('dw.pipeline.debug.breakpoints.enabled'))}
                     title={`${bp.enabled ? 'Disable' : 'Enable'} ${t('dw.pipeline.debug.breakpoints.enabled')}`}
                   >
@@ -175,7 +175,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
                         title={bp.condition}>{bp.condition}</div>
                     )}
                   </div>
-                  <button onClick={() => onRemoveBreakpoint(bp.id)}
+                  <button type="button" onClick={() => onRemoveBreakpoint(bp.id)}
                     className={iconBtn(false, t('dw.pipeline.debug.breakpoints.remove'))}
                     title={t('dw.pipeline.debug.breakpoints.remove')}
                   >

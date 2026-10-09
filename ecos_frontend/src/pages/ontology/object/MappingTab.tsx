@@ -77,7 +77,7 @@ export default function MappingTab({
           )}
           {/* W2 新增：校验映射按钮（触发 C4 映射有效性校验） */}
           {onValidateMappings && (
-            <button
+            <button type="button"
               onClick={onValidateMappings}
               disabled={validating}
               className={`${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} text-xs px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1 disabled:opacity-50`}
@@ -88,7 +88,7 @@ export default function MappingTab({
               {t('mapping.validate.button')}
             </button>
           )}
-          <button
+          <button type="button"
             onClick={onSaveMapping}
             disabled={!mappingDirty}
             className={`${mappingDirty ? styles.accentText : styles.cardTextMuted} ${
@@ -107,7 +107,7 @@ export default function MappingTab({
               <option key={ds.id} value={ds.id}>{ds.name}</option>
             ))}
           </select>
-          <button
+          <button type="button"
             onClick={handleAutoMap}
             className={`${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} text-xs px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1`}
           >
@@ -286,7 +286,7 @@ export default function MappingTab({
                 <span className={`text-sm font-semibold ${styles.cardText}`}>{t('mapping.validate.report.title')}</span>
               </div>
               {onDismissValidation && (
-                <button onClick={handleDismissReport} className={`${styles.cardTextMuted} hover:opacity-100 opacity-70`} aria-label="close">
+                <button type="button" onClick={handleDismissReport} className={`${styles.cardTextMuted} hover:opacity-100 opacity-70`} aria-label="close">
                   <X size={16} />
                 </button>
               )}
@@ -322,7 +322,7 @@ export default function MappingTab({
               )}
             </div>
             <div className={`flex justify-end px-4 py-3 border-t ${styles.cardBorder}`}>
-              <button
+              <button type="button"
                 onClick={handleDismissReport}
                 className={`${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} text-xs px-3 py-1.5 rounded font-medium`}
               >

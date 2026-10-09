@@ -51,7 +51,7 @@ export default function EmptyState({
         {defaultDescription}
       </p>
       {action && (
-        <button
+        <button type="button"
           onClick={action.onClick}
           className={`mt-5 px-5 py-2 text-xs font-bold rounded-lg cursor-pointer transition ${styles.accentBg} ${styles.accentText} hover:opacity-90 shadow-xs`}
         >

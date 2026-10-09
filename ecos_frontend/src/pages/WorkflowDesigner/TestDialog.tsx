@@ -24,7 +24,7 @@ export default function TestDialog({ testResult, onClose }: TestDialogProps) {
           <h3 className="text-sm font-bold flex items-center gap-2">
             <Activity className="w-4 h-4 text-emerald-500" /> {t("wf.test.title")}
           </h3>
-          <button onClick={onClose}>
+          <button type="button" onClick={onClose}>
             <X className={`w-4 h-4 ${styles.cardTextMuted}`} />
           </button>
         </div>
@@ -90,7 +90,7 @@ export default function TestDialog({ testResult, onClose }: TestDialogProps) {
           )}
         </div>
         <div className={`p-4 border-t ${styles.cardBorder} flex justify-end`}>
-          <button
+          <button type="button"
             onClick={onClose}
             className={`px-4 py-2 text-xs ${styles.appBg} rounded-lg hover:opacity-70 ${styles.cardText}`}
           >

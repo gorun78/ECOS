@@ -357,7 +357,7 @@ export default function TermFormPanel({
             {t("glossary.actions")}:
           </span>
           {transitions.map((tr) => (
-            <button
+            <button type="button"
               key={tr.status}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition
                 disabled:opacity-50 ${tr.danger
@@ -375,7 +375,7 @@ export default function TermFormPanel({
 
       {/* 操作按钮 */}
       <div className={`flex gap-2 pt-3 border-t ${styles.cardBorder}`}>
-        <button
+        <button type="button"
           className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs
             font-semibold transition disabled:opacity-50 flex items-center gap-1"
           onClick={handleSave}
@@ -384,7 +384,7 @@ export default function TermFormPanel({
           {saving ? <RotateCw size={14} className="animate-spin" /> : null}
           {t("glossary.save")}
         </button>
-        <button
+        <button type="button"
           className={`px-4 py-2 rounded-lg text-xs font-semibold transition disabled:opacity-50
             ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.muted}`}
           onClick={onCancel}

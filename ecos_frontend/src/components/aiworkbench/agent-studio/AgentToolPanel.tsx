@@ -86,7 +86,7 @@ export default function AgentToolPanel({
       {/* Header with Tab Selectors */}
       <div className={`p-2 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between shrink-0`}>
         <div className={`flex ${styles.inputBg} p-1 rounded-lg`}>
-          <button
+          <button type="button"
             onClick={() => setSandboxMode('chat')}
             className={`px-3 py-1.5 rounded-md font-bold text-[10px] transition-all cursor-pointer flex items-center gap-1 ${
               sandboxMode === 'chat'
@@ -97,7 +97,7 @@ export default function AgentToolPanel({
             <Icon name="MessageSquare" size={10} />
             <span>{t("aiworkbench.agentStudio.chatTab")}</span>
           </button>
-          <button
+          <button type="button"
             onClick={() => setSandboxMode('simulation')}
             className={`px-3 py-1.5 rounded-md font-bold text-[10px] transition-all cursor-pointer flex items-center gap-1 ${
               sandboxMode === 'simulation'
@@ -111,7 +111,7 @@ export default function AgentToolPanel({
         </div>
 
         {sandboxMode === 'chat' ? (
-          <button
+          <button type="button"
             onClick={() => {
               setChatMessages([
                 {
@@ -201,14 +201,14 @@ export default function AgentToolPanel({
                       </div>
 
                       <div className="flex gap-1.5 pt-1 border-t border-amber-200/50">
-                        <button
+                        <button type="button"
                           onClick={() => onActionConsent(msg.id, true)}
                           className="flex-1 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[10px] transition-colors cursor-pointer flex items-center justify-center gap-1"
                         >
                           <Icon name="Check" size={10} />
                           <span>{t("aiworkbench.agentStudio.confirmAuthorize")}</span>
                         </button>
-                        <button
+                        <button type="button"
                           onClick={() => onActionConsent(msg.id, false)}
                           className={`px-2.5 py-1.5 border ${styles.cardBorder} hover:${styles.inputBg} rounded-lg text-[10px] font-semibold ${styles.cardTextMuted} transition-colors cursor-pointer`}
                         >
@@ -261,7 +261,7 @@ export default function AgentToolPanel({
               t("aiworkbench.agentStudio.quickPrompt1"),
               t("aiworkbench.agentStudio.quickPrompt2")
             ].map(p => (
-              <button
+              <button type="button"
                 key={p}
                 onClick={() => onSendChat(p)}
                 className={`px-2.5 py-1 ${styles.cardBg} ${styles.accentHover} ${styles.accentBorder} hover:border-blue-200 border ${styles.cardBorder} rounded-full text-[10px] ${styles.cardTextMuted} font-medium whitespace-nowrap cursor-pointer transition-colors`}
@@ -281,7 +281,7 @@ export default function AgentToolPanel({
               onKeyDown={e => e.key === 'Enter' && onSendChat()}
               className={`flex-1 h-8 px-3 border ${styles.cardBorder} rounded-lg text-xs focus:outline-hidden focus:border-blue-500`}
             />
-            <button
+            <button type="button"
               onClick={() => onSendChat()}
               disabled={isReplying || !chatInput.trim()}
               className={`h-8 w-8 ${styles.accentBg} ${styles.accentHover} text-white rounded-lg flex items-center justify-center cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0`}

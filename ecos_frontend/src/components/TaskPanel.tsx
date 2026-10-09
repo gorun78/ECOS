@@ -94,7 +94,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
             <p className={`text-xs ${styles.cardTextMuted}`}>{t("taskPanel.subtitle")}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <button type="button"
               onClick={refresh}
               disabled={loading}
               className={`p-2 rounded-lg ${styles.sidebarHoverBg} transition disabled:opacity-50`}
@@ -102,7 +102,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
             >
               <RefreshCw className={`w-4 h-4 ${styles.cardTextMuted} ${loading ? "animate-spin" : ""}`} />
             </button>
-            <button onClick={onClose} className={`p-2 rounded-lg ${styles.sidebarHoverBg} transition ${styles.cardTextMuted}`}>
+            <button type="button" onClick={onClose} className={`p-2 rounded-lg ${styles.sidebarHoverBg} transition ${styles.cardTextMuted}`}>
               <X className={`w-5 h-5 ${styles.cardTextMuted}`} />
             </button>
           </div>

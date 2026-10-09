@@ -241,7 +241,7 @@ export default function KnowledgeEvalTab({ showToast }: TabProps) {
 
         {/* 右侧：运行 + 报告 */}
         <div className="space-y-4 min-w-0">
-          <button
+          <button type="button"
             onClick={handleRun}
             disabled={isRunning || seeds.length === 0}
             className={`w-full py-3 bg-amber-600 hover:bg-amber-700 disabled:${styles.sidebarBg} disabled:${styles.muted} text-white font-bold rounded-xl text-xs cursor-pointer flex items-center justify-center gap-2 disabled:cursor-not-allowed shadow-sm`}

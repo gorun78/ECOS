@@ -481,7 +481,7 @@ export default function GatewayDiagnosticsPage() {
     const Icon = def.icon;
     const isActive = tab === id;
     return (
-      <button
+      <button type="button"
         key={id}
         ref={(el) => { tabRefs.current[id] = el; }}
         role="tab"

@@ -124,7 +124,7 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
             )}
           </div>
           {onClose && (
-            <button onClick={onClose} className={`p-0.5 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} transition-colors`}>
+            <button type="button" onClick={onClose} className={`p-0.5 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} transition-colors`}>
               <X size={14} />
             </button>
           )}

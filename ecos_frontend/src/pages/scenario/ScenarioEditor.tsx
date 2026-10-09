@@ -40,7 +40,7 @@ export default function ScenarioEditor({wizard,onClose,onStepChange,onSave,setWN
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl max-w-2xl w-full overflow-hidden shadow-2xl my-8`}>
       <div className={`p-4 ${styles.cardBg} border-b ${styles.cardBorder} flex items-center justify-between`}>
         <span className={`text-sm font-bold text-white flex items-center gap-1.5`}>{Ic('Briefcase',14)}<span className={styles.accentText}/>{wizardScenarioId?t('scenario.title.edit'):t('scenario.title.create')}</span>
-        <button onClick={onClose} className={`${styles.cardTextMuted} hover:text-white cursor-pointer`}>{Ic('X',16)}</button>
+        <button type="button" onClick={onClose} className={`${styles.cardTextMuted} hover:text-white cursor-pointer`}>{Ic('X',16)}</button>
       </div>
 
       <div className={`${styles.cardBg} px-4 py-3 border-b ${styles.cardBorder} overflow-x-auto shrink-0`}>

@@ -23,7 +23,7 @@ export default function DiagnosticPanel({ result, loading, onClose, onRetry }: D
               <p className={`text-xs ${styles.cardTextMuted}`}>因果链追溯 · 根因分析 · 应对方案</p>
             </div>
           </div>
-          <button onClick={onClose} className={`p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition ${styles.cardTextMuted}`}>
+          <button type="button" onClick={onClose} className={`p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition ${styles.cardTextMuted}`}>
             <X className={`w-5 h-5 ${styles.cardTextMuted}`} />
           </button>
         </div>
@@ -44,7 +44,7 @@ export default function DiagnosticPanel({ result, loading, onClose, onRetry }: D
                   <div>
                     <p className="text-sm font-semibold text-red-700 dark:text-red-400">诊断异常</p>
                     <p className="text-xs text-red-600 dark:text-red-300 mt-1">{result.error}</p>
-                    <button onClick={onRetry} className="mt-2 text-xs font-medium text-red-600 underline">重试</button>
+                    <button type="button" onClick={onRetry} className="mt-2 text-xs font-medium text-red-600 underline">重试</button>
                   </div>
                 </div>
               ) : (

@@ -141,7 +141,7 @@ function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
 
   return (
     <div className={`rounded-xl border ${styles.cardBorder} ${styles.cardBg} overflow-hidden transition-all`}>
-      <button onClick={onToggle} className={`w-full flex items-center gap-3 px-4 py-3 transition-colors hover:opacity-90`}>
+      <button type="button" onClick={onToggle} className={`w-full flex items-center gap-3 px-4 py-3 transition-colors hover:opacity-90`}>
         <Icon className={`w-5 h-5 ${def.color}`} />
         <span className="flex-1 text-left font-semibold text-sm">{locale === "zh" ? def.labelZh : def.label}</span>
         {loading ? (
@@ -163,7 +163,7 @@ function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
       {isExpanded && (
         <div className={`border-t ${styles.cardBorder}`}>
           <div className={`flex items-center justify-end px-3 py-1.5 border-b ${styles.cardBorder}`}>
-            <button onClick={() => { onRefresh(); load(); }} className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold ${styles.appBg} ${styles.cardTextMuted} ${styles.sidebarHoverBg} transition-colors`}>
+            <button type="button" onClick={() => { onRefresh(); load(); }} className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold ${styles.appBg} ${styles.cardTextMuted} ${styles.sidebarHoverBg} transition-colors`}>
               <RefreshCw className="w-3 h-3" />
               {t("platform.monitoring.cardRefresh")}
             </button>
@@ -199,7 +199,7 @@ export default function MonitoringCenter() {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+            <button type="button" key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all border-b-2 -mb-px whitespace-nowrap ${
                 isActive
                   ? "border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20"
@@ -220,7 +220,7 @@ export default function MonitoringCenter() {
               <div className={`text-sm font-semibold ${styles.cardTextMuted}`}>
                 {t("platform.monitoring.enginesHeader")}
               </div>
-              <button onClick={() => setRefreshKey(k => k + 1)}
+              <button type="button" onClick={() => setRefreshKey(k => k + 1)}
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold ${styles.appBg} ${styles.cardTextMuted} ${styles.sidebarHoverBg} transition-colors`}>
                 <RefreshCw className="w-3 h-3" />
                 {t("platform.monitoring.refreshAll")}

@@ -36,7 +36,7 @@ export function DetailPanel({
           <Info size={12} className="text-blue-400" />
           {t('knowledge.graph.nodeDetail')}
         </h3>
-        <button
+        <button type="button"
           onClick={onClose}
           className={`p-1 ${styles.sidebarHoverBg} rounded ${styles.muted} hover:${styles.cardText} cursor-pointer transition`}
         >
@@ -112,7 +112,7 @@ export function DetailPanel({
           {/* Action Buttons */}
           <div className={`space-y-1.5 pt-2 border-t ${styles.cardBorder}`}>
             {expandedNodeIds.has(node.id) ? (
-              <button
+              <button type="button"
                 onClick={() => onCollapse(node.id)}
                 className="w-full px-3 py-1.5 text-[11px] font-bold bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
@@ -120,7 +120,7 @@ export function DetailPanel({
                 {t('knowledge.graph.collapseNode')}
               </button>
             ) : (
-              <button
+              <button type="button"
                 onClick={() => onExpand(node.id)}
                 className="w-full px-3 py-1.5 text-[11px] font-bold bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer"
               >
@@ -128,7 +128,7 @@ export function DetailPanel({
                 {t('knowledge.graph.expandNode')}
               </button>
             )}
-            <button
+            <button type="button"
               onClick={() => {
                 onSetPathSource(node.id);
               }}

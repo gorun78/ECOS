@@ -211,7 +211,7 @@ export default function UserList({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-xs font-semibold truncate">{u.username}</span>
-                    <button onClick={() => onToggleStatus(u.userId, u.status)}
+                    <button type="button" onClick={() => onToggleStatus(u.userId, u.status)}
                       className={`px-1.5 py-0.5 rounded text-[10px] font-medium cursor-pointer border transition-colors shrink-0 ${
                         u.status === "ACTIVE"
                           ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800"
@@ -247,19 +247,19 @@ export default function UserList({
               )}
               {/* 操作行：编辑 / 强制下线 / 删除（卡片底部按钮组） */}
               <div className="border-t border-black/10 dark:border-white/10 px-2.5 py-1.5 flex items-center justify-end gap-1.5">
-                <button onClick={() => onRowClick(u)}
+                <button type="button" onClick={() => onRowClick(u)}
                   className="px-2 py-1 rounded text-[11px] bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 border border-black/5 dark:border-white/5">
                   {t("platform.user.list.detail")}
                 </button>
-                <button onClick={() => onEdit(u)}
+                <button type="button" onClick={() => onEdit(u)}
                   className="px-2 py-1 rounded text-[11px] text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/30">
                   {t("platform.user.list.edit")}
                 </button>
-                <button onClick={() => onForceLogout(u)}
+                <button type="button" onClick={() => onForceLogout(u)}
                   className="px-2 py-1 rounded text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/30">
                   {t("platform.user.list.logout")}
                 </button>
-                <button onClick={() => onDelete(u)}
+                <button type="button" onClick={() => onDelete(u)}
                   className="px-2 py-1 rounded text-[11px] text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30">
                   {t("platform.user.list.delete")}
                 </button>
@@ -311,7 +311,7 @@ export default function UserList({
               <td className={td}><span className="text-xs">{orgMap[u.orgId || ""] || (u as any).orgName || u.orgId || "-"}</span></td>
               <td className={td}><RoleTags userId={u.userId} roles={roles} /></td>
               <td className={td} onClick={e => e.stopPropagation()}>
-                <button onClick={() => onToggleStatus(u.userId, u.status)}
+                <button type="button" onClick={() => onToggleStatus(u.userId, u.status)}
                   className={`px-2 py-0.5 rounded text-xs font-medium cursor-pointer border transition-colors ${
                     u.status === "ACTIVE"
                       ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/30"
@@ -322,12 +322,12 @@ export default function UserList({
               </td>
               <td className={td} onClick={e => e.stopPropagation()}>
                 <div className="flex gap-1">
-                  <button onClick={() => onEdit(u)}
+                  <button type="button" onClick={() => onEdit(u)}
                     className="text-indigo-500 hover:text-indigo-700 p-1"><Edit3 size={14} /></button>
-                  <button onClick={() => onForceLogout(u)}
+                  <button type="button" onClick={() => onForceLogout(u)}
                     className="text-amber-500 hover:text-amber-700 p-1" title={t("platform.user.list.forceLogout")}>
                     <LogOut size={14} /></button>
-                  <button onClick={() => onDelete(u)}
+                  <button type="button" onClick={() => onDelete(u)}
                     className="text-red-500 hover:text-red-700 p-1"><Trash2 size={14} /></button>
                 </div>
               </td>
@@ -343,26 +343,26 @@ export default function UserList({
             {t("user.batch.selected").replace("{count}", String(selectedIds.size))}
           </span>
           <div className="w-px h-5 bg-gray-300 dark:bg-gray-700" />
-          <button
+          <button type="button"
             onClick={() => { onBatchEnable(selectedArr); setSelectedIds(new Set()); }}
             className="px-3 py-1 rounded text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
           >
             {t("user.batch.enable")}
           </button>
-          <button
+          <button type="button"
             onClick={() => { onBatchDisable(selectedArr); setSelectedIds(new Set()); }}
             className="px-3 py-1 rounded text-xs font-medium bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
           >
             {t("user.batch.disable")}
           </button>
-          <button
+          <button type="button"
             onClick={() => setShowBatchConfirm(true)}
             className="px-3 py-1 rounded text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
           >
             {t("user.batch.delete")}
           </button>
           <div className="w-px h-5 bg-gray-300 dark:bg-gray-700" />
-          <button
+          <button type="button"
             onClick={() => setSelectedIds(new Set())}
             className="text-xs opacity-50 hover:opacity-80 px-1"
           >

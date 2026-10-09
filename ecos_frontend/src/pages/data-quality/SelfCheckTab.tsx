@@ -71,7 +71,7 @@ export default function SelfCheckTab() {
             {error}
           </span>
         ) : null}
-        <button
+        <button type="button"
           onClick={() => void load()}
           className={`mt-5 flex items-center gap-2 px-4 py-2 text-xs font-bold ${styles.accentBg} ${styles.accentHover} ${styles.cardText} rounded-lg shadow-xs transition cursor-pointer`}
         >
@@ -101,7 +101,7 @@ export default function SelfCheckTab() {
       <div className={`border ${styles.cardBorder} rounded-xl ${styles.cardBg} overflow-hidden`}>
         <div className={`flex items-center justify-between px-4 py-3 border-b ${styles.cardBorder}`}>
           <span className={`text-sm font-bold ${styles.cardText}`}>{t("dw.dqRule.selfCheckItems")}</span>
-          <button
+          <button type="button"
             onClick={() => void load()}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition cursor-pointer`}
           >

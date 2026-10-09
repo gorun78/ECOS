@@ -33,7 +33,7 @@ export default function ValidationTab({
           <div className="space-y-1 col-span-2"><label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>{t('ow.label.validationExpression')}</label><input type="text" placeholder={`如：parameter.new_status_param IN ["ON_TIME", "DELAYED"]`} value={newValExpression} onChange={e => setNewValExpression(e.target.value)} className={`w-full px-3 py-1.5 text-xs border ${styles.cardBorder} rounded ${styles.cardBg} font-mono focus:outline-hidden`} /></div>
         </div>
         <div className="space-y-1"><label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>{t('ow.label.validationErrorMessage')}</label><input type="text" placeholder={t('ow.placeholder.validationError')} value={newValError} onChange={e => setNewValError(e.target.value)} className={`w-full px-3 py-1.5 text-xs border ${styles.cardBorder} rounded ${styles.cardBg} focus:outline-hidden`} /></div>
-        <button onClick={handleAddValidation} className={`${styles.accentBg} hover:bg-blue-700 text-white text-xs px-4 py-1.5 rounded font-medium transition-colors flex items-center gap-1.5`}><Shield size={13} />{t('ow.btn.addValidationRule')}</button>
+        <button type="button" onClick={handleAddValidation} className={`${styles.accentBg} hover:bg-blue-700 text-white text-xs px-4 py-1.5 rounded font-medium transition-colors flex items-center gap-1.5`}><Shield size={13} />{t('ow.btn.addValidationRule')}</button>
       </div>
       <div className="space-y-4">
         <h4 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.section.activeValidations')} ({actionType.validationRules.length})</h4>
@@ -48,7 +48,7 @@ export default function ValidationTab({
                   <div className={`font-mono text-[10px] ${styles.appBg} ${styles.cardTextMuted} px-2 py-1 rounded border ${styles.appBg}`}>{val.expression}</div>
                   <div className="text-[10px] text-red-500 font-medium"><strong>{t('ow.label.warningText')}</strong> {val.errorMessage}</div>
                 </div>
-                <button onClick={() => handleRemoveValidation(val.id)} className={`${styles.muted} hover:text-red-500 p-1`} title="删除规则"><Trash2 size={14} /></button>
+                <button type="button" onClick={() => handleRemoveValidation(val.id)} className={`${styles.muted} hover:text-red-500 p-1`} title="删除规则"><Trash2 size={14} /></button>
               </div>
             ))}
           </div>

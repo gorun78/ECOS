@@ -64,7 +64,7 @@ export default function ConnectionTest({
 
   return (
     <div className="space-y-3">
-      <button
+      <button type="button"
         onClick={handleTest}
         disabled={testing || !jdbcUrl.trim()}
         className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition flex items-center justify-center gap-2 cursor-pointer"

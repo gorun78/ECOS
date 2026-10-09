@@ -71,7 +71,7 @@ export default function InlineSqlConsole({ datasourceId }: { datasourceId: strin
             <textarea value={sql} onChange={e => setSql(e.target.value)}
               className={`flex-1 p-2 border ${styles.inputBorder} rounded text-xs font-mono resize-none outline-none focus:${styles.accentBorder} h-16 ${styles.inputBg} ${styles.inputText}`}
               placeholder="SELECT * FROM ..." spellCheck={false} />
-            <button onClick={execute} disabled={loading}
+            <button type="button" onClick={execute} disabled={loading}
               className={`px-4 py-1 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} text-xs font-semibold rounded cursor-pointer disabled:opacity-50 shrink-0`}>
               {loading ? t("dw.executing") : t("dw.runExec")}
             </button>

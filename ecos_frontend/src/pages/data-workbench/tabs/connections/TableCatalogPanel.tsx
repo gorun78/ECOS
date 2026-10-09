@@ -61,7 +61,7 @@ export default function TableCatalogPanel({
                 </div>
                 {conn.tablesAvailable.length > tablePageSize && (
                   <div className={`flex items-center justify-between pt-2 border-t ${styles.cardBorder}`}>
-                    <button
+                    <button type="button"
                       onClick={() => setTablePage(p => Math.max(1, p - 1))}
                       disabled={tablePage <= 1}
                       className={`px-3 py-1 text-[10px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.accentText} cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1`}
@@ -72,7 +72,7 @@ export default function TableCatalogPanel({
                     <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>
                       {t("dw.conn.pageInfo").replace('{page}', String(tablePage)).replace('{total}', String(Math.ceil(conn.tablesAvailable.length / tablePageSize)))}
                     </span>
-                    <button
+                    <button type="button"
                       onClick={() => setTablePage(p => Math.min(Math.ceil(conn.tablesAvailable.length / tablePageSize), p + 1))}
                       disabled={tablePage >= Math.ceil(conn.tablesAvailable.length / tablePageSize)}
                       className={`px-3 py-1 text-[10px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.accentText} cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1`}

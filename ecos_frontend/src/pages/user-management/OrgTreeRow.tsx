@@ -28,8 +28,8 @@ export default function OrgTreeRow({ org, depth, onEdit, onDelete }: {
         <span className="text-xs opacity-50 shrink-0">{org.orgType}</span>
         <span className="text-xs opacity-40 shrink-0 max-w-[120px] truncate">{org.description || '-'}</span>
         <div className="flex gap-1 shrink-0 ml-2">
-          <button onClick={e => { e.stopPropagation(); onEdit(org); }} className="text-indigo-500 hover:text-indigo-700 p-0.5"><Edit3 size={13} /></button>
-          <button onClick={e => { e.stopPropagation(); onDelete(org); }} className="text-red-500 hover:text-red-700 p-0.5"><Trash2 size={13} /></button>
+          <button type="button" onClick={e => { e.stopPropagation(); onEdit(org); }} className="text-indigo-500 hover:text-indigo-700 p-0.5"><Edit3 size={13} /></button>
+          <button type="button" onClick={e => { e.stopPropagation(); onDelete(org); }} className="text-red-500 hover:text-red-700 p-0.5"><Trash2 size={13} /></button>
         </div>
       </div>
       {hasChildren && expanded && org.children!.map(child => <OrgTreeRow key={child.orgId} org={child} depth={depth + 1} onEdit={onEdit} onDelete={onDelete} />)}

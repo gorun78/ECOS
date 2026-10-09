@@ -87,7 +87,7 @@ function SpanTree({ rootSpans, allSpans }: { rootSpans: SpanDetail[]; allSpans: 
           <td className="py-2 px-3 text-xs font-mono text-[var(--card,#94A3B8)]">
             <span style={{ paddingLeft: depth * 20 }} className="inline-flex items-center gap-1">
               {hasChildren ? (
-                <button
+                <button type="button"
                   onClick={() => setOpenMap((prev) => ({ ...prev, [span.spanId]: !(prev[span.spanId] ?? depth < 2) }))}
                   className="p-0.5 hover:bg-white/10 rounded"
                 >
@@ -189,7 +189,7 @@ export default function TelemetryViewer() {
             {t("platform.telemetry.subtitle")}
           </p>
         </div>
-        <button
+        <button type="button"
           onClick={fetchData}
           disabled={loading}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${styles.accentBg} text-white ${styles.accentHover}`}

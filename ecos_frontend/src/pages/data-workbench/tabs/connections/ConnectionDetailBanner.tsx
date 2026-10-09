@@ -36,7 +36,7 @@ export default function ConnectionDetailBanner({
           </div>
 
           <div className="flex items-center gap-2">
-            <button
+            <button type="button"
               onClick={() => onTestConnection(conn.id)}
               disabled={testingConnId !== null}
               className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} text-xs font-semibold rounded transition-all cursor-pointer flex items-center gap-1.5`}

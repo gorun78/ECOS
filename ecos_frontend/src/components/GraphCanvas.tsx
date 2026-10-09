@@ -350,7 +350,7 @@ export default function GraphCanvas({
           />
         </div>
 
-        <button
+        <button type="button"
           onClick={handleFitView}
           className={`p-2 ${styles.cardBg} ${styles.cardTextMuted} hover:${styles.appBg} hover:${styles.cardText} rounded-xl border ${styles.cardBorder} shadow-xs cursor-pointer transition`}
           title="Fit View"
@@ -367,13 +367,13 @@ export default function GraphCanvas({
       {/* Zoom controls */}
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5">
         <div className={`flex flex-col rounded-xl border ${styles.cardBorder} ${styles.cardBg} p-1 shadow-sm`}>
-          <button
+          <button type="button"
             onClick={() => setZoom(z => Math.min(z + 0.1, 1.8))}
             className={`p-1.5 ${styles.cardTextMuted} hover:${styles.cardText} hover:${styles.appBg} rounded-lg cursor-pointer transition-all`}
           >
             <ZoomIn className="w-3.5 h-3.5" />
           </button>
-          <button
+          <button type="button"
             onClick={() => setZoom(z => Math.max(z - 0.1, 0.5))}
             className={`p-1.5 ${styles.cardTextMuted} hover:${styles.cardText} hover:${styles.appBg} rounded-lg cursor-pointer transition-all`}
           >

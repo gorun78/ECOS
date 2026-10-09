@@ -148,7 +148,7 @@ export default function CounterfactualTab() {
             <span className={`text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider`}>
               {t('scenario.iv.cf.interventions')}
             </span>
-            <button
+            <button type="button"
               onClick={addDraft}
               className={`text-[10px] font-bold px-2 py-1 rounded border ${styles.inputBorder} ${styles.cardTextMuted} hover:border-indigo-500/50 transition-colors cursor-pointer flex items-center gap-1`}
             >
@@ -180,7 +180,7 @@ export default function CounterfactualTab() {
                 placeholder={t('scenario.iv.cf.valuePh')}
                 className={`col-span-3 px-2 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:border-indigo-500 transition-colors`}
               />
-              <button
+              <button type="button"
                 onClick={() => removeDraft(i)}
                 title={t('scenario.iv.cf.removeIntervention')}
                 className={`col-span-1 flex items-center justify-center py-1.5 rounded border ${styles.inputBorder} ${styles.cardTextMuted} hover:border-red-500/60 hover:text-red-400 transition-colors cursor-pointer`}
@@ -192,7 +192,7 @@ export default function CounterfactualTab() {
         </div>
 
         <div className="flex justify-end">
-          <button
+          <button type="button"
             onClick={handleRun}
             disabled={running}
             className="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1.5"

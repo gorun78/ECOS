@@ -48,7 +48,7 @@ export default function PropertiesTab({
             <option value="timestamp">{t('ow.prop.typeTimestamp')}</option>
             <option value="geopoint">{t('ow.prop.typeGeopoint')}</option>
           </select>
-          <button
+          <button type="button"
             onClick={handleAddProperty}
             className={`${styles.accentBg} hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition-colors flex items-center gap-1`}
           >
@@ -76,7 +76,7 @@ export default function PropertiesTab({
             {objectType.properties.map(prop => (
               <tr key={prop.id} className="hover:bg-blue-50/20 transition-colors">
                 <td className="py-2.5 px-4 text-center">
-                  <button
+                  <button type="button"
                     onClick={() => handleTogglePropertyFlag(prop.id, 'isPrimaryKey')}
                     className={`p-1.5 rounded-full transition-colors ${
                       objectType.primaryKey === prop.id
@@ -89,7 +89,7 @@ export default function PropertiesTab({
                   </button>
                 </td>
                 <td className="py-2.5 px-4 text-center">
-                  <button
+                  <button type="button"
                     onClick={() => handleTogglePropertyFlag(prop.id, 'required')}
                     className={`p-1.5 rounded-full transition-colors ${
                       prop.required
@@ -154,7 +154,7 @@ export default function PropertiesTab({
                   </select>
                 </td>
                 <td className="py-2.5 px-4 text-center">
-                  <button
+                  <button type="button"
                     onClick={() => handleRemoveProperty(prop.id)}
                     className={`${styles.muted} hover:text-red-500 p-1 rounded ${styles.sidebarHoverBg} transition-colors`}
                     title={t('ow.btn.deleteProperty')}

@@ -146,7 +146,7 @@ export default function AgentTestConsole() {
 
     return (
       <div className="mt-2 ml-2 mr-6">
-        <button
+        <button type="button"
           onClick={() => toggleTrace(idx)}
           className={`flex items-center gap-1.5 text-[10px] ${styles.cardTextMuted} hover:text-gray-300 transition-colors cursor-pointer select-none`}
         >
@@ -264,7 +264,7 @@ export default function AgentTestConsole() {
 
         <div className="flex items-center gap-2 shrink-0">
           {agent && (
-            <button
+            <button type="button"
               onClick={() => navigate(`/agent-builder/${agent.id}`)}
               className={`${styles.badgeBg} ${styles.cardText} rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition`}
             >
@@ -272,7 +272,7 @@ export default function AgentTestConsole() {
               {g(locale, "Edit Agent", "编辑Agent")}
             </button>
           )}
-          <button
+          <button type="button"
             onClick={() => navigate("/agent-builder")}
             className={`${styles.badgeBg} ${styles.cardText} rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition`}
           >
@@ -369,7 +369,7 @@ export default function AgentTestConsole() {
               }
               className="flex-1 bg-[#1E2533] border border-[#2D3748] rounded-lg px-4 py-2.5 text-sm text-gray-200 placeholder-zinc-500 outline-hidden focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 transition font-sans"
             />
-            <button
+            <button type="button"
               onClick={handleSend}
               disabled={isSending || !message.trim() || !agent}
               className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg px-4 py-2.5 text-sm font-semibold flex items-center gap-2 cursor-pointer transition shadow-xs shrink-0"

@@ -49,7 +49,7 @@ function PreviewModal({ resourceId, resourceName, onClose }: { resourceId: strin
             <Eye className={`w-4 h-4 ${styles.infoText}`} />
             {t("dw.catalog.preview")}: {resourceName}
           </h3>
-          <button onClick={onClose} className="opacity-50 hover:opacity-100 transition"><X className="w-4 h-4" /></button>
+          <button type="button" onClick={onClose} className="opacity-50 hover:opacity-100 transition"><X className="w-4 h-4" /></button>
         </div>
         <div className="flex-1 overflow-auto p-2">
           {loading ? (
@@ -87,10 +87,10 @@ function PreviewModal({ resourceId, resourceName, onClose }: { resourceId: strin
               {rows.length} {t("dw.rowsUnit")} · {t("dw.catalog.page")} {page + 1}/{totalPages}
             </span>
             <div className="flex items-center gap-1">
-              <button disabled={page === 0} onClick={() => setPage(p => Math.max(0, p - 1))} className="p-1 rounded opacity-60 hover:opacity-100 disabled:opacity-20 transition">
+              <button type="button" disabled={page === 0} onClick={() => setPage(p => Math.max(0, p - 1))} className="p-1 rounded opacity-60 hover:opacity-100 disabled:opacity-20 transition">
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button disabled={page >= totalPages - 1} onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} className="p-1 rounded opacity-60 hover:opacity-100 disabled:opacity-20 transition">
+              <button type="button" disabled={page >= totalPages - 1} onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} className="p-1 rounded opacity-60 hover:opacity-100 disabled:opacity-20 transition">
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -141,7 +141,7 @@ export default function CatalogContextMenu({ node, x, y, onClose }: CatalogConte
         style={{ position: "fixed", left: Math.min(x, window.innerWidth - 200), top: Math.min(y, window.innerHeight - 140) }}
       >
         {items.map((item, i) => (
-          <button
+          <button type="button"
             key={i}
             onClick={() => { item.action(); onClose(); }}
             className={`w-full flex items-center gap-2 px-3 py-2 text-xs ${styles.cardText} hover:bg-black/5 dark:hover:${styles.cardBg}/5 transition cursor-pointer`}

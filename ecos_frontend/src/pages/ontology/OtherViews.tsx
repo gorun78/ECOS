@@ -42,7 +42,7 @@ export function InterfaceView({ intf, objectTypes, onDelete, onNavigateToObject 
             <p className={`text-xs ${styles.muted} mt-0.5`}>{intf.description}</p>
           </div>
         </div>
-        <button
+        <button type="button"
           onClick={() => onDelete(intf.id)}
           className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200"
         >
@@ -150,7 +150,7 @@ export function SharedPropertyView({ sp, objectTypes, onDelete, onNavigateToObje
             <p className={`text-xs ${styles.muted} mt-0.5`}>{sp.description}</p>
           </div>
         </div>
-        <button
+        <button type="button"
           onClick={() => onDelete(sp.id)}
           className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200"
         >

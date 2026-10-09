@@ -463,7 +463,7 @@ export default function OntologyWorkbenchLayout() {
              selectedCategory === 'glossary' ? t('ow.nav.glossary') : ''}
           </span>
           <div className="flex items-center gap-1.5">
-            <button
+            <button type="button"
               onClick={() => setShowExportModal(true)}
               className={`flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-semibold ${styles.accentBg} text-white hover:opacity-90 transition-opacity`}
             >
@@ -694,7 +694,7 @@ export default function OntologyWorkbenchLayout() {
                 <label className={`block text-[10px] font-semibold mb-1 ${styles.muted}`}>{t('ow.label.exportFormat')}</label>
                 <div className="flex gap-2">
                   {(['JSON', 'CSV', 'DDL'] as const).map(f => (
-                    <button key={f} onClick={() => setExportFormat(f)}
+                    <button type="button" key={f} onClick={() => setExportFormat(f)}
                       className={`px-3 py-1.5 rounded text-[10px] font-semibold transition-colors ${exportFormat === f ? `${styles.accentBg} text-white` : `${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}`}>
                       {t(`ow.export.format.${f}`)}
                     </button>
@@ -705,7 +705,7 @@ export default function OntologyWorkbenchLayout() {
                 <label className={`block text-[10px] font-semibold mb-1 ${styles.muted}`}>{t('ow.label.exportScope')}</label>
                 <div className="flex gap-2">
                   {(['FULL', 'ENTITIES', 'RELATIONSHIPS'] as const).map(s => (
-                    <button key={s} onClick={() => setExportScope(s)}
+                    <button type="button" key={s} onClick={() => setExportScope(s)}
                       className={`px-3 py-1.5 rounded text-[10px] font-semibold transition-colors ${exportScope === s ? `${styles.accentBg} text-white` : `${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}`}>
                       {t(`ow.export.scope.${s}`)}
                     </button>
@@ -713,8 +713,8 @@ export default function OntologyWorkbenchLayout() {
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => { setShowExportModal(false); dismissExportError(); }} className={`px-3 py-1.5 rounded text-[10px] font-semibold ${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}>{t('ow.btn.cancel')}</button>
-                <button onClick={handleExportOntology} disabled={exporting}
+                <button type="button" onClick={() => { setShowExportModal(false); dismissExportError(); }} className={`px-3 py-1.5 rounded text-[10px] font-semibold ${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}>{t('ow.btn.cancel')}</button>
+                <button type="button" onClick={handleExportOntology} disabled={exporting}
                   className={`px-3 py-1.5 rounded text-[10px] font-semibold ${styles.accentBg} text-white ${styles.accentHover} disabled:opacity-50`}>
                   {exporting ? t('ow.exportTask.creating') : t('ow.btn.exportOntology')}
                 </button>

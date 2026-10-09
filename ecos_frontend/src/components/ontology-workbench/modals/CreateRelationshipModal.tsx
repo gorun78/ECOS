@@ -152,7 +152,7 @@ export default function CreateRelationshipModal({
               <p className={`text-[10px] ${styles.muted}`}>{t('ow.rel.subtitle')}</p>
             </div>
           </div>
-          <button
+          <button type="button"
             onClick={onClose}
             className={`p-1.5 rounded-lg hover:bg-white/5 ${styles.cardTextMuted} hover:${styles.cardText} transition`}
           >

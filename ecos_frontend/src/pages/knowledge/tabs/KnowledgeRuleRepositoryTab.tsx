@@ -185,7 +185,7 @@ export default function KnowledgeRuleRepositoryTab() {
                 return (
                   <div key={reg.name}>
                     {/* Regulation level */}
-                    <button onClick={() => toggleReg(reg.name)}
+                    <button type="button" onClick={() => toggleReg(reg.name)}
                       className={`w-full text-left px-2 py-1.5 rounded-lg flex items-center gap-1.5 text-[11px] font-bold transition cursor-pointer ${
                         isRegOpen ? `${styles.accentBg} text-white` : `${styles.cardText} ${styles.sidebarHoverBg}`
                       }`}>
@@ -199,7 +199,7 @@ export default function KnowledgeRuleRepositoryTab() {
                       return (
                         <div key={chapKey} className="ml-4">
                           {/* Chapter level */}
-                          <button onClick={() => toggleChapter(chapKey)}
+                          <button type="button" onClick={() => toggleChapter(chapKey)}
                             className={`w-full text-left px-2 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-semibold transition cursor-pointer ${
                               isChapOpen ? 'text-blue-600 bg-blue-50' : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
                             }`}>
@@ -212,7 +212,7 @@ export default function KnowledgeRuleRepositoryTab() {
                                 const isActive = selectedClause === clause.name;
                                 const count = ruleCountForClause(clause.name);
                                 return (
-                                  <button key={clause.name} onClick={() => selectClause(clause.name)}
+                                  <button type="button" key={clause.name} onClick={() => selectClause(clause.name)}
                                     className={`w-full text-left px-2 py-1 rounded text-[9px] font-medium flex items-center gap-1.5 transition cursor-pointer ${
                                       isActive ? 'bg-amber-50 text-amber-700 font-bold' : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
                                     }`}>
@@ -240,7 +240,7 @@ export default function KnowledgeRuleRepositoryTab() {
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 flex items-center gap-1`}>
                 <FileText size={10} /> {selectedClause}
               </span>
-              <button onClick={() => setSelectedClause(null)} className={`text-[9px] ${styles.cardTextMuted} hover:underline`}>
+              <button type="button" onClick={() => setSelectedClause(null)} className={`text-[9px] ${styles.cardTextMuted} hover:underline`}>
                 {t('knowledge.rule.clear')}
               </button>
             </div>
@@ -299,7 +299,7 @@ export default function KnowledgeRuleRepositoryTab() {
                     {rule.ontologyType && (
                       <div className="flex gap-4 items-center">
                         <span className={`${styles.cardTextMuted} w-16`}>{t('knowledge.rule.ontology')}</span>
-                        <button onClick={e => { e.stopPropagation(); navigateToOntology(rule.ontologyTypeId); }}
+                        <button type="button" onClick={e => { e.stopPropagation(); navigateToOntology(rule.ontologyTypeId); }}
                           className="flex items-center gap-1 text-[10px] text-indigo-500 hover:underline cursor-pointer">
                           {rule.ontologyType} <ExternalLink size={10} />
                         </button>

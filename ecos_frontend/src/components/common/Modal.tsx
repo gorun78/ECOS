@@ -95,7 +95,7 @@ export default function Modal({
     return (
       <div className="flex items-center justify-end gap-2 pt-4">
         {cancelText && (
-          <button
+          <button type="button"
             onClick={() => {
               onCancel?.();
               onClose();
@@ -106,7 +106,7 @@ export default function Modal({
           </button>
         )}
         {confirmText && (
-          <button
+          <button type="button"
             disabled={confirmDisabled || confirmLoading}
             onClick={() => onConfirm?.()}
             className={`px-4 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition flex items-center gap-1.5 ${
@@ -141,7 +141,7 @@ export default function Modal({
         {title && (
           <div className={`flex items-center justify-between px-5 py-4 border-b ${styles.cardBorder} shrink-0`}>
             <h2 className={`text-sm font-bold ${styles.cardText}`}>{title}</h2>
-            <button
+            <button type="button"
               onClick={onClose}
               className={`p-1 rounded-md ${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer transition`}
             >
@@ -152,7 +152,7 @@ export default function Modal({
 
         {/* If no title but close button still needed */}
         {!title && (
-          <button
+          <button type="button"
             onClick={onClose}
             className={`absolute top-3 right-3 p-1 rounded-md ${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer transition z-10`}
           >

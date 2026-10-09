@@ -114,7 +114,7 @@ export default function RuleTemplateLibrary({ onClose, onApplied }: Props) {
   const TIcon = tpl?.icon;
   return (
     <div className="space-y-4">
-      <button onClick={() => setStep(0)} className={`text-xs ${styles.infoText} hover:${styles.infoText}`}>← {t('dw.ruleTpl.back')}</button>
+      <button type="button" onClick={() => setStep(0)} className={`text-xs ${styles.infoText} hover:${styles.infoText}`}>← {t('dw.ruleTpl.back')}</button>
       {tpl && TIcon && (
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3 flex items-center gap-2`}>
           <TIcon className={`w-4 h-4 ${styles.infoText}`} />
@@ -161,8 +161,8 @@ export default function RuleTemplateLibrary({ onClose, onApplied }: Props) {
       )}
       {error && <div className={`text-[11px] ${styles.dangerText} ${styles.dangerBg} rounded px-3 py-2`}>{error}</div>}
       <div className="flex justify-end gap-2 pt-2">
-        <button onClick={onClose} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.sidebarBg} rounded-lg`}>{t('dw.ruleTpl.cancel')}</button>
-        <button onClick={confirm} disabled={saving}
+        <button type="button" onClick={onClose} className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} hover:${styles.sidebarBg} rounded-lg`}>{t('dw.ruleTpl.cancel')}</button>
+        <button type="button" onClick={confirm} disabled={saving}
           className={`px-4 py-2 text-xs font-semibold ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} rounded-lg flex items-center gap-1.5 disabled:opacity-50`}>
           <Check className="w-3 h-3" /> {saving ? t('dw.ruleTpl.creating') : t('dw.ruleTpl.confirmCreate')}
         </button>

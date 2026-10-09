@@ -36,7 +36,7 @@ export default function ParetoOptimizerCard({
         {t("cognition.cos.pareto.desc")}
       </p>
 
-      <button
+      <button type="button"
         onClick={onOptimize}
         disabled={optimizeLoading}
         className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white rounded-lg text-xs font-bold py-2.5 transition flex items-center justify-center gap-2"

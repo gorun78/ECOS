@@ -125,7 +125,7 @@ export default function PropertyEditor({
             {t('ontology.designer.relationshipsCount', { count: relationships.length })}
           </h4>
           {allEntities.length > 1 && (
-            <button
+            <button type="button"
               onClick={() => onCreateRelation(entity.id)}
               className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
             >

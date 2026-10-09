@@ -316,7 +316,7 @@ export default function WorkOrderTab() {
             RESOLVED: "text-emerald-500",
           };
           return (
-            <button
+            <button type="button"
               key={st}
               onClick={() => setStatusFilter(statusFilter === st ? "" : st)}
               className={`rounded-md p-4 text-left cursor-pointer transition border ${
@@ -365,7 +365,7 @@ export default function WorkOrderTab() {
           ))}
         </select>
 
-        <button
+        <button type="button"
           onClick={() => {
             setLoading(true);
             void load();
@@ -403,7 +403,7 @@ export default function WorkOrderTab() {
                     } transition`}
                   >
                     {/* severity 徽章 */}
-                    <button
+                    <button type="button"
                       onClick={() => setExpandedId(expanded ? null : o.id)}
                       className={`shrink-0 cursor-pointer ${severityBadgeClass(o.severity)}`}
                     >
@@ -448,7 +448,7 @@ export default function WorkOrderTab() {
                       ) : (
                         <>
                           {(o.status === "PENDING") && (
-                            <button
+                            <button type="button"
                               onClick={() => { setAssignTarget(o.id); setAssigneeInput(""); }}
                               className="h-6 px-2 rounded text-[10px] border cursor-pointer
                                 border-blue-500/40 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10"
@@ -459,7 +459,7 @@ export default function WorkOrderTab() {
                             </button>
                           )}
                           {(o.status === "ASSIGNED") && (
-                            <button
+                            <button type="button"
                               onClick={() => doAction(o.id, "start")}
                               className="h-6 px-2 rounded text-[10px] border cursor-pointer
                                 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
@@ -470,7 +470,7 @@ export default function WorkOrderTab() {
                             </button>
                           )}
                           {(o.status === "IN_WORK") && (
-                            <button
+                            <button type="button"
                               onClick={() => doAction(o.id, "resolve", { note: "" })}
                               className="h-6 px-2 rounded text-[10px] border cursor-pointer
                                 border-teal-500/40 text-teal-600 dark:text-teal-400 hover:bg-teal-500/10"
@@ -481,7 +481,7 @@ export default function WorkOrderTab() {
                             </button>
                           )}
                           {(o.status === "RESOLVED") && (
-                            <button
+                            <button type="button"
                               onClick={() => doAction(o.id, "close")}
                               className={`h-6 px-2 rounded text-[10px] border cursor-pointer
                                 ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.appBg}`}
@@ -492,7 +492,7 @@ export default function WorkOrderTab() {
                             </button>
                           )}
                           {isP2p3 && (
-                            <button
+                            <button type="button"
                               onClick={() => doAction(o.id, "run-rca")}
                               className="h-6 px-2 rounded text-[10px] border cursor-pointer
                                 border-purple-500/40 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 flex items-center gap-0.5"
@@ -565,7 +565,7 @@ export default function WorkOrderTab() {
                         placeholder={t("dw.dqRule.workOrders.assignHint")}
                         className={`flex-1 h-7 rounded-md px-2.5 text-xs border ${styles.cardBorder} bg-transparent ${styles.cardText} outline-none`}
                       />
-                      <button
+                      <button type="button"
                         onClick={() => void submitAssign(o.id)}
                         disabled={!assigneeInput.trim()}
                         className="h-7 px-3 rounded-md text-xs font-medium cursor-pointer transition
@@ -573,7 +573,7 @@ export default function WorkOrderTab() {
                       >
                         {t("dw.dqRule.workOrders.action.assign")}
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => { setAssignTarget(null); setAssigneeInput(""); }}
                         className="h-7 px-2 rounded-md text-xs border cursor-pointer hover:opacity-70"
                         style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}

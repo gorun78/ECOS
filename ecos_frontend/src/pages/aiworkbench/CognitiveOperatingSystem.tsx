@@ -109,7 +109,7 @@ export default function CognitiveOperatingSystem() {
         </div>
         <div className="flex items-center gap-2">
           {missionId && (
-            <button
+            <button type="button"
               onClick={() => { setMissionId(null); setLogEntries([]); }}
               className="flex items-center gap-1 px-2 py-1 text-[10px] rounded border border-[var(--border)] hover:bg-[var(--muted)]"
             >
@@ -117,7 +117,7 @@ export default function CognitiveOperatingSystem() {
               {t('cognition.cos.evolution.reset')}
             </button>
           )}
-          <button
+          <button type="button"
             onClick={triggerEvolution}
             disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 shadow-lg shadow-indigo-500/20"
@@ -229,7 +229,7 @@ export default function CognitiveOperatingSystem() {
               {t('cognition.cos.evolution.logTitle')}
             </div>
             {missionId && (
-              <button onClick={() => fetchLog(missionId)} className="p-1 hover:bg-[var(--muted)] rounded">
+              <button type="button" onClick={() => fetchLog(missionId)} className="p-1 hover:bg-[var(--muted)] rounded">
                 <RefreshCw className="w-3 h-3" />
               </button>
             )}
@@ -275,7 +275,7 @@ export default function CognitiveOperatingSystem() {
                 {t('cognition.cos.evolution.recentMissions')}
               </div>
               {recentMissions.filter(m => m !== missionId).slice(0, 5).map(mid => (
-                <button key={mid} onClick={() => { setMissionId(mid); fetchLog(mid); }}
+                <button type="button" key={mid} onClick={() => { setMissionId(mid); fetchLog(mid); }}
                   className="w-full text-left text-[10px] px-2 py-1 rounded hover:bg-[var(--muted)] font-mono truncate flex items-center gap-1">
                   <ChevronRight className="w-2 h-2" />
                   {mid.slice(0, 20)}

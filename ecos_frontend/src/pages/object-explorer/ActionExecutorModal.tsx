@@ -24,7 +24,7 @@ export default function ActionExecutorModal({ selectedAction, activeObjectType, 
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-2xl p-5 w-full sm:w-[420px] mx-4 sm:mx-auto space-y-4`}>
         <div className={`flex justify-between items-center pb-2.5 border-b ${styles.divider}`}>
           <div className="flex items-center gap-1.5"><Zap size={14} className="text-amber-500 fill-amber-500/10" /><h3 className={`text-xs font-semibold ${styles.cardText}`}>执行操作：{selectedAction.displayName}</h3></div>
-          <button onClick={() => setSelectedAction(null)} className={`${styles.cardTextMuted} hover:opacity-70`}><X size={14} /></button>
+          <button type="button" onClick={() => setSelectedAction(null)} className={`${styles.cardTextMuted} hover:opacity-70`}><X size={14} /></button>
         </div>
         <p className={`text-[10px] ${styles.cardTextMuted} leading-relaxed`}>{selectedAction.description}</p>
         <div className="space-y-3 pt-1">
@@ -44,7 +44,7 @@ export default function ActionExecutorModal({ selectedAction, activeObjectType, 
           })}
         </div>
         {actionError && (<div className="p-2 bg-red-50 border border-red-200 rounded text-[10px] text-red-600 font-medium">❌ 事务约束违背：{actionError}</div>)}
-        <div className={`flex justify-end gap-2 pt-2 border-t ${styles.divider} text-[11px]`}><button onClick={() => setSelectedAction(null)} className={`h-8 px-3 rounded ${styles.appBg} hover:opacity-70 ${styles.cardText} font-semibold`}>取消</button><button onClick={handleExecuteAction} className="h-8 px-4 rounded bg-amber-500 hover:bg-amber-400 text-white font-semibold flex items-center gap-1"><CheckCircle size={12} /><span>执行写回 (Execute)</span></button></div>
+        <div className={`flex justify-end gap-2 pt-2 border-t ${styles.divider} text-[11px]`}><button type="button" onClick={() => setSelectedAction(null)} className={`h-8 px-3 rounded ${styles.appBg} hover:opacity-70 ${styles.cardText} font-semibold`}>取消</button><button type="button" onClick={handleExecuteAction} className="h-8 px-4 rounded bg-amber-500 hover:bg-amber-400 text-white font-semibold flex items-center gap-1"><CheckCircle size={12} /><span>执行写回 (Execute)</span></button></div>
       </div>
     </div>
   );

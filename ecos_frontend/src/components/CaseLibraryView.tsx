@@ -108,16 +108,16 @@ export default function CaseLibraryView() {
             onKeyDown={e => e.key === "Enter" && doSearch()}
           />
         </div>
-        <button onClick={doSearch}
+        <button type="button" onClick={doSearch}
           className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${styles.accentBg} ${styles.accentHover} text-white`}>
           {t("common.search")}
         </button>
-        <button onClick={() => setShowNew(true)}
+        <button type="button" onClick={() => setShowNew(true)}
           className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium border transition-all ${styles.cardBorder} ${styles.cardBg} hover:opacity-80`}>
           <Plus className="w-3.5 h-3.5" />
           {t("common.case.new")}
         </button>
-        <button onClick={fetchCases} disabled={loading}
+        <button type="button" onClick={fetchCases} disabled={loading}
           className={`p-1.5 rounded border transition-all ${styles.cardBorder} hover:opacity-80 disabled:opacity-30`}>
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
         </button>
@@ -144,11 +144,11 @@ export default function CaseLibraryView() {
               placeholder={t("common.case.tags")}
               value={newForm.tags} onChange={e => setNewForm({ ...newForm, tags: e.target.value })} />
             <div className="flex gap-2">
-              <button onClick={recordCase}
+              <button type="button" onClick={recordCase}
                 className={`flex-1 px-4 py-1.5 rounded text-xs font-medium ${styles.accentBg} ${styles.accentHover} text-white`}>
                 {t("common.save")}
               </button>
-              <button onClick={() => setShowNew(false)}
+              <button type="button" onClick={() => setShowNew(false)}
                 className={`flex-1 px-4 py-1.5 rounded border text-xs ${styles.cardBorder}`}>
                 {t("common.cancel")}
               </button>
@@ -188,7 +188,7 @@ export default function CaseLibraryView() {
                 <pre className="text-[10px] mt-1 p-2 rounded bg-black/20 overflow-auto max-h-32">{detail.result}</pre>
               </details>
             )}
-            <button onClick={() => setDetail(null)}
+            <button type="button" onClick={() => setDetail(null)}
               className={`mt-3 w-full px-4 py-1.5 rounded border text-xs ${styles.cardBorder}`}>
               {t("common.close")}
             </button>

@@ -100,7 +100,7 @@ const PipelineBuilderTab: React.FC<PipelineBuilderTabProps> = ({
           <span className={`text-[11px] font-bold uppercase tracking-wider ${styles.cardText}`}>
             {t('dw.pipeline.listTitle')}
           </span>
-          <button onClick={handleNew}
+          <button type="button" onClick={handleNew}
             className={`flex items-center gap-1 px-2 py-1 text-[10px] rounded ${styles.accentBg} ${styles.accentText} hover:${styles.accentHover} transition-colors`}>
             <Plus size={11} /> {t('dw.pipeline.new')}
           </button>
@@ -108,7 +108,7 @@ const PipelineBuilderTab: React.FC<PipelineBuilderTabProps> = ({
         {/* Filter tabs */}
         <div className={`flex border-b ${styles.cardBorder}`}>
           {(['all', 'pipeline', 'sync'] as const).map(f => (
-            <button key={f} onClick={() => setFilter(f)}
+            <button type="button" key={f} onClick={() => setFilter(f)}
               className={`flex-1 px-2 py-1.5 text-[10px] font-medium transition-colors ${
                 filter === f
                   ? `${styles.accentText} border-b-2 ${styles.accentBorder}`
@@ -126,7 +126,7 @@ const PipelineBuilderTab: React.FC<PipelineBuilderTabProps> = ({
             </div>
           ) : (
             mergedList.map(item => (
-              <button key={`${item.type}-${item.id}`} onClick={() => handleSelect(item)}
+              <button type="button" key={`${item.type}-${item.id}`} onClick={() => handleSelect(item)}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-left border-b ${styles.cardBorder} hover:${styles.sidebarHoverBg} transition-colors ${
                   editingPipelineId === item.id ? styles.sidebarActiveBg : ''
                 }`}>

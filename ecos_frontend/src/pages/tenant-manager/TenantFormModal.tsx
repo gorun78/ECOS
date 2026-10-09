@@ -66,7 +66,7 @@ export function TenantFormModal({ mode, tenant, onSave, onClose }: TenantFormMod
               ? t("platform.tenant.form.create")
               : t("platform.tenant.form.edit")}
           </h3>
-          <button onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
+          <button type="button" onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
         </div>
 
         {error && (
@@ -168,10 +168,10 @@ export function TenantFormModal({ mode, tenant, onSave, onClose }: TenantFormMod
         </div>
 
         <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onClose} className={`px-4 py-2 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>
+          <button type="button" onClick={onClose} className={`px-4 py-2 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>
             {t("platform.tenant.common.cancel")}
           </button>
-          <button
+          <button type="button"
             onClick={handleSave}
             disabled={saving}
             className={`px-4 py-2 rounded text-xs font-medium text-white flex items-center gap-1.5 ${styles.accentBg} ${styles.accentHover}`}

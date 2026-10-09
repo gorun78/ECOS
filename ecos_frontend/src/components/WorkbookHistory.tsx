@@ -56,7 +56,7 @@ export default function WorkbookHistory({
           </span>
         </div>
         <div className="flex items-center gap-1">
-          <button
+          <button type="button"
             onClick={onRefresh}
             className={`p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 ${styles.cardTextMuted}`}
             title={t("common.workbook.history.refresh")}
@@ -67,7 +67,7 @@ export default function WorkbookHistory({
               }`}
             />
           </button>
-          <button
+          <button type="button"
             onClick={onClose}
             className={`p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 ${styles.cardTextMuted}`}
             title={t("common.workbook.history.close")}

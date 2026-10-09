@@ -216,7 +216,7 @@ export default function AgentBuilder() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <button
+          <button type="button"
             onClick={() => navigate("/agent_studio")}
             className={`${styles.badgeBg} ${styles.cardText} rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition`}
           >
@@ -226,7 +226,7 @@ export default function AgentBuilder() {
 
           {isEdit && (
             <>
-              <button
+              <button type="button"
                 onClick={handleTest}
                 disabled={!agentId}
                 className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-xs"
@@ -234,7 +234,7 @@ export default function AgentBuilder() {
                 <Play className="w-3.5 h-3.5" />
                 {t("agentBuilder.test")}
               </button>
-              <button
+              <button type="button"
                 onClick={handleDelete}
                 disabled={deleting}
                 className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
@@ -456,7 +456,7 @@ export default function AgentBuilder() {
 
           {/* ── Save Button ───────────────────────────────────── */}
           <div className="flex justify-end pt-2 pb-6">
-            <button
+            <button type="button"
               onClick={handleSave}
               disabled={saving || !name.trim()}
               className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg px-6 py-2.5 text-sm font-semibold flex items-center gap-2 cursor-pointer transition shadow-xs"

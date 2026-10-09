@@ -115,7 +115,7 @@ export default function RuleReviewDialog({
               v{latestVersion}
             </span>
           </div>
-          <button
+          <button type="button"
             onClick={onClose}
             className={`p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 ${styles.cardTextMuted} cursor-pointer transition`}
             aria-label="close"
@@ -188,14 +188,14 @@ export default function RuleReviewDialog({
 
         {/* 底部按钮 */}
         <div className={`flex items-center justify-end gap-2 px-5 py-3 border-t ${styles.cardBorder}`}>
-          <button
+          <button type="button"
             onClick={onClose}
             disabled={submitting}
             className={`px-4 py-1.5 rounded-lg text-xs font-semibold border ${styles.cardBorder} ${styles.cardText} hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer disabled:opacity-40`}
           >
             {t("dw.dqRule.cancel")}
           </button>
-          <button
+          <button type="button"
             onClick={() => void onConfirm()}
             disabled={!canConfirm}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold ${

@@ -45,7 +45,7 @@ export default function RoleFormModal({ mode, role, allPermissions, onSave, onCl
           <h3 className={`text-sm font-semibold ${styles.cardText}`}>
             {mode === "create" ? t("platform.user.role.titleCreate") : t("platform.user.role.titleEdit")}
           </h3>
-          <button onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
+          <button type="button" onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
         </div>
         {err && <div className="mb-3 p-2 rounded bg-red-500/10 border border-red-500/30 text-red-400 text-xs">{err}</div>}
         <div className="space-y-3">
@@ -95,8 +95,8 @@ export default function RoleFormModal({ mode, role, allPermissions, onSave, onCl
           )}
         </div>
         <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onClose} className={`px-4 py-2 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>{t("platform.user.role.cancel")}</button>
-          <button onClick={save} disabled={saving}
+          <button type="button" onClick={onClose} className={`px-4 py-2 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>{t("platform.user.role.cancel")}</button>
+          <button type="button" onClick={save} disabled={saving}
             className={`px-4 py-2 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover} disabled:opacity-50`}>
             {saving ? t("platform.user.role.saving") : t("platform.user.role.save")}</button>
         </div>

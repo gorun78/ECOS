@@ -349,7 +349,7 @@ export default function WorldModelViewer() {
           </div>
 
           {/* History toggle */}
-          <button
+          <button type="button"
             onClick={() => setShowHistory(!showHistory)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium border transition-all cursor-pointer ${
               showHistory
@@ -361,7 +361,7 @@ export default function WorldModelViewer() {
             {t("platform.wm.viewer.history")}
           </button>
 
-          <button
+          <button type="button"
             onClick={fetchAll}
             disabled={loading}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all
@@ -378,7 +378,7 @@ export default function WorldModelViewer() {
         <div className="mb-4 px-3 py-2 rounded text-xs bg-red-500/10 border border-red-500/30 text-red-400 flex items-center gap-2 shrink-0">
           <AlertCircle className="w-4 h-4 shrink-0" />
           {error}
-          <button onClick={() => setError("")} className="ml-auto hover:opacity-80">
+          <button type="button" onClick={() => setError("")} className="ml-auto hover:opacity-80">
             <XCircle className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -387,7 +387,7 @@ export default function WorldModelViewer() {
       {/* Tabs */}
       <div className={`flex gap-0 border-b mb-5 shrink-0 ${styles.sidebarBorder}`}>
         {tabs.map((tabItem, i) => (
-          <button
+          <button type="button"
             key={i}
             onClick={() => { setTab(i); }}
             className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all duration-150 border-b-2 -mb-[1px] flex items-center gap-1.5 ${

@@ -161,7 +161,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
             <GitCommit size={16} className={`${styles.accentText}`} />
             <span className={`text-sm font-bold ${styles.cardText}`}>保存 Pipeline</span>
           </div>
-          <button
+          <button type="button"
             onClick={onClose}
             className={`p-1 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} hover:${styles.cardTextMuted} transition-colors`}
           >
@@ -214,7 +214,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
                     autoFocus
                   />
                 </div>
-                <button
+                <button type="button"
                   onClick={() => setShowNewBranch(false)}
                   className={`px-2 py-1 text-[10px] ${styles.muted} hover:${styles.cardTextMuted} transition-colors`}
                 >
@@ -238,7 +238,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
                   <GitBranch size={13} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${styles.cardTextMuted}`} />
                   <ChevronDown size={13} className={`absolute right-2.5 top-1/2 -translate-y-1/2 ${styles.cardTextMuted} pointer-events-none`} />
                 </div>
-                <button
+                <button type="button"
                   onClick={() => { setShowNewBranch(true); setNewBranchName(''); }}
                   className={`flex items-center gap-1 px-2 py-1 text-[10px] ${styles.accentText} hover:${styles.infoBg} rounded-lg transition-colors`}
                 >
@@ -299,14 +299,14 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
 
         {/* Footer */}
         <div className={`flex items-center justify-between gap-2 px-4 py-3 border-t ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
-          <button
+          <button type="button"
             onClick={onClose}
             className={`px-3 py-1.5 text-xs ${styles.cardTextMuted} hover:${styles.sidebarBg} rounded-lg transition-colors`}
           >
             取消
           </button>
           <div className="flex items-center gap-2">
-            <button
+            <button type="button"
               onClick={handleSaveOnly}
               disabled={savingOnly || committing}
               className={`flex items-center gap-1.5 px-4 py-1.5 text-xs border ${styles.inputBorder} ${styles.cardTextMuted} hover:${styles.sidebarBg} rounded-lg transition-colors disabled:opacity-50`}
@@ -314,7 +314,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
               {savingOnly ? <Loader2 size={12} className="animate-spin" /> : null}
               仅保存
             </button>
-            <button
+            <button type="button"
               onClick={handleCommit}
               disabled={committing || savingOnly}
               className={`flex items-center gap-1.5 px-4 py-1.5 text-xs ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} rounded-lg font-medium transition-colors disabled:opacity-50 shadow-sm`}

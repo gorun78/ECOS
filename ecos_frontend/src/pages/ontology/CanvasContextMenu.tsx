@@ -125,7 +125,7 @@ export default function CanvasContextMenu({
       </div>
 
       {items.map((item, i) => (
-        <button
+        <button type="button"
           key={i}
           onClick={() => {
             item.action();

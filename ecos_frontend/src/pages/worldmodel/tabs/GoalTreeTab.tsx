@@ -39,7 +39,7 @@ export default function GoalTreeTab({
           {t("platform.wm.goal.pyramid")} ({topLevelGoals.length})
         </span>
 
-        <button
+        <button type="button"
           onClick={() => openDlg("goals")}
           className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-medium transition-all
             ${styles.accentBg} ${styles.accentHover} text-white`}
@@ -50,13 +50,13 @@ export default function GoalTreeTab({
 
         <div className="flex-1" />
 
-        <button onClick={expandAll}
+        <button type="button" onClick={expandAll}
           className={`px-2 py-1 rounded border text-[11px] transition-all ${styles.cardBorder} ${styles.cardBg} hover:opacity-80`}
           title={t("platform.wm.goal.expandAll")}>
           <Maximize2 className="w-3 h-3 inline mr-1" />
           {t("platform.wm.goal.expand")}
         </button>
-        <button onClick={collapseAll}
+        <button type="button" onClick={collapseAll}
           className={`px-2 py-1 rounded border text-[11px] transition-all ${styles.cardBorder} ${styles.cardBg} hover:opacity-80`}
           title={t("platform.wm.goal.collapseAll")}>
           <Minimize2 className="w-3 h-3 inline mr-1" />
@@ -116,15 +116,15 @@ export default function GoalTreeTab({
               </span>
             </div>
             <div className="flex gap-1">
-              <button onClick={() => openDlg("goals", selectedGoal)}
+              <button type="button" onClick={() => openDlg("goals", selectedGoal)}
                 className={`p-1.5 rounded border text-xs transition-all ${styles.cardBorder} ${styles.cardBg} hover:opacity-80`}>
                 <Edit3 className="w-3 h-3" />
               </button>
-              <button onClick={() => handleDelete("goals", selectedGoal.id)}
+              <button type="button" onClick={() => handleDelete("goals", selectedGoal.id)}
                 className="p-1.5 rounded border text-xs text-red-400 border-red-500/20 hover:bg-red-500/10 transition-all">
                 <Trash2 className="w-3 h-3" />
               </button>
-              <button onClick={() => setSelectedGoal(null)}
+              <button type="button" onClick={() => setSelectedGoal(null)}
                 className="p-1.5 rounded border text-xs transition-all opacity-50 hover:opacity-100">
                 <XCircle className="w-3 h-3" />
               </button>

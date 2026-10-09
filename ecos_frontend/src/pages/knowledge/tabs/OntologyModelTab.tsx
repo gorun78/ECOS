@@ -151,13 +151,13 @@ export default function OntologyModelTab() {
         </div>
         <div className="flex gap-2">
           {/* Deep link to buszhi workbench (PMO-54) */}
-          <button
+          <button type="button"
             onClick={() => { window.location.hash = `#/ontology-workbench/entity?from=kb`; }}
             className={`px-3.5 py-1.5 ${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardText} font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-all`}
           >
             <ExternalLink size={12} /><span>{t('knowledge.ontology_model.openBuszhi')}</span>
           </button>
-          <button onClick={handleExport} disabled={isExporting} className="px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-all">
+          <button type="button" onClick={handleExport} disabled={isExporting} className="px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-all">
             <Download size={12} /><span>{isExporting ? (t("knowledge.ontologytab.导出中")) : (t("knowledge.ontologytab.导出_rag_知识包"))}</span>
           </button>
         </div>
@@ -182,13 +182,13 @@ export default function OntologyModelTab() {
           <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
             <div className={`flex items-center justify-between border-b ${styles.appBorder} pb-2`}>
               <h3 className={`font-extrabold ${styles.cardText} text-xs flex items-center gap-1.5`}><Layers size={12} className={styles.muted} /><span>{t("knowledge.ontologytab.语义本体实体")}</span></h3>
-              <button onClick={handleAddEntity} className="text-blue-600 hover:text-blue-800 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"><Plus size={10} /><span>{t("knowledge.ontologytab.新建")}</span></button>
+              <button type="button" onClick={handleAddEntity} className="text-blue-600 hover:text-blue-800 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"><Plus size={10} /><span>{t("knowledge.ontologytab.新建")}</span></button>
             </div>
             <div className="space-y-1.5">
               {ontologyMappings.map(ent => {
                 const isSelected = editingOntology?.entityId === ent.entityId;
                 return (
-                  <button key={ent.entityId} onClick={() => setEditingOntology(ent)} className={`w-full p-2.5 rounded-lg border text-left flex flex-col space-y-1 transition-all cursor-pointer ${isSelected ? `${styles.sidebarActiveBg} ${styles.cardText} shadow-sm` : `${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardBorder} ${styles.sidebarText}`}`}>
+                  <button type="button" key={ent.entityId} onClick={() => setEditingOntology(ent)} className={`w-full p-2.5 rounded-lg border text-left flex flex-col space-y-1 transition-all cursor-pointer ${isSelected ? `${styles.sidebarActiveBg} ${styles.cardText} shadow-sm` : `${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardBorder} ${styles.sidebarText}`}`}>
                     <div className="flex items-center justify-between w-full">
                       <span className="font-black text-xs">{ent.entityId}</span>
                       <span className={`text-[8px] px-1.5 py-0.5 rounded font-mono ${isSelected ? 'bg-blue-500 text-white' : `${styles.badgeBg} ${styles.sidebarText}`}`}>{ent.mappings?.length || 0} fields</span>
@@ -216,12 +216,12 @@ export default function OntologyModelTab() {
                   </div>
                   <p className={`text-[11px] ${styles.cardTextMuted} font-sans`}>{editingOntology.description}</p>
                 </div>
-                <button onClick={() => handleDeleteEntity(editingOntology.entityId)} className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold rounded-lg text-[10px] flex items-center gap-1 cursor-pointer transition-all"><Trash2 size={11} />{t("knowledge.ontologytab.删除")}</button>
+                <button type="button" onClick={() => handleDeleteEntity(editingOntology.entityId)} className="px-2.5 py-1 text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold rounded-lg text-[10px] flex items-center gap-1 cursor-pointer transition-all"><Trash2 size={11} />{t("knowledge.ontologytab.删除")}</button>
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className={`text-[10px] font-extrabold ${styles.muted} uppercase tracking-wider font-mono`}>{t("knowledge.ontologytab.对齐映射清单")}</span>
-                  <button onClick={handleAddMapping} className="text-blue-600 hover:text-blue-800 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"><Plus size={11} />{t("knowledge.ontologytab.添加映射")}</button>
+                  <button type="button" onClick={handleAddMapping} className="text-blue-600 hover:text-blue-800 font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"><Plus size={11} />{t("knowledge.ontologytab.添加映射")}</button>
                 </div>
                 <div className={`border ${styles.appBorder} rounded-xl overflow-hidden`}>
                   <div className="overflow-x-auto">
@@ -242,7 +242,7 @@ export default function OntologyModelTab() {
                             <td className="p-3"><select value={m.physicalTable} onChange={e => { updateMapping(idx, 'physicalTable', e.target.value); const mt = availableTables.find(t => t.tableName === e.target.value); updateMapping(idx, 'physicalColumn', mt?.columns?.[0]?.name || ''); }} className={`px-1.5 py-1 border ${styles.inputBorder} rounded-md font-bold text-[10px] ${styles.inputBg} text-blue-800`}>{availableTables.map(t => <option key={t.tableName} value={t.tableName}>{t.tableName}</option>)}</select></td>
                             <td className="p-3"><select value={m.physicalColumn} onChange={e => updateMapping(idx, 'physicalColumn', e.target.value)} className={`px-1.5 py-1 border ${styles.inputBorder} rounded-md font-mono text-[10px] font-bold ${styles.inputBg} text-emerald-800`}>{availableCols.map(c => <option key={c.name} value={c.name}>{c.name} ({c.type})</option>)}</select></td>
                             <td className="p-3"><input type="text" value={m.description} onChange={e => updateMapping(idx, 'description', e.target.value)} className={`w-full px-2 py-1 border ${styles.inputBorder} rounded-md text-[10px] ${styles.sidebarText} ${styles.inputBg}`} /></td>
-                            <td className="p-3 text-center"><button onClick={() => removeMapping(idx)} className="p-1 rounded bg-rose-50 text-rose-600 hover:bg-rose-100 cursor-pointer transition-colors"><Trash2 size={11} /></button></td>
+                            <td className="p-3 text-center"><button type="button" onClick={() => removeMapping(idx)} className="p-1 rounded bg-rose-50 text-rose-600 hover:bg-rose-100 cursor-pointer transition-colors"><Trash2 size={11} /></button></td>
                           </tr>
                         );
                       })}
@@ -253,7 +253,7 @@ export default function OntologyModelTab() {
               </div>
               <div className={`flex flex-wrap items-center justify-between pt-4 border-t ${styles.appBorder}`}>
                 <div className={`text-[10px] ${styles.muted}`}>* {t("knowledge.ontologytab.保存后实时更新_rag_上下文数据库")}</div>
-                <button onClick={() => handleSaveMappings(ontologyMappings)} className={`px-5 py-2 ${styles.accentBg} text-white font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-colors`}><Save size={12} /><span>{t("knowledge.ontologytab.保存对齐契约")}</span></button>
+                <button type="button" onClick={() => handleSaveMappings(ontologyMappings)} className={`px-5 py-2 ${styles.accentBg} text-white font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-colors`}><Save size={12} /><span>{t("knowledge.ontologytab.保存对齐契约")}</span></button>
               </div>
             </div>
           ) : (
@@ -267,14 +267,14 @@ export default function OntologyModelTab() {
           <div className={`${styles.cardBg} rounded-2xl w-[92vw] max-w-2xl border ${styles.cardBorder} shadow-xl overflow-hidden flex flex-col max-h-[85vh]`}>
             <div className="bg-slate-950 text-white p-4 flex items-center justify-between">
               <div className="flex items-center gap-2"><Download size={15} className="text-blue-400" /><span className="font-black text-xs">{t("knowledge.ontologytab.rag_先验知识元数据包")}</span></div>
-              <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-white font-bold cursor-pointer"><X size={16} /></button>
+              <button type="button" onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-white font-bold cursor-pointer"><X size={16} /></button>
             </div>
             <div className="p-5 overflow-y-auto space-y-4">
               <pre className={`p-4 ${styles.accentHover} ${styles.cardBorder} rounded-xl font-mono text-[9px] whitespace-pre-wrap leading-relaxed select-text max-h-[350px] overflow-y-auto`}>{exportedMarkdown}</pre>
             </div>
             <div className={`p-4 ${styles.badgeBg} border-t ${styles.appBorder} flex items-center justify-end gap-2 shrink-0`}>
-              <button onClick={() => { navigator.clipboard.writeText(exportedMarkdown); }} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center gap-1 transition-all"><Copy size={12} />{t("knowledge.ontologytab.复制")}</button>
-              <button onClick={() => setShowExportModal(false)} className={`px-4 py-1.5 ${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardText} font-bold rounded-lg text-xs cursor-pointer transition-all`}>{t("knowledge.ontologytab.关闭")}</button>
+              <button type="button" onClick={() => { navigator.clipboard.writeText(exportedMarkdown); }} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs cursor-pointer flex items-center gap-1 transition-all"><Copy size={12} />{t("knowledge.ontologytab.复制")}</button>
+              <button type="button" onClick={() => setShowExportModal(false)} className={`px-4 py-1.5 ${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardText} font-bold rounded-lg text-xs cursor-pointer transition-all`}>{t("knowledge.ontologytab.关闭")}</button>
             </div>
           </div>
         </div>

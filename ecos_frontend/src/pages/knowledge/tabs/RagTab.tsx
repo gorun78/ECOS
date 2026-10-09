@@ -194,11 +194,11 @@ export default function RagTab({ showToast: showToastFromProps }: { showToast?: 
                 t("knowledge.ragtab.评估_ds_ticket_sales_被高危扫描的风险"),
                 t("knowledge.ragtab.查询_ua102_航班上游链路与时效影响"),
               ].map((p, i) => (
-                <button key={i} onClick={() => setQueryInput(p)}
+                <button type="button" key={i} onClick={() => setQueryInput(p)}
                   className={`text-left w-full px-2 py-1 ${styles.appBg} border ${styles.cardBorder} hover:bg-blue-50 rounded-lg text-[10px] ${styles.muted} truncate cursor-pointer block`}>💡 {p}</button>
               ))}
             </div>
-            <button onClick={handleRun} disabled={isRetrieving || !queryInput.trim()}
+            <button type="button" onClick={handleRun} disabled={isRetrieving || !queryInput.trim()}
               className={`w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${isRetrieving ? 'opacity-70' : ''}`}>
               {isRetrieving ? <><span className={`w-3.5 h-3.5 border-2 ${styles.cardBorder} border-t-transparent rounded-full animate-spin`} />{t("knowledge.ragtab.检索中")}</>
                 : <><Flame size={13} />{t("knowledge.ragtab.开始检索推理")}</>}
@@ -225,7 +225,7 @@ export default function RagTab({ showToast: showToastFromProps }: { showToast?: 
                   onKeyDown={e => e.key === 'Enter' && handleFollowUp()}
                   placeholder={t("knowledge.ragtab.追问")}
                   className={`flex-1 px-2.5 py-1.5 text-[11px] ${styles.appBg} border ${styles.cardBorder} rounded-lg ${styles.muted} outline-none focus:border-indigo-500`} />
-                <button onClick={handleFollowUp} disabled={isRetrieving || !followUpInput.trim()}
+                <button type="button" onClick={handleFollowUp} disabled={isRetrieving || !followUpInput.trim()}
                   className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1"><ChevronRight size={12} /></button>
               </div>
             </div>

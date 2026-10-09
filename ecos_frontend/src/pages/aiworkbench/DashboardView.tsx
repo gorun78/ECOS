@@ -255,14 +255,14 @@ export default function DashboardView({
             </p>
           </div>
           <div className="flex gap-2.5 shrink-0">
-            <button
+            <button type="button"
               onClick={() => onNavigateToView('agent')}
               className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
             >
               <Bot size={13} />
               <span>{t('dashboard.welcome.btnAgent')}</span>
             </button>
-            <button
+            <button type="button"
               onClick={() => onNavigateToView('logic')}
               className={`px-3.5 py-1.5 bg-[var(--muted,#1E293B)] hover:bg-[var(--card,#334155)] text-[var(--text-primary,#E2E8F0)] border ${styles.inputBorder} font-semibold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5`}
             >
@@ -387,7 +387,7 @@ export default function DashboardView({
             </span>
             <h3 className={`text-xs font-bold ${styles.cardText}`}>{t('dashboard.audit.title')}</h3>
           </div>
-          <button
+          <button type="button"
             onClick={() => onNavigateToView('guardrails')}
             className="text-[10px] text-blue-600 hover:text-blue-700 font-bold flex items-center gap-0.5 cursor-pointer"
           >
@@ -526,7 +526,7 @@ export default function DashboardView({
 
         {/* Action Buttons */}
         <div className={`flex items-center gap-2.5 mt-4 pt-4 border-t ${styles.cardBorder}`}>
-          <button
+          <button type="button"
             onClick={startEvaluation}
             disabled={!selectedAgentId || !selectedQSetId || isRunning}
             className={`px-4 py-2 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5 bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -534,7 +534,7 @@ export default function DashboardView({
             <Play size={13} />
             <span>{t('dashboard.eval.start')}</span>
           </button>
-          <button
+          <button type="button"
             onClick={resetEvaluation}
             disabled={!session}
             className={`px-4 py-2 ${styles.appBg} hover:bg-[var(--muted,rgba(0,0,0,0.04))] disabled:opacity-50 ${styles.cardTextMuted} font-semibold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5 disabled:cursor-not-allowed`}
@@ -706,7 +706,7 @@ export default function DashboardView({
   return (
     <div className={`flex flex-col h-full ${styles.appBg}`}>
       <div className={`flex items-center gap-1 px-6 py-2 border-b ${styles.cardBorder} ${styles.inputBg} shrink-0`}>
-        <button
+        <button type="button"
           onClick={() => setSubView('overview')}
           className={`px-3.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
             subView === 'overview'
@@ -717,7 +717,7 @@ export default function DashboardView({
           <LayoutDashboard size={13} />
           <span>{t('dashboard.tab.overview')}</span>
         </button>
-        <button
+        <button type="button"
           onClick={() => setSubView('evaluation')}
           className={`px-3.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
             subView === 'evaluation'

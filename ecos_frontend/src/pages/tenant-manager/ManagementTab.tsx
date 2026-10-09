@@ -132,11 +132,11 @@ export function ManagementTab({
               <div className="px-3 py-2 border-t flex items-center justify-between gap-2 flex-wrap" style={{ borderColor: styles.cardBorder }}>
                 <span className={`text-[11px] ${styles.cardTextMuted}`}>{formatDate(tn.createdAt)}</span>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => { setEditTenant(tn); setFormMode("edit"); }}
+                  <button type="button" onClick={() => { setEditTenant(tn); setFormMode("edit"); }}
                     className="px-2.5 py-1 rounded text-[11px] font-medium text-white shrink-0 bg-indigo-500 hover:bg-indigo-600">
                     {t("platform.tenant.mgmt.edit")}
                   </button>
-                  <button onClick={() => setDeleteTarget({ id: tn.id, name: tn.tenantName })}
+                  <button type="button" onClick={() => setDeleteTarget({ id: tn.id, name: tn.tenantName })}
                     className="px-2.5 py-1 rounded text-[11px] font-medium text-white shrink-0 bg-red-500 hover:bg-red-600">
                     {t("platform.tenant.mgmt.dl")}
                   </button>
@@ -146,13 +146,13 @@ export function ManagementTab({
           ))}
           {tenantTotal > 20 && (
             <div className="flex items-center justify-center gap-2 py-2">
-              <button disabled={tenantPage <= 1}
+              <button type="button" disabled={tenantPage <= 1}
                 onClick={() => { const p = tenantPage - 1; setTenantPage(p); loadTenants(tenantSearch, p, statusFilter); }}
                 className={`px-3 py-1 rounded text-[11px] border ${styles.cardBorder} disabled:opacity-30`}>
                 {t("platform.tenant.mgmt.prev")}
               </button>
               <span className={`text-[11px] ${styles.cardTextMuted}`}>{tenantPage} / {Math.max(1, Math.ceil(tenantTotal / 20))}</span>
-              <button onClick={() => { const p = tenantPage + 1; setTenantPage(p); loadTenants(tenantSearch, p, statusFilter); }}
+              <button type="button" onClick={() => { const p = tenantPage + 1; setTenantPage(p); loadTenants(tenantSearch, p, statusFilter); }}
                 className={`px-3 py-1 rounded text-[11px] border ${styles.cardBorder}`}>
                 {t("platform.tenant.mgmt.next")}
               </button>
@@ -195,13 +195,13 @@ export function ManagementTab({
                     <td className={`px-4 py-2.5 text-[11px] ${styles.cardTextMuted}`}>{formatDate(tn.createdAt)}</td>
                     <td className="px-4 py-2.5 text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <button
+                        <button type="button"
                           onClick={() => { setEditTenant(tn); setFormMode("edit"); }}
                           className="p-1 rounded hover:bg-white/10" title={t("platform.tenant.mgmt.edit")}
                         >
                           <Edit3 className="w-3.5 h-3.5 text-blue-400" />
                         </button>
-                        <button
+                        <button type="button"
                           onClick={() => setDeleteTarget({ id: tn.id, name: tn.tenantName })}
                           className="p-1 rounded hover:bg-white/10" title={t("platform.tenant.mgmt.dl")}
                         >
@@ -221,7 +221,7 @@ export function ManagementTab({
                 {t("platform.tenant.mgmt.total", { n: tenantTotal })}
               </span>
               <div className="flex items-center gap-1">
-                <button
+                <button type="button"
                   disabled={tenantPage <= 1}
                   onClick={() => { const p = tenantPage - 1; setTenantPage(p); loadTenants(tenantSearch, p, statusFilter); }}
                   className={`px-2 py-1 rounded text-[11px] border ${styles.cardBorder} disabled:opacity-30`}
@@ -229,7 +229,7 @@ export function ManagementTab({
                   {t("platform.tenant.mgmt.prev")}
                 </button>
                 <span className={`text-[11px] px-2 ${styles.cardTextMuted}`}>{tenantPage}</span>
-                <button
+                <button type="button"
                   onClick={() => { const p = tenantPage + 1; setTenantPage(p); loadTenants(tenantSearch, p, statusFilter); }}
                   className={`px-2 py-1 rounded text-[11px] border ${styles.cardBorder}`}
                 >

@@ -69,7 +69,7 @@ export default function CsvImportModal({ onImport, onClose }: CsvImportModalProp
             <FileSpreadsheet className="w-4 h-4 inline mr-1.5" />
             {t("platform.user.csv.title")}
           </h3>
-          <button onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
+          <button type="button" onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
         </div>
 
         {error && (
@@ -83,7 +83,7 @@ export default function CsvImportModal({ onImport, onClose }: CsvImportModalProp
               {t("platform.user.csv.chooseFileHint")}
             </p>
             <input ref={fileRef} type="file" accept=".csv" onChange={handleFile} className="hidden" />
-            <button
+            <button type="button"
               onClick={() => fileRef.current?.click()}
               className={`px-4 py-2 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover}`}
             >
@@ -116,13 +116,13 @@ export default function CsvImportModal({ onImport, onClose }: CsvImportModalProp
               </table>
             </div>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setPreview(null)} className={`px-3 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>
+              <button type="button" onClick={() => setPreview(null)} className={`px-3 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>
                 {t("platform.user.csv.reselect")}
               </button>
-              <button onClick={onClose} className={`px-3 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>
+              <button type="button" onClick={onClose} className={`px-3 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>
                 {t("platform.user.csv.cancel")}
               </button>
-              <button onClick={handleImport} disabled={importing}
+              <button type="button" onClick={handleImport} disabled={importing}
                 className={`px-3 py-1.5 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover} disabled:opacity-50`}>
                 {importing ? t("platform.user.csv.importing") : t("platform.user.csv.confirmImport")}
               </button>

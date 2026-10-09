@@ -96,25 +96,25 @@ export function TaskPanelTable({
                 </td>
                 <td className="px-2 py-2.5" onClick={e => e.stopPropagation()}>
                   <div className="flex items-center gap-1">
-                    <button
+                    <button type="button"
                       onClick={() => doAction(task.taskId, "execute")}
                       disabled={isActing || status === "RUNNING"}
                       className="p-1 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 disabled:opacity-30 disabled:cursor-not-allowed transition"
                       title={t("taskPanel.action.start")}
                     ><Play className="w-3.5 h-3.5" /></button>
-                    <button
+                    <button type="button"
                       onClick={() => doAction(task.taskId, "pause")}
                       disabled={isActing || status !== "RUNNING"}
                       className="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 disabled:opacity-30 disabled:cursor-not-allowed transition"
                       title={t("taskPanel.action.pause")}
                     ><Pause className="w-3.5 h-3.5" /></button>
-                    <button
+                    <button type="button"
                       onClick={() => doAction(task.taskId, "resume")}
                       disabled={isActing || status === "RUNNING"}
                       className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition"
                       title={t("taskPanel.action.resume")}
                     ><RotateCcw className="w-3.5 h-3.5" /></button>
-                    <button
+                    <button type="button"
                       onClick={() => doAction(task.taskId, "cancel")}
                       disabled={isActing || status === "SUCCEEDED" || status === "CANCELLED"}
                       className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 disabled:opacity-30 disabled:cursor-not-allowed transition"
@@ -154,13 +154,13 @@ export function TaskPanelPagination({ page, setPage, total, totalPages }: TaskPa
     <div className={`flex items-center justify-between px-6 py-3 border-t ${styles.appBorder} shrink-0 text-sm`}>
       <span className={`${styles.cardTextMuted}`}>{t("taskPanel.pagination.total", { n: total })}</span>
       <div className="flex items-center gap-1">
-        <button
+        <button type="button"
           onClick={() => setPage(p => Math.max(1, p - 1))}
           disabled={page <= 1}
           className={`px-3 py-1 rounded border ${styles.cardBorder} ${styles.sidebarHoverBg} disabled:opacity-40 transition`}
         >{t("taskPanel.pagination.prev")}</button>
         <span className={`px-2 ${styles.cardText}`}>{page} / {totalPages}</span>
-        <button
+        <button type="button"
           onClick={() => setPage(p => Math.min(totalPages, p + 1))}
           disabled={page >= totalPages}
           className={`px-3 py-1 rounded border ${styles.cardBorder} ${styles.sidebarHoverBg} disabled:opacity-40 transition`}

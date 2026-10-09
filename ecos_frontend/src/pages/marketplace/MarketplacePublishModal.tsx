@@ -71,7 +71,7 @@ export default function MarketplacePublishModal({
           >
             <Upload className="w-5 h-5 text-indigo-400" />
             {t("marketplace.publishBtn")}
-          </h2>          <button
+          </h2>          <button type="button"
             onClick={onClose}
             disabled={submitting}
             className="opacity-50 hover:opacity-100 transition-opacity disabled:opacity-30"
@@ -159,7 +159,7 @@ export default function MarketplacePublishModal({
 
         {/* Buttons */}
         <div className="flex gap-2.5">
-          <button
+          <button type="button"
             onClick={onClose}
             disabled={submitting}
             className={`flex-1 py-2.5 rounded-lg text-sm font-medium border ${styles.sidebarBorder}
@@ -167,7 +167,7 @@ export default function MarketplacePublishModal({
           >
             {t("common.cancel")}
           </button>
-          <button
+          <button type="button"
             onClick={onSubmit}
             disabled={submitting || !name.trim() || !description.trim()}
             className="flex-1 py-2.5 rounded-lg text-sm font-medium text-white

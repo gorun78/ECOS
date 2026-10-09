@@ -214,7 +214,7 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
             {datalake?.bucket || 'ecos-datalake'}
           </span>
           <span>{datalake?.status || '...'}</span>
-          <button
+          <button type="button"
             onClick={handleInitDatalake}
             disabled={initLoading || datalake?.status === 'UP'}
             className={`px-1.5 py-0.5 rounded border text-[9px] transition disabled:opacity-40 ${styles.inputBorder} ${styles.cardTextMuted} hover:${styles.accentText}`}
@@ -235,7 +235,7 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
           {t('dw.ingest.selectTables') || '选择采集表'}
           <span className={`ml-1 ${styles.cardTextMuted} font-mono`}>({selectedNames.size}/{tables.length || selectedNames.size})</span>
         </span>
-        <button onClick={toggleAll} className={`text-[10px] ${styles.accentText} hover:underline cursor-pointer`}>
+        <button type="button" onClick={toggleAll} className={`text-[10px] ${styles.accentText} hover:underline cursor-pointer`}>
           {selectedNames.size > 0 && selectedNames.size >= tables.length && tables.length > 0
             ? (t('dw.ingest.clearAll') || '清空')
             : (t('dw.ingest.selectAll') || '全选')}
@@ -244,7 +244,7 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
 
       {/* 操作按钮 */}
       <div className="flex items-center gap-2 flex-wrap">
-        <button
+        <button type="button"
           onClick={handleRun}
           disabled={running || selectedNames.size === 0}
           className={`px-2 py-1 text-[10px] font-semibold rounded transition flex items-center gap-1 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-40`}
@@ -268,7 +268,7 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
           </select>
         )}
         {scheduleEnabled && (
-          <button
+          <button type="button"
             onClick={handleSaveSchedule}
             disabled={savingSchedule}
             className={`px-2 py-1 text-[10px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.accentText} transition disabled:opacity-40`}

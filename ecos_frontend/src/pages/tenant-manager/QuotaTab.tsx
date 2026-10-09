@@ -106,7 +106,7 @@ export function QuotaTab({
                       </div>
                     </td>
                     <td className="px-4 py-2.5 text-center">
-                      <button
+                      <button type="button"
                         onClick={() => setEditQuota(q)}
                         className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border transition-colors ${styles.cardBorder} hover:bg-white/5`}
                       >

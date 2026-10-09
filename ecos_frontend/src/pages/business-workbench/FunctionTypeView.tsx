@@ -268,7 +268,7 @@ export class ${className} {
             />
           </div>
         </div>
-        <button
+        <button type="button"
           onClick={() => onDelete(func.id)}
           className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"
         >
@@ -286,7 +286,7 @@ export class ${className} {
             test: t('ow.function.tab_test')
           };
           return (
-            <button
+            <button type="button"
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`py-3 px-4 text-xs font-medium border-b-2 -mb-px transition-colors ${
@@ -410,7 +410,7 @@ export class ${className} {
                       ))}
                     </select>
                   )}
-                  <button
+                  <button type="button"
                     onClick={handleAddParam}
                     className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition-colors flex items-center gap-1"
                   >
@@ -477,7 +477,7 @@ export class ${className} {
                             />
                           </td>
                           <td className="py-2.5 px-4 text-center">
-                            <button
+                            <button type="button"
                               onClick={() => handleRemoveParam(p.name)}
                               className={`p-1 ${styles.cardTextMuted} opacity-70 hover:opacity-100 hover:text-red-500 rounded`}
                             >
@@ -504,7 +504,7 @@ export class ${className} {
                 <p className={`text-[10px] ${styles.cardTextMuted} mt-0.5`}>{t('ow.function.code_tplHint')}</p>
               </div>
               <div className="space-y-2">
-                <button
+                <button type="button"
                   onClick={() => loadTemplate('validation')}
                   className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.sidebarBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardText} transition-all flex items-start gap-2`}
                 >
@@ -514,7 +514,7 @@ export class ${className} {
                     <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>{t('ow.function.tpl_validation_desc')}</div>
                   </div>
                 </button>
-                <button
+                <button type="button"
                   onClick={() => loadTemplate('default')}
                   className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.sidebarBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardText} transition-all flex items-start gap-2`}
                 >
@@ -524,7 +524,7 @@ export class ${className} {
                     <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>{t('ow.function.tpl_default_desc')}</div>
                   </div>
                 </button>
-                <button
+                <button type="button"
                   onClick={() => loadTemplate('computed')}
                   className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.sidebarBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardText} transition-all flex items-start gap-2`}
                 >
@@ -534,7 +534,7 @@ export class ${className} {
                     <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>{t('ow.function.tpl_computed_desc')}</div>
                   </div>
                 </button>
-                <button
+                <button type="button"
                   onClick={() => loadTemplate('aggregation')}
                   className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.sidebarBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardText} transition-all flex items-start gap-2`}
                 >
@@ -618,13 +618,13 @@ export class ${className} {
                         {/* RENDER DYNAMIC FIELD BASED ON TYPE */}
                         {p.dataType === 'boolean' ? (
                           <div className="flex items-center gap-3 mt-1.5">
-                            <button
+                            <button type="button"
                               onClick={() => setVal(true)}
                               className={`px-3 py-1 text-[11px] rounded transition-all font-mono ${value === true ? 'bg-blue-600 text-white font-semibold' : `${styles.appBg} ${styles.cardTextMuted} ${styles.sidebarHoverBg}`}`}
                             >
                               true
                             </button>
-                            <button
+                            <button type="button"
                               onClick={() => setVal(false)}
                               className={`px-3 py-1 text-[11px] rounded transition-all font-mono ${value === false ? 'bg-blue-600 text-white font-semibold' : `${styles.appBg} ${styles.cardTextMuted} ${styles.sidebarHoverBg}`}`}
                             >
@@ -680,7 +680,7 @@ export class ${className} {
               </div>
 
               {/* Big Run Button */}
-              <button
+              <button type="button"
                 onClick={handleRunTest}
                 disabled={isTesting}
                 className="w-full py-2 bg-[var(--card,#0F172A)] hover:bg-[var(--muted,#1E293B)] disabled:bg-[var(--card,#475569)] text-white rounded-lg flex items-center justify-center gap-2 font-medium transition-all shadow-xs mt-4 text-xs"

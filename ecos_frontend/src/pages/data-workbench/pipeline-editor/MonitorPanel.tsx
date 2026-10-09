@@ -226,7 +226,7 @@ export default function MonitorPanel({ session }: Props) {
         style={{ height: TAB_BAR_H }}
       >
         {TAB_IDS.map((id) => (
-          <button
+          <button type="button"
             key={id}
             onClick={() => setTab(id)}
             className={`px-3 py-1 text-xs font-semibold rounded transition-colors ${
@@ -237,7 +237,7 @@ export default function MonitorPanel({ session }: Props) {
           </button>
         ))}
         <span className="ml-auto flex items-center gap-2">
-          <button
+          <button type="button"
             onClick={() => setAutoScroll((v) => !v)}
             className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border ${styles.cardBorder} ${
               autoScroll ? `${styles.successBg} ${styles.successText}` : `${styles.sidebarBg} ${styles.cardTextMuted}`
@@ -247,7 +247,7 @@ export default function MonitorPanel({ session }: Props) {
             {autoScroll ? <PlayCircle size={12} /> : <PauseCircle size={12} />}
             {autoScroll ? t('dw.monitor.autoScroll') : t('dw.monitor.paused')}
           </button>
-          <button
+          <button type="button"
             onClick={toggleExpanded}
             className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border ${styles.cardBorder} ${styles.cardTextMuted}`}
             title={t('dw.monitor.collapse')}

@@ -104,13 +104,13 @@ export default function ActionTypeView({ actionType, objectTypes, onUpdate, onDe
             <p className={`text-xs ${styles.muted} mt-0.5`}>{actionType.description || t('ow.empty.noDescription')}</p>
           </div>
         </div>
-        <button onClick={() => onDelete(actionType.id)} className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"><Trash2 size={13} />{t('ow.btn.deleteAction')}</button>
+        <button type="button" onClick={() => onDelete(actionType.id)} className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"><Trash2 size={13} />{t('ow.btn.deleteAction')}</button>
       </div>
 
       <div className={`flex px-6 border-b ${styles.cardBorder} ${styles.cardBg}`}>
         {(['parameters', 'rules', 'validation', 'layout'] as const).map(tab => {
           const labels: Record<string, string> = { parameters: t('ow.tab.actionParameters'), rules: t('ow.tab.actionRules'), validation: t('ow.tab.actionValidation'), layout: t('ow.tab.actionLayout') };
-          return (<button key={tab} onClick={() => setActiveTab(tab)} className={`py-3 px-4 text-xs font-medium border-b-2 -mb-px transition-colors ${activeTab === tab ? `${styles.accentBorder} ${styles.accentText}` : `border-transparent ${styles.muted} hover:${styles.cardText}`}`}>{labels[tab]}</button>);
+          return (<button type="button" key={tab} onClick={() => setActiveTab(tab)} className={`py-3 px-4 text-xs font-medium border-b-2 -mb-px transition-colors ${activeTab === tab ? `${styles.accentBorder} ${styles.accentText}` : `border-transparent ${styles.muted} hover:${styles.cardText}`}`}>{labels[tab]}</button>);
         })}
       </div>
 

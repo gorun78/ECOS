@@ -189,7 +189,7 @@ export default function SecurityAudit() {
           </h1>
           <p className={`text-xs mt-0.5 ${styles.cardTextMuted}`}>{t("sec.desc")}</p>
         </div>
-        <button
+        <button type="button"
           onClick={exportCsv}
           disabled={auditLogs.length === 0}
           className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer border
@@ -222,7 +222,7 @@ export default function SecurityAudit() {
       {/* ── Filter bar ─────────────────────────────── */}
       <div className={`rounded-lg border p-3 mb-4 shrink-0 ${styles.cardBg} ${styles.cardBorder}`}>
         <div className="flex items-center gap-2 mb-2">
-          <button
+          <button type="button"
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer ${styles.cardTextMuted} hover:${styles.cardText}`}
           >
@@ -302,14 +302,14 @@ export default function SecurityAudit() {
 
             {/* Buttons */}
             <div className="flex gap-2">
-              <button
+              <button type="button"
                 onClick={handleSearch}
                 className="px-3 py-1.5 rounded-md text-xs font-bold bg-blue-600 text-white hover:bg-blue-500 transition-all flex items-center gap-1 cursor-pointer"
               >
                 <Search size={13} />
                 {t("sec.filter.search")}
               </button>
-              <button
+              <button type="button"
                 onClick={handleReset}
                 className={`px-3 py-1.5 rounded-md text-xs font-bold border transition-all flex items-center gap-1 cursor-pointer ${styles.cardTextMuted} ${styles.cardBorder} hover:${styles.cardText}`}
               >
@@ -474,7 +474,7 @@ export default function SecurityAudit() {
                 <FileJson size={13} className="text-amber-400" />
                 {t("sec.detail.title")}
               </h3>
-              <button
+              <button type="button"
                 onClick={() => setExpandedEventId(null)}
                 className={`p-1 rounded hover:bg-white/10 cursor-pointer ${styles.cardTextMuted}`}
               >
@@ -561,7 +561,7 @@ export default function SecurityAudit() {
 
           {/* Page nav */}
           <div className="flex items-center gap-1">
-            <button
+            <button type="button"
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page <= 1}
               className={`p-1 rounded transition-all cursor-pointer ${page <= 1 ? "opacity-30 cursor-not-allowed" : `hover:bg-white/10 ${styles.cardText}`}`}
@@ -571,7 +571,7 @@ export default function SecurityAudit() {
             <span className={`text-[10px] font-mono px-2 tabular-nums ${styles.cardText}`}>
               {page} <span className={styles.cardTextMuted}>/ {totalPages}</span>
             </span>
-            <button
+            <button type="button"
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
               className={`p-1 rounded transition-all cursor-pointer ${page >= totalPages ? "opacity-30 cursor-not-allowed" : `hover:bg-white/10 ${styles.cardText}`}`}

@@ -211,7 +211,7 @@ export default function AgentMesh() {
           <div className={`flex items-center gap-2 text-sm font-semibold ${styles.cardText}`}>
             <Cpu size={16} /> {t("agentMesh.registry")}
             {loadErrors.agents && (
-              <button
+              <button type="button"
                 onClick={loadAgents}
                 className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400"
                 title={loadErrors.agents}
@@ -247,7 +247,7 @@ export default function AgentMesh() {
           {agents.length === 0 && loadErrors.agents ? (
             <div className="text-center py-8">
               <p className="text-xs text-red-500 mb-2">{loadErrors.agents}</p>
-              <button
+              <button type="button"
                 onClick={loadAgents}
                 className="inline-flex items-center gap-1 px-3 py-1 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400"
               >
@@ -283,13 +283,13 @@ export default function AgentMesh() {
               {/* Mode selector */}
               <div className="flex items-center gap-2">
                 <span className={`text-xs ${styles.cardTextMuted}`}>{t("agentMesh.mode")}</span>
-                <button onClick={() => setNewMode("SUPERVISOR")}
+                <button type="button" onClick={() => setNewMode("SUPERVISOR")}
                   className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
                     newMode === "SUPERVISOR"
                       ? "bg-teal-100 text-teal-700"
                       : `${styles.badgeBg} ${styles.cardTextMuted}`
                   }`}>{t("agentMesh.modeSupervisor")}</button>
-                <button onClick={() => setNewMode("PIPELINE")}
+                <button type="button" onClick={() => setNewMode("PIPELINE")}
                   className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
                     newMode === "PIPELINE"
                       ? "bg-indigo-100 text-indigo-700"
@@ -339,12 +339,12 @@ export default function AgentMesh() {
                         className={`flex-1 px-2 py-1.5 text-xs border rounded ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
                       />
                       {i === pipelineAgents.length - 1 ? (
-                        <button
+                        <button type="button"
                           onClick={() => setPipelineAgents([...pipelineAgents, { agentId: "", instruction: "" }])}
                           className={`p-1.5 ${styles.cardTextMuted} hover:text-indigo-500`}
                         ><Plus size={14} /></button>
                       ) : (
-                        <button
+                        <button type="button"
                           onClick={() => setPipelineAgents(pipelineAgents.filter((_, j) => j !== i))}
                           className={`p-1.5 ${styles.cardTextMuted} hover:text-red-500`}
                         ><Trash2 size={14} /></button>
@@ -354,7 +354,7 @@ export default function AgentMesh() {
                 </div>
               )}
             </div>
-            <button
+            <button type="button"
               onClick={createMission}
               disabled={loading}
               className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
@@ -369,7 +369,7 @@ export default function AgentMesh() {
         <div className="flex-1 overflow-auto p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className={`text-sm font-semibold ${styles.cardText}`}>{t("agentMesh.records")}</h3>
-            <button onClick={loadMissions} className={`p-1 ${styles.cardTextMuted} hover:text-indigo-500`}><RefreshCw size={14} /></button>
+            <button type="button" onClick={loadMissions} className={`p-1 ${styles.cardTextMuted} hover:text-indigo-500`}><RefreshCw size={14} /></button>
           </div>
 
           {/* ── Task Stats Panel (shown when mission selected and has tasks) ── */}
@@ -380,7 +380,7 @@ export default function AgentMesh() {
           {missions.length === 0 && loadErrors.missions ? (
             <div className="text-center py-16">
               <p className="text-sm text-red-500 mb-3">{loadErrors.missions}</p>
-              <button
+              <button type="button"
                 onClick={loadMissions}
                 className="inline-flex items-center gap-1 px-4 py-1.5 rounded text-xs bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-950/30 dark:text-red-400"
               >
@@ -415,7 +415,7 @@ export default function AgentMesh() {
                   </span>
                   {mission.durationMs && <span className={`text-[10px] ${styles.cardTextMuted}`}>{mission.durationMs}ms</span>}
                   {(mission.status === "PENDING" || mission.status === "FAILED") && (
-                    <button
+                    <button type="button"
                       onClick={e => { e.stopPropagation(); executeMission(mission.id); }}
                       disabled={loading}
                       className="p-1 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-100 rounded"
@@ -439,7 +439,7 @@ export default function AgentMesh() {
                   <span className="text-[11px] text-red-600 dark:text-red-400 flex-1 min-w-0 truncate">
                     {t("agentMesh.pollError")} · {pollError}
                   </span>
-                  <button
+                  <button type="button"
                     onClick={(e) => { e.stopPropagation(); pollTasks(); }}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40"
                   >

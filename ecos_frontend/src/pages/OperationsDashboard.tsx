@@ -110,7 +110,7 @@ export default function OperationsDashboard() {
             {t("dashboard.ops.loadErrorTitle")}
           </p>
           <p className={`text-xs ${styles.muted} mb-4`}>{error}</p>
-          <button
+          <button type="button"
             onClick={loadData}
             className={`inline-flex items-center gap-1.5 px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded-lg transition`}
           >
@@ -148,7 +148,7 @@ export default function OperationsDashboard() {
             {t("dashboard.ops.subtitle")}
           </p>
         </div>
-        <button
+        <button type="button"
           onClick={loadData}
           disabled={loading}
           className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} hover:opacity-80 transition disabled:opacity-50`}
@@ -397,7 +397,7 @@ export default function OperationsDashboard() {
         <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
-          <button onClick={loadData} className="ml-auto font-semibold underline hover:no-underline">
+          <button type="button" onClick={loadData} className="ml-auto font-semibold underline hover:no-underline">
             {t("dashboard.ops.retry")}
           </button>
         </div>

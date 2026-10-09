@@ -300,7 +300,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
       )}
 
       {/* 左侧折叠按钮 */}
-      <button
+      <button type="button"
         onClick={() => setShowLeftPanel(!showLeftPanel)}
         className={`absolute top-1/2 -translate-y-1/2 z-20 w-4 h-12 flex items-center justify-center ${styles.sidebarBg} border ${styles.cardBorder} rounded-r ${styles.cardTextMuted} hover:text-indigo-400 cursor-pointer transition-colors ${
           showLeftPanel ? 'left-[240px]' : 'left-0'
@@ -384,7 +384,7 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
       </div>
 
       {/* 右侧折叠按钮 */}
-      <button
+      <button type="button"
         onClick={() => setShowRightPanel(!showRightPanel)}
         className={`absolute top-1/2 -translate-y-1/2 z-20 w-4 h-12 flex items-center justify-center ${styles.sidebarBg} border ${styles.cardBorder} rounded-l ${styles.cardTextMuted} hover:text-indigo-400 cursor-pointer transition-colors ${
           showRightPanel ? 'right-[256px]' : 'right-0'
@@ -444,13 +444,13 @@ export default function SQLQueryConsole({ showToast }: SQLQueryConsoleProps) {
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">
-              <button
+              <button type="button"
                 onClick={() => setShowSaveDialog(false)}
                 className={`px-4 py-1.5 text-xs rounded ${styles.sidebarBg} ${styles.cardText} hover:opacity-80 transition-colors cursor-pointer`}
               >
                 {t('common.cancel', '取消')}
               </button>
-              <button
+              <button type="button"
                 onClick={handleSaveTemplateConfirm}
                 disabled={isSaving || !saveName.trim()}
                 className={`flex items-center gap-1.5 px-4 py-1.5 text-xs rounded transition-colors cursor-pointer ${

@@ -130,7 +130,7 @@ export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete
               placeholder={t('ow.placeholder.funcDescription')} />
           </div>
         </div>
-        <button onClick={() => onDelete(func.id)}
+        <button type="button" onClick={() => onDelete(func.id)}
           className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5">
           <Trash2 size={13} />{t('ow.btn.deleteFunction')}
         </button>
@@ -142,7 +142,7 @@ export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete
             signature: t('ow.tab.funcSignature'), code: t('ow.tab.funcCode'), test: t('ow.tab.funcTest')
           };
           return (
-            <button key={tab} onClick={() => setActiveTab(tab)}
+            <button type="button" key={tab} onClick={() => setActiveTab(tab)}
               className={`py-3 px-4 text-xs font-medium border-b-2 -mb-px transition-colors ${
                 activeTab === tab ? `${styles.accentBorder} ${styles.accentText}` : `border-transparent ${styles.muted} hover:${styles.cardText}`
               }`}>{labels[tab]}</button>

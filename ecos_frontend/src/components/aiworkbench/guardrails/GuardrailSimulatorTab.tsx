@@ -135,7 +135,7 @@ export default function GuardrailSimulatorTab({
             />
           </div>
 
-          <button
+          <button type="button"
             onClick={handleRunSimulator}
             disabled={isSimulating || !testInput.trim()}
             className={`w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${

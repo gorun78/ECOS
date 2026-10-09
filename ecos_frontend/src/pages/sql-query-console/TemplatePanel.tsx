@@ -60,7 +60,7 @@ export default function TemplatePanel({ show, datasourceId, onLoad, onClose }: T
         <span className={`text-[10px] font-bold uppercase ${styles.cardTextMuted} flex items-center gap-1.5`}>
           <Icon name="Bookmark" size={13} />模板
         </span>
-        <button onClick={onClose} className={`${styles.cardTextMuted} hover:opacity-70 rounded`}>
+        <button type="button" onClick={onClose} className={`${styles.cardTextMuted} hover:opacity-70 rounded`}>
           <Icon name="X" size={13} />
         </button>
       </div>
@@ -75,10 +75,10 @@ export default function TemplatePanel({ show, datasourceId, onLoad, onClose }: T
           templates.map(t => (
             <div key={t.id} className={`px-2.5 py-2 border-b ${styles.cardBorder} hover:bg-white/5 group`}>
               <div className="flex items-center justify-between">
-                <button onClick={() => onLoad(t)} className={`text-[11px] font-medium ${styles.cardText} text-left truncate hover:text-blue-400`}>
+                <button type="button" onClick={() => onLoad(t)} className={`text-[11px] font-medium ${styles.cardText} text-left truncate hover:text-blue-400`}>
                   {t.name}
                 </button>
-                <button onClick={() => handleDelete(t.id)} className={`${styles.cardTextMuted} hover:text-rose-400 opacity-0 group-hover:opacity-100`}>
+                <button type="button" onClick={() => handleDelete(t.id)} className={`${styles.cardTextMuted} hover:text-rose-400 opacity-0 group-hover:opacity-100`}>
                   <Icon name="Trash2" size={11} />
                 </button>
               </div>

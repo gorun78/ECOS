@@ -32,7 +32,7 @@ export default function TableSelect({ value, onChange, styles, placeholder }: {
       {searchText && filtered.length > 0 && (
         <div className={`absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-lg ${styles.cardBg} border ${styles.cardBorder} shadow-lg`}>
           {filtered.slice(0, 20).map(t => (
-            <button
+            <button type="button"
               key={t.catalogId}
               onClick={() => { onChange(t.resourceName); setSearchText(''); }}
               className={`w-full text-left px-3 py-2 text-sm hover:${styles.sidebarHoverBg} ${styles.cardText} cursor-pointer`}

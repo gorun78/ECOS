@@ -76,7 +76,7 @@ export default function SystemDictionary() {
           <Loader2 size={18} className="animate-spin text-indigo-400 mx-auto mt-4" />
         ) : (
           groups.map(g => (
-            <button key={g.dictType} onClick={() => { setActiveType(g.dictType); setExpandedItem(null); }}
+            <button type="button" key={g.dictType} onClick={() => { setActiveType(g.dictType); setExpandedItem(null); }}
               className={`text-left px-3 py-2 rounded text-sm transition-colors flex items-center justify-between
                 ${activeType === g.dictType ? 'bg-indigo-600 text-white' : `${styles.muted} ${styles.sidebarHoverBg}`}`}
             >

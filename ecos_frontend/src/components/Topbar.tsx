@@ -269,7 +269,7 @@ export default function Topbar({
       {/* Left Box: Hamburger (mobile) + Breadcrumb mapping */}
       <div className={`flex items-center gap-1.5 text-xs font-mono ${styles.cardTextMuted} shrink-0`}>
         {/* Hamburger menu — visible only on mobile */}
-        <button
+        <button type="button"
           onClick={onMenuToggle}
           className={`md:hidden p-1.5 -ml-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${styles.cardText}`}
           aria-label={t("topbar.lang.toggle")}
@@ -302,7 +302,7 @@ export default function Topbar({
               onClick={() => onTabSelect(tab.id)}
             >
               <span className={isActive ? `${styles.cardText} font-bold` : `${styles.cardTextMuted}`}>{translateTabLabel(tab.label)}</span>
-              <button
+              <button type="button"
                 className={`p-0.5 rounded-full text-transparent group-hover:${styles.cardTextMuted} hover:bg-[var(--muted)] transition shrink-0`}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -336,7 +336,7 @@ export default function Topbar({
 
         {/* Language Selector Switcher */}
         <div className={`flex items-center ${styles.inputBg} border ${styles.inputBorder} rounded-lg p-0.5 select-none shrink-0 shadow-3xs transition duration-150`}>
-          <button
+          <button type="button"
             onClick={() => setLocale("zh")}
             id="lang-switch-zh"
             className={`px-2.5 py-1 text-[10px] font-bold font-sans rounded-md transition duration-150 cursor-pointer ${
@@ -347,7 +347,7 @@ export default function Topbar({
           >
             {t("topbar.lang.switch_zh")}
           </button>
-          <button
+          <button type="button"
             onClick={() => setLocale("en")}
             id="lang-switch-en"
             className={`px-2.5 py-1 text-[10px] font-bold font-sans rounded-md transition duration-150 cursor-pointer ${

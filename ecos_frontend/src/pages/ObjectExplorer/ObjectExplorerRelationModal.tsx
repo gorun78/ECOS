@@ -40,7 +40,7 @@ export function ObjectExplorerRelationModal({
           <h3 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2`}>
             <Link2 className="w-4 h-4 text-blue-500" />添加关系
           </h3>
-          <button onClick={() => setShowRelationForm(false)} className={`${styles.sidebarHoverBg} rounded p-1 transition`}>
+          <button type="button" onClick={() => setShowRelationForm(false)} className={`${styles.sidebarHoverBg} rounded p-1 transition`}>
             <X className={`w-4 h-4 ${styles.cardTextMuted}`} />
           </button>
         </div>
@@ -78,13 +78,13 @@ export function ObjectExplorerRelationModal({
           </div>
         </div>
         <div className={`p-4 border-t ${styles.cardBorder} flex gap-2 justify-end`}>
-          <button
+          <button type="button"
             onClick={() => setShowRelationForm(false)}
             className={`px-4 py-2 text-xs font-semibold ${styles.cardTextMuted} ${styles.sidebarHoverBg} rounded-lg transition`}
           >
             取消
           </button>
-          <button
+          <button type="button"
             onClick={handleCreateRelation}
             disabled={relCreating || !relFormData.targetObjectId || !relFormData.relationshipCode}
             className="px-4 py-2 text-xs font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition disabled:opacity-50 flex items-center gap-1.5"

@@ -106,7 +106,7 @@ export default function TokenDashboard() {
             <option value="7d">{t("platform.tokens.range.7d")}</option>
             <option value="30d">{t("platform.tokens.range.30d")}</option>
           </select>
-          <button
+          <button type="button"
             onClick={fetchData}
             disabled={loading}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors ${styles.accentBg} text-white ${styles.accentHover}`}

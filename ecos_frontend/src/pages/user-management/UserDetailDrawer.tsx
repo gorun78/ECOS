@@ -54,14 +54,14 @@ export default function UserDetailDrawer({ user, allRoles, orgMap, onForceLogout
             <h3 className={`text-sm font-semibold ${styles.cardText}`}>{user.username}</h3>
             <p className={`text-xs opacity-50`}>{user.realName || user.email || "-"}</p>
           </div>
-          <button onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
+          <button type="button" onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
         </div>
 
         <div className={`flex gap-1 px-4 pt-3 border-b ${styles.appBorder}`}>
           {drawerTabs.map(t => {
             const Icon = t.icon;
             return (
-              <button key={t.id} onClick={() => setTab(t.id)}
+              <button type="button" key={t.id} onClick={() => setTab(t.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-t transition-colors ${
                   tab === t.id
                     ? `${styles.accentBg} text-white`

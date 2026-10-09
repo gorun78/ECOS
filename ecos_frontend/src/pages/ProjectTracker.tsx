@@ -104,7 +104,7 @@ export default function ProjectTracker() {
       key: "name",
       label: t("projectTracker.col.name"),
       render: (_v, record) => (
-        <button
+        <button type="button"
           className={`text-left font-medium hover:underline flex items-center gap-1 ${styles.cardText}`}
           onClick={(e) => {
             e.stopPropagation();
@@ -218,7 +218,7 @@ export default function ProjectTracker() {
             {t("projectTracker.error")}
           </p>
           <p className={`text-xs ${styles.muted} mb-4`}>{error}</p>
-          <button
+          <button type="button"
             onClick={loadProjects}
             className={`inline-flex items-center gap-1.5 px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white text-xs font-semibold rounded-lg transition`}
           >
@@ -244,7 +244,7 @@ export default function ProjectTracker() {
             {t("projectTracker.subtitle")}
           </p>
         </div>
-        <button
+        <button type="button"
           onClick={() => { setCurrentPage(1); loadProjects(); }}
           disabled={loading}
           className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} hover:opacity-80 transition disabled:opacity-50`}
@@ -322,7 +322,7 @@ export default function ProjectTracker() {
                 <Briefcase className={`w-4 h-4 ${styles.accentText}`} />
                 {proj.name}
               </h3>
-              <button
+              <button type="button"
                 onClick={() => setExpandedId(null)}
                 className={`text-xs ${styles.cardTextMuted} hover:opacity-70 transition`}
               >

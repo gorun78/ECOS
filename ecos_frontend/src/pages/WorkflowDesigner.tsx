@@ -205,7 +205,7 @@ export default function WorkflowDesigner() {
               </h2>
               <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{t("wf.desc")}</p>
             </div>
-            <button
+            <button type="button"
               onClick={handleCreate}
               className="bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg px-4 py-2 text-xs font-semibold flex items-center gap-2 transition"
             >
@@ -252,7 +252,7 @@ export default function WorkflowDesigner() {
           {/* Left palette */}
           <div className={`w-full lg:w-40 shrink-0 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col`}>
             <div className={`p-3 border-b ${styles.cardBorder}`}>
-              <button onClick={() => setView("list")} className={`text-xs ${styles.cardTextMuted} hover:text-indigo-500 flex items-center gap-1 transition`}>
+              <button type="button" onClick={() => setView("list")} className={`text-xs ${styles.cardTextMuted} hover:text-indigo-500 flex items-center gap-1 transition`}>
                 <ArrowLeft className="w-3 h-3" /> {t("wf.btn.back")}
               </button>
             </div>
@@ -289,13 +289,13 @@ export default function WorkflowDesigner() {
               </span>
             </div>
             <div className="absolute top-3 right-3 z-10 flex flex-wrap items-center gap-2">
-              <button onClick={handleSave} disabled={saving} className={`${styles.cardBg} border ${styles.cardBorder} hover:opacity-80 ${styles.cardText} rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition disabled:opacity-50`}>
+              <button type="button" onClick={handleSave} disabled={saving} className={`${styles.cardBg} border ${styles.cardBorder} hover:opacity-80 ${styles.cardText} rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition disabled:opacity-50`}>
                 {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}{t("wf.btn.save")}
               </button>
-              <button onClick={handlePublish} disabled={wfDetail?.status === "PUBLISHED"} className="bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition disabled:opacity-50">
+              <button type="button" onClick={handlePublish} disabled={wfDetail?.status === "PUBLISHED"} className="bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition disabled:opacity-50">
                 <Send className="w-3 h-3" /> {t("wf.btn.publish")}
               </button>
-              <button onClick={handleTest} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition">
+              <button type="button" onClick={handleTest} className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 shadow-sm transition">
                 <Play className="w-3 h-3" /> {t("wf.btn.test")}
               </button>
             </div>

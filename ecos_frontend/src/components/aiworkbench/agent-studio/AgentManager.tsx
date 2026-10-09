@@ -144,7 +144,7 @@ export default function AgentManager({ showToast }: AgentManagerProps) {
             {loading ? '加载中...' : `共 ${agents.length} 个Agent实例`}
           </p>
         </div>
-        <button
+        <button type="button"
           onClick={loadAgents}
           className={`px-3 py-1.5 border ${styles.cardBorder} rounded-lg ${styles.cardTextMuted} hover:${styles.inputBg} cursor-pointer text-[11px] font-semibold flex items-center gap-1`}
         >
@@ -195,21 +195,21 @@ export default function AgentManager({ showToast }: AgentManagerProps) {
 
                     {/* Actions */}
                     <div className="flex items-center gap-1.5 shrink-0 ml-3">
-                      <button
+                      <button type="button"
                         onClick={() => handleEdit(a)}
                         className={`p-1.5 rounded-md ${styles.cardTextMuted} hover:${styles.inputBg} cursor-pointer transition-colors`}
                         title="编辑"
                       >
                         <Icon name="Settings2" size={12} />
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => handleToggleStatus(a)}
                         className={`p-1.5 rounded-md cursor-pointer transition-colors ${a.status === 'active' ? 'text-amber-500 hover:bg-amber-50' : 'text-green-500 hover:bg-green-50'}`}
                         title={a.status === 'active' ? '下线' : '上线'}
                       >
                         <Icon name={a.status === 'active' ? 'PauseCircle' : 'PlayCircle'} size={12} />
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => handleVersions(a.id)}
                         className={`p-1.5 rounded-md ${versionAgentId === a.id ? styles.accentText : styles.cardTextMuted} hover:${styles.inputBg} cursor-pointer transition-colors`}
                         title="版本历史"
@@ -235,7 +235,7 @@ export default function AgentManager({ showToast }: AgentManagerProps) {
                                 <span className={`font-mono font-bold ${styles.cardText}`}>v{v.version}</span>
                                 <span className={styles.cardTextMuted}>{v.createdAt?.slice(0, 16).replace('T', ' ')}</span>
                               </div>
-                              <button
+                              <button type="button"
                                 onClick={() => handleRollback(a.id, v.version)}
                                 disabled={rollingBack}
                                 className={`px-2 py-0.5 ${styles.accentText} hover:${styles.badgeBg} rounded text-[9px] font-semibold cursor-pointer disabled:opacity-50`}
@@ -261,7 +261,7 @@ export default function AgentManager({ showToast }: AgentManagerProps) {
           <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.cardBorder} w-full max-w-md overflow-hidden`}>
             <div className={`px-4 py-3 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between`}>
               <h3 className={`font-bold ${styles.cardText} text-xs`}>编辑Agent配置</h3>
-              <button onClick={() => setEditingId(null)} className={`${styles.cardTextMuted} cursor-pointer`}>
+              <button type="button" onClick={() => setEditingId(null)} className={`${styles.cardTextMuted} cursor-pointer`}>
                 <Icon name="X" size={15} />
               </button>
             </div>
@@ -326,13 +326,13 @@ export default function AgentManager({ showToast }: AgentManagerProps) {
             </div>
 
             <div className={`px-4 py-3 border-t ${styles.cardBorder} flex justify-end gap-2`}>
-              <button
+              <button type="button"
                 onClick={() => setEditingId(null)}
                 className={`px-3 py-1.5 border ${styles.cardBorder} rounded-lg hover:${styles.inputBg} ${styles.cardTextMuted} transition-colors cursor-pointer text-[11px] font-semibold`}
               >
                 取消
               </button>
-              <button
+              <button type="button"
                 onClick={handleSave}
                 disabled={saving}
                 className={`px-4 py-1.5 ${styles.accentBg} hover:opacity-90 text-white rounded-lg transition-all font-bold cursor-pointer text-[11px] disabled:opacity-50`}

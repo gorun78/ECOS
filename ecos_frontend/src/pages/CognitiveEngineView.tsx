@@ -166,12 +166,12 @@ export default function CognitiveEngineView() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={handleStartStop}
+            <button type="button" onClick={handleStartStop}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border
                 ${isRunning ? 'bg-red-900/40 border-red-700 text-red-300 hover:bg-red-800/60' : 'bg-emerald-900/40 border-emerald-700 text-emerald-300 hover:bg-emerald-800/60'}`}>
               {isRunning ? <><Square className="w-3.5 h-3.5" />{t('cognition.engine.stop')}</> : <><Play className="w-3.5 h-3.5" />{t('cognition.engine.start')}</>}
             </button>
-            <button onClick={() => { loadEngine(); loadSubEngine(activeTab); }}
+            <button type="button" onClick={() => { loadEngine(); loadSubEngine(activeTab); }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1E2533] hover:bg-[#263147] text-gray-300 text-sm border border-[#2D3748]">
               <RefreshCw className="w-3.5 h-3.5" />{t('cognition.engine.refresh')}
             </button>
@@ -200,7 +200,7 @@ export default function CognitiveEngineView() {
             const Icon = se.icon;
             const active = activeTab === se.key;
             return (
-              <button key={se.key} onClick={() => setActiveTab(se.key)}
+              <button type="button" key={se.key} onClick={() => setActiveTab(se.key)}
                 className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors
                   ${active ? `${se.color} border-current` : `${styles.muted} border-transparent hover:text-gray-300`}`}>
                 <Icon className="w-4 h-4" />
@@ -233,7 +233,7 @@ export default function CognitiveEngineView() {
               <div className="flex gap-2">
                 <input value={compileInput} onChange={e => setCompileInput(e.target.value)} placeholder="Mission ID"
                   className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} ${styles.placeholderText}`} />
-                <button onClick={handleTest} disabled={!compileInput}
+                <button type="button" onClick={handleTest} disabled={!compileInput}
                   className="px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-600 text-white text-sm disabled:opacity-40">
                   {t('cognition.engine.promptBtn')}
                 </button>
@@ -266,7 +266,7 @@ export default function CognitiveEngineView() {
               <div className="flex gap-2">
                 <input value={intentInput} onChange={e => setIntentInput(e.target.value)} placeholder={t('cognition.engine.intentPh')}
                   className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} ${styles.placeholderText}`} />
-                <button onClick={handleTest} disabled={!intentInput}
+                <button type="button" onClick={handleTest} disabled={!intentInput}
                   className="px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-600 text-white text-sm disabled:opacity-40">
                   {t('cognition.engine.routeBtn')}
                 </button>
@@ -295,7 +295,7 @@ export default function CognitiveEngineView() {
               <div className="flex gap-2">
                 <input value={validateInput} onChange={e => setValidateInput(e.target.value)} placeholder={t('cognition.engine.validatePh')}
                   className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} ${styles.placeholderText}`} />
-                <button onClick={handleTest} disabled={!validateInput}
+                <button type="button" onClick={handleTest} disabled={!validateInput}
                   className="px-3 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-sm disabled:opacity-40">
                   {t('cognition.engine.validateBtn')}
                 </button>
@@ -324,7 +324,7 @@ export default function CognitiveEngineView() {
               <div className="flex gap-2">
                 <input value={actionInput} onChange={e => setActionInput(e.target.value)} placeholder={t('cognition.engine.actionInputPh')}
                   className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} ${styles.placeholderText}`} />
-                <button onClick={handleTest} disabled={!actionInput}
+                <button type="button" onClick={handleTest} disabled={!actionInput}
                   className="px-3 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-600 text-white text-sm disabled:opacity-40">
                   {t('cognition.engine.executeBtn')}
                 </button>

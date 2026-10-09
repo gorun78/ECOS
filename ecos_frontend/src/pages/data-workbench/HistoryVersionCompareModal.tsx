@@ -145,7 +145,7 @@ export default function HistoryVersionCompareModal({ datasourceId, datasourceNam
             {t('dw.histCompare.title')}
             {datasourceName && <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${styles.appBg} ${styles.cardTextMuted}`}>{datasourceName}</span>}
           </h3>
-          <button onClick={onClose} className="opacity-50 hover:opacity-100 transition cursor-pointer">
+          <button type="button" onClick={onClose} className="opacity-50 hover:opacity-100 transition cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -188,7 +188,7 @@ export default function HistoryVersionCompareModal({ datasourceId, datasourceNam
                 <p className={`text-[10px] font-semibold uppercase tracking-wider ${styles.cardTextMuted}`}>{t('dw.histCompare.selectVersion')}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {versions.map(v => (
-                    <button
+                    <button type="button"
                       key={v.versionId}
                       onClick={() => setSelected(v.versionId)}
                       className={`text-left px-3 py-2 rounded-lg border transition-all cursor-pointer ${
@@ -217,10 +217,10 @@ export default function HistoryVersionCompareModal({ datasourceId, datasourceNam
         {/* Step1 → 比较按钮 */}
         {!diff && !diffError && (
           <div className={`flex justify-end gap-2 px-4 py-3 border-t ${styles.cardBorder}`}>
-            <button onClick={onClose} className={`px-4 py-1.5 text-xs rounded border ${styles.cardBorder} ${styles.cardTextMuted} cursor-pointer hover:${styles.appBg}`}>
+            <button type="button" onClick={onClose} className={`px-4 py-1.5 text-xs rounded border ${styles.cardBorder} ${styles.cardTextMuted} cursor-pointer hover:${styles.appBg}`}>
               {t('dw.conn.cancel')}
             </button>
-            <button
+            <button type="button"
               onClick={handleCompare}
               disabled={!selected || loadingDiff}
               className={`px-4 py-1.5 text-xs rounded font-semibold transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${styles.accentBg} ${styles.accentHover} ${styles.cardText}`}
@@ -242,7 +242,7 @@ export default function HistoryVersionCompareModal({ datasourceId, datasourceNam
           <div className="flex-1 flex flex-col items-center justify-center py-12 px-4 gap-3">
             <AlertTriangle className="w-6 h-6 opacity-50" />
             <p className={`text-xs ${styles.dangerText}`}>{diffError}</p>
-            <button onClick={handleBack} className={`px-4 py-1.5 text-xs rounded border ${styles.cardBorder} ${styles.cardText} cursor-pointer hover:${styles.appBg} flex items-center gap-1.5`}>
+            <button type="button" onClick={handleBack} className={`px-4 py-1.5 text-xs rounded border ${styles.cardBorder} ${styles.cardText} cursor-pointer hover:${styles.appBg} flex items-center gap-1.5`}>
               <ChevronLeft className="w-3.5 h-3.5" />
               {t('dw.histCompare.backToSelect')}
             </button>
@@ -264,7 +264,7 @@ export default function HistoryVersionCompareModal({ datasourceId, datasourceNam
               <div className="flex items-center gap-1">
                 <ListFilter className={`w-3 h-3 ${styles.cardTextMuted} mr-1`} />
                 {(['ALL', 'ADDED', 'DELETED', 'MODIFIED'] as ChangeFilter[]).map(f => (
-                  <button
+                  <button type="button"
                     key={f}
                     onClick={() => setFilter(f)}
                     className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors cursor-pointer ${
@@ -320,11 +320,11 @@ export default function HistoryVersionCompareModal({ datasourceId, datasourceNam
             <div className={`flex items-center justify-between px-4 py-2.5 border-t ${styles.cardBorder}`}>
               <span className={`text-[10px] ${styles.cardTextMuted}`}>{diff.summary}</span>
               <div className="flex gap-2">
-                <button onClick={handleBack} className={`px-3 py-1.5 text-xs rounded border ${styles.cardBorder} ${styles.cardText} cursor-pointer hover:${styles.appBg} flex items-center gap-1.5`}>
+                <button type="button" onClick={handleBack} className={`px-3 py-1.5 text-xs rounded border ${styles.cardBorder} ${styles.cardText} cursor-pointer hover:${styles.appBg} flex items-center gap-1.5`}>
                   <ChevronLeft className="w-3.5 h-3.5" />
                   {t('dw.histCompare.backToSelect')}
                 </button>
-                <button onClick={onClose} className={`px-4 py-1.5 text-xs rounded ${styles.accentBg} ${styles.accentHover} ${styles.cardText} font-semibold cursor-pointer`}>
+                <button type="button" onClick={onClose} className={`px-4 py-1.5 text-xs rounded ${styles.accentBg} ${styles.accentHover} ${styles.cardText} font-semibold cursor-pointer`}>
                   {t('dw.histCompare.close')}
                 </button>
               </div>

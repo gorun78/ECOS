@@ -51,7 +51,7 @@ export function EditQuotaModal({ quota, onSave, onClose }: EditQuotaModalProps) 
           <h3 className={`text-sm font-semibold ${styles.cardText}`}>
             {t("platform.tenant.eqq.title")} — {quota.quotaType}
           </h3>
-          <button onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
+          <button type="button" onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
         </div>
         {error && <div className="mb-3 p-2 rounded bg-red-500/10 border border-red-500/30 text-red-400 text-xs">{error}</div>}
         <div className="space-y-3">
@@ -67,10 +67,10 @@ export function EditQuotaModal({ quota, onSave, onClose }: EditQuotaModalProps) 
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onClose} className={`px-4 py-2 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>
+          <button type="button" onClick={onClose} className={`px-4 py-2 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>
             {t("platform.tenant.common.cancel")}
           </button>
-          <button onClick={handleSave} disabled={saving}
+          <button type="button" onClick={handleSave} disabled={saving}
             className={`px-4 py-2 rounded text-xs font-medium text-white flex items-center gap-1.5 ${styles.accentBg} ${styles.accentHover}`}>
             <Check className="w-3.5 h-3.5" />
             {saving ? t("platform.tenant.common.saving") : t("platform.tenant.common.save")}

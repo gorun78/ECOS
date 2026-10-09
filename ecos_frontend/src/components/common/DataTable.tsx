@@ -168,7 +168,7 @@ export default function DataTable<T extends Record<string, any>>({
           </span>
 
           <div className="flex items-center gap-1">
-            <button
+            <button type="button"
               className={`p-1 rounded transition cursor-pointer ${
                 page <= 1 ? "opacity-30 cursor-not-allowed" : `${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10`
               }`}
@@ -177,7 +177,7 @@ export default function DataTable<T extends Record<string, any>>({
             >
               <ChevronsLeft className="w-3.5 h-3.5" />
             </button>
-            <button
+            <button type="button"
               className={`p-1 rounded transition cursor-pointer ${
                 page <= 1 ? "opacity-30 cursor-not-allowed" : `${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10`
               }`}
@@ -191,7 +191,7 @@ export default function DataTable<T extends Record<string, any>>({
               {page}
             </span>
 
-            <button
+            <button type="button"
               className={`p-1 rounded transition cursor-pointer ${
                 page >= totalPages ? "opacity-30 cursor-not-allowed" : `${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10`
               }`}
@@ -200,7 +200,7 @@ export default function DataTable<T extends Record<string, any>>({
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
-            <button
+            <button type="button"
               className={`p-1 rounded transition cursor-pointer ${
                 page >= totalPages ? "opacity-30 cursor-not-allowed" : `${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10`
               }`}

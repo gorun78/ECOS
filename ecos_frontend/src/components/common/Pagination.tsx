@@ -64,7 +64,7 @@ export default function Pagination({
 
       <div className="flex items-center gap-1">
         {/* First page */}
-        <button
+        <button type="button"
           className={`p-1 rounded transition cursor-pointer ${
             page <= 1
               ? "opacity-30 cursor-not-allowed"
@@ -77,7 +77,7 @@ export default function Pagination({
         </button>
 
         {/* Previous */}
-        <button
+        <button type="button"
           className={`p-1 rounded transition cursor-pointer ${
             page <= 1
               ? "opacity-30 cursor-not-allowed"
@@ -96,7 +96,7 @@ export default function Pagination({
               ...
             </span>
           ) : (
-            <button
+            <button type="button"
               key={p}
               className={`min-w-[24px] h-6 px-1 rounded text-xs font-bold transition cursor-pointer ${
                 p === page
@@ -111,7 +111,7 @@ export default function Pagination({
         )}
 
         {/* Next */}
-        <button
+        <button type="button"
           className={`p-1 rounded transition cursor-pointer ${
             page >= totalPages
               ? "opacity-30 cursor-not-allowed"
@@ -124,7 +124,7 @@ export default function Pagination({
         </button>
 
         {/* Last page */}
-        <button
+        <button type="button"
           className={`p-1 rounded transition cursor-pointer ${
             page >= totalPages
               ? "opacity-30 cursor-not-allowed"

@@ -119,8 +119,8 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
   const ErrorBanner = ({ msg, onRetry, onDismiss }: { msg: string | null; onRetry?: () => void; onDismiss: () => void }) => !msg ? null : (
     <div className="rounded-lg p-3 mb-4 flex items-center gap-2 text-sm bg-red-50 border border-red-200 text-red-700">
       <AlertCircle className="w-4 h-4 shrink-0" /><span className="flex-1">{msg}</span>
-      {onRetry && <button onClick={onRetry} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold bg-white border border-current/20 rounded hover:bg-opacity-80 transition cursor-pointer"><RefreshCw className="w-3 h-3" />{t("dw.datasource.list.retry")}</button>}
-      <button onClick={onDismiss} className="text-current/60 hover:text-current cursor-pointer">&times;</button>
+      {onRetry && <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold bg-white border border-current/20 rounded hover:bg-opacity-80 transition cursor-pointer"><RefreshCw className="w-3 h-3" />{t("dw.datasource.list.retry")}</button>}
+      <button type="button" onClick={onDismiss} className="text-current/60 hover:text-current cursor-pointer">&times;</button>
     </div>
   );
 
@@ -135,7 +135,7 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
           <h1 className={`text-xl font-bold tracking-tight ${styles.cardText} flex items-center gap-2`}><Database className={`w-5 h-5 ${styles.accentText}`} />{t("dw.datasource.list.title")}</h1>
           <p className={`text-xs ${styles.muted} mt-1.5`}>{t("dw.datasource.list.subtitle")}</p>
         </div>
-        <button onClick={onOpenWizard} className={`${styles.accentBg} ${styles.accentHover} text-white rounded-lg px-4 py-2 text-xs font-semibold flex items-center gap-2 cursor-pointer transition shadow-xs`}><Plus className="w-3.5 h-3.5" />{t("dw.datasource.list.register")}</button>
+        <button type="button" onClick={onOpenWizard} className={`${styles.accentBg} ${styles.accentHover} text-white rounded-lg px-4 py-2 text-xs font-semibold flex items-center gap-2 cursor-pointer transition shadow-xs`}><Plus className="w-3.5 h-3.5" />{t("dw.datasource.list.register")}</button>
       </div>
 
       {/* Search Bar */}
@@ -144,7 +144,7 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
           <Search className={`w-3.5 h-3.5 ${styles.muted} shrink-0`} />
           <input type="text" className={`bg-transparent border-0 outline-hidden w-full ${styles.cardText} placeholder:${styles.cardTextMuted}`} placeholder={t("dw.datasource.list.searchPH")} value={searchKeyword} onChange={e => setSearchKeyword(e.target.value)} />
         </div>
-        <button onClick={loadDataSources} className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold ${styles.muted} hover:${styles.cardText} hover:${styles.appBg}/50 rounded-lg transition cursor-pointer`} title={t("dw.datasource.list.refresh")}><RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /></button>
+        <button type="button" onClick={loadDataSources} className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold ${styles.muted} hover:${styles.cardText} hover:${styles.appBg}/50 rounded-lg transition cursor-pointer`} title={t("dw.datasource.list.refresh")}><RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} /></button>
       </div>
 
       {/* Table / States */}
@@ -210,7 +210,7 @@ export default function DataSourceList({ onOpenWizard }: DataSourceListProps) {
                   <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
                     {resources.map(r => (
                       <div key={r.resourceId}>
-                        <button onClick={() => handleBrowseFields(r.resourceId)} className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center gap-2 transition cursor-pointer ${expandedResource === r.resourceId ? "bg-green-100 border border-green-300" : `${styles.cardBg} border ${styles.cardBorder} hover:border-green-300 hover:bg-green-50`}`}>
+                        <button type="button" onClick={() => handleBrowseFields(r.resourceId)} className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center gap-2 transition cursor-pointer ${expandedResource === r.resourceId ? "bg-green-100 border border-green-300" : `${styles.cardBg} border ${styles.cardBorder} hover:border-green-300 hover:bg-green-50`}`}>
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.resourceType === "TABLE" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>{r.resourceType || "?"}</span>
                           <span className={`font-bold ${styles.cardText} flex-1`}>{r.resourceName}</span>
                           <span className={`text-[10px] ${styles.cardTextMuted}`}>{r.fieldCount ?? "?"} {t("dw.datasource.list.fields")}</span>
@@ -271,7 +271,7 @@ function ActionBtn({ label, loading, icon: Icon, color, active, onClick }: { lab
   };
   const cls = active && activeColors[color] ? activeColors[color] : colors[color] || colors.blue;
   return (
-    <button onClick={onClick} disabled={loading} className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-md border transition cursor-pointer ${cls} disabled:opacity-50`}>
+    <button type="button" onClick={onClick} disabled={loading} className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold rounded-md border transition cursor-pointer ${cls} disabled:opacity-50`}>
       {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : label ? <><Icon className="w-3 h-3" />{label}</> : <Icon className="w-3 h-3" />}
     </button>
   );

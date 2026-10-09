@@ -241,7 +241,7 @@ export default function ActionTypeTab({ showToast }: ActionTypeTabProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          <button type="button"
             onClick={loadData}
             disabled={loading}
             className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${styles.cardBorder} ${styles.cardText} hover:${styles.inputBg} transition cursor-pointer`}
@@ -249,7 +249,7 @@ export default function ActionTypeTab({ showToast }: ActionTypeTabProps) {
             <Icon name="RefreshCw" size={12} className="inline mr-1" />
             {t('aiworkbench.actionType.refresh')}
           </button>
-          <button
+          <button type="button"
             onClick={openCreateModal}
             className={`px-3.5 py-1.5 ${styles.accentBg} text-white font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition hover:opacity-90`}
           >
@@ -308,21 +308,21 @@ export default function ActionTypeTab({ showToast }: ActionTypeTabProps) {
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button
+                      <button type="button"
                         onClick={() => openEditModal(item)}
                         className="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition"
                         title={t('aiworkbench.actionType.edit')}
                       >
                         <Icon name="Pencil" size={12} className={styles.cardTextMuted} />
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => setDeleteTarget(item)}
                         className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/10 cursor-pointer transition"
                         title={t('aiworkbench.actionType.delete')}
                       >
                         <Icon name="Trash2" size={12} className="text-red-500" />
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => {
                           setSelectedExecuteId(item.id);
                           setExecuteObjectId('');
@@ -410,7 +410,7 @@ export default function ActionTypeTab({ showToast }: ActionTypeTabProps) {
                 <label className={`text-[11px] font-bold ${styles.cardTextMuted}`}>
                   {t('aiworkbench.actionType.formPostActions')}
                 </label>
-                <button
+                <button type="button"
                   onClick={addPostAction}
                   className={`text-[10px] font-bold ${styles.accentBg} text-white px-2 py-0.5 rounded cursor-pointer hover:opacity-90`}
                 >
@@ -444,7 +444,7 @@ export default function ActionTypeTab({ showToast }: ActionTypeTabProps) {
                       className={`w-28 px-2 py-1 text-[11px] rounded border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
                       placeholder="value"
                     />
-                    <button
+                    <button type="button"
                       onClick={() => removePostAction(idx)}
                       className="p-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/10 cursor-pointer"
                     >
@@ -470,13 +470,13 @@ export default function ActionTypeTab({ showToast }: ActionTypeTabProps) {
 
             {/* Buttons */}
             <div className="flex gap-2 justify-end">
-              <button
+              <button type="button"
                 onClick={() => setModalOpen(false)}
                 className={`px-4 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText} hover:${styles.inputBg} cursor-pointer`}
               >
                 {t('aiworkbench.actionType.cancel')}
               </button>
-              <button
+              <button type="button"
                 onClick={handleSave}
                 disabled={saving}
                 className={`px-4 py-1.5 rounded text-xs font-bold text-white cursor-pointer transition ${styles.accentBg} hover:opacity-90 disabled:opacity-50`}
@@ -513,7 +513,7 @@ export default function ActionTypeTab({ showToast }: ActionTypeTabProps) {
             className={`px-3 py-1.5 text-xs rounded-lg border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder} w-40`}
             placeholder={t('aiworkbench.actionType.objectIdPlaceholder')}
           />
-          <button
+          <button type="button"
             onClick={handleExecute}
             disabled={executing || !selectedExecuteId || !executeObjectId.trim()}
             className={`px-4 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40`}

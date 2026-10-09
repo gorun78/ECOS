@@ -86,7 +86,7 @@ export default function VersionTimelineDrawer({
               </div>
             </div>
           </div>
-          <button
+          <button type="button"
             onClick={onClose}
             className={`p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/10 ${styles.cardTextMuted} transition cursor-pointer`}
             aria-label="close"
@@ -123,7 +123,7 @@ export default function VersionTimelineDrawer({
                       aria-hidden
                     />
                     <div className={`p-3 rounded-lg border ${styles.cardBorder} ${styles.appBg}`}>
-                      <button
+                      <button type="button"
                         onClick={() => toggle(key)}
                         className="w-full flex items-center gap-2 cursor-pointer text-left"
                         aria-expanded={isOpen}

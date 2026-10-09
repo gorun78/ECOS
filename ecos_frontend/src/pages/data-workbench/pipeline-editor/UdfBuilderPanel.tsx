@@ -168,7 +168,7 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
             <span className={`text-[10px] font-semibold ${styles.muted} uppercase tracking-wider`}>
               输入 ({language === 'sql' ? 'SQL' : 'Code'})
             </span>
-            <button
+            <button type="button"
               onClick={handleConvert}
               disabled={!inputCode.trim()}
               className={`flex items-center gap-1 px-2 py-0.5 text-[10px] ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} rounded transition-colors disabled:opacity-50`}
@@ -219,7 +219,7 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
                 placeholder="UDF 名称"
                 className={`w-32 px-1.5 py-0.5 text-[10px] border ${styles.cardBorder} rounded outline-none focus:${styles.infoBorder}`}
               />
-              <button
+              <button type="button"
                 onClick={handleRegister}
                 disabled={registering || !udfName.trim() || !outputCode.trim()}
                 className={`flex items-center gap-1 px-2 py-0.5 text-[10px] ${styles.successBg} hover:${styles.successBg} ${styles.cardText} rounded transition-colors disabled:opacity-50`}
@@ -227,7 +227,7 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
                 {registering ? <Loader2 size={10} className="animate-spin" /> : <Save size={10} />}
                 注册
               </button>
-              <button
+              <button type="button"
                 onClick={handleTest}
                 disabled={testing}
                 className={`flex items-center gap-1 px-2 py-0.5 text-[10px] ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} rounded transition-colors disabled:opacity-50`}

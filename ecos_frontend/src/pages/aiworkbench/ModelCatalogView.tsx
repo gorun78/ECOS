@@ -356,7 +356,7 @@ export default function ModelCatalogView({
                       />
                     </div>
 
-                    <button
+                    <button type="button"
                       onClick={handleRunEvaluation}
                       disabled={isEvaluating || !testPrompt.trim()}
                       className={`w-full py-2 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${

@@ -201,7 +201,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
               </p>
             </div>
           </div>
-          <button
+          <button type="button"
             onClick={handleRefreshAll}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${styles.inputBg} ${styles.inputText} text-sm transition-colors border ${styles.inputBorder} ${styles.sidebarHoverBg}`}
           >

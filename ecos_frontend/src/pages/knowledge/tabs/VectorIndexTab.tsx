@@ -65,7 +65,7 @@ export default function VectorIndexTab({ showToast }: TabProps) {
           </h2>
           <p className={`text-xs ${styles.cardTextMuted}`}>{t('knowledge.vector_index.subtitle')}</p>
         </div>
-        <button
+        <button type="button"
           onClick={loadStats}
           disabled={loading}
           className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer text-xs disabled:opacity-50 font-bold ${styles.inputBg} ${styles.cardBorder} hover:opacity-80`}
@@ -113,15 +113,15 @@ export default function VectorIndexTab({ showToast }: TabProps) {
           <Cpu size={13} className={styles.accentText} /> {t('knowledge.vector_index.actions')}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <button onClick={() => { showToast?.('info', t('knowledge.vector_index.rebuild_stub')); }}
+          <button type="button" onClick={() => { showToast?.('info', t('knowledge.vector_index.rebuild_stub')); }}
             className={`px-3 py-2 rounded-lg text-xs cursor-pointer flex items-center gap-1.5 font-bold border ${styles.successBg} ${styles.successText} ${styles.successBorder} hover:opacity-80 transition`}>
             <RefreshCw size={12} /> {t('knowledge.vector_index.rebuild_index')}
           </button>
-          <button onClick={() => { showToast?.('info', t('knowledge.vector_index.reembed_stub')); }}
+          <button type="button" onClick={() => { showToast?.('info', t('knowledge.vector_index.reembed_stub')); }}
             className={`px-3 py-2 rounded-lg text-xs cursor-pointer flex items-center gap-1.5 font-bold border ${styles.infoBg} ${styles.infoText} ${styles.infoBorder} hover:opacity-80 transition`}>
             <Binary size={12} /> {t('knowledge.vector_index.reembed_all')}
           </button>
-          <button onClick={() => { showToast?.('info', t('knowledge.vector_index.monitor_stub')); }}
+          <button type="button" onClick={() => { showToast?.('info', t('knowledge.vector_index.monitor_stub')); }}
             className={`px-3 py-2 rounded-lg text-xs cursor-pointer flex items-center gap-1.5 font-bold ${styles.cardBorder} ${styles.inputBg} hover:opacity-80`}
             style={{ color: styles.cardText }}>
             <Database size={12} /> {t('knowledge.vector_index.monitor')}

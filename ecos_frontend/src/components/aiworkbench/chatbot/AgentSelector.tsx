@@ -117,7 +117,7 @@ export default function AgentSelector({
             {agents.length}
           </span>
         </div>
-        <button
+        <button type="button"
           onClick={onStartCreate}
           className={`p-1 ${styles.accentText} ${styles.accentHover} hover:text-white ${styles.accentBorder} hover:border-transparent border rounded-md transition-all cursor-pointer flex items-center justify-center`}
           title={t('aiworkbench.chatbot.agentSelectorNewChatbot')}
@@ -144,7 +144,7 @@ export default function AgentSelector({
             className={`w-full pl-6 pr-2 py-1 text-[9px] ${styles.inputBg} border ${styles.inputBorder} rounded-md outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500`}
           />
           {searchQuery && (
-            <button
+            <button type="button"
               onClick={() => setSearchQuery('')}
               className={`absolute right-1.5 top-1/2 -translate-y-1/2 ${styles.cardTextMuted} cursor-pointer`}
             >
@@ -155,7 +155,7 @@ export default function AgentSelector({
 
         {/* Status filter pills */}
         <div className="flex gap-1 text-[8px] font-bold">
-          <button
+          <button type="button"
             onClick={() => setShowStatusFilter('all')}
             className={`flex-1 py-0.5 rounded-sm text-center transition-colors ${
               showStatusFilter === 'all'
@@ -165,7 +165,7 @@ export default function AgentSelector({
           >
             {t('aiworkbench.chatbot.agentSelectorFilterAll')} ({agents.length})
           </button>
-          <button
+          <button type="button"
             onClick={() => setShowStatusFilter('active')}
             className={`flex-1 py-0.5 rounded-sm text-center transition-colors flex items-center justify-center gap-1 ${
               showStatusFilter === 'active'
@@ -176,7 +176,7 @@ export default function AgentSelector({
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             {statusCounts.active}
           </button>
-          <button
+          <button type="button"
             onClick={() => setShowStatusFilter('development')}
             className={`flex-1 py-0.5 rounded-sm text-center transition-colors flex items-center justify-center gap-1 ${
               showStatusFilter === 'development'
@@ -197,7 +197,7 @@ export default function AgentSelector({
             <Icon name="SearchX" size={14} className="mx-auto mb-1 opacity-40" />
             <p>{t('aiworkbench.chatbot.agentSelectorNoMatch')}</p>
             {searchQuery && (
-              <button
+              <button type="button"
                 onClick={() => setSearchQuery('')}
                 className={`mt-1 ${styles.accentText} font-bold`}
               >

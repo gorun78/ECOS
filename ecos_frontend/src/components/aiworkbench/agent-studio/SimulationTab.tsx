@@ -98,7 +98,7 @@ export default function SimulationTab({
         {/* Suggestion tags */}
         <div className="flex flex-wrap gap-1">
           <span className={`text-[9px] ${styles.cardTextMuted} self-center font-bold mr-1`}>{t("aiworkbench.agentStudio.presetHighRiskScenarios")}</span>
-          <button
+          <button type="button"
             onClick={() => {
               setSimUserId('analyst_li');
               setSimDatasetId('ds_pilots_biography');
@@ -108,7 +108,7 @@ export default function SimulationTab({
           >
             {t("aiworkbench.agentStudio.scenarioSSNLeak")}
           </button>
-          <button
+          <button type="button"
             onClick={() => {
               setSimUserId('EU_DPO');
               setSimDatasetId('ds_pilots_biography');
@@ -118,7 +118,7 @@ export default function SimulationTab({
           >
             {t("aiworkbench.agentStudio.scenarioDPOCompliance")}
           </button>
-          <button
+          <button type="button"
             onClick={() => {
               setSimUserId('hr_manager');
               setSimDatasetId('ds_flights_clean');
@@ -131,7 +131,7 @@ export default function SimulationTab({
         </div>
 
         {/* Simulation Trigger Button */}
-        <button
+        <button type="button"
           onClick={handleRunSimulation}
           disabled={isSimulating}
           className={`w-full py-2 ${styles.accentBg} ${styles.accentHover} text-white rounded-lg font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50`}
