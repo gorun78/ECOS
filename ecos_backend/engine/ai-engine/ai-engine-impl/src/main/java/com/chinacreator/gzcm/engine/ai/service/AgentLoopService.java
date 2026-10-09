@@ -6,6 +6,11 @@ import com.chinacreator.gzcm.common.trace.AgentLoopTrace;
 import com.chinacreator.gzcm.engine.ai.GuardrailsService;
 import com.chinacreator.gzcm.engine.ai.SkillService;
 import com.chinacreator.gzcm.engine.ai.entity.SkillEntity;
+import com.chinacreator.gzcm.engine.ai.tool.CaliberStatusSource;
+import com.chinacreator.gzcm.engine.ai.tool.CitationPostCheckService;
+import com.chinacreator.gzcm.engine.ai.tool.RefusalRulesService;
+import com.chinacreator.gzcm.engine.ai.tool.ScenarioToolCatalog;
+import com.chinacreator.gzcm.engine.ai.tool.ToolCitation;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
@@ -23,6 +28,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -116,6 +122,22 @@ public class AgentLoopService {
     @Autowired(required = false)
     private SessionCompressionService sessionCompression;
 
+    /**
+     * F06-13 三条拒绝规则（咽喉前置判定）。required=false 只服务单测装配；
+     * 生产缺失时 {@link #refusalPreAdjudication} 记 ERROR 并按规则 1 fail-closed 澄清
+     * （无法判定口径 ≠ 可以放行数值路径）。
+     */
+    @Autowired(required = false)
+    private RefusalRulesService refusalRules;
+
+    /** F06-13 规则 1 的口径状态源（不可判 = 未批准）。 */
+    @Autowired(required = false)
+    private CaliberStatusSource caliberStatus;
+
+    /** F06-12 引用后校验器。required=false 只服务单测装配；缺失时本轮不做引用判定并记 ERROR。 */
+    @Autowired(required = false)
+    private CitationPostCheckService citationCheck;
+
     /** 正则：匹配 function_name(arg1=val1, arg2=val2) 模式 */
     private static final Pattern FUNCTION_CALL_PATTERN =
             Pattern.compile("(\\w+)\\s*\\(\\s*([^)]*)\\s*\\)");
@@ -145,6 +167,9 @@ public class AgentLoopService {
         String agentId = session != null ? session.getProfileName() : "default";
         int totalTokens = 0;
         List<Map<String, Object>> toolCallRecords = new ArrayList<>();
+        // F06-12 引用后校验的比对基准（工具返回体原文）+ F06-13 规则 3 的失败分类计数
+        List<String> toolResultBodies = new ArrayList<>();
+        List<AiErrorClass> toolFailureClasses = new ArrayList<>();
 
         // F06-06 要点 1：traceId 唯一源 = MDC（入口过滤器写入）；AgentTracer 只登记本地调试视图
         String traceId = AgentTracer.newTrace();
@@ -199,6 +224,13 @@ public class AgentLoopService {
         AgentLoopConfig resolvedConfig = agentConfigResolver.resolve(agentId, requestOverrides);
         log.info("[AgentLoop] Resolved config for agent '{}': {}", agentId, resolvedConfig);
 
+        // F06-13：三条拒绝规则的前置判定 —— 命中即返回，禁进 LLM 数值路径（非提示词祈使）
+        AgentLoopResult refusedResult = refusalPreAdjudication(
+                agentId, traceId, sessionId, userMessage, resolvedConfig, startTime);
+        if (refusedResult != null) {
+            return refusedResult;
+        }
+
         // F06-09：入模前唯一压缩判定点（modelLimit 经 llm-gateway 目录读，禁引擎侧兜底常量）
         assessCompression(compression, sessionId, resolvedConfig.getModel(), traceId);
 
@@ -246,12 +278,12 @@ public class AgentLoopService {
                     if (resp == null || !resp.isSuccess()) {
                         // T0c-2: 友好错误文案
                         String friendlyErr = "LLM 调用失败（已重试）: " + (resp != null ? resp.getErrorMsg() : "null");
-                        return addTrace(setErrMsg(AgentLoopResult.error(sessionId, friendlyErr, totalTokens), traceId));
+                        return setErrMsg(AgentLoopResult.error(sessionId, friendlyErr, totalTokens), traceId);
                     }
                 } else {
                     // T0c-2: 友好错误文案
                     String friendlyErr = "LLM 调用失败: " + err;
-                    return addTrace(setErrMsg(AgentLoopResult.error(sessionId, friendlyErr, totalTokens), traceId));
+                    return setErrMsg(AgentLoopResult.error(sessionId, friendlyErr, totalTokens), traceId);
                 }
             }
 
@@ -279,6 +311,7 @@ public class AgentLoopService {
 
                     ToolExecutorService.ToolResult tr = executeTool(tc, resolvedConfig);
                     long actElapsed = System.currentTimeMillis() - actStart;
+                    recordToolOutcome(tr, toolResultBodies, toolFailureClasses);
 
                     // T0a: trace 记录 + F06-06 结构化行（tool_call 一次；裁决态来自护栏咽喉，缺失记 NA）
                     AgentLoopTrace.Decision toolDecision = decisionOf(tr.getDecision());
@@ -331,8 +364,76 @@ public class AgentLoopService {
                 session.touch();
             }
 
+            // F06-13 规则 3：本轮工具全部失败 → 只渲染 F06-14 分类结论，禁编造、禁 F06-01 之外兜底文案
+            if (allToolCallsFailed(toolCallRecords)) {
+                AiErrorClass dominant = dominantFailureClass(toolFailureClasses);
+                log.warn("[AgentLoop] 工具全部失败 → 按分类渲染拒绝答复: class={} session={}", dominant, sessionId);
+                step(agentId, traceId, AgentLoopTrace.Op.FINAL, turn, null, resolvedConfig.getModel(),
+                        usageTokens(resp, true), usageTokens(resp, false),
+                        System.currentTimeMillis() - startTime, AgentLoopTrace.Decision.DENY);
+                if (metricsCollector != null) {
+                    metricsCollector.record(agentId, "run", false,
+                            System.currentTimeMillis() - startTime, 0, 0, traceId);
+                }
+                return allToolsFailedResult(sessionId, traceId, dominant,
+                        totalTokens, toolCallRecords);
+            }
+
+            // F06-12：数值引用后校验 —— 确定性代码，先于输出护栏（护栏只脱敏，不判引用）
+            String answerForGuardrail = content;
+            CitationSnapshot citation = new CitationSnapshot();
+            // 校验面 = 有取数的一轮 ∪ 场景受控工具白名单的一轮（PRD §4.3-2 诱导项：模型可以
+            // 干脆不调工具直接报数，只按"有工具结果"设闸会留这条缝）
+            boolean citationScope = !toolResultBodies.isEmpty()
+                    || ScenarioToolCatalog.isScenarioWhitelist(resolvedConfig.getToolWhitelist());
+            if (citationCheck == null) {
+                if (citationScope) {
+                    log.error("[AgentLoop] CitationPostCheckService 未装配：本轮属引用校验面却无法校验，"
+                            + "本轮引用状态不上报（禁伪造默认值）session={}", sessionId);
+                }
+            } else if (citationScope && answerForGuardrail != null) {
+                CitationPostCheckService.PostCheckResult pc =
+                        citationCheck.check(answerForGuardrail, toolResultBodies);
+                while (!pc.passed() && citationCheck.canRegenerate(citation.regenerations)) {
+                    citation.regenerations++;
+                    log.warn("[AgentLoop] 引用后校验未通过 → 重生成 {}/{}: {} session={}",
+                            citation.regenerations, CitationPostCheckService.MAX_REGENERATIONS,
+                            pc.diagnostic(), sessionId);
+                    long regenStart = System.currentTimeMillis();
+                    messages.add(Message.user(CitationPostCheckService.REGENERATION_INSTRUCTION));
+                    ChatResponse regen = callLLM(messages, resolvedConfig, sessionId);
+                    emitLlmCallStep(agentId, traceId, resolvedConfig, turn, regen,
+                            System.currentTimeMillis() - regenStart);
+                    if (regen != null && regen.isSuccess()) {
+                        if (regen.hasUsage()) {
+                            totalTokens += regen.getTokensInput() + regen.getTokensOutput();
+                        }
+                        if (regen.getContent() != null) {
+                            answerForGuardrail = regen.getContent();
+                        }
+                    }
+                    pc = citationCheck.check(answerForGuardrail, toolResultBodies);
+                }
+                citation.assessed = true;
+                citation.complete = pc.passed();
+                if (pc.passed()) {
+                    citation.block = ToolCitation.firstBlock(answerForGuardrail);
+                } else {
+                    citation.violation = String.join(",", pc.violations());
+                    step(agentId, traceId, AgentLoopTrace.Op.FINAL, turn, null, resolvedConfig.getModel(),
+                            usageTokens(resp, true), usageTokens(resp, false),
+                            System.currentTimeMillis() - startTime, AgentLoopTrace.Decision.DENY);
+                    if (metricsCollector != null) {
+                        metricsCollector.record(agentId, "run", false,
+                                System.currentTimeMillis() - startTime, 0, 0, traceId);
+                    }
+                    return citationFallbackResult(sessionId, traceId, citationCheck,
+                            citation, totalTokens, toolCallRecords);
+                }
+            }
+
             // T0b-2: 输出护栏 —— 必经 security-engine；命中保留整段替换文案（留痕事件已在护栏内部发出）
-            String finalContent = content;
+            String finalContent = answerForGuardrail;
             AgentLoopTrace.Decision outputDecision = AgentLoopTrace.Decision.NA;
             if (guardrailsService == null) {
                 log.error("[AgentLoop] GuardrailsService 未装配，模型输出不得未经检查返回 → FAIL_CLOSED: session={}", sessionId);
@@ -392,6 +493,11 @@ public class AgentLoopService {
 
             AgentLoopResult result = AgentLoopResult.success(finalContent, turn, sessionId, totalTokens, toolCallRecords);
             result.setTraceId(traceId);
+            result.setAnswerType(RefusalRulesService.TYPE_NORMAL);
+            if (citation.assessed) {
+                result.applyCitation(citation.complete, citation.block, citation.violation,
+                        citation.regenerations);
+            }
             return result;
         }
 
@@ -402,7 +508,7 @@ public class AgentLoopService {
             metricsCollector.record(agentId, "run", false,
                     System.currentTimeMillis() - startTime, 0, 0, traceId);
         }
-        return addTrace(AgentLoopResult.maxTurnsExceeded(sessionId, totalTokens, toolCallRecords));
+        return setErrMsg(AgentLoopResult.maxTurnsExceeded(sessionId, totalTokens, toolCallRecords), traceId);
     }
 
     // ─── F06-09 上下文压缩 ─────────────────────────────────────────────
@@ -486,6 +592,12 @@ public class AgentLoopService {
         // T1: 注入Skill列表到System Prompt（运行时加载）
         String agentId = session != null ? session.getProfileName() : null;
         systemPrompt = buildSystemPrompt(systemPrompt, agentId, null);
+
+        // F06-12 双保险第一重：场景受控工具一轮必须带数值引用硬规则（模板单源在 ToolCitation）
+        if (ScenarioToolCatalog.isScenarioWhitelist(config == null ? null : config.getToolWhitelist())) {
+            systemPrompt = (systemPrompt == null ? "" : systemPrompt) + "\n\n"
+                    + CitationPostCheckService.SYSTEM_PROMPT_RULE;
+        }
 
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             messages.add(Message.system(systemPrompt));
@@ -1209,8 +1321,25 @@ public class AgentLoopService {
             }
         }
 
+        // F06-11 要点 3（X-46）：场景 Agent 禁通用兜底工具 —— 即使误配进白名单也必须拦截
+        if (ScenarioToolCatalog.isScenarioWhitelist(config == null ? null : config.getToolWhitelist())
+                && ScenarioToolCatalog.DENIED_FOR_SCENARIO_AGENTS.contains(tc.getName())) {
+            log.error("[AgentLoop] 场景 Agent 请求通用兜底工具 → 拒绝: tool={} whitelist={}",
+                    tc.getName(), config.getToolWhitelist());
+            ToolExecutorService.ToolResult denied = new ToolExecutorService.ToolResult();
+            denied.setSuccess(false);
+            denied.setToolCallId(tc.getId());
+            denied.setToolName(tc.getName());
+            denied.setContent("");
+            denied.setElapsedMs(0);
+            denied.setError("场景 Agent 禁用通用工具 '" + tc.getName() + "'，只能调用已登记的受控工具");
+            denied.setErrorCode(AiErrorClass.INVALID_ARGUMENT.errorCode());
+            denied.setErrorClass(AiErrorClass.INVALID_ARGUMENT.name());
+            return denied;
+        }
+
         if (toolExecutorService == null) {
-            log.warn("[AgentLoop] ToolExecutorService not available, returning mock result for tool={}", tc.getName());
+            log.error("[AgentLoop] ToolExecutorService 未装配，工具无法真实执行: tool={}", tc.getName());
             return buildMockToolResult(tc);
         }
 
@@ -1408,17 +1537,144 @@ public class AgentLoopService {
         if (config.getDefaultProvider() != null) overrides.put("defaultProvider", config.getDefaultProvider());
         if (config.getMaxIterations() != null) overrides.put("maxIterations", config.getMaxIterations());
         if (config.getAgentTimeoutMs() != null) overrides.put("agentTimeoutMs", config.getAgentTimeoutMs());
+        if (config.getCaliberCode() != null) overrides.put("caliberCode", config.getCaliberCode());
         return overrides;
     }
 
     // ─── T0 辅助方法 ────────────────────────────────────────────────
 
     /** 为 AgentLoopResult 设置 traceId */
-    private static AgentLoopResult addTrace(AgentLoopResult result) {
-        if (result != null) {
-            result.setTraceId(null);  // traceId already set in run()
+    // ─── F06-12 / F06-13 咽喉判定 ─────────────────────────────────────
+
+    /** 本轮引用后校验的过程量（判定态、结论、块原文、已消耗重生成次数）。 */
+    private static final class CitationSnapshot {
+        private boolean assessed;
+        private boolean complete;
+        private String block;
+        private String violation;
+        private int regenerations;
+    }
+
+    /**
+     * F06-13 规则 1/2 的前置判定入口（在构建 messages 与任何 LLM 调用之前）。
+     *
+     * <p>命中即返回，<b>不进</b> LLM 数值路径；澄清（CLARIFY）是合法答复（success=true），
+     * 拒绝（REFUSED）按错误类语义置 success=false。判定服务未装配时记 ERROR 并放行，
+     * 与压缩/配额同纪律（禁静默，但不因装配缺失伪装成安全拦截）。</p>
+     */
+    private AgentLoopResult refusalPreAdjudication(String agentId, String traceId, String sessionId,
+                                                  String userMessage, AgentLoopConfig resolvedConfig,
+                                                  long startTime) {
+        if (refusalRules == null) {
+            log.error("[AgentLoop] RefusalRulesService 未装配：F06-13 前置判定无法执行"
+                    + "（生产必须装配）session={}", sessionId);
+            return null;
         }
+        if (userMessage == null) {
+            return null;
+        }
+        Optional<RefusalRulesService.Refusal> hit = refusalRules.preAdjudicate(
+                userMessage, resolvedConfig.getCaliberCode(), caliberStatus, traceId);
+        if (hit.isEmpty()) {
+            return null;
+        }
+        RefusalRulesService.Refusal refusal = hit.get();
+        log.warn("[AgentLoop] F06-13 前置判定命中 → 不进 LLM 数值路径: type={} session={} trace={}",
+                refusal.answerType(), sessionId, traceId);
+        step(agentId, traceId, AgentLoopTrace.Op.PLAN, 0, null, resolvedConfig.getModel(),
+                AgentLoopTrace.UNKNOWN, AgentLoopTrace.UNKNOWN,
+                System.currentTimeMillis() - startTime, AgentLoopTrace.Decision.DENY);
+        boolean clarify = RefusalRulesService.TYPE_CLARIFY.equals(refusal.answerType());
+        AgentLoopResult result = AgentLoopResult.refused(sessionId, refusal.answerType(), refusal.message(),
+                refusal.toClarification(), refusal.errorCode(), errorCodeName(refusal.errorCode()),
+                traceId, clarify);
         return result;
+    }
+
+    /** 记录单工具结局：成功体进引用比对基准，失败分类进规则 3 的众数统计。 */
+    private static void recordToolOutcome(ToolExecutorService.ToolResult tr,
+                                         List<String> toolResultBodies,
+                                         List<AiErrorClass> toolFailureClasses) {
+        if (tr == null) return;
+        if (tr.isSuccess()) {
+            if (tr.getContent() != null) {
+                toolResultBodies.add(tr.getContent());
+            }
+        } else {
+            AiErrorClass cls = aiErrorClassOf(tr.getErrorClass());
+            if (cls != null) {
+                toolFailureClasses.add(cls);
+            }
+        }
+    }
+
+    /** F06-13 规则 3 的触发地板：本轮确有工具调用且无一成功（无工具调用不属"工具全部失败"）。 */
+    private static boolean allToolCallsFailed(List<Map<String, Object>> toolCallRecords) {
+        if (toolCallRecords.isEmpty()) return false;
+        for (Map<String, Object> record : toolCallRecords) {
+            if (Boolean.TRUE.equals(record.get("success"))) return false;
+        }
+        return true;
+    }
+
+    /** 失败分类众数（按 {@link AiErrorClass#SEVEN_CLASSES} 表序取首个最高，保持确定性）。 */
+    private AiErrorClass dominantFailureClass(List<AiErrorClass> classes) {
+        return refusalRules == null ? AiErrorClass.TOOL_BACKEND_ERROR
+                : refusalRules.dominantClass(classes);
+    }
+
+    /** F06-13 规则 3 的结果装配（只渲染 F06-14 分类文案，禁原始异常上浮）。 */
+    private AgentLoopResult allToolsFailedResult(String sessionId, String traceId, AiErrorClass dominant,
+                                                 int totalTokens,
+                                                 List<Map<String, Object>> toolCallRecords) {
+        RefusalRulesService.Refusal refusal = refusalRules == null
+                ? new RefusalRulesService.Refusal(RefusalRulesService.TYPE_REFUSED, null,
+                        RefusalRulesService.TOOL_BACKEND_REQUIRED,
+                        AiErrorClass.TOOL_BACKEND_ERROR.errorCode(),
+                        AiErrorClass.TOOL_BACKEND_ERROR.renderMessage(traceId))
+                : refusalRules.allToolsFailed(dominant, traceId);
+        AgentLoopResult r = AgentLoopResult.refused(sessionId, refusal.answerType(), refusal.message(),
+                null, refusal.errorCode(),
+                dominant == null ? AiErrorClass.TOOL_BACKEND_ERROR.name() : dominant.name(),
+                traceId, false);
+        r.setTotalTokens(totalTokens);
+        r.setToolCalls(toolCallRecords);
+        return r;
+    }
+
+    /** F06-12 超限固定话术的结果装配（整段替换，禁把无据数值交给用户）。 */
+    private static AgentLoopResult citationFallbackResult(String sessionId, String traceId,
+                                                          CitationPostCheckService checker,
+                                                          CitationSnapshot citation, int totalTokens,
+                                                          List<Map<String, Object>> toolCallRecords) {
+        AgentLoopResult r = AgentLoopResult.refused(sessionId, RefusalRulesService.TYPE_REFUSED,
+                checker.fallbackMessage(traceId), null, checker.fallbackErrorCode(),
+                AiErrorClass.CITATION_MISSING.name(), traceId, false);
+        r.setTotalTokens(totalTokens);
+        r.setToolCalls(toolCallRecords);
+        r.applyCitation(false, null, citation.violation, citation.regenerations);
+        return r;
+    }
+
+    /** 错误码 → 枚举名（不可识别返回 null，禁伪造分类）。 */
+    private static String errorCodeName(String errorCode) {
+        for (AiErrorClass c : AiErrorClass.values()) {
+            if (errorCode != null && errorCode.equals(c.errorCode())) {
+                return c.name();
+            }
+        }
+        return null;
+    }
+
+    /** 枚举名 → {@link AiErrorClass}（不可识别返回 null）。 */
+    private static AiErrorClass aiErrorClassOf(String errorClassName) {
+        if (errorClassName == null || errorClassName.isBlank()) return null;
+        for (AiErrorClass c : AiErrorClass.values()) {
+            if (c.name().equals(errorClassName)) {
+                return c;
+            }
+        }
+        return null;
     }
 
     /** 设置 traceId 到 result */

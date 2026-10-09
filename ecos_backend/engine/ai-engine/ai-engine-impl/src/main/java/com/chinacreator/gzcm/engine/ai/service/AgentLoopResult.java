@@ -32,6 +32,25 @@ public class AgentLoopResult {
     private int compressedTurns;
     private boolean compressSkipped;
 
+    /**
+     * F06-13 答复类型（{@code NORMAL} / {@code CLARIFY} / {@code REFUSED}）。
+     * 前置判定命中即为 CLARIFY/REFUSED，不进 LLM 数值路径；{@code null} = 本轮未判定（视同 NORMAL）。
+     */
+    private String answerType;
+
+    /** F06-13 澄清载荷 {@code {missing, nextAction}}，仅 answerType=CLARIFY 时非空。 */
+    private Map<String, Object> clarification;
+
+    /**
+     * F06-12 引用后校验结果。{@code citationAssessed=false} 表示未做判定（如无任何工具结果），
+     * done 帧不带引用键 —— 前端按"未上报"渲染，禁伪造默认值。
+     */
+    private boolean citationAssessed;
+    private boolean citationComplete;
+    private String citationBlock;
+    private String citationViolation;
+    private int citationRegenerations;
+
     public AgentLoopResult() {}
 
     /** 成功终止 — LLM 返回了最终回复 */
@@ -108,6 +127,28 @@ public class AgentLoopResult {
         return r;
     }
 
+    /**
+     * F06-13 前置判定命中 —— 口径缺失/未批准（CLARIFY）或估算金额/工具全失败（REFUSED）。
+     *
+     * <p>本工厂产出的结果<b>不代表</b> LLM 失败：success=true（请求已按规则正确答复），
+     * 但 content 不含数值，answerType 明示答复类型，前端据此渲染澄清问句或分类原因。</p>
+     */
+    public static AgentLoopResult refused(String sessionId, String answerType, String content,
+                                         Map<String, Object> clarification, String errorCode,
+                                         String errorClass, String traceId, boolean success) {
+        AgentLoopResult r = new AgentLoopResult();
+        r.turns = 0;
+        r.sessionId = sessionId;
+        r.content = content;
+        r.success = success;
+        r.answerType = answerType;
+        r.clarification = clarification;
+        r.errorCode = errorCode;
+        r.errorClass = errorClass;
+        r.traceId = traceId;
+        return r;
+    }
+
     // ─── Getters / Setters ─────────────────────────────────────────────
 
     public int getTurns() { return turns; }
@@ -162,6 +203,35 @@ public class AgentLoopResult {
     public int getCompressedTurns() { return compressedTurns; }
     public boolean isCompressSkipped() { return compressSkipped; }
 
+    /**
+     * 附着本轮引用后校验结论（F06-12）。
+     *
+     * @param citationComplete   true = 数值主张全部有逐字引用块
+     * @param citationBlock      通过时随答复下发的冻结引用块，未通过为 null
+     * @param citationViolation  未通过类型（{@code MISSING_CITATION_BLOCK} / {@code HALLUCINATED_NUMBER}），通过为 null
+     * @param regenerations      实际重生成次数（≤2，与 PARSE_FAILURE 共用配额语义）
+     */
+    public void applyCitation(boolean citationComplete, String citationBlock, String citationViolation,
+                              int regenerations) {
+        this.citationAssessed = true;
+        this.citationComplete = citationComplete;
+        this.citationBlock = citationBlock;
+        this.citationViolation = citationViolation;
+        this.citationRegenerations = regenerations;
+    }
+
+    public String getAnswerType() { return answerType; }
+    public void setAnswerType(String answerType) { this.answerType = answerType; }
+
+    public Map<String, Object> getClarification() { return clarification; }
+    public void setClarification(Map<String, Object> clarification) { this.clarification = clarification; }
+
+    public boolean isCitationAssessed() { return citationAssessed; }
+    public boolean isCitationComplete() { return citationComplete; }
+    public String getCitationBlock() { return citationBlock; }
+    public String getCitationViolation() { return citationViolation; }
+    public int getCitationRegenerations() { return citationRegenerations; }
+
     // ─── Serialisation ──────────────────────────────────────────────────
 
     public Map<String, Object> toMap() {
@@ -187,6 +257,22 @@ public class AgentLoopResult {
             map.put("compressionMode", compressionMode);
             map.put("compressedTurns", compressedTurns);
             map.put("compressSkipped", compressSkipped);
+        }
+        if (answerType != null) {
+            map.put("answerType", answerType);
+        }
+        if (clarification != null) {
+            map.put("clarification", clarification);
+        }
+        if (citationAssessed) {
+            map.put("citationComplete", citationComplete);
+            if (citationBlock != null) {
+                map.put("citationBlock", citationBlock);
+            }
+            if (citationViolation != null) {
+                map.put("citationViolation", citationViolation);
+            }
+            map.put("citationRegenerations", citationRegenerations);
         }
         return map;
     }

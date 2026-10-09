@@ -10,6 +10,10 @@ import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlWhitelist;
 import com.chinacreator.gzcm.engine.ai.security.ToolObligationApplier;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
+import com.chinacreator.gzcm.engine.ai.tool.ScenarioToolCatalog;
+import com.chinacreator.gzcm.engine.ai.tool.ScenarioToolDefinition;
+import com.chinacreator.gzcm.engine.ai.tool.ScenarioToolRegistry;
+import com.chinacreator.gzcm.engine.ai.tool.ToolCitation;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.common.trace.EcosTraceContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,6 +26,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.lang.reflect.Method;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -61,8 +67,26 @@ public class ToolExecutorService {
     private static final Set<String> WRITE_TOOL_NAMES = Set.of("write_file", "patch");
 
     private ToolDao toolDao;
-    private final RestTemplate restTemplate;
+
+    /**
+     * F06-17 待收口项（X-24 计 3 处 {@code new RestTemplate()} 之一）：本实例仍是自建 REST 客户端，
+     * 收口到 runtime-access 属 WP8 排期。<b>非 final</b> 是 F06-11 集成测试的注入面 ——
+     * 场景工具的后端故障必须能替换出口，禁为此在生产路径加 mock 分支。
+     */
+    private RestTemplate restTemplate;
     private final Map<String, ToolDefinitionEntry> fallbackTools = new ConcurrentHashMap<>();
+
+    // F06-11: 场景受控工具声明（无执行体，dispatch 仍回本咽喉，裁决次数恰一条不变）
+    private ScenarioToolRegistry scenarioRegistry;
+
+    /**
+     * 场景工具后端的<b>服务端</b>基址（配置注入，禁取 LLM 传入的 URL —— 否则本通道退化成
+     * 第二个 {@code invoke_rest}，F06-11 要点 3 的白名单收口即失效）。
+     */
+    private String scenarioBaseUrl = DEFAULT_SCENARIO_BASE_URL;
+
+    /** 测试/装配用覆盖点（生产由 Spring 经 {@code service.scenario.base-url} 注入）。 */
+    static final String DEFAULT_SCENARIO_BASE_URL = "http://localhost:18090";
 
     // R1.3: SecuritySandboxService 位于 security-engine-impl（编译期不可见），
     // 通过 ApplicationContext + 反射调用；不可用时高危指令按 fail-closed 拒绝
@@ -114,6 +138,28 @@ public class ToolExecutorService {
     @Autowired(required = false)
     public void setSqlWhitelist(AgentToolSqlWhitelist sqlWhitelist) {
         this.sqlWhitelist = sqlWhitelist;
+    }
+
+    /** F06-11：场景受控工具声明源；未装配 = 场景工具不可见（通用工具路径不受影响）。 */
+    @Autowired(required = false)
+    public void setScenarioRegistry(ScenarioToolRegistry scenarioRegistry) {
+        this.scenarioRegistry = scenarioRegistry;
+    }
+
+    /** F06-11：场景工具后端基址（配置单源，默认本机 workspace :18090；未实现后端得到真实 502）。 */
+    @Autowired(required = false)
+    public void setScenarioBaseUrl(
+            @org.springframework.beans.factory.annotation.Value(
+                    "${service.scenario.base-url:" + DEFAULT_SCENARIO_BASE_URL + "}") String scenarioBaseUrl) {
+        if (scenarioBaseUrl != null && !scenarioBaseUrl.isBlank()) {
+            this.scenarioBaseUrl = scenarioBaseUrl.endsWith("/")
+                    ? scenarioBaseUrl.substring(0, scenarioBaseUrl.length() - 1) : scenarioBaseUrl.trim();
+        }
+    }
+
+    /** F06-11 集成测试注入面（替换 REST 出口以注入后端故障；生产路径不调用）。 */
+    void setRestTemplate(RestTemplate restTemplate) {
+        if (restTemplate != null) this.restTemplate = restTemplate;
     }
 
     public ToolExecutorService() {
@@ -181,6 +227,12 @@ public class ToolExecutorService {
         } catch (TimeoutException e) {
             long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
             return buildError(callId, toolName, "工具执行超时 (" + TIMEOUT_SECONDS + "s)", elapsedMs);
+        } catch (ScenarioArgumentsException badArgs) {
+            // F06-11 入参地板：缺参属客户端可修正态（INVALID_ARGUMENT），不得伪装成后端故障（502）
+            long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
+            log.info("F06-11 场景工具入参地板拒绝: tool={} reason={}", toolName, badArgs.getMessage());
+            return buildClassifiedError(callId, toolName, AiErrorClass.INVALID_ARGUMENT,
+                    badArgs.getMessage(), elapsedMs);
         } catch (Exception e) {
             long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
             log.error("Tool execution failed: tool={}, error={}", toolName, e.getMessage(), e);
@@ -263,8 +315,10 @@ public class ToolExecutorService {
                 decision.reason(), startNs, decision));
     }
 
-    /** {@code action.operation} 判定：写类工具与显式非 GET/HEAD 的 HTTP 方法为 write。 */
+    /** {@code action.operation} 判定：场景工具取<b>声明值</b>，其余按写类名单与 HTTP 方法推断。 */
     private String inferOperation(String toolName, ToolDefinitionEntry def, Map<String, Object> arguments) {
+        // F06-11 要点 1：read|write 是声明属性，禁按参数或方法猜测（否则同一次调用的裁决载荷会漂移）
+        if (def != null && def.scenario != null) return def.scenario.operation();
         if (toolName != null && WRITE_TOOL_NAMES.contains(toolName)) return "write";
         if (def != null && def.httpMethod != null && !def.httpMethod.isBlank()) {
             String m = def.httpMethod.toUpperCase(Locale.ROOT);
@@ -317,7 +371,7 @@ public class ToolExecutorService {
         return s.length() > max ? s.substring(0, max) + "...[truncated]" : s;
     }
 
-    /** 阶段 3：注册表之外的 DB/fallback 工具执行（原 executeWithTimeout + 截断 + 成功包装）。 */
+    /** 阶段 3：注册表之外的 DB/fallback/场景声明工具执行（原 executeWithTimeout + 截断 + 成功包装）。 */
     private ToolResult executeResolved(ToolDefinitionEntry def, Map<String, Object> arguments,
                                        String callId, long startNs)
             throws TimeoutException, Exception {
@@ -328,7 +382,57 @@ public class ToolExecutorService {
         }
         ToolResult ok = buildSuccess(callId, def.code, result, elapsedMs);
         ok.setTraceId(AiTraceSupport.currentTraceId());
+        // F06-11 要点 4：场景工具返回体必须自带引用元数据 —— 缺元数据的数值一律丢弃（CITATION_MISSING），
+        // 不允许"可用但无引用"的结果进 LLM（那正是 F06-12 后校验要拦的形态，早一阶段拦更省一次幻觉）
+        return def.scenario == null ? ok : withCitation(ok, def, result);
+    }
+
+    /**
+     * 引用元数据装配（F06-11 要点 4 → F06-12 逐字引用的上游保证）。
+     *
+     * <p>引用块由本类<b>确定性渲染</b>并附在结果尾部，LLM 只需逐字复制；元数据不全即判
+     * {@code CITATION_MISSING}（422），禁在此造默认口径或补当前时间。</p>
+     */
+    private ToolResult withCitation(ToolResult ok, ToolDefinitionEntry def, String body) {
+        Map<String, Object> parsed = parseJsonObject(body);
+        ToolCitation citation = parsed == null ? null : ToolCitation.fromResult(parsed);
+        if (citation == null || !citation.isComplete()) {
+            List<String> missing = citation == null
+                    ? List.of("forecastRunId", "caliberId", "version", "asOfTime")
+                    : citation.missingFields();
+            log.warn("F06-11 场景工具返回体缺少引用元数据，结果丢弃: tool={} missing={}",
+                    def.code, missing);
+            return buildClassifiedError(ok.getToolCallId(), def.code, AiErrorClass.CITATION_MISSING,
+                    "工具返回缺少引用元数据: " + String.join(",", missing), ok.getElapsedMs());
+        }
+        String block = citation.render();
+        ok.setCitationBlock(block);
+        ok.setContent(ok.getContent() + "\n引用块（结论数值必须逐字附带，禁改写）: " + block);
         return ok;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseJsonObject(String body) {
+        if (body == null || body.isBlank()) return null;
+        try {
+            Object parsed = objectMapper.readValue(body, Object.class);
+            return parsed instanceof Map ? (Map<String, Object>) parsed : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** 非护栏类结构化失败（F06-14 分类上浮；文案只出模板 + 诊断码，禁原始原因随响应体上浮）。 */
+    private ToolResult buildClassifiedError(String callId, String toolName, AiErrorClass errorClass,
+                                            String rawReason, long elapsedMs) {
+        AiError error = AiError.of(errorClass, AiTraceSupport.currentTraceId(), rawReason);
+        log.debug("分类错误明细（仅日志）: tool={} class={} reason={} traceId={}",
+                toolName, errorClass.name(), rawReason, error.traceId());
+        ToolResult r = ToolResult.fail(callId, toolName, error.userMessage(), elapsedMs);
+        r.setErrorCode(error.errorCode());
+        r.setErrorClass(errorClass.name());
+        r.setTraceId(error.traceId());
+        return r;
     }
 
     // ── 阶段 2: R1.3 高危指令沙盒审查（附加防御层） ──────────────────────
@@ -534,9 +638,17 @@ public class ToolExecutorService {
     // ── Tool Loading ──────────────────────────────────────────────────────
 
     /**
-     * 加载工具定义：优先从数据库，回退到内存 fallback。
+     * 加载工具定义：<b>场景受控工具声明优先</b>（F06-11），其次数据库，最后内存 fallback。
+     *
+     * <p>声明优先的次序是安全相关的：场景工具的 {@code operation}/{@code timeoutMs}/端点必须取
+     * <b>声明值</b>，若同名 DB 行先命中，管理员配的 {@code tool_type} 会改写裁决载荷的
+     * {@code action.operation}（写判成读即绕过 OPA 的写权限面）。</p>
      */
     ToolDefinitionEntry loadToolDefinition(String toolName) {
+        ToolDefinitionEntry scenario = loadScenarioDefinition(toolName);
+        if (scenario != null) {
+            return scenario;
+        }
         ToolDefinitionEntry def = loadFromDatabase(toolName);
         if (def != null) {
             return def;
@@ -544,8 +656,32 @@ public class ToolExecutorService {
         return fallbackTools.get(toolName);
     }
 
+    /**
+     * F06-11：场景受控工具声明 → {@link ToolDefinitionEntry}（{@code toolType} 恒为 REST）。
+     *
+     * <p>{@code endpointUrl} 存<b>声明里的相对路径</b>，绝对化在 dispatch 时用服务端基址拼接，
+     * 保证"基址不可由入参左右"；{@code schemaJson} 存声明的参数模式 JSON，使既有的
+     * schema 侧读面（如审计摘要）无需分叉。</p>
+     */
+    private ToolDefinitionEntry loadScenarioDefinition(String toolName) {
+        if (scenarioRegistry == null) return null;
+        ScenarioToolDefinition declared = scenarioRegistry.find(toolName).orElse(null);
+        if (declared == null) return null;
+        ToolDefinitionEntry entry = new ToolDefinitionEntry();
+        entry.code = declared.toolKey();
+        entry.name = declared.name();
+        entry.description = declared.description();
+        entry.toolType = "REST";
+        entry.endpointUrl = declared.backendEndpoint();
+        entry.httpMethod = declared.httpMethod();
+        entry.schemaJson = declared.argsSchemaJson();
+        entry.scenario = declared;
+        return entry;
+    }
+
     private ToolDefinitionEntry loadFromDatabase(String toolName) {
         if (toolDao == null) {
+
             log.debug("ToolDao not available, skipping DB load for tool: {}", toolName);
             return null;
         }
@@ -577,8 +713,12 @@ public class ToolExecutorService {
             throws TimeoutException, Exception {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Future<String> future = executor.submit(() -> dispatch(def, arguments));
+        // F06-11：场景工具的执行预算取声明 timeoutMs（上界仍是咽喉 30s），通用工具维持原 30s
+        long budgetSeconds = def.scenario == null ? TIMEOUT_SECONDS
+                : Math.min(TIMEOUT_SECONDS,
+                Math.max(1, (def.scenario.timeoutMs() + 999) / 1000));
         try {
-            return future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            return future.get(budgetSeconds, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("工具执行被中断", e);
@@ -594,6 +734,10 @@ public class ToolExecutorService {
     }
 
     private String dispatch(ToolDefinitionEntry def, Map<String, Object> arguments) throws Exception {
+        // F06-11：场景受控工具走声明式 REST 通道（端点/方法/载荷全部来自声明，不接受入参指定 URL）
+        if (def.scenario != null) {
+            return executeScenarioRest(def, arguments);
+        }
         String type = def.toolType;
         if (type == null) {
             return executeRest(def, arguments);
@@ -604,6 +748,90 @@ public class ToolExecutorService {
             case "API":     return executeRest(def, arguments);
             case "BUILTIN": return executeBuiltin(def.code, arguments);
             default:        return executeRest(def, arguments);
+        }
+    }
+
+    // ── F06-11 场景受控工具执行 ───────────────────────────────────────────
+
+    /**
+     * 场景工具分发（声明 → 唯一 REST 出向调用）。
+     *
+     * <p>三条硬约束：</p>
+     * <ol>
+     *   <li><b>URL 只由服务端基址 + 声明路径</b>构成，入参只能填 {@code {占位符}}，
+     *       不可注入 scheme/host（否则本通道退化为通用 {@code invoke_rest}）；</li>
+     *   <li><b>必填参数地板</b>在出向之前判（缺参即 {@code INVALID_ARGUMENT}，禁把注定失败的载荷打到后端）；</li>
+     *   <li><b>写工具载荷收口</b>：{@code status} 强制 DRAFT、身份字段剔除（审批人只从 token 取）。</li>
+     * </ol>
+     *
+     * <p>GET/HEAD 把非路径参数编成 query string；POST 编成 JSON body —— 两种形态都只带声明里的参数名。</p>
+     */
+    private String executeScenarioRest(ToolDefinitionEntry def, Map<String, Object> arguments)
+            throws Exception {
+        ScenarioToolDefinition declared = def.scenario;
+        List<String> missing = declared.missingRequiredArgs(arguments);
+        if (!missing.isEmpty()) {
+            throw new ScenarioArgumentsException("场景工具缺少必填参数: " + String.join(",", missing));
+        }
+        for (String placeholder : declared.pathPlaceholders()) {
+            Object value = arguments == null ? null : arguments.get(placeholder);
+            if (value == null || String.valueOf(value).isBlank()) {
+                throw new ScenarioArgumentsException("场景工具路径占位符缺值: " + placeholder);
+            }
+        }
+
+        String path = resolveUrlParams(declared.backendEndpoint(), arguments);
+        String url = scenarioBaseUrl + path;
+        HttpMethod method = HttpMethod.valueOf(declared.httpMethod().toUpperCase(Locale.ROOT));
+        Set<String> declaredArgs = declared.argsSchema().keySet();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set(EcosTraceContext.HEADER_REQUEST_ID, AiTraceSupport.currentTraceId());
+
+        HttpEntity<?> entity;
+        if (method == HttpMethod.GET || method == HttpMethod.DELETE) {
+            String query = buildDeclaredQuery(declaredArgs, path, arguments);
+            entity = new HttpEntity<>(headers);
+            if (!query.isEmpty()) url = url + (url.contains("?") ? "&" : "?") + query;
+        } else {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            if (arguments != null) {
+                for (Map.Entry<String, Object> e : arguments.entrySet()) {
+                    if (declaredArgs.contains(e.getKey())) payload.put(e.getKey(), e.getValue());
+                }
+            }
+            entity = new HttpEntity<>(ScenarioToolCatalog.enforceWritePayload(declared, payload), headers);
+        }
+
+        log.info("F06-11 场景工具出向: tool={} method={} path={} operation={}",
+                declared.toolKey(), method, path, declared.operation());
+        ResponseEntity<String> response = restTemplate.exchange(url, method, entity, String.class);
+        String body = response.getBody();
+        return body != null ? body : "";
+    }
+
+    /** GET 形态的 query string：只带声明里的参数，且不重复路径已消费的名字。 */
+    private String buildDeclaredQuery(Set<String> declaredArgs, String resolvedPath,
+                                      Map<String, Object> arguments) {
+        if (arguments == null || arguments.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, Object> e : arguments.entrySet()) {
+            String key = e.getKey();
+            if (!declaredArgs.contains(key) || e.getValue() == null) continue;
+            if (resolvedPath.contains("{" + key + "}")) continue;
+            if (!sb.isEmpty()) sb.append('&');
+            sb.append(URLEncoder.encode(key, StandardCharsets.UTF_8))
+                    .append('=')
+                    .append(URLEncoder.encode(String.valueOf(e.getValue()), StandardCharsets.UTF_8));
+        }
+        return sb.toString();
+    }
+
+    /** 场景工具入参地板失败（映射为 {@code INVALID_ARGUMENT}，与后端故障分类区分）。 */
+    static final class ScenarioArgumentsException extends RuntimeException {
+        ScenarioArgumentsException(String message) {
+            super(message);
         }
     }
 
@@ -1000,6 +1228,9 @@ public class ToolExecutorService {
         private String decision;
         private String policyId;
 
+        /** F06-11/12：场景工具返回体的引用块（由咽喉确定性渲染，禁 LLM 复述改写）。 */
+        private String citationBlock;
+
         public ToolResult() {}
 
         public static ToolResult ok(String callId, String toolName, String content, long elapsedMs) {
@@ -1045,6 +1276,8 @@ public class ToolExecutorService {
         public void setDecision(String v) { this.decision = v; }
         public String getPolicyId() { return policyId; }
         public void setPolicyId(String v) { this.policyId = v; }
+        public String getCitationBlock() { return citationBlock; }
+        public void setCitationBlock(String v) { this.citationBlock = v; }
 
         @Override
         public String toString() {
@@ -1061,5 +1294,14 @@ public class ToolExecutorService {
         String endpointUrl;
         String httpMethod;
         Object schemaJson;
+
+        /**
+         * F06-11 场景受控工具的声明体（非场景工具恒为 null）。
+         *
+         * <p>存在即代表：{@code operation} 与 {@code timeoutMs} 必须取声明值、执行必须走
+         * 服务端基址拼出的 REST 通道、返回体必须自带引用元数据 —— 三者都由本咽喉强制，
+         * 不依赖 DB 行或调用方入参。</p>
+         */
+        ScenarioToolDefinition scenario;
     }
 }

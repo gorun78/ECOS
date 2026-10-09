@@ -55,6 +55,9 @@ public class AgentLoopConfig {
     /** 工具白名单 — 非空时只有列表中工具可被调用 */
     private List<String> toolWhitelist;
 
+    /** F06-13 caliber code for this run (query key only, never persisted; null = no caliber). */
+    private String caliberCode;
+
     // ─── 构造器 ────────────────────────────────────────────────────────
 
     public AgentLoopConfig() {}
@@ -136,6 +139,10 @@ public class AgentLoopConfig {
                 }
             }
         }
+        if (templateMeta.containsKey("caliberCode") && templateMeta.get("caliberCode") != null) {
+            String v = stringOrNull(templateMeta.get("caliberCode"));
+            if (v != null) this.caliberCode = v;
+        }
         return this;
     }
 
@@ -203,6 +210,10 @@ public class AgentLoopConfig {
             String v = stringOrNull(overrides.get("defaultProvider"));
             if (v != null) this.defaultProvider = v;
         }
+        if (overrides.containsKey("caliberCode") && overrides.get("caliberCode") != null) {
+            String v = stringOrNull(overrides.get("caliberCode"));
+            if (v != null) this.caliberCode = v;
+        }
         return this;
     }
 
@@ -216,6 +227,9 @@ public class AgentLoopConfig {
 
     public List<String> getToolWhitelist() { return toolWhitelist; }
     public void setToolWhitelist(List<String> toolWhitelist) { this.toolWhitelist = toolWhitelist; }
+
+    public String getCaliberCode() { return caliberCode; }
+    public void setCaliberCode(String caliberCode) { this.caliberCode = caliberCode; }
 
     public String getModel() { return model; }
     public void setModel(String model) { this.model = model; }

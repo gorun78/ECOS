@@ -11,6 +11,7 @@ import com.chinacreator.gzcm.engine.ai.service.AgentConfigResolver;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopConfig;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopResult;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopService;
+import com.chinacreator.gzcm.engine.ai.service.ToolExecutorService;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
 import com.chinacreator.gzcm.runtime.llm.session.AgentSession;
@@ -218,6 +219,12 @@ class AgentLoopTraceTest {
         ReflectionTestUtils.setField(svc, "llmGateway", llmGateway);
         ReflectionTestUtils.setField(svc, "guardrailsService", guardrails);
         ReflectionTestUtils.setField(svc, "agentConfigResolver", configResolver);
+        // F06-13 规则 3 下"工具全部失败"必须改判拒绝答复，本类断言的是步骤行序列，
+        // 故装置必须给出一个真实可用的执行器（旧装置依赖的 mock-success 兜底已废止 X-50）
+        ToolExecutorService tools = mock(ToolExecutorService.class);
+        when(tools.execute(anyString(), any())).thenReturn(
+                ToolExecutorService.ToolResult.ok("call_1", "query_db", "{\"rows\":[]}", 1L));
+        ReflectionTestUtils.setField(svc, "toolExecutorService", tools);
         return svc;
     }
 

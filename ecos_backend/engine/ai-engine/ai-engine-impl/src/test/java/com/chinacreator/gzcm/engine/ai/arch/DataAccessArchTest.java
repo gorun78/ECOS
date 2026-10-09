@@ -48,6 +48,8 @@ class DataAccessArchTest {
             "com.chinacreator.gzcm.engine.ai..security..",
             "com.chinacreator.gzcm.engine.ai..nlq..",
             "com.chinacreator.gzcm.engine.ai..agent..",
+            // F06-11：受控工具声明/注册层同样禁自持 JdbcTemplate（表读只经 ..dao.. 门面）
+            "com.chinacreator.gzcm.engine.ai..tool..",
     };
 
     @ArchTest
