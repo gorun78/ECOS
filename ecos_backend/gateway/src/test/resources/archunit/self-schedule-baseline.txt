@@ -6,8 +6,9 @@
 #     + sysman 1（AuditLogServiceImpl）
 #     （KnowledgeExtractionService/QueryExecutionServiceImpl 仅注释/无用 import，字节码不命中，不登记）
 #   规则 D（源码，剥注释后）：裸 new Thread(
-#     —— ai 3 + data 1 + security 2（H2-T3 豁免域，源码面仍需登记）+ workspace 1 + gateway 2
+#     —— ai 3 + data 1 + security 2（H2-T3 豁免域，源码面仍需登记）+ gateway 2
 #     （gateway DigitalTwinService/OagForwardController 属 facade 非业务调度，随 H2-T1 Javadoc 白名单登记）
+#     （卷07 F07-17 W181：workspace PythonRuntime 已迁 workspaceProcessIoExecutor 命名池，条目删除）
 #   规则 E（源码，F06-17 X-27 扩）：CompletableFuture.runAsync / CompletableFuture.supplyAsync
 #     —— F06-17 落地时新增检测面；本条目为 X-27 基线化（只减不增），
 #     各引擎逐一迁 runtime-task / CognitiveRuntimeFanout 后可删对应条目。
@@ -28,13 +29,11 @@ com.chinacreator.gzcm.engine.ai.service.AgentMetricsCollector
 com.chinacreator.gzcm.engine.ai.controller.AgentLoopController
 com.chinacreator.gzcm.engine.ai.oag.OagController
 com.chinacreator.gzcm.engine.data.metadata.MetadataTaskService
-com.chinacreator.gzcm.workspace.service.ObjectKgSyncService
 com.chinacreator.gzcm.engine.data.controller.QueryController
 com.chinacreator.gzcm.engine.data.service.PipelineParallelismManager
 com.chinacreator.gzcm.engine.data.service.PipelineTaskServiceImpl
 com.chinacreator.gzcm.sysman.audit.service.impl.AuditLogServiceImpl
 com.chinacreator.gzcm.engine.security.abac.cache.InMemoryAbacPolicyCacheService
 com.chinacreator.gzcm.engine.security.policy.engine.parallel.ParallelPolicyEvaluator
-com.chinacreator.gzcm.workspace.workbook.PythonRuntime
 com.chinacreator.gzcm.gateway.twin.DigitalTwinService
 com.chinacreator.gzcm.gateway.oag.OagForwardController

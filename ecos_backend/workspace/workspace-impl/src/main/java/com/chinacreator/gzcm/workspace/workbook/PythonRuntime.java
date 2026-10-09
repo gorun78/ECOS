@@ -9,10 +9,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -24,6 +28,12 @@ import org.springframework.stereotype.Component;
  *   <li>stdout 收集结果（期望 JSON）</li>
  *   <li>工作目录: data/workbooks/{sessionId}/</li>
  * </ul>
+ *
+ * <p>卷07 F07-17 底座收口：stdout/stderr 排空不再开裸线程（原 {@code new Thread}），
+ * 改提交 workspace 命名执行器 {@code workspaceProcessIoExecutor}
+ * （{@code WorkspaceTaskExecutorConfig}，SynchronousQueue 直接交接=提交即起线程，
+ * 语义等价原裸线程且线程名可归因；禁 common pool）。池饱和（&gt;64 并发排空）时
+ * 显式拒绝 → 强杀子进程并返回错误，不静默排队造成管道死锁。</p>
  */
 @Component
 public class PythonRuntime {
@@ -41,6 +51,13 @@ public class PythonRuntime {
 
     /** Python 解释器命令 */
     private static final String PYTHON_CMD = "python3";
+
+    /** 进程 IO 排空命名执行器（F07-17，见类注释）。 */
+    private final TaskExecutor processIoExecutor;
+
+    public PythonRuntime(@Qualifier("workspaceProcessIoExecutor") TaskExecutor processIoExecutor) {
+        this.processIoExecutor = processIoExecutor;
+    }
 
     /**
      * 执行 Python 代码。
@@ -81,7 +98,9 @@ public class PythonRuntime {
             StringBuilder stdout = new StringBuilder();
             StringBuilder stderr = new StringBuilder();
 
-            Thread outThread = new Thread(() -> {
+            final CountDownLatch outDone = new CountDownLatch(1);
+            final CountDownLatch errDone = new CountDownLatch(1);
+            Runnable outDrain = () -> {
                 try (BufferedReader reader = new BufferedReader(
                         new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
@@ -94,10 +113,12 @@ public class PythonRuntime {
                     }
                 } catch (Exception ignored) {
                     log.warn("Python stdout 读取失败，结果可能不完整: {}", ignored.getMessage());
+                } finally {
+                    outDone.countDown();
                 }
-            });
+            };
 
-            Thread errThread = new Thread(() -> {
+            Runnable errDrain = () -> {
                 try (BufferedReader reader = new BufferedReader(
                         new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
                     String line;
@@ -106,11 +127,24 @@ public class PythonRuntime {
                     }
                 } catch (Exception ignored) {
                     log.warn("Python stderr 读取失败，错误信息可能丢失: {}", ignored.getMessage());
+                } finally {
+                    errDone.countDown();
                 }
-            });
+            };
 
-            outThread.start();
-            errThread.start();
+            try {
+                processIoExecutor.execute(outDrain);
+                processIoExecutor.execute(errDrain);
+            } catch (RejectedExecutionException rex) {
+                // 排空池饱和：立即强杀进程并显式报错，避免管道缓冲区写满后进程假死（F07-17）
+                process.destroyForcibly();
+                long rejectedElapsed = System.currentTimeMillis() - start;
+                log.warn("Python 进程 IO 排空执行器饱和，已强杀进程: {}", rex.getMessage());
+                result.put("timed_out", false);
+                result.put("error", "Process IO executor saturated: " + rex.getMessage());
+                result.put("elapsed_ms", rejectedElapsed);
+                return result;
+            }
 
             // 等待进程结束，带超时
             boolean finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -118,16 +152,16 @@ public class PythonRuntime {
 
             if (!finished) {
                 process.destroyForcibly();
-                outThread.join(1000);
-                errThread.join(1000);
+                awaitQuietly(outDone, 1000);
+                awaitQuietly(errDone, 1000);
                 result.put("timed_out", true);
                 result.put("error", "Execution timed out after " + TIMEOUT_SECONDS + " seconds");
                 result.put("elapsed_ms", elapsed);
                 result.put("stdout", stdout.toString().trim());
                 result.put("stderr", stderr.toString().trim());
             } else {
-                outThread.join(1000);
-                errThread.join(1000);
+                awaitQuietly(outDone, 1000);
+                awaitQuietly(errDone, 1000);
                 int exitCode = process.exitValue();
                 result.put("exit_code", exitCode);
                 result.put("timed_out", false);
@@ -154,5 +188,14 @@ public class PythonRuntime {
         }
 
         return result;
+    }
+
+    /** 等价原 Thread.join(timeout)：超时不致命（进程已被 destroyForcibly，流关闭后排空自然结束）。 */
+    private static void awaitQuietly(CountDownLatch drainDone, long timeoutMs) {
+        try {
+            drainDone.await(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

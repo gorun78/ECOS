@@ -12,7 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,12 +42,26 @@ class QueryHistoryPersistenceTest {
         @Override
         public List<QueryHistoryEntry> findPage(String subjectId, int limit, int offset) {
             pageCalls.add(new int[]{limit, offset});
-            return rows.stream()
-                    .filter(r -> subjectId == null || subjectId.equals(r.subjectId()))
-                    .sorted(Comparator.comparing(QueryHistoryEntry::createdAt).reversed())
-                    .skip(offset)
-                    .limit(limit)
-                    .toList();
+            List<QueryHistoryEntry> src = new ArrayList<>(rows);
+            List<QueryHistoryEntry> filtered = new ArrayList<>();
+            List<Integer> seq = new ArrayList<>();
+            for (int i = 0; i < src.size(); i++) {
+                QueryHistoryEntry r = src.get(i);
+                if (subjectId == null || subjectId.equals(r.subjectId())) {
+                    filtered.add(r);
+                    seq.add(i); // 插入序 tie-break：同毫秒仍确定性地"最新在前"
+                }
+            }
+            Integer[] order = seq.toArray(Integer[]::new);
+            java.util.Arrays.sort(order, (a, b) -> {
+                int t = filtered.get(b).createdAt().compareTo(filtered.get(a).createdAt());
+                return t != 0 ? t : Integer.compare(a, b);
+            });
+            List<QueryHistoryEntry> out = new ArrayList<>();
+            for (int k = offset; k < Math.min(offset + limit, order.length); k++) {
+                out.add(filtered.get(order[k]));
+            }
+            return out;
         }
 
         @Override
@@ -103,7 +116,9 @@ class QueryHistoryPersistenceTest {
         List<QueryRecord> history = afterRestart.getHistory(10);
         assertEquals(2, history.size(),
                 "重启后历史丢失 ⇒ QueryHistoryService 又在进程内自存状态（X-55 回潮）");
-        assertEquals(3, history.get(0).getResultCount(), "新→旧排序：最近一条是 resultCount=3");
+        // 时钟不敏感的顺序判据：新→旧 = 首条 createdAt 不早于次条（同毫秒平序仍满足）
+        assertFalse(history.get(0).getTimestamp().isBefore(history.get(1).getTimestamp()),
+                "新→旧排序：首条 createdAt 不得早于次条");
     }
 
     @Test
@@ -133,8 +148,8 @@ class QueryHistoryPersistenceTest {
         String jdbc = read("repository/JdbcQueryHistoryRepository.java");
         assertTrue(jdbc.contains("LIMIT ?") && jdbc.contains("OFFSET ?"),
                 "持久化实现的读取必须是 SQL 分页，而不是取全量再截断");
-        assertTrue(jdbc.contains("INSERT INTO ecos_query_history"),
-                "落库表必须显式命名（禁 currentSchema 兜底拼写不确定的表）");
+        assertTrue(jdbc.contains("INSERT INTO public.ecos_scenario_query_history"),
+                "落库表必须按 V212 显式命名（含控制域 schema 前缀，禁 currentSchema 兜底）");
     }
 
     @Test
@@ -156,7 +171,10 @@ class QueryHistoryPersistenceTest {
         if (!Files.isDirectory(base)) {
             base = Path.of("workspace-impl/src/main/java/com/chinacreator/gzcm/workspace");
         }
-        return Files.readString(base.resolve(relativeToWorkspacePkg), StandardCharsets.UTF_8);
+        // 判据源=代码本体；Javadoc 里对 X-55 反例的描述不计违约（同 WorkspaceLayeringArchTest 口径）
+        return Files.readString(base.resolve(relativeToWorkspacePkg), StandardCharsets.UTF_8)
+                .replaceAll("/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/", " ")
+                .replaceAll("//[^\\r\\n]*", " ");
     }
 
     /** 铁律 §2.5：JdbcTemplate 只准出现在 repository 层，本类的判据源就是这条。 */

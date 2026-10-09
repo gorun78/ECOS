@@ -13,9 +13,7 @@ import com.chinacreator.gzcm.workspace.scenario.SandboxLayoutVO;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioMindVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
 
@@ -24,6 +22,9 @@ import java.util.*;
  *
  * <p>验证：新增 COVERATE 检查（前端沙盘画布 ≥ 6 类资源非空 coverage）；
  * ACTIVE 需全 PASS；DRAFT 允许部分 FAIL（红色徽标但可保存）。</p>
+ *
+ * <p>卷07 F07-17 底座收口（X-53）：删除从未发起请求的死 {@code RestTemplate} 与
+ * 死 {@code ecos.gateway-base} 注入——本类校验全部走本地 service，无跨服务 HTTP 出口。</p>
  */
 @RestController
 @RequestMapping("/api/v1/workspace/scenarios")
@@ -39,22 +40,16 @@ public class ScenarioPreValidateController {
     private final ScenarioSandboxLayoutService sandboxLayoutService;
     private final CompletenessDataLoader loader;
     private final ScenarioCompletenessService completenessService;
-    private final RestTemplate rt;
 
     public ScenarioPreValidateController(
             ScenarioMindService mindService,
             ScenarioSandboxLayoutService sandboxLayoutService,
             CompletenessDataLoader loader,
-            ScenarioCompletenessService completenessService,
-            @org.springframework.beans.factory.annotation.Value("${ecos.gateway-base:http://localhost:8080}") String gatewayBase) {
+            ScenarioCompletenessService completenessService) {
         this.mindService = mindService;
         this.sandboxLayoutService = sandboxLayoutService;
         this.loader = loader;
         this.completenessService = completenessService;
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3000);
-        factory.setReadTimeout(5000);
-        this.rt = new RestTemplate(factory);
     }
 
     @PostMapping("/{id}/pre-validate")

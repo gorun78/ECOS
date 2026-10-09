@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.workspace.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.workspace.scenario.ActionProposal;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioActionService;
+import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -20,15 +21,19 @@ import java.util.Map;
  * POST /api/v1/workspace/actions/{actionId}/approve
  * </pre>
  * <p>审批人主体取自 JWT，绝不取请求体 userId（禁前端伪造）。</p>
+ * <p>F07-18：读侧（actions/decisions）经 security-engine RLS/CLS 裁决，默认 DENY。</p>
  */
 @RestController
 @RequestMapping("/api/v1/workspace")
 public class ScenarioActionController {
 
     private final ScenarioActionService actionService;
+    private final ScenarioReadGuard readGuard;
 
-    public ScenarioActionController(ScenarioActionService actionService) {
+    public ScenarioActionController(ScenarioActionService actionService,
+                                    ScenarioReadGuard readGuard) {
         this.actionService = actionService;
+        this.readGuard = readGuard;
     }
 
     @PostMapping("/scenarios/{id}/actions")
@@ -39,15 +44,18 @@ public class ScenarioActionController {
 
     @GetMapping("/scenarios/{id}/actions")
     public ApiResponse<Map<String, Object>> listActions(@PathVariable("id") String scenarioId) {
+        readGuard.assertReadable("scenario_action");
         Map<String, Object> data = new LinkedHashMap<>();
-        data.put("items", actionService.listActions(scenarioId));
+        data.put("items", readGuard.applyColumns("scenario_action", actionService.listActions(scenarioId)));
         return ApiResponse.success(data);
     }
 
     @GetMapping("/scenarios/{id}/decisions")
     public ApiResponse<Map<String, Object>> listDecisions(@PathVariable("id") String scenarioId) {
+        readGuard.assertReadable("scenario_decision");
         Map<String, Object> data = new LinkedHashMap<>();
-        List<Map<String, Object>> items = actionService.listDecisions(scenarioId);
+        List<Map<String, Object>> items = readGuard.applyColumns("scenario_decision",
+                actionService.listDecisions(scenarioId));
         data.put("items", items);
         return ApiResponse.success(data);
     }

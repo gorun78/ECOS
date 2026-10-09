@@ -11,6 +11,7 @@ import com.chinacreator.gzcm.workspace.scenario.ScenarioBindingLinkService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioBindingLinkService.ScenarioBindingLinkSaveDTO;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioBindingLinkService.ScenarioBindingLinkVO;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioBindingLinkService.ScenarioGraphVO;
+import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
 
 /**
  * 场景绑定关系边 REST API — 架构铁律 §0.6.2 子图化（PMO-66 A4）。
@@ -32,20 +33,25 @@ public class ScenarioBindingLinkController {
     private static final Logger log = LoggerFactory.getLogger(ScenarioBindingLinkController.class);
 
     private final ScenarioBindingLinkService linkService;
+    private final ScenarioReadGuard readGuard;
 
-    public ScenarioBindingLinkController(ScenarioBindingLinkService linkService) {
+    public ScenarioBindingLinkController(ScenarioBindingLinkService linkService,
+                                         ScenarioReadGuard readGuard) {
         this.linkService = linkService;
+        this.readGuard = readGuard;
     }
 
-    /** 场景完整图（nodes + links + coverage）— 前端 /graph 消费（B/B3 用）。 */
+    /** 场景完整图（nodes + links + coverage）— 前端 /graph 消费（B/B3 用）。F07-18：RLS fail-DENY 咽喉。 */
     @GetMapping("/{id}/graph")
     public ApiResponse<ScenarioGraphVO> graph(@PathVariable String id) {
+        readGuard.assertReadable("scenario_graph");
         return ApiResponse.success(linkService.graph(id));
     }
 
-    /** 边列表（六类节点间可组成的边）。 */
+    /** 边列表（六类节点间可组成的边）。F07-18：RLS fail-DENY 咽喉。 */
     @GetMapping("/{id}/binding-links")
     public ApiResponse<List<ScenarioBindingLinkVO>> list(@PathVariable String id) {
+        readGuard.assertReadable("scenario_graph");
         return ApiResponse.success(linkService.listLinks(id));
     }
 

@@ -7,6 +7,7 @@ import com.chinacreator.gzcm.workspace.scenario.CompletenessReport;
 import com.chinacreator.gzcm.workspace.scenario.LinkEdge;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioCompletenessService;
 import com.chinacreator.gzcm.workspace.scenario.WorkspaceSecurityAudit;
+import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,18 +27,23 @@ public class ScenarioCompletenessController {
     private final CompletenessDataLoader loader;
     private final ScenarioCompletenessService completenessService;
     private final WorkspaceSecurityAudit audit;
+    private final ScenarioReadGuard readGuard;
 
     public ScenarioCompletenessController(CompletenessDataLoader loader,
                                           ScenarioCompletenessService completenessService,
-                                          WorkspaceSecurityAudit audit) {
+                                          WorkspaceSecurityAudit audit,
+                                          ScenarioReadGuard readGuard) {
         this.loader = loader;
         this.completenessService = completenessService;
         this.audit = audit;
+        this.readGuard = readGuard;
     }
 
     @GetMapping("/{id}/completeness")
     public ApiResponse<CompletenessReport> completeness(@PathVariable("id") String scenarioId,
                                                         @RequestParam(name = "refresh", required = false, defaultValue = "false") boolean refresh) {
+        // F07-18：拓扑/完整度属敏感读，先过 RLS fail-DENY 咽喉（security 不可用 → 403，禁 200 数据）
+        readGuard.assertReadable("scenario_completeness");
         List<BindingNode> bindings = loader.bindingsOf(scenarioId);
         List<LinkEdge> links = loader.linksOf(scenarioId);
         CompletenessReport report = refresh

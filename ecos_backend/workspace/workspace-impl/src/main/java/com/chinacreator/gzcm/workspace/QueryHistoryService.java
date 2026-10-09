@@ -25,9 +25,9 @@ import java.util.UUID;
  * 现在本类<b>不持有任何集合</b>，写入委托 {@link QueryHistoryRepository}，
  * 读取按主体分页。</p>
  *
- * <p>{@code ecosystem} 现状注记：落库表 {@code ecos_query_history} 尚未建
- * （DDL 属主在他册），故 repository bean 默认缺席（见
- * {@code JdbcQueryHistoryRepository} 的 {@code @ConditionalOnProperty}）。
+ * <p>现状注记：落库表 {@code public.ecos_scenario_query_history} 的 V212 迁移脚本
+ * 已落 {@code docs/50-db_script}，但按 §14.4 <b>未实跑库</b>，故 repository bean
+ * 默认缺席（见 {@code JdbcQueryHistoryRepository} 的 {@code @ConditionalOnProperty}）。
  * 缺席时本类返回<b>空分页 + 一条 WARN</b>，绝不退化成堆内存列表 ——
  * "看起来能用但重启就没了"正是本项要消灭的假功能。</p>
  */
@@ -56,7 +56,7 @@ public class QueryHistoryService {
 
         QueryHistoryRepository repo = repositoryProvider.getIfAvailable();
         if (repo == null) {
-            log.warn("QueryHistory 持久化未启用（缺 ecos_query_history 表或 "
+            log.warn("QueryHistory 持久化未启用（V212 未实跑或 "
                     + "ecos.workspace.query-history.persistent=false），本次记录丢弃: id={} traceId={}",
                     id, entry.traceId());
         } else {

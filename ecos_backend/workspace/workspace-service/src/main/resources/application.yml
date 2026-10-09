@@ -85,6 +85,14 @@ ecos:
       enabled: ${ECOS_WS_HEADER_AUTH:true}
   neo4j:
     enabled: ${ECOS_NEO4J_ENABLED:false}
+  # ── 卷07 F07-17 底座收口：跨服务 base-url 两态寻址（ADR-15）──────────────────
+  # 基址单真源 = route-manifest.json，经 runtime-access ServiceEndpointResolver 解析
+  # （datanet 已切流 → :18082 直连；其余 owner 未切流 → monolith :8080 承流）。
+  # 下列键仅为运维逃生口覆盖项，默认留空走解析链；本机绝对路径/端口、个人环境值禁止入库。
+  # 超时口径集中在 workspace.config.WorkspaceRestClientConfig（键同下，默认值为代码缺省）。
+  endpoints:
+    # datanet: / buszhi: / dccheng: / aiming: / sysman: / gateway:  —— scheme://host:port 基址覆盖（无尾斜杠）
+    # timeout: options-ms=3000 · probe-ms=1500 · cognitive-ms=30000（推理红线）· security-ms=5000
 
 management:
   endpoints:

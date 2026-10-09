@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.workspace.scenario.CognitionReadGateway;
 import com.chinacreator.gzcm.workspace.scenario.CognitiveEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.scenario.WorkspaceSecurityAudit;
+import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,11 +33,14 @@ public class ScenarioCognitionV2Controller {
 
     private final ObjectProvider<CognitionReadGateway> gatewayProvider;
     private final WorkspaceSecurityAudit audit;
+    private final ScenarioReadGuard readGuard;
 
     public ScenarioCognitionV2Controller(ObjectProvider<CognitionReadGateway> gatewayProvider,
-                                         WorkspaceSecurityAudit audit) {
+                                         WorkspaceSecurityAudit audit,
+                                         ScenarioReadGuard readGuard) {
         this.gatewayProvider = gatewayProvider;
         this.audit = audit;
+        this.readGuard = readGuard;
     }
 
     @GetMapping("/{id}/cognition/detect")
@@ -65,6 +69,7 @@ public class ScenarioCognitionV2Controller {
 
     private ApiResponse<Map<String, Object>> read(String kind, String scenarioId,
                                                   Map<String, Object> params, String resource) {
+        readGuard.assertReadable("scenario_cognition");
         CognitionReadGateway gateway = gatewayProvider.getIfAvailable();
         if (gateway == null) {
             throw new CognitiveEngineUnavailableException("cognition read gateway 未装配: " + kind);

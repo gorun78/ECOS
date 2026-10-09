@@ -5,7 +5,7 @@ import com.chinacreator.gzcm.workspace.knowledge.dto.KnowledgeHealthVO.EngineHea
 import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +27,10 @@ import java.util.Map;
  *   <li>单体 fat-JAR 场景下这部分全部命中本 gateway :8080 内同路由 Controller（等价）；</li>
  *   <li>切微服务后 gateway 上加 7-companion 路由（P2-6），自然指向 5 个 service 端口。</li>
  * </ul>
+ *
+ * <p>卷07 F07-17 底座收口：gateway 承流基址由 {@code WorkspaceRestClientConfig} 经
+ * runtime-access ServiceEndpointResolver 两态寻址解析（禁自建 RestTemplate / 硬编码
+ * localhost），本类注入 1500ms 短超时探活 Bean，只传相对路径。
  *
  * <p>降级规则：单引擎 REST 失败 → status=DOWN + components.failed=true + reason
  * （HTTP 仍 200，不单点拖累前端）。
@@ -73,26 +77,12 @@ public class KnowledgeHealthAggregator {
     /** 探活 supplier — 每引擎包装成一个 Function<name, EngineHealthVO> box 说明。 */
     private final RestTemplate restTemplate;
     private final WorkspaceDataDao dao;
-    private final String gatewayBase;
 
     public KnowledgeHealthAggregator(
             WorkspaceDataDao dao,
-            @Value("${ecos.gateway-base:http://localhost:8080}") String gatewayBase) {
-        this.restTemplate = newShortTimeoutRestTemplate();
+            @Qualifier("workspaceEngineHealthProbeRest") RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
         this.dao = dao;
-        this.gatewayBase = gatewayBase;
-    }
-
-    /**
-     * 短超时 RestTemplate 工厂（1500ms）— 避免全局 RestTemplate 的默认无聊行为
-     * 拖跨认知 DOWN 探活时长。不创建独立 bean，仅内部构造 — 不影响 bean 图。
-     */
-    private static RestTemplate newShortTimeoutRestTemplate() {
-        org.springframework.http.client.SimpleClientHttpRequestFactory factory =
-                new org.springframework.http.client.SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(1500);
-        factory.setReadTimeout(1500);
-        return new RestTemplate(factory);
     }
 
     /**
@@ -121,10 +111,9 @@ public class KnowledgeHealthAggregator {
 
     private EngineHealthVO probeEngine(String name, String path) {
         EngineHealthVO eh = new EngineHealthVO();
-        String url = gatewayBase + path;
         try {
             @SuppressWarnings("rawtypes")
-            ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
+            ResponseEntity<Map> resp = restTemplate.exchange(path, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
             Map<String, Object> body = resp.getBody();
             if (body == null) {
                 eh.setStatus("DOWN");
@@ -169,7 +158,7 @@ public class KnowledgeHealthAggregator {
             }
             return eh;
         } catch (Exception ex) {
-            log.debug("{} engine health probe failed ({}): {}", name, url, shortMsg(ex));
+            log.debug("{} engine health probe failed ({}): {}", name, path, shortMsg(ex));
             eh.setStatus("DOWN");
             eh.setReason("remote-" + shortMsg(ex));
             markFailed(eh);

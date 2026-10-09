@@ -4,11 +4,10 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.workspace.scenario.AvailableItemVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
@@ -22,6 +21,9 @@ import java.util.Set;
  * 场景资源选项池 REST API — 6 类真 ID 跨服务联查（PMO-60 v2.0 P1）。
  *
  * <p>全部只读联查，跨服务 GET。各 service 不可达时返 503（铁律 §2.4-6 默认 DENY）。
+ * 卷07 F07-17 底座收口：跨服务 base-url 不再硬编码，经 {@code WorkspaceRestClientConfig}
+ * 注入带 rootUri 的共享 RestTemplate（runtime-access {@code ServiceEndpointResolver}
+ * 两态寻址，ADR-15），业务侧只传相对路径。</p>
  * <pre>
  * GET /api/v1/workspace/scenarios/available/datasets   — datanet 数据源
  * GET /api/v1/workspace/scenarios/available/objects    — buszhi 本体实体
@@ -37,25 +39,23 @@ public class ScenarioOptionsController {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioOptionsController.class);
 
-    private final RestTemplate restTemplate;
-    private final String datanetBase;
-    private final String buszhiBase;
-    private final String dcchengBase;
-    private final String aimingBase;
-    private final String sysmanBase;
+    private final RestTemplate datanetRest;
+    private final RestTemplate buszhiRest;
+    private final RestTemplate dcchengRest;
+    private final RestTemplate aimingRest;
+    private final RestTemplate sysmanRest;
 
     public ScenarioOptionsController(
-            @Value("${ecos.datanet-base:http://localhost:18082/api/v1}") String datanetBase,
-            @Value("${ecos.buszhi-base:http://localhost:18083/api/v1}") String buszhiBase,
-            @Value("${ecos.dccheng-base:http://localhost:18086/api/v1}") String dcchengBase,
-            @Value("${ecos.aiming-base:http://localhost:18084/api/v1}") String aimingBase,
-            @Value("${ecos.sysman-base:http://localhost:18081/api/v1}") String sysmanBase) {
-        this.datanetBase = datanetBase;
-        this.buszhiBase = buszhiBase;
-        this.dcchengBase = dcchengBase;
-        this.aimingBase = aimingBase;
-        this.sysmanBase = sysmanBase;
-        this.restTemplate = newShortTimeoutRestTemplate();
+            @Qualifier("workspaceDatanetRest") RestTemplate datanetRest,
+            @Qualifier("workspaceBuszhiRest") RestTemplate buszhiRest,
+            @Qualifier("workspaceDcchengRest") RestTemplate dcchengRest,
+            @Qualifier("workspaceAimingRest") RestTemplate aimingRest,
+            @Qualifier("workspaceSysmanRest") RestTemplate sysmanRest) {
+        this.datanetRest = datanetRest;
+        this.buszhiRest = buszhiRest;
+        this.dcchengRest = dcchengRest;
+        this.aimingRest = aimingRest;
+        this.sysmanRest = sysmanRest;
     }
 
     // ═══════════════ 6 类选项池端点 ═══════════════
@@ -63,7 +63,7 @@ public class ScenarioOptionsController {
     /** 可用数据集（datanet 数据源）。 */
     @GetMapping("/available/datasets")
     public ApiResponse<?> availableDatasets() {
-        return callRemote(datanetBase, "/datanet/datasource", "datanet", "id", "name");
+        return callRemote(datanetRest, "/datanet/datasource", "datanet", "id", "name");
     }
 
     /** 可用本体实体（buszhi ontology entities，按 domain 过滤）。 */
@@ -78,46 +78,37 @@ public class ScenarioOptionsController {
         String path = (domain != null && !domain.isBlank())
                 ? "/knowledge/assets?status=active&domain=" + domain
                 : "/knowledge/assets?status=active";
-        return callRemote(dcchengBase, path, "dccheng", "id", "title");
+        return callRemote(dcchengRest, path, "dccheng", "id", "title");
     }
 
     /** 可用 AI Agent（aiming agent profiles）。 */
     @GetMapping("/available/agents")
     public ApiResponse<?> availableAgents() {
-        return callRemote(aimingBase, "/agent/profiles", "aiming", "id", "name");
+        return callRemote(aimingRest, "/agent/profiles", "aiming", "id", "name");
     }
 
     /** 可用安全策略（sysman security policies — P1 新表 ecos_security_policy）。 */
     @GetMapping("/available/security")
     public ApiResponse<?> availableSecurity() {
-        return callRemote(sysmanBase, "/security/policies", "sysman", "id", "name");
+        return callRemote(sysmanRest, "/security/policies", "sysman", "id", "name");
     }
 
     /** 可用接口引用（sysman interfaces — P1 新表 ecos_interface_ref）。 */
     @GetMapping("/available/interfaces")
     public ApiResponse<?> availableInterfaces() {
-        return callRemote(sysmanBase, "/interfaces", "sysman", "id", "name");
+        return callRemote(sysmanRest, "/interfaces", "sysman", "id", "name");
     }
 
     // ═══════════════ 私有辅助 ═══════════════
 
-    /** 短超时 RestTemplate 工厂（3000ms）— 选项池联查不需要长超时。 */
-    private static RestTemplate newShortTimeoutRestTemplate() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(3000);
-        factory.setReadTimeout(3000);
-        return new RestTemplate(factory);
-    }
-
     /**
      * 通用跨服务 GET 调用 → 解析 ApiResponse.data → 映射为 List<AvailableItemVO>。
-     * 服务不可达返 503。
+     * 服务不可达返 503。path 为相对 Bean rootUri（base-url 单源=route-manifest，F07-17）的路径。
      */
-    private ApiResponse<?> callRemote(String base, String path, String serviceName,
+    private ApiResponse<?> callRemote(RestTemplate restTemplate, String path, String serviceName,
                                       String idField, String nameField) {
-        String url = base + path;
         try {
-            ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
+            ResponseEntity<Map> resp = restTemplate.exchange(path, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
             Map<String, Object> body = resp.getBody();
             if (body == null) {
                 return unavailable(serviceName, "empty response");
@@ -138,7 +129,7 @@ public class ScenarioOptionsController {
             }
             return ApiResponse.success(items);
         } catch (Exception ex) {
-            log.warn("{} 不可达 {}: {}", serviceName, url, ex.getMessage());
+            log.warn("{} 不可达 {}: {}", serviceName, path, ex.getMessage());
             return unavailable(serviceName, ex.getMessage());
         }
     }
@@ -148,12 +139,12 @@ public class ScenarioOptionsController {
      * 简化实现：仅取 domain 下首个 ontology 的实体列表。
      */
     private ApiResponse<?> callRemoteObjects(String domain) {
-        String url = buszhiBase + "/ecos/ontologies";
+        String path = "/ecos/ontologies";
         if (domain != null && !domain.isBlank()) {
-            url += "?domain=" + domain;
+            path += "?domain=" + domain;
         }
         try {
-            ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
+            ResponseEntity<Map> resp = buszhiRest.exchange(path, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
             Map<String, Object> body = resp.getBody();
             if (body == null) {
                 return unavailable("buszhi", "empty response");
@@ -171,8 +162,8 @@ public class ScenarioOptionsController {
                         String oid = asString(m.get("id"));
                         if (oid == null) continue;
                         try {
-                            ResponseEntity<Map> entResp = restTemplate.exchange(
-                                buszhiBase + "/ecos/ontologies/" + oid + "/entities",
+                            ResponseEntity<Map> entResp = buszhiRest.exchange(
+                                "/ecos/ontologies/" + oid + "/entities",
                                 HttpMethod.GET, HttpEntity.EMPTY, Map.class);
                             Map<String, Object> entBody = entResp.getBody();
                             if (entBody == null) continue;
@@ -198,7 +189,7 @@ public class ScenarioOptionsController {
             }
             return ApiResponse.success(items);
         } catch (Exception ex) {
-            log.warn("buszhi 不可达 {}: {}", url, ex.getMessage());
+            log.warn("buszhi 不可达 {}: {}", path, ex.getMessage());
             return unavailable("buszhi", ex.getMessage());
         }
     }

@@ -1,23 +1,20 @@
 package com.chinacreator.gzcm.workspace.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -33,34 +30,29 @@ import java.util.UUID;
  * td_abac_policy + {@code ${userId}} 字符串拼接的二阶注入路径已废除）；
  * security-engine 不可用时<b>默认 DENY</b>：RLS → "1=0"，CLS → 空集，ABAC → false。</p>
  *
- * <p>审计出口：runtime-event {@code EventBusService}（类名反射查找，workspace 编译期
- * 无 runtime-event 依赖）→ kafkaTemplate 反射兜底 → WARN 留痕。</p>
+ * <p>卷07 F07-17 底座收口（对齐 ai-engine W89 先例）：
+ * <ul>
+ *   <li>REST 出口注入 {@code WorkspaceRestClientConfig#workspaceSecurityEngineRest}
+ *       共享 Bean（base-url 经 runtime-access ServiceEndpointResolver 两态寻址，
+ *       禁自建 RestTemplate / 硬编码 localhost）；</li>
+ *   <li>审计出口编译期注入 runtime-event {@link EventBusService}
+ *       （原 Class.forName 反射 + kafkaTemplate 反射兜底已删除，铁律 §2.5-7
+ *       禁业务侧自建 KafkaTemplate；Bus 未装配 → WARN 留痕，不再兜底）。</li>
+ * </ul></p>
  */
 @Component
 public class WorkspaceSecurityEngineClient {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceSecurityEngineClient.class);
 
-    private static final String EVENTBUS_IMPL_FQN = "com.chinacreator.gzcm.runtime.eventbus.EventBusService";
-
-    private final String baseUrl;
     private final RestTemplate restTemplate;
-    private final ApplicationContext applicationContext;
-
-    @Autowired(required = false)
-    @Qualifier("kafkaTemplate")
-    private Object kafkaTemplateBean;
+    private final ObjectProvider<EventBusService> eventBusProvider;
 
     public WorkspaceSecurityEngineClient(
-            @Value("${service.security.base-url:http://localhost:18081}") String baseUrl,
-            @Value("${service.security.timeout-ms:5000}") int timeoutMs,
-            ApplicationContext applicationContext) {
-        this.baseUrl = baseUrl;
-        this.applicationContext = applicationContext;
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Math.max(1000, timeoutMs));
-        factory.setReadTimeout(Math.max(1000, timeoutMs));
-        this.restTemplate = new RestTemplate(factory);
+            @Qualifier("workspaceSecurityEngineRest") RestTemplate restTemplate,
+            ObjectProvider<EventBusService> eventBusProvider) {
+        this.restTemplate = restTemplate;
+        this.eventBusProvider = eventBusProvider;
     }
 
     // ═══════════════ RLS（默认 DENY "1=0"） ═══════════════
@@ -166,30 +158,18 @@ public class WorkspaceSecurityEngineClient {
     }
 
     private void publishAuditEvent(Map<String, Object> event) {
+        EventBusService bus = eventBusProvider.getIfAvailable();
+        if (bus == null) {
+            log.warn("WorkspaceSecurityEngineClient.audit: EventBusService 未装配，审计仅记日志: action={}",
+                    event.get("action"));
+            return;
+        }
         try {
-            Class<?> type = Class.forName(EVENTBUS_IMPL_FQN);
-            String[] names = applicationContext.getBeanNamesForType(type);
-            if (names.length > 0) {
-                Object bus = applicationContext.getBean(names[0]);
-                type.getMethod("publish", String.class, Object.class).invoke(bus, KafkaTopics.AUDIT, event);
-                return;
-            }
-        } catch (ClassNotFoundException ignored) {
-            // runtime-event 不在 classpath → kafkaTemplate 兜底
+            bus.publish(KafkaTopics.AUDIT, event);
         } catch (Exception e) {
-            log.debug("WorkspaceSecurityEngineClient: EventBusService 反射发布失败，转兜底: {}", e.getMessage());
+            log.warn("WorkspaceSecurityEngineClient.audit: EventBus 发布失败: action={} reason={}",
+                    event.get("action"), e.getMessage());
         }
-        if (kafkaTemplateBean != null) {
-            try {
-                Method send = kafkaTemplateBean.getClass().getMethod("send", String.class, Object.class);
-                send.invoke(kafkaTemplateBean, KafkaTopics.AUDIT, event);
-                return;
-            } catch (Exception e) {
-                log.debug("WorkspaceSecurityEngineClient: kafkaTemplate 兜底失败: {}", e.getMessage());
-            }
-        }
-        log.warn("WorkspaceSecurityEngineClient.audit: EventBus/Kafka 均不可用，审计仅记日志: action={}",
-                event.get("action"));
     }
 
     // ═══════════════ helpers ═══════════════
@@ -212,7 +192,8 @@ public class WorkspaceSecurityEngineClient {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-        ResponseEntity<Map> resp = restTemplate.postForEntity(baseUrl + path, entity, Map.class);
+        // path 为相对 Bean rootUri（sysman 基址，F07-17 两态寻址单源）的完整路由
+        ResponseEntity<Map> resp = restTemplate.postForEntity(path, entity, Map.class);
         return resp == null ? null : resp.getBody();
     }
 }

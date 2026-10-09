@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioRunRequestValidator;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioRunService;
+import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
 
 /**
  * 场景运行编排 REST API — 场景工作台认知闭环（PMO-52 T2）。
@@ -29,11 +30,14 @@ public class ScenarioRunController {
 
     private final ScenarioRunService scenarioRunService;
     private final ScenarioRunRequestValidator requestValidator;
+    private final ScenarioReadGuard readGuard;
 
     public ScenarioRunController(ScenarioRunService scenarioRunService,
-                                 ScenarioRunRequestValidator requestValidator) {
+                                 ScenarioRunRequestValidator requestValidator,
+                                 ScenarioReadGuard readGuard) {
         this.scenarioRunService = scenarioRunService;
         this.requestValidator = requestValidator;
+        this.readGuard = readGuard;
     }
 
     /**
@@ -50,10 +54,13 @@ public class ScenarioRunController {
         return ApiResponse.success(scenarioRunService.run(id, param));
     }
 
-    /** 场景运行历史（倒序）。 */
+    /** 场景运行历史（倒序）。F07-18：经 security-engine RLS/CLS 裁决后方可返回。 */
     @GetMapping("/{id}/runs")
     public ApiResponse<List<Map<String, Object>>> history(@PathVariable String id,
                                                           @RequestParam(defaultValue = "20") int limit) {
-        return ApiResponse.success(scenarioRunService.history(id, limit));
+        readGuard.assertReadable("scenario_run");
+        List<Map<String, Object>> rows =
+                readGuard.applyColumns("scenario_run", scenarioRunService.history(id, limit));
+        return ApiResponse.success(rows);
     }
 }

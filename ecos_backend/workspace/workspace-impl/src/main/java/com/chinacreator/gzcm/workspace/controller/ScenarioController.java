@@ -18,6 +18,7 @@ import com.chinacreator.gzcm.workspace.scenario.ScenarioSaveDTO;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioStatusTransitionService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioVO;
+import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
 
 /**
  * Scenario CRUD REST API — 业务场景管理（PMO-50 实体化，替代原内存 Map 实现）。
@@ -42,15 +43,18 @@ public class ScenarioController {
     private final ScenarioStatusTransitionService transitionService;
     private final CompletenessDataLoader loader;
     private final ScenarioCompletenessService completenessService;
+    private final ScenarioReadGuard readGuard;
 
     public ScenarioController(ScenarioService scenarioService,
                               ScenarioStatusTransitionService transitionService,
                               CompletenessDataLoader loader,
-                              ScenarioCompletenessService completenessService) {
+                              ScenarioCompletenessService completenessService,
+                              ScenarioReadGuard readGuard) {
         this.scenarioService = scenarioService;
         this.transitionService = transitionService;
         this.loader = loader;
         this.completenessService = completenessService;
+        this.readGuard = readGuard;
     }
 
     /**
@@ -59,6 +63,7 @@ public class ScenarioController {
      */
     @GetMapping
     public ApiResponse<List<ScenarioVO>> list(@RequestParam(name = "purpose", required = false) String purpose) {
+        readGuard.assertReadable("scenario_list");
         List<ScenarioVO> all = scenarioService.list();
         if (!"forecast".equalsIgnoreCase(purpose)) {
             return ApiResponse.success(all);
@@ -75,6 +80,7 @@ public class ScenarioController {
     /** 场景详情（含绑定 + 指标聚合 + allowedTransitions 附加字段）。 */
     @GetMapping("/{id}")
     public ApiResponse<ScenarioVO> get(@PathVariable String id) {
+        readGuard.assertReadable("scenario_detail");
         ScenarioVO vo = scenarioService.get(id);
         vo.setAllowedTransitions(transitionService.allowedTransitionsFor(id));
         return ApiResponse.success(vo);
@@ -102,6 +108,7 @@ public class ScenarioController {
     /** 场景绑定关系（六类分组）。 */
     @GetMapping("/{id}/bindings")
     public ApiResponse<Map<String, List<String>>> bindings(@PathVariable String id) {
+        readGuard.assertReadable("scenario_bindings");
         return ApiResponse.success(scenarioService.bindings(id));
     }
 

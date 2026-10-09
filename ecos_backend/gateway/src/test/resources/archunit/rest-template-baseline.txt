@@ -5,6 +5,9 @@
 # config 包共享客户端工厂（CognitiveRestClientConfig / KbEngineRestConfig /
 # AimingInfrastructureConfig）由门禁谓词直接豁免，不在此登记。
 # 备注：实测扫描未发现 archive/legacy/services-ghost 形态存量命中，无需剔除条目。
+# 卷07 F07-17（W181/C163）清偿：workspace 6 条（ScenarioOptionsController / ScenarioPreValidateController /
+# KnowledgeConfigAggregator / KnowledgeHealthAggregator / DcchengClient / WorkspaceSecurityEngineClient）
+# 已迁 WorkspaceRestClientConfig 共享 Bean + ServiceEndpointResolver 两态寻址，本批删除。
 com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient
 com.chinacreator.gzcm.engine.ai.service.ToolExecutorService
 com.chinacreator.gzcm.engine.data.controller.QueryController
@@ -17,9 +20,3 @@ com.chinacreator.gzcm.engine.ontology.client.DataNetResourceClient
 com.chinacreator.gzcm.engine.ontology.client.KbEngineGraphSyncClient
 com.chinacreator.gzcm.engine.ontology.service.PublishGateService
 com.chinacreator.gzcm.sysman.service.PortalSearchQueryService
-com.chinacreator.gzcm.workspace.controller.ScenarioOptionsController
-com.chinacreator.gzcm.workspace.controller.ScenarioPreValidateController
-com.chinacreator.gzcm.workspace.knowledge.service.KnowledgeConfigAggregator
-com.chinacreator.gzcm.workspace.knowledge.service.KnowledgeHealthAggregator
-com.chinacreator.gzcm.workspace.scenario.DcchengClient
-com.chinacreator.gzcm.workspace.security.WorkspaceSecurityEngineClient

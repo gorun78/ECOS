@@ -4,24 +4,24 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.Duration;
 import java.util.Map;
 
 /**
  * dccheng(cognitive 宿主) 客户端 — 场景运行编排专用（PMO-52 T2）。
  *
- * <p>跨服务调用统一走 cognitive 对外端点，默认经 gateway :8080（单体双跑等价：
- * workspace :18090 → gateway :8080 → 同 JVM cognitive controller），
- * 生产微服务态由 {@code ecos.cognitive-base} 指向 gateway 或内网 dccheng 端口。
- * 30s 硬超时对齐认知引擎"推理不能 >30s"红线。</p>
+ * <p>跨服务调用统一走 cognitive 对外端点。卷07 F07-17 底座收口：base-url 不再由
+ * {@code ecos.cognitive-base} 硬编码默认值决定，改注入
+ * {@code WorkspaceRestClientConfig#workspaceCognitiveInvokeRest} 共享 Bean
+ * （rootUri 经 runtime-access ServiceEndpointResolver 两态寻址：单体/未切流经
+ * gateway :8080，切流后指向 cognitive 承流端口），本类只传相对路径。
+ * 30s 硬超时对齐认知引擎"推理不能 >30s"红线，超时口径在 config 集中下发。</p>
  */
 @Service
 public class DcchengClient {
@@ -29,11 +29,9 @@ public class DcchengClient {
     private static final Logger log = LoggerFactory.getLogger(DcchengClient.class);
 
     private final RestTemplate restTemplate;
-    private final String base;
 
-    public DcchengClient(@Value("${ecos.cognitive-base:http://localhost:8080/api/v1}") String base) {
-        this.base = base;
-        this.restTemplate = new RestTemplate(newTimeoutFactory(Duration.ofSeconds(30)));
+    public DcchengClient(@Qualifier("workspaceCognitiveInvokeRest") RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
     }
 
     /** 因果诊断 POST {base}/cognitive/diagnose */
@@ -79,7 +77,6 @@ public class DcchengClient {
      * 稳态返回树供调用方 toJson 落库，结构零失真）。
      */
     private JsonNode postJson(String path, Map<String, Object> payload) {
-        String url = base + path;
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -87,10 +84,10 @@ public class DcchengClient {
             // 网关侧按 Accept 选 converter 时编缀 XML 系 converter（实证：返回 <ApiResponse> 伪 XML 文本）
             headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
             String body = RAW_JSON.writeValueAsString(payload);
-            String resp = restTemplate.postForObject(url,
+            String resp = restTemplate.postForObject(path,
                     new HttpEntity<>(body, headers), String.class);
             if (resp == null || resp.isBlank()) {
-                throw new IllegalStateException("dccheng 返回空: " + url);
+                throw new IllegalStateException("dccheng 返回空: " + path);
             }
             JsonNode root = RAW_JSON.readTree(resp);
             JsonNode code = root.path("code");
@@ -103,20 +100,20 @@ public class DcchengClient {
         } catch (IllegalStateException e) {
             throw e;
         } catch (Exception e) {
-            log.warn("dccheng 调用失败 {}: {}", url, e.getMessage());
+            log.warn("dccheng 调用失败 {}: {}", path, e.getMessage());
             throw new IllegalStateException("cognitive 服务不可用: " + e.getMessage(), e);
         }
     }
 
     private Map<String, Object> post(String path, Map<String, Object> payload) {
-        String url = base + path;
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            Map<String, Object> resp = restTemplate.postForObject(url,
+            @SuppressWarnings("unchecked")
+            Map<String, Object> resp = restTemplate.postForObject(path,
                     new HttpEntity<>(payload, headers), Map.class);
             if (resp == null) {
-                throw new IllegalStateException("dccheng 返回空: " + url);
+                throw new IllegalStateException("dccheng 返回空: " + path);
             }
             // ApiResponse 统一体: code=0 成功
             Object code = resp.get("code");
@@ -130,15 +127,8 @@ public class DcchengClient {
         } catch (IllegalStateException e) {
             throw e;
         } catch (Exception e) {
-            log.warn("dccheng 调用失败 {}: {}", url, e.getMessage());
+            log.warn("dccheng 调用失败 {}: {}", path, e.getMessage());
             throw new IllegalStateException("cognitive 服务不可用: " + e.getMessage(), e);
         }
-    }
-
-    private static SimpleClientHttpRequestFactory newTimeoutFactory(Duration d) {
-        SimpleClientHttpRequestFactory f = new SimpleClientHttpRequestFactory();
-        f.setConnectTimeout((int) d.toMillis());
-        f.setReadTimeout((int) d.toMillis());
-        return f;
     }
 }

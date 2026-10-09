@@ -6,7 +6,6 @@ import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -24,10 +23,10 @@ import java.util.Map;
  *
  * <p>scope 分发（按 PMO-55 E-A#3 要求）：
  * <ul>
- *   <li>{@code knowledge} — REST GET {@code :18086/api/v1/knowledge/settings}
- *       （dccheng 承接 kb 引擎 :18086，settings 端点已存在）；</li>
- *   <li>{@code cognitive} — REST GET {@code :18084/api/v1/cognitive/config}
- *       （aiming 承接 cognitive config :18084）；</li>
+ *   <li>{@code knowledge} — REST GET {@code {dccheng}/api/v1/knowledge/settings}
+ *       （dccheng 承接 kb 引擎，settings 端点已存在）；</li>
+ *   <li>{@code cognitive} — REST GET {@code {aiming}/api/v1/cognitive/config}
+ *       （aiming 承接 cognitive config）；</li>
  *   <li>{@code all} — 上面两者 REST + 本地 sys_config 两域（本地优先覆盖）。</li>
  * </ul>
  *
@@ -35,6 +34,10 @@ import java.util.Map;
  * 本聚合统一只解 data 载荷，写侧上游返回 {@code data.updated}=actual 写回行数。
  *
  * <p>降级：单次 REST 失败 → 该 scope 返回 _remote_failed 标记项（不 500，前端可见）。
+ *
+ * <p>卷07 F07-17 底座收口：base-url 由 {@code WorkspaceRestClientConfig} 经
+ * runtime-access ServiceEndpointResolver 两态寻址解析（禁自建 RestTemplate / 硬编码
+ * localhost:1808x），本类注入短超时（1500ms）探活 Bean，只传相对路径。
  *
  * @author ecos-factory
  * @since PMO-55 批次 E-A
@@ -50,29 +53,17 @@ public class KnowledgeConfigAggregator {
     private static final String COGNITIVE_GROUP = "cognitive-engine";
 
     private final WorkspaceDataDao dao;
-    private final RestTemplate restTemplate;
-    private final String kbBase;
-    private final String cognitiveBase;
+    /** kb settings 客户端（rootUri = dccheng 基址 + /api/v1，1500ms 短超时）。 */
+    private final RestTemplate kbRest;
+    /** cognitive config 客户端（rootUri = aiming 基址 + /api/v1，1500ms 短超时）。 */
+    private final RestTemplate cognitiveRest;
 
     public KnowledgeConfigAggregator(WorkspaceDataDao dao,
-                                     @Value("${ecos.kb-base:http://localhost:18086/api/v1}") String kbBase,
-                                     @Value("${ecos.cognitive-base:http://localhost:18084/api/v1}") String cognitiveBase) {
+                                     @Qualifier("workspaceKbSettingsRest") RestTemplate kbRest,
+                                     @Qualifier("workspaceCognitiveCfgRest") RestTemplate cognitiveRest) {
         this.dao = dao;
-        this.restTemplate = newShortTimeoutRestTemplate();
-        this.kbBase = kbBase;
-        this.cognitiveBase = cognitiveBase;
-    }
-
-    /**
-     * 短超时 RestTemplate 工厂（1500ms）— 避免全局 RestTemplate 默认无超时拖跨认知 DOWN 探活时长；
-     * 不创建独立 bean，仅内部构造 — 不影响 bean 图。
-     */
-    private static RestTemplate newShortTimeoutRestTemplate() {
-        org.springframework.http.client.SimpleClientHttpRequestFactory factory =
-                new org.springframework.http.client.SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(1500);
-        factory.setReadTimeout(1500);
-        return new RestTemplate(factory);
+        this.kbRest = kbRest;
+        this.cognitiveRest = cognitiveRest;
     }
 
     /**
@@ -128,10 +119,9 @@ public class KnowledgeConfigAggregator {
         HttpEntity<List<Map<String, String>>> entity = new HttpEntity<>(reqBody, headers);
 
         if ("knowledge".equals(scope)) {
-            String url = kbBase + "/knowledge/settings";
             try {
                 @SuppressWarnings("rawtypes")
-                ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.PUT, entity, Map.class);
+                ResponseEntity<Map> resp = kbRest.exchange("/knowledge/settings", HttpMethod.PUT, entity, Map.class);
                 return extractUpdated(resp.getBody());
             } catch (Exception ex) {
                 log.error("kb settings remote PUT failed: {}", shortMsg(ex));
@@ -139,10 +129,9 @@ public class KnowledgeConfigAggregator {
             }
         }
         if ("cognitive".equals(scope)) {
-            String url = cognitiveBase + "/cognitive/config";
             try {
                 @SuppressWarnings("rawtypes")
-                ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.PUT, entity, Map.class);
+                ResponseEntity<Map> resp = cognitiveRest.exchange("/cognitive/config", HttpMethod.PUT, entity, Map.class);
                 return extractUpdated(resp.getBody());
             } catch (Exception ex) {
                 log.error("cognitive config remote PUT failed: {}", shortMsg(ex));
@@ -155,20 +144,18 @@ public class KnowledgeConfigAggregator {
     // ── 远端 REST 读 ───────────────────────────────────
 
     private Map<String, String> readKnowledgeRemote() {
-        String url = kbBase + "/knowledge/settings";
-        return remoteGetConfigRows(url, "kb");
+        return remoteGetConfigRows(kbRest, "/knowledge/settings", "kb");
     }
 
     private Map<String, String> readCognitiveRemote() {
-        String url = cognitiveBase + "/cognitive/config";
-        return remoteGetConfigRows(url, "cognitive");
+        return remoteGetConfigRows(cognitiveRest, "/cognitive/config", "cognitive");
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, String> remoteGetConfigRows(String url, String label) {
+    private Map<String, String> remoteGetConfigRows(RestTemplate restTemplate, String path, String label) {
         Map<String, String> map = new LinkedHashMap<>();
         try {
-            ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
+            ResponseEntity<Map> resp = restTemplate.exchange(path, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
             Map<String, Object> body = resp.getBody();
             Object data = body == null ? null : body.get("data");
             if (!(data instanceof List<?> list)) {
@@ -185,7 +172,7 @@ public class KnowledgeConfigAggregator {
                 }
             }
         } catch (Exception ex) {
-            log.warn("{} settings remote read failed ({}): {}", label, shortMsg(ex), url);
+            log.warn("{} settings remote read failed ({}): {}", label, shortMsg(ex), path);
             map.put("_remote_failed", shortMsg(ex));
         }
         return map;

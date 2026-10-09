@@ -4,18 +4,24 @@ import com.chinacreator.gzcm.runtime.access.graph.Neo4jClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * A2 — Object 实例 → KG 节点同步引擎。
  *
  * <p>在 ObjectController 的 CRUD 操作中异步将对象实例同步到 Neo4j 知识图谱。
  * 所有 Neo4j 写入均为异步执行，异常仅记录日志，不抛给主业务流程。</p>
+ *
+ * <p>卷07 F07-17 底座收口：异步通道由 {@code CompletableFuture.runAsync}（common pool）
+ * 改为 workspace 命名执行器 {@code workspaceTaskExecutor}
+ * （{@code WorkspaceTaskExecutorConfig}，禁 common pool、禁裸线程）。runtime-task 仅提供
+ * DB 持久化任务计划门面、无通用一次性异步执行门面，故按 F07-17 兜底条款走命名池。</p>
  */
 @Service
 public class ObjectKgSyncService {
@@ -25,6 +31,13 @@ public class ObjectKgSyncService {
     // M0 改造 (2026-09): Neo4j Driver 由 runtime-access/Neo4jConfig 统一管理 (收敛铁律 2.5)。
     @Autowired(required = false)
     private Neo4jClient neo4jClient;
+
+    /** workspace 命名异步执行器（F07-17 底座收口，构造器注入避免新增字段注入违规）。 */
+    private final TaskExecutor taskExecutor;
+
+    public ObjectKgSyncService(@Qualifier("workspaceTaskExecutor") TaskExecutor taskExecutor) {
+        this.taskExecutor = taskExecutor;
+    }
 
     @PostConstruct
     void init() {
@@ -62,7 +75,7 @@ public class ObjectKgSyncService {
             return;
         }
 
-        CompletableFuture.runAsync(() -> {
+        taskExecutor.execute(() -> {
             try {
                 switch (operation) {
                     case "CREATE" -> {
@@ -91,14 +104,10 @@ public class ObjectKgSyncService {
                     default -> log.warn("Unknown KG sync operation: {}", operation);
                 }
             } catch (Exception e) {
-                // ★ 异常只 log，不抛 — 不能影响主业务流程
-                log.warn("KG sync {} failed for {} id={}: {}",
+                // ★ 异常只 log，不抛 — 不能影响主业务流程（命名池内自吞，等价原 exceptionally 留痕）
+                log.warn("KG sync async {} failed for {} id={}: {}",
                         operation, entityCode, objectId, e.getMessage());
             }
-        }).exceptionally(ex -> {
-            log.warn("KG sync async {} failed for {} id={}: {}",
-                    operation, entityCode, objectId, ex.getMessage());
-            return null;
         });
     }
 
@@ -126,7 +135,7 @@ public class ObjectKgSyncService {
             return;
         }
 
-        CompletableFuture.runAsync(() -> {
+        taskExecutor.execute(() -> {
             try {
                 // 使用参数化查询保护 id
                 // Label 和 Relationship Type 已通过正则安全校验
@@ -139,13 +148,10 @@ public class ObjectKgSyncService {
                 log.debug("KG sync RELATION: ({}:{})-[:{}]->({}:{})",
                         sourceEntityCode, sourceId, relationType, targetEntityCode, targetId);
             } catch (Exception e) {
-                log.warn("KG sync RELATION failed for ({}:{})-[:{}]->({}:{}): {}",
+                // ★ 异常只 log，不抛 — 不能影响主业务流程（命名池内自吞，等价原 exceptionally 留痕）
+                log.warn("KG sync async RELATION failed for ({}:{})-[:{}]->({}:{}): {}",
                         sourceEntityCode, sourceId, relationType, targetEntityCode, targetId, e.getMessage());
             }
-        }).exceptionally(ex -> {
-            log.warn("KG sync async RELATION failed for ({}:{})-[:{}]->({}:{}): {}",
-                    sourceEntityCode, sourceId, relationType, targetEntityCode, targetId, ex.getMessage());
-            return null;
         });
     }
 }
