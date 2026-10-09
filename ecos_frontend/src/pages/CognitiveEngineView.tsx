@@ -172,7 +172,7 @@ export default function CognitiveEngineView() {
               {isRunning ? <><Square className="w-3.5 h-3.5" />{t('cognition.engine.stop')}</> : <><Play className="w-3.5 h-3.5" />{t('cognition.engine.start')}</>}
             </button>
             <button type="button" onClick={() => { loadEngine(); loadSubEngine(activeTab); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1E2533] hover:bg-[#263147] text-gray-300 text-sm border border-[#2D3748]">
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${styles.islandInput} hover:bg-[#263147] ${styles.islandText} text-sm border ${styles.islandInputBorder}`}>
               <RefreshCw className="w-3.5 h-3.5" />{t('cognition.engine.refresh')}
             </button>
           </div>
