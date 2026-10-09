@@ -384,7 +384,7 @@ export default function ProposalPanel({
           </p>
         </div>
         {!showForm && (
-          <button
+          <button type="button"
             onClick={() => {
               if (!selectedObjectType && objectTypes.length === 0) {
                 showToast('error', t('ow.msg.selectObjectFirst'));
@@ -574,7 +574,7 @@ export default function ProposalPanel({
                 <div className={`flex items-center gap-1.5 pt-1 border-t ${styles.cardBorder}`}>
                   {p.status === 'DRAFT' && (
                     <>
-                      <button
+                      <button type="button"
                         onClick={() => handleSubmit(p.id)}
                         disabled={isActing}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50"
@@ -582,7 +582,7 @@ export default function ProposalPanel({
                         <Send size={10} />
                         {t('ow.btn.submitProposal')}
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => handleDelete(p.id)}
                         disabled={isActing}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 disabled:opacity-50"
@@ -593,7 +593,7 @@ export default function ProposalPanel({
                   )}
                   {p.status === 'PENDING' && (
                     <>
-                      <button
+                      <button type="button"
                         onClick={() => handleVerify(p.id)}
                         disabled={isActing}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50"
@@ -601,7 +601,7 @@ export default function ProposalPanel({
                         <Shield size={10} />
                         {t('ow.btn.verifyProposal')}
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => setReviewModal({ id: p.id, action: 'approve' })}
                         disabled={isActing || selfReview}
                         title={selfReview ? t('ow.msg.reviewerMustDiffer') : undefined}
@@ -610,7 +610,7 @@ export default function ProposalPanel({
                         <CheckCircle size={10} />
                         {t('ow.btn.approveProposal')}
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => setReviewModal({ id: p.id, action: 'reject' })}
                         disabled={isActing || selfReview}
                         title={selfReview ? t('ow.msg.reviewerMustDiffer') : undefined}
@@ -623,7 +623,7 @@ export default function ProposalPanel({
                   )}
                   {/* 已验证(VERIFIED) 或已审批(APPROVED) 均可执行 —— 与后端 execute 端点受理状态对齐 */}
                   {(p.status === 'APPROVED' || p.status === 'VERIFIED') && (
-                    <button
+                    <button type="button"
                       onClick={() => handleExecute(p.id)}
                       disabled={isActing}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
@@ -656,11 +656,11 @@ export default function ProposalPanel({
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => { setReviewModal(null); setReviewComment(''); }}
+                <button type="button" onClick={() => { setReviewModal(null); setReviewComment(''); }}
                   className={`px-3 py-1.5 rounded text-[10px] font-semibold border ${styles.cardBorder} ${styles.cardTextMuted} ${styles.cardBg}`}>
                   {t('ow.btn.cancel')}
                 </button>
-                <button onClick={handleReviewSubmit}
+                <button type="button" onClick={handleReviewSubmit}
                   className={`px-4 py-1.5 rounded text-[10px] font-semibold text-white ${reviewModal.action === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}>
                   {reviewModal.action === 'approve' ? t('ow.btn.approveProposal') : t('ow.btn.rejectProposal')}
                 </button>

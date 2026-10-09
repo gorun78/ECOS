@@ -78,7 +78,7 @@ export default function AgentList({
       <div className={`w-56 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col h-full shrink-0`}>
         <div className={`p-3 border-b ${styles.cardBorder} flex items-center justify-between ${styles.inputBg}`}>
           <span className={`font-bold ${styles.cardText}`}>{t("aiworkbench.agentStudio.agentWorkshop")} ({agents.length})</span>
-          <button
+          <button type="button"
             onClick={onStartCreate}
             className={`p-1 ${styles.badgeBg} hover:opacity-80 ${styles.accentText} ${styles.accentBorder} border rounded-md transition-colors cursor-pointer`}
             title={t("aiworkbench.agentStudio.newAgent")}

@@ -114,7 +114,7 @@ export default function MarketplaceHeader({
             {t("marketplace.subtitle")}
           </p>
         </div>
-        <button
+        <button type="button"
           onClick={onPublishClick}
           className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-500 hover:bg-indigo-600
             text-white text-sm font-medium transition-colors duration-150 shadow-lg shadow-indigo-500/20"

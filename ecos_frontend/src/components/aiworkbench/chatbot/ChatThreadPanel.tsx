@@ -83,14 +83,14 @@ export default function ChatThreadPanel({
             </form>
           ) : (
             <>
-              <button
+              <button type="button"
                 onClick={() => setShowNewThreadInput(true)}
                 className={`p-1 ${styles.accentText} hover:${styles.accentHover} rounded cursor-pointer text-[9px] font-bold`}
                 title={t('aiworkbench.chatbot.newThread')}
               >
                 <Icon name="Plus" size={10} />
               </button>
-              <button
+              <button type="button"
                 onClick={onSaveThread}
                 className={`p-1 ${styles.cardTextMuted} hover:${styles.accentText} rounded cursor-pointer text-[9px] font-bold`}
                 title={t('aiworkbench.chatbot.saveCurrentThread')}
@@ -128,7 +128,7 @@ export default function ChatThreadPanel({
               </span>
             </div>
             {thread.id !== 'thread-1' && (
-              <button
+              <button type="button"
                 onClick={(e) => { e.stopPropagation(); onDeleteThread(thread.id); }}
                 className={`p-0.5 ${styles.cardTextMuted} hover:text-rose-500 cursor-pointer`}
                 title={t('aiworkbench.chatbot.deleteThread')}

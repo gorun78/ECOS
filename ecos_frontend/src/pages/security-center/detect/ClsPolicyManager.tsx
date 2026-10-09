@@ -114,7 +114,7 @@ export default function ClsPolicyManager({ t, locale, styles }: { t: (k: string)
           <h3 className={`text-lg font-bold ${styles.cardText}`}>{t('sec.cls.title')}</h3>
           <p className={`text-xs ${styles.muted}`}>{t('sec.cls.subtitle')}</p>
         </div>
-        <button onClick={openCreate} className={`flex items-center gap-1.5 ${btnPrimary(styles)}`}>
+        <button type="button" onClick={openCreate} className={`flex items-center gap-1.5 ${btnPrimary(styles)}`}>
           <Plus size={14} />{t('sec.cls.create')}
         </button>
       </div>
@@ -132,7 +132,7 @@ export default function ClsPolicyManager({ t, locale, styles }: { t: (k: string)
       {error && (
         <div className={`p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm dark:bg-red-950/30 dark:border-red-800 dark:text-red-400 flex items-start gap-2`}>
           <AlertTriangle size={14} className="shrink-0 mt-0.5" /><span>{error}</span>
-          <button onClick={() => setError(null)} className="ml-auto"><X size={14} /></button>
+          <button type="button" onClick={() => setError(null)} className="ml-auto"><X size={14} /></button>
         </div>
       )}
 
@@ -179,10 +179,10 @@ export default function ClsPolicyManager({ t, locale, styles }: { t: (k: string)
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
-                      <button onClick={() => openEdit(p)} className={`p-1.5 rounded hover:${styles.sidebarHoverBg} ${styles.muted} cursor-pointer`}>
+                      <button type="button" onClick={() => openEdit(p)} className={`p-1.5 rounded hover:${styles.sidebarHoverBg} ${styles.muted} cursor-pointer`}>
                         <Edit3 size={14} />
                       </button>
-                      <button onClick={() => setDeleteTarget(p)} className="p-1.5 rounded hover:bg-red-50 text-red-500 cursor-pointer">
+                      <button type="button" onClick={() => setDeleteTarget(p)} className="p-1.5 rounded hover:bg-red-50 text-red-500 cursor-pointer">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -200,7 +200,7 @@ export default function ClsPolicyManager({ t, locale, styles }: { t: (k: string)
           <div className={`w-full max-w-lg mx-4 rounded-xl ${styles.cardBg} border ${styles.cardBorder} shadow-xl`} onClick={e => e.stopPropagation()}>
             <div className={`flex items-center justify-between px-5 py-4 border-b ${styles.cardBorder}`}>
               <h3 className={`font-bold ${styles.cardText}`}>{editing ? t('sec.cls.edit') : t('sec.cls.create')}</h3>
-              <button onClick={() => setModalOpen(false)} className={`${styles.muted} hover:${styles.cardText} cursor-pointer`}><X size={18} /></button>
+              <button type="button" onClick={() => setModalOpen(false)} className={`${styles.muted} hover:${styles.cardText} cursor-pointer`}><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
               <div>
@@ -240,8 +240,8 @@ export default function ClsPolicyManager({ t, locale, styles }: { t: (k: string)
               </div>
             </div>
             <div className={`flex justify-end gap-2 px-5 py-4 border-t ${styles.cardBorder}`}>
-              <button onClick={() => setModalOpen(false)} className={btnSecondary(styles)}>{t('common.cancel')}</button>
-              <button onClick={handleSave} disabled={saving || !form.policyName || !form.tableName} className={btnPrimary(styles)}>
+              <button type="button" onClick={() => setModalOpen(false)} className={btnSecondary(styles)}>{t('common.cancel')}</button>
+              <button type="button" onClick={handleSave} disabled={saving || !form.policyName || !form.tableName} className={btnPrimary(styles)}>
                 {saving ? <Loader2 size={14} className="animate-spin" /> : t('common.save')}
               </button>
             </div>
@@ -261,8 +261,8 @@ export default function ClsPolicyManager({ t, locale, styles }: { t: (k: string)
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setDeleteTarget(null)} className={btnSecondary(styles)}>{t('common.cancel')}</button>
-              <button onClick={handleDelete} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer">{t('common.delete')}</button>
+              <button type="button" onClick={() => setDeleteTarget(null)} className={btnSecondary(styles)}>{t('common.cancel')}</button>
+              <button type="button" onClick={handleDelete} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer">{t('common.delete')}</button>
             </div>
           </div>
         </div>
