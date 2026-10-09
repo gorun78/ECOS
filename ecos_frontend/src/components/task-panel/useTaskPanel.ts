@@ -189,9 +189,9 @@ export function useTaskPanel(open: boolean, t: Translate, showToast: (type: Toas
     setBatchActioning(true);
     try {
       const d = await taskPanelBatchJson([...selectedIds], action);
-      if (d.code !== 0) showToast("error", `${t("taskPanel.batchFailed")}: ${d.message || t("taskPanel.unknownError")}`);
+      if (d.code !== 0) showToast("error", `${t("taskPanel.batch.failed")}: ${d.message || t("taskPanel.unknownError")}`);
       else {
-        showToast("success", t("taskPanel.batchDone"));
+        showToast("success", t("taskPanel.batch.done"));
         setSelectedIds(new Set());
         refresh();
       }

@@ -47,7 +47,7 @@ export function TaskPanelFilterBar({
               : `${styles.appBg} ${styles.cardTextMuted} hover:${styles.sidebarHoverBg}`
           }`}
         >
-          {t("taskPanel.filter.all")}
+          {t("taskPanel.filterAll")}
         </button>
         {CATEGORIES.map(cat => (
           <button
@@ -72,7 +72,7 @@ export function TaskPanelFilterBar({
           onChange={e => setFilterStatus(e.target.value)}
           className={`px-3 py-1.5 text-sm border ${styles.inputBorder} rounded-lg ${styles.inputBg} ${styles.inputText} outline-none focus:ring-2 focus:ring-blue-500/30`}
         >
-          <option value="">{t("taskPanel.filter.allStatus")}</option>
+          <option value="">{t("taskPanel.filterAllStatus")}</option>
           <option value="PENDING">{t("taskPanel.status.pending")}</option>
           <option value="RUNNING">{t("taskPanel.status.running")}</option>
           <option value="SUCCEEDED">{t("taskPanel.status.succeeded")}</option>

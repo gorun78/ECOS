@@ -163,7 +163,7 @@ export default function TaskPanel({ open, onClose }: TaskPanelProps) {
           visible
           variant={batchConfirm === "cancel" || batchConfirm === "archive" ? "danger" : "warning"}
           title={t(`taskPanel.batch.confirm.${batchConfirm}`)}
-          message={t("taskPanel.batch.confirmMessage", { n: selectedIds.size })}
+          message={t("taskPanel.batch.confirmMessage", { action: t(`taskPanel.action.${batchConfirm}`), count: selectedIds.size })}
           onConfirm={confirmBatchAction}
           onCancel={() => setBatchConfirm(null)}
         />

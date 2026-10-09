@@ -59,11 +59,11 @@ export function TaskPanelDetailDrawer({ detailTask, detailLoading, onClose }: Ta
                   <span className="w-48"><ProgressCell progress={detailTask.status.progress} /></span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.startedAt")}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.started")}</span>
                   <span className={`text-sm ${styles.cardText}`}>{formatTime(detailTask.status.startedAt)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.completedAt")}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.completed")}</span>
                   <span className={`text-sm ${styles.cardText}`}>{formatTime(detailTask.status.completedAt)}</span>
                 </div>
               </div>
@@ -74,19 +74,19 @@ export function TaskPanelDetailDrawer({ detailTask, detailLoading, onClose }: Ta
               <h4 className={`text-xs font-semibold ${styles.cardTextMuted} uppercase tracking-wider mb-3`}>{t("taskPanel.detail.basicInfo")}</h4>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.taskId")}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.id")}</span>
                   <span className={`text-sm font-mono ${styles.cardText} text-xs`}>{detailTask.task.taskId}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.taskName")}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.name")}</span>
                   <span className={`text-sm ${styles.cardText} font-medium`}>{detailTask.task.taskName}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.taskCategory")}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.category")}</span>
                   <span><CategoryBadge taskType={detailTask.task.taskType} /></span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.taskType")}</span>
+                  <span className={`text-sm ${styles.cardTextMuted}`}>{t("taskPanel.detail.type")}</span>
                   <span className={`text-sm ${styles.cardText}`}>{detailTask.task.taskType || "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -105,7 +105,7 @@ export function TaskPanelDetailDrawer({ detailTask, detailLoading, onClose }: Ta
                 </div>
                 {detailTask.task.description && (
                   <div>
-                    <span className={`text-sm ${styles.cardTextMuted} block mb-1`}>{t("taskPanel.detail.description")}</span>
+                    <span className={`text-sm ${styles.cardTextMuted} block mb-1`}>{t("taskPanel.detail.desc")}</span>
                     <p className={`text-sm ${styles.cardText} ${styles.appBg} rounded p-2`}>
                       {detailTask.task.description}
                     </p>

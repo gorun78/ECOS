@@ -21,17 +21,17 @@ export function TaskPanelBatchBar({ selectedCount, batchActioning, doBatchAction
   return (
     <div className="flex items-center gap-2 px-6 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800/30 shrink-0">
       <span className="text-sm font-medium" style={{ color: "var(--accent)" }}>
-        {t("taskPanel.batch.selected", { n: selectedCount })}
+        {t("taskPanel.batch.selected", { count: selectedCount })}
       </span>
       <div className="flex-1" />
       <button onClick={() => doBatchAction("resume")} disabled={batchActioning}
-        className="px-3 py-1 text-xs rounded transition disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "#fff" }}>{t("taskPanel.batch.resume")}</button>
+        className="px-3 py-1 text-xs rounded transition disabled:opacity-50" style={{ backgroundColor: "var(--accent)", color: "#fff" }}>{t("taskPanel.action.resume")}</button>
       <button onClick={() => doBatchAction("pause")} disabled={batchActioning}
-        className="px-3 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white rounded transition disabled:opacity-50">{t("taskPanel.batch.pause")}</button>
+        className="px-3 py-1 text-xs bg-amber-500 hover:bg-amber-600 text-white rounded transition disabled:opacity-50">{t("taskPanel.action.pause")}</button>
       <button onClick={() => doBatchAction("cancel")} disabled={batchActioning}
-        className="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition disabled:opacity-50">{t("taskPanel.batch.cancel")}</button>
+        className="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded transition disabled:opacity-50">{t("taskPanel.action.cancel")}</button>
       <button onClick={() => doBatchAction("archive")} disabled={batchActioning}
-        className={`px-3 py-1 text-xs ${styles.cardBg} hover:${styles.appBg} ${styles.cardText} rounded transition disabled:opacity-50`}>{t("taskPanel.batch.archive")}</button>
+        className={`px-3 py-1 text-xs ${styles.cardBg} hover:${styles.appBg} ${styles.cardText} rounded transition disabled:opacity-50`}>{t("taskPanel.action.archive")}</button>
       <button onClick={() => setSelectedIds(new Set())}
         className={`px-3 py-1 text-xs ${styles.cardTextMuted} transition`}>{t("taskPanel.batch.deselect")}</button>
     </div>
