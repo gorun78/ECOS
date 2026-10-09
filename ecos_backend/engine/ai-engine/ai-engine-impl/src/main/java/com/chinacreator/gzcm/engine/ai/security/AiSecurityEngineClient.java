@@ -356,7 +356,7 @@ public class AiSecurityEngineClient {
     private Map<String, Object> postJson(String path, Map<String, Object> body) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("X-Request-Id", AiTraceSupport.currentTraceId());
+        headers.set(AiTraceSupport.HEADER_REQUEST_ID, AiTraceSupport.currentTraceId());
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
         ResponseEntity<Map> resp = restTemplate.postForEntity(baseUrl + path, entity, Map.class);
         return resp == null ? null : resp.getBody();

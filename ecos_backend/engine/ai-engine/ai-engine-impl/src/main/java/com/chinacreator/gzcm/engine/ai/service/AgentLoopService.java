@@ -53,6 +53,14 @@ public class AgentLoopService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentLoopService.class);
 
+    /**
+     * Agent Loop 结构化行专用 logger（{@link AgentLoopTrace#LOGGER_NAME}）。
+     *
+     * <p>与业务日志分通道：logback 侧该 logger 只挂文件 appender，
+     * 运行回放（F06-08）读取端因此无需从混合日志里挑行。</p>
+     */
+    private static final Logger agentLoopLog = LoggerFactory.getLogger(AgentLoopTrace.LOGGER_NAME);
+
     /** Agent 推理最大轮次 */
     private static final int MAX_TURNS = 5;
 
@@ -1166,8 +1174,11 @@ public class AgentLoopService {
     // ─── Helpers ───────────────────────────────────────────────────────
 
     /**
-     * F06-06 要点 3：一步恰一条固定格式结构化日志行（INFO 级，MDC 前缀带 traceId），
+     * F06-06 要点 3：一步恰一条固定格式结构化日志行（INFO 级，行内自携带 traceId），
      * 同时写入 {@link AgentTracer} 本地调试视图。行文本不含任何消息/工具结果原文。
+     *
+     * <p>行只经 {@link #agentLoopLog}（{@code ECOS_AGENT_LOOP} 专用通道）落文件，
+     * 该行即为 F06-08 运行回放的唯一重建源 —— 进程重启后回放仍成立，不依赖内存。</p>
      */
     private void step(String agentId, String traceId, AgentLoopTrace.Op op, int step,
                       String tool, String model, long promptTokens, long completionTokens,
@@ -1180,8 +1191,9 @@ public class AgentLoopService {
                 .completionTokens(completionTokens)
                 .latencyMs(latencyMs)
                 .decision(decision)
+                .trace(traceId)
                 .render();
-        log.info("{}", line);
+        agentLoopLog.info("{}", line);
         AgentTracer.record(traceId, step, op, latencyMs, promptTokens, completionTokens, tool, decision);
     }
 

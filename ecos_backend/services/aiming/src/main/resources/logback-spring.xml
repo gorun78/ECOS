@@ -11,6 +11,29 @@
         </encoder>
     </appender>
 
+    <!-- 详细设计-06 F06-08：Agent Loop 结构化行独立文件通道（aiming 为 ai-engine 的运行时宿主）。
+         ECOS_AGENT_LOOP logger 只写固定格式行，回放读取端按 ${LOG_PATH}/agent-loop*.log 检索；
+         滚动文件名保持纯文本（.gz 历史段不可回放），目录单一来源 = logging.file.path（logback 侧 LOG_PATH）。 -->
+    <appender name="AGENT_LOOP" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH:-logs}/agent-loop.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH:-logs}/agent-loop.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>50MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSS} %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <logger name="ECOS_AGENT_LOOP" level="INFO" additivity="false">
+        <appender-ref ref="AGENT_LOOP"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
     <logger name="com.chinacreator.gzcm" level="DEBUG"/>
     <logger name="org.springframework" level="INFO"/>
 

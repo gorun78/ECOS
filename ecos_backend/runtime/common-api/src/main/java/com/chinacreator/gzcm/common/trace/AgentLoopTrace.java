@@ -1,13 +1,26 @@
 package com.chinacreator.gzcm.common.trace;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * Agent Loop 结构化日志行单源（详细设计-06 F06-06 要点 3/4）。
  *
  * <p>固定字段序（供运行回放 F06-08 与前端诊断码 F06-19 侧按 key 解析，禁自由文案）：</p>
  * <pre>
  * EVT=AgentLoop op={plan|tool_call|tool_result|llm_call|final} step={n} agent={agentId} \
- * tool={} model={} promptTokens={} completionTokens={} latencyMs={} decision={ALLOW|DENY|FAIL_CLOSED|NA}
+ * tool={} model={} promptTokens={} completionTokens={} latencyMs={} decision={ALLOW|DENY|FAIL_CLOSED|NA} trace={}
  * </pre>
+ *
+ * <p>字段序与 F06-06 要点 3 逐字一致，仅在行末追加 {@code trace=} 一位：
+ * F06-08 要求"按 traceId 从日志重建时序"，而 MDC 前缀由 logback pattern 决定、
+ * 属部署面而非行契约，故检索键必须随行自描述，回放侧才能脱离 pattern 解析。</p>
  *
  * <p>纪律：</p>
  * <ul>
@@ -15,7 +28,9 @@ package com.chinacreator.gzcm.common.trace;
  *       本类是全仓唯一登记处，分册 07/09 前端诊断码与此对齐；</li>
  *   <li>token 与 latency <b>必填</b>：真值缺失时写 {@link #UNKNOWN}（-1），
  *       <b>禁静默 0</b>（X-38 恒 0 面）；回放侧把 -1 标为"缺失"而非 0；</li>
- *   <li>字符串字段缺失写 {@link #ABSENT}（连字符），禁写入原文（脱敏面）。</li>
+ *   <li>字符串字段缺失写 {@link #ABSENT}（连字符），禁写入原文（脱敏面）；</li>
+ *   <li>本类同时是回放侧的<b>解析器单源</b>（{@link #parse}）—— 写读同处，
+ *       禁在回放端另立第二套字段名/分隔符理解（口径漂移即断链）。</li>
  * </ul>
  */
 public final class AgentLoopTrace {
@@ -23,11 +38,27 @@ public final class AgentLoopTrace {
     /** 事件名（结构化行第一字段 value，日志侧检索锚点）。 */
     public static final String EVENT = "AgentLoop";
 
+    /** 行前缀标记：grep 与回放扫描的检索锚点（含空格，避免误命中自由文案）。 */
+    public static final String MARKER = "EVT=AgentLoop ";
+
+    /**
+     * Agent Loop 结构化行的专用 logger 名（logback 侧按此名接文件 appender，
+     * 使该文件"只含结构化行"，回放读取端无需过滤噪声）。
+     */
+    public static final String LOGGER_NAME = "ECOS_AGENT_LOOP";
+
     /** 数值字段缺失标记 —— 与"实测为 0"严格区分。 */
     public static final long UNKNOWN = -1L;
 
     /** 字符串字段缺失标记。 */
     public static final String ABSENT = "-";
+
+    /** {@code key=value} 字段对（值不含空格；agent/tool/model 由 {@link #safe} 保证）。 */
+    private static final Pattern FIELD = Pattern.compile("([A-Za-z][A-Za-z0-9]*)=(\\S*)");
+
+    /** appender pattern 前缀里的 ISO 时间戳（回放排序用；缺省则按读取顺序）。 */
+    private static final Pattern TIMESTAMP_PREFIX =
+            Pattern.compile("^(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{1,3}(?:Z|[+-]\\d{2}:?\\d{2})?)");
 
     /** Loop 步骤枚举（F06-06 要点 4，取代 think/act/observe）。 */
     public enum Op {
@@ -89,10 +120,17 @@ public final class AgentLoopTrace {
         private long completionTokens = UNKNOWN;
         private long latencyMs = UNKNOWN;
         private Decision decision = Decision.NA;
+        private String traceId;
 
         private Builder(Op op, int step) {
             this.op = op;
             this.step = step;
+        }
+
+        /** 行末检索键（F06-08 回放按 traceId 重建的前提）；缺失写 {@link #ABSENT}，禁臆造。 */
+        public Builder trace(String traceId) {
+            this.traceId = traceId;
+            return this;
         }
 
         public Builder agent(String agentId) {
@@ -149,8 +187,111 @@ public final class AgentLoopTrace {
                     .append(" promptTokens=").append(promptTokens)
                     .append(" completionTokens=").append(completionTokens)
                     .append(" latencyMs=").append(latencyMs)
-                    .append(" decision=").append(decision == null ? Decision.NA : decision);
+                    .append(" decision=").append(decision == null ? Decision.NA : decision)
+                    .append(" trace=").append(safe(traceId));
             return sb.toString();
+        }
+    }
+
+    /**
+     * 解析出的一行（回放侧读模型）。
+     *
+     * @param seq              读取序号（同一批内稳定排序用）
+     * @param timestampMillis  appender 前缀时间戳，缺失为 {@link #UNKNOWN}
+     */
+    public record Line(long seq, String traceId, Op op, int step, String agent, String tool, String model,
+                       long promptTokens, long completionTokens, long latencyMs,
+                       Decision decision, long timestampMillis) {
+
+        /** 数值字段是否缺失（-1 态）—— 回放响应里据此输出"未上报"而非 0（X-68 同纪律）。 */
+        public static Long value(long v) {
+            return v == UNKNOWN ? null : v;
+        }
+    }
+
+    /**
+     * 从一条（可能带 appender 前缀的）日志文本解析结构化行。
+     *
+     * @return 非 {@code EVT=AgentLoop} 行、op 不可识别或 step 不可解析时返回 {@code null}（调用方跳过，禁抛）
+     */
+    public static Line parse(String logText, long seq) {
+        if (logText == null) {
+            return null;
+        }
+        int anchor = logText.indexOf(MARKER.trim());
+        if (anchor < 0) {
+            return null;
+        }
+        Map<String, String> fields = new LinkedHashMap<>();
+        Matcher m = FIELD.matcher(logText.substring(anchor));
+        while (m.find()) {
+            fields.putIfAbsent(m.group(1), m.group(2));
+        }
+        Op op = Op.fromWire(fields.get("op"));
+        Integer step = parseInt(fields.get("step"));
+        if (op == null || step == null) {
+            return null;
+        }
+        return new Line(seq,
+                value(fields.get("trace")),
+                op,
+                step,
+                value(fields.get("agent")),
+                value(fields.get("tool")),
+                value(fields.get("model")),
+                parseLong(fields.get("promptTokens")),
+                parseLong(fields.get("completionTokens")),
+                parseLong(fields.get("latencyMs")),
+                decisionOf(fields.get("decision")),
+                parseTimestamp(logText));
+    }
+
+    private static Decision decisionOf(String raw) {
+        if (raw == null) {
+            return Decision.NA;
+        }
+        try {
+            return Decision.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            return Decision.NA;
+        }
+    }
+
+    /** 缺失标记还原为 null（字符串面）。 */
+    private static String value(String field) {
+        return field == null || ABSENT.equals(field) ? null : field;
+    }
+
+    private static long parseLong(String field) {
+        Integer v = parseInt(field);
+        return v == null ? UNKNOWN : v;
+    }
+
+    private static Integer parseInt(String field) {
+        if (field == null) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(field.trim());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    /** 前缀 ISO 时间戳 → epoch 毫秒；无时间戳（如 console pattern）记 {@link #UNKNOWN}，按读取顺序排序。 */
+    private static long parseTimestamp(String logText) {
+        Matcher m = TIMESTAMP_PREFIX.matcher(logText);
+        if (!m.find()) {
+            return UNKNOWN;
+        }
+        String raw = m.group(1);
+        try {
+            if (raw.endsWith("Z") || raw.contains("+") || raw.matches(".*-\\d{2}:?\\d{2}$")) {
+                return OffsetDateTime.parse(raw).toInstant().toEpochMilli();
+            }
+            return LocalDateTime.parse(raw).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+        } catch (RuntimeException ignored) {
+            return UNKNOWN;
         }
     }
 
