@@ -76,8 +76,45 @@ const forwardProxy =
       };
       if (withBody) fetchOptions.body = JSON.stringify(req.body);
       const upstream = await fetch(targetUrl, fetchOptions);
-      // 透传响应体 JSON/text + 状态码，不做任何字段改写（错误原样返回，401/403 必须正确传递）
+      // 透传响应体 + 状态码，不做任何字段改写（错误原样返回，401/403 必须正确传递）。
+      // 🔴 F06-21-1 / W163：SSE（text/event-stream）必须流式直通，禁止缓冲整个 body ——
+      //    否则 Agent 流式对话（/api/v1/agent*/*?stream=true）在 BFF 侧被攒到回连结束才下发，
+      //    SSE 语义（逐 token 推送）彻底失效。命中 SSE 走管道直转发 + 关压缩 + flushHeaders。
       const contentType = upstream.headers.get("content-type") || "";
+      if (contentType.includes("text/event-stream")) {
+        res.status(upstream.status);
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache, no-transform");
+        res.setHeader("X-Accel-Buffering", "no");
+        res.flushHeaders?.();
+        const webBody = upstream.body;
+        if (webBody) {
+          const reader = webBody.getReader();
+          const pump = async (): Promise<void> => {
+            try {
+              for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                res.write(Buffer.from(value));
+              }
+              res.end();
+            } catch (e) {
+              console.error(`[BFF] SSE ${routeLabel} stream error:`, e instanceof Error ? e.message : String(e));
+              res.end();
+            }
+          };
+          const cancelReader = (): void => {
+            void reader.cancel().catch(function (_e: unknown): void {
+              /* swallow — reader already consumed or already cancelled */
+            });
+          };
+          req.on("close", cancelReader);
+          void pump();
+        } else {
+          res.end();
+        }
+        return;
+      }
       if (contentType.includes("application/json")) {
         const data = await upstream.json();
         res.status(upstream.status).json(data);
