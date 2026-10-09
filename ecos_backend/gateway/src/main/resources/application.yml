@@ -90,6 +90,10 @@ llm:
   default-model: deepseek-chat
   default-temperature: 0.3
   max-context-tokens: 8000
+  # 详细设计-06 F06-21-2 / X-80：AI/Agent 前缀（/api/v1/agent*、/api/v1/agent-loop、
+  # /api/v1/agent-mesh、/api/v1/oag、/api/v1/cognitive 等 SSE/长流）超时的<b>权威契约</b>。
+  # 与 F06-14 的 LLM_TIMEOUT 判定（网关 request-timeout）单一绑定，防两处漂移互打。
+  # 默认 60s 覆盖非 AI 前缀（gateway.request-timeout），AI/Agent 前缀独立 300s。
   agent-timeout-ms: 300000
   deepseek:
     base-url: https://api.deepseek.com
@@ -102,7 +106,11 @@ llm:
     default-timeout: 600
   gateway:
     retry-max-attempts: 3
+    # 非 AI 前缀的网关请求超时：SSE/长流走 agent.specified（下）；其余 60s。
     request-timeout: 60s
+    # AI/Agent 前缀专属网关请求超时（F06-21-2）：与 agent-timeout-ms 同源 300s，
+    # 覆盖 SSE 长流与多轮 LLM 循环，避免 60s 把 Agent 流式对话切断。
+    ai-prefix-request-timeout: 300s
     # F06-05：只允许配置密钥「引用」（secret:<id> / enc:<keyId>:<cipher>），明文密钥禁入配置；
     # 真实密钥由 llm-gateway 服务端经 security-engine 密钥服务解析，未配置即默认 DENY。
     default-api-key-ref: ${LLM_GATEWAY_DEFAULT_API_KEY_REF:}

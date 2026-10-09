@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -133,5 +134,93 @@ class LlmConfigSingleSourceTest {
         assertTrue(violations.isEmpty(),
                 "gateway 之外出现 llm.* 重复声明（违 F06-20⑤ 单源，X-71~X-73）:\n"
                         + String.join("\n", violations));
+    }
+
+    /**
+     * F06-21-2 / X-80 —— AI/Agent 前缀网关闭约的<b>可判化守卫</b>（yml 源码扫描，无 Spring）。
+     *
+     * <p>断言：{@code llm.gateway} 块必须显式声明
+     * <ul>
+     *   <li>{@code ai-prefix-request-timeout: 300s}：AI/Agent 前缀（SSE/长流/多轮循环）专属超时；</li>
+     *   <li>{@code request-timeout: 60s}：其余前缀默认；</li>
+     *   <li>与 {@code llm.agent-timeout-ms: 300000} 数值同源（300s == 300000ms）—— 即
+     *       F06-14 的 LLM_TIMEOUT 判定与网关超时不再"互相打架"。</li>
+     * </ul>
+     * 若任一缺失或数值漂移，SSE Agent 流式对话要么被 60s 切断（超时不足），要么
+     * LLM_TIMEOUT 抛 300s 但网关已 60s 超时（判定失真）。
+     */
+    @Test
+    @DisplayName("F06-21-2/X-80：AI/Agent 前缀 300s vs 默认 60s —— 显式契约且与 agent-timeout-ms 同源")
+    void aiAgentPrefixTimeoutContractIsExplicitAndConsistent() throws IOException {
+        Path be = backendRoot();
+        Path gateway = be.resolve(GATEWAY_YML);
+        assertTrue(Files.isRegularFile(gateway), "单源缺失: " + GATEWAY_YML);
+        String yml = Files.readString(gateway, StandardCharsets.UTF_8);
+        String[] lines = yml.split("\\r?\\n", -1);
+
+        Long agentTimeoutMs = firstScalarValue(lines, "agent-timeout-ms");
+        String aiPrefix = firstScalarValueRaw(lines, "ai-prefix-request-timeout");
+        String defaultTimeout = firstScalarValueRaw(lines, "request-timeout");
+
+        assertTrue(agentTimeoutMs != null,
+                "llm.agent-timeout-ms 未显式声明（F06-21-2 契约缺 AI 侧锚点）");
+        assertTrue(aiPrefix != null,
+                "llm.gateway.ai-prefix-request-timeout 未显式声明（F06-21-2 契约缺显式前缀档，X-80 漂移点）");
+        assertTrue(defaultTimeout != null,
+                "llm.gateway.request-timeout 未显式声明（F06-21-2 契约缺默认档）");
+
+        // AI/Agent 前缀 300s == agent-timeout-ms（毫秒）同源
+        long aiPrefixSec = parseToSeconds(aiPrefix);
+        assertEquals(300L, aiPrefixSec,
+                "ai-prefix-request-timeout 应为 300s，实测 " + aiPrefix);
+        assertEquals(300_000L, agentTimeoutMs,
+                "agent-timeout-ms 应为 300000（300s），实测 " + agentTimeoutMs);
+        assertEquals(aiPrefixSec * 1000L, agentTimeoutMs,
+                "ai-prefix-request-timeout(" + aiPrefix + ") 与 agent-timeout-ms(" + agentTimeoutMs
+                        + ") 数值不同源 — F06-21-2 契约失效（X-80 互打风险）");
+
+        // 默认档仍为 60s（非 AI 前缀不受长流影响）
+        assertEquals(60L, parseToSeconds(defaultTimeout),
+                "llm.gateway.request-timeout 应为 60s（非 AI 前缀默认），实测 " + defaultTimeout);
+    }
+
+    /** 从 yml 非注释行取某键的标量数值（Long）。 */
+    private static Long firstScalarValue(String[] lines, String key) {
+        String raw = firstScalarValueRaw(lines, key);
+        if (raw == null) return null;
+        try {
+            return Long.valueOf(raw.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** 从 yml 非注释行取某键的标量文本值（跳过嵌套值行 & 注释）。 */
+    private static String firstScalarValueRaw(String[] lines, String key) {
+        String prefix = key + ":";
+        for (String l0 : lines) {
+            String line = l0.trim();
+            if (line.startsWith("#")) continue;
+            if (line.startsWith(prefix)) {
+                String val = line.substring(prefix.length()).trim();
+                int comment = val.indexOf('#');
+                if (comment >= 0) val = val.substring(0, comment).trim();
+                if (!val.isEmpty()) return val;
+            }
+        }
+        return null;
+    }
+
+    /** 解析 "300s" / "60s" / "30s" 类 → 秒；"300000ms" 系 → ms/1000。 */
+    private static long parseToSeconds(String v) {
+        String s = v.trim();
+        if (s.endsWith("ms")) {
+            return Long.valueOf(s.substring(0, s.length() - 2).trim()) / 1000L;
+        }
+        if (s.endsWith("s")) {
+            return Long.valueOf(s.substring(0, s.length() - 1).trim());
+        }
+        // 裸数字 = 秒
+        return Long.valueOf(s);
     }
 }
