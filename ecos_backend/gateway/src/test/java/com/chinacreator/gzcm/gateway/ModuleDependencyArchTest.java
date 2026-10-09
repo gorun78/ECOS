@@ -288,8 +288,9 @@ public class ModuleDependencyArchTest {
      * <p><b>合法例外</b>（PMO-49 P2-5 / 架构铁律 §0.3.1）：
      * <ul>
      *   <li>{@code engine.ai..} 可依赖 {@code com.chinacreator.gzcm.services.agent.runtime..}
-     *       —— Aim (fire·W) engine 在 aiming :18084 与 agent-service runtime (HermesMCP / Planner /
-     *       Memory / Executor) 是同一聚合服务，inline import 合法。</li>
+     *       —— 该例外<b>已随详细设计-06 §八 接缝义务 1（M0）关闭</b>：引擎侧改为依赖
+     *       {@code runtime/llm-gateway} 的 {@code AgentRuntimeProvider} SPI，
+     *       由 {@link #engineMustNotDependOnServices()} 强制。</li>
      *   <li>{@code engine.ai..} / {@code engine.cognitive2..} 可依赖 {@code llm-gateway} runtime
      *       （runtime/llm-gateway 横切底座，非 application service）。</li>
      * </ul>
@@ -339,6 +340,37 @@ public class ModuleDependencyArchTest {
             .should().dependOnClassesThat()
             .resideInAPackage("com.chinacreator.gzcm.gateway..")
             .because("铁律 v1.6 §0.3.1：gateway 是顶层 facade，不向 engine/service/workspace 内嵌依赖")
+            .allowEmptyShould(true);
+        rule.check(allClasses);
+    }
+
+    /**
+     * 详细设计-06 §八 接缝义务 1（<b>M0 直改，不等裁决</b>）/ ARCH_SPEC C257 / PRD-01 REQ-PLT-28 /
+     * ADR-19 §2.1 —— 引擎侧不得依赖任何部署态 service。
+     *
+     * <p>改造前口径：{@code engine.ai..} 直接 import
+     * {@code services.agent.runtime.{mcp,evolution,toolrouter}} 等类型，使引擎反向依赖
+     * service。现六个运行时能力已收口到 {@code runtime/llm-gateway} 的
+     * {@code com.chinacreator.gzcm.runtime.llm.agent.spi.AgentRuntimeProvider} SPI：
+     * 契约在底座、实现由 {@code services/agent-service} 提供、gateway fat-JAR 与
+     * {@code services/aiming} 在组装期注入。故本规则把 engine → services 全面禁用，
+     * 不留豁免。</p>
+     *
+     * <p>门禁双处纪律：本用例只收紧依赖方向，<b>不</b>改
+     * {@code _win_tasks/check-legacy-modules.ps1} 的 {@code baselineCount=12} 与
+     * {@code ArchitectureTest.baselineModules=12}。</p>
+     */
+    @Test
+    void engineMustNotDependOnServices() {
+        ArchRule rule = noClasses()
+            .that().resideInAnyPackage(
+                "com.chinacreator.gzcm.engine..",
+                "com.chinacreator.gzcm.runtime.."
+            )
+            .should().dependOnClassesThat()
+            .resideInAnyPackage("com.chinacreator.gzcm.services..")
+            .because("详细设计-06 §八 接缝义务 1：引擎/runtime 一律不得依赖部署态 service；"
+                    + "Agent 运行时能力只经 runtime/llm-gateway 的 AgentRuntimeProvider SPI 获取")
             .allowEmptyShould(true);
         rule.check(allClasses);
     }

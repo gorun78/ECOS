@@ -61,7 +61,7 @@ public class SecurityCheckerNode implements OagNode {
                     ctx.setSecurityPassed(false);
                     ctx.setSecurityBlockReason("检测到禁止操作: " + pattern);
                     ctx.setStatus("BLOCKED");
-                    securityEngineClient.audit(ctx.getUserId(), "oag:blocked_pattern", String.valueOf(intent), "BLOCKED");
+                    securityEngineClient.auditQuietly(ctx.getUserId(), "oag:blocked_pattern", String.valueOf(intent), "BLOCKED");
                     log.warn("[OAG:{}] 安全阻止: {}", ctx.getTraceId(), pattern);
                     return ctx;
                 }
@@ -81,7 +81,7 @@ public class SecurityCheckerNode implements OagNode {
                 ctx.setSecurityPassed(false);
                 ctx.setSecurityBlockReason("security-engine ABAC 裁决失败或不可用（默认 DENY）");
                 ctx.setStatus("BLOCKED");
-                securityEngineClient.audit(ctx.getUserId(), "oag:action", "abac_evaluate", "DENIED");
+                securityEngineClient.auditQuietly(ctx.getUserId(), "oag:action", "abac_evaluate", "DENIED");
                 log.warn("[OAG:{}] security-engine DENY: ACTION 意图被阻止 userId={}",
                         ctx.getTraceId(), ctx.getUserId());
                 return ctx;
@@ -96,7 +96,7 @@ public class SecurityCheckerNode implements OagNode {
             ctx.setSecurityPassed(false);
             ctx.setSecurityBlockReason("security-engine 不可用或 RLS 拒绝（默认 DENY）");
             ctx.setStatus("BLOCKED");
-            securityEngineClient.audit(ctx.getUserId(), "oag:rls", "apply", "DENIED");
+            securityEngineClient.auditQuietly(ctx.getUserId(), "oag:rls", "apply", "DENIED");
             log.warn("[OAG:{}] RLS DENY（security-engine 不可用/拒绝）→ BLOCKED", ctx.getTraceId());
             return ctx;
         }

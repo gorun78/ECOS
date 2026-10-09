@@ -1,5 +1,6 @@
 server:
-  port: 18084
+  # boot 调试态端口 = 服务端口 +1000（与 _win_tasks/start-backend.ps1 同口径；R-21 ①）：18084 归 services/aiming
+  port: 19084
 
 spring:
   application:

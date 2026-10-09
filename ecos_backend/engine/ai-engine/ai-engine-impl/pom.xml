@@ -72,15 +72,6 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
-        <!-- Agent Service: gateway ComponentScan 扫 services.agent.runtime，
-             本模块 AgentChatController/SkillController/CronJobController/EvolutionController
-             直接 import services.agent.*，构建必须恢复该依赖（2026-09-14 误删后恢复） -->
-        <dependency>
-            <groupId>com.chinacreator.gzcm</groupId>
-            <artifactId>agent-service</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
-        </dependency>
-
         <!-- Ontology Engine API (ExtractedSubGraph, ExtractedEntity, etc.) -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
@@ -106,6 +97,13 @@
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>
             <artifactId>runtime-task</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- 详细设计-06 F06-03：护栏裁决审计唯一出口 = runtime-event EventBusService → Kafka ecos.audit
+             （铁律 §2.5-7 禁业务侧自建 KafkaTemplate；§2.4-5 审计发出失败 = 裁决整体失败） -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-event</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
             <!-- 测试 -->

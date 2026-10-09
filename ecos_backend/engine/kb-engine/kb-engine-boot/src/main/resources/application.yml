@@ -1,5 +1,6 @@
 server:
-  port: 18086
+  # boot 调试态端口 = 服务端口 +1000（R-21 ①）：18086 归 services/dccheng
+  port: 19086
 
 spring:
   application:

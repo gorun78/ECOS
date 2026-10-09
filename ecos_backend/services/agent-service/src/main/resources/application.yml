@@ -1,5 +1,6 @@
 server:
-  port: 18086
+  # 18086 归 services/dccheng（R-21 ① 消 18086 三连冲突）；本模块生产态随 aiming:18084 组装运行，此端口仅单调试用
+  port: 18087
 
 spring:
   application:

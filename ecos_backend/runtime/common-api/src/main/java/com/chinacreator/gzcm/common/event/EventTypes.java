@@ -57,4 +57,26 @@ public final class EventTypes {
         public static final String KNOWLEDGE_LINKED = "KnowledgeLinked";
         public static final String GLOSSARY_PUBLISHED = "GlossaryPublished";
     }
+
+    /**
+     * 详细设计-06 F06-03（卷 06 REQ-AI-01）—— 护栏/工具裁决事件类型。
+     *
+     * <p>常量登记在 runtime/common-api 供全仓共用（禁 ai-engine 自定义字符串）。
+     * 载荷只带摘要与 ID，禁带工具入参原文 / SQL 原文 / 结果原文。</p>
+     */
+    public static final class Guardrail {
+        /** 一次工具裁决（ALLOW / DENY / FAIL_CLOSED 三态同型，每次裁决恰一条） */
+        public static final String GUARDRAIL_EVAL = "GUARDRAIL_EVAL";
+        /** 输入/输出护栏一次过滤（F06-04） */
+        public static final String GUARDRAIL_FILTER = "GUARDRAIL_FILTER";
+    }
+
+    /**
+     * 详细设计-06 F06-07（REQ-AI-03 §3.2）—— LLM 计量事件类型。
+     *
+     * <p>每次模型调用恰一条；计量点唯一在 runtime/llm-gateway（禁各引擎自记）。</p>
+     */
+    public static final class Llm {
+        public static final String LLM_USAGE = "LLM_USAGE";
+    }
 }

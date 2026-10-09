@@ -71,7 +71,7 @@ class SecurityCheckerNodeDenyTest {
 
         assertFalse(c.isSecurityPassed());
         assertEquals("BLOCKED", c.getStatus());
-        verify(client).audit(anyString(), anyString(), anyString(), any());
+        verify(client).auditQuietly(anyString(), anyString(), anyString(), any());
     }
 
     @Test

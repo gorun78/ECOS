@@ -1,5 +1,6 @@
 server:
-  port: 18082
+  # boot 调试态端口 = 服务端口 +1000（R-21 ①）：18082 归 services/datanet
+  port: 19082
 
 spring:
   application:

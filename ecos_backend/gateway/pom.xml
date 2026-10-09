@@ -48,6 +48,15 @@
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
+        <!-- Agent Service runtime（详细设计-06 §八 接缝义务 1 / M0）：
+             原先经 ai-engine-impl 传递进入本 fat-JAR。引擎侧依赖已按铁律 §2.1 切断，
+             provider 侧 bean（AgentRuntimeProviderAdapter 等）改由**组装层** gateway 显式声明。 -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>agent-service</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
         <!-- Cognitive Engine (认知引擎 — World Model/因果推理/仿真/优化) -->
         <dependency>
             <groupId>com.chinacreator.gzcm</groupId>

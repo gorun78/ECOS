@@ -51,7 +51,6 @@ class EndpointResolverUsageArchTest {
      */
     private static final Set<String> PORT_LITERAL_BASELINE = new LinkedHashSet<>(List.of(
             // security-engine(:18081) 各引擎客户端
-            "engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/security/AgentToolSqlSecurityGate.java",
             "engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/security/AiSecurityEngineClient.java",
             "engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/security/KnowledgeNavSecurityEngineClient.java",
             "engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/security/SecurityEngineClient.java",

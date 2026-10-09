@@ -1,17 +1,22 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
-import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.common.error.AiError;
+import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.engine.ai.dao.ToolDao;
-import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlSecurityGate;
+import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
+import com.chinacreator.gzcm.engine.ai.guardrail.ToolDecision;
+import com.chinacreator.gzcm.engine.ai.guardrail.ToolObligations;
+import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlWhitelist;
+import com.chinacreator.gzcm.engine.ai.security.ToolObligationApplier;
+import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
+import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.*;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -24,13 +29,24 @@ import java.util.concurrent.*;
 import java.util.regex.Pattern;
 
 /**
- * 工具执行器 — 从 ecos_tool_definition 表加载工具 schema
- * 支持三种执行模式：
- * <ul>
- *   <li>SQL: 经 ToolDao 执行预定义查询（R2-B4-ai 数据访问收口）</li>
- *   <li>REST: 用 RestTemplate 调内部微服务 API</li>
- *   <li>BUILTIN: Java 内置函数（如 getCurrentTime, calculateRisk）</li>
- * </ul>
+ * 工具执行器 —— Agent 工具调用的<b>唯一事实咽喉</b>（详细设计-06 F06-01）。
+ *
+ * <p>阶段链固定为
+ * {@code execute() → policyEvaluate() → sandboxReview() → dispatch() → obligationsApply()}：</p>
+ * <ol>
+ *   <li>{@code policyEvaluate}：对<b>所有</b> toolType 与<b>所有</b>来源（注册表 7 工具 +
+ *       DB/fallback 定义的 SQL/REST/BUILTIN + 场景工具）无条件执行一次且仅一次 security-engine
+ *       ABAC 裁决（废止原 {@code "SQL".equalsIgnoreCase(toolType)} 前置条件，X-11）；</li>
+ *   <li>{@code sandboxReview}：R1.3 高危沙盒，作为<b>附加</b>防御，自身异常一律 DENY
+ *       而非放行（X-14）；</li>
+ *   <li>{@code dispatch}：按 toolType 分发执行，未获 ALLOW 不会到达此处；</li>
+ *   <li>{@code obligationsApply}：ALLOW 返回的 {@code mask[]/rowFilter} 必须在结果回 LLM
+ *       <b>之前</b>经 security 侧执行落实，执行不可用则整条结果丢弃并 FAIL_CLOSED（F06-02 要点 2）。</li>
+ * </ol>
+ *
+ * <p>三态语义（DENY ≠ FAIL_CLOSED，禁折叠）由 {@link AiErrorClass#GUARDRAIL_DENIED} /
+ * {@link AiErrorClass#GUARDRAIL_FAIL_CLOSED} 承载，随 {@link ToolResult} 结构化字段上浮到
+ * {@code AgentLoopService}（F06-14）。</p>
  */
 @Service
 public class ToolExecutorService {
@@ -40,16 +56,19 @@ public class ToolExecutorService {
     private static final int TIMEOUT_SECONDS = 30;
     private static final int MAX_RESULT_LENGTH = 2000;
 
+    /** 写类工具（裁决载荷 {@code action.operation} 判定用，PRD-06 §1.3 read|write） */
+    private static final Set<String> WRITE_TOOL_NAMES = Set.of("write_file", "patch");
+
     private ToolDao toolDao;
     private final RestTemplate restTemplate;
     private final Map<String, ToolDefinitionEntry> fallbackTools = new ConcurrentHashMap<>();
 
     // R1.3: SecuritySandboxService 位于 security-engine-impl（编译期不可见），
-    // 通过 ApplicationContext + 反射调用，不可用时降级为放行（但记录警告日志）
+    // 通过 ApplicationContext + 反射调用；不可用时高危指令按 fail-closed 拒绝
     @Autowired(required = false)
     private ApplicationContext applicationContext;
 
-    /** R1.3: 高危指令正则 — DELETE/DROP/TRUNCATE/ALTER TABLE/EXEC/RM/MV/批量UPDATE/GRANT/REVOKE */
+    /** R1.3: 高危指令正则 —— 附加防御，不构成放行依据，也不再是裁决触发条件（F06-01 要点 4） */
     private static final Pattern HIGH_RISK_PATTERN = Pattern.compile(
             "(?i).*(DELETE|DROP|TRUNCATE|ALTER\\s+TABLE|EXEC|RM\\s|MV\\s|UPDATE\\s+.*WHERE|GRANT|REVOKE).*");
 
@@ -68,15 +87,27 @@ public class ToolExecutorService {
     @Autowired
     private ToolRegistry toolRegistry;
 
-    // H8-T4 (PMO-74 L3): Agent 工具 SQL 安全闸 —— 表/列白名单 + security-engine
-    // policy-engine/evaluate 裁决（铁律 §2.4-4/§2.4-6；不可用/超时/不可解析 = DENY）。
+    // F06-01/F06-02/F06-03: 工具裁决闸（原 AgentToolSqlSecurityGate 升格改名）。
+    // 未装配 = 一切工具调用 FAIL_CLOSED（§2.4-6），不存在"闸缺失即放行"的路径。
     // setter 注入与本类 toolDao 既有风格一致（字段注入存量清单归 H11-T3 统一整改）。
-    private AgentToolSqlSecurityGate sqlSecurityGate;
+    private AgentToolPolicyGate policyGate;
+    private ToolSubjectResolver subjectResolver;
+    private ToolObligationApplier obligationApplier;
     private AgentToolSqlWhitelist sqlWhitelist;
 
     @Autowired(required = false)
-    public void setSqlSecurityGate(AgentToolSqlSecurityGate sqlSecurityGate) {
-        this.sqlSecurityGate = sqlSecurityGate;
+    public void setPolicyGate(AgentToolPolicyGate policyGate) {
+        this.policyGate = policyGate;
+    }
+
+    @Autowired(required = false)
+    public void setSubjectResolver(ToolSubjectResolver subjectResolver) {
+        this.subjectResolver = subjectResolver;
+    }
+
+    @Autowired(required = false)
+    public void setObligationApplier(ToolObligationApplier obligationApplier) {
+        this.obligationApplier = obligationApplier;
     }
 
     @Autowired(required = false)
@@ -112,50 +143,40 @@ public class ToolExecutorService {
 
     private ToolResult execute(String toolName, Map<String, Object> arguments, String callId) {
         long startNs = System.nanoTime();
+        boolean viaRegistry = toolRegistry != null && toolRegistry.has(toolName);
 
-        // ── R1.3: 高危指令沙盒审查 ──
+        // registry 未命中才需要解析工具定义（DB 优先，回退内存 fallback）
+        ToolDefinitionEntry def = viaRegistry ? null : loadToolDefinition(toolName);
+        if (!viaRegistry && def == null) {
+            // 工具不存在 → 不执行，也就没有"未裁决的执行"（§1.5-1 对账口径）
+            return buildError(callId, toolName, "工具未找到: " + toolName, startNs);
+        }
+
+        // ── 阶段 1: policyEvaluate —— 无条件、一次且仅一次（F06-01 要点 1） ──
+        Adjudication adjudication = policyEvaluate(toolName, arguments, def, viaRegistry,
+                callId, startNs);
+        if (adjudication.rejected != null) {
+            return adjudication.rejected;
+        }
+        ToolDecision decision = adjudication.decision;
+
+        // ── 阶段 2: sandboxReview —— 附加防御，异常即 DENY（X-14） ──
         ToolResult sandboxBlock = sandboxReview(toolName, arguments, callId, startNs);
         if (sandboxBlock != null) {
             return sandboxBlock;
         }
 
-        // 优先走 ToolRegistry（统一工具管理）
-        if (toolRegistry != null && toolRegistry.has(toolName)) {
-            // H8-T4: 注册表路径（如 query_db，sql 为 LLM 直供参数）同样先过安全闸
-            ToolResult registryDeny = guardSqlFromArguments(toolName, arguments, callId, startNs);
-            if (registryDeny != null) {
-                return registryDeny;
-            }
-            return toolRegistry.execute(toolName, arguments);
-        }
-
         try {
-            ToolDefinitionEntry def = loadToolDefinition(toolName);
-            if (def == null) {
-                return buildError(callId, toolName, "工具未找到: " + toolName, startNs);
+            // ── 阶段 3: dispatch ──
+            ToolResult raw = viaRegistry
+                    ? toolRegistry.execute(toolName, arguments)
+                    : executeResolved(def, arguments, callId, startNs);
+            if (!raw.isSuccess()) {
+                return raw;
             }
 
-            // H8-T4: SQL 型工具在调用方线程完成「白名单 + security-engine 裁决」
-            // （dispatch 运行在独立 executor 线程，SecurityContext/TenantContextHolder
-            //  等 token 上下文 ThreadLocal 不可见，裁决必须在此取主体）
-            if ("SQL".equalsIgnoreCase(def.toolType)) {
-                String guardedSql = resolveToolSql(def, arguments);
-                ToolResult sqlDeny = guardSql(toolName, guardedSql,
-                        extractBoundParamNames(def.schemaJson), callId, startNs);
-                if (sqlDeny != null) {
-                    return sqlDeny;
-                }
-            }
-
-            String result = executeWithTimeout(def, arguments);
-            long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
-
-            // 结果截断（AgentLoopService 也会截断，但这里做第一层防御）
-            if (result != null && result.length() > MAX_RESULT_LENGTH) {
-                result = result.substring(0, MAX_RESULT_LENGTH) + "...[truncated]";
-            }
-
-            return buildSuccess(callId, toolName, result, elapsedMs);
+            // ── 阶段 4: obligationsApply —— 结果回 LLM 之前（F06-02 要点 2） ──
+            return obligationsApply(toolName, raw, decision, adjudication.subject(), startNs);
         } catch (TimeoutException e) {
             long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
             return buildError(callId, toolName, "工具执行超时 (" + TIMEOUT_SECONDS + "s)", elapsedMs);
@@ -166,106 +187,236 @@ public class ToolExecutorService {
         }
     }
 
-    // ── R1.3 高危指令沙盒审查 ────────────────────────────────────────────
+    // ── 阶段 1: policyEvaluate ────────────────────────────────────────────
+
+    /** 裁决中间结果：{@code rejected} 非空即终止（DENY / FAIL_CLOSED），禁继续执行 */
+    private record Adjudication(ToolResult rejected, ToolDecision decision,
+                                ToolAdjudicationRequest.Subject subject) {
+
+        static Adjudication reject(ToolResult result) {
+            return new Adjudication(result, null, null);
+        }
+
+        static Adjudication allow(ToolDecision decision, ToolAdjudicationRequest.Subject subject) {
+            return new Adjudication(null, decision, subject);
+        }
+    }
 
     /**
-     * R1.3: 工具执行前沙盒审查。
-     * <ol>
-     *   <li>查询当前用户的 td_user_security_profile.sandbox_mandatory</li>
-     *   <li>sandbox_mandatory=true 时，检查指令是否高危（正则匹配）</li>
-     *   <li>高危指令 → 调 SecuritySandboxService 审查 → 高风险 → 拒绝 + 写审计日志</li>
-     *   <li>非高危或 sandbox_mandatory=false → 放行（返回 null）</li>
-     * </ol>
+     * 全工具类型裁决（必须在调用方线程执行，以读取 token 上下文）。
      *
-     * @return 拒绝执行的 ToolResult，或 null 表示放行
+     * <p>主体只能来自服务端 token 上下文（{@link ToolSubjectResolver}），禁取入参自报值；
+     * SQL 原文只进本地地板校验与摘要，<b>不入裁决载荷</b>（F06-02 要点 1）。</p>
+     */
+    private Adjudication policyEvaluate(String toolName, Map<String, Object> arguments,
+                                        ToolDefinitionEntry def, boolean viaRegistry,
+                                        String callId, long startNs) {
+        if (policyGate == null) {
+            log.warn("F06-01 工具裁决闸（AgentToolPolicyGate）未装配，拒绝执行（fail-closed）: tool={}", toolName);
+            return Adjudication.reject(buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                    "工具裁决闸不可用，拒绝执行（默认 DENY，fail-closed）", startNs));
+        }
+        if (subjectResolver == null) {
+            log.warn("F06-02 主体解析器（ToolSubjectResolver）未装配，拒绝执行（fail-closed）: tool={}", toolName);
+            return Adjudication.reject(buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                    "裁决主体不可解析，拒绝执行（fail-closed）", startNs));
+        }
+
+        ToolAdjudicationRequest.Subject subject = subjectResolver.resolve();
+
+        String sqlText = null;
+        List<String> boundParams = List.of();
+        if (viaRegistry) {
+            Object sqlArg = arguments != null ? arguments.get("sql") : null;
+            if (sqlArg instanceof String s && !s.isBlank()) sqlText = s;
+        } else if (def != null && "SQL".equalsIgnoreCase(def.toolType)) {
+            try {
+                sqlText = resolveToolSql(def, arguments);
+            } catch (IllegalArgumentException | IllegalStateException floor) {
+                // schema 生成阶段的白名单拒绝 = 本地地板 DENY，不进入 dispatch
+                log.info("F06-01 裁决阶段 SQL 白名单拒绝: tool={} reason={}", toolName, floor.getMessage());
+                return Adjudication.reject(buildGuardrailError(callId, toolName,
+                        AiErrorClass.GUARDRAIL_DENIED, "SQL 被本地白名单地板拒绝: " + floor.getMessage(),
+                        startNs));
+            }
+            boundParams = extractBoundParamNames(def.schemaJson);
+        }
+
+        ToolAdjudicationRequest request = new ToolAdjudicationRequest(
+                subject,
+                new ToolAdjudicationRequest.Action(ToolAdjudicationRequest.ACTION_TYPE, toolName,
+                        inferOperation(toolName, def, arguments)),
+                ToolAdjudicationRequest.projectResource(arguments),
+                new ToolAdjudicationRequest.Environment(AiTraceSupport.currentTraceId(),
+                        ToolAdjudicationRequest.CHANNEL_AGENT, Instant.now().toString()));
+
+        ToolDecision decision = policyGate.review(request, sqlText, boundParams);
+        if (decision.allowed()) {
+            return Adjudication.allow(decision, subject);
+        }
+        AiErrorClass errorClass = AgentToolPolicyGate.errorClassFor(decision);
+        if (errorClass == null) errorClass = AiErrorClass.GUARDRAIL_DENIED;
+        log.warn("F06-01 工具被裁决闸拒绝: tool={} user={} verdict={} reason={}",
+                toolName, subject.userId(), decision.verdict(), decision.reason());
+        return Adjudication.reject(buildGuardrailError(callId, toolName, errorClass,
+                decision.reason(), startNs, decision));
+    }
+
+    /** {@code action.operation} 判定：写类工具与显式非 GET/HEAD 的 HTTP 方法为 write。 */
+    private String inferOperation(String toolName, ToolDefinitionEntry def, Map<String, Object> arguments) {
+        if (toolName != null && WRITE_TOOL_NAMES.contains(toolName)) return "write";
+        if (def != null && def.httpMethod != null && !def.httpMethod.isBlank()) {
+            String m = def.httpMethod.toUpperCase(Locale.ROOT);
+            if (!m.startsWith("GET") && !m.startsWith("HEAD")) return "write";
+        }
+        Object methodArg = arguments != null ? arguments.get("method") : null;
+        if (methodArg instanceof String s && !s.isBlank()) {
+            String m = s.toUpperCase(Locale.ROOT);
+            if (!m.startsWith("GET") && !m.startsWith("HEAD")) return "write";
+        }
+        return "read";
+    }
+
+    // ── 阶段 4: obligationsApply ──────────────────────────────────────────
+
+    /**
+     * ALLOW 义务在结果回 LLM <b>之前</b>落实；执行不可用整条结果丢弃并 FAIL_CLOSED
+     * （禁"先返回再说明"，F06-02 要点 2）。
+     */
+    private ToolResult obligationsApply(String toolName, ToolResult raw, ToolDecision decision,
+                                        ToolAdjudicationRequest.Subject subject, long startNs) {
+        ToolObligations obligations = decision == null ? ToolObligations.none() : decision.obligations();
+        if (obligations.isEmpty()) {
+            return raw;
+        }
+        if (obligationApplier == null) {
+            log.warn("F06-02 obligations 执行器未装配，整条结果丢弃（fail-closed）: tool={}", toolName);
+            return buildGuardrailError(raw.getToolCallId(), toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                    "security obligations 执行器不可用，结果已丢弃", startNs, decision);
+        }
+        ToolObligationApplier.Outcome outcome =
+                obligationApplier.apply(toolName, raw.getContent(), obligations, subject);
+        if (!outcome.applied()) {
+            log.warn("F06-02 obligations 执行失败，整条结果丢弃（fail-closed）: tool={} reason={}",
+                    toolName, outcome.failReason());
+            return buildGuardrailError(raw.getToolCallId(), toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                    "结果未按 security 义务脱敏/过滤，已丢弃: " + outcome.failReason(), startNs, decision);
+        }
+        long elapsedMs = raw.getElapsedMs();
+        ToolResult applied = ToolResult.ok(raw.getToolCallId(), toolName,
+                truncateSafe(outcome.json(), MAX_RESULT_LENGTH), elapsedMs);
+        applied.setTraceId(AiTraceSupport.currentTraceId());
+        applied.setDecision(decision.verdict().name());
+        applied.setPolicyId(decision.policyId());
+        return applied;
+    }
+
+    private String truncateSafe(String s, int max) {
+        if (s == null) return null;
+        return s.length() > max ? s.substring(0, max) + "...[truncated]" : s;
+    }
+
+    /** 阶段 3：注册表之外的 DB/fallback 工具执行（原 executeWithTimeout + 截断 + 成功包装）。 */
+    private ToolResult executeResolved(ToolDefinitionEntry def, Map<String, Object> arguments,
+                                       String callId, long startNs)
+            throws TimeoutException, Exception {
+        String result = executeWithTimeout(def, arguments);
+        long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
+        if (result != null && result.length() > MAX_RESULT_LENGTH) {
+            result = result.substring(0, MAX_RESULT_LENGTH) + "...[truncated]";
+        }
+        ToolResult ok = buildSuccess(callId, def.code, result, elapsedMs);
+        ok.setTraceId(AiTraceSupport.currentTraceId());
+        return ok;
+    }
+
+    // ── 阶段 2: R1.3 高危指令沙盒审查（附加防御层） ──────────────────────
+
+    /**
+     * R1.3 沙盒审查。详细设计-06 F06-01 要点 4 重新定位：本层是主裁决（{@code policyEvaluate}）
+     * 之后的<b>附加</b>防御，不再是任何工具调用的裁决触发条件 —— 是否强制沙盒只影响本层强度，
+     * 不影响"必须被裁决"（否则 DENY 面按用户而变，违反 §1.5-1）。
+     *
+     * <p>X-14 收口：原 {@code catch → return null}（审查器异常维持放行）改为 DENY/FAIL_CLOSED；
+     * {@code sandbox_mandatory} 读取失败（高危命中时）同样 FAIL_CLOSED。</p>
+     *
+     * @return 拒绝执行的 ToolResult，或 null 表示本层无阻断
      */
     private ToolResult sandboxReview(String toolName, Map<String, Object> arguments,
                                      String callId, long startNs) {
+        String userId;
+        String instruction;
         try {
-            String userId = getCurrentUserId();
-            if (userId == null || toolDao == null) {
-                return null; // 无用户上下文或无DB → 放行
+            userId = getCurrentUserId();
+            if (userId == null) {
+                // 阶段 1 已对无主体 FAIL_CLOSED；此处兜底，绝不放行
+                return buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                        "沙盒审查无法取得 token 主体", startNs);
             }
-
-            // 1. 查询 sandbox_mandatory
-            Boolean sandboxMandatory = querySandboxMandatory(userId);
-            if (sandboxMandatory == null || !sandboxMandatory) {
-                return null; // 未强制沙盒 → 放行
-            }
-
-            // 2. 拼接待审查的指令文本（工具名 + 参数，尤其 sql/command 字段）
-            String instruction = buildInstructionText(toolName, arguments);
+            instruction = buildInstructionText(toolName, arguments);
             if (instruction == null || instruction.isBlank()) {
                 return null;
             }
-
-            // 3. 检查是否高危
             if (!HIGH_RISK_PATTERN.matcher(instruction).matches()) {
-                return null; // 非高危 → 放行
+                return null; // 非高危：主裁决已 ALLOW，附加层不额外阻断
+            }
+        } catch (Exception e) {
+            log.warn("F06-01/X-14 沙盒审查器异常，拒绝执行（fail-closed，铁律 §2.4-6）: tool={}",
+                    toolName, e);
+            return buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                    "沙盒审查器异常: " + e.getMessage(), startNs);
+        }
+
+        try {
+            Boolean sandboxMandatory = querySandboxMandatory(userId);
+            if (sandboxMandatory == null) {
+                log.warn("F06-01/X-14 高危指令且 sandbox_mandatory 不可读，拒绝执行（fail-closed）: "
+                        + "tool={} user={}", toolName, userId);
+                return buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                        "sandbox_mandatory 无法判定", startNs);
+            }
+            if (!sandboxMandatory) {
+                return null; // 非强制沙盒用户：主裁决已在阶段 1 无条件完成
             }
 
-            // 4. 高危指令 → 调 SecuritySandboxService 审查
             Boolean highRisk = reviewBySandboxService(instruction, userId);
             if (highRisk == null) {
-                // H8-T4 收口：SecuritySandboxService 不可用 → 默认 DENY（铁律 §2.4-6
-                // 「宁可误拒不可误放」，废止原「降级放行」路径）
                 log.warn("R1.3/H8-T4 SecuritySandboxService 不可用，高危指令默认拒绝（fail-closed）: "
-                        + "tool={}, user={}, instruction={}",
+                                + "tool={}, user={}, instruction={}",
                         toolName, userId, truncate(instruction, 200),
                         new IllegalStateException("SecuritySandboxService unavailable (RLS §2.4-6 DENY)"));
                 writeSandboxBlockAudit(userId, toolName, instruction);
-                long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
-                return ToolResult.fail(callId, toolName,
-                        "安全裁决服务不可用，高危指令默认拒绝（fail-closed，铁律 §2.4-6）", elapsedMs);
+                return buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                        "安全裁决服务不可用，高危指令默认拒绝（fail-closed，铁律 §2.4-6）", startNs);
             }
 
             if (highRisk) {
-                // 高风险 → 拒绝执行 + 写审计日志
                 log.warn("R1.3 沙盒拦截高危指令: tool={}, user={}, instruction={}",
                         toolName, userId, truncate(instruction, 200));
                 writeSandboxBlockAudit(userId, toolName, instruction);
-                long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
-                return ToolResult.fail(callId, toolName,
-                        "高危指令被沙盒拦截（sandbox_block）：指令包含敏感操作，需管理员审批", elapsedMs);
+                return buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_DENIED,
+                        "高危指令被沙盒拦截（sandbox_block）：指令包含敏感操作，需管理员审批", startNs);
             }
 
-            // 审查通过 → 放行
+            // 审查通过 → 交阶段 3 dispatch
             return null;
         } catch (Exception e) {
-            // 审查器自身异常（高危判定前）：维持放行，但日志带堆栈（M15 空/裸日志治理）
-            log.warn("R1.3 沙盒审查异常（未达高危判定阶段，维持放行）: tool={}, error={}",
-                    toolName, e.getMessage(), e);
-            return null;
+            log.warn("F06-01/X-14 沙盒审查执行异常，拒绝执行（fail-closed）: tool={}", toolName, e);
+            return buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                    "沙盒审查执行异常: " + e.getMessage(), startNs);
         }
     }
 
     /**
      * R1.3 / H8-T4: 从 token 上下文获取当前用户 ID。
-     * <p>解析顺序：sysman UserContext（ThreadLocal，由 HeaderAuthInterceptor 从
-     * gateway token 链路还原）→ Spring SecurityContext principal。
-     * <b>禁止</b>从工具参数/请求体自报值取主体（PMO-74 H9-T1 口径）。</p>
+     * <p>F06-02 收口：主体解析统一收口到 {@link ToolSubjectResolver}（sysman UserContext
+     * → SecurityContext 两级），禁在本类内各自拼接主体来源，更禁从工具参数/请求体自报值取主体
+     * （PMO-74 H9-T1 口径）。</p>
      */
     private String getCurrentUserId() {
-        try {
-            Class<?> uc = Class.forName("com.chinacreator.gzcm.sysman.iam.context.UserContext");
-            Object id = uc.getMethod("getCurrentUserId").invoke(null);
-            if (id != null && !String.valueOf(id).isBlank()) {
-                return String.valueOf(id);
-            }
-        } catch (Throwable ignored) {
-            // sysman 不在 classpath（独立 ai-engine-boot 进程），落到 SecurityContext
-        }
-        try {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.isAuthenticated()) {
-                Object principal = auth.getPrincipal();
-                if (principal instanceof String s) return s;
-                if (principal != null) return principal.toString();
-            }
-        } catch (Exception e) {
-            log.debug("R1.3 获取当前用户失败: {}", e.getMessage());
-        }
-        return null;
+        if (subjectResolver == null) return null;
+        ToolAdjudicationRequest.Subject subject = subjectResolver.resolve();
+        return subject == null ? null : subject.userId();
     }
 
     /**
@@ -462,10 +613,11 @@ public class ToolExecutorService {
             throw new IllegalStateException("ToolDao 不可用，无法执行 SQL 工具");
         }
 
-        // H8-T4: 防御纵深 —— 安全闸未装配时拒绝一切 SQL 工具（fail-closed，§2.4-6）
-        if (sqlSecurityGate == null) {
+        // F06-01 防御纵深 —— 裁决闸未装配时拒绝一切 SQL 工具（fail-closed，§2.4-6）。
+        // 正常路径下阶段 1 已完成裁决，本处只是"dispatch 被绕过"时的第二道卡。
+        if (policyGate == null) {
             throw new IllegalStateException(
-                    "[H8-T4] SQL 安全闸（AgentToolSqlSecurityGate）未装配，拒绝执行 SQL 工具（fail-closed）");
+                    "[F06-01] 工具裁决闸（AgentToolPolicyGate）未装配，拒绝执行 SQL 工具（fail-closed）");
         }
 
         Object schemaObj = def.schemaJson;
@@ -485,7 +637,7 @@ public class ToolExecutorService {
         ));
     }
 
-    // ── H8-T4 SQL 安全闸 helpers ──────────────────────────────────────────
+    // ── H8-T4/F06-01 SQL 地板辅助 ────────────────────────────────────────
 
     /**
      * 解析工具的最终 SQL 文本（与 executeSql 的解析顺序完全一致）：
@@ -498,44 +650,6 @@ public class ToolExecutorService {
             if (arg instanceof String s) sql = s;
         }
         return sql;
-    }
-
-    /** 注册表路径：arguments 若携带 sql 参数（如 query_db，sql 由 LLM 直供），先过安全闸 */
-    private ToolResult guardSqlFromArguments(String toolName, Map<String, Object> arguments,
-                                             String callId, long startNs) {
-        Object arg = arguments != null ? arguments.get("sql") : null;
-        if (!(arg instanceof String s) || s.isBlank()) {
-            return null; // 非 SQL 类注册工具，维持原路径
-        }
-        return guardSql(toolName, s, Collections.emptyList(), callId, startNs);
-    }
-
-    /**
-     * H8-T4: SQL 工具执行前统一安全闸（必须在调用方线程执行，以读取 token 上下文）。
-     * 主体一律取 SecurityContext / sysman UserContext（token 链路），禁止取参数自报值。
-     *
-     * @return 拒绝执行的 ToolResult；null = 裁决 ALLOW
-     */
-    private ToolResult guardSql(String toolName, String sql, Collection<String> boundParams,
-                                String callId, long startNs) {
-        if (sqlSecurityGate == null) {
-            log.warn("H8-T4 SQL 安全闸未装配，拒绝执行（fail-closed）: tool={}", toolName);
-            return buildError(callId, toolName,
-                    "[H8-T4] SQL 安全闸不可用，拒绝执行（默认 DENY）", startNs);
-        }
-        if (sql == null || sql.isBlank()) {
-            return null; // 无 SQL 可裁决，交由 executeSql 报「缺少 SQL」原有错误
-        }
-        String userId = getCurrentUserId();
-        String tenantId = TenantContextHolder.getTenantId();
-        AgentToolSqlSecurityGate.Decision decision =
-                sqlSecurityGate.review(toolName, sql, boundParams, userId, tenantId);
-        if (!decision.allowed()) {
-            log.warn("H8-T4 Agent SQL 工具被安全闸拒绝: tool={} user={} reason={}",
-                    toolName, userId, decision.reason());
-            return buildError(callId, toolName, "[H8-T4] SQL 被安全裁决拒绝: " + decision.reason(), startNs);
-        }
-        return null;
     }
 
     /** schema 声明的绑定参数名（将拼入 WHERE 子句或作为 ? 的列约束），供白名单校验 */
@@ -840,6 +954,31 @@ public class ToolExecutorService {
         return ToolResult.fail(callId, toolName, errorMessage, elapsedMs);
     }
 
+    /**
+     * 护栏拒绝类错误（F06-14 分类）：对外文案取 {@link AiError#userMessage()} 模板
+     * （含诊断码 traceId），拒绝原因原文只进日志，禁随响应体上浮（X-49）。
+     */
+    private ToolResult buildGuardrailError(String callId, String toolName, AiErrorClass errorClass,
+                                           String rawReason, long startNs) {
+        return buildGuardrailError(callId, toolName, errorClass, rawReason, startNs, null);
+    }
+
+    private ToolResult buildGuardrailError(String callId, String toolName, AiErrorClass errorClass,
+                                           String rawReason, long startNs, ToolDecision decision) {
+        long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
+        AiError error = AiError.of(errorClass, AiTraceSupport.currentTraceId(), rawReason);
+        log.debug("护栏错误明细（仅日志）: tool={} class={} reason={} traceId={}",
+                toolName, errorClass.name(), rawReason, error.traceId());
+        ToolResult r = ToolResult.fail(callId, toolName, error.userMessage(), elapsedMs);
+        r.setErrorCode(error.errorCode());
+        r.setErrorClass(errorClass.name());
+        r.setTraceId(error.traceId());
+        r.setDecision(decision != null ? decision.verdict().name()
+                : (errorClass == AiErrorClass.GUARDRAIL_FAIL_CLOSED ? "FAIL_CLOSED" : "DENY"));
+        if (decision != null) r.setPolicyId(decision.policyId());
+        return r;
+    }
+
     // ── Inner Types ───────────────────────────────────────────────────────
 
     /** 工具执行结果 */
@@ -850,6 +989,13 @@ public class ToolExecutorService {
         private String error;
         private long elapsedMs;
         private boolean success;
+
+        // 详细设计-06 F06-14：护栏/错误分类的结构化上浮面（只增不改既有字段）
+        private String errorCode;
+        private String errorClass;
+        private String traceId;
+        private String decision;
+        private String policyId;
 
         public ToolResult() {}
 
@@ -886,6 +1032,16 @@ public class ToolExecutorService {
         public void setElapsedMs(long v) { this.elapsedMs = v; }
         public boolean isSuccess() { return success; }
         public void setSuccess(boolean v) { this.success = v; }
+        public String getErrorCode() { return errorCode; }
+        public void setErrorCode(String v) { this.errorCode = v; }
+        public String getErrorClass() { return errorClass; }
+        public void setErrorClass(String v) { this.errorClass = v; }
+        public String getTraceId() { return traceId; }
+        public void setTraceId(String v) { this.traceId = v; }
+        public String getDecision() { return decision; }
+        public void setDecision(String v) { this.decision = v; }
+        public String getPolicyId() { return policyId; }
+        public void setPolicyId(String v) { this.policyId = v; }
 
         @Override
         public String toString() {

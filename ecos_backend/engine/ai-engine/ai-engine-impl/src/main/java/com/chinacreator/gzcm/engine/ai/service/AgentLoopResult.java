@@ -18,6 +18,9 @@ public class AgentLoopResult {
     private boolean success;
     private String errorMsg;
     private String traceId;
+    private String errorCode;
+    private String errorClass;
+    private boolean retryable;
 
     public AgentLoopResult() {}
 
@@ -63,6 +66,22 @@ public class AgentLoopResult {
         return r;
     }
 
+    /**
+     * 护栏拒绝/不可用错误（详细设计-06 F06-04 + D.5 码表）。
+     *
+     * <p>{@code errorMsg} 必须是 {@link com.chinacreator.gzcm.common.error.AiError#userMessage()}
+     * 渲染后的可读消息（含诊断码），异常原文只入日志（X-49）。</p>
+     */
+    public static AgentLoopResult guardrailError(String sessionId, String errorMsg, String errorCode,
+                                                 String errorClass, String traceId, boolean retryable) {
+        AgentLoopResult r = error(sessionId, errorMsg, 0);
+        r.errorCode = errorCode;
+        r.errorClass = errorClass;
+        r.retryable = retryable;
+        r.traceId = traceId;
+        return r;
+    }
+
     // ─── Getters / Setters ─────────────────────────────────────────────
 
     public int getTurns() { return turns; }
@@ -89,6 +108,15 @@ public class AgentLoopResult {
     public String getTraceId() { return traceId; }
     public void setTraceId(String traceId) { this.traceId = traceId; }
 
+    public String getErrorCode() { return errorCode; }
+    public void setErrorCode(String errorCode) { this.errorCode = errorCode; }
+
+    public String getErrorClass() { return errorClass; }
+    public void setErrorClass(String errorClass) { this.errorClass = errorClass; }
+
+    public boolean isRetryable() { return retryable; }
+    public void setRetryable(boolean retryable) { this.retryable = retryable; }
+
     // ─── Serialisation ──────────────────────────────────────────────────
 
     public Map<String, Object> toMap() {
@@ -104,6 +132,11 @@ public class AgentLoopResult {
         }
         if (traceId != null) {
             map.put("traceId", traceId);
+        }
+        if (errorCode != null) {
+            map.put("errorCode", errorCode);
+            map.put("errorClass", errorClass);
+            map.put("retryable", retryable);
         }
         return map;
     }

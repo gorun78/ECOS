@@ -1,5 +1,6 @@
 server:
-  port: 18089
+  # boot 调试态端口 = 服务端口 +1000（与 start-backend.ps1 同口径，R-21 ①）
+  port: 19089
   servlet:
     context-path: /
 

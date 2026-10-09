@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
+import com.chinacreator.gzcm.common.error.AiError;
+import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.engine.ai.GuardrailsService;
 import com.chinacreator.gzcm.engine.ai.SkillService;
 import com.chinacreator.gzcm.engine.ai.entity.SkillEntity;
@@ -84,7 +86,8 @@ public class AgentLoopService {
     @Autowired
     private AgentConfigResolver agentConfigResolver;
 
-    @Autowired(required = false)
+    /** 护栏服务（F06-04 要点 2：必填 —— 未装配即 FAIL_CLOSED，不再有判空跳过分支） */
+    @Autowired
     private GuardrailsService guardrailsService;
 
     @Autowired(required = false)
@@ -129,19 +132,27 @@ public class AgentLoopService {
             return r;
         }
 
-        // T0b-1: 护栏输入过滤
-        if (guardrailsService != null && userMessage != null) {
+        // T0b-1: 输入护栏 —— 必经 security-engine（F06-04：判空跳过与 catch→warn 两个 fail-open 分支已消灭）
+        if (userMessage != null) {
+            if (guardrailsService == null) {
+                log.error("[AgentLoop] GuardrailsService 未装配，输入护栏无法裁决 → FAIL_CLOSED: session={}", sessionId);
+                return guardrailFailure(sessionId, traceId, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                        "护栏服务未装配（GuardrailsService Bean 缺失），禁止未经裁决的模型调用", null);
+            }
+            Map<String, Object> inputCheck;
             try {
-                Map<String, Object> inputCheck = guardrailsService.validate(Map.of("llmOutput", userMessage));
-                if (inputCheck.get("passed") != null && !(Boolean) inputCheck.get("passed")) {
-                    log.warn("[AgentLoop] Guardrails blocked input for session={}: {}", sessionId, inputCheck.get("violations"));
-                    AgentLoopResult r = AgentLoopResult.error(sessionId,
-                            "输入包含敏感内容: " + inputCheck.get("violations"), 0);
-                    r.setTraceId(traceId);
-                    return r;
-                }
+                inputCheck = guardrailsService.validate(Map.of(
+                        "llmOutput", userMessage,
+                        "stage", GuardrailsServiceImpl.STAGE_INPUT));
             } catch (Exception e) {
-                log.warn("[AgentLoop] Guardrails input check failed: {}", e.getMessage());
+                log.error("[AgentLoop] 输入护栏调用异常 → GUARDRAIL_FAIL_CLOSED: session={} err={}",
+                        sessionId, e.getMessage(), e);
+                return guardrailFailure(sessionId, traceId, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                        "输入护栏调用异常: " + e.getMessage(), e);
+            }
+            if (!Boolean.TRUE.equals(inputCheck.get("passed"))) {
+                log.warn("[AgentLoop] 输入护栏拦截 session={} violations={}", sessionId, inputCheck.get("violations"));
+                return guardrailBlocked(sessionId, traceId, inputCheck);
             }
         }
 
@@ -271,17 +282,36 @@ public class AgentLoopService {
                 session.touch();
             }
 
-            // T0b-1: 护栏输出净化
+            // T0b-2: 输出护栏 —— 必经 security-engine；命中保留整段替换文案（留痕事件已在护栏内部发出）
             String finalContent = content;
-            if (guardrailsService != null && finalContent != null) {
+            if (guardrailsService == null) {
+                log.error("[AgentLoop] GuardrailsService 未装配，模型输出不得未经检查返回 → FAIL_CLOSED: session={}", sessionId);
+                return guardrailFailure(sessionId, traceId, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                        "护栏服务未装配（GuardrailsService Bean 缺失）", null);
+            }
+            if (finalContent != null) {
+                Map<String, Object> outputCheck;
                 try {
-                    Map<String, Object> outputCheck = guardrailsService.validate(Map.of("llmOutput", finalContent));
-                    if (outputCheck.get("passed") != null && !(Boolean) outputCheck.get("passed")) {
-                        log.warn("[AgentLoop] Guardrails filtered output for session={}: {}", sessionId, outputCheck.get("violations"));
-                        finalContent = "[内容已根据安全策略过滤]";
-                    }
+                    outputCheck = guardrailsService.validate(Map.of(
+                            "llmOutput", finalContent,
+                            "stage", GuardrailsServiceImpl.STAGE_OUTPUT));
                 } catch (Exception e) {
-                    log.warn("[AgentLoop] Guardrails output check failed: {}", e.getMessage());
+                    log.error("[AgentLoop] 输出护栏调用异常 → GUARDRAIL_FAIL_CLOSED: session={} err={}",
+                            sessionId, e.getMessage(), e);
+                    return guardrailFailure(sessionId, traceId, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                            "输出护栏调用异常: " + e.getMessage(), e);
+                }
+                if (!Boolean.TRUE.equals(outputCheck.get("passed"))) {
+                    if (isGuardrailFailClosed(outputCheck)) {
+                        // 不可用 ≠ 命中：不可用整体失败（503），命中才做整段替换（403 语义）
+                        return guardrailBlocked(sessionId, traceId, outputCheck);
+                    }
+                    log.warn("[AgentLoop] 输出护栏拦截 session={} violations={}",
+                            sessionId, outputCheck.get("violations"));
+                    finalContent = GuardrailsServiceImpl.FILTERED_PLACEHOLDER;
+                } else if (outputCheck.get("content") instanceof String masked && !masked.isEmpty()) {
+                    // security 下发的脱敏结果在返回给用户前生效（F06-02 同源纪律）
+                    finalContent = masked;
                 }
             }
 
@@ -1117,6 +1147,42 @@ public class AgentLoopService {
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────
+
+    /** 护栏结果是否为不可用语义（503），与明确拒绝（403）严格分态（F06-04/F06-14）。 */
+    private static boolean isGuardrailFailClosed(Map<String, Object> check) {
+        return check != null && AiErrorClass.GUARDRAIL_FAIL_CLOSED.name().equals(check.get("errorClass"));
+    }
+
+    /** 把护栏返回体转成 Loop 错误结果：只带可读消息 + 诊断码，禁带异常原文（X-49）。 */
+    private AgentLoopResult guardrailBlocked(String sessionId, String traceId, Map<String, Object> check) {
+        AiErrorClass errorClass = isGuardrailFailClosed(check)
+                ? AiErrorClass.GUARDRAIL_FAIL_CLOSED : AiErrorClass.GUARDRAIL_DENIED;
+        Object rawMessage = check == null ? null : check.get("message");
+        String userMessage = rawMessage instanceof String s && !s.isBlank()
+                ? s : errorClass.renderMessage(traceId);
+        Object rawCode = check == null ? null : check.get("errorCode");
+        String errorCode = rawCode instanceof String s && !s.isBlank() ? s : errorClass.errorCode();
+        AgentLoopResult r = AgentLoopResult.guardrailError(sessionId, userMessage, errorCode,
+                errorClass.name(), traceId,
+                check != null && Boolean.TRUE.equals(check.get("retryable")));
+        r.setTraceId(traceId);
+        return r;
+    }
+
+    /** 护栏链自身失败（Bean 缺失 / 调用异常）→ GUARDRAIL_FAIL_CLOSED 并终止 Loop。 */
+    private AgentLoopResult guardrailFailure(String sessionId, String traceId, AiErrorClass errorClass,
+                                             String rawReason, Exception cause) {
+        if (cause != null) {
+            log.error("护栏 fail-closed 明细（仅日志）: {} traceId={}", rawReason, traceId, cause);
+        } else {
+            log.error("护栏 fail-closed 明细（仅日志）: {} traceId={}", rawReason, traceId);
+        }
+        AiError error = AiError.of(errorClass, traceId, rawReason);
+        AgentLoopResult r = AgentLoopResult.guardrailError(sessionId, error.userMessage(),
+                error.errorCode(), errorClass.name(), traceId, error.retryable());
+        r.setTraceId(traceId);
+        return r;
+    }
 
     private static String truncate(String str, int maxLen) {
         if (str == null) return null;

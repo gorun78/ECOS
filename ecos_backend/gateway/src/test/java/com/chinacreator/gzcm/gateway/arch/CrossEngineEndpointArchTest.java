@@ -49,7 +49,6 @@ class CrossEngineEndpointArchTest {
      * 命中 localhost:180xx（非 18082）的引擎 main 文件。新增命中 = 门禁 FAIL。
      */
     private static final Set<String> LOCALHOST_180XX_DENYLED_BASELINE = Set.of(
-            "engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/security/AgentToolSqlSecurityGate.java",
             "engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/security/AiSecurityEngineClient.java",
             "engine/data-engine/data-engine-api/src/main/java/com/chinacreator/gzcm/engine/data/quality/DqRcaService.java",
             "engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/event/EcosOntologyEventConsumer.java",

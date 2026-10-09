@@ -1,5 +1,6 @@
 server:
-  port: 18081
+  # boot 调试态端口 = 服务端口 +1000（R-21 ①）：18081 归 services/sysman
+  port: 19081
 
 spring:
   application:

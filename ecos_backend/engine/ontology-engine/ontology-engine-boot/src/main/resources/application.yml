@@ -1,5 +1,6 @@
 server:
-  port: 18083
+  # boot 调试态端口 = 服务端口 +1000（R-21 ①）：18083 归 services/buszhi
+  port: 19083
 
 spring:
   application:
