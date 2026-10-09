@@ -232,7 +232,7 @@ export default function CognitiveEngineView() {
               )}
               <div className="flex gap-2">
                 <input value={compileInput} onChange={e => setCompileInput(e.target.value)} placeholder="Mission ID"
-                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} placeholder:text-zinc-500`} />
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} ${styles.placeholderText}`} />
                 <button onClick={handleTest} disabled={!compileInput}
                   className="px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-600 text-white text-sm disabled:opacity-40">
                   {t('cognition.engine.promptBtn')}
@@ -265,7 +265,7 @@ export default function CognitiveEngineView() {
               </div>
               <div className="flex gap-2">
                 <input value={intentInput} onChange={e => setIntentInput(e.target.value)} placeholder={t('cognition.engine.intentPh')}
-                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} placeholder:text-zinc-500`} />
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} ${styles.placeholderText}`} />
                 <button onClick={handleTest} disabled={!intentInput}
                   className="px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-600 text-white text-sm disabled:opacity-40">
                   {t('cognition.engine.routeBtn')}
@@ -294,7 +294,7 @@ export default function CognitiveEngineView() {
               </div>
               <div className="flex gap-2">
                 <input value={validateInput} onChange={e => setValidateInput(e.target.value)} placeholder={t('cognition.engine.validatePh')}
-                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} placeholder:text-zinc-500`} />
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} ${styles.placeholderText}`} />
                 <button onClick={handleTest} disabled={!validateInput}
                   className="px-3 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-sm disabled:opacity-40">
                   {t('cognition.engine.validateBtn')}
@@ -323,7 +323,7 @@ export default function CognitiveEngineView() {
               </div>
               <div className="flex gap-2">
                 <input value={actionInput} onChange={e => setActionInput(e.target.value)} placeholder={t('cognition.engine.actionInputPh')}
-                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} placeholder:text-zinc-500`} />
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} ${styles.placeholderText}`} />
                 <button onClick={handleTest} disabled={!actionInput}
                   className="px-3 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-600 text-white text-sm disabled:opacity-40">
                   {t('cognition.engine.executeBtn')}

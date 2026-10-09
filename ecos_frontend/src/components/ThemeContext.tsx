@@ -29,6 +29,8 @@ export interface ThemeStyles {
   inputBg: string;
   inputText: string;
   inputBorder: string;
+  /** Input placeholder text color — theme-aware, never a raw zinc/gray literal */
+  placeholderText: string;
   /** Alias for cardTextMuted — used by newer pages */
   muted: string;
   /** Alias for sidebarBorder — used as generic border */
@@ -84,6 +86,7 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     inputBg: "bg-white",
     inputText: "text-slate-800",
     inputBorder: "border-[#E2E8F0]",
+    placeholderText: "placeholder:text-slate-400",
     muted: "text-slate-500",
     appBorder: "border-[#E2E8F0]",
     successBg: "bg-emerald-50",
@@ -124,6 +127,7 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     inputBg: "bg-[#1E2533]",
     inputText: "text-slate-100",
     inputBorder: "border-[#2D3748]",
+    placeholderText: "placeholder:text-slate-500",
     muted: "text-slate-400",
     appBorder: "border-[#1E293B]",
     successBg: "bg-emerald-500/10",
@@ -164,6 +168,7 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     inputBg: "bg-[#050505]",
     inputText: "text-emerald-400",
     inputBorder: "border-emerald-600/40",
+    placeholderText: "placeholder:text-emerald-700",
     muted: "text-emerald-650",
     appBorder: "border-emerald-650/50",
     successBg: "bg-emerald-500/10",
@@ -204,6 +209,7 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     inputBg: "bg-[#251D3E]",
     inputText: "text-purple-200",
     inputBorder: "border-purple-800/40",
+    placeholderText: "placeholder:text-purple-500",
     muted: "text-purple-400",
     appBorder: "border-purple-900/40",
     successBg: "bg-emerald-500/10",
