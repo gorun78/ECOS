@@ -11,7 +11,10 @@ import java.util.Map;
 public interface AgentMetrics {
 
     /**
-     * 记录一次 LLM 调用
+     * 记录一次 LLM 调用的<b>内存聚合统计</b>（subsystem 维度计数）。
+     *
+     * <p>DB 账行与 {@code LLM_USAGE} 事件由唯一计量点 {@link LlmUsageMeter} 负责
+     * （详细设计-06 F06-07 要点 1）；本方法不再落 {@code sys_agent_call_log}，禁双写。</p>
      *
      * @param subsystem    子系统
      * @param profileName  profile 名称

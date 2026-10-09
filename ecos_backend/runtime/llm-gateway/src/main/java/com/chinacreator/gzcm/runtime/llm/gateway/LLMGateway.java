@@ -43,4 +43,15 @@ public interface LLMGateway {
      * @return Map&lt;providerName, statusJson&gt;
      */
     Map<String, Object> getProviderStatus();
+
+    /**
+     * 会话累计 token 用量（详细设计-06 F06-07 要点 3 的配额判定权威读数）。
+     *
+     * <p>唯一计量点在本网关（{@code LlmUsageMeter}），读数即本网关落 {@code sys_agent_call_log}
+     * 的同会话 input+output 累计；引擎侧不得自行记账。只增方法（API 只增不改）。</p>
+     *
+     * @param sessionId 会话标识；null/空 → 0（无法界定作用域时不申报用量）
+     * @return 累计 token（无记录为 0）
+     */
+    long sessionTokenUsage(String sessionId);
 }

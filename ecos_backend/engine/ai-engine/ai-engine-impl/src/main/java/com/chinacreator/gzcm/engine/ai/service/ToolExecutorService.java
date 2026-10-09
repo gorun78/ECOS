@@ -11,6 +11,7 @@ import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlWhitelist;
 import com.chinacreator.gzcm.engine.ai.security.ToolObligationApplier;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
+import com.chinacreator.gzcm.common.trace.EcosTraceContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -697,6 +698,8 @@ public class ToolExecutorService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        // F06-06 要点 2：REST 工具出站透传 MDC traceId（同源，禁自造 ID；runtime-access 收口后由拦截器接管 — F06-17）
+        headers.set(EcosTraceContext.HEADER_REQUEST_ID, AiTraceSupport.currentTraceId());
 
         HttpEntity<?> entity;
         if (method == HttpMethod.GET || method == HttpMethod.DELETE) {

@@ -129,6 +129,8 @@ public class ReasoningEngineNode implements OagNode {
 
                 // 唯一出口：LLMGateway（F06-05）。引擎不携带 api-key，密钥由网关侧经 security-engine 解析。
                 request.setCallerId("service:ai-engine-oag");
+                // F06-07：会话作用域下传，网关计量行按它归集（OAG 上下文自带 sessionId）
+                request.setSessionId(ctx.getSessionId());
                 ChatResponse gwResp = llmGateway.call(request);
                 if (gwResp != null && gwResp.isSuccess()) {
                     response = gwResp;

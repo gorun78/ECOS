@@ -75,4 +75,11 @@
         WHERE subsystem = #{subsystem}
     </select>
 
+    <!-- F06-07 要点 3：会话级 token 配额判定的权威读数（同 session_id 累计输入+输出） -->
+    <select id="sumTokensBySession" resultType="long">
+        SELECT COALESCE(SUM(tokens_input + tokens_output), 0)
+        FROM sys_agent_call_log
+        WHERE session_id = #{sessionId}
+    </select>
+
 </mapper>

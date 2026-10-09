@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.common.error.AiError;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.common.trace.AgentLoopTrace;
 import com.chinacreator.gzcm.engine.ai.GuardrailsService;
 import com.chinacreator.gzcm.engine.ai.SkillService;
 import com.chinacreator.gzcm.engine.ai.entity.SkillEntity;
@@ -61,6 +62,11 @@ public class AgentLoopService {
     /** 工具结果最大字符数（超过截断） */
     private static final int TOOL_RESULT_MAX_CHARS = 2000;
 
+    /** F06-07 要点 3：配额超限的可读消息（占位 {used}/{limit}/{traceId}），原文与 reason 只入日志 */
+    private static final String QUOTA_MESSAGE_TEMPLATE =
+            "本次会话的 token 用量已达上限（已用 {used} / 上限 {limit}），为避免继续消耗已停止本次推理"
+                    + "（诊断码 {traceId}）。";
+
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
@@ -91,6 +97,13 @@ public class AgentLoopService {
     @Autowired(required = false)
     private AgentSessionService sessionService;
 
+    /**
+     * 会话 token 配额（F06-07 要点 3）。必填语义由本类 {@link #checkSessionQuota} 承担：
+     * 未装配 = 无法判定，按"不启用"处理并在首轮 WARN 一次（配额是成本控制，非安全红线）。
+     */
+    @Autowired(required = false)
+    private SessionTokenQuotaService sessionTokenQuota;
+
     /** 正则：匹配 function_name(arg1=val1, arg2=val2) 模式 */
     private static final Pattern FUNCTION_CALL_PATTERN =
             Pattern.compile("(\\w+)\\s*\\(\\s*([^)]*)\\s*\\)");
@@ -108,13 +121,17 @@ public class AgentLoopService {
     public AgentLoopResult run(AgentLoopConfig config, String userMessage, AgentSession session) {
         long startTime = System.currentTimeMillis();
         String sessionId = session != null ? session.getSessionId() : null;
+        String agentId = session != null ? session.getProfileName() : "default";
         int totalTokens = 0;
         List<Map<String, Object>> toolCallRecords = new ArrayList<>();
 
-        // T0a: 生成 traceId
+        // F06-06 要点 1：traceId 唯一源 = MDC（入口过滤器写入）；AgentTracer 只登记本地调试视图
         String traceId = AgentTracer.newTrace();
 
         if (llmGateway == null) {
+            step(agentId, traceId, AgentLoopTrace.Op.PLAN, 0, null, null,
+                    AgentLoopTrace.UNKNOWN, AgentLoopTrace.UNKNOWN,
+                    AgentLoopTrace.UNKNOWN, AgentLoopTrace.Decision.FAIL_CLOSED);
             AgentLoopResult r = AgentLoopResult.error(sessionId, "LLM Gateway 未就绪", 0);
             r.setTraceId(traceId);
             return r;
@@ -122,8 +139,12 @@ public class AgentLoopService {
 
         // T0b-1: 输入护栏 —— 必经 security-engine（F06-04：判空跳过与 catch→warn 两个 fail-open 分支已消灭）
         if (userMessage != null) {
+            long guardStart = System.currentTimeMillis();
             if (guardrailsService == null) {
                 log.error("[AgentLoop] GuardrailsService 未装配，输入护栏无法裁决 → FAIL_CLOSED: session={}", sessionId);
+                step(agentId, traceId, AgentLoopTrace.Op.PLAN, 0, null, null,
+                        AgentLoopTrace.UNKNOWN, AgentLoopTrace.UNKNOWN,
+                        System.currentTimeMillis() - guardStart, AgentLoopTrace.Decision.FAIL_CLOSED);
                 return guardrailFailure(sessionId, traceId, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
                         "护栏服务未装配（GuardrailsService Bean 缺失），禁止未经裁决的模型调用", null);
             }
@@ -135,11 +156,17 @@ public class AgentLoopService {
             } catch (Exception e) {
                 log.error("[AgentLoop] 输入护栏调用异常 → GUARDRAIL_FAIL_CLOSED: session={} err={}",
                         sessionId, e.getMessage(), e);
+                step(agentId, traceId, AgentLoopTrace.Op.PLAN, 0, null, null,
+                        AgentLoopTrace.UNKNOWN, AgentLoopTrace.UNKNOWN,
+                        System.currentTimeMillis() - guardStart, AgentLoopTrace.Decision.FAIL_CLOSED);
                 return guardrailFailure(sessionId, traceId, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
                         "输入护栏调用异常: " + e.getMessage(), e);
             }
             if (!Boolean.TRUE.equals(inputCheck.get("passed"))) {
                 log.warn("[AgentLoop] 输入护栏拦截 session={} violations={}", sessionId, inputCheck.get("violations"));
+                step(agentId, traceId, AgentLoopTrace.Op.PLAN, 0, null, null,
+                        AgentLoopTrace.UNKNOWN, AgentLoopTrace.UNKNOWN,
+                        System.currentTimeMillis() - guardStart, AgentLoopTrace.Decision.DENY);
                 return guardrailBlocked(sessionId, traceId, inputCheck);
             }
         }
@@ -154,7 +181,6 @@ public class AgentLoopService {
         }
 
         // ── 三层配置解析：L1(yaml) → L2(builtin模板) → L3(实例) → 运行时覆盖 ──
-        String agentId = session != null ? session.getProfileName() : "default";
         Map<String, Object> requestOverrides = configToOverrides(config);
         AgentLoopConfig resolvedConfig = agentConfigResolver.resolve(agentId, requestOverrides);
         log.info("[AgentLoop] Resolved config for agent '{}': {}", agentId, resolvedConfig);
@@ -165,23 +191,30 @@ public class AgentLoopService {
         // 1. 构建初始 messages
         List<Message> messages = buildInitialMessages(resolvedConfig, userMessage, session);
 
+        // F06-06 要点 3：plan 步骤恰一条结构化行（输入护栏通过 → ALLOW；无输入消息 → NA）
+        step(agentId, traceId, AgentLoopTrace.Op.PLAN, 0, null, resolvedConfig.getModel(),
+                AgentLoopTrace.UNKNOWN, AgentLoopTrace.UNKNOWN,
+                System.currentTimeMillis() - startTime,
+                userMessage != null ? AgentLoopTrace.Decision.ALLOW : AgentLoopTrace.Decision.NA);
+
         // 2. think → tool → observe 循环
         for (int turn = 1; turn <= maxTurns; turn++) {
             log.info("[AgentLoop] turn={}/{} session={} trace={}", turn, maxTurns, sessionId, traceId);
+
+            // F06-07 要点 3：每轮前置配额判定 —— 超限即终止，禁继续静默消耗（用量真值来自网关计量点）
+            AgentLoopResult quotaBlocked = checkSessionQuota(
+                    agentId, traceId, sessionId, resolvedConfig, turn, totalTokens, startTime);
+            if (quotaBlocked != null) {
+                return quotaBlocked;
+            }
 
             // T0a: 记录 think 阶段开始
             long thinkStart = System.currentTimeMillis();
 
             // 2a. 调用 LLM
-            ChatResponse resp = callLLM(messages, resolvedConfig);
+            ChatResponse resp = callLLM(messages, resolvedConfig, sessionId);
             long thinkElapsed = System.currentTimeMillis() - thinkStart;
-            boolean thinkSuccess = resp != null && resp.isSuccess();
-            int thinkTokens = resp != null ? resp.getTokensInput() + resp.getTokensOutput() : 0;
-            AgentTracer.record(traceId, turn, "think", thinkElapsed, thinkTokens, null, thinkSuccess);
-            // T0a-3: 慢查询告警
-            if (metricsCollector != null) {
-                metricsCollector.alertSlow(agentId, traceId, "think", thinkElapsed);
-            }
+            emitLlmCallStep(agentId, traceId, resolvedConfig, turn, resp, thinkElapsed);
 
             if (resp == null || !resp.isSuccess()) {
                 String err = resp != null ? resp.getErrorMsg() : "LLM 调用返回 null";
@@ -189,7 +222,10 @@ public class AgentLoopService {
                 // LLM 返回格式错误 → 重试一次
                 if (turn == 1 && resp != null) {
                     log.info("[AgentLoop] Retrying LLM call once after format error");
-                    resp = callLLM(messages, resolvedConfig);
+                    long retryStart = System.currentTimeMillis();
+                    resp = callLLM(messages, resolvedConfig, sessionId);
+                    emitLlmCallStep(agentId, traceId, resolvedConfig, turn, resp,
+                            System.currentTimeMillis() - retryStart);
                     if (resp == null || !resp.isSuccess()) {
                         // T0c-2: 友好错误文案
                         String friendlyErr = "LLM 调用失败（已重试）: " + (resp != null ? resp.getErrorMsg() : "null");
@@ -202,7 +238,9 @@ public class AgentLoopService {
                 }
             }
 
-            totalTokens += resp.getTokensInput() + resp.getTokensOutput();
+            if (resp.hasUsage()) {
+                totalTokens += resp.getTokensInput() + resp.getTokensOutput();
+            }
 
             // 2b. 解析响应 — 判断是 tool_call 还是 final
             String content = resp.getContent();
@@ -225,11 +263,20 @@ public class AgentLoopService {
                     ToolExecutorService.ToolResult tr = executeTool(tc, resolvedConfig);
                     long actElapsed = System.currentTimeMillis() - actStart;
 
-                    // T0a: trace 记录
-                    AgentTracer.record(traceId, turn, "act", actElapsed, 0, tc.getName(), tr.isSuccess());
+                    // T0a: trace 记录 + F06-06 结构化行（tool_call 一次；裁决态来自护栏咽喉，缺失记 NA）
+                    AgentLoopTrace.Decision toolDecision = decisionOf(tr.getDecision());
+                    step(agentId, traceId, AgentLoopTrace.Op.TOOL_CALL, turn, tc.getName(),
+                            resolvedConfig.getModel(),
+                            AgentLoopTrace.UNKNOWN, AgentLoopTrace.UNKNOWN,
+                            actElapsed, toolDecision);
+                    step(agentId, traceId, AgentLoopTrace.Op.TOOL_RESULT, turn, tc.getName(),
+                            resolvedConfig.getModel(),
+                            AgentLoopTrace.UNKNOWN, AgentLoopTrace.UNKNOWN,
+                            tr.getElapsedMs() > 0 ? tr.getElapsedMs() : AgentLoopTrace.UNKNOWN,
+                            toolDecision);
                     // T0a-3: 慢查询告警
                     if (metricsCollector != null) {
-                        metricsCollector.alertSlow(agentId, traceId, "act", actElapsed);
+                        metricsCollector.alertSlow(agentId, traceId, "tool_call", actElapsed);
                     }
 
                     // 记录到 toolCallRecords
@@ -253,9 +300,6 @@ public class AgentLoopService {
                     }
                 }
 
-                // T0a: 记录 observe 阶段（工具结果被 LLM 消化）
-                AgentTracer.record(traceId, turn, "observe", 0, 0, null, true);
-
                 // continue → 回到循环顶部，LLM 看到工具结果后继续推理
                 continue;
             }
@@ -272,8 +316,12 @@ public class AgentLoopService {
 
             // T0b-2: 输出护栏 —— 必经 security-engine；命中保留整段替换文案（留痕事件已在护栏内部发出）
             String finalContent = content;
+            AgentLoopTrace.Decision outputDecision = AgentLoopTrace.Decision.NA;
             if (guardrailsService == null) {
                 log.error("[AgentLoop] GuardrailsService 未装配，模型输出不得未经检查返回 → FAIL_CLOSED: session={}", sessionId);
+                step(agentId, traceId, AgentLoopTrace.Op.FINAL, turn, null, resolvedConfig.getModel(),
+                        usageTokens(resp, true), usageTokens(resp, false),
+                        System.currentTimeMillis() - startTime, AgentLoopTrace.Decision.FAIL_CLOSED);
                 return guardrailFailure(sessionId, traceId, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
                         "护栏服务未装配（GuardrailsService Bean 缺失）", null);
             }
@@ -286,25 +334,37 @@ public class AgentLoopService {
                 } catch (Exception e) {
                     log.error("[AgentLoop] 输出护栏调用异常 → GUARDRAIL_FAIL_CLOSED: session={} err={}",
                             sessionId, e.getMessage(), e);
+                    step(agentId, traceId, AgentLoopTrace.Op.FINAL, turn, null, resolvedConfig.getModel(),
+                            usageTokens(resp, true), usageTokens(resp, false),
+                            System.currentTimeMillis() - startTime, AgentLoopTrace.Decision.FAIL_CLOSED);
                     return guardrailFailure(sessionId, traceId, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
                             "输出护栏调用异常: " + e.getMessage(), e);
                 }
                 if (!Boolean.TRUE.equals(outputCheck.get("passed"))) {
                     if (isGuardrailFailClosed(outputCheck)) {
                         // 不可用 ≠ 命中：不可用整体失败（503），命中才做整段替换（403 语义）
+                        step(agentId, traceId, AgentLoopTrace.Op.FINAL, turn, null, resolvedConfig.getModel(),
+                                usageTokens(resp, true), usageTokens(resp, false),
+                                System.currentTimeMillis() - startTime, AgentLoopTrace.Decision.FAIL_CLOSED);
                         return guardrailBlocked(sessionId, traceId, outputCheck);
                     }
                     log.warn("[AgentLoop] 输出护栏拦截 session={} violations={}",
                             sessionId, outputCheck.get("violations"));
                     finalContent = GuardrailsServiceImpl.FILTERED_PLACEHOLDER;
+                    outputDecision = AgentLoopTrace.Decision.DENY;
                 } else if (outputCheck.get("content") instanceof String masked && !masked.isEmpty()) {
                     // security 下发的脱敏结果在返回给用户前生效（F06-02 同源纪律）
                     finalContent = masked;
+                    outputDecision = AgentLoopTrace.Decision.ALLOW;
+                } else {
+                    outputDecision = AgentLoopTrace.Decision.ALLOW;
                 }
             }
 
-            // T0a: 记录最终 observe
-            AgentTracer.record(traceId, turn, "observe", 0, 0, null, true);
+            // F06-06 要点 3：final 步骤行（latency = 整轮累计；token 取本轮 LLM 真值，缺失写 -1）
+            step(agentId, traceId, AgentLoopTrace.Op.FINAL, turn, null, resolvedConfig.getModel(),
+                    usageTokens(resp, true), usageTokens(resp, false),
+                    System.currentTimeMillis() - startTime, outputDecision);
 
             // T0a-2: 记录 metrics
             if (metricsCollector != null) {
@@ -564,9 +624,11 @@ public class AgentLoopService {
      * 调用 LLM — 使用 gateway 的 ChatRequest 模型。
      * <p>
      * 将内部 Message 列表转换为 ChatMessage 列表，构建 ChatRequest 并调用 gateway。
+     * {@code sessionId} 必须透传（F06-07）：网关是唯一计量点，会话配额按它取用量，
+     * 引擎侧不自记 token。
      * </p>
      */
-    private ChatResponse callLLM(List<Message> messages, AgentLoopConfig config) {
+    private ChatResponse callLLM(List<Message> messages, AgentLoopConfig config, String sessionId) {
         // 转换消息
         List<ChatMessage> chatMessages = new ArrayList<>();
         for (Message m : messages) {
@@ -597,6 +659,8 @@ public class AgentLoopService {
         // F06-05 要点 3：引擎侧不携带任何密钥（明文或引用）。provider 密钥一律由 llm-gateway
         // 服务端经 security-engine 密钥服务按 llm.gateway.default-api-key-ref 解析（I-4）。
         request.setCallerId("service:ai-engine-agent-loop");
+        // F06-07：会话作用域随请求下传 —— 网关按它记 LLM_USAGE 与账行，配额查询才有真值
+        request.setSessionId(sessionId);
         try {
             return llmGateway.call(request);
         } catch (Exception e) {
@@ -1101,6 +1165,58 @@ public class AgentLoopService {
 
     // ─── Helpers ───────────────────────────────────────────────────────
 
+    /**
+     * F06-06 要点 3：一步恰一条固定格式结构化日志行（INFO 级，MDC 前缀带 traceId），
+     * 同时写入 {@link AgentTracer} 本地调试视图。行文本不含任何消息/工具结果原文。
+     */
+    private void step(String agentId, String traceId, AgentLoopTrace.Op op, int step,
+                      String tool, String model, long promptTokens, long completionTokens,
+                      long latencyMs, AgentLoopTrace.Decision decision) {
+        String line = AgentLoopTrace.line(op, step)
+                .agent(agentId)
+                .tool(tool)
+                .model(model)
+                .promptTokens(promptTokens)
+                .completionTokens(completionTokens)
+                .latencyMs(latencyMs)
+                .decision(decision)
+                .render();
+        log.info("{}", line);
+        AgentTracer.record(traceId, step, op, latencyMs, promptTokens, completionTokens, tool, decision);
+    }
+
+    /** llm_call 步骤行 + 慢查询告警（重试路径与首调共用，保证每次真实网关调用恰一行）。 */
+    private void emitLlmCallStep(String agentId, String traceId, AgentLoopConfig resolvedConfig,
+                                 int turn, ChatResponse resp, long elapsedMs) {
+        step(agentId, traceId, AgentLoopTrace.Op.LLM_CALL, turn, null,
+                resp != null && resp.getModel() != null ? resp.getModel() : resolvedConfig.getModel(),
+                usageTokens(resp, true), usageTokens(resp, false), elapsedMs,
+                resp != null && resp.isSuccess()
+                        ? AgentLoopTrace.Decision.ALLOW : AgentLoopTrace.Decision.NA);
+        if (metricsCollector != null) {
+            metricsCollector.alertSlow(agentId, traceId, AgentLoopTrace.Op.LLM_CALL.wire(), elapsedMs);
+        }
+    }
+
+    /** ChatResponse token 取值：网关未给出真值/估算值 → {@link AgentLoopTrace#UNKNOWN}（禁 0 冒充实测）。 */
+    private static long usageTokens(ChatResponse resp, boolean promptSide) {
+        if (resp == null || !resp.hasUsage()) {
+            return AgentLoopTrace.UNKNOWN;
+        }
+        return promptSide ? resp.getTokensInput() : resp.getTokensOutput();
+    }
+
+    /** 工具裁决字符串 → 三态枚举（缺失/未知一律 NA，不当作放行）。 */
+    private static AgentLoopTrace.Decision decisionOf(String raw) {
+        if (raw == null) return AgentLoopTrace.Decision.NA;
+        return switch (raw.trim().toUpperCase(java.util.Locale.ROOT)) {
+            case "ALLOW", "PERMIT" -> AgentLoopTrace.Decision.ALLOW;
+            case "DENY", "DENIED", "REJECT", "REJECTED" -> AgentLoopTrace.Decision.DENY;
+            case "FAIL_CLOSED" -> AgentLoopTrace.Decision.FAIL_CLOSED;
+            default -> AgentLoopTrace.Decision.NA;
+        };
+    }
+
     /** 护栏结果是否为不可用语义（503），与明确拒绝（403）严格分态（F06-04/F06-14）。 */
     private static boolean isGuardrailFailClosed(Map<String, Object> check) {
         return check != null && AiErrorClass.GUARDRAIL_FAIL_CLOSED.name().equals(check.get("errorClass"));
@@ -1135,6 +1251,57 @@ public class AgentLoopService {
                 error.errorCode(), errorClass.name(), traceId, error.retryable());
         r.setTraceId(traceId);
         return r;
+    }
+
+    /**
+     * 会话 token 配额前置判定（详细设计-06 F06-07 要点 3）。
+     *
+     * <p>用量真值来自 llm-gateway 的唯一计量点（{@link LLMGateway#sessionTokenUsage}），
+     * 引擎侧不自记账（F06-05 / 铁律 §2.5-2）。超限即终止，<b>禁继续静默消耗</b>。</p>
+     *
+     * @return 超限时返回终止结果；未超限或不判定时返回 {@code null}（调用方继续本轮）
+     */
+    private AgentLoopResult checkSessionQuota(String agentId, String traceId, String sessionId,
+                                              AgentLoopConfig resolvedConfig, int turn,
+                                              int totalTokens, long startTime) {
+        if (sessionTokenQuota == null) {
+            if (turn == 1) {
+                log.warn("[AgentLoop] SessionTokenQuotaService 未装配，本轮无法做会话配额判定（不静默：每次运行记一次）: "
+                        + "session={}", sessionId);
+            }
+            return null;
+        }
+        SessionTokenQuotaService.QuotaState state = sessionTokenQuota.check(sessionId);
+        if (!state.enforced() || !state.exceeded()) {
+            return null;
+        }
+        log.warn("[AgentLoop] F06-07 会话 token 配额超限 → 终止 Loop: session={} used={} limit={} "
+                        + "reason={} turn={} trace={}",
+                sessionId, state.used(), state.limit(), state.reason(), turn, traceId);
+        // F06-06 要点 3：被拒的这一 step 恰一条结构化行；未发生模型调用 → token 记 -1（禁 0 冒充实测）
+        step(agentId, traceId, AgentLoopTrace.Op.PLAN, turn, null, resolvedConfig.getModel(),
+                AgentLoopTrace.UNKNOWN, AgentLoopTrace.UNKNOWN,
+                System.currentTimeMillis() - startTime, AgentLoopTrace.Decision.DENY);
+        return sessionQuotaExceeded(sessionId, traceId, state, totalTokens);
+    }
+
+    /**
+     * 配额终止结果：错误码沿用 D.5 的 {@code CONTEXT_OVERFLOW}（F06-14 前置判定），
+     * 消息按配额语义自造 —— 类模板的"已降级为摘要模式"是压缩路径（F06-09）文案，
+     * 用在配额拒绝上会让用户误以为仍有结果。
+     */
+    private AgentLoopResult sessionQuotaExceeded(String sessionId, String traceId,
+                                                 SessionTokenQuotaService.QuotaState state,
+                                                 int totalTokens) {
+        AiError error = AiError.of(AiErrorClass.CONTEXT_OVERFLOW, traceId,
+                "session token quota exceeded: used=" + state.used() + " limit=" + state.limit()
+                        + " reason=" + state.reason());
+        String userMessage = QUOTA_MESSAGE_TEMPLATE
+                .replace("{used}", String.valueOf(state.used()))
+                .replace("{limit}", String.valueOf(state.limit()))
+                .replace("{traceId}", traceId == null || traceId.isBlank() ? "-" : traceId);
+        return AgentLoopResult.contextOverflow(sessionId, userMessage, error.errorCode(),
+                error.errorClass().name(), traceId, totalTokens);
     }
 
     private static String truncate(String str, int maxLen) {

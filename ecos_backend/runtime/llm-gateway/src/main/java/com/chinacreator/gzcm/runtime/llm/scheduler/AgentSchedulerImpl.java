@@ -143,6 +143,8 @@ public class AgentSchedulerImpl implements AgentScheduler {
                 // 旧 setApiKey(明文) 通道已废弃（服务端不消费）。
                 chatRequest.setApiKeyRef(llmConfig.getApiKeyRef());
                 chatRequest.setCallerId("llm-gateway:" + subsystem + ":" + profileName);
+                // F06-07：会话标识随请求下传，计量与配额按会话聚合（callerId 格式即 LlmUsageMeter 的 subsystem/profile 解析源）
+                chatRequest.setSessionId(sessionId);
 
                 // 调用 LLM
                 log.debug("Calling LLM: subsystem={}, profile={}, model={}, session={}",

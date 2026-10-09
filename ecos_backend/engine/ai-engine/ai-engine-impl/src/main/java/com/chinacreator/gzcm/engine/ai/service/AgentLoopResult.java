@@ -82,6 +82,22 @@ public class AgentLoopResult {
         return r;
     }
 
+    /**
+     * 会话 token 配额超限（详细设计-06 F06-07 要点 3；错误码沿用 D.5 的 {@code CONTEXT_OVERFLOW}）。
+     *
+     * <p>{@code errorMsg} 为可读消息（含已用/上限/诊断码），异常原文与 {@code reason}
+     * 只入日志（X-49）。</p>
+     */
+    public static AgentLoopResult contextOverflow(String sessionId, String errorMsg, String errorCode,
+                                                  String errorClass, String traceId, int totalTokens) {
+        AgentLoopResult r = error(sessionId, errorMsg, totalTokens);
+        r.errorCode = errorCode;
+        r.errorClass = errorClass;
+        r.traceId = traceId;
+        r.retryable = false;
+        return r;
+    }
+
     // ─── Getters / Setters ─────────────────────────────────────────────
 
     public int getTurns() { return turns; }

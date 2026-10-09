@@ -8,16 +8,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * AgentMetrics 实现 — 基于 AgentCallLogRepository 的数据持久化 + 内存聚合
+ * AgentMetrics 实现 — 进程内聚合视图（subsystem 维度统计计数器）
  * <p>
- * recordCall 写入 DB，统计查询通过聚合 DB 数据或内存累积数据实现。
+ * <b>DB 落行不在本类</b>：详细设计-06 F06-07 要点 1 把用量计量收口到唯一计量点
+ * {@link LlmUsageMeter}（由 {@code LLMGatewayImpl} 在响应返回前调用，写
+ * {@code sys_agent_call_log} 并发 {@code LLM_USAGE} 事件）。本类的 {@link #recordCall}
+ * 只累计内存统计 —— 若这里也写库，同一调用会产生两行账（X-39 的"两处计量"形态）。
+ * 历史上本方法写的行 {@code session_id} 恒为 NULL，被 NOT NULL 约束静默拒绝，
+ * 这正是"接口存在、库里零行"的成因。
  * </p>
  */
 @Primary
@@ -35,25 +39,7 @@ public class AgentMetricsImpl implements AgentMetrics {
     @Override
     public void recordCall(String subsystem, String profileName,
                            int tokensInput, int tokensOutput, long durationMs, boolean success) {
-        // 持久化写入 DB
-        AgentCallLog logRecord = AgentCallLog.builder()
-                .id(UUID.randomUUID().toString().replace("-", ""))
-                .subsystem(subsystem)
-                .profileName(profileName)
-                .tokensInput(tokensInput)
-                .tokensOutput(tokensOutput)
-                .durationMs((int) durationMs)
-                .status(success ? "success" : "failed")
-                .createdTime(LocalDateTime.now())
-                .build();
-
-        try {
-            repository.insert(logRecord);
-        } catch (Exception e) {
-            log.error("Failed to persist AgentCallLog: {}", e.getMessage());
-        }
-
-        // 内存聚合
+        // 内存聚合（DB 行由 LlmUsageMeter 唯一落点，禁双写）
         statsMap.computeIfAbsent(subsystem, k -> new SubsystemStats())
                 .record(tokensInput, tokensOutput, durationMs, success);
     }

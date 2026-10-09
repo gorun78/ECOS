@@ -28,6 +28,13 @@ public class ChatRequest {
     private String apiKeyRef;
     /** 调用方主体标识（如 {@code llm-gateway:<subsystem>:<profile>}），用于密钥权限校验与审计主体 */
     private String callerId;
+    /**
+     * 会话标识（非机密，可空）— 计量与配额的作用域键（详细设计-06 F06-07 要点 1/3：
+     * {@code LLM_USAGE} 事件与 {@code sys_agent_call_log} 按会话聚合，
+     * {@code ecos.ai.session.token_limit} 判定同源于此）。
+     * 只增字段，未填不影响既有调用。
+     */
+    private String sessionId;
 
     public ChatRequest() {}
 
@@ -68,4 +75,7 @@ public class ChatRequest {
 
     public String getCallerId() { return callerId; }
     public void setCallerId(String callerId) { this.callerId = callerId; }
+
+    public String getSessionId() { return sessionId; }
+    public void setSessionId(String sessionId) { this.sessionId = sessionId; }
 }

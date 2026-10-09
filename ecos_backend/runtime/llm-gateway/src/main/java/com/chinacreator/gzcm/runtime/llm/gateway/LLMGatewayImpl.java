@@ -1,7 +1,9 @@
 package com.chinacreator.gzcm.runtime.llm.gateway;
 
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.common.trace.EcosTraceContext;
 import com.chinacreator.gzcm.runtime.llm.config.LLMGatewayProperties;
+import com.chinacreator.gzcm.runtime.llm.metrics.LlmUsageMeter;
 import com.chinacreator.gzcm.runtime.llm.security.SecurityEngineBridge;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -66,6 +68,14 @@ public class LLMGatewayImpl implements LLMGateway {
      */
     @Autowired(required = false)
     private SecurityEngineBridge securityEngineBridge;
+
+    /**
+     * 用量计量唯一落点（详细设计-06 F06-07 要点 1）：每次外发返回前记恰一条 {@code LLM_USAGE}
+     * + 一行 {@code sys_agent_call_log}。required=false 只服务单测装配；生产缺失时
+     * {@link #meterUsage} 记 ERROR（禁静默断链，X-39 形态）。
+     */
+    @Autowired(required = false)
+    private LlmUsageMeter llmUsageMeter;
 
     // ── Provider URL 解析 ──
 
@@ -137,10 +147,45 @@ public class LLMGatewayImpl implements LLMGateway {
         }
 
         if (stream) {
-            return callStreaming(baseUrl, apiKey, requestBodyJson);
+            long streamStart = System.currentTimeMillis();
+            ChatResponse response = callStreaming(baseUrl, apiKey, requestBodyJson);
+            meterUsage(request, caller, provider, response, System.currentTimeMillis() - streamStart);
+            return response;
         } else {
-            return callNonStreaming(baseUrl, apiKey, requestBodyJson);
+            long callStart = System.currentTimeMillis();
+            ChatResponse response = callNonStreaming(baseUrl, apiKey, requestBodyJson);
+            meterUsage(request, caller, provider, response, System.currentTimeMillis() - callStart);
+            return response;
         }
+    }
+
+    /**
+     * 计量点转引（F06-07 要点 1：响应返回前记账，恰一条 {@code LLM_USAGE}）。
+     * 计量自身异常绝不影响已发生的模型调用结果，但必须 ERROR 留痕。
+     */
+    private void meterUsage(ChatRequest request, String caller, String provider,
+                            ChatResponse response, long latencyMs) {
+        if (llmUsageMeter == null) {
+            log.error("[llm-gateway] LlmUsageMeter 未装配 — 本次调用未计量（LLM_USAGE 缺失、"
+                    + "会话配额读数会偏小，禁静默）: caller={}, provider={}, model={}",
+                    caller, provider, request.getModel());
+            return;
+        }
+        try {
+            llmUsageMeter.meterChat(request, caller, provider, response, latencyMs);
+        } catch (Exception e) {
+            log.error("[llm-gateway] 计量异常（不翻转调用结果，但必须留痕）: caller={}, model={}, err={}",
+                    caller, request.getModel(), e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public long sessionTokenUsage(String sessionId) {
+        if (llmUsageMeter == null) {
+            log.error("[llm-gateway] LlmUsageMeter 未装配 — 会话用量读数按不可得处理: session={}", sessionId);
+            return 0L;
+        }
+        return llmUsageMeter.sessionTokenUsage(sessionId);
     }
 
     @Override
@@ -251,6 +296,7 @@ public class LLMGatewayImpl implements LLMGateway {
                 .url(modelsUrl)
                 .header("Authorization", "Bearer " + probeKey)
                 .header("Accept", "application/json")
+                .header(EcosTraceContext.HEADER_REQUEST_ID, EcosTraceContext.currentTraceId())
                 .get()
                 .build();
 
@@ -425,6 +471,7 @@ public class LLMGatewayImpl implements LLMGateway {
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
+                .header(EcosTraceContext.HEADER_REQUEST_ID, EcosTraceContext.currentTraceId())
                 .post(body)
                 .build();
 
@@ -460,6 +507,7 @@ public class LLMGatewayImpl implements LLMGateway {
                 .url(baseUrl + "/embeddings")
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
+                .header(EcosTraceContext.HEADER_REQUEST_ID, EcosTraceContext.currentTraceId())
                 .post(RequestBody.create(requestBodyJson, MediaType.parse("application/json")))
                 .build();
         long start = System.currentTimeMillis();
@@ -531,12 +579,14 @@ public class LLMGatewayImpl implements LLMGateway {
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
                 .header("Accept", "text/event-stream")
+                .header(EcosTraceContext.HEADER_REQUEST_ID, EcosTraceContext.currentTraceId())
                 .post(body)
                 .build();
 
         StringBuilder contentBuilder = new StringBuilder();
         AtomicInteger tokensInput = new AtomicInteger(0);
         AtomicInteger tokensOutput = new AtomicInteger(0);
+        AtomicBoolean usageSeen = new AtomicBoolean(false);
         AtomicReference<String> modelUsed = new AtomicReference<>("");
         AtomicBoolean success = new AtomicBoolean(false);
         AtomicReference<String> errorMsg = new AtomicReference<>("");
@@ -574,6 +624,7 @@ public class LLMGatewayImpl implements LLMGateway {
                         if (usage.has("completion_tokens")) {
                             tokensOutput.set(usage.get("completion_tokens").asInt());
                         }
+                        usageSeen.set(true);
                     }
                     // 记录 model
                     if (node.has("model") && !node.get("model").isNull()) {
@@ -620,8 +671,10 @@ public class LLMGatewayImpl implements LLMGateway {
         if (success.get()) {
             String modelStr = modelUsed.get();
             if (modelStr.isEmpty()) modelStr = "unknown";
-            return ChatResponse.ok(contentBuilder.toString(),
+            ChatResponse ok = ChatResponse.ok(contentBuilder.toString(),
                     tokensInput.get(), tokensOutput.get(), modelStr);
+            ok.setUsageReported(usageSeen.get());
+            return ok;
         } else {
             return ChatResponse.fail(errorMsg.get());
         }
@@ -651,7 +704,8 @@ public class LLMGatewayImpl implements LLMGateway {
 
             int tokensInput = 0;
             int tokensOutput = 0;
-            if (root.has("usage") && !root.get("usage").isNull()) {
+            boolean usageReported = root.has("usage") && !root.get("usage").isNull();
+            if (usageReported) {
                 JsonNode usage = root.get("usage");
                 tokensInput = usage.has("prompt_tokens") ? usage.get("prompt_tokens").asInt() : 0;
                 tokensOutput = usage.has("completion_tokens") ? usage.get("completion_tokens").asInt() : 0;
@@ -660,7 +714,9 @@ public class LLMGatewayImpl implements LLMGateway {
             String model = root.has("model") && !root.get("model").isNull()
                     ? root.get("model").asText() : "unknown";
 
-            return ChatResponse.ok(content, tokensInput, tokensOutput, model);
+            ChatResponse ok = ChatResponse.ok(content, tokensInput, tokensOutput, model);
+            ok.setUsageReported(usageReported);
+            return ok;
 
         } catch (Exception e) {
             log.error("Failed to parse LLM response: {}", responseBody, e);

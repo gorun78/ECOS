@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.runtime.llm.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.trace.EcosTraceContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -247,7 +248,7 @@ public class SecurityEngineBridge {
                     .build();
             Request httpReq = new Request.Builder()
                     .url(baseUrl + PATH_POLICY_EVALUATE)
-                    .header("X-Request-Id", UUID.randomUUID().toString())
+                    .header(EcosTraceContext.HEADER_REQUEST_ID, EcosTraceContext.currentTraceId())
                     .post(RequestBody.create(objectMapper.writeValueAsString(body), JSON_MEDIA_TYPE))
                     .build();
             try (Response resp = client.newCall(httpReq).execute()) {
@@ -352,6 +353,7 @@ public class SecurityEngineBridge {
             event.put("timestamp", Instant.now().toString());
             event.put("module", "llm-gateway");
             event.put("userId", callerId == null ? "anonymous" : callerId);
+            event.put("traceId", EcosTraceContext.currentTraceId());
             event.put("action", action);
             event.put("resource", resource);
             event.put("result", result == null ? "OK" : result);
@@ -361,7 +363,24 @@ public class SecurityEngineBridge {
         }
     }
 
-    private void publishAuditEvent(Map<String, Object> event) {
+    /**
+     * 结构化审计事件出口（详细设计-06 F06-07 要点 2：{@code LLM_USAGE} 落 {@code ecos.audit} 链）。
+     *
+     * <p>与 {@link #audit(String, String, String, String)} 同一条通道（runtime-event
+     * {@code EventBusService} 优先，其次 kafkaTemplate 反射兜底），供网关计量器复用，
+     * 禁在别处自建 KafkaTemplate（铁律 §2.5#7）。</p>
+     *
+     * @return 事件是否已交到底座通道（false = 无可用通道，调用方须自行留痕并暴露未上报态）
+     */
+    public boolean publishStructuredAudit(Map<String, Object> event) {
+        if (event == null || event.isEmpty()) {
+            return false;
+        }
+        event.putIfAbsent("traceId", EcosTraceContext.currentTraceId());
+        return publishAuditEvent(event);
+    }
+
+    private boolean publishAuditEvent(Map<String, Object> event) {
         // 1) runtime-event EventBusService 横切通道（类名反射，避免编译期依赖）
         try {
             Class<?> type = Class.forName(EVENTBUS_FQN);
@@ -370,7 +389,7 @@ public class SecurityEngineBridge {
                 Object bus = applicationContext.getBean(names[0]);
                 type.getMethod("publish", String.class, Object.class)
                         .invoke(bus, KafkaTopics.AUDIT, event);
-                return;
+                return true;
             }
         } catch (ClassNotFoundException ignored) {
             // runtime-event 不在 classpath → kafkaTemplate 兜底
@@ -382,7 +401,7 @@ public class SecurityEngineBridge {
             try {
                 Method send = kafkaTemplateBean.getClass().getMethod("send", String.class, Object.class);
                 send.invoke(kafkaTemplateBean, KafkaTopics.AUDIT, event);
-                return;
+                return true;
             } catch (Exception e) {
                 log.debug("[llm-gateway] kafkaTemplate 兜底失败: {}", e.getMessage());
             }
@@ -390,6 +409,7 @@ public class SecurityEngineBridge {
         // 3) 无通道 → WARN 留痕
         log.warn("[llm-gateway] EventBusService/KafkaTemplate 均不可用，审计仅记日志: action={}, result={}",
                 event.get("action"), event.get("result"));
+        return false;
     }
 
     // ═══════════════ 工具 ═══════════════
