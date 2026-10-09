@@ -265,12 +265,12 @@ export default function ObjectTypeView({
                   placeholder={t('ow.object.new_prop_placeholder')}
                   value={newPropName}
                   onChange={e => setNewPropName(e.target.value)}
-                  className="px-3 py-1 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden"
+                  className={`px-3 py-1 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
                 />
                 <select
                   value={newPropType}
                   onChange={e => setNewPropType(e.target.value as any)}
-                  className={`px-2 py-1 text-xs border border-gray-300 rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
+                  className={`px-2 py-1 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} ${styles.inputText} focus:border-blue-500 focus:outline-hidden`}
                 >
                   <option value="string">{t('ow.object.dt_string')}</option>
                   <option value="integer">{t('ow.object.dt_integer')}</option>
@@ -398,7 +398,7 @@ export default function ObjectTypeView({
                   type="text"
                   value={objectType.displayName}
                   onChange={e => handleMetaChange('displayName', e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden"
+                  className={`w-full px-3 py-1.5 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
                 />
               </div>
               <div className="space-y-1.5">
@@ -407,7 +407,7 @@ export default function ObjectTypeView({
                   type="text"
                   value={objectType.apiName}
                   onChange={e => handleMetaChange('apiName', e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden"
+                  className={`w-full px-3 py-1.5 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
                 />
               </div>
             </div>
@@ -417,17 +417,17 @@ export default function ObjectTypeView({
               <textarea
                 value={objectType.description}
                 onChange={e => handleMetaChange('description', e.target.value)}
-                className="w-full h-20 px-3 py-1.5 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden"
+                className={`w-full h-20 px-3 py-1.5 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
                 placeholder={t('ow.object.meta_description_ph')}
               />
             </div>
 
-            <div className="space-y-1.5 border-t border-gray-100 pt-4">
+            <div className={`space-y-1.5 border-t ${styles.divider} pt-4`}>
               <label className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.object.meta_domain')}</label>
               <select
                 value={objectType.domainId || ''}
                 onChange={e => handleMetaChange('domainId', e.target.value || undefined)}
-                className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
+                className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} ${styles.inputText} focus:border-blue-500 focus:outline-hidden`}
               >
                 <option value="">{t('ow.object.meta_domain_none')}</option>
                 {domains.map(d => (
@@ -437,13 +437,13 @@ export default function ObjectTypeView({
               <p className={`text-[10px] ${styles.cardTextMuted}`}>{t('ow.object.meta_domain_hint')}</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-4">
+            <div className={`grid grid-cols-2 gap-4 border-t ${styles.divider} pt-4`}>
               <div className="space-y-1.5">
                 <label className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.object.meta_title_prop')}</label>
                 <select
                   value={objectType.titleProperty}
                   onChange={e => handleMetaChange('titleProperty', e.target.value)}
-                  className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
+                  className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} ${styles.inputText} focus:border-blue-500 focus:outline-hidden`}
                 >
                   {objectType.properties.map(p => (
                     <option key={p.id} value={p.id}>{p.displayName} ({p.apiName})</option>
@@ -457,7 +457,7 @@ export default function ObjectTypeView({
                 <select
                   value={objectType.status}
                   onChange={e => handleMetaChange('status', e.target.value)}
-                  className={`w-full px-3 py-1.5 text-xs border border-gray-300 rounded ${styles.inputBg} focus:border-blue-500 focus:outline-hidden`}
+                  className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} ${styles.inputText} focus:border-blue-500 focus:outline-hidden`}
                 >
                   <option value="DRAFT">{t('ow.object.status_draft')}</option>
                   <option value="ACTIVE">{t('ow.object.status_active')}</option>
@@ -472,7 +472,7 @@ export default function ObjectTypeView({
                 <select
                   value={objectType.icon}
                   onChange={e => handleMetaChange('icon', e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded bg-white focus:border-blue-500 focus:outline-hidden"
+                  className={`w-full px-3 py-1.5 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
                 >
                   <option value="Plane">Plane ({t('ow.object.icon_plane')})</option>
                   <option value="Building2">Building2 ({t('ow.object.icon_building')})</option>
@@ -490,7 +490,7 @@ export default function ObjectTypeView({
                 <select
                   value={objectType.color}
                   onChange={e => handleMetaChange('color', e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded bg-white focus:border-blue-500 focus:outline-hidden"
+                  className={`w-full px-3 py-1.5 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
                 >
                   <option value="border-blue-500 bg-blue-50 text-blue-700">{t('ow.object.color_blue')}</option>
                   <option value="border-emerald-500 bg-emerald-50 text-emerald-700">{t('ow.object.color_emerald')}</option>
@@ -503,7 +503,7 @@ export default function ObjectTypeView({
             </div>
 
             {/* Implements Interfaces */}
-            <div className="space-y-2 border-t border-gray-100 pt-4">
+            <div className={`space-y-2 border-t ${styles.divider} pt-4`}>
               <label className={`text-xs font-semibold ${styles.cardText} block`}>{t('ow.object.meta_interfaces')}</label>
               <div className="flex flex-wrap gap-2">
                 {interfaces.map(intf => {

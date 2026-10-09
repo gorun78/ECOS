@@ -94,7 +94,7 @@ export default function LinkTypeView({
               <span className={`text-xs font-mono ${styles.sidebarBg} ${styles.cardTextMuted} px-1.5 py-0.5 rounded`}>
                 {linkType.apiName}
               </span>
-              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
+              <span className={`text-xs ${styles.infoBg} ${styles.infoText} px-2 py-0.5 rounded-full font-semibold`}>
                 {linkType.cardinality} {t('ow.link.badge')}
               </span>
             </div>
@@ -130,7 +130,7 @@ export default function LinkTypeView({
                 <span className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>{sourceObj.id}</span>
               </div>
             ) : (
-              <div className="w-36 p-3 rounded-lg border-2 border-dashed border-red-300 bg-red-50 flex flex-col items-center justify-center text-red-600">
+              <div className={`w-36 p-3 rounded-lg border-2 border-dashed ${styles.dangerBorder} ${styles.dangerBg} flex flex-col items-center justify-center ${styles.dangerText}`}>
                 <span>{t('ow.link.sourceUnset')}</span>
               </div>
             )}
@@ -159,7 +159,7 @@ export default function LinkTypeView({
                 <span className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>{targetObj.id}</span>
               </div>
             ) : (
-              <div className="w-36 p-3 rounded-lg border-2 border-dashed border-red-300 bg-red-50 flex flex-col items-center justify-center text-red-600">
+              <div className={`w-36 p-3 rounded-lg border-2 border-dashed ${styles.dangerBorder} ${styles.dangerBg} flex flex-col items-center justify-center ${styles.dangerText}`}>
                 <span>{t('ow.link.targetUnset')}</span>
               </div>
             )}
@@ -169,7 +169,7 @@ export default function LinkTypeView({
         {/* Configurations */}
         <div className="grid grid-cols-2 gap-6">
           <div className="space-y-4">
-            <h4 className={`text-xs font-semibold ${styles.cardText} border-b border-gray-100 pb-2`}>{t('ow.link.basicInfo')}</h4>
+            <h4 className={`text-xs font-semibold ${styles.cardText} border-b ${styles.divider} pb-2`}>{t('ow.link.basicInfo')}</h4>
             <div className="space-y-3">
               <div className="space-y-1">
                 <label className={`text-xs ${styles.cardTextMuted} font-medium`}>{t('ow.link.label.displayName')}</label>
@@ -177,7 +177,7 @@ export default function LinkTypeView({
                   type="text"
                   value={linkType.displayName}
                   onChange={e => handleFieldChange('displayName', e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden"
+                  className={`w-full px-3 py-1.5 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
                 />
               </div>
               <div className="space-y-1">
@@ -186,7 +186,7 @@ export default function LinkTypeView({
                   type="text"
                   value={linkType.apiName}
                   onChange={e => handleFieldChange('apiName', e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden"
+                  className={`w-full px-3 py-1.5 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
                 />
               </div>
               <div className="space-y-1">
@@ -194,7 +194,7 @@ export default function LinkTypeView({
                 <select
                   value={linkType.cardinality}
                   onChange={e => handleFieldChange('cardinality', e.target.value as any)}
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-hidden"
+                  className={`w-full px-3 py-1.5 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded focus:outline-hidden`}
                 >
                   <option value="1:1">1:1 {t('ow.link.card.11')}</option>
                   <option value="1:N">1:N {t('ow.link.card.1n')}</option>
@@ -207,7 +207,7 @@ export default function LinkTypeView({
                 <textarea
                   value={linkType.description}
                   onChange={e => handleFieldChange('description', e.target.value)}
-                  className="w-full h-16 px-3 py-1.5 text-xs border border-gray-300 rounded focus:border-blue-500 focus:outline-hidden"
+                  className={`w-full h-16 px-3 py-1.5 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded focus:border-blue-500 focus:outline-hidden`}
                 />
               </div>
             </div>
@@ -222,7 +222,7 @@ export default function LinkTypeView({
                 <select
                   value={linkType.mapping.type}
                   onChange={e => handleMappingFieldChange('type', e.target.value as any)}
-                  className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded bg-white focus:outline-hidden"
+                  className={`w-full px-3 py-1.5 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded focus:outline-hidden`}
                 >
                   <option value="foreign_key">{t('ow.link.strategy.foreignKey')}</option>
                   <option value="join_table">{t('ow.link.strategy.joinTable')}</option>
@@ -239,7 +239,7 @@ export default function LinkTypeView({
                       <select
                         value={linkType.mapping.foreignKeyMapping?.sourceKey || ''}
                         onChange={e => handleFkChange('sourceKey', e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+                        className={`w-full px-2 py-1 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded`}
                       >
                         <option value="">{t('ow.link.selectProp')}</option>
                         {sourceObj?.properties.map(p => (
@@ -253,7 +253,7 @@ export default function LinkTypeView({
                       <select
                         value={linkType.mapping.foreignKeyMapping?.targetKey || ''}
                         onChange={e => handleFkChange('targetKey', e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+                        className={`w-full px-2 py-1 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded`}
                       >
                         <option value="">{t('ow.link.selectProp')}</option>
                         {targetObj?.properties.map(p => (
@@ -278,7 +278,7 @@ export default function LinkTypeView({
                     <select
                       value={linkType.mapping.datasetId || ''}
                       onChange={e => handleMappingFieldChange('datasetId', e.target.value)}
-                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+                      className={`w-full px-2 py-1 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded`}
                     >
                       <option value="">{t('ow.link.jt.datasetPlaceholder')}</option>
                       {datasets.map(ds => (
@@ -293,7 +293,7 @@ export default function LinkTypeView({
                       <select
                         value={linkType.mapping.joinTableMapping?.sourceKey || ''}
                         onChange={e => handleJoinChange('sourceKey', e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+                        className={`w-full px-2 py-1 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded`}
                       >
                         <option value="">{t('ow.link.jt.sourcePropPlaceholder')}</option>
                         {sourceObj?.properties.map(p => (
@@ -307,7 +307,7 @@ export default function LinkTypeView({
                       <select
                         value={linkType.mapping.joinTableMapping?.joinSourceKey || ''}
                         onChange={e => handleJoinChange('joinSourceKey', e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white font-mono"
+                        className={`w-full px-2 py-1 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded font-mono`}
                       >
                         <option value="">{t('ow.link.jt.columnPlaceholder')}</option>
                         {selectedDataset?.columns.map(col => (
@@ -321,7 +321,7 @@ export default function LinkTypeView({
                       <select
                         value={linkType.mapping.joinTableMapping?.targetKey || ''}
                         onChange={e => handleJoinChange('targetKey', e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white"
+                        className={`w-full px-2 py-1 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded`}
                       >
                         <option value="">{t('ow.link.jt.targetPropPlaceholder')}</option>
                         {targetObj?.properties.map(p => (
@@ -335,7 +335,7 @@ export default function LinkTypeView({
                       <select
                         value={linkType.mapping.joinTableMapping?.joinTargetKey || ''}
                         onChange={e => handleJoinChange('joinTargetKey', e.target.value)}
-                        className="w-full px-2 py-1 text-xs border border-gray-300 rounded bg-white font-mono"
+                        className={`w-full px-2 py-1 text-xs ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder} rounded font-mono`}
                       >
                         <option value="">{t('ow.link.jt.columnPlaceholder')}</option>
                         {selectedDataset?.columns.map(col => (
