@@ -82,7 +82,7 @@ export default function SystemDictionary() {
             >
               <span className="truncate text-xs">{g.dictType}</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono
-                ${activeType === g.dictType ? 'bg-indigo-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                ${activeType === g.dictType ? 'bg-indigo-500 text-white' : styles.sidebarBg}`}>
                 {g.itemCount}
               </span>
             </button>

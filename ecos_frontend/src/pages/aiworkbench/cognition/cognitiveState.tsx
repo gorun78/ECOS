@@ -123,7 +123,7 @@ export default function cognitiveState() {
                   </td>
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-20 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                      <div className={`w-20 h-1.5 ${styles.sidebarBg} rounded-full overflow-hidden`}>
                         <div className="h-full bg-blue-500 rounded-full"
                           style={{ width: `${Math.max(0, Math.min(1, b.distribution[0]?.prob ?? 0)) * 100}%` }} />
                       </div>

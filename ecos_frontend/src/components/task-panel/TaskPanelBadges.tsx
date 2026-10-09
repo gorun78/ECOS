@@ -47,7 +47,7 @@ export function ProgressCell({ progress }: { progress: number }) {
   const { styles } = useTheme();
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+      <div className={`flex-1 h-1.5 ${styles.sidebarBg} rounded-full overflow-hidden`}>
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{ width: `${Math.min(100, Math.max(0, progress))}%`, backgroundColor: "var(--accent)" }}
