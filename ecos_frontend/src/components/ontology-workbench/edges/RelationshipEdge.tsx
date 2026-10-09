@@ -96,7 +96,7 @@ function RelationshipEdge({
   const typeConfig = REL_TYPE_CONFIG[relType] || DEFAULT_TYPE_CONFIG;
 
   // 选中态颜色
-  const strokeColor = selected ? "#6366f1" : "#334155";
+  const strokeColor = selected ? styles.accentStroke : "#334155";
   const strokeWidth = selected ? 2.5 : 1.5;
 
   return (
@@ -127,7 +127,7 @@ function RelationshipEdge({
               text-[10px] font-medium
               shadow-sm shadow-black/30
               transition-all duration-150
-              ${selected ? "ring-1 ring-indigo-500" : ""}
+              ${selected ? `ring-1 ${styles.accentRing}` : ""}
             `}
           >
             {/* 关系名称 */}

@@ -137,13 +137,13 @@ export default function CanvasToolbar({
         <button
           type="button"
           onClick={onAddEntity}
-          className="
+          className={`
             flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg
-            bg-indigo-600 hover:bg-indigo-500
+            ${styles.accentBg} ${styles.accentHover}
             text-white text-[11px] font-medium
             transition-colors duration-150
             cursor-pointer
-          "
+          `}
           title={t("ow.toolbar.addEntity")}
         >
           <Plus size={13} />
@@ -165,7 +165,7 @@ export default function CanvasToolbar({
               cursor-pointer
               ${
                 activeLayout === id
-                  ? "bg-indigo-600 text-white"
+                  ? `${styles.accentBg} text-white`
                   : `${styles.cardTextMuted} hover:text-white hover:bg-[#2A3040]`
               }
             `}

@@ -153,7 +153,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
 
   // 选中态样式
   const selectedRing = selected
-    ? "ring-2 ring-indigo-500 ring-offset-1 ring-offset-[#0f1117]"
+    ? `ring-2 ${styles.accentRing} ring-offset-1 ring-offset-[#0f1117]`
     : "";
 
   return (

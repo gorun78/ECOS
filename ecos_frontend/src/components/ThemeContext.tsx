@@ -24,6 +24,10 @@ export interface ThemeStyles {
   accentHover: string;
   accentText: string;
   accentBorder: string;
+  /** Focus/selection ring color class (G2 flow-canvas selection highlight) — theme accent, not neutral */
+  accentRing: string;
+  /** Selected-edge SVG stroke hex (G2 flow-canvas) — mirrors accentBg hue; consumed as an SVG attribute, not a Tailwind class */
+  accentStroke: string;
   badgeBg: string;
   badgeText: string;
   inputBg: string;
@@ -97,6 +101,8 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     accentHover: "hover:bg-indigo-700",
     accentText: "text-indigo-600",
     accentBorder: "border-indigo-200",
+    accentRing: "ring-indigo-500",
+    accentStroke: "#6366f1",
     badgeBg: "bg-indigo-50",
     badgeText: "text-indigo-700",
     inputBg: "bg-white",
@@ -147,6 +153,8 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     accentHover: "hover:bg-blue-700",
     accentText: "text-blue-400",
     accentBorder: "border-blue-500/30",
+    accentRing: "ring-blue-500",
+    accentStroke: "#3b82f6",
     badgeBg: "bg-blue-950/40",
     badgeText: "text-blue-450",
     inputBg: "bg-[#1E2533]",
@@ -197,6 +205,8 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     accentHover: "hover:bg-emerald-600",
     accentText: "text-emerald-400",
     accentBorder: "border-emerald-500/40",
+    accentRing: "ring-emerald-500",
+    accentStroke: "#10b981",
     badgeBg: "bg-[#0A1A0F]",
     badgeText: "text-emerald-400",
     inputBg: "bg-[#050505]",
@@ -247,6 +257,8 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     accentHover: "hover:bg-purple-600",
     accentText: "text-purple-450",
     accentBorder: "border-purple-700/30",
+    accentRing: "ring-purple-500",
+    accentStroke: "#a855f7",
     badgeBg: "bg-purple-950/50",
     badgeText: "text-purple-350",
     inputBg: "bg-[#251D3E]",
