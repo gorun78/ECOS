@@ -132,6 +132,14 @@
             <artifactId>spring-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- 详细设计-06 F06-22（P-1 测试底座）：@SpringBootTest 薄切片 + TestRestTemplate
+             依赖（X-87 反虚假验收：本模块 0 @SpringBootTest 必须先补齐 —— 见
+             AiTestHarnessSmokeTest#springBootTestSliceBootsInBothModes）。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
