@@ -10,7 +10,6 @@ import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -23,7 +22,8 @@ import java.util.Map;
  *
  * <p>PMO-74.3 T2: 删除自持 HttpClient 与厂商 URL；provider/model 经 sysman
  * SysConfigService 门面读 sys_config 分组 (dw.copilot.* / config_group='data-engine')；
- * api-key 不再落 sys_config 明文，改环境变量注入链 (DEEPSEEK_API_KEY → llm.deepseek.api-key)。</p>
+ * api-key 不再由引擎携带（F06-05 / 铁律 §2.5-2）：provider 密钥由 llm-gateway 服务端
+ * 经 security-engine 密钥服务按引用解析。</p>
  *
  * @author ECOS Pipeline 2.0 Team
  */
@@ -44,9 +44,6 @@ public class CopilotServiceImpl implements CopilotService {
     /** sysman 配置门面 (config_group 单表分组)；可选注入，缺 bean 时走代码默认值 */
     @Autowired(required = false)
     private SysConfigService sysConfigService;
-
-    @Value("${llm.deepseek.api-key:}")
-    private String copilotApiKey;
 
     public CopilotServiceImpl(CopilotDao copilotDao) {
         this.copilotDao = copilotDao;
@@ -95,10 +92,6 @@ public class CopilotServiceImpl implements CopilotService {
         }
 
         String model = cfg("dw.copilot.model", DEFAULT_MODEL);
-        String apiKey = copilotApiKey != null ? copilotApiKey.trim() : "";
-        if (apiKey.isEmpty()) {
-            return "API Key 未配置。请设置环境变量 DEEPSEEK_API_KEY。";
-        }
 
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(new ChatMessage("system", systemPrompt));
@@ -108,7 +101,8 @@ public class CopilotServiceImpl implements CopilotService {
                 cfgDouble("dw.copilot.temperature", 0.2),
                 cfgInt("dw.copilot.max_tokens", 4096),
                 false);
-        request.setApiKey(apiKey);
+        // F06-05 要点 3：引擎侧不携带 api-key；密钥由 llm-gateway 服务端经 security-engine 引用解析。
+        request.setCallerId("service:data-engine-copilot");
 
         try {
             ChatResponse response = llmGateway.call(request);

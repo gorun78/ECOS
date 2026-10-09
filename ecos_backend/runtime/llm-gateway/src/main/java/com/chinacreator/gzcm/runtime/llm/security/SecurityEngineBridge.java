@@ -1,10 +1,18 @@
 package com.chinacreator.gzcm.runtime.llm.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
@@ -12,8 +20,11 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 /**
  * H10-T1 (PMO-74 N14 / 铁律 §2.4) — llm-gateway 对 security-engine 密钥/裁决/审计能力的统一桥。
@@ -21,25 +32,34 @@ import java.util.UUID;
  * <p>背景：llm-gateway 此前 apiKey 由调用方请求体明文携带（{@code ChatRequest.apiKey}），
  * {@code ProfileConfig.apiKeyRef} 设计字段零接线，security-engine 集成探针命中 0。</p>
  *
- * <p>本桥按「runtime 不编译期依赖 engine-impl」的依赖方向铁律，采用<b>类名反射 + 可选 bean</b>
- * 通道（参照 ai-engine {@code AiSecurityEngineClient} 对 runtime-event 的同款先例）访问同 JVM
- * （gateway fat-JAR 聚合部署态）的 security-engine 能力：</p>
+ * <p>详细设计-06 F06-05 要点 4（R-18 裁决项，本册默认选项 ①）：<b>ABAC 裁决改走 security-engine
+ * REST</b>（与 ai-engine {@code AiSecurityEngineClient} 同款先例）。原"类名反射 + 同 JVM bean"
+ * 通道在 gateway fat-JAR 态可用、在独立 service 态因 security 类不在 classpath 而恒 DENY，
+ * 两态行为不一致；且配套的 {@code llm.gateway.abac-eval-enabled} 可关开关本身即绕过面，已废除。
+ * 密钥取得仍走同 JVM bean 反射（引用而非明文，缺失即 null → 调用方 DENY）。</p>
+ *
+ * <p>裁决 base URL（F02-15 两态寻址单源）：显式 {@code service.security.base-url} 覆写 →
+ * runtime-access {@code ServiceEndpointResolver}（route-manifest 单源，owner={@code sysman}）
+ * → 皆不可用即空串（默认 DENY）。<b>本类源码内不得出现 {@code http://localhost:1808x} 字面量</b>；
+ * resolver 经类名反射访问（与 {@code ISecretService} 同款通道），避免 llm-gateway 新增
+ * runtime-access 编译期依赖（该模块带入 tika/minio/neo4j driver，体积不成比例）。</p>
+ *
  * <ol>
  *   <li><b>密钥取得</b>：{@link #resolveSecret(String, String)} 解析 {@code apiKeyRef} 引用
  *       （{@code secret:<id>} / {@code enc:<keyId>:<cipherText>} / 裸 {@code <secretId>}），
  *       经 {@code ISecretService.getSecretValue} 或 {@code IDataEncryptionService.decrypt}
  *       （security-engine crypto 域）还原明文密钥，<b>仅在本方法返回值中短暂存在</b>，
  *       日志/审计一律只出掩码引用。</li>
- *   <li><b>ABAC 裁决</b>：{@link #evaluate(String, String, String, Map)} 经同 JVM
- *       {@code OpaPolicyService} bean（缺失即视为 security 不可用）。</li>
+ *   <li><b>ABAC 裁决</b>：{@link #evaluate(String, String, String, Map)} 经 security-engine
+ *       {@code POST /api/v1/security/policy-engine/evaluate}（{@link #POLICY_TIMEOUT_MS} 预算）。</li>
  *   <li><b>审计</b>：{@link #audit(String, String, String, String)} 优先 runtime-event
  *       {@code EventBusService}，其次 {@code kafkaTemplate} 反射兜底，topic =
  *       {@link KafkaTopics#AUDIT}（铁律 §2.4#5 新代码走 Kafka）。</li>
  * </ol>
  *
- * <p>🔴 fail-closed（铁律 §2.4#6）：security-engine 类/bean 不在 classpath、bean 调用异常、
- * 引用无法解析 — 一律返回「不可用」（null / false）并 {@code log.warn}，由调用方默认 DENY；
- * <b>绝不回退到调用方自报的明文密钥，绝不放行直连</b>。</p>
+ * <p>🔴 fail-closed（铁律 §2.4#6）：security-engine 类/bean 不在 classpath、REST 非 2xx、
+ * 超时、响应不可解析、引用无法解析 — 一律返回「不可用」（null / false）并 {@code log.warn}，
+ * 由调用方默认 DENY；<b>绝不回退到调用方自报的明文密钥，绝不放行直连</b>。</p>
  */
 @Component
 public class SecurityEngineBridge {
@@ -52,22 +72,46 @@ public class SecurityEngineBridge {
     /** security-engine 加解密服务 */
     private static final String ENCRYPTION_SERVICE_FQN =
             "com.chinacreator.gzcm.engine.security.crypto.IDataEncryptionService";
-    /** security-engine ABAC 裁决服务（PolicyEngineController 背后的 OPA 门面） */
-    private static final String OPA_SERVICE_FQN =
-            "com.chinacreator.gzcm.engine.security.service.OpaPolicyService";
     /** runtime-event 横切审计出口（铁律 §2.5#7，禁自建 KafkaTemplate） */
     private static final String EVENTBUS_FQN =
             "com.chinacreator.gzcm.runtime.eventbus.EventBusService";
 
+    /** F06-05 要点 4：ABAC 裁决端点（与 ai-engine 侧同一 security-engine 契约，单点常量） */
+    static final String PATH_POLICY_EVALUATE = "/api/v1/security/policy-engine/evaluate";
+
+    /** PRD-06 §1.3 / W145 同口径：裁决预算 2s（复用底座 OkHttpClient 的 per-call 超时） */
+    static final int POLICY_TIMEOUT_MS = 2000;
+
+    /** runtime-access 两态寻址单源（F02-15；反射访问，禁为本类新增编译期重依赖） */
+    private static final String ENDPOINT_RESOLVER_FQN =
+            "com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver";
+    /** resolver 的 RouteMode 嵌套枚举 FQN */
+    private static final String ROUTE_MODE_FQN = ENDPOINT_RESOLVER_FQN + "$RouteMode";
+    /** route-manifest 中承载 security 域的 owner（{@code /api/v1/security} → sysman） */
+    private static final String SECURITY_ROUTE_OWNER = "sysman";
+
+    private static final MediaType JSON_MEDIA_TYPE = MediaType.get("application/json; charset=utf-8");
+
     private final ApplicationContext applicationContext;
+    private final ObjectProvider<OkHttpClient> httpClientProvider;
+    /** 显式覆写（默认空 = 走 resolver）；禁带硬编码端口默认值（F02-15 ①） */
+    private final String securityBaseUrlOverride;
+    private final ObjectMapper objectMapper;
 
     @Autowired(required = false)
     @Qualifier("kafkaTemplate")
     private Object kafkaTemplateBean;
 
     @Autowired
-    public SecurityEngineBridge(ApplicationContext applicationContext) {
+    public SecurityEngineBridge(ApplicationContext applicationContext,
+                               ObjectProvider<OkHttpClient> httpClientProvider,
+                               @Value("${service.security.base-url:}") String securityBaseUrlOverride,
+                               ObjectMapper objectMapper) {
         this.applicationContext = applicationContext;
+        this.httpClientProvider = httpClientProvider;
+        this.securityBaseUrlOverride = securityBaseUrlOverride == null
+                ? "" : securityBaseUrlOverride.trim();
+        this.objectMapper = objectMapper;
     }
 
     // ═══════════════ 1. 密钥取得（默认 DENY，不回退明文） ═══════════════
@@ -165,47 +209,134 @@ public class SecurityEngineBridge {
         }
     }
 
-    // ═══════════════ 2. ABAC 裁决（默认 DENY） ═══════════════
+    // ═══════════════ 2. ABAC 裁决（security-engine REST，默认 DENY） ═══════════════
 
     /**
-     * 经 security-engine {@code OpaPolicyService}（同 JVM bean，PolicyEngineController 背后同一实现）
-     * 做操作授权裁决。铁律 §2.4#4/#6：不可用 / 异常 / 非明确 ALLOW → 一律 false（默认 DENY）。
+     * 经 security-engine REST {@value #PATH_POLICY_EVALUATE} 做操作授权裁决。
+     *
+     * <p>F06-05 要点 4：两态（gateway fat-JAR / 独立 service）一致走 HTTP，不再有
+     * "security 类不在 classpath 即恒 DENY" 与 "配置开关可关裁决" 两个绕过面。
+     * 铁律 §2.4#4/#6：不可用 / 超时 / 非明确 ALLOW → 一律 false（默认 DENY）。</p>
      */
     public boolean evaluate(String callerId, String tenantId, String action, Map<String, Object> attrs) {
-        try {
-            Object bean = findBeanByClassName(OPA_SERVICE_FQN);
-            if (bean == null) {
-                log.warn("[llm-gateway] security-engine OpaPolicyService 不可用，ABAC 裁决默认 DENY: action={}, caller={}",
-                        action, callerId);
-                return false;
-            }
-            Map<String, Object> input = new LinkedHashMap<>();
-            input.put("action", action);
-            if (attrs != null) input.putAll(attrs);
-            input.put("subject", Map.of(
-                    "userId", callerId == null ? "anonymous" : callerId,
-                    "tenantId", tenantId == null ? "default" : tenantId,
-                    "role", "llm-gateway-service"));
-            Method m = bean.getClass().getMethod("evaluate", String.class, Map.class);
-            Object resp = m.invoke(bean, "rbac", input);
-            if (resp instanceof Map<?, ?> map) {
-                // OpaPolicyService.evaluate 返回体裁决键为 allow（兼容 result 别名）
-                Object verdict = map.containsKey("allow") ? map.get("allow") : map.get("result");
-                if (Boolean.TRUE.equals(verdict)) {
-                    return true;
-                }
-                log.warn("[llm-gateway] security-engine 裁决未放行（默认 DENY）: action={}, caller={}, verdict={}",
-                        action, callerId, verdict);
-                return false;
-            }
-            log.warn("[llm-gateway] security-engine 裁决响应异常（默认 DENY）: action={}, respType={}",
-                    action, resp == null ? "null" : resp.getClass().getName());
+        String baseUrl = securityBaseUrl();
+        if (baseUrl.isEmpty()) {
+            log.warn("[llm-gateway] security base URL 不可得（service.security.base-url 未配置且 route-manifest 寻址失败），"
+                    + "ABAC 裁决默认 DENY: action={}, caller={}", action, callerId);
             return false;
+        }
+        OkHttpClient base;
+        try {
+            base = httpClientProvider == null ? null : httpClientProvider.getIfAvailable();
+        } catch (Exception e) {
+            log.warn("[llm-gateway] llm-gateway 底座 OkHttpClient 不可解析 — ABAC 裁决不可用，默认 DENY: action={}, reason={}",
+                    action, rootMessage(e));
+            return false;
+        }
+        if (base == null) {
+            log.warn("[llm-gateway] llm-gateway 底座 OkHttpClient 未装配 — ABAC 裁决不可用，默认 DENY: action={}, caller={}",
+                    action, callerId);
+            return false;
+        }
+        Map<String, Object> body = evaluateBody(callerId, tenantId, action, attrs);
+        try {
+            OkHttpClient client = base.newBuilder()
+                    .callTimeout(POLICY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                    .connectTimeout(POLICY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                    .readTimeout(POLICY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                    .build();
+            Request httpReq = new Request.Builder()
+                    .url(baseUrl + PATH_POLICY_EVALUATE)
+                    .header("X-Request-Id", UUID.randomUUID().toString())
+                    .post(RequestBody.create(objectMapper.writeValueAsString(body), JSON_MEDIA_TYPE))
+                    .build();
+            try (Response resp = client.newCall(httpReq).execute()) {
+                if (!resp.isSuccessful() || resp.body() == null) {
+                    log.warn("[llm-gateway] security-engine 裁决 HTTP 异常（默认 DENY）: action={}, code={}",
+                            action, resp.code());
+                    return false;
+                }
+                return isExplicitAllow(parseDataSegment(resp.body().string()), action, callerId);
+            }
         } catch (Exception e) {
             log.warn("[llm-gateway] security-engine 裁决调用异常（默认 DENY）: action={}, reason={}",
                     action, rootMessage(e));
             return false;
         }
+    }
+
+    /** 裁决请求体（{@code policy=rbac} + 四段 input，与 security-engine 契约单源一致）。 */
+    private Map<String, Object> evaluateBody(String callerId, String tenantId, String action,
+                                             Map<String, Object> attrs) {
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("action", action);
+        if (attrs != null) input.putAll(attrs);
+        input.put("subject", Map.of(
+                "userId", callerId == null ? "anonymous" : callerId,
+                "tenantId", tenantId == null ? "default" : tenantId,
+                "role", "llm-gateway-service"));
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("policy", "rbac");
+        body.put("input", input);
+        return body;
+    }
+
+    /** 响应 {@code data} 段；缺段/不可解析 → null（由 {@link #isExplicitAllow} 判 DENY）。 */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseDataSegment(String json) {
+        try {
+            Map<String, Object> resp = objectMapper.readValue(json, Map.class);
+            return resp.get("data") instanceof Map<?, ?> map ? (Map<String, Object>) map : null;
+        } catch (Exception e) {
+            log.warn("[llm-gateway] security-engine 裁决响应不可解析（默认 DENY）: {}", rootMessage(e));
+            return null;
+        }
+    }
+
+    /**
+     * 恰为显式 ALLOW 才放行。
+     *
+     * <p>识别顺序与 ai-engine 侧 {@code AiSecurityEngineClient#verdictOf} 对齐：显式
+     * {@code decision}/{@code verdict} 字段优先，其次布尔裁决键 {@code allow}（兼容历史别名
+     * {@code result}）；{@code source=fallback} 或带 {@code opaError} 是 security 自身兜底
+     * 而非策略裁决 → 不放行；其余（含缺失）默认 DENY。</p>
+     */
+    private boolean isExplicitAllow(Map<String, Object> data, String action, String callerId) {
+        if (data == null) {
+            log.warn("[llm-gateway] security-engine 裁决无 data 段（默认 DENY）: action={}, caller={}",
+                    action, callerId);
+            return false;
+        }
+        Object source = data.get("source");
+        if (data.containsKey("opaError")
+                || (source != null && "fallback".equalsIgnoreCase(String.valueOf(source).trim()))) {
+            log.warn("[llm-gateway] security-engine 处于 fallback 兜底态而非策略裁决（默认 DENY）: action={}", action);
+            return false;
+        }
+        Object explicit = data.get("decision") != null ? data.get("decision") : data.get("verdict");
+        if (explicit != null) {
+            String s = String.valueOf(explicit).trim().toUpperCase(Locale.ROOT);
+            boolean allow = "ALLOW".equals(s) || "PERMIT".equals(s) || "TRUE".equals(s);
+            if (!allow) {
+                log.warn("[llm-gateway] security-engine 裁决未放行（默认 DENY）: action={}, caller={}, verdict={}",
+                        action, callerId, s);
+            }
+            return allow;
+        }
+        Object flag = data.get("allow") != null ? data.get("allow") : data.get("result");
+        if (flag == null) {
+            log.warn("[llm-gateway] security-engine 裁决键缺失（默认 DENY）: action={}, caller={}", action, callerId);
+            return false;
+        }
+        if (flag instanceof Boolean b) {
+            if (!b) {
+                log.warn("[llm-gateway] security-engine 裁决未放行（默认 DENY）: action={}, caller={}",
+                        action, callerId);
+            }
+            return b;
+        }
+        String s = String.valueOf(flag).trim().toLowerCase(Locale.ROOT);
+        return "true".equals(s) || "allow".equals(s) || "permit".equals(s);
     }
 
     // ═══════════════ 3. 审计（Kafka ecos.audit，经 runtime-event 横切出口） ═══════════════
@@ -267,6 +398,56 @@ public class SecurityEngineBridge {
     public boolean isSecurityEngineAvailable() {
         return findBeanByClassName(SECRET_SERVICE_FQN) != null
                 || findBeanByClassName(ENCRYPTION_SERVICE_FQN) != null;
+    }
+
+    /**
+     * 裁决 base URL 供给链（F02-15 两态寻址单源）：显式覆写 →
+     * {@code ServiceEndpointResolver.resolve("sysman", SERVICE)}（route=monolith 时 resolver
+     * 内部自动回落 monolith 端口）→ 皆不可用返回空串（调用方默认 DENY）。
+     */
+    private String securityBaseUrl() {
+        if (!securityBaseUrlOverride.isEmpty()) {
+            return securityBaseUrlOverride;
+        }
+        return resolveViaEndpointResolver();
+    }
+
+    private String resolveViaEndpointResolver() {
+        Object resolver = findBeanByClassName(ENDPOINT_RESOLVER_FQN);
+        if (resolver == null) {
+            return "";
+        }
+        try {
+            Class<?> modeType = Class.forName(ROUTE_MODE_FQN);
+            Object serviceMode = enumConstant(modeType, "SERVICE");
+            if (serviceMode == null) {
+                return "";
+            }
+            Object resolved = resolver.getClass()
+                    .getMethod("resolve", String.class, modeType)
+                    .invoke(resolver, SECURITY_ROUTE_OWNER, serviceMode);
+            if (resolved instanceof Optional<?> opt && opt.orElse(null) instanceof String url) {
+                return url == null ? "" : url.trim();
+            }
+            return "";
+        } catch (Exception e) {
+            log.warn("[llm-gateway] ServiceEndpointResolver 寻址 security base URL 失败（默认 DENY）: owner={}, reason={}",
+                    SECURITY_ROUTE_OWNER, rootMessage(e));
+            return "";
+        }
+    }
+
+    private static Object enumConstant(Class<?> enumType, String name) {
+        Object[] constants = enumType.getEnumConstants();
+        if (constants == null) {
+            return null;
+        }
+        for (Object c : constants) {
+            if (name.equals(String.valueOf(c))) {
+                return c;
+            }
+        }
+        return null;
     }
 
     private Object findBeanByClassName(String fqn) {

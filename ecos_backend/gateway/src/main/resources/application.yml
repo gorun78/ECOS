@@ -92,7 +92,6 @@ llm:
   max-context-tokens: 8000
   agent-timeout-ms: 300000
   deepseek:
-    api-key: ${DEEP...EY:}
     base-url: https://api.deepseek.com
     model: deepseek-chat
   engine:
@@ -104,6 +103,9 @@ llm:
   gateway:
     retry-max-attempts: 3
     request-timeout: 60s
+    # F06-05：只允许配置密钥「引用」（secret:<id> / enc:<keyId>:<cipher>），明文密钥禁入配置；
+    # 真实密钥由 llm-gateway 服务端经 security-engine 密钥服务解析，未配置即默认 DENY。
+    default-api-key-ref: ${LLM_GATEWAY_DEFAULT_API_KEY_REF:}
 
 # Agent Default Configuration (L1)
 agent:

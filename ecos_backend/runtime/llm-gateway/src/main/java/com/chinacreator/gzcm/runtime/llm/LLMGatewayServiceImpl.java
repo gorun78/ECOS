@@ -27,7 +27,9 @@ import java.util.function.Consumer;
  * <p>
  * 协调 SessionManager、ProfileManager、AgentScheduler、AgentMetrics、CallbackExecutor 完成完整 Agent 执行流程。
  * </p>
+ * <p>F06-05：写方法仅为编排壳，LLM 外发唯一出口 = {@code AgentSchedulerImpl → LLMGateway}。</p>
  */
+@Deprecated(forRemoval = true)
 @Primary
 @Service
 public class LLMGatewayServiceImpl implements LLMGatewayService {

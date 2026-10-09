@@ -48,7 +48,15 @@ class BusinessDomainWriteArchTest {
             // kb-engine 里 W62「A3 退出」双跑 diff 白名单与禁用断言 @Disabled 文案里
             // 出现 "ecos_dw.doc_chunk"（作为跨库写通道 REST 端点契约的字符串宣言），非 SQL 直读。
             "NoKbChunkWriteArchTest.java",
-            "KbChunkWriteGoneArchTest.java");
+            "KbChunkWriteGoneArchTest.java",
+            // 详细设计-06 F06-04 护栏测试族（ai-engine src/test）：护栏/裁决的被测输入<b>必须</b>
+            // 是真实受保护 schema 的 SQL 字面量（ecos_dw.*），否则"拦住了什么"不可证；
+            // 这些字符串只进 GuardrailsService/ToolGuardrail 的纯内存判定与 mock 白名单键，
+            // 全链路零 JDBC/MyBatis 连接（同 SecurityCheckerNodeDenyTest.java 先例）。
+            "ToolGuardrailChokepointTest.java",
+            "ToolAdjudicationPayloadTest.java",
+            "GuardrailAuditEventTest.java",
+            "AgentToolPolicyGateTest.java");
 
     /**
      * <b>逐行</b>豁免（严于上面的文件名白名单）：只读载体描述符。

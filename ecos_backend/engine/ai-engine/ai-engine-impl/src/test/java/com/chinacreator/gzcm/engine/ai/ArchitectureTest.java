@@ -64,8 +64,8 @@ public class ArchitectureTest {
             .should().haveSimpleNameStartingWith("I")
             .orShould().haveSimpleNameStartingWith("Knowledge")  // kb-engine legacy
             .orShould().haveSimpleNameStartingWith("Causal")     // cognitive-engine legacy
-            .orShould().haveSimpleNameStartingWith("Engine")    // IEngine variants
-            .orShould().haveSimpleNameStartingWith("LLM");      // LLMProvider legacy
+            .orShould().haveSimpleNameStartingWith("Engine");    // IEngine variants
+        // F06-05 要点 1：LLMProvider legacy 豁免已随接口删除收回（X-22）
         rule.allowEmptyShould(true).check(classes);
     }
 

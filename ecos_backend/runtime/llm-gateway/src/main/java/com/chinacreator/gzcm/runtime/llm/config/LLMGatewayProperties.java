@@ -72,11 +72,6 @@ public class LLMGatewayProperties {
          * 环境注入：{@code LLM_GATEWAY_DEFAULT_API_KEY_REF}。
          */
         private String defaultApiKeyRef;
-        /**
-         * LLM 调用前是否强制 security-engine ABAC 裁决（铁律 §2.4#4/#6，默认开启；
-         * security 不可用时默认 DENY，不降级放行）。
-         */
-        private boolean abacEvalEnabled = true;
 
         public int getRetryMaxAttempts() { return retryMaxAttempts; }
         public void setRetryMaxAttempts(int retryMaxAttempts) { this.retryMaxAttempts = retryMaxAttempts; }
@@ -84,8 +79,6 @@ public class LLMGatewayProperties {
         public void setRequestTimeout(Duration requestTimeout) { this.requestTimeout = requestTimeout; }
         public String getDefaultApiKeyRef() { return defaultApiKeyRef; }
         public void setDefaultApiKeyRef(String defaultApiKeyRef) { this.defaultApiKeyRef = defaultApiKeyRef; }
-        public boolean isAbacEvalEnabled() { return abacEvalEnabled; }
-        public void setAbacEvalEnabled(boolean abacEvalEnabled) { this.abacEvalEnabled = abacEvalEnabled; }
     }
 
     /**

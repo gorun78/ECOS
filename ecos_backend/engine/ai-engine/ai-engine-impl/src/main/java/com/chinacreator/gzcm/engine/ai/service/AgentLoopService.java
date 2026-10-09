@@ -5,7 +5,6 @@ import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.engine.ai.GuardrailsService;
 import com.chinacreator.gzcm.engine.ai.SkillService;
 import com.chinacreator.gzcm.engine.ai.entity.SkillEntity;
-import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
@@ -20,7 +19,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,8 +41,8 @@ import java.util.regex.Pattern;
  *
  * <h3>注入点</h3>
  * <ul>
- *   <li>{@link LLMGatewayService} — LLM 调用网关（required）</li>
- *   <li>{@link LLMGateway} — 底层 LLM 调用接口（required）</li>
+ *   <li>{@link LLMGateway} — 唯一 LLM 出口（F06-05 / 铁律 §2.5-2；旧
+ *       {@code LLMGatewayService} 门面在本类已移除，X-4 双注入消除）</li>
  *   <li>{@link ToolExecutorService} — 工具执行器（required=false，T0.2 实现）</li>
  *   <li>{@link ToolRegistry} — 工具注册中心，用于 Schema 校验（required=false）</li>
  * </ul>
@@ -64,9 +62,6 @@ public class AgentLoopService {
     private static final int TOOL_RESULT_MAX_CHARS = 2000;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
-
-    @Autowired
-    private LLMGatewayService llmGatewayService;
 
     @Autowired
     private LLMGateway llmGateway;
@@ -99,13 +94,6 @@ public class AgentLoopService {
     /** 正则：匹配 function_name(arg1=val1, arg2=val2) 模式 */
     private static final Pattern FUNCTION_CALL_PATTERN =
             Pattern.compile("(\\w+)\\s*\\(\\s*([^)]*)\\s*\\)");
-
-    @org.springframework.beans.factory.annotation.Value("${llm.deepseek.api-key:}")
-    private String deepseekApiKey;
-
-    /** LLM Provider 列表 — 按 priority() 排序，选择第一个支持 function-calling 的可用 Provider */
-    @Autowired(required = false)
-    private List<LLMProvider> llmProviders;
 
     // ─── Public API ────────────────────────────────────────────────────
 
@@ -606,50 +594,15 @@ public class AgentLoopService {
                 ? config.getMaxTokens() : 4096;
 
         ChatRequest request = new ChatRequest(model, chatMessages, temperature, maxTokens, false);
-
-        // 1. 优先尝试 LLMProvider（直接调用 DeepSeek API，原生 function-calling）
-        LLMProvider provider = selectProvider();
-        if (provider != null) {
-            log.info("[AgentLoop] Using LLMProvider: {} (priority={})", provider.getName(), provider.priority());
-            try {
-                ChatResponse resp = provider.chat(request);
-                if (resp != null && resp.isSuccess()) {
-                    return resp;
-                }
-                log.warn("[AgentLoop] Provider {} returned failure: {} — falling back to LLMGateway",
-                        provider.getName(), resp != null ? resp.getErrorMsg() : "null");
-            } catch (Exception e) {
-                log.warn("[AgentLoop] Provider {} threw exception — falling back to LLMGateway", provider.getName(), e);
-            }
-        }
-
-        // 2. Fallback: 使用原有 LLMGateway 路径
-        request.setApiKey(deepseekApiKey);
+        // F06-05 要点 3：引擎侧不携带任何密钥（明文或引用）。provider 密钥一律由 llm-gateway
+        // 服务端经 security-engine 密钥服务按 llm.gateway.default-api-key-ref 解析（I-4）。
+        request.setCallerId("service:ai-engine-agent-loop");
         try {
             return llmGateway.call(request);
         } catch (Exception e) {
             log.error("[AgentLoop] LLM gateway call exception", e);
             return ChatResponse.fail("LLM gateway exception: " + e.getMessage());
         }
-    }
-
-    /**
-     * 从注入的 Provider 列表中选取最优先的可用 Provider。
-     * 按 {@link LLMProvider#priority()} 升序排列，选择第一个满足
-     * {@link LLMProvider#isAvailable()} 且 {@link LLMProvider#supportsFunctionCalling()} 的实现。
-     *
-     * @return 选定的 Provider，若列表为空或无可用 Provider 则返回 null
-     */
-    private LLMProvider selectProvider() {
-        if (llmProviders == null || llmProviders.isEmpty()) {
-            return null;
-        }
-        return llmProviders.stream()
-                .sorted(Comparator.comparingInt(LLMProvider::priority))
-                .filter(LLMProvider::isAvailable)
-                .filter(LLMProvider::supportsFunctionCalling)
-                .findFirst()
-                .orElse(null);
     }
 
     /**

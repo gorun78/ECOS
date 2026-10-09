@@ -54,7 +54,6 @@ auth:
 # LLM Configuration
 llm:
   deepseek:
-    api-key: ${DEEP...EY:}
     base-url: https://api.deepseek.com
     model: deepseek-chat
   engine:

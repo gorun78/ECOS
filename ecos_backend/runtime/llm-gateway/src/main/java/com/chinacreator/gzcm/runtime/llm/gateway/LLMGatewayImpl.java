@@ -327,15 +327,10 @@ public class LLMGatewayImpl implements LLMGateway {
     }
 
     /**
-     * LLM 调用前 ABAC 裁决（铁律 §2.4#4）。security 不可用 / 明确拒绝 → false（默认 DENY）。
-     * 可通过 {@code llm.gateway.abac-eval-enabled=false} 降级关闭（仅裁决，密钥闸口不受此开关影响）。
+     * LLM 调用前 ABAC 裁决（铁律 §2.4#4，F06-05 要点 4：<b>无降级开关</b>）。
+     * security 不可用 / 超时 / 明确拒绝 → false（默认 DENY）。
      */
     private boolean abacAllowLlmCall(String caller, String provider, String model) {
-        boolean enabled = llmGatewayProperties == null
-                || llmGatewayProperties.getGateway().isAbacEvalEnabled();
-        if (!enabled) {
-            return true;
-        }
         if (securityEngineBridge == null) {
             log.warn("[llm-gateway] SecurityEngineBridge 未装配 — ABAC 裁决不可用，默认 DENY: caller={}", caller);
             return false;
