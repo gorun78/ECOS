@@ -287,23 +287,23 @@ export default function ScenarioSandbox() {
 
               {/* Simulator sliders */}
               <div className={`p-4 rounded-xl space-y-4 border bg-black/10 dark:bg-white/5 ${styles.cardBorder}`}>
-                <span className="text-[10px] font-mono font-bold text-indigo-505 block tracking-wide leading-none uppercase">Simulator Parameters</span>
+                <span className="text-[10px] font-mono font-bold text-indigo-500 block tracking-wide leading-none uppercase">Simulator Parameters</span>
                 {selectedScenarioId === "scen_reroute" ? (
                   <div>
                     <div className="flex justify-between text-xs font-mono mb-2 leading-none opacity-80">
                       <span>Active Shipping Shifts / Week</span>
                       <strong className="text-indigo-500 font-sans text-xs font-bold">{extraShifts} extra shifts</strong>
                     </div>
-                    <input type="range" min="1" max="7" className="w-full accent-indigo-650 h-1 rounded-lg cursor-pointer"
+                    <input type="range" min="1" max="7" className="w-full accent-indigo-600 h-1 rounded-lg cursor-pointer"
                       value={extraShifts} onChange={(e) => setExtraShifts(Number(e.target.value))} />
                   </div>
                 ) : (
                   <div>
                     <div className="flex justify-between text-xs font-mono mb-2 leading-none opacity-80">
                       <span>Planned Weekend Outage Duration</span>
-                      <strong className="text-indigo-505 font-sans text-xs font-bold">{plannedOutageHours} continuous hours</strong>
+                      <strong className="text-indigo-500 font-sans text-xs font-bold">{plannedOutageHours} continuous hours</strong>
                     </div>
-                    <input type="range" min="12" max="72" step="12" className="w-full accent-indigo-650 h-1 rounded-lg cursor-pointer"
+                    <input type="range" min="12" max="72" step="12" className="w-full accent-indigo-600 h-1 rounded-lg cursor-pointer"
                       value={plannedOutageHours} onChange={(e) => setPlannedOutageHours(Number(e.target.value))} />
                   </div>
                 )}

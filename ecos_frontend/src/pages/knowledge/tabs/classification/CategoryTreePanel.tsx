@@ -51,7 +51,7 @@ export function CategoryTreePanel({
 }: CategoryTreePanelProps) {
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3 min-w-0`}>
-      <div className="flex items-center justify-between border-b border-slate-150 pb-2">
+      <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-2`}>
         <span className={`font-bold text-xs ${styles.cardText} flex items-center gap-1.5`}>
           <FolderTree size={13} className="text-indigo-600" />
           {t('knowledge.nav.tree_title')}

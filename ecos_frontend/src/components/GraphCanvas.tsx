@@ -294,7 +294,7 @@ export default function GraphCanvas({
         };
       case "pipeline":
         return {
-          bg: `bg-emerald-50 border-emerald-250 hover:border-emerald-400 text-emerald-800 ${baseOpacity}`,
+          bg: `bg-emerald-50 border-emerald-200 hover:border-emerald-400 text-emerald-800 ${baseOpacity}`,
           glow: "shadow-2xs",
           iconBg: "bg-emerald-100/50",
           icon: Activity,

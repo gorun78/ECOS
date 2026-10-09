@@ -27,7 +27,7 @@ export default function BlueprintLayerStack({
     <div className={`border ${styles.cardBorder} ${styles.cardBg} rounded-xl p-6 shadow-2xs space-y-4`}>
       <div className="flex items-center justify-between border-b border-dashed pb-3" style={{ borderColor: "var(--cardBorder)" }}>
         <h3 className="font-bold text-sm tracking-tight flex items-center gap-2" style={{ color: "var(--cardText)" }}>
-          <Layers className="w-4 h-4 text-indigo-505" />
+          <Layers className="w-4 h-4 text-indigo-500" />
           <span>{t("cognition.cos.stack.title")}</span>
         </h3>
         <span className="font-mono text-[9px] uppercase tracking-wider opacity-60">High-Density Cognitive Diagram Blueprint</span>
