@@ -154,7 +154,7 @@ type NodeConfigFields = NodeConfig['config'];
 
 // ─── Per-type node components ─────────────────────────────
 // Each reads its P2-01 config fields and renders a one-line summary.
-// All labels go through i18n (t("dw.xxx")) — 0 hardcoded Chinese.
+// All labels go through i18n via dw.pipeline.* keys — 0 hardcoded Chinese.
 
 const SourceJdbcNode: React.FC<NodeProps> = (props) => {
   const { styles } = useTheme();
