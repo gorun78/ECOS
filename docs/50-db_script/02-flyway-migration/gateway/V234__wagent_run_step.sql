@@ -37,7 +37,16 @@ CREATE TABLE IF NOT EXISTS ecos_ai.ecos_wagent_run_step (
     update_time         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     create_by           VARCHAR(100),
     update_by           VARCHAR(100),
-    is_deleted          SMALLINT NOT NULL DEFAULT 0
+    is_deleted          SMALLINT NOT NULL DEFAULT 0,
+    -- 【R1-A 三段一致】StepType 六类，单源 = WAgentEnums.StepType。
+    --   文档分歧裁定：PRD REQ-WAG-14 字面 tool_call|llm_reason|…，详设-10 §4.2/F10-14 为 tool|llm|…；
+    --   按任务核定以 §4.2 集合冻结（两套名禁并存，R4 终验向 PRD-10 登记勘误）。
+    CONSTRAINT ck_wagent_step_type CHECK (step_type IS NULL OR step_type IN
+        ('tool','llm','human_gate','wait_task','sub_run','aggregate')),
+    -- PolicyEffect 四值（F10-22 / REQ-WAG-22），单源 = WAgentEnums.PolicyEffect；
+    --   security 不可用=DENY 判定在应用层（L1+ 拒绝），本 CHECK 只收词表。
+    CONSTRAINT ck_wagent_step_policy_effect CHECK (policy_effect IS NULL OR policy_effect IN
+        ('allow','allow_with_mask','require_approval','deny'))
 );
 COMMENT ON TABLE ecos_ai.ecos_wagent_run_step IS 'W Agent 运行步骤（附件 agt_step 重写；agent_execution_step 语义上位，停写口径见卷 10 §6.2 收编段）';
 
@@ -49,3 +58,5 @@ CREATE INDEX IF NOT EXISTS idx_wagent_step_run ON ecos_ai.ecos_wagent_run_step(r
 -- ── DDL Lint Self-audit ──────────────────────────────────
 -- [DR01] ecos_ai. ✓ [DR02] ecos_ ✓ [DR05/06/07/08] 通用列齐 ✓ [MC01] UUID ✓ [MC02] JSON 全 TEXT
 -- [唯一索引] 非 partial、含 is_deleted ✓  [ST07] ecos_ai ✓ [ST09] 无 FK ✓ [IR03] 只加 ✓ [§14.4] 未实跑 ✓
+-- 【R1-A 2026-10-10 三段一致收口】step_type 六值 + policy_effect 四值 CHECK 增，单源 = WAgentEnums.StepType/PolicyEffect；
+--   PRD tool_call|llm_reason 与 §4.2 tool|llm 的分歧按任务口径以 §4.2 冻结并在枚举 Javadoc 登记 ✓

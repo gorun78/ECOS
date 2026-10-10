@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS ecos_ai.ecos_wagent_candidate (
     id                      VARCHAR(36) PRIMARY KEY,          -- MC01 应用侧 UUID
     tenant_id               VARCHAR(64) NOT NULL,
     org_id                  VARCHAR(64),
-    candidate_type          VARCHAR(24),                      -- 候选类型（对象/关系/规则/口径…）
+    candidate_type          VARCHAR(24),                      -- 候选类型 12 类（【R1-A 订正】原注释"对象/关系/规则/口径…"非名录；
+                                                              --   权威 = PRD-10 十二类冻结 + WAgentEnums.CandidateType，见下方 CHECK）
     target_engine           VARCHAR(32),                      -- 属主 Engine（写回经其端口，禁 Engine 侧回写 Agent 表 §6.3）
     target_object_ref_json  TEXT,                             -- 目标对象引用（JSON 语义 TEXT）
     payload_json            TEXT,                             -- 候选载荷（引用型/序列化，MC02 TEXT）
@@ -36,7 +37,20 @@ CREATE TABLE IF NOT EXISTS ecos_ai.ecos_wagent_candidate (
     update_time             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     create_by               VARCHAR(100),
     update_by               VARCHAR(100),
-    is_deleted              SMALLINT NOT NULL DEFAULT 0
+    is_deleted              SMALLINT NOT NULL DEFAULT 0,
+    -- 【R1-A 三段一致】CandidateType 12 类（PRD-10 §三 line174 冻结名录：数据映射/DQ规则/实体/关系/指标/知识项/
+    --   假设/情景/决策选项/行动草稿/认知模型定义/模型路由 → 英文码单源 = WAgentEnums.CandidateType）；
+    --   列宽 24 容得下最长 COGNITIVE_MODEL_DEF(19)。
+    CONSTRAINT ck_wagent_candidate_type CHECK (candidate_type IS NULL OR candidate_type IN
+        ('DATA_MAPPING','DQ_RULE','ENTITY','RELATIONSHIP','METRIC','KNOWLEDGE_ITEM','ASSUMPTION',
+         'SCENARIO','DECISION_OPTION','ACTION_DRAFT','COGNITIVE_MODEL_DEF','MODEL_ROUTE')),
+    -- Candidate 状态机 10 值（F10-20；正向链 generated→validating→validated→review_pending→approved→
+    --   committing→published + 旁路终态 rejected/expired/rolled_back；PRD 声明"10 值"未逐值名录，
+    --   本集合按 §5.2 review/publish 端点与 F10-20 验收断言派生冻结，单源 = WAgentEnums.CandidateStatus，
+    --   R3-A 若发现权威名录出入按三段一致纪律同步修订）；列宽 16 容得下最长 review_pending(13)。
+    CONSTRAINT ck_wagent_candidate_status CHECK (status IS NULL OR status IN
+        ('generated','validating','validated','review_pending','approved','committing',
+         'published','rejected','expired','rolled_back'))
 );
 COMMENT ON TABLE ecos_ai.ecos_wagent_candidate IS 'W Agent 知识/资产候选（附件 agt_candidate 重写；R-40① 统一治理，kb_extract_candidate/agent_approval 收编口径见卷 10 §6.2）';
 CREATE INDEX IF NOT EXISTS idx_wagent_cand_status ON ecos_ai.ecos_wagent_candidate(status, expire_time);
@@ -46,3 +60,5 @@ CREATE INDEX IF NOT EXISTS idx_wagent_cand_batch  ON ecos_ai.ecos_wagent_candida
 -- ── DDL Lint Self-audit ──────────────────────────────────
 -- [DR01] ecos_ai. ✓ [DR02] ecos_ ✓ [DR05/06/07/08] 通用列齐 ✓ [MC01] UUID ✓ [MC02] payload 一律 TEXT
 -- [ST07] ecos_ai ✓ [ST09] 无跨 schema FK ✓ [IR03] 只加、存量不动 ✓ [§14.4] 未实跑 ✓
+-- 【R1-A 2026-10-10 三段一致收口】candidate_type 12 值 + status 10 值 CHECK 增，单源 = WAgentEnums.CandidateType/CandidateStatus；
+--   五段校验 validation_* VARCHAR(12) 词表（pass/fail/warn/skipped）随 R3-A 定版后再设 CHECK（R-15 纪律）✓

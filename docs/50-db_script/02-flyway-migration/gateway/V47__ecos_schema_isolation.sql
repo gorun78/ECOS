@@ -1,5 +1,10 @@
 -- ECOS Schema Isolation: Migrate tables from public schema to domain-specific schemas
 -- Sprint 1.1: Database Per Service alignment with design doc 06
+--
+-- 【W248/R-22 订正 2026-10-10】ST07 五枚举权威下 Agent 族落 ecos_ai，禁建 ecos_agent schema
+-- （X-4 库内本无该 schema，本脚本从未实跑，登记见 docs/40-实现/DDL迁移脚本落地登记-2026-09-30.md §一）；
+-- 原 ecos_agent 相关语句作废保留可审计（注释化），同名表实存 ecos_ai，Phase 8 迁表由
+-- docs/50-db_script/01-ddl-多方言/migration/12_to_8_schema.sql（原 ecos-sql/migration/ 第二源现位置）承接。
 
 -- Step 1: Create domain schemas
 CREATE SCHEMA IF NOT EXISTS ecos_identity;
@@ -8,7 +13,8 @@ CREATE SCHEMA IF NOT EXISTS ecos_ontology;
 CREATE SCHEMA IF NOT EXISTS ecos_object;
 CREATE SCHEMA IF NOT EXISTS ecos_workflow;
 CREATE SCHEMA IF NOT EXISTS ecos_rule;
-CREATE SCHEMA IF NOT EXISTS ecos_agent;
+-- [W248/R-22 订正 2026-10-10 作废] CREATE SCHEMA IF NOT EXISTS ecos_agent;
+--   ⇒ 禁建 ecos_agent schema（ST07 五枚举外第 12 schema）；Agent 族表归 ecos_ai（X-4/X-5 实测）
 CREATE SCHEMA IF NOT EXISTS ecos_knowledge;
 CREATE SCHEMA IF NOT EXISTS ecos_mission;
 CREATE SCHEMA IF NOT EXISTS ecos_audit;
@@ -72,12 +78,14 @@ ALTER TABLE IF EXISTS ecos_dq_execution_result SET SCHEMA ecos_rule;
 ALTER TABLE IF EXISTS ecos_cognitive_rule SET SCHEMA ecos_rule;
 
 -- ecos_agent: Agent definitions, registry, missions, tools
-ALTER TABLE IF EXISTS ecos_agent SET SCHEMA ecos_agent;
-ALTER TABLE IF EXISTS ecos_agent_registry SET SCHEMA ecos_agent;
-ALTER TABLE IF EXISTS ecos_mission SET SCHEMA ecos_agent;
-ALTER TABLE IF EXISTS ecos_mission_task SET SCHEMA ecos_agent;
-ALTER TABLE IF EXISTS ecos_tool_definition SET SCHEMA ecos_agent;
-ALTER TABLE IF EXISTS ecos_decision_case SET SCHEMA ecos_agent;
+-- [W248/R-22 订正 2026-10-10 作废] 下列 SET SCHEMA ecos_agent 语句整体作废：目标 schema 不存在且禁建，
+--   同名表实存 ecos_ai（X-4/X-5）；原语句作废保留可审计。
+-- ALTER TABLE IF EXISTS ecos_agent SET SCHEMA ecos_agent;
+-- ALTER TABLE IF EXISTS ecos_agent_registry SET SCHEMA ecos_agent;
+-- ALTER TABLE IF EXISTS ecos_mission SET SCHEMA ecos_agent;
+-- ALTER TABLE IF EXISTS ecos_mission_task SET SCHEMA ecos_agent;
+-- ALTER TABLE IF EXISTS ecos_tool_definition SET SCHEMA ecos_agent;
+-- ALTER TABLE IF EXISTS ecos_decision_case SET SCHEMA ecos_agent;
 
 -- ecos_knowledge: Knowledge graph, glossary, documents
 ALTER TABLE IF EXISTS ecos_glossary_term SET SCHEMA ecos_knowledge;
@@ -127,4 +135,7 @@ ALTER TABLE IF EXISTS ecos_biz_metric SET SCHEMA ecos_mission;
 ALTER TABLE IF EXISTS ecos_biz_target SET SCHEMA ecos_mission;
 
 -- Step 3: Set default search_path for the database to include all schemas
-ALTER DATABASE sys_man SET search_path TO ecos_identity, ecos_catalog, ecos_ontology, ecos_object, ecos_workflow, ecos_rule, ecos_agent, ecos_knowledge, ecos_mission, ecos_audit, ecos_config, ecos_pipeline, public;
+-- [W248/R-22 订正 2026-10-10] 原行含 ecos_agent，作废保留可审计：
+-- ALTER DATABASE sys_man SET search_path TO ecos_identity, ecos_catalog, ecos_ontology, ecos_object, ecos_workflow, ecos_rule, ecos_agent, ecos_knowledge, ecos_mission, ecos_audit, ecos_config, ecos_pipeline, public;
+-- 订正行（剔除 ecos_agent；Agent 族经 ecos_ai 承接，ST07 五枚举权威）：
+ALTER DATABASE sys_man SET search_path TO ecos_identity, ecos_catalog, ecos_ontology, ecos_object, ecos_workflow, ecos_rule, ecos_knowledge, ecos_mission, ecos_audit, ecos_config, ecos_pipeline, public;

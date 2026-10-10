@@ -25,7 +25,13 @@ CREATE TABLE IF NOT EXISTS ecos_ai.ecos_wagent_question (
     update_time         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     create_by           VARCHAR(100),
     update_by           VARCHAR(100),
-    is_deleted          SMALLINT NOT NULL DEFAULT 0
+    is_deleted          SMALLINT NOT NULL DEFAULT 0,
+    -- 【R1-A 三段一致】REQ-WAG-05：intent 八类封闭枚举单源 = WAgentEnums.GoalIntent（goal_type 共用，禁二套词表）；
+    --   "触发器双校"改应用层 + 本 CHECK（PRD §二.1 明载 DB 侧仅加 CHECK）。
+    CONSTRAINT ck_wagent_question_intent CHECK (intent IS NULL OR intent IN
+        ('FORECAST','DIAGNOSE','SIMULATE','RANK','MONITOR','BUILD','DECIDE','REVIEW')),
+    -- intent_confidence ∈ [0,1]（<0.70 不得建 Run 判定在应用层，F10-05）
+    CONSTRAINT ck_wagent_question_confidence CHECK (intent_confidence IS NULL OR (intent_confidence >= 0 AND intent_confidence <= 1))
 );
 COMMENT ON TABLE ecos_ai.ecos_wagent_question IS 'W Agent 业务问题（附件 agt_business_question 重写）';
 CREATE INDEX IF NOT EXISTS idx_wagent_question_mission ON ecos_ai.ecos_wagent_question(mission_id);
@@ -34,3 +40,5 @@ CREATE INDEX IF NOT EXISTS idx_wagent_question_tenant  ON ecos_ai.ecos_wagent_qu
 -- ── DDL Lint Self-audit ──────────────────────────────────
 -- [DR01] ecos_ai. ✓ [DR02] ecos_ ✓ [DR05/06/07/08] 通用列齐 ✓ [MC01] UUID ✓ [MC02] JSON 全 TEXT
 -- [ST07] ecos_ai ✓ [ST09] 无跨 schema FK ✓ [IR03] 只加 ✓ [§14.4] 未实跑 ✓
+-- 【R1-A 2026-10-10 三段一致收口】intent 8 值 CHECK（PRD §二.1 明载 DB 侧仅加 CHECK）+ intent_confidence [0,1]，
+--   单源 = WAgentEnums.GoalIntent（与 V227 goal_type 共用词表，F10-05 禁二套）✓

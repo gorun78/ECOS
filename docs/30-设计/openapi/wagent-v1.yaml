@@ -1,0 +1,1107 @@
+# =====================================================================
+# wagent-v1.yaml — W Agent 编排面（wagent v1）机器可读 REST/SSE 契约
+# ---------------------------------------------------------------------
+# 溯源：《详细设计-10-W Agent编排与DIK-C赋能》§五（W245~W277 ↔ C227~C259）。
+#   · 路径/operationId 单源 = ecos_backend/engine/ai-engine/ai-engine-impl/
+#     src/main/java/com/chinacreator/gzcm/engine/ai/wagent/WAgentApiPaths.java
+#     （本文件与其同源，参数名字面量取 P_* 常量口径；§5.2 表 24 端点 / 25 operationId
+#     全量覆盖，另附 §5.2 表外能力探测端点 getRunProgressCapability）。
+#   · 错误码单源 = WAgentErrorCodes.java（§5.3 十一码 + 实测第 12 枚举
+#     ECOS_WA_CALIBER_LOCKED，409，reviseGoal 口径锁专用）。
+#   · 响应包裹 = runtime/common-api ApiResponse.java 实测字段
+#     {code:int, errorCode:String, message, data, timestamp:Long, traceId:String}。
+#     注意：卷10 §5.3 脚注"traceId 字段实测不存在（卷06 C135 待补）"已被现源
+#     码超越——ApiResponse.java:60 在位 traceId 字段并有 withTraceId()（:99），
+#     C135 已补齐，本契约按实测登记。
+# ---------------------------------------------------------------------
+# 工件属性（诚实声明，W277/P-5）：
+#   1. 本文件是 wagent 面**首个手工登记的机器可读契约**（R2-C/#133 交付），
+#      **不是 springdoc 生成物**——springdoc 挂载未实测，禁写"已生成"。
+#   2. x-implementation-status: implemented = Controller 逐行实测（行号见各端点）；
+#      partial = 端点在位但按设计依赖降级（如 SSE 经 P-4）；
+#      planned = 仅 WAgentApiPaths 路径常量在位，Controller 未落地
+#      （#11~#16 归 R2-B、#17~#24 归 R3-A 批次）。
+#   3. 契约 ↔ Controller 字段级一致性门禁归 P-5 后续，本文件 DTO 仅到
+#      信封级（ApiResponse）+ 设计级 data 占位（additionalProperties: true），
+#      禁据此生成客户端假象。
+#   4. 安全口径：wagent 全部端点要求 JWT 认证；禁进入
+#      AnonymousEndpointRegistry.permitAllPatterns() 匿名面（WAgentApiPaths 头注）。
+#   5. 前缀策略（§5.1，只增不改）：正典 /api/v1/wagent；双路径 /api/wagent 经
+#      VersionPrefixRewriteFilter REVERSE 映射收敛到 v1，Controller 禁直接映射裸前缀。
+#      不复用已混乱的 /api/v1/agent 族（X-2/W252/R-43）。
+# =====================================================================
+openapi: 3.0.3
+info:
+  title: ECOS W Agent 编排面 API（wagent v1）
+  version: 1.0.0
+  description: |
+    W Agent 编排与 DIK-C 赋能对外契约（详细设计-10 §5.2 首批 24 端点 / 25 operationId，REST + SSE）。
+    错误语义见 §5.3 十一错误码（components.responses 按 wire code 登记）；
+    错误码经 `ApiResponse.errorCode` 字段区分，同一 HTTP 状态可承载多个 E- 码。
+    进度通道：SSE（#7）依赖 P-4，当前实测恒为如实 502 `E-WA-DEP` + 轮询回落
+    （WAgentRunController:111~125，禁伪流、禁 200 空挂）；能力探测见
+    `getRunProgressCapability`（§5.2 表外，F10-16）。
+  contact:
+    name: ECOS 卷10 R2-C（W277/P-5）
+  license:
+    name: Proprietary
+servers:
+  # 双路径口径（§5.1）：网关侧 /api/v1/wagent/** 与 /api/wagent/** 各登记一遍，
+  # 后者经 VersionPrefixRewriteFilter REVERSE 收敛到 v1 正典。
+  # 路径本体一律挂正典前缀（§5.2 表基准）；legacy 形态仅入口等价，不另列 paths。
+  - url: http://localhost:8080
+    description: 网关聚合入口（gateway:8080；正典前缀 /api/v1/wagent，legacy 双路径 /api/wagent 等价）
+  - url: http://localhost:18085
+    description: ai-engine 直连面（属主服务；仅内部调试，生产以网关为准入面）
+tags:
+  - name: goals
+    description: §5.2 #1~#2 Goal 生命周期（口径变更⇒新版本；被引用则 409 ECOS_WA_CALIBER_LOCKED）
+  - name: questions
+    description: §5.2 #3~#4 Question（意图识别 + 澄清返回 CLARIFY，F10-06/07）
+  - name: runs
+    description: §5.2 #5~#10 Run 编排（状态机/幂等/预算/awaiting_input/awaiting_approval/cancel）
+  - name: flags
+    description: §5.2 #11 Kill Switch（租户/系统级；仅 admin 角色 + 审计，F10-21）
+  - name: readiness
+    description: §5.2 #12~#13 Readiness（等级+缺项+缺口；补齐循环 ≤3，F10-08/09）
+  - name: tools
+    description: §5.2 #14~#16 工具契约（渐进披露 F10-18；契约测试五关 F10-17；只 active 可召回）
+  - name: candidates
+    description: §5.2 #17~#20 Candidate 写通道（四眼评审；publish 需 approval_token + pre-commit 裁决 + Git 归档，F10-21/23）
+  - name: evidence
+    description: §5.2 #21~#22 Claim/Evidence 追溯链（F10-24）
+  - name: decisions
+    description: §5.2 #23 决策留档（引用 pinned 评估记录）
+  - name: actions
+    description: §5.2 #24 行动草稿/提交（属主 ai-engine，经属主 Engine 写端点，Agent 不写对方表，REQ-WAG-02/R-32①）
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ───────────────────────────── Goals（§5.2 #1~#2）─────────────────────────────
+  /api/v1/wagent/goals:
+    post:
+      tags: [goals]
+      operationId: createGoal
+      summary: "#1 创建 Goal（201；幂等键头可选）"
+      x-implementation-status: implemented   # WAgentGoalController:60
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoalCreateRequest"
+      responses:
+        "201":
+          description: 创建成功；Location 头指向 /api/v1/wagent/goals/{goalId}
+          headers:
+            Location:
+              schema: { type: string }
+              description: 资源定位（WAgentGoalController:70~71 resolve(GOAL_REVISE, goalId)）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Goal"
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "429": { $ref: "#/components/responses/E-RATE" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/goals/{goalId}:
+    patch:
+      tags: [goals]
+      operationId: reviseGoal
+      summary: "#2 修订 Goal（口径变更⇒新版本；被引用则 409）"
+      x-implementation-status: implemented   # WAgentGoalController:76~77
+      parameters:
+        - $ref: "#/components/parameters/GoalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoalReviseRequest"
+      responses:
+        "200":
+          description: 修订成功（新版本 Goal；口径变更派生新版本号）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Goal"
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "409":
+          description: |
+            状态机冲突或口径锁定：errorCode ∈ { E-WA-STATE, ECOS_WA_CALIBER_LOCKED }
+            （后者为 WAgentErrorCodes 第 12 枚举，§5.2 #2 专用）。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  # ──────────────────────────── Questions（§5.2 #3~#4）──────────────────────────
+  /api/v1/wagent/questions:
+    post:
+      tags: [questions]
+      operationId: createQuestion
+      summary: "#3 创建 Question（意图识别 + 澄清返回 CLARIFY）"
+      x-implementation-status: implemented   # WAgentQuestionController:61
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionCreateRequest"
+      responses:
+        "200":
+          description: |
+            成功。data.disposition ∈ { RESOLVED, CLARIFY }；
+            CLARIFY 时携澄清槽位（F10-06/07，不另设 HTTP 状态，语义在体内）。
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Question"
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "429": { $ref: "#/components/responses/E-RATE" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/questions/{questionId}:
+    get:
+      tags: [questions]
+      operationId: getQuestion
+      summary: "#4 Question 详情（含 latest_run 摘要）"
+      x-implementation-status: implemented   # WAgentQuestionController:85~87
+      parameters:
+        - $ref: "#/components/parameters/QuestionId"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Question"
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  # ─────────────────────────────── Runs（§5.2 #5~#10）───────────────────────────
+  /api/v1/wagent/runs:
+    post:
+      tags: [runs]
+      operationId: startRun
+      summary: "#5 启动 Run（Prefer: respond-async 支持 202 + run_id）"
+      x-implementation-status: implemented   # WAgentRunController:67
+      parameters:
+        - $ref: "#/components/parameters/Prefer"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunStartRequest"
+      responses:
+        "200":
+          description: 同步通道启动成功，返回 Run 快照
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Run"
+        "202":
+          description: "Prefer: respond-async：已受理，data 含 run_id，经 #6 轮询或能力探测取进度"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Run"
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "409": { $ref: "#/components/responses/E-IDEMPOTENT-CONFLICT" }
+        "429":
+          description: "errorCode ∈ { E-RATE（配额超限，退避重试）, E-WA-BUDGET（Run 预算耗尽，提示拆分问题） }"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "502": { $ref: "#/components/responses/E-WA-DEP" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/runs/{runId}:
+    get:
+      tags: [runs]
+      operationId: getRun
+      summary: "#6 Run 详情（状态 + 时间线）"
+      x-implementation-status: implemented   # WAgentRunController:97~104（timeline 并排返回）
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: 成功（data 含状态机态 + timeline）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Run"
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/runs/{runId}/events:
+    get:
+      tags: [runs]
+      operationId: streamRunEvents
+      summary: "#7 SSE 进度流（依赖 P-4；Last-Event-ID 续传）"
+      description: |
+        目标契约（就绪后）：`text/event-stream` + `Last-Event-ID` 断线续传（F10-16）。
+        **实测现状（本契约登记口径）**：P-4 未就绪 ⇒ 当前如实返回 502 `E-WA-DEP` +
+        轮询回落指引（poll_path 指向 #6；禁伪流、禁 200 空挂），
+        见 WAgentRunController:111~125（produces 现为 application/json 如实降级体，
+        头注登记"就绪后切 text/event-stream"，#130/R4）。
+        `Last-Event-ID` 头在位即透传（:114, :119），不代表流已可用。
+      x-implementation-status: partial       # 端点在位，SSE 通道待 P-4
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+        - name: Last-Event-ID
+          in: header
+          required: false
+          description: SSE 续传游标（目标契约；当前降级态仅回显是否收到）
+          schema: { type: string }
+      responses:
+        "200":
+          description: 目标态：SSE 事件流（P-4 就绪后启用；事件载荷=ecos_wagent_run_event 引用型事件，§6.1）
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE 帧流（id/event/data 三元组，data 为 JSON 引用型事件；契约细化随 P-4）
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "502":
+          description: |
+            当前实测态：E-WA-DEP 如实降级（SSE 进度通道 P-4/F10-16 未就绪），
+            data 含轮询回落指引（poll_path / progress-capability）。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "503": { $ref: "#/components/responses/E-WA-DEP" }
+
+  /api/v1/wagent/runs/{runId}/input:
+    post:
+      tags: [runs]
+      operationId: submitRunInput
+      summary: "#8 awaiting_input 应答（续跑）"
+      x-implementation-status: implemented   # WAgentRunController:137~144
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+        - $ref: "#/components/parameters/Prefer"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunInputRequest"
+      responses:
+        "200":
+          description: 应答成功，Run 续跑（awaiting_input ⇒ executing）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Run"
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "409": { $ref: "#/components/responses/E-WA-STATE" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/runs/{runId}/approval:
+    post:
+      tags: [runs]
+      operationId: approveRunGate
+      summary: "#9 awaiting_approval 人工门（凭证校验）"
+      x-implementation-status: implemented   # WAgentRunController:153~155
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunApprovalRequest"
+      responses:
+        "200":
+          description: 审批通过（或拒绝），Run 依状态机推进
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Run"
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "409": { $ref: "#/components/responses/E-WA-STATE" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/runs/{runId}/cancel:
+    post:
+      tags: [runs]
+      operationId: cancelRun
+      summary: "#10 取消 Run（幂等）"
+      x-implementation-status: implemented   # WAgentRunController:169~170
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: 取消完成（重复取消幂等，不报 409）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - properties:
+                      data:
+                        $ref: "#/components/schemas/Run"
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  # ─────────────── 进度能力探测（§5.2 表外，F10-16 / RUN_PROGRESS_CAPABILITY）───────────────
+  /api/v1/wagent/runs/{runId}/progress-capability:
+    get:
+      tags: [runs]
+      operationId: getRunProgressCapability
+      summary: "§5.2 表外（F10-16 能力探测；WAgentApiPaths.RUN_PROGRESS_CAPABILITY）"
+      description: |
+        返回 sse|polling 二态（SSE 未就绪即回 polling）。
+        实测在位：WAgentRunController:128~134（当前恒 polling，#7 降级态的机读镜像）。
+        登记依据：本端点属 WAgentApiPaths 单源常量 + Controller 实测，非 §5.2 表 24 端点之列，
+        随 #7 同族登记（progress-capability 属主 RunProgressFacade）。
+      x-implementation-status: implemented   # WAgentRunController:128
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: 能力位（data.mode ∈ { sse, polling } + 回落指引）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - properties:
+                      data:
+                        type: object
+                        description: 设计级占位，字段收敛随 P-5 门禁
+                        additionalProperties: true
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  # ────────────────────────────── Flags（§5.2 #11）──────────────────────────────
+  /api/v1/wagent/flags/kill-switch:
+    post:
+      tags: [flags]
+      operationId: setKillSwitch
+      summary: "#11 Kill Switch（租户/系统级；仅 admin 角色 + 审计，F10-21）"
+      x-implementation-status: planned       # WAgentApiPaths.FLAGS_KILL_SWITCH 常量在位；Controller 归 R2-B
+      description: 触发后全部写通道与 Run 推进按策略拒绝（E-POLICY）；仅 admin；动作入 Kafka ecos.audit（ST06）。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KillSwitchRequest"
+      responses:
+        "200":
+          description: 开关设置成功（回显生效范围与当前态）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  # ─────────────────────────── Readiness（§5.2 #12~#13）─────────────────────────
+  /api/v1/wagent/readiness/{questionId}:
+    get:
+      tags: [readiness]
+      operationId: getReadiness
+      summary: "#12 就绪度（等级 + 缺项 + 缺口，F10-08/09）"
+      x-implementation-status: planned       # WAgentApiPaths.READINESS_BY_QUESTION 常量在位；Controller 归 R2-B
+      parameters:
+        - $ref: "#/components/parameters/QuestionId"
+      responses:
+        "200":
+          description: 就绪快照（grade/status 由服务端阈值计算，LLM 不参与定级，F10-09）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "502": { $ref: "#/components/responses/E-WA-DEP" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/readiness/{questionId}/refill:
+    post:
+      tags: [readiness]
+      operationId: refillReadiness
+      summary: "#13 缺口补齐（循环 ≤3，超限即止）"
+      x-implementation-status: planned       # WAgentApiPaths.READINESS_REFILL 常量在位；Controller 归 R2-B
+      parameters:
+        - $ref: "#/components/parameters/QuestionId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              description: 补齐选项（设计级占位，字段收敛随 P-5）
+              additionalProperties: true
+      responses:
+        "200":
+          description: 补齐结果（新就绪快照 + 已用循环数）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "409": { $ref: "#/components/responses/E-WA-STATE" }
+        "429": { $ref: "#/components/responses/E-WA-BUDGET" }
+        "502": { $ref: "#/components/responses/E-WA-DEP" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  # ─────────────────────── Tool Contract（§5.2 #14~#16）─────────────────────────
+  /api/v1/wagent/tools:
+    get:
+      tags: [tools]
+      operationId: searchTools
+      summary: "#14 工具检索（权限过滤后返回；渐进披露入口，F10-18）"
+      x-implementation-status: planned       # WAgentApiPaths.TOOLS_COLLECTION 常量在位；Controller 归 R2-B
+      description: |
+        渐进披露（F10-18）：always_loaded <10 且仅 active 可召回；
+        seeded registered 工具（V266）在契约测试五关通过前对本面不可见为 active。
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: 业务语义关键词
+          schema: { type: string }
+        - name: toolset
+          in: query
+          required: false
+          description: 工具集（core|analytics|action，与 V265 组 4 / V266 toolset 列同字面量）
+          schema: { type: string, enum: [core, analytics, action] }
+      responses:
+        "200":
+          description: 工具摘要列表
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/tools/{name}:
+    get:
+      tags: [tools]
+      operationId: describeTool
+      summary: "#15 完整契约"
+      x-implementation-status: planned       # WAgentApiPaths.TOOL_BY_NAME 常量在位；Controller 归 R2-B
+      parameters:
+        - $ref: "#/components/parameters/ToolName"
+      responses:
+        "200":
+          description: 工具契约全量（ecos_ai.ecos_wagent_tool_contract 行语义，V236 列口径）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/tools/{name}/validate:
+    post:
+      tags: [tools]
+      operationId: validateToolContract
+      summary: "#16 契约测试五关（F10-17；registered→validated/active 翻转的唯一合法通道）"
+      x-implementation-status: planned       # WAgentApiPaths.TOOL_VALIDATE 常量在位；Controller 归 R2-B
+      description: |
+        五关（F10-17）通过后工具方可 active；未过即维持 registered（fail-closed）。
+        本册 V266 seed 的 12 工具全部 registered，翻转留 R2-B 实跑。
+      parameters:
+        - $ref: "#/components/parameters/ToolName"
+      responses:
+        "200":
+          description: 五关结果（逐关 pass/fail + 证据）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "502": { $ref: "#/components/responses/E-WA-DEP" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  # ───────────────────────── Candidate（§5.2 #17~#20）───────────────────────────
+  /api/v1/wagent/candidates:
+    get:
+      tags: [candidates]
+      operationId: listCandidates
+      summary: "#17 候选列表（筛选：类型/状态/批次）"
+      x-implementation-status: planned       # WAgentApiPaths.CANDIDATES_COLLECTION 常量在位；Controller 归 R3-A
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema: { type: string }
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+        - name: batch
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: 候选分页列表
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/candidates/{candidateId}:
+    get:
+      tags: [candidates]
+      operationId: getCandidate
+      summary: "#18 候选详情（含 basis/五段校验）"
+      x-implementation-status: planned       # WAgentApiPaths.CANDIDATE_BY_ID 常量在位；Controller 归 R3-A
+      parameters:
+        - $ref: "#/components/parameters/CandidateId"
+      responses:
+        "200":
+          description: 候选全量（basis + 五段校验态）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/candidates/{candidateId}/review:
+    post:
+      tags: [candidates]
+      operationId: reviewCandidate
+      summary: "#19 四眼评审（语义/口径/知识禁批量）"
+      x-implementation-status: planned       # WAgentApiPaths.CANDIDATE_REVIEW 常量在位；Controller 归 R3-A
+      description: 四眼原则：reviewer 不得为 candidate 创建者；语义/口径/知识类候选禁批量通过（F10-21）。
+      parameters:
+        - $ref: "#/components/parameters/CandidateId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CandidateReviewRequest"
+      responses:
+        "200":
+          description: 评审登记成功（通过/驳回）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "409": { $ref: "#/components/responses/E-WA-STATE" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/candidates/{candidateId}/publish:
+    post:
+      tags: [candidates]
+      operationId: publishCandidate
+      summary: "#20 发布（approval_token 必填；pre-commit 裁决 + Git 归档，F10-23）"
+      x-implementation-status: planned       # WAgentApiPaths.CANDIDATE_PUBLISH 常量在位；Controller 归 R3-A
+      description: |
+        发布链路（F10-23）：approval_token 校验 → pre-commit 安全裁决（不可用即 DENY fail-closed）
+        → 数字一致性校验（E-WA-NARRATIVE-NUM 阻断）→ Git 归档 → 落库。
+        L3 无自动发布路径（F10-21）；本端点只接受人工凭证。
+      parameters:
+        - $ref: "#/components/parameters/CandidateId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CandidatePublishRequest"
+      responses:
+        "200":
+          description: 发布成功（归档引用 + 落库对象）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "409":
+          description: "候选过期/状态不符：errorCode = E-WA-STATE"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "429": { $ref: "#/components/responses/E-RATE" }
+        "500":
+          description: |
+            数字一致性校验失败阻断发布：errorCode = E-WA-NARRATIVE-NUM（重生成 ≤2 次）；
+            或未分类内部错误：errorCode = E-INTERNAL。
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "502": { $ref: "#/components/responses/E-WA-DEP" }
+        "503": { $ref: "#/components/responses/E-WA-DEP" }
+
+  # ──────────────────────── Evidence / Claim（§5.2 #21~#22）─────────────────────
+  /api/v1/wagent/claims/{runId}:
+    get:
+      tags: [evidence]
+      operationId: listClaims
+      summary: "#21 Run 的 Claim 列表（Claim + Evidence + 等级，F10-24）"
+      x-implementation-status: planned       # WAgentApiPaths.CLAIMS_BY_RUN 常量在位；Controller 归 R3-A
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Claim 列表（每条含 evidence 引用与等级）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/evidence/{evidenceId}:
+    get:
+      tags: [evidence]
+      operationId: traceEvidence
+      summary: "#22 引擎端追溯（Evidence → 属主 Engine 事实/快照）"
+      x-implementation-status: planned       # WAgentApiPaths.EVIDENCE_BY_ID 常量在位；Controller 归 R3-A
+      parameters:
+        - $ref: "#/components/parameters/EvidenceId"
+      responses:
+        "200":
+          description: 追溯链（引擎侧经 ServiceEndpointResolver 两态寻址，Agent 不直连库）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "502": { $ref: "#/components/responses/E-WA-DEP" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  # ─────────────────────────── Decision（§5.2 #23）──────────────────────────────
+  /api/v1/wagent/decisions:
+    post:
+      tags: [decisions]
+      operationId: recordDecision
+      summary: "#23 决策留档（引用 pinned 评估记录）"
+      x-implementation-status: planned       # WAgentApiPaths.DECISIONS_COLLECTION 常量在位；Controller 归 R3-A
+      description: |
+        "同一 Goal 只一个 baseline 选项"由应用层 + 非 partial 唯一索引
+        （decision_id, baseline_slot，NULL 多值兼容，§6.1 X-6/禁 partial）承载。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionRecordRequest"
+      responses:
+        "200":
+          description: 留档成功（返回 decision 对象；HTTP 200/201 分野未定，以实现收敛为准随 P-5）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "409": { $ref: "#/components/responses/E-WA-STATE" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  # ──────────────────────────── Action（§5.2 #24a/#24b）─────────────────────────
+  /api/v1/wagent/actions:
+    post:
+      tags: [actions]
+      operationId: draftAction
+      summary: "#24a 行动草稿（属主 ai-engine，REQ-WAG-02/R-32①）"
+      x-implementation-status: planned       # WAgentApiPaths.ACTIONS_COLLECTION 常量在位；Controller 归 R3-A
+      description: 只产 draft（side_effect=draft），Agent 不写对方表；提交一律经 #24b → 属主 Engine 写端点。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionDraftRequest"
+      responses:
+        "200":
+          description: 草稿创建成功（draft 态，待人工 commit）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "429": { $ref: "#/components/responses/E-RATE" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+  /api/v1/wagent/actions/{actionId}/commit:
+    post:
+      tags: [actions]
+      operationId: commitAction
+      summary: "#24b 行动提交（经属主 Engine 写端点，副作用=production）"
+      x-implementation-status: planned       # WAgentApiPaths.ACTION_COMMIT 常量在位；Controller 归 R3-A
+      description: |
+        commit 走属主 Engine 通道（V265 组 6 adapter 登记：
+        POST /api/v1/workspace/scenarios/{id}/actions、POST /api/v1/ontology/actions/{id}/execute、
+        POST /api/v1/datanet/facts/action-outcomes 等，Controller 实测行号见 V266 头注）；
+        pre-commit 裁决 fail-closed；回滚计划列（rollback_plan_text）为 commit 类契约硬约束（V236 ck_wagent_tool_rollback）。
+      parameters:
+        - $ref: "#/components/parameters/ActionId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              description: 提交凭证/确认体（approval 语义，设计级占位随 P-5 收敛）
+              additionalProperties: true
+      responses:
+        "200":
+          description: 提交成功（属主 Engine 受理回执并入 data）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { $ref: "#/components/responses/E-VALIDATION" }
+        "401": { $ref: "#/components/responses/E-AUTH" }
+        "403": { $ref: "#/components/responses/E-POLICY" }
+        "404": { $ref: "#/components/responses/E-NOT-FOUND" }
+        "409": { $ref: "#/components/responses/E-WA-STATE" }
+        "502": { $ref: "#/components/responses/E-WA-DEP" }
+        "503": { $ref: "#/components/responses/E-WA-DEP" }
+        "500": { $ref: "#/components/responses/E-INTERNAL" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        wagent 面统一 JWT 认证（WAgentApiPaths 头注：禁进入
+        AnonymousEndpointRegistry.permitAllPatterns() 匿名面）；
+        权限/裁决经 security-engine（ST04/ST05），不可用即默认 DENY（§5.4 GUARDRAIL_FAIL_CLOSED）。
+
+  parameters:
+    GoalId:
+      name: goalId
+      in: path
+      required: true
+      description: 单源参数名 = WAgentApiPaths.P_GOAL_ID
+      schema: { type: string, maxLength: 36 }
+    QuestionId:
+      name: questionId
+      in: path
+      required: true
+      description: 单源参数名 = WAgentApiPaths.P_QUESTION_ID
+      schema: { type: string, maxLength: 36 }
+    RunId:
+      name: runId
+      in: path
+      required: true
+      description: 单源参数名 = WAgentApiPaths.P_RUN_ID
+      schema: { type: string, maxLength: 36 }
+    ToolName:
+      name: name
+      in: path
+      required: true
+      description: 单源参数名 = WAgentApiPaths.P_NAME（工具名，V266 name 列语义）
+      schema: { type: string, maxLength: 100 }
+    CandidateId:
+      name: candidateId
+      in: path
+      required: true
+      description: 单源参数名 = WAgentApiPaths.P_CANDIDATE_ID
+      schema: { type: string, maxLength: 36 }
+    ActionId:
+      name: actionId
+      in: path
+      required: true
+      description: 单源参数名 = WAgentApiPaths.P_ACTION_ID
+      schema: { type: string, maxLength: 36 }
+    EvidenceId:
+      name: evidenceId
+      in: path
+      required: true
+      description: 单源参数名 = WAgentApiPaths.P_EVIDENCE_ID
+      schema: { type: string, maxLength: 36 }
+    Prefer:
+      name: Prefer
+      in: header
+      required: false
+      description: "respond-async：异步受理（startRun 202 + run_id；submitRunInput 同步通道内推进）"
+      schema:
+        type: string
+        example: respond-async
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: 幂等键（§5.2 #1 可选/#5 幂等冲突回既有 run_id，E-IDEMPOTENT-CONFLICT）
+      schema: { type: string, maxLength: 100 }
+
+  responses:
+    # ── §5.3 十一错误码（wire code = WAgentErrorCodes 枚举字面量，components 键名同码）──
+    E-VALIDATION:
+      description: "E-VALIDATION（400）入参/Schema 校验失败；不可重试；文案指出具体字段"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+          example: { code: 400, errorCode: "E-VALIDATION", message: "字段 goal.title 缺失 [traceId: 0a1b2c3d]", data: null, timestamp: 1760000000000, traceId: "0a1b2c3d" }
+    E-AUTH:
+      description: "E-AUTH（401）未认证；引导重新登录；security-engine 不可用亦收敛于此码 + GUARDRAIL_FAIL_CLOSED 审计"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+          example: { code: 401, errorCode: "E-AUTH", message: "凭证无效或已过期 [traceId: 0a1b2c3d]", data: null, timestamp: 1760000000000, traceId: "0a1b2c3d" }
+    E-POLICY:
+      description: "E-POLICY（403）裁决拒绝（含 Kill Switch）；可读拒绝理由 + 负责人建议；不泄露对象存在性"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+          example: { code: 403, errorCode: "E-POLICY", message: "策略拒绝：写通道需人工审批 [traceId: 0a1b2c3d]", data: null, timestamp: 1760000000000, traceId: "0a1b2c3d" }
+    E-NOT-FOUND:
+      description: "E-NOT-FOUND（404）对象不可见；文案与 403 不可区分（防枚举）"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+          example: { code: 404, errorCode: "E-NOT-FOUND", message: "资源不存在或不可见 [traceId: 0a1b2c3d]", data: null, timestamp: 1760000000000, traceId: "0a1b2c3d" }
+    E-WA-STATE:
+      description: "E-WA-STATE（409）状态机冲突 / 口径锁定 / 候选过期；提示当前状态与允许操作"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+          example: { code: 409, errorCode: "E-WA-STATE", message: "Run 当前态 awaiting_input 不允许该操作 [traceId: 0a1b2c3d]", data: null, timestamp: 1760000000000, traceId: "0a1b2c3d" }
+    E-IDEMPOTENT-CONFLICT:
+      description: "E-IDEMPOTENT-CONFLICT（409）幂等键冲突；返回既有 run_id"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+          example: { code: 409, errorCode: "E-IDEMPOTENT-CONFLICT", message: "幂等键已存在，返回既有 run [traceId: 0a1b2c3d]", data: null, timestamp: 1760000000000, traceId: "0a1b2c3d" }
+    E-RATE:
+      description: "E-RATE（429）配额/预算超限；可退避重试（委托 LLM_RATE_LIMITED 指数退避 ≤3）；提示剩余额度与降级选项"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+          example: { code: 429, errorCode: "E-RATE", message: "租户配额耗尽，请退避后重试 [traceId: 0a1b2c3d]", data: null, timestamp: 1760000000000, traceId: "0a1b2c3d" }
+    E-WA-BUDGET:
+      description: "E-WA-BUDGET（429）Run 预算耗尽；不可重试；提示拆分问题"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+          example: { code: 429, errorCode: "E-WA-BUDGET", message: "本次 Run 预算已耗尽，建议拆分问题 [traceId: 0a1b2c3d]", data: null, timestamp: 1760000000000, traceId: "0a1b2c3d" }
+    E-WA-DEP:
+      description: "E-WA-DEP（502/503）Engine/底座依赖不可用；可重试 + 降级标注（实测枚举 httpStatus=502，503 为设计并列形态，§5.3）"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+          example: { code: 502, errorCode: "E-WA-DEP", message: "SSE 进度通道(P-4/F10-16)不可用，请轮询 [traceId: 0a1b2c3d]", data: null, timestamp: 1760000000000, traceId: "0a1b2c3d" }
+    E-WA-NARRATIVE-NUM:
+      description: "E-WA-NARRATIVE-NUM（500）数字一致性校验失败（abs 差/max ≤ 1e-4 之外）；重生成 ≤2 次；阻断发布 + 标注"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+          example: { code: 500, errorCode: "E-WA-NARRATIVE-NUM", message: "叙述数字与计算值不一致，已阻断发布 [traceId: 0a1b2c3d]", data: null, timestamp: 1760000000000, traceId: "0a1b2c3d" }
+    E-INTERNAL:
+      description: "E-INTERNAL（500）未分类内部错误；含 trace_id；禁回显堆栈（对卷 07 C159\"异常原文入体\"的同类预防）"
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+          example: { code: 500, errorCode: "E-INTERNAL", message: "内部错误 [traceId: 0a1b2c3d]", data: null, timestamp: 1760000000000, traceId: "0a1b2c3d" }
+    ECOS_WA_CALIBER_LOCKED:
+      description: |
+        （§5.3 表外第 12 枚举，WAgentErrorCodes.java:78 实测在位）
+        ECOS_WA_CALIBER_LOCKED（409）Goal 口径被引用锁定，reviseGoal 专用（§5.2 #2 注记）。
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+          example: { code: 409, errorCode: "ECOS_WA_CALIBER_LOCKED", message: "口径已被既有 Goal 引用，请走新版本 [traceId: 0a1b2c3d]", data: null, timestamp: 1760000000000, traceId: "0a1b2c3d" }
+
+  schemas:
+    ApiResponse:
+      type: object
+      description: |
+        统一响应包裹（runtime/common-api ApiResponse.java 实测六字段：
+        code/errorCode/message/data/timestamp/traceId）。
+        卷10 §5.3 记"code/message/data/traceId"为设计口径；
+        "traceId 实测不存在（卷06 C135 待补）"的脚注已被源码现状超越
+        （ApiResponse.java:60 traceId 在位、:99 withTraceId()），本契约按实测登记。
+        错误码语义承载于 errorCode（见 components.responses）。
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+          description: 与 HTTP 状态一致的业务码（成功 200 族）
+          example: 200
+        errorCode:
+          type: string
+          nullable: true
+          description: E-* / ECOS_WA_* wire code；成功为 null
+          enum:
+            - E-VALIDATION
+            - E-AUTH
+            - E-POLICY
+            - E-NOT-FOUND
+            - E-WA-STATE
+            - E-IDEMPOTENT-CONFLICT
+            - E-RATE
+            - E-WA-BUDGET
+            - E-WA-DEP
+            - E-WA-NARRATIVE-NUM
+            - E-INTERNAL
+            - ECOS_WA_CALIBER_LOCKED
+        message:
+          type: string
+          description: 用户可读文案；错误模板必含 {traceId} 诊断码（WAgentErrorCodes 构造校验:89~90）
+        data:
+          nullable: true
+          description: 业务载荷（各端点 data 设计级占位，字段收敛随 P-5 门禁）
+        timestamp:
+          type: integer
+          format: int64
+          nullable: true
+        traceId:
+          type: string
+          nullable: true
+          description: 全链诊断码（AiTraceSupport/ MDC；成功响应亦携带）
+
+    # ── 以下 data/请求体 DTO 为设计级占位（additionalProperties: true）：
+    #    字段级契约以 Controller DTO 实测收敛为 P-5 门禁事项，本文件不虚构字段清单 ──
+    GoalCreateRequest:
+      type: object
+      description: 创建 Goal 请求（§5.2 #1；设计级占位，字段随 P-5 收敛）
+      additionalProperties: true
+    GoalReviseRequest:
+      type: object
+      description: 修订 Goal 请求（§5.2 #2；口径变更⇒新版本）
+      additionalProperties: true
+    Goal:
+      type: object
+      description: Goal 对象（WAgentGoalController 视图；字段清单随 P-5 收敛）
+      additionalProperties: true
+    QuestionCreateRequest:
+      type: object
+      description: 创建 Question 请求（§5.2 #3；含原始表述与槽位提示）
+      additionalProperties: true
+    Question:
+      type: object
+      description: Question 对象（含 disposition RESOLVED|CLARIFY 与 latest_run 摘要）
+      additionalProperties: true
+    RunStartRequest:
+      type: object
+      description: 启动 Run 请求（§5.2 #5；question 引用 + 预算/自动化上界）
+      additionalProperties: true
+    RunInputRequest:
+      type: object
+      description: awaiting_input 应答体（§5.2 #8；WAgentRunController RunInputRequest.input 实测形态）
+      additionalProperties: true
+    RunApprovalRequest:
+      type: object
+      description: 人工门审批凭证（§5.2 #9；approve/deny + 凭证校验）
+      additionalProperties: true
+    Run:
+      type: object
+      description: Run 快照（状态机态 + timeline；态集合=Run 六态，§4 状态机）
+      additionalProperties: true
+    KillSwitchRequest:
+      type: object
+      description: Kill Switch 设置（§5.2 #11；范围=租户/系统级，仅 admin）
+      additionalProperties: true
+    CandidateReviewRequest:
+      type: object
+      description: 四眼评审（§5.2 #19；通过/驳回 + 理由；禁批量语义在服务端强制）
+      additionalProperties: true
+    CandidatePublishRequest:
+      type: object
+      description: 发布请求（§5.2 #20；approval_token **必填**，缺失即 E-VALIDATION）
+      required: [approval_token]
+      properties:
+        approval_token:
+          type: string
+          description: 人工审批凭证（F10-21 L3 无自动路径；F10-23 pre-commit 裁决前置）
+      additionalProperties: true
+    DecisionRecordRequest:
+      type: object
+      description: 决策留档（§5.2 #23；引用 pinned 评估记录 + baseline 槽位）
+      additionalProperties: true
+    ActionDraftRequest:
+      type: object
+      description: 行动草稿（§5.2 #24a；side_effect=draft，不落生产）
+      additionalProperties: true

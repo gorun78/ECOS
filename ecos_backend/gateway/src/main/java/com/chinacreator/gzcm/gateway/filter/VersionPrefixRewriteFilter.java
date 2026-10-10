@@ -62,6 +62,11 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
         // /api/v1/sysconfig/ → /api/sysconfig/ (T4 双路径)
         Map.entry("/api/v1/sysconfig/",     "/api/sysconfig/"),
         Map.entry("/api/v1/marketplace/",   "/api/marketplace/"),
+        // ── 卷 10 §5.1（W252/R-43，三滤波器登记）：/api/v1/wagent/ **正向不重写（KEEP）** ──
+        // W 域新面 Controller（R2-A 落位）直接映射 /api/v1/wagent/** 正典路径，全库无 /api/wagent
+        // 的 legacy Controller ⇒ 若加 v1→去v1 正向条目会把正典改到空目标（网关 404），
+        // 与上方 /api/v1/dq/、/api/v1/pipeline/ 的 KEEP 教训同型，此处显式登记"无正向条目"。
+        // 双路径 /api/wagent 由下方 REVERSE 映射收敛到 v1 正典。
         // ── 集合B 修复: /api/v1/integration/ → /api/integration/ ──
         // IntegrationMetadataController 映射在裸路径 /api/integration，其类注释声明 gateway
         // 会做此重写但实现从未落地，导致 knowledgeApi 的 4 处 v1 调用全部 404。
@@ -82,6 +87,8 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
         // ── PMO-38 T5: 新增反向重写（/api/ → /api/v1/）──
         Map.entry("/api/knowledge-bases",  "/api/v1/knowledge-bases"),
         Map.entry("/api/sysconfig/",       "/api/v1/sysconfig/"),
+        // ── 卷 10 §5.1 双路径反向：/api/wagent → /api/v1/wagent（精确根形态，防误匹配同头路径）──
+        Map.entry("/api/wagent",           "/api/v1/wagent"),
         // ── PMO-45 T5: /datasource/ → /api/v1/datasource/ 反向重写 ──
         Map.entry("/datasource/",          "/api/v1/datasource/")
     );
@@ -93,7 +100,11 @@ public class VersionPrefixRewriteFilter extends OncePerRequestFilter {
         Map.entry("/api/alerts/",          "/api/v1/alerts/"),
         Map.entry("/api/portal/",          "/api/v1/portal/"),
         // ── PMO-48-A T2: /api/dq/ → /api/v1/dq/ 反向重写 (DQ 三滤波器, 与 pipeline 同粒度) ──
-        Map.entry("/api/dq/",              "/api/v1/dq/")
+        Map.entry("/api/dq/",              "/api/v1/dq/"),
+        // ── 卷 10 §5.1（W252/R-43）：/api/wagent/ → /api/v1/wagent/ 反向重写 ──
+        // 双路径口径：正典 = /api/v1/wagent（WAgentApiPaths.BASE_PREFIX）；去 v1 形态经此收敛。
+        // 注意与 legacy "/api/agent/" 条目互不误匹配（wagent 独立段）。
+        Map.entry("/api/wagent/",          "/api/v1/wagent/")
     );
 
     /** 检查给定路径是否需要反向重写 */

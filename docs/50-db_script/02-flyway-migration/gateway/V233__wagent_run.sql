@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS ecos_ai.ecos_wagent_run (
     mission_id          VARCHAR(36),                          -- V228 逻辑引用
     parent_run_id       VARCHAR(36),                          -- 父子运行（同表逻辑引用）
     previous_run_id     VARCHAR(36),                          -- 续跑前驱
-    plan_source         VARCHAR(12),                          -- PLAYBOOK/EXPLORED/REUSED 等（F10-12）
+    plan_source         VARCHAR(12),                          -- PLAYBOOK/EXPLORED（F10-12/13；【R1-A 订正】原注释"REUSED 等"无文档名录依据，
+                                                              --   权威=详设-10 F10-13 两值 + WAgentEnums.PlanSource，REUSED 已删）
     plan_json           TEXT,                                 -- Plan DAG（JSON 语义 TEXT，MC02）
     status              VARCHAR(24),
     automation_ceiling  SMALLINT,                             -- 自动化上限（F10-13 探索规划强制人工确认）
@@ -34,7 +35,14 @@ CREATE TABLE IF NOT EXISTS ecos_ai.ecos_wagent_run (
     update_time         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     create_by           VARCHAR(100),
     update_by           VARCHAR(100),
-    is_deleted          SMALLINT NOT NULL DEFAULT 0
+    is_deleted          SMALLINT NOT NULL DEFAULT 0,
+    -- 【R1-A 三段一致】Run 状态机 13 态冻结：PRD-10 REQ-WAG-11 批准链（12 态，权威）∪ F10-21 Kill Switch paused；
+    --   单源 = WAgentEnums.RunStatus（分册"11 态"为计数口径差异，不构成第 14 值来源）。列 VARCHAR(24) 容得下最长 completed_degraded(18)。
+    CONSTRAINT ck_wagent_run_status CHECK (status IS NULL OR status IN
+        ('created','planning','plan_validated','executing','awaiting_input','awaiting_approval',
+         'waiting_task','paused','completed','completed_degraded','failed','cancelled','timed_out')),
+    -- PlanSource 两值（F10-12/13）；原注释"REUSED 等"无文档依据，已按权威口径订正。
+    CONSTRAINT ck_wagent_run_plan_source CHECK (plan_source IS NULL OR plan_source IN ('PLAYBOOK','EXPLORED'))
 );
 COMMENT ON TABLE ecos_ai.ecos_wagent_run IS 'W Agent 运行实例（附件 agt_run 重写；agent_execution 语义上位；预算/幂等承载 REQ-WAG-11）';
 
@@ -54,3 +62,5 @@ CREATE INDEX IF NOT EXISTS idx_wagent_run_question ON ecos_ai.ecos_wagent_run(qu
 --   本机库 sys_man 内 `information_schema.columns LIKE '%situation%'` 实测 5 条命中全部落 ecos_demo 业务列
 --   （td_approval_project_ledger / td_risk_ledger，与本域无关）；`ecos_wagent_run` 表体本身不存在（本批未实跑）；
 --   全仓 *.java/*.ts/*.tsx Grep `situation_snapshot` = 0 命中 ⇒ 零行 + 零代码引用 ⇒ 建表期直接补合规列名，无兼容代价。
+-- 【R1-A 2026-10-10 三段一致收口】status 13 态 + plan_source 两值 CHECK 增，单源 = WAgentEnums.RunStatus/PlanSource；
+--   plan_source 注释 "REUSED 等" 违 F10-13 两值名录已删（详设-10 §4.2/F10-12~13 为权威）；脚本未实跑（§14.4），CHECK 可随 R3-A 复核修订 ✓

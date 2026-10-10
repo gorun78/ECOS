@@ -32,7 +32,11 @@ CREATE TABLE IF NOT EXISTS ecos_ai.ecos_wagent_goal (
     update_time         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     create_by           VARCHAR(100),
     update_by           VARCHAR(100),
-    is_deleted          SMALLINT NOT NULL DEFAULT 0           -- DR05
+    is_deleted          SMALLINT NOT NULL DEFAULT 0,           -- DR05
+    -- 【R1-A 三段一致】PRD-10 REQ-WAG-05 冻结枚举 → WAgentEnums.GoalIntent → DDL CHECK（卷 07 R-15 纪律）
+    -- 列可空（draft 期允许未填），值域收紧走 CHECK；NULL 通过 CHECK（三值逻辑），与应用层 isValid 双保险。
+    CONSTRAINT ck_wagent_goal_type CHECK (goal_type IS NULL OR goal_type IN
+        ('FORECAST','DIAGNOSE','SIMULATE','RANK','MONITOR','BUILD','DECIDE','REVIEW'))
 );
 COMMENT ON TABLE ecos_ai.ecos_wagent_goal IS 'W Agent 业务目标（附件 agt_business_goal 按 ECOS 模板重写；R-33① 落 ecos_ai，不建 ecos_agent schema / agt_ 前缀）';
 CREATE INDEX IF NOT EXISTS idx_wagent_goal_tenant  ON ecos_ai.ecos_wagent_goal(tenant_id, status);
@@ -42,3 +46,5 @@ CREATE INDEX IF NOT EXISTS idx_wagent_goal_owner   ON ecos_ai.ecos_wagent_goal(o
 -- [DR01] ecos_ai. 限定 ✓  [DR02] ecos_ 前缀 ✓  [DR05] is_deleted SMALLINT ✓  [DR06/07/08] 通用列齐 ✓
 -- [MC01] VARCHAR(36) UUID 无默认函数 ✓  [MC02] JSON 语义一律 *_json TEXT（DR04 收口）；无数组列；时间列无时区形态 ✓
 -- [ST04/05] 不写行级安全策略 ✓  [ST06] 无审计表 ✓  [ST07] 五枚举 ecos_ai ✓  [ST09] 无 FK ✓  [X-6] 不分区 ✓  [IR03] 只加不删 ✓
+-- 【R1-A 2026-10-10 三段一致收口】goal_type 增 ck_wagent_goal_type 8 值 CHECK，
+--   单源 = WAgentEnums.GoalIntent（PRD-10 REQ-WAG-05 冻结八意图）；脚本未实跑（§14.4），CHECK 可随 R3-A 复核修订 ✓

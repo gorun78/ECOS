@@ -1,4 +1,7 @@
-INSERT INTO ecos_agent.ecos_tool_definition (id, code, name, description, tool_type, endpoint_url, http_method, schema_json, status) VALUES
+-- 【W248/R-22 订正 2026-10-10】ST07 五枚举权威下 Agent 族落 ecos_ai，禁建 ecos_agent schema（X-4 库内本无）；
+-- 本文件原 ecos_agent schema 限定 1 处逐处订正为 ecos_ai（ecos_ai.ecos_tool_definition 实存，X-5 实测 0 行）；
+-- 本脚本从未实跑（登记见 docs/40-实现/DDL迁移脚本落地登记-2026-09-30.md §一），原语句作废保留可审计。
+INSERT INTO ecos_ai.ecos_tool_definition (id, code, name, description, tool_type, endpoint_url, http_method, schema_json, status) VALUES
 ('tool-001', 'ListDataSources', '列出数据源', '获取所有已注册的数据源列表', 'API', '/api/v1/datanet/datasource', 'GET', '{}', 'ACTIVE'),
 ('tool-002', 'GetTableSchema', '获取表结构', '获取指定资源的字段列表', 'API', '/api/v1/datanet/metadata/fields/{resourceId}', 'GET', '{"resourceId":"string"}', 'ACTIVE'),
 ('tool-003', 'SearchCatalog', '搜索数据目录', '按关键字搜索数据目录', 'API', '/api/v1/datanet/catalog/search', 'GET', '{"q":"string"}', 'ACTIVE'),

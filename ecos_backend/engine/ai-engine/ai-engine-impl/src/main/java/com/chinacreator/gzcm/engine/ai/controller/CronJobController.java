@@ -66,7 +66,18 @@ public class CronJobController {
         return ApiResponse.success(result);
     }
 
-    /** Create a new cron job */
+    /**
+     * Create a new cron job.
+     *
+     * <p><b>W255 调度收口裁决登记（2026-10-10，铁律 §2.5）</b>：本方法当前只经
+     * {@link AgentMcpCapability} 投递外部 provider 的 {@code cronjob_create}——provider 可用时
+     * <b>外部 provider 即唯一执行器</b>；若同时经 {@code ITaskManagementService.submitTask} 注册
+     * runtime-task 任务定义，同一 cron 表达式将被双调度（外部 provider + 本进程回调链）重复触发。
+     * 且 runtime-task 的 {@code TaskDescription} 为一次性任务模型（无 cron 周期字段），周期语义
+     * 承接尚缺。故本批<b>不做硬接线</b>；任务定义单源归位由详细设计-10 §五 编排链
+     * （WAgentOrchestrator → ITaskManagementService 投递，#130/F10-15 wait_task 桥接）统一实装，
+     * 届时外部 provider 降级为可选执行后端（随 R-39 裁决）。见交付说明「W255 选择与理由」。</p>
+     */
     @PostMapping
     public ApiResponse<Object> create(@RequestBody Map<String, String> body) {
         String name = body.get("name");

@@ -1,5 +1,8 @@
 -- ECOS Outbox Pattern: Add outbox_event table to each domain schema for CDC-based event publishing
 -- Sprint 1.4: Outbox Pattern for reliable event delivery via Kafka
+-- 【W248/R-22 订正 2026-10-10】ST07 五枚举权威下 Agent 族落 ecos_ai，禁建 ecos_agent schema（X-4 库内本无）；
+-- 本文件 ecos_agent. 限定逐处订正为 ecos_ai.（同名表实存 ecos_ai，IF NOT EXISTS 语义安全）；本脚本从未实跑
+-- （登记见 docs/40-实现/DDL迁移脚本落地登记-2026-09-30.md §一），原语句作废保留可审计。
 
 -- Each microservice will write events to its own outbox table within its schema.
 -- A CDC poller in each service reads from outbox and publishes to Kafka.
@@ -88,7 +91,7 @@ CREATE TABLE IF NOT EXISTS ecos_rule.outbox_event (
 );
 CREATE INDEX IF NOT EXISTS idx_rule_outbox_unpublished ON ecos_rule.outbox_event (created_at) WHERE published = FALSE;
 
-CREATE TABLE IF NOT EXISTS ecos_agent.outbox_event (
+CREATE TABLE IF NOT EXISTS ecos_ai.outbox_event (
     id BIGSERIAL PRIMARY KEY,
     event_type VARCHAR(128) NOT NULL,
     aggregate_type VARCHAR(128) NOT NULL,
@@ -100,7 +103,7 @@ CREATE TABLE IF NOT EXISTS ecos_agent.outbox_event (
     kafka_topic VARCHAR(128),
     kafka_key VARCHAR(128)
 );
-CREATE INDEX IF NOT EXISTS idx_agent_outbox_unpublished ON ecos_agent.outbox_event (created_at) WHERE published = FALSE;
+CREATE INDEX IF NOT EXISTS idx_agent_outbox_unpublished ON ecos_ai.outbox_event (created_at) WHERE published = FALSE;
 
 CREATE TABLE IF NOT EXISTS ecos_knowledge.outbox_event (
     id BIGSERIAL PRIMARY KEY,

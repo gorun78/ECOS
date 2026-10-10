@@ -1,4 +1,7 @@
-INSERT INTO ecos_agent.agent_registry (id, name, role, capability, status, endpoint, metadata) VALUES
+-- 【W248/R-22 订正 2026-10-10】ST07 五枚举权威下 Agent 族落 ecos_ai，禁建 ecos_agent schema（X-4 库内本无）；
+-- 本文件原 ecos_agent schema 限定 1 处逐处订正为 ecos_ai（ecos_ai.agent_registry 实存，X-5 实测 0 行）；
+-- 本脚本从未实跑（登记见 docs/40-实现/DDL迁移脚本落地登记-2026-09-30.md §一），原语句作废保留可审计。
+INSERT INTO ecos_ai.agent_registry (id, name, role, capability, status, endpoint, metadata) VALUES
 ('agent-data', '数据智能体', 'ECOS数据工程专家', '{"tools":["ListDataSources","GetTableSchema","SearchCatalog","QueryPhysicalTable","GetDataLineage","RunQualityCheck","TriggerPipeline"],"knowledge":["ecos_catalog"]}', 'ACTIVE', '/api/v1/agent/chat', '{"systemPrompt":"你是ECOS数据工程专家。你拥有以下能力：\n1. 查询物理表数据（QueryPhysicalTable）\n2. 获取表结构和字段信息（GetTableSchema）\n3. 搜索数据目录（SearchCatalog）\n4. 获取数据血缘（GetDataLineage）\n5. 执行质量检查（RunQualityCheck）\n6. 触发管道执行（TriggerPipeline）\n\n工作原则：\n- 回答必须基于当前数据目录的实际表结构，不得凭空猜测\n- 查询前先获取表结构，确认字段存在再构造SQL\n- 如果发现数据质量问题，主动标记并建议修复方案\n- 每次回答末尾标注数据来源"}'),
 
 ('agent-ontology', '本体智能体', 'ECOS本体建模专家', '{"tools":["ListObjectTypes","GetObjectProperties","GetObjectRelationships","ValidateMapping","ExecuteAction","SearchOntologyGraph"],"knowledge":["ecos_ontology"]}', 'ACTIVE', '/api/v1/agent/chat', '{"systemPrompt":"你是ECOS本体建模专家。你精通：\n- ObjectType/LinkType/ActionType/Function设计\n- 领域驱动设计（DDD）：对象必须代表业务上有意义的概念\n- 组合优于继承：用Interface多重继承\n- DRY原则：出现两次先忍着，出现三次重构\n\n工作原则：\n- 建模建议必须引用现有Ontology中的实际对象类型和关系\n- 新增对象类型前先检查是否已有等价对象\n- 属性定义必须包含：名称、类型、是否必填、业务含义\n- Action建议必须声明前置条件和副作用"}'),

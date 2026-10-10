@@ -1,4 +1,7 @@
 -- Sprint 4: World Model and Ontology Compiler tables
+-- 【W248/R-22 订正 2026-10-10】ST07 五枚举权威下 Agent 族落 ecos_ai，禁建 ecos_agent schema（X-4 库内本无）；
+-- 本文件原 ecos_agent schema 限定 15 处逐处订正为 ecos_ai（同名表实存 ecos_ai，IF NOT EXISTS 语义安全）；
+-- 本脚本从未实跑（登记见 docs/40-实现/DDL迁移脚本落地登记-2026-09-30.md §一），原语句作废保留可审计。
 
 -- Ontology tables
 CREATE TABLE IF NOT EXISTS ecos_ontology.entity_definition (
@@ -60,13 +63,13 @@ CREATE TABLE IF NOT EXISTS ecos_ontology.event_definition (
 );
 
 -- World Model tables
-CREATE TABLE IF NOT EXISTS ecos_agent.world_state (
+CREATE TABLE IF NOT EXISTS ecos_ai.world_state (
     id VARCHAR(64) PRIMARY KEY,
     timestamp TIMESTAMP DEFAULT NOW(),
     state_data JSONB DEFAULT '{}'
 );
 
-CREATE TABLE IF NOT EXISTS ecos_agent.world_snapshot (
+CREATE TABLE IF NOT EXISTS ecos_ai.world_snapshot (
     id VARCHAR(64) PRIMARY KEY,
     state_id VARCHAR(64),
     snapshot_type VARCHAR(32),
@@ -74,7 +77,7 @@ CREATE TABLE IF NOT EXISTS ecos_agent.world_snapshot (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS ecos_agent.scenario (
+CREATE TABLE IF NOT EXISTS ecos_ai.scenario (
     id VARCHAR(64) PRIMARY KEY,
     name VARCHAR(255),
     type VARCHAR(32) DEFAULT 'CUSTOM',
@@ -83,17 +86,17 @@ CREATE TABLE IF NOT EXISTS ecos_agent.scenario (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS ecos_agent.simulation (
+CREATE TABLE IF NOT EXISTS ecos_ai.simulation (
     id VARCHAR(64) PRIMARY KEY,
-    scenario_id VARCHAR(64) REFERENCES ecos_agent.scenario(id),
+    scenario_id VARCHAR(64) REFERENCES ecos_ai.scenario(id),
     status VARCHAR(32) DEFAULT 'CREATED',
     config JSONB DEFAULT '{}',
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS ecos_agent.simulation_result (
+CREATE TABLE IF NOT EXISTS ecos_ai.simulation_result (
     id VARCHAR(64) PRIMARY KEY,
-    simulation_id VARCHAR(64) REFERENCES ecos_agent.simulation(id),
+    simulation_id VARCHAR(64) REFERENCES ecos_ai.simulation(id),
     output_state JSONB DEFAULT '{}',
     predictions JSONB DEFAULT '{}',
     confidence DECIMAL(5,4) DEFAULT 0,
@@ -101,7 +104,7 @@ CREATE TABLE IF NOT EXISTS ecos_agent.simulation_result (
     completed_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS ecos_agent.forecast (
+CREATE TABLE IF NOT EXISTS ecos_ai.forecast (
     id VARCHAR(64) PRIMARY KEY,
     target_entity VARCHAR(128),
     target_metric VARCHAR(128),
@@ -112,7 +115,7 @@ CREATE TABLE IF NOT EXISTS ecos_agent.forecast (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS ecos_agent.optimization_job (
+CREATE TABLE IF NOT EXISTS ecos_ai.optimization_job (
     id VARCHAR(64) PRIMARY KEY,
     objective TEXT,
     constraints JSONB DEFAULT '[]',
@@ -121,7 +124,7 @@ CREATE TABLE IF NOT EXISTS ecos_agent.optimization_job (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS ecos_agent.strategy_recommendation (
+CREATE TABLE IF NOT EXISTS ecos_ai.strategy_recommendation (
     id VARCHAR(64) PRIMARY KEY,
     goal TEXT,
     actions JSONB DEFAULT '[]',
@@ -131,7 +134,7 @@ CREATE TABLE IF NOT EXISTS ecos_agent.strategy_recommendation (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS ecos_agent.causal_edge (
+CREATE TABLE IF NOT EXISTS ecos_ai.causal_edge (
     id VARCHAR(64) PRIMARY KEY,
     source_node VARCHAR(128),
     target_node VARCHAR(128),
@@ -147,7 +150,7 @@ CREATE INDEX IF NOT EXISTS idx_rel_def_target ON ecos_ontology.relationship_defi
 CREATE INDEX IF NOT EXISTS idx_metric_def_code ON ecos_ontology.metric_definition(code);
 
 -- World Model indexes
-CREATE INDEX IF NOT EXISTS idx_scenario_type ON ecos_agent.scenario(type);
-CREATE INDEX IF NOT EXISTS idx_simulation_status ON ecos_agent.simulation(status);
-CREATE INDEX IF NOT EXISTS idx_causal_source ON ecos_agent.causal_edge(source_node);
-CREATE INDEX IF NOT EXISTS idx_causal_target ON ecos_agent.causal_edge(target_node);
+CREATE INDEX IF NOT EXISTS idx_scenario_type ON ecos_ai.scenario(type);
+CREATE INDEX IF NOT EXISTS idx_simulation_status ON ecos_ai.simulation(status);
+CREATE INDEX IF NOT EXISTS idx_causal_source ON ecos_ai.causal_edge(source_node);
+CREATE INDEX IF NOT EXISTS idx_causal_target ON ecos_ai.causal_edge(target_node);
