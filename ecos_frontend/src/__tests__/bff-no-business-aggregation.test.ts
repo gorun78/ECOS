@@ -36,7 +36,8 @@ describe("bff-no-business-aggregation: /api/audit-logs 只透传，不聚合（C
   it("audit-logs 前缀 handler 已收敛为 forwardProxy(GATEWAY, ...) 单一通道", () => {
     const auditLines = findLines(src, /\/api\/audit-logs/);
     expect(auditLines.length).toBeGreaterThan(0);
-    const forwardHits = findLines(src, /app\.use\(\s*["']\/api\/audit-logs["']\s*,\s*forwardProxy\(GATEWAY/);
+    // C201/W219：允许且仅允许 jsonBody 作为中间件挂在同一 mount 上（app 级解析器已被禁用）。
+    const forwardHits = findLines(src, /app\.use\(\s*["']\/api\/audit-logs["']\s*,\s*(?:jsonBody,\s*)?forwardProxy\(GATEWAY/);
     expect(forwardHits.length).toBe(1);
   });
 

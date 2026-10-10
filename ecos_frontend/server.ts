@@ -57,7 +57,12 @@ const DATANET = process.env.DATANET_URL || "http://localhost:18082";
 const WORKSPACE = process.env.WORKSPACE_URL || "http://localhost:18090";
 const AIMING = process.env.AIMING_URL || "http://localhost:18084";
 
-app.use(express.json({ limit: "10mb" }));
+// 🔴 禁止在 app 级全局注册 body 解析器。本 app 内 vite.middlewares（见 startServer）自带 /api 代理，
+//    全局 express.json 会先于它抽干 req 流，而 http-proxy 仍按原 Content-Length 透传 ⇒ 上游等不到
+//    任何 body 字节，阻塞到 socket 超时。实证 2026-10-10：POST /api/v1/auth/login 经 :3000 无响应，
+//    同一 body 直连 :8080 = 200/0.16s；GET 与零长 POST 均正常 ⇒ 仅"带 body 的方法"受害。
+//    解析器只挂在 BFF 自有 forwardProxy 挂载点上（forwardProxy 需要 req.body 再序列化）。
+const jsonBody = express.json({ limit: "10mb" });
 
 // ── 通用上游转发函数 ────────────────────────────────────────
 // 用法：proxy(upstreamBaseUrl, routeLabel)
@@ -164,8 +169,8 @@ const forwardProxy =
 
 // 1) gateway 必选直连（🔴 架构铁律 v1.6：仅 :8080 对外可达；BFF 默认永不 bypass）
 //    /api/monitor 与 /api/twins 被 gateway Controller 持有，永远经 GATEWAY。
-app.use("/api/monitor", forwardProxy(GATEWAY, "gateway/monitor"));
-app.use("/api/twins", forwardProxy(GATEWAY, "gateway/twins"));
+app.use("/api/monitor", jsonBody, forwardProxy(GATEWAY, "gateway/monitor"));
+app.use("/api/twins", jsonBody, forwardProxy(GATEWAY, "gateway/twins"));
 
 // 2) 🔴 ADR-10 直连接能开关（默认关闭）：5 类前缀仅在 LOCAL_DIRECT_PROXY_ENABLED=true 时
 //    直接打到 service 端口；否则一律落到下方通用 /api 规则 → GATEWAY。
@@ -173,12 +178,12 @@ if (LOCAL_DIRECT_PROXY_ENABLED) {
   console.warn("[BFF] ECOS_LOCAL_DIRECT_SERVICE_PROXY=true — 开发态允许 BFF 定向直连 service (datanet/workspace/aiming)");
   // P3-A：Dq/Git/DataLake 路由物理迁至 datanet :18082（与网关 V1_REWRITE_MAP 同前缀）。
   // 路由前缀互不重叠，最长精确前缀天然胜出（Spring @RequestMapping 规则）。
-  app.use("/api/dq", forwardProxy(DATANET, "datanet-direct/dq"));
-  app.use("/api/v1/ecos/git", forwardProxy(DATANET, "datanet-direct/git"));
-  app.use("/api/datalake", forwardProxy(DATANET, "datanet-direct/datalake"));
+  app.use("/api/dq", jsonBody, forwardProxy(DATANET, "datanet-direct/dq"));
+  app.use("/api/v1/ecos/git", jsonBody, forwardProxy(DATANET, "datanet-direct/git"));
+  app.use("/api/datalake", jsonBody, forwardProxy(DATANET, "datanet-direct/datalake"));
   // PMO-60：workspace/controller 独立 :18090，cognitive 迁至 aiming :18084（认知前端归属 v1.5）。
-  app.use("/api/v1/workspace", forwardProxy(WORKSPACE, "workspace-direct"));
-  app.use("/api/v1/cognitive", forwardProxy(AIMING, "aiming-cognitive-direct"));
+  app.use("/api/v1/workspace", jsonBody, forwardProxy(WORKSPACE, "workspace-direct"));
+  app.use("/api/v1/cognitive", jsonBody, forwardProxy(AIMING, "aiming-cognitive-direct"));
 } else {
   // 默认路径：所有 /api/* (包括 5 类前缀) 一律转发 gateway :8080。
   // gateway 按最长前缀精确优先分派 service（铁律 v1.6 §0.3.1，详见 GatewayApplication excludeFilters / @ComponentScan）。
@@ -189,7 +194,7 @@ if (LOCAL_DIRECT_PROXY_ENABLED) {
 //    + 手写过 data[]，属"业务聚合"违反 ADR-15 承流口径 + ST06 审计链路属主=security-engine）。
 //    现在纯转发到 GATEWAY，与 audit 域其余路径同口径（SecController/auditLogs 属主在
 //    security-engine，BFF 无任何合成/兜底/降级路径）。
-app.use("/api/audit-logs", forwardProxy(GATEWAY, "gateway/audit-logs"));
+app.use("/api/audit-logs", jsonBody, forwardProxy(GATEWAY, "gateway/audit-logs"));
 
 // ── Vite SPA + catch-all（顺序约束见上） ──────────────────
 const startServer = async () => {
@@ -202,11 +207,11 @@ const startServer = async () => {
     app.use(vite.middlewares);
     console.log("[BFF] Vite dev middleware mounted (C175: before /api catch-all).");
     // C175: catch-all 兜底放到 vite.middlewares 之后注册 — 顺序即"vite 先，兜底后"。
-    app.use("/api", forwardProxy(GATEWAY, "gateway/default"));
+    app.use("/api", jsonBody, forwardProxy(GATEWAY, "gateway/default"));
   } else {
     const distPath = path.join(process.cwd(), "dist");
     // C175: /api 兜底必须在 SPA 静态与 get("*") 之前注册 — 顺序即"细节前缀 → /api 兜底 → 静态 → get('*')"。
-    app.use("/api", forwardProxy(GATEWAY, "gateway/default"));
+    app.use("/api", jsonBody, forwardProxy(GATEWAY, "gateway/default"));
     app.use(express.static(distPath));
     app.get("*", (_req, res) => {
       res.sendFile(path.join(distPath, "index.html"));

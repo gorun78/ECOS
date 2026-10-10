@@ -23,20 +23,20 @@ describe("bff-middleware-order: vite middlewares 优先级于 /api catch-all（C
   });
 
   it("/api catch-all 挂载点行存在（放行 ADR-10 日志锚点）", () => {
-    const hits = index(/app\.use\(\s*["']\/api["']\s*,\s*forwardProxy\(GATEWAY,\s*["']gateway\/default["']\)/);
+    const hits = index(/app\.use\(\s*["']\/api["']\s*,\s*(?:jsonBody,\s*)?forwardProxy\(GATEWAY,\s*["']gateway\/default["']\)/);
     expect(hits.length).toBeGreaterThanOrEqual(1);
   });
 
   it("vite.middlewares 的**首次**注册 必须 早于 任一 /api catch-all 的注册（顺序）", () => {
     const viteLine = index(/app\.use\(vite\.middlewares\)/)[0];
-    const apiCatchAllLines = index(/app\.use\(\s*["']\/api["']\s*,\s*forwardProxy\(GATEWAY,\s*["']gateway\/default["']\)/);
+    const apiCatchAllLines = index(/app\.use\(\s*["']\/api["']\s*,\s*(?:jsonBody,\s*)?forwardProxy\(GATEWAY,\s*["']gateway\/default["']\)/);
     expect(apiCatchAllLines.length).toBeGreaterThanOrEqual(1);
     const minApiCatchAll = Math.min(...apiCatchAllLines);
     expect(viteLine).toBeLessThan(minApiCatchAll);
   });
 
   it("prod 分支下 /api catch-all 与 SPA 静态/get('*') 的顺序仍是 catchall → static → get(*)（C175 同一红线在 prod 侧）", () => {
-    const apiCatch = index(/app\.use\(\s*["']\/api["']\s*,\s*forwardProxy\(GATEWAY,\s*["']gateway\/default["']\)/);
+    const apiCatch = index(/app\.use\(\s*["']\/api["']\s*,\s*(?:jsonBody,\s*)?forwardProxy\(GATEWAY,\s*["']gateway\/default["']\)/);
     const staticLine = index(/app\.use\(express\.static\(distPath\)\)/)[0];
     const getStarLine = index(/app\.get\(\s*["']\*["']\s*,/)[0];
     expect(staticLine).toBeDefined();
