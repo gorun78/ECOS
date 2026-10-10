@@ -16,65 +16,18 @@ import { useTheme } from "./components/ThemeContext";
 import { useLanguage } from "./components/LanguageContext";
 import ErrorBoundary from "./components/common/ErrorBoundary";
 import NetworkErrorBanner from "./components/NetworkErrorBanner";
+import { resolveTabLabel } from "./navigation/navConfig";
 import { apiHealth, notifyNetworkUp } from "./api";
 import { apiTaskStats, type TaskStats } from "./services/taskCenter";
 
 /**
- * Route path → i18n key (common.app.tab.{id}).
- * Keep these tab labels out of the JS source so they follow the
- * active locale — switching zh/en re-renders the openTabs strip.
- * (Previously hardcoded as `TAB_LABELS: Record<string, string>`.)
+ * Tab labels resolve through navigation/navConfig — the single source of
+ * truth (W190). W201: unknown ids no longer fall back to a raw
+ * `app.tab.{id}` key; resolveTabLabel logs in dev and shows the translated
+ * placeholder instead (fail-closed, no English slug on screen).
  */
-const TAB_LABEL_KEY: Record<string, string> = {
-  mission_control: "app.tab.mission_control",
-  world_model: "app.tab.world_model",
-  monitor: "app.tab.monitor",
-  "security-center": "app.tab.security_center",
-  security: "app.tab.security_center",
-  marketplace: "app.tab.marketplace",
-  knowledge_graph: "app.tab.knowledge_graph",
-  knowledge_view: "app.tab.knowledge_view",
-  ops_apps: "app.tab.ops_apps",
-  iam: "app.tab.iam",
-  dict: "app.tab.dict",
-  "system-config": "app.tab.system_config",
-  project_workbench: "app.tab.project_workbench",
-  "ai-workbench": "app.tab.ai_workbench",
-  agent_studio: "app.tab.ai_workbench",
-  agent_mesh: "app.tab.agent_mesh",
-  "agent-builder": "app.tab.agent_builder",
-  "agent-test": "app.tab.agent_test",
-  ontology_workbench: "app.tab.ontology_workbench",
-  ontology: "app.tab.ontology",
-  ontology_designer: "app.tab.ontology_designer",
-  "business-workbench": "app.tab.business_workbench",
-  "data-workbench": "app.tab.data_workbench",
-  catalog: "app.tab.catalog",
-  dataset_explorer: "app.tab.dataset_explorer",
-  pipeline: "app.tab.pipeline",
-  workbook: "app.tab.workbook",
-  lineage: "app.tab.lineage",
-  datasources: "app.tab.datasources",
-  workshop: "app.tab.workflow",
-  workflow_designer: "app.tab.workflow",
-  objects: "app.tab.objects",
-  dq_dashboard: "app.tab.dq_dashboard",
-  glossary: "app.tab.glossary",
-  guardrails: "app.tab.guardrails",
-  biz_dashboard: "app.tab.biz_dashboard",
-  project_tracker: "app.tab.project_tracker",
-  contract_manager: "app.tab.contract_manager",
-  ops_dashboard: "app.tab.ops_dashboard",
-  kanban: "app.tab.kanban",
-  "engine-tasks": "app.tab.engine_tasks",
-  telemetry: "app.tab.telemetry",
-  tokens: "app.tab.tokens",
-  "gateway-diagnostics": "app.tab.gateway_diagnostics",
-  "alerts-center": "app.tab.alerts_center",
-};
-/** Default tab label: return the raw route id for unknown views (keep prior behaviour). */
 const getTabLabel = (t: (k: string) => string, id: string): string =>
-  t(TAB_LABEL_KEY[id] ?? `app.tab.${id}`);
+  resolveTabLabel(t, id);
 
 interface Tab {
   id: string;
@@ -257,8 +210,8 @@ export default function App() {
         id="sidebar-drag-handle"
         className={`hidden md:block w-1 hover:w-1.5 active:w-1.5 h-full cursor-col-resize shrink-0 transition-all duration-150 relative z-30 ${
           isResizing
-            ? "bg-indigo-500/80 w-1.5 shadow-[0_0_8px_rgba(99,102,241,0.5)]"
-            : `border-r ${styles.appBorder} hover:bg-indigo-500/30`
+            ? `${styles.accentBg} w-1.5`
+            : `border-r ${styles.appBorder} ${styles.sidebarHoverBg}`
         }`}
         onMouseDown={(e) => {
           e.preventDefault();
@@ -279,11 +232,11 @@ export default function App() {
         />
 
         <main className="flex-1 min-h-0 flex flex-col relative overflow-hidden">
-          <div key={currentView} className="contents">
-            <ErrorBoundary>
+          {/* W214/C196 路由级错误边界：key = 内容路由根，单页崩溃只降级该页，
+              导航到兄弟路由时边界整体重挂载（门禁 ErrorBoundary.route.test.tsx）。 */}
+          <ErrorBoundary key={currentView}>
             <Outlet />
-            </ErrorBoundary>
-          </div>
+          </ErrorBoundary>
         </main>
       </div>
 
@@ -301,7 +254,7 @@ export default function App() {
         type="button"
         aria-label={t("app.copilot.open")}
         onClick={() => setCopilotOpen(true)}
-        className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full bg-[var(--card)] hover:bg-[var(--muted)] dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white shadow-lg shadow-black/30 flex items-center justify-center transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2"
+        className={`fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full ${styles.accentBg} ${styles.accentHover} text-white shadow-lg shadow-black/30 flex items-center justify-center transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2`}
       >
         <Bot className="h-7 w-7" />
       </button>

@@ -17,7 +17,8 @@ interface ChatMessage {
   thinkingTrace?: string[];
   actionProposal?: { id?: string; actionId: string; actionName: string; payload: Record<string, string>; status: 'pending' | 'approved' | 'rejected' };
 }
-interface RAGDocument { id: string; name: string; type: string; size: string; chunksCount: number; status: 'synced' | 'pending'; lastModified: string; }
+// W204/C186：chunksCount 可选——后端/本地无真实回传时保持 undefined，界面渲染"待同步/未知"语义，禁补零禁合成
+interface RAGDocument { id: string; name: string; type: string; size: string; chunksCount?: number; status: 'synced' | 'pending'; lastModified: string; }
 
 export default function ChatbotStudioView({ agents, models, guardrails, onUpdateAgents, onAddAuditLog, showToast }: {
   agents: AIPAgent[]; models: AIPModel[]; guardrails: AIPGuardrail[]; onUpdateAgents: (u: AIPAgent[]) => void; onAddAuditLog: (l: AIPAuditLog) => void; showToast?: (t: 'success'|'info'|'error', m: string) => void;
@@ -73,15 +74,18 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
   const hfd = (e:React.DragEvent) => { e.preventDefault(); setDragOver(false); const fs = Array.from(e.dataTransfer.files); if(fs.length) hfa(fs); };
   const hfs = (e:React.ChangeEvent<HTMLInputElement>) => { const fs = Array.from(e.target.files||[]); if(fs.length) hfa(fs); };
   const hfa = (files: File[]) => {
+    // W204/C186：新加文档不预设 chunksCount（无后端回传=未知，界面走"待同步/未知"渲染分支）
     const nd: RAGDocument[] = files.map((f,i) => ({ id:`doc-add-${Date.now()}-${i}`, name:f.name,
       type:f.name.split('.').pop()?.toUpperCase()||'DOCUMENT', size:`${(f.size/(1024*1024)).toFixed(2)} MB`,
-      chunksCount:0, status:'pending', lastModified:new Date().toISOString().replace('T',' ').substring(0,16) }));
+      status:'pending', lastModified:new Date().toISOString().replace('T',' ').substring(0,16) }));
     setRagDocs(p=>[...p,...nd]); showToast?.('info', t('aiworkbench.chatbot.toastFilesAdded').replace('{count}', String(files.length)));
   };
 
   const hSync = () => { setIsSyncingRAG(true); setRagLogs([t('aiworkbench.chatbot.ragLogStart')]);
     const logs = [t('aiworkbench.chatbot.ragLogRead'),t('aiworkbench.chatbot.ragLogExtract'),t('aiworkbench.chatbot.ragLogChunk'),t('aiworkbench.chatbot.ragLogEmbed'),t('aiworkbench.chatbot.ragLogInject'),t('aiworkbench.chatbot.ragLogComplete')];
-    let i=0; const iv=setInterval(()=>{if(i<logs.length){setRagLogs(p=>[...p,logs[i]]);i++;}else{clearInterval(iv);setRagDocs(p=>p.map(d=>({...d,status:'synced',chunksCount:d.chunksCount||Math.floor(Math.random()*80)+15})));setIsSyncingRAG(false);showToast?.('success',t('aiworkbench.chatbot.toastRagSyncSuccess'));}},700);
+    // W204/C186：本视图同步链路无后端回传通道 → chunksCount 保持真实来源值（未知则 undefined，
+    // 由 ConfigPanel 渲染"待同步/未知"分支）；原 `||Math.floor(Math.random()*80)+15` 伪造分块数已清除。
+    let i=0; const iv=setInterval(()=>{if(i<logs.length){setRagLogs(p=>[...p,logs[i]]);i++;}else{clearInterval(iv);setRagDocs(p=>p.map(d=>({...d,status:'synced'})));setIsSyncingRAG(false);showToast?.('success',t('aiworkbench.chatbot.toastRagSyncSuccess'));}},700);
   };
 
   const hPub = () => { setIsPublishing(true); setPublishingLogs([t('aiworkbench.chatbot.pubLogStart')]);

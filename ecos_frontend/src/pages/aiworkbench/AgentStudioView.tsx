@@ -15,7 +15,6 @@ import AgentListSidebar from './agent-studio/AgentListSidebar';
 import AgentConfigEditor from './agent-studio/AgentConfigEditor';
 import ChatPlayground from './agent-studio/ChatPlayground';
 import AgentFormModal from './agent-studio/AgentFormModal';
-import { buildMockAgentReply } from './agent-studio/agentStudioHelpers';
 import type { ChatMessage } from './agent-studio/agentStudioHelpers';
 
 interface AgentStudioViewProps {
@@ -104,7 +103,8 @@ export default function AgentStudioView({
           nodes: (Array.isArray(data.nodes) ? data.nodes : []).map((n: any, idx: number) => ({
             id: n.id || n.name || `node-${idx}`,
             name: n.name || n.id || `node-${idx}`,
-            verdict: n.verdict || (n.messages?.length ? 'GRANTED' : 'UNKNOWN'),
+            // W204/C186：引擎未给出节点 verdict 时不得默认 GRANTED（缺省=未知，非放行）
+            verdict: n.verdict || 'UNKNOWN',
             traces: n.traces || n.messages || []
           })),
           summary: data.summary
@@ -210,7 +210,7 @@ export default function AgentStudioView({
               functionIds: ['func_get_flight_weather']
             },
             guardrailIds: formGuardrails,
-            lastModified: '2026-07-03 12:00'
+            lastModified: new Date().toISOString().replace('T', ' ').substring(0, 16)
           };
         }
         return a;
@@ -233,7 +233,7 @@ export default function AgentStudioView({
         },
         guardrailIds: formGuardrails,
         status: 'active',
-        lastModified: '2026-07-03 12:00'
+        lastModified: new Date().toISOString().replace('T', ' ').substring(0, 16)
       };
       onUpdateAgents([...agents, newAgent]);
       setSelectedAgentId(newId);
@@ -265,50 +265,57 @@ export default function AgentStudioView({
       source: 'Agent Studio',
       assetName: selectedAgent.name,
       user: '王凯 (AOC签派总监)',
-      inputTokens: Math.floor(Math.random() * 500) + 400,
+      // W204/C186：发送时刻引擎尚未上报 token → 记 0（不合成随机用量）
+      inputTokens: 0,
       outputTokens: 0,
       status: 'allowed',
       details: `通过交互沙箱向智能体发送问题: "${text.substring(0, 40)}..."`
     });
 
-    setTimeout(() => {
-      const replyMsgId = `agent-${Date.now()}`;
-
-      // mock 回复决策为纯函数，已抽取至 agent-studio/agentStudioHelpers.ts（逐行一致）
-      const { replyContent, thinkingTrace, proposal } = buildMockAgentReply(text);
-
-      if (proposal) {
-        fetch('/api/v1/ontology/proposals', {
-          method: 'POST',
-          headers: authHeaders(),
-          body: JSON.stringify({
-            actionId: proposal.actionId,
-            actionName: proposal.actionName,
-            agentId: selectedAgent.id,
-            agentName: selectedAgent.name,
-            payload: proposal.payload,
-            proposedBy: `智能助手交互沙箱 (${selectedAgent.name})`
-          })
-        })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.proposal) {
-            proposal.id = data.proposal.id;
-          }
-        })
-        .catch(err => console.error('Failed to register proposal:', err));
-      }
-
-      setChatMessages(prev => [...prev, {
-        id: replyMsgId,
-        sender: 'agent',
-        content: replyContent,
-        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-        thinkingTrace,
-        actionProposal: proposal
-      }]);
-      setIsReplying(false);
-    }, 1800);
+    // W204/C186：罐头回复（buildMockAgentReply + setTimeout）已删除。
+    // 真实通道：POST /api/v1/agent-loop/chat（ApiResponse.data：content/totalTokens/toolCalls/errorMsg）。
+    // §2.3 诚实态：引擎未返回有效 content → 渲染错误态系统气泡，不合成任何回复或提案。
+    fetch('/api/v1/agent-loop/chat', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ agentId: selectedAgent.id, message: text })
+    })
+      .then(async (res) => {
+        const d = await res.json().catch((): null => null);
+        const replyId = `agent-${Date.now()}`;
+        const ts = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        const data = d?.data ?? {};
+        if (!res.ok || !d || data.success === false || typeof data.content !== 'string' || !data.content) {
+          setChatMessages(prev => [...prev, {
+            id: replyId,
+            sender: 'system',
+            content: t('aiworkbench.agentStudio.chat.engineFail'),
+            timestamp: ts
+          }]);
+          return;
+        }
+        // 思考链仅来自引擎真实 toolCalls 上报；无上报则不展示（不合成）
+        const thinkingTrace = Array.isArray(data.toolCalls) && data.toolCalls.length > 0
+          ? data.toolCalls.map((tc: Record<string, unknown>) =>
+              `${String(tc.toolName ?? 'tool')}: ${tc.success ? 'OK' : 'FAIL'} (${tc.durationMs ?? '-'}ms)`)
+          : undefined;
+        setChatMessages(prev => [...prev, {
+          id: replyId,
+          sender: 'agent',
+          content: data.content,
+          timestamp: ts,
+          thinkingTrace
+        }]);
+      })
+      .catch(() => {
+        setChatMessages(prev => [...prev, {
+          id: `agent-${Date.now()}`,
+          sender: 'system',
+          content: t('aiworkbench.agentStudio.chat.engineFail'),
+          timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+        }]);
+      })
+      .finally(() => setIsReplying(false));
   };
 
   const handleActionConsent = (msgId: string, approved: boolean) => {

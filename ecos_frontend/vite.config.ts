@@ -3,12 +3,28 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import {
+  AIMING_DEV_TRUST_HEADERS,
+  buildViteDevProxyTable,
+  validateRouteManifest,
+} from './config/route-manifest';
+
+// route-manifest 单源（详细设计-08 §4.1 / W194/C176 / R-54 ①）：
+// dev 代理表由 config/route-manifest.ts 派生（18 条引擎直连 + /api、/datanet、/cases 三条 gateway 兜底 = 21 条），
+// 与本文件同源的 server.ts（Express BFF）读取同一清单；构建期校验失败即抛错，禁运行期静默。
+const devProxyTable = buildViteDevProxyTable(process.env);
+const manifestErrors = validateRouteManifest(undefined, devProxyTable);
+if (manifestErrors.length > 0) {
+  throw new Error(
+    `[vite.config][route-manifest] 路由表单源校验失败:\n - ${manifestErrors.join('\n - ')}`,
+  );
+}
+// F05-14/R-16: aiming service 态启用 X-ECOS-* 信任头 fail-closed 校验（ecos.security.header-auth）。
+// vite dev 直连 :18084 属受信内网 dev 通道，注入 dev 信任头等价模拟 gateway 下行注入；
+// 生产无 vite 路径（Express BFF → gateway :8080），未登录访问仍被拒绝。
+void AIMING_DEV_TRUST_HEADERS; // 信任头由 buildViteDevProxyTable 内部注入，此处仅保留口径注释。
 
 export default defineConfig(() => {
-  // F05-14/R-16: aiming service 态启用 X-ECOS-* 信任头 fail-closed 校验（ecos.security.header-auth）。
-  // vite dev 直连 :18084 属受信内网 dev 通道，注入 dev 信任头等价模拟 gateway 下行注入；
-  // 生产无 vite 路径（Express BFF → gateway :8080），未登录访问仍被拒绝。
-  const aimingDevTrustHeaders = { 'X-ECOS-USER': 'admin', 'X-ECOS-TENANT': 'default' };
   return {
     plugins: [react(), tailwindcss()],
     resolve: {
@@ -20,48 +36,7 @@ export default defineConfig(() => {
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
-      proxy: {
-        // ── 引擎专属路由（优先级高于 Gateway fallback）──
-        '/api/v1/agent-loop':    { target: 'http://localhost:18084', changeOrigin: true, headers: aimingDevTrustHeaders },
-        '/api/v1/agent-mesh':    { target: 'http://localhost:18084', changeOrigin: true, headers: aimingDevTrustHeaders },
-        '/api/v1/agent':         { target: 'http://localhost:18084', changeOrigin: true, headers: aimingDevTrustHeaders },
-        '/api/v1/agent-call':    { target: 'http://localhost:18084', changeOrigin: true, headers: aimingDevTrustHeaders },
-        '/api/v1/knowledge':     { target: 'http://localhost:18086', changeOrigin: true }, // 仅 dev; 生产 BFF→gateway→kb (:8080 分派, dccheng jar :18086)
-        '/api/v1/security':      { target: 'http://localhost:18081', changeOrigin: true },
-        '/api/v1/audit':         { target: 'http://localhost:18081', changeOrigin: true },
-        '/api/v1/abac':          { target: 'http://localhost:18081', changeOrigin: true },
-        '/api/v1/data-masking':  { target: 'http://localhost:18081', changeOrigin: true },
-        '/api/v1/data-permission':{ target: 'http://localhost:18081', changeOrigin: true },
-        '/api/v1/policy-engine': { target: 'http://localhost:18081', changeOrigin: true },
-        '/api/v1/engine/data':   { target: 'http://localhost:18082', changeOrigin: true },
-        '/api/v1/ecos':          { target: 'http://localhost:18083', changeOrigin: true },
-        // PMO-60: workspace routing + cognitive merged into aiming
-        '/api/v1/workspace':     { target: 'http://localhost:18090', changeOrigin: true },
-        '/api/v1/cognitive':     { target: 'http://localhost:18084', changeOrigin: true, headers: aimingDevTrustHeaders },
-        '/api/v1/world-model':   { target: 'http://localhost:18089', changeOrigin: true },
-        '/api/v1/rules':         { target: 'http://localhost:18086', changeOrigin: true },
-        '/api/v1/kb':            { target: 'http://localhost:18086', changeOrigin: true },
-        // ── Fallback: Gateway ──
-        '/api': {
-          target: 'http://localhost:8080',
-          changeOrigin: true,
-          configure: (proxy) => {
-            proxy.on('proxyReq', (proxyReq, req) => {
-              if (req.headers.authorization) {
-                proxyReq.setHeader('Authorization', req.headers.authorization);
-              }
-            });
-          },
-        },
-        '/datanet': {
-          target: 'http://localhost:8080',
-          changeOrigin: true,
-        },
-        '/cases': {
-          target: 'http://localhost:8080',
-          changeOrigin: true,
-        },
-      },
+      proxy: devProxyTable,
     },
     test: {
       globals: true,
@@ -69,6 +44,23 @@ export default defineConfig(() => {
       setupFiles: './src/test/setup.ts',
       // design-05 F05-17 验收用例文件名用 .spec.ts（vitest 默认只收 .test.*，此处显式补 .spec.*）
       include: ['**/*.test.{ts,tsx}', 'src/**/*.spec.{ts,tsx}'],
+      // 详细设计-08 W198/C180：覆盖率门槛（vitest 4 在 vite.config.test 内配置即等效独立 vitest.config.ts，
+      // 避免双配置文件漂移；npm test 语义不变——coverage 仅在显式 --coverage 时生效）。
+      coverage: {
+        provider: 'v8' as const,
+        reporter: ['text', 'json-summary'],
+        reportsDirectory: './coverage',
+        // 门槛只加不减：低于 floor 即 --coverage 运行失败，防止覆盖率回退。
+        // 实测口径（2026-10-10，npx vitest run --coverage 全量 18 文件/66 测试全绿）：
+        //   All files lines = 20.87%（420/2012）⇒ floor 取 20（向下取整，见 W198 报告）。
+        // 2026-10-10 实现轮复测（Node ≥20.19，jsdom 套件可全跑）：49 文件/199 测试全绿，
+        //   All files lines = 31.22% / statements = 29.19%。floor 维持 20 不升：
+        //   本机 PATH Node 20.18.1 下 jsdom 依赖链（html-encoding-sniffer→@exodus/bytes ESM）
+        //   报 ERR_REQUIRE_ESM，仅 node-env 子集可跑 ⇒ 升门槛待 Node 基线统一 ≥20.19 后再执行。
+        thresholds: {
+          lines: 20,
+        },
+      },
     },
   };
 });

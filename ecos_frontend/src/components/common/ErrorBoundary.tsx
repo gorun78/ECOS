@@ -68,7 +68,6 @@ function DefaultFallback({
   error: Error;
   onReset: () => void;
 }) {
-  const themeHook = { styles: {} as any }; // Placeholder — will use ThemeWrapper
   return <FallbackInner error={error} onReset={onReset} />;
 }
 
@@ -81,30 +80,31 @@ function FallbackInner({
 }) {
   let styles: Record<string, string> = {};
   let t: (key: string) => string = (k) => k;
-  let locale = "en";
 
   try {
     const theme = useTheme();
     styles = theme.styles;
   } catch {
-    // Fallback if ThemeContext is not available
+    // ThemeContext unavailable (boundary mounted outside providers): neutral
+    // scrim classes only — no palette-specific literals (W196 owner-file rule).
     styles = {
-      cardBg: "bg-white",
-      cardBorder: "border-[#E2E8F0]",
-      cardText: "text-slate-800",
-      cardTextMuted: "text-slate-500",
-      accentBg: "bg-indigo-600",
-      accentHover: "hover:bg-indigo-700",
-      accentText: "text-indigo-600",
-      appBg: "bg-slate-50",
-      inputBg: "bg-white",
+      cardBg: "bg-black/40",
+      cardBorder: "border-white/20",
+      cardText: "text-white",
+      cardTextMuted: "text-white/70",
+      accentBg: "bg-white/20",
+      accentHover: "hover:bg-white/30",
+      accentText: "text-white",
+      appBg: "bg-black/40",
+      inputBg: "bg-black/30",
+      dangerBg: "bg-black/40",
+      dangerText: "text-white",
     };
   }
 
   try {
     const lang = useLanguage();
     t = lang.t;
-    locale = lang.locale;
   } catch {
     // LanguageContext not available
     t = (k) => k;
@@ -114,30 +114,28 @@ function FallbackInner({
     <div
       className={`flex flex-col items-center justify-center min-h-[300px] p-8 select-none ${styles.cardBg} rounded-xl border ${styles.cardBorder}`}
     >
-      <div className="flex items-center justify-center w-16 h-16 rounded-full bg-red-50 dark:bg-red-950/30 mb-5">
-        <AlertTriangle className="w-8 h-8 text-red-500" />
+      <div className={`flex items-center justify-center w-16 h-16 rounded-full ${styles.dangerBg} mb-5`}>
+        <AlertTriangle className={`w-8 h-8 ${styles.dangerText}`} />
       </div>
 
       <h2 className={`text-lg font-bold mb-1.5 ${styles.cardText}`}>
-        {locale === "zh" ? "页面渲染出错" : "Something went wrong"}
+        {t("errorboundary.title")}
       </h2>
       <p className={`text-xs max-w-md text-center leading-relaxed mb-4 ${styles.cardTextMuted}`}>
-        {locale === "zh"
-          ? "应用程序遇到了意外错误。请尝试刷新页面，如果问题持续存在，请联系管理员。"
-          : "The application encountered an unexpected error. Try refreshing the page, or contact your administrator if the issue persists."}
+        {t("errorboundary.desc")}
       </p>
 
       {/* Error details (collapsible) */}
       <details className="w-full max-w-lg mb-5">
         <summary
-          className={`text-[10px] font-mono cursor-pointer ${styles.cardTextMuted} hover:${styles.cardText} transition`}
+          className={`text-[10px] font-mono cursor-pointer ${styles.cardTextMuted} transition`}
         >
-          {locale === "zh" ? "查看错误详情" : "Error details"}
+          {t("errorboundary.details")}
         </summary>
         <pre
           className={`mt-2 p-3 rounded-lg text-[10px] font-mono leading-relaxed overflow-auto max-h-32 whitespace-pre-wrap break-all ${
             styles.inputBg
-          } border ${styles.cardBorder} text-red-600 dark:text-red-400`}
+          } border ${styles.cardBorder} ${styles.dangerText}`}
         >
           {error.message}
           {error.stack && `\n\n${error.stack}`}
@@ -150,14 +148,14 @@ function FallbackInner({
           className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition ${styles.accentBg} text-white hover:opacity-90 shadow-xs`}
         >
           <RefreshCw className="w-3.5 h-3.5" />
-          {locale === "zh" ? "重试" : "Try Again"}
+          {t("errorboundary.retry")}
         </button>
         <button
           onClick={() => window.location.reload()}
           className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition`}
         >
           <Home className="w-3.5 h-3.5" />
-          {locale === "zh" ? "刷新页面" : "Refresh Page"}
+          {t("errorboundary.refresh")}
         </button>
       </div>
     </div>
@@ -167,6 +165,10 @@ function FallbackInner({
 /**
  * ErrorBoundary — wraps children to catch render errors and display
  * a friendly error fallback with retry capability.
+ *
+ * W214/C196 route-level usage: App.tsx mounts it at the <Outlet/> layer with
+ * `key={currentView}`, so the boundary remounts per content route root —
+ * a page crash degrades only that route, siblings survive.
  *
  * Usage:
  *   <ErrorBoundary>

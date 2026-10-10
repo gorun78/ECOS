@@ -9,6 +9,7 @@
  * @license Apache-2.0
  */
 import { apiFetchData } from '../../api';
+import { API_BASE } from '../../services/httpClient';
 import { authHeaders } from '../../services/auth';
 import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel, AIPActionType, ExecuteActionResult, AIPAgentTemplate, AIPAgentMetrics, AIPAgentError, AIPAgentVersion } from '../../types/aiworkbench';
 
@@ -445,7 +446,8 @@ interface OagPlaygroundParams {
  * 后端 SSE 事件名：node / response / blocked / error / done。
  */
 export async function oagPlaygroundStream(params: OagPlaygroundParams): Promise<void> {
-  const res = await fetch('/api/v1/oag/chat/stream', {
+  // W206/C188：流式 URL 基址出自 httpClient API_BASE 单源
+  const res = await fetch(`${API_BASE}/v1/oag/chat/stream`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({

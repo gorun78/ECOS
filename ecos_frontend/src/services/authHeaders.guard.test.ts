@@ -12,7 +12,8 @@ function walk(dir: string, out: string[] = []): string[] {
     const p = path.join(dir, name);
     const st = fs.statSync(p);
     if (st.isDirectory()) walk(p, out);
-    else if (/\.(ts|tsx)$/.test(name)) out.push(p);
+    // 测试文件自身标题含 "function authHeaders" 字面量，扫描须排除 *.test/spec.*，否则自匹配
+    else if (/\.(ts|tsx)$/.test(name) && !/\.(test|spec)\.(ts|tsx)$/.test(name)) out.push(p);
   }
   return out;
 }

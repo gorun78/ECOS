@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   LayoutDashboard, Cpu, Bot, Layers, ShieldCheck, TrendingUp,
   Activity, ChevronRight, BarChart3, Play, RotateCcw, CheckCircle2,
@@ -15,10 +15,11 @@ import {
 } from 'lucide-react';
 import {
   AIPLogicPipeline, AIPAgent, AIPModel, AIPAuditLog,
-  EvaluationQuestionSet, EvaluationResult, EvaluationSession
+  EvaluationQuestionSet, EvaluationSession
 } from '../../types/aiworkbench';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
+import { fetchAgentEval } from './api';
 import RadarChart from './RadarChart';
 
 interface DashboardViewProps {
@@ -77,19 +78,9 @@ function useQuestionSets(): EvaluationQuestionSet[] {
 }
 
 /**
- * Map category labels (locale-dependent text) back to canonical radar-dim keys.
- * Used to aggregate per-quest results into radarScores
- * since the dashboard's radar chart keys are English (accuracy, relevance, etc).
+ * W204/C186：原 categoryToRadarKey（把本地合成题目类别聚合为合成雷达分）已删除——
+ * 雷达分只呈现引擎真实返回字段（见 startEvaluation）。
  */
-function categoryToRadarKey(t: (k: string) => string, cat: string): string {
-  if (cat === t('dashboard.cat.compliance') || cat === t('dashboard.cat.safety')) return 'accuracy';
-  if (cat === t('dashboard.cat.operation') || cat === t('dashboard.cat.rebooking')) return 'relevance';
-  if (cat === t('dashboard.cat.tech') || cat === t('dashboard.cat.analysis')) return 'completeness';
-  if (cat === t('dashboard.cat.safety') || cat === t('dashboard.cat.specialService')) return 'safety';
-  if (cat === t('dashboard.cat.efficiency') || cat === t('dashboard.cat.baggage')) return 'efficiency';
-  if (cat === t('dashboard.cat.revenue')) return 'creativity';
-  return 'accuracy';
-}
 
 export default function DashboardView({
   pipelines,
@@ -116,109 +107,65 @@ export default function DashboardView({
   const [selectedQSetId, setSelectedQSetId] = useState<string>('');
   const [session, setSession] = useState<EvaluationSession | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [evalError, setEvalError] = useState(false);
 
   const selectedQSet = questionSets.find((qs) => qs.id === selectedQSetId);
   const selectedAgent = agents.find((a) => a.id === selectedAgentId);
 
-  // ── Start evaluation ──────────────────────────────────────────
-  const startEvaluation = useCallback(() => {
+  // ── Start evaluation (W204/C186: 真实引擎通道，不合成评分) ─────
+  // 原 setInterval + Math.random 合成 score/latency/雷达分流程已删除。
+  // 唯一通道：GET /api/v1/aip/evals/run?agentId=（fetchAgentEval，后端不可用时返回 null）。
+  const startEvaluation = useCallback(async () => {
     if (!selectedAgentId || !selectedQSetId || !selectedQSet) return;
     const sessionId = `eval-${Date.now()}`;
-    const newSession: EvaluationSession = {
+    setEvalError(false);
+    setSession({
       id: sessionId,
       agentId: selectedAgentId,
       questionSetId: selectedQSetId,
       status: 'running',
       progress: 0,
-      results: selectedQSet.questions.map((q) => ({
-        questionId: q.id,
-        question: q.question,
-        category: q.category,
-        score: 0,
-        status: 'pending',
-      })),
+      results: [],
       radarScores: {},
-    };
-    setSession(newSession);
+    });
     setIsRunning(true);
-  }, [selectedAgentId, selectedQSetId, selectedQSet]);
 
-  // ── Simulation timer ──────────────────────────────────────────
-  useEffect(() => {
-    if (!isRunning || !session) return;
-
-    timerRef.current = setInterval(() => {
-      setSession((prev) => {
-        if (!prev || prev.status !== 'running') return prev;
-        const pendingIdx = prev.results.findIndex((r) => r.status === 'pending');
-        if (pendingIdx === -1) {
-          // All done — compute radar scores by category
-          const categoryScores: Record<string, number[]> = {};
-          for (const r of prev.results) {
-            if (!categoryScores[r.category]) categoryScores[r.category] = [];
-            categoryScores[r.category].push(r.score);
-          }
-          const radarScores: Record<string, number> = {};
-          for (const [cat, scores] of Object.entries(categoryScores)) {
-            const radarKey = categoryToRadarKey(t, cat);
-            radarScores[radarKey] = (radarScores[radarKey] ?? 0) +
-              Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-          }
-          return {
-            ...prev,
-            status: 'completed',
-            progress: 100,
-            radarScores: {
-              accuracy: radarScores.accuracy ?? 75,
-              relevance: radarScores.relevance ?? 70,
-              completeness: radarScores.completeness ?? 80,
-              safety: radarScores.safety ?? 85,
-              efficiency: radarScores.efficiency ?? 65,
-              creativity: radarScores.creativity ?? 60,
-            },
-          };
-        }
-
-        const updatedResults = [...prev.results];
-        const score = Math.floor(Math.random() * 30) + 60; // 60-90
-        const latency = Math.floor(Math.random() * 800) + 200;
-        updatedResults[pendingIdx] = {
-          ...updatedResults[pendingIdx],
-          status: 'completed',
-          score,
-          response: t('dashboard.eval.responseTemplate', {
-            q: updatedResults[pendingIdx].question.slice(0, 15),
-            score,
-          }),
-          latency,
-        };
-
-        const completedCount = updatedResults.filter((r) => r.status === 'completed').length;
-        const totalCount = updatedResults.length;
-        const progress = Math.round((completedCount / totalCount) * 100);
-
-        return { ...prev, results: updatedResults, progress };
-      });
-    }, 1200);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isRunning, session?.id, t]);
+    const evalRes = await fetchAgentEval(selectedAgentId);
+    if (!evalRes) {
+      // §2.3 诚实态：引擎未应答 → 清空会话并展示错误提示，不展示任何合成评分
+      setSession(null);
+      setIsRunning(false);
+      setEvalError(true);
+      return;
+    }
+    setIsRunning(false);
+    setSession((prev) => (prev ? {
+      ...prev,
+      status: 'completed',
+      progress: 100,
+      // 明细只来自引擎真实返回的 details（question/score/actual）
+      results: (evalRes.details ?? []).map((d, i) => ({
+        questionId: `q${i + 1}`,
+        question: d.question,
+        category: t('dashboard.eval.engineSource'),
+        score: d.score,
+        status: 'completed' as const,
+        response: d.actual,
+      })),
+      // 雷达只呈现引擎真实上报字段；未上报维度（relevance/creativity 等）留空 → 图例显示 '-'
+      radarScores: {
+        accuracy: evalRes.accuracy,
+        safety: evalRes.safety,
+        efficiency: evalRes.latencyScore,
+      },
+    } : prev));
+  }, [selectedAgentId, selectedQSetId, selectedQSet, t]);
 
   // ── Reset evaluation ──────────────────────────────────────────
   const resetEvaluation = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
     setIsRunning(false);
     setSession(null);
-  }, []);
-
-  // ── Cleanup on unmount ────────────────────────────────────────
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    setEvalError(false);
   }, []);
 
   // ── Weekday labels via i18n ───────────────────────────────────
@@ -541,6 +488,13 @@ export default function DashboardView({
           )}
         </div>
       </div>
+
+      {/* §2.3 诚实态（W204/C186）：引擎未应答 → 错误横幅，不展示任何合成评分 */}
+      {evalError && (
+        <div className={`border border-red-500/30 bg-red-500/5 text-red-400 rounded-xl p-4 text-xs`}>
+          {t('dashboard.eval.engineFail')}
+        </div>
+      )}
 
       {/* Progress */}
       {session && (

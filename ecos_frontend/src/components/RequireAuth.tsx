@@ -1,11 +1,14 @@
 /**
- * RequireAuth — route guard.
- * 1. No token → redirect to /login.
+ * RequireAuth — route guard (fail-closed, W203/C185).
+ * 1. No token → redirect to /login. No data request is ever issued.
  * 2. Token present → verify via backend GET /api/v1/auth/me.
  *    - 401 → redirect to /login (token expired).
  *    - 403 → redirect to /no-access (token valid, insufficient permission).
  *    - 200 → render children.
- *    - network error → render children optimistically (fail-open for network).
+ *    - network/other error → DENY (redirect to /no-access). The frontend must
+ *      not synthesize a pass when the security engine is unreachable — the
+ *      "security unavailable → default DENY" iron rule outranks optimism.
+ *      checkedRef stays false so the next navigation re-probes.
  *
  * @license SPDX-License-Identifier: Apache-2.0
  */
@@ -44,14 +47,16 @@ export default function RequireAuth({ children }: { children: ReactNode }) {
         else setState("ok");
       })
       // AbortError = re-render cancelled the in-flight fetch: keep "loading"
-      // so the re-run re-issues the request. Real network error stays
-      // fail-open ("ok") per the header contract — an unreachable backend
-      // must not lock users out of the shell (auth re-checks on next nav).
+      // so the re-run re-issues the request. Real network error = the decision
+      // cannot be verified → fail-closed to "no-access" (W203/C185): children
+      // (and their data fetches) are never mounted. Not marked as checked, so
+      // the next navigation re-probes against a recovered backend.
       .catch((e: unknown) => {
         if (checkedRef.current) return;
         if (e instanceof DOMException && e.name === "AbortError") return; // keep loading; re-render retries
         if (ctrl.signal.aborted) return;
-        setState("ok"); // real network error — fail open (see header)
+        console.warn("[RequireAuth] /auth/me transport error — defaulting to DENY (fail-closed):", e);
+        setState("no-access");
       });
     return () => ctrl.abort();
   }, [token]);

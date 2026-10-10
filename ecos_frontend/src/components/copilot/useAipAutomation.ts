@@ -14,6 +14,8 @@ import {
   SecurityOrg, ProjectDAC, SecurityMarking, PurposePBAC, RowColPolicy, SecurityAuditLog
 } from '../../pages/security-center/types';
 import { AgentScenarioType, scenarioPrompt } from './AgentScenarioData';
+import { evaluateAbacPolicy } from '../../api/securityClient';
+import { fetchSecurityAuditLogs } from '../../services/knowledgeQueryApi';
 
 type ViewMode = 'ontology' | 'explorer' | 'integration' | 'knowledge' | 'aip' | 'security' | 'workshop';
 
@@ -131,6 +133,37 @@ export function useAipAutomation(props: AipAutomationProps): CopilotAutomationAp
       : m));
     setCurrentStep('');
   }, []);
+
+  /**
+   * W204/C186 — 真实安全引擎评估通道（替代本地合成 GRANTED/DENIED verdict 与审计条目注入）。
+   * verdict 只来自 POST /api/v1/security/policy/evaluate 的实际返回；
+   * 引擎不可用 → 空态 + 错误提示，前端永不合成放行（与 security-engine DENY 语义对接）。
+   */
+  const runRealSecurityEval = useCallback(async (
+    userId: string, datasetId: string, purposeId: string,
+  ) => {
+    setSecuritySimUser(userId);
+    setSecuritySimDataset(datasetId);
+    setSecuritySimPurpose(purposeId);
+    try {
+      const res = await evaluateAbacPolicy({
+        subject: { userId, roles: [] },
+        resource: { type: 'Dataset', id: datasetId },
+        action: 'READ_DATASET',
+        context: { purpose: purposeId },
+      });
+      setSecuritySimResult({
+        verdict: res.allowed ? 'GRANTED' : 'DENIED',
+        traces: res.message ? [res.message] : [],
+      });
+      showToast(res.allowed ? 'success' : 'error',
+        t('copilot.toast.sim.engineVerdict', { verdict: res.allowed ? 'GRANTED' : 'DENIED' }));
+    } catch (e) {
+      console.warn('[AipAutomation] security engine evaluate unavailable — no verdict synthesized (fail-closed):', e);
+      setSecuritySimResult(null);
+      showToast('error', t('copilot.toast.sim.engineFail'));
+    }
+  }, [setSecuritySimUser, setSecuritySimDataset, setSecuritySimPurpose, setSecuritySimResult, showToast, t]);
 
   const runAgentAutomation = useCallback(async (type: AgentScenarioType, customPromptText?: string) => {
     const userPrompt = customPromptText || scenarioPrompt(t, type);
@@ -355,32 +388,8 @@ export function useAipAutomation(props: AipAutomationProps): CopilotAutomationAp
       await sleep(1500);
       props.onSecurityTabChange('overview');
 
-      setSecuritySimUser('analyst_li');
-      setSecuritySimDataset('ds_passenger_manifest');
-      setSecuritySimPurpose('purpose_eu_passenger_audit');
-      setSecuritySimResult({
-        verdict: 'GRANTED',
-        traces: [
-          t('copilot.cite.trace.g1'),
-          t('copilot.cite.trace.g2'),
-          t('copilot.cite.trace.g3'),
-          t('copilot.cite.trace.g4'),
-          t('copilot.cite.trace.g5'),
-        ],
-      });
-
-      const newLog: SecurityAuditLog = {
-        id: `log_playbook_${Date.now()}`,
-        timestamp: new Date().toTimeString().split(' ')[0],
-        username: 'analyst_li',
-        orgId: 'Org_EU_Ops',
-        resourceId: 'ds_passenger_manifest',
-        resourceType: 'Dataset',
-        action: 'READ_DATASET',
-        status: 'SUCCESS',
-        details: t('copilot.cite.log.g1'),
-      };
-      setSecurityAuditLogs([newLog, ...securityAuditLogs]);
+      // W204/C186：原「合成 GRANTED verdict + 注入审计条目」已删除；判定走真实 ABAC 通道。
+      await runRealSecurityEval('analyst_li', 'ds_passenger_manifest', 'purpose_eu_passenger_audit');
 
       setAgentResult(agentMsgId, t(resultKey));
     } else if (type === 'sec_row_col') {
@@ -411,18 +420,7 @@ export function useAipAutomation(props: AipAutomationProps): CopilotAutomationAp
         : p);
       setSecurityRowColPolicies(updatedPolicies);
 
-      const newLog: SecurityAuditLog = {
-        id: `log_rowcol_${Date.now()}`,
-        timestamp: new Date().toTimeString().split(' ')[0],
-        username: 'admin_guorong',
-        orgId: 'org_aviation_hq',
-        resourceId: 'ds_pilots_biography',
-        resourceType: 'Dataset',
-        action: 'UPDATE_POLICY',
-        status: 'SUCCESS',
-        details: t('copilot.cite.log.r1'),
-      };
-      setSecurityAuditLogs([newLog, ...securityAuditLogs]);
+      // W204/C186：原「合成 UPDATE_POLICY 审计条目注入」已删除——审计条目恒来自引擎真实上报流。
       showToast('success', t('copilot.toast.sec_row_col.done'));
 
       setAgentResult(agentMsgId, t(resultKey));
@@ -471,32 +469,8 @@ export function useAipAutomation(props: AipAutomationProps): CopilotAutomationAp
       await sleep(1500);
       props.onSecurityTabChange('overview');
 
-      setSecuritySimUser('analyst_li');
-      setSecuritySimDataset('ds_ticket_sales');
-      setSecuritySimPurpose('purpose_expired_finance');
-      setSecuritySimResult({
-        verdict: 'DENIED',
-        traces: [
-          t('copilot.cite.trace.f1'),
-          t('copilot.cite.trace.f2'),
-          t('copilot.cite.trace.f3'),
-          t('copilot.cite.trace.f4'),
-        ],
-      });
-
-      const logDenied: SecurityAuditLog = {
-        id: `log_denied_${Date.now()}`,
-        timestamp: new Date().toTimeString().split(' ')[0],
-        username: 'analyst_li',
-        orgId: 'org_aviation_hq',
-        resourceId: 'ds_ticket_sales',
-        resourceType: 'Dataset',
-        action: 'READ_DATASET',
-        status: 'DENIED',
-        details: t('copilot.cite.log.d1'),
-      };
-      setSecurityAuditLogs([logDenied, ...securityAuditLogs]);
-      showToast('error', t('copilot.toast.sec_finance.blocked'));
+      // W204/C186：原「合成 DENIED verdict + 注入 DENIED 审计条目」已删除；判定走真实 ABAC 通道。
+      await runRealSecurityEval('analyst_li', 'ds_ticket_sales', 'purpose_expired_finance');
 
       setAgentResult(agentMsgId, t(resultKey));
     } else if (type === 'sec_audit') {
@@ -508,32 +482,19 @@ export function useAipAutomation(props: AipAutomationProps): CopilotAutomationAp
       await sleep(1500);
       props.onSecurityTabChange('audit');
 
-      const alertLogs: SecurityAuditLog[] = [
-        {
-          id: `alert_01_${Date.now()}`,
-          timestamp: new Date().toTimeString().split(' ')[0],
-          username: 'unknown_scanner',
-          orgId: 'EXTERNAL_IP',
-          resourceId: 'ds_special_routes',
-          resourceType: 'Dataset',
-          action: 'READ_DATASET',
-          status: 'DENIED',
-          details: t('copilot.cite.alert.1'),
-        },
-        {
-          id: `alert_02_${Date.now()}`,
-          timestamp: new Date().toTimeString().split(' ')[0],
-          username: 'external_auditor',
-          orgId: 'org_contractor',
-          resourceId: 'proj_pilot_credentials',
-          resourceType: 'Project',
-          action: 'DISCOVER_PROJECT',
-          status: 'DENIED',
-          details: t('copilot.cite.alert.2'),
-        },
-      ];
-      setSecurityAuditLogs([...alertLogs, ...securityAuditLogs]);
-      showToast('error', t('copilot.toast.sec_audit.found'));
+      // W204/C186：原「合成两条 DENIED 告警审计条目注入」已删除。
+      // 告警只呈现真实审计流（GET /api/v1/security/audit-logs）；引擎不可用 → 错误态，不合成告警。
+      try {
+        const { ok, json } = await fetchSecurityAuditLogs();
+        if (!ok) {
+          showToast('error', t('copilot.toast.sim.engineFail'));
+        } else {
+          const rows = Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
+          showToast('info', t('copilot.toast.sec_audit.real', { count: rows.length }));
+        }
+      } catch {
+        showToast('error', t('copilot.toast.sim.engineFail'));
+      }
 
       setAgentResult(agentMsgId, t(resultKey));
     } else if (type === 'ws_generate_dashboard' || type === 'ws_auto_bind' || type === 'ws_inject_copilot' || type === 'ws_transform_theme') {
@@ -581,6 +542,7 @@ export function useAipAutomation(props: AipAutomationProps): CopilotAutomationAp
       securitySimPurpose, setSecuritySimPurpose,
       securitySimResult, setSecuritySimResult,
       setAgentResult,
+      runRealSecurityEval,
       // Pass through all props to keep callbacks closed over latest values.
       setSecuritySelectedRowColDs, securitySelectedRowColDs]);
 

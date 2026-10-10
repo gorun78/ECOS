@@ -14,6 +14,7 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { AIPAgent } from '../../../types/aiworkbench';
+import { API_BASE } from '../../../services/httpClient';
 import * as Icons from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import MessageBubble from './MessageBubble';
@@ -170,7 +171,8 @@ export default function ChatPanel({
     const role = encodeURIComponent(activeUserRole);
     const dataset = encodeURIComponent(activeContextDataset);
 
-    const sseUrl = `/api/v1/chat/stream?query=${query}&agentId=${agentId}&role=${role}&dataset=${dataset}`;
+    // W206/C188：流式 URL 基址出自 httpClient API_BASE 单源
+    const sseUrl = `${API_BASE}/v1/chat/stream?query=${query}&agentId=${agentId}&role=${role}&dataset=${dataset}`;
 
     let localSteps: OagStepInfo[] = OAG_8_STEPS.map((s, i) => ({
       step: i + 1,

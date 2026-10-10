@@ -108,5 +108,7 @@
   "dashboard.cat.specialService": "Special Service",
   "dashboard.cat.baggage": "Baggage",
   "dashboard.cat.analysis": "Analysis",
-  "dashboard.cat.revenue": "Revenue"
+  "dashboard.cat.revenue": "Revenue",
+  "dashboard.eval.engineFail": "The evaluation engine returned no result (service unavailable or network error). No synthesized scores are shown — please retry later.",
+  "dashboard.eval.engineSource": "Engine eval detail"
 }

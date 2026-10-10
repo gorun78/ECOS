@@ -17,6 +17,7 @@
  *   - retrieval / runEval 5xx → 显式失败态（PRD B.5）
  */
 import { apiFetchData } from '../../../api';
+import { API_BASE } from '../../../services/httpClient';
 import { getAuthToken } from '../../../services/auth';
 import { kbFetchData, kbSseRequest } from './kbFetch';
 import type {
@@ -24,7 +25,8 @@ import type {
   EvalReport,
 } from '../typesAndConstants';
 
-const KB_V1 = '/api/v1/knowledge';
+// W206/C188：KB 域基址由 httpClient API_BASE 单源派生
+const KB_V1 = `${API_BASE}/v1/knowledge`;
 
 // ── 画像 REQ-KB-02 / F04-06 ────────────────────────────────────────────────────
 

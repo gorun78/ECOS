@@ -11,7 +11,6 @@ import * as Icons from 'lucide-react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 /** Monaco 编辑器实例类型：取自 OnMount 回调参数，避免 monaco-editor 双份类型副本冲突 */
 type MonacoCodeEditor = Parameters<OnMount>[0];
-declare const editorNS: typeof import('monaco-editor').editor;
 
 import SchemaTree from './SchemaTree';
 import QueryToolbar from './QueryToolbar';

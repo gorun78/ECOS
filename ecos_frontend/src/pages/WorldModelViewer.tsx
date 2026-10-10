@@ -44,7 +44,7 @@ import CausalTab from "./worldmodel/tabs/CausalTab";
 import ScenariosTab from "./worldmodel/tabs/ScenariosTab";
 import ReviewTab from "./worldmodel/tabs/ReviewTab";
 import ParetoTab from "./worldmodel/tabs/ParetoTab";
-import { getAuthToken } from "../services/auth";
+import { API_BASE, apiFetchData } from "../services/httpClient";
 
 // ── Main Component ───────────────────────────
 export default function WorldModelViewer() {
@@ -211,23 +211,17 @@ export default function WorldModelViewer() {
 
   async function fetchOrgs() {
     try {
-      const token = getAuthToken();
-      const r = await fetch("/api/v1/system/organizations/tree", {
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      });
-      const j = await r.json();
-      if (j?.data) setOrgTree([j.data]);
+      // §5.3：ApiResponse 解包只在 httpClient（apiFetchData），页面不手拆信封
+      const org = await apiFetchData<any>(`${API_BASE}/v1/system/organizations/tree`);
+      if (org) setOrgTree([org]);
     } catch {}
   }
 
   async function fetchUsers() {
     try {
-      const token = getAuthToken();
-      const r = await fetch("/api/v1/system/users?pageSize=200", {
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      });
-      const j = await r.json();
-      if (j?.data?.data) setUserList(j.data.data);
+      const page = await apiFetchData<any>(`${API_BASE}/v1/system/users?pageSize=200`);
+      const users = Array.isArray(page) ? page : page?.data;
+      if (users) setUserList(users);
     } catch {}
   }
 

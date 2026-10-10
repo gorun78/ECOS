@@ -1,17 +1,17 @@
 /**
  * Command Palette — global search with real-time API results
  * SAFE VERSION — wrapped in try-catch, null-safe throughout
+ * W190/C172: 静态导航项 + 类型→导航映射全部派生自 navigation/navConfig 单源，
+ * 本文件不再持有私有 STATIC_ITEMS / TYPE_NAV_MAP / hitMeta 表。
  * @license Apache-2.0
  */
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import {
-  Search, Database, Cpu, Shield, HelpCircle, Activity,
-  Globe, Command, GitBranch, Loader2,
-} from "lucide-react";
+import { Search, HelpCircle, Loader2 } from "lucide-react";
 import { useLanguage } from "./LanguageContext";
 import { useTheme } from "./ThemeContext";
 import { globalSearch, SearchHit } from "../api";
+import { PALETTE_ITEMS, TYPE_META_MAP, TYPE_NAV_MAP, type TypeMeta } from "../navigation/navConfig";
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -19,53 +19,16 @@ interface CommandPaletteProps {
   onNavigate: (viewId: string) => void;
 }
 
-interface PaletteItem {
-  id: string;
-  title: string;
-  titleZh: string;
-  description: string;
-  descriptionZh: string;
-  category: string;
-  categoryZh: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-const STATIC_ITEMS: PaletteItem[] = [
-  {
-    id: "catalog", title: "Data Catalog / Assets Explorer",
-    titleZh: "数据目录 / 资产浏览",
-    description: "List, search, filter and inspect production data catalogs.",
-    descriptionZh: "列表、搜索、过滤和查看生产数据目录。",
-    category: "Data Platform", categoryZh: "数据平台", icon: Database
-  },
-  { id: "lineage", title: "Data Lineage", titleZh: "数据血缘", description: "Trace data lifecycle.", descriptionZh: "追踪数据生命周期。", category: "Data Platform", categoryZh: "数据平台", icon: GitBranch },
-  { id: "pipeline", title: "Pipeline Builder", titleZh: "流水线编排", description: "Visual DAG editor.", descriptionZh: "可视化DAG编辑器。", category: "Data Platform", categoryZh: "数据平台", icon: Activity },
-  { id: "ontology", title: "Ontology Manager", titleZh: "本体管理", description: "Model semantic structures.", descriptionZh: "建模语义结构。", category: "Knowledge Layer", categoryZh: "知识层", icon: Globe },
-  { id: "agent_studio", title: "Agent Studio", titleZh: "Agent工坊", description: "Build specialist agents.", descriptionZh: "构建专业Agent。", category: "Cognitive Layer", categoryZh: "认知层", icon: Cpu },
-  { id: "mission_control", title: "Mission Control", titleZh: "企业总控台", description: "Strategic dashboard.", descriptionZh: "战略仪表盘。", category: "Cognitive Layer", categoryZh: "认知层", icon: Command },
-  { id: "security-center", title: "Security Center", titleZh: "安全中心", description: "安全审计、OPA策略、ABAC、数据脱敏统一管理", descriptionZh: "安全审计、OPA策略、ABAC、数据脱敏统一管理", category: "Security & Audit", categoryZh: "安全与审计", icon: Shield }
-];
-
-function hitMeta(type: string): { cat: string; catZh: string; icon: React.ComponentType<{ className?: string }> } {
-  const m: Record<string, { cat: string; catZh: string; icon: React.ComponentType<{ className?: string }> }> = {
-    OntologyEntity: { cat: "Knowledge Layer", catZh: "知识层", icon: Globe },
-    Asset: { cat: "Data Platform", catZh: "数据平台", icon: Database },
-    Goal: { cat: "Cognitive Layer", catZh: "认知层", icon: Command },
-    Scenario: { cat: "Cognitive Layer", catZh: "认知层", icon: Command },
-    Object: { cat: "Data Platform", catZh: "数据平台", icon: Database },
-    Workflow: { cat: "Data Platform", catZh: "数据平台", icon: Activity },
-    Pipeline: { cat: "Data Platform", catZh: "数据平台", icon: Activity },
-    Knowledge: { cat: "Knowledge Layer", catZh: "知识层", icon: Globe },
-    Agent: { cat: "Cognitive Layer", catZh: "认知层", icon: Cpu },
-  };
-  return m[type] || { cat: "Other", catZh: "其他", icon: Search };
-}
-
-const TYPE_NAV_MAP: Record<string, string> = {
-  OntologyEntity: "ontology", Asset: "marketplace", Goal: "mission_control",
-  Scenario: "mission_control", Object: "catalog", Workflow: "pipeline",
-  Pipeline: "pipeline", Knowledge: "knowledge_graph", Agent: "agent_studio",
+const FALLBACK_META: TypeMeta = {
+  navId: "",
+  categoryKey: "palette.category.other",
+  icon: Search,
 };
+
+/** 命中类型 → 元数据（派生自 navConfig，未知类型走中性兜底）。 */
+function hitMeta(type: string): TypeMeta {
+  return TYPE_META_MAP[type] ?? FALLBACK_META;
+}
 
 export default function CommandPalette({ isOpen, onClose, onNavigate }: CommandPaletteProps) {
   // SAFETY: if anything crashes, return null
@@ -84,9 +47,8 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const zh = locale === "zh";
 
   useEffect(() => {
     if (isOpen) {
@@ -115,8 +77,8 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
     try {
       const results = await globalSearch(q.trim());
       setHits(Array.isArray(results) ? results : []);
-    } catch (e: any) {
-      setError(e?.message || "Search failed");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e) || "Search failed");
       setHits([]);
     } finally {
       setLoading(false);
@@ -136,27 +98,26 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
 
   if (!isOpen) return null;
 
+  // 静态导航项 + 分类全部来自 navConfig 派生（W190），文案走 t()（locales/navigation）。
+  const q = search.toLowerCase();
   const noQuery = search.trim().length === 0;
-  const filteredStatic = noQuery ? STATIC_ITEMS : STATIC_ITEMS.filter(
-    (item) =>
-      (zh ? item.titleZh : item.title).toLowerCase().includes(search.toLowerCase()) ||
-      (zh ? item.descriptionZh : item.description).toLowerCase().includes(search.toLowerCase()) ||
-      (zh ? item.categoryZh : item.category).toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredStatic = noQuery
+    ? PALETTE_ITEMS
+    : PALETTE_ITEMS.filter(
+        (item) =>
+          t(item.titleKey).toLowerCase().includes(q) ||
+          t(item.descKey).toLowerCase().includes(q) ||
+          t(item.categoryKey).toLowerCase().includes(q),
+      );
 
-  const categories = [
-    { en: "Data Platform", zh: "数据平台" },
-    { en: "Knowledge Layer", zh: "知识层" },
-    { en: "Cognitive Layer", zh: "认知层" },
-    { en: "Security & Audit", zh: "安全与审计" },
-  ];
+  const categories = Array.from(new Set(PALETTE_ITEMS.map((item) => item.categoryKey)));
 
   const hasResults = hits.length > 0;
   const hasStatic = filteredStatic.length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-[var(--overlay)] backdrop-blur-xs">
-      <div className={`w-full max-w-2xl overflow-hidden ${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-2xl animate-fade-in-down text-[#1E293B] font-sans`}>
+    <div className={`fixed inset-0 z-50 flex items-start justify-center pt-24 ${styles.overlayBg} backdrop-blur-xs`}>
+      <div className={`w-full max-w-2xl overflow-hidden ${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-2xl animate-fade-in-down ${styles.cardText} font-sans`}>
 
         {/* Search header */}
         <div className={`flex items-center px-5 py-4 border-b ${styles.cardBorder} ${styles.appBg}`}>
@@ -165,7 +126,7 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
             ref={inputRef}
             type="text"
             className={`flex-1 text-sm bg-transparent border-0 outline-hidden ${styles.cardText} placeholder:${styles.cardTextMuted}`}
-            placeholder={zh ? "实时搜索…" : "Live search…"}
+            placeholder={t("palette.placeholder")}
             autoFocus
             value={search}
             onChange={(e) => onInput(e.target.value)}
@@ -177,37 +138,37 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
           {loading && (
             <div className={`py-8 text-center ${styles.cardTextMuted}`}>
               <Loader2 className="w-5 h-5 mx-auto mb-2 animate-spin" />
-              <p className="text-xs">{zh ? "搜索中…" : "Searching…"}</p>
+              <p className="text-xs">{t("palette.searching")}</p>
             </div>
           )}
 
           {!loading && error && (
             <div className={`py-8 text-center ${styles.cardTextMuted}`}>
-              <HelpCircle className="w-6 h-6 mx-auto mb-2 text-amber-400" />
-              <p className="text-xs">{zh ? "搜索暂不可用" : "Search unavailable"}</p>
+              <HelpCircle className={`w-6 h-6 mx-auto mb-2 ${styles.warningText}`} />
+              <p className="text-xs">{t("palette.unavailable")}</p>
             </div>
           )}
 
           {!loading && hasResults && (
             <div className="space-y-1 mb-3">
-              <div className="px-3 py-1 text-[9px] font-mono tracking-widest uppercase text-indigo-500 font-bold">
-                {zh ? `结果 (${hits.length})` : `Results (${hits.length})`}
+              <div className={`px-3 py-1 text-[9px] font-mono tracking-widest uppercase ${styles.accentText} font-bold`}>
+                {t("palette.results", { count: hits.length })}
               </div>
               {hits.map((hit, i) => {
                 const meta = hitMeta(hit.type);
                 const IconC = meta.icon;
                 return (
                   <button key={`h-${i}`} onClick={() => navHit(hit)}
-                    className="w-full text-left flex items-start p-2.5 rounded-lg hover:bg-indigo-50 group transition cursor-pointer">
-                    <div className="p-2 mr-3 bg-indigo-50 border border-indigo-100 rounded-md">
-                      <IconC className="w-4 h-4 text-indigo-400 group-hover:text-indigo-600" />
+                    className={`w-full text-left flex items-start p-2.5 rounded-lg ${styles.sidebarHoverBg} group transition cursor-pointer`}>
+                    <div className={`p-2 mr-3 ${styles.badgeBg} border ${styles.accentBorder} rounded-md`}>
+                      <IconC className={`w-4 h-4 ${styles.accentText}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className={`text-sm font-semibold ${styles.cardText}`}>{hit.name || hit.id || "—"}</span>
                         <span className={`px-1.5 py-0 text-[9px] font-mono rounded ${styles.appBg} ${styles.cardTextMuted}`}>{hit.type || "?"}</span>
                       </div>
-                      <span className={`text-[10px] ${styles.cardTextMuted}`}>{zh ? meta.catZh : meta.cat}</span>
+                      <span className={`text-[10px] ${styles.cardTextMuted}`}>{t(meta.categoryKey)}</span>
                     </div>
                   </button>
                 );
@@ -217,13 +178,13 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
 
           {!loading && !hasResults && hasStatic && (
             <div className="space-y-4">
-              {categories.map((cat) => {
-                const catItems = filteredStatic.filter((i) => i.category === cat.en);
+              {categories.map((catKey) => {
+                const catItems = filteredStatic.filter((i) => i.categoryKey === catKey);
                 if (catItems.length === 0) return null;
                 return (
-                  <div key={cat.en} className="space-y-1">
+                  <div key={catKey} className="space-y-1">
                     <div className={`px-3 py-1 text-[9px] font-mono tracking-widest uppercase ${styles.cardTextMuted} font-bold`}>
-                      {zh ? cat.zh : cat.en}
+                      {t(catKey)}
                     </div>
                     {catItems.map((item) => {
                       const IconC = item.icon;
@@ -231,11 +192,11 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
                         <button key={item.id} onClick={() => { onNavigate(item.id); onClose(); }}
                           className={`w-full text-left flex items-start p-2.5 rounded-lg ${styles.sidebarHoverBg} group transition cursor-pointer`}>
                           <div className={`p-2 mr-3 ${styles.appBg} border ${styles.cardBorder} rounded-md`}>
-                            <IconC className={`w-4 h-4 ${styles.cardTextMuted} group-hover:text-[#3B82F6]`} />
+                            <IconC className={`w-4 h-4 ${styles.cardTextMuted}`} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`text-sm font-semibold ${styles.cardText}`}>{zh ? item.titleZh : item.title}</p>
-                            <p className={`text-xs ${styles.cardTextMuted} truncate mt-1`}>{zh ? item.descriptionZh : item.description}</p>
+                            <p className={`text-sm font-semibold ${styles.cardText}`}>{t(item.titleKey)}</p>
+                            <p className={`text-xs ${styles.cardTextMuted} truncate mt-1`}>{t(item.descKey)}</p>
                           </div>
                         </button>
                       );
@@ -249,14 +210,14 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
           {!loading && !hasStatic && !hasResults && (
             <div className={`py-12 text-center ${styles.cardTextMuted}`}>
               <HelpCircle className={`w-8 h-8 mx-auto mb-2 ${styles.cardTextMuted}`} />
-              <p className="text-sm font-semibold">{zh ? "无结果" : "No results"}</p>
+              <p className="text-sm font-semibold">{t("palette.no_results")}</p>
             </div>
           )}
         </div>
 
         <div className={`flex items-center justify-between px-5 py-3 border-t ${styles.cardBorder} ${styles.appBg} text-[10px] ${styles.cardTextMuted} font-mono`}>
-          <span>{zh ? "↵ 选择 · ESC 关闭" : "↵ Select · ESC Close"}</span>
-          <span className={`font-semibold ${styles.cardTextMuted}`}>{zh ? "C2EOS 命令面板" : "C2EOS Command Palette"}</span>
+          <span>{t("palette.hint")}</span>
+          <span className={`font-semibold ${styles.cardTextMuted}`}>{t("palette.brand")}</span>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 /**
  * ECOS Sidebar — 四组flat结构 + 桌面端可折叠
  * Wave-2A T3: 所有 labelZh/descZh/groupZh 改为 `sidebar.*` namespace i18n
+ * W190/C172: 导航项不再私有定义 —— 全部派生自 navigation/navConfig 单源。
  * @license Apache-2.0
  */
 
@@ -9,18 +10,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import TaskPanel from "./TaskPanel";
 import AsyncTaskCenterView from "../pages/AsyncTaskCenterView";
 import {
-  Shield,
-  LayoutDashboard,
-  Play,
-  GitPullRequest,
-  Briefcase,
-  Gauge,
-  Target,
-  Store,
-  Cpu,
-  Network,
-  Table2,
-  BookOpen,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -29,7 +18,13 @@ import {
 import { useLanguage } from "./LanguageContext";
 import { useTheme } from "./ThemeContext";
 import { showToastGlobal } from "./common/Toast";
-import type { ComponentType } from "react";
+import {
+  SIDEBAR_GROUPS,
+  SIDEBAR_PRODUCT_ITEMS,
+  SIDEBAR_ITEMS,
+  type SidebarEntry,
+  type SidebarGroup,
+} from "../navigation/navConfig";
 
 interface SidebarProps {
   width?: number;
@@ -44,19 +39,6 @@ interface SidebarProps {
   onClose?: () => void;
   desktopCollapsed?: boolean;
   onDesktopToggle?: () => void;
-}
-
-/** A nav item resolved to its i18n key (avoid stale labelZh/descZh strings). */
-interface NavItem {
-  id: string;
-  labelKey: string;
-  icon: ComponentType<{ className?: string }>;
-  descKey: string;
-}
-
-interface NavGroup {
-  groupKey: string;
-  items: NavItem[];
 }
 
 export default function Sidebar({
@@ -77,52 +59,18 @@ export default function Sidebar({
   const pathSegments = location.pathname.split("/").filter(Boolean);
   const currentView = pathSegments[0] || "world_model";
 
-  // ── 总览组 ──────────────────────────────────────────
-  const overviewGroup: NavGroup = {
-    groupKey: "sidebar.group.overview",
-    items: [
-      { id: "world_model", labelKey: "app.tab.world_model", icon: Target, descKey: "sidebar.desc.world_model" },
-      { id: "monitor", labelKey: "app.tab.monitor", icon: Gauge, descKey: "sidebar.desc.monitor" },
-    ],
-  };
-
-  // ── 资源概览组 ──────────────────────────────────────
-  const resourceGroup: NavGroup = {
-    groupKey: "sidebar.group.resources",
-    items: [
-      { id: "marketplace", labelKey: "app.tab.marketplace", icon: Store, descKey: "sidebar.desc.marketplace" },
-      { id: "knowledge_graph", labelKey: "app.tab.knowledge_graph", icon: BookOpen, descKey: "sidebar.desc.knowledge_graph" },
-      { id: "ops_apps", labelKey: "app.tab.ops_apps", icon: Play, descKey: "sidebar.desc.ops_apps" },
-    ],
-  };
-
-  // ── 系统管理组 ──────────────────────────────────────
-  const systemGroup: NavGroup = {
-    groupKey: "sidebar.group.system",
-    items: [
-      { id: "security-center", labelKey: "app.tab.security_center", icon: Shield, descKey: "sidebar.desc.security_center" },
-      { id: "dict", labelKey: "app.tab.dict", icon: Table2, descKey: "sidebar.desc.dict" },
-    ],
-  };
-
-  // ── 产品功能 — 5项平铺 ──────────────────────────────
-  const productItems: NavItem[] = [
-    { id: "project_workbench", labelKey: "app.tab.project_workbench", icon: Briefcase, descKey: "sidebar.desc.project_workbench" },
-    { id: "agent_studio", labelKey: "app.tab.ai_workbench", icon: Cpu, descKey: "sidebar.desc.agent_studio" },
-    { id: "knowledge_view", labelKey: "app.tab.knowledge_view", icon: BookOpen, descKey: "sidebar.desc.knowledge_view" },
-    { id: "ontology_workbench", labelKey: "app.tab.ontology_workbench", icon: Network, descKey: "sidebar.desc.ontology_workbench" },
-    { id: "data-workbench", labelKey: "app.tab.data_workbench", icon: LayoutDashboard, descKey: "sidebar.desc.data_workbench" },
-  ];
+  // ── 导航项：全部派生自 navigation/navConfig（W190 单源，禁止本地私有表）──
+  // SIDEBAR_GROUPS = 总览/资源/系统 三组；SIDEBAR_PRODUCT_ITEMS = 产品功能折叠组。
 
   // Render a nav item button
-  const renderNavItem = (item: NavItem, keyPrefix: string = "") => {
+  const renderNavItem = (item: SidebarEntry, keyPrefix: string = "") => {
     const isActive = currentView === item.id;
     const Icon = item.icon;
     return (
       <button
         key={`${keyPrefix}${item.id}`}
         id={`side-nav-${item.id}`}
-        onClick={() => { navigate("/" + item.id); onClose?.(); }}
+        onClick={() => { navigate(item.route); onClose?.(); }}
         className={`w-full text-left flex items-start gap-2.5 px-3 py-2 rounded-sm transition-all duration-150 outline-hidden ${
           isActive
             ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText}`
@@ -143,7 +91,7 @@ export default function Sidebar({
   };
 
   // Render a group section
-  const renderGroup = (group: NavGroup, keyPrefix: string = "") => (
+  const renderGroup = (group: SidebarGroup, keyPrefix: string = "") => (
     <div className="space-y-1">
       <span className="px-3 text-[9px] uppercase font-mono tracking-wider opacity-60 block mb-1.5 font-semibold">
         {t(group.groupKey)}
@@ -161,16 +109,14 @@ export default function Sidebar({
         <div className={`font-extrabold text-[22px] tracking-tight ${styles.cardText}`}>
           ECOS <span className="font-light opacity-65 text-xs">v2.0</span>
         </div>
-        <div className="text-[10px] font-mono tracking-widest text-indigo-500 dark:text-[#3B82F6] uppercase mt-1 leading-none">
+        <div className={`text-[10px] font-mono tracking-widest uppercase mt-1 leading-none ${styles.accentText}`}>
           {t("sidebar.brand.tagline")}
         </div>
       </div>
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4 scrollbar-thin">
-        {renderGroup(overviewGroup, "ov_")}
-        {renderGroup(resourceGroup, "res_")}
-        {renderGroup(systemGroup, "sys_")}
+        {SIDEBAR_GROUPS.map((group, i) => renderGroup(group, `grp${i}_`))}
       </div>
 
       {/* ── 产品功能（可折叠，默认收起）─────────────────── */}
@@ -186,7 +132,7 @@ export default function Sidebar({
         </button>
         {!productCollapsed && (
           <div className="space-y-0.5">
-            {productItems.map(item => renderNavItem(item, "prod_"))}
+            {SIDEBAR_PRODUCT_ITEMS.map(item => renderNavItem(item, "prod_"))}
           </div>
         )}
       </div>
@@ -195,10 +141,10 @@ export default function Sidebar({
       <div className={`p-4 border-t ${styles.sidebarBorder} bg-black/5 dark:bg-black/40 font-mono text-[10px] space-y-2 shrink-0`}>
         <div className="flex items-center justify-between py-0.5">
           <span className="flex items-center gap-1.5 opacity-85">
-            <span className={`w-2 h-2 rounded-full ${statusMetrics.serviceStatus === "UP" ? "bg-[#4ADE80]" : "bg-[#EF4444]"}`}></span>
+            <span className={`w-2 h-2 rounded-full bg-current ${statusMetrics.serviceStatus === "UP" ? styles.successText : styles.dangerText}`}></span>
             {t("sidebar.footer.kernel")}
           </span>
-          <span className={`font-bold ${statusMetrics.serviceStatus === "UP" ? "text-[#4ADE80]" : "text-[#EF4444]"}`}>
+          <span className={`font-bold ${statusMetrics.serviceStatus === "UP" ? styles.successText : styles.dangerText}`}>
             {statusMetrics.serviceStatus === "UP" ? t("sidebar.footer.running") : statusMetrics.serviceStatus}
           </span>
         </div>
@@ -209,8 +155,8 @@ export default function Sidebar({
         >
           <span>{t("sidebar.task.title")}</span>
           <span className="font-bold">
-            {statusMetrics.taskRunning > 0 && <span className="text-[#4ADE80]">{statusMetrics.taskRunning} {t("sidebar.footer.running_count")} </span>}
-            {statusMetrics.taskPending > 0 && <span className="text-[#F59E0B]">{statusMetrics.taskPending} {t("sidebar.footer.waiting")} </span>}
+            {statusMetrics.taskRunning > 0 && <span className={styles.successText}>{statusMetrics.taskRunning} {t("sidebar.footer.running_count")} </span>}
+            {statusMetrics.taskPending > 0 && <span className={styles.warningText}>{statusMetrics.taskPending} {t("sidebar.footer.waiting")} </span>}
             {statusMetrics.taskTotal > 0 && <span className="opacity-60">{statusMetrics.taskTotal} {t("sidebar.footer.total")}</span>}
             {statusMetrics.taskTotal === 0 && <span className="opacity-50">{t("sidebar.footer.idle")}</span>}
           </span>
@@ -263,14 +209,14 @@ export default function Sidebar({
             w-14 flex-col items-center py-3 gap-1 shadow-lg`}
         >
           {/* All nav icons flat */}
-          {[...overviewGroup.items, ...resourceGroup.items, ...systemGroup.items, ...productItems].map(item => {
+          {SIDEBAR_ITEMS.map(item => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
             const label = t(item.labelKey);
             return (
               <button
                 key={"rail-" + item.id}
-                onClick={() => { navigate("/" + item.id); }}
+                onClick={() => { navigate(item.route); }}
                 title={label}
                 className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all relative group
                   ${isActive

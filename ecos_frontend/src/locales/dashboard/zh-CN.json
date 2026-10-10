@@ -108,5 +108,7 @@
   "dashboard.cat.specialService": "特殊服务",
   "dashboard.cat.baggage": "行李",
   "dashboard.cat.analysis": "分析",
-  "dashboard.cat.revenue": "收入"
+  "dashboard.cat.revenue": "收入",
+  "dashboard.eval.engineFail": "评测引擎未返回结果（服务不可用或网络错误），不展示合成评分，请稍后重试。",
+  "dashboard.eval.engineSource": "引擎评测明细"
 }

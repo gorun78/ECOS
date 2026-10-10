@@ -494,5 +494,6 @@
   "aiworkbench.logic.save.done": "Logic flow updated",
   "aiworkbench.logic.save.created": "AIP logic flow created",
   "aiworkbench.logic.delete.confirm": "Delete this AIP logic flow?",
-  "aiworkbench.logic.delete.done": "Logic flow deleted"
+  "aiworkbench.logic.delete.done": "Logic flow deleted",
+  "aiworkbench.agentStudio.chat.engineFail": "The agent engine returned no valid reply (service unavailable or network error). This view never synthesizes replies — please retry later."
 }

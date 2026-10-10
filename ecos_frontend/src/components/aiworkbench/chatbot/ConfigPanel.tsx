@@ -18,7 +18,8 @@ interface RAGDocument {
   name: string;
   type: string;
   size: string;
-  chunksCount: number;
+  // W204/C186：可选 — 后端/本地无真实回传时为 undefined，渲染"待同步/未知"分支（禁补零/禁合成分块数）
+  chunksCount?: number;
   status: 'synced' | 'pending';
   lastModified: string;
 }
@@ -428,7 +429,7 @@ export default function ConfigPanel({
                       <p className={`text-[9px] ${styles.cardTextMuted} flex items-center gap-2 mt-0.5`}>
                         <span>{t('aiworkbench.chatbot.docSize')} {doc.size}</span>
                         <span>•</span>
-                        <span>{t('aiworkbench.chatbot.docChunks')} {doc.chunksCount > 0 ? `${doc.chunksCount} chunks` : t('aiworkbench.chatbot.pendingExtract')}</span>
+                        <span>{t('aiworkbench.chatbot.docChunks')} {typeof doc.chunksCount === 'number' && doc.chunksCount > 0 ? `${doc.chunksCount} chunks` : t('aiworkbench.chatbot.pendingExtract')}</span>
                       </p>
                     </div>
                   </div>

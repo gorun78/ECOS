@@ -76,8 +76,10 @@ describe('KnowledgeView 6 平铺 Page 侧栏 i18n（F1 — PMO-D Batch 1）', ()
     expect(text).toContain('知识图谱'); // knowledge.nav.page_graph
     expect(text).toContain('企业知识'); // knowledge.nav.page_wiki
     expect(text).toContain('知识治理'); // knowledge.nav.page_govern
-    expect(text).toContain('任务中心'); // knowledge.nav.global_task_center
-    expect(text).toContain('引擎监控'); // knowledge.nav.global_engine_monitor
+    // a72eabb4（菜单调整）：原 Global 入口（任务中心/引擎监控）已移出知识工作台侧栏，改由底部引擎配置承接
+    expect(text).toContain('引擎配置');
+    expect(text).not.toContain('任务中心'); // knowledge.nav.global_task_center — 撤下
+    expect(text).not.toContain('引擎监控'); // knowledge.nav.global_engine_monitor — 撤下
   });
 
   it('英文态渲染英文 6 Page 侧栏项', () => {
@@ -89,8 +91,10 @@ describe('KnowledgeView 6 平铺 Page 侧栏 i18n（F1 — PMO-D Batch 1）', ()
     expect(text).toContain('Knowledge Graph');
     expect(text).toContain('Enterprise Knowledge');
     expect(text).toContain('Knowledge Governance');
-    expect(text).toContain('Task Center'); // knowledge.nav.global_task_center
-    expect(text).toContain('Engine Monitor'); // knowledge.nav.global_engine_monitor
+    // a72eabb4：Global 英文入口同撤下，底部为 Engine Config
+    expect(text).toContain('Engine Config');
+    expect(text).not.toContain('Task Center'); // knowledge.nav.global_task_center — 撤下
+    expect(text).not.toContain('Engine Monitor'); // knowledge.nav.global_engine_monitor — 撤下
   });
 
   it('默认路由 ?page=overview 命中 6 Page 而非 14 Tab deep-link', () => {
@@ -116,9 +120,9 @@ describe('KnowledgeView 旧 14 Tab 侧栏（保留作 deep-link 后端，但 F1 
   it('侧栏不再渲染旧 5 组 14 Tab 的分组列表', () => {
     const { container } = renderWithLocale('zh');
     const text = container.textContent ?? '';
-    // 6 Page 侧栏：含 Knowledge Workbench + Global 入口
+    // 6 Page 侧栏：含 Knowledge Workbench；a72eabb4 后 Global 分组名同撤，底部引擎配置
     expect(text).toContain('Knowledge Workbench');
-    expect(text).toContain('Global');
+    expect(text).not.toContain('Global');
     // 旧 5 组分组名（管理 / 查询 / 治理 / 引擎配置）均不在侧栏
     // （这些 key 仅在路由 ?tab=xxx 时由 14 Tab 调用 t(`knowledge.group.*`) 消费，但 14 Tab 已挂撤下）
     expect(text).not.toContain('知识查询'); // knowledge.group.retrieve 仅 6 Page 路由下不出现

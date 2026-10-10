@@ -494,5 +494,6 @@
   "aiworkbench.logic.save.done": "逻辑编排修改已保存",
   "aiworkbench.logic.save.created": "成功创建 AIP 逻辑编排流程",
   "aiworkbench.logic.delete.confirm": "确定要删除这个 AIP 逻辑编排流程吗？",
-  "aiworkbench.logic.delete.done": "已删除逻辑编排流"
+  "aiworkbench.logic.delete.done": "已删除逻辑编排流",
+  "aiworkbench.agentStudio.chat.engineFail": "智能体引擎未返回有效回复（服务不可用或网络错误），本界面不合成回复，请稍后重试。"
 }
