@@ -102,4 +102,26 @@ public class BeliefDao extends JdbcTemplateDaoSupport {
             "WHERE is_deleted = 0 AND variable_name = ? ORDER BY domain, version DESC",
             variableName);
     }
+
+    // ── 《认知域与智能域补充详细设计 v1.0》§8/§13 增量（只增不改上方既有方法；V268 列位）──
+
+    /** 生命周期读投影（resolve/状态机用；V268 lifecycle_state + V262 probability + V268 置信列）。 */
+    public Map<String, Object> findLifecycleStateById(String id) {
+        try {
+            return jdbcTemplate.queryForMap(
+                "SELECT id, variable_name, domain, status, version, lifecycle_state, " +
+                "probability, prob_kind, calibration_ref, model_ref, scope_ref, as_of_time " +
+                "FROM ecos_cognitive_belief WHERE id = ? AND is_deleted = 0", id);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    /** 治理态落库（V268 lifecycle_state 唯一权威列；0 行受影响 ⇒ 调用方 fail-loud）。 */
+    public int updateLifecycleState(String id, String lifecycleState, String operator) {
+        return jdbcTemplate.update(
+            "UPDATE ecos_cognitive_belief SET lifecycle_state = ?, update_by = ?, update_time = CURRENT_TIMESTAMP " +
+            "WHERE id = ? AND is_deleted = 0",
+            lifecycleState, operator, id);
+    }
 }

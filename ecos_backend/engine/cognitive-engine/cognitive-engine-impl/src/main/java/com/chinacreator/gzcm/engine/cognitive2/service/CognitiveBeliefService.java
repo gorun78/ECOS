@@ -3,9 +3,11 @@ package com.chinacreator.gzcm.engine.cognitive2.service;
 import com.chinacreator.gzcm.common.cognitive.BeliefDistributionVO;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.engine.cognitive.api.asset.BeliefProbabilityKind;
 import com.chinacreator.gzcm.engine.cognitive2.dto.BeliefEvidenceUpdateDTO;
 import com.chinacreator.gzcm.engine.cognitive2.dto.BeliefOverrideDTO;
 import com.chinacreator.gzcm.engine.cognitive2.dto.BeliefSaveDTO;
+import com.chinacreator.gzcm.engine.cognitive2.service.asset.BeliefLifecycleGateway;
 import com.chinacreator.gzcm.engine.cognitive2.service.mental.BayesianUpdater;
 import com.chinacreator.gzcm.engine.cognitive2.service.mental.MentalEventPublisher;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
@@ -51,6 +53,8 @@ public class CognitiveBeliefService {
     private final ObjectMapper objectMapper;
     /** P2b: 心智事件发布器（ecos.cognitive 版本变更事件；构造器注入） */
     private final MentalEventPublisher eventPublisher;
+    /** §8.3/§16.5 红线 4：belief 置信三分写前网关（SUP-COG-02；非 Spring 组件，单一实例收口全部写路径） */
+    private final BeliefLifecycleGateway confidenceGateway = new BeliefLifecycleGateway();
 
     /** 审计/事件通道 — 可选装配（required=false + null 兜底） */
     @Autowired(required = false)
@@ -70,6 +74,7 @@ public class CognitiveBeliefService {
         String variableName = dto.getVariableName().trim();
         String domain = dto.getDomain().trim();
         validateDistribution(dto.getDiscreteDistribution());
+        guardProbabilityInput(dto.getProbability(), dto.getProbabilityKind());
 
         int version = store.maxVersion(variableName, domain) + 1;
         String id = "cog_blf_" + UUID.randomUUID().toString().substring(0, 12);
@@ -193,6 +198,34 @@ public class CognitiveBeliefService {
             "variable=" + variable + ", domain=" + domain + ", version=" + version
                 + ", evidence=" + trimToNull(dto.getLastEvidenceId()));
         return getLatest(variable, domain);
+    }
+
+    /**
+     * §8.3 / §16.5 红线 4 —— belief 置信三分配额写前强校验（SUP-COG-02）。
+     *
+     * <p>只增不改：既有 {@link #validateDistribution} 返回契约不变，本方法在 register()
+     * 分发前以"前置校验分支"形式可调（0 改写既有 validateDistribution，0 变更既有分布校验语义）。
+     * 调用方在 validateDistribution 之前调用本方法即可；本方法验完后调用方再调 validateDistribution。
+     *
+     * <ul>
+     *   <li>probability=NULL ⇒ 未标定（V262 既有语义），放行；</li>
+     *   <li>probability 非空 + probabilityKind=NULL ⇒ 400（V268 头注③：prob_kind 语义配套必填）；</li>
+     *   <li>probability 非空 + kind=UNCALIBRATED 族 ⇒ 400（§16.5 红线 4：LLM 置信禁伪装标定概率）；</li>
+     *   <li>probability 非空 + kind=UNKNOWN_LEGACY ⇒ 400（§8.3 末段：UNKNOWN_LEGACY 只读回落，禁写入）；</li>
+     *   <li>probability∈[0,1] 合法性由既有 validateDistribution 保，本方法只管 kind 红名。</li>
+     * </ul>
+     */
+    void guardProbabilityInput(Double probability, String probabilityKindRaw) {
+        if (probability == null) {
+            return; // uncalibrated (V262 NULL semantics), pass through
+        }
+        var kindOpt = BeliefProbabilityKind.fromDbValue(probabilityKindRaw);
+        if (kindOpt.isEmpty()) {
+            throw new BusinessException(400,
+                "COG-400: probabilityKind required (point_probability companion; allowed = "
+                + String.join("/", BeliefProbabilityKind.vocabulary()) + ")");
+        }
+        confidenceGateway.guard(probability, kindOpt.get());
     }
 
     /**

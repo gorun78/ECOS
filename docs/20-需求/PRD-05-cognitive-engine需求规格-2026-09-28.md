@@ -325,6 +325,13 @@ workspace 情景复制 → 预测运行服务：baselineRunId + overrides → �
 | COG-08 | COG-06、`ecos_decision_case` 双侧实测定权威 | PRD-10 WAG-19/20（回流引用） | **已批准（随 R-42 · §十四）** |
 | COG-09 | ADR-14（Accepted）、PRD-04 KB-08 画像版本、PRD-02 DATA 写通道 | PRD-09 FC-02/03、PRD-05 COG-02/03 | 场景批次 A（**不待裁决**，仅随本册登记） |
 
+### 需求增量登记（2026-10-10，《认知域与智能域补充详细设计 v1.0》§17 回写）
+
+- **Context Pack / Context Builder**（§5）：请求态上下文组装为新增需求增量，非 REQ-COG-01~09 任何一条的既有语义；落点 cognitive-engine，端点 `POST /api/v1/cognitive/context/build`（路径单源 `CognitiveApiPaths.CONTEXT_BUILD`）。
+- **认知资产统一生命周期**（§8.4）：`CognitiveAssetStatus`（DRAFT→ACTIVE→SUPERSEDED + 5 异常态）为 hypothesis/belief/model 三类资产的治理态词表单源（DDL V268 `lifecycle_state`）；与 REQ-COG-06 对象目录、REQ-COG-07 RegistryState 正交并存。
+- **Belief 置信三分**（§8.3）：`BeliefProbabilityKind` = STATISTICAL_PROBABILITY / CALIBRATED_MODEL_PROBABILITY / UNCALIBRATED_CONFIDENCE（+UNKNOWN_LEGACY 回落）；LLM 置信禁直写 `probability` 列（V268 补 prob_kind 五列）。
+- **Outcome Evaluation（W→D 回流）**（§9）：`POST /api/v1/cognitive/outcomes/evaluate`，与 REQ-COG-02/03 关系见补充文档 §9.1（"Run 成功 ≠ 业务验证通过"）；数值确定性计算，eval 记录落 V267。
+
 <!-- PRD-05-cognitive-engine需求规格 / 2026-09-29 / v1.2（§六 REQ-COG-06~09 已批准 R-42/R-14 组，凭证 = 需求检视报告 §十四 2026-09-29） -->
 
 <!-- PRD-05-cognitive-engine需求规格 / 2026-09-28 / v1.0 -->

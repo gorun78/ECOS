@@ -25,6 +25,16 @@ public final class CognitiveErrorCode {
     public static final String E503_NOT_IMPLEMENTED      = "ECOS-COG-503";  // 501 capability not implemented (stub=true)
     public static final String E504_INTERNAL             = "ECOS-COG-504";  // 500 cognitive internal error
 
+    // ── 《认知域与智能域补充详细设计 v1.0》增量错误码（§13.1 统一错误语义；只增不改上方冻结表）──
+    public static final String E400_SOURCE_REF_MISSING   = "ECOS-COG-400S"; // 400 Context Pack 来源项缺 ID/版本/时点（SUP-CTX-01）
+    public static final String E403_SOURCE_DENIED        = "ECOS-COG-403S"; // 403 权限/密级拒绝（不暴露对象存在性，SUP-CTX-02）
+    public static final String E409_STATE_ILLEGAL        = "ECOS-COG-409S"; // 409 资产状态迁移非法（SUP-BP-01 / §8.4 同语义）
+    public static final String E409_VERSION_STALE        = "ECOS-COG-409V"; // 409 上下文/蓝图版本过期，须重建（§5.5 版本不匹配）
+    public static final String E422_GAPS_BLOCKER_OPEN    = "ECOS-COG-422G"; // 422 BLOCKER 缺口未关闭，禁进 READY_FOR_APPROVAL/发布
+    public static final String E422_CONFLICT_UNRESOLVED  = "ECOS-COG-422C"; // 422 语义冲突未解决（禁 LLM 自行裁决为事实）
+    public static final String E502_DEPENDENCY_DOWN      = "ECOS-COG-502D"; // 502/503 必需依赖不可用（真实透传，禁伪空集合，SUP-CTX-03）
+    public static final String E429_BUDGET_EXCEEDED      = "ECOS-COG-429B"; // 429 预算耗尽（Run 转 PAUSED，禁伪成功）
+
     /** 冻结字面量（禁止改写，防前端 i18n 不一致）。 */
     public static final String MSG_MIND_NOT_ON_SCENARIO = "mind not found on this scenario";
     public static final String MSG_MIND_NOT_FOUND       = "mind not found";
@@ -43,4 +53,14 @@ public final class CognitiveErrorCode {
     public static final String MSG_MODEL_ROW_NOT_FOUND  = "cognitive model version not found";
     public static final String MSG_MODEL_IMMUTABLE      = "published model version is immutable";
     public static final String MSG_GATES_NOT_PASSED     = "publish gates not all passed";
+
+    /** 《认知域与智能域补充详细设计 v1.0》增量错误码冻结字面量（与上方同纪律：禁改写，只可新增）。 */
+    public static final String MSG_SOURCE_REF_MISSING   = "context source reference missing (id/version/asOfTime)";
+    public static final String MSG_SOURCE_DENIED        = "source access denied";
+    public static final String MSG_STATE_ILLEGAL        = "illegal asset state transition";
+    public static final String MSG_VERSION_STALE        = "context or blueprint version stale, rebuild required";
+    public static final String MSG_GAPS_BLOCKER_OPEN    = "blocker gaps must be resolved before approval";
+    public static final String MSG_CONFLICT_UNRESOLVED  = "semantic conflict unresolved, manual resolution required";
+    public static final String MSG_DEPENDENCY_DOWN      = "required dependency unavailable";
+    public static final String MSG_BUDGET_EXCEEDED      = "budget exceeded, run paused";
 }

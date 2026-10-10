@@ -139,4 +139,26 @@ public class ModelRegistryDao extends JdbcTemplateDaoSupport {
             "  AND gate_backtest = 'PASS' AND gate_calibration = 'PASS'",
             publishedBy, id);
     }
+
+    // ── 《认知域与智能域补充详细设计 v1.0》§8 增量（只增不改上方既有方法；V268 列位）──
+
+    /** 生命周期读投影（resolve/状态机用；V268 lifecycle_state + legacy status/registry_state）。 */
+    public Map<String, Object> findLifecycleStateById(String id) {
+        try {
+            return jdbcTemplate.queryForMap(
+                "SELECT id, model_id, model_type, version, status, registry_state, lifecycle_state " +
+                "FROM ecos_cognitive.ecos_cognitive_model WHERE id = ? AND is_deleted = 0", id);
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    /** 治理态落库（V268 lifecycle_state 唯一权威列；0 行受影响 ⇒ 调用方 fail-loud）。 */
+    public int updateLifecycleState(String id, String lifecycleState, String operator) {
+        return jdbcTemplate.update(
+            "UPDATE ecos_cognitive.ecos_cognitive_model " +
+            "SET lifecycle_state = ?, update_by = ?, update_time = CURRENT_TIMESTAMP " +
+            "WHERE id = ? AND is_deleted = 0",
+            lifecycleState, operator, id);
+    }
 }

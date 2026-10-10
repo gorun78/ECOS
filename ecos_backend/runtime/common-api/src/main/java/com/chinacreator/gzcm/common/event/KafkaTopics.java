@@ -32,6 +32,8 @@ public final class KafkaTopics {
             case "workflow", "task", "approval" -> WORKFLOW;
             case "agent", "mission", "tool", "execution" -> AGENT;
             case "knowledge", "glossary", "graph" -> KNOWLEDGE;
+            /** 补充设计 v1.0（Cognition 事件族 COGNITIVE_*）归属认知心智 topic；聚合名 "cognition"。 */
+            case "cognition" -> COGNITIVE;
             default -> AUDIT;
         };
     }

@@ -222,6 +222,67 @@ public class PipelineSecurityService {
     }
 
     /**
+     * 数据治理候选 apply 前置 ABAC 裁决（《补充详细设计 v1.0》§7.5 DATA_CHANGE_APPLY）。
+     * <p>与 {@link #evaluateExecute} 同一咽喉（POST /api/v1/security/policy-engine/evaluate），
+     * 但 action 为 {@code data.governance.apply}（治理写操作独立策略语义）。
+     * security-engine 不可用/裁决 FAILED → 默认 DENY（fail-closed，SUP-DATA-02）。
+     *
+     * @param candidateId 候选 ID（resource 引用）
+     * @return 裁决结果（allowed=false + reason 供审计留痕）
+     */
+    public AllowedResult evaluateDataGovernanceApply(String candidateId) {
+        try {
+            Map<String, Object> input = new LinkedHashMap<>();
+            input.put("action", "data.governance.apply");
+            input.put("resource", "data_governance_candidate:" + candidateId);
+            input.put("role", "system");
+
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("policy", "rbac");
+            body.put("input", input);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    securityBaseUrl + "/api/v1/security/policy-engine/evaluate",
+                    entity, String.class);
+
+            String bodyStr = response.getBody();
+            if (bodyStr == null || bodyStr.isEmpty()) {
+                log.warn("ABAC evaluate_data_governance_apply returned empty body: candidateId={}", candidateId);
+                return AllowedResult.deny("ABAC_EVALUATE_FAILED");
+            }
+            Map<String, Object> apiResp = MAPPER.readValue(bodyStr,
+                    new TypeReference<Map<String, Object>>() {});
+            if (apiResp == null) {
+                return AllowedResult.deny("ABAC_EVALUATE_FAILED");
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) apiResp.get("data");
+            if (data == null || data.isEmpty()) {
+                data = apiResp;
+            }
+            boolean allowed = Boolean.TRUE.equals(data.get("allow"));
+            String reason = data.get("fallback") != null
+                    ? data.get("fallback").toString()
+                    : (allowed ? "ALLOW" : "DENY");
+            if (allowed) {
+                log.info("ABAC allow data governance apply: candidateId={}, reason={}", candidateId, reason);
+            } else {
+                log.warn("ABAC deny data governance apply: candidateId={}, reason={}", candidateId, reason);
+            }
+            return new AllowedResult(allowed, reason);
+        } catch (Exception e) {
+            // security-engine 不可用 → 默认 DENY（§7.5 策略依赖失败 → DENY）
+            log.warn("ABAC evaluate_data_governance_apply failed (fail-closed DENY): candidateId={}, error={}",
+                    candidateId, e.getMessage());
+            return AllowedResult.deny("SECURITY_ENGINE_UNAVAILABLE");
+        }
+    }
+
+    /**
      * ABAC 裁决结果。
      */
     public record AllowedResult(boolean allowed, String reason) {

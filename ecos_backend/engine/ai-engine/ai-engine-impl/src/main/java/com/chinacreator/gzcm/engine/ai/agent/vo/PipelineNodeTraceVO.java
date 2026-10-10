@@ -71,6 +71,35 @@ public class PipelineNodeTraceVO {
     /** 失败时的错误信息（success/skipped/pending/idle/running 时 null） */
     private String errorMessage;
 
+    // ── Manual getters/setters (Lombok annotation processor not active in this module) ──
+
+    public String getNodeId() { return nodeId; }
+    public void setNodeId(String nodeId) { this.nodeId = nodeId; }
+
+    public String getNodeName() { return nodeName; }
+    public void setNodeName(String nodeName) { this.nodeName = nodeName; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public LocalDateTime getStartedAt() { return startedAt; }
+    public void setStartedAt(LocalDateTime startedAt) { this.startedAt = startedAt; }
+
+    public LocalDateTime getCompletedAt() { return completedAt; }
+    public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
+
+    public Long getLatencyMs() { return latencyMs; }
+    public void setLatencyMs(Long latencyMs) { this.latencyMs = latencyMs; }
+
+    public String getInputJson() { return inputJson; }
+    public void setInputJson(String inputJson) { this.inputJson = inputJson; }
+
+    public String getOutputJson() { return outputJson; }
+    public void setOutputJson(String outputJson) { this.outputJson = outputJson; }
+
+    public String getErrorMessage() { return errorMessage; }
+    public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
+
     /**
      * 序列化为 Map（camelCase 键，null 值不输出）。
      * <p>与 {@link com.chinacreator.gzcm.engine.ai.service.AgentStudioService.PipelineExecution#toMap()}

@@ -8,9 +8,7 @@
 
 ---
 
-## 0. 文档使用方式与重要边界
-
-### 0.1 本文依据
+## 0. 文档使用方式与重要边界### 0.1 本文依据
 
 本次审查依据以下文档：
 
@@ -1153,8 +1151,92 @@ OCR/ASR 输出应包含可追溯的页码、时间戳或文本区间，便于后
 - 不要把完整 Prompt、完整上下文或模型隐藏推理内容写进长期业务表；只保留必要的引用、摘要哈希和审计元数据。
 - 不要让 LLM 直接产出用于财务核算的金额、误差、贡献值或权威概率。
 - 不要把 LLM 的置信表达自动转换成 `belief.probability`。
-- 不要因模型/引擎返回空内容就视为“没有数据”；要区分空集合、未启用、无权限、缺表、超时和依赖故障。
+- 不要因模型/引擎返回空内容就视为”没有数据”；要区分空集合、未启用、无权限、缺表、超时和依赖故障。
 - 不要让 Candidate 的生成、验证、审批、应用成为一个不可分辨的单步动作。
 - 不要因一条错误或一次业务偏差自动更新生产规则、Belief、模型或经验。
 - 不要为 OCR/ASR 等小模型另建与 Model & Capability Center 并行的第二套模型管理。
-- 不要将“需求已批准”或“设计已完成”表述为“实现已完成”或“验收已通过”。
+- 不要将”需求已批准”或”设计已完成”表述为”实现已完成”或”验收已通过”。
+
+---
+
+## 19. 实施落地记录（2026-10-10 批次，§15 批次 A~E 首轮）
+
+> 本节为实施回写（R10：不新起平行文档；§17 回写清单的增量落点）。
+> 口径纪律沿用 §0.2：<b>代码交付 ≠ 库侧实跑 ≠ 验收通过</b>；DDL 仅落迁移脚本文件（`docs/50-db_script/02-flyway-migration/gateway/` V267~V273），**未对 ecos-postgres 实跑**（IR02 实跑属未授权项，需逐项再确认）；测试以”已交付冻结测试类、主仓统一 `mvn` 门禁运行”记录，运行证据以门禁报告为准。
+
+### 19.1 契约与事件单源（§15 批次 A）
+
+| 落地物 | 位置 | 溯源 |
+|---|---|---|
+| 事件登记：Cognition 族（CognitiveCandidateProposed / CognitiveAssetStatusChanged / OutcomeEvaluated / CapabilityInvoked 等）+ Scenario 族（ScenarioBlueprintPublished / …StatusChanged） | `runtime/common-api` `EventTypes.java`（additive，禁改既有 6 名） | §13 事件行；§16 SUP-GOV |
+| topic 路由：聚合名 `cognition` → `ecos.cognitive`；`scenario` 走默认 `ecos.audit` | `KafkaTopics.topicForAggregate`（additive case 分支） | §13 |
+| 认知域路径单源追加：`CONTEXT_BUILD` / `ASSETS_CATALOG` / `ASSETS_RESOLVE` / `ASSETS_PROPOSALS` / `OUTCOMES_EVALUATE` | `CognitiveApiPaths.java`（append-only） | §5/§8/§9 端点 |
+| 错误码增量：来源引用缺失 / 权限拒绝 / 状态非法 / 版本失配 / BLOCKER 缺口未关 / 语义冲突 / 依赖不可用 / 预算耗尽 | `CognitiveErrorCode.java`（append-only，冻结字面量） | §13.1 |
+| OpenAPI 单源（12 端点 + 2 逻辑事件 + trace 维度） | `docs/30-设计/openapi/supplementary-cognitive-ai-v1.yaml` | §13 / §12.2 / P-5 |
+
+### 19.2 DDL（V267~V273，仅文件，未实跑）
+
+| 版本 | 对象 | 要点 |
+|---|---|---|
+| V267 | `ecos_cognitive.ecos_cognitive_outcome_evaluation` | §9 评估记录；数值只存计算引用（可复算），update_candidates 只存候选引用 |
+| V268 | hypothesis/belief/model 三表 `lifecycle_state` + belief 置信五列（prob_kind 等） | §8.4 统一生命周期；§8.3 置信三分（存量 NULL → UNKNOWN_LEGACY 回落，禁伪造补齐） |
+| V269 | `ecos_ai.ecos_ai_capability_task` | §10.4/10.5 能力调用台账（只存引用与元数据，禁复制正文/大文件） |
+| V270 | `ecos_ai.ecos_wagent_tool_contract` 追加 13 列 | §11 机校字段（READ/SUGGEST/WRITE、encryption 上限、审批/幂等/回滚；不重复造同义字段） |
+| V271 | `workspace.ecos_scenario_blueprint` | §6 蓝图权威载体（workspace 属主；发布不可变；ai/cognitive 禁复制副本） |
+| V272 | `ecos_data.ecos_data_governance_candidate` | §7 数据治理候选（候选态 ≠ 正式资产；幂等键唯一） |
+| V273 | `ecos_ontology.ecos_ontology_candidate` | §7.3 本体候选（发布只经既有 proposals 流；AI 禁直发） |
+
+### 19.3 模块实现归属（批次 B~E）
+
+| 批次 | 模块 | 交付 | 状态口径 |
+|---|---|---|---|
+| B | cognitive-engine | Context Builder（§5 十步组装 + 失败语义五态 + contextDigest 可复现） | 代码交付，见 §19.4 |
+| B | cognitive-engine | 认知资产目录/解析/提案（§8；proposal 不改生产行）+ Belief 置信写入守卫 | 代码交付 |
+| B | workspace | 场景蓝图状态机（15 态，DRAFT 禁直进 ACTIVE）+ 六道发布门槛 + 版本不可变 | 代码交付 |
+| C | data-engine | 数据治理候选面（profile/candidates/preview/approve；GENERATED/VALIDATED≠APPROVED） | 代码交付 |
+| C | ontology-engine | 本体候选面 + 接既有 proposals 流（无直接 publish 路径） | 代码交付 |
+| D | ai-engine | 能力目录/路由/执行/异步任务（§10；未接供应商能力显式不可用，禁伪数据）+ Tool Contract §11 字段 | 代码交付 |
+| E | cognitive-engine | W→D 结果评估（§9 十步骨架；7 种禁自更新情形 fail-loud）+ TraceDimensions 常量类（§12.2） | 代码交付 |
+
+### 19.4 验收矩阵（§16）运行面
+
+- 冻结测试类随各模块代码同步交付（类名以仓内实测为准；`SUP-GOV-01/02` 架构面复用既有 ArchUnit 守卫，本批次只增业务测试，不改既有守卫基线）。
+- 测试运行 = 主仓 `mvn` 门禁统一执行；**本批次提交前未逐类实跑的，一律记「未执行」**，不以「测试类已建」替代运行证据。
+- live 集成/E2E 项（SUP-CTX-02 安全集成、SUP-BP-03 端到端回链、SUP-OUT-02 端到端复算、SUP-GOV-01 故障注入）随库侧实跑授权后执行，记「未执行（待实跑授权）」。
+
+### 19.5 验收矩阵（§16）→ 代码/测试落点登记
+
+> 测试类名为本批次代码交付的**目标名**（最终以仓内实测为准）；运行证据以主仓 `mvn` 门禁报告为准，未实跑一律记「未执行」。
+
+| SUP ID | 落点（模块 · 测试类/载体） | 覆盖的通过标准 |
+|---|---|---|
+| SUP-CTX-01 | cognitive-engine · `ContextBuilderServiceTest` + `ContextPackContractTest`（`EvidenceRef` 三要素缺失拒） | 缺来源的事实项被拒 |
+| SUP-CTX-02 | cognitive-engine · `ContextBuilderServiceTest`（权限 DENY 分支）+ 既有 RLS/CLS 门禁 | 未授权不入 Pack/模型输入，fail-closed |
+| SUP-CTX-03 | cognitive-engine · `ContextBuilderServiceTest`（503/403/409/422 分码 + 无伪空断言） | 空集/404/403/503 语义不混淆 |
+| SUP-BP-01 | workspace · `BlueprintStatusMachineTest`（DRAFT→ACTIVE 拒 / 非法 409） | 非法迁移返 409 态不变 |
+| SUP-BP-02 | workspace · `ScenarioBlueprintServiceTest`（validate 六门缺一拒 / release 门槛） | 依赖+P0 测试+审批全满足才发布 |
+| SUP-BP-03 | workspace · V271 `context_digest`/`artifact_digest` 列 + `ScenarioBlueprintServiceTest`（回链断言，端到端 live 记未执行） | 运行回链蓝图版本/Digest/输入快照 |
+| SUP-DATA-01 | data-engine · `DataGovernanceCandidateServiceTest`（preview 不触正式表 mock） | 预览前后正式版本/水位线/行数无变化 |
+| SUP-DATA-02 | data-engine · 既有 ToolExecutor 咽喉 + `DataGovernanceCandidateServiceTest`（APPLY 过裁决） | 绕过咽喉被 ArchTest 拦截 |
+| SUP-ONTO-01 | ontology-engine · `OntologyCandidateServiceTest`（缺证据/未解冲突禁提提案） | 候选必带证据+兼容性 |
+| SUP-ONTO-02 | ontology-engine · `OntologyCandidateServiceTest`（无直接 publish 路径断言；发布只走 proposals 链） | AI 无权直发正式本体 |
+| SUP-COG-01 | cognitive-engine · `CognitiveAssetLifecycleTest`（11 类目录载体/引用态无双轨） | 11 对象唯一载体或明确引用态 |
+| SUP-COG-02 | cognitive-engine · `BeliefProbabilityKindGuardTest`（UNCALIBRATED 禁写 probability） | 金额/概率写路径被拒 |
+| SUP-COG-03 | cognitive-engine · `CognitiveAssetLifecycleTest`（proposal 不改原行 / 无批准提案状态不变） | 运行态推理不自动沉淀 |
+| SUP-COG-04 | cognitive-engine · `CognitiveAssetLifecycleTest`（resolve 只读 / Decision Basis 单写权威镜像未定性不开放双写） | Agent 只读引用 |
+| SUP-OUT-01 | cognitive-engine · `OutcomeEvaluateServiceTest`（单次偏差只产候选，mock 断言 0 生产写） | 评估前后生产版本不变 |
+| SUP-OUT-02 | cognitive-engine · `DeterministicErrorCalculatorTest`（BigDecimal 精确复算，端到端 live 记未执行） | 贡献合计与总差额容差内一致 |
+| SUP-MODEL-01 | ai-engine · `AiCapabilityCatalogTest` + `ModelCapabilityRouterTest`（按 CapabilityId 路由，不硬编码 provider） | OCR/ASR/图像理解经能力 ID |
+| SUP-MODEL-02 | ai-engine · `CapabilityTaskServiceTest` + V269 台账列（modelRef/version/latency/cost/trace） | 版本/延迟/成本/错误率可追踪 |
+| SUP-MODEL-03 | ai-engine · `CapabilityTaskServiceTest`（quality.kind 未校准默认 calibrated=false） | 未校准置信度不冒充概率 |
+| SUP-FEEDBACK-01 | 各模块 · 四层指标复用既有可观测性（C.7 事件日志面 + §12.1 指标目录已定义）；端到端仪表/报告查询 live 记「未执行（需实跑+前端）」 | 数据/认知/场景/业务指标可查定义与来源 |
+| SUP-GOV-01 | data-engine/ai-engine · fail-closed 分支（安全服务超时/无策略/无凭证 → DENY）复用既有 ArchUnit 安全卡 | 所有写操作 fail-closed |
+| SUP-GOV-02 | ai-engine · `CapabilityTaskServiceTest`（异步走 runtime-task）+ 既有 NoDirectScheduler ArchTest | 无新增私有调度器/裸线程 |
+| SUP-GOV-03 | `docs/30-设计/openapi/supplementary-cognitive-ai-v1.yaml` + 各 ApiPaths 单源（12 端点 operationId 齐） | 新增 API 均有 operationId 与契约校验 |
+
+### 19.6 未决项（下沉后续批次，不冒充完成）
+
+1. 小模型（OCR/ASR/TTS/图像理解）供应商接入：契约与台账在位，执行面未接真实模型 → 能力目录 `supported=false` 显式声明。
+2. `ecos_cognitive` 既有 `ecos_decision*`（V103/V151）双镜像权威复核：沿用详设-05 R-13 ① 口径，本批次未重新裁定。
+3. 年度经营预测首场景（§15.2 批次 B 全端到端 / 详设-09 接缝）：随 V267~V273 实跑授权 + 详设-09/10 在途批次收敛后执行。
+4. 前端面（蓝图向导/候选评审/能力盘）：本批次不涉前端改动，随场景工作台 UI 批次落（F07 族后续）。

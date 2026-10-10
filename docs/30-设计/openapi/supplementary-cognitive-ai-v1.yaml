@@ -1,0 +1,353 @@
+# =====================================================================
+# supplementary-cognitive-ai-v1.yaml — 认知域与智能域补充设计 v1.0 机器可读契约
+# ---------------------------------------------------------------------
+# 溯源：《ECOS-认知域与智能域补充详细设计 v1.0》§13（API 与事件契约总表）、
+#       §16（验收矩阵 SUP-* 21 项）。
+# 范围：本批次（2026-10-10）新增/扩展的 12 个逻辑端点 + 2 条逻辑事件。
+# ---------------------------------------------------------------------
+# 工件属性（诚实声明，纪律与 wagent-v1.yaml 同）：
+#   1. 本文件为**手工登记的机器可读契约**（P-5 单源），非 springdoc 生成物。
+#   2. x-implementation-status:
+#        implemented = 本批次交付的 Controller 端点（路径常量单源见各引擎 ApiPaths）；
+#        planned     = 依赖后续批次接线的数据源/模型供应商（能力面 stub 显式不可用，
+#                      端点在位、执行面 fail-loud 503，禁伪数据——仓库 F05-16 纪律）。
+#   3. DTO 到信封级（ApiResponse）+ 设计级 data 占位（additionalProperties: true）。
+#   4. 安全口径：全部端点要求 JWT 认证，禁入匿名面；写操作面（proposals/candidates/approve/release
+#      族）要求 security-engine 裁决，不可用默认 DENY（SUP-GOV-01）。
+#   5. 统一 Trace 维度（§12.2）：所有跨引擎调用传递 traceId/scenarioId/blueprintId/blueprintVersion/
+#      runId/stepId/contextDigest/capabilityId/toolContractVersion/modelRef/modelVersion/
+#      sourceRefs/tenantId/resultRef/approvalRef（键名单源 = TraceDimensions 常量类）。
+#   6. 事件（§13 末尾两行逻辑事件）：
+#        ScenarioBlueprintPublished   → EventTypes.Scenario（topic 走 KafkaTopics 默认路由 ecos.audit）
+#        CognitiveCandidateProposed   → EventTypes.Cognition（topic 走聚合 "cognitive" → ecos.cognitive）
+#      事件名已并入 EventTypes.java 既有事件类型单源清单方可使用（本批次已登记）。
+# =====================================================================
+openapi: 3.0.3
+info:
+  title: ECOS 认知域与智能域补充设计 API（supplementary v1）
+  version: 1.0.0
+  description: |
+    补充设计 v1.0 §13 契约总表落地面：Context Builder（§5）、认知资产目录/解析/提案（§8）、
+    W→D 结果评估（§9）、数据治理剖析/候选（§7.2）、本体候选（§7.3）、能力目录/执行/任务（§10）。
+    错误语义按 §13.1 统一矩阵：400 输入/schema（指明字段）/ 404 不降级伪造 / 403 权限与
+    密级（fail-closed）/ 409 状态迁移非法与幂等 / 422 门禁失败保留明细 / 429 预算耗尽
+    / 503 依赖真实不可用（禁伪空集合）。
+  contact:
+    name: ECOS 补充设计 v1.0 批次（2026-10-10）
+  license:
+    name: Proprietary
+servers:
+  - url: http://localhost:8080
+    description: 网关聚合入口（gateway:8080；全部端点经网关为准入面）
+tags:
+  - name: context-builder
+    description: §5 请求态 Context Pack（不建认知上下文表）
+  - name: cognitive-assets
+    description: §8 认知资产目录/只读解析/受控提案（候选不改生产资产）
+  - name: outcome-evaluation
+    description: §9 W→D 结果验证与认知反馈（数值只来自确定性计算）
+  - name: data-governance
+    description: §7.2 数据治理候选（候选态；正式写入仍经 data-engine 写通道）
+  - name: ontology-candidates
+    description: §7.3 本体候选（候选态；发布只经既有 proposals 审批流）
+  - name: capabilities
+    description: §10 能力目录/执行/长任务（Model & Capability Center）
+
+paths:
+  /api/v1/cognitive/context/build:
+    post:
+      tags: [context-builder]
+      operationId: buildContextPack
+      summary: §5 生成请求态 Context Pack（十步组装算法）
+      x-implementation-status: implemented
+      x-design-ref: "补充设计 v1.0 §5.2/§5.4/§5.5；SUP-CTX-01/02/03"
+      description: |
+        按主体权限与目标范围组装权威资产引用（Context Pack），返回 contextDigest + 冲突 +
+        缺口 + 预算裁剪标记。失败语义（§5.5）：可选源不可用 → 部分上下文 + warnings；
+        必需源缺失/权限拒绝 → 403；引擎 5xx → 真实 503；语义冲突 → 422（conflicts，
+        禁 LLM 自行裁决）；超预算 → truncated=true + 未纳入清单；版本失配 → 409 要求重建。
+        不新增 cognitive_context 表（只增不改既有 API 红线）。
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 组装成功（含 truncated/conflicts/gaps 标记）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+        "400":
+          $ref: "#/components/responses/E400"
+        "403":
+          $ref: "#/components/responses/E403"
+        "409": { description: 版本失配，须重建 Context Pack }
+        "422": { description: 语义冲突未解决 }
+        "429": { description: 超预算，Run 转 PAUSED，禁伪成功 }
+        "503": { description: 必需依赖不可用（真实透传） }
+
+  /api/v1/cognitive/assets/catalog:
+    get:
+      tags: [cognitive-assets]
+      operationId: listCognitiveAssetCatalog
+      summary: §8 认知资产目录（11 类对象 + 载体/引用态说明）
+      x-implementation-status: implemented
+      x-design-ref: "补充设计 v1.0 §8.1/§13；SUP-COG-01"
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 只读目录（每类资产 A/B/C 治理层 + 载体形态）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+
+  /api/v1/cognitive/assets/{assetId}/resolve:
+    get:
+      tags: [cognitive-assets]
+      operationId: resolveCognitiveAsset
+      summary: §8 解析受治理认知资产引用（只读）
+      x-implementation-status: implemented
+      x-design-ref: "补充设计 v1.0 §8.3；SUP-COG-02"
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 只读解析（含 probabilityKind；UNKNOWN_LEGACY 回落不伪造）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "404": { description: 资产不存在（真 404，不伪空） }
+      x-examples:
+        beliefProbKind: |
+          probabilityKind ∈ STATISTICAL_PROBABILITY / CALIBRATED_MODEL_PROBABILITY /
+          UNCALIBRATED_CONFIDENCE / UNKNOWN_LEGACY（存量无来源 → 回落 UNKNOWN_LEGACY）；
+          UNCALIBRATED 类禁入金额计算/自动审批（§8.3/§16.5 红线）。
+
+  /api/v1/cognitive/assets/{assetId}/proposals:
+    post:
+      tags: [cognitive-assets]
+      operationId: proposeCognitiveAssetChange
+      summary: §8 提交认知资产变更候选（只创建候选，不改生产资产）
+      x-implementation-status: implemented
+      x-design-ref: "补充设计 v1.0 §8.4/§13；SUP-COG-03"
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema: { type: string }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201":
+          description: 候选已创建（审计/事件留痕；requiresApproval 视变更类型）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { description: evidenceRefs 缺失/变更类型非法 }
+        "409": { description: 资产状态冻结（如 PUBLISHED 模型版本） }
+      x-event: "CognitiveCandidateProposed（EventTypes.Cognition → ecos.cognitive）"
+
+  /api/v1/cognitive/outcomes/evaluate:
+    post:
+      tags: [outcome-evaluation]
+      operationId: evaluateOutcome
+      summary: §9 评估运行与实际结果，产出更新候选（禁自动改写生产资产）
+      x-implementation-status: implemented
+      x-design-ref: "补充设计 v1.0 §9.2~9.4；SUP-OUT-01/02"
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: 评估完成（metrics 数值 = 确定性计算；diagnoses 仅关联引用）
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiResponse" }
+        "400": { description: 样本不适用（未关账/口径不一致） → 明确拒因 }
+        "409": { description: 预测与实际口径不一致（status=REJECTED） }
+      x-note: "7 种禁自更新情境（§9.4）逐条检查；命中 → 不产候选 + warning。"
+
+  /api/v1/data/governance/profile:
+    post:
+      tags: [data-governance]
+      operationId: runDataProfile
+      summary: §7.2 数据剖析（只读；列类型/空值率/基数）
+      x-implementation-status: implemented
+      x-design-ref: "补充设计 v1.0 §7.2；SUP-DATA-01"
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 剖析产物（只读，不改正式资产/版本/水位线） }
+        "503": { description: 剖析源接口不可用 → 真 503，禁伪数据 }
+        "200-only-when-real": true
+
+  /api/v1/data/governance/candidates:
+    post:
+      tags: [data-governance]
+      operationId: createDataGovernanceCandidate
+      summary: §7.2 创建数据治理候选（族：语义/映射/DQ 规则；幂等键防重）
+      x-implementation-status: implemented
+      x-design-ref: "补充设计 v1.0 §7.4/§7.5；SUP-DATA-01/02"
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201": { description: 候选创建（status=GENERATED，非 APPROVED） }
+        "409": { description: 幂等键重复（返回原记录引用） }
+
+  /api/v1/data/governance/candidates/{candidateId}:
+    get:
+      tags: [data-governance]
+      operationId: getDataGovernanceCandidate
+      summary: 候选详情（含 basis/五段校验）
+      x-implementation-status: implemented
+      parameters:
+        - { name: candidateId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: OK }
+        "404": { description: 不存在 }
+
+  /api/v1/data/governance/candidates/{candidateId}/preview:
+    post:
+      tags: [data-governance]
+      operationId: previewDataGovernanceCandidate
+      summary: §7.2 只读预览（通过率/异常样本；不触正式表）
+      x-implementation-status: implemented
+      x-design-ref: "SUP-DATA-01：预览前后正式资产/版本/行数无变化"
+      parameters:
+        - { name: candidateId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: 预览产物 }
+
+  /api/v1/data/governance/candidates/{candidateId}/approve:
+    post:
+      tags: [data-governance]
+      operationId: approveDataGovernanceCandidate
+      summary: §7.2 审批（需 approval_ref）；APPLY 类走 security-engine（fail-closed DENY）
+      x-implementation-status: implemented
+      x-design-ref: "补充设计 v1.0 §7.4/§7.5；SUP-GOV-01"
+      parameters:
+        - { name: candidateId, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移至 PENDING_APPROVAL/APPROVED }
+        "400": { description: approval_ref 缺失 }
+        "403": { description: security 裁决不可用 → DENY（fail-closed） }
+        "409": { description: 状态非法（GENERATED/VALIDATED ≠ APPROVED 直接跳） }
+
+  /api/v1/ontology/candidates:
+    post:
+      tags: [ontology-candidates]
+      operationId: createOntologyCandidate
+      summary: §7.3 创建本体候选（族：实体/属性/关系/约束；证据引用必填）
+      x-implementation-status: implemented
+      x-design-ref: "补充设计 v1.0 §7.3；SUP-ONTO-01"
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201": { description: 候选创建（GENERATED） }
+        "400": { description: 证据引用/冲突未标注 }
+
+  /api/v1/ontology/candidates/{candidateId}:
+    get:
+      tags: [ontology-candidates]
+      operationId: getOntologyCandidate
+      summary: 候选详情
+      x-implementation-status: implemented
+      parameters:
+        - { name: candidateId, in: path, required: true, schema: { type: string } }
+      responses: { "200": { description: OK }, "404": { description: 不存在 } }
+
+  /api/v1/ontology/candidates/{candidateId}/validate:
+    post:
+      tags: [ontology-candidates]
+      operationId: validateOntologyCandidate
+      summary: §7.3 验证（名词/基/基数/端点/兼容性 → VALIDATED）
+      x-implementation-status: implemented
+      parameters:
+        - { name: candidateId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: 校验通过（VALIDATED），可提 proposals }
+        "422": { description: 校验失败（附 issues[]） }
+
+  /api/v1/ontology/candidates/{candidateId}/to-proposal:
+    post:
+      tags: [ontology-candidates]
+      operationId: submitOntologyCandidateToProposal
+      summary: §7.3 提交到既有 proposals 审批流（ONTOLOGY_PROPOSAL_CREATE）
+      x-implementation-status: implemented
+      x-design-ref: "AI 禁直发正式本体（SUP-ONTO-02）；发布只经既有 proposals 链"
+      parameters:
+        - { name: candidateId, in: path, required: true, schema: { type: string } }
+      responses:
+        "201": { description: 提案已创建（复用既有 OntologyProposal 创建方法） }
+        "409": { description: 候选非 VALIDATED / 冲突未解 }
+
+  /api/v1/ai/capabilities:
+    get:
+      tags: [capabilities]
+      operationId: listCapabilities
+      summary: §10 能力目录（每项 capabilityId/contractVersion/supported/automationLevel…）
+      x-implementation-status: implemented
+      x-design-ref: "补充设计 v1.0 §10；SUP-MODEL-01"
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 能力清单（模型未接入 → supported=false，禁伪 available） }
+
+  /api/v1/ai/capabilities/{capabilityId}/execute:
+    post:
+      tags: [capabilities]
+      operationId: executeCapability
+      summary: §10.3 同步执行（经 Model Router 选模；质量/校准/密级/预算各维度评分链）
+      x-implementation-status: implemented
+      x-design-ref: "SUP-MODEL-02/03；§10.6 未通过质量阈值的备用模型不得被自动选中"
+      parameters:
+        - { name: capabilityId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: CapabilityResult（quality.kind 未校准默认 calibrated=false） }
+        "404": { description: 能力未注册/不可用（真错误，禁 200 伪成功） }
+        "409": { description: 路由决策拒绝（密级/预算/版本态不满足） }
+
+  /api/v1/ai/capabilities/{capabilityId}/tasks:
+    post:
+      tags: [capabilities]
+      operationId: submitCapabilityTask
+      summary: §10.3 异步长任务提交（经 runtime-task，返回 taskId）
+      x-implementation-status: implemented
+      x-design-ref: "长任务唯一入口 = runtime-task（铁律 §2.5；SUP-GOV-02）"
+      parameters:
+        - { name: capabilityId, in: path, required: true, schema: { type: string } }
+      responses:
+        "202": { description: AsyncCapabilityHandle{taskId,capabilityId,submittedAt} }
+
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    ApiResponse:
+      type: object
+      description: runtime/common-api ApiResponse 统一信封（实测字段）
+      properties:
+        code: { type: integer, example: 0 }
+        errorCode: { type: string, nullable: true }
+        message: { type: string, nullable: true }
+        data: { type: object, additionalProperties: true, nullable: true }
+        timestamp: { type: integer, format: int64, nullable: true }
+        traceId: { type: string, nullable: true, description: "§12.2 统一 Trace 维度贯通" }
+  responses:
+    E400:
+      description: 输入/schema 错误（指明字段与错误，不自动重试——§13.1）
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+    E403:
+      description: 权限/密级拒绝（fail-closed；不暴露敏感对象存在性——§13.1/SUP-CTX-02）
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiResponse" }
+
+# =====================================================================
+# 事件登记（§13 尾两行；事件名已并入 EventTypes.java 单源清单方可使用）
+# ---------------------------------------------------------------------
+# ScenarioBlueprintPublished   | EventTypes.Scenario  | topic: KafkaTopics 默认路由 → ecos.audit
+#                               | 载荷: blueprintId/version/artifactDigest/approvalRef/traceId
+#                               | 禁带完整依赖清单正文（引用 ID 串即可）
+# CognitiveCandidateProposed   | EventTypes.Cognition | topic: 聚合 "cognitive" → ecos.cognitive
+#                               | 载荷: assetId/assetClass/proposalId/changeType/requiresApproval/traceId
+#                               | 禁带 Prompt 原文/完整上下文正文
+# =====================================================================

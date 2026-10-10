@@ -254,4 +254,10 @@ Agent Loop → ToolDispatcher.dispatch(toolCall)
 | AI-10 | PRD-01 REQ-PLT-28（M0）、R-39、R-41 | AI-06 运行时唯一性 | M0 子项直改 + 主体待裁 |
 | AI-11 | PRD-01 REQ-PLT-26/27、前置件 P-5 | PRD-10 WAG-22 | **已批准（随 R-37/R-38 · §十四），结案前置 = R-50/P-5** |
 
+### 需求增量登记（2026-10-10，《认知域与智能域补充详细设计 v1.0》§17 回写）
+
+- **Model & Capability Center 小模型能力目录**（§10）：`AiCapabilityId` 11 项（LLM_TEXT_REASONING / TEXT_EMBEDDING / DOCUMENT_OCR / DOCUMENT_LAYOUT_PARSE / SPEECH_TO_TEXT / TEXT_TO_SPEECH / IMAGE_UNDERSTANDING / ENTITY_EXTRACTION / DOCUMENT_CLASSIFICATION / RERANK / SEMANTIC_SIMILARITY）；能力目录端点 `GET /api/v1/ai/capabilities` + execute/异步 tasks 两族（`AiCapabilityApiPaths` 单源）；LLM/Embedding 唯一出口仍 llm-gateway，小模型未接供应商时显式不可用（禁伪 200）。
+- **READ/SUGGEST/WRITE 操作类别语义**（§11.2）：Tool Contract 追加 13 机校字段（DDL V270）——`operation_class`/`evidence_required`/`automation_level`/`data_classification_max`/`requires_approval`/`idempotent`/`timeout_ms`/`rollback_*`/`owner_engine` 等；SUGGEST 生候选不改权威资产，WRITE 必过 ToolExecutor 咽喉 + security 裁决。
+- **跨引擎评估要求**（§12.2）：统一 Trace 16 维度键名单源 = `TraceDimensions` 常量类（ai-engine capability 面 + cognitive 面共用）。
+
 <!-- PRD-06-ai-engine需求规格 / 2026-09-29 / v1.2（§六 REQ-AI-06~11 已批准 R-37/R-39/R-47/R-50，凭证 = 需求检视报告 §十四 2026-09-29；两处 M0 子项本就直改） -->

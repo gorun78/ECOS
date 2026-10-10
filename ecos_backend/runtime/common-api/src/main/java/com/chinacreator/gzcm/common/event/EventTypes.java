@@ -133,6 +133,39 @@ public final class EventTypes {
     }
 
     /**
+     * 《ECOS 认知域与智能域补充详细设计 v1.0》§13 —— 认知域补集 additive 注册。
+     *
+     * <p>纪律 = R-70 同口径：只加常量、禁改上方既有项；PascalCase；
+     * topic 归属沿用 {@link KafkaTopics#topicForAggregate}（聚合名 {@code "cognition"}
+     * → {@link KafkaTopics#COGNITIVE}，禁新建 topic，容器/主题基线不变）。
+     * 载荷只带资产 ID / 状态 / 版本 / 引用 ID 串与 traceId，禁带 Prompt 原文或完整上下文正文。</p>
+     */
+    public static final class Cognition {
+        /** 认知资产变更候选生成（补充文档 §8.4 / §13：只创建候选，禁自动升格生产资产）→ ecos.cognitive */
+        public static final String COGNITIVE_CANDIDATE_PROPOSED = "CognitiveCandidateProposed";
+        /** 认知资产生命周期状态迁移（§8.4 状态机；载荷含旧/新状态、原因、证据引用、审计 traceId）→ ecos.cognitive */
+        public static final String COGNITIVE_ASSET_STATUS_CHANGED = "CognitiveAssetStatusChanged";
+        /** W→D 结果评估完成（§9；载荷含 evaluationId / 指标引用 / 更新候选引用，禁带敏感正文）→ ecos.cognitive */
+        public static final String OUTCOME_EVALUATED = "OutcomeEvaluated";
+        /** 能力一次调用完成（§10 模型与能力中心；载荷含 capabilityId / modelRef / modelVersion / latencyMs / status）→ ecos.agent */
+        public static final String CAPABILITY_INVOKED = "CapabilityInvoked";
+    }
+
+    /**
+     * 《ECOS 认知域与智能域补充详细设计 v1.0》§6 / §13 —— 场景蓝图 additive 注册。
+     * 聚合名 {@code "scenario"} 无专属 topic，经默认路由落 {@link KafkaTopics#AUDIT}
+     *（与既有跨域状态迁移事件同通道，禁新建 topic）。
+     * 载荷只带 blueprintId / version / artifactDigest / 审批引用与 traceId，
+     * 禁带完整依赖清单正文（引用 ID 串即可）。
+     */
+    public static final class Scenario {
+        /** 蓝图发布（§6.4 步骤 9；发布版本不可变）→ 默认路由 ecos.audit */
+        public static final String SCENARIO_BLUEPRINT_PUBLISHED = "ScenarioBlueprintPublished";
+        /** 蓝图状态迁移（§6.3 状态机；载荷含旧/新状态、actor、原因、traceId）→ 默认路由 ecos.audit */
+        public static final String SCENARIO_BLUEPRINT_STATUS_CHANGED = "ScenarioBlueprintStatusChanged";
+    }
+
+    /**
      * 详细设计-06 F06-03（卷 06 REQ-AI-01）—— 护栏/工具裁决事件类型。
      *
      * <p>常量登记在 runtime/common-api 供全仓共用（禁 ai-engine 自定义字符串）。

@@ -59,9 +59,28 @@ public final class CognitiveApiPaths {
     public static final String OBJECTS_REL = "/objects";
     public static final String OBJECTS_ITEM_REL = OBJECTS_REL + "/{" + PARAM_OBJECT_KEY + "}";
 
+    // ── 《认知域与智能域补充详细设计 v1.0》增量端点族（§13 单源登记；只增不改，禁改写上方既有常量）──
+
+    /** §5 Context Builder（请求态 Context Pack，不建认知上下文表；聚合装配见 impl）。 */
+    public static final String CONTEXT_BUILD = COGNITIVE + "/context/build";
+
+    /** §8 认知资产目录 / 只读解析 / 受控提案（属主 cognitive，只增子路径）。 */
+    public static final String PARAM_ASSET_ID   = "assetId";
+    public static final String ASSETS_CATALOG   = COGNITIVE + "/assets/catalog";
+    public static final String ASSETS_RESOLVE   = COGNITIVE + "/assets/{" + PARAM_ASSET_ID + "}/resolve";
+    public static final String ASSETS_PROPOSALS = COGNITIVE + "/assets/{" + PARAM_ASSET_ID + "}/proposals";
+
+    /** §9 W→D 结果评估（预测 vs 实际偏差诊断；数值只来自确定性计算，LLM 零参与数值）。 */
+    public static final String OUTCOMES_EVALUATE = COGNITIVE + "/outcomes/evaluate";
+
     /** E2 相关查询参数名（防前后端字段漂移）。 */
     public static final String PARAM_MIND   = "mind";
     public static final String PARAM_LIMIT  = "limit";
     public static final int    E2_LIMIT_DEFAULT = 10;
     public static final int    E2_LIMIT_MAX     = 50;
+
+    // ── SUP-C 追加（只许追加在本类末尾，禁改写上方既有行）──
+
+    /** §8.4 认知资产受控状态迁移（治理操作者通道；非法迁移 ⇒ 409 ECOS-COG-409S 原行不变）。 */
+    public static final String ASSETS_TRANSITION = COGNITIVE + "/assets/{" + PARAM_ASSET_ID + "}/transitions";
 }

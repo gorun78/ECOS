@@ -79,4 +79,25 @@ public class HypothesisDao extends JdbcTemplateDaoSupport {
             "invalid_reason = ?, update_time = ? WHERE id = ? AND is_deleted = 0",
             status, isValid, invalidAt, invalidReason, updateTime, id) > 0;
     }
+
+    // ── 《认知域与智能域补充详细设计 v1.0》§8 增量（只增不改上方既有方法；V268 列位）──
+
+    /** 生命周期读投影（resolve/状态机用；V268 lifecycle_state + legacy status）。 */
+    public Map<String, Object> findLifecycleStateById(String id) {
+        try {
+            return jdbcTemplate.queryForMap(
+                "SELECT id, hypothesis_code, domain, status, is_valid, lifecycle_state " +
+                "FROM ecos_cognitive_hypothesis WHERE id = ? AND is_deleted = 0", id);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    /** 治理态落库（V268 lifecycle_state 唯一权威列；0 行受影响 ⇒ 调用方 fail-loud）。 */
+    public int updateLifecycleState(String id, String lifecycleState, String operator) {
+        return jdbcTemplate.update(
+            "UPDATE ecos_cognitive_hypothesis SET lifecycle_state = ?, update_by = ?, update_time = CURRENT_TIMESTAMP " +
+            "WHERE id = ? AND is_deleted = 0",
+            lifecycleState, operator, id);
+    }
 }

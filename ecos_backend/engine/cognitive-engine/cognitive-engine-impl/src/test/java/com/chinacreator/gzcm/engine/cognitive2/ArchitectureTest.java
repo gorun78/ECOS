@@ -78,7 +78,11 @@ public class ArchitectureTest {
             //     的解耦端口，命名沿用设计文档 §C.2 步骤1 冻结名，非服务门面故不套 I 前缀。
             .orShould().haveSimpleName("CognitivePipelineStore")
             .orShould().haveSimpleName("MentalEvent")
-            .orShould().haveSimpleName("ForecastRunSnapshotReader");
+            .orShould().haveSimpleName("ForecastRunSnapshotReader")
+            // 补充设计 v1.0 §5.4-3：Context Builder 权威源读取 SPI（decoupling port，
+            //     同 Store/Reader 解耦端口命名口径，非服务门面故不套 I 前缀）。
+            .orShould().haveSimpleName("ContextSourceReader")
+            .orShould().haveSimpleName("ContextSecurityTrimmer");
         rule.allowEmptyShould(true).check(classes);
     }
 
