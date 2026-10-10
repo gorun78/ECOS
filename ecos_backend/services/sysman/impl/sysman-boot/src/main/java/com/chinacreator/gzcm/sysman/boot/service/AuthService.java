@@ -71,7 +71,7 @@ public class AuthService {
      */
     public List<Map<String, Object>> findTenantByUsername(String username) {
         return jdbcTemplate.queryForList(
-                "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"USERNAME\" = ?", username);
+                "SELECT tenant_id FROM users WHERE username = ?", username);
     }
 
     // ── 获取当前用户信息 ──────────────────────────────────

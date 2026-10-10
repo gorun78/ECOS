@@ -220,7 +220,8 @@ public class AuthServiceImpl implements IAuthService {
     
     /**
      * 获取用户所属租户ID。
-     * <p>R1.10（详细设计-02 W48）：仅从 TD_USER.TENANT_ID 列查询；缺失/异常时<b>不</b>再回落到
+     * <p>R1.10（详细设计-02 W48）：仅从登录身份表 {@code users.tenant_id}（V245 加列）查询；
+     * 缺失/异常时<b>不</b>再回落到
      * 字面默认租户。上游 {@code JwtAuthenticationFilter} 对缺 tenant_id 的 claim 会按
      * {@code ECOS-AUTH-006} 403 显式拒绝（见 {@code JwtDenyTest} 缺租户包络），从而让配置错误
      * 立刻在授权层暴露，而不是被字面默认租户静默吞掉（旧行为 {@code return "tenant-a"} 会掩盖
@@ -229,15 +230,15 @@ public class AuthServiceImpl implements IAuthService {
     private String getUserTenantId(String username) {
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"USERNAME\" = ?", username);
+                "SELECT tenant_id FROM users WHERE username = ?", username);
             if (rows != null && !rows.isEmpty()) {
-                Object tid = rows.get(0).get("TENANT_ID");
+                Object tid = rows.get(0).get("tenant_id");
                 if (tid != null && !tid.toString().isBlank()) {
                     return tid.toString();
                 }
             }
         } catch (Exception e) {
-            log.warn("Failed to query TENANT_ID from TD_USER for {}: {}", username, e.getMessage());
+            log.warn("Failed to query users.tenant_id for {}: {}", username, e.getMessage());
         }
         // R1.10: 不再字面回落 tenant-a；缺失 → null → 下游按 ECOS-AUTH-006 显式拒绝
         return null;

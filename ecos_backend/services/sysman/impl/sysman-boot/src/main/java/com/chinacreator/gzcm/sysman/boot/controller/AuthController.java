@@ -189,7 +189,7 @@ public class AuthController {
         try {
             List<Map<String, Object>> tenantRows = authService.findTenantByUsername(username);
             if (tenantRows != null && !tenantRows.isEmpty()) {
-                Object tid = tenantRows.get(0).get("TENANT_ID");
+                Object tid = tenantRows.get(0).get("tenant_id");
                 if (tid != null && !tid.toString().isBlank()) {
                     extraClaims.put("tenant_id", tid.toString());
                 }

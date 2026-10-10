@@ -204,10 +204,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     /** W06：按 userId 回查租户（JWT 不含 tenant_id 时的兜底；失败返回 null → 上层 403） */
     protected String loadTenantId(String userId) {
         try {
+            // 登录身份表 = users（V245 起带 tenant_id）；td_user 是组织侧遗留表，无此列
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"ID\" = ?", userId);
+                "SELECT tenant_id FROM users WHERE id = ?", userId);
             if (rows != null && !rows.isEmpty()) {
-                Object tid = rows.get(0).get("TENANT_ID");
+                Object tid = rows.get(0).get("tenant_id");
                 return tid != null ? tid.toString() : null;
             }
         } catch (Exception ex) {
