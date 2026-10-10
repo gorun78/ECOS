@@ -1,0 +1,746 @@
+2026-09-30 16:18:55.256 [main] [] INFO  c.c.gzcm.gateway.GatewayApplication - Starting GatewayApplication using Java 17.0.17 with PID 3004 (D:\workspace\javaprojects\ECOS\ecos_backend\gateway\target\gateway-1.0.0-SNAPSHOT.jar started by guoro in D:\workspace\javaprojects\ECOS)
+2026-09-30 16:18:55.264 [main] [] DEBUG c.c.gzcm.gateway.GatewayApplication - Running with Spring Boot v3.2.2, Spring v6.1.3
+2026-09-30 16:18:55.267 [main] [] INFO  c.c.gzcm.gateway.GatewayApplication - The following 1 profile is active: "enterprise"
+2026-09-30 16:19:08.036 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRecordMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRecordMapper' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:19:08.040 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRuleMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:19:08.064 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dqRuleMapper' and 'com.chinacreator.gzcm.engine.data.quality.mapper.DqRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:19:08.066 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dqScheduleMapper' and 'com.chinacreator.gzcm.engine.data.quality.mapper.DqScheduleMapper' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:19:19.021 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-09-30 16:19:19.119 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-8080"]
+2026-09-30 16:19:19.134 [main] [] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-09-30 16:19:19.139 [main] [] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-09-30 16:19:19.438 [main] [] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-09-30 16:19:19.447 [main] [] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 23668 ms
+2026-09-30 16:19:23.247 [main] [] INFO  c.c.g.s.security.JwtTokenProvider - JwtTokenProvider initialized with RS256 keys
+2026-09-30 16:19:24.050 [main] [] DEBUG c.c.g.s.s.JwtAuthenticationFilter - Filter 'jwtAuthenticationFilter' configured for use
+2026-09-30 16:19:24.062 [main] [] DEBUG c.c.g.gateway.filter.RateLimitFilter - Filter 'rateLimitFilter' configured for use
+2026-09-30 16:19:24.065 [main] [] DEBUG c.c.g.g.filter.EcosTrustHeaderFilter - Filter 'ecosTrustHeaderFilter' configured for use
+2026-09-30 16:19:24.094 [main] [] DEBUG c.c.gzcm.gateway.filter.QuotaFilter - Filter 'quotaFilter' configured for use
+2026-09-30 16:19:24.101 [main] [] DEBUG c.c.g.g.f.VersionPrefixRewriteFilter - Filter 'versionPrefixRewriteFilter' configured for use
+2026-09-30 16:19:24.106 [main] [] DEBUG c.c.g.g.filter.SecurityHeadersFilter - Filter 'securityHeadersFilter' configured for use
+2026-09-30 16:19:24.602 [main] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - onStartup: PG 恢复 0 个任务 + 0 个执行计划
+2026-09-30 16:19:24.801 [main] [] INFO  c.c.g.g.twin.DigitalTwinService - P3-4 DigitalTwinService initialized with 5 devices
+2026-09-30 16:19:25.036 [main] [] INFO  i.o.api.GlobalOpenTelemetry - AutoConfiguredOpenTelemetrySdk found on classpath but automatic configuration is disabled. To enable, run your JVM with -Dotel.java.global-autoconfigure.enabled=true
+2026-09-30 16:19:27.134 [main] [] INFO  c.c.g.g.oag.OagForwardController - [OAG-FWD] OAG 转发控制器已初始化, 目标 http://localhost:18084
+2026-09-30 16:19:27.267 [main] [] INFO  c.c.g.g.telemetry.UsageCollector - A7 租户用量聚合任务已注册到 runtime-task: taskType=USAGE_AGGREGATION, scheduleId=dd0f9d9b-cfe1-4947-bb08-2528072602d2
+2026-09-30 16:19:27.300 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=87b7e241-a083-462e-8d6e-88f581eca305, taskName=usage-aggregation
+2026-09-30 16:19:27.324 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=87b7e241-a083-462e-8d6e-88f581eca305
+2026-09-30 16:19:27.326 [pool-2-thread-1] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=87b7e241-a083-462e-8d6e-88f581eca305, status=RUNNING
+2026-09-30 16:19:27.373 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:27.427 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO ecos_tenant_usage (tenant_id, usage_date, quota_type, used_count, updated_at) SELECT 'unknown' AS tenant_id, ?::date, 'API_CALLS', COUNT(*) AS used_count, NOW() FROM ecos_spans s WHERE s.created_at::date = ?::date ON CONFLICT (tenant_id, usage_date, quota_type) DO UPDATE SET used_count = EXCLUDED.used_count, updated_at = NOW()]
+2026-09-30 16:19:27.532 [pool-2-thread-1] [] INFO  com.zaxxer.hikari.HikariDataSource - SysManHikariCP - Starting...
+2026-09-30 16:19:27.562 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:27.564 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.085 [pool-2-thread-1] [] INFO  com.zaxxer.hikari.pool.HikariPool - SysManHikariCP - Added connection org.postgresql.jdbc.PgConnection@5bee1914
+2026-09-30 16:19:29.099 [pool-2-thread-1] [] INFO  com.zaxxer.hikari.HikariDataSource - SysManHikariCP - Start completed.
+2026-09-30 16:19:29.358 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.360 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.370 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.372 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.385 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.387 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO ecos_tenant_usage (tenant_id, usage_date, quota_type, used_count, updated_at) SELECT 'unknown' AS tenant_id, ?::date, 'TOKENS', COALESCE(SUM(total_tokens), 0) AS used_count, NOW() FROM ecos_token_usage WHERE created_at::date = ?::date ON CONFLICT (tenant_id, usage_date, quota_type) DO UPDATE SET used_count = EXCLUDED.used_count, updated_at = NOW()]
+2026-09-30 16:19:29.395 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.397 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.420 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.422 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.438 [pool-2-thread-1] [] DEBUG c.c.g.g.telemetry.UsageCollector - A7 UsageCollector aggregated 1 API + 1 token usage records for 2026-09-30 on today=2026-09-30
+2026-09-30 16:19:29.441 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.442 [pool-2-thread-1] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=87b7e241-a083-462e-8d6e-88f581eca305, status=SUCCEEDED
+2026-09-30 16:19:29.443 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.449 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=87b7e241-a083-462e-8d6e-88f581eca305, status=SUCCEEDED
+2026-09-30 16:19:29.452 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=87b7e241-a083-462e-8d6e-88f581eca305 taskType=USAGE_AGGREGATION scheduleId=dd0f9d9b-cfe1-4947-bb08-2528072602d2
+2026-09-30 16:19:29.458 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.460 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.477 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.479 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.495 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.498 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.508 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.510 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.529 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.531 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.540 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.543 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.550 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.554 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.564 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.566 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.579 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.581 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.592 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.593 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.611 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.613 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.623 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.625 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.634 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.637 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.647 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.650 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.660 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.662 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.671 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.673 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.683 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.686 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.693 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.695 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.705 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.707 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.726 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.728 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.741 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.744 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.755 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.756 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.765 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.766 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.796 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.798 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.807 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.809 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.827 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.829 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.838 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.840 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.847 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.850 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.857 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.859 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.871 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.873 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.885 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.888 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.902 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.904 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.926 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.928 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.939 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.942 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:29.984 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:29.986 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:30.000 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:30.002 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:30.013 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:30.016 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:30.028 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:30.030 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:30.044 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:30.046 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:30.055 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:30.057 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:30.072 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:30.074 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:30.082 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:30.084 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:30.091 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:30.093 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-09-30 16:19:30.106 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:30.110 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT config_key, config_value FROM sys_config WHERE status = 'active']
+2026-09-30 16:19:30.179 [main] [] INFO  c.c.g.s.c.s.impl.SysConfigService - 缓存刷新完成，当前 146 条配置
+2026-09-30 16:19:30.181 [main] [] INFO  c.c.g.s.c.s.impl.SysConfigService - SysConfigService 初始化完成，已加载 146 条配置
+2026-09-30 16:19:30.789 [main] [] INFO  c.c.g.s.controller.CausalController - CausalController 初始化完成，已加载 8 个节点, 10 条边
+2026-09-30 16:19:31.076 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:31.078 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT id, dict_type, dict_code, dict_label, dict_label_en, sort_order, status, parent_code, ext_value, subsystem, created_at, updated_at FROM sys_dict WHERE status = 'active' ORDER BY dict_type, sort_order]
+2026-09-30 16:19:31.222 [main] [] INFO  c.c.g.s.d.service.impl.DictService - Dict cache refreshed: 21 types, 102 items in 146ms
+2026-09-30 16:19:31.672 [main] [] INFO  c.c.g.s.c.MarketplaceController - MarketplaceController 初始化完成，已加载 5 条种子数据
+2026-09-30 16:19:32.201 [main] [] INFO  c.c.g.s.c.ScenarioController - ScenarioController 初始化完成，已加载默认场景
+2026-09-30 16:19:32.915 [main] [] INFO  c.c.g.s.c.WorldModelGraphController - WorldModelGraphController 初始化完成，已加载 2 个默认目标 (fallback)
+2026-09-30 16:19:33.336 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:33.340 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [DELETE FROM sys_token_blacklist WHERE expire_at <= ?]
+2026-09-30 16:19:33.384 [main] [] INFO  c.c.g.s.i.s.impl.DbBlacklistStore - DbBlacklistStore 初始化完成，已清理 sys_token_blacklist 过期项
+2026-09-30 16:19:33.395 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:33.395 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT token, expire_at FROM sys_token_blacklist WHERE expire_at > ?]
+2026-09-30 16:19:34.047 [main] [] INFO  o.s.b.f.a.AutowiredAnnotationBeanPostProcessor - Inconsistent constructor declaration on bean with name 'securityCryptoEgress': single autowire-marked constructor flagged as optional - this constructor is effectively required since there is no default constructor to fall back to: public com.chinacreator.gzcm.runtime.core.crypto.SecurityCryptoEgress(org.springframework.context.ApplicationContext)
+2026-09-30 16:19:34.131 [main] [] INFO  c.c.g.r.e.KafkaBusProducerConfig - [runtime-event] Kafka producer 装配: bootstrap=localhost:9092
+2026-09-30 16:19:35.625 [main] [] INFO  c.c.g.r.e.KafkaBusConsumerConfig - [runtime-event] Kafka consumer 基参装配: bootstrap=localhost:9092, autoOffsetReset=latest
+2026-09-30 16:19:35.636 [main] [] INFO  c.c.g.r.e.KafkaEventBusServiceImpl - [EventBus][KAFKA] activated — broker 在/不在都能发, 失败仅记 WARN 不阻塞主流程; groupPrefix=<per-subscription fan-out>
+2026-09-30 16:19:39.845 [main] [] INFO  c.c.gzcm.runtime.dlq.DltConsumer - [DltConsumer] 装配 DLQ 消费容器 11 个 (groupId=ecos-dlt-consumer, autoOffsetReset=latest)
+2026-09-30 16:19:40.202 [main] [] INFO  c.c.g.r.l.c.LLMGatewayAutoConfiguration - Hermes Engine auto-configuration initialized: enabled=false, defaultProvider=openrouter, defaultModel=deepseek/deepseek-chat
+2026-09-30 16:19:41.768 [main] [] INFO  c.c.g.r.l.c.LLMGatewayAutoConfiguration - Hermes OkHttpClient created: timeout=PT1M, retryMaxAttempts=3
+2026-09-30 16:19:44.706 [main] [] INFO  c.c.g.r.access.config.Neo4jConfig - Neo4j Driver created: uri=bolt://localhost:7687, database=neo4j, poolSize=10, timeout=5s
+2026-09-30 16:19:44.758 [main] [] INFO  c.c.g.r.a.olap.DuckDBQueryService - DuckDBQueryService downgraded (DuckDB migrated to Doris) — all operations are no-ops
+2026-09-30 16:19:46.148 [main] [] INFO  c.c.g.w.service.ObjectKgSyncService - ObjectKgSyncService init: 使用 runtime-access 统一 Neo4jClient
+2026-09-30 16:19:46.998 [main] [] INFO  c.c.gzcm.workspace.workbook.RRuntime - R runtime not found. Install with: sudo apt install r-base
+2026-09-30 16:19:47.235 [main] [] INFO  c.c.g.e.s.c.CryptoAuditController - CryptoAuditController 初始化完成
+2026-09-30 16:19:47.467 [main] [] INFO  c.c.g.e.security.SecurityEngineImpl - Security engine started (was STOPPED)
+2026-09-30 16:19:47.470 [main] [] INFO  c.c.g.e.security.SecurityEngineImpl - Security engine auto-started on boot
+2026-09-30 16:19:49.054 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-event-ecos.data.security-tagged-0800de7b-95b9-4f66-b636-804e03bb6741-1, groupId=ecos-event-ecos.data.security-tagged-0800de7b-95b9-4f66-b636-804e03bb6741] Subscribed to topic(s): ecos.data.security-tagged
+2026-09-30 16:19:49.109 [main] [] INFO  c.c.g.r.e.KafkaEventBusServiceImpl - [EventBus][KAFKA] subscribe bridged topic=ecos.data.security-tagged group=ecos-event-ecos.data.security-tagged-0800de7b-95b9-4f66-b636-804e03bb6741 payloadType=com.chinacreator.gzcm.common.event.DataAssetSecurityTaggedEvent
+2026-09-30 16:19:49.111 [main] [] INFO  c.c.g.e.s.e.DataSecurityLevelEventListener - DataSecurityLevelEventListener: subscribed topic=ecos.data.security-tagged groupId=dccheng-security-consumer
+2026-09-30 16:19:51.802 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:51.804 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:19:51.837 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:51.838 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:19:51.895 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:51.897 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:19:51.903 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:51.904 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:19:51.921 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:51.923 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:19:51.928 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:51.930 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:19:51.941 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:51.942 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:19:51.949 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:51.950 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:19:51.957 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:51.959 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:19:51.964 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:51.965 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:19:51.974 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:51.975 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:19:51.981 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:51.982 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:19:51.990 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:51.993 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:19:52.000 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:52.002 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:19:52.010 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:52.012 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:19:52.017 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:52.019 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:19:52.026 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:52.028 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:19:52.032 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:52.034 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:19:52.041 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:52.043 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:19:52.048 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:52.049 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:19:52.059 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:52.061 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:19:52.066 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:52.068 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:19:52.076 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:19:52.078 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:19:52.084 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:19:52.086 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:19:52.097 [main] [] INFO  c.c.g.e.o.c.OntologyConfigController - Ontology engine defaults loaded (12 items)
+2026-09-30 16:19:52.620 [main] [] INFO  c.c.g.e.ontology.OntologyEngineImpl - Ontology engine started (was STOPPED)
+2026-09-30 16:19:52.622 [main] [] INFO  c.c.g.e.ontology.OntologyEngineImpl - Ontology engine auto-started on boot
+2026-09-30 16:19:52.937 [main] [] INFO  c.c.g.e.o.service.Neo4jGraphService - Neo4jGraphService init: 使用 runtime-access Neo4jClient 统一出口
+2026-09-30 16:19:58.851 [runtimeEventBus-ecos.data.security-tagged-1-0-C-1] [] INFO  o.s.k.l.ConcurrentMessageListenerContainer - ecos-event-ecos.data.security-tagged-0800de7b-95b9-4f66-b636-804e03bb6741: partitions assigned: [ecos.data.security-tagged-0]
+2026-09-30 16:20:01.295 [main] [] INFO  c.c.g.e.a.a.m.k.Neo4jQueryService - Neo4jQueryService 已连接 (database: neo4j), 使用 runtime-access 统一客户端
+2026-09-30 16:20:01.410 [main] [] INFO  c.c.gzcm.engine.ai.AiEngineImpl - Cognitive engine started (was STOPPED)
+2026-09-30 16:20:01.413 [main] [] INFO  c.c.gzcm.engine.ai.AiEngineImpl - Cognitive engine auto-started on boot
+2026-09-30 16:20:02.092 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: query_db
+2026-09-30 16:20:02.096 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: invoke_rest
+2026-09-30 16:20:02.099 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: delegate_to_agent
+2026-09-30 16:20:02.102 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: read_file
+2026-09-30 16:20:02.105 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: write_file
+2026-09-30 16:20:02.109 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: search_files
+2026-09-30 16:20:02.112 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: patch
+2026-09-30 16:20:02.309 [main] [] INFO  c.c.g.e.a.c.AgentProviderController - [AgentProviderController] 0 LLM providers registered
+2026-09-30 16:20:02.508 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - Loaded agent template: AI编排Agent (id=builtin-ai-agent)
+2026-09-30 16:20:02.512 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - Loaded agent template: 认知引擎Agent (id=builtin-cognitive-agent)
+2026-09-30 16:20:02.515 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - Loaded agent template: 数据引擎Agent (id=builtin-data-agent)
+2026-09-30 16:20:02.519 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - Loaded agent template: 知识库Agent (id=builtin-kb-agent)
+2026-09-30 16:20:02.522 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - Loaded agent template: 本体引擎Agent (id=builtin-ontology-agent)
+2026-09-30 16:20:02.526 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - Loaded agent template: 安全引擎Agent (id=builtin-security-agent)
+2026-09-30 16:20:02.528 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - AgentTemplateService initialized with 6 templates
+2026-09-30 16:20:02.941 [main] [] INFO  c.c.g.e.c.c.CognitiveMentalConfig - [CognitiveMental] IWarnLogService 已装配 + 告警落库通道启用 (ecos_warn_log, PMO-59 P4a)
+2026-09-30 16:20:03.622 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:03.625 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT extname, extversion FROM pg_extension WHERE extname = 'vector']
+2026-09-30 16:20:03.644 [main] [] INFO  c.c.g.engine.kb.repo.PgVectorSupport - ✅ pgvector 扩展已就绪 — version 0.6.2
+2026-09-30 16:20:03.821 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-event-ecos.cognitive-c2990544-1865-4d71-b468-d1576be1257b-2, groupId=ecos-event-ecos.cognitive-c2990544-1865-4d71-b468-d1576be1257b] Subscribed to topic(s): ecos.cognitive
+2026-09-30 16:20:03.825 [main] [] INFO  c.c.g.r.e.KafkaEventBusServiceImpl - [EventBus][KAFKA] subscribe bridged topic=ecos.cognitive group=ecos-event-ecos.cognitive-c2990544-1865-4d71-b468-d1576be1257b payloadType=java.util.Map
+2026-09-30 16:20:03.827 [main] [] INFO  c.c.g.e.c.s.m.CognitiveInvalidationConsumer - CognitiveInvalidationConsumer: subscribed topic=ecos.cognitive via EventBusService (Kafka 模式仅内存镜像；跨 JVM 消费待 dbus 装载 KafkaListener)
+2026-09-30 16:20:03.851 [main] [] INFO  c.c.g.e.c.s.mental.MentalScanTask - PMO-59 心智层补算任务已注册到 runtime-task: taskType=COGNITIVE_MENTAL_SCAN, scheduleId=249a0a58-3211-4db1-aaa6-2420aa71bd46, periodMillis=600000
+2026-09-30 16:20:03.851 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=72626f00-374e-4bc5-ab22-28156e2f9e48, taskName=cognitive-mental-scan
+2026-09-30 16:20:03.857 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=72626f00-374e-4bc5-ab22-28156e2f9e48
+2026-09-30 16:20:03.859 [pool-2-thread-1] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=72626f00-374e-4bc5-ab22-28156e2f9e48, status=RUNNING
+2026-09-30 16:20:03.861 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:03.863 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT id, evidence_code, tenant_scope, source_type, source_ref, blob, confidence, is_conflict, refuting_evidence_ids, effective_time, expire_time, status, create_time, update_time, create_by, update_by FROM ecos_cognitive_evidence WHERE is_deleted = 0 ORDER BY create_time DESC, id]
+2026-09-30 16:20:04.033 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.035 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT id, hypothesis_code, tenant_scope, statement, domain, metric_ref, evidence_ids, is_valid, invalid_at, invalid_reason, status, create_time, update_time, create_by, update_by FROM ecos_cognitive_hypothesis WHERE is_deleted = 0 AND status = ? ORDER BY update_time DESC, id]
+2026-09-30 16:20:04.044 [main] [] INFO  c.c.g.e.kb.service.KGWriterService - ✅ KGWriterService init: 使用 runtime-access 统一 Neo4jClient (pool≈10 connections)
+2026-09-30 16:20:04.054 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.056 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT id, hypothesis_code, tenant_scope, statement, domain, metric_ref, evidence_ids, is_valid, invalid_at, invalid_reason, status, create_time, update_time, create_by, update_by FROM ecos_cognitive_hypothesis WHERE is_deleted = 0 AND status = ? ORDER BY update_time DESC, id]
+2026-09-30 16:20:04.063 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.065 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT id, hypothesis_code, tenant_scope, statement, domain, metric_ref, evidence_ids, is_valid, invalid_at, invalid_reason, status, create_time, update_time, create_by, update_by FROM ecos_cognitive_hypothesis WHERE is_deleted = 0 AND status = ? ORDER BY update_time DESC, id]
+2026-09-30 16:20:04.071 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.072 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT id, hypothesis_code, tenant_scope, statement, domain, metric_ref, evidence_ids, is_valid, invalid_at, invalid_reason, status, create_time, update_time, create_by, update_by FROM ecos_cognitive_hypothesis WHERE is_deleted = 0 AND status = ? ORDER BY update_time DESC, id]
+2026-09-30 16:20:04.079 [main] [] INFO  c.c.g.e.k.s.KnowledgeExtractionService - KnowledgeExtractionService initialized
+2026-09-30 16:20:04.080 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.081 [pool-2-thread-1] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT id, hypothesis_code, tenant_scope, statement, domain, metric_ref, evidence_ids, is_valid, invalid_at, invalid_reason, status, create_time, update_time, create_by, update_by FROM ecos_cognitive_hypothesis WHERE is_deleted = 0 AND status = ? ORDER BY update_time DESC, id]
+2026-09-30 16:20:04.087 [pool-2-thread-1] [] INFO  c.c.g.e.c.s.mental.MentalScanTask - PMO-59 心智层补算一代完成: scanned=5 invalidated=0
+2026-09-30 16:20:04.089 [pool-2-thread-1] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=72626f00-374e-4bc5-ab22-28156e2f9e48, status=SUCCEEDED
+2026-09-30 16:20:04.090 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=72626f00-374e-4bc5-ab22-28156e2f9e48, status=SUCCEEDED
+2026-09-30 16:20:04.091 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=72626f00-374e-4bc5-ab22-28156e2f9e48 taskType=COGNITIVE_MENTAL_SCAN scheduleId=249a0a58-3211-4db1-aaa6-2420aa71bd46
+2026-09-30 16:20:04.177 [main] [] INFO  c.c.gzcm.engine.kb.KbEngineImpl - Knowledge engine started (was STOPPED)
+2026-09-30 16:20:04.179 [main] [] INFO  c.c.gzcm.engine.kb.KbEngineImpl - Knowledge engine auto-started on boot
+2026-09-30 16:20:04.368 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.370 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:20:04.377 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:04.378 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:20:04.385 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.386 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:20:04.393 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:04.395 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:20:04.406 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.408 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:20:04.414 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:04.415 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:20:04.422 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.423 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:20:04.428 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:04.429 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:20:04.438 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.439 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:20:04.444 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:04.445 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:20:04.456 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.458 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:20:04.463 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:04.465 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:20:04.473 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.474 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:20:04.479 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:04.481 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:20:04.490 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.491 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:20:04.496 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:04.497 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:20:04.504 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.506 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:20:04.510 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:04.514 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:20:04.522 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.524 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:20:04.529 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:04.530 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:20:04.538 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.539 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:20:04.543 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:04.545 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:20:04.551 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:04.553 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM sys_config WHERE config_key = ?]
+2026-09-30 16:20:04.557 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:04.558 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [UPDATE sys_config SET config_value = ?, updated_at = NOW() WHERE config_key = ?]
+2026-09-30 16:20:04.565 [main] [] INFO  c.c.g.e.k.c.KnowledgeSettingsController - Knowledge settings defaults loaded (12 items)
+2026-09-30 16:20:04.826 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-event-ecos.ontology.published-6a9cedfd-3de2-4101-8721-ffbbc65d2238-3, groupId=ecos-event-ecos.ontology.published-6a9cedfd-3de2-4101-8721-ffbbc65d2238] Subscribed to topic(s): ecos.ontology.published
+2026-09-30 16:20:04.831 [main] [] INFO  c.c.g.r.e.KafkaEventBusServiceImpl - [EventBus][KAFKA] subscribe bridged topic=ecos.ontology.published group=ecos-event-ecos.ontology.published-6a9cedfd-3de2-4101-8721-ffbbc65d2238 payloadType=com.chinacreator.gzcm.common.event.OntologyPublishedEvent
+2026-09-30 16:20:04.832 [main] [] INFO  c.c.g.e.k.e.EcosOntologyEventConsumer - EcosOntologyEventConsumer: subscribed topic=ecos.ontology.published via EventBusService
+2026-09-30 16:20:04.843 [main] [] INFO  c.c.g.e.k.r.AnswerGenerationHelper - AnswerGenerationHelper init: base=http://localhost:8080, model=deepseek/deepseek-chat
+2026-09-30 16:20:04.855 [main] [] INFO  c.c.g.e.kb.service.RuleGraphService - RuleGraphService init: 使用 runtime-access 统一客户端, switchOnWrite=true
+2026-09-30 16:20:05.304 [main] [] INFO  c.c.g.e.kb.service.RuleGraphService - Neo4j constraints ensured
+2026-09-30 16:20:05.323 [main] [] INFO  c.c.g.e.k.task.KbImportTaskRegistrar - KB_IMPORT runtime-task registered: executorType=KB_IMPORT, parserType=KB_IMPORT
+2026-09-30 16:20:05.442 [main] [] INFO  c.c.gzcm.engine.data.DataEngineImpl - Data engine started (was STOPPED)
+2026-09-30 16:20:05.444 [main] [] INFO  c.c.gzcm.engine.data.DataEngineImpl - Data engine auto-started on boot
+2026-09-30 16:20:05.969 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:05.974 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM ecos_pipeline_function WHERE is_builtin = true]
+2026-09-30 16:20:05.996 [main] [] INFO  c.c.g.e.d.s.PipelineFunctionServiceImpl - PB 函数种子数据已存在 (120 条)，跳过初始化
+2026-09-30 16:20:06.199 [main] [] INFO  c.c.g.e.d.m.MetadataCollectTaskRegistrar - METADATA_COLLECT runtime-task registered: taskType=METADATA_COLLECT
+2026-09-30 16:20:06.391 [main] [] INFO  c.c.g.e.d.p.PipelineTaskRegistrar - Pipeline runtime-task registered: executorType=PIPELINE, parserType=PIPELINE
+2026-09-30 16:20:06.903 [runtimeEventBus-ecos.cognitive-2-0-C-1] [] INFO  o.s.k.l.ConcurrentMessageListenerContainer - ecos-event-ecos.cognitive-c2990544-1865-4d71-b468-d1576be1257b: partitions assigned: [ecos.cognitive-0]
+2026-09-30 16:20:06.945 [main] [] WARN  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - cron 周期注册降级 (无法计算下次触发, 任务仍可手动执行) scheduleId=de33baf5-e0e3-42e6-bd98-055eb2a84a5c task=dq-daily-scan cron=0 0 8 * * *: Unsupported field: DayOfWeek
+2026-09-30 16:20:06.947 [main] [] INFO  c.c.g.e.d.scheduler.DqScheduledTask - DQ定时巡检已注册到runtime-task: cron=0 0 8 * * ?
+2026-09-30 16:20:06.963 [main] [] WARN  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - cron 周期注册降级 (无法计算下次触发, 任务仍可手动执行) scheduleId=0c71f080-46bd-4fb9-ab3c-cc04da3b302f task=schema-change-detector cron=0 0 * * * *: Unsupported field: DayOfWeek
+2026-09-30 16:20:06.965 [main] [] INFO  c.c.g.e.d.s.SchemaChangeDetector - SchemaChangeDetector registered with runtime-task: cron=0 0 * * * ?
+2026-09-30 16:20:07.925 [runtimeEventBus-ecos.ontology.published-3-0-C-1] [] INFO  o.s.k.l.ConcurrentMessageListenerContainer - ecos-event-ecos.ontology.published-6a9cedfd-3de2-4101-8721-ffbbc65d2238: partitions assigned: [ecos.ontology.published-0]
+2026-09-30 16:20:09.682 [main] [] WARN  o.s.b.a.s.s.UserDetailsServiceAutoConfiguration - 
+
+Using generated security password: 4d6fa453-ea2b-469f-bdc4-24d32d38a8ce
+
+This generated password is for development use only. Your security configuration must be updated before running your application in production.
+
+2026-09-30 16:20:14.059 [main] [] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 3 endpoint(s) beneath base path '/actuator'
+2026-09-30 16:20:19.290 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-8080"]
+2026-09-30 16:20:19.345 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path ''
+2026-09-30 16:20:19.367 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-4, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.agent.DLT
+2026-09-30 16:20:19.391 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-5, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.audit.DLT
+2026-09-30 16:20:19.413 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-6, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.catalog.DLT
+2026-09-30 16:20:19.448 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-7, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.cognitive.DLT
+2026-09-30 16:20:19.475 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-8, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.data.security-tagged.DLT
+2026-09-30 16:20:19.505 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-9, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.identity.DLT
+2026-09-30 16:20:19.528 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-10, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.knowledge.DLT
+2026-09-30 16:20:19.552 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-11, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.object.DLT
+2026-09-30 16:20:19.578 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-12, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.ontology.DLT
+2026-09-30 16:20:19.676 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-13, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.ontology.published.DLT
+2026-09-30 16:20:19.704 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-14, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.workflow.DLT
+2026-09-30 16:20:19.710 [main] [] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Starting...
+2026-09-30 16:20:19.714 [main] [] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - BrokerAvailabilityEvent[available=true, SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@49bf800f]]
+2026-09-30 16:20:19.716 [main] [] INFO  o.s.m.s.b.SimpleBrokerMessageHandler - Started.
+2026-09-30 16:20:19.739 [ecos-dlt-consumer-ecos.cognitive.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-7, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 2 : {ecos.cognitive.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.740 [ecos-dlt-consumer-ecos.identity.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-9, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 2 : {ecos.identity.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.741 [ecos-dlt-consumer-ecos.audit.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-5, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 2 : {ecos.audit.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.742 [ecos-dlt-consumer-ecos.catalog.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-6, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 2 : {ecos.catalog.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.743 [ecos-dlt-consumer-ecos.knowledge.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-10, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 2 : {ecos.knowledge.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.743 [ecos-dlt-consumer-ecos.agent.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-4, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 2 : {ecos.agent.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.745 [ecos-dlt-consumer-ecos.data.security-tagged.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-8, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 2 : {ecos.data.security-tagged.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.746 [ecos-dlt-consumer-ecos.object.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-11, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 2 : {ecos.object.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.904 [ecos-dlt-consumer-ecos.workflow.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-14, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 2 : {ecos.workflow.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.920 [ecos-dlt-consumer-ecos.ontology.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-12, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 2 : {ecos.ontology.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.935 [ecos-dlt-consumer-ecos.ontology.published.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-13, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 2 : {ecos.ontology.published.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.944 [ecos-dlt-consumer-ecos.identity.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-9, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 7 : {ecos.identity.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.954 [ecos-dlt-consumer-ecos.cognitive.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-7, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 7 : {ecos.cognitive.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.957 [ecos-dlt-consumer-ecos.audit.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-5, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 7 : {ecos.audit.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.964 [ecos-dlt-consumer-ecos.agent.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-4, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 6 : {ecos.agent.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.965 [ecos-dlt-consumer-ecos.data.security-tagged.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-8, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 7 : {ecos.data.security-tagged.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.991 [ecos-dlt-consumer-ecos.knowledge.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-10, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 7 : {ecos.knowledge.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:19.996 [ecos-dlt-consumer-ecos.catalog.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-6, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 7 : {ecos.catalog.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.001 [ecos-dlt-consumer-ecos.object.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-11, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 7 : {ecos.object.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.072 [ecos-dlt-consumer-ecos.workflow.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-14, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 7 : {ecos.workflow.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.056 [main] [] ERROR c.c.g.g.t.OpenTelemetryInitializer - Failed to initialize OpenTelemetry SDK: GlobalOpenTelemetry.set has already been called. GlobalOpenTelemetry.set must be called only once before any calls to GlobalOpenTelemetry.get. If you are using the OpenTelemetrySdk, use OpenTelemetrySdkBuilder.buildAndRegisterGlobal instead. Previous invocation set to cause of this exception.
+java.lang.IllegalStateException: GlobalOpenTelemetry.set has already been called. GlobalOpenTelemetry.set must be called only once before any calls to GlobalOpenTelemetry.get. If you are using the OpenTelemetrySdk, use OpenTelemetrySdkBuilder.buildAndRegisterGlobal instead. Previous invocation set to cause of this exception.
+	at io.opentelemetry.api.GlobalOpenTelemetry.set(GlobalOpenTelemetry.java:107)
+	at io.opentelemetry.sdk.OpenTelemetrySdkBuilder.buildAndRegisterGlobal(OpenTelemetrySdkBuilder.java:85)
+	at com.chinacreator.gzcm.gateway.telemetry.OpenTelemetryInitializer.initOpenTelemetry(OpenTelemetryInitializer.java:63)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.context.event.ApplicationListenerMethodAdapter.doInvoke(ApplicationListenerMethodAdapter.java:365)
+	at org.springframework.context.event.ApplicationListenerMethodAdapter.processEvent(ApplicationListenerMethodAdapter.java:237)
+	at org.springframework.context.event.ApplicationListenerMethodAdapter.onApplicationEvent(ApplicationListenerMethodAdapter.java:168)
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.doInvokeListener(SimpleApplicationEventMulticaster.java:178)
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.invokeListener(SimpleApplicationEventMulticaster.java:171)
+	at org.springframework.context.event.SimpleApplicationEventMulticaster.multicastEvent(SimpleApplicationEventMulticaster.java:149)
+	at org.springframework.context.support.AbstractApplicationContext.publishEvent(AbstractApplicationContext.java:451)
+	at org.springframework.context.support.AbstractApplicationContext.publishEvent(AbstractApplicationContext.java:384)
+	at org.springframework.context.support.AbstractApplicationContext.finishRefresh(AbstractApplicationContext.java:981)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:627)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:456)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:334)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1354)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1343)
+	at com.chinacreator.gzcm.gateway.GatewayApplication.main(GatewayApplication.java:142)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:91)
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:53)
+	at org.springframework.boot.loader.launch.JarLauncher.main(JarLauncher.java:58)
+Caused by: java.lang.Throwable: null
+	at io.opentelemetry.api.GlobalOpenTelemetry.set(GlobalOpenTelemetry.java:115)
+	at io.opentelemetry.api.GlobalOpenTelemetry.get(GlobalOpenTelemetry.java:85)
+	at com.chinacreator.gzcm.gateway.interceptor.TelemetryInterceptor.<init>(TelemetryInterceptor.java:53)
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+	at java.base/java.lang.reflect.Constructor.newInstanceWithCaller(Constructor.java:500)
+	at java.base/java.lang.reflect.Constructor.newInstance(Constructor.java:481)
+	at org.springframework.beans.BeanUtils.instantiateClass(BeanUtils.java:197)
+	at org.springframework.beans.factory.support.SimpleInstantiationStrategy.instantiate(SimpleInstantiationStrategy.java:88)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.instantiateBean(AbstractAutowireCapableBeanFactory.java:1310)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1201)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:561)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:975)
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:959)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:624)
+	... 14 common frames omitted
+2026-09-30 16:20:20.081 [ecos-dlt-consumer-ecos.identity.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-9, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 8 : {ecos.identity.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.083 [main] [] INFO  c.c.gzcm.gateway.GatewayApplication - Started GatewayApplication in 88.432 seconds (process running for 92.707)
+2026-09-30 16:20:20.085 [ecos-dlt-consumer-ecos.ontology.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-12, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 7 : {ecos.ontology.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.087 [ecos-dlt-consumer-ecos.audit.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-5, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 8 : {ecos.audit.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.090 [ecos-dlt-consumer-ecos.ontology.published.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-13, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 7 : {ecos.ontology.published.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.101 [ecos-dlt-consumer-ecos.agent.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-4, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 8 : {ecos.agent.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.108 [ecos-dlt-consumer-ecos.cognitive.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-7, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 8 : {ecos.cognitive.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.112 [ecos-dlt-consumer-ecos.data.security-tagged.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-8, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 8 : {ecos.data.security-tagged.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.123 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:20.124 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM td_role]
+2026-09-30 16:20:20.143 [ecos-dlt-consumer-ecos.knowledge.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-10, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 8 : {ecos.knowledge.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.145 [ecos-dlt-consumer-ecos.catalog.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-6, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 8 : {ecos.catalog.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.148 [ecos-dlt-consumer-ecos.object.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-11, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 8 : {ecos.object.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.148 [main] [] INFO  c.c.g.e.ai.config.DataInitializer - td_role table already has 11 records, skip seeding
+2026-09-30 16:20:20.151 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:20.153 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM ecos_cron_job]
+2026-09-30 16:20:20.171 [main] [] INFO  c.c.g.e.ai.config.DataInitializer - CronJob table already has 2 records, skip seeding
+2026-09-30 16:20:20.172 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL query
+2026-09-30 16:20:20.174 [main] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [SELECT COUNT(*) FROM ecos_skill]
+2026-09-30 16:20:20.184 [main] [] INFO  c.c.g.e.ai.config.DataInitializer - Skill table already has 3 records, skip seeding
+2026-09-30 16:20:20.201 [ecos-dlt-consumer-ecos.ontology.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-12, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 8 : {ecos.ontology.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.214 [ecos-dlt-consumer-ecos.identity.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-9, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 9 : {ecos.identity.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.216 [ecos-dlt-consumer-ecos.workflow.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-14, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 8 : {ecos.workflow.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.218 [ecos-dlt-consumer-ecos.ontology.published.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-13, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 8 : {ecos.ontology.published.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.260 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - ==>  Preparing: SELECT id, name, role, capability, status, endpoint, metadata, created_at AS createdAt, updated_at AS updatedAt FROM ecos_agent_registry WHERE id = ?
+2026-09-30 16:20:20.260 [ecos-dlt-consumer-ecos.audit.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-5, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 9 : {ecos.audit.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.300 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - ==> Parameters: builtin-data-agent(String)
+2026-09-30 16:20:20.306 [ecos-dlt-consumer-ecos.cognitive.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-7, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 9 : {ecos.cognitive.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.306 [ecos-dlt-consumer-ecos.agent.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-4, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 9 : {ecos.agent.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.308 [ecos-dlt-consumer-ecos.data.security-tagged.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-8, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 9 : {ecos.data.security-tagged.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.367 [ecos-dlt-consumer-ecos.object.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-11, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 9 : {ecos.object.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.369 [ecos-dlt-consumer-ecos.catalog.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-6, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 9 : {ecos.catalog.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.371 [ecos-dlt-consumer-ecos.knowledge.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-10, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 9 : {ecos.knowledge.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.379 [ecos-dlt-consumer-ecos.ontology.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-12, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 9 : {ecos.ontology.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.381 [ecos-dlt-consumer-ecos.workflow.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-14, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 9 : {ecos.workflow.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.385 [ecos-dlt-consumer-ecos.identity.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-9, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 10 : {ecos.identity.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.390 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - <==      Total: 1
+2026-09-30 16:20:20.390 [ecos-dlt-consumer-ecos.ontology.published.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-13, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 9 : {ecos.ontology.published.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.414 [ecos-dlt-consumer-ecos.audit.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-5, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 10 : {ecos.audit.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.424 [main] [] DEBUG c.c.g.e.ai.config.DataInitializer - Built-in agent builtin-data-agent already exists, skip seeding
+2026-09-30 16:20:20.427 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - ==>  Preparing: SELECT id, name, role, capability, status, endpoint, metadata, created_at AS createdAt, updated_at AS updatedAt FROM ecos_agent_registry WHERE id = ?
+2026-09-30 16:20:20.429 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - ==> Parameters: builtin-ontology-agent(String)
+2026-09-30 16:20:20.434 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - <==      Total: 1
+2026-09-30 16:20:20.436 [main] [] DEBUG c.c.g.e.ai.config.DataInitializer - Built-in agent builtin-ontology-agent already exists, skip seeding
+2026-09-30 16:20:20.438 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - ==>  Preparing: SELECT id, name, role, capability, status, endpoint, metadata, created_at AS createdAt, updated_at AS updatedAt FROM ecos_agent_registry WHERE id = ?
+2026-09-30 16:20:20.439 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - ==> Parameters: builtin-cognitive-agent(String)
+2026-09-30 16:20:20.448 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - <==      Total: 1
+2026-09-30 16:20:20.448 [ecos-dlt-consumer-ecos.cognitive.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-7, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 10 : {ecos.cognitive.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.449 [ecos-dlt-consumer-ecos.data.security-tagged.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-8, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 10 : {ecos.data.security-tagged.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.450 [main] [] DEBUG c.c.g.e.ai.config.DataInitializer - Built-in agent builtin-cognitive-agent already exists, skip seeding
+2026-09-30 16:20:20.451 [ecos-dlt-consumer-ecos.agent.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-4, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 10 : {ecos.agent.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.454 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - ==>  Preparing: SELECT id, name, role, capability, status, endpoint, metadata, created_at AS createdAt, updated_at AS updatedAt FROM ecos_agent_registry WHERE id = ?
+2026-09-30 16:20:20.455 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - ==> Parameters: builtin-security-agent(String)
+2026-09-30 16:20:20.461 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - <==      Total: 1
+2026-09-30 16:20:20.464 [main] [] DEBUG c.c.g.e.ai.config.DataInitializer - Built-in agent builtin-security-agent already exists, skip seeding
+2026-09-30 16:20:20.466 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - ==>  Preparing: SELECT id, name, role, capability, status, endpoint, metadata, created_at AS createdAt, updated_at AS updatedAt FROM ecos_agent_registry WHERE id = ?
+2026-09-30 16:20:20.468 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - ==> Parameters: builtin-kb-agent(String)
+2026-09-30 16:20:20.474 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - <==      Total: 1
+2026-09-30 16:20:20.476 [main] [] DEBUG c.c.g.e.ai.config.DataInitializer - Built-in agent builtin-kb-agent already exists, skip seeding
+2026-09-30 16:20:20.478 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - ==>  Preparing: SELECT id, name, role, capability, status, endpoint, metadata, created_at AS createdAt, updated_at AS updatedAt FROM ecos_agent_registry WHERE id = ?
+2026-09-30 16:20:20.480 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - ==> Parameters: builtin-ai-agent(String)
+2026-09-30 16:20:20.493 [main] [] DEBUG c.c.g.e.a.a.m.r.A.findById - <==      Total: 1
+2026-09-30 16:20:20.494 [main] [] DEBUG c.c.g.e.ai.config.DataInitializer - Built-in agent builtin-ai-agent already exists, skip seeding
+2026-09-30 16:20:20.496 [main] [] INFO  c.c.g.e.ai.config.DataInitializer - Seeded 6 built-in Agents
+2026-09-30 16:20:20.497 [ecos-dlt-consumer-ecos.object.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-11, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 10 : {ecos.object.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.502 [ecos-dlt-consumer-ecos.catalog.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-6, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 10 : {ecos.catalog.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.504 [ecos-dlt-consumer-ecos.knowledge.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-10, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 10 : {ecos.knowledge.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.511 [ecos-dlt-consumer-ecos.identity.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-9, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 11 : {ecos.identity.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.517 [ecos-dlt-consumer-ecos.ontology.published.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-13, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 10 : {ecos.ontology.published.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.521 [ecos-dlt-consumer-ecos.workflow.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-14, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 10 : {ecos.workflow.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.527 [ecos-dlt-consumer-ecos.ontology.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-12, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 10 : {ecos.ontology.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.537 [ecos-dlt-consumer-ecos.audit.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-5, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 11 : {ecos.audit.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.571 [ecos-dlt-consumer-ecos.cognitive.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-7, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 11 : {ecos.cognitive.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.580 [ecos-dlt-consumer-ecos.agent.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-4, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 11 : {ecos.agent.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.581 [ecos-dlt-consumer-ecos.data.security-tagged.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-8, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 11 : {ecos.data.security-tagged.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.638 [ecos-dlt-consumer-ecos.object.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-11, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 11 : {ecos.object.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.646 [ecos-dlt-consumer-ecos.knowledge.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-10, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 11 : {ecos.knowledge.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.648 [ecos-dlt-consumer-ecos.catalog.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-6, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 11 : {ecos.catalog.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.663 [ecos-dlt-consumer-ecos.identity.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-9, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 12 : {ecos.identity.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.670 [ecos-dlt-consumer-ecos.ontology.published.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-13, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 11 : {ecos.ontology.published.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.670 [ecos-dlt-consumer-ecos.workflow.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-14, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 11 : {ecos.workflow.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.695 [ecos-dlt-consumer-ecos.ontology.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-12, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 11 : {ecos.ontology.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.696 [ecos-dlt-consumer-ecos.audit.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-5, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 12 : {ecos.audit.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.718 [ecos-dlt-consumer-ecos.agent.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-4, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 12 : {ecos.agent.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.725 [ecos-dlt-consumer-ecos.cognitive.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-7, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 12 : {ecos.cognitive.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.728 [ecos-dlt-consumer-ecos.data.security-tagged.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-8, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 12 : {ecos.data.security-tagged.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.749 [ecos-dlt-consumer-ecos.object.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-11, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 12 : {ecos.object.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.776 [ecos-dlt-consumer-ecos.knowledge.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-10, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 12 : {ecos.knowledge.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.778 [ecos-dlt-consumer-ecos.catalog.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-6, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 12 : {ecos.catalog.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.799 [ecos-dlt-consumer-ecos.workflow.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-14, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 12 : {ecos.workflow.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.803 [ecos-dlt-consumer-ecos.ontology.published.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-13, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 12 : {ecos.ontology.published.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.803 [ecos-dlt-consumer-ecos.identity.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-9, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 13 : {ecos.identity.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.837 [ecos-dlt-consumer-ecos.audit.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-5, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 13 : {ecos.audit.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.838 [ecos-dlt-consumer-ecos.ontology.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-12, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 12 : {ecos.ontology.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.858 [ecos-dlt-consumer-ecos.data.security-tagged.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-8, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 13 : {ecos.data.security-tagged.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.874 [ecos-dlt-consumer-ecos.agent.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-4, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 13 : {ecos.agent.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.891 [ecos-dlt-consumer-ecos.object.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-11, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 13 : {ecos.object.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.903 [ecos-dlt-consumer-ecos.knowledge.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-10, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 13 : {ecos.knowledge.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.903 [ecos-dlt-consumer-ecos.cognitive.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-7, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 13 : {ecos.cognitive.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.911 [ecos-dlt-consumer-ecos.catalog.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-6, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 13 : {ecos.catalog.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.946 [ecos-dlt-consumer-ecos.workflow.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-14, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 13 : {ecos.workflow.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.951 [ecos-dlt-consumer-ecos.ontology.published.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-13, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 13 : {ecos.ontology.published.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.951 [ecos-dlt-consumer-ecos.identity.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-9, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 14 : {ecos.identity.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:20.998 [ecos-dlt-consumer-ecos.audit.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-5, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 14 : {ecos.audit.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:21.001 [ecos-dlt-consumer-ecos.ontology.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-12, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 13 : {ecos.ontology.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:21.031 [ecos-dlt-consumer-ecos.knowledge.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-10, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 14 : {ecos.knowledge.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:21.064 [ecos-dlt-consumer-ecos.workflow.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-14, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 14 : {ecos.workflow.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:21.075 [ecos-dlt-consumer-ecos.ontology.published.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-13, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 14 : {ecos.ontology.published.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:21.125 [ecos-dlt-consumer-ecos.ontology.DLT-C-1] [] WARN  o.apache.kafka.clients.NetworkClient - [Consumer clientId=consumer-ecos-dlt-consumer-12, groupId=ecos-dlt-consumer] Error while fetching metadata with correlation id 14 : {ecos.ontology.DLT=LEADER_NOT_AVAILABLE}
+2026-09-30 16:20:25.944 [ecos-dlt-consumer-ecos.workflow.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: [ecos.workflow.DLT-0]
+2026-09-30 16:20:25.946 [ecos-dlt-consumer-ecos.ontology.published.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: [ecos.ontology.published.DLT-0]
+2026-09-30 16:20:25.954 [ecos-dlt-consumer-ecos.audit.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: [ecos.audit.DLT-0]
+2026-09-30 16:20:25.954 [ecos-dlt-consumer-ecos.data.security-tagged.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: [ecos.data.security-tagged.DLT-0]
+2026-09-30 16:20:25.954 [ecos-dlt-consumer-ecos.identity.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: [ecos.identity.DLT-0]
+2026-09-30 16:20:25.958 [ecos-dlt-consumer-ecos.ontology.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: [ecos.ontology.DLT-0]
+2026-09-30 16:20:25.959 [ecos-dlt-consumer-ecos.object.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: [ecos.object.DLT-0]
+2026-09-30 16:20:25.959 [ecos-dlt-consumer-ecos.catalog.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: [ecos.catalog.DLT-0]
+2026-09-30 16:20:25.959 [ecos-dlt-consumer-ecos.cognitive.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: [ecos.cognitive.DLT-0]
+2026-09-30 16:20:25.967 [ecos-dlt-consumer-ecos.agent.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: [ecos.agent.DLT-0]
+2026-09-30 16:20:25.972 [ecos-dlt-consumer-ecos.knowledge.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: [ecos.knowledge.DLT-0]
+2026-09-30 16:20:27.267 [pool-2-thread-2] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=87b7e241-a083-462e-8d6e-88f581eca305, taskName=usage-aggregation
+2026-09-30 16:20:27.270 [pool-2-thread-2] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=87b7e241-a083-462e-8d6e-88f581eca305
+2026-09-30 16:20:27.271 [pool-2-thread-2] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=87b7e241-a083-462e-8d6e-88f581eca305, status=RUNNING
+2026-09-30 16:20:27.272 [pool-2-thread-2] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:27.273 [pool-2-thread-2] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO ecos_tenant_usage (tenant_id, usage_date, quota_type, used_count, updated_at) SELECT 'unknown' AS tenant_id, ?::date, 'API_CALLS', COUNT(*) AS used_count, NOW() FROM ecos_spans s WHERE s.created_at::date = ?::date ON CONFLICT (tenant_id, usage_date, quota_type) DO UPDATE SET used_count = EXCLUDED.used_count, updated_at = NOW()]
+2026-09-30 16:20:27.282 [pool-2-thread-2] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:20:27.283 [pool-2-thread-2] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO ecos_tenant_usage (tenant_id, usage_date, quota_type, used_count, updated_at) SELECT 'unknown' AS tenant_id, ?::date, 'TOKENS', COALESCE(SUM(total_tokens), 0) AS used_count, NOW() FROM ecos_token_usage WHERE created_at::date = ?::date ON CONFLICT (tenant_id, usage_date, quota_type) DO UPDATE SET used_count = EXCLUDED.used_count, updated_at = NOW()]
+2026-09-30 16:20:27.291 [pool-2-thread-2] [] DEBUG c.c.g.g.telemetry.UsageCollector - A7 UsageCollector aggregated 1 API + 1 token usage records for 2026-09-30 on today=2026-09-30
+2026-09-30 16:20:27.292 [pool-2-thread-2] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=87b7e241-a083-462e-8d6e-88f581eca305, status=SUCCEEDED
+2026-09-30 16:20:27.294 [pool-2-thread-2] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=87b7e241-a083-462e-8d6e-88f581eca305, status=SUCCEEDED
+2026-09-30 16:20:27.295 [pool-2-thread-2] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=87b7e241-a083-462e-8d6e-88f581eca305 taskType=USAGE_AGGREGATION scheduleId=dd0f9d9b-cfe1-4947-bb08-2528072602d2
+2026-09-30 16:20:34.015 [pool-2-thread-3] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, taskName=kg-neo4j-health-check
+2026-09-30 16:20:34.018 [pool-2-thread-3] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84
+2026-09-30 16:20:34.019 [pool-2-thread-3] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=RUNNING
+2026-09-30 16:20:34.939 [pool-2-thread-3] [] DEBUG c.c.g.e.kb.service.KGWriterService - Neo4j health OK — node count: 44
+2026-09-30 16:20:34.940 [pool-2-thread-3] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=SUCCEEDED
+2026-09-30 16:20:34.943 [pool-2-thread-3] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=SUCCEEDED
+2026-09-30 16:20:34.944 [pool-2-thread-3] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84 taskType=KG_NEO4J_HEALTH_CHECK scheduleId=3ec5437d-ea41-42c3-b1a0-125c9231fad5
+2026-09-30 16:20:35.931 [pool-2-thread-4] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f, taskName=auto-collect-scan
+2026-09-30 16:20:35.933 [pool-2-thread-4] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f
+2026-09-30 16:20:35.935 [pool-2-thread-4] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f, status=RUNNING
+2026-09-30 16:20:35.940 [pool-2-thread-4] [] DEBUG c.c.g.e.d.r.D.findAll - ==>  Preparing: SELECT * FROM td_datasource ORDER BY create_time DESC
+2026-09-30 16:20:35.942 [pool-2-thread-4] [] DEBUG c.c.g.e.d.r.D.findAll - ==> Parameters: 
+2026-09-30 16:20:35.971 [pool-2-thread-4] [] DEBUG c.c.g.e.d.r.D.findAll - <==      Total: 5
+2026-09-30 16:20:36.101 [pool-2-thread-4] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f, status=SUCCEEDED
+2026-09-30 16:20:36.103 [pool-2-thread-4] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f, status=SUCCEEDED
+2026-09-30 16:20:36.104 [pool-2-thread-4] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f taskType=AUTO_COLLECT_SCAN scheduleId=a81455ab-1b5f-4c24-8ffb-cabaaef34f60
+2026-09-30 16:20:36.991 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b, taskName=data-ingest-scan
+2026-09-30 16:20:36.994 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b
+2026-09-30 16:20:36.996 [pool-2-thread-1] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b, status=RUNNING
+2026-09-30 16:20:37.002 [pool-2-thread-1] [] DEBUG c.c.g.e.d.r.D.findAll - ==>  Preparing: SELECT * FROM td_datasource ORDER BY create_time DESC
+2026-09-30 16:20:37.004 [pool-2-thread-1] [] DEBUG c.c.g.e.d.r.D.findAll - ==> Parameters: 
+2026-09-30 16:20:37.020 [pool-2-thread-1] [] DEBUG c.c.g.e.d.r.D.findAll - <==      Total: 5
+2026-09-30 16:20:37.025 [pool-2-thread-1] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b, status=SUCCEEDED
+2026-09-30 16:20:37.027 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b, status=SUCCEEDED
+2026-09-30 16:20:37.028 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=b68747c5-f723-4b88-85c9-161b5e371a5b taskType=DATA_INGEST_SCAN scheduleId=48d6af67-7ef2-458c-8528-efe6394a3f99
+2026-09-30 16:20:49.812 [MessageBroker-3] [] DEBUG c.c.g.r.a.m.AuditRetryMapper.listDue - ==>  Preparing: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+2026-09-30 16:20:49.819 [MessageBroker-3] [] DEBUG c.c.g.r.a.m.AuditRetryMapper.listDue - ==> Parameters: 2026-09-30 16:20:49.8078494(Timestamp), 100(Integer)
+2026-09-30 16:20:50.459 [MessageBroker-3] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-09-30 16:21:04.026 [pool-2-thread-5] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, taskName=kg-neo4j-health-check
+2026-09-30 16:21:04.028 [pool-2-thread-5] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84
+2026-09-30 16:21:04.030 [pool-2-thread-5] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=RUNNING
+2026-09-30 16:21:04.162 [pool-2-thread-5] [] DEBUG c.c.g.e.kb.service.KGWriterService - Neo4j health OK — node count: 44
+2026-09-30 16:21:04.164 [pool-2-thread-5] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=SUCCEEDED
+2026-09-30 16:21:04.166 [pool-2-thread-5] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=SUCCEEDED
+2026-09-30 16:21:04.168 [pool-2-thread-5] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84 taskType=KG_NEO4J_HEALTH_CHECK scheduleId=3ec5437d-ea41-42c3-b1a0-125c9231fad5
+2026-09-30 16:21:06.391 [pool-2-thread-6] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=78674208-e771-40c9-980d-d5ae553012b7, taskName=pipeline-debug-session-cleanup
+2026-09-30 16:21:06.395 [pool-2-thread-6] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=78674208-e771-40c9-980d-d5ae553012b7
+2026-09-30 16:21:06.396 [pool-2-thread-6] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=78674208-e771-40c9-980d-d5ae553012b7, status=RUNNING
+2026-09-30 16:21:06.400 [pool-2-thread-6] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=78674208-e771-40c9-980d-d5ae553012b7, status=SUCCEEDED
+2026-09-30 16:21:06.402 [pool-2-thread-6] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=78674208-e771-40c9-980d-d5ae553012b7, status=SUCCEEDED
+2026-09-30 16:21:06.405 [pool-2-thread-6] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=78674208-e771-40c9-980d-d5ae553012b7 taskType=PIPELINE_DEBUG_SESSION_CLEANUP scheduleId=2c0c8ce0-290b-4100-9382-3b73e09f3ec2
+2026-09-30 16:21:19.135 [MessageBroker-11] [] INFO  o.s.w.s.c.WebSocketMessageBrokerStats - WebSocketSession[0 current WS(0)-HttpStream(0)-HttpPoll(0), 0 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(0)-CONNECTED(0)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], outboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], sockJsScheduler[pool size = 16, active threads = 1, queued tasks = 3, completed tasks = 13]
+2026-09-30 16:21:20.000 [MessageBroker-3] [] WARN  c.c.gzcm.runtime.dlq.DltLagChecker - [DltLagChecker] AdminClient 创建失败 errType=KafkaException msg=Failed to create new KafkaAdminClient
+2026-09-30 16:21:20.002 [MessageBroker-3] [] WARN  c.c.gzcm.runtime.dlq.DltLagChecker - [DltLagChecker] AdminClient 不可用（bootstrap=localhost:9092），本轮降级跳过
+2026-09-30 16:21:27.281 [pool-2-thread-7] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=87b7e241-a083-462e-8d6e-88f581eca305, taskName=usage-aggregation
+2026-09-30 16:21:27.284 [pool-2-thread-7] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=87b7e241-a083-462e-8d6e-88f581eca305
+2026-09-30 16:21:27.286 [pool-2-thread-7] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=87b7e241-a083-462e-8d6e-88f581eca305, status=RUNNING
+2026-09-30 16:21:27.287 [pool-2-thread-7] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:21:27.289 [pool-2-thread-7] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO ecos_tenant_usage (tenant_id, usage_date, quota_type, used_count, updated_at) SELECT 'unknown' AS tenant_id, ?::date, 'API_CALLS', COUNT(*) AS used_count, NOW() FROM ecos_spans s WHERE s.created_at::date = ?::date ON CONFLICT (tenant_id, usage_date, quota_type) DO UPDATE SET used_count = EXCLUDED.used_count, updated_at = NOW()]
+2026-09-30 16:21:27.323 [pool-2-thread-7] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:21:27.324 [pool-2-thread-7] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO ecos_tenant_usage (tenant_id, usage_date, quota_type, used_count, updated_at) SELECT 'unknown' AS tenant_id, ?::date, 'TOKENS', COALESCE(SUM(total_tokens), 0) AS used_count, NOW() FROM ecos_token_usage WHERE created_at::date = ?::date ON CONFLICT (tenant_id, usage_date, quota_type) DO UPDATE SET used_count = EXCLUDED.used_count, updated_at = NOW()]
+2026-09-30 16:21:27.355 [pool-2-thread-7] [] DEBUG c.c.g.g.telemetry.UsageCollector - A7 UsageCollector aggregated 1 API + 1 token usage records for 2026-09-30 on today=2026-09-30
+2026-09-30 16:21:27.358 [pool-2-thread-7] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=87b7e241-a083-462e-8d6e-88f581eca305, status=SUCCEEDED
+2026-09-30 16:21:27.359 [pool-2-thread-7] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=87b7e241-a083-462e-8d6e-88f581eca305, status=SUCCEEDED
+2026-09-30 16:21:27.360 [pool-2-thread-7] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=87b7e241-a083-462e-8d6e-88f581eca305 taskType=USAGE_AGGREGATION scheduleId=dd0f9d9b-cfe1-4947-bb08-2528072602d2
+2026-09-30 16:21:34.025 [pool-2-thread-8] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, taskName=kg-neo4j-health-check
+2026-09-30 16:21:34.037 [pool-2-thread-8] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84
+2026-09-30 16:21:34.038 [pool-2-thread-8] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=RUNNING
+2026-09-30 16:21:34.114 [pool-2-thread-8] [] DEBUG c.c.g.e.kb.service.KGWriterService - Neo4j health OK — node count: 44
+2026-09-30 16:21:34.118 [pool-2-thread-8] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=SUCCEEDED
+2026-09-30 16:21:34.119 [pool-2-thread-8] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=SUCCEEDED
+2026-09-30 16:21:34.121 [pool-2-thread-8] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84 taskType=KG_NEO4J_HEALTH_CHECK scheduleId=3ec5437d-ea41-42c3-b1a0-125c9231fad5
+2026-09-30 16:21:35.932 [pool-2-thread-2] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f, taskName=auto-collect-scan
+2026-09-30 16:21:35.936 [pool-2-thread-2] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f
+2026-09-30 16:21:35.938 [pool-2-thread-2] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f, status=RUNNING
+2026-09-30 16:21:35.942 [pool-2-thread-2] [] DEBUG c.c.g.e.d.r.D.findAll - ==>  Preparing: SELECT * FROM td_datasource ORDER BY create_time DESC
+2026-09-30 16:21:35.945 [pool-2-thread-2] [] DEBUG c.c.g.e.d.r.D.findAll - ==> Parameters: 
+2026-09-30 16:21:35.956 [pool-2-thread-2] [] DEBUG c.c.g.e.d.r.D.findAll - <==      Total: 5
+2026-09-30 16:21:35.965 [pool-2-thread-2] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f, status=SUCCEEDED
+2026-09-30 16:21:35.966 [pool-2-thread-2] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f, status=SUCCEEDED
+2026-09-30 16:21:35.967 [pool-2-thread-2] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f taskType=AUTO_COLLECT_SCAN scheduleId=a81455ab-1b5f-4c24-8ffb-cabaaef34f60
+2026-09-30 16:21:36.991 [pool-2-thread-9] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b, taskName=data-ingest-scan
+2026-09-30 16:21:36.993 [pool-2-thread-9] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b
+2026-09-30 16:21:36.995 [pool-2-thread-9] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b, status=RUNNING
+2026-09-30 16:21:37.000 [pool-2-thread-9] [] DEBUG c.c.g.e.d.r.D.findAll - ==>  Preparing: SELECT * FROM td_datasource ORDER BY create_time DESC
+2026-09-30 16:21:37.003 [pool-2-thread-9] [] DEBUG c.c.g.e.d.r.D.findAll - ==> Parameters: 
+2026-09-30 16:21:37.023 [pool-2-thread-9] [] DEBUG c.c.g.e.d.r.D.findAll - <==      Total: 5
+2026-09-30 16:21:37.026 [pool-2-thread-9] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b, status=SUCCEEDED
+2026-09-30 16:21:37.028 [pool-2-thread-9] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b, status=SUCCEEDED
+2026-09-30 16:21:37.030 [pool-2-thread-9] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=b68747c5-f723-4b88-85c9-161b5e371a5b taskType=DATA_INGEST_SCAN scheduleId=48d6af67-7ef2-458c-8528-efe6394a3f99
+2026-09-30 16:21:50.480 [MessageBroker-15] [] DEBUG c.c.g.r.a.m.AuditRetryMapper.listDue - ==>  Preparing: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+2026-09-30 16:21:50.482 [MessageBroker-15] [] DEBUG c.c.g.r.a.m.AuditRetryMapper.listDue - ==> Parameters: 2026-09-30 16:21:50.4735242(Timestamp), 100(Integer)
+2026-09-30 16:21:50.501 [MessageBroker-15] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-09-30 16:22:04.018 [pool-2-thread-3] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, taskName=kg-neo4j-health-check
+2026-09-30 16:22:04.020 [pool-2-thread-3] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84
+2026-09-30 16:22:04.021 [pool-2-thread-3] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=RUNNING
+2026-09-30 16:22:04.060 [pool-2-thread-3] [] DEBUG c.c.g.e.kb.service.KGWriterService - Neo4j health OK — node count: 44
+2026-09-30 16:22:04.061 [pool-2-thread-3] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=SUCCEEDED
+2026-09-30 16:22:04.063 [pool-2-thread-3] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=SUCCEEDED
+2026-09-30 16:22:04.065 [pool-2-thread-3] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84 taskType=KG_NEO4J_HEALTH_CHECK scheduleId=3ec5437d-ea41-42c3-b1a0-125c9231fad5
+2026-09-30 16:22:06.358 [pool-2-thread-10] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=78674208-e771-40c9-980d-d5ae553012b7, taskName=pipeline-debug-session-cleanup
+2026-09-30 16:22:06.361 [pool-2-thread-10] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=78674208-e771-40c9-980d-d5ae553012b7
+2026-09-30 16:22:06.362 [pool-2-thread-10] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=78674208-e771-40c9-980d-d5ae553012b7, status=RUNNING
+2026-09-30 16:22:06.363 [pool-2-thread-10] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=78674208-e771-40c9-980d-d5ae553012b7, status=SUCCEEDED
+2026-09-30 16:22:06.365 [pool-2-thread-10] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=78674208-e771-40c9-980d-d5ae553012b7, status=SUCCEEDED
+2026-09-30 16:22:06.366 [pool-2-thread-10] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=78674208-e771-40c9-980d-d5ae553012b7 taskType=PIPELINE_DEBUG_SESSION_CLEANUP scheduleId=2c0c8ce0-290b-4100-9382-3b73e09f3ec2
+2026-09-30 16:22:27.274 [pool-2-thread-4] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=87b7e241-a083-462e-8d6e-88f581eca305, taskName=usage-aggregation
+2026-09-30 16:22:27.277 [pool-2-thread-4] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=87b7e241-a083-462e-8d6e-88f581eca305
+2026-09-30 16:22:27.278 [pool-2-thread-4] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=87b7e241-a083-462e-8d6e-88f581eca305, status=RUNNING
+2026-09-30 16:22:27.280 [pool-2-thread-4] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:22:27.282 [pool-2-thread-4] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO ecos_tenant_usage (tenant_id, usage_date, quota_type, used_count, updated_at) SELECT 'unknown' AS tenant_id, ?::date, 'API_CALLS', COUNT(*) AS used_count, NOW() FROM ecos_spans s WHERE s.created_at::date = ?::date ON CONFLICT (tenant_id, usage_date, quota_type) DO UPDATE SET used_count = EXCLUDED.used_count, updated_at = NOW()]
+2026-09-30 16:22:27.311 [pool-2-thread-4] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL update
+2026-09-30 16:22:27.314 [pool-2-thread-4] [] DEBUG c.c.g.g.jdbc.TenantAwareJdbcTemplate - Executing prepared SQL statement [INSERT INTO ecos_tenant_usage (tenant_id, usage_date, quota_type, used_count, updated_at) SELECT 'unknown' AS tenant_id, ?::date, 'TOKENS', COALESCE(SUM(total_tokens), 0) AS used_count, NOW() FROM ecos_token_usage WHERE created_at::date = ?::date ON CONFLICT (tenant_id, usage_date, quota_type) DO UPDATE SET used_count = EXCLUDED.used_count, updated_at = NOW()]
+2026-09-30 16:22:27.325 [pool-2-thread-4] [] DEBUG c.c.g.g.telemetry.UsageCollector - A7 UsageCollector aggregated 1 API + 1 token usage records for 2026-09-30 on today=2026-09-30
+2026-09-30 16:22:27.328 [pool-2-thread-4] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=87b7e241-a083-462e-8d6e-88f581eca305, status=SUCCEEDED
+2026-09-30 16:22:27.329 [pool-2-thread-4] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=87b7e241-a083-462e-8d6e-88f581eca305, status=SUCCEEDED
+2026-09-30 16:22:27.331 [pool-2-thread-4] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=87b7e241-a083-462e-8d6e-88f581eca305 taskType=USAGE_AGGREGATION scheduleId=dd0f9d9b-cfe1-4947-bb08-2528072602d2
+2026-09-30 16:22:34.018 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, taskName=kg-neo4j-health-check
+2026-09-30 16:22:34.031 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84
+2026-09-30 16:22:34.032 [pool-2-thread-1] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=RUNNING
+2026-09-30 16:22:34.088 [pool-2-thread-1] [] DEBUG c.c.g.e.kb.service.KGWriterService - Neo4j health OK — node count: 44
+2026-09-30 16:22:34.090 [pool-2-thread-1] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=SUCCEEDED
+2026-09-30 16:22:34.091 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=SUCCEEDED
+2026-09-30 16:22:34.093 [pool-2-thread-1] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84 taskType=KG_NEO4J_HEALTH_CHECK scheduleId=3ec5437d-ea41-42c3-b1a0-125c9231fad5
+2026-09-30 16:22:35.930 [pool-2-thread-5] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f, taskName=auto-collect-scan
+2026-09-30 16:22:35.933 [pool-2-thread-5] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f
+2026-09-30 16:22:35.934 [pool-2-thread-5] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f, status=RUNNING
+2026-09-30 16:22:35.943 [pool-2-thread-5] [] DEBUG c.c.g.e.d.r.D.findAll - ==>  Preparing: SELECT * FROM td_datasource ORDER BY create_time DESC
+2026-09-30 16:22:35.945 [pool-2-thread-5] [] DEBUG c.c.g.e.d.r.D.findAll - ==> Parameters: 
+2026-09-30 16:22:35.957 [pool-2-thread-5] [] DEBUG c.c.g.e.d.r.D.findAll - <==      Total: 5
+2026-09-30 16:22:35.968 [pool-2-thread-5] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f, status=SUCCEEDED
+2026-09-30 16:22:35.970 [pool-2-thread-5] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f, status=SUCCEEDED
+2026-09-30 16:22:35.971 [pool-2-thread-5] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=f0ee694f-1229-466c-b03e-d5ed0e90057f taskType=AUTO_COLLECT_SCAN scheduleId=a81455ab-1b5f-4c24-8ffb-cabaaef34f60
+2026-09-30 16:22:36.985 [pool-2-thread-6] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b, taskName=data-ingest-scan
+2026-09-30 16:22:36.988 [pool-2-thread-6] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b
+2026-09-30 16:22:36.990 [pool-2-thread-6] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b, status=RUNNING
+2026-09-30 16:22:36.996 [pool-2-thread-6] [] DEBUG c.c.g.e.d.r.D.findAll - ==>  Preparing: SELECT * FROM td_datasource ORDER BY create_time DESC
+2026-09-30 16:22:36.997 [pool-2-thread-6] [] DEBUG c.c.g.e.d.r.D.findAll - ==> Parameters: 
+2026-09-30 16:22:37.005 [pool-2-thread-6] [] DEBUG c.c.g.e.d.r.D.findAll - <==      Total: 5
+2026-09-30 16:22:37.008 [pool-2-thread-6] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b, status=SUCCEEDED
+2026-09-30 16:22:37.010 [pool-2-thread-6] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=b68747c5-f723-4b88-85c9-161b5e371a5b, status=SUCCEEDED
+2026-09-30 16:22:37.011 [pool-2-thread-6] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=b68747c5-f723-4b88-85c9-161b5e371a5b taskType=DATA_INGEST_SCAN scheduleId=48d6af67-7ef2-458c-8528-efe6394a3f99
+2026-09-30 16:22:50.521 [MessageBroker-10] [] DEBUG c.c.g.r.a.m.AuditRetryMapper.listDue - ==>  Preparing: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+2026-09-30 16:22:50.524 [MessageBroker-10] [] DEBUG c.c.g.r.a.m.AuditRetryMapper.listDue - ==> Parameters: 2026-09-30 16:22:50.5187517(Timestamp), 100(Integer)
+2026-09-30 16:22:50.528 [MessageBroker-10] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-09-30 16:23:04.028 [pool-2-thread-7] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, taskName=kg-neo4j-health-check
+2026-09-30 16:23:04.049 [pool-2-thread-7] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84
+2026-09-30 16:23:04.050 [pool-2-thread-7] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=RUNNING
+2026-09-30 16:23:04.224 [pool-2-thread-7] [] DEBUG c.c.g.e.kb.service.KGWriterService - Neo4j health OK — node count: 44
+2026-09-30 16:23:04.226 [pool-2-thread-7] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=SUCCEEDED
+2026-09-30 16:23:04.227 [pool-2-thread-7] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84, status=SUCCEEDED
+2026-09-30 16:23:04.229 [pool-2-thread-7] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=a998b1a3-3fa1-43df-a91c-cc3f06095b84 taskType=KG_NEO4J_HEALTH_CHECK scheduleId=3ec5437d-ea41-42c3-b1a0-125c9231fad5
+2026-09-30 16:23:06.353 [pool-2-thread-8] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=78674208-e771-40c9-980d-d5ae553012b7, taskName=pipeline-debug-session-cleanup
+2026-09-30 16:23:06.357 [pool-2-thread-8] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=78674208-e771-40c9-980d-d5ae553012b7
+2026-09-30 16:23:06.358 [pool-2-thread-8] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=78674208-e771-40c9-980d-d5ae553012b7, status=RUNNING
+2026-09-30 16:23:06.360 [pool-2-thread-8] [] DEBUG c.c.g.r.c.t.c.AgentCronTaskExecutor - AgentCronTaskExecutor.onStatusUpdate: taskId=78674208-e771-40c9-980d-d5ae553012b7, status=SUCCEEDED
+2026-09-30 16:23:06.361 [pool-2-thread-8] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=78674208-e771-40c9-980d-d5ae553012b7, status=SUCCEEDED
+2026-09-30 16:23:06.362 [pool-2-thread-8] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=78674208-e771-40c9-980d-d5ae553012b7 taskType=PIPELINE_DEBUG_SESSION_CLEANUP scheduleId=2c0c8ce0-290b-4100-9382-3b73e09f3ec2

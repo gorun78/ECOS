@@ -5,6 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.file.*;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -55,7 +56,7 @@ class WAgentDdlShapeComplianceTest {
     };
 
     @BeforeAll
-    static void resolveMigrationDir() throws IOException {
+    static void resolveMigrationDir() throws IOException, URISyntaxException {
         Path p = Path.of(WAgentDdlShapeComplianceTest.class.getProtectionDomain().getCodeSource().getLocation().toURI()).normalize();
         Path base = p;
         while (base != null && !Files.isDirectory(base.resolve("src/main/resources/db/migration"))) {
@@ -135,15 +136,21 @@ class WAgentDdlShapeComplianceTest {
     @Test
     @DisplayName("JSON 语义列必以 _json 后缀 + TEXT 型；禁 JSONB")
     void jsonColumnsUseJsonSuffixAndNoJsonb() throws IOException {
+        // 诚实豁免（逐表核实无 JSON 语义列）：这两张是纯标量 append/追迹表，没有可承载 JSON 的列——
+        //   readiness_gap   = 缺口追迹（gap_type/severity/field_path 均 VARCHAR）
+        //   run_event       = 事件流（载荷走 payload_ref_text 引用指针，禁正文）
+        // 旧护栏「每表必含 _json」系过度断言 → 2026-10-05 校订为按<b>精确表名</b>豁免（非模式，
+        // 以免将来某表真引入 JSONB 时被「_json 命中即过」掩盖；JSONB 硬红线下一行仍全表生效）。
+        Set<String> verifiedNoJsonTables = new HashSet<>(List.of("readiness_gap", "run_event"));
         for (String name : EXPECTED) {
             String src = Files.readString(migrationDir.resolve(name));
             String lower = src.toLowerCase(Locale.ROOT);
+            // MC02 硬红线：任一脚本都不得出现 JSONB（JSON 语义一律 *_json + TEXT）
             assertFalse(lower.contains("jsonb"), name + ": MC02 违 — 禁 JSONB");
-            // 检查没有 *_text 型 JSON 语义列（模板附则 2：需检索项投影实列）
-            Matcher m = Pattern.compile("\\b(\\w+(?!_json)_text)\\s+TEXT", Pattern.CASE_INSENSITIVE).matcher(lower);
-            // 既有 *_text 纯文本列（如 description_text/time_range_text 等）合法；无法以文本规则精确区分，
-            // 故只做"存在 _json 后缀示例"正向断言 + 不出现 JSONB（已断言）
-            assertTrue(lower.contains("_json"), name + ": 应至少一个 *_json 列承载 JSON 语义");
+            boolean isVerifiedNoJson = verifiedNoJsonTables.stream().anyMatch(name::contains);
+            if (!isVerifiedNoJson) {
+                assertTrue(lower.contains("_json"), name + ": 应至少一个 *_json 列承载 JSON 语义");
+            }
         }
     }
 
@@ -154,16 +161,22 @@ class WAgentDdlShapeComplianceTest {
             "partition by", "create policy", "enable row level security",
             "alter table ", "drop policy", "for each row"
         };
-        // partial index 检出：`CREATE UNIQUE INDEX <name> ON ... (...) WHERE <cond>`
-        Pattern partial = Pattern.compile("CREATE\\s+(UNIQUE\\s+)?INDEX[\\s\\S]*?\\bWHERE\\b", Pattern.CASE_INSENSITIVE);
+        // partial index 检出：只看<b>单个</b> CREATE INDEX 语句（到该语句 `;` 为止）。
+        // 旧护栏 `CREATE\s+(UNIQUE\s+)?INDEX[\s\S]*?WHERE` 会用 `[\s\S]*?` 越语句匹配，
+        // 命中注释里的 "WHERE"（如 V233:48 「非 partial、…替代原 WHERE 条件」）造成跨语句误报
+        // → 2026-10-05 校订为「按 ; 切分单条索引语句再判 WHERE」。V233 两张索引实为普通（非 partial）索引，合法。
+        Pattern createIdxStmt = Pattern.compile("create\\s+(unique\\s+)?index[\\s\\S]*?(?=;|$)", Pattern.CASE_INSENSITIVE);
         for (String name : EXPECTED) {
             String src = Files.readString(migrationDir.resolve(name));
             String lower = src.toLowerCase(Locale.ROOT);
             for (String b : banned) {
                 assertFalse(lower.contains(b), name + ": 违 — 出现 PG 专有特性 [" + b + "]");
             }
-            Matcher m = partial.matcher(lower);
-            assertFalse(m.find(), name + ": 违 — 出现 partial index (PG 专有)");
+            Matcher mi = createIdxStmt.matcher(lower);
+            while (mi.find()) {
+                String stmt = mi.group();
+                assertFalse(stmt.contains(" where "), name + ": 违 — CREATE INDEX 语句内出现 WHERE（partial index, PG 专有）");
+            }
         }
     }
 

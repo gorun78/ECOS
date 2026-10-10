@@ -19,12 +19,15 @@ import {
   Store,
   Cpu,
   Network,
+  BellRing,
   Table2,
   BookOpen,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   X,
+  ShieldCheck,
+  ScrollText,
 } from "lucide-react";
 import { useLanguage } from "./LanguageContext";
 import { useTheme } from "./ThemeContext";
@@ -105,6 +108,17 @@ export default function Sidebar({
     ],
   };
 
+  // ── 平台治理组 (L3): 网关诊断 L3 + 告警中心 L2 —— 详细设计 00 §B ──────
+  const platformGroup: NavGroup = {
+    groupKey: "sidebar.group.platform",
+    items: [
+      { id: "platform/gateway-diagnostics", labelKey: "app.tab.platform_gateway", icon: Network, descKey: "sidebar.desc.platform_gateway" },
+      { id: "platform/alerts", labelKey: "app.tab.platform_alerts", icon: BellRing, descKey: "sidebar.desc.platform_alerts" },
+      { id: "platform/security/policies", labelKey: "app.tab.platform_security", icon: ShieldCheck, descKey: "sidebar.desc.platform_security" },
+      { id: "platform/security/audit", labelKey: "app.tab.platform_audit", icon: ScrollText, descKey: "sidebar.desc.platform_audit" },
+    ],
+  };
+
   // ── 产品功能 — 5项平铺 ──────────────────────────────
   const productItems: NavItem[] = [
     { id: "project_workbench", labelKey: "app.tab.project_workbench", icon: Briefcase, descKey: "sidebar.desc.project_workbench" },
@@ -171,6 +185,7 @@ export default function Sidebar({
         {renderGroup(overviewGroup, "ov_")}
         {renderGroup(resourceGroup, "res_")}
         {renderGroup(systemGroup, "sys_")}
+        {renderGroup(platformGroup, "plat_")}
       </div>
 
       {/* ── 产品功能（可折叠，默认收起）─────────────────── */}
@@ -263,7 +278,7 @@ export default function Sidebar({
             w-14 flex-col items-center py-3 gap-1 shadow-lg`}
         >
           {/* All nav icons flat */}
-          {[...overviewGroup.items, ...resourceGroup.items, ...systemGroup.items, ...productItems].map(item => {
+          {[...overviewGroup.items, ...resourceGroup.items, ...systemGroup.items, ...platformGroup.items, ...productItems].map(item => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
             const label = t(item.labelKey);

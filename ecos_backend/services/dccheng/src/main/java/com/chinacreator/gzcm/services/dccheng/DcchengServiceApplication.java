@@ -53,6 +53,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         "com.chinacreator.gzcm.engine.kb.**.dao",
         "com.chinacreator.gzcm.engine.kb.**.repository",
         "com.chinacreator.gzcm.engine.kb.**.mapper",
+        // kb.assumption 独立 root package (KbAssumptionMapper：预置假设 CRUD)
+        "com.chinacreator.gzcm.engine.kb.assumption",
+        // kb.profile 独立 root package (KbProfileMapper/KbProfileStatsMapper：profile 参予静态档案)
+        "com.chinacreator.gzcm.engine.kb.profile",
         // 横切底座
         "com.chinacreator.gzcm.runtime.**.mapper",
         "com.chinacreator.gzcm.runtime.**.dao",

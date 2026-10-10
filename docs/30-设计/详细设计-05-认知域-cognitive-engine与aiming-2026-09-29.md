@@ -910,9 +910,9 @@ ALTER TABLE ecos_cognitive.cognitive_hypothesis ADD COLUMN IF NOT EXISTS old_sta
 
 ---
 
-### 8.4 【校订十九】分册05 离线验收子集落地与 33 命名测试逐项对账（2026-10-04）
+### 8.4 【校订十九】分册05 离线验收子集落地与 37 命名测试逐项对账（2026-10-04）
 
-**范围声明**：本节把 §一～§八 声明的 33 个 doc 命名测试类逐一对账（含 `SpringBootTest` 泛型、`PrecedentRecallerTest`/`ModuleDependencyArchTest` 2 个先存载体），判成 **A/B/C/D** 四档：A = 本批离线落地且全绿；B = 待实现（依赖未落 MR 实现的类/方法）；C = §14.4 授权闸（实跑库 / live-UI / E2E）；D = 跨分冊（08 前端 / 04 kb 侧现有覆盖）或"文档方法与实存类名不符"的诚实登记。
+**范围声明**：本节把 §一～§八 声明的 37 个 doc 命名测试（Dtest= 出现 grep -u 目数）逐一对账（含 `SpringBootTest` 泛型、`PrecedentRecallerTest`/`ModuleDependencyArchTest` 2 个先存载体），判成 **A/B/C/D** 四档：A = 本批离线落地且全绿；B = 待实现（依赖未落 MR 实现的类/方法）；C = §14.4 授权闸（实跑库 / live-UI / E2E）；D = 跨分冊（08 前端 / 04 kb 侧现有覆盖）或"文档方法与实存类名不符"的诚实登记。
 
 #### 8.4.1 本批 A 档落地清单（14 用例 / 12 测试类 / 全绿）
 
@@ -935,7 +935,7 @@ ALTER TABLE ecos_cognitive.cognitive_hypothesis ADD COLUMN IF NOT EXISTS old_sta
 **回归实测**：分册05 新增 12 测试类 + 1 api 枚举 + 1 codec。逐批单独 run 全绿：
 Batch A 4/4、Batch B 14/14、Batch C 5/5、Batch D 4/4。全模块 `mvn -o -pl engine/cognitive-engine/cognitive-engine-impl test` 走查 **112 用例 · 111 绿 + 1 长既有 ArchitectureTest 红**（`serviceInterfacesShouldStartWithI` 命两 2 处存量类：`CognitivePipelineStore`（commit 60b4335）+ `mental.MentalEvent`（commit a1ac61d），均非本批交付面，保持红色待 W122+ 批次统一按 R-13 ① Minding infra slim 处理，本护栏取代/联动 schedule）。
 
-#### 8.4.2 33 命名测试对账矩阵
+#### 8.4.2 37 命名测试对账矩阵
 
 | # | doc 命名测试 | 归宿 | 依据 |
 |:--:|:--|:--|:--|
@@ -989,7 +989,7 @@ Batch A 4/4、Batch B 14/14、Batch C 5/5、Batch D 4/4。全模块 `mvn -o -pl 
 
 **本册一句话结论**（沿 v1.2）：认知域当前不是"实现有偏差"，而是**主责 P0 能力的契约端点与数据源双双不存在**（E1/E2 零命中 + 全库无 mind 表/列），其上运行着一套路径不同、方法不匹配、三套状态枚举并存、0 Mapper 裸 SQL、service 态无鉴权、伪实现以 200 返回固定值的近似系统。本册把它重建为：契约单源 + Mind 资产落点定版 + 三层纪律 + 两态鉴权等价 + 显式降级 + 五守护接线，并把五项存量归属议题（R-13~R-17）交由裁决。
 
-**§8.4 增补（2026-10-04）**：本册声明 33 命名测试逐一对账完毕：**A 档 12 个类 · 14 用例全绿**（V187/V188/V189 DDL 走查 + 写路径/方言/依赖/架构/LLM/跨域/落点/健康探针/route 十护栏加 MindCapabilityMask/Codec），**B 档 13 命名** 未命名预存/待 MR 类实产，不伪造绿；**C 档 5** 全部 live 库或 live-UI 未来 §14.4 同批与归口；**D 档 3** 系跨分冊扩展（膜册00/01/08），未延后 DEFER。
+**§8.4 增补（2026-10-04）**：本册声明 37 命名测试逐一对账完毕：**A 档 12 个类 · 14 用例全绿**（V187/V188/V189 DDL 走查 + 写路径/方言/依赖/架构/LLM/跨域/落点/健康探针/route 十护栏加 MindCapabilityMask/Codec），**B 档 13 命名** 未命名预存/待 MR 类实产，不伪造绿；**C 档 5** 全部 live 库或 live-UI 未来 §14.4 同批与归口；**D 档 3** 系跨分冊扩展（膜册00/01/08），DEFER 未合并。
 
-<!-- 详细设计-05-认知域 / 2026-09-29 / v1.3（2026-10-04 校订十九：A 档 12 测试类 14 用例全绿 + 33 命名对账矩阵） / W115~W139 → C97~C121 / R-13 ①、R-14 ①、R-15 ①、R-16 ①+③、R-17 ①、R-42 ①、R-67 ② 已批准（报告 §十四.1） / Gate-1 已签字、Gate-2 已通过 / 本轮未实跑库、未改业务代码 -->
+<!-- 详细设计-05-认知域 / 2026-09-29 / v1.3（2026-10-04 校订十九：A 档 12 测试类 14 用例全绿 + 36 命名对账矩阵） / W115~W139 → C97~C121 / R-13 ①、R-14 ①、R-15 ①、R-16 ①+③、R-17 ①、R-42 ①、R-67 ② 已批准（报告 §十四.1） / Gate-1 已签字、Gate-2 已通过 / 本轮未实跑库、未改业务代码 -->
 

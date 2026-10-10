@@ -1,0 +1,123 @@
+2026-10-06 00:26:39.102 [main] [] INFO  c.c.g.s.d.DcchengServiceApplication - Starting DcchengServiceApplication using Java 17.0.17 with PID 15428 (D:\workspace\javaprojects\ECOS\ecos_backend\services\dccheng\target\dccheng-service-1.0.0-SNAPSHOT.jar started by guoro in D:\workspace\javaprojects\ECOS)
+2026-10-06 00:26:39.129 [main] [] INFO  c.c.g.s.d.DcchengServiceApplication - The following 1 profile is active: "standard"
+2026-10-06 00:26:55.518 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRecordMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRecordMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:26:55.523 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRuleMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:26:55.539 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorDataDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitordata.dao.IMonitorDataDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:26:55.547 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:26:55.552 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:26:55.557 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:26:55.563 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginParamsDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginParamsDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:26:55.568 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:26:55.573 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorWarnContactDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IMonitorWarnContactDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:26:55.580 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IWarnLogDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IWarnLogDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:26:55.587 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IStrategyDao' and 'com.chinacreator.gzcm.runtime.core.monitor.strategy.dao.IStrategyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:26:55.712 [main] [] WARN  o.s.c.a.ConfigurationClassPostProcessor - Cannot enhance @Configuration bean definition 'myBatisConfig' since its singleton instance has been created too early. The typical cause is a non-static @Bean method with a BeanDefinitionRegistryPostProcessor return type: Consider declaring such methods as 'static' and/or marking the containing configuration class as 'proxyBeanMethods=false'.
+2026-10-06 00:27:12.423 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 18086 (http)
+2026-10-06 00:27:12.792 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-18086"]
+2026-10-06 00:27:12.865 [main] [] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-10-06 00:27:12.884 [main] [] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-10-06 00:27:13.652 [main] [] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-10-06 00:27:13.663 [main] [] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 33908 ms
+2026-10-06 00:27:15.977 [main] [] INFO  c.c.g.s.security.JwtTokenProvider - JwtTokenProvider initialized with RS256 keys
+2026-10-06 00:27:18.534 [main] [] WARN  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'kbAssumptionServiceImpl' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/dccheng/target/dccheng-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/kb-engine-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/engine/kb/assumption/KbAssumptionServiceImpl.class]: Unsatisfied dependency expressed through constructor parameter 0: No qualifying bean of type 'com.chinacreator.gzcm.engine.kb.assumption.KbAssumptionMapper' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}
+2026-10-06 00:27:18.637 [main] [] INFO  o.a.catalina.core.StandardService - Stopping service [Tomcat]
+2026-10-06 00:27:19.185 [main] [] INFO  o.s.b.a.l.ConditionEvaluationReportLogger - 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-10-06 00:27:19.633 [main] [] ERROR o.s.b.d.LoggingFailureAnalysisReporter - 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Parameter 0 of constructor in com.chinacreator.gzcm.engine.kb.assumption.KbAssumptionServiceImpl required a bean of type 'com.chinacreator.gzcm.engine.kb.assumption.KbAssumptionMapper' that could not be found.
+
+
+Action:
+
+Consider defining a bean of type 'com.chinacreator.gzcm.engine.kb.assumption.KbAssumptionMapper' in your configuration.
+
+2026-10-06 10:33:30.340 [main] [] INFO  c.c.g.s.d.DcchengServiceApplication - Starting DcchengServiceApplication using Java 17.0.17 with PID 37664 (D:\workspace\javaprojects\ECOS\ecos_backend\services\dccheng\target\dccheng-service-1.0.0-SNAPSHOT.jar started by guoro in D:\workspace\javaprojects\ECOS)
+2026-10-06 10:33:30.368 [main] [] INFO  c.c.g.s.d.DcchengServiceApplication - The following 1 profile is active: "standard"
+2026-10-06 10:33:45.550 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRecordMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRecordMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:33:45.554 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRuleMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:33:45.568 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorDataDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitordata.dao.IMonitorDataDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:33:45.573 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:33:45.576 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:33:45.580 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:33:45.583 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginParamsDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginParamsDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:33:45.586 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:33:45.589 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorWarnContactDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IMonitorWarnContactDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:33:45.593 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IWarnLogDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IWarnLogDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:33:45.597 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IStrategyDao' and 'com.chinacreator.gzcm.runtime.core.monitor.strategy.dao.IStrategyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:33:45.636 [main] [] WARN  o.s.c.a.ConfigurationClassPostProcessor - Cannot enhance @Configuration bean definition 'myBatisConfig' since its singleton instance has been created too early. The typical cause is a non-static @Bean method with a BeanDefinitionRegistryPostProcessor return type: Consider declaring such methods as 'static' and/or marking the containing configuration class as 'proxyBeanMethods=false'.
+2026-10-06 10:34:04.850 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 18086 (http)
+2026-10-06 10:34:04.941 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-18086"]
+2026-10-06 10:34:04.962 [main] [] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-10-06 10:34:04.967 [main] [] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-10-06 10:34:05.563 [main] [] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-10-06 10:34:05.575 [main] [] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 34340 ms
+2026-10-06 10:34:08.699 [main] [] INFO  c.c.g.s.security.JwtTokenProvider - JwtTokenProvider initialized with RS256 keys
+2026-10-06 10:34:12.860 [main] [] WARN  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'kbAssumptionServiceImpl' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/dccheng/target/dccheng-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/kb-engine-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/engine/kb/assumption/KbAssumptionServiceImpl.class]: Unsatisfied dependency expressed through constructor parameter 0: No qualifying bean of type 'com.chinacreator.gzcm.engine.kb.assumption.KbAssumptionMapper' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}
+2026-10-06 10:34:13.544 [main] [] INFO  o.a.catalina.core.StandardService - Stopping service [Tomcat]
+2026-10-06 10:34:13.876 [main] [] INFO  o.s.b.a.l.ConditionEvaluationReportLogger - 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-10-06 10:34:14.320 [main] [] ERROR o.s.b.d.LoggingFailureAnalysisReporter - 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Parameter 0 of constructor in com.chinacreator.gzcm.engine.kb.assumption.KbAssumptionServiceImpl required a bean of type 'com.chinacreator.gzcm.engine.kb.assumption.KbAssumptionMapper' that could not be found.
+
+
+Action:
+
+Consider defining a bean of type 'com.chinacreator.gzcm.engine.kb.assumption.KbAssumptionMapper' in your configuration.
+
+2026-10-06 13:06:57.223 [main] [] INFO  c.c.g.s.d.DcchengServiceApplication - Starting DcchengServiceApplication using Java 17.0.17 with PID 28184 (D:\workspace\javaprojects\ECOS\ecos_backend\services\dccheng\target\dccheng-service-1.0.0-SNAPSHOT.jar started by guoro in D:\workspace\javaprojects\ECOS)
+2026-10-06 13:06:57.241 [main] [] INFO  c.c.g.s.d.DcchengServiceApplication - The following 1 profile is active: "standard"
+2026-10-06 13:07:11.590 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRecordMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRecordMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 13:07:11.594 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRuleMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 13:07:11.604 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorDataDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitordata.dao.IMonitorDataDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 13:07:11.607 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 13:07:11.609 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 13:07:11.611 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 13:07:11.612 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginParamsDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginParamsDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 13:07:11.615 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 13:07:11.618 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorWarnContactDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IMonitorWarnContactDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 13:07:11.619 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IWarnLogDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IWarnLogDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 13:07:11.622 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IStrategyDao' and 'com.chinacreator.gzcm.runtime.core.monitor.strategy.dao.IStrategyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 13:07:11.656 [main] [] WARN  o.s.c.a.ConfigurationClassPostProcessor - Cannot enhance @Configuration bean definition 'myBatisConfig' since its singleton instance has been created too early. The typical cause is a non-static @Bean method with a BeanDefinitionRegistryPostProcessor return type: Consider declaring such methods as 'static' and/or marking the containing configuration class as 'proxyBeanMethods=false'.
+2026-10-06 13:07:25.967 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 18086 (http)
+2026-10-06 13:07:26.309 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-18086"]
+2026-10-06 13:07:26.399 [main] [] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-10-06 13:07:26.412 [main] [] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-10-06 13:07:27.600 [main] [] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-10-06 13:07:27.621 [main] [] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 29429 ms
+2026-10-06 13:07:30.098 [main] [] INFO  c.c.g.s.security.JwtTokenProvider - JwtTokenProvider initialized with RS256 keys
+2026-10-06 13:07:32.089 [main] [] WARN  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'kbAssumptionServiceImpl' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/dccheng/target/dccheng-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/kb-engine-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/engine/kb/assumption/KbAssumptionServiceImpl.class]: Unsatisfied dependency expressed through constructor parameter 0: No qualifying bean of type 'com.chinacreator.gzcm.engine.kb.assumption.KbAssumptionMapper' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}
+2026-10-06 13:07:32.148 [main] [] INFO  o.a.catalina.core.StandardService - Stopping service [Tomcat]
+2026-10-06 13:07:32.425 [main] [] INFO  o.s.b.a.l.ConditionEvaluationReportLogger - 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-10-06 13:07:32.997 [main] [] ERROR o.s.b.d.LoggingFailureAnalysisReporter - 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Parameter 0 of constructor in com.chinacreator.gzcm.engine.kb.assumption.KbAssumptionServiceImpl required a bean of type 'com.chinacreator.gzcm.engine.kb.assumption.KbAssumptionMapper' that could not be found.
+
+
+Action:
+
+Consider defining a bean of type 'com.chinacreator.gzcm.engine.kb.assumption.KbAssumptionMapper' in your configuration.
+

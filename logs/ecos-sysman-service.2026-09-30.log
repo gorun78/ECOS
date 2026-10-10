@@ -1,0 +1,91 @@
+2026-09-30 16:20:30.300 [main] [] INFO  c.c.g.s.s.SysmanServiceApplication - Starting SysmanServiceApplication using Java 17.0.17 with PID 12728 (D:\workspace\javaprojects\ECOS\ecos_backend\services\sysman\target\sysman-service-1.0.0-SNAPSHOT.jar started by guoro in D:\workspace\javaprojects\ECOS)
+2026-09-30 16:20:30.326 [main] [] INFO  c.c.g.s.s.SysmanServiceApplication - The following 1 profile is active: "enterprise"
+2026-09-30 16:20:38.436 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'abacPolicyDao' and 'com.chinacreator.gzcm.sysman.abac.dao.AbacPolicyDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.438 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'auditLogDao' and 'com.chinacreator.gzcm.sysman.audit.dao.AuditLogDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.441 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'compliancePolicyDao' and 'com.chinacreator.gzcm.sysman.compliance.dao.CompliancePolicyDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.442 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'crossBorderTransferDao' and 'com.chinacreator.gzcm.sysman.compliance.dao.CrossBorderTransferDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.444 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dataResidencyDao' and 'com.chinacreator.gzcm.sysman.compliance.dao.DataResidencyDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.445 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'configDao' and 'com.chinacreator.gzcm.sysman.config.dao.ConfigDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.447 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'configVersionDao' and 'com.chinacreator.gzcm.sysman.config.dao.ConfigVersionDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.449 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPAccessDao' and 'com.chinacreator.gzcm.sysman.config.dao.IPAccessDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.450 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'systemParamDao' and 'com.chinacreator.gzcm.sysman.config.dao.SystemParamDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.452 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'systemVariableDao' and 'com.chinacreator.gzcm.sysman.config.dao.SystemVariableDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.454 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dataPermissionPolicyDao' and 'com.chinacreator.gzcm.sysman.datapermission.dao.DataPermissionPolicyDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.455 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'organizationDao' and 'com.chinacreator.gzcm.sysman.iam.dao.OrganizationDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.457 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'permissionDao' and 'com.chinacreator.gzcm.sysman.iam.dao.PermissionDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.458 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'roleDao' and 'com.chinacreator.gzcm.sysman.iam.dao.RoleDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.460 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'rolePermissionDao' and 'com.chinacreator.gzcm.sysman.iam.dao.RolePermissionDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.463 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'tenantConfigDao' and 'com.chinacreator.gzcm.sysman.iam.dao.TenantConfigDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.465 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'tenantDao' and 'com.chinacreator.gzcm.sysman.iam.dao.TenantDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.468 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'tenantResourceUsageDao' and 'com.chinacreator.gzcm.sysman.iam.dao.TenantResourceUsageDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.470 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'userDao' and 'com.chinacreator.gzcm.sysman.iam.dao.UserDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.472 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'userRoleDao' and 'com.chinacreator.gzcm.sysman.iam.dao.UserRoleDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.473 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dataSecurityPolicyDao' and 'com.chinacreator.gzcm.sysman.security.policy.dao.DataSecurityPolicyDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.484 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'securityCryptoKeyAuditDao' and 'com.chinacreator.gzcm.engine.security.crypto.dao.SecurityCryptoKeyAuditDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.486 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'securityCryptoKeyDao' and 'com.chinacreator.gzcm.engine.security.crypto.dao.SecurityCryptoKeyDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.489 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'securitySecretDao' and 'com.chinacreator.gzcm.engine.security.crypto.dao.SecuritySecretDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.499 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRecordMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRecordMapper' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.501 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRuleMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.507 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorDataDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitordata.dao.IMonitorDataDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.510 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.512 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectTargetDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.513 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.516 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginParamsDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginParamsDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.517 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginTargetDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.519 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorWarnContactDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IMonitorWarnContactDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.520 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IWarnLogDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IWarnLogDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.522 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IStrategyDao' and 'com.chinacreator.gzcm.runtime.core.monitor.strategy.dao.IStrategyDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:20:38.541 [main] [] WARN  o.s.c.a.ConfigurationClassPostProcessor - Cannot enhance @Configuration bean definition 'myBatisConfig' since its singleton instance has been created too early. The typical cause is a non-static @Bean method with a BeanDefinitionRegistryPostProcessor return type: Consider declaring such methods as 'static' and/or marking the containing configuration class as 'proxyBeanMethods=false'.
+2026-09-30 16:20:46.934 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 18081 (http)
+2026-09-30 16:20:47.035 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-18081"]
+2026-09-30 16:20:47.056 [main] [] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-09-30 16:20:47.058 [main] [] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-09-30 16:20:47.449 [main] [] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-09-30 16:20:47.458 [main] [] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 16537 ms
+2026-09-30 16:20:49.361 [main] [] INFO  c.c.g.s.security.JwtTokenProvider - JwtTokenProvider initialized with RS256 keys
+2026-09-30 16:20:54.062 [main] [] INFO  com.zaxxer.hikari.HikariDataSource - SysmanHikariCP - Starting...
+2026-09-30 16:20:55.512 [main] [] INFO  com.zaxxer.hikari.pool.HikariPool - SysmanHikariCP - Added connection org.postgresql.jdbc.PgConnection@42172065
+2026-09-30 16:20:55.522 [main] [] INFO  com.zaxxer.hikari.HikariDataSource - SysmanHikariCP - Start completed.
+2026-09-30 16:20:56.332 [main] [] INFO  c.c.g.s.c.s.impl.SysConfigService - 缓存刷新完成，当前 146 条配置
+2026-09-30 16:20:56.335 [main] [] INFO  c.c.g.s.c.s.impl.SysConfigService - SysConfigService 初始化完成，已加载 146 条配置
+2026-09-30 16:20:57.846 [main] [] INFO  c.c.g.s.controller.CausalController - CausalController 初始化完成，已加载 8 个节点, 10 条边
+2026-09-30 16:20:58.165 [main] [] INFO  c.c.g.s.d.service.impl.DictService - Dict cache refreshed: 21 types, 102 items in 84ms
+2026-09-30 16:20:58.476 [main] [] INFO  c.c.g.s.c.MarketplaceController - MarketplaceController 初始化完成，已加载 5 条种子数据
+2026-09-30 16:20:58.881 [main] [] INFO  c.c.g.s.c.ScenarioController - ScenarioController 初始化完成，已加载默认场景
+2026-09-30 16:20:59.346 [main] [] INFO  c.c.g.s.c.WorldModelGraphController - WorldModelGraphController 初始化完成，已加载 2 个默认目标 (fallback)
+2026-09-30 16:20:59.854 [main] [] INFO  c.c.g.s.i.s.impl.DbBlacklistStore - DbBlacklistStore 初始化完成，已清理 sys_token_blacklist 过期项
+2026-09-30 16:21:00.756 [main] [] WARN  c.c.g.r.e.MemoryEventBusServiceImpl - [EventBus][MEMORY] fallback mode — Kafka 未启用 (ecs.event.kafka.enabled != true), 仅同 JVM 内存分发
+2026-09-30 16:21:01.959 [main] [] INFO  c.c.g.e.s.c.CryptoAuditController - CryptoAuditController 初始化完成
+2026-09-30 16:21:02.153 [main] [] INFO  c.c.g.e.security.SecurityEngineImpl - Security engine started (was STOPPED)
+2026-09-30 16:21:02.157 [main] [] INFO  c.c.g.e.security.SecurityEngineImpl - Security engine auto-started on boot
+2026-09-30 16:21:02.240 [main] [] INFO  c.c.g.e.s.e.DataSecurityLevelEventListener - DataSecurityLevelEventListener: subscribed topic=ecos.data.security-tagged groupId=dccheng-security-consumer
+2026-09-30 16:21:02.944 [main] [] INFO  c.c.g.r.l.c.LLMGatewayAutoConfiguration - Hermes Engine auto-configuration initialized: enabled=true, defaultProvider=openrouter, defaultModel=deepseek/deepseek-chat
+2026-09-30 16:21:04.320 [main] [] INFO  c.c.g.r.l.c.LLMGatewayAutoConfiguration - Hermes OkHttpClient created: timeout=PT1M, retryMaxAttempts=3
+2026-09-30 16:21:05.868 [main] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - onStartup: PG 恢复 0 个任务 + 0 个执行计划
+2026-09-30 16:21:05.907 [main] [] INFO  o.s.b.f.a.AutowiredAnnotationBeanPostProcessor - Inconsistent constructor declaration on bean with name 'securityCryptoEgress': single autowire-marked constructor flagged as optional - this constructor is effectively required since there is no default constructor to fall back to: public com.chinacreator.gzcm.runtime.core.crypto.SecurityCryptoEgress(org.springframework.context.ApplicationContext)
+2026-09-30 16:21:08.027 [main] [] INFO  c.c.g.r.a.olap.DuckDBQueryService - DuckDBQueryService downgraded (DuckDB migrated to Doris) — all operations are no-ops
+2026-09-30 16:21:12.902 [main] [] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 3 endpoint(s) beneath base path '/actuator'
+2026-09-30 16:21:13.499 [main] [] INFO  o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@564e9c0b, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@4c7d19bf, org.springframework.security.web.context.SecurityContextHolderFilter@6a9b8f33, org.springframework.security.web.header.HeaderWriterFilter@53c0424a, org.springframework.web.filter.CorsFilter@21d478f3, org.springframework.security.web.authentication.logout.LogoutFilter@23f27434, com.chinacreator.gzcm.sysman.security.JwtAuthenticationFilter@7921a37d, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@207358ad, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@492e9e87, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@3be60847, org.springframework.security.web.session.SessionManagementFilter@9bd477c, org.springframework.security.web.access.ExceptionTranslationFilter@5013c6bc, org.springframework.security.web.access.intercept.AuthorizationFilter@475fb7]
+2026-09-30 16:21:17.544 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-18081"]
+2026-09-30 16:21:17.639 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 18081 (http) with context path ''
+2026-09-30 16:21:17.791 [main] [] INFO  c.c.g.s.s.SysmanServiceApplication - Started SysmanServiceApplication in 50.695 seconds (process running for 54.884)
+2026-09-30 16:21:49.047 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-09-30 16:22:49.076 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []

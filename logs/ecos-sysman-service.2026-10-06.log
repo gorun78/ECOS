@@ -1,0 +1,1110 @@
+2026-10-06 00:15:12.775 [main] [] INFO  c.c.g.s.s.SysmanServiceApplication - Starting SysmanServiceApplication using Java 17.0.17 with PID 18144 (D:\workspace\javaprojects\ECOS\ecos_backend\services\sysman\target\sysman-service-1.0.0-SNAPSHOT.jar started by guoro in D:\workspace\javaprojects\ECOS)
+2026-10-06 00:15:12.834 [main] [] INFO  c.c.g.s.s.SysmanServiceApplication - The following 1 profile is active: "standard"
+2026-10-06 00:15:27.756 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'abacPolicyDao' and 'com.chinacreator.gzcm.sysman.abac.dao.AbacPolicyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.760 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'auditLogDao' and 'com.chinacreator.gzcm.sysman.audit.dao.AuditLogDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.765 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'compliancePolicyDao' and 'com.chinacreator.gzcm.sysman.compliance.dao.CompliancePolicyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.769 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'crossBorderTransferDao' and 'com.chinacreator.gzcm.sysman.compliance.dao.CrossBorderTransferDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.772 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dataResidencyDao' and 'com.chinacreator.gzcm.sysman.compliance.dao.DataResidencyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.776 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'configDao' and 'com.chinacreator.gzcm.sysman.config.dao.ConfigDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.779 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'configVersionDao' and 'com.chinacreator.gzcm.sysman.config.dao.ConfigVersionDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.784 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPAccessDao' and 'com.chinacreator.gzcm.sysman.config.dao.IPAccessDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.789 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'systemParamDao' and 'com.chinacreator.gzcm.sysman.config.dao.SystemParamDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.793 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'systemVariableDao' and 'com.chinacreator.gzcm.sysman.config.dao.SystemVariableDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.796 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dataPermissionPolicyDao' and 'com.chinacreator.gzcm.sysman.datapermission.dao.DataPermissionPolicyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.801 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'organizationDao' and 'com.chinacreator.gzcm.sysman.iam.dao.OrganizationDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.803 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'permissionDao' and 'com.chinacreator.gzcm.sysman.iam.dao.PermissionDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.809 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'roleDao' and 'com.chinacreator.gzcm.sysman.iam.dao.RoleDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.813 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'rolePermissionDao' and 'com.chinacreator.gzcm.sysman.iam.dao.RolePermissionDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.817 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'tenantConfigDao' and 'com.chinacreator.gzcm.sysman.iam.dao.TenantConfigDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.821 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'tenantDao' and 'com.chinacreator.gzcm.sysman.iam.dao.TenantDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.825 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'tenantResourceUsageDao' and 'com.chinacreator.gzcm.sysman.iam.dao.TenantResourceUsageDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.829 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'userDao' and 'com.chinacreator.gzcm.sysman.iam.dao.UserDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.832 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'userRoleDao' and 'com.chinacreator.gzcm.sysman.iam.dao.UserRoleDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.837 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dataSecurityPolicyDao' and 'com.chinacreator.gzcm.sysman.security.policy.dao.DataSecurityPolicyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.864 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'securityCryptoKeyAuditDao' and 'com.chinacreator.gzcm.engine.security.crypto.dao.SecurityCryptoKeyAuditDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.869 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'securityCryptoKeyDao' and 'com.chinacreator.gzcm.engine.security.crypto.dao.SecurityCryptoKeyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.873 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'securitySecretDao' and 'com.chinacreator.gzcm.engine.security.crypto.dao.SecuritySecretDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.904 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRecordMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRecordMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.910 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRuleMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.930 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorDataDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitordata.dao.IMonitorDataDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.937 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.943 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.950 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.959 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginParamsDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginParamsDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.969 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.980 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorWarnContactDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IMonitorWarnContactDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:27.990 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IWarnLogDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IWarnLogDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:28.000 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IStrategyDao' and 'com.chinacreator.gzcm.runtime.core.monitor.strategy.dao.IStrategyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 00:15:28.069 [main] [] WARN  o.s.c.a.ConfigurationClassPostProcessor - Cannot enhance @Configuration bean definition 'myBatisConfig' since its singleton instance has been created too early. The typical cause is a non-static @Bean method with a BeanDefinitionRegistryPostProcessor return type: Consider declaring such methods as 'static' and/or marking the containing configuration class as 'proxyBeanMethods=false'.
+2026-10-06 00:15:43.259 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 18081 (http)
+2026-10-06 00:15:43.471 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-18081"]
+2026-10-06 00:15:43.491 [main] [] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-10-06 00:15:43.494 [main] [] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-10-06 00:15:43.978 [main] [] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-10-06 00:15:43.986 [main] [] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 30378 ms
+2026-10-06 00:15:46.790 [main] [] INFO  c.c.g.s.security.JwtTokenProvider - JwtTokenProvider initialized with RS256 keys
+2026-10-06 00:15:52.341 [main] [] INFO  com.zaxxer.hikari.HikariDataSource - SysmanHikariCP - Starting...
+2026-10-06 00:15:55.180 [main] [] INFO  com.zaxxer.hikari.pool.HikariPool - SysmanHikariCP - Added connection org.postgresql.jdbc.PgConnection@1e5e3147
+2026-10-06 00:15:55.191 [main] [] INFO  com.zaxxer.hikari.HikariDataSource - SysmanHikariCP - Start completed.
+2026-10-06 00:15:55.456 [main] [] ERROR c.c.g.s.c.s.impl.SysConfigService - 初始化默认配置失败: PreparedStatementCallback; bad SQL grammar [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-10-06 00:15:55.512 [main] [] ERROR c.c.g.s.c.s.impl.SysConfigService - 刷新 sys_config 缓存失败
+org.springframework.jdbc.BadSqlGrammarException: StatementCallback; bad SQL grammar [SELECT config_key, config_value FROM sys_config WHERE status = 'active']
+	at org.springframework.jdbc.support.SQLStateSQLExceptionTranslator.doTranslate(SQLStateSQLExceptionTranslator.java:112)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:116)
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:408)
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:476)
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:486)
+	at org.springframework.jdbc.core.JdbcTemplate.queryForList(JdbcTemplate.java:536)
+	at com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService.refreshCache(SysConfigService.java:122)
+	at com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService.init(SysConfigService.java:45)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.beans.factory.annotation.InitDestroyAnnotationBeanPostProcessor$LifecycleMethod.invoke(InitDestroyAnnotationBeanPostProcessor.java:457)
+	at org.springframework.beans.factory.annotation.InitDestroyAnnotationBeanPostProcessor$LifecycleMetadata.invokeInitMethods(InitDestroyAnnotationBeanPostProcessor.java:401)
+	at org.springframework.beans.factory.annotation.InitDestroyAnnotationBeanPostProcessor.postProcessBeforeInitialization(InitDestroyAnnotationBeanPostProcessor.java:219)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.applyBeanPostProcessorsBeforeInitialization(AbstractAutowireCapableBeanFactory.java:421)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1765)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:599)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:907)
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:785)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1354)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1191)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:561)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:907)
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:785)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1354)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1191)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:561)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:907)
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:785)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1354)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1191)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:561)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:975)
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:959)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:624)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:456)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:334)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1354)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1343)
+	at com.chinacreator.gzcm.services.sysman.SysmanServiceApplication.main(SysmanServiceApplication.java:82)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:91)
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:53)
+	at org.springframework.boot.loader.launch.JarLauncher.main(JarLauncher.java:58)
+Caused by: org.postgresql.util.PSQLException: ERROR: relation "sys_config" does not exist
+  位置：38
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2713)
+	at org.postgresql.core.v3.QueryExecutorImpl.processResults(QueryExecutorImpl.java:2401)
+	at org.postgresql.core.v3.QueryExecutorImpl.execute(QueryExecutorImpl.java:368)
+	at org.postgresql.jdbc.PgStatement.executeInternal(PgStatement.java:498)
+	at org.postgresql.jdbc.PgStatement.execute(PgStatement.java:415)
+	at org.postgresql.jdbc.PgStatement.executeWithFlags(PgStatement.java:335)
+	at org.postgresql.jdbc.PgStatement.executeCachedSql(PgStatement.java:321)
+	at org.postgresql.jdbc.PgStatement.executeWithFlags(PgStatement.java:297)
+	at org.postgresql.jdbc.PgStatement.executeQuery(PgStatement.java:246)
+	at com.zaxxer.hikari.pool.ProxyStatement.executeQuery(ProxyStatement.java:110)
+	at com.zaxxer.hikari.pool.HikariProxyStatement.executeQuery(HikariProxyStatement.java)
+	at org.springframework.jdbc.core.JdbcTemplate$1QueryStatementCallback.doInStatement(JdbcTemplate.java:463)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:393)
+	... 79 common frames omitted
+2026-10-06 00:15:55.554 [main] [] INFO  c.c.g.s.c.s.impl.SysConfigService - SysConfigService 初始化完成，已加载 0 条配置
+2026-10-06 00:15:57.113 [main] [] INFO  c.c.g.s.controller.CausalController - CausalController 初始化完成，已加载 8 个节点, 10 条边
+2026-10-06 00:15:57.474 [main] [] WARN  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'dictController': Unsatisfied dependency expressed through field 'dictService': Error creating bean with name 'dictService' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/sysman/target/sysman-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/sysman-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/sysman/dict/service/impl/DictService.class]: Failed to instantiate [com.chinacreator.gzcm.sysman.dict.service.impl.DictService]: Constructor threw exception
+2026-10-06 00:15:57.481 [main] [] INFO  com.zaxxer.hikari.HikariDataSource - SysmanHikariCP - Shutdown initiated...
+2026-10-06 00:15:57.509 [main] [] INFO  com.zaxxer.hikari.HikariDataSource - SysmanHikariCP - Shutdown completed.
+2026-10-06 00:15:57.563 [main] [] INFO  o.a.catalina.core.StandardService - Stopping service [Tomcat]
+2026-10-06 00:15:57.862 [main] [] INFO  o.s.b.a.l.ConditionEvaluationReportLogger - 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-10-06 00:15:58.176 [main] [] ERROR o.s.boot.SpringApplication - Application run failed
+org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'dictController': Unsatisfied dependency expressed through field 'dictService': Error creating bean with name 'dictService' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/sysman/target/sysman-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/sysman-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/sysman/dict/service/impl/DictService.class]: Failed to instantiate [com.chinacreator.gzcm.sysman.dict.service.impl.DictService]: Constructor threw exception
+	at org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor$AutowiredFieldElement.resolveFieldValue(AutowiredAnnotationBeanPostProcessor.java:787)
+	at org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor$AutowiredFieldElement.inject(AutowiredAnnotationBeanPostProcessor.java:767)
+	at org.springframework.beans.factory.annotation.InjectionMetadata.inject(InjectionMetadata.java:145)
+	at org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor.postProcessProperties(AutowiredAnnotationBeanPostProcessor.java:508)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.populateBean(AbstractAutowireCapableBeanFactory.java:1418)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:598)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:975)
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:959)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:624)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:456)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:334)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1354)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1343)
+	at com.chinacreator.gzcm.services.sysman.SysmanServiceApplication.main(SysmanServiceApplication.java:82)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:91)
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:53)
+	at org.springframework.boot.loader.launch.JarLauncher.main(JarLauncher.java:58)
+Caused by: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'dictService' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/sysman/target/sysman-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/sysman-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/sysman/dict/service/impl/DictService.class]: Failed to instantiate [com.chinacreator.gzcm.sysman.dict.service.impl.DictService]: Constructor threw exception
+	at org.springframework.beans.factory.support.ConstructorResolver.instantiate(ConstructorResolver.java:318)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:306)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1354)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1191)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:561)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor$AutowiredFieldElement.resolveFieldValue(AutowiredAnnotationBeanPostProcessor.java:784)
+	... 27 common frames omitted
+Caused by: org.springframework.beans.BeanInstantiationException: Failed to instantiate [com.chinacreator.gzcm.sysman.dict.service.impl.DictService]: Constructor threw exception
+	at org.springframework.beans.BeanUtils.instantiateClass(BeanUtils.java:223)
+	at org.springframework.beans.factory.support.SimpleInstantiationStrategy.instantiate(SimpleInstantiationStrategy.java:111)
+	at org.springframework.beans.factory.support.ConstructorResolver.instantiate(ConstructorResolver.java:315)
+	... 40 common frames omitted
+Caused by: org.springframework.jdbc.BadSqlGrammarException: StatementCallback; bad SQL grammar [SELECT id, dict_type, dict_code, dict_label, dict_label_en, sort_order, status, parent_code, ext_value, subsystem, created_at, updated_at FROM sys_dict WHERE status = 'active' ORDER BY dict_type, sort_order]
+	at org.springframework.jdbc.support.SQLStateSQLExceptionTranslator.doTranslate(SQLStateSQLExceptionTranslator.java:112)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:116)
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:408)
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:476)
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:486)
+	at com.chinacreator.gzcm.sysman.dict.service.impl.DictService.refreshCache(DictService.java:141)
+	at com.chinacreator.gzcm.sysman.dict.service.impl.DictService.<init>(DictService.java:49)
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+	at java.base/java.lang.reflect.Constructor.newInstanceWithCaller(Constructor.java:500)
+	at java.base/java.lang.reflect.Constructor.newInstance(Constructor.java:481)
+	at org.springframework.beans.BeanUtils.instantiateClass(BeanUtils.java:210)
+	... 42 common frames omitted
+Caused by: org.postgresql.util.PSQLException: ERROR: relation "sys_dict" does not exist
+  位置：144
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2713)
+	at org.postgresql.core.v3.QueryExecutorImpl.processResults(QueryExecutorImpl.java:2401)
+	at org.postgresql.core.v3.QueryExecutorImpl.execute(QueryExecutorImpl.java:368)
+	at org.postgresql.jdbc.PgStatement.executeInternal(PgStatement.java:498)
+	at org.postgresql.jdbc.PgStatement.execute(PgStatement.java:415)
+	at org.postgresql.jdbc.PgStatement.executeWithFlags(PgStatement.java:335)
+	at org.postgresql.jdbc.PgStatement.executeCachedSql(PgStatement.java:321)
+	at org.postgresql.jdbc.PgStatement.executeWithFlags(PgStatement.java:297)
+	at org.postgresql.jdbc.PgStatement.executeQuery(PgStatement.java:246)
+	at com.zaxxer.hikari.pool.ProxyStatement.executeQuery(ProxyStatement.java:110)
+	at com.zaxxer.hikari.pool.HikariProxyStatement.executeQuery(HikariProxyStatement.java)
+	at org.springframework.jdbc.core.JdbcTemplate$1QueryStatementCallback.doInStatement(JdbcTemplate.java:463)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:393)
+	... 52 common frames omitted
+2026-10-06 10:26:58.067 [main] [] INFO  c.c.g.s.s.SysmanServiceApplication - Starting SysmanServiceApplication using Java 17.0.17 with PID 12468 (D:\workspace\javaprojects\ECOS\ecos_backend\services\sysman\target\sysman-service-1.0.0-SNAPSHOT.jar started by guoro in D:\workspace\javaprojects\ECOS)
+2026-10-06 10:26:58.092 [main] [] INFO  c.c.g.s.s.SysmanServiceApplication - The following 1 profile is active: "standard"
+2026-10-06 10:27:11.540 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'abacPolicyDao' and 'com.chinacreator.gzcm.sysman.abac.dao.AbacPolicyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.554 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'auditLogDao' and 'com.chinacreator.gzcm.sysman.audit.dao.AuditLogDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.556 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'compliancePolicyDao' and 'com.chinacreator.gzcm.sysman.compliance.dao.CompliancePolicyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.559 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'crossBorderTransferDao' and 'com.chinacreator.gzcm.sysman.compliance.dao.CrossBorderTransferDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.561 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dataResidencyDao' and 'com.chinacreator.gzcm.sysman.compliance.dao.DataResidencyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.564 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'configDao' and 'com.chinacreator.gzcm.sysman.config.dao.ConfigDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.567 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'configVersionDao' and 'com.chinacreator.gzcm.sysman.config.dao.ConfigVersionDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.572 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPAccessDao' and 'com.chinacreator.gzcm.sysman.config.dao.IPAccessDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.576 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'systemParamDao' and 'com.chinacreator.gzcm.sysman.config.dao.SystemParamDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.579 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'systemVariableDao' and 'com.chinacreator.gzcm.sysman.config.dao.SystemVariableDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.583 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dataPermissionPolicyDao' and 'com.chinacreator.gzcm.sysman.datapermission.dao.DataPermissionPolicyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.586 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'organizationDao' and 'com.chinacreator.gzcm.sysman.iam.dao.OrganizationDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.589 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'permissionDao' and 'com.chinacreator.gzcm.sysman.iam.dao.PermissionDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.592 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'roleDao' and 'com.chinacreator.gzcm.sysman.iam.dao.RoleDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.596 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'rolePermissionDao' and 'com.chinacreator.gzcm.sysman.iam.dao.RolePermissionDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.600 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'tenantConfigDao' and 'com.chinacreator.gzcm.sysman.iam.dao.TenantConfigDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.603 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'tenantDao' and 'com.chinacreator.gzcm.sysman.iam.dao.TenantDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.608 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'tenantResourceUsageDao' and 'com.chinacreator.gzcm.sysman.iam.dao.TenantResourceUsageDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.612 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'userDao' and 'com.chinacreator.gzcm.sysman.iam.dao.UserDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.617 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'userRoleDao' and 'com.chinacreator.gzcm.sysman.iam.dao.UserRoleDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.621 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dataSecurityPolicyDao' and 'com.chinacreator.gzcm.sysman.security.policy.dao.DataSecurityPolicyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.645 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'securityCryptoKeyAuditDao' and 'com.chinacreator.gzcm.engine.security.crypto.dao.SecurityCryptoKeyAuditDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.650 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'securityCryptoKeyDao' and 'com.chinacreator.gzcm.engine.security.crypto.dao.SecurityCryptoKeyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.658 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'securitySecretDao' and 'com.chinacreator.gzcm.engine.security.crypto.dao.SecuritySecretDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.684 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRecordMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRecordMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.690 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRuleMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.756 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorDataDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitordata.dao.IMonitorDataDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.766 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.773 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.782 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.793 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginParamsDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginParamsDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.810 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.825 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorWarnContactDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IMonitorWarnContactDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.859 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IWarnLogDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IWarnLogDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:11.890 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IStrategyDao' and 'com.chinacreator.gzcm.runtime.core.monitor.strategy.dao.IStrategyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 10:27:12.063 [main] [] WARN  o.s.c.a.ConfigurationClassPostProcessor - Cannot enhance @Configuration bean definition 'myBatisConfig' since its singleton instance has been created too early. The typical cause is a non-static @Bean method with a BeanDefinitionRegistryPostProcessor return type: Consider declaring such methods as 'static' and/or marking the containing configuration class as 'proxyBeanMethods=false'.
+2026-10-06 10:27:30.413 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 18081 (http)
+2026-10-06 10:27:30.568 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-18081"]
+2026-10-06 10:27:30.642 [main] [] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-10-06 10:27:30.658 [main] [] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-10-06 10:27:31.277 [main] [] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-10-06 10:27:31.290 [main] [] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 32478 ms
+2026-10-06 10:27:34.841 [main] [] INFO  c.c.g.s.security.JwtTokenProvider - JwtTokenProvider initialized with RS256 keys
+2026-10-06 10:27:42.021 [main] [] INFO  com.zaxxer.hikari.HikariDataSource - SysmanHikariCP - Starting...
+2026-10-06 10:27:46.542 [main] [] INFO  com.zaxxer.hikari.pool.HikariPool - SysmanHikariCP - Added connection org.postgresql.jdbc.PgConnection@5ac7550a
+2026-10-06 10:27:46.556 [main] [] INFO  com.zaxxer.hikari.HikariDataSource - SysmanHikariCP - Start completed.
+2026-10-06 10:27:46.854 [main] [] ERROR c.c.g.s.c.s.impl.SysConfigService - 初始化默认配置失败: PreparedStatementCallback; bad SQL grammar [INSERT INTO sys_config (id, config_key, config_value, config_group, config_type, config_label, description, sort_order, status, edition) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, ?, 100, 'active', 'all') ON CONFLICT (config_key) DO UPDATE SET description = EXCLUDED.description]
+2026-10-06 10:27:46.903 [main] [] ERROR c.c.g.s.c.s.impl.SysConfigService - 刷新 sys_config 缓存失败
+org.springframework.jdbc.BadSqlGrammarException: StatementCallback; bad SQL grammar [SELECT config_key, config_value FROM sys_config WHERE status = 'active']
+	at org.springframework.jdbc.support.SQLStateSQLExceptionTranslator.doTranslate(SQLStateSQLExceptionTranslator.java:112)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:116)
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:408)
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:476)
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:486)
+	at org.springframework.jdbc.core.JdbcTemplate.queryForList(JdbcTemplate.java:536)
+	at com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService.refreshCache(SysConfigService.java:122)
+	at com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService.init(SysConfigService.java:45)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.beans.factory.annotation.InitDestroyAnnotationBeanPostProcessor$LifecycleMethod.invoke(InitDestroyAnnotationBeanPostProcessor.java:457)
+	at org.springframework.beans.factory.annotation.InitDestroyAnnotationBeanPostProcessor$LifecycleMetadata.invokeInitMethods(InitDestroyAnnotationBeanPostProcessor.java:401)
+	at org.springframework.beans.factory.annotation.InitDestroyAnnotationBeanPostProcessor.postProcessBeforeInitialization(InitDestroyAnnotationBeanPostProcessor.java:219)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.applyBeanPostProcessorsBeforeInitialization(AbstractAutowireCapableBeanFactory.java:421)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1765)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:599)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:907)
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:785)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1354)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1191)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:561)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:907)
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:785)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1354)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1191)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:561)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:907)
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:785)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1354)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1191)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:561)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:975)
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:959)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:624)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:456)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:334)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1354)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1343)
+	at com.chinacreator.gzcm.services.sysman.SysmanServiceApplication.main(SysmanServiceApplication.java:82)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:91)
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:53)
+	at org.springframework.boot.loader.launch.JarLauncher.main(JarLauncher.java:58)
+Caused by: org.postgresql.util.PSQLException: ERROR: relation "sys_config" does not exist
+  位置：38
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2713)
+	at org.postgresql.core.v3.QueryExecutorImpl.processResults(QueryExecutorImpl.java:2401)
+	at org.postgresql.core.v3.QueryExecutorImpl.execute(QueryExecutorImpl.java:368)
+	at org.postgresql.jdbc.PgStatement.executeInternal(PgStatement.java:498)
+	at org.postgresql.jdbc.PgStatement.execute(PgStatement.java:415)
+	at org.postgresql.jdbc.PgStatement.executeWithFlags(PgStatement.java:335)
+	at org.postgresql.jdbc.PgStatement.executeCachedSql(PgStatement.java:321)
+	at org.postgresql.jdbc.PgStatement.executeWithFlags(PgStatement.java:297)
+	at org.postgresql.jdbc.PgStatement.executeQuery(PgStatement.java:246)
+	at com.zaxxer.hikari.pool.ProxyStatement.executeQuery(ProxyStatement.java:110)
+	at com.zaxxer.hikari.pool.HikariProxyStatement.executeQuery(HikariProxyStatement.java)
+	at org.springframework.jdbc.core.JdbcTemplate$1QueryStatementCallback.doInStatement(JdbcTemplate.java:463)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:393)
+	... 79 common frames omitted
+2026-10-06 10:27:46.971 [main] [] INFO  c.c.g.s.c.s.impl.SysConfigService - SysConfigService 初始化完成，已加载 0 条配置
+2026-10-06 10:27:49.732 [main] [] INFO  c.c.g.s.controller.CausalController - CausalController 初始化完成，已加载 8 个节点, 10 条边
+2026-10-06 10:27:50.313 [main] [] WARN  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'dictController': Unsatisfied dependency expressed through field 'dictService': Error creating bean with name 'dictService' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/sysman/target/sysman-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/sysman-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/sysman/dict/service/impl/DictService.class]: Failed to instantiate [com.chinacreator.gzcm.sysman.dict.service.impl.DictService]: Constructor threw exception
+2026-10-06 10:27:50.321 [main] [] INFO  com.zaxxer.hikari.HikariDataSource - SysmanHikariCP - Shutdown initiated...
+2026-10-06 10:27:50.433 [main] [] INFO  com.zaxxer.hikari.HikariDataSource - SysmanHikariCP - Shutdown completed.
+2026-10-06 10:27:50.479 [main] [] INFO  o.a.catalina.core.StandardService - Stopping service [Tomcat]
+2026-10-06 10:27:50.706 [main] [] INFO  o.s.b.a.l.ConditionEvaluationReportLogger - 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-10-06 10:27:50.949 [main] [] ERROR o.s.boot.SpringApplication - Application run failed
+org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'dictController': Unsatisfied dependency expressed through field 'dictService': Error creating bean with name 'dictService' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/sysman/target/sysman-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/sysman-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/sysman/dict/service/impl/DictService.class]: Failed to instantiate [com.chinacreator.gzcm.sysman.dict.service.impl.DictService]: Constructor threw exception
+	at org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor$AutowiredFieldElement.resolveFieldValue(AutowiredAnnotationBeanPostProcessor.java:787)
+	at org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor$AutowiredFieldElement.inject(AutowiredAnnotationBeanPostProcessor.java:767)
+	at org.springframework.beans.factory.annotation.InjectionMetadata.inject(InjectionMetadata.java:145)
+	at org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor.postProcessProperties(AutowiredAnnotationBeanPostProcessor.java:508)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.populateBean(AbstractAutowireCapableBeanFactory.java:1418)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:598)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.preInstantiateSingletons(DefaultListableBeanFactory.java:975)
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:959)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:624)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:456)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:334)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1354)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1343)
+	at com.chinacreator.gzcm.services.sysman.SysmanServiceApplication.main(SysmanServiceApplication.java:82)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:91)
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:53)
+	at org.springframework.boot.loader.launch.JarLauncher.main(JarLauncher.java:58)
+Caused by: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'dictService' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/sysman/target/sysman-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/sysman-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/sysman/dict/service/impl/DictService.class]: Failed to instantiate [com.chinacreator.gzcm.sysman.dict.service.impl.DictService]: Constructor threw exception
+	at org.springframework.beans.factory.support.ConstructorResolver.instantiate(ConstructorResolver.java:318)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:306)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1354)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1191)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:561)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor$AutowiredFieldElement.resolveFieldValue(AutowiredAnnotationBeanPostProcessor.java:784)
+	... 27 common frames omitted
+Caused by: org.springframework.beans.BeanInstantiationException: Failed to instantiate [com.chinacreator.gzcm.sysman.dict.service.impl.DictService]: Constructor threw exception
+	at org.springframework.beans.BeanUtils.instantiateClass(BeanUtils.java:223)
+	at org.springframework.beans.factory.support.SimpleInstantiationStrategy.instantiate(SimpleInstantiationStrategy.java:111)
+	at org.springframework.beans.factory.support.ConstructorResolver.instantiate(ConstructorResolver.java:315)
+	... 40 common frames omitted
+Caused by: org.springframework.jdbc.BadSqlGrammarException: StatementCallback; bad SQL grammar [SELECT id, dict_type, dict_code, dict_label, dict_label_en, sort_order, status, parent_code, ext_value, subsystem, created_at, updated_at FROM sys_dict WHERE status = 'active' ORDER BY dict_type, sort_order]
+	at org.springframework.jdbc.support.SQLStateSQLExceptionTranslator.doTranslate(SQLStateSQLExceptionTranslator.java:112)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:107)
+	at org.springframework.jdbc.support.AbstractFallbackSQLExceptionTranslator.translate(AbstractFallbackSQLExceptionTranslator.java:116)
+	at org.springframework.jdbc.core.JdbcTemplate.translateException(JdbcTemplate.java:1548)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:408)
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:476)
+	at org.springframework.jdbc.core.JdbcTemplate.query(JdbcTemplate.java:486)
+	at com.chinacreator.gzcm.sysman.dict.service.impl.DictService.refreshCache(DictService.java:141)
+	at com.chinacreator.gzcm.sysman.dict.service.impl.DictService.<init>(DictService.java:49)
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+	at java.base/java.lang.reflect.Constructor.newInstanceWithCaller(Constructor.java:500)
+	at java.base/java.lang.reflect.Constructor.newInstance(Constructor.java:481)
+	at org.springframework.beans.BeanUtils.instantiateClass(BeanUtils.java:210)
+	... 42 common frames omitted
+Caused by: org.postgresql.util.PSQLException: ERROR: relation "sys_dict" does not exist
+  位置：144
+	at org.postgresql.core.v3.QueryExecutorImpl.receiveErrorResponse(QueryExecutorImpl.java:2713)
+	at org.postgresql.core.v3.QueryExecutorImpl.processResults(QueryExecutorImpl.java:2401)
+	at org.postgresql.core.v3.QueryExecutorImpl.execute(QueryExecutorImpl.java:368)
+	at org.postgresql.jdbc.PgStatement.executeInternal(PgStatement.java:498)
+	at org.postgresql.jdbc.PgStatement.execute(PgStatement.java:415)
+	at org.postgresql.jdbc.PgStatement.executeWithFlags(PgStatement.java:335)
+	at org.postgresql.jdbc.PgStatement.executeCachedSql(PgStatement.java:321)
+	at org.postgresql.jdbc.PgStatement.executeWithFlags(PgStatement.java:297)
+	at org.postgresql.jdbc.PgStatement.executeQuery(PgStatement.java:246)
+	at com.zaxxer.hikari.pool.ProxyStatement.executeQuery(ProxyStatement.java:110)
+	at com.zaxxer.hikari.pool.HikariProxyStatement.executeQuery(HikariProxyStatement.java)
+	at org.springframework.jdbc.core.JdbcTemplate$1QueryStatementCallback.doInStatement(JdbcTemplate.java:463)
+	at org.springframework.jdbc.core.JdbcTemplate.execute(JdbcTemplate.java:393)
+	... 52 common frames omitted
+2026-10-06 12:59:12.616 [main] [] INFO  c.c.g.s.s.SysmanServiceApplication - Starting SysmanServiceApplication using Java 17.0.17 with PID 41988 (D:\workspace\javaprojects\ECOS\ecos_backend\services\sysman\target\sysman-service-1.0.0-SNAPSHOT.jar started by guoro in D:\workspace\javaprojects\ECOS)
+2026-10-06 12:59:12.648 [main] [] INFO  c.c.g.s.s.SysmanServiceApplication - The following 1 profile is active: "standard"
+2026-10-06 12:59:27.706 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'abacPolicyDao' and 'com.chinacreator.gzcm.sysman.abac.dao.AbacPolicyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.710 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'auditLogDao' and 'com.chinacreator.gzcm.sysman.audit.dao.AuditLogDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.714 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'compliancePolicyDao' and 'com.chinacreator.gzcm.sysman.compliance.dao.CompliancePolicyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.717 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'crossBorderTransferDao' and 'com.chinacreator.gzcm.sysman.compliance.dao.CrossBorderTransferDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.721 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dataResidencyDao' and 'com.chinacreator.gzcm.sysman.compliance.dao.DataResidencyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.725 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'configDao' and 'com.chinacreator.gzcm.sysman.config.dao.ConfigDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.730 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'configVersionDao' and 'com.chinacreator.gzcm.sysman.config.dao.ConfigVersionDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.733 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPAccessDao' and 'com.chinacreator.gzcm.sysman.config.dao.IPAccessDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.736 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'systemParamDao' and 'com.chinacreator.gzcm.sysman.config.dao.SystemParamDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.741 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'systemVariableDao' and 'com.chinacreator.gzcm.sysman.config.dao.SystemVariableDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.745 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dataPermissionPolicyDao' and 'com.chinacreator.gzcm.sysman.datapermission.dao.DataPermissionPolicyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.749 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'organizationDao' and 'com.chinacreator.gzcm.sysman.iam.dao.OrganizationDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.752 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'permissionDao' and 'com.chinacreator.gzcm.sysman.iam.dao.PermissionDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.756 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'roleDao' and 'com.chinacreator.gzcm.sysman.iam.dao.RoleDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.759 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'rolePermissionDao' and 'com.chinacreator.gzcm.sysman.iam.dao.RolePermissionDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.762 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'tenantConfigDao' and 'com.chinacreator.gzcm.sysman.iam.dao.TenantConfigDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.766 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'tenantDao' and 'com.chinacreator.gzcm.sysman.iam.dao.TenantDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.769 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'tenantResourceUsageDao' and 'com.chinacreator.gzcm.sysman.iam.dao.TenantResourceUsageDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.774 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'userDao' and 'com.chinacreator.gzcm.sysman.iam.dao.UserDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.777 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'userRoleDao' and 'com.chinacreator.gzcm.sysman.iam.dao.UserRoleDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.781 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dataSecurityPolicyDao' and 'com.chinacreator.gzcm.sysman.security.policy.dao.DataSecurityPolicyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.803 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'securityCryptoKeyAuditDao' and 'com.chinacreator.gzcm.engine.security.crypto.dao.SecurityCryptoKeyAuditDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.806 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'securityCryptoKeyDao' and 'com.chinacreator.gzcm.engine.security.crypto.dao.SecurityCryptoKeyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.809 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'securitySecretDao' and 'com.chinacreator.gzcm.engine.security.crypto.dao.SecuritySecretDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.830 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRecordMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRecordMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.833 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRuleMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.848 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorDataDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitordata.dao.IMonitorDataDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.852 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.856 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.859 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.863 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginParamsDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginParamsDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.866 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.869 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorWarnContactDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IMonitorWarnContactDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.872 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IWarnLogDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IWarnLogDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.875 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IStrategyDao' and 'com.chinacreator.gzcm.runtime.core.monitor.strategy.dao.IStrategyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 12:59:27.908 [main] [] WARN  o.s.c.a.ConfigurationClassPostProcessor - Cannot enhance @Configuration bean definition 'myBatisConfig' since its singleton instance has been created too early. The typical cause is a non-static @Bean method with a BeanDefinitionRegistryPostProcessor return type: Consider declaring such methods as 'static' and/or marking the containing configuration class as 'proxyBeanMethods=false'.
+2026-10-06 12:59:43.997 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 18081 (http)
+2026-10-06 12:59:44.587 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-18081"]
+2026-10-06 12:59:44.634 [main] [] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-10-06 12:59:44.640 [main] [] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-10-06 12:59:45.172 [main] [] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-10-06 12:59:45.189 [main] [] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 31761 ms
+2026-10-06 12:59:48.189 [main] [] INFO  c.c.g.s.security.JwtTokenProvider - JwtTokenProvider initialized with RS256 keys
+2026-10-06 12:59:55.594 [main] [] INFO  com.zaxxer.hikari.HikariDataSource - SysmanHikariCP - Starting...
+2026-10-06 12:59:58.436 [main] [] INFO  com.zaxxer.hikari.pool.HikariPool - SysmanHikariCP - Added connection org.postgresql.jdbc.PgConnection@331ad6eb
+2026-10-06 12:59:58.467 [main] [] INFO  com.zaxxer.hikari.HikariDataSource - SysmanHikariCP - Start completed.
+2026-10-06 12:59:59.266 [main] [] INFO  c.c.g.s.c.s.impl.SysConfigService - 缓存刷新完成，当前 146 条配置
+2026-10-06 12:59:59.272 [main] [] INFO  c.c.g.s.c.s.impl.SysConfigService - SysConfigService 初始化完成，已加载 146 条配置
+2026-10-06 13:00:01.461 [main] [] INFO  c.c.g.s.controller.CausalController - CausalController 初始化完成，已加载 8 个节点, 10 条边
+2026-10-06 13:00:02.023 [main] [] INFO  c.c.g.s.d.service.impl.DictService - Dict cache refreshed: 21 types, 102 items in 111ms
+2026-10-06 13:00:02.592 [main] [] INFO  c.c.g.s.c.MarketplaceController - MarketplaceController 初始化完成，已加载 5 条种子数据
+2026-10-06 13:00:03.279 [main] [] INFO  c.c.g.s.c.ScenarioController - ScenarioController 初始化完成，已加载默认场景
+2026-10-06 13:00:04.039 [main] [] INFO  c.c.g.s.c.WorldModelGraphController - WorldModelGraphController 初始化完成，已加载 2 个默认目标 (fallback)
+2026-10-06 13:00:04.835 [main] [] INFO  c.c.g.s.i.s.impl.DbBlacklistStore - DbBlacklistStore 初始化完成，已清理 sys_token_blacklist 过期项
+2026-10-06 13:00:06.143 [main] [] WARN  c.c.g.r.e.MemoryEventBusServiceImpl - [EventBus][MEMORY] fallback mode — Kafka 未启用 (ecs.event.kafka.enabled != true), 仅同 JVM 内存分发
+2026-10-06 13:00:07.633 [main] [] INFO  c.c.g.e.s.service.OpaPolicyService - OPA 策略目录解包 classpath:opa/policies → C:\Users\guoro\AppData\Local\Temp\ecos-opa (0 文件)
+2026-10-06 13:00:07.732 [main] [] INFO  c.c.g.e.s.c.CryptoAuditController - CryptoAuditController 初始化完成
+2026-10-06 13:00:07.963 [main] [] INFO  c.c.g.e.security.SecurityEngineImpl - Security engine started (was STOPPED)
+2026-10-06 13:00:07.966 [main] [] INFO  c.c.g.e.security.SecurityEngineImpl - Security engine auto-started on boot
+2026-10-06 13:00:08.037 [main] [] INFO  c.c.g.e.s.e.DataSecurityLevelEventListener - DataSecurityLevelEventListener: subscribed topic=ecos.data.security-tagged groupId=dccheng-security-consumer
+2026-10-06 13:00:08.639 [main] [] INFO  c.c.g.r.l.c.LLMGatewayAutoConfiguration - Hermes Engine auto-configuration initialized: enabled=true, defaultProvider=openrouter, defaultModel=deepseek/deepseek-chat
+2026-10-06 13:00:11.796 [main] [] INFO  c.c.g.r.l.c.LLMGatewayAutoConfiguration - Hermes OkHttpClient created: timeout=PT1M, retryMaxAttempts=3
+2026-10-06 13:00:13.601 [main] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - onStartup: PG 恢复 0 个任务 + 0 个执行计划
+2026-10-06 13:00:13.656 [main] [] INFO  o.s.b.f.a.AutowiredAnnotationBeanPostProcessor - Inconsistent constructor declaration on bean with name 'securityCryptoEgress': single autowire-marked constructor flagged as optional - this constructor is effectively required since there is no default constructor to fall back to: public com.chinacreator.gzcm.runtime.core.crypto.SecurityCryptoEgress(org.springframework.context.ApplicationContext)
+2026-10-06 13:00:15.765 [main] [] INFO  c.c.g.r.a.olap.DuckDBQueryService - DuckDBQueryService downgraded (DuckDB migrated to Doris) — all operations are no-ops
+2026-10-06 13:00:21.809 [main] [] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 3 endpoint(s) beneath base path '/actuator'
+2026-10-06 13:00:22.833 [main] [] INFO  o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@18918ab9, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@1315f1d5, org.springframework.security.web.context.SecurityContextHolderFilter@1c0ec502, org.springframework.security.web.header.HeaderWriterFilter@1abb719a, org.springframework.web.filter.CorsFilter@3b32f0b4, org.springframework.security.web.authentication.logout.LogoutFilter@17fa25f1, com.chinacreator.gzcm.sysman.security.JwtAuthenticationFilter@25dad235, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@66075347, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@283595db, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@77d7d2d0, org.springframework.security.web.session.SessionManagementFilter@59eb987a, org.springframework.security.web.access.ExceptionTranslationFilter@5b132063, org.springframework.security.web.access.intercept.AuthorizationFilter@510d4d4b]
+2026-10-06 13:00:27.952 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-18081"]
+2026-10-06 13:00:28.048 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 18081 (http) with context path ''
+2026-10-06 13:00:28.151 [main] [] INFO  c.c.g.s.s.SysmanServiceApplication - Started SysmanServiceApplication in 83.012 seconds (process running for 90.693)
+2026-10-06 13:00:59.631 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:01:59.649 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:02:59.662 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:03:59.683 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:04:59.722 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:05:59.748 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:06:59.779 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:07:59.799 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:08:59.818 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:09:59.849 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:10:59.881 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:11:59.899 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:12:59.916 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:13:59.941 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:14:59.972 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:15:59.991 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:17:00.011 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:18:00.035 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:19:00.061 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:20:00.094 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:21:00.126 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:22:00.161 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:23:00.189 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:24:00.220 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:25:00.256 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:26:00.271 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:27:00.285 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:28:00.347 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:29:00.373 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:30:00.400 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:31:00.413 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:32:00.443 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:33:00.476 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:34:00.497 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:35:00.524 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:36:00.539 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:37:00.559 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:38:00.582 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:39:00.606 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:40:00.627 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:41:00.644 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:42:00.656 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:43:00.677 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:44:00.715 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:45:00.744 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:46:00.769 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:47:00.790 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:48:00.805 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:49:00.826 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:50:00.846 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:51:00.864 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:52:00.893 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:53:00.925 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:54:00.955 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 13:55:00.978 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []

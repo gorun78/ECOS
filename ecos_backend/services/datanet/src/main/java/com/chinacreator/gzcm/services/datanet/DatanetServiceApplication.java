@@ -1,12 +1,16 @@
 package com.chinacreator.gzcm.services.datanet;
 
+import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Profile;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
@@ -72,5 +76,20 @@ public class DatanetServiceApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(DatanetServiceApplication.class, args);
+    }
+
+    /**
+     * Datanet 独立 fat-jar 桥接：data-engine-impl 的 PipelineGitService / GitRepoRootResolver
+     * 等 ctor 依赖 sysman 域的 {@link SysConfigService} 具体类；在 gateway monolith 里由全仓
+     * @ComponentScan 拉起, 独立 :18082 daemon 不 sysman.config 全域扫描（避免 SecurityIamConfig
+     * 连带拉起 iam/audit/security/** 连环 bean）。此处仅在 bean 缺失时兜底。
+     *
+     * <p>依赖: JdbcTemplate (datanet runtime 数据源)。setup: {@code @PostConstruct} 触发
+     * sys_config 表种子 + Caffeine 缓存。
+     */
+    @Bean
+    @Profile("standard")
+    public SysConfigService sysConfigServiceBridge(JdbcTemplate jdbcTemplate) {
+        return new SysConfigService(jdbcTemplate);
     }
 }

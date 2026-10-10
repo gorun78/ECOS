@@ -14,8 +14,13 @@ import java.util.*;
  * 决策智能 REST API — 前缀 /api/v1/cognitive/decision
  *
  * <p>五步生命周期端点：record → link → query(similar/chain) → govern(impact/check-rules)</p>
+ *
+ * <p>Bean name 排除 ({@code cognitive2DecisionController})：安全域
+ * {@code com.chinacreator.gzcm.engine.security.controller.DecisionController} 已占用默认 name
+ * {@code decisionController}；此处显式命名以避免 gateway fat-JAR 组件扫描的
+ * {@code ConflictingBeanDefinitionException}（2026-10-05 B 层 live 复跑首启 encounter）。</p>
  */
-@RestController
+@RestController("cognitive2DecisionController")
 @RequestMapping("/api/v1/cognitive/decision")
 public class DecisionController {
 

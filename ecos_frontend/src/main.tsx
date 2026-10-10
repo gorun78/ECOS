@@ -62,6 +62,12 @@ const EngineMonitor = lazy(() => import('./pages/EngineMonitor.tsx'));
 const CognitiveEngineView = lazy(() => import('./pages/CognitiveEngineView.tsx'));
 const AsyncTaskCenterView = lazy(() => import('./pages/AsyncTaskCenterView'));
 const SandboxCanvas = lazy(() => import('./pages/scenario-sandbox/SandboxCanvas.tsx'));
+// PMO 平台治理（详细设计 00 §B）: 网关诊断 + 告警中心
+const GatewayDiagnosticsPage = lazy(() => import('./pages/platform/gateway-diagnostics/GatewayDiagnosticsPage.tsx'));
+const AlertsPage = lazy(() => import('./pages/platform/alerts/AlertsPage.tsx'));
+// PMO 平台治理（详细设计 01 §B 安全域）: 安全策略 + 审计查询
+const SecurityPolicyPage = lazy(() => import('./pages/platform/security/SecurityPolicyPage.tsx'));
+const AuditQueryPage = lazy(() => import('./pages/platform/audit/AuditQueryPage.tsx'));
 
 // Bridge for <Route element={...}>'s props with useParams (scenario-sandbox/:scenarioId)
 import { useParams } from 'react-router-dom';
@@ -174,6 +180,12 @@ createRoot(document.getElementById('root')!).render(
                 {/* 安全 */}
                 <Route path="security-center" element={<SecurityCenter />} />
                 <Route path="guardrails" element={<GuardrailsView />} />
+                {/* 平台治理 (L3): 网关诊断 + 告警中心 — 详细设计 00 §B */}
+                <Route path="platform/gateway-diagnostics" element={<GatewayDiagnosticsPage />} />
+                <Route path="platform/alerts" element={<AlertsPage />} />
+                {/* 平台治理 (L3): 安全策略 + 审计查询 — 详细设计 01 §B */}
+                <Route path="platform/security/policies" element={<SecurityPolicyPage />} />
+                <Route path="platform/security/audit" element={<AuditQueryPage />} />
                 {/* 系统管理 */}
                 <Route path="iam" element={<UserManagement />} />
                 <Route path="kanban" element={<KanbanBoard />} />

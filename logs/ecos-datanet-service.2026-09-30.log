@@ -1,0 +1,50 @@
+2026-09-30 16:21:33.314 [main] [] INFO  c.c.g.s.d.DatanetServiceApplication - Starting DatanetServiceApplication using Java 17.0.17 with PID 38924 (D:\workspace\javaprojects\ECOS\ecos_backend\services\datanet\target\datanet-service-1.0.0-SNAPSHOT.jar started by guoro in D:\workspace\javaprojects\ECOS)
+2026-09-30 16:21:33.338 [main] [] INFO  c.c.g.s.d.DatanetServiceApplication - The following 1 profile is active: "enterprise"
+2026-09-30 16:21:42.651 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dqRuleMapper' and 'com.chinacreator.gzcm.engine.data.quality.mapper.DqRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.656 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dqScheduleMapper' and 'com.chinacreator.gzcm.engine.data.quality.mapper.DqScheduleMapper' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.663 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dataDescriptionDao' and 'com.chinacreator.gzcm.engine.data.datadescription.dao.DataDescriptionDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.666 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'schemaRegistryDao' and 'com.chinacreator.gzcm.engine.data.datadescription.dao.SchemaRegistryDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.672 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dqRuleMapper' and 'com.chinacreator.gzcm.engine.data.quality.mapper.DqRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.674 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'dqScheduleMapper' and 'com.chinacreator.gzcm.engine.data.quality.mapper.DqScheduleMapper' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.683 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRecordMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRecordMapper' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.686 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRuleMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.693 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorDataDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitordata.dao.IMonitorDataDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.695 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.697 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectTargetDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.699 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.701 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginParamsDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginParamsDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.703 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginTargetDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.705 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorWarnContactDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IMonitorWarnContactDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.707 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IWarnLogDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IWarnLogDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.709 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IStrategyDao' and 'com.chinacreator.gzcm.runtime.core.monitor.strategy.dao.IStrategyDao' mapperInterface. Bean already defined with the same name!
+2026-09-30 16:21:42.726 [main] [] WARN  o.s.c.a.ConfigurationClassPostProcessor - Cannot enhance @Configuration bean definition 'myBatisConfig' since its singleton instance has been created too early. The typical cause is a non-static @Bean method with a BeanDefinitionRegistryPostProcessor return type: Consider declaring such methods as 'static' and/or marking the containing configuration class as 'proxyBeanMethods=false'.
+2026-09-30 16:21:49.977 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 18082 (http)
+2026-09-30 16:21:50.090 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-18082"]
+2026-09-30 16:21:50.106 [main] [] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-09-30 16:21:50.109 [main] [] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-09-30 16:21:50.529 [main] [] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-09-30 16:21:50.537 [main] [] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 16521 ms
+2026-09-30 16:21:52.436 [main] [] INFO  c.c.g.r.a.olap.DuckDBQueryService - DuckDBQueryService downgraded (DuckDB migrated to Doris) — all operations are no-ops
+2026-09-30 16:21:53.552 [main] [] WARN  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'gitController': Unsatisfied dependency expressed through field 'repoRootResolver': Error creating bean with name 'gitRepoRootResolver' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/datanet/target/datanet-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/data-engine-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/engine/data/service/GitRepoRootResolver.class]: Unsatisfied dependency expressed through constructor parameter 0: No qualifying bean of type 'com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService' available: expected at least 1 bean which qualifies as autowire candidate. Dependency annotations: {}
+2026-09-30 16:21:53.578 [main] [] INFO  o.a.catalina.core.StandardService - Stopping service [Tomcat]
+2026-09-30 16:21:53.772 [main] [] INFO  o.s.b.a.l.ConditionEvaluationReportLogger - 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-09-30 16:21:54.037 [main] [] ERROR o.s.b.d.LoggingFailureAnalysisReporter - 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Parameter 0 of constructor in com.chinacreator.gzcm.engine.data.service.GitRepoRootResolver required a bean of type 'com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService' that could not be found.
+
+The injection point has the following annotations:
+	- @org.springframework.beans.factory.annotation.Autowired(required=true)
+
+
+Action:
+
+Consider defining a bean of type 'com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService' in your configuration.
+

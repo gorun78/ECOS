@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.gateway;
 
+import org.apache.ibatis.annotations.Mapper;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -135,7 +136,13 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.chinacreator.gzcm.engine.kb.repository",
     // 非结构化文档链路：kb.doc.mapper 下的 KbDocMapper/KbDocChunkMapper 不在 kb.repository 内，
     // 不纳入扫描会导致 KnowledgeDocIngestService 注入失败（启动即失败），与 dccheng 侧口径保持一致
-    "com.chinacreator.gzcm.engine.kb.**.mapper"
+    "com.chinacreator.gzcm.engine.kb.**.mapper",
+    // 2026-10-05 B 层 live 复跑首启 encounter：kb 引擎部分 Mapper 落在业务领域包
+    // （非 **/mapper 子包），漏扫 → 对应 ServiceImpl 构造器注入无候选 bean → 启动即失败。
+    // mybatis-spring 1.5+ 默认 markerInterface=@Mapper，故整包扫描只收录 @Mapper 接口，
+    // 包内的 @Service/@Component 不受影响，无需逐包白名单。
+    "com.chinacreator.gzcm.engine.kb.assumption",
+    "com.chinacreator.gzcm.engine.kb.profile"
 })
 public class GatewayApplication {
 

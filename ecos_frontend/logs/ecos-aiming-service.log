@@ -1,0 +1,330 @@
+2026-10-06 19:26:40.440 [main] [] INFO  c.c.g.s.a.AimingServiceApplication - Starting AimingServiceApplication using Java 17.0.10 with PID 30436 (D:\workspace\javaprojects\ECOS\ecos_backend\services\aiming\target\aiming-service-1.0.0-SNAPSHOT.jar started by guoro in D:\workspace\javaprojects\ECOS\ecos_frontend)
+2026-10-06 19:26:40.470 [main] [] INFO  c.c.g.s.a.AimingServiceApplication - The following 1 profile is active: "standard"
+2026-10-06 19:26:58.315 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRecordMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRecordMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:26:58.316 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRuleMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:26:58.324 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorDataDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitordata.dao.IMonitorDataDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:26:58.325 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:26:58.326 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:26:58.327 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:26:58.327 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginParamsDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginParamsDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:26:58.327 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:26:58.328 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorWarnContactDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IMonitorWarnContactDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:26:58.329 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IWarnLogDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IWarnLogDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:26:58.329 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IStrategyDao' and 'com.chinacreator.gzcm.runtime.core.monitor.strategy.dao.IStrategyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:26:58.351 [main] [] WARN  o.s.c.a.ConfigurationClassPostProcessor - Cannot enhance @Configuration bean definition 'myBatisConfig' since its singleton instance has been created too early. The typical cause is a non-static @Bean method with a BeanDefinitionRegistryPostProcessor return type: Consider declaring such methods as 'static' and/or marking the containing configuration class as 'proxyBeanMethods=false'.
+2026-10-06 19:27:14.467 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 18084 (http)
+2026-10-06 19:27:14.657 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-18084"]
+2026-10-06 19:27:14.671 [main] [] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-10-06 19:27:14.673 [main] [] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-10-06 19:27:15.219 [main] [] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-10-06 19:27:15.228 [main] [] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 33234 ms
+2026-10-06 19:27:17.942 [main] [] ERROR o.s.b.w.e.tomcat.TomcatStarter - Error starting Tomcat context. Exception: org.springframework.beans.factory.UnsatisfiedDependencyException. Message: Error creating bean with name 'jwtAuthenticationFilter' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/aiming/target/aiming-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/sysman-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/sysman/security/JwtAuthenticationFilter.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'jwtTokenProvider' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/aiming/target/aiming-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/sysman-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/sysman/security/JwtTokenProvider.class]: Failed to instantiate [com.chinacreator.gzcm.sysman.security.JwtTokenProvider]: Constructor threw exception
+2026-10-06 19:27:18.599 [main] [] INFO  o.a.catalina.core.StandardService - Stopping service [Tomcat]
+2026-10-06 19:27:18.739 [main] [] WARN  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.context.ApplicationContextException: Unable to start web server
+2026-10-06 19:27:18.950 [main] [] INFO  o.s.b.a.l.ConditionEvaluationReportLogger - 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-10-06 19:27:19.454 [main] [] ERROR o.s.boot.SpringApplication - Application run failed
+org.springframework.context.ApplicationContextException: Unable to start web server
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.onRefresh(ServletWebServerApplicationContext.java:165)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:618)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:754)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:456)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:334)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1354)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1343)
+	at com.chinacreator.gzcm.services.aiming.AimingServiceApplication.main(AimingServiceApplication.java:130)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:568)
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:91)
+	at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:53)
+	at org.springframework.boot.loader.launch.JarLauncher.main(JarLauncher.java:58)
+Caused by: org.springframework.boot.web.server.WebServerException: Unable to start embedded Tomcat
+	at org.springframework.boot.web.embedded.tomcat.TomcatWebServer.initialize(TomcatWebServer.java:145)
+	at org.springframework.boot.web.embedded.tomcat.TomcatWebServer.<init>(TomcatWebServer.java:105)
+	at org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory.getTomcatWebServer(TomcatServletWebServerFactory.java:499)
+	at org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory.getWebServer(TomcatServletWebServerFactory.java:218)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.createWebServer(ServletWebServerApplicationContext.java:188)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.onRefresh(ServletWebServerApplicationContext.java:162)
+	... 15 common frames omitted
+Caused by: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'jwtAuthenticationFilter' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/aiming/target/aiming-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/sysman-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/sysman/security/JwtAuthenticationFilter.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'jwtTokenProvider' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/aiming/target/aiming-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/sysman-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/sysman/security/JwtTokenProvider.class]: Failed to instantiate [com.chinacreator.gzcm.sysman.security.JwtTokenProvider]: Constructor threw exception
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:798)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:237)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1354)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1191)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:561)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:204)
+	at org.springframework.boot.web.servlet.ServletContextInitializerBeans.getOrderedBeansOfType(ServletContextInitializerBeans.java:210)
+	at org.springframework.boot.web.servlet.ServletContextInitializerBeans.addAsRegistrationBean(ServletContextInitializerBeans.java:173)
+	at org.springframework.boot.web.servlet.ServletContextInitializerBeans.addAsRegistrationBean(ServletContextInitializerBeans.java:168)
+	at org.springframework.boot.web.servlet.ServletContextInitializerBeans.addAdaptableBeans(ServletContextInitializerBeans.java:153)
+	at org.springframework.boot.web.servlet.ServletContextInitializerBeans.<init>(ServletContextInitializerBeans.java:86)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.getServletContextInitializerBeans(ServletWebServerApplicationContext.java:266)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.selfInitialize(ServletWebServerApplicationContext.java:240)
+	at org.springframework.boot.web.embedded.tomcat.TomcatStarter.onStartup(TomcatStarter.java:52)
+	at org.apache.catalina.core.StandardContext.startInternal(StandardContext.java:4866)
+	at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:171)
+	at org.apache.catalina.core.ContainerBase$StartChild.call(ContainerBase.java:1332)
+	at org.apache.catalina.core.ContainerBase$StartChild.call(ContainerBase.java:1322)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at org.apache.tomcat.util.threads.InlineExecutorService.execute(InlineExecutorService.java:75)
+	at java.base/java.util.concurrent.AbstractExecutorService.submit(AbstractExecutorService.java:145)
+	at org.apache.catalina.core.ContainerBase.startInternal(ContainerBase.java:866)
+	at org.apache.catalina.core.StandardHost.startInternal(StandardHost.java:845)
+	at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:171)
+	at org.apache.catalina.core.ContainerBase$StartChild.call(ContainerBase.java:1332)
+	at org.apache.catalina.core.ContainerBase$StartChild.call(ContainerBase.java:1322)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at org.apache.tomcat.util.threads.InlineExecutorService.execute(InlineExecutorService.java:75)
+	at java.base/java.util.concurrent.AbstractExecutorService.submit(AbstractExecutorService.java:145)
+	at org.apache.catalina.core.ContainerBase.startInternal(ContainerBase.java:866)
+	at org.apache.catalina.core.StandardEngine.startInternal(StandardEngine.java:240)
+	at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:171)
+	at org.apache.catalina.core.StandardService.startInternal(StandardService.java:433)
+	at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:171)
+	at org.apache.catalina.core.StandardServer.startInternal(StandardServer.java:917)
+	at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:171)
+	at org.apache.catalina.startup.Tomcat.start(Tomcat.java:488)
+	at org.springframework.boot.web.embedded.tomcat.TomcatWebServer.initialize(TomcatWebServer.java:126)
+	... 20 common frames omitted
+Caused by: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'jwtTokenProvider' defined in URL [jar:nested:/D:/workspace/javaprojects/ECOS/ecos_backend/services/aiming/target/aiming-service-1.0.0-SNAPSHOT.jar/!BOOT-INF/lib/sysman-impl-1.0.0-SNAPSHOT.jar!/com/chinacreator/gzcm/sysman/security/JwtTokenProvider.class]: Failed to instantiate [com.chinacreator.gzcm.sysman.security.JwtTokenProvider]: Constructor threw exception
+	at org.springframework.beans.factory.support.ConstructorResolver.instantiate(ConstructorResolver.java:318)
+	at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:306)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1354)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1191)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:561)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:521)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:325)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:234)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:323)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:199)
+	at org.springframework.beans.factory.config.DependencyDescriptor.resolveCandidate(DependencyDescriptor.java:254)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1443)
+	at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1353)
+	at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:907)
+	at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:785)
+	... 61 common frames omitted
+Caused by: org.springframework.beans.BeanInstantiationException: Failed to instantiate [com.chinacreator.gzcm.sysman.security.JwtTokenProvider]: Constructor threw exception
+	at org.springframework.beans.BeanUtils.instantiateClass(BeanUtils.java:223)
+	at org.springframework.beans.factory.support.SimpleInstantiationStrategy.instantiate(SimpleInstantiationStrategy.java:111)
+	at org.springframework.beans.factory.support.ConstructorResolver.instantiate(ConstructorResolver.java:315)
+	... 75 common frames omitted
+Caused by: java.security.spec.InvalidKeySpecException: java.security.InvalidKeyException: Missing key encoding
+	at java.base/sun.security.rsa.RSAKeyFactory.engineGeneratePublic(RSAKeyFactory.java:241)
+	at java.base/java.security.KeyFactory.generatePublic(KeyFactory.java:351)
+	at com.chinacreator.gzcm.sysman.security.JwtTokenProvider.loadPublicKey(JwtTokenProvider.java:184)
+	at com.chinacreator.gzcm.sysman.security.JwtTokenProvider.<init>(JwtTokenProvider.java:66)
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+	at java.base/java.lang.reflect.Constructor.newInstanceWithCaller(Constructor.java:499)
+	at java.base/java.lang.reflect.Constructor.newInstance(Constructor.java:480)
+	at org.springframework.beans.BeanUtils.instantiateClass(BeanUtils.java:210)
+	... 77 common frames omitted
+Caused by: java.security.InvalidKeyException: Missing key encoding
+	at java.base/sun.security.rsa.RSAPublicKeyImpl.<init>(RSAPublicKeyImpl.java:151)
+	at java.base/sun.security.rsa.RSAPublicKeyImpl.newKey(RSAPublicKeyImpl.java:80)
+	at java.base/sun.security.rsa.RSAKeyFactory.generatePublic(RSAKeyFactory.java:327)
+	at java.base/sun.security.rsa.RSAKeyFactory.engineGeneratePublic(RSAKeyFactory.java:237)
+	... 86 common frames omitted
+2026-10-06 19:28:37.172 [main] [] INFO  c.c.g.s.a.AimingServiceApplication - Starting AimingServiceApplication using Java 17.0.10 with PID 40452 (D:\workspace\javaprojects\ECOS\ecos_backend\services\aiming\target\aiming-service-1.0.0-SNAPSHOT.jar started by guoro in D:\workspace\javaprojects\ECOS\ecos_frontend)
+2026-10-06 19:28:37.188 [main] [] INFO  c.c.g.s.a.AimingServiceApplication - The following 1 profile is active: "standard"
+2026-10-06 19:28:51.339 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRecordMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRecordMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:28:51.340 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'alertRuleMapper' and 'com.chinacreator.gzcm.runtime.core.alert.mapper.AlertRuleMapper' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:28:51.346 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorDataDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitordata.dao.IMonitorDataDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:28:51.347 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:28:51.347 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorObjectTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.monitorobject.dao.IMonitorObjectTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:28:51.347 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:28:51.348 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginParamsDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginParamsDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:28:51.348 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IPluginTargetDao' and 'com.chinacreator.gzcm.runtime.core.monitor.plugin.dao.IPluginTargetDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:28:51.348 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IMonitorWarnContactDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IMonitorWarnContactDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:28:51.349 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IWarnLogDao' and 'com.chinacreator.gzcm.runtime.core.monitor.server.warn.dao.IWarnLogDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:28:51.349 [main] [] WARN  o.m.s.mapper.ClassPathMapperScanner - Skipping MapperFactoryBean with name 'IStrategyDao' and 'com.chinacreator.gzcm.runtime.core.monitor.strategy.dao.IStrategyDao' mapperInterface. Bean already defined with the same name!
+2026-10-06 19:28:51.363 [main] [] WARN  o.s.c.a.ConfigurationClassPostProcessor - Cannot enhance @Configuration bean definition 'myBatisConfig' since its singleton instance has been created too early. The typical cause is a non-static @Bean method with a BeanDefinitionRegistryPostProcessor return type: Consider declaring such methods as 'static' and/or marking the containing configuration class as 'proxyBeanMethods=false'.
+2026-10-06 19:29:06.097 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 18084 (http)
+2026-10-06 19:29:06.282 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Initializing ProtocolHandler ["http-nio-18084"]
+2026-10-06 19:29:06.296 [main] [] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-10-06 19:29:06.298 [main] [] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.18]
+2026-10-06 19:29:06.894 [main] [] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-10-06 19:29:06.899 [main] [] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 29046 ms
+2026-10-06 19:29:08.807 [main] [] INFO  c.c.g.s.security.JwtTokenProvider - JwtTokenProvider initialized with RS256 keys
+2026-10-06 19:29:19.987 [main] [] WARN  c.c.g.r.access.graph.Neo4jClient - Neo4j test connection failed: Unsupported authentication token, scheme 'none' is only allowed when auth is disabled.
+2026-10-06 19:29:20.176 [main] [] INFO  c.c.gzcm.engine.ai.AiEngineImpl - Cognitive engine started (was STOPPED)
+2026-10-06 19:29:20.177 [main] [] INFO  c.c.gzcm.engine.ai.AiEngineImpl - Cognitive engine auto-started on boot
+2026-10-06 19:29:21.199 [main] [] INFO  c.c.g.r.l.c.LLMGatewayAutoConfiguration - Hermes Engine auto-configuration initialized: enabled=true, defaultProvider=openrouter, defaultModel=deepseek/deepseek-chat
+2026-10-06 19:29:22.057 [main] [] INFO  c.c.g.r.l.c.LLMGatewayAutoConfiguration - Hermes OkHttpClient created: timeout=PT1M, retryMaxAttempts=3
+2026-10-06 19:29:23.451 [main] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - onStartup: PG 恢复 0 个任务 + 0 个执行计划
+2026-10-06 19:29:25.332 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: query_db
+2026-10-06 19:29:25.335 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: invoke_rest
+2026-10-06 19:29:25.338 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: delegate_to_agent
+2026-10-06 19:29:25.340 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: read_file
+2026-10-06 19:29:25.344 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: write_file
+2026-10-06 19:29:25.348 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: search_files
+2026-10-06 19:29:25.350 [main] [] INFO  c.c.g.engine.ai.service.ToolRegistry - [ToolRegistry] Registered tool: patch
+2026-10-06 19:29:25.662 [main] [] INFO  c.c.g.e.a.c.AgentProviderController - [AgentProviderController] 委派 LLMGateway.getProviderStatus 取 provider 目录（F06-05）
+2026-10-06 19:29:26.229 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - Loaded agent template: AI编排Agent (id=builtin-ai-agent)
+2026-10-06 19:29:26.235 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - Loaded agent template: 认知引擎Agent (id=builtin-cognitive-agent)
+2026-10-06 19:29:26.240 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - Loaded agent template: 数据引擎Agent (id=builtin-data-agent)
+2026-10-06 19:29:26.243 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - Loaded agent template: 知识库Agent (id=builtin-kb-agent)
+2026-10-06 19:29:26.248 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - Loaded agent template: 本体引擎Agent (id=builtin-ontology-agent)
+2026-10-06 19:29:26.251 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - Loaded agent template: 安全引擎Agent (id=builtin-security-agent)
+2026-10-06 19:29:26.253 [main] [] INFO  c.c.g.e.a.s.AgentTemplateService - AgentTemplateService initialized with 6 templates
+2026-10-06 19:29:26.764 [main] [] INFO  c.c.g.r.e.KafkaBusProducerConfig - [runtime-event] Kafka producer 装配: bootstrap=localhost:9092
+2026-10-06 19:29:27.303 [main] [] INFO  c.c.g.r.e.KafkaBusConsumerConfig - [runtime-event] Kafka consumer 基参装配: bootstrap=localhost:9092, autoOffsetReset=latest
+2026-10-06 19:29:27.319 [main] [] INFO  c.c.g.r.e.KafkaEventBusServiceImpl - [EventBus][KAFKA] activated — broker 在/不在都能发, 失败仅记 WARN 不阻塞主流程; groupPrefix=<per-subscription fan-out>
+2026-10-06 19:29:27.609 [main] [] INFO  c.c.g.e.c.c.CognitiveMentalConfig - [CognitiveMental] IWarnLogService 已装配 + 告警落库通道启用 (ecos_warn_log, PMO-59 P4a)
+2026-10-06 19:29:32.066 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-event-ecos.cognitive-dcb5cc59-436c-40a5-beea-d7b0fbc53b46-1, groupId=ecos-event-ecos.cognitive-dcb5cc59-436c-40a5-beea-d7b0fbc53b46] Subscribed to topic(s): ecos.cognitive
+2026-10-06 19:29:32.096 [main] [] INFO  c.c.g.r.e.KafkaEventBusServiceImpl - [EventBus][KAFKA] subscribe bridged topic=ecos.cognitive group=ecos-event-ecos.cognitive-dcb5cc59-436c-40a5-beea-d7b0fbc53b46 payloadType=java.util.Map
+2026-10-06 19:29:32.096 [main] [] INFO  c.c.g.e.c.s.m.CognitiveInvalidationConsumer - CognitiveInvalidationConsumer: subscribed topic=ecos.cognitive via EventBusService (Kafka 模式仅内存镜像；跨 JVM 消费待 dbus 装载 KafkaListener)
+2026-10-06 19:29:32.185 [main] [] INFO  c.c.g.e.c.s.mental.MentalScanTask - PMO-59 心智层补算任务已注册到 runtime-task: taskType=COGNITIVE_MENTAL_SCAN, scheduleId=fb2bb9b0-5744-4629-97cb-fa34b4ac38ae, periodMillis=600000
+2026-10-06 19:29:32.193 [pool-3-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已提交: taskId=2b1d1802-83d5-45eb-a104-2f255eb07eca, taskName=cognitive-mental-scan
+2026-10-06 19:29:32.204 [pool-3-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务已解析: taskId=2b1d1802-83d5-45eb-a104-2f255eb07eca
+2026-10-06 19:29:32.361 [pool-3-thread-1] [] INFO  com.zaxxer.hikari.HikariDataSource - AimingHikariCP - Starting...
+2026-10-06 19:29:32.764 [main] [] INFO  o.s.b.f.a.AutowiredAnnotationBeanPostProcessor - Inconsistent constructor declaration on bean with name 'securityCryptoEgress': single autowire-marked constructor flagged as optional - this constructor is effectively required since there is no default constructor to fall back to: public com.chinacreator.gzcm.runtime.core.crypto.SecurityCryptoEgress(org.springframework.context.ApplicationContext)
+2026-10-06 19:29:33.950 [main] [] INFO  c.c.gzcm.runtime.dlq.DltConsumer - [DltConsumer] 装配 DLQ 消费容器 11 个 (groupId=ecos-dlt-consumer, autoOffsetReset=latest)
+2026-10-06 19:29:36.542 [main] [] INFO  c.c.g.r.a.olap.DuckDBQueryService - DuckDBQueryService downgraded (DuckDB migrated to Doris) — all operations are no-ops
+2026-10-06 19:29:39.568 [pool-3-thread-1] [] INFO  com.zaxxer.hikari.pool.HikariPool - AimingHikariCP - Added connection org.postgresql.jdbc.PgConnection@4b644d94
+2026-10-06 19:29:39.597 [pool-3-thread-1] [] INFO  com.zaxxer.hikari.HikariDataSource - AimingHikariCP - Start completed.
+2026-10-06 19:29:40.809 [pool-3-thread-1] [] INFO  c.c.g.e.c.s.mental.MentalScanTask - PMO-59 心智层补算一代完成: scanned=5 invalidated=0
+2026-10-06 19:29:40.878 [pool-3-thread-1] [] INFO  c.c.g.r.c.t.s.i.TaskManagementServiceImpl - 任务执行完成: taskId=2b1d1802-83d5-45eb-a104-2f255eb07eca, status=SUCCEEDED
+2026-10-06 19:29:40.886 [pool-3-thread-1] [] INFO  c.c.g.r.c.t.s.TaskSchedulerServiceImpl - 定时任务已提交执行 taskId=2b1d1802-83d5-45eb-a104-2f255eb07eca taskType=COGNITIVE_MENTAL_SCAN scheduleId=fb2bb9b0-5744-4629-97cb-fa34b4ac38ae
+2026-10-06 19:29:41.138 [main] [] INFO  c.c.g.s.c.s.impl.SysConfigService - 缓存刷新完成，当前 146 条配置
+2026-10-06 19:29:41.140 [main] [] INFO  c.c.g.s.c.s.impl.SysConfigService - SysConfigService 初始化完成，已加载 146 条配置
+2026-10-06 19:29:41.977 [main] [] INFO  c.c.g.s.i.s.impl.DbBlacklistStore - DbBlacklistStore 初始化完成，已清理 sys_token_blacklist 过期项
+2026-10-06 19:29:46.966 [runtimeEventBus-ecos.cognitive-1-0-C-1] [] INFO  o.s.k.l.ConcurrentMessageListenerContainer - ecos-event-ecos.cognitive-dcb5cc59-436c-40a5-beea-d7b0fbc53b46: partitions assigned: [ecos.cognitive-0]
+2026-10-06 19:29:55.186 [main] [] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 3 endpoint(s) beneath base path '/actuator'
+2026-10-06 19:29:56.865 [main] [] INFO  o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@5d96b0f, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@5f31385e, org.springframework.security.web.context.SecurityContextHolderFilter@557fe039, org.springframework.security.web.header.HeaderWriterFilter@5565d718, org.springframework.web.filter.CorsFilter@4a592d22, org.springframework.security.web.authentication.logout.LogoutFilter@19cc697c, com.chinacreator.gzcm.sysman.security.JwtAuthenticationFilter@43fbc2bf, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@3470c771, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@40ef1198, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@20072ff1, org.springframework.security.web.session.SessionManagementFilter@39b50027, org.springframework.security.web.access.ExceptionTranslationFilter@7c2d4398, org.springframework.security.web.access.intercept.AuthorizationFilter@4f290f46]
+2026-10-06 19:30:04.607 [main] [] INFO  o.a.coyote.http11.Http11NioProtocol - Starting ProtocolHandler ["http-nio-18084"]
+2026-10-06 19:30:04.729 [main] [] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 18084 (http) with context path ''
+2026-10-06 19:30:04.823 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-2, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.agent.DLT
+2026-10-06 19:30:04.911 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-3, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.audit.DLT
+2026-10-06 19:30:04.976 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-4, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.catalog.DLT
+2026-10-06 19:30:05.044 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-5, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.cognitive.DLT
+2026-10-06 19:30:05.087 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-6, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.data.security-tagged.DLT
+2026-10-06 19:30:05.152 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-7, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.identity.DLT
+2026-10-06 19:30:05.229 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-8, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.knowledge.DLT
+2026-10-06 19:30:05.279 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-9, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.object.DLT
+2026-10-06 19:30:05.328 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-10, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.ontology.DLT
+2026-10-06 19:30:05.356 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-11, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.ontology.published.DLT
+2026-10-06 19:30:05.398 [main] [] INFO  o.s.k.c.DefaultKafkaConsumerFactory$ExtendedKafkaConsumer - [Consumer clientId=consumer-ecos-dlt-consumer-12, groupId=ecos-dlt-consumer] Subscribed to topic(s): ecos.workflow.DLT
+2026-10-06 19:30:05.581 [main] [] INFO  c.c.g.s.a.AimingServiceApplication - Started AimingServiceApplication in 92.888 seconds (process running for 98.476)
+2026-10-06 19:30:05.689 [main] [] INFO  c.c.g.e.ai.config.DataInitializer - td_role table already has 11 records, skip seeding
+2026-10-06 19:30:05.701 [main] [] INFO  c.c.g.e.ai.config.DataInitializer - CronJob table already has 2 records, skip seeding
+2026-10-06 19:30:05.722 [main] [] INFO  c.c.g.e.ai.config.DataInitializer - Skill table already has 3 records, skip seeding
+2026-10-06 19:30:06.033 [main] [] INFO  c.c.g.e.ai.config.DataInitializer - Seeded 6 built-in Agents
+2026-10-06 19:30:07.255 [ecos-dlt-consumer-ecos.ontology.published.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: []
+2026-10-06 19:30:07.259 [ecos-dlt-consumer-ecos.agent.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: []
+2026-10-06 19:30:07.261 [ecos-dlt-consumer-ecos.object.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: []
+2026-10-06 19:30:07.262 [ecos-dlt-consumer-ecos.knowledge.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: []
+2026-10-06 19:30:07.262 [ecos-dlt-consumer-ecos.identity.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: []
+2026-10-06 19:30:07.267 [ecos-dlt-consumer-ecos.audit.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: []
+2026-10-06 19:30:07.267 [ecos-dlt-consumer-ecos.workflow.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: []
+2026-10-06 19:30:07.268 [ecos-dlt-consumer-ecos.catalog.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: []
+2026-10-06 19:30:07.269 [ecos-dlt-consumer-ecos.ontology.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: []
+2026-10-06 19:30:07.272 [ecos-dlt-consumer-ecos.data.security-tagged.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: []
+2026-10-06 19:30:07.307 [ecos-dlt-consumer-ecos.cognitive.DLT-C-1] [] INFO  o.s.k.l.KafkaMessageListenerContainer - ecos-dlt-consumer: partitions assigned: []
+2026-10-06 19:30:36.745 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 19:31:05.729 [scheduling-1] [] WARN  c.c.gzcm.runtime.dlq.DltLagChecker - [DltLagChecker] AdminClient 创建失败 errType=KafkaException msg=Failed to create new KafkaAdminClient
+2026-10-06 19:31:05.731 [scheduling-1] [] WARN  c.c.gzcm.runtime.dlq.DltLagChecker - [DltLagChecker] AdminClient 不可用（bootstrap=localhost:9092），本轮降级跳过
+2026-10-06 19:31:36.768 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 19:32:36.797 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 19:33:36.814 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 19:34:36.828 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 19:35:36.842 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 19:36:05.758 [scheduling-1] [] WARN  c.c.gzcm.runtime.dlq.DltLagChecker - [DltLagChecker] AdminClient 创建失败 errType=KafkaException msg=Failed to create new KafkaAdminClient
+2026-10-06 19:36:05.759 [scheduling-1] [] WARN  c.c.gzcm.runtime.dlq.DltLagChecker - [DltLagChecker] AdminClient 不可用（bootstrap=localhost:9092），本轮降级跳过
+2026-10-06 19:36:36.855 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 19:37:21.388 [http-nio-18084-exec-1] [] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-10-06 19:37:21.389 [http-nio-18084-exec-1] [] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-10-06 19:37:21.401 [http-nio-18084-exec-1] [] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 10 ms
+2026-10-06 19:37:22.166 [http-nio-18084-exec-1] [] WARN  o.s.w.s.m.s.DefaultHandlerExceptionResolver - Resolved [org.springframework.web.HttpRequestMethodNotSupportedException: Request method 'GET' is not supported]
+2026-10-06 19:37:36.872 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
+2026-10-06 19:38:36.888 [scheduling-1] [] WARN  c.c.g.runtime.audit.AuditRetryTask - [AuditRetry] 到期行拉取失败（表缺失/DB 不可用）errType=BadSqlGrammarException msg=
+### Error querying database.  Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+### The error may exist in com/chinacreator/gzcm/runtime/audit/mapper/AuditRetryMapper.java (best guess)
+### The error may involve com.chinacreator.gzcm.runtime.audit.mapper.AuditRetryMapper.listDue-Inline
+### The error occurred while setting parameters
+### SQL: SELECT id, event_type AS eventType, payload, attempts, next_retry_at AS nextRetryAt, last_error AS lastError, status, trace_id AS traceId, create_time AS createTime, update_time AS updateTime, version_no AS versionNo, is_deleted AS isDeleted, domain FROM public.ecos_runtime_audit_retry WHERE is_deleted = 0 AND status = 'pending' AND next_retry_at <= ? ORDER BY next_retry_at ASC LIMIT ?
+### Cause: org.postgresql.util.PSQLException: ERROR: relation "public.ecos_runtime_audit_retry" does not exist
+  位置：256
+; bad SQL grammar []
