@@ -91,16 +91,28 @@ public class SecurityEngineClient {
     @Autowired(required = false)
     private EventBusService eventBus;
 
-    /** 可选 — RestTemplate 来自 buszhi/gateway 全局 */
+    /**
+     * security-engine REST 专用客户端（2026-10-11 修订：自建，带配置超时）。
+     * <p>原构造参数为 {@code @Autowired(required=false) RestTemplate}「来自 buszhi/gateway 全局」。
+     * 聚合宿主下 RestTemplate 候选 Bean 十余个且无类型限定：gateway 靠 kb @Primary 才侥幸唯一，
+     * workspace（不扫 kb config）直接 NoUniqueBeanDefinitionException 启动失败——且 required=false
+     * 对「多候选歧义」并不生效，只兜「零候选」。改为按 sibling 客户端（DataNetResourceClient /
+     * KbEngineGraphSyncClient / PublishGateService）同构的自建口径：
+     * connect/read 超时取 {@code service.security.timeout-ms}，语义确定、任何宿主可装配。
+     * 失败兜底不变：调用异常仍按铁律 §2.4 默认 DENY（applyRls 返回 "1=0"）。</p>
+     */
     private final RestTemplate serviceRestTemplate;
 
     public SecurityEngineClient(
             @Value("${service.security.base-url:http://localhost:18081}") String baseUrl,
-            @Value("${service.security.timeout-ms:5000}") int timeoutMs,
-            @Autowired(required = false) RestTemplate serviceRestTemplate) {
+            @Value("${service.security.timeout-ms:5000}") int timeoutMs) {
         this.baseUrl = baseUrl;
         this.timeoutMs = timeoutMs;
-        this.serviceRestTemplate = serviceRestTemplate;
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory =
+                new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(timeoutMs);
+        factory.setReadTimeout(timeoutMs);
+        this.serviceRestTemplate = new RestTemplate(factory);
     }
 
     // ═══════════════ 1. RLS — 行级安全 ═══════════════

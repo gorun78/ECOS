@@ -5,7 +5,6 @@ import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskExecutionPlan;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -27,12 +26,12 @@ import java.util.Map;
  * <p>失败容忍语义（saveX 抛、logTask/recordExecution/watch 吞掉）仍由 service 决定，
  * 本 DAO 只忠实执行并抛出底层异常。</p>
  *
- * <p>仅在有 {@link JdbcTemplate} 且 {@code runtime.task.persistence.enabled=true} 的容器内生效。</p>
+ * <p>装配口径（2026-10-11 修订）：本 DAO 无条件装配（扫描期 {@code @ConditionalOnBean} 求值不可靠）；
+ * 启用开关由消费方 {@code JdbcTaskPersistenceService} 的条件承载，未启用时本 Bean 闲置无副作用。</p>
  *
  * <p>红线 EN01/IR01：全部 slot 参数化。</p>
  */
 @Repository
-@ConditionalOnBean(JdbcTemplate.class)
 public class TaskPersistenceDao extends JdbcTemplateDaoSupport {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();

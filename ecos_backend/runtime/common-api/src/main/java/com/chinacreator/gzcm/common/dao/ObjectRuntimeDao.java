@@ -1,6 +1,5 @@
 package com.chinacreator.gzcm.common.dao;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -24,7 +23,6 @@ import java.util.Map;
  * <p>红线 EN01/IR01：全部 slot 参数化。</p>
  */
 @Repository
-@ConditionalOnBean(JdbcTemplate.class)
 public class ObjectRuntimeDao {
 
     @Autowired

@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * PortalSearchQueryService — Portal 全局搜索只读查询层（PMO-39 批次2 T4）。
@@ -44,12 +43,16 @@ public class PortalSearchQueryService {
     private final PortalSearchQueryDao dao;
     private final RestTemplate workflowSearchHttpClient;
 
-    public PortalSearchQueryService(PortalSearchQueryDao dao,
-                                    Optional<RestTemplate> workflowSearchHttpClient) {
+    /**
+     * 自建带超时客户端，不注入共享 RestTemplate。
+     * gateway 聚合宿主下 RestTemplate 候选 Bean 随引擎/workspace 接入持续增长
+     * （实测 13 个），构造器 {@code Optional<RestTemplate>} 注入即
+     * NoUniqueBeanDefinitionException 启动崩溃（2026-10-11 实证）。本服务只读检索
+     * 且有 3s 超时诉求，独立短命客户端反而是正确语义（共享客户端无超时保证）。
+     */
+    public PortalSearchQueryService(PortalSearchQueryDao dao) {
         this.dao = dao;
-        // 共享 RestTemplate 存在则复用；否则内联建带超时的短命 RestTemplate 兜底
-        this.workflowSearchHttpClient = workflowSearchHttpClient
-                .orElseGet(PortalSearchQueryService::newWorkflowSearchHttpClient);
+        this.workflowSearchHttpClient = newWorkflowSearchHttpClient();
     }
 
     private static RestTemplate newWorkflowSearchHttpClient() {

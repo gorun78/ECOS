@@ -1,6 +1,6 @@
 package com.chinacreator.gzcm.sysman.service;
 
-import com.chinacreator.gzcm.sysman.dao.TenantDao;
+import com.chinacreator.gzcm.sysman.dao.TenantQueryDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -22,9 +22,9 @@ public class TenantService {
     private static final Logger log = LoggerFactory.getLogger(TenantService.class);
     private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("yyyy-MM");
 
-    private final TenantDao tenantDao;
+    private final TenantQueryDao tenantDao;
 
-    public TenantService(TenantDao tenantDao) {
+    public TenantService(TenantQueryDao tenantDao) {
         this.tenantDao = tenantDao;
     }
 

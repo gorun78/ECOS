@@ -61,6 +61,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // engine.data.repository — DataSourceRepository 等 dao (workspace 之外的 data 引擎库
         // 里的 @Repository 注入, 需显式才进 component scan)
         "com.chinacreator.gzcm.engine.data.repository",
+        // engine.data.dao — R2 数据访问收口后 CopilotServiceImpl 依赖的 CopilotDao 等
+        // @Repository（JdbcTemplate DAO，非 MyBatis mapper）迁入 engine.data.dao 包；
+        // 上方 .service 扫描引入 CopilotServiceImpl，其构造器 @Autowired CopilotDao
+        // 必须在此显式扫描才注册，否则 workspace 启动 Bean 缺失（2026-10-11 契约核验实修）。
+        "com.chinacreator.gzcm.engine.data.dao",
         // 横切底座
         "com.chinacreator.gzcm.runtime",
         "com.chinacreator.gzcm.runtime.llm"
@@ -74,7 +79,15 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // 三层纪律（workspace 不得依赖 *-impl）就永远拆不掉。改 REGEX 后
         // 排除效果不变，buszhi-impl 退化为纯运行期装配事实。
         @ComponentScan.Filter(type = FilterType.REGEX,
-                pattern = "com\\.chinacreator\\.gzcm\\.buszhi\\.workflow\\.controller\\.WorkflowController")
+                pattern = "com\\.chinacreator\\.gzcm\\.buszhi\\.workflow\\.controller\\.WorkflowController"),
+        // engine.data.service 的 pipeline/血缘闭环子图 —— datanet 私有装配面，:18090 不承载
+        // pipeline/lineage 端点。SUP 批次后 DataLineageService 构造新增
+        // LineageDerivationService（engine.data.lineage 包，不在扫描面）导致 workspace
+        // 启动 Bean 缺失（2026-10-11 实修）；这四个类的注入闭环只在被排除集合内部，
+        // workspace 扫描面其余 bean 0 引用（grep 实证），排除后装配面 = 收缩（F07-16 方向）。
+        @ComponentScan.Filter(type = FilterType.REGEX,
+                pattern = "com\\.chinacreator\\.gzcm\\.engine\\.data\\.service\\."
+                        + "(DataLineageService|PipelineExecutionEngine|DataLakeResourceService|PipelineTaskServiceImpl)")
 })
 @MapperScan({
         // 卷07 F07-01/X-7：原三条 workspace 通配（**.repository / **.dao / **.mapper）

@@ -1,7 +1,6 @@
 package com.chinacreator.gzcm.runtime.core.ontology.archive.dao;
 
 import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -22,7 +21,6 @@ import java.util.Map;
  * <p>红线 EN01/IR01：全部 slot 参数化（delayMinutes 为退避常数拼接，非用户输入）。</p>
  */
 @Repository
-@ConditionalOnBean(JdbcTemplate.class)
 public class GitArchivePendingDao extends JdbcTemplateDaoSupport {
 
     private static final String T = "ecos_ontology.ecos_ontology_git_archive_pending";

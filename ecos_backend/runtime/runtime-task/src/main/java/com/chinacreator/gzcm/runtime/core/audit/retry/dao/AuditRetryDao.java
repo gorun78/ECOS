@@ -1,7 +1,6 @@
 package com.chinacreator.gzcm.runtime.core.audit.retry.dao;
 
 import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -22,7 +21,6 @@ import java.util.Map;
  * <p>红线 EN01/IR01：全部 slot 参数化。</p>
  */
 @Repository
-@ConditionalOnBean(JdbcTemplate.class)
 public class AuditRetryDao extends JdbcTemplateDaoSupport {
 
     private static final String T = "ecos_control.ecos_runtime_audit_retry";

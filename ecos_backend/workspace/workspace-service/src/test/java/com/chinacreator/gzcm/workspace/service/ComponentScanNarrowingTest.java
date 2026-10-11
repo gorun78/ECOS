@@ -42,6 +42,9 @@ class ComponentScanNarrowingTest {
      *   <li>{@code sysman.config} —— SysConfigService 具体类被引擎 controller 注入</li>
      *   <li>{@code engine.data.service} / {@code engine.data.repository}
      *       —— ICopilotService 实现链</li>
+     *   <li>{@code engine.data.dao} —— R2 数据访问收口后 CopilotServiceImpl 构造依赖的
+     *       CopilotDao 等 JdbcTemplate @Repository（2026-10-11 契约核验实修，
+     *       按本类「确属必要请同步更新本基线」出口挂 W180）</li>
      * </ul>
      */
     private static final Set<String> FROZEN_SCAN_BASELINE = Set.of(
@@ -52,6 +55,7 @@ class ComponentScanNarrowingTest {
             "com.chinacreator.gzcm.sysman.config",
             "com.chinacreator.gzcm.engine.data.service",
             "com.chinacreator.gzcm.engine.data.repository",
+            "com.chinacreator.gzcm.engine.data.dao",
             "com.chinacreator.gzcm.runtime",
             "com.chinacreator.gzcm.runtime.llm"
     );

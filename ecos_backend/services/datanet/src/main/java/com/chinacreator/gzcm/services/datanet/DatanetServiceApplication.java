@@ -48,7 +48,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // data-engine GitRepoRootResolver 依赖 sysman 域 SysConfigService (唯一注入 JdbcTemplate,
         // DataSource 自动配置即可满足) — 只补扫该实现包，并排除同包另外两个 sysman 域服务，
         // 避免连带拖入 ConfigDao/GitService/ISystemVariableService 等 datanet 不可满足的依赖
-        "com.chinacreator.gzcm.sysman.config.service.impl"
+        "com.chinacreator.gzcm.sysman.config.service.impl",
+        // R2 数据访问收口（2026-10-11 全栈拉起修复）：SysConfigService 的 JdbcTemplate 已下沉
+        // sysman.dao.SysConfigDao（构造器注入）。sysman.dao 全部为无状态 JdbcTemplate DAO
+        // （无跨域 Bean 依赖，逐一核过），定向补扫本包不复活上方排除的 sysman 域服务。
+        "com.chinacreator.gzcm.sysman.dao"
 }, excludeFilters = {
         // PMO-49 P3-A 修正：datanet 不跨领域扫 sysman 安全域 (security 域 JwtProvider/JWT filter bean 独立启动 JWT DI 现实无运行时 JWT 注入).
         // 跨域 controller 治理：DataEngineConfigController 依赖 sysman 域 SysConfigService 具体类, 属 sysman 而非 data 职责.
@@ -71,6 +75,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // data-engine 内部 dao 兼容写法
         "com.chinacreator.gzcm.engine.data.**.dao",
         "com.chinacreator.gzcm.engine.data.**.mapper",
+        // 补充设计 v1.0 写通道：DwWriteChannelIdempotencyMapper 直接落 writechannel 包
+        // （非 .mapper 子包），通配不命中，须显式列出（gateway 已同法登记）。
+        "com.chinacreator.gzcm.engine.data.writechannel",
         // 横切底座
         "com.chinacreator.gzcm.runtime.**.mapper",
         "com.chinacreator.gzcm.runtime.**.dao",

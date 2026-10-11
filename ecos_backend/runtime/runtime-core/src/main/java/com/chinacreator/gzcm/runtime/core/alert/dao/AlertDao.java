@@ -3,7 +3,6 @@ package com.chinacreator.gzcm.runtime.core.alert.dao;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -31,7 +30,6 @@ import java.util.Map;
  * SQL 文本自原 {@code AlertRepository}（..alert.persist..）逐字节下沉，方法签名与行为不变。</p>
  */
 @Repository
-@ConditionalOnBean(JdbcTemplate.class)
 public class AlertDao extends JdbcTemplateDaoSupport {
 
     private static final Logger log = LoggerFactory.getLogger(AlertDao.class);

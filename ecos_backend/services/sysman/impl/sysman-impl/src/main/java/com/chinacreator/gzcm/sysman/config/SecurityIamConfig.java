@@ -19,6 +19,11 @@ import org.springframework.context.annotation.Configuration;
     "com.chinacreator.gzcm.sysman.iam",
     "com.chinacreator.gzcm.sysman.audit",
     "com.chinacreator.gzcm.sysman.security",
+    // R2 数据访问收口（2026-10-11 全栈拉起修复）：sysman.security 域 Bean
+    // （JwtAuthenticationFilter→AuthLookupDao、ClearanceInterceptor→ClearanceLookupDao）
+    // 的 DAO 依赖落在 sysman.dao；凡经本配置拉起 security 域的宿主
+    // （buszhi/aiming/workspace 只扫 sysman.config）必须同域扫描 dao，否则启动即缺 Bean。
+    "com.chinacreator.gzcm.sysman.dao",
     "com.chinacreator.gzcm.sysman.config",
     "com.chinacreator.gzcm.sysman.log"
 })

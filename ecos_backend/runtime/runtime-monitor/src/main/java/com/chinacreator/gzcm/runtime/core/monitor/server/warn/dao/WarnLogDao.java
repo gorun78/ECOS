@@ -5,7 +5,6 @@ import com.chinacreator.gzcm.runtime.core.monitor.warn.bean.WarnLogBean;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -21,13 +20,16 @@ import java.util.UUID;
  * <p>仅在有 {@link JdbcTemplate} 的容器（gateway / 各 service）内生效；无数据源栈则本 Bean 不装配，
  * {@link com.chinacreator.gzcm.runtime.core.monitor.service.impl.WarnLogServiceImpl} 退化为纯内存态。</p>
  *
+ * <p>装配口径（2026-10-11 修订）：本 DAO 无条件装配。原 {@code @ConditionalOnBean(JdbcTemplate.class)}
+ * 在 {@code @ComponentScan} 期求值不可靠（自动配置的 JdbcTemplate 在扫描之后才注册），
+ * 曾致 workspace 宿主 Bean 缺口；全部宿主均带 DataSource，JdbcTemplate 由
+ * {@code JdbcTemplateAutoConfiguration}（或 gateway {@code JdbcConfig} 显式 Bean）稳定提供。</p>
+ *
  * <p>架构铁律 §2.5#1 / IR06 收口（R2-B4c）：本类乃数据访问收口点，继承 runtime-core
  * {@link JdbcTemplateDaoSupport}，仅以继承的 {@code update} / {@code queryList} 通道访问；
- * {@code JdbcTemplate} 类型仅出现于 {@code @ConditionalOnBean} 判存注解，与 sibling DAO
- * （{@code AlertDao} / {@code AuditRetryDao} / {@code DltDao}）同构。</p>
+ * 与 sibling DAO（{@code AlertDao} / {@code AuditRetryDao} / {@code DltDao}）同构。</p>
  */
 @Repository
-@ConditionalOnBean(JdbcTemplate.class)
 public class WarnLogDao extends JdbcTemplateDaoSupport {
 
     private static final Logger log = LoggerFactory.getLogger(WarnLogDao.class);

@@ -16,9 +16,14 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class LocalCapabilityReadFallback {
 
+    /**
+     * 方法名必须不同于配置类默认 bean 名（localCapabilityReadFallback）——
+     * 同名会让 factory-bean 指回自身定义，Spring 启动即抛
+     * BeanDefinitionStoreException（2026-10-11 全栈拉起实测修复）。
+     */
     @Bean
     @ConditionalOnMissingBean(CapabilityReadService.class)
-    public CapabilityReadService localCapabilityReadFallback() {
+    public CapabilityReadService fallbackCapabilityReadService() {
         return (capabilityId, contractVersion) -> CapabilityReadService.CapabilityAvailability.unavailable(
                 "能力中心契约尚未接线（local fallback，fail-closed）: capabilityId="
                         + capabilityId + (contractVersion == null ? "" : "@v" + contractVersion));
