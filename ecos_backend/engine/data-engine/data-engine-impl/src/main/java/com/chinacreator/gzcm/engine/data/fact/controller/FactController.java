@@ -10,6 +10,7 @@ import com.chinacreator.gzcm.engine.data.fact.model.FactImportResult;
 import com.chinacreator.gzcm.engine.data.fact.model.FactTemplateVO;
 import com.chinacreator.gzcm.engine.data.fact.service.FactImportService;
 import com.chinacreator.gzcm.engine.data.fact.service.FactTemplateService;
+import com.chinacreator.gzcm.engine.data.model.ActionOutcomeVO;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -92,6 +94,19 @@ public class FactController {
     @PostMapping("/action-outcomes")
     public ApiResponse<Map<String, Object>> writeActionOutcome(@RequestBody ActionOutcomeRequest req) {
         return ApiResponse.success(importService.writeActionOutcome(req));
+    }
+
+    /**
+     * listActionOutcomes — outcome 物理载体查询（H-3 交付②，V279 表；只读）。
+     *
+     * <p>定位键二选一（forecastRunId / actionId，均走索引）；两键皆空 → 400 ECOS-DATA-023
+     * （禁全库扫描）；V279 未应用 → 503 ECOS-DATA-041。
+     */
+    @GetMapping("/action-outcomes")
+    public ApiResponse<List<ActionOutcomeVO>> listActionOutcomes(
+            @RequestParam(value = "forecastRunId", required = false) String forecastRunId,
+            @RequestParam(value = "actionId", required = false) String actionId) {
+        return ApiResponse.success(importService.listActionOutcomes(forecastRunId, actionId));
     }
 
     private static FactType parseType(String factType) {

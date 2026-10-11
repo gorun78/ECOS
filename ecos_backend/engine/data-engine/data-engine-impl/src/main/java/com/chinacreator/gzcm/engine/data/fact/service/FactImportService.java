@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.data.fact.service;
 import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.data.fact.FactType;
+import com.chinacreator.gzcm.engine.data.fact.dao.ActionOutcomeMapper;
 import com.chinacreator.gzcm.engine.data.fact.dao.AttributionFactMapper;
 import com.chinacreator.gzcm.engine.data.fact.dao.CostFactMapper;
 import com.chinacreator.gzcm.engine.data.fact.dao.ForecastSnapshotMapper;
@@ -15,6 +16,7 @@ import com.chinacreator.gzcm.engine.data.fact.model.FactImportRequest;
 import com.chinacreator.gzcm.engine.data.fact.model.FactImportResult;
 import com.chinacreator.gzcm.engine.data.fact.model.RowRejection;
 import com.chinacreator.gzcm.engine.data.fact.period.PeriodLock;
+import com.chinacreator.gzcm.engine.data.model.ActionOutcomeVO;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import org.slf4j.Logger;
@@ -23,6 +25,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -78,6 +84,18 @@ public class FactImportService {
     private final PeriodLock periodLock;
     private final Optional<EventBusService> eventBus;
     private final double coverageThreshold;
+
+    /**
+     * H-3 交付②：outcome 物理载体（V279 ecos_dw.ecos_application_action_outcome）mapper。
+     * 可选注入——未装配（V279 未应用 / 手工单测旧接线）时 writeActionOutcome 回退
+     * "审计事件 + 触达列"旧形态并 WARN（非静默：降级可见，载体就绪后自动升级为物理落表）。
+     */
+    private ActionOutcomeMapper actionOutcomeMapper;
+
+    @Autowired(required = false)
+    public void setActionOutcomeMapper(ActionOutcomeMapper actionOutcomeMapper) {
+        this.actionOutcomeMapper = actionOutcomeMapper;
+    }
 
     @Autowired
     public FactImportService(AttributionFactMapper attributionMapper,
@@ -265,12 +283,25 @@ public class FactImportService {
     /**
      * W→D 反馈链写入（writeActionOutcome，D.2）。
      *
-     * <p><b>载体缺口（V167 实证）</b>：五表无 action/outcome 列。本撮实现 =
-     * 更新 {@code update_time/update_by} + 审计事件携带 outcome 载荷（fabricating 新表违反
-     * IR03 与 V167 unapplied 约束）。缺口已在交付报告上报，待决策。
+     * <p><b>载体决策记录（卷09 v1.2 §十一 H-3 交付②："加列 vs 加表" → 加表）</b>：
+     * <ol>
+     *   <li>加列否决——outcome 若落 V167 五事实表列，回灌必须 UPDATE 行；PUBLISHED 行禁
+     *       UPDATE（ECOS-DATA-021 守卫已实装），加列即造出必须绕过不可变守卫的写路径，自相矛盾；</li>
+     *   <li>基数否决——一个 action/事实行可多次回灌（滚动复核），1:N 只能靠追加行承载
+     *       （append-only，IR03 只增友好）；</li>
+     *   <li>域归属——V218 public.ecos_fc_action_ext 是控制域<b>决策侧</b>扩展（expected_impact=
+     *       计划值），非事实回灌载体；任务裁定业务域 ecos_dw（ST07），写路径只归 data-engine
+     *       唯一写通道（ADR-14/ST08，BusinessDomainWriteArchTest 把守 ecos_dw. 字面量）。</li>
+     * </ol>
+     * 裁定落 {@code ecos_dw.ecos_application_action_outcome}（V279；ST03-A 金额列
+     * expected_impact/actual_impact NUMERIC(18,2) 已逐列登记）。旧载体形态（触达列 +
+     * ecos.audit 事件）保留不回改（只增不改）；V279 未应用环境自动回退旧形态并 WARN。
+     *
+     * <p>幂等：携带 idempotencyKey 的重复提交命中 uniq_eaao_idem 首写行 → 直接返回
+     * {@code outcomeId + alreadyRecorded=true}，零触达、零审计、零第二行（V279 唯一索引双保险）。
      *
      * @throws DataBridgeException 409 ECOS-DATA-021（PUBLISHED 行不可触达，guardPublished）
-     *                             / 400（入参不合法）/ 404（行不存在）
+     *                             / 400（入参不合法 / 金额越 NUMERIC(18,2) 精度域）/ 404（行不存在）
      */
     public Map<String, Object> writeActionOutcome(ActionOutcomeRequest req) {
         if (req == null || req.getFactId() == null || req.getFactId().isBlank()
@@ -278,6 +309,21 @@ public class FactImportService {
             throw badRequest("ECOS-DATA-000", "factId 与 outcome 必填");
         }
         FactType type = FactType.fromPath(req.getFactType());
+        String idemKey = trimToNull(req.getIdempotencyKey());
+        if (idemKey != null && actionOutcomeMapper != null) {
+            Map<String, Object> first = actionOutcomeMapper.selectByIdempotencyKey(idemKey);
+            if (first != null) {
+                Map<String, Object> replay = new LinkedHashMap<>();
+                replay.put("factId", req.getFactId());
+                replay.put("factType", type.name());
+                replay.put("outcome", req.getOutcome());
+                replay.put("outcomeId", str(first.get("id")));
+                replay.put("alreadyRecorded", true);
+                return replay;
+            }
+        }
+        checkOutcomeImpactAmounts(req);
+
         String status = mapperGetDqStatus(type).apply(req.getFactId());
         guardPublished(type, req.getFactId(), status);
         int touched = mapperTouch(type).apply(req.getFactId(), currentActor());
@@ -293,13 +339,137 @@ public class FactImportService {
         payload.put("comment", req.getComment());
         payload.put("batchId", req.getBatchId());
         payload.put("actor", currentActor());
+        // H-3 增块（只增不改：旧键全保留）
+        payload.put("actionId", trimToNull(req.getActionId()));
+        payload.put("forecastRunId", trimToNull(req.getForecastRunId()));
+        payload.put("period", trimToNull(req.getPeriod()));
+        payload.put("expectedImpact", req.getExpectedImpact());
+        payload.put("actualImpact", req.getActualImpact());
         publish(AUDIT_TOPIC, payload);
+
+        String outcomeId = null;
+        if (actionOutcomeMapper != null) {
+            outcomeId = writeOutcomeCarrier(type, req, idemKey);
+        } else {
+            log.warn("[ActionOutcome] ecos_dw.ecos_application_action_outcome 写通道未装配"
+                    + "（V279 未应用？）——本次回灌仅落旧载体形态（审计事件+触达列），无物理 outcome 行");
+        }
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("factId", req.getFactId());
         out.put("factType", type.name());
         out.put("outcome", req.getOutcome());
+        out.put("alreadyRecorded", false);
+        if (outcomeId != null) {
+            out.put("outcomeId", outcomeId);
+        }
         return out;
+    }
+
+    /** 物理载体落行（V279，data-engine 唯一写通道；append-only 零 UPDATE 语句）。 */
+    private String writeOutcomeCarrier(FactType type, ActionOutcomeRequest req, String idemKey) {
+        String actor = currentActor();
+        Map<String, Object> row = new LinkedHashMap<>();
+        String id = UUID.randomUUID().toString();                                  // MC01 应用侧 UUID
+        row.put("id", id);
+        row.put("forecastRunId", trimToNull(req.getForecastRunId()));
+        row.put("actionId", trimToNull(req.getActionId()));
+        row.put("factType", type.name());
+        row.put("factId", req.getFactId());
+        row.put("period", trimToNull(req.getPeriod()));
+        row.put("outcome", req.getOutcome());
+        row.put("outcomeComment", trimToNull(req.getComment()));
+        row.put("expectedImpact", req.getExpectedImpact());
+        row.put("actualImpact", req.getActualImpact());
+        row.put("currency", req.getCurrency() == null || req.getCurrency().isBlank()
+                ? "CNY" : req.getCurrency().trim().toUpperCase(Locale.ROOT));
+        row.put("batchId", trimToNull(req.getBatchId()));
+        row.put("idempotencyKey", idemKey);
+        row.put("detailJson", trimToNull(req.getDetailJson()));
+        row.put("domain", "default");                                              // DR08
+        row.put("versionNo", "1");                                                 // DR07
+        row.put("isDeleted", 0);                                                   // DR06
+        row.put("createBy", actor);
+        row.put("updateBy", actor);
+        actionOutcomeMapper.insertRow(row);
+        return id;
+    }
+
+    /**
+     * outcome 回灌行查询（H-3 交付②读端点）。
+     *
+     * <p>定位键二选一（forecast_run_id / action_id 均走 V279 索引），<b>禁全库扫描</b>：
+     * 两键皆空 → 400 ECOS-DATA-023；同时给出 → 按 forecastRunId 索引查询后内存收敛 actionId。
+     */
+    public List<ActionOutcomeVO> listActionOutcomes(String forecastRunId, String actionId) {
+        String run = trimToNull(forecastRunId);
+        String act = trimToNull(actionId);
+        if (run == null && act == null) {
+            throw badRequest(DataDomainErrorCode.ECOS_DATA_023,
+                    "forecastRunId 与 actionId 至少给一（禁全库扫描 outcome 载体）");
+        }
+        if (actionOutcomeMapper == null) {
+            throw new DataBridgeException(503, 503, DataDomainErrorCode.ECOS_DATA_041
+                    + "：outcome 物理载体（V279 ecos_dw.ecos_application_action_outcome）未就绪——"
+                    + "查询端点需 V279 应用后启用", null);
+        }
+        List<Map<String, Object>> rows = run != null
+                ? actionOutcomeMapper.selectByForecastRunId(run)
+                : actionOutcomeMapper.selectByActionId(act);
+        List<ActionOutcomeVO> out = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            if (run != null && act != null && !act.equals(str(row.get("action_id")))) {
+                continue;   // 双键过滤（内存收敛，不再二次查库）
+            }
+            out.add(toOutcomeVO(row));
+        }
+        return out;
+    }
+
+    private static ActionOutcomeVO toOutcomeVO(Map<String, Object> row) {
+        ActionOutcomeVO vo = new ActionOutcomeVO();
+        vo.setOutcomeId(str(row.get("id")));
+        vo.setForecastRunId(str(row.get("forecast_run_id")));
+        vo.setActionId(str(row.get("action_id")));
+        vo.setFactType(str(row.get("fact_type")));
+        vo.setFactId(str(row.get("fact_id")));
+        vo.setPeriod(str(row.get("period")));
+        vo.setOutcome(str(row.get("outcome")));
+        vo.setComment(str(row.get("outcome_comment")));
+        vo.setExpectedImpact(toDecimal(row.get("expected_impact")));
+        vo.setActualImpact(toDecimal(row.get("actual_impact")));
+        vo.setCurrency(str(row.get("currency")));
+        vo.setBatchId(str(row.get("batch_id")));
+        vo.setIdempotencyKey(str(row.get("idempotency_key")));
+        vo.setCreateBy(str(row.get("create_by")));
+        Object ct = row.get("create_time");
+        vo.setCreateTime(ct instanceof Timestamp t
+                ? t.toLocalDateTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                : str(ct));
+        return vo;
+    }
+
+    /**
+     * 金额入参显式校验（后端规范：精度问题显式拒绝，不默认四舍五入）。
+     * NUMERIC(18,2)：整数位 ≤16 位、scale ≤2；违 → 400 ECOS-DATA-023。
+     */
+    static void checkOutcomeImpactAmounts(ActionOutcomeRequest req) {
+        checkNumeric182(req.getExpectedImpact(), "expectedImpact");
+        checkNumeric182(req.getActualImpact(), "actualImpact");
+    }
+
+    private static void checkNumeric182(BigDecimal v, String field) {
+        if (v == null) {
+            return;
+        }
+        if (v.stripTrailingZeros().scale() > 2) {
+            throw badRequest(DataDomainErrorCode.ECOS_DATA_023,
+                    field + " 小数位超 NUMERIC(18,2) 精度域（>2 位小数显式拒绝，禁静默舍入）: " + v.toPlainString());
+        }
+        if (v.abs().compareTo(new BigDecimal("10000000000000000")) >= 0) {
+            throw badRequest(DataDomainErrorCode.ECOS_DATA_023,
+                    field + " 整数位超 NUMERIC(18,2) 精度域（>16 位）: " + v.toPlainString());
+        }
     }
 
     /**
@@ -440,6 +610,28 @@ public class FactImportService {
 
     private static String str(Object o) {
         return o == null ? null : String.valueOf(o);
+    }
+
+    private static String trimToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    /** DB NUMERIC 回读形态兼容（PG JDBC 常给 BigDecimal；单测/兼容驱动可能给其它 Number/String）。 */
+    private static BigDecimal toDecimal(Object o) {
+        if (o == null) {
+            return null;
+        }
+        if (o instanceof BigDecimal b) {
+            return b;
+        }
+        if (o instanceof Number n) {
+            return new BigDecimal(n.toString());
+        }
+        try {
+            return new BigDecimal(String.valueOf(o).trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /** 系统列（V167 持久列基准）：服务端填充，导入不可携带。 */

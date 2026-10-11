@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  预测运行只读快照头: ecos_dw.ecos_application_forecast_run（V197 + V277 六要素增列，H-3 交付③）
+  IR04 显式列清单；IR05 全部 #{}；MC06 ecos_dw. 限定。只读（无 INSERT/UPDATE/DELETE 语句）。
+  *_result_json = 受控 JSON 仅描述用，禁 WHERE/索引（MC02），不出现在任何条件里。
+  WHERE forecast_run_id=#{forecastRunId}：uniq_afcr_run_id 命中，禁全库扫描（SnapshotQuery 要点4）。
+-->
+<mapper namespace="com.chinacreator.gzcm.engine.data.fact.dao.ForecastRunSnapshotMapper">
+
+    <select id="selectRunHeader" resultType="java.util.LinkedHashMap">
+        SELECT forecast_run_id, scenario_id, run_type, status,
+               caliber_id, caliber_version, as_of_time,
+               snapshot_id, formula_version, baseline_run_id,
+               simulation_result_json, forecast_result_json, diagnosis_result_json,
+               domain, version_no, is_deleted, create_time, update_time, create_by, update_by
+        FROM ecos_dw.ecos_application_forecast_run
+        WHERE forecast_run_id = #{forecastRunId} AND is_deleted = 0
+        LIMIT 1
+    </select>
+
+</mapper>

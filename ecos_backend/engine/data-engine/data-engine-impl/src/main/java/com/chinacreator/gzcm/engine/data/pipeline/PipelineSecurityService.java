@@ -283,6 +283,72 @@ public class PipelineSecurityService {
     }
 
     /**
+     * 通用策略裁决（H-3 交付①：期间关账财务角色门槛，卷09 §十一；后续数据域写操作权限判定统一走本咽喉）。
+     * <p>与 {@link #evaluateExecute} / {@link #evaluateDataGovernanceApply} 同一 policy-engine 端点、
+     * 同一响应解析（ApiResponse.data.allow）；<b>fail-closed</b>：security-engine 不可用 / 响应异常 /
+     * 空响应 ⇒ deny（§2.4 第 6 条 / SUP-DATA-02）。
+     *
+     * <p>调用方约束：{@code role} 只准透传调用方身份声明（如 UserContext claims 原值），
+     * <b>禁</b>在数据域内做"角色名 → 权限"硬编码映射——角色语义归 security-engine 策略承载。
+     *
+     * @param action   策略动作名（如 {@code data.period.close}）
+     * @param resource 资源引用（如 {@code ecos_data_period_status:2025-01}）
+     * @param role     调用方角色声明原值（可空 → 传空串，由策略裁决）
+     * @return 裁决结果（allowed=false + reason 供审计留痕与 403 文案）
+     */
+    public AllowedResult evaluate(String action, String resource, String role) {
+        try {
+            Map<String, Object> input = new LinkedHashMap<>();
+            input.put("action", action);
+            input.put("resource", resource);
+            input.put("role", role == null ? "" : role);
+
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("policy", "rbac");
+            body.put("input", input);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+
+            ResponseEntity<String> response = restTemplate.postForEntity(
+                    securityBaseUrl + "/api/v1/security/policy-engine/evaluate",
+                    entity, String.class);
+
+            String bodyStr = response.getBody();
+            if (bodyStr == null || bodyStr.isEmpty()) {
+                log.warn("ABAC evaluate({}) returned empty body (fail-closed DENY)", action);
+                return AllowedResult.deny("ABAC_EVALUATE_FAILED");
+            }
+            Map<String, Object> apiResp = MAPPER.readValue(bodyStr,
+                    new TypeReference<Map<String, Object>>() {});
+            if (apiResp == null) {
+                return AllowedResult.deny("ABAC_EVALUATE_FAILED");
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> data = (Map<String, Object>) apiResp.get("data");
+            if (data == null || data.isEmpty()) {
+                data = apiResp;
+            }
+            boolean allowed = Boolean.TRUE.equals(data.get("allow"));
+            String reason = data.get("fallback") != null
+                    ? data.get("fallback").toString()
+                    : (allowed ? "ALLOW" : "DENY");
+            if (allowed) {
+                log.info("ABAC allow {}: resource={}, reason={}", action, resource, reason);
+            } else {
+                log.warn("ABAC deny {}: resource={}, reason={}", action, resource, reason);
+            }
+            return new AllowedResult(allowed, reason);
+        } catch (Exception e) {
+            // security-engine 不可用 → 默认 DENY（§2.4 第 6 条；关账场景=403 fail-closed）
+            log.warn("ABAC evaluate({}) failed (fail-closed DENY): resource={}, error={}",
+                    action, resource, e.getMessage());
+            return AllowedResult.deny("SECURITY_ENGINE_UNAVAILABLE");
+        }
+    }
+
+    /**
      * ABAC 裁决结果。
      */
     public record AllowedResult(boolean allowed, String reason) {

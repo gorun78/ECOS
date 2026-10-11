@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  行动结果回灌载体表: ecos_dw.ecos_application_action_outcome（V279，H-3 交付②）
+  IR04 显式列清单；IR05 全部 #{}；MC06 ecos_dw. 限定（业务域唯一写通道=data-engine，ADR-14/ST08）。
+  detail_json = 受控 JSON 仅描述用，禁 WHERE/索引（MC02），本 mapper 不出现在任何条件里。
+  金额列 expected_impact/actual_impact NUMERIC(18,2)（ST03-A 逐列登记见 V279 头，明文+RLS/CLS/mask 承接）。
+  append-only：无 UPDATE 语句（只增不改）；幂等查重走 uniq_eaao_idem。
+-->
+<mapper namespace="com.chinacreator.gzcm.engine.data.fact.dao.ActionOutcomeMapper">
+
+    <sql id="cols">
+        id, forecast_run_id, action_id, fact_type, fact_id, period, outcome, outcome_comment,
+        expected_impact, actual_impact, currency, batch_id, idempotency_key, detail_json,
+        domain, version_no, is_deleted, create_time, update_time, create_by, update_by
+    </sql>
+
+    <insert id="insertRow" parameterType="java.util.Map">
+        INSERT INTO ecos_dw.ecos_application_action_outcome (
+            id, forecast_run_id, action_id, fact_type, fact_id, period, outcome, outcome_comment,
+            expected_impact, actual_impact, currency, batch_id, idempotency_key, detail_json,
+            domain, version_no, is_deleted, create_time, update_time, create_by, update_by
+        ) VALUES (
+            #{id}, #{forecastRunId}, #{actionId}, #{factType}, #{factId}, #{period},
+            #{outcome}, #{outcomeComment},
+            #{expectedImpact}, #{actualImpact}, #{currency}, #{batchId}, #{idempotencyKey}, #{detailJson},
+            #{domain}, #{versionNo}, #{isDeleted},
+            NOW(), NOW(), #{createBy}, #{updateBy}
+        )
+    </insert>
+
+    <select id="selectByIdempotencyKey" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="cols"/>
+        FROM ecos_dw.ecos_application_action_outcome
+        WHERE idempotency_key = #{idempotencyKey} AND is_deleted = 0
+    </select>
+
+    <select id="selectByForecastRunId" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="cols"/>
+        FROM ecos_dw.ecos_application_action_outcome
+        WHERE forecast_run_id = #{forecastRunId} AND is_deleted = 0
+        ORDER BY create_time ASC, id ASC
+    </select>
+
+    <select id="selectByActionId" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="cols"/>
+        FROM ecos_dw.ecos_application_action_outcome
+        WHERE action_id = #{actionId} AND is_deleted = 0
+        ORDER BY create_time ASC, id ASC
+    </select>
+
+</mapper>

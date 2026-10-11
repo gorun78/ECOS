@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  期间关账状态表: ecos_data.ecos_data_period_status（V278，H-3 交付①）
+  IR04 显式列清单；IR05 全部 #{}；MC06 ecos_data. 限定（控制域表）。
+  close_detail_json = 受控 JSON 仅描述用，禁 WHERE/索引（MC02），本 mapper 不出现在任何条件里。
+  无 ON CONFLICT/RETURNING/裸 cast（MC03）；幂等判定在 Service 层（先 select 后写）。
+-->
+<mapper namespace="com.chinacreator.gzcm.engine.data.fact.dao.PeriodStatusMapper">
+
+    <sql id="cols">
+        id, period, status, closed_by, closed_at, close_reason, close_detail_json,
+        domain, version_no, is_deleted, create_time, update_time, create_by, update_by
+    </sql>
+
+    <select id="selectByPeriod" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="cols"/>
+        FROM ecos_data.ecos_data_period_status
+        WHERE period = #{period} AND is_deleted = 0
+    </select>
+
+    <select id="selectClosedPeriods" resultType="string">
+        SELECT period
+        FROM ecos_data.ecos_data_period_status
+        WHERE status = 'CLOSED' AND is_deleted = 0
+    </select>
+
+    <insert id="insertRow" parameterType="java.util.Map">
+        INSERT INTO ecos_data.ecos_data_period_status (
+            id, period, status, closed_by, closed_at, close_reason, close_detail_json,
+            domain, version_no, is_deleted, create_time, update_time, create_by, update_by
+        ) VALUES (
+            #{id}, #{period}, #{status}, #{closedBy}, #{closedAt}, #{closeReason}, #{closeDetailJson},
+            #{domain}, #{versionNo}, #{isDeleted},
+            NOW(), NOW(), #{createBy}, #{updateBy}
+        )
+    </insert>
+
+    <update id="updateOpenToClosed">
+        UPDATE ecos_data.ecos_data_period_status
+        SET status = 'CLOSED',
+            closed_by = #{closedBy},
+            closed_at = NOW(),
+            close_reason = #{closeReason},
+            close_detail_json = #{closeDetailJson},
+            version_no = #{versionNo},
+            update_by = #{updateBy},
+            update_time = NOW()
+        WHERE period = #{period} AND status = 'OPEN' AND is_deleted = 0
+    </update>
+
+</mapper>
