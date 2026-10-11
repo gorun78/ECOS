@@ -23,8 +23,15 @@ import java.util.Map;
  * 响应 message 取异常类内冻结字面量；traceId 走 MDC 回显（§12.2）。
  * 用 {@code @Order} 排到 cognitive2 既有 {@code CognitiveErrorAdvice} 之前，
  * 保证本域异常优先命中（两者异常类型不同，互不覆盖）。</p>
+ *
+ * <p><b>2026-10-11 live 契约核验实修</b>：与 {@code CognitiveErrorAdvice} 同为
+ * {@code @Order(1)} 时排序并列，按 bean 注册序 {@code CognitiveErrorAdvice}（basePackages
+ * 含本包）先命中，其 catch-all {@code Exception.class} 把 {@code ECOS-COG-400S} 族折叠成
+ * 500 {@code ECOS-COG-504}（curl 复现，违 §5.5「五类失败独立状态码禁折叠」）。本 advice
+ * 必须严格先于它求值 ⇒ 值取 0（类 javadoc 既有意图的字面落实；assignableTypes 作用域
+ * 仅 {@code ContextBuildController}，不影响其余认知端点）。</p>
  */
-@Order(1)
+@Order(0)
 @RestControllerAdvice(assignableTypes = ContextBuildController.class)
 public class ContextBuildErrorAdvice {
 
