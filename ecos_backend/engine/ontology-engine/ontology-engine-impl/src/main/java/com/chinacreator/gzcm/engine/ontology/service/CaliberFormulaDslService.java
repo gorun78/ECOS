@@ -24,6 +24,12 @@ import org.springframework.stereotype.Component;
  * <p>边界：本服务<b>不求值</b>公式（求值属 cognitive-engine，按同一 EBNF 实现，
  * 文法原文见 {@link CaliberDslParser} 类注释）；不写任何表（R-60 ② 禁第五套版本栈，
  * {@code ecos_fc_caliber} 维持 V214 引用视图）。</p>
+ *
+ * <p><b>三处消费面（同一判定源，09 册 H-2 收口）</b>：
+ * ①{@code POST /calibers/validate} 预检（{@link #validate}）；
+ * ②{@link CaliberService} 的 {@code insertVersion} 公式落库咽喉；
+ * ③{@link CaliberService} 的 {@code archiveVersion}（置 APPROVED 前）审批咽喉。
+ * 后两者经 {@link #validateFormula} 走同一四关，避免「只在独立端点上报错、写入路径照样落库」。</p>
  */
 @Component
 public class CaliberFormulaDslService {
@@ -44,6 +50,20 @@ public class CaliberFormulaDslService {
         log.info("caliber-dsl validate target={} valid={} violations={} registryMetrics={}",
                 vo.getTarget(), vo.isValid(), vo.getViolations().size(), symbols.size());
         return vo;
+    }
+
+    /**
+     * 写入 / 审批咽喉用的窄口径入口：只凭公式文本跑四关（目标取公式左端 IDENT，
+     * 私有事实字段与声明单位走内建登记册），指标注册表仍从
+     * {@code ecos_metric_definition} 实时加载（R-4 唯一语义入口）。
+     *
+     * <p>与 {@code POST /api/v1/ontology/calibers/validate} 同一判定源，
+     * 保证「预检通过 ⇒ 落库必过」不发生两套标准漂移。</p>
+     */
+    public CaliberFormulaValidationVO validateFormula(String formula) {
+        CaliberFormulaValidateDTO dto = new CaliberFormulaValidateDTO();
+        dto.setFormula(formula);
+        return validate(dto);
     }
 
     /** 指标注册表快照：code → expression（列式，显式列清单经 CaliberDao；DR05 软删过滤）。 */

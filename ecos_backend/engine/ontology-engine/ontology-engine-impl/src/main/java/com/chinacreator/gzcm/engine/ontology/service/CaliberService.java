@@ -9,9 +9,11 @@ import java.util.UUID;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.chinacreator.gzcm.engine.ontology.dao.CaliberDao;
+import com.chinacreator.gzcm.engine.ontology.dto.CaliberFormulaValidationVO;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -35,6 +37,7 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>{@link SnapshotFrozenException} — 409 ECOS-ONTO-041（发布冻结快照不可改写）;</li>
  *   <li>{@link CaliberMissingException} / {@link CaliberNotApprovedException} — 400 ECOS-ONTO-040;</li>
+ *   <li>{@link CaliberFormulaRejectedException} — 400 ECOS-ONTO-070/071/072/073（H-2 四关写入/审批咽喉）;</li>
  *   <li>其它 — 500 ECOS-ONTO-042（fail-closed）。</li>
  * </ul>
  */
@@ -45,9 +48,21 @@ public class CaliberService {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final CaliberDao caliberDao;
+    /**
+     * H-2 四关校验门面（写入 / 审批咽喉复用）。{@code null} 仅出现在遗留单测的单参装配面，
+     * Spring 容器恒走 {@link #CaliberService(CaliberDao, CaliberFormulaDslService)}。
+     */
+    private final CaliberFormulaDslService caliberFormulaDslService;
 
+    /** 遗留装配面（无 DSL 门面 = 无闸门），仅供既有纯 Mockito 单测沿用。 */
     public CaliberService(CaliberDao caliberDao) {
+        this(caliberDao, null);
+    }
+
+    @Autowired
+    public CaliberService(CaliberDao caliberDao, CaliberFormulaDslService caliberFormulaDslService) {
         this.caliberDao = caliberDao;
+        this.caliberFormulaDslService = caliberFormulaDslService;
     }
 
     // ────────────────────────────────────────────────────────────
@@ -109,11 +124,17 @@ public class CaliberService {
      *
      * <p>status 为空时默认 DRAFT；升版后仅在 {@link #archiveVersion} 推进时改为 APPROVED。</p>
      *
+     * <p><b>H-2 写入咽喉</b>：{@code formula} 非空时先过四关（V1 语法 / V2 引用闭合 / V3 量纲 /
+     * V4 无环），任一关不过即抛 {@link CaliberFormulaRejectedException} 且<b>不落库</b>
+     * （校验严格先于 DAO 写）。空 {@code formula} 裁定见
+     * {@link #assertFormulaGatePassed(String, String)}。</p>
+     *
      * @return 插入后的版本行
      */
     public Map<String, Object> insertVersion(String caliberId, String versionNo, String formula,
                                              Integer additive, String periodGranularity, String status) {
         String effectiveStatus = (status == null || status.isBlank()) ? "DRAFT" : status;
+        assertFormulaGatePassed(formula, "insertVersion");
         String id = UUID.randomUUID().toString();
         caliberDao.insertVersion(id, caliberId, versionNo, formula, additive, periodGranularity, effectiveStatus);
         return caliberDao.findVersionById(id);
@@ -127,6 +148,8 @@ public class CaliberService {
      * <p><b>行不可变 = 幂等无副作用护栏</b>：当前状态已等于目标（重审批）、迁移非法、
      * 或行不存在 → 一律返回 0（不 UPDATE、不抛异常）。APPROVED 之后除 RETIRED 外不可再流转
      * （idempotency guard）。</p>
+     * <p><b>H-2 审批咽喉（纵深防御）</b>：目标为 APPROVED 时，状态 UPDATE 之前重跑同一公式的
+     * 四关校验 —— 库里可能存有四关生效前写入的坏公式，审批是坏公式进入计算面的最后一道闸。</p>
      *
      * @return 受影响行数（0 = 无迁移 / 已终态 / 行不存在）
      */
@@ -134,6 +157,9 @@ public class CaliberService {
         String current = caliberDao.findVersionStatus(caliberId, versionNo);
         if (current == null || current.equals(newStatus) || !isForwardTransition(current, newStatus)) {
             return 0;
+        }
+        if ("APPROVED".equals(newStatus)) {
+            assertFormulaGatePassed(caliberDao.lookupVersionFormula(caliberId, versionNo), "approve");
         }
         return caliberDao.archiveVersion(caliberId, versionNo, newStatus, approvedBy, current);
     }
@@ -145,6 +171,33 @@ public class CaliberService {
         return (from.equals("DRAFT") && (to.equals("REVIEWING") || to.equals("APPROVED")))
                 || (from.equals("REVIEWING") && to.equals("APPROVED"))
                 || (from.equals("APPROVED") && to.equals("RETIRED"));
+    }
+
+    /**
+     * H-2 四关校验咽喉（写入 {@code formula} 与审批置 APPROVED 两处共用）。
+     *
+     * <p><b>裁定</b>：</p>
+     * <ul>
+     *   <li>{@code formula} 为 {@code null} / 全空白 ⇒ <b>跳过校验</b>：无公式口径是既有合法形态
+     *       （DDL 允许 formula 为空，派生口径 / 仅登记周期粒度的版本行），不算违例；</li>
+     *   <li>非空 ⇒ 必须是 {@code IDENT '=' expr} 的 DSL 形态，任何非法（含旧数据里的裸表达式
+     *       {@code SUM(x)}、SQL 片段、越白名单函数）一律 <b>V1 拒绝</b>，
+     *       <b>禁</b>为兼容旧数据降级为 warning；</li>
+     *   <li>DSL 门面未装配（遗留单参构造）⇒ 沿用旧行为不校验；Spring 容器恒装配。</li>
+     * </ul>
+     *
+     * @param stage 触发咽喉的标识（异常消息里定位是哪一道闸）
+     */
+    private void assertFormulaGatePassed(String formula, String stage) {
+        if (caliberFormulaDslService == null || formula == null || formula.isBlank()) {
+            return;
+        }
+        CaliberFormulaValidationVO vo = caliberFormulaDslService.validateFormula(formula);
+        if (!vo.isValid()) {
+            log.warn("H-2 four-check gate rejected formula at {} stage={} violations={}",
+                    stage, vo.getTarget(), vo.getViolations());
+            throw new CaliberFormulaRejectedException(stage, formula, vo.getViolations());
+        }
     }
 
     // ────────────────────────────────────────────────────────────
@@ -271,6 +324,35 @@ public class CaliberService {
     public static final class CaliberNotApprovedException extends RuntimeException {
         public CaliberNotApprovedException(String message) {
             super(message);
+        }
+    }
+
+    /**
+     * H-2 四关不过（公式落库 / 审批咽喉）→ 400，错误码取首条违反项的
+     * {@code ECOS-ONTO-070/071/072/073}，逐条违反项经 {@link #getViolations()} 透出给调用方。
+     */
+    public static final class CaliberFormulaRejectedException extends RuntimeException {
+        private final String code;
+        private final List<CaliberFormulaValidationVO.Violation> violations;
+
+        public CaliberFormulaRejectedException(String stage, String formula,
+                                               List<CaliberFormulaValidationVO.Violation> violations) {
+            super("caliber formula rejected at H-2 gate [" + stage + "]: " + violations
+                    + " — formula=" + formula);
+            this.code = (violations == null || violations.isEmpty())
+                    ? CaliberDslValidator.CODE_SYNTAX
+                    : violations.get(0).getCode();
+            this.violations = violations == null ? List.of() : List.copyOf(violations);
+        }
+
+        /** 首条违反项的错误码（ECOS-ONTO-070/071/072/073）。 */
+        public String getCode() {
+            return code;
+        }
+
+        /** 逐条违反项（gate / code / message / 符号定位）。 */
+        public List<CaliberFormulaValidationVO.Violation> getViolations() {
+            return violations;
         }
     }
 }

@@ -44,11 +44,17 @@ import com.chinacreator.gzcm.sysman.iam.context.UserContext;
  *   <li>POST   /api/v1/ontology/calibers/validate — 公式 DSL 四关校验（H-2；只校验不落库，违一即 400 且定位到符号）</li>
  * </ul>
  *
+ * <p><b>H-2 四关同时挂在写入与审批路径上</b>（{@code POST /{code}/versions}、
+ * {@code POST /{code}/versions/{versionNo}/approve}）：非空公式不过四关即 400 且不落库 / 不置 APPROVED。
+ * 空 {@code formula}（无公式口径既有形态）保持原语义放行。</p>
+ *
  * <p>错误码映射（规则 3 / 规则 4）：
  * <ul>
  *   <li>{@link CaliberService.SnapshotFrozenException} → 409 {@code ECOS-ONTO-041}（快照只读）;</li>
  *   <li>{@link CaliberService.CaliberMissingException} / {@link CaliberService.CaliberNotApprovedException}
  *       → 400 {@code ECOS-ONTO-040}（PUBLISHED 无口径 / 口径版本非 APPROVED）;</li>
+ *   <li>{@link CaliberService.CaliberFormulaRejectedException} → 400 {@code ECOS-ONTO-070/071/072/073}
+ *       （V1 语法 / V2 引用闭合 / V3 量纲 / V4 成环，errorCode 取首条违反项码）;</li>
  *   <li>身份缺失（approve 无 Username） → 400 {@code ECOS-ONTO-040};</li>
  *   <li>其它 → 500 {@code ECOS-ONTO-042}（fail-closed）。</li>
  * </ul>
@@ -146,7 +152,12 @@ public class CaliberController {
         }
     }
 
-    /** 升版（行不可变；status 缺省 DRAFT）。 */
+    /**
+     * 升版（行不可变；status 缺省 DRAFT）。
+     *
+     * <p>H-2 写入咽喉：{@code formula} 非空且不过四关 → 400
+     * {@code ECOS-ONTO-070/071/072/073}（逐条违反项在 message 内定位到符号），<b>不落库</b>。</p>
+     */
     @PostMapping("/{code}/versions")
     public ApiResponse<Map<String, Object>> addVersion(
             @PathVariable String code, @RequestBody CaliberVersionSaveDTO dto) {
@@ -164,13 +175,21 @@ public class CaliberController {
                     String.valueOf(caliber.get("id")), versionNo, dto.getFormula(),
                     dto.getAdditive(), dto.getPeriodGranularity(), dto.getStatus());
             return ApiResponse.success(ver);
+        } catch (CaliberService.CaliberFormulaRejectedException e) {
+            return ApiResponse.error(ApiResponse.CODE_BAD_REQUEST, e.getCode(), e.getMessage());
         } catch (Exception e) {
             log.error("add caliber version failed code={}", code, e);
             return ApiResponse.error(500, CODE_INTERNAL, "add caliber version failed");
         }
     }
 
-    /** 审批：DRAFT/REVIEWING→APPROVED；身份缺失 → 400 ECOS-ONTO-040。 */
+    /**
+     * 审批：DRAFT/REVIEWING→APPROVED；身份缺失 → 400 ECOS-ONTO-040。
+     *
+     * <p>H-2 审批咽喉（纵深防御）：状态置 APPROVED 之前对库内公式重跑四关，
+     * 不过 → 400 {@code ECOS-ONTO-07x} 且<b>不写状态</b>
+     * （库里可能存有四关生效前写入的坏公式，审批是坏公式进入计算面的最后一道闸）。</p>
+     */
     @PostMapping("/{code}/versions/{versionNo}/approve")
     public ApiResponse<Map<String, Object>> approve(
             @PathVariable String code, @PathVariable String versionNo) {
@@ -195,6 +214,8 @@ public class CaliberController {
             }
             return ApiResponse.success(Map.of("code", code, "versionNo", versionNo, "status", "APPROVED",
                     "approvedBy", approver));
+        } catch (CaliberService.CaliberFormulaRejectedException e) {
+            return ApiResponse.error(ApiResponse.CODE_BAD_REQUEST, e.getCode(), e.getMessage());
         } catch (Exception e) {
             log.error("approve caliber version failed code={} v={}", code, versionNo, e);
             return ApiResponse.error(500, CODE_INTERNAL, "approve caliber version failed");
