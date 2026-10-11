@@ -146,7 +146,7 @@ class CognitiveIronLawsTest {
             "(?i)\\bCREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(ecos_cognitive\\.[a-z0-9_]+)");
 
     /**
-     * 已登记的认知域表集（11 张，逐张带创建脚本引用）。
+     * 已登记的认知域表集（12 张，逐张带创建脚本引用）。
      *
      * <p><b>与 PRD-05 措辞的偏差说明（不静默）</b>：PRD-05 §5 与 ARCH-07 写"cognitive 域仅 4 表"，
      * 而 §14.1（2026-09-29）R-13 ① 批准的 V187~V196 收敛批在 {@code ecos_cognitive} 并建了 11 张
@@ -154,6 +154,12 @@ class CognitiveIronLawsTest {
      * <b>错放镜像</b>，只停写不迁移，IR03）。本门禁因此按"实登白名单 + 新增必登记"执行，
      * 而非按"4 表"字面数判定 —— 冻结标识名 {@code cognitiveDomainMayNotCreateTablesOutsideFour}
      * 保留原文，语义 = <b>白名单外零容忍</b>。</p>
+     *
+     * <p>PRD-05 §6.1 规格 3 明文要求"扩表时必须同批改白名单"，故第 12 张（V267 结果评估表）
+     * 的登记出处 = PRD-05 §七「需求增量登记（2026-10-10）」第 4 条 Outcome Evaluation
+     * + 《认知域与智能域补充详细设计 v1.0》§9.3；它属<b>评估记录</b>（控制域治理态数据），
+     * 不是确定性计算产物 —— 产物仍按 ADR-14/REQ-COG-09 落业务域 {@code ecos_dw}，
+     * 本表只存 {@code calculation_refs_text} 引用（§9.3 末段铁律）。</p>
      */
     private static final List<String> REGISTERED_COGNITIVE_TABLES = List.of(
             "ecos_cognitive.ecos_cognitive_mind",            // V187
@@ -166,7 +172,8 @@ class CognitiveIronLawsTest {
             "ecos_cognitive.ecos_cognitive_pipeline",        // V163 建 / V191·V192 幂等并建，V163 声明停写
             "ecos_cognitive.ecos_business_scenario",         // V193（错放镜像，只停写 IR03）
             "ecos_cognitive.ecos_scenario_binding",          // V193（错放镜像，只停写 IR03）
-            "ecos_cognitive.ecos_scenario_binding_link");   // V193（错放镜像，只停写 IR03）
+            "ecos_cognitive.ecos_scenario_binding_link",     // V193（错放镜像，只停写 IR03）
+            "ecos_cognitive.ecos_cognitive_outcome_evaluation"); // V267 建 / V274 幂等补列（W→D 结果评估记录，补充设计 §9）
 
     @Test
     @DisplayName("认知域 DDL 白名单外零新表（REQ-COG-05 守护项 2，ArchUnit 面 = DDL 单源目录扫描）")

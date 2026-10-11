@@ -35,6 +35,12 @@ public final class CognitiveErrorCode {
     public static final String E502_DEPENDENCY_DOWN      = "ECOS-COG-502D"; // 502/503 必需依赖不可用（真实透传，禁伪空集合，SUP-CTX-03）
     public static final String E429_BUDGET_EXCEEDED      = "ECOS-COG-429B"; // 429 预算耗尽（Run 转 PAUSED，禁伪成功）
 
+    // ── §9 W→D 结果评估错误码（POST /api/v1/cognitive/outcomes/evaluate）──
+    // 注意：§9.4 七情形命中<b>不</b>走错误码 —— 评估仍 200 落库，status 压 NEEDS_RECONCILE 并回显
+    // blockers[]（"评估没做成"是业务结论而非故障，禁包装成 4xx/5xx；DG-6 200 空集与 5xx 严格可分）。
+    public static final String E400_OUTCOME_INVALID      = "ECOS-COG-400O"; // 400 评估请求结构性非法（§9.3 必填/引用三要素缺失）
+    public static final String E404_OUTCOME              = "ECOS-COG-404O"; // 404 评估记录不存在（§9.2 步骤 10 闭环记录回查）
+
     /** 冻结字面量（禁止改写，防前端 i18n 不一致）。 */
     public static final String MSG_MIND_NOT_ON_SCENARIO = "mind not found on this scenario";
     public static final String MSG_MIND_NOT_FOUND       = "mind not found";
@@ -63,4 +69,8 @@ public final class CognitiveErrorCode {
     public static final String MSG_CONFLICT_UNRESOLVED  = "semantic conflict unresolved, manual resolution required";
     public static final String MSG_DEPENDENCY_DOWN      = "required dependency unavailable";
     public static final String MSG_BUDGET_EXCEEDED      = "budget exceeded, run paused";
+
+    /** §9 W→D 结果评估冻结字面量（与上方同纪律：禁改写，只可新增）。 */
+    public static final String MSG_OUTCOME_INVALID      = "outcome evaluation request invalid";
+    public static final String MSG_OUTCOME_NOT_FOUND    = "outcome evaluation not found";
 }

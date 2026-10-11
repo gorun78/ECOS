@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>基线（AGENTS.md / route-rewrite-lint.ps1）</b>：
  * {@code VersionPrefixRewriteFilter} 正向 {@code V1_REWRITE_MAP} = 10 条 +
- * 反向 {@code REVERSE_EXACT_MAP} + {@code REVERSE_PREFIX_MAP} = 13 条，合计 {@code 23} 条。
+ * 反向 {@code REVERSE_EXACT_MAP} + {@code REVERSE_PREFIX_MAP} = 15 条，合计 {@code 25} 条。
  *
  * <p><b>单源 route-manifest（ADR-15 C.4）</b>：
  * {@code gateway/src/main/resources/route-manifest.json} 是 5 类前缀的
@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 与三滤波器对账：
  * <ol>
  *   <li><b>Rewrite 基线</b>：{@code VersionPrefixRewriteFilter} 三张重写表
- *       Map.entry 条数 = 23（正向 10 + 反向 13，AGENTS.md / route-rewrite-lint.ps1
+ *       Map.entry 条数 = 25（正向 10 + 反向 15，AGENTS.md / route-rewrite-lint.ps1
  *       基线）—— 防止重写表自行增减破坏既有三滤波器对账。</li>
  *   <li><b>Routing / datanet</b>：manifest 中 owner=datanet 的 entry（负载 37 个
  *       data-engine controller 的三域前缀）必须带齐 artifact/route/ports/rewrite
@@ -66,8 +66,8 @@ class DatanetEndpointParityTest {
     private static final String CLEARANCE_REL =
             "ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/security/ClearanceInterceptor.java";
 
-    /** AGENTS.md 基线：正向 10 + 反向 13 = 23。 */
-    private static final int REWRITE_BASELINE = 23;
+    /** AGENTS.md 基线：正向 10 + 反向 15 = 25（13→15 增量 = 详设-10 R1-A 卷 10 §5.1 wagent 双路径两条反向条目；该批次 -DskipTests 未实跑本门禁，2026-10-11 真跑时按门禁口径订正）。 */
+    private static final int REWRITE_BASELINE = 25;
 
     private static Path repoRoot() throws IOException {
         Path p = Paths.get("").toAbsolutePath();
@@ -131,13 +131,13 @@ class DatanetEndpointParityTest {
     }
 
     @Test
-    @DisplayName("VersionPrefixRewriteFilter 重写表基线 = 23 条（正向 10 + 反向 13）")
-    void rewriteFilterBaselineIs23() throws Exception {
+    @DisplayName("VersionPrefixRewriteFilter 重写表基线 = 25 条（正向 10 + 反向 15）")
+    void rewriteFilterBaselineIs25() throws Exception {
         String filterSrc = read(repoRoot().resolve(FILTER_REL));
         List<MapEntry> all = parseFilterEntries(filterSrc);
         assertEquals(REWRITE_BASELINE, all.size(),
-                "AGENTS.md 基线 23 条；当前 = " + all.size() + "（正向 10 + 反向 13）");
-        // 正向 10 + 反向 13：分别断言两个 map 块存在
+                "AGENTS.md 基线 25 条；当前 = " + all.size() + "（正向 10 + 反向 15）");
+        // 正向 10 + 反向 15：分别断言两个 map 块存在
         assertTrue(filterSrc.contains("V1_REWRITE_MAP"), "V1_REWRITE_MAP 未定义");
         assertTrue(filterSrc.contains("REVERSE_EXACT_MAP"), "REVERSE_EXACT_MAP 未定义");
         assertTrue(filterSrc.contains("REVERSE_PREFIX_MAP"), "REVERSE_PREFIX_MAP 未定义");
@@ -145,7 +145,7 @@ class DatanetEndpointParityTest {
         int reverseExact = countEntriesInBlock(filterSrc, "REVERSE_EXACT_MAP");
         int reversePrefix = countEntriesInBlock(filterSrc, "REVERSE_PREFIX_MAP");
         assertEquals(10, forward, "正向应 10 条，当前 " + forward);
-        assertEquals(13, reverseExact + reversePrefix, "反向应 13 条，当前 " + (reverseExact + reversePrefix));
+        assertEquals(15, reverseExact + reversePrefix, "反向应 15 条，当前 " + (reverseExact + reversePrefix));
     }
 
     private static int countEntriesInBlock(String src, String blockName) {

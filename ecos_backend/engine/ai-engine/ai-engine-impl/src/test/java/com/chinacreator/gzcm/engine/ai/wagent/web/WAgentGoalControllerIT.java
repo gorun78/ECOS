@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.wagent.web;
 
+import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentGoalController;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentGoalDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentMissionDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentQuestionDao;

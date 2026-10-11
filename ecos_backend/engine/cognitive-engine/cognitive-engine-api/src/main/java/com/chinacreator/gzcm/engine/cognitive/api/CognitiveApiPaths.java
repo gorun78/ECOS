@@ -83,4 +83,19 @@ public final class CognitiveApiPaths {
 
     /** §8.4 认知资产受控状态迁移（治理操作者通道；非法迁移 ⇒ 409 ECOS-COG-409S 原行不变）。 */
     public static final String ASSETS_TRANSITION = COGNITIVE + "/assets/{" + PARAM_ASSET_ID + "}/transitions";
+
+    // ── SUP-D 修补（2026-10-11，只追加本段，上方行零改写）──
+
+    /**
+     * ASSETS_* 族的相对子路径（与上方绝对常量逐字同源，绝对 = COGNITIVE + REL）。
+     * <p>背景：{@code CognitiveAssetCatalogController} 类级前缀为 {@link #COGNITIVE}，
+     * Spring 会把方法级映射值与类前缀<b>拼接</b>——方法级直接引用绝对常量会注册成
+     * 双前缀路径（{@code /api/v1/cognitive/api/v1/cognitive/assets/catalog}），
+     * 与 §13 登记契约不符（实测 gateway 单前缀 404 / 双前缀 200）。
+     * 修正为方法级用 {@code *_REL}（对齐 {@link #MODELS_REGISTRY_REL} 既有先例）。</p>
+     */
+    public static final String ASSETS_CATALOG_REL     = "/assets/catalog";
+    public static final String ASSETS_RESOLVE_REL     = "/assets/{" + PARAM_ASSET_ID + "}/resolve";
+    public static final String ASSETS_PROPOSALS_REL   = "/assets/{" + PARAM_ASSET_ID + "}/proposals";
+    public static final String ASSETS_TRANSITION_REL  = "/assets/{" + PARAM_ASSET_ID + "}/transitions";
 }

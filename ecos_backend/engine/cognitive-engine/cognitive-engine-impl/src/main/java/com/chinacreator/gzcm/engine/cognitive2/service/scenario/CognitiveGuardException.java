@@ -24,15 +24,25 @@ public class CognitiveGuardException extends RuntimeException {
         this.missing = missing;
     }
 
+    /**
+     * 错误码 → HTTP 状态。
+     *
+     * <p>补充设计 v1.0 增量码（400S/403S/409S/409V/422G/422C/502D/429B）与 §9 结果评估码
+     * （400O/404O）此前全部落到 {@code default -> 500}，即"403 拒绝被判成 500 内部错误"，
+     * 违反 §13.1 统一错误语义与 DG-6（200/4xx/5xx 严格可分）。本 switch 补齐全部已声明码，
+     * {@code default} 只留给真正未登记的码 —— 未登记即 500 fail-loud，禁静默降级。</p>
+     */
     static int httpOf(String code) {
         if (code == null) return 500;
         return switch (code) {
-            case "ECOS-COG-400", "ECOS-COG-400M", "ECOS-COG-400P", "ECOS-COG-400C" -> 400;
-            case "ECOS-COG-404", "ECOS-COG-404R" -> 404;
-            case "ECOS-COG-403" -> 403;
+            case "ECOS-COG-400", "ECOS-COG-400M", "ECOS-COG-400P", "ECOS-COG-400C",
+                 "ECOS-COG-400S", "ECOS-COG-400O" -> 400;
+            case "ECOS-COG-404", "ECOS-COG-404R", "ECOS-COG-404O" -> 404;
+            case "ECOS-COG-403", "ECOS-COG-403S" -> 403;
             case "ECOS-COG-409R", "ECOS-COG-409S", "ECOS-COG-409V" -> 409;   // 已发布版本行不可变 / 状态迁移非法 / 版本过期
-            case "ECOS-COG-422R" -> 422;   // REQ-COG-07 规格 4：四类门禁任一非 PASS ⇒ 显式 4xx
-            case "ECOS-COG-500", "ECOS-COG-501", "ECOS-COG-502" -> 503;
+            case "ECOS-COG-422R", "ECOS-COG-422G", "ECOS-COG-422C" -> 422;   // REQ-COG-07 规格 4 / BLOCKER 缺口未关 / 语义冲突未解
+            case "ECOS-COG-429B" -> 429;                                     // 预算耗尽（Run 转 PAUSED）
+            case "ECOS-COG-500", "ECOS-COG-501", "ECOS-COG-502", "ECOS-COG-502D" -> 503;
             case "ECOS-COG-503" -> 501;
             default -> 500;
         };

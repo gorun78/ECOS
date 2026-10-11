@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.engine.ai.capability.web;
+package com.chinacreator.gzcm.engine.ai.capability.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.capability.AiCapabilityId;

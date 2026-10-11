@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.harness;
 
+import com.chinacreator.gzcm.engine.ai.harness.controller.HarnessProbeController;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;

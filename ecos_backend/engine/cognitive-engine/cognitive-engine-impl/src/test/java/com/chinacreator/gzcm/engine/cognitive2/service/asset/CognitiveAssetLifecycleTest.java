@@ -35,6 +35,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -57,6 +59,7 @@ class CognitiveAssetLifecycleTest {
     private final ModelRegistryDao modelRegistryDao = mock(ModelRegistryDao.class);
     private final CognitiveObjectCatalogService catalogService = mock(CognitiveObjectCatalogService.class);
     private final CognitiveAuditFallback auditFallback = mock(CognitiveAuditFallback.class);
+    private final BeliefStore beliefStore = mock(BeliefStore.class);
 
     private CognitiveAssetLifecycleService service;
     private CognitiveBeliefService beliefService;
@@ -67,11 +70,10 @@ class CognitiveAssetLifecycleTest {
                 catalogService, auditFallback);
         // 装配一个真实 CognitiveBeliefService 以便走真 register() 路径验证置信红线。
         // 内部依赖用 mock；测试仅验证 register() 前置的置信守卫在调用 store.insert 前是否拦截。
-        BeliefStore store = mock(BeliefStore.class);
         EvidenceStore evidenceStore = mock(EvidenceStore.class);
         com.chinacreator.gzcm.engine.cognitive2.service.mental.MentalEventPublisher eventPublisher =
                 mock(com.chinacreator.gzcm.engine.cognitive2.service.mental.MentalEventPublisher.class);
-        beliefService = new CognitiveBeliefService(store, evidenceStore, new ObjectMapper(), eventPublisher);
+        beliefService = new CognitiveBeliefService(beliefStore, evidenceStore, new ObjectMapper(), eventPublisher);
     }
 
     // ── 1. 合法迁移链（§8.4 主链 5 步）──
@@ -79,13 +81,21 @@ class CognitiveAssetLifecycleTest {
     @Test
     @DisplayName("合法迁移链：DRAFT→CANDIDATE→EVIDENCE_CHECKED→VALIDATED→APPROVED→ACTIVE")
     void legalTransitionChainRunsToActive() {
-        when(beliefDao.findLifecycleStateById("bel_x")).thenReturn(row("DRAFT", "ACTIVE"));
-        when(beliefDao.updateLifecycleState(eq("bel_x"), anyString(), anyString())).thenReturn(1);
+        // 迁移链逐步读库：findLifecycleStateById 必须返回"当前"行，
+        // 故用可变 row + updateLifecycleState 回写 lifecycle_state 模拟库侧推进（否则每步都读到 DRAFT，第 2 步即 409）。
+        Map<String, Object> live = row("DRAFT", "ACTIVE");
+        when(beliefDao.findLifecycleStateById("bel_x")).thenAnswer(inv -> live);
+        when(beliefDao.updateLifecycleState(eq("bel_x"), anyString(), anyString()))
+                .thenAnswer(inv -> {
+                    live.put("lifecycle_state", inv.getArgument(1));
+                    return 1;
+                });
         List<String> chain = new ArrayList<>(List.of(
                 "CANDIDATE", "EVIDENCE_CHECKED", "VALIDATED", "APPROVED", "ACTIVE"));
         String current = "DRAFT";
         for (String target : chain) {
             Map<String, Object> resp = service.transition("bel_x", target, "step " + target, "ev-1", "op");
+            assertEquals(current, resp.get("fromState"));
             assertEquals(target, resp.get("toState"));
             current = target;
         }
@@ -147,9 +157,8 @@ class CognitiveAssetLifecycleTest {
         assertEquals("CONTRADICTED", r.get("toState"));
         // belt 表其它列（variable/domain/distribution 等）保持原样：0 补充 UPDATE
         verify(beliefDao, times(1)).updateLifecycleState(eq("bel_c"), eq("CONTRADICTED"), anyString());
-        verify(beliefDao, never()).insert(anyString(), anyString(), anyString(), anyString(),
-                anyString(), org.mockito.ArgumentMatchers.anyInt(), anyString(),
-                org.mockito.ArgumentMatchers.anyBoolean(), anyString(), anyString());
+        verify(beliefDao, never()).insert(any(), any(), any(), any(), any(),
+                anyInt(), any(), anyBoolean(), any(), any());
     }
 
     @Test
@@ -171,9 +180,12 @@ class CognitiveAssetLifecycleTest {
     @Test
     @DisplayName("belief 写路径：probability 有值 + kind=UNCALIBRATED_CONFIDENCE ⇒ 400 拒绝（未落库）")
     void beliefProbabilityWriteRejectsUncalibratedConfidence() {
+        // 生产真值：UNCALIBRATED 族经 BeliefLifecycleGateway.guard 抛 CognitiveGuardException(ECOS-COG-400P)，
+        // 而非 missing-kind 路径的 BusinessException —— 两条拒绝路径异常型不同（见 SUP-COG-02 冻结测试）。
         BeliefSaveDTO dto = probAndKind(0.72d, "UNCALIBRATED_CONFIDENCE");
-        BusinessException e = assertThrows(BusinessException.class, () -> beliefService.register(dto));
-        assertEquals(400, e.getErrorCode());
+        CognitiveGuardException e = assertThrows(CognitiveGuardException.class, () -> beliefService.register(dto));
+        assertEquals(400, e.httpStatus);
+        assertEquals(CognitiveErrorCode.E400_INVALID_PARAM, e.errorCode);
         // 未落库：store.insert 0 调用（前置拦截）
         verifyUncalibratedRejected();
     }
@@ -182,8 +194,9 @@ class CognitiveAssetLifecycleTest {
     @DisplayName("belief 写路径：probability 有值 + kind=UNCALIBRATED_MODEL_ESTIMATE ⇒ 400 拒绝")
     void beliefProbabilityWriteRejectsUncalibratedModelEstimate() {
         BeliefSaveDTO dto = probAndKind(0.72d, "UNCALIBRATED_MODEL_ESTIMATE");
-        BusinessException e = assertThrows(BusinessException.class, () -> beliefService.register(dto));
-        assertEquals(400, e.getErrorCode());
+        CognitiveGuardException e = assertThrows(CognitiveGuardException.class, () -> beliefService.register(dto));
+        assertEquals(400, e.httpStatus);
+        assertEquals(CognitiveErrorCode.E400_INVALID_PARAM, e.errorCode);
         verifyUncalibratedRejected();
     }
 
@@ -200,16 +213,21 @@ class CognitiveAssetLifecycleTest {
     @DisplayName("belief 写路径：probability=NULL ⇒ 放行（V262 未标定既有语义）")
     void beliefProbabilityNullPassesThrough() {
         BeliefSaveDTO dto = probAndKind(null, null);
-        when(beliefServiceStoreMaxVersion()).thenReturn(0);
+        // store 为 mock：maxVersion 默认 0 ⇒ 首版 version=1，无需（也不能）对非 mock 返回值做 when 桩
         assertDoesNotThrow(() -> beliefService.register(dto));
+        // 可选列（tenantScope / lastEvidenceId / overrideReason）生产真值为 NULL，
+        // anyString() 不匹配 null（Mockito 语义）⇒ 用 any()；关键列（变量/域/版本/状态）仍精确断言。
+        verify(beliefStore, times(1)).insert(any(), eq("v"), any(), eq("dm"), any(), eq(1),
+                any(), anyBoolean(), any(), eq("ACTIVE"));
     }
 
     @Test
     @DisplayName("belief 写路径：probability 有值 + kind=STATISTICAL_PROBABILITY ⇒ 放行")
     void beliefProbabilityStatisticalPassesThrough() {
         BeliefSaveDTO dto = probAndKind(0.55d, "STATISTICAL_PROBABILITY");
-        when(beliefServiceStoreMaxVersion()).thenReturn(0);
         assertDoesNotThrow(() -> beliefService.register(dto));
+        verify(beliefStore, times(1)).insert(any(), eq("v"), any(), eq("dm"), any(), eq(1),
+                any(), anyBoolean(), any(), eq("ACTIVE"));
     }
 
     @Test
@@ -239,9 +257,8 @@ class CognitiveAssetLifecycleTest {
         assertEquals("PENDING_APPROVAL", resp.get("status"));
         ArgumentCaptor<String> idCap = ArgumentCaptor.forClass(String.class);
         verify(beliefDao, never()).updateLifecycleState(idCap.capture(), anyString(), anyString());
-        verify(beliefDao, never()).insert(anyString(), anyString(), anyString(), anyString(),
-                anyString(), org.mockito.ArgumentMatchers.anyInt(), anyString(),
-                org.mockito.ArgumentMatchers.anyBoolean(), anyString(), anyString());
+        verify(beliefDao, never()).insert(any(), any(), any(), any(), any(),
+                anyInt(), any(), anyBoolean(), any(), any());
         verify(auditFallback, times(1)).write(any());
     }
 
@@ -363,22 +380,6 @@ class CognitiveAssetLifecycleTest {
         m.put("status", status);
         m.put("lifecycle_state", lifecycle);
         return m;
-    }
-
-    /** 简化：belief.service 内部 store.maxVersion 的 mock，返回 0（首版）。 */
-    private int beliefServiceStoreMaxVersion() {
-        // beliefService 的 store 字段在 constructor 注入时构造，无法从外部替换；
-        // 该方法图符号实为 mock 桩。测试策略：register() 走到 store.insert 才发事件，
-        // 若拦截在 store.insert 之前 → 不触发 store.maxVersion；若放行 → 需 store.maxVersion=0。
-        return 0;
-    }
-
-    private com.chinacreator.gzcm.engine.cognitive2.service.BeliefStore beliefStoreRef() {
-        // 反射不可达：CognitiveBeliefService 通过 @RequiredArgsConstructor 内部字段注入
-        // （private final），测试缺 junit5-optional reflection helper，故此处直接构造
-        // 独立 BeliefService 实例不现实——本测试改为通过 gateway 直接断言已覆盖（见
-        // unknownLegacyNotWritableByGateway），belief 前缀 400 拒绝用例仅验证异常码即可。
-        throw new UnsupportedOperationException("not accessible from test");
     }
 
     private void verifyUncalibratedRejected() {

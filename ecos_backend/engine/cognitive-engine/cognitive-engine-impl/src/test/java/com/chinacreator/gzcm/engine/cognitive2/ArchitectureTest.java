@@ -82,7 +82,11 @@ public class ArchitectureTest {
             // 补充设计 v1.0 §5.4-3：Context Builder 权威源读取 SPI（decoupling port，
             //     同 Store/Reader 解耦端口命名口径，非服务门面故不套 I 前缀）。
             .orShould().haveSimpleName("ContextSourceReader")
-            .orShould().haveSimpleName("ContextSecurityTrimmer");
+            .orShould().haveSimpleName("ContextSecurityTrimmer")
+            // 补充设计 v1.0 §9.2 步骤1/3/4 + §9.3 末段：确定性计算产物只读接缝（decoupling port，
+            //     与 ForecastRunSnapshotReader 同纪律：无实现 bean ⇒ fail-loud 标不适用，禁伪造数值）。
+            //     非服务门面故不套 I 前缀。
+            .orShould().haveSimpleName("OutcomeMetricValueReader");
         rule.allowEmptyShould(true).check(classes);
     }
 

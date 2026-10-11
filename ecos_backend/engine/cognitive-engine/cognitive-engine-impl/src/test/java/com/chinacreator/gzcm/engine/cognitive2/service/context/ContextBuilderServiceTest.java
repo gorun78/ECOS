@@ -13,9 +13,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.MDC;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -49,7 +50,10 @@ import static org.mockito.Mockito.when;
  * <p>另覆盖 §5.6 稳定性测试：{@link #digestIsReproducible()}（相同来源版本、
  * 相同请求、相同策略 ⇒ contextDigest 稳定可复现）。</p>
  *
- * <p><b>测试文件已建、由主仓统一运行</b>（本任务不跑 mvn，主仓 SUP-Z 批次统一门禁执行）。</p>
+ * <p>运行面：本类由主仓 {@code mvn -o -pl engine/cognitive-engine/cognitive-engine-impl test}
+ * 门禁实跑（2026-10-11 首轮实跑修正三处装配错：{@code reader} 改为按源面归组以匹配生产的
+ * sourceType 路由；必需源读失败用例显式声明读失败；400/503 用例不预置 trimmer 桩位，
+ * 避免失败早于步骤 4 时的 UnnecessaryStubbing）。</p>
  */
 @ExtendWith(MockitoExtension.class)
 class ContextBuilderServiceTest {
@@ -79,8 +83,8 @@ class ContextBuilderServiceTest {
     @DisplayName("SUP-CTX-01/§5.3: 正常组装 ⇒ Pack 带 digest/ttl/traceId，源与事实均带 ID/版本/时点")
     void normalAssemblyProducesPackWithDigestAndTtl() {
         stubAllowAll();
-        ContextBuilderService svc = builderWith(reader(Set.of(SRC), "version-A", false,
-                new ContextSourceReader.FactProjection("revenue", "1000", SRC, "version-A", AS_OF)));
+        ContextBuilderService svc = builderWith(reader(face(SRC, "version-A", false,
+                new ContextSourceReader.FactProjection("revenue", "1000", SRC, "version-A", AS_OF))));
 
         ContextBuildResult result = svc.build(baseRequest());
 
@@ -109,8 +113,8 @@ class ContextBuilderServiceTest {
     @DisplayName("§5.6 稳定性测试: 相同来源版本 + 相同请求 + 相同策略 ⇒ contextDigest 可复现")
     void digestIsReproducible() {
         stubAllowAll();
-        ContextBuilderService svc = builderWith(reader(Set.of(SRC), "version-A", false,
-                new ContextSourceReader.FactProjection("revenue", "1000", SRC, "version-A", AS_OF)));
+        ContextBuilderService svc = builderWith(reader(face(SRC, "version-A", false,
+                new ContextSourceReader.FactProjection("revenue", "1000", SRC, "version-A", AS_OF))));
 
         ContextBuildResult r1 = svc.build(baseRequest());
         ContextBuildResult r2 = svc.build(baseRequest());
@@ -135,8 +139,8 @@ class ContextBuilderServiceTest {
     @Test
     @DisplayName("SUP-CTX-03: 必需源读取故障 ⇒ 503（非 200 空 Pack 伪装）")
     void requiredSourceReadFailureIs503() {
-        stubAllowAll();
-        ContextBuilderService svc = builderWith(reader(Set.of(SRC), "version-A", false));
+        // 无 trimmer 桩位：必需源读失败在步骤 3 抛出，早于步骤 4 权限裁剪（预置桩必触发 UnnecessaryStubbing）
+        ContextBuilderService svc = builderWith(reader(failingFace(SRC)));
 
         ContextBuildException e = assertThrows(ContextBuildException.class,
                 () -> svc.build(baseRequest()));
@@ -153,7 +157,7 @@ class ContextBuilderServiceTest {
         optional.setSourceId("kb-9");
         optional.setVersion("v1");
         optional.setRequired(false);
-        ContextBuilderService svc = builderWith(reader(Set.of(SRC), "version-A", false));
+        ContextBuilderService svc = builderWith(reader(face(SRC, "version-A", false)));
 
         ContextBuildRequest req = baseRequest();
         req.getRequiredAssets().add(optional);
@@ -175,8 +179,8 @@ class ContextBuilderServiceTest {
     void securityTrimDeniedRequiredSourceIs403() {
         when(trimmer.trim(any(), any(), any()))
                 .thenReturn(ContextSecurityTrimmer.TrimDecision.deny());
-        ContextBuilderService svc = builderWith(reader(Set.of(SRC), "version-A", false,
-                new ContextSourceReader.FactProjection("revenue", "1000", SRC, "version-A", AS_OF)));
+        ContextBuilderService svc = builderWith(reader(face(SRC, "version-A", false,
+                new ContextSourceReader.FactProjection("revenue", "1000", SRC, "version-A", AS_OF))));
 
         ContextBuildException e = assertThrows(ContextBuildException.class,
                 () -> svc.build(baseRequest()));
@@ -190,8 +194,8 @@ class ContextBuilderServiceTest {
     void securityCheckpointUnavailableIsFailClosedDeny() {
         // 不注入 trimmer Bean（Optional.empty）= security 依赖缺失
         ContextBuilderService failClosed = new ContextBuilderService(
-                List.of(reader(Set.of(SRC), "version-A", false,
-                        new ContextSourceReader.FactProjection("revenue", "1", SRC, "version-A", AS_OF))),
+                List.of(reader(face(SRC, "version-A", false,
+                        new ContextSourceReader.FactProjection("revenue", "1", SRC, "version-A", AS_OF)))),
                 Optional.empty(), eventPublisher);
 
         ContextBuildException e = assertThrows(ContextBuildException.class,
@@ -207,7 +211,7 @@ class ContextBuilderServiceTest {
     void versionMismatchIs409() {
         stubAllowAll();
         // 请求声明 version-A，源侧实际回 version-B
-        ContextBuilderService svc = builderWith(reader(Set.of(SRC), "version-B", false));
+        ContextBuilderService svc = builderWith(reader(face(SRC, "version-B", false)));
 
         ContextBuildException e = assertThrows(ContextBuildException.class,
                 () -> svc.build(baseRequest()));
@@ -218,7 +222,7 @@ class ContextBuilderServiceTest {
     @Test
     @DisplayName("SUP-CTX-01 fail-loud: 权威源清单缺 version ⇒ 400 E400_SOURCE_REF_MISSING")
     void requiredAssetMissingVersionIs400() {
-        stubAllowAll();
+        // 无 trimmer 桩位：引用三要素校验在步骤 1 即失败（预置桩必触发 UnnecessaryStubbing）
         ContextBuilderService svc = builderWith();
         ContextSourceRef bad = new ContextSourceRef();
         bad.setSourceType("DATA_ASSET");
@@ -227,6 +231,7 @@ class ContextBuilderServiceTest {
 
         ContextBuildRequest req = new ContextBuildRequest();
         req.setScenarioId("s1");
+        req.setScope(new ContextBuildRequest.Scope());
         req.getScope().setTenantId("tenant-1");
         req.getRequiredAssets().add(bad);
 
@@ -240,8 +245,8 @@ class ContextBuilderServiceTest {
     @DisplayName("SUP-CTX-01: 事实投影缺 sourceId/version ⇒ 400 拒绝（不静默丢行进 Pack）")
     void factProjectionMissingSourceRejected() {
         stubAllowAll();
-        ContextBuilderService svc = builderWith(reader(Set.of(SRC), "version-A", false,
-                new ContextSourceReader.FactProjection("revenue", "1000", null, null, AS_OF)));
+        ContextBuilderService svc = builderWith(reader(face(SRC, "version-A", false,
+                new ContextSourceReader.FactProjection("revenue", "1000", null, null, AS_OF))));
 
         ContextBuildException e = assertThrows(ContextBuildException.class,
                 () -> svc.build(baseRequest()));
@@ -256,10 +261,10 @@ class ContextBuilderServiceTest {
     void unresolvedConflictOnCriticalSourceIs422() {
         stubAllowAll();
         ContextBuilderService svc = builderWith(
-                reader(Set.of(SRC), "version-A", true,
-                        new ContextSourceReader.FactProjection("revenue", "1000", SRC, "version-A", AS_OF)),
-                reader(Set.of("asset-002"), "version-2", true,
-                        new ContextSourceReader.FactProjection("revenue", "2000", "asset-002", "version-2", AS_OF)));
+                reader(face(SRC, "version-A", true,
+                                new ContextSourceReader.FactProjection("revenue", "1000", SRC, "version-A", AS_OF)),
+                        face("asset-002", "version-2", true,
+                                new ContextSourceReader.FactProjection("revenue", "2000", "asset-002", "version-2", AS_OF))));
         ContextBuildRequest req = baseRequest();
         req.getRequiredAssets().add(source("asset-002", "version-2", false));
         req.getRequiredAssets().get(0).setSuccessCritical(true);
@@ -275,10 +280,10 @@ class ContextBuilderServiceTest {
     void unresolvedConflictWithoutCriticalYieldsEntry() {
         stubAllowAll();
         ContextBuilderService svc = builderWith(
-                reader(Set.of(SRC), "version-A", false,
-                        new ContextSourceReader.FactProjection("revenue", "1000", SRC, "version-A", AS_OF)),
-                reader(Set.of("asset-002"), "version-2", false,
-                        new ContextSourceReader.FactProjection("revenue", "2000", "asset-002", "version-2", AS_OF)));
+                reader(face(SRC, "version-A", false,
+                                new ContextSourceReader.FactProjection("revenue", "1000", SRC, "version-A", AS_OF)),
+                        face("asset-002", "version-2", false,
+                                new ContextSourceReader.FactProjection("revenue", "2000", "asset-002", "version-2", AS_OF))));
         ContextBuildRequest req = baseRequest();
         req.getRequiredAssets().add(source("asset-002", "version-2", false));
 
@@ -298,8 +303,7 @@ class ContextBuilderServiceTest {
     void budgetExceededIs429() {
         stubAllowAll();
         ContextBuilderService svc = builderWith(
-                reader(Set.of(SRC), "version-A", false),
-                reader(Set.of("asset-002"), "version-2", false));
+                reader(face(SRC, "version-A", false), face("asset-002", "version-2", false)));
         ContextBuildRequest req = baseRequest();
         req.getRequiredAssets().add(source("asset-002", "version-2", false));
         req.getBudget().setMaxSources(1); // 实际 2 源 > 1
@@ -314,8 +318,8 @@ class ContextBuilderServiceTest {
     @DisplayName("§5.4-8: 超 maxTokens 预算（条目×权重估算）⇒ 429")
     void budgetTokensExceededIs429() {
         stubAllowAll();
-        ContextBuilderService svc = builderWith(reader(Set.of(SRC), "version-A", false,
-                new ContextSourceReader.FactProjection("revenue", "1000", SRC, "version-A", AS_OF)));
+        ContextBuilderService svc = builderWith(reader(face(SRC, "version-A", false,
+                new ContextSourceReader.FactProjection("revenue", "1000", SRC, "version-A", AS_OF))));
         ContextBuildRequest req = baseRequest();
         req.getBudget().setMaxTokens(1); // 至少 2 条目 × 80 > 1
 
@@ -349,6 +353,7 @@ class ContextBuilderServiceTest {
         ContextBuildRequest req = new ContextBuildRequest();
         req.setRequestId("req-123");
         req.setScenarioId("scenario-annual-forecast");
+        req.setScope(new ContextBuildRequest.Scope());
         req.getScope().setTenantId("tenant-1");
         req.getScope().setAsOfTime(AS_OF);
         ContextBuildRequest.BlueprintRef bp = new ContextBuildRequest.BlueprintRef();
@@ -359,31 +364,54 @@ class ContextBuilderServiceTest {
         return req;
     }
 
-    /** 测试 reader：仅承接 owned sourceId 的读取；owned 源声明读失败时抛依赖异常。 */
-    private static ContextSourceReader reader(Set<String> ownedSources, String version,
-                                              boolean authoritative,
-                                              ContextSourceReader.FactProjection... facts) {
+    /** 一份测试源面：sourceId 的读回行为（{@code readFails=true} 模拟下游读失败）。 */
+    private record SourceFace(String sourceId, String version, boolean authoritative, boolean readFails,
+                              ContextSourceReader.FactProjection... facts) {
+    }
+
+    private static SourceFace face(String sourceId, String version, boolean authoritative,
+                                   ContextSourceReader.FactProjection... facts) {
+        return new SourceFace(sourceId, version, authoritative, false, facts);
+    }
+
+    private static SourceFace failingFace(String sourceId) {
+        return new SourceFace(sourceId, null, false, true);
+    }
+
+    /**
+     * 单个测试 reader 承接多份源面。
+     *
+     * <p>生产按 {@code sourceType} 路由 SPI（{@code ContextBuilderService.readOne} 取首个
+     * {@code supports} 命中的 reader），同类型多源若拆成两个 reader，第二个永远轮不到 ⇒
+     * 未命中的源会被判读失败而抛 503，遮蔽 422/429 等后置语义。故多源用例必须落在同一
+     * reader 的源面上；未声明的源返回 null，交 Builder 按必需/可选判 503 / 降级。</p>
+     */
+    private static ContextSourceReader reader(SourceFace... faces) {
+        Map<String, SourceFace> byId = new LinkedHashMap<>();
+        for (SourceFace f : faces) {
+            byId.put(f.sourceId(), f);
+        }
         return new ContextSourceReader() {
             @Override
             public boolean supports(String sourceType) {
-                return true; // 归组按 owned sourceId（见 read 内判定）
+                return true;
             }
 
             @Override
             public SourceReadResult read(ContextBuildRequest request, ContextSourceRef ref) {
-                if (!ownedSources.contains(ref.getSourceId())) {
-                    // 非本 reader 服务面：视为面向未接线，交由 Builder 判 503/降级
+                SourceFace face = byId.get(ref.getSourceId());
+                if (face == null) {
                     return null;
                 }
-                if (facts.length == 0 && version == null) {
+                if (face.readFails()) {
                     throw new ContextReadException(ref.getSourceType(), ref.getSourceId(), "模拟下游 503");
                 }
                 SourceReadResult r = new SourceReadResult();
-                r.setVersion(version);
+                r.setVersion(face.version());
                 r.setAsOfTime(AS_OF);
-                r.setAuthoritative(authoritative);
+                r.setAuthoritative(face.authoritative());
                 r.setFreshness("CURRENT");
-                r.getFacts().addAll(List.of(facts));
+                r.getFacts().addAll(List.of(face.facts()));
                 return r;
             }
         };

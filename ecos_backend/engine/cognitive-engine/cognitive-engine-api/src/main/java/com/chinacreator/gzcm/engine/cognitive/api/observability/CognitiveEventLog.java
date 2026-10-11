@@ -99,8 +99,14 @@ public final class CognitiveEventLog {
         if (CognitiveErrorCode.E400_MIND_NOT_ON_SCENARIO.equals(errorCode)
                 || CognitiveErrorCode.E400_MIND_NOT_FOUND.equals(errorCode)
                 || CognitiveErrorCode.E400_INVALID_PARAM.equals(errorCode)
+                || CognitiveErrorCode.E400_SOURCE_REF_MISSING.equals(errorCode)
+                || CognitiveErrorCode.E400_OUTCOME_INVALID.equals(errorCode)
                 || CognitiveErrorCode.E403_CLEARANCE.equals(errorCode)
-                || CognitiveErrorCode.E404_SCENARIO.equals(errorCode)) {
+                || CognitiveErrorCode.E403_SOURCE_DENIED.equals(errorCode)
+                || CognitiveErrorCode.E404_SCENARIO.equals(errorCode)
+                || CognitiveErrorCode.E404_OUTCOME.equals(errorCode)
+                || CognitiveErrorCode.E422_GAPS_BLOCKER_OPEN.equals(errorCode)
+                || CognitiveErrorCode.E422_CONFLICT_UNRESOLVED.equals(errorCode)) {
             return Result.DENY;
         }
         return null;

@@ -100,4 +100,31 @@ public class HypothesisDao extends JdbcTemplateDaoSupport {
             "WHERE id = ? AND is_deleted = 0",
             lifecycleState, operator, id);
     }
+
+    // ── 《认知域与智能域补充详细设计 v1.0》§9 增量（只增不改上方既有方法）──
+
+    /**
+     * 按指标引用批量取假设（§9.2 步骤 5「关联当时使用的 Hypothesis」）。
+     *
+     * <p>只读、显式列清单（IR04）、{@code LIMIT 200} 有界（禁无界扫描）。
+     * 空入参直接返回空列表，禁拼出 {@code IN ()} 非法 SQL。</p>
+     */
+    public List<Map<String, Object>> listByMetricRefs(List<String> metricRefs) {
+        if (metricRefs == null || metricRefs.isEmpty()) {
+            return List.of();
+        }
+        List<String> distinct = metricRefs.stream()
+                .filter(m -> m != null && !m.isBlank())
+                .distinct()
+                .toList();
+        if (distinct.isEmpty()) {
+            return List.of();
+        }
+        String placeholders = String.join(",", java.util.Collections.nCopies(distinct.size(), "?"));
+        return jdbcTemplate.queryForList(
+            "SELECT " + HYPOTHESIS_COLUMNS + " FROM ecos_cognitive_hypothesis " +
+            "WHERE is_deleted = 0 AND metric_ref IN (" + placeholders + ") " +
+            "ORDER BY update_time DESC, id LIMIT 200",
+            distinct.toArray());
+    }
 }

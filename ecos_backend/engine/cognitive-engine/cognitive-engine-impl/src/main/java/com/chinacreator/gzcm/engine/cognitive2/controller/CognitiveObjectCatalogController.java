@@ -26,8 +26,8 @@ import java.util.List;
  * （prediction 只经 data-engine 唯一写通道、decision_basis 对 W 只读）。</p>
  *
  * <p><b>三滤波器（铁律 §1.2）核对</b>：类前缀复用既有 {@code /api/v1/cognitive}
- * （VersionPrefixRewriteFilter 对该前缀 KEEP，无新增映射条目 ⇒ 不触
- * {@code RouteManifestParityTest} 的 23 条基线）；未在 {@code AnonymousEndpointRegistry}
+ * （VersionPrefixRewriteFilter 对该前缀 KEEP，无新增映射条目 ⇒ 不影响
+ * {@code RouteManifestParityTest} 的重写表条数基线）；未在 {@code AnonymousEndpointRegistry}
  * 登记 ⇒ 落 {@code SecurityConfig} 的 {@code anyRequest().authenticated()}（默认非匿名），
  * ClearanceInterceptor 经 {@code /api/v1/} 规则要求 L1；
  * 错误矩阵由 {@code CognitiveErrorAdvice}（basePackages 含本包）承接。</p>

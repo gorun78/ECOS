@@ -285,7 +285,7 @@ public class CognitiveBeliefService {
         }
         vo.setVersion(row.get("version") instanceof Number n ? n.intValue() : 1);
         vo.setSnapshotVersion(row.get("snapshot_version") instanceof Number n ? n.intValue() : null);
-        vo.setManualOverride((Boolean) row.get("manualOverride"));
+        vo.setManualOverride(Boolean.TRUE.equals(row.get("manualOverride")));
         vo.setOverrideReason(evidenceStore.fieldString(row, "override_reason"));
         vo.setLastEvidenceId(evidenceStore.fieldString(row, "last_evidence_id"));
         vo.setStatus(evidenceStore.fieldString(row, "status"));

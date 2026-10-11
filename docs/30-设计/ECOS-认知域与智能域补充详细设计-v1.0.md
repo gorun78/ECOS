@@ -1162,7 +1162,7 @@ OCR/ASR 输出应包含可追溯的页码、时间戳或文本区间，便于后
 ## 19. 实施落地记录（2026-10-10 批次，§15 批次 A~E 首轮）
 
 > 本节为实施回写（R10：不新起平行文档；§17 回写清单的增量落点）。
-> 口径纪律沿用 §0.2：<b>代码交付 ≠ 库侧实跑 ≠ 验收通过</b>；DDL 仅落迁移脚本文件（`docs/50-db_script/02-flyway-migration/gateway/` V267~V273），**未对 ecos-postgres 实跑**（IR02 实跑属未授权项，需逐项再确认）；测试以”已交付冻结测试类、主仓统一 `mvn` 门禁运行”记录，运行证据以门禁报告为准。
+> 口径纪律沿用 §0.2：<b>代码交付 ≠ 库侧实跑 ≠ 验收通过</b>；DDL 仅落迁移脚本文件（`docs/50-db_script/02-flyway-migration/gateway/` V267~V274），**未对 ecos-postgres 实跑**（IR02 实跑属未授权项，需逐项再确认）；测试运行证据已于 **2026-10-11 逐模块 `mvn` 实跑取回**（首轮 2026-10-10 提交以 `-DskipTests` 通过、把「测试类已建」当成「测试已跑」记录，属假真值，本轮订正，见 §19.4/§19.6）。
 
 ### 19.1 契约与事件单源（§15 批次 A）
 
@@ -1174,7 +1174,7 @@ OCR/ASR 输出应包含可追溯的页码、时间戳或文本区间，便于后
 | 错误码增量：来源引用缺失 / 权限拒绝 / 状态非法 / 版本失配 / BLOCKER 缺口未关 / 语义冲突 / 依赖不可用 / 预算耗尽 | `CognitiveErrorCode.java`（append-only，冻结字面量） | §13.1 |
 | OpenAPI 单源（12 端点 + 2 逻辑事件 + trace 维度） | `docs/30-设计/openapi/supplementary-cognitive-ai-v1.yaml` | §13 / §12.2 / P-5 |
 
-### 19.2 DDL（V267~V273，仅文件，未实跑）
+### 19.2 DDL（V267~V274，仅文件，未实跑）
 
 | 版本 | 对象 | 要点 |
 |---|---|---|
@@ -1185,6 +1185,7 @@ OCR/ASR 输出应包含可追溯的页码、时间戳或文本区间，便于后
 | V271 | `workspace.ecos_scenario_blueprint` | §6 蓝图权威载体（workspace 属主；发布不可变；ai/cognitive 禁复制副本） |
 | V272 | `ecos_data.ecos_data_governance_candidate` | §7 数据治理候选（候选态 ≠ 正式资产；幂等键唯一） |
 | V273 | `ecos_ontology.ecos_ontology_candidate` | §7.3 本体候选（发布只经既有 proposals 流；AI 禁直发） |
+| V274 | `ecos_cognitive.ecos_cognitive_outcome_evaluation` 追加 3 列 + 唯一索引 | §9.5 幂等（`idempotency_key` 同租户唯一，空键不参与约束）；`blockers_text` 承载 §9.4 七情形回显；`caliber_alignment` 承载口径对齐结论（ALIGNED/MISMATCH:/UNCONFIRMED:）。同样仅落文件，未实跑 |
 
 ### 19.3 模块实现归属（批次 B~E）
 
@@ -1192,21 +1193,34 @@ OCR/ASR 输出应包含可追溯的页码、时间戳或文本区间，便于后
 |---|---|---|---|
 | B | cognitive-engine | Context Builder（§5 十步组装 + 失败语义五态 + contextDigest 可复现） | 代码交付，见 §19.4 |
 | B | cognitive-engine | 认知资产目录/解析/提案（§8；proposal 不改生产行）+ Belief 置信写入守卫 | 代码交付 |
-| B | workspace | 场景蓝图状态机（15 态，DRAFT 禁直进 ACTIVE）+ 六道发布门槛 + 版本不可变 | 代码交付 |
+| B | workspace | 场景蓝图状态机（**16 态** = 11 主链 + 5 异常/回退，`BlueprintStatus` 实测；DRAFT 禁直进 ACTIVE）+ §6.6 发布门槛（四道静态验收：BLOCKER 缺口/必需依赖/必需能力/P0 测试 → 审批链齐 → 发布不可变） | 代码交付，见 §19.4（首轮「15 态 / 六道门槛」为凭印象计数，2026-10-11 按枚举与校验器实测订正） |
 | C | data-engine | 数据治理候选面（profile/candidates/preview/approve；GENERATED/VALIDATED≠APPROVED） | 代码交付 |
-| C | ontology-engine | 本体候选面 + 接既有 proposals 流（无直接 publish 路径） | 代码交付 |
+| C | ontology-engine | 本体候选面 + 接既有 proposals 流（无直接 publish 路径） | 代码交付（**2026-10-11 补齐轮**：首轮 §19.3 记"代码交付"为假 —— 该面当时实为零文件，本轮建成 `governance/dto/OntologyCandidateCreateDTO` + `governance/OntologyCandidateService` + `governance/dao/OntologyCandidateDao` + `controller/OntologyCandidateController`（14 端点，§7.3/§7.4/§7.5），并过 ontology ArchUnit 铁幕：禁 import 他引擎包、置信归一在 ontology 侧私有复刻） |
 | D | ai-engine | 能力目录/路由/执行/异步任务（§10；未接供应商能力显式不可用，禁伪数据）+ Tool Contract §11 字段 | 代码交付 |
-| E | cognitive-engine | W→D 结果评估（§9 十步骨架；7 种禁自更新情形 fail-loud）+ TraceDimensions 常量类（§12.2） | 代码交付 |
+| E | cognitive-engine | W→D 结果评估（§9 十步骨架；7 种禁自更新情形 fail-loud）+ TraceDimensions 常量类（§12.2） | 代码交付（**2026-10-11 补齐轮**：首轮同为假 —— 本轮建成 `api/outcome/` 契约十件 + `cognitive2/service/outcome/`（`OutcomeEvaluateService`/`OutcomeGuardEvaluator`/`DeterministicErrorCalculator`/`OutcomeMetricValueReader` 接缝）+ `dao/OutcomeEvaluationDao` + `controller/OutcomeEvaluateController` + V274；`runtime/common-api` `com.chinacreator.gzcm.common.trace.TraceDimensions` 单源（**15 个常量** = §12.2 的 14 项，其中 `modelRef`/`modelVersion` 分列两枚；2026-10-11 按文件实测订正，原记「14 维」系按文档条目数计） | |
 
 ### 19.4 验收矩阵（§16）运行面
 
-- 冻结测试类随各模块代码同步交付（类名以仓内实测为准；`SUP-GOV-01/02` 架构面复用既有 ArchUnit 守卫，本批次只增业务测试，不改既有守卫基线）。
-- 测试运行 = 主仓 `mvn` 门禁统一执行；**本批次提交前未逐类实跑的，一律记「未执行」**，不以「测试类已建」替代运行证据。
-- live 集成/E2E 项（SUP-CTX-02 安全集成、SUP-BP-03 端到端回链、SUP-OUT-02 端到端复算、SUP-GOV-01 故障注入）随库侧实跑授权后执行，记「未执行（待实跑授权）」。
+**2026-10-11 补实跑轮：本批次冻结测试类首次真实执行。** 命令口径 = `mvn -o -pl <module> test`（离线、串行、单模块，模块已 install 故无 `-am`），判绿以 surefire 汇总行 + `target/surefire-reports/*.txt` 为权威，日志留 `_win_tasks/logs/`：
+
+| 模块 | 实跑 Tests run / Failures / Errors / Skipped | 本批次冻结测试类用例数 | 日志文件 |
+|---|---|---|---|
+| `engine/cognitive-engine/cognitive-engine-impl` | **311 / 0 / 0 / 0** | `ContextBuilderServiceTest` 14、`ContextPackContractTest` 8、`CognitiveAssetLifecycleTest` 21、`BeliefProbabilityKindGuardTest` 8、`OutcomeEvaluateServiceTest` 9、`DeterministicErrorCalculatorTest` 11 = **71** | `cog-impl-test-r5.log` → 收尾复跑 `ai-cog-test-r2.log` |
+| `workspace/workspace-impl` | **116 / 0 / 0 / 0** | `BlueprintStatusMachineTest` 7、`ScenarioBlueprintServiceTest` 10 = **17** | `ws-test-r2.log` |
+| `engine/data-engine/data-engine-impl` | **387 / 0 / 0 / 1** | `DataGovernanceCandidateServiceTest` 11 = **11** | `data-test.log` |
+| `engine/ontology-engine/ontology-engine-impl` | **104 / 0 / 0 / 0** | `OntologyCandidateServiceTest` 11 = **11** | `onto-test.log` |
+| `engine/ai-engine/ai-engine-impl` | **196 / 0 / 0 / 0** | `ModelCapabilityExecutorTest` 6、`CapabilityTaskLedgerTest` 6、`CapabilityConfidenceCalibrationTest` 5 = **17** | `ai-test.log` → 收尾复跑 `ai-cog-test-r2.log`（夹具假 host 改动后复验） |
+| `runtime/common-api` + `runtime/runtime-core` | **35 / 0 / 0 / 0** + **10 / 0 / 0 / 0** | `TraceDimensions` 契约面随 common-api 门禁 | `runtime-test-r2.log` |
+| `gateway`（全仓门禁汇总） | **126 / 0 / 0 / 4** | 路由单源/文档真实性/LLM 唯一出口/ArchUnit 铁幕 | `gw-test-r2.log`（首跑 `gw-test-r1.log` 5 FAIL，见 §19.6） |
+
+- 本批次冻结测试类用例合计 **127**，实跑全绿（0 failures / 0 errors）。`SUP-GOV-01/02` 架构面复用既有 ArchUnit 守卫（`NoDirectScheduler`、`EndpointResolverUsageArchTest`、`CrossEngineEndpointArchTest`），本批次只增业务测试，未放宽任何既有守卫。
+- 两条 skipped 属**环境/上游前置未满足**、非本批次缺陷，如实记录：data-engine 1 skip = `data.quality.service.IncompleteContextUnknownScoreTest` 的 `@Disabled` 行为占位（等 F02-09/W58 的 `DqCheckExecuteResult` + `INCONCLUSIVE` sentinel 落地，与本设计无关）；gateway 4 skip = `arch.ComposePublicSqlGateLintTest`、`arch.PublicSqlRegressionTest`、`f0209.ScoringContextHydrationTest`、`f0214.PublicSqlRegressionTest` 四条 `assumeTrue` 实库/实容器门。
+- live 集成/E2E 项（SUP-CTX-02 安全集成、SUP-BP-03 端到端回链、SUP-OUT-02 端到端复算、SUP-GOV-01 故障注入）仍记「**未执行（待实跑授权）**」——单测绿不等于这些项通过。
+- 口径订正：2026-10-10 首轮提交以 `-DskipTests` 通过并写「测试类已交付，运行证据以门禁报告为准」，实际当时**无任何门禁报告**，属假真值；自本节起，「测试绿」的声明必须有对应日志文件与 surefire 汇总行支撑。
 
 ### 19.5 验收矩阵（§16）→ 代码/测试落点登记
 
-> 测试类名为本批次代码交付的**目标名**（最终以仓内实测为准）；运行证据以主仓 `mvn` 门禁报告为准，未实跑一律记「未执行」。
+> 下表测试类名已于 **2026-10-11 按仓内实测逐条核对为实存文件**（原记为「目标名」，其中 `CapabilityTaskServiceTest` 系不存在的载体名，已订正，见 SUP-GOV-02 行）。实跑用例数（同日期 `mvn` 门禁 surefire 汇总，证据见 §19.4）：`ContextBuilderServiceTest` 14 · `ContextPackContractTest` 8 · `CognitiveAssetLifecycleTest` 21 · `BeliefProbabilityKindGuardTest` 8 · `OutcomeEvaluateServiceTest` 9 · `DeterministicErrorCalculatorTest` 11 · `BlueprintStatusMachineTest` 7 · `ScenarioBlueprintServiceTest` 10 · `DataGovernanceCandidateServiceTest` 11 · `OntologyCandidateServiceTest` 11 · `ModelCapabilityExecutorTest` 6 · `CapabilityTaskLedgerTest` 6 · `CapabilityConfidenceCalibrationTest` 5 = **127 用例全绿**。
 
 | SUP ID | 落点（模块 · 测试类/载体） | 覆盖的通过标准 |
 |---|---|---|
@@ -1214,24 +1228,24 @@ OCR/ASR 输出应包含可追溯的页码、时间戳或文本区间，便于后
 | SUP-CTX-02 | cognitive-engine · `ContextBuilderServiceTest`（权限 DENY 分支）+ 既有 RLS/CLS 门禁 | 未授权不入 Pack/模型输入，fail-closed |
 | SUP-CTX-03 | cognitive-engine · `ContextBuilderServiceTest`（503/403/409/422 分码 + 无伪空断言） | 空集/404/403/503 语义不混淆 |
 | SUP-BP-01 | workspace · `BlueprintStatusMachineTest`（DRAFT→ACTIVE 拒 / 非法 409） | 非法迁移返 409 态不变 |
-| SUP-BP-02 | workspace · `ScenarioBlueprintServiceTest`（validate 六门缺一拒 / release 门槛） | 依赖+P0 测试+审批全满足才发布 |
+| SUP-BP-02 | workspace · `ScenarioBlueprintServiceTest`（10 用例；validate **四道**静态门槛缺一即 `passed=false`：BLOCKER 缺口 / 必需依赖 / 必需能力 / P0 测试，原记「六门」系凭印象计数，2026-10-11 按 `ScenarioBlueprintValidator` 实测订正）+ release 审批链门槛 | 依赖+P0 测试+审批全满足才发布 |
 | SUP-BP-03 | workspace · V271 `context_digest`/`artifact_digest` 列 + `ScenarioBlueprintServiceTest`（回链断言，端到端 live 记未执行） | 运行回链蓝图版本/Digest/输入快照 |
 | SUP-DATA-01 | data-engine · `DataGovernanceCandidateServiceTest`（preview 不触正式表 mock） | 预览前后正式版本/水位线/行数无变化 |
 | SUP-DATA-02 | data-engine · 既有 ToolExecutor 咽喉 + `DataGovernanceCandidateServiceTest`（APPLY 过裁决） | 绕过咽喉被 ArchTest 拦截 |
 | SUP-ONTO-01 | ontology-engine · `OntologyCandidateServiceTest`（缺证据/未解冲突禁提提案） | 候选必带证据+兼容性 |
 | SUP-ONTO-02 | ontology-engine · `OntologyCandidateServiceTest`（无直接 publish 路径断言；发布只走 proposals 链） | AI 无权直发正式本体 |
 | SUP-COG-01 | cognitive-engine · `CognitiveAssetLifecycleTest`（11 类目录载体/引用态无双轨） | 11 对象唯一载体或明确引用态 |
-| SUP-COG-02 | cognitive-engine · `BeliefProbabilityKindGuardTest`（UNCALIBRATED 禁写 probability） | 金额/概率写路径被拒 |
+| SUP-COG-02 | cognitive-engine · `BeliefProbabilityKindGuardTest`（UNCALIBRATED 禁写 probability）+ `CognitiveAssetLifecycleTest`（同族写路径；本批次按生产真值订正：UNCALIBRATED 族经 `BeliefLifecycleGateway.guard` 抛 `CognitiveGuardException`→400，kind 缺失路径仍抛 `BusinessException`，两路异常型不同，原断言统一按 BusinessException 记为假绿已修） | 金额/概率写路径被拒 |
 | SUP-COG-03 | cognitive-engine · `CognitiveAssetLifecycleTest`（proposal 不改原行 / 无批准提案状态不变） | 运行态推理不自动沉淀 |
 | SUP-COG-04 | cognitive-engine · `CognitiveAssetLifecycleTest`（resolve 只读 / Decision Basis 单写权威镜像未定性不开放双写） | Agent 只读引用 |
 | SUP-OUT-01 | cognitive-engine · `OutcomeEvaluateServiceTest`（单次偏差只产候选，mock 断言 0 生产写） | 评估前后生产版本不变 |
 | SUP-OUT-02 | cognitive-engine · `DeterministicErrorCalculatorTest`（BigDecimal 精确复算，端到端 live 记未执行） | 贡献合计与总差额容差内一致 |
-| SUP-MODEL-01 | ai-engine · `AiCapabilityCatalogTest` + `ModelCapabilityRouterTest`（按 CapabilityId 路由，不硬编码 provider） | OCR/ASR/图像理解经能力 ID |
-| SUP-MODEL-02 | ai-engine · `CapabilityTaskServiceTest` + V269 台账列（modelRef/version/latency/cost/trace） | 版本/延迟/成本/错误率可追踪 |
-| SUP-MODEL-03 | ai-engine · `CapabilityTaskServiceTest`（quality.kind 未校准默认 calibrated=false） | 未校准置信度不冒充概率 |
+| SUP-MODEL-01 | ai-engine · `ModelCapabilityExecutorTest`（按 CapabilityId 路由 + 未接能力显式 FAILED 无伪造输出；原名 `ModelCapabilityRouterTest` 作废 -- 生产类为 `ModelCapabilityExecutor`，目录面断言并入本类） | OCR/ASR/图像理解经能力 ID |
+| SUP-MODEL-02 | ai-engine · `CapabilityTaskLedgerTest`（原名 `CapabilityTaskServiceTest` 作废 -- 生产无同名类，台账写入在 `ModelCapabilityExecutor` 私有落账路径）+ V269 台账列（modelRef/version/latency/cost/trace） | 版本/延迟/成本/错误率可追踪 |
+| SUP-MODEL-03 | ai-engine · `CapabilityConfidenceCalibrationTest`（原名 `CapabilityTaskServiceTest` 作废；quality.kind 未校准默认 calibrated=false，台账列同步落 0） | 未校准置信度不冒充概率 |
 | SUP-FEEDBACK-01 | 各模块 · 四层指标复用既有可观测性（C.7 事件日志面 + §12.1 指标目录已定义）；端到端仪表/报告查询 live 记「未执行（需实跑+前端）」 | 数据/认知/场景/业务指标可查定义与来源 |
 | SUP-GOV-01 | data-engine/ai-engine · fail-closed 分支（安全服务超时/无策略/无凭证 → DENY）复用既有 ArchUnit 安全卡 | 所有写操作 fail-closed |
-| SUP-GOV-02 | ai-engine · `CapabilityTaskServiceTest`（异步走 runtime-task）+ 既有 NoDirectScheduler ArchTest | 无新增私有调度器/裸线程 |
+| SUP-GOV-02 | ai-engine · `CapabilityTaskLedgerTest#asyncSubmitOnlyGoesThroughInjectedRuntimeTask` + `#submitWithoutRuntimeTaskFailsExplicitly`（**载体名订正**：原登 `CapabilityTaskServiceTest` 仓内零实存，SUP-MODEL-02/03 两行已订正但本行漏改，2026-10-11 实测补齐）+ 既有 NoDirectScheduler ArchTest | 无新增私有调度器/裸线程 |
 | SUP-GOV-03 | `docs/30-设计/openapi/supplementary-cognitive-ai-v1.yaml` + 各 ApiPaths 单源（12 端点 operationId 齐） | 新增 API 均有 operationId 与契约校验 |
 
 ### 19.6 未决项（下沉后续批次，不冒充完成）
@@ -1240,3 +1254,22 @@ OCR/ASR 输出应包含可追溯的页码、时间戳或文本区间，便于后
 2. `ecos_cognitive` 既有 `ecos_decision*`（V103/V151）双镜像权威复核：沿用详设-05 R-13 ① 口径，本批次未重新裁定。
 3. 年度经营预测首场景（§15.2 批次 B 全端到端 / 详设-09 接缝）：随 V267~V273 实跑授权 + 详设-09/10 在途批次收敛后执行。
 4. 前端面（蓝图向导/候选评审/能力盘）：本批次不涉前端改动，随场景工作台 UI 批次落（F07 族后续）。
+5. **非本设计文档遗留（真跑门禁暴露，2026-10-11）**：ai-engine `ToolExecutorService:89` 硬编码 `http://localhost:18090` 场景 base-url，属详设-06 F06-11（commit 4940048c，2026-10-09）存量，命中 F02-15 两态寻址单源门禁 FAIL。此前各批次均 `-DskipTests` 提交，该门禁从未实跑，故长期未被发现。本轮按门禁自身规定的路径登记豁免基线（data-engine `EndpointResolverUsageArchTest` + gateway `CrossEngineEndpointArchTest` 两份，条目均注明来源 commit 与归属批次），**未做实质收口**；收口 = 改走 runtime-access `ServiceEndpointResolver`，完成后须从两份基线同步删除。本设计文档批次不代他域还债。
+6. **2026-10-11 首轮真跑抓出的历史缺陷清单**（此前均因 `-DskipTests` 提交而从未暴露；本轮已全部消化，除注明者）：
+
+| # | 缺陷 | 归属批次 | 本轮处置 |
+|---|---|---|---|
+| 1 | ai-engine `ToolExecutorService:89` 硬编码场景 base-url，违反两态寻址单源 | 详设-06 F06-11（4940048c） | 登记两份豁免基线（见上条），实质收口另批（本文件 #161） |
+| 2 | 认知域 `CognitiveBeliefService.toVo:288` 对可空 `Boolean` 直接拆箱 → 存量 NULL 行 NPE | 补充设计 v1.0 §8.3 首轮 | 改 `Boolean.TRUE.equals(...)`，随 cognitive 311 绿 |
+| 3 | ai-engine 包分层违例 + `ArchitectureTest` 宇宙基线缺 `OutcomeMetricValueReader` | 补充设计 v1.0 §9 首轮 | allow-list 追加并注理由 |
+| 4 | 认知域 DDL 白名单门禁 FAIL：V267 未登记 | 补充设计 v1.0 批次 A | 按 PRD-05 §6.1 规格 3 补登 |
+| 5 | `ContextBuilderServiceTest` 5 项失败/错误（装配与生产 SPI 按 `sourceType` 路由 + `findFirst()` 模型不符；读失败夹具条件永不成立；400/503 用例预置后置步骤桩 → `UnnecessaryStubbing`） | 补充设计 v1.0 §5 首轮（从未实跑） | 改测试装配（face-based 单 reader + `failingFace` + 删必要前的桩位），14/14 绿；**未动生产语义与 API DTO** |
+| 6 | `ScenarioBlueprintServiceTest` `InvalidUseOfMatchersException`：`verify(never())` 内裸值与 `anyString()` 混用 | 补充设计 v1.0 §6 首轮（从未实跑） | `never()` 面统一改 `any()`（`anyString()` 不匹配 null 实参会让「0 次写」断言**假绿**），116 绿 |
+| 7 | `AgentProviderControllerTest` 夹具硬编码 LLM 供应商端点字面量，命中 F00-07 唯一出口门禁 | 补充设计 v1.0 §10 首轮 | 换假 host `https://provider-base-url.from-config/v1`（该值原从未被断言，用例强度不变） |
+| 8 | 路由重写表条数基线漂移：测试/AGENTS.md 记 23（正向 10 + 反向 13），源码实为 **25**（反向 15） | 详设-10 R1-A（卷 10 §5.1/W252/R-43 的 `/api/wagent` + `/api/wagent/` 两条反向条目，`-DskipTests` 提交） | 按门禁「只严不松 + 登记来源批次」口径订正常量/文案并注归属；`route-rewrite-lint.ps1` 同步实跑为 `denominator=25 fail=6`（新增 2 条 FAIL-R4 = wagent 反向前缀尚无 Controller），AGENTS.md 基线文案同步 |
+| 9 | `ModuleDocTruthfulnessTest` Controller 计数基线 33，实测 37 | 本批 +1（§10 `AiCapabilityController`）、详设-10 R2-A +3（`WAgentRun/Question/Goal`） | 计数经 `git ls-tree` 两时点独立实测（9e4833dd=36 / 工作树=37）后订正常量并注归属；ai impl AGENTS.md 无数字声明，无需改文档 |
+
+
+---
+
+**版本记录**：v1.0（编制 2026-10-09）· §19 实施回写首轮 2026-10-10 · **订正轮 2026-10-11** —— §19.2 DDL 区间订正为 V267~V274；§19.4 回写各模块 `mvn` 实跑 surefire 汇总与日志文件（本批次冻结测试类 127 用例全绿，gateway 门禁 126/0/0/4skip）；§19.5 载体名逐条核对为实存文件并订正 SUP-GOV-02；§19.6 新增第 6 条真跑抓出的历史缺陷清单（9 项，含 2 项另批收口）。首轮的「测试类已交付 = 记录为已运行」口径作废。

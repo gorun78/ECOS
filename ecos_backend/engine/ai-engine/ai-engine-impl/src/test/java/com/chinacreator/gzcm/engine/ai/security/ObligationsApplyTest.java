@@ -94,7 +94,12 @@ class ObligationsApplyTest {
             "AgentToolPolicyGate.java",      // maskLiterals：SQL 字面量归一，非数据脱敏
             "GuardrailsServiceImpl.java",    // 片段定位 + 委托 security
             "ToolExecutorService.java",      // 仅注释提及 mask[] 义务
-            "AgentLoopService.java"          // 仅变量名 masked（承载 security 返回值）
+            "AgentLoopService.java",         // 仅变量名 masked（承载 security 返回值）
+            // 2026-10-11 实跑本门禁（历史各批 -DskipTests 从未执行）登记两条 wagent 面：
+            // 二者只引用 PolicyEffect.ALLOW_WITH_MASK 枚举名作裁决效果判定，零本地脱敏算法
+            // （algorithmHits 断言在同用例内已单独校验），符合 §2.4-7「只点名不实现」口径。
+            "WAgentEnums.java",              // PolicyEffect 四值单源：allow_with_mask 枚举字面量
+            "WAgentPolicyGuardPort.java"     // 依据 PolicyEffect 判定放行，不执行脱敏
     );
 
     // ── 验收 1：脱敏义务在结果回 LLM 之前生效 ────────────────────────────────

@@ -6,6 +6,7 @@ import com.chinacreator.gzcm.engine.cognitive2.service.scenario.CognitiveGuardEx
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,7 +22,13 @@ import java.util.Map;
  *
  * <p>F05-07 #4：{@code e.getMessage()} 只入日志 + traceId，禁直入响应体。响应 message 一律
  * 取 {@link CognitiveErrorCode#MSG_*} 冻结字面量。</p>
+ *
+ * <p>2026-10-11 契约核验实修：gateway 宿主内两个 advice 均默认最低优先级时，扫描顺序使
+ * {@code gateway.GlobalExceptionHandler} 抢先命中，ECOS-COG-* 矩阵被折叠成 ECOS-SYS-500。
+ * 对齐同域既有 {@code ContextBuildErrorAdvice#Order(1)} 先例，本 advice 显式 {@code @Order(1)}
+ * 保证局部优先（异常类型互不覆盖，不改任何端点签名）。</p>
  */
+@Order(1)
 @RestControllerAdvice(basePackages = {"com.chinacreator.gzcm.engine.cognitive2.controller.scenario",
         "com.chinacreator.gzcm.engine.cognitive2.controller"})
 public class CognitiveErrorAdvice {

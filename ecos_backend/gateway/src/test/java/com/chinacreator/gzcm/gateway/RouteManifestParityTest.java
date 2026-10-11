@@ -20,8 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * M1 W43/W53-adjacent data domain (详细设计-02 C.2.1 路由单源 / D-3 五套前缀并活) —
  * 路由重写表与 {@code route-rewrite-lint.ps1} 的 parity 门禁。
  *
- * <p><b>单源自洽性</b>：{@code route-rewrite-lint.ps1}（AGENTS.md 基线，23 条 = 正向 10
- * + 反向 13）是重写表漂移的权威校验器，其消费对象就是
+ * <p><b>单源自洽性</b>：{@code route-rewrite-lint.ps1}（AGENTS.md 基线，现 25 条 = 正向 10
+ * + 反向 15，见 {@link #REVERSE_BASELINE} 的漂移登记）是重写表漂移的权威校验器，其消费对象就是
  * {@code VersionPrefixRewriteFilter} 的三张 Map
  * （{@code V1_REWRITE_MAP} / {@code REVERSE_EXACT_MAP} / {@code REVERSE_PREFIX_MAP}），
  * 用同一条 {@code Map.entry} 正则解析。本测试与 lint 共用同一单源，防止两表各自漂移。
@@ -29,10 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>断言</b>：
  * <ol>
  *   <li>从 filter 解析出的操作路径（三张 Map 的 {@code Map.entry} source 键）集合
- *       = 23（正向 10 + 反向 13）。</li>
+ *       = 25（正向 10 + 反向 15）。</li>
  *   <li>{@code route-rewrite-lint.ps1} 引用的三张 Map 块名、filter 文件路径、
  *       {@code Map.entry} 解析器与本测试完全同源。</li>
- *   <li>两种独立解析法（分块扫描 vs 全文件扫描）得到同一个 23 集合。</li>
+ *   <li>两种独立解析法（分块扫描 vs 全文件扫描）得到同一个 25 集合。</li>
  * </ol>
  *
  * <p>纯源码/JSON 扫描，不启动 Spring。
@@ -50,8 +50,14 @@ class RouteManifestParityTest {
             "ecos_backend/gateway/src/main/resources/route-manifest.json";
 
     private static final int FORWARD_BASELINE = 10;
-    private static final int REVERSE_BASELINE = 13;
-    private static final int TOTAL_BASELINE = 23;
+    /**
+     * 反向重写条目基线。13 → 15 的增量来自详设-10 R1-A 批次（卷 10 §5.1 / W252 / R-43）
+     * 为 wagent 双路径登记的两条反向条目（{@code /api/wagent} 精确根形态 +
+     * {@code /api/wagent/} 前缀形态）。该批次以 {@code -DskipTests} 提交，本门禁从未实跑，
+     * 漂移在 2026-10-11 补充设计批次的真跑门禁中暴露并按门禁口径订正（只增不减，判定不放宽）。
+     */
+    private static final int REVERSE_BASELINE = 15;
+    private static final int TOTAL_BASELINE = 25;
 
     private static Path repoRoot() throws IOException {
         Path p = Paths.get("").toAbsolutePath();
@@ -84,8 +90,8 @@ class RouteManifestParityTest {
     }
 
     @Test
-    @DisplayName("操作路径集合 = 正向 10 + 反向 13 = 23")
-    void rewriteOperationPathsTotal23() throws IOException {
+    @DisplayName("操作路径集合 = 正向 10 + 反向 15 = 25")
+    void rewriteOperationPathsTotal25() throws IOException {
         String src = read(repoRoot().resolve(FILTER_REL));
 
         Set<String> forward = blockKeys(src, "V1_REWRITE_MAP");
@@ -95,13 +101,13 @@ class RouteManifestParityTest {
         assertEquals(FORWARD_BASELINE, forward.size(),
                 "正向重写 source 键应 10 条，当前 " + forward.size() + " : " + forward);
         assertEquals(REVERSE_BASELINE, reverseExact.size() + reversePrefix.size(),
-                "反向重写 source 键应 13 条，当前 " + (reverseExact.size() + reversePrefix.size()));
+                "反向重写 source 键应 15 条，当前 " + (reverseExact.size() + reversePrefix.size()));
 
         Set<String> all = new LinkedHashSet<>(forward);
         all.addAll(reverseExact);
         all.addAll(reversePrefix);
         assertEquals(TOTAL_BASELINE, all.size(),
-                "AGENTS.md / route-rewrite-lint.ps1 基线 23 条 source 键，当前 " + all.size());
+                "AGENTS.md / route-rewrite-lint.ps1 基线 25 条 source 键，当前 " + all.size());
     }
 
     @Test
@@ -120,8 +126,8 @@ class RouteManifestParityTest {
         assertTrue(lint.contains("VersionPrefixRewriteFilter.java"),
                 "route-rewrite-lint.ps1 应指向 VersionPrefixRewriteFilter.java 单源");
 
-        // (3) lint 用同一条 Map.entry 解析正则 —— 两表算子同源（23 条由 AGENTS.md 基线，
-        //     本测试上方 test 以 filter 解析结果 = 23 独立断言）
+        // (3) lint 用同一条 Map.entry 解析正则 —— 两表算子同源（25 条由 AGENTS.md 基线，
+        //     本测试上方 test 以 filter 解析结果 = 25 独立断言）
         //     脚本内以 regex 字面量出现为 `Map\.entry`（PowerShell [regex] 语法），
         //     或梳妆代码中直接引用为 `Map.entry`，二者等价。
         boolean usesMapEntry = lint.contains("Map.entry") || lint.contains("Map\\.entry");
@@ -137,8 +143,8 @@ class RouteManifestParityTest {
     }
 
     @Test
-    @DisplayName("两种独立解析法得到同一 23 集合（block 扫描 vs 全文件 Map.entry 扫描，防双表漂移）")
-    void twoParseMethodsReturnSame23Set() throws IOException {
+    @DisplayName("两种独立解析法得到同一 25 集合（block 扫描 vs 全文件 Map.entry 扫描，防双表漂移）")
+    void twoParseMethodsReturnSame25Set() throws IOException {
         String src = read(repoRoot().resolve(FILTER_REL));
 
         // 解析法 A：分块（V1_REWRITE_MAP + REVERSE_* ）抓 source 键
@@ -152,10 +158,10 @@ class RouteManifestParityTest {
         Matcher m = Pattern.compile("Map\\.entry\\(\\s*\"([^\"]+)\"\\s*,\\s*\"[^\"]+\"\\s*\\)").matcher(src);
         while (m.find()) byWholeFile.add(m.group(1));
 
-        // 两种解析法必须得到同一个 23 条集合（AGENTS.md 基线；route-rewrite-lint.ps1
+        // 两种解析法必须得到同一个 25 条集合（AGENTS.md 基线；route-rewrite-lint.ps1
         // 用同样的全文件 Map.entry 正则解析，故两数组源同 = 本测试必须同集）
         assertEquals(TOTAL_BASELINE, byBlock.size(),
-                "分块解析应 23 条 source 键，当前 " + byBlock.size());
+                "分块解析应 25 条 source 键，当前 " + byBlock.size());
         assertEquals(byBlock, byWholeFile,
                 "分块扫描集合 != 全文件扫描集合（rewrite 表出现游离 Map.entry，lint 口径将漂移）");
     }

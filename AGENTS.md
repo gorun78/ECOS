@@ -43,7 +43,7 @@ mvn -f D:\workspace\javaprojects\ECOS\ecos_backend\pom.xml clean install -DskipT
 | `start-frontend.ps1` | 前端 dev 启动（缺 node_modules 先 npm install；`-Build` 走生产构建） |
 | `check-legacy-modules.ps1` | 校验 v1 遗留模块引用是否残留 |
 | `db-migration-lint.ps1` | SQL 迁移脚本 lint（schema 只加不删；实跑 15 项检查，基线 0 FAIL / 8 WARN，IR01/ST03/ST06/R9 属人工审查，脚本头部已声明） |
-| `route-rewrite-lint.ps1` | 网关路由重写表 lint（校验 `VersionPrefixRewriteFilter` 正向 10 + 反向 13 = 23 条的 target/source 是否真有 Controller 服务，并打印 permitAll 匿名面；基线 `fail=4`（存量待裁 H9-T6b）/ `EXIT=2`） |
+| `route-rewrite-lint.ps1` | 网关路由重写表 lint（校验 `VersionPrefixRewriteFilter` 正向 10 + 反向 15 = 25 条的 target/source 是否真有 Controller 服务，并打印 permitAll 匿名面；基线 `fail=6`（存量待裁 H9-T6b 4 条 + 详设-10 R1-A `/api/wagent` 反向前缀 2 条待接 WAgent Controller）/ `EXIT=2`；反向 13→15 系该批次 `-DskipTests` 未实跑门禁，2026-10-11 真跑后按实测订正，只增不减） |
 | `docs-migration.ps1` / `.sh` | docs 五类目录迁移辅助 |
 
 **Java/Maven**: 本机工具链路径不入库 — 解析顺序 `JAVA_HOME`/`MAVEN_HOME` → PATH，可在 `_win_tasks/env.local.ps1` 覆盖（已 gitignore，模板 `env.local.ps1.example`）

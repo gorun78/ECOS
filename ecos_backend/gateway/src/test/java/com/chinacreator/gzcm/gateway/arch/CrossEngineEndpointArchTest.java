@@ -54,7 +54,11 @@ class CrossEngineEndpointArchTest {
             "engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/event/EcosOntologyEventConsumer.java",
             "engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/security/KnowledgeNavSecurityEngineClient.java",
             "engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/security/SecurityEngineClient.java",
-            "engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/client/KbEngineGraphSyncClient.java"
+            "engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/client/KbEngineGraphSyncClient.java",
+            // 详设-06 F06-11（commit 4940048c, 2026-10-09）遗留 workspace(:18090) 场景 base-url 默认值；
+            // 2026-10-11 真跑 mvn test 才暴露。与 data-engine EndpointResolverUsageArchTest 同文件同口径登记，
+            // 归 design-06 收尾批次改走 ServiceEndpointResolver 后从本清单删除。
+            "engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/service/ToolExecutorService.java"
     );
 
     private static Path backendRoot() {

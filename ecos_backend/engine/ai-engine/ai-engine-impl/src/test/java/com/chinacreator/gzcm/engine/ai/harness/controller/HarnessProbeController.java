@@ -1,5 +1,6 @@
-package com.chinacreator.gzcm.engine.ai.harness;
+package com.chinacreator.gzcm.engine.ai.harness.controller;
 
+import com.chinacreator.gzcm.engine.ai.harness.MockSecurityEngineStub;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.MDC;
@@ -18,7 +19,7 @@ import java.util.Map;
  * 详细设计-06 F06-22 测试底座探针端点（P-1 契约）。
  *
  * <p>本端点<b>不在</b> API 契约范围内（路径 {@code /test/harness/**}）；
- * 用途是让 {@link AiTestHarnessSmokeTest} / {@link GatewayAbacModeTest}
+ * 用途是让 {@code AiTestHarnessSmokeTest} / {@code GatewayAbacModeTest}
  * 在 <b>同一</b> 上下文中把三态 stub 的真实返回值"透传"到 HTTP 出口，
  * 从而断言网关态与 aiming 态的 <b>ABAC 拒绝不静默跳过</b>（F06-01 四段链中
  * policyEvaluate 失败必须上浮，不是 catch→200 空体）。

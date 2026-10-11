@@ -1,4 +1,4 @@
-package com.chinacreator.gzcm.engine.ai.wagent.web;
+package com.chinacreator.gzcm.engine.ai.wagent.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
@@ -6,6 +6,7 @@ import com.chinacreator.gzcm.engine.ai.wagent.WAgentApiPaths;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentErrorCodes.WAgentErrorCode;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentRunDO;
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentOrchestrator;
+import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver.Identity;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;

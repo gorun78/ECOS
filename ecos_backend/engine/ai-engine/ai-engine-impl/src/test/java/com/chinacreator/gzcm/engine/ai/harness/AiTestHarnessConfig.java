@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.harness;
 
+import com.chinacreator.gzcm.engine.ai.harness.controller.HarnessProbeController;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

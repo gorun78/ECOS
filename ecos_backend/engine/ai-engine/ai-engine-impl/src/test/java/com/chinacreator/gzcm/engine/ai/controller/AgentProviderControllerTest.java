@@ -60,7 +60,9 @@ class AgentProviderControllerTest {
     void populatedCatalogYields200WithRealValues() {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("status", "available");
-        status.put("baseUrl", "https://api.deepseek.com/v1");
+        // 夹具用假 host：F00-07（LlmSoleEgressTest）禁止 llm-gateway 之外任何 Java 源码
+        // 出现供应商端点字面量；本用例校验的是网关探测值的透传，不是具体主机名。
+        status.put("baseUrl", "https://provider-base-url.from-config/v1");
         Map<String, Object> catalog = new LinkedHashMap<>();
         catalog.put("deepseek", status);
         catalog.put("openai", Map.of("status", "unreachable", "error", "connect refused"));

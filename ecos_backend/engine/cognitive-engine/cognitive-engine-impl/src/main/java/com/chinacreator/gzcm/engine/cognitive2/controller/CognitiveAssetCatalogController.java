@@ -46,21 +46,21 @@ public class CognitiveAssetCatalogController {
         this.lifecycleService = lifecycleService;
     }
 
-    /** GET catalog（SUP-COG-01；只读、零 SQL）。 */
-    @GetMapping(CognitiveApiPaths.ASSETS_CATALOG)
+    /** GET catalog（SUP-COG-01；只读、零 SQL）。*/
+    @GetMapping(CognitiveApiPaths.ASSETS_CATALOG_REL)
     public ApiResponse<Map<String, Object>> catalog() {
         return ApiResponse.success(lifecycleService.catalog());
     }
 
     /** GET resolve（资产引用解析；bel/hyp/mod 前缀路由，查不到 404，非法前缀 400）。 */
-    @GetMapping(CognitiveApiPaths.ASSETS_RESOLVE)
+    @GetMapping(CognitiveApiPaths.ASSETS_RESOLVE_REL)
     public ApiResponse<Map<String, Object>> resolve(
             @PathVariable(CognitiveApiPaths.PARAM_ASSET_ID) String assetId) {
         return ApiResponse.success(lifecycleService.resolve(assetId));
     }
 
     /** POST proposals（SUP-COG-03；候选 = 审计事件 + CognitiveCandidateProposed 通知，禁改原资产行）。 */
-    @PostMapping(CognitiveApiPaths.ASSETS_PROPOSALS)
+    @PostMapping(CognitiveApiPaths.ASSETS_PROPOSALS_REL)
     public ApiResponse<Map<String, Object>> propose(
             @PathVariable(CognitiveApiPaths.PARAM_ASSET_ID) String assetId,
             @RequestBody AssetProposalDTO proposal) {
@@ -75,7 +75,7 @@ public class CognitiveAssetCatalogController {
      * {@code CognitiveAssetStatusChanged}；非法迁移 ⇒ 409 {@code ECOS-COG-409S}
      * （原行不变，§13.1「业务前置条件未满足 → 409」）。
      */
-    @PostMapping(CognitiveApiPaths.ASSETS_TRANSITION)
+    @PostMapping(CognitiveApiPaths.ASSETS_TRANSITION_REL)
     public ApiResponse<Map<String, Object>> transition(
             @PathVariable(CognitiveApiPaths.PARAM_ASSET_ID) String assetId,
             @RequestBody AssetTransitionRequest request) {
