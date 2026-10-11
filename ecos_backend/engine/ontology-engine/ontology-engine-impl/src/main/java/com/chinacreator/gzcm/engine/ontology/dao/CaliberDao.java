@@ -224,4 +224,13 @@ public class CaliberDao extends JdbcTemplateDaoSupport {
             return null;
         }
     }
+
+    /**
+     * H-2 DSL 四关校验（V2/V3/V4）用：指标注册表快照（R-4 唯一语义入口
+     * {@code ecos_metric_definition}）。显式列清单（DR05 is_deleted=0 过滤，禁 SELECT *）。
+     */
+    public List<Map<String, Object>> listMetricDefinitionExpressions() {
+        return jdbcTemplate.queryForList(
+                "SELECT code, expression FROM " + schema + ".ecos_metric_definition WHERE is_deleted=0");
+    }
 }

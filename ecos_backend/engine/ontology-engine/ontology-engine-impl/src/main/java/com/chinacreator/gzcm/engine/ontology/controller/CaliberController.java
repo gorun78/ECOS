@@ -14,10 +14,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.dto.CaliberFormulaValidateDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.CaliberFormulaValidationVO;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberSaveDTO;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberVO;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberVersionSaveDTO;
 import com.chinacreator.gzcm.engine.ontology.dto.MetricBindingDTO;
+import com.chinacreator.gzcm.engine.ontology.service.CaliberFormulaDslService;
 import com.chinacreator.gzcm.engine.ontology.service.CaliberService;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 
@@ -38,6 +41,7 @@ import com.chinacreator.gzcm.sysman.iam.context.UserContext;
  *   <li>POST   /api/v1/ontology/calibers/{code}/versions/{versionNo}/approve — DRAFT/REVIEWING→APPROVED</li>
  *   <li>POST   /api/v1/ontology/calibers/{code}/versions/{versionNo}/retire — APPROVED→RETIRED</li>
  *   <li>POST   /api/v1/ontology/calibers/metrics/{metricCode}/binding — 绑定口径 + 冻结快照</li>
+ *   <li>POST   /api/v1/ontology/calibers/validate — 公式 DSL 四关校验（H-2；只校验不落库，违一即 400 且定位到符号）</li>
  * </ul>
  *
  * <p>错误码映射（规则 3 / 规则 4）：
@@ -61,9 +65,12 @@ public class CaliberController {
     private static final String CODE_INTERNAL = "ECOS-ONTO-042";
 
     private final CaliberService caliberService;
+    private final CaliberFormulaDslService caliberFormulaDslService;
 
-    public CaliberController(CaliberService caliberService) {
+    public CaliberController(CaliberService caliberService,
+                             CaliberFormulaDslService caliberFormulaDslService) {
         this.caliberService = caliberService;
+        this.caliberFormulaDslService = caliberFormulaDslService;
     }
 
     /** 口径列表（status 过滤 + limit 默认 50）。 */
@@ -242,6 +249,32 @@ public class CaliberController {
         } catch (Exception e) {
             log.error("bind metric caliber failed metric={}", metricCode, e);
             return ApiResponse.error(500, CODE_INTERNAL, "bind metric caliber failed");
+        }
+    }
+
+    /**
+     * H-2（PRD-09 §1.2 V1~V4）公式 DSL 四关校验 — <b>只校验不落库</b>（向导第 3 步预检）。
+     *
+     * <p>四关违一即 400：V1 语法（ECOS-ONTO-070）/ V2 引用闭合（071）/ V3 量纲一致（072）/
+     * V4 无循环依赖（073），message 定位到符号 {@code line/column/offset}；
+     * 指标注册表（{@code ecos_metric_definition}，R-4）读取失败 → 500 fail-closed（ECOS-ONTO-042）。</p>
+     */
+    @PostMapping("/validate")
+    public ApiResponse<CaliberFormulaValidationVO> validateFormula(@RequestBody CaliberFormulaValidateDTO dto) {
+        try {
+            CaliberFormulaValidationVO vo = caliberFormulaDslService.validate(dto);
+            if (vo.isValid()) {
+                return ApiResponse.success(vo);
+            }
+            String firstCode = vo.getViolations().isEmpty()
+                    ? CODE_BAD : vo.getViolations().get(0).getCode();
+            return ApiResponse.error(ApiResponse.CODE_BAD_REQUEST, firstCode,
+                    "caliber formula rejected: " + vo.getViolations());
+        } catch (Exception e) {
+            log.error("validate caliber formula failed code={} formula={}",
+                    dto == null ? null : dto.getCode(),
+                    dto == null ? null : dto.getFormula(), e);
+            return ApiResponse.error(500, CODE_INTERNAL, "validate caliber formula failed");
         }
     }
 
