@@ -81,23 +81,34 @@ class KnowledgeRouteIntegrityTest {
     }
 
     @Test
-    @DisplayName("dev 代理 /api/v1/knowledge 指向 kb(:18086)，而非 ai(:18084)")
+    @DisplayName("dev 代理 /api/v1/knowledge 指向 kb(:18086)，而非 ai(:18084) — 事实源为 route-manifest 单源")
     void devProxyTargetsKbPort() throws IOException {
+        // 2026-10-10 详设-08 W194/C176（R-54 ①）把 dev 代理表从 vite.config.ts 迁入
+        // config/route-manifest.ts 单源，本断言的读取面随之改到该单源；意图不变：
+        // knowledge 前缀唯一所属 kb 引擎、端口 18086、不得回落到 ai 的 18084。
         Path vite = locateRepoRoot().resolve("ecos_frontend/vite.config.ts");
         assertTrue(Files.isRegularFile(vite), "未找到前端 vite.config.ts：" + vite);
-        String text = Files.readString(vite);
-        List<String> lines = Files.readAllLines(vite);
-        boolean found = false;
-        for (String line : lines) {
-            if (line.contains("'/api/v1/knowledge'")) {
-                found = true;
-                assertTrue(line.contains("18086"),
-                        "knowledge dev 代理应指向 18086，实际行：" + line.trim());
-                assertTrue(!line.contains("18084"),
-                        "knowledge dev 代理不得仍指向 ai 的 18084，实际行：" + line.trim());
-            }
-        }
-        assertTrue(found, "vite.config.ts 未找到 '/api/v1/knowledge' 代理条目：" + text);
+        List<String> viteLines = Files.readAllLines(vite);
+        assertTrue(viteLines.stream().anyMatch(l -> l.contains("buildViteDevProxyTable")),
+                "vite.config.ts 必须由 route-manifest 派生 dev 代理表（W194 单源），实际未见 buildViteDevProxyTable");
+        assertTrue(viteLines.stream().anyMatch(l -> l.contains("config/route-manifest")),
+                "vite.config.ts 必须从 ./config/route-manifest 导入，实际未导入");
+        assertTrue(viteLines.stream().anyMatch(l -> l.contains("proxy: devProxyTable")),
+                "vite.config.ts 的 server.proxy 必须由单源派生的 devProxyTable 提供（W194 单源），实际未见");
+        assertTrue(viteLines.stream().noneMatch(l -> l.matches(".*target:\\s*.*180\\d\\d.*")),
+                "vite.config.ts 不得再手写在用服务端口 target，代理目标只准来自 route-manifest 单源");
+
+        Path manifest = locateRepoRoot().resolve("ecos_frontend/config/route-manifest.ts");
+        assertTrue(Files.isRegularFile(manifest), "未找到路由单源：" + manifest);
+        List<String> knowledgeEntries = Files.readAllLines(manifest).stream()
+                .filter(l -> l.contains("prefix: \"/api/v1/knowledge\""))
+                .toList();
+        assertEquals(1, knowledgeEntries.size(),
+                "/api/v1/knowledge 在单源里必须恰有一条（禁双写漂移），实际：" + knowledgeEntries);
+        String line = knowledgeEntries.get(0);
+        assertTrue(line.contains("engine: \"kb\""), "knowledge 前缀应归属 kb 引擎，实际行：" + line.trim());
+        assertTrue(line.contains("port: 18086"), "knowledge dev 代理应指向 18086，实际行：" + line.trim());
+        assertTrue(!line.contains("18084"), "knowledge dev 代理不得仍指向 ai 的 18084，实际行：" + line.trim());
     }
 
     @Test
