@@ -10,8 +10,9 @@ import { loginAsAdmin, call, injectAuth, watchPageHealth, expectNoErrorBoundary 
  *  - API 面：request 直连 gateway（project baseURL = ECOS_API，默认 http://localhost:8080），
  *    凭据只从 ecos-tests/.env 的 ECOS_USER/ECOS_PASS 读（helpers/ecos.ts creds()，禁写死）。
  *  - UI 面：前端 http://localhost:3000/#/（HashRouter），token 经 localStorage.token 注入
- *    （helpers injectAuth）。:3000 不可达时默认 skip；`CognitiveRightPanel` 尚未挂载到
- *    场景工作台路由（design-05 B.0 IA 归一属 M1 批次），面板缺失的 UI 用例亦 skip 并注明。
+ *    （helpers injectAuth）。:3000 不可达时默认 skip；`CognitiveRightPanel` 自 §3.8 R2
+ *    （2026-10-11 双结构收敛）起唯一挂载点 = L2 场景详情「高级/调试」子面
+ *    （#/workbench/{scenarioId}，AdvancedDebugPanel 默认展开），本组用例导航至该路由。
  *
  * 契约（后端 ScenarioCognitionController / CognitiveErrorMatrixIntegrationTest 对齐）：
  *  GET /api/v1/business/scenarios/{id}/cognition[/detect|/operation-eval|/hypotheses|/beliefs]
@@ -22,10 +23,17 @@ const COG_ENDPOINTS = ['', '/detect', '/operation-eval', '/hypotheses', '/belief
 const cogPath = (scenarioId: string, suffix = ''): string =>
   `/api/v1/business/scenarios/${encodeURIComponent(scenarioId)}/cognition${suffix}`;
 
-/** 取场景列表第一条 id（/api/v1/workspace/scenarios，与 ScenarioManagementView 同源）；无数据返回 null。 */
+/**
+ * 取场景列表第一条 id（与 ScenarioManagementView 同源）。
+ *
+ * <p>必须走前端 origin（:3000 vite proxy → workspace :18090），不能走 project baseURL（gateway :8080）：
+ * gateway 单体的 {@code GatewayApplication} 用 excludeFilter 整包排除
+ * {@code com.chinacreator.gzcm.workspace.controller}（同名 Bean 冲突裁决，workspace 端点只在 :18090 承流），
+ * 故 {@code /api/v1/workspace/scenarios} 在 :8080 恒为 404 —— 走网关会让所有 UI 用例静默 skip 成假绿。
+ */
 async function firstScenarioId(request: APIRequestContext): Promise<string | null> {
   const token = await loginAsAdmin(request);
-  const { status, json } = await call(request, 'GET', '/api/v1/workspace/scenarios', { token });
+  const { status, json } = await call(request, 'GET', `${ECOS_BASE}/api/v1/workspace/scenarios`, { token });
   if (status !== 200 || !json) return null;
   const arr = Array.isArray(json.data) ? json.data : Array.isArray(json) ? json : [];
   const hit = arr.find((x: unknown) => {
@@ -40,25 +48,29 @@ async function frontendAlive(request: APIRequestContext): Promise<boolean> {
   return !!res;
 }
 
-/** 打开场景工作台并等待认知右栏；前端离线或面板未挂载（M1 IA 归一待落地）时 skip。 */
+/** 打开 L2「高级/调试」子面并等待认知右栏（§3.8 R2 唯一下沉落点）；前端离线或无场景数据时 skip。 */
 async function openCognitionPanel(page: Page, request: APIRequestContext): Promise<void> {
   test.skip(!(await frontendAlive(request)), `前端 ${ECOS_BASE} 不可用 — UI 用例默认跳过`);
   const token = await loginAsAdmin(request);
+  const id = await firstScenarioId(request);
+  test.skip(!id, '无可用场景数据 — 无法打开 L2 场景详情认知面板');
   await injectAuth(page.context(), token);
   await watchPageHealth(page);
-  await page.goto(`${ECOS_BASE}/#/project_workbench`);
+  await page.goto(`${ECOS_BASE}/#/workbench/${encodeURIComponent(id as string)}`);
   await expectNoErrorBoundary(page);
   const panel = page.getByTestId('cognitive-right-panel');
-  test.skip(
-    (await panel.count()) === 0,
-    'CognitiveRightPanel 尚未挂载到场景工作台路由（design-05 B.0 IA 归一 = M1 批次）；挂载后本组用例自动生效',
-  );
-  await expect(panel).toBeVisible();
+  await expect(
+    panel,
+    'CognitiveRightPanel 应已挂载到 L2 高级/调试子面（§3.8 R2 迁一删一，唯一实例）',
+  ).toBeVisible({ timeout: 15_000 });
 }
 
-/** 点击右栏 Tab（文案来自 locales/scenario/zh-CN.json，injectAuth 已置 ecos_locale=zh）。 */
+/** 点击右栏 Tab（文案来自 locales/scenario/zh-CN.json，injectAuth 已置 ecos_locale=zh）。
+ *  口径修正（2026-10-11 live 实跑）：CognitiveRightPanel 遵循 design-05 B.7 WAI-ARIA Tabs 模式，
+ *  四个入口是 <button role="tab">（role 显式覆写），可访问角色为 tab 而非 button；
+ *  getByRole('button') 恒不命中，属用例侧定位器与实现契约不符，非应用缺陷。 */
 async function openTab(page: Page, label: string): Promise<void> {
-  await page.getByRole('button', { name: label, exact: true }).click();
+  await page.getByRole('tab', { name: label, exact: true }).click();
 }
 
 // ═════════════════════════ API 面（gateway :8080） ═════════════════════════
@@ -103,12 +115,15 @@ test.describe('场景认知右栏 UI（:3000，离线默认 skip）', () => {
     await openCognitionPanel(page, request);
     await openTab(page, '可用 Mind 探测');
     const panel = page.getByTestId('cognitive-right-panel');
+    // E1 空态（200 data:[] → "未绑定"文案）与降级态（503 → role=status/alert 横幅）二选一，
+    // 禁报错崩溃。断言形态修正：Playwright 的 or 组合须作用于 locator（expect(a.or(b))），
+    // `expect(a).toBeVisible().or(...)` 非法（TypeError: or is not a function，2026-10-11 live 实测）。
     await expect(
-      panel.getByText('该场景未绑定 Mind').first(),
-      'E1 空态（200 data:[]）必须渲染"未绑定"空态而非报错（B.3）',
-    ).toBeVisible({ timeout: 15_000 }).or(
-      expect(panel.locator('[role="status"], [role="alert"]').first()).toBeVisible(),
-    );
+      panel.getByText('该场景未绑定 Mind').first().or(
+        panel.locator('[role="status"], [role="alert"]').first(),
+      ),
+      'E1 空态（200 data:[]）必须渲染"未绑定"空态或降级横幅之一（B.3/B.5）',
+    ).toBeVisible({ timeout: 15_000 });
     // 非空场景：至少一条 Mind 行（name + 能力集 chips）
     const rows = panel.getByText('能力集');
     if ((await rows.count()) > 0) {
@@ -180,11 +195,13 @@ test.describe('场景认知右栏 UI（:3000，离线默认 skip）', () => {
       }),
     );
     const token = await loginAsAdmin(request);
+    const id = await firstScenarioId(request);
+    test.skip(!id, '无可用场景数据 — 无法打开 L2 认知面板');
     await injectAuth(page.context(), token);
     await watchPageHealth(page);
-    await page.goto(`${ECOS_BASE}/#/project_workbench`);
+    await page.goto(`${ECOS_BASE}/#/workbench/${encodeURIComponent(id as string)}`);
     const panel = page.getByTestId('cognitive-right-panel');
-    test.skip((await panel.count()) === 0, 'CognitiveRightPanel 尚未挂载（M1 IA 归一）');
+    await expect(panel, '503 场景下认知面板本体仍须挂载（渲染降级横幅而非消失）').toBeVisible({ timeout: 15_000 });
     const banner = page.getByTestId('cog-engine-down-banner');
     await expect(banner, '503 未启用 → 右栏 banner（B.5，禁与空态混淆）').toContainText('认知引擎未启用');
     await expect(panel.locator('[aria-disabled="true"]').first(), '引擎停止时内容区置灰不可交互').toBeVisible();
@@ -205,7 +222,7 @@ test.describe('场景认知右栏 UI（:3000，离线默认 skip）', () => {
     await expect(page.getByTestId('cognitive-right-panel')).toHaveCount(1);
     const panel = page.getByTestId('cognitive-right-panel');
     for (const label of ['可用 Mind 探测', '运行评价', '假设列表', '信念列表']) {
-      await expect(panel.getByRole('button', { name: label, exact: true })).toBeVisible();
+      await expect(panel.getByRole('tab', { name: label, exact: true })).toBeVisible();
     }
   });
 });

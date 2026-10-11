@@ -68,12 +68,25 @@ export async function injectAuth(ctx: BrowserContext, token: string): Promise<vo
 /**
  * 铁律 V4「浏览器 E2E 必查三项」的执行载体：渲染无 ErrorBoundary / console 无 error / network 无意外 4xx·5xx。
  * 每个 e2e 用例末尾必须调用一次 expectHealthyPage()。
+ *
+ * expectDegraded（2026-10-11 三项前端改造 live 轮）：文档已声明的**按设计降级**端点模式
+ * （如认知引擎未承流时 cognition 四端点恒 503，见前端设计方案 §3.12 降级面清单）。
+ * 命中模式的 4xx/5xx 从「意外」集合剔除——必须逐 URL 显式声明，禁止整页豁免；
+ * trace 中仍可查该响应，页面自身必须渲染如实降级横幅（由用例另行断言）。
  */
-export function watchPageHealth(page: Page): void {
+export interface PageHealthOptions {
+  expectDegraded?: readonly RegExp[];
+}
+
+export function watchPageHealth(page: Page, opts: PageHealthOptions = {}): void {
   const errors: string[] = [];
   const badResponses: { url: string; status: number }[] = [];
   page.on('console', (msg) => {
-    if (msg.type() === 'error') errors.push(msg.text());
+    // 浏览器对 4xx/5xx 自动打印的 "Failed to load resource" 无 URL 信息，
+    // 与 badResponses 监听器重复计数 ⇒ 网络面统一走 badResponses（带 URL，可按声明剔除）。
+    if (msg.type() === 'error' && !/^Failed to load resource/i.test(msg.text())) {
+      errors.push(msg.text());
+    }
   });
   page.on('pageerror', (e) => errors.push(`pageerror: ${String(e)}`));
   page.on('response', (res) => {
@@ -81,17 +94,24 @@ export function watchPageHealth(page: Page): void {
       badResponses.push({ url: res.url(), status: res.status() });
     }
   });
-  health.set(page, { errors, badResponses });
+  health.set(page, { errors, badResponses, expectDegraded: opts.expectDegraded ?? [] });
 }
 
-const health = new WeakMap<Page, { errors: string[]; badResponses: { url: string; status: number }[] }>();
+const health = new WeakMap<Page, {
+  errors: string[];
+  badResponses: { url: string; status: number }[];
+  expectDegraded: readonly RegExp[];
+}>();
 
 export function expectHealthyPage(page: Page): void {
   const seen = health.get(page);
   if (!seen) throw new Error('用例未调用 watchPageHealth(page)');
   const fatal = seen.errors.filter((e) => !/favicon|ResizeObserver loop|DevTools/i.test(e));
   expect(fatal, `console error: ${fatal.slice(0, 3).join(' | ')}`).toHaveLength(0);
-  expect(seen.badResponses, '出现意外 4xx/5xx').toHaveLength(0);
+  const unexpected = seen.badResponses.filter(
+    (r) => !seen.expectDegraded.some((p) => p.test(r.url)),
+  );
+  expect(unexpected, '出现意外 4xx/5xx').toHaveLength(0);
 }
 
 /** 页面文本里出现错误边界 = 渲染失败 */
