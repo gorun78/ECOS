@@ -10,6 +10,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -68,12 +69,31 @@ class ScenarioToolRegistryTest {
         // 逐条抄自 PRD-06 §4.1 的映射（端点即契约，改一个字都要过评审）
         assertEquals("/api/v1/workspace/forecast-runs/{runId}/results",
                 require(ScenarioToolCatalog.FORECAST_QUERY).backendEndpoint());
-        assertEquals("/api/v1/workspace/forecast-runs/{runId}/drilldown/{level}/{entityId}",
+        // drilldown 落在同一 results 端点：PRD-06 §4.1 的映射是"results 下钻 + evidence"，
+        // 原声明 /drilldown/{level}/{entityId} 系自创（PRD-09 §2.4 端点族里没有），已订正。
+        assertEquals("/api/v1/workspace/forecast-runs/{runId}/results",
                 require(ScenarioToolCatalog.FORECAST_DRILLDOWN).backendEndpoint());
         assertEquals("/api/v1/workspace/forecast-runs/{baselineRunId}/scenario-copy",
                 require(ScenarioToolCatalog.SCENARIO_COPY_COMPARE).backendEndpoint());
         assertEquals("/api/v1/workspace/scenarios/{scenarioId}/actions",
                 require(ScenarioToolCatalog.ACTION_CREATE_DRAFT).backendEndpoint());
+    }
+
+    @Test
+    @DisplayName("分册 09 v1.2 §十一：三条 forecast-runs 移交项显式登记缺口，其余两条后端在位")
+    void pendingHandoverToolsAreDeclaredNotHidden() {
+        // 移交项必须自带缺口原因（咽喉 404 时写进分类错误原文），禁退化成"什么都不说"的空 502
+        for (String pending : List.of(ScenarioToolCatalog.FORECAST_QUERY,
+                ScenarioToolCatalog.FORECAST_DRILLDOWN, ScenarioToolCatalog.SCENARIO_COPY_COMPARE)) {
+            String hint = ScenarioToolCatalog.missingBackendHint(pending);
+            assertNotNull(hint, "移交项必须登记缺口原因: " + pending);
+            assertTrue(hint.contains("分册 09"), "缺口原因须可追溯到移交清单: " + hint);
+        }
+        // 后端在位的两条不得登记缺口（否则属主落地后会被误判"未就绪"）
+        assertNull(ScenarioToolCatalog.missingBackendHint(ScenarioToolCatalog.FORECAST_EXPLAIN));
+        assertNull(ScenarioToolCatalog.missingBackendHint(ScenarioToolCatalog.ACTION_CREATE_DRAFT));
+        assertEquals(3, ScenarioToolCatalog.missingBackendToolKeys().size(),
+                "移交项集合变更必须是显式决定（分册 09 v1.2 §十一 与 §一 实测同步）");
     }
 
     @Test

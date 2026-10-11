@@ -15,6 +15,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.LinkedHashMap;
@@ -251,6 +252,37 @@ class ScenarioToolInvocationIT {
         service.setScenarioRegistry(new ScenarioToolRegistry(null));
         service.setScenarioBaseUrl(BASE_URL);
         ReflectionTestUtils.setField(service, "restTemplate", restTemplate);
+    }
+
+    // ── 验收 4：分册 09 v1.2 §十一 移交项的 404 诊断 ────────────────────────────
+
+    @Test
+    @DisplayName("分册 09 移交项：声明端点未上线(404) → 真实 STUB_CAPABILITY(501)，缺口原文只入日志，禁伪成功")
+    void pendingHandoverEndpoint404ReportsCapabilityNotLive() {
+        restTemplate = mock(RestTemplate.class);
+        when(restTemplate.exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class),
+                eq(String.class))).thenThrow(new HttpClientErrorException(
+                        org.springframework.http.HttpStatus.NOT_FOUND));
+
+        service = newService();
+        service.setScenarioBaseUrl(BASE_URL);
+
+        ToolResult r = service.execute(ScenarioToolCatalog.FORECAST_QUERY,
+                Map.of("runId", "run-7", "year", 2026, "level", "dept"));
+
+        assertFalse(r.isSuccess(), "移交项未上线必须失败，禁 200 空数据冒充（X-50）");
+        // 归 STUB_CAPABILITY 而非 TOOL_BACKEND_ERROR：后者模板是"数据服务异常请稍后重试"且可重试 1 次，
+        // 会把一个不存在的能力报成临时抖动；501 = 尚未上线 + RetryKind.NONE
+        assertEquals("STUB_CAPABILITY", r.getErrorClass(), String.valueOf(r.getError()));
+        assertTrue(String.valueOf(r.getError()).contains("该能力尚未上线"),
+                "对外必须点明能力未上线: " + r.getError());
+        // X-49：404 原文与移交项定位（含"分册 09"）只进日志，响应面只有分类模板 + 诊断码
+        assertFalse(String.valueOf(r.getError()).contains("分册 09"),
+                "缺口原文禁进对外响应面: " + r.getError());
+        assertNotNull(ScenarioToolCatalog.missingBackendHint(ScenarioToolCatalog.FORECAST_QUERY),
+                "日志侧必须能定位所属移交项（属主册 + 缺口名）");
+        // 裁决面不受影响：分类修正只改错误形态，仍是一次调用恰一条裁决
+        verify(gate, times(1)).review(any(), any(), any());
     }
 
     /** 五个工具的合法入参（必填齐全 + 路径占位符有值）。 */

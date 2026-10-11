@@ -15,9 +15,13 @@ import com.chinacreator.gzcm.engine.cognitive.api.CognitiveApiPaths;
  * 表就位后表内行覆盖本目录（见 {@link ScenarioToolRegistry}）。两者都只是声明 —— 没有任何
  * {@code Function}/{@code lambda} 执行体，故权限面完全可由 {@code ToolExecutorService} 的裁决载荷审计（X-12）。</p>
  *
- * <p><b>跨册接缝义务（§八）</b>：{@code forecast-runs} 族端点属分册 09 FC-02/FC-03，
- * {@code scenarios/{id}/actions} 属分册 07 N8 —— 三侧当前均未实现。本目录按<b>文档已定形的路径</b>声明，
- * 未实现时调用得到真实的 {@code TOOL_BACKEND_ERROR}（502），禁 mock 成功（X-50）。</p>
+ * <p><b>跨册接缝义务</b>：{@code forecast-runs} 族三条（{@code forecast.query}/{@code forecast.drilldown}/
+ * {@code scenario.copyCompare}）的声明端点属分册 09 <b>v1.2 §十一 平台缺口移交清单</b>（属主 = 分册 07
+ * 场景工作台；2026-10-11 实测 {@code @RequestMapping} 扫描 0 命中），{@code forecast.explain} 与
+ * {@code action.createDraft} 两条的后端<b>已在位</b>（{@code CognitiveApiPaths.COGNITIVE_DIAGNOSE} /
+ * {@code ScenarioActionController}）。本目录按<b>文档已定形的路径</b>声明，属主未上线时调用得到真实的
+ * {@code STUB_CAPABILITY}（501，"该能力尚未上线"，不可重试），缺口原因经 {@link #missingBackendHint}
+ * 只入日志，禁 mock 成功（X-50）。</p>
  */
 public final class ScenarioToolCatalog {
 
@@ -109,6 +113,29 @@ public final class ScenarioToolCatalog {
     public static final Set<String> IDENTITY_FIELDS =
             Set.of("approver", "approvedBy", "userId", "tenantId", "createdBy", "operator");
 
+    /**
+     * "声明端点已定形、后端尚未实现"的移交项原因表（分册 09 v1.2 §十一，属主 = 分册 07）。
+     *
+     * <p>用途只有一个：咽喉出向拿到 404 时，把"声明端点尚不存在"这一候选原因写进分类错误原文，
+     * 与"运行 ID 不存在"的真 404 区分开，免得运维与模型侧都对着一个空 404 猜。本表<b>不</b>短路
+     * 调用、<b>不</b>伪造成功（X-50）；属主落地 forecast-runs 族后本表应随之清空 ——
+     * 集合内容由 {@code ScenarioToolRegistryTest} 钉住，任何增删都是显式决定。</p>
+     */
+    private static final Map<String, String> MISSING_BACKEND_HINTS = Map.of(
+            FORECAST_QUERY, "分册 09 v1.2 §十一 移交项「forecast-runs 只读结果面」未实现（属主: 分册 07 场景工作台）",
+            FORECAST_DRILLDOWN, "分册 09 v1.2 §十一 移交项「forecast-runs 只读结果面」未实现（属主: 分册 07 场景工作台）",
+            SCENARIO_COPY_COMPARE, "分册 09 v1.2 §十一 移交项「forecast-runs 情景复制运行面」未实现（属主: 分册 07 场景工作台）");
+
+    /** 该工具声明端点的缺口原因；{@code null} = 不属移交项（后端应在位）。 */
+    public static String missingBackendHint(String toolKey) {
+        return toolKey == null ? null : MISSING_BACKEND_HINTS.get(toolKey);
+    }
+
+    /** 当前移交项工具键集合（只读，供门禁与目录面板显示"未就绪"）。 */
+    public static Set<String> missingBackendToolKeys() {
+        return MISSING_BACKEND_HINTS.keySet();
+    }
+
     // ═══ 声明体（逐条对齐 PRD-06 §4.1） ═══
 
     private static Map<String, ScenarioToolDefinition> build() {
@@ -129,6 +156,9 @@ public final class ScenarioToolCatalog {
                 "runId,scenarioId,year,level"));
 
         // ② forecast.drilldown — results 下钻 + evidence 端点；只读，行级 RLS
+        //    路径必须落在 PRD-09 §2.4 已定形的 forecast-runs 族内（原声明 /drilldown/{level}/{entityId}
+        //    系自创、任何需求与设计册都没有该端点 ⇒ 属主落地时必 404，已订正为 results）。
+        //    参数名 → 查询串的映射义务在属主侧：level→groupBy、entityId→projectId|departmentId（按 level 判别）。
         put(map, new ScenarioToolDefinition(
                 FORECAST_DRILLDOWN, "预测结果下钻与证据",
                 "读取指定运行、层级、实体的预测下钻明细及其证据链（口径版本与截至时间随引用元数据返回）。",
@@ -139,7 +169,7 @@ public final class ScenarioToolCatalog {
                         p("period", false, "期间（如 2026-Q1 / 2026-01）"),
                         p("stage", false, "计算阶段标识")),
                 ScenarioToolDefinition.BACKEND_KIND_REST, SERVICE_WORKSPACE,
-                "/api/v1/workspace/forecast-runs/{runId}/drilldown/{level}/{entityId}", "GET",
+                "/api/v1/workspace/forecast-runs/{runId}/results", "GET",
                 ScenarioToolDefinition.OPERATION_READ, "forecast:read:row", 3_000,
                 "runId,level,entityId,period,stage"));
 

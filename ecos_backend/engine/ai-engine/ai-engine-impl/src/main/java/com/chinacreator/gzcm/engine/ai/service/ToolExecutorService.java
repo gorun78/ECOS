@@ -24,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
 import java.lang.reflect.Method;
@@ -279,6 +280,16 @@ public class ToolExecutorService {
             log.info("F06-11 场景工具入参地板拒绝: tool={} reason={}", toolName, badArgs.getMessage());
             return buildClassifiedError(callId, toolName, AiErrorClass.INVALID_ARGUMENT,
                     badArgs.getMessage(), elapsedMs);
+        } catch (ScenarioEndpointUnresolvedException pendingBackend) {
+            // 分册 09 v1.2 §十一 移交项的端点尚未上线 ⇒ 归 STUB_CAPABILITY（501，不重试），
+            // 不归 TOOL_BACKEND_ERROR（502 可重试 1 次 + "数据服务异常请稍后重试"）——把一个不存在的能力
+            // 报成一次可重试的服务故障，会诱导 Loop 无谓重试并把缺口洗成"临时抖动"（同 X-50 禁伪成功的动机）。
+            // 缺口原文（含 HTTP 404 与移交项定位）只入日志，对外用固定模板（X-49 rawReason 禁外泄）。
+            long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
+            log.warn("F06-11 场景工具声明端点未命中(属主能力未上线): tool={} reason={}", toolName,
+                    pendingBackend.getMessage());
+            return buildClassifiedError(callId, toolName, AiErrorClass.STUB_CAPABILITY,
+                    pendingBackend.getMessage(), elapsedMs);
         } catch (Exception e) {
             // F06-15「捕后必分类」：异常原文只入日志，上浮面必须是结构化分类（TOOL_BACKEND_ERROR）
             long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
@@ -857,7 +868,21 @@ public class ToolExecutorService {
 
         log.info("F06-11 场景工具出向: tool={} method={} path={} operation={}",
                 declared.toolKey(), method, path, declared.operation());
-        ResponseEntity<String> response = restTemplate.exchange(url, method, entity, String.class);
+        ResponseEntity<String> response;
+        try {
+            response = restTemplate.exchange(url, method, entity, String.class);
+        } catch (HttpStatusCodeException e) {
+            // 404 有两种真身：声明端点尚未实现（分册 09 移交项），或端点在位但资源不存在。
+            // 二者都必须以真实错误上浮（X-50 禁 mock 成功），差别只在诊断文本 —— 移交项在此点明缺口原因。
+            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                String hint = ScenarioToolCatalog.missingBackendHint(declared.toolKey());
+                if (hint != null) {
+                    throw new ScenarioEndpointUnresolvedException("场景工具声明端点未命中(404): "
+                            + method + " " + path + " —— 候选原因: " + hint, e);
+                }
+            }
+            throw e;
+        }
         String body = response.getBody();
         return body != null ? body : "";
     }
@@ -883,6 +908,16 @@ public class ToolExecutorService {
     static final class ScenarioArgumentsException extends RuntimeException {
         ScenarioArgumentsException(String message) {
             super(message);
+        }
+    }
+
+    /**
+     * 场景工具声明端点未实现（分册 09 v1.2 §十一 移交项）—— 归 {@code STUB_CAPABILITY}/501
+     * （能力尚未上线，不可重试），原文只入日志；绝不降级成成功（X-50）。
+     */
+    static final class ScenarioEndpointUnresolvedException extends RuntimeException {
+        ScenarioEndpointUnresolvedException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 
