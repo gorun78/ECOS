@@ -23,6 +23,20 @@ public interface ForecastRunGateway {
      */
     ForecastRunView submit(ForecastRunCommand command);
 
+    /**
+     * H-6 异步占位通道（additive，§十一 H-6 / PRD-09 §七-1）：以 runtime-task 真实 {@code taskId}
+     * 落一行 RUNNING 占位 run（V277 {@code task_id} 列），<b>不执行计算</b>；真实计算由
+     * {@code ForecastRunTaskExecutor} 在命名执行器线程内经 {@link #submit(ForecastRunCommand)}
+     * 走同一幂等键闭环（同 key 必须回链占位 run，禁重复落新行）。
+     *
+     * <p>默认实现视为未就绪 → 501 {@code STUB_CAPABILITY}（禁假异步/200 造数，X-44/X-50）；
+     * SPI 实现方支持异步派发时覆写本方法。</p>
+     */
+    default ForecastRunView submitDeferred(ForecastRunCommand command, String taskId) {
+        throw new ForecastRunNotLiveException("workspace/forecast-run/deferred",
+                "ForecastRunGateway 未实现异步占位通道 submitDeferred（taskId=" + taskId + "）");
+    }
+
     /** 按 runId 读取既有 run 状态（不存在返回 null，由 Service 转 404/未上线语义）。 */
     ForecastRunView findRun(String forecastRunId);
 

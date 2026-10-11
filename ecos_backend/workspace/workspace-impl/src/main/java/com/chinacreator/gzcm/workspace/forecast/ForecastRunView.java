@@ -27,6 +27,8 @@ public final class ForecastRunView {
     private final boolean degraded;
     private final List<String> evidenceRefs;
     private final QuantileTriple quantile;
+    /** H-6 异步派发回链：runtime-task 真实 taskId（submitTask 返回；同步路径为 null，V277 run 表 task_id 列落位）。 */
+    private final String taskId;
 
     private ForecastRunView(Builder b) {
         this.forecastRunId = b.forecastRunId;
@@ -47,6 +49,7 @@ public final class ForecastRunView {
                 ? Collections.<String>emptyList()
                 : Collections.unmodifiableList(new ArrayList<>(b.evidenceRefs));
         this.quantile = b.quantile;
+        this.taskId = b.taskId;
     }
 
     public static Builder builder(String forecastRunId) {
@@ -62,6 +65,20 @@ public final class ForecastRunView {
                 .idempotencyKey(idempotencyKey).contentHash(contentHash)
                 .baselineRunId(baselineRunId).reusedFromRunId(reusedFromRunId)
                 .degraded(degraded).evidenceRefs(evidenceRefs).quantile(quantile)
+                .taskId(taskId)
+                .build();
+    }
+
+    /** H-6 异步回链副本：仅改写 taskId（真实 taskId 来自 ITaskManagementService.submitTask，禁自造），其余原样透传。 */
+    public ForecastRunView withTaskId(String taskId) {
+        return ForecastRunView.builder(forecastRunId)
+                .scenarioId(scenarioId).runType(runType).status(status)
+                .caliberId(caliberId).caliberVersion(caliberVersion).asOfTime(asOfTime)
+                .snapshotId(snapshotId).formulaVersion(formulaVersion)
+                .idempotencyKey(idempotencyKey).contentHash(contentHash)
+                .baselineRunId(baselineRunId).reusedFromRunId(reusedFromRunId)
+                .degraded(degraded).evidenceRefs(evidenceRefs).quantile(quantile)
+                .taskId(taskId)
                 .build();
     }
 
@@ -129,6 +146,10 @@ public final class ForecastRunView {
         return quantile;
     }
 
+    public String getTaskId() {
+        return taskId;
+    }
+
     /** 链式构造器。 */
     public static final class Builder {
         private final String forecastRunId;
@@ -147,6 +168,7 @@ public final class ForecastRunView {
         private boolean degraded;
         private List<String> evidenceRefs;
         private QuantileTriple quantile;
+        private String taskId;
 
         private Builder(String forecastRunId) {
             this.forecastRunId = forecastRunId;
@@ -167,6 +189,7 @@ public final class ForecastRunView {
         public Builder degraded(boolean v) { this.degraded = v; return this; }
         public Builder evidenceRefs(List<String> v) { this.evidenceRefs = v; return this; }
         public Builder quantile(QuantileTriple v) { this.quantile = v; return this; }
+        public Builder taskId(String v) { this.taskId = v; return this; }
 
         public ForecastRunView build() {
             return new ForecastRunView(this);

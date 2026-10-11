@@ -8,8 +8,10 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.chinacreator.gzcm.workspace.forecast.task.ForecastRunAsyncDispatcher;
 import com.chinacreator.gzcm.workspace.scenario.RunMode;
 
 /**
@@ -35,16 +37,27 @@ public class ForecastRunOrchestrationService {
     private final ObjectProvider<ForecastRunGateway> gatewayProvider;
     private final ForecastRunStateMachine stateMachine;
     private final ForecastPeriodLock periodLock;
+    /** H-6 异步派发器（可缺省：未装配时超阈值命令诚实 501，禁假异步）。 */
+    private final ObjectProvider<ForecastRunAsyncDispatcher> asyncDispatcherProvider;
 
     public ForecastRunOrchestrationService(ObjectProvider<ForecastRunGateway> gatewayProvider,
                                            ForecastRunStateMachine stateMachine,
                                            ForecastPeriodLock periodLock) {
+        this(gatewayProvider, stateMachine, periodLock, null);
+    }
+
+    @Autowired
+    public ForecastRunOrchestrationService(ObjectProvider<ForecastRunGateway> gatewayProvider,
+                                           ForecastRunStateMachine stateMachine,
+                                           ForecastPeriodLock periodLock,
+                                           ObjectProvider<ForecastRunAsyncDispatcher> asyncDispatcherProvider) {
         this.gatewayProvider = gatewayProvider;
         this.stateMachine = stateMachine;
         this.periodLock = periodLock;
+        this.asyncDispatcherProvider = asyncDispatcherProvider;
     }
 
-    /** 创建 run：期间锁前置 → 幂等复用/冲突裁决 → 未装配即未上线。 */
+    /** 创建 run：期间锁前置 → 幂等复用/冲突裁决 → H-6 超阈值转异步 → 未装配即未上线。 */
     public ForecastRunView create(ForecastRunCommand command) {
         assertPeriodOpen(ForecastPeriodLock.periodKeyOf(command.getAsOfTime()), null);
         ForecastRunGateway gateway = requireGateway();
@@ -56,11 +69,36 @@ public class ForecastRunOrchestrationService {
                     command.getIdempotencyKey(), reusedRunId);
             return existing.withReusedFromRunId(reusedRunId);
         }
+        // ★ H-6（PRD-09 §七-1）：>50 项目 或 >10 万行 ⇒ runtime-task submitTask 真异步（真实 taskId）
+        ForecastRunView deferred = tryDispatchAsync(command, gateway);
+        if (deferred != null) {
+            return deferred;
+        }
         ForecastRunView created = gateway.submit(command);
         log.info("预测 run 已创建 runId={} scenario={} caliber={}@{} runMode={} contentHash={}",
                 created.getForecastRunId(), command.getScenarioId(), command.getCaliberId(),
                 command.getCaliberVersion(), command.getRunMode(), command.getContentHash());
         return created;
+    }
+
+    /**
+     * H-6 异步分支：命中阈值后经底座 {@code ITaskManagementService.submitTask} 派发
+     * （返回<b>真实</b> taskId，V277 run 表 task_id 占位落位 RUNNING）。
+     *
+     * <p>未装配派发器 / SPI 未实现占位通道 ⇒ 抛 501（X-44 禁假异步成功、禁自造 jobId）。
+     * 未命中阈值返回 null 走同步路径。</p>
+     */
+    private ForecastRunView tryDispatchAsync(ForecastRunCommand command, ForecastRunGateway gateway) {
+        ForecastRunAsyncDispatcher dispatcher = asyncDispatcherProvider == null
+                ? null : asyncDispatcherProvider.getIfAvailable();
+        if (dispatcher == null || !dispatcher.isAsyncEligible(command)) {
+            return null;
+        }
+        String taskId = dispatcher.dispatch(command);
+        ForecastRunView placeholder = gateway.submitDeferred(command, taskId);
+        log.info("预测 run 已转异步 runId={} taskId={} projectCount={} rowEstimate={}",
+                placeholder.getForecastRunId(), taskId, command.getProjectCount(), command.getRowEstimate());
+        return placeholder.withTaskId(taskId);
     }
 
     /** 状态查询（按 runId）。 */

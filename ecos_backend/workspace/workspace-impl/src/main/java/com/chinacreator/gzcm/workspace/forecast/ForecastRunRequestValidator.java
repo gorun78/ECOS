@@ -41,8 +41,36 @@ public class ForecastRunRequestValidator {
         if (baselineRunId != null) {
             baselineGuard.assertAllowed(mode, baselineRunId);
         }
+        // H-6 异步阈值入参（PRD-09 §七-1）：可选数值；非法数值 fail-loud 400，禁静默按 0 吞掉
+        int projectCount = optionalInt(p, "projectCount");
+        long rowEstimate = optionalLong(p, "rowEstimate");
         return new ForecastRunCommand(scenarioId, runType, caliberId, caliberVersion, asOfTime,
-                snapshotId, formulaVersion, idempotencyKey, contentHash, mode, baselineRunId);
+                snapshotId, formulaVersion, idempotencyKey, contentHash, mode, baselineRunId,
+                null, projectCount, rowEstimate);
+    }
+
+    private int optionalInt(Map<String, Object> p, String key) {
+        Object v = p.get(key);
+        if (v == null) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(String.valueOf(v).trim());
+        } catch (NumberFormatException e) {
+            throw new BusinessException(400, "FC-RUN-400: 预测 run 阈值字段非数值: " + key);
+        }
+    }
+
+    private long optionalLong(Map<String, Object> p, String key) {
+        Object v = p.get(key);
+        if (v == null) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(String.valueOf(v).trim());
+        } catch (NumberFormatException e) {
+            throw new BusinessException(400, "FC-RUN-400: 预测 run 阈值字段非数值: " + key);
+        }
     }
 
     private String require(Map<String, Object> p, String key) {

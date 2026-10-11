@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  主数据完备性检查器（H-6 交付⑤，分册 09 §十一）— 只读 SELECT，零写路径、零 DDL。
+  IR04: 显式列清单；IR05: 全部 #{}；MC06: schema 限定 ecos_dw.
+  别名显式 camelCase（不依赖 mapUnderscoreToCamelCase 配置）。
+-->
+<mapper namespace="com.chinacreator.gzcm.engine.data.fact.masterdata.MasterDataCompletenessMapper">
+
+    <select id="selectCompletenessDetails" resultType="java.util.LinkedHashMap">
+        SELECT id AS "id",
+               project_id AS "projectId",
+               department_id AS "departmentId",
+               period AS "period",
+               contract_base AS "contractBase",
+               attribution_ratio AS "attributionRatio",
+               dq_status AS "dqStatus"
+        FROM ecos_dw.ecos_biz_stage_fact
+        WHERE is_deleted = 0
+          AND dq_status &lt;&gt; 'REJECTED'
+        <if test="projectId != null"> AND project_id = #{projectId}</if>
+        <if test="period != null"> AND period = #{period}</if>
+        ORDER BY project_id ASC, period ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countRejectedDetails" resultType="int">
+        SELECT count(1)
+        FROM ecos_dw.ecos_biz_stage_fact
+        WHERE is_deleted = 0
+          AND dq_status = 'REJECTED'
+        <if test="projectId != null"> AND project_id = #{projectId}</if>
+        <if test="period != null"> AND period = #{period}</if>
+    </select>
+
+    <select id="selectActiveAttributions" resultType="java.util.LinkedHashMap">
+        SELECT id AS "id",
+               project_id AS "projectId",
+               contract_id AS "contractId",
+               department_id AS "departmentId",
+               attribution_ratio AS "attributionRatio",
+               effective_from AS "effectiveFrom",
+               effective_to AS "effectiveTo"
+        FROM ecos_dw.ecos_biz_project_attribution
+        WHERE is_deleted = 0
+          AND is_active = 1
+        <if test="projectId != null"> AND project_id = #{projectId}</if>
+        ORDER BY project_id ASC, effective_from ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

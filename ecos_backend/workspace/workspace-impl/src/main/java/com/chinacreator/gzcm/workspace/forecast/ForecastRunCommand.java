@@ -22,18 +22,32 @@ public final class ForecastRunCommand {
     private final RunMode runMode;
     private final String baselineRunId;
     private final String reusedFromRunId;
+    /** 预估涉及项目数（异步阈值入参，PRD-09 §七-1：>50 项目 ⇒ 转异步；缺省 0 = 阈值下）。 */
+    private final int projectCount;
+    /** 预估明细行数（异步阈值入参，PRD-09 §七-1：>10 万行 ⇒ 转异步；缺省 0 = 阈值下）。 */
+    private final long rowEstimate;
 
     public ForecastRunCommand(String scenarioId, String runType, String caliberId, String caliberVersion,
                               String asOfTime, String snapshotId, String formulaVersion,
                               String idempotencyKey, String contentHash, RunMode runMode, String baselineRunId) {
         this(scenarioId, runType, caliberId, caliberVersion, asOfTime, snapshotId, formulaVersion,
-                idempotencyKey, contentHash, runMode, baselineRunId, null);
+                idempotencyKey, contentHash, runMode, baselineRunId, null, 0, 0L);
     }
 
     public ForecastRunCommand(String scenarioId, String runType, String caliberId, String caliberVersion,
                               String asOfTime, String snapshotId, String formulaVersion,
                               String idempotencyKey, String contentHash, RunMode runMode,
                               String baselineRunId, String reusedFromRunId) {
+        this(scenarioId, runType, caliberId, caliberVersion, asOfTime, snapshotId, formulaVersion,
+                idempotencyKey, contentHash, runMode, baselineRunId, reusedFromRunId, 0, 0L);
+    }
+
+    /** H-6 全参构造：projectCount/rowEstimate 为异步派发阈值入参（可选，缺省 0 = 恒走同步）。 */
+    public ForecastRunCommand(String scenarioId, String runType, String caliberId, String caliberVersion,
+                              String asOfTime, String snapshotId, String formulaVersion,
+                              String idempotencyKey, String contentHash, RunMode runMode,
+                              String baselineRunId, String reusedFromRunId,
+                              int projectCount, long rowEstimate) {
         this.scenarioId = scenarioId;
         this.runType = runType;
         this.caliberId = caliberId;
@@ -46,6 +60,8 @@ public final class ForecastRunCommand {
         this.runMode = runMode;
         this.baselineRunId = baselineRunId;
         this.reusedFromRunId = reusedFromRunId;
+        this.projectCount = projectCount;
+        this.rowEstimate = rowEstimate;
     }
 
     public String getScenarioId() {
@@ -96,6 +112,14 @@ public final class ForecastRunCommand {
         return reusedFromRunId;
     }
 
+    public int getProjectCount() {
+        return projectCount;
+    }
+
+    public long getRowEstimate() {
+        return rowEstimate;
+    }
+
     /**
      * 以指定源 run 为回链派生新命令（重试/复制面）：
      * 复用六要素与内容指纹，换新 idempotencyKey，并以 baselineRunId/reusedFromRunId 回链源 run。
@@ -103,7 +127,7 @@ public final class ForecastRunCommand {
     public ForecastRunCommand deriveFrom(String newIdempotencyKey, String sourceRunId) {
         return new ForecastRunCommand(scenarioId, runType, caliberId, caliberVersion, asOfTime,
                 snapshotId, formulaVersion, newIdempotencyKey, contentHash, runMode,
-                sourceRunId, sourceRunId);
+                sourceRunId, sourceRunId, projectCount, rowEstimate);
     }
 
     /** 内容指纹一致性判定：同 key 且同 hash 才允许复用（禁对不一致载荷静默复用）。 */

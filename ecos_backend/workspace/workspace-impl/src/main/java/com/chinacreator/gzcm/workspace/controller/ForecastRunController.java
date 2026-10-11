@@ -1,12 +1,18 @@
 package com.chinacreator.gzcm.workspace.controller;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.workspace.forecast.ForecastAuditPackService;
+import com.chinacreator.gzcm.workspace.forecast.ForecastExportService;
 import com.chinacreator.gzcm.workspace.forecast.ForecastRunCommand;
 import com.chinacreator.gzcm.workspace.forecast.ForecastRunEvidence;
 import com.chinacreator.gzcm.workspace.forecast.ForecastRunOrchestrationService;
@@ -15,13 +21,16 @@ import com.chinacreator.gzcm.workspace.forecast.ForecastRunView;
 import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
 
 /**
- * 预测 run 编排面 REST API —— 详细设计-09 v1.2 §十一 H-5（卷 07 移交，只增不改）。
+ * 预测 run 编排面 REST API —— 详细设计-09 v1.2 §十一 H-5（卷 07 移交，只增不改）
+ * + H-6（导出/审计包两行，§5.1 rows 12/15）。
  *
  * <pre>
- * POST /api/v1/workspace/forecast-runs                    — 创建 run（六要素落位 + 幂等）
+ * POST /api/v1/workspace/forecast-runs                    — 创建 run（六要素落位 + 幂等；H-6 超阈值转异步返回真实 taskId）
  * GET  /api/v1/workspace/forecast-runs/{runId}            — run 状态
  * GET  /api/v1/workspace/forecast-runs/{runId}/results    — 结果明细（区间三值全展 R-62 ①）
  * GET  /api/v1/workspace/forecast-runs/{runId}/evidence   — 证据引用
+ * GET  /api/v1/workspace/forecast-runs/{runId}/export     — H-6 CSV 导出（SEC-01 与查询同管道）
+ * GET  /api/v1/workspace/forecast-runs/{runId}/audit-pack — H-6 审计包 zip（SEC-04 七文件 + manifest sha256）
  * POST /api/v1/workspace/forecast-runs/{runId}/scenario-copy — 情景复制
  * GET  /api/v1/workspace/forecast-runs/compare           — 双 run 对比（?baselineRunId=&amp;candidateRunId=）
  * POST /api/v1/workspace/forecast-runs/{runId}/retry      — 重试（派生新 run，回链源）
@@ -43,13 +52,19 @@ public class ForecastRunController {
     private final ForecastRunOrchestrationService orchestrationService;
     private final ForecastRunRequestValidator requestValidator;
     private final ScenarioReadGuard readGuard;
+    private final ForecastExportService exportService;
+    private final ForecastAuditPackService auditPackService;
 
     public ForecastRunController(ForecastRunOrchestrationService orchestrationService,
                                  ForecastRunRequestValidator requestValidator,
-                                 ScenarioReadGuard readGuard) {
+                                 ScenarioReadGuard readGuard,
+                                 ForecastExportService exportService,
+                                 ForecastAuditPackService auditPackService) {
         this.orchestrationService = orchestrationService;
         this.requestValidator = requestValidator;
         this.readGuard = readGuard;
+        this.exportService = exportService;
+        this.auditPackService = auditPackService;
     }
 
     /** 创建预测 run：body 需六要素 + idempotencyKey + contentHash；可选 runMode/baselineRunId。 */
@@ -81,6 +96,33 @@ public class ForecastRunController {
     public ApiResponse<ForecastRunEvidence> evidence(@PathVariable("runId") String runId) {
         readGuard.assertReadable("forecast_run");
         return ApiResponse.success(orchestrationService.evidence(runId));
+    }
+
+    /**
+     * H-6 CSV 导出（详设-09 §5.1 row 12 / SEC-01）：与 {@code /results} 同一 RLS 咽喉 +
+     * 同一取数通道 + 同一 CLS 列裁剪；文件头写权限范围/口径/asOf。SPI 未装配诚实 501。
+     */
+    @GetMapping("/{runId}/export")
+    public ResponseEntity<String> export(@PathVariable("runId") String runId) {
+        ForecastExportService.ExportPayload payload = exportService.buildExport(runId);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(new MediaType("text", "csv", StandardCharsets.UTF_8));
+        headers.setContentDispositionFormData("attachment", "forecast_" + runId + "_results.csv");
+        return new ResponseEntity<>(payload.getCsv(), headers, org.springframework.http.HttpStatus.OK);
+    }
+
+    /**
+     * H-6 审计包导出（详设-09 §5.1 row 15 / SEC-04）：zip 七文件 + manifest sha256，
+     * OPA {@code audit:export} 默认 DENY；成功发 {@code AUDIT_PACK_EXPORT} 审计事件；
+     * 包内权限范围 = 导出人自身权限（同管道裁决结果，禁旁路取数）。
+     */
+    @GetMapping("/{runId}/audit-pack")
+    public ResponseEntity<byte[]> auditPack(@PathVariable("runId") String runId) {
+        ForecastAuditPackService.AuditPack pack = auditPackService.buildAuditPack(runId);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentDispositionFormData("attachment", pack.getFileName());
+        return new ResponseEntity<>(pack.getZipBytes(), headers, org.springframework.http.HttpStatus.OK);
     }
 
     /** 情景复制（row 13）：以源 run 为基线派生新 run；可选 body idempotencyKey/overrides。 */

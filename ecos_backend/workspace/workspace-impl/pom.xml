@@ -60,6 +60,21 @@
             <artifactId>runtime-event</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
+        <!-- ★ 分册09v1.2 H-6 底座收口：run 级异步唯一通道 = runtime-task ITaskManagementService
+             （submitTask 返回真实 taskId，前端 AsyncTaskCenter 消费 td_runtime_task_status；
+             禁自建任务表/自造 jobId，PRD-09 §七-1；声明方式对齐 data-engine-impl pom:105 先例） -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-task</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <!-- ★ 分册09v1.2 H-6 监控 5 项登记唯一出口 = runtime-monitor IMetricRecorder 门面
+             （铁律 §2.5-5 禁自建指标注册表；装配方式对齐 cognitive-engine CognitiveObservabilityConfig 先例） -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-monitor</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
