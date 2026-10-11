@@ -1182,7 +1182,7 @@ OCR/ASR 输出应包含可追溯的页码、时间戳或文本区间，便于后
 | V268 | hypothesis/belief/model 三表 `lifecycle_state` + belief 置信五列（prob_kind 等） | §8.4 统一生命周期；§8.3 置信三分（存量 NULL → UNKNOWN_LEGACY 回落，禁伪造补齐） |
 | V269 | `ecos_ai.ecos_ai_capability_task` | §10.4/10.5 能力调用台账（只存引用与元数据，禁复制正文/大文件） |
 | V270 | `ecos_ai.ecos_wagent_tool_contract` 追加 13 列 | §11 机校字段（READ/SUGGEST/WRITE、encryption 上限、审批/幂等/回滚；不重复造同义字段） |
-| V271 | `workspace.ecos_scenario_blueprint` | §6 蓝图权威载体（workspace 属主；发布不可变；ai/cognitive 禁复制副本） |
+| V271 | `ecos_control.ecos_scenario_blueprint`（**2026-10-11 修订**：原稿 `workspace.` schema 违反 ST07 v1.4 八 schema 封闭枚举且实库无此 schema；workspace 层新表按红线落 ecos_control，属主仍 workspace 服务唯一写入面） | §6 蓝图权威载体（workspace 属主；发布不可变；ai/cognitive 禁复制副本） |
 | V272 | `ecos_data.ecos_data_governance_candidate` | §7 数据治理候选（候选态 ≠ 正式资产；幂等键唯一） |
 | V273 | `ecos_ontology.ecos_ontology_candidate` | §7.3 本体候选（发布只经既有 proposals 流；AI 禁直发） |
 | V274 | `ecos_cognitive.ecos_cognitive_outcome_evaluation` 追加 3 列 + 唯一索引 | §9.5 幂等（`idempotency_key` 同租户唯一，空键不参与约束）；`blockers_text` 承载 §9.4 七情形回显；`caliber_alignment` 承载口径对齐结论（ALIGNED/MISMATCH:/UNCONFIRMED:）。同样仅落文件，未实跑 |
@@ -1207,9 +1207,9 @@ OCR/ASR 输出应包含可追溯的页码、时间戳或文本区间，便于后
 |---|---|---|---|
 | `engine/cognitive-engine/cognitive-engine-impl` | **311 / 0 / 0 / 0** | `ContextBuilderServiceTest` 14、`ContextPackContractTest` 8、`CognitiveAssetLifecycleTest` 21、`BeliefProbabilityKindGuardTest` 8、`OutcomeEvaluateServiceTest` 9、`DeterministicErrorCalculatorTest` 11 = **71** | `cog-impl-test-r5.log` → 收尾复跑 `ai-cog-test-r2.log` |
 | `workspace/workspace-impl` | **116 / 0 / 0 / 0** | `BlueprintStatusMachineTest` 7、`ScenarioBlueprintServiceTest` 10 = **17** | `ws-test-r2.log` |
-| `engine/data-engine/data-engine-impl` | **387 / 0 / 0 / 1** | `DataGovernanceCandidateServiceTest` 11 = **11** | `data-test.log` |
+| `engine/data-engine/data-engine-impl` | **387 / 0 / 0 / 1** | `DataGovernanceCandidateServiceTest` 11 = **11** | `data-test.log` → #161 收口轮复跑 `f0215-data-gw-r1.log`（删豁免条目后 `EndpointResolverUsageArchTest` 真绿） |
 | `engine/ontology-engine/ontology-engine-impl` | **104 / 0 / 0 / 0** | `OntologyCandidateServiceTest` 11 = **11** | `onto-test.log` |
-| `engine/ai-engine/ai-engine-impl` | **196 / 0 / 0 / 0** | `ModelCapabilityExecutorTest` 6、`CapabilityTaskLedgerTest` 6、`CapabilityConfidenceCalibrationTest` 5 = **17** | `ai-test.log` → 收尾复跑 `ai-cog-test-r2.log`（夹具假 host 改动后复验） |
+| `engine/ai-engine/ai-engine-impl` | **203 / 0 / 0 / 0**（首轮记 196，系 `*IT` 未入执行面，#161 批次补 pom 后 +7） | `ModelCapabilityExecutorTest` 6、`CapabilityTaskLedgerTest` 6、`CapabilityConfidenceCalibrationTest` 5 = **17** | `ai-test.log` → 收尾复跑 `ai-cog-test-r2.log`（夹具假 host 改动后复验）→ `ai-impl-f0215-r3.log`（2026-10-11 #161 收口轮，含 3 个 `*IT` 真跑） |
 | `runtime/common-api` + `runtime/runtime-core` | **35 / 0 / 0 / 0** + **10 / 0 / 0 / 0** | `TraceDimensions` 契约面随 common-api 门禁 | `runtime-test-r2.log` |
 | `gateway`（全仓门禁汇总） | **126 / 0 / 0 / 4** | 路由单源/文档真实性/LLM 唯一出口/ArchUnit 铁幕 | `gw-test-r2.log`（首跑 `gw-test-r1.log` 5 FAIL，见 §19.6） |
 
@@ -1254,12 +1254,16 @@ OCR/ASR 输出应包含可追溯的页码、时间戳或文本区间，便于后
 2. `ecos_cognitive` 既有 `ecos_decision*`（V103/V151）双镜像权威复核：沿用详设-05 R-13 ① 口径，本批次未重新裁定。
 3. 年度经营预测首场景（§15.2 批次 B 全端到端 / 详设-09 接缝）：随 V267~V273 实跑授权 + 详设-09/10 在途批次收敛后执行。
 4. 前端面（蓝图向导/候选评审/能力盘）：本批次不涉前端改动，随场景工作台 UI 批次落（F07 族后续）。
-5. **非本设计文档遗留（真跑门禁暴露，2026-10-11）**：ai-engine `ToolExecutorService:89` 硬编码 `http://localhost:18090` 场景 base-url，属详设-06 F06-11（commit 4940048c，2026-10-09）存量，命中 F02-15 两态寻址单源门禁 FAIL。此前各批次均 `-DskipTests` 提交，该门禁从未实跑，故长期未被发现。本轮按门禁自身规定的路径登记豁免基线（data-engine `EndpointResolverUsageArchTest` + gateway `CrossEngineEndpointArchTest` 两份，条目均注明来源 commit 与归属批次），**未做实质收口**；收口 = 改走 runtime-access `ServiceEndpointResolver`，完成后须从两份基线同步删除。本设计文档批次不代他域还债。
+5. **非本设计文档遗留（真跑门禁暴露，2026-10-11）→ 同日 #161 批次已实质收口**：ai-engine `ToolExecutorService` 硬编码场景 base-url `http://localhost:18090`，属详设-06 F06-11（commit 4940048c，2026-10-09）存量，命中 F02-15 两态寻址单源门禁 FAIL。此前各批次均 `-DskipTests` 提交，该门禁从未实跑，故长期未被发现。本轮上午曾按门禁规定路径登记两份豁免基线并声明「本批次不代他域还债」——**该声明已作废**，实质收口已于同日完成：
+   - **寻址改造**：删 `DEFAULT_SCENARIO_BASE_URL` 常量（localhost 字面量唯一出处）；出向基址改三步解析链，与 workspace `WorkspaceRestClientConfig` 同口径 —— ① `service.scenario.base-url` 显式覆盖（默认空，仅运维逃生口，全仓 yml 实测零处设置）→ ② runtime-access `ServiceEndpointResolver.resolve("workspace", RouteMode.SERVICE)` 按 `route-manifest.json` 两态寻址（owner 已切流取 service 端口，未切流自动回落 monolith 端口）→ ③ 覆盖位空且 resolver 未装配/未登记即抛 `IllegalStateException` **fail-loud**，禁静默回落字面量。行为等价性：manifest `workspace` 条目 `route=="service"` 且 `ports.service=18090` ⇒ SERVICE 解析结果与原硬编码同值。
+   - **豁免基线同步删除**：data-engine `EndpointResolverUsageArchTest.PORT_LITERAL_BASELINE`（11→10 条）与 gateway `CrossEngineEndpointArchTest.LOCALHOST_180XX_DENYLED_BASELINE` 中 `ToolExecutorService.java` 条目均已移除，两门禁回到无豁免严态（符合「只减不增」）。
+   - **回归用例**：`ScenarioToolInvocationIT` 新增 3 条 —— manifest 来源（`resolve("workspace", SERVICE)` 恰一次 + 出向 URL 前缀断言）、显式覆盖优先（`verify(resolver, never()).resolve(...)`）、不可解析 fail-loud 且零出向（`TOOL_BACKEND_ERROR` + `verify(restTemplate, never()).exchange(...)`）。
+   - **真跑证据**（全为 `mvn test` 实跑，无 `-DskipTests`）：ai-engine-impl **203 用例 / 0 失败**（`_win_tasks/logs/ai-impl-f0215-r3.log`）、data-engine-impl **387 / 0 失败 / 1 skip** 与 gateway **126 / 0 失败 / 4 skip**（同一日志 `_win_tasks/logs/f0215-data-gw-r1.log`，两者均 BUILD SUCCESS / `MVN_EXIT=0`）。
 6. **2026-10-11 首轮真跑抓出的历史缺陷清单**（此前均因 `-DskipTests` 提交而从未暴露；本轮已全部消化，除注明者）：
 
 | # | 缺陷 | 归属批次 | 本轮处置 |
 |---|---|---|---|
-| 1 | ai-engine `ToolExecutorService:89` 硬编码场景 base-url，违反两态寻址单源 | 详设-06 F06-11（4940048c） | 登记两份豁免基线（见上条），实质收口另批（本文件 #161） |
+| 1 | ai-engine `ToolExecutorService` 硬编码场景 base-url，违反两态寻址单源 | 详设-06 F06-11（4940048c） | **已实质收口**（本文件 §19.6 第 5 条，#161 批次）：改走 runtime-access `ServiceEndpointResolver` + 两份豁免基条目删除 + 3 条回归用例；三模块门禁 203/387/126 用例真跑全绿 |
 | 2 | 认知域 `CognitiveBeliefService.toVo:288` 对可空 `Boolean` 直接拆箱 → 存量 NULL 行 NPE | 补充设计 v1.0 §8.3 首轮 | 改 `Boolean.TRUE.equals(...)`，随 cognitive 311 绿 |
 | 3 | ai-engine 包分层违例 + `ArchitectureTest` 宇宙基线缺 `OutcomeMetricValueReader` | 补充设计 v1.0 §9 首轮 | allow-list 追加并注理由 |
 | 4 | 认知域 DDL 白名单门禁 FAIL：V267 未登记 | 补充设计 v1.0 批次 A | 按 PRD-05 §6.1 规格 3 补登 |
@@ -1268,8 +1272,11 @@ OCR/ASR 输出应包含可追溯的页码、时间戳或文本区间，便于后
 | 7 | `AgentProviderControllerTest` 夹具硬编码 LLM 供应商端点字面量，命中 F00-07 唯一出口门禁 | 补充设计 v1.0 §10 首轮 | 换假 host `https://provider-base-url.from-config/v1`（该值原从未被断言，用例强度不变） |
 | 8 | 路由重写表条数基线漂移：测试/AGENTS.md 记 23（正向 10 + 反向 13），源码实为 **25**（反向 15） | 详设-10 R1-A（卷 10 §5.1/W252/R-43 的 `/api/wagent` + `/api/wagent/` 两条反向条目，`-DskipTests` 提交） | 按门禁「只严不松 + 登记来源批次」口径订正常量/文案并注归属；`route-rewrite-lint.ps1` 同步实跑为 `denominator=25 fail=6`（新增 2 条 FAIL-R4 = wagent 反向前缀尚无 Controller），AGENTS.md 基线文案同步 |
 | 9 | `ModuleDocTruthfulnessTest` Controller 计数基线 33，实测 37 | 本批 +1（§10 `AiCapabilityController`）、详设-10 R2-A +3（`WAgentRun/Question/Goal`） | 计数经 `git ls-tree` 两时点独立实测（9e4833dd=36 / 工作树=37）后订正常量并注归属；ai impl AGENTS.md 无数字声明，无需改文档 |
+| 10 | **`*IT.java` 冻结验收类从未被 `mvn test` 执行**（surefire 默认 includes 仅 `Test*`/`*Test`/`*Tests`/`*TestCase`，不含 `*IT`）——ai-engine-impl 的 `ScenarioToolInvocationIT`/`CitationInducementIT`/`WAgentGoalControllerIT` 3 类 7 用例长期属假绿面 | 详设-06 F06-11 + 补充设计 §10（冻结测试命名违规） | 本模块 pom 补 `<includes>` 显式加 `**/*IT.java`（默认四项必须一并声明，显式 includes 覆盖默认值）；实跑后 196→**203 全绿**。⚠ 其余模块 5 个 `*IT`（data-engine `DqPhase4E2eIT`、llm-gateway `AiFaultInjectionIT`、workspace `WorkspaceRouteReachabilityIT` 等）**仍未纳入执行面**，见新增第 7 条 |
+
+7. **`*IT` 执行面缺口（2026-10-11 #161 批次新发现，本批次仅收口 ai-engine-impl）**：surefire 默认 include 模式不含 `*IT.java`，全仓除 ai-engine-impl 已在本模块 pom 补齐外，其余模块的 5 个 `*IT` 类（含一个 `@SpringBootTest` 载体）从未进入 `mvn test` 执行面。根治口径应为「命名规约统一 + 全仓 surefire 配置上收父 POM」，属独立批次；本批次不做半截子改动，仅诚实登记。
 
 
 ---
 
-**版本记录**：v1.0（编制 2026-10-09）· §19 实施回写首轮 2026-10-10 · **订正轮 2026-10-11** —— §19.2 DDL 区间订正为 V267~V274；§19.4 回写各模块 `mvn` 实跑 surefire 汇总与日志文件（本批次冻结测试类 127 用例全绿，gateway 门禁 126/0/0/4skip）；§19.5 载体名逐条核对为实存文件并订正 SUP-GOV-02；§19.6 新增第 6 条真跑抓出的历史缺陷清单（9 项，含 2 项另批收口）。首轮的「测试类已交付 = 记录为已运行」口径作废。
+**版本记录**：v1.0（编制 2026-10-09）· §19 实施回写首轮 2026-10-10 · **订正轮 2026-10-11** —— §19.2 DDL 区间订正为 V267~V274；§19.4 回写各模块 `mvn` 实跑 surefire 汇总与日志文件（本批次冻结测试类 127 用例全绿，gateway 门禁 126/0/0/4skip）；§19.5 载体名逐条核对为实存文件并订正 SUP-GOV-02；§19.6 新增第 6 条真跑抓出的历史缺陷清单（9 项，含 2 项另批收口）。首轮的「测试类已交付 = 记录为已运行」口径作废。**#161 收口轮 2026-10-11（同日）** —— §19.6 第 5 条由「登记豁免、未做实质收口」改为已收口（`ServiceEndpointResolver` 两态寻址 + 两份豁免基线条目删除 + 3 条回归用例，ai-engine-impl 203 / data-engine-impl 387 / gateway 126 用例真跑全绿）；缺陷清单追加第 10 项并新增第 7 条，登记 `*IT.java` 系 surefire 默认 include 之外的系统性假绿面。

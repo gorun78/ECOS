@@ -6,6 +6,8 @@
 ## 本模块干什么
 - **实现层（业务）**：Agent 循环 (AgentLoopService) + 工具执行 (ToolExecutorService) + 会话 (AgentSessionService) + 委托 (AgentDelegationService) + OAG 管线 (OagPipelineEngine/SecurityCheckerNode/AgentToolPolicyGate) + LLM 网关适配 + SSE 流式。
 - **测试充分（2026-10-09 实测：33 个 test 类 / 144 个 {@code @Test} 用例）**：以目录为准（`src/test/java/.../ai/**/*Test*.java`），文档禁手写闭包清单。门禁 `ModuleDocTruthfulnessTest` 会实测并对账，漂移即 FAIL。
+- **测试执行面（2026-10-11 订正）**：surefire 默认 includes 不认 `*IT.java`，本模块 3 个 IT 冻结验收类（`ScenarioToolInvocationIT`/`CitationInducementIT`/`WAgentGoalControllerIT`，共 7 用例）此前从未被 `mvn test` 实跑；模块 pom 已显式补 `**/*IT.java`（默认四项 pattern 一并声明），现 `mvn test` 实跑 203 用例全绿。其余模块的 `*IT` 仍属未执行面（见补充详设 §19.6）。
+- **出向寻址（F02-15，2026-10-11 收口）**：`ToolExecutorService` 场景工具 base-url 一律经 runtime-access `ServiceEndpointResolver.resolve("workspace", SERVICE)` 按 `/route-manifest.json` 两态寻址；`service.scenario.base-url` 仅作运维显式覆盖位（默认空），解析不到即 fail-loud（禁回落硬编码 localhost 字面量）。
 
 ## 主要 code（控制器/服务/实体）
 - `AgentLoopController` — Agent 对话 (stream=false→JSON / stream=true→**SSE** 流式) + 会话 CRUD (`GET/POST /api/v1/agent-loop/chat`, `/api/v1/agent-loop/sessions/{id}/chat`)。

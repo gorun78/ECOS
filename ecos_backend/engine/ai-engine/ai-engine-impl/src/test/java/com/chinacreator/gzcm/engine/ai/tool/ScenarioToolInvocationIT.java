@@ -7,6 +7,7 @@ import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.service.ToolExecutorService;
 import com.chinacreator.gzcm.engine.ai.service.ToolExecutorService.ToolResult;
+import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -19,6 +20,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -28,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -47,6 +50,8 @@ import static org.mockito.Mockito.when;
 class ScenarioToolInvocationIT {
 
     private static final String BASE_URL = "http://127.0.0.1:18090";
+    /** 覆盖项夹具（假 host，非本机环境值，仅验证优先级）。 */
+    private static final String OVERRIDE_BASE_URL = "http://scenario-base-url.from-override";
     private static final String USER = "u-scenario";
     private static final String TENANT = "t-scenario";
 
@@ -141,6 +146,92 @@ class ScenarioToolInvocationIT {
     }
 
     // ── 装置 ────────────────────────────────────────────────────────────────
+
+    // ── 验收 3：F02-15 两态寻址单源收口（2026-10-11）─────────────────────────
+
+    @Test
+    @DisplayName("F02-15：未显式覆盖时基址经 ServiceEndpointResolver(workspace, SERVICE) 解析并归一张尾斜杠")
+    void scenarioBaseUrlComesFromRouteManifestWhenNotOverridden() {
+        restTemplate = mock(RestTemplate.class);
+        ServiceEndpointResolver resolver = mock(ServiceEndpointResolver.class);
+        when(restTemplate.exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class),
+                eq(String.class))).thenReturn(ResponseEntity.ok(CITED_BODY));
+        when(resolver.resolve(eq(ToolExecutorService.SCENARIO_OWNER_SERVICE),
+                eq(ServiceEndpointResolver.RouteMode.SERVICE)))
+                .thenReturn(Optional.of(BASE_URL + "/"));
+
+        service = newService();
+        service.setEndpointResolver(resolver);
+
+        ToolResult r = service.execute(ScenarioToolCatalog.FORECAST_QUERY,
+                Map.of("runId", "run-7", "year", 2026, "level", "dept"));
+
+        assertTrue(r.isSuccess(), String.valueOf(r.getError()));
+        verify(resolver, times(1)).resolve(ToolExecutorService.SCENARIO_OWNER_SERVICE,
+                ServiceEndpointResolver.RouteMode.SERVICE);
+        ArgumentCaptor<String> url = ArgumentCaptor.forClass(String.class);
+        verify(restTemplate, times(1)).exchange(url.capture(), any(HttpMethod.class),
+                any(HttpEntity.class), eq(String.class));
+        assertTrue(url.getValue().startsWith(BASE_URL + "/api/"),
+                "出向基址必须取 resolver 值（尾斜杠归一，禁双斜杠）: " + url.getValue());
+    }
+
+    @Test
+    @DisplayName("F02-15：显式覆盖项优先于 route-manifest，覆盖在位时 resolver 不参与寻址")
+    void explicitOverrideTakesPrecedenceOverRouteManifest() {
+        restTemplate = mock(RestTemplate.class);
+        ServiceEndpointResolver resolver = mock(ServiceEndpointResolver.class);
+        when(restTemplate.exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class),
+                eq(String.class))).thenReturn(ResponseEntity.ok(CITED_BODY));
+
+        service = newService();
+        service.setEndpointResolver(resolver);
+        service.setScenarioBaseUrl(OVERRIDE_BASE_URL);
+
+        ToolResult r = service.execute(ScenarioToolCatalog.FORECAST_QUERY,
+                Map.of("runId", "run-7", "year", 2026, "level", "dept"));
+
+        assertTrue(r.isSuccess(), String.valueOf(r.getError()));
+        verify(resolver, never()).resolve(anyString(), any(ServiceEndpointResolver.RouteMode.class));
+        ArgumentCaptor<String> url = ArgumentCaptor.forClass(String.class);
+        verify(restTemplate, times(1)).exchange(url.capture(), any(HttpMethod.class),
+                any(HttpEntity.class), eq(String.class));
+        assertTrue(url.getValue().startsWith(OVERRIDE_BASE_URL + "/api/"),
+                "显式覆盖项是运维逃生口，必须压过 manifest: " + url.getValue());
+    }
+
+    @Test
+    @DisplayName("F02-15：resolver 未装配且无覆盖 → fail-loud 分类失败，禁静默回落硬编码地址后出向")
+    void unresolvableScenarioBaseUrlFailsLoudWithoutEgress() {
+        restTemplate = mock(RestTemplate.class);
+
+        service = newService();
+
+        ToolResult r = service.execute(ScenarioToolCatalog.FORECAST_QUERY,
+                Map.of("runId", "run-7", "year", 2026, "level", "dept"));
+
+        assertFalse(r.isSuccess(), "基址不可解析必须失败，禁回落 localhost 字面量继续出向");
+        assertEquals("TOOL_BACKEND_ERROR", r.getErrorClass(), String.valueOf(r.getError()));
+        verify(restTemplate, never()).exchange(anyString(), any(HttpMethod.class),
+                any(HttpEntity.class), eq(String.class));
+    }
+
+    /** 除基址面外的通用装置（restTemplate 桩由调用方按需替换/注入）。 */
+    private ToolExecutorService newService() {
+        gate = mock(AgentToolPolicyGate.class);
+        ToolSubjectResolver subject = mock(ToolSubjectResolver.class);
+        when(gate.review(any(), any(), any())).thenReturn(ToolDecision.allow("p-scenario", null, 1L));
+        when(subject.resolve()).thenReturn(
+                new ToolAdjudicationRequest.Subject(USER, List.of("scenario-operator"), "dept-s", TENANT));
+
+        ToolExecutorService svc = new ToolExecutorService();
+        svc.setToolDao(mock(ToolDao.class));
+        svc.setPolicyGate(gate);
+        svc.setSubjectResolver(subject);
+        svc.setScenarioRegistry(new ScenarioToolRegistry(null));
+        ReflectionTestUtils.setField(svc, "restTemplate", restTemplate);
+        return svc;
+    }
 
     private void setUpFixture() {
         restTemplate = mock(RestTemplate.class);

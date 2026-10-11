@@ -16,6 +16,7 @@ import com.chinacreator.gzcm.engine.ai.tool.ScenarioToolRegistry;
 import com.chinacreator.gzcm.engine.ai.tool.ToolCitation;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.common.trace.EcosTraceContext;
+import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,14 +80,22 @@ public class ToolExecutorService {
     // F06-11: 场景受控工具声明（无执行体，dispatch 仍回本咽喉，裁决次数恰一条不变）
     private ScenarioToolRegistry scenarioRegistry;
 
+    /** F02-15：场景层基址的唯一寻址出口（runtime-access，route-manifest 单源）。 */
+    private ServiceEndpointResolver endpointResolver;
+
     /**
      * 场景工具后端的<b>服务端</b>基址（配置注入，禁取 LLM 传入的 URL —— 否则本通道退化成
      * 第二个 {@code invoke_rest}，F06-11 要点 3 的白名单收口即失效）。
+     *
+     * <p>F02-15 两态寻址单源：本字段只是<b>显式覆盖位</b>（默认空），未覆盖时经
+     * {@link #resolveScenarioBaseUrl()} 由 runtime-access {@code ServiceEndpointResolver}
+     * 按 route-manifest 解析。本类禁止再写死 {@code http://localhost:<port>} 字面量
+     * （data-engine {@code EndpointResolverUsageArchTest} + gateway {@code CrossEngineEndpointArchTest} 双门禁）。</p>
      */
-    private String scenarioBaseUrl = DEFAULT_SCENARIO_BASE_URL;
+    private String scenarioBaseUrlOverride = "";
 
-    /** 测试/装配用覆盖点（生产由 Spring 经 {@code service.scenario.base-url} 注入）。 */
-    static final String DEFAULT_SCENARIO_BASE_URL = "http://localhost:18090";
+    /** route-manifest 里场景层的归属服务名（{@code owner} 字段，workspace 场景层）。 */
+    public static final String SCENARIO_OWNER_SERVICE = "workspace";
 
     // R1.3: SecuritySandboxService 位于 security-engine-impl（编译期不可见），
     // 通过 ApplicationContext + 反射调用；不可用时高危指令按 fail-closed 拒绝
@@ -146,15 +155,49 @@ public class ToolExecutorService {
         this.scenarioRegistry = scenarioRegistry;
     }
 
-    /** F06-11：场景工具后端基址（配置单源，默认本机 workspace :18090；未实现后端得到真实 502）。 */
+    /**
+     * F06-11：场景工具后端基址的<b>显式覆盖位</b>（配置项 {@code service.scenario.base-url}，
+     * 默认留空）。留空即由 {@link #resolveScenarioBaseUrl()} 走 route-manifest 两态寻址；
+     * F02-15 收口后本项不再有硬编码 localhost 默认值。
+     */
     @Autowired(required = false)
     public void setScenarioBaseUrl(
-            @org.springframework.beans.factory.annotation.Value(
-                    "${service.scenario.base-url:" + DEFAULT_SCENARIO_BASE_URL + "}") String scenarioBaseUrl) {
-        if (scenarioBaseUrl != null && !scenarioBaseUrl.isBlank()) {
-            this.scenarioBaseUrl = scenarioBaseUrl.endsWith("/")
-                    ? scenarioBaseUrl.substring(0, scenarioBaseUrl.length() - 1) : scenarioBaseUrl.trim();
+            @org.springframework.beans.factory.annotation.Value("${service.scenario.base-url:}") String scenarioBaseUrl) {
+        this.scenarioBaseUrlOverride = normalizeBaseUrl(scenarioBaseUrl);
+    }
+
+    /** F02-15：两态寻址单源；未装配 = 场景工具出向 fail-loud（禁回落硬编码地址）。 */
+    @Autowired(required = false)
+    public void setEndpointResolver(ServiceEndpointResolver endpointResolver) {
+        this.endpointResolver = endpointResolver;
+    }
+
+    /**
+     * 场景工具出向基址解析链（与 workspace {@code WorkspaceRestClientConfig} 同口径）：
+     * ① {@code service.scenario.base-url} 显式覆盖（运维逃生口）→ ② route-manifest
+     * 两态寻址（{@code RouteMode.SERVICE}：owner 已切流取 service 端口，未切流自动回落
+     * monolith 端口）→ ③ 双双不可得抛异常 fail-loud，<b>禁静默回落 localhost 字面量</b>。
+     */
+    private String resolveScenarioBaseUrl() {
+        if (!scenarioBaseUrlOverride.isEmpty()) {
+            return scenarioBaseUrlOverride;
         }
+        if (endpointResolver == null) {
+            throw new IllegalStateException("ServiceEndpointResolver 未装配，场景工具基址无法解析"
+                    + "（F02-15 两态寻址单源，禁回落硬编码地址）");
+        }
+        return endpointResolver.resolve(SCENARIO_OWNER_SERVICE, ServiceEndpointResolver.RouteMode.SERVICE)
+                .map(ToolExecutorService::normalizeBaseUrl)
+                .filter(base -> !base.isEmpty())
+                .orElseThrow(() -> new IllegalStateException("route-manifest 未登记服务 "
+                        + SCENARIO_OWNER_SERVICE + "，场景工具基址无法解析（fail-loud）"));
+    }
+
+    /** base-url 归一：去首尾空白与尾斜杠；null/空白视为未设置（返回空串）。 */
+    private static String normalizeBaseUrl(String url) {
+        if (url == null) return "";
+        String trimmed = url.trim();
+        return trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
     }
 
     /** F06-11 集成测试注入面（替换 REST 出口以注入后端故障；生产路径不调用）。 */
@@ -789,7 +832,7 @@ public class ToolExecutorService {
         }
 
         String path = resolveUrlParams(declared.backendEndpoint(), arguments);
-        String url = scenarioBaseUrl + path;
+        String url = resolveScenarioBaseUrl() + path;
         HttpMethod method = HttpMethod.valueOf(declared.httpMethod().toUpperCase(Locale.ROOT));
         Set<String> declaredArgs = declared.argsSchema().keySet();
 

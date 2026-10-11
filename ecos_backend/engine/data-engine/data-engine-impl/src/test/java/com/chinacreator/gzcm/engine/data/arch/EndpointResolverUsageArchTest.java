@@ -57,11 +57,6 @@ class EndpointResolverUsageArchTest {
             // kbengine(:18086) / ontology(:18083) / 认知(:18084)
             "engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/event/EcosOntologyEventConsumer.java",
             "engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ontology/client/KbEngineGraphSyncClient.java",
-            // 详设-06 F06-11（commit 4940048c, 2026-10-09）遗留：场景受控工具 workspace(:18090) base-url
-            // 默认值。2026-10-11 真跑 mvn test 才暴露（此前各批均 -DskipTests，门禁从未实跑）。
-            // 该类同时已在 gateway RuntimeAccessTest 与 rest-template-baseline.txt 登记为存量。
-            // 归属 design-06 收尾批次改走 ServiceEndpointResolver，治理完成后从本清单删除。
-            "engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/engine/ai/service/ToolExecutorService.java",
             // workspace 场景层（非 engine，跨引擎聚合 base-url，待 workspace 批次收口）
             "workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/knowledge/service/KnowledgeConfigAggregator.java",
             "workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/security/WorkspaceSecurityEngineClient.java",

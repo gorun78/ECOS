@@ -184,6 +184,26 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- 2026-10-11 F02-15 收口批次实测：surefire 默认 includes 只认
+                 Test*/*Test/*Tests/*TestCase，本模块三个 *IT 冻结验收类
+                 （ScenarioToolInvocationIT / CitationInducementIT / WAgentGoalControllerIT）
+                 从未被 mvn test 实跑过 —— 属假绿面。此处在本模块补齐 IT 执行面
+                 （默认四项 pattern 必须一并声明，显式 includes 会覆盖默认值）。
+                 其余模块的 *IT 登记为后续批次缺口，见补充详设 §19.6。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <includes>
+                        <include>**/Test*.java</include>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                        <include>**/*TestCase.java</include>
+                        <include>**/*IT.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>
