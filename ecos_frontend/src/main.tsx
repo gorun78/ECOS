@@ -59,6 +59,7 @@ const ScenarioManagementView = lazy(() => import('./pages/ScenarioManagementView
 const WorkbenchHome = lazy(() => import('./pages/workbench/index.tsx'));
 const WorkbenchScenarioDetail = lazy(() => import('./pages/workbench/[scenarioId]/index.tsx'));
 const WorkbenchForecast = lazy(() => import('./pages/workbench/[scenarioId]/forecast.tsx'));
+const WorkbenchDecisions = lazy(() => import('./pages/workbench/[scenarioId]/decisions.tsx'));
 const NotFoundWorkbench = lazy(() => import('./pages/workbench/NotFoundWorkbench.tsx'));
 const DataQualityDashboard = lazy(() => import('./pages/DataQualityDashboard.tsx'));
 const GatewayDiagnosticsPage = lazy(() => import('./pages/platform/GatewayDiagnosticsPage.tsx'));
@@ -164,10 +165,11 @@ createRoot(document.getElementById('root')!).render(
                 {/* K · 知识层 */}
                 <Route path="workflow_designer" element={<WorkshopView />} />
                 <Route path="project_workbench" element={<ScenarioManagementView />} />
-                {/* F07-06 工作台三层 IA：我的场景 → 场景详情 → 预测推演 */}
+                {/* F07-06 工作台三层 IA：我的场景 → 场景详情 → 预测推演 / 经营管控闭环（H-8 P08/P09） */}
                 <Route path="workbench" element={<WorkbenchHome />} />
                 <Route path="workbench/:scenarioId" element={<WorkbenchScenarioDetail />} />
                 <Route path="workbench/:scenarioId/forecast" element={<WorkbenchForecast />} />
+                <Route path="workbench/:scenarioId/decisions" element={<WorkbenchDecisions />} />
                 <Route path="scenario-sandbox/:scenarioId" element={
                     <Suspense fallback={<RouteFallback />}>
                         <SandboxRouteWrapper />

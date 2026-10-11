@@ -13,6 +13,7 @@ import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
 import { useCognition } from '../../../hooks/useCognition';
+import DemoBadge from '../../../components/common/status/DemoBadge';
 
 // REGISTERED-FOR-VOLUME-08 — ForecastChart 卷数登记：内联 <svg> 图表统一在
 // CognitionPanel#ForecastChart 维护，本页通过该图表组件消费真实推演数据，禁止在此再造 svg。
@@ -47,6 +48,9 @@ export default function WorkbenchForecast() {
         <h1 className={`text-lg font-bold tracking-tight ${styles.appText} flex items-center gap-2`}>
           <LucideIcon name="TrendingUp" size={16} className={styles.infoText} />
           {t('workspace.l3.title')}
+          {/* DEMO 徽标（PRD-09 §八 演练⑥）：四源未串通前恒显示，单源判定见
+              services/forecastScenarioMode.ts */}
+          <DemoBadge className="ml-1" />
         </h1>
         <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{t('workspace.l3.subtitle')}</p>
       </div>

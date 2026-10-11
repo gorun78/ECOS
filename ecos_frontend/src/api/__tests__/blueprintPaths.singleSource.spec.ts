@@ -15,12 +15,18 @@ import { describe, expect, it } from 'vitest';
 
 const BP_DIR = join(process.cwd(), 'src', 'pages', 'workbench', '[scenarioId]', 'blueprint');
 
+/** 被测面对象 = 组件源文件；测试自身（__tests__ / *.spec.* / *.test.*）不是组件，须排除。 */
+function isGuardTestFile(name: string): boolean {
+  return /\.spec\.[jt]sx?$/.test(name) || /\.test\.[jt]sx?$/.test(name);
+}
+
 function tsxFiles(dir: string): string[] {
   const out: string[] = [];
   for (const e of readdirSync(dir)) {
+    if (e === '__tests__') continue;
     const full = join(dir, e);
     if (statSync(full).isDirectory()) out.push(...tsxFiles(full));
-    else if (e.endsWith('.tsx') || e.endsWith('.ts')) out.push(full);
+    else if ((e.endsWith('.tsx') || e.endsWith('.ts')) && !isGuardTestFile(e)) out.push(full);
   }
   return out;
 }

@@ -132,7 +132,11 @@ export function isCognitiveApiError(e: unknown): e is CognitiveApiError {
 
 // ── 内部 fetch（auth 单源）────────────────────────────
 
-async function callJson(url: string, init: RequestInit = {}): Promise<unknown> {
+/**
+ * 认知域唯一 fetch/auth 通道。导出仅为供 `services/cognitive/*` 拆分模块复用
+ * （禁拆出模块自拼 Bearer 头 / 自起 fetch），组件面不应直接调用它。
+ */
+export async function callJson(url: string, init: RequestInit = {}): Promise<unknown> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const token = getAuthToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -216,7 +220,8 @@ async function callJson(url: string, init: RequestInit = {}): Promise<unknown> {
   return body;
 }
 
-function asArray<T>(v: unknown): T[] {
+/** 形状归一：数组直取，`{rows}` / `{data}` 包装取其数组，其余一律空集（DG-6 禁造元素）。 */
+export function asArray<T>(v: unknown): T[] {
   if (Array.isArray(v)) return v as T[];
   if (v && typeof v === "object") {
     const o = v as Record<string, unknown>;
@@ -603,6 +608,15 @@ export async function buildScenarioContext(input: ContextBuildInput): Promise<Co
     pack: o.pack as Record<string, unknown> | undefined,
   };
 }
+
+// ── W→D 结果评估 / 世界模型推演已拆出 ────────────────────────────
+//
+// 该面（OUTCOMES_BASE_PATH / outcomesByRunPath / outcomesListPath / worldModelUrl /
+// OutcomeEvaluateResultDto 及 fetchOutcomesByRun、fetchOutcomesByScenario、
+// runWorldModelScenarioSimulation）现居 `services/cognitive/outcomesApi.ts`：
+// 单文件 ≤800 行门禁（前端开发规范 §十 / file-size.test.ts）要求拆分，且拆出模块
+// 仍复用本文件的 callJson 唯一 fetch/auth 通道与 COGNITIVE_BASE / WORLD_MODEL_BASE
+// 路径单源常量（禁第二处字面量、禁第二套 Bearer 拼接）。
 
 // ── alias：既有 17-controller 端点 ───────────────────
 //

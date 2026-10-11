@@ -201,10 +201,19 @@ export default function WorkbenchScenarioDetail() {
             <AdvancedDebugPanel scenarioId={scenario.id} />
           </section>
 
-          {/* Recent actions */}
+          {/* Recent actions — H-8 P08：动作闭环面（L3 同级，不新开顶层导航） */}
           <section className="px-4 pb-6">
             <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3`}>
-              <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted} mb-2`}>{t('workspace.l2.recent.title')}</h2>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted}`}>{t('workspace.l2.recent.title')}</h2>
+                <Link
+                  to={`/workbench/${scenario.id}/decisions`}
+                  className={`text-xs font-bold px-2 py-1 rounded border cursor-pointer ${styles.accentBg} ${styles.accentBorder} ${styles.cardText}`}
+                  data-testid="l2-go-decisions"
+                >
+                  {t('workspace.l2.recent.go_decisions')}
+                </Link>
+              </div>
               <p className={`text-xs ${styles.cardTextMuted}`}>{t('workspace.l2.recent.empty')}</p>
             </div>
           </section>
