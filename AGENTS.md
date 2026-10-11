@@ -42,7 +42,7 @@ mvn -f D:\workspace\javaprojects\ECOS\ecos_backend\pom.xml clean install -DskipT
 | `stop-backend.ps1` | 按 ECOS 端口白名单（8080/18081-18086/18090/19xxx）杀监听进程；`-WithFrontend` 附带 3000 |
 | `start-frontend.ps1` | 前端 dev 启动（缺 node_modules 先 npm install；`-Build` 走生产构建） |
 | `check-legacy-modules.ps1` | 校验 v1 遗留模块引用是否残留 |
-| `db-migration-lint.ps1` | SQL 迁移脚本 lint（schema 只加不删；实跑 15 项检查，基线 0 FAIL / 8 WARN，IR01/ST03/ST06/R9 属人工审查，脚本头部已声明。**2026-10-11 卷09 H-7 订正**：扫描根由 6 个（全指 `ecos_backend/`，而该侧 `db/migration/` 实存 0 个 SQL → 迁移脚本从未入集＝假绿）补第 7 根 `docs/50-db_script/02-flyway-migration`（实扫 230 个 `V*.sql`）；同批修 ST07 注释误判（先剥 `--` 行再判定）与 knownLegacy 白名单补 `ecos_mission/audit/config/pipeline` 四成员。WARN 计数不因扩根而变，基线口径改以「实扫文件数」为准） |
+| `db-migration-lint.ps1` | SQL 迁移脚本 lint（schema 只加不删；实跑 15 项检查，基线 0 FAIL / 8 WARN，IR01/ST03/ST06/R9 属人工审查，脚本头部已声明。**2026-10-11 卷09 H-7 订正**：扫描根由 6 个（全指 `ecos_backend/`，而该侧 `db/migration/` 实存 0 个 SQL → 迁移脚本从未入集＝假绿）补第 7 根 `docs/50-db_script/02-flyway-migration`（扩根当时工作树实扫 230 个 `V*.sql`）；同批修 ST07 注释误判（先剥 `--` 行再判定）与 knownLegacy 白名单补 `ecos_mission/audit/config/pipeline` 四成员。WARN 计数不因扩根而变，基线口径改以「实扫文件数」为准。**2026-10-12 卷09 结案批复跑**（V277~V280 落地后）= `PASS: 0 项 FAIL, 8 项 WARN` / EXIT=0，单源目录现扫 **231** 个 `V*.sql`） |
 | `route-rewrite-lint.ps1` | 网关路由重写表 lint（校验 `VersionPrefixRewriteFilter` 正向 10 + 反向 15 = 25 条的 target/source 是否真有 Controller 服务，并打印 permitAll 匿名面；基线 `fail=6`（存量待裁 H9-T6b 4 条 + 详设-10 R1-A `/api/wagent` 反向前缀 2 条待接 WAgent Controller）/ `EXIT=2`；反向 13→15 系该批次 `-DskipTests` 未实跑门禁，2026-10-11 真跑后按实测订正，只增不减） |
 | `docs-migration.ps1` / `.sh` | docs 五类目录迁移辅助 |
 
@@ -83,7 +83,7 @@ npm run test:watch                      # vitest watch
 - Flyway disabled (`spring.flyway.enabled: false`)
 - Schema rule: only add columns/tables, never drop — **例外（铁律 v2.0 §3.1）**：设计资产历史版本表可 DROP（首批 `ecos_ontology_version`/`ecos_object_version`/`ecos_agent_version`/`sys_rule_version`，前置=备份 + 代码读写先切 Git 链路）
 - **Schema 归属（ST07，单库 5+1 为权威）**：控制域 = `ecos_data`/`ecos_ontology`/`ecos_knowledge`/`ecos_ai`/`ecos_cognitive` 五引擎 schema + 主控制 schema（现 `public`，目标 `ecos_control`）；业务域五层数据落 `ecos_dw`（+ MinIO / Doris∨ClickHouse）。**不存在"每 service 一 schema"路线**（`ecos_sysman`/`ecos_datanet`/`ecos_buszhi`/`ecos_dccheng`/`ecos_aiming` 属 knownLegacy，只停写不迁移）
-- DDL 迁移脚本单源目录：`docs/50-db_script/02-flyway-migration/gateway/`（铁律 **v2.2** §3.1，2026-10-11 卷09 H-7 用户裁决订正，禁分域另立目录；`ecos_backend/gateway/src/main/resources/db/migration/` 实测空目录，不再写入。227 个脚本 + 最大 V 号实测见该目录，新脚本顺延 V277+）
+- DDL 迁移脚本单源目录：`docs/50-db_script/02-flyway-migration/gateway/`（铁律 **v2.2** §3.1，2026-10-11 卷09 H-7 用户裁决订正，禁分域另立目录；`ecos_backend/gateway/src/main/resources/db/migration/` 实测空目录，不再写入。计数单源=现扫该目录 `V*.sql` **231 个**（H-7 裁定时 227，卷09 结案批追加 V277~V280 四枚 ⇒ 新脚本自 **V281** 顺延；`docs/50-db_script` 全域 `.sql` = 297））
 - 金额列唯一形态 `NUMERIC(p,s)`；主键 `VARCHAR(36)` 应用侧生成 UUID，DDL 禁 `gen_random_uuid()`（MC01/MC02 v1.2）
 
 ## Infrastructure (Windows Docker Desktop)
@@ -152,11 +152,11 @@ ECOS（Enterprise Cognitive Operating System）企业认知操作系统。核心
 
 # 项目规范
 
-- 架构铁律：.trae/rules/架构铁律.md (v2.0, 宪法)
+- 架构铁律：.trae/rules/架构铁律.md (v2.2, 宪法；2026-10-11 §3.1 DDL 单源目录口径订正，其余条文与 v2.0/v2.1 一致)
 - 后端开发规范：.trae/rules/后端开发规范.md (v1.1, 新增 §九 runtime 公共底座 + §十 配置/字典单表分组 + §十一 版本×Git 归档；附 CD-1~CD-3/VG-1~VG-6 待整改)
 - 前端开发规范：.trae/rules/前端开发规范.md (v1.1, 新增 §六 i18n + §七 主题模板 + §八 移动端 + §九 配置字典消费 + §十 收口 + §十一 版本归档 UI)
 - Git提交规范：.trae/rules/Git提交规范.md
-- 数据库访问规范：.trae/rules/数据库访问规范.md (v1.2, IR/DR/EN/ST/MC 共 30 条红线 + ST03-A 豁免登记子条款；数据域二分 + Schema 归属 5+1 单库权威 + 多库兼容 + 金额列 NUMERIC(p,s) 白名单)
+- 数据库访问规范：.trae/rules/数据库访问规范.md (v1.4, 2026-10-01 V200 schema 治理 + ST07~ST09；IR01~06/DR01~08/EN01~03/ST01~09/MC01~06 共 32 条红线 + ST03-A 豁免登记子条款；数据域二分 + Schema 归属 5+1 单库权威 + 多库兼容 + 金额列 NUMERIC(p,s) 白名单)
 - 数据湖存储分层规范：.trae/rules/数据湖存储分层规范.md (v2.0, 数据域二分 + 五层 + 知识层双形态 + 版本×分层矩阵)
 - 文档编写规范：.trae/rules/文档编写规范.md (v1.2, R1-R13)
 - 文档目录规范：.trae/rules/文档目录规范.md (v3.1, 生命周期五类目录)
