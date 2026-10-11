@@ -9,20 +9,25 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 场景蓝图数据访问（DDL V271 {@code workspace.ecos_scenario_blueprint}）。
+ * 场景蓝图数据访问（DDL V271 {@code ecos_control.ecos_scenario_blueprint}）。
  *
  * <p>架构铁律 §2.5#1 三层纪律：raw-SQL 一律收口 DAO（{@code ..dao..} 包形态的
  * {@link JdbcTemplateDaoSupport} 子类，本类落 {@code ..blueprint..} 包但类名不以
  * Service/Aggregator/Runtime/Controller 结尾，同型合规；Service/Controller 禁私持
  * JdbcTemplate，见 {@code DataAccessArchTest}）。
  *
- * <p>ST07：表落 workspace 场景层 schema（DDL 单源 {@code docs/50-db_script/02-flyway-migration/gateway/V271}）；
+ * <p>ST07（v1.4 八 schema 封闭枚举）：workspace 层新表落主控制 schema {@code ecos_control}
+ * （原稿 {@code workspace.} schema 不在枚举且实库不存在，2026-10-11 修订，场景层 12 表同在
+ * ecos_control；属主仍 workspace 服务唯一写入面，DDL 单源
+ * {@code docs/50-db_script/02-flyway-migration/gateway/V271}）；
  * MC01 应用侧 UUID；MC03 索引前置条件并入 WHERE（is_deleted）；DR05 approval_required 列名带 required 语义。</p>
  */
 @Repository
 public class ScenarioBlueprintDao extends JdbcTemplateDaoSupport {
 
-    private static final String TABLE = "workspace.ecos_scenario_blueprint";
+    // 同域自家表不带 schema 限定（与 ScenarioService/WorkspaceDataDao 同约定，靠 datasource
+    // currentSchema=ecos_control,… 解析；WorkspaceLayeringArchTest ratchet 禁码内出现 schema 限定名）
+    private static final String TABLE = "ecos_scenario_blueprint";
 
     private static final String COLUMNS =
             "id, tenant_id, org_id, scenario_id, version, status, goal_statement, goal_success_text, " +

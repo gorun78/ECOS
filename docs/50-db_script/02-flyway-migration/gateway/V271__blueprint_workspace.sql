@@ -1,8 +1,12 @@
 -- V271 (补充设计-认知域与智能域 v1.0 §6): 场景蓝图 workspace 权威载体
 -- 追溯: §6.1 定位与归属（Workspace/Scenario Workbench 属主；ai/cognitive 域禁止复制副本）；
 --       八项建议 #3「场景蓝图」；§6.3 状态机；§6.5 Gap 项结构；§6.6 验收门槛
--- 落点裁定: workspace 场景层 ✓（ST07：场景层归属生态域 workspace 侧控制 schema；
---           跨引擎不引 schema，仅逻辑引用 scenario 既有主表，ST09 禁跨 schema FK）
+-- 落点裁定: 场景层控制数据 ✓（**2026-10-11 修订**：原稿落 `workspace.` schema，经与 PG 实库和
+--           《数据库访问规范》v1.4 §二附 ST07 交叉核对判定为违规——schema 封闭枚举仅 8 个，
+--           `workspace` 不在枚举且实库不存在；ST07 明文「sysman/workspace/service 层新表一律落
+--           ecos_control」，场景层既有 12 表（ecos_scenario_definition 等）V200 治理后全在 ecos_control。
+--           本稿未实跑无历史包袱，表落点改 ecos_control；属主不变（workspace 服务唯一写入面，§6.1）；
+--           跨引擎仅逻辑引用 scenario 既有主表，ST09 禁跨 schema FK）
 -- 只写红线:
 --   * 状态词表单源 = blueprint.BlueprintStatus 枚举（DDL 不建 CHECK，R-15 同纪律）；
 --   * 禁止 DRAFT 直进 ACTIVE（§6.3；状态机非法迁移 409，SUP-BP-01）；
@@ -10,10 +14,11 @@
 --   * gap/dependency/capability/test/approval 子段全 JSON-TEXT（§6.2 逻辑模型整体落 content_json；
 --     结构化查询热列才拆列，禁复制其他引擎权威对象到本表正文，§17 捷径禁令 2）；
 --   * 审批引用 approval_ref 指向 security-engine 裁决/批准记录（security 权威，本表只存引用）。
--- 状态: 仅落迁移脚本文件，**未对 ecos-postgres 实跑**
+-- 状态: 2026-10-11 修订落点后，经用户「授权实跑」增量迁移之续授权（同一 live 契约核验目的，
+--       见 goal 决议「拉起全栈核验契约后继续实现剩余面」）对本机开发 ecos-postgres/sys_man 实跑
 -- 纪律: DR01~DR08 / MC01~MC03 / ST07 / IR02 / IR03(只加不删)
 
-CREATE TABLE IF NOT EXISTS workspace.ecos_scenario_blueprint (
+CREATE TABLE IF NOT EXISTS ecos_control.ecos_scenario_blueprint (
     id                    VARCHAR(36) PRIMARY KEY,           -- MC01 应用侧 UUID（= blueprintId）
     tenant_id             VARCHAR(64) NOT NULL,
     org_id                VARCHAR(64),
@@ -49,11 +54,11 @@ CREATE TABLE IF NOT EXISTS workspace.ecos_scenario_blueprint (
     update_by             VARCHAR(100),
     is_deleted            SMALLINT NOT NULL DEFAULT 0
 );
-COMMENT ON TABLE workspace.ecos_scenario_blueprint IS
+COMMENT ON TABLE ecos_control.ecos_scenario_blueprint IS
     '场景蓝图权威载体（补充设计 v1.0 §6）：workspace 属主，唯一写入面；ai/cognitive 域禁复制副本（§6.1/§17 捷径禁令 2）；发布版本不可变，RUN 运行回链 version+context_digest（SUP-BP-02/03）';
-CREATE UNIQUE INDEX IF NOT EXISTS uk_v271_bp_scen_ver ON workspace.ecos_scenario_blueprint (scenario_id, version, is_deleted);
-CREATE INDEX IF NOT EXISTS idx_v271_bp_tenant_status ON workspace.ecos_scenario_blueprint (tenant_id, status, is_deleted);
-COMMENT ON COLUMN workspace.ecos_scenario_blueprint.version IS
+CREATE UNIQUE INDEX IF NOT EXISTS uk_v271_bp_scen_ver ON ecos_control.ecos_scenario_blueprint (scenario_id, version, is_deleted);
+CREATE INDEX IF NOT EXISTS idx_v271_bp_tenant_status ON ecos_control.ecos_scenario_blueprint (tenant_id, status, is_deleted);
+COMMENT ON COLUMN ecos_control.ecos_scenario_blueprint.version IS
     '蓝图版本号（应用侧递增，非乐观锁 version_no）；RELEASED 后该行 content_json/artifact_digest 只读，更新 = version+1 新行 + 旧行 DEPRECATED（§6.6 发布不可变）';
 
 -- ── 回滚说明 ──────────────────────────────────────────────
@@ -61,8 +66,8 @@ COMMENT ON COLUMN workspace.ecos_scenario_blueprint.version IS
 -- 幂等性：CREATE TABLE/UNIQUE INDEX/INDEX IF NOT EXISTS ⇒ 重复执行零报错。
 
 -- ── DDL Lint Self-audit ──────────────────────────────────────
--- [DR01] schema 限定（workspace.）✓ [DR02/03] 新表单数 ✓ [DR04] JSON 全 TEXT ✓
+-- [DR01] schema 限定（ecos_control.，2026-10-11 修订）✓ [DR02/03] 新表单数 ✓ [DR04] JSON 全 TEXT ✓
 -- [DR05] 布尔一律 SMALLINT 0/1 ✓ [DR06~08] 七基线列齐 ✓
 -- [MC01] UUID 主键 ✓ [MC02] 无二进制浮点；version INTEGER 计数非度量 ✓
 -- [MC03] 无条件索引（is_deleted 并入键）/ TIMESTAMP 无时区 ✓
--- [ST07] 场景层 workspace ✓ [ST09] 无跨 schema FK ✓ [IR02] 仅文件 ✓ [IR03] 只加 ✓
+-- [ST07] 八 schema 封闭枚举内：workspace 层新表落 ecos_control（v1.4 明文）✓ [ST09] 无跨 schema FK ✓ [IR02] 仅文件 ✓ [IR03] 只加 ✓
