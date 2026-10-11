@@ -427,7 +427,7 @@ public class ScenarioBlueprintService {
         vo.setTraceId(bp.getTraceId());
         vo.setActor(bp.getActor());
         vo.setTransitionReason(bp.getTransitionReason());
-        vo.setReleasedTime(null); // bp.getReleasedTime() returns String; VO expects LocalDateTime — skip for now
+        vo.setReleasedTime(bp.getReleasedTime());
         vo.setCreateTime(bp.getCreateTime());
         vo.setUpdateTime(bp.getUpdateTime());
         vo.setAllowedTransitions(stateMachine.allowedTransitions(status).stream()

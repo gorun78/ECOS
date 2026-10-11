@@ -52,6 +52,25 @@ public class ScenarioBlueprint {
     private String contextDigest;
     private String traceId;
 
+    /**
+     * 行形态热列（DDL V271 物理列直存值）。Service/DAO 的读写面一律走 *_text / contentJson /
+     * actor / transitionReason 文本访问器；结构化子段（goal/scope/列表）仅作可选投影——
+     * text getter 优先返回本组 raw 值，raw 为 null 时回落结构化序列化。
+     * （2026-10-11 live 契约核验修复：原 no-op setter + 恒 null getter 导致热列静默丢写，§6.2/§6.6。）
+     */
+    private String goalSuccessText;
+    private String scopeJsonText;
+    private String dependenciesText;
+    private String capabilitiesText;
+    private String gapsText;
+    private String risksText;
+    private String testsText;
+    private String contentJson;
+    /** 最近状态迁移操作者/原因（§6.3 五要素留痕热列）。 */
+    private String actor;
+    private String transitionReason;
+    private java.time.LocalDateTime releasedTime;
+
     /** 审计字段（持久化层映射，逻辑模型保留用于 DAO 兼容）。 */
     private String tenantId;
     private String orgId;
@@ -315,65 +334,76 @@ public class ScenarioBlueprint {
     }
 
     // ── Convenience getters for Service layer (flatten nested objects to text/JSON) ──
+    // 口径：raw 热列优先（Service/DAO 读写面），raw 为 null 时回落结构化投影序列化。
 
     public String getId() { return blueprintId; }
     public String getGoalStatement() { return goal != null ? goal.getStatement() : null; }
     public String getGoalSuccessText() {
+        if (goalSuccessText != null) return goalSuccessText;
         if (goal == null || goal.getSuccessCriteria() == null || goal.getSuccessCriteria().isEmpty()) return null;
         try { return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(goal.getSuccessCriteria()); }
         catch (Exception e) { return null; }
     }
     public String getScopeJsonText() {
+        if (scopeJsonText != null) return scopeJsonText;
         if (scope == null) return null;
         try { return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(scope); }
         catch (Exception e) { return null; }
     }
     public String getDependenciesText() {
+        if (dependenciesText != null) return dependenciesText;
         if (dependencies == null || dependencies.isEmpty()) return null;
         try { return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(dependencies); }
         catch (Exception e) { return null; }
     }
     public String getCapabilitiesText() {
+        if (capabilitiesText != null) return capabilitiesText;
         if (capabilities == null || capabilities.isEmpty()) return null;
         try { return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(capabilities); }
         catch (Exception e) { return null; }
     }
     public String getGapsText() {
+        if (gapsText != null) return gapsText;
         if (gaps == null || gaps.isEmpty()) return null;
         try { return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(gaps); }
         catch (Exception e) { return null; }
     }
     public String getRisksText() {
+        if (risksText != null) return risksText;
         if (risks == null || risks.isEmpty()) return null;
         try { return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(risks); }
         catch (Exception e) { return null; }
     }
     public String getTestsText() {
+        if (testsText != null) return testsText;
         if (tests == null || tests.isEmpty()) return null;
         try { return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(tests); }
         catch (Exception e) { return null; }
     }
-    public void setDependenciesText(String json) { /* no-op: deserialized by Service layer */ }
-    public void setCapabilitiesText(String json) { /* no-op: deserialized by Service layer */ }
-    public void setGapsText(String json) { /* no-op: deserialized by Service layer */ }
-    public void setRisksText(String json) { /* no-op: deserialized by Service layer */ }
-    public void setTestsText(String json) { /* no-op: deserialized by Service layer */ }
-    public void setContentJson(String json) { /* no-op: reserved for full snapshot */ }
+    public void setDependenciesText(String json) { this.dependenciesText = json; }
+    public void setCapabilitiesText(String json) { this.capabilitiesText = json; }
+    public void setGapsText(String json) { this.gapsText = json; }
+    public void setRisksText(String json) { this.risksText = json; }
+    public void setTestsText(String json) { this.testsText = json; }
+    public void setContentJson(String json) { this.contentJson = json; }
     public void setArtifactDigest(String digest) { if (release != null) release.setArtifactDigest(digest); }
     public void setApprovalRequired(int required) { if (approval != null) approval.setRequired(required == 1); }
-    public void setApprovalRef(String ref) { if (approval != null) approval.setPolicyRef(ref); }
-    public void setReleasedTime(java.time.LocalDateTime time) { if (release != null) release.setReleasedAt(time != null ? time.toString() : null); }
+    public void setApprovalRef(String ref) { if (approval != null) approval.setApprovalRef(ref); }
+    public void setReleasedTime(java.time.LocalDateTime time) {
+        this.releasedTime = time;
+        if (release != null) release.setReleasedAt(time != null ? time.toString() : null);
+    }
     public void setId(String id) { this.blueprintId = id; }
     public void setGoalStatement(String statement) { if (goal == null) goal = new Goal(); goal.setStatement(statement); }
-    public void setGoalSuccessText(String json) { /* no-op: deserialized by Service layer */ }
-    public void setScopeJsonText(String json) { /* no-op: deserialized by Service layer */ }
+    public void setGoalSuccessText(String json) { this.goalSuccessText = json; }
+    public void setScopeJsonText(String json) { this.scopeJsonText = json; }
     public Integer getApprovalRequired() { return approval != null && approval.isRequired() ? 1 : 0; }
-    public String getApprovalRef() { return approval != null ? approval.getPolicyRef() : null; }
+    public String getApprovalRef() { return approval != null ? approval.getApprovalRef() : null; }
     public String getArtifactDigest() { return release != null ? release.getArtifactDigest() : null; }
-    public String getReleasedTime() { return release != null ? release.getReleasedAt() : null; }
-    public String getContentJson() { return null; } // reserved for full snapshot serialization
-    public String getActor() { return null; } // from transition history
-    public String getTransitionReason() { return null; } // from transition history
+    public java.time.LocalDateTime getReleasedTime() { return releasedTime; }
+    public String getContentJson() { return contentJson; }
+    public String getActor() { return actor; }
+    public String getTransitionReason() { return transitionReason; }
     public java.time.LocalDateTime getCreateTime() { return createTime; }
     public void setCreateTime(java.time.LocalDateTime createTime) { this.createTime = createTime; }
     public java.time.LocalDateTime getUpdateTime() { return updateTime; }
@@ -396,6 +426,6 @@ public class ScenarioBlueprint {
     public void setIsDeleted(int isDeleted) { this.isDeleted = isDeleted; }
     public String getReleaseArtifactRef() { return releaseArtifactRef; }
     public void setReleaseArtifactRef(String releaseArtifactRef) { this.releaseArtifactRef = releaseArtifactRef; }
-    public void setActor(String actor) { /* no-op: from transition history */ }
-    public void setTransitionReason(String reason) { /* no-op: from transition history */ }
+    public void setActor(String actor) { this.actor = actor; }
+    public void setTransitionReason(String reason) { this.transitionReason = reason; }
 }

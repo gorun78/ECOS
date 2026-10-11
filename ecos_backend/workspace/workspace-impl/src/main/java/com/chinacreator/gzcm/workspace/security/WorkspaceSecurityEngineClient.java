@@ -1,7 +1,10 @@
 package com.chinacreator.gzcm.workspace.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor;
+import com.chinacreator.gzcm.common.security.header.ServiceContext;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -14,6 +17,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -181,8 +187,15 @@ public class WorkspaceSecurityEngineClient {
                 return auth.getName();
             }
         } catch (Exception ignored) {
-            // fail-safe：退化为 anonymous 走最小权限，而非伪造真实主体
-            log.debug("WorkspaceSecurityEngineClient: 读取 SecurityContext 失败，主体退化为 anonymous: {}", ignored.getMessage());
+            // fail-safe：退化为信任链上下文（ADR-7），再退 anonymous 走最小权限，而非伪造真实主体
+            log.debug("WorkspaceSecurityEngineClient: 读取 SecurityContext 失败，退化 ServiceContext: {}",
+                    ignored.getMessage());
+        }
+        // workspace 独立进程（:18090）无 Spring Security 上下文，主体由
+        // HeaderAuthInterceptor 还原进 ServiceContext（X-ECOS-USER 信任头单源）。
+        ServiceContext ctx = ServiceContext.current();
+        if (ctx != null && ctx.getUserId() != null && !ctx.getUserId().isBlank()) {
+            return ctx.getUserId();
         }
         return "anonymous";
     }
@@ -191,9 +204,54 @@ public class WorkspaceSecurityEngineClient {
     private Map<String, Object> postJson(String path, Map<String, Object> body) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        relayCallerCredentials(headers);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
         // path 为相对 Bean rootUri（sysman 基址，F07-17 两态寻址单源）的完整路由
         ResponseEntity<Map> resp = restTemplate.postForEntity(path, entity, Map.class);
         return resp == null ? null : resp.getBody();
+    }
+
+    /**
+     * 服务间凭证透传（H10 服务凭证收口前的 ADR-7 信任链唯一合法通道）。
+     *
+     * <p>security-engine 的 RLS/CLS/ABAC 控制面不在
+     * {@code AnonymousEndpointRegistry} ANONYMOUS 面（{@code /api/v1/security} 为
+     * CLEARANCE_EXEMPT：需认证、跳过准入裁决）。2026-10-11 live 实证：本客户端
+     * 原样出站不带任何凭证 → sysman/gateway Spring Security 默认 DENY 403 →
+     * {@code applyRls} 折叠成 "1=0" → {@link ScenarioReadGuard} fail-closed →
+     * 场景域 L1/L2 对已认证 admin 也 403（误 DENY，非策略 DENY）。</p>
+     *
+     * <p>整改：入口请求携带的 {@code Authorization}（用户 JWT 原样中继，security 端
+     * JwtAuthenticationFilter 真实验签）与 {@code X-ECOS-USER/ROLE/TENANT/DOMAIN}
+     * 信任头逐字转发；无入口请求上下文（异步/定时任务）时不伪造凭证 ——
+     * 保持 fail-closed 语义不变，只修"把合法已认证用户误判为不可用"这一 plumbing 缺口。</p>
+     */
+    private void relayCallerCredentials(HttpHeaders headers) {
+        RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+        if (!(attrs instanceof ServletRequestAttributes servletAttrs)) {
+            return; // 无请求上下文：不带凭证，由 security-engine 默认 DENY（宁 DENY 不超发）
+        }
+        HttpServletRequest request = servletAttrs.getRequest();
+        String authorization = trimToNull(request.getHeader(HttpHeaders.AUTHORIZATION));
+        if (authorization != null) {
+            headers.set(HttpHeaders.AUTHORIZATION, authorization);
+        }
+        copyIfPresent(request, headers, HeaderAuthInterceptor.H_USER);
+        copyIfPresent(request, headers, HeaderAuthInterceptor.H_ROLE);
+        copyIfPresent(request, headers, HeaderAuthInterceptor.H_TENANT);
+        copyIfPresent(request, headers, HeaderAuthInterceptor.H_DOMAIN);
+    }
+
+    private static void copyIfPresent(HttpServletRequest request, HttpHeaders headers, String header) {
+        String value = trimToNull(request.getHeader(header));
+        if (value != null) {
+            headers.set(header, value);
+        }
+    }
+
+    private static String trimToNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
     }
 }
