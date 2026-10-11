@@ -1,85 +1,118 @@
--- ECOS Schema Isolation: Migrate tables from public schema to domain-specific schemas
--- Sprint 1.1: Database Per Service alignment with design doc 06
+-- V47__ecos_schema_isolation.sql —— 【整体作废脚本 / VOIDED】
 --
--- 【W248/R-22 订正 2026-10-10】ST07 五枚举权威下 Agent 族落 ecos_ai，禁建 ecos_agent schema
--- （X-4 库内本无该 schema，本脚本从未实跑，登记见 docs/40-实现/DDL迁移脚本落地登记-2026-09-30.md §一）；
--- 原 ecos_agent 相关语句作废保留可审计（注释化），同名表实存 ecos_ai，Phase 8 迁表由
--- docs/50-db_script/01-ddl-多方言/migration/12_to_8_schema.sql（原 ecos-sql/migration/ 第二源现位置）承接。
+-- 作废依据（2026-10-11，卷09 §十一 H-7 用户裁决同批治理）：
+--   1. **ST07 五枚举权威**（《数据库访问规范》v1.2 + 铁律 v2.2 §3.1「控制域 Schema 归属 5+1」）：
+--      引擎控制 schema 只有 `ecos_data` / `ecos_ontology` / `ecos_knowledge` / `ecos_ai` / `ecos_cognitive`
+--      五个，其余控制数据归主控制 schema（现 `public`，目标 `ecos_control`）；业务域五层数据落 `ecos_dw`。
+--      本脚本要建的 12 个 schema 中 **10 个在五枚举之外**（ecos_identity / ecos_catalog / ecos_object /
+--      ecos_workflow / ecos_rule / ecos_mission / ecos_audit / ecos_config / ecos_pipeline，
+--      加上 W248 已单独作废的 ecos_agent），属"每 service 一 schema"旧路线。
+--   2. **该路线已被明令废止**：铁律 v2.0 Q6 裁决（ADR-3 修订）把"enterprise/ultimate 每 service 独立
+--      database"降级为可选部署形态，并确认"不存在每 service 一 schema 路线"（knownLegacy 只停写不迁移）。
+--   3. **本脚本从未实跑**（X-4 实测：库内不存在上述 schema；登记见
+--      `docs/40-实现/DDL迁移脚本落地登记-2026-09-30.md` §一）。真实迁表载体 =
+--      `docs/50-db_script/01-ddl-多方言/migration/12_to_8_schema.sql`，本文件不承担执行职责。
+--   4. **门禁暴露路径**：2026-10-11 卷09 H-7 给 `_win_tasks/db-migration-lint.ps1` 增 docs 扫描根后，
+--      ST07 检查项首次扫到本脚本并判 FAIL（"CREATE SCHEMA 违规 + 非法限定名"）。
+--      此前该 FAIL 不可见 —— 根因是铁律 v2.0 §3.1 把单源目录误记为 `gateway/src/main/resources/db/migration/`
+--      （实测空目录），门禁扫描集为空集，"0 FAIL" 属假绿。
+--
+-- 治理方式（沿用本文件 W248/R-22 2026-10-10 只作废 ecos_agent 的同一体例，且更彻底）：
+--   全部语句**注释化保留可审计**，不删文件、不改文件名、不占版本号（IR03「只加不删」约束的是在线库
+--   schema，不约束一个从未实跑的设计资产脚本；作废留痕即等效停写）。
+--   如需恢复其中任何语义，必须先立新的 ST07 裁决并另起 V 号脚本，禁止就地解注释执行。
+--
+-- 历史沿革（保留以便审计追溯）：
+--   [Sprint 1.1] 本脚本按"Database Per Service"设想起草（对齐当时设计文档 06）。
+--   [W248/R-22 2026-10-10] 作废 ecos_agent 相关语句（Agent 族表实存 ecos_ai）。
+--   [卷09 H-7 2026-10-11] 按 ST07 五枚举整体作废余下全部语句。
 
--- Step 1: Create domain schemas
-CREATE SCHEMA IF NOT EXISTS ecos_identity;
-CREATE SCHEMA IF NOT EXISTS ecos_catalog;
-CREATE SCHEMA IF NOT EXISTS ecos_ontology;
-CREATE SCHEMA IF NOT EXISTS ecos_object;
-CREATE SCHEMA IF NOT EXISTS ecos_workflow;
-CREATE SCHEMA IF NOT EXISTS ecos_rule;
--- [W248/R-22 订正 2026-10-10 作废] CREATE SCHEMA IF NOT EXISTS ecos_agent;
---   ⇒ 禁建 ecos_agent schema（ST07 五枚举外第 12 schema）；Agent 族表归 ecos_ai（X-4/X-5 实测）
-CREATE SCHEMA IF NOT EXISTS ecos_knowledge;
-CREATE SCHEMA IF NOT EXISTS ecos_mission;
-CREATE SCHEMA IF NOT EXISTS ecos_audit;
-CREATE SCHEMA IF NOT EXISTS ecos_config;
-CREATE SCHEMA IF NOT EXISTS ecos_pipeline;
+-- ============================================================
+-- Step 1: Create domain schemas —— 全部作废（10/12 违 ST07 五枚举）
+-- ============================================================
+-- CREATE SCHEMA IF NOT EXISTS ecos_identity;
+-- CREATE SCHEMA IF NOT EXISTS ecos_catalog;
+-- CREATE SCHEMA IF NOT EXISTS ecos_ontology;
+-- CREATE SCHEMA IF NOT EXISTS ecos_object;
+-- CREATE SCHEMA IF NOT EXISTS ecos_workflow;
+-- CREATE SCHEMA IF NOT EXISTS ecos_rule;
+-- CREATE SCHEMA IF NOT EXISTS ecos_agent;          -- [W248/R-22 2026-10-10 先行作废]
+-- CREATE SCHEMA IF NOT EXISTS ecos_knowledge;
+-- CREATE SCHEMA IF NOT EXISTS ecos_mission;
+-- CREATE SCHEMA IF NOT EXISTS ecos_audit;
+-- CREATE SCHEMA IF NOT EXISTS ecos_config;
+-- CREATE SCHEMA IF NOT EXISTS ecos_pipeline;
 
--- Step 2: Migrate tables to their domain schemas
--- ecos_identity: IAM, Organization, Tenant, Security profiles
-ALTER TABLE IF EXISTS td_user SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS td_role SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS td_permission SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS td_user_role SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS td_role_permission SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS td_organization SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS td_user_organization SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS td_org_permission SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS td_config SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS td_user_security_profile SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS td_role_security_profile SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS td_abac_policy SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS td_audit_log SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS users SET SCHEMA ecos_identity;
+-- ============================================================
+-- Step 2: Migrate tables to their domain schemas —— 全部作废
+--   归属现况（按 ST07 五枚举 + 业务域 ecos_dw）：IAM/组织/租户/审计/配置字典 → 主控制 schema（public，
+--   目标 ecos_control）；数据源/元数据/DQ/管道 → `ecos_data`；本体/实体/关系/术语 → `ecos_ontology`；
+--   知识图谱/文档/市场 → `ecos_knowledge`；Agent/工具/任务/世界模型运行态 → `ecos_ai`；
+--   认知规则/心智层 → `ecos_cognitive`；业务事实与计算产物 → `ecos_dw`（五层）。
+--   表名与真实 schema 的逐表对账不在本脚本职责，以 `SchemaInventoryGateTest` / `SchemaDriftLintTest`
+--   实测为准。
+-- ============================================================
 
--- ecos_catalog: Data sources, metadata, catalog
-ALTER TABLE IF EXISTS td_datasource SET SCHEMA ecos_catalog;
-ALTER TABLE IF EXISTS td_data_resource SET SCHEMA ecos_catalog;
-ALTER TABLE IF EXISTS td_data_field SET SCHEMA ecos_catalog;
-ALTER TABLE IF EXISTS td_catalog_item SET SCHEMA ecos_catalog;
+-- ---- 原 ecos_identity 段（IAM / 组织 / 租户 / 安全档案）作废 ----
+-- ALTER TABLE IF EXISTS td_user SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS td_role SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS td_permission SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS td_user_role SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS td_role_permission SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS td_organization SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS td_user_organization SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS td_org_permission SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS td_config SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS td_user_security_profile SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS td_role_security_profile SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS td_abac_policy SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS td_audit_log SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS users SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS ecos_tenant SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS ecos_tenant_quota SET SCHEMA ecos_identity;
+-- ALTER TABLE IF EXISTS ecos_tenant_usage SET SCHEMA ecos_identity;
 
--- ecos_ontology: Ontology definitions, entities, properties, relationships
-ALTER TABLE IF EXISTS ecos_ontology_entity SET SCHEMA ecos_ontology;
-ALTER TABLE IF EXISTS ecos_ontology_property SET SCHEMA ecos_ontology;
-ALTER TABLE IF EXISTS ecos_ontology_relationship SET SCHEMA ecos_ontology;
-ALTER TABLE IF EXISTS ecos_ontology_action SET SCHEMA ecos_ontology;
-ALTER TABLE IF EXISTS ecos_ontology_rule SET SCHEMA ecos_ontology;
-ALTER TABLE IF EXISTS ecos_ontology_version SET SCHEMA ecos_ontology;
-ALTER TABLE IF EXISTS ecos_domain SET SCHEMA ecos_ontology;
-ALTER TABLE IF EXISTS ecos_business_glossary SET SCHEMA ecos_ontology;
+-- ---- 原 ecos_catalog 段（数据源 / 元数据 / 目录 → 现归 ecos_data）作废 ----
+-- ALTER TABLE IF EXISTS td_datasource SET SCHEMA ecos_catalog;
+-- ALTER TABLE IF EXISTS td_data_resource SET SCHEMA ecos_catalog;
+-- ALTER TABLE IF EXISTS td_data_field SET SCHEMA ecos_catalog;
+-- ALTER TABLE IF EXISTS td_catalog_item SET SCHEMA ecos_catalog;
 
--- ecos_object: Object runtime, state machines, relationships, links
-ALTER TABLE IF EXISTS ecos_object_state_machine SET SCHEMA ecos_object;
-ALTER TABLE IF EXISTS ecos_object_timeline SET SCHEMA ecos_object;
-ALTER TABLE IF EXISTS ecos_object_version SET SCHEMA ecos_object;
-ALTER TABLE IF EXISTS ecos_object_relationship SET SCHEMA ecos_object;
-ALTER TABLE IF EXISTS ecos_object_attachment SET SCHEMA ecos_object;
-ALTER TABLE IF EXISTS ecos_object_links SET SCHEMA ecos_object;
-ALTER TABLE IF EXISTS ecos_object_data SET SCHEMA ecos_object;
-ALTER TABLE IF EXISTS ecos_object_relation SET SCHEMA ecos_object;
+-- ---- 原 ecos_ontology 段（目标 schema 名合法，但迁表载体不是本脚本）作废 ----
+-- ALTER TABLE IF EXISTS ecos_ontology_entity SET SCHEMA ecos_ontology;
+-- ALTER TABLE IF EXISTS ecos_ontology_property SET SCHEMA ecos_ontology;
+-- ALTER TABLE IF EXISTS ecos_ontology_relationship SET SCHEMA ecos_ontology;
+-- ALTER TABLE IF EXISTS ecos_ontology_action SET SCHEMA ecos_ontology;
+-- ALTER TABLE IF EXISTS ecos_ontology_rule SET SCHEMA ecos_ontology;
+-- ALTER TABLE IF EXISTS ecos_ontology_version SET SCHEMA ecos_ontology;
+-- ALTER TABLE IF EXISTS ecos_domain SET SCHEMA ecos_ontology;
+-- ALTER TABLE IF EXISTS ecos_business_glossary SET SCHEMA ecos_ontology;
 
--- ecos_workflow: Workflow definitions, instances, tasks, approvals
-ALTER TABLE IF EXISTS ecos_workflow SET SCHEMA ecos_workflow;
-ALTER TABLE IF EXISTS ecos_workflow_instance SET SCHEMA ecos_workflow;
-ALTER TABLE IF EXISTS ecos_workflow_task SET SCHEMA ecos_workflow;
-ALTER TABLE IF EXISTS ecos_workflow_approval SET SCHEMA ecos_workflow;
-ALTER TABLE IF EXISTS ecos_workflow_log SET SCHEMA ecos_workflow;
+-- ---- 原 ecos_object 段（对象运行态 → 现归 ecos_ontology/主控制域）作废 ----
+-- ALTER TABLE IF EXISTS ecos_object_state_machine SET SCHEMA ecos_object;
+-- ALTER TABLE IF EXISTS ecos_object_timeline SET SCHEMA ecos_object;
+-- ALTER TABLE IF EXISTS ecos_object_version SET SCHEMA ecos_object;
+-- ALTER TABLE IF EXISTS ecos_object_relationship SET SCHEMA ecos_object;
+-- ALTER TABLE IF EXISTS ecos_object_attachment SET SCHEMA ecos_object;
+-- ALTER TABLE IF EXISTS ecos_object_links SET SCHEMA ecos_object;
+-- ALTER TABLE IF EXISTS ecos_object_data SET SCHEMA ecos_object;
+-- ALTER TABLE IF EXISTS ecos_object_relation SET SCHEMA ecos_object;
 
--- ecos_rule: Data quality rules, cognitive rules
-ALTER TABLE IF EXISTS ecos_dq_rule SET SCHEMA ecos_rule;
-ALTER TABLE IF EXISTS ecos_dq_issue SET SCHEMA ecos_rule;
-ALTER TABLE IF EXISTS ecos_dq_execution_result SET SCHEMA ecos_rule;
-ALTER TABLE IF EXISTS ecos_cognitive_rule SET SCHEMA ecos_rule;
+-- ---- 原 ecos_workflow 段（工作流 / 任务 → 主控制域）作废 ----
+-- ALTER TABLE IF EXISTS ecos_workflow SET SCHEMA ecos_workflow;
+-- ALTER TABLE IF EXISTS ecos_workflow_instance SET SCHEMA ecos_workflow;
+-- ALTER TABLE IF EXISTS ecos_workflow_task SET SCHEMA ecos_workflow;
+-- ALTER TABLE IF EXISTS ecos_workflow_approval SET SCHEMA ecos_workflow;
+-- ALTER TABLE IF EXISTS ecos_workflow_log SET SCHEMA ecos_workflow;
+-- ALTER TABLE IF EXISTS ecos_task SET SCHEMA ecos_workflow;
 
--- ecos_agent: Agent definitions, registry, missions, tools
--- [W248/R-22 订正 2026-10-10 作废] 下列 SET SCHEMA ecos_agent 语句整体作废：目标 schema 不存在且禁建，
---   同名表实存 ecos_ai（X-4/X-5）；原语句作废保留可审计。
+-- ---- 原 ecos_rule 段（DQ 规则 → ecos_data；认知规则 → ecos_cognitive）作废 ----
+-- ALTER TABLE IF EXISTS ecos_dq_rule SET SCHEMA ecos_rule;
+-- ALTER TABLE IF EXISTS ecos_dq_issue SET SCHEMA ecos_rule;
+-- ALTER TABLE IF EXISTS ecos_dq_execution_result SET SCHEMA ecos_rule;
+-- ALTER TABLE IF EXISTS ecos_cognitive_rule SET SCHEMA ecos_rule;
+
+-- ---- 原 ecos_agent 段（→ ecos_ai）作废 [W248/R-22 2026-10-10 已作废] ----
 -- ALTER TABLE IF EXISTS ecos_agent SET SCHEMA ecos_agent;
 -- ALTER TABLE IF EXISTS ecos_agent_registry SET SCHEMA ecos_agent;
 -- ALTER TABLE IF EXISTS ecos_mission SET SCHEMA ecos_agent;
@@ -87,55 +120,50 @@ ALTER TABLE IF EXISTS ecos_cognitive_rule SET SCHEMA ecos_rule;
 -- ALTER TABLE IF EXISTS ecos_tool_definition SET SCHEMA ecos_agent;
 -- ALTER TABLE IF EXISTS ecos_decision_case SET SCHEMA ecos_agent;
 
--- ecos_knowledge: Knowledge graph, glossary, documents
-ALTER TABLE IF EXISTS ecos_glossary_term SET SCHEMA ecos_knowledge;
-ALTER TABLE IF EXISTS ecos_knowledge_document SET SCHEMA ecos_knowledge;
+-- ---- 原 ecos_knowledge 段（目标 schema 名合法，但迁表载体不是本脚本）作废 ----
+-- ALTER TABLE IF EXISTS ecos_glossary_term SET SCHEMA ecos_knowledge;
+-- ALTER TABLE IF EXISTS ecos_knowledge_document SET SCHEMA ecos_knowledge;
+-- ALTER TABLE IF EXISTS ecos_marketplace_asset SET SCHEMA ecos_knowledge;
+-- ALTER TABLE IF EXISTS ecos_marketplace_access_request SET SCHEMA ecos_knowledge;
 
--- ecos_mission: World model, goals, scenarios
-ALTER TABLE IF EXISTS ecos_wm_goal SET SCHEMA ecos_mission;
-ALTER TABLE IF EXISTS ecos_wm_causal_link SET SCHEMA ecos_mission;
-ALTER TABLE IF EXISTS ecos_wm_scenario SET SCHEMA ecos_mission;
-ALTER TABLE IF EXISTS ecos_wm_goal_log SET SCHEMA ecos_mission;
-ALTER TABLE IF EXISTS ecos_goal_tracking SET SCHEMA ecos_mission;
-ALTER TABLE IF EXISTS ecos_world_scenarios SET SCHEMA ecos_mission;
+-- ---- 原 ecos_mission 段（世界模型 / 场景 / 业务演示种子 → ecos_ai 或 ecos_dw）作废 ----
+-- ALTER TABLE IF EXISTS ecos_wm_goal SET SCHEMA ecos_mission;
+-- ALTER TABLE IF EXISTS ecos_wm_causal_link SET SCHEMA ecos_mission;
+-- ALTER TABLE IF EXISTS ecos_wm_scenario SET SCHEMA ecos_mission;
+-- ALTER TABLE IF EXISTS ecos_wm_goal_log SET SCHEMA ecos_mission;
+-- ALTER TABLE IF EXISTS ecos_goal_tracking SET SCHEMA ecos_mission;
+-- ALTER TABLE IF EXISTS ecos_world_scenarios SET SCHEMA ecos_mission;
+-- ALTER TABLE IF EXISTS ecos_biz_department SET SCHEMA ecos_mission;
+-- ALTER TABLE IF EXISTS ecos_biz_project SET SCHEMA ecos_mission;
+-- ALTER TABLE IF EXISTS ecos_biz_contract SET SCHEMA ecos_mission;
+-- ALTER TABLE IF EXISTS ecos_biz_metric SET SCHEMA ecos_mission;
+-- ALTER TABLE IF EXISTS ecos_biz_target SET SCHEMA ecos_mission;
 
--- ecos_audit: Telemetry, spans, token usage
-ALTER TABLE IF EXISTS ecos_spans SET SCHEMA ecos_audit;
-ALTER TABLE IF EXISTS ecos_token_usage SET SCHEMA ecos_audit;
+-- ---- 原 ecos_audit 段（遥测 / token 计量 → 主控制域 sysman 审计面）作废 ----
+-- ALTER TABLE IF EXISTS ecos_spans SET SCHEMA ecos_audit;
+-- ALTER TABLE IF EXISTS ecos_token_usage SET SCHEMA ecos_audit;
 
--- ecos_config: System configuration, dictionaries
-ALTER TABLE IF EXISTS sys_config SET SCHEMA ecos_config;
-ALTER TABLE IF EXISTS sys_dict SET SCHEMA ecos_config;
+-- ---- 原 ecos_config 段（配置与字典单源 sysman 门面，落主控制域）作废 ----
+-- ALTER TABLE IF EXISTS sys_config SET SCHEMA ecos_config;
+-- ALTER TABLE IF EXISTS sys_dict SET SCHEMA ecos_config;
 
--- ecos_pipeline: Pipeline definitions, nodes, edges, executions
-ALTER TABLE IF EXISTS ecos_pipeline_node SET SCHEMA ecos_pipeline;
-ALTER TABLE IF EXISTS ecos_pipeline_edge SET SCHEMA ecos_pipeline;
-ALTER TABLE IF EXISTS ecos_pipeline_definition SET SCHEMA ecos_pipeline;
-ALTER TABLE IF EXISTS ecos_pipeline_execution SET SCHEMA ecos_pipeline;
+-- ---- 原 ecos_pipeline 段（管道定义/节点/执行 → ecos_data）作废 ----
+-- ALTER TABLE IF EXISTS ecos_pipeline_node SET SCHEMA ecos_pipeline;
+-- ALTER TABLE IF EXISTS ecos_pipeline_edge SET SCHEMA ecos_pipeline;
+-- ALTER TABLE IF EXISTS ecos_pipeline_definition SET SCHEMA ecos_pipeline;
+-- ALTER TABLE IF EXISTS ecos_pipeline_execution SET SCHEMA ecos_pipeline;
 
--- Marketplace stays in ecos_knowledge
-ALTER TABLE IF EXISTS ecos_marketplace_asset SET SCHEMA ecos_knowledge;
-ALTER TABLE IF EXISTS ecos_marketplace_access_request SET SCHEMA ecos_knowledge;
+-- ============================================================
+-- Step 3: ALTER DATABASE search_path —— 作废
+--   对数据库级 search_path 写入 10 个非法 schema 名，属本脚本最危险的一句（一旦实跑即污染全库寻址）。
+--   现口径：search_path 以数据源 `currentSchema` 白名单为单源（`db-migration-lint.ps1` ST07 配置侧检查项），
+--   禁在迁移脚本内做库级 ALTER DATABASE。
+-- ============================================================
+-- ALTER DATABASE sys_man SET search_path TO ecos_identity, ecos_catalog, ecos_ontology, ecos_object, ecos_workflow, ecos_rule, ecos_knowledge, ecos_mission, ecos_audit, ecos_config, ecos_pipeline, public;
 
--- Tenant management stays in ecos_identity
-ALTER TABLE IF EXISTS ecos_tenant SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS ecos_tenant_quota SET SCHEMA ecos_identity;
-ALTER TABLE IF EXISTS ecos_tenant_usage SET SCHEMA ecos_identity;
-
--- Task management stays in ecos_workflow
-ALTER TABLE IF EXISTS ecos_task SET SCHEMA ecos_workflow;
-
--- Demo tables remain in public schema (demo data, not domain tables)
-
--- Business scenario demo tables → ecos_mission (business scenario seeds)
-ALTER TABLE IF EXISTS ecos_biz_department SET SCHEMA ecos_mission;
-ALTER TABLE IF EXISTS ecos_biz_project SET SCHEMA ecos_mission;
-ALTER TABLE IF EXISTS ecos_biz_contract SET SCHEMA ecos_mission;
-ALTER TABLE IF EXISTS ecos_biz_metric SET SCHEMA ecos_mission;
-ALTER TABLE IF EXISTS ecos_biz_target SET SCHEMA ecos_mission;
-
--- Step 3: Set default search_path for the database to include all schemas
--- [W248/R-22 订正 2026-10-10] 原行含 ecos_agent，作废保留可审计：
--- ALTER DATABASE sys_man SET search_path TO ecos_identity, ecos_catalog, ecos_ontology, ecos_object, ecos_workflow, ecos_rule, ecos_agent, ecos_knowledge, ecos_mission, ecos_audit, ecos_config, ecos_pipeline, public;
--- 订正行（剔除 ecos_agent；Agent 族经 ecos_ai 承接，ST07 五枚举权威）：
-ALTER DATABASE sys_man SET search_path TO ecos_identity, ecos_catalog, ecos_ontology, ecos_object, ecos_workflow, ecos_rule, ecos_knowledge, ecos_mission, ecos_audit, ecos_config, ecos_pipeline, public;
+-- ── DDL Lint Self-audit（作废态）──────────────────────────────
+-- [ST07] 本脚本不再产生 CREATE SCHEMA / 非法限定名（全量注释化）✓
+-- [IR03] 未 DROP/未删表/未改列；本脚本从未实跑，在线库零影响 ✓
+-- [IR02] Flyway 禁用，脚本仅作为设计资产留档，执行序列由人工按 IR02 裁决 ✓
+-- [R9]   与 seed 同 commit 纪律不适用（无新增对象）✓
+-- [登记] 卷09 v1.2 §十一 H-7 结案留痕；docs/40-实现/DDL迁移脚本落地登记 同步

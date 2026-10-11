@@ -65,7 +65,10 @@ $sqlRoots = @(
     (Join-Path $ProjectRoot 'engine'),
     (Join-Path $ProjectRoot 'services'),
     (Join-Path $ProjectRoot 'runtime'),
-    (Join-Path $ProjectRoot 'workspace')
+    (Join-Path $ProjectRoot 'workspace'),
+    # v2.2 铁律 §3.1 / 卷09 H-7（2026-10-11 用户裁决）：迁移脚本权威单源在仓根 docs 目录，
+    # 原六根全部指向 ecos_backend，导致 227 个 V 脚本从未入扫描集（假绿根因）。
+    (Join-Path (Split-Path -Parent $ProjectRoot) 'docs\50-db_script\02-flyway-migration')
 )
 
 $allSql = @()
@@ -330,13 +333,22 @@ $st07Cutoff = Get-Date '2026-09-28'
 $engineSchemas = @('ecos_data','ecos_ontology','ecos_knowledge','ecos_ai','ecos_cognitive')
 $allowedSchemas = @('public','ecos_dw','ecos_control') + $engineSchemas
 # knownLegacy schema 群: 规范生效日前已存在的限定名目标, 只 WARN 不 FAIL (ST07 只禁新增)
-$legacySchemaTargets = @('ecos_demo','ecos_sysman','ecos_security','ecos_infra','ecos_dq','ecos_task','ecos_rule','ecos_agent','ecos_identity','ecos_workflow','ecos_catalog','ecos_object','ecos_agent') | Sort-Object -Unique
+# 【2026-10-11 卷09 H-7 补全】追加 ecos_mission/ecos_audit/ecos_config/ecos_pipeline 四个 12-schema 旧族成员
+#   （V47/V48 等 Sprint 1.1 时代脚本既有目标；V47 已整册作废留痕，V48 outbox 属被 V162 单源化废止的旧族）。
+#   说明：$isLegacyFile 依赖文件 CreationTime，docs 目录迁移已重置时间戳致其不可靠 ⇒ 本白名单是实际判据。
+$legacySchemaTargets = @('ecos_demo','ecos_sysman','ecos_security','ecos_infra','ecos_dq','ecos_task','ecos_rule','ecos_agent','ecos_identity','ecos_workflow','ecos_catalog','ecos_object','ecos_mission','ecos_audit','ecos_config','ecos_pipeline') | Sort-Object -Unique
 
 # 14. DDL schema 归属 (ST07): CREATE SCHEMA 白名单 + 限定名表 (生效日 2026-09-28 前文件 = knownLegacy WARN)
 $ddlFiles = @($allSql | Where-Object { $_.Name -notmatch 'rollback' })
 $csBad = @(); $csLegacy = @(); $qualNew = @(); $qualLegacy = @()
 foreach ($f in $ddlFiles) {
-    $sql = Get-Content -LiteralPath $f.FullName -Raw
+    $sqlRaw = Get-Content -LiteralPath $f.FullName -Raw
+    # 注释化语句不参与 ST07 判定（2026-10-11 卷09 H-7 修正）：
+    #   本仓对作废 DDL 的治理体例是"注释化保留可审计"（W248/R-22 2026-10-10 对 ecos_agent、
+    #   卷09 H-7 对 V47 全册均如此）。原判定直接扫原文，把 `-- CREATE SCHEMA x;` 这类留痕
+    #   当作新增违规，导致作废脚本永久 FAIL、门禁与体例互斥。
+    #   剥离形态：行首 `--` 整行 + 行尾 `--` 至行末（DDL 无含 `--` 的字符串字面量，实测零误伤）。
+    $sql = ($sqlRaw -replace '(?m)--[^\r\n]*', '')
     $isLegacyFile = ($f.CreationTime -lt $st07Cutoff)
     foreach ($m in [regex]::Matches($sql, 'CREATE\s+SCHEMA(?:\s+IF\s+NOT\s+EXISTS)?\s+([a-zA-Z_]\w*)')) {
         $s = $m.Groups[1].Value
