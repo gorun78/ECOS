@@ -48,6 +48,13 @@ interface BaseState<T> {
   error: string | null;
 }
 
+/** E2 必带 mind 的解析通道：E1 detect 首项（isActive 优先）。失败原样上抛（503 ⇒ unavailable）。 */
+async function resolveFirstMind(scenarioId: string): Promise<string | undefined> {
+  const minds = await detectScenarioMinds(scenarioId);
+  const chosen = minds.find((m) => m.isActive) ?? minds[0];
+  return chosen?.mindId;
+}
+
 function useCognitionEndpoint<T>(
   loader: (scenarioId: string, signal: { cancelled: boolean }) => Promise<T | null>,
   scenarioId: string,
@@ -91,8 +98,15 @@ function useCognitionEndpoint<T>(
   return { ...state, reload };
 }
 
-/** 四端点聚合 hook：detect / operation-eval / hypotheses / beliefs 各一条独立只读通道。 */
-export function useCognition(scenarioId: string, opts: { enabled?: boolean } = {}) {
+/** 四端点聚合 hook：detect / operation-eval / hypotheses / beliefs 各一条独立只读通道。
+ *
+ * <p>E2 契约（design-05 F05-04，gateway 宿主 `ScenarioCognitionController.operationEval`）
+ * `mind` 为**必带**参数：缺失时 Spring 参数解析直接 500（2026-10-11 live 实证
+ * traceId a886196d — MissingServletRequestParameterException 'mind'）。因此本 hook
+ * 不裸发无 mind 的 E2 请求：优先用调用方传入的 `mindId`；未传则先经 E1 detect
+ * 解析场景可用 Mind（取 isActive 首项），detect 失败（503 降级）时 E2 如实转入
+ * unavailable 态（同一条降级链，禁伪数据、禁绕过必带参数）。</p> */
+export function useCognition(scenarioId: string, opts: { enabled?: boolean; mindId?: string } = {}) {
   const enabled = opts.enabled ?? true;
   const detect = useCognitionEndpoint<CognMindRow[]>(
     (id) => detectScenarioMinds(id),
@@ -100,7 +114,14 @@ export function useCognition(scenarioId: string, opts: { enabled?: boolean } = {
     enabled,
   );
   const operationEval = useCognitionEndpoint<OperationEvalResponse>(
-    (id) => fetchOperationEval(id),
+    async (id) => {
+      const mind = opts.mindId || (await resolveFirstMind(id));
+      if (!mind) {
+        // 场景无任何可用 Mind（如 sc002 空态）：不发 E2 请求，返回 null = 如实空态
+        return null;
+      }
+      return fetchOperationEval(id, { mind });
+    },
     scenarioId,
     enabled,
   );

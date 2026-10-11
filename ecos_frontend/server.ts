@@ -10,11 +10,14 @@
  * 路由表单源（详细设计-08 §4.1，W194/C176 / R-54 ①）：
  * 本文件与 vite.config.ts 的代理表均派生自 `config/route-manifest.ts`，禁止在此另写路由表。
  *
- * 中间件顺序（W193/C175 修复，见 §4.3）：
- *   express.json → BFF 显式 gateway 路由(/api/monitor,/api/twins)
- *   → 开关分支直连（仅 flag=true 且非 production）
+ * 中间件顺序（W193/C175 修复，见 §4.3；JSON 体解析器 2026-10-11 下钻为按挂载点作用域）：
+ *   BFF 显式 gateway 路由(/api/monitor,/api/twins)【各自前置 jsonParser】
+ *   → 开关分支直连（仅 flag=true 且非 production）【同上】
  *   → vite dev middlewares（dev 下使 vite 代理表对 /api/* 真正生效；未命中 proxy 的请求 next() 继续）
- *   → catch-all app.use("/api", forwardProxy(GATEWAY))
+ *   → catch-all app.use("/api", jsonParser, forwardProxy(GATEWAY))
+ *   🔴 禁止全局 app.use(express.json())：dev 下 vite 代理表(/api 兜底)会接管 /api/* POST，
+ *      而全局 body-parser 已先耗尽原始请求流 ⇒ http-proxy 永久等待请求体（登录等 JSON POST 挂死）。
+ *      原始流必须留给 vite 代理透传；仅 BFF 自有 forwardProxy 挂载点（forward 时重新序列化）解析。
  *
  * 行为口径：
  * - dev 默认模式（开关=false）：BFF 显式路由经 GATEWAY；引擎直连前缀由 vite 代理表承接；
@@ -171,8 +174,10 @@ export function buildBffApp(options: BffAppOptions = {}): BffAppBuildResult {
   };
 
   const app = express();
-  app.use(express.json({ limit: "10mb" }));
-  logMount("json");
+  // JSON 解析器不全局挂载（见文件头「中间件顺序」红线）：只作用于 BFF 自有 forwardProxy
+  // 挂载点（forwardProxy 用解析后 body 重新序列化转发）；原始请求流留给 vite 代理透传。
+  const jsonParser = express.json({ limit: "10mb" });
+  logMount("json:per-mount");
 
   // 1) BFF 显式路由（清单 alwaysGateway 非 catch-all 条目 + 开关分支），先于 vite 注册，
   //    保证 /api/monitor、/api/twins 与开关直连前缀不被 vite 代理表截胡。
@@ -183,7 +188,7 @@ export function buildBffApp(options: BffAppOptions = {}): BffAppBuildResult {
     const label = entry.alwaysGateway
       ? `gateway${entry.prefix}`
       : `${entry.engine}-direct${entry.prefix}`;
-    app.use(entry.prefix, forwardProxy(upstream, label));
+    app.use(entry.prefix, jsonParser, forwardProxy(upstream, label));
     logMount(`${entry.alwaysGateway ? "gateway" : "direct"}:${entry.prefix}`);
   }
 
@@ -198,7 +203,7 @@ export function buildBffApp(options: BffAppOptions = {}): BffAppBuildResult {
   // 3) 兜底：其余所有 /api/* 一律 GATEWAY（ADR-10 默认唯一出口）。
   //    /api/audit-logs 亦走此通道（W207/C189：BFF 聚合已删，不再伪造数据）。
   const catchAll = selectBffCatchAllEntry();
-  app.use(catchAll.prefix, forwardProxy(gateway, "gateway/default"));
+  app.use(catchAll.prefix, jsonParser, forwardProxy(gateway, "gateway/default"));
   logMount(`catch-all:${catchAll.prefix}`);
 
   return { app, mountOrder, localDirectEnabled };

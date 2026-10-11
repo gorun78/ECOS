@@ -275,6 +275,7 @@
   "app.tab.pipeline": "Pipeline Builder",
   "app.tab.project_tracker": "Project Tracker",
   "app.tab.project_workbench": "Scenario Workbench",
+  "app.tab.workbench": "Scenario Workbench",
   "app.tab.security_center": "Security Center",
   "app.tab.system_config": "System Config",
   "app.tab.telemetry": "Telemetry",

@@ -5,7 +5,9 @@ import { COGNITIVE_BASE, COGNITIVE_ENGINE_BASE } from "./cognitiveClient";
 
 // 路径常量单源（X-47/X-50 收敛）：`/api/v1/cognitive` 与 `/api/v1/engine/cognitive`
 // 唯一定义处 = services/cognitiveClient.ts，此处仅引用，不再重复字面量。
-const ENGINE_BASE = COGNITIVE_ENGINE_BASE;
+// 🔴 禁顶层求值别名（2026-10-11 live 白屏事故）：cognitiveClient ⇄ cognitiveEngineApi 存在
+//    re-export 求值环；`const X = COGNITIVE_ENGINE_BASE` 在 cognitiveClient 先求值时触发
+//    TDZ ReferenceError。导入绑定是 live 的，仅在函数体内引用即永远安全。
 
 // ── Diagnosis ────────────────────────────────────────────
 
@@ -349,7 +351,7 @@ export async function fetchCausalGraph(params?: { domain?: string }) {
 // ── Health ───────────────────────────────────────────────
 
 export async function fetchEngineHealth() {
-  return apiFetchData(`${ENGINE_BASE}/health`);
+  return apiFetchData(`${COGNITIVE_ENGINE_BASE}/health`);
 }
 
 export async function fetchCognitiveHealth() {
@@ -360,37 +362,37 @@ export async function fetchCognitiveHealth() {
 
 /** GET /api/v1/engine/cognitive/status — 引擎状态 {name, status} */
 export async function fetchEngineStatus() {
-  return apiFetchData(`${ENGINE_BASE}/status`);
+  return apiFetchData(`${COGNITIVE_ENGINE_BASE}/status`);
 }
 
 /** POST /api/v1/engine/cognitive/start — 启动引擎 */
 export async function startEngine() {
-  return apiFetchData(`${ENGINE_BASE}/start`, { method: 'POST' });
+  return apiFetchData(`${COGNITIVE_ENGINE_BASE}/start`, { method: 'POST' });
 }
 
 /** POST /api/v1/engine/cognitive/stop — 停止引擎 */
 export async function stopEngine() {
-  return apiFetchData(`${ENGINE_BASE}/stop`, { method: 'POST' });
+  return apiFetchData(`${COGNITIVE_ENGINE_BASE}/stop`, { method: 'POST' });
 }
 
 /** GET /api/v1/engine/cognitive/config — 引擎配置 */
 export async function fetchEngineSettings() {
-  return apiFetchData(`${ENGINE_BASE}/config`);
+  return apiFetchData(`${COGNITIVE_ENGINE_BASE}/config`);
 }
 
 /** GET /api/v1/engine/cognitive/config — 配置默认值（与 config 同源） */
 export async function fetchEngineSettingsDefaults() {
-  return apiFetchData(`${ENGINE_BASE}/config`);
+  return apiFetchData(`${COGNITIVE_ENGINE_BASE}/config`);
 }
 
 /** POST /api/v1/engine/cognitive/start — 刷新设置（config 只读，重启生效前借用 start 探测配置重载） */
 export async function refreshEngineSettings() {
-  return apiFetchData(`${ENGINE_BASE}/start`, { method: 'POST' });
+  return apiFetchData(`${COGNITIVE_ENGINE_BASE}/start`, { method: 'POST' });
 }
 
 /** PUT 配置不可写（后端 config 只读），设置更新走 start 触发重载 */
 export async function updateEngineSettings(body: Record<string, unknown>) {
-  return apiFetchData(`${ENGINE_BASE}/start`, {
+  return apiFetchData(`${COGNITIVE_ENGINE_BASE}/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

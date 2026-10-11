@@ -129,6 +129,9 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { id: "mission_control", route: "/mission_control", labelKey: "app.tab.mission_control", tabbable: true, icon: Command, palette: p("mission_control", CAT.cognitive), searchTypes: ["Goal", "Scenario"] },
   { id: "security", route: "/security-center", labelKey: "app.tab.security_center", tabbable: true },
   { id: "ai-workbench", route: "/ai-workbench", labelKey: "app.tab.ai_workbench", tabbable: true },
+  // workbench（详设-07 WP-D 场景工作台 L1/L2，W209 冻结路由根 fdee86d6）——
+  // tabbable 仅为其解析 Tab 标签（W201 fail-closed 面），不在 Sidebar 分组出项（无 group）。
+  { id: "workbench", route: "/workbench", labelKey: "app.tab.workbench", tabbable: true },
   { id: "agent_mesh", route: "/agent_mesh", labelKey: "app.tab.agent_mesh", tabbable: true },
   { id: "agent-builder", route: "/agent-builder", labelKey: "app.tab.agent_builder", tabbable: true },
   { id: "agent-test", route: "/agent-test", labelKey: "app.tab.agent_test", tabbable: true },

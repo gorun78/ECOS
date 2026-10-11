@@ -92,7 +92,7 @@ export default function Sidebar({
 
   // Render a group section
   const renderGroup = (group: SidebarGroup, keyPrefix: string = "") => (
-    <div className="space-y-1">
+    <div key={`sidebar-group-${keyPrefix || group.groupKey}`} className="space-y-1">
       <span className="px-3 text-[9px] uppercase font-mono tracking-wider opacity-60 block mb-1.5 font-semibold">
         {t(group.groupKey)}
       </span>

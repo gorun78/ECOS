@@ -47,6 +47,13 @@ export interface RouteManifestEntry {
   streaming: boolean;
   /** 在 vite 代理表中生成 gateway 兜底条目（/api、/datanet、/cases 这类非直连项） */
   viteFallback?: boolean;
+  /**
+   * dev 直连时的路径改写（镜像 gateway VersionPrefixRewriteFilter 的正向映射表）。
+   * 仅当引擎 Controller 实际映射不带 /v1（如 AgentMeshController=@RequestMapping("/api/agent-mesh")）
+   * 时才声明；否则 dev 直连会 404 而 gateway 路径 200（2026-10-11 live 实证 agent-mesh）。
+   * 值为 vite ProxyOptions.rewrite 的替换对：[找到的正则, 替换串]。
+   */
+  devRewrite?: readonly [string, string];
 }
 
 /** 引擎 → 上游地址环境变量（与 server.ts 既有 GATEWAY_URL/DATANET_URL/WORKSPACE_URL/AIMING_URL 兼容） */
@@ -92,7 +99,7 @@ export const ROUTE_MANIFEST: readonly RouteManifestEntry[] = Object.freeze([
 
   // ── vite dev 引擎直连表（18 条，等价迁移自旧 vite.config.ts:24-43）──
   { prefix: "/api/v1/agent-loop", engine: "ai", port: 18084, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: true },
-  { prefix: "/api/v1/agent-mesh", engine: "ai", port: 18084, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: true },
+  { prefix: "/api/v1/agent-mesh", engine: "ai", port: 18084, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: true, devRewrite: ["^/api/v1/", "/api/"] },
   { prefix: "/api/v1/agent", engine: "ai", port: 18084, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: true },
   { prefix: "/api/v1/agent-call", engine: "ai", port: 18084, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: true },
   { prefix: "/api/v1/knowledge", engine: "kb", port: 18086, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
@@ -160,7 +167,17 @@ export function buildViteDevProxyTable(
     if (entry.directInDev) {
       const target = resolveUpstream(entry, env);
       const item: ViteProxyEntryLike = { target, changeOrigin: true };
-      if (entry.engine === "ai") {
+      // dev 直连路径改写：镜像 gateway VersionPrefixRewriteFilter 正向映射（单源在网关侧，
+      // 此处只声明例外项；如 agent-mesh Controller 映射 /api/agent-mesh，直连必须去 /v1）。
+      if (entry.devRewrite) {
+        const [find, replace] = entry.devRewrite;
+        item.rewrite = (p) => p.replace(new RegExp(find), replace);
+      }
+      // dev 直连信任头注入面：凡走 runtime common-api HeaderAuthInterceptor
+      // （要求 X-ECOS-USER/X-ECOS-TENANT，由 gateway 认证后注入）的引擎，
+      // dev vite 直连绕开 gateway 时必须补注同款信任头，否则 :18084/:18090 一律
+      // 403 ECOS-AUTH-010（2026-10-11 live 实证：workspace 场景面 L1/L2 全 403）。
+      if (entry.engine === "ai" || entry.engine === "workspace") {
         item.headers = { ...AIMING_DEV_TRUST_HEADERS };
       }
       table[entry.prefix] = item;

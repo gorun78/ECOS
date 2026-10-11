@@ -275,6 +275,7 @@
   "app.tab.pipeline": "管道构建器",
   "app.tab.project_tracker": "项目跟踪",
   "app.tab.project_workbench": "场景工作台",
+  "app.tab.workbench": "场景工作台",
   "app.tab.security_center": "安全中心",
   "app.tab.system_config": "系统配置",
   "app.tab.telemetry": "遥测监控",
