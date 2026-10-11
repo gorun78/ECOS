@@ -41,6 +41,11 @@ public final class CognitiveErrorCode {
     public static final String E400_OUTCOME_INVALID      = "ECOS-COG-400O"; // 400 评估请求结构性非法（§9.3 必填/引用三要素缺失）
     public static final String E404_OUTCOME              = "ECOS-COG-404O"; // 404 评估记录不存在（§9.2 步骤 10 闭环记录回查）
 
+    // ── 详设-09 v1.2 §十一 H-2b 增量码（口径公式求值 + 预测运行快照读；只增不改上方冻结表）──
+    public static final String E400_FORMULA_SYNTAX       = "ECOS-COG-400F"; // 400 公式 DSL V1 语法违例（含非白名单函数，定位到符号行列）
+    public static final String E422_FORMULA_EVALUATION   = "ECOS-COG-422F"; // 422 已校验 DSL 求值期语义失败（未知标识符/维度缺失/除零/量纲冲突）
+    public static final String E404_FORECAST_RUN         = "ECOS-COG-404F"; // 404 预测运行快照行不存在（data-engine 读通道回业务 404，禁伪装空快照）
+
     /** 冻结字面量（禁止改写，防前端 i18n 不一致）。 */
     public static final String MSG_MIND_NOT_ON_SCENARIO = "mind not found on this scenario";
     public static final String MSG_MIND_NOT_FOUND       = "mind not found";
@@ -73,4 +78,9 @@ public final class CognitiveErrorCode {
     /** §9 W→D 结果评估冻结字面量（与上方同纪律：禁改写，只可新增）。 */
     public static final String MSG_OUTCOME_INVALID      = "outcome evaluation request invalid";
     public static final String MSG_OUTCOME_NOT_FOUND    = "outcome evaluation not found";
+
+    /** 详设-09 v1.2 H-2b 增量冻结字面量（同纪律：禁改写，只可新增）。 */
+    public static final String MSG_FORMULA_SYNTAX       = "caliber formula dsl syntax violation";
+    public static final String MSG_FORMULA_EVALUATION   = "caliber formula evaluation failed";
+    public static final String MSG_FORECAST_RUN_NOT_FOUND = "forecast run snapshot not found";
 }

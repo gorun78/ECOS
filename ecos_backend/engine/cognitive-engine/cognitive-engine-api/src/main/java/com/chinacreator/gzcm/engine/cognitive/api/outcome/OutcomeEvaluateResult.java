@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.cognitive.api.outcome;
 
+import com.chinacreator.gzcm.engine.cognitive.api.backtest.BacktestMetricSummary;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -79,4 +80,11 @@ public class OutcomeEvaluateResult {
     public boolean hasBlockers() {
         return blockers != null && !blockers.isEmpty();
     }
+
+    // ══════════ 详设-09 v1.2 §十一 H-4 追加（2026-10-12）：回测三指标 + LOW_SAMPLE 守卫 ══════════
+    // 与上方 mae/mape/totalSampleCount/applicableSampleCount 同处一个评估面（同一评估记录、同一响应体），
+    // 只增本字段、不改上方任何既有字段名与语义；null = 本次调用未做回测判定（禁以空对象冒充"已回测"）。
+
+    /** 回测指标面（偏差方向 / 区间覆盖率 / 数据覆盖率 / {@code LOW_SAMPLE} 守卫 + 阈值生效来源）。 */
+    private BacktestMetricSummary backtest;
 }

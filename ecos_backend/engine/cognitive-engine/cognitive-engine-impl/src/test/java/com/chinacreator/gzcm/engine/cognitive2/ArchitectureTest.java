@@ -86,7 +86,24 @@ public class ArchitectureTest {
             // 补充设计 v1.0 §9.2 步骤1/3/4 + §9.3 末段：确定性计算产物只读接缝（decoupling port，
             //     与 ForecastRunSnapshotReader 同纪律：无实现 bean ⇒ fail-loud 标不适用，禁伪造数值）。
             //     非服务门面故不套 I 前缀。
-            .orShould().haveSimpleName("OutcomeMetricValueReader");
+            .orShould().haveSimpleName("OutcomeMetricValueReader")
+            // 详设-09 v1.2 §十一 H-4（2026-10-12）新增的两个解耦端口，同上命名口径：
+            //   - ForecastIntervalTripleReader：区间三值（P10/P50/P90）只读接缝。ST08 禁认知直读
+            //     ecos_dw、铁律 §2.5 引擎边界 ⇒ 认知侧只声明读缝，装配层给 REST 适配器；
+            //     无 bean ⇒ 覆盖率如实 null（禁插值，R-62 ①），非服务门面故不套 I 前缀。
+            //   - BacktestReviewRoleDecider：复审角色裁决端口。红线是"认知侧零角色→权限映射"，
+            //     本端口只搬运 security-engine 的裁决结论（DENY/不可用 ⇒ 不建任务），
+            //     是端口而非门面，故不套 I 前缀。
+            .orShould().haveSimpleName("ForecastIntervalTripleReader")
+            .orShould().haveSimpleName("BacktestReviewRoleDecider")
+            // 详设-09 v1.2 §十一 H-2b（2026-10-12）：DSL 求值器的两个内嵌策略接口
+            //   - CaliberFormulaEvaluator.ValueSupply：事实/指标取值供给（调用方从 run 快照装配，
+            //     求值器自身不访问 DB，C.8 纯函数纪律）；
+            //   - CaliberFormulaEvaluator.UnitSupply：V3 单位体系运行期视图（量纲二次防御，与
+            //     ontology 侧 CaliberDslValidator 同哲学）。
+            //   两者是计算器的策略形态、不是服务门面，故不套 I 前缀。
+            .orShould().haveSimpleName("ValueSupply")
+            .orShould().haveSimpleName("UnitSupply");
         rule.allowEmptyShould(true).check(classes);
     }
 

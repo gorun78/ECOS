@@ -36,11 +36,11 @@ public class CognitiveGuardException extends RuntimeException {
         if (code == null) return 500;
         return switch (code) {
             case "ECOS-COG-400", "ECOS-COG-400M", "ECOS-COG-400P", "ECOS-COG-400C",
-                 "ECOS-COG-400S", "ECOS-COG-400O" -> 400;
-            case "ECOS-COG-404", "ECOS-COG-404R", "ECOS-COG-404O" -> 404;
+                 "ECOS-COG-400S", "ECOS-COG-400O", "ECOS-COG-400F" -> 400;   // 400F = 公式 DSL V1 语法（详设-09 H-2b）
+            case "ECOS-COG-404", "ECOS-COG-404R", "ECOS-COG-404O", "ECOS-COG-404F" -> 404;  // 404F = 预测运行快照不存在
             case "ECOS-COG-403", "ECOS-COG-403S" -> 403;
             case "ECOS-COG-409R", "ECOS-COG-409S", "ECOS-COG-409V" -> 409;   // 已发布版本行不可变 / 状态迁移非法 / 版本过期
-            case "ECOS-COG-422R", "ECOS-COG-422G", "ECOS-COG-422C" -> 422;   // REQ-COG-07 规格 4 / BLOCKER 缺口未关 / 语义冲突未解
+            case "ECOS-COG-422R", "ECOS-COG-422G", "ECOS-COG-422C", "ECOS-COG-422F" -> 422; // 422F = 公式求值期语义失败
             case "ECOS-COG-429B" -> 429;                                     // 预算耗尽（Run 转 PAUSED）
             case "ECOS-COG-500", "ECOS-COG-501", "ECOS-COG-502", "ECOS-COG-502D" -> 503;
             case "ECOS-COG-503" -> 501;

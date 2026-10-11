@@ -52,6 +52,25 @@ public class MetricEvaluation {
     /** 口径 ID（§9.2 步骤 2 对齐依据；与 ActualRef.caliberId 比对）。 */
     private String caliberId;
 
+    // ══════════ 详设-09 v1.2 §十一 H-4 追加（2026-10-12）：回测三指标的行级载体 ══════════
+    // 只增字段、不改上方任何既有字段名/类型/语义；新增字段一律<b>可空</b>，
+    // 且 validate() 不对其施加必填约束 ⇒ 既有请求/响应面与既有端点行为逐字不变。
+
+    /** 预测区间下界 P10（run 明细原值；未接线 ⇒ null，禁插值合成，R-62 ①）。 */
+    private BigDecimal predictedP10;
+
+    /** 预测区间上界 P90（同上）。 */
+    private BigDecimal predictedP90;
+
+    /** 实际值是否落入 {@code [predictedP10, predictedP90]}（三值不全 ⇒ null，不按"未覆盖"计）。 */
+    private Boolean intervalCovered;
+
+    /** 偏差方向（{@code DeviationDirection} 词表名；null = 本次调用未做回测判定）。 */
+    private String deviationDirection;
+
+    /** 区间三值来源定位（run 明细引用 / 读缝标识；未接线 ⇒ null）。 */
+    private String intervalValueSource;
+
     /**
      * 契约校验：返回问题列表（空 = 合法）。
      *

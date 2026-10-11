@@ -98,4 +98,22 @@ public final class CognitiveApiPaths {
     public static final String ASSETS_RESOLVE_REL     = "/assets/{" + PARAM_ASSET_ID + "}/resolve";
     public static final String ASSETS_PROPOSALS_REL   = "/assets/{" + PARAM_ASSET_ID + "}/proposals";
     public static final String ASSETS_TRANSITION_REL  = "/assets/{" + PARAM_ASSET_ID + "}/transitions";
+
+    // ── 详设-09 v1.2 §十一 H-4 追加（2026-10-12，只追加本段，上方行零改写）──
+
+    /**
+     * 回测面（H-4：三指标 + {@code LOW_SAMPLE} 守卫 + 复审任务路由）。
+     *
+     * <p>绝对路径 = {@link #COGNITIVE} + 下列相对段，挂在 §9 既有 {@code /outcomes} 族之下
+     * <b>只增子路径</b>；既有四端点（{@code POST /outcomes/evaluate}、{@code GET /outcomes/{id}}、
+     * {@code GET /outcomes}、{@code GET /outcomes/by-run/{runId}}）的路径、参数签名与响应语义零改动。</p>
+     */
+    public static final String PARAM_EVALUATION_ID = "evaluationId";
+    /** 回测指标面（只读视图，复用 {@code OutcomeEvaluateResult} 承载，新增可空 {@code backtest} 段）。 */
+    public static final String OUTCOMES_BACKTEST_REL = "/outcomes/{" + PARAM_EVALUATION_ID + "}/backtest";
+    /** 复审任务路由（越限 ⇒ 经 runtime-task 建复审任务；角色只来自 security-engine 裁决）。 */
+    public static final String OUTCOMES_REVIEW_TASKS_REL = "/outcomes/{" + PARAM_EVALUATION_ID + "}/review-tasks";
+    /** 绝对形态（供文档/契约面引用；Controller 侧用上面的相对段）。 */
+    public static final String OUTCOMES_BACKTEST = COGNITIVE + "/outcomes/{evaluationId}/backtest";
+    public static final String OUTCOMES_REVIEW_TASKS = COGNITIVE + "/outcomes/{evaluationId}/review-tasks";
 }

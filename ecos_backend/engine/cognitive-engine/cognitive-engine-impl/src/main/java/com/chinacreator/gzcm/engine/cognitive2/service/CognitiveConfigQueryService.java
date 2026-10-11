@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.cognitive2.service;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -137,5 +138,77 @@ public class CognitiveConfigQueryService {
             out.put(item.substring(0, eq).trim(), item.substring(eq + 1).trim().toUpperCase(java.util.Locale.ROOT));
         }
         return Map.copyOf(out);
+    }
+
+    // ── 详设-09 v1.2 §十一 H-4 追加（2026-10-12，只增本段，上方行零改写）──────────────
+
+    /**
+     * 回测/复审阈值键（U-6 冻结形态 {@code ecos.fc.backtest.review_threshold.*}，
+     * 单源落 sysman {@code sys_config} 分组 {@code fc.backtest}，种子脚本 V280）。
+     *
+     * <p>H-4 要点 3「阈值配置单源」的落地方式与 §E.5 完全同纪律：键名只准在本类出现，
+     * 业务侧只调门面方法；<b>本类不含任何缺省阈值</b>——未配置一律返回 {@code null}
+     * 并由调用方 fail-closed（禁代码常量兜底造成"代码默认 vs 库内值"两态漂移）。
+     * 与 R-66 ① 对偶：这些值<b>只</b>来自库侧配置面，任何请求体携带的同名参数一律不采信。</p>
+     */
+    public static final String KEY_BACKTEST_MIN_SAMPLES = "ecos.fc.backtest.review_threshold.min_samples";
+    public static final String KEY_BACKTEST_MAPE_RATIO = "ecos.fc.backtest.review_threshold.mape_ratio";
+    public static final String KEY_BACKTEST_ON_TARGET_BAND = "ecos.fc.backtest.review_threshold.on_target_band";
+    public static final String KEY_BACKTEST_MIN_INTERVAL_COVERAGE = "ecos.fc.backtest.review_threshold.min_interval_coverage";
+    public static final String KEY_BACKTEST_MIN_DATA_COVERAGE = "ecos.fc.backtest.review_threshold.min_data_coverage";
+
+    /** 回测阈值分组名（{@code sys_config.config_group}，铁律 §十 配置单表分组）。 */
+    public static final String GROUP_FC_BACKTEST = "fc.backtest";
+
+    /**
+     * 整数型配置读面（H-4 最小样本数用）。
+     *
+     * @return 已配置且形态合法 ⇒ 值；未配置 / 空白 / 非整数 ⇒ {@code null}（<b>禁回落代码缺省</b>）
+     */
+    public Integer integerConfig(String key) {
+        BigDecimal v = decimalConfig(key);
+        if (v == null) {
+            return null;
+        }
+        // 带小数（如 "4.5"）= 配置缺陷：必须先判整数性再取值，toBigInteger 会静默截断成 4（禁猜值）
+        if (v.stripTrailingZeros().scale() > 0) {
+            return null;
+        }
+        try {
+            return v.intValueExact();
+        } catch (ArithmeticException | NumberFormatException e) {
+            return null;   // 越界 = 配置缺陷，null 上浮由调用方 fail-closed，禁截断猜值
+        }
+    }
+
+    /**
+     * 数值型配置读面（H-4 MAPE 越限线/偏差死区/覆盖率下限用，BigDecimal 承载禁 double，MC02）。
+     *
+     * @return 已配置且可解析 ⇒ 值；未配置 / 空白 / 非数 ⇒ {@code null}（同上，禁缺省兜底）
+     */
+    public BigDecimal decimalConfig(String key) {
+        String raw = sysConfigService.getString(key);
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return new BigDecimal(raw.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 生效来源标注（与 {@link #evalTrendWeightSource()} 同形态）：配置行缺失 ⇒ 追加
+     * {@code (UNSET)}，让响应面能诚实声明"这枚阈值当前无库侧真值"。
+     */
+    public String configSource(String key) {
+        String raw = sysConfigService.getString(key);
+        return raw == null || raw.isBlank() ? key + "(UNSET)" : key;
+    }
+
+    /** 配置行是否存在（H-4 冻结测试面：区分"未配置"与"配置为 0"两种真态）。 */
+    public boolean configPresent(String key) {
+        return sysConfigService.getByKey(key) != null;
     }
 }
