@@ -23,6 +23,11 @@ import * as path from "node:path";
 import {
   SCENARIO_COGNITION_BASE,
   scenarioCognitionUrl,
+  COGNITIVE_ASSET_CATALOG_PATH,
+  cognitiveAssetResolvePath,
+  cognitiveAssetProposalsPath,
+  cognitiveAssetTransitionPath,
+  CONTEXT_BUILD_PATH,
 } from "../../services/cognitiveClient";
 
 const SRC_ROOT = path.resolve(__dirname, "..", "..");
@@ -102,4 +107,65 @@ describe("场景认知路径单源（cognitiveClient.ts 唯一出口）", () => 
       }
     }
   });
+});
+
+describe("认知资产只读引用路径单源（补充设计 §8、§13 SUP-COG-01/02）", () => {
+  it("catalog 常量与 resolve 路径构造逐字对齐后端模板", () => {
+    expect(COGNITIVE_ASSET_CATALOG_PATH).toBe("/api/v1/cognitive/assets/catalog");
+    // assetId 必须 URL 编码（parseRef 前缀 bel/hyp/mod，冒号需转义）
+    expect(cognitiveAssetResolvePath("bel:abc")).toBe(
+      "/api/v1/cognitive/assets/bel%3Aabc/resolve",
+    );
+    expect(cognitiveAssetResolvePath("mod x/../y")).toBe(
+      "/api/v1/cognitive/assets/mod%20x%2F..%2Fy/resolve",
+    );
+    // proposals / transitions（§3.5 候选评审面；对齐 ASSETS_PROPOSALS_REL / ASSETS_TRANSITION_REL）
+    expect(cognitiveAssetProposalsPath("bel:abc")).toBe(
+      "/api/v1/cognitive/assets/bel%3Aabc/proposals",
+    );
+    expect(cognitiveAssetTransitionPath("hyp x/../y")).toBe(
+      "/api/v1/cognitive/assets/hyp%20x%2F..%2Fy/transitions",
+    );
+  });
+
+  it("全 src 无第二处硬编码 `/api/v1/cognitive/assets` 字面量（一律经 cognitiveClient 导出常量派生）", () => {
+    // cognitiveClient.ts 用 `${COGNITIVE_BASE}/assets/...` 模板构造，仓内不应再出现任何
+    // 完整 `/api/v1/cognitive/assets` 字面量（含 __tests__ 目录外）——即无第二处来源。
+    const offenders = walk(SRC_ROOT)
+      .filter((f) => {
+        const code = stripComments(fs.readFileSync(f, "utf8"));
+        return /["'`]\/api\/v1\/cognitive\/assets/.test(code);
+      })
+      .map((f) => path.relative(SRC_ROOT, f).replace(/\\/g, "/"));
+    expect(
+      offenders,
+      `认知资产路径不应有第二处硬编码字面量，实际出现在: ${offenders.join(", ")}`,
+    ).toEqual([]);
+  }, 30_000);
+
+  it("认知资产面组件不得直接 fetch / 硬编码 assets 子路径，一律经 cognitiveClient 单源", () => {
+    const dir = path.join(SRC_ROOT, "pages", "knowledge");
+    const files = [
+      path.join("pages", "CognitiveAssetPage.tsx"),
+      path.join("components", "CognitiveAssetResolveDrawer.tsx"),
+      path.join("components", "CandidateReviewPanel.tsx"),
+    ];
+    for (const rel of files) {
+      const code = stripComments(fs.readFileSync(path.join(dir, rel), "utf8"));
+      expect(code, `${rel} 不得直接调用 fetch`).not.toMatch(/\bfetch\(/);
+      expect(code, `${rel} 不得硬编码 /assets 路径`).not.toMatch(/["'`]\/api\/v1\/cognitive\/assets/);
+      expect(code, `${rel} 必须 import services/cognitiveClient`).toContain("services/cognitiveClient");
+    }
+  });
+
+  it("context/build 路径常量和后端 CognitiveApiPaths.CONTEXT_BUILD 逐字对齐，全 src 无第二处字面量", () => {
+    expect(CONTEXT_BUILD_PATH).toBe("/api/v1/cognitive/context/build");
+    const offenders = walk(SRC_ROOT)
+      .filter((f) => {
+        const code = stripComments(fs.readFileSync(f, "utf8"));
+        return /["'`]\/api\/v1\/cognitive\/context/.test(code);
+      })
+      .map((f) => path.relative(SRC_ROOT, f).replace(/\\/g, "/"));
+    expect(offenders, `context 路径字面量应无第二处来源: ${offenders.join(", ")}`).toEqual([]);
+  }, 30_000);
 });

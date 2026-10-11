@@ -37,6 +37,9 @@ vi.mock('./knowledge/pages/WikiPage', () => ({
 vi.mock('./knowledge/pages/GovernPage', () => ({
   default: (): null => null,
 }));
+vi.mock('./knowledge/pages/CognitiveAssetPage', () => ({
+  default: (): null => null,
+}));
 
 type TestLocale = 'zh' | 'en';
 
@@ -66,8 +69,8 @@ afterEach(() => {
   delete testGlobal.__ecos_test_locale;
 });
 
-describe('KnowledgeView 6 平铺 Page 侧栏 i18n（F1 — PMO-D Batch 1）', () => {
-  it('中文态渲染 6 个 Page 侧栏项（知识总览/知识资产/知识抽取/知识图谱/企业知识/知识治理）', () => {
+describe('KnowledgeView 平铺 Page 侧栏 i18n（F1 — PMO-D Batch 1 + 议题1 认知资产）', () => {
+  it('中文态渲染 Page 侧栏项（知识总览/知识资产/知识抽取/知识图谱/企业知识/知识治理/认知资产）', () => {
     const { container } = renderWithLocale('zh');
     const text = container.textContent ?? '';
     expect(text).toContain('知识总览'); // knowledge.nav.page_overview
@@ -76,13 +79,14 @@ describe('KnowledgeView 6 平铺 Page 侧栏 i18n（F1 — PMO-D Batch 1）', ()
     expect(text).toContain('知识图谱'); // knowledge.nav.page_graph
     expect(text).toContain('企业知识'); // knowledge.nav.page_wiki
     expect(text).toContain('知识治理'); // knowledge.nav.page_govern
+    expect(text).toContain('认知资产'); // knowledge.nav.page_cognitive_asset — 议题1
     // a72eabb4（菜单调整）：原 Global 入口（任务中心/引擎监控）已移出知识工作台侧栏，改由底部引擎配置承接
     expect(text).toContain('引擎配置');
     expect(text).not.toContain('任务中心'); // knowledge.nav.global_task_center — 撤下
     expect(text).not.toContain('引擎监控'); // knowledge.nav.global_engine_monitor — 撤下
   });
 
-  it('英文态渲染英文 6 Page 侧栏项', () => {
+  it('英文态渲染英文 Page 侧栏项', () => {
     const { container } = renderWithLocale('en');
     const text = container.textContent ?? '';
     expect(text).toContain('Knowledge Overview');
@@ -91,6 +95,7 @@ describe('KnowledgeView 6 平铺 Page 侧栏 i18n（F1 — PMO-D Batch 1）', ()
     expect(text).toContain('Knowledge Graph');
     expect(text).toContain('Enterprise Knowledge');
     expect(text).toContain('Knowledge Governance');
+    expect(text).toContain('Cognitive Assets'); // knowledge.nav.page_cognitive_asset — 议题1
     // a72eabb4：Global 英文入口同撤下，底部为 Engine Config
     expect(text).toContain('Engine Config');
     expect(text).not.toContain('Task Center'); // knowledge.nav.global_task_center — 撤下

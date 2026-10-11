@@ -53,6 +53,7 @@ import ExtractionPage from './knowledge/pages/ExtractionPage';
 import GraphPage from './knowledge/pages/GraphPage';
 import WikiPage from './knowledge/pages/WikiPage';
 import GovernPage from './knowledge/pages/GovernPage';
+import CognitiveAssetPage from './knowledge/pages/CognitiveAssetPage';
 import OverviewDashboard from './knowledge/tabs/OverviewDashboard';
 import DataWorkbenchImportTab from './knowledge/tabs/DataWorkbenchImportTab';
 import DocumentUploadTab from './knowledge/tabs/DocumentUploadTab';
@@ -105,6 +106,7 @@ const PAGE_COMPONENTS: Record<ActivePage, PageOrTabComponent> = {
   graph: GraphPage,
   wiki: WikiPage,
   govern: GovernPage,
+  cognitive_asset: CognitiveAssetPage,
 };
 
 // ── 撤下 8 Tab → React 组件（F8 deep-link 保留） ─────────────────────────────

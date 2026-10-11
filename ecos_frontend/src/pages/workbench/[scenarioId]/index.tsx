@@ -15,6 +15,8 @@ import { useMediaQuery } from '../../../hooks/useMediaQuery';
 import { useCognition } from '../../../hooks/useCognition';
 import { apiFetchData } from '../../../api';
 import logger from '../../../services/logger';
+import BlueprintPanel from './blueprint/BlueprintPanel';
+import AdvancedDebugPanel from './advanced/AdvancedDebugPanel';
 
 interface ScenarioDetailVO {
   id: string;
@@ -142,6 +144,11 @@ export default function WorkbenchScenarioDetail() {
             </p>
           </div>
 
+          {/* Blueprint — L2 中心对象（补充设计 §6，workspace 归属） */}
+          <section className="p-4">
+            <BlueprintPanel scenarioId={scenario.id} />
+          </section>
+
           {/* Key metrics */}
           <section className="p-4">
             <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted} mb-2`}>{t('workspace.l2.stat.title')}</h2>
@@ -186,6 +193,12 @@ export default function WorkbenchScenarioDetail() {
                 </pre>
               )}
             </div>
+          </section>
+
+          {/* §3.8 R1~R2：认知运行面（原 #/project_workbench 认知 Tab）下沉 L2「高级/调试」子面，
+              CognitiveRightPanel 全应用唯一挂载点（迁一删一，去重） */}
+          <section className="px-4 pb-4">
+            <AdvancedDebugPanel scenarioId={scenario.id} />
           </section>
 
           {/* Recent actions */}

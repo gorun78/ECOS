@@ -2,13 +2,16 @@
  * ECOS 场景与项目综合调度中心（PMO-53 T1/T2：真实 API + scenario i18n namespace）。
  *
  * <p>场景数据来自 {@code /api/v1/workspace/scenarios}（ecos_business_scenario 表），
- * 不再使用 localStorage mock；「认知」Tab 双区并置：左侧 {@code CognitionPanel} 经
- * {@code POST /api/v1/workspace/scenarios/{id}/runs} 发起运行编排，右侧
- * {@code CognitiveRightPanel} 是认知四卡（E1~E4 契约）唯一渲染入口（design-05 B.0/B.5）。
+ * 不再使用 localStorage mock。§3.8 R1~R2（2026-10-11 双结构收敛）：本页收编为
+ * 「高级视图」，仅保留融合/决策/Git 三 Tab；原「认知」Tab（CognitionPanel 运行编排 +
+ * CognitiveRightPanel 认知四卡）整体迁至 L2 场景详情「高级/调试」子面
+ * （{@code pages/workbench/[scenarioId]/advanced/AdvancedDebugPanel.tsx}，迁一删一去重），
+ * 原「指标」Tab（MetricsTab 静态演示图表数据 = 假真理）随收敛清除。
  * Git 版本 UI 一律走 {@code services/gitService} 单一通道（经 GitPanel，只传 repositoryId），
  * 原假 git push 动画与 {@code ecos_cached_git_*} localStorage 伪持久化已删除（F05-17/B.9-5）。</p>
  */
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import LucideIcon from '../components/LucideIcon';
 import { useLanguage } from '../components/LanguageContext';
 import { showToastGlobal } from '../components/common/Toast';
@@ -19,15 +22,11 @@ import { apiFetchData } from '../api';
 import logger from '../services/logger';
 import type { BusinessScenario } from './project-workbench/types';
 import { calcMetrics } from './project-workbench/helpers';
-import { threatRadarData, efficiencyData } from './project-workbench/data';
 import FusionMatrixTab from './project-workbench/tabs/FusionMatrixTab';
 import DecisionDeskTab from './project-workbench/tabs/DecisionDeskTab';
-import MetricsTab from './project-workbench/tabs/MetricsTab';
 import ScenarioList from './scenario/ScenarioList';
 import ScenarioEditor, { type WizardState } from './scenario/ScenarioEditor';
 import SimulationResultPanel from './scenario/SimulationResultPanel';
-import CognitionPanel from './scenario/CognitionPanel';
-import CognitiveRightPanel from './scenario/cognition/CognitiveRightPanel';
 import { COGNITION_POLL_INTERVAL_MS } from '../services/cognitiveClient';
 
 /** 后端场景 VO（含业务目标，前端 BusinessScenario 展示同形） */
@@ -104,7 +103,7 @@ function toVM(vo: ScenarioApiVO): BusinessScenario {
   };
 }
 
-const TABS = ['fusion', 'decision', 'metrics', 'cognition', 'git'] as const;
+const TABS = ['fusion', 'decision', 'git'] as const;
 type TabKey = (typeof TABS)[number];
 
 export default function ScenarioManagementView({
@@ -370,22 +369,16 @@ export default function ScenarioManagementView({
   const tabHint: Record<TabKey, string> = {
     fusion: t('scenario.hint.fusion'),
     decision: t('scenario.hint.decision'),
-    metrics: t('scenario.hint.metrics'),
-    cognition: t('scenario.hint.cognition'),
     git: t('scenario.hint.git'),
   };
   const tabIcon: Record<TabKey, string> = {
     fusion: 'Network',
     decision: 'ShieldCheck',
-    metrics: 'TrendingUp',
-    cognition: 'BrainCircuit',
     git: 'GitBranch',
   };
   const tabLabel: Record<TabKey, string> = {
     fusion: t('scenario.tab.fusion'),
     decision: t('scenario.tab.decision'),
-    metrics: t('scenario.tab.metrics'),
-    cognition: t('scenario.tab.cognition'),
     git: t('scenario.tab.git'),
   };
 
@@ -407,11 +400,11 @@ export default function ScenarioManagementView({
           </div>
           <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{t('scenario.page.subtitle')}</p>
         </div>
+        {/* 无假真理 P0（§3.8 收敛轮）：头部原三个硬编码演示 KPI（预算/拦截率/结算耗时）
+            已删除——后端无对应聚合端点，禁本地合成；只保留真实计数。 */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center max-w-2xl w-full md:w-auto">
           <KpiBox styles={styles} label={t('scenario.kpi.total')} value={`${scenarios.length}`} suffix={t('scenario.kpi.unit')} extra={t('scenario.kpi.activeExtra', { n: activeCount })} color={styles.infoText} />
-          <KpiBox styles={styles} label={t('scenario.kpi.budget')} value="¥2.85M" color={styles.accentText} />
-          <KpiBox styles={styles} label={t('scenario.kpi.block')} value="100%" color={styles.successText} />
-          <KpiBox styles={styles} label={t('scenario.kpi.settle')} value="2.8s" suffix={<span className={`text-xs font-normal ${styles.successText}`}>(-93.7%)</span>} color={styles.warningText} />
+          <KpiBox styles={styles} label={t('scenario.kpi.pending')} value={`${pendingCount}`} color={pendingCount > 0 ? styles.warningText : styles.accentText} />
           <div className="col-span-2 sm:col-span-4 flex justify-end mt-1">
             <button
               onClick={() => setShowCopilot(!showCopilot)}
@@ -456,6 +449,14 @@ export default function ScenarioManagementView({
                   <p className={`text-xs ${styles.cardTextMuted} mt-1 max-w-4xl leading-relaxed`}>{activeScenario.description}</p>
                 </div>
                 <div className="flex flex-col gap-2 items-end self-end sm:self-start shrink-0">
+                  {/* §3.8 R1：本页 = 高级视图；L2 场景工作台（Blueprint 中心 + 认知运行面）为唯一主骨架 */}
+                  <Link
+                    to={`/workbench/${activeScenario.id}`}
+                    className={`px-3 py-1 border ${styles.accentBorder} ${styles.accentBg} ${styles.cardText} text-[11px] font-bold rounded flex items-center gap-1 transition-all cursor-pointer hover:opacity-90`}
+                  >
+                    <LucideIcon name="LayoutDashboard" size={11} />
+                    {t('scenario.advanced.openL2')}
+                  </Link>
                   <span className={`text-xs ${styles.cardTextMuted}`}>
                     {t('scenario.dept')}：{' '}
                     <span className={`text-xs border px-2.5 py-1 rounded font-bold ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}>
@@ -529,22 +530,6 @@ export default function ScenarioManagementView({
                     resolvingProposalId={resolvingProposalId}
                   />
                 </>
-              )}
-              {activeTab === 'metrics' && <MetricsTab threatRadarData={threatRadarData} efficiencyData={efficiencyData} />}
-              {activeTab === 'cognition' && (
-                <div className="flex flex-col lg:flex-row gap-4 min-h-0">
-                  <div className="flex-1 min-w-0 space-y-4">
-                    <CognitionPanel scenario={activeScenario} onRunFinished={refreshScenarios} />
-                  </div>
-                  {/* design-05 B.0：认知四卡（E1~E4）唯一入口 = CognitiveRightPanel，自场景管理视图挂载；
-                      <768px 由组件内部紧凑模式 + 下方堆叠（B.8） */}
-                  <aside
-                    className={`w-full lg:w-[380px] shrink-0 rounded-lg border overflow-hidden ${styles.cardBg} ${styles.cardBorder}`}
-                    aria-label={t('scenario.tab.cognition')}
-                  >
-                    <CognitiveRightPanel scenarioId={activeScenario.id} />
-                  </aside>
-                </div>
               )}
               {activeTab === 'git' && (
                 // Git UI 单一通道：services/gitService（只传 repositoryId = 场景 ID），

@@ -5,7 +5,8 @@
  * 注：因需 renderToStaticMarkup 直接渲染组件（JSX），本门禁 spec 使用 .tsx 扩展名。
  *
  * 覆盖面：
- *  1. COG-IA 认知四件套唯一入口：CognitiveRightPanel 必须自场景管理视图挂载；
+ *  1. COG-IA 认知四件套唯一入口：CognitiveRightPanel 必须且只能自 L2 场景详情
+ *     「高级/调试」子面（AdvancedDebugPanel）挂载（2026-10-11 §3.8 R2 迁一删一）；
  *     场景管理视图不得再引用假 Git UI（GitVersionTab/localStorage 缓存/假 push 动画）。
  *  2. COG-E1 右栏探测列表渲染（Mind 名称/能力 chips）。
  *  3. COG-503 引擎停止/ schema 未就绪 → 置灰 banner 分支存在 + 故障态与空态视觉可分。
@@ -62,10 +63,37 @@ const render = (node: React.ReactElement): string =>
   );
 
 describe('COG-IA 认知四件套唯一入口（B.0 入口归一）', () => {
+  // 2026-10-11 §3.8 R2 双结构收敛：认知右栏自场景管理视图整体迁至 L2 场景详情
+  // 「高级/调试」子面（AdvancedDebugPanel），本用例锚点随迁一删一改钉新落点。
+  const PANEL_MOUNT = path.join('pages', 'workbench', '[scenarioId]', 'advanced', 'AdvancedDebugPanel.tsx');
   const view = stripComments(read('pages/ScenarioManagementView.tsx'));
-  it('场景管理视图挂载 CognitiveRightPanel（四卡契约 E1~E4 唯一渲染入口）', () => {
-    expect(view).toContain('CognitiveRightPanel');
-    expect(view).toMatch(/<CognitiveRightPanel\s+scenarioId=/);
+
+  /** 全仓生产源码中 JSX 挂载 `<CognitiveRightPanel ...>` 的文件清单（注释与测试文件不计）。 */
+  function listPanelMounts(dir: string, out: string[] = []): string[] {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (e.name === '__tests__' || e.name === 'node_modules') continue;
+        listPanelMounts(p, out);
+      } else if (/\.tsx$/.test(e.name) && !/\.(test|spec)\.tsx$/.test(e.name)) {
+        if (/<CognitiveRightPanel\s/.test(stripComments(fs.readFileSync(p, 'utf8')))) out.push(p);
+      }
+    }
+    return out;
+  }
+
+  it('L2 高级/调试子面挂载 CognitiveRightPanel（四卡契约 E1~E4 唯一渲染入口）', () => {
+    const advanced = stripComments(read(PANEL_MOUNT));
+    expect(advanced).toContain('CognitiveRightPanel');
+    expect(advanced).toMatch(/<CognitiveRightPanel\s+scenarioId=\{scenarioId\}\s*\/>/);
+  });
+  it('挂载点全应用唯一（双结构不得并存；多一处即回归）', () => {
+    const mounts = listPanelMounts(path.join(SRC, 'pages')).map((f) => path.relative(SRC, f).replace(/\\/g, '/'));
+    expect(mounts, `CognitiveRightPanel 挂载点应唯一`).toEqual([PANEL_MOUNT.replace(/\\/g, '/')]);
+  });
+  it('场景管理视图不再挂载右栏（迁一删一，禁止回流出第二入口）', () => {
+    expect(view).not.toMatch(/<CognitiveRightPanel\s/);
+    expect(view).not.toMatch(/from\s+['"]\.\/scenario\/cognition\/CognitiveRightPanel['"]/);
   });
   it('认知四卡数据源单源：右栏组件只经 services/cognitiveClient 调 E1~E4（禁 workspace 历史路径 GET）', () => {
     const panelDir = path.join(SRC, 'pages', 'scenario', 'cognition');
@@ -101,18 +129,43 @@ describe('B.9-5 假交互/伪持久化删除（E 项防回归）', () => {
 });
 
 describe('F05-16/B 因果分析假数据删除（B 项防回归）', () => {
-  const causal = stripComments(read('pages/aiworkbench/cognition/causalAnalysis.tsx'));
-  it('不再持有硬编码 mock 因果链/固定结论数值', () => {
-    expect(causal).not.toMatch(/const NODES/);
-    expect(causal).not.toMatch(/EDGE_PAIRS/);
-    expect(causal).not.toMatch(/TRACE_NODES/);
-    for (const fake of ['0.82', '87%', '12.3%', '0.54']) {
-      expect(causal, `mock 固定值残留: ${fake}`).not.toContain(fake);
-    }
+  // 2026-10-11 议题 2：假数据原载体 pages/aiworkbench/cognition/causalAnalysis.tsx
+  // 随 AI 台认知 Tab 整体删除（三分下沉），比"清掉常量"更强 —— 载体不得复活；
+  // 硬编码假链/假数值的禁令同步转移到在册认知组件扫描面上。
+  it('假数据载体文件与其所在目录已物理删除且不得复活', () => {
+    expect(
+      fs.existsSync(path.join(SRC, 'pages', 'aiworkbench', 'cognition', 'causalAnalysis.tsx')),
+      'causalAnalysis.tsx（硬编码 mock 因果链）必须已删除',
+    ).toBe(false);
+    expect(
+      fs.existsSync(path.join(SRC, 'pages', 'aiworkbench', 'cognition')),
+      'AI 台 cognition 目录（第四认知入口）必须已删除',
+    ).toBe(false);
   });
-  it('复用真实图组件 CausalGraphView 且关闭本地 What-If 伪推演', () => {
-    expect(causal).toContain('CausalGraphView');
-    expect(causal).toMatch(/<CausalGraphView\s+showWhatIf=\{false\}/);
+
+  it('在册认知组件不再持有硬编码 mock 因果链/固定结论数值', () => {
+    const scope = [
+      ...fs
+        .readdirSync(path.join(SRC, 'pages', 'scenario', 'cognition'))
+        .filter((n) => /\.(ts|tsx)$/.test(n) && !n.includes('.test.'))
+        .map((n) => path.join('pages', 'scenario', 'cognition', n)),
+      'pages/scenario/CognitionPanel.tsx',
+    ];
+    for (const rel of scope) {
+      const code = stripComments(read(rel));
+      for (const forbidden of [/const NODES/, /EDGE_PAIRS/, /TRACE_NODES/]) {
+        expect(code, `${rel} 残留 mock 常量 ${forbidden}`).not.toMatch(forbidden);
+      }
+      for (const fake of ['0.82', '87%', '12.3%', '0.54']) {
+        expect(code, `${rel} 残留 mock 固定值: ${fake}`).not.toContain(fake);
+      }
+      // 原"复用 CausalGraphView 且 showWhatIf={false}"断言的现势形态：认知域根本不挂
+      // 该组件（CausalGraphView 的 What-If 是本地线性伪推演，默认开启），故认知面
+      // 一律禁止 import 它，比逐处关开关更严。
+      expect(code, `${rel} 认知域不得挂 CausalGraphView（含本地 What-If 伪推演）`).not.toMatch(
+        /import\s+\S*\s+from\s+['"][^'"]*CausalGraphView['"]/,
+      );
+    }
   });
 });
 

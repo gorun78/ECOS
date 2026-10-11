@@ -375,5 +375,7 @@
   "scenario.decision.reject": "Reject",
   "scenario.decision.approve": "Approve",
   "scenario.decision.writing": "Writing",
-  "scenario.decision.archived": "Archived"
+  "scenario.decision.archived": "Archived",
+  "scenario.kpi.pending": "待审提案",
+  "scenario.advanced.openL2": "进入场景工作台 L2（蓝图中心）"
 }

@@ -144,23 +144,3 @@ export const AVAILABLE_SECURITY = [
   { id: 'gr-approval', label: 'gr-approval (总监放行机制)', desc: '对于物理数据库的所有写回动作，强制在 ECOS 拦截挂钩中通过总监签名批准' },
   { id: 'proj_aviation_finance', label: 'proj_aviation_finance (财务安全隔离域)', desc: '确保航班实际收益及成本票务不被 AOC 签派人员明文获取' }
 ];
-
-// ==========================================
-// Charts Mock Data
-// ==========================================
-  // Mock charts data
-  export const threatRadarData = [
-    { name: '外部IP越权', count: 42, color: '#f43f5e' },
-    { name: 'PII脱敏规避', count: 28, color: '#f59e0b' },
-    { name: '过时密钥重放', count: 15, color: '#3b82f6' },
-    { name: '物理端口扫描', count: 7, color: '#10b981' }
-  ];
-
-  export const efficiencyData = [
-    { name: '7/2', durationSimulated: 45, durationReal: 4.8 },
-    { name: '7/3', durationSimulated: 45, durationReal: 4.5 },
-    { name: '7/4', durationSimulated: 45, durationReal: 4.2 },
-    { name: '7/5', durationSimulated: 45, durationReal: 3.9 },
-    { name: '7/6', durationSimulated: 45, durationReal: 3.5 },
-    { name: '7/7', durationSimulated: 45, durationReal: 2.8 }
-  ];

@@ -69,7 +69,6 @@ const SCOPE_DIRS = [
   path.join(SRC, "services"),
   path.join(SRC, "api"),
   path.join(SRC, "pages", "scenario", "cognition"),
-  path.join(SRC, "pages", "aiworkbench", "cognition"),
 ];
 
 const TOKEN_STORAGE_TOUCH =

@@ -1,7 +1,7 @@
 // @vitest-environment node
 /**
  * 主题 token + 可访问性门禁（design-05 B.9-4 / B.7，前端规范 §七.7）：
- *  1) 认知域范围（scenario/cognition、aiworkbench/cognition、CausalGraphView.tsx）
+ *  1) 认知域范围（scenario/cognition、CausalGraphView.tsx）
  *     生产源码禁止硬编码 Tailwind 颜色字面量，颜色一律经 useTheme() token；
  *     （注：ThemeContext.tsx 自身是 token 定义地，不在扫描范围。）
  *  2) scenario/cognition 生产源码：JSX <button>/<select>/<input> 开标签必须携带
@@ -40,11 +40,10 @@ function stripComments(code: string): string {
     .join("\n");
 }
 
-const COLOR_SCOPE = [
-  path.join(SRC, "pages", "scenario", "cognition"),
-  path.join(SRC, "pages", "aiworkbench", "cognition"),
-];
+const COLOR_SCOPE = [path.join(SRC, "pages", "scenario", "cognition")];
 const COLOR_EXTRA = [path.join(SRC, "components", "CausalGraphView.tsx")];
+/** 2026-10-11 议题 2 已删的 AI 台认知入口目录，不得复活（复活即逃逸本门禁）。 */
+const REMOVED_COLOR_SCOPE = path.join(SRC, "pages", "aiworkbench", "cognition");
 
 const TAILWIND_COLOR =
   /\b(?:bg|text|border|ring|accent|from|to|via|fill|stroke|shadow)-(?:white|black|slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)(?:-[0-9]{1,3})?(?:\/[0-9]{1,3})?\b/g;
@@ -59,6 +58,21 @@ describe("认知域主题 token 单源（B.9-4）", () => {
 
   it("扫描到范围内源文件", () => {
     expect(files.length).toBeGreaterThan(0);
+  });
+
+  it("扫描面覆盖认知右栏与 CausalGraphView（范围不得静默缩面）", () => {
+    const rel = files.map((f) => path.relative(SRC, f).replace(/\\/g, "/"));
+    for (const must of [
+      "pages/scenario/cognition/CognitiveRightPanel.tsx",
+      "pages/scenario/cognition/CognitionStateViews.tsx",
+      "components/CausalGraphView.tsx",
+    ]) {
+      expect(rel, `扫描面缺失 ${must}`).toContain(must);
+    }
+  });
+
+  it("AI 台 cognition 目录已删除且不得复活（议题 2 三分下沉）", () => {
+    expect(fs.existsSync(REMOVED_COLOR_SCOPE), `已删目录复活: ${REMOVED_COLOR_SCOPE}`).toBe(false);
   });
 
   it("非注释代码中不存在硬编码 Tailwind 颜色字面量", () => {

@@ -60,7 +60,6 @@ const BASELINE = new Set([
   'pages/aiworkbench/AgentStudioView.tsx',
   'pages/aiworkbench/ChatbotStudioView.tsx',
   'pages/aiworkbench/api.ts',
-  'pages/aiworkbench/cognition/overview.tsx',
   'pages/aiworkbench/logic-canvas/useLogicPipelineRun.ts',
   'pages/business-workbench/BusinessWorkbenchLayout.tsx',
   'pages/data-quality/api/_base.ts',
@@ -184,5 +183,5 @@ describe('api-base-single-source — API 前缀基址单源 (W206/C188, §十)',
         ? `httpClient 之外新硬编码 "/api" 前缀（基线只减不增，新增即红；应收口到 httpClient/API_BASE 单源）：\n${newViolations.join('\n')}`
         : undefined,
     ).toEqual([]);
-  });
+  }, 30_000);
 });

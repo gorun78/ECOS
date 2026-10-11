@@ -375,5 +375,7 @@
   "scenario.decision.reject": "Reject",
   "scenario.decision.approve": "Approve",
   "scenario.decision.writing": "Writing",
-  "scenario.decision.archived": "Archived"
+  "scenario.decision.archived": "Archived",
+  "scenario.kpi.pending": "Pending proposals",
+  "scenario.advanced.openL2": "Open scenario workbench L2 (blueprint center)"
 }

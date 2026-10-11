@@ -357,6 +357,253 @@ export async function fetchScenarioBeliefs(
   return { rows, issues };
 }
 
+// ── 认知资产目录 / 只读解析（补充设计 §8、§13 SUP-COG-01/02；C/K 互斥守护：只读引用态）─
+//
+// catalog = 模式/词表权威（分层图例 A/B/C + 治理资产类 + 12 态生命周期，全部服务端单源下发）；
+// 资产**实例**来自 governed-class 既有列表端点（fetchBeliefs / fetchHypotheses / fetchModels）。
+// 本模块**不含任何 KB 写入路径**（§8.4「不得把 C 类型经 KB 写通道静默落成 K 资产」）——
+// 前端只消费 catalog/resolve/proposals，proposals 走认知域自己的候选状态机，不写知识表。
+
+/** GET catalog —— 唯一路径常量，禁散落字面量（纳入 cognitivePaths 单源测试）。 */
+export const COGNITIVE_ASSET_CATALOG_PATH = `${COGNITIVE_BASE}/assets/catalog`;
+
+/** resolve 路径构造；前缀 bel/hyp/mod 由后端 parseRef 校验（非法 400 / 查不到 404）。 */
+export function cognitiveAssetResolvePath(assetId: string): string {
+  return `${COGNITIVE_BASE}/assets/${encodeURIComponent(assetId)}/resolve`;
+}
+
+/** 生命周期词表 + 治理类均由服务端 catalog 单源下发；前端不复制枚举值，仅做 i18n 显示映射。 */
+export interface CognitiveAssetCatalog {
+  /** { A, B, C } → 分层图例文案（服务端下发，只读） */
+  layers: Record<string, string>;
+  /** C 类对象目录（PRD-05 REQ-COG-06 11 对象） */
+  objects: unknown[];
+  /** 治理资产类：[BELIEF, HYPOTHESIS, MODEL] */
+  governedAssetClasses: string[];
+  /** §8.4 生命周期 12 态（服务端 CognitiveAssetStatus 单源） */
+  lifecycleStates: string[];
+}
+
+/** resolve 单条只读 DTO（字段与服务端 setConfidenceTriplet / resolve 逐字对齐）。 */
+export interface CognitiveAssetResolution {
+  assetId: string;
+  assetClass: string;
+  assetType: string;
+  /** lifecycle_state（V268 权威列）；null → legacy-fallback，禁伪造接管态 */
+  lifecycleState: string | null;
+  lifecycleSource: string;
+  legacyStatus: string | null;
+  /** 以下三项 belief 专属（§8.3 置信三分） */
+  confidenceProbability?: number | null;
+  confidenceKind?: string | null;
+  calibrationRef?: string | null;
+  objectKey?: string | null;
+}
+
+/** 拉认知资产目录（模式/词表；只读、零 SQL）。 */
+export async function fetchCognitiveAssetCatalog(): Promise<CognitiveAssetCatalog> {
+  const data = await callJson(COGNITIVE_ASSET_CATALOG_PATH);
+  const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+  return {
+    layers: (o.layers as Record<string, string>) ?? {},
+    objects: asArray<unknown>(o.objects),
+    governedAssetClasses: asArray<string>(o.governedAssetClasses),
+    lifecycleStates: asArray<string>(o.lifecycleStates),
+  };
+}
+
+/** 只读解析单条认知资产（按前缀路由；查不到抛 404，非法前缀抛 400，均由 callJson 归一）。 */
+export async function resolveCognitiveAsset(assetId: string): Promise<CognitiveAssetResolution> {
+  const data = await callJson(cognitiveAssetResolvePath(assetId));
+  return (data ?? {}) as CognitiveAssetResolution;
+}
+
+// ── 候选提案 / 受控状态迁移（§3.5 候选评审面；后端 SUP-COG-03/§8.4，2026-10-11 契约实核）──
+//
+// 路径单源：`${COGNITIVE_BASE}/assets/{id}/proposals` 与 `.../transitions`
+// （对齐 CognitiveApiPaths.ASSETS_PROPOSALS_REL / ASSETS_TRANSITION_REL）。
+// proposals 只创建候选 + 审计留痕，原资产行 0 改；transitions 合法迁移才落
+// lifecycle_state，非法迁移 ⇒ 409 ECOS-COG-409S（callJson 归一为 HTTP_ERROR，
+// `status===409` 可供 UI 分支；消费面禁出现 `/api` 字面量）。
+
+/** proposals 路径构造（POST；创建候选提案，不改原资产）。 */
+export function cognitiveAssetProposalsPath(assetId: string): string {
+  return `${COGNITIVE_BASE}/assets/${encodeURIComponent(assetId)}/proposals`;
+}
+
+/** transitions 路径构造（POST；受控状态迁移，非法迁移 409）。 */
+export function cognitiveAssetTransitionPath(assetId: string): string {
+  return `${COGNITIVE_BASE}/assets/${encodeURIComponent(assetId)}/transitions`;
+}
+
+/** 提案请求体（AssetProposalDTO 逐字对齐：targetState/reason/evidenceRef/operator/note）。 */
+export interface CognitiveAssetProposalInput {
+  targetState: string;
+  reason: string;
+  evidenceRef?: string;
+  operator?: string;
+  note?: string;
+}
+
+/** 提案响应（服务端单源字段；status 恒为 PENDING_APPROVAL，UI 不得本地合成其他值）。 */
+export interface CognitiveAssetProposalReceipt {
+  proposalId?: string;
+  assetId?: string;
+  status?: string;
+  carrier?: string;
+  eventRef?: string;
+}
+
+/** 迁移请求体（§8.4 四要件；SUPERSEDED 时 reason 须含 `supersededBy=<引用>`，由后端校验）。 */
+export interface CognitiveAssetTransitionInput {
+  targetState: string;
+  reason: string;
+  evidenceRef?: string;
+  operator?: string;
+}
+
+/** 迁移响应（fromState/toState 由服务端回填；409 走异常不返回本形状）。 */
+export interface CognitiveAssetTransitionResult {
+  assetId?: string;
+  assetClass?: string;
+  fromState?: string;
+  toState?: string;
+  traceId?: string;
+  eventRef?: string;
+}
+
+/** 提交候选提案（SUP-COG-03：只生成候选与审计事件，绝不改动原资产行）。 */
+export async function submitAssetProposal(
+  assetId: string,
+  input: CognitiveAssetProposalInput,
+): Promise<CognitiveAssetProposalReceipt> {
+  const data = await callJson(cognitiveAssetProposalsPath(assetId), {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (data ?? {}) as CognitiveAssetProposalReceipt;
+}
+
+/** 受控状态迁移（后端状态机是唯一权威；非法迁移抛 CognitiveApiError(status=409)）。 */
+export async function transitionCognitiveAsset(
+  assetId: string,
+  input: CognitiveAssetTransitionInput,
+): Promise<CognitiveAssetTransitionResult> {
+  const data = await callJson(cognitiveAssetTransitionPath(assetId), {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return (data ?? {}) as CognitiveAssetTransitionResult;
+}
+
+// ── Context Builder（设计方案 §3.4 步骤 2 资产盘点；补充设计 §5.2，POST /context/build）──
+//
+// 2026-10-11 网关实核：请求三要素 = scenarioId + scope.tenantId + requiredAssets[]
+// （缺任一 ⇒ 400 ECOS-COG-400S，envelope data 携带 {traceId, guard, errorCode, missing}）；
+// 成功 = ContextBuildResult 装配壳（contextDigest sha256 / ready / truncated / ttl /
+// createdAt / expiresAt + pack 本体）。错误族（ContextBuildErrorAdvice，@Order(1) 先于
+// 网关全局 handler）：403 ECOS-COG-403S / 409 ECOS-COG-409V / 422 ECOS-COG-422C /
+// 429 ECOS-COG-429B / 503 ECOS-COG-503D / 400 ECOS-COG-400S。
+// ready=false 时 Run 侧不得继续依赖步骤——UI 如实呈现，禁伪就绪。
+
+/** context/build 唯一路径（对齐 CognitiveApiPaths.CONTEXT_BUILD；纳入单源守卫）。 */
+export const CONTEXT_BUILD_PATH = `${COGNITIVE_BASE}/context/build`;
+
+/** 权威源类型（后端 ContextSourceRef.sourceType 词表；来自 §5.2 请求示例单源）。 */
+export const CONTEXT_SOURCE_TYPES = ["DATA_ASSET", "ONTOLOGY", "KNOWLEDGE", "COGNITIVE", "CAPABILITY"] as const;
+export type ContextSourceType = (typeof CONTEXT_SOURCE_TYPES)[number];
+
+/** 必需资产条目输入（SUP-CTX-01：缺 id/版本/时点三要素后端 400，前端只做提示不代行校验）。 */
+export interface ContextSourceRefInput {
+  sourceType: string;
+  sourceId: string;
+  version?: string;
+  required?: boolean;
+  successCritical?: boolean;
+  evidenceRefs?: string[];
+}
+
+/** 构建请求（ContextBuildRequest 字段镜像；仅必填外可缺省，由服务端补默认）。 */
+export interface ContextBuildInput {
+  requestId?: string;
+  scenarioId: string;
+  blueprintRef?: { blueprintId?: string; version?: string };
+  goal?: { type?: string; statement?: string; successCriteria?: string[]; stopConditions?: string[] };
+  scope: {
+    tenantId: string;
+    projectIds?: string[];
+    departmentIds?: string[];
+    periods?: string[];
+    caliberId?: string;
+    asOfTime?: string;
+  };
+  requiredCapabilities?: string[];
+  requiredAssets: ContextSourceRefInput[];
+  include?: Partial<Record<"dataAssets" | "ontology" | "knowledge" | "cognitiveAssets" | "modelCapabilities", boolean>>;
+  budget?: { maxTokens?: number; maxSources?: number; maxLatencyMs?: number };
+  expectedAsOfTime?: string;
+  ttlMillis?: number;
+}
+
+/** Gap（§6.5 词表：category 9 族 / severity 4 档 / status 4 态；开放字符串防词表漂移）。 */
+export interface ContextGapView {
+  gapId?: string;
+  category?: string;
+  severity?: string;
+  targetRef?: string;
+  description?: string;
+  status?: string;
+  requiresApproval?: boolean;
+  resolutionRef?: string;
+  suggestedActions?: string[];
+}
+
+/** 构建响应（ContextBuildResult 装配壳；pack 原样保留供逐面读取，禁前端合成字段）。 */
+export interface ContextBuildResultDto {
+  contextDigest?: string;
+  ttlMillis?: number;
+  scenarioId?: string;
+  blueprintRef?: { blueprintId?: string; version?: string };
+  scopeRef?: Record<string, unknown>;
+  requestId?: string;
+  createdAt?: string;
+  expiresAt?: string;
+  ready: boolean;
+  truncated: boolean;
+  pack?: Record<string, unknown>;
+}
+
+/** pack 数组安全读取（缺失/非数组 → 空集，仅用于列表渲染，不当作服务端断言）。 */
+export function packList(result: ContextBuildResultDto | null, key: string): unknown[] {
+  const v = result?.pack?.[key];
+  return Array.isArray(v) ? v : [];
+}
+
+/**
+ * 发起上下文构建（步骤 2 资产盘点）。错误经 callJson 归一为 CognitiveApiError，
+ * UI 按 `status`（403/409/422/429/503/400）分支渲染错误家族，message/traceId 原样呈现。
+ */
+export async function buildScenarioContext(input: ContextBuildInput): Promise<ContextBuildResultDto> {
+  const data = await callJson(CONTEXT_BUILD_PATH, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+  return {
+    contextDigest: typeof o.contextDigest === "string" ? o.contextDigest : undefined,
+    ttlMillis: typeof o.ttlMillis === "number" ? o.ttlMillis : undefined,
+    scenarioId: typeof o.scenarioId === "string" ? o.scenarioId : undefined,
+    blueprintRef: o.blueprintRef as ContextBuildResultDto["blueprintRef"],
+    scopeRef: o.scopeRef as Record<string, unknown> | undefined,
+    requestId: typeof o.requestId === "string" ? o.requestId : undefined,
+    createdAt: typeof o.createdAt === "string" ? o.createdAt : undefined,
+    expiresAt: typeof o.expiresAt === "string" ? o.expiresAt : undefined,
+    ready: o.ready === true,
+    truncated: o.truncated === true,
+    pack: o.pack as Record<string, unknown> | undefined,
+  };
+}
+
 // ── alias：既有 17-controller 端点 ───────────────────
 //
 // 为保持既有 importer（pages/cos/*、CognitiveEngineView、MentalReviewTab、
