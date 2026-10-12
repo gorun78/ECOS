@@ -45,7 +45,7 @@ export default function GoalTreeNode({
         style={{ marginLeft: depth * 20 }}
       >
         {/* Expand/collapse toggle */}
-        <button
+        <button type="button"
           onClick={(e) => { e.stopPropagation(); if (hasChildren) toggleExpand(node.id); }}
           className={`w-5 h-5 flex items-center justify-center rounded hover:brightness-125 flex-shrink-0
             ${hasChildren ? "cursor-pointer opacity-60 hover:opacity-100" : "opacity-20 cursor-default"}`}
@@ -92,7 +92,7 @@ export default function GoalTreeNode({
         {/* Edit/Delete actions */}
         <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
           {onEdit && (
-            <button
+            <button type="button"
               onClick={(e) => { e.stopPropagation(); onEdit(node); }}
               className="p-1 rounded hover:bg-white/10 transition-colors"
               title="Edit"
@@ -101,7 +101,7 @@ export default function GoalTreeNode({
             </button>
           )}
           {onDelete && (
-            <button
+            <button type="button"
               onClick={(e) => { e.stopPropagation(); onDelete(node.id); }}
               className="p-1 rounded hover:bg-red-500/20 transition-colors"
               title="Delete"

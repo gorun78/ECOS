@@ -9,6 +9,7 @@
 import React from 'react';
 import { AIPGuardrail } from '../../types/aiworkbench';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 import { Icon } from './AiGuardrailsShared';
 
 interface GuardrailsTabProps {
@@ -37,6 +38,7 @@ export default function AiGuardrailsGuardrailsTab({
   sandboxResult,
 }: GuardrailsTabProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -44,7 +46,7 @@ export default function AiGuardrailsGuardrailsTab({
 
         {/* Left Column: Guardrail cards config */}
         <div className="lg:col-span-2 space-y-4">
-          <h3 className={`text-xs font-extrabold ${styles.cardTextMuted} uppercase tracking-wider`}>护栏规则配置 ({guardrails.length})</h3>
+          <h3 className={`text-xs font-extrabold ${styles.cardTextMuted} uppercase tracking-wider`}>{t('aiworkbench.gr.rulesConfig')} ({guardrails.length})</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {guardrails.map(g => (
@@ -84,7 +86,7 @@ export default function AiGuardrailsGuardrailsTab({
                   <span className={`px-1.5 py-0.5 rounded font-bold text-[9px] ${
                     g.severity === 'block' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-amber-50 text-amber-600 border border-amber-200'
                   }`}>
-                    {g.severity === 'block' ? '强制拦截阻断' : '安全记录与审计'}
+                    {g.severity === 'block' ? t('aiworkbench.gr.sevBlock') : t('aiworkbench.gr.sevRecord')}
                   </span>
                 </div>
 
@@ -100,23 +102,24 @@ export default function AiGuardrailsGuardrailsTab({
               <span className="p-1 rounded bg-rose-50 text-rose-600">
                 <Icon name="ShieldAlert" size={13} />
               </span>
-              <h3 className={`text-xs font-bold ${styles.cardText}`}>安全合规审计评估沙箱</h3>
+              <h3 className={`text-xs font-bold ${styles.cardText}`}>{t('aiworkbench.gr.sandboxTitle')}</h3>
             </div>
             <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase`}>AUDIT SIMULATOR</span>
           </div>
 
           <div className="space-y-1.5">
-            <label className={`block ${styles.cardTextMuted} font-bold text-[10px] uppercase`}>1. 输入审计测试语句 (Risky Prompt Input)</label>
+            <label className={`block ${styles.cardTextMuted} font-bold text-[10px] uppercase`}>{t('aiworkbench.gr.inputLabel')}</label>
             <textarea
               value={testInput}
               onChange={e => onTestInputChange(e.target.value)}
               rows={4}
               className={`w-full px-3 py-2 border ${styles.cardBorder} rounded-lg text-xs focus:outline-hidden focus:border-blue-500 font-sans leading-relaxed ${styles.cardTextMuted} ${styles.cardBg}`}
-              placeholder="请输入包含敏感 PII 或绕过审批倾向的提示词进行合规测试..."
+              placeholder={t('aiworkbench.gr.inputPlaceholder')}
             />
           </div>
 
           <button
+            type="button"
             onClick={onRunSimulator}
             disabled={isSimulating || !testInput.trim()}
             className={`w-full py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer ${
@@ -126,19 +129,19 @@ export default function AiGuardrailsGuardrailsTab({
             {isSimulating ? (
               <>
                 <span className={`w-3.5 h-3.5 border-2 ${styles.cardBorder} border-t-transparent rounded-full animate-spin`} />
-                <span>实时深度合规阻断测试中...</span>
+                <span>{t('aiworkbench.gr.simulating')}</span>
               </>
             ) : (
               <>
                 <Icon name="ShieldCheck" size={13} />
-                <span>执行安全审计拦截测试</span>
+                <span>{t('aiworkbench.gr.runSimulator')}</span>
               </>
             )}
           </button>
 
           {sandboxTrace.length > 0 && (
             <div className="space-y-2">
-              <h4 className={`font-extrabold ${styles.cardTextMuted} uppercase tracking-wider text-[10px]`}>2. 拦截诊断事件链路 (Audit Trace)</h4>
+              <h4 className={`font-extrabold ${styles.cardTextMuted} uppercase tracking-wider text-[10px]`}>{t('aiworkbench.gr.traceTitle')}</h4>
               <div className={`${styles.appBg} rounded-xl p-3 max-h-48 overflow-y-auto space-y-2 text-[10px] font-mono ${styles.cardTextMuted}`}>
                 {sandboxTrace.map((log, idx) => (
                   <p key={idx} className="leading-relaxed">{log}</p>
@@ -149,17 +152,17 @@ export default function AiGuardrailsGuardrailsTab({
 
           {sandboxResult && (
             <div className="space-y-2">
-              <h4 className={`font-extrabold ${styles.cardTextMuted} uppercase tracking-wider text-[10px]`}>3. 脱敏阻断结果</h4>
+              <h4 className={`font-extrabold ${styles.cardTextMuted} uppercase tracking-wider text-[10px]`}>{t('aiworkbench.gr.resultTitle')}</h4>
               <div className={`${styles.inputBg} border ${styles.cardBorder} rounded-xl p-3 text-xs space-y-3`}>
                 <div>
-                  <span className={`${styles.cardTextMuted} font-bold uppercase text-[8px] block`}>拦截状态 (Status):</span>
+                  <span className={`${styles.cardTextMuted} font-bold uppercase text-[8px] block`}>{t('aiworkbench.gr.statusLabel')}</span>
                   <span className="px-2 py-0.5 bg-red-100 text-red-700 border border-red-200 rounded-full font-bold text-[9px] inline-block mt-1">
-                    🚫 已强制高危阻断 (BLOCKED)
+                    {t('aiworkbench.gr.statusBlocked')}
                   </span>
                 </div>
 
                 <div>
-                  <span className={`${styles.cardTextMuted} font-bold uppercase text-[8px] block`}>触发违规检测类:</span>
+                  <span className={`${styles.cardTextMuted} font-bold uppercase text-[8px] block`}>{t('aiworkbench.gr.triggeredLabel')}</span>
                   <div className="space-y-1 mt-1">
                     {sandboxResult.triggeredFilters.map((filter, idx) => (
                       <span key={idx} className={`block text-[10px] text-rose-600 font-mono font-bold ${styles.cardBg} px-2 py-0.5 border ${styles.cardBorder} rounded-md`}>
@@ -170,7 +173,7 @@ export default function AiGuardrailsGuardrailsTab({
                 </div>
 
                 <div>
-                  <span className={`${styles.cardTextMuted} font-bold uppercase text-[8px] block`}>脱敏并向 LLM 递呈的合规指令:</span>
+                  <span className={`${styles.cardTextMuted} font-bold uppercase text-[8px] block`}>{t('aiworkbench.gr.compliantLabel')}</span>
                   <p className={`${styles.cardBg} p-2.5 border ${styles.cardBorder} rounded-lg ${styles.cardTextMuted} font-mono text-[10px] mt-1 leading-relaxed`}>
                     {sandboxResult.processedText}
                   </p>

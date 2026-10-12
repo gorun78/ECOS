@@ -105,7 +105,7 @@ export function ObjectExplorerDetailPanel({
             <div className="flex items-center gap-2 flex-wrap">
               {/* Status badge + transition dropdown */}
               <div className="relative">
-                <button
+                <button type="button"
                   onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                   disabled={statusChanging}
                   className={`text-[10px] px-2 py-1 rounded border font-semibold flex items-center gap-1 transition disabled:opacity-50 ${STATUS_COLORS[detail.status] || STATUS_COLORS.Draft}`}
@@ -116,7 +116,7 @@ export function ObjectExplorerDetailPanel({
                 {showStatusDropdown && availableTransitions.length > 0 && (
                   <div className={`absolute top-full left-0 mt-1 ${styles.cardBg} border ${styles.cardBorder} rounded-lg shadow-lg py-1 z-30 min-w-[120px]`}>
                     {availableTransitions.map(t => (
-                      <button
+                      <button type="button"
                         key={t.transitionCode}
                         onClick={() => handleStatusChange(t.transitionCode)}
                         className={`w-full text-left px-3 py-1.5 text-[10px] font-semibold ${styles.cardText} hover:bg-blue-50 hover:text-blue-500 transition flex items-center gap-2`}
@@ -131,7 +131,7 @@ export function ObjectExplorerDetailPanel({
               </div>
 
               {/* Edit button */}
-              <button
+              <button type="button"
                 onClick={openEditForm}
                 className={`text-[10px] ${styles.appBg} ${styles.sidebarHoverBg} ${styles.cardText} border ${styles.cardBorder} rounded px-2 py-1 font-semibold transition flex items-center gap-1`}
               >
@@ -139,7 +139,7 @@ export function ObjectExplorerDetailPanel({
               </button>
 
               {/* Delete button */}
-              <button
+              <button type="button"
                 onClick={() => handleDelete(detail.id)}
                 className="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded px-2 py-1 font-semibold transition flex items-center gap-1"
               >
@@ -151,7 +151,7 @@ export function ObjectExplorerDetailPanel({
           {/* Tab bar */}
           <div className={`flex border-b ${styles.cardBorder} shrink-0 px-4 gap-0`}>
             {(["properties", "relations", "timeline"] as const).map(tab => (
-              <button
+              <button type="button"
                 key={tab}
                 onClick={() => setActiveDetailTab(tab)}
                 className={`px-3 py-2 text-[11px] font-semibold border-b-2 transition ${

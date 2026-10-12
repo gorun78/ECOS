@@ -289,7 +289,7 @@ export default function AIPCopilotDrawer({
             <span className="text-[9px] text-indigo-400 font-mono">Agent-driven Co-Processor Active</span>
           </div>
         </div>
-        <button
+        <button type="button"
           onClick={onClose}
           aria-label={t('common.close')}
           className={`p-1.5 text-[var(--text-muted)] hover:text-white hover:bg-black/20 rounded-lg transition-colors cursor-pointer`}

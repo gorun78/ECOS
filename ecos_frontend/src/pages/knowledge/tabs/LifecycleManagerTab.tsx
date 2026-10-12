@@ -87,7 +87,7 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
     if (next === asset.state) return;
     try {
       await knowledgeApi.lifecycleTransition(asset.id, next);
-      toast('success', tl('已转换状态: ', 'Transition: ') + `${asset.id} → ${next}`);
+      toast('success', t('knowledge.lifecycle.transitionToast') + `${asset.id} → ${next}`);
     } catch (e: unknown) {
       // 后端未就绪时本地审计记录
       const msg = (e as { message?: string } | undefined)?.message ?? '';
@@ -111,7 +111,7 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
   const handlePhysicalDelete = (asset: LifecycleAsset) => {
     if (!confirm(tl(`确认物理删除资产 ${asset.id}？此操作不可逆`, 'Physically delete asset ' + asset.id + '? Irreversible.'))) return;
     handleTransition(asset, 'archived');
-    toast('info', tl('物理删除标记为 → archived（软删）', 'Acted as archive (soft delete)'));
+    toast('info', t('knowledge.lifecycle.physDeletedOrSoftDeleted'));
   };
 
   const handleRestore = (asset: LifecycleAsset) => {
@@ -120,40 +120,40 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-200 pb-4 gap-3">
+      <div className={`flex flex-col md:flex-row md:items-center justify-between border-b ${styles.cardBorder} pb-4 gap-3`}>
         <div className="space-y-1">
-          <h2 className="text-sm font-black text-slate-800 flex items-center gap-2">
+          <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}>
             <GitBranch size={16} className="text-indigo-600" />
-            {tl('生命周期管理（状态机 + 审计）', 'Lifecycle Management (State Machine + Audit)')}
+            {t('knowledge.lifecycle.pageTitle')}
           </h2>
-          <p className="text-xs text-slate-500">{tl('draft → active → deprecated → archived · 每行状态变更写 kb_lifecycle_audit', '')}</p>
+          <p className={`text-xs ${styles.muted}`}>{t('knowledge.lifecycle.pageSubtitle')}</p>
         </div>
-        <button onClick={loadAssets} disabled={isLoading}
-          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs disabled:opacity-50">
+        <button type="button" onClick={loadAssets} disabled={isLoading}
+          className={`px-3 py-1.5 ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.cardText} font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs disabled:opacity-50`}>
           {isLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-          {tl('刷新资产', 'Refresh')}
+          {t('knowledge.lifecycle.refreshAssets')}
         </button>
       </div>
 
       {/* 状态机图示 */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4">
-        <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-          <GitBranch size={12} /> {tl('状态机', 'STATE MACHINE')}
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4`}>
+        <h3 className={`text-xs font-extrabold ${styles.muted} uppercase tracking-wider mb-3 flex items-center gap-1.5`}>
+          <GitBranch size={12} /> {t('knowledge.lifecycle.stateMachine')}
         </h3>
         <div className="flex items-center gap-3 flex-wrap">
           {LIFECYCLE_STATES.map((s, i) => (
             <React.Fragment key={s}>
               <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${
-                s === 'draft' ? 'bg-amber-50 border-amber-200' :
-                s === 'active' ? 'bg-emerald-50 border-emerald-200' :
+                s === 'draft' ? `${styles.warningBg} ${styles.warningBorder}` :
+                s === 'active' ? `${styles.successBg} ${styles.successBorder}` :
                 s === 'deprecated' ? 'bg-rose-50 border-rose-200' :
-                'bg-slate-50 border-slate-200'
+                `${styles.appBg} ${styles.cardBorder}`
               }`}>
                 <span className={`w-2 h-2 rounded-full ${STATE_COLOR[s].dot}`} />
                 <span className={`text-xs font-bold ${STATE_COLOR[s].nameColor}`}>{s}</span>
               </div>
               {i < LIFECYCLE_STATES.length - 1 && (
-                <span className="text-slate-300 font-bold">→</span>
+                <span className={`${styles.muted} font-bold`}>→</span>
               )}
             </React.Fragment>
           ))}
@@ -161,54 +161,54 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
       </div>
 
       {/* 资产表 */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-700">
-            {tl('资产列表', 'Assets')} ({assets.length})
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden`}>
+        <div className={`px-4 py-3 border-b ${styles.cardBorder} flex items-center justify-between`}>
+          <span className={`text-xs font-bold ${styles.cardText}`}>
+            {t('knowledge.lifecycle.assetList')} ({assets.length})
           </span>
-          <span className="text-[9px] font-mono text-slate-400">{assets.length === 0 ? tl('/assets 待 PMO-56 后端提供', '/assets endpoint awaiting PMO-56') : tl('加载自 /api/v1/knowledge/assets', 'loaded from /api/v1/knowledge/assets')}</span>
+          <span className={`text-[9px] font-mono ${styles.muted}`}>{assets.length === 0 ? t('knowledge.lifecycle.assetsPendingPmo56') : t('knowledge.lifecycle.loadedFromEndpoint')}</span>
         </div>
         <div className="w-full overflow-x-auto">
           <table className="w-full text-[11px] border-collapse whitespace-nowrap">
             <thead>
-              <tr className="bg-slate-50 text-slate-400 border-b border-slate-200">
+              <tr className={`${styles.appBg} ${styles.muted} border-b ${styles.cardBorder}`}>
                 <th className="p-3 text-left font-extrabold uppercase tracking-wider">ID</th>
-                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('名称', 'Name')}</th>
-                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('类型', 'Type')}</th>
-                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('当前状态', 'Current State')}</th>
-                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('更新于', 'Updated')}</th>
-                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{tl('转换', 'Transition')}</th>
-                <th className="p-3 text-right font-extrabold uppercase tracking-wider">{tl('操作', 'Actions')}</th>
+                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{t('knowledge.lifecycle.colName')}</th>
+                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{t('knowledge.lifecycle.colType')}</th>
+                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{t('knowledge.lifecycle.currentState')}</th>
+                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{t('knowledge.lifecycle.updatedAt')}</th>
+                <th className="p-3 text-left font-extrabold uppercase tracking-wider">{t('knowledge.lifecycle.transitionCol')}</th>
+                <th className="p-3 text-right font-extrabold uppercase tracking-wider">{t('knowledge.lifecycle.actionsCol')}</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={7} className="p-8 text-center text-slate-400">{tl('加载中...', 'Loading...')}</td></tr>
+                <tr><td colSpan={7} className={`p-8 text-center ${styles.muted}`}>{t('knowledge.lifecycle.loading')}</td></tr>
               ) : assets.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-12 text-center text-slate-400 text-xs space-y-2">
-                    <Archive size={24} className="mx-auto text-slate-300" />
-                    <p>{tl('暂无生命周期资产', 'No lifecycle assets')}</p>
-                    <p className="text-[10px] font-mono text-slate-300">/api/v1/knowledge/assets · {tl('PMO-56 待补', 'PMO-56 pending')}</p>
+                  <td colSpan={7} className={`p-12 text-center ${styles.muted} text-xs space-y-2`}>
+                    <Archive size={24} className={`mx-auto ${styles.muted}`} />
+                    <p>{t('knowledge.lifecycle.assetsEmpty')}</p>
+                    <p className={`text-[10px] font-mono ${styles.muted}`}>/api/v1/knowledge/assets · {t('knowledge.lifecycle.pmo56Pending')}</p>
                   </td>
                 </tr>
               ) : assets.map(asset => (
-                <tr key={asset.id} className="border-b border-slate-100 hover:bg-slate-50/40">
-                  <td className="p-3 font-mono font-bold text-slate-700">{asset.id}</td>
-                  <td className="p-3 text-slate-700">{asset.name}</td>
-                  <td className="p-3 text-slate-500 font-mono text-[10px]">{asset.type}</td>
+                <tr key={asset.id} className={`border-b ${styles.cardBorder} ${styles.sidebarHoverBg}`}>
+                  <td className={`p-3 font-mono font-bold ${styles.cardText}`}>{asset.id}</td>
+                  <td className={`p-3 ${styles.cardText}`}>{asset.name}</td>
+                  <td className={`p-3 ${styles.muted} font-mono text-[10px]`}>{asset.type}</td>
                   <td className="p-3">
                     <span className="inline-flex items-center gap-1.5">
                       <span className={`w-2 h-2 rounded-full ${STATE_COLOR[asset.state].dot}`} />
                       <span className={`font-bold ${STATE_COLOR[asset.state].nameColor}`}>{asset.state}</span>
                     </span>
                   </td>
-                  <td className="p-3 text-slate-500 font-mono text-[10px]">{asset.updatedAt}</td>
+                  <td className={`p-3 ${styles.muted} font-mono text-[10px]`}>{asset.updatedAt}</td>
                   <td className="p-3">
                     <select
                       value={asset.state}
                       onChange={e => handleTransition(asset, e.target.value as LifecycleState)}
-                      className="px-2 py-1 border border-slate-200 rounded text-[10px] font-bold bg-white cursor-pointer"
+                      className={`px-2 py-1 border ${styles.inputBorder} rounded text-[10px] font-bold ${styles.inputBg} cursor-pointer`}
                     >
                       {LIFECYCLE_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
@@ -216,16 +216,16 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
                   <td className="p-3">
                     <div className="flex gap-1.5 justify-end">
                       {asset.state === 'archived' && (
-                        <button onClick={() => handleRestore(asset)}
-                          className="p-1.5 text-slate-400 hover:text-emerald-600 cursor-pointer rounded hover:bg-slate-100"
-                          title={tl('恢复', 'Restore to active')}>
+                        <button type="button" onClick={() => handleRestore(asset)}
+                          className={`p-1.5 ${styles.muted} hover:text-emerald-600 cursor-pointer rounded ${styles.sidebarHoverBg}`}
+                          title={t('knowledge.lifecycle.restore')}>
                           <ArchiveRestore size={13} />
                         </button>
                       )}
                       {asset.state !== 'archived' && (
-                        <button onClick={() => handlePhysicalDelete(asset)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 cursor-pointer rounded hover:bg-slate-100"
-                          title={tl('物理删除（实际为软删 → archived）', 'Physical delete (soft → archived)')}>
+                        <button type="button" onClick={() => handlePhysicalDelete(asset)}
+                          className={`p-1.5 ${styles.muted} hover:text-rose-600 cursor-pointer rounded ${styles.sidebarHoverBg}`}
+                          title={t('knowledge.lifecycle.physDeleteTitle')}>
                           <Trash2 size={13} />
                         </button>
                       )}
@@ -239,28 +239,28 @@ export default function LifecycleManagerTab({ showToast }: TabProps) {
       </div>
 
       {/* 审计日志 */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-          <h3 className="font-extrabold text-slate-700 text-xs flex items-center gap-1.5">
-            <CheckCircle2 size={13} className="text-indigo-500" /> {tl('操作审计日志 (kb_lifecycle_audit)', 'Audit Trail (kb_lifecycle_audit)')} ({audit.length})
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-3`}>
+        <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-2`}>
+          <h3 className={`font-extrabold ${styles.cardText} text-xs flex items-center gap-1.5`}>
+            <CheckCircle2 size={13} className="text-indigo-500" /> {t('knowledge.lifecycle.auditLog')} ({audit.length})
           </h3>
-          <span className="text-[9px] font-mono text-slate-400">
-            {audit.length === 0 ? tl('后端 /lifecycle/audit 待 PMO-56 后端提供，目前仅本地 localStorage 记录', 'Backend /lifecycle/audit awaiting PMO-56; recording locally via localStorage') : tl('加载自 /lifecycle/audit', 'from /lifecycle/audit')}
+          <span className={`text-[9px] font-mono ${styles.muted}`}>
+            {audit.length === 0 ? t('knowledge.lifecycle.auditLocalOnly') : t('knowledge.lifecycle.auditLoaded')}
           </span>
         </div>
         <div className="space-y-1.5 max-h-64 overflow-y-auto">
           {isAuditing ? (
-            <div className="py-8 text-center text-slate-400 text-xs">{tl('加载中...', 'Loading...')}</div>
+            <div className={`py-8 text-center ${styles.muted} text-xs`}>{t('knowledge.lifecycle.loading')}</div>
           ) : audit.length === 0 ? (
-            <p className="py-8 text-center text-slate-400 text-xs">{tl('暂无审计记录', 'No audit entries yet')}</p>
+            <p className={`py-8 text-center ${styles.muted} text-xs`}>{t('knowledge.lifecycle.noAudit')}</p>
           ) : audit.map(a => (
-            <div key={a.id} className="p-2 bg-slate-50 border border-slate-150 rounded-lg flex items-center gap-2 text-[10px]">
-              <span className="font-mono text-slate-400 w-40 shrink-0">{new Date(a.at).toLocaleString()}</span>
-              <span className="font-bold text-slate-700 w-36 truncate">{a.assetId}</span>
-              <span className={`px-1.5 rounded ${STATE_COLOR[a.from].nameColor} bg-white border border-slate-200 font-bold`}>{a.from}</span>
-              <span className="text-slate-400">→</span>
-              <span className={`px-1.5 rounded ${STATE_COLOR[a.to].nameColor} bg-white border border-slate-200 font-bold`}>{a.to}</span>
-              <span className="font-mono text-slate-400 ml-auto">{a.operator}</span>
+            <div key={a.id} className={`p-2 ${styles.appBg} border ${styles.cardBorder} rounded-lg flex items-center gap-2 text-[10px]`}>
+              <span className={`font-mono ${styles.muted} w-40 shrink-0`}>{new Date(a.at).toLocaleString()}</span>
+              <span className={`font-bold ${styles.cardText} w-36 truncate`}>{a.assetId}</span>
+              <span className={`px-1.5 rounded ${STATE_COLOR[a.from].nameColor} ${styles.cardBg} border ${styles.cardBorder} font-bold`}>{a.from}</span>
+              <span className={styles.muted}>→</span>
+              <span className={`px-1.5 rounded ${STATE_COLOR[a.to].nameColor} ${styles.cardBg} border ${styles.cardBorder} font-bold`}>{a.to}</span>
+              <span className={`font-mono ${styles.muted} ml-auto`}>{a.operator}</span>
             </div>
           ))}
         </div>

@@ -44,15 +44,16 @@ export function CategoryBadge({ taskType }: { taskType: string }) {
 }
 
 export function ProgressCell({ progress }: { progress: number }) {
+  const { styles } = useTheme();
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+      <div className={`flex-1 h-1.5 ${styles.sidebarBg} rounded-full overflow-hidden`}>
         <div
           className="h-full rounded-full transition-all duration-500"
           style={{ width: `${Math.min(100, Math.max(0, progress))}%`, backgroundColor: "var(--accent)" }}
         />
       </div>
-      <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">{progress}%</span>
+      <span className={`text-xs ${styles.muted} w-10 text-right`}>{progress}%</span>
     </div>
   );
 }

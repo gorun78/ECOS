@@ -50,7 +50,7 @@ export default function ResultTable({ result, loading, error }: ResultTableProps
         <span>{elapsedMs}ms</span>
         <span>{columns.length} 列</span>
         <div className="flex-1" />
-        <button
+        <button type="button"
           onClick={() => exportCSV(columns, rows)}
           className="text-blue-400 hover:text-blue-300 cursor-pointer"
         >

@@ -31,9 +31,9 @@ export default function RulesTab({
       <div className="flex justify-between items-center">
         <div><h4 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.section.rulesTitle')}</h4><p className={`text-[11px] ${styles.muted} mt-0.5`}>{t('ow.section.rulesDesc')}</p></div>
         <div className="flex gap-2">
-          <button onClick={() => handleAddRule('modify_object')} className={`border ${styles.cardBorder} hover:${styles.appBg} ${styles.cardTextMuted} text-xs px-3 py-1.5 rounded flex items-center gap-1.5`}><Edit3 size={13} />{t('ow.btn.addModifyRule')}</button>
-          <button onClick={() => handleAddRule('create_object')} className={`${styles.accentBg} hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded flex items-center gap-1.5`}><FilePlus size={13} />{t('ow.btn.addCreateRule')}</button>
-          <button onClick={() => handleAddRule('delete_object')} className="border border-red-300 hover:bg-red-50 text-red-700 text-xs px-3 py-1.5 rounded flex items-center gap-1.5"><Trash2 size={13} className="text-red-500" />{t('ow.btn.addDeleteRule')}</button>
+          <button type="button" onClick={() => handleAddRule('modify_object')} className={`border ${styles.cardBorder} hover:${styles.appBg} ${styles.cardTextMuted} text-xs px-3 py-1.5 rounded flex items-center gap-1.5`}><Edit3 size={13} />{t('ow.btn.addModifyRule')}</button>
+          <button type="button" onClick={() => handleAddRule('create_object')} className={`${styles.accentBg} hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded flex items-center gap-1.5`}><FilePlus size={13} />{t('ow.btn.addCreateRule')}</button>
+          <button type="button" onClick={() => handleAddRule('delete_object')} className="border border-red-300 hover:bg-red-50 text-red-700 text-xs px-3 py-1.5 rounded flex items-center gap-1.5"><Trash2 size={13} className="text-red-500" />{t('ow.btn.addDeleteRule')}</button>
         </div>
       </div>
       {actionType.rules.length === 0 ? (
@@ -44,7 +44,7 @@ export default function RulesTab({
             const targetObjType = objectTypes.find(ot => ot.id === (rule.type === 'create_object' ? rule.targetObjectTypeId : actionType.parameters.find(p => p.id === rule.targetParameterId)?.objectTypeId));
             return (
               <div key={rule.id} className={`border ${styles.cardBorder} rounded-xl p-5 ${styles.appBg} space-y-4 shadow-2xs relative`}>
-                <button onClick={() => handleRemoveRule(rule.id)} className={`absolute top-4 right-4 ${styles.muted} hover:text-red-500 p-1 rounded hover:${styles.cardBg}`} title="删除此逻辑块"><Trash size={14} /></button>
+                <button type="button" onClick={() => handleRemoveRule(rule.id)} className={`absolute top-4 right-4 ${styles.muted} hover:text-red-500 p-1 rounded hover:${styles.cardBg}`} title="删除此逻辑块"><Trash size={14} /></button>
                 <div className="flex items-center gap-2">
                   <span className={`text-xs font-semibold ${styles.badgeBg} ${styles.cardTextMuted} px-2 py-0.5 rounded-full font-mono`}>{t('ow.label.ruleNumber').replace('{n}', String(idx + 1))}</span>
                   <div className={`text-xs font-semibold ${styles.cardText}`}>{rule.type === 'create_object' ? t('ow.action.ruleCreate') : rule.type === 'delete_object' ? t('ow.action.ruleDelete') : t('ow.action.ruleModify')}</div>
@@ -78,7 +78,7 @@ export default function RulesTab({
                             <div key={edit.propertyId} className={`flex items-center gap-3 ${styles.appBg} px-3 py-2 rounded border ${styles.cardBorder} text-xs`}>
                               <div className="w-1/3 flex items-center gap-1.5"><DynamicIcon name={targetObjType.primaryKey === edit.propertyId ? 'Key' : 'Tag'} size={12} className={targetObjType.primaryKey === edit.propertyId ? 'text-amber-500' : `${styles.muted}`} /><span className={`font-semibold ${styles.cardText}`}>{propDef?.displayName || edit.propertyId}</span><span className={`text-[10px] ${styles.muted} font-mono`}>{propDef?.dataType}</span></div>
                               <div className="flex-1 flex items-center gap-2"><span className={`${styles.muted} text-[10px]`}>设为 ＝</span><input type="text" value={edit.valueExpression} onChange={e => handlePropertyEditValueChange(rule.id, edit.propertyId, e.target.value)} className={`flex-1 px-2.5 py-1 text-xs border ${styles.cardBorder} rounded font-mono ${styles.cardBg}`} placeholder={`例如 parameter.new_status 或 "MAINTENANCE"`} /></div>
-                              <button onClick={() => handleRemovePropertyEdit(rule.id, edit.propertyId)} className={`${styles.muted} hover:text-red-500 p-1`}><Trash2 size={13} /></button>
+                              <button type="button" onClick={() => handleRemovePropertyEdit(rule.id, edit.propertyId)} className={`${styles.muted} hover:text-red-500 p-1`}><Trash2 size={13} /></button>
                             </div>
                           );
                         })}

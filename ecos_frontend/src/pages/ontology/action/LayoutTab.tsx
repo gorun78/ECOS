@@ -54,7 +54,7 @@ export default function LayoutTab({ actionType, newSectionTitle, setNewSectionTi
           <hr className={`${styles.cardBorder}`} />
           <div className="space-y-2">
             <h5 className={`text-[11px] font-semibold ${styles.cardTextMuted}`}>{t('ow.section.addFormSection')}</h5>
-            <div className="flex gap-2"><input type="text" placeholder={t('ow.placeholder.sectionName')} value={newSectionTitle} onChange={e => setNewSectionTitle(e.target.value)} className={`flex-1 px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:outline-hidden`} /><button onClick={handleAddSection} className={`bg-[var(--card,#0F172A)] text-white hover:bg-[var(--muted,#1E293B)] text-[11px] px-2.5 py-1 rounded transition-colors`}>{t('ow.btn.addSection')}</button></div>
+            <div className="flex gap-2"><input type="text" placeholder={t('ow.placeholder.sectionName')} value={newSectionTitle} onChange={e => setNewSectionTitle(e.target.value)} className={`flex-1 px-2 py-1 text-xs border ${styles.cardBorder} rounded focus:outline-hidden`} /><button type="button" onClick={handleAddSection} className={`bg-[var(--card,#0F172A)] text-white hover:bg-[var(--muted,#1E293B)] text-[11px] px-2.5 py-1 rounded transition-colors`}>{t('ow.btn.addSection')}</button></div>
           </div>
         </div>
         <div className="col-span-2 space-y-4">
@@ -64,7 +64,7 @@ export default function LayoutTab({ actionType, newSectionTitle, setNewSectionTi
               const availableParams = actionType.parameters.filter(p => !section.parameterIds.includes(p.id));
               return (
                 <div key={secIdx} className={`border ${styles.cardBorder} rounded-xl p-4 ${styles.cardBg} space-y-3 shadow-2xs relative`}>
-                  {secIdx > 0 && (<button onClick={() => handleRemoveSection(secIdx)} className={`absolute top-4 right-4 ${styles.muted} hover:text-red-500`} title="移除此区块"><Trash size={13} /></button>)}
+                  {secIdx > 0 && (<button type="button" onClick={() => handleRemoveSection(secIdx)} className={`absolute top-4 right-4 ${styles.muted} hover:text-red-500`} title="移除此区块"><Trash size={13} /></button>)}
                   <div className={`flex items-center gap-2 border-b ${styles.appBg} pb-2`}><Layers size={13} className="text-blue-500" /><span className={`text-xs font-semibold ${styles.cardText}`}>{section.title}</span><span className={`text-[10px] ${styles.muted}`}>({section.parameterIds.length} {t('ow.label.fields')})</span></div>
                   {section.parameterIds.length === 0 ? (
                     <div className={`text-center py-4 ${styles.muted} italic text-[11px]`}>{t('ow.empty.emptySection')}</div>

@@ -62,7 +62,7 @@ export function TimelineTab({ detailTimeline, timelineLoading, timelineTotal, se
           {/* Gap 3: Load more button */}
           {detailTimeline.length < timelineTotal && (
             <div className="pl-6 pt-2">
-              <button
+              <button type="button"
                 onClick={() => setTimelinePage(prev => prev + 1)}
                 disabled={timelineLoading}
                 className={`w-full text-[10px] ${styles.appBg} ${styles.sidebarHoverBg} ${styles.cardText} border ${styles.cardBorder} rounded-lg px-3 py-2 font-semibold transition flex items-center justify-center gap-1.5 disabled:opacity-50`}

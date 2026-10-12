@@ -44,7 +44,7 @@ export default function ParametersTab({
               {objectTypes.map(ot => (<option key={ot.id} value={ot.id}>{ot.displayName}</option>))}
             </select>
           )}
-          <button onClick={handleAddParam} className={`${styles.accentBg} hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition-colors flex items-center gap-1`}>
+          <button type="button" onClick={handleAddParam} className={`${styles.accentBg} hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition-colors flex items-center gap-1`}>
             <Plus size={13} />{t('ow.btn.addParameter')}
           </button>
         </div>
@@ -65,7 +65,7 @@ export default function ParametersTab({
                 <td className={`py-2.5 px-4 font-mono ${styles.cardTextMuted}`}>{param.dataType}</td>
                 <td className="py-2.5 px-4">{param.dataType === 'object' ? (<div className={`flex items-center gap-1 ${styles.accentText} font-semibold cursor-pointer`} onClick={() => param.objectTypeId && onNavigateToObject(param.objectTypeId)}><Box size={12} /><span>{objectTypes.find(o => o.id === param.objectTypeId)?.displayName || param.objectTypeId}</span></div>) : (<span className={`${styles.muted} font-mono`}>—</span>)}</td>
                 <td className="py-2.5 px-4"><input type="text" value={param.description} onChange={e => handleParamFieldChange(param.id, 'description', e.target.value)} className={`${styles.muted} border-b border-transparent hover:border-blue-300 focus:border-blue-500 focus:outline-hidden py-0.5 w-full`} placeholder={t('ow.placeholder.paramDescription')} /></td>
-                <td className="py-2.5 px-4 text-center"><button onClick={() => handleRemoveParam(param.id)} className={`${styles.muted} hover:text-red-500 p-1 rounded`}><X size={14} /></button></td>
+                <td className="py-2.5 px-4 text-center"><button type="button" onClick={() => handleRemoveParam(param.id)} className={`${styles.muted} hover:text-red-500 p-1 rounded`}><X size={14} /></button></td>
               </tr>
             ))}
           </tbody>

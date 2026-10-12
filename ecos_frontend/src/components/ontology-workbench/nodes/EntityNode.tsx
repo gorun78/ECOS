@@ -24,46 +24,52 @@ import {
 } from "lucide-react";
 import type { EntityNodeData } from "../../../adapters/flowAdapter";
 import { useTheme } from "../../ThemeContext";
+import { useLanguage } from "../../LanguageContext";
 
 // ── 实体类型图标映射 ────────────────────────────────────────
 
 /** 实体类型 → 图标组件 + 颜色类名 */
 const ENTITY_TYPE_CONFIG: Record<
   string,
-  { icon: React.FC<{ size?: number; className?: string }>; color: string; bg: string; label: string }
+  { icon: React.FC<{ size?: number; className?: string }>; color: string; bg: string; labelKey: string }
 > = {
   MASTER: {
     icon: Database,
     color: "text-indigo-400",
     bg: "bg-indigo-500/15",
-    label: "主数据",
+    labelKey: "ow.node.type.master",
   },
   TRANSACTION: {
     icon: ArrowRightLeft,
     color: "text-emerald-400",
     bg: "bg-emerald-500/15",
-    label: "事务",
+    labelKey: "ow.node.type.transaction",
   },
   EVENT: {
     icon: CalendarClock,
     color: "text-amber-400",
     bg: "bg-amber-500/15",
-    label: "事件",
+    labelKey: "ow.node.type.event",
   },
   REFERENCE: {
     icon: BookOpen,
     color: "text-purple-400",
     bg: "bg-purple-500/15",
-    label: "引用",
+    labelKey: "ow.node.type.reference",
   },
 };
 
 /** 默认/未知类型配置 */
-const DEFAULT_TYPE_CONFIG = {
+const DEFAULT_TYPE_CONFIG: {
+  icon: React.FC<{ size?: number; className?: string }>;
+  color: string;
+  bg: string;
+  labelKey: string;
+} = {
   icon: Database,
   color: "text-slate-400",
   bg: "bg-slate-500/15",
-  label: "实体",
+  labelKey: "ow.node.type.default",
 };
 
 /** 属性类型 → 图标短映射 */
@@ -127,6 +133,7 @@ PropertyPreviewRow.displayName = "PropertyPreviewRow";
  */
 function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const {
     code,
     name,
@@ -146,14 +153,14 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
 
   // 选中态样式
   const selectedRing = selected
-    ? "ring-2 ring-indigo-500 ring-offset-1 ring-offset-[#0f1117]"
+    ? `ring-2 ${styles.accentRing} ring-offset-1 ring-offset-[#0f1117]`
     : "";
 
   return (
     <div
       className={`
         relative w-[220px] rounded-xl border
-        bg-[#141924] border-[#1E293B]
+        ${styles.cardBg} ${styles.cardBorder}
         shadow-lg shadow-black/20
         transition-all duration-150
         cursor-grab active:cursor-grabbing
@@ -200,11 +207,11 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
               ${typeConfig.bg} ${typeConfig.color}
             `}
           >
-            {typeConfig.label}
+            {t(typeConfig.labelKey)}
           </span>
           {propertyCount > 0 && (
             <span className={`text-[9px] ${styles.muted}`}>
-              {propertyCount} 属性
+              {t("ow.node.propsCount", { n: propertyCount })}
             </span>
           )}
         </div>
@@ -212,7 +219,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
 
       {/* ── 属性预览区 ── */}
       {previewProps.length > 0 && (
-        <div className="px-3.5 pb-2.5 space-y-1 border-t border-[#1E293B] pt-2">
+        <div className={`px-3.5 pb-2.5 space-y-1 border-t ${styles.cardBorder} pt-2`}>
           {previewProps.map((prop, idx) => (
             <PropertyPreviewRow
               key={`${prop.code}-${idx}`}
@@ -224,7 +231,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
           {/* 属性溢出提示 */}
           {propertyCount > 3 && (
             <p className={`text-[9px] ${styles.muted} italic mt-0.5`}>
-              +{propertyCount - 3} 更多属性...
+              {t("ow.node.moreProps", { n: propertyCount - 3 })}
             </p>
           )}
         </div>
@@ -232,8 +239,8 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
 
       {/* ── 空属性提示 ── */}
       {previewProps.length === 0 && (
-        <div className="px-3.5 pb-3 border-t border-[#1E293B] pt-2">
-          <p className={`text-[9px] ${styles.muted} italic`}>暂无属性</p>
+        <div className={`px-3.5 pb-3 border-t ${styles.cardBorder} pt-2`}>
+          <p className={`text-[9px] ${styles.muted} italic`}>{t("ow.node.emptyProps")}</p>
         </div>
       )}
 
@@ -249,7 +256,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
         type="source"
         position={Position.Left}
         id="left"
-        className={`!w-2 !h-2 !${styles.appBg} !border-2 !border-[#0f1117] !left-[-4px]`}
+        className={`!w-2 !h-2 ${styles.appBg} !border-2 !border-[#0f1117] !left-[-4px]`}
       />
 
       {/* ── 右侧 Handle ── */}
@@ -257,7 +264,7 @@ function EntityNode({ data, selected }: NodeProps<Node<EntityNodeData>>) {
         type="source"
         position={Position.Right}
         id="right"
-        className={`!w-2 !h-2 !${styles.appBg} !border-2 !border-[#0f1117] !right-[-4px]`}
+        className={`!w-2 !h-2 ${styles.appBg} !border-2 !border-[#0f1117] !right-[-4px]`}
       />
     </div>
   );

@@ -15,6 +15,7 @@
 import React from 'react';
 
 import LucideIcon from '../../../components/LucideIcon';
+import { useLanguage } from '../../../components/LanguageContext';
 import type { BusinessScenario } from '../types';
 
 interface Props {
@@ -25,29 +26,29 @@ interface Props {
 const CHAIN_NODES = [
   {
     key: 'datasets',
-    title: '数据集',
-    layer: '土 · D',
+    titleKey: 'scenario.fusion.node.datasets.title',
+    layerKey: 'scenario.fusion.node.datasets.layer',
     icon: 'Database' as const,
     badge: 'bg-blue-950 text-blue-400',
   },
   {
     key: 'objectTypes',
-    title: '本体实体',
-    layer: '金 · I',
+    titleKey: 'scenario.fusion.node.objectTypes.title',
+    layerKey: 'scenario.fusion.node.objectTypes.layer',
     icon: 'Boxes' as const,
     badge: 'bg-indigo-950 text-indigo-400',
   },
   {
     key: 'knowledgeBases',
-    title: '知识库',
-    layer: '水 · K',
+    titleKey: 'scenario.fusion.node.knowledgeBases.title',
+    layerKey: 'scenario.fusion.node.knowledgeBases.layer',
     icon: 'BookOpen' as const,
     badge: 'bg-amber-950 text-amber-400',
   },
   {
     key: 'aiAgents',
-    title: 'AI Agent',
-    layer: '火 · W / 木 · C',
+    titleKey: 'scenario.fusion.node.aiAgents.title',
+    layerKey: 'scenario.fusion.node.aiAgents.layer',
     icon: 'Bot' as const,
     badge: 'bg-pink-950 text-pink-400',
   },
@@ -55,12 +56,13 @@ const CHAIN_NODES = [
 
 /** 主链边（节点间转化对照 + 契约名） */
 const CHAIN_EDGES = [
-  { label: '格 ge', hint: 'D→I · 映射契约' },
-  { label: '致 zhi', hint: 'I→K · 抽取' },
-  { label: '诚 cheng', hint: 'K→W · 认知' },
+  { labelKey: 'scenario.fusion.edge.ge.label', hintKey: 'scenario.fusion.edge.ge.hint' },
+  { labelKey: 'scenario.fusion.edge.zhi.label', hintKey: 'scenario.fusion.edge.zhi.hint' },
+  { labelKey: 'scenario.fusion.edge.cheng.label', hintKey: 'scenario.fusion.edge.cheng.hint' },
 ] as const;
 
 export default function FusionMatrixTab({ activeScenario }: Props) {
+  const { t } = useLanguage();
   const b = activeScenario.bindings;
   const cov = activeScenario.coverage;
   const d2i = cov ? Math.round(cov.d2iCoverage * 100) : 0;
@@ -74,7 +76,7 @@ export default function FusionMatrixTab({ activeScenario }: Props) {
       <div className="bg-[var(--card,#020617)] border border-[var(--card,#1E293B)] p-4 rounded-xl">
         <span className="text-xs font-extrabold text-[var(--card,#CBD5E1)] flex items-center gap-1.5 mb-3">
           <LucideIcon name="Workflow" size={14} className="text-indigo-400" />
-          场景组成子图（§0.6.2 · 主链 + 横切 + 出口）
+          {t('scenario.fusion.blockTitle')}
         </span>
 
         {/* 横切外框：SECURITY_POLICY 包裹主链 */}
@@ -82,7 +84,7 @@ export default function FusionMatrixTab({ activeScenario }: Props) {
           {/* 横切标签 */}
           <div className="absolute -top-3 left-4 bg-[var(--card,#020617)] px-2 flex items-center gap-1">
             <LucideIcon name="ShieldAlert" size={12} className="text-rose-400" />
-            <span className="text-[10px] font-bold text-rose-300">横切约束 · 安全策略 全覆盖主链</span>
+            <span className="text-[10px] font-bold text-rose-300">{t('scenario.fusion.crossLabel')}</span>
           </div>
 
           {/* 主链 + 出口 */}
@@ -93,8 +95,8 @@ export default function FusionMatrixTab({ activeScenario }: Props) {
                   <div className={`p-2 rounded-full ${node.badge} mb-1.5`}>
                     <LucideIcon name={node.icon} size={14} />
                   </div>
-                  <span className="text-[10px] font-bold text-[var(--card,#CBD5E1)]">{idx + 1}. {node.title}</span>
-                  <span className="text-[9px] text-[var(--card,#64748B)] font-mono mb-1">{node.layer}</span>
+                  <span className="text-[10px] font-bold text-[var(--card,#CBD5E1)]">{idx + 1}. {t(node.titleKey)}</span>
+                  <span className="text-[9px] text-[var(--card,#64748B)] font-mono mb-1">{t(node.layerKey)}</span>
                   <div className="mt-1 space-y-1 w-full">
                     {byKey(node.key).map(item => (
                       <span key={item}
@@ -103,7 +105,7 @@ export default function FusionMatrixTab({ activeScenario }: Props) {
                       </span>
                     ))}
                     {byKey(node.key).length === 0 && (
-                      <span className="block text-[9px] text-[var(--card,#475569)] italic">（未绑定）</span>
+                      <span className="block text-[9px] text-[var(--card,#475569)] italic">{t('scenario.fusion.unbound')}</span>
                     )}
                   </div>
                 </div>
@@ -111,8 +113,8 @@ export default function FusionMatrixTab({ activeScenario }: Props) {
                 {idx < CHAIN_NODES.length - 1 && (
                   <div className="hidden md:flex flex-col items-center pt-10">
                     <LucideIcon name="ArrowRight" size={16} className="text-indigo-500" />
-                    <span className="text-[8px] font-mono text-indigo-400 mt-0.5">{CHAIN_EDGES[idx].label}</span>
-                    <span className="text-[8px] text-[var(--card,#64748B)]">{CHAIN_EDGES[idx].hint}</span>
+                    <span className="text-[8px] font-mono text-indigo-400 mt-0.5">{t(CHAIN_EDGES[idx].labelKey)}</span>
+                    <span className="text-[8px] text-[var(--card,#64748B)]">{t(CHAIN_EDGES[idx].hintKey)}</span>
                   </div>
                 )}
               </React.Fragment>
@@ -124,18 +126,18 @@ export default function FusionMatrixTab({ activeScenario }: Props) {
             <div className="md:col-start-4 self-start bg-[var(--card,#0F172A)]/80 border border-[var(--card,#1E293B)] p-3 rounded-lg flex items-center gap-2 justify-center">
               <LucideIcon name="ArrowDown" size={12} className="text-violet-400" />
               <LucideIcon name="LayoutGrid" size={12} className="text-violet-400" />
-              <span className="text-[10px] font-bold text-[var(--card,#CBD5E1)]">出口 · 接口</span>
+              <span className="text-[10px] font-bold text-[var(--card,#CBD5E1)]">{t('scenario.fusion.outlet')}</span>
               <span className="text-[9px] text-[var(--card,#64748B)] font-mono">INTERFACE</span>
               <span className="text-[9px] text-[var(--card,#94A3B8)] truncate">
-                {b.interfaces.length ? b.interfaces[b.interfaces.length - 1] : '（未绑定）'}
+                {b.interfaces.length ? b.interfaces[b.interfaces.length - 1] : t('scenario.fusion.unbound')}
               </span>
             </div>
             <div className="md:col-start-1 flex items-center gap-2 p-2 bg-[var(--card,#020617)]/60 rounded border border-[var(--card,#1E293B)]">
-              <span className="text-[10px] text-[var(--card,#64748B)]">D→I 映射覆盖率</span>
+              <span className="text-[10px] text-[var(--card,#64748B)]">{t('scenario.fusion.covD2I')}</span>
               <span className={`text-xs font-bold font-mono ${d2i >= 60 ? 'text-emerald-400' : 'text-amber-400'}`}>{d2i}%</span>
             </div>
             <div className="md:col-start-2 flex items-center gap-2 p-2 bg-[var(--card,#020617)]/60 rounded border border-[var(--card,#1E293B)]">
-              <span className="text-[10px] text-[var(--card,#64748B)]">K→W 认知覆盖率</span>
+              <span className="text-[10px] text-[var(--card,#64748B)]">{t('scenario.fusion.covK2W')}</span>
               <span className={`text-xs font-bold font-mono ${k2w >= 60 ? 'text-emerald-400' : 'text-amber-400'}`}>{k2w}%</span>
             </div>
 
@@ -143,14 +145,14 @@ export default function FusionMatrixTab({ activeScenario }: Props) {
             <div className="md:col-span-9 md:col-start-1 flex flex-wrap items-center gap-1.5 p-2 bg-[var(--card,#020617)]/60 rounded border border-[var(--card,#1E293B)]">
               <span className="text-[10px] text-rose-300 font-bold flex items-center gap-1">
                 <LucideIcon name="ShieldAlert" size={10} />
-                横切约束（非链上一环）：
+                {t('scenario.fusion.crossInline')}
               </span>
               {b.securityPolicies.map(s => (
                 <span key={s} className="text-[9px] bg-[var(--card,#0B0F19)] px-2 py-0.5 rounded-full border border-rose-900/40 font-mono text-[var(--card,#94A3B8)]">
                   {s}
                 </span>
               ))}
-              {b.securityPolicies.length === 0 && <span className="text-[9px] text-[var(--card,#475569)] italic">（未绑定）</span>}
+              {b.securityPolicies.length === 0 && <span className="text-[9px] text-[var(--card,#475569)] italic">{t('scenario.fusion.unbound')}</span>}
             </div>
           </div>
         </div>
@@ -162,23 +164,23 @@ export default function FusionMatrixTab({ activeScenario }: Props) {
           <div>
             <span className="text-xs font-bold text-[var(--card,#94A3B8)] flex items-center gap-1">
               <LucideIcon name="Goal" size={12} className="text-blue-500" />
-              场景战略目标与业务痛点
+              {t('scenario.fusion.goalTitle')}
             </span>
             <h3 className="text-sm font-bold text-white mt-2 leading-snug">{activeScenario.businessGoal}</h3>
             <p className="text-xs text-[var(--card,#94A3B8)] mt-2 leading-relaxed">
-              本场景的核心目标是把各工作台的「数据 / 本体 / 知识 / 智能体 / 安全策略」装配成一个可演练、可闭环的高价值业务情形；通过「子图 + 横切 + 出口」分层组织，避免"孤岛绑定"（§0.6.2.1）。
+              {t('scenario.fusion.goalDesc')}
             </p>
           </div>
 
           <div className="mt-4 bg-[var(--card,#020617)]/60 p-3 rounded border border-[var(--card,#1E293B)] text-[11px] leading-relaxed">
-            💡 <b>编排引导建议</b>：新增场景选资源时，按 <b>数据集 → 本体实体 → 知识库 → AI Agent</b> 顺序级联选择；跨层关系（如 D→I 映射）必须引用既有契约（如 <span className="font-mono text-indigo-300">ecos_entity_table_mapping</span>），禁止场景层自造映射（§0.6.2.2）。
+            💡 {t('scenario.fusion.orchestrateHint')}
           </div>
         </div>
 
         <div className="bg-[var(--card,#0F172A)] border border-[var(--card,#1E293B)] p-4 rounded-xl">
           <span className="text-xs font-bold text-[var(--card,#94A3B8)] flex items-center gap-1 mb-3">
             <LucideIcon name="PieChart" size={12} className="text-indigo-400" />
-            场景完整度（真实连边覆盖率，§0.6.2.3）
+            {t('scenario.fusion.integrityTitle')}
           </span>
 
           <div className="space-y-4">
@@ -186,7 +188,7 @@ export default function FusionMatrixTab({ activeScenario }: Props) {
               <div className="flex justify-between text-xs font-mono mb-1.5">
                 <span className="text-[var(--card,#94A3B8)] flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                  D→I 映射覆盖率（MAPPING 边）
+                  {t('scenario.fusion.mappingEdge')}
                 </span>
                 <span className="font-bold text-white">{activeScenario.metrics.mappingCompleteness}%</span>
               </div>
@@ -199,7 +201,7 @@ export default function FusionMatrixTab({ activeScenario }: Props) {
               <div className="flex justify-between text-xs font-mono mb-1.5">
                 <span className="text-[var(--card,#94A3B8)] flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
-                  K→W 认知覆盖率（COGNITION 边）
+                  {t('scenario.fusion.cognitionEdge')}
                 </span>
                 <span className="font-bold text-white">{activeScenario.metrics.integrityScore}%</span>
               </div>
@@ -210,9 +212,9 @@ export default function FusionMatrixTab({ activeScenario }: Props) {
 
             {cov && (
               <div className="text-[10px] text-[var(--card,#64748B)] pt-1 border-t border-[var(--card,#1E293B)] flex gap-4">
-                <span>节点 {cov.totalNodes}</span>
-                <span>边 {cov.totalLinks}</span>
-                <span>来源 后端 /graph</span>
+                <span>{t('scenario.fusion.statNodes')} {cov.totalNodes}</span>
+                <span>{t('scenario.fusion.statEdges')} {cov.totalLinks}</span>
+                <span>{t('scenario.fusion.statSource')} /graph</span>
               </div>
             )}
           </div>

@@ -20,6 +20,7 @@ import {
 import { X } from "lucide-react";
 import type { RelationshipEdgeData } from "../../../adapters/flowAdapter";
 import { useTheme } from "../../ThemeContext";
+import { useLanguage } from "../../LanguageContext";
 
 // ── 关系类型配置 ────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ function RelationshipEdge({
   markerEnd,
 }: EdgeProps<Edge<RelationshipEdgeData>>) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   // ── 计算贝塞尔路径 ──
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -94,7 +96,7 @@ function RelationshipEdge({
   const typeConfig = REL_TYPE_CONFIG[relType] || DEFAULT_TYPE_CONFIG;
 
   // 选中态颜色
-  const strokeColor = selected ? "#6366f1" : "#334155";
+  const strokeColor = selected ? styles.accentStroke : "#334155";
   const strokeWidth = selected ? 2.5 : 1.5;
 
   return (
@@ -125,12 +127,12 @@ function RelationshipEdge({
               text-[10px] font-medium
               shadow-sm shadow-black/30
               transition-all duration-150
-              ${selected ? "ring-1 ring-indigo-500" : ""}
+              ${selected ? `ring-1 ${styles.accentRing}` : ""}
             `}
           >
             {/* 关系名称 */}
             <span className={`${styles.sidebarText} max-w-[100px] truncate`}>
-              {data?.name || data?.code || "关联"}
+              {data?.name || data?.code || t("ow.edge.nameFallback")}
             </span>
 
             {/* 关系类型标签 */}
@@ -146,6 +148,7 @@ function RelationshipEdge({
             {/* 删除按钮（仅选中时显示） */}
             {selected && (
               <button
+                type="button"
                 className="
                   shrink-0 ml-1 p-0.5 rounded
                   text-red-400 hover:text-red-300
@@ -153,7 +156,7 @@ function RelationshipEdge({
                   transition-colors duration-100
                   cursor-pointer
                 "
-                title="删除关系"
+                title={t("ow.edge.deleteTitle")}
                 onClick={(e) => {
                   e.stopPropagation();
                   // 通过自定义事件通知画布删除此边

@@ -152,7 +152,7 @@ export default function AutoDiscoverPanel({ domainCode, onClose, onEnterDesigner
             <Sparkles size={16} className="text-indigo-400" />
             <h2 className={`text-sm font-semibold ${styles.cardText}`}>{t('ontology.autoDiscover.title')}</h2>
           </div>
-          <button onClick={onClose} className={`p-1 rounded ${styles.sidebarHoverBg} ${styles.cardTextMuted} hover:opacity-100 opacity-80 transition`}><X size={16} /></button>
+          <button type="button" onClick={onClose} className={`p-1 rounded ${styles.sidebarHoverBg} ${styles.cardTextMuted} hover:opacity-100 opacity-80 transition`}><X size={16} /></button>
         </div>
 
         {/* 步骤指示器 */}
@@ -250,7 +250,7 @@ export default function AutoDiscoverPanel({ domainCode, onClose, onEnterDesigner
         <div className={`flex items-center justify-between px-5 py-3.5 border-t ${styles.cardBorder} shrink-0`}>
           <div>
             {step > 1 && step < 3 && (
-              <button onClick={() => setStep((prev) => (prev - 1) as Step)}
+              <button type="button" onClick={() => setStep((prev) => (prev - 1) as Step)}
                 className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs border ${styles.sidebarBorder} ${styles.cardTextMuted} hover:opacity-100 opacity-80 transition`}>
                 <ChevronLeft size={13} />{t('ontology.autoDiscover.back')}
               </button>
@@ -258,21 +258,21 @@ export default function AutoDiscoverPanel({ domainCode, onClose, onEnterDesigner
           </div>
           <div className="flex items-center gap-2 ml-auto">
             {step === 1 && (
-              <button onClick={handleNextToPreview} disabled={!selectedSrcId || prevLoading}
+              <button type="button" onClick={handleNextToPreview} disabled={!selectedSrcId || prevLoading}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition">
                 {prevLoading ? <Loader2 size={13} className="animate-spin" /> : <ChevronRight size={13} />}
                 {t('ontology.autoDiscover.next')}
               </button>
             )}
             {step === 2 && (
-              <button onClick={handleGenerate} disabled={selNames.size === 0 || genLoading}
+              <button type="button" onClick={handleGenerate} disabled={selNames.size === 0 || genLoading}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition">
                 {genLoading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
                 {t('ontology.autoDiscover.confirmGenerate')}
               </button>
             )}
             {step === 3 && (
-              <button onClick={() => { onEnterDesigner?.(); onClose(); }}
+              <button type="button" onClick={() => { onEnterDesigner?.(); onClose(); }}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition">
                 {t('ontology.autoDiscover.enterDesigner')}<ChevronRight size={13} />
               </button>

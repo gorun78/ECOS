@@ -191,7 +191,7 @@ export default function ScheduleTab() {
     <div className="flex-1 min-h-0 flex flex-col space-y-4">
       {/* 头部操作 */}
       <div className="flex items-center gap-2 flex-wrap">
-        <button
+        <button type="button"
           onClick={() => {
             setLoading(true);
             void load();
@@ -203,7 +203,7 @@ export default function ScheduleTab() {
           {t("dw.dqRule.refresh")}
         </button>
 
-        <button
+        <button type="button"
           onClick={() => {
             setFormName("");
             setFormTrigger("SCHEDULE");
@@ -273,7 +273,7 @@ export default function ScheduleTab() {
                   </span>
 
                   {/* enabled 开关 */}
-                  <button
+                  <button type="button"
                     onClick={() => (isBusy ? null : handleToggleEnabled(s))}
                     disabled={isBusy}
                     className="shrink-0 cursor-pointer disabled:opacity-50"
@@ -293,7 +293,7 @@ export default function ScheduleTab() {
                   </button>
 
                   {/* trigger 按钮 */}
-                  <button
+                  <button type="button"
                     disabled={isBusy || !s.enabled}
                     onClick={() => handleTrigger(s.id)}
                     className="shrink-0 h-7 px-2.5 rounded-md flex items-center gap-1 text-[11px] font-medium border cursor-pointer transition
@@ -309,7 +309,7 @@ export default function ScheduleTab() {
                   </button>
 
                   {/* 删除 */}
-                  <button
+                  <button type="button"
                     disabled={isBusy}
                     onClick={() => handleDelete(s.id)}
                     className="shrink-0 h-7 px-2 rounded-md text-[11px] border cursor-pointer transition
@@ -334,7 +334,7 @@ export default function ScheduleTab() {
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold">{t("dw.dqRule.schedules.newSchedule")}</h3>
-              <button
+              <button type="button"
                 onClick={() => !modalBusy && setShowModal(false)}
                 className="opacity-50 hover:opacity-100 cursor-pointer"
               >
@@ -432,7 +432,7 @@ export default function ScheduleTab() {
 
             {/* 按钮 */}
             <div className="flex items-center justify-end gap-2 mt-5">
-              <button
+              <button type="button"
                 onClick={() => setShowModal(false)}
                 disabled={modalBusy}
                 className="h-8 px-3 rounded-md text-xs border cursor-pointer transition hover:opacity-80"
@@ -440,7 +440,7 @@ export default function ScheduleTab() {
               >
                 {t("dw.dqRule.cancel")}
               </button>
-              <button
+              <button type="button"
                 onClick={() => void handleCreate()}
                 disabled={modalBusy || !formName.trim()}
                 className="h-8 px-4 rounded-md text-xs font-medium cursor-pointer transition

@@ -245,7 +245,7 @@ export default function KnowledgeComplianceCheckTab() {
               </div>
               {/* 模式切换 */}
               <div className={`flex rounded-lg border ${styles.cardBorder} overflow-hidden`}>
-                <button
+                <button type="button"
                   onClick={() => setJsonMode(false)}
                   className={`px-2.5 py-1 text-[10px] font-bold cursor-pointer transition-colors ${
                     !jsonMode
@@ -256,7 +256,7 @@ export default function KnowledgeComplianceCheckTab() {
                   <List size={11} className="inline mr-1" />
                   KV
                 </button>
-                <button
+                <button type="button"
                   onClick={() => setJsonMode(true)}
                   className={`px-2.5 py-1 text-[10px] font-bold cursor-pointer transition-colors ${
                     jsonMode
@@ -297,7 +297,7 @@ export default function KnowledgeComplianceCheckTab() {
                       <option value="false">false</option>
                       <option value="unknown">unknown</option>
                     </select>
-                    <button
+                    <button type="button"
                       onClick={() => removeFactRow(f.id)}
                       disabled={facts.length <= 1}
                       className={`p-1.5 rounded-lg ${styles.muted} hover:text-red-500 hover:bg-red-50 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed`}
@@ -306,7 +306,7 @@ export default function KnowledgeComplianceCheckTab() {
                     </button>
                   </div>
                 ))}
-                <button
+                <button type="button"
                   onClick={addFactRow}
                   className={`w-full py-1.5 border border-dashed ${styles.cardBorder} rounded-lg text-[10px] ${styles.muted} hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors`}
                 >
@@ -318,7 +318,7 @@ export default function KnowledgeComplianceCheckTab() {
           </div>
 
           {/* 检查按钮 */}
-          <button
+          <button type="button"
             onClick={handleCheck}
             disabled={isChecking || !businessObject}
             className={`w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -378,7 +378,7 @@ export default function KnowledgeComplianceCheckTab() {
                     <ClipboardCheck size={13} className="text-indigo-600" />
                     {t("knowledge.knowledgecompli.251")}
                   </h3>
-                  <button
+                  <button type="button"
                     onClick={handleExportReport}
                     className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-[10px] transition-colors shadow-sm"
                   >
@@ -413,7 +413,7 @@ export default function KnowledgeComplianceCheckTab() {
                     }`}
                   >
                     {/* 规则头部 */}
-                    <button
+                    <button type="button"
                       onClick={() => toggleRuleExpand(r.ruleId)}
                       className={`w-full flex items-center gap-3 px-4 py-3 text-left ${styles.sidebarHoverBg} transition-colors cursor-pointer`}
                     >

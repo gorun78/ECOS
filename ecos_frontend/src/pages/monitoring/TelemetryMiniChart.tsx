@@ -10,14 +10,13 @@ import { TwinTelemetry } from "../../api";
 
 // ── SVG Telemetry Mini Chart ───────────────────────────────
 export default function TelemetryMiniChart({ data, color = "#818CF8", height = 60 }: { data: TwinTelemetry[]; color?: string; height?: number }) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const tl = (zh: string, en: string) => locale === "zh" ? zh : en;
 
   if (data.length < 2) {
     return (
       <div className={`flex items-center justify-center text-[10px] ${styles.cardTextMuted}`} style={{ height }}>
-        {tl("数据不足，至少需要2个数据点", "Insufficient data, need at least 2 data points")}
+        {t("platform.monitoring.detail.min2")}
       </div>
     );
   }

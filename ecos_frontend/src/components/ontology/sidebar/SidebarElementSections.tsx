@@ -79,7 +79,7 @@ export default function SidebarElementSections({
         renderRows={() => objectTypes.map(ot => {
           const isActive = selectedCategory === 'object' && selectedId === ot.id;
           return (
-            <button
+            <button type="button"
               key={ot.id}
               onClick={() => onSelectCategory('object', ot.id)}
               className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
@@ -111,7 +111,7 @@ export default function SidebarElementSections({
         renderRows={() => linkTypes.map(lt => {
           const isActive = selectedCategory === 'link' && selectedId === lt.id;
           return (
-            <button
+            <button type="button"
               key={lt.id}
               onClick={() => onSelectCategory('link', lt.id)}
               className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
@@ -143,7 +143,7 @@ export default function SidebarElementSections({
         renderRows={() => actionTypes.map(at => {
           const isActive = selectedCategory === 'action' && selectedId === at.id;
           return (
-            <button
+            <button type="button"
               key={at.id}
               onClick={() => onSelectCategory('action', at.id)}
               className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
@@ -174,7 +174,7 @@ export default function SidebarElementSections({
         renderRows={() => functionTypes.map(fn => {
           const isActive = selectedCategory === 'function' && selectedId === fn.id;
           return (
-            <button
+            <button type="button"
               key={fn.id}
               onClick={() => onSelectCategory('function', fn.id)}
               className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
@@ -206,7 +206,7 @@ export default function SidebarElementSections({
         renderRows={() => interfaces.map(it => {
           const isActive = selectedCategory === 'interface' && selectedId === it.id;
           return (
-            <button
+            <button type="button"
               key={it.id}
               onClick={() => onSelectCategory('interface', it.id)}
               className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
@@ -237,7 +237,7 @@ export default function SidebarElementSections({
         renderRows={() => sharedProperties.map(sp => {
           const isActive = selectedCategory === 'shared_property' && selectedId === sp.id;
           return (
-            <button
+            <button type="button"
               key={sp.id}
               onClick={() => onSelectCategory('shared_property', sp.id)}
               className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
@@ -268,7 +268,7 @@ export default function SidebarElementSections({
         renderRows={() => datasets.map(ds => {
           const isActive = selectedCategory === 'dataset' && selectedId === ds.id;
           return (
-            <button
+            <button type="button"
               key={ds.id}
               onClick={() => onSelectCategory('dataset', ds.id)}
               className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${

@@ -4,7 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderCenterCharts(vm: any) {
-  const { styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass, showToast } = vm;
+  const { t, styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass, showToast } = vm;
   return (
     <>
                   <div className="lg:col-span-6 space-y-4">
@@ -20,12 +20,11 @@ export function renderCenterCharts(vm: any) {
                       const counts: Record<string, number> = {};
                       simData.forEach((item: any) => {
                         const val = item[groupKey] || 'UNKNOWN';
-                        let label = val;
-                        if (val === 'ON_TIME') label = '准点';
-                        else if (val === 'DELAYED') label = '延误';
-                        else if (val === 'BOARDING') label = '登机';
-                        else if (val === 'CANCELLED') label = '取消';
-                        
+                        const stKey = val.toLowerCase();
+                        const label = (['on_time', 'delayed', 'boarding', 'cancelled'].includes(stKey))
+                          ? t(`aiworkbench.ws.ct.status.${stKey}`)
+                          : val;
+
                         counts[label] = (counts[label] || 0) + 1;
                       });
 
@@ -35,7 +34,7 @@ export function renderCenterCharts(vm: any) {
                       }));
 
                       if (chartData.length === 0) {
-                        chartData.push({ name: '无数据', value: 0 });
+                        chartData.push({ name: t('aiworkbench.ws.ct.noData'), value: 0 });
                       }
 
                       return (
@@ -49,7 +48,7 @@ export function renderCenterCharts(vm: any) {
                           {editorMode === 'design' && (
                             <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
                               <span>Chart</span>
-                              <button onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
+                              <button type="button" onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
                             </div>
                           )}
                           <h3 className={`font-bold ${styles.cardText} border-b ${styles.cardBorder} pb-2 mb-4 text-[11px]`}>{w.title}</h3>
@@ -98,11 +97,12 @@ export function renderCenterCharts(vm: any) {
 
                     {editorMode === 'design' && activePage?.widgets.filter((w: any) => w.slot === 'main_middle').length === 0 && (
                       <button
+                        type="button"
                         onClick={() => { setAddWidgetSlot('main_middle'); setShowAddWidgetModal(true); }}
                         className={`border-2 border-dashed ${styles.divider} rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} transition-all cursor-pointer min-h-[120px] w-full`}
                       >
                         <Plus size={15} />
-                        <span className="text-[10px] mt-1 font-semibold">添加分析图表</span>
+                        <span className="text-[10px] mt-1 font-semibold">{t('aiworkbench.ws.ct.addChart')}</span>
                       </button>
                     )}
 
@@ -128,7 +128,7 @@ export function renderCenterCharts(vm: any) {
                           {editorMode === 'design' && (
                             <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
                               <span>Table</span>
-                              <button onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
+                              <button type="button" onClick={e => { e.stopPropagation(); handleDeleteWidget(w.id); }} className="hover:text-red-500 font-bold ml-1 text-[10px]">×</button>
                             </div>
                           )}
                           <h3 className={`font-bold ${styles.cardText} border-b ${styles.cardBorder} pb-2 mb-3 text-[11px]`}>{w.title}</h3>
@@ -139,19 +139,19 @@ export function renderCenterCharts(vm: any) {
                                 <tr className={`${styles.appBg}/50 text-[10px] font-bold ${styles.cardTextMuted} uppercase tracking-wider border-b ${styles.cardBorder}`}>
                                   {isAircraftTable ? (
                                     <>
-                                      <th className="py-2 px-3">机尾号</th>
-                                      <th className="py-2 px-3">机型</th>
-                                      <th className="py-2 px-3">制造商</th>
-                                      <th className="py-2 px-3">适航状态</th>
-                                      <th className="py-2 px-3">上次维护</th>
+                                      <th className="py-2 px-3">{t('aiworkbench.ws.ct.th.tailNumber')}</th>
+                                      <th className="py-2 px-3">{t('aiworkbench.ws.ct.th.model')}</th>
+                                      <th className="py-2 px-3">{t('aiworkbench.ws.ct.th.manufacturer')}</th>
+                                      <th className="py-2 px-3">{t('aiworkbench.ws.ct.th.airworthiness')}</th>
+                                      <th className="py-2 px-3">{t('aiworkbench.ws.ct.th.lastMaintenance')}</th>
                                     </>
                                   ) : (
                                     <>
-                                      <th className="py-2 px-3">航班号</th>
-                                      <th className="py-2 px-3">机尾号</th>
-                                      <th className="py-2 px-3">离港</th>
-                                      <th className="py-2 px-3">进港</th>
-                                      <th className="py-2 px-3">运行状态</th>
+                                      <th className="py-2 px-3">{t('aiworkbench.ws.ct.th.flightNumber')}</th>
+                                      <th className="py-2 px-3">{t('aiworkbench.ws.ct.th.tailNumber')}</th>
+                                      <th className="py-2 px-3">{t('aiworkbench.ws.ct.th.depAirport')}</th>
+                                      <th className="py-2 px-3">{t('aiworkbench.ws.ct.th.arrAirport')}</th>
+                                      <th className="py-2 px-3">{t('aiworkbench.ws.ct.th.status')}</th>
                                     </>
                                   )}
                                 </tr>
@@ -167,7 +167,7 @@ export function renderCenterCharts(vm: any) {
                                       onClick={() => {
                                         if (editorMode === 'preview' && boundTarget) {
                                           handleVariableChange(boundTarget, row);
-                                          showToast('info', `选中本体实体: ${key}`);
+                                          showToast('info', t('aiworkbench.ws.ct.selectedEntity', { key }));
                                         }
                                       }}
                                       className={`hover:${styles.appBg} transition-colors ${
@@ -200,7 +200,7 @@ export function renderCenterCharts(vm: any) {
                                               row.status === 'ON_TIME' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
                                               row.status === 'DELAYED' ? 'bg-red-50 text-red-700 border border-red-100' : '${styles.sidebarBg} ${styles.cardText}'
                                             }`}>
-                                              {row.status === 'ON_TIME' ? '准点' : row.status === 'DELAYED' ? '延误' : row.status}
+                                              {row.status === 'ON_TIME' ? t('aiworkbench.ws.ct.status.on_time') : row.status === 'DELAYED' ? t('aiworkbench.ws.ct.status.delayed') : row.status}
                                             </span>
                                           </td>
                                         </>
@@ -210,7 +210,7 @@ export function renderCenterCharts(vm: any) {
                                 })}
                                 {rowData.length === 0 && (
                                   <tr>
-                                    <td colSpan={5} className={`py-6 text-center ${styles.cardTextMuted}`}>暂无符合过滤器条件的数据实例</td>
+                                    <td colSpan={5} className={`py-6 text-center ${styles.cardTextMuted}`}>{t('aiworkbench.ws.ct.emptyFilterMatch')}</td>
                                   </tr>
                                 )}
                               </tbody>
@@ -222,11 +222,12 @@ export function renderCenterCharts(vm: any) {
 
                     {editorMode === 'design' && activePage?.widgets.filter((w: any) => w.slot === 'main_bottom').length === 0 && (
                       <button
+                        type="button"
                         onClick={() => { setAddWidgetSlot('main_bottom'); setShowAddWidgetModal(true); }}
                         className={`border-2 border-dashed ${styles.divider} rounded-xl p-4 flex flex-col items-center justify-center ${styles.cardTextMuted} transition-all cursor-pointer min-h-[140px] w-full`}
                       >
                         <Plus size={15} />
-                        <span className="text-[10px] mt-1 font-semibold">添加本体表格明细</span>
+                        <span className="text-[10px] mt-1 font-semibold">{t('aiworkbench.ws.ct.addTable')}</span>
                       </button>
                     )}
                   </div>

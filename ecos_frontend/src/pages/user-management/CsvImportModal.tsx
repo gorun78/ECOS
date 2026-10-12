@@ -14,9 +14,8 @@ interface CsvImportModalProps {
 }
 
 export default function CsvImportModal({ onImport, onClose }: CsvImportModalProps) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const isZh = locale === "zh";
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [preview, setPreview] = useState<{ headers: string[]; rows: Record<string, string>[] } | null>(null);
@@ -26,7 +25,7 @@ export default function CsvImportModal({ onImport, onClose }: CsvImportModalProp
   function parseCSV(text: string) {
     const lines = text.trim().split(/\r?\n/);
     if (lines.length < 2) {
-      setError(isZh ? "CSV文件至少需要标题行和一行数据" : "CSV needs at least header + 1 data row");
+      setError(t("platform.user.csv.minRows"));
       return;
     }
     const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
@@ -68,9 +67,9 @@ export default function CsvImportModal({ onImport, onClose }: CsvImportModalProp
         <div className="flex items-center justify-between mb-4">
           <h3 className={`text-sm font-semibold ${styles.cardText}`}>
             <FileSpreadsheet className="w-4 h-4 inline mr-1.5" />
-            {isZh ? "CSV 批量导入用户" : "CSV Batch Import Users"}
+            {t("platform.user.csv.title")}
           </h3>
-          <button onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
+          <button type="button" onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
         </div>
 
         {error && (
@@ -81,25 +80,25 @@ export default function CsvImportModal({ onImport, onClose }: CsvImportModalProp
           <div className="text-center py-8">
             <Upload className="w-10 h-10 opacity-20 mx-auto mb-3" />
             <p className={`text-sm mb-3 ${styles.cardTextMuted}`}>
-              {isZh ? "选择 CSV 文件（需包含标题行：username,realName,email,phone,orgId）" : "Select CSV file (header row required: username,realName,email,phone,orgId)"}
+              {t("platform.user.csv.chooseFileHint")}
             </p>
             <input ref={fileRef} type="file" accept=".csv" onChange={handleFile} className="hidden" />
-            <button
+            <button type="button"
               onClick={() => fileRef.current?.click()}
               className={`px-4 py-2 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover}`}
             >
-              {isZh ? "选择文件" : "Choose File"}
+              {t("platform.user.csv.chooseFile")}
             </button>
           </div>
         ) : (
           <>
             <div className={`text-xs mb-2 ${styles.cardTextMuted}`}>
-              {isZh ? `预览 ${preview.rows.length} 条记录` : `Preview ${preview.rows.length} records`}
+              {t("platform.user.csv.preview", { n: preview.rows.length })}
             </div>
             <div className="overflow-auto max-h-64 border rounded mb-3">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-800/50">
+                  <tr className={styles.sidebarBg}>
                     {preview.headers.map(h => (
                       <th key={h} className="text-left px-2 py-1.5 font-semibold opacity-70 border-b">{h}</th>
                     ))}
@@ -107,7 +106,7 @@ export default function CsvImportModal({ onImport, onClose }: CsvImportModalProp
                 </thead>
                 <tbody>
                   {preview.rows.slice(0, 20).map((row, i) => (
-                    <tr key={i} className="border-b border-gray-100 dark:border-gray-700/20">
+                    <tr key={i} className={`border-b ${styles.cardBorder}`}>
                       {preview.headers.map(h => (
                         <td key={h} className="px-2 py-1.5 opacity-70">{row[h] || "-"}</td>
                       ))}
@@ -117,15 +116,15 @@ export default function CsvImportModal({ onImport, onClose }: CsvImportModalProp
               </table>
             </div>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setPreview(null)} className={`px-3 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>
-                {isZh ? "重新选择" : "Reselect"}
+              <button type="button" onClick={() => setPreview(null)} className={`px-3 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>
+                {t("platform.user.csv.reselect")}
               </button>
-              <button onClick={onClose} className={`px-3 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>
-                {isZh ? "取消" : "Cancel"}
+              <button type="button" onClick={onClose} className={`px-3 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText}`}>
+                {t("platform.user.csv.cancel")}
               </button>
-              <button onClick={handleImport} disabled={importing}
+              <button type="button" onClick={handleImport} disabled={importing}
                 className={`px-3 py-1.5 rounded text-xs font-medium text-white ${styles.accentBg} ${styles.accentHover} disabled:opacity-50`}>
-                {importing ? (isZh ? "导入中…" : "Importing…") : (isZh ? "确认导入" : "Confirm Import")}
+                {importing ? t("platform.user.csv.importing") : t("platform.user.csv.confirmImport")}
               </button>
             </div>
           </>

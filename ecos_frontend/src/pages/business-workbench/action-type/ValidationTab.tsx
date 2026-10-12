@@ -7,6 +7,7 @@ import React from 'react';
 import { ActionType } from '../../../types/ontology';
 import LucideIcon from '../LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 
 interface ValidationTabProps {
   actionType: ActionType;
@@ -32,31 +33,32 @@ export default function ValidationTab({
   handleRemoveValidation
 }: ValidationTabProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-6">
       <p className={`text-xs ${styles.cardTextMuted}`}>
-        定义执行操作前的拦截限制条件。只有当验证表达式 (Validation Expression) 计算结果为真 (True) 时，该操作才允许被提交到本体。
+        {t('ow.act.val.intro')}
       </p>
 
       <div className={`${styles.appBg} border ${styles.cardBorder} rounded-xl p-5 space-y-4`}>
-        <h4 className={`text-xs font-semibold ${styles.cardText}`}>新建验证安全规则</h4>
+        <h4 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.act.val.newRuleTitle')}</h4>
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-1">
-            <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>验证项名称</label>
+            <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>{t('ow.act.val.nameLabel')}</label>
             <input
               type="text"
-              placeholder="如：状态合法性校验"
+              placeholder={t('ow.act.val.namePlaceholder')}
               value={newValName}
               onChange={e => setNewValName(e.target.value)}
               className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} focus:outline-hidden`}
             />
           </div>
           <div className="space-y-1 col-span-2">
-            <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>验证公式/表达式 (Logic Expression)</label>
+            <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>{t('ow.act.val.exprLabel')}</label>
             <input
               type="text"
-              placeholder="如：parameter.new_status_param IN [&quot;ON_TIME&quot;, &quot;DELAYED&quot;]"
+              placeholder={t('ow.act.val.exprPlaceholder')}
               value={newValExpression}
               onChange={e => setNewValExpression(e.target.value)}
               className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} font-mono focus:outline-hidden`}
@@ -64,29 +66,30 @@ export default function ValidationTab({
           </div>
         </div>
         <div className="space-y-1">
-          <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>验证不通过时的报错警告信息 (Error Message)</label>
+          <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>{t('ow.act.val.errorLabel')}</label>
           <input
             type="text"
-            placeholder="如：状态代码错误，航班状态必须设定为合法选项。"
+            placeholder={t('ow.act.val.errorPlaceholder')}
             value={newValError}
             onChange={e => setNewValError(e.target.value)}
             className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} focus:outline-hidden`}
           />
         </div>
         <button
+          type="button"
           onClick={handleAddValidation}
           className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 py-1.5 rounded font-medium transition-colors flex items-center gap-1.5"
         >
           <LucideIcon name="Shield" size={13} />
-          添加拦截验证规则
+          {t('ow.act.val.addBtn')}
         </button>
       </div>
 
       <div className="space-y-4">
-        <h4 className={`text-xs font-semibold ${styles.cardText}`}>已生效的验证列表 ({actionType.validationRules.length})</h4>
+        <h4 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.act.val.listTitle')} ({actionType.validationRules.length})</h4>
         {actionType.validationRules.length === 0 ? (
           <div className={`text-center py-8 border border-dashed ${styles.sidebarBorder} rounded-lg ${styles.cardTextMuted} text-xs`}>
-            暂无拦截验证规则，该操作在调用时无入参安全性限制。
+            {t('ow.act.val.empty')}
           </div>
         ) : (
           <div className="space-y-3">
@@ -103,13 +106,14 @@ export default function ValidationTab({
                     {val.expression}
                   </div>
                   <div className="text-[10px] text-red-500 font-medium">
-                    <strong>警告文案:</strong> {val.errorMessage}
+                    <strong>{t('ow.act.val.warnLabel')}:</strong> {val.errorMessage}
                   </div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => handleRemoveValidation(val.id)}
                   className={`p-1 ${styles.cardTextMuted} opacity-70 hover:opacity-100 hover:text-red-500`}
-                  title="删除规则"
+                  title={t('ow.act.val.removeTitle')}
                 >
                   <LucideIcon name="Trash2" size={14} />
                 </button>

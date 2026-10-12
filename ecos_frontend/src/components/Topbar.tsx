@@ -87,9 +87,9 @@ export default function Topbar({
 
   // Settings values loading from localStorage (cache) or default
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [email, setEmail] = useState(() => localStorage.getItem("ecos_user_email") || "guorongxiao@gmail.com");
+  const [email, setEmail] = useState(() => localStorage.getItem("ecos_user_email") || "");
   const [clearance, setClearance] = useState(() => localStorage.getItem("ecos_user_clearance") || "");
-  const [workstation, setWorkstation] = useState(() => localStorage.getItem("ecos_user_workstation") || "WS-COSMOS-09");
+  const [workstation, setWorkstation] = useState(() => localStorage.getItem("ecos_user_workstation") || "");
   const [auditMode, setAuditMode] = useState(() => localStorage.getItem("ecos_user_audit") || "full");
   const [sandbox, setSandbox] = useState(() => {
     const val = localStorage.getItem("ecos_user_sandbox");
@@ -119,7 +119,10 @@ export default function Topbar({
         setSandbox(p.sandboxMandatory);
         localStorage.setItem("ecos_user_sandbox", String(p.sandboxMandatory));
       }
-    }).catch(() => {/* fallback to localStorage values */});
+    }).catch((e) => {
+      console.warn("Topbar: failed to load security profile, falling back to local cache", e);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const displayClearance = clearance || t("topbar.role.default");
@@ -144,6 +147,9 @@ export default function Topbar({
         });
       } catch (e) {
         console.warn("Topbar: failed to sync security profile to backend", e);
+        setToast(t("topbar.user.save.localOnly"));
+        setTimeout(() => { setToast(null); }, 4000);
+        return;
       }
     }
 
@@ -160,9 +166,9 @@ export default function Topbar({
     localStorage.removeItem("ecos_user_audit");
     localStorage.removeItem("ecos_user_sandbox");
 
-    setEmail("guorongxiao@gmail.com");
+    setEmail("");
     setClearance("");
-    setWorkstation("WS-COSMOS-09");
+    setWorkstation("");
     setAuditMode("full");
     setSandbox(true);
 
@@ -172,7 +178,7 @@ export default function Topbar({
       try {
         await updateUserSecurityProfile(userId, {
           clearanceLevel: 0,
-          linkedWorkstation: "WS-COSMOS-09",
+          linkedWorkstation: "",
           auditMode: "full",
           sandboxMandatory: true,
         });
@@ -244,7 +250,7 @@ export default function Topbar({
       return [t("topbar.group.system"), t("topbar.tab.kanban")];
     if (currentView === "engine-tasks" || currentView === "task_center")
       return [t("topbar.group.system"), t("topbar.tab.engine_tasks")];
-    return [t("topbar.group.overview"), currentView];
+    return [t("topbar.group.overview"), t(`topbar.bc.${currentView}`, currentView)];
   };
 
   /** Translate existing tab labels (Chinese labels passed by App.tsx). */
@@ -263,7 +269,7 @@ export default function Topbar({
       {/* Left Box: Hamburger (mobile) + Breadcrumb mapping */}
       <div className={`flex items-center gap-1.5 text-xs font-mono ${styles.cardTextMuted} shrink-0`}>
         {/* Hamburger menu — visible only on mobile */}
-        <button
+        <button type="button"
           onClick={onMenuToggle}
           className={`md:hidden p-1.5 -ml-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${styles.cardText}`}
           aria-label={t("topbar.lang.toggle")}
@@ -274,7 +280,7 @@ export default function Topbar({
         {breadcrumbs.map((bc, idx) => (
           <React.Fragment key={idx}>
             <ChevronRight className="w-3.5 h-3.5 opacity-40 mx-0.5 shrink-0" />
-            <span className={idx === breadcrumbs.length - 1 ? "text-[#3B82F6] font-bold" : "opacity-75"}>
+            <span className={idx === breadcrumbs.length - 1 ? `${styles.accentText} font-bold` : "opacity-75"}>
               {bc}
             </span>
           </React.Fragment>
@@ -296,7 +302,7 @@ export default function Topbar({
               onClick={() => onTabSelect(tab.id)}
             >
               <span className={isActive ? `${styles.cardText} font-bold` : `${styles.cardTextMuted}`}>{translateTabLabel(tab.label)}</span>
-              <button
+              <button type="button"
                 className={`p-0.5 rounded-full text-transparent group-hover:${styles.cardTextMuted} hover:bg-[var(--muted)] transition shrink-0`}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -330,7 +336,7 @@ export default function Topbar({
 
         {/* Language Selector Switcher */}
         <div className={`flex items-center ${styles.inputBg} border ${styles.inputBorder} rounded-lg p-0.5 select-none shrink-0 shadow-3xs transition duration-150`}>
-          <button
+          <button type="button"
             onClick={() => setLocale("zh")}
             id="lang-switch-zh"
             className={`px-2.5 py-1 text-[10px] font-bold font-sans rounded-md transition duration-150 cursor-pointer ${
@@ -341,7 +347,7 @@ export default function Topbar({
           >
             {t("topbar.lang.switch_zh")}
           </button>
-          <button
+          <button type="button"
             onClick={() => setLocale("en")}
             id="lang-switch-en"
             className={`px-2.5 py-1 text-[10px] font-bold font-sans rounded-md transition duration-150 cursor-pointer ${

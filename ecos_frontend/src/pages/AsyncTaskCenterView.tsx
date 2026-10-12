@@ -200,7 +200,7 @@ export default function AsyncTaskCenterView({ showToast, onViewModeChange }: Asy
             </div>
           ))}
         </div>
-        <button
+        <button type="button"
           onClick={() => { setLoading(true); loadOnce().finally(() => setLoading(false)); }}
           className={`px-3 py-1.5 rounded-md border ${styles.cardBorder} ${styles.cardText} hover:${styles.accentText} transition-colors cursor-pointer text-xs flex items-center gap-1.5`}
         >
@@ -229,7 +229,7 @@ export default function AsyncTaskCenterView({ showToast, onViewModeChange }: Asy
         </select>
         <div className="flex gap-1 flex-wrap">
           {STATUS_FILTERS.map(f => (
-            <button
+            <button type="button"
               key={f}
               onClick={() => setStatusFilter(f)}
               className={`px-2.5 py-1 rounded text-[10px] border cursor-pointer transition-colors ${statusFilter === f
@@ -248,11 +248,11 @@ export default function AsyncTaskCenterView({ showToast, onViewModeChange }: Asy
           <span className={`text-[11px] ${styles.cardText} font-semibold`}>
             {t("taskPanel.batch.selected")?.replace("{count}", String(selectedIds.size)) || `${t("taskPanel.selectedPrefix") || "已选"} ${selectedIds.size} ${t("taskPanel.selectedSuffix") || "个任务"}`}
           </span>
-          <button className={`px-2.5 py-1 rounded text-[10px] ${styles.cardBorder} border ${styles.cardText} hover:${styles.accentText} cursor-pointer`} onClick={() => confirmBatch("resume")}>{t("taskPanel.action.resume") || "恢复"}</button>
-          <button className={`px-2.5 py-1 rounded text-[10px] ${styles.cardBorder} border ${styles.cardText} hover:${styles.accentText} cursor-pointer`} onClick={() => confirmBatch("pause")}>{t("taskPanel.action.pause") || "暂停"}</button>
-          <button className={`px-2.5 py-1 rounded text-[10px] ${styles.cardBorder} border ${styles.dangerText} hover:underline cursor-pointer`} onClick={() => confirmBatch("cancel")}>{t("taskPanel.action.cancel") || "中止"}</button>
-          <button className={`px-2.5 py-1 rounded text-[10px] ${styles.cardBorder} border ${styles.cardText} hover:${styles.accentText} cursor-pointer`} onClick={() => confirmBatch("archive")}>{t("taskPanel.action.archive") || "归档"}</button>
-          <button className={`px-2.5 py-1 rounded text-[10px] ${styles.cardTextMuted} hover:${styles.cardText} cursor-pointer ml-auto`} onClick={() => setSelectedIds(new Set())}>
+          <button type="button" className={`px-2.5 py-1 rounded text-[10px] ${styles.cardBorder} border ${styles.cardText} hover:${styles.accentText} cursor-pointer`} onClick={() => confirmBatch("resume")}>{t("taskPanel.action.resume") || "恢复"}</button>
+          <button type="button" className={`px-2.5 py-1 rounded text-[10px] ${styles.cardBorder} border ${styles.cardText} hover:${styles.accentText} cursor-pointer`} onClick={() => confirmBatch("pause")}>{t("taskPanel.action.pause") || "暂停"}</button>
+          <button type="button" className={`px-2.5 py-1 rounded text-[10px] ${styles.cardBorder} border ${styles.dangerText} hover:underline cursor-pointer`} onClick={() => confirmBatch("cancel")}>{t("taskPanel.action.cancel") || "中止"}</button>
+          <button type="button" className={`px-2.5 py-1 rounded text-[10px] ${styles.cardBorder} border ${styles.cardText} hover:${styles.accentText} cursor-pointer`} onClick={() => confirmBatch("archive")}>{t("taskPanel.action.archive") || "归档"}</button>
+          <button type="button" className={`px-2.5 py-1 rounded text-[10px] ${styles.cardTextMuted} hover:${styles.cardText} cursor-pointer ml-auto`} onClick={() => setSelectedIds(new Set())}>
             {t("taskPanel.batch.deselect") || "清除选择"}
           </button>
         </div>
@@ -474,7 +474,7 @@ export default function AsyncTaskCenterView({ showToast, onViewModeChange }: Asy
           <div className="w-full md:w-[400px] shrink-0 border rounded-lg overflow-hidden" style={{ background: styles.cardBg, borderColor: styles.cardBorder, color: styles.cardText }}>
             <div className={`px-3 py-2 border-b ${styles.cardBorder} flex items-center justify-between`} style={{ background: (styles.sidebarBg as string) + "80" }}>
               <span className="text-xs font-semibold">{t("taskPanel.detail.title") || "任务详情"}</span>
-              <button onClick={() => setActiveTaskId(null)} className="cursor-pointer text-xs hover:opacity-70" style={{ color: styles.cardTextMuted }}>✕</button>
+              <button type="button" onClick={() => setActiveTaskId(null)} className="cursor-pointer text-xs hover:opacity-70" style={{ color: styles.cardTextMuted }}>✕</button>
             </div>
             <div className="p-3 space-y-3 text-xs">
               <DetailRow label={t("taskPanel.detail.id") || "任务 ID"} value={<span className="font-mono text-[10px] break-all">{active.taskId}</span>} muted />
@@ -514,7 +514,7 @@ function ActionBtn({ label, title, tone, onClick }: { label: string; title: stri
   const { styles } = useTheme();
   const color = tone === "accent" ? styles.accentText : tone === "warn" ? styles.warningText : tone === "danger" ? styles.dangerText : styles.cardTextMuted;
   return (
-    <button
+    <button type="button"
       onClick={onClick}
       title={title}
       className={`w-6 h-6 rounded border ${styles.cardBorder} flex items-center justify-center text-[11px] cursor-pointer transition-colors hover:opacity-80`}

@@ -75,7 +75,7 @@ export default function EntityTreePanel({
     <div className={`w-full lg:w-[280px] min-w-[240px] border-r ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0`}>
       {/* 域标题 */}
       <div className={`px-4 py-3 border-b ${styles.cardBorder}`}>
-        <button
+        <button type="button"
           onClick={onBack}
           className={`flex items-center gap-1.5 text-[10px] ${styles.cardTextMuted} opacity-80 hover:opacity-100 mb-2.5 transition`}
         >
@@ -135,7 +135,7 @@ export default function EntityTreePanel({
                 ENTITY_TYPE_CONFIG[entity.entityType] || ENTITY_TYPE_CONFIG.default;
 
               return (
-                <button
+                <button type="button"
                   key={entity.id}
                   onClick={() => onSelectEntity(entity.id)}
                   className={`w-full text-left px-4 py-2.5 border-b ${styles.cardBorder}/50 transition flex items-center gap-2.5 ${
@@ -168,7 +168,7 @@ export default function EntityTreePanel({
 
       {/* 底部：创建实体按钮 */}
       <div className={`px-4 py-2.5 border-t ${styles.cardBorder}`}>
-        <button
+        <button type="button"
           onClick={onCreateEntity}
           className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg
             text-xs font-medium text-indigo-400 hover:text-indigo-300

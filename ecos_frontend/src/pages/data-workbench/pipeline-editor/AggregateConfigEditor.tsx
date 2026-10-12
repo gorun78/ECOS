@@ -43,12 +43,12 @@ const AggregateConfigEditor: React.FC<AggregateConfigEditorProps> = ({
               placeholder="列名"
               className={`flex-1 px-1.5 py-0.5 text-[11px] border ${styles.cardBorder} rounded outline-none focus:${styles.warningBorder}`}
             />
-            <button onClick={() => onRemoveGroupBy(idx)} className={`p-0.5 ${styles.dangerText} hover:${styles.dangerText} transition-colors`}>
+            <button type="button" onClick={() => onRemoveGroupBy(idx)} className={`p-0.5 ${styles.dangerText} hover:${styles.dangerText} transition-colors`}>
               <X size={14} />
             </button>
           </div>
         ))}
-        <button
+        <button type="button"
           onClick={onAddGroupBy}
           className={`w-full flex items-center justify-center gap-1 px-2 py-1 text-[11px] ${styles.warningText} border border-dashed ${styles.warningBorder} rounded hover:${styles.warningBg} transition-colors mt-1`}
         >
@@ -86,13 +86,13 @@ const AggregateConfigEditor: React.FC<AggregateConfigEditorProps> = ({
                 placeholder="as"
                 className={`flex-1 px-1.5 py-0.5 text-[11px] border ${styles.cardBorder} rounded outline-none focus:${styles.warningBorder}`}
               />
-              <button onClick={() => onRemoveAgg(idx)} className={`p-0.5 ${styles.dangerText} hover:${styles.dangerText} transition-colors`}>
+              <button type="button" onClick={() => onRemoveAgg(idx)} className={`p-0.5 ${styles.dangerText} hover:${styles.dangerText} transition-colors`}>
                 <X size={14} />
               </button>
             </div>
           </div>
         ))}
-        <button
+        <button type="button"
           onClick={onAddAgg}
           className={`w-full flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] ${styles.warningText} border border-dashed ${styles.warningBorder} rounded hover:${styles.warningBg} transition-colors`}
         >

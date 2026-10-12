@@ -27,7 +27,7 @@ const DataEngineConfigPanelGroupNav: React.FC<Props> = ({
   return (
     <div className={`w-44 border-r ${styles.cardBorder} ${styles.cardBg} flex flex-col shrink-0 overflow-y-auto`}>
       {groups.map(g => (
-        <button
+        <button type="button"
           key={g.id}
           onClick={() => onSelect(g.id)}
           className={`flex items-center gap-2 px-3 py-2.5 text-xs font-medium transition-all text-left border-l-2 ${

@@ -306,7 +306,7 @@ export default function ObjectExplorer() {
         <div className={`absolute top-4 right-4 z-50 ${styles.dangerBg} border ${styles.dangerBorder} ${styles.dangerText} rounded-lg px-4 py-3 text-xs flex items-center gap-2 shadow-lg max-w-md animate-in slide-in-from-top-2`}>
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span className="flex-1">{error}</span>
-          <button onClick={() => setError(null)} className="hover:opacity-70 rounded p-0.5"><X className="w-3 h-3" /></button>
+          <button type="button" onClick={() => setError(null)} className="hover:opacity-70 rounded p-0.5"><X className="w-3 h-3" /></button>
         </div>
       )}
 

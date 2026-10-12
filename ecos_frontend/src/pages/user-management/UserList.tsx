@@ -59,8 +59,7 @@ function BatchConfirmDialog({
   onCancel: () => void;
 }) {
   const { styles } = useTheme();
-  const { locale } = useLanguage();
-  const isZh = locale === "zh";
+  const { t } = useLanguage();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -72,13 +71,13 @@ function BatchConfirmDialog({
         </div>
         <p className={`text-sm mb-5 ${styles.cardTextMuted}`}>{message}</p>
         <div className="flex gap-2 justify-end">
-          <button onClick={onCancel}
-            className={`px-4 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText} hover:bg-gray-50 dark:hover:bg-white/5`}>
-            {isZh ? "取消" : "Cancel"}
+          <button type="button" onClick={onCancel}
+            className={`px-4 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`}>
+            {t("platform.user.list.cancel")}
           </button>
-          <button onClick={onConfirm}
+          <button type="button" onClick={onConfirm}
             className="px-4 py-1.5 rounded text-xs font-semibold bg-red-600 text-white hover:bg-red-700">
-            {isZh ? "确认删除" : "Confirm Delete"}
+            {t("platform.user.list.confirmDelete")}
           </button>
         </div>
       </div>
@@ -100,10 +99,9 @@ export default function UserList({
   onBatchDisable,
   onBatchDelete,
 }: UserListProps) {
-  const { locale, t } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const isZh = locale === "zh";
 
   // ── Batch selection state ──────────────────────────────
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
@@ -148,10 +146,10 @@ export default function UserList({
 
   const selectedArr = Array.from(selectedIds);
 
-  const th = "text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wider opacity-60 border-b border-gray-200 dark:border-gray-700/30";
-  const td = "px-3 py-2 text-[13px] border-b border-gray-100 dark:border-gray-700/20";
-  const chkCol = "px-3 py-2 border-b border-gray-100 dark:border-gray-700/20 text-center";
-  const chkTh = "text-center px-3 py-2 text-[11px] font-semibold uppercase tracking-wider opacity-60 border-b border-gray-200 dark:border-gray-700/30";
+  const th = `text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wider opacity-60 border-b ${styles.cardBorder}`;
+  const td = `px-3 py-2 text-[13px] border-b ${styles.cardBorder}`;
+  const chkCol = `px-3 py-2 border-b ${styles.cardBorder} text-center`;
+  const chkTh = `text-center px-3 py-2 text-[11px] font-semibold uppercase tracking-wider opacity-60 border-b ${styles.cardBorder}`;
 
   // Loading skeleton
   if (loading) {
@@ -161,7 +159,7 @@ export default function UserList({
           <thead>
             <tr>
               <th className={chkTh}><div className="w-3.5 h-3.5 mx-auto" /></th>
-              {[isZh ? "用户名" : "Username", isZh ? "姓名" : "Name", isZh ? "邮箱" : "Email", isZh ? "组织" : "Org", isZh ? "角色" : "Roles", isZh ? "状态" : "Status", isZh ? "操作" : "Actions"].map((h, i) => (
+              {[t("platform.user.list.colUsername"), t("platform.user.list.colName"), t("platform.user.list.colEmail"), t("platform.user.list.colOrg"), t("platform.user.list.colRoles"), t("platform.user.list.colStatus"), t("platform.user.list.colActions")].map((h, i) => (
                 <th key={i} className={th}>{h}</th>
               ))}
             </tr>
@@ -169,11 +167,11 @@ export default function UserList({
           <tbody>
             {Array.from({ length: 5 }).map((_, i) => (
               <tr key={i}>
-                <td className="px-3 py-3 border-b border-gray-100 dark:border-gray-700/20">
+                <td className={`px-3 py-3 border-b ${styles.cardBorder}`}>
                   <div className="h-3.5 w-3.5 mx-auto bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
                 </td>
                 {Array.from({ length: 7 }).map((_, j) => (
-                  <td key={j} className="px-3 py-3 border-b border-gray-100 dark:border-gray-700/20">
+                  <td key={j} className={`px-3 py-3 border-b ${styles.cardBorder}`}>
                     <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ width: `${60 + Math.random() * 40}%` }} />
                   </td>
                 ))}
@@ -200,7 +198,7 @@ export default function UserList({
         {users.map(u => {
           const expanded = expandedId === u.userId;
           return (
-            <div key={u.userId} className="rounded-md bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10">
+            <div key={u.userId} className={`rounded-md ${styles.cardBg} border border-black/10 dark:border-white/10`}>
               {/* 卡片头：checkbox + 用户名 + 状态徽章 + 展开钮 */}
               <div className="flex items-center gap-2 px-2.5 py-2.5">
                 <input
@@ -213,13 +211,13 @@ export default function UserList({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-xs font-semibold truncate">{u.username}</span>
-                    <button onClick={() => onToggleStatus(u.userId, u.status)}
+                    <button type="button" onClick={() => onToggleStatus(u.userId, u.status)}
                       className={`px-1.5 py-0.5 rounded text-[10px] font-medium cursor-pointer border transition-colors shrink-0 ${
                         u.status === "ACTIVE"
                           ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800"
                           : "bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 border-red-200 dark:border-red-800"
                       }`}>
-                      ● {u.status === "ACTIVE" ? (isZh ? "活跃" : "Active") : (isZh ? "禁用" : "Disabled")}
+                      ● {u.status === "ACTIVE" ? t("platform.user.list.statusActive") : t("platform.user.list.statusDisabled")}
                     </button>
                   </div>
                   <div className="text-[10px] opacity-50 truncate">{u.realName || "—"}</div>
@@ -234,36 +232,36 @@ export default function UserList({
               {expanded && (
                 <div className="border-t border-black/10 dark:border-white/10 px-2.5 py-2.5 flex flex-col gap-2">
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[10px] opacity-40 uppercase tracking-wider">{isZh ? "邮箱" : "Email"}</span>
+                    <span className="text-[10px] opacity-40 uppercase tracking-wider">{t("platform.user.list.mobileEmail")}</span>
                     <span className="text-xs">{u.email || "—"}</span>
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[10px] opacity-40 uppercase tracking-wider">{isZh ? "组织" : "Org"}</span>
+                    <span className="text-[10px] opacity-40 uppercase tracking-wider">{t("platform.user.list.mobileOrg")}</span>
                     <span className="text-xs">{orgMap[u.orgId || ""] || (u as any).orgName || u.orgId || "—"}</span>
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-[10px] opacity-40 uppercase tracking-wider">{isZh ? "角色" : "Roles"}</span>
+                    <span className="text-[10px] opacity-40 uppercase tracking-wider">{t("platform.user.list.mobileRoles")}</span>
                     <RoleTags userId={u.userId} roles={roles} />
                   </div>
                 </div>
               )}
               {/* 操作行：编辑 / 强制下线 / 删除（卡片底部按钮组） */}
               <div className="border-t border-black/10 dark:border-white/10 px-2.5 py-1.5 flex items-center justify-end gap-1.5">
-                <button onClick={() => onRowClick(u)}
+                <button type="button" onClick={() => onRowClick(u)}
                   className="px-2 py-1 rounded text-[11px] bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 border border-black/5 dark:border-white/5">
-                  {isZh ? "详情" : "Detail"}
+                  {t("platform.user.list.detail")}
                 </button>
-                <button onClick={() => onEdit(u)}
+                <button type="button" onClick={() => onEdit(u)}
                   className="px-2 py-1 rounded text-[11px] text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/30">
-                  {isZh ? "编辑" : "Edit"}
+                  {t("platform.user.list.edit")}
                 </button>
-                <button onClick={() => onForceLogout(u)}
+                <button type="button" onClick={() => onForceLogout(u)}
                   className="px-2 py-1 rounded text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/30">
-                  {isZh ? "下线" : "Logout"}
+                  {t("platform.user.list.logout")}
                 </button>
-                <button onClick={() => onDelete(u)}
+                <button type="button" onClick={() => onDelete(u)}
                   className="px-2 py-1 rounded text-[11px] text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30">
-                  {isZh ? "删除" : "Delete"}
+                  {t("platform.user.list.delete")}
                 </button>
               </div>
             </div>
@@ -286,18 +284,18 @@ export default function UserList({
                 className="w-3.5 h-3.5 rounded accent-indigo-500 cursor-pointer"
               />
             </th>
-            <th className={th}>{isZh ? "用户名" : "Username"}</th>
-            <th className={th}>{isZh ? "姓名" : "Name"}</th>
-            <th className={th}>{isZh ? "邮箱" : "Email"}</th>
-            <th className={th}>{isZh ? "组织" : "Org"}</th>
-            <th className={th}>{isZh ? "角色" : "Roles"}</th>
-            <th className={th}>{isZh ? "状态" : "Status"}</th>
-            <th className={th}>{isZh ? "操作" : "Actions"}</th>
+            <th className={th}>{t("platform.user.list.colUsername")}</th>
+            <th className={th}>{t("platform.user.list.colName")}</th>
+            <th className={th}>{t("platform.user.list.colEmail")}</th>
+            <th className={th}>{t("platform.user.list.colOrg")}</th>
+            <th className={th}>{t("platform.user.list.colRoles")}</th>
+            <th className={th}>{t("platform.user.list.colStatus")}</th>
+            <th className={th}>{t("platform.user.list.colActions")}</th>
           </tr>
         </thead>
         <tbody>
           {users.map(u => (
-            <tr key={u.userId} className="hover:bg-gray-50 dark:hover:bg-gray-800/20 cursor-pointer"
+            <tr key={u.userId} className={`${styles.sidebarHoverBg} cursor-pointer`}
               onClick={(e) => handleRowClick(e, u)}>
               <td className={chkCol} onClick={e => e.stopPropagation()}>
                 <input
@@ -313,23 +311,23 @@ export default function UserList({
               <td className={td}><span className="text-xs">{orgMap[u.orgId || ""] || (u as any).orgName || u.orgId || "-"}</span></td>
               <td className={td}><RoleTags userId={u.userId} roles={roles} /></td>
               <td className={td} onClick={e => e.stopPropagation()}>
-                <button onClick={() => onToggleStatus(u.userId, u.status)}
+                <button type="button" onClick={() => onToggleStatus(u.userId, u.status)}
                   className={`px-2 py-0.5 rounded text-xs font-medium cursor-pointer border transition-colors ${
                     u.status === "ACTIVE"
                       ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/30"
                       : "bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30"
                   }`}>
-                  ● {u.status === "ACTIVE" ? (isZh ? "活跃" : "Active") : (isZh ? "禁用" : "Disabled")}
+                  ● {u.status === "ACTIVE" ? t("platform.user.list.statusActive") : t("platform.user.list.statusDisabled")}
                 </button>
               </td>
               <td className={td} onClick={e => e.stopPropagation()}>
                 <div className="flex gap-1">
-                  <button onClick={() => onEdit(u)}
+                  <button type="button" onClick={() => onEdit(u)}
                     className="text-indigo-500 hover:text-indigo-700 p-1"><Edit3 size={14} /></button>
-                  <button onClick={() => onForceLogout(u)}
-                    className="text-amber-500 hover:text-amber-700 p-1" title={isZh ? "强制下线" : "Force Logout"}>
+                  <button type="button" onClick={() => onForceLogout(u)}
+                    className="text-amber-500 hover:text-amber-700 p-1" title={t("platform.user.list.forceLogout")}>
                     <LogOut size={14} /></button>
-                  <button onClick={() => onDelete(u)}
+                  <button type="button" onClick={() => onDelete(u)}
                     className="text-red-500 hover:text-red-700 p-1"><Trash2 size={14} /></button>
                 </div>
               </td>
@@ -340,35 +338,35 @@ export default function UserList({
 
       {/* ── Batch toolbar (floating at bottom) ─────────────── */}
       {someSelected && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-4 py-2.5 rounded-lg shadow-xl border bg-white dark:bg-gray-900 border-indigo-200 dark:border-indigo-800">
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-4 py-2.5 rounded-lg shadow-xl border ${styles.cardBg} border-indigo-200 dark:border-indigo-800`}>
           <span className="text-xs font-medium opacity-70">
             {t("user.batch.selected").replace("{count}", String(selectedIds.size))}
           </span>
           <div className="w-px h-5 bg-gray-300 dark:bg-gray-700" />
-          <button
+          <button type="button"
             onClick={() => { onBatchEnable(selectedArr); setSelectedIds(new Set()); }}
             className="px-3 py-1 rounded text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
           >
             {t("user.batch.enable")}
           </button>
-          <button
+          <button type="button"
             onClick={() => { onBatchDisable(selectedArr); setSelectedIds(new Set()); }}
             className="px-3 py-1 rounded text-xs font-medium bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
           >
             {t("user.batch.disable")}
           </button>
-          <button
+          <button type="button"
             onClick={() => setShowBatchConfirm(true)}
             className="px-3 py-1 rounded text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
           >
             {t("user.batch.delete")}
           </button>
           <div className="w-px h-5 bg-gray-300 dark:bg-gray-700" />
-          <button
+          <button type="button"
             onClick={() => setSelectedIds(new Set())}
             className="text-xs opacity-50 hover:opacity-80 px-1"
           >
-            {isZh ? "取消选择" : "Deselect"}
+            {t("platform.user.list.deselect")}
           </button>
         </div>
       )}
@@ -376,8 +374,8 @@ export default function UserList({
       {/* ── Batch delete confirm ──────────────────────────── */}
       {showBatchConfirm && (
         <BatchConfirmDialog
-          title={isZh ? "确认批量删除" : "Confirm Batch Delete"}
-          message={(isZh ? `确定删除 ${selectedIds.size} 个用户？此操作不可撤销` : `Delete ${selectedIds.size} users? This action is irreversible.`)}
+          title={t("platform.user.list.batchDeleteTitle")}
+          message={t("platform.user.list.batchDeleteMsg", { n: selectedIds.size })}
           onConfirm={handleBatchDelete}
           onCancel={() => setShowBatchConfirm(false)}
         />

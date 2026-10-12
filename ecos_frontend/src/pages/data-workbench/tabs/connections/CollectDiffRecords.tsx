@@ -31,7 +31,7 @@ export default function CollectDiffRecords({
                   {diffRecords.map((rec, idx) => (
                     <div key={idx} className={`group`}>
                       {showDiffDetail === idx ? (
-                        <button
+                        <button type="button"
                           onClick={() => setShowDiffDetail(null)}
                           className="w-full text-left px-3 py-2 text-[10px] font-mono whitespace-pre-wrap break-words cursor-pointer hover:bg-opacity-50 transition-colors"
                           style={{ background: styles.cardBg }}
@@ -39,7 +39,7 @@ export default function CollectDiffRecords({
                           {rec.diffMarkdown || '(空)'}
                         </button>
                       ) : (
-                        <button
+                        <button type="button"
                           onClick={() => setShowDiffDetail(idx)}
                           className="w-full text-left px-3 py-2 transition-colors hover:bg-opacity-50 cursor-pointer"
                           style={{ background: styles.cardBg }}

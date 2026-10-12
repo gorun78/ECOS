@@ -35,7 +35,7 @@ function groupByType(items: DictItem[]): DictTypeGroup[] {
 }
 
 export default function SystemDictionary() {
-  const { locale } = useLanguage() as any;
+  const { t, locale } = useLanguage() as any;
   const { styles } = useTheme() as any;
   const isZh = locale !== 'en';
 
@@ -69,27 +69,27 @@ export default function SystemDictionary() {
         <div className="flex items-center gap-2 px-1 mb-2">
           <BookOpen size={14} className={styles.muted} />
           <h3 className={`text-xs font-semibold ${styles.muted} uppercase`}>
-            {isZh ? '字典分类' : 'Dict Types'} ({groups.length})
+            {t("platform.dictionary.types")} ({groups.length})
           </h3>
         </div>
         {loading ? (
           <Loader2 size={18} className="animate-spin text-indigo-400 mx-auto mt-4" />
         ) : (
           groups.map(g => (
-            <button key={g.dictType} onClick={() => { setActiveType(g.dictType); setExpandedItem(null); }}
+            <button type="button" key={g.dictType} onClick={() => { setActiveType(g.dictType); setExpandedItem(null); }}
               className={`text-left px-3 py-2 rounded text-sm transition-colors flex items-center justify-between
-                ${activeType === g.dictType ? 'bg-indigo-600 text-white' : `${styles.muted} hover:bg-gray-100 dark:hover:bg-gray-800`}`}
+                ${activeType === g.dictType ? 'bg-indigo-600 text-white' : `${styles.muted} ${styles.sidebarHoverBg}`}`}
             >
               <span className="truncate text-xs">{g.dictType}</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono
-                ${activeType === g.dictType ? 'bg-indigo-500 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                ${activeType === g.dictType ? 'bg-indigo-500 text-white' : styles.sidebarBg}`}>
                 {g.itemCount}
               </span>
             </button>
           ))
         )}
         <div className={`mt-auto pt-3 border-t ${styles.sidebarBorder} text-[10px] ${styles.muted} px-1`}>
-          {isZh ? `共 ${totalItems} 条` : `Total ${totalItems} items`}
+          {t("platform.dictionary.total", { count: totalItems })}
         </div>
       </div>
 
@@ -98,7 +98,7 @@ export default function SystemDictionary() {
         {loading && (
           <div className="flex items-center gap-3 p-12 justify-center">
             <Loader2 size={24} className="animate-spin text-indigo-400" />
-            <span className={styles.muted}>{isZh ? '加载中...' : 'Loading...'}</span>
+            <span className={styles.muted}>{t("platform.dictionary.loading")}</span>
           </div>
         )}
 
@@ -114,8 +114,8 @@ export default function SystemDictionary() {
             <div className="flex items-center gap-3 mb-4">
               <Tag size={18} className="text-indigo-500" />
               <h2 className={`text-lg font-semibold ${styles.text}`}>{activeGroup.dictType}</h2>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${styles.muted} bg-gray-100 dark:bg-gray-800`}>
-                {activeGroup.items.length} {isZh ? '项' : 'items'}
+              <span className={`text-xs px-2 py-0.5 rounded-full ${styles.muted} ${styles.sidebarBg}`}>
+                {activeGroup.items.length} {t("platform.dictionary.itemsUnit")}
               </span>
             </div>
 
@@ -128,7 +128,7 @@ export default function SystemDictionary() {
                   >
                     {/* Row */}
                     <div
-                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                      className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${styles.sidebarHoverBg}`}
                       onClick={() => setExpandedItem(isExpanded ? null : item.id)}
                     >
                       <Hash size={14} className={`${styles.cardTextMuted} shrink-0`} />
@@ -152,7 +152,7 @@ export default function SystemDictionary() {
 
                     {/* Expanded detail */}
                     {isExpanded && (
-                      <div className={`px-4 py-3 border-t ${styles.sidebarBorder} bg-gray-50 dark:bg-gray-900/30 text-xs space-y-1`}>
+                      <div className={`px-4 py-3 border-t ${styles.sidebarBorder} ${styles.appBg} text-xs space-y-1`}>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                           <div><span className={styles.muted}>ID:</span> <span className="font-mono">{item.id}</span></div>
                           <div><span className={styles.muted}>Sort:</span> {item.sortOrder}</div>
@@ -173,7 +173,7 @@ export default function SystemDictionary() {
           <div className="flex flex-col items-center justify-center h-full">
             <BookOpen size={40} className={`${styles.muted} mb-3 opacity-30`} />
             <p className={`text-sm ${styles.muted}`}>
-              {isZh ? '← 选择左侧字典分类查看数据' : '← Select a dict type to view items'}
+              {t("platform.dictionary.emptyHint")}
             </p>
           </div>
         )}

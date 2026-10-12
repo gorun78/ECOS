@@ -158,7 +158,7 @@ export default function ExportTasksView({ visible, refreshSignal, onToast }: Exp
     <div className="mt-3 pt-3 border-t border-dashed border-current">
       <div className={`flex items-center justify-between mb-2 ${styles.cardText}`}>
         <h4 className="text-[11px] font-bold">{t('ow.exportTask.title')}</h4>
-        <button
+        <button type="button"
           onClick={loadTasks}
           className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}
         >
@@ -204,7 +204,7 @@ export default function ExportTasksView({ visible, refreshSignal, onToast }: Exp
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {isCompleted && (
-                    <button
+                    <button type="button"
                       onClick={() => handleDownload(task)}
                       disabled={busy}
                       className={`px-2 py-0.5 rounded text-[10px] font-semibold ${styles.accentBg} text-white ${styles.accentHover} disabled:opacity-50`}
@@ -213,7 +213,7 @@ export default function ExportTasksView({ visible, refreshSignal, onToast }: Exp
                     </button>
                   )}
                   {isEnded && (
-                    <button
+                    <button type="button"
                       onClick={() => handleDelete(task)}
                       disabled={busy}
                       className={`px-2 py-0.5 rounded text-[10px] font-semibold ${styles.dangerBg} ${styles.dangerText} disabled:opacity-50`}

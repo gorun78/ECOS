@@ -6,6 +6,7 @@ import React, { memo } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { GitBranch } from 'lucide-react';
 import { useTheme } from '../../ThemeContext';
+import { useLanguage } from '../../LanguageContext';
 import type { LogicNodeData, LogicConditionConfig } from '../../../types/aiworkbench';
 
 function ConditionNode({ data, selected }: NodeProps<Node<LogicNodeData>>) {
@@ -32,6 +33,7 @@ function ConditionNode({ data, selected }: NodeProps<Node<LogicNodeData>>) {
 // Re-export with proper diamond style
 function ConditionNodeDiamond({ data, selected }: NodeProps<Node<LogicNodeData>>) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const config = data.config as LogicConditionConfig;
   const statusColor = {
     idle: 'bg-gray-400',
@@ -66,7 +68,7 @@ function ConditionNodeDiamond({ data, selected }: NodeProps<Node<LogicNodeData>>
         </div>
         {data.duration != null && (
           <div className="flex justify-between">
-            <span className="font-semibold">耗时:</span>
+            <span className="font-semibold">{t('aiworkbench.logic.node.duration')}</span>
             <span className={`font-mono ${styles.cardText}`}>{data.duration}ms</span>
           </div>
         )}

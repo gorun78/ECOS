@@ -22,6 +22,7 @@ import { Layers, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { showToastGlobal } from '../../../components/common/Toast';
+import { KB_STATS_REFRESH_EVENT } from '../typesAndConstants';
 import {
   fetchNavCategories,
   fetchNavTags,
@@ -48,9 +49,9 @@ import { TagCloudPanel } from './classification/TagCloudPanel';
 import { ProductsPanel } from './classification/ProductsPanel';
 import { RecommendModal } from './classification/RecommendModal';
 
-/** 通知 Overview 总览重拉 KB 统计（与 DatasyncTab 同契约 `kb:stats:refresh`） */
+/** 通知 Overview 总览重拉 KB 统计（与 DatasyncTab 同契约 KB_STATS_REFRESH_EVENT） */
 function emitRefresh(): void {
-  window.dispatchEvent(new CustomEvent('kb:stats:refresh'));
+  window.dispatchEvent(new CustomEvent(KB_STATS_REFRESH_EVENT));
 }
 
 export default function ClassificationTab() {

@@ -22,9 +22,8 @@ interface UserDetailDrawerProps {
 }
 
 export default function UserDetailDrawer({ user, allRoles, orgMap, onForceLogout, onResetPassword, onClose }: UserDetailDrawerProps) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const isZh = locale === "zh";
   const [tab, setTab] = useState<DrawerTab>("basic");
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [rolesLoaded, setRolesLoaded] = useState(false);
@@ -41,32 +40,32 @@ export default function UserDetailDrawer({ user, allRoles, orgMap, onForceLogout
     .filter(Boolean) as string[];
 
   const drawerTabs: { id: DrawerTab; label: string; icon: React.FC<any> }[] = [
-    { id: "basic", label: isZh ? "基本信息" : "Basic Info", icon: Eye },
-    { id: "roles", label: isZh ? "角色绑定" : "Roles", icon: Shield },
-    { id: "login", label: isZh ? "登录记录" : "Login", icon: KeyRound },
+    { id: "basic", label: t("platform.user.detail.tabBasic"), icon: Eye },
+    { id: "roles", label: t("platform.user.detail.tabRoles"), icon: Shield },
+    { id: "login", label: t("platform.user.detail.tabLogin"), icon: KeyRound },
   ];
 
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} />
       <div className={`fixed right-0 top-0 h-full w-full max-w-[400px] z-50 shadow-2xl flex flex-col ${styles.cardBg} border-l ${styles.cardBorder}`}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700/30">
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${styles.cardBorder}`}>
           <div>
             <h3 className={`text-sm font-semibold ${styles.cardText}`}>{user.username}</h3>
             <p className={`text-xs opacity-50`}>{user.realName || user.email || "-"}</p>
           </div>
-          <button onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
+          <button type="button" onClick={onClose} className="opacity-60 hover:opacity-100"><X className="w-4 h-4" /></button>
         </div>
 
         <div className={`flex gap-1 px-4 pt-3 border-b ${styles.appBorder}`}>
           {drawerTabs.map(t => {
             const Icon = t.icon;
             return (
-              <button key={t.id} onClick={() => setTab(t.id)}
+              <button type="button" key={t.id} onClick={() => setTab(t.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-t transition-colors ${
                   tab === t.id
                     ? `${styles.accentBg} text-white`
-                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+                    : `${styles.sidebarHoverBg} ${styles.muted}`
                 }`}>
                 <Icon size={12} />{t.label}
               </button>
@@ -78,17 +77,17 @@ export default function UserDetailDrawer({ user, allRoles, orgMap, onForceLogout
           {tab === "basic" && (
             <div className="space-y-3">
               {[
-                [isZh ? "用户名" : "Username", user.username],
-                [isZh ? "真实姓名" : "Real Name", user.realName || "-"],
-                [isZh ? "邮箱" : "Email", user.email || "-"],
-                [isZh ? "手机" : "Phone", user.phone || "-"],
-                [isZh ? "组织" : "Organization", orgMap[user.orgId || ""] || (user as any).orgName || user.orgId || "-"],
-                [isZh ? "状态" : "Status", user.status === "ACTIVE" ? (isZh ? "正常" : "Active") : (isZh ? "锁定" : "Locked")],
-                [isZh ? "锁定" : "Locked", user.locked === "1" ? (isZh ? "是" : "Yes") : (isZh ? "否" : "No")],
-                [isZh ? "最后登录" : "Last Login", user.lastLoginTime || "-"],
-                [isZh ? "创建时间" : "Created", user.createdTime || "-"],
+                [t("platform.user.detail.username"), user.username],
+                [t("platform.user.detail.realName"), user.realName || "-"],
+                [t("platform.user.detail.email"), user.email || "-"],
+                [t("platform.user.detail.phone"), user.phone || "-"],
+                [t("platform.user.detail.org"), orgMap[user.orgId || ""] || (user as any).orgName || user.orgId || "-"],
+                [t("platform.user.detail.status"), user.status === "ACTIVE" ? t("platform.user.detail.statusActive") : t("platform.user.detail.statusLocked")],
+                [t("platform.user.detail.locked"), user.locked === "1" ? t("platform.user.detail.yes") : t("platform.user.detail.no")],
+                [t("platform.user.detail.lastLogin"), user.lastLoginTime || "-"],
+                [t("platform.user.detail.created"), user.createdTime || "-"],
               ].map(([label, value], i) => (
-                <div key={i} className="flex justify-between items-center py-1.5 border-b border-gray-100 dark:border-gray-700/20 last:border-0">
+                <div key={i} className={`flex justify-between items-center py-1.5 border-b ${styles.cardBorder} last:border-0`}>
                   <span className="text-xs opacity-50">{label}</span>
                   <span className="text-xs font-medium ml-4 text-right break-all">{value}</span>
                 </div>
@@ -104,7 +103,7 @@ export default function UserDetailDrawer({ user, allRoles, orgMap, onForceLogout
                 </div>
               ) : roleNames.length === 0 ? (
                 <div className="text-center py-8 text-xs opacity-40">
-                  {isZh ? "未绑定任何角色" : "No roles assigned"}
+                  {t("platform.user.detail.noRoles")}
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -124,30 +123,32 @@ export default function UserDetailDrawer({ user, allRoles, orgMap, onForceLogout
               <div className={`p-4 rounded-lg border ${styles.cardBorder} text-center`}>
                 <KeyRound className="w-8 h-8 opacity-20 mx-auto mb-2" />
                 <p className={`text-xs ${styles.cardTextMuted}`}>
-                  {isZh ? "登录记录功能已就绪" : "Login records ready"}
+                  {t("platform.user.detail.loginReady")}
                 </p>
                 <p className="text-[10px] opacity-30 mt-1">
-                  {isZh ? "后端接口: GET /api/v1/users/{id}/login-history" : "Backend: GET /api/v1/users/{id}/login-history"}
+                  {t("platform.user.detail.loginBackend")}
                 </p>
               </div>
             </div>
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700/30 space-y-2">
+        <div className={`px-5 py-4 border-t ${styles.cardBorder} space-y-2`}>
           <button
+            type="button"
             onClick={() => onForceLogout(user.userId)}
-            className="w-full px-3 py-2 rounded text-xs font-medium border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 flex items-center justify-center gap-1.5"
+            className={`w-full px-3 py-2 rounded text-xs font-medium border ${styles.warningBorder} ${styles.warningText} ${styles.warningBg} hover:opacity-80 flex items-center justify-center gap-1.5`}
           >
             <LogOut className="w-3.5 h-3.5" />
-            {isZh ? "强制下线" : "Force Logout"}
+            {t("platform.user.detail.forceLogout")}
           </button>
           <button
+            type="button"
             onClick={() => onResetPassword(user.userId)}
-            className="w-full px-3 py-2 rounded text-xs font-medium border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 flex items-center justify-center gap-1.5"
+            className={`w-full px-3 py-2 rounded text-xs font-medium border border-indigo-200 dark:border-indigo-800 ${styles.badgeText} ${styles.badgeBg} hover:opacity-80 flex items-center justify-center gap-1.5`}
           >
             <KeyRound className="w-3.5 h-3.5" />
-            {isZh ? "重置密码" : "Reset Password"}
+            {t("platform.user.detail.resetPassword")}
           </button>
         </div>
       </div>

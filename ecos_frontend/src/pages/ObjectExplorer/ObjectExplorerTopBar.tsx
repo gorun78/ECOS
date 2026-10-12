@@ -69,7 +69,7 @@ export function ObjectExplorerTopBar({
           className={`bg-transparent border-0 outline-none w-full ${styles.cardText}`}
         />
         {searchQ && (
-          <button onClick={() => { setSearchQ(""); loadObjects(entityCode, 1, ""); }} className={`${styles.cardTextMuted} ${styles.sidebarHoverBg}`}>
+          <button type="button" onClick={() => { setSearchQ(""); loadObjects(entityCode, 1, ""); }} className={`${styles.cardTextMuted} ${styles.sidebarHoverBg}`}>
             <X className="w-3 h-3" />
           </button>
         )}
@@ -77,14 +77,14 @@ export function ObjectExplorerTopBar({
 
       {/* Refresh + Create */}
       <div className="flex items-center gap-1.5">
-        <button
+        <button type="button"
           onClick={() => loadObjects(entityCode, currentPage, searchQ)}
           className={`p-2 ${styles.cardTextMuted} ${styles.sidebarHoverBg} rounded-lg transition`}
           title="刷新"
         >
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
-        <button
+        <button type="button"
           onClick={() => { setShowForm("create"); setFormData({}); }}
           className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 transition shrink-0"
         >

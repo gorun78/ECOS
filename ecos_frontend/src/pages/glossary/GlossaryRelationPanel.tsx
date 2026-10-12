@@ -225,7 +225,7 @@ export default function GlossaryRelationPanel({
         </div>
 
         <div className="mt-3">
-          <button
+          <button type="button"
             className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs
               font-semibold transition disabled:opacity-50 flex items-center gap-1"
             onClick={handleAdd}
@@ -274,7 +274,7 @@ export default function GlossaryRelationPanel({
                   <span className={`truncate ${styles.muted}`}>· {rel.description}</span>
                 )}
                 <span className={`ml-auto text-[10px] ${styles.muted}`}>w={rel.weight}</span>
-                <button
+                <button type="button"
                   className="p-1 rounded hover:bg-red-500/10 text-red-400"
                   title={t("glossary.delete")}
                   onClick={() => handleDelete(rel.id)}

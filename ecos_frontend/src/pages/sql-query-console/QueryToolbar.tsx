@@ -65,7 +65,7 @@ export default function QueryToolbar({
       <div className="w-px h-5 bg-[var(--card,#334155)]" />
 
       {/* 执行按钮 */}
-      <button
+      <button type="button"
         onClick={onExecute}
         disabled={!selectedDsId || isExecuting}
         className={`
@@ -86,7 +86,7 @@ export default function QueryToolbar({
       </button>
 
       {/* 保存模板按钮 */}
-      <button
+      <button type="button"
         onClick={onSaveTemplate}
         className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium bg-[var(--card,#334155)] hover:bg-[var(--card,#475569)] text-[var(--card,#E2E8F0)] cursor-pointer transition-all active:scale-95"
         title="保存为模板"
@@ -98,7 +98,7 @@ export default function QueryToolbar({
       {/* 右侧区域：历史按钮 + 导出等 */}
       <div className="flex-1" />
 
-      <button
+      <button type="button"
         onClick={onToggleHistory}
         className={`
           flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all cursor-pointer

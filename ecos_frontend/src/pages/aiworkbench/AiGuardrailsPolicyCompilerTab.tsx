@@ -8,6 +8,7 @@
 
 import React from 'react';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 import { Icon } from './AiGuardrailsShared';
 
 interface PolicyCompilerTabProps {
@@ -47,6 +48,7 @@ export default function AiGuardrailsPolicyCompilerTab({
   onPreviewTableChange,
 }: PolicyCompilerTabProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="flex-1 flex flex-col min-h-0 gap-6">
@@ -58,7 +60,7 @@ export default function AiGuardrailsPolicyCompilerTab({
             <Icon name="Binary" size={18} />
           </div>
           <div className="space-y-0.5">
-            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase tracking-wider block`}>AIP 安全中心安全策略编译器 (Security Policy Compiler)</span>
+            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase tracking-wider block`}>{t('aiworkbench.spc.leftTitle')}</span>
             <div className="flex items-center gap-2">
               <span className={`font-extrabold text-sm ${styles.cardText}`}>
                 Sovereign-Grid Security Policy Compiler v1.4
@@ -78,11 +80,12 @@ export default function AiGuardrailsPolicyCompilerTab({
         <div className="flex items-center gap-3 shrink-0">
           {compiledAt && (
             <div className="text-right hidden sm:block">
-              <p className={`text-[10px] ${styles.cardTextMuted} font-semibold`}>上次编译时间</p>
+              <p className={`text-[10px] ${styles.cardTextMuted} font-semibold`}>{t("aiworkbench.spc.lastCompile")}</p>
               <p className={`font-mono text-[10px] ${styles.cardTextMuted} font-bold`}>{compiledAt}</p>
             </div>
           )}
           <button
+            type="button"
             onClick={onSaveAndCompile}
             disabled={isCompiling}
             className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-75 text-white font-bold rounded-lg shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
@@ -90,12 +93,12 @@ export default function AiGuardrailsPolicyCompilerTab({
             {isCompiling ? (
               <>
                 <span className={`w-3.5 h-3.5 border-2 ${styles.cardBorder} border-t-transparent rounded-full animate-spin`} />
-                <span>策略编译部署中...</span>
+                <span>{t("aiworkbench.spc.compiling")}</span>
               </>
             ) : (
               <>
                 <Icon name="Play" size={12} />
-                <span>🛠️ 编译并部署安全策略 (Compile & Deploy)</span>
+                <span>{t("aiworkbench.spc.compileDeploy")}</span>
               </>
             )}
           </button>
@@ -113,7 +116,7 @@ export default function AiGuardrailsPolicyCompilerTab({
             <div className={`border-b ${styles.cardBorder} pb-2.5 flex items-center justify-between`}>
               <span className={`font-extrabold ${styles.cardTextMuted} flex items-center gap-1.5`}>
                 <Icon name="FileLock2" size={13} className={styles.accentText} />
-                <span>1. 列级脱敏配置 (Column-Level Masking Rules)</span>
+                <span>{t("aiworkbench.spc.colMaskTitle")}</span>
               </span>
               <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase font-mono`}>COLUMN_MASKING</span>
             </div>
@@ -127,9 +130,9 @@ export default function AiGuardrailsPolicyCompilerTab({
                       <span className={`text-[9px] ${styles.cardTextMuted} font-mono`}>({pol.table})</span>
                     </div>
                     <p className={`text-[10px] ${styles.cardTextMuted}`}>
-                      {pol.column === 'ssn_number' ? '机长个人高敏社会安全保障号' :
-                       pol.column === 'base_salary' ? '民航机长保底高敏薪酬数据' :
-                       '航班执飞飞行员姓名'}
+                      {pol.column === 'ssn_number' ? t('aiworkbench.spc.colDescSsn') :
+                       pol.column === 'base_salary' ? t('aiworkbench.spc.colDescSalary') :
+                       t('aiworkbench.spc.colDescName')}
                     </p>
                   </div>
 
@@ -140,13 +143,14 @@ export default function AiGuardrailsPolicyCompilerTab({
                         onChange={(e) => onChangeColumnMaskType(pol.id, e.target.value as any)}
                         className={`${styles.cardBg} border ${styles.cardBorder} rounded-md px-1.5 py-1 text-[10px] font-bold ${styles.cardTextMuted} focus:outline-hidden`}
                       >
-                        <option value="REDACT">REDACT (强物理抹除)</option>
-                        <option value="PARTIAL">PARTIAL (部分遮蔽)</option>
-                        <option value="HASH">HASH (混淆哈希)</option>
+                        <option value="REDACT">{t("aiworkbench.spc.maskRedact")}</option>
+                        <option value="PARTIAL">{t("aiworkbench.spc.maskPartial")}</option>
+                        <option value="HASH">{t("aiworkbench.spc.maskHash")}</option>
                       </select>
                     )}
 
                     <button
+                      type="button"
                       onClick={() => onToggleColumnPolicy(pol.id)}
                       className={`relative inline-flex h-4.5 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
                         pol.isEnabled ? styles.accentBg : `${styles.inputBorder}`
@@ -167,7 +171,7 @@ export default function AiGuardrailsPolicyCompilerTab({
             <div className={`border-b ${styles.cardBorder} pb-2.5 flex items-center justify-between`}>
               <span className={`font-extrabold ${styles.cardTextMuted} flex items-center gap-1.5`}>
                 <Icon name="Filter" size={13} className="text-amber-500" />
-                <span>2. 行级过滤条件 (Row-Level SQL Filtering Conditions)</span>
+                <span>{t("aiworkbench.spc.rowFilterTitle")}</span>
               </span>
               <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase font-mono`}>ROW_ISOLATION</span>
             </div>
@@ -179,11 +183,12 @@ export default function AiGuardrailsPolicyCompilerTab({
                     <div className="space-y-0.5">
                       <span className={`font-extrabold ${styles.cardText} text-[11px] font-mono block`}>Table: {pol.table}</span>
                       <span className={`text-[10px] ${styles.cardTextMuted}`}>
-                        {pol.table === 'ds_pilots_biography' ? '飞行员资质基本信息表物理条件隔离' : '核心航班运行宽表物理隔离筛选'}
+                        {pol.table === 'ds_pilots_biography' ? t('aiworkbench.spc.rowDescPilots') : t('aiworkbench.spc.rowDescFlights')}
                       </span>
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => onToggleRowPolicy(pol.id)}
                       className={`relative inline-flex h-4.5 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
                         pol.isEnabled ? 'bg-amber-500' : `${styles.inputBorder}`
@@ -214,22 +219,25 @@ export default function AiGuardrailsPolicyCompilerTab({
 
                     {pol.isEnabled && (
                       <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        <span className={`text-[8px] ${styles.cardTextMuted} font-bold uppercase`}>推荐模板:</span>
+                        <span className={`text-[8px] ${styles.cardTextMuted} font-bold uppercase`}>{t("aiworkbench.spc.recTemplate")}</span>
                         {pol.table === 'ds_pilots_biography' ? (
                           <>
                             <button
+                              type="button"
                               onClick={() => { onUpdateRowFilterCondition(pol.id, 'hours_flown > 6000'); }}
                               className={`px-1.5 py-0.5 ${styles.inputBg} hover:opacity-80 rounded font-mono text-[8px] font-bold ${styles.cardTextMuted} cursor-pointer`}
                             >
                               hours_flown &gt; 6000
                             </button>
                             <button
+                              type="button"
                               onClick={() => { onUpdateRowFilterCondition(pol.id, "licence_rating = 'B737-MAX'"); }}
                               className={`px-1.5 py-0.5 ${styles.inputBg} hover:opacity-80 rounded font-mono text-[8px] font-bold ${styles.cardTextMuted} cursor-pointer`}
                             >
                               licence_rating='B737-MAX'
                             </button>
                             <button
+                              type="button"
                               onClick={() => { onUpdateRowFilterCondition(pol.id, 'base_salary < 80000'); }}
                               className={`px-1.5 py-0.5 ${styles.inputBg} hover:opacity-80 rounded font-mono text-[8px] font-bold ${styles.cardTextMuted} cursor-pointer`}
                             >
@@ -239,12 +247,14 @@ export default function AiGuardrailsPolicyCompilerTab({
                         ) : (
                           <>
                             <button
+                              type="button"
                               onClick={() => { onUpdateRowFilterCondition(pol.id, "status = 'ON_TIME'"); }}
                               className={`px-1.5 py-0.5 ${styles.inputBg} hover:opacity-80 rounded font-mono text-[8px] font-bold ${styles.cardTextMuted} cursor-pointer`}
                             >
                               status='ON_TIME'
                             </button>
                             <button
+                              type="button"
                               onClick={() => { onUpdateRowFilterCondition(pol.id, 'delay_minutes > 0'); }}
                               className={`px-1.5 py-0.5 ${styles.inputBg} hover:opacity-80 rounded font-mono text-[8px] font-bold ${styles.cardTextMuted} cursor-pointer`}
                             >
@@ -294,15 +304,16 @@ export default function AiGuardrailsPolicyCompilerTab({
               <div className="space-y-0.5">
                 <span className={`font-extrabold ${styles.cardTextMuted} flex items-center gap-1.5 text-xs`}>
                   <Icon name="RefreshCw" size={13} className="text-emerald-500" />
-                  <span>策略编译干跑沙箱 (Dry-Run Compliance Sandbox)</span>
+                  <span>{t("aiworkbench.spc.sandboxTitle")}</span>
                 </span>
                 <p className={`text-[10px] ${styles.cardTextMuted} font-sans`}>
-                  左侧对比物理底座明文表，右侧动态输出经 SQL 行级隔离及列级脱敏编译后的安全视图。
+                  {t("aiworkbench.spc.sandboxDesc")}
                 </p>
               </div>
 
               <div className={`flex ${styles.appBg} p-0.5 rounded-lg border ${styles.cardBorder} shrink-0`}>
                 <button
+                  type="button"
                   onClick={() => onPreviewTableChange('pilots')}
                   className={`px-2.5 py-1 rounded font-bold text-[9px] cursor-pointer transition-colors ${
                     previewTable === 'pilots' ? `${styles.cardBg} ${styles.cardText} shadow-xs` : styles.cardTextMuted
@@ -311,6 +322,7 @@ export default function AiGuardrailsPolicyCompilerTab({
                   ds_pilots_biography
                 </button>
                 <button
+                  type="button"
                   onClick={() => onPreviewTableChange('flights')}
                   className={`px-2.5 py-1 rounded font-bold text-[9px] cursor-pointer transition-colors ${
                     previewTable === 'flights' ? `${styles.cardBg} ${styles.cardText} shadow-xs` : styles.cardTextMuted
@@ -329,7 +341,7 @@ export default function AiGuardrailsPolicyCompilerTab({
                   <div className={`p-2 border-b ${styles.cardBorder} ${styles.appBg} flex items-center justify-between`}>
                     <span className={`font-bold ${styles.cardTextMuted} flex items-center gap-1`}>
                       <Icon name="LockOpen" size={10} className={styles.cardTextMuted} />
-                      <span>物理元数据大表 (Raw Database View - Unsecured)</span>
+                      <span>{t("aiworkbench.spc.rawPanelTitle")}</span>
                     </span>
                     <span className={`px-1 py-0.5 rounded ${styles.inputBg} ${styles.cardTextMuted} text-[8px] font-mono`}>PLAIN_TEXT</span>
                   </div>
@@ -339,10 +351,10 @@ export default function AiGuardrailsPolicyCompilerTab({
                       <table className="w-full text-left font-mono leading-relaxed">
                         <thead className={`${styles.appBg} border-b ${styles.cardBorder} ${styles.cardTextMuted} font-extrabold`}>
                           <tr>
-                            <th className="p-1">姓名</th>
-                            <th className="p-1">ssn_number (高敏)</th>
-                            <th className="p-1">base_salary (高敏)</th>
-                            <th className="p-1">安全飞行时长</th>
+                            <th className="p-1">{t("aiworkbench.spc.thName")}</th>
+                            <th className="p-1">{t("aiworkbench.spc.thSsnRaw")}</th>
+                            <th className="p-1">{t("aiworkbench.spc.thSalaryRaw")}</th>
+                            <th className="p-1">{t("aiworkbench.spc.thHours")}</th>
                           </tr>
                         </thead>
                         <tbody className={`divide-y ${styles.cardBorder} ${styles.cardTextMuted}`}>
@@ -360,10 +372,10 @@ export default function AiGuardrailsPolicyCompilerTab({
                       <table className="w-full text-left font-mono leading-relaxed">
                         <thead className={`${styles.appBg} border-b ${styles.cardBorder} ${styles.cardTextMuted} font-extrabold`}>
                           <tr>
-                            <th className="p-1">航班号</th>
-                            <th className="p-1">航线</th>
-                            <th className="p-1">飞行员 (高敏)</th>
-                            <th className="p-1">延迟状态</th>
+                            <th className="p-1">{t("aiworkbench.spc.thFlightNo")}</th>
+                            <th className="p-1">{t("aiworkbench.spc.thRoute")}</th>
+                            <th className="p-1">{t("aiworkbench.spc.thPilotRaw")}</th>
+                            <th className="p-1">{t("aiworkbench.spc.thDelay")}</th>
                           </tr>
                         </thead>
                         <tbody className={`divide-y ${styles.cardBorder} ${styles.cardTextMuted}`}>
@@ -386,7 +398,7 @@ export default function AiGuardrailsPolicyCompilerTab({
                   <div className="p-2 border-b border-rose-100 bg-rose-500/5 flex items-center justify-between">
                     <span className="font-extrabold text-rose-800 flex items-center gap-1">
                       <Icon name="Lock" size={10} className="text-rose-600" />
-                      <span>合规安全隔离读回 (Policy Compiled View - Secure)</span>
+                      <span>{t("aiworkbench.spc.secPanelTitle")}</span>
                     </span>
                     <span className="px-1 py-0.5 rounded bg-rose-600 text-white text-[8px] font-mono">MASKED_&_SLICED</span>
                   </div>
@@ -396,17 +408,17 @@ export default function AiGuardrailsPolicyCompilerTab({
                       <table className="w-full text-left font-mono leading-relaxed">
                         <thead className={`bg-rose-500/5 border-b border-rose-100 ${styles.cardTextMuted} font-extrabold`}>
                           <tr>
-                            <th className="p-1">姓名</th>
-                            <th className="p-1">ssn_number (掩膜)</th>
-                            <th className="p-1">base_salary (掩膜)</th>
-                            <th className="p-1">安全飞行时长</th>
+                            <th className="p-1">{t("aiworkbench.spc.thName")}</th>
+                            <th className="p-1">{t("aiworkbench.spc.thSsnMask")}</th>
+                            <th className="p-1">{t("aiworkbench.spc.thSalaryMask")}</th>
+                            <th className="p-1">{t("aiworkbench.spc.thHours")}</th>
                           </tr>
                         </thead>
                         <tbody className={`divide-y divide-rose-100/30 ${styles.cardTextMuted}`}>
                           {previewData.compiled.pilots.length === 0 ? (
                             <tr>
                               <td colSpan={4} className={`p-4 text-center ${styles.cardTextMuted} font-sans font-bold italic`}>
-                                🚫 行级过滤 SQL 条件生效：没有符合此安全过滤的数据行！
+                                {t("aiworkbench.spc.noMatch")}
                               </td>
                             </tr>
                           ) : (
@@ -434,17 +446,17 @@ export default function AiGuardrailsPolicyCompilerTab({
                       <table className="w-full text-left font-mono leading-relaxed">
                         <thead className={`bg-rose-500/5 border-b border-rose-100 ${styles.cardTextMuted} font-extrabold`}>
                           <tr>
-                            <th className="p-1">航班号</th>
-                            <th className="p-1">航线</th>
-                            <th className="p-1">飞行员 (掩膜)</th>
-                            <th className="p-1">延迟状态</th>
+                            <th className="p-1">{t("aiworkbench.spc.thFlightNo")}</th>
+                            <th className="p-1">{t("aiworkbench.spc.thRoute")}</th>
+                            <th className="p-1">{t("aiworkbench.spc.thPilotMask")}</th>
+                            <th className="p-1">{t("aiworkbench.spc.thDelay")}</th>
                           </tr>
                         </thead>
                         <tbody className={`divide-y divide-rose-100/30 ${styles.cardTextMuted}`}>
                           {previewData.compiled.flights.length === 0 ? (
                             <tr>
                               <td colSpan={4} className={`p-4 text-center ${styles.cardTextMuted} font-sans font-bold italic`}>
-                                🚫 行级过滤 SQL 条件生效：没有符合此安全过滤的数据行！
+                                {t("aiworkbench.spc.noMatch")}
                               </td>
                             </tr>
                           ) : (
@@ -472,7 +484,7 @@ export default function AiGuardrailsPolicyCompilerTab({
               </div>
             ) : (
               <div className={`flex-1 flex items-center justify-center ${styles.cardTextMuted}`}>
-                <span>正在生成实时对账干跑数据...</span>
+                <span>{t("aiworkbench.spc.dryRunLoading")}</span>
               </div>
             )}
           </div>

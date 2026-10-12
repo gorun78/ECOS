@@ -65,6 +65,7 @@ export const forwardProxy =
   async (req: express.Request, res: Response): Promise<void> => {
     const targetUrl = `${upstreamBaseUrl}${req.originalUrl}`;
     const method = req.method;
+    const t0 = Date.now();
     console.log(`[BFF] ${method} ${req.originalUrl} -> ${targetUrl} (${routeLabel})`);
     try {
       // 🔴 仅在请求体存在时声明 JSON Content-Type — GET/HEAD 对 Java 后端加 JSON Content-Type
@@ -81,13 +82,32 @@ export const forwardProxy =
         ...(req.headers["last-event-id"]
           ? { "Last-Event-ID": req.headers["last-event-id"] as string }
           : {}),
+        // D-1 根因实锤（gateway-stdout.log：`CachedBodyHttpServletRequest` 在
+        // `CoyoteInputStream.read` 上 SocketTimeoutException → ClientAbortException）——
+        // BFF 的 undici fetch 复用了一条对端(Tomcat)已半关的 keep-alive 连接，body 字节
+        // 错位后 gateway 阻塞读 body 至 20s socket 超时 ⇒ BFF 拿不到任何响应头。
+        // 反制：上游用短连接（Connection: close + undici keepalive:false），不复用
+        // 陈旧 socket，直接消除此"复用竞态"（一配一用，非泛化兜底）。
+        Connection: "close",
       };
-      const fetchOptions: RequestInit = {
+      const fetchOptions: RequestInit & { keepalive?: boolean } = {
         method,
         headers: upstreamHeaders,
+        // 与 Connection: close 呼应，显式关闭 undici agent 级连接复用。
+        keepalive: false,
       };
       if (withBody) fetchOptions.body = JSON.stringify(req.body);
-      const upstream = await fetch(targetUrl, fetchOptions);
+      // D-1 (2026-10-05 BFF-login-hang 修复)：只约束"上游返回响应头"这段握手期，
+      // 一旦头部到手立即 clearTimeout —— SSE 长流在头部之后不受 30s 限制，
+      // 不给 C174 SSE 逐块 pipe 引入"30s 被砍"回归（实证 hang 发生在"拿不到任何响应"的握手相）。
+      const connectCtrl = new AbortController();
+      const connectTimer = setTimeout(
+        () => connectCtrl.abort(new Error("BFF upstream connect timeout 30000ms")),
+        30_000,
+      );
+      const upstream = await fetch(targetUrl, { ...fetchOptions, signal: connectCtrl.signal });
+      clearTimeout(connectTimer);
+      console.log(`[BFF] ← ${routeLabel} ${upstream.status} wall_ms=${Date.now() - t0} ${req.originalUrl}`);
       // 透传响应体 + 状态码，不做任何字段改写（错误原样返回，401/403 必须正确传递）。
       // 🔴 F06-21-1 / W163 / W192（C174）：SSE（text/event-stream）必须流式直通，禁止缓冲整个 body ——
       //    否则 Agent 流式对话（/api/v1/agent*/*?stream=true）在 BFF 侧被攒到回连结束才下发，
@@ -136,8 +156,14 @@ export const forwardProxy =
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[BFF] Proxy ${routeLabel} error for ${req.originalUrl}:`, msg);
-      res.status(502).json({ success: false, message: `Upstream (${routeLabel}) unavailable: ${msg}` });
+      // D-1: 附带 undici/底层 cause（如 undici UND_ERR_* / ECONNREFUSED / 30s 超时），
+      // 便于区分"上游无回包" vs "超时中止" vs "连接被拒"，不改变 502 语义。
+      const cause =
+        err instanceof Error && (err as NodeJS.ErrnoException).cause
+          ? ` cause=${String((err as NodeJS.ErrnoException).cause)}`
+          : "";
+      console.error(`[BFF] Proxy ${routeLabel} error for ${req.originalUrl} (wall_ms=${Date.now() - t0}): ${msg}${cause}`);
+      res.status(502).json({ success: false, message: `Upstream (${routeLabel}) unavailable: ${msg}${cause}` });
     }
   };
 

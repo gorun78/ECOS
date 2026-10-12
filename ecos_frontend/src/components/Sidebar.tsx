@@ -14,6 +14,8 @@ import {
   ChevronRight,
   ChevronDown,
   X,
+  ShieldCheck,
+  ScrollText,
 } from "lucide-react";
 import { useLanguage } from "./LanguageContext";
 import { useTheme } from "./ThemeContext";

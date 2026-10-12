@@ -81,17 +81,9 @@ export default function OperationalApps() {
 
       if (root.success) {
         if (root.auditLog && root.auditLog.status === "pending_approval") {
-          setActionSuccess(
-            isZh
-              ? `高危指令 [${actionId.toUpperCase()}] 已拦截并注册到安全沙箱审批流。凭证号码: ${root.voucherId}`
-              : `High-risk directive [${actionId.toUpperCase()}] intercepted and registered to safety sandbox approval flow. Voucher: ${root.voucherId}`
-          );
+          setActionSuccess(t("ops.crm.ackRiskIntercepted", { id: actionId.toUpperCase(), voucher: root.voucherId }));
         } else {
-          setActionSuccess(
-            isZh
-              ? `指令 [${actionId.toUpperCase()}] 已成功编译且写入不可篡改区块！区块哈希: ${root.voucherId}`
-              : `Directive [${actionId.toUpperCase()}] compiled and committed to immutable block! Block: ${root.voucherId}`
-          );
+          setActionSuccess(t("ops.crm.ackCommitted", { id: actionId.toUpperCase(), voucher: root.voucherId }));
         }
 
         if (actionId === "suspend_account" && payload.instanceId) {
@@ -100,10 +92,10 @@ export default function OperationalApps() {
           );
         }
       } else {
-        setErrorToast((isZh ? "执行操作失败: " : "Action execute fail: ") + (root.message || "Internal constraints"));
+        setErrorToast(t("ops.crm.execFailed", { msg: root.message || "Internal constraints" }));
       }
     } catch (err: any) {
-      setErrorToast((isZh ? "网络传输错误: " : "Network transmission error: ") + err.message);
+      setErrorToast(t("ops.crm.networkError", { msg: err.message }));
     }
   };
 
@@ -146,7 +138,7 @@ export default function OperationalApps() {
           
           <div className={`flex items-center gap-1.5 p-1 ${styles.appBg} rounded-lg shrink-0 border ${styles.cardBorder}`}>
             {(["crm", "maint", "fin"] as const).map((portal) => (
-              <button
+              <button type="button"
                 key={portal}
                 onClick={() => setActivePortal(portal)}
                 className={`px-3 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${
@@ -240,7 +232,7 @@ export default function OperationalApps() {
                       </div>
                       <div className={`p-3 bg-black/[0.01] dark:bg-white/[0.01] rounded border ${styles.cardBorder}`}>
                         <div className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{t("ops.crm.region")}</div>
-                        <div className="text-base font-bold mt-1">{currentCust.region === "APAC" && isZh ? "亚太区" : currentCust.region || "—"} ({t("ops.crm.region.sea")})</div>
+                        <div className="text-base font-bold mt-1">{currentCust.region === "APAC" && isZh ? t("ops.crm.region.apac") : (currentCust.region || "—")} ({t("ops.crm.region.sea")})</div>
                       </div>
                       <div className={`p-3 bg-black/[0.01] dark:bg-white/[0.01] rounded border ${styles.cardBorder}`}>
                         <div className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{t("ops.crm.churn")}</div>
@@ -263,7 +255,7 @@ export default function OperationalApps() {
                             onChange={(e) => setCreditIncrement(e.target.value)}
                             className={`flex-1 text-xs font-mono p-1 px-2 rounded border ${styles.inputBorder} ${styles.inputBg} ${styles.cardText}`}
                           />
-                          <button 
+                          <button type="button" 
                             onClick={() => handleAdjustCredit(currentCust.id)}
                             className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold leading-none cursor-pointer"
                           >
@@ -275,7 +267,7 @@ export default function OperationalApps() {
 
                       <div className="p-4 rounded-lg border border-red-500/10 bg-red-500/[0.01] space-y-3">
                         <div className="text-xs font-bold text-red-500 flex items-center gap-1.5"><Lock className="w-4 h-4 text-red-500" /> {t("ops.crm.control.freeze")}</div>
-                        <button 
+                        <button type="button" 
                           onClick={() => handleFreezeAccount(currentCust.id)}
                           disabled={!currentCust.isActive}
                           className="w-full py-2 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white text-xs font-bold rounded cursor-pointer"
@@ -339,7 +331,7 @@ export default function OperationalApps() {
                             </td>
                             <td className="p-2 text-right">
                               {m.has_fault ? (
-                                <button 
+                                <button type="button" 
                                   onClick={() => handleDispatchRepair(m.machine_id)}
                                   className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold cursor-pointer"
                                 >
@@ -365,9 +357,9 @@ export default function OperationalApps() {
                           onChange={(e) => setMaintPriority(e.target.value)}
                           className={`w-full text-xs p-1 px-2 rounded border ${styles.inputBorder} ${styles.inputBg} ${styles.cardText}`}
                         >
-                          <option value="Critical">Critical {isZh ? "(特急，2小时响应)" : "(2-hr SLA)"}</option>
-                          <option value="High">High {isZh ? "(高，12小时响应)" : "(12-hr SLA)"}</option>
-                          <option value="Medium">Medium {isZh ? "(日常)" : "(Normal SLA)"}</option>
+                          <option value="Critical">Critical {t("ops.maint.sla.critical")}</option>
+                          <option value="High">High {t("ops.maint.sla.high")}</option>
+                          <option value="Medium">Medium {t("ops.maint.sla.medium")}</option>
                         </select>
                       </div>
 

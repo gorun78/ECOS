@@ -25,22 +25,22 @@ export default function CodeTab({ func, handleFieldChange, loadTemplate }: CodeT
           <p className={`text-[10px] ${styles.muted} mt-0.5`}>{t('ow.section.funcTemplatesDesc')}</p>
         </div>
         <div className="space-y-2">
-          <button onClick={() => loadTemplate('validation')}
+          <button type="button" onClick={() => loadTemplate('validation')}
             className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.cardBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardTextMuted} transition-all flex items-start gap-2`}>
             <Shield size={14} className="text-emerald-500 mt-0.5 shrink-0" />
             <div><div className="text-[11px] font-semibold">{t('ow.func.templateValidation')}</div><div className={`text-[10px] font-normal ${styles.muted} mt-0.5`}>{t('ow.func.templateValidationDesc')}</div></div>
           </button>
-          <button onClick={() => loadTemplate('default')}
+          <button type="button" onClick={() => loadTemplate('default')}
             className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.cardBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardTextMuted} transition-all flex items-start gap-2`}>
             <Sparkles size={14} className="text-amber-500 mt-0.5 shrink-0" />
             <div><div className="text-[11px] font-semibold">{t('ow.func.templateDefault')}</div><div className={`text-[10px] font-normal ${styles.muted} mt-0.5`}>{t('ow.func.templateDefaultDesc')}</div></div>
           </button>
-          <button onClick={() => loadTemplate('computed')}
+          <button type="button" onClick={() => loadTemplate('computed')}
             className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.cardBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardTextMuted} transition-all flex items-start gap-2`}>
             <Calculator size={14} className="text-blue-500 mt-0.5 shrink-0" />
             <div><div className="text-[11px] font-semibold">{t('ow.func.templateComputed')}</div><div className={`text-[10px] font-normal ${styles.muted} mt-0.5`}>{t('ow.func.templateComputedDesc')}</div></div>
           </button>
-          <button onClick={() => loadTemplate('aggregation')}
+          <button type="button" onClick={() => loadTemplate('aggregation')}
             className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.cardBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardTextMuted} transition-all flex items-start gap-2`}>
             <TrendingUp size={14} className="text-indigo-500 mt-0.5 shrink-0" />
             <div><div className="text-[11px] font-semibold">{t('ow.func.templateAggregation')}</div><div className={`text-[10px] font-normal ${styles.muted} mt-0.5`}>{t('ow.func.templateAggregationDesc')}</div></div>

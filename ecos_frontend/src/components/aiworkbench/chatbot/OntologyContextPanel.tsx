@@ -69,7 +69,7 @@ export default function OntologyContextPanel({
 
   if (collapsed && compact) {
     return (
-      <button
+      <button type="button"
         onClick={() => setCollapsed(false)}
         className={`px-2 py-0.5 ${styles.cardBg} border ${styles.cardBorder} rounded text-[9px] ${styles.accentText} font-bold flex items-center gap-1`}
       >
@@ -95,7 +95,7 @@ export default function OntologyContextPanel({
             {t('aiworkbench.chatbot.ocpBindingCount').replace('{count}', String(totalBindings))}
           </span>
           {compact && (
-            <button
+            <button type="button"
               onClick={() => setCollapsed(true)}
               className={`p-0.5 ${styles.cardTextMuted}`}
             >

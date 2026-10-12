@@ -254,7 +254,7 @@ export default function DimensionTab() {
           <Gauge className={`w-4 h-4 ${styles.accentText}`} />
           <span className={`text-sm font-bold ${styles.cardText}`}>{t("dw.dqRule.tabDimension")}</span>
         </div>
-        <button
+        <button type="button"
           onClick={() => void loadRegistry()}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition cursor-pointer`}
         >
@@ -287,7 +287,7 @@ export default function DimensionTab() {
               </div>
             )}
           </div>
-          <button
+          <button type="button"
             onClick={() => void doRecompute()}
             disabled={recomputing}
             className={`flex items-center gap-1.5 px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} text-xs font-bold rounded-lg shadow-xs transition disabled:opacity-50 cursor-pointer`}

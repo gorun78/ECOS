@@ -37,7 +37,7 @@ export default function CatalogHeader({
                     : `${t("dw.ontologyReadonly")} (${conn.tablesAvailable.length} ${t("dw.tablesUnit")})`}
                 </span>
                 {!isFsConn && (
-                  <button
+                  <button type="button"
                     onClick={() => setShowVersionCompare(true)}
                     disabled={loadingTables}
                     className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.accentText} transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1 text-[10px]`}
@@ -48,7 +48,7 @@ export default function CatalogHeader({
                   </button>
                 )}
                 {isFsConn && (
-                  <button
+                  <button type="button"
                     onClick={() => refreshFolderFiles(conn.id)}
                     disabled={folderFilesLoading}
                     className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.accentText} transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1 text-[10px]`}

@@ -308,7 +308,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
                 const active = planTab === tabKey;
                 const label = tabKey === 'metadata' ? t("dw.strategy.section") : t("dw.ingest.title");
                 return (
-                  <button
+                  <button type="button"
                     key={tabKey}
                     onClick={() => setPlanTab(tabKey)}
                     className={`px-4 py-2.5 text-xs transition-colors cursor-pointer font-medium border-b-2 ${

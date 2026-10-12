@@ -104,7 +104,9 @@ export default function LogicView({
   const selectedPipeline = pipelines.find(p => p.id === selectedPipelineId);
 
   // ── Flow state ──
-  const initialGraph = useMemo(() => pipelineToGraph(selectedPipeline), []);
+  // initialGraph 只作 useNodesState/useEdgesState 的 mount-期 initialValues；
+  // 切换 pipeline 时的实际同步走下方 useEffect([selectedPipelineId, selectedPipeline])。
+  const initialGraph = useMemo(() => pipelineToGraph(selectedPipeline), [selectedPipeline]);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<LogicNodeData>>(initialGraph.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge<LogicEdgeData>>(initialGraph.edges);
 
@@ -155,7 +157,28 @@ export default function LogicView({
     });
   }, [nodes, pushHistory]);
 
-  // Keyboard shortcuts
+  const handleUndo = useCallback(() => {
+    if (historyIndex < 0) return;
+    const entry = history[historyIndex];
+    if (entry) {
+      setNodes(entry.nodes);
+      setEdges(entry.edges);
+      setHistoryIndex(prev => prev - 1);
+    }
+  }, [historyIndex, history, setNodes, setEdges]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex + 1 >= history.length) return;
+    const entry = history[historyIndex + 1];
+    if (entry) {
+      setNodes(entry.nodes);
+      setEdges(entry.edges);
+      setHistoryIndex(prev => prev + 1);
+    }
+  }, [historyIndex, history, setNodes, setEdges]);
+
+  // Keyboard shortcuts (挂 deps [handleUndo, handleRedo]；能挂 deps 前提是 useEffect 位于
+  // 二者定义之后 — 原位置在 handler 定义之前，deps 数组运行时会 TDZ 报错，故整体翻转)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
@@ -168,27 +191,7 @@ export default function LogicView({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  });
-
-  const handleUndo = () => {
-    if (historyIndex < 0) return;
-    const entry = history[historyIndex];
-    if (entry) {
-      setNodes(entry.nodes);
-      setEdges(entry.edges);
-      setHistoryIndex(prev => prev - 1);
-    }
-  };
-
-  const handleRedo = () => {
-    if (historyIndex + 1 >= history.length) return;
-    const entry = history[historyIndex + 1];
-    if (entry) {
-      setNodes(entry.nodes);
-      setEdges(entry.edges);
-      setHistoryIndex(prev => prev + 1);
-    }
-  };
+  }, [handleUndo, handleRedo]);
 
   // ── Config Panel ──
   const [selectedNode, setSelectedNode] = useState<Node<LogicNodeData> | null>(null);
@@ -367,9 +370,9 @@ export default function LogicView({
                 deleteKeyCode={['Delete', 'Backspace']}
                 className={`${styles.inputBg}`}
               >
-                <Controls className={`!${styles.cardBg} !border !${styles.appBorder} !rounded-lg !shadow-sm`} />
+                <Controls className={`${styles.cardBg} !border ${styles.appBorder} !rounded-lg !shadow-sm`} />
                 <MiniMap
-                  className={`!rounded-lg !shadow-sm !border !${styles.appBorder}`}
+                  className={`!rounded-lg !shadow-sm !border ${styles.appBorder}`}
                   nodeColor={(n: Node<LogicNodeData>) => {
                     const c: Record<LogicNodeType, string> = {
                       llm: '#a855f7', tool: '#f59e0b', ontology: '#06b6d4',

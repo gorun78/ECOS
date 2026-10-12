@@ -11,10 +11,12 @@
 import React, { useState } from 'react';
 import { CheckCircle2, Wifi } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
+import { useLanguage } from '../LanguageContext';
 
 type ToastFn = (type: 'success' | 'error' | 'info', message: string) => void;
 
 export function useIngestStep(toast: ToastFn, handleCommitToGit: (message: string, filesChanged: string[]) => void) {
+  const { t } = useLanguage();
   // --- STEP 1: INGEST STATE ---
   const [ingestLogs, setIngestLogs] = useState<string[]>([]);
   const [isIngesting, setIsIngesting] = useState<boolean>(false);
@@ -53,7 +55,7 @@ export function useIngestStep(toast: ToastFn, handleCommitToGit: (message: strin
         clearInterval(interval);
         setIsIngesting(false);
         setIngestSuccess(true);
-        toast('success', '步骤 1 (Ingest) 物理源拉取完毕，已落入 Bronze 层！');
+        toast('success', t('dw.ingest.toast.done'));
         handleCommitToGit('chore(ingest): 物理源拉取完成，更新 /aviation/bronze/flights_raw 数据存根', ['flights_raw.parquet']);
       }
     }, 400);
@@ -78,13 +80,14 @@ export default function StepIngest({
   startIngest,
 }: StepIngestProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-4 font-sans">
       <div className={`p-4 ${styles.appBg} border ${styles.cardBorder} rounded-xl space-y-3`}>
         <div className="flex justify-between items-center">
-          <span className={`text-[10px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono`}>物理连接凭证托管 (Credential Custody)</span>
-          <span className="h-2 w-2 rounded-full bg-emerald-500" title="连接可用" />
+          <span className={`text-[10px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono`}>{t('dw.ingest.custody.title')}</span>
+          <span className="h-2 w-2 rounded-full bg-emerald-500" title={t('dw.ingest.custody.connAvailable')} />
         </div>
 
         <div className="grid grid-cols-2 gap-3 text-xs">
@@ -102,26 +105,27 @@ export default function StepIngest({
       <div className="flex gap-4 items-stretch">
         <div className={`flex-1 border ${styles.cardBorder} rounded-xl p-4 ${styles.primaryBg} flex flex-col justify-between gap-3`}>
           <div className="space-y-1">
-            <div className={`text-xs font-bold ${styles.cardText}`}>物理入湖动作模拟 (Magritte Ingest Sandbox)</div>
+            <div className={`text-xs font-bold ${styles.cardText}`}>{t('dw.ingest.sandbox.title')}</div>
             <p className={`text-[10px] ${styles.cardTextMuted} leading-relaxed`}>
-              点击右侧按钮测试握手提取，查看分布式 Ingress 将外部 DB 或 AWS S3 数据包进行块级分割、断点校验、并写入 Bronze 文件夹的底层全套物理日志。
+              {t('dw.ingest.sandbox.intro')}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={startIngest}
               disabled={isIngesting}
               className={`flex-1 py-2 ${styles.darkBg} hover:${styles.darkHover} text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs disabled:${styles.inputBg} disabled:text-${styles.cardTextMuted}`}
             >
               <Wifi size={13} className={isIngesting ? 'animate-ping' : ''} />
-              <span>{isIngesting ? `提取拉取中... (${ingestProgress}%)` : '启动物理 Ingest 提取'}</span>
+              <span>{isIngesting ? t('dw.ingest.btn.ingesting', { progress: ingestProgress }) : t('dw.ingest.btn.start')}</span>
             </button>
 
             {ingestSuccess && (
               <div className="flex items-center gap-1 text-emerald-600 text-xs font-bold animate-pulse">
                 <CheckCircle2 size={14} />
-                <span>已成功落湖！</span>
+                <span>{t('dw.ingest.success.landed')}</span>
               </div>
             )}
           </div>
@@ -130,7 +134,7 @@ export default function StepIngest({
         <div className={`w-[280px] ${styles.terminalBg} rounded-xl border ${styles.terminalBorder} p-3 font-mono text-[9px] ${styles.terminalText} leading-relaxed max-h-40 overflow-y-auto`}>
           {ingestLogs.length === 0 ? (
             <div className={`${styles.cardTextMuted} italic h-full flex items-center justify-center text-center`}>
-              等待触发 Ingest Ingress 仿真提取运行日志...
+              {t('dw.ingest.logs.empty')}
             </div>
           ) : (
             <div className="space-y-1">

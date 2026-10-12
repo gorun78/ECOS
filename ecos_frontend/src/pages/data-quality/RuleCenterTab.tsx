@@ -243,7 +243,7 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
           placeholder={t("dw.dqRule.searchPlaceholderName")}
           className={`flex-1 min-w-[180px] px-3 py-1.5 text-xs border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} rounded-lg focus:outline-hidden focus:ring-1 focus:ring-indigo-500/50`} />
 
-        <button onClick={() => void load()}
+        <button type="button" onClick={() => void load()}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border ${styles.cardBorder} rounded-lg transition cursor-pointer ${styles.cardTextMuted} hover:bg-black/5 dark:hover:bg-white/5`}>
           <RefreshCw className="w-3.5 h-3.5" />
           {t("dw.dqRule.refresh")}
@@ -267,7 +267,7 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
         ) : error ? (
           <div className="flex-1 flex flex-col items-center justify-center py-16">
             <p className={`text-sm ${styles.dangerText}`}>{error}</p>
-            <button onClick={() => void load()}
+            <button type="button" onClick={() => void load()}
               className={`mt-3 px-4 py-1.5 ${styles.cardTextMuted} border rounded-lg text-xs transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/10`}>
               {t("dw.dqRule.retry")}
             </button>

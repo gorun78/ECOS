@@ -111,7 +111,7 @@ export default function ExtractionReviewTab() {
                     className={`text-xs pl-7 pr-2 py-1 rounded-md border ${styles.inputBg} ${styles.inputBorder} focus:outline-none`}
                   />
                 </div>
-                <button
+                <button type="button"
                   onClick={() => void loadFiles()}
                   className="p-1 rounded border hover:opacity-70"
                   style={{ borderColor: styles.cardBorder }}
@@ -130,7 +130,7 @@ export default function ExtractionReviewTab() {
                 </div>
               )}
               {!loading && filteredFiles.map(f => (
-                <button
+                <button type="button"
                   key={f.fileId}
                   onClick={() => setSelected(f)}
                   className={`w-full text-left px-4 py-2.5 border-b hover:opacity-80 transition-opacity ${

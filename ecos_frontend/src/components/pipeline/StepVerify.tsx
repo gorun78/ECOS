@@ -11,6 +11,7 @@
 import React, { useState } from 'react';
 import { Check, CheckCircle2, FileCode, GitPullRequest, Play } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
+import { useLanguage } from '../LanguageContext';
 
 type ToastFn = (type: 'success' | 'error' | 'info', message: string) => void;
 
@@ -36,6 +37,7 @@ export function useVerifyStep(
   handleCommitToGit: (message: string, filesChanged: string[]) => void,
   filterMinutes: number,
 ) {
+  const { t } = useLanguage();
   // --- STEP 3: LINEAGE & GIT VERIFY STATE ---
   const [activeDiffFile, setActiveDiffFile] = useState<string>('clean_flights.py');
   const [ciStatus, setCiStatus] = useState<'idle' | 'running' | 'success' | 'failed'>('idle');
@@ -74,18 +76,18 @@ export function useVerifyStep(
       if (count >= 100) {
         clearInterval(interval);
         setCiStatus('success');
-        toast('success', '所有 Git 分支 CI 合规质检测试已全部通过，可以安全合并至主分支！');
+        toast('success', t('dw.verify.toast.ciPassed'));
       }
     }, 450);
   };
 
   const mergeBranch = () => {
     if (ciStatus !== 'success') {
-      toast('error', '请先运行并通过 CI 校验测试，才可进行物理合并！');
+      toast('error', t('dw.verify.toast.ciRequired'));
       return;
     }
     setPrMerged(true);
-    toast('success', '🏆 PR 合并成功！代码及血缘已全量发布至 main 主分支，即将重算生产银牌表！');
+    toast('success', t('dw.verify.toast.prMerged'));
     handleCommitToGit(`Merge pull request #115 from dev/flight-weather-enrichment (过滤阈值:${filterMinutes}m)`, ['clean_flights.py', 'metadata.json']);
   };
 
@@ -116,6 +118,7 @@ export default function StepVerify({
   mergeBranch,
 }: StepVerifyProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const mockFileDiffs = buildMockFileDiffs(filterMinutes, nullFillerValue);
 
   return (
@@ -123,10 +126,11 @@ export default function StepVerify({
       <div className="grid grid-cols-12 gap-4">
         {/* Files list Left (cols 3) */}
         <div className={`col-span-3 border ${styles.cardBorder} rounded-xl p-3 ${styles.appBg} space-y-2 select-none`}>
-          <span className={`text-[9px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono block`}>修改待PR代码文件</span>
+          <span className={`text-[9px] font-extrabold ${styles.cardTextMuted} uppercase tracking-wider font-mono block`}>{t('dw.verify.files.title')}</span>
           <div className="space-y-1">
             {Object.keys(mockFileDiffs).map((filename) => (
               <button
+                type="button"
                 key={filename}
                 onClick={() => setActiveDiffFile(filename)}
                 className={`w-full text-left px-2.5 py-1.5 rounded-lg text-[10px] font-mono flex items-center gap-1.5 transition-all cursor-pointer ${
@@ -148,7 +152,7 @@ export default function StepVerify({
             <span className={`font-extrabold ${styles.terminalText} flex items-center gap-1`}>
               <GitPullRequest size={11} className="text-[#58a6ff]" />
               <span>
-                代码分支对比 Diff: <code>{activeDiffFile}</code>
+                {t('dw.verify.diff.title')} <code>{activeDiffFile}</code>
               </span>
             </span>
             <span className="text-[8px] bg-[#21262d] text-[#8b949e] px-1.5 py-0.2 rounded">PR #115 (dev/flight-enrichment)</span>
@@ -156,35 +160,37 @@ export default function StepVerify({
 
           <div className="p-3 grid grid-cols-2 gap-4 divide-x divide-[#30363d] h-36 overflow-y-auto select-text bg-[#0d1117]">
             <div>
-              <span className="text-[8px] text-red-400 uppercase tracking-wider block mb-1 font-sans">--- main (主生产分支)</span>
+              <span className="text-[8px] text-red-400 uppercase tracking-wider block mb-1 font-sans">{t('dw.verify.diff.mainLabel')}</span>
               <pre className={`whitespace-pre-wrap ${styles.terminalText} opacity-60 font-mono`}>{mockFileDiffs[activeDiffFile].original}</pre>
             </div>
             <div className="pl-4">
-              <span className="text-[8px] text-emerald-400 uppercase tracking-wider block mb-1 font-sans">+++ dev/enrichment (修改后草稿)</span>
+              <span className="text-[8px] text-emerald-400 uppercase tracking-wider block mb-1 font-sans">{t('dw.verify.diff.branchLabel')}</span>
               <pre className="whitespace-pre-wrap text-[#e6edf3] font-mono">{mockFileDiffs[activeDiffFile].current}</pre>
             </div>
           </div>
 
           <div className="bg-[#161b22] px-3 py-2 border-t border-[#30363d] flex justify-between items-center select-none">
-            <span className={`text-[8px] ${styles.terminalText} font-sans`}>分支保护已激活：必须运行静态 CI 与 3 组单元断言，方可解锁合并</span>
+            <span className={`text-[8px] ${styles.terminalText} font-sans`}>{t('dw.verify.branchProtection')}</span>
 
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={runCiChecks}
                 disabled={ciStatus === 'running'}
                 className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded text-[9px] transition-all flex items-center gap-1 cursor-pointer shadow-xs disabled:bg-[#3a414a]"
               >
                 <Play size={9} />
-                <span>{ciStatus === 'running' ? '运行CI中...' : '运行自动化 CI 校验'}</span>
+                <span>{ciStatus === 'running' ? t('dw.verify.btn.ciRunning') : t('dw.verify.btn.runCi')}</span>
               </button>
 
               <button
+                type="button"
                 onClick={mergeBranch}
                 disabled={ciStatus !== 'success' || prMerged}
                 className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[9px] transition-all flex items-center gap-1 cursor-pointer shadow-xs disabled:bg-[#21262d] disabled:text-[#484f58]"
               >
                 <Check size={10} />
-                <span>{prMerged ? '已合并成功' : '批准并合并 (PR Merge)'}</span>
+                <span>{prMerged ? t('dw.verify.btn.merged') : t('dw.verify.btn.approveMerge')}</span>
               </button>
             </div>
           </div>
@@ -195,7 +201,7 @@ export default function StepVerify({
       <div className={`${styles.terminalBg} rounded-xl border ${styles.terminalBorder} p-3 h-28 overflow-y-auto font-mono text-[9px] leading-relaxed select-text`}>
         {ciLogs.length === 0 ? (
           <div className={`${styles.terminalText} italic h-full flex items-center justify-center text-center`}>
-            等待启动自动化 CI 校验... (将评估 DAG 血缘圈环、静态 Doris SQL 算子及内存依赖计划并触发 unit tests)
+            {t('dw.verify.logs.empty')}
           </div>
         ) : (
           <div className="space-y-0.5">

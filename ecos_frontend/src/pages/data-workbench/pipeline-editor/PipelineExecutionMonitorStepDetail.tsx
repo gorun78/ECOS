@@ -28,7 +28,7 @@ const PipelineExecutionMonitorStepDetail: React.FC<Props> = ({ step, onClose, st
             <BarChart3 size={15} className={`${styles.accentText}`} />
             <span className={`text-sm font-bold ${styles.cardText}`}>步骤详情</span>
           </div>
-          <button
+          <button type="button"
             onClick={onClose}
             className={`p-1 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} transition-colors`}
           >
@@ -108,7 +108,7 @@ const PipelineExecutionMonitorStepDetail: React.FC<Props> = ({ step, onClose, st
         </div>
 
         <div className={`px-4 py-3 border-t ${styles.cardBorder} ${styles.cardBg} shrink-0`}>
-          <button
+          <button type="button"
             onClick={onClose}
             className={`w-full px-3 py-1.5 text-xs border ${styles.cardBorder} ${styles.cardText} hover:${styles.sidebarBg} rounded-lg transition-colors`}
           >

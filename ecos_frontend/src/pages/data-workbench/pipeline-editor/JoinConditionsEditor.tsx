@@ -69,13 +69,13 @@ const JoinConditionsEditor: React.FC<JoinConditionsEditorProps> = ({
               placeholder="右表列"
               className={`flex-1 px-1.5 py-0.5 text-[11px] border ${styles.cardBorder} rounded outline-none focus:${styles.infoBorder}`}
             />
-            <button onClick={() => onRemove(cond.id)} className={`p-0.5 ${styles.dangerText} hover:${styles.dangerText} transition-colors`}>
+            <button type="button" onClick={() => onRemove(cond.id)} className={`p-0.5 ${styles.dangerText} hover:${styles.dangerText} transition-colors`}>
               <X size={14} />
             </button>
           </div>
         </div>
       ))}
-      <button
+      <button type="button"
         onClick={onAdd}
         className={`w-full flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] ${styles.infoText} border border-dashed ${styles.infoBorder} rounded hover:${styles.infoBg} transition-colors`}
       >

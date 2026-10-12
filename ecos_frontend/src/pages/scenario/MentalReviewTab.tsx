@@ -96,7 +96,7 @@ export default function MentalReviewTab() {
           </label>
         </div>
         <div className="flex justify-end">
-          <button
+          <button type="button"
             onClick={handleQuery}
             disabled={loading}
             className="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1.5"

@@ -7,6 +7,7 @@ import React from 'react';
 import { ObjectType, OntologyDomain } from '../../../types/ontology';
 import LucideIcon from '../LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 import { getDomainColorText, getDomainColorDotClass } from './domainColors';
 
 interface DomainSelectorHeaderProps {
@@ -39,6 +40,7 @@ export default function DomainSelectorHeader({
   handleDeleteDomain
 }: DomainSelectorHeaderProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <>
@@ -48,6 +50,7 @@ export default function DomainSelectorHeader({
           {/* Custom Dropdown Trigger */}
           <div className="relative flex-1">
             <button
+              type="button"
               onClick={() => {
                 setShowDomainDropdown(!showDomainDropdown);
                 onSelectCategory('overview', null);
@@ -60,7 +63,7 @@ export default function DomainSelectorHeader({
             >
               <div className="flex items-center gap-1.5 truncate">
                 <LucideIcon name={selectedDomain ? "Layers" : "LayoutDashboard"} size={13} className={selectedDomain ? getDomainColorText(selectedDomain.color) : 'text-blue-500'} />
-                <span className="truncate">{selectedDomain ? selectedDomain.displayName.split(' (')[0] : '本体全景与总览'}</span>
+                <span className="truncate">{selectedDomain ? selectedDomain.displayName.split(' (')[0] : t('ow.domhdr.overviewTitle')}</span>
               </div>
               <LucideIcon name="ChevronDown" size={12} className="opacity-60" />
             </button>
@@ -81,7 +84,7 @@ export default function DomainSelectorHeader({
                 >
                   <div className="flex items-center gap-1.5">
                     <LucideIcon name="LayoutDashboard" size={12} className="text-blue-500" />
-                    <span>全局全景 (All)</span>
+                    <span>{t('ow.domhdr.globalAll')}</span>
                   </div>
                   {selectedDomainId === null && <LucideIcon name="Check" size={11} className="text-blue-600" />}
                 </div>
@@ -111,22 +114,24 @@ export default function DomainSelectorHeader({
                       {/* Edit/Delete Icons */}
                       <div className="flex items-center gap-0.5 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                         <button
+                          type="button"
                           onClick={() => {
                             handleStartEditDomain(d);
                             setShowDomainDropdown(false);
                           }}
                           className={`p-1 ${styles.sidebarHoverBg} ${styles.cardTextMuted} rounded transition-colors`}
-                          title="修改业务域"
+                          title={t('ow.domhdr.editDomain')}
                         >
                           <LucideIcon name="Edit" size={11} />
                         </button>
                         <button
+                          type="button"
                           onClick={() => {
                             handleDeleteDomain(d.id);
                             setShowDomainDropdown(false);
                           }}
                           className={`p-1 hover:bg-red-50 ${styles.cardTextMuted} hover:text-red-600 rounded transition-colors`}
-                          title="删除业务域"
+                          title={t('ow.domhdr.deleteDomain')}
                         >
                           <LucideIcon name="Trash2" size={11} />
                         </button>
@@ -140,9 +145,10 @@ export default function DomainSelectorHeader({
 
           {/* Plus button to add domain */}
           <button
+            type="button"
             onClick={handleStartAddDomain}
             className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-lg hover:shadow-xs transition-all cursor-pointer shrink-0"
-            title="添加业务分级域"
+            title={t('ow.domhdr.addDomain')}
           >
             <LucideIcon name="Plus" size={14} />
           </button>
@@ -151,13 +157,14 @@ export default function DomainSelectorHeader({
         {/* Core Sub-view Switcher inside Workbench */}
         <div className={`flex ${styles.appBg} p-0.5 rounded-lg border ${styles.appBorder} mt-2`}>
           <button
+            type="button"
             onClick={() => {
               onSelectCategory('overview', null);
             }}
             className={`w-full py-1.5 rounded-md text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${styles.cardBg} ${styles.cardText} shadow-xs cursor-pointer`}
           >
             <LucideIcon name="LayoutDashboard" size={11} className="text-blue-600" />
-            <span>配置全景</span>
+            <span>{t('ow.domhdr.overviewTab')}</span>
           </button>
         </div>
       </div>

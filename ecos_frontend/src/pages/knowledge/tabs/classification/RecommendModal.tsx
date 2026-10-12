@@ -65,7 +65,7 @@ export function RecommendModal({
             <p className={`text-[10px] ${styles.cardTextMuted}`}>{recommendResult.reason}</p>
           )}
         </div>
-        <div className="flex gap-2 pt-3 border-t border-slate-150">
+        <div className={`flex gap-2 pt-3 border-t ${styles.cardBorder}`}>
           <button
             type="button"
             onClick={onClose}

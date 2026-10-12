@@ -93,7 +93,7 @@ export default function DataTable<T extends Record<string, any>>({
 
   if (loading) {
     return (
-      <div className={className}>
+      <div className={`${className} min-w-0`}>
         <LoadingSkeleton variant="table" rows={pageSize} />
       </div>
     );
@@ -101,7 +101,7 @@ export default function DataTable<T extends Record<string, any>>({
 
   if (!displayData.length) {
     return (
-      <div className={className}>
+      <div className={`${className} min-w-0`}>
         <EmptyState
           icon={emptyIcon}
           title={emptyTitle}
@@ -113,9 +113,9 @@ export default function DataTable<T extends Record<string, any>>({
   }
 
   return (
-    <div className={`${className} flex flex-col`}>
+    <div className={`${className} flex flex-col min-w-0`}>
       {/* Table */}
-      <div className="overflow-x-auto scrollbar-thin">
+      <div className="overflow-x-auto scrollbar-thin min-w-0">
         <table className={`w-full text-xs border-collapse ${styles.cardText}`}>
           <thead>
             <tr className={`border-b ${styles.cardBorder}`}>
@@ -168,7 +168,7 @@ export default function DataTable<T extends Record<string, any>>({
           </span>
 
           <div className="flex items-center gap-1">
-            <button
+            <button type="button"
               className={`p-1 rounded transition cursor-pointer ${
                 page <= 1 ? "opacity-30 cursor-not-allowed" : `${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10`
               }`}
@@ -177,7 +177,7 @@ export default function DataTable<T extends Record<string, any>>({
             >
               <ChevronsLeft className="w-3.5 h-3.5" />
             </button>
-            <button
+            <button type="button"
               className={`p-1 rounded transition cursor-pointer ${
                 page <= 1 ? "opacity-30 cursor-not-allowed" : `${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10`
               }`}
@@ -191,7 +191,7 @@ export default function DataTable<T extends Record<string, any>>({
               {page}
             </span>
 
-            <button
+            <button type="button"
               className={`p-1 rounded transition cursor-pointer ${
                 page >= totalPages ? "opacity-30 cursor-not-allowed" : `${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10`
               }`}
@@ -200,7 +200,7 @@ export default function DataTable<T extends Record<string, any>>({
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
-            <button
+            <button type="button"
               className={`p-1 rounded transition cursor-pointer ${
                 page >= totalPages ? "opacity-30 cursor-not-allowed" : `${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10`
               }`}

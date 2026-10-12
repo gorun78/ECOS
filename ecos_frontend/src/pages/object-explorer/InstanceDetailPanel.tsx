@@ -54,7 +54,7 @@ export default function InstanceDetailPanel({
               </h3>
             </div>
           </div>
-          <button
+          <button type="button"
             onClick={() => setSelectedInstance(null)}
             className={`p-1 rounded ${styles.sidebarHoverBg} ${styles.muted} hover:opacity-70`}
           >
@@ -71,7 +71,7 @@ export default function InstanceDetailPanel({
             </div>
             <div className="flex flex-col gap-1">
               {availableActions.map(act => (
-                <button
+                <button type="button"
                   key={act.id}
                   onClick={() => handleOpenActionModal(act)}
                   className="w-full h-8 px-2.5 rounded border border-amber-200 bg-amber-50/40 hover:bg-amber-50 text-amber-800 text-[10px] font-semibold flex items-center justify-between transition-all"
@@ -90,7 +90,7 @@ export default function InstanceDetailPanel({
 
       {/* Panel Tab switch */}
       <div className={`flex border-b ${styles.cardBorder} px-2 text-[11px] font-medium ${styles.appBg}`}>
-        <button
+        <button type="button"
           onClick={() => setDetailTab('properties')}
           className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all ${
             detailTab === 'properties' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} ${styles.sidebarHoverBg}`
@@ -98,7 +98,7 @@ export default function InstanceDetailPanel({
         >
           {t('ow.explore.tabProperties')}
         </button>
-        <button
+        <button type="button"
           onClick={() => setDetailTab('relations')}
           className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all flex items-center justify-center gap-1 ${
             detailTab === 'relations' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} ${styles.sidebarHoverBg}`
@@ -106,7 +106,7 @@ export default function InstanceDetailPanel({
         >
           {t('ow.explore.tabRelations')} ({resolvedRelations.reduce((acc, curr) => acc + curr.instances.length, 0)})
         </button>
-        <button
+        <button type="button"
           onClick={() => setDetailTab('activity')}
           className={`flex-1 py-2 text-center border-b-2 font-semibold transition-all ${
             detailTab === 'activity' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} ${styles.sidebarHoverBg}`

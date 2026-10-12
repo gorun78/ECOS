@@ -20,6 +20,7 @@ import {
   Database, Eye, Loader2, ChevronRight, Zap,
 } from 'lucide-react';
 import { useTheme } from '../components/ThemeContext';
+import { useLanguage } from '../components/LanguageContext';
 import type {
   GuardrailPolicy, PreviewData, AuditLogEntry, PolicyStatus,
 } from './Guardrails/types';
@@ -39,6 +40,7 @@ type SubTab = 'policies' | 'compile' | 'audit';
 
 export default function GuardrailsView() {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   // ── Toast ──
   const [toast, setToast] = useState<{ type: 'success' | 'info' | 'error'; msg: string } | null>(null);
   const showToast = useCallback((type: 'success' | 'info' | 'error', msg: string) => {
@@ -84,12 +86,12 @@ export default function GuardrailsView() {
         setSelectedId(normalized[0].id);
       }
     } catch (e: any) {
-      showToast('error', `加载护栏策略失败: ${e.message}`);
+      showToast('error', t('gwv.loadFailed', { msg: e.message }));
       setPolicies([]);
     } finally {
       setLoadingList(false);
     }
-  }, [selectedId, showToast]);
+  }, [selectedId, showToast, t]);
 
   useEffect(() => {
     loadPolicies();
@@ -100,7 +102,7 @@ export default function GuardrailsView() {
   const handleSave = async () => {
     if (!editing) return;
     if (!editing.name.trim()) {
-      showToast('error', '策略名称不能为空');
+      showToast('error', t('gwv.nameRequired'));
       return;
     }
     setSaving(true);
@@ -122,7 +124,7 @@ export default function GuardrailsView() {
           method: 'POST',
           body: JSON.stringify(payload),
         });
-        showToast('success', '护栏策略已创建');
+        showToast('success', t('gwv.created'));
         const np = normalizePolicy(created || { ...editing, id: created?.id ?? Date.now().toString() });
         setPolicies(prev => [...prev, np]);
         setSelectedId(np.id);
@@ -131,13 +133,13 @@ export default function GuardrailsView() {
           method: 'PUT',
           body: JSON.stringify(payload),
         });
-        showToast('success', '护栏策略已更新');
+        showToast('success', t('gwv.updated'));
         setPolicies(prev => prev.map(p => (p.id === editing.id ? { ...editing, status: 'DRAFT' } : p)));
       }
       setFormMode(null);
       setEditing(null);
     } catch (e: any) {
-      showToast('error', `保存失败: ${e.message}`);
+      showToast('error', t('gwv.saveFailed', { msg: e.message }));
     } finally {
       setSaving(false);
     }
@@ -148,11 +150,11 @@ export default function GuardrailsView() {
     if (!deleteTarget) return;
     try {
       await apiCall<any>(`${API_BASE}/${encodeURIComponent(deleteTarget.id)}`, { method: 'DELETE' });
-      showToast('success', `策略「${deleteTarget.name}」已删除`);
+      showToast('success', t('gwv.deleted', { name: deleteTarget.name }));
       setPolicies(prev => prev.filter(p => p.id !== deleteTarget.id));
       if (selectedId === deleteTarget.id) setSelectedId(null);
     } catch (e: any) {
-      showToast('error', `删除失败: ${e.message}`);
+      showToast('error', t('gwv.deleteFailed', { msg: e.message }));
     } finally {
       setDeleteTarget(null);
     }
@@ -168,11 +170,11 @@ export default function GuardrailsView() {
         method: 'PUT',
         body: JSON.stringify({ isEnabled: next.isEnabled }),
       });
-      showToast('success', '护栏状态已动态更新');
+      showToast('success', t('gwv.stateUpdated'));
     } catch (e: any) {
       // rollback
       setPolicies(prev => prev.map(p => (p.id === policy.id ? policy : p)));
-      showToast('error', `更新失败: ${e.message}`);
+      showToast('error', t('gwv.updateFailed', { msg: e.message }));
     }
   };
 
@@ -189,18 +191,18 @@ export default function GuardrailsView() {
       const status: PolicyStatus = result?.status ?? 'COMPILED';
       const compiledAt: string = result?.compiledAt ?? result?.compiled_at ?? new Date().toISOString();
       setCompileLogs(logs.length > 0 ? logs : [
-        '🔒 [stage 1] 校验策略语法结构...',
-        '🔒 [stage 2] 编译列级脱敏规则...',
-        '🔒 [stage 3] 编译行级隔离谓词...',
-        '✅ [stage 4] 策略编译成功，已热部署到查询引擎。',
+        t('gwv.log1'),
+        t('gwv.log2'),
+        t('gwv.log3'),
+        t('gwv.log4'),
       ]);
       setPolicies(prev => prev.map(p => (p.id === policy.id ? { ...p, status, compiledAt, compileLogs: logs } : p)));
-      showToast('success', '🛡️ 安全策略编译成功，已热部署！');
+      showToast('success', t('gwv.compileSuccess'));
       // auto-refresh preview
       loadPreview({ ...policy, status, compiledAt });
     } catch (e: any) {
-      setCompileLogs([`🚫 编译失败: ${e.message}`]);
-      showToast('error', `策略编译异常: ${e.message}`);
+      setCompileLogs([t('gwv.compileLogFail', { msg: e.message })]);
+      showToast('error', t('gwv.compileFail', { msg: e.message }));
     } finally {
       setIsCompiling(false);
     }
@@ -215,7 +217,7 @@ export default function GuardrailsView() {
       const result = await apiCall<any>(`${API_BASE}/${encodeURIComponent(policy.id)}/preview`);
       setPreviewData(result as PreviewData);
     } catch (e: any) {
-      showToast('error', `预览加载失败: ${e.message}`);
+      showToast('error', t('gwv.previewFailed', { msg: e.message }));
       setPreviewData(null);
     } finally {
       setLoadingPreview(false);
@@ -268,33 +270,36 @@ export default function GuardrailsView() {
             <span className="p-1 rounded bg-rose-600 text-white">
               <ShieldCheck size={14} />
             </span>
-            <span>安全护栏管理控制台</span>
+            <span>{t('gwv.title')}</span>
           </h2>
-          <p className={`text-[11px] ${styles.cardTextMuted}`}>策略 CRUD、编译部署与合规预览的统一治理面板。</p>
+          <p className={`text-[11px] ${styles.cardTextMuted}`}>{t('gwv.subtitle')}</p>
         </div>
 
         {/* Tab switcher */}
         <div className={`flex ${styles.appBg} p-0.5 rounded-lg border ${styles.cardBorder} shrink-0`}>
           <button
+            type="button"
             onClick={() => setActiveSubTab('policies')}
             className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'policies' ? `${styles.inputBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} ${styles.sidebarHoverBg} hover:text-indigo-400`}`}
           >
             <ShieldAlert size={12} />
-            <span>策略管理</span>
+            <span>{t('gwv.tabPolicies')}</span>
           </button>
           <button
+            type="button"
             onClick={() => setActiveSubTab('compile')}
             className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'compile' ? `${styles.inputBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} ${styles.sidebarHoverBg} hover:text-indigo-400`}`}
           >
             <Binary size={12} />
-            <span>编译与预览</span>
+            <span>{t('gwv.tabCompile')}</span>
           </button>
           <button
+            type="button"
             onClick={() => setActiveSubTab('audit')}
             className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'audit' ? `${styles.inputBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} ${styles.sidebarHoverBg} hover:text-indigo-400`}`}
           >
             <FileText size={12} />
-            <span>审计日志</span>
+            <span>{t('gwv.tabAudit')}</span>
           </button>
         </div>
       </div>
@@ -336,9 +341,9 @@ export default function GuardrailsView() {
             ) : (
               <div className={`flex-1 flex flex-col items-center justify-center ${styles.cardTextMuted} space-y-2`}>
                 <Info size={24} className={styles.cardTextMuted} />
-                <p className="font-bold">请在左侧选择一条策略</p>
-                <button onClick={startCreate} className="text-blue-600 font-bold text-[11px] hover:underline flex items-center gap-1">
-                  <Plus size={11} /> 或新建一条策略
+                <p className="font-bold">{t('gwv.emptyHint')}</p>
+                <button type="button" onClick={startCreate} className="text-blue-600 font-bold text-[11px] hover:underline flex items-center gap-1">
+                  <Plus size={11} /> {t('gwv.createNew')}
                 </button>
               </div>
             )}
@@ -370,15 +375,14 @@ export default function GuardrailsView() {
           <div className={`${styles.cardBg} rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl`} onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-3">
               <span className={`p-1.5 rounded ${styles.dangerBg} ${styles.dangerText}`}><AlertTriangle size={16} /></span>
-              <h3 className={`font-black ${styles.cardText} text-sm`}>确认删除策略</h3>
+              <h3 className={`font-black ${styles.cardText} text-sm`}>{t('gwv.deleteTitle')}</h3>
             </div>
             <p className={`text-[11px] ${styles.cardText} leading-relaxed mb-4`}>
-              即将删除护栏策略「<span className={`font-bold ${styles.dangerText}`}>{deleteTarget.name}</span>」，此操作不可撤销。
-              删除后该策略将立即从查询引擎卸载。
+              {t('gwv.deleteConfirm1')}「<span className={`font-bold ${styles.dangerText}`}>{deleteTarget.name}</span>」{t('gwv.deleteConfirm2')}
             </p>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setDeleteTarget(null)} className={`px-3 py-1.5 border ${styles.cardBorder} ${styles.sidebarHoverBg} rounded-md text-[11px] font-bold ${styles.cardText} cursor-pointer`}>取消</button>
-              <button onClick={handleDelete} className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold cursor-pointer flex items-center gap-1"><Trash2 size={11} /> 删除</button>
+              <button type="button" onClick={() => setDeleteTarget(null)} className={`px-3 py-1.5 border ${styles.cardBorder} ${styles.sidebarHoverBg} rounded-md text-[11px] font-bold ${styles.cardText} cursor-pointer`}>{t('common.cancel')}</button>
+              <button type="button" onClick={handleDelete} className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold cursor-pointer flex items-center gap-1"><Trash2 size={11} /> {t('common.delete')}</button>
             </div>
           </div>
         </div>

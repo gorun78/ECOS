@@ -122,7 +122,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
             {t('databench.pipeline.functionCount', { count: PB_FUNCTIONS.length })}
           </span>
           {onClose && (
-            <button
+            <button type="button"
               onClick={onClose}
               className={`p-0.5 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} transition-colors`}
             >
@@ -161,7 +161,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
             return (
               <div key={category} className={`border-b ${styles.cardBorder} last:border-b-0`}>
                 {/* Category header */}
-                <button
+                <button type="button"
                   onClick={() => toggleCategory(category)}
                   className={`flex items-center gap-2 w-full px-3 py-2 text-left hover:${styles.cardBg} transition-colors sticky top-0 ${styles.cardBg} z-10`}
                 >
@@ -209,7 +209,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
                           </div>
                         </div>
                         <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
+                          <button type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleCopyExample(fn);
@@ -223,7 +223,7 @@ const OperatorSearchPanel: React.FC<OperatorSearchPanelProps> = ({
                               <Copy size={12} />
                             )}
                           </button>
-                          <button
+                          <button type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleSelect(fn);

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 import { Settings, Binary, Edit3, Trash2, CheckCircle2, X, Terminal } from 'lucide-react';
 import type { GuardrailPolicy } from './types';
 import { POLICY_TYPE_META } from './constants';
@@ -20,29 +21,30 @@ export default function PolicyDetail({
   const meta = POLICY_TYPE_META[policy.type] ?? POLICY_TYPE_META.custom;
   const Icon = meta.icon;
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   const configRows: { label: string; value: React.ReactNode }[] = [];
-  if (policy.table) configRows.push({ label: '目标表', value: <span className="font-mono">{policy.table}</span> });
-  if (policy.column) configRows.push({ label: '目标列', value: <span className="font-mono">{policy.column}</span> });
-  if (policy.maskType) configRows.push({ label: '脱敏策略', value: <Badge tone="blue">{policy.maskType}</Badge> });
-  if (policy.condition) configRows.push({ label: 'SQL 谓词', value: <span className="font-mono text-amber-700">WHERE {policy.condition}</span> });
+  if (policy.table) configRows.push({ label: t('gw.field.table'), value: <span className="font-mono">{policy.table}</span> });
+  if (policy.column) configRows.push({ label: t('gw.field.col'), value: <span className="font-mono">{policy.column}</span> });
+  if (policy.maskType) configRows.push({ label: t('gw.field.maskType'), value: <Badge tone="blue">{policy.maskType}</Badge> });
+  if (policy.condition) configRows.push({ label: t('gw.detail.sqlPred'), value: <span className="font-mono text-amber-700">WHERE {policy.condition}</span> });
 
   return (
     <div className="flex-1 flex flex-col overflow-y-auto">
       <div className={`p-4 border-b ${styles.cardBorder} ${styles.appBg} flex items-center justify-between shrink-0`}>
         <span className={`font-extrabold ${styles.cardText} flex items-center gap-1.5`}>
           <Settings size={13} className={styles.cardTextMuted} />
-          <span>策略详情</span>
+          <span>{t('gw.detail.title')}</span>
         </span>
         <div className="flex gap-2">
-          <button onClick={onCompile} className="px-3 py-1.5 bg-[var(--muted,#0F172A)] hover:opacity-80 text-white rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer">
-            <Binary size={11} /> 编译
+          <button type="button" onClick={onCompile} className="px-3 py-1.5 bg-[var(--muted,#0F172A)] hover:opacity-80 text-white rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer">
+            <Binary size={11} /> {t('gw.detail.compile')}
           </button>
-          <button onClick={onEdit} className={`px-3 py-1.5 border ${styles.cardBorder} ${styles.sidebarHoverBg} rounded-md text-[10px] font-bold ${styles.cardText} flex items-center gap-1 cursor-pointer`}>
-            <Edit3 size={11} /> 编辑
+          <button type="button" onClick={onEdit} className={`px-3 py-1.5 border ${styles.cardBorder} ${styles.sidebarHoverBg} rounded-md text-[10px] font-bold ${styles.cardText} flex items-center gap-1 cursor-pointer`}>
+            <Edit3 size={11} /> {t('gw.detail.edit')}
           </button>
-          <button onClick={onDelete} className={`px-3 py-1.5 border ${styles.dangerBorder} ${styles.dangerText} ${styles.dangerBg} rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer`}>
-            <Trash2 size={11} /> 删除
+          <button type="button" onClick={onDelete} className={`px-3 py-1.5 border ${styles.dangerBorder} ${styles.dangerText} ${styles.dangerBg} rounded-md text-[10px] font-bold flex items-center gap-1 cursor-pointer`}>
+            <Trash2 size={11} /> {t('gw.detail.delete')}
           </button>
         </div>
       </div>
@@ -56,11 +58,11 @@ export default function PolicyDetail({
           <div className="space-y-1 flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className={`font-black ${styles.cardText} text-sm`}>{policy.name}</h3>
-              <Badge tone="slate">{meta.label}</Badge>
-              <Badge tone={policy.severity === 'block' ? 'rose' : 'amber'}>{policy.severity === 'block' ? '强制阻断' : '记录审计'}</Badge>
-              <Badge tone={policy.status === 'COMPILED' ? 'emerald' : 'amber'}>{policy.status === 'COMPILED' ? '已编译' : '草稿'}</Badge>
+              <Badge tone="slate">{t(meta.labelKey)}</Badge>
+              <Badge tone={policy.severity === 'block' ? 'rose' : 'amber'}>{policy.severity === 'block' ? t('gw.detail.enforce') : t('gw.detail.auditLog')}</Badge>
+              <Badge tone={policy.status === 'COMPILED' ? 'emerald' : 'amber'}>{policy.status === 'COMPILED' ? t('gw.detail.compiled') : t('gw.detail.draft')}</Badge>
             </div>
-            <p className={`text-[11px] ${styles.cardTextMuted} leading-relaxed`}>{policy.description || '（暂无描述）'}</p>
+            <p className={`text-[11px] ${styles.cardTextMuted} leading-relaxed`}>{policy.description || t('gw.detail.noDesc')}</p>
           </div>
         </div>
 
@@ -79,21 +81,21 @@ export default function PolicyDetail({
         {/* Meta info */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className={`p-2.5 ${styles.inputBg} border ${styles.cardBorder} rounded-lg`}>
-            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase block`}>策略 ID</span>
+            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase block`}>{t('gw.detail.id')}</span>
             <span className={`font-mono text-[10px] ${styles.cardText} font-bold break-all`}>{policy.id}</span>
           </div>
           <div className={`p-2.5 ${styles.inputBg} border ${styles.cardBorder} rounded-lg`}>
-            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase block`}>启用状态</span>
+            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase block`}>{t('gw.detail.enabledState')}</span>
             <span className={`font-bold text-[11px] flex items-center gap-1 ${policy.isEnabled ? 'text-emerald-600' : styles.cardTextMuted}`}>
-              {policy.isEnabled ? <CheckCircle2 size={12} /> : <X size={12} />} {policy.isEnabled ? '已启用' : '已关闭'}
+              {policy.isEnabled ? <CheckCircle2 size={12} /> : <X size={12} />} {policy.isEnabled ? t('gw.detail.on') : t('gw.detail.off')}
             </span>
           </div>
           <div className={`p-2.5 ${styles.inputBg} border ${styles.cardBorder} rounded-lg`}>
-            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase block`}>编译时间</span>
-            <span className={`font-mono text-[10px] ${styles.cardText} font-bold`}>{policy.compiledAt || '未编译'}</span>
+            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase block`}>{t('gw.detail.compiledAt')}</span>
+            <span className={`font-mono text-[10px] ${styles.cardText} font-bold`}>{policy.compiledAt || t('gw.detail.never')}</span>
           </div>
           <div className={`p-2.5 ${styles.inputBg} border ${styles.cardBorder} rounded-lg`}>
-            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase block`}>更新时间</span>
+            <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase block`}>{t('gw.detail.updatedAt')}</span>
             <span className={`font-mono text-[10px] ${styles.cardText} font-bold`}>{policy.updatedAt || policy.createdAt || '—'}</span>
           </div>
         </div>
@@ -102,7 +104,7 @@ export default function PolicyDetail({
         {policy.compileLogs && policy.compileLogs.length > 0 && (
           <div className="space-y-2">
             <h4 className={`font-extrabold ${styles.cardTextMuted} uppercase tracking-wider text-[10px] flex items-center gap-1`}>
-              <Terminal size={11} /> 上次编译日志
+              <Terminal size={11} /> {t('gw.detail.lastLogs')}
             </h4>
             <div className="bg-[var(--muted,#020202)] rounded-lg p-3 max-h-40 overflow-y-auto space-y-1 text-[10px] font-mono">
               {policy.compileLogs.map((log, idx) => (

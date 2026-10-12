@@ -347,7 +347,8 @@ describe('CognitionPanel 子视图切换 (PMO-59 P4b)', () => {
     expect(text0).toContain('人工覆写');
     expect(text0).toContain('告警与复盘');
 
-    const tabBtn = Array.from(container.querySelectorAll('button')).find((b) => b.textContent?.includes('仿真推演'));
+    // Data-testid 定位避免 locale 变更后（"仿真推演"→"Simulation"）这里脆弱（R9 §2.9 [P2]）
+    const tabBtn = container.querySelector<HTMLButtonElement>('[data-testid="cognition-subtab-counterfactual"]');
     expect(tabBtn).toBeTruthy();
     await act(async () => {
       fireEvent.click(tabBtn as HTMLButtonElement);

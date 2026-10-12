@@ -246,7 +246,7 @@ export default function MessageBubble({
       <div className="max-w-[85%] space-y-1.5 min-w-0">
         {/* 头部：时间戳 + 角色 */}
         <div className={`flex items-center gap-1.5 text-[9px] font-mono ${styles.muted}`}>
-          <span className="font-bold">{isUser ? (locale === 'zh' ? '我' : 'You') : agentName}</span>
+          <span className="font-bold">{isUser ? t('aiworkbench.playground.bubbleUser') : agentName}</span>
           {time && <span>· {time}</span>}
           {msg.intent && (
             <span className={`px-1 rounded ${styles.badgeBg} font-bold`}>{msg.intent}</span>

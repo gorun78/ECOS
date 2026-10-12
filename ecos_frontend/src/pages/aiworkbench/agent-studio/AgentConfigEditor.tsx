@@ -7,6 +7,7 @@
  */
 import { AIPAgent, AIPGuardrail } from '../../../types/aiworkbench';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 import { Icon } from './Icon';
 
 export default function AgentConfigEditor({
@@ -21,6 +22,7 @@ export default function AgentConfigEditor({
   onDelete: () => void;
 }) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`flex-1 flex flex-col h-full ${styles.inputBg} overflow-y-auto p-5 space-y-4`}>
@@ -40,18 +42,20 @@ export default function AgentConfigEditor({
 
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={onEdit}
             className={`px-2.5 py-1.5 ${styles.appBg} ${styles.accentHover} ${styles.cardTextMuted} border ${styles.cardBorder} rounded-lg transition-all cursor-pointer flex items-center gap-1`}
           >
             <Icon name="Settings2" size={11} />
-            <span>管理智能体</span>
+            <span>{t('aiworkbench.as.manageAgent')}</span>
           </button>
           <button
+            type="button"
             onClick={onDelete}
             className="px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg transition-all cursor-pointer flex items-center gap-1"
           >
             <Icon name="XCircle" size={11} />
-            <span>注销</span>
+            <span>{t('aiworkbench.as.deregister')}</span>
           </button>
         </div>
       </div>
@@ -63,7 +67,7 @@ export default function AgentConfigEditor({
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>
           <h3 className={`text-xs font-extrabold ${styles.cardTextMuted} uppercase tracking-wider flex items-center gap-1.5`}>
             <Icon name="Sliders" size={12} className={styles.accentText} />
-            <span>系统角色指令 (System Persona)</span>
+            <span>{t('aiworkbench.as.systemPersona')}</span>
           </h3>
           <div className={`h-56 overflow-y-auto ${styles.inputBg} p-3 border ${styles.cardBorder} rounded-lg text-[11px] ${styles.cardTextMuted} font-sans leading-relaxed whitespace-pre-line`}>
             {agent.systemPrompt}
@@ -76,7 +80,7 @@ export default function AgentConfigEditor({
           <div className="space-y-3">
             <h3 className={`text-xs font-extrabold ${styles.cardTextMuted} uppercase tracking-wider flex items-center gap-1.5`}>
               <Icon name="Boxes" size={12} className={styles.accentText} />
-              <span>挂载本体动作与函数能力 (Tools Plugin)</span>
+              <span>{t('aiworkbench.as.toolsPlugin')}</span>
             </h3>
 
             <div className="space-y-2 max-h-32 overflow-y-auto">
@@ -89,7 +93,7 @@ export default function AgentConfigEditor({
                     <p className={`font-bold text-[10px] ${styles.cardText}`}>{act}</p>
                     <p className={`text-[9px] ${styles.cardTextMuted} font-mono`}>Ontology Action Write-Back</p>
                   </div>
-                  <span className="px-1.5 bg-amber-500/10 text-amber-600 text-[8px] font-bold rounded">已提权</span>
+                  <span className="px-1.5 bg-amber-500/10 text-amber-600 text-[8px] font-bold rounded">{t('aiworkbench.as.elevated')}</span>
                 </div>
               ))}
               {agent.assignedTools.functionIds.map(fn => (
@@ -101,7 +105,7 @@ export default function AgentConfigEditor({
                     <p className={`font-bold text-[10px] ${styles.cardText}`}>{fn}</p>
                     <p className={`text-[9px] ${styles.cardTextMuted} font-mono`}>Ontology Function Query</p>
                   </div>
-                  <span className={`px-1.5 ${styles.badgeBg} ${styles.accentText} text-[8px] font-bold rounded`}>只读</span>
+                  <span className={`px-1.5 ${styles.badgeBg} ${styles.accentText} text-[8px] font-bold rounded`}>{t('aiworkbench.as.readonly')}</span>
                 </div>
               ))}
             </div>
@@ -110,7 +114,7 @@ export default function AgentConfigEditor({
           <div className={`space-y-3 pt-3 border-t ${styles.cardBorder}`}>
             <h3 className={`text-xs font-extrabold ${styles.cardTextMuted} uppercase tracking-wider flex items-center gap-1.5`}>
               <Icon name="ShieldAlert" size={12} className="text-rose-500" />
-              <span>激活关联安全护栏 (Active Guardrails)</span>
+              <span>{t('aiworkbench.as.activeGuardrails')}</span>
             </h3>
             <div className="flex flex-wrap gap-1.5">
               {agent.guardrailIds.map(grid => {

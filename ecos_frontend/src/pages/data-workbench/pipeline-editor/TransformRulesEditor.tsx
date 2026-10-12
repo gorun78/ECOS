@@ -57,14 +57,14 @@ const TransformRulesEditor: React.FC<TransformRulesEditorProps> = ({
                 placeholder="列名"
                 className={`flex-1 px-1.5 py-0.5 text-[11px] border ${styles.cardBorder} rounded outline-none focus:${styles.successBorder}`}
               />
-              <button onClick={() => onRemove(rule.id)} className={`p-0.5 ${styles.dangerText} hover:${styles.dangerText} transition-colors`}>
+              <button type="button" onClick={() => onRemove(rule.id)} className={`p-0.5 ${styles.dangerText} hover:${styles.dangerText} transition-colors`}>
                 <X size={14} />
               </button>
             </div>
           </div>
         </div>
       ))}
-      <button
+      <button type="button"
         onClick={onAdd}
         className={`w-full flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] ${styles.successText} border border-dashed ${styles.successBorder} rounded hover:${styles.successBg} transition-colors`}
       >

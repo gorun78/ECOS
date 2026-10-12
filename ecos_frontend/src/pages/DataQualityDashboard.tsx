@@ -107,7 +107,7 @@ export default function DataQualityDashboard() {
             const TabIcon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
-              <button
+              <button type="button"
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
                 className={`h-9 px-3 rounded-t-md border-t-2 flex items-center gap-2 text-xs font-medium whitespace-nowrap shrink-0 cursor-pointer transition ${

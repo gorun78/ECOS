@@ -6,10 +6,12 @@ import React, { memo } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { UserCheck } from 'lucide-react';
 import { useTheme } from '../../ThemeContext';
+import { useLanguage } from '../../LanguageContext';
 import type { LogicNodeData, LogicApprovalConfig } from '../../../types/aiworkbench';
 
 function ApprovalNode({ data, selected }: NodeProps<Node<LogicNodeData>>) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const config = data.config as LogicApprovalConfig;
   const statusColor = {
     idle: 'bg-gray-400',
@@ -34,16 +36,16 @@ function ApprovalNode({ data, selected }: NodeProps<Node<LogicNodeData>>) {
       </div>
       <div className={`px-3 py-2 space-y-1 text-[10px] ${styles.cardTextMuted}`}>
         <div className="flex justify-between">
-          <span className="font-semibold">审批人:</span>
+          <span className="font-semibold">{t('aiworkbench.logic.node.approver')}</span>
           <span className={`font-mono ${styles.cardText}`}>{config.approver}</span>
         </div>
         <div className="flex justify-between">
-          <span className="font-semibold">超时:</span>
+          <span className="font-semibold">{t('aiworkbench.logic.node.timeout')}</span>
           <span className="font-mono text-rose-600 font-bold">{config.timeout}s</span>
         </div>
         {data.duration != null && (
           <div className="flex justify-between">
-            <span className="font-semibold">耗时:</span>
+            <span className="font-semibold">{t('aiworkbench.logic.node.duration')}</span>
             <span className={`font-mono ${styles.cardText}`}>{data.duration}ms</span>
           </div>
         )}

@@ -125,7 +125,7 @@ export default function PropertyEditor({
             {t('ontology.designer.relationshipsCount', { count: relationships.length })}
           </h4>
           {allEntities.length > 1 && (
-            <button
+            <button type="button"
               onClick={() => onCreateRelation(entity.id)}
               className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
             >
@@ -180,7 +180,7 @@ export default function PropertyEditor({
       {/* 底部操作 */}
       <div className={`px-4 py-3 mt-auto border-t ${styles.cardBorder}`}>
         <div className="flex gap-2">
-          <button
+          <button type="button"
             className="flex-1 py-1.5 rounded-lg text-[10px] font-medium
               bg-red-500/10 text-red-400 border border-red-500/20
               hover:bg-red-500/20 transition flex items-center justify-center gap-1"

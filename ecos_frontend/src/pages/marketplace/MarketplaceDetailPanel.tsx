@@ -87,10 +87,9 @@ export default function MarketplaceDetailPanel({
   onClose,
   onRequestAccess,
 }: MarketplaceDetailPanelProps) {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
   const { getLabel, getColor } = useDict("asset_status", locale);
-  const tl = (zh: string, en: string) => (locale === "zh" ? zh : en);
 
   if (!asset) return null;
 
@@ -107,16 +106,16 @@ export default function MarketplaceDetailPanel({
         {loading ? (
           <div className="flex items-center justify-center h-full opacity-50">
             <RefreshCw className="animate-spin w-6 h-6 mr-3" />
-            {tl("加载详情…", "Loading details...")}
+            {t("marketplace.detail.loading")}
           </div>
         ) : (
           <div className="p-6">
             {/* Close button */}
             <div className="flex items-center justify-between mb-5">
               <h2 className={`text-lg font-bold ${styles.cardText}`}>
-                {tl("资产详情", "Asset Detail")}
+                {t("marketplace.detail.title")}
               </h2>
-              <button
+              <button type="button"
                 onClick={onClose}
                 className="p-1.5 rounded-lg hover:bg-[var(--muted,rgba(100,116,139,0.2))] transition-colors opacity-60 hover:opacity-100"
               >
@@ -163,7 +162,7 @@ export default function MarketplaceDetailPanel({
               <p
                 className={`text-sm leading-relaxed opacity-80 mb-3 ${styles.cardText}`}
               >
-                {asset.description || tl("暂无描述", "No description")}
+                {asset.description || t("marketplace.card.noDesc")}
               </p>
 
               <div className="flex items-center gap-4 text-xs opacity-50">
@@ -207,14 +206,14 @@ export default function MarketplaceDetailPanel({
             </div>
 
             {/* Request Access button */}
-            <button
+            <button type="button"
               onClick={() => onRequestAccess(asset)}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg
                 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium
                 transition-colors duration-150 mb-6"
             >
               <Send className="w-4 h-4" />
-              {tl("申请访问权限", "Request Access")}
+              {t("marketplace.access.title")}
             </button>
 
             {/* Reviews */}
@@ -223,7 +222,7 @@ export default function MarketplaceDetailPanel({
                 className={`text-sm font-semibold ${styles.cardText} mb-3 flex items-center gap-2`}
               >
                 <MessageSquare className="w-4 h-4 opacity-60" />
-                {tl("用户评价", "Reviews")}
+                {t("marketplace.detail.reviews")}
                 {asset.reviews && (
                   <span className="text-xs font-normal opacity-50">
                     ({asset.reviews.length})
@@ -233,7 +232,7 @@ export default function MarketplaceDetailPanel({
 
               {!asset.reviews || asset.reviews.length === 0 ? (
                 <p className="text-xs opacity-40 py-4 text-center">
-                  {tl("暂无评价", "No reviews yet")}
+                  {t("marketplace.detail.reviewsEmpty")}
                 </p>
               ) : (
                 <div className="space-y-3">

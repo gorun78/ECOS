@@ -33,7 +33,7 @@ export function RelationsTab({
   return (
     <div className="space-y-2">
       {/* Gap 2: Add relationship button */}
-      <button
+      <button type="button"
         onClick={() => {
           setRelFormData({ targetObjectId: "", targetEntityCode: entityCode, relationshipCode: "", relationshipType: "OneToMany" });
           setShowRelationForm(true);

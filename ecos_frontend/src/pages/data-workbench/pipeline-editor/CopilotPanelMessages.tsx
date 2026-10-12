@@ -31,7 +31,7 @@ const CopilotPanelMessages: React.FC<Props> = ({
       <div className="relative group my-2">
         <div className={`flex items-center justify-between px-3 py-1 ${styles.cardBg} rounded-t-lg text-[10px] ${styles.cardTextMuted}`}>
           <span>{language || 'code'}</span>
-          <button
+          <button type="button"
             onClick={() => onCopy(code, `code-${code.slice(0, 20)}`)}
             className={`flex items-center gap-1 ${styles.muted} hover:${styles.cardText} transition-colors`}
           >

@@ -37,10 +37,8 @@ import MarketplaceAccessModal from "./marketplace/MarketplaceAccessModal";
 // ── Main Component ─────────────────────────────────────────
 
 export default function MarketplaceBrowser() {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
-  const isZh = locale === "zh";
-  const tl = (zh: string, en: string) => isZh ? zh : en;
 
   // State
   const [assets, setAssets] = useState<MarketplaceBrowserAsset[]>([]);
@@ -191,14 +189,14 @@ export default function MarketplaceBrowser() {
       });
       showToast(
         "success",
-        tl(`资产「${result.name}」发布成功！`, `Asset "${result.name}" published!`)
+        t("marketplace.browser.published", { name: result.name })
       );
       setPublishOpen(false);
       resetPublishForm();
       loadAssets();
       loadDashboard();
     } catch (err: any) {
-      showToast("error", tl(`发布失败：${err.message}`, `Publish failed: ${err.message}`));
+      showToast("error", t("marketplace.browser.publishFailed", { msg: err.message }));
     } finally {
       setPublishing(false);
     }
@@ -217,15 +215,20 @@ export default function MarketplaceBrowser() {
       const result = await requestAccess(accessAsset.id, accessReason.trim());
       showToast(
         "success",
-        tl(
-          `申请已提交！编号 ${result.requestId}，状态：${result.status === "PENDING" ? "待审批" : result.status}`,
-          `Request submitted! ID: ${result.requestId}, Status: ${result.status}`
-        )
+        t("marketplace.browser.accessSubmitted", {
+          id: result.requestId,
+          status:
+            result.status === "PENDING"
+              ? locale === "zh"
+                ? t("marketplace.browser.statusPending")
+                : result.status
+              : result.status,
+        })
       );
       setAccessAsset(null);
       setAccessReason("");
     } catch (err: any) {
-      showToast("error", tl(`申请失败：${err.message}`, `Request failed: ${err.message}`));
+      showToast("error", t("marketplace.browser.accessSubmittedFailed", { msg: err.message }));
     } finally {
       setAccessSubmitting(false);
     }
@@ -308,7 +311,7 @@ export default function MarketplaceBrowser() {
             <AlertCircle className="w-4 h-4 shrink-0" />
           )}
           <span>{toast.msg}</span>
-          <button
+          <button type="button"
             onClick={() => setToast(null)}
             className="ml-2 opacity-60 hover:opacity-100"
           >

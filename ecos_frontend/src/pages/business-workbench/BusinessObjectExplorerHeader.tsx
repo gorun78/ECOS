@@ -10,6 +10,7 @@ import React from 'react';
 import { ObjectType } from '../../types/ontology';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 import { FilterQuery } from './businessObjectExplorerTypes';
 
 interface ExplorerHeaderProps {
@@ -48,6 +49,7 @@ export function ExplorerHeader({
   onOpenSaveModal,
 }: ExplorerHeaderProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`${styles.cardBg} border-b ${styles.appBorder} px-6 py-4 flex flex-col gap-3`}>
@@ -69,22 +71,24 @@ export function ExplorerHeader({
         {/* View Selector Tabs */}
         <div className={`flex ${styles.sidebarBg} p-1 rounded-lg`}>
           <button
+            type="button"
             onClick={() => onTabChange('table')}
             className={`px-3 py-1.5 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
               activeTab === 'table' ? `${styles.cardBg} ${styles.text} shadow-3xs` : `${styles.cardTextMuted} hover:${styles.text}`
             }`}
           >
             <LucideIcon name="Table2" size={13} />
-            数据实例列表
+            {t('ow.boeh.tabTable')}
           </button>
           <button
+            type="button"
             onClick={() => onTabChange('analytics')}
             className={`px-3 py-1.5 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
               activeTab === 'analytics' ? `${styles.cardBg} ${styles.text} shadow-3xs` : `${styles.cardTextMuted} hover:${styles.text}`
             }`}
           >
             <LucideIcon name="BarChart3" size={13} />
-            运行统计与聚合
+            {t('ow.boeh.tabAnalytics')}
           </button>
         </div>
       </div>
@@ -93,22 +97,22 @@ export function ExplorerHeader({
       <div className={`flex flex-wrap items-center gap-3 ${styles.appBg} p-2.5 rounded-lg border ${styles.divider}`}>
         <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${styles.cardTextMuted} shrink-0`}>
           <LucideIcon name="Filter" size={13} />
-          筛选器:
+          {t('ow.boeh.filterLabel')}:
         </div>
 
         {/* Existing active filters badges */}
         {activeFilters.length === 0 && (
-          <span className={`text-[10px] ${styles.cardTextMuted} italic`}>当前没有添加任何筛选过滤器</span>
+          <span className={`text-[10px] ${styles.cardTextMuted} italic`}>{t('ow.boeh.noFilters')}</span>
         )}
         {activeFilters.map((f, idx) => {
           const prop = activeObjectType.properties.find(p => p.id === f.propertyId);
           const propName = prop ? prop.displayName : f.propertyId;
 
           const opName = f.operator === 'equals' ? '='
-            : f.operator === 'contains' ? '包含'
+            : f.operator === 'contains' ? t('ow.boeh.opContains')
             : f.operator === 'gt' ? '>'
             : f.operator === 'lt' ? '<'
-            : f.operator === 'is_empty' ? '为空' : '不为空';
+            : f.operator === 'is_empty' ? t('ow.boeh.opIsEmpty') : t('ow.boeh.opIsNotEmpty');
 
           return (
             <span key={idx} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 px-2 py-1 rounded font-medium text-[10px]">
@@ -118,6 +122,7 @@ export function ExplorerHeader({
                 <strong className="text-blue-900 font-semibold">{f.value}</strong>
               )}
               <button
+                type="button"
                 onClick={() => onRemoveFilter(idx)}
                 className="text-blue-400 hover:text-blue-600 ml-1 font-bold"
               >
@@ -130,26 +135,27 @@ export function ExplorerHeader({
         {/* Add filter creator dropdown trigger */}
         <div className="relative ml-auto flex items-center gap-2">
           <button
+            type="button"
             onClick={() => onToggleFilterCreator(!showFilterCreator)}
             className={`${styles.cardBg} border ${styles.inputBorder} ${styles.inputText} hover:bg-blue-50/20 text-[10px] font-semibold py-1 px-2 rounded-md flex items-center gap-1 transition-colors`}
           >
             <LucideIcon name="Plus" size={11} />
-            添加筛选过滤器
+            {t('ow.boeh.addFilter')}
           </button>
 
           {/* Filter Creator Popover */}
           {showFilterCreator && (
             <div className={`absolute right-0 top-7 ${styles.cardBg} border ${styles.inputBorder} rounded-lg shadow-lg p-3 z-30 w-72 space-y-3`}>
-              <h4 className={`font-semibold ${styles.cardText} text-[11px]`}>新建筛选规则</h4>
+              <h4 className={`font-semibold ${styles.cardText} text-[11px]`}>{t('ow.boeh.newRuleTitle')}</h4>
               <div className="space-y-2">
                 <div>
-                  <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>选择属性</label>
+                  <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t('ow.boeh.selectProperty')}</label>
                   <select
                     value={newFilterProp}
                     onChange={e => onNewFilterPropChange(e.target.value)}
                     className={`w-full h-8 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded px-2`}
                   >
-                    <option value="">-- 请选择 --</option>
+                    <option value="">{t('ow.boeh.optSelect')}</option>
                     {activeObjectType.properties.map(p => (
                       <option key={p.id} value={p.id}>{p.displayName} ({p.id})</option>
                     ))}
@@ -158,26 +164,26 @@ export function ExplorerHeader({
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>比较算子</label>
+                    <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t('ow.boeh.operatorLabel')}</label>
                     <select
                       value={newFilterOp}
                       onChange={e => onNewFilterOpChange(e.target.value as any)}
                       className={`w-full h-8 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded px-2`}
                     >
-                      <option value="equals">等于 (Equals)</option>
-                      <option value="contains">包含 (Contains)</option>
-                      <option value="gt">大于 (&gt;)</option>
-                      <option value="lt">小于 (&lt;)</option>
-                      <option value="is_empty">为空 (Is Empty)</option>
-                      <option value="is_not_empty">不为空 (Is Not Empty)</option>
+                      <option value="equals">{t('ow.boeh.opEquals')}</option>
+                      <option value="contains">{t('ow.boeh.opContainsOpt')}</option>
+                      <option value="gt">{t('ow.boeh.opGt')}</option>
+                      <option value="lt">{t('ow.boeh.opLt')}</option>
+                      <option value="is_empty">{t('ow.boeh.opIsEmptyOpt')}</option>
+                      <option value="is_not_empty">{t('ow.boeh.opIsNotEmptyOpt')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>设定值</label>
+                    <label className={`text-[10px] ${styles.cardTextMuted} block mb-0.5`}>{t('ow.boeh.valueLabel')}</label>
                     <input
                       type="text"
                       disabled={newFilterOp === 'is_empty' || newFilterOp === 'is_not_empty'}
-                      placeholder="搜索值"
+                      placeholder={t('ow.boeh.searchValue')}
                       value={newFilterVal}
                       onChange={e => onNewFilterValChange(e.target.value)}
                       className={`w-full h-8 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded px-2`}
@@ -188,17 +194,19 @@ export function ExplorerHeader({
 
               <div className="flex justify-end gap-1.5 pt-1">
                 <button
+                  type="button"
                   onClick={() => onToggleFilterCreator(false)}
                   className={`h-7 px-2.5 rounded text-[10px] ${styles.appBg} hover:bg-blue-50/20 ${styles.cardTextMuted}`}
                 >
-                  取消
+                  {t('ow.boeh.cancel')}
                 </button>
                 <button
+                  type="button"
                   onClick={onAddFilter}
                   disabled={!newFilterProp}
                   className="h-7 px-3 rounded text-[10px] bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  应用规则
+                  {t('ow.boeh.apply')}
                 </button>
               </div>
             </div>
@@ -207,11 +215,12 @@ export function ExplorerHeader({
           {/* Save exploration list */}
           {activeFilters.length > 0 && (
             <button
+              type="button"
               onClick={onOpenSaveModal}
               className="bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 text-[10px] font-semibold py-1 px-2.5 rounded-md flex items-center gap-1 transition-colors"
             >
               <LucideIcon name="Bookmark" size={11} />
-              保存为对象列表
+              {t('ow.boeh.saveList')}
             </button>
           )}
         </div>

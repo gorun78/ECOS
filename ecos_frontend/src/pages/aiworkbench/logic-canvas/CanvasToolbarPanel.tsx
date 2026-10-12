@@ -40,7 +40,7 @@ export default function CanvasToolbarPanel({
 
   return (
     <Panel position="top-center" className="flex items-center gap-2">
-      <button
+      <button type="button"
         onClick={onRun}
         disabled={isExecuting || nodesCount === 0}
         className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.accentText} font-bold rounded-lg shadow-sm transition-colors cursor-pointer flex items-center gap-1.5 text-[11px] ${
@@ -56,7 +56,7 @@ export default function CanvasToolbarPanel({
         <span>{isExecuting ? t('aiworkbench.logic.run.running') : t('aiworkbench.logic.run.label')}</span>
       </button>
 
-      <button
+      <button type="button"
         onClick={onUndo}
         disabled={canUndo}
         className={`px-2 py-1.5 ${styles.cardBg} ${styles.appBorder} border rounded-lg shadow-sm hover:opacity-80 disabled:opacity-40 cursor-pointer transition-opacity`}
@@ -64,7 +64,7 @@ export default function CanvasToolbarPanel({
       >
         <Icon name="Undo2" size={12} className={`${styles.cardTextMuted}`} />
       </button>
-      <button
+      <button type="button"
         onClick={onRedo}
         disabled={canRedo}
         className={`px-2 py-1.5 ${styles.cardBg} ${styles.appBorder} border rounded-lg shadow-sm hover:opacity-80 disabled:opacity-40 cursor-pointer transition-opacity`}
@@ -73,7 +73,7 @@ export default function CanvasToolbarPanel({
         <Icon name="Redo2" size={12} className={`${styles.cardTextMuted}`} />
       </button>
 
-      <button
+      <button type="button"
         onClick={onDeleteSelected}
         className={`px-2 py-1.5 ${styles.cardBg} ${styles.dangerBorder} border rounded-lg shadow-sm cursor-pointer transition-opacity hover:opacity-80`}
         title="删除选中节点 (Delete)"
@@ -81,7 +81,7 @@ export default function CanvasToolbarPanel({
         <Icon name="Trash2" size={12} className={`${styles.dangerText}`} />
       </button>
 
-      <button
+      <button type="button"
         onClick={onToggleLogs}
         className={`px-2 py-1.5 border rounded-lg shadow-sm cursor-pointer transition-colors text-[10px] font-bold ${
           showLogs ? `${styles.infoBg} ${styles.infoBorder} ${styles.infoText}` : `${styles.cardBg} ${styles.appBorder} ${styles.cardTextMuted} hover:opacity-80`

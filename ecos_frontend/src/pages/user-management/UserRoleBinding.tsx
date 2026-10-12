@@ -27,9 +27,8 @@ export default function UserRoleBinding({
   onClearAll,
   loading,
 }: UserRoleBindingProps) {
-  const { locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const isZh = locale === "zh";
 
   const [roleSearch, setRoleSearch] = useState("");
 
@@ -69,28 +68,30 @@ export default function UserRoleBinding({
             value={roleSearch}
             onChange={(e) => setRoleSearch(e.target.value)}
             className={`w-full pl-7 pr-2 py-1.5 rounded text-xs border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
-            placeholder={isZh ? "搜索角色…" : "Search roles…"}
+            placeholder={t("platform.user.bind.searchPh")}
           />
         </div>
         <button
+          type="button"
           onClick={onSelectAll}
-          className={`text-xs px-2 py-1 rounded border ${styles.cardBorder} ${styles.cardText} hover:bg-gray-50 dark:hover:bg-white/5`}
+          className={`text-xs px-2 py-1 rounded border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`}
         >
           <CheckSquare size={12} className="inline mr-1" />
-          {isZh ? "全选" : "All"}
+          {t("platform.user.bind.selectAll")}
         </button>
         <button
+          type="button"
           onClick={onClearAll}
-          className={`text-xs px-2 py-1 rounded border ${styles.cardBorder} ${styles.cardText} hover:bg-gray-50 dark:hover:bg-white/5`}
+          className={`text-xs px-2 py-1 rounded border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`}
         >
           <Square size={12} className="inline mr-1" />
-          {isZh ? "清空" : "Clear"}
+          {t("platform.user.bind.clear")}
         </button>
       </div>
 
       {/* Selected count */}
       <div className={`text-xs ${styles.cardTextMuted}`}>
-        {isZh ? "已选" : "Selected"}:{" "}
+        {t("platform.user.bind.selected")}:{" "}
         <span className="font-semibold">{selectedRoleIds.length}</span>
         {allRoles.length > 0 && (
           <span className="opacity-50">
@@ -110,7 +111,7 @@ export default function UserRoleBinding({
               className={`flex items-center gap-2 px-2.5 py-2 rounded text-xs cursor-pointer transition-colors ${
                 isSelected
                   ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
-                  : "hover:bg-gray-50 dark:hover:bg-gray-800/30"
+                  : styles.sidebarHoverBg
               }`}
             >
               <input
@@ -122,7 +123,7 @@ export default function UserRoleBinding({
               <div className="flex-1 min-w-0">
                 <div className="font-medium truncate">{r.roleName}</div>
                 <div className="text-[10px] opacity-50 truncate">
-                  {r.roleCode} · {r.roleType === "SYSTEM" ? (isZh ? "系统" : "System") : (isZh ? "自定义" : "Custom")}
+                  {r.roleCode} · {r.roleType === "SYSTEM" ? t("platform.user.bind.roleSystem") : t("platform.user.bind.roleCustom")}
                 </div>
               </div>
               {r.description && (
@@ -136,7 +137,7 @@ export default function UserRoleBinding({
 
         {filteredRoles.length === 0 && (
           <div className="text-center py-6 text-xs opacity-40">
-            {isZh ? "暂无匹配角色" : "No matching roles"}
+            {t("platform.user.bind.noMatch")}
           </div>
         )}
       </div>

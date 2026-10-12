@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { apiFetchData } from "../../api";
 import { useTheme } from "../../components/ThemeContext";
+import { useLanguage } from "../LanguageContext";
 import type { OntologyDomain, ObjectType } from "../../types/ontology";
 
 // ──────────────────────────────────────────────────────────────
@@ -169,11 +170,13 @@ export default function OntologyWorkbenchSidebar({
   selectedObjectTypeId = null,
   onSelectDomain,
   onSelectObjectType,
-  title = "本体 / 业务域",
+  title,
   showStats = true,
   className = "",
 }: OntologyWorkbenchSidebarProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
+  const displayTitle = title ?? t("ow.sidebar.defaultTitle");
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
   const [objects, setObjects] = useState<ObjectType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,13 +196,13 @@ export default function OntologyWorkbenchSidebar({
       setDomains(Array.isArray(d) ? d : []);
       setObjects(Array.isArray(o) ? o : []);
     } catch (e: unknown) {
-      setError((e as { message?: string } | undefined)?.message || "加载本体数据失败");
+      setError((e as { message?: string } | undefined)?.message || t("ow.sidebar.loadFail"));
       setDomains([]);
       setObjects([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     load();
@@ -262,19 +265,20 @@ export default function OntologyWorkbenchSidebar({
         <div className="flex items-center gap-2">
           <Network className="w-4 h-4 text-indigo-400" />
           <div>
-            <div className={`text-xs font-semibold ${styles.cardText}`}>{title}</div>
+            <div className={`text-xs font-semibold ${styles.cardText}`}>{displayTitle}</div>
             {showStats && (
               <div className={`text-[9px] ${styles.muted} font-mono mt-0.5`}>
-                {domains.length} 域 · {totalObjects} 对象类型
+                {t("ow.sidebar.topStats", { d: domains.length, o: totalObjects })}
               </div>
             )}
           </div>
         </div>
         <button
+          type="button"
           onClick={load}
           disabled={loading}
           className={`p-1.5 rounded-lg hover:bg-indigo-500/10 ${styles.cardTextMuted} hover:text-indigo-400 transition disabled:opacity-50`}
-          title="刷新"
+          title={t("ow.sidebar.refresh")}
         >
           <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
         </button>
@@ -290,13 +294,14 @@ export default function OntologyWorkbenchSidebar({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索域或对象类型..."
+            placeholder={t("ow.sidebar.searchPh")}
             className={`w-full ${styles.appBg} border ${styles.cardBorder} rounded-lg pl-7 pr-7 py-1.5
               text-xs ${styles.text} placeholder:${styles.muted}
               focus:outline-none focus:border-indigo-500/40 transition`}
           />
           {search && (
             <button
+              type="button"
               onClick={() => setSearch("")}
               className={`absolute right-2.5 top-1/2 -translate-y-1/2 ${styles.muted} hover:${styles.cardText}`}
             >
@@ -311,7 +316,7 @@ export default function OntologyWorkbenchSidebar({
         <div className="px-3 py-2 bg-red-500/10 border-b border-red-500/20 text-[10px] text-red-400 flex items-center gap-1.5 shrink-0">
           <AlertCircle size={12} className="shrink-0" />
           <span className="flex-1 truncate">{error}</span>
-          <button onClick={() => setError("")} className="hover:text-red-300">
+          <button type="button" onClick={() => setError("")} className="hover:text-red-300">
             <X size={11} />
           </button>
         </div>
@@ -322,17 +327,17 @@ export default function OntologyWorkbenchSidebar({
         {loading ? (
           <div className={`flex items-center justify-center py-10 ${styles.muted}`}>
             <Loader2 size={16} className="animate-spin mr-2" />
-            <span className="text-[11px]">加载中...</span>
+            <span className="text-[11px]">{t("ow.sidebar.loading")}</span>
           </div>
         ) : filteredDomains.length === 0 && !hasUnassigned ? (
           <div className={`flex flex-col items-center justify-center py-14 ${styles.muted} px-4`}>
             <Layers size={28} className="mb-3 opacity-20" />
             <p className="text-xs">
-              {search ? "无匹配结果" : "暂无本体数据"}
+              {search ? t("ow.sidebar.noMatch") : t("ow.sidebar.emptyData")}
             </p>
             {!search && (
               <p className="text-[10px] mt-1 opacity-50">
-                请确认后端 /api/v1/ontology 服务可用
+                {t("ow.sidebar.emptyHint")}
               </p>
             )}
           </div>
@@ -347,6 +352,7 @@ export default function OntologyWorkbenchSidebar({
                 <div key={d.id} className="mb-0.5">
                   {/* 域节点 */}
                   <button
+                    type="button"
                     onClick={() => handleDomainClick(d)}
                     className={`w-full flex items-center gap-1.5 px-2.5 py-2 text-left transition group ${
                       isSel ? "bg-indigo-500/10" : `hover:${styles.cardBg}/[0.03]`
@@ -389,6 +395,7 @@ export default function OntologyWorkbenchSidebar({
                         const badge = STATUS_BADGE[o.status];
                         return (
                           <button
+                            type="button"
                             key={o.id}
                             onClick={() => handleObjectClick(o)}
                             className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition border-l-2 ${
@@ -422,7 +429,7 @@ export default function OntologyWorkbenchSidebar({
                               </span>
                             )}
                             <span className={`text-[8px] ${styles.muted} shrink-0`}>
-                              {o.properties?.length || 0}属性
+                              {t("ow.sidebar.propsCount", { n: o.properties?.length || 0 })}
                             </span>
                           </button>
                         );
@@ -437,7 +444,7 @@ export default function OntologyWorkbenchSidebar({
             {!q && hasUnassigned && (
               <div className="mt-2 px-2.5">
                 <div className={`text-[9px] ${styles.muted} font-mono uppercase tracking-wider mb-1`}>
-                  未分组
+                  {t("ow.sidebar.ungrouped")}
                 </div>
                 <div className={`ml-1 pl-3 border-l ${styles.cardBorder}`}>
                   {objectsByDomain[UNASSIGNED_KEY].map((o) => {
@@ -445,6 +452,7 @@ export default function OntologyWorkbenchSidebar({
                     const sel = selectedObjectTypeId === o.id;
                     return (
                       <button
+                        type="button"
                         key={o.id}
                         onClick={() => handleObjectClick(o)}
                         className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition border-l-2 ${
@@ -478,10 +486,10 @@ export default function OntologyWorkbenchSidebar({
       {showStats && (
         <div className={`shrink-0 border-t ${styles.cardBorder} px-3 py-2 flex items-center justify-between text-[9px] ${styles.muted} font-mono`}>
           <span className="flex items-center gap-1">
-            <Database size={10} /> {domains.length} 域
+            <Database size={10} /> {t("ow.sidebar.statsDomains", { d: domains.length })}
           </span>
           <span className="flex items-center gap-1">
-            <Box size={10} /> {totalObjects} 对象类型
+            <Box size={10} /> {t("ow.sidebar.statsObjects", { o: totalObjects })}
           </span>
         </div>
       )}

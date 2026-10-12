@@ -38,9 +38,12 @@ import {
   fetchCommits as fetchGitCommits,
   commit as gitCommit,
   createTag as gitCreateTag,
+  push as gitPush,
+  pull as gitPull,
+  postAction as gitPostAction,
 } from '../../services/gitService';
-import { apiFetchData } from '../../api';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 
 // ── TypeScript 接口 ──────────────────────────────────────────
 
@@ -103,6 +106,7 @@ interface GitPanelProps {
 
 export default function GitPanel({ repoId }: GitPanelProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   // 状态
   const [branches, setBranches] = useState<GitBranch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>('');
@@ -200,13 +204,18 @@ export default function GitPanel({ repoId }: GitPanelProps) {
         case 'tag':
           await gitCreateTag(repoId);
           break;
+        // C181/W199 · Git 单通道（ADR-12 / 前端铁律 #6）：push/pull/default 全部改走
+        // services/gitService，本文件不再拼 `/api/v1/ecos/git/*` 字符串（此前 :206/:209
+        // 各有 1 处 raw apiFetchData 字面拼接，是 C181 违规点）。postAction 内部做 action
+        // 白名单校验，禁传入未预期动名词，防经本入口绕过单通道。
         case 'push':
+          await gitPush(repoId);
+          break;
         case 'pull':
-          // Generic POST actions not yet covered by dedicated service functions
-          await apiFetchData(`/api/v1/ecos/git/${action}?repoId=${encodeURIComponent(repoId)}`, { method: 'POST' });
+          await gitPull(repoId);
           break;
         default:
-          await apiFetchData(`/api/v1/ecos/git/${action}?repoId=${encodeURIComponent(repoId)}`, { method: 'POST' });
+          await gitPostAction(action, repoId);
       }
       // 操作成功后刷新状态
       await Promise.all([fetchStatus(), fetchCommits()]);
@@ -231,13 +240,14 @@ export default function GitPanel({ repoId }: GitPanelProps) {
         <div className="flex items-center gap-2">
           <GitBranch className={`w-4 h-4 ${styles.infoText}`} />
           <span className={`text-xs font-bold uppercase tracking-wider ${styles.cardText}`}>
-            Git 版本
+            {t('gp.title')}
           </span>
         </div>
         <button
+          type="button"
           onClick={refreshAll}
           className={`p-1 rounded hover:${styles.cardBg} ${styles.cardTextMuted} hover:${styles.cardText} transition`}
-          title="刷新"
+          title={t('gp.refresh')}
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
@@ -256,9 +266,10 @@ export default function GitPanel({ repoId }: GitPanelProps) {
         <div className="px-3 pt-3 pb-1">
           <div className="relative">
             <label className={`text-[10px] uppercase tracking-wider ${styles.muted} mb-1 block`}>
-              分支
+              {t('gp.branch')}
             </label>
             <button
+              type="button"
               onClick={() => setBranchDropdownOpen(!branchDropdownOpen)}
               disabled={loadingBranches}
               className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-[#1E293B] bg-[#1E2533] text-xs ${styles.cardText} hover:${styles.cardBorder} transition disabled:opacity-50`}
@@ -283,11 +294,12 @@ export default function GitPanel({ repoId }: GitPanelProps) {
               <div className="absolute z-20 top-full left-0 right-0 mt-1 rounded-lg border border-[#1E293B] bg-[#1A1F2E] shadow-xl max-h-48 overflow-y-auto py-1">
                 {branches.length === 0 && !loadingBranches ? (
                   <div className={`px-3 py-2 text-[10px] ${styles.muted} text-center`}>
-                    无分支数据
+                    {t('gp.noBranches')}
                   </div>
                 ) : (
                   branches.map((b) => (
                     <button
+                      type="button"
                       key={b.name}
                       onClick={() => {
                         setSelectedBranch(b.name);
@@ -333,7 +345,7 @@ export default function GitPanel({ repoId }: GitPanelProps) {
               {status.ahead === 0 && status.behind === 0 && (
                 <span className={`${styles.successText}`}>
                   <Check className="w-2.5 h-2.5 inline mr-0.5" />
-                  已同步
+                  {t('gp.synced')}
                 </span>
               )}
             </span>
@@ -343,7 +355,7 @@ export default function GitPanel({ repoId }: GitPanelProps) {
         {/* ── 2. UncommittedChangesList ────────────── */}
         <div className="px-3 pt-2 pb-1">
           <h3 className={`text-[10px] uppercase tracking-wider ${styles.muted} mb-1.5 flex items-center justify-between`}>
-            <span>未提交变更</span>
+            <span>{t('gp.uncommitted')}</span>
             {loadingStatus ? (
               <Loader2 className={`w-3 h-3 animate-spin ${styles.muted}`} />
             ) : (
@@ -358,7 +370,7 @@ export default function GitPanel({ repoId }: GitPanelProps) {
           ) : changeCount === 0 ? (
             <div className={`flex items-center gap-1.5 py-2 text-[10px] ${styles.cardTextMuted}`}>
               <Check className={`w-3 h-3 ${styles.cardTextMuted}`} />
-              工作区干净
+              {t('gp.clean')}
             </div>
           ) : (
             <div className="space-y-0.5 max-h-40 overflow-y-auto">
@@ -386,7 +398,7 @@ export default function GitPanel({ repoId }: GitPanelProps) {
         {/* ── 3. CommitHistoryList ─────────────────── */}
         <div className="px-3 pt-2 pb-1">
           <h3 className={`text-[10px] uppercase tracking-wider ${styles.muted} mb-1.5 flex items-center justify-between`}>
-            <span>最近提交</span>
+            <span>{t('gp.recentCommits')}</span>
             {loadingCommits ? (
               <Loader2 className={`w-3 h-3 animate-spin ${styles.muted}`} />
             ) : (
@@ -403,7 +415,7 @@ export default function GitPanel({ repoId }: GitPanelProps) {
           ) : commits.length === 0 ? (
             <div className={`flex items-center gap-1.5 py-2 text-[10px] ${styles.cardTextMuted}`}>
               <X className="w-3 h-3" />
-              无提交记录
+              {t('gp.noCommits')}
             </div>
           ) : (
             <div className="space-y-px max-h-64 overflow-y-auto">
@@ -469,12 +481,13 @@ export default function GitPanel({ repoId }: GitPanelProps) {
 
         {/* 刷新 */}
         <button
+          type="button"
           onClick={refreshAll}
           disabled={actionLoading !== null}
           className={`w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-[#1E293B] text-[10px] ${styles.muted} hover:${styles.cardTextMuted} hover:${styles.cardBorder} transition disabled:opacity-50`}
         >
           <RotateCcw className="w-3 h-3" />
-          刷新全部
+          {t('gp.refreshAll')}
         </button>
       </div>
     </div>
@@ -502,6 +515,7 @@ function ActionButton({ icon, label, loading, onClick, variant = 'default' }: Ac
 
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={loading}
       className={`${base} ${variant === 'primary' ? primary : defaultStyle}`}

@@ -24,6 +24,7 @@
 import React from 'react';
 import { Box, GitBranch, Building2, Network } from 'lucide-react';
 import { useTheme } from '../ThemeContext';
+import { useLanguage } from '../LanguageContext';
 
 // ── Props ──
 
@@ -40,7 +41,7 @@ export interface DomainStatsPanelProps {
 
 interface StatCardProps {
   icon: React.FC<{ size?: number; className?: string }>;
-  label: string;
+  labelKey: string;
   value: number;
   /** 主题色: indigo | emerald | amber | purple */
   color: 'indigo' | 'emerald' | 'amber' | 'purple';
@@ -73,8 +74,9 @@ const COLOR_MAP: Record<StatCardProps['color'], { bg: string; text: string; bord
   },
 };
 
-function StatCard({ icon: Icon, label, value, color }: StatCardProps) {
+function StatCard({ icon: Icon, labelKey, value, color }: StatCardProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const c = COLOR_MAP[color];
 
   return (
@@ -87,7 +89,7 @@ function StatCard({ icon: Icon, label, value, color }: StatCardProps) {
       {/* 标签 + 数值 */}
       <div className="flex-1 min-w-0">
         <p className={`text-[10px] ${styles.muted} uppercase tracking-wider font-medium`}>
-          {label}
+          {t(labelKey)}
         </p>
         <p className={`text-xl font-bold ${c.text} tabular-nums`}>
           {value.toLocaleString()}
@@ -105,6 +107,7 @@ export default function DomainStatsPanel({
   totalDomains,
 }: DomainStatsPanelProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   // 计算健康度评分（简单的加权评分，范围 0-100）
   const healthScore = React.useMemo(() => {
     if (totalEntities === 0) return 0;
@@ -145,26 +148,26 @@ export default function DomainStatsPanel({
       {/* 面板标题 */}
       <div className="flex items-center gap-2">
         <Network size={15} className="text-indigo-400" />
-        <h3 className="text-sm font-bold text-white">图谱统计</h3>
+        <h3 className="text-sm font-bold text-white">{t("ow.stats.title")}</h3>
       </div>
 
       {/* 统计卡片网格 */}
       <div className="grid grid-cols-1 gap-2.5">
         <StatCard
           icon={Box}
-          label="实体总数"
+          labelKey="ow.stats.entities"
           value={totalEntities}
           color="indigo"
         />
         <StatCard
           icon={GitBranch}
-          label="关系总数"
+          labelKey="ow.stats.relationships"
           value={totalRelationships}
           color="emerald"
         />
         <StatCard
           icon={Building2}
-          label="业务域数"
+          labelKey="ow.stats.domains"
           value={totalDomains}
           color="amber"
         />
@@ -173,7 +176,7 @@ export default function DomainStatsPanel({
       {/* 健康度评分 */}
       <div className={`rounded-lg border ${healthBg} p-4`}>
         <p className={`text-[10px] ${styles.muted} uppercase tracking-wider font-medium mb-2`}>
-          健康度评分
+          {t("ow.stats.health")}
         </p>
         <div className="flex items-end gap-2">
           <span className={`text-2xl font-bold ${healthColor}`}>
@@ -199,11 +202,10 @@ export default function DomainStatsPanel({
         {/* 评分说明 */}
         <p className={`text-[9px] ${styles.muted} mt-1.5 leading-relaxed`}>
           {healthScore >= 70
-            ? '知识图谱结构良好，实体与关系分布合理'
+            ? t("ow.stats.healthGood")
             : healthScore >= 40
-              ? '图谱结构基本合理，建议补充更多关系连线'
-              : '图谱数据量较少，建议添加更多实体和关系'
-          }
+              ? t("ow.stats.healthMid")
+              : t("ow.stats.healthLow")}
         </p>
       </div>
 
@@ -211,19 +213,19 @@ export default function DomainStatsPanel({
       {totalEntities > 0 && (
         <div className="pt-2 border-t border-[#1E293B]">
           <h4 className={`text-[10px] font-semibold ${styles.muted} uppercase tracking-wider mb-2`}>
-            指标明细
+            {t("ow.stats.details")}
           </h4>
           <div className="space-y-1.5 text-xs">
             {/* 关系密度 */}
             <div className="flex items-center justify-between">
-              <span className={styles.cardTextMuted}>关系密度</span>
+              <span className={styles.cardTextMuted}>{t("ow.stats.relDensity")}</span>
               <span className={`${styles.sidebarText} font-mono tabular-nums`}>
                 {(totalRelationships / Math.max(totalEntities, 1)).toFixed(2)}
               </span>
             </div>
             {/* 域均实体 */}
             <div className="flex items-center justify-between">
-              <span className={styles.cardTextMuted}>域均实体</span>
+              <span className={styles.cardTextMuted}>{t("ow.stats.avgPerDomain")}</span>
               <span className={`${styles.sidebarText} font-mono tabular-nums`}>
                 {totalDomains > 0
                   ? (totalEntities / totalDomains).toFixed(1)
@@ -232,7 +234,7 @@ export default function DomainStatsPanel({
             </div>
             {/* 实体密集度（max possible edges） */}
             <div className="flex items-center justify-between">
-              <span className={styles.cardTextMuted}>图密度</span>
+              <span className={styles.cardTextMuted}>{t("ow.stats.graphDensity")}</span>
               <span className={`${styles.sidebarText} font-mono tabular-nums`}>
                 {totalEntities > 1
                   ? ((totalRelationships / (totalEntities * (totalEntities - 1))) * 100).toFixed(1) + '%'

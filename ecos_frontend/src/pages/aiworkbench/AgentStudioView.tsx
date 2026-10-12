@@ -130,6 +130,8 @@ export default function AgentStudioView({
 
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
 
+  const [agentsLoadError, setAgentsLoadError] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     fetch('/api/v1/agent-mesh/agents', { headers: authHeaders() })
@@ -139,8 +141,13 @@ export default function AgentStudioView({
         const raw = Array.isArray(d?.data) ? d.data : (Array.isArray(d) ? d : []);
         const mapped: AIPAgent[] = raw.map((x: AgentMeshAgentRaw) => convertMeshAgentToAIP(x));
         if (mapped.length > 0) onUpdateAgents(mapped);
+        setAgentsLoadError(null);
       })
-      .catch(e => console.error('[AgentStudioView] Failed to load agents:', e));
+      .catch((e) => {
+        if (cancelled) return;
+        console.error('[AgentStudioView] Failed to load agents:', e);
+        setAgentsLoadError((e as Error)?.message || 'error');
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -150,7 +157,7 @@ export default function AgentStudioView({
         {
           id: 'welcome',
           sender: 'agent',
-          content: `您好！我是 **${selectedAgent.name}**。\n${selectedAgent.role}。\n我被授权调用多路航空本体资源（包含执行相关的 Ontology Actions）。请问现在有什么我能帮您调配、查询或审计的吗？`,
+          content: t('aiworkbench.agent.chatWelcome', { name: selectedAgent.name, role: selectedAgent.role }),
           timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -182,13 +189,13 @@ export default function AgentStudioView({
   };
 
   const handleDelete = (id: string) => {
-    if (!window.confirm('确定要注销这个 AIP 智能体吗？')) return;
+    if (!window.confirm(t('aiworkbench.agent.deleteConfirm'))) return;
     const updated = agents.filter(a => a.id !== id);
     onUpdateAgents(updated);
     if (selectedAgentId === id && updated.length > 0) {
       setSelectedAgentId(updated[0].id);
     }
-    showToast?.('success', '已注销智能体服务');
+    showToast?.('success', t('aiworkbench.agent.deleted'));
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -216,7 +223,7 @@ export default function AgentStudioView({
         return a;
       });
       onUpdateAgents(updated);
-      showToast?.('success', '智能体配置修改已应用');
+      showToast?.('success', t('aiworkbench.agent.updated'));
     } else {
       const newId = `agent-${Date.now().toString().slice(-4)}`;
       const newAgent: AIPAgent = {
@@ -237,7 +244,7 @@ export default function AgentStudioView({
       };
       onUpdateAgents([...agents, newAgent]);
       setSelectedAgentId(newId);
-      showToast?.('success', '成功部署全新 AIP 智能体');
+      showToast?.('success', t('aiworkbench.agent.created'));
     }
     setShowCreateModal(false);
   };
@@ -334,7 +341,7 @@ export default function AgentStudioView({
       .then(res => res.json())
       .then(data => {
         if (data.success) {
-          showToast?.('success', 'Ontology Action 物理写回成功并通过双向对账校验！');
+          showToast?.('success', t('aiworkbench.agent.execSuccess'));
           
           setChatMessages(prev => prev.map(msg => {
             if (msg.id === msgId && msg.actionProposal) {
@@ -373,15 +380,15 @@ export default function AgentStudioView({
             timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
           }]);
         } else {
-          showToast?.('error', `执行失败: ${data.message || data.error}`);
+          showToast?.('error', `${t('aiworkbench.agent.execFail')}: ${data.message || data.error}`);
         }
       })
       .catch(err => {
         console.error(err);
-        showToast?.('error', '与执行引擎建立连接失败，请重试');
+        showToast?.('error', t('aiworkbench.agent.execConnFail'));
       });
     } else {
-      showToast?.('info', '已拒绝该操作申请，指令已被安全拦截。');
+      showToast?.('info', t('aiworkbench.agent.rejected'));
       setChatMessages(prev => prev.map(msg => {
         if (msg.id === msgId && msg.actionProposal) {
           return {
@@ -398,8 +405,13 @@ export default function AgentStudioView({
   };
 
   return (
-    <div className={`flex h-full overflow-hidden select-none ${styles.appBg} ${styles.appText} text-xs`}>
-
+    <div className={`flex h-full flex-col overflow-hidden select-none ${styles.appBg} ${styles.appText} text-xs`}>
+      {agentsLoadError && (
+        <div className={`shrink-0 px-3 py-1.5 text-[11px] font-semibold ${styles.dangerBg} ${styles.dangerText}`}>
+          {t('aiworkbench.agent.loadFailed').replace('{msg}', agentsLoadError)}
+        </div>
+      )}
+      <div className="flex-1 flex overflow-hidden min-h-0">
       {/* 1. Left Agents List */}
       <AgentListSidebar
         agents={agents}
@@ -457,9 +469,10 @@ export default function AgentStudioView({
       ) : (
         <div className={`flex-1 flex flex-col items-center justify-center ${styles.cardTextMuted}`}>
           <Icon name="Bot" size={32} className={`${styles.cardTextMuted} animate-bounce mb-2`} />
-          <span>请在左侧选择或注册智能体进行控制</span>
+          <span>{t('aiworkbench.agent.selectHint')}</span>
         </div>
       )}
+      </div>
 
       {/* Create / Edit Agent Modal */}
       {showCreateModal && (

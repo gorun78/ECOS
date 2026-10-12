@@ -41,7 +41,7 @@ export function CreateModal({
               : <><ArrowRight size={14} className="text-emerald-400" /> {t('knowledge.graph.newEdge')}</>
             }
           </h3>
-          <button
+          <button type="button"
             onClick={onClose}
             className={`p-1 ${styles.sidebarHoverBg} rounded ${styles.muted} hover:${styles.cardText} cursor-pointer`}
           >
@@ -92,13 +92,13 @@ export function CreateModal({
               />
             </div>
             <div className="flex gap-2 pt-2">
-              <button
+              <button type="button"
                 onClick={onClose}
                 className={`flex-1 px-3 py-1.5 text-[11px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} rounded-lg border ${styles.cardBorder} transition cursor-pointer`}
               >
                 {t('knowledge.graph.cancel')}
               </button>
-              <button
+              <button type="button"
                 onClick={onCreateNode}
                 className="flex-1 px-3 py-1.5 text-[11px] font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition cursor-pointer"
               >
@@ -156,13 +156,13 @@ export function CreateModal({
               />
             </div>
             <div className="flex gap-2 pt-2">
-              <button
+              <button type="button"
                 onClick={onClose}
                 className={`flex-1 px-3 py-1.5 text-[11px] font-bold ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.sidebarText} rounded-lg border ${styles.cardBorder} transition cursor-pointer`}
               >
                 {t('knowledge.graph.cancel')}
               </button>
-              <button
+              <button type="button"
                 onClick={onCreateEdge}
                 className="flex-1 px-3 py-1.5 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition cursor-pointer"
               >

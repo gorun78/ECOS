@@ -84,7 +84,7 @@ export default function KnowledgeUpdateTab({ showToast }: TabProps) {
           <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{t('knowledge.kupdate.subtitle')}</p>
         </div>
         <div className="flex gap-2">
-          <button
+          <button type="button"
             onClick={loadAll}
             disabled={isRefreshing}
             className={`px-3 py-1.5 ${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardText} font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs disabled:opacity-50`}
@@ -92,7 +92,7 @@ export default function KnowledgeUpdateTab({ showToast }: TabProps) {
             {isRefreshing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
             {t('knowledge.kupdate.refresh')}
           </button>
-          <button
+          <button type="button"
             onClick={triggerFullSync}
             disabled={isRefreshing}
             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs disabled:opacity-50"
@@ -123,7 +123,7 @@ export default function KnowledgeUpdateTab({ showToast }: TabProps) {
         </div>
         <div className={cardCls}>
           <p className={cardTitleCls}><RefreshCw className={iconCn} /> {t('knowledge.kupdate.source_manual')}</p>
-          <button
+          <button type="button"
             onClick={triggerFullSync}
             className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-md flex items-center gap-1 cursor-pointer text-[11px] disabled:opacity-50"
           >

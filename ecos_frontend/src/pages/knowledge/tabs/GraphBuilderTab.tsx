@@ -121,7 +121,7 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
           <p className={`text-xs ${styles.cardTextMuted}`}>{t('knowledge.graph_builder.subtitle')}</p>
         </div>
         <div className="flex gap-2">
-          <button
+          <button type="button"
             onClick={loadJobs}
             disabled={isLoading}
             className={`px-3 py-1.5 ${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardText} font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs disabled:opacity-50`}
@@ -129,14 +129,14 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
             {isLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
             {t('knowledge.graph_builder.refresh')}
           </button>
-          <button
+          <button type="button"
             onClick={handleDryRun}
             disabled={building}
             className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs disabled:opacity-50 border border-blue-200"
           >
             <Eye size={12} /> {t('knowledge.graph_builder.dry_run')}
           </button>
-          <button
+          <button type="button"
             onClick={handleBuild}
             disabled={building}
             className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg flex items-center gap-1.5 cursor-pointer text-xs disabled:opacity-50`}
@@ -185,16 +185,16 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
                   <td className={`p-3 ${styles.cardTextMuted} font-mono text-[10px]`}>{job.createdAt}</td>
                   <td className="p-3">
                     <div className="flex gap-1.5 justify-end">
-                      <button onClick={() => openJobPreview(job)} title={t('knowledge.graph_builder.action.preview')}
+                      <button type="button" onClick={() => openJobPreview(job)} title={t('knowledge.graph_builder.action.preview')}
                         className={`p-1 ${styles.muted} hover:text-blue-600 cursor-pointer rounded ${styles.sidebarHoverBg}`}>
                         <Eye size={12} />
                       </button>
-                      <button onClick={() => openJobLogs(job)} title={t('knowledge.graph_builder.action.logs')}
+                      <button type="button" onClick={() => openJobLogs(job)} title={t('knowledge.graph_builder.action.logs')}
                         className={`p-1 ${styles.muted} hover:text-indigo-600 cursor-pointer rounded ${styles.sidebarHoverBg}`}>
                         <Terminal size={12} />
                       </button>
                       {(job.status === 'SUCCEEDED' || job.status === 'FAILED') && (
-                        <button onClick={() => handleRollback(job)} title={t('knowledge.graph_builder.action.rollback')}
+                        <button type="button" onClick={() => handleRollback(job)} title={t('knowledge.graph_builder.action.rollback')}
                           className={`p-1 ${styles.muted} hover:text-rose-600 cursor-pointer rounded ${styles.sidebarHoverBg}`}>
                           <Undo2 size={12} />
                         </button>
@@ -218,7 +218,7 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
                 <Eye size={14} className="text-blue-600" />
                 {previewJob.kind === 'build' ? t('knowledge.graph_builder.preview_title_build') : t('knowledge.graph_builder.preview_title_job')}
               </h3>
-              <button onClick={() => setPreviewJob(null)} className={`p-1 ${styles.muted} ${styles.appText} cursor-pointer text-lg`}>X</button>
+              <button type="button" onClick={() => setPreviewJob(null)} className={`p-1 ${styles.muted} ${styles.appText} cursor-pointer text-lg`}>X</button>
             </div>
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-3 gap-3">
@@ -261,11 +261,11 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
               )}
             </div>
             <div className={`p-4 border-t ${styles.cardBorder} flex justify-end gap-2`}>
-              <button onClick={() => setPreviewJob(null)} className={`px-4 py-2 ${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardText} font-bold rounded-lg text-xs cursor-pointer`}>
+              <button type="button" onClick={() => setPreviewJob(null)} className={`px-4 py-2 ${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardText} font-bold rounded-lg text-xs cursor-pointer`}>
                 {t('knowledge.graph_builder.close')}
               </button>
               {previewJob.kind === 'build' && (
-                <button onClick={handleBuild} disabled={building}
+                <button type="button" onClick={handleBuild} disabled={building}
                   className={`px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg text-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5`}>
                   <Play size={11} /> {t('knowledge.graph_builder.confirm_build')}
                 </button>
@@ -285,7 +285,7 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
                 <Terminal size={14} className="text-indigo-600" />
                 {t('knowledge.graph_builder.logs_title')} · <span className="font-mono text-[11px]">{logsJob.job.jobId}</span>
               </h3>
-              <button onClick={() => setLogsJob(null)} className={`p-1 ${styles.muted} ${styles.appText} cursor-pointer text-lg`}>X</button>
+              <button type="button" onClick={() => setLogsJob(null)} className={`p-1 ${styles.muted} ${styles.appText} cursor-pointer text-lg`}>X</button>
             </div>
             <div className="p-4 flex-1 overflow-y-auto bg-slate-950 rounded-lg">
               <pre className="font-mono text-[10px] text-slate-300 leading-relaxed whitespace-pre-wrap">

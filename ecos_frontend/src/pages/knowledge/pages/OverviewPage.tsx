@@ -27,6 +27,7 @@ import {
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { knowledgeApi, type GraphStats } from '../services/knowledgeApi';
+import { KB_STATS_REFRESH_EVENT } from '../typesAndConstants';
 import { fetchNavProducts, type NavProductItemVO } from '../../../services/knowledgeNavApi';
 
 /**
@@ -162,8 +163,8 @@ export default function OverviewPage() {
   // 监听萃取成功事件（与 Batch 1 既有 OverviewDashboard 同名事件保一致）
   useEffect(() => {
     const handler = () => { void loadAll(); };
-    window.addEventListener('kb:stats:refresh', handler);
-    return () => { window.removeEventListener('kb:stats:refresh', handler); };
+    window.addEventListener(KB_STATS_REFRESH_EVENT, handler);
+    return () => { window.removeEventListener(KB_STATS_REFRESH_EVENT, handler); };
   }, [loadAll]);
 
   /** 最近知识资产表（fetchNavProducts top 10） */

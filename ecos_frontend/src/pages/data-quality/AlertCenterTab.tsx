@@ -173,7 +173,7 @@ export default function AlertCenterTab() {
             lvl === "P0" ? Siren : lvl === "P1" ? BellRing : lvl === "P2" ? Bell : TriangleAlert;
           const count = kpiCounts[lvl] ?? 0;
           return (
-            <button
+            <button type="button"
               key={lvl}
               onClick={() => setLevelFilter(levelFilter === lvl ? "" : lvl)}
               className={`rounded-md p-4 text-left cursor-pointer transition border ${
@@ -234,7 +234,7 @@ export default function AlertCenterTab() {
           ))}
         </select>
 
-        <button
+        <button type="button"
           onClick={() => {
             setLoading(true);
             void load();
@@ -329,7 +329,7 @@ export default function AlertCenterTab() {
                     {/* 操作 */}
                     <td className="px-3 py-2.5 text-right whitespace-nowrap">
                       {canAck && (
-                        <button
+                        <button type="button"
                           disabled={isBusy}
                           onClick={() => handleAck(a.id)}
                           className="h-6 px-2 rounded text-[10px] font-medium border cursor-pointer transition
@@ -345,7 +345,7 @@ export default function AlertCenterTab() {
                         </button>
                       )}
                       {canResolve && (
-                        <button
+                        <button type="button"
                           disabled={isBusy}
                           onClick={() => handleResolve(a.id)}
                           className="h-6 px-2 rounded text-[10px] font-medium border ml-1.5 cursor-pointer transition

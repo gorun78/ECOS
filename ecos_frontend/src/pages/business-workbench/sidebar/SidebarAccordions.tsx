@@ -7,6 +7,7 @@ import React from 'react';
 import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, FunctionType } from '../../../types/ontology';
 import LucideIcon from '../LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 
 type SidebarCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function';
 
@@ -31,16 +32,18 @@ export function ObjectTypesAccordion({
   onSelectCategory
 }: ObjectTypesAccordionProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-0.5">
       <button
+        type="button"
         onClick={() => toggleExpand('object')}
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
           <LucideIcon name={expanded.object ? "ChevronDown" : "ChevronRight"} size={12} />
-          <span>对象类型 (Object Types)</span>
+          <span>{t('ow.side.objectLabel')}</span>
         </div>
         <span>{objectTypes.length}</span>
       </button>
@@ -50,6 +53,7 @@ export function ObjectTypesAccordion({
             const isActive = selectedCategory === 'object' && selectedId === ot.id;
             return (
               <button
+                type="button"
                 key={ot.id}
                 onClick={() => onSelectCategory('object', ot.id)}
                 className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
@@ -87,16 +91,18 @@ export function LinkTypesAccordion({
   onSelectCategory
 }: LinkTypesAccordionProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-0.5">
       <button
+        type="button"
         onClick={() => toggleExpand('link')}
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
           <LucideIcon name={expanded.link ? "ChevronDown" : "ChevronRight"} size={12} />
-          <span>链接关系 (Link Types)</span>
+          <span>{t('ow.side.linkLabel')}</span>
         </div>
         <span>{linkTypes.length}</span>
       </button>
@@ -106,6 +112,7 @@ export function LinkTypesAccordion({
             const isActive = selectedCategory === 'link' && selectedId === lt.id;
             return (
               <button
+                type="button"
                 key={lt.id}
                 onClick={() => onSelectCategory('link', lt.id)}
                 className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
@@ -143,16 +150,18 @@ export function ActionTypesAccordion({
   onSelectCategory
 }: ActionTypesAccordionProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-0.5">
       <button
+        type="button"
         onClick={() => toggleExpand('action')}
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
           <LucideIcon name={expanded.action ? "ChevronDown" : "ChevronRight"} size={12} />
-          <span>操作类型 (Action Types)</span>
+          <span>{t('ow.side.actionLabel')}</span>
         </div>
         <span>{actionTypes.length}</span>
       </button>
@@ -162,6 +171,7 @@ export function ActionTypesAccordion({
             const isActive = selectedCategory === 'action' && selectedId === at.id;
             return (
               <button
+                type="button"
                 key={at.id}
                 onClick={() => onSelectCategory('action', at.id)}
                 className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
@@ -198,16 +208,18 @@ export function FunctionTypesAccordion({
   onSelectCategory
 }: FunctionTypesAccordionProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-0.5">
       <button
+        type="button"
         onClick={() => toggleExpand('function')}
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
           <LucideIcon name={expanded.function ? "ChevronDown" : "ChevronRight"} size={12} />
-          <span>逻辑函数 (Functions)</span>
+          <span>{t('ow.side.functionLabel')}</span>
         </div>
         <span>{functionTypes.length}</span>
       </button>
@@ -217,6 +229,7 @@ export function FunctionTypesAccordion({
             const isActive = selectedCategory === 'function' && selectedId === fn.id;
             return (
               <button
+                type="button"
                 key={fn.id}
                 onClick={() => onSelectCategory('function', fn.id)}
                 className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
@@ -254,16 +267,18 @@ export function InterfacesAccordion({
   onSelectCategory
 }: InterfacesAccordionProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-0.5">
       <button
+        type="button"
         onClick={() => toggleExpand('interface')}
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
           <LucideIcon name={expanded.interface ? "ChevronDown" : "ChevronRight"} size={12} />
-          <span>接口规范 (Interfaces)</span>
+          <span>{t('ow.side.interfaceLabel')}</span>
         </div>
         <span>{interfaces.length}</span>
       </button>
@@ -273,6 +288,7 @@ export function InterfacesAccordion({
             const isActive = selectedCategory === 'interface' && selectedId === it.id;
             return (
               <button
+                type="button"
                 key={it.id}
                 onClick={() => onSelectCategory('interface', it.id)}
                 className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
@@ -309,16 +325,18 @@ export function SharedPropertiesAccordion({
   onSelectCategory
 }: SharedPropertiesAccordionProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className="space-y-0.5">
       <button
+        type="button"
         onClick={() => toggleExpand('shared_property')}
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
           <LucideIcon name={expanded.shared_property ? "ChevronDown" : "ChevronRight"} size={12} />
-          <span>共享属性 (Shared Properties)</span>
+          <span>{t('ow.side.sharedPropLabel')}</span>
         </div>
         <span>{sharedProperties.length}</span>
       </button>
@@ -328,6 +346,7 @@ export function SharedPropertiesAccordion({
             const isActive = selectedCategory === 'shared_property' && selectedId === sp.id;
             return (
               <button
+                type="button"
                 key={sp.id}
                 onClick={() => onSelectCategory('shared_property', sp.id)}
                 className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${
@@ -364,16 +383,18 @@ export function DatasetsAccordion({
   onSelectCategory
 }: DatasetsAccordionProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`space-y-0.5 border-t ${styles.sidebarBorder} pt-2 mt-2`}>
       <button
+        type="button"
         onClick={() => toggleExpand('dataset')}
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
           <LucideIcon name={expanded.dataset ? "ChevronDown" : "ChevronRight"} size={12} />
-          <span>原始数据集 (Datasets)</span>
+          <span>{t('ow.side.datasetLabel')}</span>
         </div>
         <span>{datasets.length}</span>
       </button>
@@ -383,6 +404,7 @@ export function DatasetsAccordion({
             const isActive = selectedCategory === 'dataset' && selectedId === ds.id;
             return (
               <button
+                type="button"
                 key={ds.id}
                 onClick={() => onSelectCategory('dataset', ds.id)}
                 className={`w-full text-left py-1.5 px-2.5 rounded-md flex items-center justify-between transition-colors ${

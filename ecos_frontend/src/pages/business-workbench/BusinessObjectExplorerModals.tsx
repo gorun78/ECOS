@@ -10,6 +10,7 @@ import React from 'react';
 import { ActionType, ObjectType } from '../../types/ontology';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 
 interface SaveSearchListModalProps {
   newSearchName: string;
@@ -20,6 +21,7 @@ interface SaveSearchListModalProps {
 
 export function SaveSearchListModal({ newSearchName, onNameChange, onClose, onSave }: SaveSearchListModalProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`fixed inset-0 ${styles.overlayBg} backdrop-blur-3xs flex items-center justify-center z-50`}>
@@ -27,17 +29,17 @@ export function SaveSearchListModal({ newSearchName, onNameChange, onClose, onSa
         <div className={`flex justify-between items-center pb-2 border-b ${styles.divider}`}>
           <h3 className={`text-xs font-semibold ${styles.text} flex items-center gap-1.5`}>
             <LucideIcon name="Bookmark" size={13} className="text-blue-600" />
-            保存当前过滤器为对象列表 (Object List)
+            {t('ow.boem.save.title')}
           </h3>
-          <button onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.text}`}>
+          <button type="button" onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.text}`}>
             <LucideIcon name="X" size={14} />
           </button>
         </div>
         <div>
-          <label className={`text-[10px] ${styles.cardTextMuted} block mb-1`}>输入对象列表名称</label>
+          <label className={`text-[10px] ${styles.cardTextMuted} block mb-1`}>{t('ow.boem.save.nameLabel')}</label>
           <input
             type="text"
-            placeholder="例如：旧金山基地待检修飞机"
+            placeholder={t('ow.boem.save.namePlaceholder')}
             value={newSearchName}
             onChange={e => onNameChange(e.target.value)}
             className={`w-full h-8 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded px-2.5 focus:border-blue-500 focus:outline-hidden`}
@@ -45,17 +47,19 @@ export function SaveSearchListModal({ newSearchName, onNameChange, onClose, onSa
         </div>
         <div className="flex justify-end gap-2 pt-1 text-[11px]">
           <button
+            type="button"
             onClick={onClose}
             className={`h-8 px-3 rounded ${styles.appBg} hover:bg-blue-50/20 ${styles.cardTextMuted} font-semibold`}
           >
-            取消
+            {t('ow.boem.save.cancel')}
           </button>
           <button
+            type="button"
             onClick={onSave}
             disabled={!newSearchName.trim()}
             className="h-8 px-4 rounded bg-blue-600 hover:bg-blue-500 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            确定保存
+            {t('ow.boem.save.confirm')}
           </button>
         </div>
       </div>
@@ -83,6 +87,7 @@ export function ExecuteActionModal({
   onExecute,
 }: ExecuteActionModalProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`fixed inset-0 ${styles.overlayBg} backdrop-blur-3xs flex items-center justify-center z-50`}>
@@ -91,10 +96,10 @@ export function ExecuteActionModal({
           <div className="flex items-center gap-1.5">
             <LucideIcon name="Zap" size={14} className="text-amber-500 fill-amber-500/10" />
             <h3 className={`text-xs font-semibold ${styles.text}`}>
-              执行操作：{action.displayName}
+              {t('ow.boem.exec.title')}：{action.displayName}
             </h3>
           </div>
-          <button onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.text}`}>
+          <button type="button" onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.text}`}>
             <LucideIcon name="X" size={14} />
           </button>
         </div>
@@ -110,7 +115,7 @@ export function ExecuteActionModal({
               <div key={param.id} className="space-y-1 text-xs">
                 <label className={`text-[10px] ${styles.cardTextMuted} font-semibold flex items-center justify-between`}>
                   <span>{param.displayName} ({param.id})</span>
-                  {param.isRequired && <span className="text-red-500 font-bold">* 必填</span>}
+                  {param.isRequired && <span className="text-red-500 font-bold">{t('ow.boem.exec.required')}</span>}
                 </label>
 
                 {isLocked ? (
@@ -126,20 +131,20 @@ export function ExecuteActionModal({
                     onChange={e => onActionParamsChange({ ...actionParams, [param.id]: e.target.value })}
                     className={`w-full h-8 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded px-2 focus:border-blue-500`}
                   >
-                    <option value="">-- 请选择目标状态 --</option>
+                    <option value="">{t('ow.boem.exec.optSelect')}</option>
                     {activeObjectType?.id === 'flight' && (
                       <>
-                        <option value="ON_TIME">ON_TIME (准点)</option>
-                        <option value="DELAYED">DELAYED (延误)</option>
-                        <option value="BOARDING">BOARDING (登机中)</option>
-                        <option value="CANCELLED">CANCELLED (取消)</option>
+                        <option value="ON_TIME">ON_TIME ({t('ow.boem.exec.stOnTime')})</option>
+                        <option value="DELAYED">DELAYED ({t('ow.boem.exec.stDelayed')})</option>
+                        <option value="BOARDING">BOARDING ({t('ow.boem.exec.stBoarding')})</option>
+                        <option value="CANCELLED">CANCELLED ({t('ow.boem.exec.stCancelled')})</option>
                       </>
                     )}
                     {activeObjectType?.id === 'aircraft' && (
                       <>
-                        <option value="ACTIVE">ACTIVE (活跃运行)</option>
-                        <option value="MAINTENANCE">MAINTENANCE (适航检修)</option>
-                        <option value="INSPECTION">INSPECTION (深度安全安检)</option>
+                        <option value="ACTIVE">ACTIVE ({t('ow.boem.exec.stActive')})</option>
+                        <option value="MAINTENANCE">MAINTENANCE ({t('ow.boem.exec.stMaintenance')})</option>
+                        <option value="INSPECTION">INSPECTION ({t('ow.boem.exec.stInspection')})</option>
                       </>
                     )}
                   </select>
@@ -153,7 +158,7 @@ export function ExecuteActionModal({
                 ) : (
                   <input
                     type="text"
-                    placeholder={`请输入 ${param.displayName}`}
+                    placeholder={t('ow.boem.exec.inputPlaceholder', { name: param.displayName })}
                     value={actionParams[param.id] || ''}
                     onChange={e => onActionParamsChange({ ...actionParams, [param.id]: e.target.value })}
                     className={`w-full h-8 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded px-2.5 focus:border-blue-500`}
@@ -169,23 +174,25 @@ export function ExecuteActionModal({
         {/* validation error line */}
         {actionError && (
           <div className="p-2 bg-red-50 border border-red-200 rounded text-[10px] text-red-600 font-medium">
-            ❌ 事务约束违背：{actionError}
+            ❌ {t('ow.boem.exec.constraintError')}：{actionError}
           </div>
         )}
 
         <div className={`flex justify-end gap-2 pt-2 border-t ${styles.divider} text-[11px]`}>
           <button
+            type="button"
             onClick={onClose}
             className={`h-8 px-3 rounded ${styles.appBg} hover:bg-blue-50/20 ${styles.cardTextMuted} font-semibold`}
           >
-            取消
+            {t('ow.boem.exec.cancel')}
           </button>
           <button
+            type="button"
             onClick={onExecute}
             className="h-8 px-4 rounded bg-amber-500 hover:bg-amber-400 text-white font-semibold flex items-center gap-1"
           >
             <LucideIcon name="CheckCircle" size={12} />
-            <span>执行写回 (Execute)</span>
+            <span>{t('ow.boem.exec.execute')}</span>
           </button>
         </div>
       </div>

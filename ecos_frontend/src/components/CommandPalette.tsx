@@ -158,7 +158,7 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
                 const meta = hitMeta(hit.type);
                 const IconC = meta.icon;
                 return (
-                  <button key={`h-${i}`} onClick={() => navHit(hit)}
+                  <button key={`h-${i}`} type="button" onClick={() => navHit(hit)}
                     className={`w-full text-left flex items-start p-2.5 rounded-lg ${styles.sidebarHoverBg} group transition cursor-pointer`}>
                     <div className={`p-2 mr-3 ${styles.badgeBg} border ${styles.accentBorder} rounded-md`}>
                       <IconC className={`w-4 h-4 ${styles.accentText}`} />
@@ -189,7 +189,7 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
                     {catItems.map((item) => {
                       const IconC = item.icon;
                       return (
-                        <button key={item.id} onClick={() => { onNavigate(item.id); onClose(); }}
+                        <button key={item.id} type="button" onClick={() => { onNavigate(item.id); onClose(); }}
                           className={`w-full text-left flex items-start p-2.5 rounded-lg ${styles.sidebarHoverBg} group transition cursor-pointer`}>
                           <div className={`p-2 mr-3 ${styles.appBg} border ${styles.cardBorder} rounded-md`}>
                             <IconC className={`w-4 h-4 ${styles.cardTextMuted}`} />

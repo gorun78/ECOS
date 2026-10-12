@@ -40,7 +40,7 @@ export default function SecurityCenterLayout() {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
-              <button
+              <button type="button"
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-md border-b-2 transition-all duration-150 cursor-pointer

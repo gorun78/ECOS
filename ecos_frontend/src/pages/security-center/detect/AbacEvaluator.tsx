@@ -102,7 +102,7 @@ export default function AbacEvaluator({ t, locale, styles }: { t: (k: string) =>
         <h4 className={`text-sm font-semibold mb-3 ${styles.cardText}`}>{t('sec.abac.action')}</h4>
         <div className="flex gap-2">
           {actions.map(a => (
-            <button
+            <button type="button"
               key={a}
               onClick={() => setAction(a)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
@@ -118,13 +118,13 @@ export default function AbacEvaluator({ t, locale, styles }: { t: (k: string) =>
       </div>
 
       {/* Evaluate button */}
-      <button
+      <button type="button"
         onClick={handleEvaluate}
         disabled={evaluating || !userId || !resourceType || !resourceId}
         className={btnPrimary(styles)}
       >
         {evaluating ? (
-          <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" />{locale === 'zh' ? '评估中...' : 'Evaluating...'}</span>
+          <span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin" />{t('sec.abac.evaluating')}</span>
         ) : (
           t('sec.abac.evalBtn')
         )}

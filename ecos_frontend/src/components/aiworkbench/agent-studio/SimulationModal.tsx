@@ -72,7 +72,7 @@ export default function SimulationModal({
       {/* Header with Tab Selectors */}
       <div className={`p-2 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between shrink-0`}>
         <div className={`flex ${styles.inputBg} p-1 rounded-lg`}>
-          <button
+          <button type="button"
             onClick={() => onModeChange('chat')}
             className={`px-3 py-1.5 rounded-md font-bold text-[10px] transition-all cursor-pointer flex items-center gap-1 ${
               sandboxMode === 'chat'
@@ -83,7 +83,7 @@ export default function SimulationModal({
             <Icon name="MessageSquare" size={10} />
             <span>{t('aiworkbench.agent.sim.modeChat')}</span>
           </button>
-          <button
+          <button type="button"
             onClick={() => onModeChange('simulation')}
             className={`px-3 py-1.5 rounded-md font-bold text-[10px] transition-all cursor-pointer flex items-center gap-1 ${
               sandboxMode === 'simulation'
@@ -164,7 +164,7 @@ export default function SimulationModal({
               <span className={`text-[9px] ${styles.cardTextMuted} self-center font-bold mr-1`}>
                 {t('aiworkbench.agent.sim.highRiskScenarios')}:
               </span>
-              <button
+              <button type="button"
                 onClick={() => applyPreset({
                   userId: 'analyst_li',
                   datasetId: 'ds_pilots_biography',
@@ -174,7 +174,7 @@ export default function SimulationModal({
               >
                 {t('aiworkbench.agent.sim.presetSsn')}
               </button>
-              <button
+              <button type="button"
                 onClick={() => applyPreset({
                   userId: 'EU_DPO',
                   datasetId: 'ds_pilots_biography',
@@ -184,7 +184,7 @@ export default function SimulationModal({
               >
                 {t('aiworkbench.agent.sim.presetDpo')}
               </button>
-              <button
+              <button type="button"
                 onClick={() => applyPreset({
                   userId: 'hr_manager',
                   datasetId: 'ds_flights_clean',
@@ -197,7 +197,7 @@ export default function SimulationModal({
             </div>
 
             {/* Simulation Trigger Button */}
-            <button
+            <button type="button"
               onClick={onRunSimulation}
               disabled={isSimulating || !simQuery.trim()}
               className={`w-full py-2 ${styles.accentBg} ${styles.accentHover} text-white rounded-lg font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50`}

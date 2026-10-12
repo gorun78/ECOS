@@ -93,7 +93,7 @@ export default function DomainDropdownMenu({
 
             {/* Edit / Publish·Deprecate / Delete Icons (T8: 新增状态菜单) */}
             <div className="flex items-center gap-0.5 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-              <button
+              <button type="button"
                 onClick={() => {
                   onEditDomain(d);
                   setShowDomainDropdown(false);
@@ -105,7 +105,7 @@ export default function DomainDropdownMenu({
                 <Edit size={11} />
               </button>
               <div className="relative">
-                <button
+                <button type="button"
                   onClick={() => setStatusMenuFor(statusMenuFor === d.id ? null : d.id)}
                   className={`p-1 ${styles.sidebarHoverBg} ${styles.muted} rounded transition-colors`}
                   title={t('ow.btn.domainStatus')}
@@ -114,7 +114,7 @@ export default function DomainDropdownMenu({
                 </button>
                 {statusMenuFor === d.id && (
                   <div className={`absolute right-0 top-6 w-32 ${styles.cardBg} border ${styles.sidebarBorder} rounded-lg shadow-xl py-1 z-50`}>
-                    <button
+                    <button type="button"
                       onClick={() => {
                         setStatusMenuFor(null);
                         setShowDomainDropdown(false);
@@ -125,7 +125,7 @@ export default function DomainDropdownMenu({
                       <Rocket size={11} />
                       <span>{t('ow.domain.publish')}</span>
                     </button>
-                    <button
+                    <button type="button"
                       onClick={() => {
                         setStatusMenuFor(null);
                         setShowDomainDropdown(false);
@@ -139,7 +139,7 @@ export default function DomainDropdownMenu({
                   </div>
                 )}
               </div>
-              <button
+              <button type="button"
                 onClick={() => {
                   onDeleteDomain(d.id);
                   setShowDomainDropdown(false);

@@ -168,14 +168,14 @@ export default function ExplorerTableView({
             {t('ow.explore.showingInstances')} {dataPage} / {dataTotalPages}
           </span>
           <div className="flex items-center gap-2">
-            <button
+            <button type="button"
               disabled={dataPage <= 1}
               onClick={() => setDataPage(p => Math.max(1, p - 1))}
               className={`h-6 px-2.5 rounded text-[10px] ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} disabled:opacity-40 disabled:cursor-not-allowed ${styles.sidebarHoverBg} transition-colors`}
             >
               {t('ow.btn.previousPage')}
             </button>
-            <button
+            <button type="button"
               disabled={dataPage >= dataTotalPages}
               onClick={() => setDataPage(p => Math.min(dataTotalPages, p + 1))}
               className={`h-6 px-2.5 rounded text-[10px] ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} disabled:opacity-40 disabled:cursor-not-allowed ${styles.sidebarHoverBg} transition-colors`}

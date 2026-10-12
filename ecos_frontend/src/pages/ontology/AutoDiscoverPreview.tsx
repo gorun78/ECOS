@@ -92,7 +92,7 @@ export default function AutoDiscoverPreview({
             ({candidates.length})
           </span>
         </span>
-        <button
+        <button type="button"
           onClick={() => onToggleAll(!allSelected)}
           className={`text-[10px] px-2 py-1 rounded transition ${
             someSelected
@@ -113,7 +113,7 @@ export default function AutoDiscoverPreview({
           const confColor = getConfidenceColor(cand.confidence, styles);
 
           return (
-            <button
+            <button type="button"
               key={cand.resourceName}
               onClick={() => onToggle(cand.resourceName)}
               className={`w-full text-left flex items-center gap-3 px-3 py-2.5 border-b ${styles.cardBorder}/50 last:border-b-0 transition ${

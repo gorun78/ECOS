@@ -42,7 +42,7 @@ const DataEngineConfigPanelActions: React.FC<Props> = ({
         )}
       </div>
       <div className="flex items-center gap-2">
-        <button
+        <button type="button"
           onClick={onRestoreDefaults}
           disabled={saving || refreshing}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium ${styles.cardTextMuted} hover:${styles.sidebarBg} rounded-md transition-colors disabled:opacity-50`}
@@ -50,7 +50,7 @@ const DataEngineConfigPanelActions: React.FC<Props> = ({
           <RotateCcw size={13} />
           {t('dw.cfg.actions.restoreDefaults')}
         </button>
-        <button
+        <button type="button"
           onClick={onSaveAll}
           disabled={saving || refreshing}
           className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold ${styles.cardText} ${styles.accentBg} hover:${styles.accentBg} rounded-md transition-colors disabled:opacity-50 shadow-sm`}
@@ -67,7 +67,7 @@ const DataEngineConfigPanelActions: React.FC<Props> = ({
             </>
           )}
         </button>
-        <button
+        <button type="button"
           onClick={onRefreshCache}
           disabled={saving || refreshing}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium ${styles.cardTextMuted} hover:${styles.sidebarBg} rounded-md transition-colors disabled:opacity-50`}

@@ -6,6 +6,7 @@
 import { BarChart3, Check, X, RefreshCw, Clock, Timer, Hash } from "lucide-react";
 import { AgentMeshMission, AgentMeshTask } from "../../api";
 import { useTheme } from "../../components/ThemeContext";
+import { useLanguage } from "../../components/LanguageContext";
 
 interface TaskStatsPanelProps {
   mission: AgentMeshMission;
@@ -14,6 +15,7 @@ interface TaskStatsPanelProps {
 
 export default function TaskStatsPanel({ mission, tasks }: TaskStatsPanelProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const total = tasks.length;
   const completed = tasks.filter(t => t.status === "COMPLETED").length;
   const failed = tasks.filter(t => t.status === "FAILED").length;
@@ -36,7 +38,7 @@ export default function TaskStatsPanel({ mission, tasks }: TaskStatsPanelProps) 
             mission.mode === "PIPELINE"
               ? "bg-purple-100 text-purple-700"
               : "bg-teal-100 text-teal-700"
-          }`}>{mission.mode}</span>
+          }`}>{mission.mode === "PIPELINE" ? t("agentMesh.modePipeline") : t("agentMesh.modeSupervisor")}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className={`text-[11px] font-medium ${styles.cardTextMuted} tabular-nums`}>{progress}%</span>

@@ -149,7 +149,7 @@ export default function LogsTab({ autoScroll, session }: Props) {
                 ? `${styles.warningBg} ${styles.warningText}`
                 : `${styles.infoBg} ${styles.infoText}`;
           return (
-            <button
+            <button type="button"
               key={lv}
               onClick={() => toggleLevel(lv)}
               className={`flex items-center gap-1 px-2 py-0.5 rounded border ${styles.cardBorder} ${
@@ -203,7 +203,7 @@ export default function LogsTab({ autoScroll, session }: Props) {
             const isErr = l.level === 'ERROR';
             const isWarn = l.level === 'WARNING';
             return (
-              <button
+              <button type="button"
                 key={l.seq}
                 onClick={() => onLineClick(l)}
                 className={`text-left text-[10px] font-mono px-2 py-0.5 flex items-start gap-2 ${

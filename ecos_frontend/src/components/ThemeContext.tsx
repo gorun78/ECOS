@@ -24,11 +24,17 @@ export interface ThemeStyles {
   accentHover: string;
   accentText: string;
   accentBorder: string;
+  /** Focus/selection ring color class (G2 flow-canvas selection highlight) — theme accent, not neutral */
+  accentRing: string;
+  /** Selected-edge SVG stroke hex (G2 flow-canvas) — mirrors accentBg hue; consumed as an SVG attribute, not a Tailwind class */
+  accentStroke: string;
   badgeBg: string;
   badgeText: string;
   inputBg: string;
   inputText: string;
   inputBorder: string;
+  /** Input placeholder text color — theme-aware, never a raw zinc/gray literal */
+  placeholderText: string;
   /** Alias for cardTextMuted — used by newer pages */
   muted: string;
   /** Alias for sidebarBorder — used as generic border */
@@ -52,6 +58,22 @@ export interface ThemeStyles {
   divider: string;
   /** Primary text (aliased default highlight text) — used by Login / AIPKnowledgeView etc. */
   text: string;
+  /**
+   * Dark-constancy "island" palette (G1). True console/terminal surfaces stay dark
+   * in ALL four themes, so these tokens carry identical dark values per preset. Text
+   * tokens use arbitrary-value hex (not named gray/slate/white) so the slate-light
+   * CSS override whitelist cannot flip them to dark ink on the still-dark island
+   * (fixes the pre-existing dark-on-dark contrast inversion).
+   */
+  islandBg: string;
+  islandBorder: string;
+  islandCardSoft: string;
+  islandInput: string;
+  islandInputBorder: string;
+  islandText: string;
+  islandMuted: string;
+  islandHoverText: string;
+  islandPlaceholder: string;
   [key: string]: string;
 }
 
@@ -79,11 +101,14 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     accentHover: "hover:bg-indigo-700",
     accentText: "text-indigo-600",
     accentBorder: "border-indigo-200",
+    accentRing: "ring-indigo-500",
+    accentStroke: "#6366f1",
     badgeBg: "bg-indigo-50",
     badgeText: "text-indigo-700",
     inputBg: "bg-white",
     inputText: "text-slate-800",
     inputBorder: "border-[#E2E8F0]",
+    placeholderText: "placeholder:text-slate-400",
     muted: "text-slate-500",
     appBorder: "border-[#E2E8F0]",
     successBg: "bg-emerald-50",
@@ -100,7 +125,16 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     infoBorder: "border-blue-200",
     overlayBg: "bg-slate-900/40",
     divider: "border-[#E2E8F0]",
-    text: "text-slate-800"
+    text: "text-slate-800",
+    islandBg: "bg-[#0B0F19]",
+    islandBorder: "border-[#1E293B]",
+    islandCardSoft: "bg-[#1E293B]/40",
+    islandInput: "bg-[#1E2533]",
+    islandInputBorder: "border-[#2D3748]",
+    islandText: "text-[#e2e8f0]",
+    islandMuted: "text-[#94a3b8]",
+    islandHoverText: "hover:text-[#cbd5e1]",
+    islandPlaceholder: "placeholder:text-[#64748b]"
   },
   "deep-space": {
     appBg: "bg-[#0B0F19]",
@@ -119,11 +153,14 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     accentHover: "hover:bg-blue-700",
     accentText: "text-blue-400",
     accentBorder: "border-blue-500/30",
+    accentRing: "ring-blue-500",
+    accentStroke: "#3b82f6",
     badgeBg: "bg-blue-950/40",
     badgeText: "text-blue-450",
     inputBg: "bg-[#1E2533]",
     inputText: "text-slate-100",
     inputBorder: "border-[#2D3748]",
+    placeholderText: "placeholder:text-slate-500",
     muted: "text-slate-400",
     appBorder: "border-[#1E293B]",
     successBg: "bg-emerald-500/10",
@@ -140,7 +177,16 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     infoBorder: "border-blue-500/30",
     overlayBg: "bg-slate-950/50",
     divider: "border-[#1E293B]",
-    text: "text-slate-100"
+    text: "text-slate-100",
+    islandBg: "bg-[#0B0F19]",
+    islandBorder: "border-[#1E293B]",
+    islandCardSoft: "bg-[#1E293B]/40",
+    islandInput: "bg-[#1E2533]",
+    islandInputBorder: "border-[#2D3748]",
+    islandText: "text-[#e2e8f0]",
+    islandMuted: "text-[#94a3b8]",
+    islandHoverText: "hover:text-[#cbd5e1]",
+    islandPlaceholder: "placeholder:text-[#64748b]"
   },
   "cyber-terminal": {
     appBg: "bg-[#020202]",
@@ -159,11 +205,14 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     accentHover: "hover:bg-emerald-600",
     accentText: "text-emerald-400",
     accentBorder: "border-emerald-500/40",
+    accentRing: "ring-emerald-500",
+    accentStroke: "#10b981",
     badgeBg: "bg-[#0A1A0F]",
     badgeText: "text-emerald-400",
     inputBg: "bg-[#050505]",
     inputText: "text-emerald-400",
     inputBorder: "border-emerald-600/40",
+    placeholderText: "placeholder:text-emerald-700",
     muted: "text-emerald-650",
     appBorder: "border-emerald-650/50",
     successBg: "bg-emerald-500/10",
@@ -180,7 +229,16 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     infoBorder: "border-cyan-500/40",
     overlayBg: "bg-black/60",
     divider: "border-emerald-650/50",
-    text: "text-emerald-500"
+    text: "text-emerald-500",
+    islandBg: "bg-[#0B0F19]",
+    islandBorder: "border-[#1E293B]",
+    islandCardSoft: "bg-[#1E293B]/40",
+    islandInput: "bg-[#1E2533]",
+    islandInputBorder: "border-[#2D3748]",
+    islandText: "text-[#e2e8f0]",
+    islandMuted: "text-[#94a3b8]",
+    islandHoverText: "hover:text-[#cbd5e1]",
+    islandPlaceholder: "placeholder:text-[#64748b]"
   },
   "royal-purple": {
     appBg: "bg-[#0F0C1B]",
@@ -199,11 +257,14 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     accentHover: "hover:bg-purple-600",
     accentText: "text-purple-450",
     accentBorder: "border-purple-700/30",
+    accentRing: "ring-purple-500",
+    accentStroke: "#a855f7",
     badgeBg: "bg-purple-950/50",
     badgeText: "text-purple-350",
     inputBg: "bg-[#251D3E]",
     inputText: "text-purple-200",
     inputBorder: "border-purple-800/40",
+    placeholderText: "placeholder:text-purple-500",
     muted: "text-purple-400",
     appBorder: "border-purple-900/40",
     successBg: "bg-emerald-500/10",
@@ -220,7 +281,16 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     infoBorder: "border-blue-500/30",
     overlayBg: "bg-purple-950/50",
     divider: "border-purple-900/40",
-    text: "text-purple-100"
+    text: "text-purple-100",
+    islandBg: "bg-[#0B0F19]",
+    islandBorder: "border-[#1E293B]",
+    islandCardSoft: "bg-[#1E293B]/40",
+    islandInput: "bg-[#1E2533]",
+    islandInputBorder: "border-[#2D3748]",
+    islandText: "text-[#e2e8f0]",
+    islandMuted: "text-[#94a3b8]",
+    islandHoverText: "hover:text-[#cbd5e1]",
+    islandPlaceholder: "placeholder:text-[#64748b]"
   }
 };
 

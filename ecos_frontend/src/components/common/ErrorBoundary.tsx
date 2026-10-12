@@ -119,10 +119,10 @@ function FallbackInner({
       </div>
 
       <h2 className={`text-lg font-bold mb-1.5 ${styles.cardText}`}>
-        {t("errorboundary.title")}
+        {t("common.error.title")}
       </h2>
       <p className={`text-xs max-w-md text-center leading-relaxed mb-4 ${styles.cardTextMuted}`}>
-        {t("errorboundary.desc")}
+        {t("common.error.desc")}
       </p>
 
       {/* Error details (collapsible) */}
@@ -130,7 +130,7 @@ function FallbackInner({
         <summary
           className={`text-[10px] font-mono cursor-pointer ${styles.cardTextMuted} transition`}
         >
-          {t("errorboundary.details")}
+          {t("common.error.details")}
         </summary>
         <pre
           className={`mt-2 p-3 rounded-lg text-[10px] font-mono leading-relaxed overflow-auto max-h-32 whitespace-pre-wrap break-all ${
@@ -143,19 +143,19 @@ function FallbackInner({
       </details>
 
       <div className="flex items-center gap-3">
-        <button
+        <button type="button"
           onClick={onReset}
           className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg cursor-pointer transition ${styles.accentBg} text-white hover:opacity-90 shadow-xs`}
         >
           <RefreshCw className="w-3.5 h-3.5" />
-          {t("errorboundary.retry")}
+          {t("common.error.retry")}
         </button>
-        <button
+        <button type="button"
           onClick={() => window.location.reload()}
           className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition`}
         >
           <Home className="w-3.5 h-3.5" />
-          {t("errorboundary.refresh")}
+          {t("common.error.reload")}
         </button>
       </div>
     </div>

@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../../stores/useWorkbenchStore';
 import { useTheme } from '../../ThemeContext';
+import { useLanguage } from '../../LanguageContext';
 import { DATA_CATALOG_UNAVAILABLE } from '../../../services/dataCatalogClient';
 
 // ── 组件接口 ────────────────────────────────────────────────
@@ -44,6 +45,7 @@ export default function DataPreviewPanel({
   resourceId,
 }: DataPreviewPanelProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const store = useWorkbenchStore();
   const {
     dataPreview,
@@ -107,7 +109,7 @@ export default function DataPreviewPanel({
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <Loader2 size={22} className="animate-spin text-indigo-400 mb-3" />
-        <p className={`text-xs ${styles.cardTextMuted}`}>加载数据预览...</p>
+        <p className={`text-xs ${styles.cardTextMuted}`}>{t("ow.preview.loading")}</p>
       </div>
     );
   }
@@ -119,11 +121,12 @@ export default function DataPreviewPanel({
         <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-amber-500/10 border border-amber-500/20 max-w-sm">
           <AlertTriangle size={15} className="text-amber-400 mt-0.5 shrink-0" />
           <div>
-            <p className="text-xs text-amber-300 font-medium">数据底座暂不可用</p>
+            <p className="text-xs text-amber-300 font-medium">{t("ow.preview.error.title")}</p>
             <p className="text-[10px] text-amber-500/70 mt-1">{error}</p>
           </div>
         </div>
         <button
+          type="button"
           onClick={handleRetry}
           disabled={retrying}
           className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs text-indigo-400
@@ -135,7 +138,7 @@ export default function DataPreviewPanel({
           ) : (
             <RefreshCw size={12} />
           )}
-          重试
+          {t("ow.preview.error.retry")}
         </button>
       </div>
     );
@@ -150,22 +153,23 @@ export default function DataPreviewPanel({
       <div className={`flex flex-col items-center justify-center py-12 ${styles.muted}`}>
         <Database size={32} className="mb-3 opacity-20" />
         <p className="text-xs">
-          {hasMappings ? '暂无预览数据' : '未映射物理表'}
+          {hasMappings ? t("ow.preview.empty.nodata") : t("ow.preview.empty.unmapped")}
         </p>
         <p className="text-[10px] mt-1.5 opacity-60 max-w-[200px] text-center">
           {hasMappings
-            ? '该实体已映射物理表，但无可用预览。请确认数据底座连接正常。'
-            : '请先在「数据源」标签页中映射物理表'}
+            ? t("ow.preview.empty.nodataHint")
+            : t("ow.preview.empty.unmappedHint")}
         </p>
         {hasMappings && (
           <button
+            type="button"
             onClick={handleRetry}
             disabled={retrying}
             className="mt-4 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] text-indigo-400
               border border-indigo-500/20 hover:bg-indigo-500/10 transition"
           >
             <RefreshCw size={11} />
-            重新加载
+            {t("ow.preview.empty.reload")}
           </button>
         )}
       </div>
@@ -178,10 +182,11 @@ export default function DataPreviewPanel({
       <AlertTriangle size={12} className="text-amber-400 shrink-0" />
       <p className="text-[10px] text-amber-400/80 flex-1">{error}</p>
       <button
+        type="button"
         onClick={() => setError(null)}
         className="text-[10px] text-amber-400 hover:text-amber-300 underline shrink-0"
       >
-        关闭
+        {t("ow.preview.error.dismiss")}
       </button>
     </div>
   ) : null;
@@ -192,17 +197,18 @@ export default function DataPreviewPanel({
       {/* 头部信息 */}
       <div className="flex items-center justify-between">
         <span className={`text-[10px] ${styles.muted}`}>
-          共 {rows.length} 行 · {columns.length} 列
+          {t("ow.preview.summary", { rows: rows.length, cols: columns.length })}
         </span>
         <button
+          type="button"
           onClick={handleRetry}
           disabled={retrying}
           className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] ${styles.muted}
             hover:${styles.cardText} hover:bg-white/5 transition`}
-          title="刷新预览"
+          title={t("ow.preview.refreshTitle")}
         >
           <RefreshCw size={11} className={retrying ? 'animate-spin' : ''} />
-          刷新
+          {t("ow.preview.refresh")}
         </button>
       </div>
 
@@ -285,10 +291,11 @@ export default function DataPreviewPanel({
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <span className={`text-[10px] ${styles.muted}`}>
-            第 {page + 1} / {totalPages} 页
+            {t("ow.preview.page", { cur: page + 1, total: totalPages })}
           </span>
           <div className="flex items-center gap-1">
             <button
+              type="button"
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
               className={`p-1.5 rounded ${styles.cardTextMuted} hover:${styles.cardText} hover:bg-white/5
@@ -297,6 +304,7 @@ export default function DataPreviewPanel({
               <ChevronLeft size={13} />
             </button>
             <button
+              type="button"
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
               className={`p-1.5 rounded ${styles.cardTextMuted} hover:${styles.cardText} hover:bg-white/5

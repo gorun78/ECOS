@@ -7,6 +7,7 @@ import React from 'react';
 import { ObjectType, OntologyDomain } from '../../../types/ontology';
 import LucideIcon from '../LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 import { getDomainColorClasses } from './domainColorClasses';
 
 interface DomainCardsGridProps {
@@ -25,6 +26,7 @@ export default function DomainCardsGrid({
   onQuickNavigate
 }: DomainCardsGridProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     /* Domains Cards Grid */
@@ -42,21 +44,23 @@ export default function DomainCardsGrid({
               <div className="flex justify-between items-start">
                 <div>
                   <h4 className={`text-xs font-semibold ${styles.cardText}`}>{d.displayName}</h4>
-                  <span className={`text-[10px] ${styles.cardTextMuted} font-mono lowercase tracking-tight`}>域识别ID: {d.id}</span>
+                  <span className={`text-[10px] ${styles.cardTextMuted} font-mono lowercase tracking-tight`}>{t('ow.domaincards.domainId', { id: d.id })}</span>
                 </div>
 
                 <div className="flex items-center gap-1.5">
                   <button
+                    type="button"
                     onClick={() => handleStartEdit(d)}
                     className={`p-1 ${styles.cardTextMuted} opacity-80 hover:opacity-100 rounded ${styles.sidebarHoverBg}`}
-                    title="编辑此业务域"
+                    title={t('ow.domaincards.editTitle')}
                   >
                     <LucideIcon name="Edit" size={12} />
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleDeleteDomain(d.id)}
                     className={`p-1 ${styles.cardTextMuted} hover:text-red-600 rounded hover:bg-red-50`}
-                    title="删除此业务域"
+                    title={t('ow.domaincards.deleteTitle')}
                   >
                     <LucideIcon name="Trash2" size={12} />
                   </button>
@@ -64,14 +68,14 @@ export default function DomainCardsGrid({
               </div>
 
               <p className={`text-[11px] ${styles.cardTextMuted} leading-relaxed min-h-[36px] line-clamp-2`}>
-                {d.description || '暂无业务描述。'}
+                {d.description || t('ow.domaincards.noDescFallback')}
               </p>
             </div>
 
             {/* Associated object lists */}
             <div className={`border-t ${styles.divider} pt-3 mt-3`}>
               <div className={`flex items-center justify-between text-[10px] ${styles.cardTextMuted} font-semibold uppercase mb-1.5`}>
-                <span>已关联对象 ({domainObjects.length})</span>
+                <span>{t('ow.domaincards.assignedLabel', { count: domainObjects.length })}</span>
                 <span className="font-mono">{d.id} domain</span>
               </div>
               {domainObjects.length > 0 ? (
@@ -88,7 +92,7 @@ export default function DomainCardsGrid({
                   ))}
                 </div>
               ) : (
-                <div className={`text-[10px] ${styles.cardTextMuted} italic`}>暂无绑定的业务实体</div>
+                <div className={`text-[10px] ${styles.cardTextMuted} italic`}>{t('ow.domaincards.noObjects')}</div>
               )}
             </div>
           </div>
@@ -102,14 +106,14 @@ export default function DomainCardsGrid({
             <div className="flex justify-between items-center">
               <h4 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1`}>
                 <LucideIcon name="AlertCircle" size={13} className="text-amber-500" />
-                <span>未分类实体池</span>
+                <span>{t('ow.domaincards.unassignedTitle')}</span>
               </h4>
               <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 font-semibold font-mono">
-                {objectTypes.filter(ot => !ot.domainId).length} 对象
+                {t('ow.domaincards.unassignedCount', { count: objectTypes.filter(ot => !ot.domainId).length })}
               </span>
             </div>
             <p className={`text-[11px] ${styles.cardTextMuted} leading-relaxed`}>
-              当前声明的某些本体实体还未绑定到具体的业务划分域中。未分类对象在全景关系拓扑中可以继续存在，但在业务域治理上未形成职责分级。
+              {t('ow.domaincards.unassignedDesc')}
             </p>
           </div>
 

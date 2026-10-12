@@ -34,14 +34,13 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
-  const isZh = locale === "zh";
 
   if (!visible) return null;
 
-  const defaultConfirm = confirmText || (isZh ? "确认" : "Confirm");
-  const defaultCancel = cancelText || (isZh ? "取消" : "Cancel");
+  const defaultConfirm = confirmText || t("common.confirm");
+  const defaultCancel = cancelText || t("common.cancel");
 
   const _danger = danger ?? variant === "danger";
 
@@ -57,12 +56,13 @@ export default function ConfirmDialog({
         <p className={`text-sm mb-5 ${styles.cardTextMuted}`}>{message}</p>
         <div className="flex gap-2 justify-end">
           <button
+            type="button"
             onClick={onCancel}
-            className={`px-4 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText} hover:bg-gray-50 dark:hover:bg-white/5`}
+            className={`px-4 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`}
           >
             {defaultCancel}
           </button>
-          <button
+          <button type="button"
             onClick={onConfirm}
             className={
               confirmClass ||

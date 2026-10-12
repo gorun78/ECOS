@@ -7,6 +7,7 @@ import React from 'react';
 import { ObjectType, OntologyDomain } from '../../../types/ontology';
 import LucideIcon from '../LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 import { getDomainColorClasses } from './domainColorClasses';
 
 interface QuickNavPanelProps {
@@ -21,12 +22,13 @@ export default function QuickNavPanel({
   onQuickNavigate
 }: QuickNavPanelProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs space-y-3`}>
       <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
         <LucideIcon name="Compass" size={14} className={styles.cardTextMuted} />
-        实体清单快速分级导航
+        {t('ow.qnav.title')}
       </h3>
 
       <div className="space-y-4 max-h-[260px] overflow-y-auto pr-1">
@@ -68,7 +70,7 @@ export default function QuickNavPanel({
           <div className="space-y-1.5">
             <div className={`flex items-center gap-1.5 text-[10px] font-extrabold ${styles.cardTextMuted} tracking-wider uppercase border-b ${styles.divider} pb-1`}>
               <span className="w-2 h-2 rounded-full bg-[var(--card,#94A3B8)]" />
-              <span>未归类业务对象 (Pool)</span>
+              <span>{t('ow.qnav.unassigned')}</span>
             </div>
             <div className="space-y-1 pl-1">
               {objectTypes.filter(ot => !ot.domainId).map(ot => (

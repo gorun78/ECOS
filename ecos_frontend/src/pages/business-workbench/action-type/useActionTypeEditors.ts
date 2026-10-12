@@ -19,6 +19,10 @@ interface ActionTypeEditorsParams {
   setNewValName: (value: string) => void;
   setNewValExpression: (value: string) => void;
   setNewValError: (value: string) => void;
+  t: {
+    (key: string, params?: Record<string, string | number>): string;
+    (key: string, fallback: string): string;
+  };
 }
 
 /**
@@ -39,7 +43,8 @@ export function useActionTypeEditors({
   newValError,
   setNewValName,
   setNewValExpression,
-  setNewValError
+  setNewValError,
+  t
 }: ActionTypeEditorsParams) {
   // Add parameter
   const handleAddParam = () => {
@@ -50,7 +55,7 @@ export function useActionTypeEditors({
       displayName: newParamName,
       dataType: newParamType,
       isRequired: true,
-      description: `关于参数 ${newParamName} 的用途。`,
+      description: t('ow.act.od.defaultDesc', { name: newParamName }),
       objectTypeId: newParamType === 'object' ? newParamObjType : undefined
     };
 
@@ -176,7 +181,7 @@ export function useActionTypeEditors({
       id: `val_${Date.now()}`,
       displayName: newValName,
       expression: newValExpression,
-      errorMessage: newValError || '验证未通过，请检查您的输入参数。'
+      errorMessage: newValError || t('ow.act.ov.defaultError')
     };
 
     onUpdate({

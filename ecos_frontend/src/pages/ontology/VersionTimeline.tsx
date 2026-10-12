@@ -240,7 +240,7 @@ function SnapshotPreview({ label, data, styles, expanded, onToggle }: {
   const display = expanded || text.length <= 600 ? text : text.slice(0, 600) + '\n…';
   return (
     <div className={`rounded border ${styles.cardBorder} overflow-hidden`}>
-      <button onClick={onToggle}
+      <button type="button" onClick={onToggle}
         className={`w-full flex items-center gap-1.5 px-2 py-1 text-left transition ${styles.sidebarHoverBg}`}>
         {expanded ? <ChevronDown size={12} className={styles.muted} /> : <ChevronRight size={12} className={styles.muted} />}
         <span className={`text-[10px] font-mono uppercase tracking-wider ${styles.muted}`}>{label}</span>
@@ -403,7 +403,7 @@ export default function VersionTimeline({ domainCode, onClose }: VersionTimeline
               <span className={`text-[10px] px-1.5 py-0.5 rounded ${styles.badgeBg} ${styles.badgeText}`}>{versions.length}</span>
             )}
           </div>
-          <button onClick={onClose} title={t('ontology.version.close')}
+          <button type="button" onClick={onClose} title={t('ontology.version.close')}
             className={`p-1 rounded transition ${styles.sidebarHoverBg} ${styles.muted}`}>
             <X size={16} />
           </button>
@@ -421,7 +421,7 @@ export default function VersionTimeline({ domainCode, onClose }: VersionTimeline
             <div className="flex flex-col items-center gap-3 py-16 px-8">
               <AlertCircle size={28} className={styles.dangerText} />
               <p className={`text-xs text-center ${styles.dangerText}`}>{listError}</p>
-              <button onClick={loadVersions}
+              <button type="button" onClick={loadVersions}
                 className={`px-3 py-1.5 rounded-lg text-xs transition ${styles.sidebarHoverBg} ${styles.cardText}`}>
                 {t('ontology.version.retry')}
               </button>
@@ -442,7 +442,7 @@ export default function VersionTimeline({ domainCode, onClose }: VersionTimeline
                 const isSelected = selected?.id === item.id;
                 const isBase = baseId === item.id && selected?.id !== item.id;
                 return (
-                  <button key={item.id}
+                  <button type="button" key={item.id}
                     onClick={() => handleSelect(item)}
                     onDoubleClick={() => handleSetBase(item)}
                     className={`w-full text-left px-3 py-2.5 rounded-lg border transition ${

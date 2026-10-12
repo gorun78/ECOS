@@ -33,7 +33,7 @@ export default function PropertyPanel({ selectedNode, onUpdateData, onDelete }: 
           <Zap className="w-4 h-4 text-indigo-500" />
           {t(`wf.node_type.${selectedNode.type}`)}
         </h3>
-        <button
+        <button type="button"
           onClick={onDelete}
           className="p-1.5 hover:bg-red-50 rounded text-red-400 transition"
           title="Delete node"

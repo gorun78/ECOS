@@ -101,29 +101,28 @@ export default function MarketplaceCardGrid({
   loading,
   onAssetClick,
 }: MarketplaceCardGridProps) {
-  const { locale } = useLanguage();
+  const { t, locale } = useLanguage();
   const { styles } = useTheme();
   const { getLabel, getColor } = useDict("asset_status", locale);
-  const tl = (zh: string, en: string) => (locale === "zh" ? zh : en);
 
   return (
     <div className="flex-1 overflow-auto px-6 lg:px-8 py-5">
       {loading ? (
         <div className="flex items-center justify-center py-20 opacity-50">
           <RefreshCw className="animate-spin w-6 h-6 mr-3" />
-          {tl("加载中…", "Loading...")}
+          {t("marketplace.card.loading")}
         </div>
       ) : assets.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 opacity-50 gap-3">
           <Store className="w-12 h-12" />
           <span className="text-sm">
-            {tl("暂无数据资产，试试发布第一个吧", "No assets found. Publish the first one!")}
+            {t("marketplace.card.empty")}
           </span>
         </div>
       ) : (
         <>
           <p className="text-xs opacity-50 mb-3">
-            {tl(`共 ${total} 个资产`, `${total} assets total`)}
+            {t("marketplace.card.total", { total })}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {assets.map((asset) => {
@@ -167,7 +166,7 @@ export default function MarketplaceCardGrid({
 
                   {/* Description */}
                   <p className="text-xs leading-relaxed opacity-60 line-clamp-2 mb-3">
-                    {asset.description || tl("暂无描述", "No description")}
+                    {asset.description || t("marketplace.card.noDesc")}
                   </p>
 
                   {/* Meta info */}

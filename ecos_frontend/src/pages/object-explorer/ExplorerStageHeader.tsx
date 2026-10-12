@@ -68,7 +68,7 @@ export default function ExplorerStageHeader({
 
         {/* View Selector Tabs */}
         <div className={`flex ${styles.appBg} p-1 rounded-lg`}>
-          <button
+          <button type="button"
             onClick={() => setActiveTab('table')}
             className={`px-3 py-1.5 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
               activeTab === 'table' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
@@ -77,7 +77,7 @@ export default function ExplorerStageHeader({
             <Table2 size={13} />
             {t('ow.explore.tabTable')}
           </button>
-          <button
+          <button type="button"
             onClick={() => setActiveTab('analytics')}
             className={`px-3 py-1.5 rounded-md text-[11px] font-semibold flex items-center gap-1.5 transition-all ${
               activeTab === 'analytics' ? `${styles.cardBg} ${styles.cardText} shadow-3xs` : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
@@ -117,7 +117,7 @@ export default function ExplorerStageHeader({
               {f.operator !== 'is_empty' && f.operator !== 'is_not_empty' && (
                 <strong className="text-blue-900 font-semibold">{f.value}</strong>
               )}
-              <button
+              <button type="button"
                 onClick={() => handleRemoveFilter(idx)}
                 className="text-blue-400 hover:text-blue-600 ml-1 font-bold"
               >
@@ -129,7 +129,7 @@ export default function ExplorerStageHeader({
 
         {/* Add filter creator dropdown trigger */}
         <div className="relative ml-auto flex items-center gap-2">
-          <button
+          <button type="button"
             onClick={() => setShowFilterCreator(!showFilterCreator)}
             className={`${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} ${styles.sidebarHoverBg} text-[10px] font-semibold py-1 px-2 rounded-md flex items-center gap-1 transition-colors`}
           >
@@ -187,13 +187,13 @@ export default function ExplorerStageHeader({
               </div>
 
               <div className="flex justify-end gap-1.5 pt-1">
-                <button
+                <button type="button"
                   onClick={() => setShowFilterCreator(false)}
                   className={`h-7 px-2.5 rounded text-[10px] ${styles.appBg} ${styles.sidebarHoverBg} ${styles.cardTextMuted}`}
                 >
                   {t('ow.btn.cancel')}
                 </button>
-                <button
+                <button type="button"
                   onClick={handleAddFilter}
                   disabled={!newFilterProp}
                   className={`h-7 px-3 rounded text-[10px] ${styles.accentBg} hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -206,7 +206,7 @@ export default function ExplorerStageHeader({
 
           {/* Save exploration list */}
           {activeFilters.length > 0 && (
-            <button
+            <button type="button"
               onClick={() => setShowSaveModal(true)}
               className={`${styles.sidebarActiveBg} border ${styles.accentBorder} text-blue-700 hover:bg-blue-100 text-[10px] font-semibold py-1 px-2.5 rounded-md flex items-center gap-1 transition-colors`}
             >

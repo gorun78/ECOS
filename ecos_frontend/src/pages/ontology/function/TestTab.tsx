@@ -134,7 +134,7 @@ export default function TestTab({ func }: TestTabProps) {
           </div>
         </div>
 
-        <button
+        <button type="button"
           onClick={runTest}
           disabled={isTesting || !expression.trim()}
           className={`w-full py-2 rounded-lg flex items-center justify-center gap-2 font-medium transition-all shadow-xs mt-4 text-xs ${styles.accentBg} text-white ${styles.accentHover} disabled:opacity-50`}

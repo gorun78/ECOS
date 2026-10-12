@@ -143,7 +143,7 @@ export default function ReportListTab() {
           {REPORT_TYPES.map((tst) => {
             const active = type === tst;
             return (
-              <button
+              <button type="button"
                 key={tst}
                 onClick={() => setType(tst)}
                 className={`px-3 py-1.5 text-xs rounded-lg border transition cursor-pointer ${
@@ -166,7 +166,7 @@ export default function ReportListTab() {
           className={`flex-1 min-w-[180px] max-w-[260px] px-2.5 py-1.5 text-xs rounded-lg border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} focus:outline-none`}
         />
 
-        <button
+        <button type="button"
           onClick={() => void handleGenerate()}
           disabled={generating}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition cursor-pointer disabled:opacity-50 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} border ${styles.accentBorder}`}
@@ -179,7 +179,7 @@ export default function ReportListTab() {
           {generating ? t("dw.dqRule.report.generating") : t("dw.dqRule.report.generate")}
         </button>
 
-        <button
+        <button type="button"
           onClick={() => void load()}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border ${styles.cardBorder} ${styles.cardTextMuted} rounded-lg transition cursor-pointer hover:bg-black/5 dark:hover:bg-white/5`}
         >
@@ -275,7 +275,7 @@ export default function ReportListTab() {
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <button
+                        <button type="button"
                           onClick={() => handleView(r.id)}
                           className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold rounded-md border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer`}
                           title={t("dw.dqRule.report.viewHint")}

@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useWorkbenchStore } from '../../stores/useWorkbenchStore';
 import { useTheme } from '../ThemeContext';
+import { useLanguage } from '../LanguageContext';
 import type { Entity } from '../../types/workbench';
 
 // ── 实体类型配置 ──────────────────────────────────────────────
@@ -37,49 +38,39 @@ const ENTITY_TYPE_CONFIG: Record<string, {
   icon: React.ReactNode;
   color: string;
   bgColor: string;
-  label: string;
+  labelKey: string;
 }> = {
   MASTER: {
     icon: <Database size={13} />,
     color: 'text-amber-400',
     bgColor: 'bg-amber-500/10',
-    label: '主数据',
+    labelKey: 'ow.node.type.master',
   },
   TRANSACTION: {
     icon: <List size={13} />,
     color: 'text-emerald-400',
     bgColor: 'bg-emerald-500/10',
-    label: '事务',
+    labelKey: 'ow.node.type.transaction',
   },
   EVENT: {
     icon: <Layers size={13} />,
     color: 'text-blue-400',
     bgColor: 'bg-blue-500/10',
-    label: '事件',
+    labelKey: 'ow.node.type.event',
   },
   REFERENCE: {
     icon: <Globe size={13} />,
     color: 'text-purple-400',
     bgColor: 'bg-purple-500/10',
-    label: '引用',
+    labelKey: 'ow.node.type.reference',
   },
   default: {
     icon: <Box size={13} />,
     color: 'text-slate-400',
     bgColor: 'bg-slate-500/10',
-    label: '未知',
+    labelKey: 'ow.node.type.default',
   },
 };
-
-function getEntityTypeLabel(et: string): string {
-  const map: Record<string, string> = {
-    MASTER: '主数据',
-    TRANSACTION: '事务',
-    EVENT: '事件',
-    REFERENCE: '引用',
-  };
-  return map[et] || et;
-}
 
 // ════════════════════════════════════════════════════════════════
 // 实体列表项
@@ -94,6 +85,7 @@ interface EntityListItemProps {
 
 function EntityListItem({ entity, isSelected, onSelect, propertyCount }: EntityListItemProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const config = ENTITY_TYPE_CONFIG[entity.entityType] || ENTITY_TYPE_CONFIG.default;
 
   const handleClick = useCallback(() => {
@@ -109,6 +101,7 @@ function EntityListItem({ entity, isSelected, onSelect, propertyCount }: EntityL
 
   return (
     <button
+      type="button"
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       className={`w-full text-left px-3 py-2.5 transition flex items-center gap-2.5 group border-l-2 ${
@@ -129,14 +122,14 @@ function EntityListItem({ entity, isSelected, onSelect, propertyCount }: EntityL
             {entity.name || entity.code}
           </span>
           <span className={`text-[9px] font-normal ${config.color} opacity-70`}>
-            {getEntityTypeLabel(entity.entityType)}
+            {t(config.labelKey)}
           </span>
         </div>
         <div className={`text-[10px] ${styles.cardTextMuted} font-mono truncate mt-0.5`}>
           {entity.code}
           {propertyCount !== undefined && (
             <span className={`${styles.cardTextMuted} ml-1.5`}>
-              · {propertyCount} 属性
+              · {propertyCount} {t("ow.tree.props")}
             </span>
           )}
         </div>
@@ -181,6 +174,7 @@ export default function EntityTreePanel({
   footer,
 }: EntityTreePanelProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const store = useWorkbenchStore();
   const { entities, selectedEntityId, properties } = store;
 
@@ -213,11 +207,12 @@ export default function EntityTreePanel({
         {/* 返回按钮 */}
         {onBack && (
           <button
+            type="button"
             onClick={onBack}
             className={`flex items-center gap-1 text-[10px] ${styles.cardTextMuted} hover:${styles.cardText} mb-2.5 transition`}
           >
             <ChevronRight size={11} className="rotate-180" />
-            返回域列表
+            {t("ow.tree.back")}
           </button>
         )}
 
@@ -230,7 +225,7 @@ export default function EntityTreePanel({
               {domainCode}
             </h3>
             <p className={`text-[10px] ${styles.cardTextMuted}`}>
-              {entityCount} 实体 · {relationshipCount} 关系
+              {t("ow.tree.stats", { e: entityCount, r: relationshipCount })}
             </p>
           </div>
         </div>
@@ -243,13 +238,14 @@ export default function EntityTreePanel({
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索实体..."
+            placeholder={t("ow.tree.search")}
             className={`w-full bg-[#0b0e14] border border-[#1E293B] rounded-lg pl-7 pr-3 py-1.5
               text-xs text-white placeholder:${styles.cardTextMuted.replace('text-', 'text-')}
               focus:outline-none focus:border-indigo-500/40 transition`}
           />
           {searchQuery && (
             <button
+              type="button"
               onClick={() => setSearchQuery('')}
               className={`absolute right-2.5 top-1/2 -translate-y-1/2 ${styles.cardTextMuted} hover:${styles.cardText}`}
             >
@@ -269,11 +265,11 @@ export default function EntityTreePanel({
           <div className={`flex flex-col items-center justify-center py-14 ${styles.cardTextMuted} px-4`}>
             <Box size={28} className="mb-3 opacity-20" />
             <p className="text-xs">
-              {searchQuery ? '无匹配实体' : '暂无实体'}
+              {searchQuery ? t("ow.tree.empty.search") : t("ow.tree.empty.none")}
             </p>
             {!searchQuery && (
               <p className="text-[10px] mt-1 opacity-50">
-                点击下方按钮创建第一个实体
+                {t("ow.tree.empty.hint")}
               </p>
             )}
           </div>
@@ -303,6 +299,7 @@ export default function EntityTreePanel({
         {onCreateEntity && (
           <div className="px-4 py-2.5">
             <button
+              type="button"
               onClick={onCreateEntity}
               className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg
                 text-xs font-medium text-indigo-400 hover:text-indigo-300
@@ -310,7 +307,7 @@ export default function EntityTreePanel({
                 bg-indigo-500/5 hover:bg-indigo-500/10 transition"
             >
               <Plus size={13} />
-              新建实体
+              {t("ow.tree.newEntity")}
             </button>
           </div>
         )}

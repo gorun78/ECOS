@@ -30,12 +30,14 @@ interface ProposalPanelProps {
 
 type StatusBadgeStyle = { bg: string; text: string; icon: React.ReactNode };
 
-/** 存量徽章样式（存量硬编码 Tailwind 色，本次不清理）；EXECUTED / VERIFIED 见 resolveStatusBadge */
-const STATUS_BADGE: Record<Exclude<ProposalStatus, 'EXECUTED' | 'VERIFIED'>, StatusBadgeStyle> = {
-  DRAFT: { bg: 'bg-slate-100', text: 'text-slate-700', icon: <Clock size={10} /> },
-  PENDING: { bg: 'bg-amber-50', text: 'text-amber-700', icon: <Clock size={10} /> },
-  APPROVED: { bg: 'bg-emerald-50', text: 'text-emerald-700', icon: <CheckCircle size={10} /> },
-  REJECTED: { bg: 'bg-red-50', text: 'text-red-700', icon: <XCircle size={10} /> },
+/** 状态 → 图标（纯结构，无颜色；颜色语义由 resolveStatusBadge 依 theme 令牌解析） */
+const STATUS_ICON: Record<string, React.ReactNode> = {
+  DRAFT: <Clock size={10} />,
+  PENDING: <Clock size={10} />,
+  APPROVED: <CheckCircle size={10} />,
+  REJECTED: <XCircle size={10} />,
+  EXECUTED: <CheckCheck size={10} />,
+  VERIFIED: <ShieldCheck size={10} />,
 };
 
 /** 提案类型 → 变更类别（写入 payload.changeType，兼容后端历史字段） */
@@ -344,15 +346,25 @@ export default function ProposalPanel({
 
   const statusLabel = (s: ProposalStatus) => t(`ow.proposal.status.${s.toLowerCase()}`);
   const kindLabel = (kind: string) => t(`ow.proposal.kind.${kind}`);
-  /** 状态徽章：EXECUTED / VERIFIED 走主题令牌语义色；未知状态兜底 DRAFT，避免后端新增状态导致渲染崩溃 */
+  /** 状态徽章：全状态走 theme 语义令牌（无裸 palette）；未知/后端新增状态归中性兜底，不再硬套 DRAFT */
   const resolveStatusBadge = (s: ProposalStatus): StatusBadgeStyle => {
-    if (s === 'EXECUTED') {
-      return { bg: styles.successBg, text: styles.successText, icon: <CheckCheck size={10} /> };
+    const icon = STATUS_ICON[s] ?? STATUS_ICON.DRAFT;
+    switch (s) {
+      case 'DRAFT':
+        return { bg: styles.cardBg, text: styles.cardTextMuted, icon };
+      case 'PENDING':
+        return { bg: styles.warningBg, text: styles.warningText, icon };
+      case 'APPROVED':
+        return { bg: styles.successBg, text: styles.successText, icon };
+      case 'REJECTED':
+        return { bg: styles.dangerBg, text: styles.dangerText, icon };
+      case 'EXECUTED':
+        return { bg: styles.successBg, text: styles.successText, icon };
+      case 'VERIFIED':
+        return { bg: styles.infoBg, text: styles.infoText, icon };
+      default:
+        return { bg: styles.cardBg, text: styles.cardTextMuted, icon };
     }
-    if (s === 'VERIFIED') {
-      return { bg: styles.infoBg, text: styles.infoText, icon: <ShieldCheck size={10} /> };
-    }
-    return STATUS_BADGE[s] ?? STATUS_BADGE.DRAFT;
   };
 
   /** 提案列表项的目标本体展示名（后端 target_entity 即对象类型 id） */
@@ -372,7 +384,7 @@ export default function ProposalPanel({
           </p>
         </div>
         {!showForm && (
-          <button
+          <button type="button"
             onClick={() => {
               if (!selectedObjectType && objectTypes.length === 0) {
                 showToast('error', t('ow.msg.selectObjectFirst'));
@@ -562,7 +574,7 @@ export default function ProposalPanel({
                 <div className={`flex items-center gap-1.5 pt-1 border-t ${styles.cardBorder}`}>
                   {p.status === 'DRAFT' && (
                     <>
-                      <button
+                      <button type="button"
                         onClick={() => handleSubmit(p.id)}
                         disabled={isActing}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 disabled:opacity-50"
@@ -570,7 +582,7 @@ export default function ProposalPanel({
                         <Send size={10} />
                         {t('ow.btn.submitProposal')}
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => handleDelete(p.id)}
                         disabled={isActing}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 disabled:opacity-50"
@@ -581,7 +593,7 @@ export default function ProposalPanel({
                   )}
                   {p.status === 'PENDING' && (
                     <>
-                      <button
+                      <button type="button"
                         onClick={() => handleVerify(p.id)}
                         disabled={isActing}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 disabled:opacity-50"
@@ -589,7 +601,7 @@ export default function ProposalPanel({
                         <Shield size={10} />
                         {t('ow.btn.verifyProposal')}
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => setReviewModal({ id: p.id, action: 'approve' })}
                         disabled={isActing || selfReview}
                         title={selfReview ? t('ow.msg.reviewerMustDiffer') : undefined}
@@ -598,7 +610,7 @@ export default function ProposalPanel({
                         <CheckCircle size={10} />
                         {t('ow.btn.approveProposal')}
                       </button>
-                      <button
+                      <button type="button"
                         onClick={() => setReviewModal({ id: p.id, action: 'reject' })}
                         disabled={isActing || selfReview}
                         title={selfReview ? t('ow.msg.reviewerMustDiffer') : undefined}
@@ -611,7 +623,7 @@ export default function ProposalPanel({
                   )}
                   {/* 已验证(VERIFIED) 或已审批(APPROVED) 均可执行 —— 与后端 execute 端点受理状态对齐 */}
                   {(p.status === 'APPROVED' || p.status === 'VERIFIED') && (
-                    <button
+                    <button type="button"
                       onClick={() => handleExecute(p.id)}
                       disabled={isActing}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
@@ -644,11 +656,11 @@ export default function ProposalPanel({
                 />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => { setReviewModal(null); setReviewComment(''); }}
+                <button type="button" onClick={() => { setReviewModal(null); setReviewComment(''); }}
                   className={`px-3 py-1.5 rounded text-[10px] font-semibold border ${styles.cardBorder} ${styles.cardTextMuted} ${styles.cardBg}`}>
                   {t('ow.btn.cancel')}
                 </button>
-                <button onClick={handleReviewSubmit}
+                <button type="button" onClick={handleReviewSubmit}
                   className={`px-4 py-1.5 rounded text-[10px] font-semibold text-white ${reviewModal.action === 'approve' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'}`}>
                   {reviewModal.action === 'approve' ? t('ow.btn.approveProposal') : t('ow.btn.rejectProposal')}
                 </button>

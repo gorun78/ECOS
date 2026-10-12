@@ -104,3 +104,38 @@ export function createBranch<T = any>(repoId: string, data?: any): Promise<T> {
     headers: data ? { 'Content-Type': 'application/json' } : undefined,
   });
 }
+
+/** POST /api/v1/ecos/git/push?repoId={repoId} — C181/W199 补齐：GitPanel push 直 fetch 收口 */
+export function push<T = any>(repoId: string, data?: any): Promise<T> {
+  return apiFetchData<T>(`/api/v1/ecos/git/push${q(repoId)}`, {
+    method: 'POST',
+    body: data ? JSON.stringify(data) : undefined,
+    headers: data ? { 'Content-Type': 'application/json' } : undefined,
+  });
+}
+
+/** POST /api/v1/ecos/git/pull?repoId={repoId} — C181/W199 补齐 */
+export function pull<T = any>(repoId: string, data?: any): Promise<T> {
+  return apiFetchData<T>(`/api/v1/ecos/git/pull${q(repoId)}`, {
+    method: 'POST',
+    body: data ? JSON.stringify(data) : undefined,
+    headers: data ? { 'Content-Type': 'application/json' } : undefined,
+  });
+}
+
+/**
+ * POST /api/v1/ecos/git/{action}?repoId={repoId} — 通用 POST 逃生口（C181/W199 单通道保留口）。
+ * 白名单防注入：action 必须是小写字母+下划线标识（禁 `/`·`?`·`..`），防止 GitPanel 传入
+ * 未预期动作名绕过本文件而直接改拉其它 /api/v1/ecos/git/* 端点。
+ */
+export function postAction<T = any>(action: string, repoId: string, data?: any): Promise<T> {
+  if (!/^[a-z][a-z0-9_]*$/.test(action)) {
+    throw new Error(`gitService.postAction: illegal action "${action}" (^[a-z][a-z0-9_]*$ required)`);
+  }
+  return apiFetchData<T>(`/api/v1/ecos/git/${action}${q(repoId)}`, {
+    method: 'POST',
+    body: data ? JSON.stringify(data) : undefined,
+    headers: data ? { 'Content-Type': 'application/json' } : undefined,
+  });
+}
+

@@ -28,7 +28,7 @@ export default function ConnectionListPanel({
   <div className={`w-72 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col overflow-hidden shrink-0`}>
     <div className={`p-4 border-b ${styles.cardBorder} flex justify-between items-center ${styles.appBg}/40`}>
       <h3 className={`text-xs font-bold ${styles.cardText}`}>{t("dw.conn.title")}</h3>
-      <button
+      <button type="button"
         onClick={() => setShowAddConn(true)}
         className={`p-1 rounded ${styles.accentBg} ${styles.cardText} ${styles.accentHover} text-xs flex items-center gap-1 cursor-pointer font-medium`}
       >
@@ -67,14 +67,14 @@ export default function ConnectionListPanel({
             <div className="flex justify-between items-center">
               <span className={`font-semibold ${styles.cardText} truncate pr-2`}>{conn.name}</span>
               <div className="flex items-center gap-1">
-                <button
+                <button type="button"
                   onClick={(e) => { e.stopPropagation(); setEditingConn(conn); }}
                   className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.accentText} transition-colors cursor-pointer`}
                   title={tt('dw.conn.edit')}
                 >
                   <LucideIcon name="Edit3" size={11} />
                 </button>
-                <button
+                <button type="button"
                   onClick={(e) => { e.stopPropagation(); handleDelete(conn.id, conn.name); }}
                   disabled={deletingId === conn.id}
                   className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.dangerText} transition-colors cursor-pointer disabled:opacity-50`}

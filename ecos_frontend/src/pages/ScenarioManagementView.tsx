@@ -406,7 +406,7 @@ export default function ScenarioManagementView({
           <KpiBox styles={styles} label={t('scenario.kpi.total')} value={`${scenarios.length}`} suffix={t('scenario.kpi.unit')} extra={t('scenario.kpi.activeExtra', { n: activeCount })} color={styles.infoText} />
           <KpiBox styles={styles} label={t('scenario.kpi.pending')} value={`${pendingCount}`} color={pendingCount > 0 ? styles.warningText : styles.accentText} />
           <div className="col-span-2 sm:col-span-4 flex justify-end mt-1">
-            <button
+            <button type="button"
               onClick={() => setShowCopilot(!showCopilot)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded border transition-colors cursor-pointer text-xs font-bold ${showCopilot ? `${styles.accentBg} ${styles.cardText} ${styles.accentBorder}` : `${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder} hover:opacity-80`}`}
             >
@@ -463,7 +463,7 @@ export default function ScenarioManagementView({
                       {activeScenario.department}
                     </span>
                   </span>
-                  <button
+                  <button type="button"
                     onClick={() => openEditWizard(activeScenario)}
                     className={`px-3 py-1 border ${styles.accentBorder} ${styles.accentBg} ${styles.cardText} text-[11px] font-bold rounded flex items-center gap-1 transition-all cursor-pointer shadow-xs hover:opacity-90`}
                   >
@@ -495,7 +495,7 @@ export default function ScenarioManagementView({
             <div className={`h-10 ${styles.cardBg} px-4 border-b ${styles.cardBorder} shrink-0 flex items-center justify-between`}>
               <div className="flex gap-2 overflow-x-auto">
                 {TABS.map((tab) => (
-                  <button
+                  <button type="button"
                     key={tab}
                     onClick={() => setActiveTab(tab)}
                     className={`px-4 h-10 border-b-2 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === tab ? `${styles.accentBorder} ${styles.accentText}` : `border-transparent ${styles.cardTextMuted} hover:opacity-80`}`}

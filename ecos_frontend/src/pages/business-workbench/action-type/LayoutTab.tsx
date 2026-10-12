@@ -7,6 +7,7 @@ import React from 'react';
 import { ActionType } from '../../../types/ontology';
 import LucideIcon from '../LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 
 interface LayoutTabProps {
   actionType: ActionType;
@@ -22,16 +23,17 @@ export default function LayoutTab({
   setNewSectionTitle
 }: LayoutTabProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   // Initialize default form layout if not defined
   const layout = actionType.formLayout || {
     sections: [
       {
-        title: '基本参数信息',
+        title: t('ow.act.layout.defaultSectionTitle'),
         parameterIds: actionType.parameters.map(p => p.id)
       }
     ],
-    buttonText: `确认执行: ${actionType.displayName}`
+    buttonText: t('ow.act.layout.defaultButtonText', { name: actionType.displayName })
   };
 
   const updateLayout = (updatedLayout: typeof layout) => {
@@ -92,42 +94,43 @@ export default function LayoutTab({
   return (
     <div className="space-y-6">
       <p className={`text-xs ${styles.cardTextMuted}`}>
-        配置当用户在主应用 Workshop 或 Object Explorer 中运行此操作时，所呈现的操作弹窗表单布局与文案。
+        {t('ow.act.layout.intro')}
       </p>
 
       <div className="grid grid-cols-3 gap-6">
         {/* Visual Customization */}
         <div className={`${styles.appBg} border ${styles.cardBorder} rounded-xl p-5 space-y-4 col-span-1 h-fit`}>
-          <h4 className={`text-xs font-semibold ${styles.cardText}`}>表单行为文案</h4>
+          <h4 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.act.layout.behaviorTitle')}</h4>
 
           <div className="space-y-1">
-            <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>提交按钮文字 (Submit Text)</label>
+            <label className={`text-[10px] font-medium ${styles.cardTextMuted} block`}>{t('ow.act.layout.submitText')}</label>
             <input
               type="text"
               value={layout.buttonText || ''}
               onChange={e => updateLayout({ ...layout, buttonText: e.target.value })}
               className={`w-full px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg} focus:outline-hidden`}
-              placeholder="如：确认修改状态"
+              placeholder={t('ow.act.layout.submitTextPlaceholder')}
             />
           </div>
 
           <hr className={styles.divider} />
 
           <div className="space-y-2">
-            <h5 className={`text-[11px] font-semibold ${styles.cardText}`}>添加新的表单区块 (Section)</h5>
+            <h5 className={`text-[11px] font-semibold ${styles.cardText}`}>{t('ow.act.layout.addSection')}</h5>
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="区块名称 (e.g. 附加选项)"
+                placeholder={t('ow.act.layout.sectionNamePlaceholder')}
                 value={newSectionTitle}
                 onChange={e => setNewSectionTitle(e.target.value)}
                 className={`flex-1 px-2 py-1 text-xs border ${styles.inputBorder} rounded focus:outline-hidden`}
               />
               <button
+                type="button"
                 onClick={handleAddSection}
                 className="bg-[var(--card,#0F172A)] text-white hover:bg-[var(--muted,#1E293B)] text-[11px] px-2.5 py-1 rounded transition-colors"
               >
-                + 区块
+                {t('ow.act.layout.addSectionBtn')}
               </button>
             </div>
           </div>
@@ -135,7 +138,7 @@ export default function LayoutTab({
 
         {/* Form layout builder panels */}
         <div className="col-span-2 space-y-4">
-          <h4 className={`text-xs font-semibold ${styles.cardText}`}>区块划分与字段归属</h4>
+          <h4 className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.act.layout.sectionTitle')}</h4>
 
           <div className="space-y-4">
             {layout.sections.map((section, secIdx) => {
@@ -148,9 +151,10 @@ export default function LayoutTab({
                 <div key={secIdx} className={`border ${styles.cardBorder} rounded-xl p-4 ${styles.cardBg} space-y-3 shadow-2xs relative`}>
                   {secIdx > 0 && (
                     <button
+                      type="button"
                       onClick={() => handleRemoveSection(secIdx)}
                       className={`absolute top-4 right-4 ${styles.cardTextMuted} opacity-70 hover:opacity-100 hover:text-red-500 transition-colors`}
-                      title="移除此区块并将字段退回第一区块"
+                      title={t('ow.act.layout.removeSectionTitle')}
                     >
                       <LucideIcon name="Trash" size={13} />
                     </button>
@@ -159,13 +163,13 @@ export default function LayoutTab({
                   <div className={`flex items-center gap-2 border-b ${styles.divider} pb-2`}>
                     <LucideIcon name="Layers" size={13} className="text-blue-500" />
                     <span className={`text-xs font-semibold ${styles.cardText}`}>{section.title}</span>
-                    <span className={`text-[10px] ${styles.cardTextMuted}`}>({section.parameterIds.length} 字段)</span>
+                    <span className={`text-[10px] ${styles.cardTextMuted}`}>({section.parameterIds.length} {t('ow.act.layout.fieldUnit')})</span>
                   </div>
 
                   {/* Parameter list in this section */}
                   {section.parameterIds.length === 0 ? (
                     <div className={`text-center py-4 ${styles.cardTextMuted} italic text-[11px]`}>
-                      该区块目前为空，请在下方选择参数移入此区。
+                      {t('ow.act.layout.sectionEmpty')}
                     </div>
                   ) : (
                     <div className="space-y-1.5">
@@ -180,7 +184,7 @@ export default function LayoutTab({
                               <span className={`${styles.cardTextMuted} text-[10px] font-mono`}>({pDef.id})</span>
                             </div>
                             <span className={`text-[10px] ${styles.sidebarBg} ${styles.cardTextMuted} px-1.5 py-0.5 rounded-full font-mono`}>
-                              {pDef.isRequired ? '必填' : '选填'}
+                              {pDef.isRequired ? t('ow.act.layout.requiredTag') : t('ow.act.layout.optionalTag')}
                             </span>
                           </div>
                         );
@@ -191,7 +195,7 @@ export default function LayoutTab({
                   {/* Add parameter to section dropdown */}
                   {availableParams.length > 0 && (
                     <div className={`flex items-center justify-end gap-2 text-[11px] pt-1 border-t ${styles.divider} mt-2`}>
-                      <span className={styles.cardTextMuted}>划转字段入此区:</span>
+                      <span className={styles.cardTextMuted}>{t('ow.act.layout.moveField')}</span>
                       <select
                         onChange={e => {
                           if (e.target.value) {
@@ -201,7 +205,7 @@ export default function LayoutTab({
                         }}
                         className={`px-2 py-0.5 border ${styles.inputBorder} rounded ${styles.inputBg} text-[10px] focus:outline-hidden`}
                       >
-                        <option value="">-- 选择可移入的变量 --</option>
+                        <option value="">{t('ow.act.layout.optSelect')}</option>
                         {availableParams.map(p => (
                           <option key={p.id} value={p.id}>{p.displayName} ({p.id})</option>
                         ))}

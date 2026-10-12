@@ -262,10 +262,7 @@ export default function DomainCanvas({
     (e: React.MouseEvent) => {
       // ── 结束拖拽 ──
       if (dragState) {
-        setNodePositions((prev) => {
-          persistPositions(prev);
-          return prev;
-        });
+        persistPositions(nodePositions);
         setDragState(null);
         return;
       }
@@ -352,10 +349,7 @@ export default function DomainCanvas({
   useEffect(() => {
     const up = () => {
       if (dragState) {
-        setNodePositions((prev) => {
-          persistPositions(prev);
-          return prev;
-        });
+        persistPositions(nodePositions);
         setDragState(null);
       }
       if (selectionBox) {
@@ -399,7 +393,7 @@ export default function DomainCanvas({
         <div className="text-center p-8">
           <AlertCircle size={32} className="text-red-400 mx-auto mb-3" />
           <p className="text-xs text-red-400 mb-3">{error}</p>
-          <button
+          <button type="button"
             onClick={onRetry}
             className={`px-4 py-1.5 rounded-lg text-xs ${styles.inputBg} ${styles.sidebarText} hover:opacity-80 transition`}
           >

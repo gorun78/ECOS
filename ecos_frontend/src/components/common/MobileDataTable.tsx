@@ -22,6 +22,7 @@
 import React, { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useTheme } from "../ThemeContext";
+import { useLanguage } from "../LanguageContext";
 import DataTable, {ColumnConfig, DataTableProps} from "./DataTable";
 import EmptyState from "./EmptyState";
 import LoadingSkeleton from "./LoadingSkeleton";
@@ -143,6 +144,7 @@ function MobileCardRows<T extends Record<string, any>>({
 }) {
   const [innerPage, setInnerPage] = useState(1);
   const [expanded, setExpanded] = useState<boolean>(false); // 当前卡片是否展开
+  const { t } = useLanguage();
   const isControlled = currentPage !== undefined;
   const page = isControlled ? currentPage : innerPage;
   const allTotal = total ?? data.length;
@@ -193,7 +195,7 @@ function MobileCardRows<T extends Record<string, any>>({
         return (
           <div
             key={rowId}
-            className="border rounded-md bg-white dark:bg-neutral-900 border-black/10 dark:border-white/10"
+            className={`border rounded-md ${styles.cardBg} ${styles.cardBorder}`}
           >
             {/* 卡片头 */}
             <div className="flex items-center justify-between px-3 py-2.5">
@@ -214,7 +216,7 @@ function MobileCardRows<T extends Record<string, any>>({
               </div>
               <button
                 type="button"
-                aria-label={expanded ? "收起详情" : "展开详情"}
+                aria-label={expanded ? t("common.mobile.collapse") : t("common.mobile.expand")}
                 onClick={() => setExpanded((v) => !v)}
                 className="p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/10 transition shrink-0"
               >
@@ -224,7 +226,7 @@ function MobileCardRows<T extends Record<string, any>>({
 
             {/* 详情区（折叠） */}
             {expanded && (
-              <div className="border-t px-3 py-2.5 border-black/10 dark:border-white/10 flex flex-col gap-2">
+              <div className={`border-t px-3 py-2.5 ${styles.cardBorder} flex flex-col gap-2`}>
                 {detailKeys.map((k) => {
                   const col = columns.find((c) => c.key === k);
                   if (!col) return null;
@@ -241,7 +243,7 @@ function MobileCardRows<T extends Record<string, any>>({
 
             {/* 操作底部 */}
             {actionCol && (
-              <div className="border-t px-3 py-2 border-black/10 dark:border-white/10 flex items-center justify-end gap-1.5 flex-wrap">
+              <div className={`border-t px-3 py-2 ${styles.cardBorder} flex items-center justify-end gap-1.5 flex-wrap`}>
                 {typeof actionCol.render === "function"
                   ? actionCol.render(r[actionCol.key], r, i)
                   : r[actionCol.key] == null
@@ -263,7 +265,7 @@ function MobileCardRows<T extends Record<string, any>>({
               onClick={() => setPage(page - 1)}
               className="px-2.5 py-1 border rounded text-xs disabled:opacity-40"
             >
-              上一页
+              {t("common.mobile.prev")}
             </button>
             <span className="px-2 select-none">{page}/{totalPages}</span>
             <button
@@ -272,7 +274,7 @@ function MobileCardRows<T extends Record<string, any>>({
               onClick={() => setPage(page + 1)}
               className="px-2.5 py-1 border rounded text-xs disabled:opacity-40"
             >
-              下一页
+              {t("common.mobile.next")}
             </button>
           </div>
         </div>

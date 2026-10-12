@@ -123,7 +123,7 @@ export default function PreviewTab({ session }: Props) {
             steps.map((s) => {
               const active = s.nodeId === selectedNodeId;
               return (
-                <button
+                <button type="button"
                   key={s.nodeId}
                   onClick={() => setSelectedNodeId(s.nodeId)}
                   className={`flex items-center gap-1.5 px-1.5 py-1 text-left text-[10px] rounded ${

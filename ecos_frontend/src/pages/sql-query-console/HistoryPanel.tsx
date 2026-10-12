@@ -83,7 +83,7 @@ export default function HistoryPanel({ show, onLoadSql, onClose }: HistoryPanelP
         <span className={`text-[10px] font-bold uppercase ${styles.cardTextMuted} flex items-center gap-1.5`}>
           <Icon name="History" size={13} />查询历史
         </span>
-        <button onClick={onClose} className={`${styles.cardTextMuted} hover:opacity-70`}>
+        <button type="button" onClick={onClose} className={`${styles.cardTextMuted} hover:opacity-70`}>
           <Icon name="X" size={13} />
         </button>
       </div>

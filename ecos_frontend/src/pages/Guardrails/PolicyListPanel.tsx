@@ -1,4 +1,5 @@
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
 import { Layers, Plus, Search, ShieldAlert } from 'lucide-react';
 import type { GuardrailPolicy } from './types';
 import { POLICY_TYPE_META } from './constants';
@@ -18,6 +19,7 @@ export default function PolicyListPanel({
   onToggle: (p: GuardrailPolicy) => void;
 }) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`lg:w-80 shrink-0 ${styles.inputBg} border ${styles.cardBorder} rounded-xl shadow-sm flex flex-col overflow-hidden`}>
@@ -25,13 +27,14 @@ export default function PolicyListPanel({
         <div className="flex items-center justify-between">
           <span className={`font-extrabold ${styles.cardText} flex items-center gap-1.5`}>
             <Layers size={13} className={styles.cardTextMuted} />
-            <span>护栏策略 ({totalCount})</span>
+            <span>{t('gw.list.titleCount', { count: totalCount })}</span>
           </span>
           <button
+            type="button"
             onClick={onCreate}
             className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-md text-[10px] flex items-center gap-1 cursor-pointer transition-colors"
           >
-            <Plus size={11} /> 新建
+            <Plus size={11} /> {t('gw.list.new')}
           </button>
         </div>
         <div className="relative">
@@ -39,7 +42,7 @@ export default function PolicyListPanel({
           <input
             value={search}
             onChange={e => onSearchChange(e.target.value)}
-            placeholder="搜索策略..."
+            placeholder={t('gw.list.searchPh')}
             className={`w-full pl-6 pr-2 py-1.5 rounded-md text-[11px] ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} focus:outline-none focus:border-blue-500`}
           />
         </div>
@@ -49,13 +52,13 @@ export default function PolicyListPanel({
         {loading ? (
           <div className={`h-full flex items-center justify-center ${styles.cardTextMuted} gap-2`}>
             <Spinner className={`w-4 h-4 ${styles.cardTextMuted}`} />
-            <span className="font-bold">加载中...</span>
+            <span className="font-bold">{t('gw.list.loading')}</span>
           </div>
         ) : policies.length === 0 ? (
           <div className={`h-full flex flex-col items-center justify-center p-6 text-center ${styles.cardTextMuted} space-y-2`}>
             <ShieldAlert size={24} className={styles.cardTextMuted} />
-            <p className="font-bold">暂无护栏策略</p>
-            <p className="text-[10px]">点击「新建」创建第一条安全护栏策略。</p>
+            <p className="font-bold">{t('gw.list.empty')}</p>
+            <p className="text-[10px]">{t('gw.list.emptyHint')}</p>
           </div>
         ) : (
           policies.map(p => {
@@ -77,12 +80,12 @@ export default function PolicyListPanel({
                   <Toggle on={p.isEnabled} onClick={() => onToggle(p)} />
                 </div>
                 <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                  <Badge tone="slate">{meta.label}</Badge>
+                  <Badge tone="slate">{t(meta.labelKey)}</Badge>
                   <Badge tone={p.severity === 'block' ? 'rose' : 'amber'}>
-                    {p.severity === 'block' ? '强制阻断' : '记录审计'}
+                    {p.severity === 'block' ? t('gw.detail.enforce') : t('gw.detail.auditLog')}
                   </Badge>
                   <Badge tone={p.status === 'COMPILED' ? 'emerald' : 'amber'}>
-                    {p.status === 'COMPILED' ? '已编译' : '草稿'}
+                    {p.status === 'COMPILED' ? t('gw.detail.compiled') : t('gw.detail.draft')}
                   </Badge>
                 </div>
               </div>

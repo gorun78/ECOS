@@ -222,7 +222,7 @@ export default function GlossaryGraphPanel({ termId, onSelectTerm }: GlossaryGra
           ))}
         </select>
 
-        <button
+        <button type="button"
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium
             transition disabled:opacity-50 ${styles.cardBorder} ${styles.sidebarHoverBg} ${styles.muted}`}
           onClick={loadGraph}
@@ -232,7 +232,7 @@ export default function GlossaryGraphPanel({ termId, onSelectTerm }: GlossaryGra
           {t("glossary.graph.refresh")}
         </button>
 
-        <button
+        <button type="button"
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium
             transition disabled:opacity-50 ${styles.cardBorder} ${styles.sidebarHoverBg} ${styles.muted}`}
           onClick={handleRelayout}

@@ -44,7 +44,7 @@ export function ProductsPanel({
 }: ProductsPanelProps) {
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3 min-w-0`}>
-      <div className="flex items-center justify-between border-b border-slate-150 pb-2">
+      <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-2`}>
         <span className={`font-bold text-xs ${styles.cardText} flex items-center gap-1.5`}>
           <ShieldCheck size={13} className="text-amber-600" />
           {t('knowledge.nav.products_title')}
@@ -67,7 +67,7 @@ export function ProductsPanel({
           <p className={`text-[11px] ${styles.cardTextMuted}`}>{t('knowledge.nav.products_empty')}</p>
         </div>
       ) : (
-        <div className="divide-y divide-slate-150">
+        <div className="divide-y divide-black/5 dark:divide-white/10">
           {products.map(p => {
             const checked = selectedRows.has(p.id);
             return (
@@ -89,7 +89,7 @@ export function ProductsPanel({
                   <div className="flex items-center gap-2">
                     <span className={`text-[11px] font-bold truncate ${styles.cardText}`}>{p.title}</span>
                     {p.domain && (
-                      <span className={`px-1 py-0.5 text-[9px] rounded bg-slate-100 ${styles.cardTextMuted}`}>
+                      <span className={`px-1 py-0.5 text-[9px] rounded ${styles.appBg} ${styles.cardTextMuted}`}>
                         {p.domain}
                       </span>
                     )}
@@ -148,7 +148,7 @@ export function ProductsPanel({
       )}
       {/* 分页控制 */}
       {total > 0 && (
-        <div className="flex items-center justify-between pt-2 border-t border-slate-150">
+        <div className={`flex items-center justify-between pt-2 border-t ${styles.cardBorder}`}>
           <span className={`text-[10px] ${styles.muted}`}>
             {t('knowledge.nav.product_page')}: {pageNum} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}
           </span>

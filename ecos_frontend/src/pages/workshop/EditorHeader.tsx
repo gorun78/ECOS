@@ -4,16 +4,17 @@ import { DynamicIcon } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderEditorHeader(vm: any) {
-  const { styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
+  const { t, styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
   return (
     <>
           {/* Top Control Header bar */}
           <div className={`h-11 ${styles.sidebarBg} border-b ${styles.cardBorder} px-3 flex items-center justify-between shrink-0 select-none`}>
             <div className="flex items-center gap-3">
               <button
+                type="button"
                 onClick={() => setActiveAppId(null)}
                 className={`p-1.5 ${styles.sidebarHoverBg} rounded-lg ${styles.cardTextMuted} transition-colors cursor-pointer`}
-                title="返回应用清单"
+                title={t('aiworkbench.ws.ed.backToApps')}
               >
                 <ArrowLeft size={15} />
               </button>
@@ -34,6 +35,7 @@ export function renderEditorHeader(vm: any) {
             {/* Switchers for Edit Mode */}
             <div className={`flex items-center ${styles.sidebarBg} p-0.5 rounded-lg border ${styles.appBorder}`}>
               <button
+                type="button"
                 onClick={() => {
                   setEditorMode('design');
                   setSelectedWidgetId(null);
@@ -43,9 +45,10 @@ export function renderEditorHeader(vm: any) {
                 }`}
               >
                 <Palette size={11} />
-                <span>设计与布局 (Design)</span>
+                <span>{t('aiworkbench.ws.ed.designMode')}</span>
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setEditorMode('preview');
                   setSelectedWidgetId(null);
@@ -55,7 +58,7 @@ export function renderEditorHeader(vm: any) {
                 }`}
               >
                 <Play size={11} />
-                <span>运行预览 (Interact)</span>
+                <span>{t('aiworkbench.ws.ed.interactMode')}</span>
               </button>
             </div>
 
@@ -63,14 +66,15 @@ export function renderEditorHeader(vm: any) {
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span className={`text-[10px] ${styles.cardTextMuted} mr-2`}>草稿已自动保存</span>
+                <span className={`text-[10px] ${styles.cardTextMuted} mr-2`}>{t('aiworkbench.ws.ed.draftAutosaved')}</span>
               </div>
               <button
+                type="button"
                 onClick={handlePublishApp}
                 className="h-7 px-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-md shadow-xs flex items-center gap-1 transition-colors cursor-pointer text-[11px]"
               >
                 <Send size={11} />
-                <span>发布应用 (Publish)</span>
+                <span>{t('aiworkbench.ws.ed.publishApp')}</span>
               </button>
             </div>
           </div>

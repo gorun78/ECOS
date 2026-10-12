@@ -101,7 +101,7 @@ export default function SignatureTab({
                 {objectTypes.map(ot => (<option key={ot.id} value={ot.id}>{ot.displayName}</option>))}
               </select>
             )}
-            <button onClick={handleAddParam}
+            <button type="button" onClick={handleAddParam}
               className={`${styles.accentBg} hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition-colors flex items-center gap-1`}>
               <Plus size={13} />添加参数
             </button>
@@ -148,7 +148,7 @@ export default function SignatureTab({
                         placeholder={t('ow.placeholder.paramDescription')} />
                     </td>
                     <td className="py-2.5 px-4 text-center">
-                      <button onClick={() => handleRemoveParam(p.name)} className={`${styles.muted} hover:text-red-500 p-1 rounded`}><X size={14} /></button>
+                      <button type="button" onClick={() => handleRemoveParam(p.name)} className={`${styles.muted} hover:text-red-500 p-1 rounded`}><X size={14} /></button>
                     </td>
                   </tr>
                 ))

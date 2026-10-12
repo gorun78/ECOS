@@ -14,6 +14,7 @@ import type { FormEvent, ReactNode } from 'react';
 import { Calendar, Database, Layers, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
+import { KB_STATS_REFRESH_EVENT } from '../typesAndConstants';
 import {
   knowledgeApi,
   fetchScheduledExtracts,
@@ -111,7 +112,7 @@ export default function DatasyncTab() {
 
   /** 通知 Overview 总览重拉 KB 统计（萃取落地后图谱/向量计数变化） */
   const notifyStatsRefresh = useCallback(() => {
-    window.dispatchEvent(new CustomEvent('kb:stats:refresh'));
+    window.dispatchEvent(new CustomEvent(KB_STATS_REFRESH_EVENT));
   }, []);
 
   /** 立即抽取（执行或 dry-run）
