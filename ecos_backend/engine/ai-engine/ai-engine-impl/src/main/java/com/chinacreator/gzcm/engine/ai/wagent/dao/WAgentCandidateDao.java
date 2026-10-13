@@ -85,6 +85,13 @@ public class WAgentCandidateDao extends JdbcTemplateDaoSupport {
                 WAgentCandidateDO.class, batchId);
     }
 
+    /** 租户列表面（§5.2 #17 listCandidates 缺省读法：租户隔离在此收口，类型/状态/批次为服务层内存过滤）。 */
+    public List<WAgentCandidateDO> findByTenant(String tenantId) {
+        return queryList("SELECT " + COLUMNS + " FROM " + TABLE
+                + " WHERE tenant_id = ? AND is_deleted = 0 ORDER BY create_time DESC",
+                WAgentCandidateDO.class, tenantId);
+    }
+
     /** 状态迁移落库（合法性由服务层状态机判定，本方法不校验词表以外的迁移）。 */
     public int updateStatus(String id, String status, String updateBy) {
         return update("UPDATE " + TABLE + " SET status = ?, update_by = ?, update_time = CURRENT_TIMESTAMP "

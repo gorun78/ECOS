@@ -4,8 +4,11 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.engine.kb.KgSyncService;
 import com.chinacreator.gzcm.engine.kb.service.KgMapperService;
+import com.chinacreator.gzcm.engine.kb.support.KbAuditEventPublisher;
+import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -23,8 +26,8 @@ import java.util.*;
  *   <li>{@code POST /api/v1/knowledge/sync/jobs/{jobId}/rollback} — 按 job 回滚（T4）</li>
  *   <li>{@code GET  /api/v1/knowledge/sync/jobs/{jobId}/logs} — 单 job 日志（T4）</li>
  * </ul>
- * 所有写操作发 Kafka {@code ecos.audit}（{@code KafkaTopics.AUDIT}），
- * Kafka broker 不可用时 log 兜底（铁律 §2.4 #5）。
+ * 所有写操作经 {@code KbAuditEventPublisher}（runtime-event EventBusService）发 Kafka
+ * {@code ecos.audit}（{@code KafkaTopics.AUDIT}）——F04-15 收口，2026-10-12 复盘订正原 log-only 伪审计。
  *
  * @group GRAPH
  */
@@ -36,6 +39,10 @@ public class GraphSyncController {
 
     private final KgSyncService kgSyncService;
     private final KgMapperService kgMapper;
+
+    /** F04-15 真实审计发布器（可空；缺席时本地结构化 log 兜底，语义同 KnowledgeNavSecurityEngineClient 先例）。 */
+    @Autowired(required = false)
+    private KbAuditEventPublisher kbAuditEventPublisher;
 
     public GraphSyncController(KgSyncService kgSyncService,
                                KgMapperService kgMapper) {
@@ -125,16 +132,22 @@ public class GraphSyncController {
     }
 
     /**
-     * 审计事件：走 Kafka {@code ecos.audit}；Kafka 不可用时 log 兜底（铁律 §2.4 #5）。
+     * 审计事件（F04-15 收口，2026-10-12 复盘订正）：经 {@link KbAuditEventPublisher} 走 EventBus
+     * 发 Kafka {@code ecos.audit}（复刻 {@code KnowledgeNavSecurityEngineClient#audit} 先例）；
+     * 发布器未装配 → 本地结构化 log 兜底；发布失败（ECOS-KB-022）→ 按先例调用方口径降级
+     * log.error（写已落库、审计证据已留本地兜底），不阻塞主链、绝不静默吞。
      */
     private void audit(String action, String detail) {
+        if (kbAuditEventPublisher == null) {
+            log.warn("[AUDIT-LOCAL-FALLBACK] topic={} action={} detail={}",
+                    KafkaTopics.AUDIT, action, sanitize(detail));
+            return;
+        }
         try {
-            String payload = String.format(
-                    "{\"action\":\"%s\",\"detail\":\"%s\",\"service\":\"kb-engine\"}",
-                    action, sanitize(detail));
-            log.info("AUDIT topic={} payload={}", KafkaTopics.AUDIT, payload);
-        } catch (Exception e) {
-            log.warn("audit fallback log failed: {}", e.getMessage());
+            kbAuditEventPublisher.audit(action, detail, "kb-graph-sync");
+        } catch (KbErrorCodes.DomainException ex) {
+            log.error("审计发布失败（写已落库，审计证据见本地兜底 log）: action={} {}",
+                    action, ex.getMessage());
         }
     }
 

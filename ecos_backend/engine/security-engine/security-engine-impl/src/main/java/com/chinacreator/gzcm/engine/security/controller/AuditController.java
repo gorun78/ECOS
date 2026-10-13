@@ -162,6 +162,47 @@ public class AuditController {
     }
 
     /**
+     * 详设-01 B 章 3.2 交互时序⑦ / §5.2 契约：POST verify-chain {from,to} → {valid, brokenAt[]}。
+     * 增量哈希链区间校验（区别于全量 GET /verify-integrity 的首断即停）。
+     */
+    @PostMapping("/verify-chain")
+    public ApiResponse<Map<String, Object>> verifyChain(@RequestBody Map<String, Object> body) {
+        try {
+            if (hashChainService == null) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("valid", false);
+                m.put("brokenAt", Collections.emptyList());
+                m.put("error", "哈希链服务未就绪");
+                return ApiResponse.success(m);
+            }
+            Long from = asLong(body.get("from"));
+            Long to = asLong(body.get("to"));
+            if (from == null || to == null) {
+                return ApiResponse.badRequest("from/to 必填且须为整数（审计日志 id 闭区间）");
+            }
+            if (from > to) {
+                return ApiResponse.badRequest("from 不能大于 to");
+            }
+            return ApiResponse.success(hashChainService.verifyHashChainRange(from, to));
+        } catch (Exception e) {
+            log.error("审计哈希链区间校验失败", e);
+            return ApiResponse.internalError("审计哈希链区间校验失败");
+        }
+    }
+
+    static Long asLong(Object o) {
+        if (o instanceof Number n) return n.longValue();
+        if (o instanceof String s) {
+            try {
+                return Long.parseLong(s.trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
      * 写入审计日志端点 — 异步落库，不阻塞调用方。
      * 请求体: {userId, action, resource, result, detail}
      */

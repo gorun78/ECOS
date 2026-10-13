@@ -254,4 +254,44 @@ class AssetServiceTest {
         verify(assetDao, never()).insertField(anyString(), any(), anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyString(), any(Timestamp.class));
         verify(assetDao, never()).updateField(anyString(), any(), anyString(), anyString(), anyString(), anyBoolean(), anyString());
     }
+
+    @Test
+    @DisplayName("tagAssetFields — ABAC 不可用（Bean 未装配）→ 默认 DENY 拒绝 (Fail-Closed, 2026-10-12 复盘订正)")
+    void tagAssetFieldsAbacUnavailableFailsClosed() {
+        // 复盘前实现：checker==null 仅 log.warn 放行（fail-open，违反铁律 #3 默认 DENY）；
+        // 订正后：抛 SecurityException(ASSET-042)，不落库、不发事件。
+        AssetService svc = serviceWith(null);
+        when(assetDao.findAssetRows("asset-1")).thenReturn(List.of(existingAsset("asset-1", "res-1", "L1")));
+
+        DataAssetFieldTagDTO dto = new DataAssetFieldTagDTO();
+        dto.setConfirmed(true);
+        dto.setOperator("tester");
+        DataAssetFieldTagDTO.FieldTagItem it = new DataAssetFieldTagDTO.FieldTagItem();
+        it.setFieldId("id_card");
+        it.setFieldName("id_card");
+        it.setFieldSensitivity("L3");
+        it.setDataType("ID_CARD");
+        it.setMaskStrategy("middle4");
+        dto.setFields(List.of(it));
+
+        SecurityException ex = assertThrows(SecurityException.class, () -> svc.tagAssetFields("asset-1", dto));
+        assertTrue(ex.getMessage().contains("ASSET-042"), "fail-closed 语义 = ASSET-042 拒绝码");
+        verify(assetDao, never()).insertField(anyString(), any(), anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyString(), any(Timestamp.class));
+        verify(eventBus, never()).publish(eq(KafkaTopics.DATA_SECURITY_TAGGED), any());
+    }
+
+    /** 以指定 ABAC checker（null = Bean 未装配）重建 AssetService。 */
+    private AssetService serviceWith(IAbacPermissionChecker checker) {
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<IAbacPermissionChecker> provider =
+            (org.springframework.beans.factory.ObjectProvider<IAbacPermissionChecker>)
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(checker);
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<EventBusService> busProvider =
+            (org.springframework.beans.factory.ObjectProvider<EventBusService>)
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        when(busProvider.getIfAvailable()).thenReturn(eventBus);
+        return new AssetService(assetDao, busProvider, provider);
+    }
 }

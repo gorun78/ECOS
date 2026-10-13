@@ -78,6 +78,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         // 补充设计 v1.0 写通道：DwWriteChannelIdempotencyMapper 直接落 writechannel 包
         // （非 .mapper 子包），通配不命中，须显式列出（gateway 已同法登记）。
         "com.chinacreator.gzcm.engine.data.writechannel",
+        // 详设-09 H-6 主数据完备性：MasterDataCompletenessMapper 落 fact.masterdata 包
+        // （非 .mapper/.dao 子包），通配不命中，未登记则 datanet 启动即失败。
+        "com.chinacreator.gzcm.engine.data.fact.masterdata",
         // 横切底座
         "com.chinacreator.gzcm.runtime.**.mapper",
         "com.chinacreator.gzcm.runtime.**.dao",

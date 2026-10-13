@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       "Agent 周期任务（CronJob 调度）"（impl 主源码零 {@code @Scheduled} 注解，
  *       CronJobController 仅代理外部 MCP，不经本 boot 调度）；</li>
  *   <li>{@code engine/ai-engine/ai-engine-impl/AGENTS.md} —
- *     (a) 不得硬写旧值 "27 个 Controller"（实测 {@link #IMPL_CONTROLLER_BASELINE}=37）；
+ *     (a) 不得硬写旧值 "27 个 Controller"（实测 {@link #IMPL_CONTROLLER_BASELINE}=44）；
  *     (b) 不得硬写旧值 "6 个 test class … 40 case"（实测见 {@link #countTestClasses()}）；
  *     (c) 不得记载不存在的类 {@code KnowledgeExtractorService}（KAG 抽取承载 =
  *         {@code KnowledgeAgentContext}，非独立 Service 类）；
@@ -65,9 +65,12 @@ class ModuleDocTruthfulnessTest {
      * <p>33（2026-10-09 建基）→ 37：+1 = 补充设计 v1.0 §10 能力目录
      * {@code AiCapabilityController}（本批次），+3 = 详设-10 R2-A {@code WAgentRun/Question/Goal}
      * 三 Controller（该批次 {@code -DskipTests} 提交，本门禁从未实跑，漂移于 2026-10-11
-     * 真跑时暴露）。计数口径 = 文件名形态 {@code *Controller.java}，测试侧载体不计入。
+     * 真跑时暴露）。37 → 44：+7 = 详设-10 复盘收口批（2026-10-12）补齐 §5.2 无 Controller 的
+     * #11~#24 端点族：{@code WAgentKillSwitch/Readiness/Candidate/EvidenceTrace/DecisionAction/}
+     * {@code ToolContract} 六 Controller + SSE 实流 {@code WAgentRunEventStreamController}，
+     * 计数口径 = 文件名形态 {@code *Controller.java}，测试侧载体不计入。
      */
-    private static final int IMPL_CONTROLLER_BASELINE = 37;
+    private static final int IMPL_CONTROLLER_BASELINE = 44;
 
     private static Path backendRoot() throws IOException {
         Path p = Paths.get("").toAbsolutePath();

@@ -58,6 +58,17 @@ public class AuditDao extends JdbcTemplateDaoSupport {
             "prev_hash, curr_hash FROM " + AUDIT_LOG + " ORDER BY created_at ASC, id ASC");
     }
 
+    /**
+     * 详设-01 B 章 3.2 交互时序⑦：取 id 闭区间 [fromId, toId] 的哈希链列（id 升序）。
+     * 区间口径以主键 id 为界（增量校验端点 verify-chain{from,to} 消费）。
+     */
+    public List<Map<String, Object>> findHashChainRowsInRange(long fromId, long toId) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, username, operation, entity_type, entity_id, created_at::text as created_at, " +
+            "prev_hash, curr_hash FROM " + AUDIT_LOG + " WHERE id BETWEEN ? AND ? ORDER BY id ASC",
+            fromId, toId);
+    }
+
     // ── Kafka 消费者幂等落库 ──
 
     /** PG 幂等落库（ON CONFLICT (id) DO NOTHING）。 */

@@ -54,6 +54,12 @@ public final class WAgentApiPaths {
     public static final String RUN_BY_ID = BASE_PREFIX + "/runs/{" + P_RUN_ID + "}";
     /** #7 GET SSE；Last-Event-ID 续传，依赖 P-4 就绪（streamRunEvents，F10-16）。 */
     public static final String RUN_EVENTS_SSE = BASE_PREFIX + "/runs/{" + P_RUN_ID + "}/events";
+    /**
+     * #7 SSE 实流通道（补债新增，只增不改）：{@link #RUN_EVENTS_SSE} 既有 JSON 面
+     * （P-4 未就绪时的 502 降级出口）保持不动；本条为 {@code text/event-stream} 正流映射
+     * （SseEmitter + Last-Event-ID 续传，轮询 {@code ecos_wagent_run_event} 回放，F10-16）。
+     */
+    public static final String RUN_EVENTS_SSE_STREAM = RUN_EVENTS_SSE + "/stream";
     /** #8 POST；awaiting_input 应答（submitRunInput）。 */
     public static final String RUN_INPUT = BASE_PREFIX + "/runs/{" + P_RUN_ID + "}/input";
     /** #9 POST；awaiting_approval + 凭证校验（approveRunGate）。 */

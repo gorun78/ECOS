@@ -68,6 +68,8 @@ public final class KbErrorCodes {
     public static final KbError APPROVED_ASSUMPTION_MODIFICATION = new KbError(409, "ECOS-KB-071");
     /** 假设已过期不可引用。 */
     public static final KbError ASSUMPTION_EXPIRED = new KbError(410, "ECOS-KB-072");
+    /** 认知供给侧（F04-08 只读端点）后端不可用 → fail-loud 拒绝，禁空列表伪装"无数据"。 */
+    public static final KbError COGNITION_SUPPLY_UNAVAILABLE = new KbError(503, "ECOS-KB-073");
 
     // ── 图谱形态 ────────────────────────────────────────────────
     /** 图谱形态不一致（PG↔Neo4j 对账差异，F04-10）。 */

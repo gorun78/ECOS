@@ -15,10 +15,13 @@ import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
 import com.chinacreator.gzcm.engine.kb.service.KbEntityInstanceExtractionService;
 import com.chinacreator.gzcm.engine.kb.service.KnowledgeDocIngestService;
 import com.chinacreator.gzcm.engine.kb.service.KnowledgeIngestQueryService;
+import com.chinacreator.gzcm.engine.kb.support.KbAuditEventPublisher;
+import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -301,12 +304,26 @@ public class KnowledgeIngestController {
         }
     }
 
-    /** 审计事件：写操作落 log；正式 Kafka 发件走 PMO-50 EventBus 统一接入后切换。 */
+    /** F04-15 真实审计发布器（可空；缺席时本地结构化 log 兜底，语义同 KnowledgeNavSecurityEngineClient 先例）。 */
+    @Autowired(required = false)
+    private KbAuditEventPublisher kbAuditEventPublisher;
+
+    /**
+     * 审计事件（F04-15 收口，2026-10-12 复盘订正）：经 {@link KbAuditEventPublisher} 走 EventBus
+     * 发 Kafka {@code ecos.audit}（复刻 {@code KnowledgeNavSecurityEngineClient#audit} 先例）；
+     * 发布器未装配 → 本地 log 兜底；发布失败（ECOS-KB-022）→ 按先例调用方口径降级 log.error，
+     * 不阻塞主链、绝不静默吞。
+     */
     private void emitAudit(String action, String detail) {
+        if (kbAuditEventPublisher == null) {
+            log.warn("[AUDIT-LOCAL-FALLBACK] topic=ecos.audit action={} detail={}", action, detail);
+            return;
+        }
         try {
-            log.info("AUDIT topic=ecos.audit action={} detail={}", action, detail);
-        } catch (Exception e) {
-            log.warn("emitAudit fallback log failed: {}", e.getMessage());
+            kbAuditEventPublisher.audit(action, detail, "kb-ingest");
+        } catch (KbErrorCodes.DomainException ex) {
+            log.error("审计发布失败（写已落库，审计证据见本地兜底 log）: action={} {}",
+                    action, ex.getMessage());
         }
     }
 

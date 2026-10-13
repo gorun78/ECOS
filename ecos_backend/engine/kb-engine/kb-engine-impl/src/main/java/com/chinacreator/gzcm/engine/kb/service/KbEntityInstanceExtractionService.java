@@ -6,6 +6,8 @@ import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.kb.dao.KbEntityInstanceExtractionServiceDao;
 import com.chinacreator.gzcm.engine.kb.dto.EntityInstanceExtractionReportVO;
 import com.chinacreator.gzcm.engine.kb.support.C3AttributeCompletenessValidator;
+import com.chinacreator.gzcm.engine.kb.support.KbAuditEventPublisher;
+import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -1000,17 +1002,32 @@ public class KbEntityInstanceExtractionService {
         return value == null ? "" : URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
+    /** F04-15 真实审计发布器（可空；缺席时本地结构化 log 兜底，语义同 KnowledgeNavSecurityEngineClient 先例）。 */
+    @Autowired(required = false)
+    private KbAuditEventPublisher kbAuditEventPublisher;
+
     /**
-     * 审计事件：走 Kafka {@code ecos.audit}；Kafka 不可用时本地 log 兜底（铁律 §2.4 #5）。
+     * 审计事件（F04-15 收口，2026-10-12 复盘订正）：经 {@link KbAuditEventPublisher} 走 EventBus
+     * 发 Kafka {@code ecos.audit}（复刻 {@code KnowledgeNavSecurityEngineClient#audit} 先例）；
+     * 发布器未装配 → 本地 log 兜底；发布失败（ECOS-KB-022）→ 按先例调用方口径降级 log.error，
+     * 不阻塞主链、绝不静默吞。
      */
     private void emitAudit(String action, String detail) {
-        try {
-            String payload = String.format("{\"action\":\"%s\",\"detail\":\"%s\",\"service\":\"kb-engine\"}",
-                    action, detail == null ? "" : detail.replace("\"", "'").replace("\\", "/"));
-            log.info("AUDIT topic={} payload={}", KafkaTopics.AUDIT, payload);
-        } catch (Exception e) {
-            log.warn("emitAudit fallback log failed: {}", e.getMessage());
+        if (kbAuditEventPublisher == null) {
+            log.warn("[AUDIT-LOCAL-FALLBACK] topic={} action={} detail={}",
+                    KafkaTopics.AUDIT, action, detail == null ? "" : sanitizeDetail(detail));
+            return;
         }
+        try {
+            kbAuditEventPublisher.audit(action, sanitizeDetail(detail), "kb-instance-extract");
+        } catch (KbErrorCodes.DomainException ex) {
+            log.error("审计发布失败（写已落库，审计证据见本地兜底 log）: action={} {}",
+                    action, ex.getMessage());
+        }
+    }
+
+    private static String sanitizeDetail(String s) {
+        return s == null ? "" : s.replace("\"", "'").replace("\\", "/");
     }
 
     // ═══════════════ 内部类型 ═══════════════

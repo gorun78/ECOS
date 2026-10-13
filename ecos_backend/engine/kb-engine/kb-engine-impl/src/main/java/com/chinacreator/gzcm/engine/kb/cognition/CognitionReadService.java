@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.cognition;
 
 import com.chinacreator.gzcm.engine.kb.dao.CognitionReadDao;
+import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -64,6 +65,44 @@ public class CognitionReadService {
             // 认知三态表可能不存在（standard 档 / 场景未启用）→ 合法空态，非结构性表缺失
             log.debug("认知三态读取降级为空 table={} domain={}: {}", realTable, domain, e.getMessage());
             return new ArrayList<>();
+        }
+    }
+
+    // ── F04-08 供给侧只读端点专用（2026-10-12 复盘：fail-loud，禁空列表伪装"无数据"） ──
+
+    /**
+     * 供给侧只读 hypothesis：后端不可用（DAO 缺席 / {@code DataAccessException}）→
+     * 抛 {@code 503 ECOS-KB-073}（{@link KbErrorCodes#COGNITION_SUPPLY_UNAVAILABLE}），
+     * 严禁降级空列表伪装"无数据"。真实空结果集仍返回空列表（合法空态）。
+     */
+    public List<Map<String, Object>> hypothesesSupply(String domain, int limit) {
+        return supplyRead(CognitionContractGuard.HYPOTHESIS_REAL_TABLE, domain, limit);
+    }
+
+    /** 供给侧只读 belief（fail-loud 语义同 {@link #hypothesesSupply}）。 */
+    public List<Map<String, Object>> beliefsSupply(String domain, int limit) {
+        return supplyRead(CognitionContractGuard.BELIEF_REAL_TABLE, domain, limit);
+    }
+
+    /** 供给侧只读 mind（fail-loud 语义同 {@link #hypothesesSupply}）。 */
+    public List<Map<String, Object>> mindsSupply(String domain, int limit) {
+        return supplyRead(CognitionContractGuard.MIND_REAL_TABLE, domain, limit);
+    }
+
+    private List<Map<String, Object>> supplyRead(String realTable, String domain, int limit) {
+        if (dao == null) {
+            throw KbErrorCodes.COGNITION_SUPPLY_UNAVAILABLE.exception(
+                    "认知供给侧不可用: CognitionReadDao 未装配 table=" + realTable);
+        }
+        String[] valid = HypothesisStatus.validStatusCodes();
+        try {
+            List<Map<String, Object>> rows = dao.read(realTable, valid, domain, limit);
+            return rows == null ? new ArrayList<>() : rows;
+        } catch (DataAccessException e) {
+            // 后端不可用 ≠ 无数据：fail-loud 抛 503，禁空列表伪装（沿用 ECOS-KB-* 错误码风格）
+            log.error("认知供给侧读取失败 table={} domain={}: {}", realTable, domain, e.getMessage(), e);
+            throw KbErrorCodes.COGNITION_SUPPLY_UNAVAILABLE.exception(
+                    "认知供给侧后端不可用（表缺失/访问被拒）table=" + realTable + " 原因=" + e.getMessage());
         }
     }
 }

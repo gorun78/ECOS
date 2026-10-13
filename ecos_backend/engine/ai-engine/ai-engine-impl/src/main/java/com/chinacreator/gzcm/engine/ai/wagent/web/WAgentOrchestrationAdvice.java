@@ -2,9 +2,16 @@ package com.chinacreator.gzcm.engine.ai.wagent.web;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
+import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentCandidateController;
+import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentDecisionActionController;
+import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentEvidenceTraceController;
 import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentGoalController;
+import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentKillSwitchController;
 import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentQuestionController;
+import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentReadinessController;
 import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentRunController;
+import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentRunEventStreamController;
+import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentToolContractController;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentErrorCodes.WAgentErrorCode;
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentOrchestrationException;
 import org.slf4j.Logger;
@@ -31,7 +38,12 @@ import java.util.Map;
  * </ul>
  */
 @RestControllerAdvice(assignableTypes = {WAgentGoalController.class,
-        WAgentQuestionController.class, WAgentRunController.class})
+        WAgentQuestionController.class, WAgentRunController.class,
+        // §5.2 补债批次（2026-10-12 只增登记）：#7 SSE 流 / #11~#24 新面共用同一 §5.3 错误出口
+        WAgentRunEventStreamController.class, WAgentKillSwitchController.class,
+        WAgentReadinessController.class, WAgentToolContractController.class,
+        WAgentCandidateController.class, WAgentEvidenceTraceController.class,
+        WAgentDecisionActionController.class})
 public class WAgentOrchestrationAdvice {
 
     private static final Logger log = LoggerFactory.getLogger(WAgentOrchestrationAdvice.class);

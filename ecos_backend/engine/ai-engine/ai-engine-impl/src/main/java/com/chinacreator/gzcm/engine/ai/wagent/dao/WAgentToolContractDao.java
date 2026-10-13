@@ -91,6 +91,13 @@ public class WAgentToolContractDao extends JdbcTemplateDaoSupport {
                 WAgentToolContractDO.class, disclosure, status);
     }
 
+    /** 全生命周期状态列表面（§5.2 #14 searchTools 无 engine/toolset 收窄时的缺省读法；关键词/权限过滤在服务层）。 */
+    public List<WAgentToolContractDO> findByStatus(String status) {
+        return queryList("SELECT " + COLUMNS + " FROM " + TABLE
+                + " WHERE status = ? AND is_deleted = 0 ORDER BY name ASC, version DESC",
+                WAgentToolContractDO.class, status);
+    }
+
     public int update(WAgentToolContractDO contract) {
         return updateByBean(UPDATE_SQL, contract);
     }

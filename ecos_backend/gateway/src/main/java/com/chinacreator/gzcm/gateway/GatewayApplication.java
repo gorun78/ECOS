@@ -146,6 +146,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     // R2-B1 (data-engine): 写通道幂等 / 载具目录 @Mapper 落在 .writechannel 包
     // (表层非 mapper/dao/repository)，未纳入扫描致 DwWriteChannelService 注入失败
     "com.chinacreator.gzcm.engine.data.writechannel",
+    // 详设-09 H-6 主数据完备性: MasterDataCompletenessMapper 落 fact.masterdata 包
+    // (表层非 mapper/dao/repository)，未纳入扫描致 gateway 启动即失败
+    "com.chinacreator.gzcm.engine.data.fact.masterdata",
     "com.chinacreator.gzcm.engine.kb.repository",
     // 非结构化文档链路：kb.doc.mapper 下的 KbDocMapper/KbDocChunkMapper 不在 kb.repository 内，
     // 不纳入扫描会导致 KnowledgeDocIngestService 注入失败（启动即失败），与 dccheng 侧口径保持一致

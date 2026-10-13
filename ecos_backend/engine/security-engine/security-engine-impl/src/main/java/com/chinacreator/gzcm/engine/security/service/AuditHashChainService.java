@@ -113,6 +113,87 @@ public class AuditHashChainService {
         return result;
     }
 
+    /**
+     * 详设-01 B 章 3.2 交互时序⑦：增量哈希链区间校验 POST verify-chain {from,to}。
+     *
+     * <p>口径：以主键 id 闭区间 [fromId,toId]、id 升序逐条重算
+     * curr_hash = SHA-256(prev_hash||username||operation||entity_type||entity_id||created_at)
+     * 并比对 prev/curr 双向链接；区间起点锚 = 区间前一条已存记录的 curr_hash
+     * （与 {@code stampHashChain} 的戳记口径一致）。与全量
+     * {@link #verifyHashChain()}（首断即停）不同，本方法遍历整个区间并汇总
+     * 全部断点 id（契约响应 {valid, brokenAt[]}）。</p>
+     *
+     * @return { valid, brokenAt: List&lt;Long&gt;, totalChecked, from, to, algorithm }
+     */
+    public Map<String, Object> verifyHashChainRange(long fromId, long toId) {
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        java.util.LinkedHashSet<Long> brokenAt = new java.util.LinkedHashSet<>();
+        int totalChecked = 0;
+
+        try {
+            if (fromId > toId) {
+                throw new IllegalArgumentException("from 不能大于 to: from=" + fromId + ", to=" + toId);
+            }
+
+            // 区间锚：from 前一条记录的已存 curr_hash（首段回落空串哈希）
+            String expectedPrevHash = auditDao.findPrevHash(fromId, EMPTY_HASH);
+            if (expectedPrevHash == null) expectedPrevHash = EMPTY_HASH;
+
+            var rows = auditDao.findHashChainRowsInRange(fromId, toId);
+
+            for (Map<String, Object> row : rows) {
+                totalChecked++;
+                long id = ((Number) row.get("id")).longValue();
+                String storedPrevHash = str(row.get("prev_hash"));
+                String storedCurrHash = str(row.get("curr_hash"));
+
+                // ① 链接校验：存储的 prev_hash 必须等于链上期望值
+                if (!expectedPrevHash.equals(storedPrevHash)) {
+                    brokenAt.add(id);
+                }
+
+                // ② 内容校验：以存储的 prev 为输入重算 curr（与戳记口径逐字一致）
+                String recordContent = storedPrevHash + "|" +
+                    str(row.get("username")) + "|" +
+                    str(row.get("operation")) + "|" +
+                    str(row.get("entity_type")) + "|" +
+                    str(row.get("entity_id")) + "|" +
+                    str(row.get("created_at"));
+                String computedHash = sha256(recordContent);
+                if (!computedHash.equals(storedCurrHash)) {
+                    brokenAt.add(id);
+                }
+
+                // 向前推进：以存储值续链（区间校验目标是逐条比对，不是重放重建）
+                expectedPrevHash = storedCurrHash;
+            }
+
+            result.put("valid", brokenAt.isEmpty());
+            result.put("brokenAt", new java.util.ArrayList<>(brokenAt));
+            result.put("totalChecked", totalChecked);
+            result.put("from", fromId);
+            result.put("to", toId);
+            result.put("algorithm", HASH_ALGORITHM);
+        } catch (IllegalArgumentException e) {
+            result.put("valid", false);
+            result.put("error", e.getMessage());
+            result.put("brokenAt", new java.util.ArrayList<>());
+            result.put("totalChecked", totalChecked);
+            result.put("from", fromId);
+            result.put("to", toId);
+        } catch (Exception e) {
+            log.error("审计哈希链区间校验失败: from={}, to={}", fromId, toId, e);
+            result.put("valid", false);
+            result.put("error", e.getMessage());
+            result.put("brokenAt", new java.util.ArrayList<>(brokenAt));
+            result.put("totalChecked", totalChecked);
+            result.put("from", fromId);
+            result.put("to", toId);
+        }
+
+        return result;
+    }
+
     private static String str(Object obj) {
         return obj != null ? obj.toString() : "";
     }

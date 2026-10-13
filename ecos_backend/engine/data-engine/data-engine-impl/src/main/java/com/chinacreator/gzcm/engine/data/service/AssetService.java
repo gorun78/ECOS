@@ -79,14 +79,18 @@ public class AssetService {
     /**
      * 打标前 ABAC 校验（security-engine 裁决）：
      * action=data.asset.security-tag，resource 带 assetId/resourceId/domain。
-     * 若 ABAC 不可用则放行（生产告警）。
+     * <p><b>2026-10-12 复盘订正（fail-open → fail-closed）</b>：ABAC 不可用（Bean 未装配）时
+     * 原实现仅 log.warn 放行，与全平台 fail-closed（架构铁律 #3 默认 DENY）相悖；
+     * 现对齐 OpaPolicyService 常量化 fail-close 先例 → 默认拒绝抛 {@link SecurityException}。
      * DENY 抛 {@link SecurityException}；NOT_APPLICABLE/PERMIT 放行。
      */
     private void abacCheck(String assetId, String resourceId, String operator, String action) {
         IAbacPermissionChecker checker = abacProvider.getIfAvailable();
         if (checker == null) {
-            log.warn("ABAC 不可用，动作 {} 放行 (asset={} resource={})", action, assetId, resourceId);
-            return;
+            // fail-closed DENY：security 不可用不放行（对齐铁律 #3 / OpaPolicyService 先例）
+            log.error("ABAC 不可用，动作 {} 默认 DENY 拒绝 (asset={} resource={})", action, assetId, resourceId);
+            throw new SecurityException(
+                "ASSET-042: ABAC 不可用，操作默认拒绝 fail-closed (asset=" + assetId + " action=" + action + ")");
         }
         AbacContext ctx = new AbacContext();
         Map<String, Object> subject = new HashMap<>();

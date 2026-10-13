@@ -131,6 +131,28 @@ class AuditHashChainServiceTest {
             return out;
         });
 
+        // 详设-01 verify-chain{from,to}：id 闭区间、id 升序（与 AuditDao.findHashChainRowsInRange 口径一致）
+        when(dao.findHashChainRowsInRange(anyLong(), anyLong())).thenAnswer(inv -> {
+            long from = inv.getArgument(0);
+            long to = inv.getArgument(1);
+            java.util.TreeMap<Long, Map<String, Object>> ordered =
+                    new java.util.TreeMap<>(store.rows);
+            java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+            for (Map<String, Object> r : ordered.subMap(from, true, to, true).values()) {
+                Map<String, Object> v = new java.util.LinkedHashMap<>();
+                v.put("id", r.get("id"));
+                v.put("username", r.get("username"));
+                v.put("operation", r.get("operation"));
+                v.put("entity_type", r.get("entity_type"));
+                v.put("entity_id", r.get("entity_id"));
+                v.put("created_at", r.get("created_at"));
+                v.put("prev_hash", r.get("prev_hash"));
+                v.put("curr_hash", r.get("curr_hash"));
+                out.add(v);
+            }
+            return out;
+        });
+
         this.service = new AuditHashChainService(dao);
     }
 
@@ -207,5 +229,45 @@ class AuditHashChainServiceTest {
         Map<String, Object> result = service.verifyHashChain();
         assertFalse((Boolean) result.get("valid"));
         assertEquals(2L, ((Number) result.get("brokenAt")).longValue());
+    }
+
+    @Test
+    @DisplayName("verifyHashChainRange — 完整链区间 [2,3] 应 valid=true、brokenAt 空、totalChecked=2")
+    void verifyChainRangePassesWhenIntact() {
+        for (int i = 1; i <= 4; i++) {
+            store.insertRow("u" + i, "OP" + i, "TYPE" + i, "id" + i, "2026-09-02T10:0" + (i - 1) + ":00");
+            service.stampHashChain((long) i);
+        }
+        Map<String, Object> result = service.verifyHashChainRange(2L, 3L);
+        assertTrue((Boolean) result.get("valid"));
+        assertEquals(2, ((Number) result.get("totalChecked")).intValue());
+        assertEquals(List.of(), result.get("brokenAt"));
+        assertEquals("SHA-256", result.get("algorithm"));
+    }
+
+    @Test
+    @DisplayName("verifyHashChainRange — 篡改区间内一条应 valid=false 且 brokenAt 含该 id")
+    void verifyChainRangeDetectsTampering() {
+        for (int i = 1; i <= 4; i++) {
+            store.insertRow("u" + i, "OP" + i, "TYPE" + i, "id" + i, "2026-09-02T10:0" + (i - 1) + ":00");
+            service.stampHashChain((long) i);
+        }
+        store.rows.get(3L).put("username", "EVIL");
+
+        Map<String, Object> result = service.verifyHashChainRange(2L, 4L);
+        assertFalse((Boolean) result.get("valid"));
+        @SuppressWarnings("unchecked")
+        List<Long> broken = (List<Long>) result.get("brokenAt");
+        assertEquals(List.of(3L), broken);
+        assertEquals(3, ((Number) result.get("totalChecked")).intValue());
+    }
+
+    @Test
+    @DisplayName("verifyHashChainRange — from>to 应 valid=false 带参数错误，不触 DAO")
+    void verifyChainRangeRejectsInvertedBounds() {
+        Map<String, Object> result = service.verifyHashChainRange(5L, 2L);
+        assertFalse((Boolean) result.get("valid"));
+        assertTrue(String.valueOf(result.get("error")).contains("from"));
+        assertEquals(0, ((Number) result.get("totalChecked")).intValue());
     }
 }
