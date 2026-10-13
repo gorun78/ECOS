@@ -592,6 +592,7 @@
   "common.status.offline_title": "Backend unreachable",
   "common.status.offline_desc": "The request timed out or was aborted; the service is temporarily unavailable.",
   "common.status.draft_kept": "Local draft kept; you can resubmit once the service is back.",
+  "common.status.demo_badge": "Demo Data",
   "common.empty.title": "No Data",
   "common.empty.desc": "Nothing to display here yet.",
   "ops.crm.region.apac": "APAC",

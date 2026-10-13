@@ -592,6 +592,7 @@
   "common.status.offline_title": "后端不可达",
   "common.status.offline_desc": "请求超时或中断，服务暂时不可用。",
   "common.status.draft_kept": "已保留本地草稿，服务恢复后可继续提交。",
+  "common.status.demo_badge": "演示数据",
   "common.empty.title": "暂无数据",
   "common.empty.desc": "当前没有可显示的内容",
   "ops.crm.region.apac": "亚太区",

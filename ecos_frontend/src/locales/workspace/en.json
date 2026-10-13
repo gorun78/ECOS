@@ -42,6 +42,7 @@
   "workspace.l2.stat.updated": "Last Update",
   "workspace.l2.recent.title": "Recent Actions",
   "workspace.l2.recent.empty": "No activity yet.",
+  "workspace.l2.recent.go_decisions": "Go to Decisions",
   "workspace.l2.cognition.title": "Cognition Summary",
   "workspace.l2.cognition.unavailable": "Cognition engine unavailable; showing placeholder only.",
   "workspace.l2.cognition.go_forecast": "Open forecast",

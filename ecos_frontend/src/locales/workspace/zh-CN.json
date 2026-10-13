@@ -42,6 +42,7 @@
   "workspace.l2.stat.updated": "最近更新时间",
   "workspace.l2.recent.title": "最近动作",
   "workspace.l2.recent.empty": "暂无动作记录。",
+  "workspace.l2.recent.go_decisions": "前往决策",
   "workspace.l2.cognition.title": "认知摘要",
   "workspace.l2.cognition.unavailable": "认知引擎暂不可用，本卡片仅显示占位。",
   "workspace.l2.cognition.go_forecast": "查看完整推演",
