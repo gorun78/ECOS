@@ -525,9 +525,9 @@ export default function DomainGraphCanvas({
               !bg-[#0f1117] !border !border-[#1E293B] !rounded-xl
               !shadow-lg !shadow-black/30
               [&_button]:!bg-[#141924] [&_button]:!border-[#1E293B]
-              [&_button]:!text-slate-400 [&_button]:hover:!bg-[#1A1F2E]
+              [&_button]:!${styles.cardTextMuted} [&_button]:hover:!bg-[#1A1F2E]
               [&_button]:hover:!text-white
-              [&_button_svg]:!fill-slate-400 [&_button_svg]:hover:!fill-white
+              [&_button_svg]:!fill-current [&_button_svg]:hover:!fill-white
               [&_svg]:!w-3.5 [&_svg]:!h-3.5
             `}
             showInteractive={!readOnly}
