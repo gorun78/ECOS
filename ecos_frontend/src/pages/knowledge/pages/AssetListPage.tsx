@@ -19,8 +19,8 @@
  * 主题守护 §4.1：0 硬编码色值（全 useTheme().styles）
  * 机构 lint §4.3：0 硬编码中文（grep -c '[一-龥]{2,}' = 0）
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Search, RefreshCw } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Search, RefreshCw, Check, Loader2, Minus, AlertCircle } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { fetchNavDomains, fetchNavProducts, fetchAssetStatuses, type NavProductItemVO, type AssetStatusItem } from '../../../services/knowledgeNavApi';
@@ -30,19 +30,21 @@ const PAGE_SIZE = 20;
 /** F10 后端 ids 上限，前端同步分片 */
 const STATUS_BATCH_SIZE = 100;
 
-/** 状态 → 主题 chip 类（已发布 green / 审核中 orange / 草稿 gray） */
-function statusBadgeClass(status: string): string {
+/** 归一化状态 → 三档（published / review / draft），供徽章与过滤共用 */
+type AssetStatusBucket = 'published' | 'review' | 'draft';
+function bucketize(status: string | undefined): AssetStatusBucket {
   const normalized = (status || '').trim().toLowerCase();
-  if (['已发布', 'published', 'active', 'released', 'ready'].includes(normalized)) return 'kb-status-published';
-  if (['审核中', 'review', 'in_review', 'pending', 'approving'].includes(normalized)) return 'kb-status-review';
-  return 'kb-status-draft';
+  if (['已发布', 'published', 'active', 'released', 'ready'].includes(normalized)) return 'published';
+  if (['审核中', 'review', 'in_review', 'pending', 'approving'].includes(normalized)) return 'review';
+  return 'draft';
 }
 
 function statusBadgeLabelKey(status: string): string {
-  const normalized = (status || '').trim().toLowerCase();
-  if (['已发布', 'published', 'active', 'released', 'ready'].includes(normalized)) return 'knowledge.asset.status_published';
-  if (['审核中', 'review', 'in_review', 'pending', 'approving'].includes(normalized)) return 'knowledge.asset.status_review';
-  return 'knowledge.asset.status_draft';
+  switch (bucketize(status)) {
+    case 'published': return 'knowledge.asset.status_published';
+    case 'review': return 'knowledge.asset.status_review';
+    default: return 'knowledge.asset.status_draft';
+  }
 }
 
 export default function AssetListPage() {
@@ -51,6 +53,8 @@ export default function AssetListPage() {
 
   // 顶层工具栏筛选
   const [keyword, setKeyword] = useState<string>('');
+  // 提交后的关键词才驱动请求（输入不直查，Enter/搜索按钮/重置 domain 时提交）
+  const [submittedKeyword, setSubmittedKeyword] = useState<string>('');
   const [assetType, setAssetType] = useState<string>('all');
   const [status, setStatus] = useState<string>('all');
   const [domain, setDomain] = useState<string>('default');
@@ -61,6 +65,8 @@ export default function AssetListPage() {
   const [pageNum, setPageNum] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadedOnce, setLoadedOnce] = useState<boolean>(false);
+  // 列表拉取失败独立错误态（区别于「真的没有数据」空态）
+  const [listError, setListError] = useState<boolean>(false);
 
   // 批量状态：articleId → AssetStatusItem
   const [statusMap, setStatusMap] = useState<Record<string, AssetStatusItem>>({});
@@ -69,8 +75,14 @@ export default function AssetListPage() {
   // 选中资产（右详情面板）
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // 防抖 — 关键词输入不直查，提交后才查
-  const firstSearchRef = useRef(true);
+  /** 状态徽章 → 语义主题 token 类（替代悬空 kb-status-* 自定义类） */
+  const statusBadgeClass = (raw: string): string => {
+    switch (bucketize(raw)) {
+      case 'published': return `${styles.successBg} ${styles.successText}`;
+      case 'review': return `${styles.warningBg} ${styles.warningText}`;
+      default: return `${styles.badgeBg} ${styles.badgeText}`;
+    }
+  };
 
   /** 拉 domain 下拉（fetchNavDomains） */
   const loadDomains = useCallback(async () => {
@@ -82,41 +94,40 @@ export default function AssetListPage() {
     }
   }, []);
 
-  /** 拉资产列表（fetchNavProducts，强类型 NAV） */
+  /** 拉资产列表（fetchNavProducts，强类型 NAV）
+   *  注：类型/状态为「本页客户端二次过滤」（后端 nav/products 无对应参数），
+   *  total 仍为服务端未过滤总数 —— UI 已标注「仅过滤本页」避免误导。 */
   const loadList = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetchNavProducts({
-        keyword: keyword || undefined,
+        keyword: submittedKeyword || undefined,
         domain: domain || 'default',
         pageNum,
         pageSize: PAGE_SIZE,
       });
       const sourceList: NavProductItemVO[] = res?.list || [];
-      // 类型 / 状态 前端二次过滤（避免后端重复参数；后端原条件保留）
+      // 类型 / 状态 前端二次过滤（仅作用于当前页）
       const typeFiltered = sourceList.filter(item => {
         if (assetType === 'all') return true;
-        // 注：NavProductItemVO 无 assetType 字段，category 字段承载；按 category 匹配
         return (item.category || '').toLowerCase() === assetType.toLowerCase();
       });
       const statusFiltered = typeFiltered.filter(item => {
         if (status === 'all') return true;
-        const normalized = (item.status || '').trim().toLowerCase();
-        if (status === 'published') return ['published', 'active', 'released', 'ready', '已发布'].includes(normalized);
-        if (status === 'review') return ['review', 'in_review', 'pending', 'approving', '审核中'].includes(normalized);
-        return ['draft', '草稿'].includes(normalized);
+        return bucketize(item.status) === status;
       });
       setList(statusFiltered);
       setTotal(res?.total ?? sourceList.length);
+      setListError(false);
       setLoadedOnce(true);
-    } catch (e) {
-      console.warn('AssetListPage loadList failed:', e);
+    } catch {
       setList([]);
       setTotal(0);
+      setListError(true);
     } finally {
       setLoading(false);
     }
-  }, [keyword, assetType, status, domain, pageNum]);
+  }, [submittedKeyword, assetType, status, domain, pageNum]);
 
   /** 拉批量状态（assetIds，chunk ≤ 100/批，超过分片并发） */
   const loadStatus = useCallback(async (ids: string[]) => {
@@ -162,28 +173,28 @@ export default function AssetListPage() {
     void loadStatus(ids);
   }, [list, loadStatus]);
 
-  /** handleSearch：触发搜索（重置分页到 1） */
+  /** handleSearch：提交关键词 + 重置分页到 1（输入不直查，此处才发起请求） */
   const handleSearch = useCallback(() => {
-    if (pageNum === 1) {
-      void loadList();
-    } else {
-      setPageNum(1);
-    }
-  }, [pageNum, loadList]);
+    setPageNum(1);
+    setSubmittedKeyword(keyword);
+    // 若关键词与分页均无变化（依赖未动）则显式刷新一次
+    if (keyword === submittedKeyword && pageNum === 1) void loadList();
+  }, [keyword, submittedKeyword, pageNum, loadList]);
 
   /** handleDomainChange：切换 domain reset 其他筛选（PRD F3 验收） */
   const handleDomainChange = useCallback((value: string) => {
     setDomain(value);
     setKeyword('');
+    setSubmittedKeyword('');
     setAssetType('all');
     setStatus('all');
-    const next = 1;
-    setPageNum(next);
+    setPageNum(1);
   }, []);
 
   /** resetFilters（侧栏详情面板 reset 钩子） */
   const handleReset = useCallback(() => {
     setKeyword('');
+    setSubmittedKeyword('');
     setAssetType('all');
     setStatus('all');
     setDomain('default');
@@ -199,23 +210,21 @@ export default function AssetListPage() {
 
   const renderVectorGlyph = (id: string): React.ReactNode => {
     const it = statusMap[id];
-    if (!it) return <span className="opacity-40">—</span>;
-    if (it.vector) return <span className="text-emerald-500">✓</span>;
-    // vector=false：向量化未完成 → ⏳ 同步中
+    if (!it) return <Minus className="w-3.5 h-3.5 mx-auto opacity-40" aria-label={t('knowledge.asset.vector_none')} />;
+    if (it.vector) return <Check className={`w-3.5 h-3.5 mx-auto ${styles.successText}`} aria-label={t('knowledge.asset.vector_done')} />;
+    // vector=false：向量化未完成 → 同步中（lucide 旋转图标，替代悬空 kb-vector-syncing + ⏳）
     return (
-      <span
-        className="kb-vector-syncing"
-        title={t('knowledge.asset.vector_syncing_hint')}
-      >
-        ⏳
-      </span>
+      <Loader2
+        className={`w-3.5 h-3.5 mx-auto animate-spin ${styles.warningText}`}
+        aria-label={t('knowledge.asset.vector_syncing_hint')}
+      />
     );
   };
 
   const renderGraphGlyph = (id: string): React.ReactNode => {
     const it = statusMap[id];
-    if (!it || !it.graph) return <span className="opacity-40">—</span>;
-    return <span className="text-emerald-500">✓</span>;
+    if (!it || !it.graph) return <Minus className="w-3.5 h-3.5 mx-auto opacity-40" aria-label={t('knowledge.asset.graph_none')} />;
+    return <Check className={`w-3.5 h-3.5 mx-auto ${styles.successText}`} aria-label={t('knowledge.asset.graph_done')} />;
   };
 
   return (
@@ -274,8 +283,7 @@ export default function AssetListPage() {
         <button
           type="button"
           onClick={handleSearch}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border cursor-pointer"
-          style={{ borderColor: styles.accentBorder, background: styles.accentBg, color: '#fff' }}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border cursor-pointer ${styles.accentBg} ${styles.accentText} ${styles.accentBorder}`}
         >
           <Search className="w-3.5 h-3.5" />
           <span>{t('knowledge.asset.action_search')}</span>
@@ -298,6 +306,14 @@ export default function AssetListPage() {
           {t('knowledge.asset.action_reset')}
         </button>
       </div>
+
+      {/* 诚实标注：类型/状态为当前页客户端过滤，总数为服务端未过滤值 */}
+      {(assetType !== 'all' || status !== 'all') && (
+        <div className="text-[10px] font-mono flex items-center gap-1.5" style={{ color: styles.muted }}>
+          <AlertCircle className="w-3 h-3 shrink-0" />
+          <span>{t('knowledge.asset.filter_page_only_hint')}</span>
+        </div>
+      )}
 
       {/* 主区：左列表 + 右详情（≥1280px 视图） */}
       <div className="flex flex-col xl:flex-row gap-3">
@@ -324,7 +340,24 @@ export default function AssetListPage() {
                 </tr>
               </thead>
               <tbody>
-                {list.length === 0 ? (
+                {listError ? (
+                  <tr>
+                    <td colSpan={8} className="px-3 py-8 text-center">
+                      <div className={`flex flex-col items-center gap-2 ${styles.dangerText}`}>
+                        <AlertCircle className="w-5 h-5" />
+                        <span>{t('knowledge.asset.list_failed')}</span>
+                        <button
+                          type="button"
+                          onClick={() => void loadList()}
+                          className="px-2 py-0.5 rounded border text-[11px] cursor-pointer"
+                          style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}
+                        >
+                          {t('knowledge.asset.action_refresh')}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : list.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-3 py-8 text-center opacity-50">
                       {loading ? t('knowledge.asset.loading') : t('knowledge.asset.empty')}
@@ -337,7 +370,16 @@ export default function AssetListPage() {
                     return (
                       <tr
                         key={item.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isSelected}
                         onClick={() => setSelectedId(isSelected ? null : item.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedId(isSelected ? null : item.id);
+                          }
+                        }}
                         className="border-b cursor-pointer transition-colors"
                         style={{
                           borderColor: styles.cardBorder,
@@ -405,9 +447,9 @@ export default function AssetListPage() {
           </div>
         </div>
 
-        {/* 右详情面板（≥ 1280px = xl 视口时露出） */}
+        {/* 右详情面板：xl 及以上侧栏；以下堆叠在列表下方（避免点击选中后无反馈的死区） */}
         <aside
-          className="hidden xl:flex flex-col rounded-md border p-3 w-80 flex-shrink-0"
+          className="flex flex-col rounded-md border p-3 w-full xl:w-80 xl:flex-shrink-0"
           style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
         >
           <div className="text-[11px] font-semibold uppercase tracking-wider opacity-60 mb-2">

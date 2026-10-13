@@ -10,6 +10,7 @@ import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 
 import { InterfaceType, SharedProperty, Dataset, ObjectType } from '../../types/ontology';
+import Badge from '../../components/common/Badge';
 // ==========================================
 // 1. Interface View Component
 // ==========================================
@@ -18,9 +19,12 @@ interface InterfaceViewProps {
   objectTypes: ObjectType[];
   onDelete: (id: string) => void;
   onNavigateToObject: (objectId: string) => void;
+  /** 无假真理：接口为 enterpriseOntologyDemo 演示数据（无后端端点）⇒ 禁用删除并如实标注 */
+  deleteUnsupported?: boolean;
+  deleteUnsupportedReason?: string;
 }
 
-export function InterfaceView({ intf, objectTypes, onDelete, onNavigateToObject }: InterfaceViewProps) {
+export function InterfaceView({ intf, objectTypes, onDelete, onNavigateToObject, deleteUnsupported, deleteUnsupportedReason }: InterfaceViewProps) {
   const { t } = useLanguage();
   const { styles } = useTheme();
   const implementingObjects = objectTypes.filter(ot => ot.interfaces?.includes(intf.id));
@@ -38,15 +42,20 @@ export function InterfaceView({ intf, objectTypes, onDelete, onNavigateToObject 
               <span className={`text-xs font-mono ${styles.badgeBg} ${styles.badgeText} px-1.5 py-0.5 rounded font-bold`}>
                 {intf.apiName}
               </span>
+              {deleteUnsupported && <Badge variant="warning">{deleteUnsupportedReason}</Badge>}
             </div>
             <p className={`text-xs ${styles.muted} mt-0.5`}>{intf.description}</p>
           </div>
         </div>
         <button type="button"
-          onClick={() => onDelete(intf.id)}
-          className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200"
+          disabled={deleteUnsupported}
+          title={deleteUnsupported ? deleteUnsupportedReason : undefined}
+          onClick={() => { if (!deleteUnsupported) onDelete(intf.id); }}
+          className={deleteUnsupported
+            ? `text-xs px-2.5 py-1.5 rounded border ${styles.appBorder} ${styles.muted} cursor-not-allowed opacity-70`
+            : "text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200"}
         >
-          {t('ow.btn.deleteInterface')}
+          {deleteUnsupported ? (deleteUnsupportedReason || t('ow.btn.deleteInterface')) : t('ow.btn.deleteInterface')}
         </button>
       </div>
 
@@ -124,9 +133,12 @@ interface SharedPropertyViewProps {
   objectTypes: ObjectType[];
   onDelete: (id: string) => void;
   onNavigateToObject: (objectId: string) => void;
+  /** 无假真理：共享属性为 enterpriseOntologyDemo 演示数据（无后端端点）⇒ 禁用删除并如实标注 */
+  deleteUnsupported?: boolean;
+  deleteUnsupportedReason?: string;
 }
 
-export function SharedPropertyView({ sp, objectTypes, onDelete, onNavigateToObject }: SharedPropertyViewProps) {
+export function SharedPropertyView({ sp, objectTypes, onDelete, onNavigateToObject, deleteUnsupported, deleteUnsupportedReason }: SharedPropertyViewProps) {
   const { t } = useLanguage();
   const { styles } = useTheme();
   const referencedObjects = objectTypes.filter(ot =>
@@ -146,15 +158,20 @@ export function SharedPropertyView({ sp, objectTypes, onDelete, onNavigateToObje
               <span className={`text-xs font-mono ${styles.badgeBg} ${styles.badgeText} px-1.5 py-0.5 rounded font-bold`}>
                 {sp.apiName}
               </span>
+              {deleteUnsupported && <Badge variant="warning">{deleteUnsupportedReason}</Badge>}
             </div>
             <p className={`text-xs ${styles.muted} mt-0.5`}>{sp.description}</p>
           </div>
         </div>
         <button type="button"
-          onClick={() => onDelete(sp.id)}
-          className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200"
+          disabled={deleteUnsupported}
+          title={deleteUnsupported ? deleteUnsupportedReason : undefined}
+          onClick={() => { if (!deleteUnsupported) onDelete(sp.id); }}
+          className={deleteUnsupported
+            ? `text-xs px-2.5 py-1.5 rounded border ${styles.appBorder} ${styles.muted} cursor-not-allowed opacity-70`
+            : "text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200"}
         >
-          {t('ow.btn.deleteSharedProperty')}
+          {deleteUnsupported ? (deleteUnsupportedReason || t('ow.btn.deleteSharedProperty')) : t('ow.btn.deleteSharedProperty')}
         </button>
       </div>
 

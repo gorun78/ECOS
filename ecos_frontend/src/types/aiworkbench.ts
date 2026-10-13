@@ -59,13 +59,14 @@ export interface AIPModel {
   provider: 'Google' | 'Anthropic' | 'OpenAI' | 'Meta' | 'On-Premises';
   type: 'language' | 'vision' | 'embedding' | 'audio';
   status: 'connected' | 'testing' | 'offline';
-  maxContext: string;
-  latencyMs: number;
-  costPerMillion: string;
-  inputCost: string;
-  outputCost: string;
-  healthRate: number;
-  temperature: number;
+  /** 后端未提供时保持 undefined，UI 显示「未知」，禁止合成默认值（无假真理） */
+  maxContext?: string;
+  latencyMs?: number;
+  costPerMillion?: string;
+  inputCost?: string;
+  outputCost?: string;
+  healthRate?: number;
+  temperature?: number;
 }
 
 export interface AIPGuardrail {
@@ -94,6 +95,8 @@ export interface AIPAuditLog {
   status: 'allowed' | 'blocked' | 'flagged' | 'pending_approval';
   actionTaken?: string;
   details: string;
+  /** true = 前端本地乐观追加（尚未持久化）；仅用于 UI 标注，永不冒充后端数据 */
+  localOrigin?: boolean;
 }
 
 export interface AIPPostAction {
@@ -141,10 +144,13 @@ export interface EvaluationResult {
   questionId: string;
   question: string;
   category: string;
+  /** 引擎加权综合分（1-5 制，原样呈现，禁换算成百分制假分） */
   score: number;
   status: 'pending' | 'running' | 'completed' | 'failed';
   response?: string;
   latency?: number;
+  /** 引擎裁判理由（真实返回） */
+  judgeReason?: string;
 }
 
 export interface EvaluationSession {

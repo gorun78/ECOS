@@ -2,30 +2,30 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  *
- * ChatPanel — OAG (Ontology-Augmented Generation) chat panel
- * PMO-14 T6-4: OAG 8-step progress bar + message metadata card + SSE streaming
+ * ChatPanel — Chatbot Studio 对话面板
  *
- * H6-T4 组件行数治理：OAG 进度条 / 元数据卡 / 流式气泡 / 线程面板 / 导出逻辑 /
- * 类型声明已机械抽取至同目录兄弟文件（OagProgressBar.tsx、MessageMetadataCard.tsx、
- * StreamingBubble.tsx、ChatThreadPanel.tsx、chatExport.ts、chatbotTypes.ts）。
- * state 与 useEffect 顺序（滚动置底 → 线程同步 → OAG 复位 → SSE → 卸载清理 → 模拟推进）
- * 保持在本组合根中不变。
+ * §4.5（2026-10-13 全页检视报告 E 组）整改：
+ * - 原 EventSource `${API_BASE}/v1/chat/stream` 指向后端不存在的 GET 端点（ghost），
+ *   连同 oag_step/token/metadata 假事件通道一并移除；
+ * - 原「SSE 未连接时 setInterval 模拟 OAG 8 步进度」(oagSimExecuting/oagSimGenerating)
+ *   整段删除——回复唯一真实来源是父级 ChatbotStudioView 经 POST /api/v1/agent-loop/chat
+ *   写入的 chatMessages；引擎处理期间只显示诚实的 loading 指示。
+ *
+ * H6-T4 组件行数治理：元数据卡 / 线程面板 / 导出逻辑 / 类型声明保持兄弟文件抽取
+ * （MessageMetadataCard.tsx、ChatThreadPanel.tsx、chatExport.ts、chatbotTypes.ts）。
  */
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { AIPAgent } from '../../../types/aiworkbench';
-import { API_BASE } from '../../../services/httpClient';
 import * as Icons from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
 import OntologyContextPanel from './OntologyContextPanel';
-import OagProgressBar from './OagProgressBar';
 import MessageMetadataCard from './MessageMetadataCard';
-import StreamingBubble from './StreamingBubble';
 import ChatThreadPanel from './ChatThreadPanel';
 import { buildChatExport, downloadChatExport } from './chatExport';
-import type { ChatMessage, ChatThread, MessageMetadata, OagStepInfo } from './chatbotTypes';
+import type { ChatMessage, ChatThread } from './chatbotTypes';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
@@ -53,18 +53,6 @@ export default function ChatPanel({
   const { t } = useLanguage();
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // ── OAG 8 steps (component-scoped for t() access) ──────────────
-  const OAG_8_STEPS: { label: string; icon: string }[] = [
-    { label: t('aiworkbench.chatbot.oagStepIntent'), icon: 'Brain' },
-    { label: t('aiworkbench.chatbot.oagStepEntity'), icon: 'Search' },
-    { label: t('aiworkbench.chatbot.oagStepOntology'), icon: 'GitBranch' },
-    { label: t('aiworkbench.chatbot.oagStepRecall'), icon: 'Database' },
-    { label: t('aiworkbench.chatbot.oagStepSecurity'), icon: 'Shield' },
-    { label: t('aiworkbench.chatbot.oagStepAssembly'), icon: 'Puzzle' },
-    { label: t('aiworkbench.chatbot.oagStepGenerate'), icon: 'Cpu' },
-    { label: t('aiworkbench.chatbot.oagStepDeliver'), icon: 'CheckCircle' },
-  ];
-
   // ── Thread state (T7-1) ──────────────────────────────────────────
   const [threads, setThreads] = useState<ChatThread[]>([
     { id: 'thread-1', name: t('aiworkbench.chatbot.defaultThread'), messages: [], createdAt: new Date().toISOString() },
@@ -76,26 +64,10 @@ export default function ChatPanel({
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const prevMsgCountRef = useRef(0);
 
-  // ── Local state for OAG progress + SSE streaming ────────────────
-  const [oagSteps, setOagSteps] = useState<OagStepInfo[]>(
-    OAG_8_STEPS.map((s, i) => ({
-      step: i + 1,
-      label: s.label,
-      icon: s.icon,
-      status: 'pending' as const,
-    })),
-  );
-  const [streamingContent, setStreamingContent] = useState('');
-  const [streamingMetadata, setStreamingMetadata] = useState<MessageMetadata | null>(null);
-  const [sseConnected, setSseConnected] = useState(false);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const onSendRef = useRef(onSend);
-  onSendRef.current = onSend;
-
-  // ── Scroll to bottom when messages/streaming change ──────────────
+  // ── Scroll to bottom when messages change ──────────────
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages, isReplying, streamingContent, oagSteps]);
+  }, [chatMessages, isReplying]);
 
   // ── Sync parent chatMessages to active thread (T7-1) ─────────────
   useEffect(() => {
@@ -116,226 +88,6 @@ export default function ChatPanel({
       ),
     );
   }, [chatMessages, activeThreadId]);
-
-  // ── Reset OAG + streaming state when replying starts/stops ───────
-  useEffect(() => {
-    if (isReplying) {
-      // Reset OAG steps to pending when a new reply begins
-      setOagSteps(
-        OAG_8_STEPS.map((s, i) => ({
-          step: i + 1,
-          label: s.label,
-          icon: s.icon,
-          status: 'pending' as const,
-        })),
-      );
-      setStreamingContent('');
-      setStreamingMetadata(null);
-    } else {
-      // Clean up when reply stops
-      setStreamingContent('');
-      setStreamingMetadata(null);
-      // Mark all remaining pending steps as completed
-      setOagSteps(prev =>
-        prev.map(s =>
-          s.status === 'active' || s.status === 'pending'
-            ? { ...s, status: 'completed' as const }
-            : s,
-        ),
-      );
-    }
-  }, [isReplying, OAG_8_STEPS]);
-
-  // ── SSE connection management ────────────────────────────────────
-  const disconnectSSE = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-      setSseConnected(false);
-    }
-  }, []);
-
-  // Connect to SSE when isReplying becomes true
-  useEffect(() => {
-    if (!isReplying) {
-      disconnectSSE();
-      return;
-    }
-
-    // Check for the last user message to use as query
-    const lastUserMsg = [...chatMessages].reverse().find(m => m.sender === 'user');
-    if (!lastUserMsg) return;
-
-    const query = encodeURIComponent(lastUserMsg.content);
-    const agentId = encodeURIComponent(activeChatbot.id);
-    const role = encodeURIComponent(activeUserRole);
-    const dataset = encodeURIComponent(activeContextDataset);
-
-    // W206/C188：流式 URL 基址出自 httpClient API_BASE 单源
-    const sseUrl = `${API_BASE}/v1/chat/stream?query=${query}&agentId=${agentId}&role=${role}&dataset=${dataset}`;
-
-    let localSteps: OagStepInfo[] = OAG_8_STEPS.map((s, i) => ({
-      step: i + 1,
-      label: s.label,
-      icon: s.icon,
-      status: 'pending' as const,
-    }));
-    let content = '';
-    let metadata: MessageMetadata | null = null;
-    let completed = false;
-
-    const es = new EventSource(sseUrl);
-    eventSourceRef.current = es;
-    setSseConnected(true);
-
-    es.addEventListener('oag_step', (e: MessageEvent) => {
-      try {
-        const data = JSON.parse(e.data);
-        localSteps = localSteps.map(s => {
-          if (s.step < data.step && data.status !== 'error') {
-            return { ...s, status: 'completed' as const };
-          }
-          if (s.step === data.step) {
-            return {
-              ...s,
-              status: data.status,
-              detail: data.detail || s.detail,
-            };
-          }
-          return s;
-        });
-        setOagSteps([...localSteps]);
-      } catch {
-        // Ignore parse errors for non-JSON events
-      }
-    });
-
-    es.addEventListener('token', (e: MessageEvent) => {
-      try {
-        const data = JSON.parse(e.data);
-        content += data.text || '';
-        setStreamingContent(content);
-      } catch {
-        // Fallback: raw text in data field
-        content += e.data;
-        setStreamingContent(content);
-      }
-    });
-
-    es.addEventListener('metadata', (e: MessageEvent) => {
-      try {
-        metadata = JSON.parse(e.data);
-        setStreamingMetadata(metadata);
-      } catch {
-        // Ignore
-      }
-    });
-
-    es.addEventListener('done', () => {
-      completed = true;
-      localSteps = localSteps.map(s => ({
-        ...s,
-        status: s.status === 'error' ? ('error' as const) : ('completed' as const),
-      }));
-      setOagSteps([...localSteps]);
-      disconnectSSE();
-      setSseConnected(false);
-      setStreamingMetadata(metadata);
-    });
-
-    es.addEventListener('error', () => {
-      if (!completed) {
-        localSteps = localSteps.map(s =>
-          s.status === 'active' ? { ...s, status: 'error' as const, detail: t('aiworkbench.chatbot.sseDisconnected') } : s,
-        );
-        setOagSteps([...localSteps]);
-      }
-      disconnectSSE();
-    });
-
-    // Generic message handler for servers that don't use named events
-    es.onmessage = (e: MessageEvent) => {
-      if (e.data === '[DONE]' || e.data === 'done') {
-        if (!completed) {
-          completed = true;
-          localSteps = localSteps.map(s => ({
-            ...s,
-            status: s.status === 'error' ? ('error' as const) : ('completed' as const),
-          }));
-          setOagSteps([...localSteps]);
-          disconnectSSE();
-        }
-        return;
-      }
-      try {
-        const data = JSON.parse(e.data);
-        if (data.type === 'oag_step') {
-          localSteps = localSteps.map(s => {
-            if (s.step < data.step && data.status !== 'error') {
-              return { ...s, status: 'completed' as const };
-            }
-            if (s.step === data.step) {
-              return { ...s, status: data.status, detail: data.detail || s.detail };
-            }
-            return s;
-          });
-          setOagSteps([...localSteps]);
-        } else if (data.type === 'token') {
-          content += data.text || '';
-          setStreamingContent(content);
-        } else if (data.type === 'metadata') {
-          metadata = data;
-          setStreamingMetadata(metadata);
-        }
-      } catch {
-        // Raw token text
-        content += e.data;
-        setStreamingContent(content);
-      }
-    };
-
-    return () => {
-      disconnectSSE();
-    };
-  }, [isReplying, chatMessages, activeChatbot.id, activeUserRole, activeContextDataset, disconnectSSE, OAG_8_STEPS]);
-
-  // ── Cleanup on unmount ────────────────────────────────────────────
-  useEffect(() => {
-    return () => {
-      disconnectSSE();
-    };
-  }, [disconnectSSE]);
-
-  // ── Simulated OAG progress when SSE isn't connected ───────────────
-  useEffect(() => {
-    if (!isReplying || sseConnected) return;
-
-    const stepLabels = OAG_8_STEPS.map(s => s.label);
-    let currentStep = 0;
-
-    const interval = setInterval(() => {
-      if (currentStep >= 8) {
-        clearInterval(interval);
-        return;
-      }
-
-      setOagSteps(prev =>
-        prev.map((s, i) => {
-          if (i < currentStep) return { ...s, status: 'completed' as const };
-          if (i === currentStep) return { ...s, status: 'active' as const, detail: t('aiworkbench.chatbot.oagSimExecuting').replace('{label}', stepLabels[i]) };
-          return { ...s, status: 'pending' as const };
-        }),
-      );
-
-      currentStep++;
-
-      if (currentStep >= 7) {
-        setStreamingContent(t('aiworkbench.chatbot.oagSimGenerating'));
-      }
-    }, 400);
-
-    return () => clearInterval(interval);
-  }, [isReplying, sseConnected, OAG_8_STEPS, t]);
 
   // ── Active thread derivation (used by handlers + display) ──────
   const activeThread = activeThreadId ? threads.find(t => t.id === activeThreadId) : null;
@@ -399,18 +151,9 @@ export default function ChatPanel({
 
   // ── Derive display messages (T7-1: support thread view) ────────
   const baseMessages = activeThread ? activeThread.messages : chatMessages;
-
-  // ── Attach metadata to the last agent message when streaming completes ──
-  const displayMessages = baseMessages.map(msg => {
-    const isLastAgentMsg =
-      msg.sender === 'agent' &&
-      msg.id === [...baseMessages].reverse().find(m => m.sender === 'agent')?.id;
-
-    if (isLastAgentMsg && streamingMetadata && !msg.metadata) {
-      return { ...msg, metadata: streamingMetadata };
-    }
-    return msg;
-  });
+  // §4.5：原「把 SSE 流末 metadata 附加到最后一条 agent 消息」的映射已移除
+  // （ghost SSE 无元数据可附）；消息自带的真实 metadata 仍由 MessageMetadataCard 渲染。
+  const displayMessages = baseMessages;
 
   return (
     <div className={`w-full md:w-110 flex flex-col h-full ${styles.inputBg} border-l ${styles.cardBorder}`}>
@@ -419,7 +162,7 @@ export default function ChatPanel({
         className={`p-3 ${styles.cardBg} border-b ${styles.cardBorder} flex items-center justify-between shrink-0`}
       >
         <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+          <Icon name="Bot" size={12} className={styles.accentText} />
           <span className={`font-extrabold ${styles.cardText}`}>
             {t('aiworkbench.chatbot.sandboxTitle')}
           </span>
@@ -446,14 +189,14 @@ export default function ChatPanel({
               <div className={`absolute right-0 top-full mt-1 z-50 ${styles.cardBg} border ${styles.cardBorder} rounded-lg shadow-lg py-1 min-w-[120px]`}>
                 <button type="button"
                   onClick={() => handleExport('md')}
-                  className={`w-full text-left px-3 py-1.5 text-[10px] ${styles.cardText} hover:${styles.inputBg} flex items-center gap-1.5`}
+                  className={`w-full text-left px-3 py-1.5 text-[10px] ${styles.cardText} flex items-center gap-1.5`}
                 >
                   <Icon name="FileText" size={10} />
                   <span>{t('aiworkbench.chatbot.exportMd')}</span>
                 </button>
                 <button type="button"
                   onClick={() => handleExport('json')}
-                  className={`w-full text-left px-3 py-1.5 text-[10px] ${styles.cardText} hover:${styles.inputBg} flex items-center gap-1.5`}
+                  className={`w-full text-left px-3 py-1.5 text-[10px] ${styles.cardText} flex items-center gap-1.5`}
                 >
                   <Icon name="Code" size={10} />
                   <span>{t('aiworkbench.chatbot.exportJson')}</span>
@@ -473,7 +216,7 @@ export default function ChatPanel({
 
       {/* Thread indicator — when viewing a saved thread (T7-1) */}
       {activeThread && (
-        <div className={`px-3 py-1.5 ${styles.accentBg}/10 border-b ${styles.cardBorder} flex items-center justify-between text-[10px]`}>
+        <div className={`px-3 py-1.5 ${styles.badgeBg} border-b ${styles.cardBorder} flex items-center justify-between text-[10px]`}>
           <span className={`${styles.accentText} font-bold flex items-center gap-1`}>
             <Icon name="Bookmark" size={10} />
             <span>{t('aiworkbench.chatbot.savedThreadViewing').replace('{name}', activeThread.name)}</span>
@@ -481,7 +224,7 @@ export default function ChatPanel({
           </span>
           <button type="button"
             onClick={() => setActiveThreadId(null)}
-            className={`${styles.cardTextMuted} hover:${styles.accentText} transition-colors text-[9px] font-bold`}
+            className={`${styles.accentText} transition-colors text-[9px] font-bold`}
           >
             {t('aiworkbench.chatbot.backToLive')}
           </button>
@@ -571,7 +314,7 @@ export default function ChatPanel({
       </div>
 
       {/* Chat History */}
-      <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${styles.appBg}/50`}>
+      <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${styles.appBg}`}>
         {displayMessages.map((msg) => (
           <div key={msg.id} className="space-y-2">
             <MessageBubble
@@ -589,26 +332,12 @@ export default function ChatPanel({
           </div>
         ))}
 
-        {/* Streaming content during reply */}
-        {isReplying && streamingContent && (
-          <StreamingBubble
-            content={streamingContent}
-            agentName={activeChatbot.name}
-            agentAvatar={activeChatbot.avatar}
-            styles={styles}
-          />
-        )}
-
-        {/* OAG Progress Bar during reply */}
+        {/* §4.5：引擎处理中指示——真实通道为父级 POST /api/v1/agent-loop/chat，
+            回复到达前只显示 loading，不再演出 OAG 8 步假进度 / 假流式文本 / 假在线徽标 */}
         {isReplying && (
-          <OagProgressBar steps={oagSteps} styles={styles} />
-        )}
-
-        {/* SSE connection badge */}
-        {isReplying && sseConnected && (
-          <div className="flex items-center gap-1 font-mono text-[8px] text-emerald-500">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>{t('aiworkbench.chatbot.sseConnected')}</span>
+          <div className={`flex items-center gap-2 font-mono text-[9px] ${styles.cardTextMuted}`}>
+            <span className={`w-3 h-3 border-2 ${styles.cardBorder} border-t-transparent rounded-full animate-spin`} />
+            <span>{t('aiworkbench.chatbot.chat.engineWorking')}</span>
           </div>
         )}
 

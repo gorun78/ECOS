@@ -3,7 +3,7 @@
  * @license SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Check, Clock, X, Fingerprint, Terminal } from "lucide-react";
 import { useTheme } from "../../components/ThemeContext";
 import { useLanguage } from "../../components/LanguageContext";
@@ -25,6 +25,8 @@ function fmtTime(iso?: string): string {
 export default function AlertDetailDrawer({ alert, canAck, busy, onAck, onClose }: Props) {
   const { styles } = useTheme();
   const { t } = useLanguage();
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
 
   // ESC to close
   useEffect(() => {
@@ -35,6 +37,19 @@ export default function AlertDetailDrawer({ alert, canAck, busy, onAck, onClose 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [alert, onClose]);
+
+  // Focus management (a11y): when the drawer opens, remember the trigger element and
+  // move focus into the dialog (close button); when it closes, restore focus to the
+  // trigger so keyboard users don't lose their place.
+  useEffect(() => {
+    if (alert) {
+      lastFocusedRef.current = document.activeElement as HTMLElement | null;
+      closeBtnRef.current?.focus();
+    } else if (lastFocusedRef.current) {
+      lastFocusedRef.current.focus();
+      lastFocusedRef.current = null;
+    }
+  }, [alert]);
 
   if (!alert) return null;
 
@@ -65,6 +80,7 @@ export default function AlertDetailDrawer({ alert, canAck, busy, onAck, onClose 
         className={`relative h-full w-full sm:w-[420px] ${styles.cardBg} border-l ${styles.cardBorder} shadow-xl flex flex-col`}
         role="dialog"
         aria-modal="true"
+        aria-label={t("platform.alerts.detail.title")}
       >
         {/* header */}
         <div className={`shrink-0 flex items-start justify-between gap-3 px-5 py-4 border-b ${styles.cardBorder}`}>
@@ -75,10 +91,11 @@ export default function AlertDetailDrawer({ alert, canAck, busy, onAck, onClose 
             </p>
           </div>
           <button
+            ref={closeBtnRef}
             type="button"
             onClick={onClose}
-            className={`shrink-0 p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer ${styles.cardTextMuted}`}
-            aria-label="close"
+            className={`shrink-0 p-1 rounded-md transition cursor-pointer ${styles.cardTextMuted} ${styles.sidebarHoverBg}`}
+            aria-label={t("platform.alerts.detail.dismiss")}
           >
             <X className="w-4 h-4" />
           </button>

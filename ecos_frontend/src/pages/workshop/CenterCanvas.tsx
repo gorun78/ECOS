@@ -1,19 +1,19 @@
 import React from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, RotateCw } from 'lucide-react';
 import { DynamicIcon } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderCenterCanvas(vm: any) {
-  const { styles, t, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
+  const { styles, t, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass, simDataError, simDataLoading, retryLoadSimData } = vm;
   return (
     <>
               
               {/* Application's Own Inner Header Bar */}
               <div className={`h-11 px-4 flex items-center justify-between shadow-xs border-b shrink-0 ${
-                activeApp.theme.isDark ? 'bg-[var(--card,#0F172A)] text-[var(--card,#F1F5F9)]' : '${styles.cardBg} ${styles.cardBorder} ${styles.cardText}'
+                activeApp.theme.isDark ? `${styles.cardBg} ${styles.cardText}` : `${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`
               }`}>
                 <div className="flex items-center gap-2">
-                  <span className={`p-1 rounded bg-${activeApp.theme.primaryColor}-100 text-${activeApp.theme.primaryColor}-700`}>
+                  <span className={`p-1 rounded ${styles.badgeBg} ${styles.badgeText}`}>
                     <DynamicIcon name={activeApp.theme.logo || 'Plane'} size={14} />
                   </span>
                   <span className="font-bold text-sm tracking-tight">{activeApp.theme.title}</span>
@@ -31,8 +31,8 @@ export function renderCenterCanvas(vm: any) {
                       }}
                       className={`h-7 px-3 rounded-md text-[11px] font-semibold transition-all ${
                         p.id === activePageId
-                          ? `bg-${activeApp.theme.primaryColor}-100 text-${activeApp.theme.primaryColor}-700`
-                          : 'opacity-65 hover:opacity-100 hover:bg-black/5'
+                          ? `${styles.badgeBg} ${styles.badgeText}`
+                          : 'opacity-65 hover:opacity-100'
                       }`}
                     >
                       {p.title}
@@ -40,6 +40,29 @@ export function renderCenterCanvas(vm: any) {
                   ))}
                 </div>
               </div>
+
+              {/* 本体数据加载状态：错误态可见 + 重试（不掩成空列表假象） */}
+              {simDataLoading && (
+                <div className={`px-4 py-2 text-[10px] ${styles.cardTextMuted} flex items-center gap-1.5`}>
+                  <RotateCw size={11} className="animate-spin" />
+                  <span>{t('aiworkbench.ws.ops.dataLoading')}</span>
+                </div>
+              )}
+              {simDataError && (
+                <div className={`mx-4 mt-2 rounded-lg border px-3 py-2 text-[11px] flex items-center justify-between gap-2 ${styles.dangerBg} ${styles.dangerText}`}>
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <AlertTriangle size={12} className="shrink-0" />
+                    <span className="truncate">{t('aiworkbench.ws.ops.dataLoadFailed', { message: simDataError })}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void retryLoadSimData()}
+                    className={`shrink-0 px-2 py-1 rounded-md border ${styles.cardBorder} font-bold cursor-pointer`}
+                  >
+                    {t('aiworkbench.ws.ops.dataRetry')}
+                  </button>
+                </div>
+              )}
 
               {/* Central canvas structure of activePage */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -70,9 +93,9 @@ export function renderCenterCanvas(vm: any) {
                       <div
                         key={w.id}
                         onClick={() => editorMode === 'design' && setSelectedWidgetId(w.id)}
-                        className={`relative rounded-xl border p-4 ${styles.cardBg} shadow-xs select-none transition-all ${
+                        className={`relative rounded-xl border p-4 ${styles.cardBg} shadow-xs transition-all ${
                           editorMode === 'design' ? 'cursor-pointer hover:border-blue-400' : ''
-                        } ${isSelected ? 'ring-2 ring-blue-500 border-transparent scale-102' : '${styles.cardBorder}'}`}
+                        } ${isSelected ? 'ring-2 ring-blue-500 border-transparent scale-102' : styles.cardBorder}`}
                       >
                         {editorMode === 'design' && (
                           <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>

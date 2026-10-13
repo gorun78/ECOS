@@ -17,14 +17,14 @@ export function FormField({ label, placeholder, required, value, onChange }: {
     <div>
       <label className={`block text-[10px] font-semibold ${styles.cardTextMuted} uppercase tracking-wider mb-1`}>
         {label}
-        {required && <span className="text-red-400 ml-0.5">*</span>}
+        {required && <span className={`${styles.dangerText} ml-0.5`}>*</span>}
       </label>
       <input
         type="text"
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder || label}
-        className={`w-full ${styles.appBg} border ${styles.cardBorder} rounded-lg px-3 py-2 text-xs ${styles.cardText} outline-none placeholder:opacity-50 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition font-mono`}
+        className={`w-full ${styles.appBg} border ${styles.cardBorder} rounded-lg px-3 py-2 text-xs ${styles.cardText} outline-none placeholder:opacity-50 focus:ring-1 focus:ring-current transition font-mono`}
       />
     </div>
   );

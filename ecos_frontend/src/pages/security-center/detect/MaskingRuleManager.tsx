@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2, Info, Lock, Smartphone, Mail, IdCard, CircleDollarSign } from 'lucide-react';
+import { useLanguage } from '../../../components/LanguageContext';
+import { useTheme } from '../../../components/ThemeContext';
 import { maskData } from '../../../api';
-import { inputClasses, btnPrimary, btnSecondary } from './helpers';
+import { inputClasses, btnPrimary } from './helpers';
 
 // ── Masking Rule Manager ─────────────────────────────────────
-export default function MaskingRuleManager({ t, locale, styles }: { t: (k: string) => string; locale: string; styles: any }) {
+export default function MaskingRuleManager() {
+  const { t, locale } = useLanguage();
+  const { styles } = useTheme();
   const [input, setInput] = useState('');
   const [maskType, setMaskType] = useState('SHA256');
   const [masking, setMasking] = useState(false);
@@ -12,11 +16,11 @@ export default function MaskingRuleManager({ t, locale, styles }: { t: (k: strin
   const [error, setError] = useState<string | null>(null);
 
   const maskTypes = [
-    { id: 'SHA256', key: 'sec.mask.type.sha256', color: 'from-blue-500 to-cyan-500', icon: '🔐' },
-    { id: 'PHONE', key: 'sec.mask.type.phone', color: 'from-green-500 to-emerald-500', icon: '📱' },
-    { id: 'EMAIL', key: 'sec.mask.type.email', color: 'from-purple-500 to-pink-500', icon: '📧' },
-    { id: 'ID_CARD', key: 'sec.mask.type.idcard', color: 'from-orange-500 to-yellow-500', icon: '🪪' },
-    { id: 'AMOUNT', key: 'sec.mask.type.amount', color: 'from-red-500 to-rose-500', icon: '💰' },
+    { id: 'SHA256', key: 'sec.mask.type.sha256', icon: Lock },
+    { id: 'PHONE', key: 'sec.mask.type.phone', icon: Smartphone },
+    { id: 'EMAIL', key: 'sec.mask.type.email', icon: Mail },
+    { id: 'ID_CARD', key: 'sec.mask.type.idcard', icon: IdCard },
+    { id: 'AMOUNT', key: 'sec.mask.type.amount', icon: CircleDollarSign },
   ];
 
   const handleMask = async () => {
@@ -60,7 +64,9 @@ export default function MaskingRuleManager({ t, locale, styles }: { t: (k: strin
 
       {/* Mask type cards */}
       <div className="grid grid-cols-5 gap-3">
-        {maskTypes.map(mt => (
+        {maskTypes.map(mt => {
+          const MtIcon = mt.icon;
+          return (
           <button type="button"
             key={mt.id}
             onClick={() => { setMaskType(mt.id); setResult(null); setError(null); }}
@@ -70,10 +76,11 @@ export default function MaskingRuleManager({ t, locale, styles }: { t: (k: strin
                 : `border-transparent ${styles.cardBg} opacity-70 hover:opacity-100`
             }`}
           >
-            <div className="text-2xl mb-1">{mt.icon}</div>
+            <div className={`mb-1 flex justify-center ${maskType === mt.id ? styles.accentText : styles.muted}`}><MtIcon size={24} /></div>
             <div className={`text-xs font-medium ${styles.cardText}`}>{t(mt.key)}</div>
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {/* Input */}
@@ -89,13 +96,18 @@ export default function MaskingRuleManager({ t, locale, styles }: { t: (k: strin
       </div>
 
       {/* Buttons */}
-      <div className="flex gap-2">
-        <button type="button" onClick={handleMask} disabled={masking || !input.trim()} className={btnPrimary(styles)}>
-          {masking ? <Loader2 size={14} className="animate-spin" /> : t('sec.mask.btn')}
-        </button>
-        <button type="button" onClick={handleDemoMask} disabled={!input.trim()} className={btnSecondary(styles)}>
-          {t('sec.mask.localDemo')}
-        </button>
+      <div className="space-y-1.5">
+        <div className="flex gap-2">
+          <button type="button" onClick={handleMask} disabled={masking || !input.trim()} className={btnPrimary(styles)}>
+            {masking ? <Loader2 size={14} className="animate-spin" /> : t('sec.mask.btn')}
+          </button>
+          <button type="button" onClick={handleDemoMask} disabled={!input.trim()}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium border ${styles.infoBg} ${styles.infoText} ${styles.infoBorder} transition-colors cursor-pointer disabled:opacity-50`}
+            title={t('sec.mask.demoHint')}>
+            <Info size={14} />{t('sec.mask.localDemo')}
+          </button>
+        </div>
+        <p className={`text-[10px] ${styles.muted}`}>{t('sec.mask.demoHint')}</p>
       </div>
 
       {/* Error */}

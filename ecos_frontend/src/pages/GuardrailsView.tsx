@@ -16,11 +16,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ShieldCheck, ShieldAlert, Binary, FileText, Plus, Trash2,
-  CheckCircle, AlertCircle, Info, AlertTriangle,
+  Info, AlertTriangle,
   Database, Eye, Loader2, ChevronRight, Zap,
 } from 'lucide-react';
 import { useTheme } from '../components/ThemeContext';
 import { useLanguage } from '../components/LanguageContext';
+import { showToastGlobal } from '../components/common/Toast';
 import type {
   GuardrailPolicy, PreviewData, AuditLogEntry, PolicyStatus,
 } from './Guardrails/types';
@@ -41,17 +42,24 @@ type SubTab = 'policies' | 'compile' | 'audit';
 export default function GuardrailsView() {
   const { styles } = useTheme();
   const { t } = useLanguage();
-  // ── Toast ──
-  const [toast, setToast] = useState<{ type: 'success' | 'info' | 'error'; msg: string } | null>(null);
+  // §4.5 P2（行230/249）：自建 toast（三套时长并存）已删除 → 统一走 common/Toast 全局通道。
+  // 加载失败不再只靠 3.2s 短 toast（行245）：listError 错误态横幅 + 重试 + traceId 常驻展示。
   const showToast = useCallback((type: 'success' | 'info' | 'error', msg: string) => {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3200);
+    showToastGlobal(type, msg);
   }, []);
+
+  /** 从网关 ApiResponse 错误原文提取 traceId（后端实报才展示，不合成） */
+  const extractTraceId = (raw: unknown): string | undefined => {
+    const text = raw instanceof Error ? raw.message : String(raw ?? '');
+    const m = text.match(/"traceId"\s*:\s*"([^"]+)"/);
+    return m?.[1];
+  };
 
   // ── State ──
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('policies');
   const [policies, setPolicies] = useState<GuardrailPolicy[]>([]);
   const [loadingList, setLoadingList] = useState(false);
+  const [listError, setListError] = useState<{ msg: string; traceId?: string } | null>(null);
   const [search, setSearch] = useState('');
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -77,6 +85,7 @@ export default function GuardrailsView() {
   // ── API: List ──
   const loadPolicies = useCallback(async () => {
     setLoadingList(true);
+    setListError(null);
     try {
       const raw = await apiCall<any>(API_BASE);
       const list: any[] = Array.isArray(raw) ? raw : (raw?.policies ?? raw?.items ?? raw?.list ?? []);
@@ -86,11 +95,14 @@ export default function GuardrailsView() {
         setSelectedId(normalized[0].id);
       }
     } catch (e: any) {
-      showToast('error', t('gwv.loadFailed', { msg: e.message }));
+      // §4.5 P1（行245）：失败 → 常驻错误态（message + traceId + 重试按钮），
+      // 不再「置空 + 3.2s 短 toast」让错误与真空不可分
       setPolicies([]);
+      setListError({ msg: e?.message || String(e), traceId: extractTraceId(e) });
     } finally {
       setLoadingList(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, showToast, t]);
 
   useEffect(() => {
@@ -190,12 +202,9 @@ export default function GuardrailsView() {
       const logs: string[] = result?.compileLogs ?? result?.logs ?? result?.compile_logs ?? [];
       const status: PolicyStatus = result?.status ?? 'COMPILED';
       const compiledAt: string = result?.compiledAt ?? result?.compiled_at ?? new Date().toISOString();
-      setCompileLogs(logs.length > 0 ? logs : [
-        t('gwv.log1'),
-        t('gwv.log2'),
-        t('gwv.log3'),
-        t('gwv.log4'),
-      ]);
+      // §4.5 P0（行230）：引擎无日志时不再填 4 条罐头「编译日志」冒充引擎输出 ——
+      // 显示诚实空态文案（真实日志条数 > 0 才逐条渲染）
+      setCompileLogs(logs.length > 0 ? logs : [t('aiworkbench.gwv.compileNoEngineLogs')]);
       setPolicies(prev => prev.map(p => (p.id === policy.id ? { ...p, status, compiledAt, compileLogs: logs } : p)));
       showToast('success', t('gwv.compileSuccess'));
       // auto-refresh preview
@@ -267,7 +276,7 @@ export default function GuardrailsView() {
       <div className={`flex flex-col md:flex-row md:items-center justify-between border-b ${styles.cardBorder} pb-3 shrink-0 gap-3`}>
         <div className="space-y-1">
           <h2 className={`text-sm font-black ${styles.cardText} flex items-center gap-2`}>
-            <span className="p-1 rounded bg-rose-600 text-white">
+            <span className={`p-1 rounded ${styles.dangerBg} ${styles.dangerText}`}>
               <ShieldCheck size={14} />
             </span>
             <span>{t('gwv.title')}</span>
@@ -280,7 +289,7 @@ export default function GuardrailsView() {
           <button
             type="button"
             onClick={() => setActiveSubTab('policies')}
-            className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'policies' ? `${styles.inputBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} ${styles.sidebarHoverBg} hover:text-indigo-400`}`}
+            className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'policies' ? `${styles.inputBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} ${styles.sidebarHoverBg} hover:${styles.accentText}`}`}
           >
             <ShieldAlert size={12} />
             <span>{t('gwv.tabPolicies')}</span>
@@ -288,7 +297,7 @@ export default function GuardrailsView() {
           <button
             type="button"
             onClick={() => setActiveSubTab('compile')}
-            className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'compile' ? `${styles.inputBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} ${styles.sidebarHoverBg} hover:text-indigo-400`}`}
+            className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'compile' ? `${styles.inputBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} ${styles.sidebarHoverBg} hover:${styles.accentText}`}`}
           >
             <Binary size={12} />
             <span>{t('gwv.tabCompile')}</span>
@@ -296,7 +305,7 @@ export default function GuardrailsView() {
           <button
             type="button"
             onClick={() => setActiveSubTab('audit')}
-            className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'audit' ? `${styles.inputBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} ${styles.sidebarHoverBg} hover:text-indigo-400`}`}
+            className={`px-3 py-1.5 rounded-md font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'audit' ? `${styles.inputBg} ${styles.cardText} shadow-sm` : `${styles.cardTextMuted} ${styles.sidebarHoverBg} hover:${styles.accentText}`}`}
           >
             <FileText size={12} />
             <span>{t('gwv.tabAudit')}</span>
@@ -306,7 +315,20 @@ export default function GuardrailsView() {
 
       {/* ═════════════ TAB: POLICIES (CRUD) ═════════════ */}
       {activeSubTab === 'policies' && (
-        <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 gap-3">
+          {/* §4.5 P1（行245）：加载失败 = 错误态横幅（message + traceId + 重试），与真空态可区分 */}
+          {listError && (
+            <div role="alert" className={`shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border ${styles.dangerBorder} ${styles.dangerBg} ${styles.dangerText} rounded-xl px-4 py-3 text-[11px]`}>
+              <span className="min-w-0 font-semibold break-all">
+                {t('gwv.loadFailed', { msg: listError.msg })}
+                {listError.traceId && <span className="ml-2 font-mono opacity-70">traceId: {listError.traceId}</span>}
+              </span>
+              <button type="button" onClick={loadPolicies} className={`shrink-0 px-2 py-1 rounded border ${styles.dangerBorder} font-bold cursor-pointer`}>
+                {t('network.retry')}
+              </button>
+            </div>
+          )}
+          <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
           {/* Left: list */}
           <PolicyListPanel
             policies={filteredPolicies}
@@ -342,11 +364,12 @@ export default function GuardrailsView() {
               <div className={`flex-1 flex flex-col items-center justify-center ${styles.cardTextMuted} space-y-2`}>
                 <Info size={24} className={styles.cardTextMuted} />
                 <p className="font-bold">{t('gwv.emptyHint')}</p>
-                <button type="button" onClick={startCreate} className="text-blue-600 font-bold text-[11px] hover:underline flex items-center gap-1">
+                <button type="button" onClick={startCreate} className={`${styles.accentText} font-bold text-[11px] hover:underline flex items-center gap-1`}>
                   <Plus size={11} /> {t('gwv.createNew')}
                 </button>
               </div>
             )}
+          </div>
           </div>
         </div>
       )}
@@ -382,23 +405,13 @@ export default function GuardrailsView() {
             </p>
             <div className="flex gap-2 justify-end">
               <button type="button" onClick={() => setDeleteTarget(null)} className={`px-3 py-1.5 border ${styles.cardBorder} ${styles.sidebarHoverBg} rounded-md text-[11px] font-bold ${styles.cardText} cursor-pointer`}>{t('common.cancel')}</button>
-              <button type="button" onClick={handleDelete} className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[11px] font-bold cursor-pointer flex items-center gap-1"><Trash2 size={11} /> {t('common.delete')}</button>
+              <button type="button" onClick={handleDelete} className={`px-3 py-1.5 ${styles.dangerBg} ${styles.dangerText} rounded-md text-[11px] font-bold cursor-pointer flex items-center gap-1`}><Trash2 size={11} /> {t('common.delete')}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Toast ── */}
-      {toast && (
-        <div className="fixed bottom-5 right-5 z-50 animate-fadeIn">
-          <div className={`px-4 py-2.5 rounded-lg shadow-lg text-white font-bold text-[11px] flex items-center gap-2 ${
-            toast.type === 'success' ? 'bg-emerald-600' : toast.type === 'error' ? 'bg-rose-600' : 'bg-[var(--muted,#334155)]'
-          }`}>
-            {toast.type === 'success' ? <CheckCircle size={14} /> : toast.type === 'error' ? <AlertCircle size={14} /> : <Info size={14} />}
-            <span>{toast.msg}</span>
-          </div>
-        </div>
-      )}
+      {/* ── Toast：§4.5 P2 自建 toast 已删除，统一走 components/common/Toast 全局单源 ── */}
     </div>
   );
 }

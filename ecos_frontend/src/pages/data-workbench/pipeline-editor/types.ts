@@ -129,13 +129,17 @@ export interface PipelineData {
 export interface PipelineFlowEditorProps {
   connections: import('../types').DataConnection[];
   pipelines: import('../types').DataPipeline[];
-  onSave: (pipeline: PipelineData) => void;
-  onExecute: (pipelineId: string) => void;
+  /** 保存：可返回 Promise<boolean>（false = 保存失败，编辑器不再谎报成功）。 */
+  onSave: (pipeline: PipelineData) => void | Promise<void | boolean>;
+  /** 执行：可返回 Promise<结果>；null/undefined = 触发失败（后端不可达）。 */
+  onExecute: (pipelineId: string) => void | Promise<{ executionId?: string; status?: string } | null>;
   showToast?: (type: 'success' | 'error' | 'info', msg: string) => void;
   computeEngine: 'memory' | 'doris';
   onEngineChange?: (engine: 'memory' | 'doris') => void;
   editingPipeline?: import('../types').DataPipeline | null;
   onBack?: () => void;
+  /** 画布存在未保存修改时回调（父级用于切换/新建前挽留确认）。 */
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 export interface JoinCondition {

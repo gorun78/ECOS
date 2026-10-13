@@ -24,6 +24,8 @@ export interface ResolvedRelation {
   direction: 'forward' | 'reverse';
   otherObjectType: ObjectType;
   instances: Array<Record<string, unknown>>;
+  /** join_table 映射无解析端点：instances 恒为空不代表「无关联」，UI 必须如实标注（无假真理） */
+  resolutionUnsupported?: boolean;
 }
 
 export interface AnalyticsBucket {

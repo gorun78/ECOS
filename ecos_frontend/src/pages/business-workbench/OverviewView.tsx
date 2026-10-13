@@ -8,11 +8,12 @@ import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Datase
 import OntologyGraph from './OntologyGraph';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import SummaryCards from './overview/SummaryCards';
 import GraphPanel from './overview/GraphPanel';
 import DomainManagerDeck from './overview/DomainManagerDeck';
 import QuickNavPanel from './overview/QuickNavPanel';
-import ActivityLogPanel from './overview/ActivityLogPanel';
 import { useOverviewDomainForm } from './overview/useOverviewDomainForm';
 
 interface OverviewViewProps {
@@ -58,6 +59,7 @@ export default function OverviewView({
 
   // Domain Maintenance Form States — extracted hook, original useState order preserved:
   // editingDomain, formId, formName, formDesc, formColor, formAssignedObjects, isAddingNew, formError
+  const { t } = useLanguage();
   const {
     editingDomain,
     setEditingDomain,
@@ -76,6 +78,10 @@ export default function OverviewView({
     handleStartAdd,
     handleStartEdit,
     handleDeleteDomain,
+    pendingDeleteId,
+    pendingDomainName,
+    confirmDeleteDomain,
+    cancelDeleteDomain,
     handleSaveDomain,
     toggleObjectAssignment
   } = useOverviewDomainForm({
@@ -181,10 +187,20 @@ export default function OverviewView({
           onQuickNavigate={onQuickNavigate}
         />
 
-        {/* Enterprise lifecycle logs */}
-        <ActivityLogPanel />
+
+
       </div>
 
+      <ConfirmDialog
+        visible={!!pendingDeleteId}
+        danger
+        title={t('ow.dommgr.delOverview.title')}
+        message={t('ow.dommgr.delOverview.msg').replace('{name}', pendingDomainName)}
+        confirmText={t('common.confirm')}
+        cancelText={t('common.cancel')}
+        onConfirm={confirmDeleteDomain}
+        onCancel={cancelDeleteDomain}
+      />
     </div>
   );
 }

@@ -18,7 +18,7 @@ export function renderCenterFilters(vm: any) {
                           onClick={() => editorMode === 'design' && setSelectedWidgetId(w.id)}
                           className={`relative rounded-xl border p-4 ${styles.cardBg} shadow-xs transition-all ${
                             editorMode === 'design' ? 'cursor-pointer hover:border-blue-400' : ''
-                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : '${styles.cardBorder}'}`}
+                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : styles.cardBorder}`}
                         >
                           {editorMode === 'design' && (
                               <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>

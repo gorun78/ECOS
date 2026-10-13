@@ -34,6 +34,15 @@ export default function AgentMesh() {
   const [missionTasks, setMissionTasks] = useState<AgentMeshTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // §4.5 P1（行237/248）：mission 详情加载失败 = 错误态（message + traceId + 重试），不再吞错续显陈旧列表
+  const [missionError, setMissionError] = useState<{ id: string; msg: string; traceId?: string } | null>(null);
+
+  /** 从网关 ApiResponse 错误原文提取 traceId（后端实报才展示，不合成） */
+  const extractTraceId = (raw: unknown): string | undefined => {
+    const text = raw instanceof Error ? raw.message : String(raw ?? "");
+    const m = text.match(/"traceId"\s*:\s*"([^"]+)"/);
+    return m?.[1];
+  };
 
   // PMO-43 T3 C-001 (P1): per-mission polling error state. A failed 3s poll
   // (3s interval, fetchAgentMeshMission) surfaced an inline banner + retry
@@ -127,15 +136,19 @@ export default function AgentMesh() {
   };
 
   const loadMission = async (id: string) => {
+    // §4.5 P1（行237）：原「外层失败→内层兜底再 try/catch 全吞」双层吞错已删除。
+    // 进入即清空旧 mission 详情（失败不再续显上一 mission 的陈旧列表），
+    // 失败 → 常驻错误态（message + traceId + 重试），成功才回填 mission/tasks。
+    setSelectedMission(null);
+    setMissionTasks([]);
+    setMissionError(null);
     try {
       const data = await fetchAgentMeshMission(id);
       setSelectedMission(data.mission);
       setMissionTasks(data.tasks || await fetchAgentMeshMissionTasks(id));
-    } catch (e) {
-      // fallback: try tasks separately
-      try {
-        setMissionTasks(await fetchAgentMeshMissionTasks(id));
-      } catch (_) {}
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? (e.message || String(e)) : String(e);
+      setMissionError({ id, msg, traceId: extractTraceId(e) });
     }
   };
 
@@ -183,22 +196,33 @@ export default function AgentMesh() {
     }
   };
 
+  // §4.5 P1（行244/247）：原始枚举直排 + 裸色板 → i18n 徽章 + 主题 token（复用 common 既有 status.* 键）
+  const statusLabel = (status: string): string => {
+    switch (status) {
+      case "COMPLETED": return t("taskPanel.status.succeeded");
+      case "FAILED": return t("taskPanel.status.failed");
+      case "RUNNING": return t("taskPanel.status.running");
+      case "PENDING": return t("taskPanel.status.pending");
+      default: return status || t("taskPanel.status.unknown");
+    }
+  };
+
   const statusIcon = (status: string) => {
     switch (status) {
-      case "COMPLETED": return <Check size={14} className="text-green-500" />;
-      case "FAILED": return <X size={14} className="text-red-500" />;
-      case "RUNNING": return <RefreshCw size={14} className="text-blue-500 animate-spin" />;
-      case "PENDING": return <Clock size={14} className="text-yellow-500" />;
-      default: return <AlertTriangle size={14} className="text-gray-400" />;
+      case "COMPLETED": return <Check size={14} className={styles.successText} />;
+      case "FAILED": return <X size={14} className={styles.dangerText} />;
+      case "RUNNING": return <RefreshCw size={14} className={`${styles.infoText} animate-spin`} />;
+      case "PENDING": return <Clock size={14} className={styles.warningText} />;
+      default: return <AlertTriangle size={14} className={styles.cardTextMuted} />;
     }
   };
 
   const statusColor = (status: string) => {
     switch (status) {
-      case "COMPLETED": return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-      case "FAILED": return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-      case "RUNNING": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
-      default: return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
+      case "COMPLETED": return `${styles.successBg} ${styles.successText}`;
+      case "FAILED": return `${styles.dangerBg} ${styles.dangerText}`;
+      case "RUNNING": return `${styles.infoBg} ${styles.infoText}`;
+      default: return `${styles.warningBg} ${styles.warningText}`;
     }
   };
 
@@ -224,9 +248,9 @@ export default function AgentMesh() {
         <div className="flex-1 overflow-auto p-3 space-y-2">
           {agents.map(agent => (
             <div key={agent.id}
-              className={`p-3 rounded-lg border text-xs cursor-pointer transition-colors ${
+              className={`p-3 rounded-lg border text-xs ${
                 agent.status === "ACTIVE"
-                  ? `border-indigo-200 ${styles.cardBg} hover:border-indigo-400`
+                  ? `${styles.accentBorder} ${styles.cardBg}`
                   : `${styles.cardBorder} ${styles.cardBg} opacity-60`
               }`}>
               <div className="flex items-center justify-between mb-1">
@@ -369,8 +393,24 @@ export default function AgentMesh() {
         <div className="flex-1 overflow-auto p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className={`text-sm font-semibold ${styles.cardText}`}>{t("agentMesh.records")}</h3>
-            <button type="button" onClick={loadMissions} className={`p-1 ${styles.cardTextMuted} hover:text-indigo-500`}><RefreshCw size={14} /></button>
+            <button type="button" onClick={loadMissions} className={`p-1 ${styles.cardTextMuted} hover:opacity-80 transition-opacity`}><RefreshCw size={14} /></button>
           </div>
+
+          {/* §4.5 P1（行237/248）：mission 详情加载失败 → 错误态横幅 + traceId + 重试（与真空可区分） */}
+          {missionError && (
+            <div role="alert" className={`mb-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 rounded-lg border ${styles.dangerBorder} ${styles.dangerBg} px-3 py-2 text-xs ${styles.dangerText}`}>
+              <span className="min-w-0 font-semibold break-all">
+                {t("aiworkbench.agentMesh.missionLoadFailed")} · {missionError.msg}
+                {missionError.traceId && <span className="ml-1 font-mono opacity-70">traceId: {missionError.traceId}</span>}
+              </span>
+              <button type="button"
+                onClick={() => loadMission(missionError.id)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] font-medium cursor-pointer shrink-0"
+              >
+                <RefreshCw size={11} /> {t("network.retry")}
+              </button>
+            </div>
+          )}
 
           {/* ── Task Stats Panel (shown when mission selected and has tasks) ── */}
           {selectedMission && (
@@ -411,7 +451,7 @@ export default function AgentMesh() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${statusColor(mission.status)}`}>
-                    {mission.status}
+                    {statusLabel(mission.status)}
                   </span>
                   {mission.durationMs && <span className={`text-[10px] ${styles.cardTextMuted}`}>{mission.durationMs}ms</span>}
                   {(mission.status === "PENDING" || mission.status === "FAILED") && (
@@ -438,6 +478,9 @@ export default function AgentMesh() {
                   <AlertTriangle size={13} className="text-red-500 shrink-0" />
                   <span className="text-[11px] text-red-600 dark:text-red-400 flex-1 min-w-0 truncate">
                     {t("agentMesh.pollError")} · {pollError}
+                    {extractTraceId(pollError) && (
+                      <span className="ml-1 font-mono opacity-70">traceId: {extractTraceId(pollError)}</span>
+                    )}
                   </span>
                   <button type="button"
                     onClick={(e) => { e.stopPropagation(); pollTasks(); }}
@@ -466,7 +509,7 @@ export default function AgentMesh() {
                               {task.agentName || task.agentId}
                             </span>
                             <span className={`px-1.5 py-0.5 rounded text-[10px] ${statusColor(task.status)}`}>
-                              {task.status}
+                              {statusLabel(task.status)}
                             </span>
                             {task.durationMs && <span className={`text-[10px] ${styles.cardTextMuted}`}>{task.durationMs}ms</span>}
                           </div>

@@ -5,7 +5,7 @@
  * 只读：无任何编辑/导入/发布按钮（§8.4 C/K 互斥守护）。
  */
 import React from 'react';
-import { Lightbulb, Scale, Brain, Eye } from 'lucide-react';
+import { Lightbulb, Scale, Brain, Eye, Link2Off } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import {
@@ -76,6 +76,15 @@ export default function CognitiveAssetCard({ row, active, onSelect }: CognitiveA
             {probKindLabelKey(row.probabilityKind) ? t(probKindLabelKey(row.probabilityKind) as string) || row.probabilityKind : row.probabilityKind}
           </span>
         )}
+      </div>
+
+      {/* 来源跳转（设计方案 §1.4.3 流程 3 / 复盘 S6）：后端契约（列表 DAO 列面、resolve DTO、
+          catalog、provenance 均）无 sourceScenarioId/blueprintId/originRef 类来源标识字段
+          ——跳转受限，如实展示说明键，禁伪造链接（取证见 2026-10 交付报告）。 */}
+      <div className="flex items-center gap-1 text-[10px] opacity-50" title={t('knowledge.cognitiveAsset.source_unavailable')}>
+        <Link2Off className="w-3 h-3 flex-shrink-0" />
+        <span className="flex-shrink-0">{t('knowledge.cognitiveAsset.source_title')}:</span>
+        <span className="truncate">{t('knowledge.cognitiveAsset.source_unavailable')}</span>
       </div>
 
       <div className="flex items-center justify-between pt-1">

@@ -1,13 +1,16 @@
 /**
- * ECOS EngineMonitor — 四引擎管控面板
+ * ECOS EngineMonitor — 引擎管控面板
  *
  * 单一组件通过 `engine` prop 适配:
- *   security | data | ontology | cognitive
+ *   security | data | ontology | cognitive | knowledge | ai
  *
  * API 端点:
  *   GET /api/v1/engine/{type}/health
  *   GET /api/v1/engine/{type}/config
  *   GET /api/v1/engine/{type}/status
+ *
+ * 去重约定：MonitoringCenter 卡片展开挂载本组件时若已通过 initialHealth/initialStatus
+ * 提供首屏数据，则跳过对应的挂载即拉（刷新仅由用户点击「全部刷新」驱动）。
  *
  * @license Apache-2.0
  */
@@ -15,8 +18,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Database, Network, Brain, BookOpen, Sparkles,
-  Activity, Server, Settings, Loader2, AlertTriangle,
-  RefreshCw, CheckCircle2, XCircle,
+  Activity, Server, Settings, Loader2, AlertTriangle, Lock,
+  RefreshCw, CheckCircle2, XCircle, ChevronDown,
 } from 'lucide-react';
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
@@ -50,13 +53,13 @@ interface StatusData {
   [key: string]: any;
 }
 
-const ENGINE_META: Record<string, { label: string; labelZh: string; icon: React.ComponentType<{ className?: string }>; color: string; configPath?: string }> = {
-  security: { label: 'Security Engine', labelZh: '安全引擎', icon: Shield, color: 'text-emerald-400' },
-  data:     { label: 'Data Engine', labelZh: '数据引擎', icon: Database, color: 'text-blue-400', configPath: '/api/v1/engine/data/settings' },
-  ontology: { label: 'Ontology Engine', labelZh: '本体引擎', icon: Network, color: 'text-purple-400' },
-  cognitive:{ label: 'Cognitive Engine', labelZh: '认知引擎', icon: Brain, color: 'text-amber-400' },
-  knowledge:{ label: 'Knowledge Engine', labelZh: '知识引擎', icon: BookOpen, color: 'text-cyan-400' },
-  ai:       { label: 'AI Engine', labelZh: 'AI引擎', icon: Sparkles, color: 'text-rose-400' },
+const ENGINE_META: Record<string, { icon: React.ComponentType<{ className?: string }>; configPath?: string }> = {
+  security: { icon: Shield },
+  data:     { icon: Database, configPath: '/api/v1/engine/data/settings' },
+  ontology: { icon: Network },
+  cognitive:{ icon: Brain },
+  knowledge:{ icon: BookOpen },
+  ai:       { icon: Sparkles },
 };
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -91,37 +94,52 @@ async function apiFetch<T = any>(url: string): Promise<T> {
   return json as T;
 }
 
+/** 加载某端点：区分 403（noAccess）与真实错误（message），不再把 NoAccessError 的原始文本上屏。 */
+function classifyError(e: unknown): { noAccess: boolean; message: string | null } {
+  if (isNoAccessError(e)) return { noAccess: true, message: null };
+  return { noAccess: false, message: e instanceof Error ? e.message : 'Unknown error' };
+}
+
 // ── Component ────────────────────────────────────────────────
 
 export default function EngineMonitor({ engine, initialHealth, initialStatus }: EngineMonitorProps) {
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
   const { showToast } = useToast();
   const meta = ENGINE_META[engine];
 
-  // ── State ──
+  // ── State ──（父卡片已拉取到的 health/status 直接作为初值，挂载不重复拉取）
   const [health, setHealth] = useState<HealthData | null>(initialHealth ?? null);
-  const [healthLoading, setHealthLoading] = useState(!initialHealth);
+  const [healthLoading, setHealthLoading] = useState(initialHealth == null);
   const [healthError, setHealthError] = useState<string | null>(null);
+  const [healthNoAccess, setHealthNoAccess] = useState(false);
 
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
+  const [configNoAccess, setConfigNoAccess] = useState(false);
 
   const [status, setStatus] = useState<StatusData | null>(initialStatus ?? null);
-  const [statusLoading, setStatusLoading] = useState(!initialStatus);
+  const [statusLoading, setStatusLoading] = useState(initialStatus == null);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusNoAccess, setStatusNoAccess] = useState(false);
+
+  // Raw JSON 面板默认折叠（三份 stringify 不再首屏常驻）
+  const [showRaw, setShowRaw] = useState(false);
 
   // ── Load health ──
   const loadHealth = useCallback(async () => {
     setHealthLoading(true);
     setHealthError(null);
+    setHealthNoAccess(false);
     try {
       const data = await apiFetch<HealthData>(`/api/v1/engine/${engine}/health`);
       setHealth(data);
     } catch (e) {
-      setHealthError(e instanceof Error ? e.message : 'Unknown error');
-      if (!isNoAccessError(e)) showToast('error', t('common.loadFailed'));
+      const c = classifyError(e);
+      setHealthNoAccess(c.noAccess);
+      setHealthError(c.noAccess ? null : c.message);
+      if (!c.noAccess) showToast('error', t('common.loadFailed'));
     } finally {
       setHealthLoading(false);
     }
@@ -131,45 +149,51 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
   const loadConfig = useCallback(async () => {
     setConfigLoading(true);
     setConfigError(null);
+    setConfigNoAccess(false);
     try {
       const data = await apiFetch<ConfigData>(meta.configPath || `/api/v1/engine/${engine}/config`);
       setConfig(data);
     } catch (e) {
-      setConfigError(e instanceof Error ? e.message : 'Unknown error');
-      if (!isNoAccessError(e)) showToast('error', t('common.loadFailed'));
+      const c = classifyError(e);
+      setConfigNoAccess(c.noAccess);
+      setConfigError(c.noAccess ? null : c.message);
+      if (!c.noAccess) showToast('error', t('common.loadFailed'));
     } finally {
       setConfigLoading(false);
     }
-  }, [engine, showToast, t]);
+  }, [engine, meta.configPath, showToast, t]);
 
   // ── Load status ──
   const loadStatus = useCallback(async () => {
     setStatusLoading(true);
     setStatusError(null);
+    setStatusNoAccess(false);
     try {
       const data = await apiFetch<StatusData>(`/api/v1/engine/${engine}/status`);
       setStatus(data);
     } catch (e) {
-      setStatusError(e instanceof Error ? e.message : 'Unknown error');
-      if (!isNoAccessError(e)) showToast('error', t('common.loadFailed'));
+      const c = classifyError(e);
+      setStatusNoAccess(c.noAccess);
+      setStatusError(c.noAccess ? null : c.message);
+      if (!c.noAccess) showToast('error', t('common.loadFailed'));
     } finally {
       setStatusLoading(false);
     }
   }, [engine, showToast, t]);
 
-  // ── Initial load ──
+  // ── Initial load：initialHealth/initialStatus 已在 state 初值中提供则跳过对应拉取（去重） ──
   useEffect(() => {
-    loadHealth();
+    if (initialHealth == null) loadHealth();
     loadConfig();
-    loadStatus();
-  }, [loadHealth, loadConfig, loadStatus]);
+    if (initialStatus == null) loadStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // ── Refresh all ──
+  // ── Refresh all（用户显式动作，三条全拉） ──
   const handleRefreshAll = () => {
     loadHealth();
     loadConfig();
     loadStatus();
-    showToast('info', t('common.refreshing'));
   };
 
   // ── Derive health status ──
@@ -180,11 +204,19 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
   const configKeys = config ? Object.keys(config).filter(k => k !== 'data' && typeof config[k] !== 'object') : [];
   const configDisplayKeys = configKeys.length > 0 ? configKeys : (config ? Object.keys(config) : []);
 
-  const statusName = status?.name || status?.engine || meta.label;
+  const statusName = status?.name || status?.engine || t(`dashboard.monitoring.engine.${engine}`);
   const statusValue = status?.status || healthStatus;
 
   const Icon = meta.icon;
-  const title = locale === 'zh' ? meta.labelZh : meta.label;
+  const title = t(`dashboard.monitoring.engine.${engine}`);
+
+  /** 错误/403 行：403 走友好文案，其余显示真实错误信息。 */
+  const ErrorLine = ({ error, noAccess }: { error: string | null; noAccess: boolean }) => (
+    <div className={`flex items-center gap-2 text-sm ${noAccess ? styles.warningText : styles.dangerText}`}>
+      {noAccess ? <Lock className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+      <span>{noAccess ? t('common.noPermission') : error}</span>
+    </div>
+  );
 
   return (
     <div className={`${styles.appBg} min-h-screen p-6`}>
@@ -193,7 +225,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
         {/* ── Header ── */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Icon className={`w-7 h-7 ${meta.color}`} />
+            <Icon className={`w-7 h-7 ${styles.accentText}`} />
             <div>
               <h1 className={`text-2xl font-bold ${styles.cardText}`}>{title}</h1>
               <p className={`text-xs ${styles.muted} mt-0.5`}>
@@ -203,7 +235,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
           </div>
           <button type="button"
             onClick={handleRefreshAll}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${styles.inputBg} ${styles.inputText} text-sm transition-colors border ${styles.inputBorder} ${styles.sidebarHoverBg}`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${styles.inputBg} ${styles.inputText} text-sm transition-colors border ${styles.inputBorder} ${styles.sidebarHoverBg} cursor-pointer`}
           >
             <RefreshCw className="w-3.5 h-3.5" />
             {t("platform.monitoring.refreshAll")}
@@ -227,40 +259,37 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
                 <Loader2 className="w-4 h-4 animate-spin" />
                 {t("platform.monitoring.em.loading")}
               </div>
-            ) : healthError ? (
-              <div className="flex items-center gap-2 text-red-400 text-sm">
-                <AlertTriangle className="w-4 h-4" />
-                {healthError}
-              </div>
+            ) : healthNoAccess || healthError ? (
+              <ErrorLine error={healthError} noAccess={healthNoAccess} />
             ) : health ? (
               <div className="space-y-3">
                 {/* Status badge */}
                 <div className="flex items-center gap-2">
                   {isUp ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    <CheckCircle2 className={`w-5 h-5 ${styles.successText}`} />
                   ) : (
-                    <XCircle className="w-5 h-5 text-red-400" />
+                    <XCircle className={`w-5 h-5 ${styles.dangerText}`} />
                   )}
-                  <span className={`text-lg font-bold ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`text-lg font-bold ${isUp ? styles.successText : styles.dangerText}`}>
                     {healthStatus}
                   </span>
                 </div>
                 {/* Extra info */}
                 {health?.service && (
                   <div className="flex items-center justify-between text-xs">
-                    <span className={`${styles.muted}`}>Service</span>
+                    <span className={`${styles.muted}`}>{t("dashboard.monitoring.field.service")}</span>
                     <span className={styles.cardText}>{health.service}</span>
                   </div>
                 )}
                 {health?.version && (
                   <div className="flex items-center justify-between text-xs">
-                    <span className={`${styles.muted}`}>Version</span>
+                    <span className={`${styles.muted}`}>{t("dashboard.monitoring.field.version")}</span>
                     <span className={styles.cardText}>{health.version}</span>
                   </div>
                 )}
                 {health?.uptime && (
                   <div className="flex items-center justify-between text-xs">
-                    <span className={`${styles.muted}`}>Uptime</span>
+                    <span className={`${styles.muted}`}>{t("dashboard.monitoring.field.uptime")}</span>
                     <span className={styles.cardText}>{health.uptime}</span>
                   </div>
                 )}
@@ -284,11 +313,8 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
                 <Loader2 className="w-4 h-4 animate-spin" />
                 {t("platform.monitoring.em.loading")}
               </div>
-            ) : configError ? (
-              <div className="flex items-center gap-2 text-red-400 text-sm">
-                <AlertTriangle className="w-4 h-4" />
-                {configError}
-              </div>
+            ) : configNoAccess || configError ? (
+              <ErrorLine error={configError} noAccess={configNoAccess} />
             ) : config && Object.keys(config).length > 0 ? (
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {Object.entries(config).map(([key, value]) => {
@@ -322,11 +348,8 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
                 <Loader2 className="w-4 h-4 animate-spin" />
                 {t("platform.monitoring.em.loading")}
               </div>
-            ) : statusError ? (
-              <div className="flex items-center gap-2 text-red-400 text-sm">
-                <AlertTriangle className="w-4 h-4" />
-                {statusError}
-              </div>
+            ) : statusNoAccess || statusError ? (
+              <ErrorLine error={statusError} noAccess={statusNoAccess} />
             ) : status ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
@@ -334,8 +357,8 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
                   <span className={`font-semibold ${styles.cardText}`}>{statusName}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className={`${styles.muted}`}>Status</span>
-                  <span className={`font-bold ${statusValue === 'UP' || statusValue === 'running' ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`${styles.muted}`}>{t("dashboard.monitoring.field.status")}</span>
+                  <span className={`font-bold ${statusValue === 'UP' || statusValue === 'running' ? styles.successText : styles.dangerText}`}>
                     {statusValue}
                   </span>
                 </div>
@@ -358,31 +381,44 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
           </div>
         </div>
 
-        {/* ── Raw Data Panel ── */}
+        {/* ── Raw Data Panel：默认折叠，用户显式展开 ── */}
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 space-y-3`}>
-          <h3 className={`text-xs font-semibold uppercase tracking-wider ${styles.muted}`}>
-            {t("platform.monitoring.em.rawTitle")}
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>/health</span>
-              <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-3 overflow-x-auto max-h-48`}>
-                {health ? JSON.stringify(health, null, 2) : (healthError || '—')}
-              </pre>
+          <button
+            type="button"
+            onClick={() => setShowRaw(v => !v)}
+            className={`w-full flex items-center justify-between gap-2 cursor-pointer ${styles.muted}`}
+            aria-expanded={showRaw}
+          >
+            <h3 className={`text-xs font-semibold uppercase tracking-wider`}>
+              {t("platform.monitoring.em.rawTitle")}
+            </h3>
+            <span className="flex items-center gap-1 text-[10px] font-mono">
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showRaw ? "rotate-180" : ""}`} />
+              {showRaw ? t("dashboard.monitoring.raw.hide") : t("dashboard.monitoring.raw.show")}
+            </span>
+          </button>
+          {showRaw && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>/health</span>
+                <pre className={`text-[11px] font-mono ${styles.islandBg} ${styles.islandText} rounded-lg p-3 overflow-x-auto max-h-48`}>
+                  {health ? JSON.stringify(health, null, 2) : (healthError || '—')}
+                </pre>
+              </div>
+              <div className="space-y-1">
+                <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{meta.configPath ? '/settings' : '/config'}</span>
+                <pre className={`text-[11px] font-mono ${styles.islandBg} ${styles.islandText} rounded-lg p-3 overflow-x-auto max-h-48`}>
+                  {config ? JSON.stringify(config, null, 2) : (configError || '—')}
+                </pre>
+              </div>
+              <div className="space-y-1">
+                <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>/status</span>
+                <pre className={`text-[11px] font-mono ${styles.islandBg} ${styles.islandText} rounded-lg p-3 overflow-x-auto max-h-48`}>
+                  {status ? JSON.stringify(status, null, 2) : (statusError || '—')}
+                </pre>
+              </div>
             </div>
-            <div className="space-y-1">
-              <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{meta.configPath ? '/settings' : '/config'}</span>
-              <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-3 overflow-x-auto max-h-48`}>
-                {config ? JSON.stringify(config, null, 2) : (configError || '—')}
-              </pre>
-            </div>
-            <div className="space-y-1">
-              <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>/status</span>
-              <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-3 overflow-x-auto max-h-48`}>
-                {status ? JSON.stringify(status, null, 2) : (statusError || '—')}
-              </pre>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -49,9 +49,8 @@ export default function AssumptionsTab() {
       const list = await knowledgeApi.kbFetchAssumptions({});
       setRows(Array.isArray(list) ? list : []);
     } catch (e) {
-      if (e instanceof KbApiError && (e.status >= 500 || (e.code && e.code.startsWith('ECOS-KB-')))) {
-        setBizError({ code: e.code, message: e.message });
-      }
+      // 检视报告行 192/206 同族订正：非 KbApiError 失败不再伪装空态 → 显式错误态
+      setBizError(codeOf(e));
       setRows([]);
     } finally {
       setLoading(false);
@@ -273,14 +272,24 @@ function ActionBtn({ title, onClick, children }: { title: string; onClick: () =>
 }
 
 function StatusBadge({ status }: { status: string }) {
+  // 检视报告行 192：裸色板类 → 语义 token；enum 原文直排 → i18n 标签（未知值回落原文）
+  const { styles } = useTheme();
+  const { t } = useLanguage();
   const up = status.toUpperCase();
   const cls =
-    up === 'ACTIVE' || up === 'APPROVED' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-    : up === 'EXPIRED' ? 'bg-slate-100 text-slate-500 dark:bg-slate-800/40 dark:text-slate-400'
-    : up === 'REJECTED' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
-    : up === 'SUBMITTED' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-    : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
-  return <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${cls}`}>{status}</span>;
+    up === 'ACTIVE' || up === 'APPROVED' ? `${styles.successBg} ${styles.successText}`
+    : up === 'EXPIRED' ? `${styles.badgeBg} ${styles.badgeText}`
+    : up === 'REJECTED' ? `${styles.dangerBg} ${styles.dangerText}`
+    : up === 'SUBMITTED' ? `${styles.warningBg} ${styles.warningText}`
+    : `${styles.infoBg} ${styles.infoText}`;
+  const labelKey =
+    up === 'ACTIVE' ? 'knowledge.assumptions.status_active'
+    : up === 'APPROVED' ? 'knowledge.assumptions.status_approved'
+    : up === 'EXPIRED' ? 'knowledge.assumptions.status_expired'
+    : up === 'REJECTED' ? 'knowledge.assumptions.status_rejected'
+    : up === 'SUBMITTED' ? 'knowledge.assumptions.status_submitted'
+    : null;
+  return <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${cls}`}>{labelKey ? t(labelKey) : status}</span>;
 }
 
 function codeOf(e: unknown): BizError {

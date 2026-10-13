@@ -4,6 +4,7 @@ import LucideIcon from '../../LucideIcon';
 import type { DataConnection } from '../../types';
 import type { FolderFileVo } from '../../api';
 import { useTheme } from "../../../../components/ThemeContext";
+import logger from '../../../../services/logger';
 import {
   fetchDataSourceResources, triggerCollectSync, saveMetadataStrategy,
   listFolderFiles, collectFolderFiles,
@@ -57,11 +58,12 @@ export default function MetadataStrategyPanel({
                                 setCollectStatus(null);
                                 showToast('info', t('dw.strategy.collectStarted').replace('{id}', r.taskId.slice(0, 8)));
                               } else {
-                                showToast('warning', t('dw.strategy.autoCollectFallback') || '自动采集任务提交失败，已回退轻量拉取');
-                                const fresh = await fetchDataSourceResources(conn.id);
-                                const tables = Array.isArray(fresh) ? fresh : [];
-                                setConnections(connections.map(c => c.id === conn.id ? { ...c, tablesAvailable: tables } : c));
+                                // 无假真理：提交失败明示错误态，不再谎称"已回退轻量拉取"后静默
+                                showToast('error', t('dw.strategy.autoCollectFailed'));
                               }
+                            } catch (e: unknown) {
+                              logger.warn('[MetadataStrategyPanel] ON_SAVE auto collect failed', e);
+                              showToast('error', t('dw.strategy.autoCollectFailed'));
                             } finally {
                               setCollecting(false);
                             }
@@ -84,7 +86,7 @@ export default function MetadataStrategyPanel({
                             const newCount = conn.strategy?.countMethod || 'OFF';
                             setConnections(connections.map(c => c.id === conn.id ? { ...c, strategy: { ...c.strategy, scheduleCron: newCron } } : c));
                             await saveMetadataStrategy(conn.id, newTrigger, newCount, newCron);
-                            showToast('success', t('dw.strategy.updateSuccess') || '策略已保存');
+                            showToast('success', t('dw.strategy.updateSuccess'));
                           }}
                           className={`w-full text-xs p-1.5 rounded border ${styles.cardBg} ${styles.cardBorder} ${styles.cardText} font-mono`}
                         >
@@ -132,30 +134,33 @@ export default function MetadataStrategyPanel({
                               if (r?.taskId) {
                                 setCollectTaskId(r.taskId);
                                 setCollectStatus(null);
-                                showToast('success', t('dw.strategy.saveParamsSuccess') || '参数已保存');
+                                showToast('success', t('dw.strategy.saveParamsSuccess'));
                               } else {
                                 const fresh = await fetchDataSourceResources(conn.id);
                                 const tables = Array.isArray(fresh) ? fresh : [];
                                 setConnections(connections.map(c => c.id === conn.id ? { ...c, tablesAvailable: tables } : c));
-                                showToast('warning', t('dw.strategy.autoCollectFallback') || '参数已保存，自动采集任务提交失败已回退轻量拉取');
+                                showToast('warning', t('dw.strategy.autoCollectFallback'));
                               }
+                            } catch (e: unknown) {
+                              logger.warn('[MetadataStrategyPanel] save-params collect failed', e);
+                              showToast('error', t('dw.strategy.saveParamsFailed'));
                             } finally {
                               setCollecting(false);
                             }
                           } else if (ok) {
-                            showToast('success', t('dw.strategy.saveParamsSuccess') || '参数已保存');
+                            showToast('success', t('dw.strategy.saveParamsSuccess'));
                           } else {
-                            showToast('error', t('dw.strategy.saveParamsFailed') || '参数保存失败');
+                            showToast('error', t('dw.strategy.saveParamsFailed'));
                           }
-                        } catch (e) {
-                          console.warn('[data-workbench] save params failed:', e);
-                          showToast('error', t('dw.strategy.saveParamsFailed') || '参数保存失败');
+                        } catch (e: unknown) {
+                          logger.warn('[data-workbench] save params failed', e);
+                          showToast('error', t('dw.strategy.saveParamsFailed'));
                         }
                       }}
                       className={`px-2 py-1 text-[11px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardText} transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1`}
                     >
                       <LucideIcon name="Save" size={11} />
-                      {t('dw.strategy.saveParams') || '保存参数'}
+                      {t('dw.strategy.saveParams')}
                     </button>
 
                     {/* 立即采集（结构源主档口，走 triggerCollectSync 异步任务；fs 走 collectFolderFiles 全量采集） */}
@@ -195,8 +200,12 @@ export default function MetadataStrategyPanel({
                             setCollectStatus(null);
                             showToast('info', t('dw.strategy.collectStarted').replace('{id}', r.taskId.slice(0, 8)));
                           } else {
-                            showToast('error', t('dw.strategy.collectFailed').replace('{err}', 'HTTP'));
+                            // 提交失败（api 层吞错返回 null）⇒ 明示失败，不再塞 'HTTP' 占位假因
+                            showToast('error', t('dw.strategy.collectSubmitFailed'));
                           }
+                        } catch (e: unknown) {
+                          logger.warn('[MetadataStrategyPanel] collect-now failed', e);
+                          showToast('error', t('dw.strategy.collectSubmitFailed'));
                         } finally {
                           setCollecting(false);
                         }
@@ -222,7 +231,7 @@ export default function MetadataStrategyPanel({
                       <div className={`flex items-center gap-2 text-[11px]`}>
                         <LucideIcon name="Loader2" size={13} className={`animate-spin ${styles.accentText}`} />
                         <span className={`font-semibold ${styles.cardText}`}>
-                          {t('dw.strategy.taskRunning') || '任务执行中'}
+                          {t('dw.strategy.taskRunning')}
                         </span>
                       </div>
                       {activeTasks.map((task, i) => (
@@ -241,7 +250,7 @@ export default function MetadataStrategyPanel({
                         className={`text-[10px] ${styles.accentText} hover:underline cursor-pointer flex items-center gap-1`}
                       >
                         <LucideIcon name="ExternalLink" size={10} />
-                        {t('dw.strategy.viewInTaskCenter') || '在任务中心查看'}
+                        {t('dw.strategy.viewInTaskCenter')}
                       </button>
                     </div>
                   )}

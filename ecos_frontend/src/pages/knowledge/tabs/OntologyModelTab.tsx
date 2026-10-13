@@ -152,7 +152,7 @@ export default function OntologyModelTab() {
         <div className="flex gap-2">
           {/* Deep link to buszhi workbench (PMO-54) */}
           <button type="button"
-            onClick={() => { window.location.hash = `#/ontology-workbench/entity?from=kb`; }}
+            onClick={() => { window.location.hash = `#/ontology_workbench?from=kb`; }}
             className={`px-3.5 py-1.5 ${styles.badgeBg} ${styles.sidebarHoverBg} ${styles.cardText} font-extrabold rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer text-xs transition-all`}
           >
             <ExternalLink size={12} /><span>{t('knowledge.ontology_model.openBuszhi')}</span>

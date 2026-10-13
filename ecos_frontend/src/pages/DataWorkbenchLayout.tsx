@@ -22,7 +22,7 @@ import ConnectionsTab from './data-workbench/tabs/ConnectionsTab';
 import DataLineageTab from './data-workbench/tabs/DataLineageTab';
 import PipelineBuilderTab from './data-workbench/tabs/PipelineBuilderTab';
 import EngineConfigTab from './data-workbench/tabs/EngineConfigTab';
-import { AddConnectionModal, AddSyncModal, ExternalInterfacesDrawer } from './data-workbench/Modals';
+import { AddConnectionModal, AddSyncModal } from './data-workbench/Modals';
 import { useDataWorkbench } from './data-workbench/hooks/useDataWorkbench';
 
 /** 数据质量中心（独立路由页复用同一组件，此处内嵌展示） */
@@ -110,7 +110,6 @@ export default function DataWorkbenchLayout({
   }, [initialLineageTable]);
 
   // ── UI toggles ──
-  const [showExtIfaces, setShowExtIfaces] = useState(false);
 
   /** 渲染一个侧边菜单按钮（主菜单与底部入口共用，保证样式与选中态一致）。 */
   const renderSideTab = (tab: SideTabItem) => {
@@ -143,14 +142,15 @@ export default function DataWorkbenchLayout({
               <div className={`font-semibold ${styles.cardText}`}>{t('dw.txt.419d9f')}</div>
               <div className="flex justify-between"><span>{t('dw.txt.f7d9ac')}</span><span className={`font-mono ${styles.cardText} font-semibold`}>{dw.connections.length} {t('dw.label.connections_count')}</span></div>
               <div className="flex justify-between"><span>{t('dw.txt.1988fc')}</span><span className={`font-mono ${styles.cardText} font-semibold`}>{dw.syncTasks.length} {t('dw.label.syncs_count')}</span></div>
-              <div className="flex justify-between"><span>{t('dw.txt.44a230')}</span><span className={`font-mono ${styles.cardText} font-semibold`}>{(propObjectTypes || []).length} {t('dw.label.objects_count')}</span></div>
+              {/* standalone 路由无 objectTypes 数据源 ⇒ 显示「—」而非谎报 0（无假真理） */}
+              <div className="flex justify-between"><span>{t('dw.txt.44a230')}</span><span className={`font-mono ${styles.cardText} font-semibold`}>{propObjectTypes ? `${propObjectTypes.length} ${t('dw.label.objects_count')}` : '—'}</span></div>
             </div>
           </div>
         </div>
 
         {/* Body — 桌面双栏内容区；移动端落到下方，min-w-0 防表格内容溢出 */}
         <div className="w-full flex-1 min-w-0 flex overflow-hidden">
-          {activeTab === 'connections' && <ConnectionsTab connections={dw.connections} setConnections={dw.setConnections} showToast={showToast} handleCreateConnection={dw.createConnection} testingConnId={dw.testingConnId} setTestingConnId={dw.setTestingConnId} testingLogs={dw.testingLogs} selectedConnId={dw.selConnId} setSelectedConnId={dw.setSelConnId} showAddConn={dw.showAddConn} setShowAddConn={dw.setShowAddConn} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.handleNcTypeChange} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} onTestConnection={dw.testConnection} t={t} ncExtra={dw.ncExtra} setNcExtraField={dw.setNcExtraField} />}
+          {activeTab === 'connections' && <ConnectionsTab connections={dw.connections} setConnections={dw.setConnections} showToast={showToast} handleCreateConnection={dw.createConnection} testingConnId={dw.testingConnId} setTestingConnId={dw.setTestingConnId} testingLogs={dw.testingLogs} selectedConnId={dw.selConnId} setSelectedConnId={dw.setSelConnId} showAddConn={dw.showAddConn} setShowAddConn={dw.setShowAddConn} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.handleNcTypeChange} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} onTestConnection={dw.testConnection} clearTestingLogs={dw.clearTestingLogs} t={t} ncExtra={dw.ncExtra} setNcExtraField={dw.setNcExtraField} />}
           {activeTab === 'pipeline-builder' && <PipelineBuilderTab connections={dw.connections} pipelines={dw.pipelines} syncTasks={dw.syncTasks} computeEngine={dw.computeEngine} setComputeEngine={dw.setComputeEngine} showToast={showToast} pipelineBuilderOutput={dw.pbOutput} setPipelineBuilderOutput={dw.setPbOutput} editingPipelineId={dw.editingPipelineId} setEditingPipelineId={dw.setEditingPipelineId} triggerSync={dw.triggerSync} t={t} />}
           {activeTab === 'health' && (
             <Suspense fallback={<TabLoading />}>
@@ -169,7 +169,6 @@ export default function DataWorkbenchLayout({
       {/* Modals */}
       {dw.showAddConn && <AddConnectionModal t={t} locale={locale} newConnName={dw.ncName} setNewConnName={dw.setNcName} newConnType={dw.ncType} setNewConnType={dw.setNcType as any} newConnHost={dw.ncHost} setNewConnHost={dw.setNcHost} newConnPort={dw.ncPort} setNewConnPort={dw.setNcPort} newConnUser={dw.ncUser} setNewConnUser={dw.setNcUser} newConnPassword={dw.ncPassword} setNewConnPassword={dw.setNcPassword} newConnDatabase={dw.ncDatabase} setNewConnDatabase={dw.setNcDatabase} ncExtra={dw.ncExtra} setNcExtraField={dw.setNcExtraField} onClose={() => dw.setShowAddConn(false)} onCreate={dw.createConnection} onTestConnection={dw.testConnectionRaw} />}
       {dw.showAddSync && <AddSyncModal t={t} locale={locale} newSyncName={dw.nsName} setNewSyncName={dw.setNsName} newSyncConn={dw.nsConn} setNewSyncConn={dw.setNsConn} newSyncTable={dw.nsTable} setNewSyncTable={dw.setNsTable} newSyncMode={dw.nsMode} setNewSyncMode={dw.setNsMode as any} newSyncSched={dw.nsSched} setNewSyncSched={dw.setNsSched as any} connections={dw.connections} onClose={() => dw.setShowAddSync(false)} onCreate={dw.createSync} />}
-      {showExtIfaces && <ExternalInterfacesDrawer t={t} connections={dw.connections} onClose={() => setShowExtIfaces(false)} />}
     </div>
   );
 }

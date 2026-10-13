@@ -3,8 +3,24 @@ import * as Icons from 'lucide-react';
 
 // ── Local types (self-contained workshop) ──
 export interface ObjectType { id: string; name: string; }
-export interface ActionType { id: string; name: string; displayName: string; description: string; parameters?: any[]; }
-export interface Dataset { id: string; sampleData: any[]; }
+/** 动作目录：文案一律经 t('aiworkbench.ws.actionType.{id}.name/.desc') 解析（§六），数据面不存裸中文。 */
+export interface ActionType { id: string; name: string; parameters?: unknown[]; }
+export interface Dataset { id: string; sampleData: unknown[]; }
+
+/** 预览运行时的本体对象行：来自 GET /api/v1/ontology/data，id 为真实写回（PUT）凭据。 */
+export interface WorkshopObjectRow {
+  id?: string;
+  flightNumber?: string;
+  tailNumber?: string;
+  depAirport?: string;
+  arrAirport?: string;
+  status?: string;
+  model?: string;
+  manufacturer?: string;
+  lastMaintenance?: string;
+  assignedPilotId?: string;
+  scheduledDep?: string;
+}
 
 // Dynamic icon component for data-driven icon names
 export const DynamicIcon = ({ name, size = 16, className }: { name: string; size?: number; className?: string }) => {
@@ -14,10 +30,10 @@ export const DynamicIcon = ({ name, size = 16, className }: { name: string; size
 
 // ── Local action types (for action_button widgets) ──
 export const mockActionTypes: ActionType[] = [
-  { id: 'update_flight_status', name: 'Update Flight Status', displayName: '更新航班状态', description: '更新指定航班的运行状态' },
-  { id: 'schedule_maintenance_check', name: 'Schedule Maintenance', displayName: '安排适航维护检修', description: '为指定飞机安排维护检查' },
-  { id: 'assign_pilot', name: 'Assign Pilot', displayName: '分派飞行员', description: '为航班分派飞行员' },
-  { id: 'cancel_flight', name: 'Cancel Flight', displayName: '取消航班', description: '取消指定航班' },
+  { id: 'update_flight_status', name: 'Update Flight Status' },
+  { id: 'schedule_maintenance_check', name: 'Schedule Maintenance' },
+  { id: 'assign_pilot', name: 'Assign Pilot' },
+  { id: 'cancel_flight', name: 'Cancel Flight' },
 ];
 
 export interface WorkshopVariable {

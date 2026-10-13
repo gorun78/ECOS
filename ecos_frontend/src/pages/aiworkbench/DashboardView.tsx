@@ -7,7 +7,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   LayoutDashboard, Cpu, Bot, Layers, ShieldCheck, TrendingUp,
   Activity, ChevronRight, BarChart3, Play, RotateCcw, CheckCircle2,
@@ -15,11 +15,12 @@ import {
 } from 'lucide-react';
 import {
   AIPLogicPipeline, AIPAgent, AIPModel, AIPAuditLog,
-  EvaluationQuestionSet, EvaluationSession
+  EvaluationSession
 } from '../../types/aiworkbench';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
-import { fetchAgentEval } from './api';
+import { startAipEval, fetchAipEvalReport, type AipEvalReport } from './api';
+import DemoBadge from '../../components/aiworkbench/DemoBadge';
 import RadarChart from './RadarChart';
 
 interface DashboardViewProps {
@@ -27,55 +28,27 @@ interface DashboardViewProps {
   agents: AIPAgent[];
   models: AIPModel[];
   auditLogs: AIPAuditLog[];
+  /** 审计流加载失败时的错误文案（错误态 + 重试，禁 mock 播种） */
+  auditError?: string;
+  onRetryAudit?: () => void;
   onNavigateToView: (view: 'logic' | 'agent' | 'model' | 'guardrails') => void;
   showToast?: (type: 'success' | 'info' | 'error', msg: string) => void;
 }
 
 /**
- * Build the question list for one mock question set from i18n keys.
- * Each question set's name/desc/questions come from `dashboard.qset.qsN.*`.
+ * §4.5 P0：评估改为真实引擎通道。
+ * POST /api/v1/aip/eval/run {questionSet} → evalId；GET /api/v1/aip/eval/{id}/report 轮询。
+ * 端点仅接受 questionSet（default | finance_20 | legal_20 | compliance_20），
+ * 不支持指定智能体 —— 原「选择评估智能体」下拉已移除，避免形成假的关联语义。
  */
-function useQuestionSets(): EvaluationQuestionSet[] {
-  const { t } = useLanguage();
-  return [
-    {
-      id: 'qs-1',
-      name: t('dashboard.qset.qs1.name'),
-      description: t('dashboard.qset.qs1.desc'),
-      questions: [
-        { id: 'q1', question: t('dashboard.qset.qs1.q1'), category: t('dashboard.cat.compliance') },
-        { id: 'q2', question: t('dashboard.qset.qs1.q2'), category: t('dashboard.cat.safety') },
-        { id: 'q3', question: t('dashboard.qset.qs1.q3'), category: t('dashboard.cat.operation') },
-        { id: 'q4', question: t('dashboard.qset.qs1.q4'), category: t('dashboard.cat.efficiency') },
-        { id: 'q5', question: t('dashboard.qset.qs1.q5'), category: t('dashboard.cat.compliance') },
-        { id: 'q6', question: t('dashboard.qset.qs1.q6'), category: t('dashboard.cat.tech') },
-      ],
-    },
-    {
-      id: 'qs-2',
-      name: t('dashboard.qset.qs2.name'),
-      description: t('dashboard.qset.qs2.desc'),
-      questions: [
-        { id: 'q1', question: t('dashboard.qset.qs2.q1'), category: t('dashboard.cat.rebooking') },
-        { id: 'q2', question: t('dashboard.qset.qs2.q2'), category: t('dashboard.cat.specialService') },
-        { id: 'q3', question: t('dashboard.qset.qs2.q3'), category: t('dashboard.cat.baggage') },
-        { id: 'q4', question: t('dashboard.qset.qs2.q4'), category: t('dashboard.cat.specialService') },
-        { id: 'q5', question: t('dashboard.qset.qs2.q5'), category: t('dashboard.cat.rebooking') },
-      ],
-    },
-    {
-      id: 'qs-3',
-      name: t('dashboard.qset.qs3.name'),
-      description: t('dashboard.qset.qs3.desc'),
-      questions: [
-        { id: 'q1', question: t('dashboard.qset.qs3.q1'), category: t('dashboard.cat.analysis') },
-        { id: 'q2', question: t('dashboard.qset.qs3.q2'), category: t('dashboard.cat.revenue') },
-        { id: 'q3', question: t('dashboard.qset.qs3.q3'), category: t('dashboard.cat.operation') },
-        { id: 'q4', question: t('dashboard.qset.qs3.q4'), category: t('dashboard.cat.tech') },
-      ],
-    },
-  ];
-}
+const EVAL_QUESTION_SETS = [
+  { id: 'default', nameKey: 'aiworkbench.dashboard.qset.default', descKey: 'aiworkbench.dashboard.qset.default.desc' },
+  { id: 'finance_20', nameKey: 'aiworkbench.dashboard.qset.finance20', descKey: 'aiworkbench.dashboard.qset.engine20.desc' },
+  { id: 'legal_20', nameKey: 'aiworkbench.dashboard.qset.legal20', descKey: 'aiworkbench.dashboard.qset.engine20.desc' },
+  { id: 'compliance_20', nameKey: 'aiworkbench.dashboard.qset.compliance20', descKey: 'aiworkbench.dashboard.qset.engine20.desc' },
+] as const;
+
+type EvalQSetId = (typeof EVAL_QUESTION_SETS)[number]['id'];
 
 /**
  * W204/C186：原 categoryToRadarKey（把本地合成题目类别聚合为合成雷达分）已删除——
@@ -87,6 +60,8 @@ export default function DashboardView({
   agents,
   models,
   auditLogs,
+  auditError,
+  onRetryAudit,
   onNavigateToView,
 }: DashboardViewProps) {
   const { styles } = useTheme();
@@ -102,26 +77,52 @@ export default function DashboardView({
   const maxUsage = Math.max(...weeklyUsage);
 
   // ── Evaluation state ──────────────────────────────────────────
-  const questionSets = useQuestionSets();
-  const [selectedAgentId, setSelectedAgentId] = useState<string>('');
-  const [selectedQSetId, setSelectedQSetId] = useState<string>('');
+  const [selectedQSetId, setSelectedQSetId] = useState<EvalQSetId | ''>('');
   const [session, setSession] = useState<EvaluationSession | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [evalError, setEvalError] = useState(false);
 
-  const selectedQSet = questionSets.find((qs) => qs.id === selectedQSetId);
-  const selectedAgent = agents.find((a) => a.id === selectedAgentId);
+  const selectedQSet = EVAL_QUESTION_SETS.find((qs) => qs.id === selectedQSetId);
 
-  // ── Start evaluation (W204/C186: 真实引擎通道，不合成评分) ─────
-  // 原 setInterval + Math.random 合成 score/latency/雷达分流程已删除。
-  // 唯一通道：GET /api/v1/aip/evals/run?agentId=（fetchAgentEval，后端不可用时返回 null）。
+  // 轮询序号：reset/重启后旧轮询结果作废，避免过期写入 UI
+  const evalRunSeq = useRef(0);
+
+  /** 轮询引擎报告：running → 继续；completed/failed → 返回；连续网络错误 ≥5 → 抛出 */
+  const pollAipEvalReport = useCallback(async (
+    evalId: string,
+    isStale: () => boolean,
+    onTick: (r: AipEvalReport) => void,
+  ): Promise<AipEvalReport> => {
+    const maxAttempts = 150; // 2s 间隔，约 5 分钟上限
+    let transient = 0;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (isStale()) throw new Error('eval-stale');
+      try {
+        const rep = await fetchAipEvalReport(evalId);
+        transient = 0;
+        if (rep.status !== 'running') return rep;
+        onTick(rep);
+      } catch (e) {
+        transient += 1;
+        if (transient >= 5) throw e;
+      }
+    }
+    throw new Error('eval-timeout');
+  }, []);
+
+  // ── Start evaluation (§4.5 P0：真实引擎通道，不合成评分) ───────
+  // POST /api/v1/aip/eval/run → evalId；GET /api/v1/aip/eval/{id}/report 轮询。
+  // 失败/超时 → 错误态横幅，不展示任何合成数据。
   const startEvaluation = useCallback(async () => {
-    if (!selectedAgentId || !selectedQSetId || !selectedQSet) return;
-    const sessionId = `eval-${Date.now()}`;
+    if (!selectedQSetId || isRunning) return;
+    const seq = evalRunSeq.current + 1;
+    evalRunSeq.current = seq;
+    const isStale = () => evalRunSeq.current !== seq;
     setEvalError(false);
     setSession({
-      id: sessionId,
-      agentId: selectedAgentId,
+      id: '',
+      agentId: '',
       questionSetId: selectedQSetId,
       status: 'running',
       progress: 0,
@@ -129,40 +130,58 @@ export default function DashboardView({
       radarScores: {},
     });
     setIsRunning(true);
-
-    const evalRes = await fetchAgentEval(selectedAgentId);
-    if (!evalRes) {
-      // §2.3 诚实态：引擎未应答 → 清空会话并展示错误提示，不展示任何合成评分
-      setSession(null);
+    try {
+      const started = await startAipEval(selectedQSetId);
+      if (isStale()) return;
+      setSession((prev) => (prev ? { ...prev, id: started.evalId } : prev));
+      const report = await pollAipEvalReport(started.evalId, isStale, (r) => {
+        const done = r.items?.length ?? 0;
+        const total = r.totalQuestions ?? 0;
+        setSession((prev) => (prev ? { ...prev, progress: total > 0 ? Math.min(99, Math.round((done / total) * 100)) : prev.progress } : prev));
+      });
+      if (isStale()) return;
       setIsRunning(false);
+      if (report.status !== 'completed') {
+        setSession(null);
+        setEvalError(true);
+        return;
+      }
+      const dims = report.dimensionAvgs;
+      setSession((prev) => (prev ? {
+        ...prev,
+        status: 'completed',
+        progress: 100,
+        // 明细只来自引擎报告 items（1-5 分制，原样呈现）
+        results: (report.items ?? []).map((it) => ({
+          questionId: it.questionId,
+          question: it.question,
+          category: it.category,
+          score: it.score,
+          status: 'completed' as const,
+          response: it.agentAnswer,
+          latency: it.durationMs,
+          judgeReason: it.judgeReason,
+        })),
+        // 雷达：引擎真实五维（1-5 制）×20 归一到 0-100，未上报维度不画
+        radarScores: dims ? {
+          toolAccuracy: (dims.toolAccuracy ?? 0) * 20,
+          keywordCoverage: (dims.keywordCoverage ?? 0) * 20,
+          answerQuality: (dims.answerQuality ?? 0) * 20,
+          executionEfficiency: (dims.executionEfficiency ?? 0) * 20,
+          hallucinationResist: (dims.hallucinationResist ?? 0) * 20,
+        } : {},
+      } : prev));
+    } catch {
+      if (isStale()) return;
+      setIsRunning(false);
+      setSession(null);
       setEvalError(true);
-      return;
     }
-    setIsRunning(false);
-    setSession((prev) => (prev ? {
-      ...prev,
-      status: 'completed',
-      progress: 100,
-      // 明细只来自引擎真实返回的 details（question/score/actual）
-      results: (evalRes.details ?? []).map((d, i) => ({
-        questionId: `q${i + 1}`,
-        question: d.question,
-        category: t('dashboard.eval.engineSource'),
-        score: d.score,
-        status: 'completed' as const,
-        response: d.actual,
-      })),
-      // 雷达只呈现引擎真实上报字段；未上报维度（relevance/creativity 等）留空 → 图例显示 '-'
-      radarScores: {
-        accuracy: evalRes.accuracy,
-        safety: evalRes.safety,
-        efficiency: evalRes.latencyScore,
-      },
-    } : prev));
-  }, [selectedAgentId, selectedQSetId, selectedQSet, t]);
+  }, [selectedQSetId, isRunning, pollAipEvalReport]);
 
   // ── Reset evaluation ──────────────────────────────────────────
   const resetEvaluation = useCallback(() => {
+    evalRunSeq.current += 1;
     setIsRunning(false);
     setSession(null);
     setEvalError(false);
@@ -176,23 +195,24 @@ export default function DashboardView({
   ];
 
   // KPI cards — defined here so we keep the array declarative (single sub-block)
+  // 护栏拦截率无统计端点 → 显示「未测量」，禁写死 100.00%（无假真理）
   const kpiCards = [
-    { title: t('dashboard.kpi.pipeline.title'), value: `${activePipelinesCount} / ${pipelines.length}`, sub: t('dashboard.kpi.pipeline.sub'), icon: Cpu, color: 'text-blue-600 bg-blue-50' },
-    { title: t('dashboard.kpi.agent.title'), value: `${activeAgentsCount} / ${agents.length}`, sub: t('dashboard.kpi.agent.sub'), icon: Bot, color: 'text-indigo-600 bg-indigo-50' },
-    { title: t('dashboard.kpi.model.title'), value: `${models.filter((m) => m.status === 'connected').length} ${t('dashboard.kpi.model.unit')}`, sub: t('dashboard.kpi.model.sub'), icon: Layers, color: 'text-emerald-600 bg-emerald-50' },
-    { title: t('dashboard.kpi.guardrail.title'), value: '100.00%', sub: t('dashboard.kpi.guardrail.sub'), icon: ShieldCheck, color: 'text-rose-600 bg-rose-50' },
-  ] as const;
+    { title: t('dashboard.kpi.pipeline.title'), value: `${activePipelinesCount} / ${pipelines.length}`, sub: t('dashboard.kpi.pipeline.sub'), icon: Cpu, color: `${styles.infoBg} ${styles.infoText}` },
+    { title: t('dashboard.kpi.agent.title'), value: `${activeAgentsCount} / ${agents.length}`, sub: t('dashboard.kpi.agent.sub'), icon: Bot, color: `${styles.badgeBg} ${styles.badgeText}` },
+    { title: t('dashboard.kpi.model.title'), value: `${models.filter((m) => m.status === 'connected').length} ${t('dashboard.kpi.model.unit')}`, sub: t('dashboard.kpi.model.sub'), icon: Layers, color: `${styles.successBg} ${styles.successText}` },
+    { title: t('dashboard.kpi.guardrail.title'), value: t('aiworkbench.dashboard.kpi.guardrail.unmeasured'), sub: t('aiworkbench.dashboard.kpi.guardrail.subOffline'), icon: ShieldCheck, color: `${styles.dangerBg} ${styles.dangerText}` },
+  ];
 
   // ── Render: Overview Dashboard ────────────────────────────────
   const renderOverview = () => (
     <div className="space-y-6 overflow-y-auto h-full p-6">
       {/* Welcome Banner — accentBg（深色 accent）+ text-white，4 主题下均保证白字可读（slate-light 不再使用 appBg 亮底） */}
       <div className={`${styles.accentBg} text-white rounded-xl p-6 shadow-sm relative overflow-hidden`}>
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-600/20 to-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-white/10 to-white/5 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-blue-400 text-xs font-semibold tracking-wider uppercase">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <div className="flex items-center gap-2 text-white/80 text-xs font-semibold tracking-wider uppercase">
+              <span className="w-2 h-2 rounded-full bg-white/80 animate-pulse" />
               <span>{t('dashboard.welcome.badge')}</span>
             </div>
             <h2 className="text-xl font-extrabold text-white">{t('dashboard.welcome.title')}</h2>
@@ -203,7 +223,7 @@ export default function DashboardView({
           <div className="flex gap-2.5 shrink-0">
             <button type="button"
               onClick={() => onNavigateToView('agent')}
-              className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+              className="px-3.5 py-1.5 bg-white/15 hover:bg-white/25 text-white border border-white/30 font-bold rounded-lg text-xs shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
             >
               <Bot size={13} />
               <span>{t('dashboard.welcome.btnAgent')}</span>
@@ -241,11 +261,11 @@ export default function DashboardView({
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 lg:col-span-2 flex flex-col justify-between space-y-4`}>
           <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-3`}>
             <div className="flex items-center gap-2">
-              <span className="p-1 rounded-md bg-blue-50 text-blue-600">
+              <span className={`p-1 rounded-md ${styles.infoBg} ${styles.infoText}`}>
                 <TrendingUp size={13} />
               </span>
               <h3 className={`text-xs font-bold ${styles.cardText}`}>{t('dashboard.trend.title')}</h3>
-              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${styles.warningBg} ${styles.warningText}`}>Sample</span>
+              <DemoBadge />
             </div>
             <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>{t('dashboard.trend.updated')}</span>
           </div>
@@ -268,7 +288,7 @@ export default function DashboardView({
                       {t('dashboard.trend.calls', { n: val })}
                     </span>
                     <div
-                      className="w-full bg-blue-500 hover:bg-blue-600 rounded-t-sm transition-all"
+                      className={`w-full ${styles.accentBg} rounded-t-sm transition-all`}
                       style={{ height: `${heightPercent * 0.8}%` }}
                     />
                     <span className={`text-[9px] ${styles.cardTextMuted} font-mono mt-1.5`}>
@@ -285,11 +305,11 @@ export default function DashboardView({
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 flex flex-col justify-between`}>
           <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-3`}>
             <div className="flex items-center gap-2">
-              <span className="p-1 rounded-md bg-indigo-50 text-indigo-600">
+              <span className={`p-1 rounded-md ${styles.badgeBg} ${styles.badgeText}`}>
                 <Layers size={13} />
               </span>
               <h3 className={`text-xs font-bold ${styles.cardText}`}>{t('dashboard.model.title')}</h3>
-              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${styles.warningBg} ${styles.warningText}`}>Sample</span>
+              <DemoBadge />
             </div>
             <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>{t('dashboard.model.byToken')}</span>
           </div>
@@ -328,20 +348,32 @@ export default function DashboardView({
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden shadow-xs`}>
         <div className={`px-4 py-3 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between`}>
           <div className="flex items-center gap-2">
-            <span className="p-1 rounded bg-rose-50 text-rose-600">
+            <span className={`p-1 rounded ${styles.dangerBg} ${styles.dangerText}`}>
               <Activity size={13} />
             </span>
             <h3 className={`text-xs font-bold ${styles.cardText}`}>{t('dashboard.audit.title')}</h3>
           </div>
           <button type="button"
             onClick={() => onNavigateToView('guardrails')}
-            className="text-[10px] text-blue-600 hover:text-blue-700 font-bold flex items-center gap-0.5 cursor-pointer"
+            className={`text-[10px] ${styles.accentText} font-bold flex items-center gap-0.5 cursor-pointer`}
           >
             <span>{t('dashboard.audit.manage')}</span>
             <ChevronRight size={11} />
           </button>
         </div>
         <div className={`divide-y ${styles.cardBorder} max-h-60 overflow-y-auto`}>
+          {auditError ? (
+            <div className={`p-4 flex items-center justify-between gap-3 text-xs ${styles.dangerText}`}>
+              <span className="min-w-0">{auditError}</span>
+              {onRetryAudit && (
+                <button type="button" onClick={onRetryAudit} className={`px-2 py-1 rounded border ${styles.dangerBorder} font-bold cursor-pointer shrink-0`}>
+                  {t('network.retry')}
+                </button>
+              )}
+            </div>
+          ) : auditLogs.length === 0 ? (
+            <p className={`p-4 text-[11px] italic ${styles.cardTextMuted}`}>{t('aiworkbench.dashboard.audit.empty')}</p>
+          ) : null}
           {auditLogs.map((log) => {
             const statusLabelKey =
               log.status === 'blocked' ? 'dashboard.audit.blocked'
@@ -360,25 +392,30 @@ export default function DashboardView({
                   <p className={`${styles.cardTextMuted} text-[11px] leading-relaxed`}>{log.details}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 shrink-0 self-end sm:self-center">
+                  {log.localOrigin && (
+                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${styles.warningBg} ${styles.warningText}`}>
+                      {t('aiworkbench.dashboard.audit.localChip')}
+                    </span>
+                  )}
                   {log.status === 'blocked' ? (
-                    <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold text-[9px] flex items-center gap-1 border border-red-200">
-                      <span className="w-1 h-1 rounded-full bg-red-600" />{t(statusLabelKey)}
+                    <span className={`px-2 py-0.5 rounded-full ${styles.dangerBg} ${styles.dangerText} font-bold text-[9px] flex items-center gap-1 border ${styles.dangerBorder}`}>
+                      <span className="w-1 h-1 rounded-full bg-current" />{t(statusLabelKey)}
                     </span>
                   ) : log.status === 'flagged' ? (
-                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold text-[9px] flex items-center gap-1 border border-amber-200">
-                      <span className="w-1 h-1 rounded-full bg-amber-600 animate-pulse" />{t(statusLabelKey)}
+                    <span className={`px-2 py-0.5 rounded-full ${styles.warningBg} ${styles.warningText} font-bold text-[9px] flex items-center gap-1 border ${styles.warningBorder}`}>
+                      <span className="w-1 h-1 rounded-full bg-current animate-pulse" />{t(statusLabelKey)}
                     </span>
                   ) : log.status === 'pending_approval' ? (
-                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[9px] flex items-center gap-1 border border-indigo-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-ping" />{t(statusLabelKey)}
+                    <span className={`px-2 py-0.5 rounded-full ${styles.badgeBg} ${styles.badgeText} font-bold text-[9px] flex items-center gap-1 border ${styles.accentBorder}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-current animate-ping" />{t(statusLabelKey)}
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-bold text-[9px] flex items-center gap-1 border border-emerald-200">
-                      <span className="w-1 h-1 rounded-full bg-emerald-600" />{t(statusLabelKey)}
+                    <span className={`px-2 py-0.5 rounded-full ${styles.successBg} ${styles.successText} font-bold text-[9px] flex items-center gap-1 border ${styles.successBorder}`}>
+                      <span className="w-1 h-1 rounded-full bg-current" />{t(statusLabelKey)}
                     </span>
                   )}
                   {log.actionTaken && (
-                    <span className="text-[9px] text-rose-500 font-mono font-bold">{log.actionTaken}</span>
+                    <span className={`text-[9px] ${styles.dangerText} font-mono font-bold`}>{log.actionTaken}</span>
                   )}
                 </div>
               </div>
@@ -395,87 +432,56 @@ export default function DashboardView({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400">
+          <div className={`p-2 rounded-lg ${styles.badgeBg} ${styles.badgeText}`}>
             <BarChart3 size={18} />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h2 className={`text-sm font-extrabold ${styles.cardText}`}>{t('dashboard.eval.title')}</h2>
-              <span className={`text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${styles.cardBorder} ${styles.cardTextMuted}`}>
-                {t('dashboard.eval.demoBadge')}
+              <span className={`text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${styles.accentBorder} ${styles.accentText}`}>
+                {t('aiworkbench.dashboard.eval.realChannel')}
               </span>
             </div>
-            <p className={`text-[10px] ${styles.cardTextMuted}`}>{t('dashboard.eval.sub')}</p>
+            <p className={`text-[10px] ${styles.cardTextMuted}`}>{t('aiworkbench.dashboard.eval.sub')}</p>
           </div>
         </div>
       </div>
 
-      {/* Selection Panel */}
+      {/* Selection Panel — 引擎端点仅接受 questionSet（无 agentId），故不提供智能体选择 */}
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5`}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Agent Selector */}
-          <div className="space-y-1.5">
-            <label className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>
-              <Bot size={11} className="inline mr-1" />
-              {t('dashboard.eval.agentLabel')}
-            </label>
-            <div className="relative">
-              <select
-                value={selectedAgentId}
-                onChange={(e) => { setSelectedAgentId(e.target.value); resetEvaluation(); }}
-                disabled={isRunning}
-                className={`w-full appearance-none px-3 py-2 text-xs rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500/30`}
-              >
-                <option value="">{t('dashboard.eval.agentPlaceholder')}</option>
-                {agents.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} {a.status === 'active' ? t('dashboard.eval.agentActive') : t('dashboard.eval.agentDev')}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={13} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${styles.cardTextMuted}`} />
-            </div>
-            {selectedAgent && (
-              <p className={`text-[10px] ${styles.cardTextMuted} pl-1`}>
-                {selectedAgent.role} · {t('dashboard.eval.agentModel')}: {selectedAgent.modelId || t('dashboard.eval.modelUnbound')}
-              </p>
-            )}
+        <div className="space-y-1.5">
+          <label className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>
+            <Brain size={11} className="inline mr-1" />
+            {t('dashboard.eval.qSetLabel')}
+          </label>
+          <div className="relative max-w-md">
+            <select
+              value={selectedQSetId}
+              onChange={(e) => { setSelectedQSetId(e.target.value as EvalQSetId); resetEvaluation(); }}
+              disabled={isRunning}
+              className={`w-full appearance-none px-3 py-2 text-xs rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none`}
+            >
+              <option value="">{t('dashboard.eval.qSetPlaceholder')}</option>
+              {EVAL_QUESTION_SETS.map((qs) => (
+                <option key={qs.id} value={qs.id}>
+                  {t(qs.nameKey)} · {qs.id}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={13} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${styles.cardTextMuted}`} />
           </div>
-
-          {/* Question Set Selector */}
-          <div className="space-y-1.5">
-            <label className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>
-              <Brain size={11} className="inline mr-1" />
-              {t('dashboard.eval.qSetLabel')}
-            </label>
-            <div className="relative">
-              <select
-                value={selectedQSetId}
-                onChange={(e) => { setSelectedQSetId(e.target.value); resetEvaluation(); }}
-                disabled={isRunning}
-                className={`w-full appearance-none px-3 py-2 text-xs rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500/30`}
-              >
-                <option value="">{t('dashboard.eval.qSetPlaceholder')}</option>
-                {questionSets.map((qs) => (
-                  <option key={qs.id} value={qs.id}>
-                    {qs.name} {t('dashboard.eval.qSetCount', { count: qs.questions.length })}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={13} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${styles.cardTextMuted}`} />
-            </div>
-            {selectedQSet && (
-              <p className={`text-[10px] ${styles.cardTextMuted} pl-1`}>{selectedQSet.description}</p>
-            )}
-          </div>
+          {selectedQSet && (
+            <p className={`text-[10px] ${styles.cardTextMuted} pl-1`}>{t(selectedQSet.descKey)}</p>
+          )}
+          <p className={`text-[10px] ${styles.cardTextMuted} pl-1`}>{t('aiworkbench.dashboard.eval.serverRunHint')}</p>
         </div>
 
         {/* Action Buttons */}
         <div className={`flex items-center gap-2.5 mt-4 pt-4 border-t ${styles.cardBorder}`}>
           <button type="button"
             onClick={startEvaluation}
-            disabled={!selectedAgentId || !selectedQSetId || isRunning}
-            className={`px-4 py-2 hover:bg-blue-500 text-white font-bold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5 bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed`}
+            disabled={!selectedQSetId || isRunning}
+            className={`px-4 py-2 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed`}
           >
             <Play size={13} />
             <span>{t('dashboard.eval.start')}</span>
@@ -483,23 +489,31 @@ export default function DashboardView({
           <button type="button"
             onClick={resetEvaluation}
             disabled={!session}
-            className={`px-4 py-2 ${styles.appBg} hover:bg-[var(--muted,rgba(0,0,0,0.04))] disabled:opacity-50 ${styles.cardTextMuted} font-semibold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5 disabled:cursor-not-allowed`}
+            className={`px-4 py-2 ${styles.appBg} hover:opacity-80 disabled:opacity-50 ${styles.cardTextMuted} font-semibold rounded-lg text-xs transition-all cursor-pointer flex items-center gap-1.5 disabled:cursor-not-allowed`}
           >
             <RotateCcw size={13} />
             <span>{t('dashboard.eval.reset')}</span>
           </button>
-          {session && (
+          {session && session.id && (
             <span className={`text-[10px] font-mono ml-auto ${styles.cardTextMuted}`}>
-              Session: {session.id}
+              evalId: {session.id}
             </span>
           )}
         </div>
       </div>
 
-      {/* §2.3 诚实态（W204/C186）：引擎未应答 → 错误横幅，不展示任何合成评分 */}
+      {/* §2.3 诚实态：引擎失败/超时 → 错误横幅 + 重试，不展示任何合成评分 */}
       {evalError && (
-        <div className={`border border-red-500/30 bg-red-500/5 text-red-400 rounded-xl p-4 text-xs`}>
-          {t('dashboard.eval.engineFail')}
+        <div className={`flex items-center justify-between gap-3 border ${styles.dangerBorder} ${styles.dangerBg} ${styles.dangerText} rounded-xl p-4 text-xs`}>
+          <span>{t('dashboard.eval.engineFail')}</span>
+          <button
+            type="button"
+            onClick={startEvaluation}
+            disabled={!selectedQSetId || isRunning}
+            className={`px-2 py-1 rounded border ${styles.dangerBorder} font-bold cursor-pointer shrink-0 disabled:opacity-50`}
+          >
+            {t('network.retry')}
+          </button>
         </div>
       )}
 
@@ -508,7 +522,7 @@ export default function DashboardView({
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5`}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <span className={`p-1.5 rounded-md ${session.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
+              <span className={`p-1.5 rounded-md ${session.status === 'completed' ? `${styles.successBg} ${styles.successText}` : `${styles.badgeBg} ${styles.badgeText}`}`}>
                 <Zap size={14} />
               </span>
               <span className={`text-xs font-bold ${styles.cardText}`}>
@@ -517,28 +531,23 @@ export default function DashboardView({
                 {session.status === 'completed' && t('dashboard.eval.completed')}
               </span>
             </div>
-            <span className={`text-[10px] font-mono font-bold ${session.status === 'completed' ? 'text-emerald-400' : 'text-blue-400'}`}>
+            <span className={`text-[10px] font-mono font-bold ${session.status === 'completed' ? styles.successText : styles.infoText}`}>
               {session.progress}%
             </span>
           </div>
           <div className="w-full rounded-full h-2 overflow-hidden" style={{ backgroundColor: "color-mix(in srgb, var(--muted-foreground, #64748B) 25%, transparent)" }}>
             <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                session.status === 'completed' ? 'bg-emerald-500' : 'bg-blue-500'
-              }`}
+              className={`h-full rounded-full transition-all duration-500 ${session.status === 'completed' ? `${styles.successBg}` : `${styles.accentBg}`}`}
               style={{ width: `${session.progress}%` }}
             />
           </div>
           <div className="flex flex-wrap gap-1.5 mt-3">
             {session.results.map((r, i) => {
-              const iconCls = r.status === 'completed' ? 'text-emerald-400' :
-                r.status === 'running' ? 'text-blue-400 animate-pulse' :
-                r.status === 'failed' ? 'text-red-400' : `${styles.cardTextMuted} opacity-50`;
               return (
                 <span key={r.questionId} className={`text-[9px] font-mono px-2 py-1 rounded border ${
-                  r.status === 'completed' ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400' :
-                  r.status === 'running' ? 'border-blue-500/30 bg-blue-500/5 text-blue-400' :
-                  r.status === 'failed' ? 'border-red-500/30 bg-red-500/5 text-red-400' :
+                  r.status === 'completed' ? `${styles.successBg} ${styles.successBorder} ${styles.successText}` :
+                  r.status === 'running' ? `${styles.infoBg} ${styles.infoBorder} ${styles.infoText}` :
+                  r.status === 'failed' ? `${styles.dangerBg} ${styles.dangerBorder} ${styles.dangerText}` :
                   `${styles.appBg} ${styles.cardBorder} ${styles.cardTextMuted}`
                 }`}>
                   Q{i + 1}
@@ -554,7 +563,7 @@ export default function DashboardView({
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
           <div className={`lg:col-span-2 ${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 flex flex-col items-center`}>
             <div className="flex items-center gap-2 self-start mb-4">
-              <span className="p-1.5 rounded-md bg-purple-500/10 text-purple-400">
+              <span className={`p-1.5 rounded-md ${styles.badgeBg} ${styles.badgeText}`}>
                 <BarChart3 size={14} />
               </span>
               <span className={`text-xs font-bold ${styles.cardText}`}>{t('dashboard.eval.radarTitle')}</span>
@@ -568,12 +577,12 @@ export default function DashboardView({
                 </p>
               </div>
             )}
-            {/* Legend */}
+            {/* Legend — 引擎真实五维 */}
             <div className="grid grid-cols-3 gap-x-3 gap-y-1.5 mt-3 w-full max-w-xs">
               {RADAR_DIM_LEGEND.map((dim) => (
                 <div key={dim.key} className="flex items-center gap-1.5 text-[10px]">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dim.color }} />
-                  <span className={styles.cardTextMuted}>{t(`dashboard.radar.${dim.key}`)}</span>
+                  <span className={`w-2 h-2 rounded-full shrink-0 bg-current ${styles[dim.token]}`} />
+                  <span className={styles.cardTextMuted}>{t(`aiworkbench.dashboard.radar.${dim.key}`)}</span>
                   <span className={`font-bold ${styles.cardText} ml-auto`}>{session.radarScores[dim.key] ?? '-'}</span>
                 </div>
               ))}
@@ -583,7 +592,7 @@ export default function DashboardView({
           {/* Right: Per-Question Details */}
           <div className={`lg:col-span-3 ${styles.cardBg} border ${styles.cardBorder} rounded-xl overflow-hidden`}>
             <div className={`px-4 py-3 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center gap-2`}>
-              <span className="p-1 rounded bg-blue-500/10 text-blue-400">
+              <span className={`p-1 rounded ${styles.infoBg} ${styles.infoText}`}>
                 <Eye size={12} />
               </span>
               <h3 className={`text-xs font-bold ${styles.cardText}`}>{t('dashboard.eval.detailTitle')}</h3>
@@ -594,18 +603,18 @@ export default function DashboardView({
                 })}
               </span>
             </div>
-            <div className="max-h-[420px] overflow-y-auto divide-y divide-[var(--card-border,#E2E8F0)]">
+            <div className={`max-h-[420px] overflow-y-auto divide-y divide-[var(--card-border,#E2E8F0)]`}>
               {session.results.map((r, i) => (
                 <div key={r.questionId} className="p-4 space-y-2">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-2.5 min-w-0 flex-1">
                       <span className="mt-0.5 shrink-0">
                         {r.status === 'completed' ? (
-                          <CheckCircle2 size={14} className="text-emerald-400" />
+                          <CheckCircle2 size={14} className={styles.successText} />
                         ) : r.status === 'running' ? (
-                          <Clock size={14} className="text-blue-400 animate-pulse" />
+                          <Clock size={14} className={`${styles.infoText} animate-pulse`} />
                         ) : r.status === 'failed' ? (
-                          <XCircle size={14} className="text-red-400" />
+                          <XCircle size={14} className={styles.dangerText} />
                         ) : (
                           <Clock size={14} className={`${styles.cardTextMuted} opacity-50`} />
                         )}
@@ -620,18 +629,23 @@ export default function DashboardView({
                             {r.response}
                           </p>
                         )}
+                        {r.judgeReason && (
+                          <p className={`text-[10px] ${styles.cardTextMuted} mt-1 italic leading-relaxed line-clamp-2`}>
+                            {r.judgeReason}
+                          </p>
+                        )}
                       </div>
                     </div>
                     {r.status === 'completed' && (
-                      <div className={`shrink-0 px-2.5 py-1.5 rounded-lg text-center ${
-                        r.score >= 80 ? 'bg-emerald-500/10 border border-emerald-500/30' :
-                        r.score >= 60 ? 'bg-amber-500/10 border border-amber-500/30' :
-                        'bg-red-500/10 border border-red-500/30'
+                      <div className={`shrink-0 px-2.5 py-1.5 rounded-lg text-center border ${
+                        r.score >= 4 ? `${styles.successBg} ${styles.successBorder}` :
+                        r.score >= 3 ? `${styles.warningBg} ${styles.warningBorder}` :
+                        `${styles.dangerBg} ${styles.dangerBorder}`
                       }`}>
                         <p className={`text-lg font-black ${
-                          r.score >= 80 ? 'text-emerald-400' :
-                          r.score >= 60 ? 'text-amber-400' : 'text-red-400'
-                        }`}>{r.score}</p>
+                          r.score >= 4 ? styles.successText :
+                          r.score >= 3 ? styles.warningText : styles.dangerText
+                        }`}>{r.score}<span className={`text-[9px] ${styles.cardTextMuted}`}>/5</span></p>
                         <p className={`text-[8px] ${styles.cardTextMuted} font-bold uppercase`}>{t('dashboard.eval.scoreLabel')}</p>
                       </div>
                     )}
@@ -663,8 +677,8 @@ export default function DashboardView({
           onClick={() => setSubView('overview')}
           className={`px-3.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
             subView === 'overview'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : `${styles.cardTextMuted} hover:${styles.cardText} hover:bg-[var(--muted,rgba(0,0,0,0.04))]`
+              ? `${styles.accentBg} text-white shadow-sm`
+              : `${styles.cardTextMuted} hover:opacity-80`
           }`}
         >
           <LayoutDashboard size={13} />
@@ -674,8 +688,8 @@ export default function DashboardView({
           onClick={() => setSubView('evaluation')}
           className={`px-3.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
             subView === 'evaluation'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : `${styles.cardTextMuted} hover:${styles.cardText} hover:bg-[var(--muted,rgba(0,0,0,0.04))]`
+              ? `${styles.accentBg} text-white shadow-sm`
+              : `${styles.cardTextMuted} hover:opacity-80`
           }`}
         >
           <BarChart3 size={13} />
@@ -690,13 +704,12 @@ export default function DashboardView({
   );
 }
 
-/** Static radar legend (paired with the 6 radar dims in the canvas). */
-const RADAR_DIM_LEGEND: Array<{ key: string; color: string }> = [
-  { key: 'accuracy', color: '#3b82f6' },
-  { key: 'relevance', color: '#8b5cf6' },
-  { key: 'completeness', color: '#10b981' },
-  { key: 'safety', color: '#ef4444' },
-  { key: 'efficiency', color: '#f59e0b' },
-  { key: 'creativity', color: '#ec4899' },
+/** Static radar legend — 与引擎 dimensionAvgs 五维一一对应（无假维度）；色点用主题 token。 */
+const RADAR_DIM_LEGEND: Array<{ key: string; token: 'infoText' | 'accentText' | 'successText' | 'warningText' | 'dangerText' }> = [
+  { key: 'toolAccuracy', token: 'infoText' },
+  { key: 'keywordCoverage', token: 'accentText' },
+  { key: 'answerQuality', token: 'successText' },
+  { key: 'executionEfficiency', token: 'warningText' },
+  { key: 'hallucinationResist', token: 'dangerText' },
 ];
 

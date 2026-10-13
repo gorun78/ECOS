@@ -181,16 +181,11 @@ function toMetadataConfigJson(strategy: { trigger?: string; countMethod?: string
   return JSON.stringify(cfg);
 }
 
-/** 数据源连接列表 */
+/** 数据源连接列表（失败向上抛出，由调用方呈现错误态+重试，禁吞错回退空数组） */
 export async function fetchDataConnections(): Promise<DataConnection[]> {
-  try {
-    const data = await get<unknown[]>(DATANET_DS);
-    if (!Array.isArray(data)) return [];
-    return data.map(mapDsToConn);
-  } catch (e) {
-    console.warn('[data-workbench] fetchDataConnections failed:', e);
-    return [];
-  }
+  const data = await get<unknown[]>(DATANET_DS);
+  if (!Array.isArray(data)) return [];
+  return data.map(mapDsToConn);
 }
 
 /** 创建数据源 → DataSourceController POST /datanet/datasource */

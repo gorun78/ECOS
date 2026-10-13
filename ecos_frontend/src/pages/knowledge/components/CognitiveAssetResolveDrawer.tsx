@@ -174,8 +174,14 @@ export default function CognitiveAssetResolveDrawer({ assetId, onClose }: Props)
               </div>
             )}
 
-            <div className="border-t pt-3" style={{ borderColor: styles.cardBorder }}>
+            <div className="border-t pt-3 flex flex-col gap-3" style={{ borderColor: styles.cardBorder }}>
               <Field label={t('knowledge.cognitiveAsset.field_objectKey')} value={state.data.objectKey} />
+              {/* 来源标识（§1.4.3 流程 3 / 复盘 S6）：resolve DTO 服务端实核不含
+                  sourceScenarioId/blueprintId/originRef 类字段 → 如实呈现受限说明，不伪造跳转。 */}
+              <Field
+                label={t('knowledge.cognitiveAsset.source_title')}
+                value={<span className="opacity-60">{t('knowledge.cognitiveAsset.source_unavailable')}</span>}
+              />
             </div>
 
             <p className="text-[10px] opacity-50 leading-relaxed">{t('knowledge.cognitiveAsset.readonly_note')}</p>

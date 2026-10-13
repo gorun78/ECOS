@@ -7,6 +7,8 @@ import React, { useState } from 'react';
 import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, FunctionType, OntologyDomain, PropertyType } from '../../types/ontology';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
+import { useLanguage } from '../../components/LanguageContext';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import DomainSelectorHeader from './sidebar/DomainSelectorHeader';
 import {
   ObjectTypesAccordion,
@@ -82,6 +84,7 @@ export default function Sidebar({
 
   // Extracted hook — preserves the original useState order:
   // showDomainModal, editingDomain, formId, formName, formDesc, formColor, formAssignedObjects, formError
+  const { t } = useLanguage();
   const {
     showDomainModal,
     setShowDomainModal,
@@ -100,6 +103,10 @@ export default function Sidebar({
     handleStartAddDomain,
     handleStartEditDomain,
     handleDeleteDomain,
+    pendingDeleteId,
+    pendingDomainName,
+    confirmDeleteDomain,
+    cancelDeleteDomain,
     handleSaveDomain,
     toggleObjectAssignment
   } = useSidebarDomainForm({
@@ -234,6 +241,16 @@ export default function Sidebar({
         />
       )}
 
+      <ConfirmDialog
+        visible={!!pendingDeleteId}
+        danger
+        title={t('ow.dommgr.delTier.title')}
+        message={t('ow.msg.confirmDeleteDomain').replace('{name}', pendingDomainName)}
+        confirmText={t('common.confirm')}
+        cancelText={t('common.cancel')}
+        onConfirm={confirmDeleteDomain}
+        onCancel={cancelDeleteDomain}
+      />
     </aside>
   );
 }

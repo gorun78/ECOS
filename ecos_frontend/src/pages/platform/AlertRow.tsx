@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { BadgeCheck, Check, Loader2, Lock, UserCheck } from "lucide-react";
+import { BadgeCheck, Check, Loader2, UserCheck } from "lucide-react";
 import { useTheme } from "../../components/ThemeContext";
 import { useLanguage } from "../../components/LanguageContext";
 import type { MonitorAlert } from "../../services/platformApi";
@@ -24,11 +24,10 @@ function fmtTime(iso?: string): string {
 }
 
 /** severity → 徽章样式（用语义 token，不硬编码颜色） */
-function severityVariant(severity: string): "success" | "warning" | "danger" | "info" {
+function severityVariant(severity: string): "warning" | "danger" | "info" {
   const s = severity?.toUpperCase();
   if (s === "CRITICAL" || s === "FATAL" || s === "P0" || s === "ERROR") return "danger";
   if (s === "HIGH" || s === "P1" || s === "WARN" || s === "WARNING") return "warning";
-  if (s === "LOW" || s === "P3") return "info";
   return "info";
 }
 
@@ -37,7 +36,6 @@ export default function AlertRow({ alert, canAck, busy, onAck, onOpen }: Props) 
   const { t } = useLanguage();
 
   const closed = alert.status === "CLOSED" || alert.status === "ACKED" || alert.status === "RESOLVED";
-  const showAck = canAck && !closed && !busy;
 
   return (
     <div
@@ -50,7 +48,7 @@ export default function AlertRow({ alert, canAck, busy, onAck, onOpen }: Props) 
           onOpen(alert);
         }
       }}
-      className={`w-full text-left border-b ${styles.cardBorder} last:border-0 px-4 py-2.5 flex items-center gap-3 transition hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer`}
+      className={`w-full text-left border-b ${styles.cardBorder} last:border-0 px-4 py-2.5 flex items-center gap-3 transition ${styles.sidebarHoverBg} cursor-pointer`}
     >
       {/* severity pill */}
       <span
@@ -59,9 +57,7 @@ export default function AlertRow({ alert, canAck, busy, onAck, onOpen }: Props) 
             ? `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`
             : severityVariant(alert.severity) === "warning"
               ? `${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`
-              : severityVariant(alert.severity) === "success"
-                ? `${styles.successBg} ${styles.successText} ${styles.successBorder}`
-                : `${styles.infoBg} ${styles.infoText} ${styles.infoBorder}`
+              : `${styles.infoBg} ${styles.infoText} ${styles.infoBorder}`
         }`}
       >
         {alert.severity || "—"}
@@ -89,26 +85,23 @@ export default function AlertRow({ alert, canAck, busy, onAck, onOpen }: Props) 
         {t("platform.alerts.status." + (alert.status || "").toLowerCase()) || alert.status}
       </span>
 
-      {/* ack button */}
+      {/* ack button — real <button type="button"> (row is role=button on a div, so a
+          nested native button is valid HTML). The `canAck && !closed` guard already
+          means canAck is true here, so the prior inner canAck/Lock ternaries were dead. */}
       {(canAck && !closed) && (
-        <span
+        <button
+          type="button"
+          disabled={busy}
+          aria-label={t("platform.alerts.ack")}
           onClick={(e) => {
             e.stopPropagation();
-            if (showAck) onAck?.(alert.id);
+            onAck?.(alert.id);
           }}
-          className={`shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium border transition ${
-            canAck ? `${styles.successBorder} ${styles.successText} hover:opacity-80` : `${styles.appBorder} ${styles.cardTextMuted} opacity-50 cursor-not-allowed`
-          }`}
+          className={`shrink-0 inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium border transition cursor-pointer ${styles.successBorder} ${styles.successText} hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed`}
         >
-          {busy ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : canAck ? (
-            <Check className="w-3 h-3" />
-          ) : (
-            <Lock className="w-3 h-3" />
-          )}
+          {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
           {t("platform.alerts.ack")}
-        </span>
+        </button>
       )}
       {closed && (
         <span className={`hidden md:inline shrink-0 text-[10px] font-mono ${styles.cardTextMuted}`}>

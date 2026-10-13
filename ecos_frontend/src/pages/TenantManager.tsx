@@ -55,7 +55,7 @@ import InvoiceTab from "./tenant-manager/InvoiceTab";
 
 export default function TenantManager() {
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const { t, locale } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
 
   // ── Toast ──
@@ -109,14 +109,12 @@ export default function TenantManager() {
     setLoadingTenants(true);
     try {
       const kw = keyword && keyword.trim() ? keyword.trim() : undefined;
-      // HACK: pass status as keyword suffix since api doesn't have status filter
-      const searchKw = status ? (kw ? `${kw} status:${status}` : `status:${status}`) : kw;
-      const result = await fetchTenants(searchKw, page ?? 1, 20);
+      // status 是后端真实查询参数（SQL WHERE status = ? 精确过滤），直接透传，
+      // 不再拼进 keyword 前缀（曾把 `status:ACTIVE` 当名字搜导致 total 失真）
+      const result = await fetchTenants(kw, page ?? 1, 20, status || undefined);
       const rawList: RawTenant[] = (result as any).data ?? [];
       const total = (result as any).total ?? 0;
-      const normalized = rawList
-        .filter((r: any) => !status || r.status === status)
-        .map(normalizeTenant);
+      const normalized = rawList.map(normalizeTenant);
       setTenants(normalized);
       setTenantTotal(total);
       if (normalized.length > 0 && !selectedTenantId) {
@@ -196,8 +194,14 @@ export default function TenantManager() {
   useEffect(() => { if (activeTab === "quota") loadQuotas(); }, [activeTab, selectedTenantId]);
 
   const handleQuotaSave = async (quotaType: string, dailyLimit: number, monthlyLimit: number) => {
-    await updateTenantQuota(String(selectedTenantId!), { quota_type: quotaType, daily_limit: dailyLimit, monthly_limit: monthlyLimit });
-    await loadQuotas();
+    try {
+      await updateTenantQuota(String(selectedTenantId!), { quota_type: quotaType, daily_limit: dailyLimit, monthly_limit: monthlyLimit });
+      showToast("success", t("platform.tenant.quotaSaved"));
+      await loadQuotas();
+    } catch (e: any) {
+      showToast("error", t("platform.tenant.quotaSaveFailed", { msg: e?.message }));
+      throw e;
+    }
   };
 
   // ── Usage: load ──
@@ -270,11 +274,11 @@ export default function TenantManager() {
   const selectedTenant = tenants.find((t) => t.id === selectedTenantId);
 
   // ── Tabs definition ──
-  const tabs: { id: TabId; label: string; labelZh: string; icon: React.ReactNode }[] = [
-    { id: "management", label: "Tenant Management", labelZh: "租户管理", icon: <Building className="w-4 h-4" /> },
-    { id: "quota", label: "Quota Management", labelZh: "配额管理", icon: <Gauge className="w-4 h-4" /> },
-    { id: "usage", label: "Usage Dashboard", labelZh: "用量仪表盘", icon: <BarChart3 className="w-4 h-4" /> },
-    { id: "invoice", label: "Billing", labelZh: "账单查看", icon: <Receipt className="w-4 h-4" /> },
+  const tabs: { id: TabId; labelKey: string; icon: React.ReactNode }[] = [
+    { id: "management", labelKey: "platform.tenant.tabs.management", icon: <Building className="w-4 h-4" /> },
+    { id: "quota", labelKey: "platform.tenant.tabs.quota", icon: <Gauge className="w-4 h-4" /> },
+    { id: "usage", labelKey: "platform.tenant.tabs.usage", icon: <BarChart3 className="w-4 h-4" /> },
+    { id: "invoice", labelKey: "platform.tenant.tabs.invoice", icon: <Receipt className="w-4 h-4" /> },
   ];
 
   // ── Render ──────────────────────────────────────────────────
@@ -328,7 +332,7 @@ export default function TenantManager() {
               }`}
             >
               {tab.icon}
-              {locale === "zh" ? tab.labelZh : tab.label}
+              {t(tab.labelKey)}
             </button>
           ))}
         </div>

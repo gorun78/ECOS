@@ -67,6 +67,8 @@ export default function BusinessWorkbenchLayout({
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [functionTypes, setFunctionTypes] = useState<FunctionType[]>([]);
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
+  // C-5 显式降级：记录当前仍为演示数据（seedData/mock）的部分，非空即挂降级横幅
+  const [demoParts, setDemoParts] = useState<string[]>([]);
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
 
   // --- Active Selections ---
@@ -139,6 +141,16 @@ export default function BusinessWorkbenchLayout({
       setDatasets(mockDatasets);
       setFunctionTypes(mockFunctionTypes);
       setDomains(loadedDomains);
+
+      // C-5 显式降级：API 未返回真实数据的部分仍为演示数据，横幅如实标注
+      const seeded: string[] = [];
+      if (loadedObjects === mockObjectTypes) seeded.push('objects');
+      if (loadedLinks === mockLinkTypes) seeded.push('links');
+      if (loadedActions === mockActionTypes) seeded.push('actions');
+      if (loadedDomains === mockDomains) seeded.push('domains');
+      // 以下四类无 API 通道，恒为演示数据
+      seeded.push('interfaces', 'sharedProps', 'datasets', 'functionTypes');
+      setDemoParts(seeded);
     } catch (err) {
       console.error('Failed to load ontology data, using seed data:', err);
       setObjectTypes(mockObjectTypes);
@@ -149,13 +161,13 @@ export default function BusinessWorkbenchLayout({
       setDatasets(mockDatasets);
       setFunctionTypes(mockFunctionTypes);
       setDomains(mockDomains);
+      setDemoParts(['objects', 'links', 'actions', 'domains', 'interfaces', 'sharedProps', 'datasets', 'functionTypes']);
     }
   };
 
   // --- Update helpers ---
   const updateObjectTypes = useCallback((updated: ObjectType[]) => {
     setObjectTypes(updated);
-    localStorage.setItem('ecos_cached_objects', JSON.stringify(updated));
   }, []);
 
   const updateLinkTypes = useCallback((updated: LinkType[]) => {
@@ -324,6 +336,11 @@ export default function BusinessWorkbenchLayout({
 
   return (
     <div className={`h-full flex flex-col ${styles.appBg} ${styles.appText} font-sans relative`}>
+      {demoParts.length > 0 && (
+        <div className={`px-4 py-1.5 text-[11px] ${styles.sidebarBg} ${styles.cardTextMuted} border-b ${styles.sidebarBorder}`}>
+          {t('bizwb.demo.banner').replace('{parts}', demoParts.map(p => t(`bizwb.demo.part.${p}`)).join(', '))}
+        </div>
+      )}
       {/* Tab Bar */}
       <div className={`flex items-center gap-1 px-4 py-2 ${styles.sidebarBg} border-b ${styles.sidebarBorder}`}>
         {tabs.map(tab => (

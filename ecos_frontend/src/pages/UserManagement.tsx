@@ -13,7 +13,7 @@ import {
   ChevronLeft, ChevronRight, UserX,
 } from "lucide-react";
 import {
-  fetchUsers, createUser, updateUser, deleteUser,
+  createUser, updateUser, deleteUser,
   toggleUserStatus, assignUserRoles,
   fetchRoles, createRole, updateRole, deleteRole,
   assignRolePermissions,
@@ -21,6 +21,7 @@ import {
   fetchPermissions, createPermission, updatePermission, deletePermission,
   IamUser, IamRole, IamOrg, IamPermission,
   forceLogoutUser, resetPasswordGenerate, batchCreateUsers,
+  apiFetchData, API_BASE,
 } from "../api";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
@@ -63,7 +64,6 @@ export default function UserManagement() {
   // Users: search & filter & pagination
   const [userSearch, setUserSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
   const [userPage, setUserPage] = useState(1);
   const pageSize = 15;
 
@@ -102,12 +102,25 @@ export default function UserManagement() {
   const loadUsers = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const res = await fetchUsers(userSearch || undefined, userPage, pageSize);
-      setUsers(res.data || []);
-      setUserTotal(res.total || 0);
-    } catch (e: any) { setError(e.message || String(e)); }
+      // 报告 §4.7 行289 P0：statusFilter 此前从未入请求（死控件）。
+      // 后端 GET /api/v1/system/users 支持 status 参数，但 iamClient.fetchUsers
+      // 签名无该参数且 catch→空数组（S2 fail-open，api 层修复已登记 g2-notes），
+      // 本页先直连 apiFetchData 做服务端过滤 + 显式报错。
+      // G-11：后端 UserController.list 仅接受 keyword/status/page/pageSize，
+      // 不开放 role 参数（本波次不改后端），roleFilter 下拉已整体移除。
+      const q = new URLSearchParams();
+      q.set("page", String(userPage));
+      q.set("pageSize", String(pageSize));
+      if (userSearch) q.set("keyword", userSearch);
+      if (statusFilter) q.set("status", statusFilter);
+      const res = await apiFetchData<{ data?: IamUser[]; total?: number }>(
+        `${API_BASE}/v1/system/users?${q.toString()}`,
+      );
+      setUsers(res?.data || []);
+      setUserTotal(res?.total || 0);
+    } catch (e: any) { setError(e?.message || String(e)); }
     setLoading(false);
-  }, [userSearch, userPage, pageSize]);
+  }, [userSearch, statusFilter, userPage, pageSize, apiFetchData]);
 
   const loadRoles = useCallback(async () => {
     setLoading(true); setError("");
@@ -151,11 +164,23 @@ export default function UserManagement() {
 
   const handleCreateUser = useCallback(async (data: Record<string, any>, roleIds: string[]) => {
     const payload = { ...data };
-    if (!payload.password) payload.password = "ECOS@2026";
+    // 报告 §4.7 行286 P0：默认密码硬编码 "ECOS@2026" 废除 —— 密码为空时如实报错
+    // 中止（后端 create 本就要求密码非空），不再以后门默认密码静默建号。
+    if (!payload.password) {
+      showToast("error", t("platform.user.host.pwdRequired"));
+      throw new Error(t("platform.user.host.pwdRequired"));
+    }
     const result: any = await createUser(payload);
     const newUserId = result?.userId || result?.id;
     if (newUserId && roleIds.length > 0) {
-      await assignUserRoles(newUserId, roleIds).catch(() => {});
+      // 行288 P0：角色绑定失败不再 .catch(()=>{}) 吞掉后仍报成功
+      try {
+        await assignUserRoles(newUserId, roleIds);
+      } catch (e: any) {
+        showToast("error", t("platform.user.host.roleBindFailed", { msg: e?.message || String(e) }));
+        loadUsers();
+        return;
+      }
     }
     showToast("success", t("platform.user.host.created"));
     loadUsers();
@@ -165,7 +190,14 @@ export default function UserManagement() {
     const userId = data.userId;
     const { userId: _, password, ...payload } = data;
     await updateUser(userId, payload);
-    await assignUserRoles(userId, roleIds).catch(() => {});
+    // 行288 P0：同上，绑定失败如实上报（基础资料已保存，角色部分如实降级提示）
+    try {
+      await assignUserRoles(userId, roleIds);
+    } catch (e: any) {
+      showToast("error", t("platform.user.host.roleBindFailed", { msg: e?.message || String(e) }));
+      loadUsers();
+      return;
+    }
     showToast("success", t("platform.user.host.updated"));
     loadUsers();
   }, [t, showToast, loadUsers]);
@@ -208,11 +240,19 @@ export default function UserManagement() {
   }, [t, showToast, loadUsers]);
 
   const handleBatchDelete = useCallback(async (userIds: string[]) => {
-    try {
-      await Promise.all(userIds.map(id => deleteUser(id)));
-      showToast("success", t("platform.user.host.batchDeleted", { n: userIds.length }));
-      loadUsers();
-    } catch (e: any) { showToast("error", e.message); }
+    // G-25b：逐条收集成败，不再 Promise.all 单点失败即整体吞掉；
+    // 无论成败都重载（重载失败由 loadUsers 内部 error 态呈现，不二次 toast）。
+    const results = await Promise.allSettled(userIds.map(id => deleteUser(id)));
+    const ok = results.filter(r => r.status === "fulfilled").length;
+    const fail = results.length - ok;
+    if (ok > 0 && fail > 0) {
+      showToast("success", t("platform.user.host.batchDeletePartial", { s: ok, f: fail }));
+    } else if (ok > 0) {
+      showToast("success", t("platform.user.host.batchDeleted", { n: ok }));
+    } else {
+      showToast("error", t("platform.user.host.batchDeleteFailed"));
+    }
+    loadUsers();
   }, [t, showToast, loadUsers]);
 
   const handleForceLogout = useCallback((userId: string) => {
@@ -239,11 +279,36 @@ export default function UserManagement() {
     setConfirmAction(null);
     try {
       const res: any = await resetPasswordGenerate(confirmAction.userId);
-      const tempPwd = res?.tempPassword || res?.password || "ECOS@2026";
+      // G-9：严禁硬编码兜底（"ECOS@2026"）。后端未返回有效临时密码时视为失败，
+      // 报 error 且不设 resetPwdResult、不报 success。
+      const tempPwd: string | undefined =
+        res?.tempPassword ?? (typeof res?.password === "string" ? res.password : undefined);
+      if (!tempPwd) {
+        showToast("error", t("platform.user.host.resetPwdNoTemp"));
+        return;
+      }
       setResetPwdResult({ userId: confirmAction.userId, tempPassword: tempPwd });
       showToast("success", t("platform.user.host.passwordResetToast"));
     } catch (e: any) { showToast("error", e.message || "Reset failed"); }
   }, [confirmAction, t, showToast]);
+
+  // G-25a：复制临时密码——clipboard 失败必须如实 error toast，禁止静默吞掉
+  const copyTempPwd = useCallback(async (pwd: string) => {
+    try {
+      await navigator.clipboard.writeText(pwd);
+      showToast("success", t("platform.user.host.copied"));
+    } catch {
+      showToast("error", t("platform.user.host.copyFailed"));
+    }
+  }, [t, showToast]);
+
+  // G-25a：临时密码弹窗仅允许显式关闭（关闭按钮/「我知道了」/Esc），杜绝误点 backdrop 丢失
+  useEffect(() => {
+    if (!resetPwdResult) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setResetPwdResult(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [resetPwdResult]);
 
   const handleCsvImport = useCallback(async (rows: Record<string, string>[]) => {
     await batchCreateUsers(rows);
@@ -350,9 +415,10 @@ export default function UserManagement() {
       {/* Toast */}
       {toast && <Toast toast={toast} onClose={() => setToast(null)} />}
 
-      {/* Reset Password Result */}
+      {/* Reset Password Result — G-25a: backdrop 点击不关闭（误点丢密码），
+          仅关闭按钮/「我知道了」/Escape 关闭 */}
       {resetPwdResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setResetPwdResult(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={e => e.stopPropagation()}>
           <div className={`rounded-lg border p-6 w-full max-w-sm ${styles.cardBg} ${styles.cardBorder}`} onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className={`text-sm font-semibold ${styles.cardText}`}>
@@ -370,10 +436,11 @@ export default function UserManagement() {
               </code>
               <button
                 type="button"
-                onClick={() => { navigator.clipboard.writeText(resetPwdResult!.tempPassword); showToast("success", t("platform.user.host.copied")); }}
-                className={`p-2 rounded border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`}
+                onClick={() => copyTempPwd(resetPwdResult.tempPassword)}
+                className={`px-3 py-2 rounded text-xs font-medium border flex items-center gap-1.5 ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`}
               >
-                <Copy className="w-4 h-4" />
+                <Copy className="w-3.5 h-3.5" />
+                {t("platform.user.host.copyTempPwd")}
               </button>
             </div>
             <button type="button" onClick={() => setResetPwdResult(null)}
@@ -541,9 +608,6 @@ export default function UserManagement() {
           onSearch={() => { setUserPage(1); loadUsers(); }}
           statusFilter={statusFilter}
           onStatusChange={v => { setStatusFilter(v); setUserPage(1); }}
-          roleFilter={roleFilter}
-          onRoleChange={v => { setRoleFilter(v); setUserPage(1); }}
-          roles={roles}
           onImportClick={() => setShowCsvImport(true)}
           onExportClick={handleCsvExport}
           totalCount={userTotal}
@@ -596,6 +660,16 @@ export default function UserManagement() {
               <th className={th}>{t("platform.user.host.roleColActions")}</th>
             </tr></thead>
             <tbody>
+              {/* G-25c: 加载/错误/空态分支 —— 403/权限类错误由页首 error 横幅统一呈现 */}
+              {loading && (
+                <tr><td colSpan={5} className={`${td} text-center opacity-50 text-xs`}>{t("platform.user.host.listLoading")}</td></tr>
+              )}
+              {!loading && error && (
+                <tr><td colSpan={5} className={`${td} text-center text-xs`}>{t("platform.user.host.roleLoadFailed")}</td></tr>
+              )}
+              {!loading && !error && roles.length === 0 && (
+                <tr><td colSpan={5} className={`${td} text-center text-xs opacity-60`}>{t("platform.user.host.roleEmpty")}</td></tr>
+              )}
               {roles.map(r => (
                 <tr key={r.roleId} className={`${styles.sidebarHoverBg} cursor-pointer`} onClick={() => { if (permissions.length === 0) loadPermissions(); setPermPanelRole(r); }}>
                   <td className={td}><span className="font-medium text-indigo-600 dark:text-indigo-400">{r.roleName}</span></td>
@@ -628,6 +702,16 @@ export default function UserManagement() {
               <span className="w-[120px] shrink-0">{t("platform.user.host.roleColDesc")}</span>
               <span className="w-16 shrink-0">{t("platform.user.host.roleColActions")}</span>
             </div>
+            {/* G-25c: 加载/错误/空态分支 —— 403/权限类错误由页首 error 横幅统一呈现 */}
+            {loading && (
+              <div className={`px-3 py-6 text-center text-xs opacity-50`}>{t("platform.user.host.listLoading")}</div>
+            )}
+            {!loading && error && (
+              <div className={`px-3 py-4 text-xs`}>{t("platform.user.host.orgLoadFailed")}</div>
+            )}
+            {!loading && !error && orgTree.length === 0 && (
+              <div className={`px-3 py-6 text-center text-xs opacity-60`}>{t("platform.user.host.orgEmpty")}</div>
+            )}
             {orgTree.map(o => <OrgTreeRow key={o.orgId} org={o} depth={0}
               onEdit={org => setOrgForm({ mode: "edit", org })}
               onDelete={org => setConfirmAction({ type: "delete", tab: "orgs", id: org.orgId, name: org.orgName })} />)}
@@ -647,6 +731,16 @@ export default function UserManagement() {
               <th className={th}>{t("platform.user.host.roleColActions")}</th>
             </tr></thead>
             <tbody>
+              {/* G-25c: 加载/错误/空态分支 —— 403/权限类错误由页首 error 横幅统一呈现 */}
+              {loading && (
+                <tr><td colSpan={5} className={`${td} text-center opacity-50 text-xs`}>{t("platform.user.host.listLoading")}</td></tr>
+              )}
+              {!loading && error && (
+                <tr><td colSpan={5} className={`${td} text-center text-xs`}>{t("platform.user.host.permLoadFailed")}</td></tr>
+              )}
+              {!loading && !error && permissions.length === 0 && (
+                <tr><td colSpan={5} className={`${td} text-center text-xs opacity-60`}>{t("platform.user.host.permEmpty")}</td></tr>
+              )}
               {permissions.map(p => (
                 <tr key={p.permissionId} className={styles.sidebarHoverBg}>
                   <td className={td}><code className={`text-[11px] ${styles.sidebarBg} px-1.5 py-0.5 rounded font-medium`}>{p.resource}</code></td>

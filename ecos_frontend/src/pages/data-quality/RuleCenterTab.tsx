@@ -138,6 +138,7 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
   const [rules, setRules] = useState<DqRuleVO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [tableFilterIgnored, setTableFilterIgnored] = useState(false);
 
   /** 拉取规则列表（legacy 只读端点） */
   const load = async () => {
@@ -148,6 +149,8 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
       // legacy 数据无 targetTable 字段：仅当返回结果中确有该字段时才按 initialTableFilter 过滤，
       // 否则忽略该参数（否则过滤条件恒不命中，列表会恒为空）
       const hasTargetTable = arr.some((r) => (r.targetTable ?? "").trim() !== "");
+      // B-27：深链过滤被忽略时显式告知，不再静默
+      setTableFilterIgnored(Boolean(initialTableFilter) && !hasTargetTable);
       const next =
         initialTableFilter && hasTargetTable
           ? arr.filter((r) => (r.targetTable ?? "").toLowerCase() === initialTableFilter.toLowerCase())
@@ -190,6 +193,10 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
       return true;
     });
   }, [rules, ruleType, status, keyword]);
+
+  // B-17：分页可见化——「加载更多」递进渲染，footer 的 shown 与实际渲染数一致
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [ruleType, status, keyword, initialTableFilter]);
 
   return (
     <div className="h-full flex flex-col">
@@ -257,6 +264,11 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
       </div>
 
       {/* 主区: 列表 */}
+      {tableFilterIgnored && (
+        <div className={`mb-3 px-3 py-2 rounded-md border text-xs ${styles.warningBorder} ${styles.warningBg} ${styles.warningText}`}>
+          {t("dw.dqRule.deepLinkIgnored")}
+        </div>
+      )}
       <div className={`flex-1 min-h-0 border rounded-xl overflow-hidden flex flex-col`}
         style={{ borderColor: styles.cardBorder, background: styles.cardBg }}>
         {loading ? (
@@ -290,7 +302,7 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice(0, PAGE_SIZE).map((r, i) => {
+                {filtered.slice(0, visibleCount).map((r, i) => {
                   const statusMeta = STATUS_META[(r.status ?? "").toUpperCase()];
                   const StatusIcon = statusMeta?.icon ?? FileText;
                   const TypeIcon = TYPE_ICONS[r.ruleType ?? ""] ?? FileText;
@@ -319,8 +331,19 @@ export default function RuleCenterTab({ initialTableFilter }: RuleCenterTabProps
               </tbody>
             </table>
             {filtered.length > PAGE_SIZE ? (
-              <div className="px-3 py-2 text-[11px] font-mono text-center" style={{ color: styles.cardTextMuted }}>
-                {t("dw.dqRule.totalCount").replace("{total}", String(stats.TOTAL)).replace("{shown}", String(filtered.length))}
+              <div className="flex flex-col items-center gap-1.5 px-3 py-2">
+                <span className="text-[11px] font-mono" style={{ color: styles.cardTextMuted }}>
+                  {t("dw.dqRule.totalCount").replace("{total}", String(stats.TOTAL)).replace("{shown}", String(Math.min(visibleCount, filtered.length)))}
+                </span>
+                {filtered.length > visibleCount && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                    className={`text-[11px] px-2.5 py-1 rounded-md border ${styles.cardBorder} ${styles.accentText} hover:opacity-80`}
+                  >
+                    {t("dw.dqRule.showMore")}
+                  </button>
+                )}
               </div>
             ) : null}
           </div>

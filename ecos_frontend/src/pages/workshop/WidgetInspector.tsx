@@ -124,7 +124,7 @@ export function renderWidgetInspector(vm: any) {
                           >
                             <option value="">{t('aiworkbench.ws.wi.selectActionPlaceholder')}</option>
                             {mockActionTypes.map((act: any) => (
-                              <option key={act.id} value={act.id}>{act.displayName}</option>
+                              <option key={act.id} value={act.id}>{t(`aiworkbench.ws.actionType.${act.id}.name`)}</option>
                             ))}
                           </select>
                         </div>

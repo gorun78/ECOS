@@ -1,5 +1,12 @@
 import type { WorkshopApp } from './types';
 
+/**
+ * 演示种子应用清单（单源）：initialApps 为民航演示场景的静态种子，
+ * 非真实业务资产。UI（AppListScreen / EditorHeader）依据本集合挂「演示」标识；
+ * 新建用户应用不在此集合内、不挂标识。
+ */
+export const SEED_APP_IDS: ReadonlySet<string> = new Set(['aviation_ops', 'aircraft_maintenance']);
+
 export const initialApps: WorkshopApp[] = [
   {
     id: 'aviation_ops',

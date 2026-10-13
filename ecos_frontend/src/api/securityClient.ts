@@ -72,17 +72,23 @@ export async function updateUserSecurityProfile(
 
 // ── Audit Logs ──────────────────────────────────────────
 // 对接 AuditController (/api/v1/audit/logs)
+// 详设-01 B 章 3.2：追加可选 startTime/endTime 尾参（后端 AuditController#list
+// 既有形参，客户端此前未透传；只增不改，既有调用方零影响）
 export async function fetchAuditLogs(
   userId?: string,
   action?: string,
   resourceType?: string,
   page = 1,
-  pageSize = 50
+  pageSize = 50,
+  startTime?: string,
+  endTime?: string
 ): Promise<{ data: AuditEvent[]; total: number; page: number; pageSize: number }> {
     const params = new URLSearchParams();
     if (userId) params.set('userId', userId);
     if (action) params.set('action', action);
     if (resourceType) params.set('resourceType', resourceType);
+    if (startTime) params.set('startTime', startTime);
+    if (endTime) params.set('endTime', endTime);
     params.set('page', String(page));
     params.set('pageSize', String(pageSize));
     try {
@@ -104,6 +110,33 @@ export async function fetchAuditStats(): Promise<AuditStats> {
   } catch (e) {
     console.warn("fetchAuditStats: backend unavailable", e);
     return { todayCount: 0, failureCount: 0, activeUsers: 0, anomalyIps: 0 };
+  }
+}
+
+// ── Audit Hash-Chain Range Verify ────────────────────────
+// 对接详设-01 B 章 3.2 交互时序⑦：POST /api/v1/security/audit/verify-chain {from,to}
+// → {valid, brokenAt[]}（AuditController#verifyChain，区间为 ecos_audit_log 主键 id 闭区间）
+export interface VerifyChainResult {
+  valid: boolean;
+  brokenAt: number[];
+  totalChecked: number;
+  from: number;
+  to: number;
+  algorithm?: string;
+  error?: string;
+}
+
+/** POST /api/v1/security/audit/verify-chain — 增量哈希链区间校验（非吞错面：失败必须上抛） */
+export async function verifyAuditHashChainRange(from: number, to: number): Promise<VerifyChainResult> {
+  try {
+    return await apiFetchData<VerifyChainResult>('/api/v1/security/audit/verify-chain', {
+      method: 'POST',
+      body: JSON.stringify({ from, to }),
+    });
+  } catch (e) {
+    // 与 fetchAuditLogs 同传播规则：不静默吞错，先广播网络下线再上抛
+    notifyNetworkDown(e);
+    throw toNetworkError(e, 'audit/verify-chain');
   }
 }
 
@@ -310,22 +343,42 @@ function mapToClsBackend(p: Partial<ClsPolicy>): Record<string, any> {
   };
 }
 
-/** GET /api/v1/security/rls/policies — 列表RLS策略 */
+/**
+ * 从抛错对象提取网关 traceId（详设-00 C.5.1：RequestContextFilter 全链生成，
+ * GlobalExceptionHandler 错误响应体 ApiResponse JSON 附 `traceId` 字段；
+ * apiFetchData/apiFetch 非 2xx 时将响应体文本作为 Error.message 上抛）。
+ * 网络层失败（NetworkError，无响应）与无 body 场景返回 undefined —— 页面据此
+ * 隐藏 traceId 行，不得伪造（无假真理）。
+ */
+export function extractErrorTraceId(e: unknown): string | undefined {
+  const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+  if (!msg || !msg.trimStart().startsWith("{")) return undefined;
+  try {
+    const parsed = JSON.parse(msg) as { traceId?: unknown };
+    return typeof parsed.traceId === "string" && parsed.traceId ? parsed.traceId : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** GET /api/v1/security/rls/policies — 列表RLS策略
+ *
+ * fail-closed 契约（报告 §4.7 行284 / OPA 基线）：不再吞 403/断连返空列表。
+ * transport（apiFetchData）抛出的类型化错误直接上抛——403 → NoAccessError、
+ * 网络失败 → NetworkError、其余 HTTP → Error{status}——调用方 denied/error
+ * 分支可达。成功路径返回形状 `{ data, total }` 不变（向后兼容）。
+ * detect/ 三个 Manager 消费方本就有 try/catch + setError 分支，契约兼容。
+ */
 export async function fetchRlsPolicies(params?: {
   tableName?: string; page?: number; pageSize?: number;
 }): Promise<{ data: RlsPolicy[]; total: number }> {
-  try {
-    const sp = new URLSearchParams();
-    if (params?.tableName) sp.set('tableName', params.tableName);
-    sp.set('page', String(params?.page || 1));
-    sp.set('pageSize', String(params?.pageSize || 50));
-    const raw = await apiFetchData<any[]>(`/api/v1/security/rls/policies?${sp.toString()}`);
-    const list = Array.isArray(raw) ? raw.map(mapRlsPolicy) : [];
-    return { data: list, total: list.length };
-  } catch (e) {
-    console.warn('fetchRlsPolicies: backend unavailable', e);
-    return { data: [], total: 0 };
-  }
+  const sp = new URLSearchParams();
+  if (params?.tableName) sp.set('tableName', params.tableName);
+  sp.set('page', String(params?.page || 1));
+  sp.set('pageSize', String(params?.pageSize || 50));
+  const raw = await apiFetchData<any[]>(`/api/v1/security/rls/policies?${sp.toString()}`);
+  const list = Array.isArray(raw) ? raw.map(mapRlsPolicy) : [];
+  return { data: list, total: list.length };
 }
 
 /** POST /api/v1/security/rls/policies — 创建RLS策略 */
@@ -351,22 +404,18 @@ export async function deleteRlsPolicy(id: string | number): Promise<void> {
   await apiFetchData(`/api/v1/security/rls/policies/${id}`, { method: 'DELETE' });
 }
 
-/** GET /api/v1/security/cls/policies — 列表CLS策略 */
+/** GET /api/v1/security/cls/policies — 列表CLS策略
+ * fail-closed 契约同 fetchRlsPolicies：403/断连上抛类型化错误，禁吞成空列表。 */
 export async function fetchClsPolicies(params?: {
   tableName?: string; page?: number; pageSize?: number;
 }): Promise<{ data: ClsPolicy[]; total: number }> {
-  try {
-    const sp = new URLSearchParams();
-    if (params?.tableName) sp.set('tableName', params.tableName);
-    sp.set('page', String(params?.page || 1));
-    sp.set('pageSize', String(params?.pageSize || 50));
-    const raw = await apiFetchData<any[]>(`/api/v1/security/cls/policies?${sp.toString()}`);
-    const list = Array.isArray(raw) ? raw.map(mapClsPolicy) : [];
-    return { data: list, total: list.length };
-  } catch (e) {
-    console.warn('fetchClsPolicies: backend unavailable', e);
-    return { data: [], total: 0 };
-  }
+  const sp = new URLSearchParams();
+  if (params?.tableName) sp.set('tableName', params.tableName);
+  sp.set('page', String(params?.page || 1));
+  sp.set('pageSize', String(params?.pageSize || 50));
+  const raw = await apiFetchData<any[]>(`/api/v1/security/cls/policies?${sp.toString()}`);
+  const list = Array.isArray(raw) ? raw.map(mapClsPolicy) : [];
+  return { data: list, total: list.length };
 }
 
 /** POST /api/v1/security/cls/policies — 创建CLS策略 */
@@ -482,31 +531,28 @@ function mapToBackendPolicy(p: Partial<AbacPolicy>): Record<string, any> {
   };
 }
 
-/** GET /api/v1/abac/policies — list+search+paginate */
+/** GET /api/v1/abac/policies — list+search+paginate
+ * fail-closed 契约同 fetchRlsPolicies（报告行284「ABAC 同病」）：吞错返空即
+ * 「故障冒充无策略」，违背 OPA 默认 DENY 基线；错误一律上抛。 */
 export async function fetchAbacPolicies(
   keyword?: string,
   page = 1,
   pageSize = 10
 ): Promise<AbacPolicyListResponse> {
-  try {
-    const params = new URLSearchParams();
-    if (keyword) params.set("keyword", keyword);
-    params.set("page", String(page));
-    params.set("pageSize", String(pageSize));
-    const data: any = await apiFetchData(
-      `/api/v1/abac/policies?${params.toString()}`
-    );
-    const rawList: any[] = data?.data || [];
-    return {
-      data: rawList.map(mapBackendPolicy),
-      total: data?.total || 0,
-      page: data?.page || page,
-      pageSize: data?.pageSize || pageSize,
-    };
-  } catch (e) {
-    console.warn("fetchAbacPolicies: backend unavailable", e);
-    return { data: [], total: 0, page, pageSize };
-  }
+  const params = new URLSearchParams();
+  if (keyword) params.set("keyword", keyword);
+  params.set("page", String(page));
+  params.set("pageSize", String(pageSize));
+  const data: any = await apiFetchData(
+    `/api/v1/abac/policies?${params.toString()}`
+  );
+  const rawList: any[] = data?.data || [];
+  return {
+    data: rawList.map(mapBackendPolicy),
+    total: data?.total || 0,
+    page: data?.page || page,
+    pageSize: data?.pageSize || pageSize,
+  };
 }
 
 /** POST /api/v1/abac/policies — create */
@@ -555,15 +601,15 @@ export interface PolicyEvalResult {
   details?: string;
 }
 
-/** GET /api/v1/policy-engine/policies — 获取所有策略名称列表 */
+/** GET /api/v1/policy-engine/policies — 获取所有策略名称列表
+ *
+ * fail-closed：transport 错误（NetworkError / NoAccessError / HTTP）直接上抛，
+ * 不再 catch → console.warn → 返 []（报告 G-6 同政策端；同档案 fetchPolicyEnginePolicy
+ * 已 throw，本函数保持一致，避免未来重新挂载时 fail-open 返"无策略"）。
+ */
 export async function fetchPolicyEnginePolicies(): Promise<string[]> {
-  try {
-    const resp = await apiFetch<{ data: string[] }>("/v1/policy-engine/policies");
-    return resp.data || [];
-  } catch (e) {
-    console.warn("fetchPolicyEnginePolicies: backend unavailable", e);
-    return [];
-  }
+  const resp = await apiFetch<{ data: string[] }>("/v1/policy-engine/policies");
+  return resp.data || [];
 }
 
 /** GET /api/v1/policy-engine/policies/{name} — 获取指定策略的 Rego 源码 */

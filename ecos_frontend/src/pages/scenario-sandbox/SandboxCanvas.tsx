@@ -22,6 +22,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -185,12 +186,13 @@ export default function SandboxCanvas({ scenarioId }: SandboxCanvasProps) {
   const sandbox = useSandbox(scenarioId);
   const {
     nodes, edges, viewport,
-    layoutVersion, dirtyLayout, saveError,
+    layoutVersion, hasLoaded, dirtyLayout, saveError,
     fetchAvailable,
     addResourceNode, removeResourceNode, linkResourceToHub,
+    setNodePosition, addManualEdge, removeEdge,
     addMindVariant, removeMindVariant, patchMindVariant,
     runInsight,
-    saveLayout, markDirty,
+    saveLayout,
   } = sandbox;
 
   // ── ReactFlow state ────────────────────────────────────
@@ -253,27 +255,80 @@ export default function SandboxCanvas({ scenarioId }: SandboxCanvasProps) {
     });
   }, [edges]);
 
-  // ── RF 内部 change：仅上报 markDirty ────────────────────
+  // ── RF 内部 change：视觉态应用到 rfNodes，位置/删除回写 useSandbox（保存不丢内容） ──
+  // 注：仓内 @xyflow/react 走 src/types/declarations.d.ts 手写 ambient 声明（change 联合未细化），
+  //     此处按最小结构化形状窄化，不依赖运行时 applyNodeChanges 辅助函数。
+  type SdNodeChange = {
+    id: string;
+    type: string;
+    position?: { x?: number; y?: number };
+    dragging?: boolean;
+    selected?: boolean;
+  };
+  type SdEdgeChange = { id: string; type: string; selected?: boolean };
+
   const onNodesChange = useCallback(
-    (changes: unknown[]) => {
-      void changes;
-      markDirty();
+    (raw: unknown[]) => {
+      const changes = raw as SdNodeChange[];
+      setRfNodes((prev) =>
+        prev
+          .filter((n) => !changes.some((c) => c.type === "remove" && c.id === n.id))
+          .map((n) => {
+            let next = n;
+            for (const c of changes) {
+              if (c.id !== n.id) continue;
+              if (
+                c.type === "position" &&
+                typeof c.position?.x === "number" &&
+                typeof c.position?.y === "number"
+              ) {
+                next = { ...next, position: { x: c.position.x, y: c.position.y } };
+              } else if (c.type === "select" && typeof c.selected === "boolean") {
+                next = { ...next, selected: c.selected };
+              }
+            }
+            return next;
+          })
+      );
+      for (const ch of changes) {
+        if (ch.type === "position" && ch.dragging === false) {
+          const pos = ch.position;
+          if (pos && typeof pos.x === "number" && typeof pos.y === "number") {
+            setNodePosition(ch.id, { x: pos.x, y: pos.y });
+          }
+        } else if (ch.type === "remove") {
+          removeResourceNode(ch.id);
+        }
+      }
     },
-    [markDirty]
+    [setNodePosition, removeResourceNode]
   );
 
   const onEdgesChange = useCallback(
-    (changes: unknown[]) => {
-      void changes;
-      markDirty();
+    (raw: unknown[]) => {
+      const changes = raw as SdEdgeChange[];
+      setRfEdges((prev) =>
+        prev
+          .filter((e) => !changes.some((c) => c.type === "remove" && c.id === e.id))
+          .map((e) => {
+            const sel = changes.find((c) => c.id === e.id && c.type === "select");
+            return sel && typeof sel.selected === "boolean"
+              ? { ...e, selected: sel.selected }
+              : e;
+          })
+      );
+      for (const ch of changes) {
+        if (ch.type === "remove") removeEdge(ch.id);
+      }
     },
-    [markDirty]
+    [removeEdge]
   );
 
-  // ── onConnect：推断 edge kind ───────────────────────────
+  // ── onConnect：推断 edge kind 并回写单一事实源（saveLayout 保存的即所见） ──
   const onConnect = useCallback(
     (conn: Connection) => {
       const { source, target } = conn;
+      if (!source || !target) return;
       const from = rfNodes.find((n) => n.id === source);
       const to = rfNodes.find((n) => n.id === target);
       const ft = (from?.type as string | undefined) ?? "resource";
@@ -286,26 +341,9 @@ export default function SandboxCanvas({ scenarioId }: SandboxCanvasProps) {
       else if (ft === "hub" && tt === "mind") kind = "feed";
       else kind = "feed";
 
-      const cpu: SdBEdge = {
-        id: `e-${source}-${target}-${Date.now().toString(36)}`,
-        source,
-        target,
-        kind,
-      };
-      setRfEdges((prev) => [
-        ...prev,
-        {
-          id: cpu.id,
-          source,
-          target,
-          kind,
-          style: sdEdgeStyle(kind),
-          animated: kind !== "inherit",
-        } as unknown as RFFEdge,
-      ]);
-      markDirty();
+      addManualEdge(source, target, kind);
     },
-    [rfNodes, markDirty]
+    [rfNodes, addManualEdge]
   );
 
   // ── 节点点击 → drawer ──────────────────────────────────
@@ -416,20 +454,33 @@ export default function SandboxCanvas({ scenarioId }: SandboxCanvasProps) {
     onRunInsight: handleRunInsight,
   };
 
-  // ── 保存 ────────────────────────────────────────────────
-  const savingRef = useRef(false);
+  // ── nodeTypes：出 render — handler 均 useCallback 稳定，仅注册一次 ──
+  const nodeTypes = useMemo(
+    () =>
+      buildNodeTypeRegistry(
+        handleSetMindActive,
+        handleDeleteMind,
+        handleCopyMind
+      ),
+    [handleSetMindActive, handleDeleteMind, handleCopyMind]
+  );
+
+  // ── 空画布引导：后端无存档时不再伪造占位资源节点 ──
+  const hasBusinessNodes = nodes.some((n) => n.type !== "hub");
+  const showEmptyGuide = hasLoaded && !hasBusinessNodes;
+
+  // ── 保存（saving 用 state：按钮/loading 图标随真实进度重渲染） ──
+  const [saving, setSaving] = useState(false);
   const onSave = useCallback(async () => {
-    if (savingRef.current) return;
-    savingRef.current = true;
+    if (saving) return;
+    setSaving(true);
     try {
-      void rfNodes;
-      void rfEdges;
-      markDirty();
-      await saveLayout();
+      // nodes/edges 已由 onNodesChange/onConnect 实时回写 useSandbox，saveLayout 即所见
+      return await saveLayout();
     } finally {
-      savingRef.current = false;
+      setSaving(false);
     }
-  }, [rfNodes, rfEdges, saveLayout, markDirty]);
+  }, [saving, saveLayout]);
 
   // ── 空场景 fallback ────────────────────────────────────
   if (!scenarioId) {
@@ -489,21 +540,19 @@ export default function SandboxCanvas({ scenarioId }: SandboxCanvasProps) {
             <button
               type="button"
               onClick={() => void onSave()}
-              disabled={!dirtyLayout || savingRef.current}
+              disabled={!dirtyLayout || saving}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded font-semibold text-xs ${styles.accentBg} ${styles.inputText} ${
-                !dirtyLayout || savingRef.current
+                !dirtyLayout || saving
                   ? "opacity-40 cursor-not-allowed"
                   : "cursor-pointer"
               }`}
             >
-              {savingRef.current ? (
+              {saving ? (
                 <Loader2 size={13} className="animate-spin" />
               ) : (
                 <Save size={13} />
               )}
-              {savingRef.current
-                ? t("scenario.sandbox.saving")
-                : t("scenario.sandbox.save")}
+              {saving ? t("scenario.sandbox.saving") : t("scenario.sandbox.save")}
             </button>
           </div>
         </div>
@@ -567,7 +616,7 @@ export default function SandboxCanvas({ scenarioId }: SandboxCanvasProps) {
           <ReactFlow
             nodes={rfNodes as unknown as RfNode[]}
             edges={rfEdges as unknown as RfEdge[]}
-            nodeTypes={buildNodeTypeRegistry(handleSetMindActive, handleDeleteMind, handleCopyMind)}
+            nodeTypes={nodeTypes}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -602,6 +651,23 @@ export default function SandboxCanvas({ scenarioId }: SandboxCanvasProps) {
               }}
             />
           </ReactFlow>
+
+          {/* 空画布引导（无存档 ≠ 假占位节点 — 诚实空态 + 操作指引） */}
+          {showEmptyGuide && (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+              <div
+                className={`pointer-events-auto max-w-sm rounded-lg border px-4 py-3 text-center ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
+              >
+                <Box size={20} className={`${styles.accentText} mx-auto mb-2`} />
+                <div className="text-sm font-semibold">
+                  {t("scenario.sandbox.canvasGuide.title")}
+                </div>
+                <p className={`mt-1 text-xs ${styles.cardTextMuted}`}>
+                  {t("scenario.sandbox.canvasGuide.body")}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* 底部版本徽章 */}
           {layoutVersion > 0 && (

@@ -5,7 +5,8 @@
  * 「每个 L1/L2/L3 面都要过六态（空/加载/错误/边界/权限/离线）」；口径同详设-08 W212 静态源守卫，
  * 与 sevenStates.matrix.spec.tsx（design-05 B.5 运行态渲染矩阵）互补，不重复其覆盖面）。
  *
- * <p>本仓四个改造面把状态机做成组件内判别联合（phase/status/kind），renderToStaticMarkup
+ * <p>本仓九个改造面（2026-10-12 复盘 S3 扩面：原 4 面 + 候选评审/进度轨/逻辑投影/发布门槛/高级调试）
+ * 把状态机做成组件内判别联合（phase/status/kind），renderToStaticMarkup
  * 无法驱动 effect 切态，行为面由 live E2E（cognition-surfaces-live.spec.ts 空态/降级横幅/真数据）
  * 覆盖；本守卫冻结**结构契约**：每个面必须存在全部承诺的状态分支、每分支必须经 i18n 文案键
  * 与主题 token 呈现，且禁止出现假数据兜底字面量。删除任一状态分支 = 本门禁红。</p>
@@ -76,6 +77,54 @@ const SURFACES: SurfaceContract[] = [
       'knowledge.cognitiveAsset.list_failed',
       'knowledge.cognitiveAsset.empty',
     ],
+  },
+  // ── 2026-10-12 复盘收口扩面（复盘报告 S3：原守卫仅冻结 4 面，承诺为"每个改造面"）──
+  {
+    // 议题1 §3.5 候选评审面板：resolve/action 双判别联合 + 引擎降级与冲突态可分
+    file: 'pages/knowledge/components/CandidateReviewPanel.tsx',
+    unionMembers: ["'idle'", "'loading'", "'ok'", "'error'", "'busy'", "'proposal'", "'transition'", "'conflict'", "'failed'"],
+    branches: [
+      'resolve.kind === \'loading\'',
+      'resolve.kind === \'error\'',
+      'action.kind === \'conflict\'',
+      'action.kind === \'failed\'',
+    ],
+    i18nKeys: [
+      'knowledge.candidate.loading',
+      'knowledge.candidate.err_engine',
+      'knowledge.candidate.err_conflict',
+      'knowledge.candidate.badge_uncalibrated',
+      'knowledge.candidate.states_not_ready',
+    ],
+  },
+  {
+    // L2 状态机进度轨（§3.3）：纯展示面无自有 fetch（态由父层注入），契约 = 8 tone 全覆盖
+    // + 当前/可达/异常三分支 + 空态与 traceId 经 i18n；不可达灰化必须由后端 allowedTransitions 驱动
+    file: 'pages/workbench/[scenarioId]/blueprint/BlueprintStatusTrack.tsx',
+    unionMembers: ["'initial'", "'progress'", "'ready'", "'approved'", "'live'", "'terminal'", "'exception'", 'unknown:'],
+    branches: ['allowed.has(step)', 'isCurrent', 'exception && status'],
+    i18nKeys: ['workspace.bp.current_state', 'workspace.bp.empty_field', 'workspace.bp.traceId'],
+  },
+  {
+    // L2 逻辑模型只读投影（§6.2）：空值显式「—」不合成 + 缺口/测试等六子段空分支 + 审批摘要 traceId
+    file: 'pages/workbench/[scenarioId]/blueprint/BlueprintDetail.tsx',
+    unionMembers: [],
+    branches: ['Object.keys(scope).length === 0', 'gaps.length === 0', 'tests.length === 0', 'deps.length === 0'],
+    i18nKeys: ['workspace.bp.empty_field', 'workspace.bp.goal_statement', 'workspace.bp.context_digest', 'workspace.bp.traceId'],
+  },
+  {
+    // L2 发布前四门槛（§6.6）：loading/error/passed/failed 分支齐 + 门槛空态经 i18n + 禁伪造 passed
+    file: 'pages/workbench/[scenarioId]/blueprint/BlueprintValidatePanel.tsx',
+    unionMembers: [],
+    branches: ['loading ? t(', 'error &&', 'result.passed', '!result.passed && result.reasons.length > 0'],
+    i18nKeys: ['workspace.bp.validate', 'workspace.bp.validating', 'workspace.bp.error', 'workspace.bp.gate.empty'],
+  },
+  {
+    // L2 高级调试折叠区（§2.3 三分下沉承接面）：折叠双分支 + CRP 容器 i18n
+    file: 'pages/workbench/[scenarioId]/advanced/AdvancedDebugPanel.tsx',
+    unionMembers: [],
+    branches: ['expanded ?'],
+    i18nKeys: ['workspace.adv.title', 'workspace.adv.cards', 'workspace.adv.legacy_link'],
   },
 ];
 

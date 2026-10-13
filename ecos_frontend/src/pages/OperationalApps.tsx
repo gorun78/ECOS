@@ -1,21 +1,22 @@
 /**
  * OperationalApps — 运营应用门户：CRM / 养护 / 财务三大子门户
- * 通过 api.ts → fetchEntityInstances + 本地 stub 执行指令
- * (原 GSXK 桥已熔断,T2 起由本地 stub 替代,语义不变)
+ * 只读数据经 apiFetchData → /api/v1/ontology/entities/{type}/instances
+ * 写操作（冻结/调额/派工）：GSXK 桥已熔断且动作端点未接通，按「无假真理」铁律
+ * 显式降级为禁用态 + DemoBadge（见 WRITE_CAPABILITY_ONLINE 注释）。
  *
  * @license SPDX-License-Identifier: Apache-2.0
  */
 
 import React, { useState, useEffect, useCallback } from "react";
 import { 
-  Briefcase, Settings, Cpu, Database, Activity,
-  HelpCircle, AlertTriangle, Layers, TrendingUp,
-  UserCheck, Lock, Wrench, Play,
-  CheckCircle2, ArrowRight, ShieldAlert, Coins
+  Database,
+  Layers,
+  UserCheck, Lock, Wrench,
+  ShieldAlert, Coins
 } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
-import { fetchEntityInstances } from "../api";
+import { apiFetchData, isNoAccessError, NetworkError, API_BASE } from "../api";
 
 // ── Types ──
 interface CustomerData {
@@ -26,6 +27,33 @@ interface CustomerData {
 interface MachineData {
   machine_id: string; temperature: number; temp_status: string;
   has_fault: boolean;
+}
+
+/** 页面级错误（分类后呈现，不谎报 SECURITY_BLOCK、不直排原始报文） */
+interface UiError {
+  tag: string;    // 已翻译的错误类别标签，如 HTTP_ERROR / PERMISSION_DENIED
+  message: string; // 已翻译的可读描述
+}
+
+/**
+ * 写操作能力门（无假真理铁律）：
+ * 原 GSXK 桥已熔断，冻结/调额/派工依赖的本体动作端点（/api/v1/ontology/actions）
+ * 尚未接通 —— 旧 executeAction 是必然 throw 的占位 stub，成功分支永不可达，
+ * 却把三个写操作呈现为可用控件。现显式降级：控件禁用 + DemoBadge「能力未上线」。
+ * TODO(重新启用条件): 后端动作端点接通后恢复真实调用，并同步补
+ *   ① 冻结账户二次确认门（属主确认，P1 遗留，禁用态下暂无触发路径）
+ *   ② 真实 traceId 透传（当前不发请求，无从生成）。
+ */
+const WRITE_CAPABILITY_ONLINE = false;
+
+// ── DemoBadge（components/common/DemoBadge 尚不存在，按任务口径内联；单文件 ≤800 行不新增共享件）──
+function DemoBadge({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-[9px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 shrink-0">
+      <Lock className="w-3 h-3" />
+      {label}
+    </span>
+  );
 }
 
 // ── Main ──────────────────────────────────────
@@ -39,22 +67,43 @@ export default function OperationalApps() {
   const [macStatus, setMacStatus] = useState<MachineData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ── Load data via api.ts ────────────────
+  // ── Error classification（按真实错误类型分级，不再统一谎报 SECURITY_BLOCK；
+  //    不直排原始报文，catch 不再吞错）────────────────
+  const classifyError = useCallback((e: unknown): UiError => {
+    if (isNoAccessError(e)) {
+      return { tag: t("ops.error.tag.permission"), message: t("ops.error.permission") };
+    }
+    if (e instanceof NetworkError) {
+      return { tag: t("ops.error.tag.network"), message: t("ops.error.network") };
+    }
+    const status = (e as { status?: number } | null)?.status;
+    if (typeof status === "number") {
+      return { tag: t("ops.error.tag.http"), message: t("ops.error.http", { status }) };
+    }
+    return { tag: t("ops.error.tag.unknown"), message: t("ops.error.unknown") };
+  }, [t]);
+
+  const [opError, setOpError] = useState<UiError | null>(null);
+
+  // ── Load data（失败 → 错误态 + 重试，不再静默置空冒充"无数据"）──
   const loadData = useCallback(async () => {
     setLoading(true);
+    setOpError(null);
     try {
       const [cust, mach] = await Promise.all([
-        fetchEntityInstances("Customer"),
-        fetchEntityInstances("Facility"),
+        apiFetchData<CustomerData[]>(`${API_BASE}/v1/ontology/entities/Customer/instances`),
+        apiFetchData<MachineData[]>(`${API_BASE}/v1/ontology/entities/Facility/instances`),
       ]);
-      setCustomers(cust);
-      setMacStatus(mach);
-    } catch {
-      console.warn("OperationalApps: backend unavailable, showing empty state");
+      setCustomers(Array.isArray(cust) ? cust : []);
+      setMacStatus(Array.isArray(mach) ? mach : []);
+    } catch (e) {
+      setOpError(classifyError(e));
+      setCustomers([]);
+      setMacStatus([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [classifyError]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -63,62 +112,6 @@ export default function OperationalApps() {
   const [creditIncrement, setCreditIncrement] = useState("5000000");
   const [maintPriority, setMaintPriority] = useState("High");
   const [dispatchNote, setDispatchNote] = useState("");
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-  const [errorToast, setErrorToast] = useState<string | null>(null);
-
-  // ── Action execution via api.ts ──────────
-  const executeAction = async (actionId: string, payload: any) => {
-    setActionSuccess(null);
-    setErrorToast(null);
-
-    try {
-      const entityType = activePortal === "crm" ? "Customer" : activePortal === "maint" ? "Facility" : "Order";
-      // T2: GSXK bridge removed — 占位 stub,等价于 api.ts 中的 throw Error('GSXK bridge removed')
-      // 改为本地 stub,避免 OperationalApps 跨文件依赖未收敛的 api.ts 段
-      const root = await (async (): Promise<any> => {
-        throw new Error('GSXK bridge removed — use /api/v1/ontology/actions instead');
-      })();
-
-      if (root.success) {
-        if (root.auditLog && root.auditLog.status === "pending_approval") {
-          setActionSuccess(t("ops.crm.ackRiskIntercepted", { id: actionId.toUpperCase(), voucher: root.voucherId }));
-        } else {
-          setActionSuccess(t("ops.crm.ackCommitted", { id: actionId.toUpperCase(), voucher: root.voucherId }));
-        }
-
-        if (actionId === "suspend_account" && payload.instanceId) {
-          setCustomers((prev) =>
-            prev.map((c) => (c.id === payload.instanceId ? { ...c, isActive: false } : c))
-          );
-        }
-      } else {
-        setErrorToast(t("ops.crm.execFailed", { msg: root.message || "Internal constraints" }));
-      }
-    } catch (err: any) {
-      setErrorToast(t("ops.crm.networkError", { msg: err.message }));
-    }
-  };
-
-  const handleFreezeAccount = (custId: string) => {
-    executeAction("suspend_account", {
-      instanceId: custId,
-      fields: { reason: "High risk profile flagged by cognitive ruleset" },
-    });
-  };
-
-  const handleAdjustCredit = (custId: string) => {
-    executeAction("adjust_credit", {
-      instanceId: custId,
-      fields: { increment_amount: creditIncrement },
-    });
-  };
-
-  const handleDispatchRepair = (macId: string) => {
-    executeAction("trigger_maintenance", {
-      instanceId: macId,
-      fields: { priority: maintPriority, details: dispatchNote || "Outlier hot sensor alert" },
-    });
-  };
 
   const currentCust = customers.find((c) => c.id === selectedCustId) || customers[0];
 
@@ -153,22 +146,24 @@ export default function OperationalApps() {
           </div>
         </div>
 
-        {/* Action toasts */}
-        {actionSuccess && (
-          <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-start gap-3 animate-fade-in text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-            <div className="text-xs font-mono font-medium">
-              <span className="font-bold">EXECUTION_SUCCESS:</span> {actionSuccess}
-            </div>
+        {/* Capability-not-online notice（写操作全部禁用并如实标注，无假可用） */}
+        {!WRITE_CAPABILITY_ONLINE && (
+          <div role="status" className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${styles.warningBg} ${styles.warningBorder} ${styles.warningText}`}>
+            <DemoBadge label={t("ops.demo.badge")} />
+            <span className="text-[11px] leading-normal">{t("ops.demo.notice")}</span>
           </div>
         )}
 
-        {errorToast && (
-          <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-start gap-3 animate-fade-in text-rose-600 dark:text-rose-400">
+        {/* Error toast（真实分类 + 重试；不再统一贴 SECURITY_BLOCK 前缀谎报安全拦截） */}
+        {opError && (
+          <div role="alert" className={`p-4 border rounded-lg flex items-start gap-3 text-xs font-mono ${styles.dangerBg} ${styles.dangerBorder} ${styles.dangerText}`}>
             <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
-            <div className="text-xs font-mono font-medium">
-              <span className="font-bold">SECURITY_BLOCK:</span> {errorToast}
+            <div className="font-medium">
+              <span className="font-bold">{opError.tag}:</span> {opError.message}
             </div>
+            <button type="button" onClick={loadData} className="ml-auto font-bold underline hover:no-underline shrink-0">
+              {t("ops.retry")}
+            </button>
           </div>
         )}
 
@@ -243,21 +238,26 @@ export default function OperationalApps() {
                     </div>
                   )}
 
-                  {/* Operational execution controllers */}
+                  {/* Operational execution controllers — 能力未上线：全部禁用 + DemoBadge，不发送任何写请求 */}
                   {currentCust && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                       <div className="p-4 rounded-lg border border-indigo-500/10 bg-indigo-500/[0.01] space-y-3">
-                        <div className="text-xs font-bold flex items-center gap-1.5"><Coins className="w-4 h-4 text-indigo-500" /> {t("ops.crm.control.credit")}</div>
+                        <div className="text-xs font-bold flex items-center gap-1.5">
+                          <Coins className="w-4 h-4 text-indigo-500" /> {t("ops.crm.control.credit")}
+                          {!WRITE_CAPABILITY_ONLINE && <DemoBadge label={t("ops.demo.badge")} />}
+                        </div>
                         <div className="flex gap-2">
                           <input 
                             type="number" 
                             value={creditIncrement} 
                             onChange={(e) => setCreditIncrement(e.target.value)}
-                            className={`flex-1 text-xs font-mono p-1 px-2 rounded border ${styles.inputBorder} ${styles.inputBg} ${styles.cardText}`}
+                            disabled
+                            className={`flex-1 text-xs font-mono p-1 px-2 rounded border ${styles.inputBorder} ${styles.inputBg} ${styles.cardText} disabled:opacity-50`}
                           />
                           <button type="button" 
-                            onClick={() => handleAdjustCredit(currentCust.id)}
-                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-bold leading-none cursor-pointer"
+                            disabled
+                            title={t("ops.demo.badge")}
+                            className="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold leading-none opacity-50 cursor-not-allowed"
                           >
                             {t("ops.crm.control.credit.btn")}
                           </button>
@@ -266,15 +266,20 @@ export default function OperationalApps() {
                       </div>
 
                       <div className="p-4 rounded-lg border border-red-500/10 bg-red-500/[0.01] space-y-3">
-                        <div className="text-xs font-bold text-red-500 flex items-center gap-1.5"><Lock className="w-4 h-4 text-red-500" /> {t("ops.crm.control.freeze")}</div>
+                        <div className="text-xs font-bold text-red-500 flex items-center gap-1.5">
+                          <Lock className="w-4 h-4 text-red-500" /> {t("ops.crm.control.freeze")}
+                          {!WRITE_CAPABILITY_ONLINE && <DemoBadge label={t("ops.demo.badge")} />}
+                        </div>
                         <button type="button" 
-                          onClick={() => handleFreezeAccount(currentCust.id)}
-                          disabled={!currentCust.isActive}
-                          className="w-full py-2 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white text-xs font-bold rounded cursor-pointer"
+                          disabled
+                          title={t("ops.demo.badge")}
+                          className="w-full py-2 bg-rose-500 text-white text-xs font-bold rounded opacity-50 cursor-not-allowed"
                         >
                           {t("ops.crm.control.freeze.btn")}
                         </button>
-                        <span className={`text-[9.5px] ${styles.cardTextMuted} block leading-normal`}>{t("ops.crm.control.freeze.hint")}</span>
+                        <span className={`text-[9.5px] ${styles.cardTextMuted} block leading-normal`}>
+                          {t("ops.crm.control.freeze.hint")}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -332,10 +337,12 @@ export default function OperationalApps() {
                             <td className="p-2 text-right">
                               {m.has_fault ? (
                                 <button type="button" 
-                                  onClick={() => handleDispatchRepair(m.machine_id)}
-                                  className="px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold cursor-pointer"
+                                  disabled
+                                  title={t("ops.demo.badge")}
+                                  className="px-2 py-1 bg-indigo-600 text-white rounded text-[10px] font-bold opacity-50 cursor-not-allowed inline-flex items-center gap-1"
                                 >
                                   {t("ops.maint.action.btn")}
+                                  <Lock className="w-3 h-3" />
                                 </button>
                               ) : (
                                 <span className={`${styles.cardTextMuted} italic font-sans text-[11px]`}>{t("ops.maint.action.ok")}</span>
@@ -380,24 +387,19 @@ export default function OperationalApps() {
               </div>
             )}
 
-            {/* ═══ Finance Portal ═══ */}
+            {/* ═══ Finance Portal ═══ — 数据源从未接入：摘除"永久空态假入口"与
+                虚构的对账告警文案（原 ops.fin.warning.* 描述不真实事件），如实标注能力未上线 */}
             {activePortal === "fin" && (
               <div className={`border ${styles.cardBorder} ${styles.cardBg} rounded-xl p-6 shadow-2xs`}>
                 <div className="flex items-center gap-2 mb-4">
                   <Layers className="w-5 h-5 text-indigo-500" />
                   <h3 className="font-bold text-sm">{t("ops.fin.header")}</h3>
+                  <DemoBadge label={t("ops.demo.badge")} />
                 </div>
 
-                <div className="space-y-4 text-xs">
-                  <div className="p-4 bg-blue-500/5 rounded border border-blue-500/10 space-y-3 leading-normal">
-                    <div className="font-bold flex items-center gap-1.5"><AlertTriangle className="w-4 h-4 text-blue-500" /> {t("ops.fin.warning.title")}</div>
-                    <p>{t("ops.fin.warning.desc")}</p>
-                  </div>
-
-                  <div className={`text-center py-12 ${styles.cardTextMuted}`}>
-                    <Database className={`w-8 h-8 mx-auto mb-2 ${styles.muted}`} />
-                    <p className="text-xs font-mono">{t("ops.fin.empty") || "No orders found."}</p>
-                  </div>
+                <div className={`text-center py-12 ${styles.cardTextMuted}`}>
+                  <Database className={`w-8 h-8 mx-auto mb-2 ${styles.muted}`} />
+                  <p className="text-xs font-mono max-w-md mx-auto leading-normal">{t("ops.fin.notImplemented")}</p>
                 </div>
               </div>
             )}

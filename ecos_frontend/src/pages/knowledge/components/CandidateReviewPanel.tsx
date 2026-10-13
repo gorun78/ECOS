@@ -49,7 +49,9 @@ type ResolveState =
 type ActionState =
   | { kind: 'none' }
   | { kind: 'busy' }
-  | { kind: 'proposal'; receipt: CognitiveAssetProposalReceipt }
+  /** evidenceRefs = 本次提案实际提交的证据引用快照（后端协议为单值 evidenceRef；
+   *  §7.2 的 evidenceRefs 列表待后端增量，复盘 S7 如实呈现，禁伪造多值）。 */
+  | { kind: 'proposal'; receipt: CognitiveAssetProposalReceipt; evidenceRefs: string[] }
   | { kind: 'transition'; result: CognitiveAssetTransitionResult }
   | { kind: 'conflict'; message: string; traceId?: string }
   | { kind: 'failed'; message: string; engineDown: boolean; traceId?: string };
@@ -129,7 +131,7 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
         operator: operator.trim() || undefined,
         note: note.trim() || undefined,
       });
-      setAction({ kind: 'proposal', receipt });
+      setAction({ kind: 'proposal', receipt, evidenceRefs: evidenceRef.trim() ? [evidenceRef.trim()] : [] });
     } catch (e) {
       setAction(failureOf(e));
     }
@@ -294,7 +296,36 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
             <div className="font-mono text-[10px] opacity-60 break-all">
               proposalId: {action.receipt.proposalId ?? '—'} · carrier: {action.receipt.carrier ?? '—'} · eventRef: {action.receipt.eventRef ?? '—'}
             </div>
+            {action.receipt.traceId && (
+              <div className="font-mono text-[10px] opacity-60 break-all">traceId: {action.receipt.traceId}</div>
+            )}
             <div className="text-[10px] opacity-50">{t('knowledge.candidate.receipt_proposal_note')}</div>
+
+            {/* §7.2 候选协议必带字段完备性（复盘 S7）。数据面实证：后端 AssetProposalDTO 仅
+                targetState/reason/evidenceRef(单值)/operator/note，回执仅
+                proposalId/assetId/status/carrier/eventRef/traceId —— evidenceRefs 列表按本次提交
+                快照如实渲染，assumptions/impact/回滚 后端未提供，显式「—」+ 统一说明，禁造演示值。 */}
+            <div className="rounded-md border p-2.5 flex flex-col gap-1" style={{ borderColor: styles.cardBorder }}>
+              <div className="text-[10px] uppercase tracking-wider opacity-50">{t('knowledge.candidate.protocol_fields_title')}</div>
+              <div className="flex items-baseline gap-2 text-[11px]">
+                <span className="opacity-60 flex-shrink-0">{t('knowledge.candidate.field_evidenceRefs')}</span>
+                {action.evidenceRefs.length > 0 ? (
+                  <ul className="font-mono text-[10px] opacity-80 break-all list-disc pl-4 m-0">
+                    {action.evidenceRefs.map((er) => (
+                      <li key={er}>{er}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span className="opacity-50">{t('knowledge.candidate.field_evidence_none')}</span>
+                )}
+              </div>
+              <div className="text-[10px] opacity-50">{t('knowledge.candidate.field_evidence_note')}</div>
+              <ProtocolAbsentField label={t('knowledge.candidate.field_assumptions')} />
+              <ProtocolAbsentField label={t('knowledge.candidate.field_impact_affected')} />
+              <ProtocolAbsentField label={t('knowledge.candidate.field_impact_breaking')} />
+              <ProtocolAbsentField label={t('knowledge.candidate.field_rollback')} />
+              <div className="text-[10px] opacity-50">{t('knowledge.candidate.protocol_fields_note')}</div>
+            </div>
           </div>
         )}
         {action.kind === 'transition' && (
@@ -332,6 +363,17 @@ export default function CandidateReviewPanel({ assetId, lifecycleStates }: Props
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** §7.2 必带字段中后端契约未提供的一项：字段名 + 显式「—」（禁造演示值；缺失语义由区块级说明键统一承载）。 */
+function ProtocolAbsentField({ label }: { label: string }) {
+  const { styles } = useTheme();
+  return (
+    <div className="flex items-baseline gap-2 text-[11px]">
+      <span className="opacity-60 flex-shrink-0">{label}</span>
+      <span className="font-mono" style={{ color: styles.cardTextMuted }}>—</span>
     </div>
   );
 }

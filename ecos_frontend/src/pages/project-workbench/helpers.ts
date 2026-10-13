@@ -78,6 +78,10 @@ export function calcMetrics(
 
   const mappingCompleteness = clamp100(Math.round(cov.d2iCoverage * 100));
   const integrityScore = clamp100(Math.round(cov.k2wCoverage * 100));
+  // ⚠️ 无假真理标注（检视报告 §4.6）：threatBlockRate / slaScore 为「本地启发式估算」——
+  //   仅按绑定策略/接口数量推断，非后端实测值，禁止作为真实 KPI 展示或落库。
+  //   当前决策面（DecisionDeskTab/FusionMatrixTab）均不渲染这两项；如后续需展示，
+  //   必须接后端实测端点并显式标注「估算」。
   const threatBlockRate = wSecurityPolicies.includes('gr-pii') || wSecurityPolicies.includes('gr-approval')
     ? 100
     : Math.min(98, wSecurityPolicies.length * 25 + 20);

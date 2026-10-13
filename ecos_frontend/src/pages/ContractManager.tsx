@@ -9,11 +9,11 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   FileText, Search, RefreshCw, AlertCircle, Loader2,
   DollarSign, Calendar, User, Building2, CheckCircle,
-  Clock, XCircle, TrendingUp
+  Clock, XCircle, TrendingUp, ChevronDown, ChevronRight
 } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
-import { apiFetchData } from "../api";
+import { apiFetchData, isNoAccessError, NetworkError } from "../api";
 import DataTable, { ColumnConfig } from "../components/common/DataTable";
 import MobileDataTable, { MobileCardConfig } from "../components/common/MobileDataTable";
 
@@ -70,6 +70,7 @@ export default function ContractManager() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const loadContracts = useCallback(async () => {
     setLoading(true);
@@ -93,8 +94,16 @@ export default function ContractManager() {
         setContracts([]);
         setTotal(0);
       }
-    } catch (e: any) {
-      setError(e.message || t("contract.loadFailed"));
+    } catch (e: unknown) {
+      // 分级错误：403（无权限）/ 网络断连 / HTTP 状态各自可辨，不直排原始报文
+      if (isNoAccessError(e)) {
+        setError(t("contract.error.forbidden"));
+      } else if (e instanceof NetworkError) {
+        setError(t("contract.error.network"));
+      } else {
+        const status = (e as { status?: number } | null)?.status;
+        setError(typeof status === "number" ? t("contract.error.http", { status }) : t("contract.loadFailed"));
+      }
       setContracts([]);
     } finally {
       setLoading(false);
@@ -103,13 +112,15 @@ export default function ContractManager() {
 
   useEffect(() => { loadContracts(); }, [loadContracts]);
 
-  // Debounced search resets page
+  // Debounced search resets page（原 `const t = setTimeout` 遮蔽了 i18n 的 t，重命名为 timer）
   useEffect(() => {
-    const t = setTimeout(() => setCurrentPage(1), 400);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setCurrentPage(1), 400);
+    return () => clearTimeout(timer);
   }, [searchQ]);
 
   // ── Computed KPIs ────────────────────────────────────
+  // 口径说明：totalCount = 服务端全量计数；totalAmount/activeCount/completedCount
+  // 只统计当前页行 —— KPI 卡标签须标注「本页」，禁止与全量数并列造成混口径误读
   const totalCount = total;
   const totalAmount = contracts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
   const activeCount = contracts.filter(c => c.status === "active").length;
@@ -128,7 +139,21 @@ export default function ContractManager() {
       key: "name",
       label: t("contract.col.name"),
       render: (_v, record) => (
-        <span className={`font-medium truncate max-w-[180px] block ${styles.cardText}`}>{record.name || "—"}</span>
+        // 详情入口：点击展开合同详情（闭环不再止步列表）
+        <button type="button"
+          className={`text-left font-medium hover:underline flex items-center gap-1 ${styles.cardText}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpandedId(expandedId === record.id ? null : record.id);
+          }}
+          title={t("contract.detail.entry")}
+        >
+          {expandedId === record.id
+            ? <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+            : <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+          }
+          <span className="truncate max-w-[180px]">{record.name || "—"}</span>
+        </button>
       ),
     },
     {
@@ -206,8 +231,8 @@ export default function ContractManager() {
     return (
       <div className={`h-full flex items-center justify-center p-6 ${styles.appBg}`}>
         <div className="text-center max-w-sm">
-          <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-red-600 mb-1">
+          <AlertCircle className={`w-10 h-10 ${styles.dangerText} mx-auto mb-3`} />
+          <p className={`text-sm font-semibold ${styles.dangerText} mb-1`}>
             {t("contract.error")}
           </p>
           <p className={`text-xs ${styles.muted} mb-4`}>{error}</p>
@@ -247,37 +272,40 @@ export default function ContractManager() {
         </button>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards — 混口径注明：total 为服务端全量，其余三卡仅统计当前页 */}
       {!loading && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiCard
-            icon={FileText}
-            label={t("contract.total")}
-            value={totalCount}
-            color={styles.accentText}
-            styles={styles}
-          />
-          <KpiCard
-            icon={DollarSign}
-            label={t("contract.totalAmount")}
-            value={fmtAmount(totalAmount, t)}
-            color="text-orange-500"
-            styles={styles}
-          />
-          <KpiCard
-            icon={CheckCircle}
-            label={t("contract.status.active")}
-            value={activeCount}
-            color="text-green-500"
-            styles={styles}
-          />
-          <KpiCard
-            icon={TrendingUp}
-            label={t("contract.status.completed")}
-            value={completedCount}
-            color="text-blue-500"
-            styles={styles}
-          />
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <KpiCard
+              icon={FileText}
+              label={t("contract.total")}
+              value={totalCount}
+              color={styles.accentText}
+              styles={styles}
+            />
+            <KpiCard
+              icon={DollarSign}
+              label={`${t("contract.totalAmount")} ${t("contract.scope.page")}`}
+              value={fmtAmount(totalAmount, t)}
+              color="text-orange-500"
+              styles={styles}
+            />
+            <KpiCard
+              icon={CheckCircle}
+              label={`${t("contract.status.active")} ${t("contract.scope.page")}`}
+              value={activeCount}
+              color="text-green-500"
+              styles={styles}
+            />
+            <KpiCard
+              icon={TrendingUp}
+              label={`${t("contract.status.completed")} ${t("contract.scope.page")}`}
+              value={completedCount}
+              color="text-blue-500"
+              styles={styles}
+            />
+          </div>
+          <p className={`text-[10px] ${styles.cardTextMuted}`}>{t("contract.caliber.note")}</p>
         </div>
       )}
 
@@ -319,11 +347,48 @@ export default function ContractManager() {
           currentPage={currentPage}
           total={total}
           onPageChange={setCurrentPage}
+          onRowClick={(record) => setExpandedId(expandedId === record.id ? null : record.id)}
           emptyTitle={t("contract.empty.title")}
           emptyDescription={t("contract.empty.desc")}
           emptyIcon={<FileText className="w-12 h-12 opacity-40" />}
         />
       </div>
+
+      {/* Contract detail panel — 详情入口闭环（列表 → 详情） */}
+      {expandedId && (() => {
+        const c = contracts.find(x => x.id === expandedId);
+        if (!c) return null;
+        return (
+          <div className={`rounded-lg border ${styles.cardBorder} ${styles.cardBg} p-5 space-y-4`}>
+            <div className="flex items-center justify-between">
+              <h3 className={`text-base font-bold flex items-center gap-2 ${styles.cardText}`}>
+                <FileText className={`w-4 h-4 ${styles.accentText}`} />
+                {c.name || c.code || c.contractNo || c.id}
+              </h3>
+              <button type="button"
+                onClick={() => setExpandedId(null)}
+                className={`text-xs ${styles.cardTextMuted} hover:opacity-70 transition`}
+              >
+                {t("contract.detail.close")}
+              </button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+              <DetailField icon={FileText} label={t("contract.col.code")} value={c.code || c.contractNo || c.id || "—"} styles={styles} />
+              <DetailField icon={Building2} label={t("contract.col.partyA")} value={c.partyA || c.clientName || "—"} styles={styles} />
+              <DetailField icon={DollarSign} label={t("contract.col.amount")} value={fmtAmount(c.amount, t)} styles={styles} />
+              <DetailField icon={Calendar} label={t("contract.col.signDate")} value={c.signDate || "—"} styles={styles} />
+              <DetailField icon={CheckCircle} label={t("contract.col.status")} value={t(`contract.status.${c.status}`)} styles={styles} />
+              <DetailField icon={Clock} label="ID" value={c.id} styles={styles} />
+            </div>
+            {c.description && (
+              <div>
+                <p className={`text-xs font-semibold ${styles.cardTextMuted} mb-1`}>{t("contract.detail.desc")}</p>
+                <p className={`text-sm ${styles.cardText}`}>{c.description}</p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Error banner (when data exists but refresh fails) */}
       {error && contracts.length > 0 && (
@@ -349,6 +414,20 @@ function KpiCard({ icon: Icon, label, value, color, styles }: {
       <div>
         <div className={`text-xl font-bold ${styles.cardText}`}>{value}</div>
         <div className={`text-[10px] ${styles.cardTextMuted}`}>{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function DetailField({ icon: Icon, label, value, styles }: {
+  icon: React.ComponentType<{ className?: string }>; label: string; value: string; styles: any;
+}) {
+  return (
+    <div className="flex items-start gap-2">
+      <Icon className={`w-3.5 h-3.5 ${styles.cardTextMuted} mt-0.5 shrink-0`} />
+      <div className="min-w-0">
+        <p className={`text-[10px] ${styles.cardTextMuted} uppercase`}>{label}</p>
+        <p className={`text-sm font-medium ${styles.cardText} break-words`}>{value}</p>
       </div>
     </div>
   );

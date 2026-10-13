@@ -163,7 +163,7 @@ export default function ContextBuildPanel({ scenarioId, blueprint }: Props) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
           <span className={`text-[9px] font-bold uppercase ${styles.cardTextMuted}`}>{t('workspace.ctx.label_tenant')}</span>
-          <input className={inputCls} value={tenantId} onChange={(e) => setTenantId(e.target.value)} placeholder="tenantId *" />
+          <input className={inputCls} value={tenantId} onChange={(e) => setTenantId(e.target.value)} placeholder={t('workspace.ctx.ph_tenant')} />
         </label>
         <label className="flex flex-col gap-1">
           <span className={`text-[9px] font-bold uppercase ${styles.cardTextMuted}`}>{t('workspace.ctx.label_asof')}</span>
@@ -205,7 +205,7 @@ export default function ContextBuildPanel({ scenarioId, blueprint }: Props) {
               className={`${inputCls} sm:col-span-4`}
               value={r.sourceId}
               onChange={(e) => updateRow(r.key, { sourceId: e.target.value })}
-              placeholder="sourceId *"
+              placeholder={t('workspace.ctx.ph_source')}
             />
             <input
               className={`${inputCls} sm:col-span-2`}
@@ -223,9 +223,9 @@ export default function ContextBuildPanel({ scenarioId, blueprint }: Props) {
               <input type="checkbox" checked={r.required !== false} onChange={(e) => updateRow(r.key, { required: e.target.checked })} />
               {t('workspace.ctx.col_required')}
             </label>
-            <label className={`flex items-center gap-1 text-[10px] ${styles.cardText} sm:col-span-1 cursor-pointer`} title={t('workspace.ctx.col_critical')}>
+            <label className={`flex items-center gap-1 text-[10px] ${styles.cardText} sm:col-span-2 cursor-pointer`} title={t('workspace.ctx.col_critical')}>
               <input type="checkbox" checked={r.successCritical === true} onChange={(e) => updateRow(r.key, { successCritical: e.target.checked })} />
-              SC
+              {t('workspace.ctx.col_critical_short')}
             </label>
             <button
               type="button"
@@ -244,7 +244,7 @@ export default function ContextBuildPanel({ scenarioId, blueprint }: Props) {
           type="button"
           onClick={() => void submit()}
           disabled={!canSubmit || phase.kind === 'submitting'}
-          className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${styles.accentBg} text-white ${styles.accentBorder}`}
+          className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${styles.accentBg} ${styles.accentSolidText} ${styles.accentBorder}`}
         >
           <LucideIcon name="Hammer" size={12} />
           {phase.kind === 'submitting' ? t('workspace.ctx.submitting') : t('workspace.ctx.submit')}

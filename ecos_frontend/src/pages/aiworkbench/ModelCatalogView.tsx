@@ -3,11 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Layers, Zap, Shield, Scale, Link2, Lock } from 'lucide-react';
 import { AIPModel, AIPAgent, AIPGuardrail } from '../../types/aiworkbench';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
+import { oagPlaygroundStream } from './api';
 
 interface ModelCatalogViewProps {
   models: AIPModel[];
@@ -19,13 +20,19 @@ interface ModelCatalogViewProps {
 
 type SubTabId = 'catalog' | 'compare' | 'guardrails';
 
+/**
+ * §4.5 P0：模型对比评测改为真实引擎通道（POST /api/v1/oag/chat/stream）。
+ * 字段只承载引擎真实上报值：response=content、latencyMs=done.elapsedMs、
+ * traceId=done/response.traceId；tokens/cost 引擎未上报 → 不再展示（禁合成）。
+ */
 interface ComparativeResult {
   modelId: string;
   displayName: string;
+  status: 'ok' | 'error' | 'blocked';
   response: string;
-  latencyMs: number;
-  tokensUsed: number;
-  cost: string;
+  latencyMs?: number;
+  traceId?: string;
+  errorMsg?: string;
 }
 
 /**
@@ -43,10 +50,11 @@ function GuardrailBindingPanel({ agents, guardrails }: { agents: AIPAgent[]; gua
   const { t } = useLanguage();
 
   const boundCount = (agent: AIPAgent) => agent.guardrailIds?.length ?? 0;
+  // 状态点：bg-current + 文本色 token，避免裸色 class
   const severityDotClass: Record<AIPGuardrail['severity'], string> = {
-    block: 'bg-rose-500',
-    warn: 'bg-amber-500',
-    audit_only: 'bg-emerald-500',
+    block: `${styles.dangerText} bg-current`,
+    warn: `${styles.warningText} bg-current`,
+    audit_only: `${styles.successText} bg-current`,
   };
   const severityLabelClass: Record<AIPGuardrail['severity'], string> = {
     block: styles.dangerText,
@@ -61,12 +69,12 @@ function GuardrailBindingPanel({ agents, guardrails }: { agents: AIPAgent[]; gua
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto p-5 space-y-4 select-none">
+    <div className="flex-1 overflow-y-auto p-5 space-y-4">
       {/* Duty Boundary Card — 顶部三行职责说明 */}
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 space-y-3 shadow-xs`}>
         {dutyLines.map((line, idx) => {
           const Icon = line.icon;
-          const barColor = ['bg-rose-500', 'bg-emerald-500', 'bg-blue-500'][idx] ?? styles.cardBorder;
+          const barColor = [`${styles.dangerText} bg-current`, `${styles.successText} bg-current`, `${styles.infoText} bg-current`][idx] ?? styles.cardBorder;
           return (
             <div key={idx} className={`flex items-start gap-3 ${idx > 0 ? `border-t ${styles.cardBorder} pt-3` : ''}`}>
               <span className={`w-1 self-stretch rounded ${barColor}`} />
@@ -98,7 +106,7 @@ function GuardrailBindingPanel({ agents, guardrails }: { agents: AIPAgent[]; gua
             return (
               <div key={agent.id} className={`flex items-center justify-between ${styles.inputBg} border ${styles.cardBorder} rounded-lg px-2.5 py-1.5`}>
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${agent.status === 'active' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${agent.status === 'active' ? `${styles.successText} bg-current` : `${styles.warningText} bg-current`}`} />
                   <span className={`text-[11px] font-semibold truncate ${styles.cardText}`}>{agent.name}</span>
                   <span className={`text-[9px] font-mono ${styles.cardTextMuted} shrink-0`}>id={agent.id}</span>
                 </div>
@@ -139,7 +147,7 @@ function GuardrailBindingPanel({ agents, guardrails }: { agents: AIPAgent[]; gua
                 <span className={`px-1.5 py-0.5 rounded border text-[9px] font-mono font-bold ${styles.cardBorder} ${severityLabelClass[g.severity]}`}>
                   {g.severity}
                 </span>
-                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${g.isEnabled ? `bg-emerald-500/15 ${styles.successText}` : `${styles.inputBg} ${styles.cardTextMuted}`}`}>
+                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${g.isEnabled ? `${styles.successBg} ${styles.successText}` : `${styles.inputBg} ${styles.cardTextMuted}`}`}>
                   {g.isEnabled ? t('aiworkbench.guardrail.enabled') : t('aiworkbench.guardrail.disabled')}
                 </span>
               </div>
@@ -161,10 +169,16 @@ export default function ModelCatalogView({
   const { styles } = useTheme();
   const { t } = useLanguage();
   const [subTab, setSubTab] = useState<SubTabId>('catalog');
-  const [selectedModelId, setSelectedModelId] = useState<string>(models[0]?.id || '');
+  // §4.5 P1：models 异步到达前不定型 → 空串起步 + 列表到达后回填
+  const [selectedModelId, setSelectedModelId] = useState<string>('');
+  useEffect(() => {
+    if (!selectedModelId && models.length > 0) setSelectedModelId(models[0].id);
+  }, [models, selectedModelId]);
   const [testPrompt, setTestPrompt] = useState('分析：航班DL440执飞机型为B737neo，由于高压油泵误报机械故障延误。拟定一份针对旅客和民航局的安全通报文案。');
   const [evalResults, setEvalResults] = useState<ComparativeResult[]>([]);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [evalError, setEvalError] = useState<string | null>(null);
+  const evalAbortRef = useRef<AbortController | null>(null);
 
   const selectedModel = models.find(m => m.id === selectedModelId);
 
@@ -178,43 +192,73 @@ export default function ModelCatalogView({
     onUpdateModels(updated);
   };
 
+  /**
+   * 真实评测：对每个已连接语言模型逐一调用 OAG SSE（POST /api/v1/oag/chat/stream），
+   * 只收集引擎实报的 content/elapsedMs/traceId；失败/拦截 → 错误态呈现，不合成结果。
+   */
   const handleRunEvaluation = async () => {
-    if (!testPrompt.trim()) return;
+    if (!testPrompt.trim() || isEvaluating) return;
+    const targets = models.filter(m => m.status === 'connected' && m.type === 'language').slice(0, 3);
+    if (targets.length === 0) {
+      setEvalError(t('aiworkbench.model.evalNoTargets'));
+      setEvalResults([]);
+      return;
+    }
     setIsEvaluating(true);
+    setEvalError(null);
     setEvalResults([]);
-
-    await new Promise(resolve => setTimeout(resolve, 1200));
-
-    const results: ComparativeResult[] = [
-      {
-        modelId: 'gemini-1.5-pro',
-        displayName: 'Gemini 1.5 Pro',
-        latencyMs: 125,
-        tokensUsed: 620,
-        cost: '$0.004',
-        response: `【民航运行控制中心 - 官方安全审计报告】\n\n一、事件概要：\n今日执飞 DL440 航班的 B737neo 客机（机身尾号 N204DL）于出发前触发高压油泵温感偏离警报。经地面整修，证实为电子温感传感器信号漂移误报，液压物理件完好。\n\n二、通告方案（旅客端）：\n「重要航务通知」今日 DL440 航班因计划外地面安全检查，起飞延迟。现已排除故障，预计12:45恢复。感谢各位旅客的理解，安全始终是我们的最高准则。\n\n三、局方报备信息：\n符合 CAAC 121.483 条技术规范，温感排故完毕，不影响后续适航评级。`
-      },
-      {
-        modelId: 'claude-3-5-sonnet',
-        displayName: 'Claude 3.5 Sonnet',
-        latencyMs: 185,
-        tokensUsed: 710,
-        cost: '$0.010',
-        response: `【关于 DL440 航班高压油泵异常告警的技术通报】\n\n致中南航监局及相关签派单位：\n\n根据《民用航空器运行适航管理规定》，现就今日 DL440 航班延迟原因做如下披露：\n1. 故障描述：离港准备阶段，机载 QAR 监测系统捕获高压油泵物理循环压力异常报警。\n2. 排故详情：经签派与机械师两轮核对，确认为单组温敏电阻在高负荷滑行时发生阻抗漂移，从而向飞控发出冗余告警。已更换温阻物理备件，系统压力恢复黄金标准。\n3. 旅客安抚：已提供机场等值午餐券及航延积分，运行井然有序。`
-      },
-      {
-        modelId: 'gpt-4o',
-        displayName: 'GPT-4o (Azure VPC)',
-        latencyMs: 155,
-        tokensUsed: 590,
-        cost: '$0.005',
-        response: `「航班 DL440 故障排查及安全公示文案」\n\n● 官方通告：\nDL440 航班（机型 B737neo）由于出发前滑行段突发油回路传感器数据偏离，为确保万无一失，AOC 签派下达就地复检指令。现已更换温控单元，航班重新起飞。保障绝对飞行安全是我们的核心，特此公示。\n\n● 性能统计：\n* 排故时间: 45分钟\n* 资质审核: 机长执照完全符合\n* CAAC规范: 零违规扣分。`
+    const controller = new AbortController();
+    evalAbortRef.current = controller;
+    const collected: ComparativeResult[] = [];
+    for (const m of targets) {
+      const base: ComparativeResult = { modelId: m.id, displayName: m.displayName || m.name || m.id, status: 'ok', response: '' };
+      try {
+        await new Promise<void>((resolve) => {
+          let content = '';
+          let settled = false;
+          const finish = (r: ComparativeResult) => {
+            if (settled) return;
+            settled = true;
+            collected.push(r);
+            setEvalResults([...collected]);
+            resolve();
+          };
+          oagPlaygroundStream({
+            message: testPrompt,
+            model: m.id,
+            abortSignal: controller.signal,
+            handlers: {
+              onStep: () => { /* 节点进度不演出，仅真事件到达时更新结果 */ },
+              onResponse: (d) => { content = d.content; },
+              onDone: (d) => {
+                finish({ ...base, status: 'ok', response: content, latencyMs: d.elapsedMs ?? undefined, traceId: d.traceId || undefined });
+              },
+              onBlocked: (d) => {
+                finish({ ...base, status: 'blocked', response: '', errorMsg: d.reason || t('aiworkbench.model.evalBlocked'), traceId: d.traceId || undefined });
+              },
+              onError: (d) => {
+                finish({ ...base, status: 'error', response: '', errorMsg: d.message || t('aiworkbench.model.evalEngineError') });
+              },
+            },
+          }).catch((e: unknown) => {
+            const msg = e instanceof Error && e.message ? e.message : String(e);
+            finish({ ...base, status: 'error', response: '', errorMsg: msg });
+          });
+        });
+        if (controller.signal.aborted) break;
+      } catch (e: unknown) {
+        const msg = e instanceof Error && e.message ? e.message : String(e);
+        collected.push({ ...base, status: 'error', errorMsg: msg });
+        setEvalResults([...collected]);
       }
-    ];
-
-    setEvalResults(results);
+    }
     setIsEvaluating(false);
-    showToast?.('info', t('aiworkbench.model.evalDemoDone'));
+    evalAbortRef.current = null;
+    if (collected.every(r => r.status !== 'ok')) {
+      setEvalError(t('aiworkbench.model.evalAllFailed'));
+    } else {
+      showToast?.('success', t('aiworkbench.model.evalDone'));
+    }
   };
 
   const SUB_TABS: Array<{ id: SubTabId; labelKey: string }> = [
@@ -224,7 +268,7 @@ export default function ModelCatalogView({
   ];
 
   return (
-    <div className={`flex-1 flex flex-col h-full ${styles.appBg} ${styles.appText} text-xs select-none`}>
+    <div className={`flex-1 flex flex-col h-full ${styles.appBg} ${styles.appText} text-xs`}>
       {/* Sub-Tab Bar */}
       <div className={`px-5 pt-3 pb-0 border-b ${styles.cardBorder} flex items-center gap-1 shrink-0`}>
         {SUB_TABS.map(tab => (
@@ -235,7 +279,7 @@ export default function ModelCatalogView({
             className={`px-3 py-1.5 text-[11px] font-semibold rounded-md transition-colors ${
               subTab === tab.id
                 ? `${styles.accentBg} text-white`
-                : `${styles.cardTextMuted} hover:${styles.inputBg}`
+                : `${styles.cardTextMuted} hover:opacity-80`
             }`}
           >
             {t(tab.labelKey)}
@@ -251,7 +295,7 @@ export default function ModelCatalogView({
             <div className={`w-56 ${styles.cardBg} border-r ${styles.cardBorder} flex flex-col h-full shrink-0`}>
               <div className={`p-3 border-b ${styles.cardBorder} ${styles.inputBg} flex items-center justify-between`}>
                 <span className={`font-bold ${styles.cardText}`}>{t('aiworkbench.model.catalogTitle')} ({models.length})</span>
-                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 font-bold rounded text-[9px] uppercase">{t('aiworkbench.model.secureBadge')}</span>
+                <span className={`px-1.5 py-0.5 ${styles.successBg} ${styles.successText} font-bold rounded text-[9px] uppercase`}>{t('aiworkbench.model.secureBadge')}</span>
               </div>
 
               <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
@@ -264,16 +308,16 @@ export default function ModelCatalogView({
                       className={`p-2.5 rounded-lg cursor-pointer transition-all flex flex-col gap-1.5 ${
                         isSelected
                           ? `${styles.accentBg} text-white shadow-xs`
-                          : `${styles.cardTextMuted} hover:${styles.inputBg}`
+                          : `${styles.cardTextMuted} hover:opacity-80`
                       }`}
                     >
                       <div className="flex items-center justify-between font-bold">
                         <span className="truncate text-xs">{(m.displayName || m.name || m.id || '').split(' ')[0]}</span>
-                        <span className={`w-2 h-2 rounded-full ${m.status === 'connected' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                        <span className={`w-2 h-2 rounded-full ${m.status === 'connected' ? `${styles.successText} bg-current` : `${styles.dangerText} bg-current`}`} />
                       </div>
                       <div className={`flex items-center justify-between text-[10px] ${styles.cardTextMuted}`}>
                         <span>{m.provider}</span>
-                        <span className="font-mono">{m.healthRate}%</span>
+                        <span className="font-mono">{typeof m.healthRate === 'number' ? `${m.healthRate}%` : t('aiworkbench.model.notReported')}</span>
                       </div>
                     </div>
                   );
@@ -301,7 +345,7 @@ export default function ModelCatalogView({
                     <div className={`flex items-center gap-4 ${styles.inputBg} border ${styles.cardBorder} p-2.5 rounded-xl shrink-0`}>
                       <div className="space-y-0.5">
                         <span className={`${styles.cardTextMuted} font-bold text-[8px] uppercase block`}>{t('aiworkbench.model.temperature')}</span>
-                        <span className={`font-mono font-bold ${styles.cardText} text-xs`}>{selectedModel.temperature}</span>
+                        <span className={`font-mono font-bold ${styles.cardText} text-xs`}>{typeof selectedModel.temperature === 'number' ? selectedModel.temperature : t('aiworkbench.model.notReported')}</span>
                       </div>
                       <input
                         type="range"
@@ -309,20 +353,20 @@ export default function ModelCatalogView({
                         min="0.0"
                         max="1.0"
                         step="0.1"
-                        value={selectedModel.temperature}
+                        value={typeof selectedModel.temperature === 'number' ? selectedModel.temperature : 0}
                         onChange={e => handleTempChange(selectedModel.id, parseFloat(e.target.value))}
-                        className={`w-24 h-1 ${styles.cardBorder} rounded-lg appearance-none cursor-pointer accent-blue-600`}
+                        className={`w-24 h-1 ${styles.cardBorder} rounded-lg appearance-none cursor-pointer`}
                       />
                     </div>
                   </div>
 
-                  {/* Performance Grid metrics */}
+                  {/* Performance Grid metrics — 后端未上报的指标显示「未上报」，禁合成 */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {[
-                      { label: t('aiworkbench.model.maxContext'), val: selectedModel.maxContext, desc: t('aiworkbench.model.maxContextDesc') },
-                      { label: t('aiworkbench.model.avgLatency'), val: `${selectedModel.latencyMs} ms`, desc: t('aiworkbench.model.avgLatencyDesc') },
-                      { label: t('aiworkbench.model.costPerMillion'), val: selectedModel.costPerMillion, desc: t('aiworkbench.model.costDesc') },
-                      { label: t('aiworkbench.model.healthRate'), val: `${selectedModel.healthRate}%`, desc: t('aiworkbench.model.healthRateDesc') }
+                      { label: t('aiworkbench.model.maxContext'), val: selectedModel.maxContext ?? t('aiworkbench.model.notReported'), desc: t('aiworkbench.model.maxContextDesc') },
+                      { label: t('aiworkbench.model.avgLatency'), val: typeof selectedModel.latencyMs === 'number' ? `${selectedModel.latencyMs} ms` : t('aiworkbench.model.notReported'), desc: t('aiworkbench.model.avgLatencyDesc') },
+                      { label: t('aiworkbench.model.costPerMillion'), val: selectedModel.costPerMillion ?? t('aiworkbench.model.notReported'), desc: t('aiworkbench.model.costDesc') },
+                      { label: t('aiworkbench.model.healthRate'), val: typeof selectedModel.healthRate === 'number' ? `${selectedModel.healthRate}%` : t('aiworkbench.model.notReported'), desc: t('aiworkbench.model.healthRateDesc') }
                     ].map((x, idx) => (
                       <div key={idx} className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-3 shadow-xs space-y-1`}>
                         <span className={`text-[9px] ${styles.cardTextMuted} font-bold uppercase tracking-wider block`}>{x.label}</span>
@@ -377,37 +421,64 @@ export default function ModelCatalogView({
                       )}
                     </button>
 
-                    {/* Evaluation side-by-side grids */}
+                    {/* 评测失败横幅 — 错误态 + 重试，不静默 */}
+                    {evalError && !isEvaluating && (
+                      <div className={`flex items-center justify-between gap-2 ${styles.dangerBg} ${styles.dangerText} border ${styles.dangerBorder} rounded-lg px-3 py-2 text-[10px] font-bold`}>
+                        <span>{evalError}</span>
+                        <button
+                          type="button"
+                          onClick={handleRunEvaluation}
+                          className={`px-2 py-0.5 rounded border ${styles.dangerBorder} cursor-pointer shrink-0`}
+                        >
+                          {t('aiworkbench.model.evalRetry')}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Evaluation side-by-side grids — 真实 OAG 引擎逐模型运行结果 */}
                     {evalResults.length > 0 && (
                       <>
                         <div className={`flex items-center gap-2 text-[10px] mt-2 ${styles.cardTextMuted}`}>
-                          <span className={`px-1.5 py-0.5 rounded font-bold uppercase ${styles.warningBg} ${styles.warningText}`}>{t('aiworkbench.model.demoSample')}</span>
-                          <span>{t('aiworkbench.model.evalDemoHint')}</span>
+                          <span className={`px-1.5 py-0.5 rounded font-bold uppercase ${styles.badgeBg} ${styles.badgeText}`}>{t('aiworkbench.model.evalRealChannel')}</span>
+                          <span>{t('aiworkbench.model.evalRealHint')}</span>
                         </div>
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2">
-                        {evalResults.map(res => (
+                        {evalResults.map(res => {
+                          const badge = res.status === 'ok'
+                            ? `${styles.successBg} ${styles.successText}`
+                            : res.status === 'blocked'
+                              ? `${styles.warningBg} ${styles.warningText}`
+                              : `${styles.dangerBg} ${styles.dangerText}`;
+                          const statusLabel = res.status === 'ok'
+                            ? t('aiworkbench.model.evalStatusPass')
+                            : res.status === 'blocked'
+                              ? t('aiworkbench.model.evalStatusBlocked')
+                              : t('aiworkbench.model.evalStatusError');
+                          return (
                           <div key={res.modelId} className={`border ${styles.cardBorder} rounded-xl overflow-hidden shadow-xs ${styles.inputBg} flex flex-col`}>
 
                             {/* Grid header */}
                             <div className={`px-3 py-2 border-b ${styles.cardBorder} ${styles.appBg} flex items-center justify-between`}>
                               <span className={`font-bold ${styles.cardText} text-[11px]`}>{res.displayName}</span>
-                              <span className={`px-1.5 py-0.5 ${styles.badgeBg} ${styles.accentText} ${styles.accentBorder} border rounded text-[9px] font-mono font-bold`}>{t('aiworkbench.model.allowBadge')}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold ${badge}`}>{statusLabel}</span>
                             </div>
 
-                            {/* Performance metrics tag */}
+                            {/* Performance metrics tag — 仅展示引擎实报值 */}
                             <div className={`p-2 border-b ${styles.cardBorder} ${styles.appBg} flex items-center justify-between font-mono text-[9px] ${styles.cardTextMuted}`}>
-                              <span>{t('aiworkbench.model.responseLabel')}: {res.latencyMs}ms</span>
-                              <span>{t('aiworkbench.model.tokenLabel')}: {res.tokensUsed}T</span>
-                              <span className="text-emerald-600 font-bold">{res.cost}</span>
+                              <span>{t('aiworkbench.model.responseLabel')}: {typeof res.latencyMs === 'number' ? `${res.latencyMs}ms` : t('aiworkbench.model.notReported')}</span>
+                              <span>traceId: {res.traceId || t('aiworkbench.model.notReported')}</span>
                             </div>
 
                             {/* Content representation */}
-                            <div className={`p-3 ${styles.cardBg} text-[11px] ${styles.cardTextMuted} leading-relaxed font-sans flex-1 h-64 overflow-y-auto whitespace-pre-line`}>
-                              {res.response}
+                            <div className={`p-3 ${styles.cardBg} text-[11px] leading-relaxed font-sans flex-1 h-64 overflow-y-auto whitespace-pre-line ${res.status === 'ok' ? styles.cardTextMuted : styles.dangerText}`}>
+                              {res.status === 'ok'
+                                ? (res.response || t('aiworkbench.model.evalEmptyResponse'))
+                                : (res.errorMsg || statusLabel)}
                             </div>
 
                           </div>
-                        ))}
+                          );
+                        })}
                         </div>
                       </>
                     )}

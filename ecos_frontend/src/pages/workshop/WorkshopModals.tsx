@@ -1,10 +1,11 @@
 import React from 'react';
-import { Check, Plus, PlusCircle, Zap, Settings } from 'lucide-react';
+import { Check, Plus, PlusCircle, Zap, Settings, FlaskConical, Loader2 } from 'lucide-react';
 import { DynamicIcon, mockActionTypes } from './types';
+import Badge from '../../components/common/Badge';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderWorkshopModals(vm: any) {
-  const { styles, t, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
+  const { styles, t, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass, actionExecuting, actionWritebackLocalOnly } = vm;
 
   // Widget catalog: title/desc resolved via t() at render, not stored raw
   const widgets = (
@@ -33,7 +34,7 @@ export function renderWorkshopModals(vm: any) {
                 <PlusCircle size={14} className="text-blue-500" />
                 <span>{t('aiworkbench.ws.addWidget.title', { slot: addWidgetSlot })}</span>
               </h3>
-              <button type="button" onClick={() => setShowAddWidgetModal(false)} className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} text-sm font-bold`}>×</button>
+              <button type="button" onClick={() => setShowAddWidgetModal(false)} className={`${styles.cardTextMuted} text-sm font-bold`}>×</button>
             </div>
 
             <div className="p-4 grid grid-cols-2 gap-3 max-h-[350px] overflow-y-auto">
@@ -67,7 +68,7 @@ export function renderWorkshopModals(vm: any) {
                   <Settings size={14} className="text-blue-500" />
                   <span>{t('aiworkbench.ws.addVar.title')}</span>
                 </h3>
-                <button type="button" onClick={() => setShowAddVarModal(false)} className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} text-sm font-bold`}>×</button>
+                <button type="button" onClick={() => setShowAddVarModal(false)} className={`${styles.cardTextMuted} text-sm font-bold`}>×</button>
               </div>
 
               <div className="p-4 space-y-3">
@@ -128,7 +129,7 @@ export function renderWorkshopModals(vm: any) {
                 <button
                   type="button"
                   onClick={() => setShowAddVarModal(false)}
-                  className={`px-3 py-1.5 border ${styles.cardBorder} rounded-md hover:${styles.sidebarBg} font-semibold`}
+                  className={`px-3 py-1.5 border ${styles.cardBorder} rounded-md font-semibold`}
                 >
                   {t('common.cancel')}
                 </button>
@@ -141,8 +142,10 @@ export function renderWorkshopModals(vm: any) {
         </div>
       )}
 
-      {/* 6. MODAL: RUN SIMULATED ACTION TYPE */}
+      {/* 6. MODAL: RUN SIMULATED ACTION TYPE — 文案经 t() 解析（§六），写回结果诚实呈现 */}
       {showActionModal && (() => {
+        const actionName = t(`aiworkbench.ws.actionType.${showActionModal.id}.name`);
+        const actionDesc = t(`aiworkbench.ws.actionType.${showActionModal.id}.desc`);
         const boundObject = activeApp ? activeApp.variables.find((v: any) => v.type === 'object')?.value : null;
 
         return (
@@ -150,16 +153,23 @@ export function renderWorkshopModals(vm: any) {
             <div className={`${styles.cardBg} rounded-xl shadow-2xl border ${styles.cardBorder} w-full max-w-sm overflow-hidden`}>
               <div className={`px-4 py-3 ${styles.appBg} border-b ${styles.cardBorder} flex items-center justify-between`}>
                 <h3 className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}>
-                  <span className="p-1 rounded bg-amber-500 text-white">
-                    <Zap size={12} className="fill-white/20" />
+                  <span className={`p-1 rounded ${styles.warningBg} ${styles.warningText}`}>
+                    <Zap size={12} />
                   </span>
-                  <span>{t('aiworkbench.ws.action.title', { name: showActionModal.displayName })}</span>
+                  <span>{t('aiworkbench.ws.action.title', { name: actionName })}</span>
                 </h3>
-                <button type="button" onClick={() => setShowActionModal(null)} className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} text-sm font-bold`}>×</button>
+                <button type="button" onClick={() => setShowActionModal(null)} className={`${styles.cardTextMuted} text-sm font-bold`}>×</button>
               </div>
 
               <div className="p-4 space-y-3">
-                <p className={`text-[10px] ${styles.cardTextMuted} italic leading-relaxed border-b ${styles.cardBorder} pb-2`}>{showActionModal.description}</p>
+                <p className={`text-[10px] ${styles.cardTextMuted} italic leading-relaxed border-b ${styles.cardBorder} pb-2`}>{actionDesc}</p>
+
+                {actionWritebackLocalOnly && (
+                  <div className={`flex items-center gap-1.5 text-[10px] ${styles.warningText}`}>
+                    <FlaskConical size={11} aria-hidden />
+                    <span>{t('aiworkbench.ws.action.localOnlyNotice')}</span>
+                  </div>
+                )}
 
                 {/* Dynamically prompt parameter form based on bound action type */}
                 {showActionModal.id === 'update_flight_status' && (
@@ -218,31 +228,32 @@ export function renderWorkshopModals(vm: any) {
                 <button
                   type="button"
                   onClick={() => setShowActionModal(null)}
-                  className={`px-3 py-1.5 border ${styles.cardBorder} rounded-md hover:${styles.sidebarBg} font-semibold`}
+                  className={`px-3 py-1.5 border ${styles.cardBorder} rounded-md font-semibold`}
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="button"
+                  disabled={actionExecuting}
                   onClick={() => {
                     if (showActionModal.id === 'update_flight_status') {
                       const sel = (document.getElementById('form_action_status') as HTMLSelectElement)?.value;
-                      handleExecuteSimulatedAction('update_flight_status', {
-                        flight_param: boundObject?.flightNumber,
-                        new_status_param: sel
+                      void handleExecuteSimulatedAction('update_flight_status', {
+                        flight_param: String(boundObject?.flightNumber ?? ''),
+                        new_status_param: sel ?? ''
                       });
                     } else if (showActionModal.id === 'schedule_maintenance_check') {
                       const mDate = (document.getElementById('form_action_mdate') as HTMLInputElement)?.value;
-                      handleExecuteSimulatedAction('schedule_maintenance_check', {
-                        aircraft_param: boundObject?.tailNumber,
-                        maintenance_date_param: mDate
+                      void handleExecuteSimulatedAction('schedule_maintenance_check', {
+                        aircraft_param: String(boundObject?.tailNumber ?? ''),
+                        maintenance_date_param: mDate ?? ''
                       });
                     }
                   }}
-                  className="px-3.5 py-1.5 bg-[var(--card,#020617)] hover:bg-[var(--card,#0B1120)] text-white font-bold rounded-md flex items-center gap-1 transition-colors"
+                  className={`px-3.5 py-1.5 ${styles.accentBg} text-white font-bold rounded-md flex items-center gap-1 transition-colors disabled:opacity-60`}
                 >
-                  <Check size={11} />
-                  <span>{t('aiworkbench.ws.action.submit')}</span>
+                  {actionExecuting ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                  <span>{t(actionExecuting ? 'aiworkbench.ws.action.executing' : 'aiworkbench.ws.action.submit')}</span>
                 </button>
               </div>
             </div>

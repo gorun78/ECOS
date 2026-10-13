@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { Loader2, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { useLanguage } from '../../../components/LanguageContext';
+import { useTheme } from '../../../components/ThemeContext';
 import { evaluateAbacPolicy } from '../../../api';
 import { inputClasses, btnPrimary } from './helpers';
 
 // ── ABAC Policy Evaluator ────────────────────────────────────
-export default function AbacEvaluator({ t, locale, styles }: { t: (k: string) => string; locale: string; styles: any }) {
+export default function AbacEvaluator() {
+  const { t, locale } = useLanguage();
+  const { styles } = useTheme();
   const [userId, setUserId] = useState('');
   const [roles, setRoles] = useState('');
   const [resourceType, setResourceType] = useState('');
@@ -108,7 +112,7 @@ export default function AbacEvaluator({ t, locale, styles }: { t: (k: string) =>
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                 action === a
                   ? `${styles.accentBg} text-white`
-                  : `${styles.cardBg} ${styles.cardText} border ${styles.cardBorder} hover:${styles.sidebarHoverBg}`
+                  : `${styles.cardBg} ${styles.cardText} border ${styles.cardBorder} ${styles.sidebarHoverBg}`
               }`}
             >
               {t(`sec.abac.action.${a}`)}
@@ -158,9 +162,24 @@ export default function AbacEvaluator({ t, locale, styles }: { t: (k: string) =>
           {result.details && (
             <div>
               <p className={`text-xs font-medium mb-2 ${styles.muted}`}>{t('sec.abac.details')}</p>
-              <pre className={`p-3 rounded-lg text-xs font-mono overflow-auto max-h-40 ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder}`}>
-                {JSON.stringify(result.details, null, 2)}
-              </pre>
+              <p className={`text-xs font-medium mb-2 ${styles.accentText}`}>{t('sec.abac.details.summary')}</p>
+              {typeof result.details === 'string' ? (
+                <pre className={`p-3 rounded-lg text-xs font-mono overflow-auto max-h-40 ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder}`}>
+                  {result.details}
+                </pre>
+              ) : (
+                <pre className={`p-3 rounded-lg text-xs font-mono overflow-auto max-h-40 ${styles.inputBg} ${styles.inputText} border ${styles.inputBorder}`}>
+                  {Object.entries(result.details as Record<string, unknown>).length === 0
+                    ? t('sec.abac.noDetails')
+                    : Object.entries(result.details as Record<string, unknown>).map(([k, v]) => (
+                        <div key={k}>
+                          <span className={styles.accentText}>{k}</span>
+                          {': '}
+                          {typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v)}
+                        </div>
+                      ))}
+                </pre>
+              )}
             </div>
           )}
         </div>

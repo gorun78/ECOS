@@ -7,6 +7,7 @@
  *        集中在 `kbFetch.ts`，overview 主仪表盘沿用 silent-degrade 行为。
  */
 import { apiFetchData } from '../../../api';
+import { kbFetchData } from './kbFetch';
 import type {
   SyncStatus,
   SyncLog,
@@ -62,6 +63,25 @@ export async function fetchGraphStats(): Promise<GraphStats> {
   } catch {
     return { graphNodeCount: 0, graphEdgeCount: 0, embeddingCount: 0, ruleCount: 0 };
   }
+}
+
+/**
+ * K-55 严格版：/stats 5xx 或 ECOS-KB-* 抛 KbApiError（网络异常同样抛出）。
+ * OverviewPage 用其区分「真实 0 值」与「拉取失败」，杜绝失败显示 0=一切正常。
+ */
+export async function kbFetchGraphStats(): Promise<GraphStats> {
+  const data = await kbFetchData<KnowledgeStatsRaw | null>('/api/v1/knowledge/stats');
+  return {
+    graphNodeCount: data?.graphNodeCount ?? 0,
+    graphEdgeCount: data?.graphEdgeCount ?? 0,
+    embeddingCount: data?.embeddingCount ?? 0,
+    ruleCount: data?.ruleCount ?? data?.complianceRuleCount ?? 0,
+    articleCount: data?.articleCount,
+    docCount: data?.docCount,
+    complianceRuleCount: data?.complianceRuleCount,
+    lastUpdatedAt: data?.lastUpdatedAt,
+    embeddingDim: data?.embeddingDim,
+  };
 }
 
 /** Wave 0 — 读本体工作台「实体-数据映射契约」（ontology-engine 只读端点） */
@@ -200,6 +220,12 @@ export async function fetchGraphJobs(): Promise<GraphBuildJob[]> {
   } catch {
     return [];
   }
+}
+
+/** K-55 严格版：KG/向量构建作业列表；失败抛错供 OverviewPage 索引待办降级标记。 */
+export async function kbFetchGraphJobs(): Promise<GraphBuildJob[]> {
+  const data = await kbFetchData<GraphBuildJob[] | GraphJobsResponse | null>(`${KB_V1}/sync/jobs`);
+  return Array.isArray(data) ? data : data?.data || [];
 }
 
 export async function previewGraphBuild(params?: { dryRun?: boolean }): Promise<GraphBuildPreview> {

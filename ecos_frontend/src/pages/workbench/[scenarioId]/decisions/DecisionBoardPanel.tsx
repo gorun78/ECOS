@@ -21,6 +21,8 @@ import { useLanguage } from '../../../../components/LanguageContext';
 import { useTheme } from '../../../../components/ThemeContext';
 import Badge from '../../../../components/common/Badge';
 import Button from '../../../../components/common/Button';
+import ConfirmDialog from '../../../../components/common/ConfirmDialog';
+import { showToastGlobal } from '../../../../components/common/Toast';
 import MobileDataTable from '../../../../components/common/MobileDataTable';
 import type { ColumnConfig } from '../../../../components/common/DataTable';
 import DegradationBanner from '../../../../components/common/status/DegradationBanner';
@@ -56,6 +58,8 @@ export default function DecisionBoardPanel({ scenarioId, activeRunId = '', refre
   const [failure, setFailure] = useState<string | null>(null);
   const [approveFailure, setApproveFailure] = useState<string | null>(null);
   const [busyActionId, setBusyActionId] = useState<string | null>(null);
+  // 审批 = 不可逆写回：先经 ConfirmDialog 二次确认再执行（危险操作铁律）
+  const [pendingApproveId, setPendingApproveId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -97,6 +101,7 @@ export default function DecisionBoardPanel({ scenarioId, activeRunId = '', refre
       try {
         await approveScenarioAction(actionId);
         await reload();
+        showToastGlobal('success', t('scenario.p08.board.approveSuccess', { actionId }));
       } catch (e) {
         setApproveFailure(
           isScenarioActionError(e)
@@ -181,7 +186,7 @@ export default function DecisionBoardPanel({ scenarioId, activeRunId = '', refre
               variant="secondary"
               size="sm"
               disabled={busyActionId === actionId}
-              onClick={() => void approve(actionId)}
+              onClick={() => setPendingApproveId(actionId)}
               data-testid={`approve-${actionId}`}
             >
               {t('scenario.p08.board.approve')}
@@ -240,6 +245,21 @@ export default function DecisionBoardPanel({ scenarioId, activeRunId = '', refre
           {approveFailure}
         </p>
       )}
+
+      <ConfirmDialog
+        visible={pendingApproveId !== null}
+        variant="warning"
+        title={t('scenario.p08.board.approveConfirmTitle')}
+        message={t('scenario.p08.board.approveConfirmMessage', { actionId: pendingApproveId ?? '' })}
+        confirmText={t('scenario.p08.board.approveConfirmOk')}
+        cancelText={t('common.cancel')}
+        onConfirm={() => {
+          const id = pendingApproveId;
+          setPendingApproveId(null);
+          if (id) void approve(id);
+        }}
+        onCancel={() => setPendingApproveId(null)}
+      />
     </section>
   );
 }

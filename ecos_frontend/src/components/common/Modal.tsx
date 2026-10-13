@@ -111,8 +111,11 @@ export default function Modal({
             onClick={() => onConfirm?.()}
             className={`px-4 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition flex items-center gap-1.5 ${
               confirmDisabled
-                ? `bg-[var(--muted)] ${styles.cardTextMuted} cursor-not-allowed dark:bg-[var(--overlay)]`
-                : `${styles.accentBg} ${styles.accentText} hover:opacity-90`
+                // 旧实现 bg-[var(--muted)]/dark:bg-[var(--overlay)]：两枚 CSS 变量
+                // 全仓从未定义（报告 §4.8 P2 死补丁同类）→ 改真实 token；
+                // 实心态 accentBg 反相前景一律 accentSolidText（同 EmptyState 收口口径）
+                ? `${styles.inputBg} ${styles.cardTextMuted} cursor-not-allowed border ${styles.cardBorder}`
+                : `${styles.accentBg} ${styles.accentSolidText} hover:opacity-90`
             }`}
           >
             {confirmLoading && (
@@ -127,15 +130,18 @@ export default function Modal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Overlay */}
+      {/* Overlay — styles.overlayBg token（报告 §4.8 P2：旧实现写死 bg-black/50，
+          浅色主题压底发灰；与 ConfirmDialog overlayBg 收口同口径） */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+        className={`absolute inset-0 ${styles.overlayBg} backdrop-blur-xs`}
         onClick={closeOnOverlay ? onClose : undefined}
       />
 
-      {/* Panel */}
+      {/* Panel — 旧 `animate-in fade-in zoom-in-95` 系 tailwindcss-animate 幽灵类
+          （依赖未安装 → 整串无效，弹窗无入场动画，报告 §4.8 P2）；改 index.css
+          真存在的 animate-fade-in。 */}
       <div
-        className={`relative z-10 w-full ${SIZE_MAP[size]} rounded-xl border ${styles.cardBorder} ${styles.cardBg} shadow-2xl animate-in fade-in zoom-in-95 duration-150 max-h-[85vh] flex flex-col max-lg:h-full max-lg:max-h-none max-lg:rounded-none max-lg:shadow-none ${className}`}
+        className={`relative z-10 w-full ${SIZE_MAP[size]} rounded-xl border ${styles.cardBorder} ${styles.cardBg} shadow-2xl animate-fade-in duration-150 max-h-[85vh] flex flex-col max-lg:h-full max-lg:max-h-none max-lg:rounded-none max-lg:shadow-none ${className}`}
       >
         {/* Header */}
         {title && (

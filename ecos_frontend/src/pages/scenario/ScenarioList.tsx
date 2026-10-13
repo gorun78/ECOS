@@ -44,17 +44,17 @@ export default function ScenarioList({
   }, [scenarios, searchQuery]);
 
   return (
-    <div className={`w-80 border-r ${styles.cardBorder} flex flex-col ${styles.cardBg} select-none shrink-0`}>
+    <div className={`w-80 border-r ${styles.cardBorder} flex flex-col ${styles.cardBg} shrink-0`}>
       {/* Header */}
       <div className={`p-3 border-b ${styles.cardBorder} flex flex-col gap-2 shrink-0 ${styles.cardBg}`}>
         <div className="flex items-center justify-between">
           <span className={`text-xs font-bold ${styles.cardTextMuted} flex items-center gap-1.5`}>
-            <LucideIcon name="ListCollapse" size={12} className="text-indigo-500" />
+            <LucideIcon name="ListCollapse" size={12} className={styles.accentText} />
             {t('scenario.list.title')}
           </span>
           <button type="button"
             onClick={onCreateNew}
-            className="text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-1 rounded flex items-center gap-1 transition-all cursor-pointer"
+            className={`text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1 transition-all cursor-pointer border ${styles.accentBg} ${styles.accentSolidText} ${styles.accentBorder}`}
           >
             <LucideIcon name="Plus" size={10} />
             {t('scenario.list.new')}
@@ -73,13 +73,13 @@ export default function ScenarioList({
             placeholder={t('scenario.list.search')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className={`w-full pl-7 pr-2 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:border-indigo-500 transition-colors`}
+            className={`w-full pl-7 pr-2 py-1.5 text-[11px] ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:ring-1 focus:ring-current transition-colors`}
           />
         </div>
       </div>
 
-      {/* Scenario Cards */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+      {/* Scenario Cards（行266 订正：listbox/option 语义 + tabIndex + Enter/Space 键盘选中 + aria-selected） */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3" role="listbox" aria-label={t('scenario.list.title')}>
         {filteredScenarios.length === 0 && (
           <div className={`text-center py-8 text-xs ${styles.cardTextMuted}`}>
             {searchQuery.trim()
@@ -96,24 +96,33 @@ export default function ScenarioList({
           return (
             <div
               key={scen.id}
+              role="option"
+              aria-selected={isSelected}
+              tabIndex={0}
               onClick={() => onSelect(scen.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelect(scen.id);
+                }
+              }}
               className={`p-3 rounded-lg border transition-all cursor-pointer ${
                 isSelected
-                  ? 'bg-[var(--card,#1E293B)] border-indigo-500 shadow-md shadow-indigo-950/30'
+                  ? `${styles.badgeBg} ${styles.accentBorder} shadow-md`
                   : `${styles.cardBg} ${styles.cardBorder} hover:opacity-80`
               }`}
             >
               <div className="flex items-start justify-between gap-1.5">
-                <span className="text-xs font-extrabold tracking-tight text-white line-clamp-1 flex-1">
+                <span className={`text-xs font-extrabold tracking-tight ${styles.cardText} line-clamp-1 flex-1`}>
                   {scen.name}
                 </span>
                 <span
-                  className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 ${
+                  className={`text-[8px] font-bold px-1.5 py-0.5 rounded uppercase shrink-0 border ${
                     isCritical
-                      ? 'bg-red-950 text-red-400 border border-red-900/50'
+                      ? `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`
                       : isHigh
-                        ? 'bg-amber-950 text-amber-400 border border-amber-900/50'
-                        : `bg-[var(--card,#1E293B)] ${styles.cardTextMuted} border border-[var(--card,#334155)]`
+                        ? `${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`
+                        : `${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`
                   }`}
                 >
                   {scen.priority}
@@ -133,12 +142,12 @@ export default function ScenarioList({
                 </span>
                 <span
                   className={`flex items-center gap-1 font-bold ${
-                    isDraft ? styles.cardTextMuted : 'text-emerald-400'
+                    isDraft ? styles.cardTextMuted : styles.successText
                   }`}
                 >
                   <span
                     className={`w-1.5 h-1.5 rounded-full ${
-                      isDraft ? 'bg-[var(--card,#475569)]' : 'bg-emerald-500 animate-pulse'
+                      isDraft ? `${styles.cardTextMuted} bg-current opacity-50` : `${styles.successText} bg-current animate-pulse`
                     }`}
                   />
                   {scen.status}
@@ -146,8 +155,8 @@ export default function ScenarioList({
                 <Link
                   to={`/scenario-sandbox/${scen.id}`}
                   onClick={(e) => e.stopPropagation()}
-                  className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded border transition-all opacity-60 hover:opacity-100"
-                  style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  className={`flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded border transition-all opacity-60 hover:opacity-100 ${styles.cardBorder} ${styles.cardTextMuted}`}
                   title={t('scenario.list.enterSandbox')}
                 >
                   <LucideIcon name="Layers" size={10} />
@@ -164,7 +173,7 @@ export default function ScenarioList({
         className={`p-3 ${styles.cardBg} border-t ${styles.cardBorder} text-[10px] ${styles.cardTextMuted} space-y-1 font-sans`}
       >
         <p className={`flex items-center gap-1 font-semibold ${styles.cardTextMuted}`}>
-          <LucideIcon name="Info" size={11} className="text-indigo-400" />
+          <LucideIcon name="Info" size={11} className={styles.accentText} />
           {t('scenario.list.howTitle')}
         </p>
         <p className="leading-relaxed">

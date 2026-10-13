@@ -9,8 +9,9 @@ import {
   ChevronRight, FileText, Link2, Clock, Trash2, ChevronDown,
 } from "lucide-react";
 import { useTheme } from "../../components/ThemeContext";
+import { useLanguage } from "../../components/LanguageContext";
 import type { ObjectData, SchemaProperty, TimelineEvent } from "../../api";
-import { STATUS_COLORS, type Relation } from "./helpers";
+import { statusBadgeClasses, type Relation } from "./helpers";
 import type { AvailableTransition, RelFormData } from "./objectExplorerTypes";
 import { PropertiesTab } from "./ObjectExplorerPropertiesTab";
 import { RelationsTab } from "./ObjectExplorerRelationsTab";
@@ -71,6 +72,7 @@ export function ObjectExplorerDetailPanel({
   navigateToRelated,
 }: DetailPanelProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <div className={`w-full lg:w-[420px] shrink-0 flex flex-col ${styles.inputBg} min-w-0`}>
@@ -78,7 +80,7 @@ export function ObjectExplorerDetailPanel({
         <div className={`flex-1 flex items-center justify-center ${styles.cardTextMuted} text-xs`}>
           <div className="text-center">
             <ChevronRight className={`w-10 h-10 mx-auto mb-3 ${styles.cardTextMuted}`} />
-            选择左侧对象查看详情
+            {t("dw.objectExplorer.detail.hint")}
           </div>
         </div>
       ) : detailLoading ? (
@@ -92,7 +94,7 @@ export function ObjectExplorerDetailPanel({
             <div className="flex items-start justify-between mb-2">
               <div className="min-w-0">
                 <h2 className={`text-sm font-bold ${styles.cardText} flex items-center gap-2 truncate`}>
-                  <Box className="w-4 h-4 text-blue-500 shrink-0" />
+                  <Box className={`w-4 h-4 ${styles.infoText} shrink-0`} />
                   {displayName(detail)}
                 </h2>
                 <div className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>
@@ -108,9 +110,9 @@ export function ObjectExplorerDetailPanel({
                 <button type="button"
                   onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                   disabled={statusChanging}
-                  className={`text-[10px] px-2 py-1 rounded border font-semibold flex items-center gap-1 transition disabled:opacity-50 ${STATUS_COLORS[detail.status] || STATUS_COLORS.Draft}`}
+                  className={`text-[10px] px-2 py-1 rounded border font-semibold flex items-center gap-1 transition disabled:opacity-50 ${statusBadgeClasses(styles, detail.status)}`}
                 >
-                  {detail.status || "Draft"}
+                  {detail.status || "—"}
                   <ChevronDown className="w-2.5 h-2.5" />
                 </button>
                 {showStatusDropdown && availableTransitions.length > 0 && (
@@ -119,7 +121,7 @@ export function ObjectExplorerDetailPanel({
                       <button type="button"
                         key={t.transitionCode}
                         onClick={() => handleStatusChange(t.transitionCode)}
-                        className={`w-full text-left px-3 py-1.5 text-[10px] font-semibold ${styles.cardText} hover:bg-blue-50 hover:text-blue-500 transition flex items-center gap-2`}
+                        className={`w-full text-left px-3 py-1.5 text-[10px] font-semibold ${styles.cardText} hover:opacity-70 transition flex items-center gap-2`}
                       >
                         <ArrowRightLeft className="w-2.5 h-2.5" />
                         → {t.toStatus}

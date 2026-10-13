@@ -120,8 +120,7 @@ export default function RetrievalTab() {
         </div>
         <button type="button" onClick={() => void run()}
                 disabled={running || !query.trim()}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-[12px] font-bold cursor-pointer disabled:opacity-50"
-                style={{ background: styles.accentBg, color: 'rgba(255,255,255,0.95)' }}>
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-[12px] font-bold cursor-pointer disabled:opacity-50 ${styles.accentBg} ${styles.accentSolidText}`}>
           {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           {t('knowledge.retrieval.run')}
         </button>

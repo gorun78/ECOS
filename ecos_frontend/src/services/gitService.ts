@@ -22,12 +22,15 @@ import { apiFetchData } from '../api';
 // ── Helpers ─────────────────────────────────────────────────
 
 function q(repoId: string, extras?: Record<string, string | number>): string {
+  // W196 收口（报告 §4.8 P1）：URLSearchParams.set/toString 本身即做百分号编码，
+  // 旧实现再套一层 encodeURIComponent → repoId 含 '/' 时变 `%252F`（双重编码），
+  // 后端 URI decode 一次只得 `%2F`，10 个 Git 接口全数受影响。改为传原始值。
   const params = new URLSearchParams();
-  params.set('repoId', encodeURIComponent(repoId));
+  params.set('repoId', repoId);
   if (extras) {
     Object.entries(extras).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') {
-        params.set(k, encodeURIComponent(String(v)));
+        params.set(k, String(v));
       }
     });
   }

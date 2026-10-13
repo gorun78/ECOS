@@ -6,7 +6,8 @@
  * `services/auth.ts#getAuthToken()`（三 key union）读取，禁直读 `localStorage['token']`。
  */
 
-import { clearAuthToken, getAuthToken } from "./auth";
+import { clearAuthSession, getAuthToken } from "./auth";
+import { tStatic } from "../components/LanguageContext";
 
 export const API_BASE = "/api";
 
@@ -46,7 +47,7 @@ export function wrapNet(p: Promise<unknown>): Promise<unknown> {
 /** Check response status for auth failure — only 401 triggers logout, 403 is a permission issue */
 export function isErrorResponse(e: unknown): { message: string; kind: "network" | "http" | "unknown"; status?: number } {
   if (e instanceof NetworkError) return { message: e.message, kind: "network" };
-  if (e instanceof TypeError) return { message: "网络错误：服务不可用", kind: "network" };
+  if (e instanceof TypeError) return { message: tStatic("common.status.offline_desc"), kind: "network" };
   if (e instanceof Error) {
     const status = typeof (e as { status?: unknown }).status === "number" ? (e as { status?: number }).status : undefined;
     if (typeof status === "number") return { message: e.message, kind: "http", status };
@@ -158,15 +159,13 @@ export function consumeAuthGraceIfActive(): boolean {
 export function handleAuthExpired(): never {
   if (consumeAuthGraceIfActive()) {
     // 宽限期内：只 throw，不清 token、不跳 #/login
-    throw new Error("Session refresh in progress. Please try again.");
+    throw new Error(tStatic("common.session.refreshing"));
   }
-  // token 清理走 services/auth 单源通道（X-51），username/roles 为展示侧信息
-  clearAuthToken();
-  localStorage.removeItem('username');
-  localStorage.removeItem('roles');
+  // token + 展示侧身份一律经 services/auth 单源清理（X-51 + 报告 §三 S5/S6）
+  clearAuthSession();
   // Hash-based redirect avoids React Router race conditions
   window.location.hash = '#/login';
-  throw new Error('Session expired. Please sign in again.');
+  throw new Error(tStatic("common.session.expired"));
 }
 
 /**
@@ -289,7 +288,9 @@ export async function apiFetchData<T>(url: string, options?: RequestInit): Promi
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     if (res.status === 403) throw new NoAccessError(text || `HTTP 403`);
-    throw new Error(text || `HTTP ${res.status}`);
+    const err = new Error(text || `HTTP ${res.status}`) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
   }
   const json = await res.json();
   if (json.success === false) throw new Error(json.message || "Request failed");
@@ -332,6 +333,42 @@ export async function doFetch(url: string, opts: RequestInit = {}): Promise<any>
   }
 }
 
+// ── Raw authed fetch (probe channel) ──────────────────────────
+
+/**
+ * rawAuthedFetch — 带 Bearer 的「裸请求」通道：返回原始 Response，
+ * **不做任何 401/403 副作用**（不清 token、不跳登录、不发 ecos-no-access 事件）。
+ *
+ * <p>为什么需要第三条通道：`/api/v1/auth/me` 这类会话探测端点本身返回 401/403 就是
+ * 业务答案（未登录 / 无权限），必须交由调用方（RequireAuth）做 fail-closed 判定；
+ * 若走 apiFetch/apiFetchData，401 会先被 handleAuthExpired 消化成「清 token + 跳
+ * #/login」，探测结果就被吞掉了（报告 §4.8 RequireAuth「else 分支视为 ok」同族问题）。
+ * 网络层失败仍按 PMO-43 口径归一为 NetworkError 并广播 ecos-network-down。</p>
+ *
+ * @param path 以 `/` 开头的路径（自动拼 API_BASE，与 apiFetch 同基址单源）
+ */
+export async function rawAuthedFetch(path: string, options?: RequestInit): Promise<Response> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const initHeaders = options?.headers;
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: initHeaders
+        ? { ...headers, ...(initHeaders as Record<string, string>) }
+        : headers,
+    });
+  } catch (e) {
+    markNetworkDown();
+    await notifyNetworkDown(e);
+    throw toNetworkError(e, `fetch ${path}`);
+  }
+  if (res.ok) notifyNetworkUp();
+  return res;
+}
+
 // ── Auth ────────────────────────────────────────────────
 export interface LoginRequest {
   username: string;
@@ -347,18 +384,28 @@ export interface LoginResponse {
 
 /** Login — POST /api/v1/auth/login (no auth header, user isn't logged in yet) */
 export async function authLogin(body: LoginRequest): Promise<LoginResponse> {
-  const res = await fetch("/api/v1/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/v1/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    // 传输层失败必须与「密码错误」区分（报告 §五 L3：登录 500/网络断只写「登录失败」
+    // → 用户无从判断该重试还是该找管理员）。
+    markNetworkDown();
+    await notifyNetworkDown(e);
+    throw toNetworkError(e, "login");
+  }
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) throw new Error("用户名或密码错误");
-    throw new Error(`登录失败 (${res.status})`);
+    if (res.status === 401 || res.status === 403) throw new Error(tStatic("login.fail.credentials"));
+    // 5xx / 其它状态：给出可重试指引 + 状态码（fail-loud，不假成功）
+    throw new Error(tStatic("login.fail.server", { status: res.status }));
   }
   const json = await res.json();
   const data = json.data || json;
-  if (!data.accessToken) throw new Error("登录响应无效，缺少 accessToken");
+  if (!data.accessToken) throw new Error(tStatic("login.invalidResponse"));
   return data;
 }
 

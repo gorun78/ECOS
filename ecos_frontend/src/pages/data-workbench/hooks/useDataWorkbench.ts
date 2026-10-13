@@ -5,7 +5,7 @@
  * @license Apache-2.0
  */
 
-import { useState, useEffect, useCallback, type SetStateAction } from 'react';
+import { useState, useEffect, useCallback, useRef, type SetStateAction } from 'react';
 import type { DataConnection, DataSyncTask, DataPipeline } from '../types';
 import type { ConnType } from '../types';
 import { getErrorMessage } from '../helpers';
@@ -33,9 +33,9 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
 
   useEffect(() => {
     import('../api').then(({ fetchDataConnections, fetchDataSyncTasks, fetchDataPipelines }) => {
-      fetchDataConnections().then(setConnections).catch(console.error);
-      fetchDataSyncTasks().then(setSyncTasks).catch(console.error);
-      fetchDataPipelines().then(setPipelines).catch(console.error);
+      fetchDataConnections().then(setConnections).catch((e) => { console.error(e); showToast('error', t('databench.layout.toast.loadConnectionsFailed')); });
+      fetchDataSyncTasks().then(setSyncTasks).catch((e) => { console.error(e); showToast('error', t('databench.layout.toast.loadSyncTasksFailed')); });
+      fetchDataPipelines().then(setPipelines).catch((e) => { console.error(e); showToast('error', t('databench.layout.toast.loadPipelinesFailed')); });
     }).catch(console.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -65,6 +65,11 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
   // ── Connection testing ──
   const [testingConnId, setTestingConnId] = useState<string | null>(null);
   const [testingLogs, setTestingLogs] = useState<string[]>([]);
+  /** 切换连接时清空上一次测试日志（防止日志跨连接串台） */
+  const clearTestingLogs = useCallback(() => setTestingLogs([]), []);
+
+  // ── In-flight sync triggers (taskId 集合，防重复触发 + 支撑轮询) ──
+  const inFlightSyncRef = useRef<Set<string>>(new Set());
 
   // ── Modal toggles ──
   const [showAddConn, setShowAddConn] = useState(false);
@@ -178,26 +183,51 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
   }, [ncName, ncType, ncHost, ncPort, ncUser, ncPassword, ncDatabase, ncExtra, showToast, t]);
 
   const triggerSync = useCallback(async (taskId: string) => {
+    // 同一任务防止重复触发（轮询期间再次点击）
+    if (inFlightSyncRef.current.has(taskId)) return;
+    inFlightSyncRef.current.add(taskId);
     setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'running' as const } : tk));
     showToast('info', t('databench.layout.toast.syncRunning'));
-    try {
-      const { triggerSyncRun } = await import('../api');
-      const result = await triggerSyncRun(taskId);
-      const tn = new Date().toISOString().replace('T', ' ').substring(0, 19);
-      if (result && result.status !== 'failed') {
-        setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'success' as const, lastRunTime: tn, errorMessage: undefined } : tk));
-        const task = syncTasks.find(tk => tk.id === taskId);
-        showToast('success', t('databench.layout.toast.syncSuccess', { name: task?.name }));
+    const stamp = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const taskName = () => syncTasks.find(tk => tk.id === taskId)?.name;
+    const finish = (ok: boolean, errMsg?: string) => {
+      inFlightSyncRef.current.delete(taskId);
+      if (ok) {
+        setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'success' as const, lastRunTime: stamp(), errorMessage: undefined } : tk));
+        showToast('success', t('databench.layout.toast.syncSuccess', { name: taskName() }));
       } else {
-        setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'failed' as const, lastRunTime: tn, errorMessage: 'Execution failed' } : tk));
-        const task = syncTasks.find(tk => tk.id === taskId);
-        showToast('error', t('databench.layout.toast.syncFailed', { name: task?.name }));
+        setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'failed' as const, lastRunTime: stamp(), errorMessage: errMsg || 'Execution failed' } : tk));
+        showToast('error', t('databench.layout.toast.syncFailed', { name: taskName() }));
       }
+    };
+    try {
+      const { triggerSyncRun, fetchPipelineRunStatus } = await import('../api');
+      const result = await triggerSyncRun(taskId);
+      // api 层失败吞掉返回 null —— 无后端可达性证据时绝不能报成功
+      if (!result) { finish(false, t('databench.layout.toast.syncTriggerUnreachable')); return; }
+      const st = (result.status || '').toLowerCase();
+      const OK_TERMINAL = ['success', 'succeeded', 'completed', 'finished', 'done'];
+      const BAD_TERMINAL = ['failed', 'error', 'cancelled', 'canceled', 'timeout'];
+      if (st && OK_TERMINAL.includes(st)) { finish(true); return; }
+      if (st && BAD_TERMINAL.includes(st)) { finish(false, result.status); return; }
+      // running / pending / 无状态 ⇒ 保持 running，轮询 run 终态后才上报
+      const runKey = result.runId || taskId;
+      const POLL_MS = 2000;
+      const MAX_ROUNDS = 60;
+      for (let round = 0; round < MAX_ROUNDS; round++) {
+        await new Promise(r => setTimeout(r, POLL_MS));
+        const rs = await fetchPipelineRunStatus(runKey);
+        if (!rs) continue; // 单次查询失败不判死，继续轮询
+        const rst = (rs.status || '').toLowerCase();
+        if (OK_TERMINAL.includes(rst)) { finish(true); return; }
+        if (BAD_TERMINAL.includes(rst)) { finish(false, rs.errorMsg || rs.status); return; }
+      }
+      // 超时仍非终态：结果未知，绝不谎报成功
+      inFlightSyncRef.current.delete(taskId);
+      setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'error' as const, errorMessage: t('databench.layout.toast.syncResultUnknown') } : tk));
+      showToast('error', t('databench.layout.toast.syncResultUnknown', { name: taskName() }));
     } catch (e) {
-      const tn = new Date().toISOString().replace('T', ' ').substring(0, 19);
-      setSyncTasks(p => p.map(tk => tk.id === taskId ? { ...tk, status: 'failed' as const, lastRunTime: tn, errorMessage: getErrorMessage(e) } : tk));
-      const task = syncTasks.find(tk => tk.id === taskId);
-      showToast('error', t('databench.layout.toast.syncFailed', { name: task?.name }));
+      finish(false, getErrorMessage(e));
     }
   }, [syncTasks, showToast, t]);
 
@@ -239,6 +269,7 @@ export function useDataWorkbench(showToast: ShowToast, t: TFn) {
     // testing
     testingConnId, setTestingConnId,
     testingLogs,
+    clearTestingLogs,
     // modal toggles
     showAddConn, setShowAddConn,
     showAddSync, setShowAddSync,

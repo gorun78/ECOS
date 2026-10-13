@@ -51,23 +51,54 @@
   animation: slide-in-left 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-/* Custom scrollbar adjustments for a clean tech feel */
+/* Custom scrollbar adjustments for a clean tech feel
+   检视报告 §4.8 P2：track/thumb 原为写死的深色十六进制（#0e111a/#1c2230），
+   slate-light 浅色主题下所有 .scrollbar-thin 容器出现"浅色内容 + 深色滚动槽"的
+   对比反转。改为 per-theme CSS 变量驱动（变量继承进 ::-webkit-scrollbar-* 伪元素），
+   并补 Firefox 的 scrollbar-color，滚动条随主题自适应。 */
+:root,
+[data-theme="deep-space"] {
+  --ecos-scrollbar-track: #0e111a;
+  --ecos-scrollbar-thumb: #1c2230;
+  --ecos-scrollbar-thumb-hover: #252e42;
+}
+[data-theme="slate-light"] {
+  --ecos-scrollbar-track: #e2e8f0;
+  --ecos-scrollbar-thumb: #94a3b8;
+  --ecos-scrollbar-thumb-hover: #64748b;
+}
+[data-theme="cyber-terminal"] {
+  --ecos-scrollbar-track: #050505;
+  --ecos-scrollbar-thumb: #0f2c1c;
+  --ecos-scrollbar-thumb-hover: #14532d;
+}
+[data-theme="royal-purple"] {
+  --ecos-scrollbar-track: #150f26;
+  --ecos-scrollbar-thumb: #3b2a5f;
+  --ecos-scrollbar-thumb-hover: #4c3679;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ecos-scrollbar-thumb) var(--ecos-scrollbar-track);
+}
+
 .scrollbar-thin::-webkit-scrollbar {
   width: 4px;
   height: 4px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {
-  background: #0e111a;
+  background: var(--ecos-scrollbar-track);
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #1c2230;
+  background: var(--ecos-scrollbar-thumb);
   border-radius: 2px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: #252e42;
+  background: var(--ecos-scrollbar-thumb-hover);
 }
 
 .scrollbar-none::-webkit-scrollbar {

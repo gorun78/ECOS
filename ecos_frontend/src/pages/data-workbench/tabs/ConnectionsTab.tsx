@@ -1,8 +1,10 @@
 /* Extracted from DataWorkbenchLayout.tsx */
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { DataConnection } from '../types';
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
+import logger from '../../../services/logger';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 import { deleteDataSource, updateDataSource, fetchDataSourceResources, fetchCollectStatus, fetchActiveCollectTasks, fetchCollectDiff, listFolderFiles, type FolderFileVo } from '../api';
 import HistoryVersionCompareModal from '../HistoryVersionCompareModal';
@@ -45,18 +47,21 @@ interface ConnectionsTabProps {
   newConnUser: string;
   setNewConnUser: (v:string)=>void;
   onTestConnection: (connId: string) => void;
+  /** 切换连接时清空上一连接的测试日志（防跨连接串显） */
+  clearTestingLogs?: () => void;
   t: (key:string)=>string;
   /** PMO-48-T5: type-specific extra fields */
   ncExtra?: Record<string, string | number | boolean>;
   setNcExtraField?: (key: string, val: string | number | boolean) => void;
 }
 
-const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast, setConnections, handleCreateConnection, testingConnId, setTestingConnId, testingLogs, selectedConnId, setSelectedConnId, showAddConn, setShowAddConn, newConnName, setNewConnName, newConnType, setNewConnType, newConnHost, setNewConnHost, newConnPort, setNewConnPort, newConnUser, setNewConnUser, onTestConnection, t, ncExtra, setNcExtraField }) => {
+const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast, setConnections, handleCreateConnection, testingConnId, setTestingConnId, testingLogs, selectedConnId, setSelectedConnId, showAddConn, setShowAddConn, newConnName, setNewConnName, newConnType, setNewConnType, newConnHost, setNewConnHost, newConnPort, setNewConnPort, newConnUser, setNewConnUser, onTestConnection, clearTestingLogs, t, ncExtra, setNcExtraField }) => {
   const { styles } = useTheme();
   const { t: tt } = useLanguage();
   const [editingConn, setEditingConn] = useState<DataConnection | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loadingTables, setLoadingTables] = useState(false);
+  const [tableError, setTableError] = useState<string | null>(null);
   const [tablePage, setTablePage] = useState(1);
   const [tablePageSize] = useState(10); // 数据表目录默认每页显示 10 条
   // 文件夹数据源（fs）目录文件列表（非结构化近源层采集源）
@@ -145,7 +150,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
         const diffs = await fetchCollectDiff(selectedConnId, 5);
         if (!cancelled) setDiffRecords(diffs || []);
       } catch (e) {
-        console.warn('[ConnTab] loadDiff failed:', e);
+        logger.warn('[ConnTab] loadDiff failed', e);
       } finally {
         if (!cancelled) setLoadingDiff(false);
       }
@@ -166,6 +171,24 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
     }
   }, [showToast, tt]);
 
+  /** 结构源目录拉取：失败 ⇒ 错误态 + 重试（禁 .then 无 catch 永久转圈） */
+  const loadCatalog = useCallback((connId: string) => {
+    setLoadingTables(true);
+    setTableError(null);
+    fetchDataSourceResources(connId)
+      .then(tables => {
+        if (tables.length > 0) {
+          setConnections(connections.map(c => c.id === connId ? { ...c, tablesAvailable: tables } : c));
+        }
+      })
+      .catch((e: unknown) => {
+        logger.warn('[ConnTab] loadCatalog failed', e);
+        setTableError(e instanceof Error ? e.message : tt('dw.conn.catalogLoadFailed'));
+      })
+      .finally(() => setLoadingTables(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connections, setConnections, tt]);
+
   // 选中连接时获取目录：数据库源拉表目录，文件夹源列目录文件
   useEffect(() => {
     setTablePage(1);
@@ -173,6 +196,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
     // fs 文件即元数据（无元数据采集任务），默认切入数据采集 Tab
     const initialConn = selectedConnId ? connections.find(c => c.id === selectedConnId) : null;
     setPlanTab(initialConn?.type === 'fs' ? 'ingest' : 'metadata');
+    clearTestingLogs?.(); // 切连接清掉上一次测试日志，防跨连接串显
     if (!selectedConnId) return;
     const conn = connections.find(c => c.id === selectedConnId);
     if (!conn) return;
@@ -181,19 +205,17 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
       return;
     }
     if (conn.tablesAvailable.length > 0) return;
-    setLoadingTables(true);
-    fetchDataSourceResources(selectedConnId).then(tables => {
-      if (tables.length > 0) {
-        setConnections(connections.map(c => c.id === selectedConnId ? { ...c, tablesAvailable: tables } : c));
-      }
-      setLoadingTables(false);
-    });
+    loadCatalog(selectedConnId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConnId]);
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(tt('dw.conn.deleteConfirm') + ': ' + name)) return;
-    setDeletingId(id);
+  // 危险操作（删除数据源）统一走 ConfirmDialog，禁原生 window.confirm
+  const confirmDeleteConnection = async () => {
+    const id = deletingId;
+    if (!id) return;
+    setDeletingId(null);
+    const conn = connections.find(c => c.id === id);
+    if (!conn) return;
     const ok = await deleteDataSource(id);
     if (ok) {
       setConnections(connections.filter(c => c.id !== id));
@@ -202,7 +224,6 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
     } else {
       showToast('error', tt('dw.conn.deleteFailed'));
     }
-    setDeletingId(null);
   };
 
   const handleSaveEdit = async (updated: DataConnection) => {
@@ -227,7 +248,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
     selectedConnId={selectedConnId}
     setSelectedConnId={setSelectedConnId}
     setEditingConn={setEditingConn}
-    handleDelete={handleDelete}
+    handleDelete={(id: string) => setDeletingId(id)}
     deletingId={deletingId}
     setShowAddConn={setShowAddConn}
     t={t}
@@ -277,6 +298,17 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
               />
             )}
 
+            {/* 目录拉取失败 ⇒ 错误态 + 重试（不再永久转圈/空目录伪装成功） */}
+            {tableError && !loadingTables && (
+              <div className={`flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg border ${styles.dangerBg} ${styles.dangerText} border-current`}>
+                <span>{tt('dw.conn.catalogLoadFailed')}: {tableError}</span>
+                <button type="button" onClick={() => loadCatalog(selectedConnId)}
+                  className={`shrink-0 px-2 py-1 rounded border border-current font-semibold hover:opacity-80 cursor-pointer`}>
+                  {tt('dw.conn.retry')}
+                </button>
+              </div>
+            )}
+
             {/* fs 文件列表 / 结构表列表 */}
             {isFsConn ? (
               <FolderFilesPanel
@@ -303,7 +335,7 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
           {/* ③ 采集方案（Tab：元数据采集 | 数据采集，紧贴目录列表下方） */}
           <div className={`border ${styles.cardBorder} rounded-xl overflow-hidden ${styles.appBg}`}>
             {/* Tab 条 */}
-            <div className={`flex border-b ${styles.cardBorder} ${styles.sidebarBg}/60`}>
+            <div className={`flex border-b ${styles.cardBorder} ${styles.sidebarBg}`}>
               {(['metadata', 'ingest'] as const).map(tabKey => {
                 const active = planTab === tabKey;
                 const label = tabKey === 'metadata' ? t("dw.strategy.section") : t("dw.ingest.title");
@@ -378,6 +410,17 @@ const ConnectionsTab: React.FC<ConnectionsTabProps> = ({ connections, showToast,
       </div>
     );
   })()}
+
+  {/* 删除数据源确认门（危险操作禁 window.confirm） */}
+  <ConfirmDialog
+    open={deletingId !== null}
+    variant="danger"
+    title={tt('dw.conn.delete')}
+    message={`${tt('dw.conn.deleteConfirm')}: ${connections.find(c => c.id === deletingId)?.name ?? deletingId ?? ''}`}
+    confirmText={tt('dw.conn.delete')}
+    onConfirm={confirmDeleteConnection}
+    onCancel={() => setDeletingId(null)}
+  />
 
   {editingConn && (
     <EditConnectionModal

@@ -22,9 +22,12 @@ interface FunctionTypeViewProps {
   objectTypes: ObjectType[];
   onUpdate: (updated: FunctionType) => void;
   onDelete: (id: string) => void;
+  /** 无假真理：函数为 enterpriseOntologyDemo 演示数据（无后端端点）⇒ 禁用删除并如实标注 */
+  deleteUnsupported?: boolean;
+  deleteUnsupportedReason?: string;
 }
 
-export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete }: FunctionTypeViewProps) {
+export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete, deleteUnsupported, deleteUnsupportedReason }: FunctionTypeViewProps) {
   const { t } = useLanguage();
   const { styles } = useTheme();
   const [activeTab, setActiveTab] = useState<'signature' | 'code' | 'test'>('code');
@@ -86,27 +89,12 @@ export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete
   };
 
   const handleRunTest = () => {
-    setIsTesting(true);
-    setTestLogs([]);
+    // 无假真理：平台不存在函数编译/沙箱执行端点。此前用 setTimeout 伪造
+    // "[ECOS Compiler] 编译成功 / 38ms / 输出结果" 全是剧本 —— 全部删除，
+    // 只给出如实的能力未上线说明（不产出假结果、不伪装耗时）。
+    setIsTesting(false);
     setTestResult(null);
-    const addLog = (msg: string, delay: number) => { setTimeout(() => { setTestLogs(prev => [...prev, msg]); }, delay); };
-    addLog(`[ECOS Compiler] 🔍 正在检索 TypeScript 源码并进行类型安全检测...`, 200);
-    addLog(`[ECOS Compiler] ⚙️ 发现主入口函数：@Function() public async ${func.apiName}()`, 500);
-    addLog(`[ECOS Compiler] ✅ 编译成功，输出：${func.apiName}.js (ES2022 Target)`, 800);
-    const inputsStr = Object.entries(testInputs).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(', ');
-    addLog(`[ECOS Runner] 🚀 开始载入本地 Sandbox 运行沙盒...`, 1100);
-    addLog(`[ECOS Runner] 📥 注入运行实参：{ ${inputsStr} }`, 1300);
-    addLog(`[ECOS Runner] 📡 自动连线 Ontology 本地实例服务并执行动态逻辑...`, 1600);
-    setTimeout(() => {
-      let output: unknown = null;
-      if (func.returnType === 'boolean') output = true;
-      else if (func.returnType === 'integer' || func.returnType === 'decimal') output = 120;
-      else if (func.returnType === 'ObjectTypeSet') output = { count: 2, type: func.returnObjectTypeId || 'aircraft', ids: ['ac_n101ua', 'ac_n204dl'], message: `Mock ObjectSet containing 2 instances of ${func.returnObjectTypeId}` };
-      else output = "⭐ COMPLETED ⭐";
-      setTestLogs(prev => [...prev, `[ECOS Runner] 💾 沙盒计算完成 (耗时: 38ms, 占用内存: 12.4MB)`, `[ECOS Runner] 🎉 执行结束，输出结果已捕获：`]);
-      setTestResult(output);
-      setIsTesting(false);
-    }, 2000);
+    setTestLogs([t('ontology.function_test_unsupported')]);
   };
 
   return (
@@ -130,9 +118,16 @@ export default function FunctionTypeView({ func, objectTypes, onUpdate, onDelete
               placeholder={t('ow.placeholder.funcDescription')} />
           </div>
         </div>
-        <button type="button" onClick={() => onDelete(func.id)}
-          className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5">
-          <Trash2 size={13} />{t('ow.btn.deleteFunction')}
+        <button
+          type="button"
+          disabled={deleteUnsupported}
+          title={deleteUnsupported ? deleteUnsupportedReason : undefined}
+          onClick={() => { if (!deleteUnsupported) onDelete(func.id); }}
+          className={deleteUnsupported
+            ? `text-xs px-2.5 py-1.5 rounded border ${styles.appBorder} ${styles.muted} cursor-not-allowed inline-flex items-center gap-1.5 opacity-70`
+            : "text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"}
+        >
+          <Trash2 size={13} />{deleteUnsupported ? (deleteUnsupportedReason || t('ow.btn.deleteFunction')) : t('ow.btn.deleteFunction')}
         </button>
       </div>
 

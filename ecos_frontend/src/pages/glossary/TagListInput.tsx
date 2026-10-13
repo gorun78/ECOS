@@ -80,10 +80,11 @@ export default function TagListInput({
                 type="button"
                 onClick={() => removeTag(index)}
                 disabled={disabled}
-                className="opacity-60 hover:opacity-100 disabled:opacity-30"
+                className="opacity-60 hover:opacity-100 disabled:opacity-30 cursor-pointer"
                 title={removeLabel}
+                aria-label={removeLabel}
               >
-                <X size={10} />
+                <X size={10} aria-hidden="true" />
               </button>
             </span>
           ))}
@@ -93,9 +94,10 @@ export default function TagListInput({
       {/* 输入 + 添加 */}
       <div className="flex items-center gap-2">
         <input
+          aria-label={placeholder}
           className={`flex-1 px-3 py-2 rounded-lg border text-xs outline-none
             ${styles.inputBorder} ${styles.inputBg} ${styles.inputText}
-            focus:border-indigo-400 disabled:opacity-50`}
+            focus:ring-2 focus:ring-inset focus-visible:ring-2 ${styles.accentRing} disabled:opacity-50`}
           placeholder={placeholder}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -106,11 +108,12 @@ export default function TagListInput({
           type="button"
           onClick={addTag}
           disabled={disabled || !draft.trim()}
-          className={`p-2 rounded-lg border transition disabled:opacity-40
+          className={`p-2 rounded-lg border transition disabled:opacity-40 cursor-pointer
             ${styles.cardBorder} ${styles.sidebarHoverBg} ${styles.muted}`}
           title={addLabel}
+          aria-label={addLabel}
         >
-          <Plus size={14} />
+          <Plus size={14} aria-hidden="true" />
         </button>
       </div>
     </div>

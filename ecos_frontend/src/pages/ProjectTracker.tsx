@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
-import { apiFetchData } from "../api";
+import { apiFetchData, isNoAccessError, NetworkError } from "../api";
 import DataTable, { ColumnConfig } from "../components/common/DataTable";
 import MobileDataTable, { MobileCardConfig } from "../components/common/MobileDataTable";
 
@@ -22,7 +22,7 @@ interface Project {
   id: string;
   name: string;
   status: string;
-  progress?: number;
+  progress?: number | string;
   manager?: string;
   amount?: number | string;
   startDate?: string;
@@ -80,13 +80,21 @@ export default function ProjectTracker() {
         setProjects([]);
         setTotal(0);
       }
-    } catch (e: any) {
-      setError(e.message || t("projectTracker.loadFailed"));
+    } catch (e: unknown) {
+      // 分级降级：403（无权限）/ 网络断连 / HTTP 状态各自可辨，不再同一条文案混报
+      if (isNoAccessError(e)) {
+        setError(t("projectTracker.error.forbidden"));
+      } else if (e instanceof NetworkError) {
+        setError(t("projectTracker.error.network"));
+      } else {
+        const status = (e as { status?: number } | null)?.status;
+        setError(typeof status === "number" ? t("projectTracker.error.http", { status }) : t("projectTracker.loadFailed"));
+      }
       setProjects([]);
     } finally {
       setLoading(false);
     }
-  }, [currentPage, statusFilter, searchQ]);
+  }, [currentPage, statusFilter, searchQ, t]);
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
 
@@ -136,13 +144,22 @@ export default function ProjectTracker() {
       key: "progress",
       label: t("projectTracker.col.progress"),
       render: (_v, record) => {
-        const pct = typeof record.progress === "number" ? record.progress : Number(record.progress) || 0;
+        // 缺字段显示「无数据」，不以 0% 冒充真实进度
+        if (record.progress == null || record.progress === "") {
+          return <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{t("projectTracker.noData")}</span>;
+        }
+        const pct = typeof record.progress === "number" ? record.progress : Number(record.progress);
+        if (Number.isNaN(pct)) {
+          return <span className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{t("projectTracker.noData")}</span>;
+        }
         return (
           <div className="flex items-center gap-2 min-w-[80px]">
             <div className={`flex-1 h-1.5 ${styles.inputBorder} border rounded-full overflow-hidden ${styles.inputBg}`}>
+              {/* 真实进度条填充：直接用主题 accent 底色 token（原 `replace("bg-","bg-")`
+                  是无操作 hack，叠加 backgroundColor:undefined 后条形实际无色） */}
               <div
-                className={`h-full ${styles.accentBg.replace("bg-", "bg-")} rounded-full transition-all`}
-                style={{ width: `${Math.min(100, Math.max(0, pct))}%`, backgroundColor: undefined }}
+                className={`h-full rounded-full transition-all ${styles.accentBg}`}
+                style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
               />
             </div>
             <span className={`text-[10px] font-mono w-8 text-right ${styles.cardTextMuted}`}>{pct}%</span>
@@ -213,8 +230,8 @@ export default function ProjectTracker() {
     return (
       <div className={`h-full flex items-center justify-center p-6 ${styles.appBg}`}>
         <div className="text-center max-w-sm">
-          <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-red-600 mb-1">
+          <AlertCircle className={`w-10 h-10 ${styles.dangerText} mx-auto mb-3`} />
+          <p className={`text-sm font-semibold ${styles.dangerText} mb-1`}>
             {t("projectTracker.error")}
           </p>
           <p className={`text-xs ${styles.muted} mb-4`}>{error}</p>
@@ -282,13 +299,17 @@ export default function ProjectTracker() {
         </select>
       </div>
 
-      {/* Summary stats */}
+      {/* Summary stats — 口径注明：total 为服务端全量计数，其余三卡只统计当前页行，
+          混口径并列时必须标注「本页」，避免读者把本页数字当全量 */}
       {!loading && projects.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatPill icon={Briefcase} label={t("projectTracker.total")} value={total} color={styles.accentText} styles={styles} />
-          <StatPill icon={Target} label={t("projectTracker.status.active")} value={projects.filter(p => p.status === "active").length} color="text-green-500" styles={styles} />
-          <StatPill icon={Clock} label={t("projectTracker.status.completed")} value={projects.filter(p => p.status === "completed").length} color="text-blue-500" styles={styles} />
-          <StatPill icon={DollarSign} label={t("projectTracker.totalAmount")} value={projects.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) / 10000} color="text-orange-500" fmt="money" unit={t("projectTracker.wan")} styles={styles} />
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatPill icon={Briefcase} label={t("projectTracker.total")} value={total} color={styles.accentText} styles={styles} />
+            <StatPill icon={Target} label={`${t("projectTracker.status.active")} ${t("projectTracker.scope.page")}`} value={projects.filter(p => p.status === "active").length} color="text-green-500" styles={styles} />
+            <StatPill icon={Clock} label={`${t("projectTracker.status.completed")} ${t("projectTracker.scope.page")}`} value={projects.filter(p => p.status === "completed").length} color="text-blue-500" styles={styles} />
+            <StatPill icon={DollarSign} label={`${t("projectTracker.totalAmount")} ${t("projectTracker.scope.page")}`} value={projects.reduce((sum, p) => sum + (Number(p.amount) || 0), 0) / 10000} color="text-orange-500" fmt="money" unit={t("projectTracker.wan")} styles={styles} />
+          </div>
+          <p className={`text-[10px] ${styles.cardTextMuted}`}>{t("projectTracker.caliber.note")}</p>
         </div>
       )}
 
@@ -340,7 +361,7 @@ export default function ProjectTracker() {
               <DetailField
                 icon={Target}
                 label={t("projectTracker.col.progress")}
-                value={`${proj.progress ?? 0}%`}
+                value={proj.progress == null || proj.progress === "" ? t("projectTracker.noData") : `${proj.progress}%`}
                 styles={styles}
               />
               <DetailField

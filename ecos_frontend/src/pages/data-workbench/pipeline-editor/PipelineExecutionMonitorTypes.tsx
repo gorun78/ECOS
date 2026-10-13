@@ -7,7 +7,6 @@ import React from 'react';
 import {
   Clock, CheckCircle, XCircle, AlertTriangle, Loader2,
 } from 'lucide-react';
-import { useTheme } from '../../../components/ThemeContext';
 
 // ─── Types ────────────────────────────────────────────
 
@@ -80,6 +79,24 @@ export const STATUS_LABELS: Record<StepStatus, string> = {
   cancelled: '已取消',
 };
 
+/** 状态 → dw i18n 命名空间双语键（展示端用 t() 解析，未知状态回退原始字符串） */
+export const STATUS_LABEL_KEYS: Record<StepStatus, string> = {
+  idle: 'dw.execMonitor.status.idle',
+  queued: 'dw.execMonitor.status.queued',
+  running: 'dw.execMonitor.status.running',
+  succeeded: 'dw.execMonitor.status.succeeded',
+  failed: 'dw.execMonitor.status.failed',
+  cancelled: 'dw.execMonitor.status.cancelled',
+};
+
+/**
+ * 安全取状态色板：未知/后端新增枚举不再整块崩溃（无假真理：以 idle 中性态呈现原始值，
+ * 而非因 map 未命中读 undefined.bg 抛 TypeError 白屏）。
+ */
+export function getStatusColor(status: string): { bg: string; text: string; border: string; icon: React.FC<{ size?: number; className?: string }> } {
+  return STATUS_COLORS[status as StepStatus] ?? STATUS_COLORS.idle;
+}
+
 // ─── Status Icon helper ───────────────────────────────
 
 export const StatusIcon: React.FC<{ status: StepStatus; size?: number }> = React.memo(({ status, size = 12 }) => {
@@ -92,5 +109,3 @@ export const StatusIcon: React.FC<{ status: StepStatus; size?: number }> = React
     case 'cancelled': return <AlertTriangle size={size} className={`${PIPELINE_STATUS_STYLE.cardTextMuted}`} />;
   }
 });
-
-// TODO: useTheme insertion needed

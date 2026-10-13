@@ -20,6 +20,8 @@ interface Props {
   availableActions: ActionType[];
   handleOpenActionModal: (action: ActionType) => void;
   resolvedRelations: ResolvedRelation[];
+  /** 关联实例缓存回源中：true 时计数显示「…」而非 0（未缓存 ≠ 无关联） */
+  relationsLoading?: boolean;
   handleJumpToInstance: (otId: string, instId: string) => void;
 }
 
@@ -32,6 +34,7 @@ export default function InstanceDetailPanel({
   availableActions,
   handleOpenActionModal,
   resolvedRelations,
+  relationsLoading,
   handleJumpToInstance
 }: Props) {
   const { t } = useLanguage();
@@ -104,7 +107,7 @@ export default function InstanceDetailPanel({
             detailTab === 'relations' ? `${styles.accentBorder} text-blue-700 font-bold` : `border-transparent ${styles.cardTextMuted} ${styles.sidebarHoverBg}`
           }`}
         >
-          {t('ow.explore.tabRelations')} ({resolvedRelations.reduce((acc, curr) => acc + curr.instances.length, 0)})
+          {t('ow.explore.tabRelations')} ({relationsLoading ? '…' : resolvedRelations.reduce((acc, curr) => acc + curr.instances.length, 0)})
         </button>
         <button type="button"
           onClick={() => setDetailTab('activity')}
@@ -189,7 +192,16 @@ export default function InstanceDetailPanel({
                     <p className={`text-[10px] ${styles.muted}`}>{rel.linkType.description}</p>
 
                     {/* List matching connected instances */}
-                    {rel.instances.length === 0 ? (
+                    {relationsLoading ? (
+                      <div className={`text-[12px] ${styles.muted} italic ${styles.appBg} p-2 rounded text-center`}>
+                        {t('ow.explorer.relations_loading')}
+                      </div>
+                    ) : rel.resolutionUnsupported ? (
+                      /* 无假真理：join_table 无解析端点，空列表必须说明「未接入」而非「无关联」 */
+                      <div className={`text-[12px] ${styles.warningText} ${styles.appBg} p-2 rounded text-center border border-dashed ${styles.cardBorder}`}>
+                        {t('ow.explorer.join_table_unsupported')}
+                      </div>
+                    ) : rel.instances.length === 0 ? (
                       <div className={`text-[10px] ${styles.muted} italic ${styles.appBg} p-2 rounded text-center`}>
                         {t('ow.empty.noRelatedInstances').replace('{name}', rel.otherObjectType.displayName)}
                       </div>

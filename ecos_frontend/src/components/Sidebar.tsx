@@ -7,15 +7,15 @@
 
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import TaskPanel from "./TaskPanel";
+// W196 收口（报告 §4.1 P2 行65）：删除 TaskPanel 死导入 —— 任务面板实际由
+// AsyncTaskCenterView 在 isTaskPanelOpen 浮层中承流，TaskPanel 从未被渲染。
 import AsyncTaskCenterView from "../pages/AsyncTaskCenterView";
 import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   X,
-  ShieldCheck,
-  ScrollText,
+  ListChecks,
 } from "lucide-react";
 import { useLanguage } from "./LanguageContext";
 import { useTheme } from "./ThemeContext";
@@ -59,7 +59,8 @@ export default function Sidebar({
   const [productCollapsed, setProductCollapsed] = useState(true);
 
   const pathSegments = location.pathname.split("/").filter(Boolean);
-  const currentView = pathSegments[0] || "world_model";
+  // index 落地 Tab 单源映射 mission_control（与 App.tsx 同步，报告 §4.1 P1 行60）
+  const currentView = pathSegments[0] || "mission_control";
 
   // ── 导航项：全部派生自 navigation/navConfig（W190 单源，禁止本地私有表）──
   // SIDEBAR_GROUPS = 总览/资源/系统 三组；SIDEBAR_PRODUCT_ITEMS = 产品功能折叠组。
@@ -192,11 +193,13 @@ export default function Sidebar({
       >
         {sidebarContent}
 
-        {/* Floating collapse button — bottom-right of sidebar (desktop only) */}
+        {/* Floating collapse button — bottom-right of sidebar (desktop only).
+            44px 触控下限（报告 §4.1 P2 行65：旧实现 w-7 h-7 = 28px 低于 WCAG/
+            Material 最小命中区），图标不变、命中区放大。 */}
         {!desktopCollapsed && (
           <button
             onClick={onDesktopToggle}
-            className={`hidden md:flex absolute bottom-3 right-2 w-7 h-7 items-center justify-center rounded-full ${styles.sidebarHoverBg} ${styles.sidebarBorder} shadow-md opacity-60 hover:opacity-100 transition-all z-10`}
+            className={`hidden md:flex absolute bottom-3 right-2 w-11 h-11 items-center justify-center rounded-full ${styles.sidebarHoverBg} ${styles.sidebarBorder} shadow-md opacity-60 hover:opacity-100 transition-all z-10 cursor-pointer`}
             title={t("sidebar.desktop.collapse")}
           >
             <ChevronLeft className="w-[14px] h-[14px]" />
@@ -204,10 +207,12 @@ export default function Sidebar({
         )}
       </aside>
 
-      {/* Desktop icon rail (visible when collapsed) */}
+      {/* Desktop icon rail (visible when collapsed) — select-none 收窄后 rail
+          自持禁选；并补齐展开态侧栏才有、rail 曾丢失的两个入口：任务中心 +
+          服务状态页脚（报告 §4.1 P2 行65）。 */}
       {desktopCollapsed && (
         <nav
-          className={`hidden md:flex fixed left-0 top-0 h-full z-50 ${styles.sidebarBg} border-r ${styles.sidebarBorder}
+          className={`hidden md:flex fixed left-0 top-0 h-full z-50 select-none ${styles.sidebarBg} border-r ${styles.sidebarBorder}
             w-14 flex-col items-center py-3 gap-1 shadow-lg`}
         >
           {/* All nav icons flat */}
@@ -235,14 +240,38 @@ export default function Sidebar({
             );
           })}
 
-          {/* Separator before expand button */}
+          {/* 任务中心入口（rail 补齐，命中区 44px；点击浮层打开 AsyncTaskCenterView） */}
+          <button
+            type="button"
+            onClick={() => setIsTaskPanelOpen(true)}
+            title={t("sidebar.footer.task.open")}
+            className="w-11 h-11 flex items-center justify-center rounded-lg opacity-60 hover:opacity-100 transition-all relative cursor-pointer"
+          >
+            <ListChecks className={`w-[18px] h-[18px] ${statusMetrics.taskRunning > 0 ? styles.successText : ""}`} />
+            {statusMetrics.taskRunning > 0 && (
+              <span className={`absolute top-1 right-1 w-2 h-2 rounded-full ${styles.successBg} ring-1 ring-current ${styles.successText}`} aria-hidden="true" />
+            )}
+          </button>
+
+          {/* Separator before footer */}
           <div className="flex-1" />
+
+          {/* 服务状态页脚（rail 补齐）：与展开态 sidebar.footer.kernel 同口径 */}
+          <div
+            className="w-11 h-11 flex items-center justify-center relative"
+            title={`${t("sidebar.footer.kernel")}: ${statusMetrics.serviceStatus === "UP" ? t("sidebar.footer.running") : statusMetrics.serviceStatus}`}
+          >
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${statusMetrics.serviceStatus === "UP" ? styles.successBg : styles.dangerBg} ring-2 ring-current ${statusMetrics.serviceStatus === "UP" ? styles.successText : styles.dangerText}`}
+              aria-hidden="true"
+            />
+          </div>
           <div className={`w-8 h-px ${styles.sidebarBorder} mb-1`} />
 
-          {/* Expand button */}
+          {/* Expand button（命中区 44px，同折叠按钮口径） */}
           <button
             onClick={onDesktopToggle}
-            className="w-10 h-10 flex items-center justify-center rounded-lg opacity-50 hover:opacity-100 transition-all"
+            className="w-11 h-11 flex items-center justify-center rounded-lg opacity-50 hover:opacity-100 transition-all cursor-pointer"
             title={t("sidebar.desktop.expand")}
           >
             <ChevronRight className="w-[16px] h-[16px]" />

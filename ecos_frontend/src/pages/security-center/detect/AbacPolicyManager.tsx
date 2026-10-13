@@ -6,10 +6,14 @@ import {
   fetchAbacPolicies, createAbacPolicy, updateAbacPolicy, deleteAbacPolicy,
   type AbacPolicy,
 } from '../../../api';
+import { useLanguage } from '../../../components/LanguageContext';
+import { useTheme } from '../../../components/ThemeContext';
 import { inputClasses, btnPrimary, btnSecondary, badgeClasses } from './helpers';
 
 // ── ABAC Policy CRUD Manager ────────────────────────────────
-export default function AbacPolicyManager({ t, locale, styles }: { t: (k: string) => string; locale: string; styles: any }) {
+export default function AbacPolicyManager() {
+  const { t, locale } = useLanguage();
+  const { styles } = useTheme();
   const [policies, setPolicies] = useState<AbacPolicy[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -146,7 +150,7 @@ export default function AbacPolicyManager({ t, locale, styles }: { t: (k: string
             </thead>
             <tbody>
               {policies.map(p => (
-                <tr key={p.id} className={`border-t ${styles.cardBorder} hover:${styles.sidebarHoverBg}`}>
+                <tr key={p.id} className={`border-t ${styles.cardBorder} ${styles.sidebarHoverBg}`}>
                   <td className={`px-4 py-3 font-medium ${styles.cardText}`}>{p.name}</td>
                   <td className={`px-4 py-3 ${styles.cardText}`}><code className={`text-xs px-1.5 py-0.5 rounded ${styles.inputBg}`}>{p.resource}</code></td>
                   <td className={`px-4 py-3 ${styles.cardText}`}>{p.action}</td>
@@ -157,7 +161,7 @@ export default function AbacPolicyManager({ t, locale, styles }: { t: (k: string
                   <td className={`px-4 py-3 ${styles.cardText}`}>{p.priority}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
-                      <button type="button" onClick={() => openEdit(p)} className={`p-1.5 rounded hover:${styles.sidebarHoverBg} ${styles.muted} cursor-pointer`}><Edit3 size={14} /></button>
+                      <button type="button" onClick={() => openEdit(p)} className={`p-1.5 rounded ${styles.sidebarHoverBg} ${styles.muted} cursor-pointer`}><Edit3 size={14} /></button>
                       <button type="button" onClick={() => setDeleteTarget(p)} className="p-1.5 rounded hover:bg-red-50 text-red-500 cursor-pointer"><Trash2 size={14} /></button>
                     </div>
                   </td>

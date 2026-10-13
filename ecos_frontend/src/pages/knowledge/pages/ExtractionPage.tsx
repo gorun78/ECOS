@@ -25,7 +25,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ArrowDownUp, Boxes, Check, FileUp, GitBranch, Loader2,
+  AlertCircle, ArrowDownUp, Boxes, Check, FileUp, Loader2,
   Layers, Send, Sparkles, ScanEye, Scissors, Network,
 } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
@@ -57,13 +57,6 @@ const DOC_CAPABILITIES = [
   { id: 'extract',  labelKey: 'knowledge.extract.doc_cap_extract',  icon: 'Extract' },
 ] as const;
 
-/** 底部 KPI 3 卡片 */
-interface KpiSummary {
-  entityCount: number;
-  relationCount: number;
-  candidateCount: number;
-}
-
 export default function ExtractionPage() {
   const { styles } = useTheme();
   const { t } = useLanguage();
@@ -86,8 +79,12 @@ export default function ExtractionPage() {
   const [docFileName, setDocFileName] = useState<string>('');
   const [docError, setDocError] = useState<string | null>(null);
 
-  // ── 底部 KPI ──
-  const [kpi, setKpi] = useState<KpiSummary>({ entityCount: 0, relationCount: 0, candidateCount: 0 });
+  // 上传后抽取状态轮询（真实端点，非假推进）
+  const mountedRef = useRef<boolean>(true);
+  const pollRef = useRef<number | null>(null);
+
+  // ── 底部 KPI — 来自最近一次「预览」真实返回（无预览则不可用） ──
+  const [lastPreview, setLastPreview] = useState<{ entities: number; relations: number } | null>(null);
 
   /** 拉映射契约（GET /api/v1/ontology/mappings）— 失败降级 disabled */
   const loadMappings = useCallback(async () => {
@@ -121,46 +118,54 @@ export default function ExtractionPage() {
   /** 后端拉取可用（contract published loading 或 error） */
   const mappingsAvailable = mappings.length > 0 && !mappingsError;
 
-  /** 「预览并提交」— POST /knowledge/structured/extract/submit（PRD F4 验收 5） */
+  /** 轮询真实抽取状态（fetchExtractStatus），有界重试；未达终态不谎报完成。 */
+  const pollExtractStatus = useCallback((taskId: string) => {
+    const INTERVAL_MS = 3000;
+    const MAX_ATTEMPTS = 20;
+    let attempts = 0;
+    const tick = async () => {
+      if (!mountedRef.current) return;
+      attempts += 1;
+      try {
+        const st = await knowledgeApi.fetchExtractStatus(taskId);
+        if (!mountedRef.current) return;
+        const s = String(st?.status || '').toUpperCase();
+        if (typeof st?.progress === 'number' && st.progress >= 0 && st.progress <= 1) setDocProgress(st.progress);
+        if (s === 'SUCCEEDED') { setDocPhase('done'); return; }
+        if (s === 'FAILED') { setDocPhase('failed'); setDocError(st?.statusMessage || t('knowledge.extract.doc_extract_failed')); return; }
+        if (attempts >= MAX_ATTEMPTS) { setDocError(t('knowledge.extract.doc_status_timeout')); return; }
+        pollRef.current = window.setTimeout((): void => { void tick(); }, INTERVAL_MS);
+      } catch {
+        if (!mountedRef.current) return;
+        setDocPhase('failed');
+        setDocError(t('knowledge.extract.doc_status_unavailable'));
+      }
+    };
+    pollRef.current = window.setTimeout((): void => { void tick(); }, INTERVAL_MS);
+  }, [t]);
+
+  /** 「预览」— 调真实 dryRun 端点 triggerStructuredExtract，展示其返回的真实计数。
+   *  注：后端抽取执行端点仅接受 {dryRun, mode}，不接收所选映射/目标 →
+   *  映射与目标选择「不参与预览/执行」（抽取执行绑定能力未上线），故相关控件禁用并标注。 */
   const handleSubmit = useCallback(async () => {
-    if (!mappingsAvailable) {
-      setSubmitResult({ ok: false, msg: t('knowledge.extract.submit_no_mapping') });
-      return;
-    }
-    // 校验：至少 1 个抽取目标
-    if (!targetGraphEntities && !targetGraphRelations && !targetVectorIndex) {
-      setSubmitResult({ ok: false, msg: t('knowledge.extract.submit_no_target') });
-      return;
-    }
-    if (!selectedMappingId) {
-      setSubmitResult({ ok: false, msg: t('knowledge.extract.submit_no_selection') });
-      return;
-    }
     setSubmitting(true);
     setSubmitResult(null);
     try {
-      const payload = {
-        mappingId: selectedMappingId,
-        dryRun: true, // 预检（PRD PRD F4 「预览」语义）
-        targets: {
-          graph_entities: targetGraphEntities,
-          graph_relations: targetGraphRelations,
-          vector_index: targetVectorIndex,
-        },
-        mode: 'INCREMENTAL',
-      };
-      // 真实后端端点未在 Batch 2 范围内；走 triggerStructuredExtract 等价
-      await knowledgeApi.triggerStructuredExtract({ dryRun: true, mode: 'INCREMENTAL' });
-      setSubmitResult({ ok: true, msg: t('knowledge.extract.submit_success') });
+      const resp = await knowledgeApi.triggerStructuredExtract({ dryRun: true, mode: 'INCREMENTAL' });
+      const entities = resp?.entityCount ?? resp?.nodeCreated ?? 0;
+      const relations = resp?.edgeCreated ?? 0;
+      setLastPreview({ entities, relations });
+      setSubmitResult({ ok: true, msg: t('knowledge.extract.preview_result', { entities, relations }) });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setSubmitResult({ ok: false, msg: `${t('knowledge.extract.submit_failed')}: ${msg}` });
     } finally {
       setSubmitting(false);
     }
-  }, [mappingsAvailable, selectedMappingId, targetGraphEntities, targetGraphRelations, targetVectorIndex, t]);
+  }, [t]);
 
-  /** 右栏「上传文档」— 走 uploadDocumentChunked 分片（PRD F4 验收 5） */
+  /** 右栏「上传文档」— uploadDocumentChunked 分片后，轮询真实抽取状态端点。
+   *  绝不以 setTimeout 假推进；未到终态或状态不可得 → 明确标注，不谎报「完成」。 */
   const handleDocFile = useCallback(async (file: File) => {
     setDocError(null);
     setDocFileName(file.name);
@@ -168,39 +173,23 @@ export default function ExtractionPage() {
     setDocProgress(0);
     try {
       const onProgress = (fraction: number) => setDocProgress(Math.max(0.02, fraction));
-      await knowledgeApi.uploadDocumentChunked(file, onProgress);
+      const { taskId } = await knowledgeApi.uploadDocumentChunked(file, onProgress);
       setDocPhase('queued');
       setDocProgress(1);
-      // 标记 → DW 层 → 知识审（PRD F4 标注）
-      window.setTimeout(() => setDocPhase('done'), 1500);
+      if (taskId) void pollExtractStatus(taskId);
+      else { setDocPhase('failed'); setDocError(t('knowledge.extract.doc_status_unavailable')); }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setDocPhase('failed');
       setDocError(msg);
     }
-  }, []);
+  }, [pollExtractStatus, t]);
 
-  /** 底部 KPI — pull fetchStructuredJobs 取最新 summary */
-  const loadKpi = useCallback(async () => {
-    try {
-      const jobs = await knowledgeApi.fetchStructuredJobs(1, 1);
-      const latest = jobs?.[0] as unknown as {
-        entityCount?: number;
-        nodeCreated?: number;
-        edgeCreated?: number;
-        candidateCount?: number;
-      } | undefined;
-      // 字段映射：结构化抽取报告（dryRun=true 时的 EntityInstanceExtractionReportVO）
-      const entityCount = (latest?.entityCount ?? latest?.nodeCreated ?? 0) as number;
-      const relationCount = (latest?.edgeCreated ?? 0) as number;
-      const candidateCount = (latest?.candidateCount ?? 0) as number;
-      setKpi({ entityCount, relationCount, candidateCount });
-    } catch {
-      // 静默失败，保留 0 值
-    }
+  // 卸载时清理轮询定时器
+  useEffect(() => () => {
+    mountedRef.current = false;
+    if (pollRef.current) window.clearTimeout(pollRef.current);
   }, []);
-
-  useEffect(() => { void loadKpi(); }, [loadKpi]);
 
   // 4 能力 badge — i18n 1:1
   const capabilityIconFor = (icon: string): React.ReactNode => {
@@ -214,11 +203,11 @@ export default function ExtractionPage() {
   };
 
   const docPhaseChipClass = (phase: typeof docPhase) => {
-    if (phase === 'done') return { background: styles.successBg, color: styles.successText };
-    if (phase === 'failed') return { background: styles.dangerBg, color: styles.dangerText };
-    if (phase === 'uploading') return { background: styles.accentBg, color: 'rgba(255,255,255,0.95)' };
-    if (phase === 'queued') return { background: styles.warningBg, color: styles.warningText };
-    return { background: styles.badgeBg, color: styles.badgeText };
+    if (phase === 'done') return `${styles.successBg} ${styles.successText}`;
+    if (phase === 'failed') return `${styles.dangerBg} ${styles.dangerText}`;
+    if (phase === 'uploading') return `${styles.accentBg} ${styles.accentText}`;
+    if (phase === 'queued') return `${styles.warningBg} ${styles.warningText}`;
+    return `${styles.badgeBg} ${styles.badgeText}`;
   };
 
   const docPhaseLabelKey = (phase: typeof docPhase) =>
@@ -228,11 +217,8 @@ export default function ExtractionPage() {
     : phase === 'queued' ? 'knowledge.extract.doc_phase_queued'
     : 'knowledge.extract.doc_phase_idle';
 
-  /** 校验 mappings 是否 ready（影响 submit 按钮状态） */
-  const submitDisabled = useMemo(
-    () => submitting || !selectedMappingId || !mappingsAvailable,
-    [submitting, selectedMappingId, mappingsAvailable],
-  );
+  /** 预览按钮仅受自身提交态约束（dryRun 预览为全局执行，不依赖映射选择） */
+  const submitDisabled = useMemo(() => submitting, [submitting]);
 
   return (
     <div className="p-2" style={{ color: styles.cardText }}>
@@ -267,6 +253,12 @@ export default function ExtractionPage() {
           </div>
 
           <div className="p-3 space-y-3 flex-1">
+            {/* 诚实标注：执行端点仅接受 {dryRun, mode}，所选映射/目标不参与预览/执行 */}
+            <div className="px-2.5 py-1.5 rounded border text-[10px] font-mono flex items-start gap-1.5"
+                 style={{ borderColor: styles.warningBorder, background: styles.warningBg, color: styles.warningText }}>
+              <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+              <span>{t('knowledge.extract.execution_binding_unavailable')}</span>
+            </div>
             {/* 映射契约 select（fetchOntologyMappings published 过滤） */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: styles.cardTextMuted }}>
@@ -276,8 +268,8 @@ export default function ExtractionPage() {
                 <select
                   value={selectedMappingId}
                   onChange={(e) => { setSelectedMappingId(e.target.value); setSubmitResult(null); }}
-                  disabled={!mappingsAvailable || mappingsLoading}
-                  className="w-full px-2.5 py-1.5 text-[11px] rounded border outline-none disabled:opacity-50 cursor-pointer"
+                  disabled
+                  className="w-full px-2.5 py-1.5 text-[11px] rounded border outline-none disabled:opacity-50"
                   style={{
                     background: styles.inputBg,
                     color: mappingsAvailable ? styles.inputText : styles.muted,
@@ -330,14 +322,16 @@ export default function ExtractionPage() {
                   return (
                     <label
                       key={target.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded border text-[11px] cursor-pointer"
+                      className="flex items-center gap-2 px-2 py-1.5 rounded border text-[11px] opacity-70"
                       style={{ borderColor: styles.cardBorder, background: checked ? styles.sidebarBg : 'transparent' }}
+                      title={t('knowledge.extract.execution_binding_unavailable')}
                     >
                       <input
                         type="checkbox"
                         checked={checked}
                         onChange={(e) => setChecked(e.target.checked)}
-                        className="h-3.5 w-3.5 cursor-pointer"
+                        disabled
+                        className="h-3.5 w-3.5 cursor-not-allowed"
                       />
                       <span className="flex-1" style={{ color: checked ? styles.cardText : styles.cardTextMuted }}>
                         {t(target.labelKey)}
@@ -355,28 +349,19 @@ export default function ExtractionPage() {
                 type="button"
                 onClick={() => void handleSubmit()}
                 disabled={submitDisabled}
-                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-[11px] font-bold transition disabled:opacity-50 cursor-pointer"
-                style={{
-                  background: styles.accentBg,
-                  color: 'rgba(255,255,255,0.95)',
-                  border: `1px solid ${styles.accentBorder}`,
-                }}
+                className={`w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-[11px] font-bold transition disabled:opacity-50 cursor-pointer border ${styles.accentBg} ${styles.accentText} ${styles.accentBorder}`}
               >
                 {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                {submitting ? t('knowledge.extract.submitting') : t('knowledge.extract.submit_button')}
+                {submitting ? t('knowledge.extract.submitting') : t('knowledge.extract.preview_button')}
               </button>
               {submitResult && (
                 <div
-                  className="mt-1.5 px-2 py-1 rounded text-[10px] font-mono flex items-center gap-1.5"
-                  style={{
-                    background: submitResult.ok ? styles.successBg : styles.dangerBg,
-                    color: submitResult.ok ? styles.successText : styles.dangerText,
-                  }}
+                  className={`mt-1.5 px-2 py-1 rounded text-[10px] font-mono flex items-center gap-1.5 ${submitResult.ok ? `${styles.successBg} ${styles.successText}` : `${styles.dangerBg} ${styles.dangerText}`}`}
                 >
                   {submitResult.ok
                     ? <Check className="w-3 h-3 shrink-0" />
-                    : <GitBranch className="w-3 h-3 shrink-0" />}
-                  <span className="truncate">{submitResult.msg || ''}</span>
+                    : <AlertCircle className="w-3 h-3 shrink-0" />}
+                  <span className="whitespace-pre-line">{submitResult.msg || ''}</span>
                 </div>
               )}
             </div>
@@ -445,12 +430,7 @@ export default function ExtractionPage() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={docPhase === 'uploading' || docPhase === 'queued'}
-                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-[11px] font-bold transition disabled:opacity-50 cursor-pointer"
-                style={{
-                  background: styles.accentBg,
-                  color: 'rgba(255,255,255,0.95)',
-                  border: `1px solid ${styles.accentBorder}`,
-                }}
+                className={`w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-[11px] font-bold transition disabled:opacity-50 cursor-pointer border ${styles.accentBg} ${styles.accentText} ${styles.accentBorder}`}
               >
                 {docPhase === 'uploading' ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -466,8 +446,7 @@ export default function ExtractionPage() {
               {docPhase !== 'idle' && (
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold"
-                    style={docPhaseChipClass(docPhase)}
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold ${docPhaseChipClass(docPhase)}`}
                   >
                     {t(docPhaseLabelKey(docPhase))}
                   </span>
@@ -491,62 +470,67 @@ export default function ExtractionPage() {
         </div>
       </div>
 
-      {/* 底部 3 KPI — 实体 / 关系 / 候选知识（PRD F4 验收） */}
-      <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <KpiCard
-          icon={<Boxes className="w-4 h-4" />}
-          label={t('knowledge.extract.kpi_entities')}
-          value={kpi.entityCount}
-          accent={styles.infoText}
-          muted={kpi.entityCount === 0}
-          styles={styles}
-        />
-        <KpiCard
-          icon={<Network className="w-4 h-4" />}
-          label={t('knowledge.extract.kpi_relations')}
-          value={kpi.relationCount}
-          accent={styles.successText}
-          muted={kpi.relationCount === 0}
-          styles={styles}
-        />
-        <KpiCard
-          icon={<Layers className="w-4 h-4" />}
-          label={t('knowledge.extract.kpi_candidates')}
-          value={kpi.candidateCount}
-          accent={styles.warningText}
-          muted={kpi.candidateCount === 0}
-          styles={styles}
-        />
+      {/* 底部 3 KPI — 反映最近一次「预览」的真实返回；未预览或无端点来源 → 「—」不臆造 */}
+      <div className="mt-3 space-y-1.5">
+        <div className="text-[10px] font-mono" style={{ color: styles.muted }}>
+          {lastPreview ? t('knowledge.extract.kpi_from_preview') : t('knowledge.extract.kpi_no_preview')}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <KpiCard
+            icon={<Boxes className="w-4 h-4" />}
+            label={t('knowledge.extract.kpi_entities')}
+            value={lastPreview ? lastPreview.entities : null}
+            accent={styles.infoText}
+            styles={styles}
+          />
+          <KpiCard
+            icon={<Network className="w-4 h-4" />}
+            label={t('knowledge.extract.kpi_relations')}
+            value={lastPreview ? lastPreview.relations : null}
+            accent={styles.successText}
+            styles={styles}
+          />
+          <KpiCard
+            icon={<Layers className="w-4 h-4" />}
+            label={t('knowledge.extract.kpi_candidates')}
+            value={null}
+            unavailableHint={t('knowledge.extract.kpi_candidates_unavailable')}
+            accent={styles.warningText}
+            styles={styles}
+          />
+        </div>
       </div>
     </div>
   );
 }
 
-/** 通用 KPI 卡片（数字 25px + 标签 12px + 灰色，原型 .kpi） */
+/** 通用 KPI 卡片：value=null → 「—」（不可用 / 未预览），不显示伪 0 */
 function KpiCard({
-  icon, label, value, accent, muted, styles,
+  icon, label, value, accent, styles, unavailableHint,
 }: {
   icon: React.ReactNode;
   label: string;
-  value: number;
+  value: number | null;
   accent: string;
-  muted: boolean;
+  unavailableHint?: string;
   styles: ReturnType<typeof useTheme>['styles'];
 }) {
-  const valueColor = muted ? styles.muted : accent;
-  const captionColor = muted ? styles.muted : styles.cardTextMuted;
+  const unavailable = value === null;
   return (
     <div
       className="rounded-md border p-3 space-y-1.5 flex flex-col"
-      style={{ borderColor: styles.cardBorder, background: styles.cardBg, opacity: muted ? 0.7 : 1 }}
+      style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
     >
-      <div className="flex items-center gap-1.5" style={{ color: captionColor }}>
-        <span style={{ color: accent, opacity: muted ? 0.5 : 1 }}>{icon}</span>
+      <div className={`flex items-center gap-1.5 ${unavailable ? styles.muted : styles.cardTextMuted}`}>
+        <span className={unavailable ? styles.muted : accent}>{icon}</span>
         <span className="text-[10px] font-mono uppercase tracking-wider">{label}</span>
       </div>
-      <p className="text-[25px] font-black font-mono leading-none" style={{ color: valueColor }}>
-        {value.toLocaleString()}
+      <p className={`text-[25px] font-black font-mono leading-none ${unavailable ? styles.muted : accent}`}>
+        {unavailable ? '—' : value.toLocaleString()}
       </p>
+      {unavailable && unavailableHint && (
+        <span className="text-[9px] font-mono" style={{ color: styles.muted }}>{unavailableHint}</span>
+      )}
     </div>
   );
 }

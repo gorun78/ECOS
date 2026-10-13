@@ -13,7 +13,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
+import logger from '../../../services/logger';
 import LucideIcon from '../LucideIcon';
+import { getErrorMessage } from '../helpers';
 import type { DataConnection } from '../types';
 import {
   fetchDatalakeStatus, initDatalake,
@@ -52,6 +54,7 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
 
   // ── 数据湖状态 ──
   const [datalake, setDatalake] = useState<{ endpoint?: string; bucket?: string; status?: string; initialized?: boolean } | null>(null);
+  const [datalakeError, setDatalakeError] = useState<string | null>(null);
   const [initLoading, setInitLoading] = useState(false);
 
   // ── 表选择（由父组件 ConnectionsTab 持有，与目录列表复选框共享） ──
@@ -67,10 +70,20 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
   const [cron, setCron] = useState('0 0 * * *');
   const [savingSchedule, setSavingSchedule] = useState(false);
 
-  // 加载数据湖状态 + 定时策略
+  // 加载数据湖状态 + 定时策略（失败 ⇒ 显式错误态，不永显 '...'）
+  const loadDatalakeStatus = React.useCallback(() => {
+    setDatalakeError(null);
+    fetchDatalakeStatus()
+      .then(d => setDatalake(d ?? { status: 'UNKNOWN' }))
+      .catch((e: unknown) => {
+        logger.warn('[IngestSubPanel] fetchDatalakeStatus failed', e);
+        setDatalakeError(getErrorMessage(e) || 'HTTP');
+      });
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
-    fetchDatalakeStatus().then(d => { if (!cancelled) setDatalake(d); });
+    loadDatalakeStatus();
     fetchIngestSchedule(conn.id).then(s => {
       if (cancelled || !s) return;
       setScheduleEnabled(Boolean(s.enabled));
@@ -80,7 +93,7 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
       if (Array.isArray(s.tables) && s.tables.length > 0 && current.size === 0) {
         setSelectedNames(new Set(s.tables));
       }
-    });
+    }).catch((e: unknown) => { logger.warn('[IngestSubPanel] fetchIngestSchedule failed', e); });
     return () => { cancelled = true; };
   }, [conn.id]);
 
@@ -100,25 +113,37 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
     setSelectedNames(selectedNames.size === allNames.length ? new Set() : new Set(allNames));
   };
 
-  const pollTask = (taskId: string, table: string) => {
-    // 每 2s 轮询一次任务状态，SUCCEEDED/FAILED/error 停止
-    const poll = async () => {
-      const st = await fetchIngestStatus(taskId);
-      if (!st) return;
-      const terminal = st.status === 'SUCCEEDED' || st.status === 'FAILED' || st.status === 'error' || st.status === 'COMPLETED';
-      setTasks(prev => prev.map(x => (x.taskId === taskId ? {
-        ...x, status: st.status || x.status, progress: st.progress ?? x.progress, errorMessage: st.errorMessage ?? x.errorMessage,
-      } : x)));
-      if (terminal && pollTimer.current) clearInterval(pollTimer.current);
-    };
+  /** 轮询本批全部任务（此前只轮询第 1 个，其余行永停 SUBMITTED = 假进度）。
+   *  每 2s 对各非终态 taskId 查一次状态，全部终态后停表。 */
+  const pollTasks = (taskList: IngestTaskState[]) => {
     if (pollTimer.current) clearInterval(pollTimer.current);
-    pollTimer.current = setInterval(poll, 2000);
+    const isTerminal = (s: string) => s === 'SUCCEEDED' || s === 'FAILED' || s === 'error' || s === 'COMPLETED';
+    const tracked = taskList.filter(x => !isTerminal(x.status));
+    if (tracked.length === 0) return;
+    const tick = async () => {
+      const results = await Promise.all(tracked.map(async x => {
+        try {
+          const st = await fetchIngestStatus(x.taskId);
+          return st ? { ...x, status: st.status || x.status, progress: st.progress ?? x.progress, errorMessage: st.errorMessage ?? x.errorMessage } : x;
+        } catch (e: unknown) {
+          logger.warn('[IngestSubPanel] poll status failed', e);
+          return x; // 单次查询失败不判死，下轮再查
+        }
+      }));
+      setTasks(prev => prev.map(p => results.find(r => r.taskId === p.taskId && r.table === p.table) ?? p));
+      if (results.every(r => isTerminal(r.status)) && pollTimer.current) {
+        clearInterval(pollTimer.current);
+        pollTimer.current = null;
+      }
+    };
+    tick();
+    pollTimer.current = setInterval(tick, 2000);
   };
 
   const handleRun = async () => {
     const list = Array.from(selectedNames);
     if (list.length === 0) {
-      showToast('warning', t('dw.ingest.noTableSelected') || '请先勾选要采集的表');
+      showToast('warning', t('dw.ingest.noTableSelected'));
       return;
     }
     setRunning(true);
@@ -135,27 +160,26 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
         setTasks(list.map(f => ({ table: f, taskId: docId, status: res.failed > 0 && res.collected === 0 ? 'FAILED' : 'SUCCEEDED' })));
         if (res.failed > 0) {
           const firstErr = res.items?.find(i => i.status !== 'SUCCESS')?.error;
-          showToast('error', (t('dw.folder.collectPartial') || '采集完成：{ok} 成功 / {fail} 失败')
-            .replace('{ok}', String(res.collected)).replace('{fail}', String(res.failed))
+          showToast('error', t('dw.folder.collectPartial', { ok: res.collected, fail: res.failed })
             + (firstErr ? `（${firstErr}）` : ''));
         } else {
-          showToast('success', (t('dw.folder.collectSuccess') || '已采集 {count} 个文件到近源层').replace('{count}', String(res.collected)));
+          showToast('success', t('dw.folder.collectSuccess', { count: res.collected }));
         }
         return;
       }
       // 结构数据源：POST /api/v1/datanet/ingest/run 走采集型管道到近源层
       const r = await runDataIngest(conn.id, list);
       if (!r || !r.submitted) {
-        showToast('error', t('dw.ingest.runFailed') || '采集任务提交失败');
+        showToast('error', t('dw.ingest.runFailed'));
         return;
       }
       const initial = r.tasks.map(x => ({ table: x.table, taskId: x.taskId, status: x.status || 'SUBMITTED' }));
       setTasks(initial);
-      showToast('info', t('dw.ingest.started') || `已提交 ${initial.length} 个采集任务`);
-      // 轮询第一个任务的状态（同批次同步执行，代表整体）
-      if (initial.length > 0) pollTask(initial[0].taskId, initial[0].table);
-    } catch (e) {
-      showToast('error', (e as Error).message || '采集任务提交失败');
+      showToast('info', t('dw.ingest.started', { count: initial.length }));
+      // 轮询全部任务终态（不再只盯第一个）
+      pollTasks(initial);
+    } catch (e: unknown) {
+      showToast('error', getErrorMessage(e) || t('dw.ingest.runFailed'));
     } finally {
       setRunning(false);
     }
@@ -167,10 +191,14 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
       const r = await initDatalake();
       if (r) {
         setDatalake(prev => ({ ...prev, bucket: r.bucket ?? prev?.bucket, status: r.status ?? prev?.status, initialized: true }));
-        showToast('success', t('dw.ingest.datalakeInitOk') || '数据湖初始化成功');
+        setDatalakeError(null);
+        showToast('success', t('dw.ingest.datalakeInitOk'));
       } else {
-        showToast('error', t('dw.ingest.datalakeInitFailed') || '数据湖初始化失败');
+        showToast('error', t('dw.ingest.datalakeInitFailed'));
       }
+    } catch (e: unknown) {
+      logger.warn('[IngestSubPanel] initDatalake failed', e);
+      showToast('error', getErrorMessage(e) || t('dw.ingest.datalakeInitFailed'));
     } finally {
       setInitLoading(false);
     }
@@ -179,7 +207,7 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
   const handleSaveSchedule = async () => {
     const list = Array.from(selectedNames);
     if (list.length === 0) {
-      showToast('warning', t('dw.ingest.noTableSelected') || '请先勾选要采集的表');
+      showToast('warning', t('dw.ingest.noTableSelected'));
       return;
     }
     setSavingSchedule(true);
@@ -188,10 +216,13 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
       const r = await saveIngestSchedule(conn.id, list, target);
       if (r) {
         setScheduleEnabled(Boolean(r.enabled));
-        showToast('success', target ? t('dw.ingest.scheduleSaved') || '定时采集已启用' : t('dw.ingest.scheduleDisabled') || '定时采集已停用');
+        showToast('success', target ? t('dw.ingest.scheduleSaved') : t('dw.ingest.scheduleDisabled'));
       } else {
-        showToast('error', t('dw.ingest.scheduleFailed') || '定时策略保存失败');
+        showToast('error', t('dw.ingest.scheduleFailed'));
       }
+    } catch (e: unknown) {
+      logger.warn('[IngestSubPanel] saveSchedule failed', e);
+      showToast('error', getErrorMessage(e) || t('dw.ingest.scheduleFailed'));
     } finally {
       setSavingSchedule(false);
     }
@@ -203,42 +234,55 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
       <div className={`flex items-center justify-between`}>
         <span className={`text-[10px] font-bold uppercase tracking-wider ${styles.accentText} flex items-center gap-1`}>
           <LucideIcon name="Database" size={12} />
-          {t('dw.ingest.title') || '数据采集'}
+          {t('dw.ingest.title')}
         </span>
-        {/* 数据湖状态 */}
+        {/* 数据湖状态（unknown/失败时明示，不永显 '...'） */}
         <div className={`flex items-center gap-1.5 text-[10px] ${styles.cardTextMuted}`}>
-          <span className={`inline-block w-1.5 h-1.5 rounded-full ${
-            datalake?.status === 'UP' ? 'bg-emerald-500' : datalake?.status === 'DOWN' ? 'bg-red-500' : 'bg-amber-400'
-          }`} />
-          <span className="font-mono">
-            {datalake?.bucket || 'ecos-datalake'}
-          </span>
-          <span>{datalake?.status || '...'}</span>
+          {datalakeError ? (
+            <>
+              <span className={`inline-block w-1.5 h-1.5 rounded-full ${styles.dangerText} bg-current`} />
+              <span className={styles.dangerText}>{t('dw.ingest.datalakeStatusUnknown')}</span>
+              <button type="button" onClick={loadDatalakeStatus}
+                className={`px-1.5 py-0.5 rounded border text-[9px] cursor-pointer ${styles.inputBorder} ${styles.cardTextMuted} hover:${styles.accentText}`}>
+                {t('dw.ingest.retry')}
+              </button>
+            </>
+          ) : (
+            <>
+              <span className={`inline-block w-1.5 h-1.5 rounded-full bg-current ${
+                datalake?.status === 'UP' ? styles.successText : datalake?.status === 'DOWN' ? styles.dangerText : styles.warningText
+              }`} />
+              <span className="font-mono">
+                {datalake?.bucket || 'ecos-datalake'}
+              </span>
+              <span>{datalake?.status || t('dw.ingest.datalakeStatusChecking')}</span>
+            </>
+          )}
           <button type="button"
             onClick={handleInitDatalake}
             disabled={initLoading || datalake?.status === 'UP'}
             className={`px-1.5 py-0.5 rounded border text-[9px] transition disabled:opacity-40 ${styles.inputBorder} ${styles.cardTextMuted} hover:${styles.accentText}`}
           >
-            {initLoading ? '...' : (t('dw.ingest.initDatalake') || '初始化')}
+            {initLoading ? '...' : t('dw.ingest.initDatalake')}
           </button>
         </div>
       </div>
 
       {/* 目标提示（MinIO 近源库默认） */}
       <p className={`text-[9px] ${styles.cardTextMuted}`}>
-        {t('dw.ingest.targetHint') || '默认写入数据湖 MinIO 近源库（datalake/数据源/表_时间戳.csv），目标可通过管道编辑器自定义。'}
+        {t('dw.ingest.targetHint')}
       </p>
 
       {/* 选中数量提示（实际复选框在目录列表区渲染） */}
       <div className={`flex items-center gap-2`}>
         <span className={`text-[10px] ${styles.cardText}`}>
-          {t('dw.ingest.selectTables') || '选择采集表'}
+          {t('dw.ingest.selectTables')}
           <span className={`ml-1 ${styles.cardTextMuted} font-mono`}>({selectedNames.size}/{tables.length || selectedNames.size})</span>
         </span>
         <button type="button" onClick={toggleAll} className={`text-[10px] ${styles.accentText} hover:underline cursor-pointer`}>
           {selectedNames.size > 0 && selectedNames.size >= tables.length && tables.length > 0
-            ? (t('dw.ingest.clearAll') || '清空')
-            : (t('dw.ingest.selectAll') || '全选')}
+            ? t('dw.ingest.clearAll')
+            : t('dw.ingest.selectAll')}
         </button>
       </div>
 
@@ -250,13 +294,13 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
           className={`px-2 py-1 text-[10px] font-semibold rounded transition flex items-center gap-1 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-40`}
         >
           <LucideIcon name="Play" size={11} className={running ? 'animate-pulse' : ''} />
-          {running ? (t('dw.ingest.running') || '采集中...') : (t('dw.ingest.runNow') || '立即采集')}
+          {running ? t('dw.ingest.running') : t('dw.ingest.runNow')}
         </button>
 
         {/* 定时开关 + cron */}
         <label className={`flex items-center gap-1 text-[10px] cursor-pointer ${styles.cardTextMuted}`}>
-          <input type="checkbox" checked={scheduleEnabled} onChange={e => setScheduleEnabled(e.target.checked)} className="accent-indigo-500" />
-          {t('dw.ingest.schedule') || '定时采集'}
+          <input type="checkbox" checked={scheduleEnabled} onChange={e => setScheduleEnabled(e.target.checked)} className="accent-current" />
+          {t('dw.ingest.schedule')}
         </label>
         {scheduleEnabled && (
           <select
@@ -273,7 +317,7 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
             disabled={savingSchedule}
             className={`px-2 py-1 text-[10px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.accentText} transition disabled:opacity-40`}
           >
-            {savingSchedule ? '...' : (t('dw.ingest.saveSchedule') || '保存定时')}
+            {savingSchedule ? '...' : t('dw.ingest.saveSchedule')}
           </button>
         )}
       </div>

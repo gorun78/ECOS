@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { CheckCircle, CheckCheck, Clock, AlertTriangle, Play, Plus, Trash2, Send, Shield, ShieldCheck, XCircle, Link2 } from 'lucide-react';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import {
   fetchProposals,
   createProposal,
@@ -89,6 +90,10 @@ export default function ProposalPanel({
   const { styles } = useTheme();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
+  // 加载失败原因（非空 = 错误态，列表区渲染错误横幅 + 重试，不再复用空态文案）
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // 危险操作确认门（禁绕过 ConfirmDialog 直接删除提案）
+  const [pendingDeleteProposal, setPendingDeleteProposal] = useState<Proposal | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formTitle, setFormTitle] = useState('');
   const [formTargetType, setFormTargetType] = useState('');
@@ -112,8 +117,12 @@ export default function ProposalPanel({
     try {
       const data = await fetchProposals();
       setProposals(data);
-    } catch {
-      showToast('error', t('ow.msg.proposalFailed'));
+      setLoadError(null);
+    } catch (err: unknown) {
+      // 无假真理：加载失败进入错误态（不再 4s toast 后回落「无提案」空态伪装），并透传后端 message
+      const msg = String((err as { message?: string } | undefined)?.message || err || '');
+      setLoadError(msg);
+      showToast('error', t('ow.proposal.load_error').replace('{message}', msg));
     } finally {
       setLoading(false);
     }
@@ -239,8 +248,9 @@ export default function ProposalPanel({
       showToast('success', t('ow.msg.proposalCreated'));
       resetForm();
       loadProposals();
-    } catch {
-      showToast('error', t('ow.msg.proposalFailed'));
+    } catch (err: unknown) {
+      // 失败原因如实透传（此前所有失败共用一句 proposalFailed 吞掉后端 message）
+      showToast('error', t('ow.proposal.action_failed').replace('{message}', String((err as { message?: string } | undefined)?.message || err)));
     }
   };
 
@@ -250,8 +260,9 @@ export default function ProposalPanel({
       await action();
       showToast('success', t(msgKey));
       loadProposals();
-    } catch {
-      showToast('error', t('ow.msg.proposalFailed'));
+    } catch (err: unknown) {
+      // 失败原因如实透传（此前所有失败共用一句 proposalFailed 吞掉后端 message）
+      showToast('error', t('ow.proposal.action_failed').replace('{message}', String((err as { message?: string } | undefined)?.message || err)));
     } finally {
       setActionLoading(null);
     }
@@ -274,8 +285,9 @@ export default function ProposalPanel({
       loadProposals();
       // 闭环：执行完成后通知工作台重拉实体/属性，使变更立即可见
       onProposalExecuted?.();
-    } catch {
-      showToast('error', t('ow.msg.proposalFailed'));
+    } catch (err: unknown) {
+      // 失败原因如实透传（此前所有失败共用一句 proposalFailed 吞掉后端 message）
+      showToast('error', t('ow.proposal.action_failed').replace('{message}', String((err as { message?: string } | undefined)?.message || err)));
     } finally {
       setActionLoading(null);
     }
@@ -286,9 +298,19 @@ export default function ProposalPanel({
       await deleteProposal(id);
       showToast('success', t('ow.msg.proposalDeleted'));
       loadProposals();
-    } catch {
-      showToast('error', t('ow.msg.proposalFailed'));
+    } catch (err: unknown) {
+      // 失败原因如实透传（此前所有失败共用一句 proposalFailed 吞掉后端 message）
+      showToast('error', t('ow.proposal.action_failed').replace('{message}', String((err as { message?: string } | undefined)?.message || err)));
     }
+  };
+
+  /** 删除提案 = 危险操作：经 ConfirmDialog 确认门后才真正调后端（icon-only 直删已废除） */
+  const requestDeleteProposal = (p: Proposal) => setPendingDeleteProposal(p);
+  const executeDeleteProposal = () => {
+    if (!pendingDeleteProposal) return;
+    const id = pendingDeleteProposal.id;
+    setPendingDeleteProposal(null);
+    void handleDelete(id);
   };
 
   const handleVerify = async (id: string) => {
@@ -299,8 +321,9 @@ export default function ProposalPanel({
       showToast('info', t('ow.msg.proposalVerified'));
       // 写后刷新：验证会变更提案状态（verified/rejected），重拉列表以驱动「执行」按钮显隐
       loadProposals();
-    } catch {
-      showToast('error', t('ow.msg.proposalFailed'));
+    } catch (err: unknown) {
+      // 失败原因如实透传（此前所有失败共用一句 proposalFailed 吞掉后端 message）
+      showToast('error', t('ow.proposal.action_failed').replace('{message}', String((err as { message?: string } | undefined)?.message || err)));
     } finally {
       setActionLoading(null);
     }
@@ -335,8 +358,9 @@ export default function ProposalPanel({
       await action();
       showToast('success', t(msgKey));
       loadProposals();
-    } catch {
-      showToast('error', t('ow.msg.proposalFailed'));
+    } catch (err: unknown) {
+      // 失败原因如实透传（此前所有失败共用一句 proposalFailed 吞掉后端 message）
+      showToast('error', t('ow.proposal.action_failed').replace('{message}', String((err as { message?: string } | undefined)?.message || err)));
     } finally {
       setActionLoading(null);
       setReviewModal(null);
@@ -516,7 +540,20 @@ export default function ProposalPanel({
       )}
 
       {loading ? (
-        <div className={`text-xs ${styles.muted} text-center py-6`}>{t('ow.empty.noProposals')}</div>
+        /* 无假真理：加载中不再复用「无提案」文案（空态≠加载中） */
+        <div className={`text-xs ${styles.muted} text-center py-6`}>{t('ow.proposal.loading')}</div>
+      ) : loadError ? (
+        /* 六态·错误态：加载失败显示错误横幅 + 重试（不再回落空态伪装「无提案」） */
+        <div className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
+          <span className="truncate">{t('ow.proposal.load_error').replace('{message}', loadError)}</span>
+          <button
+            type="button"
+            onClick={() => { setLoading(true); setLoadError(null); loadProposals(); }}
+            className={`shrink-0 rounded border px-2 py-0.5 font-semibold ${styles.dangerBorder}`}
+          >
+            {t('ontology.retry')}
+          </button>
+        </div>
       ) : proposals.length === 0 ? (
         <div className={`text-xs ${styles.muted} text-center py-6 border border-dashed ${styles.cardBorder} rounded-lg`}>
           {t('ow.empty.noProposals')}
@@ -583,8 +620,9 @@ export default function ProposalPanel({
                         {t('ow.btn.submitProposal')}
                       </button>
                       <button type="button"
-                        onClick={() => handleDelete(p.id)}
+                        onClick={() => requestDeleteProposal(p)}
                         disabled={isActing}
+                        title={t('ow.proposal.confirm_delete_title')}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 disabled:opacity-50"
                       >
                         <Trash2 size={10} />
@@ -669,6 +707,18 @@ export default function ProposalPanel({
           </div>
         </div>
       )}
+
+      {/* 危险操作确认门（架构铁律：删除类操作统一走 common/ConfirmDialog） */}
+      <ConfirmDialog
+        visible={!!pendingDeleteProposal}
+        danger
+        title={t('ow.proposal.confirm_delete_title')}
+        message={t('ow.proposal.confirm_delete_message').replace('{title}', pendingDeleteProposal?.title || '')}
+        confirmText={t('ontology.btn_confirm_delete')}
+        cancelText={t('ow.btn.cancel')}
+        onConfirm={executeDeleteProposal}
+        onCancel={() => setPendingDeleteProposal(null)}
+      />
 
       {toast && (
         <div className={`fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-lg shadow-xl text-xs font-semibold text-white ${styles.accentBg} border ${styles.accentBorder} z-50`}>

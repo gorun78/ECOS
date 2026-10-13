@@ -51,9 +51,11 @@ export default function EmptyState({
         {defaultDescription}
       </p>
       {action && (
+        // 报告 §4.8 P1：旧实现 `${accentBg} ${accentText}` = 靛蓝底 + 靛蓝字（同色系叠加，
+        // 对比度 ≈1:1，CTA 视觉上不存在）。实心态一律配 accentSolidText 反相前景。
         <button type="button"
           onClick={action.onClick}
-          className={`mt-5 px-5 py-2 text-xs font-bold rounded-lg cursor-pointer transition ${styles.accentBg} ${styles.accentText} hover:opacity-90 shadow-xs`}
+          className={`mt-5 px-5 py-2 text-xs font-bold rounded-lg cursor-pointer transition ${styles.accentBg} ${styles.accentSolidText} hover:opacity-90 shadow-xs`}
         >
           {action.label}
         </button>

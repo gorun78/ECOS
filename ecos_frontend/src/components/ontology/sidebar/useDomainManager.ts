@@ -47,6 +47,8 @@ export function useDomainManager({
   const [showDomainModal, setShowDomainModal] = useState(false);
   const [editingDomain, setEditingDomain] = useState<OntologyDomain | null>(null);
   const [saving, setSaving] = useState(false);
+  // 危险操作确认门（架构铁律：禁 window.confirm）—— Sidebar 渲染 ConfirmDialog
+  const [pendingDomainDelete, setPendingDomainDelete] = useState<OntologyDomain | null>(null);
 
   // Modal states
   const [formId, setFormId] = useState('');
@@ -83,18 +85,22 @@ export function useDomainManager({
   const handleDeleteDomain = (domainId: string) => {
     const targetDomain = domains.find(d => d.id === domainId);
     if (!targetDomain) return;
+    setPendingDomainDelete(targetDomain);
+  };
 
-    if (!window.confirm(t('ow.msg.confirmDeleteDomain').replace('{name}', targetDomain.displayName))) {
-      return;
-    }
+  /** ConfirmDialog 确认后真正删除 */
+  const confirmDomainDelete = () => {
+    const targetDomain = pendingDomainDelete;
+    if (!targetDomain) return;
+    setPendingDomainDelete(null);
 
     deleteWorkbenchDomain(targetDomain.code || targetDomain.id)
       .then(() => {
-        const updatedDomains = domains.filter(d => d.id !== domainId);
+        const updatedDomains = domains.filter(d => d.id !== targetDomain.id);
         onUpdateDomains(updatedDomains);
-        const updatedObjects = allObjectTypes.map(ot => (ot.domainId === domainId ? { ...ot, domainId: undefined } : ot));
+        const updatedObjects = allObjectTypes.map(ot => (ot.domainId === targetDomain.id ? { ...ot, domainId: undefined } : ot));
         onUpdateObjectTypes(updatedObjects);
-        if (selectedDomainId === domainId) {
+        if (selectedDomainId === targetDomain.id) {
           onSelectDomainId(null);
         }
         onToast?.('success', t('ow.domain.deleted').replace('{name}', targetDomain.displayName));
@@ -223,6 +229,9 @@ export function useDomainManager({
     editingDomain,
     setEditingDomain,
     saving,
+    pendingDomainDelete,
+    setPendingDomainDelete,
+    confirmDomainDelete,
     formId,
     setFormId,
     formName,

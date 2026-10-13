@@ -136,11 +136,13 @@ export default function GraphPage() {
     setGraphError(null);
     try {
       // PRD F5 关键：categoryIds 透传，前端不做二次过滤
-      // K-55：传入 limit（缺省 200，供后端截断）
+      // K-55 + W3-5 对齐：传入 limit = 渲染护栏 MAX_VISIBLE_GRAPH_NODES，避免
+      //   "fetch 200 / guard 500" 导致截断提示永不触发（截断信息假真理）。
+      //   若后端仍返回 > MAX（不遵守 limit），下方 guard 会截断并给出 notice。
       const data = await knowledgeApi.fetchGraph(
         domain,
         categoryIds && categoryIds.length > 0 ? categoryIds : undefined,
-        200,
+        MAX_VISIBLE_GRAPH_NODES,
       ) as unknown as {
         nodes?: GraphNode[];
         edges?: GraphEdge[];
@@ -193,12 +195,16 @@ export default function GraphPage() {
         properties: r.properties,
       }));
       setSearchResults(results);
-    } catch {
+      // 与 GraphExplorerTab 一致：命中 0 条给可感知提示，而非"下拉静默关闭"
+      if (results.length === 0) setGraphNotice(t('knowledge.graph.noMatch'));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       setSearchResults([]);
+      setGraphNotice(t('knowledge.graph.searchError') + msg);
     } finally {
       setSearching(false);
     }
-  }, [searchQuery, searchType]);
+  }, [searchQuery, searchType, t]);
 
   const handleSearchResultClick = (nodeId: string) => {
     setShowSearchResults(false);
@@ -230,10 +236,19 @@ export default function GraphPage() {
         nodeIds?: string[];
         edgeIds?: string[];
       };
-      setPathNodes(new Set(data?.path || data?.nodeIds || []));
-      setPathEdges(new Set(data?.pathEdges || data?.edgeIds || []));
-    } catch {
-      // 静默
+      const pathNodeIds = (data?.path || data?.nodeIds || []) as string[];
+      const pathEdgeIds = (data?.pathEdges || data?.edgeIds || []) as string[];
+      setPathNodes(new Set(pathNodeIds));
+      setPathEdges(new Set(pathEdgeIds));
+      // 与 GraphExplorerTab 一致：0 节点结果不再静默
+      if (pathNodeIds.length === 0) {
+        setGraphNotice(t('knowledge.graph.pathError') + t('knowledge.graph.path_source_target_missing_or_unreachable'));
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setPathNodes(new Set());
+      setPathEdges(new Set());
+      setGraphNotice(t('knowledge.graph.pathError') + msg);
     } finally {
       setIsComputingPath(false);
     }
@@ -261,8 +276,10 @@ export default function GraphPage() {
         const existing = new Set(prev.map(e => e.id));
         return [...prev, ...newEdges.filter((e: GraphEdge) => !existing.has(e.id))];
       });
-    } catch {
-      // 静默
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // 与 GraphExplorerTab 一致：展开失败必须显式反馈
+      setGraphNotice(t('knowledge.graph.expandError') + msg);
     } finally {
       setLoading(false);
     }
@@ -283,7 +300,7 @@ export default function GraphPage() {
     setExpandedNodeIds(prev => { const s = new Set(prev); s.delete(nodeId); return s; });
   };
 
-  const handleSelectNode = async (nodeId: string | null) => {
+  const handleSelectNode = async (nodeId: string | null, fromDeepLink = false) => {
     setSelectedNodeId(nodeId);
     if (nodeId) {
       try {
@@ -298,6 +315,10 @@ export default function GraphPage() {
         const found = nodes.find(n => n.id === nodeId);
         setNodeDetail(found || null);
         setNodeEdges(edges.filter(e => e.source === nodeId || e.target === nodeId));
+        // 深链定位失败不再静默（WikiPage「查看图谱上下文」断链反馈，PRD F6 验收 5）
+        if (fromDeepLink && !found) {
+          setGraphNotice(t('knowledge.graph.focus_not_found', { id: nodeId.slice(0, 12) }));
+        }
       }
     } else {
       setNodeDetail(null);
@@ -306,6 +327,25 @@ export default function GraphPage() {
   };
 
   const detailDisplayNode = nodeDetail || (selectedNodeId ? nodes.find(n => n.id === selectedNodeId) : null) || null;
+
+  /** 深链：?page=graph&focusEntity=<id> —— WikiPage "查看图谱上下文" 承接（PRD F6 验收 5） */
+  useEffect(() => {
+    const hash = window.location.hash || '';
+    const qIdx = hash.indexOf('?');
+    if (qIdx < 0) return;
+    const params = new URLSearchParams(hash.slice(qIdx + 1));
+    const focus = params.get('focusEntity');
+    if (focus) void handleSelectNode(focus, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 详情面板：关系端点显示 label 而非裸 UUID；节点未加载时 fallback 到 id。
+  const nodeLabelById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const n of nodes) if (n?.id) m.set(n.id, n.label || n.id);
+    return m;
+  }, [nodes]);
+  const edgeEndpointLabel = (id: string) => nodeLabelById.get(id) || id;
 
   /** 5 类颜色派生（PRD F5）— 返回 base name，消费者拼接 `${base}Text`/`${base}Bg` 取 token */
   const nodeColorClass = useCallback((type: string): NodeColorToken =>
@@ -346,8 +386,7 @@ export default function GraphPage() {
           type="button"
           onClick={() => void handleSearch()}
           disabled={searching || !searchQuery.trim()}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-bold cursor-pointer disabled:opacity-50"
-          style={{ background: styles.accentBg, color: 'rgba(255,255,255,0.95)' }}
+          className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-bold cursor-pointer disabled:opacity-50 ${styles.accentBg} ${styles.accentSolidText}`}
         >
           {searching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
           {t('knowledge.graph.search_button')}
@@ -373,25 +412,11 @@ export default function GraphPage() {
         )}
       </div>
 
-      {/* ═══ 主体：左工具栏 + 中画布 + 右详情 ═══ */}
-      <div className="flex-1 min-h-0 grid grid-cols-[200px_1fr]" style={{ borderColor: styles.inputBorder }}>
+      {/* ═══ 主体：左工具栏 + 中画布 + 右详情（3 列） ═══ */}
+      <div className="flex-1 min-h-0 grid grid-cols-[200px_1fr_auto]" style={{ borderColor: styles.inputBorder }}>
         {/* ───── 左工具栏 ───── */}
         <div className="border-r flex flex-col overflow-y-auto p-3 space-y-3" style={{ borderColor: styles.cardBorder }}>
-          {/* Full-text search */}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: styles.cardTextMuted }}>
-              {t('knowledge.graph.fullTextSearch')}
-            </label>
-            <input
-              type="text"
-              value={searchQuery}
-              readOnly
-              onClick={() => void handleSearch()}
-              placeholder={t('knowledge.graph.searchPlaceholder')}
-              className="w-full px-2.5 py-1.5 text-[11px] rounded outline-none"
-              style={{ background: styles.inputBg, color: styles.inputText, border: `1px solid ${styles.inputBorder}` }}
-            />
-          </div>
+          {/* 顶搜索栏已负责全文搜索；左栏不再重复放 readOnly 输入 + onClick=handleSearch 的假控件（历史 hack，已删）。 */}
 
           {/* Path finder */}
           <div className="space-y-1.5">
@@ -423,8 +448,7 @@ export default function GraphPage() {
               type="button"
               onClick={() => void handleComputePath()}
               disabled={isComputingPath || !pathSource || !pathTarget}
-              className="w-full px-2 py-1 rounded text-[10px] font-bold disabled:opacity-50 cursor-pointer"
-              style={{ background: styles.accentBg, color: 'rgba(255,255,255,0.95)' }}
+              className={`w-full px-2 py-1 rounded text-[10px] font-bold disabled:opacity-50 cursor-pointer ${styles.accentBg} ${styles.accentSolidText}`}
             >
               {isComputingPath ? <Loader2 className="w-3 h-3 animate-spin mx-auto" /> : t('knowledge.graph.path_compute_button')}
             </button>
@@ -452,7 +476,7 @@ export default function GraphPage() {
             <label className="text-[10px] font-bold uppercase tracking-wider" style={{ color: styles.cardTextMuted }}>
               {t('knowledge.graph.category_filter')}
               {selectedCategoryIds.length > 0 && (
-                <span className="ml-1 font-mono text-emerald-600">({selectedCategoryIds.length})</span>
+                <span className={`ml-1 font-mono ${styles.accentText}`}>({selectedCategoryIds.length})</span>
               )}
             </label>
             {navCategories.length === 0 ? (
@@ -490,7 +514,7 @@ export default function GraphPage() {
             <label className="text-[10px] font-bold uppercase tracking-wider flex items-center justify-between"
                    style={{ color: styles.cardTextMuted }}>
               <span>{t('knowledge.graph.neighborDegree')}</span>
-              <span className="font-mono text-emerald-600">{neighborDegree}</span>
+              <span className={`font-mono ${styles.accentText}`}>{neighborDegree}</span>
             </label>
             <input
               type="range"
@@ -569,8 +593,7 @@ export default function GraphPage() {
                 type="button"
                 onClick={() => void loadGraph(navDomain === 'default' ? undefined : navDomain,
                       selectedCategoryIds.length > 0 ? selectedCategoryIds : undefined)}
-                className="px-2.5 py-1 rounded text-[10px] font-bold cursor-pointer inline-flex items-center gap-1"
-                style={{ background: styles.accentBg, color: 'rgba(255,255,255,0.95)' }}
+                className={`px-2.5 py-1 rounded text-[10px] font-bold cursor-pointer inline-flex items-center gap-1 ${styles.accentBg} ${styles.accentSolidText}`}
               >
                 <RefreshCw className="w-3 h-3" /> {t('knowledge.common.retry')}
               </button>
@@ -637,7 +660,13 @@ export default function GraphPage() {
               <span className={`w-2 h-2 rounded-full ${nodeDotClass(NODE_TYPE_COLORS.edge)}`} />
               {t('knowledge.graph.kpi_edges', { m: edges.length })}
             </span>
-            <span className="ml-auto">{t('knowledge.graph.current_view', { k: nodes.length })}</span>
+            {/* 检视报告行 187 订正：「当前视图 K」不再是总数复读——
+                路径计算中 = 高亮节点数；常态 = 视图内节点数 / 渲染护栏上限 */}
+            <span className="ml-auto">
+              {pathNodes.size > 0
+                ? t('knowledge.graph.current_view_path', { k: pathNodes.size })
+                : t('knowledge.graph.current_view_of_cap', { k: nodes.length, cap: MAX_VISIBLE_GRAPH_NODES })}
+            </span>
           </div>
         </div>
 
@@ -705,7 +734,7 @@ export default function GraphPage() {
                            className="rounded px-2 py-1 text-[10px] flex items-center justify-between"
                            style={{ background: styles.sidebarBg }}>
                         <span className="truncate flex-1" style={{ color: styles.cardText }}>
-                          {e.source} → {e.target}
+                          {edgeEndpointLabel(e.source)} → {edgeEndpointLabel(e.target)}
                         </span>
                         {e.relation && (
                           <span className="font-mono shrink-0 ml-1" style={{ color: styles.accentText }}>{e.relation}</span>

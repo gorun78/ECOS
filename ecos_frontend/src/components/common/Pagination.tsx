@@ -6,6 +6,7 @@
 import React from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useTheme } from "../ThemeContext";
+import { useLanguage } from "../LanguageContext";
 
 export interface PaginationProps {
   page: number;
@@ -25,6 +26,7 @@ export default function Pagination({
   onPageSizeChange,
 }: PaginationProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const setPage = (p: number) => {
@@ -59,7 +61,9 @@ export default function Pagination({
       className={`flex items-center justify-between px-3 py-2.5 border-t ${styles.cardBorder} text-xs select-none`}
     >
       <span className={`${styles.cardTextMuted} text-[11px]`}>
-        {total} 条记录，第 {page}/{totalPages} 页
+        {/* W196：旧实现硬编码中文「N 条记录，第 x/y 页」违反 i18n 铁律；
+            复用 DataTable 既有 common.pagination.* 双语 key（locales/common 已备）。 */}
+        {t("common.pagination.total", { n: total })} {t("common.pagination.page", { p: page, m: totalPages })}
       </span>
 
       <div className="flex items-center gap-1">

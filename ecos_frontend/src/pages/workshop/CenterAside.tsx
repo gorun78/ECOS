@@ -1,10 +1,11 @@
 import React from 'react';
-import { Trash2, Zap, Inbox, Plus } from 'lucide-react';
+import { Trash2, Zap, Inbox, Plus, FlaskConical } from 'lucide-react';
 import { mockActionTypes } from './types';
+import Badge from '../../components/common/Badge';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderCenterAside(vm: any) {
-  const { t, styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm;
+  const { t, styles, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass, actionWritebackLocalOnly } = vm;
   return (
     <>
                   {/* RIGHT ASIDE VIEW (Object View and Actions) */}
@@ -21,7 +22,7 @@ export function renderCenterAside(vm: any) {
                           onClick={() => editorMode === 'design' && setSelectedWidgetId(w.id)}
                           className={`relative rounded-xl border p-4 ${styles.cardBg} shadow-xs transition-all ${
                             editorMode === 'design' ? 'cursor-pointer hover:border-blue-400' : ''
-                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : '${styles.cardBorder}'}`}
+                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : styles.cardBorder}`}
                         >
                           {editorMode === 'design' && (
                               <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
@@ -106,7 +107,7 @@ export function renderCenterAside(vm: any) {
                           onClick={() => editorMode === 'design' && setSelectedWidgetId(w.id)}
                           className={`relative rounded-xl border p-4 ${styles.cardBg} shadow-xs transition-all ${
                             editorMode === 'design' ? 'cursor-pointer hover:border-blue-400' : ''
-                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : '${styles.cardBorder}'}`}
+                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : styles.cardBorder}`}
                         >
                           {editorMode === 'design' && (
                             <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
@@ -122,13 +123,19 @@ export function renderCenterAside(vm: any) {
                               if (act) setShowActionModal(act);
                             }}
                             className={`w-full py-2.5 rounded-lg font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5 ${
-                              editorMode === 'design' ? '${styles.sidebarBg} ${styles.cardTextMuted} cursor-not-allowed border ${styles.cardBorder}' :
-                              boundObject ? getPrimaryColorClass(activeApp.theme.primaryColor) : '${styles.sidebarBg} ${styles.cardTextMuted} cursor-not-allowed border ${styles.cardBorder}'
+                              editorMode === 'design' ? `${styles.sidebarBg} ${styles.cardTextMuted} cursor-not-allowed border ${styles.cardBorder}` :
+                              boundObject ? getPrimaryColorClass(activeApp.theme.primaryColor) : `${styles.sidebarBg} ${styles.cardTextMuted} cursor-not-allowed border ${styles.cardBorder}`
                             }`}
                           >
                             <Zap size={12} className={boundObject ? "fill-white/25" : ""} />
                             <span>{w.title}</span>
                           </button>
+                          {actionWritebackLocalOnly && (
+                            <Badge variant="warning" className="mt-2 w-full justify-center">
+                              <FlaskConical size={10} aria-hidden />
+                              <span>{t('aiworkbench.ws.action.localOnlyNotice')}</span>
+                            </Badge>
+                          )}
                           {!boundObject && editorMode === 'preview' && (
                             <p className={`text-[9px] ${styles.cardTextMuted} text-center mt-1.5 leading-tight`}>{t('aiworkbench.ws.ca.selectFirstToTrigger')}</p>
                           )}

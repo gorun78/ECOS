@@ -1,7 +1,7 @@
 /**
  * blueprintData — ECOS 六层蓝图数据模型：BlueprintLayer 类型、API 映射纯函数、硬编码兜底蓝图。
- * 由 CognitiveOperatingSystem.tsx 机械抽取（PMO-74 H6-T4），字段映射与兜底数组内容逐行一致；
- * 原数组内联引用组件内 layerCoverage state，改为纯函数入参（同名同用法）。
+ * 由 CognitiveOperatingSystem.tsx 机械抽取（PMO-74 H6-T4），字段映射与兜底数组内容逐行一致。
+ * 兜底数组仅供 API 不可达时的「示意数据」降级使用（页面须挂 DemoBadge + 降级横幅）。
  * @license Apache-2.0
  */
 import { Target, Layers, Cpu, Globe, Database, Shield } from "lucide-react";
@@ -44,8 +44,21 @@ export function mapApiBlueprintLayer(l: any): BlueprintLayer {
   };
 }
 
-/** Map representation of the ECOS 6 Layers Functional Diagram — hardcoded fallback used when the API gives no data. */
-export function buildFallbackBlueprintLayers(layerCoverage: Record<string, number>): BlueprintLayer[] {
+/**
+ * 蓝图层规范映射 —— 仅在 GET /api/v1/cognitive/blueprint 不可达时作为「示意数据」兜底，
+ * 页面必须以降级横幅 + DemoBadge 明示；真实环境下的 coverage 以 API 值为准。
+ */
+const ILLUSTRATIVE_COVERAGE: Record<string, number> = {
+  strategic: 92,
+  knowledge: 88,
+  agent_os: 95,
+  semantic: 90,
+  data_platform: 100,
+  security_infra: 98,
+};
+
+export function buildFallbackBlueprintLayers(): BlueprintLayer[] {
+  const layerCoverage = ILLUSTRATIVE_COVERAGE;
   return [
     {
       id: "strategic",

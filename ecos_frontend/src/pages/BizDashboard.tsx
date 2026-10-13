@@ -1,12 +1,18 @@
 /**
  * CEO经营仪表盘 — 项目/合同/产值/目标 + 经营诊断
  * Connected via api.ts → /api/v1/ecos/biz/dashboard
+ *
+ * 2026-10-13 前端检视修复（F 组）：
+ * - 删除硬编码假告警文案（"供应商华强钢构准时率67%"并非真实数据）
+ * - 端点 404/5xx 时错误卡不再直排原始 Spring JSON，按真实错误分类 + 重试
+ * - 整页中文硬编码 → t()；结构性裸色板 → theme token
+ * - KPI 缺字段显示「无数据」而非 0；缺数据不再误触发"偏差告警/脉冲按钮"
  */
 import React, { useState, useEffect, useCallback } from "react";
 import { Briefcase, FileText, TrendingUp, Building2, Users, RefreshCw, AlertCircle, Loader2, Stethoscope } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
-import { fetchBizDashboard, callDiagnosticAgent } from "../api";
+import { fetchBizDashboard, callDiagnosticAgent, isNoAccessError, NetworkError } from "../api";
 import DiagnosticPanel from "../components/DiagnosticPanel";
 
 interface BizData {
@@ -17,31 +23,60 @@ interface BizData {
   targets?: { id: string; dept_id: string; target_type: string; target_value: number; target_year: number }[];
 }
 
+/** 结构化错误（标题 + 已分类描述 + HTTP 状态），不直排原始响应体 */
+interface StructuredError {
+  title: string;
+  detail: string;
+  status?: number;
+}
+
+const targetTypeNameKey: Record<string, string> = {
+  revenue: "biz.targetType.revenue",
+  profit: "biz.targetType.profit",
+  collection_rate: "biz.targetType.collection",
+};
+
 export default function BizDashboard() {
   const { t } = useLanguage();
   const { styles } = useTheme();
   const [data, setData] = useState<BizData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<StructuredError | null>(null);
   const [diagnosticOpen, setDiagnosticOpen] = useState(false);
   const [diagnosticResult, setDiagnosticResult] = useState<any>(null);
   const [diagnosing, setDiagnosing] = useState(false);
 
+  const classifyError = useCallback((e: unknown): StructuredError => {
+    const status = (e as { status?: number } | null)?.status;
+    if (isNoAccessError(e)) {
+      return { title: t("biz.error.title"), detail: t("biz.error.forbidden"), status: 403 };
+    }
+    if (e instanceof NetworkError) {
+      return { title: t("biz.error.title"), detail: t("biz.error.network") };
+    }
+    if (typeof status === "number") {
+      const detail = status === 404 ? t("biz.error.notFound") : t("biz.error.http", { status });
+      return { title: t("biz.error.title"), detail, status };
+    }
+    return { title: t("biz.error.title"), detail: t("biz.error.unknown") };
+  }, [t]);
+
   const loadData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
-    setError("");
+    setError(null);
     try {
       const raw = await fetchBizDashboard();
       setData(raw);
-    } catch (e: any) {
-      setError(e.message || t("biz.loadFail"));
+    } catch (e) {
+      setError(classifyError(e));
+      setData(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [t]);
+  }, [classifyError]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -51,66 +86,78 @@ export default function BizDashboard() {
     try {
       const result = await callDiagnosticAgent(t("biz.diagnosticPrompt"));
       setDiagnosticResult(result);
-    } catch (e: any) {
-      setDiagnosticResult({ error: e.message || t("biz.diagnosticFail") });
+    } catch (e) {
+      // 不直排原始报文（可能是整段 Spring JSON），走同一错误分类
+      setDiagnosticResult({ error: classifyError(e).detail });
     } finally {
       setDiagnosing(false);
     }
   };
 
+  const noData = t("biz.noData");
+
   if (loading) return (
     <div className="h-full flex items-center justify-center">
       <div className="text-center space-y-3">
-        <Loader2 className="w-8 h-8 text-[#3B82F6] animate-spin mx-auto" />
-        <p className={`text-sm ${styles.cardTextMuted}`}>{t('biz.loading')}</p>
+        <Loader2 className={`w-8 h-8 ${styles.accentText} animate-spin mx-auto`} />
+        <p className={`text-sm ${styles.cardTextMuted}`}>{t("biz.loading")}</p>
       </div>
     </div>
   );
   if (error) return (
-    <div className="h-full flex items-center justify-center">
-      <div className="text-center max-w-sm">
-        <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-2" />
-        <p className={`text-sm ${styles.cardTextMuted}`}>{error}</p>
+    <div className="h-full flex items-center justify-center p-6">
+      <div className={`text-center max-w-sm p-6 rounded-xl border ${styles.cardBorder} ${styles.cardBg}`}>
+        <AlertCircle className={`w-10 h-10 ${styles.dangerText} mx-auto mb-2`} />
+        <p className={`text-sm font-semibold ${styles.dangerText}`}>{error.title}</p>
+        <p className={`text-sm ${styles.cardTextMuted} mt-1`}>{error.detail}</p>
+        {error.status !== undefined && (
+          <p className={`text-[10px] font-mono uppercase tracking-wider ${styles.cardTextMuted} mt-2`}>HTTP {error.status}</p>
+        )}
         <button type="button" onClick={() => loadData()} className={`mt-3 px-4 py-2 rounded ${styles.accentBg} text-white text-sm hover:opacity-90 transition`}>
-          {t('biz.retry')}
+          {t("biz.retry")}
         </button>
       </div>
     </div>
   );
 
-  const deptCount = data?.departments?.length || 0;
+  const deptCount = data?.departments?.length ?? null;
   const projects = data?.projectStats;
   const contracts = data?.contractStats;
 
-  // Calculate CEO KPIs from metrics
+  // CEO KPIs from metrics — 缺字段 = null（显示「无数据」），不以 0 冒充真实值
   const latestMetrics = data?.metrics || [];
   const revenueMetrics = latestMetrics.filter(m => m.metric_type === 'revenue');
-  const latestRevenue = revenueMetrics.length > 0 ? revenueMetrics[revenueMetrics.length - 1].metric_value : 0;
+  const latestRevenue: number | null = revenueMetrics.length > 0 ? revenueMetrics[revenueMetrics.length - 1].metric_value : null;
   const profitMetrics = latestMetrics.filter(m => m.metric_type === 'profit');
-  const latestProfit = profitMetrics.length > 0 ? profitMetrics[profitMetrics.length - 1].metric_value : 0;
+  const latestProfit: number | null = profitMetrics.length > 0 ? profitMetrics[profitMetrics.length - 1].metric_value : null;
   const collectionMetrics = latestMetrics.filter(m => m.metric_type === 'collection_rate');
-  const latestCollection = collectionMetrics.length > 0 ? collectionMetrics[collectionMetrics.length - 1].metric_value : 0;
+  const latestCollection: number | null = collectionMetrics.length > 0 ? collectionMetrics[collectionMetrics.length - 1].metric_value : null;
 
-  // Target comparison
+  // Target comparison — 仅在指标与目标都存在时计算，缺数据不得判为"偏差"
   const targets = data?.targets || [];
   const revenueTarget = targets.find(t => t.target_type === 'revenue');
   const profitTarget = targets.find(t => t.target_type === 'profit');
   const collectionTarget = targets.find(t => t.target_type === 'collection_rate');
 
-  const revenuePct = revenueTarget && revenueTarget.target_value > 0
-    ? Math.round((latestRevenue / (revenueTarget.target_value / 12)) * 100) : 0;
-  const profitPct = profitTarget && profitTarget.target_value > 0
-    ? Math.round((latestProfit / (profitTarget.target_value / 12)) * 100) : 0;
+  const revenuePct: number | null =
+    revenueTarget && revenueTarget.target_value > 0 && latestRevenue !== null
+      ? Math.round((latestRevenue / (revenueTarget.target_value / 12)) * 100) : null;
+  const profitPct: number | null =
+    profitTarget && profitTarget.target_value > 0 && latestProfit !== null
+      ? Math.round((latestProfit / (profitTarget.target_value / 12)) * 100) : null;
 
-  // Check for critical deviations (red highlights)
-  const hasCriticalDeviation = (revenuePct < 80 || profitPct < 80);
+  // 偏差告警只在有真实指标时触发（旧逻辑缺数据时 0<80 恒告警 = 假告警）
+  const hasCriticalDeviation = (revenuePct !== null && revenuePct < 80) || (profitPct !== null && profitPct < 80);
+
+  const fmtYi = (v: number) => t("biz.unitYi", { v: (v / 100000000).toFixed(2) });
+  const fmtWan = (v: number) => t("biz.unitWan", { v: (v / 10000).toFixed(0) });
 
   return (
     <div className="flex-1 overflow-auto p-6 lg:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className={`text-2xl font-bold ${styles.appText}`}>{t('biz.title')}</h1>
-          <p className={`text-sm ${styles.cardTextMuted} mt-1`}>{t('biz.subtitle')}</p>
+          <h1 className={`text-2xl font-bold ${styles.appText}`}>{t("biz.title")}</h1>
+          <p className={`text-sm ${styles.cardTextMuted} mt-1`}>{t("biz.subtitle")}</p>
         </div>
         <div className="flex items-center gap-3">
           <button type="button"
@@ -118,12 +165,12 @@ export default function BizDashboard() {
             disabled={diagnosing}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${
               hasCriticalDeviation
-                ? "bg-red-500 text-white hover:bg-red-600 animate-pulse"
+                ? `${styles.dangerBg} border ${styles.dangerBorder} ${styles.dangerText} animate-pulse`
                 : `${styles.inputBg} border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg}`
             } disabled:opacity-50`}
           >
             <Stethoscope className={`w-4 h-4 ${diagnosing ? "animate-spin" : ""}`} />
-            {hasCriticalDeviation ? "⚠️ 经营诊断" : "经营诊断"}
+            {t("biz.diagnostic")}
           </button>
           <button type="button"
             onClick={() => loadData(true)}
@@ -131,44 +178,49 @@ export default function BizDashboard() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg ${styles.inputBg} border ${styles.cardBorder} text-sm ${styles.cardText} ${styles.sidebarHoverBg} transition disabled:opacity-50`}
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-            刷新
+            {t("biz.refresh")}
           </button>
         </div>
       </div>
 
-      {/* KPI Cards — CEO关注的4个指标 */}
+      {/* KPI Cards — 缺字段显示「无数据」，不以 0 呈现 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KpiCard icon={Building2} label="部门数" value={deptCount} color="blue" />
+        <KpiCard icon={Building2} label={t("biz.kpi.deptCount")} value={deptCount === null ? noData : deptCount} color="blue" />
         <KpiCard
-          icon={Briefcase} label="项目总数" value={projects?.total || 0}
-          sub={`在建 ${projects?.inProgress || 0} · 合同总额 ¥${((projects?.totalAmount || 0) / 100000000).toFixed(2)}亿`}
+          icon={Briefcase} label={t("biz.kpi.projects")} value={projects?.total ?? noData}
+          sub={projects
+            ? `${t("biz.kpi.inProgress")} ${projects.inProgress ?? noData} · ${t("biz.label.contractTotal")} ${fmtYi(projects.totalAmount)}`
+            : undefined}
           color="indigo"
         />
         <KpiCard
-          icon={TrendingUp} label="月营收达标率"
-          value={`${revenuePct}%`}
-          sub={`月营收 ¥${(latestRevenue / 10000).toFixed(0)}万`}
-          color={revenuePct < 80 ? "red" : "emerald"}
+          icon={TrendingUp} label={t("biz.kpi.monthRevenueRate")}
+          value={revenuePct === null ? noData : `${revenuePct}%`}
+          sub={latestRevenue !== null ? `${t("biz.kpi.revenueMonth")} ${fmtWan(latestRevenue)}` : undefined}
+          color={revenuePct !== null && revenuePct < 80 ? "red" : "emerald"}
         />
         <KpiCard
-          icon={FileText} label="回款率"
-          value={`${latestCollection.toFixed(0)}%`}
-          sub={collectionTarget ? `目标 ${collectionTarget.target_value}%` : ""}
-          color={latestCollection < (collectionTarget?.target_value || 85) ? "red" : "emerald"}
+          icon={FileText} label={t("biz.kpi.collectionRate")}
+          value={latestCollection === null ? noData : `${latestCollection.toFixed(0)}%`}
+          sub={collectionTarget ? `${t("biz.label.target")} ${collectionTarget.target_value}%` : undefined}
+          color={latestCollection !== null && latestCollection < (collectionTarget?.target_value ?? 85) ? "red" : "emerald"}
         />
       </div>
 
-      {/* Deviation Alert */}
+      {/* Deviation Alert — 仅呈现真实指标偏差；原"供应商华强钢构准时率67%"系硬编码假文案，已删除 */}
       {hasCriticalDeviation && (
-        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+        <div className={`mb-6 p-4 ${styles.dangerBg} border ${styles.dangerBorder} rounded-xl flex items-start gap-3`}>
+          <AlertCircle className={`w-5 h-5 ${styles.dangerText} mt-0.5 shrink-0`} />
           <div>
-            <p className="text-sm font-semibold text-red-700 dark:text-red-400">经营偏差告警</p>
-            <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-              营收月达标率{revenuePct}%（低于80%）· 利润月达标率{profitPct}% · 供应商华强钢构准时率67%
+            <p className={`text-sm font-semibold ${styles.dangerText}`}>{t("biz.alert.title")}</p>
+            <p className={`text-xs ${styles.dangerText} mt-1`}>
+              {[
+                revenuePct !== null ? t("biz.alert.revenue", { v: `${revenuePct}%` }) : null,
+                profitPct !== null ? t("biz.alert.profit", { v: `${profitPct}%` }) : null,
+              ].filter(Boolean).join(" · ")}
             </p>
-            <button type="button" onClick={runDiagnostic} className="mt-2 text-xs font-medium text-red-600 dark:text-red-400 underline hover:text-red-800">
-              点击进行AI诊断 →
+            <button type="button" onClick={runDiagnostic} className={`mt-2 text-xs font-medium ${styles.dangerText} underline hover:opacity-80`}>
+              {t("biz.alert.diagnoseCta")}
             </button>
           </div>
         </div>
@@ -177,11 +229,11 @@ export default function BizDashboard() {
       {/* Department + Project Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Departments */}
-        {deptCount > 0 && (
+        {deptCount !== null && deptCount > 0 && (
           <div className={`${styles.cardBg} rounded-xl border ${styles.cardBorder} p-5`}>
             <h2 className={`text-lg font-semibold ${styles.appText} mb-4 flex items-center gap-2`}>
-              <Users className="w-5 h-5 text-blue-500" />
-              组织机构 ({deptCount})
+              <Users className={`w-5 h-5 ${styles.accentText}`} />
+              {t("biz.section.org", { n: deptCount })}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {data?.departments?.slice(0, 6).map((dept) => (
@@ -198,15 +250,15 @@ export default function BizDashboard() {
         {projects && (
           <div className={`${styles.cardBg} rounded-xl border ${styles.cardBorder} p-5`}>
             <h2 className={`text-lg font-semibold ${styles.appText} mb-4 flex items-center gap-2`}>
-              <Briefcase className="w-5 h-5 text-indigo-500" />
-              项目概览
+              <Briefcase className={`w-5 h-5 ${styles.accentText}`} />
+              {t("biz.section.projects")}
             </h2>
             <div className="space-y-3">
-              <StatRow label="项目总数" value={projects.total} />
-              <StatRow label="在建项目" value={projects.inProgress} highlight />
-              <StatRow label="已完成" value={projects.completed} />
-              <StatRow label="规划中" value={projects.planning} />
-              <StatRow label="合同总额" value={`¥${(projects.totalAmount / 100000000).toFixed(2)}亿`} />
+              <StatRow label={t("biz.stat.total")} value={projects.total ?? noData} />
+              <StatRow label={t("biz.stat.inProgress")} value={projects.inProgress ?? noData} highlight />
+              <StatRow label={t("biz.stat.completed")} value={projects.completed ?? noData} />
+              <StatRow label={t("biz.stat.planning")} value={projects.planning ?? noData} />
+              <StatRow label={t("biz.stat.contractTotal")} value={projects.totalAmount != null ? fmtYi(projects.totalAmount) : noData} />
             </div>
           </div>
         )}
@@ -216,31 +268,50 @@ export default function BizDashboard() {
       {targets.length > 0 && (
         <div className={`${styles.cardBg} rounded-xl border ${styles.cardBorder} p-5 mb-6`}>
           <h2 className={`text-lg font-semibold ${styles.appText} mb-4 flex items-center gap-2`}>
-            <TrendingUp className="w-5 h-5 text-amber-500" />
-            年度目标追踪
+            <TrendingUp className={`w-5 h-5 ${styles.warningText}`} />
+            {t("biz.section.targets")}
           </h2>
           <div className="space-y-3">
-            {targets.map((t) => {
-              const actual = t.target_type === 'revenue' ? latestRevenue
-                : t.target_type === 'profit' ? latestProfit
-                : t.target_type === 'collection_rate' ? latestCollection : 0;
-              const pct = t.target_value > 0 ? Math.round((actual / t.target_value) * 100) : 0;
-              const atRisk = pct < 80;
+            {targets.map((item) => {
+              const actual = item.target_type === 'revenue' ? latestRevenue
+                : item.target_type === 'profit' ? latestProfit
+                : item.target_type === 'collection_rate' ? latestCollection : null;
+              const pct: number | null = actual !== null && item.target_value > 0
+                ? Math.round((actual / item.target_value) * 100) : null;
+              const atRisk = pct !== null && pct < 80;
               return (
-                <div key={t.id} className="flex items-center gap-4">
-                  <span className={`text-sm ${styles.cardText} w-32`}>{t.target_type === 'revenue' ? '营收' : t.target_type === 'profit' ? '利润' : '回款率'}</span>
+                <div key={item.id} className="flex items-center gap-4">
+                  <span className={`text-sm ${styles.cardText} w-32`}>
+                    {targetTypeNameKey[item.target_type] ? t(targetTypeNameKey[item.target_type]) : item.target_type}
+                  </span>
                   <div className={`flex-1 h-3 ${styles.inputBg} rounded-full overflow-hidden`}>
-                    <div
-                      className={`h-full rounded-full transition-all ${atRisk ? 'bg-red-500' : 'bg-emerald-500'}`}
-                      style={{ width: `${Math.min(pct, 100)}%` }}
-                    />
+                    {pct !== null && (
+                      <div
+                        className={`h-full rounded-full transition-all ${atRisk ? styles.dangerText : styles.successText}`}
+                        style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: "currentColor" }}
+                      />
+                    )}
                   </div>
-                  <span className={`text-sm font-mono ${atRisk ? 'text-red-500' : 'text-emerald-600'}`}>
-                    {pct}%
+                  <span className={`text-sm font-mono ${pct === null ? styles.cardTextMuted : atRisk ? styles.dangerText : styles.successText}`}>
+                    {pct === null ? noData : `${pct}%`}
                   </span>
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Contract summary（原 contractStats 从未呈现，保留口径注释以便后续接线时补充） */}
+      {contracts && contracts.total != null && (
+        <div className={`${styles.cardBg} rounded-xl border ${styles.cardBorder} p-5`}>
+          <h2 className={`text-lg font-semibold ${styles.appText} mb-4 flex items-center gap-2`}>
+            <FileText className={`w-5 h-5 ${styles.accentText}`} />
+            {t("biz.section.contracts")}
+          </h2>
+          <div className="space-y-3">
+            <StatRow label={t("biz.stat.contractTotalCount")} value={contracts.total ?? noData} />
+            <StatRow label={t("biz.stat.contractTotalValue")} value={contracts.totalValue || noData} />
           </div>
         </div>
       )}
@@ -263,7 +334,7 @@ function StatRow({ label, value, highlight }: { label: string; value: number | s
   return (
     <div className="flex items-center justify-between py-1.5">
       <span className={`text-sm ${styles.cardTextMuted}`}>{label}</span>
-      <span className={`text-sm font-semibold ${highlight ? 'text-indigo-600 dark:text-indigo-400' : styles.cardText}`}>
+      <span className={`text-sm font-semibold ${highlight ? styles.accentText : styles.cardText}`}>
         {value}
       </span>
     </div>
@@ -271,7 +342,7 @@ function StatRow({ label, value, highlight }: { label: string; value: number | s
 }
 
 function KpiCard({ icon: Icon, label, value, sub, color }: {
-  icon: any; label: string; value: number | string; sub?: string; color: string;
+  icon: React.ComponentType<{ className?: string }>; label: string; value: number | string; sub?: string; color: string;
 }) {
   const { styles } = useTheme();
   // KPI 图标语义色映射（blue/indigo/emerald/amber/red）— 属状态语义枚举，保留

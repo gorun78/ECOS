@@ -6,12 +6,14 @@
  *
  * @license Apache-2.0
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
-import { Box, ChevronRight, Compass, GitMerge, History, Layers, Network, ShieldCheck, Tag, Workflow } from 'lucide-react';
+import { Box, ChevronRight, Compass, GitMerge, History, Info, Layers, Network, ShieldCheck, Tag, Workflow } from 'lucide-react';
 import DynamicIcon from '../../components/ontology/DynamicIcon';
-import { getDomainColorClasses, auditLogs } from './helpers';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
+import { getDomainColorClasses } from './helpers';
+import { deleteWorkbenchDomain } from '../../services/ontologyApi';
 import DomainManager from './DomainManager';
 import OntologyGraph from '../../components/OntologyGraph';
 import type { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, OntologyDomain } from '../../types/ontology';
@@ -32,21 +34,37 @@ interface OverviewViewProps {
   onViewModeChange?: (mode: string) => void;
   onUpdateDomains: (domains: OntologyDomain[]) => void;
   onUpdateObjectTypes: (objectTypes: ObjectType[]) => void;
+  onToast?: (type: 'success' | 'info' | 'error', message: string) => void;
 }
 
 export default function OverviewView({
   objectTypes, linkTypes, actionTypes, interfaces, sharedProperties, datasets,
   domains, selectedDomainFilter, onSelectDomainFilter,
   onSelectNode, onSelectEdge, onQuickNavigate, onUpdateDomains, onUpdateObjectTypes,
+  onToast,
 }: OverviewViewProps) {
   const { t } = useLanguage();
   const { styles } = useTheme();
+  const [pendingDomainDelete, setPendingDomainDelete] = useState<OntologyDomain | null>(null);
 
-  const handleDeleteDomain = (domainId: string) => {
-    if (!window.confirm(t('ontology.confirm_delete_domain').replace('{name}', domains.find(d => d.id === domainId)?.displayName || ''))) return;
-    onUpdateDomains(domains.filter(d => d.id !== domainId));
-    onUpdateObjectTypes(objectTypes.map(ot => ot.domainId === domainId ? { ...ot, domainId: undefined } : ot));
-    if (selectedDomainFilter === domainId) onSelectDomainFilter(null);
+  /**
+   * 域删除接真实端点（DELETE /api/v1/ontology/domains/{code}，与侧栏 useDomainManager 同源）：
+   * 此前仅 window.confirm + 本地 filter —— 刷新后域会"复活"（假删除）。
+   * 危险操作走 ConfirmDialog（禁 window.confirm）；后端拒绝（域内含实体）时如实报错。
+   */
+  const executeDeleteDomain = async () => {
+    if (!pendingDomainDelete) return;
+    const target = pendingDomainDelete;
+    setPendingDomainDelete(null);
+    try {
+      await deleteWorkbenchDomain(target.code || target.id);
+      onUpdateDomains(domains.filter(d => d.id !== target.id));
+      onUpdateObjectTypes(objectTypes.map(ot => ot.domainId === target.id ? { ...ot, domainId: undefined } : ot));
+      if (selectedDomainFilter === target.id) onSelectDomainFilter(null);
+      onToast?.('success', t('ow.domain.deleted').replace('{name}', target.displayName));
+    } catch (e: any) {
+      onToast?.('error', t('ow.domain.delete_failed').replace('{error}', String(e?.message || e)));
+    }
   };
 
   const displayedObjects = !selectedDomainFilter ? objectTypes
@@ -94,7 +112,12 @@ export default function OverviewView({
         domains={domains} objectTypes={objectTypes}
         selectedDomainFilter={selectedDomainFilter} onSelectDomainFilter={onSelectDomainFilter}
         onUpdateDomains={onUpdateDomains} onUpdateObjectTypes={onUpdateObjectTypes}
-        onQuickNavigate={onQuickNavigate} onDeleteDomain={handleDeleteDomain}
+        onQuickNavigate={onQuickNavigate}
+        onDeleteDomain={(domainId) => {
+          const target = domains.find(d => d.id === domainId);
+          if (target) setPendingDomainDelete(target);
+        }}
+        onToast={onToast}
       />
 
       {/* Bottom: Quick Nav + Audit Logs */}
@@ -106,13 +129,28 @@ export default function OverviewView({
             {objectTypes.some(ot => !ot.domainId) && (<div className="space-y-1.5"><div className={`flex items-center gap-1.5 text-[10px] font-extrabold ${styles.cardTextMuted} tracking-wider uppercase border-b ${styles.divider} pb-1`}><span className={`w-2 h-2 rounded-full ${styles.cardTextMuted} opacity-50`} /><span>{t('ow.section.unassignedPool')}</span></div><div className="space-y-1 pl-1">{objectTypes.filter(ot => !ot.domainId).map(ot => (<div key={ot.id} onClick={() => onQuickNavigate('object', ot.id)} className={`flex items-center justify-between p-1.5 rounded-lg border ${styles.divider} hover:border-blue-300 hover:bg-blue-50/20 cursor-pointer transition-all group`}><div className="flex items-center gap-2 truncate"><span className={`p-0.5 rounded border ${ot.color}`}><DynamicIcon name={ot.icon} size={11} /></span><span className={`text-xs font-medium ${styles.cardText}`}>{ot.displayName}</span></div><ChevronRight size={11} className={`${styles.cardTextMuted} opacity-50 group-hover:translate-x-0.5`} /></div>))}</div></div>)}
           </div>
         </div>
+        {/* 无假真理：原「审计日志」面板渲染的是 helpers.ts 硬编码 4 条假记录
+            （发布 v1.2.4 / Flight 属性…），后端不存在本体操作审计端点。
+            假记录已删 —— 数据源未接入前本面板只显示如实的空态说明，不伪造历史。 */}
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs lg:col-span-2 space-y-3`}>
           <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}><History size={14} className={styles.muted} />{t('ow.section.auditLog')}</h3>
-          <div className={`divide-y ${styles.divider} max-h-[260px] overflow-y-auto pr-1`}>
-            {auditLogs.map(log => (<div key={log.id} className="py-2.5 first:pt-0 last:pb-0 text-[11px] flex items-start gap-3"><div className="mt-0.5"><span className={`w-2 h-2 rounded-full inline-block ${log.type === 'publish' ? 'bg-blue-500' : log.type === 'create' ? 'bg-emerald-500' : `${styles.cardTextMuted} opacity-50`}`} /></div><div className="flex-1 space-y-0.5"><div className="flex justify-between items-center text-xs"><span className={`font-semibold ${styles.cardText}`}>{log.action}</span><span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>{log.time}</span></div><p className={`${styles.cardTextMuted} text-[11px] leading-relaxed`}>{log.detail}</p><div className={`text-[10px] ${styles.cardTextMuted} font-mono`}>{t('ow.label.operator')} {log.user}</div></div></div>))}
+          <div className={`flex items-start gap-2 rounded-lg border border-dashed ${styles.cardBorder} px-4 py-6 text-xs ${styles.muted}`}>
+            <Info size={14} className="shrink-0 mt-0.5" />
+            <span>{t('ontology.audit_no_source')}</span>
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        visible={!!pendingDomainDelete}
+        danger
+        title={t('ontology.confirm_delete_domain_title')}
+        message={t('ontology.confirm_delete_domain').replace('{name}', pendingDomainDelete?.displayName || '')}
+        confirmText={t('ontology.btn_confirm_delete')}
+        cancelText={t('ow.btn.cancel')}
+        onConfirm={executeDeleteDomain}
+        onCancel={() => setPendingDomainDelete(null)}
+      />
     </div>
   );
 }

@@ -26,6 +26,7 @@ import {
   type EntityMappingItem,
 } from '../services/knowledgeApi';
 import { showToastGlobal } from '../../../components/common/Toast';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import OntologyTreePicker from './components/OntologyTreePicker';
 import MonitorPanel from './components/MonitorPanel';
 
@@ -181,8 +182,14 @@ export default function DatasyncTab() {
     }
   }, [loadSchedules]);
 
-  const onDelete = useCallback(async (row: ScheduledExtractVo) => {
-    if (!window.confirm(t('knowledge.datasync.sched.del_confirm'))) return;
+  const [pendingDelRow, setPendingDelRow] = useState<ScheduledExtractVo | null>(null);
+
+  const onDelete = useCallback((row: ScheduledExtractVo) => setPendingDelRow(row), []);
+
+  const runDel = useCallback(async () => {
+    const row = pendingDelRow;
+    setPendingDelRow(null);
+    if (!row) return;
     try {
       await deleteScheduledExtract(row.id);
       void loadSchedules();
@@ -190,7 +197,7 @@ export default function DatasyncTab() {
       console.warn('delete schedule failed', e);
       setError(String(e));
     }
-  }, [loadSchedules, t]);
+  }, [pendingDelRow, loadSchedules]);
 
   const onEditStart = useCallback((row: ScheduledExtractVo) => {
     setDraft({
@@ -363,6 +370,16 @@ export default function DatasyncTab() {
           active={active}
           trigger={activeTrigger}
         />
+      <ConfirmDialog
+        visible={!!pendingDelRow}
+        danger
+        title={t('knowledge.datasync.sched.del_title')}
+        message={t('knowledge.datasync.sched.del_confirm')}
+        confirmText={t('common.confirm')}
+        cancelText={t('common.cancel')}
+        onConfirm={() => void runDel()}
+        onCancel={() => setPendingDelRow(null)}
+      />
     </div>
   );
 }

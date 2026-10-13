@@ -20,6 +20,7 @@ import DomainDropdownMenu from './sidebar/DomainDropdownMenu';
 import DomainFormModal from './sidebar/DomainFormModal';
 import SidebarElementSections from './sidebar/SidebarElementSections';
 import CreateElementMenu from './sidebar/CreateElementMenu';
+import ConfirmDialog from '../common/ConfirmDialog';
 
 type SidebarCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary' | 'caliber' | 'function_audit';
 
@@ -45,6 +46,10 @@ interface SidebarProps {
   onCreateNew: (type: 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'function') => void;
   /** T8: 域 CRUD/workflow 结果 toast（由 Layout 提供 showToast） */
   onToast?: (type: 'success' | 'info' | 'error', message: string) => void;
+  /** 无假真理：无后端持久化端点的类型 ⇒ 新建菜单禁用并标注能力未上线 */
+  unsupportedCreateTypes?: ReadonlyArray<'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'function'>;
+  /** 单一来源 demo 数据的分节（function/interface/shared_property）⇒ 挂 DEMO 徽标 */
+  demoSectionKeys?: ReadonlyArray<string>;
 }
 
 export default function Sidebar({
@@ -65,7 +70,9 @@ export default function Sidebar({
   selectedId,
   onSelectCategory,
   onCreateNew,
-  onToast
+  onToast,
+  unsupportedCreateTypes,
+  demoSectionKeys
 }: SidebarProps) {
   const { t } = useLanguage();
   const { styles } = useTheme();
@@ -183,6 +190,7 @@ export default function Sidebar({
         onSelectCategory={onSelectCategory}
         expanded={expanded}
         toggleExpand={toggleExpand}
+        demoSectionKeys={demoSectionKeys}
       />
 
       {/* Bottom Action bar — T4: 替换原来的 白底/黑底 硬编码 → theme tokens */}
@@ -190,6 +198,7 @@ export default function Sidebar({
         showCreateDropdown={showCreateDropdown}
         setShowCreateDropdown={setShowCreateDropdown}
         onCreateNew={onCreateNew}
+        unsupportedCreateTypes={unsupportedCreateTypes}
       />
 
       {/* 业务划分域模态对话框 — T8: CRUD 已接后端 (OntologyDomainApiController) */}
@@ -255,6 +264,18 @@ export default function Sidebar({
           <span>{t('ow.sidebar.functionAudit')}</span>
         </button>
       </div>
+
+      {/* 域删除确认门（架构铁律：禁 window.confirm，统一 ConfirmDialog） */}
+      <ConfirmDialog
+        visible={!!domainManager.pendingDomainDelete}
+        danger
+        title={t('ontology.confirm_delete_domain_title')}
+        message={t('ow.msg.confirmDeleteDomain').replace('{name}', domainManager.pendingDomainDelete?.displayName || '')}
+        confirmText={t('ontology.btn_confirm_delete')}
+        cancelText={t('ow.btn.cancel')}
+        onConfirm={domainManager.confirmDomainDelete}
+        onCancel={() => domainManager.setPendingDomainDelete(null)}
+      />
 
     </aside>
   );

@@ -1,6 +1,6 @@
 /**
  * ExtractionReviewPanel — Knowledge extraction review panel
- * Left column: raw text with entity highlighting (DOMPurify whitelist sanctioned)
+ * Left column: raw text with entity highlighting (React segments — no innerHTML, XSS-safe by construction)
  * Right column: extraction result list (entities/relations/rule checkbox confirmation) + manual correction + confirm registration
  *
  * @license Apache-2.0
@@ -9,23 +9,12 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
   Check, X, Edit3, RotateCw, ChevronDown, Network, ShieldAlert,
-  Layers, Send, Ban, CheckSquare, Square, FileText,
+  Layers, Send, Ban, CheckSquare, Square, FileText, AlertCircle,
 } from 'lucide-react';
-import DOMPurify from 'dompurify';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
+import { useToast } from '../../../components/common/Toast';
 import { apiFetch } from '../../../api';
-
-// ── XSS Whitelist: Only allow <mark> highlight tags ────────────────────────
-
-const SANITIZE_CONFIG = {
-  ALLOWED_TAGS: ['mark', 'span', 'code', 'strong'],
-  ALLOWED_ATTR: ['class', 'style'],
-};
-
-function sanitizeHighlight(html: string): string {
-  return DOMPurify.sanitize(html, SANITIZE_CONFIG);
-}
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -56,6 +45,7 @@ interface Props {
 export default function ExtractionReviewPanel({ extractionId, sourceText, reviewData, onBack }: Props) {
   const { t } = useLanguage();
   const { styles } = useTheme();
+  const { showToast } = useToast();
 
   const [entities, setEntities] = useState<ReviewEntity[]>(reviewData.entities.map(e => ({...e, selected: true})));
   const [relations, setRelations] = useState<ReviewRelation[]>(reviewData.relations.map(r => ({...r, selected: true})));
@@ -66,21 +56,24 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
   const [editType, setEditType] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  // 检视报告 §4.4 D组：approve/reject 失败不再 console.warn 静默 —— 落错误态（可重试）+ toast
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  // Highlight source text with entity names
-  const highlightedSource = useMemo(() => {
-    if (!sourceText) return '';
+  // Highlight source text with entity names — rendered as React <mark> segments
+  // (原实现拼 HTML 串 + dangerouslySetInnerHTML/DOMPurify，已移除：文本节点直渲，天然 XSS 安全)
+  const highlightSegments = useMemo<React.ReactNode[]>(() => {
+    if (!sourceText) return [];
     const names = entities.filter(e => e.selected).map(e => e.name).filter(Boolean);
-    if (!names.length) return sourceText;
+    if (!names.length) return [sourceText];
     const escaped = names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
     const pattern = new RegExp(`(${escaped.join('|')})`, 'g');
     const parts = sourceText.split(pattern);
     return parts.map((part, i) =>
       names.includes(part)
-        ? `<mark class="bg-yellow-200 text-yellow-900 px-0.5 rounded">${part}</mark>`
+        ? <mark key={i} className={`${styles.warningBg} ${styles.warningText} px-0.5 rounded`}>{part}</mark>
         : part
-    ).join('');
-  }, [sourceText, entities]);
+    );
+  }, [sourceText, entities, styles]);
 
   const toggleEntity = useCallback((id: string) => {
     setEntities(prev => prev.map(e => e.id===id ? {...e, selected:!e.selected} : e));
@@ -107,6 +100,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
 
   const handleApprove = useCallback(async () => {
     setSubmitting(true);
+    setActionError(null);
     try {
       await apiFetch(`/v1/kb/extraction/${extractionId}/approve`, {
         method: 'POST',
@@ -116,19 +110,34 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
           rules: selectedRules.map(r => ({id:r.id, name:r.name, description:r.description})),
         }),
       });
-      // Trigger entity linking after approval
-      try { await apiFetch('/v1/kb/entity/link', { method: 'POST', body: JSON.stringify({extractionId}) }); } catch {}
+      // Trigger entity linking after approval — 链接请求失败 ≠ 审批失败：
+      // 审批已成功仍算完成，但链接失败必须显式告知（warn toast），不再 catch{} 吞掉
+      try { await apiFetch('/v1/kb/entity/link', { method: 'POST', body: JSON.stringify({extractionId}) }); }
+      catch { showToast('warning', t('extractReview.msg_link_failed')); }
       setDone(true);
-    } catch(e: unknown) { console.warn('Approve failed:', e); }
+      showToast('success', t('extractReview.msg_approve_ok'));
+    } catch(e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setActionError(`${t('extractReview.msg_approve_failed')}${msg ? `: ${msg}` : ''}`);
+      showToast('error', t('extractReview.msg_approve_failed'));
+    }
     finally { setSubmitting(false); }
-  }, [extractionId, selectedEntities, selectedRelations, selectedRules]);
+  }, [extractionId, selectedEntities, selectedRelations, selectedRules, showToast, t]);
 
   const handleReject = useCallback(async () => {
     setSubmitting(true);
-    try { await apiFetch(`/v1/kb/extraction/${extractionId}/reject`, { method: 'POST' }); setDone(true); }
-    catch(e: unknown) { console.warn('Reject failed:', e); }
+    setActionError(null);
+    try {
+      await apiFetch(`/v1/kb/extraction/${extractionId}/reject`, { method: 'POST' });
+      setDone(true);
+      showToast('success', t('extractReview.msg_reject_ok'));
+    } catch(e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setActionError(`${t('extractReview.msg_reject_failed')}${msg ? `: ${msg}` : ''}`);
+      showToast('error', t('extractReview.msg_reject_failed'));
+    }
     finally { setSubmitting(false); }
-  }, [extractionId]);
+  }, [extractionId, showToast, t]);
 
   const tabItems: Array<{key:'entities'|'relations'|'rules';labelKey:string;Icon:typeof Network;count:number}> = [
     { key:'entities', labelKey:'extractReview.tabs.entities', Icon: Layers, count: entities.length },
@@ -142,7 +151,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
         <div className={`p-4 ${styles.successBg} rounded-2xl`}><Check size={32} className={styles.successText} /></div>
         <p className={`text-sm font-extrabold ${styles.cardText}`}>{t('extractReview.complete.title')}</p>
         <p className={`text-[11px] ${styles.cardTextMuted}`}>{t('extractReview.complete.subtitle')}</p>
-        <button type="button" onClick={onBack} className={`px-4 py-2 ${styles.accentBg} text-white font-bold rounded-lg text-xs cursor-pointer`}>
+        <button type="button" onClick={onBack} className={`px-4 py-2 ${styles.accentBg} ${styles.accentSolidText} font-bold rounded-lg text-xs cursor-pointer`}>
           {t('extractReview.backToUpload')}
         </button>
       </div>
@@ -159,16 +168,27 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
         <div className="flex items-center gap-2">
           <span className={`text-[10px] ${styles.cardTextMuted}`}>{t('extractReview.selected', { n: totalSelected })}</span>
           <button type="button" onClick={handleReject} disabled={submitting}
-            className="px-4 py-1.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-lg text-[11px] cursor-pointer disabled:opacity-50 flex items-center gap-1">
+            className={`px-4 py-1.5 ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder} border font-bold rounded-lg text-[11px] cursor-pointer disabled:opacity-50 flex items-center gap-1`}>
             <Ban size={11} /> {t('extractReview.rejectAll')}
           </button>
           <button type="button" onClick={handleApprove} disabled={submitting || totalSelected===0}
-            className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg text-[11px] cursor-pointer disabled:opacity-50 flex items-center gap-1">
+            className={`px-4 py-1.5 ${styles.accentBg} ${styles.accentSolidText} font-bold rounded-lg text-[11px] cursor-pointer disabled:opacity-50 flex items-center gap-1`}>
             {submitting ? <RotateCw size={11} className="animate-spin" /> : <Send size={11} />}
             {t('extractReview.approve')}
           </button>
         </div>
       </div>
+
+      {/* 失败错误态（可重试）：审批/驳回请求失败时显式呈现，不静默 */}
+      {actionError && (
+        <div role="alert" className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-[11px] font-bold ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
+          <AlertCircle size={13} className="shrink-0" />
+          <span className="flex-1">{actionError}</span>
+          <button type="button" onClick={() => setActionError(null)} className="cursor-pointer opacity-70 hover:opacity-100" aria-label={t('extractReview.dismiss_error')}>
+            <X size={13} />
+          </button>
+        </div>
+      )}
 
       {/* Main split: left source + right review */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -177,10 +197,9 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
           <h3 className={`text-[11px] font-extrabold ${styles.cardText} flex items-center gap-1.5`}>
             <FileText size={12} /> {t('extractReview.sourceText')}
           </h3>
-          <div
-            className={`text-[11px] leading-relaxed font-sans whitespace-pre-wrap overflow-y-auto max-h-[500px] ${styles.cardText}`}
-            dangerouslySetInnerHTML={{ __html: sanitizeHighlight(highlightedSource) }}
-          />
+          <div className={`text-[11px] leading-relaxed font-sans whitespace-pre-wrap overflow-y-auto max-h-[500px] ${styles.cardText}`}>
+            {highlightSegments}
+          </div>
         </div>
 
         {/* Right: Review results with tabs */}
@@ -190,7 +209,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
             {tabItems.map(tab => (
               <button type="button" key={tab.key} onClick={() => setActiveTab(tab.key)}
                 className={`flex-1 px-3 py-2 text-[10px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
-                  activeTab===tab.key ? `${styles.accentBg} text-white` : `${styles.cardTextMuted} hover:opacity-80`
+                  activeTab===tab.key ? `${styles.accentBg} ${styles.accentSolidText}` : `${styles.cardTextMuted} hover:opacity-80`
                 }`}>
                 <tab.Icon size={11} /> {t(tab.labelKey)} ({tab.count})
               </button>
@@ -202,7 +221,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
             {activeTab==='entities' && entities.map(entity => (
               <div key={entity.id} className="px-3 py-2.5 flex items-start gap-2.5 hover:bg-opacity-20 data-[hover]:hover:bg-black /[0.02]">
                 <button type="button" onClick={() => toggleEntity(entity.id)} className="mt-0.5 shrink-0 cursor-pointer">
-                  {entity.selected ? <CheckSquare size={14} className="text-emerald-500" /> : <Square size={14} className={styles.muted} />}
+                  {entity.selected ? <CheckSquare size={14} className={styles.successText} /> : <Square size={14} className={styles.muted} />}
                 </button>
                 <div className="flex-1 min-w-0">
                   {editingId===entity.id ? (
@@ -211,7 +230,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
                         className={`flex-1 px-2 py-1 ${styles.inputBg} ${styles.inputBorder} border rounded text-[10px] font-bold ${styles.inputText}`} />
                       <input value={editType} onChange={e=>setEditType(e.target.value)}
                         className={`w-20 px-2 py-1 ${styles.inputBg} ${styles.inputBorder} border rounded text-[10px] font-bold ${styles.inputText}`} />
-                      <button type="button" onClick={saveEdit} className="px-2 py-1 bg-emerald-500 text-white rounded text-[10px]"><Check size={10}/></button>
+                      <button type="button" onClick={saveEdit} className={`px-2 py-1 ${styles.accentBg} ${styles.accentSolidText} rounded text-[10px] cursor-pointer`}><Check size={10}/></button>
                       <button type="button" onClick={()=>setEditingId(null)} className={`px-2 py-1 ${styles.sidebarBg} rounded text-[10px]`}><X size={10}/></button>
                     </div>
                   ) : (
@@ -222,7 +241,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
                         <span key={k} className={`text-[8px] font-mono ${styles.cardTextMuted} ${styles.cardBg} px-1 py-0.5 rounded`}>{k}:{String(v)}</span>
                       ))}
                       <button type="button" onClick={()=>startEdit(entity.id,entity.name,entity.type)}
-                        className="ml-auto text-[9px] text-amber-500 hover:underline cursor-pointer flex items-center gap-0.5">
+                        className={`ml-auto text-[9px] ${styles.warningText} hover:underline cursor-pointer flex items-center gap-0.5`}>
                         <Edit3 size={9}/> {t('extractReview.edit')}
                       </button>
                     </div>
@@ -233,7 +252,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
             {activeTab==='relations' && relations.map(rel => (
               <div key={rel.id} className="px-3 py-2.5 flex items-center gap-2.5 hover:bg-black/5">
                 <button type="button" onClick={() => toggleRelation(rel.id)} className="shrink-0 cursor-pointer">
-                  {rel.selected ? <CheckSquare size={14} className="text-emerald-500" /> : <Square size={14} className={styles.muted} />}
+                  {rel.selected ? <CheckSquare size={14} className={styles.successText} /> : <Square size={14} className={styles.muted} />}
                 </button>
                 <span className={`text-[10px] font-bold ${styles.cardText}`}>{rel.source}</span>
                 <span className={`px-1.5 py-0.5 ${styles.infoBg} ${styles.infoText} text-[9px] font-bold rounded-full`}>{rel.type}</span>
@@ -243,7 +262,7 @@ export default function ExtractionReviewPanel({ extractionId, sourceText, review
             {activeTab==='rules' && rules.map(rule => (
               <div key={rule.id} className="px-3 py-2.5 flex items-start gap-2.5 hover:bg-black/5">
                 <button type="button" onClick={() => toggleRule(rule.id)} className="mt-0.5 shrink-0 cursor-pointer">
-                  {rule.selected ? <CheckSquare size={14} className="text-emerald-500" /> : <Square size={14} className={styles.muted} />}
+                  {rule.selected ? <CheckSquare size={14} className={styles.successText} /> : <Square size={14} className={styles.muted} />}
                 </button>
                 <div className="flex-1 min-w-0">
                   <span className={`text-[11px] font-bold ${styles.cardText}`}>{rule.name}</span>

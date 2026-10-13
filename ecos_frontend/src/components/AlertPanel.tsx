@@ -3,9 +3,11 @@
  * Connected to: /api/alerts/*, WebSocket /ws → /topic/alerts
  */
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Bell, AlertTriangle, CheckCircle2, XCircle, RefreshCw, Zap, History, Trash2, Plus } from "lucide-react";
+import { Bell, AlertTriangle, CheckCircle2, XCircle, RefreshCw, Zap, History, Trash2, Plus, WifiOff } from "lucide-react";
 import { useLanguage } from "../pages/../components/LanguageContext";
 import { useTheme } from "../pages/../components/ThemeContext";
+import ConfirmDialog from "./common/ConfirmDialog";
+import { showToastGlobal } from "./common/Toast";
 import {
   fetchAlertRules,
   fetchAlertHistory,
@@ -49,7 +51,11 @@ export default function AlertPanel() {
   const [testValue, setTestValue] = useState("50");
   const [showNewRule, setShowNewRule] = useState(false);
   const [newRule, setNewRule] = useState({ name: "", metric: "", operator: "<", threshold: "80", level: "WARN" });
+  const [pendingDelete, setPendingDelete] = useState<{ id: number; name: string } | null>(null);
+  const [wsDegraded, setWsDegraded] = useState(false);
+  const [wsError, setWsError] = useState("");
   const stompRef = useRef<any>(null);
+  const wsAvailable = useRef(true);
 
   // ── Fetch rules + history ────────────────
   const fetchAll = useCallback(async () => {
@@ -71,52 +77,69 @@ export default function AlertPanel() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   // ── WebSocket connection ──────────────────
-  useEffect(() => {
+  const connectWs = useCallback((auto: boolean) => {
     try {
-      // Use SockJS + STOMP pattern via simple WebSocket for /topic/alerts
-      const connect = () => {
-        const wsUrl = `ws://${window.location.hostname}:8080/ws`;
-        const socket = new WebSocket(wsUrl);
+      if (!wsAvailable.current) return;
+      // Same-origin as the frontend (vite dev server / BFF), no hardcoded :8080
+      const wsBase = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host;
+      const socket = new WebSocket(wsBase + "/ws");
 
-        socket.onopen = () => {
-          // Subscribe to alerts topic via STOMP-like frame
-          socket.send("SUBSCRIBE\nid:sub-0\ndestination:/topic/alerts\n\n\0");
-        };
-
-        socket.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            // STOMP MESSAGE frame
-            if (data && data.ruleName) {
-              setLiveAlerts(prev => [data, ...prev].slice(0, 10));
-            }
-          } catch {
-            // Try parsing STOMP frame
-            const body = event.data.split("\n\n").pop()?.replace("\0", "") || "";
-            try {
-              const alert = JSON.parse(body);
-              if (alert.ruleName) {
-                setLiveAlerts(prev => [alert, ...prev].slice(0, 10));
-              }
-            } catch {}
-          }
-        };
-
-        socket.onclose = () => {
-          // Reconnect after 5s
-          setTimeout(connect, 5000);
-        };
-
-        stompRef.current = socket;
+      socket.onopen = () => {
+        setWsDegraded(false);
+        setWsError("");
+        // Subscribe to alerts topic via STOMP-like frame
+        socket.send("SUBSCRIBE\nid:sub-0\ndestination:/topic/alerts\n\n\0");
       };
 
-      connect();
-    } catch {}
+      socket.onmessage = (event: MessageEvent) => {
+        const msg = event.data as string;
+        const isStompFrame = /^[A-Z]+ /.test(msg);
+        // Strip STOMP frame header; drop control frames (e.g. +OK heartbeats)
+        const rawFrame = msg.split("\n\n").pop() ?? msg;
+        const body = rawFrame.replace("\u0000", "");
+        if (isStompFrame && !body) return;
+        let alert: { ruleName?: unknown };
+        try {
+          alert = JSON.parse(isStompFrame ? body : msg);
+        } catch {
+          // Non-JSON control frame (e.g. STOMP +OK) — nothing to surface
+          return;
+        }
+        if (alert && (alert as { ruleName?: string }).ruleName) {
+          setLiveAlerts(prev => [alert, ...prev].slice(0, 10));
+        }
+      };
 
+      socket.onerror = (e) => {
+        if (!wsAvailable.current) return;
+        setWsError(t("platform.alert.wsError"));
+        showToastGlobal("error", t("platform.alert.wsError"));
+        void e;
+      };
+
+      socket.onclose = () => {
+        if (!wsAvailable.current) return;
+        setWsDegraded(true);
+        // Reconnect after 5s
+        setTimeout(() => connectWs(true), 5000);
+      };
+
+      stompRef.current = socket;
+      void auto;
+    } catch {
+      setWsDegraded(true);
+      setWsError(t("platform.alert.wsError"));
+      showToastGlobal("error", t("platform.alert.wsError"));
+    }
+  }, [t]);
+
+  useEffect(() => {
+    connectWs(true);
     return () => {
+      wsAvailable.current = false;
       if (stompRef.current) stompRef.current.close();
     };
-  }, []);
+  }, [connectWs]);
 
   // ── Actions ───────────────────────────────
   const triggerAlert = async (ruleId?: number) => {
@@ -134,7 +157,9 @@ export default function AlertPanel() {
     try {
       await alertAck(id);
       fetchAll();
-    } catch {}
+    } catch (e: any) {
+      showToastGlobal("error", e?.message || t("platform.alert.ackFail"));
+    }
   };
 
   const createRule = async () => {
@@ -143,14 +168,19 @@ export default function AlertPanel() {
       setShowNewRule(false);
       setNewRule({ name: "", metric: "", operator: "<", threshold: "80", level: "WARN" });
       fetchAll();
-    } catch {}
+    } catch (e: any) {
+      showToastGlobal("error", e?.message || t("platform.alert.createFail"));
+    }
   };
 
   const deleteRule = async (id: number) => {
     try {
       await alertDeleteRule(id);
+      setPendingDelete(null);
       fetchAll();
-    } catch {}
+    } catch (e: any) {
+      showToastGlobal("error", e?.message || t("platform.alert.deleteFailed"));
+    }
   };
 
   const levelColor = (level: string) => {
@@ -190,6 +220,16 @@ export default function AlertPanel() {
           </button>
         </div>
         <div className="flex-1" />
+        {(wsDegraded || wsError) && (
+          <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs border ${styles.warningBg} ${styles.warningText} ${styles.cardBorder}`}>
+            <WifiOff className="w-3 h-3" />
+            <span>{wsError ? wsError : t("platform.alert.wsDisconnected")}</span>
+            <button type="button" onClick={() => { wsAvailable.current = true; connectWs(true); }}
+              className={`px-1.5 rounded border text-[10px] font-medium ${styles.cardBorder} ${styles.cardText}`}>
+              {t("platform.alert.wsRetry")}
+            </button>
+          </div>
+        )}
         <button type="button" onClick={fetchAll} disabled={loading}
           className={`p-1.5 rounded border transition-all ${styles.cardBorder}`}>
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -284,7 +324,7 @@ export default function AlertPanel() {
                   className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20">
                   {t("platform.alert.fire")}
                 </button>
-                <button type="button" onClick={() => deleteRule(r.id)}
+                <button type="button" onClick={() => setPendingDelete({ id: r.id, name: r.name })}
                   className="p-0.5 rounded hover:bg-red-500/10 text-red-400 opacity-50 hover:opacity-100">
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -323,6 +363,19 @@ export default function AlertPanel() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        visible={pendingDelete !== null}
+        title={t("platform.alert.confirmDeleteRule")}
+        message={pendingDelete
+          ? t("platform.alert.confirmDeleteRuleDesc").replace("{name}", pendingDelete.name)
+          : ""}
+        confirmText={t("common.delete")}
+        cancelText={t("common.cancel")}
+        variant="danger"
+        onConfirm={() => { if (pendingDelete) deleteRule(pendingDelete.id); }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

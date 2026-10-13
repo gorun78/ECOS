@@ -4,7 +4,7 @@
  *
  * 独立顶级路由 /gateway-diagnostics。读内部 ?tab= 参数（filters|routes|anonymous|editions）。
  * 五个版块（均取自一次 GET /api/v1/system/gateway-diagnostics）：
- *   产物 × 承流态 / 过滤器链 ORDER 对照 / 路由清单总览 / 匿名端点 / 版本能力矩阵。
+ *   产物 × 承流态 / 过滤器链 ORDER 对照 / 路由清单摘要（仅汇总计数，无逐条明细）/ 匿名端点 / 版本能力矩阵。
  * 403 → 友好展示「需要 L3 及以上权限 / requires L3+」。
  */
 
@@ -42,7 +42,7 @@ type TabId = "artifacts" | "filters" | "routes" | "anonymous" | "editions";
 const TABS: { id: TabId; icon: React.ComponentType<{ className?: string }>; i18nKey: string }[] = [
   { id: "artifacts", icon: Boxes, i18nKey: "platform.gateway.tab.artifacts" },
   { id: "filters", icon: ArrowRightLeft, i18nKey: "platform.gateway.tab.filters" },
-  { id: "routes", icon: GitBranch, i18nKey: "platform.gateway.tab.routes" },
+  { id: "routes", icon: GitBranch, i18nKey: "dashboard.gateway.routes.tabSummary" },
   { id: "anonymous", icon: Globe, i18nKey: "platform.gateway.tab.anonymous" },
   { id: "editions", icon: Layers, i18nKey: "platform.gateway.tab.editions" },
 ];
@@ -364,9 +364,15 @@ function RoutesTab({ manifest }: { manifest: GatewayRouteManifest }) {
         <StatTile label={t("platform.gateway.routes.monolith")} value={String(manifest.monolithRoutes)} tone="info" />
       </div>
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4`}>
-        <div className={`text-xs ${styles.cardTextMuted} flex items-center gap-2`}>
-          <Info className="w-3.5 h-3.5" />
-          {t("platform.gateway.routes.hint")}
+        <div className={`text-xs ${styles.cardTextMuted} flex items-start gap-2`}>
+          <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <span>
+            {t("platform.gateway.routes.hint")}
+            {/* name-vs-reality note: endpoint exposes aggregate counts only, no per-route detail rows */}
+            <span className={`mt-1 block ${styles.cardTextMuted} opacity-80`}>
+              {t("dashboard.gateway.routes.summaryNote")}
+            </span>
+          </span>
         </div>
       </div>
     </div>

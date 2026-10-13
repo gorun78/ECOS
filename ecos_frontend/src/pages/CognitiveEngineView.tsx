@@ -1,47 +1,58 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Brain, BookOpen, Users, Shield, Zap,
-  Activity, Settings, RefreshCw, CheckCircle2, XCircle,
-  Loader2, AlertTriangle, Play, Square,
+  RefreshCw, CheckCircle2, XCircle, Play, Square,
+  Loader2, ChevronDown,
 } from 'lucide-react';
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
+import { useToast } from '../components/common/Toast';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+import { isNoAccessError } from '../api';
 import {
   fetchEngineHealth, fetchEngineStatus, startEngine, stopEngine,
-  fetchEngineSettings, fetchEngineSettingsDefaults, updateEngineSettings, refreshEngineSettings,
+  fetchEngineSettings,
   compileContext, fetchIndexStatus,
   routeIntent, fetchMeshAgents, fetchMeshMissions,
-  validateGuardrails, fetchGuardrailPolicies, createGuardrailPolicy, deleteGuardrailPolicy,
+  validateGuardrails, fetchGuardrailPolicies,
   executeAction, fetchAvailableActions,
 } from '../services/cognitiveEngineApi';
 
 const SUB_ENGINES = [
-  { key: 'prompt', label: 'PromptCompiler', labelZh: '提示编译器', icon: BookOpen, color: 'text-sky-400', desc: 'Federal RAG + Context', descZh: '联邦RAG+上下文编译' },
-  { key: 'mesh', label: 'AgentMesh', labelZh: 'Agent协同', icon: Users, color: 'text-violet-400', desc: 'Multi-Agent Orchestration', descZh: '多Agent协同+意图路由' },
-  { key: 'guard', label: 'Guardrails', labelZh: '零信任护栏', icon: Shield, color: 'text-rose-400', desc: 'PII / Hallucination / Compliance', descZh: 'PII/幻觉/合规检测' },
-  { key: 'action', label: 'ActionBridge', labelZh: '行动桥接', icon: Zap, color: 'text-amber-400', desc: 'LLM Output → Ontology Action', descZh: 'LLM输出→本体Action→执行' },
+  { key: 'prompt', icon: BookOpen, labelKey: 'cognition.engine.sub.prompt', colorToken: 'infoText' },
+  { key: 'mesh', icon: Users, labelKey: 'cognition.engine.sub.mesh', colorToken: 'accentText' },
+  { key: 'guard', icon: Shield, labelKey: 'cognition.engine.sub.guard', colorToken: 'dangerText' },
+  { key: 'action', icon: Zap, labelKey: 'cognition.engine.sub.action', colorToken: 'warningText' },
 ] as const;
 
 type SubEngineKey = typeof SUB_ENGINES[number]['key'];
 
-export default function CognitiveEngineView() {
-  const { t, locale } = useLanguage();
-  const { styles } = useTheme();
+/** 待确认动作：启停与行动桥接执行前必须过确认门 */
+type PendingAction =
+  | { kind: 'start' }
+  | { kind: 'stop' }
+  | { kind: 'executeAction'; input: string }
+  | null;
 
-  const [toast, setToast] = useState<{ type: 'success' | 'info' | 'error'; msg: string } | null>(null);
-  const showToast = useCallback((type: 'success' | 'info' | 'error', msg: string) => {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3500);
-  }, []);
+export default function CognitiveEngineView() {
+  const { t } = useLanguage();
+  const { styles } = useTheme();
+  const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<SubEngineKey>('prompt');
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
 
   // Engine-level state
   const [health, setHealth] = useState<Record<string, unknown> | null>(null);
   const [status, setStatus] = useState<Record<string, unknown> | null>(null);
-  const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
+  const [, setSettings] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [engineState, setEngineState] = useState<string>('UNKNOWN');
+  const [engineOffline, setEngineOffline] = useState(false);
+  const [engineNoAccess, setEngineNoAccess] = useState(false);
+
+  // Raw 面板默认折叠
+  const [showRaw, setShowRaw] = useState(false);
 
   // Sub-engine state
   const [indexStatus, setIndexStatus] = useState<Record<string, unknown> | null>(null);
@@ -60,25 +71,27 @@ export default function CognitiveEngineView() {
 
   const loadEngine = useCallback(async () => {
     setLoading(true);
-    try {
-      const [h, s, cfg] = await Promise.allSettled([
-        fetchEngineHealth(),
-        fetchEngineStatus(),
-        fetchEngineSettings(),
-      ]);
-      if (h.status === 'fulfilled') setHealth(h.value as Record<string, unknown>);
-      if (s.status === 'fulfilled') {
-        setStatus(s.value as Record<string, unknown>);
-        const sv = s.value as Record<string, unknown>;
-        setEngineState(String(sv?.status ?? sv?.state ?? 'UNKNOWN'));
-      }
-      if (cfg.status === 'fulfilled') setSettings(cfg.value as Record<string, unknown>);
-    } catch (e: unknown) {
-      showToast('error', `Engine load failed: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setLoading(false);
+    const [h, s, cfg] = await Promise.allSettled([
+      fetchEngineHealth(),
+      fetchEngineStatus(),
+      fetchEngineSettings(),
+    ]);
+    // 分类离线/403 态：不再静默吞掉 rejection
+    const reasons = [h, s, cfg].filter(r => r.status === 'rejected').map(r => (r as PromiseRejectedResult).reason);
+    setEngineOffline(reasons.length > 0 && !reasons.every(r => isNoAccessError(r)));
+    setEngineNoAccess(reasons.length > 0 && reasons.every(r => isNoAccessError(r)));
+
+    if (h.status === 'fulfilled') setHealth(h.value as Record<string, unknown>);
+    if (s.status === 'fulfilled') {
+      setStatus(s.value as Record<string, unknown>);
+      const sv = s.value as Record<string, unknown>;
+      setEngineState(String(sv?.status ?? sv?.state ?? 'UNKNOWN'));
+    } else {
+      setEngineState('UNKNOWN');
     }
-  }, [showToast]);
+    if (cfg.status === 'fulfilled') setSettings(cfg.value as Record<string, unknown>);
+    setLoading(false);
+  }, []);
 
   const loadSubEngine = useCallback(async (key: SubEngineKey) => {
     setSubLoading(true);
@@ -99,18 +112,18 @@ export default function CognitiveEngineView() {
         setActions((a as Array<Record<string, unknown>>) || []);
       }
     } catch (e: unknown) {
-      showToast('error', `${key} load failed: ${e instanceof Error ? e.message : String(e)}`);
+      showToast('error', isNoAccessError(e) ? t('common.noPermission') : `${key} load failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSubLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, t]);
 
   useEffect(() => { loadEngine(); }, [loadEngine]);
   useEffect(() => { loadSubEngine(activeTab); }, [activeTab, loadSubEngine]);
 
-  const handleStartStop = async () => {
+  const runStartStop = async (mode: 'start' | 'stop') => {
     try {
-      if (engineState === 'RUNNING' || engineState === 'running') {
+      if (mode === 'stop') {
         await stopEngine();
         setEngineState('STOPPED');
         showToast('success', t('cognition.engine.stopped'));
@@ -120,33 +133,68 @@ export default function CognitiveEngineView() {
         showToast('success', t('cognition.engine.started'));
       }
     } catch (e: unknown) {
-      showToast('error', `${e instanceof Error ? e.message : String(e)}`);
+      showToast('error', isNoAccessError(e) ? t('common.noPermission') : `${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
   const isRunning = engineState === 'RUNNING' || engineState === 'running';
 
-  const handleTest = async () => {
+  /** 实际执行子引擎测试调用（由确认门或直发路径进入） */
+  const runTest = useCallback(async (tab: SubEngineKey) => {
     setSubLoading(true);
     try {
       let result: unknown = null;
-      if (activeTab === 'prompt' && compileInput) {
+      if (tab === 'prompt' && compileInput) {
         result = await compileContext({ missionId: compileInput, agentIds: [] });
-      } else if (activeTab === 'mesh' && intentInput) {
+      } else if (tab === 'mesh' && intentInput) {
         result = await routeIntent({ query: intentInput });
-      } else if (activeTab === 'guard' && validateInput) {
+      } else if (tab === 'guard' && validateInput) {
         result = await validateGuardrails({ content: validateInput });
-      } else if (activeTab === 'action' && actionInput) {
+      } else if (tab === 'action' && actionInput) {
         result = await executeAction({ llmOutput: actionInput });
       }
-      setTestResult(result as Record<string, unknown>);
-      showToast('success', t('cognition.engine.executed'));
+      setTestResult((result as Record<string, unknown>) ?? null);
+      // 无假真理：不抛错 ≠ 成功产出，空结果如实呈现
+      const isEmpty = result == null
+        || (typeof result === 'object' && Object.keys(result as object).length === 0)
+        || (Array.isArray(result) && result.length === 0);
+      if (isEmpty) {
+        showToast('info', t('cognition.engine.emptyResult'));
+      } else {
+        showToast('success', t('cognition.engine.executed'));
+      }
     } catch (e: unknown) {
-      showToast('error', `${e instanceof Error ? e.message : String(e)}`);
+      showToast('error', isNoAccessError(e) ? t('common.noPermission') : `${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSubLoading(false);
     }
+  }, [compileInput, intentInput, validateInput, actionInput, showToast, t]);
+
+  const handleTest = () => {
+    if (activeTab === 'action') {
+      // 行动桥接可能触发真实本体动作 → 确认门
+      setPendingAction({ kind: 'executeAction', input: actionInput });
+      return;
+    }
+    runTest(activeTab);
   };
+
+  const confirmPending = async () => {
+    const pa = pendingAction;
+    setPendingAction(null);
+    if (!pa) return;
+    if (pa.kind === 'start' || pa.kind === 'stop') {
+      await runStartStop(pa.kind);
+    } else if (pa.kind === 'executeAction') {
+      await runTest('action');
+    }
+  };
+
+  const confirmCopy = pendingAction?.kind === 'stop'
+    ? { title: t('cognition.engine.confirm.stop.title'), message: t('cognition.engine.confirm.stop.message'), danger: true }
+    : pendingAction?.kind === 'start'
+      ? { title: t('cognition.engine.confirm.start.title'), message: t('cognition.engine.confirm.start.message'), danger: false }
+      : { title: t('cognition.engine.confirm.action.title'), message: t('cognition.engine.confirm.action.message'), danger: true };
 
   return (
     <div className={`${styles.appBg} min-h-screen p-6`}>
@@ -155,7 +203,7 @@ export default function CognitiveEngineView() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Brain className="w-7 h-7 text-amber-400" />
+            <Brain className={`w-7 h-7 ${styles.accentText}`} />
             <div>
               <h1 className={`text-2xl font-bold ${styles.cardText}`}>
                 {t('cognition.engine.title')}
@@ -166,30 +214,47 @@ export default function CognitiveEngineView() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={handleStartStop}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border
-                ${isRunning ? 'bg-red-900/40 border-red-700 text-red-300 hover:bg-red-800/60' : 'bg-emerald-900/40 border-emerald-700 text-emerald-300 hover:bg-emerald-800/60'}`}>
+            <button type="button" onClick={() => setPendingAction({ kind: isRunning ? 'stop' : 'start' })}
+              disabled={engineNoAccess}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border cursor-pointer
+                ${isRunning ? `${styles.dangerBg} ${styles.dangerBorder} ${styles.dangerText}` : `${styles.successBg} ${styles.successBorder} ${styles.successText}`} disabled:opacity-40`}>
               {isRunning ? <><Square className="w-3.5 h-3.5" />{t('cognition.engine.stop')}</> : <><Play className="w-3.5 h-3.5" />{t('cognition.engine.start')}</>}
             </button>
             <button type="button" onClick={() => { loadEngine(); loadSubEngine(activeTab); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${styles.islandInput} hover:bg-[#263147] ${styles.islandText} text-sm border ${styles.islandInputBorder}`}>
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${styles.inputBg} ${styles.inputText} text-sm border ${styles.inputBorder} ${styles.sidebarHoverBg} cursor-pointer`}>
               <RefreshCw className="w-3.5 h-3.5" />{t('cognition.engine.refresh')}
             </button>
           </div>
         </div>
 
+        {/* 离线/403 状态横幅 */}
+        {engineOffline && (
+          <div className={`flex items-center gap-2 border rounded-lg px-3 py-2 text-xs ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
+            <XCircle className="w-4 h-4 shrink-0" />
+            <span>{t('cognition.engine.offlineBanner')}</span>
+          </div>
+        )}
+        {engineNoAccess && (
+          <div className={`flex items-center gap-2 border rounded-lg px-3 py-2 text-xs ${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`}>
+            <Shield className="w-4 h-4 shrink-0" />
+            <span>{t('cognition.engine.noAccess')}</span>
+          </div>
+        )}
+
         {/* Engine Status Bar */}
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 flex items-center gap-6`}>
           <div className="flex items-center gap-2">
-            {isRunning ? <CheckCircle2 className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
-            <span className={`font-bold ${isRunning ? 'text-emerald-400' : 'text-red-400'}`}>{engineState}</span>
+            {isRunning ? <CheckCircle2 className={`w-5 h-5 ${styles.successText}`} /> : <XCircle className={`w-5 h-5 ${styles.dangerText}`} />}
+            <span className={`font-bold ${engineOffline || engineNoAccess ? styles.muted : isRunning ? styles.successText : styles.dangerText}`}>
+              {engineState === 'UNKNOWN' && (engineOffline || engineNoAccess) ? t('cognition.engine.stateUnknown') : engineState}
+            </span>
           </div>
           {loading ? <Loader2 className={`w-4 h-4 animate-spin ${styles.muted}`} /> : (
             <>
-              {status?.subEngines && <span className={`text-xs ${styles.muted}`}>Sub-engines: {String(status.subEngines)}</span>}
-              {status?.agentCount != null && <span className={`text-xs ${styles.muted}`}>Agents: {String(status.agentCount)}</span>}
-              {status?.missionCount != null && <span className={`text-xs ${styles.muted}`}>Missions: {String(status.missionCount)}</span>}
-              {status?.guardrailPolicyCount != null && <span className={`text-xs ${styles.muted}`}>Policies: {String(status.guardrailPolicyCount)}</span>}
+              {status?.subEngines != null && <span className={`text-xs ${styles.muted}`}>{t('cognition.engine.stat.subEngines')}: {String(status.subEngines)}</span>}
+              {status?.agentCount != null && <span className={`text-xs ${styles.muted}`}>{t('cognition.engine.stat.agents')}: {String(status.agentCount)}</span>}
+              {status?.missionCount != null && <span className={`text-xs ${styles.muted}`}>{t('cognition.engine.stat.missions')}: {String(status.missionCount)}</span>}
+              {status?.guardrailPolicyCount != null && <span className={`text-xs ${styles.muted}`}>{t('cognition.engine.stat.policies')}: {String(status.guardrailPolicyCount)}</span>}
             </>
           )}
         </div>
@@ -201,10 +266,11 @@ export default function CognitiveEngineView() {
             const active = activeTab === se.key;
             return (
               <button type="button" key={se.key} onClick={() => setActiveTab(se.key)}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors
-                  ${active ? `${se.color} border-current` : `${styles.muted} border-transparent hover:text-gray-300`}`}>
+                title={t(`${se.labelKey}.desc`)}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer
+                  ${active ? `${(styles as Record<string, string>)[se.colorToken]} border-current` : `${styles.muted} border-transparent hover:opacity-80`}`}>
                 <Icon className="w-4 h-4" />
-                {locale === 'zh' ? se.labelZh : se.label}
+                {t(`${se.labelKey}.label`)}
               </button>
             );
           })}
@@ -220,6 +286,7 @@ export default function CognitiveEngineView() {
               <h3 className={`text-sm font-semibold ${styles.cardText}`}>
                 {t('cognition.engine.promptTitle')}
               </h3>
+              <p className={`text-xs ${styles.muted}`}>{t('cognition.engine.sub.prompt.desc')}</p>
               {indexStatus && (
                 <div className="space-y-1">
                   {Object.entries(indexStatus).map(([k, v]) => (
@@ -231,10 +298,10 @@ export default function CognitiveEngineView() {
                 </div>
               )}
               <div className="flex gap-2">
-                <input value={compileInput} onChange={e => setCompileInput(e.target.value)} placeholder="Mission ID"
-                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} ${styles.placeholderText}`} />
+                <input value={compileInput} onChange={e => setCompileInput(e.target.value)} placeholder={t('cognition.engine.missionPh')}
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} ${styles.placeholderText}`} />
                 <button type="button" onClick={handleTest} disabled={!compileInput}
-                  className="px-3 py-1.5 rounded-lg bg-sky-700 hover:bg-sky-600 text-white text-sm disabled:opacity-40">
+                  className={`px-3 py-1.5 rounded-lg ${styles.accentBg} ${styles.accentHover} text-white text-sm disabled:opacity-40 cursor-pointer`}>
                   {t('cognition.engine.promptBtn')}
                 </button>
               </div>
@@ -247,6 +314,7 @@ export default function CognitiveEngineView() {
               <h3 className={`text-sm font-semibold ${styles.cardText}`}>
                 {t('cognition.engine.meshTitle')}
               </h3>
+              <p className={`text-xs ${styles.muted}`}>{t('cognition.engine.sub.mesh.desc')}</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className={`text-xs ${styles.muted} mb-1`}>{t('cognition.engine.agentsLabel')} ({agents.length})</p>
@@ -265,9 +333,9 @@ export default function CognitiveEngineView() {
               </div>
               <div className="flex gap-2">
                 <input value={intentInput} onChange={e => setIntentInput(e.target.value)} placeholder={t('cognition.engine.intentPh')}
-                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} ${styles.placeholderText}`} />
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} ${styles.placeholderText}`} />
                 <button type="button" onClick={handleTest} disabled={!intentInput}
-                  className="px-3 py-1.5 rounded-lg bg-violet-700 hover:bg-violet-600 text-white text-sm disabled:opacity-40">
+                  className={`px-3 py-1.5 rounded-lg ${styles.accentBg} ${styles.accentHover} text-white text-sm disabled:opacity-40 cursor-pointer`}>
                   {t('cognition.engine.routeBtn')}
                 </button>
               </div>
@@ -280,13 +348,14 @@ export default function CognitiveEngineView() {
               <h3 className={`text-sm font-semibold ${styles.cardText}`}>
                 {t('cognition.engine.guardTitle')}
               </h3>
+              <p className={`text-xs ${styles.muted}`}>{t('cognition.engine.sub.guard.desc')}</p>
               <div>
                 <p className={`text-xs ${styles.muted} mb-1`}>{t('cognition.engine.policiesLabel')} ({policies.length})</p>
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {policies.map((p, i) => (
                     <div key={i} className="flex items-center justify-between text-xs">
                       <span className={styles.cardText}>{String(p.name || p.id || `policy-${i}`)}</span>
-                      <span className={String(p.isEnabled) === 'true' ? 'text-emerald-400' : 'text-zinc-500'}>{String(p.isEnabled ?? '—')}</span>
+                      <span className={String(p.isEnabled) === 'true' ? styles.successText : styles.muted}>{String(p.isEnabled ?? '—')}</span>
                     </div>
                   ))}
                   {policies.length === 0 && <p className={`text-xs ${styles.muted}`}>—</p>}
@@ -294,9 +363,9 @@ export default function CognitiveEngineView() {
               </div>
               <div className="flex gap-2">
                 <input value={validateInput} onChange={e => setValidateInput(e.target.value)} placeholder={t('cognition.engine.validatePh')}
-                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} ${styles.placeholderText}`} />
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} ${styles.placeholderText}`} />
                 <button type="button" onClick={handleTest} disabled={!validateInput}
-                  className="px-3 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-600 text-white text-sm disabled:opacity-40">
+                  className={`px-3 py-1.5 rounded-lg ${styles.accentBg} ${styles.accentHover} text-white text-sm disabled:opacity-40 cursor-pointer`}>
                   {t('cognition.engine.validateBtn')}
                 </button>
               </div>
@@ -309,6 +378,7 @@ export default function CognitiveEngineView() {
               <h3 className={`text-sm font-semibold ${styles.cardText}`}>
                 {t('cognition.engine.actionTitle')}
               </h3>
+              <p className={`text-xs ${styles.muted}`}>{t('cognition.engine.sub.action.desc')}</p>
               <div>
                 <p className={`text-xs ${styles.muted} mb-1`}>{t('cognition.engine.actionsLabel')} ({actions.length})</p>
                 <div className="space-y-1 max-h-40 overflow-y-auto">
@@ -323,61 +393,74 @@ export default function CognitiveEngineView() {
               </div>
               <div className="flex gap-2">
                 <input value={actionInput} onChange={e => setActionInput(e.target.value)} placeholder={t('cognition.engine.actionInputPh')}
-                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.cardBg} border ${styles.cardBorder} ${styles.cardText} ${styles.placeholderText}`} />
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-sm ${styles.inputBg} border ${styles.inputBorder} ${styles.inputText} ${styles.placeholderText}`} />
                 <button type="button" onClick={handleTest} disabled={!actionInput}
-                  className="px-3 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-600 text-white text-sm disabled:opacity-40">
+                  className={`px-3 py-1.5 rounded-lg ${styles.warningBg} ${styles.warningText} border ${styles.warningBorder} text-sm font-semibold disabled:opacity-40 cursor-pointer`}>
                   {t('cognition.engine.executeBtn')}
                 </button>
               </div>
             </div>
           )}
 
-          {/* Test Result */}
-          {testResult && (
+          {/* Test Result（空结果如实呈现「空结果」） */}
+          {testResult !== null && (
             <div className={`mt-4 border-t ${styles.cardBorder} pt-4`}>
-              <h4 className={`text-xs font-semibold ${styles.muted} mb-2`}>{t('cognition.engine.resultTitle')}</h4>
-              <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-3 overflow-x-auto max-h-48`}>
-                {JSON.stringify(testResult, null, 2)}
+              <h4 className={`text-xs font-semibold ${styles.muted} mb-2`}>
+                {t('cognition.engine.resultTitle')}
+                {Object.keys(testResult).length === 0 && <span className={`ml-2 ${styles.warningText}`}>（{t('cognition.engine.resultEmpty')}）</span>}
+              </h4>
+              <pre className={`text-[11px] font-mono ${styles.islandBg} ${styles.islandText} rounded-lg p-3 overflow-x-auto max-h-48`}>
+                {Object.keys(testResult).length === 0 ? '{}' : JSON.stringify(testResult, null, 2)}
               </pre>
             </div>
           )}
         </div>
 
-        {/* Raw Data Panel */}
+        {/* Raw Data Panel（默认折叠） */}
         <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5`}>
-          <h3 className={`text-xs font-semibold uppercase tracking-wider ${styles.muted}`}>
-            {t('cognition.engine.rawTitle')}
-          </h3>
-          <div className="grid grid-cols-2 gap-4 mt-3">
-            <div className="space-y-1">
-              <span className={`text-[10px] font-mono ${styles.muted}`}>/health</span>
-              <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-2 overflow-x-auto max-h-32`}>
-                {health ? JSON.stringify(health, null, 2) : '—'}
-              </pre>
+          <button
+            type="button"
+            onClick={() => setShowRaw(v => !v)}
+            aria-expanded={showRaw}
+            className={`w-full flex items-center justify-between cursor-pointer ${styles.muted}`}
+          >
+            <h3 className={`text-xs font-semibold uppercase tracking-wider`}>
+              {t('cognition.engine.rawTitle')}
+            </h3>
+            <span className="flex items-center gap-1 text-[10px] font-mono">
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showRaw ? 'rotate-180' : ''}`} />
+              {showRaw ? t('cognition.engine.rawHide') : t('cognition.engine.rawShow')}
+            </span>
+          </button>
+          {showRaw && (
+            <div className="grid grid-cols-2 gap-4 mt-3">
+              <div className="space-y-1">
+                <span className={`text-[10px] font-mono ${styles.muted}`}>/health</span>
+                <pre className={`text-[11px] font-mono ${styles.islandBg} ${styles.islandText} rounded-lg p-2 overflow-x-auto max-h-32`}>
+                  {health ? JSON.stringify(health, null, 2) : '—'}
+                </pre>
+              </div>
+              <div className="space-y-1">
+                <span className={`text-[10px] font-mono ${styles.muted}`}>/status</span>
+                <pre className={`text-[11px] font-mono ${styles.islandBg} ${styles.islandText} rounded-lg p-2 overflow-x-auto max-h-32`}>
+                  {status ? JSON.stringify(status, null, 2) : '—'}
+                </pre>
+              </div>
             </div>
-            <div className="space-y-1">
-              <span className={`text-[10px] font-mono ${styles.muted}`}>/status</span>
-              <pre className={`text-[11px] font-mono ${styles.cardText} bg-black/20 dark:bg-black/40 rounded-lg p-2 overflow-x-auto max-h-32`}>
-                {status ? JSON.stringify(status, null, 2) : '—'}
-              </pre>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Toast */}
-        {toast && (
-          <div className="fixed bottom-6 right-6 z-50 animate-fade-in">
-            <div className={`px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2
-              ${toast.type === 'success' ? 'bg-emerald-600 text-white' : ''}
-              ${toast.type === 'error' ? 'bg-red-600 text-white' : ''}
-              ${toast.type === 'info' ? 'bg-zinc-700 text-gray-50' : ''}`}>
-              {toast.type === 'success' && <CheckCircle2 className="w-4 h-4" />}
-              {toast.type === 'error' && <AlertTriangle className="w-4 h-4" />}
-              {toast.type === 'info' && <Activity className="w-4 h-4" />}
-              {toast.msg}
-            </div>
-          </div>
-        )}
+        {/* 启停 / 行动桥接执行确认门 */}
+        <ConfirmDialog
+          visible={pendingAction != null}
+          title={confirmCopy.title}
+          message={pendingAction?.kind === 'executeAction' && pendingAction.input
+            ? `${confirmCopy.message}\n${pendingAction.input}`
+            : confirmCopy.message}
+          danger={confirmCopy.danger}
+          onConfirm={confirmPending}
+          onCancel={() => setPendingAction(null)}
+        />
       </div>
     </div>
   );

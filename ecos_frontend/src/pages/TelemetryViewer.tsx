@@ -59,27 +59,39 @@ function formatDuration(ms: number): string {
   return `${(ms * 1000).toFixed(0)} µs`;
 }
 
-function statusBadge(status: string): { icon: React.ReactNode; cls: string } {
+interface ThemeStyleTokens {
+  successBg: string;
+  successText: string;
+  warningBg: string;
+  warningText: string;
+  dangerBg: string;
+  dangerText: string;
+  infoBg: string;
+  cardTextMuted: string;
+}
+
+function statusBadge(status: string, styles: ThemeStyleTokens): { iconCls: string; cls: string } {
+  // 色板令牌化（报告 G-28：此处曾硬编码 bg-emerald-500/15 等裸色违规）
   const s = status?.toLowerCase() || "";
   if (s === "ok" || s === "healthy" || s === "connected") {
-    return { icon: <CheckCircle2 className="w-3.5 h-3.5" />, cls: "bg-emerald-500/15 text-emerald-500" };
+    return { iconCls: styles.successText, cls: `${styles.successBg} ${styles.successText}` };
   }
   if (s === "error" || s === "failed") {
-    return { icon: <AlertTriangle className="w-3.5 h-3.5" />, cls: "bg-red-500/15 text-red-500" };
+    return { iconCls: styles.dangerText, cls: `${styles.dangerBg} ${styles.dangerText}` };
   }
-  return { icon: <Activity className="w-3.5 h-3.5" />, cls: "bg-amber-500/15 text-amber-500" };
+  return { iconCls: styles.warningText, cls: `${styles.warningBg} ${styles.warningText}` };
 }
 
 // ── Span Tree (stateful wrapper) ───────────────────────────────
 
-function SpanTree({ rootSpans, allSpans }: { rootSpans: SpanDetail[]; allSpans: SpanDetail[] }) {
+function SpanTree({ rootSpans, allSpans, unknownText, styles }: { rootSpans: SpanDetail[]; allSpans: SpanDetail[]; unknownText: string; styles: ThemeStyleTokens }) {
   const [openMap, setOpenMap] = React.useState<Record<string, boolean>>({});
 
   const renderWithState = (span: SpanDetail, depth: number, all: SpanDetail[]): React.ReactNode => {
     const children = all.filter((s) => s.parentSpanId === span.spanId);
     const hasChildren = children.length > 0;
     const open = openMap[span.spanId] ?? (depth < 2);
-    const badge = statusBadge(span.status);
+    const badge = statusBadge(span.status, styles);
 
     return (
       <React.Fragment key={span.spanId}>
@@ -105,8 +117,14 @@ function SpanTree({ rootSpans, allSpans }: { rootSpans: SpanDetail[]; allSpans: 
           </td>
           <td className="py-2 px-3 text-xs text-right">
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${badge.cls}`}>
-              {badge.icon}
-              {span.status || "ok"}
+              {badge.iconCls === styles.successText ? (
+                <CheckCircle2 className="w-3 h-3" />
+              ) : badge.iconCls === styles.dangerText ? (
+                <AlertTriangle className="w-3 h-3" />
+              ) : (
+                <Activity className="w-3 h-3" />
+              )}
+              {span.status || unknownText}
             </span>
           </td>
         </tr>
@@ -130,6 +148,7 @@ export default function TelemetryViewer() {
   const [traceDetail, setTraceDetail] = useState<TraceDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
   const [error, setError] = useState("");
 
   // Fetch health + traces on mount
@@ -159,15 +178,19 @@ export default function TelemetryViewer() {
     if (selectedTraceId === traceId) {
       setSelectedTraceId(null);
       setTraceDetail(null);
+      setDetailError("");
       return;
     }
     setSelectedTraceId(traceId);
     setDetailLoading(true);
+    setDetailError("");
     try {
       const detail = await apiFetchData<TraceDetail>(`/api/telemetry/traces/${traceId}`);
       setTraceDetail(detail);
     } catch (e: any) {
+      // 报告 G-21：详情失败曾静默吞掉后冒充 noSpanData —— 现在是显式错误态 + 重试
       setTraceDetail(null);
+      setDetailError(e?.message || t("platform.telemetry.spanLoadFailed"));
     } finally {
       setDetailLoading(false);
     }
@@ -200,7 +223,7 @@ export default function TelemetryViewer() {
       </div>
 
       {error && (
-        <div className="p-3 rounded bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+        <div className={`p-3 rounded border text-sm ${styles.dangerBorder} ${styles.dangerBg} ${styles.dangerText}`}>
           {error}
         </div>
       )}
@@ -209,14 +232,35 @@ export default function TelemetryViewer() {
       {health && (
         <div className={`rounded-lg border p-4 ${styles.cardBg} ${styles.cardBorder}`}>
           <div className="flex items-center gap-2 mb-3">
-            <Radio className="w-4 h-4 text-emerald-500" />
+            <Radio className={`w-4 h-4 ${styles.accentText}`} />
             <span className={`text-sm font-semibold ${styles.cardText}`}>
               {t("platform.telemetry.systemHealth")}
             </span>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-500">
-              <CheckCircle2 className="w-3 h-3" />
-              {health.status || "ok"}
-            </span>
+            {(() => {
+              // 报告 G-13：头部健康徽章曾恒 emerald 且 || "ok" 兜底 → 按真实
+              // health.status 分支（ok/healthy/connected=success、error/failed=danger、
+              // 其余=warning、缺失=info「未知」），色走主题令牌
+              const hasStatus = typeof health.status === "string" && health.status.trim() !== "";
+              const hb = hasStatus
+                ? statusBadge(health.status, styles)
+                : { iconCls: styles.cardTextMuted, cls: `${styles.infoBg} ${styles.cardTextMuted}` };
+              const label = hasStatus ? health.status : t("platform.telemetry.statusUnknown");
+              const icon = !hasStatus ? (
+                <Activity className="w-3 h-3" />
+              ) : hb.iconCls === styles.successText ? (
+                <CheckCircle2 className="w-3 h-3" />
+              ) : hb.iconCls === styles.dangerText ? (
+                <AlertTriangle className="w-3 h-3" />
+              ) : (
+                <Activity className="w-3 h-3" />
+              );
+              return (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${hb.cls}`}>
+                  {icon}
+                  {label}
+                </span>
+              );
+            })()}
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
@@ -328,6 +372,22 @@ export default function TelemetryViewer() {
                                 <Activity className="w-3.5 h-3.5 animate-spin" />
                                 {t("platform.telemetry.loadingSpans")}
                               </div>
+                            ) : detailError ? (
+                              // 报告 G-21：详情请求失败显式错误态 + 重试（不再冒充 noSpanData）
+                              <div className={`flex items-center justify-between gap-3 text-xs py-2 ${styles.dangerText}`}>
+                                <span className="inline-flex items-center gap-1.5">
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                  {detailError}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => selectedTraceId && selectTrace(selectedTraceId)}
+                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded transition-colors ${styles.accentBg} text-white ${styles.accentHover}`}
+                                >
+                                  <RefreshCw className="w-3 h-3" />
+                                  {t("platform.telemetry.retrySpan")}
+                                </button>
+                              </div>
                             ) : traceDetail && traceDetail.spans ? (
                               <table className="w-full text-left">
                                 <thead>
@@ -339,7 +399,12 @@ export default function TelemetryViewer() {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  <SpanTree rootSpans={traceDetail.spans.filter((s) => !s.parentSpanId)} allSpans={traceDetail.spans} />
+                                  <SpanTree
+                                    rootSpans={traceDetail.spans.filter((s) => !s.parentSpanId)}
+                                    allSpans={traceDetail.spans}
+                                    unknownText={t("platform.telemetry.statusUnknown")}
+                                    styles={styles}
+                                  />
                                 </tbody>
                               </table>
                             ) : (

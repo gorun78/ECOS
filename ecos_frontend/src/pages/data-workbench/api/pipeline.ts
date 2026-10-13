@@ -24,28 +24,18 @@ export interface PipelineSavePayload {
   status?: string;
 }
 
-/** 同步任务列表 — 从 CeosCompatController 聚合接口获取 */
+/** 同步任务列表 — 从 CeosCompatController 聚合接口获取（失败向上抛出，由调用方呈现错误态+重试，禁吞错回退空数组） */
 export async function fetchDataSyncTasks(): Promise<DataSyncTask[]> {
-  try {
-    const data = await get<{ syncTasks?: unknown[] }>(INTEGRATION);
-    if (!data?.syncTasks || !Array.isArray(data.syncTasks)) return [];
-    return data.syncTasks.map(mapSyncTask);
-  } catch (e) {
-    console.warn('[data-workbench] fetchDataSyncTasks failed:', e);
-    return [];
-  }
+  const data = await get<{ syncTasks?: unknown[] }>(INTEGRATION);
+  if (!data?.syncTasks || !Array.isArray(data.syncTasks)) return [];
+  return data.syncTasks.map(mapSyncTask);
 }
 
-/** Fetch sync tasks from PipelineTaskController (task_type=SYNC) */
+/** Fetch sync tasks from PipelineTaskController (task_type=SYNC)（失败上抛，禁吞错回退空数组） */
 export async function fetchSyncTasksFromPipeline(): Promise<DataSyncTask[]> {
-  try {
-    const data = await get<unknown[]>('/api/v1/engine/data/pipeline/tasks?taskType=SYNC');
-    if (!Array.isArray(data)) return [];
-    return data.map(mapSyncTask);
-  } catch (e) {
-    console.warn('[data-workbench] fetchSyncTasksFromPipeline failed:', e);
-    return [];
-  }
+  const data = await get<unknown[]>('/api/v1/engine/data/pipeline/tasks?taskType=SYNC');
+  if (!Array.isArray(data)) return [];
+  return data.map(mapSyncTask);
 }
 
 /** 创建同步任务 → PipelineTaskController POST /api/v1/engine/data/pipeline/tasks (taskType=SYNC) */
@@ -85,16 +75,30 @@ export async function triggerSyncRun(taskId: string): Promise<{ status?: string;
   }
 }
 
-/** Pipeline 定义列表 */
-export async function fetchDataPipelines(): Promise<DataPipeline[]> {
+/**
+ * 查询一次 pipeline run 的终态状态 — 用于 triggerSync 轮询。
+ * GET /api/v1/engine/data/pipeline/runs/{runId}（与 PipelineExecutionMonitor 同源端点）。
+ * 失败返回 null（调用方必须按失败处理，不得当成成功）。
+ */
+export async function fetchPipelineRunStatus(
+  runId: string
+): Promise<{ status?: string; errorMsg?: string } | null> {
   try {
-    const data = await get<unknown[]>(PIPELINE_DEFS);
-    if (!Array.isArray(data)) return [];
-    return data.map(mapPipelineDef);
+    const data = await get<{ status?: string; errorMsg?: string; data?: { status?: string; errorMsg?: string } }>(
+      `/api/v1/engine/data/pipeline/runs/${encodeURIComponent(runId)}`
+    );
+    return data?.data && typeof data.data === 'object' ? data.data : data;
   } catch (e) {
-    console.warn('[data-workbench] fetchDataPipelines failed:', e);
-    return [];
+    console.warn('[data-workbench] fetchPipelineRunStatus failed:', e);
+    return null;
   }
+}
+
+/** Pipeline 定义列表（失败向上抛出，由调用方呈现错误态+重试，禁吞错回退空数组） */
+export async function fetchDataPipelines(): Promise<DataPipeline[]> {
+  const data = await get<unknown[]>(PIPELINE_DEFS);
+  if (!Array.isArray(data)) return [];
+  return data.map(mapPipelineDef);
 }
 
 /**

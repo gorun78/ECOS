@@ -23,6 +23,7 @@ import {
 } from '../../../types/ontology';
 import DynamicIcon from './SidebarDynamicIcon';
 import SidebarAccordionSection from './SidebarAccordionSection';
+import Badge from '../../common/Badge';
 
 type ElementSectionCategory =
   | 'object'
@@ -46,6 +47,8 @@ interface SidebarElementSectionsProps {
   onSelectCategory: (category: ElementSectionCategory, id: string | null) => void;
   expanded: Record<string, boolean>;
   toggleExpand: (key: string) => void;
+  /** 无假真理：单一来源 demo 数据（enterpriseOntologyDemo.ts）的分节 ⇒ 标题挂 DEMO 徽标 */
+  demoSectionKeys?: ReadonlyArray<string>;
 }
 
 export default function SidebarElementSections({
@@ -61,9 +64,15 @@ export default function SidebarElementSections({
   onSelectCategory,
   expanded,
   toggleExpand,
+  demoSectionKeys,
 }: SidebarElementSectionsProps) {
   const { t } = useLanguage();
   const { styles } = useTheme();
+
+  const demoBadge = (key: string) =>
+    (demoSectionKeys ?? []).includes(key) ? (
+      <Badge variant="warning" className="text-[10px] px-1.5 py-0 normal-case">{t('ontology.demo_data_badge')}</Badge>
+    ) : undefined;
 
   return (
     <div className="flex-1 overflow-y-auto py-3 space-y-1">
@@ -94,7 +103,7 @@ export default function SidebarElementSections({
                 </span>
                 <span className="truncate">{ot.displayName}</span>
               </div>
-              <span className={`text-[9px] font-mono opacity-65 uppercase ${styles.muted}`}>{ot.id}</span>
+              <span className={`text-[10px] font-mono opacity-65 uppercase ${styles.muted}`}>{ot.id}</span>
             </button>
           );
         })}
@@ -126,7 +135,7 @@ export default function SidebarElementSections({
                 </span>
                 <span className="truncate">{lt.displayName}</span>
               </div>
-              <span className={`text-[9px] font-mono opacity-50 font-bold ${styles.muted}`}>{lt.cardinality}</span>
+              <span className={`text-[10px] font-mono opacity-50 font-bold ${styles.muted}`}>{lt.cardinality}</span>
             </button>
           );
         })}
@@ -171,6 +180,7 @@ export default function SidebarElementSections({
         outerClassName="space-y-0.5"
         expanded={expanded}
         onToggle={toggleExpand}
+        headerBadge={demoBadge('function')}
         renderRows={() => functionTypes.map(fn => {
           const isActive = selectedCategory === 'function' && selectedId === fn.id;
           return (
@@ -189,7 +199,7 @@ export default function SidebarElementSections({
                 </span>
                 <span className="truncate">{fn.displayName}</span>
               </div>
-              <span className={`text-[9px] font-mono opacity-50 uppercase ${styles.muted}`}>{fn.returnType}</span>
+              <span className={`text-[10px] font-mono opacity-50 uppercase ${styles.muted}`}>{fn.returnType}</span>
             </button>
           );
         })}
@@ -203,6 +213,7 @@ export default function SidebarElementSections({
         outerClassName="space-y-0.5"
         expanded={expanded}
         onToggle={toggleExpand}
+        headerBadge={demoBadge('interface')}
         renderRows={() => interfaces.map(it => {
           const isActive = selectedCategory === 'interface' && selectedId === it.id;
           return (
@@ -234,6 +245,7 @@ export default function SidebarElementSections({
         outerClassName="space-y-0.5"
         expanded={expanded}
         onToggle={toggleExpand}
+        headerBadge={demoBadge('shared_property')}
         renderRows={() => sharedProperties.map(sp => {
           const isActive = selectedCategory === 'shared_property' && selectedId === sp.id;
           return (

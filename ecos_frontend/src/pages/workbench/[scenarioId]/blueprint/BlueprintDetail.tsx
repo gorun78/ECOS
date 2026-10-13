@@ -45,18 +45,32 @@ export default function BlueprintDetail({ bp }: { bp: ScenarioBlueprintVO }) {
         )}
       </Section>
 
-      {/* 范围 */}
+      {/* 范围（行275 订正：嵌套 JSON 值不再单行直排，折叠进 <details> 展开查看） */}
       <Section icon="Layers" title={t('workspace.bp.scope_title')}>
         {Object.keys(scope).length === 0 ? (
           <span className={`text-xs ${styles.cardTextMuted}`}>{dash}</span>
         ) : (
           <ul className={`text-[11px] ${styles.cardText} space-y-0.5`}>
-            {Object.entries(scope).map(([k, v]) => (
-              <li key={k} className="flex gap-1">
-                <span className={styles.cardTextMuted}>{k}:</span>
-                <span className="truncate">{typeof v === 'object' ? JSON.stringify(v) : String(v)}</span>
-              </li>
-            ))}
+            {Object.entries(scope).map(([k, v]) =>
+              typeof v === 'object' && v !== null ? (
+                <li key={k}>
+                  <details className={`rounded border px-1.5 py-1 ${styles.cardBorder}`}>
+                    <summary className={`cursor-pointer select-none ${styles.cardTextMuted}`}>
+                      {k}
+                      <span className="ml-1 font-mono opacity-60">{'{…}'}</span>
+                    </summary>
+                    <pre className={`mt-1 text-[10px] font-mono whitespace-pre-wrap break-all ${styles.cardTextMuted}`}>
+                      {JSON.stringify(v, null, 2)}
+                    </pre>
+                  </details>
+                </li>
+              ) : (
+                <li key={k} className="flex gap-1">
+                  <span className={styles.cardTextMuted}>{k}:</span>
+                  <span className="truncate">{String(v)}</span>
+                </li>
+              ),
+            )}
           </ul>
         )}
       </Section>

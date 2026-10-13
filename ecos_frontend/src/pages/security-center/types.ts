@@ -80,22 +80,29 @@ export interface SecurityAuditLog {
 }
 
 // ==========================================
-// MOCK DATA
+// COMPONENT CONTRACTS（无 mock 数据 — 2026-10-13 报告 §4.7 行308 订正：
+// 原「MOCK DATA」章节头下早已无任何数据导出，属残留注释，予以更正）
 // ==========================================
 
+/**
+ * 安全中心 Tab id — 单源 = SecurityCenterLayout.tsx 的 SecurityTab
+ * （prevent/detect/policies/audit/audit-query，?tab= 查询参数承接）。
+ */
+export type SecurityCenterTabId = 'prevent' | 'detect' | 'policies' | 'audit' | 'audit-query';
 
 export interface PlaybookStep {
   step: number;
   title: string;
-  tab: 'overview' | 'orgs' | 'dac' | 'mac' | 'pbac' | 'row_col' | 'audit';
+  /** 跳转目标 Tab（与 SecurityCenterLayout 现 tab 集对齐） */
+  tab: SecurityCenterTabId;
   description: string;
   ecosContext: string;
   actionLabel: string;
 }
 
 export interface SecurityCenterViewProps {
-  activeTab?: 'overview' | 'orgs' | 'dac' | 'mac' | 'pbac' | 'row_col' | 'audit' | 'guide';
-  onActiveTabChange?: (tab: 'overview' | 'orgs' | 'dac' | 'mac' | 'pbac' | 'row_col' | 'audit' | 'guide') => void;
+  activeTab?: SecurityCenterTabId;
+  onActiveTabChange?: (tab: SecurityCenterTabId) => void;
   orgs?: SecurityOrg[];
   setOrgs?: React.Dispatch<React.SetStateAction<SecurityOrg[]>> | ((val: SecurityOrg[]) => void);
   projects?: ProjectDAC[];

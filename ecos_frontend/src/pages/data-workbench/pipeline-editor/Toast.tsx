@@ -42,5 +42,3 @@ const Toast: React.FC<{
 
 
 export default Toast;
-
-// TODO: useTheme insertion needed

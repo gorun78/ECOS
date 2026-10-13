@@ -9,6 +9,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+  /** true = 后端不可达/无回复时渲染的本地兜底模板（非模型输出，必须显式标注） */
+  fallback?: boolean;
 }
 
 export interface CopilotPanelProps {
@@ -17,10 +19,11 @@ export interface CopilotPanelProps {
 }
 
 // ─── Quick actions ────────────────────────────────────
+// label/prompt 走 dw.copilot.quick.* 双语键（无假真理/全 i18n）。
 
 export const QUICK_ACTIONS = [
-  { label: '帮我写一个过滤活跃用户的 Pipeline', prompt: '帮我写一个过滤活跃用户的 Pipeline，输出 YAML DSL 定义' },
-  { label: '这个表里有哪些异常值？', prompt: '这个表里有哪些异常值？请分析并列出可能的异常检测方法' },
-  { label: '推荐数据清洗步骤', prompt: '为我的数据集推荐一套完整的数据清洗 Pipeline 步骤' },
-  { label: 'UDF: 计算 RFM 模型', prompt: '帮我写一个 Python UDF 函数，用于计算用户 RFM 模型' },
+  { labelKey: 'dw.copilot.quick.1.label', promptKey: 'dw.copilot.quick.1.prompt' },
+  { labelKey: 'dw.copilot.quick.2.label', promptKey: 'dw.copilot.quick.2.prompt' },
+  { labelKey: 'dw.copilot.quick.3.label', promptKey: 'dw.copilot.quick.3.prompt' },
+  { labelKey: 'dw.copilot.quick.4.label', promptKey: 'dw.copilot.quick.4.prompt' },
 ];

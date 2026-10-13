@@ -43,7 +43,7 @@ export function renderCenterCharts(vm: any) {
                           onClick={() => editorMode === 'design' && setSelectedWidgetId(w.id)}
                           className={`relative rounded-xl border p-4 ${styles.cardBg} shadow-xs transition-all ${
                             editorMode === 'design' ? 'cursor-pointer hover:border-blue-400' : ''
-                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : '${styles.cardBorder}'}`}
+                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : styles.cardBorder}`}
                         >
                           {editorMode === 'design' && (
                             <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
@@ -123,7 +123,7 @@ export function renderCenterCharts(vm: any) {
                           onClick={() => editorMode === 'design' && setSelectedWidgetId(w.id)}
                           className={`relative rounded-xl border p-4 ${styles.cardBg} shadow-xs transition-all ${
                             editorMode === 'design' ? 'cursor-pointer hover:border-blue-400' : ''
-                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : '${styles.cardBorder}'}`}
+                          } ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : styles.cardBorder}`}
                         >
                           {editorMode === 'design' && (
                             <div className={`absolute top-1 right-1 flex items-center gap-1 opacity-60 hover:opacity-100 ${styles.sidebarBg} rounded px-1.5 py-0.5 text-[8px] font-mono`}>
@@ -170,9 +170,9 @@ export function renderCenterCharts(vm: any) {
                                           showToast('info', t('aiworkbench.ws.ct.selectedEntity', { key }));
                                         }
                                       }}
-                                      className={`hover:${styles.appBg} transition-colors ${
+                                      className={`hover:bg-black/5 transition-colors ${
                                         editorMode === 'preview' ? 'cursor-pointer' : ''
-                                      } ${isRowSelected ? 'bg-blue-50 text-blue-700 font-bold' : '${styles.cardTextMuted}'}`}
+                                      } ${isRowSelected ? 'bg-blue-50 text-blue-700 font-bold' : styles.cardTextMuted}`}
                                     >
                                       {isAircraftTable ? (
                                         <>
@@ -198,7 +198,7 @@ export function renderCenterCharts(vm: any) {
                                           <td className="py-2 px-3">
                                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
                                               row.status === 'ON_TIME' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                                              row.status === 'DELAYED' ? 'bg-red-50 text-red-700 border border-red-100' : '${styles.sidebarBg} ${styles.cardText}'
+                                              row.status === 'DELAYED' ? 'bg-red-50 text-red-700 border border-red-100' : `${styles.sidebarBg} ${styles.cardText}`
                                             }`}>
                                               {row.status === 'ON_TIME' ? t('aiworkbench.ws.ct.status.on_time') : row.status === 'DELAYED' ? t('aiworkbench.ws.ct.status.delayed') : row.status}
                                             </span>

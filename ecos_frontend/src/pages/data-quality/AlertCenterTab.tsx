@@ -46,10 +46,10 @@ const ALERT_STATUSES = ["PENDING", "NOTIFIED", "ACKED", "RESOLVED"] as const;
 
 /**
  * 告警级别徽章样式
- * P0=红 / P1=橙 / P2=黄 / P3=灰，全部用语义色 + absolute index 展开（不硬编码 Tailwind 色号）。
- * 使用 Tailwind 的任意透明度类（Tailwind v4 直接生成）保证主题感知。
+ * P0=红 / P1=橙 / P2=黄 为语义severity色（任意透明度类保证主题感知）；
+ * 未登记级别（如 P3）由调用方传入主题中性 token 类，不写裸 slate。
  */
-function levelBadgeClass(level: string): string {
+function levelBadgeClass(level: string, neutralCls: string): string {
   switch (level) {
     case "P0":
       return "bg-red-500/15 text-red-700 dark:text-red-400 border border-red-500/30";
@@ -58,7 +58,7 @@ function levelBadgeClass(level: string): string {
     case "P2":
       return "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border border-yellow-500/30";
     default:
-      return "bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-400/30"; /* FIXME:theme-helper 留尾清理 */
+      return neutralCls;
   }
 }
 
@@ -91,20 +91,30 @@ export default function AlertCenterTab() {
   const [levelFilter, setLevelFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  // B-16：加载失败不再塌缩成「暂无告警」假空态——null（失败）与 []（真空）分流呈现
+  const [loadError, setLoadError] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // 全量拉取（不带过滤参数），KPI 统计口径 = 全量；列表过滤在客户端完成
   const load = useCallback(async () => {
-    try {
-      const q: { level?: string; status?: string; sort?: string } = { sort: "desc" };
-      if (levelFilter) q.level = levelFilter;
-      if (statusFilter) q.status = statusFilter;
-      const r = await fetchDqAlerts(q);
-      setAlerts(r ?? []);
-    } finally {
-      setLoading(false);
+    const r = await fetchDqAlerts({ sort: "desc" });
+    if (r === null) {
+      setLoadError(true);
+    } else {
+      setLoadError(false);
+      setAlerts(r);
     }
-  }, [levelFilter, statusFilter]);
+    setLoading(false);
+  }, []);
+
+  const visibleAlerts = useMemo(
+    () => alerts.filter(a =>
+      (!levelFilter || a.alertLevel === levelFilter) &&
+      (!statusFilter || a.status === statusFilter)
+    ),
+    [alerts, levelFilter, statusFilter],
+  );
 
   // 首次加载 + 10s 轮询
   useEffect(() => {
@@ -247,13 +257,19 @@ export default function AlertCenterTab() {
         </button>
       </div>
 
+      {/* B-16：加载失败横幅（保留旧数据可继续浏览，但明确标注非最新） */}
+      {loadError && (
+        <div className={`px-3 py-2 rounded-md border text-xs ${styles.dangerBorder} ${styles.dangerBg} ${styles.dangerText}`}>
+          {t("dw.dqRule.alerts.loadFailed")}
+        </div>
+      )}
       {/* 告警列表 */}
       <div className={`flex-1 min-h-0 overflow-y-auto rounded-md border ${styles.cardBorder} ${styles.cardBg}`}>
         {loading && alerts.length === 0 ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-6 h-6 animate-spin opacity-50" />
           </div>
-        ) : alerts.length === 0 ? (
+        ) : visibleAlerts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <Bell className="w-8 h-8 opacity-30" />
             <span className={`text-xs ${styles.cardTextMuted}`}>{t("dw.dqRule.alerts.noAlerts")}</span>
@@ -272,7 +288,7 @@ export default function AlertCenterTab() {
               </tr>
             </thead>
             <tbody>
-              {alerts.map((a) => {
+              {visibleAlerts.map((a) => {
                 const isBusy = busyId === a.id;
                 const canAck = a.status === "PENDING" || a.status === "NOTIFIED";
                 const canResolve = a.status !== "RESOLVED";
@@ -284,7 +300,7 @@ export default function AlertCenterTab() {
                     {/* 级别 */}
                     <td className="px-3 py-2.5">
                       <span
-                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide ${levelBadgeClass(a.alertLevel)}`}
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide ${levelBadgeClass(a.alertLevel, `${styles.sidebarBg} ${styles.cardTextMuted} border ${styles.cardBorder}`)}`}
                       >
                         {a.alertLevel}
                       </span>

@@ -18,6 +18,8 @@ import {
   Node,
   Edge,
   MarkerType,
+  type NodeChange,
+  type EdgeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
@@ -25,6 +27,8 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
+import { getErrorMessage } from './helpers';
 
 // ─── Types (extracted) ─────────────────────────────────────
 import type { NodeConfig, PipelineFlowEditorProps, PipelineSaveNode, PipelineSaveEdge } from './pipeline-editor/types';
@@ -87,9 +91,16 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
   computeEngine,
   editingPipeline,
   onBack,
+  onDirtyChange,
 }) => {
   const { styles } = useTheme();
   const { t } = useLanguage();
+  // ── 未保存修改跟踪（切管道/新建/清空前挽留）──
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  const markDirty = useCallback(() => setDirty(true), []);
+  // ── 清空画布确认门 ──
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [pipelineName, setPipelineName] = useState(editingPipeline?.name || t('dw.pipeline.editor.defaultName'));
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -146,16 +157,13 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
     [showToast]
   );
 
-  // ── Wave 3 (lower) T3: debug control handlers — call the API when a
-  // session id is known, otherwise fall back to a local-only state change
-  // (the back-end endpoints land in Wave3-upper; UI stays usable regardless).
-  const ensureSession = useCallback(async (): Promise<string> => {
-    if (sessionId) return sessionId;
-    const jobSeq = ++breakpointSeq.current;
-    const url = `local-dbg-${Date.now()}-${jobSeq}`;
-    setSessionId(url);
-    return url;
-  }, [sessionId]);
+  // ── Wave 3 (lower) T3: debug control handlers — 只认真实后端会话。
+  // 后端不可达 / 无 sessionId ⇒ 显式报错并保持 idle，绝不伪造本地调试会话。
+  const mapSessionState = useCallback((state?: string): DebugState => {
+    if (state === 'broken' || state === 'paused' || state === 'awaiting') return 'paused';
+    if (state === 'completed' || state === 'failed' || state === 'stopped') return 'idle';
+    return 'running';
+  }, []);
   const handleDebugStart = useCallback(async () => {
     if (breakpoints.length === 0) {
       showLocalToast('error', t('dw.pipeline.debug.startDisabled'));
@@ -185,38 +193,54 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
       });
       if (snap?.sessionId) {
         setSessionId(snap.sessionId);
-        setDebugState('running');
+        setDebugState(mapSessionState(snap.state));
         return;
       }
     } catch (e) {
-      console.warn('[pipeline-debug] startDebugSession (placeholder) failed:', e);
+      console.warn('[pipeline-debug] startDebugSession failed:', e);
     }
-    // 后端不可达时退化为本地占位（保持 UI 可用）
-    const id = (await ensureSession()) || 'local-dbg';
-    setSessionId(id);
-    setDebugState('running');
-  }, [breakpoints.length, ensureSession, showLocalToast, t, nodes, edges, editingPipeline?.id, pipelineName]);
+    // 后端不可达：明示降级，不伪造会话、不进入 running
+    setSessionId(null);
+    setDebugState('idle');
+    showLocalToast('error', t('dw.pipeline.debug.backendUnavailable'));
+  }, [breakpoints.length, showLocalToast, t, nodes, edges, editingPipeline?.id, pipelineName, mapSessionState]);
   const handleDebugStepOver = useCallback(async () => {
     if (debugState !== 'paused' && debugState !== 'running') return;
-    if (!sessionId) return;
+    if (!sessionId) {
+      showLocalToast('error', t('dw.pipeline.debug.backendUnavailable'));
+      return;
+    }
     try {
       const { stepDebugSession } = await import('./pipelineDebugApi');
-      await stepDebugSession(sessionId);
+      const snap = await stepDebugSession(sessionId);
+      if (!snap) {
+        showLocalToast('error', t('dw.pipeline.debug.backendUnavailable'));
+        return;
+      }
+      setDebugState(mapSessionState(snap.state));
     } catch (e) {
       console.warn('[pipeline-debug] stepDebugSession failed:', e);
+      showLocalToast('error', t('dw.pipeline.debug.backendUnavailable'));
     }
-    setDebugState('running');
-  }, [debugState, sessionId]);
+  }, [debugState, sessionId, showLocalToast, t, mapSessionState]);
   const handleDebugContinue = useCallback(async () => {
-    if (debugState !== 'paused' || !sessionId) return;
+    if (debugState !== 'paused' || !sessionId) {
+      if (debugState !== 'idle' && !sessionId) showLocalToast('error', t('dw.pipeline.debug.backendUnavailable'));
+      return;
+    }
     try {
       const { continueDebugSession } = await import('./pipelineDebugApi');
-      await continueDebugSession(sessionId);
+      const snap = await continueDebugSession(sessionId);
+      if (!snap) {
+        showLocalToast('error', t('dw.pipeline.debug.backendUnavailable'));
+        return;
+      }
+      setDebugState(mapSessionState(snap.state));
     } catch (e) {
-      console.warn('[pipeline-debug] continueDebugSession (placeholder) failed:', e);
+      console.warn('[pipeline-debug] continueDebugSession failed:', e);
+      showLocalToast('error', t('dw.pipeline.debug.backendUnavailable'));
     }
-    setDebugState('running');
-  }, [debugState, sessionId]);
+  }, [debugState, sessionId, showLocalToast, t, mapSessionState]);
   const handleDebugStop = useCallback(async () => {
     if (debugState === 'idle') return;
     if (sessionId) {
@@ -263,6 +287,7 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
   const loadedDefKey = `${editingPipeline?.id ?? ''}#${Array.isArray(editingPipeline?.nodes) ? editingPipeline.nodes.length : 0}`;
   useEffect(() => {
     const apiNodes = editingPipeline?.nodes;
+    setDirty(false); // 切换定义 ⇒ 脏状态复位
     // 新建态（无 id）：清空画布，避免残留上一条管道的内容
     if (!editingPipeline?.id) {
       setNodes([]);
@@ -303,9 +328,26 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
     return `node-${Date.now()}-${nodeCounter.current}`;
   }, []);
 
+  // ── 变更跟踪包装（移动/删除节点 = 未保存修改；纯选中不算）──
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      if (changes.some((c) => c.type === 'position' || c.type === 'remove' || c.type === 'replace')) markDirty();
+      onNodesChange(changes);
+    },
+    [markDirty, onNodesChange]
+  );
+  const handleEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      if (changes.some((c) => c.type === 'add' || c.type === 'remove' || c.type === 'replace')) markDirty();
+      onEdgesChange(changes);
+    },
+    [markDirty, onEdgesChange]
+  );
+
   // ── onConnect ──
   const onConnect = useCallback(
     (connection: Connection) => {
+      markDirty();
       setEdges((eds) =>
         addEdge(
           { ...connection, animated: true, style: { stroke: '#94a3b8', strokeWidth: 2 },
@@ -314,7 +356,7 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
         )
       );
     },
-    [setEdges]
+    [setEdges, markDirty]
   );
 
   // ── Drag from palette to canvas ──
@@ -349,9 +391,10 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
         } as unknown as Record<string, unknown>,
       };
       setNodes((nds) => [...nds, newNode]);
+      markDirty();
       showLocalToast('info', t('dw.pipeline.editor.nodeAdded', { type: paletteType }));
     },
-    [reactFlowInstance, nextNodeId, setNodes, showLocalToast, t]
+    [reactFlowInstance, nextNodeId, setNodes, showLocalToast, t, markDirty]
   );
 
   // ── Node click → select ──
@@ -389,8 +432,9 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
         }
         return prev;
       });
+      markDirty();
     },
-    [setNodes]
+    [setNodes, markDirty]
   );
 
   // ── Delete node ──
@@ -399,20 +443,26 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
       setNodes((nds) => nds.filter((n) => n.id !== nodeId));
       setEdges((eds) => eds.filter((e) => e.source !== nodeId && e.target !== nodeId));
       setSelectedNode(null);
+      markDirty();
       showLocalToast('info', t('dw.pipeline.editor.nodeDeleted'));
     },
-    [setNodes, setEdges, showLocalToast, t]
+    [setNodes, setEdges, showLocalToast, t, markDirty]
   );
 
-  // ── Clear canvas ──
+  // ── Clear canvas（危险操作：先确认，禁 window.confirm）──
   const clearCanvas = useCallback(() => {
     if (nodes.length === 0 && edges.length === 0) return;
+    setClearConfirmOpen(true);
+  }, [nodes, edges]);
+  const doClearCanvas = useCallback(() => {
+    setClearConfirmOpen(false);
     setNodes([]);
     setEdges([]);
     setSelectedNode(null);
     nodeCounter.current = 0;
+    markDirty();
     showLocalToast('info', t('dw.pipeline.editor.canvasCleared'));
-  }, [nodes, edges, setNodes, setEdges, showLocalToast, t]);
+  }, [setNodes, setEdges, showLocalToast, t, markDirty]);
 
   // ── Wave 3 (lower) T2: pre-flight validation (invalid fields, DAG cycle,
   // source→sink reachability) ──
@@ -447,19 +497,17 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
     return false;
   }, [nodes, edges, t, showLocalToast]);
 
-  // ── PMO-52 T3b: GitVersionPanel restore stub — real rollback endpoint lands
-  // in a follow-up wave (T1 backend returns history; this button only marks
-  // intent so a reviewer can trace wire-up). The handler must keep the panel
-  // open (refetch happens via GitVersionPanel's refresh callback). ──
+  // ── PMO-52 T3b: Git 版本恢复 — 后端回滚端点尚未上线。
+  // 无假真理：明示「不可用」，不做任何乐观状态变更。──
   const handleGitVersionRestore = useCallback(
-    (ref: string): void => {
-      showLocalToast('info', t('dw.pipeline.git.restoreBacked'));
+    (): void => {
+      showLocalToast('error', t('dw.pipeline.git.restoreUnavailable'));
     },
     [showLocalToast, t]
   );
 
   // ── Save (T3): convert ReactFlow nodes/edges → backend PipelineNode shape ──
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!pipelineName.trim()) {
       showLocalToast('error', t('dw.pipeline.editor.nameRequired'));
       return;
@@ -477,29 +525,66 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
       };
     });
     const saveEdges: PipelineSaveEdge[] = edges.map((e) => ({ from: e.source, to: e.target }));
-    onSave({
-      id: editingPipeline?.id,
-      name: pipelineName.trim(),
-      nodes: saveNodes,
-      edges: saveEdges,
-      computeEngine,
-    });
+    // 无假真理：等待父级持久化完成后再报成功；父级返回 false 视为失败。
+    let ok: void | boolean = undefined;
+    try {
+      ok = await Promise.resolve(onSave({
+        id: editingPipeline?.id,
+        name: pipelineName.trim(),
+        nodes: saveNodes,
+        edges: saveEdges,
+        computeEngine,
+      }));
+    } catch (e) {
+      showLocalToast('error', t('dw.pipeline.editor.saveFailed', { error: getErrorMessage(e) }));
+      return;
+    }
+    if (ok === false) return; // 父级已提示失败
+    setDirty(false);
     showLocalToast('success', t('dw.pipeline.editor.saved'));
   }, [pipelineName, nodes, edges, computeEngine, onSave, showLocalToast, t, editingPipeline?.id, runValidation]);
 
   // ── Execute ──
-  const handleExecute = useCallback(() => {
+  const handleExecute = useCallback(async () => {
     if (nodes.length === 0) {
       showLocalToast('error', t('dw.pipeline.editor.canvasEmpty'));
       return;
     }
     if (!runValidation()) return;
-    setNodes((nds) =>
-      nds.map((n) => ({ ...n, data: { ...(n.data as Record<string, unknown>), nodeStatus: 'running' } }))
-    );
-    onExecute(editingPipeline?.id || pipelineName.trim() || 'untitled');
-    showLocalToast('info', t('dw.pipeline.editor.executeTriggered'));
-  }, [nodes, pipelineName, onExecute, setNodes, showLocalToast, t, editingPipeline?.id, runValidation]);
+    // 无 id 绝不能拿管道名当 id 发给后端（假执行）。
+    const pipelineId = editingPipeline?.id;
+    if (!pipelineId) {
+      showLocalToast('error', t('dw.pipeline.editor.saveBeforeExecute'));
+      return;
+    }
+    // 不预设全体 running；等待触发结果后按真实状态收敛。
+    let res: { executionId?: string; status?: string } | null | void = null;
+    try {
+      res = await Promise.resolve(onExecute(pipelineId));
+    } catch (e) {
+      showLocalToast('error', t('dw.pipeline.editor.executeFailed', { error: getErrorMessage(e) }));
+      return;
+    }
+    if (!res) {
+      showLocalToast('error', t('dw.pipeline.editor.executeUnreachable'));
+      return;
+    }
+    const st = (res.status || '').toLowerCase();
+    const bad = ['failed', 'error', 'cancelled', 'canceled', 'timeout'].includes(st);
+    const done = ['success', 'succeeded', 'completed', 'finished', 'done'].includes(st);
+    const paint = (nodeStatus: 'running' | 'success' | 'error') =>
+      setNodes((nds) => nds.map((n) => ({ ...n, data: { ...(n.data as Record<string, unknown>), nodeStatus } })));
+    if (bad) {
+      paint('error');
+      showLocalToast('error', t('dw.pipeline.editor.executeFailedStatus', { status: res.status || 'failed' }));
+    } else if (done) {
+      paint('success');
+      showLocalToast('success', t('dw.pipeline.editor.executeSuccess'));
+    } else {
+      paint('running');
+      showLocalToast('info', t('dw.pipeline.editor.executeTriggered'));
+    }
+  }, [nodes, onExecute, setNodes, showLocalToast, t, editingPipeline?.id, runValidation]);
 
   // ── Drag start from palette ──
   const onDragStart = useCallback((event: React.DragEvent<HTMLDivElement>, nodeType: string) => {
@@ -524,7 +609,7 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
       <div className={`flex items-center justify-between px-4 py-2 border-b shrink-0 ${styles.appBg} ${styles.appText} ${styles.appBorder}`}>
         <div className="flex items-center gap-3">
           {onBack && (
-            <button type="button" onClick={onBack} className={`flex items-center gap-1 text-xs ${styles.cardTextMuted} hover:${styles.infoText} transition-colors`} title={t('dw.pipeline.editor.backToList')}>
+            <button type="button" onClick={onBack} className={`flex items-center gap-1 text-xs ${styles.cardTextMuted} hover:opacity-80 transition-colors`} title={t('dw.pipeline.editor.backToList')}>
               <ArrowLeft size={14} /> {t('dw.pipeline.editor.backToList')}
             </button>
           )}
@@ -548,7 +633,7 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
                 ? styles.accentBg
                 : styles.cardTextMuted
             } ${editingPipeline?.id
-              ? 'hover:bg-indigo-50 cursor-pointer'
+              ? 'hover:opacity-80 cursor-pointer'
               : 'opacity-50 cursor-not-allowed'
             }`}
           >
@@ -556,8 +641,8 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
           </button>
           <input
             type="text" value={pipelineName}
-            onChange={(e) => setPipelineName(e.target.value)}
-            className={`bg-transparent border-b ${styles.cardBorder} px-1 py-0.5 text-sm font-medium ${styles.cardText} outline-none focus:${styles.infoBorder} transition-colors w-48`}
+            onChange={(e) => { setPipelineName(e.target.value); markDirty(); }}
+            className={`bg-transparent border-b ${styles.cardBorder} px-1 py-0.5 text-sm font-medium ${styles.cardText} outline-none transition-colors w-48`}
             placeholder={t('dw.pipeline.editor.namePlaceholder')}
           />
           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
@@ -565,31 +650,39 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
           }`}>
             {editingPipeline ? t('dw.pipeline.editor.editing') : t('dw.pipeline.editor.creating')}
           </span>
-          {editingPipeline && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${
-              editingPipeline.status === 'active' ? `${styles.successBg} ${styles.successText} ${styles.successBorder}` :
-              editingPipeline.status === 'draft' ? `${styles.sidebarBg} ${styles.cardTextMuted} ${styles.cardBorder}` :
-              editingPipeline.status === 'running' ? `${styles.infoBg} ${styles.infoText} ${styles.infoBorder}` :
-              editingPipeline.status === 'error' ? `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}` :
-              `${styles.successBg} ${styles.successText} ${styles.successBorder}`
-            }`}>
-              {editingPipeline.status === 'active' && t('dw.pipeline.status.active')}
-              {editingPipeline.status === 'draft' && t('dw.pipeline.status.draft')}
-              {editingPipeline.status === 'running' && t('dw.pipeline.status.running')}
-              {editingPipeline.status === 'success' && t('dw.pipeline.status.success')}
-              {editingPipeline.status === 'error' && t('dw.pipeline.status.error')}
-            </span>
-          )}
+          {editingPipeline && (() => {
+            // 状态徽章：未知枚举不再渲染空白徽章 ⇒ 兜底显示原始状态
+            const st = editingPipeline.status as string;
+            const badgeClass =
+              st === 'active' || st === 'success' ? `${styles.successBg} ${styles.successText} ${styles.successBorder}` :
+              st === 'draft' ? `${styles.sidebarBg} ${styles.cardTextMuted} ${styles.cardBorder}` :
+              st === 'running' ? `${styles.infoBg} ${styles.infoText} ${styles.infoBorder}` :
+              st === 'error' ? `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}` :
+              `${styles.sidebarBg} ${styles.cardTextMuted} ${styles.cardBorder}`;
+            const labelKeyByStatus: Record<string, string> = {
+              active: 'dw.pipeline.status.active',
+              draft: 'dw.pipeline.status.draft',
+              running: 'dw.pipeline.status.running',
+              success: 'dw.pipeline.status.success',
+              error: 'dw.pipeline.status.error',
+            };
+            const label = labelKeyByStatus[st] ? t(labelKeyByStatus[st]) : (st || '—');
+            return (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${badgeClass}`}>
+                {label}
+              </span>
+            );
+          })()}
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={clearCanvas} className={`flex items-center gap-1 px-2.5 py-1 text-xs transition-colors ${styles.cardTextMuted} hover:${styles.cardText}`} title={t('dw.pipeline.editor.clearCanvas')}>
+          <button type="button" onClick={clearCanvas} className={`flex items-center gap-1 px-2.5 py-1 text-xs transition-colors ${styles.cardTextMuted} hover:opacity-80`} title={t('dw.pipeline.editor.clearCanvas')}>
             <Trash2 size={13} /> {t('dw.pipeline.editor.clear')}
           </button>
           <button type="button" onClick={() => setDebugOpen((v) => !v)}
             className={`flex items-center gap-1 px-2.5 py-1 text-xs transition-colors rounded ${
               debugOpen
                 ? `${styles.accentBg} ${styles.accentText}`
-                : `${styles.cardTextMuted} hover:${styles.cardText}`
+                : `${styles.cardTextMuted} hover:opacity-80`
             }`}
             title={t('dw.pipeline.debug.title')}
           >
@@ -598,10 +691,10 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
               <span className={`text-[9px] font-mono ${debugOpen ? styles.accentText : styles.cardTextMuted}`}>{breakpoints.length}</span>
             )}
           </button>
-          <button type="button" onClick={handleExecute} className={`flex items-center gap-1.5 px-3 py-1 ${styles.successBg} hover:${styles.successBg} ${styles.cardText} rounded-lg text-xs font-medium transition-colors`}>
+          <button type="button" onClick={handleExecute} className={`flex items-center gap-1.5 px-3 py-1 ${styles.successBg} hover:opacity-90 ${styles.cardText} rounded-lg text-xs font-medium transition-colors`}>
             <Play size={13} /> {t('dw.pipeline.editor.execute')}
           </button>
-          <button type="button" onClick={handleSave} className={`flex items-center gap-1.5 px-3 py-1 ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} rounded-lg text-xs font-medium transition-colors`}>
+          <button type="button" onClick={handleSave} className={`flex items-center gap-1.5 px-3 py-1 ${styles.accentBg} hover:opacity-90 ${styles.cardText} rounded-lg text-xs font-medium transition-colors`}>
             <Save size={13} /> {t('dw.pipeline.editor.save')}
           </button>
         </div>
@@ -620,8 +713,8 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
             <FlowCanvas
               nodes={nodes}
               edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
+              onNodesChange={handleNodesChange}
+              onEdgesChange={handleEdgesChange}
               onConnect={onConnect}
               onInit={setReactFlowInstance}
               onNodeClick={onNodeClick}
@@ -676,6 +769,18 @@ const PipelineFlowEditor: React.FC<PipelineFlowEditorProps> = ({
 
       {/* ── Toast ── */}
       {toast && <Toast type={toast.type} message={toast.msg} onClose={() => setToast(null)} />}
+
+      {/* ── 清空画布确认 ── */}
+      <ConfirmDialog
+        visible={clearConfirmOpen}
+        variant="danger"
+        title={t('dw.pipeline.editor.clearCanvasConfirmTitle')}
+        message={t('dw.pipeline.editor.clearCanvasConfirmMessage')}
+        confirmText={t('dw.pipeline.editor.clear')}
+        cancelText={t('common.cancel')}
+        onConfirm={doClearCanvas}
+        onCancel={() => setClearConfirmOpen(false)}
+      />
     </div>
   );
 };

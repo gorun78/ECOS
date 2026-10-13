@@ -82,22 +82,19 @@ export default function AlertsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selected, setSelected] = useState<MonitorAlert | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pageRef = useRef(1);
-  const sevRef = useRef("");
-  const statRef = useRef("");
-  pageRef.current = alertPage;
-  sevRef.current = severity;
-  statRef.current = status;
 
+  // loadAlerts reads state directly (severity/status/alertPage) so page/filter
+  // changes always trigger a fresh fetch — no render-time refs (refs updated during
+  // render never re-run the effect, and a stale ref caused loads with the wrong page).
   const loadAlerts = useCallback(async (silent = false) => {
     if (!silent) setAlertLoading(true);
     setAlertError("");
     setNoAccess(false);
     try {
       const data = await fetchMonitorAlerts({
-        severity: sevRef.current || undefined,
-        status: statRef.current || undefined,
-        page: pageRef.current,
+        severity: severity || undefined,
+        status: status || undefined,
+        page: alertPage,
         size: 10,
       });
       setAlerts(data.rows);
@@ -108,14 +105,13 @@ export default function AlertsPage() {
     } finally {
       if (!silent) setAlertLoading(false);
     }
-  }, []);
+  }, [severity, status, alertPage]);
 
-  // Refresh on filter/page change (reset to page 1 when filters change)
+  // Runs whenever section / filters / page change (loadAlerts identity flips),
+  // plus a 15s silent poll that pauses while the tab is backgrounded.
   useEffect(() => {
     if (section !== "alerts") return;
-    setAlertPage(1);
-    setAlertLoading(true);
-    void loadAlerts(false).finally(() => setAlertLoading(false));
+    void loadAlerts(false);
     const interval = setInterval(() => {
       // PAUSE when document.hidden — skip a poll tick while the tab is background
       if (document.hidden) return;
@@ -123,7 +119,7 @@ export default function AlertsPage() {
     }, 15000);
     timerRef.current = interval;
     return () => clearInterval(interval);
-  }, [severity, status, section, loadAlerts]);
+  }, [section, loadAlerts]);
 
   const handleAck = useCallback(
     async (id: string) => {
@@ -151,18 +147,15 @@ export default function AlertsPage() {
   const [dlqLoading, setDlqLoading] = useState(false);
   const [dlqError, setDlqError] = useState("");
   const [dlqBusyId, setDlqBusyId] = useState<string | null>(null);
-  const dlqStatusRef = useRef("");
-  const dlqPageRef = useRef(1);
-  dlqStatusRef.current = dlqStatus;
-  dlqPageRef.current = dlqPage;
 
+  // Reads state directly (dlqStatus/dlqPage); see loadAlerts above for rationale.
   const loadDlq = useCallback(async (silent = false) => {
     if (!silent) setDlqLoading(true);
     setDlqError("");
     try {
       const data = await fetchDlq({
-        status: dlqStatusRef.current || undefined,
-        page: dlqPageRef.current,
+        status: dlqStatus || undefined,
+        page: dlqPage,
         size: 10,
       });
       setDlq(data.rows);
@@ -173,12 +166,11 @@ export default function AlertsPage() {
     } finally {
       if (!silent) setDlqLoading(false);
     }
-  }, []);
+  }, [dlqStatus, dlqPage]);
 
   useEffect(() => {
     if (section !== "dlq") return;
-    setDlqLoading(true);
-    void loadDlq(false).finally(() => setDlqLoading(false));
+    void loadDlq(false);
     const interval = setInterval(() => {
       if (document.hidden) return;
       void loadDlq(true);
@@ -188,7 +180,7 @@ export default function AlertsPage() {
       clearInterval(interval);
       if (timerRef.current === interval) timerRef.current = null;
     };
-  }, [dlqStatus, section, loadDlq]);
+  }, [section, loadDlq]);
 
   const handleReplay = useCallback(
     async (id: string) => {
@@ -359,7 +351,10 @@ export default function AlertsPage() {
                 <button
                   key={s || "all"}
                   type="button"
-                  onClick={() => setSeverity(s)}
+                  onClick={() => {
+                    setSeverity(s);
+                    setAlertPage(1);
+                  }}
                   className={`h-6 px-2.5 rounded-full border text-[10px] font-medium transition cursor-pointer ${
                     active
                       ? `${styles.accentBg} ${styles.accentBorder} text-white`
@@ -379,7 +374,10 @@ export default function AlertsPage() {
                 <button
                   key={s || "all"}
                   type="button"
-                  onClick={() => setStatus(s)}
+                  onClick={() => {
+                    setStatus(s);
+                    setAlertPage(1);
+                  }}
                   className={`h-6 px-2.5 rounded-full border text-[10px] font-medium transition cursor-pointer ${
                     active
                       ? `${styles.accentBg} ${styles.accentBorder} text-white`
@@ -552,6 +550,14 @@ function AlertsBody({
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
+      {/*
+        Two row renderers by design (low-risk unification, kept intentionally):
+          - desktop: AlertRow (rich custom layout, own ack button + severity/status styling)
+          - mobile:  MobileDataTable driven by `alertColumns`
+        Both paths use the SAME theme tokens (danger/warning/info badge classes) and the
+        SAME ack gating (canAck && status∉{CLOSED,ACKED} && !busy), so behaviour and look
+        stay consistent across breakpoints without a risky shared-row refactor.
+      */}
       <div className={`flex-1 min-h-0 overflow-y-auto rounded-lg border ${styles.cardBorder} ${styles.cardBg}`}>
         {isMobile ? (
           <MobileDataTable<Record<string, any>>

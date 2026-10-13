@@ -12,6 +12,7 @@ import { GitBranch, History, Loader2, X, RotateCcw } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import { apiFetchData } from '../../../api';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 /** Props for the GitVersionPanel. */
 export interface GitVersionPanelProps {
@@ -94,15 +95,22 @@ const GitVersionPanel: React.FC<GitVersionPanelProps> = ({
     };
   }, [refresh]);
 
-  // ── Restore handler (deferred to a real rollback endpoint in a future wave) ──
+  // ── Restore handler：ConfirmDialog 强确认门（禁 window.confirm；原 `window.confirm ? … : true` 为 fail-open 旁路，已删除）──
+  const [pendingRestoreSha, setPendingRestoreSha] = useState<string | null>(null);
+
   const handleRestore = useCallback(
-    async (sha: string): Promise<void> => {
+    (sha: string): void => {
       if (!onRestore) return;
-      const confirmMsg = t('dw.pipeline.git.restoreConfirm', { sha });
-      // Defensive: a real confirmation dialog will land in the restore wave.
-      // window.confirm is a safe dev-time guard against accidental clicks.
-      const ok = window.confirm ? window.confirm(confirmMsg) : true;
-      if (!ok) return;
+      setPendingRestoreSha(sha);
+    },
+    [onRestore]
+  );
+
+  const runRestore = useCallback(
+    async (): Promise<void> => {
+      const sha = pendingRestoreSha;
+      setPendingRestoreSha(null);
+      if (!sha || !onRestore) return;
       try {
         await onRestore(sha);
         // After restore succeeds, the parent commits a new version → refresh
@@ -113,7 +121,7 @@ const GitVersionPanel: React.FC<GitVersionPanelProps> = ({
         setError(e instanceof Error ? e.message : 'restore failed');
       }
     },
-    [onRestore, refresh, t]
+    [pendingRestoreSha, onRestore, refresh]
   );
 
   // ── Loading state ─────────────────────────────────────
@@ -205,6 +213,16 @@ const GitVersionPanel: React.FC<GitVersionPanelProps> = ({
           </ul>
         )}
       </div>
+      <ConfirmDialog
+        visible={!!pendingRestoreSha}
+        danger
+        title={t('dw.pipeline.git.restore_title')}
+        message={t('dw.pipeline.git.restoreConfirm', { sha: pendingRestoreSha ?? '' })}
+        confirmText={t('common.confirm')}
+        cancelText={t('common.cancel')}
+        onConfirm={() => void runRestore()}
+        onCancel={() => setPendingRestoreSha(null)}
+      />
     </div>
   );
 };

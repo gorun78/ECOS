@@ -26,7 +26,9 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
-import { knowledgeApi, type GraphStats } from '../services/knowledgeApi';
+import type { GraphStats } from '../services/knowledgeApi';
+import { kbFetchGraphStats, kbFetchGraphJobs } from '../services/overview';
+import { kbFetchStructuredJobs, fetchExtractCandidateFiles } from '../services/extract';
 import { KB_STATS_REFRESH_EVENT } from '../typesAndConstants';
 import { fetchNavProducts, type NavProductItemVO } from '../../../services/knowledgeNavApi';
 
@@ -34,28 +36,32 @@ import { fetchNavProducts, type NavProductItemVO } from '../../../services/knowl
  * KPI 6 指标（PRD F2）
  * - 知识资产（articleCount） / 图谱实体（graphNodeCount） / 图谱关系（graphEdgeCount）
  * - 向量索引（embeddingCount） / 待审核（pendingFilesCount） / 抽取任务（runningJobsCount）
- * 数据源：fetchGraphStats 一次性提供文章数/节点/边/向量；pending/running 从对应端点独立拉。
+ * 数据源：kbFetchGraphStats 提供文章数/节点/边/向量；pending/running 从对应端点独立拉，
+ * 每路失败以「—」+ 降级标记呈现（杜绝失败=0=一切正常的假真理）。
  */
-interface AcknowledgeStats extends GraphStats {
-  statsOff: boolean;
-}
 
 /** 流水线 5 步（PRD F2「知识生产流水线」）— 主题主导色 chip */
 const PIPELINE_STEPS = [
   { id: 'ontology_mapping', labelKey: 'knowledge.overview.pipeline_ontology', hintKey: 'knowledge.overview.pipeline_ontology_hint' },
   { id: 'data_extraction',  labelKey: 'knowledge.overview.pipeline_extraction', hintKey: 'knowledge.overview.pipeline_extraction_hint' },
   { id: 'knowledge_candidate', labelKey: 'knowledge.overview.pipeline_candidate', hintKey: 'knowledge.overview.pipeline_candidate_hint' },
-  { id: 'reivew_publish',     labelKey: 'knowledge.overview.pipeline_publish', hintKey: 'knowledge.overview.pipeline_publish_hint' },
+  { id: 'review_publish',     labelKey: 'knowledge.overview.pipeline_publish', hintKey: 'knowledge.overview.pipeline_publish_hint' },
   { id: 'kg_vector',          labelKey: 'knowledge.overview.pipeline_kg_vector', hintKey: 'knowledge.overview.pipeline_kg_vector_hint' },
 ] as const;
 
-/** 待处理事项 3 行（PRD F2「待处理事项」— 点击跳 F7 GovernPage） */
+/** 待处理事项 3 行（PRD F2「待处理事项」）
+ *  value=null → 不可用（无真实端点）；error=true → 拉取失败（区别于真实 0）。
+ *  target 为该事项在知识工作台的真实承接页（深链 ?page=&gsub=）。 */
 interface ToDoRow {
   id: 'ai_candidates' | 'wiki_pending' | 'index_failed';
   labelKey: string;
-  value: number;
-  /** 跳转路径（全部由 GovernPage，原来 ExtractionReviewTab / 现 AuditFeedCard 承载） */
-  target: 'govern';
+  value: number | null;
+  error: boolean;
+  available: boolean;
+  /** 承接路由 hash；available=false 时忽略 */
+  target: string;
+  /** 不可用原因（available=false 时展示） */
+  reasonKey?: string;
 }
 
 /** 最近知识资产表行（来自 fetchNavProducts，与 AssetListPage 同源） */
@@ -87,74 +93,81 @@ export default function OverviewPage() {
     embeddingCount: 0,
     ruleCount: 0,
   });
-  const [statsOff, setStatsOff] = useState<boolean>(false);
+
+  // ── 四路降级标记（各路由独立，失败≠0=正常） ──
+  const [statsErr, setStatsErr] = useState<boolean>(false);
+  const [filesErr, setFilesErr] = useState<boolean>(false);
+  const [jobsErr, setJobsErr] = useState<boolean>(false);
+  const [indexErr, setIndexErr] = useState<boolean>(false);
 
   // ── 待审核 / 抽取任务（KPI 4-6） ──
   const [pendingFiles, setPendingFiles] = useState<number>(0);
   const [runningJobs, setRunningJobs] = useState<number>(0);
 
-  // ── 3 待办 ──
-  const [wikiPending, setWikiPending] = useState<number>(0);
+  // ── 待办：索引/构建失败（KG 构建作业 FAILED 真实计数） ──
   const [indexFailed, setIndexFailed] = useState<number>(0);
 
   // ── 最近资产表 ──
   const [assets, setAssets] = useState<AssetRow[]>([]);
   const [assetsLoading, setAssetsLoading] = useState<boolean>(true);
+  const [assetsErr, setAssetsErr] = useState<boolean>(false);
 
   // ── 资产表 loading（用于顶栏遮罩） ──
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
   /**
-   * 一次性并发拉 4 路：
-   *  1) fetchGraphStats（KPI 1-4 主源）
-   *  2) fetchExtractCandidateFiles → 过滤 pending（KPI 5 待审核 + 第 1 行待办）
-   *  3) fetchStructuredJobs(1,1) → 第一个 job status=RUNNING 时 runningJobs=1
-   *  4) fetchLifecycleAudit → 推导 indexFailed + wikiPending（待办 2/3）
-   *
-   * 各路独立 catch（静默降级），0 值保留，不阻塞整体渲染（PRD F2 验收 6 KPI 全调用真实 API）。
+   * 一次性并发拉 4 路（每路独立错误标记，失败绝不静默显示 0=一切正常）：
+   *  1) kbFetchGraphStats（KPI 1-4 主源；失败 statsErr）
+   *  2) fetchExtractCandidateFiles → 过滤 pending（KPI 待审核 + AI 候选待办；失败 filesErr）
+   *  3) kbFetchStructuredJobs → status=RUNNING 计数（KPI 抽取任务；失败 jobsErr）
+   *  4) kbFetchGraphJobs → status=FAILED 计数（索引/构建失败待办；失败 indexErr）
+   * Wiki 待审核无对应真实端点 → 待办标注「不可用」（见 toDoRows）。
    */
   const loadAll = useCallback(async (): Promise<void> => {
     setRefreshing(true);
-    // 4 路并发，每路独立 catch
-    const [stats, files, jobs, audits] = await Promise.all([
-      knowledgeApi.fetchGraphStats().catch((): GraphStats | null => null),
-      knowledgeApi.fetchExtractCandidateFiles().catch((): Promise<{ fileId: string; fileName: string; status: string; candidateCount: number }[]> => Promise.resolve([])),
-      knowledgeApi.fetchStructuredJobs(1, 5).catch((): Promise<unknown[]> => Promise.resolve([])),
-      knowledgeApi.fetchLifecycleAudit().catch((): Promise<never[]> => Promise.resolve([] as never[])),
+    const [statsR, filesR, jobsR, graphJobsR] = await Promise.all([
+      kbFetchGraphStats().then((v) => ({ ok: true as const, v })).catch(() => ({ ok: false as const, v: null as GraphStats | null })),
+      fetchExtractCandidateFiles().then((v) => ({ ok: true as const, v })).catch(() => ({ ok: false as const, v: null as Awaited<ReturnType<typeof fetchExtractCandidateFiles>> | null })),
+      kbFetchStructuredJobs(1, 5).then((v) => ({ ok: true as const, v })).catch(() => ({ ok: false as const, v: null as unknown[] | null })),
+      kbFetchGraphJobs().then((v) => ({ ok: true as const, v })).catch(() => ({ ok: false as const, v: null as Awaited<ReturnType<typeof kbFetchGraphJobs>> | null })),
     ]);
 
     // 1) KPI 1-4（Article / Nodes / Edges / Embedding）
-    if (stats) {
-      setGraphStats(stats);
-      setStatsOff(false);
+    setStatsErr(!statsR.ok);
+    if (statsR.ok && statsR.v) setGraphStats(statsR.v);
+    else setGraphStats({ graphNodeCount: 0, graphEdgeCount: 0, embeddingCount: 0, ruleCount: 0 });
+
+    // 2) KPI 待审核数 + AI 候选待办
+    setFilesErr(!filesR.ok);
+    if (filesR.ok && filesR.v) {
+      const pendingList = filesR.v.filter((f) => {
+        const s = (f.status || '').trim().toUpperCase();
+        return ['PENDING', 'QUEUED', ''].includes(s);
+      });
+      setPendingFiles(pendingList.length);
     } else {
-      setStatsOff(true);
-      setGraphStats({ graphNodeCount: 0, graphEdgeCount: 0, embeddingCount: 0, ruleCount: 0 });
+      setPendingFiles(0);
     }
 
-    // 2) KPI 5 待审核数 + 第 1 行待办
-    const pendingList = (files || []).filter((f) => {
-      const s = (f.status || '').trim().toUpperCase();
-      return ['PENDING', 'QUEUED', ''].includes(s) || s.length === 0;
-    });
-    setPendingFiles(pendingList.length);
+    // 3) KPI 抽取任务 running 数（后端无显式 running 字段，从 status 推导）
+    setJobsErr(!jobsR.ok);
+    if (jobsR.ok && jobsR.v) {
+      const runningCount = jobsR.v.filter((j) => {
+        const st = String((j as { status?: string }).status || '').toLowerCase();
+        return ['running', 'in_progress'].includes(st);
+      }).length;
+      setRunningJobs(runningCount);
+    } else {
+      setRunningJobs(0);
+    }
 
-    // 3) KPI 6 抽取任务 running 数（结构性提取作业 running）
-    // 后端 StructuredExtractJob 无显式 "running" 字段，从 status 推导
-    const jobsList = Array.isArray(jobs) ? jobs : [];
-    const runningCount = jobsList.filter((j) => {
-      const st = String((j as { status?: string }).status || '').toLowerCase();
-      return ['running', 'in_progress'].includes(st);
-    }).length;
-    setRunningJobs(runningCount);
-
-    // 4) 待办 2/3 — Wiki 待审核 / 索引失败
-    // wikiPending ← audits 中 to_state = 'active'（已发布代表 Wiki 审计通过）— 简化取 review 状态
-    const toStates = (audits || []).map((a) => String((a as { to_state?: string; state?: string }).to_state || (a as { state?: string }).state || ''));
-    const wikiActive = toStates.filter((s) => (s || '').toLowerCase() === 'active').length;
-    setWikiPending(wikiActive);
-    const failedCount = toStates.filter((s) => (s || '').toLowerCase() === 'archived' || (s || '').toLowerCase() === 'deprecated').length;
-    setIndexFailed(failedCount);
+    // 4) 索引/构建失败待办 — KG/向量构建作业 FAILED 真实计数
+    setIndexErr(!graphJobsR.ok);
+    if (graphJobsR.ok && graphJobsR.v) {
+      setIndexFailed(graphJobsR.v.filter((j) => String(j.status || '').toUpperCase() === 'FAILED').length);
+    } else {
+      setIndexFailed(0);
+    }
 
     setRefreshing(false);
   }, []);
@@ -173,6 +186,7 @@ export default function OverviewPage() {
     try {
       const res = await fetchNavProducts({ pageNum: 1, pageSize: 10 });
       const list: NavProductItemVO[] = res?.list || [];
+      setAssetsErr(false);
       setAssets(list.slice(0, 10).map((it) => ({
         id: it.id,
         title: it.title || '—',
@@ -183,6 +197,7 @@ export default function OverviewPage() {
       })));
     } catch {
       setAssets([]);
+      setAssetsErr(true);
     } finally {
       setAssetsLoading(false);
     }
@@ -190,17 +205,10 @@ export default function OverviewPage() {
 
   useEffect(() => { void loadAssets(); }, [loadAssets]);
 
-  /** 「查看任务」按钮 — 跳 #/tasks（P3 未注册当前 disabled） */
-  const handleViewTasks = useCallback(() => {
-    // PRD F2：「查看任务」跳 #/tasks（统一任务中心）。当前批次该路由未注册（P3 才落地）
-    // → disabled + tooltip（i18n key knowledge.overview.task_center_p3）
-    window.location.hash = '#/tasks';
-  }, []);
-
-  const statusChip = (status: AssetRow['status']) => {
-    if (status === 'published') return { background: styles.successBg, color: styles.successText };
-    if (status === 'review') return { background: styles.warningBg, color: styles.warningText };
-    return { background: styles.badgeBg, color: styles.badgeText };
+  const statusChipClass = (status: AssetRow['status']) => {
+    if (status === 'published') return `${styles.successBg} ${styles.successText}`;
+    if (status === 'review') return `${styles.warningBg} ${styles.warningText}`;
+    return `${styles.badgeBg} ${styles.badgeText}`;
   };
 
   const statusLabelKey = (status: AssetRow['status']) =>
@@ -208,13 +216,37 @@ export default function OverviewPage() {
     : status === 'review' ? 'knowledge.asset.status_review'
     : 'knowledge.asset.status_draft';
 
-  const toDoRows: ToDoRow[] = useMemo(() => [
-    { id: 'ai_candidates', labelKey: 'knowledge.overview.todo_ai_candidates', value: pendingFiles, target: 'govern' },
-    { id: 'wiki_pending', labelKey: 'knowledge.overview.todo_wiki_pending', value: wikiPending, target: 'govern' },
-    { id: 'index_failed', labelKey: 'knowledge.overview.todo_index_failed', value: indexFailed, target: 'govern' },
-  ], [pendingFiles, wikiPending, indexFailed]);
+  const toDoRows: ToDoRow[] = useMemo<ToDoRow[]>(() => [
+    {
+      id: 'ai_candidates',
+      labelKey: 'knowledge.overview.todo_ai_candidates',
+      value: filesErr ? null : pendingFiles,
+      error: filesErr,
+      available: !filesErr,
+      target: '#/knowledge_view?page=govern&gsub=audit',
+    },
+    {
+      // Wiki 待审核：无对应真实端点 → 明确标注不可用（不臆造计数）
+      id: 'wiki_pending',
+      labelKey: 'knowledge.overview.todo_wiki_pending',
+      value: null,
+      error: false,
+      available: false,
+      target: '',
+      reasonKey: 'knowledge.overview.todo_wiki_unavailable',
+    },
+    {
+      // 索引/构建失败：KG/向量构建作业 FAILED 真实计数，承接抽取作业页
+      id: 'index_failed',
+      labelKey: 'knowledge.overview.todo_index_failed',
+      value: indexErr ? null : indexFailed,
+      error: indexErr,
+      available: !indexErr,
+      target: '#/knowledge_view?page=extract',
+    },
+  ], [pendingFiles, filesErr, indexFailed, indexErr]);
 
-  const kpiCards: Array<{ id: string; labelKey: string; value: number; icon: React.ReactNode; accent: string; muted: boolean }> = [
+  const kpiCards: Array<{ id: string; labelKey: string; value: number; icon: React.ReactNode; accent: string; muted: boolean; error: boolean }> = [
     {
       id: 'assets',
       labelKey: 'knowledge.overview.kpi_assets',
@@ -222,6 +254,7 @@ export default function OverviewPage() {
       icon: <FileText className="w-4 h-4" />,
       accent: styles.accentText,
       muted: (graphStats.articleCount ?? 0) === 0,
+      error: statsErr,
     },
     {
       id: 'entities',
@@ -230,6 +263,7 @@ export default function OverviewPage() {
       icon: <Network className="w-4 h-4" />,
       accent: styles.infoText,
       muted: graphStats.graphNodeCount === 0,
+      error: statsErr,
     },
     {
       id: 'relations',
@@ -238,6 +272,7 @@ export default function OverviewPage() {
       icon: <Layers className="w-4 h-4" />,
       accent: styles.successText,
       muted: graphStats.graphEdgeCount === 0,
+      error: statsErr,
     },
     {
       id: 'vector',
@@ -246,6 +281,7 @@ export default function OverviewPage() {
       icon: <Database className="w-4 h-4" />,
       accent: styles.warningText,
       muted: graphStats.embeddingCount === 0,
+      error: statsErr,
     },
     {
       id: 'pending',
@@ -254,6 +290,7 @@ export default function OverviewPage() {
       icon: <FileSearch className="w-4 h-4" />,
       accent: styles.warningText,
       muted: pendingFiles === 0,
+      error: filesErr,
     },
     {
       id: 'jobs',
@@ -262,6 +299,7 @@ export default function OverviewPage() {
       icon: <Activity className="w-4 h-4" />,
       accent: styles.accentText,
       muted: runningJobs === 0,
+      error: jobsErr,
     },
   ];
 
@@ -311,36 +349,30 @@ export default function OverviewPage() {
         </div>
       </div>
 
-      {/* ═══ KPI 6 卡片（grid 6 列 · 数字 25px / 标签 12px + 灰色 · PRD F2 验收 2） ═══ */}
-      {statsOff ? (
-        <div className="rounded-md border p-6 flex flex-col items-center gap-1.5"
-             style={{ borderColor: styles.dangerBorder, background: styles.dangerBg, color: styles.dangerText }}>
-          <Database className="w-5 h-5" />
-          <p className="text-[11px]">{t('knowledge.overview.stats_offline')}</p>
-          <p className="text-[10px] font-mono opacity-70">/api/v1/knowledge/stats · {t('knowledge.overview.retry_hint')}</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {kpiCards.map((kpi) => (
-            <div
-              key={kpi.id}
-              className="rounded-md border p-3 space-y-1.5 flex flex-col"
-              style={{ borderColor: styles.cardBorder, background: styles.cardBg, opacity: kpi.muted ? 0.7 : 1 }}
-            >
-              <div className="flex items-center gap-1.5" style={{ color: kpi.muted ? styles.muted : styles.cardTextMuted }}>
-                <span className={kpi.muted ? '' : ''} style={{ color: kpi.accent, opacity: kpi.muted ? 0.5 : 1 }}>
-                  {kpi.icon}
-                </span>
-                <span className="text-[12px] font-bold uppercase tracking-wider">{t(kpi.labelKey)}</span>
-              </div>
-              <p className="text-[25px] font-black font-mono leading-none"
-                 style={{ color: kpi.muted ? styles.muted : kpi.accent }}>
-                {kpi.value.toLocaleString()}
-              </p>
+      {/* ═══ KPI 6 卡片（grid 6 列 · 数字 25px / 标签 12px + 灰色 · PRD F2 验收 2）
+          每路独立降级：拉取失败显示「—」而非伪 0，杜绝「失败=一切正常」假真理 ═══ */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {kpiCards.map((kpi) => (
+          <div
+            key={kpi.id}
+            className="rounded-md border p-3 space-y-1.5 flex flex-col"
+            style={{ borderColor: kpi.error ? styles.dangerBorder : styles.cardBorder, background: styles.cardBg }}
+          >
+            <div className={`flex items-center gap-1.5 ${kpi.error ? styles.dangerText : styles.cardTextMuted}`}>
+              <span className={kpi.error ? styles.dangerText : kpi.accent} style={{ opacity: kpi.muted && !kpi.error ? 0.5 : 1 }}>
+                {kpi.error ? <Activity className="w-4 h-4" /> : kpi.icon}
+              </span>
+              <span className="text-[12px] font-bold uppercase tracking-wider">{t(kpi.labelKey)}</span>
             </div>
-          ))}
-        </div>
-      )}
+            <p className={`text-[25px] font-black font-mono leading-none ${kpi.error ? styles.dangerText : kpi.accent}`}>
+              {kpi.error ? '—' : kpi.value.toLocaleString()}
+            </p>
+            <span className="text-[9px] font-mono" style={{ color: styles.muted }}>
+              {kpi.error ? t('knowledge.overview.kpi_unavailable') : kpi.muted ? t('knowledge.overview.kpi_zero') : ''}
+            </span>
+          </div>
+        ))}
+      </div>
 
       {/* ═══ 知识生产流水线（5 步横条 · PRD F2 验收 3） ═══ */}
       <div className="rounded-md border p-3 space-y-2"
@@ -397,31 +429,51 @@ export default function OverviewPage() {
               {t('knowledge.overview.todo_click_hint')}
             </span>
           </div>
-          <div className="flex-1 p-2 space-y-1.5">
-            {toDoRows.map((row) => (
-              <button
-                key={row.id}
-                type="button"
-                onClick={() => { window.location.hash = '#/knowledge_view?page=govern'; }}
-                className="w-full text-left rounded-md px-3 py-2.5 flex items-center justify-between gap-2 border transition cursor-pointer hover:opacity-80"
-                style={{
-                  borderColor: row.value > 0 ? styles.warningBorder : styles.cardBorder,
-                  background: row.value > 0 ? styles.warningBg : styles.inputBg,
-                  color: row.value > 0 ? styles.warningText : styles.cardTextMuted,
-                }}
-              >
-                <span className="text-[11px] font-bold truncate">{t(row.labelKey)}</span>
-                <span
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-black shrink-0"
-                  style={{
-                    background: row.value > 0 ? styles.warningText : styles.cardTextMuted,
-                    color: row.value > 0 ? styles.warningBg : styles.cardText,
-                  }}
-                >
-                  {row.value}
-                </span>
-              </button>
-            ))}
+          <div className="flex-1 p-2 space-y-2">
+            {toDoRows.map((row) => {
+              const hasWork = row.value !== null && row.value > 0;
+              const badge = row.error
+                ? '—'
+                : row.value === null
+                  ? t('knowledge.overview.todo_na')
+                  : String(row.value);
+              return (
+                <div key={row.id} className="space-y-1">
+                  <button
+                    type="button"
+                    disabled={!row.available}
+                    onClick={() => { if (row.available && row.target) window.location.hash = row.target; }}
+                    className={`w-full text-left rounded-md px-3 py-2.5 flex items-center justify-between gap-2 border transition ${row.available ? 'cursor-pointer hover:opacity-80' : 'cursor-not-allowed opacity-60'}`}
+                    style={{
+                      borderColor: hasWork ? styles.warningBorder : styles.cardBorder,
+                      background: hasWork ? styles.warningBg : styles.inputBg,
+                      color: hasWork ? styles.warningText : styles.cardTextMuted,
+                    }}
+                  >
+                    <span className="text-[11px] font-bold truncate">{t(row.labelKey)}</span>
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-mono font-black shrink-0 ${hasWork ? styles.warningText : styles.cardTextMuted}`}
+                      style={{
+                        background: hasWork ? styles.warningBg : styles.cardBorder,
+                        color: hasWork ? 'inherit' : styles.cardText,
+                      }}
+                    >
+                      {badge}
+                    </span>
+                  </button>
+                  {row.error && (
+                    <p className="text-[9px] font-mono pl-1" style={{ color: styles.dangerText }}>
+                      {t('knowledge.overview.todo_fetch_failed')}
+                    </p>
+                  )}
+                  {!row.available && !row.error && row.reasonKey && (
+                    <p className="text-[9px] font-mono pl-1" style={{ color: styles.muted }}>
+                      {t(row.reasonKey)}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -465,6 +517,18 @@ export default function OverviewPage() {
                 <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
                 {t('knowledge.overview.assets_loading')}
               </div>
+            ) : assetsErr && assets.length === 0 ? (
+              <div className={`p-4 text-center text-[11px] ${styles.dangerText}`}>
+                <Activity className="w-5 h-5 mx-auto mb-1 opacity-60" />
+                <p>{t('knowledge.overview.assets_failed')}</p>
+                <button
+                  type="button"
+                  onClick={() => void loadAssets()}
+                  className="mt-1 text-[10px] underline cursor-pointer"
+                >
+                  {t('knowledge.overview.retry')}
+                </button>
+              </div>
             ) : assets.length === 0 ? (
               <div className="p-4 text-center text-[11px]" style={{ color: styles.muted }}>
                 <Search className="w-5 h-5 mx-auto mb-1 opacity-40" />
@@ -481,8 +545,7 @@ export default function OverviewPage() {
                   <span className="font-mono truncate" style={{ color: styles.cardTextMuted }}>{a.type}</span>
                   <span>
                     <span
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-bold"
-                      style={statusChip(a.status)}
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono font-bold ${statusChipClass(a.status)}`}
                     >
                       {t(statusLabelKey(a.status))}
                     </span>

@@ -32,10 +32,9 @@ export interface IamPermission {
 
 // Users
 export async function fetchUsers(keyword?: string, page=1, pageSize=20): Promise<{data:IamUser[], total:number}> {
-  try {
-    const q = keyword ? `&keyword=${encodeURIComponent(keyword)}` : '';
-    return await apiFetchData(`/api/v1/system/users?page=${page}&pageSize=${pageSize}${q}`);
-  } catch (e) { console.warn("fetchUsers failed", e); return { data: [], total: 0 }; }
+  const q = keyword ? `&keyword=${encodeURIComponent(keyword)}` : '';
+  // 禁吞错返回空数组（fail-open 假空态）——错误上抛，由调用方错误分支呈现
+  return apiFetchData(`/api/v1/system/users?page=${page}&pageSize=${pageSize}${q}`);
 }
 export async function createUser(body: Record<string,any>) {
   return apiFetchData('/api/v1/system/users', { method:'POST', body:JSON.stringify(body) });
@@ -54,14 +53,12 @@ export async function toggleUserStatus(id:string, status:string) {
 }
 /** Fetch organizations for a specific user */
 export async function fetchUserOrganizations(userId:string): Promise<IamOrg[]> {
-  try { return await apiFetchData<IamOrg[]>(`/api/v1/system/users/${userId}/organizations`); }
-  catch (e) { console.warn("fetchUserOrganizations failed", e); return []; }
+  return apiFetchData<IamOrg[]>(`/api/v1/system/users/${userId}/organizations`);
 }
 
 // Roles
 export async function fetchRoles(): Promise<{data:IamRole[], total:number}> {
-  try { return await apiFetchData('/api/v1/system/roles'); }
-  catch (e) { console.warn("fetchRoles failed", e); return { data: [], total: 0 }; }
+  return apiFetchData('/api/v1/system/roles');
 }
 export async function createRole(body:Record<string,any>) {
   return apiFetchData('/api/v1/system/roles', { method:'POST', body:JSON.stringify(body) });
@@ -75,18 +72,15 @@ export async function deleteRole(id:string) {
 
 // Organizations
 export async function fetchOrgs(): Promise<IamOrg[]> {
-  try { return await apiFetchData('/api/v1/system/organizations/all'); }
-  catch (e) { console.warn("fetchOrgs failed", e); return []; }
+  return apiFetchData('/api/v1/system/organizations/all');
 }
 /** Fetch organization tree — returns nested children structure.
  *  Backend returns single root node wrapped in ApiResponse.data (Map, not Array).
  *  Normalize to IamOrg[] so callers can safely use .map(). */
 export async function fetchOrgTree(): Promise<IamOrg[]> {
-  try {
-    const data = await apiFetchData<any>('/api/v1/system/organizations/tree');
-    if (Array.isArray(data)) return data;
-    return data ? [data] : [];
-  } catch (e) { console.warn("fetchOrgTree failed", e); return []; }
+  const data = await apiFetchData<any>('/api/v1/system/organizations/tree');
+  if (Array.isArray(data)) return data;
+  return data ? [data] : [];
 }
 export async function createOrg(body:Record<string,any>) {
   return apiFetchData('/api/v1/system/organizations', { method:'POST', body:JSON.stringify(body) });
@@ -94,8 +88,7 @@ export async function createOrg(body:Record<string,any>) {
 
 // Permissions
 export async function fetchPermissions(): Promise<IamPermission[]> {
-  try { return await apiFetchData<IamPermission[]>('/api/v1/system/permissions'); }
-  catch (e) { console.warn("fetchPermissions: backend unavailable", e); return []; }
+  return apiFetchData<IamPermission[]>('/api/v1/system/permissions');
 }
 export async function createPermission(body: Record<string,any>) {
   return apiFetchData('/api/v1/system/permissions', { method:'POST', body:JSON.stringify(body) });
@@ -109,15 +102,12 @@ export async function deletePermission(id:string) {
 
 // User-Role assignments
 export async function fetchUserRoles(userId:string): Promise<string[]> {
-  try {
-    const data = await apiFetchData<any[]>(`/api/v1/system/users/${userId}/roles`);
-    // API returns [{roleId, roleName, roleCode}], extract roleId strings
-    if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object') {
-      return data.map(r => r.roleId).filter(Boolean);
-    }
-    return data as string[];
+  const data = await apiFetchData<any[]>(`/api/v1/system/users/${userId}/roles`);
+  // API returns [{roleId, roleName, roleCode}], extract roleId strings
+  if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object') {
+    return data.map(r => r.roleId).filter(Boolean);
   }
-  catch (e) { console.warn("fetchUserRoles failed", e); return []; }
+  return data as string[];
 }
 export async function assignUserRoles(userId:string, roleIds:string[]): Promise<void> {
   return apiFetchData(`/api/v1/system/users/${userId}/roles`, { method:'PUT', body:JSON.stringify({roleIds}) });
@@ -125,8 +115,7 @@ export async function assignUserRoles(userId:string, roleIds:string[]): Promise<
 
 // Role-Permission assignments
 export async function fetchRolePermissions(roleId:string): Promise<string[]> {
-  try { return await apiFetchData<string[]>(`/api/v1/system/roles/${roleId}/permissions`); }
-  catch (e) { console.warn("fetchRolePermissions failed", e); return []; }
+  return apiFetchData<string[]>(`/api/v1/system/roles/${roleId}/permissions`);
 }
 export async function assignRolePermissions(roleId:string, permissionIds:string[]): Promise<void> {
   return apiFetchData(`/api/v1/system/roles/${roleId}/permissions`, { method:'PUT', body:JSON.stringify({permissionIds}) });
@@ -189,24 +178,22 @@ export interface TenantQuotaUpdateRequest {
   monthly_limit: number;
 }
 
-/** GET /api/v1/system/tenants — 分页查询租户列表 */
+/** GET /api/v1/system/tenants — 分页查询租户列表（status 为可选精确过滤，由后端 SQL WHERE 分支承接） */
 export async function fetchTenants(
   keyword?: string,
   page = 1,
-  pageSize = 20
+  pageSize = 20,
+  status?: string
 ): Promise<{ data: TenantInfo[]; total: number }> {
-  try {
-    const params = new URLSearchParams();
-    if (keyword) params.set("keyword", keyword);
-    params.set("page", String(page));
-    params.set("pageSize", String(pageSize));
-    return await apiFetchData<{ data: TenantInfo[]; total: number }>(
-      `/api/v1/system/tenants?${params.toString()}`
-    );
-  } catch (e) {
-    console.warn("fetchTenants: backend unavailable", e);
-    return { data: [], total: 0 };
-  }
+  const params = new URLSearchParams();
+  if (keyword) params.set("keyword", keyword);
+  if (status) params.set("status", status);
+  params.set("page", String(page));
+  params.set("pageSize", String(pageSize));
+  // 禁吞错返回空列表——错误上抛，由 TenantManager 既有 try/catch 错误分支呈现
+  return apiFetchData<{ data: TenantInfo[]; total: number }>(
+    `/api/v1/system/tenants?${params.toString()}`
+  );
 }
 
 /** POST /api/v1/system/tenants — 创建租户 */
@@ -242,14 +229,9 @@ export async function deleteTenant(tenantId: string): Promise<void> {
 export async function fetchTenantQuota(
   tenantId: string
 ): Promise<{ data: TenantQuota[]; total: number }> {
-  try {
-    return await apiFetchData<{ data: TenantQuota[]; total: number }>(
-      `/api/v1/system/tenants/${tenantId}/quota`
-    );
-  } catch (e) {
-    console.warn("fetchTenantQuota: backend unavailable", e);
-    return { data: [], total: 0 };
-  }
+  return apiFetchData<{ data: TenantQuota[]; total: number }>(
+    `/api/v1/system/tenants/${tenantId}/quota`
+  );
 }
 
 /** PUT /api/v1/system/tenants/{tenantId}/quota — 更新租户配额 */

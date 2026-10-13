@@ -8,6 +8,11 @@ import { useTheme } from '../../components/ThemeContext';
 import { AlertCircle, Check, Edit, Edit3, PlusCircle, Settings, Trash2, X } from 'lucide-react';
 import DynamicIcon from '../../components/ontology/DynamicIcon';
 import { getDomainColorClasses } from './helpers';
+import {
+  createWorkbenchDomain,
+  updateWorkbenchDomain,
+  reassignObjectDomain,
+} from '../../services/ontologyApi';
 import type { ObjectType, OntologyDomain } from '../../types/ontology';
 
 type QuickNavCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'glossary';
@@ -21,11 +26,12 @@ interface DomainManagerProps {
   onUpdateObjectTypes: (objectTypes: ObjectType[]) => void;
   onQuickNavigate: (category: QuickNavCategory, id: string) => void;
   onDeleteDomain: (domainId: string) => void;
+  onToast?: (type: 'success' | 'info' | 'error', message: string) => void;
 }
 
 export default function DomainManager({
   domains, objectTypes, selectedDomainFilter, onSelectDomainFilter,
-  onUpdateDomains, onUpdateObjectTypes, onQuickNavigate, onDeleteDomain,
+  onUpdateDomains, onUpdateObjectTypes, onQuickNavigate, onDeleteDomain, onToast,
 }: DomainManagerProps) {
   const [editingDomain, setEditingDomain] = useState<OntologyDomain | null>(null);
   const [formId, setFormId] = useState('');
@@ -35,28 +41,82 @@ export default function DomainManager({
   const [formAssignedObjects, setFormAssignedObjects] = useState<string[]>([]);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
   const { t } = useLanguage();
   const { styles } = useTheme();
 
   const handleStartAdd = () => { setEditingDomain(null); setFormId(''); setFormName(''); setFormDesc(''); setFormColor('blue'); setFormAssignedObjects([]); setIsAddingNew(true); setFormError(''); };
-  const handleStartEdit = (domain: OntologyDomain) => { setEditingDomain(domain); setFormId(domain.id); setFormName(domain.displayName); setFormDesc(domain.description); setFormColor(domain.color); setFormAssignedObjects(objectTypes.filter(ot => ot.domainId === domain.id).map(ot => ot.id)); setIsAddingNew(true); setFormError(''); };
+  const handleStartEdit = (domain: OntologyDomain) => { setEditingDomain(domain); setFormId(domain.code || domain.id); setFormName(domain.displayName); setFormDesc(domain.description); setFormColor(domain.color); setFormAssignedObjects(objectTypes.filter(ot => ot.domainId === domain.id).map(ot => ot.id)); setIsAddingNew(true); setFormError(''); };
   const toggleObjectAssignment = (objId: string) => { setFormAssignedObjects(prev => prev.includes(objId) ? prev.filter(id => id !== objId) : [...prev, objId]); };
 
-  const handleSaveDomain = (e: React.FormEvent) => {
-    e.preventDefault(); setFormError('');
+  /**
+   * 域创建/编辑接真实端点（POST/PUT /api/v1/ontology/domains，与侧栏 useDomainManager 同源）。
+   * 无假真理：此前保存仅写本地 state —— 刷新后丢失且与后端域表不一致（假成功）。
+   * 对象归属经 PUT /api/v1/ontology/objects/{id}/domain 逐对象落库，本地映射即时回显。
+   */
+  const handleSaveDomain = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
+    setFormError('');
     if (!formName.trim()) { setFormError(t('ow.msg.domainNameRequired')); return; }
-    const domainId = editingDomain ? editingDomain.id : (formId.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') || `domain_${Date.now().toString().slice(-4)}`);
-    if (!editingDomain && domains.some(d => d.id === domainId)) { setFormError(t('ow.msg.domainIdExists').replace('{id}', domainId)); return; }
-    const savedDomain: OntologyDomain = { id: domainId, displayName: formName.trim(), description: formDesc.trim(), color: formColor };
-    const newDomains = editingDomain ? domains.map(d => d.id === editingDomain.id ? savedDomain : d) : [...domains, savedDomain];
-    onUpdateDomains(newDomains);
-    const updatedObjects = objectTypes.map(ot => {
-      if (formAssignedObjects.includes(ot.id)) return { ...ot, domainId };
-      if (ot.domainId === domainId) return { ...ot, domainId: undefined };
-      return ot;
-    });
-    onUpdateObjectTypes(updatedObjects);
-    setIsAddingNew(false); setEditingDomain(null);
+
+    const code = editingDomain
+      ? (editingDomain.code || editingDomain.id)
+      : (formId.trim().toLowerCase().replace(/[^a-z0-9_]/g, '') || `domain_${Date.now().toString().slice(-4)}`);
+    if (!code) { setFormError(t('ow.domain.validation.code_required')); return; }
+    if (!editingDomain && domains.some(d => (d.code || d.id) === code)) {
+      setFormError(t('ow.domain.validation.code_dup').replace('{code}', code));
+      return;
+    }
+
+    const savedName = formName.trim();
+    const savedDescription = formDesc.trim();
+    setSaving(true);
+    try {
+      const vo = editingDomain
+        ? await updateWorkbenchDomain(code, { code, name: savedName, description: savedDescription })
+        : await createWorkbenchDomain({ code, name: savedName, description: savedDescription });
+
+      const savedDomain: OntologyDomain = {
+        id: vo?.id || code,
+        code: vo?.code || code,
+        displayName: vo?.name || savedName,
+        description: vo?.description || savedDescription,
+        color: formColor,
+        status: vo?.status,
+      };
+      onUpdateDomains(editingDomain ? domains.map(d => d.id === editingDomain.id ? savedDomain : d) : [...domains, savedDomain]);
+
+      // 对象归属：后端逐对象 PUT（best-effort，失败如实计数提示）+ 本地即时映射
+      const assignedSet = new Set(formAssignedObjects);
+      const savedDomainKey = savedDomain.id;
+      let reassignFailed = 0;
+      const updatedObjects = objectTypes.map(ot => {
+        const shouldHave = assignedSet.has(ot.id);
+        if (shouldHave && (ot.domainId || undefined) !== savedDomainKey) {
+          reassignObjectDomain(ot.id, { domainCode: code }).catch(() => { reassignFailed += 1; });
+        }
+        if (shouldHave) return { ...ot, domainId: savedDomainKey };
+        if (ot.domainId === savedDomainKey) return { ...ot, domainId: undefined };
+        return ot;
+      });
+      onUpdateObjectTypes(updatedObjects);
+      if (reassignFailed > 0) {
+        onToast?.('error', t('ow.domain.save_failed').replace('{error}', `${reassignFailed} object(s) reassign pending/failed`));
+      } else {
+        onToast?.('success', (editingDomain ? t('ow.domain.updated') : t('ow.domain.created')).replace('{name}', savedName));
+      }
+      setIsAddingNew(false); setEditingDomain(null); setFormAssignedObjects([]);
+    } catch (err: any) {
+      const msg = String(err?.message || err || '');
+      if (msg.toLowerCase().includes('ont-009') || msg.toLowerCase().includes('already exists')) {
+        setFormError(t('ow.domain.validation.code_dup').replace('{code}', code));
+      } else {
+        setFormError(t('ow.domain.save_failed').replace('{error}', msg));
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -80,7 +140,7 @@ export default function DomainManager({
           </div>
           <div className="space-y-1"><label className={`text-[11px] font-bold ${styles.sidebarText} uppercase tracking-wider block`}>{t('ow.label.businessDescription')}</label><textarea value={formDesc} onChange={e => setFormDesc(e.target.value)} placeholder={t('ow.placeholder.businessDescription')} className={`w-full h-16 px-3 py-1.5 text-xs border ${styles.inputBorder} rounded ${styles.inputBg}`} /></div>
           <div className={`space-y-2 border-t ${styles.cardBorder} pt-3`}><label className={`text-[11px] font-bold ${styles.sidebarText} uppercase tracking-wider block`}>{t('ow.label.bindEntities')}</label><div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1.5">{objectTypes.map(ot => { const isChecked = formAssignedObjects.includes(ot.id); const isMappedToOther = ot.domainId && ot.domainId !== formId; return (<div key={ot.id} onClick={() => !isMappedToOther && toggleObjectAssignment(ot.id)} className={`flex items-center justify-between p-2 rounded-lg border text-xs select-none transition-all ${isMappedToOther ? `${styles.badgeBg} ${styles.cardBorder} ${styles.muted} cursor-not-allowed opacity-60` : isChecked ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium cursor-pointer' : `${styles.inputBg} ${styles.cardBorder} ${styles.sidebarText} ${styles.sidebarHoverBg} cursor-pointer`}`}><div className="flex items-center gap-2 truncate"><span className={`p-0.5 rounded border ${isChecked ? 'bg-blue-100 border-blue-200' : `${styles.badgeBg} ${styles.cardBorder}`}`}><DynamicIcon name={ot.icon} size={12} /></span><span className="truncate">{ot.displayName}</span></div><span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${isChecked ? 'bg-blue-600 border-blue-600 text-white' : `${styles.cardBorder} ${styles.inputBg}`}`}>{isChecked && <Check size={10} />}</span></div>); })}</div></div>
-          <div className={`flex justify-end gap-2 border-t ${styles.cardBorder} pt-3`}><button type="button" onClick={() => { setIsAddingNew(false); setEditingDomain(null); }} className={`px-3.5 py-1.5 rounded-lg border ${styles.cardBorder} ${styles.sidebarText} text-xs font-semibold ${styles.inputBg}`}>{t('ow.btn.cancel')}</button><button type="submit" className="px-4 py-1.5 rounded-lg text-white text-xs font-semibold bg-blue-600 hover:bg-blue-700 shadow-sm">{editingDomain ? t('ow.btn.saveChanges') : t('ow.btn.createDomain')}</button></div>
+          <div className={`flex justify-end gap-2 border-t ${styles.cardBorder} pt-3`}><button type="button" onClick={() => { setIsAddingNew(false); setEditingDomain(null); }} className={`px-3.5 py-1.5 rounded-lg border ${styles.cardBorder} ${styles.sidebarText} text-xs font-semibold ${styles.inputBg}`}>{t('ow.btn.cancel')}</button><button type="submit" disabled={saving} className="px-4 py-1.5 rounded-lg text-white text-xs font-semibold bg-blue-600 hover:bg-blue-700 shadow-sm disabled:opacity-50">{saving ? t('ontology.saving') : (editingDomain ? t('ow.btn.saveChanges') : t('ow.btn.createDomain'))}</button></div>
         </form>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

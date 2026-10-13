@@ -1,7 +1,9 @@
 import React from 'react';
-import { LayoutGrid, Plus, Trash2 } from 'lucide-react';
+import { LayoutGrid, Plus, Trash2, FlaskConical } from 'lucide-react';
 import { DynamicIcon } from './types';
 import type { WorkshopApp } from './types';
+import { SEED_APP_IDS } from './mockData';
+import Badge from '../../components/common/Badge';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderAppListScreen(vm: any) {
@@ -24,7 +26,7 @@ export function renderAppListScreen(vm: any) {
             <button
               type="button"
               onClick={handleCreateNewApp}
-              className="px-4 py-2 bg-[var(--card,#020617)] hover:bg-[var(--card,#0B1120)] text-white font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition-all cursor-pointer text-xs"
+              className={`px-4 py-2 ${styles.accentBg} text-white font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition-all cursor-pointer text-xs`}
             >
               <Plus size={14} />
               {t('aiworkbench.ws.al.newApp')}
@@ -45,18 +47,24 @@ export function renderAppListScreen(vm: any) {
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className={`p-2 rounded-lg bg-${app.theme.primaryColor}-50 text-${app.theme.primaryColor}-600 border border-${app.theme.primaryColor}-100`}>
+                    <span className={`p-2 rounded-lg ${styles.badgeBg} ${styles.badgeText} border ${styles.appBorder}`}>
                       <DynamicIcon name={app.theme.logo || 'LayoutGrid'} size={16} />
                     </span>
                     <div className="flex items-center gap-2">
+                      {SEED_APP_IDS.has(app.id) && (
+                        <Badge variant="warning" className="shrink-0">
+                          <FlaskConical size={10} aria-hidden />
+                          <span>{t('aiworkbench.ws.vw.demoSeedApp')}</span>
+                        </Badge>
+                      )}
                       {app.isPublished ? (
-                        <span className="bg-emerald-50 text-emerald-700 text-[10px] px-2 py-0.5 rounded-full font-bold border border-emerald-100">
-                          {t('aiworkbench.ws.al.published')}
-                        </span>
+                        <Badge variant="success" className="shrink-0">
+                          <span>{t('aiworkbench.ws.al.published')}</span>
+                        </Badge>
                       ) : (
-                        <span className="bg-amber-50 text-amber-700 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-100">
-                          {t('aiworkbench.ws.al.draft')}
-                        </span>
+                        <Badge variant="neutral" className="shrink-0">
+                          <span>{t('aiworkbench.ws.al.draft')}</span>
+                        </Badge>
                       )}
                     </div>
                   </div>

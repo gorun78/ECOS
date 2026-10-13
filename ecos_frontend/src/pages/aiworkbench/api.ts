@@ -11,7 +11,7 @@
 import { apiFetchData } from '../../api';
 import { API_BASE } from '../../services/httpClient';
 import { authHeaders } from '../../services/auth';
-import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel, AIPActionType, ExecuteActionResult, AIPAgentTemplate, AIPAgentMetrics, AIPAgentError, AIPAgentVersion } from '../../types/aiworkbench';
+import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel, AIPActionType, ExecuteActionResult, AIPAgentTemplate, AIPAgentMetrics, AIPAgentError, AIPAuditLog } from '../../types/aiworkbench';
 
 // ── AgentMesh ──────────────────────────────────────────────────
 
@@ -31,6 +31,10 @@ interface AgentMeshAgentRaw {
   updatedAt?: string;
 }
 
+/**
+ * AgentMesh 网关路径（VersionPrefixRewriteFilter: /api/v1/agent-mesh/ → /api/agent-mesh/），
+ * 支持 GET/POST/PUT/DELETE /agents（AgentMeshController，真实持久化到 ecos_agent_registry）。
+ */
 export async function fetchAIPAgentsFromMesh(): Promise<AIPAgent[]> {
   // PMO-43 T3: no silent catch — caller renders error + retry state
   const raw = await apiFetchData<AgentMeshAgentRaw[]>('/api/v1/agent-mesh/agents');
@@ -50,6 +54,12 @@ function convertMeshAgentToAIP(raw: AgentMeshAgentRaw): AIPAgent {
       functionIds = tools.filter((t: string) => t.startsWith('func_'));
     }
   } catch { /* plain text */ }
+  // guardrailIds 存于 metadata JSON（{guardrails:[...]}），无上报则为空数组（不合成）
+  let guardrailIds: string[] = [];
+  try {
+    const meta = raw.metadata ? JSON.parse(raw.metadata) : null;
+    if (meta && Array.isArray(meta.guardrails)) guardrailIds = meta.guardrails as string[];
+  } catch { /* plain metadata */ }
 
   return {
     id: raw.id,
@@ -60,10 +70,57 @@ function convertMeshAgentToAIP(raw: AgentMeshAgentRaw): AIPAgent {
     modelId: raw.model || 'gemini-1.5-pro',
     systemPrompt,
     assignedTools: { actionIds, functionIds },
-    guardrailIds: [],
+    guardrailIds,
     status: (raw.status || '').toUpperCase() === 'ACTIVE' ? 'active' : 'development',
     lastModified: raw.updatedAt || raw.createdAt || new Date().toISOString(),
   };
+}
+
+/** AIPAgent → AgentMesh 注册实体（systemPrompt 内嵌 JSON 工具表、metadata 内嵌护栏，与转换器互逆） */
+function toMeshAgentEntity(a: Partial<AIPAgent> & { id: string }): Record<string, unknown> {
+  const tools = [
+    ...(a.assignedTools?.actionIds ?? []),
+    ...(a.assignedTools?.functionIds ?? []),
+  ];
+  return {
+    id: a.id,
+    name: a.name ?? '',
+    role: a.role ?? 'assistant',
+    description: a.description ?? '',
+    systemPrompt: JSON.stringify({ systemPrompt: a.systemPrompt ?? '', tools }),
+    model: a.modelId ?? 'gemini-1.5-pro',
+    maxIterations: 10,
+    status: a.status === 'development' ? 'INACTIVE' : 'ACTIVE',
+    metadata: JSON.stringify({ guardrails: a.guardrailIds ?? [] }),
+    capability: '{}',
+    endpoint: '',
+  };
+}
+
+/** 注册新 Agent — POST /api/v1/agent-mesh/agents（真实写 ecos_agent_registry） */
+export async function createMeshAgent(input: Omit<Partial<AIPAgent>, 'id'> & { id?: string }): Promise<AIPAgent> {
+  const body = { ...toMeshAgentEntity({ ...input, id: input.id || '' }), id: input.id || undefined };
+  const created = await apiFetchData<AgentMeshAgentRaw>('/api/v1/agent-mesh/agents', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return convertMeshAgentToAIP(created);
+}
+
+/** 更新 Agent — PUT /api/v1/agent-mesh/agents/{id}（404 表示不存在，由 apiFetchData 抛出） */
+export async function updateMeshAgent(id: string, patch: Partial<AIPAgent>): Promise<AIPAgent> {
+  const updated = await apiFetchData<AgentMeshAgentRaw>(`/api/v1/agent-mesh/agents/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(toMeshAgentEntity({ ...patch, id })),
+  });
+  return convertMeshAgentToAIP(updated);
+}
+
+/** 删除 Agent — DELETE /api/v1/agent-mesh/agents/{id} */
+export async function deleteMeshAgent(id: string): Promise<void> {
+  await apiFetchData<void>(`/api/v1/agent-mesh/agents/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
 }
 
 // ── Guardrails ─────────────────────────────────────────────────
@@ -223,6 +280,8 @@ export async function executeActionType(
 export async function fetchAgentModels(): Promise<AIPModel[]> {
   // PMO-43 T1: mock fallback removed — re-throw so ModelCatalogView can
   // distinguish "backend down" from "no models registered".
+  // §4.5/W204：缺失指标一律保持 undefined（UI 渲染「未知」），禁止 `||150`、
+  // `||'$0.005'`、`||99.5` 之类的合成假指标。
   const raw = await apiFetchData<any[]>('/api/v1/aip/models');
   return (Array.isArray(raw) ? raw : []).map((item: any) => ({
     id: item.id,
@@ -235,13 +294,13 @@ export async function fetchAgentModels(): Promise<AIPModel[]> {
     status: item.status === 'active' ? 'connected'
         : item.status === 'testing' ? 'testing'
         : 'offline',
-    maxContext: item.maxContext || '128K',
-    latencyMs: item.latencyMs || 150,
-    costPerMillion: item.costPerMillion || '$0.005',
-    inputCost: item.inputCost || '$0.003',
-    outputCost: item.outputCost || '$0.006',
-    healthRate: item.healthRate || 99.5,
-    temperature: item.temperature || 0.7,
+    maxContext: item.maxContext ?? undefined,
+    latencyMs: typeof item.latencyMs === 'number' ? item.latencyMs : undefined,
+    costPerMillion: item.costPerMillion ?? undefined,
+    inputCost: item.inputCost ?? undefined,
+    outputCost: item.outputCost ?? undefined,
+    healthRate: typeof item.healthRate === 'number' ? item.healthRate : undefined,
+    temperature: typeof item.temperature === 'number' ? item.temperature : undefined,
   }));
 }
 
@@ -316,30 +375,9 @@ export async function updateManagedAgent(
   });
 }
 
-export async function toggleAgentStatus(id: string, status: 'active' | 'development'): Promise<void> {
-  await apiFetchData(`/api/v1/aip/agents/${encodeURIComponent(id)}/status`, {
-    method: 'PUT',
-    body: JSON.stringify({ status: status === 'active' ? 'ACTIVE' : 'INACTIVE' }),
-  });
-}
-
-export async function fetchAgentVersions(agentId: string): Promise<AIPAgentVersion[]> {
-  const raw = await apiFetchData<any[]>(`/api/v1/aip/agents/${encodeURIComponent(agentId)}/versions`);
-  return (Array.isArray(raw) ? raw : []).map((v: any) => ({
-    id: v.id,
-    agentId: v.agentId || agentId,
-    version: v.version || 0,
-    config: typeof v.config === 'string' ? v.config : JSON.stringify(v.config || {}),
-    createdAt: v.createdAt || new Date().toISOString(),
-  }));
-}
-
-export async function rollbackAgent(agentId: string, version: number): Promise<void> {
-  await apiFetchData(`/api/v1/aip/agents/${encodeURIComponent(agentId)}/rollback`, {
-    method: 'POST',
-    body: JSON.stringify({ version }),
-  });
-}
+// §4.5（2026-10-13 检视报告）：原 toggleAgentStatus / fetchAgentVersions / rollbackAgent
+// 指向后端不存在的映射（/agents/{id}/status、/versions、/rollback 均为 ghost 路径），
+// 已删除。Agent 发布 / 版本回滚能力未上线——调用方应禁用相应控件并标注「能力未上线」。
 
 // ── Agent Monitor (T9-3) ─────────────────────────────────────
 
@@ -539,25 +577,161 @@ export async function fetchAgentSessions(agentId?: string): Promise<AgentSession
   return apiFetchData<AgentSessionSaved[]>(url);
 }
 
-// ── Evals (AIP) ────────────────────────────────────────
+// ── Evals (AIP) — 真实端点 POST /api/v1/aip/eval/run + GET /api/v1/aip/eval/{id}/report ──
+// 原 GET /api/v1/aip/evals/run?agentId=（fetchAgentEval）为 ghost 路径（后端不存在），
+// 连同 try/catch→null 的吞错通道一并移除（§4.5 W204：评估必须走真实引擎）。
 
-/** Agent 评估结果（AIP evals 维度评分） */
-export interface AgentEvalResult {
-  agentId: string;
-  accuracy: number;
-  safety: number;
-  latencyScore: number;
-  hallucinationRate: number;
-  toolCallAccuracy: number;
-  overallScore: number;
-  details: Array<{ question: string; score: number; expected: string; actual: string }>;
+/** 评估单题结果（对齐 AgentEvalController itemToMap） */
+export interface AipEvalItem {
+  questionId: string;
+  question: string;
+  category: string;
+  score: number;
+  rawScore?: number;
+  agentAnswer?: string;
+  actualTool?: string;
+  matchedKeywords?: string[];
+  dimensions?: Record<string, number>;
+  judgeReason?: string;
+  durationMs?: number;
 }
 
-/** 运行 Agent 评估 — GET /api/v1/aip/evals/run?agentId=...；后端不可用时返回 null 而非抛错 */
-export async function fetchAgentEval(agentId: string): Promise<AgentEvalResult | null> {
-  try {
-    return apiFetchData<AgentEvalResult>(`/api/v1/aip/evals/run?agentId=${encodeURIComponent(agentId)}`);
-  } catch {
-    return null;
-  }
+/** 评估报告（对齐 AgentEvalController GET /{id}/report 的 ApiResponse.data） */
+export interface AipEvalReport {
+  evalId: string;
+  questionSet: string;
+  status: string; // running | completed | failed
+  totalQuestions?: number;
+  totalScore?: number;
+  avgScore?: number;
+  grade?: string;
+  totalDurationMs?: number;
+  dimensionAvgs?: Record<string, number>;
+  startedAt?: string;
+  completedAt?: string;
+  items?: AipEvalItem[];
+}
+
+/** 启动评估（异步）— POST /api/v1/aip/eval/run，立即返回 evalId */
+export async function startAipEval(questionSet: 'default' | 'finance_20' | 'legal_20' | 'compliance_20'): Promise<{ evalId: string; questionSet: string }> {
+  return apiFetchData<{ evalId: string; questionSet: string }>('/api/v1/aip/eval/run', {
+    method: 'POST',
+    body: JSON.stringify({ questionSet }),
+  });
+}
+
+/** 查询评估报告 — GET /api/v1/aip/eval/{id}/report；未就绪时后端 404 → 抛出，由调用方轮询/展示 */
+export async function fetchAipEvalReport(evalId: string): Promise<AipEvalReport> {
+  return apiFetchData<AipEvalReport>(`/api/v1/aip/eval/${encodeURIComponent(evalId)}/report`);
+}
+
+// ── Agent Loop 对话（真实推理通道） ─────────────────────────────
+// POST /api/v1/agent-loop/chat（stream=false → JSON）。
+// ApiResponse.data 字段：success / content / totalTokens / toolCalls / errorMsg。
+
+export interface AgentLoopToolCall {
+  toolName?: string;
+  success?: boolean;
+  durationMs?: number;
+  [k: string]: unknown;
+}
+
+export interface AgentLoopChatData {
+  success?: boolean;
+  content?: string;
+  totalTokens?: number;
+  toolCalls?: AgentLoopToolCall[];
+  errorMsg?: string;
+}
+
+export async function agentLoopChat(params: { agentId: string; message: string; sessionId?: string }): Promise<AgentLoopChatData> {
+  return apiFetchData<AgentLoopChatData>('/api/v1/agent-loop/chat', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+// ── AIP 审计日志 — GET /api/v1/aip/audit-logs（AIPGuardrailController）──
+
+interface AipAuditLogRaw {
+  id?: string;
+  event?: string;
+  agentId?: string;
+  user?: string;
+  action?: string;
+  result?: string;
+  timestamp?: string;
+  details?: { tokensUsed?: number; durationMs?: number } & Record<string, unknown>;
+}
+
+/**
+ * 拉取真实审计日志并映射为 AIPAuditLog。
+ * 后端仅上报 tokensUsed/durationMs（合并用量），未拆分 input/output tokens →
+ * 两个字段记 0 并把真实上报值放进 details 文本（不合成、不拆假）。
+ */
+export async function fetchAIPAuditLogs(): Promise<AIPAuditLog[]> {
+  const raw = await apiFetchData<AipAuditLogRaw[]>('/api/v1/aip/audit-logs');
+  const statusMap: Record<string, AIPAuditLog['status']> = {
+    success: 'allowed', SUCCESS: 'allowed', allowed: 'allowed',
+    blocked: 'blocked', BLOCKED: 'blocked',
+    flagged: 'flagged', FLAGGED: 'flagged',
+    pending: 'pending_approval', PENDING: 'pending_approval',
+  };
+  return (Array.isArray(raw) ? raw : []).map((r) => ({
+    id: r.id || `audit-${Date.now()}`,
+    timestamp: r.timestamp || '',
+    source: r.event || 'AIP',
+    assetName: r.agentId || '',
+    user: r.user || '',
+    inputTokens: 0,
+    outputTokens: 0,
+    status: statusMap[String(r.result ?? '')] || 'allowed',
+    actionTaken: r.action,
+    details: `tokensUsed=${r.details?.tokensUsed ?? '-'} durationMs=${r.details?.durationMs ?? '-'}`,
+    localOrigin: false,
+  }));
+}
+
+// ── Ontology 提案（真实通道：/api/v1/ontology/proposals） ───────
+
+/** 提案 VO 宽松形态：后端字段直出，前端只渲染实际存在的字段（无假回执）。 */
+export interface OntologyProposalVo {
+  id?: string;
+  status?: string;
+  actionId?: string;
+  actionName?: string;
+  agentId?: string;
+  agentName?: string;
+  payload?: Record<string, unknown>;
+  proposedBy?: string;
+  executionDetail?: string;
+  transactionHash?: string;
+  verificationMatrix?: Array<{ logicalField?: string; physicalCol?: string; expectedValue?: string; readbackValue?: string }>;
+  [k: string]: unknown;
+}
+
+/** 提交提案 — POST /api/v1/ontology/proposals */
+export async function submitOntologyProposal(body: {
+  actionId: string;
+  actionName: string;
+  agentId: string;
+  agentName: string;
+  payload: Record<string, string>;
+  proposedBy: string;
+}): Promise<OntologyProposalVo> {
+  return apiFetchData<OntologyProposalVo>('/api/v1/ontology/proposals', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+/** 执行提案 — POST /api/v1/ontology/proposals/{id}/execute（非 PENDING 状态 409 → 抛出） */
+export async function executeOntologyProposal(
+  id: string,
+  body: { userRole: string; userName: string }
+): Promise<OntologyProposalVo> {
+  return apiFetchData<OntologyProposalVo>(`/api/v1/ontology/proposals/${encodeURIComponent(id)}/execute`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }

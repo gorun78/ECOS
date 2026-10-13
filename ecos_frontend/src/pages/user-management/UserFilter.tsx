@@ -1,6 +1,8 @@
 /**
  * UserFilter — 用户筛选栏组件
- * 功能: 角色下拉筛选 + 状态下拉筛选 + 搜索框 + CSV导入/导出按钮
+ * 功能: 状态下拉筛选 + 搜索框 + CSV导入/导出按钮
+ * 注：G-11 — 后端 GET /api/v1/system/users 不开放 role 参数（本波次不改后端），
+ *     原 roleFilter 下拉整体移除，不做「已禁用」的假控件。
  * @license Apache-2.0
  */
 
@@ -8,13 +10,6 @@ import React from "react";
 import { Search, Upload, Download } from "lucide-react";
 import { useLanguage } from "../../components/LanguageContext";
 import { useTheme } from "../../components/ThemeContext";
-import type { IamRole } from "../../api";
-
-export interface UserFilterValues {
-  keyword: string;
-  status: string;
-  roleId: string;
-}
 
 interface UserFilterProps {
   search: string;
@@ -22,9 +17,6 @@ interface UserFilterProps {
   onSearch: () => void;
   statusFilter: string;
   onStatusChange: (v: string) => void;
-  roleFilter: string;
-  onRoleChange: (v: string) => void;
-  roles: IamRole[];
   onImportClick: () => void;
   onExportClick: () => void;
   totalCount: number;
@@ -37,9 +29,6 @@ export default function UserFilter({
   onSearch,
   statusFilter,
   onStatusChange,
-  roleFilter,
-  onRoleChange,
-  roles,
   onImportClick,
   onExportClick,
   totalCount,
@@ -77,19 +66,7 @@ export default function UserFilter({
         <option value="DISABLED">{t("platform.user.filter.statusLocked")}</option>
       </select>
 
-      {/* Role filter */}
-      <select
-        value={roleFilter}
-        onChange={(e) => { onRoleChange(e.target.value); }}
-        className={`px-3 py-2 rounded text-sm border ${styles.inputBg} ${styles.inputText} ${styles.inputBorder}`}
-      >
-        <option value="">{t("platform.user.filter.allRoles")}</option>
-        {roles.map((r) => (
-          <option key={r.roleId} value={r.roleId}>
-            {r.roleName}
-          </option>
-        ))}
-      </select>
+      {/* 角色筛选：后端未开放 role 参数（G-11），本波次不接 —— 下拉已移除 */}
 
       {/* Search button */}
       <button type="button"

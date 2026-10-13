@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../../../api';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 import { QUICK_ACTIONS, type ChatMessage, type CopilotPanelProps } from './CopilotPanelTypes';
 import { generateFallbackResponse } from './CopilotPanelFallback';
 import CopilotPanelMessages from './CopilotPanelMessages';
@@ -18,16 +19,21 @@ import CopilotPanelMessages from './CopilotPanelMessages';
 // Re-export props type so existing imports keep working
 export type { CopilotPanelProps } from './CopilotPanelTypes';
 
-const createWelcomeMessage = (): ChatMessage => ({
-  id: 'welcome',
-  role: 'assistant',
-  content: '👋 你好！我是 **ECOS Copilot**，你的数据工程 AI 助手。\n\n我可以帮你：\n- 📝 编写 Pipeline DSL / YAML 定义\n- 🔍 分析数据异常值\n- 🧹 推荐数据清洗步骤\n- 🐍 生成 Python UDF 代码\n- ❓ 解答 PB 函数用法\n\n请随意提问！',
-  timestamp: new Date(),
-});
-
 const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) => {
   const { styles } = useTheme();
-  const [messages, setMessages] = useState<ChatMessage[]>([createWelcomeMessage()]);
+  const { t } = useLanguage();
+  const createWelcomeMessage = useCallback((): ChatMessage => ({
+    id: 'welcome',
+    role: 'assistant',
+    content: t('dw.copilot.welcome'),
+    timestamp: new Date(),
+  }), [t]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [{
+    id: 'welcome',
+    role: 'assistant',
+    content: t('dw.copilot.welcome'),
+    timestamp: new Date(),
+  }]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -85,14 +91,16 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
           },
         ]);
       } else {
+        // 无回复 = 后端未给出模型输出 ⇒ 明示本地兜底模板（fallback 标记驱动徽标）
         const fallback = generateFallbackResponse(msgText);
         setMessages((prev) => [
           ...prev,
           {
             id: `assistant-${Date.now()}`,
             role: 'assistant',
-            content: fallback,
+            content: `> ⚠️ ${t('dw.copilot.fallbackNotice')}\n\n${fallback}`,
             timestamp: new Date(),
+            fallback: true,
           },
         ]);
       }
@@ -103,14 +111,15 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
         {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
-          content: fallback,
+          content: `> ⚠️ ${t('dw.copilot.fallbackNotice')}\n\n${fallback}`,
           timestamp: new Date(),
+          fallback: true,
         },
       ]);
     } finally {
       setLoading(false);
     }
-  }, [inputValue, loading, messages]);
+  }, [inputValue, loading, messages, t]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -126,14 +135,7 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
   };
 
   const handleClear = () => {
-    setMessages([
-      {
-        id: 'welcome',
-        role: 'assistant',
-        content: '对话已清空。有什么我可以帮你的？',
-        timestamp: new Date(),
-      },
-    ]);
+    setMessages([createWelcomeMessage()]);
   };
 
   return (
@@ -152,15 +154,16 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
         <div className="flex items-center gap-1">
           <button type="button"
             onClick={handleClear}
-            className={`p-1 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} hover:${styles.cardTextMuted} transition-colors`}
-            title="清空对话"
+            className={`p-1 rounded hover:opacity-70 ${styles.cardTextMuted} transition-colors`}
+            title={t('dw.copilot.clearTitle')}
           >
             <Trash2 size={13} />
           </button>
           {onClose && (
             <button type="button"
               onClick={onClose}
-              className={`p-1 rounded hover:${styles.sidebarBg} ${styles.cardTextMuted} transition-colors`}
+              className={`p-1 rounded hover:opacity-70 ${styles.cardTextMuted} transition-colors`}
+              title={t('dw.copilot.closeTitle')}
             >
               <X size={13} />
             </button>
@@ -183,10 +186,10 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
           {QUICK_ACTIONS.map((action, i) => (
             <button type="button"
               key={i}
-              onClick={() => handleSend(action.prompt)}
-              className={`text-[10px] px-2 py-1 rounded-full border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.infoBg} hover:${styles.infoBorder} hover:${styles.infoText} whitespace-nowrap transition-colors`}
+              onClick={() => handleSend(t(action.promptKey))}
+              className={`text-[10px] px-2 py-1 rounded-full border ${styles.cardBorder} ${styles.cardTextMuted} hover:opacity-80 whitespace-nowrap transition-colors`}
             >
-              {action.label}
+              {t(action.labelKey)}
             </button>
           ))}
         </div>
@@ -200,15 +203,15 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="输入问题，如: 帮我写一个过滤活跃用户的 Pipeline..."
+            placeholder={t('dw.copilot.inputPlaceholder')}
             rows={2}
-            className={`flex-1 px-3 py-1.5 text-xs border ${styles.cardBorder} rounded-lg resize-none focus:${styles.infoBorder} focus:ring-1 focus:${styles.infoBorder} outline-none transition-colors ${styles.cardBg} ${styles.cardText}`}
+            className={`flex-1 px-3 py-1.5 text-xs border ${styles.cardBorder} rounded-lg resize-none focus:ring-1 focus:ring-current outline-none transition-colors ${styles.cardBg} ${styles.cardText}`}
             disabled={loading}
           />
           <button type="button"
             onClick={() => handleSend()}
             disabled={!inputValue.trim() || loading}
-            className={`shrink-0 flex items-center justify-center w-9 h-9 ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} rounded-lg transition-colors disabled:opacity-50 self-end`}
+            className={`shrink-0 flex items-center justify-center w-9 h-9 ${styles.accentBg} hover:opacity-90 ${styles.cardText} rounded-lg transition-colors disabled:opacity-50 self-end`}
           >
             {loading ? (
               <Loader2 size={15} className="animate-spin" />

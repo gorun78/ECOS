@@ -198,8 +198,7 @@ export default function EvalRunPanel() {
           type="button"
           onClick={() => void handleRun()}
           disabled={isRunning}
-          className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-bold disabled:opacity-50 cursor-pointer"
-          style={{ background: styles.accentBg, color: 'rgba(255,255,255,0.95)' }}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded text-[11px] font-bold disabled:opacity-50 cursor-pointer ${styles.accentBg} ${styles.accentSolidText}`}
         >
           {isRunning ? <LoaderAlt className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
           {isRunning ? t('knowledge.govern.eval_running') : t('knowledge.govern.eval_run_button')}
@@ -234,9 +233,9 @@ export default function EvalRunPanel() {
               )}
             </div>
             <div className="grid grid-cols-3 gap-2">
-              <MetricBar label="Recall@5" value={displayReport.recallAt5} bg={styles.accentText} />
-              <MetricBar label="MRR@5"    value={displayReport.mrrAt5}    bg={styles.successText} />
-              <MetricBar label="NDCG@5"   value={displayReport.ndcgAt5}   bg={styles.warningText} />
+              <MetricBar label="Recall@5" value={displayReport.recallAt5} fillClass={styles.accentBg} trackClass={styles.badgeBg} />
+              <MetricBar label="MRR@5"    value={displayReport.mrrAt5}    fillClass={styles.successBg} trackClass={styles.badgeBg} />
+              <MetricBar label="NDCG@5"   value={displayReport.ndcgAt5}   fillClass={styles.warningBg} trackClass={styles.badgeBg} />
             </div>
           </>
         )}
@@ -284,18 +283,18 @@ export default function EvalRunPanel() {
   );
 }
 
-/** 单指标条 */
-function MetricBar({ label, value, bg }: { label: string; value: number; bg: string }) {
+/** 单指标条（检视报告：原实现把 text-* token 当 background 值用 → 渲染失效；
+ *  改为 className 通道走主题 Bg token，轨道走 badgeBg，0 裸色板/0 rgba） */
+function MetricBar({ label, value, fillClass, trackClass }: { label: string; value: number; fillClass: string; trackClass: string }) {
   return (
     <div className="space-y-0.5">
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-bold uppercase" style={{ color: 'inherit' }}>{label}</span>
+        <span className="text-[9px] font-bold uppercase">{label}</span>
         <span className="text-[9px] font-mono font-bold">{(value * 100).toFixed(1)}%</span>
       </div>
-      <div className="h-1.5 w-full rounded-full overflow-hidden"
-           style={{ background: 'rgba(127,127,127,0.12)' }}>
-        <div className="h-full rounded-full transition-all duration-500"
-             style={{ width: `${Math.min(100, value * 100)}%`, background: bg, opacity: 0.75 }} />
+      <div className={`h-1.5 w-full rounded-full overflow-hidden ${trackClass}`}>
+        <div className={`h-full rounded-full transition-all duration-500 ${fillClass}`}
+             style={{ width: `${Math.min(100, value * 100)}%` }} />
       </div>
     </div>
   );

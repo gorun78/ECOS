@@ -1,15 +1,19 @@
 /**
  * buildObjectColumns — ObjectExplorer 表格列构造（自 ObjectExplorer.tsx 的 useMemo 体原样迁出，H6-T4）
- * 纯函数：useMemo 仍留在父组件同一位置，依赖数组不变。
+ * 纯函数：useMemo 仍留在父组件同一位置；t 由调用方注入（语言切换需参与 memo 依赖）。
  * @license Apache-2.0
  */
 
 import type { ColumnConfig } from "../../components/common/DataTable";
 import type { ThemeStyles } from "../../components/ThemeContext";
 import type { ObjectData, SchemaProperty } from "../../api";
-import { STATUS_COLORS } from "./helpers";
+import { statusBadgeClasses } from "./helpers";
 
-export function buildObjectColumns(schema: SchemaProperty[], styles: ThemeStyles): ColumnConfig<ObjectData>[] {
+export function buildObjectColumns(
+  schema: SchemaProperty[],
+  styles: ThemeStyles,
+  t: (key: string) => string,
+): ColumnConfig<ObjectData>[] {
   const cols: ColumnConfig<ObjectData>[] = [
     {
       key: "id",
@@ -21,11 +25,11 @@ export function buildObjectColumns(schema: SchemaProperty[], styles: ThemeStyles
     },
     {
       key: "status",
-      label: "状态",
+      label: t("dw.objectExplorer.col.status"),
       width: "80px",
       render: (val) => (
-        <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${STATUS_COLORS[val] || STATUS_COLORS.Draft}`}>
-          {val || "Draft"}
+        <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${statusBadgeClasses(styles, val)}`}>
+          {val || "—"}
         </span>
       ),
     },
@@ -46,14 +50,14 @@ export function buildObjectColumns(schema: SchemaProperty[], styles: ThemeStyles
   } else {
     // Fallback columns
     cols.splice(1, 0,
-      { key: "name", label: "名称", render: (val: string) => <span className={`font-medium ${styles.cardText} truncate block max-w-[160px]`}>{val || "—"}</span> },
-      { key: "code", label: "编码", render: (val: string) => <span className={`font-mono text-[10px] truncate block max-w-[120px] ${styles.cardText}`}>{val || "—"}</span> },
+      { key: "name", label: t("dw.objectExplorer.col.name"), render: (val: string) => <span className={`font-medium ${styles.cardText} truncate block max-w-[160px]`}>{val || "—"}</span> },
+      { key: "code", label: t("dw.objectExplorer.col.code"), render: (val: string) => <span className={`font-mono text-[10px] truncate block max-w-[120px] ${styles.cardText}`}>{val || "—"}</span> },
     );
   }
 
   cols.push({
     key: "createdAt",
-    label: "创建时间",
+    label: t("dw.objectExplorer.col.createdAt"),
     width: "140px",
     render: (val: string) => (
       <span className={`text-[10px] ${styles.cardTextMuted}`}>

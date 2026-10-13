@@ -22,7 +22,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { CircleDashed, ClipboardList, Gauge, Scale, Sparkles } from 'lucide-react';
+import { CircleDashed, ClipboardList, Gauge, ListChecks, Scale, Sparkles } from 'lucide-react';
 import { useLanguage } from '../../../../components/LanguageContext';
 import { useTheme } from '../../../../components/ThemeContext';
 import MobileDataTable from '../../../../components/common/MobileDataTable';
@@ -44,6 +44,7 @@ import {
   type OutcomeEvaluateResultDto,
   type OutcomeMetricEvaluation,
 } from '../../../../services/cognitive/outcomesApi';
+import OutcomeProposalReturnForm from './OutcomeProposalReturnForm';
 
 export interface OutcomeQuadViewProps {
   /** 预测运行锚点（URL `?runId=` 或动作回链带入）；空串 ⇒ 空态，不猜测。 */
@@ -66,6 +67,8 @@ export default function OutcomeQuadView({ runId, scenarioId }: OutcomeQuadViewPr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<CognitiveApiError | null>(null);
   const [picked, setPicked] = useState(0);
+  /** 幕10 回流：当前展开「转入候选评审」表单的诊断项 key（单开，切换评估/重新加载即收起）。 */
+  const [returnOpenKey, setReturnOpenKey] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!runId) {
@@ -75,6 +78,7 @@ export default function OutcomeQuadView({ runId, scenarioId }: OutcomeQuadViewPr
     }
     setLoading(true);
     setError(null);
+    setReturnOpenKey(null);
     try {
       const data = await fetchOutcomesByRun(runId);
       setRows(data);
@@ -258,17 +262,51 @@ export default function OutcomeQuadView({ runId, scenarioId }: OutcomeQuadViewPr
                 <p className={`text-[11px] ${styles.cardTextMuted}`}>{t('scenario.p09.quad.diagnoses_empty')}</p>
               ) : (
                 <ul className="space-y-2">
-                  {current.diagnoses.map((d, i) => (
-                    <li key={`${d.metricRef ?? 'd'}-${i}`} className="text-[11px]">
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant={d.verdict === 'SUPPORTED' ? 'success' : d.verdict === 'REFUTED' ? 'danger' : 'neutral'}>
-                          {d.verdict || t('scenario.p09.quad.verdict_unknown')}
-                        </Badge>
-                        <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>{d.metricRef ?? '—'}</span>
-                      </div>
-                      {d.explanation && <p className={`mt-1 ${styles.cardText}`}>{d.explanation}</p>}
-                    </li>
-                  ))}
+                  {current.diagnoses.map((d, i) => {
+                    const refKey = `${picked}:${d.metricRef ?? 'd'}:${i}`;
+                    const assetRefs = Array.isArray(d.assetRefs) ? d.assetRefs.filter((r) => typeof r === 'string' && r !== '') : [];
+                    const open = returnOpenKey === refKey;
+                    return (
+                      <li key={refKey} className="text-[11px]">
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant={d.verdict === 'SUPPORTED' ? 'success' : d.verdict === 'REFUTED' ? 'danger' : 'neutral'}>
+                            {d.verdict || t('scenario.p09.quad.verdict_unknown')}
+                          </Badge>
+                          <span className={`font-mono text-[10px] ${styles.cardTextMuted}`}>{d.metricRef ?? '—'}</span>
+                        </div>
+                        {d.explanation && <p className={`mt-1 ${styles.cardText}`}>{d.explanation}</p>}
+                        {/* 幕10 结果回流：偏差诊断 → 候选提案（proposals 通道，不改生产资产行）。
+                            目标资产唯一定位来源 = 服务端 assetRefs；无引用时禁用并如实说明，禁猜资产。 */}
+                        <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                          {assetRefs.length > 0 ? (
+                            <button
+                              type="button"
+                              onClick={() => setReturnOpenKey(open ? null : refKey)}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-[10px] font-bold cursor-pointer ${styles.cardBg} ${styles.accentText} ${styles.cardBorder}`}
+                              data-testid="quad-return-btn"
+                            >
+                              <ListChecks size={11} />
+                              {t('scenario.p09.return.btn')}
+                            </button>
+                          ) : (
+                            <span className={`text-[10px] ${styles.cardTextMuted}`} data-testid="quad-return-disabled">
+                              {t('scenario.p09.return.no_refs')}
+                            </span>
+                          )}
+                        </div>
+                        {open && assetRefs.length > 0 && (
+                          <OutcomeProposalReturnForm
+                            assetRefs={assetRefs}
+                            evaluationId={current.evaluationId}
+                            runId={runId}
+                            metricRef={d.metricRef}
+                            resultTraceId={current.traceId}
+                            onClose={() => setReturnOpenKey(null)}
+                          />
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

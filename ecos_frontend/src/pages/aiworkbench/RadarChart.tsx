@@ -7,7 +7,7 @@
  */
 
 import React, { useRef, useEffect } from 'react';
-import { Target, Brain, Eye, Shield, Gauge, Sparkles } from 'lucide-react';
+import { Target, Eye, Shield, Gauge, Sparkles } from 'lucide-react';
 import { useLanguage } from '../../components/LanguageContext';
 
 interface RadarChartProps {
@@ -15,18 +15,22 @@ interface RadarChartProps {
 }
 
 /**
- * Custom hook: returns the 6 capability dimensions with i18n keys
+ * Custom hook: returns the 5 engine dimensions with i18n keys
  * and primitive-component icons. Icon type is React.ComponentType.
+ */
+/**
+ * 引擎真实五维（AgentEvaluator DimensionScores）：
+ * toolAccuracy / keywordCoverage / answerQuality / executionEfficiency / hallucinationResist。
+ * 分数已由 DashboardView 归一到 0-100；画布颜色为 canvas 必需的字面量（非 Tailwind class）。
  */
 function useRadarDims() {
   const { t } = useLanguage();
   return [
-    { key: 'accuracy', label: t('dashboard.radar.accuracy'), color: '#3b82f6', icon: Target },
-    { key: 'relevance', label: t('dashboard.radar.relevance'), color: '#8b5cf6', icon: Brain },
-    { key: 'completeness', label: t('dashboard.radar.completeness'), color: '#10b981', icon: Eye },
-    { key: 'safety', label: t('dashboard.radar.safety'), color: '#ef4444', icon: Shield },
-    { key: 'efficiency', label: t('dashboard.radar.efficiency'), color: '#f59e0b', icon: Gauge },
-    { key: 'creativity', label: t('dashboard.radar.creativity'), color: '#ec4899', icon: Sparkles },
+    { key: 'toolAccuracy', label: t('aiworkbench.dashboard.radar.toolAccuracy'), color: '#3b82f6', icon: Target },
+    { key: 'keywordCoverage', label: t('aiworkbench.dashboard.radar.keywordCoverage'), color: '#8b5cf6', icon: Eye },
+    { key: 'answerQuality', label: t('aiworkbench.dashboard.radar.answerQuality'), color: '#10b981', icon: Sparkles },
+    { key: 'executionEfficiency', label: t('aiworkbench.dashboard.radar.executionEfficiency'), color: '#f59e0b', icon: Gauge },
+    { key: 'hallucinationResist', label: t('aiworkbench.dashboard.radar.hallucinationResist'), color: '#ef4444', icon: Shield },
   ];
 }
 

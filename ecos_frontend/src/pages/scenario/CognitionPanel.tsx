@@ -9,6 +9,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import LucideIcon from '../../components/LucideIcon';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme, type ThemeStyles } from '../../components/ThemeContext';
+import { showToastGlobal } from '../../components/common/Toast';
+import logger from '../../services/logger';
 import { apiFetchData } from '../../api';
 import type { BusinessScenario } from '../project-workbench/types';
 import CounterfactualTab from './CounterfactualTab';
@@ -143,14 +145,19 @@ export default function CognitionPanel({
   const [openRuleId, setOpenRuleId] = useState<string | null>(null);
   const [openPrecedentId, setOpenPrecedentId] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<(typeof SUB_TABS)[number]['key']>('diagnosis');
+  // catch 吞错 → 错误态：历史/模型加载失败不再静默 console.error，展示可重试错误
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [modelsError, setModelsError] = useState<string | null>(null);
 
   const fetchHistory = useCallback(async () => {
     if (!scenario) return;
     try {
       const d = await apiFetchData<RunHistoryRow[]>(`/api/v1/workspace/scenarios/${scenario.id}/runs?limit=20`);
       setHistory(Array.isArray(d) ? d : []);
+      setHistoryError(null);
     } catch (e) {
-      console.error('Failed to fetch scenario run history', e);
+      logger.error('cognition-history', e);
+      setHistoryError(e instanceof Error ? e.message : String(e));
     }
   }, [scenario]);
 
@@ -158,8 +165,10 @@ export default function CognitionPanel({
     try {
       const d = await apiFetchData<CognitiveModelRow[]>('/api/v1/cognitive/models');
       setModels(Array.isArray(d) ? d : []);
+      setModelsError(null);
     } catch (e) {
-      console.error('Failed to fetch cognitive models', e);
+      logger.error('cognition-models', e);
+      setModelsError(e instanceof Error ? e.message : String(e));
     }
   }, []);
 
@@ -177,7 +186,8 @@ export default function CognitionPanel({
   const handleRun = async () => {
     if (!scenario || running) return;
     if (runTypes.length === 0) {
-      alert(t('scenario.cog.needTypes'));
+      // 危险/校验提示禁原生 alert()（铁律）→ in-app toast
+      showToastGlobal('error', t('scenario.cog.needTypes'));
       return;
     }
     setRunning(true);
@@ -196,7 +206,10 @@ export default function CognitionPanel({
       fetchHistory();
       onRunFinished?.();
     } catch (e) {
-      console.error('Scenario run failed', e);
+      // catch 吞错 → 错误态 + toast（不再仅 console.error）
+      const msg = e instanceof Error ? e.message : String(e);
+      logger.error('cognition-run', e);
+      showToastGlobal('error', t('scenario.cog.runFailed', { msg }));
       setResult({ runId: undefined, status: 'ERROR' } as RunResult);
     } finally {
       setRunning(false);
@@ -485,7 +498,15 @@ export default function CognitionPanel({
       {/* ── 运行历史 ── */}
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg overflow-hidden`}>
         <SectionHeader icon="History" title={t('scenario.cog.history')} />
-        {history.length === 0 ? (
+        {historyError ? (
+          <div className={`p-4 text-center space-y-2`}>
+            <p className={`text-xs ${styles.dangerText}`}>{t('scenario.cog.historyLoadFailed')}</p>
+            <button type="button" onClick={() => void fetchHistory()}
+              className={`px-3 py-1 border ${styles.cardBorder} ${styles.cardText} text-[11px] font-bold rounded flex items-center gap-1 mx-auto cursor-pointer hover:opacity-80`}>
+              <LucideIcon name="RefreshCw" size={11} />{t('scenario.decision.retry')}
+            </button>
+          </div>
+        ) : history.length === 0 ? (
           <p className={`p-4 text-xs ${styles.cardTextMuted}`}>{t('scenario.cog.empty')}</p>
         ) : (
           <div className="overflow-x-auto">
@@ -523,7 +544,15 @@ export default function CognitionPanel({
       {/* ── 模型注册表 ── */}
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg overflow-hidden`}>
         <SectionHeader icon="Cpu" title={t('scenario.toml.modelsBtn')} />
-        {models.length === 0 ? (
+        {modelsError ? (
+          <div className={`p-4 text-center space-y-2`}>
+            <p className={`text-xs ${styles.dangerText}`}>{t('scenario.cog.modelsLoadFailed')}</p>
+            <button type="button" onClick={() => void fetchModels()}
+              className={`px-3 py-1 border ${styles.cardBorder} ${styles.cardText} text-[11px] font-bold rounded flex items-center gap-1 mx-auto cursor-pointer hover:opacity-80`}>
+              <LucideIcon name="RefreshCw" size={11} />{t('scenario.decision.retry')}
+            </button>
+          </div>
+        ) : models.length === 0 ? (
           <p className={`p-4 text-xs ${styles.cardTextMuted}`}>{t('scenario.cog.noData')}</p>
         ) : (
           <div className="overflow-x-auto">

@@ -8,6 +8,7 @@ import { Bot, User, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { ChatMessage } from './CopilotPanelTypes';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 
 interface Props {
   messages: ChatMessage[];
@@ -25,6 +26,7 @@ const CopilotPanelMessages: React.FC<Props> = ({
   messagesEndRef,
 }) => {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   // Render code block with copy button
   const renderCodeBlock = (code: string, language: string = '') => {
     return (
@@ -33,7 +35,7 @@ const CopilotPanelMessages: React.FC<Props> = ({
           <span>{language || 'code'}</span>
           <button type="button"
             onClick={() => onCopy(code, `code-${code.slice(0, 20)}`)}
-            className={`flex items-center gap-1 ${styles.muted} hover:${styles.cardText} transition-colors`}
+            className={`flex items-center gap-1 ${styles.muted} hover:opacity-80 transition-colors`}
           >
             {copiedId === `code-${code.slice(0, 20)}` ? (
               <Check size={10} className={`${styles.successText}`} />
@@ -75,6 +77,11 @@ const CopilotPanelMessages: React.FC<Props> = ({
                 : `${styles.sidebarBg} ${styles.cardText}`
             }`}
           >
+            {msg.fallback && (
+              <span className={`inline-flex items-center gap-1 mb-1 text-[9px] font-semibold px-1.5 py-0.5 rounded ${styles.warningBg} ${styles.warningText}`}>
+                {t('dw.copilot.fallbackTag')}
+              </span>
+            )}
             {msg.role === 'assistant' ? (
               <div className="text-xs prose prose-sm max-w-none dark:prose-invert">
                 <ReactMarkdown

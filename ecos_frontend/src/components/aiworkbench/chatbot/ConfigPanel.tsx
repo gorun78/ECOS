@@ -7,6 +7,7 @@ import React from 'react';
 import { AIPAgent, AIPGuardrail } from '../../../types/aiworkbench';
 import * as Icons from 'lucide-react';
 import { useLanguage } from '../../../components/LanguageContext';
+import DemoBadge from '../DemoBadge';
 
 const Icon = ({ name, size, className }: { name: string; size?: number; className?: string }) => {
   const Comp = (Icons as any)[name] || (Icons as any).HelpCircle;
@@ -49,7 +50,8 @@ interface ConfigPanelProps {
   selectedGuardrails: string[];
   setSelectedGuardrails: React.Dispatch<React.SetStateAction<string[]>>;
   guardrails: AIPGuardrail[];
-  // RAG tab
+  // RAG tab（§4.5：后端无同步/向量化通道 → 同步控件禁用 + 「能力未上线」徽标，
+  // 原 isSyncingRAG/handleSyncRAG/ragLogs 假演出 props 已移除）
   handleDragOver: (e: React.DragEvent) => void;
   handleDragLeave: () => void;
   handleDrop: (e: React.DragEvent) => void;
@@ -57,13 +59,7 @@ interface ConfigPanelProps {
   dragOver: boolean;
   ragDocs: RAGDocument[];
   setRagDocs: React.Dispatch<React.SetStateAction<RAGDocument[]>>;
-  isSyncingRAG: boolean;
-  handleSyncRAG: () => void;
-  ragLogs: string[];
-  // Publish tab
-  isPublishing: boolean;
-  handlePublishChatbot: () => void;
-  publishingLogs: string[];
+  // Publish tab（§4.5：发布无后端编译/部署端点 → 禁用 + 徽标，假进度 props 已移除）
   embedTab: string;
   setEmbedTab: React.Dispatch<React.SetStateAction<string>>;
   apiLang: string;
@@ -103,12 +99,6 @@ export default function ConfigPanel({
   dragOver,
   ragDocs,
   setRagDocs,
-  isSyncingRAG,
-  handleSyncRAG,
-  ragLogs,
-  isPublishing,
-  handlePublishChatbot,
-  publishingLogs,
   embedTab,
   setEmbedTab,
   apiLang,
@@ -195,7 +185,7 @@ export default function ConfigPanel({
               <textarea
                 value={tempPrompt}
                 onChange={(e) => setTempPrompt(e.target.value)}
-                className={`w-full h-64 p-3 border ${styles.cardBorder} rounded-xl text-[11px] font-mono leading-relaxed ${styles.inputBg} ${styles.cardText} focus:${styles.cardBg} focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none`}
+                className={`w-full h-64 p-3 border ${styles.cardBorder} rounded-xl text-[11px] font-mono leading-relaxed ${styles.inputBg} ${styles.cardText} outline-none`}
                 placeholder={t('aiworkbench.chatbot.promptPlaceholder')}
               />
               <p className={`text-[9px] ${styles.cardTextMuted} leading-normal`}>
@@ -302,7 +292,7 @@ export default function ConfigPanel({
                         );
                       }}
                       className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-start gap-2.5 ${
-                        isBound ? `${styles.badgeBg} ${styles.accentBorder}` : `${styles.cardBg} ${styles.cardBorder} hover:${styles.inputBg}`
+                        isBound ? `${styles.badgeBg} ${styles.accentBorder}` : `${styles.cardBg} ${styles.cardBorder}`
                       }`}
                     >
                       <input
@@ -342,7 +332,7 @@ export default function ConfigPanel({
                         );
                       }}
                       className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-3 ${
-                        isBound ? 'bg-indigo-50/50 border-indigo-200' : `${styles.cardBg} ${styles.cardBorder} hover:${styles.inputBg}`
+                        isBound ? 'bg-indigo-50/50 border-indigo-200' : `${styles.cardBg} ${styles.cardBorder}`
                       }`}
                     >
                       <input
@@ -376,8 +366,8 @@ export default function ConfigPanel({
               onDrop={handleDrop}
               className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center transition-all cursor-pointer ${
                 dragOver
-                  ? `border-blue-500 ${styles.badgeBg}/40`
-                  : `${styles.inputBorder} ${styles.appBg}/40 hover:${styles.inputBg}`
+                  ? `border-blue-500 ${styles.badgeBg}`
+                  : `${styles.inputBorder} ${styles.appBg}`
               }`}
             >
               <input
@@ -398,31 +388,27 @@ export default function ConfigPanel({
               <h4 className={`font-extrabold ${styles.cardTextMuted} text-[11px] uppercase tracking-wider font-mono`}>
                 {t('aiworkbench.chatbot.mountedDocs')} ({ragDocs.length})
               </h4>
-              <button type="button"
-                onClick={handleSyncRAG}
-                disabled={isSyncingRAG || !ragDocs.some(d => d.status === 'pending')}
-                className={`px-3 py-1 ${styles.accentBg} ${styles.accentHover} text-white font-bold rounded-lg transition-all text-[10px] flex items-center gap-1 cursor-pointer ${
-                  isSyncingRAG || !ragDocs.some(d => d.status === 'pending') ? 'opacity-40 cursor-not-allowed' : ''
-                }`}
-              >
-                {isSyncingRAG ? (
-                  <>
-                    <span className={`w-3 h-3 border ${styles.cardBorder} border-t-transparent rounded-full animate-spin`} />
-                    <span>{t('aiworkbench.chatbot.vectorAligning')}</span>
-                  </>
-                ) : (
-                  <>
-                    <Icon name="RefreshCcw" size={10} />
-                    <span>{t('aiworkbench.chatbot.startChunkAlign')}</span>
-                  </>
-                )}
-              </button>
+              {/* §4.5 P0：RAG 同步无后端通道 → 控件禁用 + 「能力未上线」，禁止假进度演出 */}
+              <span className="flex items-center gap-1.5">
+                <DemoBadge />
+                <button type="button"
+                  disabled
+                  title={t('aiworkbench.chatbot.ragSyncOfflineDesc')}
+                  className={`px-3 py-1 ${styles.badgeBg} ${styles.badgeText} font-bold rounded-lg text-[10px] flex items-center gap-1 cursor-not-allowed opacity-60`}
+                >
+                  <Icon name="RefreshCcw" size={10} />
+                  <span>{t('aiworkbench.chatbot.startChunkAlign')}</span>
+                </button>
+              </span>
             </div>
+            <p className={`text-[9px] ${styles.cardTextMuted} leading-normal`}>
+              {t('aiworkbench.chatbot.ragSyncOfflineDesc')}
+            </p>
 
             {/* Document List */}
             <div className="space-y-1.5 max-h-56 overflow-y-auto">
               {ragDocs.map(doc => (
-                <div key={doc.id} className={`p-2 ${styles.cardBg} border ${styles.cardBorder}/80 hover:${styles.inputBg} rounded-lg flex items-center justify-between gap-4 transition-colors`}>
+                <div key={doc.id} className={`p-2 ${styles.cardBg} border ${styles.cardBorder} rounded-lg flex items-center justify-between gap-4 transition-colors`}>
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span className={`p-1.5 rounded ${doc.type === 'PDF' ? 'bg-red-50 text-red-500' : `${styles.inputBg} ${styles.cardTextMuted}`}`}>
                       <Icon name="FileText" size={12} />
@@ -460,22 +446,8 @@ export default function ConfigPanel({
               ))}
             </div>
 
-            {/* Log Console */}
-            {ragLogs.length > 0 && (
-              <div className={`${styles.cardBg} p-3 rounded-xl shadow-xs border ${styles.cardBorder} flex flex-col space-y-2`}>
-                <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-1.5`}>
-                  <span className={`font-mono ${styles.cardText} text-[9px] font-bold`}>RAG Pipeline Vectorization Stream</span>
-                  <span className={`text-[8px] ${styles.cardTextMuted} font-mono`}>text-embedding-004</span>
-                </div>
-                <div className={`space-y-1 font-mono text-[8.5px] ${styles.cardTextMuted} leading-normal max-h-24 overflow-y-auto`}>
-                  {ragLogs.map((log, idx) => (
-                    <p key={idx} className={log.includes('✅') ? 'text-emerald-400 font-bold' : styles.cardTextMuted}>
-                      {log}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* §4.5 P0：假 "RAG Pipeline Vectorization Stream" 罐头日志控制台已移除
+                （同步能力未上线，无任何真实引擎日志可流式呈现） */}
           </div>
         )}
 
@@ -501,7 +473,7 @@ export default function ConfigPanel({
                       );
                     }}
                     className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-start justify-between gap-4 ${
-                      isEnabled ? `${styles.badgeBg} ${styles.accentBorder} shadow-xs` : `${styles.cardBg} ${styles.cardBorder} hover:${styles.inputBg}`
+                      isEnabled ? `${styles.badgeBg} ${styles.accentBorder} shadow-xs` : `${styles.cardBg} ${styles.cardBorder}`
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -556,57 +528,33 @@ export default function ConfigPanel({
         {/* TAB 5: Publishing & Deployment options */}
         {activeWorkspaceTab === 'publish' && (
           <div className="space-y-4 font-sans">
-            {/* Compile & Publish zone */}
+            {/* §4.5 P0：编译/发布无后端端点（status/versions/rollback 均为 ghost）→
+                发布控件禁用 + 「能力未上线」，假进度罐头日志控制台已移除 */}
             <div className={`p-4 ${styles.accentBg} rounded-2xl text-white space-y-4 relative overflow-hidden shadow-md`}>
               <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-4 translate-y-4 scale-150">
                 <Icon name="Send" size={120} />
               </div>
               <div className="space-y-1">
-                <span className="px-1.5 py-0.5 bg-blue-500 text-white rounded text-[8px] font-extrabold uppercase">
-                  Sovereign Compiler v2.4
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="px-1.5 py-0.5 bg-blue-500 text-white rounded text-[8px] font-extrabold uppercase">
+                    Sovereign Compiler
+                  </span>
+                  <DemoBadge />
                 </span>
                 <h3 className="font-extrabold text-sm">{t('aiworkbench.chatbot.publishTitle')}</h3>
                 <p className={`text-[10px] ${styles.cardText}`}>
-                  {t('aiworkbench.chatbot.publishDesc')}
+                  {t('aiworkbench.chatbot.publishOfflineDesc')}
                 </p>
               </div>
               <button type="button"
-                onClick={handlePublishChatbot}
-                disabled={isPublishing}
-                className={`px-4 py-2 styles.cardBg hover:styles.appBg styles.cardText font-extrabold rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
-                  isPublishing ? 'opacity-70 cursor-not-allowed' : ''
-                }`}
+                disabled
+                title={t('aiworkbench.chatbot.publishOfflineDesc')}
+                className={`px-4 py-2 ${styles.badgeBg} ${styles.badgeText} font-extrabold rounded-xl text-xs flex items-center gap-1.5 cursor-not-allowed opacity-60`}
               >
-                {isPublishing ? (
-                  <>
-                    <span className={`w-3.5 h-3.5 border-2 ${styles.cardBorder} border-t-transparent rounded-full animate-spin`} />
-                    <span>{t('aiworkbench.chatbot.publishCompiling')}</span>
-                  </>
-                ) : (
-                  <>
-                    <Icon name="Cpu" size={13} />
-                    <span>{t('aiworkbench.chatbot.publishBtn')}</span>
-                  </>
-                )}
+                <Icon name="Cpu" size={13} />
+                <span>{t('aiworkbench.chatbot.publishBtn')}</span>
               </button>
             </div>
-
-            {/* Publishing Console logs */}
-            {publishingLogs.length > 0 && (
-              <div className={`${styles.cardBg} p-3.5 rounded-xl border ${styles.cardBorder} ${styles.cardTextMuted} font-mono text-[9px] space-y-1.5`}>
-                <div className={`flex items-center justify-between border-b ${styles.cardBorder} pb-1.5`}>
-                  <span className={`${styles.cardText} font-bold`}>AIP Copilot Compiler Logs</span>
-                  <span className={`text-[8px] ${styles.cardTextMuted}`}>v1.0.5</span>
-                </div>
-                <div className="space-y-1 max-h-32 overflow-y-auto leading-relaxed">
-                  {publishingLogs.map((log, i) => (
-                    <p key={i} className={log.includes('🎉') || log.includes('✅') ? 'text-emerald-400 font-bold' : styles.cardTextMuted}>
-                      {log}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Integration Snippets */}
             <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-4 shadow-xs space-y-3`}>

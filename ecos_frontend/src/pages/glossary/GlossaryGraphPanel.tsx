@@ -18,7 +18,8 @@ import { Network, RefreshCw, Shuffle, RotateCw } from "lucide-react";
 import { useTheme } from "../../components/ThemeContext";
 import { useLanguage } from "../../components/LanguageContext";
 import { useDict } from "../../hooks/useDict";
-import { fetchGlossaryGraph, type GlossaryGraph } from "../../services/glossary";
+import ErrorPanel from "../../components/common/status/ErrorPanel";
+import { fetchGlossaryGraph, readGlossaryError, type GlossaryGraph } from "../../services/glossary";
 
 // ── canvas 色值常量（canvas 不识别 Tailwind class，故为具体值）──
 /** 节点文字颜色：统一白字 */
@@ -64,8 +65,9 @@ export default function GlossaryGraphPanel({ termId, onSelectTerm }: GlossaryGra
       const data = await fetchGlossaryGraph(termId, depth);
       setGraph(data);
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      setError(`${t("glossary.graph.load_failed")}: ${message}`);
+      // 统一经 readGlossaryError 取业务 message + traceId（报告 §三 S7：traceId 全域稀缺）
+      const { message, traceId } = readGlossaryError(e);
+      setError(`${t("glossary.graph.load_failed")}: ${message}${traceId ? ` · traceId=${traceId}` : ""}`);
     } finally {
       setLoading(false);
     }

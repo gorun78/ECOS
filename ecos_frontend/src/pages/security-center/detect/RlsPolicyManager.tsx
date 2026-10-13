@@ -6,11 +6,15 @@ import {
   fetchRlsPolicies, createRlsPolicy, updateRlsPolicy, deleteRlsPolicy,
   type RlsPolicy,
 } from '../../../api';
+import { useLanguage } from '../../../components/LanguageContext';
+import { useTheme } from '../../../components/ThemeContext';
 import { inputClasses, btnPrimary, btnSecondary, badgeClasses } from './helpers';
 import TableSelect from './TableSelect';
 
 // ── RLS Policy Manager ───────────────────────────────────────
-export default function RlsPolicyManager({ t, locale, styles }: { t: (k: string) => string; locale: string; styles: any }) {
+export default function RlsPolicyManager() {
+  const { t, locale } = useLanguage();
+  const { styles } = useTheme();
   const [policies, setPolicies] = useState<RlsPolicy[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -157,7 +161,7 @@ export default function RlsPolicyManager({ t, locale, styles }: { t: (k: string)
             </thead>
             <tbody>
               {policies.map(p => (
-                <tr key={p.id} className={`border-t ${styles.cardBorder} hover:${styles.sidebarHoverBg}`}>
+                <tr key={p.id} className={`border-t ${styles.cardBorder} ${styles.sidebarHoverBg}`}>
                   <td className={`px-4 py-3 font-medium ${styles.cardText}`}>{p.policyName}</td>
                   <td className={`px-4 py-3 ${styles.cardText}`}><code className={`text-xs px-1.5 py-0.5 rounded ${styles.inputBg}`}>{p.tableName}</code></td>
                   <td className={`px-4 py-3 ${styles.cardText}`}><code className={`text-xs px-1.5 py-0.5 rounded ${styles.inputBg}`}>{p.filterExpression}</code></td>
@@ -175,7 +179,7 @@ export default function RlsPolicyManager({ t, locale, styles }: { t: (k: string)
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
-                      <button type="button" onClick={() => openEdit(p)} className={`p-1.5 rounded hover:${styles.sidebarHoverBg} ${styles.muted} cursor-pointer`}>
+                      <button type="button" onClick={() => openEdit(p)} className={`p-1.5 rounded ${styles.sidebarHoverBg} ${styles.muted} cursor-pointer`}>
                         <Edit3 size={14} />
                       </button>
                       <button type="button" onClick={() => setDeleteTarget(p)} className="p-1.5 rounded hover:bg-red-50 text-red-500 cursor-pointer">
@@ -208,11 +212,12 @@ export default function RlsPolicyManager({ t, locale, styles }: { t: (k: string)
               </div>
               <div>
                 <label className={`block text-xs mb-1.5 ${styles.muted}`}>{t('sec.rls.tableName')}</label>
-                <TableSelect value={form.tableName} onChange={v => setForm(f => ({ ...f, tableName: v }))} styles={styles} />
+                <TableSelect value={form.tableName} onChange={v => setForm(f => ({ ...f, tableName: v }))} />
               </div>
               <div>
                 <label className={`block text-xs mb-1.5 ${styles.muted}`}>{t('sec.rls.filterExpression')}</label>
                 <textarea rows={3} value={form.filterExpression} onChange={e => setForm(f => ({ ...f, filterExpression: e.target.value }))} className={inputClasses(styles)} />
+                <p className={`text-[10px] mt-1 ${styles.muted}`}>{t('sec.rls.predicateHint')}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

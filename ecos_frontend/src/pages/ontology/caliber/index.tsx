@@ -18,6 +18,7 @@ import {
   Clock,
   GitBranch,
   History,
+  Info,
   Lock,
   Loader2,
   Plus,
@@ -195,7 +196,14 @@ export default function CaliberPage({ onToast }: CaliberPageProps) {
             </div>
           </header>
 
+          {/* 无假真理·limit50 截断提示：后端无分页端点，第 51 条起不可见必须显式声明 */}
+          {calibers.length >= 50 && !loadingList && (
+            <div className={`px-3 py-1.5 border-b ${styles.appBorder} text-[10px] ${styles.warningText} ${styles.warningBg}`}>
+              {t("ow.caliber.list.truncated")}
+            </div>
+          )}
           {newCaliberOpen && (
+
             <div className={`px-3 py-2 border-b ${styles.appBorder} ${styles.cardBg} space-y-1.5`}>
               <input
                 value={newCode}
@@ -388,7 +396,7 @@ export default function CaliberPage({ onToast }: CaliberPageProps) {
             <div className="flex items-center gap-1.5 font-bold">
               <Table2 size={13} />
               <span>{t("ow.caliber.bound.title")}</span>
-              <span className={`ml-1 px-1.5 rounded text-[9px] ${styles.infoBg} ${styles.infoText}`}>{bindings.length}</span>
+              <span title={t("ow.caliber.bound.session_only")} className={`ml-1 px-1.5 rounded text-[9px] ${styles.infoBg} ${styles.infoText}`}>{bindings.length}</span>
             </div>
             <Wand2 size={13} className={styles.accentText} />
           </header>
@@ -419,6 +427,13 @@ export default function CaliberPage({ onToast }: CaliberPageProps) {
               <div className={`flex items-start gap-1 text-[9px] ${styles.muted}`}>
                 <ShieldAlert size={10} className="mt-0.5 shrink-0" />
                 <span>{t("ow.caliber.bind.policy")}</span>
+              </div>
+              {/* 无假真理：后端仅有 POST binding（提交即落库），无 GET 回读端点 ⇒
+                  本列表只可能是「本会话成功提交」的集合，已落库历史绑定不可见，
+                  计数徽章同此口径，必须显式声明（此前静默显示 0 条 = 假空态误导）。 */}
+              <div className={`flex items-start gap-1 text-[10px] ${styles.warningText}`}>
+                <Info size={10} className="mt-0.5 shrink-0" />
+                <span>{t("ow.caliber.bound.session_only")}</span>
               </div>
             </div>
 

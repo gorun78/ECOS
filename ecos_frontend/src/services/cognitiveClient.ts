@@ -135,8 +135,41 @@ export function isCognitiveApiError(e: unknown): e is CognitiveApiError {
 /**
  * 认知域唯一 fetch/auth 通道。导出仅为供 `services/cognitive/*` 拆分模块复用
  * （禁拆出模块自拼 Bearer 头 / 自起 fetch），组件面不应直接调用它。
+ *
+ * <p>S2 收口（复盘 2026-10-12）：本函数行为与既有契约完全一致（签名不变）；
+ * 实现委托 {@link callJsonInternal}，成功响应**不透出**响应头 traceId——
+ * 需要响应头溯源通道的调用方改用 {@link callJsonWithTrace}（同一条内部实现，
+ * 禁第二套 fetch/auth 拼接）。</p>
  */
 export async function callJson(url: string, init: RequestInit = {}): Promise<unknown> {
+  return callJsonInternal(url, init, undefined);
+}
+
+/**
+ * 与 {@link callJson} 同一内部实现，但把网关入口回写的响应头 traceId 透出给调用方。
+ *
+ * <p>实证通道（非臆造）：gateway `RequestContextFilter`（common-api
+ * `EcosTraceContext.HEADER_REQUEST_ID`）对**每个**响应 `setHeader("X-Request-Id", traceId)`；
+ * 而 workspace `ScenarioRunController` / `ForecastRunController` 出口走
+ * `ApiResponse.success(...)`，**未**调 `withTraceIdFromMdc()`，响应体 envelope 的
+ * `traceId` 为 null（NON_NULL 序列化即缺失）⇒ 成功态 traceId 唯一真实来源是响应头。
+ * 兼容性：同时探测历史口径 `X-Trace-Id`（callJson 错误路径既有引用），取到哪个算哪个。</p>
+ */
+export async function callJsonWithTrace(
+  url: string,
+  init: RequestInit = {},
+): Promise<{ data: unknown; traceId?: string }> {
+  const meta: { traceId?: string } = {};
+  const data = await callJsonInternal(url, init, meta);
+  return { data, traceId: meta.traceId };
+}
+
+/** callJson / callJsonWithTrace 共享内部实现（auth 单源 + 错误矩阵，逐字保持既有行为）。 */
+async function callJsonInternal(
+  url: string,
+  init: RequestInit,
+  meta: { traceId?: string } | undefined,
+): Promise<unknown> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const token = getAuthToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -154,10 +187,20 @@ export async function callJson(url: string, init: RequestInit = {}): Promise<unk
       message: e instanceof Error ? e.message : String(e),
     });
   }
+  if (meta) {
+    // 响应头溯源（仅显式要求 meta 的调用方可见；不改 callJson 对外行为）
+    const headerTrace = res.headers.get("X-Request-Id") ?? res.headers.get("X-Trace-Id") ?? undefined;
+    if (headerTrace) meta.traceId = headerTrace;
+  }
   const text = await res.text().catch(() => "");
   let body: unknown = null;
   if (text) {
     try { body = JSON.parse(text); } catch { /* 非 JSON 响应，保持 null */ }
+  }
+  if (meta && !meta.traceId && body && typeof body === "object") {
+    // envelope 兜底：后端若经 ApiResponse traceId 直通（复盘补充授权项）在响应体回填，同样采信
+    const envelopeTrace = (body as Record<string, unknown>).traceId;
+    if (typeof envelopeTrace === "string" && envelopeTrace !== "") meta.traceId = envelopeTrace;
   }
   const extract = (b: unknown): { msg: string; traceId?: string } => {
     if (b && typeof b === "object") {
@@ -450,13 +493,15 @@ export interface CognitiveAssetProposalInput {
   note?: string;
 }
 
-/** 提案响应（服务端单源字段；status 恒为 PENDING_APPROVAL，UI 不得本地合成其他值）。 */
+/** 提案响应（服务端单源字段；status 恒为 PENDING_APPROVAL，UI 不得本地合成其他值。
+ *  traceId = 服务端 propose() 审计追踪号，2026-10-12 按 CognitiveAssetLifecycleService L283 实核补入）。 */
 export interface CognitiveAssetProposalReceipt {
   proposalId?: string;
   assetId?: string;
   status?: string;
   carrier?: string;
   eventRef?: string;
+  traceId?: string;
 }
 
 /** 迁移请求体（§8.4 四要件；SUPERSEDED 时 reason 须含 `supersededBy=<引用>`，由后端校验）。 */

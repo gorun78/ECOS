@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { BarChart3, CpuIcon, ChevronDown, Activity, Shield, Database, Network, Brain, BookOpen, Sparkles, RefreshCw, CheckCircle2, XCircle, Loader2, AlertTriangle, Server, Settings } from "lucide-react";
+import { BarChart3, CpuIcon, ChevronDown, Activity, Shield, Database, Network, Brain, BookOpen, Sparkles, RefreshCw, CheckCircle2, XCircle, Loader2, AlertTriangle, Lock } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
 import BasicMonitoringTab from "./monitoring/tabs/BasicMonitoringTab";
@@ -9,47 +9,53 @@ import { useToast } from "../components/common/Toast";
 
 interface TabDef {
   id: string;
-  label: string;
-  labelZh: string;
+  labelKey: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
 const TABS: TabDef[] = [
-  { id: "metrics", label: "Metrics", labelZh: "基础指标", icon: BarChart3 },
-  { id: "engines", label: "Engines", labelZh: "引擎监控", icon: Activity },
-  { id: "twins", label: "Digital Twin", labelZh: "数字孪生", icon: CpuIcon },
+  { id: "metrics", labelKey: "dashboard.monitoring.tab.metrics", icon: BarChart3 },
+  { id: "engines", labelKey: "dashboard.monitoring.tab.engines", icon: Activity },
+  { id: "twins", labelKey: "dashboard.monitoring.tab.twins", icon: CpuIcon },
 ];
 
 interface EngineDef {
   id: string;
-  label: string;
-  labelZh: string;
+  labelKey: string;
   icon: React.ComponentType<{ className?: string }>;
   engine: "security" | "data" | "ontology" | "cognitive" | "knowledge" | "ai";
-  color: string;
   apiBase: string;
 }
 
 const ENGINES: EngineDef[] = [
-  { id: "eng-security",  label: "Security Engine",  labelZh: "安全引擎", icon: Shield,    engine: "security",  color: "text-emerald-500", apiBase: "/api/v1/engine/security" },
-  { id: "eng-data",      label: "Data Engine",      labelZh: "数据引擎", icon: Database,  engine: "data",      color: "text-blue-500",    apiBase: "/api/v1/engine/data" },
-  { id: "eng-ontology",  label: "Ontology Engine",  labelZh: "本体引擎", icon: Network,   engine: "ontology",  color: "text-purple-500",  apiBase: "/api/v1/engine/ontology" },
-  { id: "eng-cognitive", label: "Cognitive Engine", labelZh: "认知引擎", icon: Brain,     engine: "cognitive", color: "text-amber-500",   apiBase: "/api/v1/engine/cognitive" },
-  { id: "eng-knowledge", label: "Knowledge Engine", labelZh: "知识引擎", icon: BookOpen,  engine: "knowledge", color: "text-cyan-500",    apiBase: "/api/v1/engine/knowledge" },
-  { id: "eng-ai",        label: "AI Engine",        labelZh: "AI引擎",  icon: Sparkles,  engine: "ai",        color: "text-rose-500",    apiBase: "/api/v1/engine/ai" },
+  { id: "eng-security",  labelKey: "dashboard.monitoring.engine.security",  icon: Shield,   engine: "security",  apiBase: "/api/v1/engine/security" },
+  { id: "eng-data",      labelKey: "dashboard.monitoring.engine.data",      icon: Database, engine: "data",      apiBase: "/api/v1/engine/data" },
+  { id: "eng-ontology",  labelKey: "dashboard.monitoring.engine.ontology",  icon: Network,  engine: "ontology",  apiBase: "/api/v1/engine/ontology" },
+  { id: "eng-cognitive", labelKey: "dashboard.monitoring.engine.cognitive", icon: Brain,    engine: "cognitive", apiBase: "/api/v1/engine/cognitive" },
+  { id: "eng-knowledge", labelKey: "dashboard.monitoring.engine.knowledge", icon: BookOpen, engine: "knowledge", apiBase: "/api/v1/engine/knowledge" },
+  { id: "eng-ai",        labelKey: "dashboard.monitoring.engine.ai",        icon: Sparkles, engine: "ai",        apiBase: "/api/v1/engine/ai" },
 ];
 
 // 鉴权头单源定义见 services/auth.ts (H6-T1)
-import { authHeaders } from '../services/auth';
+import { authHeaders, clearAuthToken } from '../services/auth';
 
-async function apiFetch<T>(url: string, id?: string): Promise<T | null> {
+/**
+ * 请求结果分类：403(denied) / 网络不可达(offline) / 5xx 等 HTTP 错误(error) 不再同归 null→UNKNOWN。
+ */
+type FetchOutcome<T> =
+  | { kind: "ok"; data: T | null }
+  | { kind: "denied" }
+  | { kind: "offline" }
+  | { kind: "error"; status: number };
+
+async function apiFetch<T>(url: string, id?: string): Promise<FetchOutcome<T>> {
   try {
     const res = await fetch(url, { headers: authHeaders() });
     if (res.status === 401) {
-      // Login expired — force re-login (PMO-43 T4).
-      localStorage.removeItem("token");
+      // Login expired — force re-login (PMO-43 T4). auth 单源清理，禁手删单键。
+      clearAuthToken();
       window.location.hash = "#/login";
-      return null;
+      return { kind: "error", status: 401 };
     }
     if (res.status === 403) {
       // Permission denied on a valid session — never log out.
@@ -58,16 +64,16 @@ async function apiFetch<T>(url: string, id?: string): Promise<T | null> {
       // H-001: `id` is the owning card's identity — lets each EngineCard
       // filter out 403s raised by sibling cards (cross-card mis-report).
       window.dispatchEvent(new CustomEvent("ecos-403", { detail: { id, url, timestamp: Date.now() } }));
-      return null;
+      return { kind: "denied" };
     }
-    if (!res.ok) return null;
+    if (!res.ok) return { kind: "error", status: res.status };
     const ct = res.headers.get("content-type");
-    if (!ct || !ct.includes("application/json")) return null;
+    if (!ct || !ct.includes("application/json")) return { kind: "ok", data: null };
     const json = await res.json();
-    if (json && typeof json === "object" && json.data !== undefined && "data" in json) return json.data as T;
-    return json as T;
+    if (json && typeof json === "object" && json.data !== undefined && "data" in json) return { kind: "ok", data: json.data as T };
+    return { kind: "ok", data: json as T };
   } catch {
-    return null;
+    return { kind: "offline" };
   }
 }
 
@@ -85,6 +91,8 @@ interface StatusSummary {
   engine?: string;
 }
 
+type CardClassification = "up" | "down" | "denied" | "offline" | "error" | "unknown";
+
 interface EngineCardProps {
   def: EngineDef;
   isExpanded: boolean;
@@ -93,28 +101,21 @@ interface EngineCardProps {
 }
 
 function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
-  const { locale, t } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
   const { showToast } = useToast();
-  const [noPermission, setNoPermission] = useState(false);
-  const Icon = def.icon;
 
   const [health, setHealth] = useState<HealthSummary | null>(null);
   const [status, setStatus] = useState<StatusSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [classification, setClassification] = useState<CardClassification>("unknown");
+  const [errStatus, setErrStatus] = useState<number>(0);
 
   const load = useCallback(async () => {
     setLoading(true);
-    // 403 (no permission) — surface inline, never log the user out.
-    // H-001: scope the flag to THIS card's id so a sibling card's 403
-    // (which also fans out as an `ecos-403` CustomEvent) does NOT trigger
-    // this card's no-permission state + toast.
-    let saw403 = false;
     const on403 = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.id !== def.id) return; // ignore sibling cards' 403s
-      saw403 = true;
-      setNoPermission(true);
       showToast("error", t("common.noPermission"));
     };
     window.addEventListener("ecos-403", on403);
@@ -123,38 +124,73 @@ function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
       apiFetch<StatusSummary>(`${def.apiBase}/status`, def.id),
     ]);
     window.removeEventListener("ecos-403", on403);
-    if (h === null || s === null || saw403) {
-      // Either no-permission (403) or service failure (network/5xx).
-      // 403 shows a dedicated "无权限" card; network failure relies on
-      // the global NetworkErrorBanner plus an EMPTY inline state.
-      setNoPermission(saw403);
+
+    // 分类判定：denied > offline > error > ok(按状态值)
+    let cls: CardClassification;
+    if (h.kind === "denied" || s.kind === "denied") {
+      cls = "denied";
+    } else if (h.kind === "offline" && s.kind === "offline") {
+      cls = "offline";
+    } else if (h.kind === "error" || s.kind === "error") {
+      const errStatus = h.kind === "error" ? h.status : (s.kind === "error" ? s.status : 0);
+      cls = "error";
+      setErrStatus(errStatus);
+    } else {
+      const hs = (h.kind === "ok" ? h.data?.status : undefined) || (s.kind === "ok" ? s.data?.status : undefined) || "";
+      const up = hs.toUpperCase() === "UP" || hs.toUpperCase() === "OK" || hs.toUpperCase() === "HEALTHY" || hs.toUpperCase() === "RUNNING";
+      cls = h.kind === "ok" || s.kind === "ok" ? (up ? "up" : "down") : "unknown";
     }
-    setHealth(h);
-    setStatus(s);
+    setClassification(cls);
+    setHealth(h.kind === "ok" ? h.data : null);
+    setStatus(s.kind === "ok" ? s.data : null);
     setLoading(false);
   }, [def.id, def.apiBase, showToast, t]);
 
   useEffect(() => { load(); }, [load]);
 
-  const healthStatus = health?.status?.toUpperCase() || status?.status?.toUpperCase() || "UNKNOWN";
-  const isUp = healthStatus === "UP" || healthStatus === "OK" || healthStatus === "HEALTHY" || healthStatus === "RUNNING";
+  const healthStatus = (classification === "up"
+    ? (health?.status || status?.status || "UP")
+    : classification === "down"
+      ? (health?.status || status?.status || "DOWN")
+      : "").toUpperCase();
+
+  const classLabel: Record<CardClassification, string> = {
+    up: t("dashboard.monitoring.class.up"),
+    down: t("dashboard.monitoring.class.down"),
+    denied: t("dashboard.monitoring.class.denied"),
+    offline: t("dashboard.monitoring.class.offline"),
+    error: t("dashboard.monitoring.class.error", { status: errStatus }),
+    unknown: t("dashboard.monitoring.class.unknown"),
+  };
+
+  const Icon = def.icon;
 
   return (
     <div className={`rounded-xl border ${styles.cardBorder} ${styles.cardBg} overflow-hidden transition-all`}>
-      <button type="button" onClick={onToggle} className={`w-full flex items-center gap-3 px-4 py-3 transition-colors hover:opacity-90`}>
-        <Icon className={`w-5 h-5 ${def.color}`} />
-        <span className="flex-1 text-left font-semibold text-sm">{locale === "zh" ? def.labelZh : def.label}</span>
+      <button type="button" onClick={onToggle} className="w-full flex items-center gap-3 px-4 py-3 transition-colors hover:opacity-90">
+        <Icon className={`w-5 h-5 ${styles.accentText}`} />
+        <span className="flex-1 text-left font-semibold text-sm" style={{ color: "var(--cardText)" }}>{t(def.labelKey)}</span>
         {loading ? (
           <Loader2 className={`w-4 h-4 animate-spin ${styles.cardTextMuted}`} />
-        ) : isUp ? (
-          <span className="flex items-center gap-1 text-emerald-500">
+        ) : classification === "up" ? (
+          <span className={`flex items-center gap-1 ${styles.successText}`}>
             <CheckCircle2 className="w-4 h-4" />
             <span className="text-[10px] font-bold">{healthStatus}</span>
           </span>
+        ) : classification === "denied" ? (
+          <span className={`flex items-center gap-1 ${styles.warningText}`}>
+            <Lock className="w-4 h-4" />
+            <span className="text-[10px] font-bold">{classLabel[classification]}</span>
+          </span>
+        ) : classification === "unknown" ? (
+          <span className={`flex items-center gap-1 ${styles.cardTextMuted}`}>
+            <AlertTriangle className="w-4 h-4" />
+            <span className="text-[10px] font-bold">{classLabel[classification]}</span>
+          </span>
         ) : (
-          <span className="flex items-center gap-1 text-red-400">
+          <span className={`flex items-center gap-1 ${styles.dangerText}`}>
             <XCircle className="w-4 h-4" />
-            <span className="text-[10px] font-bold">{healthStatus}</span>
+            <span className="text-[10px] font-bold">{classification === "error" || classification === "offline" || classification === "down" ? classLabel[classification] : healthStatus}</span>
           </span>
         )}
         <ChevronDown className={`w-4 h-4 ${styles.cardTextMuted} transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
@@ -168,7 +204,15 @@ function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
               {t("platform.monitoring.cardRefresh")}
             </button>
           </div>
-          <EngineMonitor engine={def.engine} initialHealth={health} initialStatus={status} />
+          {classification === "denied" ? (
+            /* 403：呈现专门的无权限卡片，不再混入 UNKNOWN */
+            <div className={`flex items-center gap-2 px-4 py-6 text-xs ${styles.warningBg} ${styles.warningText}`}>
+              <Lock className="w-4 h-4 shrink-0" />
+              <span>{t("dashboard.monitoring.deniedCard")}</span>
+            </div>
+          ) : (
+            <EngineMonitor engine={def.engine} initialHealth={health} initialStatus={status} />
+          )}
         </div>
       )}
     </div>
@@ -176,13 +220,12 @@ function EngineCard({ def, isExpanded, onToggle, onRefresh }: EngineCardProps) {
 }
 
 export default function MonitoringCenter() {
-  const { locale, t } = useLanguage();
+  const { t } = useLanguage();
   const { styles } = useTheme();
   const [activeTab, setActiveTab] = useState(TABS[0].id);
-  const [expandedEngines, setExpandedEngines] = useState<Set<string>>(() => new Set(ENGINES.map(e => e.id)));
+  // 默认全部折叠：避免挂载即 6 卡 × (health+status) 并发风暴；展开由用户驱动
+  const [expandedEngines, setExpandedEngines] = useState<Set<string>>(() => new Set());
   const [refreshKey, setRefreshKey] = useState(0);
-
-  const tl = (zh: string, en: string) => locale === "zh" ? zh : en;
 
   const toggleEngine = (id: string) => {
     setExpandedEngines(prev => {
@@ -200,13 +243,13 @@ export default function MonitoringCenter() {
           const isActive = activeTab === tab.id;
           return (
             <button type="button" key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all border-b-2 -mb-px whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all border-b-2 -mb-px whitespace-nowrap cursor-pointer ${
                 isActive
-                  ? "border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20"
+                  ? `${styles.accentBorder} ${styles.accentText} ${styles.badgeBg}`
                   : `border-transparent ${styles.cardTextMuted} hover:opacity-80`
               }`}>
               <Icon className="w-3.5 h-3.5" />
-              <span>{tl(tab.labelZh, tab.label)}</span>
+              <span>{t(tab.labelKey)}</span>
             </button>
           );
         })}
@@ -221,7 +264,7 @@ export default function MonitoringCenter() {
                 {t("platform.monitoring.enginesHeader")}
               </div>
               <button type="button" onClick={() => setRefreshKey(k => k + 1)}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold ${styles.appBg} ${styles.cardTextMuted} ${styles.sidebarHoverBg} transition-colors`}>
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold ${styles.appBg} ${styles.cardTextMuted} ${styles.sidebarHoverBg} transition-colors cursor-pointer`}>
                 <RefreshCw className="w-3 h-3" />
                 {t("platform.monitoring.refreshAll")}
               </button>

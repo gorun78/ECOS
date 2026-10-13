@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
 import { fetchCatalogTables, type CatalogTable } from '../../../api';
+import { useLanguage } from '../../../components/LanguageContext';
+import { useTheme } from '../../../components/ThemeContext';
 import { inputClasses } from './helpers';
 
 // ── Table Select (from data catalog) ─────────────────────────
-export default function TableSelect({ value, onChange, styles, placeholder }: {
-  value: string; onChange: (v: string) => void; styles: any; placeholder?: string;
+export default function TableSelect({ value, onChange, placeholder }: {
+  value: string; onChange: (v: string) => void; placeholder?: string;
 }) {
+  const { t } = useLanguage();
+  const { styles } = useTheme();
   const [tables, setTables] = useState<CatalogTable[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
 
   useEffect(() => {
@@ -26,7 +30,7 @@ export default function TableSelect({ value, onChange, styles, placeholder }: {
         value={searchText || value}
         onChange={e => { setSearchText(e.target.value); if (!e.target.value) onChange(''); }}
         onFocus={() => setSearchText('')}
-        placeholder={placeholder || (loading ? '加载表列表...' : '输入表名或搜索...')}
+        placeholder={placeholder || t(loading ? 'sec.det.tableLoading' : 'sec.det.tableSearchPlaceholder')}
         className={inputClasses(styles)}
       />
       {searchText && filtered.length > 0 && (
@@ -35,7 +39,7 @@ export default function TableSelect({ value, onChange, styles, placeholder }: {
             <button type="button"
               key={t.catalogId}
               onClick={() => { onChange(t.resourceName); setSearchText(''); }}
-              className={`w-full text-left px-3 py-2 text-sm hover:${styles.sidebarHoverBg} ${styles.cardText} cursor-pointer`}
+              className={`w-full text-left px-3 py-2 text-sm ${styles.sidebarHoverBg} ${styles.cardText} cursor-pointer`}
             >
               <span className="font-medium">{t.resourceName}</span>
               <span className={`ml-2 text-xs ${styles.muted}`}>{t.resourceType}</span>

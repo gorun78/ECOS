@@ -1,9 +1,9 @@
 /**
  * SandboxE2E.test.tsx — PMO-60 v2.0 P3：沙盘画布 E2E 组件级集成测试 (vitest + jsdom)。
  *
- * 覆盖 P2a 沙盘画布最小链路（1 hub + 6 类资源 + 拖入 + 画布连通 + 乐观锁 409 + i18n 切换）：
- *   C1 默认布局空态：未选 scenarioId → 兜底文案；sc_1 → React Flow 画布 + 6 类资源徽标
- *   C2 拖入资源 + 连通：palette "DATASOURCE" → picker modal → 选真 ID ds_x → 节点 7→8 + 7 bind 边
+ * 覆盖 P2a 沙盘画布最小链路（hub + 真实资源拖入 + 画布连通 + 乐观锁 409 + i18n 切换）：
+ *   C1 默认布局空态：未选 scenarioId → 兜底文案；sc_1 → React Flow 画布 + 仅 1 hub + 空画布引导（不伪造占位资源）
+ *   C2 拖入资源 + 连通：palette "DATASOURCE" → picker modal → 选真 ID ds_x → 节点 1→2 + bind 边
  *   C3 保存乐观锁 409：第一次保存成功 v3，第二次 409 → 画布顶部 banner 显示 saveConflict (c=3)
  *   C4 i18n 切换：render 切 locale zh→en，画布 title "场景沙盘" → "Scenario Sandbox"
  *
@@ -85,7 +85,7 @@ beforeEach(() => {
   mockMinds.mockReset();
   mockAvailable.mockReset();
   mockSave.mockReset();
-  // 默认：未存档 + 无 mind → buildDefaultLayout（1 hub + 6 resource）
+  // 默认：未存档 + 无 mind → buildDefaultLayout（仅 1 hub，空画布引导，不伪造占位资源）
   mockLayout.mockResolvedValue(null);
   mockMinds.mockResolvedValue([]);
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -96,6 +96,27 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// ── 测试侧辅助：从 palette 拖入一个真实 DATASOURCE 资源 ──────────────────
+async function addDsResource(container: HTMLElement, id = 'ds_x') {
+  mockAvailable.mockResolvedValue([
+    { id, name: id.toUpperCase(), status: 'ok', childCount: 1 },
+  ]);
+  const dssrc = container.querySelector<HTMLButtonElement>('button[title="数据源"]');
+  expect(dssrc).toBeTruthy();
+  await act(async () => {
+    dssrc!.click();
+  });
+  await flush(120);
+  const pick = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+    (b) => (b.textContent ?? '').includes(id),
+  );
+  expect(pick).toBeTruthy();
+  await act(async () => {
+    pick!.click();
+  });
+  await flush(120);
+}
+
 // ── C1 默认布局空态 ─────────────────────────────────────────────────────
 describe('SandboxCanvas 默认布局 (PMO-60 P3 C1)', () => {
   it('C1 空 scenarioId → 兜底文案 "未选择场景"', async () => {
@@ -105,59 +126,41 @@ describe('SandboxCanvas 默认布局 (PMO-60 P3 C1)', () => {
     expect(screen.getByText('未选择场景')).toBeTruthy();
   });
 
-  it('C1 sc_1 → React Flow 画布 + 默认 7 节点（1 hub + 6 resource）', async () => {
+  it('C1 sc_1 → React Flow 画布 + 仅 1 hub 节点 + 空画布引导（不伪造占位资源）', async () => {
     const { container } = renderSandbox('sc_1');
     await flush(120);
 
     // React Flow 容器 .react-flow 出现
     expect(container.querySelector('.react-flow')).toBeTruthy();
-    // React Flow v12 节点容器 .react-flow__node 数量 = 7
-    expect(container.querySelectorAll('.react-flow__node').length).toBe(7);
-    // 1 个 hub：SdHubNode 渲染核心文案 张量分布（diagnose/forecast/simulate/policy 任其一处即可）
+    // 无存档 → 仅中央 hub 1 节点（旧断言的 6 个 *_PLACEHOLDER 假资源节点已按「无假真理」裁决移除）
     const nodes = Array.from(container.querySelectorAll('.react-flow__node'));
+    expect(nodes.length).toBe(1);
+    // 1 个 hub：SdHubNode 渲染核心文案
     const hub = nodes.find((n) => n.className.includes('hub'));
     expect(hub).toBeTruthy();
     expect((hub?.textContent ?? '').length).toBeGreaterThan(0);
-    // 6 个 resource 节点
-    const resources = nodes.filter((n) => n.className.includes('resource'));
-    expect(resources.length).toBe(6);
+    // 0 个 resource 占位节点
+    expect(container.querySelectorAll('.react-flow__node-resource').length).toBe(0);
+    // 空画布引导可见（t('scenario.sandbox.canvasGuide.title') zh）
+    expect((container.textContent ?? '')).toContain('画布还没有资源节点');
   });
 });
 
 // ── C2 拖入资源 + 连通 ─────────────────────────────────────────────────────
 describe('SandboxCanvas 拖入资源 + 连通 (PMO-60 P3 C2)', () => {
-  it('C2 点 DATASOURCE palette → picker modal → 选真 ID ds_x → 节点 7→8 + bind 边 ≥ 7', async () => {
-    mockAvailable.mockResolvedValue([
-      { id: 'ds_x', name: 'DS-X', status: 'ok', childCount: 1 },
-      { id: 'ds_y', name: 'DS-Y', status: 'ok', childCount: 0 },
-    ]);
+  it('C2 点 DATASOURCE palette → picker modal → 选真 ID ds_x → 节点 1→2 + ds_x 上屏', async () => {
     const { container } = renderSandbox('sc_1');
     await flush(120);
-    // 找到 DATASOURCE palette 按钮（title 文案 = "数据源"）
-    const dssrc = container.querySelector<HTMLButtonElement>('button[title="数据源"]');
-    expect(dssrc).toBeTruthy();
-    await act(async () => {
-      dssrc!.click();
-    });
-    await flush(120);
-    // picker modal 已渲染：列表含 ds_x
-    expect((container.textContent ?? '')).toContain('ds_x');
-    const pick = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
-      (b) => (b.textContent ?? '').includes('ds_x'),
-    );
-    expect(pick).toBeTruthy();
-    await act(async () => {
-      pick!.click();
-    });
-    await flush(120);
-    // 节点 7→8（默认 1 hub + 6 resource + 新拖入 1）
-    expect(container.querySelectorAll('.react-flow__node').length).toBe(8);
-    // 连通性：hub 与 data node 之间必有 bind 关系
-    // jsdom 无真实尺寸 → RF v12 的 onlyRenderVisibleElements 不渲染 SVG 边
-    // 改为从 edge ID pattern 验证（bind-{nodeId} 前缀在 DOM data attribute 或 store 内）
-    // 或：直接验证 text 里出现 ds_x（确认节点已添加）+ 默认 bind 边计数仍在（6 条 fallback）
+    expect(container.querySelectorAll('.react-flow__node').length).toBe(1);
+
+    // 找到 DATASOURCE palette 按钮（title 文案 = "数据源"）→ picker modal → 选 ds_x
+    await addDsResource(container, 'ds_x');
+
+    // picker modal 已渲染过：列表含 ds_x；节点 1→2（hub + 新拖入真实资源）
+    expect(container.querySelectorAll('.react-flow__node').length).toBe(2);
+    // 确认节点已添加（text 出现 ds_x）
     expect(container.textContent).toContain('ds_x');
-    // 删除按钮在 drawer 打开时出现（验证 drawer flow 正常）
+    // bind 边由 addResourceNode 自动建立（jsdom 无真实尺寸时 RF 不渲染 SVG 边，链路以 state 为准）
     expect(container.querySelectorAll('.react-flow__edge, [data-id^="bind-"]').length).toBeGreaterThanOrEqual(0);
   });
 });
@@ -180,13 +183,14 @@ describe('SandboxCanvas 保存乐观锁 409 (PMO-60 P3 C3)', () => {
     const { container } = renderSandbox('sc_1');
     await flush(120);
 
-    // 点击一个 resource node 打开 drawer（drawer 里"移除"按钮可触发 removeResourceNode → dirty=true）
-    // 默认布局 nodes = [hub, ...resources]，第一个是 hub，需跳过找 resource
-    const allNodes = Array.from(container.querySelectorAll('.react-flow__node'));
-    const firstResource = allNodes.find((n) => n.className.includes('resource')) as HTMLElement;
-    expect(firstResource).toBeTruthy();
+    // 拖入一个真实资源，再打开其 drawer 点「移除」→ dirty=true
+    await addDsResource(container, 'ds_x');
+    const resourceNode = Array.from(container.querySelectorAll('.react-flow__node')).find((n) =>
+      n.className.includes('resource'),
+    ) as HTMLElement;
+    expect(resourceNode).toBeTruthy();
     await act(async () => {
-      firstResource.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      resourceNode.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     });
     await flush(120);
     // drawer 已打开 → 找 "移除" 按钮
@@ -212,7 +216,8 @@ describe('SandboxCanvas 保存乐观锁 409 (PMO-60 P3 C3)', () => {
     await flush(120);
     expect(callCount).toBe(1);
 
-    // dirty=false 了 → 再开一个 node drawer，再移除，再 save
+    // dirty=false 了 → 再拖入一个资源、再移除、再 save → 409
+    await addDsResource(container, 'ds_y');
     const secondResource = Array.from(container.querySelectorAll('.react-flow__node')).find((n) =>
       n.className.includes('resource'),
     ) as HTMLElement;

@@ -12,7 +12,7 @@
  * 主题 §4.1：useTheme token（class）
  * i18n §4.3：0 硬编码中文（knowledge.profiles.*）
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   AlertTriangle, Building2, ChevronDown, ChevronRight, Loader2,
@@ -25,6 +25,13 @@ import type { KbProfileRow } from '../../../services/govern';
 
 interface BizError { code?: string; message: string }
 
+/**
+ * 任务轮询参数（检视报告行 206：与 EvalRunPanel 同类操作统一策略 —
+ * 3s 间隔 · ≤30 次，任务落库出现 DRAFT 行即停）。
+ */
+const POLL_INTERVAL_MS = 3000;
+const MAX_POLL_ATTEMPTS = 30;
+
 export default function ProfilesTab() {
   const { styles } = useTheme();
   const { t } = useLanguage();
@@ -36,6 +43,9 @@ export default function ProfilesTab() {
   const [windowTo, setWindowTo] = useState('');
   const [generating, setGenerating] = useState(false);
   const [lastTask, setLastTask] = useState<{ taskId: string; traceId?: string } | null>(null);
+  // 行 206：任务提交后的轮询状态（running → 发现新行/超时停止）
+  const [taskPolling, setTaskPolling] = useState(false);
+  const pollRef = useRef<number | null>(null);
 
   // ── 列表 ──
   const [rows, setRows] = useState<KbProfileRow[]>([]);
@@ -51,17 +61,55 @@ export default function ProfilesTab() {
       const list = await knowledgeApi.kbFetchProfiles({ page: 1, size: 20 });
       setRows(Array.isArray(list) ? list : []);
     } catch (e) {
-      if (e instanceof KbApiError && (e.status >= 500 || (e.code && e.code.startsWith('ECOS-KB-')))) {
+      // 检视报告行 206 订正：任何失败都是失败 —— 非 KbApiError（网络 / 解析）不再
+      // 伪装空态，统一置错误态（带 message）；KbApiError 另附 code。
+      if (e instanceof KbApiError) {
         setBizError({ code: e.code, message: e.message });
+      } else {
+        setBizError({ message: e instanceof Error ? e.message : String(e) });
       }
-      // 其余错误：空态
       setRows([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
+  /** 终止任务轮询（卸载 / 命中新行 / 超限时调用） */
+  const stopPolling = useCallback(() => {
+    if (pollRef.current != null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    setTaskPolling(false);
+  }, []);
+
   useEffect(() => { void loadProfiles(); }, [loadProfiles]);
+  useEffect(() => stopPolling, [stopPolling]);
+
+  /**
+   * 行 206 统一策略：提交生成任务后不再「提交即拉一次列表」，
+   * 而是按 EvalRunPanel 同款轮询（3s · ≤30 次）直到 DRAFT 行出现。
+   */
+  const startTaskPolling = useCallback((baselineCount: number) => {
+    stopPolling();
+    let attempts = 0;
+    setTaskPolling(true);
+    pollRef.current = window.setInterval(async () => {
+      attempts += 1;
+      if (attempts > MAX_POLL_ATTEMPTS) { stopPolling(); return; }
+      try {
+        const list = await knowledgeApi.kbFetchProfiles({ page: 1, size: 20 });
+        const arr = Array.isArray(list) ? list : [];
+        const hasDraft = arr.some((r) => (r.status || '').toUpperCase() === 'DRAFT');
+        if (arr.length > baselineCount || hasDraft) {
+          setRows(arr);
+          stopPolling();
+        }
+      } catch {
+        // 单次轮询失败不中断（与 EvalRunPanel 一致）；连续失败最终由超限停止
+      }
+    }, POLL_INTERVAL_MS);
+  }, [stopPolling]);
 
   const handleGenerate = useCallback(async () => {
     if (!metric.trim() || !windowFrom.trim() || !windowTo.trim()) return;
@@ -76,8 +124,8 @@ export default function ProfilesTab() {
         dryRun: false,
       });
       setLastTask({ taskId: resp.taskId, traceId: resp.traceId });
-      // 任务提交后刷新列表（DRAFT 行出现）
-      void loadProfiles();
+      // 任务提交后开始轮询列表（DRAFT 行出现即停）
+      startTaskPolling(rows.length);
     } catch (e) {
       if (e instanceof KbApiError) {
         // 503/ECOS-KB-021（runtime-task 不可用）→ 显式 taskId 缺失故障
@@ -88,7 +136,7 @@ export default function ProfilesTab() {
     } finally {
       setGenerating(false);
     }
-  }, [metric, dims, windowFrom, windowTo, loadProfiles]);
+  }, [metric, dims, windowFrom, windowTo, rows.length, startTaskPolling]);
 
   const handlePublish = useCallback(async (id: string) => {
     setBizError(null);
@@ -155,8 +203,7 @@ export default function ProfilesTab() {
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => void handleGenerate()}
                   disabled={generating || !metric.trim() || !windowFrom.trim() || !windowTo.trim()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-bold cursor-pointer disabled:opacity-50"
-                  style={{ background: styles.accentBg, color: 'rgba(255,255,255,0.95)' }}>
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-bold cursor-pointer disabled:opacity-50 ${styles.accentBg} ${styles.accentSolidText}`}>
             {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
             {t('knowledge.profiles.submit_task')}
           </button>
@@ -164,6 +211,12 @@ export default function ProfilesTab() {
             <span className="text-[10px] font-mono" style={{ color: styles.muted }}>
               {t('knowledge.profiles.task_submitted')} {lastTask.taskId}
               {lastTask.traceId ? ` · ${lastTask.traceId}` : ''}
+            </span>
+          )}
+          {taskPolling && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-mono" style={{ color: styles.infoText }}>
+              <Loader2 className="w-3 h-3 animate-spin" />
+              {t('knowledge.profiles.task_polling')}
             </span>
           )}
         </div>
@@ -308,13 +361,22 @@ function ChainNode({ label, highlight = false }: { label: string; highlight?: bo
 }
 
 function StatusChip({ status }: { status: string }) {
+  // 检视报告行 192：原 emerald/blue/slate/amber 裸色板类 → 语义 token；
+  // 原 enum 原文直排 → i18n 标签（未知状态回落原文，不编造译名）
+  const { styles } = useTheme();
+  const { t } = useLanguage();
   const up = status.toUpperCase();
-  const cls =
-    up === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-    : up === 'DRAFT' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-    : up === 'DEPRECATED' ? 'bg-slate-100 text-slate-500 dark:bg-slate-800/40 dark:text-slate-400'
-    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
-  return <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${cls}`}>{status}</span>;
+  const chip =
+    up === 'PUBLISHED' ? `${styles.successBg} ${styles.successText}`
+    : up === 'DRAFT' ? `${styles.infoBg} ${styles.infoText}`
+    : up === 'DEPRECATED' ? `${styles.badgeBg} ${styles.badgeText}`
+    : `${styles.warningBg} ${styles.warningText}`;
+  const label =
+    up === 'PUBLISHED' ? t('knowledge.profiles.status_published')
+    : up === 'DRAFT' ? t('knowledge.profiles.status_draft')
+    : up === 'DEPRECATED' ? t('knowledge.profiles.status_deprecated')
+    : status;
+  return <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold ${chip}`}>{label}</span>;
 }
 
 function fmtDims(dims?: Record<string, unknown>): string {

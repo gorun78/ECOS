@@ -180,18 +180,13 @@ export default function AuditFeedCard() {
                   key={f.fileId}
                   type="button"
                   onClick={() => { setActiveFileId(f.fileId); setActiveStep(2); }}
-                  className="w-full text-left px-2.5 py-1.5 border-b flex items-center gap-1.5 text-[10px] hover:opacity-80 transition cursor-pointer"
-                  style={{
-                    borderColor: styles.cardBorder,
-                    background: activeFileId === f.fileId ? styles.accentBg : 'transparent',
-                    color: activeFileId === f.fileId ? 'rgba(255,255,255,0.95)' : styles.cardText,
-                  }}
+                  className={`w-full text-left px-2.5 py-1.5 border-b flex items-center gap-1.5 text-[10px] hover:opacity-80 transition cursor-pointer ${styles.cardBorder} ${
+                    activeFileId === f.fileId ? `${styles.accentBg} ${styles.accentSolidText}` : styles.cardText
+                  }`}
                 >
                   <FileText className="w-3 h-3 shrink-0" />
                   <span className="truncate flex-1">{f.fileName}</span>
-                  <span className="text-[9px] font-mono shrink-0" style={{
-                    color: activeFileId === f.fileId ? 'rgba(255,255,255,0.8)' : styles.muted,
-                  }}>{f.candidateCount}</span>
+                  <span className="text-[9px] font-mono shrink-0 opacity-80">{f.candidateCount}</span>
                 </button>
               ))
             )}
@@ -287,16 +282,12 @@ export default function AuditFeedCard() {
               const isDone = i < activeStep;
               return (
                 <div key={step.key}
-                     className="flex items-center gap-2 px-2 py-1.5 rounded border text-[10px] font-bold"
-                     style={{
-                       borderColor: styles.cardBorder,
-                       background: isActive ? styles.accentBg : (isDone ? styles.successBg : 'transparent'),
-                       color: isActive ? 'rgba(255,255,255,0.95)' : (isDone ? styles.successText : styles.cardTextMuted),
-                       opacity: isDone ? 0.7 : 1,
-                     }}>
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{
-                    background: isActive ? 'rgba(255,255,255,0.9)' : (isDone ? styles.successText : styles.muted),
-                  }} />
+                     className={`flex items-center gap-2 px-2 py-1.5 rounded border text-[10px] font-bold ${styles.cardBorder} ${
+                       isActive ? `${styles.accentBg} ${styles.accentSolidText}`
+                       : isDone ? `${styles.successBg} ${styles.successText} opacity-70`
+                       : styles.cardTextMuted
+                     }`}>
+                  <span className={`w-2 h-2 rounded-full shrink-0 bg-current ${isDone || isActive ? 'opacity-90' : 'opacity-60'}`} />
                   <span className="truncate flex-1">{t(step.key)}</span>
                   {isDone && <CheckCircle2 className="w-3 h-3 shrink-0" />}
                 </div>

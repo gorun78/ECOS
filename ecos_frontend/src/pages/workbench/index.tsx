@@ -3,7 +3,9 @@
  *
  * <p>首屏只暴露业务语义（场景卡片 / 快捷入口 / 高级视图折叠区），
  * 不出现 Mind / Goal Tree / Causal 等技术概念或后端原始字段名。
- * 六态（§3.3）：空 / 加载 / 错误 / 边界 / 权限 / 离线 全覆盖。
+ * 六态（§3.3）实装口径：加载（spinner）/ 错误+重试（含权限失败的后端
+ * message 直排，未单拆 403 分支）/ 空与边界（无场景 → 引导空态）/
+ * 离线（加载失败且 navigator.onLine=false 时横幅）。
  * 颜色全部走 useTheme 语义 token，文案全部走 t('workspace.*')。</p>
  */
 import React, { useEffect, useState } from 'react';
@@ -24,8 +26,7 @@ interface ScenarioSummaryVO {
   status?: string;
 }
 
-/** 快捷入口配置（iconKey + i18n key + 目标） */
-type Entry = { icon: string; labelKey: string; to: string; accent: (s: ThemeStyles) => string };
+/** 快捷入口条目（to 为已解析真实目标；无真实目标的入口不构造，见 quickEntries 注释） */
 
 export default function WorkbenchHome() {
   const { styles } = useTheme();
@@ -59,12 +60,21 @@ export default function WorkbenchHome() {
     void load();
   }, []);
 
-  const quickEntries: Entry[] = [
-    { icon: 'Plus', labelKey: 'workspace.l1.entry.new_scenario', to: '/project_workbench', accent: (s) => s.accentText },
-    { icon: 'ShieldCheck', labelKey: 'workspace.l1.entry.pending', to: '/project_workbench', accent: (s) => s.warningText },
-    { icon: 'TrendingUp', labelKey: 'workspace.l1.entry.forecast', to: '/workbench', accent: (s) => s.infoText },
-    { icon: 'GitBranch', labelKey: 'workspace.l1.entry.versions', to: '/project_workbench', accent: (s) => s.successText },
-  ];
+  // 快捷入口真实目标（2026-10-13 前端检视报告 §4.6 行253 订正）：
+  // - 「新建场景」：创建向导实存于高级视图（ScenarioManagementView 挂 ScenarioEditor），保留 /project_workbench；
+  // - 「待我决策」「预测与推演」：目标页需 scenarioId ⇒ 取场景列表首项（最近场景）直达，无场景时不渲染（禁自环）；
+  // - 「版本历史」：无独立真实路由/端点可指 ⇒ 已摘除（蓝图版本在 L2 内呈现，不在 L1 造入口）。
+  const first = scenarios[0];
+  type ResolvedEntry = { icon: string; labelKey: string; to: string; accent: (s: ThemeStyles) => string };
+  const quickEntries: ResolvedEntry[] = [
+    { icon: 'Plus', labelKey: 'workspace.l1.entry.new_scenario', to: '/project_workbench', accent: (s: ThemeStyles) => s.accentText },
+    first
+      ? { icon: 'ShieldCheck', labelKey: 'workspace.l1.entry.pending', to: `/workbench/${first.id}/decisions`, accent: (s: ThemeStyles) => s.warningText }
+      : null,
+    first
+      ? { icon: 'TrendingUp', labelKey: 'workspace.l1.entry.forecast', to: `/workbench/${first.id}/forecast`, accent: (s: ThemeStyles) => s.infoText }
+      : null,
+  ].filter((e): e is ResolvedEntry => e !== null);
 
   return (
     <div className={`flex-1 flex flex-col overflow-y-auto ${styles.appBg} ${styles.appText}`}>
@@ -151,9 +161,12 @@ export default function WorkbenchHome() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <h3 className={`text-sm font-bold ${styles.cardText} leading-snug`}>{s.name}</h3>
-                  <span className={`text-[10px] border px-1.5 py-0.5 rounded font-mono shrink-0 ${styles.accentText} ${styles.accentBorder} ${styles.badgeBg}`}>
-                    {s.status ?? 'DRAFT'}
-                  </span>
+                  {/* 行275 订正：status 缺字段不再兜底成 'DRAFT' 真实徽章（禁假状态），缺省即不渲染 */}
+                  {s.status ? (
+                    <span className={`text-[10px] border px-1.5 py-0.5 rounded font-mono shrink-0 ${styles.accentText} ${styles.accentBorder} ${styles.badgeBg}`}>
+                      {s.status}
+                    </span>
+                  ) : null}
                 </div>
                 <p className={`text-xs ${styles.cardTextMuted} line-clamp-2`}>{s.businessGoal || s.description || '—'}</p>
                 <div className="flex items-center gap-3 text-[11px] font-mono">

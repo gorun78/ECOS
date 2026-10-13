@@ -163,6 +163,53 @@ interface ApiResponse<T> {
   message?: string;
   data?: T;
   timestamp?: number;
+  /** 后端卷 00 口径：追踪号，成功/失败均可能为 null */
+  traceId?: string | null;
+}
+
+/**
+ * Glossary API 错误 — 在标准 Error 之外透出追踪号与 HTTP 状态。
+ *
+ * <p>检视报告 §4.3 行161 要求「加载失败 = 独立错误态 + 重试 + traceId」，而页面拿不到
+ * 响应头就无法定位后端日志，故传输层必须把 traceId 随异常一起抛出。message 文案口径与
+ * 旧实现完全一致（后端 message 优先），既有调用方只读 e.message，零行为变化。</p>
+ */
+export class GlossaryApiError extends Error {
+  /** 追踪号（响应头 X-Request-Id / X-Trace-Id，兜底响应体 traceId） */
+  readonly traceId?: string;
+  /** HTTP 状态码（网络异常时缺失） */
+  readonly httpStatus?: number;
+
+  constructor(message: string, init?: { traceId?: string; httpStatus?: number }) {
+    super(message);
+    this.name = "GlossaryApiError";
+    this.traceId = init?.traceId;
+    this.httpStatus = init?.httpStatus;
+  }
+}
+
+/** 追踪号提取口径与 services/cognitiveClient.ts 一致：响应头优先，其次响应体 traceId */
+function pickTraceId(res: Response, body: ApiResponse<unknown> | null): string | undefined {
+  const header =
+    res.headers.get("X-Request-Id") ??
+    res.headers.get("X-Trace-Id") ??
+    res.headers.get("X-ECOS-Trace-Id");
+  if (header) {
+    return header;
+  }
+  const envelope = body?.traceId;
+  return typeof envelope === "string" && envelope !== "" ? envelope : undefined;
+}
+
+/**
+ * 页面侧取错误摘要（文案 + 追踪号）的唯一口径，避免各面板重复 instanceof 判定。
+ * 非 GlossaryApiError（如 TypeError 网络异常）时 traceId 为 undefined，界面不补假值。
+ */
+export function readGlossaryError(e: unknown): { message: string; traceId?: string } {
+  const message = e instanceof Error ? e.message : String(e);
+  return e instanceof GlossaryApiError
+    ? { message, traceId: e.traceId }
+    : { message };
 }
 
 /**
@@ -185,11 +232,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     body = null;
   }
 
+  const traceId = pickTraceId(res, body);
+
   if (body && typeof body.code === "number" && body.code !== 0) {
-    throw new Error(body.message || `API error code=${body.code}`);
+    throw new GlossaryApiError(body.message || `API error code=${body.code}`, {
+      traceId,
+      httpStatus: res.status,
+    });
   }
   if (!res.ok) {
-    throw new Error(body?.message || `Glossary API ${path} returned HTTP ${res.status}`);
+    throw new GlossaryApiError(
+      body?.message || `Glossary API ${path} returned HTTP ${res.status}`,
+      { traceId, httpStatus: res.status },
+    );
   }
 
   return body?.data as T;

@@ -16,7 +16,12 @@ import { PALETTE_ITEMS, TYPE_META_MAP, TYPE_NAV_MAP, type TypeMeta } from "../na
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
-  onNavigate: (viewId: string) => void;
+  /**
+   * viewId = 分类页路由根；focusId = 命中的对象 id（报告 §4.1 P1 行64：旧实现
+   * 命中项只跳分类页、从不传 hit.id → 搜索永远无法定位对象）。App 侧把 focusId
+   * 拼为 `?focus=<id>` 查询参数，目标页据此消费定位；无 id 时保持旧跳转形态。
+   */
+  onNavigate: (viewId: string, focusId?: string) => void;
 }
 
 const FALLBACK_META: TypeMeta = {
@@ -47,8 +52,19 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // 键盘导航（报告 §4.1 P1 行64：旧实现无 ↑/↓/Enter 选择）——高亮/激活项索引，
+  // 列表 = 命中结果（有结果时）或过滤后的静态导航项（无结果时），与渲染顺序一致。
+  const [activeIdx, setActiveIdx] = useState(0);
   const { t } = useLanguage();
   const { styles } = useTheme();
+
+  useEffect(() => { setActiveIdx(0); }, [search, hits.length, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const el = document.querySelector(`[data-palette-idx="${activeIdx}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [activeIdx, isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -59,13 +75,12 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
     }
   }, [isOpen]);
 
+  // Ctrl+K toggle 单源在 App.tsx（报告 §4.1 P2 行66：旧实现在此重复监听同一
+  // 键位，双 handler 竞争 open/close）。这里只保留面板内 Escape 关闭。
   useEffect(() => {
+    if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        if (isOpen) onClose();
-      }
-      if (e.key === "Escape" && isOpen) onClose();
+      if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -93,7 +108,9 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
 
   const navHit = (hit: SearchHit) => {
     const viewId = TYPE_NAV_MAP[hit.type] || hit.type?.toLowerCase() || "";
-    if (viewId) { onNavigate(viewId); onClose(); }
+    // 深链定位（报告 §4.1 P1 行64）：命中对象 id 随导航一并透传，App 侧拼
+    // ?focus=<id>；旧实现只跳分类页，搜索结果永远无法定位到具体对象。
+    if (viewId) { onNavigate(viewId, hit.id); onClose(); }
   };
 
   if (!isOpen) return null;
@@ -115,8 +132,37 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
   const hasResults = hits.length > 0;
   const hasStatic = filteredStatic.length > 0;
 
+  // ── 键盘导航条目（与渲染顺序一致）：有搜索结果 → 结果列表；否则 → 静态项 ──
+  type PaletteEntry = { kind: "hit"; hit: SearchHit } | { kind: "static"; id: string };
+  const entries: PaletteEntry[] = hasResults
+    ? hits.map((hit) => ({ kind: "hit" as const, hit }))
+    : filteredStatic.map((item) => ({ kind: "static" as const, id: item.id }));
+  const staticIdxById = new Map<string, number>();
+  entries.forEach((entry, i) => {
+    if (entry.kind === "static") staticIdxById.set(entry.id, i);
+  });
+
+  const activateEntry = (entry: PaletteEntry | undefined): void => {
+    if (!entry) return;
+    if (entry.kind === "hit") navHit(entry.hit);
+    else { onNavigate(entry.id); onClose(); }
+  };
+
+  const onInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (entries.length > 0) setActiveIdx((i) => Math.min(i + 1, entries.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (entries.length > 0) setActiveIdx((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (!loading) activateEntry(entries[activeIdx] ?? entries[0]);
+    }
+  };
+
   return (
-    <div className={`fixed inset-0 z-50 flex items-start justify-center pt-24 ${styles.overlayBg} backdrop-blur-xs`}>
+    <div className={`fixed inset-0 z-50 flex items-start justify-center pt-24 select-none ${styles.overlayBg} backdrop-blur-xs`}>
       <div className={`w-full max-w-2xl overflow-hidden ${styles.cardBg} border ${styles.cardBorder} rounded-xl shadow-2xl animate-fade-in-down ${styles.cardText} font-sans`}>
 
         {/* Search header */}
@@ -130,6 +176,10 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
             autoFocus
             value={search}
             onChange={(e) => onInput(e.target.value)}
+            onKeyDown={onInputKeyDown}
+            role="combobox"
+            aria-expanded={entries.length > 0}
+            aria-label={t("palette.placeholder")}
           />
           <span className={`px-2 py-0.5 text-[10px] font-mono ${styles.cardTextMuted} ${styles.cardBg} rounded border ${styles.cardBorder}`}>ESC</span>
         </div>
@@ -159,7 +209,9 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
                 const IconC = meta.icon;
                 return (
                   <button key={`h-${i}`} type="button" onClick={() => navHit(hit)}
-                    className={`w-full text-left flex items-start p-2.5 rounded-lg ${styles.sidebarHoverBg} group transition cursor-pointer`}>
+                    data-palette-idx={i}
+                    aria-selected={i === activeIdx}
+                    className={`w-full text-left flex items-start p-2.5 rounded-lg group transition cursor-pointer ${i === activeIdx ? `${styles.sidebarHoverBg} ${styles.accentBorder} border` : `${styles.sidebarHoverBg} border border-transparent`}`}>
                     <div className={`p-2 mr-3 ${styles.badgeBg} border ${styles.accentBorder} rounded-md`}>
                       <IconC className={`w-4 h-4 ${styles.accentText}`} />
                     </div>
@@ -188,9 +240,12 @@ function CommandPaletteInner({ isOpen, onClose, onNavigate }: CommandPaletteProp
                     </div>
                     {catItems.map((item) => {
                       const IconC = item.icon;
+                      const idx = staticIdxById.get(item.id) ?? -1;
                       return (
                         <button key={item.id} type="button" onClick={() => { onNavigate(item.id); onClose(); }}
-                          className={`w-full text-left flex items-start p-2.5 rounded-lg ${styles.sidebarHoverBg} group transition cursor-pointer`}>
+                          data-palette-idx={idx}
+                          aria-selected={idx === activeIdx}
+                          className={`w-full text-left flex items-start p-2.5 rounded-lg ${styles.sidebarHoverBg} group transition cursor-pointer ${idx === activeIdx ? `${styles.accentBorder} border` : "border border-transparent"}`}>
                           <div className={`p-2 mr-3 ${styles.appBg} border ${styles.cardBorder} rounded-md`}>
                             <IconC className={`w-4 h-4 ${styles.cardTextMuted}`} />
                           </div>

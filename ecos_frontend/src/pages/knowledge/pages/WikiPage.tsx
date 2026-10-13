@@ -156,6 +156,11 @@ export default function WikiPage() {
   const [relatedRefs, setRelatedRefs] = useState<string[]>([]);
   const [graphRelations, setGraphRelations] = useState<Array<{ from: string; verb: string; to: string }>>([]);
 
+  // 检视报告行 191：kb:wiki:upload:done 全库零监听（列表不刷新）——
+  //   上传成功后改为直接重拉已加载 space；ref 用于在回调里读最新已加载集合。
+  const spaceStatusRef = useRef<Record<string, SpaceDocs>>({});
+  spaceStatusRef.current = spaceStatus;
+
   // 缓存所有 space 的并发拉取
   const loadSpace = useCallback(async (space: typeof WIKI_SPACES[number]) => {
     setSpaceStatus((prev) => ({ ...prev, [space.id]: { loading: true, docs: prev[space.id]?.docs || [] } }));
@@ -184,26 +189,27 @@ export default function WikiPage() {
           // 相关知识：取 category 字段（最多 3 个）
           const category = (item.category || '').split(/[,，;；]/).map((s) => s.trim()).filter(Boolean);
           const related = category.slice(0, 3);
-          // 图谱关系种子（确定性占位，后端后续可替换）— 1 条
-          const relations = [
-            { from: t('knowledge.wiki.relation_seed_from', { name: (item.title || '').slice(0, 12) }), verb: t('knowledge.wiki.relation_verb'), to: t('knowledge.wiki.relation_seed_to') },
-          ];
-          // 原始 content：未持久化 md 正文（需要拉 article detail P3）；本地兜底占位
-          const contentPreview =
-            `# ${item.title}\n\n${t('knowledge.wiki.preview_body_demo', { title: item.title })}\n\n` +
-            (matchedTags.length > 0 ? `${matchedTags.join(' ')}\n\n` : '') +
-            (item.updatedAt ? `${t('knowledge.wiki.preview_body_updated')}: ${item.updatedAt}` : '');
+          // 检视报告行 180 订正（P0 假真理）：
+          //   - 图谱关系不再本地 seed 假三元组 —— kb 侧无「按文章查局部图」端点，
+          //     有真实数据才渲染，否则右栏显示「图谱上下文暂不可用」（无则不装）。
+          const graphRelations: Array<{ from: string; verb: string; to: string }> = [];
+          //   - md 正文：NavProductItemVO 无 body/content 字段，且前端服务层无
+          //     article detail 端点 → 不再本地拼装 preview_body_demo 假正文；
+          //     中栏渲染「内容不可用」提示（有真实正文字段时才渲染 markdown）。
+          const content = (item as { content?: string; summary?: string }).content
+            || (item as { summary?: string }).summary;
           return {
             id: item.id,
             title: item.title,
             status,
             updatedAt: item.updatedAt,
             version,
-            author: (item as { updatedBy?: string }).updatedBy || (item.source || '-'),
-            content: contentPreview,
+            // 检视报告行 205：author 不再回落到 source（来源串≠作者）；缺则显示占位
+            author: (item as { updatedBy?: string }).updatedBy,
+            content,
             semanticEntities,
             related,
-            graphRelations: relations,
+            graphRelations,
           };
         });
       setSpaceStatus((prev) => ({ ...prev, [space.id]: { loading: false, docs } }));
@@ -256,8 +262,11 @@ export default function WikiPage() {
       await knowledgeApi.uploadDocumentChunked(file, onProgress);
       setIsUploading(1); // 100%
       setUploadError(null);
-      // 触发 .md 内容识别
-      window.dispatchEvent(new CustomEvent('kb:wiki:upload:done', { detail: { filename: file.name } } as CustomEvent));
+      // 检视报告行 191：原 `kb:wiki:upload:done` 事件全库零监听（列表永不刷新，
+      // 用户被迫反复重传）→ 上传成功后直接重拉所有已加载 space。
+      for (const space of WIKI_SPACES) {
+        if (spaceStatusRef.current[space.id]) void loadSpace(space);
+      }
       window.setTimeout(() => { setUploadFileName(''); setIsUploading(0); }, 1500);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -265,7 +274,7 @@ export default function WikiPage() {
       setIsUploading(0);
       setUploadFileName('');
     }
-  }, [t]);
+  }, [t, loadSpace]);
 
   const triggerFilePick = () => { fileInputRef.current?.click(); };
 
@@ -338,11 +347,11 @@ export default function WikiPage() {
           </div>
         )}
 
-        {/* 三栏 — 220px / 1fr / 280px（PRD F6） */}
-        <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_280px] gap-0 divide-x divide-slate-200"
-             style={{ borderColor: styles.cardBorder }}>
+        {/* 三栏 — 220px / 1fr / 280px（PRD F6）
+            检视报告行 205：`divide-slate-200` 裸色板类移除，列分隔走主题 cardBorder token */}
+        <div className="grid grid-cols-1 md:grid-cols-[220px_1fr_280px] gap-0">
           {/* ───── 左栏 · 知识空间 tree ───── */}
-          <div className="p-3 overflow-y-auto max-h-[64vh] min-h-80">
+          <div className={`p-3 overflow-y-auto max-h-[64vh] min-h-80 border-b ${styles.cardBorder} md:border-b-0 md:border-r`}>
             <div className="text-[10px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5"
                  style={{ color: styles.cardTextMuted }}>
               <FolderTree className="w-3 h-3" />
@@ -380,7 +389,14 @@ export default function WikiPage() {
                     </button>
                     {isExpanded && (
                       <div className="ml-4 pl-2 border-l space-y-0.5 py-1" style={{ borderColor: styles.inputBorder }}>
-                        {st?.docs.length === 0 && (
+                        {/* 检视报告行 205：loading 与「暂无数据」不再同屏 —— 加载中只显示 spinner，
+                            拉完（!loading）才区分 故障态 / 真空态 */}
+                        {st?.docs.length === 0 && st?.loading && (
+                          <div className="px-2 py-1 text-[10px] flex items-center gap-1.5" style={{ color: styles.muted }}>
+                            <Loader2 className="w-3 h-3 animate-spin" />{t('knowledge.wiki.space_loading')}
+                          </div>
+                        )}
+                        {st?.docs.length === 0 && !st?.loading && (
                           st?.errorCode ? (
                             /* F04-03 显式故障态：KbApiError（5xx / ECOS-KB-050 nav 表缺失）
                                —— 禁止用「暂无数据」空态替代（PRD B.5 wiki） */
@@ -393,8 +409,16 @@ export default function WikiPage() {
                               </div>
                             </div>
                           ) : (
-                            <div className="px-2 py-1 text-[10px]" style={{ color: styles.muted }}>
-                              {st?.error ? t('knowledge.wiki.space_load_error') : t('knowledge.wiki.space_empty')}
+                            <div className="px-2 py-1 text-[10px] space-y-1" style={{ color: styles.muted }}>
+                              {st?.error ? (
+                                <div>
+                                  <span>{t('knowledge.wiki.space_load_error')}</span>
+                                  <button type="button" onClick={() => void loadSpace(space)}
+                                          className="ml-1.5 underline font-bold cursor-pointer">
+                                    {t('knowledge.common.retry')}
+                                  </button>
+                                </div>
+                              ) : t('knowledge.wiki.space_empty')}
                             </div>
                           )
                         )}
@@ -403,18 +427,16 @@ export default function WikiPage() {
                             key={d.id}
                             type="button"
                             onClick={() => setSelectedDocId(d.id)}
-                            className="w-full text-left px-2 py-1 rounded flex items-center gap-1.5 text-[10px] transition hover:opacity-80"
-                            style={{
-                              background: selectedDocId === d.id ? styles.accentBg : 'transparent',
-                              color: selectedDocId === d.id ? 'rgba(255,255,255,0.92)' : styles.cardTextMuted,
-                            }}
+                            className={`w-full text-left px-2 py-1 rounded flex items-center gap-1.5 text-[10px] transition hover:opacity-80 ${
+                              selectedDocId === d.id
+                                ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText}`
+                                : styles.cardTextMuted
+                            }`}
                             title={d.title}
                           >
                             <FileText className="w-3 h-3 shrink-0" />
                             <span className="truncate flex-1">{d.title}</span>
-                            <span className="text-[9px] font-mono shrink-0 ml-1" style={{
-                              color: selectedDocId === d.id ? 'rgba(255,255,255,0.85)' : styles.muted,
-                            }}>{d.version}</span>
+                            <span className="text-[9px] font-mono shrink-0 ml-1 opacity-70">{d.version}</span>
                           </button>
                         ))}
                       </div>
@@ -426,7 +448,7 @@ export default function WikiPage() {
           </div>
 
           {/* ───── 中栏 · md 预览（read-only） ───── */}
-          <div className="min-w-0 flex flex-col overflow-hidden">
+          <div className={`min-w-0 flex flex-col overflow-hidden md:border-l ${styles.cardBorder}`}>
             <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: styles.cardBorder }}>
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-sm font-bold truncate" style={{ color: styles.cardText }}>
@@ -454,14 +476,24 @@ export default function WikiPage() {
                     <p>{t('knowledge.wiki.center_preview_placeholder')}</p>
                   </div>
                 </div>
-              ) : (
+              ) : previewText ? (
                 renderMarkdownLite(previewText, styles)
+              ) : (
+                /* 检视报告行 180（P0）：不再本地拼装假正文；nav 产物接口无正文字段，
+                   诚实显示「内容不可用」，禁止伪装成真实文档 */
+                <div className="h-full flex items-center justify-center text-xs" style={{ color: styles.muted }}>
+                  <div className="text-center space-y-1.5 max-w-sm">
+                    <AlertTriangle className="w-6 h-6 mx-auto opacity-40" />
+                    <p className="font-bold">{t('knowledge.wiki.content_unavailable')}</p>
+                    <p className="text-[10px]">{t('knowledge.wiki.content_unavailable_hint')}</p>
+                  </div>
+                </div>
               )}
             </div>
           </div>
 
           {/* ───── 右栏 · Knowledge Context ───── */}
-          <div className="overflow-y-auto max-h-[64vh] min-h-80" style={{ background: styles.sidebarBg }}>
+          <div className={`overflow-y-auto max-h-[64vh] min-h-80 md:border-l ${styles.cardBorder}`} style={{ background: styles.sidebarBg }}>
             <div className="px-3 py-2 border-b text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5"
                  style={{ borderColor: styles.cardBorder, color: styles.cardTextMuted }}>
               <ListChecks className="w-3 h-3" />
@@ -515,7 +547,9 @@ export default function WikiPage() {
                 {t('knowledge.wiki.graph_relations')}
               </span>
               {graphRelations.length === 0 ? (
-                <p className="text-[10px]" style={{ color: styles.muted }}>{t('knowledge.wiki.no_graph_relations')}</p>
+                /* 检视报告行 180：原右栏「图谱关系」为本地 seed 假三元组，已删；
+                   无真实端点数据时诚实标注不可用，不编造关系 */
+                <p className="text-[10px]" style={{ color: styles.muted }}>{t('knowledge.wiki.graph_relations_unavailable')}</p>
               ) : (
                 <div className="space-y-1">
                   {graphRelations.slice(0, 3).map((rel, i) => (
@@ -539,8 +573,7 @@ export default function WikiPage() {
                 <button
                   type="button"
                   onClick={() => { window.location.hash = `#/knowledge_view?page=graph&focusEntity=${encodeURIComponent(selectedDoc.id)}`; }}
-                  className="w-full px-3 py-1.5 rounded text-[11px] font-bold flex items-center justify-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
-                  style={{ background: styles.accentBg, color: 'rgba(255,255,255,0.95)', border: `1px solid ${styles.accentBorder}` }}
+                  className={`w-full px-3 py-1.5 rounded text-[11px] font-bold flex items-center justify-center gap-1.5 transition disabled:opacity-50 cursor-pointer ${styles.accentBg} ${styles.accentSolidText}`}
                 >
                   <Network className="w-3.5 h-3.5" />
                   {t('knowledge.wiki.view_graph_context')}

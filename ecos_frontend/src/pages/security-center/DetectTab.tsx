@@ -51,7 +51,7 @@ export default function DetectTab() {
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all duration-150 cursor-pointer
                 ${isActive
                   ? `${styles.accentText} border-b-current`
-                  : `${styles.muted} border-b-transparent hover:${styles.sidebarHoverBg}`
+                  : `${styles.muted} border-b-transparent ${styles.sidebarHoverBg}`
                 }`}
             >
               <Icon size={16} />
@@ -63,11 +63,11 @@ export default function DetectTab() {
 
       {/* Sub-tab content */}
       <div className="flex-1 overflow-hidden">
-        {activeSubTab === 'abac-crud' && <AbacPolicyManager t={t} locale={locale} styles={styles} />}
-        {activeSubTab === 'abac' && <AbacEvaluator t={t} locale={locale} styles={styles} />}
-        {activeSubTab === 'rls' && <RlsPolicyManager t={t} locale={locale} styles={styles} />}
-        {activeSubTab === 'cls' && <ClsPolicyManager t={t} locale={locale} styles={styles} />}
-        {activeSubTab === 'masking' && <MaskingRuleManager t={t} locale={locale} styles={styles} />}
+        {activeSubTab === 'abac-crud' && <AbacPolicyManager />}
+        {activeSubTab === 'abac' && <AbacEvaluator />}
+        {activeSubTab === 'rls' && <RlsPolicyManager />}
+        {activeSubTab === 'cls' && <ClsPolicyManager />}
+        {activeSubTab === 'masking' && <MaskingRuleManager />}
       </div>
     </div>
   );

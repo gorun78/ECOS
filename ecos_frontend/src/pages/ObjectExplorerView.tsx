@@ -88,6 +88,11 @@ export default function ObjectExplorerView({
   const [dataPage, setDataPage] = useState(1);
   const [dataTotalPages, setDataTotalPages] = useState(1);
   const [dataTotal, setDataTotal] = useState(0);
+  // 无假真理：实例拉取失败不再静默置空（空列表≠加载失败）。错误态 + 重试入口。
+  const [instanceError, setInstanceError] = useState<string | null>(null);
+  const [instanceRetryTick, setInstanceRetryTick] = useState(0);
+  // 关系实例缓存未就绪时不得显示「0 关联」假象（fail-open），须显示加载中
+  const [relatedLoading, setRelatedLoading] = useState(false);
 
   const [relatedInstanceCache, setRelatedInstanceCache] = useState<Record<string, DataRecord[]>>({});
 
@@ -132,10 +137,12 @@ export default function ObjectExplorerView({
   useEffect(() => {
     if (!activeObjectType) {
       setInstanceData([]);
+      setInstanceError(null);
       return;
     }
     let cancelled = false;
     setDataLoading(true);
+    setInstanceError(null);
     fetchOntologyData({ objectTypeId: activeObjectType.id, page: dataPage, size: 20 })
       .then(res => {
         if (cancelled) return;
@@ -143,16 +150,18 @@ export default function ObjectExplorerView({
         setDataTotalPages(res.totalPages ?? 1);
         setDataTotal(res.total ?? 0);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
         if (cancelled) return;
+        // 失败 ≠ 空数据：置错误态（UI 渲染错误横幅 + 重试），不再伪装「暂无实例」
         setInstanceData([]);
         setDataTotalPages(1);
+        setInstanceError(String((e as { message?: string } | undefined)?.message || e));
       })
       .finally(() => {
         if (!cancelled) setDataLoading(false);
       });
     return () => { cancelled = true; };
-  }, [activeObjectType, dataPage]);
+  }, [activeObjectType, dataPage, instanceRetryTick]);
 
   // Instantiation helper for arbitrary object type (for relationships)
   const getInstancesOfObjectType = (otId: string): any[] => {
@@ -180,18 +189,26 @@ export default function ObjectExplorerView({
     });
     if (otIds.size === 0) return;
     let cancelled = false;
+    setRelatedLoading(true);
     const fetchRelated = async () => {
       const newCache: Record<string, DataRecord[]> = {};
+      let failed = 0;
       for (const otId of otIds) {
         try {
           const res = await fetchOntologyData({ objectTypeId: otId, page: 1, size: 50 });
           newCache[otId] = res.data ?? [];
-        } catch { newCache[otId] = []; }
+        } catch { failed += 1; newCache[otId] = []; }
       }
-      if (!cancelled) setRelatedInstanceCache(prev => ({ ...prev, ...newCache }));
+      if (!cancelled) {
+        setRelatedInstanceCache(prev => ({ ...prev, ...newCache }));
+        setRelatedLoading(false);
+        // 关联对象实例拉取失败时如实提示（「0 关联」可能只是拉取失败，不得静默）
+        if (failed > 0) showToast('error', t('ontology.partialPropsLoadFailed').replace('{count}', String(failed)));
+      }
     };
     fetchRelated();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeObjectTypeId, linkTypes]);
 
   // 2. Filter, Search and Sort Logic
@@ -285,15 +302,22 @@ export default function ObjectExplorerView({
   const analyticsData = useMemo((): { property: typeof activeObjectType extends infer T ? T extends { properties: (infer P)[] } ? P : never : never; data: Array<{ name: string; count: number; percentage: string }> } | any[] => {
     if (!activeObjectType || processedInstances.length === 0) return [];
 
-    // Choose the best property for categorical grouping
-    // Find status, manufacturer, or model properties
-    const groupProp = activeObjectType.properties.find(p => 
-      p.id === 'status' || 
-      p.id === 'manufacturer' || 
-      p.id === 'model' || 
-      p.id === 'city' || 
-      p.id === 'rank'
-    ) || activeObjectType.properties[0];
+    // 动态选择分组字段（此前硬编码 status/manufacturer/model/city/rank 等演示 id，
+    // 系 aviation 演示数据残留 —— 真实本体不存在这些属性时永远回落 properties[0]）。
+    // 口径：在已加载实例上统计各属性的取值基数，优先取「基数 2~12 且基数最大」的
+    // 非主键属性（类别型分布最适合分组）；无命中回落首个非主键属性，再回落 properties[0]。
+    const pk = activeObjectType.primaryKey;
+    let groupProp = activeObjectType.properties.find(p => p.id !== pk) || activeObjectType.properties[0];
+    let bestDistinct = -1;
+    for (const p of activeObjectType.properties) {
+      if (p.id === pk) continue;
+      const distinct = new Set(processedInstances.map(inst => String(inst[p.id] ?? '')));
+      const n = distinct.size;
+      if (n >= 2 && n <= 12 && n > bestDistinct) {
+        bestDistinct = n;
+        groupProp = p;
+      }
+    }
 
     const distribution: Record<string, number> = {};
     processedInstances.forEach(inst => {
@@ -379,6 +403,7 @@ export default function ObjectExplorerView({
       direction: 'forward' | 'reverse';
       otherObjectType: ObjectType;
       instances: any[];
+      resolutionUnsupported?: boolean;
     }> = [];
 
     // Search linkTypes referencing the activeObjectType
@@ -402,7 +427,9 @@ export default function ObjectExplorerView({
           linkType: lt,
           direction: 'forward',
           otherObjectType: targetOt,
-          instances: matches
+          instances: matches,
+          // join_table 无解析端点：空列表是「无法解析」而非「无关联」，UI 侧如实标注
+          resolutionUnsupported: lt.mapping?.type === 'join_table'
         });
       } else if (lt.targetObjectType === activeObjectType.id) {
         // Reverse relation (e.g. Airport -> Flights, or Aircraft -> Flights)
@@ -418,14 +445,17 @@ export default function ObjectExplorerView({
             String(s[lt.mapping.foreignKeyMapping!.sourceKey]) === String(targetVal)
           );
         } else if (lt.mapping?.type === 'join_table' && lt.mapping.joinTableMapping) {
-          // Join table resolution requires separate API — skip for now
+          // 无假真理：join_table 解析需独立后端端点（现不存在）。
+          // 此前静默丢弃 → UI 显示「0 关联」误导；改为置 resolutionUnsupported，
+          // 由 InstanceDetailPanel 渲染「join_table 解析未接入」标注（空 ≠ 无关联）。
         }
 
         relations.push({
           linkType: lt,
           direction: 'reverse',
           otherObjectType: sourceOt,
-          instances: matches
+          instances: matches,
+          resolutionUnsupported: lt.mapping?.type === 'join_table'
         });
       }
     });
@@ -481,46 +511,26 @@ export default function ObjectExplorerView({
     setActionParams(initialParams);
   };
 
+  /**
+   * 动作执行（无假真理整改）：
+   *   - 平台不存在动作执行/写回端点（services/ontologyApi 全表面核实：action-types 仅 GET），
+   *     旧实现「前端校验一遍 → toast 已执行 → refetch 原数据」是假写回，已删除；
+   *   - 校验不再按演示 id（update_flight_status 等）硬编码分支，改为通用的必填参数检查；
+   *   - Modal 的执行按钮已置为禁用 + 如实文案；此处为双保险 —— 仅报错、绝不弹成功、不发假写回。
+   */
   const handleExecuteAction = () => {
     if (!selectedAction || !activeObjectType || !selectedInstance) return;
 
-    let valid = true;
-    let errMessage = '';
-
-    selectedAction.validationRules.forEach(rule => {
-      if (selectedAction.id === 'update_flight_status') {
-        const newVal = actionParams['new_status_param'];
-        const allowed = ['ON_TIME', 'DELAYED', 'BOARDING', 'CANCELLED'];
-        if (!allowed.includes(newVal)) {
-          valid = false;
-          errMessage = rule.errorMessage;
-        }
-      } else if (selectedAction.id === 'schedule_maintenance_check') {
-        if (selectedInstance.status === 'MAINTENANCE') {
-          valid = false;
-          errMessage = rule.errorMessage;
-        }
-      }
-    });
-
-    if (!valid) {
-      setActionError(errMessage);
-      showToast('error', t('ow.msg.validationFailed') + errMessage);
+    const missing = selectedAction.parameters.filter(
+      p => p.isRequired && !String(actionParams[p.id] ?? '').trim()
+    );
+    if (missing.length > 0) {
+      setActionError(t('ow.msg.validationFailed') + missing.map(p => p.displayName).join(', '));
+      showToast('error', t('ow.msg.validationFailed') + missing.map(p => p.displayName).join(', '));
       return;
     }
 
-    showToast('success', t('ow.msg.actionExecuted').replace('{name}', selectedAction.displayName));
-    setSelectedAction(null);
-
-    setDataPage(1);
-    fetchOntologyData({ objectTypeId: activeObjectType.id, page: 1, size: 20 })
-      .then(res => {
-        setInstanceData(res.data ?? []);
-        setDataTotalPages(res.totalPages ?? 1);
-        setDataTotal(res.total ?? 0);
-        setSelectedInstance(null);
-      })
-      .catch(() => {});
+    showToast('error', t('ow.explorer.action_exec_unsupported'));
   };
 
   return (
@@ -582,6 +592,19 @@ export default function ObjectExplorerView({
               
               {/* Work Desk Stage */}
               <div className="flex-1 flex flex-col overflow-hidden">
+                {/* 六态·错误态：实例加载失败显式横幅 + 重试（不再伪装「暂无数据」） */}
+                {instanceError && (
+                  <div className={`m-3 flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
+                    <span className="truncate">{t('ow.explorer.instance_load_failed').replace('{error}', instanceError)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setInstanceRetryTick(v => v + 1)}
+                      className={`shrink-0 rounded border px-2 py-0.5 font-semibold ${styles.dangerBorder}`}
+                    >
+                      {t('ontology.retry')}
+                    </button>
+                  </div>
+                )}
                 {activeTab === 'table' ? (
                   <ExplorerTableView
                     activeObjectType={activeObjectType}
@@ -625,6 +648,7 @@ export default function ObjectExplorerView({
                   availableActions={availableActions}
                   handleOpenActionModal={handleOpenActionModal}
                   resolvedRelations={resolvedRelations}
+                  relationsLoading={relatedLoading}
                   handleJumpToInstance={handleJumpToInstance}
                 />
               ) : null}

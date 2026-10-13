@@ -12,8 +12,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { AlertTriangle, Check, X, Info } from 'lucide-react';
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
+import Badge from '../components/common/Badge';
+import ConfirmDialog from '../components/common/ConfirmDialog';
 import type {
   ObjectType,
   LinkType,
@@ -31,7 +34,7 @@ import ObjectTypeDetail from './ontology/ObjectTypeDetail';
 import LinkTypeDetail from './ontology/LinkTypeDetail';
 import ActionTypeDetail from './ontology/ActionTypeDetail';
 import FunctionTypeDetail from './ontology/FunctionTypeDetail';
-import ExportTasksView from './ontology/ExportTasksView';
+import OntologyExportModal from './ontology/OntologyExportModal';
 import { InterfaceView, SharedPropertyView, DatasetView } from './ontology/OtherViews';
 import GlossaryTab from './knowledge/tabs/GlossaryTab';
 import ObjectExplorerView from './ObjectExplorerView';
@@ -50,7 +53,6 @@ import {
   mapEntityToObjectType,
   mapRelationshipToLinkType,
   DEFAULT_ONTOLOGY_ID,
-  createExportTask,
   fetchWorkbenchDomains,
   fetchDwDatasets,
   fetchActionTypes,
@@ -61,16 +63,30 @@ import {
   DEMO_SHARED_PROPERTIES,
   applyEnterpriseDemoBindings,
 } from '../data/enterpriseOntologyDemo';
-import type { CreateExportDTO } from '../types/ontology';
 import { useOntologyData } from '../hooks/useOntologyData';
 import type { Entity } from '../types/workbench';
 
 type ViewCategory = 'overview' | 'explorer' | 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'dataset' | 'function' | 'glossary' | 'caliber' | 'function_audit';
 type CreatableType = 'object' | 'link' | 'action' | 'interface' | 'shared_property' | 'function';
 
+/**
+ * 无后端持久化能力的元素类型（架构铁律·无假真理）：
+ *   - 新建/删除仅内存操作 → 侧栏「新建」菜单禁用 + 详情页删除按钮禁用，文案如实标注；
+ *   - action 虽由真实端点 /api/v1/ontology/action-types 只读加载，但无 DELETE 端点，
+ *     此前「删除=本地过滤」属假成功，一并禁用。
+ * 后端出现对应 CRUD 端点后，把类型从本数组移除即可恢复。
+ */
+const UNSUPPORTED_PERSISTENCE_TYPES: ReadonlyArray<CreatableType> = ['action', 'interface', 'shared_property', 'function'];
+
+/** 三块 demo 面板（逻辑函数/接口规范/共享属性）——单一数据源 data/enterpriseOntologyDemo.ts */
+const DEMO_SOURCE_CATEGORIES: ReadonlyArray<ViewCategory> = ['function', 'interface', 'shared_property'];
+
 export default function OntologyWorkbenchLayout() {
   // ── Ontology States ──
   const [objectTypes, setObjectTypes] = useState<ObjectType[]>([]);
+  // 服务器权威数据（未叠加 demo 绑定）。提案面板必须以此为准：
+  // demo 注入的 interfaces/sharedPropertyId 是演示资产，绝不允许进入 changeSet 被提交回后端。
+  const [serverObjectTypes, setServerObjectTypes] = useState<ObjectType[]>([]);
   const [linkTypes, setLinkTypes] = useState<LinkType[]>([]);
   const [actionTypes, setActionTypes] = useState<ActionType[]>([]);
   const [interfaces, setInterfaces] = useState<InterfaceType[]>([]);
@@ -87,12 +103,9 @@ export default function OntologyWorkbenchLayout() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [explorerActiveObjectTypeId, setExplorerActiveObjectTypeId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
+  // 危险操作确认门（替代 window.confirm）：pendingDelete 非空即弹 ConfirmDialog
+  const [pendingDelete, setPendingDelete] = useState<{ category: 'object' | 'link'; id: string; name: string } | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [exportFormat, setExportFormat] = useState<'JSON' | 'CSV' | 'DDL'>('JSON');
-  const [exportScope, setExportScope] = useState<'FULL' | 'ENTITIES' | 'RELATIONSHIPS'>('FULL');
-  const [exporting, setExporting] = useState(false);
-  // T10: 新建导出任务后的列表刷新信号（ExportTasksView 监听自增即重拉任务列表）
-  const [exportTasksSignal, setExportTasksSignal] = useState(0);
   // 详情页「发起变更提案」信号：自增后 ProposalPanel 自动展开表单并锁定当前对象类型
   const [proposalFormSignal, setProposalFormSignal] = useState(0);
 
@@ -101,35 +114,20 @@ export default function OntologyWorkbenchLayout() {
   //     /api/v1/ontology/domains(域表, OntologyDomainApiController) 权威源,
   //     消除"本体表当域源 + 写域表"的双源不一致。
   // useOntologyData 仍负责 objectTypes/linkTypes 种子加载(主逻辑不动)。
-  useOntologyData(({ objectTypes: loadedObjects, linkTypes: loadedLinks }) => {
+  const ontologyData = useOntologyData(({ objectTypes: loadedObjects, linkTypes: loadedLinks }) => {
+    setServerObjectTypes(loadedObjects);
     setObjectTypes(applyEnterpriseDemoBindings(loadedObjects));
     setLinkTypes(loadedLinks);
     // action/interface/shared-prop/function 见下方专门的数据加载 effect
+  }, (failedCount) => {
+    // 部分实体属性加载失败 ⇒ 如实提示（数据不完整 ≠ 完整）
+    showToast('error', t('ontology.partialPropsLoadFailed').replace('{count}', String(failedCount)));
   });
 
   // ── Toast Helper ──
   const showToast = (type: 'success' | 'info' | 'error', message: string) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 4000);
-  };
-
-  const handleExportOntology = async () => {
-    setExporting(true);
-    try {
-      const dto: CreateExportDTO = {
-        ontologyId: DEFAULT_ONTOLOGY_ID,
-        format: exportFormat,
-        scope: exportScope,
-      };
-      await createExportTask(dto);
-      showToast('success', t('ow.msg.exportStarted'));
-      // T10: 创建成功后保持 Modal 打开，刷新右下任务列表并轮询状态闭环
-      setExportTasksSignal(v => v + 1);
-    } catch (e: any) {
-      showToast('error', t('ow.msg.exportFailed'));
-    } finally {
-      setExporting(false);
-    }
   };
 
   // ── Mutation Helpers ──
@@ -215,7 +213,9 @@ export default function OntologyWorkbenchLayout() {
 
   /**
    * 加载逻辑函数 / 接口规范 / 共享属性 —— 后端暂无数据源，使用企业 demo 数据集
-   * （见 data/enterpriseOntologyDemo.ts）。
+   * （单一来源 data/enterpriseOntologyDemo.ts）。
+   * 无假真理：这三块内容全部是演示资产 —— 侧栏分节挂 DEMO 徽标、进入对应面板时
+   * 主区顶部渲染降级横幅（见 demoBanner），且 demo 绑定不进入提案 changeSet。
    */
   useEffect(() => {
     setFunctionTypes(DEMO_FUNCTION_TYPES);
@@ -232,12 +232,20 @@ export default function OntologyWorkbenchLayout() {
     try {
       const rawEntities = await fetchEntities(DEFAULT_ONTOLOGY_ID);
       const entities = rawEntities || [];
+      // 逐实体属性失败不再静默吞为 []：计数并在结果里如实提示（数据不完整 ≠ 完整）
+      let failedProps = 0;
       const propsResponses = await Promise.all(
-        entities.map((entity: any) => fetchProperties(entity.id).catch((): any[] => [])),
+        entities.map((entity: any) =>
+          fetchProperties(entity.id).catch((): null => { failedProps += 1; return null; }),
+        ),
       );
+      if (failedProps > 0) {
+        showToast('error', t('ontology.partialPropsLoadFailed').replace('{count}', String(failedProps)));
+      }
       const list: ObjectType[] = entities.map((entity: any, idx: number) =>
         mapEntityToObjectType(entity, propsResponses[idx] || []),
       );
+      setServerObjectTypes(list);
       setObjectTypes(applyEnterpriseDemoBindings(list));
     } catch (e: any) {
       showToast('error', t('ow.msg.dataLoadFailed'));
@@ -265,11 +273,14 @@ export default function OntologyWorkbenchLayout() {
         const list: ObjectType[] = (entities || []).map((e: any, idx: number) =>
           mapEntityToObjectType(e, propsResponses[idx] || [])
         );
+        setServerObjectTypes(list);
         updateObjectTypes(applyEnterpriseDemoBindings(list));
       } catch (e: any) {
         showToast('error', t('ow.msg.createFailed').replace('{error}', String(e.message)));
       }
-    } else if (type === 'link') {
+      return;
+    }
+    if (type === 'link') {
       if (objectTypes.length < 2) {
         showToast('error', t('ow.msg.needTwoObjectTypes'));
         return;
@@ -288,77 +299,41 @@ export default function OntologyWorkbenchLayout() {
       } catch (e: any) {
         showToast('error', t('ow.msg.linkCreateFailed').replace('{error}', String(e.message)));
       }
-    } else if (type === 'action') {
-      const newActionId = `custom_action_${defaultNum}`;
-      const newAction: ActionType = {
-        id: newActionId,
-        displayName: t('ow.action.defaultName').replace('{n}', defaultNum),
-        apiName: `customAction${defaultNum}`,
-        description: t('ow.action.defaultDescription'),
-        parameters: [],
-        rules: [],
-        validationRules: []
-      };
-      updateActionTypes([...actionTypes, newAction]);
-      setSelectedCategory('action');
-      setSelectedId(newActionId);
-      showToast('info', t('ow.msg.actionCreated').replace('{name}', newAction.displayName));
-    } else if (type === 'interface') {
-      const newIntfId = `custom_interface_${defaultNum}`;
-      const newIntf: InterfaceType = {
-        id: newIntfId,
-        displayName: t('ow.intf.defaultName').replace('{n}', defaultNum),
-        apiName: `CustomInterface${defaultNum}`,
-        description: t('ow.intf.defaultDescription'),
-        properties: [
-          { id: 'uuid', displayName: t('ow.intf.defaultPropertyName'), apiName: 'uuid', dataType: 'string', isRequired: true, description: t('ow.intf.defaultPropertyDescription') }
-        ]
-      };
-      updateInterfaces([...interfaces, newIntf]);
-      setSelectedCategory('interface');
-      setSelectedId(newIntfId);
-      showToast('info', t('ow.msg.interfaceCreated').replace('{name}', newIntf.displayName));
-    } else if (type === 'shared_property') {
-      const newSpId = `custom_sp_${defaultNum}`;
-      const newSp: SharedProperty = {
-        id: newSpId,
-        displayName: t('ow.prop.defaultName').replace('{n}', defaultNum),
-        apiName: `customSharedProp${defaultNum}`,
-        dataType: 'string',
-        description: t('ow.prop.defaultDescription')
-      };
-      updateSharedProperties([...sharedProperties, newSp]);
-      setSelectedCategory('shared_property');
-      setSelectedId(newSpId);
-      showToast('info', t('ow.msg.sharedPropertyCreated').replace('{name}', newSp.displayName));
-    } else if (type === 'function') {
-      const newFuncId = `custom_function_${defaultNum}`;
-      const newFunc: FunctionType = {
-        id: newFuncId,
-        displayName: t('ow.func.defaultName').replace('{n}', defaultNum),
-        apiName: `customFunction${defaultNum}`,
-        description: t('ow.func.defaultDescription'),
-        returnType: 'string',
-        parameters: [],
-        code: `import { Function } from "@ecos/functions-api";\n\nexport class CustomFunctionClass_${defaultNum} {\n    @Function()\n    public async customFunction${defaultNum}(): Promise<string> {\n        return "Hello World";\n    }\n}`
-      };
-      updateFunctionTypes([...functionTypes, newFunc]);
-      setSelectedCategory('function');
-      setSelectedId(newFuncId);
-      showToast('info', t('ow.msg.functionCreated').replace('{name}', newFunc.displayName));
+      return;
+    }
+
+    // 无假真理：action/interface/shared_property/function 均无后端创建端点（已核实
+    // services/ontology/* 全表面：action-types 仅 GET，interfaces/shared-properties/functions
+    // 无任何端点）。侧栏按钮已禁用，此处为双保险 —— 不落内存假数据、不弹成功 toast。
+    if ((UNSUPPORTED_PERSISTENCE_TYPES as ReadonlyArray<string>).includes(type)) {
+      showToast('error', t('ontology.create_unsupported'));
     }
   };
 
   // ── DELETE ──
-  const handleDeleteElement = async (category: string, id: string) => {
-    const confirmDelete = window.confirm(t('ontology.confirm_delete_element'));
-    if (!confirmDelete) return;
+  /** 请求删除：object/link 走 ConfirmDialog 确认门后写真后端；其余类型无端点一律拒绝 */
+  const handleDeleteElement = (category: string, id: string, name?: string) => {
+    if (category === 'object' || category === 'link') {
+      setPendingDelete({ category, id, name: name || '' });
+      return;
+    }
+    // action（后端只读加载）/ interface / shared_property / function（demo 数据）：
+    // 无 DELETE 端点 ⇒ 不执行本地过滤假删除、不弹「已移除」假 toast
+    showToast('error', t('ontology.delete_unsupported'));
+  };
+
+  /** ConfirmDialog 确认后真正执行删除 */
+  const executePendingDelete = async () => {
+    if (!pendingDelete) return;
+    const { category, id } = pendingDelete;
+    setPendingDelete(null);
 
     if (category === 'object') {
       try {
         await deleteEntity(id, DEFAULT_ONTOLOGY_ID);
         showToast('success', t('ow.msg.entityDeleted'));
         updateObjectTypes(objectTypes.filter(ot => ot.id !== id));
+        setServerObjectTypes(serverObjectTypes.filter(ot => ot.id !== id));
         updateLinkTypes(linkTypes.filter(lt => lt.sourceObjectType !== id && lt.targetObjectType !== id));
       } catch (e: any) {
         showToast('error', t('ow.msg.deleteFailed').replace('{error}', String(e.message)));
@@ -371,19 +346,10 @@ export default function OntologyWorkbenchLayout() {
       } catch (e: any) {
         showToast('error', t('ow.msg.deleteFailed').replace('{error}', String(e.message)));
       }
-    } else if (category === 'action') {
-      updateActionTypes(actionTypes.filter(at => at.id !== id));
-    } else if (category === 'interface') {
-      updateInterfaces(interfaces.filter(it => it.id !== id));
-    } else if (category === 'shared_property') {
-      updateSharedProperties(sharedProperties.filter(sp => sp.id !== id));
-    } else if (category === 'function') {
-      updateFunctionTypes(functionTypes.filter(fn => fn.id !== id));
     }
 
     setSelectedCategory('overview');
     setSelectedId(null);
-    showToast('info', t('ow.msg.elementRemoved'));
   };
 
   // ── Domain-aware filtering ──
@@ -423,6 +389,8 @@ export default function OntologyWorkbenchLayout() {
             setSelectedId(id);
           }}
           onCreateNew={handleCreateNewElement}
+          unsupportedCreateTypes={UNSUPPORTED_PERSISTENCE_TYPES}
+          demoSectionKeys={DEMO_SOURCE_CATEGORIES}
         />
       </div>
 
@@ -430,7 +398,8 @@ export default function OntologyWorkbenchLayout() {
       <main className="w-full flex-1 min-w-0 overflow-hidden relative flex flex-col">
         {/* Top toolbar */}
         <div className={`flex items-center justify-between px-3 py-1.5 border-b ${styles.cardBorder} ${styles.cardBg}`}>
-          <span className={`text-[10px] font-semibold uppercase tracking-wider ${styles.muted}`}>
+          <span className={`flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider ${styles.muted}`}>
+            <span>
             {selectedCategory === 'overview' ? t('ow.nav.overview') :
              selectedCategory === 'explorer' ? t('ow.nav.explorer') :
              selectedCategory === 'object' ? t('ow.nav.object') :
@@ -443,6 +412,10 @@ export default function OntologyWorkbenchLayout() {
              selectedCategory === 'glossary' ? t('ow.nav.glossary') :
              selectedCategory === 'caliber' ? t('ow.nav.caliber') :
              selectedCategory === 'function_audit' ? t('ow.nav.functionAudit') : ''}
+            </span>
+            {DEMO_SOURCE_CATEGORIES.includes(selectedCategory) && (
+              <Badge variant="warning">{t('ontology.demo_data_badge')}</Badge>
+            )}
           </span>
           <div className="flex items-center gap-1.5">
             <button
@@ -458,6 +431,40 @@ export default function OntologyWorkbenchLayout() {
         {/* min-h-0：flex 纵向布局下 overflow-auto 子项的最小高度会退化为 0，
             若不显式声明，详情区会被下方提案面板挤成 0 高度（对象详情与属性表不可见） */}
         <div className="flex-1 min-h-0 overflow-auto">
+        {/* 六态覆盖·错误态：本体基础数据加载失败 ⇒ 显式错误横幅 + 重试（不再静默空列表） */}
+        {ontologyData.error && (
+          <div className={`m-3 flex items-center justify-between gap-3 rounded-lg border px-3 py-2 ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
+            <span className="flex items-center gap-1.5 min-w-0">
+              <AlertTriangle size={13} className="shrink-0" />
+              <span className="truncate">{t('ontology.data_load_failed').replace('{error}', String(ontologyData.error))}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => ontologyData.retry()}
+              className={`shrink-0 rounded border px-2 py-0.5 text-xs font-semibold ${styles.dangerBorder}`}
+            >
+              {t('ontology.retry')}
+            </button>
+          </div>
+        )}
+        {ontologyData.loading && objectTypes.length === 0 && (
+          <div className={`m-3 rounded-lg border px-3 py-2 text-xs ${styles.infoBg} ${styles.infoText} ${styles.infoBorder}`}>
+            {t('ontology.data_loading')}
+          </div>
+        )}
+        {/* 无假真理·降级横幅：demo 面板与只读面板的显式标识 */}
+        {DEMO_SOURCE_CATEGORIES.includes(selectedCategory) && (
+          <div className={`m-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`}>
+            <AlertTriangle size={13} className="shrink-0" />
+            <span>{t('ontology.demo_data_banner')}</span>
+          </div>
+        )}
+        {selectedCategory === 'action' && (
+          <div className={`m-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${styles.infoBg} ${styles.infoText} ${styles.infoBorder}`}>
+            <Info size={13} className="shrink-0" />
+            <span>{t('ontology.action_readonly_banner')}</span>
+          </div>
+        )}
         {selectedCategory === 'overview' && (
           <OverviewView
             objectTypes={objectTypes}
@@ -471,6 +478,7 @@ export default function OntologyWorkbenchLayout() {
             onSelectDomainFilter={setSelectedDomainId}
             onUpdateDomains={updateDomains}
             onUpdateObjectTypes={updateObjectTypes}
+            onToast={showToast}
             onSelectNode={(nodeId: string) => {
               setSelectedCategory('object');
               setSelectedId(nodeId);
@@ -515,7 +523,7 @@ export default function OntologyWorkbenchLayout() {
               onUpdate={(updated: ObjectType) => {
                 updateObjectTypes(objectTypes.map(o => o.id === selectedId ? updated : o));
               }}
-              onDelete={(id: string) => handleDeleteElement('object', id)}
+              onDelete={(id: string) => handleDeleteElement('object', id, ot.displayName)}
               onNavigateToLink={(linkId: string) => {
                 setSelectedCategory('link');
                 setSelectedId(linkId);
@@ -546,7 +554,7 @@ export default function OntologyWorkbenchLayout() {
               onUpdate={(updated: LinkType) => {
                 updateLinkTypes(linkTypes.map(l => l.id === selectedId ? updated : l));
               }}
-              onDelete={(id: string) => handleDeleteElement('link', id)}
+              onDelete={(id: string) => handleDeleteElement('link', id, lt.displayName)}
               onNavigateToObject={(objId: string) => {
                 setSelectedCategory('object');
                 setSelectedId(objId);
@@ -562,6 +570,8 @@ export default function OntologyWorkbenchLayout() {
             <ActionTypeDetail
               actionType={at}
               objectTypes={objectTypes}
+              deleteUnsupported
+              deleteUnsupportedReason={t('ontology.delete_unsupported')}
               onUpdate={(updated: ActionType) => {
                 updateActionTypes(actionTypes.map(a => a.id === selectedId ? updated : a));
               }}
@@ -581,6 +591,8 @@ export default function OntologyWorkbenchLayout() {
             <FunctionTypeDetail
               func={fn}
               objectTypes={objectTypes}
+              deleteUnsupported
+              deleteUnsupportedReason={t('ontology.demo_data_badge')}
               onUpdate={(updated: FunctionType) => {
                 updateFunctionTypes(functionTypes.map(f => f.id === selectedId ? updated : f));
               }}
@@ -596,6 +608,8 @@ export default function OntologyWorkbenchLayout() {
             <InterfaceView
               intf={it}
               objectTypes={objectTypes}
+              deleteUnsupported
+              deleteUnsupportedReason={t('ontology.demo_data_badge')}
               onDelete={(id: string) => handleDeleteElement('interface', id)}
               onNavigateToObject={(objId: string) => {
                 setSelectedCategory('object');
@@ -612,6 +626,8 @@ export default function OntologyWorkbenchLayout() {
             <SharedPropertyView
               sp={sp}
               objectTypes={objectTypes}
+              deleteUnsupported
+              deleteUnsupportedReason={t('ontology.demo_data_badge')}
               onDelete={(id: string) => handleDeleteElement('shared_property', id)}
               onNavigateToObject={(objId: string) => {
                 setSelectedCategory('object');
@@ -660,12 +676,14 @@ export default function OntologyWorkbenchLayout() {
         </div>
 
         {/* Proposal Panel — 目标锁定当前选中对象类型；执行完成后回刷实体/属性形成闭环。
-            max-h + 自身滚动：提案列表会随数量增长，不加约束会把上方详情区挤塌 */}
+            max-h + 自身滚动：提案列表会随数量增长，不加约束会把上方详情区挤塌。
+            changeSet 隔离（无假真理）：这里必须传 serverObjectTypes（未叠加 demo 绑定的后端权威数据），
+            否则 demo 注入的 sharedPropertyId/interfaces 会被 diff 进提案、被提交回后端 = 假数据落库 */}
         {selectedCategory === 'object' && (
           <div className="shrink-0 max-h-[45%] overflow-y-auto">
             <ProposalPanel
-              objectTypes={objectTypes}
-              selectedObjectType={objectTypes.find(o => o.id === selectedId) ?? null}
+              objectTypes={serverObjectTypes}
+              selectedObjectType={serverObjectTypes.find(o => o.id === selectedId) ?? null}
               openFormSignal={proposalFormSignal}
               onProposalExecuted={reloadObjects}
             />
@@ -673,57 +691,44 @@ export default function OntologyWorkbenchLayout() {
         )}
       </main>
 
-      {/* Export Modal — T3 主题 token；T10 闭环：格式/范围创建 + 任务列表（轮询/下载/删除） */}
-      {showExportModal && (
-        <div className={`fixed inset-0 ${styles.overlayBg} z-50 flex items-center justify-center`} onClick={() => setShowExportModal(false)}>
-          <div className={`rounded-xl shadow-2xl border ${styles.cardBorder} p-5 w-[34rem] max-w-[92vw] max-h-[85vh] overflow-y-auto ${styles.cardBg} ${styles.cardText}`} onClick={e => e.stopPropagation()}>
-            <h3 className={`text-sm font-bold mb-3 ${styles.cardText}`}>{t('ow.section.exportPanel')}</h3>
-            <div className="space-y-3">
-              <div>
-                <label className={`block text-[10px] font-semibold mb-1 ${styles.muted}`}>{t('ow.label.exportFormat')}</label>
-                <div className="flex gap-2">
-                  {(['JSON', 'CSV', 'DDL'] as const).map(f => (
-                    <button key={f} onClick={() => setExportFormat(f)}
-                      className={`px-3 py-1.5 rounded text-[10px] font-semibold transition-colors ${exportFormat === f ? `${styles.accentBg} text-white` : `${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}`}>
-                      {t(`ow.export.format.${f}`)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className={`block text-[10px] font-semibold mb-1 ${styles.muted}`}>{t('ow.label.exportScope')}</label>
-                <div className="flex gap-2">
-                  {(['FULL', 'ENTITIES', 'RELATIONSHIPS'] as const).map(s => (
-                    <button key={s} onClick={() => setExportScope(s)}
-                      className={`px-3 py-1.5 rounded text-[10px] font-semibold transition-colors ${exportScope === s ? `${styles.accentBg} text-white` : `${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}`}>
-                      {t(`ow.export.scope.${s}`)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setShowExportModal(false)} className={`px-3 py-1.5 rounded text-[10px] font-semibold ${styles.inputBg} ${styles.inputText} ${styles.sidebarHoverBg}`}>{t('ow.btn.cancel')}</button>
-                <button onClick={handleExportOntology} disabled={exporting}
-                  className={`px-3 py-1.5 rounded text-[10px] font-semibold ${styles.accentBg} text-white ${styles.accentHover} disabled:opacity-50`}>
-                  {exporting ? t('ow.exportTask.creating') : t('ow.btn.exportOntology')}
-                </button>
-              </div>
-              {/* T10 导出任务闭环：列表 / 状态轮询 / 下载到本地 / 删除已结束任务 */}
-              <ExportTasksView visible={showExportModal} refreshSignal={exportTasksSignal} onToast={showToast} />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Export Modal — 自本文件拆分至 ontology/OntologyExportModal.tsx（§十 ≤800 行门禁，仅搬移不改逻辑） */}
+      <OntologyExportModal
+        visible={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        onToast={showToast}
+      />
 
-      {/* Toast Notification */}
+      {/* Toast Notification — 语义 token 三色（禁裸色），去掉 animate-bounce 干扰动画 */}
       {toast && (
-        <div className={`fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-lg shadow-xl text-xs font-semibold text-white ${styles.accentBg} border ${styles.accentBorder} z-50 animate-bounce`}>
-          <span className={toast.type === 'success' ? 'text-emerald-400' : toast.type === 'error' ? 'text-red-400' : 'text-blue-400'}>
-            {toast.type === 'success' ? '✓' : toast.type === 'error' ? '✗' : 'ℹ'}
-          </span>
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 rounded-lg shadow-md text-xs font-semibold border z-50 ${
+            toast.type === 'success'
+              ? `${styles.successBg} ${styles.successText} ${styles.successBorder}`
+              : toast.type === 'error'
+                ? `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`
+                : `${styles.infoBg} ${styles.infoText} ${styles.infoBorder}`
+          }`}
+        >
+          {toast.type === 'success' ? <Check size={14} /> : toast.type === 'error' ? <X size={14} /> : <Info size={14} />}
           <span>{toast.message}</span>
         </div>
       )}
+
+      {/* 危险操作确认门（架构铁律：禁 window.confirm） */}
+      <ConfirmDialog
+        visible={!!pendingDelete}
+        danger
+        title={t('ontology.confirm_delete_element')}
+        message={pendingDelete?.category === 'link'
+          ? t('ontology.confirm_delete_link').replace('{name}', pendingDelete?.name || '')
+          : t('ontology.confirm_delete_object').replace('{name}', pendingDelete?.name || '')}
+        confirmText={t('ontology.btn_confirm_delete')}
+        cancelText={t('ow.btn.cancel')}
+        onConfirm={executePendingDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

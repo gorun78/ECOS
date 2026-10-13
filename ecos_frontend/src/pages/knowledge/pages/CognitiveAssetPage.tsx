@@ -13,7 +13,7 @@
  * 主题守护：0 硬编码色。图标仅 lucide-react。文案全 t()。组件 ≤800 行。
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Layers, AlertTriangle, RefreshCw, Inbox, Search } from 'lucide-react';
+import { Layers, AlertTriangle, RefreshCw, Inbox, Search, Info } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import {
@@ -24,7 +24,7 @@ import {
   isCognitiveApiError,
   type CognitiveAssetCatalog,
 } from '../../../services/cognitiveClient';
-import { normalizeAssetRows, type CognitiveAssetRow } from '../services/cognitiveAsset';
+import { normalizeAssetRows, PENDING_GOVERNED_CLASSES, type CognitiveAssetRow } from '../services/cognitiveAsset';
 import CognitiveAssetCard from '../components/CognitiveAssetCard';
 import CognitiveAssetResolveDrawer from '../components/CognitiveAssetResolveDrawer';
 import CandidateReviewPanel from '../components/CandidateReviewPanel';
@@ -173,6 +173,27 @@ export default function CognitiveAssetPage() {
             <div key={k} className="text-[11px] flex gap-2">
               <span className="font-mono opacity-70 flex-shrink-0">{k}</span>
               <span className="opacity-70">{v}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 承诺类型引导块（复盘 S6 / 设计方案 §1.2、§1.4.2）：Decision Basis、经治理 Pattern·Case
+          已承诺类型面，但后端无治理列表端点（取证：CognitiveApiPaths 资产路径池仅
+          catalog/resolve/proposals/transitions；catalog.governedAssetClasses = BELIEF/HYPOTHESIS/MODEL）。
+          信息性呈现（非错误态），如实标注后端增量边界。 */}
+      {catalog.status === 'ok' && (
+        <div
+          className="rounded-md border p-3 flex flex-col gap-1.5"
+          style={{ borderColor: styles.cardBorder, background: styles.cardBg }}
+        >
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider opacity-50">
+            <Info className="w-3.5 h-3.5" />{t('knowledge.cognitiveAsset.pending_classes_title')}
+          </div>
+          {PENDING_GOVERNED_CLASSES.map((c) => (
+            <div key={c} className="text-[11px] flex items-baseline gap-2">
+              <span className="opacity-70">{t(`knowledge.cognitiveAsset.class.${c}`)}</span>
+              <span className="opacity-50">{t('knowledge.cognitiveAsset.pending_classes_hint')}</span>
             </div>
           ))}
         </div>

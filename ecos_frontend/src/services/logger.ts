@@ -8,7 +8,14 @@
  * @license Apache-2.0
  */
 
-const isDev = typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+/**
+ * dev/prod 判定单源 = Vite 编译期常量 `import.meta.env.DEV`。
+ * 旧实现读 `process.env.NODE_ENV`：浏览器运行时没有 `process`（Vite 也不注入 global
+ * `process`），`typeof process !== "undefined"` 恒 false → dev 下 debug/info 全部哑火，
+ * 等价于"日志开关永远关"（报告 §4.8 P2 死逻辑）。
+ * 测试环境（vitest）同样把 import.meta.env.DEV 置为 true，行为与 dev 一致。
+ */
+const isDev = import.meta.env.DEV;
 
 export const logger = {
   debug(...args: unknown[]): void {

@@ -24,9 +24,12 @@ interface ActionTypeViewProps {
   onUpdate: (updated: ActionType) => void;
   onDelete: (id: string) => void;
   onNavigateToObject: (objectId: string) => void;
+  /** 无假真理：/api/v1/ontology/action-types 仅 GET（无创建/删除端点）⇒ 禁用删除并如实标注 */
+  deleteUnsupported?: boolean;
+  deleteUnsupportedReason?: string;
 }
 
-export default function ActionTypeView({ actionType, objectTypes, onUpdate, onDelete, onNavigateToObject }: ActionTypeViewProps) {
+export default function ActionTypeView({ actionType, objectTypes, onUpdate, onDelete, onNavigateToObject, deleteUnsupported, deleteUnsupportedReason }: ActionTypeViewProps) {
   const { t } = useLanguage();
   const { styles } = useTheme();
   const [activeTab, setActiveTab] = useState<'parameters' | 'rules' | 'validation' | 'layout'>('parameters');
@@ -104,7 +107,17 @@ export default function ActionTypeView({ actionType, objectTypes, onUpdate, onDe
             <p className={`text-xs ${styles.muted} mt-0.5`}>{actionType.description || t('ow.empty.noDescription')}</p>
           </div>
         </div>
-        <button type="button" onClick={() => onDelete(actionType.id)} className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"><Trash2 size={13} />{t('ow.btn.deleteAction')}</button>
+        <button
+          type="button"
+          disabled={deleteUnsupported}
+          title={deleteUnsupported ? deleteUnsupportedReason : undefined}
+          onClick={() => { if (!deleteUnsupported) onDelete(actionType.id); }}
+          className={deleteUnsupported
+            ? `text-xs px-2.5 py-1.5 rounded border ${styles.appBorder} ${styles.muted} cursor-not-allowed inline-flex items-center gap-1.5 opacity-70`
+            : "text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"}
+        >
+          <Trash2 size={13} />{deleteUnsupported ? (deleteUnsupportedReason || t('ow.btn.deleteAction')) : t('ow.btn.deleteAction')}
+        </button>
       </div>
 
       <div className={`flex px-6 border-b ${styles.cardBorder} ${styles.cardBg}`}>

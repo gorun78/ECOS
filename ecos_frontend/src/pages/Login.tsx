@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
-import { authLogin, setAuthGracePeriod } from "../api";
+import { authLogin, isErrorResponse, setAuthGracePeriod } from "../api";
 import { fetchAuthMeWithToken } from "../services/auth";
 
 export default function Login() {
@@ -30,10 +30,13 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Where to redirect after successful login
+  // Where to redirect after successful login.
+  // 落地根必须是「真实存在的路由根」：index 路由 = CognitiveOperatingSystem，
+  // 而 `/app` 在全仓路由表里不存在（main.tsx 无 app 根）→ 登录后落到 404 兜底页
+  // （检视报告 §4.1 P0 / §一 S6）。RequireAuth 传入的 from 仍优先。
   const from =
     (location.state as { from?: { pathname: string } })?.from?.pathname ||
-    "/app";
+    "/";
 
   const inputCls = `w-full px-4 py-2.5 ${styles.inputBg} ${styles.inputBorder} border rounded-lg text-sm ${styles.inputText} transition`;
 
@@ -76,11 +79,17 @@ export default function Login() {
       } catch { /* non-critical */ }
 
       navigate(from, { replace: true });
-    } catch (err: any) {
-      if (err.message === "Failed to fetch" || err.name === "TypeError") {
+    } catch (err: unknown) {
+      // 错误分类（报告 §五 L3：原实现只判 "Failed to fetch" 字面量，5xx 与密码错误
+      // 同文案 → 用户不知道「该重试」还是「该找管理员」）。传输层失败已由 authLogin
+      // 广播 ecos-network-down，这里补一条可重试口径。
+      const info = isErrorResponse(err);
+      if (info.kind === "network") {
         setError(t("login.noNetwork"));
+      } else if (info.status && info.status >= 500) {
+        setError(t("login.fail.server", { status: info.status }));
       } else {
-        setError(err.message || t("login.fail"));
+        setError(err instanceof Error && err.message ? err.message : t("login.fail"));
       }
     } finally {
       setLoading(false);
@@ -106,8 +115,8 @@ export default function Login() {
       <div className="w-full max-w-md mx-4">
         {/* ── Brand ──────────────────────────────────────── */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-lg" style={{ backgroundColor: "var(--accent)" }}>
-            <ShieldCheck className="w-8 h-8 text-white" />
+          <div className={`w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-lg ${styles.accentBg}`}>
+            <ShieldCheck className={`w-8 h-8 ${styles.accentSolidText}`} />
           </div>
           <h1 className={`text-2xl font-bold ${styles.text}`}>ECOS Platform</h1>
           <p className={`text-sm mt-1 ${styles.muted}`}>

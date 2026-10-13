@@ -36,6 +36,7 @@ type OnEdgesChange = (changes: EdgeChange[]) => void;
 type OnConnect = (connection: Connection) => void;
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import type {
   AIPLogicPipeline,
   AIPModel,
@@ -259,7 +260,8 @@ export default function LogicView({
 
   /** 节点边框样式：IDLE 用节点类型色；RUNNING/SUCCESS/FAILED/SKIPPED 用主题 token */
   const nodeBorder = (status: LogicNodeStatus, selected: boolean): string => {
-    if (selected) return 'border-blue-500';
+    // §4.5 P2（行249）：选中态裸色 border-blue-500 → 主题 token
+    if (selected) return `${styles.accentBorder} border-2`;
     switch (status) {
       case 'running': return `${styles.warningBorder} border-2 animate-pulse`;
       case 'success': return `${styles.successBorder} border-2`;
@@ -287,8 +289,14 @@ export default function LogicView({
     setShowCreateModal(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (!window.confirm(t('aiworkbench.logic.delete.confirm'))) return;
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  const handleDelete = (id: string) => setPendingDeleteId(id);
+
+  const runDelete = () => {
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
+    if (!id) return;
     const updated = pipelines.filter(p => p.id !== id);
     onUpdatePipelines(updated);
     if (selectedPipelineId === id && updated.length > 0) {
@@ -448,6 +456,16 @@ export default function LogicView({
           onClose={() => setShowCreateModal(false)}
         />
       )}
+      <ConfirmDialog
+        visible={!!pendingDeleteId}
+        danger
+        title={t('aiworkbench.logic.delete.title')}
+        message={t('aiworkbench.logic.delete.confirm')}
+        confirmText={t('common.confirm')}
+        cancelText={t('common.cancel')}
+        onConfirm={runDelete}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }

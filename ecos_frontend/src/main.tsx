@@ -1,7 +1,18 @@
 import { StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import './index.css';
+
+/**
+ * `#/knowledge` 旧入口 → `#/knowledge_view` 正主入口单源重定向（W196 收口，
+ * 检视报告 H 组：双入口同渲染 = 「单入口」失实）。knowledge_view 是 navConfig
+ * 唯一 tabbable id、Topbar 面包屑分支与 pages/knowledge 内部深链的锚点；
+ * 重定向保留 `?page=…` 查询串，既有深链不断。
+ */
+function KnowledgeLegacyRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/knowledge_view${location.search}`} replace />;
+}
 
 // Keep core shell, auth + providers eager (first-paint critical path).
 import App from './App.tsx';
@@ -32,7 +43,6 @@ const ObjectExplorer = lazy(() => import('./pages/ObjectExplorer.tsx'));
 const WorldModelViewer = lazy(() => import('./pages/WorldModelViewer.tsx'));
 const CaseLibrary = lazy(() => import('./components/CaseLibraryView.tsx'));
 const AlertPanel = lazy(() => import('./components/AlertPanel.tsx'));
-const GlossaryManager = lazy(() => import('./pages/GlossaryManager.tsx'));
 const MarketplaceBrowser = lazy(() => import('./pages/MarketplaceBrowser.tsx'));
 const UserManagement = lazy(() => import('./pages/UserManagement.tsx'));
 const BizDashboard = lazy(() => import('./pages/BizDashboard.tsx'));
@@ -40,9 +50,11 @@ const ProjectTracker = lazy(() => import('./pages/ProjectTracker.tsx'));
 const ContractManager = lazy(() => import('./pages/ContractManager.tsx'));
 const OperationsDashboard = lazy(() => import('./pages/OperationsDashboard.tsx'));
 const KanbanBoard = lazy(() => import('./pages/KanbanBoard.tsx'));
-const DataLineage = lazy(() => import('./pages/DataLineage.tsx'));
+// W196 收口（报告 H 组死 lazy）：DataLineage / SystemDictionary 在本路由表零引用
+// —— 两页由 data-workbench / knowledge 子树以静态 import 直接挂载（见
+// pages/data-workbench/tabs/DataLineageTab.tsx、pages/knowledge/tabs/GlossaryTab.tsx），
+// 此处 lazy 声明删除不断链；页面文件保留不动。
 const DictManager = lazy(() => import('./pages/DictManager.tsx'));
-const SystemDictionary = lazy(() => import('./pages/SystemDictionary.tsx'));
 const SystemConfigManager = lazy(() => import('./pages/SystemConfigManager.tsx'));
 const SecurityCenter = lazy(() => import('./pages/security-center/SecurityCenterLayout'));
 const TelemetryViewer = lazy(() => import('./pages/TelemetryViewer.tsx'));
@@ -176,9 +188,9 @@ createRoot(document.getElementById('root')!).render(
                     </Suspense>
                 } />
                 <Route path="world_model" element={<WorldModelViewer />} />
-                {/* B.0 信息架构归一：`#/knowledge` 是 6 平铺页主入口；
-                    `#/knowledge_view` 保留（Deprecation），行为不变，待后续 Wave 合并删除。 */}
-                <Route path="knowledge" element={<KnowledgeView />} />
+                {/* B.0 信息架构归一收口（W196）：单入口 = #/knowledge_view（navConfig
+                    tabbable 正主）；#/knowledge 降级为保查询串的重定向。 */}
+                <Route path="knowledge" element={<KnowledgeLegacyRedirect />} />
                 <Route path="knowledge_view" element={<KnowledgeView />} />
                 {/* W · 智能层 */}
                 <Route path="agent_studio" element={<Navigate to="/ai-workbench" replace />} />

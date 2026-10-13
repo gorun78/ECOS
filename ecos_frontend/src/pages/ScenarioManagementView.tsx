@@ -27,7 +27,7 @@ import DecisionDeskTab from './project-workbench/tabs/DecisionDeskTab';
 import ScenarioList from './scenario/ScenarioList';
 import ScenarioEditor, { type WizardState } from './scenario/ScenarioEditor';
 import SimulationResultPanel from './scenario/SimulationResultPanel';
-import { COGNITION_POLL_INTERVAL_MS } from '../services/cognitiveClient';
+import { COGNITION_POLL_INTERVAL_MS, callJsonWithTrace } from '../services/cognitiveClient';
 
 /** 后端场景 VO（含业务目标，前端 BusinessScenario 展示同形） */
 interface ScenarioApiVO {
@@ -141,7 +141,11 @@ export default function ScenarioManagementView({
   const [wSecurityPolicies, setWSecurityPolicies] = useState<string[]>([]);
   const [proposals, setProposals] = useState<unknown[]>([]);
   const [isLoadingProposals, setIsLoadingProposals] = useState(false);
+  const [proposalsError, setProposalsError] = useState<string | null>(null);
   const [resolvingProposalId, setResolvingProposalId] = useState<string | null>(null);
+  // 驳回确认对话框（替代原生 prompt()，F 组 P1）：目标提案 + 理由输入
+  const [rejectTarget, setRejectTarget] = useState<{ id: string; actionId: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const activeScenario = scenarios.find((s) => s.id === selectedScenarioId) || scenarios[0];
 
@@ -168,47 +172,59 @@ export default function ScenarioManagementView({
   }, []);
 
   // ── Proposals（对账提案，走后端实时接口） ──
+  // 仅 decision Tab 可见时拉取 + 轮询（隐藏 Tab 不常驻轮询，降低无谓请求）
   const fetchProposalsList = async () => {
     setIsLoadingProposals(true);
     try {
       const d = await apiFetchData<unknown[]>('/api/v1/ontology/proposals');
       setProposals(Array.isArray(d) ? d : []);
+      setProposalsError(null);
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
       logger.error('proposals', e);
+      // 吞错→错误态：失败不再伪装「暂无提案」，由 DecisionDeskTab 渲染错误 + 重试
+      setProposalsError(msg);
     } finally {
       setIsLoadingProposals(false);
     }
   };
   useEffect(() => {
+    if (activeTab !== 'decision') return;
     fetchProposalsList();
     const timer = setInterval(fetchProposalsList, COGNITION_POLL_INTERVAL_MS);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeTab]);
 
   const handleApproveProposal = async (id: string, actionId: string) => {
     setResolvingProposalId(id);
     try {
       // 零信任身份由后端从 SSO 会话解析；前端不再内联伪造 userRole/userName（F07-22）
-      await apiFetchData(`/api/v1/ontology/proposals/${id}/approve`, { method: 'POST' });
-      toast('success', t('scenario.proposal.approveOk', { actionId }));
+      // 网关对每个响应回写 X-Request-Id：经 callJsonWithTrace 透出真实 traceId 进 toast 归因
+      const { traceId } = await callJsonWithTrace(`/api/v1/ontology/proposals/${id}/approve`, { method: 'POST' });
+      toast('success', traceId
+        ? t('scenario.proposal.approveOkTrace', { actionId, traceId })
+        : t('scenario.proposal.approveOk', { actionId }));
       fetchProposalsList();
       refreshScenarios();
     } catch (e) {
-      const err = e as Error | undefined;
-      toast('error', err?.message || t('scenario.proposal.approveErr'));
+      const err = e as { message?: string; traceId?: string };
+      toast('error', err.traceId
+        ? `${err.message ?? t('scenario.proposal.approveErr')} (traceId: ${err.traceId})`
+        : err.message || t('scenario.proposal.approveErr'));
     } finally {
       setResolvingProposalId(null);
     }
   };
 
-  const handleRejectProposal = async (id: string, actionId: string) => {
+  /** 打开驳回对话框（输入理由，替代原生 prompt()） */
+  const openRejectDialog = (id: string, actionId: string) => {
+    setRejectTarget({ id, actionId });
+    setRejectReason(t('scenario.proposal.rejectDefault'));
+  };
+
+  const handleRejectProposal = async (id: string, actionId: string, reason: string) => {
     setResolvingProposalId(id);
-    const reason = prompt(t('scenario.proposal.rejectPrompt'), t('scenario.proposal.rejectDefault'));
-    if (reason === null) {
-      setResolvingProposalId(null);
-      return;
-    }
     try {
       await apiFetchData(`/api/v1/ontology/proposals/${id}/reject`, {
         method: 'POST',
@@ -221,6 +237,7 @@ export default function ScenarioManagementView({
       toast('error', err?.message || t('scenario.proposal.networkErr', { msg: String(err?.message ?? e) }));
     } finally {
       setResolvingProposalId(null);
+      setRejectTarget(null);
     }
   };
 
@@ -313,7 +330,9 @@ export default function ScenarioManagementView({
       status: wStatus,
       budget: wBudget,
       safetyIndexTarget: target,
-      actualSafetyIndex: wStatus === 'ACTIVE' ? 0.995 : 0,
+      // 无假真理 P0（报告 §4.6 F 组）：原「ACTIVE → 0.995 否则 0」硬编码写回删除。
+      // actualSafetyIndex 是运行实绩测量值，只由后端测量链路落库；向导不产出该字段，
+      // 缺失即留空（展示层 fmtIndex → 「—」），杜绝制造虚假实绩。
       metrics: m,
       bindings,
     };
@@ -394,7 +413,7 @@ export default function ScenarioManagementView({
             <h1 className={`text-lg font-bold tracking-tight ${styles.appText} flex items-center gap-2`}>
               {t('scenario.page.title')}{' '}
               <span className={`text-[10px] border px-2 py-0.5 rounded font-bold tracking-widest uppercase ${styles.badgeBg} ${styles.accentText} ${styles.cardBorder}`}>
-                Executive Cockpit
+                {t('scenario.badge.cockpit')}
               </span>
             </h1>
           </div>
@@ -440,8 +459,8 @@ export default function ScenarioManagementView({
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className={`text-[10px] border px-2 py-0.5 rounded font-mono font-bold ${styles.successBg} ${styles.successText} ${styles.successBorder}`}>
-                      ACTIVE SCENARIO
+                    <span className={`text-[10px] border px-2 py-0.5 rounded font-mono font-bold ${activeScenario.status === 'ACTIVE' ? `${styles.successBg} ${styles.successText} ${styles.successBorder}` : `${styles.badgeBg} ${styles.cardTextMuted} ${styles.cardBorder}`}`}>
+                      {t('scenario.badge.activeScenario')} · {activeScenario.status}
                     </span>
                     <span className={`text-xs font-semibold ${styles.cardTextMuted} font-mono`}>ID: {activeScenario.id}</span>
                   </div>
@@ -524,9 +543,10 @@ export default function ScenarioManagementView({
                     activeScenario={activeScenario}
                     proposals={proposals}
                     isLoadingProposals={isLoadingProposals}
+                    proposalsError={proposalsError}
                     fetchProposalsList={fetchProposalsList}
                     handleApproveProposal={handleApproveProposal}
-                    handleRejectProposal={handleRejectProposal}
+                    openRejectDialog={openRejectDialog}
                     resolvingProposalId={resolvingProposalId}
                   />
                 </>
@@ -565,6 +585,42 @@ export default function ScenarioManagementView({
         styles={styles}
         toast={toast}
       />
+
+      {/* 驳回理由对话框（原生 prompt() → 主题化模态，F 组 P1） */}
+      {rejectTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label={t('scenario.proposal.rejectTitle')}>
+          <div className="absolute inset-0 bg-black/40" onClick={() => setRejectTarget(null)} />
+          <div className={`relative z-10 w-full max-w-md mx-4 rounded-xl shadow-2xl p-6 ${styles.cardBg} border ${styles.cardBorder}`}>
+            <h3 className={`text-base font-bold ${styles.cardText} mb-2`}>{t('scenario.proposal.rejectTitle')}</h3>
+            <p className={`text-sm mb-4 ${styles.cardTextMuted}`}>{t('scenario.proposal.rejectMessage')}</p>
+            <textarea
+              autoFocus
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={3}
+              placeholder={t('scenario.proposal.rejectPlaceholder')}
+              className={`w-full resize-none text-xs rounded border p-2.5 ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
+            />
+            <div className="flex gap-2 justify-end mt-5">
+              <button
+                type="button"
+                onClick={() => setRejectTarget(null)}
+                className={`px-4 py-1.5 rounded text-xs border ${styles.cardBorder} ${styles.cardText} ${styles.sidebarHoverBg} cursor-pointer`}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                disabled={!rejectReason.trim() || resolvingProposalId === rejectTarget.id}
+                onClick={() => void handleRejectProposal(rejectTarget.id, rejectTarget.actionId, rejectReason.trim())}
+                className={`px-4 py-1.5 rounded text-xs font-semibold border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}
+              >
+                {t('scenario.proposal.rejectConfirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showCopilot && (
         <div className="absolute top-0 right-0 bottom-0 w-80 border-l border-[var(--border)] bg-[var(--card)] shadow-2xl z-40 flex flex-col overflow-hidden">

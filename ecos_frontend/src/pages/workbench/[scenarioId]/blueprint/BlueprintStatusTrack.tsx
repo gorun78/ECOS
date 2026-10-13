@@ -24,7 +24,10 @@ import {
   type ScenarioBlueprintVO,
 } from '../../../../services/scenarioBlueprintClient';
 
-/** tone → 主题 token 类（避免硬编码 Tailwind 结构色）。 */
+/**
+ * tone → 主题 token 类（零 palette 字面量：点/连接线用「语义文本色 + bg-current」，
+ * 背景色取自 currentColor，四主题自动跟随）。
+ */
 interface ToneClass {
   dot: string;
   text: string;
@@ -34,21 +37,21 @@ interface ToneClass {
 function toneClass(tone: StatusTone, s: ReturnType<typeof useTheme>['styles']): ToneClass {
   switch (tone) {
     case 'initial':
-      return { dot: `bg-slate-400`, text: s.cardTextMuted, ring: s.cardBorder };
+      return { dot: `${s.sidebarText} bg-current`, text: s.cardTextMuted, ring: s.cardBorder };
     case 'progress':
-      return { dot: `bg-blue-500`, text: s.infoText, ring: `border-blue-500/40` };
+      return { dot: `${s.infoText} bg-current`, text: s.infoText, ring: s.infoBorder };
     case 'ready':
-      return { dot: `bg-amber-500`, text: s.warningText, ring: s.warningBorder };
+      return { dot: `${s.warningText} bg-current`, text: s.warningText, ring: s.warningBorder };
     case 'approved':
-      return { dot: `bg-indigo-500`, text: s.accentText, ring: s.accentBorder };
+      return { dot: `${s.accentText} bg-current`, text: s.accentText, ring: s.accentBorder };
     case 'live':
-      return { dot: `bg-emerald-500`, text: s.successText, ring: s.successBorder };
+      return { dot: `${s.successText} bg-current`, text: s.successText, ring: s.successBorder };
     case 'terminal':
-      return { dot: `bg-slate-500`, text: s.cardTextMuted, ring: s.cardBorder };
+      return { dot: `${s.cardTextMuted} bg-current`, text: s.cardTextMuted, ring: s.cardBorder };
     case 'exception':
-      return { dot: `bg-red-500`, text: s.dangerText, ring: s.dangerBorder };
+      return { dot: `${s.dangerText} bg-current`, text: s.dangerText, ring: s.dangerBorder };
     default:
-      return { dot: `bg-slate-300`, text: s.cardTextMuted, ring: s.cardBorder };
+      return { dot: `${s.cardTextMuted} bg-current`, text: s.cardTextMuted, ring: s.cardBorder };
   }
 }
 
@@ -118,11 +121,11 @@ export default function BlueprintStatusTrack({ blueprint, onTransition, busy }: 
                         : `${styles.cardTextMuted} ${styles.cardBorder} ${styles.cardBg} opacity-50 cursor-not-allowed`,
                 ].join(' ')}
               >
-                <span className={`h-2 w-2 rounded-full ${done ? 'bg-emerald-500' : isCurrent ? stepTc.dot : 'bg-slate-300'}`} />
+                <span className={`h-2 w-2 rounded-full ${done ? `${styles.successText} bg-current` : isCurrent ? stepTc.dot : `${styles.cardTextMuted} bg-current opacity-40`}`} />
                 {t(`workspace.bp.step.${step}`)}
               </button>
               {idx < BLUEPRINT_MAIN_FLOW.length - 1 && (
-                <span className={`h-px w-3 ${done ? 'bg-emerald-500' : 'bg-slate-300'}`} aria-hidden />
+                <span className={`h-px w-3 ${done ? `${styles.successText} bg-current` : `${styles.cardTextMuted} bg-current opacity-40`}`} aria-hidden />
               )}
             </li>
           );

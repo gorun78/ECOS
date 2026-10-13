@@ -13,7 +13,7 @@ import { Box, AlertCircle, X } from "lucide-react";
 import { useTheme } from "../components/ThemeContext";
 import { useLanguage } from "../components/LanguageContext";
 import {
-  fetchObjects, searchObjects, fetchObjectDetail, fetchObjectSchema,
+  fetchObjects, fetchObjectDetail, fetchObjectSchema,
   createObject, updateObject, deleteObject,
   ObjectData, SchemaProperty,
   fetchAvailableTransitions, executeTransition,
@@ -22,6 +22,9 @@ import {
 } from "../api";
 // T2: fetchEntityList/EntityListItem 由 api.ts 收敛到 services/ontologyApi.ts
 import { fetchEntityList, EntityListItem } from "../services/ontologyApi";
+import { getUserIdentity } from "../services/auth";
+import logger from "../services/logger";
+import ConfirmDialog from "../components/common/ConfirmDialog";
 import MobileDataTable, { MobileCardConfig } from "../components/common/MobileDataTable";
 import DataTable, { ColumnConfig } from "../components/common/DataTable";
 import { PAGE_SIZE, type Relation } from "./ObjectExplorer/helpers";
@@ -35,7 +38,8 @@ import { ObjectExplorerRelationModal } from "./ObjectExplorer/ObjectExplorerRela
 export default function ObjectExplorer() {
   const { t } = useLanguage();
   const { styles } = useTheme();
-  const [entityCode, setEntityCode] = useState<string>("Customer");
+  // 初始为空：实体清单只来自 API（无假真理 — 不得默认演示实体 Customer）
+  const [entityCode, setEntityCode] = useState<string>("");
   const [entityList, setEntityList] = useState<EntityListItem[]>([]);
   const [entityListLoading, setEntityListLoading] = useState(true);
   const [entityListError, setEntityListError] = useState(false);
@@ -80,8 +84,8 @@ export default function ObjectExplorer() {
     setSelectedId(targetObjectId);
   };
 
-  // ── Load entity list dynamically from API ──
-  useEffect(() => {
+  // ── Load entity list dynamically from API（失败 ⇒ 错误态+重试，禁止演示兜底实体）──
+  const loadEntityList = useCallback(() => {
     setEntityListLoading(true);
     setEntityListError(false);
     fetchEntityList()
@@ -90,7 +94,7 @@ export default function ObjectExplorer() {
           setEntityList(list);
           setEntityCode(list[0].code);
         } else {
-          // API returned empty list, use fallback
+          // 空列表 = 无真实实体可选 ⇒ 显式错误态，不静默留空
           setEntityListError(true);
         }
       })
@@ -100,27 +104,24 @@ export default function ObjectExplorer() {
       .finally(() => setEntityListLoading(false));
   }, []);
 
-  // Load objects
+  useEffect(() => { loadEntityList(); }, [loadEntityList]);
+
+  // Load objects（搜索与分页统一走 fetchObjects 服务端 keyword+page，搜索×分页不再断链）
   const loadObjects = useCallback(async (ec: string, page: number, kw?: string) => {
+    if (!ec) { setObjects([]); setTotal(0); setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
-      if (kw && kw.trim()) {
-        const result = await searchObjects(kw, ec);
-        setObjects(result.data);
-        setTotal(result.total);
-      } else {
-        const result = await fetchObjects(ec, kw, page, PAGE_SIZE);
-        setObjects(result.data);
-        setTotal(result.total);
-      }
+      const result = await fetchObjects(ec, kw?.trim() || undefined, page, PAGE_SIZE);
+      setObjects(result.data);
+      setTotal(result.total);
     } catch (e: any) {
-      setError(e.message || "加载失败");
+      setError(e.message || t("dw.objectExplorer.loadFailed"));
       setObjects([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -137,6 +138,7 @@ export default function ObjectExplorer() {
 
   // Load entity schema
   useEffect(() => {
+    if (!entityCode) { setSchema([]); return; }
     fetchObjectSchema(entityCode).then(s => setSchema(s.properties || []))
       .catch(() => { /* schema endpoint may not exist — use empty schema */ });
   }, [entityCode]);
@@ -149,7 +151,7 @@ export default function ObjectExplorer() {
     setTimelineTotal(0);
     Promise.all([
       fetchObjectDetail(entityCode, selectedId),
-      fetchAvailableTransitions(entityCode, selectedId).catch((): null => { setError('Transitions 加载失败'); return null; }),
+      fetchAvailableTransitions(entityCode, selectedId).catch((): null => { setError(t('dw.objectExplorer.transitions.loadFailed')); return null; }),
     ])
       .then(([d, transitions]) => {
         setDetail(d);
@@ -159,9 +161,13 @@ export default function ObjectExplorer() {
           setAvailableTransitions(transitions.availableTransitions || []);
         }
       })
-      .catch(() => { /* detail endpoint may not exist */ })
+      .catch(() => {
+        // 无假真理：详情拉取失败不得静默留空白面板
+        setDetail(null);
+        setError(t('dw.objectExplorer.detail.loadFailed'));
+      })
       .finally(() => setDetailLoading(false));
-  }, [selectedId, entityCode]);
+  }, [selectedId, entityCode, t]);
 
   // Gap 3: Load timeline independently when tab is selected
   useEffect(() => {
@@ -176,7 +182,7 @@ export default function ObjectExplorer() {
         }
         setTimelineTotal(page.total);
       })
-      .catch(e => setError(e.message))
+      .catch(e => setError(e?.message || t('dw.objectExplorer.timeline.loadFailed')))
       .finally(() => setTimelineLoading(false));
   }, [selectedId, entityCode, activeDetailTab, timelinePage]);
 
@@ -235,15 +241,21 @@ export default function ObjectExplorer() {
     setShowForm("edit");
   };
 
-  // ---- Delete ----
+  // ---- Delete（危险操作走 ConfirmDialog，禁原生 confirm）----
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const handleDelete = async (id: string) => {
-    if (!confirm(t("object_explorer.confirm_delete"))) return;
+    setDeleteTarget(id);
+  };
+  const confirmDelete = async () => {
+    const id = deleteTarget;
+    if (!id) return;
+    setDeleteTarget(null);
     try {
       await deleteObject(entityCode, id);
       setObjects(prev => prev.filter(o => o.id !== id));
       setTotal(prev => prev - 1);
       if (selectedId === id) setSelectedId(null);
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) { setError(e?.message || t('dw.objectExplorer.delete.failed')); }
   };
 
   // Gap 2: Create relationship
@@ -262,30 +274,32 @@ export default function ObjectExplorer() {
       // Refresh relations
       fetchObjectDetail(entityCode, selectedId)
         .then(d => setDetailRelations(d.relations || []))
-        .catch((e: any) => { console.error('Refresh relations failed:', e); });
+        .catch((e: unknown) => { logger.warn('Refresh relations failed', e); });
     } catch (e: any) { setError(e.message); }
     finally { setRelCreating(false); }
   };
 
-  // Gap 1: Status change via backend transition
+  // Gap 1: Status change via backend transition（操作者 = 真实登录身份，禁硬编码 "admin" 伪造审计主体）
   const handleStatusChange = async (transitionCode: string) => {
     if (!selectedId) return;
+    const identity = getUserIdentity();
+    if (!identity) { setError(t('dw.objectExplorer.transition.noIdentity')); return; }
     setShowStatusDropdown(false);
     setStatusChanging(true);
     try {
-      const result = await executeTransition(entityCode, selectedId, transitionCode, "admin");
+      const result = await executeTransition(entityCode, selectedId, transitionCode, identity.username);
       setDetail(prev => prev ? { ...prev, status: result.newStatus } : null);
       setObjects(prev => prev.map(o => o.id === selectedId ? { ...o, status: result.newStatus } : o));
       // Refresh available transitions after status change
       fetchAvailableTransitions(entityCode, selectedId)
         .then(t => setAvailableTransitions(t.availableTransitions || []))
-        .catch((e: any) => { console.error('Refresh transitions failed:', e); });
-    } catch (e: any) { setError(e.message); }
+        .catch((e: unknown) => { logger.warn('Refresh transitions failed', e); });
+    } catch (e: any) { setError(e?.message || t('dw.objectExplorer.transition.failed')); }
     finally { setStatusChanging(false); }
   };
 
   // ---- Build table columns from schema ----
-  const tableColumns: ColumnConfig<ObjectData>[] = useMemo(() => buildObjectColumns(schema, styles), [schema, styles]);
+  const tableColumns: ColumnConfig<ObjectData>[] = useMemo(() => buildObjectColumns(schema, styles, t), [schema, styles, t]);
 
   // ---- Mobile card config（移动端卡片态：ObjectExplorer 表格页）----
   // 卡片头：主键 id + 1 个最高优先级字段（status，呈现 Dup/Active 状态颜色）
@@ -314,6 +328,9 @@ export default function ObjectExplorer() {
       <ObjectExplorerTopBar
         entityCode={entityCode}
         entityList={entityList}
+        entityListLoading={entityListLoading}
+        entityListError={entityListError}
+        onRetryEntityList={loadEntityList}
         handleEntityChange={handleEntityChange}
         searchQ={searchQ}
         setSearchQ={setSearchQ}
@@ -334,10 +351,12 @@ export default function ObjectExplorer() {
             data={objects}
             rowKey="id"
             loading={loading}
-            emptyTitle={`暂无${entityCode}对象`}
-            emptyDescription="点击「新建」按钮创建第一个对象"
+            emptyTitle={t("dw.objectExplorer.empty.title", { entity: entityCode })}
+            emptyDescription={entityListError
+              ? t("dw.objectExplorer.empty.entityError")
+              : t("dw.objectExplorer.empty.description")}
             emptyIcon={<Box className={`w-8 h-8 ${styles.cardTextMuted}`} />}
-            emptyAction={{ label: "新建对象", onClick: () => { setShowForm("create"); setFormData({}); } }}
+            emptyAction={{ label: t("dw.objectExplorer.empty.createAction"), onClick: () => { setShowForm("create"); setFormData({}); } }}
             pageSize={PAGE_SIZE}
             currentPage={currentPage}
             total={total}
@@ -388,6 +407,17 @@ export default function ObjectExplorer() {
           handleEdit={handleEdit}
         />
       )}
+
+      {/* 删除确认门（危险操作统一 ConfirmDialog，禁 window.confirm） */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        variant="danger"
+        title={t("dw.objectExplorer.delete.confirmTitle")}
+        message={t("dw.objectExplorer.delete.confirmMessage", { id: deleteTarget ?? "" })}
+        confirmText={t("dw.objectExplorer.delete.confirmOk")}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
 
       {/* Click-away handler for status dropdown */}
       {showStatusDropdown && (

@@ -63,10 +63,17 @@ export function useOverviewDomainForm({
     setFormError('');
   };
 
-  const handleDeleteDomain = (domainId: string) => {
-    if (!window.confirm(`确定要删除业务划分域「${domains.find(d => d.id === domainId)?.displayName}」吗？关联的实体将变更为未分类。`)) {
-      return;
-    }
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const pendingDomainName = domains.find(d => d.id === pendingDeleteId)?.displayName ?? '';
+
+  // 危险操作确认门：禁 window.confirm，统一 ConfirmDialog（消费组件渲染对话框）
+  const handleDeleteDomain = (domainId: string) => setPendingDeleteId(domainId);
+  const cancelDeleteDomain = () => setPendingDeleteId(null);
+
+  const confirmDeleteDomain = () => {
+    const domainId = pendingDeleteId;
+    setPendingDeleteId(null);
+    if (!domainId) return;
     // Delete domain
     const updatedDomains = domains.filter(d => d.id !== domainId);
     onUpdateDomains(updatedDomains);
@@ -163,6 +170,10 @@ export function useOverviewDomainForm({
     handleStartAdd,
     handleStartEdit,
     handleDeleteDomain,
+    pendingDeleteId,
+    pendingDomainName,
+    confirmDeleteDomain,
+    cancelDeleteDomain,
     handleSaveDomain,
     toggleObjectAssignment
   };

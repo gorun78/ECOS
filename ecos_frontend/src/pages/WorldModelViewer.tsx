@@ -1,13 +1,14 @@
 /**
- * WorldModelViewer v2 — 世界模型浏览器：5标签页金字塔可视化
+ * WorldModelViewer v2 — 世界模型浏览器：7 标签页金字塔可视化（Tab 状态同步到 URL ?tab=）
  * Connected to backend: /api/v1/ecos/world-model/*
  *
- * Tabs: Goal Tree | Execution Tracking | Causal Graph | Scenarios | Review
+ * Tabs: Goal Tree | Execution Tracking | Causal Graph | Scenarios | Review | Simulation | Pareto
  *
  * @license SPDX-License-Identifier: Apache-2.0
  */
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Target, GitBranch, Network, RefreshCw,
   AlertCircle, XCircle,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
+import ConfirmDialog from "../components/common/ConfirmDialog";
 import ScenarioSandbox from "../components/ScenarioSandbox";
 import ErrorBoundary from "../components/common/ErrorBoundary";
 import {
@@ -51,7 +53,21 @@ export default function WorldModelViewer() {
   const { t, locale } = useLanguage();
   const { styles } = useTheme();
 
-  const [tab, setTab] = useState(0);
+  const TAB_COUNT = 7;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = Number(searchParams.get("tab"));
+  const tab = Number.isFinite(rawTab) ? Math.min(Math.max(Math.trunc(rawTab), 0), TAB_COUNT - 1) : 0;
+  const setTab = (i: number) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", String(i));
+    setSearchParams(next, { replace: true });
+  };
+
+  // 删除确认门：handleDelete 改两段式（点击 → 确认弹窗 → 真实删除），子 Tab 传入签名不变
+  const [pendingDelete, setPendingDelete] = useState<{ type: string; id: number | string } | null>(null);
+  // 新建目标「编码待后端发号/手工填写」显式标注（弹窗遮挡页面横幅不可见时配合 toast）
+  const [showCodePending, setShowCodePending] = useState(false);
+
   const [goals, setGoals] = useState<Goal[]>([]);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [trackingData, setTrackingData] = useState<any[]>([]);
@@ -164,7 +180,7 @@ export default function WorldModelViewer() {
   const [orgTree, setOrgTree] = useState<any[]>([]);
   const [userList, setUserList] = useState<any[]>([]);
 
-  async function handleDelete(type: string, id: number | string) {
+  async function executeDelete(type: string, id: number | string) {
     try {
       await deleteWorldModelItem(type, id as any);
     } catch (e: any) {
@@ -174,11 +190,17 @@ export default function WorldModelViewer() {
     if (selectedGoal && selectedGoal.id === id) setSelectedGoal(null);
   }
 
+  /** 删除入口：先进确认门，确认后才发真实 DELETE */
+  function handleDelete(type: string, id: number | string) {
+    setPendingDelete({ type, id });
+  }
+
   async function openDlg(type: string, item?: any) {
     setDlgType(type);
 
     if (type === "goals" && !item) {
-      // New goal: auto-generate code, set defaults
+      // New goal: set defaults（编码不本地生成——无 /next-code 端点，
+      // 本地 Math.random 造号属「无假真理」违例：留空 + 页面显式标注「待后端发号/手工填写」）
       const now = new Date();
       const year = now.getFullYear();
       const defaults: Record<string, any> = {
@@ -186,11 +208,9 @@ export default function WorldModelViewer() {
         priority: 0,
         startDate: `${year}-01-01`,
         endDate: `${year + 1}-01-01`,
+        code: "",
       };
-
-      // 后端未提供 /next-code 端点（404）；改为本地生成一个占位 code，
-      // 避免每次「新建目标」都触发 404 且不影响保存流程。
-      defaults.code = `GOAL-${year}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      setShowCodePending(true);
 
       // Fetch org tree (fire and forget)
       fetchOrgs();
@@ -199,6 +219,7 @@ export default function WorldModelViewer() {
 
       setForm(defaults);
     } else {
+      setShowCodePending(false);
       setForm(item || (type === "goals"
         ? { status: "ACTIVE", priority: 0 }
         : type === "scenarios"
@@ -236,6 +257,7 @@ export default function WorldModelViewer() {
       setError(e.message);
       return;
     }
+    setShowCodePending(false);
     setDlgOpen(false);
     fetchAll();
   }
@@ -304,13 +326,13 @@ export default function WorldModelViewer() {
 
   // ── Tab definitions ──────────────────────
   const tabs = [
-    { label: t("platform.wm.tabs.goalTree"), icon: Target, emoji: "🌳" },
-    { label: t("platform.wm.tabs.track"), icon: TrendingUp, emoji: "📊" },
-    { label: t("platform.wm.tabs.causal"), icon: Network, emoji: "🕸️" },
-    { label: t("platform.wm.tabs.scenarios"), icon: GitBranch, emoji: "🎯" },
-    { label: t("platform.wm.tabs.review"), icon: ClipboardList, emoji: "📝" },
-    { label: t("platform.wm.tabs.simulation"), icon: BarChart3, emoji: "🧪" },
-    { label: t("platform.wm.tabs.pareto"), icon: Zap, emoji: "⚡" },
+    { label: t("platform.wm.tabs.goalTree"), icon: Target },
+    { label: t("platform.wm.tabs.track"), icon: TrendingUp },
+    { label: t("platform.wm.tabs.causal"), icon: Network },
+    { label: t("platform.wm.tabs.scenarios"), icon: GitBranch },
+    { label: t("platform.wm.tabs.review"), icon: ClipboardList },
+    { label: t("platform.wm.tabs.simulation"), icon: BarChart3 },
+    { label: t("platform.wm.tabs.pareto"), icon: Zap },
   ];
 
   // ── Render ──────────────────────────────
@@ -320,7 +342,7 @@ export default function WorldModelViewer() {
       <div className="flex justify-between items-center mb-5 shrink-0">
         <div>
           <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <Target className="text-indigo-500 w-5 h-5 shrink-0" />
+            <Target className={`w-5 h-5 shrink-0 ${styles.accentText}`} />
             {t("platform.wm.viewer.title")}
           </h1>
           <p className={`text-xs mt-0.5 ${styles.cardTextMuted}`}>
@@ -348,7 +370,7 @@ export default function WorldModelViewer() {
             onClick={() => setShowHistory(!showHistory)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium border transition-all cursor-pointer ${
               showHistory
-                ? "bg-amber-500/10 border-amber-500/30 text-amber-500"
+                ? `${styles.warningBg} ${styles.warningBorder} ${styles.warningText}`
                 : `${styles.cardBorder} opacity-60 hover:opacity-100`
             }`}
           >
@@ -370,10 +392,21 @@ export default function WorldModelViewer() {
 
       {/* Error bar */}
       {error && (
-        <div className="mb-4 px-3 py-2 rounded text-xs bg-red-500/10 border border-red-500/30 text-red-400 flex items-center gap-2 shrink-0">
+        <div className={`mb-4 px-3 py-2 rounded text-xs flex items-center gap-2 shrink-0 ${styles.dangerBg} border ${styles.dangerBorder} ${styles.dangerText}`}>
           <AlertCircle className="w-4 h-4 shrink-0" />
           {error}
-          <button type="button" onClick={() => setError("")} className="ml-auto hover:opacity-80">
+          <button type="button" onClick={() => setError("")} className="ml-auto hover:opacity-80 cursor-pointer" aria-label={t("common.close")}>
+            <XCircle className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* 新建目标时编码待补提示（无发号端点，如实标注） */}
+      {showCodePending && (
+        <div className={`mb-2 px-3 py-2 rounded text-xs flex items-center gap-2 shrink-0 ${styles.warningBg} border ${styles.warningBorder} ${styles.warningText}`}>
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          {t("dashboard.wm.codePending")}
+          <button type="button" onClick={() => setShowCodePending(false)} aria-label={t("common.close")} className="ml-auto hover:opacity-80 cursor-pointer">
             <XCircle className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -385,14 +418,14 @@ export default function WorldModelViewer() {
           <button type="button"
             key={i}
             onClick={() => { setTab(i); }}
-            className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all duration-150 border-b-2 -mb-[1px] flex items-center gap-1.5 ${
+            aria-current={tab === i ? "page" : undefined}
+            className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all duration-150 border-b-2 -mb-[1px] flex items-center gap-1.5 cursor-pointer ${
               tab === i
-                ? "border-indigo-500 text-indigo-400"
-                : `border-transparent ${styles.cardTextMuted} hover:text-gray-300`
+                ? `border-current ${styles.accentText}`
+                : `border-transparent ${styles.cardTextMuted} hover:opacity-90`
             }`}
           >
             <tabItem.icon className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">{tabItem.emoji}</span>
             <span className="hidden sm:inline">{tabItem.label}</span>
           </button>
         ))}
@@ -460,7 +493,7 @@ export default function WorldModelViewer() {
       {tab === 5 && (
         <div className="flex-1 overflow-y-auto space-y-4">
           {showHistory && (
-            <div className="px-3 py-2 rounded text-xs bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center gap-2">
+            <div className={`px-3 py-2 rounded text-xs flex items-center gap-2 ${styles.warningBg} border ${styles.warningBorder} ${styles.warningText}`}>
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               {t("platform.wm.viewer.historyBanner", { year: selectedYear })}
             </div>
@@ -501,6 +534,20 @@ export default function WorldModelViewer() {
         goalTree={goalTree}
         orgTree={orgTree}
         userList={userList}
+      />
+
+      {/* ═══════ 删除确认门 ═══════ */}
+      <ConfirmDialog
+        visible={pendingDelete != null}
+        title={t("dashboard.wm.confirmDeleteTitle")}
+        message={t("dashboard.wm.confirmDeleteMessage")}
+        danger
+        onConfirm={() => {
+          const pd = pendingDelete;
+          setPendingDelete(null);
+          if (pd) executeDelete(pd.type, pd.id);
+        }}
+        onCancel={() => setPendingDelete(null)}
       />
     </div>
   );

@@ -1,6 +1,8 @@
 import React from 'react';
-import { ArrowLeft, Palette, Play, Send, Settings } from 'lucide-react';
+import { ArrowLeft, FlaskConical, Palette, Play, Send, Settings } from 'lucide-react';
 import { DynamicIcon } from './types';
+import { SEED_APP_IDS } from './mockData';
+import Badge from '../../components/common/Badge';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderEditorHeader(vm: any) {
@@ -18,7 +20,7 @@ export function renderEditorHeader(vm: any) {
               >
                 <ArrowLeft size={15} />
               </button>
-              <div className="h-4 w-px bg-[var(--card,#CBD5E1)]" />
+              <div className={`h-4 border-l ${styles.cardBorder}`} />
               <div>
                 <input
                   type="text"
@@ -30,6 +32,12 @@ export function renderEditorHeader(vm: any) {
               <span className={`text-[10px] ${styles.cardTextMuted} ${styles.sidebarBg} px-1.5 py-0.5 rounded font-mono uppercase`}>
                 {activeApp.id}
               </span>
+              {SEED_APP_IDS.has(activeApp.id) && (
+                <Badge variant="warning" className="shrink-0">
+                  <FlaskConical size={10} aria-hidden />
+                  <span>{t('aiworkbench.ws.vw.demoSeedApp')}</span>
+                </Badge>
+              )}
             </div>
 
             {/* Switchers for Edit Mode */}
@@ -41,7 +49,7 @@ export function renderEditorHeader(vm: any) {
                   setSelectedWidgetId(null);
                 }}
                 className={`px-3 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                  editorMode === 'design' ? '${styles.cardBg} ${styles.cardText} shadow-xs' : '${styles.cardTextMuted} hover:${styles.cardText}'
+                  editorMode === 'design' ? `${styles.cardBg} ${styles.cardText} shadow-xs` : `${styles.cardTextMuted}`
                 }`}
               >
                 <Palette size={11} />
@@ -54,7 +62,7 @@ export function renderEditorHeader(vm: any) {
                   setSelectedWidgetId(null);
                 }}
                 className={`px-3 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                  editorMode === 'preview' ? '${styles.cardBg} ${styles.cardText} shadow-xs' : '${styles.cardTextMuted} hover:${styles.cardText}'
+                  editorMode === 'preview' ? `${styles.cardBg} ${styles.cardText} shadow-xs` : `${styles.cardTextMuted}`
                 }`}
               >
                 <Play size={11} />
@@ -62,19 +70,23 @@ export function renderEditorHeader(vm: any) {
               </button>
             </div>
 
-            {/* Draft Publish buttons */}
+            {/* Draft Publish buttons — 发布通道未接入后端，明示「演示·仅本地」 */}
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className={`w-1.5 h-1.5 rounded-full ${styles.successBg}`} />
                 <span className={`text-[10px] ${styles.cardTextMuted} mr-2`}>{t('aiworkbench.ws.ed.draftAutosaved')}</span>
               </div>
+              <Badge variant="warning" className="shrink-0">
+                <FlaskConical size={10} aria-hidden />
+                <span>{t('aiworkbench.ws.vw.publishLocalDemoTag')}</span>
+              </Badge>
               <button
                 type="button"
                 onClick={handlePublishApp}
-                className="h-7 px-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-md shadow-xs flex items-center gap-1 transition-colors cursor-pointer text-[11px]"
+                className={`h-7 px-3.5 ${styles.accentBg} text-white font-bold rounded-md shadow-xs flex items-center gap-1 transition-colors cursor-pointer text-[11px]`}
               >
                 <Send size={11} />
-                <span>{t('aiworkbench.ws.ed.publishApp')}</span>
+                <span>{t(activeApp.isPublished ? 'aiworkbench.ws.ed.unpublishApp' : 'aiworkbench.ws.ed.publishApp')}</span>
               </button>
             </div>
           </div>

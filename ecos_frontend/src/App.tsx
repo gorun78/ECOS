@@ -42,8 +42,12 @@ export default function App() {
   const location = useLocation();
 
   // Derive currentView from URL path
+  // index 路由（<Route index/>，main.tsx）渲染的是 CognitiveOperatingSystem，与
+  // mission_control 路由同元素 → 落地根 Tab/面包屑必须映射 mission_control。
+  // 旧实现默认 "world_model"：Tab 显示"世界模型"、内容却是认知蓝图、点 Tab 又跳
+  // WorldModelViewer（检视报告 §4.1 P1 行60）。
   const pathSegments = location.pathname.split("/").filter(Boolean);
-  const currentView = pathSegments[0] || "world_model";
+  const currentView = pathSegments[0] || "mission_control";
 
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number>(240);
@@ -109,7 +113,7 @@ export default function App() {
   // strip re-renders when the user switches locale. The `id` doubles as the
   // stable i18n id — Topbar.applyTranslateTabLabel will resolve keys to UI.
   const [openTabs, setOpenTabs] = useState<Tab[]>(() => [
-    { id: "world_model", label: getTabLabel((k) => k, "world_model"), active: true }
+    { id: "mission_control", label: getTabLabel((k) => k, "mission_control"), active: true }
   ]);
 
   // Re-resolve every tab label whenever the locale changes. Without this
@@ -148,7 +152,10 @@ export default function App() {
     };
   }, [isResizing]);
 
-  // Command palette toggle (Ctrl+K)
+  // Command palette toggle (Ctrl+K) — 全仓唯一 toggle 监听点（单源）。
+  // CommandPalette 内部旧的同键位监听（只负责"已开时再按=关"）已删除：双监听
+  // 在同一 keydown 里先后触发 open/close 竞争，语义漂移且不可调试
+  // （检视报告 §4.1 P2 行66）。toggle 关闭由本处 !prev 分支承担。
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -184,7 +191,10 @@ export default function App() {
   }, [openTabs, navigate]);
 
   return (
-    <div className={`flex h-screen ${styles.appBg} ${styles.appText} overflow-hidden font-sans select-none antialiased transition-colors duration-150`}>
+    // select-none 从根容器移除（报告 §4.1 P1 行61：全局禁选导致 traceId/taskId/
+    // 错误详情不可复制）。禁选语义收窄到导航/图标容器：Sidebar aside、Topbar 根、
+    // CommandPalette 容器各自带 select-none；内容区 <main> 保持默认可选。
+    <div className={`flex h-screen ${styles.appBg} ${styles.appText} overflow-hidden font-sans antialiased transition-colors duration-150`}>
       {/* Global network/offline banner (PMO-43 T5) — fixed top overlay */}
       <NetworkErrorBanner />
 
@@ -244,17 +254,22 @@ export default function App() {
       <CommandPalette
         isOpen={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
-        onNavigate={(viewId) => {
-          navigate("/" + viewId);
+        onNavigate={(viewId, focusId) => {
+          // 深链：命中对象 id 以 ?focus= 透传给分类页（报告 §4.1 P1 行64）。
+          navigate(focusId ? `/${viewId}?focus=${encodeURIComponent(focusId)}` : "/" + viewId);
         }}
       />
 
-      {/* AIP Copilot floating entry button */}
+      {/* AIP Copilot floating entry button — 避让右下功能区（报告 §4.1 P2 行66：
+          原 bottom-6 right-6 与分页器/内容右下区叠压，live 截图实锤）。
+          改贴内容区左下缘：桌面端按侧栏实际宽度（折叠 rail = 56px + 分隔条）算
+          left；移动端侧栏为 overlay，固定 24px 边距。 */}
       <button
         type="button"
         aria-label={t("app.copilot.open")}
         onClick={() => setCopilotOpen(true)}
-        className={`fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full ${styles.accentBg} ${styles.accentHover} text-white shadow-lg shadow-black/30 flex items-center justify-center transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2`}
+        style={{ left: isMobile ? 24 : desktopCollapsed ? 80 : sidebarWidth + 28 }}
+        className={`fixed bottom-6 z-50 h-14 w-14 rounded-full ${styles.accentBg} ${styles.accentHover} text-white shadow-lg shadow-black/30 flex items-center justify-center transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 select-none`}
       >
         <Bot className="h-7 w-7" />
       </button>

@@ -55,7 +55,7 @@ export default function TokenDashboard() {
   const { styles } = useTheme();
 
   const [data, setData] = useState<TokenSummary | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [range, setRange] = useState("7d");
 
@@ -160,7 +160,7 @@ export default function TokenDashboard() {
               {t("platform.tokens.byModel")}
             </span>
           </div>
-          {byModel.length === 0 ? (
+          {!loading && byModel.length === 0 ? (
             <div className="p-6 text-center">
               <BarChart3 className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
               <p className={`text-xs ${styles.cardTextMuted}`}>
@@ -205,7 +205,7 @@ export default function TokenDashboard() {
               {t("platform.tokens.byOperation")}
             </span>
           </div>
-          {byOperation.length === 0 ? (
+          {!loading && byOperation.length === 0 ? (
             <div className="p-6 text-center">
               <TrendingUp className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
               <p className={`text-xs ${styles.cardTextMuted}`}>

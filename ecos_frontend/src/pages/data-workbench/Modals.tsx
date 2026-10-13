@@ -448,37 +448,6 @@ export function AddSyncModal({ t, locale, newSyncName, setNewSyncName, newSyncCo
   );
 }
 
-interface ExternalInterfacesDrawerProps {
-  t: (key: string) => string;
-  connections: DataConnection[];
-  onClose: () => void;
-}
 
-export function ExternalInterfacesDrawer({ t, connections, onClose }: ExternalInterfacesDrawerProps) {
-  const { styles } = useTheme();
-  return (
-    <div className={`absolute top-12 right-0 bottom-0 w-96 ${styles.overlayBg} ${styles.cardText} border-l ${styles.cardBorder} shadow-2xl z-40 flex flex-col overflow-hidden select-none`}>
-      <div className={`px-5 py-4 border-b ${styles.cardBorder} flex justify-between items-center ${styles.overlayBg} shrink-0`}>
-        <h3 className={`text-xs font-bold ${styles.cardText} flex items-center gap-2`}><LucideIcon name="Layers" size={14} className={`${styles.warningText} animate-pulse`} /><span>{t('dw.txt.c5dda0')}</span></h3>
-        <button type="button" onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.cardText} p-1`}><LucideIcon name="X" size={14} /></button>
-      </div>
-      <div className="flex-1 overflow-y-auto p-5 space-y-4">
-        <p className={`text-[11px] ${styles.cardTextMuted} leading-relaxed font-sans`}>以下是当前 ECOS 集成平台与外界各大物理系统、调度系统、云对象存储以及 ERP 财务系统的注册接口。</p>
-        {connections.map(conn => (
-          <div key={conn.id} className={`p-3 ${styles.overlayBg} rounded-lg border ${styles.cardBorder} text-xs space-y-2.5`}>
-            <div className={`flex justify-between items-center border-b ${styles.cardBorder} pb-1.5`}>
-              <span className={`font-bold ${styles.cardText} font-mono`}>{conn.id}</span>
-              <span className={`text-[9px] font-mono px-1.5 rounded-full ${conn.status === 'connected' ? `${styles.successBg} ${styles.successText}` : `${styles.dangerBg} ${styles.dangerText}`}`}>{conn.status.toUpperCase()}</span>
-            </div>
-            <div className={`space-y-1 text-[11px] ${styles.cardTextMuted}`}>
-              <div><span className={`${styles.cardTextMuted} font-semibold uppercase text-[9px] block`}>{t('dw.txt.f274bd')}</span><span className={`${styles.cardText}`}>{conn.name}</span></div>
-              <div><span className={`${styles.cardTextMuted} font-semibold uppercase text-[9px] block`}>{t('dw.txt.dec92b')}</span><span className={`${styles.cardTextMuted} font-mono`}>ECOS Connector v1.2 [{conn.type.toUpperCase()}]</span></div>
-              {conn.config.host && <div><span className={`${styles.cardTextMuted} font-semibold uppercase text-[9px] block`}>{t('dw.txt.15e5bb')}</span><span className={`${styles.cardTextMuted} font-mono`}>{conn.config.host}:{conn.config.port || 5432}</span></div>}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className={`p-4 ${styles.overlayBg} border-t ${styles.cardBorder} text-[10px] ${styles.muted} text-center select-none font-mono`}>Aviation Integration Gateway (Total: {connections.length} Endpoints)</div>
-    </div>
-  );
-}
+// [2026-10-13 前端检视修复] ExternalInterfacesDrawer 已摘除：零打开入口的死组件（DataWorkbenchLayout 调用点同步删除）。
+// 如需恢复真实外部接口清单能力，须接后端集成端点并以六态（空/加载/错误/边界/权限/离线）呈现，禁止再落内存假数据。

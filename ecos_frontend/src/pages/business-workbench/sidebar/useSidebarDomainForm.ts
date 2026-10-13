@@ -62,13 +62,19 @@ export function useSidebarDomainForm({
     setShowDomainModal(true);
   };
 
-  const handleDeleteDomain = (domainId: string) => {
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const pendingDomainName = domains.find(d => d.id === pendingDeleteId)?.displayName ?? '';
+
+  // 危险操作确认门：禁 window.confirm，统一 ConfirmDialog（消费组件渲染对话框）
+  const handleDeleteDomain = (domainId: string) => setPendingDeleteId(domainId);
+  const cancelDeleteDomain = () => setPendingDeleteId(null);
+
+  const confirmDeleteDomain = () => {
+    const domainId = pendingDeleteId;
+    setPendingDeleteId(null);
+    if (!domainId) return;
     const targetDomain = domains.find(d => d.id === domainId);
     if (!targetDomain) return;
-
-    if (!window.confirm(`确定要删除业务分级域「${targetDomain.displayName}」吗？关联的实体将变更为未分类。`)) {
-      return;
-    }
 
     const updatedDomains = domains.filter(d => d.id !== domainId);
     onUpdateDomains(updatedDomains);
@@ -161,6 +167,10 @@ export function useSidebarDomainForm({
     handleStartAddDomain,
     handleStartEditDomain,
     handleDeleteDomain,
+    pendingDeleteId,
+    pendingDomainName,
+    confirmDeleteDomain,
+    cancelDeleteDomain,
     handleSaveDomain,
     toggleObjectAssignment
   };

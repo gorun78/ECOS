@@ -4,11 +4,10 @@
  */
 
 import React, { useState } from "react";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
-import { useLanguage } from "../LanguageContext";
 import { useTheme } from "../ThemeContext";
 import LoadingSkeleton from "./LoadingSkeleton";
 import EmptyState from "./EmptyState";
+import Pagination from "./Pagination";
 
 export interface ColumnConfig<T> {
   key: string;
@@ -56,7 +55,6 @@ export default function DataTable<T extends Record<string, any>>({
   hidePagination = false,
 }: DataTableProps<T>) {
   const { styles } = useTheme();
-  const { t } = useLanguage();
   const [internalPage, setInternalPage] = useState(1);
 
   const isControlled = controlledPage !== undefined;
@@ -158,59 +156,16 @@ export default function DataTable<T extends Record<string, any>>({
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination — 复用 common/Pagination 单源分页器（报告 §4.8 P2：旧实现在
+          此重写了一份四钮分页器，与 Pagination.tsx 重复且行为漂移：无页码列表、
+          total=0 时仍渲染等）。pageSize 变更入口由调用方经 Pagination 直接使用。 */}
       {!hidePagination && totalPages > 1 && (
-        <div
-          className={`flex items-center justify-between px-3 py-2.5 border-t ${styles.cardBorder} text-xs select-none`}
-        >
-          <span className={`${styles.cardTextMuted} text-[11px]`}>
-            {t("common.pagination.total", { n: total })} {t("common.pagination.page", { p: page, m: totalPages })}
-          </span>
-
-          <div className="flex items-center gap-1">
-            <button type="button"
-              className={`p-1 rounded transition cursor-pointer ${
-                page <= 1 ? "opacity-30 cursor-not-allowed" : `${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10`
-              }`}
-              disabled={page <= 1}
-              onClick={() => setPage(1)}
-            >
-              <ChevronsLeft className="w-3.5 h-3.5" />
-            </button>
-            <button type="button"
-              className={`p-1 rounded transition cursor-pointer ${
-                page <= 1 ? "opacity-30 cursor-not-allowed" : `${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10`
-              }`}
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-
-            <span className={`px-2 py-0.5 font-bold ${styles.cardText}`}>
-              {page}
-            </span>
-
-            <button type="button"
-              className={`p-1 rounded transition cursor-pointer ${
-                page >= totalPages ? "opacity-30 cursor-not-allowed" : `${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10`
-              }`}
-              disabled={page >= totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-            <button type="button"
-              className={`p-1 rounded transition cursor-pointer ${
-                page >= totalPages ? "opacity-30 cursor-not-allowed" : `${styles.cardTextMuted} hover:bg-black/10 dark:hover:bg-white/10`
-              }`}
-              disabled={page >= totalPages}
-              onClick={() => setPage(totalPages)}
-            >
-              <ChevronsRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+        />
       )}
     </div>
   );

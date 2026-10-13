@@ -17,15 +17,21 @@ import {
 } from './api';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
+import { useToast } from '../../components/common/Toast';
 
 export default function ChatbotStudioRouterPage() {
   const { styles } = useTheme();
   const { t } = useLanguage();
+  // §4.5 P1：原 showToast→console.info 零可见反馈 → 接全局 ToastProvider
+  const { showToast } = useToast();
 
   const [agents, setAgents] = useState<AIPAgent[]>([]);
   const [models, setModels] = useState<AIPModel[]>([]);
   const [guardrails, setGuardrails] = useState<AIPGuardrail[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // 独立路由页无工作台总览的审计流视图：会话内累积（标注 localOrigin，不假装已持久化）。
+  // 真实服务端审计流见 AI 工作台总览（GET /api/v1/aip/audit-logs）。
+  const [sessionAudit, setSessionAudit] = useState<AIPAuditLog[]>([]);
 
   const loadData = () => {
     setLoadError(null);
@@ -57,9 +63,8 @@ export default function ChatbotStudioRouterPage() {
   }, []);
 
   const handleAddAuditLog = (log: AIPAuditLog) => {
-    // 独立路由页：审计日志仅本地累积，不跨页面共享
-    // eslint-disable-next-line no-console
-    console.info('[ChatbotStudio][audit]', log);
+    // §4.5 P2：console.info 泄漏已移除；本地累积并显式标注 localOrigin
+    setSessionAudit(prev => [...prev, { ...log, localOrigin: true }]);
   };
 
   if (loadError) {
@@ -80,13 +85,19 @@ export default function ChatbotStudioRouterPage() {
 
   return (
     <div className={`h-full w-full ${styles.appBg} ${styles.appText}`}>
+      {/* §4.5：sessionAudit 计数可见（本地会话审计 ≠ 服务端审计流，如实标注） */}
+      {sessionAudit.length > 0 && (
+        <div className={`px-3 py-1 text-[9px] ${styles.cardTextMuted} border-b ${styles.cardBorder}`}>
+          {t('aiworkbench.chatbot.sessionAuditLocalNote').replace('{count}', String(sessionAudit.length))}
+        </div>
+      )}
       <ChatbotStudioView
         agents={agents}
         models={models}
         guardrails={guardrails}
         onUpdateAgents={setAgents}
         onAddAuditLog={handleAddAuditLog}
-        showToast={(type, msg) => console.info(`[ChatbotStudio][${type}]`, msg)}
+        showToast={showToast}
       />
     </div>
   );

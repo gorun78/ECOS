@@ -7,10 +7,12 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { X, ChevronRight, Palette, Settings, Menu } from "lucide-react";
+import { X, ChevronRight, Palette, Settings, Menu, ShieldQuestion, UserRound } from "lucide-react";
 import { useLanguage } from "./LanguageContext";
 import { useTheme, ThemeId } from "./ThemeContext";
 import { fetchUserSecurityProfile, updateUserSecurityProfile } from "../api";
+import { getUserIdentity, getUserInitials, performLogout } from "../services/auth";
+import ConfirmDialog from "./common/ConfirmDialog";
 
 interface Tab {
   id: string;
@@ -33,8 +35,12 @@ const TAB_ZH_TO_KEY: Record<string, string> = {
   "监控中心": "topbar.tab.monitor",
   "安全中心": "topbar.tab.security_center",
   "数据市场": "topbar.tab.marketplace",
+  // W196 图谱同名异义分职（报告 §三）：#/knowledge_graph 实挂 GraphExplorerView
+  // （本体图谱，金I），旧标签「企业知识图谱/知识图谱」与 dccheng 知识图谱域撞名。
+  // 显示值已改「本体图谱浏览器」；下列三个旧中文串保留作历史 Tab 标签翻译兼容。
   "企业知识图谱": "topbar.tab.knowledge_graph",
   "知识图谱": "topbar.tab.knowledge_graph",
+  "本体图谱浏览器": "topbar.tab.knowledge_graph",
   "知识工作台": "topbar.tab.knowledge_view",
   "运营应用": "topbar.tab.ops_apps",
   "用户管理": "topbar.tab.iam",
@@ -96,6 +102,15 @@ export default function Topbar({
     return val !== "false"; // default to true
   });
   const [toast, setToast] = useState<string | null>(null);
+
+  // 真实登录身份（services/auth 单源）：无身份时显式降级为「未登录/未知账号」，
+  // 绝不显示常量 "AD"/admin（检视报告 §4.1 P0：顶栏身份是假真理）。
+  const identity = getUserIdentity();
+  const displayName = identity?.username || t("topbar.user.anonymous");
+  const initials = getUserInitials() || "—";
+
+  // 敏感项（安全准入等级 / 沙盒审查 / 清空缓存）改动需二次确认门（报告 §4.1 P1）
+  const [confirmAction, setConfirmAction] = useState<"save" | "reset" | null>(null);
 
   // Load security profile from backend on mount (sync with td_user_security_profile)
   useEffect(() => {
@@ -271,8 +286,8 @@ export default function Topbar({
         {/* Hamburger menu — visible only on mobile */}
         <button type="button"
           onClick={onMenuToggle}
-          className={`md:hidden p-1.5 -ml-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${styles.cardText}`}
-          aria-label={t("topbar.lang.toggle")}
+          className={`md:hidden p-1.5 -ml-1 rounded-md ${styles.sidebarHoverBg} transition-colors ${styles.cardText}`}
+          aria-label={t("topbar.menu.toggle")}
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -296,20 +311,26 @@ export default function Topbar({
               key={tab.id}
               className={`group h-9 px-3.5 rounded-t-md border-t border-x flex items-center gap-2 text-xs font-medium cursor-pointer transition shrink-0 ${
                 isActive
-                  ? `${styles.cardBg} ${styles.cardBorder} border-t-2 border-t-indigo-500 text-indigo-500 shadow-xs dark:border-t-emerald-500 dark:text-emerald-400`
+                  ? `${styles.cardBg} ${styles.cardBorder} border-t-2 ${styles.accentText} border-t-current shadow-xs`
                   : `${styles.appBg} border-transparent opacity-80 hover:opacity-100`
               }`}
               onClick={() => onTabSelect(tab.id)}
             >
               <span className={isActive ? `${styles.cardText} font-bold` : `${styles.cardTextMuted}`}>{translateTabLabel(tab.label)}</span>
+              {/* 关闭 X：旧实现 text-transparent + `hover:${styles.x}` 运行时拼类
+                  （Vite 不生成该 utility → hover 无效，X 常态隐形 = 报告 §4.1 P1 死控件）。
+                  改为 token 常显 + 命中区从 ~14px 放大到 32px（受 36px 标签条高度上限约束，
+                  44px 需整条改版，已在报告登记为待办）。 */}
               <button type="button"
-                className={`p-0.5 rounded-full text-transparent group-hover:${styles.cardTextMuted} hover:bg-[var(--muted)] transition shrink-0`}
+                aria-label={t("topbar.tab.close", { label: translateTabLabel(tab.label) })}
+                title={t("topbar.tab.close", { label: translateTabLabel(tab.label) })}
+                className={`-mr-1 h-8 w-8 shrink-0 flex items-center justify-center rounded-full ${styles.cardTextMuted} ${styles.sidebarHoverBg} transition`}
                 onClick={(e) => {
                   e.stopPropagation();
                   onTabClose(tab.id);
                 }}
               >
-                <X className="w-2.5 h-2.5" />
+                <X className="w-3 h-3" />
               </button>
             </div>
           );
@@ -327,8 +348,11 @@ export default function Topbar({
             onChange={(e) => setActiveTheme(e.target.value as ThemeId)}
             className={`bg-transparent border-0 outline-hidden text-[11px] font-bold cursor-pointer font-sans shrink-0 pr-1 ${styles.cardText}`}
           >
-            <option value="slate-light" className={`text-[var(--text-primary)] bg-[var(--card)]`}>{t("theme.slate-light")}</option>
-            <option value="deep-space" className={`text-[var(--text-primary)] bg-[var(--overlay)]`}>{t("theme.deep-space")}</option>
+            {/* 主题预览项：slate-light / deep-space 两项旧实现用 var(--text-primary)/var(--card)，
+                这两个 CSS 变量在全仓从未定义（= 无效声明，选中态文字随系统色发虚）。
+                改走 useTheme token；另两项保留各自主题的预览色。 */}
+            <option value="slate-light" className={`${styles.inputText} ${styles.inputBg}`}>{t("theme.slate-light")}</option>
+            <option value="deep-space" className={`${styles.inputText} ${styles.islandBg}`}>{t("theme.deep-space")}</option>
             <option value="cyber-terminal" className="text-emerald-400 bg-black">{t("theme.cyber-terminal")}</option>
             <option value="royal-purple" className="text-purple-200 bg-[#18112A]">{t("theme.royal-purple")}</option>
           </select>
@@ -341,7 +365,7 @@ export default function Topbar({
             id="lang-switch-zh"
             className={`px-2.5 py-1 text-[10px] font-bold font-sans rounded-md transition duration-150 cursor-pointer ${
               locale === "zh"
-                ? `bg-[var(--card)] text-indigo-700 shadow-2xs font-extrabold`
+                ? `${styles.cardBg} ${styles.accentText} shadow-2xs font-extrabold`
                 : "opacity-50 hover:opacity-100"
             }`}
           >
@@ -352,7 +376,7 @@ export default function Topbar({
             id="lang-switch-en"
             className={`px-2.5 py-1 text-[10px] font-bold font-sans rounded-md transition duration-150 cursor-pointer ${
               locale === "en"
-                ? `bg-[var(--card)] text-indigo-700 shadow-2xs font-extrabold`
+                ? `${styles.cardBg} ${styles.accentText} shadow-2xs font-extrabold`
                 : "opacity-50 hover:opacity-100"
             }`}
           >
@@ -365,14 +389,16 @@ export default function Topbar({
           <div
             id="user-profile-trigger"
             onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-            className={`flex items-center gap-3 cursor-pointer group select-none p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors duration-150`}
+            className={`flex items-center gap-3 cursor-pointer group select-none p-1 rounded-lg ${styles.sidebarHoverBg} transition-colors duration-150`}
           >
             <div className="text-right hidden md:block">
-              <div className={`text-xs font-bold ${styles.cardText} group-hover:text-indigo-500 dark:group-hover:text-emerald-400 transition-colors`}>{t("topbar.admin")}</div>
+              <div className={`text-xs font-bold truncate max-w-[140px] ${styles.cardText}`}>{displayName}</div>
               <div className={`text-[10px] ${styles.cardTextMuted} font-medium`}>{displayClearance}</div>
             </div>
-            <div className={`w-9 h-9 border ${styles.cardBorder} rounded-full ${styles.badgeBg} flex items-center justify-center font-bold ${styles.badgeText} text-xs transition group-hover:border-indigo-500 dark:group-hover:border-emerald-500 shadow-3xs`}>
-              AD
+            {/* 头像首字母 = getUserIdentity()/getUserInitials() 真实值；无身份时显式占位 "—"，
+                不再硬编常量 "AD"（报告 §4.1 P0 假真理）。 */}
+            <div className={`w-9 h-9 border ${styles.cardBorder} rounded-full ${styles.badgeBg} flex items-center justify-center font-bold ${styles.badgeText} text-xs shadow-3xs`} aria-hidden="true">
+              {initials}
             </div>
           </div>
 
@@ -385,11 +411,11 @@ export default function Topbar({
               />
               <div
                 id="user-settings-dropdown"
-                className={`absolute right-0 mt-2 w-80 max-w-sm rounded-xl border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} p-4 shadow-xl z-50 space-y-4 animate-in fade-in slide-in-from-top-2 duration-150`}
+                className={`absolute right-0 mt-2 w-80 max-w-sm rounded-xl border ${styles.cardBorder} ${styles.cardBg} ${styles.cardText} p-4 shadow-xl z-50 space-y-4 animate-fade-in-down duration-150`}
               >
                 {/* Header title */}
                 <div className={`flex items-center gap-2 pb-2 border-b border-dashed ${styles.cardBorder}`}>
-                  <Settings className="w-4 h-4 text-indigo-500" />
+                  <Settings className={`w-4 h-4 ${styles.accentText}`} />
                   <span className="font-bold text-xs uppercase tracking-tight">{t("topbar.user.settings")}</span>
                 </div>
 
@@ -404,8 +430,8 @@ export default function Topbar({
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className={`w-full text-xs p-1.5 px-3 rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-hidden focus:ring-1 focus:ring-indigo-500/50 transition`}
-                      placeholder="e.g. user@enterprise.com"
+                      className={`w-full text-xs p-1.5 px-3 rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-hidden focus:ring-1 ${styles.accentRing} transition`}
+                      placeholder={t("topbar.user.email.placeholder")}
                     />
                   </div>
 
@@ -419,7 +445,7 @@ export default function Topbar({
                         type="text"
                         value={clearance}
                         onChange={(e) => setClearance(e.target.value)}
-                        className={`w-full text-xs p-1.5 px-3 rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-hidden focus:ring-1 focus:ring-indigo-500/50 transition`}
+                        className={`w-full text-xs p-1.5 px-3 rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-hidden focus:ring-1 ${styles.accentRing} transition`}
                         placeholder={t("topbar.role.default")}
                       />
                     </div>
@@ -431,8 +457,8 @@ export default function Topbar({
                         type="text"
                         value={workstation}
                         onChange={(e) => setWorkstation(e.target.value)}
-                        className={`w-full text-xs p-1.5 px-3 rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-hidden focus:ring-1 focus:ring-indigo-500/50 transition`}
-                        placeholder="WS-COSMOS-09"
+                        className={`w-full text-xs p-1.5 px-3 rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-hidden focus:ring-1 ${styles.accentRing} transition`}
+                        placeholder={t("topbar.user.workstation.placeholder")}
                       />
                     </div>
                   </div>
@@ -445,7 +471,7 @@ export default function Topbar({
                     <select
                       value={auditMode}
                       onChange={(e) => setAuditMode(e.target.value)}
-                      className={`w-full text-xs p-1.5 px-3 rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-hidden focus:ring-1 focus:ring-indigo-500/50 cursor-pointer`}
+                      className={`w-full text-xs p-1.5 px-3 rounded-lg border ${styles.inputBorder} ${styles.inputBg} ${styles.inputText} focus:outline-hidden focus:ring-1 ${styles.accentRing} cursor-pointer`}
                     >
                       <option value="full" className={`${styles.inputBg} ${styles.cardText}`}>
                         {t("topbar.user.auditlevel.full")}
@@ -462,46 +488,52 @@ export default function Topbar({
                       type="checkbox"
                       checked={sandbox}
                       onChange={(e) => setSandbox(e.target.checked)}
-                      className={`rounded border ${styles.inputBorder} ${styles.inputBg} focus:ring-indigo-500 mt-0.5 h-3.5 w-3.5`}
+                      className={`rounded border ${styles.inputBorder} ${styles.inputBg} ${styles.accentRing} focus:ring-1 mt-0.5 h-3.5 w-3.5`}
                     />
                     <span className={`text-[10.5px] font-semibold leading-normal ${styles.cardText}`}>{t("topbar.user.sandbox")}</span>
                   </label>
+
+                  {/* 安全敏感项自助修改提示（报告 §4.1 P1）：等级/沙盒开关会写入后端安全档案，
+                      保存前需二次确认；此处显式声明边界，避免"用户以为改了全局策略"的假真理。 */}
+                  <p className={`text-[10px] leading-snug ${styles.warningText} ${styles.warningBg} border ${styles.warningBorder} rounded px-2 py-1.5`}>
+                    {t("topbar.user.securityNotice")}
+                  </p>
                 </div>
 
                 {/* Toast alerts box */}
                 {toast && (
-                  <div className={`text-[10px] p-2 leading-relaxed rounded border bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-mono`}>
+                  <div className={`text-[10px] p-2 leading-relaxed rounded border ${styles.successBg} ${styles.successText} ${styles.successBorder} font-mono`} role="status">
                     {toast}
                   </div>
                 )}
 
-                {/* Confirm submit and reset buttons */}
+                {/* Confirm submit and reset buttons — 均经 ConfirmDialog 二次确认门 */}
                 <div className={`flex gap-2 pt-2 border-t border-dashed ${styles.cardBorder}`}>
                   <button
                     type="button"
-                    onClick={handleSaveSettings}
-                    className="flex-1 py-1.5 px-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10.5px] font-bold cursor-pointer transition leading-none h-8"
+                    onClick={() => setConfirmAction("save")}
+                    className={`flex-1 py-1.5 px-2.5 ${styles.accentBg} ${styles.accentSolidText} rounded-lg text-[10.5px] font-bold cursor-pointer transition leading-none h-8`}
                   >
                     {t("topbar.user.save")}
                   </button>
                   <button
                     type="button"
-                    onClick={handleResetCache}
-                    className={`py-1.5 px-2 border ${styles.cardBorder} ${styles.cardTextMuted} hover:bg-black/5 dark:hover:bg-white/5 rounded-lg text-[10.5px] font-semibold cursor-pointer transition leading-none h-8`}
+                    onClick={() => setConfirmAction("reset")}
+                    className={`py-1.5 px-2 border ${styles.cardBorder} ${styles.cardTextMuted} ${styles.sidebarHoverBg} rounded-lg text-[10.5px] font-semibold cursor-pointer transition leading-none h-8`}
                   >
                     {t("topbar.user.reset")}
                   </button>
                 </div>
 
-                {/* Logout */}
+                {/* Logout — 走 services/auth performLogout() 单源清会话，
+                    不再手删 localStorage 个别 key（旧实现漏删 roles/user_id，且硬跳 /#/login） */}
                 <button
                   type="button"
                   onClick={() => {
-                    localStorage.removeItem("ecos_token");
-                    localStorage.removeItem("ecos_user");
-                    window.location.href = "/#/login";
+                    setIsSettingsOpen(false);
+                    performLogout();
                   }}
-                  className="w-full py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[10.5px] font-bold cursor-pointer transition leading-none h-8 mt-1"
+                  className={`w-full py-2 ${styles.dangerBg} ${styles.dangerText} border ${styles.dangerBorder} rounded-lg text-[10.5px] font-bold cursor-pointer transition leading-none h-8 mt-1`}
                 >
                   {t("topbar.logout")}
                 </button>
@@ -513,6 +545,23 @@ export default function Topbar({
         </div>
 
       </div>
+
+      {/* 敏感设置二次确认门（报告 §4.1 P1）：安全准入等级 / 沙盒审查 / 工作区缓存重置 */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        variant={confirmAction === "reset" ? "danger" : "warning"}
+        title={t(confirmAction === "reset" ? "topbar.confirm.reset.title" : "topbar.confirm.save.title")}
+        message={t(confirmAction === "reset" ? "topbar.confirm.reset.message" : "topbar.confirm.save.message")}
+        confirmText={t("common.confirm")}
+        cancelText={t("common.cancel")}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          const action = confirmAction;
+          setConfirmAction(null);
+          if (action === "save") void handleSaveSettings();
+          else if (action === "reset") void handleResetCache();
+        }}
+      />
     </header>
   );
 }

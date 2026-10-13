@@ -5,6 +5,15 @@ import { getErrorMessage } from '../../helpers';
 import { useTheme } from "../../../../components/ThemeContext";
 import { useLanguage } from "../../../../components/LanguageContext";
 import { getAuthToken } from "../../../../services/auth";
+import ConfirmDialog from "../../../../components/common/ConfirmDialog";
+
+/** 结果表最多渲染 50 行（后端 max_rows=500，超出仅展示截断） */
+const MAX_RENDER_ROWS = 50;
+
+/** 写操作 / DDL 关键字检测：命中 ⇒ 执行前二次确认（就地执行任意 SQL 的确认门） */
+function isRiskySql(sql: string): boolean {
+  return /\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|MERGE|REPLACE)\b/i.test(sql);
+}
 
 // Inline SQL Query Console (embedded, reuses datasource ID)
 /** 后端 QueryExecutionServiceImpl.execute 返回 Map：columns[{name,label,type}] / rows(以列 label 为键) / rowCount / elapsedMs */
@@ -24,11 +33,12 @@ interface SqlResult {
 export default function InlineSqlConsole({ datasourceId }: { datasourceId: string }) {
   const { styles } = useTheme();
   const { t } = useLanguage();
-  const [sql, setSql] = React.useState('SELECT * FROM orders LIMIT 10');
+  const [sql, setSql] = React.useState('');
   const [result, setResult] = React.useState<SqlResult | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [collapsed, setCollapsed] = React.useState(false);
+  const [confirmRisky, setConfirmRisky] = React.useState(false);
 
   const execute = async () => {
     setLoading(true); setError(null);
@@ -55,6 +65,12 @@ export default function InlineSqlConsole({ datasourceId }: { datasourceId: strin
     } finally { setLoading(false); }
   };
 
+  const handleRunClick = () => {
+    if (!sql.trim()) return;
+    if (isRiskySql(sql)) { setConfirmRisky(true); return; }
+    void execute();
+  };
+
   return (
     <div className={`border ${styles.cardBorder} rounded-xl overflow-hidden`}>
       <div className={`${styles.sidebarBg} px-4 py-2 flex items-center justify-between cursor-pointer select-none`}
@@ -67,12 +83,16 @@ export default function InlineSqlConsole({ datasourceId }: { datasourceId: strin
       </div>
       {!collapsed && (
         <div className={`${styles.cardBg} p-3 space-y-3`}>
+          {/* 只读约束警示：本控制台直连数据源，写/DDL 语句将真实生效 */}
+          <div className={`text-[10px] px-2 py-1.5 rounded border ${styles.warningBg} ${styles.warningText} border-current`}>
+            {t("dw.sqlConsole.readonlyWarning")}
+          </div>
           {/* SQL editor + run button */}
           <div className="flex gap-2">
             <textarea value={sql} onChange={e => setSql(e.target.value)}
               className={`flex-1 p-2 border ${styles.inputBorder} rounded text-xs font-mono resize-none outline-none focus:${styles.accentBorder} h-16 ${styles.inputBg} ${styles.inputText}`}
               placeholder="SELECT * FROM ..." spellCheck={false} />
-            <button type="button" onClick={execute} disabled={loading}
+            <button type="button" onClick={handleRunClick} disabled={loading || !sql.trim()}
               className={`px-4 py-1 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} text-xs font-semibold rounded cursor-pointer disabled:opacity-50 shrink-0`}>
               {loading ? t("dw.executing") : t("dw.runExec")}
             </button>
@@ -85,6 +105,9 @@ export default function InlineSqlConsole({ datasourceId }: { datasourceId: strin
                 <span className={`font-bold ${styles.accentText}`}>{result.rowCount} {t("dw.rowsUnit")}</span>
                 <span>{result.elapsedMs}ms</span>
                 <span>{result.columns.length} {t("dw.colsUnit")}</span>
+                {result.rows.length > MAX_RENDER_ROWS && (
+                  <span className={styles.warningText}>{t("dw.sqlConsole.truncatedHint", { shown: MAX_RENDER_ROWS, total: result.rows.length })}</span>
+                )}
               </div>
               <div className={`max-h-64 overflow-auto border ${styles.cardBorder} rounded`}>
                 <table className="w-full text-[11px]">
@@ -94,8 +117,8 @@ export default function InlineSqlConsole({ datasourceId }: { datasourceId: strin
                     ))}
                   </tr></thead>
                   <tbody>
-                    {result.rows.slice(0, 50).map((row, i: number) => (
-                      <tr key={i} className={i % 2 ? `${styles.appBg}/50` : ''}>
+                    {result.rows.slice(0, MAX_RENDER_ROWS).map((row, i: number) => (
+                      <tr key={i} className={i % 2 ? styles.appBg : ''}>
                         {result.columns.map((c: string) => (
                           <td key={c} className={`px-2 py-0.5 ${styles.cardTextMuted} border-b ${styles.cardBorder} max-w-[200px] truncate`}>
                             {row[c] === null ? <span className={`${styles.cardTextMuted} italic`}>NULL</span> : String(row[c])}
@@ -110,6 +133,16 @@ export default function InlineSqlConsole({ datasourceId }: { datasourceId: strin
           )}
         </div>
       )}
+      {/* 写/DDL 语句执行确认门（危险操作禁直发） */}
+      <ConfirmDialog
+        open={confirmRisky}
+        variant="danger"
+        title={t("dw.sqlConsole.confirmTitle")}
+        message={t("dw.sqlConsole.confirmMessage", { sql: sql.trim().slice(0, 200) })}
+        confirmText={t("dw.runExec")}
+        onConfirm={() => { setConfirmRisky(false); void execute(); }}
+        onCancel={() => setConfirmRisky(false)}
+      />
     </div>
   );
 };

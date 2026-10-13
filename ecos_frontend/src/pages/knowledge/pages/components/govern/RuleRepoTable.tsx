@@ -216,8 +216,7 @@ export default function RuleRepoTable() {
             type="button"
             onClick={() => { setShowCreate((v) => !v); setEditingId(null); setCreateForm(DEFAULT_FORM); }}
             disabled={saving}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold disabled:opacity-50 cursor-pointer"
-            style={{ background: styles.accentBg, color: 'rgba(255,255,255,0.95)' }}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold disabled:opacity-50 cursor-pointer ${styles.accentBg} ${styles.accentSolidText}`}
             title={t('knowledge.govern.rule_create')}
           >
             <Plus className="w-3 h-3" />
@@ -303,9 +302,8 @@ export default function RuleRepoTable() {
         <button
           type="button"
           onClick={() => { setDomain(''); }}
-          className="px-2 py-1 rounded text-[10px] font-bold cursor-pointer"
-          style={{ background: domain ? styles.accentBg : styles.inputBg, color: domain ? 'rgba(255,255,255,0.95)' : styles.cardTextMuted, border: `1px solid ${styles.inputBorder}` }}
-          title="All domains"
+          className={`px-2 py-1 rounded text-[10px] font-bold cursor-pointer border ${domain ? `${styles.accentBg} ${styles.accentSolidText}` : `${styles.inputBg} ${styles.cardTextMuted}`}`}
+          title={t('knowledge.govern.rule_domain_all')}
         >
           {t('knowledge.govern.rule_domain_all')}
         </button>

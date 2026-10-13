@@ -65,8 +65,9 @@ export default function FusionMatrixTab({ activeScenario }: Props) {
   const { t } = useLanguage();
   const b = activeScenario.bindings;
   const cov = activeScenario.coverage;
-  const d2i = cov ? Math.round(cov.d2iCoverage * 100) : 0;
-  const k2w = cov ? Math.round(cov.k2wCoverage * 100) : 0;
+  // 无假真理：后端未回传 coverage 时不再伪造 0%，展示层显式标注「未采集」
+  const d2i = cov ? Math.round(cov.d2iCoverage * 100) : null;
+  const k2w = cov ? Math.round(cov.k2wCoverage * 100) : null;
 
   const byKey = (key: (typeof CHAIN_NODES)[number]['key']) => b[key];
 
@@ -134,11 +135,15 @@ export default function FusionMatrixTab({ activeScenario }: Props) {
             </div>
             <div className="md:col-start-1 flex items-center gap-2 p-2 bg-[var(--card,#020617)]/60 rounded border border-[var(--card,#1E293B)]">
               <span className="text-[10px] text-[var(--card,#64748B)]">{t('scenario.fusion.covD2I')}</span>
-              <span className={`text-xs font-bold font-mono ${d2i >= 60 ? 'text-emerald-400' : 'text-amber-400'}`}>{d2i}%</span>
+              <span className={`text-xs font-bold font-mono ${d2i === null ? 'text-[var(--card,#64748B)]' : d2i >= 60 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {d2i === null ? t('scenario.fusion.covNotMeasured') : `${d2i}%`}
+              </span>
             </div>
             <div className="md:col-start-2 flex items-center gap-2 p-2 bg-[var(--card,#020617)]/60 rounded border border-[var(--card,#1E293B)]">
               <span className="text-[10px] text-[var(--card,#64748B)]">{t('scenario.fusion.covK2W')}</span>
-              <span className={`text-xs font-bold font-mono ${k2w >= 60 ? 'text-emerald-400' : 'text-amber-400'}`}>{k2w}%</span>
+              <span className={`text-xs font-bold font-mono ${k2w === null ? 'text-[var(--card,#64748B)]' : k2w >= 60 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {k2w === null ? t('scenario.fusion.covNotMeasured') : `${k2w}%`}
+              </span>
             </div>
 
             {/* 横切安全策略（chips） */}

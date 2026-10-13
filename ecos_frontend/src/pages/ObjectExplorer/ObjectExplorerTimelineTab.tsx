@@ -6,8 +6,9 @@
 import type { Dispatch, SetStateAction } from "react";
 import { Clock, Loader2, User, Calendar } from "lucide-react";
 import { useTheme } from "../../components/ThemeContext";
+import { useLanguage } from "../../components/LanguageContext";
 import type { TimelineEvent } from "../../api";
-import { EVENT_LABELS } from "./helpers";
+import { EVENT_LABEL_KEYS, timelineDotClasses } from "./helpers";
 
 interface TimelineTabProps {
   detailTimeline: TimelineEvent[];
@@ -18,32 +19,31 @@ interface TimelineTabProps {
 
 export function TimelineTab({ detailTimeline, timelineLoading, timelineTotal, setTimelinePage }: TimelineTabProps) {
   const { styles } = useTheme();
+  const { t } = useLanguage();
+
+  const eventLabel = (eventType: string) =>
+    eventType in EVENT_LABEL_KEYS ? t(EVENT_LABEL_KEYS[eventType]) : eventType;
 
   return (
     <div className="space-y-2 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-[var(--card-border,#E2E8F0)]">
       {timelineLoading && detailTimeline.length === 0 ? (
         <div className={`text-center py-12 text-xs ${styles.cardTextMuted}`}>
           <Loader2 className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted} animate-spin`} />
-          加载时间线...
+          {t("dw.objectExplorer.timeline.loading")}
         </div>
       ) : detailTimeline.length === 0 ? (
         <div className={`text-center py-12 text-xs ${styles.cardTextMuted}`}>
           <Clock className={`w-6 h-6 mx-auto mb-2 ${styles.cardTextMuted}`} />
-          暂无操作记录
+          {t("dw.objectExplorer.timeline.empty")}
         </div>
       ) : (
         <>
           {detailTimeline.map(evt => (
             <div key={evt.id} className="flex items-start gap-3 pl-6 relative">
-              <div className={`absolute left-[7px] top-1.5 w-[9px] h-[9px] rounded-full border-2 ${
-                evt.eventType === "created" ? "bg-green-100 border-green-400" :
-                evt.eventType === "deleted" ? "bg-red-100 border-red-400" :
-                evt.eventType === "status_changed" ? "bg-blue-100 border-blue-400" :
-                `${styles.appBg} ${styles.appBorder}`
-              }`} />
+              <div className={`absolute left-[7px] top-1.5 w-[9px] h-[9px] rounded-full border-2 ${timelineDotClasses(styles, evt.eventType)}`} />
               <div className="flex-1 min-w-0">
                 <div className={`text-[11px] font-semibold ${styles.cardText}`}>
-                  {EVENT_LABELS[evt.eventType] || evt.eventType}
+                  {eventLabel(evt.eventType)}
                   {evt.eventType === "status_changed" && evt.eventDetail && (
                     <span className={`text-[10px] font-normal ${styles.cardTextMuted} ml-1`}>
                       {typeof evt.eventDetail === "object" ? `${evt.eventDetail.from} → ${evt.eventDetail.to}` : ""}
@@ -68,9 +68,9 @@ export function TimelineTab({ detailTimeline, timelineLoading, timelineTotal, se
                 className={`w-full text-[10px] ${styles.appBg} ${styles.sidebarHoverBg} ${styles.cardText} border ${styles.cardBorder} rounded-lg px-3 py-2 font-semibold transition flex items-center justify-center gap-1.5 disabled:opacity-50`}
               >
                 {timelineLoading ? (
-                  <><Loader2 className="w-3 h-3 animate-spin" />加载中...</>
+                  <><Loader2 className="w-3 h-3 animate-spin" />{t("dw.objectExplorer.timeline.loadingShort")}</>
                 ) : (
-                  <>加载更多 ({detailTimeline.length}/{timelineTotal})</>
+                  <>{t("dw.objectExplorer.timeline.loadMore", { loaded: detailTimeline.length, total: timelineTotal })}</>
                 )}
               </button>
             </div>

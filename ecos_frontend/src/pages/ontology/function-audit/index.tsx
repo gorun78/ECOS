@@ -43,7 +43,9 @@ function currentUsername(): string {
   } catch {
     /* ignore */
   }
-  return localStorage.getItem("ecos_user") || "admin";
+  // 无假真理：兜底 'admin' 会把未登录主体伪造成管理员（越权可见全量），
+  // 改为空串 ⇒ 页面按最小权限 fail-closed（不展示任何记录并如实说明）。
+  return "";
 }
 
 const PAGE_SIZE = 20;
@@ -74,32 +76,54 @@ export default function FunctionAuditPage({ onToast }: FunctionAuditPageProps) {
   const [callerFilter, setCallerFilter] = useState("");
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  // 权限护栏提示（请求了非自身 caller 时置位，fail-closed 不放行）
+  const [guardNotice, setGuardNotice] = useState<string | null>(null);
 
   const me = useMemo(() => currentUsername(), []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setGuardNotice(null);
+    if (!me) {
+      // 未识别登录主体 ⇒ fail-closed：不展示任何记录（此前 me 兜底 'admin' 属身份造假）
+      setRows([]);
+      setTotal(null);
+      setError(t("ow.fnAudit.err.no_identity"));
+      setLoading(false);
+      return;
+    }
+    const requestedCaller = callerFilter.trim();
+    if (requestedCaller && requestedCaller !== me) {
+      // 权限护栏：此前「输入任意 caller 即放行全部」是越权旁路，现改为拦截（只看自身）
+      setRows([]);
+      setTotal(null);
+      setGuardNotice(t("ow.fnAudit.guard.self_only"));
+      setLoading(false);
+      return;
+    }
     try {
       const vo = await fetchFunctionAudit({
         status: statusFilter || undefined,
-        callerId: callerFilter || undefined,
+        callerId: me,
         page,
         pageSize: PAGE_SIZE,
       });
-      // 非管理员：只保留自身 caller_id 的行（客户端侧二次护栏；服务端未强制时兜底）
-      const items = (vo?.items || []).filter(
-        r => callerFilter || String(r.caller_id || "") === me
-      );
+      const rawItems = vo?.items || [];
+      // 客户端护栏：无论服务端是否已按 callerId 过滤，只保留自身 caller_id 的行
+      const items = rawItems.filter(r => String(r.caller_id || "") === me);
       setRows(items);
-      setTotal(vo?.total ?? items.length);
+      // total 口径统一：仅当客户端护栏未剔除任何行（服务端过滤可信）时才显示服务端 total；
+      // 否则隐藏（此前「服务端 total + 客户端过滤 rows」自相矛盾）
+      setTotal(items.length === rawItems.length ? (vo?.total ?? items.length) : null);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
       setRows([]);
+      setTotal(null);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, callerFilter, page, me]);
+  }, [statusFilter, callerFilter, page, me, t]);
 
   useEffect(() => {
     load();
@@ -174,6 +198,14 @@ export default function FunctionAuditPage({ onToast }: FunctionAuditPageProps) {
           </button>
         </div>
       </div>
+
+      {/* 权限护栏拦截提示（fail-closed，非静默放行） */}
+      {guardNotice && (
+        <div className={`mb-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-[12px] ${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`}>
+          <ShieldAlert size={13} className="shrink-0" />
+          <span>{guardNotice}</span>
+        </div>
+      )}
 
       {/* 表格 */}
       <div className={`rounded-lg border ${styles.cardBorder} ${styles.cardBg} h-[calc(100%-4.5rem)] min-h-0 overflow-auto`}>

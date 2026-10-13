@@ -102,6 +102,15 @@ export function normalizeAssetRows(raw: unknown, assetClass: CognitiveAssetClass
     .filter((r): r is CognitiveAssetRow => r !== null);
 }
 
+/**
+ * 补充设计 §1.2 / 前端设计方案 §1.4.2 对 B 层承诺、但后端**尚无治理列表端点**的类型
+ * （取证 2026-10-12：cognitive-engine `CognitiveApiPaths` 资产路径池仅
+ * catalog/resolve/proposals/transitions；catalog.governedAssetClasses 恒为
+ * BELIEF/HYPOTHESIS/MODEL；Decision Basis / Pattern·Case 无列表端点）。
+ * 仅用于列表页「端点未就绪」引导块渲染（复盘 S6），不参与 LIST_DISPATCH、不伪装成资产类。
+ */
+export const PENDING_GOVERNED_CLASSES = ['DECISION_BASIS', 'PATTERN_CASE'] as const;
+
 /** 生命周期态 → i18n key（服务端 CognitiveAssetStatus 名单源；未知值回落 raw 展示，禁伪造映射）。 */
 export function assetStatusLabelKey(state: string | null): string | null {
   if (!state) return null;

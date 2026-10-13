@@ -26,6 +26,14 @@ export interface ThemeStyles {
   accentBorder: string;
   /** Focus/selection ring color class (G2 flow-canvas selection highlight) — theme accent, not neutral */
   accentRing: string;
+  /**
+   * Foreground text class for elements sitting ON TOP of a solid `accentBg` fill
+   * (primary buttons / badges). Needed because `accentText` is the accent *hue* used
+   * as text on a card background — it is unreadable on the accent fill itself, and
+   * hard-coding `text-white` would be a raw palette literal (铁律 §六 禁裸色板).
+   * cyber-terminal inverts (dark ink on emerald fill) since white-on-emerald fails contrast there.
+   */
+  accentSolidText: string;
   /** Selected-edge SVG stroke hex (G2 flow-canvas) — mirrors accentBg hue; consumed as an SVG attribute, not a Tailwind class */
   accentStroke: string;
   badgeBg: string;
@@ -102,6 +110,9 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     accentText: "text-indigo-600",
     accentBorder: "border-indigo-200",
     accentRing: "ring-indigo-500",
+    /* arbitrary-value hex: index.css 的 [data-theme=slate-light] .text-white 反patch 白名单
+       会把 text-white 翻成近黑 #0f172a → 实心态按钮变深字深底。绕开白名单命名色。 */
+    accentSolidText: "text-[#FFFFFF]",
     accentStroke: "#6366f1",
     badgeBg: "bg-indigo-50",
     badgeText: "text-indigo-700",
@@ -154,6 +165,7 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     accentText: "text-blue-400",
     accentBorder: "border-blue-500/30",
     accentRing: "ring-blue-500",
+    accentSolidText: "text-[#F8FAFC]",
     accentStroke: "#3b82f6",
     badgeBg: "bg-blue-950/40",
     badgeText: "text-blue-450",
@@ -197,7 +209,10 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     cardTextMuted: "text-emerald-650",
     sidebarBg: "bg-[#000000]",
     sidebarText: "text-emerald-500",
-    sidebarBorder: "border-emerald-650/50",
+    /* 原 border-emerald-650/50：650 级不存在 + `/50` 修饰符落在不存在的级上 →
+       即使 index.css ghost 补块只覆盖 .border-emerald-650，带 /50 的类名仍是死声明。
+       改为有效 500 级 + /40（与同主题 accentBorder 一致）。 */
+    sidebarBorder: "border-emerald-500/40",
     sidebarActiveBg: "bg-[#0A1A0F] border-l-emerald-500",
     sidebarActiveText: "text-emerald-400 font-bold",
     sidebarHoverBg: "hover:bg-emerald-900/10",
@@ -206,6 +221,8 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     accentText: "text-emerald-400",
     accentBorder: "border-emerald-500/40",
     accentRing: "ring-emerald-500",
+    /* emerald 实心 + 白字 = WCAG 不达标（≈2.4:1）→ 深色墨字 */
+    accentSolidText: "text-[#04140B]",
     accentStroke: "#10b981",
     badgeBg: "bg-[#0A1A0F]",
     badgeText: "text-emerald-400",
@@ -214,7 +231,7 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     inputBorder: "border-emerald-600/40",
     placeholderText: "placeholder:text-emerald-700",
     muted: "text-emerald-650",
-    appBorder: "border-emerald-650/50",
+    appBorder: "border-emerald-500/40",
     successBg: "bg-emerald-500/10",
     successText: "text-emerald-400",
     successBorder: "border-emerald-500/40",
@@ -228,7 +245,7 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     infoText: "text-cyan-400",
     infoBorder: "border-cyan-500/40",
     overlayBg: "bg-black/60",
-    divider: "border-emerald-650/50",
+    divider: "border-emerald-500/40",
     text: "text-emerald-500",
     islandBg: "bg-[#0B0F19]",
     islandBorder: "border-[#1E293B]",
@@ -258,6 +275,7 @@ const THEME_PRESETS: Record<ThemeId, ThemeStyles> = {
     accentText: "text-purple-450",
     accentBorder: "border-purple-700/30",
     accentRing: "ring-purple-500",
+    accentSolidText: "text-[#F3E8FF]",
     accentStroke: "#a855f7",
     badgeBg: "bg-purple-950/50",
     badgeText: "text-purple-350",

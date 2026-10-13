@@ -7,6 +7,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useTheme } from "../components/ThemeContext";
 import { useLanguage } from "../components/LanguageContext";
 import { showToastGlobal } from "../components/common/Toast";
+import ConfirmDialog from "../components/common/ConfirmDialog";
 
 import type { WorkshopApp, WorkshopWidget } from './workshop/types';
 import { initialApps } from './workshop/mockData';
@@ -55,6 +56,9 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
   const [newVarType, setNewVarType] = useState<'object_set' | 'object' | 'string' | 'number' | 'boolean'>('string');
   const [newVarObjType, setNewVarObjType] = useState('flight');
   const [newVarDesc, setNewVarDesc] = useState('');
+  // 危险操作确认门（应用/页面删除走 ConfirmDialog，不再 window.confirm）
+  const [pendingDeleteApp, setPendingDeleteApp] = useState<{ id: string; name: string } | null>(null);
+  const [pendingDeletePage, setPendingDeletePage] = useState<{ id: string; title: string } | null>(null);
 
   const activeApp = apps.find(a => a.id === activeAppId);
   const activePage = activeApp?.pages.find(p => p.id === activePageId);
@@ -64,7 +68,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
     activeApp ?? null,
     activePage ?? null,
     saveAppsState,
-    showToast as any,
+    showToast as (type: 'success' | 'info' | 'error', message: string) => void,
     {
       newVarName, setNewVarName,
       newVarDesc, setNewVarDesc,
@@ -109,9 +113,29 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
   };
 
   const handleDeleteApp = (id: string, name: string) => {
-    if (!confirm(t('aiworkbench.ws.vw.confirmDeleteApp', { name }))) return;
+    setPendingDeleteApp({ id, name });
+  };
+
+  const confirmDeleteApp = () => {
+    if (!pendingDeleteApp) return;
+    const { id } = pendingDeleteApp;
+    setPendingDeleteApp(null);
     saveAppsState(apps.filter(a => a.id !== id));
     if (activeAppId === id) setActiveAppId(null);
+  };
+
+  const handleDeletePage = (pageId: string, title: string) => {
+    setPendingDeletePage({ id: pageId, title });
+  };
+
+  const confirmDeletePage = () => {
+    if (!activeApp || !pendingDeletePage) return;
+    const { id } = pendingDeletePage;
+    setPendingDeletePage(null);
+    saveAppsState(apps.map(a => a.id === activeApp.id
+      ? { ...a, pages: a.pages.filter(p => p.id !== id) }
+      : a));
+    if (activePageId === id) setActivePageId(activeApp.pages.find(p => p.id !== id)?.id || '');
   };
 
   const handleAddPage = () => {
@@ -129,10 +153,12 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
     } : a));
   };
 
+  // 发布通道未接入后端（services 无 workshop app publish 端点）⇒ 只翻转本地草稿状态，
+  // 明示「演示·仅本地」，不谎报外部可见。
   const handlePublishApp = () => {
     if (!activeApp) return;
     saveAppsState(apps.map(a => a.id === activeApp.id ? { ...a, isPublished: !a.isPublished } : a));
-    showToast('success', activeApp.isPublished ? t('aiworkbench.ws.vw.appUnpublished') : t('aiworkbench.ws.vw.appPublished'));
+    showToast('info', t('aiworkbench.ws.vw.appPublishLocalDemo'));
   };
 
   const vm = {
@@ -141,14 +167,14 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
     leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot,
     showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType,
     newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc,
-    setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage,
+    setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleDeletePage,
     handleUpdateAppTheme, handlePublishApp, saveAppsState,
     onOpenApp: (app: WorkshopApp) => { setActiveAppId(app.id); setActivePageId(app.pages[0]?.id || ''); setSelectedWidgetId(null); setEditorMode('design'); },
     ...widgetOps,
   };
 
   return (
-    <div className={`flex-1 flex flex-col h-full overflow-hidden ${styles.appBg} select-none`}>
+    <div className={`flex-1 flex flex-col h-full overflow-hidden ${styles.appBg}`}>
       {activeAppId === null ? (
         renderAppListScreen(vm)
       ) : (
@@ -156,7 +182,7 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
           {renderEditorHeader(vm)}
           <div className="flex-1 flex overflow-hidden">
             {renderLeftSidebar(vm)}
-            <div className={`flex-1 flex flex-col overflow-hidden ${activeApp?.theme.isDark ? 'bg-[var(--card,#020617)] text-[var(--card,#F1F5F9)]' : `${styles.sidebarBg} ${styles.cardText}`}`}>
+            <div className={`flex-1 flex flex-col overflow-hidden ${styles.cardBg} ${styles.cardText}`}>
               {renderCenterCanvas(vm)}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                 {renderCenterFilters(vm)}
@@ -169,6 +195,32 @@ export default function WorkshopView({ showToast: propShowToast }: { showToast?:
           {renderWorkshopModals(vm)}
         </div>
       )}
+
+      {/* 危险操作确认门 */}
+      <ConfirmDialog
+        visible={pendingDeleteApp !== null}
+        danger
+        title={t('aiworkbench.ws.vw.confirmDeleteAppTitle')}
+        message={t('aiworkbench.ws.vw.confirmDeleteApp', { name: pendingDeleteApp?.name ?? '' })}
+        onConfirm={confirmDeleteApp}
+        onCancel={() => setPendingDeleteApp(null)}
+      />
+      <ConfirmDialog
+        visible={pendingDeletePage !== null}
+        danger
+        title={t('aiworkbench.ws.vw.confirmDeletePageTitle')}
+        message={t('aiworkbench.ws.ls.confirmDeletePage', { name: pendingDeletePage?.title ?? '' })}
+        onConfirm={confirmDeletePage}
+        onCancel={() => setPendingDeletePage(null)}
+      />
+      <ConfirmDialog
+        visible={vm.pendingDeleteWidgetId != null}
+        danger
+        title={t('aiworkbench.ws.ops.confirmDeleteWidgetTitle')}
+        message={t('aiworkbench.ws.ops.confirmDeleteWidgetMsg')}
+        onConfirm={vm.confirmDeleteWidget}
+        onCancel={vm.cancelDeleteWidget}
+      />
     </div>
   );
 }

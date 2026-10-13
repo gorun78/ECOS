@@ -4,7 +4,7 @@ import { DynamicIcon } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function renderLeftSidebar(vm: any) {
-  const { styles, t, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm as { styles: Record<string, string>; t: (k: string, p?: any) => string; [key: string]: any };
+  const { styles, t, activeApp, activePage, activePageId, setActivePageId, activeAppId, apps, editorMode, setEditorMode, selectedWidgetId, setSelectedWidgetId, leftTab, setLeftTab, showAddWidgetModal, setShowAddWidgetModal, addWidgetSlot, setAddWidgetSlot, showAddVarModal, setShowAddVarModal, newVarName, setNewVarName, newVarType, setNewVarType, newVarObjType, setNewVarObjType, newVarDesc, setNewVarDesc, setActiveAppId, handleCreateNewApp, handleDeleteApp, handleAddPage, handleDeletePage, handleUpdateAppTheme, handlePublishApp, saveAppsState, showActionModal, setShowActionModal, flightsData, setFlightsData, aircraftData, setAircraftData, pilotsData, setPilotsData, handleAddVariable, handleAddWidget, handleDeleteWidget, handleUpdateWidgetConfig, handleVariableChange, getVarValue, getSimulatedFlights, handleExecuteSimulatedAction, getVarTypeBadge, getPrimaryColorClass } = vm as { styles: Record<string, string>; t: (k: string, p?: any) => string; [key: string]: any };
   return (
     <>
             {/* COLUMN 1: LEFT CONFIG SIDEBAR (Widget list, Pages, Variables, Styles) */}
@@ -18,8 +18,8 @@ export function renderLeftSidebar(vm: any) {
                     onClick={() => setLeftTab(tab)}
                     className={`flex-1 py-2 font-semibold text-[10px] uppercase transition-colors cursor-pointer ${
                       leftTab === tab
-                        ? '${styles.cardBg} ${styles.cardText} border-b-2 border-blue-500'
-                        : '${styles.cardTextMuted} hover:${styles.sidebarBg} hover:${styles.cardText}'
+                        ? `${styles.cardBg} ${styles.cardText} border-b-2 border-blue-500`
+                        : `${styles.cardTextMuted} hover:bg-black/5`
                     }`}
                   >
                     {t(`aiworkbench.ws.ls.tab.${tab}`)}
@@ -50,7 +50,7 @@ export function renderLeftSidebar(vm: any) {
                               setSelectedWidgetId(null);
                             }}
                             className={`w-full p-2 rounded-lg flex items-center justify-between cursor-pointer transition-colors ${
-                              isActive ? '${styles.cardBg} shadow-xs border ${styles.cardBorder} font-bold ${styles.cardText}' : '${styles.cardTextMuted} ${styles.sidebarHoverBg}'
+                              isActive ? `${styles.cardBg} shadow-xs border ${styles.cardBorder} font-bold ${styles.cardText}` : `${styles.cardTextMuted} ${styles.sidebarHoverBg}`
                             }`}
                           >
                             <div className="flex items-center gap-2 truncate">
@@ -80,16 +80,8 @@ export function renderLeftSidebar(vm: any) {
                                 type="button"
                                 onClick={e => {
                                   e.stopPropagation();
-                                  if (!window.confirm(t('aiworkbench.ws.ls.confirmDeletePage', { name: p.title }))) return;
-                                  const updated = apps.map((a: any) => {
-                                    if (a.id === activeApp.id) {
-                                      const remaining = a.pages.filter((pg: any) => pg.id !== p.id);
-                                      return { ...a, pages: remaining };
-                                    }
-                                    return a;
-                                  });
-                                  saveAppsState(updated);
-                                  if (isActive) setActivePageId(activeApp.pages.find((pg: any) => pg.id !== p.id)?.id || '');
+                                  // 危险操作走 WorkshopView 的 ConfirmDialog 确认门
+                                  handleDeletePage(p.id, p.title);
                                 }}
                                 className="p-1 opacity-0 hover:opacity-100 text-red-500 hover:bg-red-50 rounded"
                               >
@@ -152,7 +144,7 @@ export function renderLeftSidebar(vm: any) {
                             key={w.id}
                             onClick={() => setSelectedWidgetId(w.id)}
                             className={`p-1.5 rounded-md flex items-center justify-between cursor-pointer transition-all ${
-                              isSelected ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600' : '${styles.cardTextMuted} hover:${styles.sidebarBg}'
+                              isSelected ? 'bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600' : `${styles.cardTextMuted} hover:bg-black/5`
                             }`}
                           >
                             <div className="flex items-center gap-1.5 truncate">

@@ -3,8 +3,9 @@
  *
  * 提供：
  *   - 拉布局（fetchSandboxLayout）→ 初始化 nodes/edges/viewport
- *   - 默认布局：1 中央 hub + 6 资源按对侧散点（按 category swatch）
+ *   - 初始布局：仅 1 中央 hub（不伪造资源节点 — 无存档时画布为空态引导，资源须从 palette 选真实项加入）
  *   - addResourceNode / removeResourceNode（自动建 bind edge）
+ *   - setNodePosition / addManualEdge / removeEdge（画布手势回写单一事实源，保存不丢内容）
  *   - updateHubData / addMindVariant / removeMindVariant（PATCH active 切换）
  *   - runInsight（stub 占位，P3b T25 接真端点）
  *   - dirtyLayout + saveLayout（2s debounce on nodes/edges 变化）
@@ -48,7 +49,7 @@ const DEFAULT_VIEWPORT: SdViewport = { x: 0, y: 0, zoom: 0.8 };
 /** 默认 hub 位置（画布中央） */
 const HUB_POSITION = { x: 480, y: 280 };
 
-/** 6 类资源默认位置（围绕 hub，左右各 3，等距 y 分布） */
+/** 6 类资源默认位置（围绕 hub，左右各 3，等距 y 分布）— palette 加入时按类别取初始坐标 */
 const RESOURCE_DEFAULT_POSITIONS: Record<ResourceCategory, { x: number; y: number }> = {
   DATASOURCE: { x: 80, y: 60 },
   ONTOLOGY_ENTITY: { x: 80, y: 220 },
@@ -56,24 +57,6 @@ const RESOURCE_DEFAULT_POSITIONS: Record<ResourceCategory, { x: number; y: numbe
   AGENT_PROFILE: { x: 880, y: 60 },
   SECURITY_POLICY: { x: 880, y: 220 },
   INTERFACE_REF: { x: 880, y: 380 },
-};
-
-/** 6 类资源默认 label（前端展示） */
-const RESOURCE_DEFAULT_LABEL: Record<ResourceCategory, string> = {
-  DATASOURCE: "DATASOURCE_PLACEHOLDER",
-  ONTOLOGY_ENTITY: "ONT_ENTITY_PLACEHOLDER",
-  KNOWLEDGE_ARTICLE: "KNOWLEDGE_ARTICLE_PLACEHOLDER",
-  AGENT_PROFILE: "AGENT_PROFILE_PLACEHOLDER",
-  SECURITY_POLICY: "SECURITY_POLICY_PLACEHOLDER",
-  INTERFACE_REF: "INTERFACE_REF_PLACEHOLDER",
-};
-
-/** 默认 base 心智（首次建档时落库） */
-const DEFAULT_MIND_VARIANT: SdMindVariant = {
-  mindId: "mind-base",
-  label: "BASE_MIND_PLACEHOLDER",
-  active: true,
-  inheritedFrom: undefined,
 };
 
 // ── 节点 id 前缀 ──────────────────────────────────────────
@@ -111,12 +94,16 @@ function buildDefaultHubNode(scenarioId: string): SdBNode {
   };
 }
 
-/** 构造默认 resource 节点（占位 label，等待 fetchSandboxAvailable 后从抽屉 select 真 id） */
-function buildResourceNode(category: ResourceCategory): SdBNode {
+/** 构造 resource 节点（targetId/targetName 由 palette 选中的真实资源传入，不伪造占位 label） */
+function buildResourceNode(
+  category: ResourceCategory,
+  targetId: string,
+  targetName: string
+): SdBNode {
   const data: SdBResourceData = {
     category,
-    targetId: `resource-${Date.now().toString(36)}`,
-    targetName: RESOURCE_DEFAULT_LABEL[category],
+    targetId,
+    targetName,
     status: "ok",
   };
   return {
@@ -138,16 +125,16 @@ function buildBindEdge(resourceNodeId: string, hubNodeId: string): SdBEdge {
   };
 }
 
-/** 构造 6 类 resource 默认散点布局：1 hub + 6 资源分散在 hub 两侧 */
+/**
+ * 初始布局：仅中央 hub。
+ * 后端无存档时不伪造 6 类 *_PLACEHOLDER 资源节点 —— 画布呈空态引导，
+ * 资源必须由用户从 palette 选取真实项加入（addResourceNode）。
+ */
 function buildDefaultLayout(scenarioId: string): SdLayout {
   const hub = buildDefaultHubNode(scenarioId);
-  const resources: SdBNode[] = (Object.keys(RESOURCE_DEFAULT_POSITIONS) as ResourceCategory[]).map(
-    (cat) => buildResourceNode(cat)
-  );
-  const edges: SdBEdge[] = resources.map((n) => buildBindEdge(n.id, hub.id));
   return {
-    nodes: [hub, ...resources],
-    edges,
+    nodes: [hub],
+    edges: [],
     viewport: { ...DEFAULT_VIEWPORT },
   };
 }
@@ -180,6 +167,12 @@ export interface UseSandboxReturn {
   removeResourceNode(nodeId: string): void;
   /** 给一个未 bind 的 resource 建 bind edge */
   linkResourceToHub(nodeId: string): void;
+  /** 画布拖拽结束后回写节点位置（单一事实源，保存不丢） */
+  setNodePosition(nodeId: string, position: { x: number; y: number }): void;
+  /** 画布手动连线回写 edge（source→target + 推断 kind） */
+  addManualEdge(source: string, target: string, kind: SdBEdge["kind"]): void;
+  /** 画布删除 edge 回写 */
+  removeEdge(edgeId: string): void;
   /** 修改 hub data */
   updateHubData(partial: Partial<SdBHubData>): void;
 
@@ -420,10 +413,7 @@ export function useSandbox(scenarioId: string | null): UseSandboxReturn {
 
   const addResourceNode = useCallback(
     (category: ResourceCategory, targetId: string, targetName: string) => {
-      const node = buildResourceNode(category);
-      const resData = node.data as SdBResourceData;
-      resData.targetId = targetId;
-      resData.targetName = targetName;
+      const node = buildResourceNode(category, targetId, targetName);
       setNodes((prevNodes) => [...prevNodes, node]);
       // 资源永远 bind 到中央 hub（hub 一定存在）
       setEdges((prevEdges) => [
@@ -456,6 +446,46 @@ export function useSandbox(scenarioId: string | null): UseSandboxReturn {
         },
       ];
     });
+    setDirtyLayout(true);
+  }, []);
+
+  const setNodePosition = useCallback(
+    (nodeId: string, position: { x: number; y: number }) => {
+      setNodes((prev) => {
+        const target = prev.find((n) => n.id === nodeId);
+        if (!target || (target.position.x === position.x && target.position.y === position.y)) {
+          return prev;
+        }
+        return prev.map((n) => (n.id === nodeId ? { ...n, position } : n));
+      });
+      setDirtyLayout(true);
+    },
+    []
+  );
+
+  const addManualEdge = useCallback(
+    (source: string, target: string, kind: SdBEdge["kind"]) => {
+      if (!source || !target) return;
+      setEdges((prev) => {
+        if (prev.some((e) => e.source === source && e.target === target)) return prev;
+        return [
+          ...prev,
+          {
+            id: `e-${source}-${target}-${Date.now().toString(36)}`,
+            source,
+            target,
+            kind,
+            animated: kind !== "inherit",
+          },
+        ];
+      });
+      setDirtyLayout(true);
+    },
+    []
+  );
+
+  const removeEdge = useCallback((edgeId: string) => {
+    setEdges((prev) => prev.filter((e) => e.id !== edgeId));
     setDirtyLayout(true);
   }, []);
 
@@ -625,6 +655,9 @@ export function useSandbox(scenarioId: string | null): UseSandboxReturn {
     addResourceNode,
     removeResourceNode,
     linkResourceToHub,
+    setNodePosition,
+    addManualEdge,
+    removeEdge,
     updateHubData,
     addMindVariant,
     removeMindVariant,

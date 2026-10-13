@@ -76,6 +76,9 @@ export default function ObjectTypeView({
   const [metaBaseline, setMetaBaseline] = useState<{ domainId?: string }>({});
   const [impactResult, setImpactResult] = useState<LineageImpactResult | null>(null);
   const [impactLoading, setImpactLoading] = useState(false);
+  // 无假真理：映射回读 / 影响分析失败不再静默（此前失败=「无映射/无影响」假象），显式错误态
+  const [mappingError, setMappingError] = useState<string | null>(null);
+  const [impactError, setImpactError] = useState<string | null>(null);
 
   const mapping = objectType.mapping || { datasetId: '', propertyMappings: {} };
   /** DW 层数据对象的列定义缓存（选中时懒加载，避免对全部对象做 N+1 列查询） */
@@ -97,6 +100,9 @@ export default function ObjectTypeView({
     setDocAnchor({ docId: '', source: '', docChunkCount: undefined });
     setDocAnchorType('TABLE');
     setLastValidation(null);
+    setMappingError(null);
+    setImpactError(null);
+    setImpactResult(null);
     fetchMappings({ objectId: objectType.id })
       .then(records => {
         if (cancelled) return;
@@ -124,7 +130,11 @@ export default function ObjectTypeView({
           });
         }
       })
-      .catch(() => {});
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // 加载失败 ≠ 无映射：置错误态，由映射 Tab 渲染错误横幅
+        setMappingError(String((err as { message?: string } | undefined)?.message || err));
+      });
     return () => { cancelled = true; };
   }, [objectType.id]);
 
@@ -222,11 +232,14 @@ export default function ObjectTypeView({
 
   const handleImpactAnalysis = async () => {
     setImpactLoading(true);
+    setImpactError(null);
     try {
       const result = await fetchLineageImpact({ objectId: objectType.id });
       setImpactResult(result);
-    } catch {
+    } catch (err: unknown) {
+      // 失败不再伪装「无影响」：置错误态由 lineage Tab 渲染错误横幅
       setImpactResult(null);
+      setImpactError(String((err as { message?: string } | undefined)?.message || err));
     } finally {
       setImpactLoading(false);
     }
@@ -450,18 +463,26 @@ export default function ObjectTypeView({
             metaDirty={metaDirty} metaSaving={metaSaving} onSaveMetadata={handleSaveMetadata} />
         )}
         {activeTab === 'mapping' && (
-          <MappingTab objectType={objectType} onUpdate={onUpdate}
-            datasets={datasets} selectedDataset={selectedDataset}
-            handleDatasetChange={handleDatasetChange} handleAutoMap={handleAutoMap}
-            handlePropMappingChange={handlePropMappingChange}
-            mappingDirty={mappingDirty} onSaveMapping={handleSaveMapping}
-            docAnchor={docAnchor} docAnchorType={docAnchorType}
-            handleDocAnchorChange={handleDocAnchorChange}
-            handleDocAnchorTypeChange={handleDocAnchorTypeChange}
-            onValidateMappings={handleValidateMappings}
-            validating={validating}
-            lastValidation={lastValidation || undefined}
-            onDismissValidation={handleDismissValidation} />
+          <div className="space-y-3">
+            {/* 六态·错误态：映射回读失败显式说明（此前 catch→静默 = 「无映射」假象） */}
+            {mappingError && (
+              <div className={`rounded-lg border px-3 py-2 text-xs ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
+                {t('ow.mapping.load_failed').replace('{error}', mappingError)}
+              </div>
+            )}
+            <MappingTab objectType={objectType} onUpdate={onUpdate}
+              datasets={datasets} selectedDataset={selectedDataset}
+              handleDatasetChange={handleDatasetChange} handleAutoMap={handleAutoMap}
+              handlePropMappingChange={handlePropMappingChange}
+              mappingDirty={mappingDirty} onSaveMapping={handleSaveMapping}
+              docAnchor={docAnchor} docAnchorType={docAnchorType}
+              handleDocAnchorChange={handleDocAnchorChange}
+              handleDocAnchorTypeChange={handleDocAnchorTypeChange}
+              onValidateMappings={handleValidateMappings}
+              validating={validating}
+              lastValidation={lastValidation || undefined}
+              onDismissValidation={handleDismissValidation} />
+          </div>
         )}
         {activeTab === 'links' && (
           <LinksTab objectType={objectType} relatedLinks={relatedLinks}
@@ -483,6 +504,12 @@ export default function ObjectTypeView({
                 <AlertTriangle size={12} />{impactLoading ? '...' : t('ow.btn.impactAnalysis')}
               </button>
             </div>
+            {impactError && (
+              /* 六态·错误态：分析调用失败 ≠ 「无影响」 */
+              <div className={`mb-3 rounded-lg border px-3 py-2 text-xs ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
+                {t('ow.impact.load_failed').replace('{error}', impactError)}
+              </div>
+            )}
             {impactResult ? (
               <div>
                 <div className={`text-[10px] font-semibold ${styles.muted} mb-2`}>

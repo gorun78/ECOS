@@ -22,39 +22,57 @@ import { fetchBizDashboard } from "../api";
 
 // ── Types ──────────────────────────────────────────────
 interface DashboardData {
-  maintenanceOutput?: number | string;
-  projectCount?: number;
-  contractFulfillmentRate?: number | string;
-  equipmentHealthRate?: number | string;
+  maintenanceOutput?: number | null;
+  projectCount?: number | null;
+  contractFulfillmentRate?: number | null;
+  equipmentHealthRate?: number | null;
   departments?: { name: string; output?: number; value?: number; headcount?: number }[];
   monthlyTrend?: { month: string; value: number; projects: number }[];
   contractTrend?: { month: string; rate: number }[];
 }
 
 // ── Colors ─────────────────────────────────────────────
+// 图表系列色板属数据可视化枚举（非结构性容器底色），保留
 const PIE_COLORS = ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#06B6D4", "#F97316", "#84CC16"];
 
 // ── Helpers ────────────────────────────────────────────
-function fmtMoney(v: number | string | undefined | null): string {
-  if (v == null) return "—";
+// 缺字段返回 null（渲染为「无数据」），不再 `?? 0` 冒充真实零值
+function numOrNull(v: number | string | undefined | null): number | null {
+  if (v == null) return null;
   const n = Number(v);
-  if (isNaN(n)) return String(v);
-  if (n >= 100000000) return `${(n / 100000000).toFixed(2)} 亿`;
-  if (n >= 10000) return `${(n / 10000).toFixed(0)} 万`;
+  return Number.isFinite(n) ? n : null;
+}
+
+function fmtMoney(v: number | string | null | undefined, noData: string, t: (k: string, p?: Record<string, string | number>) => string): string {
+  const n = numOrNull(v);
+  if (n === null) return noData;
+  if (n >= 100000000) return t("dashboard.ops.unitYi", { v: (n / 100000000).toFixed(2) });
+  if (n >= 10000) return t("dashboard.ops.unitWan", { v: (n / 10000).toFixed(0) });
   return n.toLocaleString();
 }
 
-function fmtPercent(v: number | string | undefined | null): string {
-  if (v == null) return "—";
-  const n = Number(v);
-  if (isNaN(n)) return String(v);
+function fmtPercent(v: number | string | null | undefined, noData: string): string {
+  const n = numOrNull(v);
+  if (n === null) return noData;
   return `${n.toFixed(1)}%`;
 }
 
 // ── Component ──────────────────────────────────────────
 export default function OperationsDashboard() {
   const { t } = useLanguage();
-  const { styles } = useTheme();
+  const { styles, activeTheme } = useTheme();
+  const noData = t("dashboard.ops.noData");
+
+  // recharts Tooltip 需要内联色值（无法走 Tailwind 类）。主题差异收敛在这一个
+  // token 层派生对象里（slate-light = 浅档，其余 3 套深主题 = 深档），组件不做主题分支渲染。
+  const isDarkChart = activeTheme !== "slate-light";
+  const TOOLTIP_CONTENT_STYLE: React.CSSProperties = {
+    backgroundColor: isDarkChart ? "rgba(20,25,36,0.95)" : "rgba(255,255,255,0.95)",
+    border: `1px solid ${isDarkChart ? "#2B3548" : "#CBD5E1"}`,
+    borderRadius: "8px",
+    fontSize: "12px",
+    color: isDarkChart ? "#E2E8F0" : "#1E293B",
+  };
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,17 +84,19 @@ export default function OperationsDashboard() {
     try {
       const raw = await fetchBizDashboard();
 
+      // 缺字段保持 null → 渲染「无数据」，不再 ?? 0 冒充真实零值
       setData({
-        maintenanceOutput: raw.maintenanceOutput ?? raw.maintenance_output ?? 0,
-        projectCount: raw.projectCount ?? raw.project_count ?? raw.projectStats?.total ?? 0,
-        contractFulfillmentRate: raw.contractFulfillmentRate ?? raw.contract_fulfillment_rate ?? raw.contractStats?.fulfillmentRate ?? 0,
-        equipmentHealthRate: raw.equipmentHealthRate ?? raw.equipment_health_rate ?? 0,
+        maintenanceOutput: numOrNull(raw.maintenanceOutput ?? raw.maintenance_output),
+        projectCount: numOrNull(raw.projectCount ?? raw.project_count ?? raw.projectStats?.total),
+        contractFulfillmentRate: numOrNull(raw.contractFulfillmentRate ?? raw.contract_fulfillment_rate ?? raw.contractStats?.fulfillmentRate),
+        equipmentHealthRate: numOrNull(raw.equipmentHealthRate ?? raw.equipment_health_rate),
         departments: raw.departments || [],
         monthlyTrend: raw.monthlyTrend || raw.monthly_trend || [],
         contractTrend: raw.contractTrend || raw.contract_trend || [],
       });
     } catch (e: any) {
-      setError(e.message || t("dashboard.ops.loadFailed"));
+      const status = typeof e?.status === "number" ? e.status : undefined;
+      setError(status !== undefined ? t("dashboard.ops.httpError", { status }) : t("dashboard.ops.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -105,8 +125,8 @@ export default function OperationsDashboard() {
     return (
       <div className={`h-full flex items-center justify-center p-6 ${styles.appBg}`}>
         <div className="text-center max-w-sm">
-          <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-red-600 mb-1">
+          <AlertCircle className={`w-10 h-10 ${styles.dangerText} mx-auto mb-3`} />
+          <p className={`text-sm font-semibold ${styles.dangerText} mb-1`}>
             {t("dashboard.ops.loadErrorTitle")}
           </p>
           <p className={`text-xs ${styles.muted} mb-4`}>{error}</p>
@@ -163,28 +183,28 @@ export default function OperationsDashboard() {
         <KpiTile
           icon={TrendingUp}
           label={t("dashboard.ops.kpi.maintOutput")}
-          value={fmtMoney(data?.maintenanceOutput)}
+          value={fmtMoney(data?.maintenanceOutput, noData, t)}
           color="text-emerald-500"
           styles={styles}
         />
         <KpiTile
           icon={Briefcase}
           label={t("dashboard.ops.kpi.projects")}
-          value={data?.projectCount ?? 0}
+          value={data?.projectCount == null ? noData : data.projectCount.toLocaleString()}
           color="text-blue-500"
           styles={styles}
         />
         <KpiTile
           icon={FileCheck}
           label={t("dashboard.ops.kpi.fulfillment")}
-          value={fmtPercent(data?.contractFulfillmentRate)}
+          value={fmtPercent(data?.contractFulfillmentRate, noData)}
           color="text-violet-500"
           styles={styles}
         />
         <KpiTile
           icon={Wrench}
           label={t("dashboard.ops.kpi.equipHealth")}
-          value={fmtPercent(data?.equipmentHealthRate)}
+          value={fmtPercent(data?.equipmentHealthRate, noData)}
           color="text-amber-500"
           styles={styles}
         />
@@ -219,14 +239,7 @@ export default function OperationsDashboard() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" strokeOpacity={0.3} />
                     <XAxis dataKey="month" tick={CHART_TICK_STYLE} />
                     <YAxis tick={CHART_TICK_STYLE} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "rgba(255,255,255,0.95)",
-                        border: "1px solid #E2E8F0",
-                        borderRadius: "8px",
-                        fontSize: "12px",
-                      }}
-                    />
+                    <Tooltip contentStyle={TOOLTIP_CONTENT_STYLE} />
                     <Line
                       type="monotone"
                       dataKey="value"
@@ -277,13 +290,8 @@ export default function OperationsDashboard() {
                       ))}
                     </Pie>
                     <Tooltip
-                      contentStyle={{
-                        backgroundColor: "rgba(255,255,255,0.95)",
-                        border: "1px solid #E2E8F0",
-                        borderRadius: "8px",
-                        fontSize: "12px",
-                      }}
-                      formatter={(value: any) => [fmtMoney(value), t("dashboard.ops.output")]}
+                      contentStyle={TOOLTIP_CONTENT_STYLE}
+                      formatter={(value: any) => [fmtMoney(value, noData, t), t("dashboard.ops.output")]}
                     />
                     <Legend
                       wrapperStyle={{ fontSize: "11px" }}
@@ -310,12 +318,7 @@ export default function OperationsDashboard() {
                 <XAxis dataKey="month" tick={CHART_TICK_STYLE} />
                 <YAxis tick={CHART_TICK_STYLE} domain={[0, 100]} />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: "rgba(255,255,255,0.95)",
-                    border: "1px solid #E2E8F0",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                  }}
+                  contentStyle={TOOLTIP_CONTENT_STYLE}
                   formatter={(value: any) => [`${value}%`, t("dashboard.ops.rate")]}
                 />
                 <Bar
@@ -355,9 +358,9 @@ export default function OperationsDashboard() {
             </thead>
             <tbody>
               {depts.map((d, i) => {
-                const val = d.output ?? d.value ?? 0;
-                const totalVal = depts.reduce((s, x) => s + (x.output ?? x.value ?? 0), 0);
-                const pct = totalVal > 0 ? (Number(val) / totalVal * 100) : 0;
+                const val = numOrNull(d.output ?? d.value);
+                const totalVal = depts.reduce((s, x) => s + (numOrNull(x.output ?? x.value) ?? 0), 0);
+                const pct = val !== null && totalVal > 0 ? (val / totalVal * 100) : null;
                 return (
                   <tr key={i} className={`border-b ${styles.cardBorder} hover:opacity-80 transition`}>
                     <td className="px-4 py-2.5">
@@ -369,19 +372,19 @@ export default function OperationsDashboard() {
                         {d.name}
                       </span>
                     </td>
-                    <td className={`text-right px-4 py-2.5 font-mono ${styles.cardText}`}>{fmtMoney(val)}</td>
+                    <td className={`text-right px-4 py-2.5 font-mono ${styles.cardText}`}>{fmtMoney(val, noData, t)}</td>
                     <td className="text-right px-4 py-2.5">
                       <div className="flex items-center justify-end gap-2">
                         <div className={`w-16 h-1.5 ${styles.inputBorder} border rounded-full overflow-hidden ${styles.inputBg}`}>
                           <div
                             className="h-full rounded-full"
                             style={{
-                              width: `${Math.min(100, pct)}%`,
+                              width: `${pct === null ? 0 : Math.min(100, pct)}%`,
                               backgroundColor: PIE_COLORS[i % PIE_COLORS.length],
                             }}
                           />
                         </div>
-                        <span className={`w-10 text-right font-mono ${styles.cardTextMuted}`}>{pct.toFixed(1)}%</span>
+                        <span className={`w-10 text-right font-mono ${styles.cardTextMuted}`}>{pct === null ? noData : `${pct.toFixed(1)}%`}</span>
                       </div>
                     </td>
                   </tr>
@@ -394,7 +397,7 @@ export default function OperationsDashboard() {
 
       {/* Error banner */}
       {error && data && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+        <div className={`flex items-center gap-2 px-4 py-3 ${styles.dangerBg} border ${styles.dangerBorder} rounded-lg text-xs ${styles.dangerText}`}>
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
           <button type="button" onClick={loadData} className="ml-auto font-semibold underline hover:no-underline">

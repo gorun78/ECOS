@@ -12,6 +12,8 @@ import { RotateCw } from "lucide-react";
 import { useTheme } from "../../components/ThemeContext";
 import { useLanguage } from "../../components/LanguageContext";
 import { useDict } from "../../hooks/useDict";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import { readGlossaryError } from "../../services/glossary";
 import {
   createGlossaryTerm,
   updateGlossaryTerm,
@@ -20,11 +22,12 @@ import {
 } from "../../services/glossary";
 import TagListInput from "./TagListInput";
 
-/** 状态流转配置（按钮文案 key + 目标状态 + 样式变体） */
-const TRANSITIONS: Record<string, { key: string; status: string; danger?: boolean }[]> = {
+/** 状态流转配置（按钮文案 key + 目标状态 + 样式变体 + 是否需二次确认） */
+const TRANSITIONS: Record<string, { key: string; status: string; danger?: boolean; confirm?: boolean }[]> = {
   DRAFT: [{ key: "glossary.transition.submit_review", status: "REVIEW" }],
   REVIEW: [{ key: "glossary.transition.publish", status: "PUBLISHED" }],
-  PUBLISHED: [{ key: "glossary.transition.deprecate", status: "DEPRECATED", danger: true }],
+  // 废弃 = 终态流转（词条退出可用面），按危险操作加确认门
+  PUBLISHED: [{ key: "glossary.transition.deprecate", status: "DEPRECATED", danger: true, confirm: true }],
 };
 
 interface TermFormPanelProps {
@@ -57,6 +60,8 @@ export default function TermFormPanel({
   const termTypeDict = useDict("glossary_term_type", locale);
 
   const [saving, setSaving] = useState(false);
+  /** 待确认的危险流转（status 值）；null = 无待确认弹窗 */
+  const [pendingTransition, setPendingTransition] = useState<string | null>(null);
 
   // ── 表单字段 ──
   const [name, setName] = useState("");
@@ -86,8 +91,9 @@ export default function TermFormPanel({
     setTags(term?.tags ?? []);
   }, [term, mode]);
 
-  /** 统一输入框样式 */
-  const inputClass = `w-full px-3 py-2 rounded-lg border text-xs outline-none focus:border-indigo-400
+  /** 统一输入框样式（聚焦态走主题 accentRing，禁裸色板 §七.1） */
+  const inputClass = `w-full px-3 py-2 rounded-lg border text-xs outline-none
+    focus:ring-2 focus:ring-inset focus-visible:ring-2 ${styles.accentRing}
     disabled:opacity-50 ${styles.inputBorder} ${styles.inputBg} ${styles.inputText}`;
 
   /** 字段标题样式 */
@@ -126,29 +132,62 @@ export default function TermFormPanel({
         onSaved(updated);
       }
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
+      const { message } = readGlossaryError(e);
       showToast("error", `${t("glossary.toast.save_failed")}: ${message}`);
     } finally {
       setSaving(false);
     }
   };
 
+  /** 词条切换时收起未确认的危险流转 */
+  useEffect(() => {
+    setPendingTransition(null);
+  }, [term?.id, mode]);
+
+  /** Esc 关闭流转确认弹窗（modal 键盘出口） */
+  useEffect(() => {
+    if (!pendingTransition) {
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPendingTransition(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pendingTransition]);
+
   /** 状态流转（后端非法流转会返回业务错误 message） */
-  const handleTransition = async (status: string) => {
-    if (!term) {
+  const runTransition = async (status: string) => {
+    if (!term || !status) {
       return;
     }
     setSaving(true);
     try {
       const updated = await updateGlossaryTerm(term.id, { status });
-      showToast("success", `${t("glossary.toast.status_changed")}「${getLabel(status)}」`);
+      setPendingTransition(null);
+      // 书名号拼接改走 i18n 插值键（缺词期以既有键组合兜底，见 .fixtmp/need-locale-onto2.md）
+      showToast(
+        "success",
+        t("glossary.toast.status_changed_to", `${t("glossary.toast.status_changed")} ${getLabel(status)}`),
+      );
       onSaved(updated);
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
+      const { message } = readGlossaryError(e);
       showToast("error", `${t("glossary.toast.status_failed")}: ${message}`);
     } finally {
       setSaving(false);
     }
+  };
+
+  /** 流转入口：危险流转（废弃）先过确认门，其余直接执行 */
+  const handleTransition = (target: { status: string; confirm?: boolean }) => {
+    if (target.confirm) {
+      setPendingTransition(target.status);
+      return;
+    }
+    void runTransition(target.status);
   };
 
   // 编辑态但词条未命中（列表筛选后遗落等情况）
@@ -172,7 +211,7 @@ export default function TermFormPanel({
       {/* 名称 */}
       <div>
         <div className={labelClass}>
-          {t("glossary.field.name")} <span className="text-red-400">*</span>
+          {t("glossary.field.name")} <span className={styles.dangerText} aria-hidden="true">*</span>
         </div>
         <input
           className={inputClass}
@@ -359,14 +398,14 @@ export default function TermFormPanel({
           {transitions.map((tr) => (
             <button type="button"
               key={tr.status}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition
                 disabled:opacity-50 ${tr.danger
-                  ? "bg-red-600 hover:bg-red-700 text-white"
-                  : `${styles.badgeBg} ${styles.badgeText}`}`}
-              onClick={() => handleTransition(tr.status)}
+                  ? `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`
+                  : `${styles.badgeBg} ${styles.badgeText} ${styles.cardBorder}`}`}
+              onClick={() => handleTransition(tr)}
               disabled={saving}
             >
-              {saving ? <RotateCw size={14} className="animate-spin inline mr-1" /> : null}
+              {saving && !pendingTransition ? <RotateCw size={14} className="animate-spin inline mr-1" aria-hidden="true" /> : null}
               {t(tr.key)}
             </button>
           ))}
@@ -376,16 +415,16 @@ export default function TermFormPanel({
       {/* 操作按钮 */}
       <div className={`flex gap-2 pt-3 border-t ${styles.cardBorder}`}>
         <button type="button"
-          className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs
-            font-semibold transition disabled:opacity-50 flex items-center gap-1"
+          className={`px-4 py-2 rounded-lg text-xs font-semibold transition disabled:opacity-50
+            flex items-center gap-1 cursor-pointer ${styles.accentBg} ${styles.accentHover} ${styles.accentSolidText}`}
           onClick={handleSave}
           disabled={saving}
         >
-          {saving ? <RotateCw size={14} className="animate-spin" /> : null}
+          {saving ? <RotateCw size={14} className="animate-spin" aria-hidden="true" /> : null}
           {t("glossary.save")}
         </button>
         <button type="button"
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition disabled:opacity-50
+          className={`px-4 py-2 rounded-lg text-xs font-semibold transition disabled:opacity-50 cursor-pointer
             ${styles.sidebarBg} ${styles.sidebarHoverBg} ${styles.muted}`}
           onClick={onCancel}
           disabled={saving}
@@ -393,6 +432,21 @@ export default function TermFormPanel({
           {t("glossary.cancel")}
         </button>
       </div>
+
+      {/* 危险流转确认门（废弃 = 终态，须显式确认；role=alertdialog 由 ConfirmDialog 提供） */}
+      <ConfirmDialog
+        open={!!pendingTransition}
+        title={t(
+          "glossary.transition.confirm_title",
+          `${t("glossary.actions")} · ${term?.name ?? ""}`,
+        )}
+        message={t("glossary.transition.deprecate_confirm_msg", `${term?.name ?? ""} · ${t("common.confirm.irreversible")}`)}
+        confirmText={t("glossary.transition.deprecate")}
+        cancelText={t("glossary.cancel")}
+        variant="danger"
+        onConfirm={() => void runTransition(pendingTransition ?? "")}
+        onCancel={() => setPendingTransition(null)}
+      />
     </div>
   );
 }

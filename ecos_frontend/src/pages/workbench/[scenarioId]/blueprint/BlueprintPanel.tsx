@@ -8,6 +8,7 @@
  * `allowedTransitions` 决定（唯一权威），409 按 errorCode 呈现，绝不本地合成。</p>
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import LucideIcon from '../../../../components/LucideIcon';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useLanguage } from '../../../../components/LanguageContext';
@@ -32,6 +33,7 @@ import BlueprintDetail from './BlueprintDetail';
 import BlueprintValidatePanel from './BlueprintValidatePanel';
 import CapabilityPanel from './CapabilityPanel';
 import ContextBuildPanel from './ContextBuildPanel';
+import WizardShell, { type WizardStep } from './WizardShell';
 
 interface Props {
   scenarioId: string;
@@ -242,7 +244,7 @@ export default function BlueprintPanel({ scenarioId }: Props) {
               type="button"
               onClick={() => void pickVersion(v.id)}
               className={`text-[11px] font-mono px-2 py-0.5 rounded border cursor-pointer ${
-                v.id === selectedId ? `${styles.accentBg} text-white ${styles.accentBorder}` : `${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`
+                v.id === selectedId ? `${styles.accentBg} ${styles.accentSolidText} ${styles.accentBorder}` : `${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`
               }`}
             >
               {t('workspace.bp.version', { version: v.version })}
@@ -351,56 +353,148 @@ export default function BlueprintPanel({ scenarioId }: Props) {
             />
           )}
 
-          <BlueprintStatusTrack blueprint={selected} onTransition={onTransition} busy={busy} />
-
-          {/* 操作条：审批门 / 审批通过 / 发布 / 修订 */}
-          <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3 space-y-2`}>
-            <div className="flex items-center gap-2 flex-wrap">
-              {allowed.has('READY_FOR_APPROVAL') && (
-                <ActionButton icon="ClipboardCheck" label={t('workspace.bp.action.enter_approval')} busy={busy} onClick={() => void runAction(() => enterApprovalGate(scenarioId, selected.id))} />
-              )}
-              {allowed.has('APPROVED') && (
-                <div className="flex items-center gap-1 flex-wrap">
-                  <input
-                    value={approvalRef}
-                    onChange={(e) => setApprovalRef(e.target.value)}
-                    placeholder={t('workspace.bp.approval_ref_ph')}
-                    className={`text-xs px-2 py-1 rounded border ${styles.cardBg} ${styles.cardText} ${styles.cardBorder}`}
-                  />
-                  <ActionButton icon="Stamp" label={t('workspace.bp.action.approve')} busy={busy} disabled={!approvalRef.trim()} onClick={() => void runAction(() => approveBlueprint(scenarioId, selected.id, approvalRef.trim()))} />
-                </div>
-              )}
-              {allowed.has('RELEASED') && (
-                <ActionButton icon="Rocket" label={t('workspace.bp.action.release')} busy={busy} onClick={() => void runAction(() => releaseBlueprint(scenarioId, selected.id))} />
-              )}
-              <ActionButton icon="GitCompareArrows" label={t('workspace.bp.action.revise')} busy={busy} variant="muted" onClick={() => void runAction(() => reviseBlueprint(scenarioId, selected.id))} />
-            </div>
-
-            {actionError && (
-              <div className={`text-[11px] rounded border px-2 py-1.5 flex items-start gap-1.5 ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
-                <LucideIcon name="AlertOctagon" size={12} className="mt-0.5 shrink-0" />
-                <span>
-                  {errKey(actionError.code) === 'workspace.bp.err.unknown'
-                    ? t('workspace.bp.err.unknown', { msg: actionError.msg })
-                    : t(errKey(actionError.code))}
-                  {actionError.traceId ? <span className={`ml-1 font-mono ${styles.cardTextMuted}`}>traceId={actionError.traceId}</span> : null}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <BlueprintValidatePanel result={validateResult} loading={validating} error={validateError} onRun={() => void doValidate()} disabled={!selected} />
-
-          <CapabilityPanel declaredCapabilities={selected.capabilities} />
-
-          {/* §3.4 步骤 2 资产盘点：Context Builder（认知域通道，蓝图引用/目标回显自 selected） */}
-          <ContextBuildPanel scenarioId={scenarioId} blueprint={selected} />
-
-          <BlueprintDetail bp={selected} />
+          <WizardShell
+            status={selected.status}
+            steps={buildWizardSteps({
+              scenarioId,
+              selected,
+              busy,
+              allowed,
+              actionError,
+              errKey,
+              onTransition,
+              runAction,
+              enterApprovalGate,
+              approveBlueprint,
+              releaseBlueprint,
+              reviseBlueprint,
+              approvalRef,
+              setApprovalRef,
+              validateResult,
+              validating,
+              validateError,
+              doValidate,
+              t,
+              styles,
+            })}
+          />
         </div>
       )}
     </div>
   );
+}
+
+/** 向导五步内容装配（复用既有面板组件，复盘 S1：面板堆叠 → 步骤编排）。 */
+function buildWizardSteps(ctx: {
+  scenarioId: string;
+  selected: ScenarioBlueprintVO;
+  busy: boolean;
+  allowed: Set<string>;
+  actionError: { code?: BlueprintErrorCode; msg: string; traceId?: string } | null;
+  errKey: (code?: BlueprintErrorCode) => string;
+  onTransition: (target: string) => void;
+  runAction: (fn: () => Promise<ScenarioBlueprintVO>) => Promise<void>;
+  enterApprovalGate: (sid: string, id: string) => Promise<ScenarioBlueprintVO>;
+  approveBlueprint: (sid: string, id: string, ref: string) => Promise<ScenarioBlueprintVO>;
+  releaseBlueprint: (sid: string, id: string) => Promise<ScenarioBlueprintVO>;
+  reviseBlueprint: (sid: string, id: string) => Promise<ScenarioBlueprintVO>;
+  approvalRef: string;
+  setApprovalRef: (v: string) => void;
+  validateResult: BlueprintValidateResult | null;
+  validating: boolean;
+  validateError: string | null;
+  doValidate: () => Promise<void>;
+  t: (k: string, p?: Record<string, unknown>) => string;
+  styles: ReturnType<typeof useTheme>['styles'];
+}): WizardStep[] {
+  const {
+    scenarioId, selected, busy, allowed, actionError, errKey, onTransition, runAction,
+    approvalRef, setApprovalRef, validateResult, validating, validateError, doValidate, t, styles,
+  } = ctx;
+
+  const goalStep = (
+    <div className="space-y-3">
+      <BlueprintStatusTrack blueprint={selected} onTransition={onTransition} busy={busy} />
+      <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3 space-y-2`}>
+        <div className="flex items-center gap-2 flex-wrap">
+          {allowed.has('READY_FOR_APPROVAL') && (
+            <ActionButton icon="ClipboardCheck" label={t('workspace.bp.action.enter_approval')} busy={busy} onClick={() => void runAction(() => ctx.enterApprovalGate(scenarioId, selected.id))} />
+          )}
+          {allowed.has('APPROVED') && (
+            <div className="flex items-center gap-1 flex-wrap">
+              <input
+                value={approvalRef}
+                onChange={(e) => setApprovalRef(e.target.value)}
+                placeholder={t('workspace.bp.approval_ref_ph')}
+                className={`text-xs px-2 py-1 rounded border ${styles.cardBg} ${styles.cardText} ${styles.cardBorder}`}
+              />
+              <ActionButton icon="Stamp" label={t('workspace.bp.action.approve')} busy={busy} disabled={!approvalRef.trim()} onClick={() => void runAction(() => ctx.approveBlueprint(scenarioId, selected.id, approvalRef.trim()))} />
+            </div>
+          )}
+          {allowed.has('RELEASED') && (
+            <ActionButton icon="Rocket" label={t('workspace.bp.action.release')} busy={busy} onClick={() => void runAction(() => ctx.releaseBlueprint(scenarioId, selected.id))} />
+          )}
+          <ActionButton icon="GitCompareArrows" label={t('workspace.bp.action.revise')} busy={busy} variant="muted" onClick={() => void runAction(() => ctx.reviseBlueprint(scenarioId, selected.id))} />
+        </div>
+
+        {actionError && (
+          <div className={`text-[11px] rounded border px-2 py-1.5 flex items-start gap-1.5 ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
+            <LucideIcon name="AlertOctagon" size={12} className="mt-0.5 shrink-0" />
+            <span>
+              {errKey(actionError.code) === 'workspace.bp.err.unknown'
+                ? t('workspace.bp.err.unknown', { msg: actionError.msg })
+                : t(errKey(actionError.code))}
+              {actionError.traceId ? <span className={`ml-1 font-mono ${styles.cardTextMuted}`}>traceId={actionError.traceId}</span> : null}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const releaseStep = (
+    <div className="space-y-2">
+      <BlueprintStatusTrack blueprint={selected} busy />
+      <p className={`text-xs ${styles.cardTextMuted}`}>{t('workspace.wiz.release_hint')}</p>
+      <div className="flex items-center gap-2 flex-wrap">
+        <Link
+          to={`/workbench/${scenarioId}/forecast`}
+          className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded border cursor-pointer ${styles.accentBg} ${styles.cardText} ${styles.accentBorder}`}
+        >
+          <LucideIcon name="TrendingUp" size={12} />
+          {t('workspace.wiz.go_forecast')}
+        </Link>
+        <Link
+          to={`/workbench/${scenarioId}/decisions`}
+          className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded border cursor-pointer ${styles.cardBg} ${styles.cardText} ${styles.cardBorder}`}
+        >
+          <LucideIcon name="Scale" size={12} />
+          {t('workspace.wiz.go_decisions')}
+        </Link>
+      </div>
+    </div>
+  );
+
+  return [
+    { key: 'goal', icon: 'Target', content: goalStep },
+    { key: 'context', icon: 'Layers', content: <ContextBuildPanel scenarioId={scenarioId} blueprint={selected} /> },
+    {
+      key: 'model',
+      icon: 'Wrench',
+      content: (
+        <div className="space-y-3">
+          <CapabilityPanel declaredCapabilities={selected.capabilities} />
+          <BlueprintDetail bp={selected} />
+        </div>
+      ),
+    },
+    {
+      key: 'validate',
+      icon: 'ShieldCheck',
+      content: <BlueprintValidatePanel result={validateResult} loading={validating} error={validateError} onRun={() => void doValidate()} disabled={!selected} />,
+    },
+    { key: 'release', icon: 'Rocket', content: releaseStep },
+  ];
 }
 
 function ActionButton({ icon, label, busy, disabled, onClick, variant }: { icon: string; label: string; busy: boolean; disabled?: boolean; onClick: () => void; variant?: 'muted' }) {
@@ -414,7 +508,7 @@ function ActionButton({ icon, label, busy, disabled, onClick, variant }: { icon:
         'inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors',
         variant === 'muted'
           ? `${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`
-          : `${styles.accentBg} text-white ${styles.accentBorder}`,
+          : `${styles.accentBg} ${styles.accentSolidText} ${styles.accentBorder}`,
       ].join(' ')}
     >
       <LucideIcon name={icon} size={12} />
@@ -459,7 +553,7 @@ function CreateForm(props: {
         {t('workspace.bp.approval_required')}
       </label>
       <div className="flex items-center gap-2">
-        <button type="button" onClick={props.onSubmit} disabled={props.creating || !props.goal.trim()} className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded border cursor-pointer ${styles.accentBg} text-white ${styles.accentBorder} disabled:opacity-50`}>
+        <button type="button" onClick={props.onSubmit} disabled={props.creating || !props.goal.trim()} className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded border cursor-pointer ${styles.accentBg} ${styles.accentSolidText} ${styles.accentBorder} disabled:opacity-50`}>
           {props.creating ? t('workspace.bp.creating') : t('workspace.bp.create')}
         </button>
         <button type="button" onClick={props.onCancel} className={`text-xs font-bold px-3 py-1.5 rounded border cursor-pointer ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}>

@@ -43,7 +43,11 @@ interface AgentError {
 export default function EvalsView({ agents, models, showToast }: EvalsViewProps): React.JSX.Element {
   const { styles } = useTheme();
   const { t } = useLanguage();
-  const [selectedAgent, setSelectedAgent] = useState<string>(agents[0]?.id || '');
+  // §4.5 P1（行235）：agents 异步到达前不定型 —— 空串起步，列表到达后回填首个 id
+  const [selectedAgent, setSelectedAgent] = useState<string>('');
+  useEffect(() => {
+    if (!selectedAgent && agents.length > 0) setSelectedAgent(agents[0].id);
+  }, [agents, selectedAgent]);
   const [metrics, setMetrics] = useState<AgentMetrics | null>(null);
   const [errors, setErrors] = useState<AgentError[]>([]);
   const [loading, setLoading] = useState(false);

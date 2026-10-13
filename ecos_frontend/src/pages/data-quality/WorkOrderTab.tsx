@@ -229,20 +229,28 @@ export default function WorkOrderTab() {
   const [assignTarget, setAssignTarget] = useState<string | null>(null);
   const [assigneeInput, setAssigneeInput] = useState("");
 
+  // B-16：失败（null）与真空（[]）分流；全量拉取 + 客户端过滤，KPI 口径=全量
+  const [loadError, setLoadError] = useState(false);
+
   const load = useCallback(async () => {
-    try {
-      const q: { status?: string; severity?: string; sort?: string } = {};
-      if (statusFilter) q.status = statusFilter;
-      if (sevFilter) q.severity = sevFilter;
-      const r = await fetchDqWorkOrders(q);
-      let arr = r ?? [];
-      // 本地按 severity 降序排列（与后端 sort 语义一致，兼容后端未实现 sort 的情况）
-      arr = [...arr].sort((a, b) => severityWeight(b.severity) - severityWeight(a.severity));
-      setOrders(arr);
-    } finally {
-      setLoading(false);
+    const r = await fetchDqWorkOrders({});
+    if (r === null) {
+      setLoadError(true);
+    } else {
+      setLoadError(false);
+      setOrders(r);
     }
-  }, [statusFilter, sevFilter]);
+    setLoading(false);
+  }, []);
+
+  const visibleOrders = useMemo(() => {
+    const filtered = orders.filter(o =>
+      (!statusFilter || o.status === statusFilter) &&
+      (!sevFilter || o.severity === sevFilter)
+    );
+    // 本地按 severity 降序排列（与后端 sort 语义一致）
+    return [...filtered].sort((a, b) => severityWeight(b.severity) - severityWeight(a.severity));
+  }, [orders, statusFilter, sevFilter]);
 
   useEffect(() => {
     setLoading(true);
@@ -378,20 +386,26 @@ export default function WorkOrderTab() {
         </button>
       </div>
 
+      {/* B-16：加载失败横幅（保留旧数据，明确标注非最新） */}
+      {loadError && (
+        <div className={`px-3 py-2 rounded-md border text-xs ${styles.dangerBorder} ${styles.dangerBg} ${styles.dangerText}`}>
+          {t("dw.dqRule.workOrders.loadFailed")}
+        </div>
+      )}
       {/* 工单列表 */}
       <div className={`flex-1 min-h-0 overflow-y-auto rounded-md border ${styles.cardBorder} ${styles.cardBg}`}>
         {loading && orders.length === 0 ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-6 h-6 animate-spin opacity-50" />
           </div>
-        ) : orders.length === 0 ? (
+        ) : visibleOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
             <ClipboardList className="w-8 h-8 opacity-30" />
             <span className={`text-xs ${styles.cardTextMuted}`}>{t("dw.dqRule.workOrders.noWorkOrders")}</span>
           </div>
         ) : (
           <div>
-            {orders.map((o) => {
+            {visibleOrders.map((o) => {
               const isBusy = busyId === o.id;
               const expanded = expandedId === o.id;
               const isP2p3 = o.severity === "MEDIUM" || o.severity === "LOW";

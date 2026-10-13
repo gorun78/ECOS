@@ -13,10 +13,13 @@ import { ArrowRight, Plus, RotateCw, Trash2, Link2 } from "lucide-react";
 import { useTheme } from "../../components/ThemeContext";
 import { useLanguage } from "../../components/LanguageContext";
 import { useDict } from "../../hooks/useDict";
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import ErrorPanel from "../../components/common/status/ErrorPanel";
 import {
   listGlossaryRelations,
   createGlossaryRelation,
   deleteGlossaryRelation,
+  readGlossaryError,
   type GlossaryRelation,
   type GlossaryTerm,
 } from "../../services/glossary";
@@ -42,6 +45,10 @@ export default function GlossaryRelationPanel({
   const [relations, setRelations] = useState<GlossaryRelation[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  /** 关系列表失败态（与「暂无关系」空态互斥，避免错误伪装空态） */
+  const [loadError, setLoadError] = useState<{ reason: string; traceId?: string } | null>(null);
+  /** 待删除关系边（非空即打开确认弹窗，替代 window.confirm） */
+  const [deleteTarget, setDeleteTarget] = useState<GlossaryRelation | null>(null);
 
   // ── 新增表单 ──
   const [fromTermId, setFromTermId] = useState<number>(termId);
@@ -65,17 +72,33 @@ export default function GlossaryRelationPanel({
     try {
       const data = await listGlossaryRelations({ termId });
       setRelations(data);
+      setLoadError(null);
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      showToast("error", `${t("glossary.toast.load_failed")}: ${message}`);
+      const { message, traceId } = readGlossaryError(e);
+      // 失败态独立呈现（错误面板 + 重试），不把失败渲染成「暂无关系」
+      setLoadError({ reason: `${t("glossary.toast.load_failed")}: ${message}`, traceId });
     } finally {
       setLoading(false);
     }
-  }, [termId, showToast, t]);
+  }, [termId, t]);
 
   useEffect(() => {
     void loadRelations();
   }, [loadRelations]);
+
+  /** Esc 关闭删除确认（modal 键盘出口） */
+  useEffect(() => {
+    if (!deleteTarget) {
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setDeleteTarget(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [deleteTarget]);
 
   /** 新增关系边 */
   const handleAdd = async () => {
@@ -102,33 +125,39 @@ export default function GlossaryRelationPanel({
       setDescription("");
       await loadRelations();
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
+      const { message } = readGlossaryError(e);
       showToast("error", `${t("glossary.relation.create_failed")}: ${message}`);
     } finally {
       setSaving(false);
     }
   };
 
-  /** 删除关系边（二次确认） */
-  const handleDelete = async (id: number) => {
-    if (!window.confirm(t("glossary.relation.delete_confirm"))) {
+  /** 删除关系边：先开确认门（window.confirm 无主题/无障碍，报告 §4.3 行114） */
+  const handleDelete = (rel: GlossaryRelation) => setDeleteTarget(rel);
+
+  /** 确认后的实际删除（写成功重拉列表 — 铁律 §4.8-3） */
+  const runDelete = async () => {
+    if (!deleteTarget) {
       return;
     }
+    const target = deleteTarget;
     setSaving(true);
     try {
-      await deleteGlossaryRelation(id);
+      await deleteGlossaryRelation(target.id);
       showToast("success", t("glossary.relation.deleted"));
+      setDeleteTarget(null);
       await loadRelations();
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
+      const { message } = readGlossaryError(e);
       showToast("error", `${t("glossary.relation.delete_failed")}: ${message}`);
     } finally {
       setSaving(false);
     }
   };
 
-  /** 输入控件统一样式 */
-  const inputClass = `w-full px-3 py-2 rounded-lg border text-xs outline-none focus:border-indigo-400
+  /** 输入控件统一样式（聚焦态走主题 accentRing，禁裸色板 §七.1） */
+  const inputClass = `w-full px-3 py-2 rounded-lg border text-xs outline-none
+    focus:ring-2 focus:ring-inset focus-visible:ring-2 ${styles.accentRing}
     disabled:opacity-50 ${styles.inputBorder} ${styles.inputBg} ${styles.inputText}`;
   const labelClass = `text-[11px] font-semibold mb-1 ${styles.cardTextMuted}`;
 
@@ -226,12 +255,12 @@ export default function GlossaryRelationPanel({
 
         <div className="mt-3">
           <button type="button"
-            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs
-              font-semibold transition disabled:opacity-50 flex items-center gap-1"
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition disabled:opacity-50
+              flex items-center gap-1 cursor-pointer ${styles.accentBg} ${styles.accentHover} ${styles.accentSolidText}`}
             onClick={handleAdd}
             disabled={saving}
           >
-            {saving ? <RotateCw size={14} className="animate-spin" /> : <Plus size={14} />}
+            {saving ? <RotateCw size={14} className="animate-spin" aria-hidden="true" /> : <Plus size={14} aria-hidden="true" />}
             {t("glossary.relation.add")}
           </button>
         </div>
@@ -248,8 +277,16 @@ export default function GlossaryRelationPanel({
 
         {loading ? (
           <div className={`flex items-center justify-center py-10 text-xs gap-2 ${styles.muted}`}>
-            <RotateCw size={16} className="animate-spin" />
+            <RotateCw size={16} className="animate-spin" aria-hidden="true" />
             {t("glossary.loading")}
+          </div>
+        ) : loadError ? (
+          <div className="p-4">
+            <ErrorPanel
+              reason={loadError.reason}
+              traceId={loadError.traceId}
+              onRetry={() => void loadRelations()}
+            />
           </div>
         ) : relations.length === 0 ? (
           <div className={`py-10 text-center text-xs ${styles.muted}`}>
@@ -262,31 +299,48 @@ export default function GlossaryRelationPanel({
                 key={rel.id}
                 className={`flex items-center gap-2 px-4 py-2.5 border-b text-xs ${styles.cardBorder}`}
               >
-                <span className={`font-semibold ${styles.cardText}`}>{rel.fromTermName}</span>
-                <ArrowRight size={12} className={styles.muted} />
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold
+                <span className={`font-semibold truncate ${styles.cardText}`} title={rel.fromTermName}>
+                  {rel.fromTermName}
+                </span>
+                <ArrowRight size={12} className={styles.muted} aria-hidden="true" />
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0
                   ${styles.badgeBg} ${styles.badgeText}`}>
                   {relationTypeDict.getLabel(rel.relationType)}
                 </span>
-                <ArrowRight size={12} className={styles.muted} />
-                <span className={`font-semibold ${styles.cardText}`}>{rel.toTermName}</span>
+                <ArrowRight size={12} className={styles.muted} aria-hidden="true" />
+                <span className={`font-semibold truncate ${styles.cardText}`} title={rel.toTermName}>
+                  {rel.toTermName}
+                </span>
                 {rel.description && (
-                  <span className={`truncate ${styles.muted}`}>· {rel.description}</span>
+                  <span className={`truncate ${styles.muted}`} title={rel.description}>· {rel.description}</span>
                 )}
-                <span className={`ml-auto text-[10px] ${styles.muted}`}>w={rel.weight}</span>
+                <span className={`ml-auto text-[10px] shrink-0 ${styles.muted}`}>w={rel.weight}</span>
                 <button type="button"
-                  className="p-1 rounded hover:bg-red-500/10 text-red-400"
+                  className={`p-1 rounded cursor-pointer ${styles.sidebarHoverBg} ${styles.dangerText}`}
                   title={t("glossary.delete")}
-                  onClick={() => handleDelete(rel.id)}
+                  aria-label={t("glossary.delete")}
+                  onClick={() => handleDelete(rel)}
                   disabled={saving}
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={13} aria-hidden="true" />
                 </button>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* 删除关系确认门（应用内 modal：role=alertdialog + aria-modal 由 ConfirmDialog 提供，Esc 关闭） */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={t("glossary.delete_confirm_title")}
+        message={t("glossary.relation.delete_confirm")}
+        confirmText={t("glossary.delete")}
+        cancelText={t("glossary.cancel")}
+        variant="danger"
+        onConfirm={() => void runDelete()}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

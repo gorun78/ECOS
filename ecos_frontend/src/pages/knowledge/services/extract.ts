@@ -168,6 +168,18 @@ export async function fetchStructuredJobs(pageNum: number, pageSize: number): Pr
   }
 }
 
+/**
+ * K-55 严格版：抽取作业列表拉取失败抛 KbApiError / Error，
+ * 供 OverviewPage「抽取任务」KPI 区分真实 0 与失败降级。
+ */
+export async function kbFetchStructuredJobs(pageNum: number, pageSize: number): Promise<StructuredExtractJob[]> {
+  const clampedSize = Math.min(Math.max(1, pageSize), 50);
+  const data = await kbFetchData<StructuredExtractJob[]>(
+    `${KB_V1}/extract/structured/jobs?pageNum=${pageNum}&pageSize=${clampedSize}`,
+  );
+  return Array.isArray(data) ? data : [];
+}
+
 export async function fetchStructuredJobDetail(jobId: string): Promise<{ jobId: string; status: string; detail: string }> {
   return await apiFetchData<{ jobId: string; status: string; detail: string }>(
     `${KB_V1}/extract/structured/jobs/${encodeURIComponent(jobId)}`,

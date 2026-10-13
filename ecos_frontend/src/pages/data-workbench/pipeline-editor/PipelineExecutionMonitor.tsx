@@ -11,8 +11,9 @@ import {
 } from 'lucide-react';
 import { apiFetchData } from '../../../api';
 import { useTheme } from '../../../components/ThemeContext';
+import { useLanguage } from '../../../components/LanguageContext';
 import {
-  STATUS_COLORS, STATUS_LABELS, StatusIcon,
+  getStatusColor, STATUS_LABEL_KEYS, StatusIcon,
   type StepStatus, type StepRunInfo, type RunInfo,
   type PipelineExecutionMonitorProps,
 } from './PipelineExecutionMonitorTypes';
@@ -28,11 +29,20 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
   className = '',
 }) => {
   const { styles } = useTheme();
+  const { t } = useLanguage();
   const [runInfo, setRunInfo] = useState<RunInfo | null>(null);
   const [selectedStep, setSelectedStep] = useState<StepRunInfo | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; msg: string } | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevStatusRef = useRef<StepStatus | null>(null);
+  // B-15：轮询连续失败可见化，不再静默冻结在旧数据上
+  const pollErrCountRef = useRef(0);
+  const [pollDegraded, setPollDegraded] = useState(false);
+
+  /** 状态标签：枚举内走双语键，未知枚举原样呈现（无假翻译） */
+  const labelOf = useCallback((s: string) => (
+    s in STATUS_LABEL_KEYS ? t(STATUS_LABEL_KEYS[s as StepStatus]) : s
+  ), [t]);
 
   // Toast helper
   const showToast = useCallback((type: 'success' | 'error' | 'info', msg: string) => {
@@ -48,11 +58,13 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
       );
       const data = resp?.data || resp;
       setRunInfo(data);
+      pollErrCountRef.current = 0;
+      setPollDegraded(false);
 
       // Check for completion
       if (data?.status === 'succeeded') {
         if (prevStatusRef.current !== 'succeeded') {
-          showToast('success', `Pipeline 执行完成! ${data.elapsedMs ? `耗时 ${(data.elapsedMs / 1000).toFixed(1)}s` : ''}`);
+          showToast('success', t('dw.execMonitor.completedToast').replace('{elapsed}', data.elapsedMs ? t('dw.execMonitor.completedElapsed').replace('{sec}', (data.elapsedMs / 1000).toFixed(1)) : ''));
           onRunComplete?.(data);
         }
         // Stop polling on completion
@@ -62,7 +74,7 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
         }
       } else if (data?.status === 'failed') {
         if (prevStatusRef.current !== 'failed') {
-          showToast('error', `Pipeline 执行失败: ${data.errorMsg || '未知错误'}`);
+          showToast('error', t('dw.execMonitor.failedToast').replace('{msg}', data.errorMsg || t('dw.execMonitor.unknownError')));
           onRunComplete?.(data);
         }
         if (pollingRef.current) {
@@ -71,7 +83,7 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
         }
       } else if (data?.status === 'cancelled') {
         if (prevStatusRef.current !== 'cancelled') {
-          showToast('info', 'Pipeline 已取消');
+          showToast('info', t('dw.execMonitor.cancelledToast'));
           onRunComplete?.(data);
         }
         if (pollingRef.current) {
@@ -82,9 +94,11 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
 
       prevStatusRef.current = data?.status || null;
     } catch {
-      // Silently ignore fetch errors during polling
+      // 连续 3 次轮询失败 → 头部挂「连接中断」降级标，不再无感冻结
+      pollErrCountRef.current += 1;
+      if (pollErrCountRef.current >= 3) setPollDegraded(true);
     }
-  }, [onRunComplete, showToast]);
+  }, [onRunComplete, showToast, t]);
 
   // Start/stop polling
   useEffect(() => {
@@ -113,13 +127,18 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
           <div className="flex items-center gap-2">
             <Play size={14} className={`${styles.accentText}`} />
             <span className={`text-xs font-bold ${styles.cardText} uppercase tracking-wider`}>
-              执行监控
+              {t('dw.execMonitor.title')}
             </span>
-            {runInfo && (
+            {runInfo && (() => { const sc = getStatusColor(runInfo.status); return (
               <span
-                className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full ${STATUS_COLORS[runInfo.status].bg} ${STATUS_COLORS[runInfo.status].text}`}
+                className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full ${sc.bg} ${sc.text}`}
               >
-                {STATUS_LABELS[runInfo.status]}
+                {labelOf(runInfo.status)}
+              </span>
+            ); })()}
+            {pollDegraded && (
+              <span className={`inline-flex items-center gap-1 text-[10px] ${styles.dangerText}`}>
+                <AlertTriangle size={11} /> {t('dw.execMonitor.pollDegraded')}
               </span>
             )}
           </div>
@@ -134,7 +153,7 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
         {runInfo && (
           <div className={`px-3 py-2 border-b ${styles.cardBorder}`}>
             <div className={`flex items-center justify-between text-[10px] ${styles.cardTextMuted} mb-1`}>
-              <span>进度: {runInfo.completedSteps}/{runInfo.totalSteps} 步骤</span>
+              <span>{t('dw.execMonitor.progress').replace('{done}', String(runInfo.completedSteps)).replace('{total}', String(runInfo.totalSteps))}</span>
               <span>{runInfo.elapsedMs ? `${(runInfo.elapsedMs / 1000).toFixed(1)}s` : '—'}</span>
             </div>
             <div className={`w-full h-1.5 ${styles.cardBg} rounded-full overflow-hidden`}>
@@ -175,12 +194,12 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
                     {step.nodeName || step.nodeId}
                   </div>
                   <div className={`flex items-center gap-2 text-[9px] ${styles.cardTextMuted}`}>
-                    <span>{STATUS_LABELS[step.status]}</span>
+                    <span>{labelOf(step.status)}</span>
                     {step.rowsInput > 0 && (
-                      <span>入: {step.rowsInput.toLocaleString()} 行</span>
+                      <span>{t('dw.execMonitor.rowsIn').replace('{n}', step.rowsInput.toLocaleString())}</span>
                     )}
                     {step.rowsOutput > 0 && (
-                      <span>出: {step.rowsOutput.toLocaleString()} 行</span>
+                      <span>{t('dw.execMonitor.rowsOut').replace('{n}', step.rowsOutput.toLocaleString())}</span>
                     )}
                     {step.elapsedMs > 0 && (
                       <span>{(step.elapsedMs / 1000).toFixed(1)}s</span>
@@ -197,10 +216,10 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
               {externalRunId ? (
                 <span className="flex items-center gap-1.5">
                   <Loader2 size={12} className="animate-spin" />
-                  正在加载步骤...
+                  {t('dw.execMonitor.loadingSteps')}
                 </span>
               ) : (
-                '暂无执行记录'
+                t('dw.execMonitor.noRuns')
               )}
             </div>
           )}
