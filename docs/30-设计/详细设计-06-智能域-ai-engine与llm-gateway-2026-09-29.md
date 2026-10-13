@@ -1000,6 +1000,23 @@ CREATE INDEX IF NOT EXISTS idx_agdl_tool  ON ecos_ai.ecos_ai_guardrail_decision_
 | 存量动作边界 | `ecos_ai` 空壳 DROP、9 900 行死前端删除、`V202` 存量语义切换三项均属**存量动作**，本册只定性并提裁决（R-19/R-23/R-20），**未擅自迁移**；仅 `V204`（纯补建、无归属争议）与重复迁移版本 V50/V150/V155（确定性缺陷）可先行动作 | 7.2 + 需求检视报告例外口径 |
 | **Gate-2（技术负责人批准）** | **已通过** —— 凭证 = 需求检视报告 §十四.3（用户批准 2026-09-29，ARCH_SPEC + 11 册全集）；`deliverable_allowed=true` ⇒ 本册 F06-01~04（P0 红线）具备进入实现分发的门禁条件（**尚未实现，验收仍记"未执行"**） | — |
 
+#### 8.3.1 【2026-10-12 全量设计复盘回写·只加注不改写】四门禁用例"别名 vs 缺付"逐一判定
+
+复盘报告（`docs/50-测试/复盘报告-设计域全量分册-2026-10-12.md` §M2 / P1 门禁补齐批）指本册 4 个门禁
+验收名"疑缺同名文件"。2026-10-12 对当前工作树逐一实测判定如下（出处：`find ecos_backend -name "*.java"`
+与 `ecos_frontend/src/__tests__/` 实测清单）：
+
+| 本册冻结名 | 判定 | 实测载体与口径差异 |
+|:--|:--|:--|
+| `AiPersistenceArchTest#serviceLayerHasNoJdbcTemplateDirectAccess` / `#everyTableNameIsSchemaQualified` | **别名在位** | `engine/ai-engine/ai-engine-impl/.../ai/arch/DataAccessArchTest`（R2-B4a 数据访问收口 ArchUnit 门，语义同 = service 层禁直接持有 JdbcTemplate）+ 同模块 `SchemaOwnershipArchTest` / `NoDirectEngineTableAccessTest`（schema 限定面）。本册名未建，验收名与实建名不同源 ⇒ 登记别名映射，不改写本册原文 |
+| `AuditPayloadProbeTest#llmUsageFindableInAuditStore` | **半在位·查询条款缺付** | 发射面别名 = `runtime/llm-gateway/.../metrics/LlmUsageMeteringTest`（`usageEventEmitOncePerCallWithRealOrEstimatedFlag` 等，经 `publishStructuredAudit` 断言恰好一发）；但"从审计存储**查得** LLM_USAGE"条款 = mock verify 发射，非真实 store 查询 ⇒ **缺付登记**（审计存储面正由 2026-10-12 安全域欠账批次整改，避免并发写入，收口挂后续批次） |
+| `FrontendAiComplianceScanTest#noHardcodedColorsNoChineseLiteralsNoInlineSvgInAiFiles` | **色板条款别名在位·其余两条款缺付** | 色板面 = `ecos_frontend/src/__tests__/no-hardcoded-colors.test.ts`（冻结门禁名 `structuralComponentsHaveNoLiteralPalette`，2026-10-12 复盘收口已扩三项改造面零容忍 + 全库棘轮 `srcLiteralPaletteDoesNotExceedBaseline`，见详设-08 v1.3）；**中文字面量 / 内联 SVG 两条款**当前无 AI 面全量扫描门（仅个别页面 i18n 测试）⇒ 缺付登记 |
+| `FrontendI18nGapTest#noMissingZhCnKeyAmongAiUsedKeys` | **近似别名·"AI 用键集合"条款缺付** | 近似载体 = `i18n-coverage.test.ts › noSilentFallbackToRawKey`（navConfig/palette/sidebar 单源键 zh/en 成对）+ `ecos_frontend/scripts/check-i18n-parity.mjs`（locale 平价）；二者作用域均非"AI 面板消费键枚举"⇒ 该条款缺付登记 |
+
+同批核销（P1 OpenAPI 对账批 security 条款）：`openapi/supplementary-cognitive-ai-v1.yaml` 逐操作实测
+56 operation / 56 `security:` 声明（awk 扫描 0 缺）；`openapi/wagent-v1.yaml` 用根级全局 `security`
+（:93，OpenAPI 合法语义）覆盖全部 26 操作，头注第 4 条已声明 JWT 口径 ⇒ "补 security 声明"条款关闭。
+
 ### 8.4 前置件 P-1：AI 测试底座（红线验收的载体）
 
 | 项 | 内容 |

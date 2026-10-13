@@ -94,6 +94,14 @@ else {
 }
 ```
 
+> **2026-10-12 复盘订正：实现与平台铁律统一为 fail-closed**。上文代码块中"ABAC 不可用即放行 log.warn"
+> 系原实现口径，与架构铁律 #3（security 不可用默认 DENY）相悖，已废止：
+> `AssetService.abacCheck` 现对 `abac == null` 抛 `SecurityException("ASSET-042: ABAC 不可用，操作默认拒绝 fail-closed")`
+> （对齐 OpaPolicyService 常量化 fail-close 先例）；回归用例
+> `AssetServiceTest#tagAssetFieldsAbacUnavailableFailsClosed`（不可用即拒、不落库、不发事件）。
+> 另：`DataSecurityLevelEventListener`（security-engine 消费侧）自身无"不可用放行/拒绝"裁决语义，
+> 它只在收到打标事件后生成 CLS/RLS 策略，fail-open 风险点仅在上述 ABAC 前置门。
+
 ## 五、ADR-DATA10-01：资产表升级方式（物理 + 业务双轨）
 
 | ADR-DATA10-01 决策 | 理由 |

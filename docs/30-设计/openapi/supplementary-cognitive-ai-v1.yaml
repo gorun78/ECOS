@@ -3,7 +3,13 @@
 # ---------------------------------------------------------------------
 # 溯源：《ECOS-认知域与智能域补充详细设计 v1.0》§13（API 与事件契约总表）、
 #       §16（验收矩阵 SUP-* 21 项）。
-# 范围：本批次（2026-10-10）新增/扩展的 12 个逻辑端点 + 2 条逻辑事件。
+# 范围：本批次（2026-10-10）新增/扩展的逻辑端点 + 2 条逻辑事件。
+# 【2026-10-12 全量设计复盘回写】原头注"12 个逻辑端点"为批次登记快照，与 paths 实登面（17 op）
+#   已不一致；本次按 Controller @Mapping 实测对账：订正 2 处路径（preview→GET /dq-preview/{id}、
+#   to-proposal→POST /{id}/submit-proposal），补登实现已有而未登记端点（数据治理建议族/状态推进族、
+#   本体候选全量状态机、蓝图 11 面、资产 transitions、outcomes 读回/回测、能力任务状态），
+#   现登记合计 **56 个方法级端点**（计数口径=operation 数，逐条附 Controller file:line）。
+#   变更记录：v1.0.0 → v1.0.1（2026-10-12，复盘回写，只加注/订正，不改写既有语义）。
 # ---------------------------------------------------------------------
 # 工件属性（诚实声明，纪律与 wagent-v1.yaml 同）：
 #   1. 本文件为**手工登记的机器可读契约**（P-5 单源），非 springdoc 生成物。
@@ -25,7 +31,7 @@
 openapi: 3.0.3
 info:
   title: ECOS 认知域与智能域补充设计 API（supplementary v1）
-  version: 1.0.0
+  version: 1.0.1   # 2026-10-12 复盘回写（路径对账 + 补登 + security 补齐，见头注变更记录）
   description: |
     补充设计 v1.0 §13 契约总表落地面：Context Builder（§5）、认知资产目录/解析/提案（§8）、
     W→D 结果评估（§9）、数据治理剖析/候选（§7.2）、本体候选（§7.3）、能力目录/执行/任务（§10）。
@@ -52,6 +58,8 @@ tags:
     description: §7.3 本体候选（候选态；发布只经既有 proposals 审批流）
   - name: capabilities
     description: §10 能力目录/执行/长任务（Model & Capability Center）
+  - name: scenario-blueprints
+    description: §6 场景蓝图（属主 workspace 场景层；2026-10-12 复盘补登，ScenarioBlueprintController.java:34 类前缀实测）
 
 paths:
   /api/v1/cognitive/context/build:
@@ -177,7 +185,7 @@ paths:
       responses:
         "200": { description: 剖析产物（只读，不改正式资产/版本/水位线） }
         "503": { description: 剖析源接口不可用 → 真 503，禁伪数据 }
-        "200-only-when-real": true
+      x-200-only-when-real: true   # 2026-10-12 订正：原为 responses 非法子键 "200-only-when-real"，移至 operation 级合法 x- 扩展，语义不变（仅真实剖析可得 200，禁伪空集合）
 
   /api/v1/data/governance/candidates:
     post:
@@ -190,6 +198,20 @@ paths:
       responses:
         "201": { description: 候选创建（status=GENERATED，非 APPROVED） }
         "409": { description: 幂等键重复（返回原记录引用） }
+    # 2026-10-12 复盘补登：候选列表 GET（DataGovernanceCandidateController.java:120，@GetMapping 集合面）
+    get:
+      tags: [data-governance]
+      operationId: listDataGovernanceCandidates
+      summary: 候选列表（tenantId/status/candidateType/batchId 过滤；Controller :120）
+      x-implementation-status: implemented
+      parameters:
+        - { name: tenantId, in: query, required: false, schema: { type: string } }
+        - { name: status, in: query, required: false, schema: { type: string } }
+        - { name: candidateType, in: query, required: false, schema: { type: string } }
+        - { name: batchId, in: query, required: false, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 候选列表 }
 
   /api/v1/data/governance/candidates/{candidateId}:
     get:
@@ -199,19 +221,25 @@ paths:
       x-implementation-status: implemented
       parameters:
         - { name: candidateId, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]   # 2026-10-12 复盘补齐：与头注安全口径④「全部端点要求 JWT」一致（实测不在 AnonymousEndpointRegistry 匿名面）
       responses:
         "200": { description: OK }
         "404": { description: 不存在 }
 
-  /api/v1/data/governance/candidates/{candidateId}/preview:
-    post:
+  /api/v1/data/governance/dq-preview/{id}:
+    get:
       tags: [data-governance]
-      operationId: previewDataGovernanceCandidate
+      operationId: dqPreviewDataGovernanceCandidate
       summary: §7.2 只读预览（通过率/异常样本；不触正式表）
       x-implementation-status: implemented
       x-design-ref: "SUP-DATA-01：预览前后正式资产/版本/行数无变化"
+      x-correction-2026-10-12: |
+        复盘回写：原登记 POST /api/v1/data/governance/candidates/{candidateId}/preview 与代码不符。
+        实测 = GET /api/v1/data/governance/dq-preview/{id}
+        （DataGovernanceCandidateController.java:205 @GetMapping("/dq-preview/{id}")，data-engine-impl）。
       parameters:
-        - { name: candidateId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
       responses:
         "200": { description: 预览产物 }
 
@@ -242,6 +270,21 @@ paths:
       responses:
         "201": { description: 候选创建（GENERATED） }
         "400": { description: 证据引用/冲突未标注 }
+    # 2026-10-12 复盘补登：候选列表 GET（OntologyCandidateController.java:89，@GetMapping 集合面）
+    get:
+      tags: [ontology-candidates]
+      operationId: listOntologyCandidates
+      summary: 候选列表（tenantId 必填，空白 → 400；status/candidateType/batchId 可选）
+      x-implementation-status: implemented
+      parameters:
+        - { name: tenantId, in: query, required: false, schema: { type: string } }
+        - { name: status, in: query, required: false, schema: { type: string } }
+        - { name: candidateType, in: query, required: false, schema: { type: string } }
+        - { name: batchId, in: query, required: false, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 候选列表 }
+        "400": { description: tenantId 空白 }
 
   /api/v1/ontology/candidates/{candidateId}:
     get:
@@ -251,6 +294,7 @@ paths:
       x-implementation-status: implemented
       parameters:
         - { name: candidateId, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]   # 2026-10-12 复盘补齐（同上口径）
       responses: { "200": { description: OK }, "404": { description: 不存在 } }
 
   /api/v1/ontology/candidates/{candidateId}/validate:
@@ -261,19 +305,24 @@ paths:
       x-implementation-status: implemented
       parameters:
         - { name: candidateId, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]   # 2026-10-12 复盘补齐（头注④全部端点 JWT）
       responses:
         "200": { description: 校验通过（VALIDATED），可提 proposals }
-        "422": { description: 校验失败（附 issues[]） }
+        "422": { description: "校验失败（附 issues[]）" }   # 2026-10-12 语法修正：flow 标量加引号（纯文本含 [] 在 flow 上下文非法），语义不变
 
-  /api/v1/ontology/candidates/{candidateId}/to-proposal:
+  /api/v1/ontology/candidates/{id}/submit-proposal:
     post:
       tags: [ontology-candidates]
       operationId: submitOntologyCandidateToProposal
       summary: §7.3 提交到既有 proposals 审批流（ONTOLOGY_PROPOSAL_CREATE）
       x-implementation-status: implemented
       x-design-ref: "AI 禁直发正式本体（SUP-ONTO-02）；发布只经既有 proposals 链"
+      x-correction-2026-10-12: |
+        复盘回写：原登记路径 .../to-proposal 与代码不符。实测 = POST /{id}/submit-proposal
+        （OntologyCandidateController.java:150 @PostMapping("/{id}/submit-proposal")，ontology-engine-impl）。
       parameters:
-        - { name: candidateId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
       responses:
         "201": { description: 提案已创建（复用既有 OntologyProposal 创建方法） }
         "409": { description: 候选非 VALIDATED / 冲突未解 }
@@ -289,31 +338,534 @@ paths:
       responses:
         "200": { description: 能力清单（模型未接入 → supported=false，禁伪 available） }
 
-  /api/v1/ai/capabilities/{capabilityId}/execute:
+  /api/v1/ai/capabilities/{id}/execute:
     post:
       tags: [capabilities]
       operationId: executeCapability
       summary: §10.3 同步执行（经 Model Router 选模；质量/校准/密级/预算各维度评分链）
       x-implementation-status: implemented
       x-design-ref: "SUP-MODEL-02/03；§10.6 未通过质量阈值的备用模型不得被自动选中"
+      x-correction-2026-10-12: "路径参数名按代码单源订正为 id（AiCapabilityApiPaths.java:18,28；原登记 capabilityId 与代码 P_ID=\"id\" 不符，路由结构不变）"
       parameters:
-        - { name: capabilityId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
       responses:
         "200": { description: CapabilityResult（quality.kind 未校准默认 calibrated=false） }
         "404": { description: 能力未注册/不可用（真错误，禁 200 伪成功） }
         "409": { description: 路由决策拒绝（密级/预算/版本态不满足） }
 
-  /api/v1/ai/capabilities/{capabilityId}/tasks:
+  /api/v1/ai/capabilities/{id}/tasks:
     post:
       tags: [capabilities]
       operationId: submitCapabilityTask
       summary: §10.3 异步长任务提交（经 runtime-task，返回 taskId）
       x-implementation-status: implemented
       x-design-ref: "长任务唯一入口 = runtime-task（铁律 §2.5；SUP-GOV-02）"
+      x-correction-2026-10-12: "路径参数名按代码单源订正为 id（AiCapabilityApiPaths.java:31）"
       parameters:
-        - { name: capabilityId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
       responses:
         "202": { description: AsyncCapabilityHandle{taskId,capabilityId,submittedAt} }
+
+  # ═════════════════════════════════════════════════════════════════
+  # 2026-10-12 全量设计复盘补登区（实现已在位、原 yaml 未登记的端点；
+  # 逐条以 Controller @Mapping 实测为单源；全部 implemented；
+  # security 按头注④「全部端点要求 JWT」逐条声明）
+  # ═════════════════════════════════════════════════════════════════
+
+  # ── data-governance 补登（DataGovernanceCandidateController.java，行号见各端点）──
+  /api/v1/data/governance/field-semantic-suggest:
+    get:
+      tags: [data-governance]
+      operationId: suggestFieldSemantic
+      summary: §7.2 FIELD_SEMANTIC_SUGGEST（只读建议；Controller :83）
+      x-implementation-status: implemented
+      parameters:
+        - { name: assetRef, in: query, required: true, schema: { type: string } }
+        - { name: field, in: query, required: false, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 语义候选建议（只读，不落正式资产） }
+
+  /api/v1/data/governance/field-mapping-suggest:
+    get:
+      tags: [data-governance]
+      operationId: suggestFieldMapping
+      summary: §7.2 FIELD_MAPPING_SUGGEST（只读建议；Controller :91）
+      x-implementation-status: implemented
+      parameters:
+        - { name: sourceField, in: query, required: true, schema: { type: string } }
+        - { name: targetRef, in: query, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 映射候选建议 }
+
+  /api/v1/data/governance/dq-rule-suggest:
+    get:
+      tags: [data-governance]
+      operationId: suggestDqRules
+      summary: §7.2 DQ_RULE_SUGGEST（只读建议；Controller :99）
+      x-implementation-status: implemented
+      parameters:
+        - { name: assetRef, in: query, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: DQ 规则候选建议 }
+
+  # GET /api/v1/data/governance/candidates（候选列表）已并入上方既有 path 项的 get 子键，此处不重复声明。
+
+  /api/v1/data/governance/candidates/{id}/validate:
+    post:
+      tags: [data-governance]
+      operationId: validateDataGovernanceCandidate
+      summary: §7.4 GENERATED/EVIDENCE_CHECKED → VALIDATED（Controller :141）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+        "409": { description: 前置状态不满足（CAS） }
+
+  /api/v1/data/governance/candidates/{id}/submit-to-approval:
+    post:
+      tags: [data-governance]
+      operationId: submitDataGovernanceCandidateToApproval
+      summary: §7.4 VALIDATED → PENDING_APPROVAL（DATA_CHANGE_PROPOSAL 必经；Controller :148）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+        "409": { description: 前置状态不满足 }
+
+  /api/v1/data/governance/candidates/{id}/reject:
+    post:
+      tags: [data-governance]
+      operationId: rejectDataGovernanceCandidate
+      summary: §7.4 → REJECTED（Controller :162）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: reason, in: query, required: false, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+
+  /api/v1/data/governance/candidates/{id}/need-evidence:
+    post:
+      tags: [data-governance]
+      operationId: needEvidenceDataGovernanceCandidate
+      summary: §7.4 → NEEDS_EVIDENCE（Controller :170）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: reason, in: query, required: false, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+
+  /api/v1/data/governance/candidates/{id}/conflict:
+    post:
+      tags: [data-governance]
+      operationId: conflictDataGovernanceCandidate
+      summary: §7.4 → CONFLICTED（Controller :178）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: reason, in: query, required: false, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+
+  /api/v1/data/governance/candidates/{id}/expire:
+    post:
+      tags: [data-governance]
+      operationId: expireDataGovernanceCandidate
+      summary: §7.4 → EXPIRED（Controller :186）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+
+  /api/v1/data/governance/candidates/{id}/apply:
+    post:
+      tags: [data-governance]
+      operationId: applyDataGovernanceCandidate
+      summary: §7.4 APPROVED → APPLIED（DATA_CHANGE_APPLY；security 裁决 fail-closed DENY；Controller :197）
+      x-implementation-status: implemented
+      x-design-ref: "SUP-DATA-02"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 应用回执 }
+        "403": { description: security 裁决不可用/拒绝 → DENY（fail-closed） }
+        "409": { description: 非 APPROVED 态 }
+
+  # ── ontology-candidates 补登（OntologyCandidateController.java，行号见各端点）──
+  # GET /api/v1/ontology/candidates（候选列表）已并入上方既有 path 项，见该 item 的 get 子键。
+  /api/v1/ontology/candidates/gap-analyze:
+    post:
+      tags: [ontology-candidates]
+      operationId: gapAnalyzeOntology
+      summary: §7.3 ONTOLOGY_GAP_ANALYZE（只读，不写候选表；请求体 targetEntityTypes[] + 可选 relationshipIntents[]）
+      x-implementation-status: implemented
+      x-correction-2026-10-12: "路径按代码实测登记：POST /api/v1/ontology/candidates/gap-analyze（OntologyCandidateController.java:116 @PostMapping(\"/gap-analyze\")，无 {id} 段）"
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 缺口分析产物 }
+
+  /api/v1/ontology/candidates/{id}/diff-preview:
+    post:
+      tags: [ontology-candidates]
+      operationId: diffPreviewOntologyCandidate
+      summary: §7.3 ONTOLOGY_DIFF_PREVIEW（只读快照，committed 恒 false；Controller :138）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 结构差异快照（正式资产永不触碰） }
+
+  /api/v1/ontology/candidates/{id}/checked:
+    post:
+      tags: [ontology-candidates]
+      operationId: markOntologyCandidateChecked
+      summary: §7.4 GENERATED → EVIDENCE_CHECKED（Controller :158）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+
+  /api/v1/ontology/candidates/{id}/approve:
+    post:
+      tags: [ontology-candidates]
+      operationId: approveOntologyCandidate
+      summary: §7.4 PENDING_APPROVAL → APPROVED（approvalRef 必填；ABAC fail-closed DENY → 403；Controller :164-167）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: approvalRef, in: query, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+        "403": { description: security 裁决拒绝/不可用 → DENY }
+        "409": { description: 非 PENDING_APPROVAL 态 }
+
+  /api/v1/ontology/candidates/{id}/reject:
+    post:
+      tags: [ontology-candidates]
+      operationId: rejectOntologyCandidate
+      summary: §7.4 → REJECTED（Controller :172）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: reason, in: query, required: false, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+
+  /api/v1/ontology/candidates/{id}/need-evidence:
+    post:
+      tags: [ontology-candidates]
+      operationId: needEvidenceOntologyCandidate
+      summary: §7.4 → NEEDS_EVIDENCE（Controller :181）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: reason, in: query, required: false, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+
+  /api/v1/ontology/candidates/{id}/conflict:
+    post:
+      tags: [ontology-candidates]
+      operationId: conflictOntologyCandidate
+      summary: §7.4 → CONFLICTED（Controller :190）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: reason, in: query, required: false, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+
+  /api/v1/ontology/candidates/{id}/expire:
+    post:
+      tags: [ontology-candidates]
+      operationId: expireOntologyCandidate
+      summary: §7.4 → EXPIRED（Controller :199）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+
+  /api/v1/ontology/candidates/{id}/apply:
+    post:
+      tags: [ontology-candidates]
+      operationId: applyOntologyCandidate
+      summary: §7.4 APPROVED → APPLIED（回执态，不执行本体变更；Controller :209）
+      x-implementation-status: implemented
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 应用回执（正式变更仍只经 proposals 审批链） }
+
+  # ── cognitive-assets / outcome-evaluation 补登（cognitive-engine-impl）──
+  /api/v1/cognitive/assets/{assetId}/transitions:
+    post:
+      tags: [cognitive-assets]
+      operationId: transitionCognitiveAsset
+      summary: §8.4 受控状态迁移（合法迁移落 lifecycle_state；CognitiveAssetCatalogController.java:78，常量 CognitiveApiPaths.java:100）
+      x-implementation-status: implemented
+      parameters:
+        - { name: assetId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true, description: "AssetTransitionRequest{targetState,reason,evidenceRef,operator}（Controller :107-116 实测字段）" }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功（发 CognitiveAssetStatusChanged 事件） }
+        "409": { description: 非法迁移（ECOS-COG-409S，原行不变） }
+
+  /api/v1/cognitive/outcomes/{evaluationId}:
+    get:
+      tags: [outcome-evaluation]
+      operationId: getOutcomeEvaluation
+      summary: 按评估 ID 读回（未命中 404 ECOS-COG-404O；OutcomeEvaluateController.java:54）
+      x-implementation-status: implemented
+      parameters:
+        - { name: evaluationId, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 评估结果 }
+        "404": { description: 不存在 }
+
+  /api/v1/cognitive/outcomes:
+    get:
+      tags: [outcome-evaluation]
+      operationId: listOutcomesByScenario
+      summary: 场景维度评估列表（scenarioId 必填，status 可选；空集 200+[] 与故障严格可分 DG-6；Controller :60-63）
+      x-implementation-status: implemented
+      parameters:
+        - { name: scenarioId, in: query, required: true, schema: { type: string } }
+        - { name: status, in: query, required: false, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 评估列表 }
+        "400": { description: scenarioId 空白 }
+
+  /api/v1/cognitive/outcomes/by-run/{runId}:
+    get:
+      tags: [outcome-evaluation]
+      operationId: listOutcomesByRun
+      summary: 运行维度评估列表（Controller :72）
+      x-implementation-status: implemented
+      parameters:
+        - { name: runId, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 评估列表 }
+
+  /api/v1/cognitive/outcomes/{evaluationId}/backtest:
+    get:
+      tags: [outcome-evaluation]
+      operationId: backtestOutcome
+      summary: 回测读回（OutcomeBacktestController.java:77，常量 CognitiveApiPaths.java:113）
+      x-implementation-status: implemented
+      parameters:
+        - { name: evaluationId, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 回测产物 }
+
+  /api/v1/cognitive/outcomes/{evaluationId}/review-tasks:
+    post:
+      tags: [outcome-evaluation]
+      operationId: createOutcomeReviewTask
+      summary: 复核任务登记（OutcomeBacktestController.java:90，常量 CognitiveApiPaths.java:115）
+      x-implementation-status: implemented
+      parameters:
+        - { name: evaluationId, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 复核任务登记结果 }
+
+  # ── capabilities 补登（AiCapabilityController.java:96 / AiCapabilityApiPaths.java:37-38）──
+  /api/v1/ai/capabilities/tasks/{taskId}/status:
+    get:
+      tags: [capabilities]
+      operationId: getCapabilityTaskStatus
+      summary: §10.4 长任务状态回读（GET /api/v1/ai/capabilities/tasks/{taskId}/status）
+      x-implementation-status: implemented
+      parameters:
+        - { name: taskId, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 任务状态 }
+        "404": { description: 任务不存在 }
+
+  # ── scenario-blueprints 补登（ScenarioBlueprintController.java，workspace-impl；类前缀 :34）──
+  /api/v1/business/scenarios/{scenarioId}/blueprints:
+    post:
+      tags: [scenario-blueprints]
+      operationId: createScenarioBlueprint
+      summary: §6.2 创建草稿（DRAFT version+1 新行，201；Controller :44）
+      x-implementation-status: implemented
+      parameters:
+        - { name: scenarioId, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201": { description: 草稿创建 }
+        "400": { description: 内容非法 }
+    get:
+      tags: [scenario-blueprints]
+      operationId: listScenarioBlueprints
+      summary: §6 场景蓝图版本表（升序；Controller :53）
+      x-implementation-status: implemented
+      parameters:
+        - { name: scenarioId, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 版本列表 }
+
+  /api/v1/business/scenarios/{scenarioId}/blueprints/{id}:
+    get:
+      tags: [scenario-blueprints]
+      operationId: getScenarioBlueprint
+      summary: 蓝图详情（含 allowedTransitions 前端按钮态；Controller :78）
+      x-implementation-status: implemented
+      parameters:
+        - { name: scenarioId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+        "404": { description: 不存在 }
+
+  /api/v1/business/scenarios/{scenarioId}/blueprints/{id}/transition:
+    post:
+      tags: [scenario-blueprints]
+      operationId: transitionScenarioBlueprint
+      summary: §6.3 状态迁移（五要素留痕；非法 409；Controller :59）
+      x-implementation-status: implemented
+      parameters:
+        - { name: scenarioId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+        "409": { description: 非法迁移/并发冲突 }
+
+  /api/v1/business/scenarios/{scenarioId}/blueprints/{id}/transition/{target}:
+    post:
+      tags: [scenario-blueprints]
+      operationId: transitionScenarioBlueprintTo
+      summary: 迁移目标态快捷面（同 transition；Controller :121）
+      x-implementation-status: implemented
+      parameters:
+        - { name: scenarioId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: target, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 迁移成功 }
+
+  /api/v1/business/scenarios/{scenarioId}/blueprints/{id}/revise:
+    post:
+      tags: [scenario-blueprints]
+      operationId: reviseScenarioBlueprint
+      summary: §6.2 版本不可变语义修订（version+1 DRAFT 新行，201；Controller :69）
+      x-implementation-status: implemented
+      parameters:
+        - { name: scenarioId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201": { description: 新草稿 }
+
+  /api/v1/business/scenarios/{scenarioId}/blueprints/{id}/validate:
+    get:
+      tags: [scenario-blueprints]
+      operationId: validateScenarioBlueprint
+      summary: §6.6 发布前四道静态门槛（只读，200 + passed 明细；Controller :85）
+      x-implementation-status: implemented
+      parameters:
+        - { name: scenarioId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 门槛明细（含未过项，只读不迁移） }
+
+  /api/v1/business/scenarios/{scenarioId}/blueprints/{id}/diff:
+    get:
+      tags: [scenario-blueprints]
+      operationId: diffScenarioBlueprint
+      summary: §6.2 两版本 gap/依赖/content 结构化对比（无 diff 表；Controller :92）
+      x-implementation-status: implemented
+      parameters:
+        - { name: scenarioId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: fromVersion, in: query, required: false, schema: { type: integer } }
+        - { name: toVersion, in: query, required: false, schema: { type: integer } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: diff 产物 }
+
+  /api/v1/business/scenarios/{scenarioId}/blueprints/{id}/approve:
+    post:
+      tags: [scenario-blueprints]
+      operationId: approveScenarioBlueprint
+      summary: §6.6 审批（approvalRef 缺失/审批链不齐 → 409；Controller :101）
+      x-implementation-status: implemented
+      parameters:
+        - { name: scenarioId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 审批登记 }
+        "409": { description: approval_ref 缺失或审批链不齐 }
+
+  /api/v1/business/scenarios/{scenarioId}/blueprints/{id}/release:
+    post:
+      tags: [scenario-blueprints]
+      operationId: releaseScenarioBlueprint
+      summary: §6.6 发布（验收门槛全过才 201；发布版本不可变 SUP-BP-02；Controller :110）
+      x-implementation-status: implemented
+      parameters:
+        - { name: scenarioId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201": { description: 发布成功 }
+        "409": { description: 门槛未过 }
+
+  /api/v1/business/scenarios/{scenarioId}/blueprints/{id}/enter-approval:
+    post:
+      tags: [scenario-blueprints]
+      operationId: enterApprovalScenarioBlueprint
+      summary: §6.6 审批门（门槛全过才进 READY_FOR_APPROVAL，否则 409；Controller :131）
+      x-implementation-status: implemented
+      parameters:
+        - { name: scenarioId, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string } }
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: 进入审批门 }
+        "409": { description: 门槛未过 }
 
 components:
   securitySchemes:

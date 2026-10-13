@@ -1,7 +1,7 @@
 # 知识导航设计文档（PMO-B T4）
 
 > 来源: PMO-B 任务规格 | 日期: 2026-09-24 | 责任人: FullStack 实现工程师
-> 版本: v2.0（批次 3：6 页面结构定稿 + §7 未做项 #1-#3 已落 commit `12a20d6` + §9 铁律 §5.3 批次表/§4.6 800 行上限）
+> 版本: v2.1（v2.0 = 批次 3 定稿；**v2.1 2026-10-12 全量设计复盘回写**：§八 ACTIVE_PAGES 6→7、知识抽取数据源按实测订正、GovernPage 子组件现状注记；其余章节为历史快照不动）
 > 追溯: PMO-A 已交付 kb_nav_category / kb_nav_tag / kb_nav_article_rel 3 张 DDL（V155/156/157）
 > 上游: .trae/rules/架构铁律.md §2.4（安全）/ §4.1（主题）/ §4.3（i18n）/ §5.3（单指令 ≤ 5 Task）/ §4.6（组件 ≤ 800 行）
 
@@ -206,14 +206,24 @@
 |:--|:--|:--|:--|
 | 知识总览 | `pages/knowledge/pages/OverviewPage.tsx` | `GET /api/v1/engine/kb/index-status` · `GET /api/v1/knowledge/extract/candidates` · `GET /api/v1/knowledge/extract/jobs` · `GET /api/v1/knowledge/nav/products`（资产表 5 行） | `knowledge.overview.*` |
 | 知识资产 | `pages/knowledge/pages/AssetListPage.tsx` | `GET /api/v1/knowledge/nav/products` · `GET /api/v1/knowledge/assets/status`（批量 status 列，>100 reject）· `GET /api/v1/knowledge/nav/domains` | `knowledge.asset.*` |
-| 知识抽取 | `pages/knowledge/pages/ExtractionPage.tsx` | `GET /api/v1/knowledge/structured/mappings` · `POST /api/v1/knowledge/structured/extract/submit` · `GET /api/v1/knowledge/docs/ingest` | `knowledge.extract.*` |
+| 知识抽取 | `pages/knowledge/pages/ExtractionPage.tsx` | 【2026-10-12 复盘回写】`GET /api/v1/ontology/mappings`（映射契约，ExtractionPage.tsx:97 实测；原载 `GET /api/v1/knowledge/structured/mappings` 全仓零命中，系路径误记）· `POST /api/v1/knowledge/extract/structured`（抽取提交，StructuredExtractController.java:76+126 类前缀+@PostMapping 实测；原载 `POST /api/v1/knowledge/structured/extract/submit` 为组件注释级历史表述，前端实际经 `knowledgeApi.triggerStructuredExtract` → extract.ts:230 `${KB_V1}/extract/structured`）· `GET /api/v1/knowledge/docs/ingest` | `knowledge.extract.*` |
 | 知识图谱 | `pages/knowledge/pages/GraphPage.tsx` | `GET /api/v1/knowledge/graph?domain=&categoryIds=` · `GET /api/v1/knowledge/nav/domains` | `knowledge.graph.*` |
 | 企业知识 | `pages/knowledge/pages/WikiPage.tsx` | `POST /api/v1/knowledge/docs/ingest`（`Content-Type: text/markdown` 分支）· `GET /api/v1/knowledge/nav/categories?domain=&parentId=` | `knowledge.wiki.*` |
 | 知识治理 | `pages/knowledge/pages/GovernPage.tsx` + `pages/knowledge/components/govern/{AuditFeedCard,QualityMetricsTable,RuleRepoTable,EvalRunPanel}` | `GET /api/v1/knowledge/extract/candidates` · `GET /api/v1/knowledge/rules` · `POST /api/v1/knowledge/eval/run` | `knowledge.govern.*` |
+| 认知资产（第 7 面，2026-10-12 复盘补录） | `pages/knowledge/pages/CognitiveAssetPage.tsx` | `GET /api/v1/cognitive/assets/catalog`（模式权威）· `fetchBeliefs/fetchHypotheses/fetchModels`（governed-class 实例行）· `GET /api/v1/cognitive/assets/{assetId}/resolve`（抽屉只读解析）——CognitiveAssetPage.tsx:8-10 注释与实现实测 | `knowledge.*`（cognitive_asset 导航键） |
 
 **说明**：
 
-- `GovernPage` 主文件 ~300 行，4 子组件各 ≤ 300 行 — 符合 §4.6 800 行上限。
+- 【2026-10-12 复盘回写①·ACTIVE_PAGES 6→7】`typesAndConstants.ts:356` 实测
+  `ACTIVE_PAGES = ['overview','assets','extract','graph','wiki','govern','cognitive_asset']`（7 项），
+  v2.0 定稿的「6 平铺 Page」已扩为 7 面（新增认知资产页，见上表第 7 行）；`ACTIVE_PAGE_ICONS` /
+  `ACTIVE_PAGE_I18N_KEYS` 均已含 `cognitive_asset` 映射（typesAndConstants.ts:367/:381 实测）。
+- 【2026-10-12 复盘回写②·GovernPage 子组件现状】上表所列 4 子组件
+  （`AuditFeedCard`/`QualityMetricsTable`/`RuleRepoTable`/`EvalRunPanel`）**当前已不被 `GovernPage` 引用**：
+  `GovernPage.tsx:22-24` 实测 import 为 `ProfilesTab`/`AssumptionsTab`/`RetrievalTab`（B.0 信息架构归一 /
+  分册 04 B.3 govern 子 Tab，见 GovernPage.tsx:9-10 头注「本 Wave 前 GovernPage 渲染 4 子组件…主结构改为」）；
+  4 组件文件仍在 `pages/knowledge/pages/components/govern/` 存续（§3.1 只加不删，物理移除属另行裁决）。
+- `GovernPage` 主文件 ~300 行，4 子组件各 ≤ 300 行 — 符合 §4.6 800 行上限（v2.0 定稿口径，行数历史快照）。
 - 6 Page 文件路径内的 13 个撤下 Tab 旧 i18n 前缀已在 `zh-CN.json` / `en.json` 中加 `_depr.{key}: true` 元 key（合计 265 个），由 `scripts/check-i18n-parity.mjs` 在 CI 可选门禁中校验平行度。
 - `GraphPage.tsx` line 中 `categoryIds` 调用策略见 PRD §F12 C4（checkbox 不勾时传 undefined，不传字段）；后端接 `categoryIds` 入参行为见 C1-C3（同 PRD §F12）。
 
@@ -228,4 +238,4 @@
 > - **§5.3 批次表**（`PRD §4.4.A` 配套）— Batch 1 (commit `693617d`)：F1+F10+F3；Batch 2 (commit `69d3095`)：F2+F4+F5+F6+F7；Batch 3 (本 commit)：F8+F9+F11+F12。
 
 ---
-> 本设计文档 v1.0 制定于 2026-09-24（PMO-B 批次 1），v1.1 于 2026-09-24 由 PMO-C 批次 2 落地 §7 未做项 #1~#3（commit `12a20d6`），v2.0 于 2026-09-25 由 PMO-C 批次 3 收口（新增 §八 6 页面结构定稿 + §九 铁律引用 + §2.3 F6 补充 + 头部批次 3 变更表）。后续 PMO / P3 批次需同步更新。
+> 本设计文档 v1.0 制定于 2026-09-24（PMO-B 批次 1），v1.1 于 2026-09-24 由 PMO-C 批次 2 落地 §7 未做项 #1~#3（commit `12a20d6`），v2.0 于 2026-09-25 由 PMO-C 批次 3 收口（新增 §八 6 页面结构定稿 + §九 铁律引用 + §2.3 F6 补充 + 头部批次 3 变更表）。后续 PMO / P3 批次需同步更新。v2.1 于 2026-10-12 全量设计复盘回写：§八 ACTIVE_PAGES 6→7（实测 `typesAndConstants.ts:356` 含 `cognitive_asset` 第 7 面）、知识抽取数据源按 Controller 实测订正、GovernPage 旧 4 子组件现状注记；历史章节语义未改写。

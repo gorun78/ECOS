@@ -1,5 +1,14 @@
 # 知识抽取（K1）功能实现 — 架构轻量设计与任务 DAG
 
+> **【已被取代 · 2026-10-12 全量设计复盘登记】** 本文 E1~E5 已落地且路径与最终实现一致（2026-10-12 复盘实测，
+> 反而是 `knowledge-navigation-design.md` v2.0 曾记错，该导航文档已按实测回写至 v2.1）。本文整体进入留痕状态：
+> 现行权威 = `docs/30-设计/knowledge-navigation-design.md` v2.1 + `openapi/supplementary-cognitive-ai-v1.yaml`。
+> **红线警示**：本文 §4 承诺的 V140 `BIGSERIAL PRIMARY KEY` 已照录入库，违反现行 MC01/02 红线，
+> 已按 2026-10-12 复盘登记入 `.trae/rules/数据库访问规范.md` v1.5「§三 ST03-A 历史违例登记」——引用本文 DDL 模板者以规范 v1.5 为准。
+> 判定出处：`docs/50-测试/复盘报告-设计域全量分册-2026-10-12.md` §3.13。
+
+***
+
 > 依据：`docs/plans/knowledge-workbench-replan-v1.md` §6 K1「知识抽取」+ §5.3 接口规范 + §1 五条边界铁律
 > 复杂度：L2 标准（总分 27/60） | 工作流：架构轻量设计 → 前后端并行 → QA → Reviewer | 日期：2026-09-20
 > 实施基线：B1\~B8 已完成（B3-2 `KbEntityInstanceExtractionService` 已就绪）

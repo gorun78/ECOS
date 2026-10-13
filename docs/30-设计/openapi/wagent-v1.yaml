@@ -29,11 +29,19 @@
 #   5. 前缀策略（§5.1，只增不改）：正典 /api/v1/wagent；双路径 /api/wagent 经
 #      VersionPrefixRewriteFilter REVERSE 映射收敛到 v1，Controller 禁直接映射裸前缀。
 #      不复用已混乱的 /api/v1/agent 族（X-2/W252/R-43）。
+# ---------------------------------------------------------------------
+# 【2026-10-12 全量设计复盘回写】v1.0.0 → v1.0.1：
+#   ① servers 的 ai-engine 直连端口按实测订正（18085 系 v1 legacy 幽灵端口，见 servers 注记）；
+#   ② planned 面 readiness/evidence/candidates 三处端点定义对齐前端消费签名
+#      （ReadinessCard.tsx:2 / EvidenceDrawer.tsx:4 / CandidateDiffView.tsx:6，均为组件头注声明的
+#      消费路径；WAgentApiPaths 常量现态与前端签名的收敛属 R2-B/R3-A 批次事项，
+#      各端点 x-correction-2026-10-12 已逐条登记差异）；implemented 面不动。
 # =====================================================================
 openapi: 3.0.3
 info:
   title: ECOS W Agent 编排面 API（wagent v1）
-  version: 1.0.0
+  version: 1.0.1   # 2026-10-12 复盘回写：servers 端口订正（18085→18084/19084 实测）+ planned 面
+                   # readiness/evidence/candidates-review 签名对齐前端消费位点（见各端点 x-correction-2026-10-12）
   description: |
     W Agent 编排与 DIK-C 赋能对外契约（详细设计-10 §5.2 首批 24 端点 / 25 operationId，REST + SSE）。
     错误语义见 §5.3 十一错误码（components.responses 按 wire code 登记）；
@@ -51,8 +59,15 @@ servers:
   # 路径本体一律挂正典前缀（§5.2 表基准）；legacy 形态仅入口等价，不另列 paths。
   - url: http://localhost:8080
     description: 网关聚合入口（gateway:8080；正典前缀 /api/v1/wagent，legacy 双路径 /api/wagent 等价）
-  - url: http://localhost:18085
-    description: ai-engine 直连面（属主服务；仅内部调试，生产以网关为准入面）
+  - url: http://localhost:18084
+    description: |
+      2026-10-12 复盘订正：原登记 18085 与代码不符——18085 仅存在于 v1 legacy 幽灵工程
+      （ecos_backend/archive/legacy/services-ghost/api-gateway）与 docker-compose.app-v1-legacy.yml，
+      现网 ai-engine 面无此端口。实测属主部署面 = services/aiming :18084
+      （services/aiming/src/main/resources/application.yml:3 `port: 18084`）；
+      ai-engine-boot 调试态 = 19084（engine/ai-engine/ai-engine-boot/src/main/resources/application.yml:2-3，
+      boot 端口 = 服务端口 +1000 口径）。平台 API 基线仍以 gateway :8080 承流为准入面，
+      本直连面仅内部调试（R2-C 注记）。
 tags:
   - name: goals
     description: §5.2 #1~#2 Goal 生命周期（口径变更⇒新版本；被引用则 409 ECOS_WA_CALIBER_LOCKED）
@@ -469,14 +484,23 @@ paths:
         "500": { $ref: "#/components/responses/E-INTERNAL" }
 
   # ─────────────────────────── Readiness（§5.2 #12~#13）─────────────────────────
-  /api/v1/wagent/readiness/{questionId}:
+  /api/v1/wagent/readiness:
     get:
       tags: [readiness]
       operationId: getReadiness
       summary: "#12 就绪度（等级 + 缺项 + 缺口，F10-08/09）"
       x-implementation-status: planned       # WAgentApiPaths.READINESS_BY_QUESTION 常量在位；Controller 归 R2-B
+      x-correction-2026-10-12: |
+        复盘回写：按前端消费签名登记为 GET /api/v1/wagent/readiness?mission=
+        （前端位点 components/common/structured/ReadinessCard.tsx:2，注释级契约声明、组件只接 props 不发请求）。
+        WAgentApiPaths.READINESS_BY_QUESTION 现态仍为 /readiness/{questionId} 路径参数形态（WAgentApiPaths.java:70）；
+        两种签名收敛（常量改集合面 or 前端改路径参数）归 R2-B 落地批次，落地前本契约以消费侧签名为准。
       parameters:
-        - $ref: "#/components/parameters/QuestionId"
+        - name: mission
+          in: query
+          required: true
+          description: 任务/使命标识（前端消费签名；单源参数名待 R2-B 与 WAgentApiPaths 收敛）
+          schema: { type: string, maxLength: 36 }
       responses:
         "200":
           description: 就绪快照（grade/status 由服务端阈值计算，LLM 不参与定级，F10-09）
@@ -645,12 +669,18 @@ paths:
         "404": { $ref: "#/components/responses/E-NOT-FOUND" }
         "500": { $ref: "#/components/responses/E-INTERNAL" }
 
-  /api/v1/wagent/candidates/{candidateId}/review:
+  /api/v1/wagent/candidates/{candidateId}/approve:
     post:
       tags: [candidates]
       operationId: reviewCandidate
-      summary: "#19 四眼评审（语义/口径/知识禁批量）"
-      x-implementation-status: planned       # WAgentApiPaths.CANDIDATE_REVIEW 常量在位；Controller 归 R3-A
+      summary: "#19 四眼评审（语义/口径/知识禁批量）——前端消费动作名 approve"
+      x-implementation-status: planned       # WAgentApiPaths.CANDIDATE_REVIEW 常量在位（/review 形态）；Controller 归 R3-A
+      x-correction-2026-10-12: |
+        复盘回写：前端消费签名为 POST /api/v1/wagent/candidates/{id}/approve
+        （位点 components/common/structured/CandidateDiffView.tsx:6「approve/reject 通道处理，本组件只回调」）。
+        WAgentApiPaths.CANDIDATE_REVIEW 现态为 CANDIDATE_BY_ID + "/review"（WAgentApiPaths.java:88）。
+        语义同为四眼评审（通过/驳回），动作段名 review↔approve 收敛归 R3-A 落地批次；
+        operationId reviewCandidate 保留（§5.2 #19 溯源单源）。
       description: 四眼原则：reviewer 不得为 candidate 创建者；语义/口径/知识类候选禁批量通过（F10-21）。
       parameters:
         - $ref: "#/components/parameters/CandidateId"
@@ -737,14 +767,23 @@ paths:
         "404": { $ref: "#/components/responses/E-NOT-FOUND" }
         "500": { $ref: "#/components/responses/E-INTERNAL" }
 
-  /api/v1/wagent/evidence/{evidenceId}:
+  /api/v1/wagent/evidence:
     get:
       tags: [evidence]
       operationId: traceEvidence
-      summary: "#22 引擎端追溯（Evidence → 属主 Engine 事实/快照）"
-      x-implementation-status: planned       # WAgentApiPaths.EVIDENCE_BY_ID 常量在位；Controller 归 R3-A
+      summary: "#22 引擎端追溯（Evidence → 属主 Engine 事实/快照）——前端消费为 claim 查询面"
+      x-implementation-status: planned       # WAgentApiPaths.EVIDENCE_BY_ID 常量在位（/{evidenceId} 形态）；Controller 归 R3-A
+      x-correction-2026-10-12: |
+        复盘回写：前端消费签名为 GET /api/v1/wagent/evidence?claim=
+        （位点 components/common/structured/EvidenceDrawer.tsx:4，注释级契约声明、组件只接 props 不发请求）。
+        WAgentApiPaths.EVIDENCE_BY_ID 现态为 /evidence/{evidenceId}（WAgentApiPaths.java:96）；
+        by-claim 集合面与 by-id 详情面的签名收敛归 R3-A 落地批次，落地前本契约以消费侧签名登记。
       parameters:
-        - $ref: "#/components/parameters/EvidenceId"
+        - name: claim
+          in: query
+          required: true
+          description: Claim 标识（前端消费签名；追溯链按 claim 定位 evidence 三要素 source/version/snapshot）
+          schema: { type: string, maxLength: 36 }
       responses:
         "200":
           description: 追溯链（引擎侧经 ServiceEndpointResolver 两态寻址，Agent 不直连库）
