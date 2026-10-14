@@ -1,0 +1,2025 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="slate-light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECOS 前端可交互原型 v2.0 · 产品结构对齐版</title>
+<style>
+/* ========== 设计 token：四主题（对齐 useTheme() 语义 token） ========== */
+*{box-sizing:border-box;margin:0;padding:0}
+:root[data-theme="slate-light"]{--bg:#f1f5f9;--surface:#fff;--surface2:#f8fafc;--inset:#eef2f7;--border:#d8e0ea;--text:#0f172a;--muted:#64748b;--accent:#4f46e5;--accent-soft:#e0e7ff;--accent-fg:#fff;--ok:#15803d;--warn:#b45309;--danger:#b91c1c;--info:#0369a1;--ok-bg:#dcfce7;--warn-bg:#fef3c7;--danger-bg:#fee2e2;--info-bg:#e0f2fe;--grade-a:#15803d;--grade-b:#b45309;--grade-c:#c2410c;--grade-d:#b91c1c;--conf-high:#15803d;--conf-med:#b45309;--conf-low:#b91c1c;--edge-pos:#16a34a;--edge-neg:#dc2626;--link:#4f46e5;--mono-bg:#f1f5f9;--shadow:0 1px 3px rgba(15,23,42,.10);--sk1:#e2e8f0;--sk2:#f1f5f9}
+:root[data-theme="deep-space"]{--bg:#0b1220;--surface:#111a2e;--surface2:#16223a;--inset:#0d1626;--border:#24344f;--text:#e2e8f0;--muted:#8ea3c0;--accent:#818cf8;--accent-soft:#232f52;--accent-fg:#0b1220;--ok:#4ade80;--warn:#fbbf24;--danger:#f87171;--info:#38bdf8;--ok-bg:#14532d55;--warn-bg:#713f1255;--danger-bg:#7f1d1d55;--info-bg:#0c4a6e55;--grade-a:#4ade80;--grade-b:#fbbf24;--grade-c:#fb923c;--grade-d:#f87171;--conf-high:#4ade80;--conf-med:#fbbf24;--conf-low:#f87171;--edge-pos:#4ade80;--edge-neg:#f87171;--link:#93c5fd;--mono-bg:#0d1626;--shadow:0 1px 3px rgba(0,0,0,.4);--sk1:#1e2c46;--sk2:#16223a}
+:root[data-theme="cyber-terminal"]{--bg:#0a0f0a;--surface:#101a12;--surface2:#142116;--inset:#0c140e;--border:#24401f;--text:#d7f0d7;--muted:#7da37f;--accent:#22c55e;--accent-soft:#12331c;--accent-fg:#04140a;--ok:#4ade80;--warn:#fbbf24;--danger:#f87171;--info:#34d399;--ok-bg:#14532d55;--warn-bg:#713f1255;--danger-bg:#7f1d1d55;--info-bg:#064e3b55;--grade-a:#4ade80;--grade-b:#fbbf24;--grade-c:#fb923c;--grade-d:#f87171;--conf-high:#4ade80;--conf-med:#fbbf24;--conf-low:#f87171;--edge-pos:#4ade80;--edge-neg:#f87171;--link:#6ee7b7;--mono-bg:#0c140e;--shadow:0 1px 3px rgba(0,0,0,.5);--sk1:#1a2e1d;--sk2:#142116}
+:root[data-theme="royal-purple"]{--bg:#150e24;--surface:#1e1533;--surface2:#261b40;--inset:#181029;--border:#3a2a5e;--text:#e9e4f5;--muted:#a593cc;--accent:#a78bfa;--accent-soft:#322356;--accent-fg:#150e24;--ok:#4ade80;--warn:#fbbf24;--danger:#f87171;--info:#c084fc;--ok-bg:#14532d55;--warn-bg:#713f1255;--danger-bg:#7f1d1d55;--info-bg:#581c8755;--grade-a:#4ade80;--grade-b:#fbbf24;--grade-c:#fb923c;--grade-d:#f87171;--conf-high:#4ade80;--conf-med:#fbbf24;--conf-low:#f87171;--edge-pos:#4ade80;--edge-neg:#f87171;--link:#c4b5fd;--mono-bg:#181029;--shadow:0 1px 3px rgba(0,0,0,.45);--sk1:#2c2149;--sk2:#261b40}
+/* ========== 基础 ========== */
+html{font-size:14px}
+body{font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.55}
+.mono{font-family:ui-monospace,"Cascadia Code",Consolas,monospace}
+.muted{color:var(--muted)}
+.small{font-size:.85em}
+a{color:var(--link);text-decoration:none;cursor:pointer}
+h1{font-size:1.25rem;font-weight:700;letter-spacing:-.01em}
+h2{font-size:.95rem;font-weight:600}
+h3{font-size:.88rem;font-weight:600}
+::selection{background:var(--accent-soft)}
+/* ========== 壳 ========== */
+#topbar{height:52px;display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+#topbar .logo{font-weight:800;font-size:1.05rem;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+#topbar .logo .dot{width:10px;height:10px;border-radius:3px;background:var(--accent)}
+#topbar nav{display:flex;gap:2px;margin-left:8px}
+#topbar nav a{padding:6px 12px;border-radius:8px;color:var(--muted);font-weight:600;font-size:.9rem}
+#topbar nav a.on{background:var(--accent-soft);color:var(--accent)}
+#topbar .sp{flex:1}
+#topbar select,#topbar .langbtn,#topbar .askbtn{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-size:.82rem;cursor:pointer}
+#topbar .askbtn{background:var(--accent);color:var(--accent-fg);font-weight:700;border-color:var(--accent)}
+#subnav{display:flex;gap:4px;padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);overflow-x:auto;position:sticky;top:52px;z-index:40}
+#subnav a{white-space:nowrap;padding:5px 12px;border-radius:999px;font-size:.84rem;color:var(--muted);border:1px solid transparent}
+#subnav a.on{background:var(--surface);color:var(--accent);border-color:var(--accent);font-weight:600}
+#view{padding:20px 16px 80px;max-width:1440px;margin:0 auto}
+/* ========== 通用组件 ========== */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+.card+.card{margin-top:14px}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:10px}
+.between{justify-content:space-between}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:900px){.grid2,.grid3,.grid4{grid-template-columns:1fr}}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.88rem;font-weight:600;cursor:pointer;min-height:34px}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.btn.primary:hover{filter:brightness(1.08);color:var(--accent-fg)}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.ghost{border-color:transparent;color:var(--muted)}
+.btn.sm{padding:4px 10px;font-size:.8rem;min-height:28px}
+.btn[disabled]{opacity:.45;cursor:not-allowed;pointer-events:none}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:.76rem;font-weight:700;border:1px solid var(--border);color:var(--muted);background:var(--surface2)}
+.badge.ok{color:var(--ok);background:var(--ok-bg);border-color:transparent}
+.badge.warn{color:var(--warn);background:var(--warn-bg);border-color:transparent}
+.badge.danger{color:var(--danger);background:var(--danger-bg);border-color:transparent}
+.badge.info{color:var(--info);background:var(--info-bg);border-color:transparent}
+.badge.accent{color:var(--accent);background:var(--accent-soft);border-color:transparent}
+.badge.ga{color:var(--grade-a);background:var(--ok-bg);border-color:transparent}
+.badge.gb{color:var(--grade-b);background:var(--warn-bg);border-color:transparent}
+.badge.gc{color:var(--grade-c);background:var(--warn-bg);border-color:transparent}
+.badge.gd{color:var(--grade-d);background:var(--danger-bg);border-color:transparent}
+.badge.outline{background:transparent;border-style:dashed}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface);font-size:.84rem;cursor:pointer}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.banner{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-radius:10px;font-size:.88rem;border:1px solid transparent;margin-bottom:14px}
+.banner.warn{background:var(--warn-bg);color:var(--warn)}
+.banner.danger{background:var(--danger-bg);color:var(--danger)}
+.banner.info{background:var(--info-bg);color:var(--info)}
+.banner.ok{background:var(--ok-bg);color:var(--ok)}
+.banner.neutral{background:var(--inset);color:var(--muted)}
+.note{font-size:.8rem;color:var(--info);background:var(--info-bg);border-left:3px solid var(--info);padding:8px 12px;border-radius:0 8px 8px 0;margin:10px 0}
+.table{width:100%;border-collapse:collapse;font-size:.86rem}
+.table th{text-align:left;padding:8px 10px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border);white-space:nowrap}
+.table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+.table tr:hover td{background:var(--surface2)}
+.input,select.input,textarea.input{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:.9rem;font-family:inherit}
+.input:focus{outline:2px solid var(--accent);outline-offset:-1px}
+label.f{display:block;font-size:.8rem;color:var(--muted);margin:10px 0 4px;font-weight:600}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px}
+.kpi .v{font-size:1.5rem;font-weight:800;font-family:ui-monospace,monospace}
+.kpi .l{font-size:.8rem;color:var(--muted)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:14px;overflow-x:auto}
+.tabs a{padding:8px 14px;font-size:.88rem;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tabs a.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.contract-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:.76rem;color:var(--muted);background:var(--inset);border:1px dashed var(--border);border-radius:8px;padding:6px 12px;margin-bottom:14px}
+.contract-bar b{color:var(--info)}
+/* 骨架屏 / 状态块 */
+.skeleton{border-radius:8px;background:linear-gradient(90deg,var(--sk1) 25%,var(--sk2) 50%,var(--sk1) 75%);background-size:200% 100%;animation:sk 1.2s infinite;min-height:14px}
+@keyframes sk{to{background-position:-200% 0}}
+@media(prefers-reduced-motion:reduce){.skeleton{animation:none}}
+.state-block{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:48px 20px;text-align:center;border:1px dashed var(--border);border-radius:12px;background:var(--surface2)}
+.state-block .ic{width:40px;height:40px;opacity:.6}
+.state-block.err{border-color:var(--danger);background:var(--danger-bg)}
+.state-block.err .t{color:var(--danger)}
+/* 弹层 */
+#modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:100}
+#modal-mask.open{display:flex}
+#modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;max-width:640px;width:92%;max-height:82vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.3)}
+#drawer{position:fixed;top:0;right:-480px;width:460px;max-width:94vw;height:100vh;background:var(--surface);border-left:1px solid var(--border);z-index:100;transition:right .22s ease;overflow-y:auto;padding:20px;box-shadow:-8px 0 30px rgba(0,0,0,.25)}
+#drawer.open{right:0}
+#toast-wrap{position:fixed;top:64px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:10px;padding:10px 16px;font-size:.86rem;box-shadow:var(--shadow);min-width:240px}
+.toast.ok{border-left-color:var(--ok)}.toast.warn{border-left-color:var(--warn)}.toast.err{border-left-color:var(--danger)}
+/* 完整度环 */
+.ring{position:relative;width:64px;height:64px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring .txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:800;font-family:monospace}
+/* 聊天气泡 */
+.msg{display:flex;gap:10px;margin-bottom:14px}
+.msg .av{width:30px;height:30px;border-radius:8px;flex:none;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800}
+.msg.user .av{background:var(--accent-soft);color:var(--accent)}
+.msg.ai .av{background:var(--ok-bg);color:var(--ok)}
+.msg .bubble{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 14px;flex:1;font-size:.9rem}
+.msg.user .bubble{background:var(--accent-soft);border-color:transparent}
+.citation{background:var(--inset);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:8px 12px;margin-top:8px;font-size:.8rem}
+.frame-log{font-size:.74rem;font-family:monospace}
+.frame-log .f{padding:3px 8px;border-bottom:1px dashed var(--border);display:flex;gap:8px}
+.frame-log .ft{font-weight:800;min-width:52px}
+.cursor-blink{display:inline-block;width:8px;height:14px;background:var(--accent);animation:blk 1s steps(2) infinite;vertical-align:-2px}
+@keyframes blk{50%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.cursor-blink{animation:none}}
+/* 时间线 */
+.tl{position:relative;padding-left:22px}
+.tl:before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:2px;background:var(--border)}
+.tl .ti{position:relative;margin-bottom:14px}
+.tl .ti:before{content:"";position:absolute;left:-19px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2.5px solid var(--muted)}
+.tl .ti.ok:before{border-color:var(--ok)}
+.tl .ti.cur:before{border-color:var(--accent);background:var(--accent)}
+.tl .ti.bad:before{border-color:var(--danger)}
+/* 向导 */
+.wiz{display:flex;gap:0;margin-bottom:18px}
+.wiz .st{flex:1;text-align:center;font-size:.8rem;color:var(--muted);padding:8px 4px;border-bottom:3px solid var(--border);font-weight:600}
+.wiz .st.on{color:var(--accent);border-bottom-color:var(--accent)}
+.wiz .st.done{color:var(--ok);border-bottom-color:var(--ok)}
+/* 因果图 */
+.causal-svg text{fill:var(--text);font-size:11px;font-weight:600}
+.causal-svg .cn{fill:var(--surface);stroke:var(--accent);stroke-width:1.5;cursor:pointer}
+.causal-svg .cn.unv{stroke-dasharray:4 3;stroke:var(--warn)}
+.meter{height:8px;border-radius:99px;background:var(--inset);overflow:hidden}
+.meter>div{height:100%;border-radius:99px}
+.hr{border:none;border-top:1px solid var(--border);margin:14px 0}
+.tag{font-size:.72rem;padding:1px 7px;border-radius:6px;background:var(--inset);color:var(--muted);font-weight:600}
+.progress-steps{display:flex;flex-direction:column;gap:6px}
+/* 404 */
+.big404{font-size:5rem;font-weight:900;color:var(--muted);opacity:.35;font-family:monospace}
+/* 四问面板 */
+.q-panel{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+@media(max-width:900px){.q-panel{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.q-panel{grid-template-columns:1fr}}
+.q-panel .q-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px}
+.q-panel .q-card h3{margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.q-panel .q-card .q-list{display:flex;flex-direction:column;gap:8px}
+.q-panel .q-card .q-item{padding:8px 10px;border-radius:8px;background:var(--inset);font-size:.84rem;cursor:pointer}
+.q-panel .q-card .q-item:hover{background:var(--accent-soft)}
+.q-panel .q-card .q-item .q-title{font-weight:600}
+.q-panel .q-card .q-item .q-sub{font-size:.76rem;color:var(--muted);margin-top:2px}
+/* Ask ECOS 浮动入口 */
+#ask-fab{position:fixed;bottom:24px;right:24px;width:52px;height:52px;border-radius:50%;background:var(--accent);color:var(--accent-fg);border:none;box-shadow:0 4px 16px rgba(0,0,0,.25);cursor:pointer;z-index:90;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:800;transition:transform .2s}
+#ask-fab:hover{transform:scale(1.08)}
+#ask-panel{position:fixed;bottom:88px;right:24px;width:380px;max-width:94vw;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;z-index:90;box-shadow:0 8px 32px rgba(0,0,0,.2);display:none}
+#ask-panel.open{display:block}
+#ask-panel input{margin-bottom:8px}
+/* 沙盘画布 */
+.canvas-wrap{background:var(--inset);border:1px solid var(--border);border-radius:12px;overflow:auto;position:relative}
+.sec-band{margin:10px;padding:8px 12px;border:1.5px dashed var(--warn);border-radius:10px;color:var(--warn);font-size:.78rem;font-weight:700;background:var(--warn-bg);text-align:center}
+.layer{display:flex;align-items:center;gap:0;padding:6px 16px}
+.layer .lt{width:86px;flex:none;font-size:.76rem;color:var(--muted);font-weight:700;text-align:right;padding-right:12px}
+.node{position:relative;z-index:2;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;padding:7px 12px;font-size:.82rem;font-weight:600;cursor:pointer;min-width:118px;text-align:center;box-shadow:var(--shadow)}
+.node:hover{outline:2px solid var(--accent-soft)}
+.node.island{border-color:var(--muted);opacity:.62;border-style:dotted}
+.node.island:after{content:"孤岛";position:absolute;top:-9px;right:-8px;font-size:.62rem;background:var(--muted);color:var(--surface);padding:1px 6px;border-radius:999px}
+.node.plain{border-color:var(--border)}
+.edge-lane{display:flex;align-items:center;justify-content:center;min-width:70px;flex:1}
+.edge-lane svg{display:block}
+.sandbox-ribbon{position:fixed;top:52px;right:-42px;transform:rotate(38deg);background:var(--warn-bg);color:var(--warn);border:1.5px dashed var(--warn);padding:4px 48px;font-weight:800;font-size:.8rem;z-index:60;letter-spacing:.1em}
+/* 资产卡片 */
+.asset-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:border-color .15s}
+.asset-card:hover{border-color:var(--accent)}
+.asset-card .asset-head{display:flex;justify-content:space-between;align-items:start;margin-bottom:8px}
+.asset-card .asset-title{font-weight:600;font-size:.9rem}
+.asset-card .asset-meta{font-size:.76rem;color:var(--muted);margin-top:4px}
+/* 看板列 */
+.kanban{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
+.kanban .kanban-col{flex:none;width:260px}
+.kanban .kanban-col h3{margin-bottom:8px;padding:6px 10px;border-radius:8px;background:var(--inset)}
+.kanban .kanban-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer}
+.kanban .kanban-card:hover{border-color:var(--accent)}
+footer{padding:24px;text-align:center;color:var(--muted);font-size:.76rem}
+</style>
+</head>
+<body>
+<div id="topbar"></div>
+<div id="subnav"></div>
+<div id="view"></div>
+<div id="modal-mask"><div id="modal" role="dialog" aria-modal="true"></div></div>
+<div id="drawer" role="complementary"></div>
+<div id="toast-wrap"></div>
+<button id="ask-fab" title="问 ECOS" style="display:none">问</button>
+<div id="ask-panel"><input class="input" id="ask-input" placeholder="输入经营问题，Enter 发送" data-enter="askGlobalSend"><button class="btn primary sm" data-act="askGlobalSend">发送</button></div>
+<footer>ECOS 前端可交互原型 v2.0 · 产品结构对齐版 · 2026-10-13 · 全部数据为模拟数据</footer>
+<script>
+"use strict";
+/* ================= 全局状态 ================= */
+const S = {
+  theme: localStorage.getItem('ecos.proto.v2.theme') || 'slate-light',
+  locale: localStorage.getItem('ecos.proto.v2.locale') || 'zh-CN',
+  demo: 'normal',           // 精简四态：normal/loading/error/forbidden
+  sandboxWatermark: false,
+  chat: null,               // 智能对话运行态
+  agent: { stage:'ask', round:0, slots:{}, grade:null, runStatus:null, steps:[], option:null, published:null, automation:'L1', killSwitch:false, approved:{}, runTimers:[], runHist:[] },
+  wb: { bound:{}, activated:{}, layoutSaved:true },
+  wizard: { step:1, mode:'FORMAL', baseline:'run-2026Q3-formal', running:false, done:false, dqFixed:false, runProg:0, timer:null },
+  cogTab: 'overview',
+  cogMind: 'mind-finance-v2',
+  cogExpl: false,
+  cogAutonomy: 'L1',
+  aiFilter: { toolset:'', op:'', status:'' },
+  usagePeriod: '7d',
+  replayInput: '',
+  waQuestion: '',
+  waErrSim: '',
+  askOpen: false,
+};
+/* ================= 图标（原型内联简化版；实现态仅 lucide-react） ================= */
+const IC = {
+  'shield-check':'M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5l8-3z M9 12l2 2 4-4',
+  'shield-off':'M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5l8-3z M9 9l6 6 M15 9l-6 6',
+  'alert-triangle':'M12 3l10 18H2L12 3z M12 10v4 M12 17.5v.5',
+  'ban':'M12 3a9 9 0 100 18 9 9 0 000-18z M5.5 5.5l13 13',
+  'circle-dot':'M12 3a9 9 0 100 18 9 9 0 000-18z M12 9a3 3 0 100 6 3 3 0 000-6z',
+  'check':'M4 12l5 5L20 6',
+  'x':'M5 5l14 14 M19 5L5 19',
+  'refresh':'M20 12a8 8 0 11-2.3-5.6 M20 3v4h-4',
+  'brain':'M9 3a3 3 0 00-3 3 3 3 0 00-2 5 3 3 0 003 5 3 3 0 005 2 3 3 0 005-2 3 3 0 003-5 3 3 0 00-2-5 3 3 0 00-3-3',
+  'gauge':'M12 15l4-6 M5 19a9 9 0 1114 0',
+  'lightbulb':'M9 18h6 M10 21h4 M12 3a6 6 0 00-4 10c1 1 1 2 1 3h6c0-1 0-2 1-3a6 6 0 00-4-10z',
+  'activity':'M3 12h4l3 8 4-16 3 8h4',
+  'git':'M6 3v12 M18 9a3 3 0 100-6 3 3 0 000 6z M6 21a3 3 0 100-6 3 3 0 000 6z M18 9a9 9 0 01-9 9',
+  'send':'M22 2L11 13 M22 2l-7 20-4-9-9-4 20-7z',
+  'link':'M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1.5 1.5 M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7L12.5 19.5',
+  'db':'M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3z M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6 M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
+  'layers':'M12 2l10 6-10 6L2 8l10-6z M2 14l10 6 10-6',
+  'bot':'M12 2v3 M5 8h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2v-8a2 2 0 012-2z M8 14h.5 M16 14h.5',
+  'file':'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z M14 2v6h6',
+  'zap':'M13 2L3 14h8l-1 8 10-12h-8l1-8z',
+  'lock':'M6 11V7a6 6 0 0112 0v4 M4 11h16v10H4V11z',
+  'copy':'M8 8h12v12H8V8z M4 16V4h12',
+  'chev-r':'M9 6l6 6-6 6',
+  'plus':'M12 5v14 M5 12h14',
+  'play':'M6 4l14 8-14 8V4z',
+  'pause':'M7 4h4v16H7z M13 4h4v16h-4z',
+  'clock':'M12 3a9 9 0 100 18 9 9 0 000-18z M12 7v5l3 3',
+  'user':'M12 8a4 4 0 100-8 4 4 0 000 8z M4 21c0-4 4-6 8-6s8 2 8 6',
+  'radar':'M12 12l6-6 M12 3a9 9 0 019 9 M12 7a5 5 0 015 5 M12 12h.5 M12 21a9 9 0 110-18',
+  'waypoints':'M5 5h.5 M19 5h.5 M5 19h.5 M19 19h.5 M7 5h10 M12 7v10 M7 19h10',
+  'scale':'M12 3v18 M5 7l7-4 7 4 M5 7l-3 7a3.5 3.5 0 007 0L5 7z M19 7l-3 7a3.5 3.5 0 007 0l-3-7z',
+  'target':'M12 3a9 9 0 100 18 9 9 0 000-18z M12 7a5 5 0 100 6 5 5 0 000-6z M12 11a1 1 0 100 2 1 1 0 000-2z',
+  'trending-up':'M3 17l6-6 4 4 8-8 M14 7h7v7',
+  'trending-down':'M3 7l6 6 4-4 8 8 M14 17h7v-7',
+  'help':'M12 3a9 9 0 100 18 9 9 0 000-18z M9 9a3 3 0 116 0c0 2-3 2-3 4 M12 17v.5',
+  'settings':'M12 3l1 3 3-1 1 3 3 1-1 3 1 3-3 1-1 3-3-1-1 3-1-3-3 1-1-3-3-1 1-3-1-3 3-1z M12 9a3 3 0 100 6 3 3 0 000-6z',
+  'clipboard':'M9 3h6v2H9z M5 5h2v2h10V5h2v16H5V5z',
+  'shield':'M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5l8-3z',
+  'eye':'M12 5c-5 0-9 7-9 7s4 7 9 7 9-7 9-7-4-7-9-7z M12 9a3 3 0 100 6 3 3 0 000-6z',
+  'flask':'M9 3h6 M10 3v6l-5 9a2 2 0 002 3h10a2 2 0 002-3l-5-9V3',
+};
+function ic(n, sz, cls){ sz=sz||15; return '<svg class="ic '+(cls||'')+'" width="'+sz+'" height="'+sz+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+(IC[n]||IC['circle-dot'])+'"/></svg>'; }
+/* ================= 工具 ================= */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function nav(h){ location.hash = h; }
+function fmtNum(n){ return new Intl.NumberFormat(S.locale==='zh-CN'?'zh-CN':'en-US').format(n); }
+function fmtMoney(n){ const v=Math.abs(n); const s=(n<0?'-':'')+(v>=10000?(v/10000).toFixed(1)+'万':fmtNum(v)); return S.locale==='zh-CN'?s+' 元':'¥'+s; }
+function uid(p){ return (p||'id')+'-'+Math.random().toString(36).slice(2,8); }
+function traceId(){ return Array.from({length:4},()=>Math.random().toString(16).slice(2,6)).join('').slice(0,8)+'-'+Math.random().toString(16).slice(2,6)+'-'+Math.random().toString(16).slice(2,6); }
+function copyTxt(txt, msg){ try{ navigator.clipboard.writeText(txt); }catch(e){} toast(msg||(T('common.copied')+': '+txt), 'ok'); }
+/* ================= 弹层 ================= */
+function openModal(html){ const m=document.getElementById('modal-mask'); document.getElementById('modal').innerHTML=html+'<div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn" data-act="closeModal">'+T('common.close')+'</button></div>'; m.classList.add('open'); }
+function closeModal(){ document.getElementById('modal-mask').classList.remove('open'); }
+function openDrawer(html){ document.getElementById('drawer').innerHTML=html; document.getElementById('drawer').classList.add('open'); }
+function closeDrawer(){ document.getElementById('drawer').classList.remove('open'); }
+function toast(msg, type){ const w=document.getElementById('toast-wrap'); const el=document.createElement('div'); el.className='toast '+(type||''); el.innerHTML=msg; w.appendChild(el); setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(), 320); }, 3200); }
+/* ================= 路由 ================= */
+function parseRoute(){ const h=(location.hash||'#/decision').replace(/^#/,''); const qi=h.indexOf('?'); const path=qi>=0?h.slice(0,qi):h; const query={}; if(qi>=0){ new URLSearchParams(h.slice(qi+1)).forEach((v,k)=>query[k]=v); } const seg=path.split('/').filter(Boolean); return {path, seg, query}; }
+function moduleOf(seg){ const m={decision:'decision', scene:'decision', assets:'assets', cog:'assets', aiwork:'aiwork', ai:'aiwork', admin:'admin'}; return m[seg[0]]||'decision'; }
+/* ================= 壳渲染 ================= */
+const MODULE_HOME = { decision:'#/decision', assets:'#/assets/overview', aiwork:'#/aiwork/chat', admin:'#/admin' };
+function renderShell(r){
+  const mod = moduleOf(r.seg);
+  const demos = ['normal','loading','error','forbidden'];
+  document.getElementById('topbar').innerHTML =
+    '<div class="logo"><span class="dot"></span>ECOS <span class="tag">'+T('app.tag')+'</span></div>'
+    + '<nav>'
+    + ['decision','assets','aiwork','admin'].map(m=>'<a data-nav="'+MODULE_HOME[m]+'" class="'+(mod===m?'on':'')+'">'+T('nav.'+m)+'</a>').join('')
+    + '</nav><div class="sp"></div>'
+    + (S.sandboxWatermark ? '<span class="badge warn">'+ic('zap',12)+' '+T('common.sandbox')+'</span>' : '')
+    + '<select id="demo-sel" title="'+T('nav.demo')+'">'+demos.map(d=>'<option value="'+d+'"'+(S.demo===d?' selected':'')+'>'+T('demo.'+d)+'</option>').join('')+'</select>'
+    + '<select id="theme-sel">'+['slate-light','deep-space','cyber-terminal','royal-purple'].map(t=>'<option value="'+t+'"'+(S.theme===t?' selected':'')+'>'+t+'</option>').join('')+'</select>'
+    + '<button class="langbtn" data-act="toggleLang">'+(S.locale==='zh-CN'?'EN':'中文')+'</button>'
+    + '<button class="askbtn" data-act="toggleAsk">'+ic('help',13)+' '+T('nav.askEcos')+'</button>';
+  document.getElementById('subnav').innerHTML = subnavFor(mod, r);
+  document.getElementById('demo-sel').onchange = e=>{ S.demo=e.target.value; render(); };
+  document.getElementById('theme-sel').onchange = e=>{ S.theme=e.target.value; localStorage.setItem('ecos.proto.v2.theme',S.theme); document.documentElement.dataset.theme=S.theme; };
+  document.body.querySelectorAll('.sandbox-ribbon').forEach(x=>x.remove());
+  if (S.sandboxWatermark){ const d=document.createElement('div'); d.className='sandbox-ribbon'; d.textContent='[ '+T('common.sandboxWatermark')+' · SANDBOX ]'; document.body.appendChild(d); }
+  /* Ask ECOS 浮动按钮 */
+  const fab=document.getElementById('ask-fab'); const ap=document.getElementById('ask-panel');
+  fab.style.display = mod==='aiwork' ? 'none' : 'flex';
+  ap.classList.remove('open'); S.askOpen=false;
+}
+function subnavFor(mod, r){
+  const cur = r.path;
+  const link = (href, key, on)=> '<a data-nav="'+href+'" class="'+(on?'on':'')+'">'+T(key)+'</a>';
+  if (mod==='decision'){
+    let s = link('#/decision','dec.nav.overview', !r.seg[1]);
+    if (r.seg[1]==='scene' && r.seg[2]) s += link('#/decision/scene/'+r.seg[2],'dec.nav.detail', !r.seg[3]) + link('#/decision/scene/'+r.seg[2]+'/forecast','dec.nav.forecast', r.seg[3]==='forecast') + link('#/decision/scene/'+r.seg[2]+'/ask','dec.nav.ask', r.seg[3]==='ask');
+    s += link('#/decision/todo','dec.nav.todo', r.seg[1]==='todo');
+    s += link('#/decision/actions','dec.nav.actions', r.seg[1]==='actions');
+    s += link('#/decision/feedback','dec.nav.feedback', r.seg[1]==='feedback');
+    s += link('#/decision/mind','dec.nav.mind', r.seg[1]==='mind');
+    return s;
+  }
+  if (mod==='assets'){
+    return ['overview','evidence','beliefs','models','results','governance'].map(p=>link('#/assets/'+p,'ast.nav.'+p,(r.seg[1]||'overview')===p)).join('');
+  }
+  if (mod==='aiwork'){
+    return ['agents','chat','tools','guardrails','models','replay','usage','monitor','config'].map(p=>link('#/aiwork/'+p+(p==='monitor'?'/'+(r.seg[2]||'run-7001'):''),'ai.nav.'+p,(r.seg[1]||'chat')===p)).join('');
+  }
+  if (mod==='admin'){
+    return link('#/admin','adm.nav.overview', !r.seg[1]);
+  }
+  return '';
+}
+function contractBar(basis, route, comps, extra){
+  return '<div class="contract-bar"><span>'+T('contract.basis')+' <b>'+esc(basis)+'</b></span><span>·</span><span>'+T('contract.route')+' <b class="mono">'+esc(route)+'</b></span><span>·</span><span>'+T('contract.comps')+' <b>'+esc(comps)+'</b></span>'+(extra?'<span>·</span><span>'+extra+'</span>':'')+'</div>';
+}
+function fillNote(txt){ return '<div class="note">'+ic('lightbulb',13)+' <b>'+T('contract.fill')+'</b>：'+txt+'</div>'; }
+/* ================= 演示状态守卫（精简四态） ================= */
+function stateGuard(allowed){
+  if (S.demo==='normal' || !allowed.includes(S.demo)) return null;
+  const tr = traceId();
+  if (S.demo==='loading') return '<div class="card"><div class="col"><div class="skeleton" style="height:22px;width:40%"></div><div class="skeleton" style="height:14px"></div><div class="skeleton" style="height:14px"></div><div class="skeleton" style="height:90px"></div></div><p class="small muted" role="status" style="margin-top:10px">'+T('common.loading')+'…</p></div>';
+  if (S.demo==='error') return '<div class="state-block err" role="alert">'+ic('alert-triangle',40)+'<div class="t"><b>'+T('common.errTitle')+'</b></div><p class="small">ECOS-500 · '+T('common.errMsg')+'</p><p class="small mono muted">traceId: '+tr+'</p><div class="row"><button class="btn sm" data-act="copyTrace" data-v="'+tr+'">'+ic('copy',12)+' '+T('common.copyTrace')+'</button><button class="btn sm primary" data-act="demoReset">'+ic('refresh',12)+' '+T('common.retry')+'</button></div></div>';
+  if (S.demo==='forbidden') return '<div class="state-block" role="alert">'+ic('lock',40)+'<div><b>'+T('common.forbidden')+'</b></div><p class="small muted">'+T('common.forbiddenHint')+'</p></div>';
+  return null;
+}
+function statusBadge(s){
+  const m={draft:'warn',active:'ok',suspended:'info',completed:'info',executing:'ok',published:'ok',approved:'ok',rejected:'danger',pending:'warn',failed:'danger',cancelled:'info',paused:'warn',validating:'info',verified:'ok',adopted:'ok',evidenced:'ok',evaluated:'info',contested:'warn',uncertain:'warn',proposed:'info',reserved:'warn',refuted:'danger',expired:'danger',superseded:'info',revised:'info'};
+  let label = T('common.status.'+s);
+  if (label === 'common.status.'+s) label = T('ast.status.'+s);
+  if (label === 'ast.status.'+s) label = s;
+  return '<span class="badge '+(m[s]||'')+'">'+label+'</span>';
+}
+function confBadge(v){ return '<span class="badge '+(v>=0.8?'ga':v>=0.5?'gb':'gd')+'">'+(v>=0.8?T('cog.hypo.confHigh'):v>=0.5?T('cog.hypo.confMed'):T('cog.hypo.confLow'))+'</span>'; }
+function gradeBadge(g){ return '<span class="badge g'+String(g).toLowerCase()+'">L'+g+'</span>'; }
+function readinessBadge(g){ return '<span class="badge g'+g.toLowerCase()+'">'+T('wa.readiness.'+g)+' ('+g+')</span>'; }
+function meterRow(label, val, color){ return '<div class="row between" style="padding:4px 0"><span class="small">'+esc(label)+'</span><div class="meter" style="width:120px"><div style="width:'+Math.round(val*100)+'%;background:var(--'+(color||'accent')+')"></div></div><b class="small mono">'+Math.round(val*100)+'%</b></div>'; }
+/* ================= i18n（zh-CN / en 成对） ================= */
+const L = {
+'zh-CN': {
+'app.tag':'v2.0 原型','nav.decision':'经营决策','nav.assets':'认知资产','nav.aiwork':'AI 工作台','nav.admin':'平台管理','nav.askEcos':'问 ECOS','nav.demo':'演示态',
+'demo.normal':'正常','demo.loading':'加载','demo.error':'故障','demo.forbidden':'权限 403',
+'common.close':'关闭','common.retry':'重试','common.copyTrace':'复制诊断码','common.copied':'已复制','common.loading':'加载中','common.errTitle':'服务故障','common.errMsg':'请求返回 5xx，请稍后重试','common.forbidden':'无权访问','common.forbiddenHint':'资源不存在或当前账号无权查看（DENY 与 NOT-FOUND 文案同构）','common.back':'返回','common.send':'发送','common.stop':'停止','common.submit':'提交','common.cancel':'取消','common.confirm':'确认','common.run':'运行','common.publish':'发布','common.approve':'批准','common.reject':'驳回','common.details':'详情','common.expand':'展开','common.collapse':'收起','common.view':'查看','common.next':'下一步','common.prev':'上一步','common.all':'全部','common.status':'状态','common.actions':'操作','common.traceId':'诊断码','common.sandbox':'演练','common.sandboxWatermark':'演练模式',
+'common.status.draft':'草稿','common.status.active':'运行中','common.status.suspended':'已挂起','common.status.completed':'已完成','common.status.executing':'执行中','common.status.published':'已发布','common.status.approved':'已批准','common.status.rejected':'已驳回','common.status.pending':'待审批','common.status.failed':'失败','common.status.cancelled':'已取消','common.status.paused':'已暂停',
+'contract.basis':'设计依据','contract.route':'路由','contract.comps':'组件','contract.fill':'补全逻辑',
+/* 经营决策域 */
+'dec.nav.overview':'总览','dec.nav.detail':'场景详情','dec.nav.forecast':'预测向导','dec.nav.ask':'问 ECOS','dec.nav.todo':'决策待办','dec.nav.actions':'行动跟踪','dec.nav.feedback':'效果反馈','dec.nav.mind':'心智 Mind',
+'dec.title':'经营决策','dec.subtitle':'从经营现状到行动闭环，ECOS 为决策者提供全链路支持',
+'dec.q.current':'经营现状','dec.q.judge':'需要判断什么','dec.q.decide':'需要决定什么','dec.q.action':'正在采取什么行动',
+'dec.q.current.hint':'指标偏差、目标差距、趋势变化','dec.q.judge.hint':'未解决问题、运行中任务','dec.q.decide.hint':'方案比较、待审批决策','dec.q.action.hint':'执行进度、效果反馈与归因',
+'dec.scenario.list':'场景列表','dec.scenario.new':'新建场景','dec.scenario.empty':'还没有业务场景','dec.scenario.emptyCta':'点击「新建场景」从模板开始',
+'dec.create.title':'新建业务场景','dec.create.name':'场景名称','dec.create.namePh':'如：2027 供应链降本专项','dec.create.goal':'业务目标','dec.create.goalPh':'如：材料成本降低 8%','dec.create.tpl':'从模板创建','dec.create.tpl.blank':'空白场景','dec.create.tpl.forecast':'经营预测模板','dec.create.tpl.cost':'成本诊断模板','dec.create.tplHint':'选择模板将预填业务目标与初始口径','dec.create.caliber':'初始口径','dec.create.nameRequired':'请填写场景名称','dec.create.ok':'场景已创建（草稿）','dec.create.afterHint':'创建后进入场景详情，可在「配置与就绪」中绑定资源',
+'dec.scene.goal':'业务目标','dec.scene.conclusion':'经营结论','dec.scene.todo':'待决事项','dec.scene.progress':'行动进度','dec.scene.config':'配置与就绪','dec.scene.config.hint':'完整度 / 数据质量 / 口径锁定 / 资源绑定',
+'dec.scene.ask':'问 ECOS','dec.scene.askHint':'在场景上下文中提问，W Agent 自动继承场景口径与数据',
+'dec.forecast.title':'预测向导','dec.forecast.preset':'场景上下文已预填：口径/基准/范围',
+'dec.todo.title':'决策待办','dec.todo.pending':'待评估','dec.todo.pendingApproval':'待审批','dec.todo.approved':'已批准','dec.todo.published':'已发布','dec.todo.rejected':'已拒绝',
+'dec.actions.title':'行动跟踪','dec.actions.fiveStage':'五阶段：草稿→审批→发布→执行→效果归因',
+'dec.feedback.title':'效果反馈','dec.feedback.attribution':'归因分析','dec.feedback.attributable':'可归因','dec.feedback.confounded':'存在混杂因素','dec.feedback.WtoD':'W→D 回灌：行动效果回灌认知资产',
+/* 认知资产域 */
+'ast.nav.overview':'总览','ast.nav.evidence':'证据与假设','ast.nav.beliefs':'Belief 管理','ast.nav.models':'模型资产','ast.nav.results':'认知成果','ast.nav.governance':'验证与发布',
+'ast.type.mind':'心智','ast.mind.title':'心智（Mind）','ast.mind.subtitle':'围绕明确问题组织的认知聚合体：上下文 · 信念 · 假设 · 证据 · 解释 · 演化','ast.mind.detail':'查看心智','ast.mind.back':'返回心智列表',
+'ast.mind.subject':'认知主体','ast.mind.scope':'认知范围','ast.mind.contextRef':'关联场景','ast.mind.goals':'认知目标','ast.mind.keyQuestions':'关键问题',
+'ast.mind.secContext':'① 认知上下文','ast.mind.secBeliefs':'② 信念（Beliefs）','ast.mind.secHypotheses':'③ 认知假设（Hypotheses）','ast.mind.secEvidence':'④ 证据关联（Evidence）','ast.mind.secExplanation':'⑤ 解释结构','ast.mind.secEvolution':'⑥ 演化与治理',
+'ast.mind.axis':'三维状态（相互独立，不可合并为单一 status）','ast.mind.axisValidity':'认知有效性','ast.mind.axisReview':'审查治理','ast.mind.axisAdoption':'业务采纳',
+'ast.mind.validity.valid':'有效','ast.mind.validity.pendingReview':'待复核','ast.mind.validity.invalidated':'已失效',
+'ast.mind.review.draft':'草稿','ast.mind.review.pending':'待审','ast.mind.review.approved':'已批准',
+'ast.mind.adoption.notAdopted':'未采纳','ast.mind.adoption.adopted':'已采纳','ast.mind.adoption.withdrawn':'已撤回',
+'ast.mind.relation.support':'支持','ast.mind.relation.refute':'反驳','ast.mind.relation.limit':'限定',
+'ast.mind.evRefNote':'证据为权威来源引用（来源 + 版本 + 支持/反驳关系），不复制来源内容','ast.mind.reason':'关联理由','ast.mind.refAt':'引用时间','ast.mind.domain':'来源域','ast.mind.ver':'版本',
+'ast.mind.candidates':'W Agent 候选更新','ast.mind.candidatesNote':'Agent 通过受控 API 提交候选更新，须经复核后写入，不直接修改认知状态','ast.mind.candAccept':'提交复核','ast.mind.candReject':'驳回','ast.mind.candAccepted':'候选更新已提交复核','ast.mind.candRejected':'候选更新已驳回','ast.mind.candSubmitted':'已提交','ast.mind.candWasRejected':'已驳回','ast.mind.noCandidates':'暂无待处理的候选更新',
+'ast.mind.boundaryNote':'Mind ≠ 知识资产（一条知识可被多个 Mind 引用）；Mind ≠ Agent 一次运行结果（运行可提出候选更新，认知状态跨运行持续维护）',
+'ast.mind.verHistory':'版本历史','ast.mind.countBeliefs':'信念','ast.mind.countHypotheses':'假设','ast.mind.countEvidence':'证据关联','ast.mind.countVersions':'版本','ast.mind.evidence':'来源引用',
+'ast.models.boundaryNote':'认知模型 ≠ AI 模型 ≠ 计算引擎：Cognition 管理模型的业务含义、适用范围与认知状态；算法与运行归预测/仿真等计算服务','ast.models.threeLayers':'三层协作（引用 + API，不合并数据）：','ast.models.layer1':'① 认知对象（Mind/信念/假设/证据）','ast.models.layer2':'② 认知模型资产（本页）','ast.models.layer3':'③ 计算与业务执行（预测/仿真/W Agent/场景）',
+'ast.models.phaseFilter':'建设分期','ast.models.phase.all':'全部','ast.models.phase.1':'首期','ast.models.phase.2':'二期','ast.models.phase.3':'三期','ast.models.phaseHint':'首期：因果/诊断/假设检验+证据关联 · 二期：预测/风险/仿真 · 三期：优化/行为/信念更新',
+'ast.models.computeOwner':'计算执行归属','ast.models.limits':'适用限制','ast.models.io':'输入 → 输出','ast.models.groupNote':'类型非互斥：同一业务问题可组合使用多类模型（如分群→预测→因果→仿真）','ast.models.extNote':'扩展类型（信念更新/机制/规范策略/认知视角）作为模型功能或属性实现，不单列实体',
+'ast.models.type.causal':'因果模型','ast.models.type.causal.q':'解释为什么','ast.models.type.diagnostic':'异常与诊断模型','ast.models.type.diagnostic.q':'当前状态哪里异常','ast.models.type.hypothesisTesting':'假设检验模型','ast.models.type.hypothesisTesting.q':'什么证据支持/反驳假设','ast.models.type.predictive':'预测模型','ast.models.type.predictive.q':'预测会怎样','ast.models.type.simulation':'情景与仿真模型','ast.models.type.simulation.q':'如果这样做会怎样','ast.models.type.risk':'风险与不确定性模型','ast.models.type.risk.q':'有多大风险','ast.models.type.optimization':'优化与权衡模型','ast.models.type.optimization.q':'应该选择什么','ast.models.type.behavioral':'分群与行为模型','ast.models.type.behavioral.q':'对象如何表现','ast.models.type.relational':'关系与结构模型','ast.models.type.relational.q':'事物如何关联',
+'ast.title':'认知资产','ast.subtitle':'五类认知资产的生产、维护、验证、发布、治理',
+'ast.type.evidence':'Evidence','ast.type.hypothesis':'Hypothesis','ast.type.belief':'Belief','ast.type.model':'Model','ast.type.result':'CognitionResult',
+'ast.type.evidence.desc':'事实数据、来源记录、质量评估','ast.type.hypothesis.desc':'可验证的主张与验证关系','ast.type.belief.desc':'当前采信的判断与置信度','ast.type.model.desc':'注册/验证/发布/适用范围/回测','ast.type.result.desc':'诊断/因果/帕累托等显式成果',
+'ast.status.collected':'已采集','ast.status.verified':'已验证','ast.status.contested':'有争议','ast.status.expired':'已失效','ast.status.proposed':'已提出','ast.status.evidenced':'已证实','ast.status.refuted':'已证伪','ast.status.uncertain':'暂不确定','ast.status.candidate':'候选','ast.status.adopted':'当前采信','ast.status.reserved':'保留意见','ast.status.revised':'已修订','ast.status.revoked':'已撤销','ast.status.draft':'草稿','ast.status.validating':'验证中','ast.status.approved':'已批准','ast.status.deprecated':'已弃用','ast.status.running':'运行中','ast.status.succeeded':'成功','ast.status.evaluated':'已评估','ast.status.superseded':'已被替代',
+'ast.governance.title':'治理工作台','ast.governance.flow':'采集→验证→发布→监测→替代','ast.governance.byType':'按资产类型',
+'ast.evidence.title':'证据与假设','ast.evidence.tabEvidence':'证据','ast.evidence.tabHypothesis':'假设','ast.evidence.support':'支持','ast.evidence.refute':'反驳','ast.evidence.chain':'关系链：claim → evidence → 引擎对象','ast.evidence.immutable':'证据不可篡改，随版本固化',
+'ast.beliefs.title':'Belief 管理','ast.beliefs.threeAxis':'三轴分离：运行状态 / 认知有效性 / 业务采纳','ast.beliefs.confidence':'置信度','ast.beliefs.scope':'适用范围','ast.beliefs.version':'版本',
+'ast.models.title':'模型资产','ast.models.registry':'Mind 注册','ast.models.capabilityMask':'能力掩码','ast.models.closedLoopPre':'闭环界 PRE','ast.models.closedLoopPost':'闭环界 POST','ast.models.backtest':'回测指标','ast.models.scenarioBind':'场景绑定',
+'ast.results.title':'认知成果','ast.results.runRef':'运行引用','ast.results.modelVer':'模型版本','ast.results.caliberVer':'口径版本','ast.results.evaluate':'评估',
+'ast.overview.kpi':'五类资产 KPI','ast.overview.pendingVerify':'待验证','ast.overview.pendingReview':'待复审','ast.overview.published':'已发布','ast.overview.expired':'已失效',
+/* AI 工作台域 */
+'ai.title':'AI 工作台','ai.nav.agents':'智能体模板','ai.nav.chat':'智能对话','ai.nav.tools':'工具注册表','ai.nav.guardrails':'护栏裁决台账','ai.nav.models':'模型中心','ai.nav.replay':'运行回放','ai.nav.usage':'用量与配额','ai.nav.monitor':'运行监控','ai.nav.config':'编排配置',
+'ai.agents.title':'智能体与编排模板','ai.agents.subtitle':'AI 工作台统一承载智能体构建、编排与治理，覆盖智能体全生命周期；系统内置模板与自定义智能体同级管理',
+'ai.agents.builtin':'系统内置模板','ai.agents.custom':'自定义智能体','ai.agents.badge.builtin':'内置','ai.agents.badge.custom':'自定义',
+'ai.agents.lifecycle':'全生命周期','ai.agents.lifecycleNote':'构建 → 编排 → 发布 → 治理 → 回收（同一平台闭环）',
+'ai.agents.boundaryNote':'W Agent 已由独立模块降级为 AI 工作台下的系统内置 Agent 编排模板，与对内服务的数据/本体/知识智能体保持同级模板定位（R5）',
+'ai.agents.colTemplate':'模板','ai.agents.colType':'类型','ai.agents.colScope':'服务域','ai.agents.colLifecycle':'生命周期','ai.agents.colState':'状态','ai.agents.colAction':'操作',
+'ai.agents.open':'进入编排','ai.agents.instances':'实例数','ai.agents.new':'新建智能体','ai.agents.newOk':'已创建智能体草稿（演示）',
+'ai.agents.wagent':'W Agent 编排模板','ai.agents.wagent.desc':'把 D/I/K/C 认知产出编排为目标—就绪—运行—结论—决策—行动链（火 W 内置）',
+'ai.agents.data':'数据智能体','ai.agents.data.desc':'面向数据底座的对内服务智能体：接入、质量门禁、管道与告警',
+'ai.agents.onto':'本体智能体','ai.agents.onto.desc':'面向本体与口径的对内服务智能体：领域包、口径元数据、映射契约',
+'ai.agents.knowledge':'知识智能体','ai.agents.knowledge.desc':'面向知识域的对内服务智能体：抽取、画像、假设与回流正发',
+'ai.session.new':'新建会话','ai.session.empty':'暂无会话','ai.session.today':'今天','ai.session.lastWeek':'上周',
+'ai.chat.placeholder':'输入问题，Enter 发送','ai.chat.send':'发送','ai.chat.stop':'停止','ai.chat.connected':'已连接','ai.chat.connecting':'连接中','ai.chat.disconnected':'已断线','ai.chat.frames':'帧监视器','ai.chat.framesGot':'已收帧','ai.chat.reconnect':'凭 Last-Event-ID 重连','ai.chat.interrupted':'已中断，请重新提问（已收帧保留）','ai.chat.simDisconnect':'模拟断线','ai.chat.refusalClarify':'澄清卡：缺口径','ai.chat.toolCall':'工具调用','ai.chat.dryRun':'干跑','ai.chat.decision':'裁决','ai.chat.latency':'耗时',
+'ai.guardrail.ALLOW':'ALLOW','ai.guardrail.DENY':'DENY','ai.guardrail.FAIL_CLOSED':'FAIL_CLOSED','ai.guardrail.pauseBanner':'安全服务暂不可用，AI 操作已暂停（ECOS-AI-503）','ai.guardrail.table':'裁决台账','ai.guardrail.distro':'决策分布','ai.guardrail.noReason':'禁回显 DENY reason / policyId',
+'ai.usage.prompt':'输入 tokens','ai.usage.completion':'输出 tokens','ai.usage.estimated':'估算','ai.usage.notReported':'未上报','ai.usage.quotaLeft':'剩余配额','ai.usage.costRatio':'成本占比','ai.usage.byModel':'按模型统计',
+'ai.compress.LLM_SUMMARY':'LLM_SUMMARY','ai.compress.TRUNCATE_FALLBACK':'TRUNCATE_FALLBACK','ai.compress.banner':'上下文已压缩','ai.compress.turns':'压缩轮次','ai.context.meter':'上下文用量','ai.context.compress':'压缩','ai.context.refresh':'刷新',
+'ai.citation.run':'运行号','ai.citation.caliber':'口径版本','ai.citation.asOf':'截止时点','ai.citation.evidence':'证据','ai.citation.hidden':'无依据数值，已隐藏','ai.citation.trace':'追溯证据',
+'ai.error.ECOS-AI-403':'当前权限不支持该操作','ai.error.ECOS-AI-503':'安全服务暂不可用','ai.error.ECOS-AI-504':'依赖调用超时','ai.error.ECOS-AI-501':'能力未上线','ai.error.retryable':'可重试','ai.error.notRetryable':'不可重试',
+'ai.replay.title':'运行回放','ai.replay.step':'步骤','ai.replay.jumpStep':'跳至步骤','ai.replay.token':'token','ai.replay.fromDiagnostic':'从诊断码跳转',
+'ai.model.catalog':'模型目录','ai.model.contextWindow':'上下文窗口','ai.model.cost':'价目（/1k tokens）','ai.model.health':'健康度','ai.model.route':'路由解析','ai.model.register':'注册模型','ai.model.noHardcode':'价目与上下文窗口来自目录，禁硬编码',
+'ai.tool.name':'工具名','ai.tool.backend':'后端端点','ai.tool.operation':'操作','ai.tool.minLvl':'最小等级','ai.tool.status':'状态','ai.tool.filter':'筛选','ai.tool.contractDetail':'契约详情（17 要素 + 权限绑定）','ai.tool.ACTIVE':'可用','ai.tool.ledger':'工具调用台账',
+/* W Agent 键（场景内执行机制复用） */
+'wa.goal.caliber':'口径','wa.goal.asOf':'截止','wa.goal.slotsUser':'用户填槽','wa.goal.slotsInferred':'系统推断','wa.goal.revise':'修订 Goal','wa.goal.locked':'口径已锁定','wa.goal.inferredWarn':'存在全推断槽位（inferred_count>0），请确认','wa.goal.mission':'Mission',
+'wa.question.clarify':'澄清问题','wa.question.missingSlots':'缺失槽位','wa.question.roundLimit':'每轮 ≤3 项；补齐循环 ≤3 轮','wa.question.askPlaceholder':'输入你的经营问题，例如：2027 年利润能否达成 1.2 亿？','wa.question.ask':'提问','wa.question.answer':'提交澄清',
+'wa.readiness.grade':'就绪等级','wa.readiness.A':'就绪','wa.readiness.B':'有条件','wa.readiness.C':'不足','wa.readiness.D':'阻塞','wa.readiness.layers':'四层度','wa.readiness.items':'检查项','wa.readiness.gaps':'缺口','wa.readiness.unlockValue':'解锁价值','wa.readiness.owner':'负责人','wa.readiness.refillLimit':'补齐循环 ≤3 轮','wa.readiness.goto':'去补齐','wa.readiness.runNow':'直接运行','wa.readiness.refill':'一键补齐','wa.readiness.layerData':'数据就绪','wa.readiness.layerKnowledge':'知识就绪','wa.readiness.layerCognition':'认知就绪','wa.readiness.layerGovernance':'治理就绪',
+'wa.run.status.plan_validated':'计划已校验','wa.run.status.awaiting_approval':'待审批','wa.run.status.executing':'执行中','wa.run.status.awaiting_input':'待输入','wa.run.status.waiting_task':'待异步任务','wa.run.status.paused':'已暂停（Kill Switch）','wa.run.status.completed':'已完成','wa.run.status.completed_degraded':'已完成（降级）','wa.run.status.failed':'失败','wa.run.status.cancelled':'已取消','wa.run.status.timed_out':'超时',
+'wa.run.budget':'预算','wa.run.replan':'重规划','wa.run.killSwitch':'Kill Switch','wa.run.progressSse':'进度通道：SSE','wa.run.progressPolling':'进度通道：轮询（降级）','wa.run.cancel':'取消运行','wa.run.channel':'通道由能力位决定并显式标注',
+'wa.claim.fact':'事实','wa.claim.inference':'推断','wa.claim.recommendation':'建议','wa.claim.evidence':'证据','wa.claim.noEvidence':'无证据','wa.claim.trace':'追溯',
+'wa.degrade.title':'降级横幅（VO degradations[] 单源）','wa.degrade.ack':'确认','wa.degrade.DG-D1':'数据缺口降级','wa.degrade.DG-K1':'知识未证实需确认','wa.degrade.DG-C1':'认知置信不足','wa.degrade.DG-C2':'仅相关非因果','wa.degrade.DG-L1':'LLM 解释不可用','wa.degrade.DG-L2':'LLM 压缩降级','wa.degrade.DG-T1':'工具超时','wa.degrade.DG-M1':'模型回退','wa.degrade.DG-M2':'模型掩码未绑定',
+'wa.candidate.fourEyes':'四眼审批（审批人 ≠ 提案人）','wa.candidate.expired':'已过期','wa.candidate.bulkForbidden':'禁止批量发布','wa.candidate.publish':'发布','wa.candidate.gitRef':'发布回执 publishedGitRef','wa.candidate.diff':'差异对比','wa.candidate.pending':'待评审','wa.candidate.approved':'已批准','wa.candidate.rejected':'已驳回',
+'wa.error.E-VALIDATION':'参数校验失败','wa.error.E-AUTH':'鉴权失败','wa.error.E-POLICY':'策略拒绝','wa.error.E-NOT-FOUND':'资源不存在或无权访问','wa.error.E-WA-STATE':'非法状态迁移','wa.error.E-IDEMPOTENT-CONFLICT':'幂等冲突，返回既有运行','wa.error.E-RATE':'触发限流','wa.error.E-WA-BUDGET':'预算耗尽','wa.error.E-WA-DEP':'依赖不可用（可重试）','wa.error.E-WA-NARRATIVE-NUM':'叙述与数字不一致（禁展示该数字）','wa.error.E-INTERNAL':'内部错误','wa.error.simulate':'模拟错误（单源 wagent.error.*）',
+'wa.action.draft':'行动草稿','wa.action.commit':'提交','wa.action.approvalToken':'审批 token','wa.action.effectDue':'效果到期','wa.action.l3Disabled':'L3 自动化强制 approval_token 非空：无 token 时按钮禁用并说明原因','wa.action.expected':'预期改变','wa.action.actual':'实际结果','wa.action.attribution':'效果归因','wa.action.attributable':'可归因','wa.action.confounded':'存在混杂因素','wa.action.fiveStage':'五阶段：草稿→审批→发布→执行→效果归因',
+'wa.conclusion.s1':'结论','wa.conclusion.s2':'依据','wa.conclusion.s3':'行动','wa.conclusion.adopt':'采纳','wa.conclusion.createDraft':'生成行动草稿','wa.conclusion.gate':'人工闸门','wa.conclusion.gateHint':'探索性计划（plan_source=EXPLORED）已经人工闸门，自动化上限降为 L2','wa.conclusion.optionCompare':'选项对比','wa.conclusion.baseline':'基线',
+'wa.approval.title':'审批抽屉（四眼 + token）','wa.approval.comment':'审批意见','wa.approval.token':'审批 token','wa.approval.approver':'审批人','wa.approval.proposer':'提案人','wa.approval.samePerson':'审批人与提案人不得相同（四眼制衡）','wa.approval.escConfirm':'Esc 关闭需二次确认','wa.approval.publishOk':'发布成功',
+'wa.admin.automation':'自动化等级上限（只降不升）','wa.admin.threshold':'阈值配置','wa.admin.scopeTenant':'租户级','wa.admin.scopeSystem':'系统级','wa.admin.killOn':'Kill Switch 已开启：运行暂停（paused）','wa.admin.killOff':'Kill Switch 已解除：运行恢复（executing）','wa.admin.automationHint':'effective = min(contract.min_level, run.automation_ceiling, tenant_policy.max_level)，只降不升',
+'wa.monitor.title':'运行监控','wa.monitor.states':'11 态状态机','wa.monitor.budget':'预算','wa.monitor.channel':'通道','wa.monitor.steps':'步骤','wa.monitor.cancel':'取消运行',
+/* 平台管理域 */
+'adm.title':'平台管理','adm.subtitle':'数据源、本体、知识库、权限、系统配置',
+'adm.nav.overview':'总览',
+'adm.card.dataSource':'数据源管理','adm.card.dataSource.desc':'PG/Neo4j/Doris/MinIO 连接配置',
+'adm.card.ontology':'本体管理','adm.card.ontology.desc':'业务对象模型与关系定义',
+'adm.card.knowledge':'知识库管理','adm.card.knowledge.desc':'知识资产树与索引',
+'adm.card.permission':'权限管理','adm.card.permission.desc':'角色、用户、行/列级权限',
+'adm.card.system':'系统配置','adm.card.system.desc':'引擎配置、字典、版本与归档',
+'adm.dataSource.title':'数据源','adm.ontology.title':'本体','adm.knowledge.title':'知识库','adm.permission.title':'权限','adm.system.title':'系统配置',
+/* 场景资源 */
+'ws.catalog.dataset':'数据集','ws.catalog.businessObject':'业务对象','ws.catalog.knowledgeBase':'知识库','ws.catalog.cognition':'分析能力','ws.catalog.agent':'智能体','ws.catalog.exposure':'暴露面',
+'ws.coverage':'完整度','ws.comp.title':'连接完整度（N1 单源）','ws.comp.required':'必需边（分母固定 3）','ws.comp.mapping':'映射（数据集→业务对象）','ws.comp.extraction':'抽取（业务对象→知识库）','ws.comp.cognition':'认知（知识库→分析能力）','ws.comp.present':'已连接','ws.comp.missing':'缺失','ws.comp.islands':'孤岛节点',
+'ws.activate':'激活场景','ws.activate.ok':'场景已激活（200）','ws.activate.conflict':'激活被拒绝（409）：存在孤岛与缺失必需边',
+'ws.404.title':'页面不存在','ws.404.back':'返回经营决策',
+},
+'en': {
+'app.tag':'v2.0 Prototype','nav.decision':'Decision','nav.assets':'Cognitive Assets','nav.aiwork':'AI Workbench','nav.admin':'Platform Admin','nav.askEcos':'Ask ECOS','nav.demo':'Demo',
+'demo.normal':'Normal','demo.loading':'Loading','demo.error':'Error','demo.forbidden':'Forbidden 403',
+'common.close':'Close','common.retry':'Retry','common.copyTrace':'Copy traceId','common.copied':'Copied','common.loading':'Loading','common.errTitle':'Service error','common.errMsg':'Request failed with 5xx, please retry','common.forbidden':'Access denied','common.forbiddenHint':'Resource not found or no permission (DENY ≡ NOT-FOUND wording)','common.back':'Back','common.send':'Send','common.stop':'Stop','common.submit':'Submit','common.cancel':'Cancel','common.confirm':'Confirm','common.run':'Run','common.publish':'Publish','common.approve':'Approve','common.reject':'Reject','common.details':'Details','common.expand':'Expand','common.collapse':'Collapse','common.view':'View','common.next':'Next','common.prev':'Previous','common.all':'All','common.status':'Status','common.actions':'Actions','common.traceId':'traceId','common.sandbox':'Sandbox','common.sandboxWatermark':'Sandbox mode',
+'common.status.draft':'Draft','common.status.active':'Active','common.status.suspended':'Suspended','common.status.completed':'Completed','common.status.executing':'Executing','common.status.published':'Published','common.status.approved':'Approved','common.status.rejected':'Rejected','common.status.pending':'Pending','common.status.failed':'Failed','common.status.cancelled':'Cancelled','common.status.paused':'Paused',
+'contract.basis':'Design basis','contract.route':'Route','contract.comps':'Components','contract.fill':'Filled logic',
+/* Decision */
+'dec.nav.overview':'Overview','dec.nav.detail':'Scene detail','dec.nav.forecast':'Forecast wizard','dec.nav.ask':'Ask ECOS','dec.nav.todo':'Decision todo','dec.nav.actions':'Action tracking','dec.nav.feedback':'Effect feedback','dec.nav.mind':'Minds',
+'dec.title':'Business Decision','dec.subtitle':'From current state to action loop, ECOS supports decision-makers end-to-end',
+'dec.q.current':'Current state','dec.q.judge':'What to judge','dec.q.decide':'What to decide','dec.q.action':'Actions underway',
+'dec.q.current.hint':'Metric deviations, target gaps, trends','dec.q.judge.hint':'Open questions, running tasks','dec.q.decide.hint':'Options, pending approvals','dec.q.action.hint':'Progress, effect feedback & attribution',
+'dec.scenario.list':'Scenarios','dec.scenario.new':'New scenario','dec.scenario.empty':'No scenarios yet','dec.scenario.emptyCta':'Click "New scenario" to start from a template',
+'dec.create.title':'New business scenario','dec.create.name':'Scenario name','dec.create.namePh':'e.g. 2027 supply-chain cost program','dec.create.goal':'Business goal','dec.create.goalPh':'e.g. reduce material cost by 8%','dec.create.tpl':'Create from template','dec.create.tpl.blank':'Blank scenario','dec.create.tpl.forecast':'Business forecast template','dec.create.tpl.cost':'Cost diagnosis template','dec.create.tplHint':'Choosing a template pre-fills the goal and initial caliber','dec.create.caliber':'Initial caliber','dec.create.nameRequired':'Please enter a scenario name','dec.create.ok':'Scenario created (draft)','dec.create.afterHint':'You will enter the scenario detail; bind resources in "Config & readiness"',
+'dec.scene.goal':'Business goal','dec.scene.conclusion':'Conclusion','dec.scene.todo':'Pending items','dec.scene.progress':'Action progress','dec.scene.config':'Config & readiness','dec.scene.config.hint':'Coverage / DQ / caliber / resource binding',
+'dec.scene.ask':'Ask ECOS','dec.scene.askHint':'Ask within scene context; W Agent inherits caliber and data',
+'dec.forecast.title':'Forecast wizard','dec.forecast.preset':'Scene context pre-filled: caliber/baseline/scope',
+'dec.todo.title':'Decision todo','dec.todo.pending':'To evaluate','dec.todo.pendingApproval':'To approve','dec.todo.approved':'Approved','dec.todo.published':'Published','dec.todo.rejected':'Rejected',
+'dec.actions.title':'Action tracking','dec.actions.fiveStage':'5 stages: draft→approve→publish→execute→effect attribution',
+'dec.feedback.title':'Effect feedback','dec.feedback.attribution':'Attribution analysis','dec.feedback.attributable':'Attributable','dec.feedback.confounded':'Confounded','dec.feedback.WtoD':'W→D: action effects flow back to cognitive assets',
+/* Assets */
+'ast.nav.overview':'Overview','ast.nav.evidence':'Evidence & Hypotheses','ast.nav.beliefs':'Beliefs','ast.nav.models':'Models','ast.nav.results':'Results','ast.nav.governance':'Governance',
+'ast.type.mind':'Mind','ast.mind.title':'Minds','ast.mind.subtitle':'Cognitive aggregates organized around a clear problem: context · beliefs · hypotheses · evidence · explanation · evolution','ast.mind.detail':'Open mind','ast.mind.back':'Back to minds',
+'ast.mind.subject':'Cognitive subject','ast.mind.scope':'Scope','ast.mind.contextRef':'Linked scenario','ast.mind.goals':'Cognitive goals','ast.mind.keyQuestions':'Key questions',
+'ast.mind.secContext':'① Cognitive context','ast.mind.secBeliefs':'② Beliefs','ast.mind.secHypotheses':'③ Hypotheses','ast.mind.secEvidence':'④ Evidence associations','ast.mind.secExplanation':'⑤ Explanatory structure','ast.mind.secEvolution':'⑥ Evolution & governance',
+'ast.mind.axis':'Three status axes (independent, never merged into one status)','ast.mind.axisValidity':'Cognitive validity','ast.mind.axisReview':'Review & governance','ast.mind.axisAdoption':'Business adoption',
+'ast.mind.validity.valid':'Valid','ast.mind.validity.pendingReview':'Pending re-check','ast.mind.validity.invalidated':'Invalidated',
+'ast.mind.review.draft':'Draft','ast.mind.review.pending':'Pending','ast.mind.review.approved':'Approved',
+'ast.mind.adoption.notAdopted':'Not adopted','ast.mind.adoption.adopted':'Adopted','ast.mind.adoption.withdrawn':'Withdrawn',
+'ast.mind.relation.support':'Supports','ast.mind.relation.refute':'Refutes','ast.mind.relation.limit':'Limits',
+'ast.mind.evRefNote':'Evidence is an authoritative reference (source + version + support/refute relation); source content is never copied','ast.mind.reason':'Rationale','ast.mind.refAt':'Cited at','ast.mind.domain':'Source domain','ast.mind.ver':'Version',
+'ast.mind.candidates':'W Agent candidate updates','ast.mind.candidatesNote':'Agents submit candidate updates via a controlled API; they are written only after review and never mutate cognitive state directly','ast.mind.candAccept':'Submit for review','ast.mind.candReject':'Reject','ast.mind.candAccepted':'Candidate update submitted for review','ast.mind.candRejected':'Candidate update rejected','ast.mind.candSubmitted':'Submitted','ast.mind.candWasRejected':'Rejected','ast.mind.noCandidates':'No pending candidate updates',
+'ast.mind.boundaryNote':'Mind ≠ a knowledge asset (one knowledge item can be cited by many minds); Mind ≠ a single agent run (a run may propose candidate updates, while cognitive state persists across runs)',
+'ast.mind.verHistory':'Version history','ast.mind.countBeliefs':'Beliefs','ast.mind.countHypotheses':'Hypotheses','ast.mind.countEvidence':'Evidence refs','ast.mind.countVersions':'Versions','ast.mind.evidence':'Source ref',
+'ast.models.boundaryNote':'Cognitive model ≠ AI model ≠ compute engine: Cognition manages business meaning, applicability and cognitive status; algorithms and runs belong to forecast/simulation services','ast.models.threeLayers':'Three-layer collaboration (references + APIs, no data merging):','ast.models.layer1':'① Cognitive objects (Mind/Belief/Hypothesis/Evidence)','ast.models.layer2':'② Cognitive model assets (this page)','ast.models.layer3':'③ Compute & business execution (forecast/sim/W Agent/scenario)',
+'ast.models.phaseFilter':'Rollout phase','ast.models.phase.all':'All','ast.models.phase.1':'Phase 1','ast.models.phase.2':'Phase 2','ast.models.phase.3':'Phase 3','ast.models.phaseHint':'Phase 1: causal/diagnostic/hypothesis-testing + evidence · Phase 2: predictive/risk/simulation · Phase 3: optimization/behavioral/belief-update',
+'ast.models.computeOwner':'Compute owner','ast.models.limits':'Limits','ast.models.io':'Input → Output','ast.models.groupNote':'Types are not mutually exclusive: one problem may combine several (segment → predict → causal → simulate)','ast.models.extNote':'Extended types (belief-update/mechanism/policy/perspective) are implemented as model features or attributes, not separate entities',
+'ast.models.type.causal':'Causal model','ast.models.type.causal.q':'Why it happens','ast.models.type.diagnostic':'Diagnostic model','ast.models.type.diagnostic.q':'Where it is abnormal','ast.models.type.hypothesisTesting':'Hypothesis testing model','ast.models.type.hypothesisTesting.q':'What evidence supports/refutes','ast.models.type.predictive':'Predictive model','ast.models.type.predictive.q':'What will happen','ast.models.type.simulation':'Scenario/Simulation model','ast.models.type.simulation.q':'What if we do this','ast.models.type.risk':'Risk/Uncertainty model','ast.models.type.risk.q':'How much risk','ast.models.type.optimization':'Optimization/Trade-off model','ast.models.type.optimization.q':'What to choose','ast.models.type.behavioral':'Segmentation/Behavioral model','ast.models.type.behavioral.q':'How subjects behave','ast.models.type.relational':'Relational/Structural model','ast.models.type.relational.q':'How things relate',
+'ast.title':'Cognitive Assets','ast.subtitle':'Production, maintenance, validation, publishing, governance of 5 asset types',
+'ast.type.evidence':'Evidence','ast.type.hypothesis':'Hypothesis','ast.type.belief':'Belief','ast.type.model':'Model','ast.type.result':'CognitionResult',
+'ast.type.evidence.desc':'Fact data, source records, quality assessment','ast.type.hypothesis.desc':'Testable claims and verification relations','ast.type.belief.desc':'Currently adopted judgments and confidence','ast.type.model.desc':'Registration/validation/publishing/scope/backtest','ast.type.result.desc':'Diagnosis/causal/Pareto explicit results',
+'ast.status.collected':'Collected','ast.status.verified':'Verified','ast.status.contested':'Contested','ast.status.expired':'Expired','ast.status.proposed':'Proposed','ast.status.evidenced':'Evidenced','ast.status.refuted':'Refuted','ast.status.uncertain':'Uncertain','ast.status.candidate':'Candidate','ast.status.adopted':'Adopted','ast.status.reserved':'Reserved','ast.status.revised':'Revised','ast.status.revoked':'Revoked','ast.status.draft':'Draft','ast.status.validating':'Validating','ast.status.approved':'Approved','ast.status.deprecated':'Deprecated','ast.status.running':'Running','ast.status.succeeded':'Succeeded','ast.status.evaluated':'Evaluated','ast.status.superseded':'Superseded',
+'ast.governance.title':'Governance workbench','ast.governance.flow':'Collect→Validate→Publish→Monitor→Supersede','ast.governance.byType':'By asset type',
+'ast.evidence.title':'Evidence & Hypotheses','ast.evidence.tabEvidence':'Evidence','ast.evidence.tabHypothesis':'Hypothesis','ast.evidence.support':'Supports','ast.evidence.refute':'Refutes','ast.evidence.chain':'Chain: claim → evidence → engine object','ast.evidence.immutable':'Evidence is immutable, versioned',
+'ast.beliefs.title':'Belief management','ast.beliefs.threeAxis':'Three-axis separation: runtime / cognitive validity / business adoption','ast.beliefs.confidence':'Confidence','ast.beliefs.scope':'Scope','ast.beliefs.version':'Version',
+'ast.models.title':'Model assets','ast.models.registry':'Mind registry','ast.models.capabilityMask':'Capability mask','ast.models.closedLoopPre':'Closed-loop PRE','ast.models.closedLoopPost':'Closed-loop POST','ast.models.backtest':'Backtest','ast.models.scenarioBind':'Scenario binding',
+'ast.results.title':'Cognition results','ast.results.runRef':'Run reference','ast.results.modelVer':'Model version','ast.results.caliberVer':'Caliber version','ast.results.evaluate':'Evaluate',
+'ast.overview.kpi':'5-type asset KPI','ast.overview.pendingVerify':'Pending verify','ast.overview.pendingReview':'Pending review','ast.overview.published':'Published','ast.overview.expired':'Expired',
+/* AI Workbench */
+'ai.title':'AI Workbench','ai.nav.agents':'Agent templates','ai.nav.chat':'Chat','ai.nav.tools':'Tool registry','ai.nav.guardrails':'Guardrail ledger','ai.nav.models':'Model catalog','ai.nav.replay':'Run replay','ai.nav.usage':'Usage & quota','ai.nav.monitor':'Run monitor','ai.nav.config':'Orchestration config',
+'ai.agents.title':'Agents & orchestration templates','ai.agents.subtitle':'The AI Workbench unifies agent construction, orchestration and governance across the full lifecycle; built-in templates and custom agents are managed at the same level',
+'ai.agents.builtin':'Built-in templates','ai.agents.custom':'Custom agents','ai.agents.badge.builtin':'Built-in','ai.agents.badge.custom':'Custom',
+'ai.agents.lifecycle':'Full lifecycle','ai.agents.lifecycleNote':'Build → orchestrate → publish → govern → retire (closed loop in one platform)',
+'ai.agents.boundaryNote':'W Agent has been demoted from a standalone module to a built-in Agent orchestration template under the AI Workbench, at the same template level as the data/ontology/knowledge internal agents (R5)',
+'ai.agents.colTemplate':'Template','ai.agents.colType':'Type','ai.agents.colScope':'Service domain','ai.agents.colLifecycle':'Lifecycle','ai.agents.colState':'State','ai.agents.colAction':'Action',
+'ai.agents.open':'Open orchestration','ai.agents.instances':'Instances','ai.agents.new':'New agent','ai.agents.newOk':'Agent draft created (demo)',
+'ai.agents.wagent':'W Agent orchestration template','ai.agents.wagent.desc':'Orchestrates D/I/K/C cognition into a goal—readiness—run—conclusion—decision—action chain (built into Fire W)',
+'ai.agents.data':'Data agent','ai.agents.data.desc':'Internal agent for the data foundation: ingestion, quality gates, pipelines and alerts',
+'ai.agents.onto':'Ontology agent','ai.agents.onto.desc':'Internal agent for ontology and caliber: domain packs, caliber metadata, mapping contracts',
+'ai.agents.knowledge':'Knowledge agent','ai.agents.knowledge.desc':'Internal agent for the knowledge domain: extraction, profiling, hypotheses and circulation',
+'ai.session.new':'New session','ai.session.empty':'No sessions','ai.session.today':'Today','ai.session.lastWeek':'Last week',
+'ai.chat.placeholder':'Type a question, Enter to send','ai.chat.send':'Send','ai.chat.stop':'Stop','ai.chat.connected':'Connected','ai.chat.connecting':'Connecting','ai.chat.disconnected':'Disconnected','ai.chat.frames':'Frame monitor','ai.chat.framesGot':'Frames received','ai.chat.reconnect':'Reconnect via Last-Event-ID','ai.chat.interrupted':'Interrupted, please ask again (frames kept)','ai.chat.simDisconnect':'Simulate disconnect','ai.chat.refusalClarify':'Clarify card: missing caliber','ai.chat.toolCall':'Tool call','ai.chat.dryRun':'Dry run','ai.chat.decision':'Decision','ai.chat.latency':'Latency',
+'ai.guardrail.ALLOW':'ALLOW','ai.guardrail.DENY':'DENY','ai.guardrail.FAIL_CLOSED':'FAIL_CLOSED','ai.guardrail.pauseBanner':'Security service unavailable, AI operations paused (ECOS-AI-503)','ai.guardrail.table':'Decision ledger','ai.guardrail.distro':'Decision distribution','ai.guardrail.noReason':'DENY reason / policyId never echoed',
+'ai.usage.prompt':'Prompt tokens','ai.usage.completion':'Completion tokens','ai.usage.estimated':'Estimated','ai.usage.notReported':'Not reported','ai.usage.quotaLeft':'Quota left','ai.usage.costRatio':'Cost ratio','ai.usage.byModel':'By model',
+'ai.compress.LLM_SUMMARY':'LLM_SUMMARY','ai.compress.TRUNCATE_FALLBACK':'TRUNCATE_FALLBACK','ai.compress.banner':'Context compressed','ai.compress.turns':'Compression turns','ai.context.meter':'Context usage','ai.context.compress':'Compress','ai.context.refresh':'Refresh',
+'ai.citation.run':'Run','ai.citation.caliber':'Caliber','ai.citation.asOf':'As of','ai.citation.evidence':'Evidence','ai.citation.hidden':'Uncited figure hidden','ai.citation.trace':'Trace evidence',
+'ai.error.ECOS-AI-403':'Operation not permitted for current role','ai.error.ECOS-AI-503':'Security service unavailable','ai.error.ECOS-AI-504':'Dependency timeout','ai.error.ECOS-AI-501':'Capability not online','ai.error.retryable':'Retryable','ai.error.notRetryable':'Not retryable',
+'ai.replay.title':'Run replay','ai.replay.step':'Step','ai.replay.jumpStep':'Jump to step','ai.replay.token':'token','ai.replay.fromDiagnostic':'Jumped from diagnostic code',
+'ai.model.catalog':'Model catalog','ai.model.contextWindow':'Context window','ai.model.cost':'Price (/1k tokens)','ai.model.health':'Health','ai.model.route':'Resolve route','ai.model.register':'Register model','ai.model.noHardcode':'Price & context window from catalog, never hardcoded',
+'ai.tool.name':'Tool','ai.tool.backend':'Backend endpoint','ai.tool.operation':'Operation','ai.tool.minLvl':'Min level','ai.tool.status':'Status','ai.tool.filter':'Filter','ai.tool.contractDetail':'Contract detail (17 elements + permission binding)','ai.tool.ACTIVE':'Active','ai.tool.ledger':'Tool call ledger',
+/* W Agent */
+'wa.goal.caliber':'Caliber','wa.goal.asOf':'As of','wa.goal.slotsUser':'User slots','wa.goal.slotsInferred':'Inferred slots','wa.goal.revise':'Revise goal','wa.goal.locked':'Caliber locked','wa.goal.inferredWarn':'Fully inferred slots present (inferred_count>0), please confirm','wa.goal.mission':'Mission',
+'wa.question.clarify':'Clarifying questions','wa.question.missingSlots':'Missing slots','wa.question.roundLimit':'≤3 items per round; ≤3 refill rounds','wa.question.askPlaceholder':'Ask a business question, e.g.: can 2027 profit reach ¥120M?','wa.question.ask':'Ask','wa.question.answer':'Submit answers',
+'wa.readiness.grade':'Readiness grade','wa.readiness.A':'Ready','wa.readiness.B':'Conditional','wa.readiness.C':'Insufficient','wa.readiness.D':'Blocked','wa.readiness.layers':'4 layers','wa.readiness.items':'Check items','wa.readiness.gaps':'Gaps','wa.readiness.unlockValue':'Unlock value','wa.readiness.owner':'Owner','wa.readiness.refillLimit':'Refill loop ≤3 rounds','wa.readiness.goto':'Go fill','wa.readiness.runNow':'Run now','wa.readiness.refill':'Refill all','wa.readiness.layerData':'Data readiness','wa.readiness.layerKnowledge':'Knowledge readiness','wa.readiness.layerCognition':'Cognition readiness','wa.readiness.layerGovernance':'Governance readiness',
+'wa.run.status.plan_validated':'Plan validated','wa.run.status.awaiting_approval':'Awaiting approval','wa.run.status.executing':'Executing','wa.run.status.awaiting_input':'Awaiting input','wa.run.status.waiting_task':'Waiting task','wa.run.status.paused':'Paused (Kill Switch)','wa.run.status.completed':'Completed','wa.run.status.completed_degraded':'Completed (degraded)','wa.run.status.failed':'Failed','wa.run.status.cancelled':'Cancelled','wa.run.status.timed_out':'Timed out',
+'wa.run.budget':'Budget','wa.run.replan':'Replan','wa.run.killSwitch':'Kill Switch','wa.run.progressSse':'Progress channel: SSE','wa.run.progressPolling':'Progress channel: polling (degraded)','wa.run.cancel':'Cancel run','wa.run.channel':'Channel decided by capability flag and labeled',
+'wa.claim.fact':'Fact','wa.claim.inference':'Inference','wa.claim.recommendation':'Recommendation','wa.claim.evidence':'Evidence','wa.claim.noEvidence':'No evidence','wa.claim.trace':'Trace',
+'wa.degrade.title':'Degradation banner (single source: VO degradations[])','wa.degrade.ack':'Acknowledge','wa.degrade.DG-D1':'Data gap degradation','wa.degrade.DG-K1':'Unverified knowledge, confirm needed','wa.degrade.DG-C1':'Insufficient cognition confidence','wa.degrade.DG-C2':'Correlation only, not causal','wa.degrade.DG-L1':'LLM explanation unavailable','wa.degrade.DG-L2':'LLM compression degradation','wa.degrade.DG-T1':'Tool timeout','wa.degrade.DG-M1':'Model fallback','wa.degrade.DG-M2':'Model mask unbound',
+'wa.candidate.fourEyes':'Four-eyes approval (approver ≠ proposer)','wa.candidate.expired':'Expired','wa.candidate.bulkForbidden':'Bulk publish forbidden','wa.candidate.publish':'Publish','wa.candidate.gitRef':'Publish receipt publishedGitRef','wa.candidate.diff':'Diff comparison','wa.candidate.pending':'Pending','wa.candidate.approved':'Approved','wa.candidate.rejected':'Rejected',
+'wa.error.E-VALIDATION':'Validation failed','wa.error.E-AUTH':'Authentication failed','wa.error.E-POLICY':'Policy denied','wa.error.E-NOT-FOUND':'Not found or no permission','wa.error.E-WA-STATE':'Illegal state transition','wa.error.E-IDEMPOTENT-CONFLICT':'Idempotent conflict, existing run returned','wa.error.E-RATE':'Rate limited','wa.error.E-WA-BUDGET':'Budget exhausted','wa.error.E-WA-DEP':'Dependency unavailable (retryable)','wa.error.E-WA-NARRATIVE-NUM':'Narrative-number mismatch (figure hidden)','wa.error.E-INTERNAL':'Internal error','wa.error.simulate':'Simulate error (single source wagent.error.*)',
+'wa.action.draft':'Action draft','wa.action.commit':'Commit','wa.action.approvalToken':'Approval token','wa.action.effectDue':'Effect due','wa.action.l3Disabled':'L3 automation requires non-empty approval_token: button disabled with reason','wa.action.expected':'Expected change','wa.action.actual':'Actual result','wa.action.attribution':'Effect attribution','wa.action.attributable':'Attributable','wa.action.confounded':'Confounded','wa.action.fiveStage':'5 stages: draft→approve→publish→execute→effect attribution',
+'wa.conclusion.s1':'Conclusion','wa.conclusion.s2':'Basis','wa.conclusion.s3':'Action','wa.conclusion.adopt':'Adopt','wa.conclusion.createDraft':'Create action draft','wa.conclusion.gate':'Human gate','wa.conclusion.gateHint':'Explored plan (plan_source=EXPLORED) passed human gate, automation capped at L2','wa.conclusion.optionCompare':'Option comparison','wa.conclusion.baseline':'Baseline',
+'wa.approval.title':'Approval drawer (four-eyes + token)','wa.approval.comment':'Comment','wa.approval.token':'Approval token','wa.approval.approver':'Approver','wa.approval.proposer':'Proposer','wa.approval.samePerson':'Approver must differ from proposer (four-eyes)','wa.approval.escConfirm':'Esc close requires double confirmation','wa.approval.publishOk':'Published',
+'wa.admin.automation':'Automation ceiling (decrease-only)','wa.admin.threshold':'Thresholds','wa.admin.scopeTenant':'Tenant scope','wa.admin.scopeSystem':'System scope','wa.admin.killOn':'Kill Switch ON: runs paused','wa.admin.killOff':'Kill Switch OFF: runs resumed','wa.admin.automationHint':'effective = min(contract.min_level, run.automation_ceiling, tenant_policy.max_level), decrease-only',
+'wa.monitor.title':'Run monitor','wa.monitor.states':'11-state machine','wa.monitor.budget':'Budget','wa.monitor.channel':'Channel','wa.monitor.steps':'Steps','wa.monitor.cancel':'Cancel run',
+/* Admin */
+'adm.title':'Platform Admin','adm.subtitle':'Data sources, ontology, knowledge bases, permissions, system config',
+'adm.nav.overview':'Overview',
+'adm.card.dataSource':'Data source management','adm.card.dataSource.desc':'PG/Neo4j/Doris/MinIO connection config',
+'adm.card.ontology':'Ontology management','adm.card.ontology.desc':'Business object models and relations',
+'adm.card.knowledge':'Knowledge base','adm.card.knowledge.desc':'Knowledge asset tree and index',
+'adm.card.permission':'Permission management','adm.card.permission.desc':'Roles, users, row/column permissions',
+'adm.card.system':'System config','adm.card.system.desc':'Engine config, dictionary, version & archive',
+'adm.dataSource.title':'Data sources','adm.ontology.title':'Ontology','adm.knowledge.title':'Knowledge base','adm.permission.title':'Permissions','adm.system.title':'System config',
+/* Scenario resources */
+'ws.catalog.dataset':'Datasets','ws.catalog.businessObject':'Business objects','ws.catalog.knowledgeBase':'Knowledge bases','ws.catalog.cognition':'Capabilities','ws.catalog.agent':'Agents','ws.catalog.exposure':'Exposure',
+'ws.coverage':'Coverage','ws.comp.title':'Connection completeness (N1 single source)','ws.comp.required':'Required edges (fixed denominator 3)','ws.comp.mapping':'Mapping (dataset→object)','ws.comp.extraction':'Extraction (object→KB)','ws.comp.cognition':'Cognition (KB→capability)','ws.comp.present':'Present','ws.comp.missing':'Missing','ws.comp.islands':'Islands',
+'ws.activate':'Activate scenario','ws.activate.ok':'Scenario activated (200)','ws.activate.conflict':'Activation rejected (409): islands & missing required edges',
+'ws.404.title':'Page not found','ws.404.back':'Back to decision',
+}};
+function T(k){ const d=L[S.locale]||L['zh-CN']; return d[k]||L['zh-CN'][k]||k; }
+/* ================= 动作注册表 ================= */
+const ACT = {};
+const PAGES = {};
+/* ============================================================ 块3：模拟数据 ============================================================ */
+/* 场景数据 */
+const SCENARIOS = [
+  {id:'sc-2027-profit', name:'2027 年度经营预测', status:'active', goal:'2027 年利润达成 1.2 亿', conclusion:'基于当前趋势，预测利润 1.08 亿，缺口 1,200 万', todo:['采购成本优化方案待审批','Q4 预算调整待决策'], progress:{stage:'executing', actions:2, done:1}, coverage:{mapping:'present',extraction:'present',cognition:'present', islands:0}, caliber:'cal-finance-v2.3', actions:[
+    {id:'act-1',name:'锁定 Q4 采购长协价',stage:'executing',expected:'材料成本 -8%',actual:'-6.2%',attribution:'confounded'},
+    {id:'act-2',name:'Q4 预算削减 5%',stage:'published',expected:'费用 -200 万',actual:'—',attribution:''},
+  ]},
+  {id:'sc-profit-diag', name:'项目利润诊断', status:'draft', goal:'定位项目利润偏差根因', conclusion:'材料涨价贡献 -300 万（主因），进度延期 -250 万', todo:['人力外溢数据需补录','因果链待验证'], progress:{stage:'draft', actions:0, done:0}, coverage:{mapping:'present',extraction:'missing',cognition:'missing', islands:1}, caliber:'cal-project-v1.1', actions:[]},
+  {id:'sc-marketing', name:'营销投放复盘', status:'suspended', goal:'评估 Q3 营销 ROI', conclusion:'—', todo:['ROI 对象未绑定','广告数据为孤岛'], progress:{stage:'draft', actions:0, done:0}, coverage:{mapping:'missing',extraction:'missing',cognition:'missing', islands:2}, caliber:'—', actions:[]},
+];
+function getSc(id){ return SCENARIOS.find(s=>s.id===id); }
+
+/* 认知资产五类数据 */
+const COG_ASSETS = {
+  evidence: [
+    {id:'ev-101', type:'evidence', name:'采购价曲线', source:'kg://evidence/ev-101', quality:0.92, scope:'供应链', status:'verified', collectedAt:'2026-09-15'},
+    {id:'ev-102', type:'evidence', name:'验收单', source:'kg://evidence/ev-102', quality:0.88, scope:'项目', status:'verified', collectedAt:'2026-09-18'},
+    {id:'ev-103', type:'evidence', name:'人力台账', source:'kg://evidence/ev-103', quality:0.65, scope:'项目', status:'contested', collectedAt:'2026-09-20'},
+    {id:'ev-104', type:'evidence', name:'回款记录', source:'kg://evidence/ev-104', quality:0.95, scope:'财务', status:'verified', collectedAt:'2026-09-22'},
+    {id:'ev-105', type:'evidence', name:'旧版成本快照', source:'kg://evidence/ev-105', quality:0.3, scope:'项目', status:'expired', collectedAt:'2026-06-01'},
+  ],
+  hypothesis: [
+    {id:'hy-201', type:'hypothesis', claim:'材料涨价是利润下降的主因', evidence:['ev-101','ev-102'], status:'evidenced', confidence:0.85, method:'回归分析'},
+    {id:'hy-202', type:'hypothesis', claim:'进度延期导致人力外溢', evidence:['ev-103'], status:'uncertain', confidence:0.45, method:'相关性分析'},
+    {id:'hy-203', type:'hypothesis', claim:'回款变慢影响现金流', evidence:['ev-104'], status:'proposed', confidence:0.6, method:'趋势分析'},
+    {id:'hy-204', type:'hypothesis', claim:'旧版快照不可用作基准', evidence:['ev-105'], status:'refuted', confidence:0.1, method:'版本比对'},
+  ],
+  belief: [
+    {id:'bl-301', type:'belief', name:'材料涨价贡献 -300 万', confidence:0.85, scope:'2027Q1', version:'v2.3', status:'adopted', evidenceRef:'ev-101,hy-201'},
+    {id:'bl-302', type:'belief', name:'进度延期贡献 -250 万', confidence:0.7, scope:'2027Q1', version:'v2.3', status:'adopted', evidenceRef:'ev-102,hy-202'},
+    {id:'bl-303', type:'belief', name:'人力外溢影响待确认', confidence:0.4, scope:'2027Q1', version:'v2.2', status:'reserved', evidenceRef:'ev-103'},
+    {id:'bl-304', type:'belief', name:'旧版基准已废弃', confidence:0.95, scope:'全局', version:'v2.3', status:'revised', evidenceRef:'ev-105'},
+  ],
+  model: [
+    {id:'md-401', type:'model', modelType:'causal', name:'mind-causal-v1', scope:'因果诊断', phase:1, status:'approved', version:'v1.1', binding:'supporting', backtest:{accuracy:0.72,mae:120.5}, closedLoopPre:'runId', closedLoopPost:'causalGraph@v', computeOwner:'causal-engine · 分析服务', limits:'仅覆盖已映射血缘的指标域', io:'指标快照+口径版本 → 因果图+贡献度'},
+    {id:'md-402', type:'model', modelType:'diagnostic', name:'mind-diag-anomaly-v1', scope:'异常诊断', phase:1, status:'approved', version:'v1.0', binding:'primary', backtest:{accuracy:0.81,mae:32.0}, closedLoopPre:'runId+snapshot', closedLoopPost:'diagReport@v', computeOwner:'cognitive-engine · 诊断服务', limits:'异常阈值需按口径标定', io:'指标序列 → 异常点+原因候选'},
+    {id:'md-403', type:'model', modelType:'hypothesisTesting', name:'mind-hypo-verify-v0', scope:'假设检验', phase:1, status:'draft', version:'v0.3', binding:'—', backtest:{accuracy:0,mae:0}, closedLoopPre:'—', closedLoopPost:'—', computeOwner:'cognitive-engine · 证据评估', limits:'验证条件须先登记', io:'假设+证据集 → 支持/反驳/不足'},
+    {id:'md-404', type:'model', modelType:'predictive', name:'mind-finance-v2', scope:'财务预测', phase:2, status:'approved', version:'v2.3', binding:'primary', backtest:{accuracy:0.87,mae:45.2}, closedLoopPre:'runId+snapshot', closedLoopPost:'diagnosis@v', computeOwner:'forecast-service · 预测服务', limits:'适用 2027 财年与 cal-finance-v2.3 口径', io:'历史序列+口径版本 → 预测值+置信区间'},
+    {id:'md-405', type:'model', modelType:'simulation', name:'mind-sim-scenario-v1', scope:'情景仿真', phase:2, status:'validating', version:'v1.0', binding:'supporting', backtest:{accuracy:0.68,mae:88.4}, closedLoopPre:'runId', closedLoopPost:'simDiff@v', computeOwner:'sim-service · 仿真服务', limits:'单次仿真 ≤ 6 个干预变量', io:'基线+干预参数 → 情景差分'},
+    {id:'md-406', type:'model', modelType:'risk', name:'mind-risk-supply-v0', scope:'风险不确定性', phase:2, status:'draft', version:'v0.2', binding:'—', backtest:{accuracy:0,mae:0}, closedLoopPre:'—', closedLoopPost:'—', computeOwner:'risk-service（规划）', limits:'风险事件库未建全', io:'风险事件+概率 → 敞口+影响范围'},
+    {id:'md-407', type:'model', modelType:'optimization', name:'mind-opt-resource-v0', scope:'优化权衡', phase:3, status:'draft', version:'v0.1', binding:'—', backtest:{accuracy:0,mae:0}, closedLoopPre:'—', closedLoopPost:'—', computeOwner:'opt-service（规划）', limits:'约束模型待业务确认', io:'目标+约束 → 帕累托方案集'},
+    {id:'md-408', type:'model', modelType:'behavioral', name:'mind-segment-churn-v0', scope:'分群行为', phase:3, status:'draft', version:'v0.1', binding:'—', backtest:{accuracy:0,mae:0}, closedLoopPre:'—', closedLoopPost:'—', computeOwner:'analytics-service（规划）', limits:'行为事件采集待补齐', io:'客户特征+行为事件 → 分群+响应模式'},
+    {id:'md-409', type:'model', modelType:'relational', name:'mind-rel-graph-v1', scope:'关系结构', phase:2, status:'approved', version:'v1.2', binding:'supporting', backtest:{accuracy:0,mae:0}, closedLoopPre:'—', closedLoopPost:'impactPath@v', computeOwner:'ontology-engine · 图谱服务', limits:'依赖本体域关系定义版本', io:'业务对象图 → 关联路径+影响范围'},
+  ],
+  result: [
+    {id:'rs-501', type:'result', name:'2027Q1 利润偏差诊断', runRef:'fr-2027-0009', modelVer:'mind-finance-v2/v2.3', caliberVer:'cal-finance-v2.3', status:'evaluated', evalScore:0.82},
+    {id:'rs-502', type:'result', name:'采购成本因果分析', runRef:'fr-2027-0011', modelVer:'mind-causal-v1/v1.1', caliberVer:'cal-project-v1.1', status:'adopted', evalScore:0.75},
+    {id:'rs-503', type:'result', name:'Q3 营销 ROI 评估', runRef:'fr-2027-0007', modelVer:'—', caliberVer:'—', status:'superseded', evalScore:0},
+  ],
+};
+
+/* Mind 心智（认知聚合根）：组织信念/假设/证据关联/解释结构，三维状态分离（认知有效性/审查治理/业务采纳） */
+const MINDS = [
+  {
+    id:'mind-churn-001', name:'客户流失问题认知', desc:'围绕华东区企业客户近一季度流失率上升形成的认知聚合体',
+    subject:'客户成功团队', scope:'华东区企业客户 · 2026Q3', contextRef:'sc-profit-diag',
+    goals:['定位客户流失率上升的主因','评估交付改善方案的挽回效果'],
+    keyQuestions:['流失率上升是否与交付延迟显著相关？','哪些客户群体受影响最大？','改善交付后流失率能否回到基线？'],
+    beliefIds:['bl-302'], hypothesisIds:['hy-202'],
+    evidenceRefs:[
+      {ref:'kg://delivery/records-2026Q3', ver:'v1.4', domain:'Data', relation:'support', reason:'交付记录显示延迟单占比上升', at:'2026-09-18'},
+      {ref:'kg://kb/nps-survey-q3', ver:'v2.0', domain:'Knowledge', relation:'support', reason:'NPS 调研中交付相关差评占比 41%', at:'2026-09-20'},
+      {ref:'onto://metric/churn-rate', ver:'v3.1', domain:'Ontology', relation:'limit', reason:'流失率口径仅覆盖正式合同客户', at:'2026-09-15'},
+      {ref:'run://fr-2026-0871', ver:'—', domain:'Scenario', relation:'refute', reason:'Q3 仿真显示价格因素解释力不足', at:'2026-09-22'},
+    ],
+    explanation:'交付延迟 → 客户满意度下降 → 流失概率上升（竞争性解释：价格上调影响中小客户，待更多证据区分）',
+    validity:'valid', review:'approved', adoption:'adopted',
+    versions:[
+      {ver:'v1.2', at:'2026-10-08', reason:'新增 NPS 调研证据，信念置信度上调', by:'认知工程组', state:'cur'},
+      {ver:'v1.1', at:'2026-09-25', reason:'交付记录完成验证，纳入证据关联', by:'客户成功团队', state:'ok'},
+      {ver:'v1.0', at:'2026-09-15', reason:'Mind 创建，初步假设登记', by:'W Agent 候选更新（经审批）', state:''},
+    ],
+    candidates:[
+      {id:'cand-1', from:'W Agent Run fr-2026-0902', change:'建议新增信念「交付周期是流失的领先指标」（置信 0.6）', evidence:'run://fr-2026-0902', status:'pending'},
+    ],
+  },
+  {
+    id:'mind-profit-2027', name:'2027 利润目标认知', desc:'围绕 2027 年利润达成 1.2 亿目标的认知状态与演化',
+    subject:'经营管理委员会', scope:'全公司 · 2027 财年', contextRef:'sc-2027-profit',
+    goals:['判断 2027 利润目标可达性','识别达成缺口的关键贡献因子'],
+    keyQuestions:['当前预测与目标差距多大？','材料涨价的影响是否已被充分定价？'],
+    beliefIds:['bl-301','bl-303'], hypothesisIds:['hy-201','hy-204'],
+    evidenceRefs:[
+      {ref:'kg://evidence/ev-101', ver:'v1.2', domain:'Data', relation:'support', reason:'采购价曲线同比 +12%', at:'2026-09-15'},
+      {ref:'run://fr-2027-0009', ver:'mind-finance-v2/v2.3', domain:'Model', relation:'support', reason:'确定性预测缺口 1,200 万', at:'2026-10-10'},
+      {ref:'kg://evidence/ev-105', ver:'v0.9', domain:'Data', relation:'refute', reason:'旧版成本快照口径失效，不可作基准', at:'2026-06-01'},
+    ],
+    explanation:'材料涨价（-300 万）+ 进度延期人力外溢（-250 万，待确认）→ 利润缺口 1,200 万；情景模拟显示采购重谈可回补 60%',
+    validity:'pendingReview', review:'pending', adoption:'notAdopted',
+    versions:[
+      {ver:'v2.3', at:'2026-10-10', reason:'预测模型升级，口径切至 cal-finance-v2.3', by:'认知工程组', state:'cur'},
+      {ver:'v2.2', at:'2026-09-28', reason:'信念 bl-303 降为保留意见', by:'财务 BP', state:'ok'},
+    ],
+    candidates:[],
+  },
+];
+function getMind(id){ return MINDS.find(m=>m.id===id); }
+function mindAxesBadges(m){
+  const vm = {valid:'ok', pendingReview:'gb', invalidated:'danger'};
+  const rm = {draft:'', pending:'gb', approved:'ok'};
+  const am = {notAdopted:'', adopted:'accent', withdrawn:'danger'};
+  return '<span class="row" style="gap:14px;flex-wrap:wrap">'
+    + '<span class="small muted">'+T('ast.mind.axisValidity')+' <span class="badge '+vm[m.validity]+'">'+T('ast.mind.validity.'+m.validity)+'</span></span>'
+    + '<span class="small muted">'+T('ast.mind.axisReview')+' <span class="badge '+rm[m.review]+'">'+T('ast.mind.review.'+m.review)+'</span></span>'
+    + '<span class="small muted">'+T('ast.mind.axisAdoption')+' <span class="badge '+am[m.adoption]+'">'+T('ast.mind.adoption.'+m.adoption)+'</span></span>'
+    + '</span>';
+}
+
+/* AI 工作台数据 */
+const AI = {
+  sessions: [
+    {id:'s1',title:'利润预测分析',ts:'09:30',today:true},
+    {id:'s2',title:'成本诊断对话',ts:'昨天 14:20',today:false},
+    {id:'s3',title:'回款口径确认',ts:'昨天 10:15',today:false},
+    {id:'s4',title:'采购价趋势',ts:'10-10 16:40',today:false},
+  ],
+  tools: [
+    {name:'forecast.run', endpoint:'POST /api/v1/wagent/runs', op:'runForecast', minLvl:1, status:'ACTIVE', contract:{timeout:60000, retry:1, breaker:'5/30s'}},
+    {name:'causal.diagnose', endpoint:'POST /api/v1/cognitive/diagnose', op:'diagnose', minLvl:2, status:'ACTIVE', contract:{timeout:30000, retry:2, breaker:'3/30s'}},
+    {name:'data.query', endpoint:'POST /api/v1/data/query', op:'query', minLvl:1, status:'ACTIVE', contract:{timeout:15000, retry:3, breaker:'10/60s'}},
+    {name:'knowledge.search', endpoint:'POST /api/v1/kb/search', op:'search', minLvl:1, status:'ACTIVE', contract:{timeout:10000, retry:2, breaker:'5/30s'}},
+    {name:'model.register', endpoint:'POST /api/v1/aiwork/models', op:'register', minLvl:3, status:'ACTIVE', contract:{timeout:120000, retry:0, breaker:'N/A'}},
+    {name:'experiment.sim', endpoint:'POST /api/v1/cognitive/simulate', op:'simulate', minLvl:2, status:'ACTIVE', contract:{timeout:45000, retry:1, breaker:'3/30s'}},
+  ],
+  ledger: [
+    {ts:'14:22:01', tool:'forecast.run', decision:'ALLOW', latency:'2.3s', sessionId:'s1'},
+    {ts:'14:20:15', tool:'causal.diagnose', decision:'ALLOW', latency:'5.1s', sessionId:'s2'},
+    {ts:'14:18:30', tool:'data.query', decision:'DENY', latency:'0.1s', sessionId:'s2'},
+    {ts:'14:15:00', tool:'forecast.run', decision:'ALLOW', latency:'1.8s', sessionId:'s1'},
+    {ts:'14:12:20', tool:'knowledge.search', decision:'ALLOW', latency:'0.8s', sessionId:'s1'},
+    {ts:'14:10:00', tool:'forecast.run', decision:'FAIL_CLOSED', latency:'30s', sessionId:'s1'},
+    {ts:'14:08:15', tool:'data.query', decision:'ALLOW', latency:'0.5s', sessionId:'s1'},
+    {ts:'14:05:00', tool:'causal.diagnose', decision:'DENY', latency:'0.1s', sessionId:'s3'},
+  ],
+  models: [
+    {name:'gpt-4o', provider:'OpenAI', contextWindow:128000, cost:0.0175, health:0.98, active:true},
+    {name:'claude-3.5-sonnet', provider:'Anthropic', contextWindow:200000, cost:0.015, health:0.95, active:true},
+    {name:'qwen-max', provider:'Alibaba', contextWindow:32768, cost:0.004, health:0.92, active:true},
+    {name:'deepseek-v3', provider:'DeepSeek', contextWindow:64000, cost:0.002, health:0.88, active:false},
+  ],
+  usage: {
+    '7d': {prompt:1240000, completion:580000, cost:28.5, quotaLeft:87000, byModel:{'gpt-4o':12.5,'claude-3.5':9.2,'qwen-max':4.8,'deepseek-v3':2.0}},
+    '30d': {prompt:5200000, completion:2400000, cost:122.0, quotaLeft:350000, byModel:{'gpt-4o':55.0,'claude-3.5':38.5,'qwen-max':18.2,'deepseek-v3':10.3}},
+    '90d': {prompt:15200000, completion:7100000, cost:365.0, quotaLeft:0, byModel:null},
+  },
+  replay: {
+    'fr-2027-0009': [
+      {step:1, name:'parse goal', tool:null, token:120, status:'ok', ts:'14:22:00'},
+      {step:2, name:'check readiness', tool:null, token:85, status:'ok', ts:'14:22:01'},
+      {step:3, name:'call forecast.run', tool:'forecast.run', token:210, status:'ok', ts:'14:22:02'},
+      {step:4, name:'aggregate result', tool:null, token:180, status:'ok', ts:'14:22:05'},
+      {step:5, name:'generate narrative', tool:null, token:340, status:'ok', ts:'14:22:06'},
+    ],
+    '9f2c1e4a': [
+      {step:1, name:'parse goal', tool:null, token:110, status:'ok', ts:'14:20:00'},
+      {step:2, name:'call causal.diagnose', tool:'causal.diagnose', token:250, status:'ok', ts:'14:20:01'},
+      {step:3, name:'build causal graph', tool:null, token:180, status:'ok', ts:'14:20:05'},
+      {step:4, name:'generate narrative', tool:null, token:300, status:'ok', ts:'14:20:07'},
+    ],
+  },
+};
+
+/* SSE 帧流数据（三回合：正常回答 / 澄清卡 / 错误帧） */
+const SSE_FLOWS = [
+  [
+    {type:'meta', runId:'fr-2027-0009', caliber:'cal-finance-v2.3', asOf:'2026-09-30'},
+    {type:'step', name:'readiness_check', status:'ok'},
+    {type:'step', name:'forecast_run', tool:'forecast.run', decision:'ALLOW'},
+    {type:'token', count:42},
+    {type:'delta', text:'根据 2027 年度经营预测模型（mind-finance-v2/v2.3），'},
+    {type:'delta', text:'基于口径 cal-finance-v2.3、截止 2026-09-30 的数据快照，'},
+    {type:'delta', text:'预测 2027 年利润为 1.08 亿元，'},
+    {type:'delta', text:'与目标 1.2 亿存在约 1,200 万元缺口。'},
+    {type:'citation', runId:'fr-2027-0009', caliber:'cal-finance-v2.3', asOf:'2026-09-30', evidence:['ev-101 采购价曲线','ev-102 验收单']},
+    {type:'delta', text:'主要驱动因素：材料涨价贡献 -300 万元（贡献度 38%）。'},
+    {type:'token', count:18},
+    {type:'done', status:'completed', turns:1},
+  ],
+  [
+    {type:'meta', runId:'fr-2027-0010', caliber:null, asOf:'2026-09-30'},
+    {type:'step', name:'readiness_check', status:'DENY', reason:null, missingSlots:['caliber','baseline','scope']},
+    {type:'delta', text:'当前问题缺少必要口径，无法直接回答。'},
+    {type:'done', status:'completed', turns:2},
+  ],
+  [
+    {type:'meta', runId:'fr-2027-0011', caliber:'cal-finance-v2.3', asOf:'2026-09-30'},
+    {type:'step', name:'forecast_run', tool:'forecast.run', decision:'ALLOW'},
+    {type:'error', code:'ECOS-AI-504', message:'依赖调用超时', retryable:true},
+    {type:'done', status:'failed', turns:3},
+  ],
+];
+
+/* 决策待办看板数据 */
+const DECISIONS = [
+  {id:'dec-3001', title:'采购成本优化方案', stage:'pendingApproval', scenario:'sc-2027-profit', runId:'run-7001', forecast:'材料成本 -8%', approver:'CFO', gitRef:null},
+  {id:'dec-3002', title:'Q4 预算调整', stage:'approved', scenario:'sc-2027-profit', runId:'run-7002', forecast:'费用 -200 万', approver:'CEO', gitRef:'refs/heads/main@abc123'},
+  {id:'dec-3003', title:'供应商切换评估', stage:'pendingEval', scenario:'sc-2027-profit', runId:'run-7003', forecast:'—', approver:'—', gitRef:null},
+  {id:'dec-3004', title:'人力外溢补充数据采集', stage:'published', scenario:'sc-profit-diag', runId:'run-7004', forecast:'—', approver:'PMO', gitRef:'refs/heads/dev@def456'},
+  {id:'dec-3005', title:'Q3 营销 ROI 终止评估', stage:'rejected', scenario:'sc-marketing', runId:'run-7005', forecast:'—', approver:'CMO', gitRef:null},
+];
+
+/* 行动跟踪数据 */
+const WA_ACTIONS = [
+  {id:'act-3001', name:'锁定 Q4 采购长协价', scenario:'sc-2027-profit', stage:'executing', expected:'材料成本 -8%', actual:'-6.2%', attribution:'confounded', dueDate:'2026-12-31'},
+  {id:'act-2988', name:'Q3 预算削减 5%', scenario:'sc-2027-profit', stage:'published', expected:'费用 -200 万', actual:'-180 万', attribution:'attributable', dueDate:'2026-09-30'},
+];
+
+/* ============================================================ 块4：经营决策域页面 ============================================================ */
+PAGES.decOverview = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('PRD-决策域 v2.0', '#/decision', 'Q-Panel + ScenarioList');
+  h += '<h1>'+T('dec.title')+'</h1>';
+  h += '<p class="muted small" style="margin:4px 0 18px">'+T('dec.subtitle')+'</p>';
+  const q = [
+    {key:'current', items: SCENARIOS.filter(s=>s.status==='active').map(s=>({title:s.name, sub:s.goal, href:'#/decision/scene/'+s.id}))},
+    {key:'judge', items: SCENARIOS.filter(s=>s.todo && s.todo.length).map(s=>({title:s.name, sub:s.todo[0], href:'#/decision/scene/'+s.id}))},
+    {key:'decide', items: DECISIONS.filter(d=>d.stage==='pendingApproval'||d.stage==='pendingEval').map(d=>({title:d.title, sub:d.forecast, href:'#/decision/todo'}))},
+    {key:'action', items: WA_ACTIONS.map(a=>({title:a.name, sub:a.expected+(a.actual?(' / '+a.actual):''), href:'#/decision/actions'}))},
+  ];
+  h += '<div class="q-panel">';
+  q.forEach(col=>{
+    h += '<div class="q-card"><h3>'+ic('activity',14)+' '+T('dec.q.'+col.key)+'</h3>';
+    h += '<p class="small muted" style="margin:-4px 0 10px">'+T('dec.q.'+col.key+'.hint')+'</p>';
+    h += '<div class="q-list">';
+    if (!col.items.length) h += '<div class="small muted">—</div>';
+    col.items.forEach(it=>{
+      h += '<a class="q-item" data-nav="'+it.href+'"><div class="q-title">'+esc(it.title)+'</div><div class="q-sub">'+esc(it.sub)+'</div></a>';
+    });
+    h += '</div></div>';
+  });
+  h += '</div>';
+  h += '<div class="card"><div class="row between"><h2>'+T('dec.scenario.list')+'</h2><button class="btn sm primary" data-act="decNewScene">'+ic('plus',12)+' '+T('dec.scenario.new')+'</button></div>';
+  h += '<table class="table" style="margin-top:10px"><thead><tr><th>'+T('common.status')+'</th><th>名称</th><th>'+T('dec.scene.goal')+'</th><th>'+T('dec.scene.progress')+'</th><th>'+T('common.actions')+'</th></tr></thead><tbody>';
+  SCENARIOS.forEach(s=>{
+    h += '<tr><td>'+statusBadge(s.status)+'</td>';
+    h += '<td><a data-nav="#/decision/scene/'+s.id+'"><b>'+esc(s.name)+'</b></a></td>';
+    h += '<td class="small">'+esc(s.goal)+'</td>';
+    h += '<td class="small">'+statusBadge(s.progress.stage)+' '+s.progress.done+'/'+s.progress.actions+'</td>';
+    h += '<td><button class="btn sm" data-nav="#/decision/scene/'+s.id+'">'+T('common.view')+'</button> ';
+    h += '<button class="btn sm primary" data-nav="#/decision/scene/'+s.id+'/ask">'+T('dec.scene.ask')+'</button></td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
+  return h;
+};
+
+PAGES.decDetail = function(id){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  const sc = getSc(id);
+  if (!sc) return PAGES.notFound();
+  let h = contractBar('PRD-决策域 · 场景详情', '#/decision/scene/'+id, 'SceneHead + GoalConclusion + Todo + ActionProgress + ConfigFold');
+  h += '<div class="row between"><div><h1>'+esc(sc.name)+'</h1><p class="muted small">'+esc(sc.id)+' · '+T('dec.scene.goal')+': '+esc(sc.goal)+'</p></div>'+statusBadge(sc.status)+'</div>';
+  h += '<div class="grid2" style="margin-top:14px">';
+  h += '<div class="card"><h3>'+ic('target',14)+' '+T('dec.scene.goal')+'</h3><p style="margin-top:6px">'+esc(sc.goal)+'</p></div>';
+  h += '<div class="card"><h3>'+ic('lightbulb',14)+' '+T('dec.scene.conclusion')+'</h3><p style="margin-top:6px">'+esc(sc.conclusion)+'</p></div>';
+  h += '</div>';
+  h += '<div class="card"><h3>'+ic('help',14)+' '+T('dec.scene.todo')+'</h3><div class="col" style="margin-top:8px">';
+  if (!sc.todo.length) h += '<div class="small muted">—</div>';
+  sc.todo.forEach(t=>{ h += '<div class="row"><span class="badge warn">'+ic('alert-triangle',11)+'</span><span>'+esc(t)+'</span></div>'; });
+  h += '</div></div>';
+  h += '<div class="card"><div class="row between"><h3>'+ic('activity',14)+' '+T('dec.scene.progress')+'</h3><span class="small muted">'+T('dec.actions.fiveStage')+'</span></div>';
+  if (!sc.actions.length){
+    h += '<div class="state-block" style="padding:24px"><p class="small muted">暂无行动</p></div>';
+  } else {
+    h += '<table class="table" style="margin-top:10px"><thead><tr><th>'+T('common.status')+'</th><th>名称</th><th>'+T('wa.action.expected')+'</th><th>'+T('wa.action.actual')+'</th><th>'+T('dec.feedback.attribution')+'</th></tr></thead><tbody>';
+    sc.actions.forEach(a=>{
+      h += '<tr><td>'+statusBadge(a.stage)+'</td><td>'+esc(a.name)+'</td><td class="small">'+esc(a.expected)+'</td><td class="small">'+esc(a.actual)+'</td><td>'+(a.attribution?('<span class="badge '+(a.attribution==='attributable'?'ok':'warn')+'">'+T('dec.feedback.'+a.attribution)+'</span>'):'—')+'</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+  h += '</div>';
+  h += '<details class="card" style="margin-top:14px"><summary style="cursor:pointer;font-weight:600">'+ic('settings',14)+' '+T('dec.scene.config')+' <span class="small muted">— '+T('dec.scene.config.hint')+'</span></summary>';
+  h += '<div class="grid2" style="margin-top:12px">';
+  h += '<div><b class="small">'+T('ws.coverage')+'</b><div class="row" style="margin-top:6px"><span class="badge '+(sc.coverage.mapping==='present'?'ok':'danger')+'">'+T('ws.comp.mapping')+': '+T('ws.comp.'+sc.coverage.mapping)+'</span><span class="badge '+(sc.coverage.extraction==='present'?'ok':'danger')+'">'+T('ws.comp.extraction')+': '+T('ws.comp.'+sc.coverage.extraction)+'</span><span class="badge '+(sc.coverage.cognition==='present'?'ok':'danger')+'">'+T('ws.comp.cognition')+': '+T('ws.comp.'+sc.coverage.cognition)+'</span></div></div>';
+  h += '<div><b class="small">'+T('wa.goal.caliber')+'</b><div class="row" style="margin-top:6px"><span class="badge accent mono">'+esc(sc.caliber)+'</span><span class="badge info">'+T('ws.comp.islands')+': '+sc.coverage.islands+'</span></div></div>';
+  h += '</div>';
+  h += fillNote(T('dec.scene.askHint'));
+  h += '</details>';
+  h += '<div class="row" style="margin-top:14px"><button class="btn primary" data-nav="#/decision/scene/'+id+'/ask">'+ic('send',12)+' '+T('dec.scene.ask')+'</button><button class="btn" data-nav="#/decision/scene/'+id+'/forecast">'+ic('trending-up',12)+' '+T('dec.nav.forecast')+'</button><button class="btn ghost" data-nav="#/decision">'+T('common.back')+'</button></div>';
+  return h;
+};
+
+PAGES.decForecast = function(id){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  const sc = getSc(id);
+  if (!sc) return PAGES.notFound();
+  let h = contractBar('PRD-决策域 · 预测向导', '#/decision/scene/'+id+'/forecast', 'Wizard4Step + ScenePreset');
+  h += '<h1>'+T('dec.forecast.title')+'</h1>';
+  h += '<div class="note">'+ic('lightbulb',13)+' <b>'+T('dec.forecast.preset')+'</b>：'+esc(sc.name)+' · '+esc(sc.caliber)+'</div>';
+  const stepNames = [T('wa.goal.caliber'), T('wa.readiness.layerCognition'), T('common.run'), T('wa.conclusion.s1')];
+  h += '<div class="wiz">';
+  for (let i=1; i<=4; i++){
+    const cls = S.wizard.step===i?'on':(S.wizard.step>i?'done':'');
+    h += '<div class="st '+cls+'">'+i+'. '+stepNames[i-1]+'</div>';
+  }
+  h += '</div>';
+  if (S.wizard.done){
+    h += '<div class="banner ok">'+ic('check',14)+' 预测完成：<b>2027 年利润预测 1.08 亿</b>，缺口 <b>1,200 万</b>。'+T('dec.feedback.WtoD')+'</div>';
+  }
+  h += '<div class="card">';
+  if (S.wizard.step===1){
+    h += '<label class="f">'+T('wa.goal.caliber')+'</label><input class="input" value="'+esc(sc.caliber)+'" readonly>';
+    h += '<label class="f">'+T('wa.goal.asOf')+'</label><input class="input" value="2026-09-30" readonly>';
+    h += '<label class="f">'+T('wa.readiness.layerData')+'</label><div class="row"><span class="badge ok">'+T('ws.comp.present')+'</span><span class="small muted">3/3 '+T('ws.comp.required')+'</span></div>';
+    h += fillNote(T('wa.goal.locked')+'：'+esc(sc.caliber));
+  } else if (S.wizard.step===2){
+    const md = COG_ASSETS.model.find(m=>m.name==='mind-finance-v2');
+    h += '<label class="f">'+T('ast.type.model')+'</label>';
+    h += '<div class="asset-card" style="cursor:default"><div class="asset-head"><div><div class="asset-title">'+esc(md.name)+'</div><div class="asset-meta">'+esc(md.scope)+' · '+esc(md.version)+'</div></div>'+statusBadge(md.status)+'</div>';
+    h += '<div class="row" style="margin-top:8px"><span class="badge info">'+T('ai.model.contextWindow')+': '+md.contextWindow||('—')+'</span><span class="badge">'+T('ast.models.backtest')+': '+(md.backtest.accuracy*100).toFixed(0)+'%</span></div></div>';
+    h += fillNote(T('ai.model.noHardcode'));
+  } else if (S.wizard.step===3){
+    h += '<label class="f">'+T('wa.run.budget')+'</label><input class="input" value="1000 tokens" readonly>';
+    h += '<label class="f">'+T('wa.run.progressSse')+'</label><div class="row"><span class="badge ok">'+T('ai.chat.connected')+'</span><span class="small mono">channel=SSE</span></div>';
+    h += fillNote(T('wa.run.channel'));
+  } else {
+    h += '<h3>'+T('wa.conclusion.s1')+'</h3><p style="margin:8px 0"><b>2027 年利润预测 1.08 亿</b>（口径 '+esc(sc.caliber)+'，截止 2026-09-30）</p>';
+    h += '<h3>'+T('wa.conclusion.s2')+'</h3><p style="margin:8px 0">材料涨价 -300 万（38%）、进度延期 -250 万（31%）、其他 -150 万</p>';
+    h += '<h3>'+T('wa.conclusion.s3')+'</h3><p style="margin:8px 0">建议：1) 锁定 Q4 采购长协价；2) Q4 预算削减 5%。</p>';
+    h += '<div class="note">'+ic('git',13)+' '+T('wa.candidate.gitRef')+': refs/heads/main@abc123</div>';
+  }
+  h += '</div>';
+  h += '<div class="row" style="margin-top:14px">';
+  h += '<button class="btn" data-act="wizPrev"'+(S.wizard.step===1?' disabled':'')+'>'+T('common.prev')+'</button>';
+  if (S.wizard.step<4){
+    h += '<button class="btn primary" data-act="wizNext">'+T('common.next')+'</button>';
+  } else if (!S.wizard.done){
+    h += '<button class="btn primary" data-act="wizRun"'+(S.wizard.running?' disabled':'')+'>'+ic('play',12)+' '+(S.wizard.running?T('common.loading'):T('common.run'))+'</button>';
+  }
+  if (S.wizard.done) h += '<button class="btn ghost" data-act="wizReset">'+T('common.retry')+'</button>';
+  h += '<button class="btn ghost" data-nav="#/decision/scene/'+id+'">'+T('common.back')+'</button>';
+  h += '</div>';
+  return h;
+};
+
+PAGES.decAsk = function(id){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  const sc = getSc(id);
+  if (!sc) return PAGES.notFound();
+  if (!S.waAsk) waAskInit();
+  const streaming = S.waAsk.streaming;
+  const interrupted = S.waAsk.interrupted;
+  const stBadge = streaming ? '<span class="badge ok">'+ic('activity',12)+' '+T('ai.chat.connected')+'</span>' : (interrupted ? '<span class="badge danger">'+T('ai.chat.disconnected')+'</span>' : '<span class="badge ok">'+T('ai.chat.connected')+'</span>');
+  let h = contractBar('PRD-决策域 · 问 ECOS（场景内）', '#/decision/scene/'+id+'/ask', 'SceneCtx + WAgent浓缩 + SSE帧');
+  h += '<div class="card"><div class="row between"><div><h1>'+T('dec.scene.ask')+'</h1><p class="muted small">'+esc(sc.name)+' · '+esc(sc.caliber)+'</p></div>'+stBadge+'</div>';
+  h += '<div class="row" style="margin-top:8px"><span class="badge accent mono">'+T('wa.goal.caliber')+': '+esc(sc.caliber)+'</span><span class="badge info">'+T('wa.goal.asOf')+': 2026-09-30</span><span class="badge '+(sc.coverage.islands?'warn':'ok')+'">'+T('ws.comp.islands')+': '+sc.coverage.islands+'</span></div>';
+  h += fillNote(T('dec.scene.askHint'));
+  h += '</div>';
+  h += '<div class="grid2" style="margin-top:14px"><div class="card" style="display:flex;flex-direction:column;gap:10px">';
+  h += '<div style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--inset)">';
+  S.waAsk.messages.forEach(m=>{ h += msgHtml(m); });
+  if (streaming) h += '<span class="cursor-blink"></span>';
+  h += '</div>';
+  h += '<div class="row"><input class="input" id="wa-ask-input" placeholder="'+T('wa.question.askPlaceholder')+'" data-enter="waAskSend"'+(streaming?' disabled':'')+' style="flex:1">';
+  if (streaming){
+    h += '<button class="btn danger" data-act="waAskStop">'+ic('pause',12)+' '+T('common.stop')+'</button>';
+  } else if (interrupted){
+    h += '<button class="btn" data-act="waAskReconnect">'+ic('refresh',12)+' '+T('ai.chat.reconnect')+'</button>';
+  } else {
+    h += '<button class="btn primary" data-act="waAskSend">'+ic('send',12)+' '+T('common.send')+'</button>';
+    h += '<button class="btn ghost" data-act="waAskDisconnect">'+T('ai.chat.simDisconnect')+'</button>';
+  }
+  h += '</div>';
+  h += '<div>'+frameLogHtml(S.waAsk.frames)+'</div>';
+  h += '</div>';
+  h += '<div class="card"><h3>'+T('wa.candidate.title')+'</h3><p class="small muted" style="margin:6px 0">'+T('wa.candidate.fourEyes')+'</p>';
+  h += '<div class="col" style="gap:6px"><span class="badge warn">'+T('wa.candidate.pending')+'</span><span class="badge ok">'+T('wa.candidate.approved')+'</span><span class="badge danger">'+T('wa.candidate.rejected')+'</span></div>';
+  h += '<hr class="hr"><h3>'+T('wa.degrade.title')+'</h3><div class="banner warn small">'+T('wa.degrade.DG-T1')+': '+T('wa.run.status.completed_degraded')+'</div>';
+  h += '<hr class="hr"><button class="btn ghost" data-nav="#/decision/scene/'+id+'">'+T('common.back')+'</button>';
+  h += '</div></div>';
+  return h;
+};
+
+PAGES.decTodo = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('PRD-决策域 · 决策待办', '#/decision/todo', 'Kanban5Col + FourEyes + GitRef');
+  h += '<h1>'+T('dec.todo.title')+'</h1>';
+  const cols = ['pending','pendingApproval','approved','published','rejected'];
+  h += '<div class="kanban" style="margin-top:14px">';
+  cols.forEach(stage=>{
+    const items = DECISIONS.filter(d=>d.stage===stage);
+    h += '<div class="kanban-col"><h3>'+T('dec.todo.'+stage)+' <span class="small muted">('+items.length+')</span></h3>';
+    items.forEach(d=>{
+      h += '<div class="kanban-card" data-act="guardrailDetail" data-v="'+DECISIONS.indexOf(d)+'"><div class="row between"><b class="small">'+esc(d.title)+'</b>'+statusBadge(d.stage==='pendingApproval'?'pending':d.stage)+'</div>';
+      h += '<div class="asset-meta">'+T('wa.action.expected')+': '+esc(d.forecast)+'</div>';
+      h += '<div class="asset-meta">'+T('wa.approval.approver')+': '+esc(d.approver)+'</div>';
+      if (d.gitRef) h += '<div class="asset-meta mono">'+ic('git',11)+' '+esc(d.gitRef)+'</div>';
+      h += '</div>';
+    });
+    h += '</div>';
+  });
+  h += '</div>';
+  h += '<div class="note" style="margin-top:14px">'+ic('shield',13)+' '+T('wa.candidate.fourEyes')+'；'+T('wa.candidate.bulkForbidden')+'</div>';
+  return h;
+};
+
+PAGES.decActions = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('PRD-决策域 · 行动跟踪', '#/decision/actions', 'Stepper5Stage + Attribution');
+  h += '<h1>'+T('dec.actions.title')+'</h1>';
+  h += '<p class="small muted" style="margin:4px 0 14px">'+T('dec.actions.fiveStage')+'</p>';
+  const stages = [{key:'draft',label:T('common.status.draft')},{key:'pendingApproval',label:T('dec.todo.pendingApproval')},{key:'published',label:T('common.status.published')},{key:'executing',label:T('common.status.executing')},{key:'attribution',label:T('dec.feedback.attribution')}];
+  h += '<div class="wiz">';
+  stages.forEach((s,i)=>{
+    const filled = WA_ACTIONS.some(a=>(s.key==='attribution'?(a.attribution):a.stage===s.key));
+    const cls = filled?'on':'';
+    h += '<div class="st '+cls+'">'+(i+1)+'. '+esc(s.label)+'</div>';
+  });
+  h += '</div>';
+  h += '<div class="kanban" style="margin-top:14px">';
+  stages.forEach(s=>{
+    const items = WA_ACTIONS.filter(a=>(s.key==='attribution'?(a.attribution):(a.stage===s.key)));
+    h += '<div class="kanban-col"><h3>'+esc(s.label)+' <span class="small muted">('+items.length+')</span></h3>';
+    items.forEach(a=>{
+      const sc = getSc(a.scenario);
+      h += '<div class="kanban-card"><div class="row between"><b class="small">'+esc(a.name)+'</b>'+statusBadge(a.stage)+'</div>';
+      h += '<div class="asset-meta">'+T('wa.action.expected')+': '+esc(a.expected)+'</div>';
+      h += '<div class="asset-meta">'+T('wa.action.actual')+': '+esc(a.actual)+'</div>';
+      h += '<div class="asset-meta">'+T('wa.action.effectDue')+': '+esc(a.dueDate)+'</div>';
+      if (a.attribution){
+        h += '<div class="row" style="margin-top:4px"><span class="badge '+(a.attribution==='attributable'?'ok':'warn')+'">'+T('dec.feedback.'+a.attribution)+'</span></div>';
+      }
+      h += '<div class="asset-meta muted">'+(sc?'场景: '+esc(sc.name):'')+'</div></div>';
+    });
+    h += '</div>';
+  });
+  h += '</div>';
+  return h;
+};
+
+PAGES.decFeedback = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('PRD-决策域 · 效果反馈', '#/decision/feedback', 'AttributionAnalysis + WtoD');
+  h += '<h1>'+T('dec.feedback.title')+'</h1>';
+  h += '<p class="small muted" style="margin:4px 0 14px">'+T('dec.feedback.WtoD')+'</p>';
+  const groups = [
+    {key:'attributable',label:T('dec.feedback.attributable'),cls:'ok'},
+    {key:'confounded',label:T('dec.feedback.confounded'),cls:'warn'},
+  ];
+  h += '<div class="grid2">';
+  groups.forEach(grp=>{
+    const items = WA_ACTIONS.filter(a=>a.attribution===grp.key);
+    h += '<div class="card"><h3>'+ic('scale',14)+' '+esc(grp.label)+'</h3>';
+    if (!items.length){ h += '<div class="state-block" style="padding:18px"><p class="small muted">—</p></div>'; }
+    items.forEach(a=>{
+      const sc = getSc(a.scenario);
+      h += '<div class="kanban-card" style="margin-top:8px"><b class="small">'+esc(a.name)+'</b>';
+      h += '<div class="asset-meta">'+T('wa.action.expected')+': '+esc(a.expected)+'</div>';
+      h += '<div class="asset-meta">'+T('wa.action.actual')+': '+esc(a.actual)+'</div>';
+      h += '<div class="asset-meta muted">'+(sc?esc(sc.name):'')+' · '+esc(a.dueDate)+'</div></div>';
+    });
+    h += '</div>';
+  });
+  h += '</div>';
+  h += '<div class="card" style="margin-top:14px"><h3>'+T('wa.degrade.title')+'</h3><div class="banner warn small" style="margin-top:8px">'+T('wa.degrade.DG-C2')+'：'+T('dec.feedback.confounded')+'，需补充对照实验</div></div>';
+  return h;
+};
+
+/* ============================================================ 块5：认知资产域页面 ============================================================ */
+function astKpi(){
+  return [
+    {label:T('ast.type.evidence'),count:COG_ASSETS.evidence.length,cls:'info'},
+    {label:T('ast.type.hypothesis'),count:COG_ASSETS.hypothesis.length,cls:'info'},
+    {label:T('ast.type.belief'),count:COG_ASSETS.belief.length,cls:'accent'},
+    {label:T('ast.type.model'),count:COG_ASSETS.model.length,cls:'ok'},
+    {label:T('ast.type.result'),count:COG_ASSETS.result.length,cls:'gb'},
+  ];
+}
+
+PAGES.astOverview = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('需求 §4.3 认知资产 v2.1-R5（原 §4.4 并入）', '#/assets/overview', 'KPI5 + 4Panel');
+  h += '<h1>'+T('ast.title')+'</h1><p class="muted small" style="margin:4px 0 18px">'+T('ast.subtitle')+'</p>';
+  h += '<h2>'+T('ast.overview.kpi')+'</h2>';
+  h += '<div class="grid4" style="grid-template-columns:repeat(5,1fr)">';
+  astKpi().forEach(k=>{ h += '<div class="kpi"><div class="v">'+k.count+'</div><div class="l">'+k.label+'</div></div>'; });
+  h += '</div>';
+  const panels = [
+    {key:'pendingVerify',items:COG_ASSETS.evidence.filter(e=>e.status==='contested').concat(COG_ASSETS.hypothesis.filter(x=>x.status==='proposed'||x.status==='uncertain'))},
+    {key:'pendingReview',items:COG_ASSETS.belief.filter(b=>b.status==='reserved').concat(COG_ASSETS.model.filter(m=>m.status==='draft'))},
+    {key:'published',items:COG_ASSETS.belief.filter(b=>b.status==='adopted').concat(COG_ASSETS.model.filter(m=>m.status==='approved'))},
+    {key:'expired',items:COG_ASSETS.evidence.filter(e=>e.status==='expired').concat(COG_ASSETS.result.filter(r=>r.status==='superseded'))},
+  ];
+  h += '<div class="grid2" style="margin-top:14px">';
+  panels.forEach(p=>{
+    h += '<div class="card"><h3>'+T('ast.overview.'+p.key)+' ('+p.items.length+')</h3><div class="col" style="gap:6px;margin-top:8px">';
+    if (!p.items.length) h += '<div class="small muted">—</div>';
+    p.items.forEach(it=>{ h += '<div class="row"><span class="badge">'+esc(it.type)+'</span><span class="small">'+esc(it.name||it.claim||'')+'</span></div>'; });
+    h += '</div></div>';
+  });
+  h += '</div>';
+  return h;
+};
+
+PAGES.astEvidence = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('PRD-资产域 · 证据与假设', '#/assets/evidence', 'Evidence + Hypothesis + Chain');
+  h += '<h1>'+T('ast.evidence.title')+'</h1>';
+  h += '<div class="tabs"><a class="on">'+T('ast.evidence.tabEvidence')+'</a><a>'+T('ast.evidence.tabHypothesis')+'</a></div>';
+  h += '<div class="card"><h3>'+T('ast.evidence.tabEvidence')+'</h3><p class="small muted" style="margin:4px 0 8px">'+T('ast.evidence.immutable')+'</p>';
+  h += '<table class="table"><thead><tr><th>ID</th><th>名称</th><th>来源</th><th>质量</th><th>范围</th><th>'+T('common.status')+'</th><th>采集时间</th></tr></thead><tbody>';
+  COG_ASSETS.evidence.forEach(e=>{
+    h += '<tr><td class="mono small">'+esc(e.id)+'</td><td>'+esc(e.name)+'</td><td class="mono small">'+esc(e.source)+'</td><td>'+meterRow('',e.quality,'--conf-med').replace('between','').replace('padding:4px 0','')+'</td><td class="small">'+esc(e.scope)+'</td><td>'+statusBadge(e.status)+'</td><td class="small mono">'+esc(e.collectedAt)+'</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<div class="card"><h3>'+T('ast.evidence.tabHypothesis')+'</h3><p class="small muted" style="margin:4px 0 8px">'+T('ast.evidence.chain')+'</p>';
+  h += '<table class="table"><thead><tr><th>ID</th><th>主张</th><th>'+T('ast.evidence.support')+'/'+T('ast.evidence.refute')+'</th><th>'+T('ast.beliefs.confidence')+'</th><th>方法</th><th>'+T('common.status')+'</th></tr></thead><tbody>';
+  COG_ASSETS.hypothesis.forEach(hy=>{
+    h += '<tr><td class="mono small">'+esc(hy.id)+'</td><td>'+esc(hy.claim)+'</td><td class="small">'+hy.evidence.map(eid=>'<span class="badge outline">'+esc(eid)+'</span>').join(' ')+'</td><td>'+confBadge(hy.confidence)+'</td><td class="small">'+esc(hy.method)+'</td><td>'+statusBadge(hy.status)+'</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  return h;
+};
+
+PAGES.astBeliefs = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('PRD-资产域 · Belief 管理', '#/assets/beliefs', 'ThreeAxis + Confidence + Version');
+  h += '<h1>'+T('ast.beliefs.title')+'</h1>';
+  h += '<p class="small muted" style="margin:4px 0 14px">'+T('ast.beliefs.threeAxis')+'</p>';
+  h += '<div class="card"><table class="table"><thead><tr><th>ID</th><th>名称</th><th>'+T('ast.beliefs.confidence')+'</th><th>'+T('ast.beliefs.scope')+'</th><th>'+T('ast.beliefs.version')+'</th><th>引用</th><th>'+T('common.status')+'</th></tr></thead><tbody>';
+  COG_ASSETS.belief.forEach(b=>{
+    h += '<tr><td class="mono small">'+esc(b.id)+'</td><td>'+esc(b.name)+'</td><td>'+confBadge(b.confidence)+'</td><td class="small">'+esc(b.scope)+'</td><td><span class="badge accent mono">'+esc(b.version)+'</span></td><td class="small mono">'+esc(b.evidenceRef)+'</td><td>'+statusBadge(b.status)+'</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  return h;
+};
+
+/* 模型资产：认知模型分类（7 主类 + 诊断/假设检验），三期路线，认知边界与计算归属分离 */
+PAGES.astModels = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  const phase = S.astModelPhase || 'all';
+  const TYPES = ['causal','diagnostic','hypothesisTesting','predictive','simulation','risk','relational','optimization','behavioral'];
+  const phaseCls = {1:'ok',2:'gb',3:''};
+  let h = contractBar('PRD-资产域 · 认知模型资产', '#/assets/models', 'TypedGroups + ThreeLayers + PhaseRoadmap');
+  h += '<h1>'+T('ast.models.title')+'</h1>';
+  h += '<div class="banner small">'+T('ast.models.boundaryNote')+'</div>';
+  h += '<div class="card" style="padding:10px 14px"><div class="row small" style="gap:10px;flex-wrap:wrap"><b>'+T('ast.models.threeLayers')+'</b><span class="badge accent">'+T('ast.models.layer1')+'</span><span>'+ic('chev-r',12)+'</span><span class="badge ok">'+T('ast.models.layer2')+'</span><span>'+ic('chev-r',12)+'</span><span class="badge info">'+T('ast.models.layer3')+'</span></div></div>';
+  h += '<div class="row" style="margin:12px 0;gap:8px;flex-wrap:wrap"><span class="small muted">'+T('ast.models.phaseFilter')+'</span>'
+    + ['all','1','2','3'].map(p=>'<span class="chip'+(phase===p?' on':'')+'" data-act="astModelPhase" data-v="'+p+'">'+T('ast.models.phase.'+p)+'</span>').join('')
+    + '<span class="small muted" style="margin-left:8px">'+T('ast.models.phaseHint')+'</span></div>';
+  TYPES.forEach(tp=>{
+    const models = COG_ASSETS.model.filter(m=>m.modelType===tp && (phase==='all' || String(m.phase)===phase));
+    if (!models.length) return;
+    h += '<div class="card"><div class="row between"><h3>'+T('ast.models.type.'+tp)+' <span class="small muted">· '+T('ast.models.type.'+tp+'.q')+'</span></h3><span class="badge">'+models.length+'</span></div>';
+    h += '<table class="table" style="margin-top:8px"><thead><tr><th>ID</th><th>'+T('ast.models.title')+'</th><th>'+T('ast.models.phaseFilter')+'</th><th>'+T('ast.models.scenarioBind')+'</th><th>'+T('ast.models.backtest')+'</th><th>'+T('ast.models.computeOwner')+'</th><th>'+T('ast.models.io')+'</th><th>'+T('ast.models.limits')+'</th><th>'+T('common.status')+'</th></tr></thead><tbody>';
+    models.forEach(m=>{
+      h += '<tr><td class="mono small">'+esc(m.id)+'</td><td><b>'+esc(m.name)+'</b> <span class="badge accent mono">'+esc(m.version)+'</span><div class="small muted">'+esc(m.scope)+'</div></td>';
+      h += '<td><span class="badge '+phaseCls[m.phase]+'">'+T('ast.models.phase.'+m.phase)+'</span></td>';
+      h += '<td><span class="badge">'+esc(m.binding)+'</span></td>';
+      h += '<td class="small">'+(m.backtest.accuracy?('acc='+(m.backtest.accuracy*100).toFixed(0)+'% mae='+m.backtest.mae):'—')+'</td>';
+      h += '<td class="small mono">'+esc(m.computeOwner)+'</td><td class="small">'+esc(m.io)+'</td><td class="small muted">'+esc(m.limits)+'</td><td>'+statusBadge(m.status)+'</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  });
+  h += '<div class="banner small">'+T('ast.models.groupNote')+'<br>'+T('ast.models.extNote')+'</div>';
+  return h;
+};
+
+PAGES.astResults = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('PRD-资产域 · 认知成果', '#/assets/results', 'RunRef + ModelVer + CaliberVer');
+  h += '<h1>'+T('ast.results.title')+'</h1>';
+  h += '<div class="card"><table class="table"><thead><tr><th>ID</th><th>名称</th><th>'+T('ast.results.runRef')+'</th><th>'+T('ast.results.modelVer')+'</th><th>'+T('ast.results.caliberVer')+'</th><th>'+T('ast.results.evaluate')+'</th><th>'+T('common.status')+'</th><th>'+T('common.actions')+'</th></tr></thead><tbody>';
+  COG_ASSETS.result.forEach(r=>{
+    h += '<tr><td class="mono small">'+esc(r.id)+'</td><td>'+esc(r.name)+'</td><td class="mono small">'+esc(r.runRef)+'</td><td class="small mono">'+esc(r.modelVer)+'</td><td class="small mono">'+esc(r.caliberVer)+'</td>';
+    h += '<td>'+(r.evalScore?('<span class="badge '+(r.evalScore>=0.8?'ga':'gb')+'">'+r.evalScore.toFixed(2)+'</span>'):'—')+'</td>';
+    h += '<td>'+statusBadge(r.status)+'</td>';
+    h += '<td><button class="btn sm" data-nav="#/aiwork/replay/'+esc(r.runRef)+'">'+T('ai.nav.replay')+'</button></td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
+  return h;
+};
+
+PAGES.astGovernance = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('PRD-资产域 · 治理工作台', '#/assets/governance', 'StateMachine + ByType');
+  h += '<h1>'+T('ast.governance.title')+'</h1>';
+  h += '<p class="small muted" style="margin:4px 0 14px">'+T('ast.governance.flow')+'</p>';
+  h += '<div class="card"><div class="row between"><h3>'+T('ast.governance.byType')+'</h3><select class="input sm" data-act-chg="astGovType"><option value="overview">'+T('common.all')+'</option><option value="evidence">'+T('ast.type.evidence')+'</option><option value="hypothesis">'+T('ast.type.hypothesis')+'</option><option value="belief">'+T('ast.type.belief')+'</option><option value="model">'+T('ast.type.model')+'</option><option value="result">'+T('ast.type.result')+'</option></select></div>';
+  const stages = ['collected','validating','approved','deprecated','superseded'];
+  const icons = {collected:'plus',validating:'refresh',approved:'check',deprecated:'ban',superseded:'git'};
+  h += '<div class="wiz" style="margin-top:14px">';
+  stages.forEach((s,i)=>{
+    h += '<div class="st '+(i===2?'on':'')+'">'+ic(icons[s],12)+' '+T('ast.status.'+s)+'</div>';
+  });
+  h += '</div>';
+  h += '<div class="grid2" style="margin-top:14px"><div><b class="small">'+T('ast.evidence.chain')+'</b><div class="tl" style="margin-top:10px">';
+  h += '<div class="ti ok"><div><b>ev-101</b> 采购价曲线</div></div>';
+  h += '<div class="ti ok"><div><b>hy-201</b> 材料涨价主因 <span class="badge ok">evidenced</span></div></div>';
+  h += '<div class="ti cur"><div><b>bl-301</b> 材料涨价 -300 万 <span class="badge accent">adopted</span></div></div>';
+  h += '<div class="ti"><div><b>rs-502</b> 采购成本因果 <span class="badge info">evaluated</span></div></div>';
+  h += '</div></div>';
+  h += '<div><b class="small">'+T('wa.candidate.fourEyes')+'</b><div class="banner warn small" style="margin-top:10px">'+T('wa.candidate.bulkForbidden')+'；'+T('wa.candidate.gitRef')+' 单源</div></div>';
+  h += '</div></div>';
+  return h;
+};
+
+/* Mind 心智列表：认知聚合根，三维状态分离（R5 自认知资产迁入场景工作台） */
+PAGES.decMinds = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('需求 §4.4 场景工作台 · 心智 Mind（R5 迁入）', '#/decision/mind', 'AggregateRoot + ThreeAxes');
+  h += '<h1>'+T('ast.mind.title')+'</h1><p class="muted small" style="margin:4px 0 14px">'+T('ast.mind.subtitle')+'</p>';
+  h += '<div class="banner small" style="margin-bottom:14px">'+T('ast.mind.boundaryNote')+'</div>';
+  h += '<div class="grid2">';
+  MINDS.forEach(m=>{
+    h += '<div class="card"><div class="row between"><h3>'+esc(m.name)+'</h3><span class="badge accent">'+esc(m.id)+'</span></div>';
+    h += '<p class="small muted" style="margin:6px 0 10px">'+esc(m.desc)+'</p>';
+    h += '<div class="row small" style="gap:14px;flex-wrap:wrap"><span>'+ic('user',12)+' '+esc(m.subject)+'</span><span>'+ic('target',12)+' '+esc(m.scope)+'</span><a data-nav="#/decision/scene/'+esc(m.contextRef)+'">'+ic('layers',12)+' '+esc(m.contextRef)+'</a></div>';
+    h += '<div style="margin:10px 0;padding:8px 10px;border:1px dashed var(--border);border-radius:8px">'+mindAxesBadges(m)+'</div>';
+    h += '<div class="row small muted" style="gap:12px;flex-wrap:wrap">'
+      + '<span>'+T('ast.mind.countBeliefs')+' <b>'+m.beliefIds.length+'</b></span>'
+      + '<span>'+T('ast.mind.countHypotheses')+' <b>'+m.hypothesisIds.length+'</b></span>'
+      + '<span>'+T('ast.mind.countEvidence')+' <b>'+m.evidenceRefs.length+'</b></span>'
+      + '<span>'+T('ast.mind.countVersions')+' <b>'+m.versions.length+'</b></span></div>';
+    h += '<div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn sm primary" data-nav="#/decision/mind/'+esc(m.id)+'">'+ic('chev-r',12)+' '+T('ast.mind.detail')+'</button></div>';
+    h += '</div>';
+  });
+  h += '</div>';
+  return h;
+};
+
+/* Mind 详情：六段结构（上下文/信念/假设/证据关联/解释/演化）+ 三维状态 + W Agent 候选更新（R5 迁入场景工作台） */
+PAGES.decMindDetail = function(id){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  const m = getMind(id);
+  if (!m) return PAGES.notFound();
+  let h = contractBar('需求 §4.4 场景工作台 · 心智 Mind 详情（R5 迁入）', '#/decision/mind/'+id, 'SixSections + ThreeAxes + CandidateGate');
+  h += '<div class="row between"><h1>'+esc(m.name)+' <span class="badge accent mono">'+esc(m.id)+'</span></h1><button class="btn sm" data-nav="#/decision/mind">'+T('ast.mind.back')+'</button></div>';
+  h += '<p class="muted small" style="margin:4px 0 10px">'+esc(m.desc)+'</p>';
+  h += '<div class="card" style="border-left:3px solid var(--accent)"><b class="small">'+T('ast.mind.axis')+'</b><div style="margin-top:8px">'+mindAxesBadges(m)+'</div></div>';
+  h += '<div class="banner small">'+T('ast.mind.boundaryNote')+'</div>';
+  /* ① 认知上下文 */
+  h += '<div class="card"><h3>'+T('ast.mind.secContext')+'</h3>';
+  h += '<div class="grid2" style="margin-top:8px"><div class="small">'+ic('user',12)+' <b>'+T('ast.mind.subject')+'</b>：'+esc(m.subject)+'</div><div class="small">'+ic('target',12)+' <b>'+T('ast.mind.scope')+'</b>：'+esc(m.scope)+'</div></div>';
+  h += '<div class="small" style="margin-top:6px">'+ic('layers',12)+' <b>'+T('ast.mind.contextRef')+'</b>：<a data-nav="#/decision/scene/'+esc(m.contextRef)+'">'+esc(m.contextRef)+'</a></div>';
+  h += '<div class="grid2" style="margin-top:10px"><div><b class="small">'+T('ast.mind.goals')+'</b><ul class="small" style="margin:6px 0 0 18px">'+m.goals.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>'
+    + '<div><b class="small">'+T('ast.mind.keyQuestions')+'</b><ul class="small" style="margin:6px 0 0 18px">'+m.keyQuestions.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div></div>';
+  h += '</div>';
+  /* ② 信念 */
+  h += '<div class="card"><h3>'+T('ast.mind.secBeliefs')+'</h3><table class="table" style="margin-top:8px"><thead><tr><th>ID</th><th>'+T('ast.beliefs.title')+'</th><th>'+T('ast.beliefs.confidence')+'</th><th>'+T('ast.beliefs.version')+'</th><th>'+T('common.status')+'</th></tr></thead><tbody>';
+  m.beliefIds.forEach(bid=>{
+    const b = COG_ASSETS.belief.find(x=>x.id===bid);
+    if (!b) return;
+    h += '<tr><td class="mono small">'+esc(b.id)+'</td><td>'+esc(b.name)+'</td><td>'+confBadge(b.confidence)+'</td><td><span class="badge accent mono">'+esc(b.version)+'</span></td><td>'+statusBadge(b.status)+'</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  /* ③ 认知假设 */
+  h += '<div class="card"><h3>'+T('ast.mind.secHypotheses')+'</h3><table class="table" style="margin-top:8px"><thead><tr><th>ID</th><th>'+T('ast.evidence.tabHypothesis')+'</th><th>'+T('ast.beliefs.confidence')+'</th><th>'+T('common.status')+'</th></tr></thead><tbody>';
+  m.hypothesisIds.forEach(hid=>{
+    const hy = COG_ASSETS.hypothesis.find(x=>x.id===hid);
+    if (!hy) return;
+    h += '<tr><td class="mono small">'+esc(hy.id)+'</td><td>'+esc(hy.claim)+'</td><td>'+confBadge(hy.confidence)+'</td><td>'+statusBadge(hy.status)+'</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  /* ④ 证据关联 */
+  h += '<div class="card"><h3>'+T('ast.mind.secEvidence')+'</h3><p class="small muted" style="margin:4px 0 8px">'+T('ast.mind.evRefNote')+'</p>';
+  h += '<table class="table"><thead><tr><th>'+T('ast.mind.evidence')+'</th><th>'+T('ast.mind.domain')+'</th><th>'+T('ast.mind.ver')+'</th><th>'+T('ast.evidence.support')+'/'+T('ast.evidence.refute')+'</th><th>'+T('ast.mind.reason')+'</th><th>'+T('ast.mind.refAt')+'</th></tr></thead><tbody>';
+  m.evidenceRefs.forEach(e=>{
+    const relCls = e.relation==='support'?'ok':(e.relation==='refute'?'danger':'gb');
+    h += '<tr><td class="mono small">'+esc(e.ref)+'</td><td><span class="badge info">'+esc(e.domain)+'</span></td><td class="mono small">'+esc(e.ver)+'</td><td><span class="badge '+relCls+'">'+T('ast.mind.relation.'+e.relation)+'</span></td><td class="small">'+esc(e.reason)+'</td><td class="small mono">'+esc(e.at)+'</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  /* ⑤ 解释结构 */
+  h += '<div class="card"><h3>'+T('ast.mind.secExplanation')+'</h3><p class="small" style="margin-top:8px;line-height:1.8">'+esc(m.explanation)+'</p></div>';
+  /* ⑥ 演化与治理 */
+  h += '<div class="card"><h3>'+T('ast.mind.secEvolution')+' · '+T('ast.mind.verHistory')+'</h3><div class="tl" style="margin-top:12px">';
+  m.versions.forEach(v=>{
+    h += '<div class="ti '+(v.state||'')+'"><div><b class="mono small">'+esc(v.ver)+'</b> <span class="small muted">'+esc(v.at)+' · '+esc(v.by)+'</span><div class="small" style="margin-top:2px">'+esc(v.reason)+'</div></div></div>';
+  });
+  h += '</div></div>';
+  /* W Agent 候选更新 */
+  h += '<div class="card"><h3>'+T('ast.mind.candidates')+'</h3><p class="small muted" style="margin:4px 0 10px">'+T('ast.mind.candidatesNote')+'</p>';
+  if (!m.candidates.length){
+    h += '<div class="small muted">'+T('ast.mind.noCandidates')+'</div>';
+  } else {
+    m.candidates.forEach(c=>{
+      h += '<div class="row between" style="padding:10px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px"><div><div class="small"><b>'+esc(c.from)+'</b></div><div class="small" style="margin-top:4px">'+esc(c.change)+'</div><div class="small mono muted" style="margin-top:4px">'+esc(c.evidence)+'</div></div>';
+      if (c.status==='pending'){
+        h += '<div class="row" style="gap:8px"><button class="btn sm primary" data-act="mindCand" data-v="'+esc(c.id)+'|'+esc(m.id)+'|accept">'+T('ast.mind.candAccept')+'</button><button class="btn sm danger" data-act="mindCand" data-v="'+esc(c.id)+'|'+esc(m.id)+'|reject">'+T('ast.mind.candReject')+'</button></div>';
+      } else if (c.status==='submitted'){
+        h += '<span class="badge ok">'+T('ast.mind.candSubmitted')+'</span>';
+      } else {
+        h += '<span class="badge danger">'+T('ast.mind.candWasRejected')+'</span>';
+      }
+      h += '</div>';
+    });
+  }
+  h += '</div>';
+  return h;
+};
+
+/* ============================================================ 块6：AI 工作台页面 ============================================================ */
+/* 智能体与编排模板：AI 工作台作为智能体构建/编排/治理的统一平台；W Agent 降级为系统内置编排模板（R5） */
+PAGES.aiAgents = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('AI 工作台 v2.1-R5 · 智能体与编排模板', '#/aiwork/agents', 'AgentTemplates + Lifecycle + WAgent(Demoted)');
+  h += '<h1>'+T('ai.agents.title')+'</h1><p class="muted small" style="margin:4px 0 12px">'+T('ai.agents.subtitle')+'</p>';
+  h += '<div class="banner small" style="margin-bottom:12px">'+ic('target',13)+' '+T('ai.agents.boundaryNote')+'</div>';
+  h += '<div class="card"><h3>'+ic('refresh',13)+' '+T('ai.agents.lifecycle')+'</h3><p class="small muted" style="margin-top:6px">'+T('ai.agents.lifecycleNote')+'</p></div>';
+  /* 系统内置模板：W Agent 与数据/本体/知识智能体同级 */
+  h += '<div class="card" style="margin-top:14px"><h3>'+ic('bot',13)+' '+T('ai.agents.builtin')+'</h3>';
+  h += '<table class="table" style="margin-top:8px"><thead><tr><th>'+T('ai.agents.colTemplate')+'</th><th>'+T('ai.agents.colType')+'</th><th>'+T('ai.agents.colScope')+'</th><th>'+T('ai.agents.colState')+'</th><th>'+T('ai.agents.colAction')+'</th></tr></thead><tbody>';
+  const tpl = [
+    { key:'ai.agents.wagent', icon:'bot', scope:'nav.decision', route:'#/aiwork/config', accent:true },
+    { key:'ai.agents.data', icon:'db', scope:'nav.decision', route:'#/decision' },
+    { key:'ai.agents.onto', icon:'layers', scope:'nav.assets', route:'#/assets/overview' },
+    { key:'ai.agents.knowledge', icon:'brain', scope:'nav.assets', route:'#/assets/overview' }
+  ];
+  tpl.forEach(t=>{
+    h += '<tr><td><b class="small">'+ic(t.icon,13)+' '+T(t.key)+'</b><div class="small muted" style="margin-top:2px">'+T(t.key+'.desc')+'</div></td>'
+      + '<td><span class="badge '+(t.accent?'accent':'info')+'">'+T('ai.agents.badge.builtin')+'</span></td>'
+      + '<td class="small">'+T(t.scope)+'</td><td>'+statusBadge('active')+'</td>'
+      + '<td><button class="btn sm" data-nav="'+t.route+'">'+ic('chev-r',12)+' '+T('ai.agents.open')+'</button></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  /* 自定义智能体：全生命周期管理入口 */
+  h += '<div class="card" style="margin-top:14px"><div class="row between"><h3>'+T('ai.agents.custom')+'</h3><button class="btn sm primary" data-act="aiAgentNew">'+ic('plus',12)+' '+T('ai.agents.new')+'</button></div>';
+  h += '<p class="small muted" style="margin-top:6px">'+T('ai.agents.instances')+'：<b>2</b> · '+T('ai.agents.lifecycleNote')+'</p></div>';
+  return h;
+};
+PAGES.aiChat = function(){
+  if (!S.chat) chatInit();
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  const streaming = S.chat.streaming;
+  const interrupted = S.chat.interrupted;
+  const stBadge = streaming ? '<span class="badge ok">'+ic('activity',12)+' '+T('ai.chat.connected')+'</span>' : (interrupted ? '<span class="badge danger">'+T('ai.chat.disconnected')+'</span>' : '<span class="badge ok">'+T('ai.chat.connected')+'</span>');
+  let h = contractBar('AI 工作台 v2.0 · 智能对话', '#/aiwork/chat', 'ChatSessions + MsgStream + FrameMonitor + ContextMeter');
+  h += '<div style="display:grid;grid-template-columns:200px 1fr 220px;gap:12px">';
+  h += '<div class="card" style="padding:10px"><div class="row between"><h3>'+T('ai.session.today')+'</h3><button class="btn sm ghost" data-act="chatNewSession" title="'+T('ai.session.new')+'">'+ic('plus',12)+'</button></div><div class="col" style="gap:4px;margin-top:8px">';
+  S.chat.sessions.forEach(s=>{
+    const cur = S.chat.curSession===s.id;
+    h += '<a class="q-item" data-act="chatSession" data-v="'+s.id+'"'+(cur?' style="background:var(--accent-soft)"':'')+'><div class="q-title">'+esc(s.title)+'</div><div class="q-sub">'+esc(s.ts)+'</div></a>';
+  });
+  h += '</div></div>';
+  h += '<div class="card" style="display:flex;flex-direction:column;gap:10px;padding:14px">';
+  h += '<div class="row between"><div>'+stBadge+'</div><div class="small muted mono">Last-Event-ID: '+S.chat.frames.length+' / flow #'+(S.chat.flowIdx+1)+'</div></div>';
+  h += '<div style="max-height:380px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--inset)">';
+  S.chat.messages.forEach(m=>{ h += msgHtml(m); });
+  if (streaming) h += '<span class="cursor-blink"></span>';
+  h += '</div>';
+  h += '<div class="row"><input class="input" id="chat-input" placeholder="'+T('ai.chat.placeholder')+'" data-enter="chatSend"'+(streaming?' disabled':'')+' style="flex:1">';
+  if (streaming){
+    h += '<button class="btn danger" data-act="chatStop">'+ic('pause',12)+' '+T('common.stop')+'</button>';
+  } else if (interrupted){
+    h += '<button class="btn" data-act="chatReconnect">'+ic('refresh',12)+' '+T('ai.chat.reconnect')+'</button>';
+  } else {
+    h += '<button class="btn primary" data-act="chatSend">'+ic('send',12)+' '+T('common.send')+'</button>';
+    h += '<button class="btn ghost" data-act="chatDisconnect">'+T('ai.chat.simDisconnect')+'</button>';
+  }
+  h += '</div>';
+  h += '<div>'+frameLogHtml(S.chat.frames)+'</div>';
+  h += '</div>';
+  h += '<div class="card" style="padding:12px"><h3>'+T('ai.context.meter')+'</h3>';
+  h += meterRow(T('ai.usage.prompt'), 0.62, 'accent');
+  h += meterRow(T('ai.usage.completion'), 0.38, 'info');
+  h += '<hr class="hr"><div class="kpi"><div class="v">87K</div><div class="l">'+T('ai.usage.quotaLeft')+'</div></div>';
+  h += '<div class="small muted" style="margin-top:8px">'+ic('lightbulb',12)+' '+T('ai.compress.banner')+': 2 '+T('ai.compress.turns')+'</div>';
+  h += '<hr class="hr"><div class="small muted">'+T('ai.citation.run')+': fr-2027-0009<br>'+T('ai.citation.caliber')+': cal-finance-v2.3<br>'+T('ai.citation.asOf')+': 2026-09-30</div>';
+  h += '</div></div>';
+  return h;
+};
+
+PAGES.aiTools = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('AI 工作台 · 工具注册表', '#/aiwork/tools', '17ElemContract + PermissionBind + Filter');
+  h += '<h1>'+T('ai.tool.name')+' / '+T('ai.tool.ledger')+'</h1>';
+  h += '<div class="card"><div class="row" style="gap:8px"><select class="input sm" data-act-chg="aiToolToolset"><option value="">'+T('common.all')+' toolset</option>['+JSON.stringify([...new Set(AI.tools.map(t=>t.name.split('.')[0]))]).slice(1,-1).replace(/"/g,'').split(',').map(s=>'<option>'+s.trim()+'</option>').join('')+']}</select>';
+  h += '<select class="input sm" data-act-chg="aiToolOp"><option value="">'+T('common.all')+' op</option>'+AI.tools.map(t=>'<option value="'+esc(t.op)+'">'+esc(t.op)+'</option>').join('')+'</select>';
+  h += '<select class="input sm" data-act-chg="aiToolStatus"><option value="">'+T('common.all')+' status</option><option value="ACTIVE">'+T('ai.tool.ACTIVE')+'</option></select>';
+  h += '<span class="badge info">'+T('ai.tool.filter')+'</span></div>';
+  h += '<table class="table" style="margin-top:10px"><thead><tr><th>'+T('ai.tool.name')+'</th><th>'+T('ai.tool.backend')+'</th><th>'+T('ai.tool.operation')+'</th><th>'+T('ai.tool.minLvl')+'</th><th>'+T('ai.tool.status')+'</th><th>'+T('common.actions')+'</th></tr></thead><tbody>';
+  AI.tools.filter(t=>{
+    if (S.aiFilter.toolset && !t.name.startsWith(S.aiFilter.toolset+'.')) return false;
+    if (S.aiFilter.op && t.op!==S.aiFilter.op) return false;
+    if (S.aiFilter.status && t.status!==S.aiFilter.status) return false;
+    return true;
+  }).forEach(t=>{
+    h += '<tr><td class="mono"><b>'+esc(t.name)+'</b></td><td class="mono small">'+esc(t.endpoint)+'</td><td class="small">'+esc(t.op)+'</td><td>'+gradeBadge(t.minLvl)+'</td><td><span class="badge ok">'+T('ai.tool.ACTIVE')+'</span></td><td><button class="btn sm" data-act="toolDetail" data-v="'+esc(t.name)+'">'+T('ai.tool.contractDetail')+'</button></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<div class="card"><h3>'+T('ai.tool.ledger')+'</h3><table class="table" style="margin-top:8px"><thead><tr><th>时间</th><th>工具</th><th>'+T('ai.chat.decision')+'</th><th>'+T('ai.chat.latency')+'</th><th>会话</th><th>'+T('common.actions')+'</th></tr></thead><tbody>';
+  AI.ledger.forEach((r,i)=>{
+    h += '<tr><td class="mono small">'+esc(r.ts)+'</td><td class="mono">'+esc(r.tool)+'</td><td><span class="badge '+(r.decision==='ALLOW'?'ok':r.decision==='DENY'?'danger':'warn')+'">'+T('ai.guardrail.'+r.decision)+'</span></td><td class="small mono">'+esc(r.latency)+'</td><td class="small mono">'+esc(r.sessionId)+'</td><td><button class="btn sm" data-act="guardrailDetail" data-v="'+i+'">'+T('common.details')+'</button></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  return h;
+};
+
+PAGES.aiGuardrails = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('AI 工作台 · 护栏裁决台账', '#/aiwork/guardrails', 'DecisionDistro + Ledger + NoReasonEcho');
+  h += '<h1>'+T('ai.guardrail.table')+'</h1>';
+  const dist = {ALLOW:0,DENY:0,FAIL_CLOSED:0};
+  AI.ledger.forEach(r=>{ dist[r.decision]=(dist[r.decision]||0)+1; });
+  const total = AI.ledger.length;
+  h += '<div class="card"><h3>'+T('ai.guardrail.distro')+'</h3><div class="meter" style="height:18px;margin-top:10px"><div style="width:'+Math.round(dist.ALLOW/total*100)+'%;background:var(--ok);display:inline-block;height:100%"></div><div style="width:'+Math.round(dist.DENY/total*100)+'%;background:var(--danger);display:inline-block;height:100%"></div><div style="width:'+Math.round(dist.FAIL_CLOSED/total*100)+'%;background:var(--warn);display:inline-block;height:100%"></div></div>';
+  h += '<div class="row" style="margin-top:8px"><span class="badge ok">'+T('ai.guardrail.ALLOW')+' '+dist.ALLOW+'</span><span class="badge danger">'+T('ai.guardrail.DENY')+' '+dist.DENY+'</span><span class="badge warn">'+T('ai.guardrail.FAIL_CLOSED')+' '+dist.FAIL_CLOSED+'</span></div></div>';
+  h += '<div class="card"><table class="table"><thead><tr><th>时间</th><th>工具</th><th>'+T('ai.chat.decision')+'</th><th>'+T('ai.chat.latency')+'</th><th>'+T('common.actions')+'</th></tr></thead><tbody>';
+  AI.ledger.forEach((r,i)=>{
+    h += '<tr><td class="mono small">'+esc(r.ts)+'</td><td class="mono">'+esc(r.tool)+'</td><td><span class="badge '+(r.decision==='ALLOW'?'ok':r.decision==='DENY'?'danger':'warn')+'">'+T('ai.guardrail.'+r.decision)+'</span></td><td class="small mono">'+esc(r.latency)+'</td><td><button class="btn sm" data-act="guardrailDetail" data-v="'+i+'">'+T('common.details')+'</button></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<div class="note">'+ic('shield-off',13)+' '+T('ai.guardrail.noReason')+'</div>';
+  return h;
+};
+
+PAGES.aiModels = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('AI 工作台 · 模型中心', '#/aiwork/models', 'Catalog + Register + RouteResolve');
+  h += '<h1>'+T('ai.model.catalog')+'</h1>';
+  h += '<div class="row" style="margin-bottom:10px"><button class="btn primary" data-act="modelRegister">'+ic('plus',12)+' '+T('ai.model.register')+'</button></div>';
+  h += '<div class="card"><table class="table"><thead><tr><th>模型</th><th>提供商</th><th>'+T('ai.model.contextWindow')+'</th><th>'+T('ai.model.cost')+'</th><th>'+T('ai.model.health')+'</th><th>'+T('common.status')+'</th><th>'+T('common.actions')+'</th></tr></thead><tbody>';
+  AI.models.forEach(m=>{
+    h += '<tr><td><b class="mono">'+esc(m.name)+'</b></td><td class="small">'+esc(m.provider)+'</td><td class="small mono">'+fmtNum(m.contextWindow)+'</td><td class="small mono">$'+m.cost.toFixed(4)+'</td><td>'+meterRow('',m.health,'--conf-high').replace('between','').replace('padding:4px 0','')+'</td><td>'+(m.active?statusBadge('active'):statusBadge('suspended'))+'</td><td><button class="btn sm" data-act="modelRoute" data-v="'+esc(m.name)+'">'+T('ai.model.route')+'</button></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<div class="note">'+ic('lightbulb',13)+' '+T('ai.model.noHardcode')+'</div>';
+  return h;
+};
+
+PAGES.aiReplay = function(r){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('AI 工作台 · 运行回放', '#/aiwork/replay', 'TraceId + Timeline + StepJump');
+  h += '<h1>'+T('ai.replay.title')+'</h1>';
+  h += '<div class="card"><div class="row" style="gap:8px"><input class="input" style="flex:1" placeholder="'+T('ai.replay.fromDiagnostic')+' / '+T('common.traceId')+'" value="'+esc(r||S.replayInput||'')+'" data-act-chg="replayInput"><button class="btn primary" data-act="replayJump" data-v="'+esc(r||S.replayInput||'')+'">'+T('common.run')+'</button></div></div>';
+  const replayKey = r && AI.replay[r] ? r : (S.replayInput && AI.replay[S.replayInput] ? S.replayInput : 'fr-2027-0009');
+  const steps = AI.replay[replayKey] || [];
+  h += '<div class="card"><h3>'+T('ai.replay.step')+' ('+replayKey+')</h3>';
+  h += '<div class="tl" style="margin-top:10px">';
+  steps.forEach((s,i)=>{
+    h += '<div class="ti '+(i===steps.length-1?'cur':'ok')+'"><div><b>#'+s.step+'</b> '+esc(s.name)+(s.tool?(' <span class="badge info mono">'+esc(s.tool)+'</span>'):'')+' <span class="small muted mono">'+esc(s.ts)+'</span> <span class="badge">'+T('ai.replay.token')+': '+s.token+'</span></div></div>';
+  });
+  h += '</div>';
+  h += '<div class="row" style="margin-top:12px"><button class="btn sm" data-act="replayJump" data-v="1">'+T('ai.replay.jumpStep')+' 1</button><button class="btn sm" data-act="replayJump" data-v="3">'+T('ai.replay.jumpStep')+' 3</button></div>';
+  h += '</div>';
+  return h;
+};
+
+PAGES.aiUsage = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('AI 工作台 · 用量与配额', '#/aiwork/usage', 'PeriodTabs + KPI + ByModel + 90dNotReported');
+  h += '<h1>'+T('ai.nav.usage')+'</h1>';
+  const periods = ['7d','30d','90d'];
+  h += '<div class="tabs">';
+  periods.forEach(p=>{ h += '<a data-nav="#/aiwork/usage" class="'+(S.usagePeriod===p?'on':'')+'" data-act-chg="usagePeriod" data-v="'+p+'">'+p+'</a>'; });
+  h += '</div>';
+  const u = AI.usage[S.usagePeriod] || AI.usage['7d'];
+  h += '<div class="grid4" style="margin-top:14px">';
+  h += '<div class="kpi"><div class="v">'+fmtNum(u.prompt)+'</div><div class="l">'+T('ai.usage.prompt')+'</div></div>';
+  h += '<div class="kpi"><div class="v">'+fmtNum(u.completion)+'</div><div class="l">'+T('ai.usage.completion')+'</div></div>';
+  h += '<div class="kpi"><div class="v">$'+u.cost.toFixed(1)+'</div><div class="l">'+T('ai.usage.costRatio')+'</div></div>';
+  h += '<div class="kpi"><div class="v">'+(u.quotaLeft?fmtNum(u.quotaLeft):'—')+'</div><div class="l">'+T('ai.usage.quotaLeft')+'</div></div>';
+  h += '</div>';
+  if (u.byModel){
+    h += '<div class="card" style="margin-top:14px"><h3>'+T('ai.usage.byModel')+'</h3><table class="table" style="margin-top:8px"><thead><tr><th>模型</th><th>'+T('ai.usage.costRatio')+'</th><th>占比</th></tr></thead><tbody>';
+    Object.keys(u.byModel).forEach(k=>{
+      h += '<tr><td class="mono">'+esc(k)+'</td><td>$'+u.byModel[k].toFixed(2)+'</td><td>'+meterRow('',u.byModel[k]/u.cost,'--accent').replace('between','').replace('padding:4px 0','')+'</td></tr>';
+    });
+    h += '</tbody></table></div>';
+  } else {
+    h += '<div class="banner warn" style="margin-top:14px">'+ic('alert-triangle',14)+' '+T('ai.usage.notReported')+'（90d '+T('ai.usage.estimated')+'）</div>';
+  }
+  return h;
+};
+
+PAGES.aiMonitor = function(r){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('AI 工作台 · 运行监控', '#/aiwork/monitor/'+esc(r), '11State + Budget + Channel + Steps + Cancel');
+  h += '<h1>'+T('wa.monitor.title')+' <span class="small muted mono">'+esc(r)+'</span></h1>';
+  const states = ['plan_validated','awaiting_approval','executing','awaiting_input','waiting_task','paused','completed','completed_degraded','failed','cancelled','timed_out'];
+  h += '<div class="card"><h3>'+T('wa.monitor.states')+'</h3><div class="row" style="gap:6px;margin-top:10px">';
+  states.forEach(s=>{
+    const cur = S.agent.stage===s;
+    h += '<span class="badge '+(cur?'accent':(s==='failed'||s==='cancelled'||s==='timed_out'?'danger':(s==='completed'||s==='completed_degraded'||s==='plan_validated'?'ok':'outline')))+'"'+(cur?'':'')+'>'+T('wa.run.status.'+s)+'</span>';
+  });
+  h += '</div></div>';
+  h += '<div class="grid2" style="margin-top:14px"><div class="card"><h3>'+T('wa.run.budget')+'</h3>'+meterRow('tokens',0.32,'accent')+'<div class="small muted" style="margin-top:6px">已用 320 / 1000 tokens</div></div>';
+  h += '<div class="card"><h3>'+T('wa.monitor.channel')+'</h3><span class="badge '+(S.agent.killSwitch?'warn':'ok')+'">'+(S.agent.killSwitch?T('wa.run.progressPolling'):T('wa.run.progressSse'))+'</span><div class="small muted" style="margin-top:6px">'+T('wa.run.channel')+'</div></div></div>';
+  h += '<div class="card"><h3>'+T('wa.monitor.steps')+'</h3><div class="tl" style="margin-top:8px">';
+  if (!S.agent.steps.length) h += '<div class="small muted">尚未开始</div>';
+  S.agent.steps.forEach(s=>{
+    h += '<div class="ti ok"><div><b>#'+s.step+'</b> '+esc(s.name)+' <span class="small mono">'+esc(s.ts)+'</span></div></div>';
+  });
+  h += '</div></div>';
+  h += '<div class="card"><h3>'+T('wa.monitor.states')+' '+T('common.status')+'</h3><div class="tl" style="margin-top:8px">';
+  S.agent.runHist.forEach(s=>{
+    h += '<div class="ti '+(s.stage==='completed_degraded'?'ok':s.stage==='cancelled'?'bad':'cur')+'"><div><b class="mono small">'+esc(s.ts)+'</b> '+esc(s.label)+'</div></div>';
+  });
+  h += '</div></div>';
+  h += '<div class="row" style="margin-top:14px"><button class="btn primary" data-act="runStart">'+ic('play',12)+' '+T('common.run')+'</button>';
+  if (S.agent.killSwitch){
+    h += '<button class="btn" data-act="runResume">'+ic('refresh',12)+' '+T('wa.run.killSwitch')+' OFF</button>';
+  } else {
+    h += '<button class="btn warn" data-act="runKill">'+ic('pause',12)+' '+T('wa.run.killSwitch')+'</button>';
+  }
+  h += '<button class="btn danger" data-act="runCancel">'+T('wa.monitor.cancel')+'</button></div>';
+  return h;
+};
+
+PAGES.aiConfig = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('AI 工作台 · 编排配置', '#/aiwork/config', 'KillSwitch + AutomationCeiling(decrease-only) + Threshold + ToolContract');
+  h += '<h1>'+T('ai.nav.config')+'</h1>';
+  h += '<div class="card"><div class="row between"><h3>'+T('wa.run.killSwitch')+'</h3><button class="btn '+(S.agent.killSwitch?'danger':'ok')+'" data-act="killToggle">'+(S.agent.killSwitch?T('wa.admin.killOn'):T('wa.admin.killOff'))+'</button></div>';
+  h += '<div class="small muted" style="margin-top:6px">'+T('wa.admin.killOn')+'</div></div>';
+  h += '<div class="card"><h3>'+T('wa.admin.automation')+'</h3><div class="row" style="margin-top:8px"><select class="input sm" data-act-chg="autoCeiling"><option value="L1"'+(S.agent.automation==='L1'?' selected':'')+'>L1</option><option value="L2"'+(S.agent.automation==='L2'?' selected':'')+'>L2</option><option value="L3"'+(S.agent.automation==='L3'?' selected':'')+'>L3</option></select><span class="badge accent">'+esc(S.agent.automation)+'</span></div>';
+  h += '<div class="small muted" style="margin-top:6px">'+T('wa.admin.automationHint')+'</div></div>';
+  h += '<div class="card"><h3>'+T('wa.admin.threshold')+'</h3><div class="grid2" style="margin-top:8px"><div><label class="f">'+T('ai.usage.quotaLeft')+' 阈值</label><input class="input" value="1000" readonly></div><div><label class="f">'+T('ai.chat.latency')+' 阈值</label><input class="input" value="30s" readonly></div></div></div>';
+  h += '<div class="card"><h3>'+T('ai.tool.contractDetail')+'</h3><table class="table" style="margin-top:8px"><thead><tr><th>'+T('ai.tool.name')+'</th><th>'+T('ai.tool.minLvl')+'</th><th>timeout</th><th>retry</th><th>breaker</th></tr></thead><tbody>';
+  AI.tools.forEach(t=>{
+    h += '<tr><td class="mono">'+esc(t.name)+'</td><td>'+gradeBadge(t.minLvl)+'</td><td class="small mono">'+t.contract.timeout+'ms</td><td class="small mono">'+t.contract.retry+'</td><td class="small mono">'+esc(t.contract.breaker)+'</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  return h;
+};
+
+/* ============================================================ 块7：平台管理 + ACT + CHG + 事件 + render + boot ============================================================ */
+PAGES.admOverview = function(){
+  const g = stateGuard(['normal','loading','error','forbidden']);
+  if (g) return g;
+  let h = contractBar('平台管理 v2.0', '#/admin', '5 EntryCards');
+  h += '<h1>'+T('adm.title')+'</h1><p class="muted small" style="margin:4px 0 18px">'+T('adm.subtitle')+'</p>';
+  const cards = [
+    {key:'dataSource',icon:'db',desc:T('adm.card.dataSource.desc')},
+    {key:'ontology',icon:'layers',desc:T('adm.card.ontology.desc')},
+    {key:'knowledge',icon:'file',desc:T('adm.card.knowledge.desc')},
+    {key:'permission',icon:'lock',desc:T('adm.card.permission.desc')},
+    {key:'system',icon:'settings',desc:T('adm.card.system.desc')},
+  ];
+  h += '<div class="grid3" style="grid-template-columns:repeat(5,1fr)">';
+  cards.forEach(c=>{
+    h += '<div class="asset-card" data-act="admCard" data-v="'+c.key+'"><div class="asset-head"><div style="font-size:24px;color:var(--accent)">'+ic(c.icon,28)+'</div></div>';
+    h += '<div class="asset-title">'+T('adm.card.'+c.key)+'</div><div class="asset-meta">'+esc(c.desc)+'</div></div>';
+  });
+  h += '</div>';
+  h += '<div class="note" style="margin-top:14px">'+ic('lightbulb',13)+' 平台管理子页面在 v2.0 原型中以入口卡片形式提供，进入各引擎独立配置页（dev/test 环境）。</div>';
+  return h;
+};
+
+PAGES.notFound = function(){
+  return '<div class="state-block"><div class="big404">404</div>'+ic('help',40)+'<h2>'+T('ws.404.title')+'</h2><button class="btn primary" data-nav="#/decision">'+ic('chev-r',12)+' '+T('ws.404.back')+'</button></div>';
+};
+
+/* ===================== SSE 帧引擎与 W Agent 运行模拟 ===================== */
+function frameStr(f){
+  if (f.type==='meta') return 'meta: runId='+esc(f.runId)+' caliber='+(f.caliber?esc(f.caliber):'—')+' asOf='+esc(f.asOf);
+  if (f.type==='step'){
+    let s = 'step: '+esc(f.name)+' ['+esc(f.status)+']';
+    if (f.tool) s += ' tool='+esc(f.tool);
+    if (f.decision) s += ' decision='+esc(f.decision);
+    if (f.missingSlots) s += ' missing='+f.missingSlots.join(',');
+    return s;
+  }
+  if (f.type==='token') return 'token: count='+f.count;
+  if (f.type==='delta') return 'delta: "'+esc(f.text).slice(0,60)+(f.text.length>60?'…':'')+'"';
+  if (f.type==='citation') return 'citation: run='+esc(f.runId)+' evidence=['+f.evidence.map(esc).join(', ')+']';
+  if (f.type==='error') return 'error: '+esc(f.code)+' '+esc(f.message)+(f.retryable?(' ['+T('ai.error.retryable')+']'):' ['+T('ai.error.notRetryable')+']');
+  if (f.type==='done') return 'done: status='+esc(f.status)+' turns='+f.turns;
+  return esc(f.type);
+}
+
+function frameLogHtml(frames){
+  if (!frames || !frames.length) return '<div class="frame-log muted small" style="padding:6px 8px;border:1px dashed var(--border);border-radius:6px">'+T('ai.chat.frames')+': —</div>';
+  return '<div class="frame-log" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:4px"><div class="small muted" style="padding:4px 8px;border-bottom:1px dashed var(--border)">'+T('ai.chat.frames')+' ('+T('ai.chat.framesGot')+': '+frames.length+')</div>'+frames.map(f=>'<div class="f"><span class="ft">'+esc(f.type)+'</span><span>'+frameStr(f)+'</span></div>').join('')+'</div>';
+}
+
+function msgHtml(m){
+  if (m.role==='user') return '<div class="msg user"><div class="av">U</div><div class="bubble">'+esc(m.text)+'</div></div>';
+  let cite = '';
+  if (m.citations && m.citations.length) cite = '<div class="citation">'+ic('git',12)+' '+m.citations.map(esc).join(' · ')+'</div>';
+  return '<div class="msg ai"><div class="av">AI</div><div class="bubble">'+esc(m.text).replace(/\n/g,'<br>')+cite+'</div></div>';
+}
+
+function chatInit(){
+  if (S.chat) return;
+  S.chat = {
+    sessions: AI.sessions.slice(),
+    curSession: 's1',
+    flowIdx: 0,
+    frames: [],
+    curFrameIdx: 0,
+    timer: null,
+    streaming: false,
+    interrupted: false,
+    messages: [
+      {role:'ai', text:'你好，我是 ECOS 智能助手。可基于场景上下文回答经营决策类问题（模拟 SSE 流式响应，三回合循环：正常 / 澄清 / 错误）。', citations:[], frames:[]},
+    ],
+  };
+}
+
+function chatStart(){
+  if (!S.chat) chatInit();
+  if (S.chat.streaming) return;
+  S.chat.frames = [];
+  S.chat.curFrameIdx = 0;
+  S.chat.streaming = true;
+  S.chat.interrupted = false;
+  S.chat.messages.push({role:'ai', text:'', citations:[], frames:[], streaming:true});
+  render();
+  chatNext();
+}
+
+function chatNext(){
+  if (!S.chat || !S.chat.streaming || S.chat.interrupted) return;
+  const flow = SSE_FLOWS[S.chat.flowIdx % SSE_FLOWS.length];
+  if (S.chat.curFrameIdx >= flow.length){
+    S.chat.streaming = false;
+    S.chat.flowIdx++;
+    const last = S.chat.messages[S.chat.messages.length-1];
+    if (last && last.streaming) last.streaming = false;
+    render();
+    return;
+  }
+  const f = flow[S.chat.curFrameIdx];
+  S.chat.frames.push(f);
+  const last = S.chat.messages[S.chat.messages.length-1];
+  if (last && last.streaming){
+    last.frames = S.chat.frames.slice();
+    if (f.type==='delta') last.text += f.text;
+    else if (f.type==='citation') last.citations = [T('ai.citation.run')+'='+f.runId, T('ai.citation.caliber')+'='+(f.caliber||'—'), T('ai.citation.asOf')+'='+f.asOf, T('ai.citation.evidence')+': '+f.evidence.join(', ')];
+    else if (f.type==='error') last.text = T('ai.error.'+f.code)+': '+f.message+' ['+(f.retryable?T('ai.error.retryable'):T('ai.error.notRetryable'))+']';
+    else if (f.type==='step' && f.status==='DENY') last.text = T('ai.chat.refusalClarify')+(f.missingSlots?(': '+f.missingSlots.join(', ')):'');
+  }
+  S.chat.curFrameIdx++;
+  render();
+  S.chat.timer = setTimeout(chatNext, 700);
+}
+
+function chatCut(){
+  if (!S.chat || !S.chat.streaming) return;
+  if (S.chat.timer){ clearTimeout(S.chat.timer); S.chat.timer = null; }
+  S.chat.streaming = false;
+  S.chat.interrupted = true;
+  const last = S.chat.messages[S.chat.messages.length-1];
+  if (last && last.streaming) last.streaming = false;
+  render();
+}
+
+function chatResume(){
+  if (!S.chat || !S.chat.interrupted) return;
+  S.chat.interrupted = false;
+  S.chat.streaming = true;
+  chatNext();
+}
+
+function waAskInit(){
+  if (S.waAsk) return;
+  S.waAsk = {
+    flowIdx: 0,
+    frames: [],
+    curFrameIdx: 0,
+    timer: null,
+    streaming: false,
+    interrupted: false,
+    messages: [
+      {role:'ai', text:'已加载场景上下文（口径 + 截止 + 完整度）。请输入经营问题。', citations:[], frames:[]},
+    ],
+  };
+}
+
+function waAskStart(){
+  if (!S.waAsk) waAskInit();
+  if (S.waAsk.streaming) return;
+  S.waAsk.frames = [];
+  S.waAsk.curFrameIdx = 0;
+  S.waAsk.streaming = true;
+  S.waAsk.interrupted = false;
+  S.waAsk.messages.push({role:'ai', text:'', citations:[], frames:[], streaming:true});
+  render();
+  waAskNext();
+}
+
+function waAskNext(){
+  if (!S.waAsk || !S.waAsk.streaming || S.waAsk.interrupted) return;
+  const flow = SSE_FLOWS[S.waAsk.flowIdx % SSE_FLOWS.length];
+  if (S.waAsk.curFrameIdx >= flow.length){
+    S.waAsk.streaming = false;
+    S.waAsk.flowIdx++;
+    const last = S.waAsk.messages[S.waAsk.messages.length-1];
+    if (last && last.streaming) last.streaming = false;
+    render();
+    return;
+  }
+  const f = flow[S.waAsk.curFrameIdx];
+  S.waAsk.frames.push(f);
+  const last = S.waAsk.messages[S.waAsk.messages.length-1];
+  if (last && last.streaming){
+    last.frames = S.waAsk.frames.slice();
+    if (f.type==='delta') last.text += f.text;
+    else if (f.type==='citation') last.citations = [T('ai.citation.run')+'='+f.runId, T('ai.citation.caliber')+'='+(f.caliber||'—'), T('ai.citation.asOf')+'='+f.asOf, T('ai.citation.evidence')+': '+f.evidence.join(', ')];
+    else if (f.type==='error') last.text = T('ai.error.'+f.code)+': '+f.message+' ['+(f.retryable?T('ai.error.retryable'):T('ai.error.notRetryable'))+']';
+    else if (f.type==='step' && f.status==='DENY') last.text = T('ai.chat.refusalClarify')+(f.missingSlots?(': '+f.missingSlots.join(', ')):'');
+  }
+  S.waAsk.curFrameIdx++;
+  render();
+  S.waAsk.timer = setTimeout(waAskNext, 700);
+}
+
+function waAskCut(){
+  if (!S.waAsk || !S.waAsk.streaming) return;
+  if (S.waAsk.timer){ clearTimeout(S.waAsk.timer); S.waAsk.timer = null; }
+  S.waAsk.streaming = false;
+  S.waAsk.interrupted = true;
+  const last = S.waAsk.messages[S.waAsk.messages.length-1];
+  if (last && last.streaming) last.streaming = false;
+  render();
+}
+
+function waAskResume(){
+  if (!S.waAsk || !S.waAsk.interrupted) return;
+  S.waAsk.interrupted = false;
+  S.waAsk.streaming = true;
+  waAskNext();
+}
+
+function nowStr(){ return new Date().toLocaleTimeString('zh-CN', {hour12:false}); }
+
+function runSim(){
+  if (S.agent.runTimers && S.agent.runTimers.length){
+    S.agent.runTimers.forEach(t=>clearTimeout(t));
+  }
+  S.agent.runTimers = [];
+  S.agent.runHist = [];
+  S.agent.steps = [];
+  S.agent.stage = 'plan_validated';
+  S.agent.runHist.push({ts: nowStr(), stage:'plan_validated', label:T('wa.run.status.plan_validated')});
+  render();
+  const seq = [
+    {delay:800, stage:'executing', step:{step:1, name:'parse goal', status:'ok', ts:nowStr()}},
+    {delay:1600, step:{step:2, name:'check readiness', status:'ok', ts:nowStr()}},
+    {delay:2400, step:{step:3, name:'call forecast.run', status:'ok', tool:'forecast.run', ts:nowStr()}},
+    {delay:3200, step:{step:4, name:'aggregate result', status:'ok', ts:nowStr()}},
+    {delay:4000, step:{step:5, name:'generate narrative', status:'ok', ts:nowStr()}},
+    {delay:4800, stage:'completed_degraded', label:T('wa.run.status.completed_degraded')},
+  ];
+  seq.forEach(s=>{
+    const tid = setTimeout(()=>{
+      if (S.agent.killSwitch) return;
+      if (s.stage){
+        S.agent.stage = s.stage;
+        S.agent.runHist.push({ts: nowStr(), stage:s.stage, label:s.label||('Step '+s.step.step)});
+      }
+      if (s.step){
+        S.agent.steps.push(s.step);
+        S.agent.runHist.push({ts: s.step.ts, stage:S.agent.stage, label:'Step '+s.step.step+': '+s.step.name});
+      }
+      render();
+    }, s.delay);
+    S.agent.runTimers.push(tid);
+  });
+}
+
+function runKill(on){
+  if (S.agent.runTimers && S.agent.runTimers.length){
+    S.agent.runTimers.forEach(t=>clearTimeout(t));
+    S.agent.runTimers = [];
+  }
+  S.agent.killSwitch = on;
+  if (on){
+    S.agent.stage = 'paused';
+    S.agent.runHist.push({ts: nowStr(), stage:'paused', label:T('wa.run.status.paused')});
+  } else if (S.agent.stage === 'paused'){
+    S.agent.stage = 'executing';
+  }
+  render();
+  toast(on?T('wa.admin.killOn'):T('wa.admin.killOff'), 'warn');
+}
+
+function runCancel(){
+  if (S.agent.runTimers && S.agent.runTimers.length){
+    S.agent.runTimers.forEach(t=>clearTimeout(t));
+    S.agent.runTimers = [];
+  }
+  S.agent.stage = 'cancelled';
+  S.agent.runHist.push({ts: nowStr(), stage:'cancelled', label:T('wa.run.status.cancelled')});
+  render();
+  toast(T('wa.monitor.cancel')+'：'+T('wa.run.status.cancelled'), 'warn');
+}
+
+/* ===================== 抽屉与模态内容构造 ===================== */
+function toolContractDrawer(t){
+  const items = [
+    ['name', t.name], ['endpoint', t.endpoint], ['operation', t.op], ['minLvl', 'L'+t.minLvl], ['status', t.status],
+    ['timeout', t.contract.timeout+'ms'], ['retry', t.contract.retry], ['breaker', t.contract.breaker],
+    ['permission', 'role:analyst+'], ['idempotency', 'Idempotency-Key: '+t.op], ['trace', 'W3C traceparent'],
+    ['budget', '1000 tokens'], ['dryRun', 'enabled'], ['audit', 'ecos.audit'], ['degrade', 'DG-T1'],
+    ['circuit', t.contract.breaker], ['fallback', 'TRUNCATE_FALLBACK'],
+  ];
+  let h = '<div class="row between"><h2>'+T('ai.tool.contractDetail')+'</h2><button class="btn ghost sm" data-act="closeDrawer">'+T('common.close')+'</button></div>';
+  h += '<h3 class="mono" style="margin:8px 0">'+esc(t.name)+'</h3>';
+  h += '<table class="table"><tbody>';
+  items.forEach(it=>{ h += '<tr><td class="muted small" style="width:40%">'+esc(it[0])+'</td><td class="mono small">'+esc(it[1])+'</td></tr>'; });
+  h += '</tbody></table>';
+  h += '<div class="note">'+ic('shield',13)+' 17 要素 + 权限绑定；门面：runtime-access</div>';
+  return h;
+}
+
+function guardrailDetailDrawer(r){
+  let h = '<div class="row between"><h2>'+T('ai.chat.decision')+' '+T('ai.guardrail.'+r.decision)+'</h2><button class="btn ghost sm" data-act="closeDrawer">'+T('common.close')+'</button></div>';
+  h += '<table class="table" style="margin-top:8px"><tbody>';
+  h += '<tr><td class="muted small">'+T('ai.tool.name')+'</td><td class="mono">'+esc(r.tool)+'</td></tr>';
+  h += '<tr><td class="muted small">时间</td><td class="mono">'+esc(r.ts)+'</td></tr>';
+  h += '<tr><td class="muted small">'+T('ai.chat.decision')+'</td><td><span class="badge '+(r.decision==='ALLOW'?'ok':r.decision==='DENY'?'danger':'warn')+'">'+T('ai.guardrail.'+r.decision)+'</span></td></tr>';
+  h += '<tr><td class="muted small">'+T('ai.chat.latency')+'</td><td class="mono">'+esc(r.latency)+'</td></tr>';
+  h += '<tr><td class="muted small">会话</td><td class="mono">'+esc(r.sessionId)+'</td></tr>';
+  h += '<tr><td class="muted small">reason / policyId</td><td class="small muted">'+T('ai.guardrail.noReason')+'</td></tr>';
+  h += '</tbody></table>';
+  return h;
+}
+
+function modelRegisterForm(){
+  let h = '<h2>'+T('ai.model.register')+'</h2>';
+  h += '<label class="f">模型名</label><input class="input" placeholder="e.g. glm-4-plus">';
+  h += '<label class="f">提供商</label><select class="input"><option>OpenAI</option><option>Anthropic</option><option>Alibaba</option><option>DeepSeek</option><option>自托管</option></select>';
+  h += '<label class="f">'+T('ai.model.contextWindow')+'</label><input class="input" type="number" placeholder="128000">';
+  h += '<label class="f">'+T('ai.model.cost')+'</label><input class="input" type="number" step="0.0001" placeholder="0.0175">';
+  h += '<div class="note" style="margin-top:10px">'+ic('lightbulb',13)+' '+T('ai.model.noHardcode')+'</div>';
+  return h;
+}
+
+function modelRouteDrawer(name){
+  const m = AI.models.find(x=>x.name===name);
+  let h = '<div class="row between"><h2>'+T('ai.model.route')+' — '+esc(name)+'</h2><button class="btn ghost sm" data-act="closeDrawer">'+T('common.close')+'</button></div>';
+  h += '<div class="tl" style="margin-top:10px">';
+  h += '<div class="ti ok"><div><b>1.</b> 接收请求 <span class="small mono">user goal</span></div></div>';
+  h += '<div class="ti ok"><div><b>2.</b> 路由策略：cost+health+context <span class="badge info">weighted</span></div></div>';
+  h += '<div class="ti cur"><div><b>3.</b> 选中：<b class="mono">'+esc(name)+'</b> '+(m?('['+esc(m.provider)+']'):'')+'</div></div>';
+  h += '<div class="ti"><div><b>4.</b> 调用 / 回退（'+(m&&m.active?'active':'fallback')+'）</div></div>';
+  h += '<div class="ti"><div><b>5.</b> 计量 + 审计</div></div>';
+  h += '</div>';
+  return h;
+}
+
+/* ===================== ACT 处理器 ===================== */
+ACT.closeModal = function(){ closeModal(); };
+ACT.closeDrawer = function(){ closeDrawer(); };
+ACT.demoReset = function(){ S.demo='normal'; render(); };
+ACT.copyTrace = function(v){ copyTxt(v, T('common.copied')+': '+v); };
+ACT.toggleLang = function(){ S.locale = (S.locale==='zh-CN'?'en':'zh-CN'); localStorage.setItem('ecos.proto.v2.locale', S.locale); render(); };
+ACT.toggleAsk = function(){ S.askOpen = !S.askOpen; const ap=document.getElementById('ask-panel'); if(ap) ap.classList.toggle('open', S.askOpen); };
+ACT.askGlobalSend = function(v, el){ const inp=document.getElementById('ask-input'); const t=(v || (inp?inp.value:'')||'').trim(); if(!t) return; S.waQuestion=t; if(inp) inp.value=''; S.askOpen=false; if(document.getElementById('ask-panel')) document.getElementById('ask-panel').classList.remove('open'); nav('#/aiwork/chat'); toast(T('common.send')+'：'+t, 'ok'); };
+/* 新建场景：模板预填 + 名称/目标校验 + 创建后跳转详情 */
+function applyNewSceneTpl(v){
+  if (v==='forecast'){ S.newScene.goal='2027 年利润达成 1.2 亿'; S.newScene.caliber='cal-finance-v2.3'; }
+  else if (v==='cost'){ S.newScene.goal='定位项目成本偏差根因'; S.newScene.caliber='cal-project-v1.1'; }
+  else { S.newScene.goal=''; S.newScene.caliber='—'; }
+}
+function decCreateForm(){
+  const ns=S.newScene;
+  const tpls=[['blank','dec.create.tpl.blank'],['forecast','dec.create.tpl.forecast'],['cost','dec.create.tpl.cost']];
+  let h='<h2>'+ic('plus',16)+' '+T('dec.create.title')+'</h2>';
+  h+='<div class="col" style="margin-top:12px">';
+  h+='<div><label class="f">'+T('dec.create.name')+' *</label><input class="input" id="ns-name" value="'+esc(ns.name)+'" placeholder="'+T('dec.create.namePh')+'"></div>';
+  h+='<div><label class="f">'+T('dec.create.goal')+'</label><input class="input" id="ns-goal" value="'+esc(ns.goal)+'" placeholder="'+T('dec.create.goalPh')+'"></div>';
+  h+='<div><label class="f">'+T('dec.create.tpl')+'</label><div class="row">'+tpls.map(t=>'<span class="chip'+(ns.tpl===t[0]?' on':'')+'" data-act="decPickTpl" data-v="'+t[0]+'">'+T(t[1])+'</span>').join('')+'</div><p class="small muted" style="margin-top:6px">'+T('dec.create.tplHint')+'</p></div>';
+  h+='<div><label class="f">'+T('dec.create.caliber')+'</label><input class="input mono" value="'+esc(ns.caliber)+'" readonly style="opacity:.8"></div>';
+  h+='</div>';
+  h+='<p class="small muted" style="margin-top:10px">'+T('dec.create.afterHint')+'</p>';
+  h+='<div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn primary" data-act="decCreateScene">'+ic('check',12)+' '+T('common.confirm')+'</button></div>';
+  return h;
+}
+ACT.decNewScene = function(){ S.newScene={name:'', goal:'', tpl:'forecast', caliber:''}; applyNewSceneTpl('forecast'); openModal(decCreateForm()); };
+ACT.decPickTpl = function(v){
+  const n=document.getElementById('ns-name'), g=document.getElementById('ns-goal');
+  if (n) S.newScene.name=n.value;
+  if (g) S.newScene.goal=g.value;
+  if (S.newScene.tpl===v) return;
+  S.newScene.tpl=v;
+  applyNewSceneTpl(v);
+  openModal(decCreateForm());
+};
+ACT.decCreateScene = function(){
+  const n=document.getElementById('ns-name'), g=document.getElementById('ns-goal');
+  const name=(n&&n.value||'').trim();
+  const goal=(g&&g.value||'').trim();
+  if (!name){ toast(T('dec.create.nameRequired'), 'warn'); return; }
+  const tpl=S.newScene.tpl;
+  const sc={
+    id: uid('sc'), name:name, status:'draft', goal:(goal||'—'), conclusion:'—',
+    todo: tpl==='blank'?[]:['完成资源配置与口径确认'],
+    progress:{stage:'draft', actions:0, done:0},
+    coverage:{mapping: tpl==='blank'?'missing':'present', extraction:'missing', cognition:'missing', islands: tpl==='blank'?0:1},
+    caliber: S.newScene.caliber||'—', actions:[]
+  };
+  SCENARIOS.push(sc);
+  closeModal();
+  toast(T('dec.create.ok')+' · '+esc(sc.name), 'ok');
+  nav('#/decision/scene/'+sc.id);
+};
+ACT.decActivate = function(v){ const sc=getSc(v); if(!sc) return; if(sc.coverage.islands>0 || sc.coverage.mapping==='missing'){ toast(T('ws.activate.conflict'), 'warn'); } else { toast(T('ws.activate.ok'), 'ok'); } };
+/* Mind 候选更新复核：data-v 格式 candId|mindId|accept|reject */
+ACT.mindCand = function(v){
+  const parts = v.split('|');
+  const m = getMind(parts[1]); if(!m) return;
+  const c = m.candidates.find(x=>x.id===parts[0]); if(!c) return;
+  c.status = parts[2]==='accept' ? 'submitted' : 'rejected';
+  render();
+  toast(T(parts[2]==='accept'?'ast.mind.candAccepted':'ast.mind.candRejected'), parts[2]==='accept'?'ok':'info');
+};
+/* AI 工作台：智能体全生命周期管理入口（演示） */
+ACT.aiAgentNew = function(){ toast(T('ai.agents.newOk'), 'ok'); };
+/* 认知模型分期筛选 */
+ACT.astModelPhase = function(v){ S.astModelPhase = v; render(); };
+ACT.wizNext = function(){ if(S.wizard.step<4){ S.wizard.step++; render(); } };
+ACT.wizPrev = function(){ if(S.wizard.step>1){ S.wizard.step--; render(); } };
+ACT.wizRun = function(){ S.wizard.running=true; S.wizard.done=false; render(); setTimeout(()=>{ S.wizard.running=false; S.wizard.done=true; render(); toast('预测完成：1.08 亿（缺口 1,200 万）', 'ok'); }, 1500); };
+ACT.wizReset = function(){ S.wizard.step=1; S.wizard.running=false; S.wizard.done=false; render(); };
+ACT.toolDetail = function(v){ const t=AI.tools.find(x=>x.name===v); if(!t) return; openDrawer(toolContractDrawer(t)); };
+ACT.guardrailDetail = function(v){ const idx=parseInt(v,10); const r=AI.ledger[idx]; if(!r) return; openDrawer(guardrailDetailDrawer(r)); };
+ACT.modelRegister = function(){ openModal(modelRegisterForm()); };
+ACT.modelRoute = function(v){ openDrawer(modelRouteDrawer(v)); };
+ACT.replayJump = function(v){ toast(T('ai.replay.jumpStep')+' '+v, 'info'); };
+ACT.runStart = function(){ runSim(); toast(T('common.run')+'：'+T('wa.run.status.executing'), 'ok'); };
+ACT.runKill = function(){ runKill(true); };
+ACT.runResume = function(){ runKill(false); };
+ACT.runCancel = function(){ runCancel(); };
+ACT.killToggle = function(){ S.agent.killSwitch=!S.agent.killSwitch; if(S.agent.killSwitch){ S.agent.stage='paused'; } else if(S.agent.stage==='paused'){ S.agent.stage='executing'; } render(); toast(S.agent.killSwitch?T('wa.admin.killOn'):T('wa.admin.killOff'), 'warn'); };
+ACT.chatSend = function(){ const inp=document.getElementById('chat-input'); const text=(inp && inp.value || '').trim(); if(!text || !S.chat || S.chat.streaming) return; S.chat.messages.push({role:'user', text:text}); if(inp) inp.value=''; chatStart(); };
+ACT.chatStop = function(){ chatCut(); };
+ACT.chatDisconnect = function(){ chatCut(); toast(T('ai.chat.interrupted'), 'warn'); };
+ACT.chatReconnect = function(){ chatResume(); toast(T('ai.chat.reconnect'), 'info'); };
+ACT.chatNewSession = function(){ if(!S.chat) chatInit(); const sid=uid('s'); S.chat.sessions.unshift({id:sid, title:'新会话', ts:'现在', today:true}); S.chat.curSession=sid; S.chat.messages=[{role:'ai', text:'已切换到新会话。', citations:[], frames:[]}]; S.chat.frames=[]; S.chat.flowIdx=0; S.chat.streaming=false; S.chat.interrupted=false; render(); };
+ACT.chatSession = function(v){ if(!S.chat) chatInit(); S.chat.curSession=v; S.chat.messages=[{role:'ai', text:'已切换会话 '+v, citations:[], frames:[]}]; S.chat.frames=[]; S.chat.flowIdx=0; S.chat.streaming=false; S.chat.interrupted=false; render(); };
+ACT.waAskSend = function(){ const inp=document.getElementById('wa-ask-input'); const text=(inp && inp.value || '').trim(); if(!text || !S.waAsk || S.waAsk.streaming) return; S.waAsk.messages.push({role:'user', text:text}); if(inp) inp.value=''; waAskStart(); };
+ACT.waAskStop = function(){ waAskCut(); };
+ACT.waAskDisconnect = function(){ waAskCut(); toast(T('ai.chat.interrupted'), 'warn'); };
+ACT.waAskReconnect = function(){ waAskResume(); toast(T('ai.chat.reconnect'), 'info'); };
+ACT.admCard = function(v){ toast('入口：'+T('adm.card.'+v)+'（原型未展开）', 'info'); };
+
+/* ===================== CHG 处理器（change 委托） ===================== */
+const CHG = {
+  aiToolToolset: function(v){ S.aiFilter.toolset=v; render(); },
+  aiToolOp: function(v){ S.aiFilter.op=v; render(); },
+  aiToolStatus: function(v){ S.aiFilter.status=v; render(); },
+  usagePeriod: function(v){ S.usagePeriod=v; render(); },
+  replayInput: function(v){ S.replayInput=v; render(); },
+  astGovType: function(v){ S.cogTab=v; render(); },
+  autoCeiling: function(v){ S.agent.automation=v; render(); },
+};
+
+/* ===================== 事件委托 ===================== */
+document.addEventListener('click', function(e){
+  const navEl = e.target.closest('[data-nav]');
+  if (navEl){ nav(navEl.dataset.nav); return; }
+  const actEl = e.target.closest('[data-act]');
+  if (actEl){ const name=actEl.dataset.act; const v=actEl.dataset.v||''; if(ACT[name]){ e.preventDefault(); ACT[name](v, actEl); } return; }
+});
+document.addEventListener('change', function(e){
+  const chgEl = e.target.closest('[data-act-chg]');
+  if (chgEl){ const name=chgEl.dataset.actChg; const v=chgEl.value||chgEl.dataset.v||''; if(CHG[name]){ CHG[name](v, chgEl); } }
+});
+document.addEventListener('keydown', function(e){
+  if (e.key !== 'Enter') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const entEl = e.target.closest('[data-enter]');
+  if (entEl){ e.preventDefault(); const name=entEl.dataset.enter; if(ACT[name]){ ACT[name](entEl.value||'', entEl); } }
+});
+
+/* ===================== 路由分发 ===================== */
+function render(){
+  const r = parseRoute();
+  renderShell(r);
+  const mod = moduleOf(r.seg);
+  let html = '';
+  try {
+    if (mod === 'decision'){
+      if (!r.seg[1]) html = PAGES.decOverview();
+      else if (r.seg[1] === 'scene' && r.seg[2]){
+        const sc = getSc(r.seg[2]);
+        if (!sc) html = PAGES.notFound();
+        else if (r.seg[3] === 'forecast') html = PAGES.decForecast(r.seg[2]);
+        else if (r.seg[3] === 'ask') html = PAGES.decAsk(r.seg[2]);
+        else html = PAGES.decDetail(r.seg[2]);
+      }
+      else if (r.seg[1] === 'todo') html = PAGES.decTodo();
+      else if (r.seg[1] === 'actions') html = PAGES.decActions();
+      else if (r.seg[1] === 'feedback') html = PAGES.decFeedback();
+      else if (r.seg[1] === 'mind') html = r.seg[2] ? PAGES.decMindDetail(r.seg[2]) : PAGES.decMinds();
+      else html = PAGES.notFound();
+    }
+    else if (mod === 'assets'){
+      const p = r.seg[1] || 'overview';
+      if (p === 'overview') html = PAGES.astOverview();
+      else if (p === 'evidence') html = PAGES.astEvidence();
+      else if (p === 'beliefs') html = PAGES.astBeliefs();
+      else if (p === 'models') html = PAGES.astModels();
+      else if (p === 'results') html = PAGES.astResults();
+      else if (p === 'governance') html = PAGES.astGovernance();
+      else html = PAGES.notFound();
+    }
+    else if (mod === 'aiwork'){
+      const p = r.seg[1] || 'chat';
+      if (p === 'agents') html = PAGES.aiAgents();
+      else if (p === 'chat') html = PAGES.aiChat();
+      else if (p === 'tools') html = PAGES.aiTools();
+      else if (p === 'guardrails') html = PAGES.aiGuardrails();
+      else if (p === 'models') html = PAGES.aiModels();
+      else if (p === 'replay') html = PAGES.aiReplay(r.seg[2]||'');
+      else if (p === 'usage') html = PAGES.aiUsage();
+      else if (p === 'monitor') html = PAGES.aiMonitor(r.seg[2]||'run-7001');
+      else if (p === 'config') html = PAGES.aiConfig();
+      else html = PAGES.notFound();
+    }
+    else if (mod === 'admin'){
+      html = PAGES.admOverview();
+    }
+    else {
+      html = PAGES.notFound();
+    }
+  } catch(err){
+    html = '<div class="state-block err" role="alert">'+ic('alert-triangle',40)+'<div class="t"><b>渲染异常</b></div><p class="small mono">'+esc(err && err.message || String(err))+'</p><button class="btn sm" data-act="demoReset">'+T('common.retry')+'</button></div>';
+    if (window.console && console.error) console.error(err);
+  }
+  const view = document.getElementById('view');
+  if (view){
+    view.innerHTML = html;
+    view.scrollTop = 0;
+  }
+  const ap = document.getElementById('ask-panel');
+  if (ap){ ap.classList.toggle('open', !!S.askOpen); }
+}
+
+/* ===================== 启动 ===================== */
+function boot(){
+  document.documentElement.dataset.theme = S.theme;
+  const fab = document.getElementById('ask-fab');
+  if (fab){ fab.addEventListener('click', function(){ ACT.toggleAsk(); }); }
+  window.addEventListener('hashchange', render);
+  render();
+}
+boot();
+
+</script>
+</body>
+</html>
