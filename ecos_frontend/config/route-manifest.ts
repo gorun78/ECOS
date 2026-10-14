@@ -89,8 +89,9 @@ export const AIMING_DEV_TRUST_HEADERS: Readonly<Record<string, string>> = Object
 
 /**
  * 唯一事实源。条目集合 = server.ts 显式路由(2)+开关分支(5)+catch-all(1)
- * 与 vite.config.ts 代理表(18 直连 + 3 兜底) 的并集，共 26 条（21 条进 vite 表）。
- * 顺序即 vite proxy 对象的 key 插入顺序（vite 按前缀匹配，顺序保持迁移前后等价）。
+ * 与 vite.config.ts 代理表(18 直连 + 3 gateway 宿主的 knowledge 子路径 + 3 兜底) 的并集，
+ * 共 29 条（24 条进 vite 表）。
+ * 顺序即 vite proxy 对象的 key 插入顺序（vite 按前缀匹配，首中生效 ⇒ 更具体前缀必须先于父前缀）。
  */
 export const ROUTE_MANIFEST: readonly RouteManifestEntry[] = Object.freeze([
   // ── BFF 显式 gateway 路由（不进 vite 表：dev 下由 server.ts 先于 vite 注册）──
@@ -102,6 +103,13 @@ export const ROUTE_MANIFEST: readonly RouteManifestEntry[] = Object.freeze([
   { prefix: "/api/v1/agent-mesh", engine: "ai", port: 18084, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: true, devRewrite: ["^/api/v1/", "/api/"] },
   { prefix: "/api/v1/agent", engine: "ai", port: 18084, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: true },
   { prefix: "/api/v1/agent-call", engine: "ai", port: 18084, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: true },
+  // workspace 宿主例外（dev-only）：knowledge 工作台 stats/engine-config/health 三端点由
+  // gateway 宿主（workspace-impl KnowledgeWorkbenchController :89/:107/:72），kb-engine :18086
+  // 无这些路径 ⇒ dev 必须用更具体前缀回落 gateway（vite 前缀匹配按插入序首中），否则 404。
+  // prod 仍走 BFF `/api` catch-all → gateway，本组只生成 dev vite 表条目，不改生产路由归属。
+  { prefix: "/api/v1/knowledge/stats", engine: "gateway", port: 8080, directInDev: false, directWhenFlag: false, alwaysGateway: false, streaming: false, viteFallback: true },
+  { prefix: "/api/v1/knowledge/engine-config", engine: "gateway", port: 8080, directInDev: false, directWhenFlag: false, alwaysGateway: false, streaming: false, viteFallback: true },
+  { prefix: "/api/v1/knowledge/health", engine: "gateway", port: 8080, directInDev: false, directWhenFlag: false, alwaysGateway: false, streaming: false, viteFallback: true },
   { prefix: "/api/v1/knowledge", engine: "kb", port: 18086, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
   { prefix: "/api/v1/security", engine: "security", port: 18081, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
   { prefix: "/api/v1/audit", engine: "security", port: 18081, directInDev: true, directWhenFlag: false, alwaysGateway: false, streaming: false },
@@ -155,8 +163,9 @@ export function resolveLocalDirectFlag(
  * target 必填——清单派生项一律给出上游地址） */
 export type ViteProxyEntryLike = ProxyOptions & { target: string };
 
-/** 由清单派生 vite dev 代理表（21 条：18 引擎直连 + /api|/datanet|/cases gateway 兜底）。
- * `/api` 兜底保留 Authorization 透传 configure（等价旧 vite.config.ts:48-54）。 */
+/** 由清单派生 vite dev 代理表（24 条：18 引擎直连 + 3 条 gateway 宿主的 knowledge 子路径
+ * + /api|/datanet|/cases gateway 兜底）。
+ * gateway 兜底条目一律带 Authorization 透传 configure（等价旧 vite.config.ts:48-54 的 /api 面）。 */
 export function buildViteDevProxyTable(
   env: Record<string, string | undefined> = process.env,
   manifest: readonly RouteManifestEntry[] = ROUTE_MANIFEST,
@@ -183,14 +192,15 @@ export function buildViteDevProxyTable(
       table[entry.prefix] = item;
     } else if (entry.viteFallback) {
       const item: ViteProxyEntryLike = { target: gatewayBase, changeOrigin: true };
-      if (entry.prefix === CATCH_ALL_PREFIX) {
-        item.configure = (proxy) => {
-          proxy.on("proxyReq", (proxyReq, req) => {
-            const auth = req.headers["authorization"];
-            if (auth) proxyReq.setHeader("Authorization", auth);
-          });
-        };
-      }
+      // gateway 兜底一律透传调用方身份：/api catch-all 等价旧 vite.config.ts:48-54，
+      // 更具体前缀（如 /api/v1/knowledge/stats 走 gateway 宿主）替换 catch-all 后必须保持同款透传，
+      // 否则同一次页面加载会因路由归属变化而丢 Authorization。
+      item.configure = (proxy) => {
+        proxy.on("proxyReq", (proxyReq, req) => {
+          const auth = req.headers["authorization"];
+          if (auth) proxyReq.setHeader("Authorization", auth);
+        });
+      };
       table[entry.prefix] = item;
     }
   }

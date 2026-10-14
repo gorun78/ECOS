@@ -10,7 +10,8 @@ import {
 } from './config/route-manifest';
 
 // route-manifest 单源（详细设计-08 §4.1 / W194/C176 / R-54 ①）：
-// dev 代理表由 config/route-manifest.ts 派生（18 条引擎直连 + /api、/datanet、/cases 三条 gateway 兜底 = 21 条），
+// dev 代理表由 config/route-manifest.ts 派生（18 条引擎直连 + 3 条 gateway 宿主的 knowledge 子路径
+// + /api、/datanet、/cases 三条 gateway 兜底 = 24 条），
 // 与本文件同源的 server.ts（Express BFF）读取同一清单；构建期校验失败即抛错，禁运行期静默。
 const devProxyTable = buildViteDevProxyTable(process.env);
 const manifestErrors = validateRouteManifest(undefined, devProxyTable);

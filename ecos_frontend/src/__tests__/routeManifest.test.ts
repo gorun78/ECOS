@@ -5,7 +5,8 @@
  *
  * 证明 vite.config.ts（dev 直连表）与 server.ts（BFF prod/默认承流）从同一
  * config/route-manifest.ts 派生，双表已消灭：
- *  - vite dev 表恰为迁移前 21 条（18 引擎直连 + /api、/datanet、/cases gateway 兜底），target 等价；
+ *  - vite dev 表 = 迁移前 21 条基线（18 引擎直连 + /api、/datanet、/cases gateway 兜底）
+ *    + 3 条迁移后新增的 gateway 宿主 knowledge 子路径（stats/engine-config/health），target 等价；
  *  - BFF 显式路由 = alwaysGateway 2 条（monitor/twins）+ 开关分支 5 条 + catch-all /api；
  *  - 构建期校验①②③通过，且变异注入（删表项/加表外项）会被校验捕获。
  */
@@ -72,6 +73,18 @@ const PRE_MIGRATION_VITE_TARGETS: Record<string, number> = {
   "/cases": 8080,
 };
 
+/**
+ * 迁移后新增：knowledge 工作台的 stats/engine-config/health 三端点物理宿主在 gateway
+ * （workspace-impl KnowledgeWorkbenchController，gateway fat-JAR 宿主），kb-engine :18086
+ * 无这些路径 ⇒ dev 必须用更具体前缀回落 gateway，否则 404（2026-10-14 live 实证）。
+ * 生产侧不受影响：BFF 默认 gateway-only，仍由 `/api` catch-all 承流。
+ */
+const GATEWAY_HOSTED_KNOWLEDGE_KEYS = [
+  "/api/v1/knowledge/stats",
+  "/api/v1/knowledge/engine-config",
+  "/api/v1/knowledge/health",
+];
+
 const viteConfigSrc = readFileSync(resolve(__dirname, "../../vite.config.ts"), "utf8");
 const serverSrc = readFileSync(resolve(__dirname, "../../server.ts"), "utf8");
 
@@ -86,11 +99,22 @@ describe("bff › route manifest single source (W194/C176)", () => {
     // server.ts 已无手写开关分支 / 手写 catch-all 字面量注册
     expect(serverSrc).not.toMatch(/app\.use\(\s*["']\/api\/(dq|datalake|v1\/ecos\/git)["']/);
 
-    // 1) dev 侧：vite 表 = 迁移前 21 条、target 端口逐条等价
+    // 1) dev 侧：vite 表 = 迁移前 21 条基线 + 3 条 gateway 宿主 knowledge 子路径，target 逐条等价
     const table = buildViteDevProxyTable({});
-    expect(Object.keys(table).sort()).toEqual([...PRE_MIGRATION_VITE_KEYS].sort());
+    expect(Object.keys(table).sort()).toEqual(
+      [...PRE_MIGRATION_VITE_KEYS, ...GATEWAY_HOSTED_KNOWLEDGE_KEYS].sort(),
+    );
     for (const [prefix, port] of Object.entries(PRE_MIGRATION_VITE_TARGETS)) {
       expect(table[prefix]?.target, `vite target of ${prefix}`).toBe(`http://localhost:${port}`);
+    }
+    for (const prefix of GATEWAY_HOSTED_KNOWLEDGE_KEYS) {
+      expect(table[prefix]?.target, `vite target of ${prefix}`).toBe("http://localhost:8080");
+    }
+    // 前缀归属不变式：更具体前缀必须排在父前缀之前（vite 按插入序首中，否则被 kb :18086 截胡）
+    const prefixes = ROUTE_MANIFEST.map((e) => e.prefix);
+    const knowledgeIdx = prefixes.indexOf("/api/v1/knowledge");
+    for (const prefix of GATEWAY_HOSTED_KNOWLEDGE_KEYS) {
+      expect(prefixes.indexOf(prefix), `${prefix} 必须早于 /api/v1/knowledge`).toBeLessThan(knowledgeIdx);
     }
     // aiming dev 直连仍注入信任头（F05-14/R-16 等价迁移）
     expect(table["/api/v1/agent-loop"]?.headers).toEqual({
@@ -99,8 +123,11 @@ describe("bff › route manifest single source (W194/C176)", () => {
     });
     expect(table["/api/v1/cognitive"]?.headers).toBeDefined();
     expect(table["/api/v1/security"]?.headers).toBeUndefined();
-    // /api 兜底保留 Authorization 透传 configure
+    // gateway 兜底（含替换 catch-all 的更具体前缀）一律保留 Authorization 透传 configure
     expect(typeof table["/api"]?.configure).toBe("function");
+    for (const prefix of GATEWAY_HOSTED_KNOWLEDGE_KEYS) {
+      expect(typeof table[prefix]?.configure, `configure of ${prefix}`).toBe("function");
+    }
 
     // 2) prod/BFF 侧：显式路由与开关分支从同一清单派生
     const explicitFlagOff = selectBffExplicitEntries(false).map((e) => e.prefix);
