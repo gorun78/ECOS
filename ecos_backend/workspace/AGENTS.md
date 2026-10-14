@@ -24,6 +24,8 @@
 | 探测 / 聚合 | `ScenarioOptionsController`（**唯一跨 service 聚合探测点**） | D-3 三滤波器 |
 
 > 精确端点数以路由 mapping 表实测为准（`OpenApiPathParityTest` 与 `docs/40-实现/SCENARIO_OPENAPI.md` 对齐）；本文件不写死会漂移的总数。
+>
+> **2026-10-15 #140 子批 A 订正注**：`OpenApiPathParityTest` 已实装于 `gateway/src/test/java/com/chinacreator/gzcm/gateway/`（差距分析曾判其为悬空引用）。落地形态=**静态扫描 workspace main 源码映射注解**，非 Spring `RequestMappingHandlerMapping` 反射；三向对账（详设-07 D-2 12 行 ≡ 契约片段 12 条 ≡ 6 属主类 12 映射）+ 详设 line 529 具名用例 `#everyWorkspaceMappingHasAnOperationId`，2026-10-15 实跑 6/6 绿。反射档/可达性档仍属真容器 IT，本类不冒充（D-3 禁静态门禁宣称可达性）。
 
 ## 3. 认知四端点（E1~E4）契约纪律
 
