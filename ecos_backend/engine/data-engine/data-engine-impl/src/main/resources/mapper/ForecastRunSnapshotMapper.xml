@@ -11,11 +11,32 @@
     <select id="selectRunHeader" resultType="java.util.LinkedHashMap">
         SELECT forecast_run_id, scenario_id, run_type, status,
                caliber_id, caliber_version, as_of_time,
-               snapshot_id, formula_version, baseline_run_id,
+               snapshot_id, formula_version, baseline_run_id, reused_from_run_id, task_id,
+               idempotency_key, content_hash,
                simulation_result_json, forecast_result_json, diagnosis_result_json,
                domain, version_no, is_deleted, create_time, update_time, create_by, update_by
         FROM ecos_dw.ecos_application_forecast_run
         WHERE forecast_run_id = #{forecastRunId} AND is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <!--
+      按幂等键定位（详设-09 H-5 幂等复用判定链，V287 增列）：
+      WHERE idempotency_key = #{idempotencyKey} → idx_afcr_idem(idempotency_key, is_deleted) 命中。
+      ORDER BY create_time DESC LIMIT 1：同键多行只可能是「异内容指纹冲突」场景
+      （V287 刻意不建唯一索引，冲突判定归 ForecastRunStateMachine），取最新行为裁决基准。
+      无行 → 结果集空 → null，由 service 转「未命中」语义，禁伪装空快照。
+    -->
+    <select id="selectRunHeaderByIdempotencyKey" resultType="java.util.LinkedHashMap">
+        SELECT forecast_run_id, scenario_id, run_type, status,
+               caliber_id, caliber_version, as_of_time,
+               snapshot_id, formula_version, baseline_run_id, reused_from_run_id, task_id,
+               idempotency_key, content_hash,
+               simulation_result_json, forecast_result_json, diagnosis_result_json,
+               domain, version_no, is_deleted, create_time, update_time, create_by, update_by
+        FROM ecos_dw.ecos_application_forecast_run
+        WHERE idempotency_key = #{idempotencyKey} AND is_deleted = 0
+        ORDER BY create_time DESC
         LIMIT 1
     </select>
 

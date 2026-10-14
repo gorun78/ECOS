@@ -76,6 +76,64 @@ public class ForecastArtifactWriteChannel {
                            String scenarioId,
                            String runType,
                            String traceId) {
+        return submit(artifact, null, scenarioId, runType, traceId, null, null);
+    }
+
+    /**
+     * 提交一次确定性产物（<b>全要素形态</b>，B2-② 批新增，旧 4 参签名保留委派 ⇒ API 只增不改）。
+     *
+     * <p><b>本重载修的是一处真实缺陷</b>：{@link #WHERE_COLUMNS} 声明以
+     * {@code forecast_run_id/caliber_id/caliber_version/as_of_time} 四列做 UPSERT 定位，
+     * 而原 {@code headerRow} 只写 5 列、<b>从不带</b> caliber_id/caliber_version/as_of_time
+     * ⇒ 通道按 NULL 列匹配，"同键重放不产生第二行"在数据层无从命中（V197 列一直存在，
+     * 是写侧漏填）。补齐后六要素锚定列与 WHERE 列一致。</p>
+     *
+     * <p>幂等/指纹两列（V287）随产物一并落库：{@code idempotency_key} 供 data-engine
+     * 幂等键读端点定位既有 run，{@code content_hash} 供编排面判"同键异指纹 ⇒ 409 冲突"。
+     * 二者均为存值真值，禁在读侧回推伪造。</p>
+     *
+     * @param artifact      {@link DeterministicForecastCalculator#compute} 装配的产物
+     * @param factors       六要素（可空 = 沿用旧形态只写 5 列；非空时补齐口径/时点三列）
+     * @param scenarioId    场景业务键（必填，V197 NOT NULL 列）
+     * @param runType       运行类型（DIAGNOSE/FORECAST/SIMULATE/STRATEGY/FULL）
+     * @param traceId       全链路追踪 ID（必填，写通道四必带项之一）
+     * @param snapshotId    输入快照键（V277 列，可空 = 历史形态无快照锚定，禁伪造）
+     * @param baselineRunId 反事实/情景重算基准运行键（V197 列，可空）
+     */
+    public WriteAck submit(DeterministicForecastCalculator.Artifact artifact,
+                           DeterministicForecastCalculator.SixFactors factors,
+                           String scenarioId,
+                           String runType,
+                           String traceId,
+                           String snapshotId,
+                           String baselineRunId) {
+        return submit(artifact, factors, scenarioId, runType, traceId, snapshotId, baselineRunId, null, null);
+    }
+
+    /**
+     * 提交一次确定性产物（<b>幂等锚外置形态</b>，B2-② 批追加，上一 7 参签名保留委派 ⇒ API 只增不改）。
+     *
+     * <p><b>裁决 D-B2②-1（幂等键/内容指纹属主 = 调用方）</b>：{@code DeterministicForecastCalculator}
+     * 自算的 {@code artifact.idempotencyKey()} 是「口径域:六要素指纹」，含 {@code forecastRunId} ⇒
+     * 每次重试必不同；而编排契约（{@code ForecastRunRequestValidator} 必填的
+     * {@code idempotencyKey}/{@code contentHash}）表达的是「同一请求重放」语义。
+     * 若库里只落引擎派生键，编排面按调用方键查 {@code findByIdempotencyKey} 将<b>永远查不到</b>
+     * ⇒ 幂等复用与"同键异指纹 409"双双形同虚设（真断点，非风格问题）。
+     * 故本重载允许调用方传入外置锚：非空 ⇒ 落 {@code idempotency_key}/{@code content_hash} 两列，
+     * 为空 ⇒ 沿用产物派生值（旧 7 参行为零变化）。产物自算哈希仍在 canonicalBytes 内可复核。</p>
+     *
+     * @param requestIdempotencyKey 调用方幂等键（可空 = 沿用产物派生键）
+     * @param requestContentHash    调用方内容指纹（可空 = 沿用产物指纹）
+     */
+    public WriteAck submit(DeterministicForecastCalculator.Artifact artifact,
+                           DeterministicForecastCalculator.SixFactors factors,
+                           String scenarioId,
+                           String runType,
+                           String traceId,
+                           String snapshotId,
+                           String baselineRunId,
+                           String requestIdempotencyKey,
+                           String requestContentHash) {
         if (scenarioId == null || scenarioId.isBlank()) {
             throw new CognitiveGuardException(CognitiveErrorCode.E400_INVALID_PARAM,
                     CognitiveErrorCode.E400_INVALID_PARAM + ": scenarioId 必填（写通道 carrier 定位要素残缺）");
@@ -92,7 +150,8 @@ public class ForecastArtifactWriteChannel {
         body.put("traceId", traceId);
         body.put("idempotencyKey", artifact.idempotencyKey());
         body.put("whereColumns", WHERE_COLUMNS);
-        body.put("rows", headerRow(artifact, scenarioId, runType));
+        body.put("rows", headerRow(artifact, factors, scenarioId, runType, snapshotId, baselineRunId,
+                requestIdempotencyKey, requestContentHash));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -126,15 +185,40 @@ public class ForecastArtifactWriteChannel {
 
     /** 运行头行（明细走 forecast_result_json TEXT，MC02 不建索引、不参与 WHERE）。 */
     private Map<String, Object> headerRow(DeterministicForecastCalculator.Artifact artifact,
+                                          DeterministicForecastCalculator.SixFactors factors,
                                           String scenarioId,
-                                          String runType) {
+                                          String runType,
+                                          String snapshotId,
+                                          String baselineRunId,
+                                          String requestIdempotencyKey,
+                                          String requestContentHash) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("forecast_run_id", artifact.forecastRunId());
         row.put("scenario_id", scenarioId);
         row.put("run_type", runType == null ? "FORECAST" : runType);
         row.put("status", "SUCCEEDED");
         row.put("forecast_result_json", new String(artifact.canonicalBytes(), java.nio.charset.StandardCharsets.UTF_8));
+        // 幂等锚（V287）：调用方外置锚优先（裁决 D-B2②-1），缺省沿用产物派生真值，禁在读侧回推伪造
+        row.put("idempotency_key", orKeep(requestIdempotencyKey, artifact.idempotencyKey()));
+        row.put("content_hash", orKeep(requestContentHash, artifact.contentHash()));
+        if (factors != null) {
+            // WHERE 定位三列补齐（修复"声明参与 WHERE 却从不写值"的漏填）
+            row.put("caliber_id", factors.caliberId());
+            row.put("caliber_version", factors.caliberVersion());
+            row.put("as_of_time", factors.asOfTime());
+        }
+        if (snapshotId != null && !snapshotId.isBlank()) {
+            row.put("snapshot_id", snapshotId);      // V277 列，缺位不写（禁空串冒充快照锚定）
+        }
+        if (baselineRunId != null && !baselineRunId.isBlank()) {
+            row.put("baseline_run_id", baselineRunId);
+        }
         return row;
+    }
+
+    /** 外置锚优先、缺省沿用产物派生值（两值均为存值真值，禁造默认占位）。 */
+    private static String orKeep(String primary, String fallback) {
+        return primary != null && !primary.isBlank() ? primary : fallback;
     }
 
     private static Integer asInt(Object o) {

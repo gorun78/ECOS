@@ -35,4 +35,17 @@ public class ForecastRunSnapshotController {
     public ApiResponse<ForecastRunSnapshotVO> getForecastRunSnapshot(@PathVariable("runId") String runId) {
         return ApiResponse.success(snapshotService.getSnapshot(runId));
     }
+
+    /**
+     * getForecastRunSnapshotByIdempotencyKey — 按幂等键定位既有运行（H-5 幂等复用判定链，只增不改）。
+     *
+     * <p>语义与按 runId 读的关键差别：<b>未命中 = code 0 + data null</b>（"首次运行"的正常分支，
+     * 编排面据此继续提交），而非 404。键空白 = 400（禁全库扫描）。
+     * 消费方：cognitive {@code ForecastRunComputeService} → workspace {@code findByIdempotencyKey}。</p>
+     */
+    @GetMapping("/by-idempotency-key/{idempotencyKey}/snapshot")
+    public ApiResponse<ForecastRunSnapshotVO> getForecastRunSnapshotByIdempotencyKey(
+            @PathVariable("idempotencyKey") String idempotencyKey) {
+        return ApiResponse.success(snapshotService.getSnapshotByIdempotencyKey(idempotencyKey));
+    }
 }

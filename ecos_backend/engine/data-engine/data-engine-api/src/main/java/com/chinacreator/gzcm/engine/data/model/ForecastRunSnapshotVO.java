@@ -58,6 +58,20 @@ public class ForecastRunSnapshotVO {
     private String runType;
     private String status;
     private String baselineRunId;
+    /**
+     * 幂等复用来源运行键（V277 增列）。
+     *
+     * <p><b>本字段是补齐项</b>：cognitive 侧 {@code DataEngineForecastRunSnapshotReader.SnapshotLineage}
+     * 早已按 {@code reusedFromRunId} 键名读取该列，但本 VO 从未声明该字段 ⇒ 线上恒为缺失键、
+     * 复用回链在生产不可观测（2026-10-15 B2-② 批次发现并修复）。历史行缺值 = null，禁伪造回填。
+     */
+    private String reusedFromRunId;
+    /** 异步运行任务键（V277 task_id；runtime-task 真实 taskId，同步运行为 null）。 */
+    private String taskId;
+    /** 幂等键（V287 增列；与唯一写通道台账同值，历史搬运行 null）。 */
+    private String idempotencyKey;
+    /** 内容指纹（V287 增列；同键异指纹 ⇒ 编排面 409 冲突判定依据，禁改写）。 */
+    private String contentHash;
 
     // ── 金额真值（缺载荷时为 null，禁伪造）──
     private BigDecimal baselineProfit;
@@ -163,4 +177,12 @@ public class ForecastRunSnapshotVO {
     public void setCells(List<CellVO> cells) { this.cells = cells == null ? new ArrayList<>() : cells; }
     public List<EdgeVO> getEdges() { return edges; }
     public void setEdges(List<EdgeVO> edges) { this.edges = edges == null ? new ArrayList<>() : edges; }
+    public String getReusedFromRunId() { return reusedFromRunId; }
+    public void setReusedFromRunId(String reusedFromRunId) { this.reusedFromRunId = reusedFromRunId; }
+    public String getTaskId() { return taskId; }
+    public void setTaskId(String taskId) { this.taskId = taskId; }
+    public String getIdempotencyKey() { return idempotencyKey; }
+    public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
+    public String getContentHash() { return contentHash; }
+    public void setContentHash(String contentHash) { this.contentHash = contentHash; }
 }

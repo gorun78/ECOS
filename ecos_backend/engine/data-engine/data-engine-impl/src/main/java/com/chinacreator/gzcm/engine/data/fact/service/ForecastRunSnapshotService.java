@@ -72,7 +72,30 @@ public class ForecastRunSnapshotService {
             throw new com.chinacreator.gzcm.common.exception.DataBridgeException(
                     404, 404, "预测运行不存在: " + forecastRunId, null);
         }
+        return toSnapshotVO(header);
+    }
 
+    /**
+     * 按幂等键取只读快照（详设-09 H-5 幂等复用判定链 / V287 增列，只读）。
+     *
+     * <p>与 {@link #getSnapshot} 的唯一语义差别：<b>未命中返回 null 而非 404</b>。
+     * 理由：幂等键未命中是"首次运行"的正常分支（编排面据此继续 submit），不是资源缺失；
+     * 把正常分支做成 404 会诱使调用侧用异常控制流程并掩盖真实的路由未上线（X-44）。</p>
+     *
+     * @return 命中返回 VO；未命中返回 null（调用方禁据此造数）
+     * @throws com.chinacreator.gzcm.common.exception.DataBridgeException 400（键空白——禁全库扫描）
+     */
+    public ForecastRunSnapshotVO getSnapshotByIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new com.chinacreator.gzcm.common.exception.DataBridgeException(
+                    400, 400, "ECOS-DATA-023：idempotencyKey 不能为空（禁全库扫描）", null);
+        }
+        Map<String, Object> header = snapshotMapper.selectRunHeaderByIdempotencyKey(idempotencyKey.trim());
+        return header == null ? null : toSnapshotVO(header);
+    }
+
+    /** 运行头 → 快照 VO（两条读路径共用同一映射，禁形态分叉）。 */
+    private ForecastRunSnapshotVO toSnapshotVO(Map<String, Object> header) {
         ForecastRunSnapshotVO vo = new ForecastRunSnapshotVO();
         vo.setForecastRunId(str(header.get("forecast_run_id")));
         vo.setCaliberId(str(header.get("caliber_id")));
@@ -84,6 +107,11 @@ public class ForecastRunSnapshotService {
         vo.setRunType(str(header.get("run_type")));
         vo.setStatus(str(header.get("status")));
         vo.setBaselineRunId(str(header.get("baseline_run_id")));
+        // V277/V287 增列：历史行缺值原样 null（禁伪造回填）；cognitive 侧 SnapshotLineage.reused() 依赖本键
+        vo.setReusedFromRunId(str(header.get("reused_from_run_id")));
+        vo.setTaskId(str(header.get("task_id")));
+        vo.setIdempotencyKey(str(header.get("idempotency_key")));
+        vo.setContentHash(str(header.get("content_hash")));
 
         JsonNode payload = firstParseable(str(header.get("simulation_result_json")),
                 str(header.get("forecast_result_json")));

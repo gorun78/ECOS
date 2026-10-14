@@ -195,4 +195,97 @@ class ForecastRunSnapshotContractTest {
         assertEquals(400, ex.getHttpStatus());
         verify(snapshotMapper, never()).selectRunHeader(any());
     }
+
+    // ── V287 幂等锚两列 + 按幂等键读路径（差距分析 P0-4 / 详设-09 H-5 判定链）──
+
+    @Test
+    @DisplayName("按运行键读：V287 两列 + V277 task_id/reused_from_run_id 齐备透出")
+    void v287AnchorColumnsSurfaceOnRunKeyRead() {
+        ForecastRunSnapshotService service = new ForecastRunSnapshotService(snapshotMapper);
+        Map<String, Object> h = header(false);
+        h.put("idempotency_key", "idem-caller-0001");
+        h.put("content_hash", "sha256:aa55");
+        h.put("reused_from_run_id", "run-60");
+        h.put("task_id", "task-777");
+        when(snapshotMapper.selectRunHeader("run-77")).thenReturn(h);
+
+        ForecastRunSnapshotVO vo = service.getSnapshot("run-77");
+
+        assertEquals("idem-caller-0001", vo.getIdempotencyKey());
+        assertEquals("sha256:aa55", vo.getContentHash());
+        assertEquals("run-60", vo.getReusedFromRunId());
+        assertEquals("task-777", vo.getTaskId());
+    }
+
+    @Test
+    @DisplayName("历史行缺 V287 列 ⇒ 幂等锚 null（禁伪造回填，读侧不可据此判复用）")
+    void legacyRowWithoutAnchorColumnsStaysNull() {
+        ForecastRunSnapshotService service = new ForecastRunSnapshotService(snapshotMapper);
+        when(snapshotMapper.selectRunHeader("run-77")).thenReturn(header(false));
+
+        ForecastRunSnapshotVO vo = service.getSnapshot("run-77");
+
+        assertNull(vo.getIdempotencyKey());
+        assertNull(vo.getContentHash());
+        assertNull(vo.getReusedFromRunId());
+        assertNull(vo.getTaskId());
+    }
+
+    @Test
+    @DisplayName("按幂等键读：命中行映射与按运行键读同形（两条读路径禁形态分叉）")
+    void snapshotByIdempotencyKeyUsesSameMapping() {
+        ForecastRunSnapshotService service = new ForecastRunSnapshotService(snapshotMapper);
+        Map<String, Object> h = header(true);
+        h.put("idempotency_key", "idem-caller-0001");
+        h.put("content_hash", "sha256:aa55");
+        when(snapshotMapper.selectRunHeaderByIdempotencyKey("idem-caller-0001")).thenReturn(h);
+
+        ForecastRunSnapshotVO byKey = service.getSnapshotByIdempotencyKey("idem-caller-0001");
+
+        assertEquals("run-77", byKey.getForecastRunId());
+        assertEquals("idem-caller-0001", byKey.getIdempotencyKey());
+        assertEquals("sha256:aa55", byKey.getContentHash());
+        assertEquals(2, byKey.getCells().size());
+        // 库侧按 create_time DESC LIMIT 1 取最近一行，读侧不再二次筛选
+        verify(snapshotMapper).selectRunHeaderByIdempotencyKey("idem-caller-0001");
+        verify(snapshotMapper, never()).selectRunHeader(any());
+    }
+
+    @Test
+    @DisplayName("按幂等键未命中 ⇒ 返回 null 而非 404（首次运行的正常分支，禁把正常分支做成异常）")
+    void idempotencyKeyMissIsNullNot404() {
+        ForecastRunSnapshotService service = new ForecastRunSnapshotService(snapshotMapper);
+        when(snapshotMapper.selectRunHeaderByIdempotencyKey("idem-new")).thenReturn(null);
+
+        assertNull(service.getSnapshotByIdempotencyKey("idem-new"));
+    }
+
+    @Test
+    @DisplayName("幂等键空白 ⇒ 400 且不触库（禁全库扫描）")
+    void blankIdempotencyKeyIs400NoQuery() {
+        ForecastRunSnapshotService service = new ForecastRunSnapshotService(snapshotMapper);
+        DataBridgeException ex = assertThrows(DataBridgeException.class,
+                () -> service.getSnapshotByIdempotencyKey("   "));
+        assertEquals(400, ex.getHttpStatus());
+        assertTrue(ex.getMessage().contains("idempotencyKey"), ex.getMessage());
+        verify(snapshotMapper, never()).selectRunHeaderByIdempotencyKey(any());
+    }
+
+    @Test
+    @DisplayName("序列化键名 = cognitive/workspace 读侧键名（reusedFromRunId/taskId/idempotencyKey/contentHash）")
+    void wireKeysMatchReaderSideNames() throws Exception {
+        ForecastRunSnapshotService service = new ForecastRunSnapshotService(snapshotMapper);
+        Map<String, Object> h = header(false);
+        h.put("idempotency_key", "idem-1");
+        h.put("content_hash", "hash-1");
+        h.put("task_id", "task-1");
+        when(snapshotMapper.selectRunHeader("run-77")).thenReturn(h);
+
+        JsonNode json = new ObjectMapper().valueToTree(service.getSnapshot("run-77"));
+
+        for (String key : new String[]{"reusedFromRunId", "taskId", "idempotencyKey", "contentHash"}) {
+            assertTrue(json.has(key), "读侧依赖键缺失: " + key);
+        }
+        assertEquals("idem-1", json.get("idempotencyKey").asText());
+    }
 }

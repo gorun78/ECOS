@@ -116,4 +116,32 @@ public final class CognitiveApiPaths {
     /** 绝对形态（供文档/契约面引用；Controller 侧用上面的相对段）。 */
     public static final String OUTCOMES_BACKTEST = COGNITIVE + "/outcomes/{evaluationId}/backtest";
     public static final String OUTCOMES_REVIEW_TASKS = COGNITIVE + "/outcomes/{evaluationId}/review-tasks";
+
+    // ── 差距分析 P0-4（详设-09 §十一 H-5 认知侧半区，2026-10-14 追加，只追加本段，上方行零改写）──
+
+    /**
+     * 预测 run 计算与读回端点族（{@code ForecastRunGateway} SPI 的认知域真实落地）。
+     *
+     * <p>正典前缀 = {@link #COGNITIVE} + {@link #FORECAST_RUNS_REL} = {@code /api/v1/cognitive/forecast-runs}；
+     * 与既有 {@code POST /forecast}（时序预测，无 run 语义）严格分族，不复用其路径。
+     * 网关侧<b>无正向 rewrite 条目</b>（对齐 {@code /api/v1/dq/}、{@code /api/v1/pipeline/} 的 KEEP 教训：
+     * 全库无 {@code /api/cognitive/forecast-runs} 的 legacy Controller，重写会把正典改到空目标）。</p>
+     */
+    public static final String PARAM_FORECAST_RUN_ID = "forecastRunId";
+    public static final String PARAM_IDEMPOTENCY_KEY = "idempotencyKey";
+    /** 类级前缀下的相对段（Controller 侧只用相对段，绝对常量供契约/文档面引用）。 */
+    public static final String FORECAST_RUNS_REL = "/forecast-runs";
+    public static final String FORECAST_RUNS_COMPUTE_REL = FORECAST_RUNS_REL + "/compute";
+    public static final String FORECAST_RUNS_ITEM_REL = FORECAST_RUNS_REL + "/{" + PARAM_FORECAST_RUN_ID + "}";
+    public static final String FORECAST_RUNS_BY_KEY_REL =
+            FORECAST_RUNS_REL + "/by-idempotency-key/{" + PARAM_IDEMPOTENCY_KEY + "}";
+    public static final String FORECAST_RUNS_RESULTS_REL = FORECAST_RUNS_ITEM_REL + "/results";
+    public static final String FORECAST_RUNS_EVIDENCE_REL = FORECAST_RUNS_ITEM_REL + "/evidence";
+    /** 绝对形态（文档/契约引用）。 */
+    public static final String FORECAST_RUNS = COGNITIVE + FORECAST_RUNS_REL;
+    public static final String FORECAST_RUNS_COMPUTE = COGNITIVE + FORECAST_RUNS_COMPUTE_REL;
+    public static final String FORECAST_RUNS_ITEM = COGNITIVE + FORECAST_RUNS_ITEM_REL;
+    public static final String FORECAST_RUNS_BY_KEY = COGNITIVE + FORECAST_RUNS_BY_KEY_REL;
+    public static final String FORECAST_RUNS_RESULTS = COGNITIVE + FORECAST_RUNS_RESULTS_REL;
+    public static final String FORECAST_RUNS_EVIDENCE = COGNITIVE + FORECAST_RUNS_EVIDENCE_REL;
 }
