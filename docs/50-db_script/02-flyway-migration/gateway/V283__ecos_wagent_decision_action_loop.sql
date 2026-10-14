@@ -15,7 +15,20 @@
 -- Schema 归属: ecos_ai（ST07 五引擎枚举，§10.4.4 禁建 ecos_agent schema；R-33① 同批口径）。
 -- 唯一约束: `UNIQUE(decision_id, baseline_slot)`（§10.4.2 原文）——非 baseline 行 baseline_slot=NULL，
 --   唯一索引忽略 NULL ⇒ 多库兼容，替代 partial index（禁项）。
--- 状态: **仅落文件，未对 ecos-postgres 实跑**（实跑需逐项授权，同 V227~V240 口径 §14.4）。
+-- 状态: **已对 ecos-postgres/sys_man 实跑**（2026-10-14 用户裁决「建，但把金额四列改形态」；
+--       实跑凭证与幂等复验见 docs/40-实现/DDL迁移脚本落地登记-2026-09-30.md §十五）。
+-- ── 本窗订正（2026-10-14 用户裁决「建，但把金额四列改形态」，其余条文不动）────────
+-- 四枚金额列 profit_delta / revenue_delta / cost_delta / cash_impact NUMERIC(18,2) **移出本表**：
+--   ecos_ai 属 ST07 控制域五引擎 schema，而《列级加密豁免登记表》§二·续·补三（2026-10-10 W272 批）
+--   已把纪律写死——"控制域 ecos_ai 禁落金额语义，金额实列唯一轨道为业务域 ecos_dw；
+--   若语义升级为金额必须迁 ecos_dw 并逐列另起豁免行，不得就地升级本声明"；ST03-A ④ 另定控制域永不可豁免。
+--   设计 §10.4.2 把四列放在 ecos_ai 属**设计↔规范冲突**，按用户 R9①（铁律/规范为单源权威）以规范为准。
+-- 处置 = 本表改以 `amount_ref VARCHAR(36)` 弱关联引用位承接金额面（同 V176 stats_ref 家规），
+--   金额实列另立 **V286__ecos_dw_wagent_option_amount.sql** 落 ecos_dw（APPLICATION 层）。
+--   非金额三枚数值列**留本表**（判据 = 非货币/无量纲）：risk_delta 比率 NUMERIC(9,6)、
+--   confidence 概率 NUMERIC(5,4)、headcount_impact 人数 NUMERIC(9,2)，与 §二·续·补三
+--   已声明的 intent_confidence / cover_ratio 同族，属派生统计量，不入金额轨道。
+-- ────────────────────────────────────────────────────────────────────────────
 -- 纪律: DR01~DR08 / MC01~MC02 / ST04/ST05(不写 RLS) / ST07 / ST09(无跨 schema FK) / IR02 / IR03(只加不删)
 -- ============================================================
 
@@ -55,13 +68,10 @@ CREATE TABLE IF NOT EXISTS ecos_ai.ecos_wagent_decision_option (
     lever_target_id     VARCHAR(36),                           -- 作用对象（逻辑引用）
     delta_text          TEXT,                                  -- 差异摘要（叙事）
     feasibility         VARCHAR(16),                           -- 可行性（值域待枚举单源）
-    profit_delta        NUMERIC(18,2),                         -- 金额列唯一形态 NUMERIC(p,s)（MC02/类型白名单）
-    revenue_delta       NUMERIC(18,2),
-    cost_delta          NUMERIC(18,2),
-    cash_impact         NUMERIC(18,2),
-    risk_delta          NUMERIC(9,6),                          -- 比率
-    confidence          NUMERIC(5,4),                          -- 概率
-    headcount_impact    NUMERIC(9,2),                          -- 人数影响
+    amount_ref          VARCHAR(36),                           -- 金额面引用位（弱关联，V176 stats_ref 同族家规）→ ecos_dw.ecos_application_wagent_option_amount.option_id；本表不落金额实列（文头订正）
+    risk_delta          NUMERIC(9,6),                          -- 比率（无量纲，非货币，留控制域）
+    confidence          NUMERIC(5,4),                          -- 概率（同上）
+    headcount_impact    NUMERIC(9,2),                          -- 人数影响（非货币）
     baseline_slot       SMALLINT,                              -- 基准槽位；NULL=非 baseline 行（唯一索引忽略 NULL，多库兼容）
     domain              VARCHAR(50) NOT NULL DEFAULT 'default',
     version_no          VARCHAR(20) NOT NULL,
@@ -73,9 +83,12 @@ CREATE TABLE IF NOT EXISTS ecos_ai.ecos_wagent_decision_option (
     trace_id            VARCHAR(64)
 );
 COMMENT ON TABLE ecos_ai.ecos_wagent_decision_option IS
-    'W 域备选方案对比（Option：feasibility/profit_delta/risk_delta/baseline_slot，详设 §10.4.2/§10.3 七问「备选方案与比较」）';
+    'W 域备选方案对比（Option：feasibility/risk_delta/confidence/headcount_impact/baseline_slot，详设 §10.4.2/§10.3 七问「备选方案与比较」）；四枚金额面经 amount_ref 弱关联至 ecos_dw.ecos_application_wagent_option_amount（V286），控制域不落金额实列';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_wagent_option_decision_baseline
     ON ecos_ai.ecos_wagent_decision_option (decision_id, baseline_slot);  -- §10.4.2 唯一约束原文，替代 partial index
+COMMENT ON COLUMN ecos_ai.ecos_wagent_decision_option.amount_ref IS
+    '金额面引用位（应用侧生成 VARCHAR(36)，不建 FK — ST09）：指向 ecos_dw.ecos_application_wagent_option_amount.option_id（V286）。'
+    '四枚金额（profit/revenue/cost/cash）该表 1:1 承载；NULL=金额面尚未核算，禁在本控制域表以任何数值形态落地';
 
 CREATE TABLE IF NOT EXISTS ecos_ai.ecos_wagent_action (
     id                  VARCHAR(36) PRIMARY KEY,
@@ -139,6 +152,9 @@ CREATE INDEX IF NOT EXISTS idx_wagent_effect_action ON ecos_ai.ecos_wagent_actio
 --   三段一致纪律（PRD 冻结枚举 → 代码 enum → DDL CHECK）要求枚举单源存在后才收紧；
 --   WAgentEnums 当前无这六组值域 ⇒ 本批不臆造，待 wagent 决策面代码批次（差距文档 B3）落地时同批补 CHECK。
 -- D3 version_no NOT NULL 无默认：同 V227~V240 家规（应用侧写入方生成），不另立默认值造成双真相。
+-- D4【本窗裁决】四枚金额列移出 ecos_ai → 由 V286 在 ecos_dw 承载，本表以 amount_ref 引用位衔接
+--   （判据与理由见文头「本窗订正」）。代价如实登记：设计 §10.4.2 原文的列清单与本表实列不再逐字一致，
+--   台账 docs/30-设计/ECOS实体物理表名映射台账-2026-10-14.md §C 的 V283 行须同步标注"金额列拆出 V286"。
 -- ──────────────────────────────────────────────────────────
 
 -- ── 回滚说明 ──────────────────────────────────────────────
@@ -147,8 +163,11 @@ CREATE INDEX IF NOT EXISTS idx_wagent_effect_action ON ecos_ai.ecos_wagent_actio
 -- 实跑影响面：新增 4 表 + 4 索引，均 0 行；不触碰任何存量表/列/策略；无 RLS 语句。
 --
 -- ── DDL Lint Self-audit ──────────────────────────────────────
--- [DR01] ecos_ai. 限定 ✓  [DR02] ecos_ 前缀 ✓  [DR03] 表单数 ✓  [DR04] planned_json/actual_json 带后缀 ✓
--- [DR05] is_deleted SMALLINT ✓  [DR06] create_time/update_time ✓  [DR07] version_no VARCHAR(20) ✓  [DR08] domain ✓
--- [MC01] VARCHAR(36) PK 无 gen_random_uuid ✓  [MC02] JSON 一律 *_json TEXT，无 JSONB ✓；金额 NUMERIC(18,2)/比率(9,6)/概率(5,4)/人数(9,2) 全在白名单 ✓
+-- [DR01] ecos_ai. 限定 ✓  [DR02] ecos_ 前缀 ✓（注意 lint DR02 对 schema 限定 CREATE 空判，见登记表 §十四 D-16，本行为人工核对）
+-- [DR03] 表单数 ✓  [DR04] planned_json/actual_json 带后缀 ✓  [DR05] is_deleted SMALLINT ✓  [DR06] create/update_time ✓
+-- [DR07] version_no VARCHAR(20) ✓  [DR08] domain ✓
+-- [MC01] VARCHAR(36) PK 无 gen_random_uuid ✓  [MC02] JSON 一律 *_json TEXT，无 JSONB ✓
+-- [MC02/金额] 本表**零金额实列**（D4 移出）；余三枚数值列 = 比率(9,6)/概率(5,4)/人数(9,2)，非货币，
+--            按豁免登记表 §二·续·补三"逐列不登记声明"处置，控制域豁免面零新增
 -- [MC03] 无 PG 专有语法（partial index/分区均避用）✓  [ST04/05] 不写 RLS ✓  [ST06] 无审计表 ✓
--- [ST07] ecos_ai 五引擎枚举内 ✓  [ST09] 无跨 schema FK（全逻辑引用）✓  [IR02] 只落文件，实跑待授权 ✓  [IR03] 只加不删 ✓
+-- [ST07] ecos_ai 五引擎枚举内 ✓  [ST09] 无跨 schema FK（全逻辑引用）✓  [IR02] 已手动 psql 实跑（凭证登记表 §十五）✓  [IR03] 只加不删 ✓
