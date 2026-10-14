@@ -91,6 +91,17 @@ class WAgentDdlShapeComplianceTest {
             "V286__ecos_dw_wagent_option_amount.sql"
     );
 
+    /**
+     * 业务域金额承载表全名 —— <b>本门禁的登记表字面量</b>（不建连、不发 SQL、只作钉死清单的键）。
+     *
+     * <p>C.3.6 业务域写通道唯一性门禁（{@code BusinessDomainWriteArchTest}）对非 data-engine
+     * 文件里的带点限定名逐行判定，故此处以单点常量承载，并让命中行自带
+     * {@code ddl-shape-inventory-only} 标记在该门禁的登记表里显式登记理由；
+     * 该门禁另有反向守卫，标记一旦失效（行没了/改名）即变红，不做死豁免。</p>
+     */
+    private static final String DW_AMOUNT_TABLE =
+            "ecos_dw.ecos_application_wagent_option_amount"; // ddl-shape-inventory-only
+
     /** 21 张 wagent 表（20 张控制域 ecos_ai + 1 张业务域 ecos_dw）。 */
     private static final Set<String> PINNED_TABLES = Set.of(
             "ecos_ai.ecos_wagent_goal",
@@ -113,7 +124,7 @@ class WAgentDdlShapeComplianceTest {
             "ecos_ai.ecos_wagent_decision_option",
             "ecos_ai.ecos_wagent_action",
             "ecos_ai.ecos_wagent_action_effect",
-            "ecos_dw.ecos_application_wagent_option_amount"
+            DW_AMOUNT_TABLE
     );
 
     /** 钉死豁免：纯 n:m 关联表允许复合主键（无独立 id 列），逐表登记理由。 */
@@ -124,7 +135,7 @@ class WAgentDdlShapeComplianceTest {
 
     /** 钉死豁免：业务域金额承载表（控制域金额永不可豁免 ST03-A ④ ⇒ 金额列只能落这里）。 */
     private static final Set<String> BUSINESS_DOMAIN_AMOUNT_TABLES = Set.of(
-            "ecos_dw.ecos_application_wagent_option_amount"
+            DW_AMOUNT_TABLE
     );
 
     /**
@@ -234,7 +245,7 @@ class WAgentDdlShapeComplianceTest {
                         Pattern.CASE_INSENSITIVE).matcher(junction.body()).find(),
                 "解析器在 claim_evidence 表体内看不到复合主键 ⇒ body 抽取退化");
 
-        TableShape amount = byName.get("ecos_dw.ecos_application_wagent_option_amount");
+        TableShape amount = byName.get(DW_AMOUNT_TABLE);
         assertTrue(amount != null, "解析器未抓到 V286 业务域金额表");
         for (String col : List.of("profit_delta", "revenue_delta", "cost_delta", "cash_impact")) {
             assertTrue(Pattern.compile("\\b" + col + "\\s+NUMERIC\\s*\\(\\s*18\\s*,\\s*2\\s*\\)",

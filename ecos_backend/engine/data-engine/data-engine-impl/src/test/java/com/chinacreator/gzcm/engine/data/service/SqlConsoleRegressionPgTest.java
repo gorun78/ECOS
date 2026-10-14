@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -71,7 +72,10 @@ class SqlConsoleRegressionPgTest {
                         new JdbcConnector.ColumnDescriptor("id", "id", "bigint"),
                         new JdbcConnector.ColumnDescriptor("tenant", "tenant", "character varying")),
                 rows, false);
-        when(jc.executeQueryGuarded(eq(PG_CONFIG), anyString(), anyInt(), anyInt(), anyInt()))
+        // W31（QueryExecutorBindingTest 批）：executeQueryGuarded 增第 3 位绑定值参数
+        // (config, sql, params, maxRows, timeout, rowLimit)。本类只管通道路由，故对参数表取
+        // anyList()；「值不入 SQL」的断言在 QueryExecutorBindingTest，不在此放宽也不在此重复。
+        when(jc.executeQueryGuarded(eq(PG_CONFIG), anyString(), anyList(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(guarded);
 
         Map<String, Object> result = svc.execute(
@@ -80,7 +84,7 @@ class SqlConsoleRegressionPgTest {
                 Collections.emptyMap(), 100, 30);
 
         // 关键路由断言：建连与查询统一走 JdbcConnector（1 次）
-        verify(jc).executeQueryGuarded(eq(PG_CONFIG), anyString(), anyInt(), anyInt(), eq(10000));
+        verify(jc).executeQueryGuarded(eq(PG_CONFIG), anyString(), anyList(), anyInt(), anyInt(), eq(10000));
         assertNotNull(result.get("columns"));
         assertNotNull(result.get("rows"));
         assertEquals(1, (Integer) result.get("rowCount"), "rowCount 应 = 1");
@@ -101,14 +105,14 @@ class SqlConsoleRegressionPgTest {
         ds.setDatasourceType("POSTGRESQL");
         ds.setConnectionConfig(PG_CONFIG);
         when(dsSvc.getById("ds-pg-err")).thenReturn(ds);
-        when(jc.executeQueryGuarded(anyString(), anyString(), anyInt(), anyInt(), anyInt()))
+        when(jc.executeQueryGuarded(anyString(), anyString(), anyList(), anyInt(), anyInt(), anyInt()))
                 .thenThrow(new java.sql.SQLException("relation \"t\" does not exist"));
 
         org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
                 () -> svc.execute("ds-pg-err", "SELECT * FROM t LIMIT 100",
                         Collections.emptyMap(), 100, 30),
                 "PG syntax/relation 错误必须 fail-loud，不得假返回空 rows");
-        verify(jc).executeQueryGuarded(eq(PG_CONFIG), anyString(), anyInt(), anyInt(), eq(10000));
+        verify(jc).executeQueryGuarded(eq(PG_CONFIG), anyString(), anyList(), anyInt(), anyInt(), eq(10000));
     }
 
     @Test

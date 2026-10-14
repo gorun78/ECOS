@@ -508,37 +508,81 @@ public class JdbcConnector implements Connector {
     public GuardedResult executeQueryGuarded(String connectionConfig, String sql,
                                              int maxRows, int timeoutSeconds,
                                              int rowLimit) throws SQLException {
+        return executeQueryGuarded(connectionConfig, sql, null, maxRows, timeoutSeconds, rowLimit);
+    }
+
+    /**
+     * 带<b>参数绑定</b>的受保护查询（详细设计-01 W31／门禁 {@code QueryExecutorBindingTest}）。
+     *
+     * <p>W31 的失败判据是「字面量入 SQL」：调用方此前把 {@code :name} 占位符的值经
+     * 字符串替换（含手工转义 {@code ''}）内联进 SQL 文本，值与语句同体 ⇒ RLS 谓词绑定值
+     * 一旦含引号即可改写语句。本重载把语句与值彻底分开：{@code sql} 只含 JDBC
+     * 位置占位符 {@code ?}，{@code params} 按占位符出现序经
+     * {@link PreparedStatement#setObject(int, Object)} 绑定，任何值都不进入 SQL 文本。</p>
+     *
+     * <p>{@code params} 为 {@code null}/空时走原 {@link Statement} 形态，
+     * 与 5 参重载行为逐字一致（既有无参调用方零行为变化）。</p>
+     *
+     * @param params 按 {@code ?} 出现序对齐的绑定值（可为 {@code null} 元素 ⇒ 绑 NULL）
+     */
+    public GuardedResult executeQueryGuarded(String connectionConfig, String sql, List<?> params,
+                                             int maxRows, int timeoutSeconds,
+                                             int rowLimit) throws SQLException {
         List<ColumnDescriptor> columns = new ArrayList<>();
         List<Map<String, Object>> rows = new ArrayList<>();
-        boolean truncated = false;
 
-        try (Connection conn = openConnection(connectionConfig);
-             Statement stmt = conn.createStatement()) {
-            if (timeoutSeconds > 0) {
-                stmt.setQueryTimeout(timeoutSeconds);
-            }
-            if (maxRows > 0) {
-                stmt.setMaxRows(maxRows);
-            }
-            try (ResultSet rs = stmt.executeQuery(sql)) {
-                ResultSetMetaData rsmd = rs.getMetaData();
-                int colCount = rsmd.getColumnCount();
-                for (int i = 1; i <= colCount; i++) {
-                    columns.add(new ColumnDescriptor(
-                        rsmd.getColumnName(i), rsmd.getColumnLabel(i), rsmd.getColumnTypeName(i)));
-                }
-                while (rs.next()) {
-                    if (rowLimit > 0 && rows.size() >= rowLimit) {
-                        truncated = true;
-                        break;
+        try (Connection conn = openConnection(connectionConfig)) {
+            if (params == null || params.isEmpty()) {
+                try (Statement stmt = conn.createStatement()) {
+                    if (timeoutSeconds > 0) {
+                        stmt.setQueryTimeout(timeoutSeconds);
                     }
-                    Map<String, Object> row = new java.util.LinkedHashMap<>();
-                    for (int i = 1; i <= colCount; i++) {
-                        row.put(rsmd.getColumnLabel(i), rs.getObject(i));
+                    if (maxRows > 0) {
+                        stmt.setMaxRows(maxRows);
                     }
-                    rows.add(row);
+                    try (ResultSet rs = stmt.executeQuery(sql)) {
+                        return readGuarded(rs, columns, rows, rowLimit);
+                    }
                 }
             }
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                if (timeoutSeconds > 0) {
+                    ps.setQueryTimeout(timeoutSeconds);
+                }
+                if (maxRows > 0) {
+                    ps.setMaxRows(maxRows);
+                }
+                for (int i = 0; i < params.size(); i++) {
+                    ps.setObject(i + 1, params.get(i));
+                }
+                try (ResultSet rs = ps.executeQuery()) {
+                    return readGuarded(rs, columns, rows, rowLimit);
+                }
+            }
+        }
+    }
+
+    /** 列元数据 + 按 label 取行 + 应用侧触顶截断（Statement／PreparedStatement 两形态共用）。 */
+    private static GuardedResult readGuarded(ResultSet rs, List<ColumnDescriptor> columns,
+                                             List<Map<String, Object>> rows, int rowLimit)
+            throws SQLException {
+        ResultSetMetaData rsmd = rs.getMetaData();
+        int colCount = rsmd.getColumnCount();
+        for (int i = 1; i <= colCount; i++) {
+            columns.add(new ColumnDescriptor(
+                rsmd.getColumnName(i), rsmd.getColumnLabel(i), rsmd.getColumnTypeName(i)));
+        }
+        boolean truncated = false;
+        while (rs.next()) {
+            if (rowLimit > 0 && rows.size() >= rowLimit) {
+                truncated = true;
+                break;
+            }
+            Map<String, Object> row = new java.util.LinkedHashMap<>();
+            for (int i = 1; i <= colCount; i++) {
+                row.put(rsmd.getColumnLabel(i), rs.getObject(i));
+            }
+            rows.add(row);
         }
         return new GuardedResult(columns, rows, truncated);
     }

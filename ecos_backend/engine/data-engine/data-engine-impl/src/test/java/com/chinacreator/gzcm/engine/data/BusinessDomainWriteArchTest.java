@@ -80,6 +80,25 @@ class BusinessDomainWriteArchTest {
             "engine/cognitive-engine/cognitive-engine-impl/src/test/java/com/chinacreator/gzcm/"
                     + "engine/cognitive2/seam/CognitiveObjectCatalogTest.java");
 
+    /**
+     * <b>第二类逐行豁免（2026-10-15 追加，不改第一类语义）</b>：DDL 形态门禁的表名登记字面量。
+     *
+     * <p>触发场景＝本仓新增的静态门禁 {@code gateway/.../WAgentDdlShapeComplianceTest}：
+     * 它按 ST03-A ④「金额实列唯一落业务域 ecos_dw」钉死一张承载表名做清单对账，
+     * 该字面量<b>不建连、不发 SQL、不读写任何表</b>，只当集合元素用。若不做逐行豁免，
+     * 结果是「守 DDL 形态的门禁被 C.3.6 写通道门禁判成越权」＝两条门禁互相打脸，
+     * 而把表名拆开拼接以躲正则＝给本门禁制造假绿口子，二者都不可取。</p>
+     *
+     * <p>与第一类同样严格：命中行必须自带 {@link #DDL_INVENTORY_TOKEN}，
+     * 同文件其它 {@code ecos_dw.} 字面量照旧 FAIL，并由
+     * {@code ddlInventoryExemptionStillLive} 反向守卫该登记不为死豁免。</p>
+     */
+    private static final String DDL_INVENTORY_TOKEN = "ddl-shape-inventory-only";
+
+    /** DDL 形态门禁登记表字面量的唯一登记面（相对 ecos_backend/，路径须逐字命中）。 */
+    private static final Set<String> DDL_INVENTORY_FILES = Set.of(
+            "gateway/src/test/java/com/chinacreator/gzcm/gateway/WAgentDdlShapeComplianceTest.java");
+
     @Test
     @DisplayName("非 data-engine 模块禁 ecos_dw 限定表名直读直查（Java + XML 同扫）")
     void noEcosDwOutsideDataEngine() throws IOException {
@@ -140,9 +159,23 @@ class BusinessDomainWriteArchTest {
     @Test
     @DisplayName("只读载体描述符豁免不得沦为死豁免或越权扩面")
     void readOnlyCarrierExemptionStillLive() throws IOException {
+        assertExemptionStillLive(READ_ONLY_CARRIER_FILES, READ_ONLY_CARRIER_TOKEN);
+    }
+
+    @Test
+    @DisplayName("DDL 形态门禁登记表豁免同样不得沦为死豁免或越权扩面")
+    void ddlInventoryExemptionStillLive() throws IOException {
+        assertExemptionStillLive(DDL_INVENTORY_FILES, DDL_INVENTORY_TOKEN);
+    }
+
+    /**
+     * 逐行豁免登记面的通用反向守卫：登记文件必须存在、必须至少有一行带标记，
+     * 且<b>不得</b>存在未带标记的 {@code ecos_dw.} 限定名行（那意味着豁免面被拿来掩护真实读写）。
+     */
+    private void assertExemptionStillLive(Set<String> registry, String token) throws IOException {
         Path backend = repoRoot().resolve("ecos_backend");
         List<String> stale = new ArrayList<>();
-        for (String rel : READ_ONLY_CARRIER_FILES) {
+        for (String rel : registry) {
             Path f = backend.resolve(Path.of(rel.replace('/', java.io.File.separatorChar)));
             if (!Files.isRegularFile(f)) {
                 stale.add(rel + " :: 登记文件已不存在（豁免须随之删除）");
@@ -150,21 +183,25 @@ class BusinessDomainWriteArchTest {
             }
             int marked = 0;
             int unmarked = 0;
-            int lin = 0;
             for (String raw : Files.readString(f, StandardCharsets.UTF_8).split("\\R", -1)) {
-                lin++;
                 String t = raw.trim();
                 if (t.isEmpty() || t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")) continue;
                 if (!ECOS_DW_QUALIFIED.matcher(raw).find()) continue;
-                if (raw.contains(READ_ONLY_CARRIER_TOKEN)) marked++;
+                if (raw.contains(token)) marked++;
                 else unmarked++;
             }
             if (marked == 0) stale.add(rel + " :: 无任何带标记的 ecos_dw 描述符行（死豁免）");
             // 未标记行本应被 noEcosDwOutsideDataEngine 拦下；此处冗余断言，防豁免面被放宽
             assertEquals(0, unmarked,
-                    rel + " :: 存在未带标记的 ecos_dw 限定名（只读描述符豁免不得覆盖）");
+                    rel + " :: 存在未带标记的 ecos_dw 限定名（" + token + " 豁免不得覆盖）");
         }
-        assertTrue(stale.isEmpty(), "只读载体描述符登记面失真:\n" + String.join("\n", stale));
+        assertTrue(stale.isEmpty(), "逐行豁免登记面失真:\n" + String.join("\n", stale));
+    }
+
+    /** 命中行是否落在两类<b>逐行</b>豁免登记面之内（文件登记 + 行内标记，二者缺一不豁免）。 */
+    private static boolean exempted(String rel, String raw) {
+        return (READ_ONLY_CARRIER_FILES.contains(rel) && raw.contains(READ_ONLY_CARRIER_TOKEN))
+                || (DDL_INVENTORY_FILES.contains(rel) && raw.contains(DDL_INVENTORY_TOKEN));
     }
 
     /** 单文件扫描：Java 忽略 行首 // * /* 注释；XML 忽略 行首 <!--。 */
@@ -183,8 +220,8 @@ class BusinessDomainWriteArchTest {
                 }
                 // 仅 -File 文档纯叙述（.md 不进入）；.java / .xml 只信实际字面量
                 if (ECOS_DW_QUALIFIED.matcher(raw).find()) {
-                    // 逐行豁免：只读载体描述符必须自带标记，缺标记照旧记违规
-                    if (READ_ONLY_CARRIER_FILES.contains(rel) && raw.contains(READ_ONLY_CARRIER_TOKEN)) {
+                    // 逐行豁免：登记面内的命中行必须自带对应类别标记，缺标记照旧记违规
+                    if (exempted(rel, raw)) {
                         continue;
                     }
                     violations.add(name + ":" + lin + " (" + rel + "): " + t);

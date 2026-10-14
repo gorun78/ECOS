@@ -62,7 +62,11 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
         insertHistoryStart(historyId, datasourceId, sql);
         runningQueries.put(historyId, java.util.concurrent.CompletableFuture.completedFuture(null)); // ConcurrentHashMap 不允许 null value
 
-        String resolvedSql = resolveParams(sql, params);
+        // 详细设计-01 W31：命名参数改「位置占位符 + 绑定值」两段，值不进 SQL 文本
+        //（旧形态是把 `:name` 的值经手工转义字符串替换进 SQL＝失败判据「字面量入 SQL」，
+        //  门禁见 QueryExecutorBindingTest）。历史落库仍记绑定前的模板 SQL，值不入审计文本。
+        BoundSql bound = bindNamedParameters(sql, params);
+        String resolvedSql = bound.sql();
 
         // 大表查询保护：SQL不含LIMIT时自动注入 LIMIT 10000
         if (!Pattern.compile("(?i)\\bLIMIT\\b").matcher(resolvedSql).find()) {
@@ -74,7 +78,7 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
             // H2-T6：建连与受保护查询一律经 runtime-access 的 JdbcConnector（数据库访问规范 IR 系列），
             // 引擎侧只负责把 GuardedResult 组装成既有响应契约（columns/rows/rowCount/elapsedMs/historyId[/truncated]）。
             JdbcConnector.GuardedResult guarded = jdbcConnector.executeQueryGuarded(
-                    ds.getConnectionConfig(), resolvedSql, maxRows, timeoutSeconds, 10000);
+                    ds.getConnectionConfig(), resolvedSql, bound.values(), maxRows, timeoutSeconds, 10000);
 
             List<Map<String, String>> columns = new ArrayList<>();
             for (JdbcConnector.ColumnDescriptor cd : guarded.columns()) {
@@ -301,25 +305,78 @@ public class QueryExecutionServiceImpl implements QueryExecutionService {
         }
     }
 
-    private String resolveParams(String sql, Map<String, Object> params) {
-        if (params == null || params.isEmpty()) {
-            return sql;
-        }
-        String resolved = sql;
-        for (Map.Entry<String, Object> entry : params.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
-            String replaceValue = formatParamValue(value);
-            resolved = resolved.replace(":" + key, replaceValue);
-        }
-        return resolved;
+    /** 命名参数绑定结果：只含位置占位符 {@code ?} 的 SQL，与按出现序对齐的绑定值。 */
+    record BoundSql(String sql, List<Object> values) {
     }
 
-    private String formatParamValue(Object value) {
-        if (value == null) return "NULL";
-        if (value instanceof Number) return value.toString();
-        if (value instanceof Boolean) return value.toString();
-        String str = value.toString().replace("'", "''");
-        return "'" + str + "'";
+    /**
+     * 详细设计-01 W31（P0）：把 SQL 里的 {@code :name} 命名参数改写为 JDBC 位置占位符
+     * {@code ?}，值按<b>出现序</b>收集后经 {@code JdbcConnector} 的
+     * {@link PreparedStatement} 通道绑定 ⇒ 任何参数值都不进入 SQL 文本。
+     *
+     * <p>旧形态是 {@code resolved.replace(":" + key, "'转义值'")} 的字面量内联，
+     * 失败判据正是设计 §4.7.1 的「字面量入 SQL」：RLS 谓词绑定值与用户参数走同一条
+     * {@code params} 通道，值一旦含引号即可改写语句语义。本方法把语句与值彻底分离。</p>
+     *
+     * <p>字符态机跳过三类非占位符上下文：① 单引号字符串字面量（含 {@code ''} 转义）；
+     * ② 双引号标识符；③ PostgreSQL 类型转换 {@code ::}（如 {@code reltuples::bigint}）。</p>
+     *
+     * <p>{@code params} 中不存在对应 key 的 {@code :name} <b>保持原样</b>（不绑 NULL、不吞占位符）：
+     * 把「漏传参数」静默绑成 NULL 会让行级过滤退化为空结果或全放行，属越权面；留原样由
+     * 数据库报语法错误更诚实，也与既有「未登记参数不参与替换」的行为等价。</p>
+     */
+    static BoundSql bindNamedParameters(String sql, Map<String, Object> params) {
+        if (sql == null || sql.isEmpty()) {
+            return new BoundSql(sql, List.of());
+        }
+        List<Object> values = new ArrayList<>();
+        StringBuilder out = new StringBuilder(sql.length() + 16);
+        int i = 0;
+        int n = sql.length();
+        while (i < n) {
+            char c = sql.charAt(i);
+            if (c == '\'' || c == '"') {
+                char quote = c;
+                out.append(c);
+                i++;
+                while (i < n) {
+                    char d = sql.charAt(i);
+                    out.append(d);
+                    i++;
+                    if (d == quote) {
+                        if (i < n && sql.charAt(i) == quote) {   // '' / "" 转义，仍在字面量内
+                            out.append(sql.charAt(i));
+                            i++;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                continue;
+            }
+            if (c == ':' && i + 1 < n && sql.charAt(i + 1) == ':') {
+                out.append("::");
+                i += 2;
+                continue;
+            }
+            if (c == ':' && i + 1 < n && Character.isJavaIdentifierStart(sql.charAt(i + 1))) {
+                int j = i + 1;
+                while (j < n && Character.isJavaIdentifierPart(sql.charAt(j))) {
+                    j++;
+                }
+                String key = sql.substring(i + 1, j);
+                if (params != null && params.containsKey(key)) {
+                    out.append('?');
+                    values.add(params.get(key));
+                } else {
+                    out.append(':').append(key);
+                }
+                i = j;
+                continue;
+            }
+            out.append(c);
+            i++;
+        }
+        return new BoundSql(out.toString(), values);
     }
 }

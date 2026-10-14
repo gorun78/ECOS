@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -75,7 +76,9 @@ class SqlConsoleRegressionDorisTest {
                         new JdbcConnector.ColumnDescriptor("stat_key", "stat_key", "varchar"),
                         new JdbcConnector.ColumnDescriptor("value", "value", "bigint")),
                 rows, false);
-        when(jc.executeQueryGuarded(eq(DORIS_CONFIG), anyString(), anyInt(), anyInt(), anyInt()))
+        // W31（QueryExecutorBindingTest 批）：executeQueryGuarded 增第 3 位绑定值参数；
+        // 本类只钉通道路由，参数表取 anyList()，绑定语义断言见 QueryExecutorBindingTest。
+        when(jc.executeQueryGuarded(eq(DORIS_CONFIG), anyString(), anyList(), anyInt(), anyInt(), anyInt()))
                 .thenReturn(guarded);
 
         Map<String, Object> result = svc.execute(
@@ -83,7 +86,7 @@ class SqlConsoleRegressionDorisTest {
                 "SELECT stat_key, sum(value) FROM ods.fct_stats GROUP BY stat_key ORDER BY stat_key LIMIT 50",
                 Collections.emptyMap(), 50, 30);
 
-        verify(jc).executeQueryGuarded(eq(DORIS_CONFIG), anyString(), anyInt(), anyInt(), eq(10000));
+        verify(jc).executeQueryGuarded(eq(DORIS_CONFIG), anyString(), anyList(), anyInt(), anyInt(), eq(10000));
         assertNotNull(result.get("columns"));
         assertEquals(1, (Integer) result.get("rowCount"), "Doris 查询结果 rowCount 应 = 1");
         Map<?, ?> first = (Map<?, ?>) ((List<?>) result.get("rows")).get(0);
