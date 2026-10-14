@@ -230,7 +230,22 @@ export interface LifecycleAuditEntry {
 
 // ── PMO-54 — engine config ─────────────────────────────────────────────────────
 
-export type EngineConfigScope = 'pgvector' | 'neo4j' | 'llm' | 'task' | 'extract';
+/**
+ * 引擎配置 scope — 单源对齐后端 KnowledgeConfigAggregator.SCOPES。
+ * knowledge/cognitive 可读写（PUT 转发到 dccheng settings / aiming cognitive-config），
+ * all 只读（读侧额外并入本地 sys_config，写侧后端直接拒绝）。
+ */
+export type EngineConfigScope = 'knowledge' | 'cognitive' | 'all';
+
+/** 后端 PUT 只接受这两枚 scope，all 为读侧聚合视图 */
+export type WritableEngineConfigScope = Exclude<EngineConfigScope, 'all'>;
+
+/** GET /engine-config 响应体（KnowledgeEngineConfigVO：只有 scope/config/count，无版本/时间戳） */
+export interface EngineConfigResult {
+  scope: EngineConfigScope;
+  config: EngineConfig;
+  count: number;
+}
 
 /** K1 结构化抽取临时文件上传门禁（引擎配置 extract.allow_direct_upload 驱动） */
 export interface ExtractUploadGate {

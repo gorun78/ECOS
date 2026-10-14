@@ -186,12 +186,6 @@ export async function fetchStructuredJobDetail(jobId: string): Promise<{ jobId: 
   );
 }
 
-/** K1 抽取引擎配置（scope=extract，复用 overview.fetchEngineConfig） */
-export async function fetchExtractEngineConfig(): Promise<{ config: Record<string, unknown>; version: number; updatedAt: string }> {
-  const { fetchEngineConfig } = await import('./overview');
-  return fetchEngineConfig('extract');
-}
-
 /** 待审核文件列表（PMO-56 待补） */
 export async function fetchExtractCandidateFiles(): Promise<{
   fileId: string;

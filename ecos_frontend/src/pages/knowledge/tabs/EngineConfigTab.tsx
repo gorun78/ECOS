@@ -1,99 +1,94 @@
-// 引擎配置 Tab（PMO-55 批次 D）
-// 4 子 Tab: pgvector / neo4j / llm / task
-// 统一走 /api/v1/knowledge/engine-config?scope=（fallback /api/v1/cognitive/config sys_config）
+// 引擎配置 Tab — scope 词表单源对齐后端 KnowledgeConfigAggregator.SCOPES {knowledge, cognitive, all}
+// GET  /api/v1/knowledge/engine-config?scope= → {scope, config: Map<String,String>, count}
+// PUT  /api/v1/knowledge/engine-config        → body {scope, entries}；all 为读侧聚合视图，写侧后端直接拒绝
+// 宿主是 workspace.knowledge.KnowledgeWorkbenchController（gateway :8080 fat-jar 内），不是 kb-engine :18086，
+// dev 直连前缀已在 config/route-manifest.ts 归到 gateway，否则命中 kb-engine 必 404。
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ArrowUpFromLine, Cpu, Database, FileJson, ListChecks, Loader2, RefreshCw, Save,
+  Cpu, Database, Layers, Loader2, RefreshCw, Save,
 } from "lucide-react";
 import { useTheme } from "../../../components/ThemeContext";
 import { useLanguage } from "../../../components/LanguageContext";
 import { knowledgeApi } from "../services/knowledgeApi";
-
-type Scope = "pgvector" | "neo4j" | "llm" | "task" | "extract";
-
-interface EngineConfigWrapper {
-  config: Record<string, unknown>;
-  version: number;
-  updatedAt: string;
-}
+import type {
+  EngineConfig, EngineConfigScope, WritableEngineConfigScope,
+} from "../typesAndConstants";
 
 interface TabProps { showToast?: (type: 'success' | 'info' | 'error', msg: string) => void }
 
-const SCOPES: { scope: Scope; Icon: typeof Database; i18nKey: string }[] = [
-  { scope: "pgvector", Icon: Database, i18nKey: "knowledge.engine_config.scope.pgvector" },
-  { scope: "neo4j", Icon: FileJson, i18nKey: "knowledge.engine_config.scope.neo4j" },
-  { scope: "llm", Icon: Cpu, i18nKey: "knowledge.engine_config.scope.llm" },
-  { scope: "task", Icon: ListChecks, i18nKey: "knowledge.engine_config.scope.task" },
-  { scope: "extract", Icon: ArrowUpFromLine, i18nKey: "knowledge.engine_config.scope.extract" },
-];
+/** 后端读侧上游取数失败时注入的标记键 — 不是配置项，须从列表剔除并转成降级提示 */
+const REMOTE_FAILED_KEY = "_remote_failed";
 
-// 各 scope 的默认 schema 字段（用于编辑 hint + 类型校验）
-const CONFIG_FIELDS: Record<Scope, { key: string; i18nKey: string; type: "number" | "string" | "boolean" }[]> = {
-  pgvector: [
-    { key: "dimensions", i18nKey: "knowledge.engine_config.field.dimensions", type: "number" },
-    { key: "indexType", i18nKey: "knowledge.engine_config.field.indexType", type: "string" },
-    { key: "maintenanceWorkMem", i18nKey: "knowledge.engine_config.field.maintenanceWorkMem", type: "number" },
-    { key: "hnswEfConstruction", i18nKey: "knowledge.engine_config.field.hnswEfConstruction", type: "number" },
-    { key: "hnswM", i18nKey: "knowledge.engine_config.field.hnswM", type: "number" },
-  ],
-  neo4j: [
-    { key: "uri", i18nKey: "knowledge.engine_config.field.uri", type: "string" },
-    { key: "db", i18nKey: "knowledge.engine_config.field.db", type: "string" },
-    { key: "maxConnectionPoolSize", i18nKey: "knowledge.engine_config.field.maxConnectionPoolSize", type: "number" },
-    { key: "readOnlyTimeoutSeconds", i18nKey: "knowledge.engine_config.field.readOnlyTimeoutSeconds", type: "number" },
-    { key: "resultNodeLimit", i18nKey: "knowledge.engine_config.field.resultNodeLimit", type: "number" },
-  ],
-  llm: [
-    { key: "provider", i18nKey: "knowledge.engine_config.field.provider", type: "string" },
-    { key: "model", i18nKey: "knowledge.engine_config.field.model", type: "string" },
-    { key: "temperature", i18nKey: "knowledge.engine_config.field.temperature", type: "number" },
-    { key: "maxTokens", i18nKey: "knowledge.engine_config.field.maxTokens", type: "number" },
-    { key: "timeoutMs", i18nKey: "knowledge.engine_config.field.timeoutMs", type: "number" },
-  ],
-  task: [
-    { key: "threadPoolSize", i18nKey: "knowledge.engine_config.field.threadPoolSize", type: "number" },
-    { key: "maxConcurrency", i18nKey: "knowledge.engine_config.field.maxConcurrency", type: "number" },
-    { key: "retryCount", i18nKey: "knowledge.engine_config.field.retryCount", type: "number" },
-    { key: "deadLetterRetentionDays", i18nKey: "knowledge.engine_config.field.deadLetterRetentionDays", type: "number" },
-    { key: "heartbeatIntervalSeconds", i18nKey: "knowledge.engine_config.field.heartbeatIntervalSeconds", type: "number" },
-  ],
-  // K1 知识抽取 — key 与后端 extract 配置键名一致（snake_case）
-  extract: [
-    { key: "allow_direct_upload", i18nKey: "knowledge.engine_config.field.allowDirectUpload", type: "boolean" },
-    { key: "page_limit", i18nKey: "knowledge.engine_config.field.pageLimit", type: "number" },
-    { key: "max_pages", i18nKey: "knowledge.engine_config.field.maxPages", type: "number" },
-    { key: "periodic_enabled", i18nKey: "knowledge.engine_config.field.periodicEnabled", type: "boolean" },
-  ],
+type FieldType = "boolean" | "number" | "string";
+
+/** 显示元数据，key 与后端 sys_config 实键名逐字一致；未登记的键回落裸键名，不伪造字段 */
+const FIELD_META: Record<string, { i18nKey: string; type: FieldType }> = {
+  // scope=knowledge ← ecos_control.sys_config group 'knowledge'
+  "extract.allow_direct_upload": { i18nKey: "knowledge.engine_config.field.allowDirectUpload", type: "boolean" },
+  "extract.page_limit": { i18nKey: "knowledge.engine_config.field.pageLimit", type: "number" },
+  "extract.max_pages": { i18nKey: "knowledge.engine_config.field.maxPages", type: "number" },
+  "extract.periodic_enabled": { i18nKey: "knowledge.engine_config.field.periodicEnabled", type: "boolean" },
+  "knowledge.graph.defaultDomain": { i18nKey: "knowledge.engine_config.field.defaultDomain", type: "string" },
+  "knowledge.graph.maxNeighborDegree": { i18nKey: "knowledge.engine_config.field.maxNeighborDegree", type: "number" },
+  "knowledge.index.autoSyncEnabled": { i18nKey: "knowledge.engine_config.field.autoSyncEnabled", type: "boolean" },
+  "knowledge.index.batchSize": { i18nKey: "knowledge.engine_config.field.batchSize", type: "number" },
+  "knowledge.lineage.maxDepth": { i18nKey: "knowledge.engine_config.field.lineageMaxDepth", type: "number" },
+  "knowledge.rag.model": { i18nKey: "knowledge.engine_config.field.model", type: "string" },
+  "knowledge.rag.similarityThreshold": { i18nKey: "knowledge.engine_config.field.similarityThreshold", type: "number" },
+  "knowledge.rag.topK": { i18nKey: "knowledge.engine_config.field.ragTopK", type: "number" },
+  // scope=cognitive ← aiming CognitiveConfigController DEFAULTS（group 'cognitive-engine'）
+  "prompt-compiler.topK": { i18nKey: "knowledge.engine_config.field.promptTopK", type: "number" },
+  "prompt-compiler.vectorModel": { i18nKey: "knowledge.engine_config.field.vectorModel", type: "string" },
+  "agent-mesh.routingStrategy": { i18nKey: "knowledge.engine_config.field.routingStrategy", type: "string" },
+  "guardrails.piiDetectionEnabled": { i18nKey: "knowledge.engine_config.field.piiDetection", type: "boolean" },
+  "guardrails.hallucinationCheckEnabled": { i18nKey: "knowledge.engine_config.field.hallucinationCheck", type: "boolean" },
+  "action-bridge.autoExecuteEnabled": { i18nKey: "knowledge.engine_config.field.autoExecute", type: "boolean" },
+  "action-bridge.matchConfidenceThreshold": { i18nKey: "knowledge.engine_config.field.matchConfidence", type: "number" },
 };
 
-interface FieldChange {
-  key: string;
-  value: string; // input 值，保存时按字段类型转换
-}
+const SCOPES: { scope: EngineConfigScope; Icon: typeof Database; i18nKey: string }[] = [
+  { scope: "knowledge", Icon: Database, i18nKey: "knowledge.engine_config.scope.knowledge" },
+  { scope: "cognitive", Icon: Cpu, i18nKey: "knowledge.engine_config.scope.cognitive" },
+  { scope: "all", Icon: Layers, i18nKey: "knowledge.engine_config.scope.all" },
+];
+
+type BannerType = "error" | "warning" | "success" | "info";
 
 export default function EngineConfigTab({ showToast }: TabProps = {}) {
   const { styles } = useTheme();
   const { t } = useLanguage();
-  const [scope, setScope] = useState<Scope>("pgvector");
-  const [cfg, setCfg] = useState<Record<string, unknown>>({});
-  const [meta, setMeta] = useState<{ version: number; updatedAt: string } | null>(null);
+  const [scope, setScope] = useState<EngineConfigScope>("knowledge");
+  const [cfg, setCfg] = useState<EngineConfig>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [changes, setChanges] = useState<FieldChange[]>([]);
-  const [banner, setBanner] = useState<{ type: "info" | "success" | "error"; text: string } | null>(null);
-  const [afterSaveCheck, setAfterSaveCheck] = useState(false); // 是否已保存过（false 时 dirty 检测不触发）
+  const [changes, setChanges] = useState<Record<string, string>>({});
+  const [banner, setBanner] = useState<{ type: BannerType; text: string } | null>(null);
 
-  // 加载当前 scope 的 config
-  const loadScope = useCallback(async (s: Scope) => {
+  const readOnly = scope === "all";
+
+  const bannerClass = (type: BannerType): string => {
+    switch (type) {
+      case "error": return `${styles.dangerBorder} ${styles.dangerBg} ${styles.dangerText}`;
+      case "warning": return `${styles.warningBorder} ${styles.warningBg} ${styles.warningText}`;
+      case "success": return `${styles.successBorder} ${styles.successBg} ${styles.successText}`;
+      default: return `${styles.infoBorder} ${styles.infoBg} ${styles.infoText}`;
+    }
+  };
+
+  // 加载当前 scope — 失败即显式报错并清空，绝不以空配置冒充"没有项"
+  const loadScope = useCallback(async (s: EngineConfigScope) => {
     setLoading(true);
-    setChanges([]);
-    setAfterSaveCheck(false);
+    setChanges({});
     try {
-      const res: EngineConfigWrapper = await knowledgeApi.fetchEngineConfig(s);
-      setCfg((res.config as Record<string, unknown>) || {});
-      setMeta({ version: res.version ?? 1, updatedAt: res.updatedAt ?? "" });
-      setBanner(null);
+      const res = await knowledgeApi.fetchEngineConfig(s);
+      const next = (res.config ?? {}) as EngineConfig;
+      setCfg(next);
+      const remoteFailed = next[REMOTE_FAILED_KEY];
+      setBanner(remoteFailed === undefined
+        ? null
+        : { type: "warning", text: `${t("knowledge.engine_config.remote_failed")} ${String(remoteFailed)}` });
     } catch (e) {
+      setCfg({});
       setBanner({ type: "error", text: `${t("knowledge.engine_config.load_failed")} ${String(e)}` });
     } finally {
       setLoading(false);
@@ -104,59 +99,51 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
     void loadScope(scope);
   }, [scope, loadScope]);
 
-  const fields = useMemo(() => CONFIG_FIELDS[scope], [scope]);
+  // 后端返回什么键就渲染什么键（服务端驱动），按字典序稳定排列
+  const rows = useMemo(
+    () => Object.keys(cfg).filter(k => k !== REMOTE_FAILED_KEY).sort(),
+    [cfg],
+  );
 
-  const displayFor = (k: string, v: unknown): string => {
-    if (v === null || v === undefined) return "";
-    return String(v);
+  const displayFor = (k: string): string => {
+    const v = cfg[k];
+    return v === null || v === undefined ? "" : String(v);
   };
 
-  /** 按字段类型把 input 原始值转回真实配置值（number → Number，boolean → 布尔，其余原样） */
-  const toConfigValue = (type: "number" | "string" | "boolean", raw: string): unknown => {
-    if (type === "number") return Number(raw);
-    if (type === "boolean") return raw === "true";
-    return raw;
-  };
-
-  const changedValue = (k: string): string => {
-    const c = changes.find(x => x.key === k);
-    return c?.value ?? "";
-  };
-  const dirty = changes.length > 0;
+  const dirty = Object.keys(changes).length > 0;
 
   const updateField = (k: string, raw: string) => {
-    const original = displayFor(k, cfg[k]);
+    const original = displayFor(k);
     setChanges(prev => {
-      const next = prev.filter(c => c.key !== k);
-      if (raw !== original) next.push({ key: k, value: raw });
+      const next = { ...prev };
+      if (raw === original) delete next[k];
+      else next[k] = raw;
       return next;
     });
   };
 
-  const resetField = (k: string) => setChanges(prev => prev.filter(c => c.key !== k));
-
   const save = async () => {
+    if (readOnly || !dirty) return;
     setSaving(true);
     try {
-      // 按字段类型反序列化（number 强制 number，boolean 转布尔）
-      const newCfg: Record<string, unknown> = { ...cfg };
-      for (const chg of changes) {
-        const f = fields.find(fd => fd.key === chg.key);
-        newCfg[chg.key] = toConfigValue(f?.type ?? "string", chg.value);
+      // 后端只回 {updated}，不含版本/时间戳，前端不得合成
+      const { updated } = await knowledgeApi.saveEngineConfig(
+        scope as WritableEngineConfigScope,
+        { ...changes },
+      );
+      setChanges({});
+      await loadScope(scope);
+      if (updated <= 0) {
+        // 0 行落库不是成功：后端语义上没写入任何东西
+        setBanner({ type: "warning", text: t("knowledge.engine_config.save_noop") });
+        showToast?.('info', t("knowledge.engine_config.save_noop"));
+        return;
       }
-      const updated: EngineConfigWrapper = await knowledgeApi.saveEngineConfig(scope, newCfg);
-      setCfg((updated?.config as Record<string, unknown>) || {});
-      setMeta({ version: updated?.version ?? 1, updatedAt: updated?.updatedAt ?? "" });
-      setChanges([]);
-      setAfterSaveCheck(true);
-      setBanner({
-        type: "success",
-        text: `${t("knowledge.engine_config.save_success")} v${updated?.version ?? 1}`,
-      });
+      setBanner({ type: "success", text: `${t("knowledge.engine_config.save_success")} ${updated}` });
+      showToast?.('success', t("knowledge.engine_config.save_success"));
     } catch (e) {
-      // 失败 toast 替 500 白屏（C-3 要求）
       showToast?.('error', `${t("knowledge.engine_config.save_failed")} ${String(e)}`);
-      setBanner({ type: "error", text: String(e) });
+      setBanner({ type: "error", text: `${t("knowledge.engine_config.save_failed")} ${String(e)}` });
     } finally {
       setSaving(false);
     }
@@ -168,10 +155,10 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
         {/* 头部 */}
         <div>
           <h2 className={`text-xl font-bold ${styles.cardText}`}>{t("knowledge.engine_config.title")}</h2>
-          <p className="text-xs mt-1 opacity-70">{t("knowledge.engine_config.subtitle")}</p>
+          <p className={`text-xs mt-1 ${styles.cardTextMuted}`}>{t("knowledge.engine_config.subtitle")}</p>
         </div>
 
-        {/* scope 切换栏 — 4 scope sub-section 用 i18nKey 渲染 */}
+        {/* scope 切换栏 — 与后端 SCOPES 同集合 */}
         <div className={`border rounded-lg flex items-center gap-1 p-1 ${styles.cardBg} ${styles.cardBorder}`}>
           {SCOPES.map(({ scope: s, Icon, i18nKey }) => (
             <button type="button"
@@ -179,7 +166,7 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
               onClick={() => setScope(s)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 scope === s
-                  ? `${styles.accentBg} text-white`
+                  ? `${styles.accentBg} ${styles.accentSolidText}`
                   : `border ${styles.inputBorder} hover:opacity-80`
               }`}
             >
@@ -201,91 +188,92 @@ export default function EngineConfigTab({ showToast }: TabProps = {}) {
         </div>
 
         {banner && (
-          <div
-            className={`rounded-md border px-3 py-2 text-xs ${
-              banner.type === "error"
-                ? "border-red-300 bg-red-100 text-red-800"
-                : "border-green-300 bg-green-100 text-green-800"
-            }`}
-          >
+          <div className={`rounded-md border px-3 py-2 text-xs ${bannerClass(banner.type)}`}>
             {banner.text}
           </div>
         )}
 
-        {/* 配置面板 */}
+        {/* 配置面板 — 行集来自服务端响应 */}
         <div className={`border rounded-lg overflow-hidden ${styles.cardBg} ${styles.cardBorder}`}>
           <div className="flex items-center justify-between px-4 py-2.5 border-b" style={{ borderColor: styles.cardBorder }}>
             <div className="text-sm font-medium">{t("knowledge.engine_config.field_list_hint")}</div>
-            {meta && (
-              <div className="text-[10px] font-mono opacity-60">
-                v{meta.version} · {new Date(meta.updatedAt).toLocaleString()}
-              </div>
-            )}
+            <div className={`text-[10px] font-mono ${styles.cardTextMuted}`}>
+              {t("knowledge.engine_config.item_count", { count: rows.length })}
+              {readOnly ? ` · ${t("knowledge.engine_config.readonly_hint")}` : ""}
+            </div>
           </div>
-          <div className="divide-y" style={{ borderColor: styles.cardBorder }}>
-            {fields.map(f => {
-              const isChanged = changes.some(c => c.key === f.key);
-              return (
-                  <div key={f.key} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center px-4 py-2.5">
-                  <div className="text-xs">
-                    <div>{t(f.i18nKey)}</div>
-                    <div className="text-[10px] font-mono opacity-50">{f.key}</div>
-                  </div>
-                  <div className="col-span-2 flex items-center gap-2">
-                    {f.type === "boolean" ? (
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
+          {loading ? (
+            <div className="flex items-center gap-2 px-4 py-6 text-xs opacity-70">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              {t("knowledge.engine_config.loading")}
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="px-4 py-6 text-xs opacity-70">{t("knowledge.engine_config.empty_hint")}</div>
+          ) : (
+            <div className="divide-y" style={{ borderColor: styles.cardBorder }}>
+              {rows.map(k => {
+                const meta = FIELD_META[k];
+                const type = meta?.type ?? "string";
+                const original = displayFor(k);
+                const isChanged = k in changes;
+                const current = isChanged ? changes[k] : original;
+                return (
+                  <div key={k} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center px-4 py-2.5">
+                    <div className="text-xs">
+                      <div>{meta ? t(meta.i18nKey) : k}</div>
+                      <div className={`text-[10px] font-mono ${styles.cardTextMuted}`}>{k}</div>
+                    </div>
+                    <div className="col-span-2 flex items-center gap-2">
+                      {type === "boolean" ? (
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            disabled={readOnly}
+                            checked={current === "true"}
+                            onChange={e => updateField(k, e.target.checked ? "true" : "false")}
+                            className="w-4 h-4 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                          <span className={`text-[11px] font-mono ${styles.cardTextMuted}`}>{current}</span>
+                        </label>
+                      ) : (
                         <input
-                          type="checkbox"
-                          checked={
-                            isChanged
-                              ? changedValue(f.key) === "true"
-                              : cfg[f.key] === true || cfg[f.key] === "true"
-                          }
-                          onChange={e => updateField(f.key, e.target.checked ? "true" : "false")}
-                          className="w-4 h-4 cursor-pointer"
+                          type={type === "number" ? "number" : "text"}
+                          step={type === "number" ? "any" : undefined}
+                          disabled={readOnly}
+                          value={current}
+                          onChange={e => updateField(k, e.target.value)}
+                          className={`w-full px-2.5 py-1.5 text-xs rounded-md border focus:outline-none disabled:opacity-60 ${styles.inputBg} ${styles.inputBorder} ${styles.inputText}`}
                         />
-                        <span className="text-[11px] font-mono opacity-70">
-                          {isChanged
-                            ? changedValue(f.key)
-                            : String(cfg[f.key] ?? "")}
-                        </span>
-                      </label>
-                    ) : (
-                      <input
-                        type={f.type === "number" ? "number" : "text"}
-                        value={isChanged ? changedValue(f.key) : displayFor(f.key, cfg[f.key])}
-                        onChange={e => updateField(f.key, e.target.value)}
-                        className={`w-full px-2.5 py-1.5 text-xs rounded-md border focus:outline-none ${styles.inputBg} ${styles.inputBorder}`}
-                      />
-                    )}
-                    {isChanged && (
-                      <button type="button"
-                        onClick={() => resetField(f.key)}
-                        className="text-[11px] px-2 py-1 rounded border hover:opacity-70"
-                        style={{ borderColor: styles.cardBorder }}
-                        title={t("knowledge.engine_config.reset")}
-                      >
-                        {t("knowledge.engine_config.reset")}
-                      </button>
-                    )}
+                      )}
+                      {isChanged && !readOnly && (
+                        <button type="button"
+                          onClick={() => updateField(k, original)}
+                          className="text-[11px] px-2 py-1 rounded border hover:opacity-70"
+                          style={{ borderColor: styles.cardBorder }}
+                          title={t("knowledge.engine_config.reset")}
+                        >
+                          {t("knowledge.engine_config.reset")}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* 操作栏 */}
         <div className="flex flex-wrap items-center justify-end gap-2">
           {dirty && !saving && (
-            <span className="text-[11px] font-mono opacity-70">
-              {t("knowledge.engine_config.dirty_hint")} ({changes.length})
+            <span className={`text-[11px] font-mono ${styles.cardTextMuted}`}>
+              {t("knowledge.engine_config.dirty_hint")} ({Object.keys(changes).length})
             </span>
           )}
           <button type="button"
             onClick={() => void save()}
-            disabled={!dirty || saving || !afterSaveCheck && !dirty}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold text-white disabled:opacity-40 transition-opacity ${styles.accentBg}`}
+            disabled={readOnly || !dirty || saving}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold disabled:opacity-40 transition-opacity ${styles.accentBg} ${styles.accentSolidText}`}
           >
             {saving
               ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

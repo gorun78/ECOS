@@ -12,6 +12,8 @@ import type {
   SyncStatus,
   SyncLog,
   EngineConfigScope,
+  EngineConfigResult,
+  WritableEngineConfigScope,
   EngineConfig,
 } from '../typesAndConstants';
 
@@ -269,7 +271,7 @@ export async function fetchGraphJobLogs(jobId: string): Promise<string[]> {
   }
 }
 
-// ── Engine config（cognitive fallback） ─────────────────────────────────────────
+// ── Engine config（scope 走 gateway 宿主 KnowledgeWorkbenchController，无本地回落） ─────────
 
 export async function fetchCognitiveConfig() {
   return apiFetchData('/api/v1/cognitive/config');
@@ -282,55 +284,34 @@ export async function updateCognitiveConfig(updates: Array<{ config_key: string;
   });
 }
 
-export async function fetchEngineConfig(scope: EngineConfigScope): Promise<{ config: EngineConfig; version: number; updatedAt: string }> {
-  try {
-    const data = await apiFetchData<EngineConfig>(`${KB_V1}/engine-config?scope=${encodeURIComponent(scope)}`);
-    return { config: data || {}, version: 1, updatedAt: new Date().toISOString() };
-  } catch {
-    try {
-      const data = await apiFetchData<EngineConfig>('/api/v1/cognitive/config');
-      const result: EngineConfig = {};
-      for (const [k, v] of Object.entries(data || {})) result[`knowledge.${scope}.${k}`] = String(v);
-      return { config: result, version: 1, updatedAt: new Date().toISOString() };
-    } catch {
-      return { config: {}, version: 1, updatedAt: new Date().toISOString() };
-    }
-  }
-}
-
-export async function saveEngineConfig(scope: EngineConfigScope, cfg: Record<string, unknown>): Promise<{ config: EngineConfig; version: number; updatedAt: string }> {
-  const asyncRp = apiFetchData<{ config: EngineConfig; version: number; updatedAt: string } | EngineConfig | null>(
+/**
+ * 读引擎配置（scope 分发）— fail-closed：HTTP/业务错误原样抛出，由 Tab 层呈现降级横幅。
+ * 后端 KnowledgeEngineConfigVO 只含 {scope, config, count}，不含版本/更新时间，前端不得合成。
+ */
+export async function fetchEngineConfig(scope: EngineConfigScope): Promise<EngineConfigResult> {
+  const data = await apiFetchData<Partial<EngineConfigResult> | null>(
     `${KB_V1}/engine-config?scope=${encodeURIComponent(scope)}`,
-    { method: 'PUT', body: JSON.stringify(cfg) },
   );
-
-  const settle = async (): Promise<{ config: EngineConfig; version: number; updatedAt: string }> => {
-    const primary = await asyncRp.catch(function (): { config: EngineConfig; version: number; updatedAt: string } | EngineConfig | null {
-      return null;
-    });
-    if (primary && typeof primary === 'object' && 'config' in primary) return primary as { config: EngineConfig; version: number; updatedAt: string };
-    if (primary && typeof primary === 'object' && 'config' in (primary as Record<string, unknown>)) {
-      const p = primary as Record<string, unknown>;
-      return {
-        config: (p.config as EngineConfig) || (cfg as EngineConfig),
-        version: Number(p.version ?? 1),
-        updatedAt: String(p.updatedAt ?? new Date().toISOString()),
-      };
-    }
-    if (primary) return { config: (primary as EngineConfig) || (cfg as EngineConfig), version: 1, updatedAt: new Date().toISOString() };
-    const updates = Object.entries(cfg).map(([config_key, config_value]) => ({
-      config_key: `knowledge_engine.${scope}.${config_key}`,
-      config_value,
-    }));
-    const fbResp = await apiFetchData<Record<string, unknown> | null>('/api/v1/cognitive/config', {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    });
-    return { config: (fbResp ? (fbResp as EngineConfig) : cfg) as EngineConfig, version: 1, updatedAt: new Date().toISOString() };
+  const config = (data?.config ?? {}) as EngineConfig;
+  return {
+    scope,
+    config,
+    count: typeof data?.count === 'number' ? data.count : Object.keys(config).length,
   };
-  try {
-    return await settle();
-  } catch {
-    return { config: cfg as EngineConfig, version: 1, updatedAt: new Date().toISOString() };
-  }
 }
+
+/**
+ * 写引擎配置 — 请求体按后端 EngineConfigUpdateReq `{scope, entries}` 组装（scope 走 body，非 query）。
+ * 返回上游实际写回行数；updated=0 表示一行未落，调用方须按失败呈现，不得记为成功。
+ */
+export async function saveEngineConfig(
+  scope: WritableEngineConfigScope,
+  entries: Record<string, string>,
+): Promise<{ updated: number }> {
+  const data = await apiFetchData<{ updated?: number } | null>(
+    `${KB_V1}/engine-config`,
+    { method: 'PUT', body: JSON.stringify({ scope, entries }) },
+  );
+  return { updated: Number(data?.updated ?? 0) };
+}
+
