@@ -13,6 +13,7 @@ import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.service.MetadataCollectionService;
 import com.chinacreator.gzcm.engine.data.service.MetadataRowCountService;
 import com.chinacreator.gzcm.engine.data.metadata.AutoCollectScheduler;
+import com.chinacreator.gzcm.engine.data.metadata.ColumnCatalogQueryService;
 import com.chinacreator.gzcm.engine.data.metadata.MetadataAsyncTrigger;
 import com.chinacreator.gzcm.engine.data.metadata.MetadataCollectGitArchive;
 import com.chinacreator.gzcm.engine.data.metadata.MetadataCollectTaskParser;
@@ -59,6 +60,7 @@ public class MetadataController {
     private final MetadataAsyncTrigger asyncTrigger;
     private final MetadataCollectGitArchive gitArchive;
     private final MetadataService metadataService;
+    private final ColumnCatalogQueryService columnCatalogQuery;
 
     /** 数据湖分层资源登记服务（B5-1：通用资源登记，供知识工作台登记解析文本）。 */
     private final DataLakeResourceService dataLakeResourceService;
@@ -74,6 +76,7 @@ public class MetadataController {
                               MetadataAsyncTrigger asyncTrigger,
                               MetadataCollectGitArchive gitArchive,
                               MetadataService metadataService,
+                              ColumnCatalogQueryService columnCatalogQuery,
                               DataLakeResourceService dataLakeResourceService) {
         this.collectionService = collectionService;
         this.taskService = taskService;
@@ -83,6 +86,7 @@ public class MetadataController {
         this.asyncTrigger = asyncTrigger;
         this.gitArchive = gitArchive;
         this.metadataService = metadataService;
+        this.columnCatalogQuery = columnCatalogQuery;
         this.dataLakeResourceService = dataLakeResourceService;
     }
 
@@ -157,6 +161,31 @@ public class MetadataController {
         r.put("message", "ok");
         r.put("data", fields);
         return r;
+    }
+
+    // ===== P0-3 新增：跨引擎列元数据供数（本体域 V3 血缘门禁） =====
+
+    /**
+     * 按 tableRef 取表的<b>真实列清单</b>（供本体域 V3 血缘门禁跨引擎只读消费）。
+     *
+     * <p>契约出处：详设《从零实施版》端点登记表
+     * {@code GET /api/v1/datanet/metadata/columns | listColumnsByTableRef | L1}。
+     * 出参解析路径 {@code $.data.columns} 由调用方
+     * {@code DatNetLineageGuard.RestLineageColumnFetcher} 固定，<b>字段名即线上契约</b>。</p>
+     *
+     * <p>失败语义（详见 {@link ColumnCatalogQueryService}）：
+     * tableRef 非法/schema 越界 → {@code code=400}（调用侧按依赖不可用 fail-closed）；
+     * 表不存在 → {@code code=0} + {@code exists=false} + 空列集（调用侧折成「列缺失」否决）。</p>
+     */
+    @GetMapping("/columns")
+    public ApiResponse<com.chinacreator.gzcm.engine.data.model.MetadataColumnsVO> listColumnsByTableRef(
+            @RequestParam(required = false) String tableRef) {
+        try {
+            return ApiResponse.success(columnCatalogQuery.query(tableRef));
+        } catch (ValidationException e) {
+            log.info("metadata/columns 入参被拒 tableRef={}: {}", tableRef, e.getMessage());
+            return ApiResponse.badRequest(e.getMessage());
+        }
     }
 
     // ===== PMO-37 新增：手动触发异步采集 =====

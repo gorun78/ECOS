@@ -4,14 +4,21 @@ import com.chinacreator.gzcm.engine.ontology.dto.GateResult;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * F03-03 V3 — 血缘列存在守卫（经 data-engine 元数据 REST 校验事实表列真实存在）。
@@ -116,15 +123,34 @@ public final class DatNetLineageGuard {
      *
      * <p>不可用（resolver 空 / 404 / 5xx / 连接失败 / 响应非法）→ 返回 <b>null</b>，
      * 由 {@link DatNetLineageGuard#check} 统一折算成 503 ECOS-ONTO-050（fail-closed）。</p>
+     *
+     * <p><b>P0-3 第二处断点修复（2026-10-14）</b>：datanet 面不在匿名单源
+     * {@code AnonymousEndpointRegistry} 内（未登记 = {@code anyRequest().authenticated()} 默认 DENY），
+     * 故裸 {@code RestTemplate} 调用必然 401 —— 即便服务端端点存在，V3 仍恒 fail-closed。
+     * 修法取<b>「透传入站 JWT」</b>而非「把端点登记成匿名」：
+     * 前者保持调用者身份与 L1 准入语义（详设 §3073 该端点定级 L1），
+     * 后者会把列清单变成无凭证可枚举的信息泄露面。
+     * 无请求上下文（异步/定时触发）时不透传 → 401 → 依旧 fail-closed，不放开。</p>
      */
     static final class RestLineageColumnFetcher implements LineageColumnFetcher {
 
         private final ServiceEndpointResolver endpointResolver;
         private final RestTemplate restTemplate;
 
+        /** 入站凭证供给（生产 = 当前 HTTP 请求的 Authorization 头；测试可注入桩）。 */
+        private final Supplier<String> authorizationSupplier;
+
         public RestLineageColumnFetcher(ServiceEndpointResolver endpointResolver, RestTemplate restTemplate) {
+            this(endpointResolver, restTemplate, RestLineageColumnFetcher::currentInboundAuthorization);
+        }
+
+        /** 包可见装配位：单测注入凭证供给，无需真实 servlet 上下文。 */
+        RestLineageColumnFetcher(ServiceEndpointResolver endpointResolver, RestTemplate restTemplate,
+                                 Supplier<String> authorizationSupplier) {
             this.endpointResolver = endpointResolver;
             this.restTemplate = restTemplate;
+            this.authorizationSupplier = authorizationSupplier != null
+                    ? authorizationSupplier : () -> null;
         }
 
         @Override
@@ -139,7 +165,8 @@ public final class DatNetLineageGuard {
             }
             String url = base + "/api/v1/datanet/metadata/columns?tableRef=" + java.net.URLEncoder.encode(tableRef, java.nio.charset.StandardCharsets.UTF_8);
             try {
-                ResponseEntity<Map> resp = restTemplate.getForEntity(url, Map.class);
+                ResponseEntity<Map> resp = restTemplate.exchange(
+                        url, HttpMethod.GET, new HttpEntity<>(requestHeaders()), Map.class);
                 Map body = resp.getBody();
                 if (body == null) return null;
                 Object data = body.get("data");
@@ -154,7 +181,7 @@ public final class DatNetLineageGuard {
                 return null; // 响应非法 → 依赖不可用
             } catch (HttpClientErrorException e) {
                 log.warn("V3 lineage: datanet metadata HTTP {} tableRef={}", e.getStatusCode(), tableRef);
-                return null; // 4xx（含 404）→ 依赖不可用
+                return null; // 4xx（含 404/401）→ 依赖不可用
             } catch (HttpServerErrorException e) {
                 log.warn("V3 lineage: datanet metadata 5xx tableRef={} status={}", tableRef, e.getStatusCode());
                 return null; // 5xx → 依赖不可用
@@ -165,6 +192,25 @@ public final class DatNetLineageGuard {
                 log.warn("V3 lineage: datanet metadata fetch error tableRef={}", tableRef, e);
                 return null;
             }
+        }
+
+        /** 组装出向请求头：仅在拿到入站凭证时带 Authorization（缺凭证不加头，让服务端按默认 DENY 处置）。 */
+        private HttpHeaders requestHeaders() {
+            HttpHeaders headers = new HttpHeaders();
+            String authorization = authorizationSupplier.get();
+            if (authorization != null && !authorization.isBlank()) {
+                headers.set(HttpHeaders.AUTHORIZATION, authorization.trim());
+            }
+            return headers;
+        }
+
+        /** 从当前请求上下文取入站 Authorization；非 HTTP 线程（异步/定时）返回 {@code null}。 */
+        static String currentInboundAuthorization() {
+            RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+            if (attributes instanceof ServletRequestAttributes servletAttributes) {
+                return servletAttributes.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
+            }
+            return null;
         }
     }
 }
