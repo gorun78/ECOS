@@ -12,7 +12,8 @@ import {
   Check, Play, Search, Plus, Trash2, Edit3, RefreshCw, AlertTriangle,
   GitBranch, Zap, BarChart3, Eye, Link, Unlink, MessageSquare,
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Table, Wifi, Terminal,
-  Package,
+  Package, FolderTree, FolderOpen, Save, ExternalLink, GitCommit, Loader2,
+  CheckCircle, XCircle, Cloud, FolderGit, Globe, HardDrive,
   type LucideIcon as LucideIconType,
 } from 'lucide-react';
 
@@ -23,7 +24,9 @@ const iconMap: Record<string, LucideIconType> = {
   GitBranch, Zap, BarChart3, Eye, Link, Unlink, MessageSquare,
   ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Table, Wifi, Terminal,
   // PMO-data10: 'data-assets' tab
-  Package,
+  Package, FolderTree, FolderOpen, Save, ExternalLink, GitCommit, Loader2,
+  // 动态名面：helpers.getSourceIcon() 返回值 + Modals 测试结果三元式（仅以字符串出现，静态扫描不可见）
+  CheckCircle, XCircle, Cloud, FolderGit, Globe, HardDrive,
 };
 
 interface Props {
