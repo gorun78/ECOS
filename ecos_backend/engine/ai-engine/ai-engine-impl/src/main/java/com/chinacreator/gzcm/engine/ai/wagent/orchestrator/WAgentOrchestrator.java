@@ -17,10 +17,12 @@ import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentRunStepDO;
 import com.chinacreator.gzcm.engine.ai.wagent.event.WAgentEvent;
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentBudgetService.BudgetSnapshot;
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentBudgetService.Consumption;
+import com.chinacreator.gzcm.engine.ai.wagent.readiness.ReadinessService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
@@ -64,6 +66,11 @@ public class WAgentOrchestrator {
     private final StepExecutor stepExecutor;
     private final StepWriter stepWriter;
     private final WAgentEventPublisher eventPublisher;
+    /**
+     * F10-08 首评服务（懒解析：{@code readiness} 侧反向依赖本包的
+     * {@link WAgentQuestionService}/{@link WAgentBudgetService}，直接构造注入会成 Spring 环）。
+     */
+    private final ObjectProvider<ReadinessService> readinessServiceProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public WAgentOrchestrator(WAgentRunDao runDao, WAgentRunStepDao stepDao,
@@ -71,7 +78,8 @@ public class WAgentOrchestrator {
                               WAgentBudgetService budgetService, WAgentRunStateMachine stateMachine,
                               PlanBuilder planBuilder, PlanValidator planValidator,
                               StepExecutor stepExecutor, StepWriter stepWriter,
-                              WAgentEventPublisher eventPublisher) {
+                              WAgentEventPublisher eventPublisher,
+                              ObjectProvider<ReadinessService> readinessServiceProvider) {
         this.runDao = runDao;
         this.stepDao = stepDao;
         this.runEventDao = runEventDao;
@@ -83,6 +91,7 @@ public class WAgentOrchestrator {
         this.stepExecutor = stepExecutor;
         this.stepWriter = stepWriter;
         this.eventPublisher = eventPublisher;
+        this.readinessServiceProvider = readinessServiceProvider;
     }
 
     /** 建 Run 命令（idempotencyKey 为调用方原始键，本类做 sha256 散列入库）。 */
@@ -164,7 +173,42 @@ public class WAgentOrchestrator {
         appendRunEvent(run, null, EventTypes.Agent.RUN_CREATED, payload(
                 "questionId", run.getQuestionId(), "status", run.getStatus()));
         publishRunEvent(EventTypes.Agent.RUN_CREATED, run, cmd.operator());
+        bestEffortInitialAssessment(run, question, cmd.operator());
         return new RunStartOutcome(run, false);
+    }
+
+    /**
+     * F10-08 首评挂钩（详细设计-10 §4.2：Question→Run→Readiness 评估）。
+     *
+     * <p><b>为什么必须挂在这里</b>：{@code #12 getReadiness} 是"读当前评估行"，评估行的唯一
+     * 生产者是 {@link ReadinessService}。若不在此建首评，只有 {@code #13 refill} 会触发复评，
+     * 而 refill 的前置又是"已有当前评估"⇒ 新 Run 永远拿 404（死锁）。</p>
+     *
+     * <p><b>best-effort 口径（裁决 D-B2④-17）</b>：评估失败只 WARN，<b>不</b>回滚 Run、
+     * <b>不</b>把 startRun 变成 5xx——就绪评估是"给决策用的元数据"，它缺席时正确的做法是
+     * 让 Run 继续并把缺席如实反映在 {@code #12} 的 404 上，而不是把主链一起拖死。
+     * 代价如实登记：探测单层预算 3s（{@link com.chinacreator.gzcm.engine.ai.wagent.readiness.EngineProbeClient#LAYER_BUDGET_MS}
+     * 四路 fan-out，最坏 ≈3s + margin），故 startRun 在最坏情形多约 3s；
+     * 只在<b>非幂等重放</b>路径调用（重放直接 return，既有 Run 保留既有评估行，不重复探测）。</p>
+     */
+    private void bestEffortInitialAssessment(WAgentRunDO run, WAgentQuestionDO question, String operator) {
+        ReadinessService readinessService = readinessServiceProvider.getIfAvailable();
+        if (readinessService == null) {
+            log.warn("[F10-08] ReadinessService 未装配，Run 首评跳过: runId={}", run.getId());
+            return;
+        }
+        try {
+            ReadinessService.EvaluationResult result =
+                    readinessService.evaluateForQuestion(question, run.getId(), operator);
+            run.setReadinessId(result.assessmentId());
+            run.setUpdateBy(operator);
+            runDao.update(run);
+            log.info("[F10-08] Run 首评落库: runId={} assessmentId={} grade={}",
+                    run.getId(), result.assessmentId(), result.grade().grade().value());
+        } catch (Exception ex) { // NOSONAR：主链隔离边界，任何评估侧异常都只降级不外溢
+            log.warn("[F10-08] Run 首评失败（不影响主链，#12 将如实 404）: runId={} cause={}",
+                    run.getId(), ex.toString());
+        }
     }
 
     // ══════════════════════════ 主干管线 ══════════════════════════

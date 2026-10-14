@@ -63,7 +63,8 @@ class RunIdempotencyTest {
                 mock(WAgentRunStepDao.class), mock(WAgentRunEventDao.class), questionService,
                 mock(WAgentBudgetService.class), mock(WAgentRunStateMachine.class),
                 mock(PlanBuilder.class), mock(PlanValidator.class), mock(StepExecutor.class),
-                mock(StepWriter.class), mock(WAgentEventPublisher.class));
+                mock(StepWriter.class), mock(WAgentEventPublisher.class),
+                WAgentTestSupport.noReadinessService());
 
         WAgentOrchestrator.RunStartOutcome outcome = orchestrator.startRun(
                 new WAgentOrchestrator.RunStartCommand("t1", "o1", "u1", "q1", "m1",

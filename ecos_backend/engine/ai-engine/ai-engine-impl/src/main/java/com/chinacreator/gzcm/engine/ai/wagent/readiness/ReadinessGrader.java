@@ -26,6 +26,18 @@ import java.util.Map;
  * <b>尚未接线</b>：GET #12 仍只读现有评估行、POST #13 refill 仍如实 501，
  * 四层探测与评估落库仍在差距清单里——本批只交定级器本体与具名门禁，不谎称 Readiness 闭环。</p>
  *
+ * <p><b>订正注（2026-10-14，批 #146 B2④续）</b>：上段的「尚未接线」已部分失效，逐条对照现状 —
+ * ①四层探测已由 {@code EngineProbeClient.probeAll()} 承流（预算 3s/层，异常即
+ * {@code reachable=false}，禁 fail-open）；②评估落库已由 {@code ReadinessService.evaluate()}
+ * 承流（V231 明细 → V232 缺口 → V230 头 → 替代位的固定序）；③POST #13 refill 不再 501，
+ * 轮次闸与派发在 {@code ReadinessGapService}（≤3 超限转 {@code awaiting_input}，HTTP 200）；
+ * ④GET #12 <b>仍是只读快照</b>（当前评估行 + V231 缺项 + V232 缺口）：现评由 Run 首评与 refill
+ * 复评触发，读端点不同步探测——GET 里打四次引擎探测会把只读面变成写路径并吃掉 3s×4 预算。
+ * <b>仍然如实的差距</b>（不随本注消失，登记在差距文档 v1.0.7）：四引擎八度量读端点未接线
+ * ⇒ 度量恒 {@code absent} ⇒ 检查项恒 UNKNOWN ⇒ 总级恒不高于 C；V230~V232 迁移脚本未在
+ * dev PG 实跑；{@code confirm/fetch/approve} 三类动作的引擎侧端口未接线（只进 deferred 清单）。
+ * 本类「无状态纯函数」的定位不变：上述四件全在它之外。</p>
+ *
  * <h3>规则（优先级自上而下，先命中先定档：D &gt; C &gt; B &gt; A）</h3>
  * <ol>
  *   <li>无检查项 ⇒ <b>C</b>（{@code NO_CHECK->C}）：一个都没有＝四层全无证据，

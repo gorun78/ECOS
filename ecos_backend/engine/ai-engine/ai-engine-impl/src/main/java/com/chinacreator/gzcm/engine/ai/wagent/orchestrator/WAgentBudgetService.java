@@ -84,6 +84,21 @@ public class WAgentBudgetService {
         }
     }
 
+    /**
+     * 消耗写库形态（consumption_json）——与 {@link #toSnapshotJson} 同族的写侧单源。
+     *
+     * <p>键名单源 = {@link Consumption#asMap()}；读侧单源仍在 {@code StepExecutor#parseConsumption}
+     * （既有 4 个调用点在用，不迁）。本方法只服务新增写入方（F10-09 补齐轮次回写），
+     * 禁调用点自己拼 {@code {"refill_rounds":n}} 字面量。</p>
+     */
+    public String toConsumptionJson(Consumption consumption) {
+        try {
+            return objectMapper.writeValueAsString(consumption.asMap());
+        } catch (Exception e) {
+            throw WAgentOrchestrationException.validation("consumption_json 序列化失败");
+        }
+    }
+
     /** 快照读回（null/脏值 ⇒ 现值重取——新 Run 语义，恢复路径由调用方保证有值）。 */
     public BudgetSnapshot parseSnapshot(String json) {
         if (json == null || json.isBlank()) {

@@ -159,6 +159,35 @@ public class WAgentQuestionService {
     }
 
     /**
+     * F10-09 补齐轮次超限 ⇒ 问题转 {@code awaiting_input}（原文「超限输出缺口清单并转
+     * awaiting_input」）。
+     *
+     * <p>与 {@link SlotFillingService} 的澄清挂起是<b>两个不同的触发面</b>（前者=槽位补齐无进展，
+     * 本方法=DIKC 缺口补评到顶），共用同一个目标态与同一张词表，不另立状态字面量。</p>
+     *
+     * <p>租户闸在方法内再核一次（R-36）：{@code tenantId} 不符 ⇒ 不写库并返回 false，
+     * 调用方（readiness refill）此前已做过 404 掩码，这里只是纵深防御。</p>
+     *
+     * @return true = 已置为 awaiting_input；false = 行不存在/租户不符/已是挂起态
+     */
+    public boolean markAwaitingInput(String questionId, String tenantId, String operator) {
+        WAgentQuestionDO question = questionDao.findById(questionId).orElse(null);
+        if (question == null || (tenantId != null && !tenantId.equals(question.getTenantId()))) {
+            log.warn("[F10-09] 补齐超限挂起跳过：问题行不存在或租户不符 questionId={}", questionId);
+            return false;
+        }
+        if (WAgentStatus.QuestionStatus.AWAITING_INPUT.value().equals(question.getStatus())) {
+            return false; // 已挂起 ⇒ 幂等，不重复刷 update_time
+        }
+        question.setStatus(WAgentStatus.QuestionStatus.AWAITING_INPUT.value());
+        question.setUpdateBy(operator);
+        questionDao.update(question);
+        log.info("[F10-09] 补齐轮次达上限 ⇒ 问题转 awaiting_input: questionId={} operator={}",
+                questionId, operator);
+        return true;
+    }
+
+    /**
      * F10-05 边界：depends_on 环路应用层拓扑检测。从每个依赖节点 DFS 展开既有问题的
      * depends_on 边；引用不存在的问题 ⇒ E-NOT-FOUND；图上任一环 ⇒ E-VALIDATION 拒绝。
      */

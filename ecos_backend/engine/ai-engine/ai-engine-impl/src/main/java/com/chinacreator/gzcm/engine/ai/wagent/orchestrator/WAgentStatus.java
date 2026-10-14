@@ -8,7 +8,11 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Goal/Question/Step 状态词表单源（详细设计-10 §二 F10-05/06/11/14、§4.2 控制流派生）。
+ * Goal/Question/Step/Gap 状态词表单源（详细设计-10 §二 F10-05/06/11/14、§4.2 控制流派生）。
+ *
+ * <p><b>【B2④ 追加第四张词表】</b>{@link GapStatus}：V232 {@code readiness_gap.status} 的处置态
+ * （DDL 同样无 CHECK，词表只由本类单源）。原 javadoc 写"三张"是当时的事实，追加后口径为四张，
+ * 单源纪律不变（订正而非改写：不删原文，避免后续会话以为该包另有 gap 词表）。</p>
  *
  * <p><b>为什么不在 {@code WAgentEnums}（#127 冻结契约单源包）内：</b>该类按 §二 冻结的 19 个
  * 嵌套枚举未含 Goal/Question/Step 三张状态词表（DDL V227/V229/V234 的 status 列均无 CHECK，
@@ -122,6 +126,41 @@ public final class WAgentStatus {
 
         public boolean isTerminal() {
             return this == SUCCEEDED || this == FAILED || this == SKIPPED || this == CANCELLED;
+        }
+    }
+
+    /**
+     * 就绪缺口处置态三值（V232 {@code status VARCHAR(20)}，详细设计-10 F10-09 补齐循环）。
+     *
+     * <p><b>只有 {@link #OPEN} 和 {@link #SUPERSEDED} 在本批有写入方</b>：重评时旧缺口
+     * {@code open → superseded}（裁决 D-B2④-10——<b>不写 {@code resolved_time}、不置
+     * {@code resolved}</b>，因为"重新评估过了"不等于"问题解决了"；缺口是否真被补齐由新评估
+     * 的同类检查项说话）。{@link #RESOLVED} 是补齐回写通道的目标态，该通道依赖引擎侧补数端口
+     * （fetch/approve 面，仍在差距清单），本批<b>无任何代码置位</b>——登记词表是为了让读端
+     * 和前端按同一套值渲染，禁调用点自造第四个字面量。</p>
+     */
+    public enum GapStatus implements WAgentEnums.WAgentValue {
+        OPEN("open"),
+        SUPERSEDED("superseded"),
+        /** 目标态：补齐回写通道（引擎侧补数端口）未接线，本批零写入方。 */
+        RESOLVED("resolved");
+
+        private final String value;
+
+        GapStatus(String value) {
+            this.value = value;
+        }
+
+        @Override
+        public String value() {
+            return value;
+        }
+
+        public static final Set<String> ALL = wordSet(
+                java.util.Arrays.stream(values()).map(GapStatus::value).toArray(String[]::new));
+
+        public static boolean isValid(String raw) {
+            return raw != null && ALL.contains(raw.trim().toLowerCase(Locale.ROOT));
         }
     }
 }

@@ -93,7 +93,8 @@ class OrchestratorRecoveryTest {
                 mock(WAgentRunEventDao.class), questionService,
                 new WAgentBudgetService(mock(org.springframework.beans.factory.ObjectProvider.class)),
                 new WAgentRunStateMachine(runDao), mock(PlanBuilder.class), mock(PlanValidator.class),
-                stepExecutor, stepWriter, mock(WAgentEventPublisher.class));
+                stepExecutor, stepWriter, mock(WAgentEventPublisher.class),
+                WAgentTestSupport.noReadinessService());
 
         WAgentRunDO out = orchestrator.resume("r1", "u1");
 

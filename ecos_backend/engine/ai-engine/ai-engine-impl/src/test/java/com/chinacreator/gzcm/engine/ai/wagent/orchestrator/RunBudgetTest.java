@@ -94,7 +94,8 @@ class RunBudgetTest {
         WAgentOrchestrator orchestrator = new WAgentOrchestrator(runDao, stepDao, runEventDao,
                 mock(WAgentQuestionService.class), budgetService,
                 new WAgentRunStateMachine(runDao), mock(PlanBuilder.class), mock(PlanValidator.class),
-                stepExecutor, stepWriter, mock(WAgentEventPublisher.class));
+                stepExecutor, stepWriter, mock(WAgentEventPublisher.class),
+                WAgentTestSupport.noReadinessService());
 
         WAgentOrchestrationException e = assertThrows(WAgentOrchestrationException.class,
                 () -> orchestrator.runPipeline("r1", "u1"));

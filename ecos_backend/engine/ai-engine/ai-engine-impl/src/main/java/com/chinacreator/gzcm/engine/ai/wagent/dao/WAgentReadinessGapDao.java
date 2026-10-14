@@ -73,4 +73,17 @@ public class WAgentReadinessGapDao extends JdbcTemplateDaoSupport {
     public int update(WAgentReadinessGapDO gap) {
         return updateByBean(UPDATE_SQL, gap);
     }
+
+    /**
+     * 重评时旧缺口的处置态迁移（裁决 D-B2④-10）：{@code open → superseded}。
+     *
+     * <p><b>不写 {@code resolved_time}、不置 {@code resolved}</b>——缺口是否真被补齐由新评估
+     * 的同类检查项说话，旧行只有"被下一次复评替代"的语义；把"评估过了"洗成"解决了"就是假绿。
+     * 已是 {@code superseded}/{@code resolved} 的行不在本语句射程（{@code status = open} 前置）。</p>
+     */
+    public int supersedeOpen(String assessmentId, String statusSuperseded, String statusOpen, String updateBy) {
+        return update("UPDATE " + TABLE + " SET status = ?, update_by = ?, update_time = CURRENT_TIMESTAMP "
+                        + "WHERE assessment_id = ? AND status = ? AND is_deleted = 0",
+                statusSuperseded, updateBy, assessmentId, statusOpen);
+    }
 }

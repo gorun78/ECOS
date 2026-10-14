@@ -1,6 +1,12 @@
 package com.chinacreator.gzcm.engine.ai.config;
 
 import com.chinacreator.gzcm.common.trace.EcosTraceContext;
+import com.chinacreator.gzcm.engine.ai.wagent.readiness.EngineProbeClient;
+import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpRequest;
@@ -9,9 +15,15 @@ import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.DefaultUriBuilderFactory;
+import org.springframework.web.util.UriTemplateHandler;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * AI 域共享 REST 客户端工厂（F06-17 要点 2 / W148 收口）。
@@ -33,11 +45,30 @@ import java.util.List;
 @Configuration
 public class AiRestClientConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(AiRestClientConfig.class);
+
     /** 连接超时（毫秒），与认知域共享客户端一致。 */
     static final int CONNECT_TIMEOUT_MS = 3000;
 
     /** 读取超时（毫秒），与认知域共享客户端一致。 */
     static final int READ_TIMEOUT_MS = 10000;
+
+    /** route-manifest 里四层健康面的承流归属服务名（引擎前缀族由 gateway 路由）。 */
+    static final String PROBE_OWNER_SERVICE = "gateway";
+
+    /**
+     * gateway 基址的<b>显式覆盖位</b>（默认空 → 走 route-manifest 解析）。
+     * 仅作运维逃生口；禁止在此写本机个人环境值（文档规范 R7）。
+     */
+    @Value("${ecos.endpoints.gateway:}")
+    private String gatewayOverride;
+
+    /** F02-15/X-35：跨服务基址的唯一寻址出口（runtime-access，route-manifest 单源）。 */
+    private final ObjectProvider<ServiceEndpointResolver> endpointProvider;
+
+    public AiRestClientConfig(ObjectProvider<ServiceEndpointResolver> endpointProvider) {
+        this.endpointProvider = endpointProvider;
+    }
 
     /**
      * AI 域共享 RestTemplate：连接/读取超时统一在此下发，出站自动注入 {@code X-Request-Id}
@@ -47,23 +78,104 @@ public class AiRestClientConfig {
      */
     @Bean("aiRestTemplate")
     public RestTemplate aiRestTemplate() {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        factory.setReadTimeout(READ_TIMEOUT_MS);
-        RestTemplate restTemplate = new RestTemplate(factory);
+        RestTemplate restTemplate = new RestTemplate(requestFactory(CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS));
         restTemplate.getMessageConverters().removeIf(c ->
                 c instanceof org.springframework.http.converter.xml.MappingJackson2XmlHttpMessageConverter);
         // 出站统一注入 X-Request-Id（值 = 当前 MDC traceId，缺失时生成完整 UUID 写回，F06-06）
-        restTemplate.setInterceptors(List.of(
-                new ClientHttpRequestInterceptor() {
-                    @Override
-                    public ClientHttpResponse intercept(HttpRequest request, byte[] body,
-                            ClientHttpRequestExecution execution) throws IOException {
-                        EcosTraceContext.TraceHeader header = EcosTraceContext.outboundHeader();
-                        request.getHeaders().set(header.name(), header.value());
-                        return execution.execute(request, body);
-                    }
-                }));
+        restTemplate.setInterceptors(List.of(traceInterceptor()));
         return restTemplate;
+    }
+
+    /**
+     * F10-08 DIKC 四层就绪探测专用客户端（{@code EngineProbeClient} 唯一注入面）。
+     *
+     * <p>口径与 {@code workspaceEngineHealthProbeRest} 同形：<b>基址经 gateway 承流</b>
+     * （四层的 {@code /api/v1/engine/{layer}/health} 与 {@code /api/v1/knowledge/health}
+     * 都是 gateway 路由前缀，禁在本类写死任何 {@code localhost:180xx}），超时按 F10-08
+     * 原文单层 3s 下发（{@link EngineProbeClient#LAYER_BUDGET_MS} 单源，禁在此另立数值）。</p>
+     *
+     * <p><b>基址延迟解析</b>：owner=gateway 的基址在<b>首次探测</b>时才解析（而非 Bean 创建期）。
+     * 理由是 aiming 独立 JAR 的 classpath 未必带 route-manifest —— 若在创建期 fail-loud，
+     * 会把"探测能力缺席"升级成"整个服务起不来"，这与铁律的可用性口径相反。
+     * 解析不到时由 {@link #resolveProbeBase()} 抛 {@link IllegalStateException}，
+     * {@code EngineProbeClient} 将其如实折算为该层不可达（UNKNOWN），<b>绝不折成 pass</b>。</p>
+     */
+    @Bean("wagentEngineProbeRest")
+    public RestTemplate wagentEngineProbeRest() {
+        int budgetMs = (int) EngineProbeClient.LAYER_BUDGET_MS;
+        RestTemplate restTemplate = new RestTemplate(requestFactory(budgetMs, budgetMs));
+        restTemplate.setUriTemplateHandler(new LazyProbeBaseHandler());
+        restTemplate.setInterceptors(List.of(traceInterceptor()));
+        return restTemplate;
+    }
+
+    // ── 内部 ─────────────────────────────────────────
+
+    /** 基址解析链（F02-15/X-35）：显式覆盖项 → route-manifest 两态寻址 → fail-loud。 */
+    String resolveProbeBase() {
+        if (gatewayOverride != null && !gatewayOverride.isBlank()) {
+            return trimTrailingSlash(gatewayOverride.trim());
+        }
+        ServiceEndpointResolver resolver = endpointProvider.getIfAvailable();
+        if (resolver != null) {
+            Optional<String> host = resolver.resolve(PROBE_OWNER_SERVICE,
+                    ServiceEndpointResolver.RouteMode.SERVICE);
+            if (host.isPresent()) {
+                return trimTrailingSlash(host.get());
+            }
+        }
+        throw new IllegalStateException("F10-08 探测基址不可解析：" + PROBE_OWNER_SERVICE
+                + " 既无 ecos.endpoints." + PROBE_OWNER_SERVICE + " 覆盖项，也未在 route-manifest 登记"
+                + "（fail-loud，禁止回落硬编码地址）");
+    }
+
+    private static SimpleClientHttpRequestFactory requestFactory(int connectMs, int readMs) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(connectMs);
+        factory.setReadTimeout(readMs);
+        return factory;
+    }
+
+    private static ClientHttpRequestInterceptor traceInterceptor() {
+        return new ClientHttpRequestInterceptor() {
+            @Override
+            public ClientHttpResponse intercept(HttpRequest request, byte[] body,
+                    ClientHttpRequestExecution execution) throws IOException {
+                EcosTraceContext.TraceHeader header = EcosTraceContext.outboundHeader();
+                request.getHeaders().set(header.name(), header.value());
+                return execution.execute(request, body);
+            }
+        };
+    }
+
+    private static String trimTrailingSlash(String url) {
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
+
+    /** 首次展开 URI 时才解析 gateway 基址并缓存（解析失败 ⇒ IllegalStateException，由探测侧如实记不可达）。 */
+    private final class LazyProbeBaseHandler implements UriTemplateHandler {
+
+        private final AtomicReference<UriTemplateHandler> delegate = new AtomicReference<>();
+
+        @Override
+        public URI expand(String uriTemplate, Map<String, ?> uriVariables) {
+            return target().expand(uriTemplate, uriVariables);
+        }
+
+        @Override
+        public URI expand(String uriTemplate, Object... uriVariables) {
+            return target().expand(uriTemplate, uriVariables);
+        }
+
+        private UriTemplateHandler target() {
+            UriTemplateHandler handler = delegate.get();
+            if (handler == null) {
+                String base = resolveProbeBase();
+                log.info("[F10-08] 探测基址已解析: {}", base);
+                handler = new DefaultUriBuilderFactory(base);
+                delegate.set(handler);
+            }
+            return handler;
+        }
     }
 }

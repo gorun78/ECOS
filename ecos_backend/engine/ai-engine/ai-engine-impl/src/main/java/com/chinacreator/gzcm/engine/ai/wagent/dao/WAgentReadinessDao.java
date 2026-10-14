@@ -77,4 +77,19 @@ public class WAgentReadinessDao extends JdbcTemplateDaoSupport {
     public int update(WAgentReadinessDO assessment) {
         return updateByBean(UPDATE_SQL, assessment);
     }
+
+    /**
+     * 只追加纪律的替代位回写（F10-08 硬规则④「评估记录只追加 + {@code superseded_by}」）。
+     *
+     * <p>旧行<b>不删不改内容</b>，只写指针。三个前置条件都是 {@code WHERE} 里的闸而非服务层自觉：
+     * {@code superseded_by IS NULL}（禁二次替代，历史链单向前进）、{@code is_pinned = 0}
+     * （被 Decision 钉住的评估不参与重评清理，F10-07 硬规则④后半句）。返回 0 ⇒ 目标行是
+     * pinned 或已被替代，调用方记 WARN 而非抛错（钉住是运维显式意图，不是故障）。</p>
+     */
+    public int markSuperseded(String id, String supersededBy, String updateBy) {
+        return update("UPDATE " + TABLE + " SET superseded_by = ?, update_by = ?, "
+                + "update_time = CURRENT_TIMESTAMP "
+                + "WHERE id = ? AND is_deleted = 0 AND superseded_by IS NULL AND is_pinned = 0",
+                supersededBy, updateBy, id);
+    }
 }
