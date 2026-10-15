@@ -35,6 +35,10 @@ import java.util.UUID;
  *   <li>mask → 敏感数据目录 {@code ecos_security_asset}（COLUMN 行 guard_combo 含 mask 的列 → 强制 mask）</li>
  *   <li>OPA → {@link OpaPolicyService#evaluate}（fail-close 常量化，DENY 语义自带）</li>
  * </ul>
+ *
+ * <p>#142/B4-3b 只增：RLS/CLS 两源的<b>命中策略名</b>以 {@code policyRefs[]} 落进 bundle
+ * （{@link DecisionBundle#scopeEvidence} 的唯一出处）。此前 bundle 只携带谓词与列集，
+ * 消费方（导出件权限自证）无出处可引，只能写常量 —— 见差距文档 D-B4-10/D-B4-11。</p>
  */
 @Service
 public class SecurityDecisionService {
@@ -108,11 +112,41 @@ public class SecurityDecisionService {
     @SuppressWarnings("unchecked")
     private Map<String, Object> asPredicatePart(Map<String, Object> rlsRes) {
         Object pred = rlsRes.get("predicate");
-        if (pred instanceof Map<?, ?> p) return (Map<String, Object>) p;
+        // 复制而非改源：policyRefs 是 bundle 层追加的范围证据，不写回 RlsPredicate.toMap 的语义
+        Map<String, Object> part = pred instanceof Map<?, ?> p
+                ? new LinkedHashMap<>((Map<String, Object>) p)
+                : fallbackPredicatePart();
+        part.put("policyRefs", namesOf(rlsRes.get("policies")));
+        return part;
+    }
+
+    private static Map<String, Object> fallbackPredicatePart() {
         Map<String, Object> fallback = new LinkedHashMap<>();
         fallback.put("predicateTemplate", "1=1");
         fallback.put("denyIfEmpty", true);
         return fallback;
+    }
+
+    /**
+     * RLS/CLS 源返回的命中策略清单 → 策略名列表（范围证据单源）。
+     *
+     * <p>两源形态不同（{@code RowLevelSecurityServiceImpl} 给对象数组、
+     * {@code ColumnLevelSecurityServiceImpl} 给字符串数组），此处统一成名字；
+     * <b>清单缺失返回空列表而非 null</b>，由消费方按「无命中策略 + denyIfEmpty」判 DENY，
+     * 禁把"读不到出处"折叠成"出处为空所以放行"。</p>
+     */
+    private static List<String> namesOf(Object policies) {
+        if (!(policies instanceof List<?> list)) return new ArrayList<>();
+        List<String> out = new ArrayList<>();
+        for (Object o : list) {
+            if (o instanceof Map<?, ?> m) {
+                Object name = m.get("name") != null ? m.get("name") : m.get("policy_name");
+                if (name != null && !String.valueOf(name).isBlank()) out.add(String.valueOf(name));
+            } else if (o != null && !String.valueOf(o).isBlank()) {
+                out.add(String.valueOf(o));
+            }
+        }
+        return out;
     }
 
     private Map<String, Object> safeCls(String table, String userId, List<String> columns) {
@@ -134,6 +168,7 @@ public class SecurityDecisionService {
         // C.2.3：allow 语义（返回可读列集合）；allow 空集 = 该主体不可读该资产任何列（非全放开）
         m.put("mode", "allow");
         m.put("names", visible);
+        m.put("policyRefs", namesOf(clsRes.get("policies")));
         return m;
     }
 

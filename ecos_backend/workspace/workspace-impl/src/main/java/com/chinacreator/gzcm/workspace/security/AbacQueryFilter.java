@@ -120,6 +120,27 @@ public class AbacQueryFilter {
     }
 
     /**
+     * 三通道唯一裁决入口的 workspace 侧委托（详设-01 C.1 [3] / F01-02，#142/B4-3b 只增）。
+     *
+     * <p>本方法是 workspace 出<em>裁决</em>的第二条腿（第一条是 {@link #buildRowFilterCondition}
+     * / {@link #filterColumns} 的分散面），刻意放在同一委托类里：workspace 侧"谁能调
+     * security-engine"的清单保持单点，不新增第三个出口。导出通道需要的是
+     * <b>一次拿全四源 + 范围证据</b>，分散面给不了（{@code /rls/apply} 只回谓词、
+     * 不回"命中了哪条策略"），故 B4-3b 先接导出；页面/AI 两通道合流到本入口归 B4-3c
+     * （差距文档 D-B4-15）。</p>
+     *
+     * @param entityCode 受保护资产定位符（与 {@code AssetRef.table} 同义）
+     * @param purpose    通道字面量（{@code page} / {@code export} / {@code ai}）
+     * @return {@code DecisionBundle} 的 REST 形态；security 明确拒绝/应答缺段 → {@code null}
+     *         （调用方按 fail-closed 处理）；进程不可用 → 503 {@code ECOS-SEC-501} 上抛
+     */
+    public Map<String, Object> decisionBundle(String entityCode, String purpose) {
+        // columns 传空 = 整表面裁决；列裁剪仍走 filterColumns/allowedColumns（bundle 列面
+        // 在 columns=[] 时不可用，收口项 D-B4-16），禁在此处猜列名。
+        return securityEngineClient.decide(entityCode, List.of(), purpose);
+    }
+
+    /**
      * 策略缓存清空的兼容入口 — 裁决已收敛 security-engine，本地无缓存可刷（保留签名）。
      */
     public void invalidateCache() {

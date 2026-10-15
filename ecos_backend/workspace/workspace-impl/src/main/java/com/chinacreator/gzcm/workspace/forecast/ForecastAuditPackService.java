@@ -40,8 +40,10 @@ import com.chinacreator.gzcm.workspace.security.WorkspaceSecurityEngineClient;
  * 明确拒绝/应答不可解析 → 403，宁 DENY 不超发；<b>进程不可用</b>是另一态 ——
  * 503 {@code ECOS-SEC-501} 上抛，禁伪装成"没权限"，详设-01 §4.5.4/§4.7.2，
  * 门禁 {@code SecurityDownAllChannelDenyTest#export}）；成功后发审计事件 {@code AUDIT_PACK_EXPORT}
- * （runtime-event 底座单通道 → Kafka ecos.audit）。包内权限范围 = 导出人自身权限
- * （同管道裁决的自然结果，manifest 自证）。</p>
+ * （runtime-event 底座单通道 → Kafka ecos.audit）。包内权限范围与水印<b>不自行拼写</b>，
+ * 逐字引用 {@link ForecastExportService} 第①步 {@code decide(purpose=export)} 的裁决证据
+ * （decisionId + 命中策略名 + obligations 水印），因此 §4.7.2「manifest 标 scope」的断言
+ * 可被审计反查到 {@code ecos_rls_policy}（#142/B4-3b，原文常量自证形态已废）。</p>
  */
 @Service
 public class ForecastAuditPackService {
@@ -133,6 +135,10 @@ public class ForecastAuditPackService {
         manifest.put("fileName", "forecast_" + forecastRunId + "_audit_" + generatedAt + ".zip");
         manifest.put("generatedAt", generatedAt);
         manifest.put("permissionScope", export.getMeta().get("permissionScope"));
+        // #142/B4-3b：水印与裁决号引用导出件真值（同源，禁在包层再拼一套）。
+        // 义务未签发时值为 NOT_ISSUED —— 那是 D-B4-12 的在册痕迹，不是"已加水印"。
+        manifest.put("watermark", export.getMeta().get("watermark"));
+        manifest.put("decisionId", export.getMeta().get("decisionId"));
         manifest.put("currency", export.getMeta().get("currency"));
         manifest.put("unit", export.getMeta().get("unit"));
         manifest.put("caliberId", view.getCaliberId());

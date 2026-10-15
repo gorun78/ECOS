@@ -99,8 +99,10 @@ public class ForecastRunController {
     }
 
     /**
-     * H-6 CSV 导出（详设-09 §5.1 row 12 / SEC-01）：与 {@code /results} 同一 RLS 咽喉 +
-     * 同一取数通道 + 同一 CLS 列裁剪；文件头写权限范围/口径/asOf。SPI 未装配诚实 501。
+     * H-6 CSV 导出（详设-09 §5.1 row 12 / SEC-01）：导出裁决（三通道唯一入口
+     * {@code POST /api/v1/security/decision}，purpose=export，#142/B4-3b）先于取数，
+     * 取数与 {@code /results} 同一通道、列裁剪同一 CLS 咽喉；文件头写裁决给出的
+     * 权限范围/水印/口径/asOf。SPI 未装配诚实 501。
      */
     @GetMapping("/{runId}/export")
     public ResponseEntity<String> export(@PathVariable("runId") String runId) {

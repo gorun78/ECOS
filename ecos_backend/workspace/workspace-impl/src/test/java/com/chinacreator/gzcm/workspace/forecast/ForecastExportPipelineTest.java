@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
+import com.chinacreator.gzcm.workspace.security.ExportDecision;
 import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,14 +38,25 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 /**
  * H-6 导出与审计包验收（详设-09 v1.2 §十一 §5.1 rows 12/15，卷 07 SEC-01/SEC-04）。
  *
- * <p><b>SEC-01 同管道</b>是本页的主张：导出的行级 RLS、取数通道、列级 CLS 三步必须与页面查询
- * 同一咽喉同一顺序（RLS 先于任何取数），断言方式是 {@link InOrder} 而非"结果长得像"；
+ * <p><b>SEC-01 同管道</b>是本页的主张：导出的行级裁决、取数通道、列级 CLS 三步必须与页面查询
+ * 同一咽喉同一顺序（裁决先于任何取数），断言方式是 {@link InOrder} 而非"结果长得像"；
  * <b>SEC-04</b> 审计包 OPA 默认 DENY，且包内 manifest 逐文件 sha256 可自证完整性。</p>
+ *
+ * <p><b>#142/B4-3b 订正（原文保留）</b>：第①步咽喉由 {@code assertReadable}（{@code /rls/apply}
+ * 分散面）换为 {@code exportDecision}（三通道唯一入口 {@code /api/v1/security/decision}，
+ * {@code purpose=export}）。因此本类内的权限范围/水印断言<b>不再是硬编码常量</b>，
+ * 而是逐字等于由测试内<b>真实 bundle 形态</b>经 {@code ExportDecision.fromBundle} 产出的串 ——
+ * bundle 的键名契约由 security 侧与本侧 {@code ExportDecisionContractTest} 双向钉住，
+ * 键名漂移时本类变红（旧断言把 {@code same-pipeline-as-query} 常量钉成"期望值"，
+ * 恰好让"导出件自证"这一缺陷无法变红，属结构性假绿，已废）。</p>
  */
 @DisplayName("H-6 导出同管道 + 审计包 OPA/manifest")
 class ForecastExportPipelineTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+
+    /** 范围证据期望值（由 bundle 逐字推出，禁在断言里重写常量）。 */
+    private static final String DECISION_ID = "dec-fin-0001";
 
     private static Map<String, Object> row(Object... kv) {
         Map<String, Object> m = new LinkedHashMap<>();
@@ -52,6 +64,52 @@ class ForecastExportPipelineTest {
             m.put(String.valueOf(kv[i]), kv[i + 1]);
         }
         return m;
+    }
+
+    /**
+     * 构造 security-engine {@code DecisionBundle} 的 REST 形态（键名与
+     * {@code DecisionBundle.toMap()} / {@code SecurityDecisionService} 写入点一致；
+     * 契约由 {@code ExportDecisionContractTest} 对 security 源文件做双向钉）。
+     *
+     * @param rlsRefs   命中的 RLS 策略名（空集＝无出处 ⇒ 范围证据写 NONE）
+     * @param predicate 合并谓词模板（财务行现状为 {@code "(1=1)"}）
+     * @param clsRefs   命中的 CLS 策略名
+     * @param watermark OPA 水印义务文本；{@code null}＝未签发义务（D-B4-12 现状）
+     */
+    private static Map<String, Object> bundle(List<String> rlsRefs, String predicate,
+                                              List<String> clsRefs, String watermark) {
+        Map<String, Object> rls = new LinkedHashMap<>();
+        rls.put("predicateTemplate", predicate);
+        rls.put("bindings", List.of());
+        rls.put("combine", "AND");
+        rls.put("denyIfEmpty", true);
+        rls.put("policyRefs", rlsRefs);
+
+        Map<String, Object> columns = new LinkedHashMap<>();
+        columns.put("mode", "allow");
+        columns.put("names", List.of("period", "predicted"));
+        columns.put("policyRefs", clsRefs);
+
+        Map<String, Object> opa = new LinkedHashMap<>();
+        opa.put("allow", true);
+        opa.put("policyRef", "ecos.data.access");
+        opa.put("obligations", watermark == null ? List.of()
+                : List.of(row("obligation", "watermark", "watermark", watermark)));
+
+        Map<String, Object> b = new LinkedHashMap<>();
+        b.put("rls", rls);
+        b.put("columns", columns);
+        b.put("masks", List.of());
+        b.put("opa", opa);
+        b.put("decisionId", DECISION_ID);
+        b.put("traceId", "trace-1");
+        return b;
+    }
+
+    /** 导出裁决（放行态：命中 rls-finance-all + 谓词恒真）。 */
+    private static ExportDecision grantedDecision(String watermark) {
+        return ExportDecision.fromBundle("forecast_run",
+                bundle(List.of("rls-finance-all"), "(1=1)", List.of(), watermark));
     }
 
     private static Map<String, Object> resultsWith(List<Map<String, Object>> rows) {
@@ -90,29 +148,32 @@ class ForecastExportPipelineTest {
     // ── 导出：同管道三步 ──
 
     @Test
-    @DisplayName("RLS 咽喉 → 同一 results 通道 → CLS 裁剪，三步严格同序（禁旁路取数）")
+    @DisplayName("导出裁决咽喉 → 同一 results 通道 → CLS 裁剪，三步严格同序（禁旁路取数）")
     void exportRunsThroughTheSameGuardOrderAsQuery() {
         ScenarioReadGuard guard = mock(ScenarioReadGuard.class);
         ForecastRunOrchestrationService orchestration = mock(ForecastRunOrchestrationService.class);
         List<Map<String, Object>> page = List.of(row("period", "2026Q3", "predicted", "100.00"));
         when(orchestration.results("fc_1")).thenReturn(resultsWith(page));
+        when(guard.exportDecision("forecast_run")).thenReturn(grantedDecision(null));
         when(guard.applyColumns(eq("forecast_run"), anyList())).thenAnswer(i -> i.getArgument(1));
 
         new ForecastExportService(guard, orchestration).buildExport("fc_1");
 
         InOrder order = inOrder(guard, orchestration);
-        order.verify(guard).assertReadable("forecast_run");
+        order.verify(guard).exportDecision("forecast_run");
         order.verify(orchestration).results("fc_1");
         order.verify(guard).applyColumns(eq("forecast_run"), anyList());
+        // 旧分散面不得再出现在导出链路上（否则"同一入口"只是加了个并行调用）
+        verify(guard, never()).assertReadable(anyString());
     }
 
     @Test
-    @DisplayName("RLS 拒绝 ⇒ 立即中断，一次取数都不发生（宁缺不超发）")
+    @DisplayName("裁决拒绝 ⇒ 立即中断，一次取数都不发生（宁缺不超发）")
     void rlsDenyStopsBeforeAnyDataAccess() {
         ScenarioReadGuard guard = mock(ScenarioReadGuard.class);
         ForecastRunOrchestrationService orchestration = mock(ForecastRunOrchestrationService.class);
-        doThrow(new com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException("forecast_run"))
-                .when(guard).assertReadable(anyString());
+        doThrow(new com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException("scenario:export:forecast_run"))
+                .when(guard).exportDecision(anyString());
 
         assertThrows(com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException.class,
                 () -> new ForecastExportService(guard, orchestration).buildExport("fc_1"));
@@ -120,11 +181,13 @@ class ForecastExportPipelineTest {
     }
 
     @Test
-    @DisplayName("文件头自证权限/口径/asOf，meta 与之一致")
+    @DisplayName("文件头自证权限/水印/口径/asOf，meta 与裁决证据逐字一致（禁常量）")
     void csvHeaderDeclaresPermissionCaliberAndAsOf() {
         ScenarioReadGuard guard = mock(ScenarioReadGuard.class);
         ForecastRunOrchestrationService orchestration = mock(ForecastRunOrchestrationService.class);
+        ExportDecision decision = grantedDecision("U:u-fin|dec:" + DECISION_ID + "|2026-10-15");
         when(orchestration.results("fc_1")).thenReturn(resultsWith(List.of(row("period", "2026Q3"))));
+        when(guard.exportDecision("forecast_run")).thenReturn(decision);
         when(guard.applyColumns(anyString(), anyList())).thenAnswer(i -> i.getArgument(1));
 
         ForecastExportService.ExportPayload payload =
@@ -132,12 +195,38 @@ class ForecastExportPipelineTest {
 
         String csv = payload.getCsv();
         assertTrue(csv.startsWith("# forecast-export runId=fc_1\n"), csv);
-        assertTrue(csv.contains("# permission-scope: rls+cls:forecast_run(same-pipeline-as-query, SEC-01)\n"), csv);
+        assertTrue(csv.contains("# permission-scope: " + decision.permissionScope() + "\n"), csv);
         assertTrue(csv.contains("# caliber: cal-1@v3; formulaVersion=f-2\n"), csv);
         assertTrue(csv.contains("# asOf: 2026-09-30T00:00:00\n"), csv);
-        assertEquals("rls+cls:forecast_run(same-pipeline-as-query, SEC-01)",
-                payload.getMeta().get("permissionScope"));
+        // 范围证据必须能反查到裁决与命中策略（旧常量形态给不出这两样）
+        assertTrue(csv.contains("decision=" + DECISION_ID), csv);
+        assertTrue(csv.contains("purpose=export"), csv);
+        assertTrue(csv.contains("rls=[rls-finance-all]"), csv);
+        assertEquals(decision.permissionScope(), payload.getMeta().get("permissionScope"));
+        assertEquals(DECISION_ID, payload.getMeta().get("decisionId"));
+        // §2.10.2 之四：水印义务进页眉<b>和</b>页脚（只写一头时尾部截断无痕迹）
+        assertEquals(decision.watermark(), payload.getMeta().get("watermark"));
+        assertEquals(2, countOccurrences(csv, "# watermark: " + decision.watermark()), csv);
         assertEquals("T-9", payload.getMeta().get("taskId"), "异步 taskId 须随导出元数据回显");
+    }
+
+    @Test
+    @DisplayName("缺陷 D-B4-12 — OPA 未签发水印义务时，导出件原样落 NOT_ISSUED（禁冒充已加水印）")
+    void missingWatermarkObligationIsDeclaredNotFabricated() {
+        ScenarioReadGuard guard = mock(ScenarioReadGuard.class);
+        ForecastRunOrchestrationService orchestration = mock(ForecastRunOrchestrationService.class);
+        when(orchestration.results("fc_1")).thenReturn(resultsWith(List.of(row("period", "2026Q3"))));
+        when(guard.exportDecision("forecast_run")).thenReturn(grantedDecision(null));
+        when(guard.applyColumns(anyString(), anyList())).thenAnswer(i -> i.getArgument(1));
+
+        ForecastExportService.ExportPayload payload =
+                new ForecastExportService(guard, orchestration).buildExport("fc_1");
+
+        String csv = payload.getCsv();
+        assertTrue(csv.contains("# watermark: " + ExportDecision.WATERMARK_NOT_ISSUED), csv);
+        assertEquals(ExportDecision.WATERMARK_NOT_ISSUED, payload.getMeta().get("watermark"));
+        // 义务缺失时不得凭空生成看似真实的水印（例如主体名+时间戳）
+        assertFalse(csv.contains("# watermark: U:"), csv);
     }
 
     @Test
@@ -146,6 +235,7 @@ class ForecastExportPipelineTest {
         ScenarioReadGuard guard = mock(ScenarioReadGuard.class);
         ForecastRunOrchestrationService orchestration = mock(ForecastRunOrchestrationService.class);
         when(orchestration.results("fc_1")).thenReturn(resultsWith(List.of(row("period", "2026Q3"))));
+        when(guard.exportDecision("forecast_run")).thenReturn(grantedDecision(null));
         when(guard.applyColumns(anyString(), anyList())).thenReturn(List.of());
 
         String csv = new ForecastExportService(guard, orchestration).buildExport("fc_1").getCsv();
@@ -161,6 +251,7 @@ class ForecastExportPipelineTest {
         ForecastRunOrchestrationService orchestration = mock(ForecastRunOrchestrationService.class);
         when(orchestration.results("fc_1")).thenReturn(resultsWith(List.of(
                 row("period", "2026Q3", "predicted", null, "note", "a,b\"c\nd"))));
+        when(guard.exportDecision("forecast_run")).thenReturn(grantedDecision(null));
         when(guard.applyColumns(anyString(), anyList())).thenAnswer(i -> i.getArgument(1));
 
         String csv = new ForecastExportService(guard, orchestration).buildExport("fc_1").getCsv();
@@ -178,6 +269,7 @@ class ForecastExportPipelineTest {
         ScenarioReadGuard guard = mock(ScenarioReadGuard.class);
         ForecastRunOrchestrationService orchestration = mock(ForecastRunOrchestrationService.class);
         when(orchestration.results("fc_1")).thenReturn(resultsWith(null));
+        when(guard.exportDecision("forecast_run")).thenReturn(grantedDecision(null));
         when(guard.applyColumns(anyString(), anyList())).thenAnswer(i -> i.getArgument(1));
 
         String csv = new ForecastExportService(guard, orchestration).buildExport("fc_1").getCsv();
@@ -216,8 +308,11 @@ class ForecastExportPipelineTest {
         when(security.evaluate(eq("audit:export"), any())).thenReturn(true);
         when(orchestration.status("fc_1")).thenReturn(view());
         when(orchestration.evidence("fc_1")).thenReturn(evidence());
+        ExportDecision decision = grantedDecision("U:u-fin|dec:" + DECISION_ID + "|2026-10-15");
         Map<String, Object> meta = new LinkedHashMap<>();
-        meta.put("permissionScope", "rls+cls:forecast_run(same-pipeline-as-query, SEC-01)");
+        meta.put("permissionScope", decision.permissionScope());
+        meta.put("decisionId", decision.decisionId());
+        meta.put("watermark", decision.watermark());
         meta.put("currency", "CNY");
         meta.put("unit", "万元");
         when(exportService.buildExport("fc_1")).thenReturn(
@@ -235,8 +330,12 @@ class ForecastExportPipelineTest {
 
         JsonNode manifest = JSON.readTree(entries.get("manifest.json"));
         assertEquals("fc_1", manifest.get("forecastRunId").asText());
-        assertEquals("rls+cls:forecast_run(same-pipeline-as-query, SEC-01)",
-                manifest.get("permissionScope").asText(), "包内权限范围=导出人自身权限");
+        assertEquals(decision.permissionScope(), manifest.get("permissionScope").asText(),
+                "包内权限范围=导出人自身权限（逐字引用导出件的裁决证据，禁另拼一套）");
+        assertEquals(DECISION_ID, manifest.get("decisionId").asText(),
+                "manifest 必须能反查到本次裁决号");
+        assertEquals(decision.watermark(), manifest.get("watermark").asText(),
+                "水印义务与导出件同源（禁 manifest 与 CSV 各写一套）");
         assertEquals(6, manifest.get("files").size());
         for (JsonNode file : manifest.get("files")) {
             String name = file.get("name").asText();
@@ -275,6 +374,16 @@ class ForecastExportPipelineTest {
         assertFalse(actions.contains("no-kind"), actions);
         assertTrue(new String(entries.get("evidence-index.csv"), StandardCharsets.UTF_8)
                 .startsWith("seq,evidenceRef\n"), "证据引用零条时只出表头，禁造行");
+    }
+
+    /** 数一段文本在整体里出现的次数（水印要求页眉+页脚双写时用，禁只断"含有一次"）。 */
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0, from = 0;
+        while ((from = haystack.indexOf(needle, from)) >= 0) {
+            count++;
+            from += needle.length();
+        }
+        return count;
     }
 
     private static Map<String, byte[]> readZip(byte[] zipBytes) throws Exception {

@@ -137,6 +137,68 @@ public class WorkspaceSecurityEngineClient {
         }
     }
 
+    // ═══════════════ 三通道唯一裁决入口（详设-01 C.1 [3] / F01-02） ═══════════════
+
+    /**
+     * POST /api/v1/security/decision —— 三通道唯一裁决入口的 workspace 侧接线
+     * （#142/B4-3b；此前 workspace 只有 {@code /rls/apply}＋{@code /cls/columns}＋
+     * {@code /policy-engine/evaluate} 三个分散调用，{@code Purpose.EXPORT} 生产零调用 ⇒
+     * 导出通道在结构上仍能"漏掉某一条"，即 S-6 旁路面未关，差距文档 D-B4-10）。
+     *
+     * @param table   受保护资产定位符（与 security 侧 {@code AssetRef.table} 同义）
+     * @param columns 请求列集；{@code null}/空 = 未指定列（此时 bundle 的列面
+     *                <b>不可</b>用作裁剪依据，列裁剪仍走 {@link #allowedColumns}，
+     *                收口项见差距文档 D-B4-16）
+     * @param purpose 通道字面量（{@code page} / {@code export} / {@code ai}）
+     * @return {@code DecisionBundle} 的 REST 形态（含 {@code rls.policyRefs} 范围证据）；
+     *         security 明确拒绝（4xx 信封）或应答缺段不可解析 → {@code null}（调用方必须按
+     *         fail-closed 处理，禁把 null 当"无策略所以放行"）
+     * @throws SecurityEngineUnavailableException security 进程不可用（连不上/超时/5xx），
+     *         或 security 内部裁决失败后以 {@code code=503 / ECOS-SEC-501} 信封应答
+     *         —— 前者由 {@link #postJson} 单点转换，后者由 {@link #unavailableEnvelope}
+     *         在<b>同一分类点</b>补上：{@code DecisionController} 把内部异常包成
+     *         HTTP 200 + {@code code=503} 信封，若不识别该信封就会把"引擎裁决失败"
+     *         误归成"没有裁决证据"，违详设-01 §4.5.4「不可用 ≠ 无权限」分态
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> decide(String table, List<String> columns, String purpose) {
+        try {
+            Map<String, Object> asset = new LinkedHashMap<>();
+            asset.put("table", table);
+            if (columns != null && !columns.isEmpty()) asset.put("columns", columns);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("assetRef", asset);
+            body.put("purpose", purpose);
+            Map<String, Object> resp = postJson("/api/v1/security/decision", body);
+            if (resp == null) return null;
+            if (unavailableEnvelope(resp)) {
+                throw new SecurityEngineUnavailableException("/api/v1/security/decision",
+                        "security 信封 code=" + resp.get("code") + " message=" + resp.get("message"), null);
+            }
+            if (!(resp.get("data") instanceof Map)) return null;
+            return (Map<String, Object>) resp.get("data");
+        } catch (SecurityEngineUnavailableException e) {
+            throw e; // 可用性故障保持独立态上抛（§4.5.4 分态）
+        } catch (Exception e) {
+            log.warn("WorkspaceSecurityEngineClient.decide 无裁决证据: table={} purpose={} reason={}",
+                    table, purpose, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 是否为「不可用」信封：{@code ApiResponse.code == 503} 或 message 以
+     * {@code ECOS-SEC-501} 起头（{@code DecisionController} 的 fail-closed 出口形态）。
+     * 4xx 业务信封（400 参数错 / 403 无上下文）不算不可用 —— 那是明确的"无裁决"，
+     * 由调用方走 403 分支。
+     */
+    private static boolean unavailableEnvelope(Map<String, Object> resp) {
+        Object code = resp.get("code");
+        if (code instanceof Number n && n.intValue() == 503) return true;
+        Object message = resp.get("message");
+        return message != null && String.valueOf(message).startsWith("ECOS-SEC-501");
+    }
+
     // ═══════════════ ABAC（默认 DENY false） ═══════════════
 
     /**
