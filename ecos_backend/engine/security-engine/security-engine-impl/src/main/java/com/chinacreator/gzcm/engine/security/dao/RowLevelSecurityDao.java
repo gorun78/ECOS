@@ -18,7 +18,26 @@ public class RowLevelSecurityDao extends JdbcTemplateDaoSupport {
 
     private static final String TABLE = "ecos_rls_policy";
 
-    /** 命中策略查询（table_name OR resource_id 双轨 + user/role 匹配，priority 升序，含 V164 参数化列）。 */
+    /**
+     * 命中策略查询（table_name OR resource_id 双轨 + user/role 匹配，priority 升序，含 V164 参数化列）。
+     *
+     * <p><b>#142/B4-3a 缺陷修复（详设 §4.7.2 角色×通道矩阵的角色维度在真实库上从未生效）</b>：
+     * 角色子查询原写作 {@code SELECT "ROLE_ID" FROM TD_USER_ROLE WHERE "USER_ID" = ?}。
+     * PostgreSQL 双引号标识符<b>大小写敏感</b>，而 {@code td_user_role} 的全仓 DDL 单源
+     * （{@code docs/50-db_script/01-ddl-多方言/postgresql/01_ecos_sysman.sql:122}、
+     * {@code 06-docker-infra/iam_pg_seed.sql:57}）建的列名是<b>不加引号的小写</b>
+     * {@code user_id/role_id}（PG 未加引号即折叠小写），因此该语句在 dev PG 上必然报错——
+     * 本批实跑凭证（改前，只读）：{@code ERROR: column "ROLE_ID" does not exist}；
+     * 改后同形语句在按 DDL 单源建的 {@code TEMP} 表上按角色各命中 1 条策略（详见差距文档 v1.0.14）。</p>
+     *
+     * <p>异常在 {@code RowLevelSecurityServiceImpl.apply} 里被 catch 成"无策略"，
+     * 于是 {@code predicateTemplate=1=1 + denyIfEmpty=true}——即<b>角色行级过滤整体失效</b>
+     * 而对外仍像"策略在位"。这正是差距文档 D-15/D-16 记录的"mock 绿、真库断"形态，
+     * 具名门禁 {@code RoleResolutionSqlShapeTest} 已把该 SQL 形态钉住（禁再写引号大写）。</p>
+     *
+     * <p>写法取<b>不加引号</b>形态：PG 折叠小写命中现网列；Oracle 折叠大写命中其未加引号建的同名列；
+     * MySQL 列名大小写不敏感——三档方言唯一同时成立的写法（多库兼容口径见数据库访问规范 §多库兼容）。</p>
+     */
     public List<Map<String, Object>> findPoliciesForUser(String tableName, String userId) {
         String sql = """
             SELECT filter_expr, priority, policy_name,
@@ -27,7 +46,7 @@ public class RowLevelSecurityDao extends JdbcTemplateDaoSupport {
             WHERE (table_name = ? OR resource_id = ?) AND enabled = true
               AND (user_id = ? OR user_id IS NULL)
               AND (role_id IS NULL OR role_id IN (
-                  SELECT "ROLE_ID" FROM TD_USER_ROLE WHERE "USER_ID" = ?
+                  SELECT role_id FROM td_user_role WHERE user_id = ?
               ))
             ORDER BY priority ASC
             """;

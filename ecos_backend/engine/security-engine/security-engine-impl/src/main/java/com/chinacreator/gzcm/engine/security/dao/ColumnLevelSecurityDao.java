@@ -17,7 +17,16 @@ public class ColumnLevelSecurityDao extends JdbcTemplateDaoSupport {
 
     private static final String TABLE = "ecos_cls_policy";
 
-    /** 命中策略查询（table_name OR resource_id 双轨 + user/role 匹配，priority 升序）。 */
+    /**
+     * 命中策略查询（table_name OR resource_id 双轨 + user/role 匹配，priority 升序）。
+     *
+     * <p>#142/B4-3a：角色子查询的 {@code "ROLE_ID"/"USER_ID"} 引号大写形态在 dev PG 上
+     * 报 {@code ERROR: column "ROLE_ID" does not exist}（与 {@link RowLevelSecurityDao} 同缺陷、
+     * 同修法、同 DDL 单源依据）。CLS 侧后果更硬：异常被 {@code getColumns} 的 catch 转成
+     * {@code visibleColumns=[]}（fail-closed 全拒绝）⇒ 列级策略<b>永远命中不到</b>，
+     * 非财务角色的"隐藏时薪/金额列"与财务角色的"可见"两种预期同时落空。
+     * 形态由 {@code RoleResolutionSqlShapeTest} 钉住。</p>
+     */
     public List<Map<String, Object>> findPoliciesForUser(String tableName, String userId) {
         String sql = """
             SELECT visible_cols, blocked_cols, priority, policy_name
@@ -25,7 +34,7 @@ public class ColumnLevelSecurityDao extends JdbcTemplateDaoSupport {
             WHERE (table_name = ? OR resource_id = ?) AND enabled = true
               AND (user_id = ? OR user_id IS NULL)
               AND (role_id IS NULL OR role_id IN (
-                  SELECT "ROLE_ID" FROM TD_USER_ROLE WHERE "USER_ID" = ?
+                  SELECT role_id FROM td_user_role WHERE user_id = ?
               ))
             ORDER BY priority ASC
             """;
