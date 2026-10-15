@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.workspace.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.workspace.QueryHistoryService;
+import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.security.AbacQueryFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,6 +109,11 @@ public class ObjectQLController {
         } catch (IllegalArgumentException e) {
             log.warn("ObjectQL 参数错误: {}", e.getMessage());
             return ApiResponse.badRequest(e.getMessage());
+        } catch (SecurityEngineUnavailableException e) {
+            // 详设-01 §4.7.2「security 不可用（全角色）→ 503，禁渲染空列表」：
+            // 本面若把可用性故障并入泛 catch，响应会是 HTTP 200 + code=-1「查询执行失败」，
+            // 前端按「查询失败」处置而非「安全引擎不可用」，且丢失 ECOS-SEC-501 追踪语义。
+            throw e;
         } catch (Exception e) {
             log.error("ObjectQL 查询失败", e);
             return ApiResponse.internalError("查询执行失败");

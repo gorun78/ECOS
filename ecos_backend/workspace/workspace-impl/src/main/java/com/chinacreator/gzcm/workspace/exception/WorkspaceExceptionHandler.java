@@ -66,13 +66,16 @@ public class WorkspaceExceptionHandler {
         return build(status, code, message, details);
     }
 
-    /** 503 认知异常的下游原文只落日志面（X-41）；其余领域异常无此字段。 */
+    /** 503 认知/安全引擎不可用的下游原文只落日志面（X-41）；其余领域异常无此字段。 */
     private static String technicalReason(Throwable ex) {
         if (ex instanceof CognitiveEngineUnavailableException c) {
             return c.getTechnicalReason();
         }
         if (ex instanceof com.chinacreator.gzcm.workspace.scenario.CognitiveEngineUnavailableException c) {
             return c.getTechnicalReason();
+        }
+        if (ex instanceof SecurityEngineUnavailableException s) {
+            return s.getTechnicalReason();
         }
         return null;
     }

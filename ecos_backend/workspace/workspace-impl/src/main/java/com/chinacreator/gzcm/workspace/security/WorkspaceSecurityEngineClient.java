@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor;
 import com.chinacreator.gzcm.common.security.header.ServiceContext;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
+import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +17,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -34,7 +37,16 @@ import java.util.UUID;
  * <p>铁律 §2.4：RLS / CLS / ABAC 裁决 / 审计一律走 security-engine REST + Kafka，
  * workspace 内不再自建 ABAC 策略解析（原 {@link AbacQueryFilter} 直查
  * td_abac_policy + {@code ${userId}} 字符串拼接的二阶注入路径已废除）；
- * security-engine 不可用时<b>默认 DENY</b>：RLS → "1=0"，CLS → 空集，ABAC → false。</p>
+ * security-engine <b>拒绝</b>时默认 DENY：RLS → "1=0"，CLS → 空集，ABAC → false。</p>
+ *
+ * <p><b>不可用与拒绝分态（详设-01 §4.5.4 六×四降级矩阵 / §4.7.1 三通道全 DENY 门禁，
+ * 验收载体 {@code SecurityDownAllChannelDenyTest#page} / {@code #export}）</b>：
+ * 连不上 / 读超时 / security 侧 5xx 属<b>可用性故障</b>而非策略裁决，
+ * 由 {@link #postJson} 单点转 {@link SecurityEngineUnavailableException}
+ * （HTTP 503 / ECOS-SEC-501）上抛，禁再折叠成 {@code "1=0"} / 空列集 / {@code false} ——
+ * 旧形态把"安全引擎故障"渲染成"你没有数据"（200 + 空列表），
+ * 违从零实施版 line 2602「503 DENY 且禁渲染空列表冒充无数据」。
+ * 4xx（含默认 DENY 的 403）与响应缺段不可解析仍按既有兜底走 DENY 语义，分态不外溢。</p>
  *
  * <p>卷07 F07-17 底座收口（对齐 ai-engine W89 先例）：
  * <ul>
@@ -66,7 +78,9 @@ public class WorkspaceSecurityEngineClient {
     /**
      * POST /api/v1/security/rls/apply。
      *
-     * @return WHERE 片段；无策略=空串；不可用/DENY="1=0"（调用方拼进 WHERE 后天然零行）
+     * @return WHERE 片段；无策略=空串；security 明确 DENY="1=0"（调用方拼进 WHERE 后天然零行）
+     * @throws SecurityEngineUnavailableException security 进程不可用（连不上/超时/5xx），
+     *         由 {@link #postJson} 单点转 503，禁冒充"无数据"
      */
     @SuppressWarnings("unchecked")
     public String applyRls(String entityType, String tableName, Map<String, Object> filters) {
@@ -80,6 +94,8 @@ public class WorkspaceSecurityEngineClient {
             if (resp == null || !(resp.get("data") instanceof Map)) return "1=0";
             Object whereObj = ((Map<String, Object>) resp.get("data")).get("whereClause");
             return whereObj == null ? "" : whereObj.toString();
+        } catch (SecurityEngineUnavailableException e) {
+            throw e; // 可用性故障保持独立态上抛（§4.5.4 分态）
         } catch (Exception e) {
             log.warn("WorkspaceSecurityEngineClient.applyRls DENY: entityType={} reason={}",
                     entityType, e.getMessage());
@@ -92,7 +108,8 @@ public class WorkspaceSecurityEngineClient {
     /**
      * POST /api/v1/security/cls/columns。
      *
-     * @return 允许列；security 不可用/异常/DENY → List.of()
+     * @return 允许列；security 明确 DENY/异常 → List.of()
+     * @throws SecurityEngineUnavailableException security 进程不可用（连不上/超时/5xx）
      */
     @SuppressWarnings("unchecked")
     public List<String> allowedColumns(String entityType, List<String> allColumns) {
@@ -111,6 +128,8 @@ public class WorkspaceSecurityEngineClient {
                 return result;
             }
             return List.of();
+        } catch (SecurityEngineUnavailableException e) {
+            throw e; // 可用性故障不得冒充"无可见列"（§4.5.4 分态）
         } catch (Exception e) {
             log.warn("WorkspaceSecurityEngineClient.allowedColumns DENY: entityType={} reason={}",
                     entityType, e.getMessage());
@@ -122,6 +141,10 @@ public class WorkspaceSecurityEngineClient {
 
     /**
      * POST /api/v1/security/policy-engine/evaluate。
+     *
+     * <p>导出通道（{@code audit:export}）咽喉：security 明确 DENY → {@code false}
+     * （调用方转 403）；进程不可用 → 503 {@link SecurityEngineUnavailableException} 上抛，
+     * 由 {@code SecurityDownAllChannelDenyTest#export} 钉住"拒绝产出任何字节"。</p>
      */
     @SuppressWarnings("unchecked")
     public boolean evaluate(String action, Map<String, Object> attrs) {
@@ -137,6 +160,8 @@ public class WorkspaceSecurityEngineClient {
             if (resp == null || !(resp.get("data") instanceof Map)) return false;
             Object result = ((Map<String, Object>) resp.get("data")).get("result");
             return Boolean.TRUE.equals(result);
+        } catch (SecurityEngineUnavailableException e) {
+            throw e; // 可用性故障不得冒充"策略拒绝"（§4.5.4 分态）
         } catch (Exception e) {
             log.warn("WorkspaceSecurityEngineClient.evaluate DENY: action={} reason={}",
                     action, e.getMessage());
@@ -206,8 +231,15 @@ public class WorkspaceSecurityEngineClient {
         headers.setContentType(MediaType.APPLICATION_JSON);
         relayCallerCredentials(headers);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
-        // path 为相对 Bean rootUri（sysman 基址，F07-17 两态寻址单源）的完整路由
-        ResponseEntity<Map> resp = restTemplate.postForEntity(path, entity, Map.class);
+        ResponseEntity<Map> resp;
+        try {
+            // path 为相对 Bean rootUri（sysman 基址，F07-17 两态寻址单源）的完整路由
+            resp = restTemplate.postForEntity(path, entity, Map.class);
+        } catch (ResourceAccessException | HttpServerErrorException e) {
+            // 连不上 / 超时 / security 侧 5xx = 可用性故障，不是策略裁决（详设-01 §4.5.4）：
+            // 单点转 503 ECOS-SEC-501 上抛，禁在此折叠成 "1=0" / 空列集 / false
+            throw new SecurityEngineUnavailableException(path, e.getMessage(), e);
+        }
         return resp == null ? null : resp.getBody();
     }
 

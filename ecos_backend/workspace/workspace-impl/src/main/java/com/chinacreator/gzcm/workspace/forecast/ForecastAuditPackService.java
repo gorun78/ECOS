@@ -37,7 +37,9 @@ import com.chinacreator.gzcm.workspace.security.WorkspaceSecurityEngineClient;
  * （公式文本不落包：只放 caliberId@version + formulaVersion 引用，R-62）。</p>
  *
  * <p><b>裁决与审计</b>：OPA 动作 {@code audit:export} 默认 DENY（security-engine
- * 不可用即 403，宁 DENY 不超发）；成功后发审计事件 {@code AUDIT_PACK_EXPORT}
+ * 明确拒绝/应答不可解析 → 403，宁 DENY 不超发；<b>进程不可用</b>是另一态 ——
+ * 503 {@code ECOS-SEC-501} 上抛，禁伪装成"没权限"，详设-01 §4.5.4/§4.7.2，
+ * 门禁 {@code SecurityDownAllChannelDenyTest#export}）；成功后发审计事件 {@code AUDIT_PACK_EXPORT}
  * （runtime-event 底座单通道 → Kafka ecos.audit）。包内权限范围 = 导出人自身权限
  * （同管道裁决的自然结果，manifest 自证）。</p>
  */
@@ -92,7 +94,8 @@ public class ForecastAuditPackService {
      * 由 {@code WorkspaceSecurityEngineClient} 底座侧 WARN）。
      */
     public AuditPack buildAuditPack(String forecastRunId) {
-        // ① SEC-04 OPA 裁决（默认 DENY；不可用=false，宁 DENY 不超发）
+        // ① SEC-04 OPA 裁决（明确拒绝/应答不可解析 = false → 403，宁 DENY 不超发；
+        //    进程不可用 → 客户端单点转 503 ECOS-SEC-501 上抛，取数面零触达）
         Map<String, Object> attrs = new LinkedHashMap<>();
         attrs.put("resource", "forecast_run");
         attrs.put("forecastRunId", forecastRunId);

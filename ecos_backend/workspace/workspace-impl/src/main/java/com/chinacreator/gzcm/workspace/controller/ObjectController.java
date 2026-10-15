@@ -12,6 +12,7 @@ import com.chinacreator.gzcm.common.service.ObjectRuntimeService;
 import com.chinacreator.gzcm.common.engine.StateMachineEngine;
 import com.chinacreator.gzcm.common.engine.IFunctionPropertyEvaluator;
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.security.AbacQueryFilter;
 import com.chinacreator.gzcm.workspace.service.ObjectKgSyncService;
 import com.chinacreator.gzcm.workspace.service.ObjectQueryService;
@@ -356,6 +357,11 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
                     rows = abacFilter.filterColumns(entityCode, rows);
                     allRows.addAll(rows);
                 }
+            } catch (SecurityEngineUnavailableException e) {
+                // 详设-01 §4.7.2「security 不可用（全角色）→ 页面 503，禁渲染空列表」：
+                // 本搜索面逐表 try/catch，若把可用性故障一起 skip，响应体会是
+                // HTTP 200 + 空 data（把"安全引擎故障"冒充成"你没有数据"），必须原样上抛。
+                throw e;
             } catch (Exception e) {
                 log.debug("Search skip table {}: {}", table, e.getMessage());
             }

@@ -23,8 +23,12 @@ import java.util.Set;
  *
  * <h3>默认 DENY</h3>
  * <ul>
- *   <li>行过滤：security-engine 不可用/拒绝 → {@code "1=0"}（调用方拼进 WHERE 即零行）</li>
- *   <li>列裁剪：security-engine 不可用/拒绝 → 可见列空集 → 返回空行集</li>
+ *   <li>行过滤：security-engine 明确拒绝 → {@code "1=0"}（调用方拼进 WHERE 即零行）</li>
+ *   <li>列裁剪：security-engine 明确拒绝 → 可见列空集 → 返回空行集</li>
+ *   <li>security-engine <b>进程不可用</b>（连不上/超时/5xx）不属上述两态：由客户端单点转
+ *       503 {@code ECOS-SEC-501}（{@link com.chinacreator.gzcm.workspace.exception
+ *       .SecurityEngineUnavailableException}）原样上抛，禁冒充"无数据"
+ *       （详设-01 §4.5.4 / §4.7.2，门禁 {@code SecurityDownAllChannelDenyTest}）</li>
  * </ul>
  *
  * <h3>调用契约（保持不变，API 只增不改）</h3>
@@ -52,7 +56,8 @@ public class AbacQueryFilter {
      *
      * @param entityCode 实体编码（如 "Contract"）
      * @param rows       查询结果行列表
-     * @return 裁剪后的行列表（新 List，不影响原数据）；CLS 拒绝/security 不可用 → 空列表（默认 DENY）
+     * @return 裁剪后的行列表（新 List，不影响原数据）；CLS 明确拒绝 → 空列表（默认 DENY）；
+     *         security-engine 进程不可用 → 上抛 503 {@code ECOS-SEC-501}，禁空行集冒充
      */
     public List<Map<String, Object>> filterColumns(String entityCode, List<Map<String, Object>> rows) {
         if (rows == null || rows.isEmpty()) return rows;
@@ -60,8 +65,9 @@ public class AbacQueryFilter {
         List<String> allColumns = new ArrayList<>(rows.get(0).keySet());
         List<String> allowed = securityEngineClient.allowedColumns(entityCode, allColumns);
         if (allowed.isEmpty()) {
-            // DENY：security-engine 不可用或无可见列 —— 默认拒绝，不返回任何列数据
-            log.warn("ABAC列裁剪 DENY（security-engine 不可用/无可见列）: entity={}, rows={} 被置空",
+            // 明确 DENY（4xx 鉴权失败/响应不可解析同归此态）：默认拒绝，不返回任何列数据。
+            // 「进程不可用」已在客户端单点转 503 上抛，不会走到本分支冒充空行集。
+            log.warn("ABAC列裁剪 DENY（security-engine 明确拒绝/应答不可解析）: entity={}, rows={} 被置空",
                     entityCode, rows.size());
             return List.of();
         }
@@ -91,12 +97,13 @@ public class AbacQueryFilter {
      * 构建行过滤 SQL WHERE 片段 — 经 security-engine RLS 端点裁决。
      *
      * @param entityCode 实体编码
-     * @return SQL WHERE 片段；无策略返回空字符串；security-engine 不可用/DENY 返回 "1=0"
+     * @return SQL WHERE 片段；无策略返回空字符串；RLS 明确拒绝 → {@code "1=0"}；
+     *         security-engine 进程不可用 → 上抛 503 {@code ECOS-SEC-501}，禁 {@code "1=0"} 冒充空列表
      */
     public String buildRowFilterCondition(String entityCode) {
         String whereClause = securityEngineClient.applyRls(entityCode, entityCode, Map.of());
         if ("1=0".equals(whereClause)) {
-            log.warn("ABAC行过滤 DENY（security-engine RLS 拒绝或不可用）: entity={}", entityCode);
+            log.warn("ABAC行过滤 DENY（security-engine RLS 明确拒绝或应答不可解析）: entity={}", entityCode);
         }
         return whereClause;
     }
