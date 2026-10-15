@@ -53,6 +53,22 @@ public class RuntimeAlertDao extends JdbcTemplateDaoSupport {
                 "update_time=NOW() WHERE id = ? AND status = 'open'", by, id);
     }
 
+    /**
+     * #142/B4-1 {@code closeAlert}（设计 §3.3 L2124）：{@code open}/{@code acked} → {@code closed}。
+     *
+     * <p>口径说明（不留含糊）：①只写 V242 已有的 {@code close_time} 列——该表
+     * <b>不存在</b> {@code close_by} 列（实测 V242 只有 {@code ack_by/ack_time/close_time}），
+     * 契约 data 也只要求 {@code {id,status,closeTime}}，故本批<b>不</b>为凑字段新起一枚 V288 加列；
+     * ②谓词带 {@code is_deleted = 0}——既有 {@link #ackAlert} 未带（软删告警仍可被 ack 属存量面，
+     * 按 IR03 不回改），新增写通道一律带，禁把存量的漏过滤当成口径；
+     * ③终态集合 = {@code open}/{@code acked}，已是 {@code closed} 的记录不再改写 {@code close_time}。</p>
+     */
+    public int closeAlert(String id) {
+        return jdbcTemplate.update(
+                "UPDATE ecos_runtime_alert_record SET status='closed', close_time=NOW(), " +
+                "update_time=NOW() WHERE id = ? AND status IN ('open','acked') AND is_deleted = 0", id);
+    }
+
     public List<Map<String, Object>> listDlq(String status, int size, int offset) {
         return jdbcTemplate.queryForList(
                 "SELECT id, topic, dlt_topic, error_message, attempts, first_seen_at, " +

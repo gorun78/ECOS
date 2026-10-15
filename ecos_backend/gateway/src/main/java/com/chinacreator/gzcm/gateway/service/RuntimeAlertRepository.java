@@ -51,6 +51,18 @@ public class RuntimeAlertRepository {
         }
     }
 
+    /**
+     * #142/B4-1 {@code closeAlert} 持久化编排（设计 §3.3 L2124）。
+     * 与 {@link #ackAlert} 同结构：只编排 + 记错，裸 SQL 在 {@link RuntimeAlertDao#closeAlert(String)}。
+     */
+    public int closeAlert(String id) {
+        try {
+            return dao.closeAlert(id);
+        } catch (Exception ex) {
+            log.error("closeAlert: {}", ex.getMessage()); throw ex;
+        }
+    }
+
     public List<Map<String, Object>> listDlq(String status, int size, int offset) {
         try {
             return dao.listDlq(status, size, offset);
