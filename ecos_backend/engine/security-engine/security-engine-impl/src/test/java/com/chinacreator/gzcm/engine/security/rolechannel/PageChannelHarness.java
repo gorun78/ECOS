@@ -29,10 +29,14 @@ import static org.mockito.Mockito.when;
  * {@link V246SeedFixtures} 的语义选取——该语义已由 dev PG 实跑凭证钉住（见夹具类注释），
  * 不是随手写的 stub。</p>
  *
- * <p><b>OPA 源刻意用真实现 + 不可达地址</b>（{@code http://127.0.0.1:1}）：
- * 全仓只有 {@code ecos.rbac} 一个 rego，<b>不存在</b> {@code data.access} 策略，
- * 因此 {@code decide} 的 opa 面必然 fail-close {@code allow=false}。用例集不把它伪造成 ALLOW
- * ——AI 通道的角色用例属 B4-3c（要先补 rego 策略），页面通道只断行/列面。</p>
+ * <p><b>OPA 源默认用真实现 + 不可达地址</b>（{@code http://127.0.0.1:1}）：
+ * 页面/导出通道的行列面用例不依赖护栏结论，让它如实落在<b>不可用态</b>
+ * （{@code policyState=OPA_UNAVAILABLE}）而不是伪造 ALLOW。
+ * <b>订正（B4-3c）</b>：本类原注释写"全仓不存在 data.access 策略，因此必然 fail-close"，
+ * 现状是策略名已合规为单源 {@code data_access}、rego 已落仓
+ * （{@code ecos-docker/opa-policies/data_access.rego}）；护栏面的真值用例走
+ * {@link #create(String)} 接录制型 oracle 回放（见 {@code OpaOracleReplaySupport}），
+ * 仍不伪造。</p>
  *
  * <p>mask 源 stub 成空集：脱敏强制面已由既有
  * {@code MaskEnforcementOnExportAndAiTest} 覆盖，本批不重复断言，也不冒充"已覆盖"。</p>
@@ -46,17 +50,29 @@ final class PageChannelHarness {
     private final RowLevelSecurityServiceImpl rls;
     private final ColumnLevelSecurityServiceImpl cls;
     private final SecurityDecisionService decisionService;
+    private final OpaPolicyService opa;
 
     private PageChannelHarness(V246SeedFixtures seed, RowLevelSecurityServiceImpl rls,
                                ColumnLevelSecurityServiceImpl cls,
-                               SecurityDecisionService decisionService) {
+                               SecurityDecisionService decisionService, OpaPolicyService opa) {
         this.seed = seed;
         this.rls = rls;
         this.cls = cls;
         this.decisionService = decisionService;
+        this.opa = opa;
     }
 
     static PageChannelHarness create() throws IOException {
+        return create("http://127.0.0.1:1");
+    }
+
+    /**
+     * 指定 OPA base-url 的装配（护栏面用例用）。
+     *
+     * <p>地址由调用方给出，其余链路（RLS/CLS/decide 入口）与默认装配<b>完全同一实例构造</b> ——
+     * oracle 回放时唯一变化的就是护栏源的 HTTP 对端，禁在本方法里另加任何判定分支。</p>
+     */
+    static PageChannelHarness create(String opaBaseUrl) throws IOException {
         V246SeedFixtures seed = V246SeedFixtures.load();
 
         RowLevelSecurityDao rlsDao = mock(RowLevelSecurityDao.class);
@@ -70,13 +86,13 @@ final class PageChannelHarness {
         SecurityDecisionDao decisionDao = mock(SecurityDecisionDao.class);
         when(decisionDao.masksForTable(anyString(), any())).thenReturn(List.of());
 
-        // 真实现 + 不可达地址 ⇒ OPA 源 fail-close（不伪造 ALLOW）
-        OpaPolicyService opa = new OpaPolicyService("http://127.0.0.1:1", null);
+        // 真实现 + 调用方给定的对端：默认不可达 ⇒ 如实 UNAVAILABLE；oracle 回放 ⇒ 真引擎应答形态
+        OpaPolicyService opa = new OpaPolicyService(opaBaseUrl, null);
 
         RowLevelSecurityServiceImpl rls = new RowLevelSecurityServiceImpl(rlsDao);
         ColumnLevelSecurityServiceImpl cls = new ColumnLevelSecurityServiceImpl(clsDao);
         SecurityDecisionService svc = new SecurityDecisionService(rls, cls, opa, decisionDao);
-        return new PageChannelHarness(seed, rls, cls, svc);
+        return new PageChannelHarness(seed, rls, cls, svc, opa);
     }
 
     /** 走生产 RLS 全量返回（含 policies 名单与 params），用于断"命中了哪条策略"。 */
@@ -97,6 +113,28 @@ final class PageChannelHarness {
 
     DecisionBundle decide(String table, List<String> columns, String userId, DecisionBundle.Purpose purpose) {
         return decisionService.decide(new AssetRef(SCHEMA, table, columns), purpose, context(userId));
+    }
+
+    /**
+     * 原样透传装配（护栏面用例用）：资产定位符与上下文（角色/组织域/主体）由调用方给定，
+     * 为的是让<b>生产 safeOpa 发出的请求体</b>与录制 oracle 时的输入逐字可比。
+     */
+    DecisionBundle decide(AssetRef asset, DecisionContext ctx, DecisionBundle.Purpose purpose) {
+        return decisionService.decide(asset, purpose, ctx);
+    }
+
+    /**
+     * 直连护栏源（同一 {@link OpaPolicyService} 实例，非另造客户端）：
+     * 供 {@code resource.dataScope} 形态的 oracle 用例回放 —— 该输入只有 AI 工具裁决载荷会发，
+     * {@code /decision} 的 {@code safeOpa} 不发，因此不能强塞进行列面入口冒充同一条链。
+     */
+    Map<String, Object> evaluateGuardrail(Map<String, Object> input) {
+        return opa.evaluate(OpaPolicyService.POLICY_DATA_ACCESS, input);
+    }
+
+    /** 显式上下文（不经 seed 角色归属单源）；仅护栏面用例使用，行列面仍走 {@link #context(String)}。 */
+    DecisionContext explicitContext(String userId, String tenantId, String orgId, List<String> roles) {
+        return DecisionContext.of(userId, tenantId, orgId, null, List.copyOf(roles), "trace-" + userId);
     }
 
     /** 上下文角色取夹具的角色归属单源，保证与 seed 的 role_id 同源。 */

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.workspace.security;
 
+import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException;
 import org.springframework.stereotype.Component;
 
@@ -84,39 +85,43 @@ public class ScenarioReadGuard {
      * 导出通道裁决咽喉：产出任何导出字节<b>之前</b>必须调用，返回值即导出件的
      * 「权限范围 / 水印」唯一出处（禁调用方再写常量，差距文档 D-B4-10/D-B4-11）。
      *
-     * <p>判定表（全部 fail-closed，宁 DENY 不超发）：</p>
+     * <p>判定表（全部 fail-closed，宁 DENY 不超发；顺序即优先级）：</p>
      * <ol>
      *   <li>{@code decide} 无裁决证据（security 明确 4xx / 应答缺段）→ 403；
      *       进程不可用不在此态 —— 503 {@code ECOS-SEC-501} 由客户端单点上抛；</li>
-     *   <li>bundle.opa 护栏态<b>不作 403 硬门，只如实渲染进范围证据</b>（{@code opa=allow}
-     *       / {@code deny:<原因>} / {@code ABSENT}）。理由（差距文档 D-B4-14/D-B4-18）：
-     *       {@code SecurityDecisionService.safeOpa} 以非法策略名 {@code "data.access"}
-     *       调 {@code OpaPolicyService.evaluate}（其白名单正则不含点号），护栏源
-     *       <b>从未被真正咨询</b>，每次都是异常兜底 {@code allow=false +
-     *       OPA_ERROR_FAIL_CLOSED}。据此 DENY 会把"护栏没接上"的引擎缺陷伪装成
-     *       "策略拒绝"，并把导出功能打死＝换一种假绿。硬门待 B4-3c 补 {@code data.access}
-     *       rego 后由配套用例打开；{@link ExportDecision#guardrailUnconsulted()}
-     *       即该状态的消费侧读面；</li>
+     *   <li><b>OPA 硬门（B4-3c 开启）</b>：护栏<b>未给出裁决</b>
+     *       （{@code POLICY_UNDEFINED} / {@code OPA_UNAVAILABLE} / opa 段缺失或状态键漂移）
+     *       → 503 {@code ECOS-SEC-501}。理由：这三态的含义是"护栏没说话"，报 403 会把引擎/
+     *       部署缺陷伪装成"用户无权限"（§4.7.2「不可用 ≠ 无权限」，D-B4-14/18/20/21）。
+     *       硬门此前不能开启的唯一原因是策略名非法（{@code data.access} 过不了
+     *       {@code OpaPolicyService} 的名称白名单 ⇒ 护栏从未被咨询），B4-3c 已补名合规的
+     *       {@code ecos-docker/opa-policies/data_access.rego}；</li>
+     *   <li>护栏给出<b>真实策略拒绝</b>（{@code EVALUATED_DENY}）→ 403，details 带
+     *       {@code deniedReason}（可回查 rego 里的 violation 名）与 {@code decision}；</li>
      *   <li>RLS 谓词 {@code 1=0} → 403；</li>
      *   <li>RLS 无命中策略且 {@code denyIfEmpty=true} → 403（§4.7.2「无权用户」行，
      *       验收载体 {@code AuditPackDenyTest}）；</li>
      *   <li>RLS 谓词非 {@code 1=1} 的非平凡形态 → 403「无法下推」（§4.7.2
      *       project/dept 行：导出件数据载体不接参数化谓词，宁 DENY 不做
      *       「全量捞回内存再滤」的超发，F07-18-1 红线同源，登记 D-B4-13）；</li>
-     *   <li>以上皆不命中（有命中策略 + 谓词 {@code 1=1} 或空）→ 返回
+     *   <li>以上皆不命中（护栏 ALLOW + 有命中策略 + 谓词 {@code 1=1} 或空）→ 返回
      *       {@link ExportDecision}，其 {@code permissionScope} 可被审计反查。</li>
      * </ol>
      *
-     * <p>注：审计包通道另有 {@code audit:export} 的 OPA 硬门（403/503 分态在位），
-     * 那条走 {@code OpaPolicyService.evaluate} 的合法策略名，与本处"护栏未被咨询"不同态，
-     * 不受本节裁决影响。</p>
+     * <p><b>dev 环境后果（登记，不隐瞒）</b>：dev 的 {@code ecos-opa} 容器以
+     * {@code /opa run --server} 启动、{@code /v1/policies} 实数 0 个 ⇒ 仓内 rego 未被加载，
+     * 本咽喉第 2 条会把导出如实报成 503（与既有「pipeline execute 因 OPA 无策略 fail-closed」
+     * 同一基线）。恢复路径＝授权把 {@code ecos-docker/docker-compose.yml} 的 OPA 启动参数
+     * 改为加载 {@code opa-policies/} 目录（或挂 bundle），属运维授权项，见差距文档剩余项。</p>
      *
      * <p><b>列面仍走 {@link #applyColumns}</b>：本方法请求的 {@code columns=[]}，
      * bundle 的 {@code columns.names} 在整表请求形态下不可当白名单用（D-B4-16 在册），
      * 故裁剪仍按行集实际列经 {@code /cls/columns} 裁决 —— 两处都是 security 单源，
      * 不存在第二套真值。</p>
      *
-     * @throws ForbiddenOperationException 上述任一 DENY 态
+     * @throws ForbiddenOperationException 上述任一 403 态
+     * @throws com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException
+     *         护栏未给出裁决（503，与"策略拒绝"分态）
      */
     public ExportDecision exportDecision(String entityCode) {
         Map<String, Object> bundle = abacQueryFilter.decisionBundle(entityCode, PURPOSE_EXPORT);
@@ -125,9 +130,17 @@ public class ScenarioReadGuard {
                     Map.of("reason", "导出通道无裁决证据（security-engine 明确拒绝/应答缺段），默认 DENY"));
         }
         ExportDecision decision = ExportDecision.fromBundle(entityCode, bundle);
-        // OPA 护栏态此处不作硬门（见判定表第 2 条 / D-B4-14、D-B4-18）：护栏源当前从未被
-        // 真正咨询，据此 DENY 会把引擎缺陷伪装成策略拒绝。状态已经 ExportDecision
-        // 如实渲染进 permissionScope 的 opa= 段，硬门待 B4-3c 补 data.access rego 后开启。
+        if (decision.guardrailUnevaluated()) {
+            throw new SecurityEngineUnavailableException("security/decision?purpose=" + PURPOSE_EXPORT,
+                    "OPA 护栏未给出裁决: policyState=" + decision.opaPolicyState()
+                            + " decision=" + decision.decisionId(), null);
+        }
+        if (decision.guardrailDenied()) {
+            throw new ForbiddenOperationException("scenario:export:" + entityCode,
+                    Map.of("reason", "OPA 策略裁决 DENY",
+                            "deniedReason", String.valueOf(decision.opaState()),
+                            "decision", String.valueOf(decision.decisionId())));
+        }
         if (decision.rlsPredicateIsDeny()) {
             throw new ForbiddenOperationException("scenario:export:" + entityCode);
         }

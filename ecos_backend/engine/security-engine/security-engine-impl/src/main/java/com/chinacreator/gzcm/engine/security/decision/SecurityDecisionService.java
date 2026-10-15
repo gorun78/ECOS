@@ -193,26 +193,50 @@ public class SecurityDecisionService {
         }
     }
 
+    /**
+     * [4] OPA 护栏源（B4-3c 名合规 + 载荷补齐）。
+     *
+     * <p><b>策略名取单源常量</b> {@link OpaPolicyService#POLICY_DATA_ACCESS}：此前写
+     * {@code "data.access"}，含点号即不过 {@code SAFE_NAME} 白名单，校验在 try 之外抛出 ⇒
+     * <b>OPA 从未被咨询</b>，三通道每次都拿到异常兜底（差距文档 D-B4-14/D-B4-18）。
+     * 名字改对之后，护栏态才第一次承载真实语义，{@code policyState} 也因此成为
+     * 「策略拒绝(403/DENY)」与「护栏未评估(503/FAIL_CLOSED)」分态的唯一依据。</p>
+     *
+     * <p><b>载荷必须带角色与动作</b>：rego 侧的角色×通道矩阵（§4.7.2）读
+     * {@code input.subject.roles / subject.department / action / purpose}；此前只发
+     * subjectId/tenantId ⇒ "按角色裁决"在结构上不可表达（D-B4-22）。角色与组织域都取自
+     * {@link DecisionContext}（分册 00 信任链：客户端 X-Org-Id 已被剥离，orgId 只服务端派生）。</p>
+     */
     private Map<String, Object> safeOpa(AssetRef asset, DecisionBundle.Purpose purpose, DecisionContext ctx) {
+        Map<String, Object> subject = new LinkedHashMap<>();
+        subject.put("userId", ctx != null ? ctx.userId() : null);
+        subject.put("roles", ctx == null ? List.of() : ctx.roles());
+        subject.put("department", ctx != null ? ctx.orgId() : null);
+        subject.put("tenantId", ctx != null ? ctx.tenantId() : null);
+        String purposeWire = purpose.name().toLowerCase();
         Map<String, Object> input = new LinkedHashMap<>();
-        input.put("purpose", purpose.name().toLowerCase());
+        input.put("purpose", purposeWire);
+        input.put("action", "data:" + purposeWire);
         input.put("asset", asset.key());
-        input.put("subjectId", ctx != null ? ctx.userId() : null);
-        input.put("tenantId", ctx != null ? ctx.tenantId() : null);
+        input.put("subject", subject);
+        String policyRef = "ecos." + OpaPolicyService.POLICY_DATA_ACCESS;
         try {
-            Map<String, Object> r = opa.evaluate("data.access", input);
+            Map<String, Object> r = opa.evaluate(OpaPolicyService.POLICY_DATA_ACCESS, input);
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("allow", r.getOrDefault("allow", false));
-            out.put("policyRef", r.getOrDefault("policyRef", "ecos.data.access"));
+            out.put("policyState", r.getOrDefault("policyState", OpaPolicyService.STATE_UNAVAILABLE));
+            out.put("policyRef", r.getOrDefault("policyRef", policyRef));
             Object ob = r.get("obligations");
             out.put("obligations", ob instanceof List<?> l ? l : new ArrayList<>());
             return out;
         } catch (Exception e) {
-            // OpaPolicyService.evaluate 内部已 fail-close；这里再兜一层：绝不因 OPA 抛错而放行
+            // OpaPolicyService.evaluate 内部已 fail-close；这里再兜一层：绝不因 OPA 抛错而放行。
+            // 状态记 UNAVAILABLE 而非 DENY —— 本分支恰恰意味着"护栏没被咨询"，禁伪装成策略裁决。
             log.warn("decide OPA 源异常，fail-close → allow=false: {}", e.getMessage());
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("allow", false);
-            out.put("policyRef", "ecos.data.access");
+            out.put("policyState", OpaPolicyService.STATE_UNAVAILABLE);
+            out.put("policyRef", policyRef);
             out.put("obligations", List.of(Map.of("obligation", "DENIED", "deniedReason", "OPA_ERROR_FAIL_CLOSED")));
             return out;
         }

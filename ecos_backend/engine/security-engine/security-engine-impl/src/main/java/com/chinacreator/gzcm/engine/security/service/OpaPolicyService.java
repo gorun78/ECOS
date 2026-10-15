@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.security.service;
 
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +27,40 @@ public class OpaPolicyService {
     /** SEC-P0-3: 策略名称白名单正则 — 仅允许字母、数字、下划线、横线 */
     private static final java.util.regex.Pattern SAFE_NAME =
             java.util.regex.Pattern.compile("^[a-zA-Z0-9_-]{1,64}$");
+
+    /**
+     * 护栏态四值（#142/B4-3c，消费方据此分「策略拒绝」与「护栏没接上」两态，禁折叠）。
+     *
+     * <p>存在意义（差距文档 D-B4-14/D-B4-18/D-B4-20/D-B4-21）：本服务此前只把
+     * {@code body.contains("\"result\":true")} 当裁决，于是<b>策略未加载</b>（OPA 应答
+     * 无 {@code result} 段）、<b>HTTP 5xx</b>、<b>真策略拒绝</b>三态全部塌缩成
+     * {@code allow=false}，消费方无法分辨"被护栏拒绝"和"护栏根本没说话"，
+     * 只能把引擎缺陷伪装成用户无权限。状态串随 {@code policyState} 键单点写入，
+     * 三通道各自消费（页面/导出 → 403 或 503，AI → DENY 或 FAIL_CLOSED）。</p>
+     */
+    // 四态 + 策略名的<b>单源在 runtime 底座</b>（GuardrailDecisionContract）：
+    // ai-engine 裁决闸与 workspace 导出咽喉都不依赖本模块，词表只有一处定义才不会静默失配。
+    // 语义与理由见该常量的 javadoc（上方段落）与 GuardrailDecisionContract 类注释。
+
+    /** OPA 已咨询且明确放行。 */
+    public static final String STATE_ALLOW = GuardrailDecisionContract.STATE_ALLOW;
+    /** OPA 已咨询且明确拒绝（真实策略判定，可映射 403 / GUARDRAIL_DENIED）。 */
+    public static final String STATE_DENY = GuardrailDecisionContract.STATE_DENY;
+    /** OPA 可达但本策略未定义/未加载（应答缺 result 或 result 无 allow）⇒ fail-closed，属部署缺陷态。 */
+    public static final String STATE_POLICY_UNDEFINED = GuardrailDecisionContract.STATE_POLICY_UNDEFINED;
+    /** OPA 不可达 / 超时 / 非 2xx / 应答不可解析 ⇒ fail-closed，属不可用态（禁伪装成策略拒绝）。 */
+    public static final String STATE_UNAVAILABLE = GuardrailDecisionContract.STATE_UNAVAILABLE;
+
+    /**
+     * 数据访问护栏策略名 —— 转委托单源常量。
+     *
+     * <p>必须是 {@code data_access} 而不是 {@code data.access}：{@link #SAFE_NAME} 不含点号，
+     * 名字非法时校验在 try 之外抛出，OPA 从未被咨询，每次落异常兜底
+     * （{@code allow=false + OPA_ERROR_FAIL_CLOSED}）—— 三通道因此都活在"护栏看起来在拒绝、
+     * 实际根本没说话"的假象里（差距文档 D-B4-14/D-B4-18，详设施策见
+     * {@code ecos-docker/opa-policies/data_access.rego}）。</p>
+     */
+    public static final String POLICY_DATA_ACCESS = GuardrailDecisionContract.POLICY_DATA_ACCESS;
 
     private final String opaUrl;
     private final Path policyDir;
@@ -65,7 +100,12 @@ public class OpaPolicyService {
         // SEC-P0-3: 校验 policy 名称防止注入
         validatePolicyName(policy);
         try {
-            String opaPath = "/v1/data/ecos/" + policy + "/allow";
+            // B4-3c：查询<b>策略文档</b> {@code /v1/data/ecos/<policy>}，不再查裸布尔
+            // {@code .../allow}。理由（差距文档 D-B4-20）：裸布尔查询的 result 恒为标量，
+            // 下面的 parseObligations 只认对象形态 ⇒ 义务集（deniedReason/maskHints/
+            // watermark/rateLimitKey）在结构上永不可达，这才是 D-B4-12「水印义务取不到值」
+            // 的更深根因；改查文档后同一应答既给 allow 也给 obligations。
+            String opaPath = "/v1/data/ecos/" + policy;
             String payload = "{\"input\":" + MAPPER.writeValueAsString(input) + "}";
 
             var req = HttpRequest.newBuilder(URI.create(opaUrl + opaPath))
@@ -74,62 +114,131 @@ public class OpaPolicyService {
                     .POST(HttpRequest.BodyPublishers.ofString(payload))
                     .build();
             var resp = http.send(req, HttpResponse.BodyHandlers.ofString());
-
-            boolean allow = resp.body().contains("\"result\":true");
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("policy", policy);
-            result.put("allow", allow);
-            result.put("opaStatus", resp.statusCode());
-            result.put("source", "opa");
-            // C.2.5 ③：裁决结果携带 obligations（deniedReason/maskHints/watermark/rateLimitKey）。
-            // OPA 业务数据源尚未接入时返回空义务集；结构先落，接口契约保持可演进。
-            result.put("obligations", parseObligations(resp.body()));
-            result.put("policyRef", "ecos." + policy);
-            // C.2.5 ④：裁决落审计线索（input 摘要，不落原文避免敏感外泄）
-            result.put("inputDigest", sha256Hex(safeJson(input)));
-            return result;
+            return parseEvalResponse(policy, input, resp.statusCode(), resp.body());
         } catch (Exception e) {
             log.warn("OPA 不可用, fail-close → DENY: policy={}, error={}", policy, e.getMessage());
             // W35（M0/P0）：fail-close 常量化 —— OPA 不可用一律拒绝，无 fail-open 分支。
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("policy", policy);
-            result.put("source", "fallback");
-            result.put("opaError", e.getMessage());
-            result.put("allow", false);
-            result.put("fallback", "DENY_OPA_DOWN");
-            result.put("eccode", "ECOS-SEC-502");
-            result.put("obligations", List.of(
-                    Map.of("obligation", "DENIED", "deniedReason", "OPA_UNAVAILABLE_FAIL_CLOSED")));
-            result.put("inputDigest", sha256Hex(safeJson(input)));
-            log.warn("OPA fail-close → DENY: policy={}", policy);
-            return result;
+            return unavailable(policy, input, "OPA_UNAVAILABLE_FAIL_CLOSED", e.getMessage(), null);
         }
     }
 
     /**
-     * C.2.5 ③：从 OPA 响应解析 obligations。
-     * <p>OPA 返回 {@code {"result": {...}}}；obligations 若能识别取 {@code result.obligations}
-     * （对象数组），否则返回空集（fail-safe，不放大权限）。任何解析失败都归空。</p>
+     * OPA 应答 → 裁决形态（单点解析；包级可见，供用例直读三种应答形态）。
+     *
+     * <p>四态判定（B4-3c，禁把后两态伪装成"策略拒绝"）：</p>
+     * <ul>
+     *   <li>{@code 2xx} 且 {@code result.allow == true} → {@link #STATE_ALLOW}；</li>
+     *   <li>{@code 2xx} 且 {@code result.allow == false} → {@link #STATE_DENY}（真实策略判定）；</li>
+     *   <li>{@code 2xx} 但应答无 {@code result} 段、或 {@code result} 对象缺 {@code allow} 键
+     *       → {@link #STATE_POLICY_UNDEFINED}（OPA 可达但本策略未加载/未定义，
+     *       dev 容器未挂 bundle 即落此态）；</li>
+     *   <li>非 2xx / 应答不可解析 → {@link #STATE_UNAVAILABLE}。</li>
+     * </ul>
+     *
+     * <p>后两态一律 {@code allow=false}（fail-close）并携带一条 {@code DENIED} 义务写明
+     * 真实理由，但<b>状态串不被折叠成 DENY</b> —— 消费方据此把「护栏没说话」报成 503/
+     * FAIL_CLOSED 而不是 403。</p>
      */
-    private List<Map<String, Object>> parseObligations(String opaBody) {
-        List<Map<String, Object>> out = new ArrayList<>();
+    @SuppressWarnings("unchecked")
+    Map<String, Object> parseEvalResponse(String policy, Map<String, Object> input,
+                                          int statusCode, String body) {
+        if (statusCode < 200 || statusCode >= 300) {
+            // 5xx/4xx 不是裁决：此前只看 body 是否含 "result":true，会把网关故障伪装成策略拒绝（D-B4-21）
+            return unavailable(policy, input, "OPA_HTTP_" + statusCode, null, statusCode);
+        }
+        Object result;
         try {
-            Map<String, Object> root = MAPPER.readValue(opaBody,
+            Map<String, Object> root = MAPPER.readValue(body,
                     new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-            Object result = root.get("result");
-            if (result instanceof Map<?, ?> r && r.get("obligations") instanceof List<?> l) {
-                for (Object o : l) {
-                    if (o instanceof Map<?, ?> om) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> mm = (Map<String, Object>) om;
-                        out.add(mm);
-                    }
-                }
+            result = root.get("result");
+        } catch (Exception e) {
+            return unavailable(policy, input, "OPA_RESPONSE_UNPARSABLE", e.getMessage(), statusCode);
+        }
+        Boolean allow = null;
+        List<Map<String, Object>> obligations = new ArrayList<>();
+        if (result instanceof Map<?, ?> r) {
+            Map<String, Object> doc = (Map<String, Object>) r;
+            allow = asBoolean(doc.get("allow"));
+            obligations = obligationsOf(doc.get("obligations"));
+        } else if (result != null) {
+            allow = asBoolean(result);   // 兼容裸布尔形态（旧 .../allow 查询）
+        }
+        if (allow == null) {
+            // OPA 应答里没有本策略的 allow ⇒ 策略未加载/未定义，护栏等于没被咨询
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("policy", policy);
+            out.put("allow", false);
+            out.put("policyState", STATE_POLICY_UNDEFINED);
+            out.put("opaStatus", statusCode);
+            out.put("source", "opa");
+            out.put("policyRef", "ecos." + policy);
+            out.put("obligations", List.of(Map.of("obligation", "DENIED",
+                    "deniedReason", "OPA_POLICY_UNDEFINED")));
+            out.put("inputDigest", sha256Hex(safeJson(input)));
+            log.warn("OPA 应答无 {}.allow（策略未加载/未定义），fail-closed 且状态如实上报: state={}",
+                    policy, STATE_POLICY_UNDEFINED);
+            return out;
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("policy", policy);
+        out.put("allow", allow);
+        out.put("policyState", allow ? STATE_ALLOW : STATE_DENY);
+        out.put("opaStatus", statusCode);
+        out.put("source", "opa");
+        out.put("policyRef", "ecos." + policy);
+        // C.2.5 ③：裁决结果携带 obligations（deniedReason/maskHints/watermark/rateLimitKey）。
+        out.put("obligations", obligations);
+        // C.2.5 ④：裁决落审计线索（input 摘要，不落原文避免敏感外泄）
+        out.put("inputDigest", sha256Hex(safeJson(input)));
+        return out;
+    }
+
+    /** 不可用态（网络/超时/非 2xx/应答不可解析）：fail-close + 状态单列，禁冒充策略裁决。 */
+    private Map<String, Object> unavailable(String policy, Map<String, Object> input,
+                                            String deniedReason, String error, Integer statusCode) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("policy", policy);
+        result.put("source", "fallback");
+        result.put("allow", false);
+        result.put("policyState", STATE_UNAVAILABLE);
+        result.put("fallback", "DENY_OPA_DOWN");
+        result.put("eccode", "ECOS-SEC-502");
+        if (error != null) result.put("opaError", error);
+        if (statusCode != null) result.put("opaStatus", statusCode);
+        result.put("obligations", List.of(
+                Map.of("obligation", "DENIED", "deniedReason", deniedReason)));
+        result.put("inputDigest", sha256Hex(safeJson(input)));
+        log.warn("OPA fail-close → DENY: policy={} reason={}", policy, deniedReason);
+        return result;
+    }
+
+    /**
+     * C.2.5 ③：义务集解析（fail-safe，不放大权限）。
+     *
+     * <p>兼容两种义务书写：对象数组（rego 侧 {@code obligations} 规则的标准形态）与
+     * 字符串数组（旧 {@code "mask:hourly_rate"} 之类简写，逐字保留供消费方分形态读取）。</p>
+     */
+    private static List<Map<String, Object>> obligationsOf(Object raw) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (!(raw instanceof List<?> list)) return out;
+        for (Object o : list) {
+            if (o instanceof Map<?, ?> om) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> mm = (Map<String, Object>) om;
+                out.add(mm);
+            } else if (o != null && !String.valueOf(o).isBlank()) {
+                out.add(Map.of("obligation", String.valueOf(o)));
             }
-        } catch (Exception ignored) {
-            // 解析失败 → 空义务集
         }
         return out;
+    }
+
+    private static Boolean asBoolean(Object o) {        if (o instanceof Boolean b) return b;
+        if (o == null) return null;
+        String s = String.valueOf(o).trim().toLowerCase(Locale.ROOT);
+        if ("true".equals(s)) return Boolean.TRUE;
+        if ("false".equals(s)) return Boolean.FALSE;
+        return null;
     }
 
     private static String safeJson(Object o) {

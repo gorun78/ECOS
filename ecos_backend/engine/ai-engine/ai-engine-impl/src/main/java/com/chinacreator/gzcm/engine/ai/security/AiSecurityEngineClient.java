@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import org.slf4j.Logger;
@@ -109,7 +110,12 @@ public class AiSecurityEngineClient {
      * 把 security 响应 {@code data} 段解析成三态，禁在此折叠语义：
      *
      * <ol>
-     *   <li>显式 {@code decision}/{@code verdict} 字段优先（ALLOW/PERMIT、DENY/DENIED，未知取值 →
+     *   <li><b>{@code policyState} 优先</b>（B4-3c，#142）：显式为
+     *       {@code POLICY_UNDEFINED}（OPA 可达但本策略未加载）或 {@code OPA_UNAVAILABLE}
+     *       （不可达/超时/非 2xx/不可解析）⇒ <b>FAIL_CLOSED</b>。这两态的含义是"护栏没说话"，
+     *       与策略拒绝（403）分态（§4.7.2「不可用 ≠ 无权限」/ F06-14）。缺该键＝旧形态，
+     *       继续走下面的兼容分支；</li>
+     *   <li>显式 {@code decision}/{@code verdict} 字段（ALLOW/PERMIT、DENY/DENIED，未知取值 →
      *       FAIL_CLOSED，禁默认放行兜底）；</li>
      *   <li>无显式字段时读布尔裁决键 —— 分册 01 现契约（{@code OpaPolicyService.evaluate}）用
      *       <b>{@code allow}</b>，{@code result} 为历史别名，两者都要认（只认一个即恒 DENY）；</li>
@@ -120,6 +126,8 @@ public class AiSecurityEngineClient {
      */
     public static String verdictOf(Map<String, Object> data) {
         if (data == null) return V_FAIL_CLOSED;
+        String policyState = GuardrailDecisionContract.stateOf(data);
+        if (GuardrailDecisionContract.isUnevaluated(policyState)) return V_FAIL_CLOSED;
         if (isUnavailableSource(data)) return V_FAIL_CLOSED;
         Object explicit = data.get("decision") != null ? data.get("decision") : data.get("verdict");
         if (explicit != null) {
@@ -128,6 +136,8 @@ public class AiSecurityEngineClient {
             if ("DENY".equals(s) || "DENIED".equals(s) || "REJECT".equals(s)) return V_DENY;
             return V_FAIL_CLOSED;
         }
+        if (GuardrailDecisionContract.STATE_DENY.equals(policyState)) return V_DENY;
+        if (GuardrailDecisionContract.STATE_ALLOW.equals(policyState)) return V_ALLOW;
         Object flag = data.get("allow") != null ? data.get("allow") : data.get("result");
         if (flag == null) return V_FAIL_CLOSED;
         if (flag instanceof Boolean b) return b ? V_ALLOW : V_DENY;
@@ -179,10 +189,20 @@ public class AiSecurityEngineClient {
         return body;
     }
 
-    /** 四段载荷形态的裁决体（{@code ToolAdjudicationRequest#toEvaluateInput()} 直供）。 */
+    /**
+     * 四段载荷形态的裁决体（{@code ToolAdjudicationRequest#toEvaluateInput()} 直供）。
+     *
+     * <p><b>策略名单源改为 {@code data_access}（B4-3c，差距文档 D-B4-22）</b>：此前硬编码
+     * {@code "rbac"}，于是"三通道同源"只在入口形态上成立、在策略面上是假的 —— 页面/导出通道
+     * 经 {@code /decision} 查数据访问策略，AI 工具却查另一份策略。{@code data_access.rego}
+     * 的输入契约（{@code purpose=ai} + {@code subject.roles} + {@code resource.dataScope}
+     * + {@code environment.channel}）正是为四段载荷设计的，{@code §4.7.2} 的 AI 列
+     * （项目负责人 p1 ALLOW / p2 DENY、按部门域、无权用户 GUARDRAIL_DENIED）只有查这份策略
+     * 才可表达。词表取 runtime 底座 {@link GuardrailDecisionContract}，禁在本类内联字面量。</p>
+     */
     public Map<String, Object> evaluateBodyForAdjudication(Map<String, Object> input) {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("policy", "rbac");
+        body.put("policy", GuardrailDecisionContract.POLICY_DATA_ACCESS);
         body.put("input", input);
         return body;
     }

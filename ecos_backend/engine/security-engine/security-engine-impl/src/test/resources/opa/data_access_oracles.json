@@ -1,0 +1,1398 @@
+{
+  "_provenance": {
+    "note": "录制型 oracle —— 逐字取自本仓 data_access.rego 在真 Rego 引擎（dev 容器 ecos-opa 的 /opa）上的求值结果；serverBody 是 OPA server 对文档查询 POST /v1/data/ecos/data_access 的应答形态。Java 侧用例据此断言裁决链，禁手工编辑本文件：改了 rego 必须用同目录 record_data_access_oracles.mjs 重录。",
+    "policySource": "ecos-docker/opa-policies/data_access.rego",
+    "policySha256": "6b7ab680d6a7e061f4db7a5d1a5ef7f7c6441b9ea0ed51b1453d40590c1f099c",
+    "opaVersion": "Version: 0.63.0\nBuild Commit: bb30b153692aa77738b982e29424c8b24a1ad14a\nBuild Timestamp: 2024-03-28T15:50:15Z\nBuild Hostname: 63421a8c0453\nGo Version: go1.22.1\nPlatform: linux/amd64\nWebAssembly: available",
+    "command": "printf '<input-json>' | docker exec -i ecos-opa /opa eval -d /policies/data_access.rego -I --format json 'data.ecos.data_access'",
+    "recorder": "record_data_access_oracles.mjs（同目录；仓根由脚本自身位置反解；含逐例 input 绑定自检）",
+    "recordedAt": "2026-10-15T11:47:05.163Z"
+  },
+  "cases": [
+    {
+      "name": "fin_export",
+      "input": {
+        "purpose": "export",
+        "asset": "ecos_dw.fc_cost_allocation_fact",
+        "subject": {
+          "userId": "u-fin",
+          "roles": [
+            "finance_lead"
+          ],
+          "department": "d00",
+          "tenantId": "t-demo"
+        }
+      },
+      "serverBody": {
+        "result": {
+          "allow": true,
+          "asset": "ecos_dw.fc_cost_allocation_fact",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {},
+          "deny_obligations": [],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": true,
+          "is_finance": true,
+          "mask_obligations": [],
+          "obligations": [
+            {
+              "obligation": "watermark",
+              "watermark": "ECOS 导出 主体=u-fin 资产=ecos_dw.fc_cost_allocation_fact 通道=export"
+            }
+          ],
+          "purpose": "export",
+          "rate_obligations": [],
+          "requested_department": "",
+          "requested_project_ids": [],
+          "requested_purpose": "export",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d00",
+          "subject_id": "u-fin",
+          "subject_roles": [
+            "finance_lead"
+          ],
+          "violation": [],
+          "watermark_obligations": [
+            {
+              "obligation": "watermark",
+              "watermark": "ECOS 导出 主体=u-fin 资产=ecos_dw.fc_cost_allocation_fact 通道=export"
+            }
+          ]
+        }
+      },
+      "allow": true,
+      "obligations": [
+        {
+          "obligation": "watermark",
+          "watermark": "ECOS 导出 主体=u-fin 资产=ecos_dw.fc_cost_allocation_fact 通道=export"
+        }
+      ]
+    },
+    {
+      "name": "fin_page",
+      "input": {
+        "purpose": "page",
+        "asset": "ecos_dw.fc_cost_allocation_fact",
+        "subject": {
+          "userId": "u-fin",
+          "roles": [
+            "finance_lead"
+          ],
+          "department": "d00",
+          "tenantId": "t-demo"
+        }
+      },
+      "serverBody": {
+        "result": {
+          "allow": true,
+          "asset": "ecos_dw.fc_cost_allocation_fact",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {},
+          "deny_obligations": [],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": true,
+          "is_finance": true,
+          "mask_obligations": [],
+          "obligations": [],
+          "purpose": "page",
+          "rate_obligations": [],
+          "requested_department": "",
+          "requested_project_ids": [],
+          "requested_purpose": "page",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d00",
+          "subject_id": "u-fin",
+          "subject_roles": [
+            "finance_lead"
+          ],
+          "violation": [],
+          "watermark_obligations": []
+        }
+      },
+      "allow": true,
+      "obligations": []
+    },
+    {
+      "name": "fin_ai",
+      "input": {
+        "purpose": "ai",
+        "asset": "ecos_dw.fc_cost_allocation_fact",
+        "subject": {
+          "userId": "u-fin",
+          "roles": [
+            "finance_lead"
+          ],
+          "department": "d00",
+          "tenantId": "t-demo"
+        }
+      },
+      "serverBody": {
+        "result": {
+          "allow": true,
+          "asset": "ecos_dw.fc_cost_allocation_fact",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {},
+          "deny_obligations": [],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": true,
+          "is_finance": true,
+          "mask_obligations": [],
+          "obligations": [
+            {
+              "obligation": "rateLimit",
+              "rateLimitKey": "ai.tool.u-fin"
+            }
+          ],
+          "purpose": "ai",
+          "rate_obligations": [
+            {
+              "obligation": "rateLimit",
+              "rateLimitKey": "ai.tool.u-fin"
+            }
+          ],
+          "requested_department": "",
+          "requested_project_ids": [],
+          "requested_purpose": "ai",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d00",
+          "subject_id": "u-fin",
+          "subject_roles": [
+            "finance_lead"
+          ],
+          "violation": [],
+          "watermark_obligations": []
+        }
+      },
+      "allow": true,
+      "obligations": [
+        {
+          "obligation": "rateLimit",
+          "rateLimitKey": "ai.tool.u-fin"
+        }
+      ]
+    },
+    {
+      "name": "proj_ai_p1",
+      "input": {
+        "purpose": "ai",
+        "asset": "ecos_dw.fc_cost_allocation_fact",
+        "subject": {
+          "userId": "u-p1",
+          "roles": [
+            "project_owner",
+            "non_finance"
+          ],
+          "department": "d01",
+          "tenantId": "t-demo"
+        },
+        "resource": {
+          "dataScope": {
+            "departmentId": "d01",
+            "projectIds": [
+              "p1"
+            ]
+          }
+        }
+      },
+      "serverBody": {
+        "result": {
+          "allow": true,
+          "asset": "ecos_dw.fc_cost_allocation_fact",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {
+            "departmentId": "d01",
+            "projectIds": [
+              "p1"
+            ]
+          },
+          "deny_obligations": [],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": true,
+          "is_finance": false,
+          "mask_obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "obligation": "rateLimit",
+              "rateLimitKey": "ai.tool.u-p1"
+            }
+          ],
+          "purpose": "ai",
+          "rate_obligations": [
+            {
+              "obligation": "rateLimit",
+              "rateLimitKey": "ai.tool.u-p1"
+            }
+          ],
+          "requested_department": "d01",
+          "requested_project_ids": [
+            "p1"
+          ],
+          "requested_purpose": "ai",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d01",
+          "subject_id": "u-p1",
+          "subject_roles": [
+            "non_finance",
+            "project_owner"
+          ],
+          "violation": [],
+          "watermark_obligations": []
+        }
+      },
+      "allow": true,
+      "obligations": [
+        {
+          "column": "hourly_rate",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "column": "amount",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "obligation": "rateLimit",
+          "rateLimitKey": "ai.tool.u-p1"
+        }
+      ]
+    },
+    {
+      "name": "proj_ai_p2",
+      "input": {
+        "purpose": "ai",
+        "asset": "ecos_dw.fc_cost_allocation_fact",
+        "subject": {
+          "userId": "u-p1",
+          "roles": [
+            "project_owner",
+            "non_finance"
+          ],
+          "department": "d01",
+          "tenantId": "t-demo"
+        },
+        "resource": {
+          "dataScope": {
+            "departmentId": "d02",
+            "projectIds": [
+              "p2"
+            ]
+          }
+        }
+      },
+      "serverBody": {
+        "result": {
+          "allow": false,
+          "asset": "ecos_dw.fc_cost_allocation_fact",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {
+            "departmentId": "d02",
+            "projectIds": [
+              "p2"
+            ]
+          },
+          "deny_obligations": [
+            {
+              "deniedReason": "AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT",
+              "obligation": "DENIED"
+            }
+          ],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": true,
+          "is_finance": false,
+          "mask_obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "obligations": [
+            {
+              "deniedReason": "AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT",
+              "obligation": "DENIED"
+            },
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "purpose": "ai",
+          "rate_obligations": [],
+          "requested_department": "d02",
+          "requested_project_ids": [
+            "p2"
+          ],
+          "requested_purpose": "ai",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d01",
+          "subject_id": "u-p1",
+          "subject_roles": [
+            "non_finance",
+            "project_owner"
+          ],
+          "violation": [
+            "AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT"
+          ],
+          "watermark_obligations": []
+        }
+      },
+      "allow": false,
+      "obligations": [
+        {
+          "deniedReason": "AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT",
+          "obligation": "DENIED"
+        },
+        {
+          "column": "hourly_rate",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "column": "amount",
+          "obligation": "mask",
+          "strategy": "hide"
+        }
+      ]
+    },
+    {
+      "name": "proj_ai_no_scope",
+      "input": {
+        "purpose": "ai",
+        "asset": "ecos_dw.fc_cost_allocation_fact",
+        "subject": {
+          "userId": "u-p1",
+          "roles": [
+            "project_owner",
+            "non_finance"
+          ],
+          "department": "d01",
+          "tenantId": "t-demo"
+        }
+      },
+      "serverBody": {
+        "result": {
+          "allow": false,
+          "asset": "ecos_dw.fc_cost_allocation_fact",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {},
+          "deny_obligations": [
+            {
+              "deniedReason": "AI_SCOPE_NOT_DECLARED",
+              "obligation": "DENIED"
+            }
+          ],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": true,
+          "is_finance": false,
+          "mask_obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "obligations": [
+            {
+              "deniedReason": "AI_SCOPE_NOT_DECLARED",
+              "obligation": "DENIED"
+            },
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "purpose": "ai",
+          "rate_obligations": [],
+          "requested_department": "",
+          "requested_project_ids": [],
+          "requested_purpose": "ai",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d01",
+          "subject_id": "u-p1",
+          "subject_roles": [
+            "non_finance",
+            "project_owner"
+          ],
+          "violation": [
+            "AI_SCOPE_NOT_DECLARED"
+          ],
+          "watermark_obligations": []
+        }
+      },
+      "allow": false,
+      "obligations": [
+        {
+          "deniedReason": "AI_SCOPE_NOT_DECLARED",
+          "obligation": "DENIED"
+        },
+        {
+          "column": "hourly_rate",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "column": "amount",
+          "obligation": "mask",
+          "strategy": "hide"
+        }
+      ]
+    },
+    {
+      "name": "proj_export",
+      "input": {
+        "purpose": "export",
+        "asset": "ecos_dw.fc_cost_allocation_fact",
+        "subject": {
+          "userId": "u-p1",
+          "roles": [
+            "project_owner",
+            "non_finance"
+          ],
+          "department": "d01",
+          "tenantId": "t-demo"
+        }
+      },
+      "serverBody": {
+        "result": {
+          "allow": true,
+          "asset": "ecos_dw.fc_cost_allocation_fact",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {},
+          "deny_obligations": [],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": true,
+          "is_finance": false,
+          "mask_obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "obligation": "watermark",
+              "watermark": "ECOS 导出 主体=u-p1 资产=ecos_dw.fc_cost_allocation_fact 通道=export"
+            }
+          ],
+          "purpose": "export",
+          "rate_obligations": [],
+          "requested_department": "",
+          "requested_project_ids": [],
+          "requested_purpose": "export",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d01",
+          "subject_id": "u-p1",
+          "subject_roles": [
+            "non_finance",
+            "project_owner"
+          ],
+          "violation": [],
+          "watermark_obligations": [
+            {
+              "obligation": "watermark",
+              "watermark": "ECOS 导出 主体=u-p1 资产=ecos_dw.fc_cost_allocation_fact 通道=export"
+            }
+          ]
+        }
+      },
+      "allow": true,
+      "obligations": [
+        {
+          "column": "hourly_rate",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "column": "amount",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "obligation": "watermark",
+          "watermark": "ECOS 导出 主体=u-p1 资产=ecos_dw.fc_cost_allocation_fact 通道=export"
+        }
+      ]
+    },
+    {
+      "name": "dept_ai",
+      "input": {
+        "purpose": "ai",
+        "asset": "ecos_dw.fc_resource_input_fact",
+        "subject": {
+          "userId": "u-d01",
+          "roles": [
+            "dept_user",
+            "non_finance"
+          ],
+          "department": "d01",
+          "tenantId": "t-demo"
+        },
+        "resource": {
+          "dataScope": {
+            "departmentId": "d01",
+            "projectIds": [
+              "p1"
+            ]
+          }
+        }
+      },
+      "serverBody": {
+        "result": {
+          "allow": true,
+          "asset": "ecos_dw.fc_resource_input_fact",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {
+            "departmentId": "d01",
+            "projectIds": [
+              "p1"
+            ]
+          },
+          "deny_obligations": [],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": true,
+          "is_finance": false,
+          "mask_obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "obligation": "rateLimit",
+              "rateLimitKey": "ai.tool.u-d01"
+            }
+          ],
+          "purpose": "ai",
+          "rate_obligations": [
+            {
+              "obligation": "rateLimit",
+              "rateLimitKey": "ai.tool.u-d01"
+            }
+          ],
+          "requested_department": "d01",
+          "requested_project_ids": [
+            "p1"
+          ],
+          "requested_purpose": "ai",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d01",
+          "subject_id": "u-d01",
+          "subject_roles": [
+            "dept_user",
+            "non_finance"
+          ],
+          "violation": [],
+          "watermark_obligations": []
+        }
+      },
+      "allow": true,
+      "obligations": [
+        {
+          "column": "hourly_rate",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "column": "amount",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "obligation": "rateLimit",
+          "rateLimitKey": "ai.tool.u-d01"
+        }
+      ]
+    },
+    {
+      "name": "dept_export",
+      "input": {
+        "purpose": "export",
+        "asset": "ecos_dw.fc_cost_allocation_fact",
+        "subject": {
+          "userId": "u-d01",
+          "roles": [
+            "dept_user",
+            "non_finance"
+          ],
+          "department": "d01",
+          "tenantId": "t-demo"
+        }
+      },
+      "serverBody": {
+        "result": {
+          "allow": true,
+          "asset": "ecos_dw.fc_cost_allocation_fact",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {},
+          "deny_obligations": [],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": true,
+          "is_finance": false,
+          "mask_obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "obligation": "watermark",
+              "watermark": "ECOS 导出 主体=u-d01 资产=ecos_dw.fc_cost_allocation_fact 通道=export"
+            }
+          ],
+          "purpose": "export",
+          "rate_obligations": [],
+          "requested_department": "",
+          "requested_project_ids": [],
+          "requested_purpose": "export",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d01",
+          "subject_id": "u-d01",
+          "subject_roles": [
+            "dept_user",
+            "non_finance"
+          ],
+          "violation": [],
+          "watermark_obligations": [
+            {
+              "obligation": "watermark",
+              "watermark": "ECOS 导出 主体=u-d01 资产=ecos_dw.fc_cost_allocation_fact 通道=export"
+            }
+          ]
+        }
+      },
+      "allow": true,
+      "obligations": [
+        {
+          "column": "hourly_rate",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "column": "amount",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "obligation": "watermark",
+          "watermark": "ECOS 导出 主体=u-d01 资产=ecos_dw.fc_cost_allocation_fact 通道=export"
+        }
+      ]
+    },
+    {
+      "name": "norole_page",
+      "input": {
+        "purpose": "page",
+        "asset": "ecos_dw.fc_cost_allocation_fact",
+        "subject": {
+          "userId": "u-none",
+          "roles": [
+            "no_such_role"
+          ],
+          "department": "d09",
+          "tenantId": "t-demo"
+        }
+      },
+      "serverBody": {
+        "result": {
+          "allow": false,
+          "asset": "ecos_dw.fc_cost_allocation_fact",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {},
+          "deny_obligations": [
+            {
+              "deniedReason": "NO_DATA_ACCESS_ROLE",
+              "obligation": "DENIED"
+            }
+          ],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": false,
+          "is_finance": false,
+          "mask_obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "obligations": [
+            {
+              "deniedReason": "NO_DATA_ACCESS_ROLE",
+              "obligation": "DENIED"
+            },
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "purpose": "page",
+          "rate_obligations": [],
+          "requested_department": "",
+          "requested_project_ids": [],
+          "requested_purpose": "page",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d09",
+          "subject_id": "u-none",
+          "subject_roles": [
+            "no_such_role"
+          ],
+          "violation": [
+            "NO_DATA_ACCESS_ROLE"
+          ],
+          "watermark_obligations": []
+        }
+      },
+      "allow": false,
+      "obligations": [
+        {
+          "deniedReason": "NO_DATA_ACCESS_ROLE",
+          "obligation": "DENIED"
+        },
+        {
+          "column": "hourly_rate",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "column": "amount",
+          "obligation": "mask",
+          "strategy": "hide"
+        }
+      ]
+    },
+    {
+      "name": "norole_export",
+      "input": {
+        "purpose": "export",
+        "asset": "ecos_dw.fc_cost_allocation_fact",
+        "subject": {
+          "userId": "u-none",
+          "roles": [
+            "no_such_role"
+          ],
+          "department": "d09",
+          "tenantId": "t-demo"
+        }
+      },
+      "serverBody": {
+        "result": {
+          "allow": false,
+          "asset": "ecos_dw.fc_cost_allocation_fact",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {},
+          "deny_obligations": [
+            {
+              "deniedReason": "NO_DATA_ACCESS_ROLE",
+              "obligation": "DENIED"
+            }
+          ],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": false,
+          "is_finance": false,
+          "mask_obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "obligations": [
+            {
+              "deniedReason": "NO_DATA_ACCESS_ROLE",
+              "obligation": "DENIED"
+            },
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "purpose": "export",
+          "rate_obligations": [],
+          "requested_department": "",
+          "requested_project_ids": [],
+          "requested_purpose": "export",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d09",
+          "subject_id": "u-none",
+          "subject_roles": [
+            "no_such_role"
+          ],
+          "violation": [
+            "NO_DATA_ACCESS_ROLE"
+          ],
+          "watermark_obligations": []
+        }
+      },
+      "allow": false,
+      "obligations": [
+        {
+          "deniedReason": "NO_DATA_ACCESS_ROLE",
+          "obligation": "DENIED"
+        },
+        {
+          "column": "hourly_rate",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "column": "amount",
+          "obligation": "mask",
+          "strategy": "hide"
+        }
+      ]
+    },
+    {
+      "name": "norole_ai",
+      "input": {
+        "purpose": "ai",
+        "asset": "ecos_dw.fc_cost_allocation_fact",
+        "subject": {
+          "userId": "u-none",
+          "roles": [
+            "no_such_role"
+          ],
+          "department": "d09",
+          "tenantId": "t-demo"
+        }
+      },
+      "serverBody": {
+        "result": {
+          "allow": false,
+          "asset": "ecos_dw.fc_cost_allocation_fact",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {},
+          "deny_obligations": [
+            {
+              "deniedReason": "NO_DATA_ACCESS_ROLE",
+              "obligation": "DENIED"
+            }
+          ],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": false,
+          "is_finance": false,
+          "mask_obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "obligations": [
+            {
+              "deniedReason": "NO_DATA_ACCESS_ROLE",
+              "obligation": "DENIED"
+            },
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "purpose": "ai",
+          "rate_obligations": [],
+          "requested_department": "",
+          "requested_project_ids": [],
+          "requested_purpose": "ai",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d09",
+          "subject_id": "u-none",
+          "subject_roles": [
+            "no_such_role"
+          ],
+          "violation": [
+            "NO_DATA_ACCESS_ROLE"
+          ],
+          "watermark_obligations": []
+        }
+      },
+      "allow": false,
+      "obligations": [
+        {
+          "deniedReason": "NO_DATA_ACCESS_ROLE",
+          "obligation": "DENIED"
+        },
+        {
+          "column": "hourly_rate",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "column": "amount",
+          "obligation": "mask",
+          "strategy": "hide"
+        }
+      ]
+    },
+    {
+      "name": "ai_channel_inferred",
+      "input": {
+        "action": "TOOL_CALL:forecast.drilldown",
+        "subject": {
+          "userId": "u-p1",
+          "roles": [
+            "project_owner",
+            "non_finance"
+          ],
+          "department": "d01"
+        },
+        "resource": {
+          "dataScope": {
+            "departmentId": "d01",
+            "projectIds": [
+              "p1"
+            ]
+          }
+        },
+        "environment": {
+          "channel": "AGENT"
+        }
+      },
+      "serverBody": {
+        "result": {
+          "agent_channel": true,
+          "allow": true,
+          "asset": "",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {
+            "departmentId": "d01",
+            "projectIds": [
+              "p1"
+            ]
+          },
+          "deny_obligations": [],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": true,
+          "is_finance": false,
+          "mask_obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "obligation": "rateLimit",
+              "rateLimitKey": "ai.tool.u-p1"
+            }
+          ],
+          "purpose": "ai",
+          "rate_obligations": [
+            {
+              "obligation": "rateLimit",
+              "rateLimitKey": "ai.tool.u-p1"
+            }
+          ],
+          "requested_department": "d01",
+          "requested_project_ids": [
+            "p1"
+          ],
+          "requested_purpose": "",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d01",
+          "subject_id": "u-p1",
+          "subject_roles": [
+            "non_finance",
+            "project_owner"
+          ],
+          "violation": [],
+          "watermark_obligations": []
+        }
+      },
+      "allow": true,
+      "obligations": [
+        {
+          "column": "hourly_rate",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "column": "amount",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "obligation": "rateLimit",
+          "rateLimitKey": "ai.tool.u-p1"
+        }
+      ]
+    },
+    {
+      "name": "ai_channel_no_department",
+      "input": {
+        "action": "TOOL_CALL:forecast.drilldown",
+        "subject": {
+          "userId": "u-p1",
+          "roles": [
+            "project_owner",
+            "non_finance"
+          ],
+          "department": ""
+        },
+        "resource": {
+          "dataScope": {
+            "departmentId": "d01",
+            "projectIds": [
+              "p1"
+            ]
+          }
+        },
+        "environment": {
+          "channel": "AGENT"
+        }
+      },
+      "serverBody": {
+        "result": {
+          "agent_channel": true,
+          "allow": false,
+          "asset": "",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {
+            "departmentId": "d01",
+            "projectIds": [
+              "p1"
+            ]
+          },
+          "deny_obligations": [
+            {
+              "deniedReason": "AI_SUBJECT_DEPARTMENT_UNRESOLVED",
+              "obligation": "DENIED"
+            }
+          ],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": true,
+          "is_finance": false,
+          "mask_obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "obligations": [
+            {
+              "deniedReason": "AI_SUBJECT_DEPARTMENT_UNRESOLVED",
+              "obligation": "DENIED"
+            },
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "purpose": "ai",
+          "rate_obligations": [],
+          "requested_department": "d01",
+          "requested_project_ids": [
+            "p1"
+          ],
+          "requested_purpose": "",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "",
+          "subject_id": "u-p1",
+          "subject_roles": [
+            "non_finance",
+            "project_owner"
+          ],
+          "violation": [
+            "AI_SUBJECT_DEPARTMENT_UNRESOLVED"
+          ],
+          "watermark_obligations": []
+        }
+      },
+      "allow": false,
+      "obligations": [
+        {
+          "deniedReason": "AI_SUBJECT_DEPARTMENT_UNRESOLVED",
+          "obligation": "DENIED"
+        },
+        {
+          "column": "hourly_rate",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "column": "amount",
+          "obligation": "mask",
+          "strategy": "hide"
+        }
+      ]
+    }
+  ]
+}

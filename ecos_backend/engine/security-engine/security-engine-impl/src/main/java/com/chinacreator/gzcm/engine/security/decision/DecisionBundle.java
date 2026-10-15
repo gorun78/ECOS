@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.security.decision;
 
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,10 +16,16 @@ import java.util.Map;
  *   rls:     {predicateTemplate, bindings[], combine, denyIfEmpty, policyRefs[]},
  *   columns: {mode: allow|deny, names: [...], policyRefs[]},
  *   masks:   [{column, strategy}],
- *   opa:     {allow, policyRef, obligations[]},
+ *   opa:     {allow, policyState, policyRef, obligations[]},
  *   decisionId, traceId
  * }
  * }</pre>
+ *
+ * <p>{@code opa.policyState}（#142/B4-3c 只增）＝ {@link GuardrailDecisionContract} 的四态之一，
+ * 是消费方分「策略拒绝（403 / GUARDRAIL_DENIED）」与「护栏没说话（503 / FAIL_CLOSED）」
+ * 两态的唯一依据。存在理由（差距文档 D-B4-14/D-B4-18/D-B4-20/D-B4-21）：只看 {@code allow}
+ * 布尔时，策略未加载、OPA 不可达、真策略拒绝三态全部塌缩成 {@code false}，
+ * 引擎缺陷被伪装成"用户无权限"。</p>
  *
  * <p>{@code policyRefs[]}（#142/B4-3b 只增）= 该源在本主体下<b>实际命中</b>的策略名清单，
  * 是导出件「权限范围」与「水印」字段的唯一合法出处；旧形态只有谓词没有出处，
@@ -129,6 +137,53 @@ public final class DecisionBundle {
                 }
             } else if (item instanceof String s && s.toLowerCase().startsWith("watermark")) {
                 return s;
+            }
+        }
+        return null;
+    }
+
+    // ── #142/B4-3c 只增：OPA 护栏四态消费面 ─────────────────────────────
+    //
+    // 「不可用 ≠ 无权限」（详设-01 §4.7.2）此前在 bundle 上无法表达：opa 段只有 allow 布尔，
+    // 策略未加载 / OPA 不可达 / 真策略拒绝三态都是 allow=false。四态串由
+    // SecurityDecisionService#safeOpa 单点写入 opa.policyState，本组访问器是唯一读面
+    // —— 消费方据此把「护栏没说话」报 503/FAIL_CLOSED，把「策略拒绝」报 403/DENY。
+
+    /** OPA 护栏态串（四态之一）；opa 段缺失或键漂移时返回 null（＝未评估，禁当成放行）。 */
+    public String opaPolicyState() {
+        return GuardrailDecisionContract.stateOf(opa);
+    }
+
+    /** 护栏是否明确放行（{@code allow=true} 且状态为 ALLOW；仅布尔为真不算）。 */
+    public boolean opaAllowed() {
+        return GuardrailDecisionContract.STATE_ALLOW.equals(opaPolicyState())
+                || (opaPolicyState() == null && Boolean.TRUE.equals(opa == null ? null : opa.get("allow")));
+    }
+
+    /** 护栏是否给出了策略裁决（ALLOW / DENY）。false ⇒ 部署缺陷或不可用态，走 503 分支。 */
+    public boolean guardrailEvaluated() {
+        return GuardrailDecisionContract.isEvaluated(opaPolicyState());
+    }
+
+    /**
+     * 护栏是否<b>没有给出</b>策略裁决（{@code POLICY_UNDEFINED} / {@code OPA_UNAVAILABLE} /
+     * opa 段缺失 / 状态键漂移）。
+     *
+     * <p>与 {@link #guardrailEvaluated()} 互补；单独成名是因为消费方的 503 分支必须
+     * "确实知道护栏没说话"，而不是"allow 不为真"的后验推断。</p>
+     */
+    public boolean guardrailUnevaluated() {
+        String state = opaPolicyState();
+        return state == null || GuardrailDecisionContract.isUnevaluated(state);
+    }
+
+    /** OPA 拒绝原因（义务集里第一条 {@code deniedReason}；无则 null）。 */
+    public String opaDeniedReason() {
+        Object raw = opa == null ? null : opa.get(GuardrailDecisionContract.KEY_OBLIGATIONS);
+        if (!(raw instanceof List<?> list)) return null;
+        for (Object item : list) {
+            if (item instanceof Map<?, ?> m && m.get(GuardrailDecisionContract.KEY_DENIED_REASON) != null) {
+                return String.valueOf(m.get(GuardrailDecisionContract.KEY_DENIED_REASON));
             }
         }
         return null;

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.security.rolechannel;
 
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
 import com.chinacreator.gzcm.engine.security.service.OpaPolicyService;
 import org.junit.jupiter.api.BeforeAll;
@@ -84,45 +85,55 @@ class AuditPackFinTest {
     }
 
     @Test
-    @DisplayName("export/缺陷 D-B4-12 — OPA 面在 data.access rego 缺失下恒 fail-close ⇒ 水印义务为 null（禁冒充已加）")
-    void watermarkObligationIsAbsentUntilDataAccessRegoExists() {
+    @DisplayName("export/D-B4-12 现状半边 — 护栏不可达时水印义务如实为 null（可达态见 OpaFinAiTest 的 oracle 回放）")
+    void watermarkObligationIsAbsentWhileOpaUnreachable() {
         DecisionBundle b = harness.decide(V246SeedFixtures.T_COST, V246SeedFixtures.COST_COLUMNS,
                 V246SeedFixtures.FIN_USER, DecisionBundle.Purpose.EXPORT);
 
-        // 特征化断言（钉现状，非认可）：harness 用真 OpaPolicyService + 不可达地址，
-        // 且全仓只有 ecos.rbac 一个 rego（无 data.access、无 watermark 义务定义）。
-        assertEquals(Boolean.FALSE, b.opa().get("allow"), "OPA 源缺失必须 fail-close（D-B4-12 现状）");
+        // 特征化断言（钉现状，非认可）：本 harness 的 OPA 对端不可达 ⇒ 义务集为空是诚实结果。
+        // 订正（B4-3c）：仓内已有名合规的 data_access.rego（含 watermark 规则），
+        // "水印义务可得"的正面证据在 OpaFinAiTest（录制型 oracle 回放），不在本用例。
+        assertEquals(Boolean.FALSE, b.opa().get("allow"), "OPA 源不可达必须 fail-close（D-B4-12 现状）");
         assertNull(b.watermarkObligation(),
-                "水印义务当前不可得；B4-3c 补 data.access rego 后本断言须改为义务文本断言");
+                "不可达态不可能带出水印义务；若此处凭空得到义务文本即为伪造");
     }
 
     /**
-     * 缺陷根因钉桩（D-B4-14/D-B4-18）：{@code SecurityDecisionService.safeOpa} 用策略名
-     * {@code "data.access"} 调 {@code OpaPolicyService.evaluate}，而该服务的名称白名单
-     * {@code ^[a-zA-Z0-9_-]{1,64}$} <b>不含点号</b> ⇒ 在发起任何 HTTP 之前就抛
-     * {@code IllegalArgumentException}，被 {@code safeOpa} 兜成
-     * {@code allow=false + OPA_ERROR_FAIL_CLOSED}。
+     * 缺陷根因钉桩 + 订正（D-B4-14/D-B4-18 → B4-3c 已修）。
      *
-     * <p><b>为什么必须钉这一条</b>：bundle 里的 {@code allow=false} 看起来像"策略拒绝"，
-     * 实际上是"护栏根本没被咨询"。二者混同后，任何以 {@code opa.allow} 为硬门的通道
-     * 都会把引擎缺陷伪装成用户无权限（并让导出功能永久不可用），
-     * 而 {@code parseObligations} 恒空又让水印义务永不可得。
-     * workspace 侧据此把护栏态如实写进范围证据（{@code ExportDecision#guardrailUnconsulted}），
-     * 硬门待 B4-3c 补名合规的 rego 后开启。</p>
+     * <p><b>原缺陷</b>：{@code SecurityDecisionService.safeOpa} 用策略名 {@code "data.access"}
+     * 调 {@code OpaPolicyService.evaluate}，而名称白名单 {@code ^[a-zA-Z0-9_-]{1,64}$} 不含点号
+     * ⇒ 在发起任何 HTTP 之前就抛 {@code IllegalArgumentException}，被兜成
+     * {@code allow=false + OPA_ERROR_FAIL_CLOSED}。bundle 里的 {@code allow=false}
+     * 看起来像"策略拒绝"，实际是"护栏根本没被咨询"——二者混同后，任何以 {@code opa.allow}
+     * 为硬门的通道都会把引擎缺陷伪装成用户无权限。</p>
+     *
+     * <p><b>B4-3c 后的现状（本用例断言的新事实）</b>：策略名取自单源
+     * {@code OpaPolicyService.POLICY_DATA_ACCESS}（{@code data_access}，白名单可过），
+     * 请求真的发到了 OPA 网络面；harness 的对端不可达 ⇒ 呈现的是<b>不可用态</b>
+     * {@code policyState=OPA_UNAVAILABLE + deniedReason=OPA_UNAVAILABLE_FAIL_CLOSED}，
+     * 不再是异常兜底态。二者都必须与"策略拒绝"分态（§4.7.2 不可用 ≠ 无权限）：
+     * 消费侧据此报 503/FAIL_CLOSED，禁折叠成 403。名称白名单那条根因规则本身仍在位，
+     * 故保留其回归断言（非法名永远进不了网络面）。</p>
      */
     @Test
-    @DisplayName("export/缺陷 D-B4-14 — 护栏未被咨询（策略名非法），不是策略拒绝")
-    void guardrailIsUnconsultedBecausePolicyNameIsIllegal() {
+    @DisplayName("export/护栏分态 — 策略名已合规（点号名仍被白名单拒），不可达如实呈现 OPA_UNAVAILABLE 而非策略拒绝")
+    void guardrailStateIsUnavailableNotPolicyDeny() {
         OpaPolicyService opa = new OpaPolicyService("http://127.0.0.1:1", null);
         IllegalArgumentException rejected = assertThrows(IllegalArgumentException.class,
                 () -> opa.evaluate("data.access", Map.of("purpose", "export")),
-                "根因验证：含点号的策略名在名称白名单处即被拒（未触达 OPA 网络面）");
+                "根因规则仍在位：含点号的策略名在名称白名单处即被拒（未触达 OPA 网络面）");
         assertTrue(rejected.getMessage().contains("非法策略名称"), rejected.getMessage());
 
         DecisionBundle b = harness.decide(V246SeedFixtures.T_COST, V246SeedFixtures.COST_COLUMNS,
                 V246SeedFixtures.FIN_USER, DecisionBundle.Purpose.EXPORT);
-        assertEquals("OPA_ERROR_FAIL_CLOSED", deniedReason(b),
-                "bundle 的拒绝原因必须是「异常兜底」而非策略给出的 deniedReason，否则本缺陷会被伪装成权限拒绝");
+        assertEquals("ecos." + OpaPolicyService.POLICY_DATA_ACCESS, b.opa().get("policyRef"),
+                "裁决入口必须用单源合规名，否则护栏从未被咨询");
+        assertEquals(GuardrailDecisionContract.STATE_UNAVAILABLE, b.opaPolicyState(),
+                "对端不可达必须是不可用态，禁冒充策略裁决");
+        assertEquals("OPA_UNAVAILABLE_FAIL_CLOSED", deniedReason(b),
+                "不可用态的 deniedReason 必须自带 fail-close 出处，供审计区分「策略拒绝」与「护栏没说话」");
+        assertFalse(b.guardrailEvaluated(), "不可用态不属于已评估态，硬门须走 503 而非 403");
     }
 
     private static String deniedReason(DecisionBundle b) {

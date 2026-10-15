@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.security.rolechannel;
 
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
+import com.chinacreator.gzcm.engine.security.service.OpaPolicyService;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,8 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       {@code predicateTemplate="1=1"} 且 {@code denyIfEmpty=true} ——
  *       执行侧（data-engine {@code QueryController}）据此拒绝而非放行；
  *       同时命中策略清单与参数集必须为空，返回体里不得出现"存在哪些策略/哪些表被管控"的元信息。</li>
- *   <li><b>OPA 面的 DENY</b>：{@code data.access} 策略实缺（全仓只有 {@code ecos.rbac}）⇒
- *       fail-close {@code allow=false}，与 §2.4-8 默认 DENY 一致（如实呈现，非伪造）。</li>
+ *   <li><b>OPA 面的 DENY 形态</b>：策略名已合规（单源 {@code data_access}，订正 B4-3c），
+ *       本 harness 的 OPA 对端不可达 ⇒ fail-close {@code allow=false} +
+ *       {@code policyState=OPA_UNAVAILABLE}，与 §2.4-8 默认 DENY 一致（如实呈现，非伪造）。</li>
  * </ol>
  *
  * <p><b>在册缺陷（不作为通过项）</b>：CLS 当前是<b>黑名单式</b>——
@@ -80,9 +82,11 @@ class RlsDenyNoLeakTest {
         assertEquals(Boolean.TRUE, b.rls().get("denyIfEmpty"),
                 "bundle 必须把 denyIfEmpty 透传给执行侧");
         assertEquals(List.of(), b.rls().get("bindings"), "bindings 必须为空列表");
-        assertEquals("ecos.data.access", b.opa().get("policyRef"));
+        assertEquals("ecos." + OpaPolicyService.POLICY_DATA_ACCESS, b.opa().get("policyRef"));
         assertEquals(Boolean.FALSE, b.opa().get("allow"),
-                "data.access 实缺 ⇒ OPA 面如实 DENY（AI/页面通道均不得据此放行）");
+                "harness 的 OPA 对端不可达 ⇒ 如实 DENY 形态（AI/页面通道均不得据此放行）");
+        assertEquals(OpaPolicyService.STATE_UNAVAILABLE, b.opaPolicyState(),
+                "不可达必须落在不可用态（订正 B4-3c：策略名已合规，不再冒充异常兜底态）");
 
         // bundle 结构本身不含策略名/表清单字段：只允许 4 源 + 2 个 id（防"把命中过程回显给前端"）
         Map<String, Object> view = b.toMap();

@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.security.rolechannel;
 
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
+import com.chinacreator.gzcm.engine.security.service.OpaPolicyService;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code V246__security_policy_seed.sql} 解析（单源，不在测试里抄策略），
  * 裁决由 {@link PageChannelHarness} 装配的<b>生产实现</b>
  * （RLS/CLS service + {@code SecurityDecisionService#decide}）算出，
- * OPA 源是真实现且因 {@code data.access} 策略不存在而 fail-close ——
- * 本用例只断行/列面，OPA 面见 {@code OpaFinAiTest}（B4-3c）。</p>
+ * OPA 源是真实现且对端不可达而 fail-close（订正 B4-3c：策略名已合规为单源 {@code data_access}，
+ * 本用例只断行/列面，护栏面的角色×通道真值见 {@code OpaFinAiTest}）。</p>
  *
  * <p><b>「全量行」的实现形态</b>：V246 给 finance_lead 的是
  * {@code source_kind=legacy_text} + {@code filter_expr='1=1'}，即<b>唯一</b>允许无条件放行的主体
@@ -80,7 +81,9 @@ class RlsFinAllTest {
         assertNotNull(b.decisionId(), "每通道必须有独立 decisionId");
         assertFalse(b.columnsDenied(), "finance_lead 的列投影不得为空");
         assertEquals(Boolean.FALSE, b.opa().get("allow"),
-                "data.access rego 不存在 ⇒ OPA 面如实呈现 fail-close DENY（本批不伪造 ALLOW，见 B4-3c）");
+                "本 harness 的 OPA 对端不可达 ⇒ OPA 面如实呈现 fail-close DENY（本用例不伪造 ALLOW）");
+        assertEquals(OpaPolicyService.STATE_UNAVAILABLE, b.opaPolicyState(),
+                "不可达态须单列（订正 B4-3c：名称已合规，剩余原因是部署面未加载策略）");
     }
 
     @Test

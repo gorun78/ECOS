@@ -23,28 +23,36 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException;
 
 /**
- * 导出通道契约与接线钉（#142/B4-3b，差距文档 D-B4-10/D-B4-11/D-B4-13/D-B4-14/D-B4-16）。
+ * 导出通道契约与接线钉（#142/B4-3b + B4-3c，差距文档 D-B4-10/D-B4-11/D-B4-13/D-B4-14/
+ * D-B4-16/D-B4-18/D-B4-21/D-B4-22）。
  *
  * <p><b>本类解决的假绿问题</b>：workspace 侧 {@code ExportDecision} 消费的是
  * security-engine REST 应答里的<b>字符串键名</b>（{@code rls.policyRefs} 等），
  * 两侧分处不同 Maven 模块、编译期零耦合 —— security 侧改键名时 workspace 侧只会
- * <b>静默读到 null</b>，导出件随即退回"无证据"形态而不报错。因此这里做三件编译做不到的事：</p>
+ * <b>静默读到 null</b>，导出件随即退回"无证据"形态而不报错。因此这里做四件编译做不到的事：</p>
  * <ol>
  *   <li>{@link #bundleKeyNamesMatchSecurityEngineSource()} —— 直接读 security-engine 生产源文件，
  *       对键名字面量做双向核对（源文件找不到即失败，禁跳过）；</li>
  *   <li>{@link #exportPathIsWiredToTheSingleDecisionEntry()} /
  *       {@link #permissionScopeConstantCannotComeBack()} —— 把"必须走 /decision"和
  *       "不得再用常量自称权限范围"钉成源码级断言；</li>
- *   <li>咽喉六态行为断言（{@link ScenarioReadGuard#exportDecision} 真实对象 + mock 客户端），
- *       其中含一条<b>反向钉</b>：OPA 护栏未被咨询时不得 403（D-B4-14/D-B4-18 的裁决），
- *       谁把它改回硬门，这条会红并给出理由。</li>
+ *   <li>咽喉七态行为断言（{@link ScenarioReadGuard#exportDecision} 真实对象 + mock 客户端）。
+ *       B4-3c 起护栏<b>是硬门</b>：{@code EVALUATED_DENY} → 403，
+ *       {@code POLICY_UNDEFINED}/{@code OPA_UNAVAILABLE}/缺段 → 503 {@code ECOS-SEC-501}
+ *       （「不可用 ≠ 无权限」）。B4-3b 那条"护栏未被咨询时不得 403"的反向钉，
+ *       按其 javadoc 自述的承诺<b>删除并翻正</b>为上述两态用例，不留双轨；</li>
+ *   <li>{@link #guardrailVocabularyIsSingleSourced()} —— 护栏词表（策略名 + 四态 +
+ *       应答键名）单源在 {@link GuardrailDecisionContract}，三引擎生产代码位（剥注释后）
+ *       出现内联字面量即红；旧形态（security 写 {@code "data.access"}、ai 写 {@code "rbac"}、
+ *       workspace 靠 {@code OPA_ERROR_FAIL_CLOSED} 反推状态）回潮同样即红。</li>
  * </ol>
  */
-@DisplayName("导出通道：跨模块键名契约 + 单入口接线 + 咽喉六态")
+@DisplayName("导出通道：跨模块键名契约 + 单入口接线 + 咽喉七态 + 词表单源")
 class ExportDecisionContractTest {
 
     private static final String SECURITY_BUNDLE_SRC =
@@ -58,6 +66,19 @@ class ExportDecisionContractTest {
                     + "com/chinacreator/gzcm/workspace/security/ExportDecision.java";
     private static final String WORKSPACE_MAIN_TREE =
             "ecos_backend/workspace/workspace-impl/src/main/java";
+    private static final String SECURITY_MAIN_TREE =
+            "ecos_backend/engine/security-engine/security-engine-impl/src/main/java";
+    private static final String AI_MAIN_TREE =
+            "ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java";
+    private static final String AI_CLIENT_SRC =
+            "ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/ai/security/AiSecurityEngineClient.java";
+    private static final String AI_GATE_SRC =
+            "ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/ai/security/AgentToolPolicyGate.java";
+    private static final String GUARDRAIL_CONTRACT_SRC =
+            "ecos_backend/runtime/common-api/src/main/java/"
+                    + "com/chinacreator/gzcm/common/security/guardrail/GuardrailDecisionContract.java";
 
     /** 旧形态的权限自证常量（B4-3b 废除，出现即假绿回潮）。 */
     private static final String BANNED_SCOPE_CONSTANT = "same-pipeline-as-query";
@@ -94,6 +115,30 @@ class ExportDecisionContractTest {
             assertTrue(consumerSrc.contains("\"" + key + "\""),
                     "ExportDecision 不再读取 bundle 键 " + key + "：两侧契约断裂");
         }
+    }
+
+    @Test
+    @DisplayName("护栏键契约 — security 写 policyState，workspace 经单源常量读（禁两侧各自内联）")
+    void guardrailKeysAreProducedAndConsumedThroughTheSingleSource() throws IOException {
+        String contractSrc = readRepoFile(GUARDRAIL_CONTRACT_SRC);
+        String decisionSrc = readRepoFile(SECURITY_DECISION_SRC);
+        String consumerSrc = stripComments(readRepoFile(WORKSPACE_CONSUMER_SRC));
+
+        // 单源必须定义这四态 + 应答键名（本类其余断言的取值全部来自它）
+        for (String literal : List.of("\"data_access\"", "\"EVALUATED_ALLOW\"", "\"EVALUATED_DENY\"",
+                "\"POLICY_UNDEFINED\"", "\"OPA_UNAVAILABLE\"", "\"policyState\"", "\"deniedReason\"")) {
+            assertTrue(contractSrc.contains(literal),
+                    "GuardrailDecisionContract 不再定义 " + literal + "：词表单源被拆，三消费方失配");
+        }
+        // security 侧生产面写入 policyState（护栏态是 403/503 分态的唯一依据）
+        assertTrue(decisionSrc.contains("\"policyState\""),
+                "裁决入口必须把护栏态写进 bundle.opa，否则消费侧只能靠布尔反推（旧假绿形态）");
+        // workspace 侧只经单源读键与判态，代码位不得再出现内联字面量
+        assertTrue(consumerSrc.contains("GuardrailDecisionContract.stateOf(")
+                        && consumerSrc.contains("GuardrailDecisionContract.isUnevaluated("),
+                "ExportDecision 必须经单源读护栏态并判「未评估」，禁本地另立词表");
+        assertFalse(consumerSrc.contains("\"policyState\""),
+                "ExportDecision 代码位内联 policyState 字面量 = 单源被绕过，键名漂移将静默失配");
     }
 
     // ═══════════════ ② 接线与禁常量 ═══════════════
@@ -135,25 +180,73 @@ class ExportDecisionContractTest {
         assertFalse(stripComments("/** 旧常量 " + BANNED_SCOPE_CONSTANT + " 已废 */").contains(BANNED_SCOPE_CONSTANT),
                 "javadoc/行注释里的说明性提及不算代码位（本仓红线：文档只加订正注、原文不删）");
 
-        Path root = repoFile(WORKSPACE_MAIN_TREE);
-        List<String> hits = new ArrayList<>();
-        int scanned;
-        try (Stream<Path> walk = Files.walk(root)) {
-            List<Path> sources = walk.filter(p -> p.toString().endsWith(".java")).toList();
-            scanned = sources.size();
-            for (Path p : sources) {
-                try {
-                    if (stripComments(Files.readString(p)).contains(BANNED_SCOPE_CONSTANT)) {
-                        hits.add(p.toString());
-                    }
-                } catch (IOException e) {
-                    throw new IllegalStateException("读取失败: " + p, e);
-                }
-            }
-        }
-        assertTrue(scanned > 0, "扫描根解析出 0 个 .java 源文件 = 门禁空转，禁把「没扫到」当成「没违例」");
+        List<String> hits = findInCodePositions(WORKSPACE_MAIN_TREE, BANNED_SCOPE_CONSTANT);
         assertTrue(hits.isEmpty(),
                 "导出件权限范围必须是裁决证据（decision=<id> rls=[命中策略]），不得写常量: " + hits);
+    }
+
+    // ═══════════════ ②b 护栏词表单源 ═══════════════
+
+    /**
+     * 护栏词表（策略名 + 四态 + 旧反推串）在<b>三引擎生产代码位</b>必须取自
+     * {@link GuardrailDecisionContract}，内联字面量即红。
+     *
+     * <p>为什么钉这一条（D-B4-14/D-B4-18/D-B4-22）：旧形态是 security 写 {@code "data.access"}
+     * （非法名 ⇒ OPA 从未被咨询）、ai 写 {@code "rbac"}（三通道策略面不同源）、
+     * workspace 用 {@code OPA_ERROR_FAIL_CLOSED} 反推状态。三处分处不同 Maven 模块，
+     * 改名后编译不报错，只会静默失配 —— 而"护栏到底说了话没有"正是 403/503 分态的唯一依据。</p>
+     */
+    @Test
+    @DisplayName("词表单源 — 三引擎代码位禁内联护栏态/策略名字面量；ai 裁决咽喉禁查 rbac")
+    void guardrailVocabularyIsSingleSourced() throws IOException {
+        // 四态 + 策略名是「跨模块线契约」⇒ 三引擎生产代码位一律只准引单源常量
+        List<String> shared = List.of(
+                "\"" + GuardrailDecisionContract.STATE_ALLOW + "\"",
+                "\"" + GuardrailDecisionContract.STATE_DENY + "\"",
+                "\"" + GuardrailDecisionContract.STATE_POLICY_UNDEFINED + "\"",
+                "\"" + GuardrailDecisionContract.STATE_UNAVAILABLE + "\"",
+                "\"" + GuardrailDecisionContract.POLICY_DATA_ACCESS + "\"",
+                "\"data.access\"");
+
+        // 门禁有效性对照（禁把"剥注释后扫"做成恒绿假绿源）：
+        // 代码位字面量必须被抓到，javadoc 里的说明性提及必须不被抓。
+        String inline = "out.put(\"policyState\", \"" + GuardrailDecisionContract.STATE_DENY + "\");";
+        assertTrue(stripComments(inline).contains(shared.get(1)),
+                "扫描口径若吞掉代码位字符串字面量，本门恒绿＝假绿");
+        assertFalse(stripComments("/** 旧值 \"" + GuardrailDecisionContract.STATE_DENY + "\" 已废 */")
+                .contains(shared.get(1)), "注释/订正注里的说明性提及不算违例（本仓红线：原文不删）");
+
+        for (String tree : List.of(SECURITY_MAIN_TREE, AI_MAIN_TREE, WORKSPACE_MAIN_TREE)) {
+            List<String> hits = findInCodePositions(tree, shared.toArray(String[]::new));
+            assertTrue(hits.isEmpty(), "护栏词表必须取自单源 GuardrailDecisionContract，"
+                    + "内联字面量会随改名静默失配 (" + tree + "): " + hits);
+        }
+
+        // 消费侧禁"靠拒绝原因串反推护栏态"（旧形态）；生产侧的 deniedReason 是审计痕迹、
+        // 由 OpaPolicyService 单点书写，不属本门范围（详设 C.2.5 ③ 义务集语义）。
+        List<String> hits = findInCodePositions(WORKSPACE_MAIN_TREE,
+                "\"" + GuardrailDecisionContract.STATE_ALLOW + "\"", "\"OPA_ERROR_FAIL_CLOSED\"");
+        assertTrue(hits.isEmpty(), "workspace 侧必须按 policyState 分态，"
+                + "禁再用 deniedReason 字符串反推（D-B4-14/D-B4-18 的旧口径）: " + hits);
+
+        // AI 通道咽喉：策略名单源 + 接线在位 + 禁 rbac 回潮
+        String aiClientSrc = readRepoFile(AI_CLIENT_SRC);
+        String gateSrc = readRepoFile(AI_GATE_SRC);
+        int sig = aiClientSrc.indexOf("Map<String, Object> evaluateBodyForAdjudication(");
+        assertTrue(sig >= 0, "AI 裁决体构造点消失：三通道策略名单源失去落点");
+        String adjudicationRegion = aiClientSrc.substring(sig, aiClientSrc.indexOf("\n    }", sig));
+        assertTrue(adjudicationRegion.contains("GuardrailDecisionContract.POLICY_DATA_ACCESS"),
+                "AI 通道必须查单源策略名 data_access（D-B4-22：此前硬编码 rbac ⇒「三通道同源」在策略面上是假的）");
+        assertFalse(adjudicationRegion.contains("\"rbac\""),
+                "AI 裁决咽喉回潮查 rbac ⇒ §4.7.2 AI 列（p1 ALLOW / p2 DENY / 按部门域）不可表达");
+        assertTrue(gateSrc.contains("evaluateBodyForAdjudication("),
+                "工具裁决闸必须经咽喉构造裁决体，禁在调用方另拼 policy 字段");
+
+        // 特征化断言（钉现状非认可）：ai-engine 侧剩余 rbac 代码位只许是这两个非咽喉点
+        List<String> rbacFiles = findInCodePositions(AI_MAIN_TREE, "\"rbac\"").stream()
+                .map(h -> h.substring(0, h.indexOf(" 含 "))).distinct().sorted().toList();
+        assertEquals(List.of("AiSecurityEngineClient.java", "GuardrailsServiceImpl.java"), rbacFiles,
+                "ai-engine 侧 rbac 调用面变化须同步登记（D-B4-22 剩余面，新增即需裁决：是否属裁决咽喉）");
     }
 
     // ═══════════════ ③ 咽喉六态行为 ═══════════════
@@ -163,7 +256,7 @@ class ExportDecisionContractTest {
     void grantedDecisionCarriesFullEvidence() {
         WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
         when(client.decide(anyString(), anyList(), anyString())).thenReturn(
-                bundle(List.of("rls-finance-all"), "(1=1)", List.of(), "allow", null,
+                bundle(List.of("rls-finance-all"), "(1=1)", List.of(), GuardrailDecisionContract.STATE_ALLOW, null,
                         "财务负责人全量导出 2026-10-15"));
         ExportDecision d = guard(client).exportDecision("forecast_run");
 
@@ -173,7 +266,7 @@ class ExportDecisionContractTest {
                 d.permissionScope());
         assertEquals("财务负责人全量导出 2026-10-15", d.watermark());
         assertEquals("dec-1", d.decisionId());
-        assertFalse(d.guardrailUnconsulted());
+        assertFalse(d.guardrailUnevaluated());
     }
 
     @Test
@@ -205,7 +298,7 @@ class ExportDecisionContractTest {
     void noPolicyMatchedWithDenyIfEmptyIsDeny() {
         WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
         when(client.decide(anyString(), anyList(), anyString())).thenReturn(
-                bundle(List.of(), "1=1", List.of(), "allow", null, null));
+                bundle(List.of(), "1=1", List.of(), GuardrailDecisionContract.STATE_ALLOW, null, null));
 
         ForbiddenOperationException ex = assertThrows(ForbiddenOperationException.class,
                 () -> guard(client).exportDecision("forecast_run"));
@@ -217,7 +310,7 @@ class ExportDecisionContractTest {
     void nonTrivialPredicateCannotBePushedDownIsDeny() {
         WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
         when(client.decide(anyString(), anyList(), anyString())).thenReturn(
-                bundle(List.of("rls-dept-scope"), "(department_id = :userDeptId)", List.of(), "allow", null, null));
+                bundle(List.of("rls-dept-scope"), "(department_id = :userDeptId)", List.of(), GuardrailDecisionContract.STATE_ALLOW, null, null));
 
         ForbiddenOperationException ex = assertThrows(ForbiddenOperationException.class,
                 () -> guard(client).exportDecision("forecast_run"));
@@ -232,7 +325,7 @@ class ExportDecisionContractTest {
         for (String spelling : List.of("1=0", "(1=0)", " ( 1=0 ) ")) {
             WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
             when(client.decide(anyString(), anyList(), anyString())).thenReturn(
-                    bundle(List.of("rls-x"), spelling, List.of(), "allow", null, null));
+                    bundle(List.of("rls-x"), spelling, List.of(), GuardrailDecisionContract.STATE_ALLOW, null, null));
 
             assertThrows(ForbiddenOperationException.class,
                     () -> guard(client).exportDecision("forecast_run"), spelling);
@@ -249,7 +342,7 @@ class ExportDecisionContractTest {
     @Test
     @DisplayName("证据缺段 — bundle 无 policyRefs/无 opa 段时写 NOT_WIRED/NOT_ISSUED，禁默认值冒充")
     void missingEvidenceSectionsAreMarkedNotDefaulted() {
-        Map<String, Object> b = bundle(List.of("rls-finance-all"), "(1=1)", List.of(), "allow", null, null);
+        Map<String, Object> b = bundle(List.of("rls-finance-all"), "(1=1)", List.of(), GuardrailDecisionContract.STATE_ALLOW, null, null);
         @SuppressWarnings("unchecked")
         Map<String, Object> rls = (Map<String, Object>) b.get("rls");
         rls.remove("policyRefs");
@@ -259,41 +352,69 @@ class ExportDecisionContractTest {
         assertEquals(ExportDecision.SCOPE_NOT_WIRED, d.permissionScope());
         assertEquals(ExportDecision.WATERMARK_NOT_ISSUED, d.watermark());
         assertEquals("ABSENT", d.opaState());
-        assertTrue(d.guardrailUnconsulted(), "opa 段缺失＝护栏没被咨询，不得当成\"已裁决\"");
+        assertTrue(d.guardrailUnevaluated(), "opa 段缺失＝护栏未被证明咨询过，不得当成\"已裁决\"");
     }
 
     /**
-     * 反向钉（本批裁决，差距文档 D-B4-14/D-B4-18）：护栏源因策略名非法而从未被咨询时，
-     * 导出咽喉<b>不据此 403</b>，而是把护栏态如实写进范围证据。
+     * 硬门·未评估态（B4-3c 开启，差距文档 D-B4-14/D-B4-18/D-B4-20/D-B4-21）。
      *
-     * <p>为什么必须钉反方向：把 {@code opa.allow=false}（根因＝
-     * {@code SecurityDecisionService.safeOpa} 用非法策略名 {@code "data.access"} 调
-     * {@code OpaPolicyService.evaluate}）当策略拒绝，会把引擎缺陷伪装成用户无权限，
-     * 并让导出功能永久不可用 —— 那是另一种假绿（"看起来在 fail-closed"）。
-     * 硬门的正确开启点是 B4-3c 补名合规的 {@code data_access} rego 之后；
-     * 届时应同时删除本用例并改为 DENY 断言，而不是悄悄改掉。</p>
+     * <p>B4-3b 的反向钉（"护栏未被咨询时不得 403，只记证据"）按其 javadoc 自述的承诺在此
+     * <b>删除并翻正</b>：策略名已合规（单源 {@code data_access}），护栏态第一次承载真实语义，
+     * 「护栏没给出裁决」必须报 503 {@code ECOS-SEC-501}（可告警、可重试）而不是 403 ——
+     * §4.7.2「不可用 ≠ 无权限」；把它折叠成 403 等于把引擎缺陷伪装成用户无权限。</p>
      */
     @Test
-    @DisplayName("反向钉 — 护栏未被咨询（OPA_ERROR_FAIL_CLOSED）时放行但如实记入范围证据，禁伪装成策略拒绝")
-    void unconsultedGuardrailIsEvidenceNotADeny() {
+    @DisplayName("硬门 503 — 护栏未给出裁决（POLICY_UNDEFINED / OPA_UNAVAILABLE / policyState 漂移）⇒ ECOS-SEC-501，禁折叠成 403")
+    void unevaluatedGuardrailIs503NotADeny() {
+        for (String state : List.of(GuardrailDecisionContract.STATE_POLICY_UNDEFINED,
+                GuardrailDecisionContract.STATE_UNAVAILABLE)) {
+            WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
+            when(client.decide(anyString(), anyList(), anyString())).thenReturn(
+                    bundle(List.of("rls-finance-all"), "(1=1)", List.of(), state,
+                            "OPA_POLICY_UNDEFINED", null));
+
+            SecurityEngineUnavailableException ex = assertThrows(
+                    SecurityEngineUnavailableException.class,
+                    () -> guard(client).exportDecision("forecast_run"), state);
+            assertEquals(503, ex.getHttpStatus());
+            assertEquals("ECOS-SEC-501", ex.getCode());
+            assertTrue(ex.getTechnicalReason().contains("policyState=" + state),
+                    "日志面必须带未评估态原值供回查，实得: " + ex.getTechnicalReason());
+        }
+        // 第三态：policyState 键漂移（旧形态应答）⇒ 无法证明护栏说过话，同走 503
         WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
         when(client.decide(anyString(), anyList(), anyString())).thenReturn(
-                bundle(List.of("rls-finance-all"), "(1=1)", List.of(), "deny",
-                        "OPA_ERROR_FAIL_CLOSED", null));
+                bundle(List.of("rls-finance-all"), "(1=1)", List.of(), null, null, null));
 
-        ExportDecision d = guard(client).exportDecision("forecast_run");
+        assertThrows(SecurityEngineUnavailableException.class,
+                () -> guard(client).exportDecision("forecast_run"),
+                "缺 policyState 即护栏未被证明咨询过，禁按 allow 布尔冒充「已裁决」放行");
+    }
 
-        assertTrue(d.guardrailUnconsulted());
-        assertFalse(d.opaAllowed());
-        assertTrue(d.permissionScope().contains("opa=deny:OPA_ERROR_FAIL_CLOSED"), d.permissionScope());
-        assertEquals(ExportDecision.WATERMARK_NOT_ISSUED, d.watermark(),
-                "护栏没被咨询 ⇒ 水印义务不可能存在，只能如实标 NOT_ISSUED");
+    @Test
+    @DisplayName("硬门 403 — 护栏真实策略拒绝（EVALUATED_DENY）⇒ 403 且带 deniedReason（rego violation 名可回查）")
+    void evaluatedDenyIs403WithDeniedReason() {
+        Map<String, Object> b = bundle(List.of("rls-proj-owner"), "(1=1)", List.of(),
+                GuardrailDecisionContract.STATE_DENY, "AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT", null);
+        ExportDecision d = ExportDecision.fromBundle("forecast_run", b);
+        assertFalse(d.guardrailUnevaluated(), "EVALUATED_DENY 是「护栏说了话」的态，不得落 503 分支");
+        assertTrue(d.guardrailDenied());
+        assertEquals("deny:AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT", d.opaState());
+
+        WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
+        when(client.decide(anyString(), anyList(), anyString())).thenReturn(b);
+
+        ForbiddenOperationException ex = assertThrows(ForbiddenOperationException.class,
+                () -> guard(client).exportDecision("forecast_run"));
+        assertReasonContains(ex, "OPA 策略裁决 DENY");
+        assertEquals("deny:AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT", ex.getDetails().get("deniedReason"),
+                "403 必须带上拒绝原因（rego violation 名），否则审计无从反查是哪条规则卡的");
     }
 
     @Test
     @DisplayName("漂移保守面 — denyIfEmpty 缺段按 true 处理（宁可拒绝也不放行）")
     void missingDenyIfEmptyFlagFailsClosed() {
-        Map<String, Object> b = bundle(List.of(), "1=1", List.of(), "allow", null, null);
+        Map<String, Object> b = bundle(List.of(), "1=1", List.of(), GuardrailDecisionContract.STATE_ALLOW, null, null);
         @SuppressWarnings("unchecked")
         Map<String, Object> rls = (Map<String, Object>) b.get("rls");
         rls.remove("denyIfEmpty");
@@ -322,9 +443,14 @@ class ExportDecisionContractTest {
                 "拒绝理由应含「" + needle + "」，实得 details=" + ex.getDetails());
     }
 
-    /** {@code DecisionBundle.toMap()} 的 REST 形态（键名与 security 侧同源，见契约断言）。 */
+    /**
+     * {@code DecisionBundle.toMap()} 的 REST 形态（键名与 security 侧同源，见契约断言）。
+     *
+     * @param opaPolicyState {@link GuardrailDecisionContract} 四态之一；传 null 即<b>不写</b>
+     *                       {@code policyState} 键（旧形态漂移面，另有用例断其保守行为）
+     */
     private static Map<String, Object> bundle(List<String> rlsRefs, String predicate,
-                                              List<String> clsRefs, String opaAllow,
+                                              List<String> clsRefs, String opaPolicyState,
                                               String deniedReason, String watermark) {
         Map<String, Object> rls = new LinkedHashMap<>();
         rls.put("predicateTemplate", predicate);
@@ -339,8 +465,11 @@ class ExportDecisionContractTest {
         columns.put("policyRefs", clsRefs);
 
         Map<String, Object> opa = new LinkedHashMap<>();
-        opa.put("allow", "allow".equals(opaAllow));
-        opa.put("policyRef", "ecos.data.access");
+        opa.put("allow", GuardrailDecisionContract.STATE_ALLOW.equals(opaPolicyState));
+        if (opaPolicyState != null) {
+            opa.put("policyState", opaPolicyState);
+        }
+        opa.put("policyRef", "ecos." + GuardrailDecisionContract.POLICY_DATA_ACCESS);
         List<Map<String, Object>> obligations = new ArrayList<>();
         if (deniedReason != null) {
             obligations.add(Map.of("obligation", "DENIED", "deniedReason", deniedReason));
@@ -372,6 +501,38 @@ class ExportDecisionContractTest {
             idx += needle.length();
         }
         return count;
+    }
+
+    /**
+     * 扫描某模块生产源码树，返回<b>代码位</b>（剥注释后）命中任一 needle 的文件清单。
+     *
+     * <p>解析出 0 个 {@code .java} 即失败 —— 禁把"没扫到文件"当成"没违例"（门禁空转）。</p>
+     */
+    private static List<String> findInCodePositions(String rootRepoRelative, String... needles)
+            throws IOException {
+        Path root = repoFile(rootRepoRelative);
+        List<String> hits = new ArrayList<>();
+        int scanned;
+        try (Stream<Path> walk = Files.walk(root)) {
+            List<Path> sources = walk.filter(p -> p.toString().endsWith(".java")).toList();
+            scanned = sources.size();
+            for (Path p : sources) {
+                String code;
+                try {
+                    code = stripComments(Files.readString(p));
+                } catch (IOException e) {
+                    throw new IllegalStateException("读取失败: " + p, e);
+                }
+                for (String needle : needles) {
+                    if (code.contains(needle)) {
+                        hits.add(p.getFileName() + " 含 " + needle);
+                    }
+                }
+            }
+        }
+        assertTrue(scanned > 0,
+                "扫描根解析出 0 个 .java 源文件 = 门禁空转，禁把「没扫到」当成「没违例」: " + rootRepoRelative);
+        return hits;
     }
 
     /**

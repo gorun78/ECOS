@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.workspace.security;
 
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -28,9 +30,17 @@ public final class ExportDecision {
     /** 范围证据缺失标记（bundle 无 {@code rls.policyRefs} ⇒ 无法反查命中策略；D-B4-10 在册痕迹）。 */
     public static final String SCOPE_NOT_WIRED = "scope=NOT_WIRED(裁决未返回 policyRefs，禁以常量冒充范围)";
 
-    /** 水印义务未签发标记（OPA obligations 无 watermark 项；D-B4-12 在册痕迹）。 */
+    /**
+     * 水印义务未签发标记（OPA obligations 无 watermark 项）。
+     *
+     * <p>B4-3c 后 {@code data_access.rego} 已落仓（{@code ecos-docker/opa-policies/data_access.rego}，
+     * 导出放行时签发 watermark 义务），因此本标记不再表示"策略文件不存在"（那是 D-B4-12 的旧根因），
+     * 而表示<b>本次应答的义务集里没有 watermark 项</b> —— 常见成因是护栏未被评估
+     * （{@code POLICY_UNDEFINED}＝dev OPA 未挂 bundle），该态在 {@code ScenarioReadGuard}
+     * 已先转 503，正常走不到这里；走到即说明义务漂移，须留痕而非冒充"已加水印"。</p>
+     */
     public static final String WATERMARK_NOT_ISSUED =
-            "NOT_ISSUED(OPA 未签发 watermark 义务：data.access 策略缺失，见差距文档 D-B4-12)";
+            "NOT_ISSUED(OPA 未签发 watermark 义务：data_access 应答义务集缺项，见差距文档 D-B4-12)";
 
     /** bundle.rls.predicateTemplate 缺段时的取值（空串=未给谓词）。 */
     private static final String NO_TEMPLATE = "";
@@ -42,13 +52,15 @@ public final class ExportDecision {
     private final String rlsPredicateTemplate;
     private final boolean rlsDenyIfEmpty;
     private final boolean opaAllowed;
+    private final String opaPolicyState;
     private final String opaState;
     private final List<String> rlsPolicyRefs;
     private final List<String> clsPolicyRefs;
 
     private ExportDecision(String entityCode, String decisionId, String permissionScope, String watermark,
                            String rlsPredicateTemplate, boolean rlsDenyIfEmpty, boolean opaAllowed,
-                           String opaState, List<String> rlsPolicyRefs, List<String> clsPolicyRefs) {
+                           String opaPolicyState, String opaState,
+                           List<String> rlsPolicyRefs, List<String> clsPolicyRefs) {
         this.entityCode = entityCode;
         this.decisionId = decisionId;
         this.permissionScope = permissionScope;
@@ -56,6 +68,7 @@ public final class ExportDecision {
         this.rlsPredicateTemplate = rlsPredicateTemplate;
         this.rlsDenyIfEmpty = rlsDenyIfEmpty;
         this.opaAllowed = opaAllowed;
+        this.opaPolicyState = opaPolicyState;
         this.opaState = opaState;
         this.rlsPolicyRefs = rlsPolicyRefs;
         this.clsPolicyRefs = clsPolicyRefs;
@@ -84,8 +97,12 @@ public final class ExportDecision {
         // 漂移时宁可拒绝也不放行（与 namesOf 的"读不到出处不当成放行"同一口径）
         boolean denyIfEmpty = rls.get("denyIfEmpty") == null
                 || Boolean.TRUE.equals(rls.get("denyIfEmpty"));
-        boolean opaAllow = Boolean.TRUE.equals(opa.get("allow"));
-        String opaState = opaState(opa, opaAllow);
+        // B4-3c：护栏态串优先（policyState 是「策略拒绝 / 护栏没说话」分态的唯一依据，
+        // 词表单源在 runtime 底座 GuardrailDecisionContract，禁本类内联比对字符串）
+        String policyState = GuardrailDecisionContract.stateOf(opa);
+        boolean opaAllow = GuardrailDecisionContract.STATE_ALLOW.equals(policyState)
+                || (policyState == null && Boolean.TRUE.equals(opa.get(GuardrailDecisionContract.KEY_ALLOW)));
+        String opaState = opaState(opa, opaAllow, policyState);
 
         String scope = rlsRefs.isEmpty() && clsRefs.isEmpty()
                 ? SCOPE_NOT_WIRED
@@ -96,7 +113,52 @@ public final class ExportDecision {
                         + " opa=" + opaState;
 
         return new ExportDecision(entityCode, decisionId, scope, watermarkOf(opa), template,
-                denyIfEmpty, opaAllow, opaState, rlsRefs, clsRefs);
+                denyIfEmpty, opaAllow, policyState, opaState, rlsRefs, clsRefs);
+    }
+
+    /**
+     * OPA 护栏态串（范围证据的组成部分，禁只写 allow/deny 把"未咨询"和"被拒绝"混成一态）。
+     *
+     * <p>B4-3c 起优先呈现 {@code policyState} 四态（词表单源
+     * {@link GuardrailDecisionContract}）：</p>
+     * <ul>
+     *   <li>{@code EVALUATED_DENY:〈deniedReason〉} —— 真实策略拒绝，可映射 403；</li>
+     *   <li>{@code POLICY_UNDEFINED} / {@code OPA_UNAVAILABLE} —— 护栏没说话，映射 503；</li>
+     *   <li>ALLOW 态渲染成 {@code allow}（范围串是给审计读的，不必重复全名）。</li>
+     * </ul>
+     *
+     * <p>{@code policyState} 键缺失＝security 侧旧形态/键漂移，此时退回旧的推断口径
+     * （{@code allow} / {@code deny:〈deniedReason〉} / {@code ABSENT}），并由
+     * {@link #guardrailUnevaluated()} 一律按"未评估"处理（缺状态＝无法证明护栏说过话，
+     * 宁 503 不 403、更不放行）。</p>
+     */
+    private static String opaState(Map<String, Object> opa, boolean allow, String policyState) {
+        if (opa.isEmpty()) return "ABSENT";
+        if (policyState != null) {
+            if (GuardrailDecisionContract.STATE_ALLOW.equals(policyState)) return "allow";
+            if (GuardrailDecisionContract.STATE_DENY.equals(policyState)) {
+                String reason = deniedReasonOf(opa);
+                return reason == null ? "deny" : "deny:" + reason;
+            }
+            return policyState;
+        }
+        if (allow) return "allow";
+        String reason = deniedReasonOf(opa);
+        return reason == null ? "deny" : "deny:" + reason;
+    }
+
+    /** obligations 首条 {@code deniedReason}（无则 null）。 */
+    private static String deniedReasonOf(Map<String, Object> opa) {
+        Object obligations = opa.get(GuardrailDecisionContract.KEY_OBLIGATIONS);
+        if (obligations instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> m
+                        && m.get(GuardrailDecisionContract.KEY_DENIED_REASON) != null) {
+                    return String.valueOf(m.get(GuardrailDecisionContract.KEY_DENIED_REASON));
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -151,24 +213,31 @@ public final class ExportDecision {
     public boolean rlsDenyIfEmpty() { return rlsDenyIfEmpty; }
     public boolean opaAllowed() { return opaAllowed; }
     public String opaState() { return opaState; }
+    /** OPA 护栏态原始串（{@link GuardrailDecisionContract} 四值之一；缺键＝漂移，返回 null）。 */
+    public String opaPolicyState() { return opaPolicyState; }
     public List<String> rlsPolicyRefs() { return rlsPolicyRefs; }
     public List<String> clsPolicyRefs() { return clsPolicyRefs; }
 
     /**
-     * 护栏源是否<b>根本没被成功咨询</b>（bundle opa 段缺失，或拒绝原因取自
-     * fail-close 兜底态）。
+     * 护栏是否<b>没有给出</b>策略裁决（B4-3c 起为导出咽喉的 503 硬门判据）。
      *
-     * <p>存在意义（差距文档 D-B4-14/D-B4-18）：{@code SecurityDecisionService.safeOpa}
-     * 用策略名 {@code "data.access"} 调 {@code OpaPolicyService.evaluate}，而该服务的
-     * {@code SAFE_NAME} 正则不允许点号 ⇒ 每次都走异常兜底 {@code allow=false +
-     * OPA_ERROR_FAIL_CLOSED}。把这种"护栏没接上"伪装成 403 策略拒绝（或据此把功能打死）
-     * 都是误导：导出咽喉据此把护栏态<b>如实渲染进范围证据</b>，硬门开关等
-     * B4-3c 补 {@code data.access} rego 后由配套用例打开。</p>
+     * <p>命中态：opa 段缺失（{@code ABSENT}）、{@code POLICY_UNDEFINED}（OPA 可达但策略未加载）、
+     * {@code OPA_UNAVAILABLE}（不可达/超时/非 2xx/不可解析），以及 {@code policyState} 键漂移
+     * （旧形态 —— 无法证明护栏说过话，宁 503 不 403）。</p>
+     *
+     * <p>存在意义（差距文档 D-B4-14/D-B4-18/D-B4-20/D-B4-21）：旧形态只有 {@code allow=false}，
+     * 把"护栏没接上"伪装成"策略拒绝"。B4-3c 补齐名合规的 {@code data_access} rego 后，
+     * 本判据即硬门开关：未评估态一律 503 {@code ECOS-SEC-501}（可告警、可重试），
+     * 真拒绝才 403。</p>
      */
-    public boolean guardrailUnconsulted() {
-        return "ABSENT".equals(opaState)
-                || opaState.contains("OPA_ERROR_FAIL_CLOSED")
-                || opaState.contains("OPA_UNAVAILABLE_FAIL_CLOSED");
+    public boolean guardrailUnevaluated() {
+        if (opaPolicyState() == null) return true;
+        return GuardrailDecisionContract.isUnevaluated(opaPolicyState());
+    }
+
+    /** 护栏是否给出<b>真实策略拒绝</b>（仅 {@code EVALUATED_DENY} 态 ⇒ 403）。 */
+    public boolean guardrailDenied() {
+        return GuardrailDecisionContract.STATE_DENY.equals(opaPolicyState);
     }
 
     /** 是否处于「无命中策略」态（导出通道叠加 {@code denyIfEmpty} 后据此 DENY）。 */

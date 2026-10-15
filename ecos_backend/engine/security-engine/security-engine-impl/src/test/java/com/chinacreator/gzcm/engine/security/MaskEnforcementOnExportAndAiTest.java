@@ -58,9 +58,10 @@ class MaskEnforcementOnExportAndAiTest {
 
         Map<String, Object> opaRes = new LinkedHashMap<>();
         opaRes.put("allow", true);
-        opaRes.put("policyRef", "ecos.data.access");
+        opaRes.put("policyState", OpaPolicyService.STATE_ALLOW);
+        opaRes.put("policyRef", "ecos." + OpaPolicyService.POLICY_DATA_ACCESS);
         opaRes.put("obligations", List.of());
-        when(opa.evaluate(anyString(), anyMap())).thenReturn(opaRes);
+        when(opa.evaluate(eq(OpaPolicyService.POLICY_DATA_ACCESS), anyMap())).thenReturn(opaRes);
 
         // 目录：staff_ref → STAFF_REF，amount → AMOUNT（两张登记列都走 mask）
         when(dao.masksForTable(anyString(), anyString())).thenReturn(List.of(

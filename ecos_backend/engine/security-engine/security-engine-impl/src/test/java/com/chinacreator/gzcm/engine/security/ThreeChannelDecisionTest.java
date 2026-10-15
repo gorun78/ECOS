@@ -66,12 +66,13 @@ class ThreeChannelDecisionTest {
         clsRes.put("blockedColumns", List.of("sensitive_col"));
         when(cls.getColumns(anyString(), anyString(), anyList())).thenReturn(clsRes);
 
-        // OPA 源：allow=true（正常放行）
+        // OPA 源：护栏已评估且放行（应答形态与 B4-3c 后的 OpaPolicyService 单源一致）
         Map<String, Object> opaRes = new LinkedHashMap<>();
         opaRes.put("allow", true);
-        opaRes.put("policyRef", "ecos.data.access");
+        opaRes.put("policyState", OpaPolicyService.STATE_ALLOW);
+        opaRes.put("policyRef", "ecos." + OpaPolicyService.POLICY_DATA_ACCESS);
         opaRes.put("obligations", List.of());
-        when(opa.evaluate(anyString(), anyMap())).thenReturn(opaRes);
+        when(opa.evaluate(eq(OpaPolicyService.POLICY_DATA_ACCESS), anyMap())).thenReturn(opaRes);
 
         // mask 源：目录无登记 → 空集
         when(dao.masksForTable(anyString(), anyString())).thenReturn(List.of());
@@ -124,10 +125,11 @@ class ThreeChannelDecisionTest {
     void aiChannelUsesDecideOpaDeny() {
         Map<String, Object> opaDeny = new LinkedHashMap<>();
         opaDeny.put("allow", false);
-        opaDeny.put("policyRef", "ecos.data.access");
+        opaDeny.put("policyState", OpaPolicyService.STATE_DENY);
+        opaDeny.put("policyRef", "ecos." + OpaPolicyService.POLICY_DATA_ACCESS);
         opaDeny.put("obligations", List.of(Map.of("obligation", "DENIED", "deniedReason", "GUARDRAIL_DENIED")));
         reset(opa);
-        when(opa.evaluate(anyString(), anyMap())).thenReturn(opaDeny);
+        when(opa.evaluate(eq(OpaPolicyService.POLICY_DATA_ACCESS), anyMap())).thenReturn(opaDeny);
 
         DecisionBundle b = svc.decide(asset(), DecisionBundle.Purpose.AI, ctx());
         assertEquals(false, b.opa().get("allow"), "AI 通道 OPA 拒绝必须显式透传 upstream");
