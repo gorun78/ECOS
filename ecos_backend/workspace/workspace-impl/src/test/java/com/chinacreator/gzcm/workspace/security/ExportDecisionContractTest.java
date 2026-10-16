@@ -37,7 +37,10 @@ import com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException;
  * <b>静默读到 null</b>，导出件随即退回"无证据"形态而不报错。因此这里做四件编译做不到的事：</p>
  * <ol>
  *   <li>{@link #bundleKeyNamesMatchSecurityEngineSource()} —— 直接读 security-engine 生产源文件，
- *       对键名字面量做双向核对（源文件找不到即失败，禁跳过）；</li>
+ *       对键名字面量做双向核对（源文件找不到即失败，禁跳过）。#142/B4-3d-5 起分两形态：
+ *       无单源常量的 bundle 键仍按字面量成对核对；RLS 执行契约面／护栏义务键改由
+ *       {@code assertReadThroughSingleSourceConstant} 三段核对（消费侧引常量 + 单源定义该字面量
+ *       + 消费侧代码位禁第二形态内联），覆盖面严于原单向字面量核对，不因形态迁移而放宽；</li>
  *   <li>{@link #exportPathIsWiredToTheSingleDecisionEntry()} /
  *       {@link #permissionScopeConstantCannotComeBack()} —— 把"必须走 /decision"和
  *       "不得再用常量自称权限范围"钉成源码级断言；</li>
@@ -79,6 +82,9 @@ class ExportDecisionContractTest {
     private static final String GUARDRAIL_CONTRACT_SRC =
             "ecos_backend/runtime/common-api/src/main/java/"
                     + "com/chinacreator/gzcm/common/security/guardrail/GuardrailDecisionContract.java";
+    private static final String RLS_EXECUTION_CONTRACT_SRC =
+            "ecos_backend/runtime/common-api/src/main/java/"
+                    + "com/chinacreator/gzcm/common/security/rls/RlsExecutionContract.java";
 
     /** 旧形态的权限自证常量（B4-3b 废除，出现即假绿回潮）。 */
     private static final String BANNED_SCOPE_CONSTANT = "same-pipeline-as-query";
@@ -109,12 +115,49 @@ class ExportDecisionContractTest {
                     "bundle 键 " + key + " 在 security 侧已消失（键名漂移）");
         }
 
-        // workspace 侧：读的就是这些字面量，缺一即静默 null（本断言让漂移变红而非静默降级）
-        for (String key : List.of("policyRefs", "predicateTemplate", "denyIfEmpty",
-                "obligations", "decisionId")) {
+        // workspace 侧读的就是这些键，缺一即静默 null（本断言让漂移变红而非静默降级）。
+        // #142/B4-3d-5 起分两形态，且**只准加严不准放宽**：
+        //   ① bundle 里尚无单源常量的键（policyRefs/decisionId）⇒ 仍按字面量成对核对；
+        //   ② RLS 执行契约面 / 护栏义务键 ⇒ 字面量唯一落点已搬进单源常量，消费侧只准引常量。
+        // 若因为形态换了就删掉第②类断言，键名漂移从此不可见＝把真门改成假门；
+        // 因此改成三段核对：消费侧引了该常量 + 单源把该常量定义成该字面量 + 消费侧代码位
+        // 不得再内联该字面量（第二形态回潮即红）。security 侧是否仍写该字面量由上面一段守住。
+        for (String key : List.of("policyRefs", "decisionId")) {
             assertTrue(consumerSrc.contains("\"" + key + "\""),
                     "ExportDecision 不再读取 bundle 键 " + key + "：两侧契约断裂");
         }
+        String rlsContractSrc = readRepoFile(RLS_EXECUTION_CONTRACT_SRC);
+        String guardrailContractSrc = readRepoFile(GUARDRAIL_CONTRACT_SRC);
+        String consumerCode = stripComments(consumerSrc);
+        assertReadThroughSingleSourceConstant(consumerCode, rlsContractSrc,
+                "KEY_PREDICATE_TEMPLATE", "predicateTemplate");
+        assertReadThroughSingleSourceConstant(consumerCode, rlsContractSrc,
+                "KEY_DENY_IF_EMPTY", "denyIfEmpty");
+        assertReadThroughSingleSourceConstant(consumerCode, guardrailContractSrc,
+                "KEY_OBLIGATIONS", "obligations");
+        assertReadThroughSingleSourceConstant(consumerCode, guardrailContractSrc,
+                "KEY_DENIED_REASON", "deniedReason");
+        assertReadThroughSingleSourceConstant(consumerCode, guardrailContractSrc,
+                "KEY_OBLIGATION", "obligation");
+        assertReadThroughSingleSourceConstant(consumerCode, guardrailContractSrc,
+                "OBLIGATION_WATERMARK", "watermark");
+    }
+
+    /**
+     * 单源常量形态核对（第②类）：三段任一不成立即红。
+     *
+     * <p>第 1 段防「消费侧改回自带字面量却没人发现」，第 2 段防「单源改名而消费侧静默读
+     * null」，第 3 段防「单源与内联字面量两套形态并存」。三段合起来的覆盖面严于 B4-3b
+     * 原断言（原断言只要求消费侧存在内联字面量）。</p>
+     */
+    private static void assertReadThroughSingleSourceConstant(String consumerCode, String contractSrc,
+            String constName, String wireKey) {
+        assertTrue(consumerCode.contains(constName),
+                "ExportDecision 未引单源常量 " + constName + "（" + wireKey + " 的读取面失控）");
+        assertTrue(contractSrc.contains(constName + " = \"" + wireKey + "\""),
+                "单源常量 " + constName + " 不再定义为 \"" + wireKey + "\"：线契约键名漂移");
+        assertFalse(consumerCode.contains("\"" + wireKey + "\""),
+                "ExportDecision 代码位内联 \"" + wireKey + "\" = 绕过单源的第二形态，漂移将静默失配");
     }
 
     @Test

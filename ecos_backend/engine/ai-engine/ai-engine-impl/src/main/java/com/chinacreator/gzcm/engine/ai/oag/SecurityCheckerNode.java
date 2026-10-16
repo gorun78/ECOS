@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.oag;
 
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,10 +94,12 @@ public class SecurityCheckerNode implements OagNode {
         }
 
         // 3. RLS — security-engine 行级过滤条件；不可用/DENY 返回 "1=0" → 默认拒绝
+        //    #142/B4-3d-5（D-B4-24）：片段字面量与理由码单源于 RlsExecutionContract，
+        //    本节点只做分态消费，禁再手抄 "1=0" / 理由文案。
         String whereClause = securityEngineClient.applyRls(
                 ctx.getUserId(), ctx.getTenantId(), intent == null ? "default" : intent.toLowerCase(),
                 "oag_query", Map.of("tenantId", String.valueOf(ctx.getTenantId())));
-        if ("1=0".equals(whereClause)) {
+        if (RlsExecutionContract.DENY_CLAUSE.equals(whereClause)) {
             ctx.setSecurityPassed(false);
             ctx.setSecurityBlockReason("security-engine 不可用或 RLS 拒绝（默认 DENY）");
             ctx.setStatus("BLOCKED");
@@ -113,10 +116,10 @@ public class SecurityCheckerNode implements OagNode {
         if (whereClause == null || whereClause.isBlank()) {
             ctx.setSecurityPassed(false);
             ctx.setSecurityBlockReason("security-engine RLS 应答未给执行契约"
-                    + "（RLS_WHERE_CLAUSE_ABSENT，禁当成「无过滤」）");
+                    + "（" + RlsExecutionContract.REASON_WHERE_ABSENT + "）");
             ctx.setStatus("BLOCKED");
             securityEngineClient.auditQuietly(ctx.getUserId(), "oag:rls", "apply",
-                    "DENIED:RLS_WHERE_CLAUSE_ABSENT");
+                    "DENIED:" + RlsExecutionContract.REASON_WHERE_ABSENT_CODE);
             log.warn("[OAG:{}] RLS 应答缺执行契约 → BLOCKED（不再按空串放行）userId={}",
                     ctx.getTraceId(), ctx.getUserId());
             return ctx;
@@ -127,7 +130,9 @@ public class SecurityCheckerNode implements OagNode {
 
         Map<String, Object> rlsFilters = new LinkedHashMap<>();
         rlsFilters.put("tenantId", ctx.getTenantId());
-        rlsFilters.put("whereClause", whereClause);
+        // 键名单源（#142/B4-3d-5，差距 D-B4-24）：上下文里的片段键与 /rls/apply 应答执行面同名，
+        // 用契约常量而非字面量，避免下游按第三套键名读数。
+        rlsFilters.put(RlsExecutionContract.KEY_WHERE_CLAUSE, whereClause);
         ctx.setRlsFilters(rlsFilters);
         ctx.setClsColumns(new LinkedHashMap<>());
 

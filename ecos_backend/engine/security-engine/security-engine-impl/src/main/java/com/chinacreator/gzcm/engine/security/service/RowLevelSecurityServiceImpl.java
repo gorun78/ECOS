@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.security.service;
 
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.security.dao.RowLevelSecurityDao;
 import com.chinacreator.gzcm.engine.security.rls.PredicateBinding;
 import com.chinacreator.gzcm.engine.security.rls.RlsPredicate;
@@ -70,13 +71,15 @@ public class RowLevelSecurityServiceImpl {
 
         Map<String, Object> result = new LinkedHashMap<>();
         // ── 新契约（C.2.2 / D 章 DecisionBundle.rls）：参数化谓词 ──
-        result.put("predicate", predicate.toMap());
+        // 键面单源（#142/B4-3d-5，差距 D-B4-24）：生产者与四消费者读写同一份键常量，
+        // 不存在「生产者改键、消费者不知」的漂移空间。
+        result.put(RlsExecutionContract.KEY_PREDICATE_SEGMENT, predicate.toMap());
         // ── 兼容旧契约（D.5.3）：condition 标注 deprecated，仅供日志核对，禁用于拼 SQL ──
         result.put("condition", predicate.legacyConditionForLog());
         result.put("conditionDeprecated", true);
         // ── 执行契约（D-B4-17）：可直接绑定 PreparedStatement 的片段 + 同序参数 ──
         result.putAll(rendered.toMap());
-        result.put("denyIfEmpty", predicate.isDenyIfEmpty());
+        result.put(RlsExecutionContract.KEY_DENY_IF_EMPTY, predicate.isDenyIfEmpty());
         // 非空 = 调用方可据此绑定 PreparedStatement 参数（W30 params 恒空已关闭）
         result.put("params", new LinkedHashMap<String, Object>(
                 bindingNameValueMap(predicate.getBindings(), subjectCtx)));

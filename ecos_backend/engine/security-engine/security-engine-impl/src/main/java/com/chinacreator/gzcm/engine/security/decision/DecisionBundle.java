@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.security.decision;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -200,15 +201,21 @@ public final class DecisionBundle {
         return columns == null ? List.of() : policyNames(columns.get("policyRefs"));
     }
 
-    /** 合并谓词模板（{@code 1=1} = 无限制；{@code 1=0} = 拒绝；其余 = 需下推）。 */
+    /** 合并谓词模板（{@code 1=1} = 无限制；{@code 1=0} = 拒绝；其余 = 需下推）。
+     *
+     * <p>#142/B4-3d-5（差距 D-B4-24）：键名取 {@link RlsExecutionContract} 常量——
+     * bundle 的 rls 段与 {@code /rls/apply} 的 data 段同键同形，两侧共用一份键面。
+     * 注意本方法是<b>表达面</b>读数；执行面（可直接绑参的片段）由消费端经
+     * {@code RlsExecutionContract.read} 取得，禁以本值拼 SQL。</p>
+     */
     public String rlsPredicateTemplate() {
-        Object t = rls == null ? null : rls.get("predicateTemplate");
+        Object t = rls == null ? null : rls.get(RlsExecutionContract.KEY_PREDICATE_TEMPLATE);
         return t == null ? null : String.valueOf(t);
     }
 
     /** 无匹配策略时是否拒绝（{@code denyIfEmpty}，导出通道必须消费）。 */
     public boolean rlsDenyIfEmpty() {
-        return rls != null && Boolean.TRUE.equals(rls.get("denyIfEmpty"));
+        return rls != null && Boolean.TRUE.equals(rls.get(RlsExecutionContract.KEY_DENY_IF_EMPTY));
     }
 
     /**

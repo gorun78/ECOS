@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -99,6 +100,43 @@ class BusinessDomainWriteArchTest {
     private static final Set<String> DDL_INVENTORY_FILES = Set.of(
             "gateway/src/test/java/com/chinacreator/gzcm/gateway/WAgentDdlShapeComplianceTest.java");
 
+    /**
+     * <b>第三类登记面（2026-10-16 追加，#142/B4-3d-5）</b>：安全裁决护栏／夹具测试的表名字面量。
+     *
+     * <p><b>触发场景</b>：本目标前序批次（#142/B4-1、B4-3a、B4-3c、CLS 契约批）在六枚
+     * 非 data-engine 测试类里以 {@code ecos_dw.*} 真实受保护表名做裁决输入或策略夹具常量
+     * （RLS 谓词渲染、OPA 部门范围、决策数据域载荷、AI fail-closed、CLS 列面契约、V246 策略单源夹具）。
+     * 全量跑 {@code data-engine-impl} 才暴露：此前各批只按 {@code -Dtest} 选择性跑本域用例，
+     * 从未跑过这枚横切门禁 ⇒ <b>本目标自己制造的假绿漏点</b>，非并行会话变更。</p>
+     *
+     * <p><b>为什么登记而非放宽扫描面</b>：C.3.6 禁的是「跨引擎直读写业务域表」，判定依据是<b>建连与读写载体</b>，
+     * 不是表名字符串本身。这六枚文件全链路零 JDBC/MyBatis 连接，表名只进纯内存裁决与 mock 键
+     * （同 {@link #KNOWN_PREEXISTING} 里 F06-04 护栏族先例）。两种更弱的修法一律不采用：
+     * ① 把扫描面收窄到 {@code src/main} ⇒ 整个 test 树从此免检，给越权写开了口子；
+     * ② 只按文件名登记 ⇒ 同名文件任意扩面都跟着豁免。本登记面按<b>相对路径逐字命中</b>，
+     * 并由 {@code guardrailFixtureRegistryStillLiveAndConnectionFree} 反向守卫：
+     * 登记文件不存在、或已无 {@code ecos_dw.} 字面量（死豁免）、<b>或出现任一建连/读写载体</b>
+     * （豁免当场撤销、门禁变红）。</p>
+     */
+    private static final Set<String> GUARDRAIL_FIXTURE_FILES = Set.of(
+            "engine/ai-engine/ai-engine-impl/src/test/java/com/chinacreator/gzcm/engine/ai/security/AiRlsFailClosedTest.java",
+            "engine/security-engine/security-engine-impl/src/test/java/com/chinacreator/gzcm/engine/security/rolechannel/V246SeedFixtures.java",
+            "engine/security-engine/security-engine-impl/src/test/java/com/chinacreator/gzcm/engine/security/rolechannel/OpaDeptTest.java",
+            "engine/security-engine/security-engine-impl/src/test/java/com/chinacreator/gzcm/engine/security/rolechannel/DecisionDataScopePayloadTest.java",
+            "engine/security-engine/security-engine-impl/src/test/java/com/chinacreator/gzcm/engine/security/RlsWhereClauseRenderTest.java",
+            "runtime/common-api/src/test/java/com/chinacreator/gzcm/common/security/cls/ColumnSurfaceContractTest.java");
+
+    /**
+     * 登记面内<b>禁止</b>出现的建连／读写载体。出现任一即视为真实越权读写，豁免失效（见
+     * {@code guardrailFixtureRegistryStillLiveAndConnectionFree}）。刻意用全限定/精确形态，
+     * 不吃 {@code flyway} 这类出现在文档路径里的宽松词，避免反向守卫自己误判。
+     */
+    private static final Pattern CONNECTION_BEARING = Pattern.compile(
+            "java\\.sql\\.(Connection|Statement|PreparedStatement|DriverManager)"
+                    + "|javax\\.sql\\.DataSource|DataSource"
+                    + "|JdbcTemplate|SqlSession|DriverManager"
+                    + "|createStatement|prepareStatement|@Mapper\\b");
+
     @Test
     @DisplayName("非 data-engine 模块禁 ecos_dw 限定表名直读直查（Java + XML 同扫）")
     void noEcosDwOutsideDataEngine() throws IOException {
@@ -125,6 +163,9 @@ class BusinessDomainWriteArchTest {
                 // Windows 分隔符归一：repoRoot/repo 均为绝对 FileSystem 绝对路径，relativize 会带 \
                 String rel = backend.relativize(f).toString().replace('\\', '/');
                 if (rel.startsWith(DATA_ENGINE_IMPL)) continue;  // 合法目标侧
+                // 第三类登记面：相对路径逐字命中才豁免（严于文件名白名单），
+                // 其「纯字面量、零建连」前提由 guardrailFixtureRegistryStillLiveAndConnectionFree 守卫
+                if (GUARDRAIL_FIXTURE_FILES.contains(rel)) continue;
                 FileCheck.check(rel, name, f, violations);
                 if (!violations.isEmpty()
                         && violations.get(violations.size() - 1).startsWith(name + ":")) {
@@ -166,6 +207,38 @@ class BusinessDomainWriteArchTest {
     @DisplayName("DDL 形态门禁登记表豁免同样不得沦为死豁免或越权扩面")
     void ddlInventoryExemptionStillLive() throws IOException {
         assertExemptionStillLive(DDL_INVENTORY_FILES, DDL_INVENTORY_TOKEN);
+    }
+
+    @Test
+    @DisplayName("安全护栏夹具登记面：文件在位、字面量仍在用、且全篇零建连零读写载体")
+    void guardrailFixtureRegistryStillLiveAndConnectionFree() throws IOException {
+        Path backend = repoRoot().resolve("ecos_backend");
+        List<String> stale = new ArrayList<>();
+        for (String rel : GUARDRAIL_FIXTURE_FILES) {
+            Path f = backend.resolve(Path.of(rel.replace('/', java.io.File.separatorChar)));
+            if (!Files.isRegularFile(f)) {
+                stale.add(rel + " :: 登记文件已不存在（豁免须随之删除）");
+                continue;
+            }
+            String text = Files.readString(f, StandardCharsets.UTF_8);
+            int literals = 0;
+            for (String raw : text.split("\\R", -1)) {
+                String t = raw.trim();
+                if (t.isEmpty() || t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")) continue;
+                if (ECOS_DW_QUALIFIED.matcher(raw).find()) literals++;
+            }
+            // 死豁免反向守卫：字面量一旦不再出现，该行就该从登记面里删掉，不许留空壳豁免
+            if (literals == 0) {
+                stale.add(rel + " :: 无任何 ecos_dw 字面量（死豁免，登记应随之删除）");
+            }
+            // 越权扩面反向守卫：登记的前提是「纯字面量夹具」，出现建连/读写载体即刻撤销豁免
+            Matcher carrier = CONNECTION_BEARING.matcher(text);
+            if (carrier.find()) {
+                stale.add(rel + " :: 出现建连/读写载体「" + carrier.group()
+                        + "」（C.3.6 豁免只覆盖纯字面量夹具，真实读写必须撤销豁免）");
+            }
+        }
+        assertTrue(stale.isEmpty(), "安全护栏夹具登记面失真:\n" + String.join("\n", stale));
     }
 
     /**

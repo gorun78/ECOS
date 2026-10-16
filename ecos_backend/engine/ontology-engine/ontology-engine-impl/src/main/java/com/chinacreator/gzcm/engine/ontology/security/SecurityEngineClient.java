@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ontology.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -60,11 +61,11 @@ public class SecurityEngineClient {
     private static final String PHONE_REGEX = "^(\\d{3})\\d{4}(\\d{4})$";
     private static final String IDCARD_REGEX = "^(\\d{4})\\d{10}(\\d{4})$";
 
-    /** RLS 拒绝片段（与 security-engine {@code RlsPredicateRenderer.DENY_CLAUSE} 同值）。 */
-    public static final String DENY_CLAUSE = "1=0";
+    /** RLS 拒绝片段（单源别名，值来自 {@link RlsExecutionContract#DENY_CLAUSE}，禁本类内联字面量）。 */
+    public static final String DENY_CLAUSE = RlsExecutionContract.DENY_CLAUSE;
 
-    /** RLS 恒真片段（裁决明确"不限制行"），与"未给谓词"分态。 */
-    public static final String ALLOW_ALL_CLAUSE = "1=1";
+    /** RLS 恒真片段（裁决明确"不限制行"），与"未给谓词"分态；同上为单源别名。 */
+    public static final String ALLOW_ALL_CLAUSE = RlsExecutionContract.ALLOW_ALL_CLAUSE;
 
     private static final Map<String, String> MASKING_RULES;
     static {
@@ -129,21 +130,26 @@ public class SecurityEngineClient {
      *
      * <p><b>#142/B4-3c-2 收口（D-B4-17）</b>：本方法此前在应答缺 {@code whereClause}
      * 字段时返回<b>空串</b>，而调用方把空串当"无行级限制"直接返回原行集 —— 即
-     * 字段名漂移（生产者从未发过该字段）= 全量渗漏。现统一为：</p>
-     * <ul>
-     *   <li>缺字段/空白 → {@link #DENY_CLAUSE}（漂移即拒绝，不再冒充"无过滤"）；</li>
-     *   <li>片段含 {@code ?}（需绑参）→ {@link #DENY_CLAUSE}：本引擎的 RLS 消费面是
-     *       <b>响应侧内存过滤</b>，没有参数绑定通道，宁 DENY 不猜值拼接
-     *       （IR05；登记见差距文档，参数化下推需 DAO 侧改造）；</li>
-     *   <li>{@code 1=1} 恒真 → 原样返回（调用方据此"不限制行"，与"未给谓词"分态）。</li>
-     * </ul>
+     * 字段名漂移（生产者从未发过该字段）= 全量渗漏。</p>
+     *
+     * <p><b>#142/B4-3d-5 单源化（差距 D-B4-24）</b>：上述收口在本类里是
+     * <b>第二套手抄解析</b>（自读 {@code "whereClause"} 字面量 + 自判 {@code '?'}）。
+     * 现改为委托 {@link RlsExecutionContract#read}：四道构造期不变量（缺片段／
+     * {@code ?} 与参数个数不符／参数含 {@code null}／仍含 {@code :name}）由单源一次做完，
+     * 本通道再叠加自己的形态约束 {@link RlsExecutionContract.Execution#rejectForUnbindableChannel}
+     * ——本引擎的 RLS 消费面是<b>响应侧内存过滤</b>、无参数绑定通道，含 {@code ?}
+     * 的片段宁 DENY 不猜值拼接（IR05；参数化下推需 DAO 侧改造，已登记）。</p>
+     *
+     * <p><b>对外形态不变</b>：返回值仍是 WHERE 片段字符串，
+     * 拒绝/漂移/不可绑定 → {@link #DENY_CLAUSE}，恒真 → 原样返回（调用方据此"不限制行"）。
+     * "security 进程不可用"在本通道仍被折叠成 {@code 1=0}（与 §4.5.4 的分态要求有差距，
+     * 登记为 D-B4-26 余项；单源已提供 {@code State.UNAVAILABLE} 与 data-engine 的落地样板）。</p>
      *
      * @param entityType 实体类型
      * @param table      表名
      * @param filters    过滤条件键值
      * @return WHERE 条件片段；拒绝/漂移/不可绑定 → {@code "1=0"}
      */
-    @SuppressWarnings("unchecked")
     public String applyRls(String entityType, String table, Map<String, Object> filters) {
         if (serviceRestTemplate == null) {
             log.debug("SecurityEngineClient.applyRls: RestTemplate 未注入，DENY");
@@ -158,22 +164,15 @@ public class SecurityEngineClient {
                 body.put("filters", filters);
             }
             Map<String, Object> resp = postJson("/api/v1/security/rls/apply", body);
-            if (resp == null || resp.get("data") == null) return DENY_CLAUSE;
-            Object dataObj = resp.get("data");
-            if (!(dataObj instanceof Map)) return DENY_CLAUSE;
-            Map<String, Object> data = (Map<String, Object>) dataObj;
-            Object whereObj = data.get("whereClause");
-            if (whereObj == null || String.valueOf(whereObj).isBlank()) {
-                log.warn("SecurityEngineClient.applyRls DENY（应答缺 whereClause，禁当\"无过滤\"）: table={}", table);
+            RlsExecutionContract.Execution exec = RlsExecutionContract
+                    .read(resp == null ? null : resp.get("data"), "table=" + table)
+                    .rejectForUnbindableChannel("table=" + table);
+            if (!exec.usable()) {
+                log.warn("SecurityEngineClient.applyRls DENY: table={} state={} reason={}",
+                        table, exec.state(), exec.reason());
                 return DENY_CLAUSE;
             }
-            String clause = String.valueOf(whereObj).trim();
-            if (clause.indexOf('?') >= 0) {
-                log.warn("SecurityEngineClient.applyRls DENY（片段需绑参，本引擎无参数通道）: table={} clause={}",
-                        table, clause);
-                return DENY_CLAUSE;
-            }
-            return clause;
+            return exec.clause();
         } catch (Exception e) {
             log.warn("SecurityEngineClient.applyRls DENY: entityType={} table={} reason={}",
                     entityType, table, e.getMessage());

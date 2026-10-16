@@ -115,11 +115,10 @@ public class WorkspaceSecurityEngineClient {
             if (filters != null && !filters.isEmpty()) body.put("filters", filters);
             Map<String, Object> resp = postJson("/api/v1/security/rls/apply", body);
             Object data = resp == null ? null : resp.get("data");
-            if (!(data instanceof Map)) {
-                return RlsFilter.deny(RlsFilter.DRIFT_ABSENT + " entity=" + entityType
-                        + "（应答无 data 段）", true, List.of());
-            }
-            RlsFilter filter = RlsFilter.fromData((Map<String, Object>) data, entityType);
+            // #142/B4-3d-5（D-B4-24）：外层形态漂移（无 data 段 / 非 Map）同样交给单源归一，
+            // 禁在本类再手写一份拒绝理由——read() 对此返 REASON_NO_DATA_SEGMENT 拒绝态。
+            RlsFilter filter = RlsFilter.fromData(
+                    data instanceof Map ? (Map<String, Object>) data : null, entityType);
             if (filter.denied()) {
                 log.warn("WorkspaceSecurityEngineClient.applyRls DENY: entityType={} reason={}",
                         entityType, filter.denyReason());

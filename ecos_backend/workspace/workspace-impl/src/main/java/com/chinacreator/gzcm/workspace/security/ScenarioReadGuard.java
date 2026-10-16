@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.workspace.security;
 
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException;
 import org.springframework.stereotype.Component;
@@ -74,7 +75,7 @@ public class ScenarioReadGuard {
             throw new ForbiddenOperationException("scenario:read:" + entityCode,
                     Map.of("reason", rls.denyReason() == null
                                     ? DENY_PREDICATE + "（security-engine RLS 明确拒绝）" : rls.denyReason(),
-                            "unresolvedBindings", rls.unresolvedBindings()));
+                            RlsExecutionContract.KEY_UNRESOLVED_BINDINGS, rls.unresolvedBindings()));
         }
         // 有非平凡谓词但该读端点的数据载体不接 SQL 谓词 —— fail-closed，禁超发
         throw new ForbiddenOperationException("scenario:read:" + entityCode,

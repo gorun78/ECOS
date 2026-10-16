@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ontology.security;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.UnauthorizedException;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -165,8 +166,9 @@ public class OntologySecurityInterceptor {
                     Map.of("tenant", "default"));
             // #142/B4-3c-2（D-B4-17）：空串/缺失是「应答未发执行契约」，不是「无行级限制」——
             // 旧写法在此 return rows（fail-open，全行渗漏）。三态：恒真才不限制行。
+            // #142/B4-3d-5（D-B4-24）：漂移理由取单源常量，禁在本类手抄第二份文案。
             if (where == null || where.isBlank()) {
-                return denyUntrustedWhere("RLS_WHERE_CLAUSE_ABSENT(应答未发执行契约，禁当成「无过滤」)");
+                return denyUntrustedWhere(RlsExecutionContract.REASON_WHERE_ABSENT);
             }
             if (isDenyClause(where)) return new ArrayList<>();
             if (isAllowAllClause(where)) return rows;
@@ -223,24 +225,16 @@ public class OntologySecurityInterceptor {
     /**
      * 拒绝态判定（#142/B4-3c-2）：剥括号与空白后等于 {@code 1=0}。
      * 生产者的合并逻辑给每个策略段加括号，字面量相等会把 {@code "(1=0)"} 误判成非平凡谓词。
+     * <p><b>#142/B4-3d-5（D-B4-24）</b>：归一化口径与片段字面量单源于
+     * {@link RlsExecutionContract}，本类不再自写第二套剥括号实现。</p>
      */
     private static boolean isDenyClause(String clause) {
-        return SecurityEngineClient.DENY_CLAUSE.equals(normalizeClause(clause));
+        return RlsExecutionContract.DENY_CLAUSE.equals(RlsExecutionContract.normalize(clause));
     }
 
     /** 恒真态判定：{@code 1=1}＝裁决明确"不限制行"，与"未给谓词"（漂移）分态。 */
     private static boolean isAllowAllClause(String clause) {
-        return SecurityEngineClient.ALLOW_ALL_CLAUSE.equals(normalizeClause(clause));
-    }
-
-    private static String normalizeClause(String clause) {
-        if (clause == null) return "";
-        StringBuilder sb = new StringBuilder(clause.length());
-        for (int i = 0; i < clause.length(); i++) {
-            char c = clause.charAt(i);
-            if (c != '(' && c != ')' && !Character.isWhitespace(c)) sb.append(c);
-        }
-        return sb.toString();
+        return RlsExecutionContract.ALLOW_ALL_CLAUSE.equals(RlsExecutionContract.normalize(clause));
     }
 
     /**

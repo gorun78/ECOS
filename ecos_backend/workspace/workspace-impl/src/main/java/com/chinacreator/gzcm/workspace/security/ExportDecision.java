@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.workspace.security;
 
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -91,12 +92,16 @@ public final class ExportDecision {
 
         List<String> rlsRefs = names(rls.get("policyRefs"));
         List<String> clsRefs = names(columns.get("policyRefs"));
-        String template = rls.get("predicateTemplate") == null ? NO_TEMPLATE
-                : String.valueOf(rls.get("predicateTemplate"));
+        // 键面单源（#142/B4-3d-5，差距 D-B4-24）：本类只读契约常量，不再手抄键名字面量。
+        // 诚实边界（差距 D-B4-24b，本批不改性）：导出通道的谓词分态仍取自「表达面」
+        // predicateTemplate 而非执行面 whereClause —— 键名已收单源，面选择仍待收口。
+        String template = rls.get(RlsExecutionContract.KEY_PREDICATE_TEMPLATE) == null
+                ? NO_TEMPLATE
+                : String.valueOf(rls.get(RlsExecutionContract.KEY_PREDICATE_TEMPLATE));
         // denyIfEmpty 缺省按 true：security 侧 RlsPredicate 恒置 true，字段缺失只可能是漂移，
         // 漂移时宁可拒绝也不放行（与 namesOf 的"读不到出处不当成放行"同一口径）
-        boolean denyIfEmpty = rls.get("denyIfEmpty") == null
-                || Boolean.TRUE.equals(rls.get("denyIfEmpty"));
+        boolean denyIfEmpty = rls.get(RlsExecutionContract.KEY_DENY_IF_EMPTY) == null
+                || Boolean.TRUE.equals(rls.get(RlsExecutionContract.KEY_DENY_IF_EMPTY));
         // B4-3c：护栏态串优先（policyState 是「策略拒绝 / 护栏没说话」分态的唯一依据，
         // 词表单源在 runtime 底座 GuardrailDecisionContract，禁本类内联比对字符串）
         String policyState = GuardrailDecisionContract.stateOf(opa);
@@ -174,11 +179,11 @@ public final class ExportDecision {
     private static String opaState(Map<String, Object> opa, boolean allow) {
         if (opa.isEmpty()) return "ABSENT";
         if (allow) return "allow";
-        Object obligations = opa.get("obligations");
+        Object obligations = opa.get(GuardrailDecisionContract.KEY_OBLIGATIONS);
         if (obligations instanceof List<?> list) {
             for (Object item : list) {
-                if (item instanceof Map<?, ?> m && m.get("deniedReason") != null) {
-                    return "deny:" + m.get("deniedReason");
+                if (item instanceof Map<?, ?> m && m.get(GuardrailDecisionContract.KEY_DENIED_REASON) != null) {
+                    return "deny:" + m.get(GuardrailDecisionContract.KEY_DENIED_REASON);
                 }
             }
         }
@@ -187,17 +192,19 @@ public final class ExportDecision {
 
     /** OPA obligations 中的水印项（三种书写形态兼容；无 ⇒ {@link #WATERMARK_NOT_ISSUED}）。 */
     private static String watermarkOf(Map<String, Object> opa) {
-        Object raw = opa.get("obligations");
+        Object raw = opa.get(GuardrailDecisionContract.KEY_OBLIGATIONS);
         if (raw instanceof List<?> list) {
             for (Object item : list) {
                 if (item instanceof Map<?, ?> m) {
-                    Object wm = m.get("watermark");
+                    Object wm = m.get(GuardrailDecisionContract.OBLIGATION_WATERMARK);
                     if (wm != null && !String.valueOf(wm).isBlank()) return String.valueOf(wm);
-                    if ("watermark".equals(String.valueOf(m.get("obligation")))) {
+                    if (GuardrailDecisionContract.OBLIGATION_WATERMARK
+                            .equals(String.valueOf(m.get(GuardrailDecisionContract.KEY_OBLIGATION)))) {
                         Object value = m.get("value");
                         if (value != null && !String.valueOf(value).isBlank()) return String.valueOf(value);
                     }
-                } else if (item instanceof String s && s.toLowerCase().startsWith("watermark")) {
+                } else if (item instanceof String s
+                        && s.toLowerCase().startsWith(GuardrailDecisionContract.OBLIGATION_WATERMARK)) {
                     return s;
                 }
             }

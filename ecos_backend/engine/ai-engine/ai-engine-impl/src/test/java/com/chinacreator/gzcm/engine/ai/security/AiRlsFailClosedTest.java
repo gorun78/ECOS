@@ -10,6 +10,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -40,6 +41,11 @@ import static org.mockito.Mockito.when;
  *
  * <p>本引擎无 RLS 参数绑定通道（差距文档登记 NOT_WIRED），故含 {@code ?} 的片段一律拒绝 ——
  * 这是"宁 DENY 不超发"（IR05），不是漏实现。</p>
+ *
+ * <p>#142/B4-3d-5（差距 D-B4-24）：读数改由 {@code RlsExecutionContract.read} 单源完成，
+ * 本类因此覆盖<b>两类</b>拒绝码 —— 单源的构造期不变量（缺片段／arity／null 参数／占位符残留）
+ * 与本通道叠加的形态约束（{@code RLS_PARAM_UNBINDABLE}）。用例刻意把两者分开断言，
+ * 防止将来任一层的口径变化被另一层的断言掩盖。</p>
  */
 class AiRlsFailClosedTest {
 
@@ -108,10 +114,18 @@ class AiRlsFailClosedTest {
     }
 
     @Test
-    @DisplayName("片段需绑参（含 ?）→ 1=0：AI 侧无参数通道，宁 DENY 不猜值拼接（IR05）")
+    @DisplayName("片段需绑参（含 ?，参数成对）→ 1=0：AI 侧无参数通道，宁 DENY 不猜值拼接（IR05）")
     void parameterizedFragmentDeniesWithoutBindChannel() {
         assertEquals(AiSecurityEngineClient.DENY_CLAUSE,
-                applyRls(Map.of("whereClause", "(org_id = ? AND owner_id = ?)")));
+                applyRls(Map.of("whereClause", "(org_id = ? AND owner_id = ?)",
+                        "whereParams", List.of("o-1", "u-42"))));
+    }
+
+    @Test
+    @DisplayName("片段含 ? 而参数缺位 → 1=0：单源 arity 不变量先拒，禁把未绑定的 ? 拼进 SQL")
+    void placeholderWithoutPairedParamsDenies() {
+        assertEquals(AiSecurityEngineClient.DENY_CLAUSE,
+                applyRls(Map.of("whereClause", "(org_id = ?)")));
     }
 
     @Test
@@ -148,13 +162,24 @@ class AiRlsFailClosedTest {
     }
 
     @Test
-    @DisplayName("OrThrow：片段需绑参 → 抛 RLS_PARAM_UNBINDABLE")
+    @DisplayName("OrThrow：片段需绑参且参数成对 → 抛 RLS_PARAM_UNBINDABLE（通道级拒绝）")
     void orThrowSurfacesUnbindablePredicate() {
         AiSecurityEngineClient.SecurityResponseUnparsableException e = assertThrows(
                 AiSecurityEngineClient.SecurityResponseUnparsableException.class,
-                () -> applyRlsOrThrow(Map.of("whereClause", "org_id = ?")));
+                () -> applyRlsOrThrow(Map.of("whereClause", "org_id = ?",
+                        "whereParams", List.of("o-1"))));
         assertTrue(e.getMessage().contains("RLS_PARAM_UNBINDABLE"),
                 "异常需指名不可绑定码: " + e.getMessage());
+    }
+
+    @Test
+    @DisplayName("OrThrow：片段含 ? 而参数缺位 → 抛 RLS_PARAM_ARITY_MISMATCH（单源不变量先于通道判）")
+    void orThrowSurfacesArityMismatchBeforeChannelCheck() {
+        AiSecurityEngineClient.SecurityResponseUnparsableException e = assertThrows(
+                AiSecurityEngineClient.SecurityResponseUnparsableException.class,
+                () -> applyRlsOrThrow(Map.of("whereClause", "org_id = ?")));
+        assertTrue(e.getMessage().contains("RLS_PARAM_ARITY_MISMATCH"),
+                "片段与参数不成对必须由单源先拒绝，不得留到通道层再判: " + e.getMessage());
     }
 
     @Test

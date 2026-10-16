@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.ai.security;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import org.slf4j.Logger;
@@ -216,17 +217,30 @@ public class AiSecurityEngineClient {
      * <p><b>#142/B4-3c-2 收口（D-B4-17）</b>：应答缺 {@code whereClause} 时此前返回
      * <b>空串</b>，调用方（{@code SecurityCheckerNode}）把空串当"无策略但放行"写入上下文；
      * 加上本引擎的 RLS 面从未把片段真正下推到 SQL（差距文档登记 NOT_WIRED），
-     * 空串形态等于把"应答漂移"伪装成"无行级限制"。现在缺字段/空白/需绑参（含 {@code ?}，
-     * 本引擎无参数通道）一律 {@code "1=0"} = 拒绝。</p>
+     * 空串形态等于把"应答漂移"伪装成"无行级限制"。</p>
+     *
+     * <p><b>#142/B4-3d-5 单源化（差距 D-B4-24）</b>：本类的 {@code whereClauseOf} +
+     * {@code requireRenderableRls} 是键面的<b>第三套手抄解析</b>（自读字面量、自判 {@code '?'}、
+     * 自写理由文案）。现全部委托 {@link RlsExecutionContract}：四道构造期不变量由单源一次做完，
+     * 本通道再叠加 {@link RlsExecutionContract.Execution#rejectForUnbindableChannel}
+     * ——OAG 只把片段写进上下文、没有参数绑定通道，含 {@code ?} 的片段宁 DENY 不猜值拼接（IR05）。</p>
+     *
+     * <p><b>对外形态不变</b>：缺字段/空白/需绑参/不可用/DENY 一律 {@code "1=0"}；
+     * 恒真 {@code 1=1}＝不限制行（与"未给谓词"分态）。</p>
      *
      * @return whereClause；恒真 {@code 1=1}＝不限制行；缺字段/空白/不可绑定/不可用/DENY → {@code "1=0"}
      */
-    @SuppressWarnings("unchecked")
     public String applyRls(String userId, String tenantId, String entityType,
                            String tableName, Map<String, Object> filters) {
         try {
-            return requireRenderableRls(whereClauseOf(postJson(PATH_RLS_APPLY,
-                    rlsRequestBody(userId, tenantId, entityType, tableName, filters)), entityType));
+            RlsExecutionContract.Execution exec = rlsExecution(userId, tenantId, entityType,
+                    tableName, filters);
+            if (!exec.usable()) {
+                log.warn("AiSecurityEngineClient.applyRls DENY: entityType={} state={} reason={}",
+                        entityType, exec.state(), exec.reason());
+                return DENY_CLAUSE;
+            }
+            return exec.clause();
         } catch (Exception e) {
             log.warn("AiSecurityEngineClient.applyRls DENY: entityType={} reason={}", entityType, e.getMessage());
             return DENY_CLAUSE;
@@ -237,21 +251,27 @@ public class AiSecurityEngineClient {
      * RLS 的<b>不吞异常</b>版本：obligations 执行必须区分"无策略"与"security 不可用"，
      * 后者整条结果丢弃并 FAIL_CLOSED（F06-02 要点 2，禁"先返回再说明"）。
      *
-     * <p>应答缺 {@code whereClause} / 片段需绑参同样抛
+     * <p>传输异常原样上抛（＝不可用态）；应答不可解析/缺片段/片段不可绑定同样抛
      * {@link SecurityResponseUnparsableException}（而不是返回空串冒充"无行级限制"），
-     * 由调用方走 FAIL_CLOSED。</p>
+     * 由调用方走 FAIL_CLOSED。理由码取单源，禁本类自写文案。</p>
      */
     public String applyRlsOrThrow(String userId, String tenantId, String entityType,
                                   String tableName, Map<String, Object> filters) throws Exception {
-        return requireRenderableRls(whereClauseOf(postJson(PATH_RLS_APPLY,
-                rlsRequestBody(userId, tenantId, entityType, tableName, filters)), entityType), true);
+        RlsExecutionContract.Execution exec = rlsExecution(userId, tenantId, entityType,
+                tableName, filters);
+        if (!exec.usable()) {
+            throw new SecurityResponseUnparsableException(
+                    exec.reason() == null ? "rls/apply 返回不可执行形态: entityType=" + entityType
+                            : exec.reason());
+        }
+        return exec.clause();
     }
 
-    /** 拒绝片段（与 security-engine {@code RlsPredicateRenderer.DENY_CLAUSE} 同值）。 */
-    public static final String DENY_CLAUSE = "1=0";
+    /** 拒绝片段（单源别名，值来自 {@link RlsExecutionContract#DENY_CLAUSE}，禁本类内联字面量）。 */
+    public static final String DENY_CLAUSE = RlsExecutionContract.DENY_CLAUSE;
 
-    /** 恒真片段＝裁决明确"不限制行"（与非平凡谓词、与拒绝皆分态）。 */
-    public static final String ALLOW_ALL_CLAUSE = "1=1";
+    /** 恒真片段＝裁决明确"不限制行"（与非平凡谓词、与拒绝皆分态）；同上为单源别名。 */
+    public static final String ALLOW_ALL_CLAUSE = RlsExecutionContract.ALLOW_ALL_CLAUSE;
 
     private Map<String, Object> rlsRequestBody(String userId, String tenantId, String entityType,
                                                String tableName, Map<String, Object> filters) {
@@ -264,42 +284,20 @@ public class AiSecurityEngineClient {
         return body;
     }
 
-    /** 取 {@code data.whereClause} 原文；应答不可解析 → {@code null}。 */
-    @SuppressWarnings("unchecked")
-    private static String whereClauseOf(Map<String, Object> resp, String entityType) throws Exception {
-        if (resp == null || !(resp.get("data") instanceof Map)) {
-            throw new SecurityResponseUnparsableException("rls/apply 响应不可解析: entityType=" + entityType);
-        }
-        Object whereObj = ((Map<String, Object>) resp.get("data")).get("whereClause");
-        return whereObj == null ? null : String.valueOf(whereObj);
-    }
-
     /**
-     * 执行契约合规化：只有「不需要绑定参数的片段」（{@code 1=0}/{@code 1=1}/裸文本条件）
-     * 才能被本引擎消费——本引擎没有把 RLS 参数带进 SQL 的通道，含 {@code ?} 的片段
-     * 若放行就是超发（IR05）。
+     * 单源读数 + 本通道形态约束（无参数绑定通道 ⇒ 需绑参的片段转拒绝）。
      *
-     * @param strict {@code true}（OrThrow 版）时不可用形态抛异常；{@code false} 时返回 {@code "1=0"}
+     * <p>传输/寻址异常照抛，由 {@link #applyRls} 折叠成 {@code 1=0}、
+     * {@link #applyRlsOrThrow} 原样上抛 —— 后者保留 §4.5.4 的"不可用 ≠ 无权限"分态。</p>
      */
-    private String requireRenderableRls(String clause, boolean strict) throws Exception {
-        if (clause == null || clause.isBlank()) {
-            String reason = "RLS_WHERE_CLAUSE_ABSENT(应答未发执行契约，禁当成「无过滤」)";
-            if (strict) throw new SecurityResponseUnparsableException(reason);
-            log.warn("AiSecurityEngineClient.applyRls DENY: {}", reason);
-            return DENY_CLAUSE;
-        }
-        String trimmed = clause.trim();
-        if (trimmed.indexOf('?') >= 0) {
-            String reason = "RLS_PARAM_UNBINDABLE(片段需绑参，AI 侧无参数通道): clause=" + trimmed;
-            if (strict) throw new SecurityResponseUnparsableException(reason);
-            log.warn("AiSecurityEngineClient.applyRls DENY: {}", reason);
-            return DENY_CLAUSE;
-        }
-        return trimmed;
-    }
-
-    private String requireRenderableRls(String clause) throws Exception {
-        return requireRenderableRls(clause, false);
+    private RlsExecutionContract.Execution rlsExecution(String userId, String tenantId, String entityType,
+                                                        String tableName, Map<String, Object> filters)
+            throws Exception {
+        Map<String, Object> resp = postJson(PATH_RLS_APPLY,
+                rlsRequestBody(userId, tenantId, entityType, tableName, filters));
+        String subject = "entityType=" + entityType;
+        return RlsExecutionContract.read(resp == null ? null : resp.get("data"), subject)
+                .rejectForUnbindableChannel(subject);
     }
 
     // ═══════════════ CLS（默认 DENY 空集） ═══════════════

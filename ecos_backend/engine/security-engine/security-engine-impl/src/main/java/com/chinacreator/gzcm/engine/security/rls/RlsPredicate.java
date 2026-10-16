@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.security.rls;
 
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -70,15 +72,21 @@ public final class RlsPredicate {
         return out;
     }
 
-    /** REST 序列化（D 章 DecisionBundle.rls 子结构）。 */
+    /** REST 序列化（D 章 DecisionBundle.rls 子结构）。
+     *
+     * <p>#142/B4-3d-5（差距 D-B4-24）：键名取 {@link RlsExecutionContract} 的表达面常量。
+     * 本段是<b>表达面</b>（模板文本 + 具名绑定），只供日志/校验核对；
+     * 拼 SQL 必须读同契约的执行契约面（{@code whereClause}/{@code whereParams}），
+     * 禁在此处另立一套"可读但不可执行"的口径。</p>
+     */
     public Map<String, Object> toMap() {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("predicateTemplate", predicateTemplate);
+        m.put(RlsExecutionContract.KEY_PREDICATE_TEMPLATE, predicateTemplate);
         List<Map<String, Object>> bs = new ArrayList<>();
         for (PredicateBinding b : bindings) bs.add(b.toMap());
         m.put("bindings", bs);
         m.put("combine", combine);
-        m.put("denyIfEmpty", denyIfEmpty);
+        m.put(RlsExecutionContract.KEY_DENY_IF_EMPTY, denyIfEmpty);
         return m;
     }
 

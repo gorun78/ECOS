@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.security.rls;
 
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -44,11 +46,14 @@ import java.util.regex.Pattern;
  */
 public final class RlsPredicateRenderer {
 
-    /** 拒绝形态的 WHERE 片段：与消费者既有约定同值（拼进 WHERE 即零行，默认 DENY）。 */
-    public static final String DENY_CLAUSE = "1=0";
+    /**
+     * 拒绝形态的 WHERE 片段（#142/B4-3d-5 起为单源别名，值来自
+     * {@link RlsExecutionContract#DENY_CLAUSE}；拼进 WHERE 即零行，默认 DENY）。
+     */
+    public static final String DENY_CLAUSE = RlsExecutionContract.DENY_CLAUSE;
 
     /** 恒真片段（{@code rls-finance-all} 的"全量可见"策略形态）；供消费者分态判定。 */
-    public static final String ALLOW_ALL_CLAUSE = "1=1";
+    public static final String ALLOW_ALL_CLAUSE = RlsExecutionContract.ALLOW_ALL_CLAUSE;
 
     /** 占位符识别与 {@link RlsPredicateValidator#PLACEHOLDER} 同形（{@code :name}）。 */
     private static final Pattern PLACEHOLDER = Pattern.compile(":(\\w+)");
@@ -77,14 +82,18 @@ public final class RlsPredicateRenderer {
             return !denied() && ALLOW_ALL_CLAUSE.equals(normalize(whereClause));
         }
 
-        /** REST 序列化（{@code /rls/apply} 与 {@code DecisionBundle.rls} 共用）。 */
+        /** REST 序列化（{@code /rls/apply} 与 {@code DecisionBundle.rls} 共用）。
+         *
+         * <p>#142/B4-3d-5（D-B4-24）：键名一律取 {@link RlsExecutionContract} 常量——
+         * 生产者与消费者读的是同一份键面，不存在"生产者改键、消费者不知"的漂移空间。</p>
+         */
         public Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("whereClause", whereClause);
-            m.put("whereParams", whereParams);
-            m.put("unresolvedBindings", unresolvedBindings);
-            m.put("noPolicyMatched", noPolicyMatched);
-            if (denyReason != null) m.put("rlsDenyReason", denyReason);
+            m.put(RlsExecutionContract.KEY_WHERE_CLAUSE, whereClause);
+            m.put(RlsExecutionContract.KEY_WHERE_PARAMS, whereParams);
+            m.put(RlsExecutionContract.KEY_UNRESOLVED_BINDINGS, unresolvedBindings);
+            m.put(RlsExecutionContract.KEY_NO_POLICY_MATCHED, noPolicyMatched);
+            if (denyReason != null) m.put(RlsExecutionContract.KEY_RLS_DENY_REASON, denyReason);
             return m;
         }
 
@@ -183,15 +192,15 @@ public final class RlsPredicateRenderer {
                 List.of(), null, false);
     }
 
-    /** 归一化：剥括号与空白（与 workspace 侧 ExportDecision 的分态口径一致）。 */
+    /**
+     * 归一化：剥括号与空白（与 workspace 侧 ExportDecision 的分态口径一致）。
+     *
+     * <p>#142/B4-3d-5（D-B4-24）：口径单源于 {@link RlsExecutionContract#normalize}——
+     * 生产者与四通道必须用同一个"什么算同一条谓词"的判据，否则 {@code "(1=1)"} 在一侧是恒真、
+     * 在另一侧是非平凡谓词，分态就又分裂了。</p>
+     */
     public static String normalize(String clause) {
-        if (clause == null) return "";
-        StringBuilder sb = new StringBuilder(clause.length());
-        for (int i = 0; i < clause.length(); i++) {
-            char c = clause.charAt(i);
-            if (c != '(' && c != ')' && !Character.isWhitespace(c)) sb.append(c);
-        }
-        return sb.toString();
+        return RlsExecutionContract.normalize(clause);
     }
 
     /** 供消费者复用的"名字集合稳定序"辅助（测试与序列化用）。 */

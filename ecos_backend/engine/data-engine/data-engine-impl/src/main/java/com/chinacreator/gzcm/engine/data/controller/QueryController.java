@@ -1,7 +1,9 @@
 package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.data.QueryExecutionService;
+import com.chinacreator.gzcm.engine.data.security.RlsPredicateBinder;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,15 +52,23 @@ public class QueryController {
     /**
      * 执行 SQL 查询。
      * 架构规则 2.4：若 body 传 tableName，查询前调 security-engine RLS 注入行级过滤。
-     * 默认 DENY：RLS 调用失败/返回空 condition → 403 拒绝，不降级放行。
+     * 默认 DENY：RLS 调用失败/裁决拒绝 → 拒绝，不降级放行。
      *
-     * <p>详细设计-01 W31（P0）：不再把 security 返回的<b>裸 RLS 条件字符串</b>直接
-     * 拼进 SQL（旧的「包裹用户 SQL + 追加 WHERE 裸条件」形态已删除，见门禁
-     * {@code RlsInjectionGuardArchTest}）。改为消费 security-engine 的<b>参数化谓词</b>
-     * （C.2.2）——{@code predicateTemplate} 已在策略写入期经 {@code RlsPredicateValidator}
-     * 白名单校验（禁 SQL 关键字/拼接语义），其 {@code :name} 占位符并入 {@code params}，
-     * 由执行层统一参数化解析；只把 <code>用户 intent SQL</code> 包进子查询，不拼接任何
-     * 客户端/策略原始条件串。</p>
+     * <p><b>#142/B4-3d-5 收口（差距 D-B4-24／§4.5.4 分态 D-B4-26）</b>：本通道此前读的是
+     * {@code /rls/apply} 应答的<b>表达面</b> {@code predicate.predicateTemplate} + {@code :name}
+     * 占位符，而另三通道（页面／本体／AI）读<b>执行契约面</b> {@code whereClause} + {@code ?}
+     * ——同源不同口径。危害不是写法差异，而是<b>绕过了渲染器的拒绝归一</b>：上下文未解析时
+     * 表达面的 {@code params} 带 {@code null}，本通道会把它当绑定值下推（{@code col = NULL}
+     * 语义为「未知」，却表现为「该用户没有数据」，把 D-B4-23 伪装成正常空集）；恒真策略
+     * （{@code 1=1}＝明确不限制行）则被本通道判成「无有效谓词」直接 403。</p>
+     *
+     * <p>现在读数一律经 {@link RlsExecutionContract#read} 单源，并按其四态分流：
+     * {@code ALLOW_ALL}＝放行且不拼过滤；{@code FILTERED}＝片段经 {@link RlsPredicateBinder}
+     * 改写为本引擎的命名参数形态，值只走 {@code PreparedStatement} 通道（IR05，
+     * 门禁见 {@code QueryExecutorBindingTest}）；{@code DENIED}＝403 且不泄露存在性；
+     * {@code UNAVAILABLE}＝503 {@code ECOS-SEC-501}，与「无权限」分态（§4.5.4 降级矩阵
+     * 「security-engine 不可用 → 503 DENY」，与 {@code DecisionController} 的 fail-closed
+     * 出口同形）。裸 RLS 条件字符串拼接的旧形态仍禁止（{@code RlsInjectionGuardArchTest}）。</p>
      */
     @PostMapping("/execute")
     public ApiResponse<Map<String, Object>> execute(@RequestBody Map<String, Object> body,
@@ -76,45 +86,43 @@ public class QueryController {
                 return ApiResponse.badRequest("数据源 ID 和 SQL 不能为空");
             }
 
-            // ── 架构规则 2.4: RLS 行级过滤接入（参数化谓词，W30/W31）──
+            // ── 架构规则 2.4: RLS 行级过滤接入（执行契约单源 + 四态分流，D-B4-24）──
             if (tableName != null && !tableName.isEmpty()) {
                 String userId = UserContext.getCurrentUserId();
                 if (userId == null) {
                     userId = "anonymous";
                 }
 
-                Map<String, Object> rls = applyRls(tableName, userId, authHeader);
-                if (rls == null) {
-                    // 默认 DENY：RLS 不可用 → 拒绝，不降级放行
-                    log.warn("RLS 不可用，默认 DENY: tableName={}, userId={}", tableName, userId);
-                    return ApiResponse.forbidden("RLS 行级过滤不可用，查询被拒绝（默认 DENY）");
+                RlsExecutionContract.Execution rls = applyRls(tableName, userId, authHeader);
+                if (rls.unavailable()) {
+                    // §4.5.4：不可用与「无权限」分态——503 可告警、可重试，禁冒充 403「没权限」
+                    log.warn("RLS 服务不可用，默认 DENY（503 分态）: tableName={}, userId={}, reason={}",
+                            tableName, userId, rls.reason());
+                    return ApiResponse.error(503, ERROR_SEC_UNAVAILABLE,
+                            "行级安全服务不可用，查询被拒绝（默认 DENY，非「无权限」）");
                 }
-
-                @SuppressWarnings("unchecked")
-                Map<String, Object> pred = (Map<String, Object>) rls.get("predicate");
-                if (pred == null) {
-                    return ApiResponse.forbidden("RLS 未返回参数化谓词，查询被拒绝（默认 DENY）");
-                }
-                @SuppressWarnings("unchecked")
-                Map<String, Object> predParams = (Map<String, Object>) rls.get("params");
-
-                String template = (String) pred.get("predicateTemplate");
-                boolean denyIfEmpty = !Boolean.FALSE.equals(pred.get("denyIfEmpty"));
-                if (template == null || template.isBlank() || "1=1".equals(template.trim())) {
-                    // 无有效谓词：denyIfEmpty（默认）→ DENY，不泄露存在性。
-                    log.warn("RLS 无有效谓词, denyIfEmpty={}, 默认 DENY: tableName={}, userId={}",
-                            denyIfEmpty, tableName, userId);
+                if (rls.denied()) {
+                    log.warn("RLS 裁决拒绝，默认 DENY: tableName={}, userId={}, reason={}, noPolicyMatched={}",
+                            tableName, userId, rls.reason(), rls.noPolicyMatched());
                     return ApiResponse.forbidden("无匹配的行级安全策略，访问被拒绝（默认 DENY）");
                 }
-
-                // 谓词占位符并入 params（:name → 值），执行层统一参数化解析；不拼接裸条件串。
-                if (predParams != null) {
-                    params.putAll(predParams);
+                if (rls.allowAll()) {
+                    // 恒真＝裁决明确「不限制行」，与「应答没给谓词」是两个态（后者已在上两分支拒绝）
+                    log.info("RLS 裁决恒真（不限制行），本查询不追加行过滤: tableName={}, userId={}",
+                            tableName, userId);
+                } else {
+                    RlsPredicateBinder.Bound bound =
+                            RlsPredicateBinder.toNamedForm(rls.clause(), rls.params(), params);
+                    if (!bound.ok()) {
+                        log.warn("RLS 片段不可安全绑定，默认 DENY: tableName={}, userId={}, reason={}",
+                                tableName, userId, bound.reason());
+                        return ApiResponse.forbidden("行级安全谓词无法安全绑定，查询被拒绝（默认 DENY）");
+                    }
+                    params.putAll(bound.namedParams());
+                    sql = wrapWithRlsPredicate(sql, bound.template());
+                    log.info("RLS 参数化谓词已注入: tableName={}, userId={}, bindings={}",
+                            tableName, userId, bound.namedParams().size());
                 }
-                // 仅把「用户 intent SQL」包进子查询；WHERE 段 = 写期经 RlsPredicateValidator
-                // 白名单校验的谓词模板（只含列名/占位符，无客户端值），绑定值经 params 参数化。
-                sql = wrapWithRlsPredicate(sql, template);
-                log.info("RLS 参数化谓词已注入: tableName={}, userId={}, template={}", tableName, userId, template);
             }
 
             // 大表查询保护：ExecutorService 超时保护 (30秒)
@@ -143,13 +151,18 @@ public class QueryController {
     }
 
     /**
-     * 调 security-engine RLS apply 端点获取<b>参数化谓词</b>。
-     * 架构规则 2.1：引擎间只调 REST。2.4 第 6 条：RLS 不可用 → 返回 null（调用方默认 DENY）。
+     * 调 security-engine RLS apply 端点，经 {@link RlsExecutionContract} 单源读回执行契约。
+     * 架构规则 2.1：引擎间只调 REST。2.4 第 6 条：不可用 → {@link RlsExecutionContract.State#UNAVAILABLE} 态
+     * （由调用方转 503 DENY），禁再返回 {@code null} 让调用方把「连不上」猜成某一种拒绝。
      *
-     * @return RLS {@code data} 载荷（含 {@code predicate}/{@code params}），null 表示不可用（DENY）。
+     * @return 永不为 {@code null} 的 {@link RlsExecutionContract.Execution}
      */
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> applyRls(String tableName, String userId, String authHeader) {
+    private RlsExecutionContract.Execution applyRls(String tableName, String userId, String authHeader) {
+        String rlsUrl = resolveRlsApplyUrl();
+        if (rlsUrl == null) {
+            // 寻址失败属「安全服务不可达」，不是策略结论（§4.5.4 分态）
+            return RlsExecutionContract.Execution.unavailable("端点寻址失败（resolver 缺失或 route-manifest 未登记 sysman）");
+        }
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -158,31 +171,29 @@ public class QueryController {
                 headers.set("Authorization", authHeader);
             }
 
-            String rlsUrl = resolveRlsApplyUrl();
-            if (rlsUrl == null) {
-                log.error("RLS 端点寻址失败（默认 DENY）: tableName={}, userId={}", tableName, userId);
-                return null;
-            }
             Map<String, Object> rlsRequest = Map.of("tableName", tableName, "userId", userId);
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(rlsRequest, headers);
 
             Map<String, Object> response = restTemplate.postForObject(rlsUrl, entity, Map.class);
             if (response == null) {
-                log.error("RLS apply 返回空响应: tableName={}, userId={}", tableName, userId);
-                return null;
+                return RlsExecutionContract.Execution.unavailable("apply 返回空响应");
             }
             Object code = response.get("code");
             if (code == null || !"0".equals(code.toString())) {
-                log.error("RLS apply 业务失败: code={}, message={}", code, response.get("message"));
-                return null;
+                // security 侧业务失败（含 RlsController 兜底的 internalError）：不是策略结论，
+                // 按不可用态处理，禁把「安全服务报错」读成「用户无权限」
+                return RlsExecutionContract.Execution.unavailable(
+                        "apply 业务失败 code=" + code + ", message=" + response.get("message"));
             }
-            Object data = response.get("data");
-            return data instanceof Map ? (Map<String, Object>) data : null;
+            return RlsExecutionContract.read(response.get("data"), "table=" + tableName);
         } catch (Exception e) {
             log.error("RLS apply REST 调用失败: tableName={}, userId={}, error={}", tableName, userId, e.getMessage());
-            return null; // 默认 DENY
+            return RlsExecutionContract.Execution.unavailable("REST 调用失败: " + e.getMessage());
         }
     }
+
+    /** 不可用态的对外错误码（与 {@code DecisionController}、gateway 既有口径同值）。 */
+    static final String ERROR_SEC_UNAVAILABLE = "ECOS-SEC-501";
 
     /**
      * 详细设计-01 W32：security-engine 端点经 {@link ServiceEndpointResolver}（单源
