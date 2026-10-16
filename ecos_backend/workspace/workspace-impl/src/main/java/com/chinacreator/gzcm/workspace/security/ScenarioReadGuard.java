@@ -14,9 +14,12 @@ import java.util.Map;
  * 缺的是<b>接线</b>。场景域敏感读端点（graph / completeness / 认知四端点 /
  * runs / actions / decisions / 场景列表与详情）在返回前一律经过本守卫：</p>
  * <ul>
- *   <li>{@link #assertReadable(String)} —— 行级 RLS 裁决：security-engine <b>明确拒绝</b>
- *       （谓词 {@code "1=0"}）→ 403 PERMISSION_DENIED（铁律 §0.2.1 默认 DENY）；
- *       无策略（空串）→ 放行；<b>返回非平凡谓词而本端点无 SQL 下载体时同样拒绝</b>
+ *   <li>{@link #assertReadable(String)} —— 行级 RLS 裁决：取 {@link AbacQueryFilter#buildRowFilter}
+ *       的<b>执行契约三态</b>（#142/B4-3c-2 订正，旧写法按"片段是否为空串"分态 ⇒ fail-open）：
+ *       security-engine <b>明确拒绝</b>（谓词 {@code "1=0"}）、应答<b>未发执行契约</b>
+ *       （缺 {@code whereClause}/空白，{@link RlsFilter#DRIFT_ABSENT}）、参数不可完整绑定
+ *       三种形态一律 403 PERMISSION_DENIED（铁律 §0.2.1 默认 DENY）；
+ *       仅恒真 {@code 1=1}（裁决明确"不限制行"）放行；<b>返回非平凡谓词而本端点无 SQL 下载体时同样拒绝</b>
  *       （宁 DENY 不超发，禁把全量捞回内存再滤，违 F07-18-1 红线）；
  *       <b>security 进程不可用</b>（连不上/超时/5xx）不再落到本守卫的 403 分支——
  *       客户端单点转 503 {@code ECOS-SEC-501}（{@link
@@ -38,7 +41,7 @@ import java.util.Map;
 public class ScenarioReadGuard {
 
     /** security-engine 明确 DENY（含 4xx 鉴权失败与响应不可解析）时 {@link AbacQueryFilter} 的行过滤兜底谓词。 */
-    static final String DENY_PREDICATE = "1=0";
+    static final String DENY_PREDICATE = RlsFilter.DENY_CLAUSE;
 
     private final AbacQueryFilter abacQueryFilter;
 
@@ -49,23 +52,33 @@ public class ScenarioReadGuard {
     /**
      * 行级裁决咽喉：场景域读端点返回前必须调用。
      *
+     * <p><b>#142/B4-3c-2 分态订正（D-B4-17）</b>：判据由"片段字符串是否为空"改为
+     * {@link RlsFilter} 的三态 —— 旧写法把「应答未发执行契约」当成「无策略」直接放行
+     * （fail-open）。现在只有 security <b>明确给出恒真</b>（{@code 1=1}）才放行；
+     * 缺片段/空白/参数不可绑定等漂移形态在 {@link RlsFilter} 构造期已归一为拒绝，
+     * 与"策略 DENY"同走 403 分支，但 {@code details.denyReason} 保留两者区别供回查。</p>
+     *
      * @param entityCode security-engine 注册的实体编码（如 {@code scenario_graph}）
-     * @throws ForbiddenOperationException RLS 明确拒绝，或存在本端点无法下推的非平凡策略谓词
-     *                                     （fail-closed）；
+     * @throws ForbiddenOperationException RLS 明确拒绝 / 应答形态漂移，或存在本端点无法下推的
+     *                                     非平凡策略谓词（fail-closed）；
      * @throws com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException
      *         security-engine 进程不可用（503，独立态，不由本守卫转 403）
      */
     public void assertReadable(String entityCode) {
-        String predicate = abacQueryFilter.buildRowFilterCondition(entityCode);
-        if (predicate == null || predicate.isEmpty()) {
-            return; // 无策略登记 → 放行（security-engine 单源裁决，非本地推断）
+        RlsFilter rls = abacQueryFilter.buildRowFilter(entityCode);
+        if (rls.allowAll()) {
+            return; // 裁决明确「不限制行」（如 rls-finance-all）——不是"没给谓词"
         }
-        if (DENY_PREDICATE.equals(predicate)) {
-            throw new ForbiddenOperationException("scenario:read:" + entityCode);
+        if (rls.denied()) {
+            throw new ForbiddenOperationException("scenario:read:" + entityCode,
+                    Map.of("reason", rls.denyReason() == null
+                                    ? DENY_PREDICATE + "（security-engine RLS 明确拒绝）" : rls.denyReason(),
+                            "unresolvedBindings", rls.unresolvedBindings()));
         }
         // 有非平凡谓词但该读端点的数据载体不接 SQL 谓词 —— fail-closed，禁超发
         throw new ForbiddenOperationException("scenario:read:" + entityCode,
-                Map.of("reason", "RLS 谓词无法下推至本端点数据载体，默认 DENY"));
+                Map.of("reason", "RLS 谓词无法下推至本端点数据载体，默认 DENY",
+                        "predicate", rls.clause()));
     }
 
     /**

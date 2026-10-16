@@ -1,0 +1,182 @@
+package com.chinacreator.gzcm.engine.ai.security;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+/**
+ * #142/B4-3c-2（D-B4-17）—— AI 通道行级过滤 fail-closed 具名用例。
+ *
+ * <p><b>缺陷本体</b>：{@code AiSecurityEngineClient.applyRls} 在应答缺 {@code whereClause}
+ * 时返回空串，{@code SecurityCheckerNode} 把空串读成"无策略但放行"写入 OAG 上下文 ——
+ * 生产者字段名漂移被 AI 通道折叠成"全量可见"。收口后三态唯一：</p>
+ * <ul>
+ *   <li>{@code "1=0"}＝拒绝（含缺字段/空白/需绑参/不可用）；</li>
+ *   <li>{@code "1=1"}＝明确不限制行；</li>
+ *   <li>不含 {@code ?} 的裸文本谓词＝非平凡条件原样下传。</li>
+ * </ul>
+ *
+ * <p>{@code OrThrow} 变体承担 §4.7.2「不可用 ≠ 无权限」的分态：漂移/需绑参抛
+ * {@link AiSecurityEngineClient.SecurityResponseUnparsableException}，
+ * 传输异常原样上抛（调用方据此走 503 语义而不是 403）。</p>
+ *
+ * <p>本引擎无 RLS 参数绑定通道（差距文档登记 NOT_WIRED），故含 {@code ?} 的片段一律拒绝 ——
+ * 这是"宁 DENY 不超发"（IR05），不是漏实现。</p>
+ */
+class AiRlsFailClosedTest {
+
+    private static final String USER = "u-42";
+    private static final String TENANT = "t-7";
+    private static final String ENTITY = "oag_query";
+    private static final String TABLE = "ecos_dw.application_contract";
+
+    private static AiSecurityEngineClient client(Map<String, Object> resp) {
+        RestTemplate stub = mock(RestTemplate.class);
+        when(stub.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(respOf(resp));
+        return clientWith(stub);
+    }
+
+    private static AiSecurityEngineClient throwingClient(RuntimeException failure) {
+        RestTemplate stub = mock(RestTemplate.class);
+        when(stub.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+                .thenThrow(failure);
+        return clientWith(stub);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static ResponseEntity<Map> respOf(Map<String, Object> resp) {
+        return (ResponseEntity) ResponseEntity.ok(resp);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static AiSecurityEngineClient clientWith(RestTemplate stub) {
+        AiSecurityEngineClient client = new AiSecurityEngineClient(
+                "http://127.0.0.1:18081", 200, mock(ObjectProvider.class));
+        ReflectionTestUtils.setField(client, "restTemplate", stub);
+        return client;
+    }
+
+    private static String applyRls(Map<String, Object> data) {
+        return client(Map.of("data", data)).applyRls(USER, TENANT, ENTITY, TABLE, Map.of());
+    }
+
+    // ═══════════════ 吞异常版：漂移即 1=0，永不空串 ═══════════════
+
+    @Test
+    @DisplayName("应答缺 whereClause → 1=0（旧实现在此返回空串＝AI 通道裸放）")
+    void missingWhereClauseDeniesInsteadOfEmptyString() {
+        String clause = applyRls(Map.of("allowed", true, "matchedPolicies", 0));
+        assertEquals(AiSecurityEngineClient.DENY_CLAUSE, clause);
+        assertNotEquals("", clause, "空串＝「无行级限制」，正是 D-B4-17 的 fail-open 形态");
+    }
+
+    @Test
+    @DisplayName("whereClause 空白 / null 值 → 1=0")
+    void blankAndNullWhereClauseDeny() {
+        assertEquals(AiSecurityEngineClient.DENY_CLAUSE, applyRls(Map.of("whereClause", "  ")));
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("whereClause", null);
+        assertEquals(AiSecurityEngineClient.DENY_CLAUSE, applyRls(data));
+    }
+
+    @Test
+    @DisplayName("应答无 data / data 非 Map → 1=0（外层形态漂移同样拒绝）")
+    void malformedResponseDenies() {
+        assertEquals(AiSecurityEngineClient.DENY_CLAUSE,
+                client(Map.of("code", -1)).applyRls(USER, TENANT, ENTITY, TABLE, Map.of()));
+        assertEquals(AiSecurityEngineClient.DENY_CLAUSE,
+                client(Map.of("data", "1=1")).applyRls(USER, TENANT, ENTITY, TABLE, Map.of()));
+    }
+
+    @Test
+    @DisplayName("片段需绑参（含 ?）→ 1=0：AI 侧无参数通道，宁 DENY 不猜值拼接（IR05）")
+    void parameterizedFragmentDeniesWithoutBindChannel() {
+        assertEquals(AiSecurityEngineClient.DENY_CLAUSE,
+                applyRls(Map.of("whereClause", "(org_id = ? AND owner_id = ?)")));
+    }
+
+    @Test
+    @DisplayName("恒真 1=1 原样返回＝「明确不限制行」，与「未给谓词」分态")
+    void allowAllIsDistinctFromDrift() {
+        assertEquals(AiSecurityEngineClient.ALLOW_ALL_CLAUSE, applyRls(Map.of("whereClause", "1=1")));
+    }
+
+    @Test
+    @DisplayName("可绑定裸文本谓词原样下传（反向对照，证明上面的 1=0 非恒真）")
+    void literalPredicatePassesThrough() {
+        assertEquals("tenant_id = 't-7'", applyRls(Map.of("whereClause", "tenant_id = 't-7'")));
+    }
+
+    @Test
+    @DisplayName("security-engine 不可用（传输异常）→ 1=0，不折叠成放行")
+    void transportFailureDenies() {
+        assertEquals(AiSecurityEngineClient.DENY_CLAUSE,
+                throwingClient(new ResourceAccessException("connection refused"))
+                        .applyRls(USER, TENANT, ENTITY, TABLE, Map.of()));
+    }
+
+    // ═══════════════ 不吞异常版：漂移与不可用各自分态上抛 ═══════════════
+
+    @Test
+    @DisplayName("OrThrow：应答缺 whereClause → 抛不可解析（禁折叠成 DENY 语义）")
+    void orThrowSurfacesDriftAsUnparsable() {
+        AiSecurityEngineClient.SecurityResponseUnparsableException e = assertThrows(
+                AiSecurityEngineClient.SecurityResponseUnparsableException.class,
+                () -> client(Map.of("data", Map.of("allowed", true)))
+                        .applyRlsOrThrow(USER, TENANT, ENTITY, TABLE, Map.of()));
+        assertTrue(e.getMessage().contains("RLS_WHERE_CLAUSE_ABSENT"),
+                "异常需指名漂移码: " + e.getMessage());
+    }
+
+    @Test
+    @DisplayName("OrThrow：片段需绑参 → 抛 RLS_PARAM_UNBINDABLE")
+    void orThrowSurfacesUnbindablePredicate() {
+        AiSecurityEngineClient.SecurityResponseUnparsableException e = assertThrows(
+                AiSecurityEngineClient.SecurityResponseUnparsableException.class,
+                () -> applyRlsOrThrow(Map.of("whereClause", "org_id = ?")));
+        assertTrue(e.getMessage().contains("RLS_PARAM_UNBINDABLE"),
+                "异常需指名不可绑定码: " + e.getMessage());
+    }
+
+    @Test
+    @DisplayName("OrThrow：传输异常原样上抛＝「不可用」与「无权限」分态（§4.7.2）")
+    void orThrowKeepsUnavailabilitySeparateFromDeny() {
+        ResourceAccessException e = assertThrows(ResourceAccessException.class,
+                () -> throwingClient(new ResourceAccessException("connect timed out"))
+                        .applyRlsOrThrow(USER, TENANT, ENTITY, TABLE, Map.of()));
+        assertEquals("connect timed out", e.getMessage());
+    }
+
+    @Test
+    @DisplayName("OrThrow：恒真与非平凡谓词正常返回（正向对照）")
+    void orThrowReturnsRenderableForms() throws Exception {
+        assertEquals(AiSecurityEngineClient.ALLOW_ALL_CLAUSE,
+                applyRlsOrThrow(Map.of("whereClause", "1=1")));
+        assertEquals("status = 'ACTIVE'",
+                applyRlsOrThrow(Map.of("whereClause", "status = 'ACTIVE'")));
+    }
+
+    private static String applyRlsOrThrow(Map<String, Object> data) throws Exception {
+        return client(Map.of("data", data))
+                .applyRlsOrThrow(USER, TENANT, ENTITY, TABLE, Map.of());
+    }
+}

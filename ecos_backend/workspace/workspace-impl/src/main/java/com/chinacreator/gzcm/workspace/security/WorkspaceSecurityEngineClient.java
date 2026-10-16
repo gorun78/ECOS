@@ -76,14 +76,37 @@ public class WorkspaceSecurityEngineClient {
     // ═══════════════ RLS（默认 DENY "1=0"） ═══════════════
 
     /**
-     * POST /api/v1/security/rls/apply。
+     * POST /api/v1/security/rls/apply —— 只取 WHERE 片段的兼容出口（签名不变，只增语义）。
      *
-     * @return WHERE 片段；无策略=空串；security 明确 DENY="1=0"（调用方拼进 WHERE 后天然零行）
+     * <p><b>B4-3c-2 起的口径订正（原为 fail-open）</b>：本方法此前在应答缺
+     * {@code whereClause} 时返回<b>空串</b>，调用方把空串理解成"无策略所以不过滤"——
+     * 而 {@code whereClause} 在生产者侧从来没发过，于是页面通道的行级安全恒等于关闭
+     * （差距 D-B4-17）。收口后缺字段/空白一律是 {@link RlsFilter} 的拒绝形态 ⇒
+     * 这里返回 {@code "1=0"}。</p>
+     *
+     * <p><b>需要真正下推行过滤的调用方必须改用 {@link #applyRlsFilter}</b>：
+     * 片段是带 {@code ?} 的 JDBC 形态，只取片段不绑参数等于把半条 SQL 交给数据库。</p>
+     *
+     * @return WHERE 片段（含 {@code ?} 占位，禁单独使用）；恒真＝{@code "1=1"}；
+     *         security 明确 DENY / 无策略 / 应答漂移 = {@code "1=0"}（本方法永不返回空串）
      * @throws SecurityEngineUnavailableException security 进程不可用（连不上/超时/5xx），
      *         由 {@link #postJson} 单点转 503，禁冒充"无数据"
      */
-    @SuppressWarnings("unchecked")
     public String applyRls(String entityType, String tableName, Map<String, Object> filters) {
+        return applyRlsFilter(entityType, tableName, filters).clause();
+    }
+
+    /**
+     * 行级裁决的<b>完整执行契约</b>出口（#142/B4-3c-2 只增）：
+     * {@code whereClause} 片段 + 同序 {@code whereParams}，二者由 {@link RlsFilter}
+     * 成对承载并做绑定前不变量校验（缺片段/{@code ?} 数与参数数不符/参数含 null/
+     * 占位符残留 ⇒ 一律拒绝态）。
+     *
+     * @return 永不为 {@code null}；拒绝态见 {@link RlsFilter#denied()}
+     * @throws SecurityEngineUnavailableException security 进程不可用（503，独立态）
+     */
+    @SuppressWarnings("unchecked")
+    public RlsFilter applyRlsFilter(String entityType, String tableName, Map<String, Object> filters) {
         try {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("tableName", tableName);
@@ -91,15 +114,23 @@ public class WorkspaceSecurityEngineClient {
             body.put("entityType", entityType);
             if (filters != null && !filters.isEmpty()) body.put("filters", filters);
             Map<String, Object> resp = postJson("/api/v1/security/rls/apply", body);
-            if (resp == null || !(resp.get("data") instanceof Map)) return "1=0";
-            Object whereObj = ((Map<String, Object>) resp.get("data")).get("whereClause");
-            return whereObj == null ? "" : whereObj.toString();
+            Object data = resp == null ? null : resp.get("data");
+            if (!(data instanceof Map)) {
+                return RlsFilter.deny(RlsFilter.DRIFT_ABSENT + " entity=" + entityType
+                        + "（应答无 data 段）", true, List.of());
+            }
+            RlsFilter filter = RlsFilter.fromData((Map<String, Object>) data, entityType);
+            if (filter.denied()) {
+                log.warn("WorkspaceSecurityEngineClient.applyRls DENY: entityType={} reason={}",
+                        entityType, filter.denyReason());
+            }
+            return filter;
         } catch (SecurityEngineUnavailableException e) {
             throw e; // 可用性故障保持独立态上抛（§4.5.4 分态）
         } catch (Exception e) {
             log.warn("WorkspaceSecurityEngineClient.applyRls DENY: entityType={} reason={}",
                     entityType, e.getMessage());
-            return "1=0";
+            return RlsFilter.deny("RLS_APPLY_EXCEPTION(" + e.getMessage() + ")", true, List.of());
         }
     }
 

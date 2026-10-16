@@ -34,8 +34,11 @@ import static org.mockito.Mockito.when;
  *       {@code assertReadable}/{@code applyColumns}，且 Controller 层不得绕过守卫
  *       直连 {@link AbacQueryFilter}（单咽喉）；</li>
  *   <li>{@link #securityEngineFailureDeniesNotPasses()} 行为面：security-engine
- *       拒绝/不可用 → 403，非平凡谓词无 SQL 载体 → fail-closed 拒绝（宁 DENY 不超发），
- *       列裁决拒绝 → 空行集；空串=无策略才放行。</li>
+ *       拒绝/形态漂移 → 403，非平凡谓词无 SQL 载体 → fail-closed 拒绝（宁 DENY 不超发），
+ *       列裁决拒绝 → 空行集；<b>只有恒真 {@code 1=1}（裁决明确"不限制行"）才放行</b>。
+ *       #142/B4-3c-2（D-B4-17）把本类原判据「空串=无策略才放行」翻正为该口径：
+ *       空串的真实含义是应答未发执行契约（生产者从来没有 {@code whereClause} 字段），
+ *       当成"无行级限制"即是页面通道 fail-open 的根因。</li>
  * </ol>
  */
 class WorkspaceAbacWiringTest {
@@ -81,11 +84,13 @@ class WorkspaceAbacWiringTest {
         }
         assertTrue(bypass.isEmpty(), "F07-18 违规：Controller 绕过 ScenarioReadGuard 直连 AbacQueryFilter: " + bypass);
 
-        // 守卫单源：RLS/CLS 裁决只经 AbacQueryFilter（其内部再走 security-engine REST 客户端）
+        // 守卫单源：RLS/CLS 裁决只经 AbacQueryFilter（其内部再走 security-engine REST 客户端）。
+        // #142/B4-3c-2（D-B4-17）：行裁决必须走"片段+参数成对"的 buildRowFilter( 出口——
+        // 只取片段的 buildRowFilterCondition( 会把带 ? 的片段当半条 SQL 交出去，故在此钉死禁回归。
         String guard = stripComments(
                 Files.readString(pkgRoot.resolve("security/ScenarioReadGuard.java"), StandardCharsets.UTF_8));
-        assertTrue(guard.contains("abacQueryFilter.buildRowFilterCondition("),
-                "ScenarioReadGuard 行裁决必须委托 AbacQueryFilter（security-engine 单源）");
+        assertTrue(guard.contains("abacQueryFilter.buildRowFilter("),
+                "ScenarioReadGuard 行裁决必须委托 AbacQueryFilter.buildRowFilter（成对下推，security-engine 单源）");
         assertTrue(guard.contains("abacQueryFilter.filterColumns("),
                 "ScenarioReadGuard 列裁决必须委托 AbacQueryFilter（security-engine 单源）");
     }
@@ -97,9 +102,9 @@ class WorkspaceAbacWiringTest {
         WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
         ScenarioReadGuard guard = new ScenarioReadGuard(new AbacQueryFilter(client));
 
-        // (1) security-engine 不可用/拒绝 → "1=0" → 403，禁放行
-        when(client.applyRls(eq("scenario_graph"), eq("scenario_graph"), any()))
-                .thenReturn("1=0");
+        // (1) security-engine 明确拒绝 / 应答形态漂移 → 拒绝态 → 403，禁放行
+        when(client.applyRlsFilter(eq("scenario_graph"), eq("scenario_graph"), any()))
+                .thenReturn(RlsFilter.deny("RLS_NO_POLICY_MATCHED", true, List.of()));
         ForbiddenOperationException denied = assertThrows(ForbiddenOperationException.class,
                 () -> guard.assertReadable("scenario_graph"));
         assertEquals(403, denied.getHttpStatus());
@@ -107,12 +112,17 @@ class WorkspaceAbacWiringTest {
 
         // (2) 非平凡谓词而本端点无 SQL 下载体 → fail-closed 拒绝（宁 DENY 不超发，
         //     禁全量捞回内存再滤，F07-18-1 红线）
-        when(client.applyRls(anyString(), anyString(), any()))
-                .thenReturn("org_id = 'o-1' AND owner = 'u-1'");
+        when(client.applyRlsFilter(anyString(), anyString(), any())).thenReturn(RlsFilter.fromData(
+                Map.of("whereClause", "(org_id = ? AND owner = ?)",
+                        "whereParams", List.of("o-1", "u-1")), "scenario_run"));
         assertThrows(ForbiddenOperationException.class, () -> guard.assertReadable("scenario_run"));
 
-        // (3) 正向对照：空串=无策略登记 → 放行（DENY 用例不是恒抛造成的假通过）
-        when(client.applyRls(anyString(), anyString(), any())).thenReturn("");
+        // (3) 正向对照：恒真 1=1（裁决明确不限制行）→ 放行。
+        //     本条在 #142/B4-3c-2 翻正：原对照用的是「空串=无策略→放行」，而空串的真实含义
+        //     是"应答未发执行契约"（D-B4-17 的 fail-open 入口），故改为恒真形态；
+        //     缺字段/空白形态由 (1) 与 RlsFilterContractTest 钉为拒绝。
+        when(client.applyRlsFilter(anyString(), anyString(), any()))
+                .thenReturn(RlsFilter.unrestricted());
         assertDoesNotThrow(() -> guard.assertReadable("scenario_list"));
 
         // (4) CLS 拒绝/security 不可用 → 空行集

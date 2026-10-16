@@ -163,8 +163,13 @@ public class OntologySecurityInterceptor {
         try {
             String where = securityEngineClient.applyRls("ecos_ontology", tableName,
                     Map.of("tenant", "default"));
-            if (where == null || where.isEmpty()) return rows;
-            if ("1=0".equals(where)) return new ArrayList<>();
+            // #142/B4-3c-2（D-B4-17）：空串/缺失是「应答未发执行契约」，不是「无行级限制」——
+            // 旧写法在此 return rows（fail-open，全行渗漏）。三态：恒真才不限制行。
+            if (where == null || where.isBlank()) {
+                return denyUntrustedWhere("RLS_WHERE_CLAUSE_ABSENT(应答未发执行契约，禁当成「无过滤」)");
+            }
+            if (isDenyClause(where)) return new ArrayList<>();
+            if (isAllowAllClause(where)) return rows;
             // P0-2: 仅接受单条件白名单 (entity_code/tenant_id/domain_id/ontology_id/is_deleted/status)
             // 的 = / != 二 token; 其它情况 (AND/OR/NOT/LIKE/IN/多条件/未知字段名) 视为 RLS 表达式不可信
             // -> DENY (return empty). 多条件 SQL WHERE 推到 DAO 层做 (T17 落库时白名单字段名 + 参数绑定).
@@ -213,6 +218,29 @@ public class OntologySecurityInterceptor {
             }
             return new ArrayList<>();
         }
+    }
+
+    /**
+     * 拒绝态判定（#142/B4-3c-2）：剥括号与空白后等于 {@code 1=0}。
+     * 生产者的合并逻辑给每个策略段加括号，字面量相等会把 {@code "(1=0)"} 误判成非平凡谓词。
+     */
+    private static boolean isDenyClause(String clause) {
+        return SecurityEngineClient.DENY_CLAUSE.equals(normalizeClause(clause));
+    }
+
+    /** 恒真态判定：{@code 1=1}＝裁决明确"不限制行"，与"未给谓词"（漂移）分态。 */
+    private static boolean isAllowAllClause(String clause) {
+        return SecurityEngineClient.ALLOW_ALL_CLAUSE.equals(normalizeClause(clause));
+    }
+
+    private static String normalizeClause(String clause) {
+        if (clause == null) return "";
+        StringBuilder sb = new StringBuilder(clause.length());
+        for (int i = 0; i < clause.length(); i++) {
+            char c = clause.charAt(i);
+            if (c != '(' && c != ')' && !Character.isWhitespace(c)) sb.append(c);
+        }
+        return sb.toString();
     }
 
     /**

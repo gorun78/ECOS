@@ -59,6 +59,12 @@ public class SecurityEngineClient {
     private static final String PHONE_REGEX = "^(\\d{3})\\d{4}(\\d{4})$";
     private static final String IDCARD_REGEX = "^(\\d{4})\\d{10}(\\d{4})$";
 
+    /** RLS 拒绝片段（与 security-engine {@code RlsPredicateRenderer.DENY_CLAUSE} 同值）。 */
+    public static final String DENY_CLAUSE = "1=0";
+
+    /** RLS 恒真片段（裁决明确"不限制行"），与"未给谓词"分态。 */
+    public static final String ALLOW_ALL_CLAUSE = "1=1";
+
     private static final Map<String, String> MASKING_RULES;
     static {
         // 10+ 对，Map.of 上限 10 对，改用 HashMap
@@ -120,16 +126,27 @@ public class SecurityEngineClient {
     /**
      * 行级 RLS — 请求 security-engine 计算 WHERE 条件。
      *
+     * <p><b>#142/B4-3c-2 收口（D-B4-17）</b>：本方法此前在应答缺 {@code whereClause}
+     * 字段时返回<b>空串</b>，而调用方把空串当"无行级限制"直接返回原行集 —— 即
+     * 字段名漂移（生产者从未发过该字段）= 全量渗漏。现统一为：</p>
+     * <ul>
+     *   <li>缺字段/空白 → {@link #DENY_CLAUSE}（漂移即拒绝，不再冒充"无过滤"）；</li>
+     *   <li>片段含 {@code ?}（需绑参）→ {@link #DENY_CLAUSE}：本引擎的 RLS 消费面是
+     *       <b>响应侧内存过滤</b>，没有参数绑定通道，宁 DENY 不猜值拼接
+     *       （IR05；登记见差距文档，参数化下推需 DAO 侧改造）；</li>
+     *   <li>{@code 1=1} 恒真 → 原样返回（调用方据此"不限制行"，与"未给谓词"分态）。</li>
+     * </ul>
+     *
      * @param entityType 实体类型
      * @param table      表名
      * @param filters    过滤条件键值
-     * @return WHERE 条件字符串；security-engine 不可用 DENY 时返回 "1=0"
+     * @return WHERE 条件片段；拒绝/漂移/不可绑定 → {@code "1=0"}
      */
     @SuppressWarnings("unchecked")
     public String applyRls(String entityType, String table, Map<String, Object> filters) {
         if (serviceRestTemplate == null) {
             log.debug("SecurityEngineClient.applyRls: RestTemplate 未注入，DENY");
-            return "1=0";
+            return DENY_CLAUSE;
         }
         try {
             Map<String, Object> body = new LinkedHashMap<>();
@@ -140,17 +157,26 @@ public class SecurityEngineClient {
                 body.put("filters", filters);
             }
             Map<String, Object> resp = postJson("/api/v1/security/rls/apply", body);
-            if (resp == null || resp.get("data") == null) return "1=0";
+            if (resp == null || resp.get("data") == null) return DENY_CLAUSE;
             Object dataObj = resp.get("data");
-            if (!(dataObj instanceof Map)) return "1=0";
+            if (!(dataObj instanceof Map)) return DENY_CLAUSE;
             Map<String, Object> data = (Map<String, Object>) dataObj;
             Object whereObj = data.get("whereClause");
-            if (whereObj == null) return "";
-            return whereObj.toString();
+            if (whereObj == null || String.valueOf(whereObj).isBlank()) {
+                log.warn("SecurityEngineClient.applyRls DENY（应答缺 whereClause，禁当\"无过滤\"）: table={}", table);
+                return DENY_CLAUSE;
+            }
+            String clause = String.valueOf(whereObj).trim();
+            if (clause.indexOf('?') >= 0) {
+                log.warn("SecurityEngineClient.applyRls DENY（片段需绑参，本引擎无参数通道）: table={} clause={}",
+                        table, clause);
+                return DENY_CLAUSE;
+            }
+            return clause;
         } catch (Exception e) {
             log.warn("SecurityEngineClient.applyRls DENY: entityType={} table={} reason={}",
                     entityType, table, e.getMessage());
-            return "1=0";
+            return DENY_CLAUSE;
         }
     }
 

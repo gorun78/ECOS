@@ -8,9 +8,11 @@ import com.chinacreator.gzcm.engine.security.decision.SecurityDecisionService;
 import com.chinacreator.gzcm.engine.security.service.ColumnLevelSecurityServiceImpl;
 import com.chinacreator.gzcm.engine.security.service.OpaPolicyService;
 import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl;
+import com.chinacreator.gzcm.engine.security.rls.RlsSubjectContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,6 +46,8 @@ class ThreeChannelDecisionTest {
         svc = new SecurityDecisionService(rls, cls, opa, dao);
 
         // RLS 源：参数化策略（含 : 占位符 + bindings，禁裸拼）
+        // 执行契约段（whereClause/whereParams）= #142/B4-3c-2 D-B4-17 生产者新增字段，
+        // 本用例同时钉「bundle 必须把它透传给消费者」——消费者读不到它就等于不过滤。
         Map<String, Object> rlsRes = new LinkedHashMap<>();
         Map<String, Object> pred = new LinkedHashMap<>();
         pred.put("predicateTemplate", "(department_id = :userDeptId)");
@@ -58,7 +62,13 @@ class ThreeChannelDecisionTest {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("userDeptId", null);
         rlsRes.put("params", params);
-        when(rls.apply(anyString(), anyString())).thenReturn(rlsRes);
+        rlsRes.put("whereClause", "(department_id = ?)");
+        rlsRes.put("whereParams", List.of("dept-1"));
+        rlsRes.put("unresolvedBindings", List.of());
+        rlsRes.put("noPolicyMatched", false);
+        // B4-3c-2 起 decide() 走上下文形态的 apply（组织域/密级只服务端派生），
+        // 旧的 apply(table, userId) 只保留兼容入口，不再是裁决腿。
+        when(rls.apply(anyString(), any(RlsSubjectContext.class))).thenReturn(rlsRes);
 
         // CLS 源：allow 模式 2 列可读
         Map<String, Object> clsRes = new LinkedHashMap<>();
@@ -94,6 +104,18 @@ class ThreeChannelDecisionTest {
         assertNotNull(b.rls());
         assertEquals("(department_id = :userDeptId)", b.rls().get("predicateTemplate"));
         assertNotNull(b.rls().get("bindings"), "RLS 必须含参绑定，禁裸字符串");
+        // D-B4-17：裁决入口必须自带可执行片段，消费者不必再回读 /rls/apply（第二裁决腿）
+        assertEquals("(department_id = ?)", b.rls().get("whereClause"));
+        assertEquals(List.of("dept-1"), b.rls().get("whereParams"));
+        assertEquals(Boolean.FALSE, b.rls().get("noPolicyMatched"));
+        assertNull(b.rls().get("rlsDenyReason"));
+
+        // 主体属性只服务端派生：userId/tenantId 来自 DecisionContext，org 无单源时如实为 null
+        ArgumentCaptor<RlsSubjectContext> subject = ArgumentCaptor.forClass(RlsSubjectContext.class);
+        verify(rls).apply(eq("fc_project_period_fact"), subject.capture());
+        assertEquals("u1", subject.getValue().userId());
+        assertEquals("t1", subject.getValue().tenantId());
+        assertNull(subject.getValue().orgId(), "D-B4-23：现网无组织域单源，禁在裁决入口伪造 orgId");
 
         assertNotNull(b.columns());
         assertEquals("allow", b.columns().get("mode"));
@@ -166,5 +188,35 @@ class ThreeChannelDecisionTest {
                 () -> svc.decide(new AssetRef("public", null, null), DecisionBundle.Purpose.PAGE, ctx()));
         assertThrows(IllegalArgumentException.class,
                 () -> svc.decide(null, DecisionBundle.Purpose.PAGE, ctx()));
+    }
+
+    @Test
+    @DisplayName("7. RLS 源抛异常 → bundle.rls 发 1=0 拒绝片段（源异常不得表现为「没有 whereClause」）")
+    void rlsSourceFailureYieldsDenyShapeNotMissingField() {
+        reset(rls);
+        when(rls.apply(anyString(), any(RlsSubjectContext.class)))
+                .thenThrow(new RuntimeException("policy store down"));
+
+        DecisionBundle b = svc.decide(asset(), DecisionBundle.Purpose.PAGE, ctx());
+
+        assertEquals("1=0", b.rls().get("whereClause"),
+                "D-B4-17：异常态必须与正常态同形，否则消费者按「字段缺失」走放行分支");
+        assertEquals("RLS_SOURCE_ERROR", b.rls().get("rlsDenyReason"));
+        assertEquals(List.of(), b.rls().get("whereParams"));
+        assertEquals(Boolean.TRUE, b.rls().get("noPolicyMatched"));
+    }
+
+    @Test
+    @DisplayName("8. RLS 应答缺 predicate 段（键漂移）→ 兜底段仍给 1=0，禁「漂移=放行」")
+    void missingPredicateSegmentFallsBackToDeny() {
+        reset(rls);
+        when(rls.apply(anyString(), any(RlsSubjectContext.class))).thenReturn(new LinkedHashMap<>());
+
+        DecisionBundle b = svc.decide(asset(), DecisionBundle.Purpose.EXPORT, ctx());
+
+        assertEquals("1=0", b.rls().get("whereClause"));
+        assertEquals("RLS_PREDICATE_SEGMENT_ABSENT", b.rls().get("rlsDenyReason"));
+        assertEquals("1=1", b.rls().get("predicateTemplate"),
+                "兼容字段仍给旧值（钉现状供日志核对，非认可：执行侧只认 whereClause）");
     }
 }

@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.security.decision;
 
 import com.chinacreator.gzcm.engine.security.dao.SecurityDecisionDao;
 import com.chinacreator.gzcm.engine.security.rls.RlsPredicate;
+import com.chinacreator.gzcm.engine.security.rls.RlsSubjectContext;
 import com.chinacreator.gzcm.engine.security.service.ColumnLevelSecurityServiceImpl;
 import com.chinacreator.gzcm.engine.security.service.OpaPolicyService;
 import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl;
@@ -69,8 +70,8 @@ public class SecurityDecisionService {
         String table = asset.getTable();
         String userId = ctx == null ? null : ctx.userId();
 
-        // ── [1] RLS：参数化谓词（占位符 + bindings，禁字符串拼接）──
-        Map<String, Object> rlsRes = safeRls(table, userId);
+        // ── [1] RLS：参数化谓词（占位符 + bindings，禁字符串拼接）+ 可绑定 WHERE 片段 ──
+        Map<String, Object> rlsRes = safeRls(table, ctx);
         Map<String, Object> rlsPart = asPredicatePart(rlsRes);
 
         // ── [2] CLS：列投影（allow 空集 = DENY 全部列）──
@@ -94,9 +95,9 @@ public class SecurityDecisionService {
 
     // ── 四源各自的 fail-safe 隔离：某源异常不放大成整条抛错，而是保守拒绝 ──
 
-    private Map<String, Object> safeRls(String table, String userId) {
+    private Map<String, Object> safeRls(String table, DecisionContext ctx) {
         try {
-            return rls.apply(table, userId);
+            return rls.apply(table, subjectContextOf(ctx));
         } catch (Exception e) {
             log.warn("decide RLS 源异常，按无策略 1=1 + denyIfEmpty=true 保守处理: table={}, err={}", table, e.getMessage());
             RlsPredicate p = new RlsPredicate();
@@ -105,8 +106,25 @@ public class SecurityDecisionService {
             Map<String, Object> r = new LinkedHashMap<>();
             r.put("predicate", p.toMap());
             r.put("params", Map.of());
+            // 异常态必须与正常态同形：无命中策略 + 拒绝片段，消费端读不到 whereClause
+            // 时会当成"字段缺失"，那正是 D-B4-17 的 fail-open 形态，故此处显式给 1=0。
+            r.put("whereClause", "1=0");
+            r.put("whereParams", List.of());
+            r.put("noPolicyMatched", true);
+            r.put("rlsDenyReason", "RLS_SOURCE_ERROR");
             return r;
         }
+    }
+
+    /**
+     * {@link DecisionContext} → RLS 绑定解析上下文（组织域/密级只服务端派生，
+     * 现网无单源时为 {@code null}，由 {@code RlsPredicateRenderer} 转"未解析 ⇒ 拒绝"）。
+     */
+    private static RlsSubjectContext subjectContextOf(DecisionContext ctx) {
+        if (ctx == null) {
+            return new RlsSubjectContext(null, null, null, null);
+        }
+        return new RlsSubjectContext(ctx.userId(), ctx.tenantId(), ctx.orgId(), ctx.clearanceLevel());
     }
 
     @SuppressWarnings("unchecked")
@@ -117,13 +135,30 @@ public class SecurityDecisionService {
                 ? new LinkedHashMap<>((Map<String, Object>) p)
                 : fallbackPredicatePart();
         part.put("policyRefs", namesOf(rlsRes.get("policies")));
+        // #142/B4-3c-2：bundle 的 rls 段必须自带可绑定片段，否则页面/AI 通道合流到本入口后
+        // 仍要回去读 /rls/apply（等于第二条裁决腿）。透传而非重算，保持单源。
+        copyIfPresent(rlsRes, part, "whereClause");
+        copyIfPresent(rlsRes, part, "whereParams");
+        copyIfPresent(rlsRes, part, "unresolvedBindings");
+        copyIfPresent(rlsRes, part, "noPolicyMatched");
+        copyIfPresent(rlsRes, part, "rlsDenyReason");
         return part;
+    }
+
+    private static void copyIfPresent(Map<String, Object> from, Map<String, Object> to, String key) {
+        Object value = from.get(key);
+        if (value != null) to.put(key, value);
     }
 
     private static Map<String, Object> fallbackPredicatePart() {
         Map<String, Object> fallback = new LinkedHashMap<>();
         fallback.put("predicateTemplate", "1=1");
         fallback.put("denyIfEmpty", true);
+        // RLS 段整体缺失＝裁决无出处，给拒绝形态而非"没过滤"（D-B4-17 fail-open 的最后一处）
+        fallback.put("whereClause", "1=0");
+        fallback.put("whereParams", List.of());
+        fallback.put("noPolicyMatched", true);
+        fallback.put("rlsDenyReason", "RLS_PREDICATE_SEGMENT_ABSENT");
         return fallback;
     }
 

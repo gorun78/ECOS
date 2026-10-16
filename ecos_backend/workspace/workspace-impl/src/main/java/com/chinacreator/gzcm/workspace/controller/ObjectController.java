@@ -14,6 +14,7 @@ import com.chinacreator.gzcm.common.engine.IFunctionPropertyEvaluator;
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.security.AbacQueryFilter;
+import com.chinacreator.gzcm.workspace.security.RlsFilter;
 import com.chinacreator.gzcm.workspace.service.ObjectKgSyncService;
 import com.chinacreator.gzcm.workspace.service.ObjectQueryService;
 
@@ -100,6 +101,34 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
         return Collections.unmodifiableMap(map);
     }
 
+    /**
+     * WHERE 尾串合流：调用方条件与 RLS 片段以 {@code AND} 连接，RLS 片段一律加括号
+     * （防 {@code OR} 优先级把行过滤旁路掉——这是 RLS 拼接面的经典绕过形态）。
+     *
+     * @param originCond 调用方条件（如 {@code "id = ?"}），无则传空串
+     * @param rlsCond    {@link RlsFilter#clauseForSplice()}（恒真时为空串）
+     * @return 形如 {@code " WHERE a = ? AND (rls)"}；两者皆空时返回空串（不拼 WHERE）
+     */
+    private static String whereTail(String originCond, String rlsCond) {
+        boolean hasOrigin = originCond != null && !originCond.isEmpty();
+        boolean hasRls = rlsCond != null && !rlsCond.isEmpty();
+        if (hasOrigin && hasRls) return " WHERE " + originCond + " AND (" + rlsCond + ")";
+        if (hasOrigin) return " WHERE " + originCond;
+        if (hasRls) return " WHERE (" + rlsCond + ")";
+        return "";
+    }
+
+    /**
+     * 变参绑定拼装：{@code prefix}（keyword + RLS 绑定值，按 SQL 出现顺序）+ 尾部字面值。
+     * 单独抽出来是为了让"参数顺序 = 占位符顺序"这件事只有一处实现（IR05 参数化纪律）。
+     */
+    private static Object[] bind(List<Object> prefix, Object... tail) {
+        Object[] out = new Object[prefix.size() + tail.length];
+        for (int i = 0; i < prefix.size(); i++) out[i] = prefix.get(i);
+        System.arraycopy(tail, 0, out, prefix.size(), tail.length);
+        return out;
+    }
+
     // ═══════════════ 列表 ═══════════════════
 
     @GetMapping("/{entityCode}")
@@ -111,41 +140,30 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
         String table = ENTITY_TABLE.get(entityCode);
         if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
 
-        // ★ ABAC 行过滤条件
-        String abacRowFilter = abacFilter.buildRowFilterCondition(entityCode);
+        // ★ ABAC 行过滤（#142/B4-3c-2 / D-B4-17）：security 发的执行契约是
+        //   「带 ? 的片段 + 同序参数」，两者必须成对下推 —— 旧写法只取片段
+        //   （buildRowFilterCondition）且把"应答缺片段"当空串放行（fail-open）。
+        //   三态：恒真=不拼条件；拒绝=拼 1=0（零行）；非平凡=拼片段并按位置绑参。
+        RlsFilter rls = abacFilter.buildRowFilter(entityCode);
+        String rlsCond = rls.clauseForSplice();
+        List<Object> rlsArgs = rls.paramsForSplice();
 
         int offset = (page - 1) * size;
-        List<Map<String, Object>> rows;
-        Long total;
-
-        if (keyword.isEmpty()) {
-            if (abacRowFilter.isEmpty()) {
-                rows = objectQueryService.queryForList(
-                    "SELECT * FROM " + table + " ORDER BY id LIMIT ? OFFSET ?", size, offset);
-                total = objectQueryService.queryForObject("SELECT COUNT(*) FROM " + table, Long.class);
-            } else {
-                rows = objectQueryService.queryForList(
-                    "SELECT * FROM " + table + " WHERE " + abacRowFilter + " ORDER BY id LIMIT ? OFFSET ?", size, offset);
-                total = objectQueryService.queryForObject(
-                    "SELECT COUNT(*) FROM " + table + " WHERE " + abacRowFilter, Long.class);
-            }
-        } else {
-            if (abacRowFilter.isEmpty()) {
-                rows = objectQueryService.queryForList(
-                    "SELECT * FROM " + table + " WHERE CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ? ORDER BY id LIMIT ? OFFSET ?",
-                    "%" + keyword + "%", "%" + keyword + "%", size, offset);
-                total = objectQueryService.queryForObject(
-                    "SELECT COUNT(*) FROM " + table + " WHERE CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ?",
-                    Long.class, "%" + keyword + "%", "%" + keyword + "%");
-            } else {
-                rows = objectQueryService.queryForList(
-                    "SELECT * FROM " + table + " WHERE (CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ?) AND " + abacRowFilter + " ORDER BY id LIMIT ? OFFSET ?",
-                    "%" + keyword + "%", "%" + keyword + "%", size, offset);
-                total = objectQueryService.queryForObject(
-                    "SELECT COUNT(*) FROM " + table + " WHERE (CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ?) AND " + abacRowFilter,
-                    Long.class, "%" + keyword + "%", "%" + keyword + "%");
-            }
+        String keywordCond = keyword.isEmpty() ? ""
+                : "(CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ?)";
+        String tail = whereTail(keywordCond, rlsCond);
+        List<Object> headArgs = new ArrayList<>();
+        if (!keyword.isEmpty()) {
+            headArgs.add("%" + keyword + "%");
+            headArgs.add("%" + keyword + "%");
         }
+        headArgs.addAll(rlsArgs);
+
+        List<Map<String, Object>> rows = objectQueryService.queryForList(
+                "SELECT * FROM " + table + tail + " ORDER BY id LIMIT ? OFFSET ?",
+                bind(headArgs, size, offset));
+        Long total = objectQueryService.queryForObject(
+                "SELECT COUNT(*) FROM " + table + tail, Long.class, headArgs.toArray());
 
         // ★ ABAC 列裁剪
         rows = abacFilter.filterColumns(entityCode, rows);
@@ -170,17 +188,16 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
         String table = ENTITY_TABLE.get(entityCode);
         if (table == null) return ApiResponse.notFound("实体 " + entityCode + " 不存在");
 
-        // ★ ABAC 行过滤条件
-        String abacRowFilter = abacFilter.buildRowFilterCondition(entityCode);
+        // ★ ABAC 行过滤（同列表面：片段与参数成对下推，拒绝态拼 1=0 → 详情按"不存在"处置）
+        RlsFilter rls = abacFilter.buildRowFilter(entityCode);
+        String rlsCond = rls.clauseForSplice();
+        List<Object> args = new ArrayList<>();
+        args.add(id);
+        args.addAll(rls.paramsForSplice());
+        String tail = whereTail("id = ?", rlsCond);
 
-        List<Map<String, Object>> rows;
-        if (abacRowFilter.isEmpty()) {
-            rows = objectQueryService.queryForList(
-                "SELECT * FROM " + table + " WHERE id = ?", id);
-        } else {
-            rows = objectQueryService.queryForList(
-                "SELECT * FROM " + table + " WHERE id = ? AND " + abacRowFilter, id);
-        }
+        List<Map<String, Object>> rows = objectQueryService.queryForList(
+                "SELECT * FROM " + table + tail, args.toArray());
         if (rows.isEmpty()) return ApiResponse.notFound(entityCode + " " + id + " 不存在");
 
         // ★ ABAC 列裁剪
@@ -338,20 +355,17 @@ private static final Logger log = LoggerFactory.getLogger(ObjectController.class
             String entityCode = entry.getKey();
             String table = entry.getValue();
             try {
-                // ★ ABAC 行过滤条件
-                String abacRowFilter = abacFilter.buildRowFilterCondition(entityCode);
-                List<Map<String, Object>> rows;
-                if (abacRowFilter.isEmpty()) {
-                    rows = objectQueryService.queryForList(
+                // ★ ABAC 行过滤（片段 + 参数成对下推；拒绝态拼 1=0 → 该表零行）
+                RlsFilter rls = abacFilter.buildRowFilter(entityCode);
+                String rlsCond = rls.clauseForSplice();
+                List<Object> args = new ArrayList<>(List.of("%" + q + "%", "%" + q + "%"));
+                args.addAll(rls.paramsForSplice());
+                args.add(size);
+                List<Map<String, Object>> rows = objectQueryService.queryForList(
                         "SELECT *, '" + table + "' AS _entity FROM " + table
-                        + " WHERE CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ? LIMIT ?",
-                        "%" + q + "%", "%" + q + "%", size);
-                } else {
-                    rows = objectQueryService.queryForList(
-                        "SELECT *, '" + table + "' AS _entity FROM " + table
-                        + " WHERE (CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ?) AND " + abacRowFilter + " LIMIT ?",
-                        "%" + q + "%", "%" + q + "%", size);
-                }
+                        + whereTail("(CAST(id AS TEXT) ILIKE ? OR CAST(name AS TEXT) ILIKE ?)", rlsCond)
+                        + " LIMIT ?",
+                        args.toArray());
                 if (rows != null) {
                     // ★ ABAC 列裁剪
                     rows = abacFilter.filterColumns(entityCode, rows);

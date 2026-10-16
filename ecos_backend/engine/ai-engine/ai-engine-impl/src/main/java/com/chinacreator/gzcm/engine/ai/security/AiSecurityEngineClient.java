@@ -212,47 +212,93 @@ public class AiSecurityEngineClient {
     /**
      * POST {@value #PATH_RLS_APPLY} — 行级安全 WHERE 片段。
      *
-     * @return whereClause；无策略=""；security 不可用/异常/DENY → "1=0"
+     * <p><b>#142/B4-3c-2 收口（D-B4-17）</b>：应答缺 {@code whereClause} 时此前返回
+     * <b>空串</b>，调用方（{@code SecurityCheckerNode}）把空串当"无策略但放行"写入上下文；
+     * 加上本引擎的 RLS 面从未把片段真正下推到 SQL（差距文档登记 NOT_WIRED），
+     * 空串形态等于把"应答漂移"伪装成"无行级限制"。现在缺字段/空白/需绑参（含 {@code ?}，
+     * 本引擎无参数通道）一律 {@code "1=0"} = 拒绝。</p>
+     *
+     * @return whereClause；恒真 {@code 1=1}＝不限制行；缺字段/空白/不可绑定/不可用/DENY → {@code "1=0"}
      */
     @SuppressWarnings("unchecked")
     public String applyRls(String userId, String tenantId, String entityType,
                            String tableName, Map<String, Object> filters) {
         try {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("tableName", tableName);
-            body.put("userId", userId == null ? "anonymous" : userId);
-            body.put("entityType", entityType);
-            if (tenantId != null) body.put("tenantId", tenantId);
-            if (filters != null && !filters.isEmpty()) body.put("filters", filters);
-            Map<String, Object> resp = postJson(PATH_RLS_APPLY, body);
-            if (resp == null || !(resp.get("data") instanceof Map)) return "1=0";
-            Object whereObj = ((Map<String, Object>) resp.get("data")).get("whereClause");
-            return whereObj == null ? "" : whereObj.toString();
+            return requireRenderableRls(whereClauseOf(postJson(PATH_RLS_APPLY,
+                    rlsRequestBody(userId, tenantId, entityType, tableName, filters)), entityType));
         } catch (Exception e) {
             log.warn("AiSecurityEngineClient.applyRls DENY: entityType={} reason={}", entityType, e.getMessage());
-            return "1=0";
+            return DENY_CLAUSE;
         }
     }
 
     /**
      * RLS 的<b>不吞异常</b>版本：obligations 执行必须区分"无策略"与"security 不可用"，
      * 后者整条结果丢弃并 FAIL_CLOSED（F06-02 要点 2，禁"先返回再说明"）。
+     *
+     * <p>应答缺 {@code whereClause} / 片段需绑参同样抛
+     * {@link SecurityResponseUnparsableException}（而不是返回空串冒充"无行级限制"），
+     * 由调用方走 FAIL_CLOSED。</p>
      */
-    @SuppressWarnings("unchecked")
     public String applyRlsOrThrow(String userId, String tenantId, String entityType,
                                   String tableName, Map<String, Object> filters) throws Exception {
+        return requireRenderableRls(whereClauseOf(postJson(PATH_RLS_APPLY,
+                rlsRequestBody(userId, tenantId, entityType, tableName, filters)), entityType), true);
+    }
+
+    /** 拒绝片段（与 security-engine {@code RlsPredicateRenderer.DENY_CLAUSE} 同值）。 */
+    public static final String DENY_CLAUSE = "1=0";
+
+    /** 恒真片段＝裁决明确"不限制行"（与非平凡谓词、与拒绝皆分态）。 */
+    public static final String ALLOW_ALL_CLAUSE = "1=1";
+
+    private Map<String, Object> rlsRequestBody(String userId, String tenantId, String entityType,
+                                               String tableName, Map<String, Object> filters) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("tableName", tableName);
         body.put("userId", userId == null ? "anonymous" : userId);
         body.put("entityType", entityType);
         if (tenantId != null) body.put("tenantId", tenantId);
         if (filters != null && !filters.isEmpty()) body.put("filters", filters);
-        Map<String, Object> resp = postJson(PATH_RLS_APPLY, body);
+        return body;
+    }
+
+    /** 取 {@code data.whereClause} 原文；应答不可解析 → {@code null}。 */
+    @SuppressWarnings("unchecked")
+    private static String whereClauseOf(Map<String, Object> resp, String entityType) throws Exception {
         if (resp == null || !(resp.get("data") instanceof Map)) {
-            throw new SecurityResponseUnparsableException("rls/apply 响应不可解析: " + summarize(resp));
+            throw new SecurityResponseUnparsableException("rls/apply 响应不可解析: entityType=" + entityType);
         }
         Object whereObj = ((Map<String, Object>) resp.get("data")).get("whereClause");
-        return whereObj == null ? "" : whereObj.toString();
+        return whereObj == null ? null : String.valueOf(whereObj);
+    }
+
+    /**
+     * 执行契约合规化：只有「不需要绑定参数的片段」（{@code 1=0}/{@code 1=1}/裸文本条件）
+     * 才能被本引擎消费——本引擎没有把 RLS 参数带进 SQL 的通道，含 {@code ?} 的片段
+     * 若放行就是超发（IR05）。
+     *
+     * @param strict {@code true}（OrThrow 版）时不可用形态抛异常；{@code false} 时返回 {@code "1=0"}
+     */
+    private String requireRenderableRls(String clause, boolean strict) throws Exception {
+        if (clause == null || clause.isBlank()) {
+            String reason = "RLS_WHERE_CLAUSE_ABSENT(应答未发执行契约，禁当成「无过滤」)";
+            if (strict) throw new SecurityResponseUnparsableException(reason);
+            log.warn("AiSecurityEngineClient.applyRls DENY: {}", reason);
+            return DENY_CLAUSE;
+        }
+        String trimmed = clause.trim();
+        if (trimmed.indexOf('?') >= 0) {
+            String reason = "RLS_PARAM_UNBINDABLE(片段需绑参，AI 侧无参数通道): clause=" + trimmed;
+            if (strict) throw new SecurityResponseUnparsableException(reason);
+            log.warn("AiSecurityEngineClient.applyRls DENY: {}", reason);
+            return DENY_CLAUSE;
+        }
+        return trimmed;
+    }
+
+    private String requireRenderableRls(String clause) throws Exception {
+        return requireRenderableRls(clause, false);
     }
 
     // ═══════════════ CLS（默认 DENY 空集） ═══════════════

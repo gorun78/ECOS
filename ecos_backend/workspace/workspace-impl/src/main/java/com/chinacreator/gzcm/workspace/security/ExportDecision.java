@@ -250,12 +250,12 @@ public final class ExportDecision {
      * 否则 security 返回的 {@code "(1=0)"} 会被误判成"非平凡谓词"而走错分支。</p>
      */
     public boolean rlsPredicateIsDeny() {
-        return "1=0".equals(normalize(rlsPredicateTemplate));
+        return RlsFilter.DENY_CLAUSE.equals(normalize(rlsPredicateTemplate));
     }
 
     /** 谓词是否恒真（{@code 1=1} = 无行级限制；财务负责人行的 {@code rls-finance-all} 形态）。 */
     public boolean rlsPredicateIsAllowAll() {
-        return "1=1".equals(normalize(rlsPredicateTemplate));
+        return RlsFilter.ALLOW_ALL_CLAUSE.equals(normalize(rlsPredicateTemplate));
     }
 
     /** 是否未给谓词（空/缺失）——与「恒真」不同态：空谓词=裁决没说话，恒真=裁决明确说不限制。 */
@@ -263,14 +263,12 @@ public final class ExportDecision {
         return rlsPredicateTemplate == null || rlsPredicateTemplate.isBlank();
     }
 
+    /**
+     * 归一化单源委托（#142/B4-3c-2）：同一"剥括号与空白"口径此前在本类与
+     * {@link RlsFilter} 各有一份副本，两处漂移就会把 {@code "(1=0)"} 判成不同态。
+     */
     private static String normalize(String predicate) {
-        if (predicate == null) return "";
-        StringBuilder sb = new StringBuilder(predicate.length());
-        for (int i = 0; i < predicate.length(); i++) {
-            char c = predicate.charAt(i);
-            if (c != '(' && c != ')' && !Character.isWhitespace(c)) sb.append(c);
-        }
-        return sb.toString();
+        return RlsFilter.normalize(predicate);
     }
 
     @SuppressWarnings("unchecked")

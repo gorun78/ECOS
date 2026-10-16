@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.workspace.QueryHistoryService;
 import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.security.AbacQueryFilter;
+import com.chinacreator.gzcm.workspace.security.RlsFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -70,9 +71,23 @@ public class ObjectQLController {
             // ★ ABAC 行过滤：从查询 JSON 中提取 entity 名，注入行过滤条件
             String entityCode = extractEntityFromQueryJson(queryJson);
             if (entityCode != null) {
-                String abacRowFilter = abacFilter.buildRowFilterCondition(entityCode);
-                if (!abacRowFilter.isEmpty()) {
-                    pq = ObjectQLParser.appendWhereCondition(pq, abacRowFilter);
+                // #142/B4-3c-2（D-B4-17）：片段与参数必须成对下推。旧写法 buildRowFilterCondition
+                // 只取片段——security 现在发的是带 ? 的片段（如 "(department_id = ?)"），
+                // 只拼片段不绑参 = 悬空占位符；而应答缺片段时旧写法返回空串被当成"无策略"
+                // 直接放行（fail-open）。现在恒真才跳过注入，其余一律带参注入或拒绝。
+                RlsFilter rls = abacFilter.buildRowFilter(entityCode);
+                if (!rls.allowAll()) {
+                    try {
+                        pq = ObjectQLParser.appendWhereCondition(pq,
+                                rls.denied() ? RlsFilter.DENY_CLAUSE : rls.clause(),
+                                rls.denied() ? List.of() : rls.params());
+                    } catch (IllegalArgumentException e) {
+                        // 片段可注入但参数序对不上 = 无法保证绑到正确的列 —— 宁 DENY 不超发。
+                        // 不把解析器内部原因外泄给调用方（响应体只给固定的拒绝语义）。
+                        log.warn("RLS 片段无法安全下推，默认 DENY: entity={} reason={}",
+                                entityCode, e.getMessage());
+                        pq = ObjectQLParser.appendWhereCondition(pq, RlsFilter.DENY_CLAUSE);
+                    }
                 }
             }
 

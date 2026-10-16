@@ -703,11 +703,43 @@ public final class ObjectQLParser {
      * 在已解析的 SQL 中注入额外的 WHERE 条件（用于 ABAC 行过滤）。
      * 在 ORDER BY / LIMIT / OFFSET 之前插入条件。
      *
+     * <p><b>无参片段专用</b>：本形态把 RLS 片段当"不含 {@code ?} 的常量条件"插入
+     * （如 {@code 1=0}/{@code 1=1}）。security-engine 现发的是<b>带占位符的片段 +
+     * 同序参数</b>（#142/B4-3c-2，D-B4-17），任何需要绑定参数的片段必须改用
+     * {@link #appendWhereCondition(ParsedQuery, String, List)} —— 只拼片段不绑参会让
+     * {@code ?} 悬空（SQL 语法错）或把值绑到别的列上。</p>
+     *
      * @param pq          已解析的查询
      * @param extraWhere  额外的 WHERE 条件片段（如 "department_id = 'dept1'"）
      * @return 新的 ParsedQuery（SQL 已修改，params 不变）
      */
     public static ParsedQuery appendWhereCondition(ParsedQuery pq, String extraWhere) {
+        if (extraWhere != null && extraWhere.indexOf('?') >= 0) {
+            // 兼容出口只服务"无占位符的常量条件"（1=0/1=1/裸文本）。
+            // 带 ? 的片段走这里＝参数无处可绑（悬空占位符或把值绑到别的列），
+            // 必须改走三参重载；这里直接抛而不是静默拼半条 SQL。
+            throw new IllegalArgumentException(
+                    "无参出口不接受含 ? 的片段，请改用 appendWhereCondition(pq, clause, params): " + extraWhere);
+        }
+        return appendWhereCondition(pq, extraWhere, List.of());
+    }
+
+    /**
+     * 注入带参数的 WHERE 条件片段（RLS 执行契约下推的唯一合法入口）。
+     *
+     * <p><b>参数顺序规则</b>：JDBC 按占位符在 SQL 文本中的<b>出现顺序</b>绑定，因此
+     * 新参数表 = 插入点之前的原参数前缀 + RLS 参数 + 插入点之后的原参数后缀
+     * （ORDER BY/LIMIT/OFFSET 段的参数）。插入点之后的 {@code ?} 个数若与原参数表
+     * 长度对不上，说明"参数表与占位符不同序"，此时<b>不猜</b>：直接
+     * {@link IllegalArgumentException}（调用方按 fail-closed 处置，禁超发）。</p>
+     *
+     * @param pq          已解析的查询
+     * @param extraWhere  条件片段（可含 {@code ?}）
+     * @param extraParams 与 {@code extraWhere} 里 {@code ?} 同序的参数（可为空）
+     * @return 新的 ParsedQuery（SQL 与 params 一起改写）
+     */
+    public static ParsedQuery appendWhereCondition(ParsedQuery pq, String extraWhere,
+                                                   List<Object> extraParams) {
         if (extraWhere == null || extraWhere.isBlank()) return pq;
         String sql = pq.getSql();
         String extra = "(" + extraWhere + ")";
@@ -730,6 +762,41 @@ public final class ObjectQLParser {
             // 无 WHERE → WHERE 插入
             newSql = sql.substring(0, insertPos) + " WHERE " + extra + " " + sql.substring(insertPos).trim();
         }
-        return new ParsedQuery(newSql.trim(), pq.getParams());
+
+        List<Object> origin = pq.getParams();
+        if (extraParams == null || extraParams.isEmpty()) {
+            return new ParsedQuery(newSql.trim(), origin);
+        }
+        int marksBefore = countPlaceholders(sql.substring(0, insertPos));
+        int totalMarks = countPlaceholders(sql);
+        if (totalMarks != origin.size()) {
+            throw new IllegalArgumentException("参数表与占位符不同序，拒绝注入行过滤: SQL ? 数="
+                    + totalMarks + ", 参数数=" + origin.size());
+        }
+        List<Object> spliced = new ArrayList<>(origin.size() + extraParams.size());
+        spliced.addAll(origin.subList(0, marksBefore));
+        spliced.addAll(extraParams);
+        spliced.addAll(origin.subList(marksBefore, origin.size()));
+        return new ParsedQuery(newSql.trim(), spliced);
+    }
+
+    /** {@code ?} 占位符计数（跳过字符串字面量内的 {@code ?}，与 JDBC 同口径）。 */
+    private static int countPlaceholders(String sql) {
+        int n = 0;
+        boolean inSingle = false;
+        for (int i = 0; i < sql.length(); i++) {
+            char c = sql.charAt(i);
+            if (c == '\'') {
+                // PG 转义 '' 视作字面量内引号，不结束字符串
+                if (inSingle && i + 1 < sql.length() && sql.charAt(i + 1) == '\'') {
+                    i++;
+                    continue;
+                }
+                inSingle = !inSingle;
+                continue;
+            }
+            if (c == '?' && !inSingle) n++;
+        }
+        return n;
     }
 }

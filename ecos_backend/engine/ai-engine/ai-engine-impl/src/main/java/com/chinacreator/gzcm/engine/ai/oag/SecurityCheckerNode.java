@@ -19,6 +19,10 @@ import java.util.Map;
  *       DENY 或 security-engine 不可用 → 默认 DENY，节点置 BLOCKED</li>
  *   <li>所有意图：{@code POST /api/v1/security/rls/apply} 取行级过滤条件，
  *       返回 "1=0"（不可用/DENY）→ BLOCKED；结果经 rlsFilters 传给 KnowledgeRetriever</li>
+ *   <li><b>#142/B4-3c-2（D-B4-17）执行契约三态</b>：{@code "1=0"}＝拒绝、
+ *       {@code "1=1"}＝明确不限制行、其余＝非平凡谓词原样下传；
+ *       <b>空/缺失片段＝形态漂移 → BLOCKED</b>（旧口径把空串当"无行级限制"放行，
+ *       即本批次关掉的 fail-open，登记见差距文档）</li>
  *   <li>敏感操作黑名单（本地第一道闸）保留不变</li>
  * </ul>
  *
@@ -101,14 +105,29 @@ public class SecurityCheckerNode implements OagNode {
             return ctx;
         }
 
-        // 4. 通过裁决 — RLS/CLS 结果写入上下文供下游节点（KnowledgeRetriever 等）消费
+        // 4. 执行契约收口（#142/B4-3c-2 / D-B4-17）：客户端只会给出
+        //    "1=0"（拒绝）/ "1=1"（明确不限制行）/ 不含 ? 的裸文本谓词三种形态。
+        //    拿到空片段＝上游形态漂移（生产者从未发过空 whereClause），必须拒绝——
+        //    旧口径「空串＝无行级限制」而放行，正是本批次关掉的 fail-open：
+        //    字段名漂移会让 AI 通道整条链路裸返，且下游无法与"真的无策略"区分。
+        if (whereClause == null || whereClause.isBlank()) {
+            ctx.setSecurityPassed(false);
+            ctx.setSecurityBlockReason("security-engine RLS 应答未给执行契约"
+                    + "（RLS_WHERE_CLAUSE_ABSENT，禁当成「无过滤」）");
+            ctx.setStatus("BLOCKED");
+            securityEngineClient.auditQuietly(ctx.getUserId(), "oag:rls", "apply",
+                    "DENIED:RLS_WHERE_CLAUSE_ABSENT");
+            log.warn("[OAG:{}] RLS 应答缺执行契约 → BLOCKED（不再按空串放行）userId={}",
+                    ctx.getTraceId(), ctx.getUserId());
+            return ctx;
+        }
+
+        // 5. 通过裁决 — RLS/CLS 结果写入上下文供下游节点（KnowledgeRetriever 等）消费
         ctx.setSecurityPassed(true);
 
         Map<String, Object> rlsFilters = new LinkedHashMap<>();
         rlsFilters.put("tenantId", ctx.getTenantId());
-        if (whereClause != null && !whereClause.isBlank()) {
-            rlsFilters.put("whereClause", whereClause);
-        }
+        rlsFilters.put("whereClause", whereClause);
         ctx.setRlsFilters(rlsFilters);
         ctx.setClsColumns(new LinkedHashMap<>());
 
