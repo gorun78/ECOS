@@ -125,8 +125,14 @@ final class PageChannelHarness {
 
     /**
      * 直连护栏源（同一 {@link OpaPolicyService} 实例，非另造客户端）：
-     * 供 {@code resource.dataScope} 形态的 oracle 用例回放 —— 该输入只有 AI 工具裁决载荷会发，
-     * {@code /decision} 的 {@code safeOpa} 不发，因此不能强塞进行列面入口冒充同一条链。
+     * 供 {@code OpaDocumentShapeTest} 逐例校验<b>策略文档应答形态</b>，以及带
+     * {@code input.environment} 的 AI 工具载荷形态输入。
+     *
+     * <p><b>订正（#142/B4-3d-3）</b>：本方法原注释的理由是"该输入只有 AI 工具裁决载荷会发，
+     * {@code safeOpa} 不发，因此不能强塞进行列面入口"。现状是 {@code safeOpa} 已按
+     * {@code DataScopeContract} 写出 {@code resource.dataScope}，故
+     * <b>行列面断言一律走 {@link #decide(AssetRef, DecisionContext, DecisionBundle.Purpose)}</b>；
+     * 用本方法回放带 dataScope 的例会绕开唯一入口（D-B4-20 的原缺陷形态），禁再这么做。</p>
      */
     Map<String, Object> evaluateGuardrail(Map<String, Object> input) {
         return opa.evaluate(OpaPolicyService.POLICY_DATA_ACCESS, input);

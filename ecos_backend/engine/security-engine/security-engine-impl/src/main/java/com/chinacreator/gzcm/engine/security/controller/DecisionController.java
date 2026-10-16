@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
+import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.engine.security.decision.AssetRef;
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
@@ -24,9 +26,15 @@ import java.util.Map;
  * {@code {rls, columns, masks, opa, decisionId, traceId}}。</p>
  *
  * <p>上下文字段处理（W40 前置）：本端点从请求体只接受
- * {@code assetRef} / {@code purpose} / {@code subject}；
+ * {@code assetRef} / {@code purpose} / {@code subject} / {@code resource}；
  * userId/tenantId 优先取信任链 {@link com.chinacreator.gzcm.common.security.header.ServiceContext}，
  * 缺失时回退到 subject；orgId/clearance 由服务端派生（暂不在此注入，W40 关闭时接）。</p>
+ *
+ * <p>{@code resource}（#142/B4-3d-3 只增，D-B4-20）：AI 通道的<b>请求数据域声明</b>段，
+ * 形态为 {@code resource.dataScope} 下的 {@code departmentId} 与 {@code projectIds} 两键。
+ * 它不是主体属性而是调用方声明，读/写一律经 {@link DataScopeContract} 单源
+ * （信任边界与"未声明即不写"的理由在该类内声明）。页面/导出通道不传该段 ⇒ 护栏输入形态
+ * 与本批之前逐字节一致。</p>
  */
 @RestController
 @RequestMapping({"/api/security/decision", "/api/v1/security/decision"})
@@ -69,7 +77,13 @@ public class DecisionController {
             return ApiResponse.forbidden("无用户上下文（ECOS-AUTH-010），拒绝裁决");
         }
 
-        DecisionContext ctx = DecisionContext.of(userId, tenantId, null, null, roles, traceId);
+        DecisionContext ctx = DecisionContext.of(userId, tenantId, null, null, roles, traceId)
+                // #142/B4-3d-3 只增：调用方声明的请求数据域（AI 通道的 §4.7.2 判据面）。
+                // 信任边界——本段是「声明」不是「主体属性」：策略侧的横向越权地板拿它和
+                // <b>服务端派生</b>的 subject.department 比（分册 00：客户端 X-Org-Id 已被剥离），
+                // 故谎报只会落 DENY（AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT），不会落放行；
+                // 未声明则整段不写（页面/导出通道载荷逐字节不变）。键面走单源 DataScopeContract。
+                .withDataScope(DataScopeContract.read(body.get(DataScopeContract.KEY_RESOURCE)));
         try {
             DecisionBundle bundle = service.decide(asset, purpose, ctx);
             return ApiResponse.success(bundle.toMap());

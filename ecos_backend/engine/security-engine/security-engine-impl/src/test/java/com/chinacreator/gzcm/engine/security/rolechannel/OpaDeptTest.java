@@ -20,9 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 资产名取自 oracle 的 {@code input.asset}（该格录的是 {@code fc_resource_input_fact}），
  * 用例不内联表名，避免与 V246 种子/矩阵登记形成第二套真值。</p>
  *
- * <p>{@code dept_ai} 带 {@code resource.dataScope}，只有 AI 工具裁决载荷会发，
- * 因此走直连通道；{@code dept_export} 走三通道唯一入口。理由同
- * {@link OpaProjOwnerTest} 类注释。</p>
+ * <p>{@code dept_ai} 带 {@code resource.dataScope}，本批前走直连通道（理由＝唯一入口发不出
+ * 该段）；#142/B4-3d-3 后它与 {@code dept_export} 一样走三通道唯一入口
+ * —— 理由同 {@link OpaProjOwnerTest} 类注释（D-B4-20 收口）。</p>
  */
 class OpaDeptTest {
 
@@ -45,18 +45,20 @@ class OpaDeptTest {
     }
 
     @Test
-    @DisplayName("ai — 本部门资源事实表 ALLOW（请求域＝主体组织域 ⇒ 无横向越权）")
+    @DisplayName("ai — 经唯一入口在本部门资源事实表 ALLOW（请求域＝主体组织域 ⇒ 无横向越权）")
     void aiWithinOwnDepartmentScopeAllowsOnResourceFact() throws IOException {
-        OpaOracleReplaySupport.GuardrailReplay r =
-                OpaOracleReplaySupport.replayViaGuardrailDirect("dept_ai");
+        OpaOracleReplaySupport.ChainReplay r = OpaOracleReplaySupport.replayViaDecisionChain(
+                "dept_ai", DecisionBundle.Purpose.AI, V246SeedFixtures.RESOURCE_COLUMNS);
 
-        assertEquals(Boolean.TRUE, r.data().get(GuardrailDecisionContract.KEY_ALLOW));
-        assertEquals(GuardrailDecisionContract.STATE_ALLOW,
-                r.data().get(GuardrailDecisionContract.KEY_POLICY_STATE));
+        assertTrue(r.bundle().opaAllowed(), "域内声明经 /decision 必须放行（唯一入口现已能表达数据域）");
+        assertEquals(GuardrailDecisionContract.STATE_ALLOW, r.bundle().opaPolicyState());
         assertEquals("ecos_dw.fc_resource_input_fact", r.oracle().input().get("asset"),
                 "本格录的是资源事实表；若单源被改动则本断言先红，禁改期望值迁就");
         assertEquals(2, OpaOracleReplaySupport.obligationsOf("mask", r.oracle().obligations()).size(),
                 "dept_user 同属非财务主体 ⇒ 掩码义务不得缺席");
         assertEquals(1, OpaOracleReplaySupport.obligationsOf("rateLimit", r.oracle().obligations()).size());
+        assertEquals(OpaOracleReplaySupport.writeJson(r.oracle().obligations()),
+                OpaOracleReplaySupport.writeJson(r.bundle().opa()
+                        .get(GuardrailDecisionContract.KEY_OBLIGATIONS)));
     }
 }

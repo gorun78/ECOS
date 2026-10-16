@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.security.decision;
 
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
+import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.engine.security.dao.SecurityDecisionDao;
 import com.chinacreator.gzcm.engine.security.rls.RlsPredicate;
@@ -302,7 +303,7 @@ public class SecurityDecisionService {
     }
 
     /**
-     * [4] OPA 护栏源（B4-3c 名合规 + 载荷补齐）。
+     * [4] OPA 护栏源（B4-3c 名合规 + 载荷补齐 + #142/B4-3d-3 数据域腿，D-B4-20）。
      *
      * <p><b>策略名取单源常量</b> {@link OpaPolicyService#POLICY_DATA_ACCESS}：此前写
      * {@code "data.access"}，含点号即不过 {@code SAFE_NAME} 白名单，校验在 try 之外抛出 ⇒
@@ -314,12 +315,27 @@ public class SecurityDecisionService {
      * {@code input.subject.roles / subject.department / action / purpose}；此前只发
      * subjectId/tenantId ⇒ "按角色裁决"在结构上不可表达（D-B4-22）。角色与组织域都取自
      * {@link DecisionContext}（分册 00 信任链：客户端 X-Org-Id 已被剥离，orgId 只服务端派生）。</p>
+     *
+     * <p><b>#142/B4-3d-3 只增：AI 请求数据域（{@code input.resource.dataScope}）</b>。
+     * §4.7.2 的 AI 列（项目负责人 p1 域内 ALLOW ／ p2 越域 DENY、未声明域
+     * {@code AI_SCOPE_NOT_DECLARED}）完全由该段表达，而本入口此前<b>从不写</b> {@code resource}
+     * ⇒ AI 列语义在"三通道唯一入口"上不可表达，带 dataScope 的验收例只能绕道护栏源直连
+     * （差距文档 v1.0.16 行登记的那条裁决）。现按 {@link DataScopeContract} 单源写出：
+     * 未声明时<b>整段不写</b>（页面/导出通道的载荷逐字节不变，既有 9 例回放的线路钉不受影响），
+     * 声明时键序与录制器同形（oracle 可比性钉按 JSON 文本深比）。</p>
+     *
+     * <p><b>组织域归一为 {@code ""} 而不是 {@code null}</b>：rego 的
+     * {@code object.get(..., "department", "")} 默认值只在<b>键缺失</b>时生效，写了
+     * {@code null} 就读成 {@code null} —— 于是「主体组织域未解析」不会命中
+     * {@code AI_SUBJECT_DEPARTMENT_UNRESOLVED}，而落到「声明域 ≠ 主体域」的越权规则：
+     * 结果同为 DENY，但理由是伪造的，运维会去查越权而不是去查上下文解析（D-B4-23 的真实形态）。
+     * 该语义差已由 dev 容器 {@code /opa eval} 离线只读求值实测（差距文档 v1.0.20 行凭证）。</p>
      */
     private Map<String, Object> safeOpa(AssetRef asset, DecisionBundle.Purpose purpose, DecisionContext ctx) {
         Map<String, Object> subject = new LinkedHashMap<>();
         subject.put("userId", ctx != null ? ctx.userId() : null);
         subject.put("roles", ctx == null ? List.of() : ctx.roles());
-        subject.put("department", ctx != null ? ctx.orgId() : null);
+        subject.put("department", DataScopeContract.textOrEmpty(ctx == null ? null : ctx.orgId()));
         subject.put("tenantId", ctx != null ? ctx.tenantId() : null);
         String purposeWire = DecisionChannelContract.normalize(purpose.name());
         if (purposeWire == null) {
@@ -334,6 +350,12 @@ public class SecurityDecisionService {
         input.put("action", "data:" + purposeWire);
         input.put("asset", asset.key());
         input.put("subject", subject);
+        // 调用方声明的请求域（AI 通道）：未声明即不写，禁写空段冒充"声明了空域"
+        Map<String, Object> resource = DataScopeContract.toResourceSegment(
+                ctx == null ? null : ctx.dataScope());
+        if (resource != null) {
+            input.put(DataScopeContract.KEY_RESOURCE, resource);
+        }
         String policyRef = "ecos." + OpaPolicyService.POLICY_DATA_ACCESS;
         try {
             Map<String, Object> r = opa.evaluate(OpaPolicyService.POLICY_DATA_ACCESS, input);

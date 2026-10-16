@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.guardrail;
 
+import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -28,7 +30,8 @@ public final class ToolAdjudicationRequest {
 
     /** resource 允许投影的工具入参字段（白名单；其余字段一律不入载荷） */
     private static final Set<String> RESOURCE_ARG_WHITELIST = Set.of(
-            "scenarioId", "forecastRunId", "projectIds", "periods", "caliberId", "objectId");
+            "scenarioId", "forecastRunId", DataScopeContract.KEY_PROJECT_IDS, "periods",
+            "caliberId", "objectId");
 
     /** 主体段：只来自服务端 token 上下文 */
     public record Subject(String userId, List<String> roles, String department, String tenantId) {
@@ -95,6 +98,19 @@ public final class ToolAdjudicationRequest {
         return m;
     }
 
+    /**
+     * 资源段写出：{@code dataScope} 的键面<b>委托</b> {@link DataScopeContract} 单源
+     * （#142/B4-3d-3，D-B4-20 的第二套字面量消除）。
+     *
+     * <p><b>钉现状（非认可，差距 D-B4-29）</b>：本段只声明 {@code projectIds}（与策略不读的
+     * {@code periods}），<b>从不声明</b> {@code departmentId} —— {@link Resource} 里就没有这个字段，
+     * 工具入参白名单里也没有。后果是 §4.7.2 的 AI p1「域内 ALLOW」在生产工具形态下
+     * <b>不可达</b>：策略侧 {@code requested_department} 取默认 {@code ""}，与已解析的
+     * {@code subject_department} 不等 ⇒ 落 {@code AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT}，
+     * 明明域内却按越权拒。本批刻意<b>不</b>顺手补该字段：补了就得同时给"声明域从哪来"
+     * 定单源（场景上下文 or 主体所属域），否则等于把一条未裁决的语义写进生产载荷。
+     * 有 {@code ToolPayloadDataScopeNailTest} 的一条特征化用例在此钉住，改动必与裁决同批。</p>
+     */
     private Map<String, Object> resourceMap() {
         Map<String, Object> m = new LinkedHashMap<>();
         if (resource == null) return m;
@@ -104,12 +120,12 @@ public final class ToolAdjudicationRequest {
         if (resource.objectId() != null) m.put("objectId", resource.objectId());
         Map<String, Object> scope = new LinkedHashMap<>();
         if (resource.projectIds() != null && !resource.projectIds().isEmpty()) {
-            scope.put("projectIds", resource.projectIds());
+            scope.put(DataScopeContract.KEY_PROJECT_IDS, resource.projectIds());
         }
         if (resource.periods() != null && !resource.periods().isEmpty()) {
             scope.put("periods", resource.periods());
         }
-        if (!scope.isEmpty()) m.put("dataScope", scope);
+        if (!scope.isEmpty()) m.put(DataScopeContract.KEY_DATA_SCOPE, scope);
         return m;
     }
 
@@ -139,7 +155,7 @@ public final class ToolAdjudicationRequest {
                 asText(kept.get("forecastRunId")),
                 asText(kept.get("caliberId")),
                 asText(kept.get("objectId")),
-                asTextList(kept.get("projectIds")),
+                asTextList(kept.get(DataScopeContract.KEY_PROJECT_IDS)),
                 asTextList(kept.get("periods")));
     }
 

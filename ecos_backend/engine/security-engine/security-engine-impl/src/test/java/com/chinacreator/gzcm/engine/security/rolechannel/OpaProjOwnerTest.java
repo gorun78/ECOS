@@ -23,12 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 不在用例里另写一套判定（差距文档 D-B4-22：AI 通道此前查的是另一份策略 {@code rbac}，
  * 「三通道同源」只在入口形态成立、在策略面上是假的 —— 本类即改判据后的证据）。</p>
  *
- * <p><b>两条回放通道的分工</b>：带 {@code resource.dataScope} 的输入只有 AI 工具裁决载荷会发，
- * {@code /decision} 的 {@code safeOpa} 不发，因此 p1/p2 走
- * {@link OpaOracleReplaySupport#replayViaGuardrailDirect}（请求体逐字＝oracle 输入），
- * 无数据域的 {@code proj_ai_no_scope} 与 {@code proj_export} 走三通道唯一入口
- * {@link OpaOracleReplaySupport#replayViaDecisionChain}。禁为了省事把 dataScope 硬塞进
- * 行列面入口 —— 那会让发出的请求体和录制态不一致，回放即不成立。</p>
+ * <p><b>回放通道的分工（#142/B4-3d-3 订正，D-B4-20 收口）</b>：带
+ * {@code resource.dataScope} 的 p1/p2 两例<b>必须</b>走三通道唯一入口
+ * {@link OpaOracleReplaySupport#replayViaDecisionChain} —— 本批前它们走护栏源直连，
+ * 理由（"safeOpa 不发 dataScope"）正是 D-B4-20 登记的缺陷本身；现在 {@code safeOpa}
+ * 按 {@link com.chinacreator.gzcm.common.security.decision.DataScopeContract} 写出声明域，
+ * 可比性钉会深比 {@code resource} 段 ⇒ 若生产者漏写/改写该段，回放立刻变红。
+ * 无数据域的 {@code proj_ai_no_scope} 与 {@code proj_export} 同走唯一入口；只有带
+ * {@code input.environment} 的通道推断例才保留直连（{@code /decision} 发不出该段）。</p>
  */
 class OpaProjOwnerTest {
 
@@ -47,34 +49,34 @@ class OpaProjOwnerTest {
     }
 
     @Test
-    @DisplayName("ai/本部门 p1 — ALLOW 且义务集含脱敏 + 限流（逐字等于录制态）")
+    @DisplayName("ai/本部门 p1 — 经唯一入口 ALLOW 且义务集逐字等于录制态（D-B4-20 收口硬证）")
     void aiWithInDepartmentScopeIsAllow() throws IOException {
-        OpaOracleReplaySupport.GuardrailReplay r =
-                OpaOracleReplaySupport.replayViaGuardrailDirect("proj_ai_p1");
+        OpaOracleReplaySupport.ChainReplay r = OpaOracleReplaySupport.replayViaDecisionChain(
+                "proj_ai_p1", DecisionBundle.Purpose.AI, V246SeedFixtures.COST_COLUMNS);
 
-        assertEquals(Boolean.TRUE, r.data().get(GuardrailDecisionContract.KEY_ALLOW));
-        assertEquals(GuardrailDecisionContract.STATE_ALLOW,
-                r.data().get(GuardrailDecisionContract.KEY_POLICY_STATE));
+        DecisionBundle b = r.bundle();
+        assertTrue(b.opaAllowed(), "域内请求经 /decision 必须得到放行（此前该形态在唯一入口上不可表达）");
+        assertEquals(GuardrailDecisionContract.STATE_ALLOW, b.opaPolicyState());
         assertEquals(OpaOracleReplaySupport.writeJson(r.oracle().obligations()),
-                OpaOracleReplaySupport.writeJson(r.data().get(GuardrailDecisionContract.KEY_OBLIGATIONS)),
+                OpaOracleReplaySupport.writeJson(obligationsOf(b.opa())),
                 "义务集（含掩码列与限流键）必须逐字透传，禁在此裁剪或补写");
         assertEquals(2, OpaOracleReplaySupport.obligationsOf("mask", r.oracle().obligations()).size(),
                 "非财务主体必带两条掩码义务（与 cls-non-finance-hide 同源列集）");
     }
 
     @Test
-    @DisplayName("ai/跨部门 p2 — DENY(AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT) 且拒绝态仍带掩码义务")
+    @DisplayName("ai/跨部门 p2 — 经唯一入口 DENY(AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT) 且拒绝态仍带掩码义务")
     void aiWithCrossDepartmentScopeIsDenyButKeepsMaskObligations() throws IOException {
-        OpaOracleReplaySupport.GuardrailReplay r =
-                OpaOracleReplaySupport.replayViaGuardrailDirect("proj_ai_p2");
+        OpaOracleReplaySupport.ChainReplay r = OpaOracleReplaySupport.replayViaDecisionChain(
+                "proj_ai_p2", DecisionBundle.Purpose.AI, V246SeedFixtures.COST_COLUMNS);
 
-        assertEquals(Boolean.FALSE, r.data().get(GuardrailDecisionContract.KEY_ALLOW));
-        assertEquals(GuardrailDecisionContract.STATE_DENY,
-                r.data().get(GuardrailDecisionContract.KEY_POLICY_STATE));
+        DecisionBundle b = r.bundle();
+        assertFalse(b.opaAllowed());
+        assertEquals(GuardrailDecisionContract.STATE_DENY, b.opaPolicyState());
         assertEquals("AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT", deniedReasonOf(r.oracle()));
-        assertEquals(deniedReasonOf(r.oracle()), firstDeniedReason(r.data()),
+        assertEquals(deniedReasonOf(r.oracle()), b.opaDeniedReason(),
                 "跨部门请求域的拒绝理由必须由义务给出，不能只在 allow 布尔上体现");
-        assertFalse(OpaOracleReplaySupport.obligationsOf("mask", obligationsOf(r.data())).isEmpty(),
+        assertFalse(OpaOracleReplaySupport.obligationsOf("mask", obligationsOf(b.opa())).isEmpty(),
                 "拒绝态义务集不得整段消失（rego 侧 default X=[] 的存在理由：分支未定义会让 DENIED 理由一起丢）");
     }
 
@@ -104,15 +106,7 @@ class OpaProjOwnerTest {
         return String.valueOf(denied.get(0).get(GuardrailDecisionContract.KEY_DENIED_REASON));
     }
 
-    /** 生产返回段里第一条 deniedReason。 */
-    private static String firstDeniedReason(Map<String, Object> data) {
-        for (Map<String, Object> o : obligationsOf(data)) {
-            Object reason = o.get(GuardrailDecisionContract.KEY_DENIED_REASON);
-            if (reason != null) return String.valueOf(reason);
-        }
-        return null;
-    }
-
+    /** 生产返回段里的义务集（只读，不含判定逻辑）。 */
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> obligationsOf(Map<String, Object> opaSegment) {
         Object raw = opaSegment.get(GuardrailDecisionContract.KEY_OBLIGATIONS);

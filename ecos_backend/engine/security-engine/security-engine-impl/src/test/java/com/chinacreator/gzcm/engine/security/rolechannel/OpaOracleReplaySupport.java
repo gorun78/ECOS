@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.security.rolechannel;
 
+import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
 import com.chinacreator.gzcm.engine.security.decision.AssetRef;
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -75,10 +76,25 @@ public final class OpaOracleReplaySupport implements AutoCloseable {
                              boolean allow,
                              List<Map<String, Object>> obligations) {
 
-        /** 该输入是否带 {@code resource.dataScope}（只有 AI 工具裁决载荷会发，故不可走 /decision）。 */
+        /**
+         * 该输入是否带 {@code resource.dataScope}。
+         *
+         * <p><b>订正（#142/B4-3d-3）</b>：原注释断言"只有 AI 工具裁决载荷会发，故不可走
+         * {@code /decision}" —— 那是 D-B4-20 缺陷形态的描述，现已由本批关掉；
+         * 本谓词只作 {@code DecisionChainCoverageTest} 的形态分区计数用。</p>
+         */
         public boolean hasResourceScope() {
-            Object resource = input.get("resource");
-            return resource instanceof Map<?, ?> m && m.get("dataScope") != null;
+            Object resource = input.get(DataScopeContract.KEY_RESOURCE);
+            return resource instanceof Map<?, ?> m && m.get(DataScopeContract.KEY_DATA_SCOPE) != null;
+        }
+
+        /**
+         * 该输入是否是 {@code /decision} 可表达形态：顶层 {@code purpose}+{@code asset} 齐备，
+         * 且<b>不带</b> {@code environment}（生产唯一入口不发该段）。
+         */
+        public boolean decisionChainShaped() {
+            return input.get("purpose") != null && input.get("asset") != null
+                    && !input.containsKey("environment");
         }
 
         @SuppressWarnings("unchecked")
@@ -330,9 +346,10 @@ public final class OpaOracleReplaySupport implements AutoCloseable {
         requireEqual(c.name() + " subject.roles(集合等值)",
                 new TreeSet<>(stringList(c.subject().get("roles"))),
                 new TreeSet<>(stringList(sentSubject.get("roles"))));
-        if (c.input().containsKey("resource")) {
+        if (c.input().containsKey(DataScopeContract.KEY_RESOURCE)) {
             requireEqual(c.name() + " resource(深比)",
-                    writeJson(c.input().get("resource")), writeJson(sent.get("resource")));
+                    writeJson(c.input().get(DataScopeContract.KEY_RESOURCE)),
+                    writeJson(sent.get(DataScopeContract.KEY_RESOURCE)));
         }
     }
 
@@ -388,14 +405,10 @@ public final class OpaOracleReplaySupport implements AutoCloseable {
         return out;
     }
 
-    // ═══════════════ 两条回放通道（都由 oracle 单源驱动，用例零内联策略语义） ═══════════════
+    // ═══════════════ 唯一回放通道（由 oracle 单源驱动，用例零内联策略语义） ═══════════════
 
     /** 一次成立的回放：裁决包 + 对应 oracle 记录（用例断言的两侧）。 */
     public record ChainReplay(DecisionBundle bundle, OracleCase oracle) {
-    }
-
-    /** 护栏源直连回放：生产 {@code evaluate} 的返回段 + oracle 记录。 */
-    public record GuardrailReplay(Map<String, Object> data, OracleCase oracle) {
     }
 
     /**
@@ -403,20 +416,29 @@ public final class OpaOracleReplaySupport implements AutoCloseable {
      * 全部取自 oracle 的 {@code input} 段，用例不内联任何策略语义；发出请求体与 oracle 输入
      * 的可比性由 {@link #assertRequestMatches} 在断言结果之前先钉。
      *
-     * <p>前置：该 case 必须是 {@code /decision} 可表达的形态（顶层 {@code purpose}+{@code asset}
-     * 且不带 {@code resource}），否则 {@link #replayViaGuardrailDirect} 才是正确通道。</p>
+     * <p><b>#142/B4-3d-3 订正（D-B4-20 收口的硬证）</b>：本方法原先对带
+     * {@code resource.dataScope} 的 case <b>直接抛错</b>，理由是"只有 AI 工具裁决载荷会发该段，
+     * {@code safeOpa} 不发"。该理由描述的是批前的缺陷形态，不是不变量 —— 现在
+     * {@code safeOpa} 会按 {@link DataScopeContract} 把声明域写进护栏输入，于是
+     * proj_ai_p1 / proj_ai_p2 / dept_ai 三例<b>必须</b>能走唯一入口，且发请求体与录制态逐字可比。
+     * 反过来，本方法现在拒绝的是<b>真正不可表达</b>的形态：{@code input.environment}
+     * （AI 工具载荷的通道推断面，{@code /decision} 从不发送）—— 若放过它，
+     * 可比性钉只看 {@code purpose/asset/subject/resource} 四段，会把"少发了一个决定
+     * {@code purpose} 的段"伪装成等价回放（假绿）。</p>
      */
     public static ChainReplay replayViaDecisionChain(String caseName,
                                                      DecisionBundle.Purpose purpose,
                                                      List<String> columns) throws IOException {
         OracleCase c = byName(caseName);
         if (c.input().get("purpose") == null || c.input().get("asset") == null) {
-            throw new AssertionError(caseName + " 不是 /decision 形态的输入（缺 purpose/asset），"
-                    + "应走 replayViaGuardrailDirect");
+            throw new AssertionError(caseName + " 不是 /decision 形态的输入（缺 purpose/asset）。"
+                    + "本类已无直连回放通道（见「直连回放通道已删除」注），此类 case 应由"
+                    + "对应侧的消费者用例覆盖，禁在本类另起绕行");
         }
-        if (c.hasResourceScope()) {
-            throw new AssertionError(caseName + " 带 resource.dataScope，只有 AI 工具裁决载荷会发；"
-                    + "硬塞进行列面入口会得到与录制时不同的请求体 ⇒ 回放不成立");
+        if (c.input().containsKey("environment")) {
+            throw new AssertionError(caseName + " 带 input.environment（AI 工具载荷的通道推断面），"
+                    + "/decision 侧无对应入参形态 ⇒ 走唯一入口会漏发该段，回放不成立；"
+                    + "该 case 由 AiGuardrailVerdictFromOracleTest / OpaDocumentShapeTest 覆盖");
         }
         assertPolicyNotDrifted();
         try (OpaOracleReplaySupport server = start()) {
@@ -425,7 +447,9 @@ public final class OpaOracleReplaySupport implements AutoCloseable {
             DecisionBundle bundle = harness.decide(
                     new AssetRef(PageChannelHarness.SCHEMA, (String) c.input().get("asset"), columns),
                     harness.explicitContext(str(c, "userId"), str(c, "tenantId"), str(c, "department"),
-                            rolesOf(c)),
+                                    rolesOf(c))
+                            // 声明域同样取 oracle 单源：用例不内联 projectIds/departmentId
+                            .withDataScope(DataScopeContract.read(c.input().get("resource"))),
                     purpose);
             assertRequestMatches(c, server.lastSentInput());
             assertWireShape(server);
@@ -434,25 +458,21 @@ public final class OpaOracleReplaySupport implements AutoCloseable {
     }
 
     /**
-     * 护栏源<b>直连</b>回放（{@code resource.dataScope} 等 AI 工具载荷形态）：
-     * 请求体逐字＝oracle 记录的输入，因此可比性钉退化为深比 {@code input} 段本身。
+     * <b>直连回放通道已删除（#142/B4-3d-3，D-B4-20 收口的反面证据）</b>
+     *
+     * <p>本类原先有 {@code replayViaGuardrailDirect}，把 oracle 的 {@code input} 原样喂给
+     * {@code OpaPolicyService.evaluate} 来回放带 {@code resource.dataScope} 的三例。那是
+     * "唯一入口发不出该段"时的绕行，也正是 D-B4-20 登记的缺陷形态：<b>回放走得通，
+     * 但验的不是生产链路</b>。现在 {@code safeOpa} 会写 {@code resource}，三例
+     * （proj_ai_p1 / proj_ai_p2 / dept_ai）已由 {@link #replayViaDecisionChain} 覆盖，
+     * 保留直连方法等于给后人留一条"绕开唯一入口还能变绿"的路 —— 删。</p>
+     *
+     * <p>剩下的两个带 {@code input.environment} 的例（{@code ai_channel_inferred} /
+     * {@code ai_channel_no_department}）不属"绕行"：它们的通道判定发生在 AI 工具裁决载荷侧，
+     * 由 {@code AiGuardrailVerdictFromOracleTest}（ai 侧消费者，读同一份 oracle 单源）
+     * 与 {@code OpaDocumentShapeTest}（策略文档形态，逐例 {@code evaluateGuardrail}）覆盖，
+     * 本类不再重复回放。该分工的判据由 {@code DecisionChainCoverageTest} 的形态分区计数钉住。</p>
      */
-    public static GuardrailReplay replayViaGuardrailDirect(String caseName) throws IOException {
-        OracleCase c = byName(caseName);
-        assertPolicyNotDrifted();
-        try (OpaOracleReplaySupport server = start()) {
-            server.setCase(caseName);
-            PageChannelHarness harness = PageChannelHarness.create(server.baseUrl());
-            Map<String, Object> data = harness.evaluateGuardrail(c.input());
-            Map<String, Object> sent = server.lastSentInput();
-            if (!writeJson(sent).equals(writeJson(c.input()))) {
-                throw new AssertionError(caseName + " 发出的请求体与录制输入不逐字一致：oracle="
-                        + writeJson(c.input()) + " 实发=" + writeJson(sent));
-            }
-            assertWireShape(server);
-            return new GuardrailReplay(data, c);
-        }
-    }
 
     /**
      * 线路形态钉：恰好一次请求，且打的是策略文档

@@ -33,24 +33,50 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class OpaDenyTest {
 
+    /**
+     * 矩阵行的三格拆成三条具名用例（#142/B4-3d-3）。
+     *
+     * <p>本批前后差别：原先是一个 {@code for (purpose ...)} 循环，用例名靠
+     * {@code "norole_" + purpose.name().toLowerCase()} 拼出来。运行时三格确实都跑了，
+     * 但覆盖率钉（{@code DecisionChainCoverageTest}）按调用点的字面名比对 oracle 单源，
+     * 拼接名读不到 ⇒ {@code norole_ai} 被报成「无人回放」。<b>这是门禁抓到的真问题，
+     * 不是门禁的假阳</b>：§4.7.2 的验收单位是「一格一条具名用例」，拼名让某一格失去
+     * 可静态定位的属主，改名或漏一格都不会变红。故改为三条独立用例，
+     * 判据仍走同一个私有断言（禁三处各写一套）。</p>
+     */
     @Test
-    @DisplayName("page/export/ai — 无权用户三通道同判 NO_DATA_ACCESS_ROLE（真实策略拒绝态）")
-    void noDataAccessRoleDeniesAllThreePurposes() throws IOException {
-        for (DecisionBundle.Purpose purpose : List.of(DecisionBundle.Purpose.PAGE,
-                DecisionBundle.Purpose.EXPORT, DecisionBundle.Purpose.AI)) {
-            OpaOracleReplaySupport.ChainReplay r = OpaOracleReplaySupport.replayViaDecisionChain(
-                    "norole_" + purpose.name().toLowerCase(), purpose, List.of());
+    @DisplayName("page — 无权用户经唯一入口落 EVALUATED_DENY(NO_DATA_ACCESS_ROLE)")
+    void pageChannelDeniesUserWithoutDataAccessRole() throws IOException {
+        assertDeniesWithNoDataAccessRole(OpaOracleReplaySupport.replayViaDecisionChain(
+                "norole_page", DecisionBundle.Purpose.PAGE, List.of()));
+    }
 
-            DecisionBundle b = r.bundle();
-            assertEquals(GuardrailDecisionContract.STATE_DENY, b.opaPolicyState(),
-                    purpose + " 通道必须是「已评估的拒绝」态");
-            assertTrue(b.guardrailEvaluated(), purpose + " 通道不得落「护栏未给出裁决」态");
-            assertFalse(b.guardrailUnevaluated(), purpose + " 通道不得被报成 503");
-            assertFalse(b.opaAllowed());
-            assertEquals("NO_DATA_ACCESS_ROLE", deniedReasonOf(r.oracle()),
-                    purpose + " 通道的拒绝原因逐字取自 rego violation 名");
-            assertEquals(deniedReasonOf(r.oracle()), b.opaDeniedReason());
-        }
+    @Test
+    @DisplayName("export — 无权用户经唯一入口落 EVALUATED_DENY(NO_DATA_ACCESS_ROLE)")
+    void exportChannelDeniesUserWithoutDataAccessRole() throws IOException {
+        assertDeniesWithNoDataAccessRole(OpaOracleReplaySupport.replayViaDecisionChain(
+                "norole_export", DecisionBundle.Purpose.EXPORT, List.of()));
+    }
+
+    @Test
+    @DisplayName("ai — 无权用户经唯一入口落 EVALUATED_DENY(NO_DATA_ACCESS_ROLE)")
+    void aiChannelDeniesUserWithoutDataAccessRole() throws IOException {
+        assertDeniesWithNoDataAccessRole(OpaOracleReplaySupport.replayViaDecisionChain(
+                "norole_ai", DecisionBundle.Purpose.AI, List.of()));
+    }
+
+    /** 三格共用的判据：拒绝态、护栏确实说话、原因串与录制态逐字一致。 */
+    private static void assertDeniesWithNoDataAccessRole(OpaOracleReplaySupport.ChainReplay r) {
+        DecisionBundle b = r.bundle();
+        String purpose = String.valueOf(r.oracle().input().get("purpose"));
+        assertEquals(GuardrailDecisionContract.STATE_DENY, b.opaPolicyState(),
+                purpose + " 通道必须是「已评估的拒绝」态");
+        assertTrue(b.guardrailEvaluated(), purpose + " 通道不得落「护栏未给出裁决」态");
+        assertFalse(b.guardrailUnevaluated(), purpose + " 通道不得被报成 503");
+        assertFalse(b.opaAllowed());
+        assertEquals("NO_DATA_ACCESS_ROLE", deniedReasonOf(r.oracle()),
+                purpose + " 通道的拒绝原因逐字取自 rego violation 名");
+        assertEquals(deniedReasonOf(r.oracle()), b.opaDeniedReason());
     }
 
     @Test
