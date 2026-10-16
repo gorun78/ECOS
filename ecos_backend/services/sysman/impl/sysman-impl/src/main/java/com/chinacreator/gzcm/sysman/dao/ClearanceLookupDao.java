@@ -17,7 +17,7 @@ public class ClearanceLookupDao extends com.chinacreator.gzcm.runtime.core.datab
     /** 按 userId 回查其所属机构（详情设计-01 W40：机构只从服务端解析）。 */
     public List<Map<String, Object>> findOrgById(String userId) {
         return jdbcTemplate.queryForList(
-            "SELECT \"ORG_ID\" FROM TD_USER WHERE \"ID\" = ?", userId);
+            "SELECT org_id FROM td_user_organization WHERE user_id = ? AND is_primary = '1' LIMIT 1", userId);
     }
 
     /** 按行表 + id 列回查配置（含租户过滤缓存）。 */

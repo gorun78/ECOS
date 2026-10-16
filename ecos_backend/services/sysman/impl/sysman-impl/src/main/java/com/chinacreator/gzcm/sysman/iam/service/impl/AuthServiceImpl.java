@@ -226,7 +226,7 @@ public class AuthServiceImpl implements IAuthService {
         try {
             List<Map<String, Object>> rows = userLookupDao.findTenantByUsername(username);
             if (rows != null && !rows.isEmpty()) {
-                Object tid = rows.get(0).get("TENANT_ID");
+                Object tid = rows.get(0).get("tenant_id");
                 if (tid != null && !tid.toString().isBlank()) {
                     return tid.toString();
                 }

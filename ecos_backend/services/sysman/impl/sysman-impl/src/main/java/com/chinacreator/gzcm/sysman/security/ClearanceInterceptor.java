@@ -243,14 +243,14 @@ public class ClearanceInterceptor implements HandlerInterceptor {
     }
 
     private String getCurrentOrgId(String userId) {
-        // 详细设计-01 W40：机构上下文只从服务端解析（TD_USER.ORG_ID），
+        // 详细设计-01 W40：机构上下文只从服务端解析（td_user_organization 主组织），
         // 不再信任客户端 X-Org-Id 头 / orgId 参数（水平越权面）。客户端头已在
         // gateway EcosTrustHeaderFilter 剥离；此处兜底彻底移除客户端来源，双重保险。
         if (userId != null) {
             try {
                 List<Map<String, Object>> rows = clearanceLookupDao.findOrgById(userId);
                 if (rows != null && !rows.isEmpty()) {
-                    Object oid = rows.get(0).get("ORG_ID");
+                    Object oid = rows.get(0).get("org_id");
                     return oid != null ? oid.toString() : null;
                 }
             } catch (Exception e) {

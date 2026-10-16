@@ -70,28 +70,28 @@ public class UserController {
 			@RequestParam(defaultValue = "20") int pageSize) {
 		try {
 			StringBuilder sql = new StringBuilder(
-				"SELECT u.\"USER_ID\" as \"userId\", u.\"USERNAME\" as username, u.\"REAL_NAME\" as \"realName\", " +
-				"u.\"EMAIL\" as email, u.\"MOBILE_TEL1\" as phone, u.\"STATUS\" as status, " +
-				"u.\"LOCKED\" as locked, u.\"LAST_LOGIN_TIME\" as \"lastLoginTime\", " +
-				"u.\"CREATED_TIME\" as \"createdTime\", " +
-				"o.\"ORG_ID\" as \"orgId\", o.\"ORG_NAME\" as \"orgName\" " +
+				"SELECT u.user_id as \"userId\", u.username as username, u.real_name as \"realName\", " +
+				"u.email as email, u.mobile_tel1 as phone, u.status as status, " +
+				"u.locked as locked, u.last_login_time as \"lastLoginTime\", " +
+				"u.created_time as \"createdTime\", " +
+				"o.org_id as \"orgId\", o.org_name as \"orgName\" " +
 				"FROM TD_USER u " +
-				"LEFT JOIN td_user_organization uo ON u.\"USER_ID\" = uo.\"USER_ID\" AND uo.\"IS_PRIMARY\" = '1' " +
-				"LEFT JOIN td_organization o ON uo.\"ORG_ID\" = o.\"ORG_ID\" " +
+				"LEFT JOIN td_user_organization uo ON u.user_id = uo.user_id AND uo.is_primary = '1' " +
+				"LEFT JOIN td_organization o ON uo.org_id = o.org_id " +
 				"WHERE 1=1 ");
 			List<Object> params = new ArrayList<>();
 			if (keyword != null && !keyword.isEmpty()) {
-				sql.append("AND (u.\"USERNAME\" ILIKE ? OR u.\"EMAIL\" ILIKE ?) ");
+				sql.append("AND (u.username ILIKE ? OR u.email ILIKE ?) ");
 				String kw = "%" + keyword + "%";
 				params.add(kw); params.add(kw);
 			}
 			if (status != null && !status.isEmpty()) {
-				sql.append("AND u.\"STATUS\" = ? ");
+				sql.append("AND u.status = ? ");
 				params.add(status);
 			} else {
-				sql.append("AND u.\"STATUS\" != 'DELETED' ");
+				sql.append("AND u.status != 'DELETED' ");
 			}
-			sql.append("ORDER BY u.\"CREATED_TIME\" DESC ");
+			sql.append("ORDER BY u.created_time DESC ");
 
 			String countSql = "SELECT COUNT(*) FROM (" + sql.toString() + ") t";
 			int total = userQueryService.queryForObject(countSql, Integer.class, params.toArray());
@@ -258,8 +258,8 @@ public class UserController {
 	@RequirePermission(permission = "system:user:query")
 	public ApiResponse<List<Map<String, Object>>> getRoles(@PathVariable String id) {
 		try {
-			String sql = "SELECT r.\"ROLE_ID\" as \"roleId\", r.\"ROLE_NAME\" as \"roleName\", r.\"ROLE_CODE\" as \"roleCode\" FROM TD_ROLE r " +
-						"INNER JOIN TD_USER_ROLE ur ON r.\"ROLE_ID\" = ur.\"ROLE_ID\" WHERE ur.\"USER_ID\" = ?";
+			String sql = "SELECT r.role_id as \"roleId\", r.role_name as \"roleName\", r.role_code as \"roleCode\" FROM TD_ROLE r " +
+						"INNER JOIN TD_USER_ROLE ur ON r.role_id = ur.role_id WHERE ur.user_id = ?";
 			List<Map<String, Object>> roles = userQueryService.queryForList(sql, id);
 			return ApiResponse.success(roles);
 		} catch (Exception e) {
@@ -278,9 +278,9 @@ public class UserController {
 				return ApiResponse.badRequest("roleIds 不能为空");
 			}
 
-			userQueryService.update("DELETE FROM TD_USER_ROLE WHERE \"USER_ID\" = ?", id);
+			userQueryService.update("DELETE FROM TD_USER_ROLE WHERE user_id = ?", id);
 			for (String roleId : roleIds) {
-				userQueryService.update("INSERT INTO TD_USER_ROLE (\"USER_ID\", \"ROLE_ID\") VALUES (?, ?)", id, roleId);
+				userQueryService.update("INSERT INTO TD_USER_ROLE (user_id, role_id, created_by) VALUES (?, ?, 'admin')", id, roleId);
 			}
 			return ApiResponse.success();
 		} catch (Exception e) {

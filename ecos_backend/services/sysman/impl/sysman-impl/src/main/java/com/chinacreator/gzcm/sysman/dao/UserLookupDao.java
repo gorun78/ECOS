@@ -15,18 +15,18 @@ public class UserLookupDao extends com.chinacreator.gzcm.runtime.core.database.s
     /** 按用户名回查租户ID（AuthServiceImpl.login）。 */
     public List<Map<String, Object>> findTenantByUsername(String username) {
         return jdbcTemplate.queryForList(
-            "SELECT \"TENANT_ID\" FROM TD_USER WHERE \"USERNAME\" = ?", username);
+            "SELECT tenant_id FROM TD_USER WHERE username = ?", username);
     }
 
     // ── 用户-组织关联（td_user_organization）──
 
     public void deleteUserOrg(String userId) {
-        jdbcTemplate.update("DELETE FROM td_user_organization WHERE \"USER_ID\" = ?", userId);
+        jdbcTemplate.update("DELETE FROM td_user_organization WHERE user_id = ?", userId);
     }
 
     public void insertUserOrg(String userId, String orgId, String createdById) {
         jdbcTemplate.update(
-            "INSERT INTO td_user_organization (\"USER_ID\", \"ORG_ID\", \"IS_PRIMARY\", \"CREATED_TIME\", \"CREATED_BY\") VALUES (?, ?, '1', now(), ?)",
+            "INSERT INTO td_user_organization (user_id, org_id, is_primary, created_time, created_by) VALUES (?, ?, '1', now(), ?)",
             userId, orgId, createdById);
     }
 }
