@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ontology.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -185,9 +186,16 @@ public class SecurityEngineClient {
     /**
      * 列级 CLS — 给定实体全列，返回当前用户可见列。
      *
+     * <p><b>#142/B4-3d-1 语义订正（差距 D-B4-25）</b>：读数位此前只认
+     * {@code data.allowedColumns}，而 CLS 生产者写的键是 {@code visibleColumns}
+     * ⇒ 本体通道的列裁剪结构性恒空集（恒 DENY）。现委托
+     * {@link ColumnSurfaceContract#read} 单源读取；空集＝策略拒绝、
+     * 两键皆不可读＝形态漂移（带理由日志），两者都返 {@code List.of()}，
+     * 但真实可读集现在真的能返回。</p>
+     *
      * @param entityType 实体类型
      * @param cols       全列列表
-     * @return 可见列集合；DENY 时返回 List.of()
+     * @return 可见列集合；DENY / 列面漂移时返回 List.of()
      */
     @SuppressWarnings("unchecked")
     public List<String> filterColumns(String entityType, List<String> cols) {
@@ -200,17 +208,21 @@ public class SecurityEngineClient {
             body.put("userId", currentUserIdOrAnonymous());
             body.put("allColumns", cols);
             Map<String, Object> resp = postJson("/api/v1/security/cls/columns", body);
-            if (resp == null || resp.get("data") == null) return List.of();
-            Object dataObj = resp.get("data");
-            if (!(dataObj instanceof Map)) return List.of();
-            Map<String, Object> data = (Map<String, Object>) dataObj;
-            Object allowedObj = data.get("allowedColumns");
-            if (allowedObj instanceof List<?> list) {
-                List<String> result = new ArrayList<>(list.size());
-                for (Object o : list) result.add(String.valueOf(o));
-                return result;
+            ColumnSurfaceContract.Reading reading =
+                    ColumnSurfaceContract.read(resp == null ? null : resp.get("data"));
+            if (reading.drifted()) {
+                log.warn("SecurityEngineClient.filterColumns 列面漂移 → DENY: entityType={} reason={}",
+                        entityType, reading.reason());
+                return List.of();
             }
-            return List.of();
+            if (reading.visible().isEmpty()) {
+                log.warn("SecurityEngineClient.filterColumns 策略拒绝全部列(ECOS-SEC-402): entityType={}",
+                        entityType);
+            } else if (reading.legacyKeyUsed()) {
+                log.warn("SecurityEngineClient.filterColumns 走 legacy 别名键: entityType={} size={}",
+                        entityType, reading.visible().size());
+            }
+            return reading.visible();
         } catch (Exception e) {
             log.warn("SecurityEngineClient.filterColumns DENY: entityType={} reason={}",
                     entityType, e.getMessage());

@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.workspace.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor;
 import com.chinacreator.gzcm.common.security.header.ServiceContext;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
@@ -25,7 +26,6 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -139,10 +139,21 @@ public class WorkspaceSecurityEngineClient {
     /**
      * POST /api/v1/security/cls/columns。
      *
-     * @return 允许列；security 明确 DENY/异常 → List.of()
+     * <p><b>#142/B4-3d-1 语义订正（差距 D-B4-25）</b>：本方法此前只读
+     * {@code data.allowedColumns}，而 CLS 生产者写的一直是 {@code visibleColumns}
+     * （仓根实证：生产侧零处写 {@code allowedColumns}）——键面漂移使页面通道的列裁剪
+     * <b>结构性恒 DENY</b>：任何主体任何资产都拿不到可读列。现在读数委托
+     * {@link ColumnSurfaceContract#read}（单源读取面，与 ontology/ai 同一份逻辑），
+     * 并区分三态：非空可读集＝可裁剪；空集＝策略明确拒绝；两键皆不可读＝形态漂移
+     * （带理由落日志，禁静默空集冒充"策略裁决"）。</p>
+     *
+     * <p><b>返回值语义不变（只增不改签名）</b>：拒绝态与漂移态都返回空表，调用方
+     * {@code AbacQueryFilter#filterColumns} 按空表置空行集。差异在于<b>真实可读集现在
+     * 真的能返回来</b>，以及漂移态现在可解释。</p>
+     *
+     * @return 允许列；security 明确 DENY / 应答键面漂移 → List.of()
      * @throws SecurityEngineUnavailableException security 进程不可用（连不上/超时/5xx）
      */
-    @SuppressWarnings("unchecked")
     public List<String> allowedColumns(String entityType, List<String> allColumns) {
         if (allColumns == null || allColumns.isEmpty()) return List.of();
         try {
@@ -151,14 +162,21 @@ public class WorkspaceSecurityEngineClient {
             body.put("userId", currentUserId());
             body.put("allColumns", allColumns);
             Map<String, Object> resp = postJson("/api/v1/security/cls/columns", body);
-            if (resp == null || !(resp.get("data") instanceof Map)) return List.of();
-            Object allowedObj = ((Map<String, Object>) resp.get("data")).get("allowedColumns");
-            if (allowedObj instanceof List<?> list) {
-                List<String> result = new ArrayList<>(list.size());
-                for (Object o : list) result.add(String.valueOf(o));
-                return result;
+            ColumnSurfaceContract.Reading reading =
+                    ColumnSurfaceContract.read(resp == null ? null : resp.get("data"));
+            if (reading.drifted()) {
+                log.warn("WorkspaceSecurityEngineClient.allowedColumns 列面漂移 → DENY: "
+                        + "entityType={} reason={}", entityType, reading.reason());
+                return List.of();
             }
-            return List.of();
+            if (reading.visible().isEmpty()) {
+                log.warn("WorkspaceSecurityEngineClient.allowedColumns 策略拒绝全部列(ECOS-SEC-402): "
+                        + "entityType={} blocked={}", entityType, reading.blocked().size());
+            } else if (reading.legacyKeyUsed()) {
+                log.warn("WorkspaceSecurityEngineClient.allowedColumns 走 legacy 别名键: "
+                        + "entityType={} size={}", entityType, reading.visible().size());
+            }
+            return reading.visible();
         } catch (SecurityEngineUnavailableException e) {
             throw e; // 可用性故障不得冒充"无可见列"（§4.5.4 分态）
         } catch (Exception e) {
