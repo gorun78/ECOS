@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <sqlMap namespace="RolePermission">
     <insert id="insertRolePermission">
-        INSERT INTO TD_ROLE_PERMISSION ("ROLE_ID", "PERMISSION_ID", "CREATED_TIME", "CREATED_BY")
+        INSERT INTO TD_ROLE_PERMISSION (role_id, permission_id, created_time, created_by)
         VALUES (#[roleId], #[permissionId], now(), 'system')
     </insert>
 
     <delete id="deleteRolePermission">
-        DELETE FROM TD_ROLE_PERMISSION WHERE "ROLE_ID" = #[roleId] AND "PERMISSION_ID" = #[permissionId]
+        DELETE FROM TD_ROLE_PERMISSION WHERE role_id = #[roleId] AND permission_id = #[permissionId]
     </delete>
 
     <select id="listRolePermissions">
-        SELECT "ROLE_ID" as role_id, "PERMISSION_ID" as permission_id FROM TD_ROLE_PERMISSION WHERE "ROLE_ID" = #[roleId]
+        SELECT role_id as role_id, permission_id as permission_id FROM TD_ROLE_PERMISSION WHERE role_id = #[roleId]
     </select>
 </sqlMap>
