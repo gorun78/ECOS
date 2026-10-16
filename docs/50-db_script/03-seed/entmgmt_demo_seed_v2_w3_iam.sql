@@ -7,7 +7,7 @@
 -- 前置     : W0 备份已完成（本机 ~/ecos-backups/sys_man_pre_entmgmt_v2_2026-10-16.sql，sha256 fcd724bb070fd416…）
 --
 -- 列形态权威（2026-10-16 实跑 information_schema，非 DDL 文本推断）：
---   td_organization 13 列 / td_user 17 列（password NOT NULL）/ td_role 9 列 / td_permission 10 列（**无 status 列**）
+--   td_organization 13 列 / td_user 17 列（password NOT NULL）+ **V289 补 real_name/login_ip/login_count ⇒ 20 列** / td_role 9 列 / td_permission 10 列（**无 status 列**）
 --   td_role_permission(role_id,permission_id,created_time,created_by) / td_user_role(+org_id default '-1')
 --   td_user_organization(is_primary default '1') / td_abac_policy 11 列 / td_role_security_profile / td_user_security_profile
 --   全库对以上表零 CHECK 约束、零外键（沿用一期实测口径）⇒ 插入顺序只为语义可读。
@@ -183,6 +183,25 @@ VALUES
   ('u_ent2_data_gov',  'ent2_data_gov',  'NOLOGIN:seed-entmgmt-v2','tang.yu@entmgmt.demo',      '13800000011','ACTIVE','0',false,'tenant-a','seed-entmgmt','seed-entmgmt'),
   ('u_ent2_sec_aud',   'ent2_sec_aud',   'NOLOGIN:seed-entmgmt-v2','qin.lang@entmgmt.demo',     '13800000012','ACTIVE','0',false,'tenant-a','seed-entmgmt','seed-entmgmt')
 ON CONFLICT (user_id) DO NOTHING;
+
+-- E2. 姓名回填（依赖 V289；User-sql.xml queryUsers 按名引用 real_name，缺列则人员面 bad SQL grammar）
+--     login_ip / login_count 属**运行结果面**，本脚本刻意不写（红线：结果数据禁 seed）⇒ 保持默认 NULL / 0。
+UPDATE td_user u SET real_name = v.real_name, updated_time = CURRENT_TIMESTAMP, updated_by = 'seed-entmgmt'
+FROM (VALUES
+  ('u_ent2_group_gm',  '郑国栋'),
+  ('u_ent2_group_cfo', '林洲'),
+  ('u_ent2_infra_gm',  '陈明远'),
+  ('u_ent2_energy_gm', '黄志远'),
+  ('u_ent2_digital_gm','吴子涵'),
+  ('u_ent2_infra_fin', '周雅'),
+  ('u_ent2_energy_fin','郑凯'),
+  ('u_ent2_proj_a',    '孙立'),
+  ('u_ent2_proj_b',    '马涛'),
+  ('u_ent2_proj_c',    '胡宁'),
+  ('u_ent2_data_gov',  '唐宇'),
+  ('u_ent2_sec_aud',   '秦岭')
+) AS v(user_id, real_name)
+WHERE u.user_id = v.user_id AND u.created_by = 'seed-entmgmt';
 
 -- ── F. 人员-组织（is_primary='1'）与人员-角色（org_id 落真实机构行，不用默认 '-1'）──
 INSERT INTO td_user_organization (user_id, org_id, is_primary, created_by) VALUES
