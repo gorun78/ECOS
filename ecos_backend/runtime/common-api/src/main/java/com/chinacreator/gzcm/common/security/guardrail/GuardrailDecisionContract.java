@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.common.security.guardrail;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -19,7 +20,9 @@ import java.util.Map;
  * 同一分层口径）。</p>
  *
  * <p>策略本体（rego 源）在 {@code ecos-docker/opa-policies/data_access.rego}；
- * 本类只定义"叫什么名、应答里哪个键、状态有哪四值"，不含任何判定逻辑。</p>
+ * 本类只定义"叫什么名、应答里哪个键、状态有哪四值、义务怎么读"，不含任何判定逻辑
+ * （读数≠判定：{@link #readRateLimitDeclaration} 只把策略给的义务形态翻译成显式三态，
+ * 放行/拒绝的结论永远来自 {@code allow} 段，不在本类产生）。</p>
  */
 public final class GuardrailDecisionContract {
 
@@ -59,6 +62,39 @@ public final class GuardrailDecisionContract {
     /** 义务类型键（义务项内）。 */
     public static final String KEY_OBLIGATION = "obligation";
 
+    // ── 义务词表（详设 C.2.5 ③ 四类；义务项 {@code obligation} 的取值面） ──
+    //
+    // 与策略源 {@code ecos-docker/opa-policies/data_access.rego} 的
+    // {@code deny/mask/watermark/rate_obligations} 四组规则逐字对齐，
+    // 由 {@code GuardrailRateLimitVocabularyTest} 做 rego 交叉核对。
+    // 本批只把 rateLimit 一族收进来（消费方在本批落地）；mask/watermark 一族
+    // 的生产侧内联字面量尚未迁移，属主登记为差距 D-B4-31，禁在本批做半截门禁。
+
+    /** 义务类型值：明确拒绝（项内带 {@link #KEY_DENIED_REASON}）。 */
+    public static final String OBLIGATION_DENIED = "DENIED";
+    /** 义务类型值：列脱敏（项内带 column/strategy）。 */
+    public static final String OBLIGATION_MASK = "mask";
+    /** 义务类型值：导出水印（项内带 watermark）。 */
+    public static final String OBLIGATION_WATERMARK = "watermark";
+    /**
+     * 义务类型值：AI 工具调用限流。
+     *
+     * <p>策略侧只在 {@code purpose == "ai" && count(violation) == 0} 时签发，
+     * 因此页面/导出通道永不含该义务 —— 消费方落在 AI 工具咽喉
+     * （{@code ToolExecutorService} 阶段 2.5），不是传输层限流。</p>
+     */
+    public static final String OBLIGATION_RATE_LIMIT = "rateLimit";
+
+    /** 限流键名（义务项内，值形如 {@code ai.tool.<subjectId>}）。 */
+    public static final String KEY_RATE_LIMIT_KEY = "rateLimitKey";
+    /**
+     * 限流键前缀 —— 与策略侧 {@code sprintf("ai.tool.%s",[subject_id])} 逐字一致。
+     *
+     * <p>消费方按本前缀做键面校验：不匹配即<b>键面漂移</b>，属"护栏给的形态不合契约"，
+     * 必须报 FAIL_CLOSED 而不是按自造键计数（后者会把拒绝态洗成放行态）。</p>
+     */
+    public static final String RATE_LIMIT_KEY_PREFIX = "ai.tool.";
+
     // ── 状态判定（唯一实现点，禁各消费方各自字符串比对） ──
 
     /** 从裁决应答读护栏态串；缺键／空串返回 null（＝旧形态漂移，非某一态）。 */
@@ -83,5 +119,64 @@ public final class GuardrailDecisionContract {
     /** 「护栏已给出策略裁决」＝ ALLOW 或 DENY（仅此两态可映射 403 / 放行语义）。 */
     public static boolean isEvaluated(String state) {
         return STATE_ALLOW.equals(state) || STATE_DENY.equals(state);
+    }
+
+    // ── 义务读数（唯一读数点；消费方禁各自遍历义务数组比对字面量） ──
+
+    /**
+     * {@code rateLimit} 义务的声明形态读数。
+     *
+     * <p>必须区分三件事，否则 §4.7.2 的「策略没说」与「策略说了但形态不合」会被折叠：
+     * <ol>
+     *   <li>{@code declared=false} —— 义务集里没有 rateLimit 项（页面/导出通道恒如此）＝本层无义务；</li>
+     *   <li>{@code declared=true, key=null/空} —— 策略签发了限流义务但键缺失＝形态不合契约；</li>
+     *   <li>{@code declared=true, key="ai.tool.x"} —— 可用键。</li>
+     * </ol>
+     * 因此 {@link #key()} 只可能是 null 或原文，"有没有义务"一律看 {@link #declared()}。</p>
+     */
+    public record RateLimitDeclaration(boolean declared, String key) {
+
+        /** 未声明限流义务（不是缺陷，也不是放行判定 —— 放行权在 allow 段）。 */
+        public static RateLimitDeclaration undeclared() {
+            return new RateLimitDeclaration(false, null);
+        }
+    }
+
+    /**
+     * 从应答的 {@code obligations} 段读限流义务声明，兼容策略侧的两种书写：
+     * 对象数组（rego {@code obligations} 规则的标准形态）与单对象（简写）。
+     *
+     * <p>多条 rateLimit 项取<b>首条</b>并在遇到时即返回 —— 策略侧按主体只签发一条，
+     * 出现多条属形态异常，由消费方的键面前缀校验兜住，不在本读数点做去重或合并。</p>
+     */
+    public static RateLimitDeclaration readRateLimitDeclaration(Object obligationsRaw) {
+        if (obligationsRaw == null) return RateLimitDeclaration.undeclared();
+        if (obligationsRaw instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> item) {
+                    RateLimitDeclaration d = declarationOfItem(asMap(item));
+                    if (d.declared()) return d;
+                }
+            }
+            return RateLimitDeclaration.undeclared();
+        }
+        if (obligationsRaw instanceof Map<?, ?> single) {
+            return declarationOfItem(asMap(single));
+        }
+        return RateLimitDeclaration.undeclared();
+    }
+
+    /** 单个义务项的限流读数（非限流项＝未声明）。 */
+    private static RateLimitDeclaration declarationOfItem(Map<String, Object> item) {
+        if (!OBLIGATION_RATE_LIMIT.equals(item.get(KEY_OBLIGATION))) {
+            return RateLimitDeclaration.undeclared();
+        }
+        Object raw = item.get(KEY_RATE_LIMIT_KEY);
+        return new RateLimitDeclaration(true, raw == null ? null : String.valueOf(raw));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> asMap(Map<?, ?> m) {
+        return (Map<String, Object>) m;
     }
 }

@@ -87,6 +87,13 @@ public class ToolObligationApplier {
         List<ToolObligations.Mask> masks = obligations.mask();
         String rowFilter = obligations.rowFilter();
 
+        // 限流义务（D-B4-21）属阶段 2.5 的"这次调用能否发起"判断，本段只处理结果回传面的列/行义务。
+        // 义务集里除限流外没有列/行义务时必须原样放行：否则下面的行结构解释会把"没有可脱敏列"
+        // 读成"结果不可过滤"而 fail-close —— 那会把一次正常调用判成缺陷（本批引入的新回归形态）。
+        if (masks.isEmpty() && (rowFilter == null || rowFilter.isBlank())) {
+            return Outcome.passThrough(resultJson);
+        }
+
         Object root;
         try {
             root = objectMapper.readValue(resultJson, Object.class);

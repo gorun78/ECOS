@@ -8,6 +8,7 @@ import com.chinacreator.gzcm.engine.ai.guardrail.ToolDecision;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolObligations;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlWhitelist;
+import com.chinacreator.gzcm.engine.ai.security.AiToolRateLimitGate;
 import com.chinacreator.gzcm.engine.ai.security.ToolObligationApplier;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.tool.ScenarioToolCatalog;
@@ -41,13 +42,16 @@ import java.util.regex.Pattern;
  * 工具执行器 —— Agent 工具调用的<b>唯一事实咽喉</b>（详细设计-06 F06-01）。
  *
  * <p>阶段链固定为
- * {@code execute() → policyEvaluate() → sandboxReview() → dispatch() → obligationsApply()}：</p>
+ * {@code execute() → policyEvaluate() → sandboxReview() → rateLimitEnforce() → dispatch() → obligationsApply()}：</p>
  * <ol>
  *   <li>{@code policyEvaluate}：对<b>所有</b> toolType 与<b>所有</b>来源（注册表 7 工具 +
  *       DB/fallback 定义的 SQL/REST/BUILTIN + 场景工具）无条件执行一次且仅一次 security-engine
  *       ABAC 裁决（废止原 {@code "SQL".equalsIgnoreCase(toolType)} 前置条件，X-11）；</li>
  *   <li>{@code sandboxReview}：R1.3 高危沙盒，作为<b>附加</b>防御，自身异常一律 DENY
  *       而非放行（X-14）；</li>
+ *   <li>{@code rateLimitEnforce}：ALLOW 裁决若签发 {@code rateLimit} 义务，必须在
+ *       <b>dispatch 之前</b>消费（#142/B4-3d-4 收口差距 D-B4-21）——配额用尽归 DENIED（403），
+ *       义务形态不合契约归 FAIL_CLOSED（503），两者都不进 dispatch，也禁折叠成一态；</li>
  *   <li>{@code dispatch}：按 toolType 分发执行，未获 ALLOW 不会到达此处；</li>
  *   <li>{@code obligationsApply}：ALLOW 返回的 {@code mask[]/rowFilter} 必须在结果回 LLM
  *       <b>之前</b>经 security 侧执行落实，执行不可用则整条结果丢弃并 FAIL_CLOSED（F06-02 要点 2）。</li>
@@ -128,6 +132,7 @@ public class ToolExecutorService {
     private AgentToolPolicyGate policyGate;
     private ToolSubjectResolver subjectResolver;
     private ToolObligationApplier obligationApplier;
+    private AiToolRateLimitGate rateLimitGate;
     private AgentToolSqlWhitelist sqlWhitelist;
 
     @Autowired(required = false)
@@ -143,6 +148,18 @@ public class ToolExecutorService {
     @Autowired(required = false)
     public void setObligationApplier(ToolObligationApplier obligationApplier) {
         this.obligationApplier = obligationApplier;
+    }
+
+    /**
+     * 阶段 2.5 的限流义务消费方（#142/B4-3d-4，D-B4-21）。
+     *
+     * <p>未装配时<b>只在裁决确实签发了限流义务</b>的路径上 FAIL_CLOSED：
+     * 无义务的裁决不受影响（页面形态/旧策略），避免把"策略没签发"变成"全量工具不可用"，
+     * 同时禁止"有义务但无人消费 ⇒ 静默丢弃义务"这一 D-B4-21 原形态复现。</p>
+     */
+    @Autowired(required = false)
+    public void setRateLimitGate(AiToolRateLimitGate rateLimitGate) {
+        this.rateLimitGate = rateLimitGate;
     }
 
     @Autowired(required = false)
@@ -257,6 +274,12 @@ public class ToolExecutorService {
         ToolResult sandboxBlock = sandboxReview(toolName, arguments, callId, startNs);
         if (sandboxBlock != null) {
             return sandboxBlock;
+        }
+
+        // ── 阶段 2.5: rateLimitEnforce —— ALLOW 签发的限流义务必须在 dispatch 之前消费（D-B4-21） ──
+        ToolResult rateBlock = rateLimitEnforce(toolName, decision, callId, startNs);
+        if (rateBlock != null) {
+            return rateBlock;
         }
 
         try {
@@ -392,6 +415,63 @@ public class ToolExecutorService {
             if (!m.startsWith("GET") && !m.startsWith("HEAD")) return "write";
         }
         return "read";
+    }
+
+    // ── 阶段 2.5: rateLimitEnforce ────────────────────────────────────────
+
+    /**
+     * 消费 ALLOW 裁决签发的 {@code rateLimit} 义务（#142/B4-3d-4，差距 D-B4-21 的收口点）。
+     *
+     * <p>策略侧只在 {@code purpose=="ai"} 且放行时签发该义务，键形如
+     * {@code ai.tool.<subjectId>}，键名与前缀的单源在
+     * {@link com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract}。
+     * 本腿在 dispatch <b>之前</b>：限流是"这次调用能否发起"的判断，放到结果回传段
+     * （阶段 4）执行等于先花掉后端预算再拒绝。</p>
+     *
+     * <p>三态映射（禁折叠，§4.7.2 在执行面的延伸）：</p>
+     * <ul>
+     *   <li>未签发义务 → {@code null}（本层无阻断，且不计额）；</li>
+     *   <li>窗口内配额用尽 → {@code GUARDRAIL_DENIED}（403，不重试；这是策略义务未满足，
+     *       不是"护栏没说话"）；</li>
+     *   <li>义务形态不合契约（键缺失／键面漂移／主体段为空）或消费方未装配
+     *       → {@code GUARDRAIL_FAIL_CLOSED}（503；禁按自造键计额后放行，
+     *       也禁把"有义务没人消费"重新退化成静默丢弃＝D-B4-21 的原形态）。</li>
+     * </ul>
+     *
+     * <p>复用 {@code GUARDRAIL_DENIED} 而非新增 429 码的理由见差距文档 v1.0.21 ⑤c
+     * （D.5 码表冻结 + {@code LLM_RATE_LIMITED} 自带"降级备用 provider"语义，
+     * 用它会把护栏拒绝冒充成 provider 限流）。</p>
+     *
+     * @return 拒绝执行的 ToolResult；{@code null} 表示本层无阻断
+     */
+    private ToolResult rateLimitEnforce(String toolName, ToolDecision decision,
+                                        String callId, long startNs) {
+        ToolObligations obligations = decision == null ? null : decision.obligations();
+        if (obligations == null || !obligations.declaresRateLimit()) {
+            return null;
+        }
+        if (rateLimitGate == null) {
+            log.warn("F06-02 限流义务消费方未装配，拒绝执行（fail-closed）: tool={} key={}",
+                    toolName, obligations.rateLimitKey());
+            return buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                    "限流义务消费方不可用（AI_TOOL_RATE_LIMIT_GATE_UNWIRED），拒绝执行", startNs, decision);
+        }
+        AiToolRateLimitGate.RateOutcome outcome = rateLimitGate.enforce(obligations);
+        switch (outcome.verdict()) {
+            case DENIED:
+                log.info("F06-02 限流义务拒绝工具调用（策略结论）: tool={} reason={}",
+                        toolName, outcome.reason());
+                return buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_DENIED,
+                        "工具调用限流义务配额已用尽: " + outcome.reason(), startNs, decision);
+            case FAIL_CLOSED:
+                log.warn("F06-02 限流义务形态不合契约，拒绝执行（fail-closed）: tool={} reason={}",
+                        toolName, outcome.reason());
+                return buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
+                        "限流义务无法消费: " + outcome.reason(), startNs, decision);
+            case PASS:
+            default:
+                return null;
+        }
     }
 
     // ── 阶段 4: obligationsApply ──────────────────────────────────────────
