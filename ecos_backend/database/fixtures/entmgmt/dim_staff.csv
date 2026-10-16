@@ -1,0 +1,9 @@
+staff_code,user_id,dept_org_id,position_name,hourly_rate,currency,staff_status
+S001,u_ent2_proj_a,org_ent2_infra_p1,项目经理,120.00,CNY,ACTIVE
+S002,u_ent2_proj_a,org_ent2_infra_p1,施工员,95.00,CNY,ACTIVE
+S003,u_ent2_proj_b,org_ent2_energy_p1,电气工程师,110.00,CNY,ACTIVE
+S004,u_ent2_proj_c,org_ent2_digital_p1,交付架构师,150.00,CNY,ACTIVE
+S005,u_ent2_infra_fin,org_ent2_infra_fin,财务主管,90.00,CNY,ACTIVE
+S006,u_ent2_energy_fin,org_ent2_energy_fin,资金专员,80.00,CNY,ACTIVE
+S007,u_ent2_data_gov,org_ent2_ops_center,数据治理岗,105.00,CNY,ACTIVE
+S008,u_ent2_group_cfo,org_ent2_fin_center,经营分析岗,130.00,CNY,ACTIVE

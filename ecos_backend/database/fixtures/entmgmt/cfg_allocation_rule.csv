@@ -1,0 +1,4 @@
+rule_code,rule_name,allocation_basis,applies_to_category,pool_dept_org_id,effective_from,is_active
+ALC-2026-STD,集团总部费用按板块产值分摊,OUTPUT_VALUE,MANAGEMENT,org_ent2_fin_center,2026-01,1
+ALC-2026-MKT,市场费用按合同额分摊,CONTRACT_AMOUNT,MARKETING,org_ent2_fin_center,2026-01,1
+ALC-2026-SAL,共享人员工资按工时分摊,WORK_HOURS,SALARY,org_ent2_ops_center,2026-01,1

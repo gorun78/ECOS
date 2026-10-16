@@ -1,0 +1,19 @@
+project_id,contract_id,dept_org_id,attribution_type,attribution_ratio,effective_from,effective_to,source_evidence
+p-ent-001,c-ent-101,org_ent2_infra_p1,ACCEPTANCE,0.6000,2026-01,2027-06,计量单 2026-JL-001
+p-ent-001,c-ent-101,org_ent2_infra_fin,ACCEPTANCE,0.4000,2026-01,2027-06,计量单 2026-JL-001
+p-ent-001,c-ent-101,org_ent2_infra_p1,COLLECTION,0.6000,2026-01,2027-06,资金归集协议 2026-ZJ-011
+p-ent-001,c-ent-101,org_ent2_infra_fin,COLLECTION,0.4000,2026-01,2027-06,资金归集协议 2026-ZJ-011
+p-ent-001,c-ent-101,org_ent2_infra_p1,SUBCONTRACT,0.6000,2026-01,2027-06,分包合同台账 FB-2025-18
+p-ent-002,c-ent-102,org_ent2_infra_p2,ACCEPTANCE,1.0000,2026-01,2026-12,计量单 2026-JL-002
+p-ent-002,c-ent-102,org_ent2_infra_p2,COLLECTION,1.0000,2026-01,2026-12,资金归集协议 2026-ZJ-012
+p-ent-002,c-ent-102,org_ent2_infra_p2,SUBCONTRACT,1.0000,2026-01,2026-12,分包合同台账 FB-2025-21
+p-ent-003,c-ent-103,org_ent2_energy_p1,ACCEPTANCE,1.0000,2026-01,2026-11,计量单 2026-JL-003
+p-ent-003,c-ent-103,org_ent2_energy_fin,COLLECTION,1.0000,2026-01,2026-11,资金归集协议 2026-ZJ-013
+p-ent-004,c-ent-104,org_ent2_digital_p1,ACCEPTANCE,0.5500,2026-02,2026-08,里程碑确认单 MS-2026-04
+p-ent-004,c-ent-104,org_ent2_ops_center,ACCEPTANCE,0.5000,2026-02,2026-08,里程碑确认单 MS-2026-04
+p-ent-004,c-ent-104,org_ent2_digital_p1,COLLECTION,0.5000,2026-02,2026-08,资金归集协议 2026-ZJ-014
+p-ent-004,c-ent-104,org_ent2_digital_p1,COLLECTION,0.5000,2026-02,2026-08,资金归集协议 2026-ZJ-014
+p-ent-005,c-ent-105,org_ent2_energy_p1,ACCEPTANCE,1.0000,2026-03,2026-12,计量单 2026-JL-005
+p-ent-005,c-ent-105,org_ent2_energy_fin,COLLECTION,1.0000,2026-03,2026-12,资金归集协议 2026-ZJ-015
+p-ent-006,c-ent-106,org_ent2_ops_center,ACCEPTANCE,1.0000,2026-03,2026-09,阶段确认单 ST-2026-06
+p-ent-006,c-ent-106,org_ent2_ops_center,COLLECTION,1.0000,2026-03,2026-09,资金归集协议 2026-ZJ-016
