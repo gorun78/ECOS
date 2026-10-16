@@ -86,13 +86,17 @@ public class DqScoreDao extends JdbcTemplateDaoSupport {
     }
 
     public void perDimensionScores(java.util.function.BiConsumer<String, Double> sink) {
+        // ResultSetExtractor 形态：入参 ResultSet 停在首行之前，必须先 next() 再取列，
+        // 否则 PG 驱动抛 SQLState 24000（同 loadRecentChecks 的历史 500 根因）。
         jdbcTemplate.query(
                 "SELECT dimension, AVG(score_value) AS avg_score" +
                 " FROM ecos_data.dq_score_snapshot" +
                 " WHERE evaluated_at >= NOW() - interval '1 day'" +
                 " GROUP BY dimension",
                 rs -> {
-                    sink.accept(rs.getString("dimension"), rs.getDouble("avg_score"));
+                    while (rs.next()) {
+                        sink.accept(rs.getString("dimension"), rs.getDouble("avg_score"));
+                    }
                     return null;
                 });
     }
@@ -126,16 +130,16 @@ public class DqScoreDao extends JdbcTemplateDaoSupport {
                 " WHERE rule_id IN (" + inClause + ")" +
                 "   AND executed_at >= NOW() - " + oneHourInterval,
                 rs -> {
-                    Map<String, Object> m = new java.util.LinkedHashMap<>();
-                    m.put("passed", rs.getBoolean("passed"));
-                    long t = rs.getLong("totalRows");
-                    m.put("totalRows", t);
-                    long f = rs.getLong("failedRows");
-                    m.put("failedRows", f);
-                    m.put("passRate", rs.getDouble("passRate"));
-                    java.sql.Timestamp execTs = rs.getTimestamp("executedAt");
-                    m.put("executedAt", execTs != null ? execTs.toLocalDateTime() : null);
-                    sink.accept(rs.getString("ruleId"), m);
+                    while (rs.next()) {
+                        Map<String, Object> m = new java.util.LinkedHashMap<>();
+                        m.put("passed", rs.getBoolean("passed"));
+                        m.put("totalRows", rs.getLong("totalRows"));
+                        m.put("failedRows", rs.getLong("failedRows"));
+                        m.put("passRate", rs.getDouble("passRate"));
+                        java.sql.Timestamp execTs = rs.getTimestamp("executedAt");
+                        m.put("executedAt", execTs != null ? execTs.toLocalDateTime() : null);
+                        sink.accept(rs.getString("ruleId"), m);
+                    }
                     return null;
                 },
                 ids);

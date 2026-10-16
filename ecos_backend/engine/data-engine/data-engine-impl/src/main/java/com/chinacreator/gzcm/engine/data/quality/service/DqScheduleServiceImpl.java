@@ -25,6 +25,8 @@ import com.chinacreator.gzcm.engine.data.quality.mapper.DqThrottleRow;
 import com.chinacreator.gzcm.engine.data.quality.model.DqRuleVO;
 import com.chinacreator.gzcm.engine.data.quality.model.DqScheduleDTO;
 import com.chinacreator.gzcm.engine.data.quality.model.DqScheduleVO;
+import com.chinacreator.gzcm.engine.data.quality.probe.DqRuleProbeExecutor;
+import com.chinacreator.gzcm.engine.data.quality.probe.RuleProbeResult;
 import com.chinacreator.gzcm.engine.data.quality.scoring.DqDimension;
 import com.chinacreator.gzcm.engine.data.quality.scoring.DimensionScore;
 import com.chinacreator.gzcm.engine.data.quality.scoring.ScoringContext;
@@ -83,19 +85,22 @@ public class DqScheduleServiceImpl implements DqScheduleService {
     private final DqSecurityService securityService;
     private final DqAlertService alertService;
     private final DqScheduleDao scheduleDao;
+    private final DqRuleProbeExecutor probeExecutor;
 
     public DqScheduleServiceImpl(DqScheduleMapper scheduleMapper,
                                  DqRuleMapper ruleMapper,
                                  DqScoreService scoreService,
                                  DqSecurityService securityService,
                                  DqAlertService alertService,
-                                 DqScheduleDao scheduleDao) {
+                                 DqScheduleDao scheduleDao,
+                                 DqRuleProbeExecutor probeExecutor) {
         this.scheduleMapper = scheduleMapper;
         this.ruleMapper = ruleMapper;
         this.scoreService = scoreService;
         this.securityService = securityService;
         this.alertService = alertService;
         this.scheduleDao = scheduleDao;
+        this.probeExecutor = probeExecutor;
     }
 
     // ==================== 1. CRUD ====================
@@ -322,15 +327,18 @@ public class DqScheduleServiceImpl implements DqScheduleService {
     /**
      * 组装 ScoringContext（参数经 DqSecurityService.maskParameters 脱敏 — 铁律 2.4 #3）。
      *
-     * <p>F02-09 上下文真实化：{@code lastCheck/totalRows/failedRows/sampleFailures}
-     * 从上一次 {@code ecos_data.dq_rule_check} 行取真值（同源字段一致性），
-     * 禁止空 Map 造成评估器"高分通过"假象；本波环境不可接通真实 datasources 表
-     * 拉取连接配置，connectionConfig 显式注解 {@code contextIncomplete=true}
-     * 提示下游评估器降级为 UNKNOWN（对应 D.5 错误码 "contextIncomplete"）。
-     * 数据库不可达时同样置 incomplete=true，不阻断批执行。</p>
+     * <p>F02-09 定义的两级上下文：先做真实探测（{@link DqRuleProbeExecutor}），
+     * 拿失败/总数就是权威值；探测不可用（rule_type 未覆盖、目标表/列不在白名单、
+     * SQL 异常）→ 回退到"最近 1h 内的 dq_rule_check 行"（同源字段回填）；
+     * 两级都不可得时保持 {@code contextIncomplete=true}，评估器降级 UNKNOWN
+     *（避免"0/0 → 空表视完整 → 假 1.0"的自证循环）。
      *
-     * <p>可见性 package-private 便于验收单测（ScoringContextHydrationTest）
-     * 直接驱动 mock DqScheduleDao → buildContext 分支。</p>
+     * <p>probeExecutor 是核心路径, 覆盖绝大多数 seed 出的 ENT-* 规则类型
+     * (NOT_NULL/PRESENCE/RANGE/ENUM/FORMAT/VALIDITY/FRESHNESS/UNIQUE)，
+     * 探查实现与双白名单约束见 {@code quality.probe.DqRuleProbeExecutorImpl}。</p>
+     *
+     * <p>可见性 package-private 便于验收单测（ScoringContextHydrationTest / DqScheduleServiceProbeTest）
+     * 直接驱动 mock DqScheduleDao / DqRuleProbeExecutor → buildContext 三分支。</p>
      */
     ScoringContext buildContext(DqRuleVO rule) {
         Map<String, Object> params = securityService.maskParameters(parseParamsJson(rule.getParametersJson()));
@@ -342,17 +350,69 @@ public class DqScheduleServiceImpl implements DqScheduleService {
         ctx.setTotalRows(0L);
         ctx.setFailedRows(0L);
         ctx.setExecutedAt(LocalDateTime.now());
-        // F02-09：connectionConfig 显式标 incomplete（连接配置实值来自 pipeline 执行统计，
-        // 二期接入；本波以占位 Marker 让评估器能正确判 COMPLETE/UNKNOWN 降级）
+
+        // 一级：真实探测
+        RuleProbeResult probe = null;
+        try {
+            probe = probeExecutor.probe(rule);
+        } catch (RuntimeException e) {
+            log.warn("DqSchedule buildContext probe 异常（回退 last-check 语义）: ruleId={}, err={}",
+                    rule.getId(), e.getMessage());
+        }
+
         Map<String, Object> connCfg = new LinkedHashMap<>();
         connCfg.put("scopeKind", scopeOf(rule));
         connCfg.put("scopeId", scopeIdOf(rule));
-        connCfg.put("contextIncomplete", Boolean.TRUE);
-        ctx.setConnectionConfig(connCfg);
         Map<String, Object> sampleFailures = new LinkedHashMap<>();
-        sampleFailures.put("contextIncomplete", Boolean.TRUE);
-        ctx.setSampleFailures(sampleFailures);
         Map<String, Object> lastCheck = new LinkedHashMap<>();
+
+        if (probe != null && probe.isExecuted()) {
+            // 权威真值路径
+            ctx.setTotalRows(probe.getTotalRows() != null ? probe.getTotalRows() : 0L);
+            ctx.setFailedRows(probe.getFailedRows() != null ? probe.getFailedRows() : 0L);
+            connCfg.put("contextIncomplete", Boolean.FALSE);
+            connCfg.put("probeSqlDigest", probe.getSqlDigest());
+            sampleFailures.put("probe", Boolean.TRUE);
+            if (probe.getSqlDigest() != null) {
+                sampleFailures.put("probeQuery", probe.getSqlDigest());
+            }
+            if (ctx.getTotalRows() > 0L && ctx.getFailedRows() > 0L) {
+                double pr = 1.0D - (double) ctx.getFailedRows() / (double) ctx.getTotalRows();
+                lastCheck.put("passRate", pr);
+                lastCheck.put("totalRows", ctx.getTotalRows());
+                lastCheck.put("failedRows", ctx.getFailedRows());
+                lastCheck.put("source", "probe");
+                lastCheck.put("sqlDigest", probe.getSqlDigest());
+            } else if (ctx.getTotalRows() > 0L) {
+                lastCheck.put("passRate", 1.0D);
+                lastCheck.put("totalRows", ctx.getTotalRows());
+                lastCheck.put("failedRows", 0L);
+                lastCheck.put("source", "probe");
+                lastCheck.put("sqlDigest", probe.getSqlDigest());
+            } else {
+                // 空表 (total=0) — 保持 contextIncomplete=true 让评估器按空样本处理（1.0）而非假"通过"
+                connCfg.put("contextIncomplete", Boolean.TRUE);
+                sampleFailures.put("contextIncomplete", Boolean.TRUE);
+                lastCheck.put("contextIncomplete", Boolean.TRUE);
+                lastCheck.put("reason", "probe-executed-empty-table");
+            }
+            ctx.setLastCheck(lastCheck);
+            ctx.setSampleFailures(sampleFailures);
+            ctx.setConnectionConfig(connCfg);
+            ctx.setTargetField(rule.getTargetField());
+            return ctx;
+        }
+
+        // 二级/三级：回退 F02-09 legacy — 最近 1h 内 check 行 / inputInComplete
+        connCfg.put("contextIncomplete", Boolean.TRUE);
+        sampleFailures.put("contextIncomplete", Boolean.TRUE);
+        lastCheck.put("contextIncomplete", Boolean.TRUE);
+        if (probe != null && probe.getReason() != null) {
+            lastCheck.put("probeReason", probe.getReason());
+            connCfg.put("probeReason", probe.getReason());
+        }
+        ctx.setConnectionConfig(connCfg);
+        ctx.setSampleFailures(sampleFailures);
         hydrateFromLastCheck(ctx, lastCheck, rule.getId());
         ctx.setLastCheck(lastCheck);
         ctx.setTargetField(rule.getTargetField());

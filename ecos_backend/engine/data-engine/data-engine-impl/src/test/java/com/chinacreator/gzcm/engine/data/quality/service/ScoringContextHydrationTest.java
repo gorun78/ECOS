@@ -25,6 +25,8 @@ import com.chinacreator.gzcm.engine.data.quality.mapper.DqRuleMapper;
 import com.chinacreator.gzcm.engine.data.quality.mapper.DqScheduleMapper;
 import com.chinacreator.gzcm.engine.data.quality.dao.DqScheduleDao;
 import com.chinacreator.gzcm.engine.data.quality.model.DqRuleVO;
+import com.chinacreator.gzcm.engine.data.quality.probe.DqRuleProbeExecutor;
+import com.chinacreator.gzcm.engine.data.quality.probe.RuleProbeResult;
 import com.chinacreator.gzcm.engine.data.quality.scoring.ScoringContext;
 
 /**
@@ -50,6 +52,11 @@ import com.chinacreator.gzcm.engine.data.quality.scoring.ScoringContext;
 @DisplayName("F02-09 DQ 评分上下文真实化：buildContext 从 dq_rule_check 行取值")
 class ScoringContextHydrationTest {
 
+    /** 本类验证回退路径：probe 一律 notExecuted → buildContext 走 F02-09 legacy 回填。 */
+    private static DqRuleProbeExecutor notExecutedProbe() {
+        return rule -> RuleProbeResult.notExecuted("test-override: probe disabled");
+    }
+
     @Test
     @DisplayName("单条 dq_rule_check 行 → ctx.lastCheck/totalRows/failedRows/sampleFailures/connectionConfig 全部回填")
     void buildContext_hydratesFromLastCheckRow() {
@@ -62,7 +69,7 @@ class ScoringContextHydrationTest {
 
         DqScheduleServiceImpl svc = new DqScheduleServiceImpl(
                 scheduleMapper, ruleMapper, scoreService, security, alertService,
-                scheduleDao);
+                scheduleDao, notExecutedProbe());
 
         // 预置 1 条 dq_rule_check 行 — 模拟真实回填源
         Map<String, Object> checkRow = new LinkedHashMap<>();
@@ -137,7 +144,7 @@ class ScoringContextHydrationTest {
 
         DqScheduleServiceImpl svc = new DqScheduleServiceImpl(
                 scheduleMapper, ruleMapper, scoreService, security, alertService,
-                scheduleDao);
+                scheduleDao, notExecutedProbe());
         when(scheduleDao.findLastCheck(eq("rule-002")))
                 .thenReturn(Collections.emptyList());
         when(security.maskParameters(any())).thenAnswer(inv -> inv.getArgument(0));

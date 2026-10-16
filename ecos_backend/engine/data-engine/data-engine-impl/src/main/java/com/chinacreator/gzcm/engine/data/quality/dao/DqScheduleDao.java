@@ -29,7 +29,7 @@ public class DqScheduleDao extends JdbcTemplateDaoSupport {
                 + " executed_at AS executedAt, passed, total_rows AS totalRows,"
                 + " failed_rows AS failedRows, pass_rate AS passRate, sample_size AS sampleSize,"
                 + " sample_failures::text AS sampleFailuresJson, error_message AS errorMessage"
-                + " FROM ecos_data.dq_rule_check WHERE rule_id = ? AND is_deleted = FALSE"
+                + " FROM ecos_data.dq_rule_check WHERE rule_id = ?"
                 + "   AND executed_at >= NOW() - interval '1 hour'"
                 + " ORDER BY executed_at DESC, id LIMIT 1",
                 ruleId);
