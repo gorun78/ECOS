@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.workspace.security;
 
+import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
+import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -14,8 +16,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -34,6 +38,12 @@ import static org.mockito.Mockito.when;
  * {@code emptyRlsClauseMeansNoPolicyNotDeny}（空串＝无策略＝放行）翻正为
  * {@link #emptyClauseIsNowDenyNotNoPolicy()}——空串/缺字段是应答形态漂移，必须拒绝。
  * 旧断言本身就是 fail-open 的测试化形态，按其 javadoc 自述的承诺删除并翻正，不留双轨。</p>
+ *
+ * <p><b>#142/B4-3d-2（D-B4-15 / D-B4-16）列面段改腿</b>：列裁决 stub 由
+ * {@code allowedColumns}（{@code /cls/columns}）换成 {@code decide(..., purpose=page)}
+ * （三通道唯一入口），并新增 {@code never()} 断言钉住"页面通道不再另走分散面"。
+ * 四态细分（漂移 / 宇宙未解析 / 源异常 / 策略拒绝）由
+ * {@code WorkspacePageChannelDecisionMergeTest} 逐一具名覆盖。</p>
  */
 class AbacQueryFilterDenyTest {
 
@@ -50,27 +60,56 @@ class AbacQueryFilterDenyTest {
         return m;
     }
 
-    // ═══════════════ CLS：默认 DENY ═══════════════
+    // ═══════════════ CLS：默认 DENY（#142/B4-3d-2 页面通道合流 /decision） ═══════════════
+    //
+    // 本段在 B4-3d-2 整体改腿：列裁决此前 stub 的是 client.allowedColumns(...)（= /cls/columns 分散面），
+    // 而导出通道走 /decision —— 同一主体同一张表的列面由两个端点各答一次，"绕不过"在结构上不成立
+    // （差距文档 D-B4-15）。现在页面通道的唯一裁决腿是 decide(purpose=page)，且请求必须带上
+    // 结果行的实际列键作为列全集（universe），否则 security 侧只能回 COLUMN_UNIVERSE_UNRESOLVED。
+
+    /** 按 {@code ColumnSurfaceContract} 的权威形态造一版 bundle 的 {@code columns} 段。 */
+    private static Map<String, Object> columnSegment(List<String> visible, List<String> blocked,
+                                                     String denyReason) {
+        Map<String, Object> seg = new LinkedHashMap<>();
+        seg.put(ColumnSurfaceContract.KEY_VISIBLE_COLUMNS, visible);
+        seg.put(ColumnSurfaceContract.KEY_BLOCKED_COLUMNS, blocked);
+        seg.put(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_SOURCE, ColumnSurfaceContract.UNIVERSE_REQUEST);
+        seg.put(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_RESOLVED, true);
+        if (denyReason != null) seg.put(ColumnSurfaceContract.KEY_CLS_DENY_REASON, denyReason);
+        return seg;
+    }
+
+    private static Map<String, Object> bundleWithColumns(Map<String, Object> columnSegment) {
+        Map<String, Object> bundle = new LinkedHashMap<>();
+        bundle.put("columns", columnSegment);
+        return bundle;
+    }
 
     @Test
-    void clsDenyOrUnavailableReturnsNoRowsInsteadOfOriginalRows() {
+    void clsDenyReturnsNoRowsAndGoesThroughTheSingleDecisionEntry() {
         List<Map<String, Object>> rows = List.of(
                 row("id", "c-1", "salary", 9000),
                 row("id", "c-2", "salary", 12000));
-        when(client.allowedColumns(eq(ENTITY), anyList())).thenReturn(List.of());
+        when(client.decide(eq(ENTITY), anyList(), eq(DecisionChannelContract.PURPOSE_PAGE)))
+                .thenReturn(bundleWithColumns(columnSegment(List.of(), List.of("salary"),
+                        ColumnSurfaceContract.DENY_POLICY)));
 
         List<Map<String, Object>> filtered = filter.filterColumns(ENTITY, rows);
 
-        assertTrue(filtered.isEmpty(), "CLS 拒绝/security 不可用必须置空行集（默认 DENY）");
+        assertTrue(filtered.isEmpty(), "CLS 策略拒绝必须置空行集（默认 DENY）");
         assertNotSame(rows, filtered);
-        verify(client).allowedColumns(eq(ENTITY), anyList());
+        // 列全集＝结果行实际列键（顺序即行内键序），禁传空表（空表＝security 侧宇宙未解析）
+        verify(client).decide(ENTITY, List.of("id", "salary"), DecisionChannelContract.PURPOSE_PAGE);
+        // 第二腿必须真的断了：/cls/columns 消费者面不再参与页面通道裁决
+        verify(client, never()).allowedColumns(anyString(), anyList());
     }
 
     @Test
     void clsAllowPrunesUnlistedColumnsCaseInsensitively() {
         // 正向对照：证明 DENY 用例不是「恒空」stub 造成的假通过
         List<Map<String, Object>> rows = List.of(row("id", "c-1", "NAME", "张三", "salary", 9000));
-        when(client.allowedColumns(eq(ENTITY), anyList())).thenReturn(List.of("ID", "name"));
+        when(client.decide(eq(ENTITY), anyList(), eq(DecisionChannelContract.PURPOSE_PAGE)))
+                .thenReturn(bundleWithColumns(columnSegment(List.of("ID", "name"), List.of("salary"), null)));
 
         List<Map<String, Object>> filtered = filter.filterColumns(ENTITY, rows);
 
@@ -78,6 +117,7 @@ class AbacQueryFilterDenyTest {
         Map<String, Object> kept = filtered.get(0);
         assertTrue(kept.containsKey("id") && kept.containsKey("NAME"), "允许列（含大小写差异）须保留");
         assertFalse(kept.containsKey("salary"), "未列出的列必须被裁剪掉");
+        verify(client, never()).allowedColumns(anyString(), anyList());
     }
 
     @Test

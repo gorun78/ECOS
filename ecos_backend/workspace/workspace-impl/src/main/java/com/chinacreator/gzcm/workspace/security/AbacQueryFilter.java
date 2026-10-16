@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.workspace.security;
 
+import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
+import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -17,14 +19,22 @@ import java.util.Set;
  * <h3>H10-T1（PMO-74 N7/N16）整改</h3>
  * <p>原实现直查 {@code td_abac_policy} 表、本地解析 environment_condition JSON，
  * 并用 {@code rowFilterSql.replace("${userId}", userId)} 字符串插值（二阶注入面）。
- * 现按架构铁律 §2.4 全部裁决改经 {@link WorkspaceSecurityEngineClient} 调
- * security-engine REST（RLS {@code /api/v1/security/rls/apply} +
- * CLS {@code /api/v1/security/cls/columns}），workspace 进程不再自建 ABAC 解析。</p>
+ * 现按架构铁律 §2.4 全部裁决改经 {@link WorkspaceSecurityEngineClient} 调 security-engine REST，
+ * workspace 进程不再自建 ABAC 解析。</p>
+ *
+ * <h3>裁决腿现状（#142/B4-3d-2 订正，差距 D-B4-15 / D-B4-16）</h3>
+ * <ul>
+ *   <li>列裁剪 {@link #filterColumns}：<b>{@code /api/v1/security/decision}（{@code purpose=page}）
+ *       单腿</b> —— 页面通道已合流三通道唯一入口，不再另调 {@code /cls/columns}；</li>
+ *   <li>导出 {@link #decisionBundle}：同一入口（{@code purpose=export}）；</li>
+ *   <li>行过滤 {@link #buildRowFilter}：仍走 {@code /rls/apply}（bundle 的 rls 段已自带可执行片段，
+ *       合流归 B4-3d 后续子批 —— 本批不动行面，避免一次改两条腿导致回归面不可定位）。</li>
+ * </ul>
  *
  * <h3>默认 DENY</h3>
  * <ul>
  *   <li>行过滤：security-engine 明确拒绝 → {@code "1=0"}（调用方拼进 WHERE 即零行）</li>
- *   <li>列裁剪：security-engine 明确拒绝 → 可见列空集 → 返回空行集</li>
+ *   <li>列裁剪：裁决束缺失 / 列面漂移 / 列全集未解析 / 可读集为空 → 返回空行集（各自带理由进日志）</li>
  *   <li>security-engine <b>进程不可用</b>（连不上/超时/5xx）不属上述两态：由客户端单点转
  *       503 {@code ECOS-SEC-501}（{@link com.chinacreator.gzcm.workspace.exception
  *       .SecurityEngineUnavailableException}）原样上抛，禁冒充"无数据"
@@ -54,28 +64,69 @@ public class AbacQueryFilter {
     // ═══════════════ 公共 API ═══════════════════
 
     /**
-     * 对查询结果做列裁剪：仅保留 security-engine CLS 裁决允许的列。
+     * 对查询结果做列裁剪 —— <b>页面通道合流三通道唯一裁决入口</b>
+     * （详设-01 C.1 [3] / F01-02，#142/B4-3d-2 收口差距 D-B4-15 / D-B4-16）。
+     *
+     * <p><b>为什么改这一条腿</b>：本方法此前调 {@code /cls/columns}，而导出通道调
+     * {@code /decision}，同一个主体在同一张表上的列面由<b>两个端点</b>各答一次
+     * （"绕过其中一条在架构上不可表达"的前提是先只有一条）。bundle 的列面在 B4-3d-2 之前
+     * 又不可用（{@code mode} 恒 "allow"、{@code names} 是列面第三种叫法、无拒绝理由），
+     * 所以合流必须先修 bundle —— 两件事同批做，否则合流就是又一次假收口。</p>
+     *
+     * <p><b>四态分面（§4.5.4「不可用 ≠ 无权限」在页面通道的落地）</b>：
+     * 传输故障由客户端单点转 503 上抛（不改）；裁决束缺失 / 列面键面漂移 /
+     * 列全集未解析 / 可读集为空 四态一律返回空行集（fail-closed），
+     * 但<b>各自带不同理由进日志</b> —— 前两种是缺陷/形态态，后两种才是策略结论。
+     * 禁把四态折叠成同一条"无可见列"日志（那正是 D-B4-16 的病灶）。</p>
      *
      * @param entityCode 实体编码（如 "Contract"）
      * @param rows       查询结果行列表
-     * @return 裁剪后的行列表（新 List，不影响原数据）；CLS 明确拒绝 → 空列表（默认 DENY）；
+     * @return 裁剪后的行列表（新 List，不影响原数据）；列面不可用 → 空列表（默认 DENY）；
      *         security-engine 进程不可用 → 上抛 503 {@code ECOS-SEC-501}，禁空行集冒充
      */
     public List<Map<String, Object>> filterColumns(String entityCode, List<Map<String, Object>> rows) {
         if (rows == null || rows.isEmpty()) return rows;
 
         List<String> allColumns = new ArrayList<>(rows.get(0).keySet());
-        List<String> allowed = securityEngineClient.allowedColumns(entityCode, allColumns);
-        if (allowed.isEmpty()) {
-            // 明确 DENY（4xx 鉴权失败/响应不可解析同归此态）：默认拒绝，不返回任何列数据。
-            // 「进程不可用」已在客户端单点转 503 上抛，不会走到本分支冒充空行集。
-            log.warn("ABAC列裁剪 DENY（security-engine 明确拒绝/应答不可解析）: entity={}, rows={} 被置空",
+        if (allColumns.isEmpty()) {
+            // 宇宙为空＝无可裁剪对象，也不发起裁决：让 security 侧的 COLUMN_UNIVERSE_UNRESOLVED
+            // 分支去回应"一行里连列名都没有"的请求，等于用一条拒绝掩盖调用侧缺陷。
+            log.warn("ABAC列裁剪 DENY（结果行无列键，未发起裁决）: entity={}, rows={}", entityCode, rows.size());
+            return List.of();
+        }
+
+        Map<String, Object> bundle = securityEngineClient.decide(
+                entityCode, allColumns, DecisionChannelContract.PURPOSE_PAGE);
+        if (bundle == null) {
+            // 裁决束缺失（应答无 data 段/形态非 Map）＝裁决无出处，与"策略拒绝"分态。
+            log.warn("ABAC列裁剪 DENY（页面通道裁决束缺失，非策略结论）: entity={}, rows={} 被置空",
                     entityCode, rows.size());
             return List.of();
         }
 
+        Object columnSegment = bundle.get("columns");
+        ColumnSurfaceContract.Reading reading = ColumnSurfaceContract.read(columnSegment);
+        if (reading.drifted()) {
+            log.warn("ABAC列裁剪 DENY（bundle 列面键面漂移，非策略结论）: entity={} reason={}",
+                    entityCode, reading.reason());
+            return List.of();
+        }
+        if (ColumnSurfaceContract.universeUnresolved(columnSegment)) {
+            log.warn("ABAC列裁剪 DENY（列全集未解析，裁决未判定列面）: entity={} clsDenyReason={}",
+                    entityCode, ColumnSurfaceContract.denyReasonOf(columnSegment));
+            return List.of();
+        }
+        if (reading.visible().isEmpty()) {
+            // 明确 DENY（策略清空可读集 / CLS 源异常态已由生产者写入 clsDenyReason）：
+            // 默认拒绝，不返回任何列数据。「进程不可用」已在客户端单点转 503 上抛，
+            // 不会走到本分支冒充空行集。
+            log.warn("ABAC列裁剪 DENY（security-engine 明确拒绝）: entity={}, rows={} 被置空 reason={}",
+                    entityCode, rows.size(), ColumnSurfaceContract.denyReasonOf(columnSegment));
+            return List.of();
+        }
+
         Set<String> allowedLower = new LinkedHashSet<>();
-        for (String col : allowed) {
+        for (String col : reading.visible()) {
             if (col != null) allowedLower.add(col.toLowerCase());
         }
 
@@ -90,8 +141,9 @@ public class AbacQueryFilter {
             }
             filtered.add(cleaned);
         }
-        log.debug("ABAC列裁剪(security-engine CLS): entity={}, allowed={}, rows={}",
-                entityCode, allowed.size(), rows.size());
+        log.debug("ABAC列裁剪(security-engine /decision purpose={}): entity={}, allowed={}, blocked={}, rows={}",
+                DecisionChannelContract.PURPOSE_PAGE, entityCode, reading.visible().size(),
+                reading.blocked().size(), rows.size());
         return filtered;
     }
 
@@ -152,21 +204,27 @@ public class AbacQueryFilter {
     /**
      * 三通道唯一裁决入口的 workspace 侧委托（详设-01 C.1 [3] / F01-02，#142/B4-3b 只增）。
      *
-     * <p>本方法是 workspace 出<em>裁决</em>的第二条腿（第一条是 {@link #buildRowFilterCondition}
-     * / {@link #filterColumns} 的分散面），刻意放在同一委托类里：workspace 侧"谁能调
-     * security-engine"的清单保持单点，不新增第三个出口。导出通道需要的是
-     * <b>一次拿全四源 + 范围证据</b>，分散面给不了（{@code /rls/apply} 只回谓词、
-     * 不回"命中了哪条策略"），故 B4-3b 先接导出；页面/AI 两通道合流到本入口归 B4-3c
-     * （差距文档 D-B4-15）。</p>
+     * <p>本方法是"整表面裁决 + 范围证据"的出口（导出件需要 {@code rls.policyRefs} /
+     * {@code columns.policyRefs} / 水印义务，分散面给不了）。workspace 侧"谁能调
+     * security-engine"的清单保持单点，不新增第三个出口。</p>
+     *
+     * <p><b>#142/B4-3d-2 订正（D-B4-15 / D-B4-16 收口进度）</b>：原文记载"页面/AI 两通道合流
+     * 归 B4-3c"未成立（B4-3c 只做了 AI 侧的护栏名合规与具名用例）。本批页面通道的列面已合流经
+     * {@link #filterColumns} 走 {@code /decision}；仍留在分散面上的是<b>行过滤</b>
+     * （{@link #buildRowFilter} 走 {@code /rls/apply}）与 <b>AI 通道</b>（归 B4-3d-3）。
+     * 本方法刻意保持 {@code columns=[]}（整表面裁决）：列裁剪请用 {@link #filterColumns}，
+     * 它会把结果行的实际列键作为 universe 一起送裁决 —— 本入口拿不到行数据，
+     * 在此猜列名会造出第二个宇宙源。</p>
      *
      * @param entityCode 受保护资产定位符（与 {@code AssetRef.table} 同义）
-     * @param purpose    通道字面量（{@code page} / {@code export} / {@code ai}）
+     * @param purpose    通道字面量，取值只认 {@link DecisionChannelContract}
+     *                   （{@code page} / {@code export} / {@code ai}）
      * @return {@code DecisionBundle} 的 REST 形态；security 明确拒绝/应答缺段 → {@code null}
-     *         （调用方按 fail-closed 处理）；进程不可用 → 503 {@code ECOS-SEC-501} 上抛
+     *         （调用方按 fail-closed 处理）；进程不可用 → 503 {@code ECOS-SEC-501} 上抛；
+     *         未识别的 purpose ⇒ security 返回 400，由客户端归入"无裁决证据"的 {@code null} 态
+     *         （D-B4-27：调用方词面失配不再被静默当成页面通道）
      */
     public Map<String, Object> decisionBundle(String entityCode, String purpose) {
-        // columns 传空 = 整表面裁决；列裁剪仍走 filterColumns/allowedColumns（bundle 列面
-        // 在 columns=[] 时不可用，收口项 D-B4-16），禁在此处猜列名。
         return securityEngineClient.decide(entityCode, List.of(), purpose);
     }
 

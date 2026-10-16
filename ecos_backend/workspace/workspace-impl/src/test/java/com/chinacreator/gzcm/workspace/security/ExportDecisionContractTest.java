@@ -159,8 +159,10 @@ class ExportDecisionContractTest {
                 "workspace 侧必须存在 /decision 单入口调用（D-B4-10：EXPORT 通道此前生产零调用）");
         assertTrue(filterSrc.contains("securityEngineClient.decide("),
                 "workspace 出裁决只经 AbacQueryFilter 委托，不得新增第三个出口");
-        assertTrue(guardSrc.contains("PURPOSE_EXPORT = \"export\""),
-                "通道字面量必须与 security 侧 Purpose.EXPORT 的 wire 形态同源");
+        assertTrue(guardSrc.contains("PURPOSE_EXPORT = DecisionChannelContract.PURPOSE_EXPORT"),
+                "通道字面量必须取 DecisionChannelContract 单源（#142/B4-3d-2，D-B4-27："
+                        + "内联 \"export\" 加上入口对未识别值的静默回落 PAGE，等于词面一失配"
+                        + "导出就以页面档被裁决且返回 200）");
         assertTrue(guardSrc.contains("decisionBundle(entityCode, PURPOSE_EXPORT)"),
                 "导出咽喉必须取自裁决入口，不得退回 /rls/apply 分散面");
         assertTrue(exportSrc.contains("readGuard.exportDecision(ENTITY_CODE)"),

@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.engine.security.decision.AssetRef;
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
 import com.chinacreator.gzcm.engine.security.decision.DecisionContext;
@@ -45,7 +46,14 @@ public class DecisionController {
         if (asset == null) {
             return ApiResponse.badRequest("assetRef.table 不能为空");
         }
-        DecisionBundle.Purpose purpose = parsePurpose(asStr(body.get("purpose")));
+        String rawPurpose = asStr(body.get("purpose"));
+        DecisionBundle.Purpose purpose = resolvePurpose(rawPurpose);
+        if (purpose == null) {
+            // D-B4-27：未识别的 purpose 过去被静默当 PAGE 放行（导出/AI 调用一旦词面失配，
+            // 就以页面档的护栏矩阵被裁决并返回 200 —— 无错误、无日志、消费方无从察觉）。
+            // 现按 400 显式拒绝；缺失/空白仍是既约定的 PAGE 默认，既有调用方行为不变。
+            return ApiResponse.badRequest(DecisionChannelContract.unrecognizedReason(rawPurpose));
+        }
 
         String userId = ctxUserId();
         String tenantId = ctxTenantId();
@@ -73,10 +81,23 @@ public class DecisionController {
         }
     }
 
-    private static DecisionBundle.Purpose parsePurpose(String s) {
-        if (s == null) return DecisionBundle.Purpose.PAGE;
-        try { return DecisionBundle.Purpose.valueOf(s.trim().toUpperCase()); }
-        catch (IllegalArgumentException e) { return DecisionBundle.Purpose.PAGE; }
+    /**
+     * 通道词解析（#142/B4-3d-2 语义订正，D-B4-27）。
+     *
+     * <p>三态：缺失/空白 ⇒ {@code PAGE}（既约定默认，保持不传 purpose 的既有调用方行为不变）；
+     * 命中 {@link DecisionChannelContract} 词表 ⇒ 对应通道；<b>未命中 ⇒ {@code null}</b>，
+     * 由调用方转 400。旧实现在未命中时 {@code return Purpose.PAGE}，即静默降级。</p>
+     */
+    private static DecisionBundle.Purpose resolvePurpose(String s) {
+        if (s == null || s.isBlank()) return DecisionBundle.Purpose.PAGE;
+        String normalized = DecisionChannelContract.normalize(s);
+        if (normalized == null) return null;
+        try {
+            return DecisionBundle.Purpose.valueOf(normalized.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            // 词表里有、枚举里没有＝两侧失配（新增通道只改了一处），同样拒绝而非降级
+            return null;
+        }
     }
 
     @SuppressWarnings("unchecked")

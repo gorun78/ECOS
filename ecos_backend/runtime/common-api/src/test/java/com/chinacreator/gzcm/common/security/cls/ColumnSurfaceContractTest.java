@@ -193,10 +193,84 @@ class ColumnSurfaceContractTest {
     }
 
     @Test
-    @DisplayName("契约键名单源：三键字面量与本类常量一致（生产者/消费者改名的唯一对照点）")
+    @DisplayName("契约键名单源：键字面量与本类常量一致（生产者/消费者改名的唯一对照点）")
     void keyLiteralsAreSingleSourced() {
         assertEquals("visibleColumns", ColumnSurfaceContract.KEY_VISIBLE_COLUMNS);
         assertEquals("blockedColumns", ColumnSurfaceContract.KEY_BLOCKED_COLUMNS);
         assertEquals("allowedColumns", ColumnSurfaceContract.KEY_ALLOWED_COLUMNS_LEGACY);
+        // #142/B4-3d-2（D-B4-16）：裁决束列面的三枚证据键同属单源，改名必须先过本类
+        assertEquals("columnUniverseSource", ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_SOURCE);
+        assertEquals("columnUniverseResolved", ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_RESOLVED);
+        assertEquals("clsDenyReason", ColumnSurfaceContract.KEY_CLS_DENY_REASON);
+    }
+
+    @Test
+    @DisplayName("理由词表单源：四值互不相同（消费侧靠它们分立 403 / 503 / 缺陷三态）")
+    void denyReasonVocabularyIsDistinctAndSingleSourced() {
+        List<String> reasons = List.of(
+                ColumnSurfaceContract.DENY_POLICY,
+                ColumnSurfaceContract.DENY_UNIVERSE_UNRESOLVED,
+                ColumnSurfaceContract.DENY_SOURCE_ERROR,
+                ColumnSurfaceContract.DRIFT_ABSENT,
+                ColumnSurfaceContract.DRIFT_NO_DATA);
+        assertEquals(5, reasons.stream().distinct().count(), "理由码不得复用（复用＝两态被折成一支）");
+        assertEquals("CLS_POLICY_DENY", ColumnSurfaceContract.DENY_POLICY);
+        assertEquals("COLUMN_UNIVERSE_UNRESOLVED", ColumnSurfaceContract.DENY_UNIVERSE_UNRESOLVED);
+        assertEquals("CLS_SOURCE_ERROR", ColumnSurfaceContract.DENY_SOURCE_ERROR);
+        // universe 源值同为单源：生产侧只可能写这两个值之一
+        assertEquals("REQUEST", ColumnSurfaceContract.UNIVERSE_REQUEST);
+        assertEquals("NONE", ColumnSurfaceContract.UNIVERSE_NONE);
+    }
+
+    // ═══════════════ 5. 裁决束列面的证据读数（#142/B4-3d-2，差距 D-B4-16） ═══════════════
+
+    @Test
+    @DisplayName("universeUnresolved 只在显式 false 时为真；键缺失/非布尔/true 均为假")
+    void universeUnresolvedRequiresExplicitFalse() {
+        assertTrue(ColumnSurfaceContract.universeUnresolved(
+                Map.of(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_RESOLVED, false)));
+        assertFalse(ColumnSurfaceContract.universeUnresolved(
+                Map.of(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_RESOLVED, true)));
+        // 键缺失 ⇒ 假：/cls/columns 的应答从来没有这枚键，凭空判"不可解析"会让
+        // 唯一没有证据段的应答面变红（真值由裁决束生产者写键 + 门禁钉住，不靠默认值兜）
+        assertFalse(ColumnSurfaceContract.universeUnresolved(Map.of("visibleColumns", List.of())));
+        assertFalse(ColumnSurfaceContract.universeUnresolved(
+                Map.of(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_RESOLVED, "false")),
+                "字符串 \"false\" 不是布尔 false（JSON 反序列化形态漂移不做类型猜测）");
+        assertFalse(ColumnSurfaceContract.universeUnresolved(null));
+        assertFalse(ColumnSurfaceContract.universeUnresolved("columnUniverseResolved"));
+    }
+
+    @Test
+    @DisplayName("denyReasonOf：可读理由 / 缺失得 null / 空白得 null（禁消费者自造默认理由）")
+    void denyReasonOfNeverInventsADefault() {
+        assertEquals(ColumnSurfaceContract.DENY_SOURCE_ERROR, ColumnSurfaceContract.denyReasonOf(
+                Map.of(ColumnSurfaceContract.KEY_CLS_DENY_REASON, ColumnSurfaceContract.DENY_SOURCE_ERROR)));
+        assertNull(ColumnSurfaceContract.denyReasonOf(Map.of("visibleColumns", List.of("id"))));
+        assertNull(ColumnSurfaceContract.denyReasonOf(
+                Map.of(ColumnSurfaceContract.KEY_CLS_DENY_REASON, "   ")),
+                "空白理由当 null：可用态禁写空串冒充「无理由」（与三消费者读取面同纪律）");
+        assertNull(ColumnSurfaceContract.denyReasonOf(null));
+        assertNull(ColumnSurfaceContract.denyReasonOf(Map.of(
+                ColumnSurfaceContract.KEY_CLS_DENY_REASON, 402)));
+    }
+
+    @Test
+    @DisplayName("正向对照：证据读数与 read() 互不干扰（加键不改变列面可读性判定）")
+    void evidenceKeysDoNotDisturbColumnReading() {
+        Map<String, Object> segment = new LinkedHashMap<>();
+        segment.put("visibleColumns", Arrays.asList("id", "amount"));
+        segment.put("blockedColumns", List.of("salary"));
+        segment.put(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_SOURCE,
+                ColumnSurfaceContract.UNIVERSE_REQUEST);
+        segment.put(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_RESOLVED, true);
+
+        ColumnSurfaceContract.Reading reading = ColumnSurfaceContract.read(segment);
+
+        assertFalse(reading.drifted());
+        assertTrue(reading.usable());
+        assertEquals(2, reading.visible().size());
+        assertFalse(ColumnSurfaceContract.universeUnresolved(segment));
+        assertNull(ColumnSurfaceContract.denyReasonOf(segment));
     }
 }

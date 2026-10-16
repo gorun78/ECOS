@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.security;
 
+import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.engine.security.dao.SecurityDecisionDao;
 import com.chinacreator.gzcm.engine.security.decision.AssetRef;
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
@@ -119,8 +120,15 @@ class ThreeChannelDecisionTest {
 
         assertNotNull(b.columns());
         assertEquals("allow", b.columns().get("mode"));
-        assertIterableEquals(List.of("col1", "col2"),
-                (Iterable<?>) b.columns().get("names"), "CLS 应按目录 allow 集裁剪");
+        // 单源访问器为唯一读数面；names 只作兼容别名，必须与权威可读集逐字节等值
+        // （#142/B4-3d-2，D-B4-16：别名分叉＝列面出现两套真值，正是 D-B4-25 的成因）
+        assertEquals(List.of("col1", "col2"), b.columnsVisible(), "CLS 应按目录 allow 集裁剪");
+        assertIterableEquals(b.columnsVisible(),
+                (Iterable<?>) b.columns().get("names"), "兼容别名 names 不得与单源可读集分叉");
+        assertEquals(ColumnSurfaceContract.UNIVERSE_REQUEST,
+                b.columnUniverseSource(), "列全集出处必须落证据（AssetRef.columns 显式请求）");
+        assertTrue(b.columnUniverseResolved());
+        assertNull(b.clsDenyReason(), "可用列面禁带拒绝理由");
 
         assertNotNull(b.opa());
         assertEquals(true, b.opa().get("allow"));

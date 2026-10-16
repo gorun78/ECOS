@@ -55,6 +55,47 @@ public final class ColumnSurfaceContract {
     /** 应答 {@code data} 段整体缺失（无 data / 非 Map）。 */
     public static final String DRIFT_NO_DATA = "CLS_RESPONSE_HAS_NO_DATA_SEGMENT";
 
+    // ── #142/B4-3d-2 只增：裁决束列面的「证据键 + 理由词表」单源（差距 D-B4-16） ──
+    //
+    // 动机：{@code /cls/columns} 的列面只回答"哪些列可读"，而三通道唯一裁决入口
+    // {@code /decision} 的 {@code columns} 段还要回答"这个结论是怎么来的"。此前 bundle
+    // 只有 {@code mode}/{@code names} 两个键，且 {@code mode} 由生产者恒写 "allow"（零信息量），
+    // 于是「策略拒绝全部列」「列全集(universe)没给」「CLS 源抛异常」三态在消费侧全是
+    // {@code names=[]} 一副面孔 —— 消费方无法按 §4.5.4「不可用 ≠ 无权限」分态，
+    // 只能一律当"无权限"，或更糟：当成"没限制"。这三个键与三个理由值就是为了让
+    // 三态在**线上形态**上可区分，且生产者/消费者共用同一份字面量（禁各写一套 ——
+    // 那正是 D-B4-25 的根因）。
+
+    /** 列全集出处（{@link #UNIVERSE_REQUEST} / {@link #UNIVERSE_NONE}）。 */
+    public static final String KEY_COLUMN_UNIVERSE_SOURCE = "columnUniverseSource";
+
+    /** 列全集是否解析得出来（{@code false}＝未解析，此时 {@code visibleColumns=[]} 不是策略结论）。 */
+    public static final String KEY_COLUMN_UNIVERSE_RESOLVED = "columnUniverseResolved";
+
+    /** 列面不可用时的机读理由（可用时该键缺席——禁写空串冒充"无理由"）。 */
+    public static final String KEY_CLS_DENY_REASON = "clsDenyReason";
+
+    /** 列全集来自调用方显式请求（页面通道＝结果行的实际列键，唯一常态）。 */
+    public static final String UNIVERSE_REQUEST = "REQUEST";
+
+    /** 调用方未给列全集 ⇒ 列面不可判定（生产者禁自造宇宙源，见类内 {@link #DENY_UNIVERSE_UNRESOLVED}）。 */
+    public static final String UNIVERSE_NONE = "NONE";
+
+    /** 列全集在位、CLS 策略把可读集清空 ⇒ 真正的"策略拒绝全部列"（§4.3.3 {@code ECOS-SEC-402}）。 */
+    public static final String DENY_POLICY = "CLS_POLICY_DENY";
+
+    /**
+     * 列全集未解析 ⇒ 列面**未判定**，不是"用户无权限"。
+     *
+     * <p>本批刻意不给 universe 兜底一个"CATALOG"源：安全域资产目录 {@code ecos_security_asset}
+     * 在 dev 实存 0 行（D-B4-19），拿它当宇宙等于用一条不可测分支冒充单源。裁决登记见
+     * 差距文档 v1.0.19 行。</p>
+     */
+    public static final String DENY_UNIVERSE_UNRESOLVED = "COLUMN_UNIVERSE_UNRESOLVED";
+
+    /** CLS 源自身抛异常（{@code SecurityDecisionService#safeCls} 兜底态）⇒ 属可用性/缺陷态。 */
+    public static final String DENY_SOURCE_ERROR = "CLS_SOURCE_ERROR";
+
     private ColumnSurfaceContract() {
     }
 
@@ -131,6 +172,33 @@ public final class ColumnSurfaceContract {
         return Reading.drift(DRIFT_ABSENT
                 + "（权威键 " + KEY_VISIBLE_COLUMNS + " 与别名键 " + KEY_ALLOWED_COLUMNS_LEGACY
                 + " 均不可读，非「无策略」）");
+    }
+
+    /**
+     * 列全集是否<b>显式</b>判不可解析。
+     *
+     * <p>只在 {@code columnUniverseResolved == false} 时为真。键缺失时为假 —— 这是有意的：
+     * {@code /cls/columns} 的应答从来没有该键（它不是裁决束），把它当成"不可解析"会让
+     * 三通道里唯一没有证据段的应答面凭空变红。裁决束侧的生产者必须写该键，
+     * 由 {@code BundleColumnSurfaceTest} 与静态门禁钉住，不靠本方法的默认值兜。</p>
+     */
+    public static boolean universeUnresolved(Object segment) {
+        if (!(segment instanceof Map<?, ?> data)) return false;
+        return Boolean.FALSE.equals(data.get(KEY_COLUMN_UNIVERSE_RESOLVED));
+    }
+
+    /**
+     * 列面不可用的机读理由（键缺失/非字符串形态 ⇒ {@code null}，禁由消费者自造默认理由）。
+     *
+     * <p>只对 {@code String} 形态生效：与 {@link #read(Object)} 「非列表不猜类型」同一纪律。
+     * 若把数字/布尔用 {@code String.valueOf} 折成理由，消费侧的
+     * {@code clsDenyReason() equals DENY_*} 判定会在生产侧写错类型时静默变成"有理由的拒绝"，
+     * 把形态漂移伪装成策略结论（D-B4-16 要消除的正是这种折叠）。</p>
+     */
+    public static String denyReasonOf(Object segment) {
+        if (!(segment instanceof Map<?, ?> data)) return null;
+        if (!(data.get(KEY_CLS_DENY_REASON) instanceof String raw)) return null;
+        return raw.isBlank() ? null : raw;
     }
 
     private static List<String> strings(Object raw) {

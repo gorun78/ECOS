@@ -147,9 +147,16 @@ public class WorkspaceSecurityEngineClient {
      * 并区分三态：非空可读集＝可裁剪；空集＝策略明确拒绝；两键皆不可读＝形态漂移
      * （带理由落日志，禁静默空集冒充"策略裁决"）。</p>
      *
-     * <p><b>返回值语义不变（只增不改签名）</b>：拒绝态与漂移态都返回空表，调用方
-     * {@code AbacQueryFilter#filterColumns} 按空表置空行集。差异在于<b>真实可读集现在
-     * 真的能返回来</b>，以及漂移态现在可解释。</p>
+     * <p><b>返回值语义不变（只增不改签名）</b>：拒绝态与漂移态都返回空表。差异在于
+     * <b>真实可读集现在真的能返回来</b>，以及漂移态现在可解释。</p>
+     *
+     * <p><b>#142/B4-3d-2 订正（D-B4-15 收口）</b>：原文记载"调用方
+     * {@code AbacQueryFilter#filterColumns} 按空表置空行集"已不成立 —— 页面通道的列裁剪
+     * 已合流 {@code /decision}（{@code purpose=page}），不再经本方法，workspace 侧列面
+     * 因此只剩一条裁决腿。本方法保留：①作为 {@code /cls/columns} 端点的消费者契约面
+     * （端点未退役，退役判定见差距文档 B4-3d 余项）；②作为
+     * {@code SecurityDownAllChannelDenyTest} 反向对照的可用性探针载体。
+     * <b>禁</b>新增业务调用方经本方法取列面 —— 那等于恢复第二条腿。</p>
      *
      * @return 允许列；security 明确 DENY / 应答键面漂移 → List.of()
      * @throws SecurityEngineUnavailableException security 进程不可用（连不上/超时/5xx）

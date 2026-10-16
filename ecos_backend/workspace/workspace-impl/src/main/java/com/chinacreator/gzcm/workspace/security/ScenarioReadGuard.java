@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.workspace.security;
 
+import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException;
 import org.springframework.stereotype.Component;
@@ -91,8 +92,15 @@ public class ScenarioReadGuard {
 
     // ═══════════════ 导出通道（详设-01 §4.7.2 第 2 列 / #142-B4-3b） ═══════════════
 
-    /** 通道字面量（与 security 侧 {@code DecisionBundle.Purpose.EXPORT} 的 wire 形态同源）。 */
-    static final String PURPOSE_EXPORT = "export";
+    /**
+     * 通道字面量 —— 单源取 {@link DecisionChannelContract#PURPOSE_EXPORT}（#142/B4-3d-2，D-B4-27）。
+     *
+     * <p>此前这里是内联 {@code "export"}。字面量重复本身只是维护成本，真正的风险在
+     * security 侧 {@code parsePurpose} 对 unrecognized 值静默回落 {@code PAGE}：
+     * 词面一旦失配，导出调用就以页面档被裁决且返回 200。入口侧已改成未识别即 400，
+     * 消费侧的取值也必须来自同一份词表 —— 两侧各写一套正是 D-B4-25 的成因。</p>
+     */
+    static final String PURPOSE_EXPORT = DecisionChannelContract.PURPOSE_EXPORT;
 
     /**
      * 导出通道裁决咽喉：产出任何导出字节<b>之前</b>必须调用，返回值即导出件的

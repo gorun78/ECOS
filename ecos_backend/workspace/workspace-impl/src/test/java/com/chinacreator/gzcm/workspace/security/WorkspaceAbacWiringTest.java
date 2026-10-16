@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.workspace.security;
 
+import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
+import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException;
 import org.junit.jupiter.api.Test;
 
@@ -125,8 +127,10 @@ class WorkspaceAbacWiringTest {
                 .thenReturn(RlsFilter.unrestricted());
         assertDoesNotThrow(() -> guard.assertReadable("scenario_list"));
 
-        // (4) CLS 拒绝/security 不可用 → 空行集
-        when(client.allowedColumns(eq("scenario_run"), anyList())).thenReturn(List.of());
+        // (4) CLS 策略拒绝 → 空行集（#142/B4-3d-2：页面通道列面改经 /decision 单腿裁决）
+        when(client.decide(eq("scenario_run"), anyList(), eq(DecisionChannelContract.PURPOSE_PAGE)))
+                .thenReturn(bundleWithVisible(List.of(), List.of("runId", "amount"),
+                        ColumnSurfaceContract.DENY_POLICY));
         List<Map<String, Object>> rows = new ArrayList<>();
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("runId", "r-1");
@@ -136,13 +140,28 @@ class WorkspaceAbacWiringTest {
                 "F07-18 违规：列裁决拒绝时仍返回原始行（默认 DENY 失守）");
 
         // (5) CLS 正向对照：允许列保留、未列裁剪
-        when(client.allowedColumns(eq("scenario_run"), anyList())).thenReturn(List.of("runId"));
+        when(client.decide(eq("scenario_run"), anyList(), eq(DecisionChannelContract.PURPOSE_PAGE)))
+                .thenReturn(bundleWithVisible(List.of("runId"), List.of("amount"), null));
         List<Map<String, Object>> pruned = guard.applyColumns("scenario_run", rows);
         assertEquals(1, pruned.size());
         assertTrue(pruned.get(0).containsKey("runId") && !pruned.get(0).containsKey("amount"));
     }
 
     // ═══════════════ 辅助 ═══════════════
+
+    /** 造一版 {@code /decision} 应答的 {@code columns} 段（权威键形态，见 ColumnSurfaceContract）。 */
+    private static Map<String, Object> bundleWithVisible(List<String> visible, List<String> blocked,
+                                                         String denyReason) {
+        Map<String, Object> seg = new LinkedHashMap<>();
+        seg.put(ColumnSurfaceContract.KEY_VISIBLE_COLUMNS, visible);
+        seg.put(ColumnSurfaceContract.KEY_BLOCKED_COLUMNS, blocked);
+        seg.put(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_SOURCE, ColumnSurfaceContract.UNIVERSE_REQUEST);
+        seg.put(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_RESOLVED, true);
+        if (denyReason != null) seg.put(ColumnSurfaceContract.KEY_CLS_DENY_REASON, denyReason);
+        Map<String, Object> bundle = new LinkedHashMap<>();
+        bundle.put("columns", seg);
+        return bundle;
+    }
 
     private static Path workspacePackageRoot() {
         Path p = Paths.get("").toAbsolutePath();

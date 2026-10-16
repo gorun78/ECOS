@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.security.decision;
 
+import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
+import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.engine.security.dao.SecurityDecisionDao;
 import com.chinacreator.gzcm.engine.security.rls.RlsPredicate;
 import com.chinacreator.gzcm.engine.security.rls.RlsSubjectContext;
@@ -74,9 +76,19 @@ public class SecurityDecisionService {
         Map<String, Object> rlsRes = safeRls(table, ctx);
         Map<String, Object> rlsPart = asPredicatePart(rlsRes);
 
-        // ── [2] CLS：列投影（allow 空集 = DENY 全部列）──
-        Map<String, Object> clsRes = safeCls(table, userId, asset.getColumns());
-        Map<String, Object> columnsPart = asColumnsPart(clsRes);
+        // ── [2] CLS：列投影（allow 空集 = DENY 全部列）+ 列全集出处证据（#142/B4-3d-2，D-B4-16）──
+        //
+        // universe（列全集）在此显式定型，不在下游猜：本入口的列全集<b>只有一个合法出处</b>
+        // —— 调用方经 AssetRef.columns 显式请求。给空集就是"未解析"，不是"该主体无列权限"；
+        // 二者过去在 bundle 上完全同形（names=[]），消费方无法分态（§4.5.4「不可用 ≠ 无权限」）。
+        // 刻意不引入"目录兜底 universe"：ecos_security_asset 现网 0 行（D-B4-19），
+        // 拿它当宇宙等于用一条不可测分支冒充单源 —— 裁决依据已登记在差距文档 v1.0.19 行。
+        List<String> universe = asset.getColumns();
+        String universeSource = universe.isEmpty()
+                ? ColumnSurfaceContract.UNIVERSE_NONE
+                : ColumnSurfaceContract.UNIVERSE_REQUEST;
+        Map<String, Object> clsRes = safeCls(table, userId, universe);
+        Map<String, Object> columnsPart = asColumnsPart(clsRes, universeSource);
 
         // ── [3] mask：敏感数据目录 → 强制 mask 列集合 ──
         List<Map<String, Object>> masks = safeMasks(asset, purpose);
@@ -86,9 +98,12 @@ public class SecurityDecisionService {
 
         String decisionId = uuid();
         String traceId = ctx != null ? ctx.traceId() : null;
-        log.debug("decide: asset={} purpose={} → decisionId={} rlsTemplate={} columnsMode={} masks={} opaAllow={}",
+        log.debug("decide: asset={} purpose={} → decisionId={} rlsTemplate={} columnsMode={} "
+                        + "universeSource={} visible={} clsDenyReason={} masks={} opaAllow={}",
                 asset.key(), p, decisionId,
                 rlsPart.get("predicateTemplate"), columnsPart.get("mode"),
+                columnsPart.get(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_SOURCE),
+                columnCountOf(columnsPart), columnsPart.get(ColumnSurfaceContract.KEY_CLS_DENY_REASON),
                 masks.size(), opaPart.get("allow"));
         return new DecisionBundle(rlsPart, columnsPart, masks, opaPart, decisionId, traceId);
     }
@@ -184,27 +199,85 @@ public class SecurityDecisionService {
         return out;
     }
 
+    /**
+     * CLS 源调用（#142/B4-3d-2 只增：异常兜底态必须带机读理由）。
+     *
+     * <p>此前异常兜底只写空 {@code visibleColumns}，与"策略把可读集清空"在线上形态上同形；
+     * 消费方据此只能报 403，而真相是裁决腿自身失败（§4.5.4 应属可用性/缺陷态）。
+     * 现按 {@code safeRls} 的 {@code rlsDenyReason} 同一pattern 写入
+     * {@link ColumnSurfaceContract#DENY_SOURCE_ERROR}，由 {@link #asColumnsPart} 归入理由优先级。</p>
+     */
     private Map<String, Object> safeCls(String table, String userId, List<String> columns) {
         try {
             return cls.getColumns(table, userId, columns);
         } catch (Exception e) {
             log.warn("decide CLS 源异常，按 fail-closed 拒绝全部列: table={}", table, e);
             Map<String, Object> r = new LinkedHashMap<>();
-            r.put("visibleColumns", new ArrayList<String>());
-            r.put("blockedColumns", columns == null ? new ArrayList<String>() : new ArrayList<>(columns));
+            r.put(ColumnSurfaceContract.KEY_VISIBLE_COLUMNS, new ArrayList<String>());
+            r.put(ColumnSurfaceContract.KEY_BLOCKED_COLUMNS,
+                    columns == null ? new ArrayList<String>() : new ArrayList<>(columns));
+            r.put(ColumnSurfaceContract.KEY_CLS_DENY_REASON, ColumnSurfaceContract.DENY_SOURCE_ERROR);
             return r;
         }
     }
 
-    private Map<String, Object> asColumnsPart(Map<String, Object> clsRes) {
-        Object vis = clsRes.get("visibleColumns");
-        List<?> visible = vis instanceof List<?> l ? l : new ArrayList<>();
+    /**
+     * 列面段（{@code columns}）单源成形 —— #142/B4-3d-2 收口差距 D-B4-16。
+     *
+     * <p><b>缺陷本质</b>：本段此前只有 {@code mode}/{@code names} 两键，是列面的<b>第三种叫法</b>
+     * （生产者叫 {@code visibleColumns}，legacy 契约册叫 {@code allowedColumns}，bundle 又叫
+     * {@code names}），且 {@code mode} 恒写 {@code "allow"} —— 一个取值恒定的键等于没有键。
+     * 结果是页面通道合流到本入口后仍拿不到可用的列面，只能回读 {@code /cls/columns}
+     * （第二条裁决腿，差距文档 D-B4-15）。</p>
+     *
+     * <p><b>修法</b>：列面读数改经 {@link ColumnSurfaceContract#read(Object)}（与三消费者同源，
+     * 禁在此处再写一遍键名），并把"结论怎么来的"落成三键
+     * （{@code columnUniverseSource} / {@code columnUniverseResolved} / {@code clsDenyReason}）。
+     * {@code mode} 改为按 {@link com.chinacreator.gzcm.engine.security.controller.ClsController}
+     * GET 别名的同一口径计算（空集＝{@code deny}），{@code names} 保留为逐字节等值的兼容别名
+     * —— API 只增不改：既有读 {@code names} 的用例与消费方不受影响。</p>
+     *
+     * <p><b>拒绝理由优先级</b>（不可叠加，取最先命中者，保证一个列面只有一个解释）：
+     * 源异常 &gt; 列全集未解析 &gt; 键面漂移 &gt; 策略拒绝全部列。前两者不是"用户无权限"，
+     * 消费方必须分态处理（403 vs 503/告警），故排在最前。</p>
+     */
+    private Map<String, Object> asColumnsPart(Map<String, Object> clsRes, String universeSource) {
+        boolean universeResolved = ColumnSurfaceContract.UNIVERSE_REQUEST.equals(universeSource);
+        ColumnSurfaceContract.Reading reading = ColumnSurfaceContract.read(clsRes);
+        List<String> visible = reading.visible();
+        List<String> blocked = reading.blocked();
+
+        String denyReason = null;
+        if (visible.isEmpty()) {
+            String sourceReason = ColumnSurfaceContract.denyReasonOf(clsRes);
+            if (sourceReason != null) {
+                denyReason = sourceReason;
+            } else if (!universeResolved) {
+                denyReason = ColumnSurfaceContract.DENY_UNIVERSE_UNRESOLVED;
+            } else if (reading.drifted()) {
+                denyReason = reading.reason();
+            } else {
+                denyReason = ColumnSurfaceContract.DENY_POLICY;
+            }
+        }
+
         Map<String, Object> m = new LinkedHashMap<>();
         // C.2.3：allow 语义（返回可读列集合）；allow 空集 = 该主体不可读该资产任何列（非全放开）
-        m.put("mode", "allow");
+        m.put("mode", visible.isEmpty() ? "deny" : "allow");
         m.put("names", visible);
+        m.put(ColumnSurfaceContract.KEY_VISIBLE_COLUMNS, visible);
+        m.put(ColumnSurfaceContract.KEY_BLOCKED_COLUMNS, blocked);
         m.put("policyRefs", namesOf(clsRes.get("policies")));
+        m.put(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_SOURCE, universeSource);
+        m.put(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_RESOLVED, universeResolved);
+        if (denyReason != null) m.put(ColumnSurfaceContract.KEY_CLS_DENY_REASON, denyReason);
         return m;
+    }
+
+    /** 日志专用：列面段可读列数（形态异常时记 0，禁因日志而抛错）。 */
+    private static int columnCountOf(Map<String, Object> columnsPart) {
+        Object raw = columnsPart.get(ColumnSurfaceContract.KEY_VISIBLE_COLUMNS);
+        return raw instanceof List<?> list ? list.size() : 0;
     }
 
     private List<Map<String, Object>> safeMasks(AssetRef asset, DecisionBundle.Purpose purpose) {
@@ -248,7 +321,14 @@ public class SecurityDecisionService {
         subject.put("roles", ctx == null ? List.of() : ctx.roles());
         subject.put("department", ctx != null ? ctx.orgId() : null);
         subject.put("tenantId", ctx != null ? ctx.tenantId() : null);
-        String purposeWire = purpose.name().toLowerCase();
+        String purposeWire = DecisionChannelContract.normalize(purpose.name());
+        if (purposeWire == null) {
+            // 枚举名与通道词表失配＝生产侧漂移（新增 Purpose 却忘了词表 / 词表改名）。
+            // 此处必须抛错而非发 null：rego 收到 null purpose 会走"不匹配任何通道"分支，
+            // 那等于把一次配置错误伪装成一次策略拒绝（D-B4-27 同源风险的镜像面）。
+            throw new IllegalArgumentException("DecisionBundle.Purpose 与通道词表失配: " + purpose
+                    + "，合法取值=" + DecisionChannelContract.known());
+        }
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("purpose", purposeWire);
         input.put("action", "data:" + purposeWire);

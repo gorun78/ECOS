@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.security.decision;
 
+import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
+import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 
 import java.util.ArrayList;
@@ -13,13 +15,23 @@ import java.util.Map;
  * <p>结构（D 章 {@code DecisionBundle}）：</p>
  * <pre>{@code
  * {
- *   rls:     {predicateTemplate, bindings[], combine, denyIfEmpty, policyRefs[]},
- *   columns: {mode: allow|deny, names: [...], policyRefs[]},
+ *   rls:     {predicateTemplate, bindings[], combine, denyIfEmpty, policyRefs[],
+ *             whereClause, whereParams, unresolvedBindings, noPolicyMatched, rlsDenyReason},
+ *   columns: {mode: allow|deny, names: [...]（兼容别名，与 visibleColumns 同值）,
+ *             visibleColumns: [...], blockedColumns: [...], policyRefs[],
+ *             columnUniverseSource: REQUEST|NONE, columnUniverseResolved: bool,
+ *             clsDenyReason?: CLS_POLICY_DENY|COLUMN_UNIVERSE_UNRESOLVED|CLS_SOURCE_ERROR|漂移串},
  *   masks:   [{column, strategy}],
  *   opa:     {allow, policyState, policyRef, obligations[]},
  *   decisionId, traceId
  * }
  * }</pre>
+ *
+ * <p>{@code columns} 段的三键证据面（#142/B4-3d-2 只增，差距 D-B4-16）：列面不能只用
+ * {@code names} 是否为空来表达 —— 空集同时是"策略拒绝全部列""列全集没给""CLS 源抛错"
+ * "键面漂移"四种事实的写法。消费方唯一合法读面是 {@link #columnsReading()} /
+ * {@link #clsDenyReason()} / {@link #columnsUndecidable()}，禁再自行 {@code get("names")}
+ * 判空（那是第二套真值，D-B4-25 的成因）。</p>
  *
  * <p>{@code opa.policyState}（#142/B4-3c 只增）＝ {@link GuardrailDecisionContract} 的四态之一，
  * 是消费方分「策略拒绝（403 / GUARDRAIL_DENIED）」与「护栏没说话（503 / FAIL_CLOSED）」
@@ -64,13 +76,104 @@ public final class DecisionBundle {
     public String decisionId() { return decisionId; }
     public String traceId() { return traceId; }
 
-    /** CLS 是否拒绝全部列（allow 模式且 names 空）。 */
+    /**
+     * CLS 是否拒绝全部列 —— 三态归一后的唯一判据（#142/B4-3d-2 语义订正，D-B4-16）。
+     *
+     * <p>旧形态读 {@code mode}/{@code names}：{@code "allow".equals(mode) && names 空}。
+     * 这有两个洞：</p>
+     * <ul>
+     *   <li>{@code mode} 由生产者恒写 {@code "allow"}，判据实际只剩"names 是否为空"，
+     *       而空集在线上同时表达<b>四种</b>事实（策略清空 / 列全集没给 / CLS 源抛错 / 键面漂移），
+     *       把它们一律当成"该用户无列权限"就是缺陷本身；</li>
+     *   <li>{@code names} 是列面的第三种叫法，与 {@code visibleColumns} 分裂 —— 键名两侧各写各的
+     *       正是 D-B4-25 的根因。</li>
+     * </ul>
+     *
+     * <p>现委托 {@link ColumnSurfaceContract#read(Object)}（与三消费者、生产者同一份读取面）：
+     * 可读集不可用（漂移或空）即为拒绝。<b>注意本方法语义收紧</b>：
+     * "键面漂移"过去会被当成"非 allow 模式所以没拒绝"，现在明确计入拒绝 ——
+     * 读不到列面就不给列，fail-closed。区分具体理由请用 {@link #clsDenyReason()}，
+     * 区分"未判定"与"策略拒绝"请用 {@link #columnsUndecidable()}。</p>
+     */
     public boolean columnsDenied() {
-        Object mode = columns.get("mode");
-        Object names = columns.get("names");
-        boolean allowMode = "allow".equals(String.valueOf(mode));
-        boolean empty = names instanceof List<?> l && l.isEmpty();
-        return allowMode && empty;
+        return !columnsReading().usable();
+    }
+
+    /**
+     * 列面读取结果（唯一读取出口，#142/B4-3d-2 只增）。
+     *
+     * <p>{@code columns} 段整体为 {@code null} 时按"应答无 data 段"漂移态处理（{@code read(null)}），
+     * 不再 NPE —— 消费方拿到的是可解释的拒绝而非 500 堆栈。</p>
+     */
+    public ColumnSurfaceContract.Reading columnsReading() {
+        return ColumnSurfaceContract.read(columns);
+    }
+
+    /** 可读列集（漂移/DENY 时为空表；禁据此判"全放开"）。 */
+    public List<String> columnsVisible() {
+        return columnsReading().visible();
+    }
+
+    /** 被策略显式隐藏的列（展示与审计用，禁并入可读集）。 */
+    public List<String> columnsBlocked() {
+        return columnsReading().blocked();
+    }
+
+    /** 列面键面是否漂移（两键皆不可读）—— 与"策略拒绝全部列"分态。 */
+    public boolean columnsSurfaceDrifted() {
+        return columnsReading().drifted();
+    }
+
+    /** 列全集出处（{@code REQUEST} / {@code NONE}）；键缺失 ⇒ {@code null}（＝生产者未写证据，禁当 REQUEST）。 */
+    public String columnUniverseSource() {
+        Object raw = columns == null ? null : columns.get(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_SOURCE);
+        return raw == null ? null : String.valueOf(raw);
+    }
+
+    /** 列全集是否解析得出来（仅在显式 {@code false} 时为假；键缺失时按未判定处理，见 {@link #columnsUndecidable()}）。 */
+    public boolean columnUniverseResolved() {
+        return columns != null
+                && !ColumnSurfaceContract.universeUnresolved(columns)
+                && !columnUniverseSourceIsNull();
+    }
+
+    /** 列面不可用的机读理由（可读集非空时为 {@code null}）。 */
+    public String clsDenyReason() {
+        if (columns == null) return ColumnSurfaceContract.DRIFT_NO_DATA;
+        String reason = ColumnSurfaceContract.denyReasonOf(columns);
+        if (reason != null) return reason;
+        ColumnSurfaceContract.Reading reading = columnsReading();
+        if (!reading.visible().isEmpty()) return null;
+        if (reading.drifted()) return reading.reason();
+        return ColumnSurfaceContract.DENY_POLICY;
+    }
+
+    /**
+     * 列面是否被<b>策略</b>明确拒绝（{@code CLS_POLICY_DENY}）—— 消费方报 403 的唯一合法依据。
+     *
+     * <p>与 {@link #columnsUndecidable()} 互斥：后者属"裁决没给结论"，报 503/告警，
+     * 禁伪装成"该主体无权限"（§4.5.4）。</p>
+     */
+    public boolean columnsPolicyDenied() {
+        return ColumnSurfaceContract.DENY_POLICY.equals(clsDenyReason());
+    }
+
+    /**
+     * 列面是否<b>未判定</b>（源异常 / 列全集未解析 / 键面漂移 / 证据段整体缺失）。
+     *
+     * <p>存在理由：三态此前在 bundle 上全是 {@code names=[]}，消费方只能一律 403，
+     * 把引擎缺陷伪装成用户无权限（与 D-B4-14「OPA 从未被咨询」同一类）。
+     * 门禁 {@code BundleColumnSurfaceTest} 钉住四态的可区分性。</p>
+     */
+    public boolean columnsUndecidable() {
+        String reason = clsDenyReason();
+        if (reason == null) return false;
+        return !ColumnSurfaceContract.DENY_POLICY.equals(reason);
+    }
+
+    /** columns 段是否带 universe 证据键（缺失＝生产者未落证据，属形态漂移）。 */
+    private boolean columnUniverseSourceIsNull() {
+        return columnUniverseSource() == null;
     }
 
     // ── #142/B4-3b 只增：范围证据与水印义务 ──────────────────────────────
@@ -81,25 +184,31 @@ public final class DecisionBundle {
     // 由 {@link SecurityDecisionService} 从各源原始返回单点写入），消费方只能从
     // 这里取，不得再自行拼常量 —— 常量与真值的区别就是能不能被审计反查。
 
-    /** RLS 命中策略名（单源 = {@code RowLevelSecurityServiceImpl#apply} 的 policies 清单）。 */
+    /**
+     * RLS 命中策略名（单源 = {@code RowLevelSecurityServiceImpl#apply} 的 policies 清单）。
+     *
+     * <p>#142/B4-3d-2 只加固不改性：{@code rls}/{@code columns} 段整体缺失时返回空表而非 NPE。
+     * 理由与 {@link #columnsReading()} 同一口径 —— 证据段缺失必须是一条<b>可解释的拒绝</b>
+     * （{@code clsDenyReason} 给出漂移码），不能变成 500 堆栈（§4.5.4 分态纪律）。</p>
+     */
     public List<String> rlsPolicyRefs() {
-        return policyNames(rls.get("policyRefs"));
+        return rls == null ? List.of() : policyNames(rls.get("policyRefs"));
     }
 
     /** CLS 命中策略名（单源 = {@code ColumnLevelSecurityServiceImpl#getColumns} 的 policies 清单）。 */
     public List<String> clsPolicyRefs() {
-        return policyNames(columns.get("policyRefs"));
+        return columns == null ? List.of() : policyNames(columns.get("policyRefs"));
     }
 
     /** 合并谓词模板（{@code 1=1} = 无限制；{@code 1=0} = 拒绝；其余 = 需下推）。 */
     public String rlsPredicateTemplate() {
-        Object t = rls.get("predicateTemplate");
+        Object t = rls == null ? null : rls.get("predicateTemplate");
         return t == null ? null : String.valueOf(t);
     }
 
     /** 无匹配策略时是否拒绝（{@code denyIfEmpty}，导出通道必须消费）。 */
     public boolean rlsDenyIfEmpty() {
-        return Boolean.TRUE.equals(rls.get("denyIfEmpty"));
+        return rls != null && Boolean.TRUE.equals(rls.get("denyIfEmpty"));
     }
 
     /**
@@ -110,8 +219,15 @@ public final class DecisionBundle {
      * 因此「scope=finance-all」这类断言不再是自述。</p>
      */
     public String scopeEvidence(DecisionBundle.Purpose purpose) {
+        // 通道词单源（#142/B4-3d-2，D-B4-27）：证据串里的 purpose 必须与线上入参词、
+        // OPA 载荷词同一份词表。枚举名未命中词表＝生产侧漂移，宁可抛错也不写出"看起来对"的证据串。
+        String purposeWord = DecisionChannelContract.normalize(
+                purpose == null ? Purpose.PAGE.name() : purpose.name());
+        if (purposeWord == null) {
+            throw new IllegalArgumentException("DecisionBundle.Purpose 与通道词表失配: " + purpose);
+        }
         return "decision=" + decisionId
-                + " purpose=" + (purpose == null ? Purpose.PAGE.name().toLowerCase() : purpose.name().toLowerCase())
+                + " purpose=" + purposeWord
                 + " rls=[" + (rlsPolicyRefs().isEmpty() ? "NONE" : String.join("+", rlsPolicyRefs())) + "]"
                 + " cls=[" + (clsPolicyRefs().isEmpty() ? "NONE" : String.join("+", clsPolicyRefs())) + "]";
     }

@@ -175,11 +175,17 @@ final class PageChannelHarness {
         return null;
     }
 
-    /** bundle.columns.names（C.2.3 allow 集）→ 列名列表。 */
-    @SuppressWarnings("unchecked")
+    /**
+     * bundle 的可读列集 —— <b>只走单源访问器</b>（#142/B4-3d-2，差距 D-B4-16 订正）。
+     *
+     * <p>原形态是 {@code bundle.columns().get("names")}：那是在列面上承认<b>第三种叫法</b>
+     * （生产者叫 {@code visibleColumns}、legacy 契约册叫 {@code allowedColumns}、bundle 又叫
+     * {@code names}），并且空集四种事实（策略清空 / 宇宙未解析 / 源异常 / 键面漂移）在键面上
+     * 同形，用例读不出区别。{@link DecisionBundle#columnsVisible()} 内部委托
+     * {@code ColumnSurfaceContract.read}，与三消费者、生产者共用同一份读取逻辑。</p>
+     */
     static List<String> visibleColumns(DecisionBundle bundle) {
-        Object names = bundle.columns().get("names");
-        return names instanceof List<?> l ? (List<String>) l : List.of();
+        return bundle.columnsVisible();
     }
 
     @SuppressWarnings("unchecked")
