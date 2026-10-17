@@ -141,16 +141,28 @@ public class OntologySecurityInterceptor {
                     List<Map<String, Object>> rows = asRowList(list);
                     if (rows != null && !rows.isEmpty()) {
                         String tableName = resolveTableName(rows);
+                        boolean rowFiltered = false;
                         if (userId != null) {
                             rows = applyRlsRemote(tableName, userId, rows);
                             rows = applyClsRemote(tableName, userId, rows);
+                            rowFiltered = true;
                         }
                         rows = applyMaskingRows(rows);
                         dataMap.put("data", rows);
-                        dataMap.put("total", rows.size());
+                        // #142/B4-3d-8：total 只在实际做过行级过滤时改写 —— 匿名/无登录态
+                        // 没过滤却改计数，等于用零安全收益的行为变更去换分页元数据一致。
+                        // 已登录且过滤＝按可见行少报（fail-closed）；分页元数据（page/size/
+                        // totalPages）的口径退化需 DAO 侧带 RLS 的 count 下推，已登记不收口。
+                        if (rowFiltered) {
+                            dataMap.put("total", rows.size());
+                        }
                     }
                 }
                 maskMapInPlace(dataMap);
+                // #142/B4-3d-8（D-B4-34）：副本必须写回 resp。此前 copyMap 出来的 dataMap
+                // 从头到尾没有 assignData，RLS/CLS/mask 三条通道对 {data: List} 形态
+                // （分页读接口的权威形状）结构性恒等于关闭 —— 应答仍是未过滤的全量行。
+                assignData(resp, dataMap);
             }
         } catch (Exception e) {
             log.warn("OntologySecurityInterceptor 读增强失败 (不影响主流程): {}", e.getMessage());
