@@ -133,6 +133,29 @@ public final class RlsExecutionContract {
     /** security 明确 DENY 但应答没带理由时的兜底理由（不冒充"无数据"）。 */
     public static final String REASON_DENY_FROM_SECURITY_ENGINE = "RLS_DENY_FROM_SECURITY_ENGINE";
 
+    // ── 「不可用」态的对外码面（§4.5.4 分态的可寻址形态） ──
+
+    /**
+     * 不可用态的对外理由码：security 进程连不上／超时／寻址失败。
+     *
+     * <p><b>#142/B4-3d-10（D-B4-26 余项）</b>：此码此前只在 workspace 异常类与
+     * data-engine {@code QueryController} 各写一份字面量，本体／AI 两条腿连"不可用"
+     * 都表达不出来（一律折成 {@code 1=0}）。单源的意义不只是少抄一遍文案：
+     * 告警规则要能按这一个码寻址"引擎没答"，抄两份就等于两套检索口径。</p>
+     *
+     * <p>与 {@code DecisionController} 的 fail-closed 出口、gateway
+     * {@code SecurityDownAllChannelDenyTest} 的既有判据同值。</p>
+     */
+    public static final String SEC_UNAVAILABLE_CODE = "ECOS-SEC-501";
+
+    /**
+     * 不可用态的对外信封码（与 {@code ApiResponse.error(503, ECOS-SEC-501, …)} 同源）。
+     *
+     * <p>取 503 而非 403：403 说的是"你没权限"，503 说的是"裁决机构没答"，
+     * 前者不该触发运维告警、后者不该触发权限申诉。</p>
+     */
+    public static final int SEC_UNAVAILABLE_HTTP = 503;
+
     /** 占位符残留检测（与生产者 {@code RlsPredicateRenderer.PLACEHOLDER} 同形）。 */
     private static final Pattern RESIDUAL_PLACEHOLDER = Pattern.compile(":(\\w+)");
 
@@ -333,6 +356,27 @@ public final class RlsExecutionContract {
             if (c != '(' && c != ')' && !Character.isWhitespace(c)) sb.append(c);
         }
         return sb.toString();
+    }
+
+    /**
+     * 是否为「不可用」信封：{@code ApiResponse.code ==}{@link #SEC_UNAVAILABLE_HTTP}
+     * 或 {@code message} 以 {@link #SEC_UNAVAILABLE_CODE} 起头。
+     *
+     * <p><b>为什么需要这一层</b>：security 侧内部裁决失败时以 <b>HTTP 200 + 失败信封</b>
+     * 应答（{@code DecisionController} 的 fail-closed 出口），应答里没有 {@code data} 段。
+     * 消费者若只看 {@code data}，会把它读成「应答缺执行契约」＝形态漂移（DENIED），
+     * 而事实是"引擎没给出结论"＝不可用（§4.5.4 禁止的正是这种折叠）。</p>
+     *
+     * <p>#142/B4-3d-10 前，这一判据在 ai 客户端与 workspace 客户端各抄一份；
+     * 现由本类单源持有，消费者只做委托（HTTP 信封的字段名 {@code code}/{@code message}
+     * 是 {@code ApiResponse} 的契约面，不属 RLS 键面）。</p>
+     */
+    public static boolean isUnavailableEnvelope(Map<?, ?> resp) {
+        if (resp == null) return false;
+        Object code = resp.get("code");
+        if (code instanceof Number n && n.intValue() == SEC_UNAVAILABLE_HTTP) return true;
+        Object message = resp.get("message");
+        return message instanceof String s && s.startsWith(SEC_UNAVAILABLE_CODE);
     }
 
     private static String producerReason(Map<?, ?> data) {

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.security;
 
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -146,6 +148,61 @@ class AiRlsFailClosedTest {
         assertEquals(AiSecurityEngineClient.DENY_CLAUSE,
                 throwingClient(new ResourceAccessException("connection refused"))
                         .applyRls(USER, TENANT, ENTITY, TABLE, Map.of()));
+    }
+
+    // ═══════════════ 带态出口：不可用 ≠ 无权限（#142/B4-3d-10 / D-B4-26 余项） ═══════════════
+
+    @Test
+    @DisplayName("带态出口：传输异常 → State.UNAVAILABLE（折叠出口仍 1=0，两出口共存不互换）")
+    void executionLegMarksTransportFailureAsUnavailable() {
+        AiSecurityEngineClient down = throwingClient(new ResourceAccessException("connection refused"));
+        RlsExecutionContract.Execution exec =
+                down.applyRlsExecution(USER, TENANT, ENTITY, TABLE, Map.of());
+        assertEquals(RlsExecutionContract.State.UNAVAILABLE, exec.state());
+        assertTrue(exec.reason().contains(RlsExecutionContract.REASON_SERVICE_UNAVAILABLE),
+                "不可用理由需带单源前缀码供告警寻址: " + exec.reason());
+        assertFalse(exec.usable(), "分态不放宽处置——不可用仍 fail-closed");
+        assertEquals(AiSecurityEngineClient.DENY_CLAUSE,
+                down.applyRls(USER, TENANT, ENTITY, TABLE, Map.of()),
+                "折叠出口对既有调用方语义不变（API 只增不改）");
+    }
+
+    @Test
+    @DisplayName("带态出口：security 失败信封（HTTP 200 + code=503）→ UNAVAILABLE，禁读成缺片段漂移")
+    void executionLegMarksSecurityFailureEnvelopeAsUnavailable() {
+        RlsExecutionContract.Execution exec = client(Map.of(
+                "code", RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                "message", RlsExecutionContract.SEC_UNAVAILABLE_CODE + ": RLS 裁决内部失败"))
+                .applyRlsExecution(USER, TENANT, ENTITY, TABLE, Map.of());
+        assertEquals(RlsExecutionContract.State.UNAVAILABLE, exec.state(),
+                "认不出失败信封＝把可用性故障冒充成形态漂移（§4.5.4 禁止的折叠）");
+    }
+
+    @Test
+    @DisplayName("带态出口：应答体为空 → UNAVAILABLE；策略拒绝仍是 DENIED（两态互不冒充）")
+    void executionLegSeparatesEmptyBodyFromPolicyDeny() {
+        assertEquals(RlsExecutionContract.State.UNAVAILABLE,
+                client(null).applyRlsExecution(USER, TENANT, ENTITY, TABLE, Map.of()).state());
+
+        RlsExecutionContract.Execution denied = client(Map.of(
+                "data", Map.of(RlsExecutionContract.KEY_WHERE_CLAUSE, RlsExecutionContract.DENY_CLAUSE)))
+                .applyRlsExecution(USER, TENANT, ENTITY, TABLE, Map.of());
+        assertEquals(RlsExecutionContract.State.DENIED, denied.state());
+        assertFalse(denied.unavailable(), "「你没权限」打上不可用码＝用运维告警掩盖授权结论");
+    }
+
+    @Test
+    @DisplayName("带态出口：恒真/非平凡谓词不误报不可用（反向对照）")
+    void executionLegKeepsUsableFormsOutOfUnavailableState() {
+        assertEquals(RlsExecutionContract.State.ALLOW_ALL,
+                client(Map.of("data", Map.of(RlsExecutionContract.KEY_WHERE_CLAUSE,
+                        RlsExecutionContract.ALLOW_ALL_CLAUSE)))
+                        .applyRlsExecution(USER, TENANT, ENTITY, TABLE, Map.of()).state());
+        RlsExecutionContract.Execution bare = client(Map.of(
+                "data", Map.of(RlsExecutionContract.KEY_WHERE_CLAUSE, "tenant_id = 't-7'")))
+                .applyRlsExecution(USER, TENANT, ENTITY, TABLE, Map.of());
+        assertTrue(bare.usable());
+        assertFalse(bare.unavailable());
     }
 
     // ═══════════════ 不吞异常版：漂移与不可用各自分态上抛 ═══════════════

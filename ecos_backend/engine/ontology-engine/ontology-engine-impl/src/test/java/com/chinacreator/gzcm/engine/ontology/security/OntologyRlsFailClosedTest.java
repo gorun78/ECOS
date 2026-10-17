@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ontology.security;
 
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpEntity;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,6 +45,11 @@ import static org.mockito.Mockito.when;
  *
  * <p>反向对照（证明 DENY 断言可观察而非恒真）：{@link #allowAllKeepsEveryRow()} 与
  * {@link #whitelistedSingleConditionFiltersRows()} 在同样桩点上必须放行。</p>
+ *
+ * <p><b>#142/B4-3d-10（D-B4-26 余项）追加第 3 节</b>：折叠出口之外还有带态出口
+ * {@code applyRlsExecution}，本节钉的是「security 进程没答」在类型上不能与
+ * 「策略拒绝」同值——前者 {@code State.UNAVAILABLE}、后者 {@code State.DENIED}，
+ * 并由拦截器 {@code RlsOutcome.unavailable()} 把态带到对外信封。</p>
  */
 class OntologyRlsFailClosedTest {
 
@@ -145,7 +152,7 @@ class OntologyRlsFailClosedTest {
     @DisplayName("客户端给空片段（上游漂移）→ 拒绝空集，不再 return rows")
     void blankClauseFromClientDeniesRows() {
         assertEquals(0, rowsAfterRemote(""));
-        assertEquals(0, rowsAfterRemote(null));
+        assertEquals(0, rowsAfterRemote((String) null));
     }
 
     @Test
@@ -184,21 +191,141 @@ class OntologyRlsFailClosedTest {
         assertEquals(0, rowsAfterRemote("secret_col = 'x'"));
     }
 
+    // ═══════════════ 3. 「不可用」与「无权限」分态（#142/B4-3d-10，D-B4-26 余项） ═══════════════
+
+    /**
+     * 带态出口读数。
+     *
+     * <p>折叠出口 {@code applyRls} 只能给出一个字符串，本节判据是<b>态</b>，
+     * 必须走 {@link SecurityEngineClient#applyRlsExecution}。</p>
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static RlsExecutionContract.Execution executionFromResponse(Map<String, Object> resp) {
+        RestTemplate stub = mock(RestTemplate.class);
+        when(stub.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn((ResponseEntity) ResponseEntity.ok(resp));
+        return newClient(stub).applyRlsExecution(ENTITY, TABLE, Map.of("tenant", "default"));
+    }
+
+    @Test
+    @DisplayName("带态出口：传输异常 → UNAVAILABLE（收口前折成 1=0＝把「引擎没答」说成「你没权限」）")
+    void transportFailureIsUnavailableState() {
+        RestTemplate stub = mock(RestTemplate.class);
+        when(stub.postForEntity(anyString(), any(HttpEntity.class), eq(Map.class)))
+                .thenThrow(new ResourceAccessException("connection refused"));
+        RlsExecutionContract.Execution exec = newClient(stub)
+                .applyRlsExecution(ENTITY, TABLE, Map.of());
+        assertEquals(RlsExecutionContract.State.UNAVAILABLE, exec.state());
+        assertTrue(exec.reason().contains(RlsExecutionContract.REASON_SERVICE_UNAVAILABLE),
+                "不可用理由必须带单源前缀码，供日志/告警按码寻址: " + exec.reason());
+        assertFalse(exec.usable(), "不可用仍是 fail-closed（分态改的是可寻址性，不是放宽处置）");
+    }
+
+    @Test
+    @DisplayName("带态出口：security 失败信封（HTTP 200 + code=503）→ UNAVAILABLE，不冒充形态漂移")
+    void failureEnvelopeIsUnavailableNotDrift() {
+        RlsExecutionContract.Execution exec = executionFromResponse(Map.of(
+                "code", RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                "message", RlsExecutionContract.SEC_UNAVAILABLE_CODE + ": RLS 裁决内部失败"));
+        assertEquals(RlsExecutionContract.State.UNAVAILABLE, exec.state(),
+                "认不出失败信封即把可用性故障读成「应答缺执行契约」＝D-B4-26 的折叠");
+    }
+
+    @Test
+    @DisplayName("反向对照：同一失败信封不经信封判据时，单源读数给的是 DENIED + 无 data 段")
+    void envelopeBlindnessWouldProduceDeniedDriftShape() {
+        RlsExecutionContract.Execution blind = RlsExecutionContract.read(null, "table=" + TABLE);
+        assertEquals(RlsExecutionContract.State.DENIED, blind.state());
+        assertTrue(blind.reason().contains(RlsExecutionContract.REASON_NO_DATA_SEGMENT),
+                "缺 data 段的默认归一只能是漂移拒绝，说明上面的 UNAVAILABLE 来自信封判据而非巧合: "
+                        + blind.reason());
+    }
+
+    @Test
+    @DisplayName("带态出口：应答整体为空 → UNAVAILABLE（与「无 data 段」的漂移态分家）")
+    void nullResponseIsUnavailable() {
+        assertEquals(RlsExecutionContract.State.UNAVAILABLE,
+                executionFromResponse(null).state(),
+                "空信封＝没答，不是答了个没法解析的形态");
+    }
+
+    @Test
+    @DisplayName("带态出口：正常三态不误报不可用（策略拒绝仍为 DENIED）")
+    void policyDenyIsNotReportedAsUnavailable() {
+        RlsExecutionContract.Execution denied = executionFromResponse(
+                Map.of("data", Map.of(RlsExecutionContract.KEY_WHERE_CLAUSE,
+                        RlsExecutionContract.DENY_CLAUSE)));
+        assertEquals(RlsExecutionContract.State.DENIED, denied.state());
+        assertFalse(denied.unavailable(), "「你没权限」打上不可用＝用告警掩盖授权问题");
+    }
+
+    @Test
+    @DisplayName("拦截器：不可用态行集清空且带不可用标记（供切面写 503 信封）")
+    void interceptorCarriesUnavailableFlagWithEmptyRows() {
+        OntologySecurityInterceptor.RlsOutcome outcome =
+                outcome(RlsExecutionContract.Execution.unavailable("table=" + TABLE + "(test)"));
+        assertTrue(outcome.unavailable());
+        assertEquals(0, outcome.rows().size(), "不可用态禁把未过滤行交给调用方，哪怕对外写成 503");
+        assertTrue(outcome.reason() != null && !outcome.reason().isBlank(),
+                "不可用必须带可解释理由，对外信封才有排障线索");
+    }
+
+    @Test
+    @DisplayName("拦截器：拒绝态仍走本地过滤腿（unavailable=false，反向对照）")
+    void interceptorKeepsDeniedStateDistinctFromUnavailable() {
+        OntologySecurityInterceptor.RlsOutcome outcome =
+                outcome(executionOf(RlsExecutionContract.DENY_CLAUSE));
+        assertFalse(outcome.unavailable());
+        assertEquals(0, outcome.rows().size());
+    }
+
+    @Test
+    @DisplayName("可用态带空片段（上游形态漂移）→ 拦截器第二道仍拒绝，不因态可用而放行")
+    void usableStateWithBlankClauseDeniesRows() {
+        // 单源 read() 构造不出这一形状（缺片段即 DENIED）：它只能来自未来的生产者漂移，
+        // 拦截器的 blank 判腿必须独立于态判定存在，否则「态＝可用」被当成「片段必非空」。
+        assertEquals(0, rowsAfterRemote(new RlsExecutionContract.Execution(
+                RlsExecutionContract.State.FILTERED, "", List.of(), List.of(), true, false, null)));
+    }
+
     /** 桩掉客户端返回指定片段，反射调用拦截器私有 {@code applyRlsRemote}，返回行集大小。 */
     private static int rowsAfterRemote(String clause) {
+        return rowsAfterRemote(executionOf(clause));
+    }
+
+    /**
+     * 片段字符串 → 执行契约读数（夹具经 {@code read} 构造，与生产者应答同一形状）。
+     *
+     * <p>#142/B4-3d-10 起拦截器消费的是带态出口 {@code applyRlsExecution}，
+     * 桩不能再停在折叠后的字符串上——那会把四种形态重新压成一个字面量，
+     * 正是 D-B4-26 折叠本身的测试化形态。</p>
+     */
+    private static RlsExecutionContract.Execution executionOf(String clause) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        if (clause != null) data.put(RlsExecutionContract.KEY_WHERE_CLAUSE, clause);
+        return RlsExecutionContract.read(data, "table=" + TABLE)
+                .rejectForUnbindableChannel("table=" + TABLE);
+    }
+
+    private static OntologySecurityInterceptor.RlsOutcome outcome(RlsExecutionContract.Execution exec) {
         SecurityEngineClient client = mock(SecurityEngineClient.class);
-        when(client.applyRls(anyString(), anyString(), any())).thenReturn(clause);
+        when(client.applyRlsExecution(anyString(), anyString(), any())).thenReturn(exec);
         OntologySecurityInterceptor interceptor = new OntologySecurityInterceptor(client);
         try {
             Method m = OntologySecurityInterceptor.class.getDeclaredMethod(
                     "applyRlsRemote", String.class, String.class, List.class);
             m.setAccessible(true);
             Object out = m.invoke(interceptor, TABLE, USER, sampleRows());
-            assertTrue(out instanceof List<?>, "返回值必须是行集: " + out);
-            return ((List<?>) out).size();
+            assertTrue(out instanceof OntologySecurityInterceptor.RlsOutcome,
+                    "applyRlsRemote 必须返回带态读数（退回 List 即分态判据消失）: " + out);
+            return (OntologySecurityInterceptor.RlsOutcome) out;
         } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("applyRlsRemote 形态漂移，本用例判据失效", e);
         }
+    }
+
+    private static int rowsAfterRemote(RlsExecutionContract.Execution exec) {
+        return outcome(exec).rows().size();
     }
 
     private static List<Map<String, Object>> sampleRows() {

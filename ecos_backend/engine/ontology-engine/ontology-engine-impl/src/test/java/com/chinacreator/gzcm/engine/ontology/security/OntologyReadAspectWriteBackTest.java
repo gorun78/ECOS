@@ -297,6 +297,84 @@ class OntologyReadAspectWriteBackTest {
                 "行内嵌套字段本来就该掩（本例在 D-B4-35 收口前即成立＝证明判据不误报）");
     }
 
+    // ═══════════════ D-B4-26 余项：不可用态的对外信封 ═══════════════
+
+    @Test
+    @DisplayName("Map 形态·不可用（D-B4-26 余项）— 503 信封 + data 清空，未过滤行一律不外流")
+    void unavailableRlsLegProducesSecurityUnavailableEnvelope() {
+        ApiResponse<Map<String, Object>> resp = pagedPayload(
+                List.of(row("t-7", "合同"), row("t-8", "发票")));
+        SecurityEngineClient client = mock(SecurityEngineClient.class);
+        when(client.applyRlsExecution(anyString(), anyString(), any()))
+                .thenReturn(RlsExecutionContract.Execution.unavailable("table=" + TABLE + "(connection refused)"));
+
+        new OntologySecurityInterceptor(client).secureReadResult(resp);
+
+        assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_HTTP, resp.getCode(),
+                "「security 进程没答」仍报成功码＝折叠没解除");
+        assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_CODE, resp.getErrorCode(),
+                "对外必须带机读码，告警规则才能按码寻址");
+        Object payload = resp.getData();
+        assertTrue(payload instanceof List<?> emptyList && emptyList.isEmpty(),
+                "503 只改码不清 data＝客户端按 200 读成功的一腿仍在渗漏: " + payload);
+        assertTrue(String.valueOf(resp.getMessage())
+                        .contains(RlsExecutionContract.REASON_SERVICE_UNAVAILABLE),
+                "信封文案需指名单源理由码，禁写成「无数据」: " + resp.getMessage());
+    }
+
+    @Test
+    @DisplayName("List 形态·不可用（D-B4-26 余项）— 两条 payload 腿都不许留原行集")
+    void unavailableRlsLegRewritesListShapedPayloadToo() {
+        ApiResponse<List<Map<String, Object>>> resp = ApiResponse.success(
+                new ArrayList<>(List.of(row("t-7", "合同"), row("t-8", "发票"))));
+        SecurityEngineClient client = mock(SecurityEngineClient.class);
+        when(client.applyRlsExecution(anyString(), anyString(), any()))
+                .thenReturn(RlsExecutionContract.Execution.unavailable("table=" + TABLE + "(timeout)"));
+
+        new OntologySecurityInterceptor(client).secureReadResult(resp);
+
+        assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_HTTP, resp.getCode());
+        assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_CODE, resp.getErrorCode());
+        assertTrue(resp.getData().isEmpty(), "不可用态返回了 " + resp.getData().size() + " 行未过滤数据");
+    }
+
+    @Test
+    @DisplayName("反向对照 — 策略拒绝仍是 200＋空行（判据不是「空结果就红」，两态必须可分）")
+    void policyDenyKeepsSuccessEnvelopeWithEmptyRows() {
+        ApiResponse<Map<String, Object>> resp = pagedPayload(
+                List.of(row("t-7", "合同"), row("t-8", "发票")));
+        SecurityEngineClient client = deciding(RlsExecutionContract.DENY_CLAUSE,
+                List.of("tenant_id", "name"));
+
+        new OntologySecurityInterceptor(client).secureReadResult(resp);
+
+        assertEquals(0, resp.getCode(), "把「你没权限」打成 503＝用运维告警掩盖授权结论");
+        assertTrue(dataOf(resp).isEmpty());
+    }
+
+    @Test
+    @DisplayName("源码判据（D-B4-26 余项）— 不可用码面单源，切面内禁手抄 ECOS-SEC-501；判据须能变红")
+    void unavailableEnvelopeUsesSingleSourceCodeFace() throws IOException {
+        String src = stripComments(Files.readString(repoFile(INTERCEPTOR_SRC), StandardCharsets.UTF_8));
+
+        assertTrue(src.contains("RlsExecutionContract.SEC_UNAVAILABLE_HTTP"),
+                "D-B4-26 余项回潮：503 码面又回到本地字面量");
+        assertTrue(src.contains("markSecurityUnavailable(resp, rls.reason())"),
+                "D-B4-26 余项回潮：不可用态没有落到对外信封（重新折成 200＋空行）");
+        assertFalse(src.contains("\"" + RlsExecutionContract.SEC_UNAVAILABLE_CODE + "\""),
+                "机读码在本类出现第二次即两套检索口径");
+
+        String foldedShape = stripComments("""
+                RlsOutcome rls = applyRlsRemote(tableName, userId, rows);
+                rows = applyClsRemote(tableName, userId, rls.rows());
+                dataMap.put("data", rows);
+                """);
+        assertFalse(foldedShape.contains("markSecurityUnavailable"),
+                "判据必须能变红：折叠原形里定位不到「信封改写」这一腿＝假门禁");
+        assertTrue(foldedShape.contains("rls.rows()"),
+                "判据必须能变红：折叠原形里没有 rows() 直取＝定位失败");
+    }
+
     // ═══════════════ 静态判据（防「行为用例外壳还在、写回被摘掉」） ═══════════════
 
     @Test
@@ -369,9 +447,19 @@ class OntologyReadAspectWriteBackTest {
 
     private static SecurityEngineClient deciding(String clause, List<String> visibleColumns) {
         SecurityEngineClient client = mock(SecurityEngineClient.class);
-        when(client.applyRls(anyString(), anyString(), any())).thenReturn(clause);
+        // #142/B4-3d-10：切面消费的是带态出口，桩必须停在 Execution 上。
+        // 停在折叠后的 String 上＝把四态重新压成一个字面量，正是被收口的缺陷本身。
+        when(client.applyRlsExecution(anyString(), anyString(), any())).thenReturn(executionOf(clause));
         when(client.filterColumns(anyString(), anyList())).thenReturn(new ArrayList<>(visibleColumns));
         return client;
+    }
+
+    /** 片段字符串 → 执行契约读数（与生产者应答同一形状）。 */
+    private static RlsExecutionContract.Execution executionOf(String clause) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put(RlsExecutionContract.KEY_WHERE_CLAUSE, clause);
+        return RlsExecutionContract.read(data, "table=" + TABLE)
+                .rejectForUnbindableChannel("table=" + TABLE);
     }
 
     private static Map<String, Object> row(String tenantId, String name) {

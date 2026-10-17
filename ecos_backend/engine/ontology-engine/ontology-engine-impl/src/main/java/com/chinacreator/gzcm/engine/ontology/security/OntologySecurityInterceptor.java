@@ -113,6 +113,15 @@ public class OntologySecurityInterceptor {
     /**
      * 拦截读方法 — 行级 RLS + 列级 CLS + 脱敏。
      * <p>仅处理 ApiResponse 的 payload 是 List 或 {data: List} Map 两种形态。</p>
+     *
+     * <p><b>#142/B4-3d-10（D-B4-26 余项）</b>：RLS 腿改取四态读数。
+     * {@code UNAVAILABLE}（security 进程没答）在本切面就地改写信封
+     * （{@code code=503} + {@code errorCode=ECOS-SEC-501} + data 清空），
+     * 不再折叠成"200＋零行"。选改信封而不是抛异常是两条约束的交点：
+     * ① {@code @AfterReturning} 抛运行时异常会穿透成 500（本模块无对应
+     * {@code @ExceptionHandler}），既不是 503 也丢机读码；
+     * ② 抛出去还会跳过写回、把已过滤前的载荷留在应答里＝fail-open。
+     * 503 信封与 {@code DecisionController} 的 fail-closed 出口同形。</p>
      */
     @AfterReturning(pointcut = "anyOperation()", returning = "result")
     public void secureReadResult(Object result) {
@@ -128,8 +137,12 @@ public class OntologySecurityInterceptor {
                 if (rows != null && !rows.isEmpty()) {
                     String tableName = resolveTableName(rows);
                     if (userId != null) {
-                        rows = applyRlsRemote(tableName, userId, rows);
-                        rows = applyClsRemote(tableName, userId, rows);
+                        RlsOutcome rls = applyRlsRemote(tableName, userId, rows);
+                        if (rls.unavailable()) {
+                            markSecurityUnavailable(resp, rls.reason());
+                            return;
+                        }
+                        rows = applyClsRemote(tableName, userId, rls.rows());
                     }
                     rows = applyMaskingRows(rows);
                     assignData(resp, rows);
@@ -143,8 +156,14 @@ public class OntologySecurityInterceptor {
                         String tableName = resolveTableName(rows);
                         boolean rowFiltered = false;
                         if (userId != null) {
-                            rows = applyRlsRemote(tableName, userId, rows);
-                            rows = applyClsRemote(tableName, userId, rows);
+                            RlsOutcome rls = applyRlsRemote(tableName, userId, rows);
+                            if (rls.unavailable()) {
+                                // 不可用态：整个副本（含未过滤的行）都不许写回，
+                                // 只出 503 信封＋空 data（D-B4-34 刚接通的写回腿在此必须让位于改写信封）
+                                markSecurityUnavailable(resp, rls.reason());
+                                return;
+                            }
+                            rows = applyClsRemote(tableName, userId, rls.rows());
                             rowFiltered = true;
                         }
                         dataMap.put("data", rows);
@@ -178,19 +197,55 @@ public class OntologySecurityInterceptor {
 
     // ═══════════════ RLS — 走 security-engine ═══════════════
 
-    private List<Map<String, Object>> applyRlsRemote(String tableName, String userId,
-                                                     List<Map<String, Object>> rows) {
+    /**
+     * 一次 RLS 消费的结果：行集 + 「是否 security 进程不可用」。
+     *
+     * <p><b>为什么不是一个布尔就够了</b>（#142/B4-3d-10，D-B4-26 余项）：不可用与拒绝
+     * 都返空集，但对外形态必须不同（503 信封 vs 200＋空行）。旧签名 {@code List} 只能
+     * 表达后者，于是"security 挂了"在本通道读起来就是"这人看不到数据"。</p>
+     */
+    record RlsOutcome(List<Map<String, Object>> rows, boolean unavailable, String reason) {
+
+        static RlsOutcome filtered(List<Map<String, Object>> rows) {
+            return new RlsOutcome(rows, false, null);
+        }
+
+        static RlsOutcome unavailable(String reason) {
+            return new RlsOutcome(List.of(), true, reason);
+        }
+    }
+
+    private RlsOutcome applyRlsRemote(String tableName, String userId,
+                                      List<Map<String, Object>> rows) {
         try {
-            String where = securityEngineClient.applyRls("ecos_ontology", tableName,
-                    Map.of("tenant", "default"));
-            // #142/B4-3c-2（D-B4-17）：空串/缺失是「应答未发执行契约」，不是「无行级限制」——
-            // 旧写法在此 return rows（fail-open，全行渗漏）。三态：恒真才不限制行。
-            // #142/B4-3d-5（D-B4-24）：漂移理由取单源常量，禁在本类手抄第二份文案。
+            RlsExecutionContract.Execution exec = securityEngineClient
+                    .applyRlsExecution("ecos_ontology", tableName, Map.of("tenant", "default"));
+
+            // 不可用态：不折叠成拒绝（§4.5.4）。审计与对外信封分别由
+            // audit 事件名与 markSecurityUnavailable 的 503 承载。
+            if (exec.unavailable()) {
+                log.warn("security-engine 进程不可用（非无权限）: table={} reason={}",
+                        tableName, exec.reason());
+                try {
+                    securityEngineClient.audit("RLS_UNAVAILABLE_SECURITY_ENGINE",
+                            "unavailable:" + exec.reason());
+                } catch (Exception ignored) {
+                    // audit 不阻断主流程（fail-closed 由返回值保证，不由审计保证）
+                }
+                return RlsOutcome.unavailable(exec.reason());
+            }
+            // #142/B4-3c-2（D-B4-17）：应答缺执行契约＝漂移即拒绝（客户端已归一为 DENIED 态，
+            // 理由带 REASON_WHERE_ABSENT），不再 return rows（fail-open 全量渗漏）。
+            if (!exec.usable()) {
+                return denyUntrustedWhere(exec.reason() == null
+                        ? RlsExecutionContract.REASON_DENY_FROM_SECURITY_ENGINE : exec.reason());
+            }
+            String where = exec.clause();
             if (where == null || where.isBlank()) {
                 return denyUntrustedWhere(RlsExecutionContract.REASON_WHERE_ABSENT);
             }
-            if (isDenyClause(where)) return new ArrayList<>();
-            if (isAllowAllClause(where)) return rows;
+            if (isDenyClause(where)) return RlsOutcome.filtered(new ArrayList<>());
+            if (isAllowAllClause(where)) return RlsOutcome.filtered(rows);
             // P0-2: 仅接受单条件白名单 (entity_code/tenant_id/domain_id/ontology_id/is_deleted/status)
             // 的 = / != 二 token; 其它情况 (AND/OR/NOT/LIKE/IN/多条件/未知字段名) 视为 RLS 表达式不可信
             // -> DENY (return empty). 多条件 SQL WHERE 推到 DAO 层做 (T17 落库时白名单字段名 + 参数绑定).
@@ -227,17 +282,17 @@ public class OntologySecurityInterceptor {
                 boolean eq = actual != null && actual.toString().equals(val);
                 if (isNeq != eq) filtered.add(row);
             }
-            return filtered;
+            return RlsOutcome.filtered(filtered);
         } catch (Exception e) {
-            // P0-1: 默认 DENY (架构铁律 2.4.6) — security-engine 不可用必须返空,
-            // 不可 fail-open 返原 rows 否则 27 个 Controller 读接口全量渗漏全行
-            log.warn("security-engine RLS 不可用, 默认 DENY: {}", e.getMessage());
+            // P0-1: 默认 DENY (架构铁律 2.4.6) — 本方法内部异常只可能是本地过滤腿出错，
+            // 与"security 进程不可用"分态由 applyRlsExecution 已经判过，此处不再冒充不可用。
+            log.warn("本体 RLS 过滤腿异常, 默认 DENY: {}", e.getMessage());
             try {
-                securityEngineClient.audit("RLS_DENY_FAIL_OPEN_DETECTED", "deny:resttemplate_throw:" + e.getMessage());
+                securityEngineClient.audit("RLS_DENY_LOCAL_FILTER_THROWN", "deny:filter_throw:" + e.getMessage());
             } catch (Exception ignored) {
                 // audit 不阻断主流程
             }
-            return new ArrayList<>();
+            return RlsOutcome.filtered(new ArrayList<>());
         }
     }
 
@@ -257,20 +312,21 @@ public class OntologySecurityInterceptor {
     }
 
     /**
-     * P0-2: RLS whereClause 不可信时走默认 DENY — 记录审计并返回空集.
-     * <p>覆盖场景: AND/OR/NOT/LIKE/IN 多条件 / 未知 op / 非白名单字段名.</p>
+     * P0-2: RLS 谓词不可信时走默认 DENY — 记录审计并返回空行集.
+     * <p>覆盖场景: AND/OR/NOT/LIKE/IN 多条件 / 未知 op / 非白名单字段名 /
+     * 单源读数给出的拒绝态（含应答缺执行契约的漂移）.</p>
      *
-     * @param whereClause 原始 where 字符串
-     * @return 空列表
+     * @param reason 拒绝理由（片段原文或单源理由码），只进审计与日志，不参与判定
+     * @return 空行集的拒绝态读数（{@code unavailable=false}：这是策略拒绝，不是引擎没答）
      */
-    private List<Map<String, Object>> denyUntrustedWhere(String whereClause) {
-        log.warn("RLS whereClause 不可信, 默认 DENY: clause={}", whereClause);
+    private RlsOutcome denyUntrustedWhere(String reason) {
+        log.warn("RLS 拒绝: clause={}", reason);
         try {
-            securityEngineClient.audit("RLS_DENY_UNTRUSTED_WHERE", "deny:clause=" + whereClause);
+            securityEngineClient.audit("RLS_DENY_UNTRUSTED_WHERE", "deny:clause=" + reason);
         } catch (Exception ignored) {
             // audit 不阻断
         }
-        return new ArrayList<>();
+        return RlsOutcome.filtered(new ArrayList<>());
     }
 
     /**
@@ -454,6 +510,24 @@ public class OntologySecurityInterceptor {
         } catch (Exception e) {
             log.debug("assignData 反射失败: {}", e.getMessage());
         }
+    }
+
+    /**
+     * 就地改写信封为「不可用」态（#142/B4-3d-10，D-B4-26 余项）。
+     *
+     * <p>三件事一起做、缺一不可：{@code code} 从 0 改 503、机读 {@code errorCode}
+     * 带 {@code ECOS-SEC-501}、{@code data} 清空。只改前两件而留着 data，
+     * 客户端只要有一处按 HTTP 状态（200）读成功，渗漏照旧——写回与改写必须原子；
+     * 只清 data 而不改码，又把"引擎没答"冒充成"这人没数据"（§4.5.4 禁止的折叠）。</p>
+     *
+     * <p>码面取 {@link RlsExecutionContract} 单源常量，禁在本类写字面量。</p>
+     */
+    private static void markSecurityUnavailable(ApiResponse<?> resp, String reason) {
+        resp.setCode(RlsExecutionContract.SEC_UNAVAILABLE_HTTP);
+        resp.setErrorCode(RlsExecutionContract.SEC_UNAVAILABLE_CODE);
+        resp.setMessage(RlsExecutionContract.REASON_SERVICE_UNAVAILABLE
+                + "（security-engine 进程不可用，非「用户无权限」）: " + reason);
+        assignData(resp, Collections.emptyList());
     }
 
     private static String resolveTableName(List<Map<String, Object>> rows) {

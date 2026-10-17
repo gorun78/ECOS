@@ -20,11 +20,18 @@ import java.util.Map;
  *   <li>ACTION 类意图：{@code POST /api/v1/security/policy-engine/evaluate} ABAC 裁决，
  *       DENY 或 security-engine 不可用 → 默认 DENY，节点置 BLOCKED</li>
  *   <li>所有意图：{@code POST /api/v1/security/rls/apply} 取行级过滤条件，
- *       返回 "1=0"（不可用/DENY）→ BLOCKED；结果经 rlsFilters 传给 KnowledgeRetriever</li>
+ *       拒绝/不可用 → BLOCKED；结果经 rlsFilters 传给 KnowledgeRetriever</li>
  *   <li><b>#142/B4-3c-2（D-B4-17）执行契约三态</b>：{@code "1=0"}＝拒绝、
  *       {@code "1=1"}＝明确不限制行、其余＝非平凡谓词原样下传；
  *       <b>空/缺失片段＝形态漂移 → BLOCKED</b>（旧口径把空串当"无行级限制"放行，
  *       即本批次关掉的 fail-open，登记见差距文档）</li>
+ *   <li><b>#142/B4-3d-10（D-B4-26 余项）四态</b>：本节点改消费
+ *       {@link AiSecurityEngineClient#applyRlsExecution}，"security 进程不可用"
+ *       与"策略拒绝"在阻止原因与审计事件名上分成两态
+ *       （{@code UNAVAILABLE:ECOS-SEC-501} / {@code DENIED:理由码}）。
+ *       处置仍是 BLOCKED（fail-closed 不变），变的只有可寻址性——
+ *       此前本节点用 {@code applyRls} 的 {@code "1=0"}，传输故障在 OAG 侧读起来
+ *       与"这人没权限"完全同形，运维与申诉两边都拿不到线索。</li>
  *   <li>敏感操作黑名单（本地第一道闸）保留不变</li>
  * </ul>
  *
@@ -107,26 +114,47 @@ public class SecurityCheckerNode implements OagNode {
             }
         }
 
-        // 3. RLS — security-engine 行级过滤条件；不可用/DENY 返回 "1=0" → 默认拒绝
-        //    #142/B4-3d-5（D-B4-24）：片段字面量与理由码单源于 RlsExecutionContract，
-        //    本节点只做分态消费，禁再手抄 "1=0" / 理由文案。
-        String whereClause = securityEngineClient.applyRls(
+        // 3. RLS — security-engine 行级过滤条件（四态读数，#142/B4-3d-10 / D-B4-26 余项）
+        //    片段字面量、状态模型与理由码单源于 RlsExecutionContract，本节点只做分态消费。
+        RlsExecutionContract.Execution rls = securityEngineClient.applyRlsExecution(
                 ctx.getUserId(), ctx.getTenantId(), intent == null ? "default" : intent.toLowerCase(),
                 "oag_query", Map.of("tenantId", String.valueOf(ctx.getTenantId())));
-        if (RlsExecutionContract.DENY_CLAUSE.equals(whereClause)) {
+
+        // 3a. 不可用态与拒绝态在此分岔：处置相同（都 BLOCKED，fail-closed 不变），
+        //     对外码与审计事件名不同。§4.5.4 要的正是这种可寻址性——
+        //     折叠成一条 "1=0" 之后，"security 挂了"与"这人没权限"在日志里长得一样，
+        //     前者该叫运维、后者该走申诉，混在一起就是两边都误判。
+        if (rls.unavailable()) {
             ctx.setSecurityPassed(false);
-            ctx.setSecurityBlockReason("security-engine 不可用或 RLS 拒绝（默认 DENY）");
+            ctx.setSecurityBlockReason("security-engine 进程不可用（"
+                    + RlsExecutionContract.SEC_UNAVAILABLE_CODE + "，非「用户无权限」）: " + rls.reason());
             ctx.setStatus("BLOCKED");
-            securityEngineClient.auditQuietly(ctx.getUserId(), "oag:rls", "apply", "DENIED");
-            log.warn("[OAG:{}] RLS DENY（security-engine 不可用/拒绝）→ BLOCKED", ctx.getTraceId());
+            securityEngineClient.auditQuietly(ctx.getUserId(), "oag:rls", "apply",
+                    "UNAVAILABLE:" + RlsExecutionContract.SEC_UNAVAILABLE_CODE);
+            log.warn("[OAG:{}] RLS UNAVAILABLE → BLOCKED（不可用态，禁冒充无权限）userId={} reason={}",
+                    ctx.getTraceId(), ctx.getUserId(), rls.reason());
+            return ctx;
+        }
+        if (rls.denied()) {
+            ctx.setSecurityPassed(false);
+            ctx.setSecurityBlockReason("security-engine RLS 拒绝: " + rls.reason());
+            ctx.setStatus("BLOCKED");
+            // 审计理由带上生产者的机读码：零命中／未解析上下文／需绑参在应答里都是 1=0，
+            // 只有理由能把它们分开（缺理由时按兜底码，禁自造）。
+            securityEngineClient.auditQuietly(ctx.getUserId(), "oag:rls", "apply",
+                    "DENIED:" + (rls.reason() == null ? RlsExecutionContract.REASON_DENY_FROM_SECURITY_ENGINE
+                            : rls.reason()));
+            log.warn("[OAG:{}] RLS DENY → BLOCKED userId={} reason={}",
+                    ctx.getTraceId(), ctx.getUserId(), rls.reason());
             return ctx;
         }
 
-        // 4. 执行契约收口（#142/B4-3c-2 / D-B4-17）：客户端只会给出
-        //    "1=0"（拒绝）/ "1=1"（明确不限制行）/ 不含 ? 的裸文本谓词三种形态。
-        //    拿到空片段＝上游形态漂移（生产者从未发过空 whereClause），必须拒绝——
-        //    旧口径「空串＝无行级限制」而放行，正是本批次关掉的 fail-open：
-        //    字段名漂移会让 AI 通道整条链路裸返，且下游无法与"真的无策略"区分。
+        // 4. 执行契约收口（#142/B4-3c-2 / D-B4-17）：可用态只会给出
+        //    "1=1"（明确不限制行）或不含 ? 的裸文本谓词两种形态（单源四道不变量 +
+        //    本通道 rejectForUnbindableChannel 已把需绑参的片段转成拒绝态）。
+        //    拿到空片段＝上游形态漂移，仍须拒绝——旧口径「空串＝无行级限制」而放行，
+        //    正是 D-B4-17 关掉的 fail-open；此处是纵深防御的第二道，不依赖客户端永不漂移。
+        String whereClause = rls.clause();
         if (whereClause == null || whereClause.isBlank()) {
             ctx.setSecurityPassed(false);
             ctx.setSecurityBlockReason("security-engine RLS 应答未给执行契约"

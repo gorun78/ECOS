@@ -239,22 +239,65 @@ public class AiSecurityEngineClient {
      * <p><b>对外形态不变</b>：缺字段/空白/需绑参/不可用/DENY 一律 {@code "1=0"}；
      * 恒真 {@code 1=1}＝不限制行（与"未给谓词"分态）。</p>
      *
+     * <p><b>#142/B4-3d-10（D-B4-26 余项）</b>：本方法保留折叠语义（改签名撞「API 只增不改」），
+     * 但不再是唯一出口 —— 需要「不可用 ≠ 无权限」分态的调用方用 {@link #applyRlsExecution}。</p>
+     *
      * @return whereClause；恒真 {@code 1=1}＝不限制行；缺字段/空白/不可绑定/不可用/DENY → {@code "1=0"}
      */
     public String applyRls(String userId, String tenantId, String entityType,
                            String tableName, Map<String, Object> filters) {
+        RlsExecutionContract.Execution exec = applyRlsExecution(userId, tenantId, entityType,
+                tableName, filters);
+        // 日志不在此重复：applyRlsExecution 已按态打过一次带理由的 warn（折叠点只留一处口径）
+        return exec.usable() ? exec.clause() : DENY_CLAUSE;
+    }
+
+    /**
+     * RLS 的<b>带态、不抛异常</b>出口（#142/B4-3d-10，差距 D-B4-26 余项）。
+     *
+     * <p><b>与本类另两个出口的分工</b>：{@link #applyRls} 把一切不可用折叠成 {@code 1=0}
+     * （旧对外形态），{@link #applyRlsOrThrow} 把故障原样上抛（obligations 链的
+     * FAIL_CLOSED 用），本方法则把四种形态留在返回值里。三者共用同一份单源读数，
+     * 差别只在"折叠／上抛／带态"，禁再出现第四套解析。</p>
+     *
+     * <p><b>不可用的四种形态</b>（与 data-engine {@code QueryController} 的判据同口径）：
+     * 传输/寻址异常、应答空信封、security 失败信封（HTTP 200 + {@code code=503}／
+     * message 以 {@code ECOS-SEC-501} 起头，见 {@link RlsExecutionContract#isUnavailableEnvelope}）、
+     * 以及本引擎特有的 RestTemplate 缺失。四类都出
+     * {@link RlsExecutionContract.State#UNAVAILABLE}，不得伪装成"策略拒绝"（§4.5.4）。</p>
+     *
+     * @return 永不为 {@code null} 的执行契约读数（已叠加 {@code rejectForUnbindableChannel}）
+     */
+    public RlsExecutionContract.Execution applyRlsExecution(String userId, String tenantId,
+                                                            String entityType, String tableName,
+                                                            Map<String, Object> filters) {
+        String subject = "entityType=" + entityType;
         try {
-            RlsExecutionContract.Execution exec = rlsExecution(userId, tenantId, entityType,
-                    tableName, filters);
+            Map<String, Object> resp = postJson(PATH_RLS_APPLY,
+                    rlsRequestBody(userId, tenantId, entityType, tableName, filters));
+            if (resp == null) {
+                log.warn("AiSecurityEngineClient.applyRls UNAVAILABLE: 应答空信封 entityType={}", entityType);
+                return RlsExecutionContract.Execution.unavailable(subject + "(应答为空信封)");
+            }
+            if (RlsExecutionContract.isUnavailableEnvelope(resp)) {
+                log.warn("AiSecurityEngineClient.applyRls UNAVAILABLE: security 失败信封 entityType={} code={} message={}",
+                        entityType, resp.get("code"), resp.get("message"));
+                return RlsExecutionContract.Execution.unavailable(
+                        subject + "(security 失败信封 code=" + resp.get("code") + ")");
+            }
+            RlsExecutionContract.Execution exec = RlsExecutionContract
+                    .read(resp.get("data"), subject)
+                    .rejectForUnbindableChannel(subject);
             if (!exec.usable()) {
                 log.warn("AiSecurityEngineClient.applyRls DENY: entityType={} state={} reason={}",
                         entityType, exec.state(), exec.reason());
-                return DENY_CLAUSE;
             }
-            return exec.clause();
+            return exec;
         } catch (Exception e) {
-            log.warn("AiSecurityEngineClient.applyRls DENY: entityType={} reason={}", entityType, e.getMessage());
-            return DENY_CLAUSE;
+            log.warn("AiSecurityEngineClient.applyRls UNAVAILABLE: entityType={} reason={}",
+                    entityType, e.getMessage());
+            return RlsExecutionContract.Execution.unavailable(
+                    subject + "(" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")");
         }
     }
 
@@ -405,10 +448,10 @@ public class AiSecurityEngineClient {
         // security 内部裁决失败以 HTTP 200 + code=503 信封应答（DecisionController 的
         // fail-closed 出口）；AI 侧必须认这层信封，否则"引擎没结论"会被读成"列面段缺失"，
         // 把可用性故障冒充成形态漂移（workspace 侧同一分类点见 unavailableEnvelope）。
-        if (isUnavailableEnvelope(resp)) {
+        if (RlsExecutionContract.isUnavailableEnvelope(resp)) {
             throw new SecurityResponseUnparsableException(
-                    "security 内部裁决失败（ECOS-SEC-501 信封）: table=" + table
-                            + " code=" + resp.get("code") + " message=" + resp.get("message"));
+                    "security 内部裁决失败（" + RlsExecutionContract.SEC_UNAVAILABLE_CODE + " 信封）: table="
+                            + table + " code=" + resp.get("code") + " message=" + resp.get("message"));
         }
         Object data = resp.get("data");
         if (!(data instanceof Map<?, ?> dataMap)) {
@@ -427,24 +470,9 @@ public class AiSecurityEngineClient {
         return surface;
     }
 
-    /**
-     * 是否为「不可用」信封（{@code ApiResponse.code == 503} 或 message 以 {@code ECOS-SEC-501}
-     * 起头）。与 workspace 侧同名判据同语义，但两处各自持有：跨模块的 HTTP 信封分类没有
-     * 共同底座可挂（common-api 不引 Spring），键面单源在
-     * {@link DecisionChannelContract}，本批只把码面收成常量比较。
-     */
-    private static boolean isUnavailableEnvelope(Map<String, Object> resp) {
-        Object code = resp.get("code");
-        if (code instanceof Number n && n.intValue() == HTTP_UNAVAILABLE) return true;
-        Object message = resp.get("message");
-        return message instanceof String s && s.startsWith(REASON_SECURITY_UNAVAILABLE);
-    }
-
-    /** security 内部裁决失败信封的 HTTP 码（与 {@code ApiResponse.error(503, ...)} 同源）。 */
-    private static final int HTTP_UNAVAILABLE = 503;
-
-    /** security 内部裁决失败的理由码前缀（详设-01 §4.5.4）。 */
-    private static final String REASON_SECURITY_UNAVAILABLE = "ECOS-SEC-501";
+    // 「不可用」信封的判据与码面（code=503 / ECOS-SEC-501）单源在
+    // RlsExecutionContract#isUnavailableEnvelope（#142/B4-3d-10 收口 D-B4-26 余项时归并：
+    // 此前本类与 workspace 各持一份，同一事实两套检索口径）。
 
     // ═══════════════ 脱敏 / 行过滤执行（obligations 消费，算法只在 security 侧） ═══════════════
 

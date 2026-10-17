@@ -141,19 +141,53 @@ public class SecurityEngineClient {
      * 的片段宁 DENY 不猜值拼接（IR05；参数化下推需 DAO 侧改造，已登记）。</p>
      *
      * <p><b>对外形态不变</b>：返回值仍是 WHERE 片段字符串，
-     * 拒绝/漂移/不可绑定 → {@link #DENY_CLAUSE}，恒真 → 原样返回（调用方据此"不限制行"）。
-     * "security 进程不可用"在本通道仍被折叠成 {@code 1=0}（与 §4.5.4 的分态要求有差距，
-     * 登记为 D-B4-26 余项；单源已提供 {@code State.UNAVAILABLE} 与 data-engine 的落地样板）。</p>
+     * 拒绝/漂移/不可绑定 → {@link #DENY_CLAUSE}，恒真 → 原样返回（调用方据此"不限制行"）。</p>
+     *
+     * <p><b>#142/B4-3d-10（D-B4-26 余项）</b>：本方法保留「把不可用折叠成 {@code 1=0}」的
+     * 旧语义（改签名会撞「API 只增不改」），但折叠不再是唯一出口 —— 需要分态的调用方
+     * 改用 {@link #applyRlsExecution}，本方法只是它上面的一层归一。</p>
      *
      * @param entityType 实体类型
      * @param table      表名
      * @param filters    过滤条件键值
-     * @return WHERE 条件片段；拒绝/漂移/不可绑定 → {@code "1=0"}
+     * @return WHERE 条件片段；拒绝/漂移/不可绑定/不可用 → {@code "1=0"}
      */
     public String applyRls(String entityType, String table, Map<String, Object> filters) {
-        if (serviceRestTemplate == null) {
-            log.debug("SecurityEngineClient.applyRls: RestTemplate 未注入，DENY");
+        RlsExecutionContract.Execution exec = applyRlsExecution(entityType, table, filters);
+        if (!exec.usable()) {
+            // 日志在此不再重复：applyRlsExecution 已按态打过一次带理由的 warn，
+            // 两处各打＝同一事实两套文案，排障时无法确定哪条是权威。
             return DENY_CLAUSE;
+        }
+        return exec.clause();
+    }
+
+    /**
+     * 行级 RLS 的<b>带态</b>出口（#142/B4-3d-10，差距 D-B4-26 余项）。
+     *
+     * <p><b>与 {@link #applyRls} 的差别只有一处、但语义上是一级</b>：本方法把
+     * "security 进程没答"（连不上／超时／寻址失败／空信封／{@code ECOS-SEC-501}
+     * 失败信封）表达为 {@link RlsExecutionContract.State#UNAVAILABLE}，
+     * 而不是把它冒充成"策略拒绝"（{@code 1=0}）。§4.5.4「不可用 ≠ 无权限」要的
+     * 不是两种处置（两者都 fail-closed），而是<b>可寻址</b>：403 触发权限申诉、
+     * 503 触发运维告警，折叠之后两者互相掩盖。</p>
+     *
+     * <p><b>永不抛异常</b>：传输故障也归到返回值里（{@link RlsExecutionContract.Execution#unavailable}），
+     * 调用方拿到的永远是四态之一的可解释读数；本引擎的对外形态由调用方决定
+     * （读切面写 503 信封，而非让异常穿过 {@code @AfterReturning} 变成 500）。</p>
+     *
+     * @param entityType 实体类型
+     * @param table      表名
+     * @param filters    过滤条件键值
+     * @return 永不为 {@code null} 的执行契约读数（本通道已叠加 {@code rejectForUnbindableChannel}）
+     */
+    public RlsExecutionContract.Execution applyRlsExecution(String entityType, String table,
+                                                            Map<String, Object> filters) {
+        String subject = "table=" + table;
+        if (serviceRestTemplate == null) {
+            log.warn("SecurityEngineClient.applyRls UNAVAILABLE: 通道未装配 entityType={} table={}",
+                    entityType, table);
+            return RlsExecutionContract.Execution.unavailable(subject + "(RestTemplate 未装配)");
         }
         try {
             Map<String, Object> body = new LinkedHashMap<>();
@@ -164,19 +198,32 @@ public class SecurityEngineClient {
                 body.put("filters", filters);
             }
             Map<String, Object> resp = postJson("/api/v1/security/rls/apply", body);
+            if (resp == null) {
+                log.warn("SecurityEngineClient.applyRls UNAVAILABLE: 应答空信封 entityType={} table={}",
+                        entityType, table);
+                return RlsExecutionContract.Execution.unavailable(subject + "(应答为空信封)");
+            }
+            // security 内部裁决失败以 HTTP 200 + ECOS-SEC-501 信封应答：不认这层信封
+            // 就会把"引擎没结论"读成"应答缺执行契约"＝把可用性故障冒充成形态漂移。
+            if (RlsExecutionContract.isUnavailableEnvelope(resp)) {
+                log.warn("SecurityEngineClient.applyRls UNAVAILABLE: security 失败信封 entityType={} table={} code={} message={}",
+                        entityType, table, resp.get("code"), resp.get("message"));
+                return RlsExecutionContract.Execution.unavailable(
+                        subject + "(security 失败信封 code=" + resp.get("code") + ")");
+            }
             RlsExecutionContract.Execution exec = RlsExecutionContract
-                    .read(resp == null ? null : resp.get("data"), "table=" + table)
-                    .rejectForUnbindableChannel("table=" + table);
+                    .read(resp.get("data"), subject)
+                    .rejectForUnbindableChannel(subject);
             if (!exec.usable()) {
                 log.warn("SecurityEngineClient.applyRls DENY: table={} state={} reason={}",
                         table, exec.state(), exec.reason());
-                return DENY_CLAUSE;
             }
-            return exec.clause();
+            return exec;
         } catch (Exception e) {
-            log.warn("SecurityEngineClient.applyRls DENY: entityType={} table={} reason={}",
+            log.warn("SecurityEngineClient.applyRls UNAVAILABLE: entityType={} table={} reason={}",
                     entityType, table, e.getMessage());
-            return DENY_CLAUSE;
+            return RlsExecutionContract.Execution.unavailable(
+                    subject + "(" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")");
         }
     }
 
