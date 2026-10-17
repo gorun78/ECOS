@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.security.decision;
 
+import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -38,10 +40,12 @@ public final class AssetRef {
     public static AssetRef fromMap(java.util.Map<String, Object> m) {
         if (m == null) return null;
         Object schema = m.get("schema");
-        Object table = m.get("table");
-        @SuppressWarnings("unchecked")
-        List<String> cols = (List<String>) (m.get("columns") == null
-                ? null : ((java.util.List<?>) m.get("columns")).stream().map(String::valueOf).toList());
+        // 请求面键单源（#142/B4-3d-6，差距 D-B4-28/30 同族）：本类读的 table/columns 与
+        // 三通道客户端写侧共用 DecisionChannelContract 的常量，禁再各抄一份字面量。
+        Object table = m.get(DecisionChannelContract.KEY_ASSET_TABLE);
+        Object columnsRaw = m.get(DecisionChannelContract.KEY_ASSET_COLUMNS);
+        List<String> cols = columnsRaw == null ? null
+                : ((java.util.List<?>) columnsRaw).stream().map(String::valueOf).toList();
         if (table == null || table.toString().isBlank()) return null;
         return new AssetRef(schema == null ? null : schema.toString(), table.toString(), cols);
     }

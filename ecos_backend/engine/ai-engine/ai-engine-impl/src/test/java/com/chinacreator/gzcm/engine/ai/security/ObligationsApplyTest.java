@@ -112,9 +112,9 @@ class ObligationsApplyTest {
         ToolObligations obligations = maskOf("phone", "phone");
 
         // ① 执行器层：返回值即被替换，原文不再出现
-        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper());
+        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper(), gateFor(client));
         ToolObligationApplier.Outcome outcome =
-                applier.apply("query_db", RESULT_JSON, obligations, SUBJECT);
+                applier.apply("query_db", RESULT_JSON, obligations, SUBJECT, null);
         assertTrue(outcome.applied(), "security 可用时义务必须落实: " + outcome.failReason());
         assertNotNull(outcome.json());
         assertFalse(outcome.json().contains(RAW_PHONE),
@@ -186,10 +186,10 @@ class ObligationsApplyTest {
                     return verdict;
                 });
 
-        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper());
+        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper(), gateFor(client));
         ToolObligations obligations = new ToolObligations(List.of(), "dept = 'dept-a'", Map.of());
         ToolObligationApplier.Outcome outcome =
-                applier.apply("query_db", RESULT_JSON, obligations, SUBJECT);
+                applier.apply("query_db", RESULT_JSON, obligations, SUBJECT, null);
 
         assertTrue(outcome.applied(), outcome.failReason());
         assertEquals(1, outcome.filtered(), "只应保留 security 放行的那一行");
@@ -204,9 +204,9 @@ class ObligationsApplyTest {
         AiSecurityEngineClient client = mock(AiSecurityEngineClient.class);
         when(client.evaluateFilter(anyString(), any(), anyString())).thenReturn(Map.of());
 
-        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper());
+        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper(), gateFor(client));
         ToolObligationApplier.Outcome outcome = applier.apply("query_db", RESULT_JSON,
-                new ToolObligations(List.of(), "dept = 'dept-a'", Map.of()), SUBJECT);
+                new ToolObligations(List.of(), "dept = 'dept-a'", Map.of()), SUBJECT, null);
 
         assertTrue(outcome.applied(), "判定本身可用，只是不放行 —— 属 DENY 面而非不可用面");
         assertEquals(0, outcome.filtered());
@@ -222,9 +222,9 @@ class ObligationsApplyTest {
         when(client.applyMasking(any(), any()))
                 .thenThrow(new AiSecurityEngineClient.SecurityResponseUnparsableException("masking/apply 响应不可解析"));
 
-        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper());
+        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper(), gateFor(client));
         ToolObligationApplier.Outcome outcome =
-                applier.apply("query_db", RESULT_JSON, maskOf("phone", "phone"), SUBJECT);
+                applier.apply("query_db", RESULT_JSON, maskOf("phone", "phone"), SUBJECT, null);
 
         assertFalse(outcome.applied());
         assertNull(outcome.json());
@@ -243,10 +243,10 @@ class ObligationsApplyTest {
     @DisplayName("F06-02 结果不可解析为行结构而义务又存在 → 丢弃（不得假设'没有敏感列'）")
     void unparseableResultWithObligationsIsFailClosed() throws Exception {
         AiSecurityEngineClient client = mock(AiSecurityEngineClient.class);
-        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper());
+        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper(), gateFor(client));
 
         ToolObligationApplier.Outcome outcome = applier.apply("query_db",
-                "查询完成，共 2 条记录（非结构化文本）", maskOf("phone", "phone"), SUBJECT);
+                "查询完成，共 2 条记录（非结构化文本）", maskOf("phone", "phone"), SUBJECT, null);
 
         assertFalse(outcome.applied(), "不可解释的结构必须丢弃: " + outcome.json());
         assertTrue(outcome.failReason().contains("不可解析"), outcome.failReason());
@@ -262,9 +262,9 @@ class ObligationsApplyTest {
         }
         sb.append("],\"count\":").append(ToolObligationApplier.MAX_FILTER_ROWS + 1).append("}");
 
-        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper());
+        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper(), gateFor(client));
         ToolObligationApplier.Outcome outcome = applier.apply("query_db", sb.toString(),
-                new ToolObligations(List.of(), "dept = 'dept-a'", Map.of()), SUBJECT);
+                new ToolObligations(List.of(), "dept = 'dept-a'", Map.of()), SUBJECT, null);
 
         assertFalse(outcome.applied());
         assertTrue(outcome.failReason().contains("超逐行裁决上限"), outcome.failReason());
@@ -274,10 +274,10 @@ class ObligationsApplyTest {
     @DisplayName("F06-02 mask 义务缺规则名 → 丢弃（无规则名即无从交 security 执行）")
     void maskWithoutRuleIsFailClosed() throws Exception {
         AiSecurityEngineClient client = mock(AiSecurityEngineClient.class);
-        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper());
+        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper(), gateFor(client));
 
         ToolObligationApplier.Outcome outcome = applier.apply("query_db", RESULT_JSON,
-                maskOf("phone", null), SUBJECT);
+                maskOf("phone", null), SUBJECT, null);
 
         assertFalse(outcome.applied());
         assertTrue(outcome.failReason().contains("缺少规则名"), outcome.failReason());
@@ -288,10 +288,10 @@ class ObligationsApplyTest {
     @DisplayName("F06-02 无义务时原样透传（不得凭空加工结果）")
     void noObligationPassesResultThroughUnchanged() throws Exception {
         AiSecurityEngineClient client = mock(AiSecurityEngineClient.class);
-        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper());
+        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper(), gateFor(client));
 
         ToolObligationApplier.Outcome outcome =
-                applier.apply("query_db", RESULT_JSON, ToolObligations.none(), SUBJECT);
+                applier.apply("query_db", RESULT_JSON, ToolObligations.none(), SUBJECT, null);
 
         assertTrue(outcome.applied());
         assertEquals(RESULT_JSON, outcome.json());
@@ -300,6 +300,16 @@ class ObligationsApplyTest {
     }
 
     // ── 装置 ────────────────────────────────────────────────────────────────
+
+    /**
+     * 列面带装置（#142/B4-3d-6）：真口径 {@link AiToolColumnSurfaceGate}=真实门 + 桩 client。
+     * 这些用例不指定表资产（asset=null），列面带在直测层面恒 NOT_APPLICABLE，
+     * 不改变原有义务的判据；资产非 NONE 的列面路径由 {@code AiClsColumnSurfaceTest}
+     * 与咽喉端到端用例单独覆盖。
+     */
+    private static AiToolColumnSurfaceGate gateFor(AiSecurityEngineClient client) {
+        return new AiToolColumnSurfaceGate(client);
+    }
 
     private static ToolObligations maskOf(String column, String rule) {
         return new ToolObligations(List.of(new ToolObligations.Mask(column, rule)), null, Map.of());
@@ -337,7 +347,8 @@ class ObligationsApplyTest {
             service.setToolDao(toolDao);
             service.setPolicyGate(gate);
             service.setSubjectResolver(subjectResolver);
-            service.setObligationApplier(new ToolObligationApplier(client, new ObjectMapper()));
+            service.setObligationApplier(new ToolObligationApplier(
+                    client, new ObjectMapper(), gateFor(client)));
             ReflectionTestUtils.setField(service, "toolRegistry", registry);
         }
     }

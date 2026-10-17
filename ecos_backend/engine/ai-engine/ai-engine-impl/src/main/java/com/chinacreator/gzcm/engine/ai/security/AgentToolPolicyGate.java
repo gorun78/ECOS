@@ -248,6 +248,25 @@ public class AgentToolPolicyGate {
         return tables;
     }
 
+    /**
+     * 受控表面（#142/B4-3d-6，D-B4-28 的取表入口）。
+     *
+     * <p>列面闸需要"这次工具调用涉及哪张（些）表"来定资产基数，而本方法是全链路上
+     * <b>唯一</b>的表引用提取器（SQL 地板与 ABAC 载荷都用它）。把它只以本公共方法暴露给
+     * 咽喉，禁 {@code ToolExecutorService} 或列面闸再自写一套 {@code TABLE_REF} 解析 ——
+     * 两套解析器会对同一 SQL 给出不同表集，"该裁哪张表"于是变成第二个真值。</p>
+     *
+     * <p>返回集合的基数不在这里判定（0/1/≥2 的语义属于
+     * {@link AiToolColumnSurfaceGate.Asset#of(java.util.Collection)}），本方法只保证
+     * <b>与裁决载荷同源</b>。</p>
+     *
+     * @param sqlText 工具 SQL 原文（可空；空/无可识别引用返回空集）
+     * @return 小写归一的表名集合，顺序稳定（提取先后）
+     */
+    public Set<String> controlledTables(String sqlText) {
+        return extractTables(sqlText);
+    }
+
     private String digest(String sql) {
         String s = sql.replaceAll("\\s+", " ").trim();
         return "len=" + s.length() + " sha=" + Integer.toHexString(s.hashCode());

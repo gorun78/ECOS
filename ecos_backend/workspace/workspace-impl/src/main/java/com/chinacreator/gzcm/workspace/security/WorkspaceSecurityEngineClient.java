@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.workspace.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
+import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor;
 import com.chinacreator.gzcm.common.security.header.ServiceContext;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
@@ -219,11 +220,13 @@ public class WorkspaceSecurityEngineClient {
     public Map<String, Object> decide(String table, List<String> columns, String purpose) {
         try {
             Map<String, Object> asset = new LinkedHashMap<>();
-            asset.put("table", table);
-            if (columns != null && !columns.isEmpty()) asset.put("columns", columns);
+            asset.put(DecisionChannelContract.KEY_ASSET_TABLE, table);
+            if (columns != null && !columns.isEmpty()) {
+                asset.put(DecisionChannelContract.KEY_ASSET_COLUMNS, columns);
+            }
             Map<String, Object> body = new LinkedHashMap<>();
-            body.put("assetRef", asset);
-            body.put("purpose", purpose);
+            body.put(DecisionChannelContract.KEY_ASSET_REF, asset);
+            body.put(DecisionChannelContract.KEY_PURPOSE, purpose);
             Map<String, Object> resp = postJson("/api/v1/security/decision", body);
             if (resp == null) return null;
             if (unavailableEnvelope(resp)) {

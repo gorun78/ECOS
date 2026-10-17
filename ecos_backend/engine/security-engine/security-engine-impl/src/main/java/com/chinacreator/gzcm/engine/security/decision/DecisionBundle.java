@@ -329,7 +329,10 @@ public final class DecisionBundle {
     public Map<String, Object> toMap() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("rls", rls);
-        m.put("columns", columns);
+        // 段键单源（#142/B4-3d-6）：消费侧（workspace AbacQueryFilter / AI 列面闸）读的是
+        // DecisionChannelContract.KEY_BUNDLE_COLUMNS，写侧必须同源，否则又是一次键面漂移。
+        m.put(com.chinacreator.gzcm.common.security.decision.DecisionChannelContract
+                .KEY_BUNDLE_COLUMNS, columns);
         m.put("masks", masks);
         m.put("opa", opa);
         m.put("decisionId", decisionId);

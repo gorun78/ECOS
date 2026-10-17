@@ -99,10 +99,20 @@ class ExportDecisionContractTest {
         String consumerSrc = readRepoFile(WORKSPACE_CONSUMER_SRC);
 
         // security 侧：bundle 结构四源 + 两 id，范围证据键由 SecurityDecisionService 单点写入
-        for (String key : List.of("\"rls\"", "\"columns\"", "\"masks\"", "\"opa\"",
+        // #142/B4-3d-6 起 "columns" 段键的字面量唯一落点搬进 DecisionChannelContract.KEY_BUNDLE_COLUMNS
+        // （toMap 侧改引常量后本字面量在 bundleSrc 消失）——不是放宽：改按单源常量形态核对
+        // （第 1 段生产侧引常量 + 第 2 段单源定义该字面量 + 第 3 段生产侧代码位禁内联该字面量回潮），
+        // 覆盖面严于原字面量单段核对，键名漂移同样变红。
+        for (String key : List.of("\"rls\"", "\"masks\"", "\"opa\"",
                 "\"decisionId\"", "\"traceId\"")) {
             assertTrue(bundleSrc.contains(key), "DecisionBundle.toMap 键集变化须同步消费侧: " + key);
         }
+        String channelContractSrc = readRepoFile(
+                "ecos_backend/runtime/common-api/src/main/java/"
+                        + "com/chinacreator/gzcm/common/security/decision/DecisionChannelContract.java");
+        String bundleCode = stripComments(bundleSrc);
+        assertReadThroughSingleSourceConstant(bundleCode, channelContractSrc,
+                "KEY_BUNDLE_COLUMNS", "columns", "DecisionBundle");
         assertTrue(decisionSrc.contains("\"policyRefs\""),
                 "范围证据出处（policyRefs）必须由裁决入口单点写入，否则导出件无证据可引");
         // 加严：refs 必须 rls 段与 columns 段各挂一处。只出现一次＝其中一段被漏改，
@@ -152,12 +162,20 @@ class ExportDecisionContractTest {
      */
     private static void assertReadThroughSingleSourceConstant(String consumerCode, String contractSrc,
             String constName, String wireKey) {
-        assertTrue(consumerCode.contains(constName),
-                "ExportDecision 未引单源常量 " + constName + "（" + wireKey + " 的读取面失控）");
+        assertReadThroughSingleSourceConstant(consumerCode, contractSrc, constName, wireKey, "ExportDecision");
+    }
+
+    /**
+     * 同上，多一个位点名（生产侧等其它代码位复用同一三段核对时区分排障信息）。
+     */
+    private static void assertReadThroughSingleSourceConstant(String siteCode, String contractSrc,
+            String constName, String wireKey, String siteLabel) {
+        assertTrue(siteCode.contains(constName),
+                siteLabel + " 未引单源常量 " + constName + "（" + wireKey + " 的读取面失控）");
         assertTrue(contractSrc.contains(constName + " = \"" + wireKey + "\""),
                 "单源常量 " + constName + " 不再定义为 \"" + wireKey + "\"：线契约键名漂移");
-        assertFalse(consumerCode.contains("\"" + wireKey + "\""),
-                "ExportDecision 代码位内联 \"" + wireKey + "\" = 绕过单源的第二形态，漂移将静默失配");
+        assertFalse(siteCode.contains("\"" + wireKey + "\""),
+                siteLabel + " 代码位内联 \"" + wireKey + "\" = 绕过单源的第二形态，漂移将静默失配");
     }
 
     @Test

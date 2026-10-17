@@ -242,8 +242,9 @@ class RateLimitChokepointTest {
             service.setToolDao(toolDao);
             service.setPolicyGate(policyGate);
             service.setSubjectResolver(subjectResolver);
+            AiSecurityEngineClient securityStub = mock(AiSecurityEngineClient.class);
             service.setObligationApplier(new ToolObligationApplier(
-                    mock(AiSecurityEngineClient.class), new ObjectMapper()));
+                    securityStub, new ObjectMapper(), new AiToolColumnSurfaceGate(securityStub)));
             service.setRateLimitGate(gate);
             ReflectionTestUtils.setField(service, "toolRegistry", registry);
         }

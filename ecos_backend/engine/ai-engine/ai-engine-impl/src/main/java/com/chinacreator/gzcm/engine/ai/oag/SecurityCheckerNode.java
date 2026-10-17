@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.oag;
 
+import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient;
 import org.slf4j.Logger;
@@ -31,7 +32,11 @@ import java.util.Map;
  * <ul>
  *   <li>POST /api/v1/security/policy-engine/evaluate</li>
  *   <li>POST /api/v1/security/rls/apply</li>
- *   <li>POST /api/v1/security/cls/columns</li>
+ *   <li>订正（#142/B4-3d-6 / D-B4-28）：本节点<b>不</b>调用 CLS 端点。
+ *       早期注释把它列在本节点的外部端点清单里，而代码里从未有过那次调用 ——
+ *       列面在 OAG 一侧只写"未判定"证据面（见 {@link #OAG_NO_COLUMN_UNIVERSE}），
+ *       AI 通道真正的列面消费腿在工具咽喉
+ *       （{@code AiToolColumnSurfaceGate} → {@code POST /api/v1/security/decision}）。</li>
  * </ul>
  */
 @Component
@@ -44,6 +49,15 @@ public class SecurityCheckerNode implements OagNode {
             "DROP TABLE", "DROP DATABASE", "TRUNCATE",
             "ALTER SYSTEM", "SHUTDOWN", "GRANT ALL"
     );
+
+    /**
+     * OAG 列面"未判定"的理由码（#142/B4-3d-6 / D-B4-28）。
+     *
+     * <p>本链路没有数据腿，列宇宙无从谈起；这与"security 说没有可读列"（策略拒绝）
+     * 和"security 没答"（不可用）是三种不同的事，必须用不同的码区分，
+     * 否则审计里看不出该判的到底判过没有。</p>
+     */
+    public static final String OAG_NO_COLUMN_UNIVERSE = "OAG_NO_COLUMN_UNIVERSE";
 
     private final AiSecurityEngineClient securityEngineClient;
 
@@ -134,7 +148,13 @@ public class SecurityCheckerNode implements OagNode {
         // 用契约常量而非字面量，避免下游按第三套键名读数。
         rlsFilters.put(RlsExecutionContract.KEY_WHERE_CLAUSE, whereClause);
         ctx.setRlsFilters(rlsFilters);
-        ctx.setClsColumns(new LinkedHashMap<>());
+        // 列面证据面（#142/B4-3d-6，D-B4-28 的 OAG 半边）：OAG 管道没有数据腿
+        // （KnowledgeRetrieverNode 的 knowledgeChunks 是常量桩，零行零列）⇒ 没有可裁决的列全集。
+        // 旧实现写 new LinkedHashMap<>()（空 Map）冒充"CLS 已过滤"，下游 ReasoningEngineNode
+        // 按 !isEmpty() 判过就宣称「返回列已由 CLS 策略过滤」——空 Map 既不是可读集也不是结论，
+        // 它唯一的实效是让一句假话听起来有依据。这里显式写"未判定"并把理由带上，
+        // 宣称位改由 ColumnSurfaceContract.isEvaluatedFace 把关（默认不宣称）。
+        ctx.setClsColumns(ColumnSurfaceContract.notEvaluatedFace(OAG_NO_COLUMN_UNIVERSE));
 
         log.debug("[OAG:{}] 安全检查通过 intent={} rls={}", ctx.getTraceId(), intent, whereClause);
 

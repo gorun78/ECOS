@@ -8,6 +8,7 @@ import com.chinacreator.gzcm.engine.ai.guardrail.ToolDecision;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolObligations;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlWhitelist;
+import com.chinacreator.gzcm.engine.ai.security.AiToolColumnSurfaceGate;
 import com.chinacreator.gzcm.engine.ai.security.AiToolRateLimitGate;
 import com.chinacreator.gzcm.engine.ai.security.ToolObligationApplier;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
@@ -54,7 +55,10 @@ import java.util.regex.Pattern;
  *       义务形态不合契约归 FAIL_CLOSED（503），两者都不进 dispatch，也禁折叠成一态；</li>
  *   <li>{@code dispatch}：按 toolType 分发执行，未获 ALLOW 不会到达此处；</li>
  *   <li>{@code obligationsApply}：ALLOW 返回的 {@code mask[]/rowFilter} 必须在结果回 LLM
- *       <b>之前</b>经 security 侧执行落实，执行不可用则整条结果丢弃并 FAIL_CLOSED（F06-02 要点 2）。</li>
+ *       <b>之前</b>经 security 侧执行落实，执行不可用则整条结果丢弃并 FAIL_CLOSED（F06-02 要点 2）；
+ *       同一阶段还承担 <b>CLS 列面裁剪</b>（#142/B4-3d-6 收口差距 D-B4-28）——
+ *       列面裁决与义务签发相互独立，故"义务为空"不再等于"本阶段无事可做"；
+ *       顺序固定为 rowFilter → mask → 列面裁剪（详设-01 C.2.4）。</li>
  * </ol>
  *
  * <p>三态语义（DENY ≠ FAIL_CLOSED，禁折叠）由 {@link AiErrorClass#GUARDRAIL_DENIED} /
@@ -292,7 +296,8 @@ public class ToolExecutorService {
             }
 
             // ── 阶段 4: obligationsApply —— 结果回 LLM 之前（F06-02 要点 2） ──
-            return obligationsApply(toolName, raw, decision, adjudication.subject(), startNs);
+            return obligationsApply(toolName, raw, decision, adjudication.subject(),
+                    adjudication.asset(), startNs);
         } catch (TimeoutException e) {
             long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
             return buildClassifiedError(callId, toolName, AiErrorClass.TOOL_BACKEND_ERROR,
@@ -327,16 +332,25 @@ public class ToolExecutorService {
 
     // ── 阶段 1: policyEvaluate ────────────────────────────────────────────
 
-    /** 裁决中间结果：{@code rejected} 非空即终止（DENY / FAIL_CLOSED），禁继续执行 */
+    /**
+     * 裁决中间结果：{@code rejected} 非空即终止（DENY / FAIL_CLOSED），禁继续执行。
+     *
+     * <p>{@code asset}（#142/B4-3d-6，D-B4-28）是<b>阶段 1 就定形</b>的表资产基数：
+     * 列面裁剪要知道"这次结果该按哪张表裁决"，而 SQL 原文在阶段 1 之后就不在作用域里了。
+     * 让值对象随裁决结果一路带到阶段 4，结果回传段既不回头重解析 SQL，也不自带第二套
+     * 表引用解析器 —— 两处解析对同一 SQL 给出不同表集时，"该裁哪张表"就成了第二个真值。</p>
+     */
     private record Adjudication(ToolResult rejected, ToolDecision decision,
-                                ToolAdjudicationRequest.Subject subject) {
+                                ToolAdjudicationRequest.Subject subject,
+                                AiToolColumnSurfaceGate.Asset asset) {
 
         static Adjudication reject(ToolResult result) {
-            return new Adjudication(result, null, null);
+            return new Adjudication(result, null, null, AiToolColumnSurfaceGate.Asset.of(List.of()));
         }
 
-        static Adjudication allow(ToolDecision decision, ToolAdjudicationRequest.Subject subject) {
-            return new Adjudication(null, decision, subject);
+        static Adjudication allow(ToolDecision decision, ToolAdjudicationRequest.Subject subject,
+                                  AiToolColumnSurfaceGate.Asset asset) {
+            return new Adjudication(null, decision, subject, asset);
         }
     }
 
@@ -389,8 +403,11 @@ public class ToolExecutorService {
                         ToolAdjudicationRequest.CHANNEL_AGENT, Instant.now().toString()));
 
         ToolDecision decision = policyGate.review(request, sqlText, boundParams);
+        // 表资产基数与 ABAC 载荷同源（AgentToolPolicyGate 的唯一表引用提取器，D-B4-28）
+        AiToolColumnSurfaceGate.Asset asset =
+                AiToolColumnSurfaceGate.Asset.of(policyGate.controlledTables(sqlText));
         if (decision.allowed()) {
-            return Adjudication.allow(decision, subject);
+            return Adjudication.allow(decision, subject, asset);
         }
         AiErrorClass errorClass = AgentToolPolicyGate.errorClassFor(decision);
         if (errorClass == null) errorClass = AiErrorClass.GUARDRAIL_DENIED;
@@ -479,20 +496,48 @@ public class ToolExecutorService {
     /**
      * ALLOW 义务在结果回 LLM <b>之前</b>落实；执行不可用整条结果丢弃并 FAIL_CLOSED
      * （禁"先返回再说明"，F06-02 要点 2）。
+     *
+     * <p>#142/B4-3d-6（D-B4-28）后本阶段承担两条腿：OPA 义务（rowFilter/mask）与
+     * <b>CLS 列面裁剪</b>。短路口径因此从"义务为空即返回"改为
+     * "义务为空<b>且</b>无待裁列面才返回" —— 否则"策略没签发义务"会把列面腿整条旁路掉，
+     * 而列面裁决与义务签发是两件独立的事（{@code /decision} 的 columns 段不依赖 obligations）。</p>
+     *
+     * <p>分态（§4.5.4「不可用 ≠ 无权限」，禁折叠）：</p>
+     * <ul>
+     *   <li>{@link ToolObligationApplier.Outcome#denied()} ⇒ {@link AiErrorClass#GUARDRAIL_DENIED}
+     *       （403，策略结论，禁重试）；</li>
+     *   <li>其余 {@code !applied} ⇒ {@link AiErrorClass#GUARDRAIL_FAIL_CLOSED}（503，没有可用结论）；</li>
+     *   <li>执行器未装配且本调用确实需要列面裁决 ⇒ 503，理由取
+     *       {@link AiToolColumnSurfaceGate#REASON_GATE_UNWIRED}（"列面腿没接线"这一缺陷形态
+     *       必须在审计里可辨认，禁写成一句通用文案）。</li>
+     * </ul>
      */
     private ToolResult obligationsApply(String toolName, ToolResult raw, ToolDecision decision,
-                                        ToolAdjudicationRequest.Subject subject, long startNs) {
+                                        ToolAdjudicationRequest.Subject subject,
+                                        AiToolColumnSurfaceGate.Asset asset, long startNs) {
         ToolObligations obligations = decision == null ? ToolObligations.none() : decision.obligations();
-        if (obligations.isEmpty()) {
+        boolean needsColumnScreen = asset != null && asset.requiresScreening();
+        if (obligations.isEmpty() && !needsColumnScreen) {
             return raw;
         }
         if (obligationApplier == null) {
-            log.warn("F06-02 obligations 执行器未装配，整条结果丢弃（fail-closed）: tool={}", toolName);
+            log.warn("F06-02 obligations 执行器未装配，整条结果丢弃（fail-closed）: tool={} columnScreen={}",
+                    toolName, needsColumnScreen);
+            String reason = needsColumnScreen
+                    ? "security obligations 执行器不可用，结果已丢弃（"
+                            + AiToolColumnSurfaceGate.REASON_GATE_UNWIRED + "）"
+                    : "security obligations 执行器不可用，结果已丢弃";
             return buildGuardrailError(raw.getToolCallId(), toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
-                    "security obligations 执行器不可用，结果已丢弃", startNs, decision);
+                    reason, startNs, decision);
         }
         ToolObligationApplier.Outcome outcome =
-                obligationApplier.apply(toolName, raw.getContent(), obligations, subject);
+                obligationApplier.apply(toolName, raw.getContent(), obligations, subject, asset);
+        if (outcome.denied()) {
+            log.info("B4-3d-6 列面策略拒绝工具结果（策略结论，不重试）: tool={} reason={}",
+                    toolName, outcome.failReason());
+            return buildGuardrailError(raw.getToolCallId(), toolName, AiErrorClass.GUARDRAIL_DENIED,
+                    outcome.failReason(), startNs, decision);
+        }
         if (!outcome.applied()) {
             log.warn("F06-02 obligations 执行失败，整条结果丢弃（fail-closed）: tool={} reason={}",
                     toolName, outcome.failReason());

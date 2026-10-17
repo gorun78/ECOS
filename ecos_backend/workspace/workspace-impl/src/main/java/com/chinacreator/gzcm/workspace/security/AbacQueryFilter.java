@@ -73,11 +73,13 @@ public class AbacQueryFilter {
      * 又不可用（{@code mode} 恒 "allow"、{@code names} 是列面第三种叫法、无拒绝理由），
      * 所以合流必须先修 bundle —— 两件事同批做，否则合流就是又一次假收口。</p>
      *
-     * <p><b>四态分面（§4.5.4「不可用 ≠ 无权限」在页面通道的落地）</b>：
-     * 传输故障由客户端单点转 503 上抛（不改）；裁决束缺失 / 列面键面漂移 /
-     * 列全集未解析 / 可读集为空 四态一律返回空行集（fail-closed），
-     * 但<b>各自带不同理由进日志</b> —— 前两种是缺陷/形态态，后两种才是策略结论。
-     * 禁把四态折叠成同一条"无可见列"日志（那正是 D-B4-16 的病灶）。</p>
+     * <p><b>分态分面（§4.5.4「不可用 ≠ 无权限」在页面通道的落地）</b>：
+     * 传输故障由客户端单点转 503 上抛（不改）；裁决束缺失 / 列面键面漂移 / CLS 源异常 /
+     * 列全集未解析 / 可读集为空 五态一律返回空行集（fail-closed），
+     * 但<b>各自带不同理由进日志</b> —— 前四种是缺陷/形态态，最后一种才是策略结论。
+     * 禁把这些态折叠成同一条"无可见列"日志（那正是 D-B4-16 的病灶）。
+     * 态的判定顺序是单源 {@link ColumnSurfaceContract#decide(Object)}，本类只做日志分派
+     * （#142/B4-3d-6，差距 D-B4-28 同族的"手抄第 N 套"预防项）。</p>
      *
      * @param entityCode 实体编码（如 "Contract"）
      * @param rows       查询结果行列表
@@ -97,36 +99,48 @@ public class AbacQueryFilter {
 
         Map<String, Object> bundle = securityEngineClient.decide(
                 entityCode, allColumns, DecisionChannelContract.PURPOSE_PAGE);
-        if (bundle == null) {
-            // 裁决束缺失（应答无 data 段/形态非 Map）＝裁决无出处，与"策略拒绝"分态。
-            log.warn("ABAC列裁剪 DENY（页面通道裁决束缺失，非策略结论）: entity={}, rows={} 被置空",
-                    entityCode, rows.size());
-            return List.of();
-        }
-
-        Object columnSegment = bundle.get("columns");
-        ColumnSurfaceContract.Reading reading = ColumnSurfaceContract.read(columnSegment);
-        if (reading.drifted()) {
-            log.warn("ABAC列裁剪 DENY（bundle 列面键面漂移，非策略结论）: entity={} reason={}",
-                    entityCode, reading.reason());
-            return List.of();
-        }
-        if (ColumnSurfaceContract.universeUnresolved(columnSegment)) {
-            log.warn("ABAC列裁剪 DENY（列全集未解析，裁决未判定列面）: entity={} clsDenyReason={}",
-                    entityCode, ColumnSurfaceContract.denyReasonOf(columnSegment));
-            return List.of();
-        }
-        if (reading.visible().isEmpty()) {
-            // 明确 DENY（策略清空可读集 / CLS 源异常态已由生产者写入 clsDenyReason）：
-            // 默认拒绝，不返回任何列数据。「进程不可用」已在客户端单点转 503 上抛，
-            // 不会走到本分支冒充空行集。
-            log.warn("ABAC列裁剪 DENY（security-engine 明确拒绝）: entity={}, rows={} 被置空 reason={}",
-                    entityCode, rows.size(), ColumnSurfaceContract.denyReasonOf(columnSegment));
-            return List.of();
+        // 四态分类单源化（#142/B4-3d-6，差距 D-B4-28 同族）：本方法此前手抄
+        // read→drifted→universeUnresolved→visible.isEmpty 四段 if，是列面处置顺序的
+        // 唯一一份实现；AI 通道接线时若照抄就是第二套真值。顺序本体已收进
+        // ColumnSurfaceContract.decide，本类只保留"每态各自一条理由日志"的分派。
+        ColumnSurfaceContract.Surface surface = ColumnSurfaceContract.decide(
+                bundle == null ? null : bundle.get(DecisionChannelContract.KEY_BUNDLE_COLUMNS));
+        switch (surface.state()) {
+            case SEGMENT_ABSENT -> {
+                // 裁决束/列面段缺失（应答无 data 段或列面非 Map）＝裁决无出处，与"策略拒绝"分态。
+                log.warn("ABAC列裁剪 DENY（页面通道裁决束缺失，非策略结论）: entity={}, rows={} 被置空",
+                        entityCode, rows.size());
+                return List.of();
+            }
+            case SURFACE_DRIFT -> {
+                log.warn("ABAC列裁剪 DENY（bundle 列面键面漂移，非策略结论）: entity={} reason={}",
+                        entityCode, surface.reason());
+                return List.of();
+            }
+            case UNIVERSE_UNRESOLVED -> {
+                log.warn("ABAC列裁剪 DENY（列全集未解析，裁决未判定列面）: entity={} clsDenyReason={}",
+                        entityCode, surface.reason());
+                return List.of();
+            }
+            case SOURCE_ERROR -> {
+                log.warn("ABAC列裁剪 DENY（CLS 源异常，裁决未得出结论）: entity={} clsDenyReason={}",
+                        entityCode, surface.reason());
+                return List.of();
+            }
+            case POLICY_DENY -> {
+                // 明确 DENY（策略清空可读集）：默认拒绝，不返回任何列数据。
+                // 「进程不可用」已在客户端单点转 503 上抛，不会走到本分支冒充空行集。
+                log.warn("ABAC列裁剪 DENY（security-engine 明确拒绝）: entity={}, rows={} 被置空 reason={}",
+                        entityCode, rows.size(), surface.reason());
+                return List.of();
+            }
+            case TRIMMED -> {
+                // 继续走下面的裁剪
+            }
         }
 
         Set<String> allowedLower = new LinkedHashSet<>();
-        for (String col : reading.visible()) {
+        for (String col : surface.visible()) {
             if (col != null) allowedLower.add(col.toLowerCase());
         }
 
@@ -142,8 +156,8 @@ public class AbacQueryFilter {
             filtered.add(cleaned);
         }
         log.debug("ABAC列裁剪(security-engine /decision purpose={}): entity={}, allowed={}, blocked={}, rows={}",
-                DecisionChannelContract.PURPOSE_PAGE, entityCode, reading.visible().size(),
-                reading.blocked().size(), rows.size());
+                DecisionChannelContract.PURPOSE_PAGE, entityCode, surface.visible().size(),
+                surface.blocked().size(), rows.size());
         return filtered;
     }
 

@@ -28,7 +28,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *   <li><b>列面读数回到第三种叫法</b>（D-B4-16）：{@code bundle.columns} 曾只有
  *       {@code mode}（恒 "allow"，零信息）/{@code names}，消费者自行 {@code get("names")}
  *       就等于在 workspace 侧再造一套列面真值；四态（策略拒绝 / 宇宙未解析 / 源异常 / 键面漂移）
- *       一旦被折成一条日志，运维与调用方就分不清 403 与 503（§4.5.4「不可用 ≠ 无权限」）；</li>
+ *       一旦被折成一条日志，运维与调用方就分不清 403 与 503（§4.5.4「不可用 ≠ 无权限」）；
+ *       （#142/B4-3d-6 订正：消费侧分类收口 {@code ColumnSurfaceContract.decide} 六态分面，
+ *       「四态」是本门历史口径，断言随迁且只加严）</li>
  *   <li><b>通道词字面量复制</b>（D-B4-27）：入口把认不出的 purpose 静默当 {@code page}
  *       是 fail-open 伪装成成功，而消费侧内联 {@code "export"} 会让"改了词表没人知道"
  *       成为常态。词表唯一持有者必须是 {@code DecisionChannelContract}。</li>
@@ -70,12 +72,14 @@ class PageChannelDecisionLegGateTest {
     private static final List<String> DECISION_ENDPOINT_HOLDERS = List.of(
             PRODUCER_CONTROLLER_SRC, WORKSPACE_CLIENT_SRC);
 
-    /** 页面通道列裁剪的五条分立理由（日志面在代码里，不经注释剥除即可见）。 */
-    private static final List<String> FOUR_STATE_LOG_FACES = List.of(
+    /** 页面通道列裁剪的六条分立理由（日志面在代码里，不经注释剥除即可见）。
+     *  #142/B4-3d-6 起列面分类收口 ColumnSurfaceContract.decide 六态分面，新增 CLS 源异常态。 */
+    private static final List<String> STATE_LOG_FACES = List.of(
             "结果行无列键，未发起裁决",
             "页面通道裁决束缺失，非策略结论",
             "bundle 列面键面漂移，非策略结论",
             "列全集未解析，裁决未判定列面",
+            "CLS 源异常，裁决未得出结论",
             "security-engine 明确拒绝");
 
     /** 列面键面（含 legacy 别名与第三种叫法）：workspace 侧禁直读。 */
@@ -136,21 +140,24 @@ class PageChannelDecisionLegGateTest {
     // ═══════════════ 2. 四态不折叠 + 读数单源 ═══════════════
 
     @Test
-    @DisplayName("列面读数委托 ColumnSurfaceContract，四态各有一条可区分的 DENY 理由")
+    @DisplayName("列面读数委托 ColumnSurfaceContract.decide 单源分派，六态各有一条可区分的 DENY 理由")
     void columnSurfaceStatesAreReportedDistinctly() throws IOException {
         String src = stripComments(readRepoFile(ABAC_SRC));
 
         assertTrue(src.contains("import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;"),
                 "未 import 单源契约＝改回本地键面判定（制造第二套真值）");
-        assertTrue(src.contains("ColumnSurfaceContract.read("),
-                "列面读数必须经单源入口 ColumnSurfaceContract.read(");
-        assertTrue(src.contains(".drifted()"), "缺漂移态分面＝漂移被折成普通空集（缺陷复发时无法在审计里区分）");
-        assertTrue(src.contains("universeUnresolved("), "缺宇宙未解析分面＝调用方少传参数被报成用户无权限");
-        assertTrue(src.contains("denyReasonOf("), "拒绝理由未取单源＝workspace 侧自编解释");
+        // #142/B4-3d-6 起处置顺序本体收口单源 decide（原 read→drifted→universeUnresolved→
+        // visible.isEmpty 四段手抄即本批要关的「第 N 套解析」缺陷族）：断言只加严 ——
+        // 只认决策入口与键面单源常量，旧四段字面量不再作判据（回潮将被 decide 断言抓红）。
+        assertTrue(src.contains("ColumnSurfaceContract.decide("),
+                "列面分类必须经单源入口 ColumnSurfaceContract.decide(（禁再手抄 if 链）");
+        assertTrue(src.contains("DecisionChannelContract.KEY_BUNDLE_COLUMNS"),
+                "取列面段必须经键面单源常量，禁内联键名（跨模块键名漂移将静默失配）");
+        assertTrue(src.contains("surface.state()"), "消费侧未按 SurfaceState 单点分派＝手写第二套顺序");
 
-        for (String face : FOUR_STATE_LOG_FACES) {
-            assertTrue(src.contains(face), "四态折叠：日志面缺少「" + face + "」——"
-                    + "五态（含本地空宇宙）必须各带不同理由，禁折叠成一条「无可见列」");
+        for (String face : STATE_LOG_FACES) {
+            assertTrue(src.contains(face), "分类折叠：日志面缺少「" + face + "」——"
+                    + "六条（含本地空宇宙）必须各带不同理由，禁折叠成一条「无可见列」");
         }
     }
 
@@ -320,7 +327,7 @@ class PageChannelDecisionLegGateTest {
  * 可变红探针（每条违例面各一次，逐条翻面、逐条还原，禁一次翻多面）：
  *   P1 在 AbacQueryFilter#filterColumns 内插入 `if (false) securityEngineClient.allowedColumns(entityCode, allColumns);`
  *      → 用例 1「第二条裁决腿」+ 用例 2「持有者清单恰为客户端」同时红（还原后二者复绿）。
- *   P2 把任一 FOUR_STATE_LOG_FACES 的理由串改成与其它条相同 → 用例「四态各有一条可区分的 DENY 理由」红。
+ *   P2 把任一 STATE_LOG_FACES 的理由串改成与其它条相同 → 用例「六态各有一条可区分的 DENY 理由」红。
  *   P3 在 ScenarioReadGuard 里把 PURPOSE_EXPORT 换成内联 "export" → 用例「裸通道词只属于单源契约」红。
  * 本批实测记录见差距文档 v1.0.19 行与 BUILD 日志；探针语句严禁入库（提交前 grep MUTATION 必须零残留）。
  */

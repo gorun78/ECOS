@@ -2,7 +2,6 @@ package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
-import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.engine.security.decision.AssetRef;
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
@@ -50,11 +49,12 @@ public class DecisionController {
 
     @PostMapping
     public ApiResponse<Map<String, Object>> decide(@RequestBody Map<String, Object> body) {
-        AssetRef asset = AssetRef.fromMap(asMap(body.get("assetRef")));
+        AssetRef asset = AssetRef.fromMap(asMap(body.get(DecisionChannelContract.KEY_ASSET_REF)));
         if (asset == null) {
-            return ApiResponse.badRequest("assetRef.table 不能为空");
+            return ApiResponse.badRequest(DecisionChannelContract.KEY_ASSET_REF + "."
+                    + DecisionChannelContract.KEY_ASSET_TABLE + " 不能为空");
         }
-        String rawPurpose = asStr(body.get("purpose"));
+        String rawPurpose = asStr(body.get(DecisionChannelContract.KEY_PURPOSE));
         DecisionBundle.Purpose purpose = resolvePurpose(rawPurpose);
         if (purpose == null) {
             // D-B4-27：未识别的 purpose 过去被静默当 PAGE 放行（导出/AI 调用一旦词面失配，
@@ -68,9 +68,9 @@ public class DecisionController {
         String traceId = ctxTraceId();
         List<String> roles = ctxRoleList();
         // subject 兜底：显式请求体可覆盖（用于 QA 跨主体演练场景；生产应以信任链为准）
-        Map<String, Object> subject = asMap(body.get("subject"));
+        Map<String, Object> subject = asMap(body.get(DecisionChannelContract.KEY_SUBJECT));
         if (subject != null) {
-            Object sid = subject.get("subjectId");
+            Object sid = subject.get(DecisionChannelContract.KEY_SUBJECT_ID);
             if (sid != null && !sid.toString().isBlank()) userId = sid.toString();
         }
         if (userId == null || userId.isBlank()) {

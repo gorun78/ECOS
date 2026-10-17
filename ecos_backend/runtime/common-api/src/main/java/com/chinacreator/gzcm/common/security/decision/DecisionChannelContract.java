@@ -52,6 +52,37 @@ public final class DecisionChannelContract {
      */
     public static final String REASON_UNRECOGNIZED = "DECISION_PURPOSE_UNRECOGNIZED";
 
+    // ── #142/B4-3d-6 只增：裁决请求面 + 应答段键的单源（差距 D-B4-28 / D-B4-30） ──
+    //
+    // 动机（与 D-B4-25 同一病灶，只是换了一张面孔）：{@code /decision} 的请求体
+    // {@code assetRef.{table,columns}} / {@code purpose} / {@code subject.subjectId}
+    // 与应答体 {@code data.columns} 此前各有两份手抄字面量（{@code DecisionController}
+    // 读侧 + workspace 客户端写侧），第三份写侧（AI 列面腿）一接线就是四套真值。
+    // 键名漂移在跨 Maven 模块、编译期零耦合的两侧不会红 ——
+    // 本批把两侧都改成引用这里的常量，并由
+    // {@code ClsColumnSurfaceContractGateTest} 的跨模块清单钉住"不得再有裸字面量"。
+
+    /** 请求体：受保护对象段。 */
+    public static final String KEY_ASSET_REF = "assetRef";
+
+    /** 请求体：{@code assetRef} 内的表定位符（与 {@code AssetRef.table} 同义）。 */
+    public static final String KEY_ASSET_TABLE = "table";
+
+    /** 请求体：{@code assetRef} 内的列全集（空/缺失＝未给宇宙，列面按未判定处置）。 */
+    public static final String KEY_ASSET_COLUMNS = "columns";
+
+    /** 请求体：通道词。 */
+    public static final String KEY_PURPOSE = "purpose";
+
+    /** 请求体：主体段（只用于跨主体演练；生产以信任链为准）。 */
+    public static final String KEY_SUBJECT = "subject";
+
+    /** 请求体：{@code subject} 内的主体标识。 */
+    public static final String KEY_SUBJECT_ID = "subjectId";
+
+    /** 应答体 {@code data} 里的列面段（其内部键面见 {@code ColumnSurfaceContract}）。 */
+    public static final String KEY_BUNDLE_COLUMNS = "columns";
+
     private DecisionChannelContract() {
     }
 

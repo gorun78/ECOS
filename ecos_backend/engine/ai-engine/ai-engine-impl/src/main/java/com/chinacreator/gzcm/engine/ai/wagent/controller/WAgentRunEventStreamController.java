@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.wagent.controller;
 
+import com.chinacreator.gzcm.engine.ai.config.RunEventStreamExecutorConfig;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentApiPaths;
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.RunStatus;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentRunDao;
@@ -11,6 +12,7 @@ import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver.Identity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -57,12 +59,18 @@ public class WAgentRunEventStreamController {
     private final WAgentRunDao runDao;
     private final WAgentRunEventDao runEventDao;
     private final WAgentIdentityResolver identityResolver;
-    /** Spring 托管线程池（applicationTaskExecutor）：轮询泵禁裸线程/裸 CompletableFuture（SelfScheduleArchTest 红线）。 */
+    /**
+     * W 域 SSE 轮询泵命名线程池（Bean 名单源 = {@code RunEventStreamExecutorConfig}，模块级底座提供）：
+     * 轮询泵禁裸线程/裸 CompletableFuture（SelfScheduleArchTest 红线）。<b>必须按名注入</b>——gateway
+     * 单体聚合面存在 5 个 {@code TaskExecutor} 候选且无 {@code @Primary}，按类型注入必歧义
+     * （2026-10-16 实测 gateway 启动失败，详设-10 复盘批登记）。
+     */
     private final TaskExecutor taskExecutor;
 
     public WAgentRunEventStreamController(WAgentRunDao runDao,
                                           WAgentRunEventDao runEventDao,
                                           WAgentIdentityResolver identityResolver,
+                                          @Qualifier(RunEventStreamExecutorConfig.RUN_EVENT_STREAM_EXECUTOR)
                                           TaskExecutor taskExecutor) {
         this.runDao = runDao;
         this.runEventDao = runEventDao;

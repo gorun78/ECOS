@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.oag;
 
+import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
@@ -43,6 +44,22 @@ public class ReasoningEngineNode implements OagNode {
 
     /** 默认模型（fallback 链为空时使用） */
     private static final String DEFAULT_MODEL = "deepseek-chat";
+
+    /**
+     * 列面<b>已判定</b>时给 LLM 的约束行（唯一允许宣称"已过滤"的文案）。
+     * 判据来自单源 {@link ColumnSurfaceContract#isEvaluatedFace(Object)}，禁在此另写一套。
+     */
+    static final String CLS_FILTERED_CLAIM = "- 返回列已由 CLS 策略过滤";
+
+    /**
+     * 列面<b>未判定</b>时的如实文案（#142/B4-3d-6 / D-B4-28）。
+     *
+     * <p>不提"未判定"而只是"少说一句"是不够的：OAG 这条链路当前没有数据腿，
+     * 模型若以为上游裁过列，就会把"输出检索到的全部字段"当成安全行为。
+     * 这里把事实交给模型，同时给出一条替代约束（不扩列）。</p>
+     */
+    static final String CLS_NOT_EVALUATED_CLAIM =
+            "- 本链路未经列级安全裁决，回答只可复述上文出现过的字段，不得补全或扩列";
 
     /** LLM 模型 fallback 链（按优先级排列，第一项最先尝试） */
     @Value("${ecos.oag.model-fallback:'deepseek-chat'}")
@@ -245,8 +262,14 @@ public class ReasoningEngineNode implements OagNode {
         sb.append("## 安全约束:\n");
         sb.append("- 仅返回用户有权访问的数据\n");
         sb.append("- 不输出敏感信息\n");
-        if (clsColumns != null && !clsColumns.isEmpty()) {
-            sb.append("- 返回列已由 CLS 策略过滤\n");
+        // 宣称位（#142/B4-3d-6 / D-B4-28）：旧判据是 !isEmpty()，于是 SecurityCheckerNode
+        // 写的空 Map（"没裁决过"）与真裁决结果（"已按策略裁剪"）在这里同义 ——
+        // 提示词因此会替一条没发生过的过滤说话。改判据为单源证据面：只有显式声明
+        // "已判定"的列面才允许宣称过滤过；未判定/缺失一律如实写明未判定（默认不宣称）。
+        if (ColumnSurfaceContract.isEvaluatedFace(clsColumns)) {
+            sb.append(CLS_FILTERED_CLAIM).append("\n");
+        } else {
+            sb.append(CLS_NOT_EVALUATED_CLAIM).append("\n");
         }
         sb.append("\n请根据以上上下文回答用户问题。");
 
@@ -255,12 +278,17 @@ public class ReasoningEngineNode implements OagNode {
 
     /**
      * 模拟 LLM 响应（降级兜底路径）。
+     *
+     * <p>订正（#142/B4-3d-6 / D-B4-28）：原文案无条件写「已按安全策略过滤」，
+     * 而这条路径既没有数据腿也没有列面裁决（知识片段是常量桩），
+     * 那句话在演示之外从未为真。降级文案可以朴素，但不许替没发生过的安全步骤说话。</p>
      */
     private String simulateLlmResponse(String query, String intent, Map<String, Object> knowledge) {
         return String.format(
                 "根据您的查询「%s」(意图: %s)，系统已完成分析。\n\n" +
                 "ECOS 平台基于 DIKW 架构提供数据治理、知识图谱和大模型Agent三大核心能力。" +
-                "当前检索到 %d 条相关知识片段，已按安全策略过滤。",
+                "当前检索到 %d 条相关知识片段；本降级路径未做列级安全裁决，"
+                + "仅复述上文出现过的字段。",
                 query, intent != null ? intent : "UNKNOWN",
                 knowledge != null && knowledge.containsKey("knowledgeChunks")
                         ? ((java.util.List<?>) knowledge.get("knowledgeChunks")).size() : 0

@@ -321,11 +321,13 @@ class AgentToolPolicyGateTest {
         ToolDecision d = gate().review(request());
         assertEquals(ToolDecision.Verdict.ALLOW, d.verdict());
 
-        ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper());
+        ToolObligationApplier applier =
+                new ToolObligationApplier(client, new ObjectMapper(), new AiToolColumnSurfaceGate(client));
         ToolObligationApplier.Outcome outcome = applier.apply("query_db",
                 "{\"rows\":[{\"phone\":\"13800001111\"}],\"count\":1}",
                 d.obligations(),
-                new ToolAdjudicationRequest.Subject(USER, List.of("viewer"), null, TENANT));
+                new ToolAdjudicationRequest.Subject(USER, List.of("viewer"), null, TENANT),
+                null);
 
         assertFalse(outcome.applied(), "security 脱敏不可用时整条结果丢弃（禁先返回再说明）");
         assertNotNull(outcome.failReason());

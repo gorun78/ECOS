@@ -116,8 +116,13 @@ class WAgentForbiddenDependencyArchTest {
             WAGENT_ROOT + ".controller.WAgentRunEventStreamController",
             WAGENT_ROOT + ".readiness.EngineProbeClient");
 
-    /** 反空集锁④（扫描面基线）：2026-10-15 实测 ai 模块 main 源码 252 个 .java（其中 wagent 92）。 */
-    private static final int AI_SOURCE_FILE_FLOOR = 252;
+    /** 反空集锁④（扫描面基线）：2026-10-15 实测 ai 模块 main 源码 252 个 .java（其中 wagent 92）；
+     *  2026-10-16 +1（252→253）= 收口 gateway 聚合面 {@code TaskExecutor} 注入歧义新增的
+     *  {@code ai.config.RunEventStreamExecutorConfig}（W 域 SSE 泵命名池；受本守卫红线 3 与
+     *  {@code TerminologyArchTest} 双门禁夹制，只能以非 {@code WAgent} 名住在 wagent 包外的模块级 config）；
+     *  2026-10-16 +1（253→255）= #142/B4-3d-6（D-B4-28 收口）新增
+     *  {@code ai.security.AiToolColumnSurfaceGate}（AI 工具结果列面消费闸，ai 批内接线、不入 wagent 计数基线）。 */
+    private static final int AI_SOURCE_FILE_FLOOR = 255;
 
     /** 反空集锁④：跨引擎门面引用单点（详设-06 F06-11 forecast.explain 走 cognitive api 常量）。 */
     private static final Pattern ENGINE_IMPORT =
@@ -391,7 +396,7 @@ class WAgentForbiddenDependencyArchTest {
             List<Path> sources = paths.filter(p -> p.getFileName().toString().endsWith(".java"))
                     .sorted().collect(Collectors.toList());
             assertEquals(AI_SOURCE_FILE_FLOOR, sources.size(),
-                    "ai 模块源码文件数与登记基线不一致（2026-10-15 实测 252）—— 扫描面失真则 import 名录不可信；"
+                    "ai 模块源码文件数与登记基线不一致（2026-10-16 实测 255）—— 扫描面失真则 import 名录不可信；"
                             + "实测 " + sources.size());
             for (Path source : sources) {
                 for (String line : Files.readAllLines(source, StandardCharsets.UTF_8)) {

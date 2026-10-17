@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ai.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
+import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
@@ -60,6 +61,16 @@ public class AiSecurityEngineClient {
     private static final String PATH_EVALUATE_FILTER = "/api/security/evaluate-filter";
     private static final String PATH_RLS_APPLY = "/api/v1/security/rls/apply";
     private static final String PATH_CLS_COLUMNS = "/api/v1/security/cls/columns";
+
+    /**
+     * 三通道唯一裁决入口（详设-01 C.1 [3] / F01-02 / W33）。
+     *
+     * <p><b>#142/B4-3d-6 只增（差距 D-B4-28 / D-B4-30）</b>：AI 通道此前在列面上零命中
+     * 本端点（仓根实证 {@code grep -rn '/security/decision' engine/ai-engine} = 0），
+     * 护栏裁决只问 {@value #PATH_POLICY_EVALUATE}。本常量是 ai-engine 内的第一处引用位，
+     * 消费方为 {@link AiToolColumnSurfaceGate}。</p>
+     */
+    private static final String PATH_DECISION = "/api/v1/security/decision";
 
     private final String baseUrl;
     private final RestTemplate restTemplate;
@@ -345,6 +356,95 @@ public class AiSecurityEngineClient {
             return List.of();
         }
     }
+
+    /**
+     * POST {@value #PATH_DECISION} — <b>AI 通道列面消费腿</b>（详设-01 C.2.3「三处同源」+
+     * F01-02/W33「三通道唯一裁决入口」，#142/B4-3d-6 收口差距 <b>D-B4-28</b>）。
+     *
+     * <p><b>为什么走 /decision 而不是 {@code /cls/columns}</b>：S-6/W33 的"绕不过"前提是
+     * <b>只有一条入口</b>。页面通道已在 B4-3d-2 合流，导出在 B4-3b，AI 再调分散面等于
+     * 给"绕过裁决入口"留一条合法路径。{@code /cls/columns} 的退役判定另批做
+     * （D-B4-15 附注），本方法不改它。</p>
+     *
+     * <p><b>不吞异常</b>（本类既有分态纪律，也是 {@code AiClsColumnSurfaceTest}
+     * 里那条"钉现状"用例不适用于本腿的理由）：传输/寻址故障照抛 ⇒ 调用方按
+     * {@code GUARDRAIL_FAIL_CLOSED}（503）处置；旧 {@code allowedColumns} 把同类故障
+     * 折成空集＝冒充"策略拒绝"（403），那正是 §4.5.4「不可用 ≠ 无权限」禁止的折叠。</p>
+     *
+     * <p><b>主体只来自服务端解析</b>：入参 {@code userId} 由
+     * {@code ToolSubjectResolver}（token 上下文）给出，禁取 LLM 自报的入参值。
+     * 本进程出站不带信任链头（{@code postJson} 只带 {@code X-Request-Id}），故把主体
+     * 放在请求体 {@code subject.subjectId}；security 侧该位可覆盖信任链，
+     * 这一信任边界弱点登记为新差距（见差距文档 v1.0.23 行），不在本批掩盖。</p>
+     *
+     * @param userId  服务端解析的裁决主体
+     * @param table   受保护资产定位符（工具 SQL 的单表白名单结果）
+     * @param columns 列全集＝工具结果行的实际列键（空集时 security 侧判宇宙未解析）
+     * @return 永不为 {@code null} 的 {@link ColumnSurfaceContract.Surface}（四态已分类）
+     * @throws Exception 传输/寻址故障＝不可用态，原样上抛（禁折叠成空集）
+     */
+    public ColumnSurfaceContract.Surface columnSurface(String userId, String table,
+                                                       List<String> columns) throws Exception {
+        Map<String, Object> asset = new LinkedHashMap<>();
+        asset.put(DecisionChannelContract.KEY_ASSET_TABLE, table);
+        asset.put(DecisionChannelContract.KEY_ASSET_COLUMNS,
+                columns == null ? List.of() : columns);
+        Map<String, Object> subject = new LinkedHashMap<>();
+        subject.put(DecisionChannelContract.KEY_SUBJECT_ID,
+                userId == null || userId.isBlank() ? "anonymous" : userId);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put(DecisionChannelContract.KEY_ASSET_REF, asset);
+        body.put(DecisionChannelContract.KEY_PURPOSE, DecisionChannelContract.PURPOSE_AI);
+        body.put(DecisionChannelContract.KEY_SUBJECT, subject);
+
+        Map<String, Object> resp = postJson(PATH_DECISION, body);
+        if (resp == null) {
+            throw new SecurityResponseUnparsableException(
+                    "decision 应答为空信封: table=" + table);
+        }
+        // security 内部裁决失败以 HTTP 200 + code=503 信封应答（DecisionController 的
+        // fail-closed 出口）；AI 侧必须认这层信封，否则"引擎没结论"会被读成"列面段缺失"，
+        // 把可用性故障冒充成形态漂移（workspace 侧同一分类点见 unavailableEnvelope）。
+        if (isUnavailableEnvelope(resp)) {
+            throw new SecurityResponseUnparsableException(
+                    "security 内部裁决失败（ECOS-SEC-501 信封）: table=" + table
+                            + " code=" + resp.get("code") + " message=" + resp.get("message"));
+        }
+        Object data = resp.get("data");
+        if (!(data instanceof Map<?, ?> dataMap)) {
+            // 无 data 段＝无裁决出处。抛而非返回 SEGMENT_ABSENT：调用方要能在
+            // 日志里区分"security 说没这回事"与"security 根本没答"。
+            throw new SecurityResponseUnparsableException(
+                    "decision 应答缺 data 段: table=" + table);
+        }
+        Object columnsSegment = dataMap.get(DecisionChannelContract.KEY_BUNDLE_COLUMNS);
+        ColumnSurfaceContract.Surface surface = ColumnSurfaceContract.decide(columnsSegment);
+        if (surface.state() == ColumnSurfaceContract.SurfaceState.TRIMMED
+                && surface.legacyKeyUsed()) {
+            log.warn("AiSecurityEngineClient.columnSurface 走 legacy 别名键: table={} size={}",
+                    table, surface.visible().size());
+        }
+        return surface;
+    }
+
+    /**
+     * 是否为「不可用」信封（{@code ApiResponse.code == 503} 或 message 以 {@code ECOS-SEC-501}
+     * 起头）。与 workspace 侧同名判据同语义，但两处各自持有：跨模块的 HTTP 信封分类没有
+     * 共同底座可挂（common-api 不引 Spring），键面单源在
+     * {@link DecisionChannelContract}，本批只把码面收成常量比较。
+     */
+    private static boolean isUnavailableEnvelope(Map<String, Object> resp) {
+        Object code = resp.get("code");
+        if (code instanceof Number n && n.intValue() == HTTP_UNAVAILABLE) return true;
+        Object message = resp.get("message");
+        return message instanceof String s && s.startsWith(REASON_SECURITY_UNAVAILABLE);
+    }
+
+    /** security 内部裁决失败信封的 HTTP 码（与 {@code ApiResponse.error(503, ...)} 同源）。 */
+    private static final int HTTP_UNAVAILABLE = 503;
+
+    /** security 内部裁决失败的理由码前缀（详设-01 §4.5.4）。 */
+    private static final String REASON_SECURITY_UNAVAILABLE = "ECOS-SEC-501";
 
     // ═══════════════ 脱敏 / 行过滤执行（obligations 消费，算法只在 security 侧） ═══════════════
 
