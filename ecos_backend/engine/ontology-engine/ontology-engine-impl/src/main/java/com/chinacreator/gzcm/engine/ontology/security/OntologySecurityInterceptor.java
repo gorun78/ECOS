@@ -147,7 +147,6 @@ public class OntologySecurityInterceptor {
                             rows = applyClsRemote(tableName, userId, rows);
                             rowFiltered = true;
                         }
-                        rows = applyMaskingRows(rows);
                         dataMap.put("data", rows);
                         // #142/B4-3d-8：total 只在实际做过行级过滤时改写 —— 匿名/无登录态
                         // 没过滤却改计数，等于用零安全收益的行为变更去换分页元数据一致。
@@ -158,7 +157,15 @@ public class OntologySecurityInterceptor {
                         }
                     }
                 }
-                maskMapInPlace(dataMap);
+                // #142/B4-3d-9（D-B4-35）：脱敏在本分支只走 maskSingleRow 这一条递归腿
+                // （行级脱敏不再单独预跑一遍）。被删除的 maskMapInPlace 坏在两处：
+                // 递归腿在 copyMap 的一次性副本上自我调用＝掩码随副本丢弃；顶层腿
+                // it.remove() 后紧接 map.put() 在 LinkedHashMap 迭代中构成结构性修改，
+                // 抛 ConcurrentModificationException 且被本方法外层 catch 静默吞掉——
+                // 连带把 D-B4-34 刚接通的写回一起跳过。
+                // maskPhone 不幂等（138****5678 再掩一次成 138*****5678），故判据是
+                // 「一次遍历到位」，任何「再补一遍脱敏」的修法都算回潮。
+                dataMap = maskSingleRow(dataMap);
                 // #142/B4-3d-8（D-B4-34）：副本必须写回 resp。此前 copyMap 出来的 dataMap
                 // 从头到尾没有 assignData，RLS/CLS/mask 三条通道对 {data: List} 形态
                 // （分页读接口的权威形状）结构性恒等于关闭 —— 应答仍是未过滤的全量行。
@@ -370,29 +377,6 @@ public class OntologySecurityInterceptor {
             return maskedList;
         }
         return v;
-    }
-
-    private void maskMapInPlace(Map<String, Object> map) {
-        for (Iterator<Map.Entry<String, Object>> it = map.entrySet().iterator(); it.hasNext(); ) {
-            Map.Entry<String, Object> e = it.next();
-            Object value = e.getValue();
-            if (value instanceof String s) {
-                String rule = findMaskingRule(e.getKey());
-                if (rule != null && !s.isEmpty()) {
-                    String key = e.getKey();
-                    it.remove();
-                    map.put(key, applyMask(s, rule));
-                }
-            } else if (value instanceof Map<?, ?> sub) {
-                maskMapInPlace(copyMap(sub));
-            } else if (value instanceof List<?> list) {
-                for (Object item : list) {
-                    if (item instanceof Map<?, ?> m) {
-                        maskMapInPlace(copyMap(m));
-                    }
-                }
-            }
-        }
     }
 
     private String findMaskingRule(String fieldName) {

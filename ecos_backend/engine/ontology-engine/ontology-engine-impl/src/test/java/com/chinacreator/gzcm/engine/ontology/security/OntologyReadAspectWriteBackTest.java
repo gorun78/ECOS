@@ -64,8 +64,22 @@ import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
  * 参数化下推同一依赖）。本批选择「仅在实际做过行级过滤时改写 {@code total}」：
  * 已登录且过滤＝fail-closed 少报，匿名未过滤＝保持原口径不变（零行为变更）。
  * 分页元数据退化作为 D-B4-34 子项登记，不在本批冒充解掉。</p>
+ *
+ * <p><b>#142/B4-3d-9 追加（差距 D-B4-35）</b>：顶层写回接通后，脱敏的<b>嵌套腿</b>仍是
+ * fail-open，且 {@code maskMapInPlace} 实际上坏在两处——</p>
+ * <ul>
+ *   <li>递归腿：对 {@code copyMap(sub)} 的一次性副本递归自身，掩码结果随副本丢弃
+ *       ⇒ 信封里的嵌套 Map／List 字段（{@code meta.phone}、{@code history[].email}）对外仍是原文；</li>
+ *   <li>顶层腿：{@code it.remove()} 后紧跟 {@code map.put(key, …)} 在 LinkedHashMap 迭代中
+ *       构成结构性修改 ⇒ 该键之后只要还有元素就抛 {@code ConcurrentModificationException}，
+ *       被 {@code secureReadResult} 外层 {@code catch (Exception)}「不影响主流程」静默吞掉，
+ *       <b>连同 D-B4-34 刚接通的写回一起跳过</b>——即"多掩一个字段"反而把行/列过滤全丢掉。</li>
+ * </ul>
+ * <p>本类尾段把两条腿与「同一字段不得被掩两遍」一起钉住：{@code maskPhone} 并不幂等
+ * （{@code 138****5678} 再过一遍会变成 {@code 138*****5678}），所以修法的判据是
+ * 「一次递归遍历到位」，不是「再多补一遍脱敏」。</p>
  */
-@DisplayName("本体读切面：Map 形态过滤结果必须写回对外应答（D-B4-34）")
+@DisplayName("本体读切面：Map 形态过滤结果必须写回对外应答（D-B4-34／嵌套脱敏腿 D-B4-35）")
 class OntologyReadAspectWriteBackTest {
 
     private static final String INTERCEPTOR_SRC =
@@ -198,6 +212,91 @@ class OntologyReadAspectWriteBackTest {
         assertEquals(0, ((Number) resp.getData().get("total")).intValue());
     }
 
+    // ═══════════════ D-B4-35：脱敏的嵌套腿 ═══════════════
+
+    @Test
+    @DisplayName("Map 形态·嵌套信封（D-B4-35）— meta.phone/idcard 不得随副本被丢弃")
+    void envelopeNestedMapFieldIsMasked() {
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("phone", "13812345678");
+        meta.put("idcard", "110101199003078888");
+        Map<String, Object> envelope = pageEnvelope(
+                new ArrayList<>(List.of(row("t-7", "合同"))), 1);
+        envelope.put("meta", meta);
+        ApiResponse<Map<String, Object>> resp = ApiResponse.success(envelope);
+        SecurityEngineClient client = deciding("1=1", List.of("tenant_id", "name"));
+
+        new OntologySecurityInterceptor(client).secureReadResult(resp);
+
+        Map<?, ?> outMeta = (Map<?, ?>) resp.getData().get("meta");
+        assertEquals("138****5678", String.valueOf(outMeta.get("phone")),
+                "信封里嵌套 Map 的 phone 仍是原文＝脱敏递归腿作用在被丢弃的副本上");
+        assertEquals("1101**********8888", String.valueOf(outMeta.get("idcard")));
+    }
+
+    @Test
+    @DisplayName("Map 形态·信封内 List（D-B4-35）— history[].email 必须已掩码")
+    void envelopeNestedListOfMapsIsMasked() {
+        Map<String, Object> envelope = pageEnvelope(
+                new ArrayList<>(List.of(row("t-7", "合同"))), 1);
+        envelope.put("history", new ArrayList<>(List.of(Map.of("email", "tom@corp.com"))));
+        ApiResponse<Map<String, Object>> resp = ApiResponse.success(envelope);
+        SecurityEngineClient client = deciding("1=1", List.of("tenant_id", "name"));
+
+        new OntologySecurityInterceptor(client).secureReadResult(resp);
+
+        List<?> history = (List<?>) resp.getData().get("history");
+        assertEquals("t***@corp.com",
+                String.valueOf(((Map<?, ?>) history.get(0)).get("email")),
+                "List 元素里的 email 仍是原文＝同一缺陷的另一条腿");
+    }
+
+    @Test
+    @DisplayName("Map 形态·D-B4-35 的更硬一面 — 掩一个顶层字段不得把行/列过滤一起丢掉")
+    void maskedTopLevelFieldMustNotAbortTheWriteBack() {
+        Map<String, Object> r7 = row("t-7", "合同");
+        r7.put("phone", "13812345678");
+        r7.put("contact", new LinkedHashMap<>(Map.of("email", "tom@corp.com")));
+        ApiResponse<Map<String, Object>> resp = pagedPayload(
+                new ArrayList<>(List.of(r7, row("t-8", "发票"))));
+        SecurityEngineClient client = deciding("tenant_id = 't-7'",
+                List.of("tenant_id", "name", "phone", "contact"));
+
+        new OntologySecurityInterceptor(client).secureReadResult(resp);
+
+        List<?> data = dataOf(resp);
+        assertEquals(1, data.size(),
+                "行过滤结论又没了＝脱敏腿抛出的异常被外层 catch 静默吞掉，写回整段被跳过");
+        Map<?, ?> only = (Map<?, ?>) data.get(0);
+        assertEquals("138****5678", String.valueOf(only.get("phone")));
+        assertEquals("t***@corp.com",
+                String.valueOf(((Map<?, ?>) only.get("contact")).get("email")),
+                "行内嵌套 email 必须已掩码");
+    }
+
+    @Test
+    @DisplayName("反向对照（D-B4-35 修法边界）— 同一字段只许掩一遍：maskPhone 不幂等")
+    void sameFieldMustNotBeMaskedTwice() {
+        Map<String, Object> r = row("t-7", "合同");
+        r.put("phone", "13812345678");
+        Map<String, Object> contact = new LinkedHashMap<>();
+        contact.put("phone", "13812345678");
+        r.put("contact", contact);
+        ApiResponse<Map<String, Object>> resp = ApiResponse.success(
+                pageEnvelope(new ArrayList<>(List.of(r)), 1));
+        SecurityEngineClient client = deciding("1=1",
+                List.of("tenant_id", "name", "phone", "contact"));
+
+        new OntologySecurityInterceptor(client).secureReadResult(resp);
+
+        Map<?, ?> only = (Map<?, ?>) dataOf(resp).get(0);
+        assertEquals("138****5678", String.valueOf(only.get("phone")),
+                "被掩两遍会成 138*****5678＝修法把脱敏补成双通道，不是把一条通道修对");
+        assertEquals("138****5678",
+                String.valueOf(((Map<?, ?>) only.get("contact")).get("phone")),
+                "行内嵌套字段本来就该掩（本例在 D-B4-35 收口前即成立＝证明判据不误报）");
+    }
+
     // ═══════════════ 静态判据（防「行为用例外壳还在、写回被摘掉」） ═══════════════
 
     @Test
@@ -221,6 +320,37 @@ class OntologyReadAspectWriteBackTest {
                 "判据对缺陷原形定位不到＝假门禁");
         assertFalse(mapBranchOf(preFixShape).contains("assignData(resp, dataMap)"),
                 "判据必须能变红：收口前的形状里不允许出现写回");
+    }
+
+    @Test
+    @DisplayName("源码判据（D-B4-35）— 脱敏递归腿不得作用于一次性副本；判据自身须能变红")
+    void nestedMaskLegsMustNotOperateOnThrowawayCopies() throws IOException {
+        String src = stripComments(Files.readString(repoFile(INTERCEPTOR_SRC), StandardCharsets.UTF_8));
+
+        assertFalse(src.contains("maskMapInPlace(copyMap("),
+                "D-B4-35 回潮：在 copyMap 出来的副本上递归脱敏＝掩码结果连同副本一起被丢弃");
+        assertFalse(src.contains("it.remove()"),
+                "D-B4-35 的顶层腿回潮：迭代中 remove+put 造成结构性修改＝CME 被外层 catch 吞掉＝写回整段跳过");
+
+        String defectShape = stripComments("""
+                if (value instanceof String s) {
+                    String key = e.getKey();
+                    it.remove();
+                    map.put(key, applyMask(s, rule));
+                } else if (value instanceof Map<?, ?> sub) {
+                    maskMapInPlace(copyMap(sub));
+                } else if (value instanceof List<?> list) {
+                    for (Object item : list) {
+                        if (item instanceof Map<?, ?> m) {
+                            maskMapInPlace(copyMap(m));
+                        }
+                    }
+                }
+                """);
+        assertTrue(defectShape.contains("maskMapInPlace(copyMap("),
+                "判据必须能变红：缺陷原形里定位不到递归腿＝假门禁");
+        assertTrue(defectShape.contains("it.remove()"),
+                "判据必须能变红：缺陷原形里定位不到顶层腿＝假门禁");
     }
 
     // ═══════════════ 夹具 ═══════════════
