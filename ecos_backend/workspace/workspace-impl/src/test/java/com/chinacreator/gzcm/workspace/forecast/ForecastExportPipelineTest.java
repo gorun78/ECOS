@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.workspace.security.ExportDecision;
 import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -71,6 +72,12 @@ class ForecastExportPipelineTest {
      * {@code DecisionBundle.toMap()} / {@code SecurityDecisionService} 写入点一致；
      * 契约由 {@code ExportDecisionContractTest} 对 security 源文件做双向钉）。
      *
+     * <p><b>#142/B4-3d-7 起 rls 段必须同时给两面</b>（差距 D-B4-24b）：消费侧
+     * {@code ExportDecision} 的分态判据已改读<b>执行契约面</b>，夹具只写表达面
+     * {@code predicateTemplate} 会让裁决在单源里被判成「应答未发执行契约」的拒绝态，
+     * 本类的放行路径用例随即变红（红得有道理，但属夹具漂移而非缺陷）。
+     * 零命中时按生产者的真实配对给 {@code whereClause="1=0"}。</p>
+     *
      * @param rlsRefs   命中的 RLS 策略名（空集＝无出处 ⇒ 范围证据写 NONE）
      * @param predicate 合并谓词模板（财务行现状为 {@code "(1=1)"}）
      * @param clsRefs   命中的 CLS 策略名
@@ -78,12 +85,21 @@ class ForecastExportPipelineTest {
      */
     private static Map<String, Object> bundle(List<String> rlsRefs, String predicate,
                                               List<String> clsRefs, String watermark) {
+        boolean noPolicy = rlsRefs.isEmpty();
         Map<String, Object> rls = new LinkedHashMap<>();
-        rls.put("predicateTemplate", predicate);
+        rls.put(RlsExecutionContract.KEY_PREDICATE_TEMPLATE, predicate);
         rls.put("bindings", List.of());
         rls.put("combine", "AND");
-        rls.put("denyIfEmpty", true);
+        rls.put(RlsExecutionContract.KEY_DENY_IF_EMPTY, true);
         rls.put("policyRefs", rlsRefs);
+        rls.put(RlsExecutionContract.KEY_WHERE_CLAUSE,
+                noPolicy ? RlsExecutionContract.DENY_CLAUSE : predicate);
+        rls.put(RlsExecutionContract.KEY_WHERE_PARAMS, List.of());
+        rls.put(RlsExecutionContract.KEY_UNRESOLVED_BINDINGS, List.of());
+        rls.put(RlsExecutionContract.KEY_NO_POLICY_MATCHED, noPolicy);
+        if (noPolicy) {
+            rls.put(RlsExecutionContract.KEY_RLS_DENY_REASON, "RLS_NO_POLICY_MATCHED");
+        }
 
         Map<String, Object> columns = new LinkedHashMap<>();
         columns.put("mode", "allow");

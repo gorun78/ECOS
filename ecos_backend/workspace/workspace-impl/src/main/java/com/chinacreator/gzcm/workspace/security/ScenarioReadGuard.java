@@ -120,13 +120,16 @@ public class ScenarioReadGuard {
      *       {@code ecos-docker/opa-policies/data_access.rego}；</li>
      *   <li>护栏给出<b>真实策略拒绝</b>（{@code EVALUATED_DENY}）→ 403，details 带
      *       {@code deniedReason}（可回查 rego 里的 violation 名）与 {@code decision}；</li>
-     *   <li>RLS 谓词 {@code 1=0} → 403；</li>
+     *   <li>RLS 执行契约处于<b>拒绝态</b>（生产者 {@code 1=0}／零命中／应答未发执行契约／
+     *       单源四道不变量不过）→ 403，details 带单源机读 reason（#142/B4-3d-7 起按
+     *       {@link RlsExecutionContract.State} 分态，不再按表达面文本比字面量，D-B4-24b）；</li>
      *   <li>RLS 无命中策略且 {@code denyIfEmpty=true} → 403（§4.7.2「无权用户」行，
-     *       验收载体 {@code AuditPackDenyTest}）；</li>
-     *   <li>RLS 谓词非 {@code 1=1} 的非平凡形态 → 403「无法下推」（§4.7.2
+     *       验收载体 {@code AuditPackDenyTest}；执行契约面已把零命中折成拒绝态，
+     *       本条是挡住"发恒真片段却自报未命中/出处键漂移"的第二道）；</li>
+     *   <li>RLS 处于 {@code FILTERED}（非平凡谓词）→ 403「无法下推」（§4.7.2
      *       project/dept 行：导出件数据载体不接参数化谓词，宁 DENY 不做
      *       「全量捞回内存再滤」的超发，F07-18-1 红线同源，登记 D-B4-13）；</li>
-     *   <li>以上皆不命中（护栏 ALLOW + 有命中策略 + 谓词 {@code 1=1} 或空）→ 返回
+     *   <li>以上皆不命中（护栏 ALLOW + RLS 恒真 {@code 1=1}）→ 返回
      *       {@link ExportDecision}，其 {@code permissionScope} 可被审计反查。</li>
      * </ol>
      *
@@ -163,18 +166,25 @@ public class ScenarioReadGuard {
                             "deniedReason", String.valueOf(decision.opaState()),
                             "decision", String.valueOf(decision.decisionId())));
         }
-        if (decision.rlsPredicateIsDeny()) {
-            throw new ForbiddenOperationException("scenario:export:" + entityCode);
+        if (decision.rlsDenied()) {
+            // 执行契约面的拒绝态：生产者 1=0／零命中／应答未发执行契约／单源四道不变量不过。
+            // 理由必须带单源的机读 reason（#142/B4-3d-7，D-B4-24b：旧写法按表达面文本比字面量，
+            // "应答根本没发执行契约"会被读成"空谓词"而走下面第 5 条，静默放行）。
+            throw new ForbiddenOperationException("scenario:export:" + entityCode,
+                    Map.of("reason", "RLS 执行契约拒绝（默认 DENY）: " + decision.rlsExecution().reason(),
+                            "state", String.valueOf(decision.rlsState()),
+                            "predicate", String.valueOf(decision.rlsClause()),
+                            "decision", String.valueOf(decision.decisionId())));
         }
         if (decision.noPolicyMatched() && decision.rlsDenyIfEmpty()) {
             throw new ForbiddenOperationException("scenario:export:" + entityCode,
                     Map.of("reason", "无命中 RLS 策略且 denyIfEmpty=true，默认 DENY",
                             "decision", String.valueOf(decision.decisionId())));
         }
-        if (!decision.rlsPredicateAbsent() && !decision.rlsPredicateIsAllowAll()) {
+        if (decision.rlsFiltered()) {
             throw new ForbiddenOperationException("scenario:export:" + entityCode,
                     Map.of("reason", "RLS 谓词无法下推至导出件载体，默认 DENY",
-                            "predicate", decision.rlsPredicateTemplate(),
+                            "predicate", decision.rlsClause(),
                             "decision", String.valueOf(decision.decisionId())));
         }
         return decision;

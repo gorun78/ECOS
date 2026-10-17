@@ -42,7 +42,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code RlsExecutionContract.read}，生产者（渲染器 + {@code /rls/apply} + {@code /decision}）
  * 写数一律经 {@code KEY_*} 常量；
  * ③ 无参数绑定通道的两引擎必须再叠一层 {@code rejectForUnbindableChannel}；
- * ④ fail-open 形态与「读表达面拼 SQL」的形态在各自扫描面内零残留。</p>
+ * ④ fail-open 形态与「读表达面拼 SQL」的形态在各自扫描面内零残留 ——
+ * <b>#142/B4-3d-7（差距 D-B4-24b）把第 ④ 条从"键名"升级为"取面"</b>：表达面禁读面同时覆盖
+ * {@code get("predicateTemplate")} 与 {@code get(RlsExecutionContract.KEY_PREDICATE_TEMPLATE)}
+ * 两种形态（前者是 D-B4-24 原形，后者是键名收口后新出现的"合规键名 + 错误面"形态）。
+ * 判据的两种形态各有"缺陷原形必须命中"的自检，见
+ * {@link #gateItselfDetectsTheKeyFaceDriftShape()}。</p>
  *
  * <p>反假绿纪律：扫描根解析到 0 文件即判失败；每条静态判据都配一条
  * 「缺陷原形必须命中、收口形状不得误报」的自检
@@ -57,8 +62,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>诚实边界二：{@code denyIfEmpty} 与 {@code predicate} 两键与 CLS 列面／本体关系谓词面<b>同名</b>
  * （{@code ClsController} 的 {@code denyIfEmpty}、{@code OntologyCandidateService} 的 {@code predicate}
- * 都是各自契约的合法键），故不入禁面清单；本门禁只禁五个 RLS 执行面专有键与表达面的
- * {@code predicateTemplate}（后者只禁消费者树，生产者的策略写请求入参就是该形态）。</p>
+ * 都是各自契约的合法键），故不入<b>本门禁的全后端</b>禁面清单；本门禁只禁五个 RLS 执行面专有键与
+ * 表达面的 {@code predicateTemplate}（后者只禁消费者树，生产者的策略写请求入参就是该形态）。
+ * {@code denyIfEmpty} 在导出消费侧的禁读由范围更窄的
+ * {@code ExportDecisionContractTest#expressionFaceReads} 对<b>单文件</b> {@code ExportDecision.java}
+ * 钉住——两门不是同一口径的重复，禁面清单不同是因为同名键在别的契约里合法，
+ * 别把它"统一"成全后端禁令（那会误伤 CLS）。</p>
  */
 @DisplayName("RLS 执行契约：键面单源 + 四通道委托读数 + fail-open 形态零残留")
 class RlsExecutionContractGateTest {
@@ -119,9 +128,19 @@ class RlsExecutionContractGateTest {
     private static final Pattern FAIL_OPEN_SHAPE = Pattern.compile(
             "get\\(\\s*\"whereClause\"\\s*\\)[\\s\\S]{0,160}\\?\\s*\"\"\\s*:");
 
-    /** 「读表达面模板」的缺陷形态（D-B4-24：data-engine 收口前的逐字形状）。 */
+    /**
+     * 「读表达面模板」的缺陷形态（D-B4-24 的原始形状 ＋ #142/B4-3d-7 的新形态 D-B4-24b）。
+     *
+     * <p>B4-3d-5 把键名收进单源常量后，本模式的旧版本只认
+     * {@code get("predicateTemplate")}，于是「改读 {@code get(RlsExecutionContract
+     * .KEY_PREDICATE_TEMPLATE)}」这条路径变成门禁盲区——键名合规了，<b>面</b>还是错的：
+     * 表达面不含渲染器的拒绝归一（零命中在这里是 {@code 1=1}，在执行契约面才是
+     * {@code 1=0}＋理由），消费者读它分态即绕过拒绝归一（D-B4-24b 的 workspace
+     * {@code ExportDecision} 形状）。故两种形态并列命中；只准加面不准减面。</p>
+     */
     private static final Pattern TEMPLATE_SPLICE_SHAPE = Pattern.compile(
-            "get\\(\\s*\"predicateTemplate\"\\s*\\)");
+            "get\\(\\s*(?:RlsExecutionContract\\.)?KEY_PREDICATE_TEMPLATE\\s*\\)"
+                    + "|get\\(\\s*\"predicateTemplate\"\\s*\\)");
 
     @Test
     void contractClassOwnsTheKeyFaceAndClauseConstants() throws IOException {
@@ -236,8 +255,8 @@ class RlsExecutionContractGateTest {
                     "具名消费者树在本次扫描里为 0 个文件（树被移动/改名即门禁空转）: " + tree);
         }
         assertTrue(scan.violations.isEmpty(),
-                "D-B4-24 违规: 消费者在键面之外另读表达面 predicateTemplate（同源不同口径的分裂源头）: "
-                        + scan.violations);
+                "D-B4-24/D-B4-24b 违规: 消费者另读表达面 predicateTemplate（键名形态不限）——"
+                        + "绕过渲染器拒绝归一即第二套分态口径: " + scan.violations);
     }
 
     /**
@@ -265,6 +284,12 @@ class RlsExecutionContractGateTest {
      *
      * <p>这里刻意复用 {@link #executionKeyViolations} 与 {@link #templateFaceViolations}
      * 而非另写一份断言，否则自检与真实判据可能各自漂移（自检绿而真实判据恒不命中＝假绿）。</p>
+     *
+     * <p><b>#142/B4-3d-7 翻正（差距 D-B4-24b，原文保留）</b>：本用例旧形态把
+     * 「引单源常量读 {@code KEY_PREDICATE_TEMPLATE}」的形状断成<b>不得误报</b> ——
+     * 那是在把门禁钉在"键名合规"上、放行"取面错误"，正是 workspace 侧
+     * {@code ExportDecision} 收口前的形状。现在该形状归入违例侧，合规侧改为
+     * 只引用执行面常量／整体委托 {@code read} 的形状。翻正后覆盖面只增不减。</p>
      */
     @Test
     void gateItselfDetectsTheKeyFaceDriftShape() {
@@ -279,12 +304,23 @@ class RlsExecutionContractGateTest {
         assertTrue(hits.stream().anyMatch(s -> s.contains("whereParams")),
                 "键面判据对缺陷原形的 whereParams 不命中＝假门禁");
         assertFalse(templateFaceViolations(preFixConsumer).isEmpty(),
-                "表达面判据对缺陷原形不命中＝假门禁");
+                "表达面判据对字面量形态的缺陷原形不命中＝假门禁");
 
-        String postFixConsumer = stripComments("""
+        // D-B4-24b 的新缺陷形态：键名合规（引单源常量），面却仍是表达面 ⇒ 必须命中
+        String keyCompliantWrongFace = stripComments("""
                 RlsExecutionContract.Execution exec = RlsExecutionContract.read(data, subject);
                 String tpl = String.valueOf(predicate
                         .get(RlsExecutionContract.KEY_PREDICATE_TEMPLATE));
+                """);
+        assertFalse(templateFaceViolations(keyCompliantWrongFace).isEmpty(),
+                "D-B4-24b 违规: 表达面判据对「引常量的读法」不命中＝把真门改成假门（键名合规掩盖取面错误）");
+        assertTrue(executionKeyViolations(keyCompliantWrongFace).isEmpty(),
+                "键面判据把「引单源常量」误报成手抄（违例清单会全是噪声）: "
+                        + executionKeyViolations(keyCompliantWrongFace));
+
+        String postFixConsumer = stripComments("""
+                RlsExecutionContract.Execution exec = RlsExecutionContract.read(data, subject);
+                return exec.denied() ? RlsExecutionContract.DENY_CLAUSE : exec.clause();
                 """);
         assertTrue(executionKeyViolations(postFixConsumer).isEmpty(),
                 "收口后的形状被误报（判据与生产码同判即噪声）: " + executionKeyViolations(postFixConsumer));
@@ -320,7 +356,7 @@ class RlsExecutionContractGateTest {
         return out;
     }
 
-    /** 表达面判据：消费者树内 {@code get("predicateTemplate")} 即违例。 */
+    /** 表达面判据：消费者树内读表达面键即违例（字面量形态与单源常量形态都算，见 {@link #TEMPLATE_SPLICE_SHAPE}）。 */
     private static List<String> templateFaceViolations(String strippedCode) {
         Matcher m = TEMPLATE_SPLICE_SHAPE.matcher(strippedCode);
         return m.find() ? List.of("表达面读数: " + m.group()) : List.of();

@@ -24,6 +24,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException;
 
@@ -34,13 +35,18 @@ import com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException;
  * <p><b>本类解决的假绿问题</b>：workspace 侧 {@code ExportDecision} 消费的是
  * security-engine REST 应答里的<b>字符串键名</b>（{@code rls.policyRefs} 等），
  * 两侧分处不同 Maven 模块、编译期零耦合 —— security 侧改键名时 workspace 侧只会
- * <b>静默读到 null</b>，导出件随即退回"无证据"形态而不报错。因此这里做四件编译做不到的事：</p>
+ * <b>静默读到 null</b>，导出件随即退回"无证据"形态而不报错。因此这里做五件编译做不到的事：</p>
  * <ol>
  *   <li>{@link #bundleKeyNamesMatchSecurityEngineSource()} —— 直接读 security-engine 生产源文件，
  *       对键名字面量做双向核对（源文件找不到即失败，禁跳过）。#142/B4-3d-5 起分两形态：
  *       无单源常量的 bundle 键仍按字面量成对核对；RLS 执行契约面／护栏义务键改由
  *       {@code assertReadThroughSingleSourceConstant} 三段核对（消费侧引常量 + 单源定义该字面量
- *       + 消费侧代码位禁第二形态内联），覆盖面严于原单向字面量核对，不因形态迁移而放宽；</li>
+ *       + 消费侧代码位禁第二形态内联），覆盖面严于原单向字面量核对，不因形态迁移而放宽。
+ *       <b>#142/B4-3d-7 起 RLS 段从"键名核对"升级为"取面核对"</b>（差距 D-B4-24b）：
+ *       键名收进单源常量并不等于读对了面 —— 表达面 {@code predicateTemplate} 不含渲染器的
+ *       拒绝归一，「一条策略都没命中」在表达面是 {@code 1=1}、在执行契约面才是 {@code 1=0}
+ *       ＋机读理由，故消费侧只准整体委托 {@code RlsExecutionContract.read}，
+ *       自取两面键（常量形态或字面量形态）一律即红；</li>
  *   <li>{@link #exportPathIsWiredToTheSingleDecisionEntry()} /
  *       {@link #permissionScopeConstantCannotComeBack()} —— 把"必须走 /decision"和
  *       "不得再用常量自称权限范围"钉成源码级断言；</li>
@@ -52,10 +58,13 @@ import com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException;
  *   <li>{@link #guardrailVocabularyIsSingleSourced()} —— 护栏词表（策略名 + 四态 +
  *       应答键名）单源在 {@link GuardrailDecisionContract}，三引擎生产代码位（剥注释后）
  *       出现内联字面量即红；旧形态（security 写 {@code "data.access"}、ai 写 {@code "rbac"}、
- *       workspace 靠 {@code OPA_ERROR_FAIL_CLOSED} 反推状态）回潮同样即红。</li>
+ *       workspace 靠 {@code OPA_ERROR_FAIL_CLOSED} 反推状态）回潮同样即红；</li>
+ *   <li>D-B4-24b 的两条<b>故意分叉</b>取面钉（{@link #executionFaceDenyOverridesAllowLookingTemplate}、
+ *       {@link #executionFaceAllowOverridesDenyLookingTemplate}）——夹具把两面的真实配对摊开，
+ *       读错面即用例红，禁把"两面同值"的夹具当成"契约已覆盖"。</li>
  * </ol>
  */
-@DisplayName("导出通道：跨模块键名契约 + 单入口接线 + 咽喉七态 + 词表单源")
+@DisplayName("导出通道：跨模块键名契约 + 取面钉 + 单入口接线 + 咽喉分态 + 词表单源")
 class ExportDecisionContractTest {
 
     private static final String SECURITY_BUNDLE_SRC =
@@ -139,10 +148,6 @@ class ExportDecisionContractTest {
         String rlsContractSrc = readRepoFile(RLS_EXECUTION_CONTRACT_SRC);
         String guardrailContractSrc = readRepoFile(GUARDRAIL_CONTRACT_SRC);
         String consumerCode = stripComments(consumerSrc);
-        assertReadThroughSingleSourceConstant(consumerCode, rlsContractSrc,
-                "KEY_PREDICATE_TEMPLATE", "predicateTemplate");
-        assertReadThroughSingleSourceConstant(consumerCode, rlsContractSrc,
-                "KEY_DENY_IF_EMPTY", "denyIfEmpty");
         assertReadThroughSingleSourceConstant(consumerCode, guardrailContractSrc,
                 "KEY_OBLIGATIONS", "obligations");
         assertReadThroughSingleSourceConstant(consumerCode, guardrailContractSrc,
@@ -151,6 +156,56 @@ class ExportDecisionContractTest {
                 "KEY_OBLIGATION", "obligation");
         assertReadThroughSingleSourceConstant(consumerCode, guardrailContractSrc,
                 "OBLIGATION_WATERMARK", "watermark");
+
+        // RLS 面（#142/B4-3d-7 收口差距 D-B4-24b 后改判）：
+        // 旧断言钉的是「ExportDecision 经单源常量读 predicateTemplate / denyIfEmpty」——
+        // 常量形态确实不再有第二套键名，但<b>面</b>读错了：表达面不含渲染器的拒绝归一，
+        // 零命中在表达面是 "1=1"（看起来像放行）、在执行契约面才是 1=0 + 机读理由。
+        // 因此本门从「键名核对」升级为「取面核对」：必须整体委托 RlsExecutionContract.read，
+        // 两面键（predicateTemplate / denyIfEmpty）无论以常量名还是字面量形态重现即红。
+        // 放宽回去＝把真门改成假门，故禁删本段，只许再加严。
+        assertTrue(consumerCode.contains("RlsExecutionContract.read("),
+                "D-B4-24b 违规: ExportDecision 未整体委托单源读执行契约（自取键子集＝第二套分态口径）");
+        assertTrue(rlsContractSrc.contains("KEY_WHERE_CLAUSE = \"whereClause\""),
+                "单源的执行面键定义漂移（消费侧按 read 取数会静默读到缺失）");
+        assertTrue(expressionFaceReads(consumerCode).isEmpty(),
+                "D-B4-24b 违规: ExportDecision 仍在自选 RLS 面键分态: " + expressionFaceReads(consumerCode));
+        // 执行态四判据必须来自状态而非文本比对（旧形态按 normalize 后的字面量分三态）
+        for (String accessor : List.of("rlsExecution.denied()", "rlsExecution.allowAll()",
+                "rlsExecution.filtered()", "rlsExecution.noPolicyMatched()", "rlsExecution.denyIfEmpty()")) {
+            assertTrue(consumerCode.contains(accessor),
+                    "D-B4-24b 违规: ExportDecision 未用单源状态判据 " + accessor + "（退回字面量比对即门禁空转）");
+        }
+        // 门禁有效性对照（禁把本门做成恒绿的假门）：收口前的取面形状必须被同一条判据抓到，
+        // 且收口后的委托形状不得被误报——两者缺一，本门就是噪声或空转。
+        assertTrue(!expressionFaceReads(stripComments(
+                "String t = String.valueOf(rls.get(RlsExecutionContract.KEY_PREDICATE_TEMPLATE));")).isEmpty(),
+                "取面判据对 D-B4-24b 缺陷原形不命中＝假门禁，必须修判据而不是删用例");
+        assertTrue(!expressionFaceReads(stripComments(
+                "boolean deny = Boolean.TRUE.equals(rls.get(\"denyIfEmpty\"));")).isEmpty(),
+                "取面判据对字面量形态不命中＝假门禁");
+        assertTrue(expressionFaceReads(stripComments(
+                "RlsExecutionContract.Execution exec = RlsExecutionContract.read(bundle.get(\"rls\"), subject);")).isEmpty(),
+                "收口后的委托形状被误报（判据与生产码同判即噪声）");
+    }
+
+    /**
+     * 取面判据（真实文件与门禁有效性对照共用同一份，禁两处各写一套）：
+     * 消费侧代码位出现 RLS 表达面键／单键自读（常量名或字面量两种形态）即违例。
+     */
+    private static List<String> expressionFaceReads(String strippedConsumerCode) {
+        List<String> hits = new ArrayList<>();
+        for (String bannedConstant : List.of("KEY_PREDICATE_TEMPLATE", "KEY_DENY_IF_EMPTY")) {
+            if (strippedConsumerCode.contains(bannedConstant)) {
+                hits.add("自读单源键常量 " + bannedConstant);
+            }
+        }
+        for (String bannedLiteral : List.of("\"predicateTemplate\"", "\"denyIfEmpty\"", "\"whereClause\"")) {
+            if (strippedConsumerCode.contains(bannedLiteral)) {
+                hits.add("代码位内联 RLS 面键 " + bannedLiteral);
+            }
+        }
+        return hits;
     }
 
     /**
@@ -325,7 +380,7 @@ class ExportDecisionContractTest {
 
         verify(client).decide("forecast_run", List.of(), "export");
         assertEquals("decision=dec-1 purpose=export rls=[rls-finance-all] cls=[NONE]"
-                        + " predicate=(1=1) opa=allow",
+                        + " rlsState=ALLOW_ALL predicate=(1=1) opa=allow",
                 d.permissionScope());
         assertEquals("财务负责人全量导出 2026-10-15", d.watermark());
         assertEquals("dec-1", d.decisionId());
@@ -356,8 +411,19 @@ class ExportDecisionContractTest {
         assertEquals("ECOS-SEC-501", ex.getCode());
     }
 
+    /**
+     * 无权用户行（0 命中策略）⇒ 403。
+     *
+     * <p><b>#142/B4-3d-7 翻正（差距 D-B4-24b，原文保留）</b>：本用例旧形态只把
+     * {@code predicateTemplate="1=1"} 写进夹具并断理由含 {@code denyIfEmpty} ——
+     * 那钉的是"消费者靠 {@code policyRefs} 读空反推裁决"这条<b>第二套口径</b>，
+     * 而生产者的真实配对是「表达面 {@code 1=1} ＋执行面 {@code 1=0} +
+     * {@code RLS_NO_POLICY_MATCHED}」。现断言改钉执行契约面的机读理由（DENIED 态第一道分支），
+     * 键漂移时不再静默放行；「发恒真片段却自报未命中」这类异常配对由
+     * {@link #selfReportedNoPolicyMatchedWithAllowAllClauseIsSecondGate} 单独钉第二道。</p>
+     */
     @Test
-    @DisplayName("无权用户行 — 0 命中策略 + denyIfEmpty=true ⇒ 403（矩阵第4行第2格，验收 AuditPackDenyTest）")
+    @DisplayName("无权用户行 — 0 命中策略（生产配对：表达面 1=1 + 执行面 1=0）⇒ 403 且带生产者机读理由")
     void noPolicyMatchedWithDenyIfEmptyIsDeny() {
         WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
         when(client.decide(anyString(), anyList(), anyString())).thenReturn(
@@ -365,21 +431,126 @@ class ExportDecisionContractTest {
 
         ForbiddenOperationException ex = assertThrows(ForbiddenOperationException.class,
                 () -> guard(client).exportDecision("forecast_run"));
+        assertReasonContains(ex, PRODUCTION_ZERO_POLICY_REASON);
+        assertEquals("DENIED", ex.getDetails().get("state"),
+                "拒绝必须落执行契约状态（供审计分态检索），实得: " + ex.getDetails());
+    }
+
+    /**
+     * 第二道门：应答发的是<b>恒真片段</b>但自报「一条策略都没命中」。
+     *
+     * <p>真实生产者不会产生这组配对（零命中已被渲染成 {@code 1=0}），所以本用例钉的是
+     * <b>漂移面</b>：{@code RlsExecutionContract.read} 只在执行面判态，遇到这种自相矛盾的应答
+     * 保持 ALLOW_ALL 态，导出咽喉据 {@code noPolicyMatched && denyIfEmpty} 仍须 DENY。
+     * 少了这道门，"执行面恒真 + 出处读空"就成了新的 fail-open 入口。</p>
+     */
+    @Test
+    @DisplayName("第二道门 — 执行面恒真但自报未命中策略 ⇒ 仍 403（禁把「没出处」当成「不限制行」）")
+    void selfReportedNoPolicyMatchedWithAllowAllClauseIsSecondGate() {
+        WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
+        when(client.decide(anyString(), anyList(), anyString())).thenReturn(
+                bundleWithRls(rlsSegment(List.of("rls-silent"), "1=1", "(1=1)", List.of(), true, null),
+                        List.of(), GuardrailDecisionContract.STATE_ALLOW, null, null));
+
+        ForbiddenOperationException ex = assertThrows(ForbiddenOperationException.class,
+                () -> guard(client).exportDecision("forecast_run"));
         assertReasonContains(ex, "denyIfEmpty");
+    }
+
+    /**
+     * 取面钉·拒绝半边（D-B4-24b 的缺陷原形）。
+     *
+     * <p>两面<b>故意分叉</b>：表达面 {@code "(1=1)"}（旧写法据此判 ALLOW_ALL ⇒ 放行导出），
+     * 执行契约面 {@code 1=0} ＋理由。本用例只有在消费者<b>读执行面</b>时才绿；
+     * 若有人把 {@code ExportDecision} 改回读 {@code predicateTemplate}，本用例即红 ——
+     * 这就是本类对 D-B4-24b 的可执行钉，禁以"注释里写了要求"替代。</p>
+     */
+    @Test
+    @DisplayName("取面钉 — 表达面看着放行、执行面拒绝 ⇒ 必须 403（读表达面＝D-B4-24b 缺陷原形）")
+    void executionFaceDenyOverridesAllowLookingTemplate() {
+        Map<String, Object> b = bundleWithRls(
+                rlsSegment(List.of("rls-x"), "(1=1)", RlsExecutionContract.DENY_CLAUSE,
+                        List.of(), false, "RLS_TEMPLATE_REJECTED: lexically illegal"),
+                List.of(), GuardrailDecisionContract.STATE_ALLOW, null, null);
+
+        ExportDecision d = ExportDecision.fromBundle("forecast_run", b);
+        assertEquals(RlsExecutionContract.State.DENIED, d.rlsState(),
+                "表达面是恒真文本，态必须取自执行契约面");
+
+        WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
+        when(client.decide(anyString(), anyList(), anyString())).thenReturn(b);
+        ForbiddenOperationException ex = assertThrows(ForbiddenOperationException.class,
+                () -> guard(client).exportDecision("forecast_run"));
+        assertReasonContains(ex, "RLS_TEMPLATE_REJECTED");
+    }
+
+    /** 取面钉·放行半边：反向分叉（表达面像拒绝文本、执行面恒真）⇒ 必须放行，证明判据只认执行面。 */
+    @Test
+    @DisplayName("取面钉 — 表达面写着 1=0、执行契约给恒真 ⇒ 放行（禁把文本比对当分态依据）")
+    void executionFaceAllowOverridesDenyLookingTemplate() {
+        Map<String, Object> b = bundleWithRls(
+                rlsSegment(List.of("rls-finance-all"), "1=0", "(1=1)", List.of(), false, null),
+                List.of(), GuardrailDecisionContract.STATE_ALLOW, null, null);
+
+        WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
+        when(client.decide(anyString(), anyList(), anyString())).thenReturn(b);
+
+        ExportDecision d = guard(client).exportDecision("forecast_run");
+
+        assertEquals(RlsExecutionContract.State.ALLOW_ALL, d.rlsState());
+        assertTrue(d.permissionScope().contains("rlsState=ALLOW_ALL"),
+                "范围证据必须带状态，审计才分得开「不限制行」与「被载体挡住的过滤」: " + d.permissionScope());
+    }
+
+    /**
+     * D-B4-24b 的后果里最重的一种漂移形态：<b>应答根本没发执行契约面</b>（旧 security 版本／
+     * {@code asPredicatePart} 的 {@code copyIfPresent} 因源缺键而跳过）。
+     *
+     * <p>收口前 {@code ExportDecision} 读表达面 {@code predicateTemplate="1=1"} ⇒ 判成恒真放行，
+     * 导出件于是带着「范围证据齐全」的外观把全表捞出去；收口后单源把该形态归一为
+     * {@link RlsExecutionContract#REASON_WHERE_ABSENT}（D-B4-17 同源理由码）⇒ 403。
+     * 本用例是"读错面"与"读对面"的分水岭，禁删。</p>
+     */
+    @Test
+    @DisplayName("缺执行契约面 — 应答只给表达面 ⇒ 403 RLS_WHERE_CLAUSE_ABSENT，禁读成「不限制行」（fail-open 原形）")
+    void absentExecutionFaceIsDenyNotAllowAll() {
+        Map<String, Object> b = bundleWithRls(
+                rlsSegment(List.of("rls-finance-all"), "1=1", "(1=1)", List.of(), false, null),
+                List.of(), GuardrailDecisionContract.STATE_ALLOW, null, null);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rls = (Map<String, Object>) b.get("rls");
+        rls.remove(RlsExecutionContract.KEY_WHERE_CLAUSE);
+
+        ExportDecision d = ExportDecision.fromBundle("forecast_run", b);
+        assertEquals(RlsExecutionContract.State.DENIED, d.rlsState(),
+                "表达面写着恒真不构成放行依据：缺执行契约即无法证明裁决可用");
+
+        WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
+        when(client.decide(anyString(), anyList(), anyString())).thenReturn(b);
+        ForbiddenOperationException ex = assertThrows(ForbiddenOperationException.class,
+                () -> guard(client).exportDecision("forecast_run"));
+        assertReasonContains(ex, RlsExecutionContract.REASON_WHERE_ABSENT_CODE);
     }
 
     @Test
     @DisplayName("缺陷 D-B4-13 — 非平凡谓词（部门/项目维度）不可下推至导出件载体 ⇒ 403 而非全量外带")
     void nonTrivialPredicateCannotBePushedDownIsDeny() {
+        // 生产者真实配对：模板 (department_id = :userDeptId) → 片段 (department_id = ?) + 1 个参数
+        Map<String, Object> b = bundleWithRls(
+                rlsSegment(List.of("rls-dept-scope"), "(department_id = :userDeptId)",
+                        "(department_id = ?)", List.of("D-01"), false, null),
+                List.of(), GuardrailDecisionContract.STATE_ALLOW, null, null);
+
+        assertEquals(RlsExecutionContract.State.FILTERED, ExportDecision.fromBundle("forecast_run", b).rlsState());
+
         WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
-        when(client.decide(anyString(), anyList(), anyString())).thenReturn(
-                bundle(List.of("rls-dept-scope"), "(department_id = :userDeptId)", List.of(), GuardrailDecisionContract.STATE_ALLOW, null, null));
+        when(client.decide(anyString(), anyList(), anyString())).thenReturn(b);
 
         ForbiddenOperationException ex = assertThrows(ForbiddenOperationException.class,
                 () -> guard(client).exportDecision("forecast_run"));
         assertReasonContains(ex, "无法下推");
-        assertEquals("(department_id = :userDeptId)", ex.getDetails().get("predicate"),
-                "拒绝原因必须带上被拒的谓词，便于回查是哪条策略卡住导出");
+        assertEquals("(department_id = ?)", ex.getDetails().get("predicate"),
+                "拒绝原因必须带上<b>执行面</b>片段（可绑定形态），禁回显 :name 模板");
     }
 
     @Test
@@ -477,10 +648,14 @@ class ExportDecisionContractTest {
     @Test
     @DisplayName("漂移保守面 — denyIfEmpty 缺段按 true 处理（宁可拒绝也不放行）")
     void missingDenyIfEmptyFlagFailsClosed() {
-        Map<String, Object> b = bundle(List.of(), "1=1", List.of(), GuardrailDecisionContract.STATE_ALLOW, null, null);
+        // 两面分开给：执行面恒真（单源据此判 ALLOW_ALL，不进 DENIED 分支）＋自报未命中，
+        // 于是本用例唯一考的就是「denyIfEmpty 键缺失时默认取保守值 true」。
+        Map<String, Object> b = bundleWithRls(
+                rlsSegment(List.of("rls-finance-all"), "1=1", "(1=1)", List.of(), true, null),
+                List.of(), GuardrailDecisionContract.STATE_ALLOW, null, null);
         @SuppressWarnings("unchecked")
         Map<String, Object> rls = (Map<String, Object>) b.get("rls");
-        rls.remove("denyIfEmpty");
+        rls.remove(RlsExecutionContract.KEY_DENY_IF_EMPTY);
         WorkspaceSecurityEngineClient client = mock(WorkspaceSecurityEngineClient.class);
         when(client.decide(anyString(), anyList(), anyString())).thenReturn(b);
 
@@ -509,19 +684,64 @@ class ExportDecisionContractTest {
     /**
      * {@code DecisionBundle.toMap()} 的 REST 形态（键名与 security 侧同源，见契约断言）。
      *
+     * <p><b>#142/B4-3d-7 起 rls 段按「两面分离」的生产者真实配对给</b>（差距 D-B4-24b）：
+     * 表达面 {@code predicateTemplate} 出自 {@code RowLevelSecurityServiceImpl.mergePolicies}
+     * （零命中时兜底文本是 {@code "1=1"}），执行契约面出自 {@code RlsPredicateRenderer.render}
+     * （零命中归一为 {@code whereClause="1=0"} + {@code noPolicyMatched=true}
+     * + {@code rlsDenyReason="RLS_NO_POLICY_MATCHED"}；{@code denyReason!=null} 时参数与
+     * 未解析表恒空）。本方法据 {@code rlsRefs} 是否为空复刻这对配对，
+     * 于是「读表达面」与「读执行面」在零命中用例里<b>必然给出相反结论</b> ——
+     * 夹具若把两面写成同值，本类的取面钉就退化成恒绿噪声。</p>
+     *
+     * <p>需要<b>非平凡谓词</b>（FILTERED）或<b>故意让两面分叉</b>的用例不走本重载，
+     * 直接经 {@link #rlsSegment} + {@link #bundleWithRls} 显式给执行面。</p>
+     *
      * @param opaPolicyState {@link GuardrailDecisionContract} 四态之一；传 null 即<b>不写</b>
      *                       {@code policyState} 键（旧形态漂移面，另有用例断其保守行为）
      */
-    private static Map<String, Object> bundle(List<String> rlsRefs, String predicate,
+    private static Map<String, Object> bundle(List<String> rlsRefs, String predicateTemplate,
                                               List<String> clsRefs, String opaPolicyState,
                                               String deniedReason, String watermark) {
+        boolean noPolicy = rlsRefs.isEmpty();
+        return bundleWithRls(rlsSegment(rlsRefs, predicateTemplate,
+                noPolicy ? RlsExecutionContract.DENY_CLAUSE : predicateTemplate,
+                List.of(), noPolicy, noPolicy ? PRODUCTION_ZERO_POLICY_REASON : null),
+                clsRefs, opaPolicyState, deniedReason, watermark);
+    }
+
+    /** 生产者零命中时的机读拒绝理由（{@code RlsPredicateRenderer.Rendered.deny} 的首参原文）。 */
+    private static final String PRODUCTION_ZERO_POLICY_REASON = "RLS_NO_POLICY_MATCHED";
+
+    /**
+     * rls 段装配（键名一律取 {@link RlsExecutionContract} 常量 —— 与
+     * {@code SecurityDecisionService.asPredicatePart} 的透传形态同形，含 {@code policyRefs} 追加）。
+     *
+     * @param predicateTemplate 表达面（含 {@code :name} 占位符的策略原文／兜底文本）
+     * @param whereClause       执行契约面（渲染器产物：可绑定片段或 {@code 1=0}）
+     */
+    private static Map<String, Object> rlsSegment(List<String> rlsRefs, String predicateTemplate,
+                                                  String whereClause, List<Object> whereParams,
+                                                  boolean noPolicyMatched, String rlsDenyReason) {
         Map<String, Object> rls = new LinkedHashMap<>();
-        rls.put("predicateTemplate", predicate);
+        rls.put(RlsExecutionContract.KEY_PREDICATE_TEMPLATE, predicateTemplate);
         rls.put("bindings", List.of());
         rls.put("combine", "AND");
-        rls.put("denyIfEmpty", true);
+        rls.put(RlsExecutionContract.KEY_DENY_IF_EMPTY, true);
         rls.put("policyRefs", rlsRefs);
+        rls.put(RlsExecutionContract.KEY_WHERE_CLAUSE, whereClause);
+        rls.put(RlsExecutionContract.KEY_WHERE_PARAMS, whereParams);
+        rls.put(RlsExecutionContract.KEY_UNRESOLVED_BINDINGS, List.of());
+        rls.put(RlsExecutionContract.KEY_NO_POLICY_MATCHED, noPolicyMatched);
+        if (rlsDenyReason != null) {
+            rls.put(RlsExecutionContract.KEY_RLS_DENY_REASON, rlsDenyReason);
+        }
+        return rls;
+    }
 
+    /** 用给定 rls 段形态组装完整 bundle（其余三段与本类既有夹具一致）。 */
+    private static Map<String, Object> bundleWithRls(Map<String, Object> rls, List<String> clsRefs,
+                                                     String opaPolicyState, String deniedReason,
+                                                     String watermark) {
         Map<String, Object> columns = new LinkedHashMap<>();
         columns.put("mode", "allow");
         columns.put("names", List.of());
