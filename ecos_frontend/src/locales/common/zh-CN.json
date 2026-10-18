@@ -605,6 +605,7 @@
   "common.status.degraded_title": "降级提示",
   "common.status.view_details": "查看明细",
   "common.status.poll_fallback": "降级：非实时（轮询 {seconds} 秒）",
+  "common.status.degraded_ack_required": "该降级需要人工确认（当前无在线确认通道）",
   "common.status.error_reason": "失败原因",
   "common.status.trace_id": "追踪号",
   "common.status.retry": "重试",

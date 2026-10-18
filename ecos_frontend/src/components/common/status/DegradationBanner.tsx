@@ -6,12 +6,16 @@
  * - 轮询兜底（progressChannel="poll"）时必须显示「降级：非实时（轮询 N 秒）」注记
  *   （与 RunProgress 共用 common.status.poll_fallback 单源文案，§2.2/W192 C174：
  *   未拿到 P-4 结论前不得声称流式）；
+ * - W run 流 degrade 帧的 `requiresAck` 走本条的只读标注腿：W run 域没有任何确认端点
+ *   （全仓 `/ack`、`/acknowledge` 只属于 runtime 告警、DQ 告警与 schema 变更三域，
+ *   无一对 Run 降级生效），因此这里**不**渲染确认按钮——
+ *   没有回路控件的按钮点了不改变任何状态，属假闭环；
  * - active/reasons/channel 均来自引擎端点消费结果，组件不推断降级原因。
  * @license Apache-2.0
  */
 
 import React from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, ShieldAlert } from "lucide-react";
 import { useTheme } from "../../ThemeContext";
 import { useLanguage } from "../../LanguageContext";
 import type { ProgressChannel } from "../structured/RunProgress";
@@ -27,6 +31,11 @@ export interface DegradationBannerProps {
   progressChannel?: ProgressChannel;
   /** 轮询间隔秒数（poll 通道注记展示） */
   pollIntervalSeconds?: number;
+  /**
+   * degrade 帧 `requiresAck`（帧 6 键面单源）：只读标注「需人工确认」，
+   * 由调用方从承流层的 ackRequired 直接传入，组件不自行判定。
+   */
+  requiresAck?: boolean;
 }
 
 export default function DegradationBanner({
@@ -35,6 +44,7 @@ export default function DegradationBanner({
   onOpenDetails,
   progressChannel,
   pollIntervalSeconds,
+  requiresAck = false,
 }: DegradationBannerProps) {
   const { styles } = useTheme();
   const { t } = useLanguage();
@@ -58,6 +68,12 @@ export default function DegradationBanner({
         )}
         {progressChannel === "poll" && (
           <p className={styles.warningText}>{t("common.status.poll_fallback", { seconds: pollIntervalSeconds ?? 3 })}</p>
+        )}
+        {requiresAck && (
+          <p className={`flex items-center gap-1 font-semibold ${styles.warningText}`}>
+            <ShieldAlert className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            {t("common.status.degraded_ack_required")}
+          </p>
         )}
       </div>
       {onOpenDetails && (

@@ -4,7 +4,9 @@
  * 与后端唯一登记处 `runtime/common-api .../common/stream/SseFrameContract.java`
  * 逐字对齐（帧名、键名、op/decision 词表、缺失标记 -1 / "-"）。两侧必须是同一口径，
  * 否则前端会把「未上报」读成「实测为零」。对齐由
- * `src/__tests__/sseFrameSingleSourceGate.test.ts` 跨语言读后端源码钉桩，禁人工记忆。
+ * `src/services/__tests__/sseFrames.singleSource.spec.ts` 跨语言读后端源码钉桩，禁人工记忆
+ * （本行原写 `src/__tests__/sseFrameSingleSourceGate.test.ts`——该路径实不存在，属注释里的虚假引用，
+ * 2026-10-18 #143/B5-5b-2 按实测文件名订正，门禁本体未变）。
  *
  * 前端侧禁在任何其它文件再写帧名字面量（写出/消费都只准 import 本模块）。
  * @license Apache-2.0
@@ -162,7 +164,7 @@ export function validateFrameSequencePrefix(events: readonly string[]): string |
 
 // ── 帧载荷读取（缺失即 -1 / "-"，禁补零补串） ──
 
-type FramePayload = Record<string, unknown>;
+export type FramePayload = Record<string, unknown>;
 
 function numOrUnknown(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : TOKEN_UNKNOWN;

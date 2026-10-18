@@ -605,6 +605,7 @@
   "common.status.degraded_title": "Degradation notice",
   "common.status.view_details": "View details",
   "common.status.poll_fallback": "Degraded: not real-time (polling every {seconds}s)",
+  "common.status.degraded_ack_required": "This degradation requires manual acknowledgment (no online confirmation channel yet)",
   "common.status.error_reason": "Failure reason",
   "common.status.trace_id": "Trace ID",
   "common.status.retry": "Retry",

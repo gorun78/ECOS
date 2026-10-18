@@ -1,6 +1,7 @@
 /**
  * DegradationBanner 冻结门禁用例（详设-08 §2.3「降级」行）：
  * `unit: DegradationBanner.test.tsx › shows poll fallback note`
+ * 外加 #143/B5-5b-2 的 degrade 帧 requiresAck 只读腿（含「不得长出确认控件」反向断言）。
  * @license Apache-2.0
  */
 import { describe, it, expect, afterEach, vi } from "vitest";
@@ -49,5 +50,19 @@ describe("DegradationBanner", () => {
     expect(screen.queryByText(/not real-time/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "View details" }));
     expect(onOpenDetails).toHaveBeenCalledTimes(1);
+  });
+
+  // degrade 帧 requiresAck 只做只读标注：W run 域零确认端点，渲染确认按钮＝假闭环
+  it("marks requiresAck read-only and never grows a confirmation control", () => {
+    renderWithProviders(
+      <DegradationBanner active reasons={["CLS degraded"]} requiresAck progressChannel="sse" />,
+    );
+    expect(screen.getByText(/requires manual acknowledgment/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("omits the acknowledgment note when no degrade frame asked for it", () => {
+    renderWithProviders(<DegradationBanner active reasons={["CLS degraded"]} progressChannel="sse" />);
+    expect(screen.queryByText(/requires manual acknowledgment/i)).not.toBeInTheDocument();
   });
 });
