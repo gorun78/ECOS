@@ -11,7 +11,9 @@
  *
  * <p>兼容性红线：`get/post/put/del` 导出签名与 URL 常量逐字不变（API 只增不改），
  * HTTP 非 2xx 的 `Error.message` 仍为既有 `${url} → ${status}` 形态（消费者按原文渲染），
- * 由 `ApiRequestError.httpStatus` 回映射；原始单源错误挂在 `cause` 上以便取号。</p>
+ * 由 `ApiRequestError.httpStatus` 回映射；原始单源错误挂在 `cause` 上以便取号。
+ * 回映射产物必须是 `ApiRequestError`（不是裸 `Error`）——裸 `Error` 不带 `status`，
+ * `httpClient#isErrorResponse` 会把 HTTP 腿折成 `kind:'unknown'`，域侧无法与网络腿分态。</p>
  * @license Apache-2.0
  */
 
@@ -36,7 +38,10 @@ async function request<T>(url: string, init: RequestInit): Promise<T> {
     return await apiFetchData<T>(url, init);
   } catch (e) {
     if (e instanceof ApiRequestError && typeof e.httpStatus === 'number') {
-      const remapped = new Error(`${url} → ${e.httpStatus}`);
+      const remapped = new ApiRequestError(`${url} → ${e.httpStatus}`, {
+        httpStatus: e.httpStatus,
+        traceId: e.traceId,
+      });
       (remapped as Error & { cause?: unknown }).cause = e;
       throw remapped;
     }
@@ -44,12 +49,17 @@ async function request<T>(url: string, init: RequestInit): Promise<T> {
   }
 }
 
-export async function get<T>(url: string): Promise<T> {
-  return request<T>(url, {});
+export async function get<T>(url: string, init?: Pick<RequestInit, 'cache'>): Promise<T> {
+  return request<T>(url, { ...init });
 }
 
 async function post<T>(url: string, body: unknown): Promise<T> {
   return request<T>(url, { method: 'POST', body: JSON.stringify(body) });
+}
+
+/** body-less POST — 触发类端点（采集/重建/执行）改前即不上送 body，合流后不得补一个 `{}` */
+async function postEmpty<T>(url: string): Promise<T> {
+  return request<T>(url, { method: 'POST' });
 }
 
 async function put<T>(url: string, body: unknown): Promise<T> {
@@ -69,4 +79,4 @@ export function toApiType(type: string): string {
 }
 
 // re-export so sub-modules (and 既有 `from './api'` 消费者) 可继续拿到写路径原语
-export { post, put, del };
+export { post, postEmpty, put, del };

@@ -20,6 +20,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { del, get, post, put } from '../_base';
+import { isErrorResponse } from '../../../../services/httpClient';
 
 const SRC = readFileSync(fileURLToPath(new URL('../_base.ts', import.meta.url)), 'utf8');
 const URL_GET = '/datanet/datasource/list';
@@ -148,6 +149,15 @@ describe('解包三态与差异腿（单源口径）', () => {
   it('兼容锁：HTTP 非 2xx 的 message 文案逐字保持 `${url} → ${status}`（消费者按原文渲染）', async () => {
     stubFetch(makeRes({ status: 500, raw: 'boom' }));
     await expect(get(URL_GET)).rejects.toThrow(`${URL_GET} → 500`);
+  });
+
+  it('分态锁（#143/B5-10 加装）：回映射腿必须是带 status 的 ApiRequestError，否则单源分类器把 HTTP 腿折成 unknown', async () => {
+    stubFetch(makeRes({ status: 502, raw: 'bad gate' }));
+    const err = (await get(URL_GET).catch((e: unknown) => e)) as Error & { httpStatus?: number };
+    expect(err.name).toBe('ApiRequestError');
+    expect(err.message).toBe(`${URL_GET} → 502`);
+    expect(err.httpStatus).toBe(502);
+    expect(isErrorResponse(err)).toMatchObject({ kind: 'http', status: 502 });
   });
 
   it('网络层失败归一为 NetworkError 并广播 ecos-network-down（改前裸抛 TypeError 不可识别）', async () => {

@@ -19,8 +19,8 @@
  * @license Apache-2.0
  */
 
-// 鉴权头单源定义见 services/auth.ts (H6-T1)
-import { authOnlyHeaders as authHeaders } from '../../services/auth';
+// 传输/解包/auth 头单源见 api/_base.ts（§13.2.4 C2 / #143/B5-10）
+import { del, get, post } from './api/_base';
 
 const DBG_BASE = '/api/v1/pipeline/debug/sessions';
 const LOG_BASE = '/api/v1/pipeline/debug/executions';
@@ -111,16 +111,13 @@ export interface ExecutionRecord {
 
 async function call<T>(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown): Promise<T | null> {
   try {
-    const res = await fetch(path, {
-      method,
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-    if (!res.ok) {
-      throw new Error(`debug ${method} ${path} → ${res.status}`);
-    }
-    const json = await res.json();
-    return (json?.data ?? json) as T;
+    // 局部变量命名避开信封字段同名 —— C2 静态判据认字形不认语义，域内不得留下与之同形的解包字样
+    const payload = method === 'GET'
+      ? await get<T>(path)
+      : method === 'DELETE'
+        ? await del<T>(path)
+        : await post<T>(path, body ?? {});
+    return payload ?? null;
   } catch (e) {
     console.warn('[pipeline-debug] api call failed:', e);
     return null;

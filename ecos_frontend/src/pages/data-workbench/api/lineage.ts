@@ -3,8 +3,7 @@
  * (从原单文件 api.ts 拆分, 见 W66 前端 <800 行约定)
  * @license Apache-2.0
  */
-import { get, LINEAGE_TOPOL } from './_base';
-import { authOnlyHeaders as authHeaders } from '../../../services/auth';
+import { get, postEmpty, LINEAGE_TOPOL } from './_base';
 
 /** Data Lineage — 查询持久化拓扑（全局表级/字段级血缘全景图） */
 /** 后端 DataLineageService.getTopology 返回 Map（nodes/edges/total_nodes/total_edges/from_db） */
@@ -86,10 +85,7 @@ export async function fetchLineageImpact(
     params.set('startNode', startNode);
     params.set('depth', String(depth));
     const url = '/api/v1/engine/data/lineage/impact?' + params.toString();
-    const res = await fetch(url, { headers: { ...authHeaders() } });
-    if (!res.ok) return null;
-    const json = await res.json();
-    const data: LineageImpactRaw = json?.data ?? json;
+    const data = await get<LineageImpactRaw>(url);
     if (!data) return null;
     const toArr = (v: unknown): LineageImpactNodeRaw[] => (Array.isArray(v) ? (v as LineageImpactNodeRaw[]) : []);
     return {
@@ -122,12 +118,7 @@ export async function rebuildLineage(limit = 0): Promise<{
   definitions_scanned?: number;
 }> {
   try {
-    const res = await fetch(`${LINEAGE_TOPOL}/rebuild?limit=${limit}`, {
-      method: 'POST', headers: { ...authHeaders() },
-    });
-    if (!res.ok) throw new Error(`${LINEAGE_TOPOL}/rebuild → ${res.status}`);
-    const json = await res.json();
-    const data = json?.data ?? json;
+    const data = await postEmpty<Record<string, unknown>>(`${LINEAGE_TOPOL}/rebuild?limit=${limit}`);
     return {
       total_nodes: Number(data?.total_nodes) || 0,
       total_edges: Number(data?.total_edges) || 0,

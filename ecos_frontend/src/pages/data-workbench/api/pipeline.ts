@@ -3,8 +3,7 @@
  * (从原单文件 api.ts 拆分, 见 W66 前端 <800 行约定)
  * @license Apache-2.0
  */
-import { get, post, PIPELINE_DEFS, INTEGRATION } from './_base';
-import { authOnlyHeaders as authHeaders } from '../../../services/auth';
+import { del, get, post, postEmpty, put, PIPELINE_DEFS, INTEGRATION } from './_base';
 import { mapPipelineDef, mapSyncTask, normalizeBackendPipelineNode } from './mappers';
 import type { DataPipeline, DataSyncTask } from '../types';
 
@@ -112,18 +111,12 @@ export async function fetchDataPipelines(): Promise<DataPipeline[]> {
  */
 export async function getPipelineDefinition(id: string): Promise<DataPipeline | null> {
   try {
-    const res = await fetch(`${PIPELINE_DEFS}/${encodeURIComponent(id)}`, {
-      headers: { ...authHeaders() },
-    });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const json = (await res.json()) as Record<string, unknown>;
-    const raw: unknown = json.data ?? json;
+    const raw = await get<Record<string, unknown>>(`${PIPELINE_DEFS}/${encodeURIComponent(id)}`);
     if (!raw || typeof raw !== 'object') return null;
-    const flat = raw as Record<string, unknown>;
     // Nested ApiResponse<T> envelope: unwrap .data when present
-    const inner = flat.data && typeof flat.data === 'object'
-      ? (flat.data as Record<string, unknown>)
-      : flat;
+    const inner = raw.data && typeof raw.data === 'object'
+      ? (raw.data as Record<string, unknown>)
+      : raw;
     const rawNodes = Array.isArray(inner.nodes) ? (inner.nodes as Record<string, unknown>[]) : [];
     const detail = mapPipelineDef(inner);
     return { ...detail, nodes: rawNodes.map(normalizeBackendPipelineNode) };
@@ -136,19 +129,13 @@ export async function getPipelineDefinition(id: string): Promise<DataPipeline | 
 /** Pipeline CRUD — 创建 (supports full { name, nodes, edges } payload per PMO-3J T3) */
 export async function createPipeline(payload: PipelineSavePayload): Promise<DataPipeline | null> {
   try {
-    const res = await fetch(PIPELINE_DEFS, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({
-        name: payload.name,
-        description: payload.description || '',
-        nodes: payload.nodes || [],
-        edges: payload.edges || [],
-      }),
+    const created = await post<Record<string, unknown>>(PIPELINE_DEFS, {
+      name: payload.name,
+      description: payload.description || '',
+      nodes: payload.nodes || [],
+      edges: payload.edges || [],
     });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const json = await res.json();
-    return mapPipelineDef(json.data ?? {});
+    return mapPipelineDef(created ?? {});
   } catch (e) {
     console.warn('[data-workbench] createPipeline failed:', e);
     return null;
@@ -167,14 +154,8 @@ export async function updatePipeline(
     if (payload.status !== undefined) body.status = payload.status;
     if (payload.nodes !== undefined) body.nodes = payload.nodes;
     if (payload.edges !== undefined) body.edges = payload.edges;
-    const res = await fetch(`${PIPELINE_DEFS}/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const json = await res.json();
-    return mapPipelineDef(json.data ?? {});
+    const updated = await put<Record<string, unknown>>(`${PIPELINE_DEFS}/${id}`, body);
+    return mapPipelineDef(updated ?? {});
   } catch (e) {
     console.warn('[data-workbench] updatePipeline failed:', e);
     return null;
@@ -197,8 +178,8 @@ export async function savePipelineDefinition(
 /** Pipeline CRUD — 删除（软删除 → ARCHIVED） */
 export async function deletePipeline(id: string): Promise<boolean> {
   try {
-    const res = await fetch(`${PIPELINE_DEFS}/${id}`, { method: 'DELETE', headers: { ...authHeaders() } });
-    return res.ok;
+    await del<unknown>(`${PIPELINE_DEFS}/${id}`);
+    return true;
   } catch (e) {
     console.warn('[data-workbench] deletePipeline failed:', e);
     return false;
@@ -208,10 +189,7 @@ export async function deletePipeline(id: string): Promise<boolean> {
 /** Pipeline CRUD — 执行 */
 export async function executePipeline(id: string): Promise<{ executionId?: string; status?: string } | null> {
   try {
-    const res = await fetch(`${PIPELINE_DEFS}/${id}/execute`, { method: 'POST', headers: { ...authHeaders() } });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const json = await res.json();
-    return json.data as Record<string, unknown> ?? null;
+    return await postEmpty<{ executionId?: string; status?: string }>(`${PIPELINE_DEFS}/${id}/execute`) ?? null;
   } catch (e) {
     console.warn('[data-workbench] executePipeline failed:', e);
     return null;

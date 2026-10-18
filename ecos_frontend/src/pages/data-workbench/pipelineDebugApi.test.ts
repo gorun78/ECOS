@@ -173,9 +173,11 @@ describe('POST 动作 — step/continue/stop/reset', () => {
 });
 
 describe('DELETE /{sessionId}', () => {
-  it('ok=true 删除成功 — call() 返回 data（后端 DELETE 通常 data=null，回退整 json）', async () => {
+  it('ok=true 删除成功 — 单源解包口径：data:null 即返回 null，不再回退整个信封（#143/B5-10 收 C2 私拆信封）', async () => {
     // 后端约定 DELETE 响应 { success: true, code: 0, data: null }
-    // call() 实现: json?.data ?? json — data===null 命中 ?? 回退整 json
+    // 改前 call() 手写 `json?.data ?? json`：data===null 命中 ?? ⇒ 回退整个信封（故障面与成功面同形）。
+    // 合流后解包点唯一（httpClient#apiFetchData：`data !== undefined ? data : json`）⇒ 该腿返回 null。
+    // 消费者 DebugTab.tsx:207 丢弃返回值、只以「不抛错」为成功，故口径变更不影响交互。
     const f = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -184,10 +186,7 @@ describe('DELETE /{sessionId}', () => {
     vi.stubGlobal('fetch', f);
 
     const res = await deleteDebugSession('s1');
-    // 实际返回的是 json 整体（data:null 短路 ??）
-    // 关键契约：fetch 被调用、url=DELETE 端点（结构验证），res 为 truthy 含义是"完成"
-    expect(res).not.toBeNull();
-    expect((res as unknown as { success?: boolean }).success).toBe(true);
+    expect(res).toBeNull();
 
     const [url, init] = (f as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(url).toBe('/api/v1/pipeline/debug/sessions/s1');
