@@ -22,6 +22,8 @@
  * Authorization）、services/glossary.ts（私设基址 + 自留 pickTraceId/拆信封）、
  * api/dictConfigClient.ts、pages/Guardrails/constants.ts 四处基址改由 API_BASE 派生；
  * 同批消 pages/workbench/NewScenarioModal.tsx 一处 HEAD 既有红（该文件从未入基线）。
+ * 2026-10-18 #143/B5-8 收口减 1：pages/data-workbench/api/_base.ts 三枚 /api 常量改由
+ * API_BASE 派生（URL 逐字不变），同批该文件的 DW 共享 HTTP 四动词合流 apiFetchData 单源。
  */
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
@@ -67,7 +69,6 @@ const BASELINE = new Set([
   'pages/business-workbench/BusinessWorkbenchLayout.tsx',
   'pages/data-quality/api/_base.ts',
   'pages/data-workbench/DataEngineConfigPanel.tsx',
-  'pages/data-workbench/api/_base.ts',
   'pages/data-workbench/api/datasource.ts',
   'pages/data-workbench/api/lineage.ts',
   'pages/data-workbench/api/metadata.ts',
