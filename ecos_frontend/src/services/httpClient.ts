@@ -462,14 +462,47 @@ export async function rawAuthedUrlFetch(url: string, options?: RequestInit): Pro
   const token = getAuthToken();
   const headers: Record<string, string> = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
+  return rawUrlFetch(url, headers, options);
+}
+
+/**
+ * `rawAuthedUrlFetch` 的**匿名**同胞 — 同一内核，唯一差别 = 不拼 Bearer。
+ *
+ * <p>为什么为匿名腿单开一条具名通道，而不是让域文件继续自己 `fetch(url)`：
+ * C2′ 判据要收的是「传输封装散落」，不是「所有请求都必须带 token」。
+ * 若把匿名腿折进带 Bearer 的通道，登录后会多出 `Authorization` ⇒ 网关按身份与准入等级
+ * 裁决，应答面改变（`/api/v1/knowledge/query` 这类端点有无身份结果就不同）——那是语义变更，
+ * 不属于「传输合流」这一批的授权范围。反之若留裸 `fetch`，判据出现洞、
+ * 且「这次请求不带身份」这个决定散落在各域文件里不可核对。
+ * 具名通道把它收成**一次显式调用**：全仓 grep `rawAnonUrlFetch` 即匿名传输面清单。</p>
+ *
+ * <p>⚠ 匿名不等于可用：`AnonymousEndpointRegistry`（网关 permitAll 单源，实测 9 条 ANONYMOUS）
+ * 内没有本通道当前承接的 `knowledge/query`、`knowledge/rag`、`ontology/compiler/compile`、
+ * `security/audit-logs` 四条路径 ⇒ 经网关/BFF 时按 `anyRequest().authenticated()` 恒 401
+ * （vite dev 直连引擎时可过，生产链路不可）。已作为 **D-B5-36** 登记，处置需产品裁决
+ * （改带身份 ⇒ 语义变更；补登记 permitAll ⇒ 后端契约变更），本批只做零语义变化的传输合流。</p>
+ */
+export async function rawAnonUrlFetch(url: string, options?: RequestInit): Promise<Response> {
+  return rawUrlFetch(url, {}, options);
+}
+
+/**
+ * 两条裸响应通道的共用内核：只负责拼头 + 发请求 + PMO-43 网络态归一，
+ * **不做 401/403 副作用、不解析响应体**（返回未消费的 `Response`，供流式/二进制腿 `getReader()`/`blob()`）。
+ */
+async function rawUrlFetch(
+  url: string,
+  baseHeaders: Record<string, string>,
+  options?: RequestInit,
+): Promise<Response> {
   const initHeaders = options?.headers;
   let res: Response;
   try {
     res = await fetch(url, {
       ...options,
       headers: initHeaders
-        ? { ...headers, ...(initHeaders as Record<string, string>) }
-        : headers,
+        ? { ...baseHeaders, ...(initHeaders as Record<string, string>) }
+        : baseHeaders,
     });
   } catch (e) {
     markNetworkDown();

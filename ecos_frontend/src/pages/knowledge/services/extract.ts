@@ -6,8 +6,11 @@
  *
  * K-55 纠正：
  *   - `fetchExtractLogs` / `fetchExportLogBody` / `uploadDocumentChunked` /
- *     `uploadEvalSeed` 不再直接 `localStorage.getItem('token')`，
- *     auth 头统一走 `services/auth.ts`（`getAuthToken` / `authOnlyHeaders`）。
+ *     `uploadEvalSeed` 不再直接 `localStorage.getItem('token')`。
+ *   - **#143/B5-11d 传输合流**：本域 3 条裸 `fetch` 腿（分片上传 + 两份导出日志）
+ *     改走 `services/httpClient.ts#rawAuthedUrlFetch`——Bearer 由单源拼接，
+ *     本文件不再出现裸 `fetch(`（C2′ 判据）也不再手拼 `Authorization`。
+ *     通道不解析响应体 ⇒ `FormData`/`blob()` 两条特殊形态原样可用，语义零变化。
  *   - `fetchOntologyTree` / `fetchScheduledExtracts` / `fetchExtractJobs` 走
  *     `kbFetchData` → 5xx / ECOS-KB-* 抛 `KbApiError`（Tab 错误态分治）。
  *
@@ -18,7 +21,7 @@
  */
 import { apiFetchData } from '../../../api';
 import { ApiRequestError } from '../../../services/httpClient';
-import { getAuthToken } from '../../../services/auth';
+import { rawAuthedUrlFetch } from '../../../services/httpClient';
 import { kbFetchData } from './kbFetch';
 import type {
   ImportQueueItem,
@@ -103,8 +106,6 @@ export async function uploadDocumentChunked(
   const CHUNK_SIZE = 5 * 1024 * 1024;
   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
   const fileId = `doc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const token = getAuthToken();
-  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
   for (let i = 0; i < totalChunks; i++) {
     const start = i * CHUNK_SIZE;
     const end = Math.min(start + CHUNK_SIZE, file.size);
@@ -115,7 +116,9 @@ export async function uploadDocumentChunked(
     fd.append('chunkIndex', String(i));
     fd.append('totalChunks', String(totalChunks));
     fd.append('name', file.name);
-    const res = await fetch(`${KB_V1}/extract/upload`, { method: 'POST', headers, body: fd });
+    // 只带 Bearer、不带 Content-Type：multipart 的 boundary 必须由浏览器自造，
+    // 单源通道未传 headers 时正是「只有 Authorization」这一形状 ⇒ 与改前逐字节一致。
+    const res = await rawAuthedUrlFetch(`${KB_V1}/extract/upload`, { method: 'POST', body: fd });
     if (!res.ok) throw new Error(`chunk ${i}/${totalChunks} failed: ${res.status}`);
     onProgress((i + 1) / totalChunks);
   }
@@ -476,26 +479,29 @@ export async function fetchExtractLogs(jobId: string): Promise<ExtractLogEntry[]
   }
 }
 
-/** 抽取日志导出 Blob（auth 头走 auth.ts；K-55 头部单源） */
-export async function fetchExportLogBody(jobId: string): Promise<Blob> {
-  const token = getAuthToken();
-  const res = await fetch(`${KB_V1}/extract/structured/export-log`, {
+/**
+ * 抽取日志导出的**唯一传输腿**：两条对外函数（`fetchExportLogBody` / `exportExtractLog`）
+ * 改前是同一段裸 `fetch` 的两份拷贝、只差一句错误文案，本批合流到单源通道后
+ * 文案差异仍按调用方各自保留（页面 `MonitorPanel` 依赖 `exportExtractLog` 的原文案）。
+ */
+async function postExportLogRequest(jobId: string): Promise<Response> {
+  return rawAuthedUrlFetch(`${KB_V1}/extract/structured/export-log`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jobId }),
   });
+}
+
+/** 抽取日志导出 Blob（auth 头走单源通道；#143/B5-11d 传输合流） */
+export async function fetchExportLogBody(jobId: string): Promise<Blob> {
+  const res = await postExportLogRequest(jobId);
   if (!res.ok) throw new Error(`export-log HTTP ${res.status}`);
   return res.blob();
 }
 
 /** 导出抽取日志（alias；page 层需 a.click() 触发下载） */
 export async function exportExtractLog(jobId: string): Promise<Blob> {
-  const token = getAuthToken();
-  const res = await fetch(`${KB_V1}/extract/structured/export-log`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ jobId }),
-  });
+  const res = await postExportLogRequest(jobId);
   if (!res.ok) throw new Error(`extract log export failed: ${res.status}`);
   return await res.blob();
 }

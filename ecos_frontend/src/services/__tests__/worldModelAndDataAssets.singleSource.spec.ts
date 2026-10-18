@@ -6,7 +6,9 @@
  * <p>**改前缺陷本体（实测取证，2026-10-19）**：
  * ① `worldModelGraphApi.ts` 自带 2 处私设 `await fetch(`，且头注释明写「无鉴权头」——
  * 而 gateway `SecurityConfig` 取数自 `AnonymousEndpointRegistry.permitAllPatterns()`
- * （runtime/common-api，实测 46 条中零条 world-model／`/api/v1/ecos` 登记）
+ * （runtime/common-api，实测登记 12 条 = 9 ANONYMOUS + 3 CLEARANCE_EXEMPT、permitAll 展开 10 条，
+ * 其中零条 world-model／`/api/v1/ecos` 登记；此处原记「46 条」系 #143/B5-11b 误测，#143/B5-11d 勘误，
+ * 「零条命中 ⇒ 改前恒 401」的结论不受影响）
  * ＋ `anyRequest().authenticated()` ⇒ **五腿改前恒 401**，不是此前记载的「两腿错挂前缀」
  * （该归因已在台账勘定）。前缀错位真实存在但为 **4/5**：sysman
  * `WorldModelGraphController` @ `/api/v1/ecos/world-model-graph` 只有
