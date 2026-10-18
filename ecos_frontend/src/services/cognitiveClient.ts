@@ -7,13 +7,16 @@
  * 出口。既有 {@link cognitiveEngineApi}（17-controller 面）通过具名 re-export
  * 与本文件 alias，不引入第二套 auth 头拼接、不重复实现 fetch。</p>
  *
- * <p>auth 单源：所有 fetch 均经 {@link getAuthToken}（`services/auth.ts`）
- * 拼 Bearer，禁直接读 localStorage['token'] / sessionStorage['jwt']。</p>
+ * <p>传输单源（C2 收口 #143/B5-10c-2）：本域不再自起传输，请求一律经
+ * `httpClient#apiFetchEnvelope`——auth 头拼接（内部只走 `services/auth.ts#getAuthToken`，
+ * 禁直接读 localStorage['token'] / sessionStorage['jwt']）、响应体解包与 traceId 取号
+ * 全在该通道完成，域内只做 7 态错误矩阵分类。</p>
  *
  * <p>取号单源（D-B5-26，2026-10-18 #143/B5-7）：成功腿与全部错误腿的 traceId 一律
- * 委托 `httpClient#pickTraceId`，域内禁再自留对响应头 X- 系列取值的私有取号腿——历史上
- * 本域错误腿只看 `X-Trace-Id`、成功腿看 `X-Request-Id`/`X-Trace-Id`，两腿顺位不同
- * 且都缺第三号 `X-ECOS-Trace-Id`，传输层改口径时本域必然漂移。</p>
+ * 由单源 `httpClient#pickTraceId` 裁决（经 apiFetchEnvelope 透出），域内禁再自留对响应头
+ * X- 系列取值的私有取号腿——历史上本域错误腿只看 `X-Trace-Id`、成功腿看
+ * `X-Request-Id`/`X-Trace-Id`，两腿顺位不同且都缺第三号 `X-ECOS-Trace-Id`，传输层改口径时
+ * 本域必然漂移。</p>
  *
  * <p>错误矩阵（与后端 `CognitiveErrorMatrixIntegrationTest` 对齐）：
  * ① 场景不存在 → 404 NOT_FOUND ② 已软删 → 404 NOT_FOUND
@@ -24,8 +27,7 @@
  * @license Apache-2.0
  */
 
-import { getAuthToken } from "./auth";
-import { pickTraceId } from "./httpClient";
+import { apiFetchEnvelope, type ApiEnvelopeOutcome } from "./httpClient";
 
 // ── 轮询 / 防抖常量（design-05 B.6 / X-52 契约要求，唯一命名源，禁散落魔法数）────
 
@@ -136,10 +138,10 @@ export function isCognitiveApiError(e: unknown): e is CognitiveApiError {
   return e instanceof CognitiveApiError;
 }
 
-// ── 内部 fetch（auth 单源）────────────────────────────
+// ── 内部通道（传输委托 httpClient 单源）────────────────
 
 /**
- * 认知域唯一 fetch/auth 通道。导出仅为供 `services/cognitive/*` 拆分模块复用
+ * 认知域唯一请求通道。导出仅为供 `services/cognitive/*` 拆分模块复用
  * （禁拆出模块自拼 Bearer 头 / 自起 fetch），组件面不应直接调用它。
  *
  * <p>S2 收口（复盘 2026-10-12）：本函数行为与既有契约完全一致（签名不变）；
@@ -171,54 +173,43 @@ export async function callJsonWithTrace(
   return { data, traceId: meta.traceId };
 }
 
-/** callJson / callJsonWithTrace 共享内部实现（auth 单源 + 错误矩阵，逐字保持既有行为）。 */
+/**
+ * callJson / callJsonWithTrace 共享内部实现。
+ *
+ * <p>C2 收口（#143/B5-10c-2，2026-10-19）：传输、auth 头拼接、响应体解包与 traceId
+ * 取号一律委托 `httpClient#apiFetchEnvelope` 单源，域内只保留 7 态错误矩阵的分类规则
+ * （矩阵逐条同码同态由 `__tests__/envelopeSingleChannel.spec.ts` 锁死）。
+ * 不并入 `apiFetchData` 的原因是真实的：该通道在解包前把非 2xx 与信封失败一律折叠成抛错，
+ * 且不透出响应体原文与 status ⇒ 照搬会摧毁 503 两态与 501 stub 分类。</p>
+ */
 async function callJsonInternal(
   url: string,
   init: RequestInit,
   meta: { traceId?: string } | undefined,
 ): Promise<unknown> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const token = getAuthToken();
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const mergedHeaders: Record<string, string> = {
-    ...headers,
-    ...((init.headers as Record<string, string> | undefined) ?? {}),
-  };
-  let res: Response;
+  let out: ApiEnvelopeOutcome;
   try {
-    res = await fetch(url, { ...init, headers: mergedHeaders });
+    out = await apiFetchEnvelope(url, init);
   } catch (e) {
+    // 网络层：单源已广播 ecos-network-down 并抛出 NetworkError 口径，域内仍归一 NETWORK。
     throw new CognitiveApiError({
       code: "NETWORK",
       status: 0,
       message: e instanceof Error ? e.message : String(e),
     });
   }
-  const text = await res.text().catch(() => "");
-  let body: unknown = null;
-  if (text) {
-    try { body = JSON.parse(text); } catch { /* 非 JSON 响应，保持 null */ }
-  }
-  // D-B5-26 收口：取号一律委托 httpClient#pickTraceId 单源（三号面顺位 + 信封兜底 +
-  // 无 headers 面不反噬）。域内此前自留一份对响应头 X- 系列的私有取值腿，成功腿与错误腿
-  // 顺位还不一致（错误腿只看 X-Trace-Id），是「改一处口径另一处漂移」的实证来源。
-  const traceId = pickTraceId(res, (body ?? null) as { traceId?: string | null } | null);
+  const { status, ok, text, traceId, envelope } = out;
   if (meta && traceId) meta.traceId = traceId;
   /** 文案口径逐字保持既有行为：信封 message 优先 → 响应体原文 → `HTTP ${status}`。 */
-  const msgOf = (b: unknown): string =>
-    b && typeof b === "object"
-      ? (typeof (b as Record<string, unknown>).message === "string"
-          ? ((b as Record<string, unknown>).message as string)
-          : text || `HTTP ${res.status}`)
-      : text || `HTTP ${res.status}`;
-  if (res.status === 404) {
-    throw new CognitiveApiError({ code: "NOT_FOUND", status: 404, message: msgOf(body), traceId });
+  const msgOf = (): string => envelope.message ?? (text || `HTTP ${status}`);
+  if (status === 404) {
+    throw new CognitiveApiError({ code: "NOT_FOUND", status: 404, message: msgOf(), traceId });
   }
-  if (res.status === 400) {
-    throw new CognitiveApiError({ code: "BAD_REQUEST", status: 400, message: msgOf(body), traceId });
+  if (status === 400) {
+    throw new CognitiveApiError({ code: "BAD_REQUEST", status: 400, message: msgOf(), traceId });
   }
-  if (res.status === 503) {
-    const msg = msgOf(body);
+  if (status === 503) {
+    const msg = msgOf();
     const schemaNotReady = /schema not ready|SCHEMA_NOT_READY/i.test(msg);
     throw new CognitiveApiError({
       code: schemaNotReady ? "SCHEMA_NOT_READY" : "ENGINE_DISABLED",
@@ -227,45 +218,41 @@ async function callJsonInternal(
       traceId,
     });
   }
-  if (res.status === 501) {
+  if (status === 501) {
     throw new CognitiveApiError({
       code: "STUB",
       status: 501,
-      message: msgOf(body),
+      message: msgOf(),
       stub: true,
       traceId,
     });
   }
-  if (!res.ok) {
+  if (!ok) {
     throw new CognitiveApiError({
       code: "HTTP_ERROR",
-      status: res.status,
-      message: msgOf(body),
+      status,
+      message: msgOf(),
       traceId,
     });
   }
-  // 200：{success,data} / {code,data} / 裸 data 三形态兼容
-  if (body && typeof body === "object") {
-    const o = body as Record<string, unknown>;
-    if (o.success === false) {
-      throw new CognitiveApiError({
-        code: "BUSINESS_ERROR",
-        status: res.status,
-        message: typeof o.message === "string" ? o.message : "Request failed",
-        traceId,
-      });
-    }
-    if (typeof o.code === "number" && o.code !== 200 && o.code !== 0) {
-      throw new CognitiveApiError({
-        code: "BUSINESS_ERROR",
-        status: res.status,
-        message: typeof o.message === "string" ? o.message : `Error ${o.code}`,
-        traceId,
-      });
-    }
-    return o.data !== undefined ? o.data : body;
+  // 2xx：{success,data} / {code,data} / 裸 data 三形态兼容（解包形状由单源透出）
+  if (envelope.success === false) {
+    throw new CognitiveApiError({
+      code: "BUSINESS_ERROR",
+      status,
+      message: envelope.message ?? "Request failed",
+      traceId,
+    });
   }
-  return body;
+  if (typeof envelope.code === "number" && envelope.code !== 200 && envelope.code !== 0) {
+    throw new CognitiveApiError({
+      code: "BUSINESS_ERROR",
+      status,
+      message: envelope.message ?? `Error ${envelope.code}`,
+      traceId,
+    });
+  }
+  return out.data;
 }
 
 /** 形状归一：数组直取，`{rows}` / `{data}` 包装取其数组，其余一律空集（DG-6 禁造元素）。 */
@@ -672,9 +659,9 @@ export async function buildScenarioContext(input: ContextBuildInput): Promise<Co
 //
 // 为保持既有 importer（pages/cos/*、CognitiveEngineView、MentalReviewTab、
 // OverrideTab 等）无需修改，本文件 re-export `cognitiveEngineApi` 单源聚合。
-// 该 module 内所有 fetch 调用经 `apiFetchData`（内部只走 `getAuthToken()` 单源
-// token 读取）；本文件 4 契约端点走独立 `callJson`（同样经 `getAuthToken()`）。
-// 2 个通道的 auth 读取路径完全等价（都是 `services/auth.ts#getAuthToken()`），
+// 该 module 内所有 fetch 调用经 `apiFetchData`（与本文件的 `callJson` 同读
+// `httpClient` 单源传输通道）；本文件 4 契约端点走独立 `callJson`。
+// 2 个通道的 auth 读取路径完全等价（都落在 `services/auth.ts#getAuthToken()` 单源），
 // 均不直接读 localStorage。
 
 export {

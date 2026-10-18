@@ -13,13 +13,14 @@
  * 409（非法迁移 / 门槛未过 / 并发冲突 / 发布阻断）按 `errorCode` 归一为
  * {@link BlueprintApiError}，绝不本地合成状态或伪装 200；网络失败归 NETWORK。</p>
  *
- * <p>auth 单源：所有 fetch 经 {@link getAuthToken} 拼 Bearer，禁直读 localStorage['token']。</p>
+ * <p>传输单源（C2 收口 #143/B5-10c-2）：本文件不再自起传输，请求一律经
+ * `httpClient#apiFetchEnvelope`，auth 头由该通道内部
+ * 走 `services/auth.ts#getAuthToken()` 单源拼 Bearer，禁直读 localStorage['token']。</p>
  *
  * @license Apache-2.0
  */
 
-import { getAuthToken } from './auth';
-import { API_BASE } from './httpClient';
+import { API_BASE, apiFetchEnvelope, type ApiEnvelopeOutcome } from './httpClient';
 
 // ── 静态前缀（唯一出口）─────────────────────────────
 
@@ -303,36 +304,32 @@ function normalizeCode(status: number, errorCode?: string, message?: string): Bl
 }
 
 // ── 传输核心（透传后端语义，禁合成）───────────────────
+/**
+ * 蓝图域唯一请求通道（C2 收口 #143/B5-10c-2：传输/auth/解包/取号委托
+ * `httpClient#apiFetchEnvelope` 单源，域内只保留按 status + 后端原始 errorCode 的分类）。
+ *
+ * <p>不并入 `apiFetchData`：该通道不透出响应体原文与原始 `errorCode`，照搬会摧毁
+ * 409 迁移冲突族的名码优先口径。D-B5-31 同批收口：域内私有取号腿只看 `X-Trace-Id`，
+ * 而网关对每个响应写的是 `X-Request-Id` ⇒ 真机 traceId 恒缺，现由单源顺位表裁决。</p>
+ */
 async function callBlueprint(url: string, init: RequestInit = {}): Promise<unknown> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const token = getAuthToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const merged: Record<string, string> = {
-    ...headers,
-    ...((init.headers as Record<string, string> | undefined) ?? {}),
-  };
-  let res: Response;
+  let out: ApiEnvelopeOutcome;
   try {
-    res = await fetch(url, { ...init, headers: merged });
+    out = await apiFetchEnvelope(url, init);
   } catch (e) {
+    // 网络层：单源已广播 ecos-network-down 并抛出 NetworkError 口径，域内仍归一 NETWORK。
     throw new BlueprintApiError({
       code: 'NETWORK',
       status: 0,
       message: e instanceof Error ? e.message : String(e),
     });
   }
-  const text = await res.text().catch(() => '');
-  let body: unknown = null;
-  if (text) {
-    try { body = JSON.parse(text); } catch { /* 非 JSON：保持 null */ }
-  }
-  const o = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
-  const traceId = (res.headers.get('X-Trace-Id')
-    ?? (typeof o.traceId === 'string' ? o.traceId : undefined)) as string | undefined;
-  const message = typeof o.message === 'string' ? o.message : (text || `HTTP ${res.status}`);
-  const rawErrorCode = typeof o.errorCode === 'string' ? o.errorCode : undefined;
+  const { status, ok, text, traceId, envelope } = out;
+  /** 文案口径逐字保持既有行为：信封 message 优先 → 响应体原文 → `HTTP ${status}`。 */
+  const message = envelope.message ?? (text || `HTTP ${status}`);
+  const rawErrorCode = envelope.errorCode;
 
-  if (res.status === 409) {
+  if (status === 409) {
     // 迁移/门槛/发布/并发冲突族：优先后端 errorCode，缺失按 HTTP 归一。
     const code = normalizeCode(409, rawErrorCode, message);
     throw new BlueprintApiError({
@@ -343,23 +340,23 @@ async function callBlueprint(url: string, init: RequestInit = {}): Promise<unkno
       traceId,
     });
   }
-  if (res.status === 404) {
+  if (status === 404) {
     throw new BlueprintApiError({ code: normalizeCode(404, rawErrorCode, message), status: 404, message, rawErrorCode, traceId });
   }
-  if (res.status === 400) {
+  if (status === 400) {
     throw new BlueprintApiError({ code: normalizeCode(400, rawErrorCode, message), status: 400, message, rawErrorCode, traceId });
   }
-  if (res.status === 503) {
+  if (status === 503) {
     throw new BlueprintApiError({ code: normalizeCode(503, rawErrorCode, message), status: 503, message, rawErrorCode, traceId });
   }
-  if (!res.ok) {
-    throw new BlueprintApiError({ code: 'HTTP_ERROR', status: res.status, message, rawErrorCode, traceId });
+  if (!ok) {
+    throw new BlueprintApiError({ code: 'HTTP_ERROR', status, message, rawErrorCode, traceId });
   }
-  // 200/201：{code, data} 信封；code!=200/0 视为业务错误（透传，禁伪装）
-  if (typeof o.code === 'number' && o.code !== 200 && o.code !== 0 && o.code !== 201) {
-    throw new BlueprintApiError({ code: 'BUSINESS_ERROR', status: res.status, message, rawErrorCode, traceId });
+  // 200/201：{code, data} 信封；code!=200/0/201 视为业务错误（透传，禁伪装）
+  if (typeof envelope.code === 'number' && envelope.code !== 200 && envelope.code !== 0 && envelope.code !== 201) {
+    throw new BlueprintApiError({ code: 'BUSINESS_ERROR', status, message, rawErrorCode, traceId });
   }
-  return o.data !== undefined ? o.data : body;
+  return out.data;
 }
 
 function asArray<T>(v: unknown): T[] {

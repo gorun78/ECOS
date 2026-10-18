@@ -464,6 +464,106 @@ export async function rawAuthedFetch(path: string, options?: RequestInit): Promi
   return res;
 }
 
+// ── Envelope outcome channel (C2 单解包点) ────────────────────
+
+/** {@link apiFetchEnvelope} 的返回形状：解包与取号在单源完成，分类判定留给调用方。 */
+export interface ApiEnvelopeOutcome {
+  status: number;
+  ok: boolean;
+  /** 单源解包结果：整包是对象且带 `data` ⇒ 取 `data`，否则整包原样（标量 JSON 不塌成 null） */
+  data: unknown;
+  /** 解析后的整包响应体；空体或非 JSON ⇒ null */
+  body: unknown;
+  /** 响应原文：调用方兜底文案（`text || HTTP <status>`）要用的就是这一面，单源不代造文案 */
+  text: string;
+  /** `pickTraceId` 单源顺位结果（响应头三号面优先，其次信封 `traceId`） */
+  traceId?: string;
+  /**
+   * 信封字段透出（缺字段即 undefined，不伪造默认值）。
+   * 容差口径留给调用方：`apiFetchData` 把「`code` 非 200/0」一律折叠成抛错，而
+   * 蓝图通道对 `code:201`（创建成功）必须放行、认知通道不容 ⇒ 折叠会摧毁分类。
+   */
+  envelope: {
+    code?: number;
+    success?: boolean;
+    message?: string;
+    errorCode?: string;
+  };
+}
+
+/**
+ * 第四条通道：一次取齐「解包结果 + 整包 + 原文 + traceId + 信封字段」，
+ * **除网络层失败外不抛错**（401/403 的会话副作用照做，但 status 仍透出让调用方分类）。
+ *
+ * <p>存在理由（C2「ApiResponse 单解包点」与错误分类矩阵的交点）：cognitiveClient 的
+ * 404/400/503→SCHEMA_NOT_READY/501→STUB 矩阵、scenarioBlueprintClient 的 409 迁移冲突族
+ * （优先后端 `errorCode`，缺失才按 HTTP 归一）都需要读**原始 status ＋ 原始 errorCode ＋
+ * 响应体原文**才能分类，而 `apiFetchData` 在解包前就抛错、且不透出这些面 ⇒ 两者此前各自
+ * 保留一份私设 `await fetch` ＋ 手写 `data ??` 解包（＝C2 的最后两处违例）。本通道把解包
+ * 与取号收回单源，分类规则原样留在域内。</p>
+ */
+export async function apiFetchEnvelope(url: string, opts: RequestInit = {}): Promise<ApiEnvelopeOutcome> {
+  const token = getAuthToken();
+  const defaults: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) defaults['Authorization'] = `Bearer ${token}`;
+  // 逐调用方覆盖（而非整组替换）：两域客户端改前就是这个形状，
+  // 若照 apiFetchData 的 `{headers, ...options}` 展开，带自定义头的调用会连 Bearer 一起丢掉。
+  const headers: Record<string, string> = {
+    ...defaults,
+    ...((opts.headers as Record<string, string> | undefined) ?? {}),
+  };
+  let res: Response;
+  try {
+    res = await fetch(url, { ...opts, headers });
+  } catch (e) {
+    markNetworkDown();
+    await notifyNetworkDown(e);
+    throw toNetworkError(e, `fetch ${url}`);
+  }
+  if (res.status === 401) {
+    // 会话副作用（清 token + 跳 #/login + 宽限期判定）照单源执行；其收尾 throw 在这里吞掉，
+    // 因为两条域通道各自有 7 态/6 态错误矩阵，必须按 status=401 分类而非被折叠成网络态。
+    try {
+      handleAuthExpired();
+    } catch {
+      /* 已完成的清会话/跳转不回滚，改由返回值 status 透出 */
+    }
+  }
+  if (res.status === 403) notifyNoAccess({ path: url });
+  const text = await res.text().catch(() => '');
+  const body = parseJsonBody(text);
+  const obj = (body && typeof body === 'object' ? body : null) as Record<string, unknown> | null;
+  const traceId = pickTraceId(res, obj as TraceBearingBody | null);
+  if (res.ok) notifyNetworkUp();
+  return {
+    status: res.status,
+    ok: res.ok,
+    data: obj && obj.data !== undefined ? obj.data : body,
+    body,
+    text,
+    traceId,
+    envelope: {
+      code: typeof obj?.code === 'number' ? obj.code : undefined,
+      success: typeof obj?.success === 'boolean' ? obj.success : undefined,
+      message: typeof obj?.message === 'string' ? obj.message : undefined,
+      errorCode: typeof obj?.errorCode === 'string' ? obj.errorCode : undefined,
+    },
+  };
+}
+
+/**
+ * 宽容解析：保留 JSON 标量（`5` / `"ok"`）原样返回，非 JSON 或空体才为 null。
+ * 不复用 `parseEnvelope`——那只用于取号（对象面），塌成 null 会让裸标量载荷的调用方丢数据。
+ */
+function parseJsonBody(text: string): unknown {
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 // ── Auth ────────────────────────────────────────────────
 export interface LoginRequest {
   username: string;
