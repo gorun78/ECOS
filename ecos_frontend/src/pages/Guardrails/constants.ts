@@ -1,11 +1,16 @@
 import { FileLock2, Filter, Users, EyeOff, ShieldCheck } from 'lucide-react';
 import type { PolicyType } from './types';
+import { API_BASE as API_ROOT } from '../../services/httpClient';
 
 // ─────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────
 
-export const API_BASE = '/api/v1/guardrails/policies';
+/**
+ * 护栏策略端点基址（完整路径，供 helpers#apiCall 裸 fetch 使用）。
+ * 前缀由 httpClient#API_BASE 单源派生 —— W206/C188 禁本文件再写字面前缀。
+ */
+export const API_BASE = `${API_ROOT}/v1/guardrails/policies`;
 
 export const POLICY_TYPE_META: Record<PolicyType, { labelKey: string; icon: any; color: string }> = {
   column_masking: { labelKey: 'gw.type.column_masking', icon: FileLock2, color: 'text-blue-500' },

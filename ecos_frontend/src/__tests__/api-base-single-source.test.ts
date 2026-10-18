@@ -9,7 +9,8 @@
  *   c) apiFetchData / apiFetch 等封装传字面 "/api/..." 绝对路径；
  *   d) SSE/流式各自拼 URL（§十）。
  *
- * 基线白名单（文件级登记）：当前实测 95 个既有违规文件，全部登记如下。
+ * 基线白名单（文件级登记）：清单内容为准，本注释不写死计数（改前写「实测 95 个」而
+ * 实数组 101 枚，注释与代码漂移本身就是一种假绿——以 `new Set([...]).size` 实跑为准）。
  * 属主 W206/B 批（任务 #119）按域渐进收敛为经 httpClient 的相对路径或
  * `import { API_BASE } from ".../httpClient"`；参照 R-55②/H6-T5 口径
  * **清单只减不增**——新增文件即红，禁止扩充本清单来豁免新违规。
@@ -17,6 +18,10 @@
  * 已改由 API_BASE 派生，WorldModelViewer.tsx 两处裸 fetch + `j.data.data` 手拆信封
  * 改走 apiFetchData（§5.3 唯一解包点）。aiworkbench/api.ts 流式点同批改用
  * API_BASE，但因存量 24 处其他字面暂留基线。
+ * 2026-10-18 #143/B5-6 收口减 4：services/dict.ts（私设 API_BASE + 裸 fetch + 不带
+ * Authorization）、services/glossary.ts（私设基址 + 自留 pickTraceId/拆信封）、
+ * api/dictConfigClient.ts、pages/Guardrails/constants.ts 四处基址改由 API_BASE 派生；
+ * 同批消 pages/workbench/NewScenarioModal.tsx 一处 HEAD 既有红（该文件从未入基线）。
  */
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
@@ -33,7 +38,6 @@ const CANONICAL = 'services/httpClient.ts';
 const BASELINE = new Set([
   'api/agentClient.ts',
   'api/dataClient.ts',
-  'api/dictConfigClient.ts',
   'api/iamClient.ts',
   'api/knowledgeClient.ts',
   'api/monitorClient.ts',
@@ -47,7 +51,6 @@ const BASELINE = new Set([
   'pages/DataAssetsDashboard.tsx',
   'pages/DataLineage.tsx',
   'pages/EngineMonitor.tsx',
-  'pages/Guardrails/constants.ts',
   'pages/MonitoringCenter.tsx',
   'pages/OntologyObjectBrowser.tsx',
   'pages/ProjectTracker.tsx',
@@ -112,9 +115,7 @@ const BASELINE = new Set([
   'services/copilotApi.ts',
   'services/dataCatalogClient.ts',
   'services/datanetMetadataApi.ts',
-  'services/dict.ts',
   'services/gitService.ts',
-  'services/glossary.ts',
   'services/knowledgeNavApi.ts',
   'services/knowledgeQueryApi.ts',
   'services/ontology/ontologyDataApi.ts',

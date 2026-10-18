@@ -191,9 +191,12 @@ export const NO_ACCESS_ERROR_NAME = "NoAccessError";
  */
 export class NoAccessError extends Error {
   status = 403;
-  constructor(message = "You do not have permission to access this resource.") {
+  /** 传输层追踪号（响应头优先，见 pickTraceId 单源口径）；无号时保持 undefined，不补假值 */
+  traceId?: string;
+  constructor(message = "You do not have permission to access this resource.", init?: { traceId?: string }) {
     super(message);
     this.name = NO_ACCESS_ERROR_NAME;
+    this.traceId = init?.traceId;
   }
 }
 
@@ -223,6 +226,92 @@ export function notifyNoAccess(detail?: { path?: string; status?: number }): voi
  */
 export function isNoAccessError(e: unknown): e is NoAccessError {
   return e instanceof NoAccessError;
+}
+
+// ── traceId 单源（#143/B5-6；差距台账 篇13-15 「httpClient 无 traceId」腿）──
+
+/** 后端信封里可能带追踪号的形态（成功/失败均可能为 null，禁把 null 当 0 号） */
+interface TraceBearingBody {
+  traceId?: string | null;
+}
+
+/**
+ * 追踪号提取唯一口径：响应头优先（X-Request-Id / X-Trace-Id / X-ECOS-Trace-Id），其次信封 traceId。
+ * `headers` 用可选链读取：取号只是错误归因的辅助面，绝不能因为拿不到头就把传输层错误
+ * 本身吞掉（改前此处裸取，遇到无 headers 的 Response 桩/异常响应对象会抛 TypeError，
+ * 页面拿到的是「解析崩溃」而不是 500/404 + traceId）。
+ */
+export function pickTraceId(res: Response, body?: TraceBearingBody | null): string | undefined {
+  const header =
+    res.headers?.get("X-Request-Id") ??
+    res.headers?.get("X-Trace-Id") ??
+    res.headers?.get("X-ECOS-Trace-Id");
+  if (header) return header;
+  const envelope = body?.traceId;
+  return typeof envelope === "string" && envelope !== "" ? envelope : undefined;
+}
+
+/**
+ * 失败响应体尽力解析为信封：错误响应可能不是 JSON（网关 HTML/纯文本），
+ * 解析不出时返回 null——「拿不到追踪号」与「后端没给追踪号」都不能被当成一个号。
+ */
+function parseEnvelope(text: string): TraceBearingBody | null {
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as TraceBearingBody) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 传输层业务/HTTP 错误统一形态：在 `message` 之外透出 `traceId` 与 `httpStatus`，
+ * 使页面不必为拿追踪号各自拆信封（旧形态是 glossary/cognitiveClient 各写一份
+ * `pickTraceId`，一处改口径另一处就悄悄漂移）。
+ *
+ * <p>兼容性红线：既有消费者读 `e.message` 与 `e.status`（`isErrorResponse` 按
+ * `status` 数字分 http/unknown），故这里 `status` 与 `httpStatus` 同值双写，
+ * 不改既有判别面。</p>
+ */
+export class ApiRequestError extends Error {
+  readonly traceId?: string;
+  readonly httpStatus?: number;
+  /** 与 httpStatus 同值，供既有 `isErrorResponse` / `(e as {status}).status` 消费者读取 */
+  readonly status?: number;
+
+  constructor(message: string, init?: { traceId?: string; httpStatus?: number }) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.traceId = init?.traceId;
+    this.httpStatus = init?.httpStatus;
+    this.status = init?.httpStatus;
+  }
+}
+
+/**
+ * 页面侧取错误摘要（文案 + 追踪号）的单源口径。
+ * 非 ApiRequestError/NoAccessError（如网络层 NetworkError、TypeError）时 traceId 为
+ * undefined——界面不补假值，也不把「拿不到号」渲染成「没有号」。
+ */
+export function readApiError(e: unknown): { message: string; traceId?: string; status?: number } {
+  const message = (() => {
+    if (e instanceof Error) return e.message;
+    // 非 Error 抛出物（拦截器/代理层转发的裸对象）常带 message 字段，直接 String() 只会
+    // 得到 "[object Object]"，页面错误态等于没文案
+    const bare = (e as { message?: unknown } | null)?.message;
+    return typeof bare === "string" && bare !== "" ? bare : String(e);
+  })();
+  if (e instanceof ApiRequestError) {
+    return { message, traceId: e.traceId, status: e.httpStatus };
+  }
+  if (e instanceof NoAccessError) {
+    return { message, traceId: e.traceId, status: e.status };
+  }
+  const legacyStatus = (e as { status?: unknown } | null)?.status;
+  return typeof legacyStatus === "number"
+    ? { message, status: legacyStatus }
+    : { message };
 }
 
 /** Encode query parameters for Tomcat UTF-8 compatibility */
@@ -259,8 +348,11 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   if (res.status === 401) handleAuthExpired();
   if (res.status === 403) notifyNoAccess({ path });
   if (!res.ok) {
-    if (res.status === 403) throw new NoAccessError(`API ${path} forbidden`);
-    throw new Error(`API ${path} returned ${res.status}`);
+    if (res.status === 403) throw new NoAccessError(`API ${path} forbidden`, { traceId: pickTraceId(res) });
+    throw new ApiRequestError(`API ${path} returned ${res.status}`, {
+      httpStatus: res.status,
+      traceId: pickTraceId(res),
+    });
   }
   notifyNetworkUp();
   return res.json();
@@ -287,16 +379,19 @@ export async function apiFetchData<T>(url: string, options?: RequestInit): Promi
   if (res.status === 403) notifyNoAccess({ path: url });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    if (res.status === 403) throw new NoAccessError(text || `HTTP 403`);
-    const err = new Error(text || `HTTP ${res.status}`) as Error & { status?: number };
-    err.status = res.status;
-    throw err;
+    const traceId = pickTraceId(res, parseEnvelope(text));
+    if (res.status === 403) throw new NoAccessError(text || `HTTP 403`, { traceId });
+    throw new ApiRequestError(text || `HTTP ${res.status}`, { httpStatus: res.status, traceId });
   }
-  const json = await res.json();
-  if (json.success === false) throw new Error(json.message || "Request failed");
-  if (json.code && json.code !== 200 && json.code !== 0) throw new Error(json.message || `Error ${json.code}`);
+  const json = (await res.json()) as TraceBearingBody & { code?: number; message?: string; success?: boolean; data?: unknown };
+  if (json.success === false) {
+    throw new ApiRequestError(json.message || "Request failed", { traceId: pickTraceId(res, json) });
+  }
+  if (json.code && json.code !== 200 && json.code !== 0) {
+    throw new ApiRequestError(json.message || `Error ${json.code}`, { traceId: pickTraceId(res, json) });
+  }
   notifyNetworkUp();
-  return json.data !== undefined ? json.data : json;
+  return (json.data !== undefined ? json.data : json) as T;
 }
 
 /**
@@ -320,8 +415,8 @@ export async function doFetch(url: string, opts: RequestInit = {}): Promise<any>
     if (r.status === 401) handleAuthExpired();
     if (r.status === 403) notifyNoAccess({ path: url });
     if (!r.ok) {
-      if (r.status === 403) throw new NoAccessError(`HTTP 403 on ${url}`);
-      throw new Error(`${r.status}`);
+      if (r.status === 403) throw new NoAccessError(`HTTP 403 on ${url}`, { traceId: pickTraceId(r) });
+      throw new ApiRequestError(`${r.status}`, { httpStatus: r.status, traceId: pickTraceId(r) });
     }
     const ct = r.headers.get('content-type');
     const body = ct && ct.includes('application/json') ? await r.json() : null;

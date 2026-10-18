@@ -6,7 +6,7 @@
  * @license SPDX-License-Identifier: Apache-2.0
  */
 
-const API_BASE = '/api/v1/dict';
+import { API_BASE, apiFetchData } from "./httpClient";
 
 // ── Types ─────────────────────────────────────────────
 
@@ -51,32 +51,15 @@ export interface DictTableListResult {
   total: number;
 }
 
-// ── ApiResponse ───────────────────────────────────────
+// ── ApiResponse 拆解与传输一律经 services/httpClient 单源（#143/B5-6）──
+// 改前本文件私设 `const API_BASE = '/api/v1/dict'` 并自留 fetch + 拆信封腿，
+// 且请求不带 Authorization（后端 auth 通道下这类调用只可能 401）。
 
-interface ApiResponse<T> {
-  code: number;
-  message?: string;
-  data?: T;
-  timestamp?: number;
-}
+/** 基址由 httpClient#API_BASE 派生（W206/C188 基址单源，禁本文件再写字面 "/api"） */
+const DICT_BASE = `${API_BASE}/v1/dict`;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-
-  if (!res.ok) {
-    throw new Error(`Dict API ${path} returned HTTP ${res.status}`);
-  }
-
-  const body = await res.json() as ApiResponse<T>;
-
-  if (body.code !== 0) {
-    throw new Error(body.message || `API error code=${body.code}`);
-  }
-
-  return body.data as T;
+  return apiFetchData<T>(`${DICT_BASE}${path}`, options);
 }
 
 // ── Table CRUD ────────────────────────────────────────

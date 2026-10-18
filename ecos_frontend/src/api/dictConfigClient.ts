@@ -2,7 +2,7 @@
  * dictConfigClient.ts — src/api.ts 按域拆分产物（design-05 B.9-1 / X-50 / F05-17）。
  * 经 src/api.ts re-export shim 保持既有 from "../api" 导入面零破坏。
  */
-import { apiFetch, apiFetchData } from "../services/httpClient";
+import { API_BASE, apiFetch, apiFetchData } from "../services/httpClient";
 
 // ── System Config Manager ────────────────────────────────────
 
@@ -133,7 +133,8 @@ export interface DictItem {
   updatedAt: string;
 }
 
-const DICT_BASE = '/api/v1/system/dict';
+/** 基址由 httpClient#API_BASE 派生（W206/C188 基址单源；改前此处私设字面前缀） */
+const DICT_BASE = `${API_BASE}/v1/system/dict`;
 
 /** GET /api/v1/system/dict/types — 获取所有字典类型 */
 export async function listDictTypes(): Promise<DictType[]> {

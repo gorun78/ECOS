@@ -14,7 +14,7 @@ import Modal from '../../components/common/Modal';
 import LucideIcon from '../../components/LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
-import { apiFetchData } from '../../api';
+import { API_BASE, apiFetchData } from '../../api';
 import { showToastGlobal } from '../../components/common/Toast';
 import logger from '../../services/logger';
 
@@ -29,6 +29,9 @@ const TEMPLATE_PRESETS: Record<NewSceneTpl, { goal: string; caliber: string }> =
 interface CreatedScenarioVO {
   id?: string;
 }
+
+/** 创建端点完整 URL：前缀由 httpClient#API_BASE 单源派生（W206/C188 基址单源） */
+const SCENARIOS_URL = `${API_BASE}/v1/workspace/scenarios`;
 
 export default function NewScenarioModal({
   isOpen,
@@ -77,7 +80,7 @@ export default function NewScenarioModal({
     try {
       // DTO 口径 = 后端 ScenarioSaveDTO：name 必填；businessGoal 缺省回落 description；
       // status 缺省后端即 DRAFT，不假声明。
-      const created = await apiFetchData<CreatedScenarioVO>('/api/v1/workspace/scenarios', {
+      const created = await apiFetchData<CreatedScenarioVO>(SCENARIOS_URL, {
         method: 'POST',
         body: JSON.stringify({ name: trimmed, businessGoal: goal.trim() || undefined }),
       });

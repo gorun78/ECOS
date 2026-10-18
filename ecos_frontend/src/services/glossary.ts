@@ -8,13 +8,19 @@
  * 端点：/api/v1/ontology/glossary/**
  */
 
-import { getAuthToken } from "./auth";
+import {
+  API_BASE,
+  ApiRequestError,
+  NoAccessError,
+  apiFetchData,
+} from "./httpClient";
 import type {
   GlossaryFilter,
   GlossaryTerm as WorkbenchGlossaryTerm,
 } from "../types/workbench";
 
-const API_BASE = "/api/v1/ontology/glossary";
+/** 基址由 httpClient#API_BASE 派生（W206/C188 基址单源；改前本文件私设字面 "/api/v1/ontology/glossary"） */
+const GLOSSARY_BASE = `${API_BASE}/v1/ontology/glossary`;
 
 /** 词条类型枚举：本体实体 / 关系 / 指标 / 函数 / 概念 */
 export type GlossaryTermType = "ENTITY" | "RELATION" | "METRIC" | "FUNCTION" | "CONCEPT";
@@ -158,21 +164,16 @@ export interface GlossaryListResult {
   total: number;
 }
 
-interface ApiResponse<T> {
-  code: number;
-  message?: string;
-  data?: T;
-  timestamp?: number;
-  /** 后端卷 00 口径：追踪号，成功/失败均可能为 null */
-  traceId?: string | null;
-}
-
 /**
  * Glossary API 错误 — 在标准 Error 之外透出追踪号与 HTTP 状态。
  *
  * <p>检视报告 §4.3 行161 要求「加载失败 = 独立错误态 + 重试 + traceId」，而页面拿不到
  * 响应头就无法定位后端日志，故传输层必须把 traceId 随异常一起抛出。message 文案口径与
  * 旧实现完全一致（后端 message 优先），既有调用方只读 e.message，零行为变化。</p>
+ *
+ * <p>#143/B5-6 起本类不再自行取号：追踪号由 httpClient 传输层单源
+ * （`pickTraceId`）随 `ApiRequestError`/`NoAccessError` 抛出，此处只做域内错误类型
+ * 回映射，保住 `GlossaryApiError` 这一既有判别面。</p>
  */
 export class GlossaryApiError extends Error {
   /** 追踪号（响应头 X-Request-Id / X-Trace-Id，兜底响应体 traceId） */
@@ -188,19 +189,6 @@ export class GlossaryApiError extends Error {
   }
 }
 
-/** 追踪号提取口径与 services/cognitiveClient.ts 一致：响应头优先，其次响应体 traceId */
-function pickTraceId(res: Response, body: ApiResponse<unknown> | null): string | undefined {
-  const header =
-    res.headers.get("X-Request-Id") ??
-    res.headers.get("X-Trace-Id") ??
-    res.headers.get("X-ECOS-Trace-Id");
-  if (header) {
-    return header;
-  }
-  const envelope = body?.traceId;
-  return typeof envelope === "string" && envelope !== "" ? envelope : undefined;
-}
-
 /**
  * 页面侧取错误摘要（文案 + 追踪号）的唯一口径，避免各面板重复 instanceof 判定。
  * 非 GlossaryApiError（如 TypeError 网络异常）时 traceId 为 undefined，界面不补假值。
@@ -213,41 +201,22 @@ export function readGlossaryError(e: unknown): { message: string; traceId?: stri
 }
 
 /**
- * 统一请求封装：带 Bearer token，解 ApiResponse 包装，业务错误透出后端 message。
+ * 统一请求封装：传输与信封拆解走 httpClient#apiFetchData（基址单源 + token 单源 +
+ * traceId 单源），本层只把传输层错误回映射为 `GlossaryApiError` 以保住页面侧既有
+ * 的 `instanceof` 与 `readGlossaryError` 口径。
  */
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  // auth 单源（X-51）：token 一律经 services/auth.ts#getAuthToken() 读取
-  const token = getAuthToken();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  const res = await fetch(`${API_BASE}${path}`, { headers, ...options });
-
-  // 优先读取响应体，保证业务错误（HTTP 可能仍为 200）能拿到后端 message
-  let body: ApiResponse<T> | null = null;
   try {
-    body = (await res.json()) as ApiResponse<T>;
-  } catch {
-    body = null;
+    return await apiFetchData<T>(`${GLOSSARY_BASE}${path}`, options);
+  } catch (e) {
+    if (e instanceof ApiRequestError) {
+      throw new GlossaryApiError(e.message, { traceId: e.traceId, httpStatus: e.httpStatus });
+    }
+    if (e instanceof NoAccessError) {
+      throw new GlossaryApiError(e.message, { traceId: e.traceId, httpStatus: e.status });
+    }
+    throw e;
   }
-
-  const traceId = pickTraceId(res, body);
-
-  if (body && typeof body.code === "number" && body.code !== 0) {
-    throw new GlossaryApiError(body.message || `API error code=${body.code}`, {
-      traceId,
-      httpStatus: res.status,
-    });
-  }
-  if (!res.ok) {
-    throw new GlossaryApiError(
-      body?.message || `Glossary API ${path} returned HTTP ${res.status}`,
-      { traceId, httpStatus: res.status },
-    );
-  }
-
-  return body?.data as T;
 }
 
 /** 组装查询串（自动忽略空值） */
