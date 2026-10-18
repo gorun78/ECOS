@@ -550,6 +550,8 @@
   "platform.alert.wsError": "Realtime push connection error",
   "platform.alert.wsDisconnected": "WebSocket disconnected",
   "platform.alert.wsRetry": "Reconnect",
+  "platform.alert.pushNotWired": "Realtime push not wired: no backend publisher on /topic/alerts and /ws is SockJS-only",
+  "platform.alert.restNotWired": "Not exposed by backend: alert rules / history / test-trigger have no REST mapping",
   "platform.alert.ackFail": "Ack failed",
   "platform.alert.createFail": "Create rule failed",
   "platform.alert.deleteFailed": "Delete failed",

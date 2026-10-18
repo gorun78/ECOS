@@ -1,9 +1,14 @@
 /**
- * P2-6 AlertPanel — 实时告警面板：规则管理 + 触发 + 历史 + WebSocket 实时推送
- * Connected to: /api/alerts/*, WebSocket /ws → /topic/alerts
+ * P2-6 AlertPanel — 告警面板：规则 + 历史 + 确认动作
+ *
+ * <p>承流现状（台账 D-B5-32，2026-10-19 源级取证）：`/api/alerts/rules`、`/history`、
+ * `/test` 三族后端零映射，`/api/alerts` 列表是恒空壳、详情与 ack 自回 notFound；
+ * 实时推送亦未接线（gateway `WebSocketConfig` 的 `/ws` 只开 SockJS，且全仓无
+ * `/topic/alerts` 发布者，dev/BFF 也无 ws 代理）。故本面板一律显式呈现「未承流 /
+ * 未接线」，不以任何空列表或静默成功冒充可用。</p>
  */
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Bell, AlertTriangle, CheckCircle2, XCircle, RefreshCw, Zap, History, Trash2, Plus, WifiOff } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { Bell, AlertTriangle, CheckCircle2, XCircle, RefreshCw, Zap, History, Trash2, Plus } from "lucide-react";
 import { useLanguage } from "../pages/../components/LanguageContext";
 import { useTheme } from "../pages/../components/ThemeContext";
 import ConfirmDialog from "./common/ConfirmDialog";
@@ -15,6 +20,7 @@ import {
   alertAck,
   alertCreateRule,
   alertDeleteRule,
+  AlertApiError,
 } from "../services/alertsApi";
 
 interface AlertRule {
@@ -45,106 +51,50 @@ export default function AlertPanel() {
 
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [history, setHistory] = useState<AlertRecord[]>([]);
-  const [liveAlerts, setLiveAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notWired, setNotWired] = useState(false);
   const [testValue, setTestValue] = useState("50");
   const [showNewRule, setShowNewRule] = useState(false);
   const [newRule, setNewRule] = useState({ name: "", metric: "", operator: "<", threshold: "80", level: "WARN" });
   const [pendingDelete, setPendingDelete] = useState<{ id: number; name: string } | null>(null);
-  const [wsDegraded, setWsDegraded] = useState(false);
-  const [wsError, setWsError] = useState("");
-  const stompRef = useRef<any>(null);
-  const wsAvailable = useRef(true);
 
-  // ── Fetch rules + history ────────────────
+  // ── Fetch rules + history（逐腿独立归类，未承流≠空列表）────
+  /**
+   * 「后端未承流」只由 `ENDPOINT_NOT_WIRED` 触发（真实 404 与 200 包壳 `code:404` 已在
+   * alertsApi 同码归一）。业务失败（如信封 `code:-1` 系统错）不得冒充未承流横幅。
+   */
+  const isNotWired = (e: unknown): boolean => e instanceof AlertApiError && e.code === "ENDPOINT_NOT_WIRED";
+
+  const rowsOf = (payload: unknown): unknown[] => (Array.isArray(payload) ? payload : []);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    try {
-      const [rData, hData] = await Promise.all([
-        fetchAlertRules(),
-        fetchAlertHistory(20),
-      ]);
-      setRules(rData?.data || []);
-      setHistory(hData?.data || []);
-    } catch (e: any) {
-      setError(e?.message || t("platform.alert.loadFail"));
-    } finally {
-      setLoading(false);
+    setError("");
+    const settled = await Promise.allSettled([fetchAlertRules(), fetchAlertHistory(20)]);
+    const [rRes, hRes] = settled;
+    if (rRes.status === "fulfilled") setRules(rowsOf(rRes.value) as AlertRule[]);
+    else setRules([]);
+    if (hRes.status === "fulfilled") setHistory(rowsOf(hRes.value) as AlertRecord[]);
+    else setHistory([]);
+    const failures = settled.filter((s) => s.status === "rejected") as PromiseRejectedResult[];
+    if (failures.length > 0) {
+      setNotWired(failures.every((f) => isNotWired(f.reason)));
+      const first = failures.find((f) => !isNotWired(f.reason)) ?? failures[0];
+      const msg = first.reason instanceof Error ? first.reason.message : String(first.reason);
+      setError(`${t("platform.alert.loadFail")}: ${msg}`);
+    } else {
+      setNotWired(false);
     }
-  }, []);
-
-  useEffect(() => { fetchAll(); }, [fetchAll]);
-
-  // ── WebSocket connection ──────────────────
-  const connectWs = useCallback((auto: boolean) => {
-    try {
-      if (!wsAvailable.current) return;
-      // Same-origin as the frontend (vite dev server / BFF), no hardcoded :8080
-      const wsBase = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host;
-      const socket = new WebSocket(wsBase + "/ws");
-
-      socket.onopen = () => {
-        setWsDegraded(false);
-        setWsError("");
-        // Subscribe to alerts topic via STOMP-like frame
-        socket.send("SUBSCRIBE\nid:sub-0\ndestination:/topic/alerts\n\n\0");
-      };
-
-      socket.onmessage = (event: MessageEvent) => {
-        const msg = event.data as string;
-        const isStompFrame = /^[A-Z]+ /.test(msg);
-        // Strip STOMP frame header; drop control frames (e.g. +OK heartbeats)
-        const rawFrame = msg.split("\n\n").pop() ?? msg;
-        const body = rawFrame.replace("\u0000", "");
-        if (isStompFrame && !body) return;
-        let alert: { ruleName?: unknown };
-        try {
-          alert = JSON.parse(isStompFrame ? body : msg);
-        } catch {
-          // Non-JSON control frame (e.g. STOMP +OK) — nothing to surface
-          return;
-        }
-        if (alert && (alert as { ruleName?: string }).ruleName) {
-          setLiveAlerts(prev => [alert, ...prev].slice(0, 10));
-        }
-      };
-
-      socket.onerror = (e) => {
-        if (!wsAvailable.current) return;
-        setWsError(t("platform.alert.wsError"));
-        showToastGlobal("error", t("platform.alert.wsError"));
-        void e;
-      };
-
-      socket.onclose = () => {
-        if (!wsAvailable.current) return;
-        setWsDegraded(true);
-        // Reconnect after 5s
-        setTimeout(() => connectWs(true), 5000);
-      };
-
-      stompRef.current = socket;
-      void auto;
-    } catch {
-      setWsDegraded(true);
-      setWsError(t("platform.alert.wsError"));
-      showToastGlobal("error", t("platform.alert.wsError"));
-    }
+    setLoading(false);
   }, [t]);
 
-  useEffect(() => {
-    connectWs(true);
-    return () => {
-      wsAvailable.current = false;
-      if (stompRef.current) stompRef.current.close();
-    };
-  }, [connectWs]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
   // ── Actions ───────────────────────────────
   const triggerAlert = async (ruleId?: number) => {
     try {
-      const body: any = { metricValue: testValue };
+      const body: Record<string, unknown> = { metricValue: testValue };
       if (ruleId) body.ruleId = ruleId;
       await alertTest(body);
       fetchAll();
@@ -220,16 +170,10 @@ export default function AlertPanel() {
           </button>
         </div>
         <div className="flex-1" />
-        {(wsDegraded || wsError) && (
-          <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs border ${styles.warningBg} ${styles.warningText} ${styles.cardBorder}`}>
-            <WifiOff className="w-3 h-3" />
-            <span>{wsError ? wsError : t("platform.alert.wsDisconnected")}</span>
-            <button type="button" onClick={() => { wsAvailable.current = true; connectWs(true); }}
-              className={`px-1.5 rounded border text-[10px] font-medium ${styles.cardBorder} ${styles.cardText}`}>
-              {t("platform.alert.wsRetry")}
-            </button>
-          </div>
-        )}
+        <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs border shrink-0 ${styles.warningBg} ${styles.warningText} ${styles.cardBorder}`}>
+          <AlertTriangle className="w-3 h-3" />
+          <span>{t("platform.alert.pushNotWired")}</span>
+        </div>
         <button type="button" onClick={fetchAll} disabled={loading}
           className={`p-1.5 rounded border transition-all ${styles.cardBorder}`}>
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -238,6 +182,12 @@ export default function AlertPanel() {
 
       {error && (
         <div className="mb-3 px-3 py-2 rounded text-xs bg-red-500/10 border border-red-500/30 text-red-400 shrink-0">{error}</div>
+      )}
+
+      {notWired && (
+        <div className={`mb-3 px-3 py-2 rounded text-xs border shrink-0 ${styles.warningBg} ${styles.warningText} ${styles.cardBorder}`}>
+          {t("platform.alert.restNotWired")}
+        </div>
       )}
 
       {/* New Rule Modal */}
@@ -281,25 +231,6 @@ export default function AlertPanel() {
                 {t("common.cancel")}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Live Alerts (WebSocket) */}
-      {liveAlerts.length > 0 && (
-        <div className="mb-3 shrink-0">
-          <h4 className="text-xs font-semibold mb-1.5 opacity-70 flex items-center gap-1">
-            <Zap className="w-3 h-3 text-amber-400" />
-            {t("platform.alert.liveAlerts")} ({liveAlerts.length})
-          </h4>
-          <div className="space-y-1">
-            {liveAlerts.slice(0, 3).map((a, i) => (
-              <div key={i} className={`px-3 py-1.5 rounded text-xs border flex items-center gap-2 animate-pulse ${levelColor(a.level)}`}>
-                {levelIcon(a.level)}
-                <span className="flex-1 truncate">{a.message}</span>
-                <span className="text-[10px] opacity-60">{new Date(a.timestamp).toLocaleTimeString()}</span>
-              </div>
-            ))}
           </div>
         </div>
       )}

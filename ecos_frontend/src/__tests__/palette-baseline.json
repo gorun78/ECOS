@@ -63,7 +63,7 @@
  "pages/knowledge/tabs/KnowledgeRuleRepositoryTab.tsx": 13,
  "components/ontology-workbench/modals/CreateRelationshipModal.tsx": 13,
  "components/ontology-workbench/panels/DataPreviewPanel.tsx": 13,
- "components/AlertPanel.tsx": 13,
+ "components/AlertPanel.tsx": 12,
  "pages/business-workbench/BusinessObjectExplorerSidebar.tsx": 13,
  "pages/business-workbench/sidebar/SidebarAccordions.tsx": 13,
  "pages/dict/constants.ts": 13,

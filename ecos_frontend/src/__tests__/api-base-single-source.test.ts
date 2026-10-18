@@ -24,6 +24,8 @@
  * 同批消 pages/workbench/NewScenarioModal.tsx 一处 HEAD 既有红（该文件从未入基线）。
  * 2026-10-18 #143/B5-8 收口减 1：pages/data-workbench/api/_base.ts 三枚 /api 常量改由
  * API_BASE 派生（URL 逐字不变），同批该文件的 DW 共享 HTTP 四动词合流 apiFetchData 单源。
+ * 2026-10-19 #143/B5-11a 收口减 1：services/alertsApi.ts 六枚私设 fetch 腿整体重写为
+ * apiFetchEnvelope 单源通道，基址改由 API_BASE 派生（URL 逐字不变）。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -110,7 +112,6 @@ const BASELINE = new Set([
   'providers/graphqlClient.ts',
   'services/agentMeshApi.ts',
   'services/aiworkbenchApi.ts',
-  'services/alertsApi.ts',
   'services/auth.ts',
   'services/cognitiveClient.ts',
   'services/cognitiveEngineApi.ts',

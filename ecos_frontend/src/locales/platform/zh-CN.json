@@ -550,6 +550,8 @@
   "platform.alert.wsError": "实时推送连接异常",
   "platform.alert.wsDisconnected": "WebSocket 断连",
   "platform.alert.wsRetry": "重连",
+  "platform.alert.pushNotWired": "实时推送未接线：后端 /topic/alerts 无发布者，/ws 仅支持 SockJS",
+  "platform.alert.restNotWired": "后端未承流：告警规则 / 历史 / 试触发三族无 REST 映射",
   "platform.alert.ackFail": "确认告警失败",
   "platform.alert.createFail": "创建告警规则失败",
   "platform.alert.deleteFailed": "删除失败",
