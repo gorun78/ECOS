@@ -26,9 +26,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>怎么钉</b>：扫本模块 {@code src/test/java} 里的
  * {@code replayViaDecisionChain("<caseName>")} 调用点（正则容忍换行/缩进），
- * 与 oracle 单源的形态分区做集合比对；同时确认两个不可表达形态（带
+ * 与 oracle 单源的形态分区做集合比对；同时确认三个不可表达形态（带
  * {@code input.environment}）的例在 ai 侧消费者用例里仍被引用，
- * 防止"删了直连通道 ⇒ 两例从此无人回放"这种静默降覆盖。</p>
+ * 防止"删了直连通道 ⇒ 该例从此无人回放"这种静默降覆盖。
+ * {@code B4-3d-11} 新增的 {@code ai_tool_no_department_declared} 属于第三例，
+ * 分区随之由 2→3，总例数 14→15（可表达侧仍为 12，故覆盖率钉的分子不变）。</p>
  *
  * <p><b>本批实测到的门禁有效性问题</b>：首跑即抓到 {@code norole_ai} 报「无人回放」。
  * 它其实在 {@code OpaDenyTest} 里跑过，只是用例名由 {@code "norole_" + purpose} 拼接而来 ——
@@ -40,21 +42,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DecisionChainCoverageTest {
 
     @Test
-    @DisplayName("形态分区 — 12 例 /decision 可表达、2 例带 environment 不可表达")
-    void oraclePartitionIsExactlyTwelvePlusTwo() throws IOException {
+    @DisplayName("形态分区 — 12 例 /decision 可表达、3 例带 environment 不可表达")
+    void oraclePartitionIsExactlyTwelvePlusThree() throws IOException {
         List<OpaOracleReplaySupport.OracleCase> all = OpaOracleReplaySupport.cases();
-        assertEquals(14, all.size(), "oracle 单源例数变了 ⇒ 本覆盖率钉的基线须同批重算并登记");
+        assertEquals(15, all.size(), "oracle 单源例数变了 ⇒ 本覆盖率钉的基线须同批重算并登记");
 
         List<String> shaped = new ArrayList<>();
         List<String> unshaped = new ArrayList<>();
         for (OpaOracleReplaySupport.OracleCase c : all) {
             (c.decisionChainShaped() ? shaped : unshaped).add(c.name());
         }
-        assertEquals(12, shaped.size(), "走唯一入口的例数应为 9→12（本批 +3 例声明域）");
-        assertEquals(unshaped, List.of("ai_channel_inferred", "ai_channel_no_department").stream()
+        assertEquals(12, shaped.size(), "走唯一入口的例数应为 9→12（B4-3d-3 +3 例声明域）");
+        assertEquals(unshaped, List.of("ai_channel_inferred", "ai_channel_no_department",
+                        "ai_tool_no_department_declared").stream()
                         .filter(unshaped::contains).toList(),
-                "不可表达形态只能是通道推断两例（带 input.environment，/decision 不发该段）");
-        assertEquals(2, unshaped.size());
+                "不可表达形态只能是 AI 通道三例（带 input.environment，/decision 不发该段）");
+        assertEquals(3, unshaped.size());
     }
 
     @Test
@@ -93,6 +96,8 @@ class DecisionChainCoverageTest {
                 .toList();
         assertEquals(List.of("dept_ai", "proj_ai_p1", "proj_ai_p2"), scoped,
                 "声明域的三例必须都能经唯一入口表达（否则 D-B4-20 未收口）");
+        // 第四例 ai_tool_no_department_declared 也带 resource.dataScope，但它是生产工具形态
+        // （带 environment.channel=AGENT），按 D-B4-30 之前的现状不走 /decision —— 有意不入本清单。
     }
 
     @Test
@@ -154,7 +159,7 @@ class DecisionChainCoverageTest {
     }
 
     @Test
-    @DisplayName("两个通道推断例仍被 ai 侧消费者用例引用（降覆盖防护）")
+    @DisplayName("三个 environment 形态例仍被 ai 侧消费者用例引用（降覆盖防护）")
     void environmentShapedCasesStayCoveredOnAiSide() throws IOException {
         String aiTest = Files.readString(OpaOracleReplaySupport.repoFile(
                 "ecos_backend/engine/ai-engine/ai-engine-impl/src/test/java/"
@@ -162,5 +167,9 @@ class DecisionChainCoverageTest {
                 StandardCharsets.UTF_8);
         assertTrue(aiTest.contains("ai_channel_inferred"), "ai_channel_inferred 失去属主用例");
         assertTrue(aiTest.contains("ai_channel_no_department"), "ai_channel_no_department 失去属主用例");
+        // #142/B4-3d-11：这一格是 D-B4-29 唯一能被真引擎证伪的形态（生产工具载荷 + 主体域已解析），
+        // 只挂在 ai 侧消费者用例上 —— 属主一旦被删，矩阵会静默退回"没人证明 p1 域内可达"。
+        assertTrue(aiTest.contains("ai_tool_no_department_declared"),
+                "ai_tool_no_department_declared 失去属主用例");
     }
 }

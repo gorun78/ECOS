@@ -58,7 +58,10 @@ class AiGuardrailVerdictFromOracleTest {
             "dept_ai", AiSecurityEngineClient.V_ALLOW,
             "norole_ai", AiSecurityEngineClient.V_DENY,
             "ai_channel_inferred", AiSecurityEngineClient.V_ALLOW,
-            "ai_channel_no_department", AiSecurityEngineClient.V_DENY);
+            "ai_channel_no_department", AiSecurityEngineClient.V_DENY,
+            // #142/B4-3d-11：生产 AI 工具载荷形态（ToolAdjudicationRequest 只投影 projectIds）。
+            // DENY 是本批登记的现状而非认可的终态 —— 域内可达性由 D-B4-30/D-B4-36 的服务端真值解析关掉。
+            "ai_tool_no_department_declared", AiSecurityEngineClient.V_DENY);
 
     @Test
     @DisplayName("AI 列三态 — 矩阵期望与 oracle 录制态交叉核对后逐例判定")
@@ -88,6 +91,18 @@ class AiGuardrailVerdictFromOracleTest {
         assertEquals(AiSecurityEngineClient.V_DENY, AiSecurityEngineClient.verdictOf(data));
         assertEquals("AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT", firstDeniedReason(data),
                 "横向越权的违规名必须能在 AI 侧被记录（审计/告警据此定位 rego 里的 violation）");
+    }
+
+    @Test
+    @DisplayName("理由码诚实化 — 生产工具形态落 AI_DEPARTMENT_NOT_DECLARED，禁冒充跨域（D-B4-29）")
+    void undeclaredDepartmentHasItsOwnReasonCode() throws IOException {
+        Map<String, Object> data = dataSegmentOf(caseByName("ai_tool_no_department_declared"));
+
+        assertEquals(AiSecurityEngineClient.V_DENY, AiSecurityEngineClient.verdictOf(data));
+        assertEquals("AI_DEPARTMENT_NOT_DECLARED", firstDeniedReason(data),
+                "「载荷从未声明域」与「声明的域不是自己的域」是两件事：折叠成一个码会让运维对着"
+                        + "一个从未声明域的工具调用去查这个人的跨域行为，方向从根上就错"
+                        + "（与 §4.5.4「不可用 ≠ 无权限」、D-B4-26 同一条纪律的第三种形态）");
     }
 
     @Test

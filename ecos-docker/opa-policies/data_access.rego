@@ -109,13 +109,27 @@ violation["AI_SUBJECT_DEPARTMENT_UNRESOLVED"] {
 	subject_department == ""
 }
 
+# 载荷带了项目集却没声明所属域 ⇒ 无法做横向比对（生产 AI 工具形态：白名单只投影 projectIds）。
+# 禁与下一条合并成一个理由码：「没声明」是载荷缺陷（由服务端真值解析关闭，D-B4-29/36），
+# 「声明了但不是自己的域」才是越权。折叠后运维会对着一个从未声明域的调用去查这个人的跨域行为。
+violation["AI_DEPARTMENT_NOT_DECLARED"] {
+	has_data_role
+	not is_finance
+	purpose == "ai"
+	count(requested_project_ids) > 0
+	subject_department != ""
+	requested_department == ""
+}
+
 # 跨部门请求域 = 横向越权（矩阵 p1 ALLOW / p2 DENY 的判据）
+# 前置 requested_department != "" 把"键缺失/空串"划给上一条，本条只判真越权。
 violation["AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT"] {
 	has_data_role
 	not is_finance
 	purpose == "ai"
 	count(requested_project_ids) > 0
 	subject_department != ""
+	requested_department != ""
 	requested_department != subject_department
 }
 

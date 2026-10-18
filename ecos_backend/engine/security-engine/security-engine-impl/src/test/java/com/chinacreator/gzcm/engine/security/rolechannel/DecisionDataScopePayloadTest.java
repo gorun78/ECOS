@@ -23,7 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code OpaProjOwnerTest}/{@code OpaDeptTest} 的 oracle 回放断 —— 分工的理由：
  * 回放用例的可比性钉要求"发出形态＝录制形态"，而本批新增的四种上下文组合
  * （声明两键/只声明域/只声明项目集/完全不声明）里只有两键态在 oracle 里有记录，
- * 其余三态若强行录进 oracle 就得改策略单源文件并重录全部 14 例，代价与本断言收益不称。</p>
+ * 其余三态若强行录进 oracle 就得改策略单源文件并重录全部 oracle 例（本批落地时 14 例，
+ * B4-3d-11 起为 15 例），代价与本断言收益不称。</p>
  *
  * <p><b>能变红的点</b>：删掉 {@code safeOpa} 里写 {@code resource} 的三行 ⇒ 例 1/2/3 红；
  * 把"未声明也写空段"改回去 ⇒ 例 4 红；把 {@code subject.department} 的归一去掉 ⇒ 例 5 红。</p>

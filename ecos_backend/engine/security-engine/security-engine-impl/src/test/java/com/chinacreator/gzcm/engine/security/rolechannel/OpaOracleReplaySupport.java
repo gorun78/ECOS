@@ -31,7 +31,7 @@ import java.util.TreeSet;
  * OPA fail-close 是登记在册的基线态）。因此本批采取的手段是：
  * <ol>
  *   <li>策略源唯一落在仓内 {@code ecos-docker/opa-policies/data_access.rego}；</li>
- *   <li>用<b>真 Rego 引擎</b>（容器内 {@code /opa eval}，只读、离线）对 14 组输入求值，
+ *   <li>用<b>真 Rego 引擎</b>（容器内 {@code /opa eval}，只读、离线）对 15 组输入求值，
  *       逐字录制进 {@code data_access_oracles.json}（含 {@code serverBody}＝OPA HTTP 应答原文、
  *       {@code opaVersion}、求值命令、策略文件 SHA-256）；</li>
  *   <li>Java 用例把 {@code serverBody} 原样喂给<b>生产</b> {@code OpaPolicyService}

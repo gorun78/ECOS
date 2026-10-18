@@ -62,6 +62,15 @@ const CASES = [
   {name: 'ai_channel_no_department', input: {action: 'TOOL_CALL:forecast.drilldown',
     subject: {userId: 'u-p1', roles: ['project_owner', 'non_finance'], department: ''},
     resource: {dataScope: {departmentId: 'd01', projectIds: ['p1']}}, environment: {channel: 'AGENT'}}},
+  // #142/B4-3d-11（D-B4-29）：生产 AI 工具载荷的真实形态 —— ToolAdjudicationRequest 只投影
+  // projectIds（departmentId 不在白名单，且不得进白名单，理由见该类的信任边界注释），
+  // 主体域由 token 解析出非空值。此前这一格在策略侧落 AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT
+  // ＝把"载荷没声明域"说成"这人跨域"，理由与事实不符；oracle 里没有这一格，
+  // 所以缺陷只在 dev 生产链上暴露、录制面看不见。本例把它钉进单源。
+  {name: 'ai_tool_no_department_declared', input: {action: 'TOOL_CALL:sql_query_tool',
+    subject: {userId: 'u-p1', roles: ['project_owner', 'non_finance'], department: 'd01', tenantId: 't-demo'},
+    resource: {dataScope: {projectIds: ['p1']}},
+    environment: {traceId: 'trace-oracle', channel: 'AGENT', timestamp: '2026-10-17T00:00:00Z'}}},
 ];
 
 /**
@@ -120,7 +129,7 @@ const rows = CASES.map((c) => {
 });
 
 if (rows.every((r) => r.allow === false)) {
-  throw new Error('14 例全为 allow=false —— 整批拒绝通常不是策略结论而是求值面失效，拒绝写出');
+  throw new Error(`${rows.length} 例全为 allow=false —— 整批拒绝通常不是策略结论而是求值面失效，拒绝写出`);
 }
 
 const sha = createHash('sha256').update(fs.readFileSync(REGO)).digest('hex');

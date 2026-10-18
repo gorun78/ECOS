@@ -102,14 +102,21 @@ public final class ToolAdjudicationRequest {
      * 资源段写出：{@code dataScope} 的键面<b>委托</b> {@link DataScopeContract} 单源
      * （#142/B4-3d-3，D-B4-20 的第二套字面量消除）。
      *
-     * <p><b>钉现状（非认可，差距 D-B4-29）</b>：本段只声明 {@code projectIds}（与策略不读的
-     * {@code periods}），<b>从不声明</b> {@code departmentId} —— {@link Resource} 里就没有这个字段，
-     * 工具入参白名单里也没有。后果是 §4.7.2 的 AI p1「域内 ALLOW」在生产工具形态下
-     * <b>不可达</b>：策略侧 {@code requested_department} 取默认 {@code ""}，与已解析的
-     * {@code subject_department} 不等 ⇒ 落 {@code AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT}，
-     * 明明域内却按越权拒。本批刻意<b>不</b>顺手补该字段：补了就得同时给"声明域从哪来"
-     * 定单源（场景上下文 or 主体所属域），否则等于把一条未裁决的语义写进生产载荷。
-     * 有 {@code ToolPayloadDataScopeNailTest} 的一条特征化用例在此钉住，改动必与裁决同批。</p>
+     * <p><b>不声明 {@code departmentId} 是授权边界，不是待补的缺口（#142/B4-3d-11 订正
+     * D-B4-29 的定性，可达性缺口另号为 D-B4-36）</b>：{@link Resource} 没有该字段、
+     * 工具入参白名单也不含它 —— 而 SQL 类工具的执行腿
+     * （{@code ToolExecutorService#executeSql} → {@code queryForList}）没有任何 RLS 行级下推，
+     * 只有只读地板 + 表白名单 + CLS 列面。于是策略里的「声明域 vs 主体域」比对，
+     * 在这条通道上是<b>唯一的行范围闸</b>。若把它放进调用方（= LLM 可控）的白名单，
+     * 等于让被裁决者自己申报裁决依据 ⇒ 一行 {@code "departmentId": "<任意域>"} 即可越域。
+     * 因此本字段<b>只允许由服务端真值解析产出</b>（前置 D-B4-30 裁决腿并入 {@code /decision}、
+     * D-B4-36 声明域单源落地），且落地时须由该批把白名单的来源约束一起写明。</p>
+     *
+     * <p><b>后果（如实登记，非认可）</b>：§4.7.2 的 AI p1「域内 ALLOW」在生产工具形态下暂不可达；
+     * 策略侧自 B4-3d-11 起落的是诚实理由码 {@code AI_DEPARTMENT_NOT_DECLARED}
+     * （旧形态误标为横向越权 {@code AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT}）。
+     * 有 {@code ToolPayloadDataScopeNailTest} 两条钉守着：白名单加成员即刻变红，
+     * 调用方自报字段必须被丢弃。</p>
      */
     private Map<String, Object> resourceMap() {
         Map<String, Object> m = new LinkedHashMap<>();

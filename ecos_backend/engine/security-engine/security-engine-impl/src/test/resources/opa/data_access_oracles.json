@@ -2,11 +2,11 @@
   "_provenance": {
     "note": "录制型 oracle —— 逐字取自本仓 data_access.rego 在真 Rego 引擎（dev 容器 ecos-opa 的 /opa）上的求值结果；serverBody 是 OPA server 对文档查询 POST /v1/data/ecos/data_access 的应答形态。Java 侧用例据此断言裁决链，禁手工编辑本文件：改了 rego 必须用同目录 record_data_access_oracles.mjs 重录。",
     "policySource": "ecos-docker/opa-policies/data_access.rego",
-    "policySha256": "6b7ab680d6a7e061f4db7a5d1a5ef7f7c6441b9ea0ed51b1453d40590c1f099c",
+    "policySha256": "bd95a3df5d182305dbcebf2dee50dc19ad350a28212c5a36d9d2d534f114a75d",
     "opaVersion": "Version: 0.63.0\nBuild Commit: bb30b153692aa77738b982e29424c8b24a1ad14a\nBuild Timestamp: 2024-03-28T15:50:15Z\nBuild Hostname: 63421a8c0453\nGo Version: go1.22.1\nPlatform: linux/amd64\nWebAssembly: available",
     "command": "printf '<input-json>' | docker exec -i ecos-opa /opa eval -d /policies/data_access.rego -I --format json 'data.ecos.data_access'",
     "recorder": "record_data_access_oracles.mjs（同目录；仓根由脚本自身位置反解；含逐例 input 绑定自检）",
-    "recordedAt": "2026-10-15T11:47:05.163Z"
+    "recordedAt": "2026-10-17T06:42:56.194Z"
   },
   "cases": [
     {
@@ -1380,6 +1380,127 @@
       "obligations": [
         {
           "deniedReason": "AI_SUBJECT_DEPARTMENT_UNRESOLVED",
+          "obligation": "DENIED"
+        },
+        {
+          "column": "hourly_rate",
+          "obligation": "mask",
+          "strategy": "hide"
+        },
+        {
+          "column": "amount",
+          "obligation": "mask",
+          "strategy": "hide"
+        }
+      ]
+    },
+    {
+      "name": "ai_tool_no_department_declared",
+      "input": {
+        "action": "TOOL_CALL:sql_query_tool",
+        "subject": {
+          "userId": "u-p1",
+          "roles": [
+            "project_owner",
+            "non_finance"
+          ],
+          "department": "d01",
+          "tenantId": "t-demo"
+        },
+        "resource": {
+          "dataScope": {
+            "projectIds": [
+              "p1"
+            ]
+          }
+        },
+        "environment": {
+          "traceId": "trace-oracle",
+          "channel": "AGENT",
+          "timestamp": "2026-10-17T00:00:00Z"
+        }
+      },
+      "serverBody": {
+        "result": {
+          "agent_channel": true,
+          "allow": false,
+          "asset": "",
+          "data_roles": [
+            "dept_user",
+            "finance_lead",
+            "project_owner"
+          ],
+          "data_scope": {
+            "projectIds": [
+              "p1"
+            ]
+          },
+          "deny_obligations": [
+            {
+              "deniedReason": "AI_DEPARTMENT_NOT_DECLARED",
+              "obligation": "DENIED"
+            }
+          ],
+          "finance_roles": [
+            "finance_lead"
+          ],
+          "has_data_role": true,
+          "is_finance": false,
+          "mask_obligations": [
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "obligations": [
+            {
+              "deniedReason": "AI_DEPARTMENT_NOT_DECLARED",
+              "obligation": "DENIED"
+            },
+            {
+              "column": "hourly_rate",
+              "obligation": "mask",
+              "strategy": "hide"
+            },
+            {
+              "column": "amount",
+              "obligation": "mask",
+              "strategy": "hide"
+            }
+          ],
+          "purpose": "ai",
+          "rate_obligations": [],
+          "requested_department": "",
+          "requested_project_ids": [
+            "p1"
+          ],
+          "requested_purpose": "",
+          "sensitive_columns": [
+            "hourly_rate",
+            "amount"
+          ],
+          "subject_department": "d01",
+          "subject_id": "u-p1",
+          "subject_roles": [
+            "non_finance",
+            "project_owner"
+          ],
+          "violation": [
+            "AI_DEPARTMENT_NOT_DECLARED"
+          ],
+          "watermark_obligations": []
+        }
+      },
+      "allow": false,
+      "obligations": [
+        {
+          "deniedReason": "AI_DEPARTMENT_NOT_DECLARED",
           "obligation": "DENIED"
         },
         {

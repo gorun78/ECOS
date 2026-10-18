@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  <p>三段职责：</p>
  * <ol>
- *   <li><b>全量回放一致性</b>：oracle 里 14 组输入逐一过生产
+ *   <li><b>全量回放一致性</b>：oracle 里 15 组输入逐一过生产
  *       {@code OpaPolicyService#evaluate}（真 HTTP + 真解析），断 {@code allow} /
  *       {@code policyState} / {@code obligations} / {@code policyRef} 与录制态逐字相等 ——
  *       这是「应答原文 → 裁决」这一段的保真证明，也顺带证明 oracle 未被手编；</li>
@@ -42,11 +42,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OpaDocumentShapeTest {
 
     @Test
-    @DisplayName("全量回放 — 14 组录制输入的裁决结果逐字复现（禁挑例自证）")
+    @DisplayName("全量回放 — 15 组录制输入的裁决结果逐字复现（禁挑例自证）")
     void everyRecordedCaseReproducesThroughProductionParser() throws IOException {
         OpaOracleReplaySupport.assertPolicyNotDrifted();
         List<OpaOracleReplaySupport.OracleCase> cases = OpaOracleReplaySupport.cases();
-        assertEquals(14, cases.size(), "oracle 用例数与 §4.7.2 矩阵护栏格登记值不符（改动须同步矩阵）");
+        assertEquals(15, cases.size(), "oracle 用例数与 §4.7.2 矩阵护栏格登记值不符（改动须同步矩阵）");
 
         try (OpaOracleReplaySupport server = OpaOracleReplaySupport.start()) {
             PageChannelHarness harness = PageChannelHarness.create(server.baseUrl());
@@ -156,6 +156,11 @@ class OpaDocumentShapeTest {
         assertTrue(body.contains("\"NO_DATA_ACCESS_ROLE\""), "无权角色违规名必须在策略里");
         assertTrue(body.contains("\"AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT\""),
                 "横向越权违规名必须在策略里（§4.7.2 项目负责人行 AI 列 DENY 的判据）");
+        // #142/B4-3d-11（D-B4-29）：「载荷没声明域」与「声明的域不是自己的域」是两件事，
+        // 折叠成一个理由码时，运维对着一个从未声明域的工具调用去查"这人跨域"，方向从根上就是错的。
+        // 与 §4.5.4「不可用 ≠ 无权限」、D-B4-26 同一条纪律的第三种形态：未声明 ≠ 跨域。
+        assertTrue(body.contains("\"AI_DEPARTMENT_NOT_DECLARED\""),
+                "未声明所属域的违规名必须在策略里（生产 AI 工具形态的诚实拒绝理由）");
     }
 
     @Test

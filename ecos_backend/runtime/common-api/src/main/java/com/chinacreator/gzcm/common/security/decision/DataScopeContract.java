@@ -40,7 +40,14 @@ public final class DataScopeContract {
     /** 资源段内的请求数据域键（AI 通道专用；§4.7.2 的 p1/p2 判据出处）。 */
     public static final String KEY_DATA_SCOPE = "dataScope";
 
-    /** 调用方声明的所属域（与 {@code subject.department} 做横向越权比对，非主体属性）。 */
+    /**
+     * 请求所声明的所属域（与 {@code subject.department} 做横向越权比对，非主体属性）。
+     *
+     * <p><b>信任边界（#142/B4-3d-11，D-B4-29 取证）</b>：本键只允许<b>服务端真值解析</b>写入。
+     * AI 工具通道的入参白名单刻意排除它 —— 该通道的 SQL 执行腿没有 RLS 行级下推，
+     * 本比对是唯一行范围闸，让被裁决者自报即形同放行（见 {@code ToolPayloadDataScopeNailTest}）。
+     * 未声明时策略落 {@code AI_DEPARTMENT_NOT_DECLARED}，禁伪装成跨域。</p>
+     */
     public static final String KEY_DEPARTMENT_ID = "departmentId";
 
     /** 调用方声明的项目集（空集＝未声明域，策略侧落 {@code AI_SCOPE_NOT_DECLARED}）。 */
