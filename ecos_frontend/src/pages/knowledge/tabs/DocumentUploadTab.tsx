@@ -17,7 +17,12 @@ import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { apiFetchData } from '../../../api';
 import { knowledgeApi } from '../services/knowledgeApi';
-import { getAuthToken } from '../../../services/auth';
+import {
+  extractTaskReviewPayload,
+  mapExtractTaskPhase,
+  pollExtractTask,
+  type ExtractPhaseToken,
+} from '../services/extract';
 import type { ExtractUploadGate } from '../typesAndConstants';
 import ExtractionReviewPanel from '../components/ExtractionReviewPanel';
 
@@ -26,7 +31,7 @@ type ReviewDataShape = React.ComponentProps<typeof ExtractionReviewPanel>['revie
 
 // ── 阶段状态机 ──────────────────────────────────────────────────────────────
 
-type Phase = 'idle' | 'uploading' | 'queued' | 'parsing' | 'extracting' | 'reviewing' | 'done' | 'failed';
+type Phase = 'idle' | 'uploading' | ExtractPhaseToken;
 
 const PHASE_ORDER: Phase[] = ['idle', 'uploading', 'queued', 'parsing', 'extracting', 'reviewing', 'done'];
 
@@ -118,40 +123,25 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
     let attempt = 0;
     pollRef.current = setInterval(async () => {
       attempt++;
-      try {
-        // PMO-54 — 任务状态查询端点；未就绪时回退到本地阶段推进
-        const res = await fetch(`/api/v1/knowledge/extract/tasks/${id}`, {
-          headers: { Authorization: `Bearer ${getAuthToken()}` },
-        });
-        if (!res.ok) throw new Error(`status ${res.status}`);
-        const json = await res.json();
-        const data = json?.data ?? json;
-        const status = String(data.status ?? '');
-        // 状态机：后端 TaskStatus 统一映射
-        const mapped: Phase =
-          status === 'UPLOADED' ? 'queued' :
-          status === 'PARSING' ? 'parsing' :
-          status === 'EXTRACTING' ? 'extracting' :
-          status === 'PENDING_REVIEW' ? 'reviewing' :
-          status === 'COMPLETED' ? 'done' :
-          status === 'FAILED' ? 'failed' :
-          phase;
+      const poll = await pollExtractTask(id);
+      if (poll.source === 'backend') {
+        const next = mapExtractTaskPhase(poll.task);
+        const mapped: Phase = next === null ? phase : next;
         if (mapped !== phase) setPhase(mapped);
         if (mapped === 'reviewing') {
-          setReviewData({ sourceText: data.sourceText || '', data: data.results || data.reviewData || null });
+          setReviewData(extractTaskReviewPayload(poll.task));
           if (pollRef.current) clearInterval(pollRef.current);
         }
-      } catch {
-        // 后端未就绪 — 本地状态机推进：queued → parsing (1.5s) → extracting (2s) → reviewing (3s)
-        const steps: Phase[] = ['queued', 'parsing', 'extracting', 'reviewing'];
-        const localIdx = Math.min(attempt - 1, steps.length - 1);
-        const step = steps[localIdx];
-        setPhase(step);
-        if (step === 'reviewing') {
-          // PMO-56 待补：fetchExtractCandidates(fileId) — 后端暂返 null
-          const candidates = await knowledgeApi.fetchExtractCandidates(id);
-          if (pollRef.current) clearInterval(pollRef.current);
-        }
+        return;
+      }
+      // 后端未就绪 — 本地状态机推进：queued → parsing (1.5s) → extracting (2s) → reviewing (3s)
+      const steps: Phase[] = ['queued', 'parsing', 'extracting', 'reviewing'];
+      const step = steps[Math.min(attempt - 1, steps.length - 1)];
+      setPhase(step);
+      if (step === 'reviewing') {
+        // PMO-56 待补：fetchExtractCandidates(fileId) — 后端暂返 null
+        await knowledgeApi.fetchExtractCandidates(id);
+        if (pollRef.current) clearInterval(pollRef.current);
       }
     }, 1500);
   }, [phase]);

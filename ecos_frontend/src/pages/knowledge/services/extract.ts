@@ -17,6 +17,7 @@
  *        减小浏览器本地数据面（页刷新后队列可恢复但不再跨会话）。
  */
 import { apiFetchData } from '../../../api';
+import { ApiRequestError } from '../../../services/httpClient';
 import { getAuthToken } from '../../../services/auth';
 import { kbFetchData } from './kbFetch';
 import type {
@@ -249,6 +250,66 @@ export async function fetchExtractStatus(taskId: string): Promise<{
     `${KB_V1}/extract/status/${encodeURIComponent(taskId)}`,
   );
   return data || { taskId, status: 'UNKNOWN', progress: 0 };
+}
+
+// ── 抽取任务轮询（DocumentUploadTab 状态机）───────────────────────────────────
+// 传输合流 #143/B5-10c-3：该腿原写在页面组件的 setInterval 回调里——私设 `await fetch`
+// ＋手拼 Bearer＋自行拆信封，是 httpClient 之外的第四个解包点（台账 §13.2.4 C2）。
+// 腿体下沉本域服务＝解包交 apiFetchData 单源，组件只消费判别结果；同时让该腿可在
+// node 环境被直接测试（组件文件在 Node 20.18.1 下无法安全 import，见 vite.config W198 注）。
+
+/** 后端 TaskStatus → 页面阶段 token（未知状态无映射 ⇒ 调用方保持当前阶段） */
+export type ExtractPhaseToken = 'queued' | 'parsing' | 'extracting' | 'reviewing' | 'done' | 'failed';
+
+// 用 Map 而非对象字面量：状态串来自后端，`obj['constructor']` 这类键会取到原型成员。
+const EXTRACT_STATUS_PHASE = new Map<string, ExtractPhaseToken>([
+  ['UPLOADED', 'queued'],
+  ['PARSING', 'parsing'],
+  ['EXTRACTING', 'extracting'],
+  ['PENDING_REVIEW', 'reviewing'],
+  ['COMPLETED', 'done'],
+  ['FAILED', 'failed'],
+]);
+
+export type ExtractTaskPayload = Record<string, any>;
+
+export type ExtractTaskPoll =
+  | { source: 'backend'; task: ExtractTaskPayload }
+  | { source: 'unavailable'; error: unknown };
+
+function normalizeTaskPayload(v: unknown): ExtractTaskPayload {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  return { ...o, status: String(o.status ?? '') };
+}
+
+/**
+ * 轮询一次抽取任务。两条出腿互斥：
+ * `backend` = 后端应答了（含错误信封，载荷按空对象归一 ⇒ 映射为「不作为」）；
+ * `unavailable` = 传输/HTTP 不可用，由调用方决定是否降级。
+ */
+export async function pollExtractTask(taskId: string): Promise<ExtractTaskPoll> {
+  try {
+    const data = await apiFetchData<ExtractTaskPayload>(`${KB_V1}/extract/tasks/${taskId}`);
+    return { source: 'backend', task: normalizeTaskPayload(data) };
+  } catch (e) {
+    // `httpStatus` 缺失 ⇒ 抛出物只可能来自「HTTP 200 + 信封 success:false / code 非 0·200」这一条腿，
+    // 即后端应答了、只是应答失败（`ExtractionController.getTask` 的 notFound 就是这个形状）。
+    // 改前此处拆到的是错误信封本身 ⇒ 无 status ⇒ 保持当前阶段；若折进 unavailable，
+    // 一条真实应答就会被本地伪造推进接管，假推进面反而扩大。
+    if (e instanceof ApiRequestError && e.httpStatus === undefined) {
+      return { source: 'backend', task: normalizeTaskPayload({}) };
+    }
+    return { source: 'unavailable', error: e };
+  }
+}
+
+export function mapExtractTaskPhase(task: ExtractTaskPayload | null | undefined): ExtractPhaseToken | null {
+  return EXTRACT_STATUS_PHASE.get(String(task?.status ?? '')) ?? null;
+}
+
+/** 审核面板入参取形：sourceText 兜空串，results 优先、reviewData 次之、皆无则 null */
+export function extractTaskReviewPayload(task: ExtractTaskPayload): { sourceText: string; data: any } {
+  return { sourceText: task.sourceText || '', data: task.results || task.reviewData || null };
 }
 
 // 结构化抽取作业（status/jobs 端点，兼容 taskId 关联）
