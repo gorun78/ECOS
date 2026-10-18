@@ -130,10 +130,14 @@ class WAgentForbiddenDependencyArchTest {
      *  以避开 {@code ArchitectureTest} 的 service 接口命名门，由 {@code SseFrameSingleSourceGateTest} 夹制）；
      *  2026-10-18 +1（257→258）= #143/B5-5a（D-B5-7 OAG 写出面收口）新增
      *  {@code ai.stream.OagSseFrames}（OAG 通道唯一出帧面，与 agent-loop 写出器同包同纪律，
-     *  词表消费 {@code common-api} 的 {@code OagSseFrameContract}）。</p>
-     * <p>计数口径 = {@code find src/main/java -name '*.java' | wc -l} 于 2026-10-18 实测 <b>258</b>。</p>
+     *  词表消费 {@code common-api} 的 {@code OagSseFrameContract}）；
+     *  2026-10-18 +1（258→259）= #143/B5-5b（D-B5-8 WAgent run 流八帧收口）新增
+     *  {@code ai.wagent.stream.WAgentSseFrames}（W 通道唯一出帧面）。包位取 wagent 子树而非 {@code ai.stream}：
+     *  首版落 {@code ai.stream} 时被 {@code TerminologyArchTest.wAgentClassesResideInWagentPackageOnly}
+     *  （F10-01 术语门）抓红 ⇒ 按"改码不改闸"迁入 wagent 包，改类名绕门不在选项内。</p>
+     * <p>计数口径 = {@code find src/main/java -name '*.java' | wc -l} 于 2026-10-18 实测 <b>259</b>。</p>
      */
-    private static final int AI_SOURCE_FILE_FLOOR = 258;
+    private static final int AI_SOURCE_FILE_FLOOR = 259;
 
     /** 反空集锁④：跨引擎门面引用单点（详设-06 F06-11 forecast.explain 走 cognitive api 常量）。 */
     private static final Pattern ENGINE_IMPORT =
@@ -407,7 +411,7 @@ class WAgentForbiddenDependencyArchTest {
             List<Path> sources = paths.filter(p -> p.getFileName().toString().endsWith(".java"))
                     .sorted().collect(Collectors.toList());
             assertEquals(AI_SOURCE_FILE_FLOOR, sources.size(),
-                    "ai 模块源码文件数与登记基线不一致（2026-10-18 实测 257）—— 扫描面失真则 import 名录不可信；"
+                    "ai 模块源码文件数与登记基线不一致（2026-10-18 实测 259）—— 扫描面失真则 import 名录不可信；"
                             + "实测 " + sources.size());
             for (Path source : sources) {
                 for (String line : Files.readAllLines(source, StandardCharsets.UTF_8)) {

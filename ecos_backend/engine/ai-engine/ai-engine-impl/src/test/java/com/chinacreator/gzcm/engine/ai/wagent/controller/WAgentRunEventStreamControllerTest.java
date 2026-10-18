@@ -1,8 +1,10 @@
 package com.chinacreator.gzcm.engine.ai.wagent.controller;
 
 import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.RunStatus;
+import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentReadinessDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentRunDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentRunEventDao;
+import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentRunStepDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentRunDO;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentRunEventDO;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver;
@@ -45,10 +47,21 @@ class WAgentRunEventStreamControllerTest {
         when(identityResolver.require()).thenReturn(new Identity("t1", "u1", "o1"));
 
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new WAgentRunEventStreamController(runDao, eventDao, identityResolver, Runnable::run))
+                .standaloneSetup(newController(runDao, eventDao,
+                        mock(WAgentRunStepDao.class), mock(WAgentReadinessDao.class), identityResolver))
                 .setControllerAdvice(new WAgentOrchestrationAdvice())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())
                 .build();
+    }
+
+    /** 六参装配单源（B5-5b 起控制器多出 run_step/readiness 两条真值读腿 + 命名线程池）。 */
+    static WAgentRunEventStreamController newController(WAgentRunDao runDao,
+                                                        WAgentRunEventDao eventDao,
+                                                        WAgentRunStepDao runStepDao,
+                                                        WAgentReadinessDao readinessDao,
+                                                        WAgentIdentityResolver identityResolver) {
+        return new WAgentRunEventStreamController(runDao, eventDao, runStepDao, readinessDao,
+                identityResolver, Runnable::run);
     }
 
     @Test
@@ -63,7 +76,7 @@ class WAgentRunEventStreamControllerTest {
     }
 
     @Test
-    @DisplayName("#7-SSE 在位 run ⇒ 同步 200 流建立（既有 #7 JSON 面不动，本条为新增映射；standalone MockMvc 不回写 SSE Content-Type，故只断言状态码，帧语义由 resumeIndex/isTerminal 用例覆盖）")
+    @DisplayName("#7-SSE 在位 run ⇒ 同步 200 流建立（既有 #7 JSON 面不动，本条为新增映射；帧语义见 WAgentRunStreamFramesTest。订正注：本条原注释断言「standalone MockMvc 不回写 SSE 响应体」，B5-5b 实跑证伪——帧体可直读，故八帧断言改为入口驱动真实发射面）")
     void streamEstablished() throws Exception {
         WAgentRunDO run = new WAgentRunDO();
         run.setId("r1");

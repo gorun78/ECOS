@@ -38,6 +38,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 把改前缺陷原形喂给同一谓词，抓不到即判据失效，"零违例"不可信。
  * 原基线数字 7/4 不删、留在注释与本段作为收口前凭证。</p>
  *
+ * <p><b>#143/B5-5b 把第三条通道（WAgent run 流）纳入同一判据</b>：改前该流是
+ * {@code send(emitter, "<自有词>")} + {@code event().name(变量)} 的内联形态（D-B5-8 病灶，
+ * 词形 {@code stream_ready/run_terminal/stream_timeout} 与 §10.3.6 八帧不同名）。收口后该形状
+ * 归零，故本文件新增两枚探针：{@link #INLINE_SEND_WITH_NAME}（整体扫描面归零 + 合成样本必须抓到）
+ * 与 {@link #W_FRAME_WORD_LITERAL}（W 写出面零内联八帧词）。词形一律由单源
+ * {@link SseFrameContract#wagentVocabulary()} 反拼，禁在本门禁里另抄一份八帧字面量。</p>
+ *
  * <p><b>本守卫管不到的另一面（照登，不假装全覆盖）</b>：{@code OagController#toStepEvent}
  * 读的是 {@code OagPipelineEngine} 内部事件 Map 的键（{@code node/intent/nodeElapsedMs/
  * securityPassed}），那是引擎侧契约、不是 SSE 事件名，静态词表管不到它。该面的漂移由入口驱动的
@@ -72,6 +79,21 @@ class SseFrameSingleSourceGateTest {
     private static final Pattern SEND_EVENT_WITH_NAME =
             Pattern.compile("sendEvent\\(\\s*emitter,\\s*\"([^\"]+)\"");
 
+    /**
+     * W 通道改前自发射形态（D-B5-8 病灶）：{@code send(emitter, "<字面量>", ...)}。
+     *
+     * <p>与 {@link #SEND_EVENT_WITH_NAME} 分列而非合并：OAG 侧用的是 {@code sendEvent(...)} 私有方法，
+     * 一条正则覆盖两种写法会把两通道的基线数字混成一个数，改前凭证（OAG 7 处 / W 3 处）就不可对账。
+     * 本探针<b>不限词表内事件名</b>——改前 W 流的帧名（{@code stream_ready} 等）恰恰不在八帧里，
+     * 若只认词表内名字，这条判据对缺陷原形是瞎的。</p>
+     */
+    private static final Pattern INLINE_SEND_WITH_NAME =
+            Pattern.compile("send\\(\\s*emitter,\\s*\"([^\"]+)\"");
+
+    /** W 通道帧词字面量（词形由单源反拼 = 八帧 ∪ milestone；本处只作探针，不作第二词表）。 */
+    private static final Pattern W_FRAME_WORD_LITERAL = Pattern.compile(
+            "\"(" + String.join("|", SseFrameContract.wagentVocabulary()) + ")\"");
+
     /** agent-loop 写出面 = 控制器 + 帧写出器（这两处只允许引用单源，不许自带词表）。 */
     private static final List<String> WRITE_SURFACE = List.of(
             "controller/AgentLoopController.java",
@@ -83,15 +105,36 @@ class SseFrameSingleSourceGateTest {
             "oag/dto/OagStepEvent.java",
             "stream/OagSseFrames.java");
 
-    /** 单源词表声明数（七帧各一枚）。 */
+    /**
+     * WAgent 写出面（B5-5b 起与另两条通道同形）。
+     *
+     * <p>控制器在列是必要的而非冗余：它是唯一碰 Spring SSE BuilderAPI 的地方
+     * （{@code sinkOf} 把帧名与 {@code id:} 位落成线格式），帧词若被内联回这里，写出器的单源就绕过了。</p>
+     */
+    private static final List<String> WAGENT_WRITE_SURFACE = List.of(
+            "wagent/controller/WAgentRunEventStreamController.java",
+            "wagent/stream/WAgentSseFrames.java");
+
+    /** 七帧固定序枚数（§9.3.3 表首列）。 */
     private static final int VOCABULARY_SIZE = 7;
+    /**
+     * 单源帧名声明枚数（七帧 + {@code degrade} + {@code milestone} = 9，2026-10-18 实测）。
+     *
+     * <p>与 {@link #VOCABULARY_SIZE} 分列：前者是 agent-loop 词表闭合性（七帧），后者是声明面计数。
+     * 混用一个数会让"agent-loop 里冒出 degrade"这种违例在计数判据上看起来是正常的。</p>
+     */
+    private static final int FRAME_DECLARATION_SIZE = 9;
     /** OAG 通道词表声明数（node/response/blocked/error/done 各一枚，2026-10-18 实测）。 */
     private static final int OAG_EVENT_VOCABULARY_SIZE = 5;
+    /** W 通道八帧枚数（§10.3.6 表首列 1..8；{@code milestone} 不在内）。 */
+    private static final int WAGENT_FRAME_ORDER_SIZE = 8;
+    /** W 写出器实际有真载体的帧枚数（meta/step/degrade/milestone/error/done；token/delta/citation 零生产者）。 */
+    private static final int WAGENT_WRITER_FRAME_REFS_FLOOR = 6;
 
     // ═══ 1) 词表声明面：全局单文件 ═══
 
     @Test
-    @DisplayName("§1.9.2 单源：ai 引擎内零第二帧词表声明，同一谓词在 common-api 单源抓到 7 枚")
+    @DisplayName("§1.9.2 单源：ai 引擎内零第二帧词表声明，同一谓词在 common-api 单源抓到 9 枚")
     void frameVocabularyIsDeclaredInExactlyOneFile() throws Exception {
         List<Source> aiMain = aiMainSources();
         assertFalse(aiMain.isEmpty(), "ai 源码扫描面为空 —— 本守卫恒绿，无意义");
@@ -103,26 +146,41 @@ class SseFrameSingleSourceGateTest {
                 "ai 引擎内出现第二份帧名词表声明（词表唯一登记处 = common-api SseFrameContract）:\n"
                         + String.join("\n", secondVocabulary));
 
-        // 正控制：同一谓词必须能抓到真单源里的 7 枚声明，抓不到说明正则/读文件面坏了
+        // 正控制：同一谓词必须能抓到真单源里的 9 枚声明，抓不到说明正则/读文件面坏了
         List<String> canonical = matchedLines(singleSourceContract(), FRAME_VOCABULARY_DECLARATION)
                 .collect(Collectors.toList());
-        assertEquals(VOCABULARY_SIZE, canonical.size(),
-                "单源 SseFrameContract 的帧名声明数不为 7 —— 扫描面或词表已变化，需重新登记");
+        assertEquals(FRAME_DECLARATION_SIZE, canonical.size(),
+                "单源 SseFrameContract 的帧名声明数不为 9（agent-loop 七帧 + degrade + milestone）"
+                        + " —— 扫描面或词表已变化，需重新登记; 实测 " + canonical);
     }
 
-    // ═══ 2) 写出面：零内联帧词（agent-loop 与 OAG 两通道同判据） ═══
+    // ═══ 2) 写出面：零内联帧词（三条通道同判据） ═══
 
     @Test
-    @DisplayName("§9.3.3 写出面：agent-loop 与 OAG 四条写出面零内联七帧词")
+    @DisplayName("§9.3.3 写出面：agent-loop、OAG、WAgent 六条写出面零内联七帧词")
     void writeSurfaceNeverInlinesFrameWords() throws Exception {
         List<String> surfaces = new ArrayList<>(WRITE_SURFACE);
         surfaces.addAll(OAG_WRITE_SURFACE);
+        surfaces.addAll(WAGENT_WRITE_SURFACE);
         for (String relative : surfaces) {
             Source source = aiSource(relative);
             List<String> inlined = matchedLines(source, FRAME_WORD_LITERAL).collect(Collectors.toList());
             assertTrue(inlined.isEmpty(),
                     "写出面内联七帧词字面量（必须经单源常量引用）: "
                             + relative + "\n" + String.join("\n", inlined));
+        }
+    }
+
+    @Test
+    @DisplayName("§10.3.6 W 写出面：零内联八帧词（含 degrade/milestone，探针词形取自单源）")
+    void wagentWriteSurfaceNeverInlinesWFrameWords() throws Exception {
+        for (String relative : WAGENT_WRITE_SURFACE) {
+            Source source = aiSource(relative);
+            List<String> inlined = matchedLines(source, W_FRAME_WORD_LITERAL).collect(Collectors.toList());
+            assertTrue(inlined.isEmpty(),
+                    "W 写出面内联八帧词字面量（必须经单源常量引用；此探针比七帧面多出 degrade/milestone 两词，"
+                            + "只用七帧词面会放行这两词的自拼）: " + relative + "\n"
+                            + String.join("\n", inlined));
         }
     }
 
@@ -148,10 +206,10 @@ class SseFrameSingleSourceGateTest {
                         + "数目变化说明本守卫的'剥注释'判据与实际码面脱节");
     }
 
-    // ═══ 4) 收口后判据：内联发射面归零（改前基线 7 处，凭证留档不删） ═══
+    // ═══ 4) 收口后判据：内联发射面归零（改前基线 OAG 7 处 / W 4 处，凭证留档不删） ═══
 
     @Test
-    @DisplayName("§1.9.2 收口：ai 全域 sendEvent(emitter, \"<字面量>\") 归零（改前实测 7 处，D-B5-7 已闭）")
+    @DisplayName("§1.9.2 收口：ai 全域内联发射（sendEvent/send 两形）归零（改前 OAG 7 处、W 4 处）")
     void inlineEmitterSendSurfaceIsNowZeroAcrossAiDomain() throws Exception {
         List<Source> aiMain = aiMainSources();
         List<String> hits = aiMain.stream()
@@ -162,6 +220,17 @@ class SseFrameSingleSourceGateTest {
                 "内联 sendEvent(emitter, \"<字面量>\") 面复现（2026-10-18 收口前实测基线 = 7 处且全在 OagController，"
                         + "收口后必须为 0）。新增即多开一个未合流的发射点，须改码合流、不许改本判据放行:\n"
                         + String.join("\n", hits));
+
+        // W 通道（D-B5-8）改前形状：send(emitter, "stream_ready"…"stream_error")，实测 4 处，收口后必须为 0
+        List<String> wagentHits = aiMain.stream()
+                .flatMap(source -> matchedLines(source, INLINE_SEND_WITH_NAME)
+                        .map(text -> source.file().getFileName() + ": " + text.trim()))
+                .collect(Collectors.toList());
+        assertTrue(wagentHits.isEmpty(),
+                "W 通道内联 send(emitter, \"<字面量>\") 面复现（2026-10-18 收口前实测基线 = 4 处："
+                        + "stream_ready/run_terminal/stream_timeout/stream_error，均不在 §10.3.6 八帧词表内，"
+                        + "收口后必须为 0）。此判据不限词表内名字——八帧外的自拼帧名恰是缺陷原形:\n"
+                        + String.join("\n", wagentHits));
     }
 
     // ═══ 4b) OAG 事件名声明面：ai 域零枚，唯一真值在 common-api 单源 ═══
@@ -200,7 +269,12 @@ class SseFrameSingleSourceGateTest {
                 "    sendEvent(emitter, \"done\", payload);",
                 "    emitter.send(SseEmitter.event().name(\"node\").data(payload));",
                 "    private static final String EVENT_NODE = \"node\";",
-                "    private static final String FRAME_DELTA = \"delta\";");
+                "    private static final String FRAME_DELTA = \"delta\";",
+                "    send(emitter, \"stream_ready\", Map.of());",
+                "    send(emitter, \"run_terminal\", Map.of());",
+                "    send(emitter, \"stream_timeout\", Map.of());",
+                "    send(emitter, \"stream_error\", Map.of());",
+                "    String degradeFrameName = \"degrade\";");
         assertEquals(2L, countInText(preFixShape, SEND_EVENT_WITH_NAME),
                 "内联发射探针失效 —— 源码面的'0 处'不可信");
         assertEquals(1L, countInText(preFixShape, EVENT_NAME_CALL_SITE),
@@ -211,29 +285,68 @@ class SseFrameSingleSourceGateTest {
                 "七帧词探针失效（前两条 + 末条 FRAME_DELTA）");
         assertEquals(1L, countInText(preFixShape, FRAME_VOCABULARY_DECLARATION),
                 "七帧词表声明探针失效");
+        assertEquals(4L, countInText(preFixShape, INLINE_SEND_WITH_NAME),
+                "W 通道内联发射探针失效（改前 stream_ready/run_terminal/stream_timeout/stream_error 四形）"
+                        + " —— 源码面的'0 处'不可信");
+        assertEquals(4L, countInText(preFixShape, W_FRAME_WORD_LITERAL),
+                "八帧词探针失效（error/done/delta/degrade 四处）；它与七帧探针的差集正是 degrade —— "
+                        + "只留七帧探针会让 degrade/milestone 的自拼漏检");
     }
 
-    // ═══ 5) 七帧 ≠ 八帧：degrade 帧显式缺席（WAgent 面欠账留痕） ═══
+    // ═══ 5) 七帧 ≠ 八帧：两通道词表分册，degrade 只在 W 册 ═══
 
     @Test
-    @DisplayName("§9.3.3 词表面：agent-loop 七帧固定序无 degrade；WAgent 八帧（§10.3.6）在 ai 域尚未落地")
-    void agentLoopVocabularyIsSevenFramesAndDegradeIsAbsent() {
+    @DisplayName("§9.3.3/§10.3.6 词表面：agent-loop 七帧恒不含 degrade；WAgent 八帧已登记且 degrade 载荷四键同批")
+    void agentLoopStaysDegradeFreeWhileWagentEightFramesAreRegistered() {
         assertEquals(List.of("meta", "step", "token", "delta", "citation", "error", "done"),
                 SseFrameContract.AGENT_LOOP_FRAME_ORDER,
                 "七帧固定序与详设-06 §9.3.3 表首列不一致（前端 §13.4.5 解析器按此序假设）");
 
         List<String> declaredValues = frameVocabularyValues();
-        assertEquals(VOCABULARY_SIZE, declaredValues.size(),
-                "词表声明枚数与七帧不符: " + declaredValues);
-        assertFalse(declaredValues.contains("degrade"),
-                "ai 域词表已出现 degrade 帧但 §10.3.6 的 WAgent 八帧序尚未登记 —— "
-                        + "degrade 帧属 WAgent run 流，须与 {dgCode,appliesTo,requiresAck,note} 载荷同批落地");
+        assertEquals(FRAME_DECLARATION_SIZE, declaredValues.size(),
+                "单源帧名声明枚数不为 9（七帧 + degrade + milestone）: " + declaredValues);
+        assertTrue(declaredValues.contains(SseFrameContract.FRAME_DEGRADE),
+                "degrade 帧名已从单源消失 —— W 通道降级横幅将无帧可读: " + declaredValues);
+
+        // 两通道分册：degrade 属 W 册，agent-loop 面既不认它、也不许把它收进七帧序
+        assertFalse(SseFrameContract.AGENT_LOOP_FRAME_ORDER.contains(SseFrameContract.FRAME_DEGRADE),
+                "agent-loop 七帧序里混入了 degrade —— §9.3.3 的闭合词表不给降级留位，"
+                        + "两通道词表一旦互冒充，前端解析器与审计对账就各有其一套帧名");
+        assertFalse(SseFrameContract.isKnownFrame(SseFrameContract.FRAME_DEGRADE),
+                "agent-loop 装配入口 frame() 已认 degrade 帧 = 两通道词表合流的第一个信号，须回退");
+        assertTrue(SseFrameContract.validateSequence(
+                        List.of(SseFrameContract.FRAME_META, SseFrameContract.FRAME_DEGRADE,
+                                SseFrameContract.FRAME_DONE)).isPresent(),
+                "七帧帧序校验放行了 degrade（通道互斥的判据失效）");
+
+        // WAgent 八帧序 = §10.3.6 表首列 1..8；degrade 载荷四键必须同批在位
+        assertEquals(List.of("meta", "step", "token", "delta", "citation", "degrade", "error", "done"),
+                SseFrameContract.WAGENT_FRAME_ORDER,
+                "WAgent 八帧固定序与详设-10 §10.3.6 表首列不一致");
+        assertEquals(WAGENT_FRAME_ORDER_SIZE, SseFrameContract.WAGENT_FRAME_ORDER.size(),
+                "WAgent 八帧枚数不为 8");
+        assertEquals(List.of(SseFrameContract.KEY_TRACE_ID, SseFrameContract.KEY_DG_CODE,
+                        SseFrameContract.KEY_APPLIES_TO, SseFrameContract.KEY_REQUIRES_ACK,
+                        SseFrameContract.KEY_NOTE),
+                SseFrameContract.WAGENT_FRAME_KEYS.get(SseFrameContract.FRAME_DEGRADE),
+                "degrade 帧的载荷键面与 §10.3.6 帧 6 的 {dgCode,appliesTo,requiresAck,note} 不一致"
+                        + "（帧名与载荷必须同批登记，只补帧名等于前端拿到空降级）");
+        assertTrue(SseFrameContract.isKnownWagentFrame(SseFrameContract.FRAME_DEGRADE),
+                "W 通道装配入口不认 degrade —— 降级帧无法经单源装配");
+
+        // milestone 是通道补充帧：词表可认，但永不进八帧序（进了即冒充 §10.3.6 设计原文）
+        assertTrue(declaredValues.contains(SseFrameContract.FRAME_MILESTONE),
+                "milestone 补充帧名已从单源消失: " + declaredValues);
+        assertFalse(SseFrameContract.WAGENT_FRAME_ORDER.contains(SseFrameContract.FRAME_MILESTONE),
+                "milestone 被塞进 WAGENT_FRAME_ORDER = 把通道自加帧冒充成 §10.3.6 八帧设计原文");
+        assertFalse(SseFrameContract.AGENT_LOOP_FRAME_ORDER.contains(SseFrameContract.FRAME_MILESTONE),
+                "milestone 泄漏进 agent-loop 七帧序");
     }
 
     // ═══ 6) 写出面确实经单源消费（防空断言） ═══
 
     @Test
-    @DisplayName("消费面：写出器逐帧引用 SseFrameContract.FRAME_*（≥7）且控制器逐键引用 KEY_*（≥7）")
+    @DisplayName("消费面：三条通道写出器均逐帧引用 SseFrameContract，控制器逐键引用 KEY_*")
     void writeSurfaceActuallyConsumesTheSingleSource() throws Exception {
         long frameRefs = matchedLines(aiSource("stream/AgentLoopSseFrames.java"),
                         Pattern.compile("SseFrameContract\\.FRAME_\\w+")).count();
@@ -244,6 +357,23 @@ class SseFrameSingleSourceGateTest {
                 Pattern.compile("SseFrameContract\\.KEY_\\w+")).count();
         assertTrue(keyRefs >= VOCABULARY_SIZE,
                 "控制器对单源键名的引用少于 7 —— done/error 尾帧键面已脱离词表；实测 " + keyRefs);
+
+        // W 通道：有真载体的六帧（meta/step/degrade/milestone/error/done）逐一经单源帧名常量装配
+        long wFrameRefs = matchedLines(aiSource("wagent/stream/WAgentSseFrames.java"),
+                Pattern.compile("SseFrameContract\\.FRAME_\\w+")).count();
+        assertTrue(wFrameRefs >= WAGENT_WRITER_FRAME_REFS_FLOOR,
+                "W 写出器对单源帧名的引用少于 6 —— token/delta/citation 三帧因零生产者不发（差距册 D-B5-19），"
+                        + "其余六帧若不引用单源，帧名就来自第三处；实测 " + wFrameRefs);
+        long wKeyRefs = matchedLines(aiSource("wagent/stream/WAgentSseFrames.java"),
+                Pattern.compile("SseFrameContract\\.KEY_\\w+")).count();
+        assertTrue(wKeyRefs >= WAGENT_FRAME_ORDER_SIZE,
+                "W 写出器对单源键名的引用少于 8 —— 键面若既不引用又不内联，则第四套键名藏在别处；实测 " + wKeyRefs);
+        assertTrue(matchedLines(aiSource("wagent/stream/WAgentSseFrames.java"),
+                        Pattern.compile("SseFrameContract\\.wagentFrame\\(")).findAny().isPresent(),
+                "W 写出器没走 wagentFrame() 装配入口 —— 键面白名单（非登记键即抛）被绕过");
+        assertTrue(matchedLines(aiSource("wagent/stream/WAgentSseFrames.java"),
+                        Pattern.compile("SseFrameContract\\.validateWagentSequence\\(")).findAny().isPresent(),
+                "W 写出器末帧前未复验帧序 —— 单源里的尾序校验成了没人调用的死码");
     }
 
     // ═══ 7) 判据自身的误报自检 ═══

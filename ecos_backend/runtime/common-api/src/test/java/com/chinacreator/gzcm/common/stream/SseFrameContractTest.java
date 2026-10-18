@@ -171,4 +171,106 @@ class SseFrameContractTest {
         assertEquals(AgentLoopTrace.ABSENT, SseFrameContract.textOrAbsent("   "));
         assertEquals("sess-1", SseFrameContract.textOrAbsent("sess-1"));
     }
+
+    // ═══ WAgent run 流八帧（详设-10 §10.3.6；#143/B5-5b 收口 D-B5-8）═══
+
+    @Test
+    @DisplayName("W 八帧词表与序逐字钉住，milestone 是补充帧、永不进八帧序")
+    void wagentEightFrameOrderIsTheFrozenOrder() {
+        assertEquals(List.of("meta", "step", "token", "delta", "citation", "degrade", "error", "done"),
+                SseFrameContract.WAGENT_FRAME_ORDER);
+        assertEquals(8, SseFrameContract.WAGENT_FRAME_ORDER.size());
+        assertEquals(1, SseFrameContract.wagentFrameIndex(SseFrameContract.FRAME_META));
+        assertEquals(6, SseFrameContract.wagentFrameIndex(SseFrameContract.FRAME_DEGRADE));
+        assertEquals(8, SseFrameContract.wagentFrameIndex(SseFrameContract.FRAME_DONE));
+        assertEquals((int) AgentLoopTrace.UNKNOWN, SseFrameContract.wagentFrameIndex(SseFrameContract.FRAME_MILESTONE),
+                "milestone 不在 §10.3.6 表内，序位只能是「未知」——给它一个号即冒充设计原文");
+        assertEquals(9, SseFrameContract.wagentVocabulary().size(), "W 词表 = 八帧 + milestone");
+    }
+
+    @Test
+    @DisplayName("八帧逐帧键面全在登记表内且首键恒为 traceId（禁实现侧自造第四套键）")
+    void everyWagentFrameHasItsOwnKeyTable() {
+        assertEquals(8, SseFrameContract.WAGENT_FRAME_KEYS.size());
+        for (String frame : SseFrameContract.WAGENT_FRAME_ORDER) {
+            List<String> keys = SseFrameContract.WAGENT_FRAME_KEYS.get(frame);
+            assertTrue(keys != null && !keys.isEmpty(), frame + " 无键面登记表");
+            assertEquals(SseFrameContract.KEY_TRACE_ID, keys.get(0), frame + " 首键必须是 traceId");
+        }
+        assertEquals(List.of(SseFrameContract.KEY_TRACE_ID, SseFrameContract.KEY_DG_CODE,
+                        SseFrameContract.KEY_APPLIES_TO, SseFrameContract.KEY_REQUIRES_ACK,
+                        SseFrameContract.KEY_NOTE),
+                SseFrameContract.WAGENT_FRAME_KEYS.get(SseFrameContract.FRAME_DEGRADE));
+        assertEquals(List.of(SseFrameContract.KEY_TRACE_ID, SseFrameContract.KEY_EVENT_ID,
+                        SseFrameContract.KEY_EVENT_TYPE, SseFrameContract.KEY_OCCUR_TIME,
+                        SseFrameContract.KEY_PAYLOAD_KIND),
+                SseFrameContract.MILESTONE_FRAME_KEYS);
+    }
+
+    @Test
+    @DisplayName("W 装配入口只认本通道词表：非登记键即抛，三枚白名单自加键放行")
+    void wagentFrameFailsLoudOnThirdKeySet() {
+        java.util.Map<String, Object> whitelisted = new java.util.LinkedHashMap<>();
+        whitelisted.put(SseFrameContract.KEY_RUN_ID, "r1");
+        whitelisted.put(SseFrameContract.KEY_STREAM_MODE, "table-polling-replay");
+        whitelisted.put(SseFrameContract.KEY_EVENT_ID, "e1");
+        Map<String, Object> ok = SseFrameContract.wagentFrame(SseFrameContract.FRAME_META, "trace-1", whitelisted);
+        assertEquals(List.of(SseFrameContract.KEY_TRACE_ID, SseFrameContract.KEY_RUN_ID,
+                        SseFrameContract.KEY_STREAM_MODE, SseFrameContract.KEY_EVENT_ID),
+                List.copyOf(ok.keySet()));
+
+        IllegalArgumentException keyEx = assertThrows(IllegalArgumentException.class,
+                () -> SseFrameContract.wagentFrame(SseFrameContract.FRAME_META, "trace-1",
+                        Map.of(SseFrameContract.KEY_GRADE, "A")));
+        assertTrue(keyEx.getMessage().contains("§10.3.6"),
+                "违例文案要点名设计出处，便于定位: " + keyEx.getMessage());
+        assertThrows(IllegalArgumentException.class,
+                () -> SseFrameContract.wagentFrame("stream_ready", "trace-1", Map.of()),
+                "改前自有词形不得经 W 入口装配");
+        assertThrows(IllegalArgumentException.class,
+                () -> SseFrameContract.frame(SseFrameContract.FRAME_DEGRADE, "trace-1", Map.of()),
+                "七帧入口不得认 degrade（agent-loop 面出现降级帧＝未经登记的通道扩词）");
+    }
+
+    @Test
+    @DisplayName("降级载荷四键：无码或无说明即抛（空降级不得成帧）")
+    void degradeFieldsRefuseEmptyCodeOrNote() {
+        assertEquals(List.of(SseFrameContract.KEY_DG_CODE, SseFrameContract.KEY_APPLIES_TO,
+                        SseFrameContract.KEY_REQUIRES_ACK, SseFrameContract.KEY_NOTE),
+                List.copyOf(SseFrameContract.degradeFields("DG-D1", "D,K", true, "数据层降级").keySet()));
+        assertEquals(AgentLoopTrace.ABSENT,
+                SseFrameContract.degradeFields("DG-D1", " ", true, "note").get(SseFrameContract.KEY_APPLIES_TO),
+                "appliesTo 不可得时写缺失标记，禁空串冒充「无层位」");
+        assertThrows(IllegalArgumentException.class,
+                () -> SseFrameContract.degradeFields(null, "D", true, "note"));
+        assertThrows(IllegalArgumentException.class,
+                () -> SseFrameContract.degradeFields("DG-D1", "D", true, "  "));
+    }
+
+    @Test
+    @DisplayName("W 帧序校验：合法尾序放行，改前自有词形与 milestone 冒充首末帧必红")
+    void wagentSequenceGateAcceptsLegalAndCatchesPreFixShape() {
+        assertTrue(SseFrameContract.validateWagentSequence(
+                List.of("meta", "degrade", "milestone", "step", "done")).isEmpty());
+        assertTrue(SseFrameContract.validateWagentSequence(List.of("meta", "error", "done")).isEmpty());
+        assertTrue(SseFrameContract.validateWagentSequence(
+                List.of("meta", "milestone", "error", "done")).isEmpty());
+
+        // 缺陷原形 D-B5-8：改前该流出的就是这四个自有词形，本闸必须逐条抓红
+        for (String oldName : List.of("stream_ready", "run_terminal", "stream_timeout", "stream_error")) {
+            assertTrue(SseFrameContract.validateWagentSequence(
+                    List.of("meta", oldName, "done")).orElseThrow().contains("未知 WAgent 帧名"),
+                    "改前词形未被抓红: " + oldName);
+        }
+        assertTrue(SseFrameContract.validateWagentSequence(List.of("meta", "milestone"))
+                .orElseThrow().contains("末帧"), "milestone 不得冒充末帧");
+        assertTrue(SseFrameContract.validateWagentSequence(List.of("degrade", "done"))
+                .orElseThrow().contains("首帧"));
+        assertTrue(SseFrameContract.validateWagentSequence(List.of("meta", "error", "step", "done"))
+                .orElseThrow().contains("紧接 done"));
+
+        // 通道互斥：七帧面校验必须拒绝 W 专有帧，否则两词表实际已合流
+        assertTrue(SseFrameContract.validateSequence(
+                List.of("meta", "degrade", "done")).orElseThrow().contains("未知帧名"));
+    }
 }
