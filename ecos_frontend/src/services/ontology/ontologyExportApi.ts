@@ -4,10 +4,15 @@
  * 域：Ontology Export（T2.2 + T10 落地下载）。
  * 端点前缀：/api/v1/ontology/export。
  * 对外唯一导入入口仍是 `src/services/ontologyApi.ts`（纯 re-export 兼容入口）。
+ *
+ * 基址单源 + 传输单源（#143/B5-11f）：`EXPORT_BASE` 由 `API_BASE` 派生（取值与
+ * 改前字面量逐字相同），唯一一条私设 `fetch` 腿（`downloadExport`，blob 形态必须
+ * 拿未消费的响应体）改经 `rawAuthedUrlFetch` ⇒ 从 `api-base-single-source` 与
+ * `privateTransportRatchet` 两份基线同批剪除本文件。
  */
 
 import { apiFetchData } from "../../api";
-import { getAuthToken } from "../auth";
+import { API_BASE, rawAuthedUrlFetch } from "../httpClient";
 import type {
   ExportTaskSummary,
   ExportTask,
@@ -18,7 +23,7 @@ import type {
 // 本体导出 (Ontology Export) — T2.2
 // ================================================================
 
-const EXPORT_BASE = "/api/v1/ontology/export";
+const EXPORT_BASE = `${API_BASE}/v1/ontology/export`;
 
 export async function fetchExportTasks(params?: { ontologyId?: string; format?: string; status?: string }) {
   const qs = new URLSearchParams();
@@ -43,11 +48,10 @@ export async function createExportTask(data: CreateExportDTO) {
 }
 
 export async function downloadExport(id: string): Promise<void> {
-  // auth 单源（X-51）
-  const token = getAuthToken();
-  const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${EXPORT_BASE}/${id}/download`, { headers });
+  // auth 单源（X-51）+ 私设传输收口（#143/B5-11f）：改经 `rawAuthedUrlFetch`，
+  // 该通道不预读响应体 ⇒ `res.blob()` 与 `content-disposition` 取名的既有形状逐字保留；
+  // 也不设 Content-Type 默认值（原腿同样只带 Authorization）。
+  const res = await rawAuthedUrlFetch(`${EXPORT_BASE}/${id}/download`);
   if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
   const blob = await res.blob();
   const contentDisposition = res.headers.get("content-disposition") || "";

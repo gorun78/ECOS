@@ -35,6 +35,9 @@
  * 五腿（#143/B5-11d 已合流传输，本批补基址）的 "/api/…" 字面量全部改 API_BASE 派生。
  * 三文件 URL 逐字不变；`pages/knowledge/services/extract.ts` 经实测仍有 8 行 `/api` 字面量
  * （`KB_V1`、lineage、integration 三族）未派生 ⇒ **保留在基线内**（不冒充已收口）。
+ * 2026-10-19 #143/B5-11f 收口减 2：`services/systemDictApi.ts` 一腿与
+ * `services/ontology/ontologyExportApi.ts` 的 `EXPORT_BASE` 改由 API_BASE 派生
+ * （取值逐字不变），两文件同批从 privateTransportRatchet 基线一并剪除。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -129,7 +132,6 @@ const BASELINE = new Set([
   'services/ontology/ontologyDataApi.ts',
   'services/ontology/ontologyDomainApi.ts',
   'services/ontology/ontologyEngineApi.ts',
-  'services/ontology/ontologyExportApi.ts',
   'services/ontology/ontologyLineageApi.ts',
   'services/ontology/ontologyMappingApi.ts',
   'services/ontology/ontologyModelApi.ts',
@@ -138,7 +140,6 @@ const BASELINE = new Set([
   'services/ontologyClient.ts',
   'services/ontologyWorkbenchApi.ts',
   'services/platformApi.ts',
-  'services/systemDictApi.ts',
   'services/taskCenter.ts',
 ]);
 

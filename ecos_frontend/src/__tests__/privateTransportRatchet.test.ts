@@ -37,6 +37,9 @@
  * #143/B5-11e 剪除 `services/caseLibraryApi.ts`(4) + `services/copilotApi.ts`(2)
  * + `services/datanetMetadataApi.ts`(2) 三条**匿名腿**（走新增具名通道 `rawAnonUrlFetch`，
  * 不因「本来就没身份」而豁免）⇒ 19/25 → **16 文件 / 17 命中行**（同批实跑校验，非推算）。
+ * #143/B5-11f 剪除 `services/systemDictApi.ts`(1) + `services/ontology/ontologyExportApi.ts`(1)
+ * 两条带 Bearer 腿（合流 `rawAuthedUrlFetch`）⇒ 16/17 → **14 文件 / 15 命中行**
+ * （同批实跑校验：改前先跑一次本门读出实测值 14/15，再剪基线，非推算）。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -51,8 +54,8 @@ const SRC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CANONICAL = 'services/httpClient.ts';
 
 /**
- * 基线（存量登记，#143/B5-11e 收口 caseLibraryApi + copilotApi + datanetMetadataApi 后实测
- * 16 文件 / 17 命中行；只减不增）。
+ * 基线（存量登记，#143/B5-11f 收口 systemDictApi + ontologyExportApi 后实测
+ * 14 文件 / 15 命中行；只减不增）。
  * 值 = 该文件允许的最大命中行数，剪项/降数必须与该文件的真实收口同批。
  */
 const BASELINE: Readonly<Record<string, number>> = Object.freeze({
@@ -68,9 +71,7 @@ const BASELINE: Readonly<Record<string, number>> = Object.freeze({
   'services/agentLoopStream.ts': 1,
   'services/capabilityClient.ts': 1,
   'services/engineProbeApi.ts': 2,
-  'services/ontology/ontologyExportApi.ts': 1,
   'services/scenarioActionClient.ts': 1,
-  'services/systemDictApi.ts': 1,
   'services/wagentRunStream.ts': 1,
 });
 
@@ -168,8 +169,8 @@ describe('privateTransportRatchet — C2′ 私设传输棘轮门 (#143/B5-11a)'
 
   it('基线自身可校验：条目数与合计命中上限与文档口径一致', () => {
     const entries = Object.entries(BASELINE);
-    expect(entries.length).toBe(16);
-    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(17);
+    expect(entries.length).toBe(14);
+    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(15);
     // 键必须是 POSIX 相对路径且非基线外文件形态
     for (const [rel] of entries) {
       expect(rel.startsWith('./')).toBe(false);
