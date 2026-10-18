@@ -5,10 +5,12 @@
  *           runtime-task JdbcTaskPersistenceService 持久化 (cron/next_run_at/last_run_at/last_status)
  */
 
-import { apiFetchData } from "../api";
-import { authOnlyHeaders } from "./auth";
+import { apiFetchData, doFetch } from "../api";
+import { rawAuthedFetch } from "./httpClient";
 
 const BASE = "/api/v1/task";
+/** rawAuthedFetch 自带 API_BASE 前缀单源，此处只给「前缀之后」的路径，避免拼成 /api/api/… */
+const AUTHED_PROBE_BASE = "/v1/task";
 
 // ── 类型 ──────────────────────────────────────────────
 export type RealTaskStatus =
@@ -72,22 +74,17 @@ export interface TaskTypesPayload {
 }
 
 // ── 内部工具 ──────────────────────────────────────────
+// 解包点单源 (#143/B5-10c-1)：信封拆合交 httpClient，域内只保留「失败形状 T|null」
+// 这层契约（消费者 AsyncTaskCenterView 用 !! 与 Array.isArray 判据）。
 async function jget<T>(url: string): Promise<T | null> {
-  const res = await fetch(url, { headers: authOnlyHeaders(), cache: "no-store" });
-  if (!res.ok) return null;
-  const json = await res.json();
-  return (json?.data ?? null as T);
+  return apiFetchData<T>(url, { cache: "no-store" }).catch((): T | null => null);
 }
 
 async function jpost<T>(url: string, body?: unknown): Promise<T | null> {
-  const res = await fetch(url, {
+  return apiFetchData<T>(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...authOnlyHeaders() },
     body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) return null;
-  const json = await res.json();
-  return (json?.data ?? null as T);
+  }).catch((): T | null => null);
 }
 
 // ── 列表与统计 ────────────────────────────────────────
@@ -253,22 +250,22 @@ export async function apiTaskStats(): Promise<TaskStats> {
   return apiFetchData(`${TASK_BASE}/stats`);
 }
 
-// ── 裸 fetch 收口 (H6-T2)：TaskPanel / TaskCenter 原语义（无鉴权头、整包 JSON）迁移 ──
+// ── 裸 fetch 收口 (H6-T2)：TaskPanel / TaskCenter 原语义（整包 JSON）迁移 ──
+// #143/B5-10c-1 二次收口：这两条腿的返回值是**整包信封**（消费者 useTaskPanel 逐字判
+// d.code === 0 / d.code !== 0 并读 d.message、d.total），故合流到整包通道 doFetch 而非
+// apiFetchData——合包与否由腿部外显形状决定，整包语义不构成第二解包点。
 
 /** 整包 JSON GET（保留 code/data 原判断语义，失败抛错由调用方 catch） */
 async function rawGetJson(url: string): Promise<any> {
-  const r = await fetch(url);
-  return r.json();
+  return doFetch(url);
 }
 
-/** 整包 JSON POST（原 TaskPanel 无/有 Content-Type 两种形态分别保留） */
-async function rawPostJson(url: string, body?: unknown, withContentType = false): Promise<any> {
-  const r = await fetch(url, {
+/** 整包 JSON POST（单源恒带 Content-Type，原 withContentType 分支失去意义后移除） */
+async function rawPostJson(url: string, body?: unknown): Promise<any> {
+  return doFetch(url, {
     method: "POST",
-    ...(withContentType ? { headers: { "Content-Type": "application/json" } } : {}),
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  return r.json();
 }
 
 export function taskPanelTypesJson(): Promise<any> {
@@ -292,17 +289,17 @@ export function taskPanelActionJson(taskId: string, action: string): Promise<any
 }
 
 export function taskPanelBatchJson(taskIds: string[], action: string): Promise<any> {
-  return rawPostJson(`${BASE}/batch`, { taskIds, action }, true);
+  return rawPostJson(`${BASE}/batch`, { taskIds, action });
 }
 
 /** GET /api/v1/task/doris/health — 返回 {ok, json}，仅 ok 时解析 */
 export async function taskDorisHealth(): Promise<{ ok: boolean; json?: any }> {
-  const r = await fetch(`${BASE}/doris/health`);
+  const r = await rawAuthedFetch(`${AUTHED_PROBE_BASE}/doris/health`);
   return { ok: r.ok, json: r.ok ? await r.json() : undefined };
 }
 
 /** POST /api/v1/task/{id}/execute — 仅返回是否成功（原 TaskCenter 语义） */
 export async function taskExecuteOk(taskId: string): Promise<boolean> {
-  const r = await fetch(`${BASE}/${taskId}/execute`, { method: "POST" });
+  const r = await rawAuthedFetch(`${AUTHED_PROBE_BASE}/${taskId}/execute`, { method: "POST" });
   return r.ok;
 }
