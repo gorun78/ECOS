@@ -3,21 +3,15 @@
  * (从原单文件 api.ts 拆分, 见 W66 前端 <800 行约定)
  * @license Apache-2.0
  */
-import { get } from './_base';
-import { authOnlyHeaders as authHeaders } from '../../../services/auth';
+import { get, postEmpty, put, asArray, httpStatusText } from './_base';
 import { normalizeRowCount } from './mappers';
 import type { TableInfo } from '../types';
 
 /** 立即触发元数据采集 → POST /api/v1/datanet/metadata/collect-async/{id} (PMO-37) */
 export async function triggerMetadataCollect(datasourceId: string): Promise<{ taskId?: string; message?: string } | null> {
   try {
-    const res = await fetch(`/api/v1/datanet/metadata/collect-async/${encodeURIComponent(datasourceId)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const json = await res.json();
-    return (json.data ?? json) as { taskId?: string; message?: string } | null;
+    const result = await postEmpty<{ taskId?: string; message?: string } | null>(`/api/v1/datanet/metadata/collect-async/${encodeURIComponent(datasourceId)}`);
+    return result ?? null;
   } catch (e) {
     console.warn('[data-workbench] triggerMetadataCollect failed:', e);
     return null;
@@ -79,13 +73,8 @@ export async function fetchCollectStatus(taskId: string): Promise<{
 /** 立即触发采集（同步 UI 模式）— POST /api/v1/datanet/metadata/collect-sync/{id} */
 export async function triggerCollectSync(datasourceId: string): Promise<{ taskId?: string; mode?: string } | null> {
   try {
-    const res = await fetch(`/api/v1/datanet/metadata/collect-sync/${encodeURIComponent(datasourceId)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    return (json.data ?? json) as { taskId?: string; mode?: string } | null;
+    const result = await postEmpty<{ taskId?: string; mode?: string } | null>(`/api/v1/datanet/metadata/collect-sync/${encodeURIComponent(datasourceId)}`);
+    return result ?? null;
   } catch (e) {
     console.warn('[data-workbench] triggerCollectSync failed:', e);
     return null;
@@ -104,13 +93,8 @@ interface TaskListItemRaw {
 }
 export async function fetchActiveCollectTasks(datasourceId: string): Promise<{ taskId: string; status: string; progress: number; startTime?: string }[]> {
   try {
-    const res = await fetch(`/api/v1/task/list?taskType=METADATA_COLLECT&offset=0&limit=20`, {
-      headers: { ...authHeaders() },
-    });
-    if (!res.ok) return [];
-    const json = await res.json();
-    const list = (json?.data?.data || json?.data || []) as TaskListItemRaw[];
-    if (!Array.isArray(list)) return [];
+    const raw = await get<unknown>('/api/v1/task/list?taskType=METADATA_COLLECT&offset=0&limit=20');
+    const list = asArray<TaskListItemRaw>(raw);
     return list
       .filter((t) => {
         const params = t?.parameters || {};
@@ -149,14 +133,9 @@ export async function fetchCollectDiff(datasourceId: string, limit = 5): Promise
   tablesTotal?: number;
 }[]> {
   try {
-    const res = await fetch(`/api/v1/datanet/metadata/collect-diff/${encodeURIComponent(datasourceId)}?limit=${limit}`, {
-      headers: { ...authHeaders() },
-      cache: 'no-store',
-    });
-    if (!res.ok) return [];
-    const json = await res.json();
-    const list = (json?.data?.diffs || []) as CollectDiffItemRaw[];
-    if (!Array.isArray(list)) return [];
+    const raw = await get<{ diffs?: CollectDiffItemRaw[] }>(`/api/v1/datanet/metadata/collect-diff/${encodeURIComponent(datasourceId)}?limit=${limit}`, { cache: 'no-store' });
+    const rawDiffs = raw?.diffs;
+    const list = Array.isArray(rawDiffs) ? rawDiffs : [];
     return list.map((d) => ({
       collectedAt: d.collectedAt,
       taskId: d.taskId,
@@ -205,16 +184,14 @@ export async function fetchVersionHistory(datasourceId: string): Promise<{
   current: { exists: boolean; collectedAt?: string; tableCount?: number };
 } | null> {
   try {
-    const res = await fetch(`/api/v1/datanet/metadata/version-history/${encodeURIComponent(datasourceId)}`, {
-      headers: { ...authHeaders() },
-      cache: 'no-store',
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    if (json?.code !== 0) return null;
+    const raw = await get<{ versions?: MetadataVersion[]; current?: { exists: boolean; collectedAt?: string; tableCount?: number } }>(
+      `/api/v1/datanet/metadata/version-history/${encodeURIComponent(datasourceId)}`,
+      { cache: 'no-store' },
+    );
+    const rawVersions = raw?.versions;
     return {
-      versions: Array.isArray(json?.data?.versions) ? json.data.versions : [],
-      current: json?.data?.current || { exists: false },
+      versions: Array.isArray(rawVersions) ? rawVersions : [],
+      current: raw?.current || { exists: false },
     };
   } catch (e) {
     console.warn('[data-workbench] fetchVersionHistory failed:', e);
@@ -225,23 +202,22 @@ export async function fetchVersionHistory(datasourceId: string): Promise<{
 /** 历史版本与当前版本结构化比较 → GET /api/v1/datanet/metadata/version-diff/{id}?version={ts} */
 export async function fetchVersionDiff(datasourceId: string, version: string): Promise<VersionDiffResult | { error: string } | null> {
   try {
-    const res = await fetch(`/api/v1/datanet/metadata/version-diff/${encodeURIComponent(datasourceId)}?version=${encodeURIComponent(version)}`, {
-      headers: { ...authHeaders() },
-      cache: 'no-store',
-    });
-    if (!res.ok) return { error: `HTTP ${res.status}` };
-    const json = await res.json();
-    if (json?.code !== 0) {
-      return { error: json?.message || 'version diff failed' };
-    }
-    const d = json?.data || {};
+    const raw = await get<Record<string, unknown>>(
+      `/api/v1/datanet/metadata/version-diff/${encodeURIComponent(datasourceId)}?version=${encodeURIComponent(version)}`,
+      { cache: 'no-store' },
+    );
+    const d = raw ?? {};
     return {
-      rows: Array.isArray(d.rows) ? d.rows : [],
-      currentCollectedAt: d.currentCollectedAt || '',
-      versionCollectedAt: d.versionCollectedAt || '',
-      summary: d.summary,
+      rows: Array.isArray(d.rows) ? d.rows as VersionDiffRow[] : [],
+      currentCollectedAt: (d.currentCollectedAt as string) || '',
+      versionCollectedAt: (d.versionCollectedAt as string) || '',
+      summary: d.summary as string | undefined,
     };
   } catch (e) {
+    // 返回的 error 文案会直接呈现给用户：非 2xx/伪失败取单源还原；网络层失败（httpStatusText
+    // 返回 null）留在 null 腿，禁把「请求没到达服务端」的内部文案当后端文案渲染。
+    const text = httpStatusText(e, 'version diff failed');
+    if (text !== null) return { error: text };
     console.warn('[data-workbench] fetchVersionDiff failed:', e);
     return null;
   }
@@ -255,14 +231,9 @@ export async function fetchPreview(resourceId: string, limit = 50): Promise<{
   rows: Record<string, unknown>[];
 } | null> {
   try {
-    const res = await fetch(`/api/v1/datanet/metadata/preview/${encodeURIComponent(resourceId)}?limit=${limit}`, {
-      headers: { ...authHeaders() },
-      cache: 'no-store',
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    const data = json?.data ?? json;
-    const rows: Record<string, unknown>[] = Array.isArray(data?.rows) ? data.rows : [];
+    const raw = await get<{ rows?: Record<string, unknown>[] }>(`/api/v1/datanet/metadata/preview/${encodeURIComponent(resourceId)}?limit=${limit}`, { cache: 'no-store' });
+    const rawRows = raw?.rows;
+    const rows: Record<string, unknown>[] = Array.isArray(rawRows) ? rawRows : [];
     const inferType = (v: unknown): string =>
       typeof v === 'number' ? 'NUMBER' : typeof v === 'boolean' ? 'BOOL' : 'STRING';
     const columns = rows.length > 0
@@ -292,15 +263,8 @@ export interface DataFieldMeta {
 }
 export async function fetchFields(resourceId: string): Promise<DataFieldMeta[]> {
   try {
-    const res = await fetch(`/api/v1/datanet/metadata/fields/${encodeURIComponent(resourceId)}`, {
-      headers: { ...authHeaders() },
-      cache: 'no-store',
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    const arr = json?.data?.data ?? json?.data ?? json;
-    if (!Array.isArray(arr)) return [];
-    return arr as DataFieldMeta[];
+    const raw = await get<unknown>(`/api/v1/datanet/metadata/fields/${encodeURIComponent(resourceId)}`, { cache: 'no-store' });
+    return asArray<DataFieldMeta>(raw);
   } catch (e) {
     console.warn('[data-workbench] fetchFields failed:', e);
     return [];
@@ -312,14 +276,8 @@ export async function saveMetadataStrategy(datasourceId: string, strategy: strin
   try {
     const body: Record<string, unknown> = { strategy, countMethod };
     if (scheduleCron) body.scheduleCron = scheduleCron;
-    const res = await fetch(`/api/v1/datanet/metadata/strategy/${encodeURIComponent(datasourceId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const json = await res.json();
-    return json?.success === true || json?.code === 0;
+    await put(`/api/v1/datanet/metadata/strategy/${encodeURIComponent(datasourceId)}`, body);
+    return true;
   } catch (e) {
     console.warn('[data-workbench] saveMetadataStrategy failed:', e);
     return false;
@@ -330,15 +288,8 @@ export async function saveMetadataStrategy(datasourceId: string, strategy: strin
 export async function fetchDataSourceResources(datasourceId: string): Promise<TableInfo[]> {
   try {
     const url = `/api/v1/datanet/metadata/resources/${encodeURIComponent(datasourceId)}?_=${Date.now()}`;
-    const res = await fetch(url, {
-      headers: { ...authHeaders() },
-      cache: 'no-store',
-    });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const json = await res.json();
-    const raw: unknown[] = (json?.data ?? json);
-    if (!Array.isArray(raw)) return [];
-    return raw.map((r: Record<string, unknown>) => ({
+    const raw = await get<unknown>(url, { cache: 'no-store' });
+    return asArray<Record<string, unknown>>(raw).map((r: Record<string, unknown>) => ({
       name: (r.resourceName as string) || (r.tableName as string) || (r.name as string) || '',
       rowCount: normalizeRowCount(r.recordCount, r.rowCount, r.rows),
       columns: Array.isArray(r.columns)

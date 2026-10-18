@@ -3,8 +3,7 @@
  * (从原单文件 api.ts 拆分, 见 W66 前端 <800 行约定)
  * @license Apache-2.0
  */
-import { get, post, put, del, toApiType, DATANET_DS } from './_base';
-import { authOnlyHeaders as authHeaders } from '../../../services/auth';
+import { get, post, put, del, toApiType, envelopeErrorText, DATANET_DS } from './_base';
 import { mapDsToConn } from './mappers';
 import type { DataConnection } from '../types';
 
@@ -379,25 +378,13 @@ export function buildPreviewSchemaPayload(payload: SchemaPreviewPayload): Record
 export async function fetchSchemaPreview(payload: SchemaPreviewPayload): Promise<{ fields: SchemaField[]; tableNames: string[] } | { ok: false; error: string }> {
   const body = buildPreviewSchemaPayload(payload);
   try {
-    const res = await fetch('/api/v1/ecos/data/datasource/preview-schema', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      let msg = `HTTP ${res.status}`;
-      try {
-        const errJson = await res.json();
-        msg = errJson.message || errJson.error || msg;
-      } catch { /* ignore parse error */ }
-      return { ok: false, error: msg };
-    }
-    const json = await res.json();
-    const data = json.data ?? json;
-    const fields: SchemaField[] = Array.isArray(data.fields) ? data.fields : [];
-    const tableNames: string[] = Array.isArray(data.tableNames) ? data.tableNames : [];
+    const raw = await post<{ fields?: unknown; tableNames?: unknown }>('/api/v1/ecos/data/datasource/preview-schema', body);
+    const rawFields = raw?.fields;
+    const rawTableNames = raw?.tableNames;
+    const fields: SchemaField[] = Array.isArray(rawFields) ? rawFields as SchemaField[] : [];
+    const tableNames: string[] = Array.isArray(rawTableNames) ? rawTableNames as string[] : [];
     return { fields, tableNames };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'network error' };
+    return { ok: false, error: envelopeErrorText(e, 'network error') };
   }
 }
