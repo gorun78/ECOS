@@ -19,6 +19,7 @@
 import { apiFetchData } from '../../../api';
 import { API_BASE } from '../../../services/httpClient';
 import { getAuthToken } from '../../../services/auth';
+import { createSseParser } from '../../../services/sseParser';
 import { kbFetchData, kbSseRequest } from './kbFetch';
 import type {
   EvalSeedQuery,
@@ -287,6 +288,11 @@ export async function kbRunEval(seedSetName: string): Promise<EvalReport> {
 /**
  * SSE-capable RAG query —— SSE 走 `kbSseRequest`（auth via auth.ts）；
  * SSE 不可用时 fallback 到 `runRAGQuery`（silent 版），整体上保留既有语义。
+ *
+ * 线路级切分单源在 `services/sseParser`（D-B5-11 收口：此处此前按 `chunk.split('\n')`
+ * 逐行正则匹配 `^data:`，一条 token 被分包切成两段时前半截当完整 token 上屏、后半截直接丢失）。
+ * 零 data 帧视为「本通道不可用」而不是「成功但无内容」：后端 `GET /rag?stream=true` 端点
+ * 实不存在（登记 D-B5-12），应答是普通 JSON 体 ⇒ 必须显式转兜底通道，禁静默空回答。
  */
 export async function runRAGQuerySSE(query: string, onToken: (token: string) => void): Promise<{ answerGenerated: boolean }> {
   try {
@@ -295,18 +301,19 @@ export async function runRAGQuerySSE(query: string, onToken: (token: string) => 
     if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`);
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
-    let answerGenerated = true;
+    const parser = createSseParser();
+    let tokens = 0;
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split('\n');
-      for (const line of lines) {
-        const m = line.match(/^data:\s*(.+)$/);
-        if (m) onToken(m[1].trim());
+      for (const evt of parser.push(decoder.decode(value, { stream: true }))) {
+        onToken(evt.data);
+        tokens += 1;
       }
     }
-    return { answerGenerated };
+    parser.end();
+    if (tokens === 0) throw new Error('SSE 通道未产出任何 data 帧');
+    return { answerGenerated: true };
   } catch (e: unknown) {
     // SSE 不可用 → fallback 到 POST（preserve 既有 fallback 语义）
     console.info('SSE fallback to POST:', (e as { message?: string } | undefined)?.message);

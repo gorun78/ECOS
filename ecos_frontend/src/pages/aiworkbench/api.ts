@@ -10,6 +10,7 @@
  */
 import { apiFetchData } from '../../api';
 import { API_BASE } from '../../services/httpClient';
+import { createSseParser, decodeFrameData, type SseRawEvent } from '../../services/sseParser';
 import { authHeaders } from '../../services/auth';
 import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel, AIPActionType, ExecuteActionResult, AIPAgentTemplate, AIPAgentMetrics, AIPAgentError, AIPAuditLog } from '../../types/aiworkbench';
 
@@ -503,56 +504,51 @@ export async function oagPlaygroundStream(params: OagPlaygroundParams): Promise<
 
 /**
  * Reusable SSE 流解析 — parse the EventSource `text/event-stream` format via ReadableStream。
- * 按 SSE 事件分隔符 `\n\n` 切分，派发 `event:`/`data:` 行。
+ *
+ * 线路级切分单源在 `services/sseParser`（D-B5-11 收口：此处此前自留 `indexOf('\n\n')`，
+ * 对 Spring 默认写出的 `\r\n` 分隔一个事件都派发不出来 ⇒ 界面「跑完什么都没显示」）。
+ * 本函数只负责把已闭合事件按 OAG 事件名派发进 handlers，不认识 SSE 行协议。
  */
 export async function parseSseStream(res: Response, handlers: OagSseHandlers): Promise<void> {
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
-  let buffer = '';
+  const parser = createSseParser();
+  const dispatch = (evt: SseRawEvent) => {
+    // 非 JSON 载荷按原文进 message 位（后端 error 事件的纯文本形态），不静默丢弃
+    const data = (decodeFrameData(evt.data) ?? { message: evt.data }) as Record<string, unknown>;
+    switch (evt.event) {
+      case 'node': handlers.onStep(data as unknown as OagStepEvent); break;
+      case 'response':
+        handlers.onResponse({ content: (data.content as string) || '', traceId: (data.traceId as string) || '' });
+        break;
+      case 'blocked':
+        handlers.onBlocked({ reason: (data.reason as string) || '', traceId: (data.traceId as string) || '' });
+        break;
+      case 'error':
+        handlers.onError({ message: (data.message as string) || '', traceId: data.traceId as string | undefined });
+        break;
+      case 'done':
+        handlers.onDone({
+          traceId: (data.traceId as string) || '',
+          sessionId: (data.sessionId as string) || '',
+          elapsedMs: (data.elapsedMs as number) || 0,
+          status: (data.status as string) || '',
+          intent: data.intent as string | undefined,
+          securityPassed: data.securityPassed as boolean | undefined,
+        });
+        break;
+      default:
+        // 契约外事件名整条忽略：禁把未知帧冒充已知帧渲染
+        break;
+    }
+  };
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    // 按 SSE 分隔符 \n\n 切分
-    let sep;
-    while ((sep = buffer.indexOf('\n\n')) >= 0) {
-      const raw = buffer.slice(0, sep);
-      buffer = buffer.slice(sep + 2);
-      const lines = raw.split('\n');
-      let event = 'message';
-      const dataSegments: string[] = [];
-      for (const line of lines) {
-        if (line.startsWith('event:')) event = line.slice(6).trim();
-        else if (line.startsWith('data:')) dataSegments.push(line.slice(5).trim());
-      }
-      if (dataSegments.length === 0) continue;
-      const dataStr = dataSegments.join('\n');
-      let data: Record<string, unknown>;
-      try { data = JSON.parse(dataStr); } catch { data = { message: dataStr }; }
-      switch (event) {
-        case 'node': handlers.onStep(data as unknown as OagStepEvent); break;
-        case 'response':
-          handlers.onResponse({ content: (data.content as string) || '', traceId: (data.traceId as string) || '' });
-          break;
-        case 'blocked':
-          handlers.onBlocked({ reason: (data.reason as string) || '', traceId: (data.traceId as string) || '' });
-          break;
-        case 'error':
-          handlers.onError({ message: (data.message as string) || '', traceId: data.traceId as string | undefined });
-          break;
-        case 'done':
-          handlers.onDone({
-            traceId: (data.traceId as string) || '',
-            sessionId: (data.sessionId as string) || '',
-            elapsedMs: (data.elapsedMs as number) || 0,
-            status: (data.status as string) || '',
-            intent: data.intent as string | undefined,
-            securityPassed: data.securityPassed as boolean | undefined,
-          });
-          break;
-      }
-    }
+    for (const evt of parser.push(decoder.decode(value, { stream: true }))) dispatch(evt);
   }
+  // 尾块未以空行闭合 ⇒ 由单源解析器丢弃（半截 JSON 绝不当事件消费）
+  parser.end();
 }
 
 // ── Agent Session (复用已有 AgentSessionService) ──────

@@ -3,8 +3,10 @@
  *
  * 只做「字节流 → 事件块」的线路级切分（`event:` / `data:` / `id:` / `retry:` / 注释行），
  * 不认识帧名、不做契约校验 —— 那部分单源在 `services/sseFrames.ts`。
- * 分层理由：页面侧此前各自手写 `indexOf('\n\n')` 切分（`pages/aiworkbench/api.ts`
- * 的 OAG 通道即其一），既不认 `\r\n`，也不处理跨 chunk 断包，属第二实现面（已登记 D-B5-11）。
+ * 分层理由：页面侧曾各自手写 `indexOf` 空行块切与逐行 `data:` 正则（`pages/aiworkbench/api.ts`
+ * 的 OAG 通道、`pages/knowledge/services/govern.ts` 的 KB RAG 通道），既不认 `\r\n`，也不处理
+ * 跨 chunk 断包，属第二实现面（D-B5-11，#143/B5-4 已收口至此单源）。
+ * 再加新承流通道一律引本文件，闸：`services/__tests__/sseChannelSingleSource.spec.ts`。
  *
  * 纯函数、无 DOM/React 依赖，可直接单测。
  * @license Apache-2.0
