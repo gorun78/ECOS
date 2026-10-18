@@ -41,6 +41,20 @@ export interface Mission {
   result: string | null;
 }
 
+/**
+ * Run 上下文（篇13 §13.4.5：`meta` 帧建立 Run 上下文并写入 useAgentStore）。
+ * 单源在此，面板读同一份；值逐字来自后端 meta 帧，缺失即缺失标记（-1 / "-"），禁补零补串。
+ */
+export interface AgentRunContext {
+  traceId: string;
+  sessionId: string;
+  model: string;
+  contextLimit: number;
+  estimatedTokens: number;
+  /** 承流通道：sse=实时七帧流；poll=断线达阈值后的非流式兜底（§4.4，不得声称实时） */
+  channel: 'sse' | 'poll';
+}
+
 export interface AgentState {
   agents: AgentDefinition[];
   selectedAgentId: string | null;
@@ -49,6 +63,7 @@ export interface AgentState {
   executionPlans: ExecutionPlan[];
   loading: boolean;
   error: string | null;
+  runContext: AgentRunContext | null;
 
   fetchAgents: () => Promise<void>;
   selectAgent: (id: string | null) => void;
@@ -57,6 +72,7 @@ export interface AgentState {
   createMission: (mission: Partial<Mission>) => Promise<void>;
   executeMission: (id: string) => Promise<void>;
   setError: (error: string | null) => void;
+  setRunContext: (context: AgentRunContext | null) => void;
 }
 
 export const useAgentStore = create<AgentState>()(
@@ -69,6 +85,7 @@ export const useAgentStore = create<AgentState>()(
       executionPlans: [] as ExecutionPlan[],
       loading: false,
       error: null as string | null,
+      runContext: null as AgentRunContext | null,
 
       fetchAgents: async () => {
         set({ loading: true, error: null });
@@ -119,6 +136,8 @@ export const useAgentStore = create<AgentState>()(
       },
 
       setError: (error) => set({ error }),
+
+      setRunContext: (context) => set({ runContext: context }),
     }),
     { name: 'agent-store' }
   )

@@ -15,7 +15,7 @@
  *   未上报字段显式标注「后端未上报」。
  * - CRUD：创建/编辑/删除接真实 /api/v1/agent-mesh/agents（ecos_agent_registry 持久化）。
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AIPAgent, AIPModel, AIPGuardrail, AIPAuditLog } from '../../types/aiworkbench';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
@@ -23,6 +23,22 @@ import ConfirmDialog from '../../components/common/ConfirmDialog';
 import ChatHeader from '../../components/aiworkbench/chatbot/ChatHeader';
 import ConfigPanel from '../../components/aiworkbench/chatbot/ConfigPanel';
 import ChatPanel from '../../components/aiworkbench/chatbot/ChatPanel';
+import CitationList from '../../components/common/structured/CitationList';
+import EvidenceDrawer from '../../components/common/structured/EvidenceDrawer';
+import RunProgress from '../../components/common/structured/RunProgress';
+import DegradationBanner from '../../components/common/status/DegradationBanner';
+import ErrorPanel from '../../components/common/status/ErrorPanel';
+import { useAgentLoopStream, type AgentLoopRunResult } from '../../hooks/useAgentLoopStream';
+import { useAgentStore } from '../../stores/agent/useAgentStore';
+import type { AgentLoopStepFrame } from '../../services/sseFrames';
+import {
+  POLL_INTERVAL_DEFAULT_SECONDS,
+  TEXT_ABSENT,
+  TOKEN_UNKNOWN,
+  citationToEvidence,
+  isDenialDecision,
+  isToolStepOp,
+} from '../../services/sseFrames';
 import { agentLoopChat, createMeshAgent, updateMeshAgent, deleteMeshAgent, executeOntologyProposal } from './api';
 
 interface ChatMessage {
@@ -94,29 +110,116 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
   };
 
   // ── 真实推理通道：POST /api/v1/agent-loop/chat（§4.5 P0：罐头回复已删除）──
+  // #143/B5-3：同路径改走 SSE 七帧承流（靠 `Accept: text/event-stream` 与 JSON 端点分流）。
+  // 断线累计达 §4.4 阈值后由 hook 切既有非流式 JSON 回执兜底（fallbackRunner），
+  // 降级条如实显示「非实时」，禁把兜底轮渲染成流式。
+  const [streamTurn, setStreamTurn] = useState<{ timestamp: string } | null>(null);
+  const [streamFailure, setStreamFailure] = useState<{ reason: string; traceId: string | null } | null>(null);
+  const [evidenceIndex, setEvidenceIndex] = useState<number | null>(null);
+  const { state: stream, run: runStream, abort: abortStream, reset: resetStream } = useAgentLoopStream({
+    fallbackRunner: async (req) => {
+      const data = await agentLoopChat({ agentId: req.agentId, message: req.message, sessionId: req.sessionId });
+      if (!data || data.success === false || typeof data.content !== 'string' || !data.content) {
+        throw new Error(data?.errorMsg || t('aiworkbench.chatbot.chat.engineFail'));
+      }
+      return data.content;
+    },
+  });
+  const runContext = useAgentStore((s) => s.runContext);
+
+  /** 思考链只来自 step 帧的 tool_call/tool_result；无上报即不展示（不合成） */
+  const traceOf = (steps: AgentLoopStepFrame[]): string[] =>
+    steps.filter((s) => isToolStepOp(s.op)).map((s) => `${s.op}: ${s.tool} [${s.decision}]`);
+  const thinkingTrace = useMemo(() => traceOf(stream.steps), [stream.steps]);
+
+  /** step 帧 → 时间线（帧是事后发出的既有事实，故落 done/failed 两态，不演 pending） */
+  const runSteps = useMemo(
+    () => stream.steps.map((s, i) => ({
+      id: `${s.op}-${s.step}-${i}`,
+      label: s.tool === TEXT_ABSENT ? s.op : `${s.op} · ${s.tool}`,
+      state: isDenialDecision(s.decision) ? ('failed' as const) : ('done' as const),
+    })),
+    [stream.steps],
+  );
+
+  /** 分项用量 -1（后端未上报）禁折算、禁显示 0 */
+  const usageCell = (value: number | undefined): string =>
+    value === undefined || value === TOKEN_UNKNOWN ? t('aiworkbench.chatbot.chat.usageAbsent') : String(value);
+
+  /** 流式气泡：正文随 delta 帧增长（§13.4.5 禁整段覆盖），收流后由 hSend 固化进 chatMessages */
+  const liveChatMessages = useMemo<ChatMessage[]>(() => {
+    if (!streamTurn) return chatMessages;
+    return [
+      ...chatMessages,
+      {
+        id: 'streaming',
+        sender: 'agent',
+        content: stream.content,
+        timestamp: streamTurn.timestamp,
+        thinkingTrace: thinkingTrace.length > 0 ? thinkingTrace : undefined,
+      },
+    ];
+  }, [chatMessages, streamTurn, stream.content, thinkingTrace]);
+
+  /** 失败四类（transport/contract/interrupted/aborted）各给各的文案，禁折叠成「出错了」 */
+  const failReason = (failure: AgentLoopRunResult['failure']): string => {
+    if (!failure) return t('aiworkbench.chatbot.chat.engineFail');
+    switch (failure.kind) {
+      case 'transport': return `${t('aiworkbench.chatbot.chat.engineFail')}: ${failure.message}`;
+      case 'contract': return `${t('aiworkbench.chatbot.chat.contractViolation')}: ${failure.detail}`;
+      case 'interrupted': return t('aiworkbench.chatbot.chat.streamInterrupted');
+      case 'aborted': return t('aiworkbench.chatbot.chat.streamAborted');
+    }
+  };
+
+  /** traceId 缺失标记不铺界面（ErrorPanel 只在有真实追踪号时渲染该行） */
+  const realTraceId = (value: string | null | undefined): string | null =>
+    value && value !== TEXT_ABSENT ? value : null;
+
+  /** 右栏只在有可如实呈现的帧事实时出现；空面板剧场不算布局 */
+  const railVisible =
+    stream.running ||
+    runSteps.length > 0 ||
+    stream.citations.length > 0 ||
+    stream.usage !== null ||
+    stream.doneFrame !== null ||
+    streamFailure !== null ||
+    stream.degradedToPoll ||
+    stream.disconnectCount > 0;
+
+  /** ErrorPanel 重试要重发同一条用户文本（chatInput 已在发送后清空） */
+  const lastUserTextRef = useRef('');
+
   const hSend = async (txt?: string) => {
     const text = txt || chatInput;
     if (!text.trim() || isReplying || !activeChatbot) return;
-    const um: ChatMessage = { id:`user-${Date.now()}`, sender:'user', content:text, timestamp:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) };
-    setChatMessages(p=>[...p,um]); setChatInput(''); setIsReplying(true);
-    const ts = new Date().toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' });
+    const ts = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const um: ChatMessage = { id: `user-${Date.now()}`, sender: 'user', content: text, timestamp: ts };
+    lastUserTextRef.current = text;
+    setChatMessages(p => [...p, um]); setChatInput(''); setIsReplying(true);
+    setStreamFailure(null); setEvidenceIndex(null); setStreamTurn({ timestamp: ts });
     try {
-      const data = await agentLoopChat({ agentId: activeChatbot.id, message: text });
-      if (!data || data.success === false || typeof data.content !== 'string' || !data.content) {
-        // §2.3 诚实态：引擎未返回有效 content → 错误气泡，不合成回复/思考链/提案
-        const reason = data?.errorMsg ? `${t('aiworkbench.chatbot.chat.engineFail')}: ${data.errorMsg}` : t('aiworkbench.chatbot.chat.engineFail');
-        setChatMessages(p=>[...p,{ id:`sys-${Date.now()}`, sender:'system', content:reason, timestamp:ts }]);
-        return;
+      const result = await runStream({ agentId: activeChatbot.id, message: text });
+      // 有据正文先固化；失败分支也保留已渲染内容（§13.4.5「error 进 ErrorPanel 且保留已渲染内容」）
+      if (result.content) {
+        const trace = traceOf(result.steps);
+        setChatMessages(p => [...p, {
+          id: `agent-${Date.now()}`, sender: 'agent', content: result.content, timestamp: ts,
+          thinkingTrace: trace.length > 0 ? trace : undefined,
+        }]);
       }
-      // 思考链仅来自引擎真实 toolCalls 上报；无上报则不展示（不合成）
-      const thinkingTrace = Array.isArray(data.toolCalls) && data.toolCalls.length > 0
-        ? data.toolCalls.map(tc => `${String(tc.toolName ?? 'tool')}: ${tc.success ? 'OK' : 'FAIL'} (${tc.durationMs ?? '-'}ms)`)
-        : undefined;
-      setChatMessages(p=>[...p,{ id:`agent-${Date.now()}`, sender:'agent', content:data.content, timestamp:ts, thinkingTrace }]);
+      const failed = result.doneFrame ? !result.doneFrame.success : result.failure !== null;
+      if (failed) {
+        const reason = result.errorFrame?.message || failReason(result.failure);
+        setStreamFailure({ reason, traceId: realTraceId(result.errorFrame?.traceId ?? result.meta?.traceId) });
+        if (!result.content) showToast?.('error', reason);
+      }
     } catch (e: unknown) {
+      // run() 内已把失败归四类、不 throw；此分支只兜编程错误，原文只进面板不进正文
       const msg = e instanceof Error && e.message ? e.message : String(e);
-      setChatMessages(p=>[...p,{ id:`sys-${Date.now()}`, sender:'system', content:`${t('aiworkbench.chatbot.chat.engineFail')} (${msg})`, timestamp:ts }]);
+      setStreamFailure({ reason: `${t('aiworkbench.chatbot.chat.engineFail')} (${msg})`, traceId: null });
     } finally {
+      setStreamTurn(null);
       setIsReplying(false);
     }
   };
@@ -216,7 +319,7 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
     }
   };
 
-  const hReset = () => { if(activeChatbot){ setChatMessages([{id:'welcome-reset',sender:'agent',content:t('aiworkbench.chatbot.resetWelcome').replace('{name}',activeChatbot.name),timestamp:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}]); showToast?.('info',t('aiworkbench.chatbot.toastClearHistory')); }};
+  const hReset = () => { if(activeChatbot){ setChatMessages([{id:'welcome-reset',sender:'agent',content:t('aiworkbench.chatbot.resetWelcome').replace('{name}',activeChatbot.name),timestamp:new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}]); setStreamFailure(null); setEvidenceIndex(null); resetStream(); showToast?.('info',t('aiworkbench.chatbot.toastClearHistory')); }};
 
   return (
     <div className={`h-full w-full flex flex-col md:flex-row overflow-hidden ${styles.appBg} ${styles.appText} text-xs`}>
@@ -235,16 +338,87 @@ export default function ChatbotStudioView({ agents, models, guardrails, onUpdate
             dragOver={dragOver} ragDocs={ragDocs} setRagDocs={setRagDocs}
             embedTab={embedTab} setEmbedTab={setEmbedTab}
             apiLang={apiLang} setApiLang={setApiLang} onEditConfig={()=>setShowMetadataModal(!showMetadataModal)} onDelete={()=>hDelete(activeChatbot.id)} styles={styles} />
-          <ChatPanel activeChatbot={activeChatbot} chatMessages={chatMessages} chatInput={chatInput} setChatInput={setChatInput}
+          <ChatPanel activeChatbot={activeChatbot} chatMessages={liveChatMessages} chatInput={chatInput} setChatInput={setChatInput}
             isReplying={isReplying} onSend={hSend} onProposalConsent={hConsent} onResetChat={hReset}
             activeUserRole={activeUserRole} setActiveUserRole={setActiveUserRole} activeContextDataset={activeContextDataset} setActiveContextDataset={setActiveContextDataset}
             showToast={showToast} styles={styles} />
+          {railVisible && (
+            <aside
+              className={`w-full md:w-72 shrink-0 flex flex-col gap-3 p-3 border-l overflow-y-auto ${styles.cardBg} ${styles.cardBorder}`}
+              aria-label={t('aiworkbench.chatbot.chat.railTitle')}
+            >
+              <DegradationBanner
+                active={stream.degradedToPoll}
+                reasons={[t('aiworkbench.chatbot.chat.streamDegraded').replace('{count}', String(stream.disconnectCount))]}
+                progressChannel={stream.channel}
+                pollIntervalSeconds={POLL_INTERVAL_DEFAULT_SECONDS}
+              />
+              {stream.disconnectCount > 0 && !stream.degradedToPoll && (
+                <p className={`text-[10px] leading-normal ${styles.warningText}`} role="status">
+                  {t('aiworkbench.chatbot.chat.noResumeNote').replace('{count}', String(stream.disconnectCount))}
+                </p>
+              )}
+              {streamFailure && (
+                <ErrorPanel
+                  reason={streamFailure.reason}
+                  traceId={streamFailure.traceId}
+                  onRetry={() => void hSend(lastUserTextRef.current)}
+                />
+              )}
+              {(stream.running || runSteps.length > 0) && (
+                <RunProgress
+                  runId={runContext?.traceId ?? TEXT_ABSENT}
+                  progressChannel={stream.channel}
+                  pollIntervalSeconds={POLL_INTERVAL_DEFAULT_SECONDS}
+                  steps={runSteps}
+                  sseDisconnectCount={stream.disconnectCount}
+                  onCancel={async () => { abortStream(); }}
+                />
+              )}
+              <section className={`rounded-xl border p-3 space-y-2 ${styles.cardBg} ${styles.cardBorder}`}>
+                <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('common.evidence.list.title')}</h3>
+                <CitationList
+                  citations={stream.citations}
+                  completed={stream.doneFrame !== null}
+                  onSelect={setEvidenceIndex}
+                  selected={evidenceIndex}
+                />
+              </section>
+              <section className={`rounded-xl border p-3 space-y-1 ${styles.cardBg} ${styles.cardBorder}`}>
+                <h3 className={`text-xs font-semibold ${styles.cardText}`}>{t('aiworkbench.chatbot.chat.usageTitle')}</h3>
+                <p className={`text-[10px] font-mono ${styles.cardTextMuted}`}>
+                  {t('aiworkbench.chatbot.chat.usagePrompt')}: {usageCell(stream.usage?.promptTokens)}
+                </p>
+                <p className={`text-[10px] font-mono ${styles.cardTextMuted}`}>
+                  {t('aiworkbench.chatbot.chat.usageCompletion')}: {usageCell(stream.usage?.completionTokens)}
+                </p>
+                <p className={`text-[10px] font-mono ${styles.cardTextMuted}`}>
+                  {t('aiworkbench.chatbot.chat.usageTotal')}: {usageCell(stream.doneFrame?.totalTokens)}
+                </p>
+                {stream.usage?.estimated && (
+                  <p className={`text-[10px] ${styles.warningText}`}>{t('aiworkbench.chatbot.chat.usageEstimatedNote')}</p>
+                )}
+              </section>
+              {runContext && (
+                <p className={`text-[10px] font-mono break-all ${styles.cardTextMuted}`}>
+                  {t('common.status.trace_id')}: {realTraceId(runContext.traceId) ?? TEXT_ABSENT}
+                  <span className="block">{t('aiworkbench.chatbot.chat.runIdIsTrace')}</span>
+                </p>
+              )}
+            </aside>
+          )}
         </div>
       ) : (
         <div className={`flex-1 flex items-center justify-center ${styles.cardTextMuted} text-sm`}>
           {t('aiworkbench.chatbot.welcomeSelectAgent')}
         </div>
       )}
+      <EvidenceDrawer
+        open={evidenceIndex !== null}
+        claim={stream.citations[evidenceIndex ?? 0]?.forecastRunId}
+        evidence={evidenceIndex === null ? null : citationToEvidence(stream.citations[evidenceIndex])}
+        onClose={() => setEvidenceIndex(null)}
+      />
       <ConfirmDialog
         visible={!!pendingDeleteId}
         danger

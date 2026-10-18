@@ -24,6 +24,7 @@ import { useLanguage } from "../../LanguageContext";
 import Button from "../Button";
 import ConfirmDialog from "./ConfirmDialog";
 import { apiFetch } from "../../../services/httpClient";
+import { SSE_FALLBACK_THRESHOLD } from "../../../services/sseFrames";
 
 /** 进度通道：服务端决定，"sse" 实时流 / "poll" 轮询兜底 */
 export type ProgressChannel = "sse" | "poll";
@@ -40,8 +41,8 @@ export interface RunStep {
 /** Kill Switch 端点路径（httpClient 会补 API_BASE="/api"，最终 /api/v1/wagent/kill-switch） */
 export const KILL_SWITCH_PATH = "/v1/wagent/kill-switch";
 
-/** 断线自动切轮询阈值（§4.4） */
-export const SSE_FALLBACK_THRESHOLD = 3;
+/** 断线自动切轮询阈值（§4.4）——单源在 services/sseFrames，此处只 re-export 免第二常量源 */
+export { SSE_FALLBACK_THRESHOLD };
 
 export interface RunProgressProps {
   runId: string;
