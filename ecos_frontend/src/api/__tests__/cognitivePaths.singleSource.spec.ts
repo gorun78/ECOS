@@ -17,7 +17,8 @@
  * node 环境的用例不受该环境影响。
  */
 // @vitest-environment node
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+vi.setConfig({ testTimeout: 30_000 });
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {

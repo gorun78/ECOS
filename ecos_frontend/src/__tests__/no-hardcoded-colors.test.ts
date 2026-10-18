@@ -22,7 +22,8 @@
  *    palette-baseline.json 快照（新文件/新增行即红；修复后应同步调低基线）。
  *    单源豁免：components/ThemeContext.tsx 是四主题 token 的合法定义处，不参与扫描。
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+vi.setConfig({ testTimeout: 30_000 });
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';

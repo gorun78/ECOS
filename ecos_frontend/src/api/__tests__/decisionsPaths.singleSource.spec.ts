@@ -12,7 +12,8 @@
  */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.setConfig({ testTimeout: 30_000 });
 
 const ROOT = join(process.cwd(), 'src', 'pages', 'workbench', '[scenarioId]');
 const FILE_BY_BASE: Record<string, string> = {

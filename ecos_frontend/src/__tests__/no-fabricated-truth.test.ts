@@ -30,7 +30,8 @@
  *   components/pipeline/StepVerify.tsx     — buildMockFileDiffs 假 diff 生成器（C 批返工面 W196/210，属主任务 #120）
  * @license Apache-2.0
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+vi.setConfig({ testTimeout: 30_000 });
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';

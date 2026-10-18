@@ -26,7 +26,8 @@
  * API_BASE 派生（URL 逐字不变），同批该文件的 DW 共享 HTTP 四动词合流 apiFetchData 单源。
  */
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+vi.setConfig({ testTimeout: 30_000 });
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';

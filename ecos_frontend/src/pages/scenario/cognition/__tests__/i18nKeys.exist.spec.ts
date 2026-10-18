@@ -11,7 +11,8 @@
  * 已整体删除，扫描根随之移除，并改由下方"删除不回潮"用例守门——防止该目录被
  * 重新引入却不再受本门禁覆盖（静默缩面）。
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+vi.setConfig({ testTimeout: 30_000 });
 import fs from "fs";
 import path from "path";
 

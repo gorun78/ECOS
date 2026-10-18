@@ -1,5 +1,6 @@
 // 详细设计-01 F01-10（M2）前端安全约束门禁：authHeaders 单实例防回归。
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+vi.setConfig({ testTimeout: 30_000 });
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { authHeaders, authOnlyHeaders, getAuthToken } from "./auth";

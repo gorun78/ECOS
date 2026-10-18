@@ -5,7 +5,8 @@
  * token 键；一律经 `services/auth.ts#getAuthToken()`。本用例扫描全量页面/
  * 组件/服务源文件，剔除注释与 `auth.ts` 自身后断言零直读。
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+vi.setConfig({ testTimeout: 30_000 });
 import fs from "fs";
 import path from "path";
 

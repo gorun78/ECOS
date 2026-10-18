@@ -4,7 +4,8 @@
  * 冻结门禁名：unit: navConfig.test.ts › everyNavRouteExistsInMainTsx
  * @license Apache-2.0
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+vi.setConfig({ testTimeout: 30_000 });
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';

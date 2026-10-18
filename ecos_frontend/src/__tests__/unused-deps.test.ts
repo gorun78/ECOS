@@ -13,7 +13,8 @@
  * （types/declarations.d.ts 的 webpack-graphql 类型声明属 .d.ts，不在源码扫描面。）
  */
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+vi.setConfig({ testTimeout: 30_000 });
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';

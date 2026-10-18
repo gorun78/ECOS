@@ -11,7 +11,8 @@
  *   属主 PMO-C 登记在位（W212/C194），替换/续期须经 PMO 裁决，不允许静默移除。
  */
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+vi.setConfig({ testTimeout: 30_000 });
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';

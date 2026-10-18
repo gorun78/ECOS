@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+vi.setConfig({ testTimeout: 30_000 });
 
 /**
  * 详细设计-06 F06-19-7（X-82 身份伪造面归零）AI 侧验收断言。

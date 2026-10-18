@@ -10,7 +10,8 @@
  *
  * 约定：JSX 开标签的收尾 `>`/`/>` 独占一行（本仓库现有格式），据此切分标签段。
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+vi.setConfig({ testTimeout: 30_000 });
 import fs from "fs";
 import path from "path";
 

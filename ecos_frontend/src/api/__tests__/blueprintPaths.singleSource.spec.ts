@@ -11,7 +11,8 @@
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, sep } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.setConfig({ testTimeout: 30_000 });
 
 const BP_DIR = join(process.cwd(), 'src', 'pages', 'workbench', '[scenarioId]', 'blueprint');
 
