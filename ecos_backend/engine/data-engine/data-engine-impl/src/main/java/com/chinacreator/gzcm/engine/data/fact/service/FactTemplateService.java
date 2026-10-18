@@ -37,12 +37,12 @@ public class FactTemplateService {
                             "contractBase"),
                     List.of(
                             List.of("p-001", "d-01", "2025-03", "ACCEPTANCE", "ACTUAL", "1200000.00",
-                                    "0.6000", null, "720000.00", "CNY", "IMPORT", "batch-20250401", "doc-991"),
+                                    "0.6000", "", "720000.00", "CNY", "IMPORT", "batch-20250401", "doc-991"),
                             List.of("p-001", "d-01", "2025-04", "COLLECTION", "PLAN", "1200000.00",
-                                    "0.6000", null, "360000.00", "CNY", "MANUAL", "", "审批单 AP-2210")));
+                                    "0.6000", "", "360000.00", "CNY", "MANUAL", "", "审批单 AP-2210")));
             case RESOURCE -> new FactTemplateVO(
                     "RESOURCE", type.tableName(),
-                    "project_id,department_id,period(YYYY-MM),staff_ref_hash(SHA-256,64位hex),staff_hash_algo(默认SHA-256),fte(0~1可空),work_hours(小时可空),hourly_rate(元/时可空),cost_category(默认SALARY),fact_type(PLAN/ACTUAL),source_ref",
+                    "project_id,department_id,period(YYYY-MM),staff_ref_hash(SHA-256 64hex),staff_hash_algo(默认SHA-256),fte(0~1可空),work_hours(小时可空),hourly_rate(元/时可空),cost_category(默认SALARY),fact_type(PLAN/ACTUAL),source_ref",
                     List.of("ID", "ID", "期间 YYYY-MM",
                             "工号单向哈希（禁明文，V167 脱敏存储）", "哈希算法（默认 SHA-256）",
                             "FTE 0~1", "小时（NUMERIC(8,1)）", "元/时（NUMERIC(18,2)）",
@@ -64,13 +64,13 @@ public class FactTemplateService {
                     List.of("departmentId", "period", "costCategory", "directOrAllocated", "amount",
                             "factType"),
                     List.of(
-                            List.of("p-001", "0", "d-01", "2025-03", "SALARY", "DIRECT", null,
+                            List.of("p-001", "0", "d-01", "2025-03", "SALARY", "DIRECT", "",
                                     "51200.00", "CNY", "ACTUAL", "工资单 doc-331"),
                             List.of("POOL", "1", "d-01", "2025-03", "MANAGEMENT", "ALLOCATED",
                                     "rule-009", "8800.00", "CNY", "ACTUAL", "分摊审批 ap-77")));
             case FORECAST_SNAPSHOT -> new FactTemplateVO(
                     "FORECAST_SNAPSHOT", type.tableName(),
-                    "forecast_run_id,as_of_time(ISO-8601),scope_hash(sha256,64hex),fact_refs_json,metric_versions_json,profile_versions_json,assumption_versions_json,caliber_id,caliber_version,checksum(sha256,64hex)",
+                    "forecast_run_id,as_of_time(ISO-8601),scope_hash(sha256 64hex),fact_refs_json,metric_versions_json,profile_versions_json,assumption_versions_json,caliber_id,caliber_version,checksum(sha256 64hex)",
                     List.of("预测运行 ID", "ISO 时间戳", "范围 sha256", "受控 JSON（TEXT，仅描述）",
                             "受控 JSON", "受控 JSON", "受控 JSON", "口径 ID", "口径版本", "全内容 sha256"),
                     List.of("forecastRunId", "asOfTime", "scopeHash", "caliberId", "caliberVersion",

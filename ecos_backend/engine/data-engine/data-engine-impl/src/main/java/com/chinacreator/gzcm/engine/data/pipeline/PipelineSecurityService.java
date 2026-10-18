@@ -1,7 +1,9 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
+import com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,6 +12,9 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -153,6 +158,71 @@ public class PipelineSecurityService {
         return key != null && SENSITIVE_KEYS.contains(key.toLowerCase());
     }
 
+    // ==================== 2.1 出站凭证中继（ADR-7 信任链） ====================
+
+    /**
+     * 把当前入口请求的凭证与信任头中继到 policy-engine 出站请求（卷07 F07-17 同型判例，
+     * 范式见 {@code WorkspaceSecurityEngineClient#relayCallerCredentials}）。
+     *
+     * <p>2026-10-16 live 实证：本类出站只带 Content-Type、不带任何凭证 ⇒ 打到 gateway
+     * 自家 :8080 的 {@code /api/v1/security/policy-engine/evaluate} 被 Spring Security
+     * {@code anyRequest().authenticated()} 判 403 ⇒ 被下方 {@code catch (Exception)} 折叠成
+     * {@code SECURITY_ENGINE_UNAVAILABLE} ⇒ 已登录用户被误报"ABAC 策略拒绝"。
+     * 这是 plumbing 缺口，不是策略裁决。
+     *
+     * <p><b>fail-closed 语义不变</b>：无入口请求上下文（异步/定时线程）⇒ 不伪造凭证，
+     * 由被调方按默认策略裁决；只逐字转发入口请求已带的 {@code Authorization} 与
+     * {@code X-ECOS-USER/ROLE/TENANT/DOMAIN}，不升权、不拼接、不加兜底租户。
+     */
+    private static void relayCallerCredentials(HttpHeaders headers) {
+        RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+        if (!(attrs instanceof ServletRequestAttributes servletAttrs)) {
+            return;
+        }
+        HttpServletRequest request = servletAttrs.getRequest();
+        String authorization = trimToNull(request.getHeader(HttpHeaders.AUTHORIZATION));
+        if (authorization != null) {
+            headers.set(HttpHeaders.AUTHORIZATION, authorization);
+        }
+        copyIfPresent(request, headers, HeaderAuthInterceptor.H_USER);
+        copyIfPresent(request, headers, HeaderAuthInterceptor.H_ROLE);
+        copyIfPresent(request, headers, HeaderAuthInterceptor.H_TENANT);
+        copyIfPresent(request, headers, HeaderAuthInterceptor.H_DOMAIN);
+    }
+
+    private static void copyIfPresent(HttpServletRequest request, HttpHeaders headers, String header) {
+        String value = trimToNull(request.getHeader(header));
+        if (value != null) {
+            headers.set(header, value);
+        }
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    /**
+     * 构造 policy-engine 出站请求头：JSON Content-Type + <b>显式 Accept: application/json</b>
+     * + 调用方凭证中继。
+     *
+     * <p>Accept 必须显式钉死：{@code jackson-dataformat-xml}（runtime-core 传递依赖）注册了
+     * XML 转换器，而 RestTemplate 默认 Accept 含 {@code application/xml} ⇒ 内容协商会把
+     * {@code ApiResponse} 序列化成 XML，本类 {@code MAPPER.readValue} 以
+     * {@code Unexpected character ('<')} 抛错并折叠成 {@code SECURITY_ENGINE_UNAVAILABLE}
+     * ——又一个"把可达的裁决误报成引擎不可用"（2026-10-16 live 实证）。
+     */
+    private HttpHeaders jsonHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setAccept(java.util.List.of(MediaType.APPLICATION_JSON));
+        relayCallerCredentials(headers);
+        return headers;
+    }
+
     // ==================== 3. ABAC 裁决（execute 前置） ====================
 
     /**
@@ -175,10 +245,8 @@ public class PipelineSecurityService {
             body.put("policy", "rbac");
             body.put("input", input);
 
-            // 用 HttpHeaders 显式声明 JSON Content-Type（避免 RestTemplate 默认 XML 序列化）
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+            // 用 HttpHeaders 显式声明 JSON Content-Type + Accept（避免 RestTemplate 默认 XML 序列化）
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, jsonHeaders());
 
             ResponseEntity<String> response = restTemplate.postForEntity(
                     securityBaseUrl + "/api/v1/security/policy-engine/evaluate",
@@ -241,9 +309,7 @@ public class PipelineSecurityService {
             body.put("policy", "rbac");
             body.put("input", input);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, jsonHeaders());
 
             ResponseEntity<String> response = restTemplate.postForEntity(
                     securityBaseUrl + "/api/v1/security/policy-engine/evaluate",
@@ -307,9 +373,7 @@ public class PipelineSecurityService {
             body.put("policy", "rbac");
             body.put("input", input);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, jsonHeaders());
 
             ResponseEntity<String> response = restTemplate.postForEntity(
                     securityBaseUrl + "/api/v1/security/policy-engine/evaluate",

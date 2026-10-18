@@ -145,7 +145,10 @@ services:
     image: openpolicyagent/opa:0.63.0
     container_name: ecos-opa
     restart: unless-stopped
-    command: run --server --log-level=info --addr=:8181
+    # 2026-10-16: 必须带 -b /policies 才会加载下行 volume 里的策略源。
+    # 缺省时服务起来但零策略（GET /v1/policies = {"result":[]}），裁决恒落
+    # POLICY_UNDEFINED → fail-closed，与"策略真的拒绝"不可分辨（default allow=false 语义未变）。
+    command: run --server --log-level=info --addr=:8181 -b /policies
     ports:
       - "8181:8181"
     volumes:

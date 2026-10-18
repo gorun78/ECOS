@@ -148,7 +148,7 @@ export async function compareCausalScenarios(body: any): Promise<any> {
 
 // ── Monitoring Dashboard ───────────────────────────────
 // 对接 MonitorController (/api/monitor)
-const MONITOR_BASE = "/api/v1/monitor";
+export const MONITOR_BASE = "/api/v1/monitor";
 
 export interface MonitoringKpi {
   label: string;

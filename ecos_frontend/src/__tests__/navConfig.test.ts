@@ -40,9 +40,12 @@ describe('navConfig — single source structure', () => {
     }
   });
 
-  it('sidebar derivation yields exactly 12 items in 3 groups + products', () => {
+  it('sidebar derivation yields exactly 12 items in 4 flat groups (2026-10-14 restructure)', () => {
+    // 用户裁决菜单：总览1（决策面板）+ 工作区5（场景/AI/知识/本体/数据工作台）
+    // + 资源概览1（资源中心）+ 控制面板5（安全/任务/监控/字典/治理）= 12
     expect(SIDEBAR_ITEMS.length).toBe(12);
-    expect(SIDEBAR_GROUPS.length).toBe(3);
+    expect(SIDEBAR_GROUPS.length).toBe(4);
+    // 兼容导出 = 控制面板组（5 项：安全中心/任务中心/监控中心/数据字典/平台治理）
     expect(SIDEBAR_PRODUCT_ITEMS.length).toBe(5);
     for (const item of SIDEBAR_ITEMS) {
       expect(["function", "object"]).toContain(typeof item.icon); // lucide = forwardRef object
@@ -157,17 +160,20 @@ describe('W209/C191 — 本册实现轮未新增内容路由根（§2.1 落地�
    *   knowledge（详设-04 B 章，b617c8bc）· workbench（详设-07 WP-D，fdee86d6）。
    * 本册 W209/R-49 红线 = 在此基线上**新增即红**；下线须走对应 W191/R-52 定档后同步本清单。
    */
+  // 2026-10-14 菜单重构（用户裁决）追加 3 个新路由根：decision / resource-center /
+  // platform-governance —— 基线 53 → 56；此为本波内唯一允许的新增，后续仍需 freeze（新增即红）。
   const CONTENT_ROUTE_ROOT_BASELINE = [
     'agent-builder', 'agent-test', 'agent_mesh', 'agent_studio', 'ai-workbench',
     'alerts', 'alerts-center', 'biz_dashboard', 'business-workbench', 'case_library',
-    'chatbot_studio', 'contract_manager', 'data-workbench', 'dict', 'domain_designer',
-    'domains', 'dq_dashboard', 'engine-ai', 'engine-cognitive', 'engine-data',
-    'engine-knowledge', 'engine-ontology', 'engine-security', 'engine-tasks',
-    'gateway-diagnostics', 'glossary', 'guardrails', 'iam', 'kanban', 'knowledge',
-    'knowledge_graph', 'knowledge_view', 'marketplace', 'mission_control', 'monitor',
-    'objects', 'ontology', 'ontology_designer', 'ontology_workbench', 'ops_apps',
-    'ops_dashboard', 'project_tracker', 'project_workbench', 'scenario-sandbox',
-    'security-center', 'system-config', 'telemetry', 'tenants', 'tokens', 'workbench',
+    'chatbot_studio', 'contract_manager', 'data-workbench', 'decision', 'dict',
+    'domain_designer', 'domains', 'dq_dashboard', 'engine-ai', 'engine-cognitive',
+    'engine-data', 'engine-knowledge', 'engine-ontology', 'engine-security',
+    'engine-tasks', 'gateway-diagnostics', 'glossary', 'guardrails', 'iam', 'kanban',
+    'knowledge', 'knowledge_graph', 'knowledge_view', 'marketplace', 'mission_control',
+    'monitor', 'objects', 'ontology', 'ontology_designer', 'ontology_workbench',
+    'ops_apps', 'ops_dashboard', 'platform-governance', 'project_tracker',
+    'project_workbench', 'resource-center', 'scenario-sandbox', 'security-center',
+    'system-config', 'telemetry', 'tenants', 'tokens', 'workbench',
     'workflow_designer', 'workshop', 'world_model',
   ];
 
@@ -193,7 +199,7 @@ describe('W209/C191 — 本册实现轮未新增内容路由根（§2.1 落地�
       removed,
       `路由根消失须先经 W191/R-52 定档并同步本基线清单：${removed.join(', ')}`,
     ).toEqual([]);
-    expect(CONTENT_ROUTE_ROOT_BASELINE.length).toBe(53); // 49（2026-09-29 设计窗）+4（他册实现轮，见上注释）
+    expect(CONTENT_ROUTE_ROOT_BASELINE.length).toBe(56); // 53（2026-09-29 基线+他册 +4）+3（2026-10-14 菜单重构：decision/resource-center/platform-governance，见上注释）
   });
 });
 

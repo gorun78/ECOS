@@ -27,7 +27,7 @@ import com.chinacreator.gzcm.gateway.DdlShapeScanner.Table;
  * <p><b>差距来源</b>：差距文档 §7.7（篇 6 kb 侧门禁行）与 §8.4.4（篇 8 行）具名缺失门禁
  * {@code Mc02TypeWhitelistTest}（同族别名 {@code Mc02RetirementTest}）按名 find 零命中；
  * 既有载体 {@code AiDdlComplianceTest}、{@code WAgentDdlShapeComplianceTest} 只在<b>各自域段</b>
- * 内校验类型红线 ⇒ <b>全源 238 枚脚本的类型面</b>无人守护。按 R9①「缺的门禁＝补代码实现」补本类。</p>
+ * 内校验类型红线 ⇒ <b>全源 239 枚脚本的类型面</b>无人守护。按 R9①「缺的门禁＝补代码实现」补本类。</p>
  *
  * <p><b>白名单判定面 = 规范原文 + 裁决 D-#144A-1（已同步回写规范，不留双轨）</b>：
  * MC02 的<b>存在理由</b>是「多库兼容：达梦/金仓官方 PG 兼容模式亦不保证私有类型」（规范 §六 设计原则
@@ -61,7 +61,7 @@ import com.chinacreator.gzcm.gateway.DdlShapeScanner.Table;
  * 台账纪律约束（{@code MigrationVersionUniquenessTest} 的顺延门），实际改动面已收敛到
  * 「必须新增 V200+ 脚本」，而新增段是成员级零容忍。两枚门合起来才是不漏项口径，单看本类会高估。</p>
  *
- * <p><b>反假绿四锁</b>：①扫描面非空（238 枚脚本 / 建表数下限）；②<b>解析器反向对照</b>——
+ * <p><b>反假绿四锁</b>：①扫描面非空（239 枚脚本 / 建表数下限）；②<b>解析器反向对照</b>——
  * 必须真的看见已知的三类违例形态：V281 的 {@code JSONB}、V285 的<b>双引号大写列名</b>上的
  * {@code BIGSERIAL}（解析器只认裸标识符时这张表会解析成零列，违例整张漏掉＝本类最危险的假绿形态，
  * 故把它钉成断言）、以及 V&lt;200 段的 {@code BOOLEAN}；③白名单<b>谓词自身</b>的判据自检
@@ -114,8 +114,9 @@ class Mc02TypeWhitelistTest {
     /** GOVERNED 段建表/列解析数下限（实测口径由本类首跑钉死，只增不减）。 */
     private static final int GOVERNED_TABLE_FLOOR = 60;
 
-    /** 全源脚本数下限（与 {@code MigrationVersionUniquenessTest} 同口径，各自单源不互引）。 */
-    private static final int SCRIPT_FLOOR = 238;
+    /** 全源脚本数下限（与 {@code MigrationVersionUniquenessTest} 同口径，各自单源不互引）。
+     *  2026-10-16 二期 W2：V289（td_user IAM 读面补列）落地 ⇒ 238→239；V288 由规范 §十 预留给 #144-c，本批不占。 */
+    private static final int SCRIPT_FLOOR = 239;
 
     /**
      * 存量段计数钉死（键={@code 桶|类型头}，值=违例列数，实测 2026-10-15 取证，双向相等）。

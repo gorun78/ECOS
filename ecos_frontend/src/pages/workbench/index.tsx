@@ -16,6 +16,7 @@ import { useLanguage } from '../../components/LanguageContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { apiFetchData } from '../../api';
 import logger from '../../services/logger';
+import NewScenarioModal from './NewScenarioModal';
 
 interface ScenarioSummaryVO {
   id: string;
@@ -25,8 +26,6 @@ interface ScenarioSummaryVO {
   department?: string;
   status?: string;
 }
-
-/** 快捷入口条目（to 为已解析真实目标；无真实目标的入口不构造，见 quickEntries 注释） */
 
 export default function WorkbenchHome() {
   const { styles } = useTheme();
@@ -38,6 +37,7 @@ export default function WorkbenchHome() {
   const [error, setError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -60,14 +60,14 @@ export default function WorkbenchHome() {
     void load();
   }, []);
 
-  // 快捷入口真实目标（2026-10-13 前端检视报告 §4.6 行253 订正）：
-  // - 「新建场景」：创建向导实存于高级视图（ScenarioManagementView 挂 ScenarioEditor），保留 /project_workbench；
+  // 快捷入口真实目标（2026-10-14 裁决订正）：
+  // - 「新建场景」：L1 直接弹新建模态（原型 v2.0：模板 chips 预填 + 真实
+  //   POST /api/v1/workspace/scenarios，创建即 DRAFT，成功跳 L2 详情）；
   // - 「待我决策」「预测与推演」：目标页需 scenarioId ⇒ 取场景列表首项（最近场景）直达，无场景时不渲染（禁自环）；
   // - 「版本历史」：无独立真实路由/端点可指 ⇒ 已摘除（蓝图版本在 L2 内呈现，不在 L1 造入口）。
   const first = scenarios[0];
   type ResolvedEntry = { icon: string; labelKey: string; to: string; accent: (s: ThemeStyles) => string };
-  const quickEntries: ResolvedEntry[] = [
-    { icon: 'Plus', labelKey: 'workspace.l1.entry.new_scenario', to: '/project_workbench', accent: (s: ThemeStyles) => s.accentText },
+  const navEntries: ResolvedEntry[] = [
     first
       ? { icon: 'ShieldCheck', labelKey: 'workspace.l1.entry.pending', to: `/workbench/${first.id}/decisions`, accent: (s: ThemeStyles) => s.warningText }
       : null,
@@ -97,11 +97,20 @@ export default function WorkbenchHome() {
         </div>
       )}
 
-      {/* 快捷入口 */}
+      {/* 快捷入口：首格固定「新建场景」（直接弹模态，勿做成跳转占位） */}
       <section className="p-4">
         <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted} mb-2`}>{t('workspace.l1.quick_entries')}</h2>
         <div className={`grid gap-2 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}>
-          {quickEntries.map((e) => (
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className={`${styles.accentBg} ${styles.accentSolidText} rounded-lg p-3 flex items-center gap-2 transition-all hover:opacity-90 cursor-pointer`}
+            aria-label={t('workspace.l1.entry.new_scenario')}
+          >
+            <LucideIcon name="Plus" size={16} />
+            <span className="text-xs font-bold">{t('workspace.l1.entry.new_scenario')}</span>
+          </button>
+          {navEntries.map((e) => (
             <Link
               key={e.labelKey}
               to={e.to}
@@ -118,7 +127,17 @@ export default function WorkbenchHome() {
 
       {/* 我的场景 */}
       <section className="px-4 pb-4">
-        <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted} mb-2`}>{t('workspace.l1.my_scenarios')}</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted}`}>{t('workspace.l1.my_scenarios')}</h2>
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded border ${styles.accentBg} ${styles.accentBorder} ${styles.accentText} cursor-pointer hover:opacity-90 transition`}
+          >
+            <LucideIcon name="Plus" size={12} />
+            {t('workspace.l1.entry.new_scenario')}
+          </button>
+        </div>
 
         {/* 加载态 */}
         {loading && (
@@ -211,6 +230,9 @@ export default function WorkbenchHome() {
           </div>
         )}
       </section>
+
+      {/* 新建场景模态（L1 直接创建，真实 POST，创建即 DRAFT，成功后跳 L2 并刷新列表） */}
+      <NewScenarioModal isOpen={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => void load()} />
     </div>
   );
 }

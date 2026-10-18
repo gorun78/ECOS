@@ -8,6 +8,15 @@ import type {
 } from "../types";
 import { apiFetch, apiFetchData, toNetworkError, notifyNetworkDown } from "../services/httpClient";
 
+// ── Engine Health ──────────────────────────────────────────
+/**
+ * GET /api/v1/engine/security/health — 安全引擎公开健康 VO
+ * （HealthCheck{status, components?, version?, uptimeMs?}）。
+ */
+export async function fetchSecurityEngineHealth(): Promise<Record<string, unknown>> {
+  return apiFetchData<Record<string, unknown>>("/api/v1/engine/security/health");
+}
+
 // ── Security Profile ───────────────────────────────────────
 export interface SecurityProfile {
   clearanceLevel: number;

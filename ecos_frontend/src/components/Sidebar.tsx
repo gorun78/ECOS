@@ -22,11 +22,20 @@ import { useTheme } from "./ThemeContext";
 import { showToastGlobal } from "./common/Toast";
 import {
   SIDEBAR_GROUPS,
-  SIDEBAR_PRODUCT_ITEMS,
   SIDEBAR_ITEMS,
   type SidebarEntry,
   type SidebarGroup,
 } from "../navigation/navConfig";
+
+// 2026-10-14 用户裁决：控制面板组保留原「产品功能」折叠风格 —— 靠底展示、
+// 默认收缩（ChevronDown 未旋转），点击展开；其余三组（总览/工作区/资源概览）平铺。
+const CONTROL_GROUP_KEY = "sidebar.group.control";
+const FLAT_GROUPS: readonly SidebarGroup[] = SIDEBAR_GROUPS.filter(
+  (g) => g.groupKey !== CONTROL_GROUP_KEY,
+);
+const CONTROL_GROUP: SidebarGroup | undefined = SIDEBAR_GROUPS.find(
+  (g) => g.groupKey === CONTROL_GROUP_KEY,
+);
 
 interface SidebarProps {
   width?: number;
@@ -56,14 +65,16 @@ export default function Sidebar({
   const { t } = useLanguage();
   const { styles } = useTheme();
   const [isTaskPanelOpen, setIsTaskPanelOpen] = useState(false);
-  const [productCollapsed, setProductCollapsed] = useState(true);
+  // 2026-10-14：控制面板默认收缩（用户裁决，复刻原「产品功能」折叠组行为）。
+  const [controlCollapsed, setControlCollapsed] = useState(true);
 
   const pathSegments = location.pathname.split("/").filter(Boolean);
   // index 落地 Tab 单源映射 mission_control（与 App.tsx 同步，报告 §4.1 P1 行60）
   const currentView = pathSegments[0] || "mission_control";
 
   // ── 导航项：全部派生自 navigation/navConfig（W190 单源，禁止本地私有表）──
-  // SIDEBAR_GROUPS = 总览/资源/系统 三组；SIDEBAR_PRODUCT_ITEMS = 产品功能折叠组。
+  // 2026-10-14 菜单重构：SIDEBAR_GROUPS = 总览/工作区/资源概览/控制面板 四组平铺，
+  // 原「产品功能」折叠组退役（navConfig.SIDEBAR_PRODUCT_ITEMS 为兼容导出）。
 
   // Render a nav item button
   const renderNavItem = (item: SidebarEntry, keyPrefix: string = "") => {
@@ -105,6 +116,27 @@ export default function Sidebar({
     </div>
   );
 
+  // 控制面板折叠组（复刻原「产品功能」靠底折叠块：border-t + 默认收缩 + ChevronDown 旋转翻转）
+  const renderControlGroup = () => CONTROL_GROUP && (
+    <div className={`border-t ${styles.sidebarBorder} px-3 py-3 space-y-2 shrink-0`}>
+      <button
+        type="button"
+        onClick={() => setControlCollapsed(!controlCollapsed)}
+        className="flex items-center justify-between w-full px-1 hover:opacity-80 transition-opacity"
+      >
+        <span className="text-[9px] uppercase font-mono tracking-wider opacity-50 font-semibold">
+          {t(CONTROL_GROUP.groupKey)}
+        </span>
+        <ChevronDown className={`w-3.5 h-3.5 opacity-40 transition-transform duration-200 ${controlCollapsed ? '' : 'rotate-180'}`} />
+      </button>
+      {!controlCollapsed && (
+        <div className="space-y-0.5">
+          {CONTROL_GROUP.items.map(item => renderNavItem(item, "ctrl_"))}
+        </div>
+      )}
+    </div>
+  );
+
   const sidebarContent = (
     <>
       {/* Brand Header */}
@@ -117,30 +149,17 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation — 2026-10-14 用户裁决：总览/工作区/资源概览三组平铺；
+          控制面板组下沉到靠底折叠块（见 renderControlGroup）。 */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4 scrollbar-thin">
-        {SIDEBAR_GROUPS.map((group, i) => renderGroup(group, `grp${i}_`))}
+        {FLAT_GROUPS.map((group, i) => renderGroup(group, `grp${i}_`))}
       </div>
 
-      {/* ── 产品功能（可折叠，默认收起）─────────────────── */}
-      <div className={`border-t ${styles.sidebarBorder} px-3 py-3 space-y-2 shrink-0`}>
-        <button
-          onClick={() => setProductCollapsed(!productCollapsed)}
-          className="flex items-center justify-between w-full px-1 hover:opacity-80 transition-opacity"
-        >
-          <span className="text-[9px] uppercase font-mono tracking-wider opacity-50 font-semibold">
-            {t("sidebar.group.product")}
-          </span>
-          <ChevronDown className={`w-3.5 h-3.5 opacity-40 transition-transform duration-200 ${productCollapsed ? '' : 'rotate-180'}`} />
-        </button>
-        {!productCollapsed && (
-          <div className="space-y-0.5">
-            {SIDEBAR_PRODUCT_ITEMS.map(item => renderNavItem(item, "prod_"))}
-          </div>
-        )}
-      </div>
+      {/* ── 控制面板（靠底折叠，默认收缩；复刻原「产品功能」块）──────── ── */}
+      {renderControlGroup()}
 
-      {/* Footer */}
+      {/* Footer — 2026-10-14 用户裁决：仅保留内核状态 + 认知引擎版本，删除任务引擎行。
+          任务引擎计数入口仍由 navConfig 中 engine-tasks（控制面板组）承担。 */}
       <div className={`p-4 border-t ${styles.sidebarBorder} bg-black/5 dark:bg-black/40 font-mono text-[10px] space-y-2 shrink-0`}>
         <div className="flex items-center justify-between py-0.5">
           <span className="flex items-center gap-1.5 opacity-85">
@@ -151,22 +170,13 @@ export default function Sidebar({
             {statusMetrics.serviceStatus === "UP" ? t("sidebar.footer.running") : statusMetrics.serviceStatus}
           </span>
         </div>
-        <div
-          className="flex items-center justify-between py-0.5 opacity-85 hover:opacity-100 cursor-pointer hover:bg-white/5 rounded px-0.5 transition"
-          onClick={() => setIsTaskPanelOpen(true)}
-          title={t("sidebar.footer.task.open")}
-        >
-          <span>{t("sidebar.task.title")}</span>
-          <span className="font-bold">
-            {statusMetrics.taskRunning > 0 && <span className={styles.successText}>{statusMetrics.taskRunning} {t("sidebar.footer.running_count")} </span>}
-            {statusMetrics.taskPending > 0 && <span className={styles.warningText}>{statusMetrics.taskPending} {t("sidebar.footer.waiting")} </span>}
-            {statusMetrics.taskTotal > 0 && <span className="opacity-60">{statusMetrics.taskTotal} {t("sidebar.footer.total")}</span>}
-            {statusMetrics.taskTotal === 0 && <span className="opacity-50">{t("sidebar.footer.idle")}</span>}
-          </span>
-        </div>
         <div className={`flex items-center justify-between py-0.5 text-[9.5px] border-t ${styles.sidebarBorder} pt-2 opacity-70`}>
           <span>{t("sidebar.footer.engine")}</span>
-          <span className="font-bold font-sans">v{statusMetrics.engineVersion}</span>
+          {/* 2026-10-14：版本取真实接口（apiCognitiveHealth）；后端响应无 version
+              字段时只保留 label，不渲染假 v1.0.0 字面量（禁悬置口径）。 */}
+          {statusMetrics.engineVersion
+            ? <span className="font-bold font-sans">v{statusMetrics.engineVersion}</span>
+            : <span className="opacity-50 font-sans">—</span>}
         </div>
       </div>
     </>

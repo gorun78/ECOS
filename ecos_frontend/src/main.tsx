@@ -76,6 +76,10 @@ const NotFoundWorkbench = lazy(() => import('./pages/workbench/NotFoundWorkbench
 const DataQualityDashboard = lazy(() => import('./pages/DataQualityDashboard.tsx'));
 const GatewayDiagnosticsPage = lazy(() => import('./pages/platform/GatewayDiagnosticsPage.tsx'));
 const AlertsPage = lazy(() => import('./pages/platform/AlertsPage.tsx'));
+// 2026-10-14 菜单重构（用户裁决）：总览/资源概览/控制面板 三页对
+const DecisionBoard = lazy(() => import('./pages/DecisionBoard.tsx'));
+const ResourceCenter = lazy(() => import('./pages/ResourceCenter.tsx'));
+const PlatformGovernance = lazy(() => import('./pages/PlatformGovernance.tsx'));
 // EngineMonitor + CognitiveEngineView are imported once eagerly because
 // lazy() can't pass static props at import site.
 const EngineMonitor = lazy(() => import('./pages/EngineMonitor.tsx'));
@@ -139,8 +143,11 @@ createRoot(document.getElementById('root')!).render(
                   </RequireAuth>
                 }
               >
-                {/* 总览 */}
-                <Route index element={<CognitiveOperatingSystem />} />
+                {/* 总览 — 2026-10-14 用户裁决：登录首页改为直接进入决策面板；
+                    认知蓝图（CognitiveOperatingSystem）保留在 /mission_control 可达，
+                    不在首页渲染。index 根仍为 Navigate 重定向（红线：路由根只增不删）。 */}
+                <Route index element={<Navigate to="/decision" replace />} />
+                <Route path="decision" element={<DecisionBoard />} />
                 <Route path="mission_control" element={<CognitiveOperatingSystem />} />
                 <Route path="monitor" element={<MonitoringCenter />} />
                 {/* 业务应用 */}
@@ -150,6 +157,8 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="ops_dashboard" element={<OperationsDashboard />} />
                 <Route path="ops_apps" element={<OperationalApps />} />
                 <Route path="marketplace" element={<MarketplaceBrowser />} />
+                {/* 资源概览：本体→数据→知识→认知 四 Tab 融合（2026-10-14 菜单重构） */}
+                <Route path="resource-center" element={<ResourceCenter />} />
                 {/* D · 数据层 */}
                 <Route path="objects" element={<ObjectExplorer />} />
                 {/* I · 信息层 — 本体工作台 (单页，内部分区切换) */}
@@ -174,6 +183,8 @@ createRoot(document.getElementById('root')!).render(
                 <Route path="glossary" element={<Navigate to="/ontology_workbench" replace />} />
                 <Route path="dict" element={<DictManager />} />
                 <Route path="system-config" element={<SystemConfigManager />} />
+                {/* 控制面板：平台治理（部署情况/各引擎配置/平台自检，2026-10-14 菜单重构） */}
+                <Route path="platform-governance" element={<PlatformGovernance />} />
                 {/* K · 知识层 */}
                 <Route path="workflow_designer" element={<WorkshopView />} />
                 <Route path="project_workbench" element={<ScenarioManagementView />} />

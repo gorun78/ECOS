@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { X, ChevronRight, Palette, Settings, Menu, ShieldQuestion, UserRound } from "lucide-react";
+import { X, ChevronRight, Palette, Settings, Menu, ShieldQuestion, UserRound, Bot } from "lucide-react";
 import { useLanguage } from "./LanguageContext";
 import { useTheme, ThemeId } from "./ThemeContext";
 import { fetchUserSecurityProfile, updateUserSecurityProfile } from "../api";
@@ -27,6 +27,8 @@ interface TopbarProps {
   onTabSelect: (tabId: string) => void;
   onTabClose: (tabId: string) => void;
   onMenuToggle?: () => void;
+  /** 2026-10-14：Copilot 入口从悬浮按钮移入 Topbar 右上角，点击开启抽屉。 */
+  onCopilotOpen?: () => void;
 }
 
 /** Chinese label → i18n key (used to translate existing Chinese tab labels). */
@@ -86,7 +88,8 @@ export default function Topbar({
   openTabs,
   onTabSelect,
   onTabClose,
-  onMenuToggle
+  onMenuToggle,
+  onCopilotOpen,
 }: TopbarProps) {
   const { locale, setLocale, t } = useLanguage();
   const { activeTheme, setActiveTheme, styles } = useTheme();
@@ -245,6 +248,8 @@ export default function Topbar({
     if (currentView === "data-workbench" || currentView === "catalog" || currentView === "dataset_explorer" || currentView === "lineage" || currentView === "pipeline" || currentView === "workbook")
       return [t("topbar.group.product"), t("topbar.tab.data_workbench")];
     // 其他
+    if (currentView === "decision")
+      return [t("topbar.group.overview"), t("topbar.tab.decision")];
     if (currentView === "workshop" || currentView === "workflow_designer")
       return [t("topbar.group.product"), t("topbar.tab.workflow_design")];
     if (currentView === "biz_dashboard")
@@ -339,6 +344,17 @@ export default function Topbar({
 
       {/* Right Box: Global search trigger & UTC Clock */}
       <div className="flex items-center gap-4 shrink-0">
+
+        {/* ECOS Copilot 入口（2026-10-14 用户裁决：悬浮按钮去除，落位 Topbar 右上角） */}
+        <button
+          type="button"
+          onClick={() => onCopilotOpen?.()}
+          className={`h-8 w-8 flex items-center justify-center rounded-lg ${styles.accentBg} ${styles.accentSolidText} transition hover:opacity-90 focus:outline-none focus:ring-2 ${styles.accentRing}`}
+          aria-label={t("app.copilot.open")}
+          title={t("app.copilot.open")}
+        >
+          <Bot className="w-4 h-4" />
+        </button>
 
         {/* Theme Selector Switcher */}
         <div className={`flex items-center gap-1.5 ${styles.inputBg} border ${styles.inputBorder} rounded-lg px-2.5 py-1 select-none shrink-0 shadow-3xs transition duration-150`}>

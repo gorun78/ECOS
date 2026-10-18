@@ -19,24 +19,25 @@ import {
   Activity,
   BookOpen,
   Briefcase,
+  ClipboardList,
   Command,
+  Compass,
   Cpu,
   Database,
   Gauge,
   GitBranch,
   Globe,
+  Layers,
   LayoutDashboard,
   Network,
-  Play,
+  Settings2,
   Shield,
-  Store,
   Table2,
-  Target,
 } from "lucide-react";
 
 export type IconComponent = ComponentType<{ className?: string }>;
 
-export type SidebarGroupId = "overview" | "resources" | "system" | "products";
+export type SidebarGroupId = "overview" | "workspaces" | "resources" | "control";
 
 /** 命令面板静态项的 i18n 键包（语料在 locales/navigation/*，非 common ns）。 */
 export interface PaletteMeta {
@@ -83,9 +84,9 @@ export interface SidebarGroup {
 
 const GROUP_KEYS: Record<SidebarGroupId, string> = {
   overview: "sidebar.group.overview",
+  workspaces: "sidebar.group.workspaces",
   resources: "sidebar.group.resources",
-  system: "sidebar.group.system",
-  products: "sidebar.group.product",
+  control: "sidebar.group.control",
 };
 
 const p = (id: string, categoryKey: string): PaletteMeta => ({
@@ -102,36 +103,52 @@ const CAT = {
 } as const;
 
 /**
- * NAV_CONFIG — 45 项，与既有 TAB_LABEL_KEY（实测 45 键）一一对应。
- * 前 12 项带 group = Sidebar 入口；7 项 vestigial（security/catalog/
- * dataset_explorer/pipeline/workbook/lineage/datasources）当前无根路由，
- * 但保留 tabbable 以维持既有标签行为（route 为意向路径，门禁方向是
- * main.tsx→NAV_CONFIG 成员检查，不要求反向可达）。
+ * NAV_CONFIG — 47 项（2026-10-14 菜单重构：+decision / +resource-center /
+ * +platform-governance），与既有 TAB_LABEL_KEY 一一对应。
+ * 前 13 项带 group = Sidebar 入口（4 组：总览/工作区/资源概览/控制面板）；
+ * 7 项 vestigial（security/catalog/dataset_explorer/pipeline/workbook/
+ * lineage/datasources）当前无根路由，但保留 tabbable 以维持既有标签行为
+ * （route 为意向路径，门禁方向是 main.tsx→NAV_CONFIG 成员检查，不要求反向可达）。
+ *
+ * 2026-10-14 结构调整（用户裁决）：
+ *  - 总览组只留「决策面板」(新页 #/decision)；world_model / monitor 摘除 group
+ *    （保留 tabbable + URL 可达，菜单出口移除，非下线）。
+ *  - 新增「工作区」组：五个工作台按 场景→AI→知识→本体→数据 顺序。
+ *  - 资源概览组只留「资源中心」(新页 #/resource-center)；marketplace /
+ *    knowledge_graph / ops_apps 摘除 group（同上，保留 URL 可达）。
+ *  - 「系统管理」组拆除，「产品功能」折叠组退役 → 合并为「控制面板」组：
+ *    安全中心 / 任务中心(engine-tasks) / 监控中心 / 数据字典 / 平台治理(新页)。
  */
 export const NAV_ENTRIES: readonly NavEntry[] = [
   // ── Sidebar：总览组 ─────────────────────────────────────────────
-  { id: "world_model", route: "/world_model", labelKey: "app.tab.world_model", group: "overview", descKey: "sidebar.desc.world_model", icon: Target, tabbable: true },
-  { id: "monitor", route: "/monitor", labelKey: "app.tab.monitor", group: "overview", descKey: "sidebar.desc.monitor", icon: Gauge, tabbable: true },
+  { id: "decision", route: "/decision", labelKey: "app.tab.decision", group: "overview", descKey: "sidebar.desc.decision", icon: Compass, tabbable: true },
+  // ── Sidebar：工作区组（顺序：场景→AI→知识→本体→数据，用户裁决）─────────
+  // 2026-10-14 用户裁决：场景工作台入口指向 L1「我的场景」（#/workbench，详设-07），
+  // 非 /project_workbench 高级技术视图（ScenarioManagementView，保留可达，不在本组出项）。
+  { id: "workbench", route: "/workbench", labelKey: "app.tab.workbench", group: "workspaces", descKey: "sidebar.desc.workbench", icon: Briefcase, tabbable: true },
+  { id: "agent_studio", route: "/agent_studio", labelKey: "app.tab.ai_workbench", group: "workspaces", descKey: "sidebar.desc.agent_studio", icon: Cpu, tabbable: true, palette: p("agent_studio", CAT.cognitive), searchTypes: ["Agent"] },
+  { id: "knowledge_view", route: "/knowledge_view", labelKey: "app.tab.knowledge_view", group: "workspaces", descKey: "sidebar.desc.knowledge_view", icon: BookOpen, tabbable: true },
+  { id: "ontology_workbench", route: "/ontology_workbench", labelKey: "app.tab.ontology_workbench", group: "workspaces", descKey: "sidebar.desc.ontology_workbench", icon: Network, tabbable: true },
+  { id: "data-workbench", route: "/data-workbench", labelKey: "app.tab.data_workbench", group: "workspaces", descKey: "sidebar.desc.data_workbench", icon: LayoutDashboard, tabbable: true },
   // ── Sidebar：资源概览组 ─────────────────────────────────────────
-  { id: "marketplace", route: "/marketplace", labelKey: "app.tab.marketplace", group: "resources", descKey: "sidebar.desc.marketplace", icon: Store, tabbable: true, searchTypes: ["Asset"], categoryKey: CAT.data },
-  { id: "knowledge_graph", route: "/knowledge_graph", labelKey: "app.tab.knowledge_graph", group: "resources", descKey: "sidebar.desc.knowledge_graph", icon: BookOpen, tabbable: true, searchTypes: ["Knowledge"], categoryKey: CAT.knowledge },
-  { id: "ops_apps", route: "/ops_apps", labelKey: "app.tab.ops_apps", group: "resources", descKey: "sidebar.desc.ops_apps", icon: Play, tabbable: true },
-  // ── Sidebar：系统管理组 ─────────────────────────────────────────
-  { id: "security-center", route: "/security-center", labelKey: "app.tab.security_center", group: "system", descKey: "sidebar.desc.security_center", icon: Shield, tabbable: true, palette: p("security-center", CAT.security) },
-  { id: "dict", route: "/dict", labelKey: "app.tab.dict", group: "system", descKey: "sidebar.desc.dict", icon: Table2, tabbable: true },
-  // ── Sidebar：产品功能组（可折叠）───────────────────────────────
-  { id: "project_workbench", route: "/project_workbench", labelKey: "app.tab.project_workbench", group: "products", descKey: "sidebar.desc.project_workbench", icon: Briefcase, tabbable: true },
-  { id: "agent_studio", route: "/agent_studio", labelKey: "app.tab.ai_workbench", group: "products", descKey: "sidebar.desc.agent_studio", icon: Cpu, tabbable: true, palette: p("agent_studio", CAT.cognitive), searchTypes: ["Agent"] },
-  { id: "knowledge_view", route: "/knowledge_view", labelKey: "app.tab.knowledge_view", group: "products", descKey: "sidebar.desc.knowledge_view", icon: BookOpen, tabbable: true },
-  { id: "ontology_workbench", route: "/ontology_workbench", labelKey: "app.tab.ontology_workbench", group: "products", descKey: "sidebar.desc.ontology_workbench", icon: Network, tabbable: true },
-  { id: "data-workbench", route: "/data-workbench", labelKey: "app.tab.data_workbench", group: "products", descKey: "sidebar.desc.data_workbench", icon: LayoutDashboard, tabbable: true },
+  { id: "resource-center", route: "/resource-center", labelKey: "app.tab.resource_center", group: "resources", descKey: "sidebar.desc.resource_center", icon: Layers, tabbable: true, searchTypes: ["Asset", "Knowledge", "OntologyEntity"], categoryKey: CAT.knowledge },
+  // ── Sidebar：控制面板组 ─────────────────────────────────────────
+  { id: "security-center", route: "/security-center", labelKey: "app.tab.security_center", group: "control", descKey: "sidebar.desc.security_center", icon: Shield, tabbable: true, palette: p("security-center", CAT.security) },
+  { id: "engine-tasks", route: "/engine-tasks", labelKey: "app.tab.engine_tasks", group: "control", descKey: "sidebar.desc.engine_tasks", icon: ClipboardList, tabbable: true },
+  { id: "monitor", route: "/monitor", labelKey: "app.tab.monitor", group: "control", descKey: "sidebar.desc.monitor", icon: Gauge, tabbable: true },
+  { id: "dict", route: "/dict", labelKey: "app.tab.dict", group: "control", descKey: "sidebar.desc.dict", icon: Table2, tabbable: true },
+  { id: "platform-governance", route: "/platform-governance", labelKey: "app.tab.platform_governance", group: "control", descKey: "sidebar.desc.platform_governance", icon: Settings2, tabbable: true },
+  // ── 菜单外保留 tabbable（2026-10-14 摘出菜单，URL/标签条仍可达）──
+  { id: "world_model", route: "/world_model", labelKey: "app.tab.world_model", tabbable: true },
+  { id: "marketplace", route: "/marketplace", labelKey: "app.tab.marketplace", tabbable: true, searchTypes: ["Asset"], categoryKey: CAT.data },
+  { id: "knowledge_graph", route: "/knowledge_graph", labelKey: "app.tab.knowledge_graph", tabbable: true, searchTypes: ["Knowledge"], categoryKey: CAT.knowledge },
+  { id: "ops_apps", route: "/ops_apps", labelKey: "app.tab.ops_apps", tabbable: true },
   // ── 其余 tabbable 内容根 / 兼容别名 / vestigial ─────────────────
   { id: "mission_control", route: "/mission_control", labelKey: "app.tab.mission_control", tabbable: true, icon: Command, palette: p("mission_control", CAT.cognitive), searchTypes: ["Goal", "Scenario"] },
   { id: "security", route: "/security-center", labelKey: "app.tab.security_center", tabbable: true },
   { id: "ai-workbench", route: "/ai-workbench", labelKey: "app.tab.ai_workbench", tabbable: true },
   // workbench（详设-07 WP-D 场景工作台 L1/L2，W209 冻结路由根 fdee86d6）——
-  // tabbable 仅为其解析 Tab 标签（W201 fail-closed 面），不在 Sidebar 分组出项（无 group）。
-  { id: "workbench", route: "/workbench", labelKey: "app.tab.workbench", tabbable: true },
+  // 2026-10-14 用户裁决：升为工作区组成项（见上「工作区组」，route=/workbench）。
   { id: "agent_mesh", route: "/agent_mesh", labelKey: "app.tab.agent_mesh", tabbable: true },
   { id: "agent-builder", route: "/agent-builder", labelKey: "app.tab.agent_builder", tabbable: true },
   { id: "agent-test", route: "/agent-test", labelKey: "app.tab.agent_test", tabbable: true },
@@ -157,7 +174,6 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { id: "system-config", route: "/system-config", labelKey: "app.tab.system_config", tabbable: true },
   { id: "iam", route: "/iam", labelKey: "app.tab.iam", tabbable: true },
   { id: "kanban", route: "/kanban", labelKey: "app.tab.kanban", tabbable: true },
-  { id: "engine-tasks", route: "/engine-tasks", labelKey: "app.tab.engine_tasks", tabbable: true },
   { id: "telemetry", route: "/telemetry", labelKey: "app.tab.telemetry", tabbable: true },
   { id: "tokens", route: "/tokens", labelKey: "app.tab.tokens", tabbable: true },
   { id: "gateway-diagnostics", route: "/gateway-diagnostics", labelKey: "app.tab.gateway_diagnostics", tabbable: true },
@@ -179,20 +195,24 @@ const sidebarGroupsOf = (groupId: SidebarGroupId): SidebarGroup => ({
   items: NAV_ENTRIES.filter((e) => e.group === groupId).map(toSidebarEntry),
 });
 
-/** Sidebar 前三组（总览/资源/系统），组内顺序 = NAV_ENTRIES 声明顺序。 */
+/** Sidebar 四组（总览/工作区/资源概览/控制面板），组内顺序 = NAV_ENTRIES 声明顺序。 */
 export const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
   sidebarGroupsOf("overview"),
+  sidebarGroupsOf("workspaces"),
   sidebarGroupsOf("resources"),
-  sidebarGroupsOf("system"),
+  sidebarGroupsOf("control"),
 ];
 
-/** Sidebar 产品功能组（可折叠区），单独导出以保持消费端形状。 */
-export const SIDEBAR_PRODUCT_ITEMS: readonly SidebarEntry[] = sidebarGroupsOf("products").items;
+/**
+ * 历史兼容导出（2026-10-14 后语义 = 控制面板组）：「产品功能」折叠组在
+ * 2026-10-14 菜单重构中退役（4 组全部平铺），该导出保留以避免消费端
+ * （__tests__/navConfig.test.ts）断言形状漂移；Sidebar.tsx 不再消费。
+ */
+export const SIDEBAR_PRODUCT_ITEMS: readonly SidebarEntry[] = SIDEBAR_GROUPS[3].items;
 
-/** Sidebar 全部 12 项（折叠 rails 消费）。 */
+/** Sidebar 全部 12 项（总览1 + 工作区5 + 资源概览1 + 控制面板5，用户裁决 2026-10-14）。 */
 export const SIDEBAR_ITEMS: readonly SidebarEntry[] = [
   ...SIDEBAR_GROUPS.flatMap((g) => g.items),
-  ...SIDEBAR_PRODUCT_ITEMS,
 ];
 
 // ── 派生：工作区标签条（App.tsx）────────────────────────────────────────────
@@ -278,8 +298,10 @@ export const DELIBERATELY_UNLINKED: Readonly<Record<string, string>> = {
   case_library: "口径 C 硬孤岛：案例库仅从认知页跳转进入；待产品定档是否升为一级导航",
   domain_designer: "口径 C 硬孤岛：main.tsx 仅剩 Navigate 重定向兼容；待后续 Wave 清理",
   domains: "旧重定向兼容路由（Navigate → ontology_workbench），非页面根；保留至重定向下线",
-  workbench: "F07-06 三层 IA：入口由场景动作跳转提供，不在全局导航；待产品定档",
   "scenario-sandbox": "沙箱演练页：由场景详情动作进入，天然不该有全局入口",
+  project_workbench:
+    "2026-10-14 用户裁决：侧栏场景工作台入口改指 /workbench（工作区组成项）；" +
+    "本项目为「场景管理·规划·评审」高级技术视图，保留 URL 可达，由 workbench 页内链接直达，不再出侧栏项",
   knowledge: "与 knowledge_view 双入口并存（B.0 归一遗留）：待后续 Wave 合并删除",
   chatbot_studio: "入口由 ai-workbench 页面内跳转提供；待产品定档是否独立入口",
   alerts: "旧告警页：新 alerts-center 已入 NAV_CONFIG；legacy 待下线",

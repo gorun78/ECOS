@@ -18,6 +18,11 @@ export async function fetchEngineHealth() {
   return apiFetchData(`${ENGINE_BASE}/health`);
 }
 
+/** GET /api/v1/engine/ontology/health — 本体引擎公开健康 VO（fetchEngineHealth 的同端点别名，显式语义命名）。 */
+export async function fetchOntologyEngineHealth(): Promise<Record<string, unknown>> {
+  return fetchEngineHealth() as Promise<Record<string, unknown>>;
+}
+
 export async function fetchEngineStatus() {
   return apiFetchData(`${ENGINE_BASE}/status`);
 }

@@ -48,7 +48,7 @@ import org.junit.jupiter.api.Test;
  * ③ 版本族名录：点号/下划线扩展版本（{@code V4.1}、{@code V25_1}…）逐枚钉死，
  * 防止后来者用 {@code V288.1} 型小版本号绕过「新增脚本须顺延登记」的台账纪律；
  * ④ 台账锚：单源目录内最大基线版本 {@code = 287}（下一枚 {@code V288}），
- * 且脚本总数只增不减（下限 238）。</p>
+ * 且脚本总数只增不减（下限 239）。</p>
  *
  * <p><b>反假绿四锁</b>：①扫描面非空 + 解析成功率 100%（解析不了的文件名直接进失败消息）；
  * ②重复检测的<b>反向对照</b>=解析器必须真的同时看见 V155 与 V50 的两枚实文件
@@ -77,12 +77,16 @@ class MigrationVersionUniquenessTest {
     private static final Pattern LEGAL_NAME =
             Pattern.compile("^V(\\d+(?:[._]\\d+)*)__([^_][^/]*?)\\.sql$");
 
-    /** 锁①：单源脚本总数下限（实测 238，只增不减；上限不钉，避免正常加脚本要改门禁）。 */
-    private static final int SCRIPT_COUNT_FLOOR = 238;
+    /** 锁①：单源脚本总数下限（实测 239，只增不减；上限不钉，避免正常加脚本要改门禁）。 */
+    private static final int SCRIPT_COUNT_FLOOR = 239;
 
-    /** 锁④：台账锚——基线最大版本与下一号（新增脚本必须用 {@code > } 本值的主版本号）。 */
-    private static final int MAX_BASELINE_VERSION = 287;
-    private static final int NEXT_FREE_VERSION = 288;
+    /**
+     * 锁④：台账锚——基线最大版本与下一号（新增脚本必须用 {@code > } 本值的主版本号）。
+     * 2026-10-16 二期 W2：V289（td_user IAM 读面补列）落地 ⇒ 287→289 / 下一号 288→290。
+     * V288 仍空置：《数据库访问规范》§十 预留给 #144-c，本批不占。
+     */
+    private static final int MAX_BASELINE_VERSION = 289;
+    private static final int NEXT_FREE_VERSION = 290;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。
@@ -147,7 +151,7 @@ class MigrationVersionUniquenessTest {
     // ────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("解析器自检：必须真的同时看见 V155 与 V50 两组重复、14 枚版本族文件、最大基线号 287")
+    @DisplayName("解析器自检：必须真的同时看见 V155 与 V50 两组重复、14 枚版本族文件、最大基线号 289")
     void scannerActuallySeesTheKnownShapes() throws IOException {
         List<ScriptEntry> entries = parseAll();
         Map<String, List<ScriptEntry>> groups = groupByVersion(entries);
@@ -232,14 +236,14 @@ class MigrationVersionUniquenessTest {
     // ────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("台账锚：主版本号连续性与下一号（实测最大 287 ⇒ 新脚本自 288 顺延，禁回填占号）")
+    @DisplayName("台账锚：主版本号连续性与下一号（实测最大 289 ⇒ 新脚本自 290 顺延，禁回填占号；V288 预留未占）")
     void baselineSequenceIsAddressableAndNextSlotIsKnown() throws IOException {
         Set<Integer> majors = new TreeSet<>(parseAll().stream()
                 .map(ScriptEntry::majorVersion).toList());
-        assertTrue(majors.contains(MAX_BASELINE_VERSION), "实测最大主版本号缺失 287");
+        assertTrue(majors.contains(MAX_BASELINE_VERSION), "实测最大主版本号缺失 289");
         assertTrue(!majors.contains(NEXT_FREE_VERSION),
                 "V" + NEXT_FREE_VERSION + " 已被占用但门禁基线未同步（登记册 §修订记录须同批改本值）");
-        // 主版本号集合非空且 >= 200 枚（V1~V287 区间内存量分布本就稀疏，不虚构连续性）
+        // 主版本号集合非空且 >= 200 枚（V1~V289 区间内存量分布本就稀疏，不虚构连续性）
         assertTrue(majors.size() >= 200, "可解析主版本数=" + majors.size() + "（异常骤降=解析面退化）");
     }
 

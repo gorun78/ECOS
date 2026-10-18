@@ -52,6 +52,15 @@ export async function fetchKnowledgeGraph(): Promise<{
 // ── Knowledge Search (Cognitive Operating System) ─────────────
 const KNOWLEDGE_SEARCH_BASE = "/api/v1/knowledge";
 
+/**
+ * GET /api/v1/engine/knowledge/health — 知识引擎公开健康 VO
+ * （与 data/ontology/cognitive/security 同族 /api/v1/engine/{k}/health 契约，
+ * 返回 HealthCheck{status, components?, version?, uptimeMs?}）。
+ */
+export async function fetchKnowledgeEngineHealth(): Promise<Record<string, unknown>> {
+  return apiFetchData<Record<string, unknown>>("/api/v1/engine/knowledge/health");
+}
+
 export async function searchKnowledge(q: string): Promise<any> {
   return doFetch(`${KNOWLEDGE_SEARCH_BASE}/search?q=${encodeURIComponent(q)}`);
 }

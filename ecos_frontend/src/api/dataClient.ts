@@ -14,6 +14,28 @@ import { apiFetchData, doFetch } from "../services/httpClient";
 
 // ── Datasets ────────────────────────────────────────────
 
+export const DATANET_ASSETS_BASE = "/api/v1/datanet/assets";
+
+/**
+ * GET {DATANET_ASSETS_BASE}?page={page}&pageSize={pageSize} — 已登记数据资产清单
+ * （DataAssetsDashboard 同源端点；响应 {data:[...]}，pageSize 客户端上限 500，
+ * 后端当前未分页包裹 total —— 计数语义为「server 返回行数」，非全量总计数）。
+ */
+export async function listDataAssets(page = 1, pageSize = 500): Promise<unknown[]> {
+  const res = await apiFetchData<{ data?: unknown[] }>(
+    `${DATANET_ASSETS_BASE}?page=${page}&pageSize=${pageSize}`,
+  );
+  return Array.isArray(res?.data) ? res.data : [];
+}
+
+/**
+ * GET /api/v1/engine/data/health — 数据引擎公开健康 VO
+ * （HealthCheck{status, components?, version?, uptimeMs?}）。
+ */
+export async function fetchDataEngineHealth(): Promise<Record<string, unknown>> {
+  return apiFetchData<Record<string, unknown>>("/api/v1/engine/data/health");
+}
+
 /**
  * PMO-43 T1 — tag mock-fallback data with `error: 'MOCK'` so UI and tests can
  * distinguish provable real backend data from placeholder enrichment rows.

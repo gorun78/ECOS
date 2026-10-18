@@ -47,6 +47,11 @@ export function actionApproveUrl(actionId: string): string {
   return `${WORKSPACE_BASE}/actions/${encodeURIComponent(actionId)}/approve`;
 }
 
+/** 场景清单：`/api/v1/workspace/scenarios`（GET 全量列表，决策面板边界内只投影 id/name/businessGoal/status）。 */
+export function workspaceScenariosUrl(): string {
+  return `${WORKSPACE_BASE}/scenarios`;
+}
+
 // ── 五必填单源（与 ActionProposalValidator 逐字对齐）────
 
 /**

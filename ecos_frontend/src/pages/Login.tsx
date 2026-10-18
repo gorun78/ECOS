@@ -31,7 +31,8 @@ export default function Login() {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Where to redirect after successful login.
-  // 落地根必须是「真实存在的路由根」：index 路由 = CognitiveOperatingSystem，
+  // 落地根必须是「真实存在的路由根」：index 根自 2026-10-14 起为
+  // <Navigate to="/decision" replace/>（用户裁决：首页直接进决策面板），
   // 而 `/app` 在全仓路由表里不存在（main.tsx 无 app 根）→ 登录后落到 404 兜底页
   // （检视报告 §4.1 P0 / §一 S6）。RequireAuth 传入的 from 仍优先。
   const from =

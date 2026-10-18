@@ -6,7 +6,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { Bot } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import CommandPalette from "./components/CommandPalette";
@@ -17,7 +16,7 @@ import { useLanguage } from "./components/LanguageContext";
 import ErrorBoundary from "./components/common/ErrorBoundary";
 import NetworkErrorBanner from "./components/NetworkErrorBanner";
 import { resolveTabLabel } from "./navigation/navConfig";
-import { apiHealth, notifyNetworkUp } from "./api";
+import { apiHealth, notifyNetworkUp, apiCognitiveHealth } from "./api";
 import { apiTaskStats, type TaskStats } from "./services/taskCenter";
 
 /**
@@ -42,12 +41,12 @@ export default function App() {
   const location = useLocation();
 
   // Derive currentView from URL path
-  // index 路由（<Route index/>，main.tsx）渲染的是 CognitiveOperatingSystem，与
-  // mission_control 路由同元素 → 落地根 Tab/面包屑必须映射 mission_control。
-  // 旧实现默认 "world_model"：Tab 显示"世界模型"、内容却是认知蓝图、点 Tab 又跳
-  // WorldModelViewer（检视报告 §4.1 P1 行60）。
+  // index 根是 <Navigate to="/decision" replace/>（2026-10-14 用户裁决，main.tsx）：
+  // 登录落地即重定向到 /decision，渲染期内不会以 "decision" 之外的空根到达 App。
+  // 兜底默认 "decision"：与导航首项（navConfig 总览组）一致，失效 URL 下 Tab/面包屑
+  // 不再张冠李戴指向 mission_control（认知蓝图已不占首页）。
   const pathSegments = location.pathname.split("/").filter(Boolean);
-  const currentView = pathSegments[0] || "mission_control";
+  const currentView = pathSegments[0] || "decision";
 
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState<number>(240);
@@ -85,6 +84,15 @@ export default function App() {
   const [serviceStatus, setServiceStatus] = useState("UP");
   const prevHealthUpRef = useRef(true);
 
+  // 认知引擎版本（Sidebar 左下状态面板）：走 apiCognitiveHealth()（GET /api/v1/cognitive/health）。
+  // 后端契约实测：gateway monolith 侧 cognitive2 的 CognitiveEngineOpenHealthController
+  // （唯一 setVersion 的 VO）被 GatewayApplication excludeFilters 排除，gateway 该路径
+  // 由 ai 侧/其它 Controller 承接且无 version 字段；独立 :18089 调试引擎侧才有
+  // CognitiveEngineOpenHealthVO.version="v2.0"。⇒ 前端只能 fail-closed：请求体带了
+  // 真实 version 才显示，否则 Sidebar 只渲染「认知引擎」label 不渲染 v?
+  // （假字面量 1.0.0-SNAPSHOT 已在本波删除）。失败保留上次有效值，不清屏。
+  const [engineVersion, setEngineVersion] = useState("");
+
   useEffect(() => {
     const poll = () => {
       apiHealth()
@@ -106,6 +114,23 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Cognitive engine version polling (30s，与 health 同周期；失败保留上次值)
+  useEffect(() => {
+    const pollVersion = () => {
+      apiCognitiveHealth()
+        .then((s) => {
+          const v = s?.version;
+          if (typeof v === "string" && v) setEngineVersion(v);
+        })
+        .catch(() => {
+          // 静默：Sidebar 占位文案已表达「取不到」，无需打扰
+        });
+    };
+    pollVersion();
+    const interval = setInterval(pollVersion, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Mobile sidebar hook
   const { isMobile, sidebarOpen, toggleSidebar, closeSidebar } = useMobileSidebar();
 
@@ -113,7 +138,7 @@ export default function App() {
   // strip re-renders when the user switches locale. The `id` doubles as the
   // stable i18n id — Topbar.applyTranslateTabLabel will resolve keys to UI.
   const [openTabs, setOpenTabs] = useState<Tab[]>(() => [
-    { id: "mission_control", label: getTabLabel((k) => k, "mission_control"), active: true }
+    { id: "decision", label: getTabLabel((k) => k, "decision"), active: true }
   ]);
 
   // Re-resolve every tab label whenever the locale changes. Without this
@@ -207,7 +232,7 @@ export default function App() {
         onDesktopToggle={() => setDesktopCollapsed(!desktopCollapsed)}
         statusMetrics={{
           serviceStatus,
-          engineVersion: "1.0.0-SNAPSHOT",
+          engineVersion,
           taskRunning: taskStats.running,
           taskPending: taskStats.pending,
           taskTotal: taskStats.total
@@ -239,6 +264,7 @@ export default function App() {
           onTabSelect={handleTabSelect}
           onTabClose={handleTabClose}
           onMenuToggle={toggleSidebar}
+          onCopilotOpen={() => setCopilotOpen(true)}
         />
 
         <main className="flex-1 min-h-0 flex flex-col relative overflow-hidden">
@@ -260,19 +286,7 @@ export default function App() {
         }}
       />
 
-      {/* AIP Copilot floating entry button — 避让右下功能区（报告 §4.1 P2 行66：
-          原 bottom-6 right-6 与分页器/内容右下区叠压，live 截图实锤）。
-          改贴内容区左下缘：桌面端按侧栏实际宽度（折叠 rail = 56px + 分隔条）算
-          left；移动端侧栏为 overlay，固定 24px 边距。 */}
-      <button
-        type="button"
-        aria-label={t("app.copilot.open")}
-        onClick={() => setCopilotOpen(true)}
-        style={{ left: isMobile ? 24 : desktopCollapsed ? 80 : sidebarWidth + 28 }}
-        className={`fixed bottom-6 z-50 h-14 w-14 rounded-full ${styles.accentBg} ${styles.accentHover} text-white shadow-lg shadow-black/30 flex items-center justify-center transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 select-none`}
-      >
-        <Bot className="h-7 w-7" />
-      </button>
+      {/* 2026-10-14 用户裁决：Copilot 悬浮按钮入口去除，入口改由 Topbar 右上角承担。 */}
 
       {/* AIP Copilot drawer */}
       <AIPCopilotDrawer
