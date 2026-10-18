@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.arch;
 
+import com.chinacreator.gzcm.common.stream.OagSseFrameContract;
 import com.chinacreator.gzcm.common.stream.SseFrameContract;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,9 +30,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 所以本守卫只能在源码面钉：写出面零内联帧词、词表声明面全局单文件、帧名装配调用点零字面量。</p>
  *
  * <p>判据一律"剥注释后再数"（{@link #stripComments}），否则 javadoc 里对旧写法的反面举例
- * 会被当成违例——那是假红，会让后来者把注释删掉来过关。同时每条零值断言都配一条
- * <b>真实载体正控制</b>：同一谓词在 OAG 通道（现状仍内联）必须抓到实测数字，抓不到即扫描面失真，
- * 本守卫的"零违例"不可信。</p>
+ * 会被当成违例——那是假红，会让后来者把注释删掉来过关。</p>
+ *
+ * <p><b>#143/B5-5a 的判据换挡（照登，不留隐性双轨）</b>：改前 OAG 通道是内联发射形态，
+ * 因此本守卫拿它当"真实载体正控制"（同一谓词必须抓到实测 7/4 处）。收口后该真实载体消失，
+ * 全部扫描面归零 ⇒ 正控制改由<b>合成样本</b>承担（{@link #zeroValuePredicatesStillBiteOnThePreFixShape}）：
+ * 把改前缺陷原形喂给同一谓词，抓不到即判据失效，"零违例"不可信。
+ * 原基线数字 7/4 不删、留在注释与本段作为收口前凭证。</p>
+ *
+ * <p><b>本守卫管不到的另一面（照登，不假装全覆盖）</b>：{@code OagController#toStepEvent}
+ * 读的是 {@code OagPipelineEngine} 内部事件 Map 的键（{@code node/intent/nodeElapsedMs/
+ * securityPassed}），那是引擎侧契约、不是 SSE 事件名，静态词表管不到它。该面的漂移由入口驱动的
+ * {@code OagSseChannelSequenceTest#completedLegWritesResponseThenTerminalDone} 以"节点进度键必须落到载荷"
+ * 的功能断言兜住——键改名即断言红，不依赖本文件的计数。</p>
  */
 class SseFrameSingleSourceGateTest {
 
@@ -43,10 +54,21 @@ class SseFrameSingleSourceGateTest {
     private static final Pattern FRAME_VOCABULARY_DECLARATION =
             Pattern.compile("String\\s+FRAME_\\w+\\s*=");
 
+    /**
+     * OAG 通道词表声明面：任何 {@code String EVENT_xxx = "<OAG 事件名>"} 都构成第二份事件名真值。
+     *
+     * <p>词形由单源 {@link OagSseFrameContract#events()} 反拼，禁在本门禁里另抄一份字面量。
+     * 不加"值必须是词表内事件名"这层约束会误伤
+     * {@code WAgentEventPublisher.EVENT_SOURCE = "ai-engine:wagent"}——那是事件源标识、
+     * 不是 SSE 事件名，计入即假红。</p>
+     */
+    private static final Pattern OAG_EVENT_VOCABULARY_DECLARATION = Pattern.compile(
+            "String\\s+EVENT_\\w+\\s*=\\s*\"(" + String.join("|", OagSseFrameContract.events()) + ")\"");
+
     /** 帧名自拼面：Spring SSE BuilderAPI 的 {@code event().name("...")} 形态。 */
     private static final Pattern EVENT_NAME_CALL_SITE = Pattern.compile("\\.name\\(\\s*\"");
 
-    /** 承流面自发射形态（OAG 通道现状），捕获事件名用于分类计数。 */
+    /** 承流面自发射形态（OAG 通道改前形状），捕获事件名用于分类计数。 */
     private static final Pattern SEND_EVENT_WITH_NAME =
             Pattern.compile("sendEvent\\(\\s*emitter,\\s*\"([^\"]+)\"");
 
@@ -55,12 +77,16 @@ class SseFrameSingleSourceGateTest {
             "controller/AgentLoopController.java",
             "stream/AgentLoopSseFrames.java");
 
-    /** 2026-10-18 实测：OAG 通道 {@code sendEvent(emitter, "<字面量>")} 共 7 处，全在 OagController。 */
-    private static final int OAG_INLINE_SEND_EVENT_PIN = 7;
-    /** 上述 7 处里落在七帧词表上的枚数（error×3 + done×1）；node/response/blocked 是 OAG 私有词形。 */
-    private static final int OAG_FRAME_WORD_PIN = 4;
+    /** OAG 写出面（B5-5a 起与 agent-loop 面同形：只引用单源，零内联发射）。 */
+    private static final List<String> OAG_WRITE_SURFACE = List.of(
+            "oag/OagController.java",
+            "oag/dto/OagStepEvent.java",
+            "stream/OagSseFrames.java");
+
     /** 单源词表声明数（七帧各一枚）。 */
     private static final int VOCABULARY_SIZE = 7;
+    /** OAG 通道词表声明数（node/response/blocked/error/done 各一枚，2026-10-18 实测）。 */
+    private static final int OAG_EVENT_VOCABULARY_SIZE = 5;
 
     // ═══ 1) 词表声明面：全局单文件 ═══
 
@@ -84,27 +110,20 @@ class SseFrameSingleSourceGateTest {
                 "单源 SseFrameContract 的帧名声明数不为 7 —— 扫描面或词表已变化，需重新登记");
     }
 
-    // ═══ 2) 写出面：零内联帧词 ═══
+    // ═══ 2) 写出面：零内联帧词（agent-loop 与 OAG 两通道同判据） ═══
 
     @Test
-    @DisplayName("§9.3.3 写出面：agent-loop 控制器与帧写出器零内联帧词，OAG 同谓词实测 4 处（证明判据咬得住）")
+    @DisplayName("§9.3.3 写出面：agent-loop 与 OAG 四条写出面零内联七帧词")
     void writeSurfaceNeverInlinesFrameWords() throws Exception {
-        for (String relative : WRITE_SURFACE) {
+        List<String> surfaces = new ArrayList<>(WRITE_SURFACE);
+        surfaces.addAll(OAG_WRITE_SURFACE);
+        for (String relative : surfaces) {
             Source source = aiSource(relative);
             List<String> inlined = matchedLines(source, FRAME_WORD_LITERAL).collect(Collectors.toList());
             assertTrue(inlined.isEmpty(),
-                    "写出面内联七帧词字面量（必须经 SseFrameContract.FRAME_* 引用）: "
+                    "写出面内联七帧词字面量（必须经单源常量引用）: "
                             + relative + "\n" + String.join("\n", inlined));
         }
-
-        // 真实载体正控制：OAG 通道仍是内联发射形态，同谓词必须抓到实测 4 处七帧词
-        List<String> oagFrameWords =
-                matchedLines(aiSource("oag/OagController.java"), FRAME_WORD_LITERAL)
-                        .collect(Collectors.toList());
-        assertEquals(OAG_FRAME_WORD_PIN, oagFrameWords.size(),
-                "OAG 内联帧词实测基线漂移（2026-10-18 = 4：error×3 + done×1）—— "
-                        + "该数为正控制，变小=判据失效，变大=又开了内联发射点；实测 "
-                        + oagFrameWords);
     }
 
     // ═══ 3) 帧名自拼面：剥注释后为零 ═══
@@ -129,23 +148,69 @@ class SseFrameSingleSourceGateTest {
                         + "数目变化说明本守卫的'剥注释'判据与实际码面脱节");
     }
 
-    // ═══ 4) 现状钉桩：OAG 通道词形未合流（钉现状 ≠ 认可） ═══
+    // ═══ 4) 收口后判据：内联发射面归零（改前基线 7 处，凭证留档不删） ═══
 
     @Test
-    @DisplayName("现状钉桩：OAG 通道内联发射恰 7 处且全在 OagController（D-B5-8 未合流，只增不减）")
-    void oagInlineEventSurfaceIsPinnedNotApproved() throws Exception {
+    @DisplayName("§1.9.2 收口：ai 全域 sendEvent(emitter, \"<字面量>\") 归零（改前实测 7 处，D-B5-7 已闭）")
+    void inlineEmitterSendSurfaceIsNowZeroAcrossAiDomain() throws Exception {
         List<Source> aiMain = aiMainSources();
         List<String> hits = aiMain.stream()
                 .flatMap(source -> matchedLines(source, SEND_EVENT_WITH_NAME)
                         .map(text -> source.file().getFileName() + ": " + text.trim()))
                 .collect(Collectors.toList());
-        assertEquals(OAG_INLINE_SEND_EVENT_PIN, hits.size(),
-                "内联 sendEvent(emitter, \"<字面量>\") 面变化。2026-10-18 实测基线 = 7 处且全部属 OagController；"
-                        + "新增即多开一个未合流的发射点（须改码合流，不许改本基线放行），"
-                        + "减少则须同步订正 D-B5-8 与本注释。实测:\n" + String.join("\n", hits));
-        assertTrue(hits.stream().allMatch(hit -> hit.startsWith("OagController.java")),
-                "内联发射点已越出 OagController —— 本钉桩的属主假设不再成立，需重新登记:\n"
+        assertTrue(hits.isEmpty(),
+                "内联 sendEvent(emitter, \"<字面量>\") 面复现（2026-10-18 收口前实测基线 = 7 处且全在 OagController，"
+                        + "收口后必须为 0）。新增即多开一个未合流的发射点，须改码合流、不许改本判据放行:\n"
                         + String.join("\n", hits));
+    }
+
+    // ═══ 4b) OAG 事件名声明面：ai 域零枚，唯一真值在 common-api 单源 ═══
+
+    @Test
+    @DisplayName("§1.9.2 OAG 单源：ai 引擎零 EVENT_* 事件名声明，同一谓词在 common-api 抓到恰 5 枚")
+    void oagEventVocabularyIsDeclaredOnlyInTheCommonApiSurface() throws Exception {
+        List<String> secondVocabulary = aiMainSources().stream()
+                .flatMap(source -> matchedLines(source, OAG_EVENT_VOCABULARY_DECLARATION)
+                        .map(text -> source.file().getFileName() + ": " + text.trim()))
+                .collect(Collectors.toList());
+        assertTrue(secondVocabulary.isEmpty(),
+                "ai 引擎内出现第二份 OAG 事件名声明（唯一登记处 = common-api OagSseFrameContract）:\n"
+                        + String.join("\n", secondVocabulary));
+
+        List<String> canonical =
+                matchedLines(oagSingleSourceContract(), OAG_EVENT_VOCABULARY_DECLARATION)
+                        .collect(Collectors.toList());
+        assertEquals(OAG_EVENT_VOCABULARY_SIZE, canonical.size(),
+                "OAG 单源事件名声明数不为 5 —— 词表或扫描面已变化，需重新登记；实测 " + canonical);
+
+        long consumeRefs = matchedLines(aiSource("oag/dto/OagStepEvent.java"),
+                Pattern.compile("OagSseFrameContract\\.\\w+")).count();
+        assertTrue(consumeRefs >= OAG_EVENT_VOCABULARY_SIZE,
+                "载荷装配面对 OAG 单源的引用少于 5 —— 若它既不内联又不引用，则事件名来自第三处，"
+                        + "本守卫的'零'是假的；实测 " + consumeRefs);
+    }
+
+    // ═══ 4c) 零值判据的自证：合成样本必须能被同一谓词抓到 ═══
+
+    @Test
+    @DisplayName("自检：收口后各零值判据仍能咬住改前缺陷原形（合成样本，非源码面）")
+    void zeroValuePredicatesStillBiteOnThePreFixShape() {
+        String preFixShape = String.join("\n",
+                "    sendEvent(emitter, \"error\", payload);",
+                "    sendEvent(emitter, \"done\", payload);",
+                "    emitter.send(SseEmitter.event().name(\"node\").data(payload));",
+                "    private static final String EVENT_NODE = \"node\";",
+                "    private static final String FRAME_DELTA = \"delta\";");
+        assertEquals(2L, countInText(preFixShape, SEND_EVENT_WITH_NAME),
+                "内联发射探针失效 —— 源码面的'0 处'不可信");
+        assertEquals(1L, countInText(preFixShape, EVENT_NAME_CALL_SITE),
+                "自拼帧名探针失效 —— 源码面的'0 处'不可信");
+        assertEquals(1L, countInText(preFixShape, OAG_EVENT_VOCABULARY_DECLARATION),
+                "OAG 词表声明探针失效");
+        assertEquals(3L, countInText(preFixShape, FRAME_WORD_LITERAL),
+                "七帧词探针失效（前两条 + 末条 FRAME_DELTA）");
+        assertEquals(1L, countInText(preFixShape, FRAME_VOCABULARY_DECLARATION),
+                "七帧词表声明探针失效");
     }
 
     // ═══ 5) 七帧 ≠ 八帧：degrade 帧显式缺席（WAgent 面欠账留痕） ═══
@@ -310,6 +375,22 @@ class SseFrameSingleSourceGateTest {
             }
         }
         throw new IllegalStateException("SseFrameContract 源文件缺失，cwd=" + Path.of("").toAbsolutePath()
+                + " 候选=" + candidates);
+    }
+
+    /** OAG 通道事件名单源（跨模块只读该单文件，与七帧单源分表登记）。 */
+    private static Source oagSingleSourceContract() {
+        List<String> candidates = List.of(
+                "../../../runtime/common-api/src/main/java/com/chinacreator/gzcm/common/stream/OagSseFrameContract.java",
+                "runtime/common-api/src/main/java/com/chinacreator/gzcm/common/stream/OagSseFrameContract.java",
+                "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/gzcm/common/stream/OagSseFrameContract.java");
+        for (String candidate : candidates) {
+            Path path = Path.of(candidate);
+            if (Files.isRegularFile(path)) {
+                return readSource(path);
+            }
+        }
+        throw new IllegalStateException("OagSseFrameContract 源文件缺失，cwd=" + Path.of("").toAbsolutePath()
                 + " 候选=" + candidates);
     }
 

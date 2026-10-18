@@ -127,10 +127,13 @@ class WAgentForbiddenDependencyArchTest {
      *  同时受本守卫与 {@code NoDirectEngineTableAccessTest} 夹制）；
      *  2026-10-18 +1（257）= #143/B5-2（SSE 七帧契约收口）新增
      *  {@code ai.stream.AgentLoopSseFrames}（承流帧序状态机，词表唯一消费方；置于 ai.stream 包
-     *  以避开 {@code ArchitectureTest} 的 service 接口命名门，由 {@code SseFrameSingleSourceGateTest} 夹制）。</p>
-     * <p>计数口径 = {@code find src/main/java -name '*.java' | wc -l} 于 2026-10-18 实测 <b>257</b>。</p>
+     *  以避开 {@code ArchitectureTest} 的 service 接口命名门，由 {@code SseFrameSingleSourceGateTest} 夹制）；
+     *  2026-10-18 +1（257→258）= #143/B5-5a（D-B5-7 OAG 写出面收口）新增
+     *  {@code ai.stream.OagSseFrames}（OAG 通道唯一出帧面，与 agent-loop 写出器同包同纪律，
+     *  词表消费 {@code common-api} 的 {@code OagSseFrameContract}）。</p>
+     * <p>计数口径 = {@code find src/main/java -name '*.java' | wc -l} 于 2026-10-18 实测 <b>258</b>。</p>
      */
-    private static final int AI_SOURCE_FILE_FLOOR = 257;
+    private static final int AI_SOURCE_FILE_FLOOR = 258;
 
     /** 反空集锁④：跨引擎门面引用单点（详设-06 F06-11 forecast.explain 走 cognitive api 常量）。 */
     private static final Pattern ENGINE_IMPORT =

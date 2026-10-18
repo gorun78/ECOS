@@ -1,9 +1,12 @@
 package com.chinacreator.gzcm.engine.ai.oag;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.stream.OagSseFrameContract;
 import com.chinacreator.gzcm.engine.ai.oag.dto.OagChatRequest;
 import com.chinacreator.gzcm.engine.ai.oag.dto.OagChatResponse;
 import com.chinacreator.gzcm.engine.ai.oag.dto.OagStepEvent;
+import com.chinacreator.gzcm.engine.ai.stream.AgentLoopSseFrames;
+import com.chinacreator.gzcm.engine.ai.stream.OagSseFrames;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,13 +30,14 @@ import java.util.concurrent.CompletableFuture;
  *   GET  /api/v1/oag/chat/health   — 管道健康检查
  * </pre>
  *
- * <p>SSE 事件类型（事件名保持不变，payload 改为强类型序列化）：</p>
+ * <p>SSE 事件词表与载荷键单一来源 = {@link OagSseFrameContract}（写出面 =
+ * {@code stream/OagSseFrames}，禁在本类自拼事件名）：</p>
  * <ul>
  *   <li>{@code node}      — 每个节点完成时推送</li>
  *   <li>{@code response}  — 最终响应</li>
- *   <li>{@code done}      — 管道完成</li>
- *   <li>{@code error}     — 错误</li>
- *   <li>{@code blocked}   — 安全检查阻止</li>
+ *   <li>{@code done}      — 管道完成（末帧恒发）</li>
+ *   <li>{@code error}     — 错误（至多一条且紧接 done 之前）</li>
+ *   <li>{@code blocked}   — 安全检查阻止（拦截原因出 {@code reason} 键）</li>
  * </ul>
  */
 @RestController
@@ -44,6 +48,16 @@ public class OagController {
 
     /** SSE 超时（毫秒） */
     private static final long SSE_TIMEOUT_MS = 300_000L;
+
+    /**
+     * 管道异常的用户消息模板（D-B5-14：承流 error 帧永不携带异常原文）。
+     *
+     * <p>改前该帧写 {@code "OAG 管道失败: " + e.getMessage()}，而 {@code getMessage()}
+     * 可能含数据源串、SQL 片段或第三方 SDK 报文——同 §9.3.3 对 error 帧的约束。
+     * 原文一律入日志，帧里只出模板 + 诊断码。</p>
+     */
+    private static final String PIPELINE_FAILURE_TEMPLATE = "OAG 管道失败，请稍后重试（诊断码 {traceId}）";
+    private static final String DIAGNOSTIC_PLACEHOLDER = "{traceId}";
 
     @Autowired
     private OagPipelineEngine pipelineEngine;
@@ -125,85 +139,97 @@ public class OagController {
     /**
      * SSE 流式 OAG 管道对话。
      *
-     * <p>保留 Map 入参（兼容性优先），每个 SSE 事件 payload 改为
-     * {@link OagStepEvent#toMap()} 的强类型序列化结果。
-     * 事件名保持 {@code node/response/done/error/blocked} 不变。</p>
+     * <p>事件名与载荷键单一来源 = {@link OagSseFrameContract}，出帧面单一入口 =
+     * {@link OagSseFrames}；本方法只负责 {@code SseEmitter} 装配与异步泵送，
+     * 不再逐处 {@code sendEvent(emitter, "<字面量>", ...)}（D-B5-7 病灶即该形态：
+     * {@code error}/{@code done} 与 agent-loop 七帧同字面量却不同载荷形）。</p>
+     *
+     * <p>末帧 {@code done} 恒发（含参数校验失败与管道抛异常两条腿）：SSE 无末帧时
+     * 前端解析器只能靠连接关闭收尾，断线续传与"跑完什么都没显示"的判读都失去依据。</p>
      */
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chatStream(@RequestBody Map<String, Object> body) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
+        OagSseFrames frames = new OagSseFrames(sinkOf(emitter));
 
         CompletableFuture.runAsync(() -> {
-            try {
-                String message = (String) body.get("message");
-                if (message == null || message.isBlank()) {
-                    sendEvent(emitter, "error",
-                            OagStepEvent.error(null, "FAILED", 0, null, "message 不能为空").toMap());
-                    emitter.complete();
-                    return;
-                }
-
-                String userId = getStringOrDefault(body, "userId", "anonymous");
-                String tenantId = getStringOrDefault(body, "tenantId", "default");
-
-                // 执行管道（带 SSE 回调 — 强类型 OagStepEvent）
-                OagPipelineContext ctx = pipelineEngine.run(message, body, userId, tenantId,
-                        event -> {
-                            try {
-                                // 将管道事件 Map 转为 OagStepEvent 再序列化
-                                OagStepEvent stepEvent = toStepEvent(event);
-                                sendEvent(emitter, "node", stepEvent.toMap());
-                            } catch (IOException e) {
-                                log.warn("[OAG] SSE 推送节点事件失败", e);
-                            }
-                        });
-
-                // 推送最终响应
-                if ("COMPLETED".equals(ctx.getStatus()) && ctx.getFinalResponse() != null) {
-                    OagChatResponse resp = OagChatResponse.from(ctx);
-                    Map<String, Object> respData = new LinkedHashMap<>();
-                    respData.put("content", resp.getContent());
-                    respData.put("traceId", resp.getTraceId());
-                    sendEvent(emitter, "response", respData);
-                } else if ("BLOCKED".equals(ctx.getStatus())) {
-                    OagStepEvent blockedEvent = OagStepEvent.nodeDone(null, "BLOCKED", 0,
-                            ctx.getTraceId(), ctx.getIntent(), ctx.isSecurityPassed());
-                    blockedEvent.setMessage(ctx.getSecurityBlockReason() != null
-                            ? ctx.getSecurityBlockReason() : "安全检查不通过");
-                    sendEvent(emitter, "blocked", blockedEvent.toMap());
-                } else if ("FAILED".equals(ctx.getStatus())) {
-                    OagStepEvent errorEvent = OagStepEvent.error("Pipeline", "FAILED", ctx.getElapsedMs(),
-                            ctx.getTraceId(), ctx.getErrorMessage() != null
-                                    ? ctx.getErrorMessage() : "未知错误");
-                    sendEvent(emitter, "error", errorEvent.toMap());
-                }
-
-                // 推送 done 事件
-                OagStepEvent doneEvent = OagStepEvent.nodeDone(null, ctx.getStatus(),
-                        ctx.getElapsedMs(), ctx.getTraceId(),
-                        ctx.getIntent(), ctx.isSecurityPassed());
-                sendEvent(emitter, "done", doneEvent.toMap());
-
-                emitter.complete();
-
-            } catch (Exception e) {
-                log.error("[OAG] SSE 流式对话失败", e);
-                try {
-                    sendEvent(emitter, "error",
-                            OagStepEvent.error(null, "FAILED", 0, null,
-                                    "OAG 管道失败: " + e.getMessage()).toMap());
-                } catch (Exception ignored) {
-                    // emitter may already be closed
-                }
-                emitter.completeWithError(e);
-            }
+            streamChannel(frames, body);
+            emitter.complete();
         });
 
-        emitter.onCompletion(() -> log.debug("[OAG] SSE stream completed"));
+        emitter.onCompletion(() -> log.debug("[OAG] SSE stream completed, 已出帧={}", frames.emittedNames()));
         emitter.onTimeout(() -> log.warn("[OAG] SSE stream timed out after {}ms", SSE_TIMEOUT_MS));
         emitter.onError(ex -> log.error("[OAG] SSE stream error", ex));
 
         return emitter;
+    }
+
+    /**
+     * 通道腿：真实出帧面 + 兜底错误帧（包内可见供入口驱动测试，同
+     * {@code AgentLoopController#runStream} 的纪律——帧序要从发射面本身断出来）。
+     *
+     * <p>本方法<b>不抛</b>：管道异常一律转成 {@code error → done} 两帧，异常原文只入日志。
+     * 改前异常腿走 {@code emitter.completeWithError(e)}，把失败以传输层异常形态甩给客户端，
+     * 前端 fetch-stream 侧表现为流中断而非错误帧（承流面自带错误帧时不该再炸传输）。</p>
+     */
+    void streamChannel(OagSseFrames frames, Map<String, Object> body) {
+        try {
+            runStream(frames, body);
+        } catch (Exception e) {
+            log.error("[OAG] SSE 流式对话失败", e);
+            try {
+                frames.send(OagStepEvent.error(null, "FAILED", 0L, frames.traceId(),
+                        PIPELINE_FAILURE_TEMPLATE.replace(DIAGNOSTIC_PLACEHOLDER, frames.traceId())));
+                frames.done(OagStepEvent.done("FAILED", 0L, frames.traceId(), null, false));
+            } catch (Exception ignored) {
+                // 断连竞态：sink 已关闭时补帧必失败，放弃（异常原文已在上面入日志）
+            }
+        }
+    }
+
+    /** 出帧主体：参数校验 → 管道执行（节点进度帧）→ 终态帧 → 末帧。 */
+    private void runStream(OagSseFrames frames, Map<String, Object> body) throws IOException {
+        String message = (String) body.get("message");
+        if (message == null || message.isBlank()) {
+            frames.send(OagStepEvent.error(null, "FAILED", 0L, frames.traceId(), "message 不能为空"));
+            frames.done(OagStepEvent.done("FAILED", 0L, frames.traceId(), null, false));
+            return;
+        }
+
+        String userId = getStringOrDefault(body, "userId", "anonymous");
+        String tenantId = getStringOrDefault(body, "tenantId", "default");
+
+        OagPipelineContext ctx = pipelineEngine.run(message, body, userId, tenantId,
+                event -> {
+                    try {
+                        frames.send(toStepEvent(event));
+                    } catch (IOException e) {
+                        log.warn("[OAG] SSE 推送节点事件失败", e);
+                    }
+                });
+
+        frames.bindTraceId(ctx.getTraceId());
+        String traceId = frames.traceId();
+
+        if ("COMPLETED".equals(ctx.getStatus()) && ctx.getFinalResponse() != null) {
+            OagChatResponse resp = OagChatResponse.from(ctx);
+            frames.send(OagStepEvent.response(resp.getContent(), traceId));
+        } else if ("BLOCKED".equals(ctx.getStatus())) {
+            frames.send(OagStepEvent.blocked(ctx.getSecurityBlockReason() != null
+                    ? ctx.getSecurityBlockReason() : "安全检查不通过", traceId,
+                    ctx.getIntent(), ctx.isSecurityPassed()));
+        } else if ("FAILED".equals(ctx.getStatus())) {
+            frames.send(OagStepEvent.error("Pipeline", "FAILED", ctx.getElapsedMs(), traceId,
+                    ctx.getErrorMessage() != null ? ctx.getErrorMessage() : "未知错误"));
+        }
+
+        frames.done(OagStepEvent.done(ctx.getStatus(), ctx.getElapsedMs(), traceId,
+                ctx.getIntent(), ctx.isSecurityPassed()));
+    }
+
+    /** {@code SseEmitter} 桥：事件名与载荷都由写出器给定，本处只做线路装配。 */
+    private static AgentLoopSseFrames.SseFrameSink sinkOf(SseEmitter emitter) {
+        return (event, data) -> emitter.send(SseEmitter.event().name(event).data(data, MediaType.APPLICATION_JSON));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -261,20 +287,5 @@ public class OagController {
     private static String getStringOrDefault(Map<String, Object> map, String key, String defaultVal) {
         Object val = map.get(key);
         return val instanceof String s && !s.isBlank() ? s : defaultVal;
-    }
-
-    /**
-     * 发送 SSE 事件。
-     *
-     * @param emitter     SSE 发射器
-     * @param eventName   事件名（node/response/done/error/blocked）
-     * @param eventPayload JSON 序列化的 Map payload
-     * @throws IOException 发送失败
-     */
-    private void sendEvent(SseEmitter emitter, String eventName, Map<String, Object> eventPayload)
-            throws IOException {
-        emitter.send(SseEmitter.event()
-                .name(eventName)
-                .data(eventPayload, MediaType.APPLICATION_JSON));
     }
 }
