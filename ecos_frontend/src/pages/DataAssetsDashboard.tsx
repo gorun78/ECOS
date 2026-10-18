@@ -63,11 +63,11 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
     (async () => {
       try {
         const [lv, ct] = await Promise.all([
-          api<{ data: DataLevelDef[] }>(`${API}/levels`),
-          api<{ data: DataCategoryTreeItem[] }>(`${API}/categories`),
+          api<DataLevelDef[]>(`${API}/levels`),
+          api<DataCategoryTreeItem[]>(`${API}/categories`),
         ]);
-        setLevels(lv.data ?? []);
-        setCategories(ct.data ?? []);
+        setLevels(lv ?? []);
+        setCategories(ct ?? []);
       } catch (e) {
         console.warn('levels/categories 加载失败（后端未重启或网络异常）', e);
       }
@@ -83,8 +83,8 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
       if (f.keyword) params.append('keyword', f.keyword);
       params.append('page', '1');
       params.append('pageSize', '100');
-      const resp = await api<{ data: DataAssetVO[] }>(`${API}/assets?${params.toString()}`);
-      setAssets(resp.data ?? []);
+      const resp = await api<DataAssetVO[]>(`${API}/assets?${params.toString()}`);
+      setAssets(resp ?? []);
     } catch (e) {
       showToast('error', t('dw.assets.loadFailed').replace('{msg}', (e as Error).message));
     } finally {
@@ -101,13 +101,13 @@ export default function DataAssetsDashboard({ showToast, t }: Props) {
     if (!selectedAssetId) { setFields([]); return; }
     (async () => {
       try {
-        const resp = await api<{ data: DataAssetFieldVO[] }>(
+        const resp = await api<DataAssetFieldVO[] | { items?: DataAssetFieldVO[] }>(
           `${API}/assets/${encodeURIComponent(selectedAssetId)}/fields?page=1&pageSize=200`,
         );
         // 后端可能直接返回数组；同时兼容包一层 { items: [...] } 形式（防御性处理）
-        const arr = Array.isArray(resp.data)
-          ? resp.data
-          : (resp.data as unknown as { items?: DataAssetFieldVO[] })?.items ?? [];
+        const arr = Array.isArray(resp)
+          ? resp
+          : (resp as { items?: DataAssetFieldVO[] })?.items ?? [];
         setFields(arr);
       } catch {
         setFields([]);
@@ -300,10 +300,9 @@ function AssetDetail({
       setEditingFieldId(null);
       // 同步刷新资产列表与当前资产字段
       await onChanged(filter);
-      const resp = await api<{ data: DataAssetFieldVO[] }>(
+      await api<DataAssetFieldVO[]>(
         `${API}/assets/${asset.assetId}/fields?page=1&pageSize=200`,
       );
-      void resp;
     } catch (e) {
       showToast('error', t('dw.assets.tagFailed').replace('{msg}', (e as Error).message));
     }

@@ -24,6 +24,8 @@
  * 同批消 pages/workbench/NewScenarioModal.tsx 一处 HEAD 既有红（该文件从未入基线）。
  * 2026-10-18 #143/B5-8 收口减 1：pages/data-workbench/api/_base.ts 三枚 /api 常量改由
  * API_BASE 派生（URL 逐字不变），同批该文件的 DW 共享 HTTP 四动词合流 apiFetchData 单源。
+ * 2026-10-19 #143/B5-11b 收口减 1：services/worldModelGraphApi.ts 私设 fetch 两通道腿
+ * 合流 apiFetchData，基址由字面量改 API_BASE 派生（五腿 URL 逐字不变）。
  * 2026-10-19 #143/B5-11a 收口减 1：services/alertsApi.ts 六枚私设 fetch 腿整体重写为
  * apiFetchEnvelope 单源通道，基址改由 API_BASE 派生（URL 逐字不变）。
  */
@@ -135,7 +137,6 @@ const BASELINE = new Set([
   'services/platformApi.ts',
   'services/systemDictApi.ts',
   'services/taskCenter.ts',
-  'services/worldModelGraphApi.ts',
 ]);
 
 /** 代码行硬编码 "/api 前缀（引号或反引号后紧跟 /api）。 */

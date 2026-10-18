@@ -42,7 +42,7 @@ const SRC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CANONICAL = 'services/httpClient.ts';
 
 /**
- * 基线（存量登记，2026-10-19 实测 25 文件 / 40 命中行；只减不增）。
+ * 基线（存量登记，2026-10-19 实测 23 文件 / 37 命中行；只减不增）。
  * 值 = 该文件允许的最大命中行数，剪项/降数必须与该文件的真实收口同批。
  */
 const BASELINE: Readonly<Record<string, number>> = Object.freeze({
@@ -62,7 +62,6 @@ const BASELINE: Readonly<Record<string, number>> = Object.freeze({
   'services/capabilityClient.ts': 1,
   'services/caseLibraryApi.ts': 4,
   'services/copilotApi.ts': 2,
-  'services/dataAssetsApi.ts': 1,
   'services/datanetMetadataApi.ts': 2,
   'services/engineProbeApi.ts': 2,
   'services/knowledgeQueryApi.ts': 5,
@@ -70,7 +69,6 @@ const BASELINE: Readonly<Record<string, number>> = Object.freeze({
   'services/scenarioActionClient.ts': 1,
   'services/systemDictApi.ts': 1,
   'services/wagentRunStream.ts': 1,
-  'services/worldModelGraphApi.ts': 2,
 });
 
 /** 私设传输判据：裸 fetch / 私设 WebSocket / XHR / axios。 */
@@ -167,8 +165,8 @@ describe('privateTransportRatchet — C2′ 私设传输棘轮门 (#143/B5-11a)'
 
   it('基线自身可校验：条目数与合计命中上限与文档口径一致', () => {
     const entries = Object.entries(BASELINE);
-    expect(entries.length).toBe(25);
-    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(40);
+    expect(entries.length).toBe(23);
+    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(37);
     // 键必须是 POSIX 相对路径且非基线外文件形态
     for (const [rel] of entries) {
       expect(rel.startsWith('./')).toBe(false);

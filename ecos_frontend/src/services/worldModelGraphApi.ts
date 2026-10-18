@@ -1,23 +1,43 @@
 /**
- * 认知引擎 world-model-graph REST 收口 (H6-T2) — 自 stores/cognitive 与 queries 层迁入。
- * 原语义保持：无鉴权头；非 2xx 抛错（errorMessage 缺省为 `HTTP ${status}`，与迁移前各调用方一致）。
+ * 世界模型 REST 收口 (H6-T2，#143/B5-11a/b 改单源) — 原语义保持：调用方可传
+ * `errorMessage`（缺省时透出单源错误信息），消费面 `json.data || json` 兼容
+ * （`apiFetchData` 已解一层 `data`，解包后对象无 `data` 键 ⇒ 回落取整包）。
+ *
+ * 承流现状（2026-10-19 实测，登记见差距分析台账 D-B5-33，勿据此宣布功能可用）：
+ * 网关匿名面 `AnonymousEndpointRegistry.permitAllPatterns()` 零条 world-model 登记
+ * + `anyRequest().authenticated()` ⇒ 迁移前本文件不带 `Authorization`，五腿全部
+ * 401；改走单源后补上 Bearer，`/causal-graph`（sysman `WorldModelGraphController:296`
+ * 活映射）方为可达，其余四腿（`/state`、GET `/scenarios`、POST `/scenarios`、
+ * POST `/strategy/recommend`）在本前缀下零映射 ⇒ 转为显式 404 未承流。
+ * cognitive 侧存在同名但不同前缀的显式 501 stub（`WorldModelController`
+ * @ `/api/v1/world-model`，`data.stub=true`），是否把腿改挂过去属入口定档，
+ * 触 R-52① ⇒ 待产品裁决，本批不动 URL。
  */
+import { API_BASE, apiFetchData } from "./httpClient";
+
+const WMG = `${API_BASE}/v1/ecos/world-model-graph`;
+
 async function getJson(url: string, errorMessage?: string): Promise<any> {
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(errorMessage ?? `HTTP ${resp.status}`);
-  return resp.json();
+  try {
+    return await apiFetchData(url);
+  } catch (e) {
+    if (errorMessage) throw new Error(errorMessage, { cause: e });
+    throw e;
+  }
 }
 
 async function postJson(url: string, errorMessage?: string, body?: unknown): Promise<any> {
-  const resp = await fetch(url, {
-    method: 'POST',
-    ...(body !== undefined ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
-  });
-  if (!resp.ok) throw new Error(errorMessage ?? `HTTP ${resp.status}`);
-  return resp.json();
+  try {
+    // 不传 headers：单源 `{ headers, ...options }` 形态下自定义头会整组替换掉
+    // Authorization（D-B5-34），Content-Type 单源已默认设置。
+    return await apiFetchData(url, body === undefined
+      ? { method: 'POST' }
+      : { method: 'POST', body: JSON.stringify(body) });
+  } catch (e) {
+    if (errorMessage) throw new Error(errorMessage, { cause: e });
+    throw e;
+  }
 }
-
-const WMG = '/api/v1/ecos/world-model-graph';
 
 export function fetchWorldStateJson(errorMessage?: string): Promise<any> {
   return getJson(`${WMG}/state`, errorMessage);
