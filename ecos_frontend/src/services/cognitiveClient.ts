@@ -10,6 +10,11 @@
  * <p>auth 单源：所有 fetch 均经 {@link getAuthToken}（`services/auth.ts`）
  * 拼 Bearer，禁直接读 localStorage['token'] / sessionStorage['jwt']。</p>
  *
+ * <p>取号单源（D-B5-26，2026-10-18 #143/B5-7）：成功腿与全部错误腿的 traceId 一律
+ * 委托 `httpClient#pickTraceId`，域内禁再自留对响应头 X- 系列取值的私有取号腿——历史上
+ * 本域错误腿只看 `X-Trace-Id`、成功腿看 `X-Request-Id`/`X-Trace-Id`，两腿顺位不同
+ * 且都缺第三号 `X-ECOS-Trace-Id`，传输层改口径时本域必然漂移。</p>
+ *
  * <p>错误矩阵（与后端 `CognitiveErrorMatrixIntegrationTest` 对齐）：
  * ① 场景不存在 → 404 NOT_FOUND ② 已软删 → 404 NOT_FOUND
  * ③ 参数非法 / mind 不属场景 / mind 不存在 → 400 BAD_REQUEST
@@ -20,6 +25,7 @@
  */
 
 import { getAuthToken } from "./auth";
+import { pickTraceId } from "./httpClient";
 
 // ── 轮询 / 防抖常量（design-05 B.6 / X-52 契约要求，唯一命名源，禁散落魔法数）────
 
@@ -153,7 +159,8 @@ export async function callJson(url: string, init: RequestInit = {}): Promise<unk
  * 而 workspace `ScenarioRunController` / `ForecastRunController` 出口走
  * `ApiResponse.success(...)`，**未**调 `withTraceIdFromMdc()`，响应体 envelope 的
  * `traceId` 为 null（NON_NULL 序列化即缺失）⇒ 成功态 traceId 唯一真实来源是响应头。
- * 兼容性：同时探测历史口径 `X-Trace-Id`（callJson 错误路径既有引用），取到哪个算哪个。</p>
+ * 兼容性：历史口径 `X-Trace-Id` 与 `X-ECOS-Trace-Id` 同在单源顺位表内（D-B5-26 后
+ * 由 `pickTraceId` 统一裁决，本域不再自定顺位）。</p>
  */
 export async function callJsonWithTrace(
   url: string,
@@ -187,44 +194,31 @@ async function callJsonInternal(
       message: e instanceof Error ? e.message : String(e),
     });
   }
-  if (meta) {
-    // 响应头溯源（仅显式要求 meta 的调用方可见；不改 callJson 对外行为）
-    const headerTrace = res.headers.get("X-Request-Id") ?? res.headers.get("X-Trace-Id") ?? undefined;
-    if (headerTrace) meta.traceId = headerTrace;
-  }
   const text = await res.text().catch(() => "");
   let body: unknown = null;
   if (text) {
     try { body = JSON.parse(text); } catch { /* 非 JSON 响应，保持 null */ }
   }
-  if (meta && !meta.traceId && body && typeof body === "object") {
-    // envelope 兜底：后端若经 ApiResponse traceId 直通（复盘补充授权项）在响应体回填，同样采信
-    const envelopeTrace = (body as Record<string, unknown>).traceId;
-    if (typeof envelopeTrace === "string" && envelopeTrace !== "") meta.traceId = envelopeTrace;
-  }
-  const extract = (b: unknown): { msg: string; traceId?: string } => {
-    if (b && typeof b === "object") {
-      const o = b as Record<string, unknown>;
-      const traceId =
-        (res.headers.get("X-Trace-Id") ??
-          (typeof o.traceId === "string" ? o.traceId : undefined)) as string | undefined;
-      return {
-        msg: typeof o.message === "string" ? o.message : text || `HTTP ${res.status}`,
-        traceId,
-      };
-    }
-    return { msg: text || `HTTP ${res.status}`, traceId: res.headers.get("X-Trace-Id") ?? undefined };
-  };
+  // D-B5-26 收口：取号一律委托 httpClient#pickTraceId 单源（三号面顺位 + 信封兜底 +
+  // 无 headers 面不反噬）。域内此前自留一份对响应头 X- 系列的私有取值腿，成功腿与错误腿
+  // 顺位还不一致（错误腿只看 X-Trace-Id），是「改一处口径另一处漂移」的实证来源。
+  const traceId = pickTraceId(res, (body ?? null) as { traceId?: string | null } | null);
+  if (meta && traceId) meta.traceId = traceId;
+  /** 文案口径逐字保持既有行为：信封 message 优先 → 响应体原文 → `HTTP ${status}`。 */
+  const msgOf = (b: unknown): string =>
+    b && typeof b === "object"
+      ? (typeof (b as Record<string, unknown>).message === "string"
+          ? ((b as Record<string, unknown>).message as string)
+          : text || `HTTP ${res.status}`)
+      : text || `HTTP ${res.status}`;
   if (res.status === 404) {
-    const { msg, traceId } = extract(body);
-    throw new CognitiveApiError({ code: "NOT_FOUND", status: 404, message: msg, traceId });
+    throw new CognitiveApiError({ code: "NOT_FOUND", status: 404, message: msgOf(body), traceId });
   }
   if (res.status === 400) {
-    const { msg, traceId } = extract(body);
-    throw new CognitiveApiError({ code: "BAD_REQUEST", status: 400, message: msg, traceId });
+    throw new CognitiveApiError({ code: "BAD_REQUEST", status: 400, message: msgOf(body), traceId });
   }
   if (res.status === 503) {
-    const { msg, traceId } = extract(body);
+    const msg = msgOf(body);
     const schemaNotReady = /schema not ready|SCHEMA_NOT_READY/i.test(msg);
     throw new CognitiveApiError({
       code: schemaNotReady ? "SCHEMA_NOT_READY" : "ENGINE_DISABLED",
@@ -234,12 +228,21 @@ async function callJsonInternal(
     });
   }
   if (res.status === 501) {
-    const { msg, traceId } = extract(body);
-    throw new CognitiveApiError({ code: "STUB", status: 501, message: msg, stub: true, traceId });
+    throw new CognitiveApiError({
+      code: "STUB",
+      status: 501,
+      message: msgOf(body),
+      stub: true,
+      traceId,
+    });
   }
   if (!res.ok) {
-    const { msg, traceId } = extract(body);
-    throw new CognitiveApiError({ code: "HTTP_ERROR", status: res.status, message: msg, traceId });
+    throw new CognitiveApiError({
+      code: "HTTP_ERROR",
+      status: res.status,
+      message: msgOf(body),
+      traceId,
+    });
   }
   // 200：{success,data} / {code,data} / 裸 data 三形态兼容
   if (body && typeof body === "object") {
@@ -249,6 +252,7 @@ async function callJsonInternal(
         code: "BUSINESS_ERROR",
         status: res.status,
         message: typeof o.message === "string" ? o.message : "Request failed",
+        traceId,
       });
     }
     if (typeof o.code === "number" && o.code !== 200 && o.code !== 0) {
@@ -256,6 +260,7 @@ async function callJsonInternal(
         code: "BUSINESS_ERROR",
         status: res.status,
         message: typeof o.message === "string" ? o.message : `Error ${o.code}`,
+        traceId,
       });
     }
     return o.data !== undefined ? o.data : body;
