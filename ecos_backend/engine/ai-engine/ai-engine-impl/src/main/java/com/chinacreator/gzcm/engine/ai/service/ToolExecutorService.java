@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.common.error.AiError;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.engine.ai.config.AiRestClientConfig;
 import com.chinacreator.gzcm.engine.ai.dao.ToolDao;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolDecision;
@@ -194,6 +195,87 @@ public class ToolExecutorService {
         this.endpointResolver = endpointResolver;
     }
 
+    // ── #143/B5-1 W 契约目录接缝（工具目录单源化） ─────────────────────────
+
+    /**
+     * W 契约目录进咽喉的<b>中立接缝</b>（详细设计-10 F10-17/F10-19，差距分析 B5 行「双轨」收口）。
+     *
+     * <p>为什么是"咽喉增源读契约目录"而不是"把契约映射进咽喉声明表"：后者是把
+     * {@code ecos_wagent_tool_contract} 的行复制进 {@code ecos_tool_definition}，
+     * 两份数据两处写面 ⇒ 双轨更硬（同一工具的两个版本可以各说各话）。增源只加一个读面，
+     * 契约行的唯一真值仍在 W 目录。</p>
+     *
+     * <p>依赖方向：实现落在 {@code ai.wagent.tool} 侧（持 {@code WAgentToolContractDao}），
+     * 本类只见声明、不见 DO —— 咽喉不解析契约列，契约侧不复制声明行。</p>
+     *
+     * <p>命名取 {@code I} 前缀：{@code ArchitectureTest.serviceInterfacesShouldStartWithI}
+     * 对 {@code ..service..} 包内<b>所有</b>接口（含嵌套）生效，本接缝的旧名由该门禁抓红后收回。</p>
+     */
+    public interface IContractToolSource {
+
+        /**
+         * 按 {@code name+version} 取<b>可执行</b>契约声明；任何前置不成立（非 active、
+         * 非 rest 形态、端点前缀不可归属、方法非法）一律返回空 ⇒ 咽喉维持「工具未找到」
+         * （fail-closed，禁"退而求其次"按名取其它版本或按 DB 行拼一个）。
+         */
+        Optional<ContractToolDeclaration> findActive(String toolName, String toolVersion);
+    }
+
+    /**
+     * 契约声明里咽喉真正需要的几项（{@code operation} 已折算成裁决词表 {@code read|write}）。
+     *
+     * <p>{@code endpointPath} 存<b>声明里的相对路径</b>，与场景工具同纪律：绝对化在出向时用
+     * 服务端基址拼接，入参只能填 {@code {占位符}}，不可左右 scheme/host。</p>
+     */
+    public record ContractToolDeclaration(String name, String version, String endpointPath,
+                                          String httpMethod, String operation, String inputSchemaJson,
+                                          Long timeoutMs) {
+    }
+
+    private IContractToolSource contractToolSource;
+
+    /** gateway 基址的<b>显式覆盖位</b>（与 {@code AiRestClientConfig} 同键，默认空走 route-manifest）。 */
+    private String contractBaseUrlOverride = "";
+
+    /**
+     * W 契约目录源；未装配 = 契约工具对咽喉不可见（通用工具与场景工具路径不受影响）。
+     * 实现在 wagent 侧（{@code WAgentContractToolSource}），装配后 F10-19 的 12 工具才可执行。
+     */
+    @Autowired(required = false)
+    public void setContractToolSource(IContractToolSource contractToolSource) {
+        this.contractToolSource = contractToolSource;
+    }
+
+    /** 契约工具基址覆盖项（运维逃生口；键名与 gateway 探测面单源同一条，禁在此写本机值）。 */
+    @Autowired(required = false)
+    public void setContractBaseUrl(
+            @org.springframework.beans.factory.annotation.Value("${"
+                    + AiRestClientConfig.GATEWAY_BASE_URL_PROPERTY + ":}") String contractBaseUrl) {
+        this.contractBaseUrlOverride = normalizeBaseUrl(contractBaseUrl);
+    }
+
+    /**
+     * 契约工具出向基址：与 F10-08 探测面同源（覆盖项 → route-manifest 解析 gateway 承流地址 →
+     * fail-loud）。契约声明的 {@code /api/v1/{engine}/...} 前缀族的路由表唯一属主是 gateway，
+     * 本通道禁自拼各 service 端口。
+     */
+    private String resolveContractBaseUrl() {
+        if (!contractBaseUrlOverride.isEmpty()) {
+            return contractBaseUrlOverride;
+        }
+        if (endpointResolver == null) {
+            throw new IllegalStateException("ServiceEndpointResolver 未装配，契约工具基址无法解析"
+                    + "（F02-15 两态寻址单源，禁回落硬编码地址）");
+        }
+        return endpointResolver
+                .resolve(AiRestClientConfig.GATEWAY_OWNER_SERVICE,
+                        ServiceEndpointResolver.RouteMode.SERVICE)
+                .map(ToolExecutorService::normalizeBaseUrl)
+                .filter(base -> !base.isEmpty())
+                .orElseThrow(() -> new IllegalStateException("route-manifest 未登记 gateway 承流服务，"
+                        + "契约工具基址无法解析（fail-loud）"));
+    }
+
     /**
      * 场景工具出向基址解析链（与 workspace {@code WorkspaceRestClientConfig} 同口径）：
      * ① {@code service.scenario.base-url} 显式覆盖（运维逃生口）→ ② route-manifest
@@ -236,10 +318,14 @@ public class ToolExecutorService {
 
     /**
      * 执行工具调用（通过 ToolCall 对象）。
-     * 供 {@link AgentLoopService} 调用。
+     * 供 {@link AgentLoopService} 与 W Agent 编排通道（{@code EngineEndpointInvoker}）调用。
+     *
+     * <p>#143/B5-1：{@code call.getVersion()} 必须一路带到工具定义解析（见
+     * {@link #loadToolDefinition(String, String)}）—— W 契约目录按 {@code name+version}
+     * 唯一定位且只有 active 版可执行，版本在这一跳丢掉 ⇒ 编排侧校完 active、咽喉仍解析不到。</p>
      */
     public ToolResult execute(ToolCall call) {
-        return execute(call.getName(), call.getArguments(), call.getId());
+        return execute(call.getName(), call.getArguments(), call.getId(), call.getVersion());
     }
 
     /**
@@ -250,15 +336,16 @@ public class ToolExecutorService {
      * @return 工具执行结果
      */
     public ToolResult execute(String toolName, Map<String, Object> arguments) {
-        return execute(toolName, arguments, null);
+        return execute(toolName, arguments, null, null);
     }
 
-    private ToolResult execute(String toolName, Map<String, Object> arguments, String callId) {
+    private ToolResult execute(String toolName, Map<String, Object> arguments, String callId,
+                               String toolVersion) {
         long startNs = System.nanoTime();
         boolean viaRegistry = toolRegistry != null && toolRegistry.has(toolName);
 
-        // registry 未命中才需要解析工具定义（DB 优先，回退内存 fallback）
-        ToolDefinitionEntry def = viaRegistry ? null : loadToolDefinition(toolName);
+        // registry 未命中才需要解析工具定义（场景声明 → W 契约 → DB → 内存 fallback）
+        ToolDefinitionEntry def = viaRegistry ? null : loadToolDefinition(toolName, toolVersion);
         if (!viaRegistry && def == null) {
             // 工具不存在 → 不执行，也就没有"未裁决的执行"（§1.5-1 对账口径）
             // D.5：未注册工具属客户端可修正态（400 INVALID_ARGUMENT），禁记 502 后端故障
@@ -300,8 +387,10 @@ public class ToolExecutorService {
                     adjudication.asset(), startNs);
         } catch (TimeoutException e) {
             long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
+            String timeoutText = e.getMessage() == null || e.getMessage().isBlank()
+                    ? "工具执行超时 (" + TIMEOUT_SECONDS + "s)" : e.getMessage();
             return buildClassifiedError(callId, toolName, AiErrorClass.TOOL_BACKEND_ERROR,
-                    "工具执行超时 (" + TIMEOUT_SECONDS + "s)", elapsedMs);
+                    timeoutText, elapsedMs);
         } catch (ScenarioArgumentsException badArgs) {
             // F06-11 入参地板：缺参属客户端可修正态（INVALID_ARGUMENT），不得伪装成后端故障（502）
             long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
@@ -417,10 +506,13 @@ public class ToolExecutorService {
                 decision.reason(), startNs, decision));
     }
 
-    /** {@code action.operation} 判定：场景工具取<b>声明值</b>，其余按写类名单与 HTTP 方法推断。 */
+    /** {@code action.operation} 判定：场景/W 契约工具取<b>声明值</b>，其余按写类名单与 HTTP 方法推断。 */
     private String inferOperation(String toolName, ToolDefinitionEntry def, Map<String, Object> arguments) {
         // F06-11 要点 1：read|write 是声明属性，禁按参数或方法猜测（否则同一次调用的裁决载荷会漂移）
         if (def != null && def.scenario != null) return def.scenario.operation();
+        // #143/B5-1：契约工具的 operation 同样取声明值（由 WAgentContractToolSource 按
+        // operation_class 折算：READ→read，SUGGEST/WRITE→write，宁严勿宽）
+        if (def != null && def.contract != null) return def.contract.operation();
         if (toolName != null && WRITE_TOOL_NAMES.contains(toolName)) return "write";
         if (def != null && def.httpMethod != null && !def.httpMethod.isBlank()) {
             String m = def.httpMethod.toUpperCase(Locale.ROOT);
@@ -825,22 +917,58 @@ public class ToolExecutorService {
     // ── Tool Loading ──────────────────────────────────────────────────────
 
     /**
-     * 加载工具定义：<b>场景受控工具声明优先</b>（F06-11），其次数据库，最后内存 fallback。
+     * 加载工具定义：<b>场景受控工具声明优先</b>（F06-11），其次 W 契约目录（#143/B5-1），
+     * 再次数据库，最后内存 fallback。
      *
-     * <p>声明优先的次序是安全相关的：场景工具的 {@code operation}/{@code timeoutMs}/端点必须取
+     * <p>声明优先的次序是安全相关的：工具的 {@code operation}/{@code timeoutMs}/端点必须取
      * <b>声明值</b>，若同名 DB 行先命中，管理员配的 {@code tool_type} 会改写裁决载荷的
      * {@code action.operation}（写判成读即绕过 OPA 的写权限面）。</p>
+     *
+     * <p>W 契约这一源只在<b>带版本</b>时参与：契约唯一定位靠 {@code uniq(name, version)}，
+     * 无版本即不猜"最新版"（{@code EngineEndpointInvoker} 已裁决的口径，两侧必须同判据）。</p>
      */
-    ToolDefinitionEntry loadToolDefinition(String toolName) {
+    ToolDefinitionEntry loadToolDefinition(String toolName, String toolVersion) {
         ToolDefinitionEntry scenario = loadScenarioDefinition(toolName);
         if (scenario != null) {
             return scenario;
+        }
+        ToolDefinitionEntry contract = loadContractDefinition(toolName, toolVersion);
+        if (contract != null) {
+            return contract;
         }
         ToolDefinitionEntry def = loadFromDatabase(toolName);
         if (def != null) {
             return def;
         }
         return fallbackTools.get(toolName);
+    }
+
+    /**
+     * W 契约声明 → {@link ToolDefinitionEntry}（{@code toolType} 恒为 REST）。
+     *
+     * <p>接缝自身不判 active／前缀归属（那是 {@link IContractToolSource} 实现的地板，
+     * 与 {@code PlanValidator}、{@code EngineEndpointInvoker} 同一词表单源）；
+     * 这里只负责"拿到声明后按 REST 通道形态装好"。</p>
+     */
+    private ToolDefinitionEntry loadContractDefinition(String toolName, String toolVersion) {
+        if (contractToolSource == null || toolVersion == null || toolVersion.isBlank()) {
+            return null;
+        }
+        ContractToolDeclaration declared =
+                contractToolSource.findActive(toolName, toolVersion).orElse(null);
+        if (declared == null) {
+            return null;
+        }
+        ToolDefinitionEntry entry = new ToolDefinitionEntry();
+        entry.code = declared.name();
+        entry.name = declared.name();
+        entry.description = "W 契约工具 " + declared.name() + "@" + declared.version();
+        entry.toolType = "REST";
+        entry.endpointUrl = declared.endpointPath();
+        entry.httpMethod = declared.httpMethod();
+        entry.schemaJson = declared.inputSchemaJson();
+        entry.contract = declared;
+        return entry;
     }
 
     /**
@@ -901,11 +1029,17 @@ public class ToolExecutorService {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Future<String> future = executor.submit(() -> dispatch(def, arguments));
         // F06-11：场景工具的执行预算取声明 timeoutMs（上界仍是咽喉 30s），通用工具维持原 30s
-        long budgetSeconds = def.scenario == null ? TIMEOUT_SECONDS
-                : Math.min(TIMEOUT_SECONDS,
-                Math.max(1, (def.scenario.timeoutMs() + 999) / 1000));
+        // #143/B5-1：W 契约工具同口径取契约 timeout_ms —— 该列是 V236 INTEGER 列（V270 对同名列
+        // 的 ADD COLUMN IF NOT EXISTS 恒为 no-op，DO 里 timeoutMsContract 无列可映射，已登记缺陷）
+        long declaredBudgetMs = def.scenario != null ? def.scenario.timeoutMs()
+                : def.contract == null || def.contract.timeoutMs() == null
+                        ? TIMEOUT_SECONDS * 1000L : def.contract.timeoutMs();
+        long budgetSeconds = Math.min(TIMEOUT_SECONDS, Math.max(1, (declaredBudgetMs + 999) / 1000));
         try {
             return future.get(budgetSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            // 预算文案必须报实际预算：契约/声明可低于 30s，固定印 "30s" 会把 1s 的声明缺口说成咽喉超时
+            throw new TimeoutException("工具执行超时 (" + budgetSeconds + "s)");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("工具执行被中断", e);
@@ -924,6 +1058,10 @@ public class ToolExecutorService {
         // F06-11：场景受控工具走声明式 REST 通道（端点/方法/载荷全部来自声明，不接受入参指定 URL）
         if (def.scenario != null) {
             return executeScenarioRest(def, arguments);
+        }
+        // #143/B5-1：W 契约工具同纪律 —— 端点/方法/参数面全部来自契约声明
+        if (def.contract != null) {
+            return executeContractRest(def, arguments);
         }
         String type = def.toolType;
         if (type == null) {
@@ -978,7 +1116,7 @@ public class ToolExecutorService {
 
         HttpEntity<?> entity;
         if (method == HttpMethod.GET || method == HttpMethod.DELETE) {
-            String query = buildDeclaredQuery(declaredArgs, path, arguments);
+            String query = buildDeclaredQuery(declaredArgs, declared.backendEndpoint(), arguments);
             entity = new HttpEntity<>(headers);
             if (!query.isEmpty()) url = url + (url.contains("?") ? "&" : "?") + query;
         } else {
@@ -1012,15 +1150,21 @@ public class ToolExecutorService {
         return body != null ? body : "";
     }
 
-    /** GET 形态的 query string：只带声明里的参数，且不重复路径已消费的名字。 */
-    private String buildDeclaredQuery(Set<String> declaredArgs, String resolvedPath,
+    /**
+     * GET 形态的 query string：只带声明里的参数，且不重复路径已消费的名字。
+     *
+     * <p>入参必须是<b>占位符替换前的模板路径</b>（{@code backendEndpoint}/{@code endpointPath}）：
+     * "已消费"的判据是模板里存在 {@code \{key\}}；传替换后的实际路径会让该判据恒不成立，
+     * 于是路径参数被重复编进 query string（同一值出现两处 = 后端可能读到不一致口径）。</p>
+     */
+    private String buildDeclaredQuery(Set<String> declaredArgs, String templatePath,
                                       Map<String, Object> arguments) {
         if (arguments == null || arguments.isEmpty()) return "";
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<String, Object> e : arguments.entrySet()) {
             String key = e.getKey();
             if (!declaredArgs.contains(key) || e.getValue() == null) continue;
-            if (resolvedPath.contains("{" + key + "}")) continue;
+            if (templatePath.contains("{" + key + "}")) continue;
             if (!sb.isEmpty()) sb.append('&');
             sb.append(URLEncoder.encode(key, StandardCharsets.UTF_8))
                     .append('=')
@@ -1043,6 +1187,145 @@ public class ToolExecutorService {
     static final class ScenarioEndpointUnresolvedException extends RuntimeException {
         ScenarioEndpointUnresolvedException(String message, Throwable cause) {
             super(message, cause);
+        }
+    }
+
+    // ── #143/B5-1 W 契约工具执行 ───────────────────────────────────────────
+
+    /**
+     * 契约工具分发（契约声明 → 唯一 REST 出向调用），与 {@link #executeScenarioRest} 同三条硬约束：
+     * 基址由服务端解析（入参不可左右 scheme/host）、必填地板先于出向、载荷只带声明里的参数名。
+     *
+     * <p>差别只在声明形态：契约行的参数面是 JSON-Schema（{@code properties}／{@code required}），
+     * 不是场景声明的内部参数表，因此这里就地解析 schema 得到参数白名单。</p>
+     *
+     * <p><b>占位符地板</b>：路径里的 {@code \{x\}} 必须是 {@code properties} 已声明的属性名。
+     * V266 现存的 {@code check_metric_caliber} 用 {@code \{code\}} 而 schema 声明
+     * {@code metricCode} —— 属目录行数据缺陷，本通道 fail-closed 拒绝出向，禁把字面
+     * {@code \{code\}} 打到后端换 404（那会把"目录配错"洗成"能力未上线"，并把缺陷从日志里抹平）。
+     * 分类仍落 {@code INVALID_ARGUMENT}（{@code RetryKind.NONE}，不诱导 Loop 重试），
+     * 且诊断文本点明是目录侧缺陷而非调用方缺参。</p>
+     */
+    private String executeContractRest(ToolDefinitionEntry def, Map<String, Object> arguments)
+            throws Exception {
+        ContractToolDeclaration declared = def.contract;
+        Map<String, Object> schema = parseContractSchema(declared);
+        Set<String> declaredArgs = contractPropertyNames(schema);
+
+        for (String placeholder : contractPathPlaceholders(declared.endpointPath())) {
+            if (!declaredArgs.contains(placeholder)) {
+                throw new ScenarioArgumentsException("契约工具路径占位符未在 input_schema.properties 声明"
+                        + "（目录行缺陷，需订正 endpoint 或 schema）: " + declared.name() + " {" + placeholder + "}");
+            }
+        }
+        for (String required : contractRequiredNames(schema)) {
+            Object value = arguments == null ? null : arguments.get(required);
+            if (value == null || String.valueOf(value).isBlank()) {
+                throw new ScenarioArgumentsException("契约工具缺少必填参数: " + declared.name() + " " + required);
+            }
+        }
+
+        String path = resolveUrlParams(declared.endpointPath(), arguments);
+        if (path.indexOf('{') >= 0 || path.indexOf('}') >= 0) {
+            // 走到这里说明占位符有声明但入参没给值 —— 同样禁止把未填充的字面量出向
+            throw new ScenarioArgumentsException("契约工具路径占位符未填满: " + declared.name());
+        }
+
+        String url = resolveContractBaseUrl() + path;
+        HttpMethod method = HttpMethod.valueOf(declared.httpMethod().toUpperCase(Locale.ROOT));
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set(EcosTraceContext.HEADER_REQUEST_ID, AiTraceSupport.currentTraceId());
+
+        HttpEntity<?> entity;
+        if (method == HttpMethod.GET || method == HttpMethod.DELETE) {
+            String query = buildDeclaredQuery(declaredArgs, declared.endpointPath(), arguments);
+            entity = new HttpEntity<>(headers);
+            if (!query.isEmpty()) url = url + (url.contains("?") ? "&" : "?") + query;
+        } else {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            if (arguments != null) {
+                for (Map.Entry<String, Object> e : arguments.entrySet()) {
+                    if (declaredArgs.contains(e.getKey())) payload.put(e.getKey(), e.getValue());
+                }
+            }
+            entity = new HttpEntity<>(payload, headers);
+        }
+
+        log.info("B5-1 契约工具出向: tool={} version={} method={} path={} operation={}",
+                declared.name(), declared.version(), method, path, declared.operation());
+        ResponseEntity<String> response;
+        try {
+            response = restTemplate.exchange(url, method, entity, String.class);
+        } catch (HttpStatusCodeException e) {
+            // 与场景通道同一分类：404 = 声明端点尚未落地（V266 备注列已声明"设计路径待复核"三行）
+            // ⇒ STUB_CAPABILITY(501, 不重试)，不归 502 可重试抖动（X-50 禁把缺口洗成临时故障）
+            if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                throw new ScenarioEndpointUnresolvedException("契约工具声明端点未命中(404): "
+                        + method + " " + path + " —— 契约行 endpoint 属设计路径或后端未上线，需登记缺口", e);
+            }
+            throw e;
+        }
+        String body = response.getBody();
+        return body != null ? body : "";
+    }
+
+    /** 契约 {@code input_schema_json} 解析：空／非对象一律 fail-loud（禁"读不懂就当无参数面"放行）。 */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseContractSchema(ContractToolDeclaration declared) {
+        String schemaJson = declared.inputSchemaJson();
+        if (schemaJson == null || schemaJson.isBlank()) {
+            throw new IllegalStateException("契约工具 input_schema_json 为空，参数面无法解析（fail-closed）: "
+                    + declared.name());
+        }
+        try {
+            if (objectMapper.readValue(schemaJson, Object.class) instanceof Map<?, ?> map) {
+                return (Map<String, Object>) map;
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException("契约工具 input_schema_json 非法 JSON（fail-closed）: "
+                    + declared.name(), e);
+        }
+        throw new IllegalStateException("契约工具 input_schema_json 不是 JSON 对象（fail-closed）: "
+                + declared.name());
+    }
+
+    /** {@code properties} 键集 = 出向允许携带的参数名（未声明的入参一律丢弃，与场景通道同纪律）。 */
+    private Set<String> contractPropertyNames(Map<String, Object> schema) {
+        Set<String> names = new LinkedHashSet<>();
+        if (schema.get("properties") instanceof Map<?, ?> props) {
+            for (Object key : props.keySet()) {
+                if (key instanceof String s && !s.isBlank()) names.add(s);
+            }
+        }
+        return names;
+    }
+
+    /** {@code required} 数组（JSON-Schema 形态；缺失即无必填面）。 */
+    private List<String> contractRequiredNames(Map<String, Object> schema) {
+        List<String> required = new ArrayList<>();
+        if (schema.get("required") instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof String s && !s.isBlank()) required.add(s);
+            }
+        }
+        return required;
+    }
+
+    /** 路径里的 {@code \{name\}} 清单（不用正则，避免为一条地板规则再引 Matcher）。 */
+    private List<String> contractPathPlaceholders(String path) {
+        List<String> out = new ArrayList<>();
+        if (path == null) return out;
+        int from = 0;
+        while (true) {
+            int open = path.indexOf('{', from);
+            if (open < 0) return out;
+            int close = path.indexOf('}', open + 1);
+            if (close < 0) return out;
+            String name = path.substring(open + 1, close).trim();
+            if (!name.isEmpty()) out.add(name);
+            from = close + 1;
         }
     }
 
@@ -1509,5 +1792,14 @@ public class ToolExecutorService {
          * 不依赖 DB 行或调用方入参。</p>
          */
         ScenarioToolDefinition scenario;
+
+        /**
+         * #143/B5-1 W 契约工具的声明体（非契约工具恒为 null）。
+         *
+         * <p>存在即代表：端点/方法/参数面全部取自 {@code ecos_wagent_tool_contract} 行，
+         * 执行只能走 {@link #executeContractRest} 的服务端基址通道，{@code operation} 与
+         * 超时预算取契约值 —— 与 {@link #scenario} 同纪律，二者互斥（声明解析按场景优先）。</p>
+         */
+        ContractToolDeclaration contract;
     }
 }

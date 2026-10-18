@@ -150,7 +150,9 @@ public class EngineEndpointInvoker {
 
         ToolExecutorService.ToolResult raw;
         try {
-            raw = toolExecutorService.execute(new ToolCall(callId, toolName, input));
+            // #143/B5-1：版本必须一路带进咽喉 —— 契约目录按 uniq(name,version) 定位，
+            // 只传名字 ⇒ 咽喉永远解析不到契约行（表现为「工具未找到」→ E-VALIDATION）
+            raw = toolExecutorService.execute(new ToolCall(callId, toolName, input, toolVersion));
         } catch (Exception e) {
             log.error("[F10-14] 咽喉调用异常: tool={} run={} step={} raw={}",
                     toolName, request.runId(), request.stepKey(), e.getMessage(), e);

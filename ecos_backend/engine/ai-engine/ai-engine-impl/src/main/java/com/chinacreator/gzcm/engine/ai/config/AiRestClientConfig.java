@@ -53,14 +53,24 @@ public class AiRestClientConfig {
     /** 读取超时（毫秒），与认知域共享客户端一致。 */
     static final int READ_TIMEOUT_MS = 10000;
 
-    /** route-manifest 里四层健康面的承流归属服务名（引擎前缀族由 gateway 路由）。 */
-    static final String PROBE_OWNER_SERVICE = "gateway";
+    /**
+     * route-manifest 里四层健康面的承流归属服务名（引擎前缀族由 gateway 路由）。
+     *
+     * <p>#143/B5-1 后本常量同时是 <b>W 契约工具通道</b>的基址归属单源
+     * （{@code ToolExecutorService#resolveContractBaseUrl()} 引本常量，禁在调用点另写
+     * {@code "gateway"} 字面量）：{@code /api/v1/engine/{layer}/health} 与契约声明的
+     * {@code /api/v1/{族}/...} 都是 gateway 路由前缀。</p>
+     */
+    public static final String GATEWAY_OWNER_SERVICE = "gateway";
+
+    /** gateway 基址覆盖项的<b>键名</b>单源（运维逃生口，与 {@link #GATEWAY_OWNER_SERVICE} 同族）。 */
+    public static final String GATEWAY_BASE_URL_PROPERTY = "ecos.endpoints.gateway";
 
     /**
      * gateway 基址的<b>显式覆盖位</b>（默认空 → 走 route-manifest 解析）。
      * 仅作运维逃生口；禁止在此写本机个人环境值（文档规范 R7）。
      */
-    @Value("${ecos.endpoints.gateway:}")
+    @Value("${" + GATEWAY_BASE_URL_PROPERTY + ":}")
     private String gatewayOverride;
 
     /** F02-15/X-35：跨服务基址的唯一寻址出口（runtime-access，route-manifest 单源）。 */
@@ -118,14 +128,14 @@ public class AiRestClientConfig {
         }
         ServiceEndpointResolver resolver = endpointProvider.getIfAvailable();
         if (resolver != null) {
-            Optional<String> host = resolver.resolve(PROBE_OWNER_SERVICE,
+            Optional<String> host = resolver.resolve(GATEWAY_OWNER_SERVICE,
                     ServiceEndpointResolver.RouteMode.SERVICE);
             if (host.isPresent()) {
                 return trimTrailingSlash(host.get());
             }
         }
-        throw new IllegalStateException("F10-08 探测基址不可解析：" + PROBE_OWNER_SERVICE
-                + " 既无 ecos.endpoints." + PROBE_OWNER_SERVICE + " 覆盖项，也未在 route-manifest 登记"
+        throw new IllegalStateException("F10-08 探测基址不可解析：" + GATEWAY_OWNER_SERVICE
+                + " 既无 ecos.endpoints." + GATEWAY_OWNER_SERVICE + " 覆盖项，也未在 route-manifest 登记"
                 + "（fail-loud，禁止回落硬编码地址）");
     }
 

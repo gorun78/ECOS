@@ -217,6 +217,33 @@ class ScenarioToolInvocationIT {
                 any(HttpEntity.class), eq(String.class));
     }
 
+    // ── 验收 5：D-B5-5 query 组装的"已消费"判据 ────────────────────────────────
+
+    @Test
+    @DisplayName("D-B5-5：路径占位符已消费的参数不得再重复编进 query string（判据取替换前的模板路径）")
+    void pathConsumedArgumentIsNotDuplicatedIntoQuery() {
+        restTemplate = mock(RestTemplate.class);
+        when(restTemplate.exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class),
+                eq(String.class))).thenReturn(ResponseEntity.ok(CITED_BODY));
+
+        service = newService();
+        service.setScenarioBaseUrl(BASE_URL);
+
+        Map<String, Object> args = new LinkedHashMap<>();
+        args.put("runId", "run-7");
+        args.put("year", 2026);
+        args.put("level", "dept");
+        ToolResult r = service.execute(ScenarioToolCatalog.FORECAST_QUERY, args);
+
+        assertTrue(r.isSuccess(), String.valueOf(r.getError()));
+        ArgumentCaptor<String> url = ArgumentCaptor.forClass(String.class);
+        verify(restTemplate, times(1)).exchange(url.capture(), any(HttpMethod.class),
+                any(HttpEntity.class), eq(String.class));
+        // 同一值出现在路径与 query 两处 ⇒ 后端可读到一个被填充、一个被忽略的 runId（口径漂移）
+        assertEquals(BASE_URL + "/api/v1/workspace/forecast-runs/run-7/results?year=2026&level=dept",
+                url.getValue(), "出向 URL 精确形态：路径填 runId，query 只带其余声明参数");
+    }
+
     /** 除基址面外的通用装置（restTemplate 桩由调用方按需替换/注入）。 */
     private ToolExecutorService newService() {
         gate = mock(AgentToolPolicyGate.class);
