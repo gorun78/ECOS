@@ -30,6 +30,11 @@
  * apiFetchEnvelope 单源通道，基址改由 API_BASE 派生（URL 逐字不变）。
  * 2026-10-19 #143/B5-11c 收口减 1：services/agentMeshApi.ts 两通道腿合流 apiFetchData，
  * 基址由字面量改 API_BASE 派生（六腿 URL 逐字不变），并补上改前缺失的 Bearer（D-B5-35）。
+ * 2026-10-19 #143/B5-11e 收口减 3：services/copilotApi.ts 两腿、services/datanetMetadataApi.ts
+ * 两腿改走匿名具名通道 rawAnonUrlFetch 且基址由 API_BASE 派生；services/knowledgeQueryApi.ts
+ * 五腿（#143/B5-11d 已合流传输，本批补基址）的 "/api/…" 字面量全部改 API_BASE 派生。
+ * 三文件 URL 逐字不变；`pages/knowledge/services/extract.ts` 经实测仍有 8 行 `/api` 字面量
+ * （`KB_V1`、lineage、integration 三族）未派生 ⇒ **保留在基线内**（不冒充已收口）。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -118,12 +123,9 @@ const BASELINE = new Set([
   'services/auth.ts',
   'services/cognitiveClient.ts',
   'services/cognitiveEngineApi.ts',
-  'services/copilotApi.ts',
   'services/dataCatalogClient.ts',
-  'services/datanetMetadataApi.ts',
   'services/gitService.ts',
   'services/knowledgeNavApi.ts',
-  'services/knowledgeQueryApi.ts',
   'services/ontology/ontologyDataApi.ts',
   'services/ontology/ontologyDomainApi.ts',
   'services/ontology/ontologyEngineApi.ts',

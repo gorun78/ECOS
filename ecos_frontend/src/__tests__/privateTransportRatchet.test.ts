@@ -10,7 +10,7 @@
  *   传输层唯一有权封装的是 `services/httpClient.ts`（Bearer 拼接、解包、traceId
  *   取号、401 会话副作用、网络/权限广播均在其内单源）。
  *   **匿名腿不算豁免**（#143/B5-11d）：本门收的是「传输封装散落」，不是「所有请求都必须带身份」。
- *   域文件为维持匿名语义而留裸 `fetch` 会在判据上出现洞， httpClient 遂提供具名匿名通道
+ *   域文件为维持匿名语义而留裸 `fetch` 会在判据上出现洞，httpClient 遂提供具名匿名通道
  *   `rawAnonUrlFetch` —— 显式点名调用使「这次不带身份」成为全仓可 grep 的决定，
  *   对「带身份 / 匿名」两种腿判据只有一个：裸传输不得出现在 httpClient 之外。
  *
@@ -32,8 +32,11 @@
  *
  * 基线数字为 2026-10-19 #143/B5-11c（alertsApi+AlertPanel → worldModelGraphApi+dataAssetsApi
  * → kbFetch+agentMeshApi 三批收口后）实跑值，非估算。首批订立时实测 26 文件 / 45 处。
- * 本批（#143/B5-11d）剪除 `services/knowledgeQueryApi.ts`(5) + `pages/knowledge/services/extract.ts`(3)
- * 两枚 ⇒ 现值 **19 文件 / 25 命中行**（同批实跑校验，非推算）。
+ * #143/B5-11d 剪除 `services/knowledgeQueryApi.ts`(5) + `pages/knowledge/services/extract.ts`(3)
+ * ⇒ 21/33 → 19 文件 / 25 命中行。
+ * #143/B5-11e 剪除 `services/caseLibraryApi.ts`(4) + `services/copilotApi.ts`(2)
+ * + `services/datanetMetadataApi.ts`(2) 三条**匿名腿**（走新增具名通道 `rawAnonUrlFetch`，
+ * 不因「本来就没身份」而豁免）⇒ 19/25 → **16 文件 / 17 命中行**（同批实跑校验，非推算）。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -48,7 +51,8 @@ const SRC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CANONICAL = 'services/httpClient.ts';
 
 /**
- * 基线（存量登记，#143/B5-11d 收口 knowledgeQueryApi + extract 后实测 19 文件 / 25 命中行；只减不增）。
+ * 基线（存量登记，#143/B5-11e 收口 caseLibraryApi + copilotApi + datanetMetadataApi 后实测
+ * 16 文件 / 17 命中行；只减不增）。
  * 值 = 该文件允许的最大命中行数，剪项/降数必须与该文件的真实收口同批。
  */
 const BASELINE: Readonly<Record<string, number>> = Object.freeze({
@@ -63,9 +67,6 @@ const BASELINE: Readonly<Record<string, number>> = Object.freeze({
   'pages/knowledge/tabs/SyncTab.tsx': 1,
   'services/agentLoopStream.ts': 1,
   'services/capabilityClient.ts': 1,
-  'services/caseLibraryApi.ts': 4,
-  'services/copilotApi.ts': 2,
-  'services/datanetMetadataApi.ts': 2,
   'services/engineProbeApi.ts': 2,
   'services/ontology/ontologyExportApi.ts': 1,
   'services/scenarioActionClient.ts': 1,
@@ -167,8 +168,8 @@ describe('privateTransportRatchet — C2′ 私设传输棘轮门 (#143/B5-11a)'
 
   it('基线自身可校验：条目数与合计命中上限与文档口径一致', () => {
     const entries = Object.entries(BASELINE);
-    expect(entries.length).toBe(19);
-    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(25);
+    expect(entries.length).toBe(16);
+    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(17);
     // 键必须是 POSIX 相对路径且非基线外文件形态
     for (const [rel] of entries) {
       expect(rel.startsWith('./')).toBe(false);
