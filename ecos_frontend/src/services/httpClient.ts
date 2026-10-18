@@ -443,13 +443,29 @@ export async function doFetch(url: string, opts: RequestInit = {}): Promise<any>
  * @param path 以 `/` 开头的路径（自动拼 API_BASE，与 apiFetch 同基址单源）
  */
 export async function rawAuthedFetch(path: string, options?: RequestInit): Promise<Response> {
+  return rawAuthedUrlFetch(`${API_BASE}${path}`, options);
+}
+
+/**
+ * `rawAuthedFetch` 的全 URL 内核 — 同一份实现，只是不再拼 API_BASE。
+ *
+ * <p>为什么需要 URL 形态：SSE/流式与二进制下载腿必须拿到**未被消费**的 `Response.body`
+ * 交给 `getReader()`，而 `apiFetchData`/`apiFetchEnvelope` 都会先把响应体读成
+ * text/JSON（流一旦被读掉就无法再解析帧序），KB 域这类腿的入参一直是调用方拼好的
+ * 完整路径 ⇒ 不能再拼一次前缀。Bearer 拼接仍只在本单源内发生（C2′ 判据的收口目标：
+ * 域文件里不再出现裸 `fetch(`）。</p>
+ *
+ * <p>与 `rawAuthedFetch` 一致的取舍：不设 `Content-Type` 默认值（GET 流式带 JSON
+ * 类型无意义，且调用方传 `headers` 时是逐键覆盖而非整组替换）。</p>
+ */
+export async function rawAuthedUrlFetch(url: string, options?: RequestInit): Promise<Response> {
   const token = getAuthToken();
   const headers: Record<string, string> = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const initHeaders = options?.headers;
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, {
+    res = await fetch(url, {
       ...options,
       headers: initHeaders
         ? { ...headers, ...(initHeaders as Record<string, string>) }
@@ -458,7 +474,7 @@ export async function rawAuthedFetch(path: string, options?: RequestInit): Promi
   } catch (e) {
     markNetworkDown();
     await notifyNetworkDown(e);
-    throw toNetworkError(e, `fetch ${path}`);
+    throw toNetworkError(e, `fetch ${url}`);
   }
   if (res.ok) notifyNetworkUp();
   return res;

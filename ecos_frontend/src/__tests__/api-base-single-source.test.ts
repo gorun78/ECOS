@@ -28,6 +28,8 @@
  * 合流 apiFetchData，基址由字面量改 API_BASE 派生（五腿 URL 逐字不变）。
  * 2026-10-19 #143/B5-11a 收口减 1：services/alertsApi.ts 六枚私设 fetch 腿整体重写为
  * apiFetchEnvelope 单源通道，基址改由 API_BASE 派生（URL 逐字不变）。
+ * 2026-10-19 #143/B5-11c 收口减 1：services/agentMeshApi.ts 两通道腿合流 apiFetchData，
+ * 基址由字面量改 API_BASE 派生（六腿 URL 逐字不变），并补上改前缺失的 Bearer（D-B5-35）。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -112,7 +114,6 @@ const BASELINE = new Set([
   'pages/workbench/[scenarioId]/index.tsx',
   'pages/workbench/index.tsx',
   'providers/graphqlClient.ts',
-  'services/agentMeshApi.ts',
   'services/aiworkbenchApi.ts',
   'services/auth.ts',
   'services/cognitiveClient.ts',

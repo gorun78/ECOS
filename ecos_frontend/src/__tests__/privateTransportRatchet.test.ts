@@ -26,8 +26,8 @@
  * 它们的帧序已由 #143/B5-2~B5-5b 收口至单源，但传输腿仍是裸 fetch，
  * 归本门渐进收敛（不因「另有 SSE 门」而豁免，否则判据出现洞）。
  *
- * 基线数字为 2026-10-19 本批（alertsApi.ts 6 处 + AlertPanel.tsx WS 1 处收口后）
- * 实跑值，非估算。改前实测 26 文件 / 45 处（含 alertsApi 与 AlertPanel）。
+ * 基线数字为 2026-10-19 #143/B5-11c（alertsApi+AlertPanel → worldModelGraphApi+dataAssetsApi
+ * → kbFetch+agentMeshApi 三批收口后）实跑值，非估算。首批订立时实测 26 文件 / 45 处。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -42,7 +42,7 @@ const SRC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CANONICAL = 'services/httpClient.ts';
 
 /**
- * 基线（存量登记，2026-10-19 实测 23 文件 / 37 命中行；只减不增）。
+ * 基线（存量登记，2026-10-19 实测 21 文件 / 33 命中行；只减不增）。
  * 值 = 该文件允许的最大命中行数，剪项/降数必须与该文件的真实收口同批。
  */
 const BASELINE: Readonly<Record<string, number>> = Object.freeze({
@@ -55,10 +55,8 @@ const BASELINE: Readonly<Record<string, number>> = Object.freeze({
   'pages/data-workbench/tabs/connections/InlineSqlConsole.tsx': 1,
   'pages/knowledge/services/extract.ts': 3,
   'pages/knowledge/services/govern.ts': 1,
-  'pages/knowledge/services/kbFetch.ts': 2,
   'pages/knowledge/tabs/SyncTab.tsx': 1,
   'services/agentLoopStream.ts': 1,
-  'services/agentMeshApi.ts': 2,
   'services/capabilityClient.ts': 1,
   'services/caseLibraryApi.ts': 4,
   'services/copilotApi.ts': 2,
@@ -165,8 +163,8 @@ describe('privateTransportRatchet — C2′ 私设传输棘轮门 (#143/B5-11a)'
 
   it('基线自身可校验：条目数与合计命中上限与文档口径一致', () => {
     const entries = Object.entries(BASELINE);
-    expect(entries.length).toBe(23);
-    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(37);
+    expect(entries.length).toBe(21);
+    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(33);
     // 键必须是 POSIX 相对路径且非基线外文件形态
     for (const [rel] of entries) {
       expect(rel.startsWith('./')).toBe(false);

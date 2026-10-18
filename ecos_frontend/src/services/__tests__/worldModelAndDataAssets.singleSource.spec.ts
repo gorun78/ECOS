@@ -162,7 +162,8 @@ describe('源形自检 — 两文件零私设传输（C2′ 棘轮剪除后的�
     );
     expect(ratchet).not.toContain("'services/worldModelGraphApi.ts'");
     expect(ratchet).not.toContain("'services/dataAssetsApi.ts'");
-    expect(ratchet).toContain('expect(entries.length).toBe(23)');
+    // 计数不在此钉死（钉住数字 = 每批都要回来改一行，且改漏了就变红）；
+    // 「声明数与基线实体一致」由 #143/B5-11c 的棘轮自校验用例从基线对象本身推导。
   });
 });
 

@@ -45,6 +45,9 @@ function stubFetch(sseChunks: string[], fallbackBody: unknown) {
       ok: true,
       status: 200,
       headers: new Headers({ "Content-Type": "application/json" }),
+      // 兜底腿自 #143/B5-11c 起经单源 `apiFetchEnvelope`，该通道先 `res.text()` 再自行 parse
+      // （真实 Response 同时具备 text()/json() 两面 ⇒ 桩必须补齐，否则是桩缺面而不是产品回归）
+      text: async () => JSON.stringify(fallbackBody),
       json: async () => fallbackBody,
     } as unknown as Response;
   });
@@ -123,6 +126,7 @@ describe("KB RAG 承流 —— 线路级单源（D-B5-11）", () => {
           ok: true,
           status: 200,
           headers: new Headers({ "Content-Type": "application/json" }),
+          text: async () => JSON.stringify({ success: true, data: { answer: "兜底答案", answerGenerated: true } }),
           json: async () => ({ success: true, data: { answer: "兜底答案", answerGenerated: true } }),
         } as unknown as Response;
       }),
