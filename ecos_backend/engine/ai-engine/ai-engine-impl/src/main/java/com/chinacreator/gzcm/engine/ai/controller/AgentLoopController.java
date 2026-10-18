@@ -3,12 +3,15 @@ package com.chinacreator.gzcm.engine.ai.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.error.AiError;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.common.stream.SseFrameContract;
+import com.chinacreator.gzcm.common.trace.AgentLoopTrace;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopConfig;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopResult;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopService;
 import com.chinacreator.gzcm.engine.ai.service.AgentSessionService;
 import com.chinacreator.gzcm.engine.ai.service.AgentCircuitBreaker;
 import com.chinacreator.gzcm.engine.ai.service.ErrorCodeMapper;
+import com.chinacreator.gzcm.engine.ai.stream.AgentLoopSseFrames;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.runtime.llm.session.AgentSession;
 import org.slf4j.Logger;
@@ -118,16 +121,17 @@ public class AgentLoopController {
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * SSE 流式 Agent 对话。
+     * SSE 流式 Agent 对话（详细设计-06 §9.3.3 七帧承流；帧名/帧序/键面单源
+     * {@link SseFrameContract}，写出面 {@link AgentLoopSseFrames}）。
      *
-     * <p>SSE 事件类型：</p>
-     * <ul>
-     *   <li>{@code event:token} — 逐 token 推送回复内容</li>
-     *   <li>{@code event:tool_call} — 工具调用通知</li>
-     *   <li>{@code event:tool_result} — 工具执行结果</li>
-     *   <li>{@code event:done} — 推理完成</li>
-     *   <li>{@code event:error} — 错误信息</li>
-     * </ul>
+     * <p>帧序 {@code meta → step → token → delta → citation → error → done}。
+     * {@code meta} 在进入推理循环<b>之前</b>发出（首帧必发），故请求体非法与熔断两条
+     * 早退分支也带帧序上下文，不再出现旧形态"一条裸 error"。</p>
+     *
+     * <p>旧帧名 {@code tool_call}/{@code tool_result} 不再是 event 名 —— §9.3.3 把它们
+     * 定义为 {@code step} 帧的 {@code op} 取值，词形仍逐字出现在帧载荷里；正文增量的
+     * 帧名由旧 {@code token} 改为 {@code delta}，{@code token} 归还给 §9.3.3 的用量帧
+     * （同帧名两种载荷正是本差距的实测形态）。</p>
      *
      * <p>请求体格式同非流式端点。</p>
      *
@@ -137,106 +141,27 @@ public class AgentLoopController {
     public SseEmitter chatStream(@RequestBody Map<String, Object> body,
                                   @RequestParam(name = "thread", defaultValue = "main") String thread) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
+        // traceId 只能在请求线程取：CompletableFuture 的池线程不继承 MDC，异步内取会恒得缺失标记
+        String traceId = AiTraceSupport.currentTraceId();
+        AgentLoopSseFrames frames = new AgentLoopSseFrames(traceId,
+                (event, data) -> emitter.send(SseEmitter.event().name(event).data(data, MediaType.APPLICATION_JSON)));
 
         CompletableFuture.runAsync(() -> {
             try {
-                String message = (String) body.get("message");
-                if (message == null || message.isBlank()) {
-                    sendEvent(emitter, "error", Map.of("message", "message 不能为空"));
-                    emitter.complete();
-                    return;
-                }
-
-                // T0c-3: 熔断器检查
-                String agentId = (String) body.getOrDefault("agentId", "default");
-                if (!circuitBreaker.isAllowed(agentId)) {
-                    sendEvent(emitter, "error", Map.of("message", "Agent 服务暂时不可用（熔断保护），请稍后重试"));
-                    emitter.complete();
-                    return;
-                }
-
-                AgentLoopConfig config = buildConfig(body);
-                AgentSession session = buildRuntimeSession(body);
-
-                // 执行推理循环
-                AgentLoopResult result = agentLoopService.run(config, message, session);
-
-                // T0c-3: 记录结果
-                if (result.isSuccess()) {
-                    circuitBreaker.recordSuccess(agentId);
-                } else {
-                    circuitBreaker.recordFailure(agentId);
-                }
-
-                // 推送 tool_call 事件
-                if (result.getToolCalls() != null && !result.getToolCalls().isEmpty()) {
-                    for (Map<String, Object> tc : result.getToolCalls()) {
-                        Map<String, Object> event = new LinkedHashMap<>();
-                        event.put("toolName", tc.get("toolName"));
-                        event.put("toolCallId", tc.get("toolCallId"));
-                        event.put("durationMs", tc.get("durationMs"));
-                        event.put("success", tc.get("success"));
-                        event.put("turn", tc.get("turn"));
-
-                        sendEvent(emitter, "tool_call", event);
-
-                        // 工具结果
-                        Map<String, Object> resultEvent = new LinkedHashMap<>();
-                        resultEvent.put("toolName", tc.get("toolName"));
-                        resultEvent.put("resultSnippet", tc.get("resultSnippet"));
-                        sendEvent(emitter, "tool_result", resultEvent);
-                    }
-                }
-
-                // 推送 token 事件 — 将最终回复按 token 粒度分批发送
-                if (result.isSuccess() && result.getContent() != null) {
-                    String content = result.getContent();
-                    List<String> tokens = splitIntoTokens(content);
-                    for (String token : tokens) {
-                        sendEvent(emitter, "token", Map.of("content", token));
-                        // 微小延迟模拟逐 token 输出
-                        Thread.sleep(10);
-                    }
-                }
-
-                // 推送 done 事件
-                Map<String, Object> doneEvent = new LinkedHashMap<>();
-                doneEvent.put("sessionId", result.getSessionId());
-                doneEvent.put("turns", result.getTurns());
-                doneEvent.put("totalTokens", result.getTotalTokens());
-                doneEvent.put("success", result.isSuccess());
-                if (!result.isSuccess()) {
-                    // F06-14/15：失败帧只出分类码 + 渲染消息 + 诊断码，异常原文不外泄（X-49）
-                    AiErrorClass errorClass = AiResponseSupport.resolveClass(result);
-                    doneEvent.put("errorCode", result.getErrorCode() == null
-                            ? errorClass.errorCode() : result.getErrorCode());
-                    doneEvent.put("errorClass", errorClass.name());
-                    doneEvent.put("retryable", errorClass.retryable());
-                    doneEvent.put("message", result.getErrorMsg() == null
-                            ? errorClass.renderMessage(result.getTraceId()) : result.getErrorMsg());
-                }
-                // F06-09 ⑥：压缩状态只在上游已判定时下发，未判定 ⇒ 键缺席（前端渲染"未上报"，禁伪造）
-                if (result.isCompressionAssessed()) {
-                    doneEvent.put("compressionMode", result.getCompressionMode());
-                    doneEvent.put("compressedTurns", result.getCompressedTurns());
-                    doneEvent.put("compressSkipped", result.isCompressSkipped());
-                }
-                sendEvent(emitter, "done", doneEvent);
-
+                runStream(body, frames);
                 emitter.complete();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 log.error("[AgentLoop] SSE 流式对话被中断", e);
-                sendErrorQuietly(emitter, Map.of("message", "推理被中断，请稍后重试"));
+                failClosedTail(frames, e);
                 emitter.completeWithError(e);
             } catch (RuntimeException | IOException e) {
                 // F06-15：控制器不写 catch(Exception)；此处只兜 SSE 通道（异步线程内异常无人接管），
                 // 且外泄面只有 D.5 分类码 + 诊断码
-                AiError error = ErrorCodeMapper.classify(e, ErrorCodeMapper.Context.generic(),
-                        AiTraceSupport.currentTraceId());
+                AiError error = ErrorCodeMapper.classify(e, ErrorCodeMapper.Context.generic(), traceId);
                 log.error("[AgentLoop] SSE 流式对话失败: class={} code={} traceId={}",
                         error.errorClass().name(), error.errorCode(), error.traceId(), e);
-                sendErrorQuietly(emitter, error.toSseErrorFrame());
+                failClosedTail(frames, error);
                 emitter.completeWithError(e);
             }
         });
@@ -523,51 +448,176 @@ public class AgentLoopController {
         return data;
     }
 
-    /** 错误帧尽力下发：连接可能已关闭，下发失败只记 debug（不再向外抛，避免 SSE 线程二次异常）。 */
-    private void sendErrorQuietly(SseEmitter emitter, Map<String, Object> frame) {
+    /**
+     * 七帧写出（可测入口）：{@link #chatStream} 只负责 emitter 装配与完成信号，
+     * 帧序与载荷都在本方法，测试用记录型 sink 驱动即可断到真实出帧形态。
+     *
+     * <p>包内可见是刻意的：帧序属承流契约，必须能被入口级用例驱动，
+     * 而不是"加个类再单测它自己"。</p>
+     */
+    void runStream(Map<String, Object> body, AgentLoopSseFrames frames) throws IOException, InterruptedException {
+        AgentLoopConfig config = buildConfig(body);
+        String message = (String) body.get("message");
+        frames.meta((String) body.get("sessionId"), config.getModel(), config.getMaxContextTokens(), null);
+
+        if (message == null || message.isBlank()) {
+            failClosedTail(frames, AiError.of(AiErrorClass.INVALID_ARGUMENT, frames.traceId()));
+            return;
+        }
+
+        // T0c-3: 熔断器检查
+        String agentId = (String) body.getOrDefault("agentId", "default");
+        if (!circuitBreaker.isAllowed(agentId)) {
+            failClosedTail(frames, AiError.of(AiErrorClass.LLM_RATE_LIMITED, frames.traceId()));
+            return;
+        }
+
+        AgentSession session = buildRuntimeSession(body);
+
+        // 执行推理循环
+        AgentLoopResult result = agentLoopService.run(config, message, session);
+
+        // T0c-3: 记录结果
+        if (result.isSuccess()) {
+            circuitBreaker.recordSuccess(agentId);
+        } else {
+            circuitBreaker.recordFailure(agentId);
+        }
+
+        for (Map<String, Object> tc : toolRecordsOf(result)) {
+            int turn = tc.get("turn") instanceof Number n ? n.intValue() : 0;
+            String tool = tc.get("toolName") == null ? null : String.valueOf(tc.get("toolName"));
+            String decision = tc.get("decision") == null ? null : String.valueOf(tc.get("decision"));
+            frames.step(AgentLoopTrace.Op.TOOL_CALL, turn, tool, config.getModel(), decision);
+            frames.step(AgentLoopTrace.Op.TOOL_RESULT, turn, tool, config.getModel(), decision);
+        }
+
+        // 失败分支不编正文：delta/citation 属"有据叙述"腿，失败时只出 error → done
+        AiError failure = result.isSuccess()
+                ? null
+                : AiError.of(AiResponseSupport.resolveClass(result), frames.traceId());
+        if (result.isSuccess()) {
+            frames.step(AgentLoopTrace.Op.LLM_CALL, result.getTurns(), null, config.getModel(),
+                    AgentLoopTrace.Decision.NA.name());
+            // 分项用量未随 AgentLoopResult 传播 ⇒ 按 §9.3.3 写 -1，禁以 totalTokens 折算冒充分项
+            frames.tokenUsage(SseFrameContract.unknownToken(), SseFrameContract.unknownToken(), false);
+            for (String chunk : splitDeltaChunks(result.getContent())) {
+                frames.delta(chunk);
+                // 微小延迟保留原节奏（真流式增量待 llm-gateway stream 接入，非本批范围）
+                Thread.sleep(10);
+            }
+            String block = citationBlockOf(result);
+            if (block != null) {
+                frames.citation(block);
+            }
+        }
+        if (failure != null) {
+            frames.error(failure);
+        }
+        frames.done(doneFields(result, failure));
+    }
+
+    /** 工具记录面归一（Service 可能回传 null 列表：出帧侧按空集处理，不另造记录）。 */
+    private static List<Map<String, Object>> toolRecordsOf(AgentLoopResult result) {
+        return result.getToolCalls() == null ? List.of() : result.getToolCalls();
+    }
+
+    /** 引用块来源：循环级确定性渲染优先，否则取工具记录里第一条带引用的返回体（禁在此另算口径）。 */
+    private static String citationBlockOf(AgentLoopResult result) {
+        if (result.getCitationBlock() != null && !result.getCitationBlock().isBlank()) {
+            return result.getCitationBlock();
+        }
+        for (Map<String, Object> tc : toolRecordsOf(result)) {
+            Object block = tc.get("citationBlock");
+            if (block instanceof String s && !s.isBlank()) {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    /** 末帧载荷：压缩态未判定 ⇒ 键缺席（F06-09 ⑥「前端渲染未上报，禁伪造」）。 */
+    private static Map<String, Object> doneFields(AgentLoopResult result, AiError failure) {
+        Map<String, Object> done = new LinkedHashMap<>();
+        done.put(SseFrameContract.KEY_SESSION_ID, result.getSessionId());
+        done.put("turns", result.getTurns());
+        done.put(SseFrameContract.KEY_TOTAL_TOKENS, result.getTotalTokens());
+        done.put("success", result.isSuccess());
+        if (failure != null) {
+            // 与 error 帧同源同一次分类，禁两处各自再推一遍（旧形态是 done 自带一套码值）
+            done.put(SseFrameContract.KEY_ERROR_CODE, failure.errorCode());
+            done.put("errorClass", failure.errorClass().name());
+            done.put(SseFrameContract.KEY_RETRYABLE, failure.retryable());
+            // 专项文案（如配额已用/上限）由上游按 D.5 模板渲染后随结果携带，只走 done 帧；
+            // error 帧按 §9.3.3 恒为分类模板文案，两帧因此既不同形也同不断源
+            if (result.getErrorMsg() != null && !result.getErrorMsg().isBlank()) {
+                done.put("message", result.getErrorMsg());
+            }
+        }
+        if (result.isCompressionAssessed()) {
+            done.put(SseFrameContract.KEY_COMPRESSION_MODE, result.getCompressionMode());
+            done.put("compressedTurns", result.getCompressedTurns());
+            done.put("compressSkipped", result.isCompressSkipped());
+        }
+        return done;
+    }
+
+    /** 兜底腿的异常形态：先按 D.5 分类再出帧，异常原文无入口。 */
+    void failClosedTail(AgentLoopSseFrames frames, Throwable e) {
+        failClosedTail(frames, ErrorCodeMapper.classify(e, ErrorCodeMapper.Context.generic(), frames.traceId()));
+    }
+
+    /**
+     * 故障尾帧：{@code meta} 未及写出时先补一发（首帧必发），随后 {@code error → done}。
+     * 连接可能已关闭，下发失败只记 debug，避免 SSE 线程二次异常。
+     *
+     * <p>包内可见与 {@link #runStream} 同理：尾帧是承流写出面的一部分，必须能被入口级用例驱动。</p>
+     */
+    void failClosedTail(AgentLoopSseFrames frames, AiError error) {
         try {
-            sendEvent(emitter, "error", frame);
+            if (frames.emittedNames().isEmpty()) {
+                frames.meta(null, null, null, null);
+            }
+            frames.error(error);
+            Map<String, Object> tail = new LinkedHashMap<>();
+            tail.put("success", false);
+            tail.put(SseFrameContract.KEY_ERROR_CODE, error.errorCode());
+            tail.put("errorClass", error.errorClass().name());
+            tail.put(SseFrameContract.KEY_RETRYABLE, error.retryable());
+            frames.done(tail);
         } catch (IOException | RuntimeException ignored) {
-            log.debug("[AgentLoop] SSE 错误帧下发失败（连接已关闭）");
+            log.debug("[AgentLoop] SSE 故障尾帧下发失败（连接已关闭）");
         }
     }
 
     /**
-     * 发送 SSE 事件。
+     * 将终稿文本按语义边界分段，作为 {@code delta} 帧正文。
+     *
+     * <p>命名由 {@code splitIntoTokens} 改为 {@code splitDeltaChunks}：分段的帧名是
+     * {@code delta}（§9.3.3 帧 4），{@code token} 帧另有用量语义（帧 3），一名两义即本差距病灶。</p>
      */
-    private void sendEvent(SseEmitter emitter, String eventName, Object data) throws IOException {
-        emitter.send(SseEmitter.event()
-                .name(eventName)
-                .data(data, MediaType.APPLICATION_JSON));
-    }
-
-    /**
-     * 将文本按 token 粒度切分（简化版：按字符边界切块）。
-     * <p>真实场景应使用 tokenizer，此处按语义边界分段发送。</p>
-     */
-    private List<String> splitIntoTokens(String content) {
+    private List<String> splitDeltaChunks(String content) {
         if (content == null || content.isEmpty()) {
             return List.of();
         }
 
-        // 按段/句边界切分，每段作为一个 "token" 发送
-        // 优先按段落切，再按句号切
+        // 按段/句边界切分，每段作为一个 delta 帧下发
         String[] paragraphs = content.split("(?<=\\n\\n)");
-        java.util.List<String> tokens = new java.util.ArrayList<>();
+        java.util.List<String> chunks = new java.util.ArrayList<>();
         for (String para : paragraphs) {
             if (para.length() <= 80) {
-                tokens.add(para);
+                chunks.add(para);
             } else {
                 // 按句子切分
                 String[] sentences = para.split("(?<=[。！？\\n.?!])");
                 for (String sentence : sentences) {
                     if (!sentence.isBlank()) {
-                        tokens.add(sentence);
+                        chunks.add(sentence);
                     }
                 }
             }
         }
-        return tokens;
+        return chunks;
     }
 
     private Double getDouble(Map<String, Object> body, String key, Double defaultValue) {

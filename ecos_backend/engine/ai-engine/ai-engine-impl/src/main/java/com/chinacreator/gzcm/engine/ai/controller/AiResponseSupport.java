@@ -7,7 +7,6 @@ import com.chinacreator.gzcm.engine.ai.service.ErrorCodeMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -36,20 +35,6 @@ public final class AiResponseSupport {
                         ? errorClass.renderMessage(result.getTraceId()) : result.getErrorMsg());
         body.setData(data);
         return ResponseEntity.status(HttpStatus.valueOf(errorClass.httpStatus())).body(body);
-    }
-
-    /** Loop 终止态 → SSE {@code error} 帧（§5.4 形态，与 HTTP 体同源）。 */
-    public static Map<String, Object> sseErrorFrame(AgentLoopResult result) {
-        AiErrorClass errorClass = resolveClass(result);
-        Map<String, Object> frame = new LinkedHashMap<>();
-        frame.put("errorCode", result.getErrorCode() == null
-                ? errorClass.errorCode() : result.getErrorCode());
-        frame.put("class", errorClass.name());
-        frame.put("message", result.getErrorMsg() == null
-                ? errorClass.renderMessage(result.getTraceId()) : result.getErrorMsg());
-        frame.put("retryable", errorClass.retryable());
-        frame.put("traceId", result.getTraceId() == null ? "-" : result.getTraceId());
-        return frame;
     }
 
     /**

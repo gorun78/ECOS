@@ -335,6 +335,12 @@ public class AgentLoopService {
                     record.put("durationMs", actElapsed);
                     record.put("success", tr.isSuccess());
                     record.put("resultSnippet", truncate(tr.getContent(), 200));
+                    // B5-2 承流面取用：裁决态在此映射一次（映射单源=decisionOf），
+                    // 引用块是上游由工具返回体确定性渲染的产物，承流侧只搬运不重算
+                    record.put("decision", toolDecision.name());
+                    if (tr.getCitationBlock() != null && !tr.getCitationBlock().isBlank()) {
+                        record.put("citationBlock", tr.getCitationBlock());
+                    }
                     toolCallRecords.add(record);
 
                     // 工具结果塞回 messages
