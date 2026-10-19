@@ -6,7 +6,11 @@
  * C1 基址单源每扩一批域，这类腿就静默变薄：建门批（#143/B5-19）实跑读出 680 个生产文件、
  * 258 个 URL 族、30 个族存在 >1 生产方，而**只认裸字面量的口径当时只能看到 9 个** ⇒ 21 个重复族
  * 对旧判据完全隐形。#143/B5-20 复跑 = 30/6/24（该批把知识服务域 32 处裸面搬成派生态，
- * dupBoth 不减而裸形态口径又瞎三族），故下方三个 pin 随批更新，读的是当批实测而非建门批快照。逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
+ * dupBoth 不减而裸形态口径又瞎三族）。#143/B5-21 复跑 = 680 文件 / 258 族 / 裸面 87 / 派生面 247
+ * （两面之和 **334 恒定**，纯转换只挪点位）/ dupBoth 30 / dupRawOnly **5** / blind **25**：
+ * 该批把 data-workbench/api 域 26 处裸面派生化，`/v1/engine/data/pipeline/runs/{}` 一族只剩
+ * `pipeline-editor/PipelineExecutionMonitor.tsx` 一个裸面属主 ⇒ 又掉出旧判据视野。
+ * 三个 pin 随批更新，读的是当批实测而非建门批快照。逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。
  *
@@ -200,20 +204,27 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
   }, 30_000);
 
   it('派生分支真在扫 + 双形态口径严格强于裸字面量口径（本门不是旧判据的等价改写）', () => {
-    expect(snapshot.derSites).toBeGreaterThanOrEqual(100);
-    expect(snapshot.rawSites).toBeGreaterThanOrEqual(100);
+    expect(snapshot.derSites, '派生分支必须在扫，否则本门退化为裸形态旧判据').toBeGreaterThan(0);
+    expect(snapshot.rawSites, '裸形态分支必须在扫').toBeGreaterThan(0);
+    // #143/B5-21 起把两条 `>=100` 绝对地板换掉：C1 每收口一批就把点位从裸形态面搬到派生面，
+    // 地板迟早被真实进度撞红（本批 rawSites 113→87 即撞）。换成**两面之和恒等**这条更强的
+    // 判据——纯 raw→derived 转换只在两面之间移动点位，总数不变；扫描根一旦漂移（漏目录、
+    // 判据改动）总数必变，比两条独立地板更能证「没在扫空」。334 = 本批实跑读出，与 dup* 同批重钉。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(334);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     expect(dupBoth.size).toBeGreaterThan(dupRawOnly.size);
     // 三个数 = 本门实跑读出值，与 BASELINE 同批改动（重复面一变，这里必红，防「基线改了、盲区量化注记没跟上」）
-    // #143/B5-20 起改为此值：该批把知识服务域 32 处裸字面量搬成派生态，dupBoth 不变（30），
-    // 但裸形态口径丢三族（/v1/knowledge 五属主全裸面归零、/v1/ontology/mappings 与
-    // /v1/knowledge/compliance-rules 各降到单属主）⇒ 盲区由 21 扩到 24。这正是 D-B5-40 的
-    // 预期行为：C1 每收口一批，只认裸形态的旧判据就更瞎，不是本门放松。
+    // #143/B5-20：知识服务域 32 处裸面派生化，dupBoth 不变（30），裸形态口径丢三族
+    // （/v1/knowledge 五属主全裸面归零、/v1/ontology/mappings 与 /v1/knowledge/compliance-rules
+    // 各降到单属主）⇒ 盲区 21 → 24。
+    // #143/B5-21：data-workbench/api 域 26 处裸面派生化，dupBoth 仍 30，/v1/engine/data/pipeline/runs/{}
+    // 只剩 1 个裸面属主 ⇒ dupRawOnly 6 → 5、盲区 24 → 25。这正是 D-B5-40 的预期行为：
+    // C1 每收口一批，只认裸形态的旧判据就更瞎，不是本门放松。
     expect(dupBoth.size).toBe(30);
-    expect(dupRawOnly.size).toBe(6);
+    expect(dupRawOnly.size).toBe(5);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(24);
+    expect(blind.length).toBe(25);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);

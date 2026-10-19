@@ -85,6 +85,13 @@
  * `API_BASE` 实际值还原后与 HEAD 快照做多重集比对（32 条逐字不变）；整域九个 `.ts`
  * 代码行零私设基址（`govern.ts` 系 2026-10-10 W206/C188 已派生，本批只复核不动）。
  * 47 → 42 枚系实跑读出后剪除。
+ * 2026-10-19 #143/B5-21 收口减 5：`src/pages/data-workbench/api/` 五个基线在册文件
+ * （datasource / lineage / metadata / pipeline / unstructured）代码行私设基址 **26 处**
+ * （逐文件 1 + 1 + 11 + 4 + 9）改由 `API_BASE` 派生，形态拆分 = 单引号 11 + **反引号 15**
+ * + 双引号 0。域级取证门 `pages/data-workbench/api/__tests__/dataWorkbenchApiBaseSingleSource.spec.ts`
+ * 的比对面为 **27** 条＝26 条裸形态 + 1 条改前既有派生态（`unstructured.ts` 上传腿，#143/B5-14），
+ * 漏计既有派生态会让「多重集相等」假绿；`_base.ts` 三枚常量系 #143/B5-8 即已派生，只由
+ * 「整域八个 `.ts` 零私设基址」腿覆盖、不计入本批派生点数。42 → 37 枚系实跑读出后剪除。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -115,11 +122,6 @@ const BASELINE = new Set([
   'pages/business-workbench/BusinessWorkbenchLayout.tsx',
   'pages/data-quality/api/_base.ts',
   'pages/data-workbench/DataEngineConfigPanel.tsx',
-  'pages/data-workbench/api/datasource.ts',
-  'pages/data-workbench/api/lineage.ts',
-  'pages/data-workbench/api/metadata.ts',
-  'pages/data-workbench/api/pipeline.ts',
-  'pages/data-workbench/api/unstructured.ts',
   'pages/data-workbench/pipeline-editor/CopilotPanel.tsx',
   'pages/data-workbench/pipeline-editor/GitCommitDialog.tsx',
   'pages/data-workbench/pipeline-editor/GitVersionPanel.tsx',

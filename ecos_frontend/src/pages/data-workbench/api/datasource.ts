@@ -4,6 +4,7 @@
  * @license Apache-2.0
  */
 import { get, post, put, del, toApiType, envelopeErrorText, DATANET_DS } from './_base';
+import { API_BASE } from '../../../services/httpClient';
 import { mapDsToConn } from './mappers';
 import type { DataConnection } from '../types';
 
@@ -378,7 +379,7 @@ export function buildPreviewSchemaPayload(payload: SchemaPreviewPayload): Record
 export async function fetchSchemaPreview(payload: SchemaPreviewPayload): Promise<{ fields: SchemaField[]; tableNames: string[] } | { ok: false; error: string }> {
   const body = buildPreviewSchemaPayload(payload);
   try {
-    const raw = await post<{ fields?: unknown; tableNames?: unknown }>('/api/v1/ecos/data/datasource/preview-schema', body);
+    const raw = await post<{ fields?: unknown; tableNames?: unknown }>(`${API_BASE}/v1/ecos/data/datasource/preview-schema`, body);
     const rawFields = raw?.fields;
     const rawTableNames = raw?.tableNames;
     const fields: SchemaField[] = Array.isArray(rawFields) ? rawFields as SchemaField[] : [];

@@ -5,6 +5,7 @@
  */
 import { del, get, post, postEmpty, put, PIPELINE_DEFS, INTEGRATION } from './_base';
 import { mapPipelineDef, mapSyncTask, normalizeBackendPipelineNode } from './mappers';
+import { API_BASE } from '../../../services/httpClient';
 import type { DataPipeline, DataSyncTask } from '../types';
 
 /** Pipeline save payload (PMO-3J T3) — matches backend PipelineController createDefinition. */
@@ -32,7 +33,7 @@ export async function fetchDataSyncTasks(): Promise<DataSyncTask[]> {
 
 /** Fetch sync tasks from PipelineTaskController (task_type=SYNC)（失败上抛，禁吞错回退空数组） */
 export async function fetchSyncTasksFromPipeline(): Promise<DataSyncTask[]> {
-  const data = await get<unknown[]>('/api/v1/engine/data/pipeline/tasks?taskType=SYNC');
+  const data = await get<unknown[]>(`${API_BASE}/v1/engine/data/pipeline/tasks?taskType=SYNC`);
   if (!Array.isArray(data)) return [];
   return data.map(mapSyncTask);
 }
@@ -56,7 +57,7 @@ export async function createSyncTask(payload: {
         syncMode: payload.syncMode || 'snapshot',
       }),
     };
-    const result = await post<Record<string, unknown>>('/api/v1/engine/data/pipeline/tasks', body);
+    const result = await post<Record<string, unknown>>(`${API_BASE}/v1/engine/data/pipeline/tasks`, body);
     return mapSyncTask(result);
   } catch (e) {
     console.warn('[data-workbench] createSyncTask failed:', e);
@@ -67,7 +68,7 @@ export async function createSyncTask(payload: {
 /** 触发同步任务执行 → PipelineTaskController POST /api/v1/engine/data/pipeline/tasks/{id}/run */
 export async function triggerSyncRun(taskId: string): Promise<{ status?: string; runId?: string } | null> {
   try {
-    return await post<{ status?: string; runId?: string }>(`/api/v1/engine/data/pipeline/tasks/${taskId}/run`, {});
+    return await post<{ status?: string; runId?: string }>(`${API_BASE}/v1/engine/data/pipeline/tasks/${taskId}/run`, {});
   } catch (e) {
     console.warn('[data-workbench] triggerSyncRun failed:', e);
     return null;
@@ -84,7 +85,7 @@ export async function fetchPipelineRunStatus(
 ): Promise<{ status?: string; errorMsg?: string } | null> {
   try {
     const data = await get<{ status?: string; errorMsg?: string; data?: { status?: string; errorMsg?: string } }>(
-      `/api/v1/engine/data/pipeline/runs/${encodeURIComponent(runId)}`
+      `${API_BASE}/v1/engine/data/pipeline/runs/${encodeURIComponent(runId)}`
     );
     return data?.data && typeof data.data === 'object' ? data.data : data;
   } catch (e) {

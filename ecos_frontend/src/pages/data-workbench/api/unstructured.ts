@@ -28,7 +28,7 @@ export interface IngestTaskItem {
 /** 可用目标数据湖（MINIO 类型数据源） */
 export async function fetchIngestTargets(): Promise<IngestTarget[]> {
   try {
-    const data = await get<unknown[] | Record<string, unknown>>('/api/v1/datanet/ingest/targets');
+    const data = await get<unknown[] | Record<string, unknown>>(`${API_BASE}/v1/datanet/ingest/targets`);
     const arr = Array.isArray(data) ? data : (data?.items as unknown[] | undefined) ?? [];
     return arr.map((t: unknown) => {
       const m = t as Record<string, unknown>;
@@ -50,7 +50,7 @@ export async function runDataIngest(datasourceId: string, tableNames: string[]):
 } | null> {
   try {
     const body = { datasourceId, tableNames };
-    const data = await post<Record<string, unknown>>('/api/v1/datanet/ingest/run', body);
+    const data = await post<Record<string, unknown>>(`${API_BASE}/v1/datanet/ingest/run`, body);
     return {
       datasourceId: (data?.datasourceId as string) || datasourceId,
       submitted: Boolean(data?.submitted),
@@ -80,7 +80,7 @@ export async function fetchIngestStatus(taskId: string): Promise<{
 } | null> {
   try {
     return await get<{ available: boolean; status?: string; progress?: number; result?: unknown; errorMessage?: string }>(
-      `/api/v1/datanet/ingest/status/${encodeURIComponent(taskId)}`
+      `${API_BASE}/v1/datanet/ingest/status/${encodeURIComponent(taskId)}`
     );
   } catch (e) {
     console.warn('[data-workbench] fetchIngestStatus failed:', e);
@@ -94,7 +94,7 @@ export async function saveIngestSchedule(
 ): Promise<{ enabled: boolean; cron: string; tables: string[] } | null> {
   try {
     const body = { datasourceId, tableNames, cron };
-    return await post<{ enabled: boolean; cron: string; tables: string[] }>('/api/v1/datanet/ingest/schedule', body);
+    return await post<{ enabled: boolean; cron: string; tables: string[] }>(`${API_BASE}/v1/datanet/ingest/schedule`, body);
   } catch (e) {
     console.warn('[data-workbench] saveIngestSchedule failed:', e);
     return null;
@@ -107,7 +107,7 @@ export async function fetchIngestSchedule(datasourceId: string): Promise<{
 } | null> {
   try {
     return await get<{ enabled: boolean; cron: string; tables: string[] }>(
-      `/api/v1/datanet/ingest/schedule/${encodeURIComponent(datasourceId)}`
+      `${API_BASE}/v1/datanet/ingest/schedule/${encodeURIComponent(datasourceId)}`
     );
   } catch (e) {
     console.warn('[data-workbench] fetchIngestSchedule failed:', e);
@@ -123,7 +123,7 @@ export async function fetchDatalakeStatus(): Promise<{
 } | null> {
   try {
     return await get<{ endpoint?: string; bucket?: string; status?: string; initialized?: boolean; accessKey?: string }>(
-      '/api/v1/datanet/datalake/status'
+      `${API_BASE}/v1/datanet/datalake/status`
     );
   } catch (e) {
     console.warn('[data-workbench] fetchDatalakeStatus failed:', e);
@@ -134,7 +134,7 @@ export async function fetchDatalakeStatus(): Promise<{
 /** 初始化数据湖（ensure bucket，幂等） */
 export async function initDatalake(): Promise<{ bucket?: string; status?: string } | null> {
   try {
-    return await post<{ bucket?: string; status?: string }>('/api/v1/datanet/datalake/init', {});
+    return await post<{ bucket?: string; status?: string }>(`${API_BASE}/v1/datanet/datalake/init`, {});
   } catch (e) {
     console.warn('[data-workbench] initDatalake failed:', e);
     return null;
@@ -238,7 +238,7 @@ export interface FolderCollectResult {
 /** 列出 FILESYSTEM 数据源根目录下的可采集文件（扩展名白名单过滤，docId 可选前缀过滤） */
 export async function listFolderFiles(datasourceId: string, docId?: string): Promise<FolderFileVo[]> {
   try {
-    const url = `/api/v1/datanet/datalake/unstructured/folder/files?datasourceId=${encodeURIComponent(datasourceId)}${docId ? `&docId=${encodeURIComponent(docId)}` : ''}`;
+    const url = `${API_BASE}/v1/datanet/datalake/unstructured/folder/files?datasourceId=${encodeURIComponent(datasourceId)}${docId ? `&docId=${encodeURIComponent(docId)}` : ''}`;
     const raw = await get<unknown[]>(url);
     if (!Array.isArray(raw)) return [];
     return (raw as Record<string, unknown>[])
@@ -256,7 +256,7 @@ export async function listFolderFiles(datasourceId: string, docId?: string): Pro
 
 /** 将 FILESYSTEM 数据源目录中的文件采集到近源层并登记（后端逐文件处理） */
 export async function collectFolderFiles(req: FolderCollectReq): Promise<FolderCollectResult> {
-  const raw = await post<Record<string, unknown> | null>('/api/v1/datanet/datalake/unstructured/collect', req);
+  const raw = await post<Record<string, unknown> | null>(`${API_BASE}/v1/datanet/datalake/unstructured/collect`, req);
   if (!raw) {
     return { collected: 0, failed: req.fileNames.length, items: [] };
   }

@@ -5,12 +5,13 @@
  */
 import { get, postEmpty, put, asArray, httpStatusText } from './_base';
 import { normalizeRowCount } from './mappers';
+import { API_BASE } from '../../../services/httpClient';
 import type { TableInfo } from '../types';
 
 /** 立即触发元数据采集 → POST /api/v1/datanet/metadata/collect-async/{id} (PMO-37) */
 export async function triggerMetadataCollect(datasourceId: string): Promise<{ taskId?: string; message?: string } | null> {
   try {
-    const result = await postEmpty<{ taskId?: string; message?: string } | null>(`/api/v1/datanet/metadata/collect-async/${encodeURIComponent(datasourceId)}`);
+    const result = await postEmpty<{ taskId?: string; message?: string } | null>(`${API_BASE}/v1/datanet/metadata/collect-async/${encodeURIComponent(datasourceId)}`);
     return result ?? null;
   } catch (e) {
     console.warn('[data-workbench] triggerMetadataCollect failed:', e);
@@ -39,7 +40,7 @@ export async function fetchCollectStatus(taskId: string): Promise<{
   totalRecords?: number;
 } | null> {
   try {
-    const raw = await get<Record<string, unknown>>(`/api/v1/datanet/metadata/collect-status/${encodeURIComponent(taskId)}`);
+    const raw = await get<Record<string, unknown>>(`${API_BASE}/v1/datanet/metadata/collect-status/${encodeURIComponent(taskId)}`);
     if (!raw) return null;
     // 后端 result 是 JSON 字符串，解析后展平
     let result: Record<string, unknown> = {};
@@ -73,7 +74,7 @@ export async function fetchCollectStatus(taskId: string): Promise<{
 /** 立即触发采集（同步 UI 模式）— POST /api/v1/datanet/metadata/collect-sync/{id} */
 export async function triggerCollectSync(datasourceId: string): Promise<{ taskId?: string; mode?: string } | null> {
   try {
-    const result = await postEmpty<{ taskId?: string; mode?: string } | null>(`/api/v1/datanet/metadata/collect-sync/${encodeURIComponent(datasourceId)}`);
+    const result = await postEmpty<{ taskId?: string; mode?: string } | null>(`${API_BASE}/v1/datanet/metadata/collect-sync/${encodeURIComponent(datasourceId)}`);
     return result ?? null;
   } catch (e) {
     console.warn('[data-workbench] triggerCollectSync failed:', e);
@@ -93,7 +94,7 @@ interface TaskListItemRaw {
 }
 export async function fetchActiveCollectTasks(datasourceId: string): Promise<{ taskId: string; status: string; progress: number; startTime?: string }[]> {
   try {
-    const raw = await get<unknown>('/api/v1/task/list?taskType=METADATA_COLLECT&offset=0&limit=20');
+    const raw = await get<unknown>(`${API_BASE}/v1/task/list?taskType=METADATA_COLLECT&offset=0&limit=20`);
     const list = asArray<TaskListItemRaw>(raw);
     return list
       .filter((t) => {
@@ -133,7 +134,7 @@ export async function fetchCollectDiff(datasourceId: string, limit = 5): Promise
   tablesTotal?: number;
 }[]> {
   try {
-    const raw = await get<{ diffs?: CollectDiffItemRaw[] }>(`/api/v1/datanet/metadata/collect-diff/${encodeURIComponent(datasourceId)}?limit=${limit}`, { cache: 'no-store' });
+    const raw = await get<{ diffs?: CollectDiffItemRaw[] }>(`${API_BASE}/v1/datanet/metadata/collect-diff/${encodeURIComponent(datasourceId)}?limit=${limit}`, { cache: 'no-store' });
     const rawDiffs = raw?.diffs;
     const list = Array.isArray(rawDiffs) ? rawDiffs : [];
     return list.map((d) => ({
@@ -185,7 +186,7 @@ export async function fetchVersionHistory(datasourceId: string): Promise<{
 } | null> {
   try {
     const raw = await get<{ versions?: MetadataVersion[]; current?: { exists: boolean; collectedAt?: string; tableCount?: number } }>(
-      `/api/v1/datanet/metadata/version-history/${encodeURIComponent(datasourceId)}`,
+      `${API_BASE}/v1/datanet/metadata/version-history/${encodeURIComponent(datasourceId)}`,
       { cache: 'no-store' },
     );
     const rawVersions = raw?.versions;
@@ -203,7 +204,7 @@ export async function fetchVersionHistory(datasourceId: string): Promise<{
 export async function fetchVersionDiff(datasourceId: string, version: string): Promise<VersionDiffResult | { error: string } | null> {
   try {
     const raw = await get<Record<string, unknown>>(
-      `/api/v1/datanet/metadata/version-diff/${encodeURIComponent(datasourceId)}?version=${encodeURIComponent(version)}`,
+      `${API_BASE}/v1/datanet/metadata/version-diff/${encodeURIComponent(datasourceId)}?version=${encodeURIComponent(version)}`,
       { cache: 'no-store' },
     );
     const d = raw ?? {};
@@ -231,7 +232,7 @@ export async function fetchPreview(resourceId: string, limit = 50): Promise<{
   rows: Record<string, unknown>[];
 } | null> {
   try {
-    const raw = await get<{ rows?: Record<string, unknown>[] }>(`/api/v1/datanet/metadata/preview/${encodeURIComponent(resourceId)}?limit=${limit}`, { cache: 'no-store' });
+    const raw = await get<{ rows?: Record<string, unknown>[] }>(`${API_BASE}/v1/datanet/metadata/preview/${encodeURIComponent(resourceId)}?limit=${limit}`, { cache: 'no-store' });
     const rawRows = raw?.rows;
     const rows: Record<string, unknown>[] = Array.isArray(rawRows) ? rawRows : [];
     const inferType = (v: unknown): string =>
@@ -263,7 +264,7 @@ export interface DataFieldMeta {
 }
 export async function fetchFields(resourceId: string): Promise<DataFieldMeta[]> {
   try {
-    const raw = await get<unknown>(`/api/v1/datanet/metadata/fields/${encodeURIComponent(resourceId)}`, { cache: 'no-store' });
+    const raw = await get<unknown>(`${API_BASE}/v1/datanet/metadata/fields/${encodeURIComponent(resourceId)}`, { cache: 'no-store' });
     return asArray<DataFieldMeta>(raw);
   } catch (e) {
     console.warn('[data-workbench] fetchFields failed:', e);
@@ -276,7 +277,7 @@ export async function saveMetadataStrategy(datasourceId: string, strategy: strin
   try {
     const body: Record<string, unknown> = { strategy, countMethod };
     if (scheduleCron) body.scheduleCron = scheduleCron;
-    await put(`/api/v1/datanet/metadata/strategy/${encodeURIComponent(datasourceId)}`, body);
+    await put(`${API_BASE}/v1/datanet/metadata/strategy/${encodeURIComponent(datasourceId)}`, body);
     return true;
   } catch (e) {
     console.warn('[data-workbench] saveMetadataStrategy failed:', e);
@@ -287,7 +288,7 @@ export async function saveMetadataStrategy(datasourceId: string, strategy: strin
 /** 获取数据源的物理表/目录列表 → GET /api/v1/datanet/metadata/resources/{datasourceId} */
 export async function fetchDataSourceResources(datasourceId: string): Promise<TableInfo[]> {
   try {
-    const url = `/api/v1/datanet/metadata/resources/${encodeURIComponent(datasourceId)}?_=${Date.now()}`;
+    const url = `${API_BASE}/v1/datanet/metadata/resources/${encodeURIComponent(datasourceId)}?_=${Date.now()}`;
     const raw = await get<unknown>(url, { cache: 'no-store' });
     return asArray<Record<string, unknown>>(raw).map((r: Record<string, unknown>) => ({
       name: (r.resourceName as string) || (r.tableName as string) || (r.name as string) || '',

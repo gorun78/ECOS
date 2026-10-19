@@ -4,6 +4,7 @@
  * @license Apache-2.0
  */
 import { get, postEmpty, LINEAGE_TOPOL } from './_base';
+import { API_BASE } from '../../../services/httpClient';
 
 /** Data Lineage — 查询持久化拓扑（全局表级/字段级血缘全景图） */
 /** 后端 DataLineageService.getTopology 返回 Map（nodes/edges/total_nodes/total_edges/from_db） */
@@ -84,7 +85,7 @@ export async function fetchLineageImpact(
     const params = new URLSearchParams();
     params.set('startNode', startNode);
     params.set('depth', String(depth));
-    const url = '/api/v1/engine/data/lineage/impact?' + params.toString();
+    const url = `${API_BASE}/v1/engine/data/lineage/impact?` + params.toString();
     const data = await get<LineageImpactRaw>(url);
     if (!data) return null;
     const toArr = (v: unknown): LineageImpactNodeRaw[] => (Array.isArray(v) ? (v as LineageImpactNodeRaw[]) : []);
