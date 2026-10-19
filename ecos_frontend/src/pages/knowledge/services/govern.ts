@@ -17,8 +17,10 @@
  *   - retrieval / runEval 5xx → 显式失败态（PRD B.5）
  */
 import { apiFetchData } from '../../../api';
-import { API_BASE } from '../../../services/httpClient';
-import { getAuthToken } from '../../../services/auth';
+// #143/B5-14：seed 上传腿合流到 httpClient 裸响应通道。该通道基头集合 = 「有 token 时仅
+// `Authorization: Bearer …`、无 token 时空对象」，与本腿改前的 `token ? {Authorization} : {}`
+// 逐键相同；且不写 `Content-Type`（multipart 的 boundary 必须由浏览器自己生成）。
+import { API_BASE, rawAuthedUrlFetch } from '../../../services/httpClient';
 import { createSseParser } from '../../../services/sseParser';
 import { kbFetchData, kbSseRequest } from './kbFetch';
 import type {
@@ -242,10 +244,8 @@ export async function kbFetchEvalSeeds(): Promise<EvalSeedQuery[]> {
 export async function uploadEvalSeed(file: File): Promise<{ name: string; count: number }> {
   const fd = new FormData();
   fd.append('file', file);
-  const token = getAuthToken();
-  const res = await fetch(`${KB_V1}/eval/seeds/upload`, {
+  const res = await rawAuthedUrlFetch(`${KB_V1}/eval/seeds/upload`, {
     method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: fd,
   });
   if (!res.ok) throw new Error(`seed upload failed ${res.status}`);

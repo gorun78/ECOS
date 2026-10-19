@@ -4,7 +4,11 @@
  * @license Apache-2.0
  */
 import { get, post } from './_base';
-import { authOnlyHeaders as authHeaders } from '../../../services/auth';
+// #143/B5-14：上传腿合流到 httpClient 裸响应通道（multipart 需未预读体 + 只要身份头）。
+// `authOnlyHeaders()` 与 `rawAuthedUrlFetch` 的基头集合逐键相同（有 token 时仅
+// `Authorization`，无 token 时为空对象），且该通道不写 `Content-Type` —— 浏览器必须
+// 自己带 `multipart/form-data; boundary=…`，单源若补 Content-Type 会让后端丢 boundary。
+import { API_BASE, rawAuthedUrlFetch } from '../../../services/httpClient';
 
 /* ── 即时采集 / 定时采集 ──────────────────────────────────── */
 
@@ -188,9 +192,8 @@ export async function uploadUnstructured(
   );
   fd.set('req', fd.get('req') as Blob, 'req.json');
   try {
-    const res = await fetch('/api/v1/datanet/datalake/unstructured/upload', {
+    const res = await rawAuthedUrlFetch(`${API_BASE}/v1/datanet/datalake/unstructured/upload`, {
       method: 'POST',
-      headers: { ...authHeaders() },
       body: fd,
     });
     const json = await res.json().catch(() => ({ code: res.status, message: `HTTP ${res.status}` }));

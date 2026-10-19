@@ -26,9 +26,10 @@
  *   的「文件级白名单」相比更严，故两者不可互相替代。
  *
  * SSE/流式四腿（`pages/aiworkbench/api.ts`、`pages/knowledge/services/govern.ts`、
- * `services/agentLoopStream.ts`、`services/wagentRunStream.ts`）在此计入基线——
- * 它们的帧序已由 #143/B5-2~B5-5b 收口至单源，但传输腿仍是裸 fetch，
- * 归本门渐进收敛（不因「另有 SSE 门」而豁免，否则判据出现洞）。
+ * `services/agentLoopStream.ts`、`services/wagentRunStream.ts`）曾在此占基线——
+ * 帧序由 #143/B5-2~B5-5b 收口后，传输腿仍逐条计入本门（不因「另有 SSE 门」而豁免，
+ * 否则判据出现洞）。四条已于 #143/B5-13（三条流式腿 → `rawStreamUrlFetch`）与
+ * #143/B5-14（govern 的 seed 上传腿 → `rawAuthedUrlFetch`）全部剪除，基线归零。
  *
  * 页面域三腿（#143/B5-11g）的合流口径：三处原本写 `fetch(url, { headers: authHeaders() })`，
  * 而 `authHeaders()` 含 `Content-Type: application/json`、`rawAuthedUrlFetch` 的单源底头
@@ -66,6 +67,23 @@
  * 零语义变化授权面 ⇒ 新通道只做拼头+发请求+原样抛错（详见该通道文档注释）
  * ⇒ 7/7 → **4 文件 / 4 命中行**
  * （同批实跑校验：改前先跑一次本门读出实测值 4/4，再剪基线，非推算）。
+ * #143/B5-14 剪除 `pages/data-workbench/api/unstructured.ts`(1) +
+ * `pages/knowledge/services/govern.ts`(1) 两条 **multipart 上传腿**（合流
+ * `rawAuthedUrlFetch`）⇒ 4/4 → **2 文件 / 2 命中行**
+ * （同批实跑校验：改前先跑一次本门读出实测值「合计 2 文件 / 2 命中行 + 两条陈旧豁免」，
+ * 再剪基线，非推算）。multipart 腿的取舍注记：该通道底头**只有** Authorization、
+ * 刻意不设 `Content-Type`，与两腿改前的头集合逐键相同（一条经 `authOnlyHeaders()`、
+ * 一条经 `token ? {Authorization} : {}`，两者实现在 `services/auth#authOnlyHeaders`
+ * 与 `authHeaders.guard` 用例里钉死为「有 token 只带 Authorization / 无 token 空对象」）；
+ * 反之若在单源补 `Content-Type: application/json`，浏览器就不会再生成
+ * `multipart/form-data; boundary=…`，后端解不了 form ⇒ 本批两腿**不许**顺手补头。
+ * 与流式腿不同，这两条走带 PMO-43 归一的通道是有意的：上传失败面原本就以
+ * `catch → {ok:false, error}` / 裸 `TypeError` 上抛，归一只把文案换成
+ * `NetworkError` 口径并补上全局掉线广播（PMO-43 对全部 HTTP 的平台契约），
+ * 不改响应体解析与成功面。
+ * 余 2 条 = `services/capabilityClient.ts` + `services/scenarioActionClient.ts`，
+ * 两条是「域内自设网络分态 + 自持会话副作用」的整域基座（不是单条腿），
+ * 合流前需先裁决该域的网络分类与会话副作用归属（台账 §13.2.4 C2′ 注余项②）。
  *
  * `services/engineProbeApi.ts` 的处置 = **下线，不是收口**（判据口径要写清，
  * 否则后来者会以为那两条腿被合流了）：全仓取证（ripgrep，排除 node_modules/target）
@@ -97,8 +115,6 @@ const CANONICAL = 'services/httpClient.ts';
  * 值 = 该文件允许的最大命中行数，剪项/降数必须与该文件的真实收口同批。
  */
 const BASELINE: Readonly<Record<string, number>> = Object.freeze({
-  'pages/data-workbench/api/unstructured.ts': 1,
-  'pages/knowledge/services/govern.ts': 1,
   'services/capabilityClient.ts': 1,
   'services/scenarioActionClient.ts': 1,
 });
@@ -197,8 +213,8 @@ describe('privateTransportRatchet — C2′ 私设传输棘轮门 (#143/B5-11a)'
 
   it('基线自身可校验：条目数与合计命中上限与文档口径一致', () => {
     const entries = Object.entries(BASELINE);
-    expect(entries.length).toBe(4);
-    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(4);
+    expect(entries.length).toBe(2);
+    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(2);
     // 键必须是 POSIX 相对路径且非基线外文件形态
     for (const [rel] of entries) {
       expect(rel.startsWith('./')).toBe(false);
