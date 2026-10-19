@@ -20,6 +20,7 @@ import {
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
 import { apiFetchData } from "../api";
+import { API_BASE } from "../services/httpClient";
 import ErrorBoundary from "../components/common/ErrorBoundary";
 
 // ── Types ──────────────────────────────────────────────────────
@@ -157,8 +158,8 @@ export default function TelemetryViewer() {
     setError("");
     try {
       const [healthData, tracesData] = await Promise.all([
-        apiFetchData<HealthData>("/api/telemetry/health"),
-        apiFetchData<TraceSummary[]>("/api/telemetry/traces?limit=20"),
+        apiFetchData<HealthData>(`${API_BASE}/telemetry/health`),
+        apiFetchData<TraceSummary[]>(`${API_BASE}/telemetry/traces?limit=20`),
       ]);
       setHealth(healthData);
       setTraces(Array.isArray(tracesData) ? tracesData : []);
@@ -185,7 +186,7 @@ export default function TelemetryViewer() {
     setDetailLoading(true);
     setDetailError("");
     try {
-      const detail = await apiFetchData<TraceDetail>(`/api/telemetry/traces/${traceId}`);
+      const detail = await apiFetchData<TraceDetail>(`${API_BASE}/telemetry/traces/${traceId}`);
       setTraceDetail(detail);
     } catch (e: any) {
       // 报告 G-21：详情失败曾静默吞掉后冒充 noSpanData —— 现在是显式错误态 + 重试

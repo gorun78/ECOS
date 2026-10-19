@@ -7,7 +7,7 @@
  * MentalReviewTab 1）、`pages/workbench/` 两个（index 1 + [scenarioId]/index 1）、
  * 根侧 `ScenarioManagementView.tsx` 6。至此 `pages/scenario` 整域 **15** 个生产文件与
  * `pages/workbench` 整域 **20** 个生产文件零私设基址（后者 `NewScenarioModal.tsx` 一枚派生态
- * 系 #143/B5-11h 既有，非本批）。</p>
+ * 系 #143/B5-6 既有（`git log -S API_BASE` 实跑读出），非本批）。</p>
  *
  * <p>派生只有一种正确性可证：**运行期面值逐字不变**。故本门把每个派生点按 `API_BASE` 实际值
  * 还原成字符串，与改前快照（17 条，2026-10-19 自 `git show HEAD:` 实跑读出，非手抄）做排序

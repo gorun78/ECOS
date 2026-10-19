@@ -12,6 +12,7 @@ import { Globe, Box, Database, Layers, Plus, Pencil, Trash2, X, Save, Loader2 } 
 import { useTheme } from '../ThemeContext';
 import { useLanguage } from '../LanguageContext';
 import { ontologyDomainApiFetch as apiFetch } from '../../services/ontologyWorkbenchApi';
+import { API_BASE } from '../../services/httpClient';
 
 // ── 本体 → 图标映射 ──
 const ONTOLOGY_ICONS: Record<string, React.FC<{ className?: string }>> = {
@@ -20,8 +21,8 @@ const ONTOLOGY_ICONS: Record<string, React.FC<{ className?: string }>> = {
 };
 
 // ── API helpers ──
-const ONTOLOGY_API = '/api/v1/ecos/ontologies';
-const ENTITY_API = '/api/v1/ecos/ontologies'; // {ontologyId}/entities
+const ONTOLOGY_API = `${API_BASE}/v1/ecos/ontologies`;
+const ENTITY_API = `${API_BASE}/v1/ecos/ontologies`; // {ontologyId}/entities
 
 async function fetchOntologies(): Promise<OntologyItem[]> {
   return apiFetch(ONTOLOGY_API);

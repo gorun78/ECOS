@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../components/LanguageContext';
 import { showToastGlobal } from '../../components/common/Toast';
 import { apiFetch } from '../../api';
+import { API_BASE } from '../../services/httpClient';
 import { CopilotPanel } from '../../components/CopilotPanel';
 import { useTheme } from '../../components/ThemeContext';
 
@@ -96,10 +97,10 @@ export default function BusinessWorkbenchLayout({
     try {
       // Try loading from backend API
       const [objectsResp, linksResp, actionsResp, domainsResp] = await Promise.allSettled([
-        apiFetch('/api/v1/ecos/ontologies') as Promise<any>,
-        apiFetch('/api/v1/ecos/relationships') as Promise<any>,
-        apiFetch('/api/v1/ecos/actions') as Promise<any>,
-        apiFetch('/api/v1/ecos/domains') as Promise<any>,
+        apiFetch(`${API_BASE}/v1/ecos/ontologies`) as Promise<any>,
+        apiFetch(`${API_BASE}/v1/ecos/relationships`) as Promise<any>,
+        apiFetch(`${API_BASE}/v1/ecos/actions`) as Promise<any>,
+        apiFetch(`${API_BASE}/v1/ecos/domains`) as Promise<any>,
       ]);
 
       // Use seed data as fallback, merge API data if available

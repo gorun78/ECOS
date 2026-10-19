@@ -24,6 +24,13 @@
  * 唯一幸存的裸面重复族 = `/v1/ecos/ontologies`（OntologyDomainPanel 2 处 + BusinessWorkbenchLayout 1 处，
  * 两文件均在 api-base 基线内、属后续批）。dupRawOnly 5→1 正是上一批登记的机制的反向实证：
  * 族内裸面属主数而非条数决定可见性，一批可以只挪 17 条却抹掉 4 个族的旧判据可见性。
+ * #143/B5-24 复跑 = 680 / 258 / 裸面 **46** / 派生面 **288**（和仍 334）/ dupBoth 30 / dupRawOnly **0** /
+ * blind **30**：本批把 AI/工作台散点域 4 文件 11 处裸面派生化，其中 `/v1/ecos/ontologies` 那一族的
+ * 两个裸面属主（OntologyDomainPanel 2 处 + BusinessWorkbenchLayout 1 处）**同批全转** ⇒ 旧判据视野
+ * 里的最后一族消失，**dupRawOnly 面归零、盲区 30/30**。这不是好消息而是该缺陷的完成态：D-B5-40 登记的
+ * 「只认引号形态的判据对派生态不可见」至此对全部 30 个重复族成立——它们在生产代码里仍在双写，
+ * 但 12 个引号形态门**一族都看不见**。裸面只剩 46 点且每族至多一个裸面属主，即旧口径的重复面已被
+ * C1 进度清空；自此本门是这条腿的唯一守卫，后继批的 dupBoth 减才代表存量债真收敛（不是旧判据变瞎）。
  * 三个 pin 随批更新，读的是当批实测而非建门批快照。逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。
@@ -237,10 +244,12 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // C1 每收口一批，只认裸形态的旧判据就更瞎，不是本门放松。
     // #143/B5-22 dupRawOnly/blind 未动（归因见文件头）。#143/B5-23：场景域页面 17 处派生化一次抹掉
     // 四族的裸面可见性 ⇒ dupRawOnly 5 → **1**、盲区 25 → **29**；dupBoth 仍 30（基线不动、无陈旧豁免）。
+    // #143/B5-24：散点域 11 处派生化把幸存最后一族 `/v1/ecos/ontologies` 的两个裸面属主同批转尽
+    // ⇒ dupRawOnly 1 → **0**、盲区 29 → **30**（= dupBoth 全集）；dupBoth 仍 30、基线不动。
     expect(dupBoth.size).toBe(30);
-    expect(dupRawOnly.size).toBe(1);
+    expect(dupRawOnly.size).toBe(0);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(29);
+    expect(blind.length).toBe(30);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);

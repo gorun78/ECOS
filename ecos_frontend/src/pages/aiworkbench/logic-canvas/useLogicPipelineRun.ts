@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import { apiFetchData } from '../../../api';
+import { API_BASE } from '../../../services/httpClient';
 import { useLanguage } from '../../../components/LanguageContext';
 import type { AIPLogicPipeline, LogicNodeData, LogicEdgeData, LogicNodeStatus } from '../../../types/aiworkbench';
 import { topologicalSort } from './graph';
@@ -88,7 +89,7 @@ export default function useLogicPipelineRun({
     let execId = '';
     try {
       const exec = await apiFetchData<BackendPipelineExec & { executionId?: string }>(
-        `/api/v1/aip/studio/pipelines/${encodeURIComponent(selectedPipeline.id)}/execute`,
+        `${API_BASE}/v1/aip/studio/pipelines/${encodeURIComponent(selectedPipeline.id)}/execute`,
         { method: 'POST', body: JSON.stringify(inputParams) }
       );
       execId = (exec && (exec as BackendPipelineExec).executionId) || '';
@@ -114,7 +115,7 @@ export default function useLogicPipelineRun({
       if (ac.signal.aborted) return;
       try {
         const res = await apiFetchData<BackendPipelineExec>(
-          `/api/v1/aip/studio/pipelines/${encodeURIComponent(execId)}/executions`,
+          `${API_BASE}/v1/aip/studio/pipelines/${encodeURIComponent(execId)}/executions`,
           { signal: ac.signal }
         );
         if (!res) return;

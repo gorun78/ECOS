@@ -105,7 +105,17 @@
  * ScenarioManagementView 6）改由 `API_BASE` 派生，形态拆分 = 单引号 6 + **反引号 11** + 双引号 0。
  * 域级取证门 `pages/__tests__/scenarioWorkbenchBaseSingleSource.spec.ts` 递归扫
  * `pages/scenario` 15 个与 `pages/workbench` 20 个生产文件判零私设基址（后者 NewScenarioModal
- * 一枚派生态系 #143/B5-11h 既有，非本批）。28 → 20 枚系实跑读出后剪除。
+ * 一枚派生态系 #143/B5-6 既有（`git log -S API_BASE` 实跑读出），非本批）。28 → 20 枚系实跑读出后剪除。
+ * 2026-10-19 #143/B5-24 收口减 4：**工作台散点**四个基线在册文件代码行私设基址 **11 处**
+ * （`pages/business-workbench/BusinessWorkbenchLayout.tsx` 4 + `components/ontology-workbench/
+ * OntologyDomainPanel.tsx` 2 + `pages/aiworkbench/logic-canvas/useLogicPipelineRun.ts` 2 +
+ * `pages/TelemetryViewer.tsx` 3）改由 `API_BASE` 派生，形态拆分 = 单引号 6 + 反引号 3 + **双引号 2**
+ * （本波首次出现双引号腿：`apiFetchData<HealthData>("/api/telemetry/health")` 两条，只吃单引号的
+ * 判据会放过）。另注：`TelemetryViewer` 三条腿是**无版本段** `/api/telemetry/…`（不带 `v1/`），
+ * 双形态棘轮门按 `startsWith('/v1/')` 收族故不在族面内，但 C1 判据对它们可见⇒仍须收口。
+ * 批级门 `__tests__/workbenchScatterBaseSingleSource.spec.ts` 另判 `pages/business-workbench` 38 个与
+ * `components/ontology-workbench` 14 个生产文件整域零私设基址；`pages/aiworkbench` 尚有 `api.ts`
+ * 27 处⇒该域本批不宣称闭合。20 → 16 枚系实跑读出后剪除。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -121,18 +131,14 @@ const CANONICAL = 'services/httpClient.ts';
 
 /** 基线（存量登记，2026-10 拆分 ontologyApi 后全量实测；只减不增）。 */
 const BASELINE = new Set([
-  'components/ontology-workbench/OntologyDomainPanel.tsx',
   'hooks/useBindingCatalog.ts',
   'pages/ContractManager.tsx',
   'pages/DataAssetsDashboard.tsx',
   'pages/DataLineage.tsx',
   'pages/ProjectTracker.tsx',
-  'pages/TelemetryViewer.tsx',
   'pages/TenantManager.tsx',
   'pages/TokenDashboard.tsx',
   'pages/aiworkbench/api.ts',
-  'pages/aiworkbench/logic-canvas/useLogicPipelineRun.ts',
-  'pages/business-workbench/BusinessWorkbenchLayout.tsx',
   'pages/data-quality/api/_base.ts',
   'pages/knowledge/pages/ExtractionPage.tsx',
   'pages/knowledge/pages/components/govern/RuleRepoTable.tsx',
