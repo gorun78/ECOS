@@ -104,7 +104,14 @@ describe('COG-IA 认知四件套唯一入口（B.0 入口归一）', () => {
       const code = stripComments(fs.readFileSync(path.join(panelDir, f), 'utf8'));
       expect(code, `${f} 不得调用 workspace 历史认知路径`).not.toMatch(/\/workspace\/scenarios\/[^"'`]*cognitive/);
     }
-    expect(read('services/cognitiveClient.ts')).toContain('/api/v1/business/scenarios');
+    // #143/B5-19（D-B5-40 收口）：原判据 `toContain('/api/v1/business/scenarios')` 在
+    // cognitiveClient.ts 里只能命中注释行（:5/:82/:91），代码行 :83 早已是
+    // `${API_BASE}/v1/business/scenarios` 派生态 ⇒ 该 leg 靠注释保绿 = 死判据。
+    // 改为剥注释后的双形态匹配：裸字面量 ∨ API_BASE 派生态，两种写法都算单源正主。
+    expect(
+      stripComments(read('services/cognitiveClient.ts')),
+      'cognitiveClient.ts 代码行必须含 /v1/business/scenarios 基址（裸形态或 ${API_BASE} 派生态）',
+    ).toMatch(/(?:["'`]\/api\/v1\/business\/scenarios|\$\{API_BASE\}\/v1\/business\/scenarios)/);
   });
 });
 
