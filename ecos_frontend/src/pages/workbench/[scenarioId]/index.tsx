@@ -17,6 +17,7 @@ import { useLanguage } from '../../../components/LanguageContext';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
 import { useCognition } from '../../../hooks/useCognition';
 import { apiFetchData } from '../../../api';
+import { API_BASE } from '../../../services/httpClient';
 import type { OperationEvalRow } from '../../../services/cognitiveClient';
 import {
   isScenarioActionError,
@@ -64,7 +65,7 @@ export default function WorkbenchScenarioDetail() {
     setError(null);
     setNotFound(false);
     setDenied(false);
-    apiFetchData<ScenarioDetailVO>(`/api/v1/workspace/scenarios/${scenarioId}`)
+    apiFetchData<ScenarioDetailVO>(`${API_BASE}/v1/workspace/scenarios/${scenarioId}`)
       .then((d) => {
         if (!cancelled) setScenario(d);
       })

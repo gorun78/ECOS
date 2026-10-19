@@ -13,6 +13,7 @@ import LucideIcon from '../../components/LucideIcon';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 import { apiFetchData } from '../../api';
+import { API_BASE } from '../../services/httpClient';
 import { showToastGlobal } from '../../components/common/Toast';
 import { formatNum, formatTime, type MentalReviewResult } from './mentalTypes';
 
@@ -44,7 +45,7 @@ export default function MentalReviewTab() {
     setLoading(true);
     try {
       const data = await apiFetchData<MentalReviewResult>(
-        `/api/v1/cognitive/mental-reviews?${params.toString()}`
+        `${API_BASE}/v1/cognitive/mental-reviews?${params.toString()}`
       );
       setResult(data);
       showToastGlobal('success', t('scenario.iv.rv.queryOk'));

@@ -15,6 +15,7 @@ import { useTheme, type ThemeStyles } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { apiFetchData } from '../../api';
+import { API_BASE } from '../../services/httpClient';
 import logger from '../../services/logger';
 import NewScenarioModal from './NewScenarioModal';
 
@@ -43,7 +44,7 @@ export default function WorkbenchHome() {
     setLoading(true);
     setError(null);
     try {
-      const d = await apiFetchData<ScenarioSummaryVO[]>('/api/v1/workspace/scenarios');
+      const d = await apiFetchData<ScenarioSummaryVO[]>(`${API_BASE}/v1/workspace/scenarios`);
       setScenarios(Array.isArray(d) ? d : []);
       setOffline(false);
     } catch (e) {

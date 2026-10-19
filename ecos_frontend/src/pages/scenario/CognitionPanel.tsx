@@ -12,6 +12,7 @@ import { useTheme, type ThemeStyles } from '../../components/ThemeContext';
 import { showToastGlobal } from '../../components/common/Toast';
 import logger from '../../services/logger';
 import { apiFetchData } from '../../api';
+import { API_BASE } from '../../services/httpClient';
 import type { BusinessScenario } from '../project-workbench/types';
 import CounterfactualTab from './CounterfactualTab';
 import ReplayTab from './ReplayTab';
@@ -152,7 +153,7 @@ export default function CognitionPanel({
   const fetchHistory = useCallback(async () => {
     if (!scenario) return;
     try {
-      const d = await apiFetchData<RunHistoryRow[]>(`/api/v1/workspace/scenarios/${scenario.id}/runs?limit=20`);
+      const d = await apiFetchData<RunHistoryRow[]>(`${API_BASE}/v1/workspace/scenarios/${scenario.id}/runs?limit=20`);
       setHistory(Array.isArray(d) ? d : []);
       setHistoryError(null);
     } catch (e) {
@@ -163,7 +164,7 @@ export default function CognitionPanel({
 
   const fetchModels = useCallback(async () => {
     try {
-      const d = await apiFetchData<CognitiveModelRow[]>('/api/v1/cognitive/models');
+      const d = await apiFetchData<CognitiveModelRow[]>(`${API_BASE}/v1/cognitive/models`);
       setModels(Array.isArray(d) ? d : []);
       setModelsError(null);
     } catch (e) {
@@ -194,7 +195,7 @@ export default function CognitionPanel({
     setResult(null);
     setActiveStepId(null);
     try {
-      const d = await apiFetchData<RunResult>(`/api/v1/workspace/scenarios/${scenario.id}/runs`, {
+      const d = await apiFetchData<RunResult>(`${API_BASE}/v1/workspace/scenarios/${scenario.id}/runs`, {
         method: 'POST',
         body: JSON.stringify({
           runTypes,

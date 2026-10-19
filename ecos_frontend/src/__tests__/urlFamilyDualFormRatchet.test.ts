@@ -15,6 +15,15 @@
  * （`…/pipeline/runs/{}`、`/v1/engine/data/settings`）的另一属主在改前就已是纯派生态（各 raw 0 / der 1，
  * settings 另一属主 EngineMonitor.tsx 系 #143/B5-11g 已派生）⇒ 旧判据视野本来就不含这两族，无族可掉。
  * 登记此归因以防「dupRawOnly 必随裸面总数单调下降」的误推断：它数的是**族内 ≥2 裸面属主**，不是裸面条数。
+ * #143/B5-23 复跑 = 680 / 258 / 裸面 **54** / 派生面 **280**（和仍 334）/ dupBoth 30 / dupRawOnly **1** /
+ * blind **29**：本批把场景域页面 8 文件 17 处裸面派生化，**一次掉出旧判据视野四族**——
+ * `/v1/cognitive/beliefs?domain={}`（OverrideTab + ReplayTab 两属主全转）、`/v1/workspace/scenarios`
+ * （ScenarioManagementView + workbench/index 全转，第三属主 NewScenarioModal.tsx 改前即 r0/d1 纯派生）、
+ * `/v1/workspace/scenarios/{}`（ScenarioManagementView + [scenarioId]/index 全转）、
+ * `/v1/ontology/proposals`（ScenarioManagementView 转后只剩 aiworkbench/api.ts 一个裸面属主）。
+ * 唯一幸存的裸面重复族 = `/v1/ecos/ontologies`（OntologyDomainPanel 2 处 + BusinessWorkbenchLayout 1 处，
+ * 两文件均在 api-base 基线内、属后续批）。dupRawOnly 5→1 正是上一批登记的机制的反向实证：
+ * 族内裸面属主数而非条数决定可见性，一批可以只挪 17 条却抹掉 4 个族的旧判据可见性。
  * 三个 pin 随批更新，读的是当批实测而非建门批快照。逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。
@@ -226,10 +235,12 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // #143/B5-21：data-workbench/api 域 26 处裸面派生化，dupBoth 仍 30，/v1/engine/data/pipeline/runs/{}
     // 只剩 1 个裸面属主 ⇒ dupRawOnly 6 → 5、盲区 24 → 25。这正是 D-B5-40 的预期行为：
     // C1 每收口一批，只认裸形态的旧判据就更瞎，不是本门放松。
+    // #143/B5-22 dupRawOnly/blind 未动（归因见文件头）。#143/B5-23：场景域页面 17 处派生化一次抹掉
+    // 四族的裸面可见性 ⇒ dupRawOnly 5 → **1**、盲区 25 → **29**；dupBoth 仍 30（基线不动、无陈旧豁免）。
     expect(dupBoth.size).toBe(30);
-    expect(dupRawOnly.size).toBe(5);
+    expect(dupRawOnly.size).toBe(1);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(25);
+    expect(blind.length).toBe(29);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);

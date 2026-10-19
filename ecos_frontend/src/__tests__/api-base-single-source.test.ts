@@ -99,6 +99,13 @@
  * 递归扫整域 78 个生产文件（排除 `__tests__` 与 `*.test.*`/`*.spec.*`）判零私设基址——至此
  * 数据工作台域（api/ 子域系 #143/B5-21）整体收口；该门比对面 16 条＝全部裸形态，
  * 因这九文件改前零派生态（与 B5-21 有一条既有上传腿须计入不同）。37 → 28 枚系实跑读出后剪除。
+ * 2026-10-19 #143/B5-23 收口减 8：**场景域页面**八个基线在册文件代码行私设基址 **17 处**
+ * （`pages/scenario/` 五个：CognitionPanel 3 + OverrideTab 2 + ReplayTab 2 + CounterfactualTab 1 +
+ * MentalReviewTab 1；`pages/workbench/` 两个：index 1 + [scenarioId]/index 1；根侧
+ * ScenarioManagementView 6）改由 `API_BASE` 派生，形态拆分 = 单引号 6 + **反引号 11** + 双引号 0。
+ * 域级取证门 `pages/__tests__/scenarioWorkbenchBaseSingleSource.spec.ts` 递归扫
+ * `pages/scenario` 15 个与 `pages/workbench` 20 个生产文件判零私设基址（后者 NewScenarioModal
+ * 一枚派生态系 #143/B5-11h 既有，非本批）。28 → 20 枚系实跑读出后剪除。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -120,7 +127,6 @@ const BASELINE = new Set([
   'pages/DataAssetsDashboard.tsx',
   'pages/DataLineage.tsx',
   'pages/ProjectTracker.tsx',
-  'pages/ScenarioManagementView.tsx',
   'pages/TelemetryViewer.tsx',
   'pages/TenantManager.tsx',
   'pages/TokenDashboard.tsx',
@@ -134,13 +140,6 @@ const BASELINE = new Set([
   'pages/knowledge/tabs/DocumentUploadTab.tsx',
   'pages/knowledge/tabs/GraphBuilderTab.tsx',
   'pages/knowledge/tabs/KnowledgeRuleRepositoryTab.tsx',
-  'pages/scenario/CognitionPanel.tsx',
-  'pages/scenario/CounterfactualTab.tsx',
-  'pages/scenario/MentalReviewTab.tsx',
-  'pages/scenario/OverrideTab.tsx',
-  'pages/scenario/ReplayTab.tsx',
-  'pages/workbench/[scenarioId]/index.tsx',
-  'pages/workbench/index.tsx',
   'providers/graphqlClient.ts',
 ]);
 

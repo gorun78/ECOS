@@ -13,6 +13,7 @@ import LucideIcon from '../../components/LucideIcon';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 import { apiFetchData } from '../../api';
+import { API_BASE } from '../../services/httpClient';
 import { showToastGlobal } from '../../components/common/Toast';
 import {
   formatNum,
@@ -62,7 +63,7 @@ export default function ReplayTab() {
     setLoadingBeliefs(true);
     try {
       const data = await apiFetchData<BeliefDistribution[]>(
-        `/api/v1/cognitive/beliefs?domain=${encodeURIComponent(domainValue)}`
+        `${API_BASE}/v1/cognitive/beliefs?domain=${encodeURIComponent(domainValue)}`
       );
       setBeliefs(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -126,7 +127,7 @@ export default function ReplayTab() {
     setRunning(true);
     try {
       const data = await apiFetchData<CounterfactualResult>(
-        `/api/v1/cognitive/beliefs/${encodeURIComponent(variableValue)}/${encodeURIComponent(version.trim())}/replay?${params.toString()}`
+        `${API_BASE}/v1/cognitive/beliefs/${encodeURIComponent(variableValue)}/${encodeURIComponent(version.trim())}/replay?${params.toString()}`
       );
       setResult(data);
       showToastGlobal('success', t('scenario.iv.rp.runOk'));

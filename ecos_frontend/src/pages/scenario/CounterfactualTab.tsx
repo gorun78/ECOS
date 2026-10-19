@@ -11,6 +11,7 @@ import LucideIcon from '../../components/LucideIcon';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 import { apiFetchData } from '../../api';
+import { API_BASE } from '../../services/httpClient';
 import { showToastGlobal } from '../../components/common/Toast';
 import { formatNum, type CounterfactualResult, type Intervention } from './mentalTypes';
 
@@ -62,7 +63,7 @@ export default function CounterfactualTab() {
 
     setRunning(true);
     try {
-      const data = await apiFetchData<CounterfactualResult>('/api/v1/cognitive/counterfactual', {
+      const data = await apiFetchData<CounterfactualResult>(`${API_BASE}/v1/cognitive/counterfactual`, {
         method: 'POST',
         body: JSON.stringify({
           domain: domainValue,

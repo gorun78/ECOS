@@ -19,6 +19,7 @@ import { useTheme, type ThemeStyles } from '../components/ThemeContext';
 import { CopilotPanel } from '../components/CopilotPanel';
 import GitPanel from '../components/data-workbench/GitPanel';
 import { apiFetchData } from '../api';
+import { API_BASE } from '../services/httpClient';
 import logger from '../services/logger';
 import type { BusinessScenario } from './project-workbench/types';
 import { calcMetrics } from './project-workbench/helpers';
@@ -152,7 +153,7 @@ export default function ScenarioManagementView({
   // ── 场景列表：真实 API（替代 localStorage mock） ──
   const refreshScenarios = async () => {
     try {
-      const d = await apiFetchData<ScenarioApiVO[]>('/api/v1/workspace/scenarios');
+      const d = await apiFetchData<ScenarioApiVO[]>(`${API_BASE}/v1/workspace/scenarios`);
       const list = (Array.isArray(d) ? d : []).map(toVM);
       setScenarios(list);
       if (list.length > 0 && !list.some((s) => s.id === selectedScenarioId)) {
@@ -176,7 +177,7 @@ export default function ScenarioManagementView({
   const fetchProposalsList = async () => {
     setIsLoadingProposals(true);
     try {
-      const d = await apiFetchData<unknown[]>('/api/v1/ontology/proposals');
+      const d = await apiFetchData<unknown[]>(`${API_BASE}/v1/ontology/proposals`);
       setProposals(Array.isArray(d) ? d : []);
       setProposalsError(null);
     } catch (e) {
@@ -201,7 +202,7 @@ export default function ScenarioManagementView({
     try {
       // 零信任身份由后端从 SSO 会话解析；前端不再内联伪造 userRole/userName（F07-22）
       // 网关对每个响应回写 X-Request-Id：经 callJsonWithTrace 透出真实 traceId 进 toast 归因
-      const { traceId } = await callJsonWithTrace(`/api/v1/ontology/proposals/${id}/approve`, { method: 'POST' });
+      const { traceId } = await callJsonWithTrace(`${API_BASE}/v1/ontology/proposals/${id}/approve`, { method: 'POST' });
       toast('success', traceId
         ? t('scenario.proposal.approveOkTrace', { actionId, traceId })
         : t('scenario.proposal.approveOk', { actionId }));
@@ -226,7 +227,7 @@ export default function ScenarioManagementView({
   const handleRejectProposal = async (id: string, actionId: string, reason: string) => {
     setResolvingProposalId(id);
     try {
-      await apiFetchData(`/api/v1/ontology/proposals/${id}/reject`, {
+      await apiFetchData(`${API_BASE}/v1/ontology/proposals/${id}/reject`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
       });
@@ -338,13 +339,13 @@ export default function ScenarioManagementView({
     };
     try {
       if (wizardScenarioId) {
-        await apiFetchData(`/api/v1/workspace/scenarios/${wizardScenarioId}`, {
+        await apiFetchData(`${API_BASE}/v1/workspace/scenarios/${wizardScenarioId}`, {
           method: 'PUT',
           body: JSON.stringify(body),
         });
         toast('success', t('scenario.cog.saveSuccess', { name: wName }));
       } else {
-        const created = await apiFetchData<{ id: string }>('/api/v1/workspace/scenarios', {
+        const created = await apiFetchData<{ id: string }>(`${API_BASE}/v1/workspace/scenarios`, {
           method: 'POST',
           body: JSON.stringify(body),
         });

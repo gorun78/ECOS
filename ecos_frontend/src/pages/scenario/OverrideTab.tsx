@@ -11,6 +11,7 @@ import LucideIcon from '../../components/LucideIcon';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 import { apiFetchData } from '../../api';
+import { API_BASE } from '../../services/httpClient';
 import { showToastGlobal } from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { formatNum, type BeliefDistribution } from './mentalTypes';
@@ -58,7 +59,7 @@ export default function OverrideTab() {
     setLoading(true);
     try {
       const data = await apiFetchData<BeliefDistribution[]>(
-        `/api/v1/cognitive/beliefs?domain=${encodeURIComponent(domainValue)}`
+        `${API_BASE}/v1/cognitive/beliefs?domain=${encodeURIComponent(domainValue)}`
       );
       setBeliefs(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -123,7 +124,7 @@ export default function OverrideTab() {
     setSubmitting(true);
     try {
       await apiFetchData<BeliefDistribution>(
-        `/api/v1/cognitive/beliefs/${encodeURIComponent(variable.trim())}/override`,
+        `${API_BASE}/v1/cognitive/beliefs/${encodeURIComponent(variable.trim())}/override`,
         {
           method: 'POST',
           body: JSON.stringify({
