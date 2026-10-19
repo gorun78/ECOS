@@ -38,13 +38,26 @@ describe("ai › 前端不再自填主体身份（F06-19-7 / X-82 safeguard）",
     expect(slice).not.toMatch(/tenantId\s*:\s*['"]/);
   });
 
-  it("oagPlaygroundStream 鉴权头走 authHeaders()（token 单源）", () => {
+  /**
+   * #143/B5-13 形态订正（判据意图不变、指纹换形）：本门原断言
+   * `import { authHeaders } from '../../services/auth'` + 腿内 `authHeaders()`，
+   * 而该形态已被「传输合流」取代——流式腿改调 httpClient 具名通道，Bearer 在单源内拼。
+   * 若只把断言删掉，本门就退化成「没人自填」的空门；故改成钉三段可核事实：
+   * ① 腿内不出现裸 `fetch(`（传输在单源）；② 腿内不出现 `Authorization`（身份不在域内造）；
+   * ③ 单源通道本体确实从 `services/auth#getAuthToken()` 取号（防止「换个地方自填」）。
+   */
+  it("oagPlaygroundStream 鉴权走 token 单源（#143/B5-13 起经具名流式通道）", () => {
     const apiSrc = readFileSync(join(AI_DIR, "api.ts"), "utf8");
-    expect(apiSrc).toContain("import { authHeaders } from '../../services/auth'");
+    expect(apiSrc).not.toMatch(/[^A-Za-z0-9_.$-]fetch\s*\(/);
+    expect(apiSrc).not.toMatch(/Authorization\s*[:=]/);
     const slice = apiSrc
       .split("export async function")
       .filter((p) => p.trimStart().startsWith("oagPlaygroundStream"))[0];
-    expect(slice).toContain("authHeaders()");
+    expect(slice).toContain("rawStreamUrlFetch(");
+
+    const httpSrc = readFileSync(join(SRC_ROOT, "src/services/httpClient.ts"), "utf8");
+    const channel = httpSrc.slice(httpSrc.indexOf("export async function rawStreamUrlFetch"));
+    expect(channel.slice(0, channel.indexOf("\n}"))).toMatch(/getAuthToken\(\)/);
   });
 
   it("全 AI 面源码无 userId/tenantId 字符串字面量自填（护栏）", () => {

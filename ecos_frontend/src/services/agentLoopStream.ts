@@ -19,8 +19,7 @@
  * @license Apache-2.0
  */
 
-import { API_BASE } from "./httpClient";
-import { authHeaders } from "./auth";
+import { API_BASE, rawStreamUrlFetch } from "./httpClient";
 import { createSseParser, decodeFrameData } from "./sseParser";
 import {
   SSE_FALLBACK_THRESHOLD,
@@ -159,15 +158,17 @@ export async function streamAgentLoopChat(
   const url =
     `${API_BASE}${AGENT_LOOP_CHAT_REL_PATH}` +
     (request.thread ? `?thread=${encodeURIComponent(request.thread)}` : "");
+  // 头集合与改前 `{...authHeaders(), Accept}` 逐键一致：Authorization 由单源拼，
+  // Content-Type 是改前 authHeaders() 的既有键 ⇒ 必须在此显式补回（不新增、不删除键）。
   const headers: Record<string, string> = {
-    ...authHeaders(),
+    "Content-Type": "application/json",
     Accept: SSE_ACCEPT,
   };
   if (request.lastEventId) headers["Last-Event-ID"] = request.lastEventId;
 
   let res: Response;
   try {
-    res = await fetch(url, {
+    res = await rawStreamUrlFetch(url, {
       method: "POST",
       headers,
       body: JSON.stringify({

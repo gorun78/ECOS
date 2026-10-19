@@ -19,8 +19,13 @@ import {
 } from "./agentLoopStream";
 import { AGENT_LOOP_FRAME_ORDER, SSE_FALLBACK_THRESHOLD } from "./sseFrames";
 
+// #143/B5-13 形态订正：本腿传输已合流到 httpClient 的具名流式通道 ⇒ Bearer 拼接从域内
+// `authHeaders()` 移到单源内的 `getAuthToken()`。桩只供 authHeaders 会让单源拿到 undefined
+// 的 getAuthToken，在 fetch 之前就抛 TypeError ⇒ 全部用例塌成 transport 假红（实跑读出）。
 vi.mock("./auth", () => ({
-  authHeaders: () => ({ Authorization: "Bearer test-token" }),
+  authHeaders: () => ({ "Content-Type": "application/json", Authorization: "Bearer test-token" }),
+  getAuthToken: () => "test-token",
+  clearAuthSession: (): void => undefined,
 }));
 
 const encoder = new TextEncoder();

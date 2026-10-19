@@ -487,23 +487,56 @@ export async function rawAnonUrlFetch(url: string, options?: RequestInit): Promi
 }
 
 /**
- * 两条裸响应通道的共用内核：只负责拼头 + 发请求 + PMO-43 网络态归一，
- * **不做 401/403 副作用、不解析响应体**（返回未消费的 `Response`，供流式/二进制腿 `getReader()`/`blob()`）。
+ * SSE/流式腿专用具名通道 — 与 `rawAuthedUrlFetch` 同一份 Bearer 拼接与逐键合并头，
+ * **唯一差别 = 不套 PMO-43 网络态归一**。
+ *
+ * <p>为什么流式腿必须另开一条不归一化的通道（而不是复用 `rawAuthedUrlFetch`）：
+ * 归一化对调用方改写了两件事，且两件都不是「传输合流」的零语义变化授权范围——
+ * ① 错误对象经 `toNetworkError` 转换后，调用方的 `isAbortError(e)` 不再认得用户主动中止
+ * ⇒ 流结局四分类里的 `aborted` 会被误判成 `transport`；
+ * ② `markNetworkDown()` + `notifyNetworkDown()` 把「一次流被取消/自然断开」广播成**全局掉线**
+ * （跨组件副作用，含 ecos-network-down 监听面）。
+ * 本通道只做「拼头 + 发请求 + 原样抛错」，失败分态仍由流式调用方自持；
+ * 全仓 grep `rawStreamUrlFetch` 即流式传输面清单（与 `rawAnonUrlFetch` 同一收口口径）。</p>
+ */
+export async function rawStreamUrlFetch(url: string, options?: RequestInit): Promise<Response> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return sendUrlFetch(url, headers, options);
+}
+
+/**
+ * 裸响应通道的共用传输体：只负责拼头（调用方 headers 逐键覆盖 baseHeaders）+ 发请求，
+ * **不做 401/403 副作用、不解析响应体、不改写错误对象**
+ * （返回未消费的 `Response`，供流式/二进制腿 `getReader()`/`blob()`）。
+ */
+async function sendUrlFetch(
+  url: string,
+  baseHeaders: Record<string, string>,
+  options?: RequestInit,
+): Promise<Response> {
+  const initHeaders = options?.headers;
+  return fetch(url, {
+    ...options,
+    headers: initHeaders
+      ? { ...baseHeaders, ...(initHeaders as Record<string, string>) }
+      : baseHeaders,
+  });
+}
+
+/**
+ * `sendUrlFetch` + PMO-43 网络态归一（掉线广播 + 错误对象转 `NetworkError`）。
+ * 供 `rawAuthedUrlFetch` / `rawAnonUrlFetch` 两条非流式裸响应通道共用。
  */
 async function rawUrlFetch(
   url: string,
   baseHeaders: Record<string, string>,
   options?: RequestInit,
 ): Promise<Response> {
-  const initHeaders = options?.headers;
   let res: Response;
   try {
-    res = await fetch(url, {
-      ...options,
-      headers: initHeaders
-        ? { ...baseHeaders, ...(initHeaders as Record<string, string>) }
-        : baseHeaders,
-    });
+    res = await sendUrlFetch(url, baseHeaders, options);
   } catch (e) {
     markNetworkDown();
     await notifyNetworkDown(e);

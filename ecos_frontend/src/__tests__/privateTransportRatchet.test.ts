@@ -58,6 +58,14 @@
  * 另两条原本经 `authHeaders()`/显式字面量发 `Content-Type` ⇒ 逐腿补回）
  * + `services/engineProbeApi.ts`(2) ⇒ 11/12 → **7 文件 / 7 命中行**
  * （同批实跑校验：改前先跑一次本门读出实测值 7/7，再剪基线，非推算）。
+ * #143/B5-13 剪除 `pages/aiworkbench/api.ts`(1) + `services/agentLoopStream.ts`(1)
+ * + `services/wagentRunStream.ts`(1) 三条 **SSE 流式腿**：合流走新增具名通道
+ * `rawStreamUrlFetch` 而**不是** `rawAuthedUrlFetch`——流式调用方自持
+ * `aborted`/`transport`/`contract` 分态，PMO-43 网络归一化会把用户主动中止误判成
+ * 网络故障、并把一次流断开广播成全局掉线（跨组件副作用），二者都超出「传输合流」的
+ * 零语义变化授权面 ⇒ 新通道只做拼头+发请求+原样抛错（详见该通道文档注释）
+ * ⇒ 7/7 → **4 文件 / 4 命中行**
+ * （同批实跑校验：改前先跑一次本门读出实测值 4/4，再剪基线，非推算）。
  *
  * `services/engineProbeApi.ts` 的处置 = **下线，不是收口**（判据口径要写清，
  * 否则后来者会以为那两条腿被合流了）：全仓取证（ripgrep，排除 node_modules/target）
@@ -82,17 +90,17 @@ const CANONICAL = 'services/httpClient.ts';
 
 /**
  * 基线（存量登记，#143/B5-11h 收口 SyncTab + InlineSqlConsole + AgentStudioView
- * 三腿并下线零消费者的 engineProbeApi 后实测 7 文件 / 7 命中行；只减不增）。
+ * 三腿并下线零消费者的 engineProbeApi 后实测 7 文件 / 7 命中行；
+ * #143/B5-13 收口 SSE 流式三腿（`pages/aiworkbench/api.ts` 的 `oagPlaygroundStream`、
+ * `services/agentLoopStream.ts`、`services/wagentRunStream.ts`，改走新增具名通道
+ * `rawStreamUrlFetch`）后实测 **4 文件 / 4 命中行**；只减不增）。
  * 值 = 该文件允许的最大命中行数，剪项/降数必须与该文件的真实收口同批。
  */
 const BASELINE: Readonly<Record<string, number>> = Object.freeze({
-  'pages/aiworkbench/api.ts': 1,
   'pages/data-workbench/api/unstructured.ts': 1,
   'pages/knowledge/services/govern.ts': 1,
-  'services/agentLoopStream.ts': 1,
   'services/capabilityClient.ts': 1,
   'services/scenarioActionClient.ts': 1,
-  'services/wagentRunStream.ts': 1,
 });
 
 /** 私设传输判据：裸 fetch / 私设 WebSocket / XHR / axios。 */
@@ -189,8 +197,8 @@ describe('privateTransportRatchet — C2′ 私设传输棘轮门 (#143/B5-11a)'
 
   it('基线自身可校验：条目数与合计命中上限与文档口径一致', () => {
     const entries = Object.entries(BASELINE);
-    expect(entries.length).toBe(7);
-    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(7);
+    expect(entries.length).toBe(4);
+    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(4);
     // 键必须是 POSIX 相对路径且非基线外文件形态
     for (const [rel] of entries) {
       expect(rel.startsWith('./')).toBe(false);

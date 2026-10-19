@@ -9,9 +9,8 @@
  * @license Apache-2.0
  */
 import { apiFetchData } from '../../api';
-import { API_BASE } from '../../services/httpClient';
+import { API_BASE, rawStreamUrlFetch } from '../../services/httpClient';
 import { createSseParser, decodeFrameData, type SseRawEvent } from '../../services/sseParser';
-import { authHeaders } from '../../services/auth';
 import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel, AIPActionType, ExecuteActionResult, AIPAgentTemplate, AIPAgentMetrics, AIPAgentError, AIPAuditLog } from '../../types/aiworkbench';
 
 // ── AgentMesh ──────────────────────────────────────────────────
@@ -485,10 +484,11 @@ interface OagPlaygroundParams {
  * 后端 SSE 事件名：node / response / blocked / error / done。
  */
 export async function oagPlaygroundStream(params: OagPlaygroundParams): Promise<void> {
-  // W206/C188：流式 URL 基址出自 httpClient API_BASE 单源
-  const res = await fetch(`${API_BASE}/v1/oag/chat/stream`, {
+  // W206/C188：流式 URL 基址出自 httpClient API_BASE 单源；#143/B5-13 传输腿合流具名流式通道。
+  // 头集合与改前 `authHeaders()` 逐键一致（Content-Type 是既有键，Authorization 由单源拼）。
+  const res = await rawStreamUrlFetch(`${API_BASE}/v1/oag/chat/stream`, {
     method: 'POST',
-    headers: authHeaders(),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       message: params.message,
       model: params.model,

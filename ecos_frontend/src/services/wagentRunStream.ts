@@ -22,8 +22,7 @@
  * @license Apache-2.0
  */
 
-import { API_BASE } from "./httpClient";
-import { authHeaders } from "./auth";
+import { API_BASE, rawStreamUrlFetch } from "./httpClient";
 import { createSseParser, decodeFrameData } from "./sseParser";
 import {
   SSE_ACCEPT,
@@ -161,12 +160,17 @@ export async function streamWagentRunEvents(
     ackRequired: false,
   };
 
-  const headers: Record<string, string> = { ...authHeaders(), Accept: SSE_ACCEPT };
+  // 头集合与改前 `{...authHeaders(), Accept}` 逐键一致：Authorization 由单源拼，
+  // Content-Type 是改前 authHeaders() 的既有键 ⇒ 必须在此显式补回（不新增、不删除键）。
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: SSE_ACCEPT,
+  };
   if (request.lastEventId) headers["Last-Event-ID"] = request.lastEventId;
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${wagentRunEventsStreamPath(request.runId)}`, {
+    res = await rawStreamUrlFetch(`${API_BASE}${wagentRunEventsStreamPath(request.runId)}`, {
       method: "GET",
       headers,
       signal: request.abortSignal,
