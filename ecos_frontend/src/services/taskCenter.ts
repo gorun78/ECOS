@@ -6,9 +6,9 @@
  */
 
 import { apiFetchData, doFetch } from "../api";
-import { rawAuthedFetch } from "./httpClient";
+import { API_BASE, rawAuthedFetch } from "./httpClient";
 
-const BASE = "/api/v1/task";
+const BASE = `${API_BASE}/v1/task`;
 /** rawAuthedFetch 自带 API_BASE 前缀单源，此处只给「前缀之后」的路径，避免拼成 /api/api/… */
 const AUTHED_PROBE_BASE = "/v1/task";
 
@@ -200,7 +200,7 @@ export const CATEGORY_LABELS: Record<TaskCategory, string> = {
 };
 
 // ── Task Center (S5-1.5) — 自 src/api.ts 迁入，签名与路径不变 (H6-T1) ──
-const TASK_BASE = "/api/v1/task";
+const TASK_BASE = `${API_BASE}/v1/task`;
 
 /** GET /api/v1/task/list — 任务列表 */
 export async function apiTaskList(params?: {

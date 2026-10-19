@@ -1,6 +1,6 @@
 // apiFetchData 直接取自传输原语单源 services/httpClient.ts（不再经 src/api.ts shim，
 // 避免 api ↔ cognitiveEngineApi ↔ cognitiveClient 的求值环；design-05 B.9-1/B.9-2）
-import { apiFetchData } from "./httpClient";
+import { API_BASE, apiFetchData } from "./httpClient";
 import { COGNITIVE_BASE, COGNITIVE_ENGINE_BASE } from "./cognitiveClient";
 
 // 路径常量单源（X-47/X-50 收敛）：`/api/v1/cognitive` 与 `/api/v1/engine/cognitive`
@@ -324,18 +324,18 @@ export async function fetchProvenance(params?: { domain?: string }) {
 // ── World Model ──────────────────────────────────────────
 
 export async function fetchWorldState() {
-  return apiFetchData(`/api/v1/world-model/state`);
+  return apiFetchData(`${API_BASE}/v1/world-model/state`);
 }
 
 export async function runWorldScenarios(body: Record<string, unknown>) {
-  return apiFetchData(`/api/v1/world-model/scenarios`, {
+  return apiFetchData(`${API_BASE}/v1/world-model/scenarios`, {
     method: "POST",
     body: JSON.stringify(body),
   });
 }
 
 export async function recommendStrategy(body: Record<string, unknown>) {
-  return apiFetchData(`/api/v1/world-model/strategy/recommend`, {
+  return apiFetchData(`${API_BASE}/v1/world-model/strategy/recommend`, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -345,7 +345,7 @@ export async function fetchCausalGraph(params?: { domain?: string }) {
   const qs = new URLSearchParams();
   if (params?.domain) qs.set("domain", params.domain);
   const q = qs.toString();
-  return apiFetchData(`/api/v1/world-model/causal-graph${q ? "?" + q : ""}`);
+  return apiFetchData(`${API_BASE}/v1/world-model/causal-graph${q ? "?" + q : ""}`);
 }
 
 // ── Health ───────────────────────────────────────────────
@@ -419,17 +419,17 @@ export async function fetchIndexStatus() {
 
 /** GET /api/agent-mesh/agents — 已注册 Agent 列表 */
 export async function fetchMeshAgents() {
-  return apiFetchData('/api/agent-mesh/agents');
+  return apiFetchData(`${API_BASE}/agent-mesh/agents`);
 }
 
 /** GET /api/agent-mesh/missions — Mission 列表 */
 export async function fetchMeshMissions() {
-  return apiFetchData('/api/agent-mesh/missions');
+  return apiFetchData(`${API_BASE}/agent-mesh/missions`);
 }
 
 /** POST /api/agent-mesh/route-intent — 意图路由 */
 export async function routeIntent(body: { query: string }) {
-  return apiFetchData('/api/agent-mesh/route-intent', {
+  return apiFetchData(`${API_BASE}/agent-mesh/route-intent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -440,7 +440,7 @@ export async function routeIntent(body: { query: string }) {
 
 /** POST /api/v1/guardrails/validate — 内容校验（PII/幻觉/合规） */
 export async function validateGuardrails(body: { content: string }) {
-  return apiFetchData('/api/v1/guardrails/validate', {
+  return apiFetchData(`${API_BASE}/v1/guardrails/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -449,12 +449,12 @@ export async function validateGuardrails(body: { content: string }) {
 
 /** GET /api/v1/guardrails/policies — 护栏策略列表 */
 export async function fetchGuardrailPolicies() {
-  return apiFetchData('/api/v1/guardrails/policies');
+  return apiFetchData(`${API_BASE}/v1/guardrails/policies`);
 }
 
 /** POST /api/v1/guardrails/policies — 新增护栏策略 */
 export async function createGuardrailPolicy(body: Record<string, unknown>) {
-  return apiFetchData('/api/v1/guardrails/policies', {
+  return apiFetchData(`${API_BASE}/v1/guardrails/policies`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -463,7 +463,7 @@ export async function createGuardrailPolicy(body: Record<string, unknown>) {
 
 /** DELETE /api/v1/guardrails/policies/{id} — 删除护栏策略 */
 export async function deleteGuardrailPolicy(id: string) {
-  return apiFetchData(`/api/v1/guardrails/policies/${id}`, { method: 'DELETE' });
+  return apiFetchData(`${API_BASE}/v1/guardrails/policies/${id}`, { method: 'DELETE' });
 }
 
 // ── ActionBridge (ActionBridgeController @ /api/v1/cognitive) ──

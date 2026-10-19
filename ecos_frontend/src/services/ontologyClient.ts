@@ -17,7 +17,7 @@
  *   GET  /api/v1/ontology/functions/audit                   → Function 审计分页
  */
 
-import { apiFetchData } from "./httpClient";
+import { API_BASE, apiFetchData } from "./httpClient";
 
 /** 组装查询串：跳过 undefined/null/空串，值做 URL 编码（fail-closed 参数化）。 */
 function qs(p: Record<string, string | number | undefined>): string {
@@ -125,8 +125,8 @@ export interface MetricBindingDTO {
 
 // ── URL 单源常量 ────────────────────────────────────────────
 
-const CALIBER_BASE = "/api/v1/ontology/calibers";
-const FUNCTION_AUDIT_URL = "/api/v1/ontology/functions/audit";
+const CALIBER_BASE = `${API_BASE}/v1/ontology/calibers`;
+const FUNCTION_AUDIT_URL = `${API_BASE}/v1/ontology/functions/audit`;
 
 // ══════════════════════════════════════════════════
 // §1 口径 Calibers

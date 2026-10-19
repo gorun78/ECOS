@@ -7,6 +7,7 @@
  * @license SPDX-License-Identifier: Apache-2.0
  */
 import { apiFetchData } from "../api";
+import { API_BASE } from "./httpClient";
 import type { AIPLogicPipeline, AIPAgent, AIPModel, AIPGuardrail, AIPAuditLog } from "../types/aiworkbench";
 import {
   fetchPipelineDefinitions,
@@ -84,7 +85,7 @@ export async function fetchPipelines(): Promise<AIPLogicPipeline[]> {
 
 /** Create a new AIP logic pipeline — immutable primary entry, fetched via main entry not here. */
 export async function createPipeline(body: Partial<AIPLogicPipeline>): Promise<AIPLogicPipeline> {
-  return apiFetchData<AIPLogicPipeline>("/api/v1/aip/pipelines", {
+  return apiFetchData<AIPLogicPipeline>(`${API_BASE}/v1/aip/pipelines`, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -92,7 +93,7 @@ export async function createPipeline(body: Partial<AIPLogicPipeline>): Promise<A
 
 /** Update an existing AIP logic pipeline */
 export async function updatePipeline(id: string, body: Partial<AIPLogicPipeline>): Promise<AIPLogicPipeline> {
-  return apiFetchData<AIPLogicPipeline>(`/api/v1/aip/pipelines/${id}`, {
+  return apiFetchData<AIPLogicPipeline>(`${API_BASE}/v1/aip/pipelines/${id}`, {
     method: "PUT",
     body: JSON.stringify(body),
   });
@@ -100,7 +101,7 @@ export async function updatePipeline(id: string, body: Partial<AIPLogicPipeline>
 
 /** Delete an AIP logic pipeline */
 export async function deletePipeline(id: string): Promise<void> {
-  return apiFetchData<void>(`/api/v1/aip/pipelines/${id}`, {
+  return apiFetchData<void>(`${API_BASE}/v1/aip/pipelines/${id}`, {
     method: "DELETE",
   });
 }
@@ -109,12 +110,12 @@ export async function deletePipeline(id: string): Promise<void> {
 
 /** Fetch all AIP agents. Errors propagate (re-throw) — see fetchPipelines. */
 export async function fetchAgents(): Promise<AIPAgent[]> {
-  return apiFetchData<AIPAgent[]>("/api/v1/aip/agents");
+  return apiFetchData<AIPAgent[]>(`${API_BASE}/v1/aip/agents`);
 }
 
 /** Create a new AIP agent */
 export async function createAgent(body: Partial<AIPAgent>): Promise<AIPAgent> {
-  return apiFetchData<AIPAgent>("/api/v1/aip/agents", {
+  return apiFetchData<AIPAgent>(`${API_BASE}/v1/aip/agents`, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -122,7 +123,7 @@ export async function createAgent(body: Partial<AIPAgent>): Promise<AIPAgent> {
 
 /** Update an existing AIP agent */
 export async function updateAgent(id: string, body: Partial<AIPAgent>): Promise<AIPAgent> {
-  return apiFetchData<AIPAgent>(`/api/v1/aip/agents/${id}`, {
+  return apiFetchData<AIPAgent>(`${API_BASE}/v1/aip/agents/${id}`, {
     method: "PUT",
     body: JSON.stringify(body),
   });
@@ -130,7 +131,7 @@ export async function updateAgent(id: string, body: Partial<AIPAgent>): Promise<
 
 /** Delete an AIP agent */
 export async function deleteAgent(id: string): Promise<void> {
-  return apiFetchData<void>(`/api/v1/aip/agents/${id}`, {
+  return apiFetchData<void>(`${API_BASE}/v1/aip/agents/${id}`, {
     method: "DELETE",
   });
 }
@@ -157,7 +158,7 @@ export async function fetchGuardrails(): Promise<AIPGuardrail[]> {
 
 /** Create a new AIP guardrail */
 export async function createGuardrail(body: Partial<AIPGuardrail>): Promise<AIPGuardrail> {
-  return apiFetchData<AIPGuardrail>("/api/v1/aip/guardrails", {
+  return apiFetchData<AIPGuardrail>(`${API_BASE}/v1/aip/guardrails`, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -171,5 +172,5 @@ export async function createGuardrail(body: Partial<AIPGuardrail>): Promise<AIPG
  *  建议调用方迁到 pages/aiworkbench/api 或独立封装)。保留导出名以兼容旧调用。 */
 export async function fetchAuditLogs(): Promise<AIPAuditLog[]> {
   console.warn("legacy api, please use /api/v1/aip/audit-logs directly");
-  return apiFetchData<AIPAuditLog[]>("/api/v1/aip/audit-logs");
+  return apiFetchData<AIPAuditLog[]>(`${API_BASE}/v1/aip/audit-logs`);
 }

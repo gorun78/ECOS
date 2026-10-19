@@ -13,7 +13,7 @@
  * 403 抛 NoAccessError）。all admin-only；调用方用 `isNoAccessError` 感知 403。
  */
 
-import { apiFetchData } from "./httpClient";
+import { API_BASE, apiFetchData } from "./httpClient";
 
 // ── Gateway Diagnostics ─────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ export interface GatewayDiagnostics {
 /** GET /api/v1/system/gateway-diagnostics */
 export async function fetchGatewayDiagnostics(): Promise<GatewayDiagnostics> {
   const data = await apiFetchData<GatewayDiagnostics>(
-    "/api/v1/system/gateway-diagnostics",
+    `${API_BASE}/v1/system/gateway-diagnostics`,
   );
   return {
     artifacts: data.artifacts ?? [],
@@ -120,7 +120,7 @@ export async function fetchMonitorAlerts(params: {
   qs.set("page", String(params.page ?? 1));
   qs.set("size", String(params.size ?? 10));
   const data = await apiFetchData<MonitorAlertPage>(
-    `/api/v1/monitor/alerts?${qs.toString()}`,
+    `${API_BASE}/v1/monitor/alerts?${qs.toString()}`,
   );
   return {
     rows: data.rows ?? [],
@@ -132,7 +132,7 @@ export async function fetchMonitorAlerts(params: {
 
 /** POST /api/v1/monitor/alerts/{id}/ack */
 export async function ackMonitorAlert(id: string): Promise<void> {
-  await apiFetchData(`/api/v1/monitor/alerts/${encodeURIComponent(id)}/ack`, {
+  await apiFetchData(`${API_BASE}/v1/monitor/alerts/${encodeURIComponent(id)}/ack`, {
     method: "POST",
   });
 }
@@ -167,7 +167,7 @@ export async function fetchDlq(params: {
   if (params.status) qs.set("status", params.status);
   qs.set("page", String(params.page ?? 1));
   qs.set("size", String(params.size ?? 10));
-  const data = await apiFetchData<DlqPage>(`/api/v1/monitor/dlq?${qs.toString()}`);
+  const data = await apiFetchData<DlqPage>(`${API_BASE}/v1/monitor/dlq?${qs.toString()}`);
   return {
     rows: data.rows ?? [],
     total: data.total ?? 0,
@@ -178,7 +178,7 @@ export async function fetchDlq(params: {
 
 /** POST /api/v1/monitor/dlq/{id}/replay */
 export async function replayDlq(id: string): Promise<void> {
-  await apiFetchData(`/api/v1/monitor/dlq/${encodeURIComponent(id)}/replay`, {
+  await apiFetchData(`${API_BASE}/v1/monitor/dlq/${encodeURIComponent(id)}/replay`, {
     method: "POST",
   });
 }

@@ -2,7 +2,7 @@
  * 本体工作台 REST 收口 (H6-T2) — 自 ontology-workbench 组件与 BusinessObjectExplorer 迁入。
  * 原语义保持（含各自的错误消息与解包方式）。
  */
-import { doFetch, apiFetchData } from "./httpClient";
+import { API_BASE, doFetch, apiFetchData } from "./httpClient";
 
 /**
  * 本体工作台 REST 收口 (H6-T2) — 自 ontology-workbench 组件与 BusinessObjectExplorer 迁入。
@@ -20,5 +20,5 @@ export function ontologyDomainApiFetch(path: string, options?: RequestInit): Pro
 
 /** GET /api/v1/ontology/data — ok-check + 整包 JSON（normalizeObjectTypes 留在页面层）。 */
 export function fetchOntologyDataJson(): Promise<any> {
-  return doFetch("/api/v1/ontology/data");
+  return doFetch(`${API_BASE}/v1/ontology/data`);
 }

@@ -13,6 +13,7 @@
  */
 
 import { apiFetchData } from "../api";
+import { API_BASE } from "./httpClient";
 import type {
   BulkResource,
   WorkbenchDataField,
@@ -21,7 +22,7 @@ import type {
 // ── 配置常量 ──────────────────────────────────────────────
 
 /** 数据底座 metadata 基础路径 */
-const DATANET_BASE = "/api/v1/datanet/metadata";
+const DATANET_BASE = `${API_BASE}/v1/datanet/metadata`;
 
 // ── 降级错误 ──────────────────────────────────────────────
 

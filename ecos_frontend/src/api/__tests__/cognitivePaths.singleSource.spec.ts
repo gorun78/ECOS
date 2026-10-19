@@ -67,17 +67,36 @@ describe("场景认知路径单源（cognitiveClient.ts 唯一出口）", () => 
     );
   });
 
-  it("全 src 内 `/api/v1/business/scenarios` 路径字面量只允许出现在 services/cognitiveClient.ts", () => {
-    const offenders = walk(SRC_ROOT)
-      .filter((f) => {
-        const code = stripComments(fs.readFileSync(f, "utf8"));
-        return /["'`]\/api\/v1\/business\/scenarios/.test(code);
-      })
-      .map((f) => path.relative(SRC_ROOT, f).replace(/\\/g, "/"));
+  it("全 src 内场景认知路径字面量只允许出现在 services/cognitiveClient.ts（含 API_BASE 派生态）", () => {
+    // #143/B5-18 起 cognitiveClient 的基址改由 httpClient 单源 `API_BASE` 派生（C1 口径），源码里不再
+    // 出现完整 `"/api/v1/business/scenarios"` 字面量。本腿若仍只按「完整字面量」判定，派生会把唯一出口
+    // 本身判成缺席 ⇒ 判据升级为「路径段只允许出现在声明过的属主文件」，同时覆盖裸字面量与派生两种形态，
+    // 比改前更严（第二处即便写成 `${API_BASE}/v1/business/scenarios` 也会被逮）。
+    //
+    // 升级后立刻抓出一处改前判据检不到的文件：`services/scenarioBlueprintClient.ts` 也拼同一资源根。
+    // 经核对后端契约，那是另一族端点（`@RequestMapping("/api/v1/business/scenarios/{scenarioId}/blueprints")`，
+    // 蓝图族自己的唯一出口，页面一律经它取路径），**与本门所管的 cognition 族不是同一条契约**，故按属主
+    // 白名单放行；真正属于本门契约的 cognition 子路径另立一条腿单独收紧，防止别的模块自拼 cognition URL。
+    const ROOT_RE = /(?:["'`]|API_BASE\})\/v1\/business\/scenarios/;
+    const COGNITION_LEG_RE = /(?:["'`]|API_BASE\}|SCENARIO_COGNITION_BASE\})\/v1\/business\/scenarios\/[^"'`\n]*\/cognition/;
+    const ROOT_OWNERS = ["services/cognitiveClient.ts", "services/scenarioBlueprintClient.ts"];
+    const files = walk(SRC_ROOT);
+    const offenders = files
+      .filter((f) => ROOT_RE.test(stripComments(fs.readFileSync(f, "utf8"))))
+      .map((f) => path.relative(SRC_ROOT, f).replace(/\\/g, "/"))
+      .sort();
     expect(
       offenders,
-      `路径字面量应单源于 cognitiveClient.ts，实际还出现在: ${offenders.join(", ")}`,
-    ).toEqual(["services/cognitiveClient.ts"]);
+      `路径段应只出现在已登记属主，实际还出现在: ${offenders.filter((f) => !ROOT_OWNERS.includes(f)).join(", ")}`,
+    ).toEqual(ROOT_OWNERS);
+    const cognitionOwners = files
+      .filter((f) => COGNITION_LEG_RE.test(stripComments(fs.readFileSync(f, "utf8"))))
+      .map((f) => path.relative(SRC_ROOT, f).replace(/\\/g, "/"));
+    expect(
+      cognitionOwners,
+      `cognition 子路径应单源于 cognitiveClient.ts，实际出现在: ${cognitionOwners.join(", ")}`,
+    ).toEqual([]);
+    // cognition 族的唯一出口由本文件首条用例的运行期断言证明（import 后逐字相等），不靠源码形状。
     // 全 src 同步读在并行 worker + 本机负载下可超 vitest 默认 5s ⇒ 显式放宽（与 token 门禁同口径）
   }, 30_000);
 

@@ -14,8 +14,9 @@
  * 路由前缀 `/api` 走 gateway :8080。
  */
 import { apiFetchData } from '../api';
+import { API_BASE } from './httpClient';
 
-const NAV_BASE = '/api/v1/knowledge/nav';
+const NAV_BASE = `${API_BASE}/v1/knowledge/nav`;
 
 /** 目录节点（与 kb_nav_category 列对齐） */
 export interface NavCategoryVO {
@@ -284,7 +285,7 @@ export async function fetchAssetStatuses(ids: string[]): Promise<AssetStatusItem
   }
   const qs = `?ids=${encodeURIComponent(ids.join(','))}`;
   const data = await apiFetchData<{ items?: AssetStatusItem[] } | AssetStatusItem[]>(
-    `/api/v1/knowledge/assets/status${qs}`,
+    `${API_BASE}/v1/knowledge/assets/status${qs}`,
   );
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.items)) return data.items;

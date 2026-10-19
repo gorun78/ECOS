@@ -70,6 +70,13 @@
  * `["']` 去扫会把反引号那 4 处漏成"已收口"，本批实测抓出）。`API_BASE === "/api"` ⇒ 拼接面值
  * 逐字不变；同批该目录（含 #143/B5-11f 已派生的 `ontologyExportApi.ts`）整域残留 0 处。
  * 65 → 57 枚同样系实跑读出后剪除。
+ * 2026-10-19 #143/B5-18 收口减 10：`src/services/` 根十个基线在册文件（aiworkbenchApi /
+ * cognitiveClient / cognitiveEngineApi / dataCatalogClient / gitService / knowledgeNavApi /
+ * ontologyClient / ontologyWorkbenchApi / platformApi / taskCenter）代码行私设基址 **48 处**
+ * 改由 `API_BASE` 派生，形态拆分为双引号 16 + 单引号 7 + **反引号 25**——本批反引号占比过半，
+ * 窄口径 `["']` 只能看到 23 处，是 #143/B5-17 已照登漏扫形状的放大版，故域级取证门
+ * `services/__tests__/servicesRootBaseSingleSource.spec.ts` 把三形态拆分写成快照自校验断言。
+ * `API_BASE === "/api"` ⇒ 48 条面值逐字不变（多重集比对，非眼看）；57 → 47 枚系实跑读出后剪除。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -132,16 +139,6 @@ const BASELINE = new Set([
   'pages/workbench/[scenarioId]/index.tsx',
   'pages/workbench/index.tsx',
   'providers/graphqlClient.ts',
-  'services/aiworkbenchApi.ts',
-  'services/cognitiveClient.ts',
-  'services/cognitiveEngineApi.ts',
-  'services/dataCatalogClient.ts',
-  'services/gitService.ts',
-  'services/knowledgeNavApi.ts',
-  'services/ontologyClient.ts',
-  'services/ontologyWorkbenchApi.ts',
-  'services/platformApi.ts',
-  'services/taskCenter.ts',
 ]);
 
 /** 代码行硬编码 "/api 前缀（引号或反引号后紧跟 /api）。 */

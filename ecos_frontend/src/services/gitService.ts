@@ -18,6 +18,7 @@
  */
 
 import { apiFetchData } from '../api';
+import { API_BASE } from './httpClient';
 
 // ── Helpers ─────────────────────────────────────────────────
 
@@ -41,7 +42,7 @@ function q(repoId: string, extras?: Record<string, string | number>): string {
 
 /** GET /api/v1/ecos/git/status?repoId={repoId} */
 export function fetchStatus<T = any>(repoId: string): Promise<T> {
-  return apiFetchData<T>(`/api/v1/ecos/git/status${q(repoId)}`);
+  return apiFetchData<T>(`${API_BASE}/v1/ecos/git/status${q(repoId)}`);
 }
 
 /** GET /api/v1/ecos/git/commits?repoId={repoId}&limit=N&path=P */
@@ -51,13 +52,13 @@ export function fetchCommits<T = any>(
   limit?: number,
 ): Promise<T> {
   return apiFetchData<T>(
-    `/api/v1/ecos/git/commits${q(repoId, { path, limit })}`,
+    `${API_BASE}/v1/ecos/git/commits${q(repoId, { path, limit })}`,
   );
 }
 
 /** POST /api/v1/ecos/git/commit?repoId={repoId} */
 export function commit<T = any>(repoId: string, data?: any): Promise<T> {
-  return apiFetchData<T>(`/api/v1/ecos/git/commit${q(repoId)}`, {
+  return apiFetchData<T>(`${API_BASE}/v1/ecos/git/commit${q(repoId)}`, {
     method: 'POST',
     body: data ? JSON.stringify(data) : undefined,
     headers: data ? { 'Content-Type': 'application/json' } : undefined,
@@ -66,7 +67,7 @@ export function commit<T = any>(repoId: string, data?: any): Promise<T> {
 
 /** GET /api/v1/ecos/git/branches?repoId={repoId} */
 export function fetchBranches<T = any>(repoId: string): Promise<T> {
-  return apiFetchData<T>(`/api/v1/ecos/git/branches${q(repoId)}`);
+  return apiFetchData<T>(`${API_BASE}/v1/ecos/git/branches${q(repoId)}`);
 }
 
 /** GET /api/v1/ecos/git/diff?repoId={repoId}&commit1=X&commit2=Y&path=P */
@@ -77,13 +78,13 @@ export function fetchDiff<T = any>(
   path?: string,
 ): Promise<T> {
   return apiFetchData<T>(
-    `/api/v1/ecos/git/diff${q(repoId, { commit1, commit2, path })}`,
+    `${API_BASE}/v1/ecos/git/diff${q(repoId, { commit1, commit2, path })}`,
   );
 }
 
 /** POST /api/v1/ecos/git/tag?repoId={repoId} */
 export function createTag<T = any>(repoId: string, data?: any): Promise<T> {
-  return apiFetchData<T>(`/api/v1/ecos/git/tag${q(repoId)}`, {
+  return apiFetchData<T>(`${API_BASE}/v1/ecos/git/tag${q(repoId)}`, {
     method: 'POST',
     body: data ? JSON.stringify(data) : undefined,
     headers: data ? { 'Content-Type': 'application/json' } : undefined,
@@ -92,7 +93,7 @@ export function createTag<T = any>(repoId: string, data?: any): Promise<T> {
 
 /** POST /api/v1/ecos/git/rollback?repoId={repoId} */
 export function rollback<T = any>(repoId: string, data?: any): Promise<T> {
-  return apiFetchData<T>(`/api/v1/ecos/git/rollback${q(repoId)}`, {
+  return apiFetchData<T>(`${API_BASE}/v1/ecos/git/rollback${q(repoId)}`, {
     method: 'POST',
     body: data ? JSON.stringify(data) : undefined,
     headers: data ? { 'Content-Type': 'application/json' } : undefined,
@@ -101,7 +102,7 @@ export function rollback<T = any>(repoId: string, data?: any): Promise<T> {
 
 /** POST /api/v1/ecos/git/branch?repoId={repoId} */
 export function createBranch<T = any>(repoId: string, data?: any): Promise<T> {
-  return apiFetchData<T>(`/api/v1/ecos/git/branch${q(repoId)}`, {
+  return apiFetchData<T>(`${API_BASE}/v1/ecos/git/branch${q(repoId)}`, {
     method: 'POST',
     body: data ? JSON.stringify(data) : undefined,
     headers: data ? { 'Content-Type': 'application/json' } : undefined,
@@ -110,7 +111,7 @@ export function createBranch<T = any>(repoId: string, data?: any): Promise<T> {
 
 /** POST /api/v1/ecos/git/push?repoId={repoId} — C181/W199 补齐：GitPanel push 直 fetch 收口 */
 export function push<T = any>(repoId: string, data?: any): Promise<T> {
-  return apiFetchData<T>(`/api/v1/ecos/git/push${q(repoId)}`, {
+  return apiFetchData<T>(`${API_BASE}/v1/ecos/git/push${q(repoId)}`, {
     method: 'POST',
     body: data ? JSON.stringify(data) : undefined,
     headers: data ? { 'Content-Type': 'application/json' } : undefined,
@@ -119,7 +120,7 @@ export function push<T = any>(repoId: string, data?: any): Promise<T> {
 
 /** POST /api/v1/ecos/git/pull?repoId={repoId} — C181/W199 补齐 */
 export function pull<T = any>(repoId: string, data?: any): Promise<T> {
-  return apiFetchData<T>(`/api/v1/ecos/git/pull${q(repoId)}`, {
+  return apiFetchData<T>(`${API_BASE}/v1/ecos/git/pull${q(repoId)}`, {
     method: 'POST',
     body: data ? JSON.stringify(data) : undefined,
     headers: data ? { 'Content-Type': 'application/json' } : undefined,
@@ -135,7 +136,7 @@ export function postAction<T = any>(action: string, repoId: string, data?: any):
   if (!/^[a-z][a-z0-9_]*$/.test(action)) {
     throw new Error(`gitService.postAction: illegal action "${action}" (^[a-z][a-z0-9_]*$ required)`);
   }
-  return apiFetchData<T>(`/api/v1/ecos/git/${action}${q(repoId)}`, {
+  return apiFetchData<T>(`${API_BASE}/v1/ecos/git/${action}${q(repoId)}`, {
     method: 'POST',
     body: data ? JSON.stringify(data) : undefined,
     headers: data ? { 'Content-Type': 'application/json' } : undefined,

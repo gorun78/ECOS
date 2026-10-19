@@ -27,7 +27,7 @@
  * @license Apache-2.0
  */
 
-import { apiFetchEnvelope, type ApiEnvelopeOutcome } from "./httpClient";
+import { API_BASE, apiFetchEnvelope, type ApiEnvelopeOutcome } from "./httpClient";
 
 // ── 轮询 / 防抖常量（design-05 B.6 / X-52 契约要求，唯一命名源，禁散落魔法数）────
 
@@ -77,16 +77,16 @@ export function clampCognitionLimit(limit?: number): number {
 // ── 静态前缀常量（唯一出口）────────────────────────
 
 /** 认知引擎裸域前缀（旧 17-controller 端点，`/api/v1/cognitive/*`）。 */
-export const COGNITIVE_BASE = "/api/v1/cognitive";
+export const COGNITIVE_BASE = `${API_BASE}/v1/cognitive`;
 
 /** 场景级认知契约前缀（PRD-05 E1~E4，`/api/v1/business/scenarios/{id}/cognition/[...]`）。 */
-export const SCENARIO_COGNITION_BASE = "/api/v1/business/scenarios";
+export const SCENARIO_COGNITION_BASE = `${API_BASE}/v1/business/scenarios`;
 
 /** 认知引擎健康/启停前缀（AiEngineStatusController）。 */
-export const COGNITIVE_ENGINE_BASE = "/api/v1/engine/cognitive";
+export const COGNITIVE_ENGINE_BASE = `${API_BASE}/v1/engine/cognitive`;
 
 /** 世界模型前缀（world-model 四端点）。 */
-export const WORLD_MODEL_BASE = "/api/v1/world-model";
+export const WORLD_MODEL_BASE = `${API_BASE}/v1/world-model`;
 
 /** 构造场景认知子路径：`/api/v1/business/scenarios/{id}/cognition[/suffix]`。
  *  `suffix` 应以 `/` 开头（如 `/detect`）或为空（前缀末尾）。 */
