@@ -37,7 +37,7 @@ interface AgentMeshAgentRaw {
  */
 export async function fetchAIPAgentsFromMesh(): Promise<AIPAgent[]> {
   // PMO-43 T3: no silent catch — caller renders error + retry state
-  const raw = await apiFetchData<AgentMeshAgentRaw[]>('/api/v1/agent-mesh/agents');
+  const raw = await apiFetchData<AgentMeshAgentRaw[]>(`${API_BASE}/v1/agent-mesh/agents`);
   return (Array.isArray(raw) ? raw : []).map(convertMeshAgentToAIP);
 }
 
@@ -100,7 +100,7 @@ function toMeshAgentEntity(a: Partial<AIPAgent> & { id: string }): Record<string
 /** 注册新 Agent — POST /api/v1/agent-mesh/agents（真实写 ecos_agent_registry） */
 export async function createMeshAgent(input: Omit<Partial<AIPAgent>, 'id'> & { id?: string }): Promise<AIPAgent> {
   const body = { ...toMeshAgentEntity({ ...input, id: input.id || '' }), id: input.id || undefined };
-  const created = await apiFetchData<AgentMeshAgentRaw>('/api/v1/agent-mesh/agents', {
+  const created = await apiFetchData<AgentMeshAgentRaw>(`${API_BASE}/v1/agent-mesh/agents`, {
     method: 'POST',
     body: JSON.stringify(body),
   });
@@ -109,7 +109,7 @@ export async function createMeshAgent(input: Omit<Partial<AIPAgent>, 'id'> & { i
 
 /** 更新 Agent — PUT /api/v1/agent-mesh/agents/{id}（404 表示不存在，由 apiFetchData 抛出） */
 export async function updateMeshAgent(id: string, patch: Partial<AIPAgent>): Promise<AIPAgent> {
-  const updated = await apiFetchData<AgentMeshAgentRaw>(`/api/v1/agent-mesh/agents/${encodeURIComponent(id)}`, {
+  const updated = await apiFetchData<AgentMeshAgentRaw>(`${API_BASE}/v1/agent-mesh/agents/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify(toMeshAgentEntity({ ...patch, id })),
   });
@@ -118,7 +118,7 @@ export async function updateMeshAgent(id: string, patch: Partial<AIPAgent>): Pro
 
 /** 删除 Agent — DELETE /api/v1/agent-mesh/agents/{id} */
 export async function deleteMeshAgent(id: string): Promise<void> {
-  await apiFetchData<void>(`/api/v1/agent-mesh/agents/${encodeURIComponent(id)}`, {
+  await apiFetchData<void>(`${API_BASE}/v1/agent-mesh/agents/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
 }
@@ -136,7 +136,7 @@ interface GuardrailPolicyRaw {
 }
 
 export async function fetchGuardrailPolicies(): Promise<AIPGuardrail[]> {
-  const data = await apiFetchData<GuardrailPolicyRaw[]>('/api/v1/guardrails/policies');
+  const data = await apiFetchData<GuardrailPolicyRaw[]>(`${API_BASE}/v1/guardrails/policies`);
   return (Array.isArray(data) ? data : []).map(convertPolicyToGuardrail);
 }
 
@@ -181,7 +181,7 @@ interface PipelineDefinitionRaw {
 }
 
 export async function fetchPipelineDefinitions(): Promise<AIPLogicPipeline[]> {
-  const data = await apiFetchData<PipelineDefinitionRaw[]>('/api/v1/pipeline/definitions');
+  const data = await apiFetchData<PipelineDefinitionRaw[]>(`${API_BASE}/v1/pipeline/definitions`);
   return (Array.isArray(data) ? data : []).map((p: PipelineDefinitionRaw) => ({
     id: p.id || p.name,
     name: p.name,
@@ -211,8 +211,8 @@ interface ActionTypeRaw {
 
 export async function fetchActionTypes(objectTypeId?: string): Promise<AIPActionType[]> {
   const url = objectTypeId
-    ? `/api/v1/ontology/actions?objectTypeId=${encodeURIComponent(objectTypeId)}`
-    : '/api/v1/ontology/actions';
+    ? `${API_BASE}/v1/ontology/actions?objectTypeId=${encodeURIComponent(objectTypeId)}`
+    : `${API_BASE}/v1/ontology/actions`;
   const data = await apiFetchData<ActionTypeRaw[]>(url);
   return (Array.isArray(data) ? data : []).map(convertActionType);
 }
@@ -239,7 +239,7 @@ export async function createActionType(data: {
   postActions?: Array<{ type: string; params: Record<string, string> }>;
   auditEnabled?: boolean;
 }): Promise<AIPActionType> {
-  const result = await apiFetchData<ActionTypeRaw>('/api/v1/ontology/actions', {
+  const result = await apiFetchData<ActionTypeRaw>(`${API_BASE}/v1/ontology/actions`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -253,7 +253,7 @@ export async function updateActionType(id: string, data: {
   postActions?: Array<{ type: string; params: Record<string, string> }>;
   auditEnabled?: boolean;
 }): Promise<AIPActionType> {
-  const result = await apiFetchData<ActionTypeRaw>(`/api/v1/ontology/actions/${encodeURIComponent(id)}`, {
+  const result = await apiFetchData<ActionTypeRaw>(`${API_BASE}/v1/ontology/actions/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
@@ -261,7 +261,7 @@ export async function updateActionType(id: string, data: {
 }
 
 export async function deleteActionType(id: string): Promise<void> {
-  await apiFetchData<void>(`/api/v1/ontology/actions/${encodeURIComponent(id)}`, {
+  await apiFetchData<void>(`${API_BASE}/v1/ontology/actions/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   });
 }
@@ -271,7 +271,7 @@ export async function executeActionType(
   objectId: string,
   context?: Record<string, unknown>
 ): Promise<ExecuteActionResult> {
-  return apiFetchData<ExecuteActionResult>(`/api/v1/ontology/actions/${encodeURIComponent(id)}/execute`, {
+  return apiFetchData<ExecuteActionResult>(`${API_BASE}/v1/ontology/actions/${encodeURIComponent(id)}/execute`, {
     method: 'POST',
     body: JSON.stringify({ objectId, context }),
   });
@@ -282,7 +282,7 @@ export async function fetchAgentModels(): Promise<AIPModel[]> {
   // distinguish "backend down" from "no models registered".
   // §4.5/W204：缺失指标一律保持 undefined（UI 渲染「未知」），禁止 `||150`、
   // `||'$0.005'`、`||99.5` 之类的合成假指标。
-  const raw = await apiFetchData<any[]>('/api/v1/aip/models');
+  const raw = await apiFetchData<any[]>(`${API_BASE}/v1/aip/models`);
   return (Array.isArray(raw) ? raw : []).map((item: any) => ({
     id: item.id,
     displayName: item.name || item.displayName || item.id,
@@ -309,7 +309,7 @@ export async function fetchAgentModels(): Promise<AIPModel[]> {
 export async function fetchAgentTemplates(): Promise<AIPAgentTemplate[]> {
   // PMO-43 T3: no silent catch — caller (AgentMarket) merges with BUILTIN
   // defaults and surfaces an inline error state when the backend is down.
-  const raw = await apiFetchData<any[]>('/api/v1/aip/agents/templates');
+  const raw = await apiFetchData<any[]>(`${API_BASE}/v1/aip/agents/templates`);
   return (Array.isArray(raw) ? raw : []).map((t: any) => ({
     id: t.id,
     name: t.name || t.id,
@@ -327,7 +327,7 @@ export async function instantiateAgent(
   templateId: string,
   name: string
 ): Promise<AIPAgent> {
-  const data = await apiFetchData<any>('/api/v1/aip/agents/instantiate', {
+  const data = await apiFetchData<any>(`${API_BASE}/v1/aip/agents/instantiate`, {
     method: 'POST',
     body: JSON.stringify({ templateId, name }),
   });
@@ -349,7 +349,7 @@ export async function instantiateAgent(
 // ── Agent Manager (T9-2) ─────────────────────────────────────
 
 export async function fetchManagedAgents(): Promise<AIPAgent[]> {
-  const raw = await apiFetchData<any[]>('/api/v1/aip/agents');
+  const raw = await apiFetchData<any[]>(`${API_BASE}/v1/aip/agents`);
   return (Array.isArray(raw) ? raw : []).map((a: any) => ({
     id: a.id,
     name: a.name || a.id,
@@ -369,7 +369,7 @@ export async function updateManagedAgent(
   id: string,
   data: { name?: string; systemPrompt?: string; model?: string; temperature?: number; maxIterations?: number }
 ): Promise<void> {
-  await apiFetchData(`/api/v1/aip/agents/${encodeURIComponent(id)}`, {
+  await apiFetchData(`${API_BASE}/v1/aip/agents/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
@@ -388,7 +388,7 @@ export async function updateManagedAgent(
  * 字段对齐后端实际返回: agentId/totalCount/successCount/successRate/avgElapsedMs/p50Ms/p99Ms 等。
  */
 export async function fetchAgentMetrics(agentId: string): Promise<AIPAgentMetrics> {
-  const data = await apiFetchData<any>(`/api/v1/aip/agent-metrics/${encodeURIComponent(agentId)}`);
+  const data = await apiFetchData<any>(`${API_BASE}/v1/aip/agent-metrics/${encodeURIComponent(agentId)}`);
   return {
     agentId: data.agentId || agentId,
     agentName: data.agentName || agentId,
@@ -413,7 +413,7 @@ export async function fetchAgentMetrics(agentId: string): Promise<AIPAgentMetric
  */
 export async function fetchAgentErrors(agentId: string): Promise<AIPAgentError[]> {
   const resp = await apiFetchData<{ total?: number; errors?: any[] }>(
-    `/api/v1/aip/agent-metrics/${encodeURIComponent(agentId)}/errors`
+    `${API_BASE}/v1/aip/agent-metrics/${encodeURIComponent(agentId)}/errors`
   );
   const raw = Array.isArray(resp) ? resp : (resp?.errors ?? []);
   return (Array.isArray(raw) ? raw : []).map((e: any) => ({
@@ -568,8 +568,8 @@ export interface AgentSessionSaved {
 /** 获取 Agent 会话列表（可按 agentId 过滤） — GET /api/v1/agent-loop/sessions */
 export async function fetchAgentSessions(agentId?: string): Promise<AgentSessionSaved[]> {
   const url = agentId
-    ? `/api/v1/agent-loop/sessions?agentId=${encodeURIComponent(agentId)}`
-    : '/api/v1/agent-loop/sessions';
+    ? `${API_BASE}/v1/agent-loop/sessions?agentId=${encodeURIComponent(agentId)}`
+    : `${API_BASE}/v1/agent-loop/sessions`;
   return apiFetchData<AgentSessionSaved[]>(url);
 }
 
@@ -610,7 +610,7 @@ export interface AipEvalReport {
 
 /** 启动评估（异步）— POST /api/v1/aip/eval/run，立即返回 evalId */
 export async function startAipEval(questionSet: 'default' | 'finance_20' | 'legal_20' | 'compliance_20'): Promise<{ evalId: string; questionSet: string }> {
-  return apiFetchData<{ evalId: string; questionSet: string }>('/api/v1/aip/eval/run', {
+  return apiFetchData<{ evalId: string; questionSet: string }>(`${API_BASE}/v1/aip/eval/run`, {
     method: 'POST',
     body: JSON.stringify({ questionSet }),
   });
@@ -618,7 +618,7 @@ export async function startAipEval(questionSet: 'default' | 'finance_20' | 'lega
 
 /** 查询评估报告 — GET /api/v1/aip/eval/{id}/report；未就绪时后端 404 → 抛出，由调用方轮询/展示 */
 export async function fetchAipEvalReport(evalId: string): Promise<AipEvalReport> {
-  return apiFetchData<AipEvalReport>(`/api/v1/aip/eval/${encodeURIComponent(evalId)}/report`);
+  return apiFetchData<AipEvalReport>(`${API_BASE}/v1/aip/eval/${encodeURIComponent(evalId)}/report`);
 }
 
 // ── Agent Loop 对话（真实推理通道） ─────────────────────────────
@@ -641,7 +641,7 @@ export interface AgentLoopChatData {
 }
 
 export async function agentLoopChat(params: { agentId: string; message: string; sessionId?: string }): Promise<AgentLoopChatData> {
-  return apiFetchData<AgentLoopChatData>('/api/v1/agent-loop/chat', {
+  return apiFetchData<AgentLoopChatData>(`${API_BASE}/v1/agent-loop/chat`, {
     method: 'POST',
     body: JSON.stringify(params),
   });
@@ -666,7 +666,7 @@ interface AipAuditLogRaw {
  * 两个字段记 0 并把真实上报值放进 details 文本（不合成、不拆假）。
  */
 export async function fetchAIPAuditLogs(): Promise<AIPAuditLog[]> {
-  const raw = await apiFetchData<AipAuditLogRaw[]>('/api/v1/aip/audit-logs');
+  const raw = await apiFetchData<AipAuditLogRaw[]>(`${API_BASE}/v1/aip/audit-logs`);
   const statusMap: Record<string, AIPAuditLog['status']> = {
     success: 'allowed', SUCCESS: 'allowed', allowed: 'allowed',
     blocked: 'blocked', BLOCKED: 'blocked',
@@ -715,7 +715,7 @@ export async function submitOntologyProposal(body: {
   payload: Record<string, string>;
   proposedBy: string;
 }): Promise<OntologyProposalVo> {
-  return apiFetchData<OntologyProposalVo>('/api/v1/ontology/proposals', {
+  return apiFetchData<OntologyProposalVo>(`${API_BASE}/v1/ontology/proposals`, {
     method: 'POST',
     body: JSON.stringify(body),
   });
@@ -726,7 +726,7 @@ export async function executeOntologyProposal(
   id: string,
   body: { userRole: string; userName: string }
 ): Promise<OntologyProposalVo> {
-  return apiFetchData<OntologyProposalVo>(`/api/v1/ontology/proposals/${encodeURIComponent(id)}/execute`, {
+  return apiFetchData<OntologyProposalVo>(`${API_BASE}/v1/ontology/proposals/${encodeURIComponent(id)}/execute`, {
     method: 'POST',
     body: JSON.stringify(body),
   });

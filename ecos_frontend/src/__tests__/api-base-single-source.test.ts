@@ -116,6 +116,15 @@
  * 批级门 `__tests__/workbenchScatterBaseSingleSource.spec.ts` 另判 `pages/business-workbench` 38 个与
  * `components/ontology-workbench` 14 个生产文件整域零私设基址；`pages/aiworkbench` 尚有 `api.ts`
  * 27 处⇒该域本批不宣称闭合。20 → 16 枚系实跑读出后剪除。
+ * 2026-10-19 #143/B5-25 收口减 1：`pages/aiworkbench/api.ts` 单文件代码行私设基址 **27 处**
+ * （本波最大单项；剪除后全仓残留面为 15 文件 21 处，另单源本体 `services/httpClient.ts` 2 处按口径不计）
+ * 改由 `API_BASE` 派生，形态拆分 = 单引号 15 + 反引号 12 + 双引号 0。该文件的派生面全量是 **28**＝27 条裸形态 + 1 条改前既有派生态
+ * （`rawStreamUrlFetch` 的 SSE 流式腿，#143/B5-13），与 B5-21 同形——漏计既有派生态会让
+ * 「多重集相等」假绿，故域级门 `pages/aiworkbench/__tests__/aiworkbenchBaseSingleSource.spec.ts`
+ * 按全量面逐字钉死。另一点不同：`API_BASE` 系改前即已导入，「导入腿恰 1 条」判在这里数
+ * **含 API_BASE 的 import 行**而非新增行。同批 `pages/aiworkbench` 整域 29 个生产文件零私设基址
+ * ⇒ 该域闭合（B5-24 只收 `logic-canvas/useLogicPipelineRun.ts`，当时明示不宣称闭合）。
+ * 16 → 15 枚系实跑读出后剪除。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -138,7 +147,6 @@ const BASELINE = new Set([
   'pages/ProjectTracker.tsx',
   'pages/TenantManager.tsx',
   'pages/TokenDashboard.tsx',
-  'pages/aiworkbench/api.ts',
   'pages/data-quality/api/_base.ts',
   'pages/knowledge/pages/ExtractionPage.tsx',
   'pages/knowledge/pages/components/govern/RuleRepoTable.tsx',
