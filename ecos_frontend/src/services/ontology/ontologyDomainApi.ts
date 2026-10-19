@@ -15,6 +15,7 @@
  */
 
 import { apiFetchData } from "../../api";
+import { API_BASE } from "../httpClient";
 
 /**
  * 工作台域 VO — 对齐后端 OntologyDomainVO (T16-2)。
@@ -60,7 +61,7 @@ export interface WorkbenchDomainReassignDTO {
  * GET /api/v1/ontology/domains
  */
 export async function fetchWorkbenchDomains(): Promise<WorkbenchDomainVO[]> {
-  return apiFetchData<WorkbenchDomainVO[]>("/api/v1/ontology/domains");
+  return apiFetchData<WorkbenchDomainVO[]>(`${API_BASE}/v1/ontology/domains`);
 }
 
 /**
@@ -70,7 +71,7 @@ export async function fetchWorkbenchDomains(): Promise<WorkbenchDomainVO[]> {
 export async function createWorkbenchDomain(
   dto: WorkbenchDomainSaveDTO
 ): Promise<WorkbenchDomainVO> {
-  return apiFetchData<WorkbenchDomainVO>("/api/v1/ontology/domains", {
+  return apiFetchData<WorkbenchDomainVO>(`${API_BASE}/v1/ontology/domains`, {
     method: "POST",
     body: JSON.stringify(dto),
   });
@@ -85,7 +86,7 @@ export async function updateWorkbenchDomain(
   dto: WorkbenchDomainSaveDTO
 ): Promise<WorkbenchDomainVO> {
   return apiFetchData<WorkbenchDomainVO>(
-    `/api/v1/ontology/domains/${encodeURIComponent(code)}`,
+    `${API_BASE}/v1/ontology/domains/${encodeURIComponent(code)}`,
     { method: "PUT", body: JSON.stringify(dto) }
   );
 }
@@ -95,7 +96,7 @@ export async function updateWorkbenchDomain(
  * DELETE /api/v1/ontology/domains/{code}
  */
 export async function deleteWorkbenchDomain(code: string): Promise<void> {
-  await apiFetchData(`/api/v1/ontology/domains/${encodeURIComponent(code)}`, {
+  await apiFetchData(`${API_BASE}/v1/ontology/domains/${encodeURIComponent(code)}`, {
     method: "DELETE",
   });
 }
@@ -155,7 +156,7 @@ export async function reassignObjectDomain(
   dto: WorkbenchDomainReassignDTO
 ): Promise<WorkbenchDomainReassignVO> {
   return apiFetchData<WorkbenchDomainReassignVO>(
-    `/api/v1/ontology/objects/${encodeURIComponent(objectId)}/domain`,
+    `${API_BASE}/v1/ontology/objects/${encodeURIComponent(objectId)}/domain`,
     { method: "PUT", body: JSON.stringify(dto) }
   );
 }

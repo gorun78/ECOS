@@ -7,6 +7,7 @@
  */
 
 import { apiFetchData } from "../../api";
+import { API_BASE } from "../httpClient";
 import type {
   PaginatedDataResponse,
   DataRecord,
@@ -18,7 +19,7 @@ import type {
 // 本体数据 (Ontology Data) — T2.3
 // ================================================================
 
-const DATA_BASE = "/api/v1/ontology/data";
+const DATA_BASE = `${API_BASE}/v1/ontology/data`;
 
 export async function fetchOntologyData(params?: { type?: string; objectTypeId?: string; page?: number; size?: number }) {
   const qs = new URLSearchParams();
@@ -68,7 +69,7 @@ export async function clearOntologyDataByType(objectTypeId: string) {
 // 后端 T16-3 强类型契约：入参 OntologyFunctionSaveDTO / 返回 FunctionResult
 // ================================================================
 
-const FUNCTION_BASE = "/api/v1/ontology/functions";
+const FUNCTION_BASE = `${API_BASE}/v1/ontology/functions`;
 
 /** 函数沙盒执行结果 — 对齐后端 FunctionResult POJO（@JsonInclude NON_NULL） */
 export interface FunctionTestResultVO {

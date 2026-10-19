@@ -7,6 +7,7 @@
  */
 
 import { apiFetchData } from "../../api";
+import { API_BASE } from "../httpClient";
 import type {
   LineageEdge,
   CreateLineageDTO,
@@ -21,7 +22,7 @@ import type {
 // 数据血缘 (Lineage) — T2.5
 // ================================================================
 
-const LINEAGE_BASE = "/api/v1/lineage";
+const LINEAGE_BASE = `${API_BASE}/v1/lineage`;
 
 export async function fetchLineages(params?: { source?: string; target?: string; direction?: string }) {
   const qs = new URLSearchParams();

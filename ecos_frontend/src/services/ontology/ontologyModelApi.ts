@@ -8,6 +8,7 @@
  */
 
 import { apiFetchData } from "../../api";
+import { API_BASE } from "../httpClient";
 import type {
   KnowledgeGraphResponse,
   Entity,
@@ -27,7 +28,7 @@ import type { ObjectType, PropertyType, LinkType } from "../../types/ontology";
 export const DEFAULT_ONTOLOGY_ID = "ont001";
 
 /** API 基础路径 */
-const BASE = "/api/v1/ecos";
+const BASE = `${API_BASE}/v1/ecos`;
 
 // ================================================================
 // 本体基础类型定义 (T2: 由 api.ts 收敛迁移至此)

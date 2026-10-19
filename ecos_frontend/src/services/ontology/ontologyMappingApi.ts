@@ -8,6 +8,7 @@
  */
 
 import { apiFetchData } from "../../api";
+import { API_BASE } from "../httpClient";
 import type {
   OntologyMappingRecord,
   CreateMappingDTO,
@@ -26,7 +27,7 @@ import type {
 // 本体映射 (Ontology Mapping) — T2.1
 // ================================================================
 
-const MAPPING_BASE = "/api/v1/ontology/mappings";
+const MAPPING_BASE = `${API_BASE}/v1/ontology/mappings`;
 
 export async function fetchMappings(params?: { objectId?: string; sourceType?: string }) {
   const qs = new URLSearchParams();
@@ -116,8 +117,8 @@ export function buildDocAnchorPayload(
 //   GET /api/v1/datanet/metadata/fields/{id}    → 该对象的列定义（懒加载）
 // ================================================================
 
-const DATA_LAYER_BASE = "/api/v1/engine/data/layers";
-const DATA_FIELDS_BASE = "/api/v1/datanet/metadata/fields";
+const DATA_LAYER_BASE = `${API_BASE}/v1/engine/data/layers`;
+const DATA_FIELDS_BASE = `${API_BASE}/v1/datanet/metadata/fields`;
 
 /**
  * 获取 DW 层（CURATED）数据对象列表，映射为工作台 Dataset（列定义由
@@ -156,7 +157,7 @@ export async function fetchDwDatasetColumns(resourceId: string): Promise<Dataset
 //   post_actions   → rules（写回动作映射为 modify_object）
 // ================================================================
 
-const ACTION_TYPE_BASE = "/api/v1/ontology/action-types";
+const ACTION_TYPE_BASE = `${API_BASE}/v1/ontology/action-types`;
 
 /** 安全解析后端 JSON 数组文本；非法/空值返回空数组（不抛错，避免整页失败） */
 function parseJsonArray(raw: unknown): any[] {

@@ -64,6 +64,12 @@
  * **83 处**全部改由 `API_BASE` 派生（取值逐字不变：`API_BASE === "/api"`，拼接结果与改前同串），
  * 只动代码行、注释里的端点说明不动（判据本就不计注释行，改注释属无谓抖动）。
  * 72 → 65 枚系本批实跑读出后剪除，非推算。
+ * 2026-10-19 #143/B5-17 收口减 8：`src/services/ontology/` 域基线在册八文件（data/domain/engine/
+ * lineage/mapping/model/proposal/version 各 `*Api.ts`）代码行私设基址 **17 处**改由 `API_BASE`
+ * 派生（13 枚双引号常量 + 4 枚反引号内联，判据与 `HARDCODED_RE` 同口径含反引号——只用
+ * `["']` 去扫会把反引号那 4 处漏成"已收口"，本批实测抓出）。`API_BASE === "/api"` ⇒ 拼接面值
+ * 逐字不变；同批该目录（含 #143/B5-11f 已派生的 `ontologyExportApi.ts`）整域残留 0 处。
+ * 65 → 57 枚同样系实跑读出后剪除。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -132,14 +138,6 @@ const BASELINE = new Set([
   'services/dataCatalogClient.ts',
   'services/gitService.ts',
   'services/knowledgeNavApi.ts',
-  'services/ontology/ontologyDataApi.ts',
-  'services/ontology/ontologyDomainApi.ts',
-  'services/ontology/ontologyEngineApi.ts',
-  'services/ontology/ontologyLineageApi.ts',
-  'services/ontology/ontologyMappingApi.ts',
-  'services/ontology/ontologyModelApi.ts',
-  'services/ontology/ontologyProposalApi.ts',
-  'services/ontology/ontologyVersionApi.ts',
   'services/ontologyClient.ts',
   'services/ontologyWorkbenchApi.ts',
   'services/platformApi.ts',

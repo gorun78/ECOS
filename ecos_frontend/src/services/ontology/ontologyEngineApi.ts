@@ -7,8 +7,9 @@
  */
 
 import { apiFetchData } from "../../api";
+import { API_BASE } from "../httpClient";
 
-const ENGINE_BASE = "/api/v1/engine/ontology";
+const ENGINE_BASE = `${API_BASE}/v1/engine/ontology`;
 
 // ================================================================
 // 引擎状态 / 启停

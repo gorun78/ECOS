@@ -7,6 +7,7 @@
  */
 
 import { apiFetchData } from "../../api";
+import { API_BASE } from "../httpClient";
 import type {
   Proposal,
   ProposalStatus,
@@ -20,7 +21,7 @@ import type {
 // 本体提案 (Ontology Proposal) — T2.4
 // ================================================================
 
-const PROPOSAL_BASE = "/api/v1/ontology/proposals";
+const PROPOSAL_BASE = `${API_BASE}/v1/ontology/proposals`;
 
 /**
  * 提案状态归一化（API 边界适配器）

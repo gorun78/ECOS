@@ -9,12 +9,13 @@
  */
 
 import { apiFetchData } from "../../api";
+import { API_BASE } from "../httpClient";
 
 // ================================================================
 // 版本管理 (Version Timeline) — T3
 // ================================================================
 
-const VERSION_BASE = "/api/v1/ecos/versions";
+const VERSION_BASE = `${API_BASE}/v1/ecos/versions`;
 
 /** 版本列表项 — 对齐后端 OntologyVersionVO (T16-5 简化端点强类型化) */
 export interface VersionItem {
@@ -107,6 +108,6 @@ export async function fetchVersionDetail(id: string): Promise<VersionItem & { sn
  */
 export async function fetchOntologyVersionDiff(v1Id: string, v2Id: string): Promise<VersionDiff> {
   return apiFetchData<VersionDiff>(
-    `/api/v1/ontology/versions/diff?v1=${encodeURIComponent(v1Id)}&v2=${encodeURIComponent(v2Id)}`
+    `${API_BASE}/v1/ontology/versions/diff?v1=${encodeURIComponent(v1Id)}&v2=${encodeURIComponent(v2Id)}`
   );
 }
