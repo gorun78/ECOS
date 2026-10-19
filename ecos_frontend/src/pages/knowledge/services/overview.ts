@@ -7,6 +7,7 @@
  *        集中在 `kbFetch.ts`，overview 主仪表盘沿用 silent-degrade 行为。
  */
 import { apiFetchData } from '../../../api';
+import { API_BASE } from '../../../services/httpClient';
 import { kbFetchData } from './kbFetch';
 import type {
   SyncStatus,
@@ -17,7 +18,7 @@ import type {
   EngineConfig,
 } from '../typesAndConstants';
 
-const KNOWLEDGE_BASE = '/api/v1/knowledge';
+const KNOWLEDGE_BASE = `${API_BASE}/v1/knowledge`;
 const KB_V1 = KNOWLEDGE_BASE;
 
 // ── Overview / Dashboard ────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ interface KnowledgeStatsRaw {
 
 export async function fetchGraphStats(): Promise<GraphStats> {
   try {
-    const data = await apiFetchData<KnowledgeStatsRaw | null>('/api/v1/knowledge/stats');
+    const data = await apiFetchData<KnowledgeStatsRaw | null>(`${API_BASE}/v1/knowledge/stats`);
     return {
       graphNodeCount: data?.graphNodeCount ?? 0,
       graphEdgeCount: data?.graphEdgeCount ?? 0,
@@ -72,7 +73,7 @@ export async function fetchGraphStats(): Promise<GraphStats> {
  * OverviewPage 用其区分「真实 0 值」与「拉取失败」，杜绝失败显示 0=一切正常。
  */
 export async function kbFetchGraphStats(): Promise<GraphStats> {
-  const data = await kbFetchData<KnowledgeStatsRaw | null>('/api/v1/knowledge/stats');
+  const data = await kbFetchData<KnowledgeStatsRaw | null>(`${API_BASE}/v1/knowledge/stats`);
   return {
     graphNodeCount: data?.graphNodeCount ?? 0,
     graphEdgeCount: data?.graphEdgeCount ?? 0,
@@ -97,7 +98,7 @@ export interface EntityMappingItem {
 
 export async function fetchEntityMappings(): Promise<EntityMappingItem[]> {
   try {
-    const data = await apiFetchData<unknown>('/api/v1/ontology/entity-mappings');
+    const data = await apiFetchData<unknown>(`${API_BASE}/v1/ontology/entity-mappings`);
     return Array.isArray(data) ? (data as EntityMappingItem[]) : [];
   } catch {
     return [];
@@ -147,7 +148,7 @@ export async function fetchSyncLogs(): Promise<SyncLog[]> {
 
 export async function fetchOntologyMappings() {
   try {
-    return await apiFetchData('/api/v1/ontology/mappings');
+    return await apiFetchData(`${API_BASE}/v1/ontology/mappings`);
   } catch {
     return { mappings: [] };
   }
@@ -155,7 +156,7 @@ export async function fetchOntologyMappings() {
 
 export async function saveOntologyMappings(mappings: unknown) {
   try {
-    return await apiFetchData('/api/v1/ontology/mappings', {
+    return await apiFetchData(`${API_BASE}/v1/ontology/mappings`, {
       method: 'POST',
       body: JSON.stringify(mappings),
     });
@@ -166,7 +167,7 @@ export async function saveOntologyMappings(mappings: unknown) {
 
 export async function exportOntology() {
   try {
-    return await apiFetchData('/api/v1/ontology/export');
+    return await apiFetchData(`${API_BASE}/v1/ontology/export`);
   } catch {
     return '';
   }
@@ -182,7 +183,7 @@ export async function fetchIndexStatus() {
 
 export async function syncVectors(config: Record<string, unknown>) {
   try {
-    return await apiFetchData('/api/v1/knowledge/sync', {
+    return await apiFetchData(`${API_BASE}/v1/knowledge/sync`, {
       method: 'POST',
       body: JSON.stringify(config),
     });
@@ -274,11 +275,11 @@ export async function fetchGraphJobLogs(jobId: string): Promise<string[]> {
 // ── Engine config（scope 走 gateway 宿主 KnowledgeWorkbenchController，无本地回落） ─────────
 
 export async function fetchCognitiveConfig() {
-  return apiFetchData('/api/v1/cognitive/config');
+  return apiFetchData(`${API_BASE}/v1/cognitive/config`);
 }
 
 export async function updateCognitiveConfig(updates: Array<{ config_key: string; config_value: string }>) {
-  return apiFetchData('/api/v1/cognitive/config', {
+  return apiFetchData(`${API_BASE}/v1/cognitive/config`, {
     method: 'PUT',
     body: JSON.stringify(updates),
   });

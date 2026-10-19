@@ -77,6 +77,14 @@
  * 窄口径 `["']` 只能看到 23 处，是 #143/B5-17 已照登漏扫形状的放大版，故域级取证门
  * `services/__tests__/servicesRootBaseSingleSource.spec.ts` 把三形态拆分写成快照自校验断言。
  * `API_BASE === "/api"` ⇒ 48 条面值逐字不变（多重集比对，非眼看）；57 → 47 枚系实跑读出后剪除。
+ * 2026-10-19 #143/B5-20 收口减 5：`src/pages/knowledge/services/` 五个基线在册文件
+ * （assets / extract / graph / overview / wiki）代码行私设基址 **32 处**改由 `API_BASE` 派生，
+ * 形态拆分 = 单引号 25 + **反引号 7** + 双引号 0（该域惯用单引号，与 B5-18 根域的反引号过半
+ * 相反 ⇒ 每批必须各自数形态，不可沿用上一批的形状结论）。域级取证门
+ * `pages/knowledge/services/__tests__/knowledgeServicesBaseSingleSource.spec.ts` 按
+ * `API_BASE` 实际值还原后与 HEAD 快照做多重集比对（32 条逐字不变）；整域九个 `.ts`
+ * 代码行零私设基址（`govern.ts` 系 2026-10-10 W206/C188 已派生，本批只复核不动）。
+ * 47 → 42 枚系实跑读出后剪除。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -122,11 +130,6 @@ const BASELINE = new Set([
   'pages/data-workbench/pipelineDebugApi.ts',
   'pages/knowledge/pages/ExtractionPage.tsx',
   'pages/knowledge/pages/components/govern/RuleRepoTable.tsx',
-  'pages/knowledge/services/assets.ts',
-  'pages/knowledge/services/extract.ts',
-  'pages/knowledge/services/graph.ts',
-  'pages/knowledge/services/overview.ts',
-  'pages/knowledge/services/wiki.ts',
   'pages/knowledge/tabs/DataWorkbenchImportTab.tsx',
   'pages/knowledge/tabs/DocumentUploadTab.tsx',
   'pages/knowledge/tabs/GraphBuilderTab.tsx',

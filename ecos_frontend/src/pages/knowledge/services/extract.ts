@@ -20,7 +20,7 @@
  *        减小浏览器本地数据面（页刷新后队列可恢复但不再跨会话）。
  */
 import { apiFetchData } from '../../../api';
-import { ApiRequestError } from '../../../services/httpClient';
+import { API_BASE, ApiRequestError } from '../../../services/httpClient';
 import { rawAuthedUrlFetch } from '../../../services/httpClient';
 import { kbFetchData } from './kbFetch';
 import type {
@@ -29,7 +29,7 @@ import type {
   StructuredExtractJob,
 } from '../typesAndConstants';
 
-const KB_V1 = '/api/v1/knowledge';
+const KB_V1 = `${API_BASE}/v1/knowledge`;
 
 // ── Wave 3 C1 — T8 抽取 · 定时 · 日志 · 本体树 类型 ───────────────────────────
 
@@ -510,7 +510,7 @@ export async function exportExtractLog(jobId: string): Promise<Blob> {
 
 export async function fetchLineageImpact(startNode: string) {
   try {
-    return await apiFetchData(`/api/v1/lineage/impact?startNode=${encodeURIComponent(startNode)}`);
+    return await apiFetchData(`${API_BASE}/v1/lineage/impact?startNode=${encodeURIComponent(startNode)}`);
   } catch {
     return null;
   }
@@ -518,7 +518,7 @@ export async function fetchLineageImpact(startNode: string) {
 
 export async function parseLineage(format: string, payload: string) {
   try {
-    return await apiFetchData('/api/v1/lineage/parse', {
+    return await apiFetchData(`${API_BASE}/v1/lineage/parse`, {
       method: 'POST',
       body: JSON.stringify({ format, payload }),
     });
@@ -533,7 +533,7 @@ export async function fetchIntegrationMetadata(): Promise<{
   try {
     return await apiFetchData<{
       simulationState?: { isSchemaDriftActive?: boolean; isSlaBreachActive?: boolean };
-    }>('/api/v1/integration/metadata');
+    }>(`${API_BASE}/v1/integration/metadata`);
   } catch {
     return null;
   }
@@ -541,7 +541,7 @@ export async function fetchIntegrationMetadata(): Promise<{
 
 export async function fetchIntegrationLogs() {
   try {
-    return await apiFetchData('/api/v1/integration/logs');
+    return await apiFetchData(`${API_BASE}/v1/integration/logs`);
   } catch {
     return [];
   }
@@ -549,7 +549,7 @@ export async function fetchIntegrationLogs() {
 
 export async function toggleSimulationDrift(type: string, enabled: boolean) {
   try {
-    return await apiFetchData('/api/v1/integration/metadata/drift', {
+    return await apiFetchData(`${API_BASE}/v1/integration/metadata/drift`, {
       method: 'POST',
       body: JSON.stringify({ type, enabled }),
     });
@@ -589,7 +589,7 @@ interface DataWorkbenchSourcesResponse {
 
 export async function fetchDataWorkbenchSources(): Promise<DataWorkbenchSource[]> {
   try {
-    const data = await apiFetchData<DataWorkbenchSourceRaw[] | DataWorkbenchSourcesResponse>('/api/v1/integration/metadata');
+    const data = await apiFetchData<DataWorkbenchSourceRaw[] | DataWorkbenchSourcesResponse>(`${API_BASE}/v1/integration/metadata`);
     const items = Array.isArray(data) ? data : data?.data || data?.sources || [];
     return items.map((s) => ({
       dsId: String(s.id ?? s.dsId ?? s.name ?? ''),
@@ -619,7 +619,7 @@ export async function fetchMetadataDrift(sample?: boolean): Promise<{
 }> {
   try {
     const q = sample ? '?sample=true' : '';
-    const data = await apiFetchData<MetadataDriftRaw | null>(`/api/v1/integration/metadata/drift${q}`);
+    const data = await apiFetchData<MetadataDriftRaw | null>(`${API_BASE}/v1/integration/metadata/drift${q}`);
     return {
       schemaDelta: data?.schemaDelta || data?.fields || [],
       rows: data?.rows || data?.samples,

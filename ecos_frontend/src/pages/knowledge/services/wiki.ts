@@ -15,7 +15,7 @@
  */
 import { apiFetchData } from '../../../api';
 import { kbFetchData } from './kbFetch';
-import { encodeQueryString } from '../../../services/httpClient';
+import { API_BASE, encodeQueryString } from '../../../services/httpClient';
 import type {
   NavProductQuery,
   NavProductPage,
@@ -30,10 +30,10 @@ import type {
   RagResult,
 } from '../typesAndConstants';
 
-const KNOWLEDGE_BASE = '/api/v1/knowledge';
+const KNOWLEDGE_BASE = `${API_BASE}/v1/knowledge`;
 const KB_V1 = KNOWLEDGE_BASE;
-const GLOSSARY_BASE = '/api/v1/ontology/glossary';
-const RULES_BASE = '/api/v1/knowledge/compliance-rules';
+const GLOSSARY_BASE = `${API_BASE}/v1/ontology/glossary`;
+const RULES_BASE = `${API_BASE}/v1/knowledge/compliance-rules`;
 
 // ── KB Workbench settings（检索参数：vector/chunk/overlap/maxRetrieval） ─────────
 
@@ -131,7 +131,7 @@ export async function deleteGlossaryTerm(id: string) {
 
 export async function runRAGQuery(req: RagRequest): Promise<RagResult> {
   try {
-    const data = await apiFetchData<RagResult>('/api/v1/knowledge/rag', {
+    const data = await apiFetchData<RagResult>(`${API_BASE}/v1/knowledge/rag`, {
       method: 'POST',
       body: JSON.stringify(req),
     });
@@ -146,7 +146,7 @@ export async function runRAGQuery(req: RagRequest): Promise<RagResult> {
  * `RagResult.vectorDegraded?` 由 govern/retrieval Tab 展示「向量降级」横幅。
  */
 export async function kbRunRAGQuery(req: RagRequest): Promise<RagResult> {
-  return kbFetchData<RagResult>('/api/v1/knowledge/rag', {
+  return kbFetchData<RagResult>(`${API_BASE}/v1/knowledge/rag`, {
     method: 'POST',
     body: JSON.stringify(req),
   });
@@ -154,7 +154,7 @@ export async function kbRunRAGQuery(req: RagRequest): Promise<RagResult> {
 
 export async function runKnowledgeQuery(query: string) {
   try {
-    return await apiFetchData('/api/v1/knowledge/query', {
+    return await apiFetchData(`${API_BASE}/v1/knowledge/query`, {
       method: 'POST',
       body: JSON.stringify({ query }),
     });
@@ -182,7 +182,7 @@ export async function kbFetchNavProducts(query: NavProductQuery): Promise<NavPro
   }
   params.set('pageNum', String(query.pageNum ?? 1));
   params.set('pageSize', String(query.pageSize ?? 20));
-  const url = encodeQueryString(`/api/v1/knowledge/nav/products?${params.toString()}`);
+  const url = encodeQueryString(`${API_BASE}/v1/knowledge/nav/products?${params.toString()}`);
   return kbFetchData<NavProductPage>(url);
 }
 
@@ -192,7 +192,7 @@ export async function kbFetchNavCategories(domain: string, parentId?: string | n
   params.set('domain', domain);
   if (parentId) params.set('parentId', parentId);
   if (search) params.set('search', search);
-  return kbFetchData<NavCategoryVO[]>(`/api/v1/knowledge/nav/categories?${params.toString()}`);
+  return kbFetchData<NavCategoryVO[]>(`${API_BASE}/v1/knowledge/nav/categories?${params.toString()}`);
 }
 
 export async function fetchRules(

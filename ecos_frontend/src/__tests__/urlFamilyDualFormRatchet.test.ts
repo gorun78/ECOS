@@ -3,9 +3,10 @@
  *
  * 收口缺陷 **D-B5-40**（差距台账 §13.2.4 C1-C6 注 ㉘）：仓内「出现第二处硬编码字面量即违例」
  * 型单源判据普遍只认引号形态（`["'`]/api…`），对 C1 派生态 `` `${API_BASE}/…` `` 不可见。
- * C1 基址单源每扩一批域，这类腿就静默变薄：本批实测（683 个生产文件、258 个 URL 族）
- * 30 个族存在 >1 生产方，而**只认裸字面量的口径今天只能看到 9 个** ⇒ 21 个重复族
- * 对旧判据完全隐形。逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
+ * C1 基址单源每扩一批域，这类腿就静默变薄：建门批（#143/B5-19）实跑读出 680 个生产文件、
+ * 258 个 URL 族、30 个族存在 >1 生产方，而**只认裸字面量的口径当时只能看到 9 个** ⇒ 21 个重复族
+ * 对旧判据完全隐形。#143/B5-20 复跑 = 30/6/24（该批把知识服务域 32 处裸面搬成派生态，
+ * dupBoth 不减而裸形态口径又瞎三族），故下方三个 pin 随批更新，读的是当批实测而非建门批快照。逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。
  *
@@ -205,10 +206,14 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     expect(dupBoth.size).toBeGreaterThan(dupRawOnly.size);
     // 三个数 = 本门实跑读出值，与 BASELINE 同批改动（重复面一变，这里必红，防「基线改了、盲区量化注记没跟上」）
+    // #143/B5-20 起改为此值：该批把知识服务域 32 处裸字面量搬成派生态，dupBoth 不变（30），
+    // 但裸形态口径丢三族（/v1/knowledge 五属主全裸面归零、/v1/ontology/mappings 与
+    // /v1/knowledge/compliance-rules 各降到单属主）⇒ 盲区由 21 扩到 24。这正是 D-B5-40 的
+    // 预期行为：C1 每收口一批，只认裸形态的旧判据就更瞎，不是本门放松。
     expect(dupBoth.size).toBe(30);
-    expect(dupRawOnly.size).toBe(9);
+    expect(dupRawOnly.size).toBe(6);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(21);
+    expect(blind.length).toBe(24);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);

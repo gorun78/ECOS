@@ -13,6 +13,7 @@
  *     5xx / ECOS-KB-* 抛 `KbApiError`，AssetListPage 5xx 显式错误码展示（PRD B.5）。
  */
 import { apiFetchData } from '../../../api';
+import { API_BASE } from '../../../services/httpClient';
 import { kbFetchData } from './kbFetch';
 import type {
   LifecycleAsset,
@@ -20,7 +21,7 @@ import type {
   LifecycleState,
 } from '../typesAndConstants';
 
-const KB_V1 = '/api/v1/knowledge';
+const KB_V1 = `${API_BASE}/v1/knowledge`;
 
 // /assets 原始行形态（后端字段命名新旧并存：assetId/id、assetName/name…；仅本文件消费）
 interface LifecycleAssetRaw {
@@ -130,9 +131,9 @@ export async function kbFetchLifecycleAudit(): Promise<LifecycleAuditEntry[]> {
 
 /** catalog auto-classify — 单资产分类触发（PRD B.2「详情 → 自动分类」流程入口） */
 export async function classifyAsset(assetId: string) {
-  return apiFetchData(`/api/v1/catalog/assets/${encodeURIComponent(assetId)}/auto-classify`, { method: 'POST' });
+  return apiFetchData(`${API_BASE}/v1/catalog/assets/${encodeURIComponent(assetId)}/auto-classify`, { method: 'POST' });
 }
 
 export async function kbClassifyAsset(assetId: string) {
-  return kbFetchData(`/api/v1/catalog/assets/${encodeURIComponent(assetId)}/auto-classify`, { method: 'POST' });
+  return kbFetchData(`${API_BASE}/v1/catalog/assets/${encodeURIComponent(assetId)}/auto-classify`, { method: 'POST' });
 }

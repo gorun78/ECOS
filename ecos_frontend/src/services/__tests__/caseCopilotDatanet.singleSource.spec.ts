@@ -204,8 +204,9 @@ describe('源形 — 三文件私设传输归零（C2′ 棘轮第五批）', ()
       expect(SRC_APIBASE).not.toContain(rel);
     }
     expect(SRC_APIBASE).not.toContain("'services/knowledgeQueryApi.ts'");
-    // extract.ts 仍有 lineage/integration 两族字面量 ⇒ 不许冒充已收口
-    expect(SRC_APIBASE).toContain("'pages/knowledge/services/extract.ts'");
+    // extract.ts 的 lineage/integration 两族字面量已于 #143/B5-20 整域派生清零 ⇒ 本腿反向：
+    // 已收口就不许在 api-base 基线里空留豁免位（原断言是「仍在册=不冒充已收口」，随批翻转）。
+    expect(SRC_APIBASE).not.toContain("'pages/knowledge/services/extract.ts'");
 
     const entryRe = /^\s*'([^']+)':\s*(\d+),$/gm;
     const entries = [...SRC_RATCHET.matchAll(entryRe)];

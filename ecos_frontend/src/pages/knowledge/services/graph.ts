@@ -10,9 +10,10 @@
  *   - 走 `kbFetchData` → 5xx / ECOS-KB-* 抛 `KbApiError`，
  *     GraphPage catch 分支据此渲染错误态（而非静默/空态）。
  */
+import { API_BASE } from '../../../services/httpClient';
 import { kbFetchData } from './kbFetch';
 
-const GRAPH_BASE = '/api/v1/knowledge';
+const GRAPH_BASE = `${API_BASE}/v1/knowledge`;
 
 /** K-55：图谱拉取默认/上限。默认 200，硬上限 2000（防误用）。 */
 export const GRAPH_FETCH_DEFAULT_LIMIT = 200;
@@ -71,11 +72,11 @@ export async function findPath(source: string, target: string) {
 
 // ── PMO-26 T1: Graph full-text search & path ──
 export async function graphSearch(query: string) {
-  return kbFetchData(`/api/v1/knowledge/graph/search?q=${encodeURIComponent(query)}`);
+  return kbFetchData(`${API_BASE}/v1/knowledge/graph/search?q=${encodeURIComponent(query)}`);
 }
 
 export async function graphPath(source: string, target: string) {
-  return kbFetchData('/api/v1/knowledge/graph/path', {
+  return kbFetchData(`${API_BASE}/v1/knowledge/graph/path`, {
     method: 'POST',
     body: JSON.stringify({ source, target }),
   });
