@@ -5,8 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AIPAgent, AIPModel, AIPGuardrail, AIPAuditLog } from '../../types/aiworkbench';
-import { API_BASE } from '../../services/httpClient';
-import { authHeaders } from '../../services/auth';
+import { API_BASE, rawAuthedUrlFetch } from '../../services/httpClient';
 import {
   fetchAIPAgentsFromMesh, createMeshAgent, updateMeshAgent, deleteMeshAgent,
   agentLoopChat, executeOntologyProposal,
@@ -89,9 +88,9 @@ export default function AgentStudioView({
 
     try {
       // §4.5 P1（行243）：URL 走 API_BASE 单源（原裸 '/api/v1/...' 前缀硬编码）
-      const response = await fetch(`${API_BASE}/v1/guardrails/policies/preview`, {
+      const response = await rawAuthedUrlFetch(`${API_BASE}/v1/guardrails/policies/preview`, {
         method: 'POST',
-        headers: authHeaders(),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: simUserId,
           datasetId: simDatasetId,

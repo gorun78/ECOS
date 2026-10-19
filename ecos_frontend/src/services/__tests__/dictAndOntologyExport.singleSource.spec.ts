@@ -227,7 +227,7 @@ describe('A 源形 — 两文件私设传输与硬编码基址归零（C2′ 棘
     expect(SRC_LOGIN).toContain('localStorage.setItem("token", data.accessToken)');
   }, 30_000);
 
-  it('A5 两份门禁基线同批剪除本批两文件，且棘轮声明值 = 当前实测口径 11/12', () => {
+  it('A5 两份门禁基线同批剪除本批两文件，且棘轮元门禁声明值 = 基线自身实数', () => {
     for (const src of [SRC_RATCHET, SRC_APIBASE]) {
       expect(src).not.toContain("'services/systemDictApi.ts'");
       expect(src).not.toContain("'services/ontology/ontologyExportApi.ts'");
@@ -236,10 +236,13 @@ describe('A 源形 — 两文件私设传输与硬编码基址归零（C2′ 棘
     const declaredSum = Number(
       /expect\(entries\.reduce\(\(n, \[, c\]\) => n \+ c, 0\)\)\.toBe\((\d+)\)/.exec(SRC_RATCHET)?.[1] ?? -1,
     );
-    // 14/15 → 11/12：#143/B5-11g 剪除页面域三腿后的实测口径。
-    // 本断言故意读门禁源码而非复制常量——棘轮声明若与实际收口脱节，这里会变红。
-    expect(declaredCount).toBe(11);
-    expect(declaredSum).toBe(12);
+    // 口径来源 = 棘轮 BASELINE 自身实数（#143/B5-11f/g 曾把这里的期望写成硬编码 14/15、
+    // 11/12，结果每收口一批就得改本用例，且「复制常量」与本注原意自相矛盾）。
+    // 棘轮门自己的「陈旧豁免即红 + 每文件命中上限」已负责声明↔实际的收口同步，
+    // 本处只钉元门禁声明与基线条目的一致性。
+    const entries = [...SRC_RATCHET.matchAll(/^\s*'([^']+)':\s*(\d+),/gm)];
+    expect(entries.length).toBe(declaredCount);
+    expect(entries.reduce((n, [, , c]) => n + Number(c), 0)).toBe(declaredSum);
   });
 });
 

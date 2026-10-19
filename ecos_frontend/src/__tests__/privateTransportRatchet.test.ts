@@ -51,6 +51,22 @@
  * + `pages/MonitoringCenter.tsx`(1) 三条页面域 helper 腿（合流 `rawAuthedUrlFetch`
  * 并显式补回 `Content-Type`，见下「页面域三腿」注）⇒ 14/15 → **11 文件 / 12 命中行**
  * （同批实跑校验：改前先跑一次本门读出实测值 11/12，再剪基线，非推算）。
+ * #143/B5-11h 剪除 `pages/knowledge/tabs/SyncTab.tsx`(1) +
+ * `pages/data-workbench/tabs/connections/InlineSqlConsole.tsx`(1) +
+ * `pages/aiworkbench/AgentStudioView.tsx`(1) 三条腿（合流 `rawAuthedUrlFetch`，
+ * 头集合逐键不变：SyncTab 原本只发 Authorization ⇒ 不补 `Content-Type`，
+ * 另两条原本经 `authHeaders()`/显式字面量发 `Content-Type` ⇒ 逐腿补回）
+ * + `services/engineProbeApi.ts`(2) ⇒ 11/12 → **7 文件 / 7 命中行**
+ * （同批实跑校验：改前先跑一次本门读出实测值 7/7，再剪基线，非推算）。
+ *
+ * `services/engineProbeApi.ts` 的处置 = **下线，不是收口**（判据口径要写清，
+ * 否则后来者会以为那两条腿被合流了）：全仓取证（ripgrep，排除 node_modules/target）
+ * 显示除本基线自身外零消费者，文件头声称的「自 EngineMonitor / MonitoringCenter /
+ * DataAssetsDashboard 迁入」从未接线，且两个导出与页面现行 helper 已经漂移——
+ * `monitoringCenterFetch` 返回 `T | null`，而 MonitoringCenter 用的是
+ * `{kind:'ok'|'denied'|'error'|'offline'}` 四态对象，形态不兼容 ⇒ 既不能当作
+ * 单源复用，也不该继续占 2 枚豁免位（基线预算用来保护死代码是最坏用法）。
+ * 该「迁入未接线 + 形态漂移」缺陷已登记台账，属 #143/B5-11h。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -65,20 +81,16 @@ const SRC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CANONICAL = 'services/httpClient.ts';
 
 /**
- * 基线（存量登记，#143/B5-11g 收口 EngineMonitor + Guardrails/helpers + MonitoringCenter
- * 后实测 11 文件 / 12 命中行；只减不增）。
+ * 基线（存量登记，#143/B5-11h 收口 SyncTab + InlineSqlConsole + AgentStudioView
+ * 三腿并下线零消费者的 engineProbeApi 后实测 7 文件 / 7 命中行；只减不增）。
  * 值 = 该文件允许的最大命中行数，剪项/降数必须与该文件的真实收口同批。
  */
 const BASELINE: Readonly<Record<string, number>> = Object.freeze({
-  'pages/aiworkbench/AgentStudioView.tsx': 1,
   'pages/aiworkbench/api.ts': 1,
   'pages/data-workbench/api/unstructured.ts': 1,
-  'pages/data-workbench/tabs/connections/InlineSqlConsole.tsx': 1,
   'pages/knowledge/services/govern.ts': 1,
-  'pages/knowledge/tabs/SyncTab.tsx': 1,
   'services/agentLoopStream.ts': 1,
   'services/capabilityClient.ts': 1,
-  'services/engineProbeApi.ts': 2,
   'services/scenarioActionClient.ts': 1,
   'services/wagentRunStream.ts': 1,
 });
@@ -177,8 +189,8 @@ describe('privateTransportRatchet — C2′ 私设传输棘轮门 (#143/B5-11a)'
 
   it('基线自身可校验：条目数与合计命中上限与文档口径一致', () => {
     const entries = Object.entries(BASELINE);
-    expect(entries.length).toBe(11);
-    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(12);
+    expect(entries.length).toBe(7);
+    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(7);
     // 键必须是 POSIX 相对路径且非基线外文件形态
     for (const [rel] of entries) {
       expect(rel.startsWith('./')).toBe(false);

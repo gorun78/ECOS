@@ -43,6 +43,14 @@
  * （`ENGINES` 六枚 `apiBase`）的 `"/api/v1/engine/…"` 字面量全改 API_BASE 派生，
  * 取值逐字不变；两文件同批从 privateTransportRatchet 基线一并剪除
  * （`pages/Guardrails/helpers.ts` 只收传输，本就无基址字面量，不在本清单）。
+ * 2026-10-19 #143/B5-11h 收口减 3：`pages/knowledge/tabs/SyncTab.tsx`
+ * （`'/api/integration/metadata'` 一枚改 `${API_BASE}/integration/metadata`，取值逐字不变）
+ * 与 `pages/data-workbench/tabs/connections/InlineSqlConsole.tsx`
+ * （`'/api/v1/engine/data/query/execute'` 一枚同改）随传输合流一并派生；
+ * `pages/aiworkbench/AgentStudioView.tsx` 实测改前即 0 命中（早批已用 API_BASE），
+ * 属本门检不出的**陈旧豁免**（本门只扫基线外文件，不像棘轮门会把 0 命中项判红）⇒ 同批剪除。
+ * 基线内此类陈旧项另有 11 枚（含 8 枚指向已不存在的路径），已单独立项 #143/B5-12 处置，
+ * 不在本批夹带。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -80,7 +88,6 @@ const BASELINE = new Set([
   'pages/TelemetryViewer.tsx',
   'pages/TenantManager.tsx',
   'pages/TokenDashboard.tsx',
-  'pages/aiworkbench/AgentStudioView.tsx',
   'pages/aiworkbench/ChatbotStudioView.tsx',
   'pages/aiworkbench/api.ts',
   'pages/aiworkbench/logic-canvas/useLogicPipelineRun.ts',
@@ -100,7 +107,6 @@ const BASELINE = new Set([
   'pages/data-workbench/pipeline-editor/PropertyPanel.tsx',
   'pages/data-workbench/pipeline-editor/UdfBuilderPanel.tsx',
   'pages/data-workbench/pipelineDebugApi.ts',
-  'pages/data-workbench/tabs/connections/InlineSqlConsole.tsx',
   'pages/knowledge/pages/ExtractionPage.tsx',
   'pages/knowledge/pages/components/govern/RuleRepoTable.tsx',
   'pages/knowledge/services/assets.ts',
@@ -112,7 +118,6 @@ const BASELINE = new Set([
   'pages/knowledge/tabs/DocumentUploadTab.tsx',
   'pages/knowledge/tabs/GraphBuilderTab.tsx',
   'pages/knowledge/tabs/KnowledgeRuleRepositoryTab.tsx',
-  'pages/knowledge/tabs/SyncTab.tsx',
   'pages/scenario/CognitionPanel.tsx',
   'pages/scenario/CounterfactualTab.tsx',
   'pages/scenario/MentalReviewTab.tsx',

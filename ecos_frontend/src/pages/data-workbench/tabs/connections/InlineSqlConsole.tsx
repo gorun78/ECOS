@@ -4,8 +4,8 @@ import LucideIcon from '../../LucideIcon';
 import { getErrorMessage } from '../../helpers';
 import { useTheme } from "../../../../components/ThemeContext";
 import { useLanguage } from "../../../../components/LanguageContext";
-import { getAuthToken } from "../../../../services/auth";
 import ConfirmDialog from "../../../../components/common/ConfirmDialog";
+import { API_BASE, rawAuthedUrlFetch } from "../../../../services/httpClient";
 
 /** 结果表最多渲染 50 行（后端 max_rows=500，超出仅展示截断） */
 const MAX_RENDER_ROWS = 50;
@@ -43,10 +43,9 @@ export default function InlineSqlConsole({ datasourceId }: { datasourceId: strin
   const execute = async () => {
     setLoading(true); setError(null);
     try {
-      const token = getAuthToken();
-      const res = await fetch('/api/v1/engine/data/query/execute', {
+      const res = await rawAuthedUrlFetch(`${API_BASE}/v1/engine/data/query/execute`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ datasource_id: datasourceId, sql: sql.trim(), max_rows: 500, timeout_seconds: 30 })
       });
       if (!res.ok) throw new Error(await res.text());

@@ -259,7 +259,7 @@ describe('A 源形 — 三文件私设传输与硬编码基址归零（C2′ 棘
     expect(countInCode('await apiCall(u, { headers: { X: 1 } });', /\bheaders\s*:/g)).toBe(1);
   });
 
-  it('A7 两份门禁基线同批剪除三文件，且棘轮声明值 = 当前实测口径 11/12', () => {
+  it('A7 两份门禁基线同批剪除三文件，且棘轮元门禁声明值 = 基线自身实数', () => {
     for (const gate of [SRC_RATCHET, SRC_APIBASE]) {
       expect(gate).not.toContain("'pages/EngineMonitor.tsx'");
       expect(gate).not.toContain("'pages/MonitoringCenter.tsx'");
@@ -269,9 +269,11 @@ describe('A 源形 — 三文件私设传输与硬编码基址归零（C2′ 棘
     const declaredSum = Number(
       /expect\(entries\.reduce\(\(n, \[, c\]\) => n \+ c, 0\)\)\.toBe\((\d+)\)/.exec(SRC_RATCHET)?.[1] ?? -1,
     );
-    // 读门禁源码而非复制常量：棘轮声明若与实际收口脱节，这里会变红。
-    expect(declaredCount).toBe(11);
-    expect(declaredSum).toBe(12);
+    // 口径来源 = 棘轮 BASELINE 自身实数，而非把 11/12 抄进本用例（抄一次就得每批改一次，
+    // 且「复制常量」与本注原意自相矛盾）。声明↔实际的收口同步由棘轮门自己保证。
+    const entries = [...SRC_RATCHET.matchAll(/^\s*'([^']+)':\s*(\d+),/gm)];
+    expect(entries.length).toBe(declaredCount);
+    expect(entries.reduce((n, [, , c]) => n + Number(c), 0)).toBe(declaredSum);
   });
 });
 

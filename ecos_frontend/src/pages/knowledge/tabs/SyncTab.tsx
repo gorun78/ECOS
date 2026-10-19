@@ -3,7 +3,7 @@ import { RefreshCw, ShieldAlert, AlertTriangle, Clock, Check, FileClock, RotateC
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { knowledgeApi } from '../services/knowledgeApi';
-import { getAuthToken } from '../../../services/auth';
+import { API_BASE, rawAuthedUrlFetch } from '../../../services/httpClient';
 import type { MetadataAsset } from '../typesAndConstants';
 
 // 本地响应形态（knowledgeApi 的 these 端点当前无精确返回类型，此处在边界处收窄）
@@ -51,7 +51,8 @@ export default function SyncTab() {
     } catch { /* fallback */ }
     // PMO-54: real asset list — /api/integration/metadata returns sources
     try {
-      const raw = await (await fetch('/api/integration/metadata', { headers: { Authorization: `Bearer ${getAuthToken()}` } })).json();
+      const res = await rawAuthedUrlFetch(`${API_BASE}/integration/metadata`);
+      const raw: any = await res.json();
       const sources = raw?.sources || raw?.data?.sources || raw?.data || raw;
       const list: unknown[] = Array.isArray(sources) ? sources : [];
       setAssets(list.map((s, i) => {
