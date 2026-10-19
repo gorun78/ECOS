@@ -15,13 +15,13 @@
 import { apiFetchData } from '../../../api';
 import { API_BASE } from '../../../services/httpClient';
 import { kbFetchData } from './kbFetch';
+import { KNOWLEDGE_BASE } from '../../../api/knowledgeClient';
 import type {
   LifecycleAsset,
   LifecycleAuditEntry,
   LifecycleState,
 } from '../typesAndConstants';
 
-const KB_V1 = `${API_BASE}/v1/knowledge`;
 
 // /assets 原始行形态（后端字段命名新旧并存：assetId/id、assetName/name…；仅本文件消费）
 interface LifecycleAssetRaw {
@@ -56,7 +56,7 @@ function toAsset(a: LifecycleAssetRaw): LifecycleAsset {
 /** 静默版（AssetListPage 主列表，兼容既有 Tab 的 catch 兜底模式） */
 export async function fetchLifecycleAssets(): Promise<LifecycleAsset[]> {
   try {
-    const data = await apiFetchData<LifecycleAssetRaw[] | LifecycleAssetsResponse>(`${KB_V1}/assets`);
+    const data = await apiFetchData<LifecycleAssetRaw[] | LifecycleAssetsResponse>(`${KNOWLEDGE_BASE}/assets`);
     const items: LifecycleAssetRaw[] = Array.isArray(data) ? data : data?.data || [];
     return items.map(toAsset).filter((a) => a.id);
   } catch {
@@ -77,7 +77,7 @@ export async function fetchLifecycleAssetsPage(opts?: {
   qs.set('offset', String(offset));
   if (opts?.state) qs.set('state', opts.state);
   try {
-    const data = await apiFetchData<LifecycleAssetRaw[] | LifecycleAssetsResponse>(`${KB_V1}/assets?${qs.toString()}`);
+    const data = await apiFetchData<LifecycleAssetRaw[] | LifecycleAssetsResponse>(`${KNOWLEDGE_BASE}/assets?${qs.toString()}`);
     const items: LifecycleAssetRaw[] = Array.isArray(data) ? data : data?.data || [];
     return items.map(toAsset).filter((a) => a.id);
   } catch {
@@ -97,20 +97,20 @@ export async function kbFetchLifecycleAssets(opts?: {
   qs.set('limit', String(limit));
   qs.set('offset', String(offset));
   if (opts?.state) qs.set('state', opts.state);
-  const data = await kbFetchData<LifecycleAssetRaw[] | LifecycleAssetsResponse>(`${KB_V1}/assets?${qs.toString()}`);
+  const data = await kbFetchData<LifecycleAssetRaw[] | LifecycleAssetsResponse>(`${KNOWLEDGE_BASE}/assets?${qs.toString()}`);
   const items: LifecycleAssetRaw[] = Array.isArray(data) ? data : data?.data || [];
   return items.map(toAsset).filter((a) => a.id);
 }
 
 export async function lifecycleTransition(assetId: string, next: LifecycleState): Promise<LifecycleAsset> {
-  return apiFetchData<LifecycleAsset>(`${KB_V1}/assets/${encodeURIComponent(assetId)}/transition`, {
+  return apiFetchData<LifecycleAsset>(`${KNOWLEDGE_BASE}/assets/${encodeURIComponent(assetId)}/transition`, {
     method: 'POST',
     body: JSON.stringify({ state: next }),
   });
 }
 
 export async function kbLifecycleTransition(assetId: string, next: LifecycleState): Promise<LifecycleAsset> {
-  return kbFetchData<LifecycleAsset>(`${KB_V1}/assets/${encodeURIComponent(assetId)}/transition`, {
+  return kbFetchData<LifecycleAsset>(`${KNOWLEDGE_BASE}/assets/${encodeURIComponent(assetId)}/transition`, {
     method: 'POST',
     body: JSON.stringify({ state: next }),
   });
@@ -118,7 +118,7 @@ export async function kbLifecycleTransition(assetId: string, next: LifecycleStat
 
 export async function fetchLifecycleAudit(): Promise<LifecycleAuditEntry[]> {
   try {
-    const data = await apiFetchData<LifecycleAuditEntry[]>(`${KB_V1}/lifecycle/audit`);
+    const data = await apiFetchData<LifecycleAuditEntry[]>(`${KNOWLEDGE_BASE}/lifecycle/audit`);
     return Array.isArray(data) ? data : [];
   } catch {
     return [];
@@ -126,7 +126,7 @@ export async function fetchLifecycleAudit(): Promise<LifecycleAuditEntry[]> {
 }
 
 export async function kbFetchLifecycleAudit(): Promise<LifecycleAuditEntry[]> {
-  return kbFetchData<LifecycleAuditEntry[]>(`${KB_V1}/lifecycle/audit`);
+  return kbFetchData<LifecycleAuditEntry[]>(`${KNOWLEDGE_BASE}/lifecycle/audit`);
 }
 
 /** catalog auto-classify — 单资产分类触发（PRD B.2「详情 → 自动分类」流程入口） */

@@ -15,6 +15,7 @@
  */
 import { apiFetchData } from '../../../api';
 import { kbFetchData } from './kbFetch';
+import { KNOWLEDGE_BASE } from '../../../api/knowledgeClient';
 import { API_BASE, encodeQueryString } from '../../../services/httpClient';
 import type {
   NavProductQuery,
@@ -30,7 +31,6 @@ import type {
   RagResult,
 } from '../typesAndConstants';
 
-const KNOWLEDGE_BASE = `${API_BASE}/v1/knowledge`;
 const KB_V1 = KNOWLEDGE_BASE;
 const GLOSSARY_BASE = `${API_BASE}/v1/ontology/glossary`;
 const RULES_BASE = `${API_BASE}/v1/knowledge/compliance-rules`;

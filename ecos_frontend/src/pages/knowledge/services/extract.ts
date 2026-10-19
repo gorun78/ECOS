@@ -23,13 +23,13 @@ import { apiFetchData } from '../../../api';
 import { API_BASE, ApiRequestError } from '../../../services/httpClient';
 import { rawAuthedUrlFetch } from '../../../services/httpClient';
 import { kbFetchData } from './kbFetch';
+import { KNOWLEDGE_BASE } from '../../../api/knowledgeClient';
 import type {
   ImportQueueItem,
   StructuredExtractReport,
   StructuredExtractJob,
 } from '../typesAndConstants';
 
-const KB_V1 = `${API_BASE}/v1/knowledge`;
 
 // ── Wave 3 C1 — T8 抽取 · 定时 · 日志 · 本体树 类型 ───────────────────────────
 
@@ -118,7 +118,7 @@ export async function uploadDocumentChunked(
     fd.append('name', file.name);
     // 只带 Bearer、不带 Content-Type：multipart 的 boundary 必须由浏览器自造，
     // 单源通道未传 headers 时正是「只有 Authorization」这一形状 ⇒ 与改前逐字节一致。
-    const res = await rawAuthedUrlFetch(`${KB_V1}/extract/upload`, { method: 'POST', body: fd });
+    const res = await rawAuthedUrlFetch(`${KNOWLEDGE_BASE}/extract/upload`, { method: 'POST', body: fd });
     if (!res.ok) throw new Error(`chunk ${i}/${totalChunks} failed: ${res.status}`);
     onProgress((i + 1) / totalChunks);
   }
@@ -127,7 +127,7 @@ export async function uploadDocumentChunked(
 
 export async function fetchExtractCandidates(fileId: string): Promise<{ candidates: Record<string, unknown>[] } | null> {
   try {
-    const data = await apiFetchData<{ candidates?: Record<string, unknown>[] } | null>(`${KB_V1}/extract/candidates/${encodeURIComponent(fileId)}`);
+    const data = await apiFetchData<{ candidates?: Record<string, unknown>[] } | null>(`${KNOWLEDGE_BASE}/extract/candidates/${encodeURIComponent(fileId)}`);
     if (!data) return null;
     return { candidates: (data.candidates || []) as Record<string, unknown>[] };
   } catch {
@@ -140,7 +140,7 @@ export async function fetchExtractCandidates(fileId: string): Promise<{ candidat
 /** 临时文件上传门禁（引擎配置 extract.allow_direct_upload） */
 export async function fetchUploadEnabled(): Promise<{ allowed: boolean; hint: string }> {
   try {
-    return await apiFetchData<{ allowed: boolean; hint: string }>(`${KB_V1}/extract/upload-enabled`);
+    return await apiFetchData<{ allowed: boolean; hint: string }>(`${KNOWLEDGE_BASE}/extract/upload-enabled`);
   } catch {
     // 后端不可用时按默认禁用，避免绕过门禁
     return { allowed: false, hint: 'backend unavailable' };
@@ -153,7 +153,7 @@ export async function fetchTriggerStructuredExtract(params: {
   mode: 'FULL' | 'INCREMENTAL';
   dryRun?: boolean;
 }): Promise<StructuredExtractReport> {
-  return await apiFetchData<StructuredExtractReport>(`${KB_V1}/extract/structured`, {
+  return await apiFetchData<StructuredExtractReport>(`${KNOWLEDGE_BASE}/extract/structured`, {
     method: 'POST',
     body: JSON.stringify(params),
   });
@@ -164,7 +164,7 @@ export async function fetchStructuredJobs(pageNum: number, pageSize: number): Pr
   const clampedSize = Math.min(Math.max(1, pageSize), 50);
   try {
     const data = await apiFetchData<StructuredExtractJob[]>(
-      `${KB_V1}/extract/structured/jobs?pageNum=${pageNum}&pageSize=${clampedSize}`,
+      `${KNOWLEDGE_BASE}/extract/structured/jobs?pageNum=${pageNum}&pageSize=${clampedSize}`,
     );
     return Array.isArray(data) ? data : [];
   } catch {
@@ -179,14 +179,14 @@ export async function fetchStructuredJobs(pageNum: number, pageSize: number): Pr
 export async function kbFetchStructuredJobs(pageNum: number, pageSize: number): Promise<StructuredExtractJob[]> {
   const clampedSize = Math.min(Math.max(1, pageSize), 50);
   const data = await kbFetchData<StructuredExtractJob[]>(
-    `${KB_V1}/extract/structured/jobs?pageNum=${pageNum}&pageSize=${clampedSize}`,
+    `${KNOWLEDGE_BASE}/extract/structured/jobs?pageNum=${pageNum}&pageSize=${clampedSize}`,
   );
   return Array.isArray(data) ? data : [];
 }
 
 export async function fetchStructuredJobDetail(jobId: string): Promise<{ jobId: string; status: string; detail: string }> {
   return await apiFetchData<{ jobId: string; status: string; detail: string }>(
-    `${KB_V1}/extract/structured/jobs/${encodeURIComponent(jobId)}`,
+    `${KNOWLEDGE_BASE}/extract/structured/jobs/${encodeURIComponent(jobId)}`,
   );
 }
 
@@ -208,7 +208,7 @@ export async function fetchExtractCandidateFiles(): Promise<{
     checksum?: string;
     createdAt?: string;
     error?: string;
-  }[]>(`${KB_V1}/extract/files`);
+  }[]>(`${KNOWLEDGE_BASE}/extract/files`);
 }
 
 // ── 抽取作业信息（Wave 3 补充 2） ──────────────────────────────────────────────
@@ -237,7 +237,7 @@ export async function triggerStructuredExtract(req: {
   mode: string;
 }): Promise<StructuredExtractTriggerResp> {
   const data = await apiFetchData<StructuredExtractTriggerResp>(
-    `${KB_V1}/extract/structured`,
+    `${KNOWLEDGE_BASE}/extract/structured`,
     { method: 'POST', body: JSON.stringify(req) },
   );
   return data || { taskId: '', jobId: '', status: 'PENDING' };
@@ -250,7 +250,7 @@ export async function fetchExtractStatus(taskId: string): Promise<{
   statusMessage?: string;
 }> {
   const data = await apiFetchData<{ taskId: string; status: string; progress: number; statusMessage?: string }>(
-    `${KB_V1}/extract/status/${encodeURIComponent(taskId)}`,
+    `${KNOWLEDGE_BASE}/extract/status/${encodeURIComponent(taskId)}`,
   );
   return data || { taskId, status: 'UNKNOWN', progress: 0 };
 }
@@ -292,7 +292,7 @@ function normalizeTaskPayload(v: unknown): ExtractTaskPayload {
  */
 export async function pollExtractTask(taskId: string): Promise<ExtractTaskPoll> {
   try {
-    const data = await apiFetchData<ExtractTaskPayload>(`${KB_V1}/extract/tasks/${taskId}`);
+    const data = await apiFetchData<ExtractTaskPayload>(`${KNOWLEDGE_BASE}/extract/tasks/${taskId}`);
     return { source: 'backend', task: normalizeTaskPayload(data) };
   } catch (e) {
     // `httpStatus` 缺失 ⇒ 抛出物只可能来自「HTTP 200 + 信封 success:false / code 非 0·200」这一条腿，
@@ -339,7 +339,7 @@ export async function fetchExtractJobs(limit = 50): Promise<ExtractJobInfo[]> {
   const clamped = Math.min(Math.max(1, limit), 50);
   try {
     const d = await apiFetchData<{ jobs?: ExtractJobInfo[] } & ExtractJobInfo>(
-      `${KB_V1}/extract/structured/jobs?limit=${clamped}`,
+      `${KNOWLEDGE_BASE}/extract/structured/jobs?limit=${clamped}`,
     );
     if (!d) return [];
     if (Array.isArray((d as { jobs?: unknown }).jobs)) return (d as { jobs?: ExtractJobInfo[] }).jobs || [];
@@ -353,7 +353,7 @@ export async function fetchExtractJobs(limit = 50): Promise<ExtractJobInfo[]> {
 export async function fetchExtractJobStatus(taskId: string): Promise<ExtractJobInfo | null> {
   try {
     return await apiFetchData<ExtractJobInfo>(
-      `${KB_V1}/extract/structured/status/${encodeURIComponent(taskId)}`,
+      `${KNOWLEDGE_BASE}/extract/structured/status/${encodeURIComponent(taskId)}`,
     );
   } catch {
     return null;
@@ -380,7 +380,7 @@ export async function createScheduledExtract(
   req: ScheduledExtractCreateReq,
 ): Promise<{ id: number; scheduleId: string; nextRunAt: string }> {
   const data = await apiFetchData<{ id: number; scheduleId: string; nextRunAt: string }>(
-    `${KB_V1}/extract/scheduled`,
+    `${KNOWLEDGE_BASE}/extract/scheduled`,
     { method: 'POST', body: JSON.stringify(req) },
   );
   return data || { id: 0, scheduleId: '', nextRunAt: new Date().toISOString() };
@@ -390,14 +390,14 @@ export async function updateScheduledExtract(
   id: number,
   req: ScheduledExtractCreateReq,
 ): Promise<void> {
-  await apiFetchData<unknown>(`${KB_V1}/extract/scheduled/${id}`, {
+  await apiFetchData<unknown>(`${KNOWLEDGE_BASE}/extract/scheduled/${id}`, {
     method: 'PUT',
     body: JSON.stringify(req),
   });
 }
 
 export async function deleteScheduledExtract(id: number): Promise<void> {
-  await apiFetchData<unknown>(`${KB_V1}/extract/scheduled/${id}`, { method: 'DELETE' });
+  await apiFetchData<unknown>(`${KNOWLEDGE_BASE}/extract/scheduled/${id}`, { method: 'DELETE' });
 }
 
 /** 创建定时抽取任务（POST /extract/scheduled） */
@@ -409,7 +409,7 @@ export async function createScheduledExtractRow(body: {
   timeOfDay: string;
 }): Promise<{ id: number; scheduleId: string; nextRunAt: string }> {
   return await apiFetchData<{ id: number; scheduleId: string; nextRunAt: string }>(
-    `${KB_V1}/extract/scheduled`,
+    `${KNOWLEDGE_BASE}/extract/scheduled`,
     { method: 'POST', body: JSON.stringify(body) },
   );
 }
@@ -424,21 +424,21 @@ export async function updateScheduledExtractRow(id: number, body: {
   enabled?: boolean;
 }): Promise<{ id: number; scheduleId: string; nextRunAt: string }> {
   return await apiFetchData<{ id: number; scheduleId: string; nextRunAt: string }>(
-    `${KB_V1}/extract/scheduled/${id}`,
+    `${KNOWLEDGE_BASE}/extract/scheduled/${id}`,
     { method: 'PUT', body: JSON.stringify(body) },
   );
 }
 
 /** 拉取本体三级树（domain → ontology → entityCodes）；走 KbApiError → Tab 显式错误/空分治 */
 export async function kbFetchOntologyTree(): Promise<OntologyTreeVo[]> {
-  const data = await kbFetchData<OntologyTreeVo[]>(`${KB_V1}/extract/ontology-tree`);
+  const data = await kbFetchData<OntologyTreeVo[]>(`${KNOWLEDGE_BASE}/extract/ontology-tree`);
   return Array.isArray(data) ? data : [];
 }
 
 /** 静默版（OntologyTreePicker 老 surface），保留：KbApiError 由调用方按需 catch */
 export async function fetchOntologyTree(): Promise<OntologyTreeVo[]> {
   try {
-    const data = await apiFetchData<OntologyTreeVo[]>(`${KB_V1}/extract/ontology-tree`);
+    const data = await apiFetchData<OntologyTreeVo[]>(`${KNOWLEDGE_BASE}/extract/ontology-tree`);
     return Array.isArray(data) ? data : [];
   } catch {
     return [];
@@ -447,13 +447,13 @@ export async function fetchOntologyTree(): Promise<OntologyTreeVo[]> {
 
 /** 获取定时抽取任务列表（走 KbApiError 供 Tab 错误态） */
 export async function kbFetchScheduledExtracts(): Promise<ScheduledExtractVo[]> {
-  const data = await kbFetchData<ScheduledExtractVo[]>(`${KB_V1}/extract/scheduled`);
+  const data = await kbFetchData<ScheduledExtractVo[]>(`${KNOWLEDGE_BASE}/extract/scheduled`);
   return Array.isArray(data) ? data : [];
 }
 
 export async function fetchScheduledExtracts(): Promise<ScheduledExtractVo[]> {
   try {
-    const data = await apiFetchData<ScheduledExtractVo[]>(`${KB_V1}/extract/scheduled`);
+    const data = await apiFetchData<ScheduledExtractVo[]>(`${KNOWLEDGE_BASE}/extract/scheduled`);
     return Array.isArray(data) ? data : [];
   } catch {
     return [];
@@ -463,7 +463,7 @@ export async function fetchScheduledExtracts(): Promise<ScheduledExtractVo[]> {
 /** KbApiError 版：抽取日志（结构化抽取 → 按 jobId 反查） */
 export async function kbFetchExtractLogs(jobId: string): Promise<ExtractLogEntry[]> {
   const data = await kbFetchData<ExtractLogEntry[]>(
-    `${KB_V1}/extract/structured/logs/${encodeURIComponent(jobId)}`,
+    `${KNOWLEDGE_BASE}/extract/structured/logs/${encodeURIComponent(jobId)}`,
   );
   return Array.isArray(data) ? data : [];
 }
@@ -471,7 +471,7 @@ export async function kbFetchExtractLogs(jobId: string): Promise<ExtractLogEntry
 export async function fetchExtractLogs(jobId: string): Promise<ExtractLogEntry[]> {
   try {
     const data = await apiFetchData<ExtractLogEntry[]>(
-      `${KB_V1}/extract/structured/logs/${encodeURIComponent(jobId)}`,
+      `${KNOWLEDGE_BASE}/extract/structured/logs/${encodeURIComponent(jobId)}`,
     );
     return Array.isArray(data) ? data : [];
   } catch {
@@ -485,7 +485,7 @@ export async function fetchExtractLogs(jobId: string): Promise<ExtractLogEntry[]
  * 文案差异仍按调用方各自保留（页面 `MonitorPanel` 依赖 `exportExtractLog` 的原文案）。
  */
 async function postExportLogRequest(jobId: string): Promise<Response> {
-  return rawAuthedUrlFetch(`${KB_V1}/extract/structured/export-log`, {
+  return rawAuthedUrlFetch(`${KNOWLEDGE_BASE}/extract/structured/export-log`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jobId }),

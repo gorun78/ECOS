@@ -20,16 +20,14 @@ import { apiFetchData } from '../../../api';
 // #143/B5-14：seed 上传腿合流到 httpClient 裸响应通道。该通道基头集合 = 「有 token 时仅
 // `Authorization: Bearer …`、无 token 时空对象」，与本腿改前的 `token ? {Authorization} : {}`
 // 逐键相同；且不写 `Content-Type`（multipart 的 boundary 必须由浏览器自己生成）。
-import { API_BASE, rawAuthedUrlFetch } from '../../../services/httpClient';
+import { rawAuthedUrlFetch } from '../../../services/httpClient';
 import { createSseParser } from '../../../services/sseParser';
 import { kbFetchData, kbSseRequest } from './kbFetch';
+import { KNOWLEDGE_BASE } from '../../../api/knowledgeClient';
 import type {
   EvalSeedQuery,
   EvalReport,
 } from '../typesAndConstants';
-
-// W206/C188：KB 域基址由 httpClient API_BASE 单源派生
-const KB_V1 = `${API_BASE}/v1/knowledge`;
 
 // ── 画像 REQ-KB-02 / F04-06 ────────────────────────────────────────────────────
 
@@ -83,7 +81,7 @@ export interface KbProfileResolveResp {
   traceId?: string;
 }
 
-const PROFILES_BASE = `${KB_V1}/profiles`;
+const PROFILES_BASE = `${KNOWLEDGE_BASE}/profiles`;
 
 /** 提交画像生成任务（经 ITaskManagementService；503 → ECOS-KB-021 → KbApiError） */
 export async function kbGenerateProfiles(req: KbProfileGenerateReq): Promise<KbProfileGenerateResp> {
@@ -164,7 +162,7 @@ export interface KbAssumptionCreateReq {
   expireAt?: string;
 }
 
-const ASSUMPTIONS_BASE = `${KB_V1}/assumptions`;
+const ASSUMPTIONS_BASE = `${KNOWLEDGE_BASE}/assumptions`;
 
 /** 建假设 DRAFT —— 201 → {id, assumptionVersion, status:"DRAFT"} */
 export async function kbCreateAssumption(req: KbAssumptionCreateReq): Promise<KbAssumptionRow> {
@@ -229,7 +227,7 @@ export async function kbResolveAssumptions(params: {
 
 export async function fetchEvalSeeds(): Promise<EvalSeedQuery[]> {
   try {
-    const data = await apiFetchData<EvalSeedQuery[]>(`${KB_V1}/eval/seeds`);
+    const data = await apiFetchData<EvalSeedQuery[]>(`${KNOWLEDGE_BASE}/eval/seeds`);
     return Array.isArray(data) ? data : [];
   } catch {
     return [];
@@ -237,14 +235,14 @@ export async function fetchEvalSeeds(): Promise<EvalSeedQuery[]> {
 }
 
 export async function kbFetchEvalSeeds(): Promise<EvalSeedQuery[]> {
-  const data = await kbFetchData<EvalSeedQuery[]>(`${KB_V1}/eval/seeds`);
+  const data = await kbFetchData<EvalSeedQuery[]>(`${KNOWLEDGE_BASE}/eval/seeds`);
   return Array.isArray(data) ? data : [];
 }
 
 export async function uploadEvalSeed(file: File): Promise<{ name: string; count: number }> {
   const fd = new FormData();
   fd.append('file', file);
-  const res = await rawAuthedUrlFetch(`${KB_V1}/eval/seeds/upload`, {
+  const res = await rawAuthedUrlFetch(`${KNOWLEDGE_BASE}/eval/seeds/upload`, {
     method: 'POST',
     body: fd,
   });
@@ -255,7 +253,7 @@ export async function uploadEvalSeed(file: File): Promise<{ name: string; count:
 
 export async function runEval(seedSetName: string): Promise<EvalReport> {
   try {
-    const data = await apiFetchData<EvalReport>(`${KB_V1}/eval/run`, {
+    const data = await apiFetchData<EvalReport>(`${KNOWLEDGE_BASE}/eval/run`, {
       method: 'POST',
       body: JSON.stringify({ seedSetName }),
     });
@@ -277,7 +275,7 @@ export async function runEval(seedSetName: string): Promise<EvalReport> {
 
 /** KbApiError 版 runEval —— govern/retrieval + EvalRunPanel 错误态分治 */
 export async function kbRunEval(seedSetName: string): Promise<EvalReport> {
-  return kbFetchData<EvalReport>(`${KB_V1}/eval/run`, {
+  return kbFetchData<EvalReport>(`${KNOWLEDGE_BASE}/eval/run`, {
     method: 'POST',
     body: JSON.stringify({ seedSetName }),
   });
@@ -296,7 +294,7 @@ export async function kbRunEval(seedSetName: string): Promise<EvalReport> {
  */
 export async function runRAGQuerySSE(query: string, onToken: (token: string) => void): Promise<{ answerGenerated: boolean }> {
   try {
-    const url = `${KB_V1}/rag?query=${encodeURIComponent(query)}&stream=true`;
+    const url = `${KNOWLEDGE_BASE}/rag?query=${encodeURIComponent(query)}&stream=true`;
     const res = await kbSseRequest(url);
     if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`);
     const reader = res.body.getReader();

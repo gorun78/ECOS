@@ -46,6 +46,20 @@
  * 「裸形态分支必须在扫」不能再拿 prod 面 `rawSites > 0` 当证据（0 命中与判据失灵同形），故把 prod 面
  * 钉成 0（再写裸面即红），裸分支活性下沉到合成 fixture（单/双引号各一条）承证。自此 D-B5-40 的
  * 「旧判据面」在生产代码里是**全域**看不见，不再只是「部分族看不见」——本门是族面重复的唯一守卫。
+ * #145/B6-1 复跑 = 680 / 258 / 裸面 **0** / 派生面 **328** / dupBoth **29** / dupRawOnly **0** /
+ * blind **29**：B6 存量债首批收口 `/v1/knowledge` 一族——改前 7 个生产方各自写一份
+ * `` `${API_BASE}/v1/knowledge` `` 基址常量（`api/knowledgeClient.ts` + `pages/knowledge/services/`
+ * 六文件），现由 `api/knowledgeClient.ts` 的**导出** `KNOWLEDGE_BASE` 单源持有，其余六文件改成
+ * `import { KNOWLEDGE_BASE }`。消费方文件里从此没有该族的 URL 体 ⇒ 属主 7→1、族退出重复面、
+ * BASELINE 同批剪除。两点形状须记清，防止后继批误读：
+ *   ① **dupBoth 第一次真实下降**（30→29，欠 B5-21~26 六批一直原地不动的账）。下降的因是**生产方
+ *      个数**变了，不是形态变了——与 B5-25「点数搬家≠债收敛」互为正反证；记账只认 dupBoth，
+ *      不认派生态点数（本批 derSites 334→328 的 6 点下降是收口的**副产物**，不是进度本身）。
+ *   ② 单源化会让**该族之下的子路径腿对族面口径隐形**：`${KNOWLEDGE_BASE}/assets` 不含 `/v1/` 体，
+ *      `familiesOf` 吃不到。本批刻意**只**把 6 枚基址声明换成 import，各文件里 `${API_BASE}/v1/knowledge/…`
+ *      的具体子路径腿（graph.ts 2 处、overview.ts 3 处、wiki.ts 6 处、knowledgeClient.ts 3 处）**保持原样**，
+ *      故族面 258 一点未动。后继 B6 批若要连子路径一起合流，必须预期族面会降，且那降是可见性变化
+ *      而非新增重复——不得反过来当成"族面变小=债少了"。
  * 逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。
@@ -58,7 +72,8 @@
  * 棘轮口径 = **族 → 属主清单**（两侧都只减不增）：
  *   新族出现在重复面 → 红；基线族新增属主 → 红；基线族/属主已不再重复 → 陈旧豁免亦红
  *   （与 privateTransportRatchet「陈旧豁免即红」同口径：基线预算不留给已收口的项）。
- *   本门**不宣称**证明单源成立——30 个基线族是存量债清单（收敛属 B5 后续批与 B6 存量债），
+ *   本门**不宣称**证明单源成立——基线剩 29 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
+ *   `/v1/knowledge` 一族后 29 族 62 属主，余属 B6 后续批），
  *   本门钉死的是「债不再增 + 派生态不再隐身」。
  *
  * 三防恒绿：
@@ -198,7 +213,6 @@ const BASELINE: Readonly<Record<string, readonly string[]>> = Object.freeze({
   '/v1/engine/data/settings': ['pages/EngineMonitor.tsx', 'pages/data-workbench/DataEngineConfigPanel.tsx'],
   '/v1/engine/ontology': ['pages/MonitoringCenter.tsx', 'services/ontology/ontologyEngineApi.ts'],
   '/v1/guardrails/policies': ['pages/aiworkbench/api.ts', 'services/cognitiveEngineApi.ts'],
-  '/v1/knowledge': ['api/knowledgeClient.ts', 'pages/knowledge/services/assets.ts', 'pages/knowledge/services/extract.ts', 'pages/knowledge/services/govern.ts', 'pages/knowledge/services/graph.ts', 'pages/knowledge/services/overview.ts', 'pages/knowledge/services/wiki.ts'],
   '/v1/knowledge/compliance-rules': ['pages/knowledge/pages/components/govern/RuleRepoTable.tsx', 'pages/knowledge/services/wiki.ts'],
   '/v1/knowledge/query': ['pages/knowledge/services/wiki.ts', 'services/knowledgeQueryApi.ts'],
   '/v1/knowledge/rag': ['pages/knowledge/services/wiki.ts', 'services/knowledgeQueryApi.ts'],
@@ -255,8 +269,13 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // #143/B5-21 起把两条 `>=100` 绝对地板换掉：C1 每收口一批就把点位从裸形态面搬到派生面，
     // 地板迟早被真实进度撞红（本批 rawSites 113→87 即撞）。换成**两面之和恒等**这条更强的
     // 判据——纯 raw→derived 转换只在两面之间移动点位，总数不变；扫描根一旦漂移（漏目录、
-    // 判据改动）总数必变，比两条独立地板更能证「没在扫空」。334 = 本批实跑读出，与 dup* 同批重钉。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(334);
+    // 判据改动）总数必变，比两条独立地板更能证「没在扫空」。334 = 该批实跑读出，与 dup* 同批重钉。
+    // #145/B6-1 起这条恒等式的适用面要打个补丁：**存量债收口批（B6）不是 raw→derived 搬运，
+    // 而是「多属主各写一份派生态」→「一份派生态 + N 条 import」**，import 行不含 URL 体 ⇒ 点位数
+    // 真降（本批 334→**328**，差额恰为被删的 6 条 `${API_BASE}/v1/knowledge` 基址声明）。
+    // 恒等式的含义由此从「点数守恒」退成「点数等于本批实跑读出」，仍是有效的防空扫/防漂移钉，
+    // 但**不得**再拿它的升降当进度：债的收敛只认 dupBoth 下降（见文件头 B5-25 归因）。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(328);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     expect(dupBoth.size).toBeGreaterThan(dupRawOnly.size);
@@ -271,10 +290,14 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 四族的裸面可见性 ⇒ dupRawOnly 5 → **1**、盲区 25 → **29**；dupBoth 仍 30（基线不动、无陈旧豁免）。
     // #143/B5-24：散点域 11 处派生化把幸存最后一族 `/v1/ecos/ontologies` 的两个裸面属主同批转尽
     // ⇒ dupRawOnly 1 → **0**、盲区 29 → **30**（= dupBoth 全集）；dupBoth 仍 30、基线不动。
-    expect(dupBoth.size).toBe(30);
+    // #145/B6-1（存量债首批）：`/v1/knowledge` 一族 7 属主收口为「`api/knowledgeClient.ts` 单源导出
+    // `KNOWLEDGE_BASE` + 6 文件改为 import」⇒ **dupBoth 30 → 29**、BASELINE 同批剪除该族（属主 69 → 62）。
+    // 这是本门建成（#143/B5-19）以来 dupBoth 的**第一次真实下降**，与 B5-21~26 各批的「原地不动」相对：
+    // 那六批改的是形态、本批改的是生产方个数，正是文件头「dupBoth 下降才代表存量债真收敛」的兑现。
+    expect(dupBoth.size).toBe(29);
     expect(dupRawOnly.size).toBe(0);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(30);
+    expect(blind.length).toBe(29);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);
@@ -305,8 +328,10 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
 
   it('基线自身可校验：族面/属主面形态合规且与实跑读出同数', () => {
     const entries = Object.entries(BASELINE);
-    expect(entries.length).toBe(30);
-    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(69);
+    // #145/B6-1 起 29 族 / 62 属主（`/v1/knowledge` 一族 7 属主收口单源，与本批同款改动同批剪除）
+    expect(entries.length).toBe(29);
+    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(62);
+    expect(BASELINE['/v1/knowledge']).toBeUndefined();
     for (const [fam, owners] of entries) {
       expect(fam.startsWith('/v1/')).toBe(true);
       expect(fam.includes('\\')).toBe(false);

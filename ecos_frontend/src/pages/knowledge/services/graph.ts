@@ -2,7 +2,7 @@
  * graph.ts — 知识图谱 契约（B.9 / K-55 拆分）。
  *
  * 覆盖 Tab：`graph`
- * base 单源：GRAPH_BASE = /api/v1/knowledge
+ * base 单源：KNOWLEDGE_BASE = /api/v1/knowledge
  *
  * K-55 纠正（关键新增）：
  *   - `fetchGraph` 追加 `limit` 参数（缺省 200、上限 2000），
@@ -12,8 +12,8 @@
  */
 import { API_BASE } from '../../../services/httpClient';
 import { kbFetchData } from './kbFetch';
+import { KNOWLEDGE_BASE } from '../../../api/knowledgeClient';
 
-const GRAPH_BASE = `${API_BASE}/v1/knowledge`;
 
 /** K-55：图谱拉取默认/上限。默认 200，硬上限 2000（防误用）。 */
 export const GRAPH_FETCH_DEFAULT_LIMIT = 200;
@@ -49,7 +49,7 @@ export async function fetchGraph(
   params.set('limit', String(clampedLimit));
   const q = `?${params.toString()}`;
   // 走 kbFetchData：5xx / ECOS-KB-* → KbApiError；其余兼容 apiFetchData 语义
-  return kbFetchData<{ nodes: unknown[]; edges: unknown[] }>(`${GRAPH_BASE}/graph${q}`);
+  return kbFetchData<{ nodes: unknown[]; edges: unknown[] }>(`${KNOWLEDGE_BASE}/graph${q}`);
 }
 
 /** 硬上限保护：≤0 走默认；> MAX 走 MAX。 */
@@ -59,15 +59,15 @@ export function clampLimit(limit: number): number {
 }
 
 export async function fetchNode(id: string) {
-  return kbFetchData(`${GRAPH_BASE}/nodes/${encodeURIComponent(id)}`);
+  return kbFetchData(`${KNOWLEDGE_BASE}/nodes/${encodeURIComponent(id)}`);
 }
 
 export async function searchKnowledge(query: string) {
-  return kbFetchData(`${GRAPH_BASE}/search?q=${encodeURIComponent(query)}`);
+  return kbFetchData(`${KNOWLEDGE_BASE}/search?q=${encodeURIComponent(query)}`);
 }
 
 export async function findPath(source: string, target: string) {
-  return kbFetchData(`${GRAPH_BASE}/path?s=${encodeURIComponent(source)}&t=${encodeURIComponent(target)}`);
+  return kbFetchData(`${KNOWLEDGE_BASE}/path?s=${encodeURIComponent(source)}&t=${encodeURIComponent(target)}`);
 }
 
 // ── PMO-26 T1: Graph full-text search & path ──
@@ -83,17 +83,17 @@ export async function graphPath(source: string, target: string) {
 }
 
 export async function fetchNeighbors(id: string, depth = 1) {
-  return kbFetchData(`${GRAPH_BASE}/neighbors/${encodeURIComponent(id)}?d=${depth}`);
+  return kbFetchData(`${KNOWLEDGE_BASE}/neighbors/${encodeURIComponent(id)}?d=${depth}`);
 }
 
 export async function createNode(data: Record<string, unknown>) {
-  return kbFetchData(`${GRAPH_BASE}/nodes`, { method: 'POST', body: JSON.stringify(data) });
+  return kbFetchData(`${KNOWLEDGE_BASE}/nodes`, { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function createEdge(data: Record<string, unknown>) {
-  return kbFetchData(`${GRAPH_BASE}/edges`, { method: 'POST', body: JSON.stringify(data) });
+  return kbFetchData(`${KNOWLEDGE_BASE}/edges`, { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function getDataSource() {
-  return kbFetchData(`${GRAPH_BASE}/source`);
+  return kbFetchData(`${KNOWLEDGE_BASE}/source`);
 }

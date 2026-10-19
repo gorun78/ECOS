@@ -9,6 +9,7 @@
 import { apiFetchData } from '../../../api';
 import { API_BASE } from '../../../services/httpClient';
 import { kbFetchData } from './kbFetch';
+import { KNOWLEDGE_BASE } from '../../../api/knowledgeClient';
 import type {
   SyncStatus,
   SyncLog,
@@ -18,7 +19,6 @@ import type {
   EngineConfig,
 } from '../typesAndConstants';
 
-const KNOWLEDGE_BASE = `${API_BASE}/v1/knowledge`;
 const KB_V1 = KNOWLEDGE_BASE;
 
 // ── Overview / Dashboard ────────────────────────────────────────────────────────

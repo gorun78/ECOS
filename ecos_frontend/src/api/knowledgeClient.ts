@@ -50,7 +50,7 @@ export async function fetchKnowledgeGraph(): Promise<{
 
 
 // ── Knowledge Search (Cognitive Operating System) ─────────────
-const KNOWLEDGE_SEARCH_BASE = `${API_BASE}/v1/knowledge`;
+export const KNOWLEDGE_BASE = `${API_BASE}/v1/knowledge`;
 
 /**
  * GET /api/v1/engine/knowledge/health — 知识引擎公开健康 VO
@@ -62,7 +62,7 @@ export async function fetchKnowledgeEngineHealth(): Promise<Record<string, unkno
 }
 
 export async function searchKnowledge(q: string): Promise<any> {
-  return doFetch(`${KNOWLEDGE_SEARCH_BASE}/search?q=${encodeURIComponent(q)}`);
+  return doFetch(`${KNOWLEDGE_BASE}/search?q=${encodeURIComponent(q)}`);
 }
 
 /** GET /api/knowledge/path?s=srcId&t=tgtId — find shortest path between two nodes */
