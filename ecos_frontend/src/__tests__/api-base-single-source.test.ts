@@ -51,6 +51,14 @@
  * 属本门检不出的**陈旧豁免**（本门只扫基线外文件，不像棘轮门会把 0 命中项判红）⇒ 同批剪除。
  * 基线内此类陈旧项另有 11 枚（含 8 枚指向已不存在的路径），已单独立项 #143/B5-12 处置，
  * 不在本批夹带。
+ * 2026-10-19 #143/B5-12 本门补「陈旧即红」腿：此前只判「基线外新增」不判「基线内陈旧」，
+ * 空占的豁免位永远检不出（与 privateTransportRatchet 的 `[陈旧豁免]` 判据口径不对称）。
+ * 补腿后同批实跑读出 **11 枚陈旧** ⇒ 全部剪除（8 枚路径已不存在：
+ * `components/ontology-workbench/OntologyWorkbenchSidebar.tsx`、`pages/OntologyObjectBrowser.tsx`、
+ * `pages/SqlQueryConsole.tsx`、`pages/SystemDictionary.tsx`、`pages/sql-query-console/{HistoryPanel,
+ * SchemaTree,TemplatePanel,api}`；3 枚在位但代码行 0 命中 = 早批已收口：
+ * `components/data-workbench/GitPanel.tsx`、`pages/aiworkbench/ChatbotStudioView.tsx`、`services/auth.ts`）。
+ * 另配一条合成数据反向自检（缺失/零命中/有命中三例），证明该判据本身能变红。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -73,22 +81,16 @@ const BASELINE = new Set([
   'api/monitorClient.ts',
   'api/ontologyClient.ts',
   'api/securityClient.ts',
-  'components/data-workbench/GitPanel.tsx',
   'components/ontology-workbench/OntologyDomainPanel.tsx',
-  'components/ontology-workbench/OntologyWorkbenchSidebar.tsx',
   'hooks/useBindingCatalog.ts',
   'pages/ContractManager.tsx',
   'pages/DataAssetsDashboard.tsx',
   'pages/DataLineage.tsx',
-  'pages/OntologyObjectBrowser.tsx',
   'pages/ProjectTracker.tsx',
   'pages/ScenarioManagementView.tsx',
-  'pages/SqlQueryConsole.tsx',
-  'pages/SystemDictionary.tsx',
   'pages/TelemetryViewer.tsx',
   'pages/TenantManager.tsx',
   'pages/TokenDashboard.tsx',
-  'pages/aiworkbench/ChatbotStudioView.tsx',
   'pages/aiworkbench/api.ts',
   'pages/aiworkbench/logic-canvas/useLogicPipelineRun.ts',
   'pages/business-workbench/BusinessWorkbenchLayout.tsx',
@@ -123,15 +125,10 @@ const BASELINE = new Set([
   'pages/scenario/MentalReviewTab.tsx',
   'pages/scenario/OverrideTab.tsx',
   'pages/scenario/ReplayTab.tsx',
-  'pages/sql-query-console/HistoryPanel.tsx',
-  'pages/sql-query-console/SchemaTree.tsx',
-  'pages/sql-query-console/TemplatePanel.tsx',
-  'pages/sql-query-console/api.ts',
   'pages/workbench/[scenarioId]/index.tsx',
   'pages/workbench/index.tsx',
   'providers/graphqlClient.ts',
   'services/aiworkbenchApi.ts',
-  'services/auth.ts',
   'services/cognitiveClient.ts',
   'services/cognitiveEngineApi.ts',
   'services/dataCatalogClient.ts',
@@ -178,6 +175,33 @@ function isComment(line: string): boolean {
   return t.startsWith('//') || t.startsWith('*') || t.startsWith('/*') || t.startsWith('///');
 }
 
+/**
+ * 陈旧豁免判据（纯函数，供本门与「能变红」自检共用）：
+ * 基线只登记「真有 `/api` 字面量待收口」的文件。路径不存在、或代码行零命中，
+ * 都说明豁免位空占——本门若只判「基线外新增」，这类空位永远检不出（与 C2′ 棘轮门口径不对称）。
+ */
+function staleEntries(entries: readonly string[], read: (rel: string) => string | null): string[] {
+  const stale: string[] = [];
+  for (const rel of [...entries].sort()) {
+    const body = read(rel);
+    if (body === null) {
+      stale.push(`${rel} — 文件已不存在`);
+      continue;
+    }
+    const hits = body.split('\n').filter((l) => !isComment(l) && HARDCODED_RE.test(l)).length;
+    if (hits === 0) stale.push(`${rel} — 代码行 0 命中（已收口，豁免位应剪除）`);
+  }
+  return stale;
+}
+
+const readSrc = (rel: string): string | null => {
+  try {
+    return readFileSync(join(SRC_ROOT, ...rel.split('/')), 'utf8');
+  } catch {
+    return null;
+  }
+};
+
 describe('api-base-single-source — API 前缀基址单源 (W206/C188, §十)', () => {
   it('noHardcodedApiPrefixOutsideHttpClient', () => {
     const files: string[] = [];
@@ -201,4 +225,30 @@ describe('api-base-single-source — API 前缀基址单源 (W206/C188, §十)',
         : undefined,
     ).toEqual([]);
   }, 30_000);
+
+  it('noStaleExemptionInsideBaseline — 基线内陈旧豁免同批判红（#143/B5-12）', () => {
+    const stale = staleEntries([...BASELINE], readSrc);
+    expect(
+      stale,
+      stale.length
+        ? `陈旧豁免 ${stale.length} 枚（文件不存在或代码行 0 命中），必须同批从 BASELINE 剪除：\n${stale.join('\n')}`
+        : undefined,
+    ).toEqual([]);
+  }, 30_000);
+
+  it('判据反向自检：合成数据必须各判出该判的红，否则本门是自证清白', () => {
+    const fake = (rel: string): string | null => {
+      if (rel === 'gone/missing.ts') return null;
+      if (rel === 'clean/already.ts') return "import { API_BASE } from '../services/httpClient';\nconst u = `${API_BASE}/v1/x`;\n// '/api/v1/legacy' 注释行不计\n";
+      if (rel === 'dirty/still.ts') return "const u = '/api/v1/still-hardcoded';\n";
+      throw new Error(`合成用例外的路径：${rel}`);
+    };
+    // 返回按条目名排序 ⇒ 断言顺序 = clean < gone；dirty 有命中不该判红。
+    expect(
+      staleEntries(['gone/missing.ts', 'clean/already.ts', 'dirty/still.ts'], fake),
+    ).toEqual([
+      'clean/already.ts — 代码行 0 命中（已收口，豁免位应剪除）',
+      'gone/missing.ts — 文件已不存在',
+    ]);
+  });
 });
