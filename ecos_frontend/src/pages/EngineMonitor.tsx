@@ -55,7 +55,7 @@ interface StatusData {
 
 const ENGINE_META: Record<string, { icon: React.ComponentType<{ className?: string }>; configPath?: string }> = {
   security: { icon: Shield },
-  data:     { icon: Database, configPath: '/api/v1/engine/data/settings' },
+  data:     { icon: Database, configPath: `${API_BASE}/v1/engine/data/settings` },
   ontology: { icon: Network },
   cognitive:{ icon: Brain },
   knowledge:{ icon: BookOpen },
@@ -64,11 +64,20 @@ const ENGINE_META: Record<string, { icon: React.ComponentType<{ className?: stri
 
 // ── Helpers ──────────────────────────────────────────────────
 
-// 鉴权头单源定义见 services/auth.ts (H6-T1)
-import { authHeaders } from '../services/auth';
+// 传输单源（#143/B5-11g）：本 helper 只把裸 `fetch(` 换成 httpClient 的带身份裸响应通道
+// `rawAuthedUrlFetch`，401/403/406→null/content-type 容差/信封解包五面逐字保留在本域
+// （单源的 `apiFetch` 语义不同：401 走 handleAuthExpired、403 走 notifyNoAccess+ApiRequestError、
+// 且无 content-type 容差 ⇒ 折过去就是语义变更，不属本批授权）。
+// 头集合逐键不变：改前 `authHeaders()` = `Content-Type: application/json` +（有 token 才拼的）
+// `Authorization: Bearer`；`rawAuthedUrlFetch` 只拼 Authorization，故 Content-Type 由本行显式带上。
+// 合流新增的唯一共享面 = PMO-43 网络态归一（传输故障改抛 NetworkError 并派发 ecos-network-down，
+// 改前是原生 TypeError "Failed to fetch"；本页 classifyError 只取 e.message ⇒ 上屏文案变化）。
+// 同批观察（未改动，避免夹带语义变更）：401 腿仍写 `localStorage.removeItem('token')`，
+// 而 `MonitoringCenter` 同类腿已用 auth 单源 `clearAuthToken()`（「禁手删单键」）⇒ 并入 #108 队列。
+import { API_BASE, rawAuthedUrlFetch } from '../services/httpClient';
 
 async function apiFetch<T = any>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: authHeaders() });
+  const res = await rawAuthedUrlFetch(url, { headers: { 'Content-Type': 'application/json' } });
   if (res.status === 401) {
     // Token expired/invalid → clear auth & re-login (AM-30 event,
     // PMO-43 T4, same behaviour as api.ts handleAuthExpired).
@@ -133,7 +142,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
     setHealthError(null);
     setHealthNoAccess(false);
     try {
-      const data = await apiFetch<HealthData>(`/api/v1/engine/${engine}/health`);
+      const data = await apiFetch<HealthData>(`${API_BASE}/v1/engine/${engine}/health`);
       setHealth(data);
     } catch (e) {
       const c = classifyError(e);
@@ -151,7 +160,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
     setConfigError(null);
     setConfigNoAccess(false);
     try {
-      const data = await apiFetch<ConfigData>(meta.configPath || `/api/v1/engine/${engine}/config`);
+      const data = await apiFetch<ConfigData>(meta.configPath || `${API_BASE}/v1/engine/${engine}/config`);
       setConfig(data);
     } catch (e) {
       const c = classifyError(e);
@@ -169,7 +178,7 @@ export default function EngineMonitor({ engine, initialHealth, initialStatus }: 
     setStatusError(null);
     setStatusNoAccess(false);
     try {
-      const data = await apiFetch<StatusData>(`/api/v1/engine/${engine}/status`);
+      const data = await apiFetch<StatusData>(`${API_BASE}/v1/engine/${engine}/status`);
       setStatus(data);
     } catch (e) {
       const c = classifyError(e);

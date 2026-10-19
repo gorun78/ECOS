@@ -227,7 +227,7 @@ describe('A 源形 — 两文件私设传输与硬编码基址归零（C2′ 棘
     expect(SRC_LOGIN).toContain('localStorage.setItem("token", data.accessToken)');
   }, 30_000);
 
-  it('A5 两份门禁基线同批剪除本批两文件，且棘轮声明值 = 实测口径 14/15', () => {
+  it('A5 两份门禁基线同批剪除本批两文件，且棘轮声明值 = 当前实测口径 11/12', () => {
     for (const src of [SRC_RATCHET, SRC_APIBASE]) {
       expect(src).not.toContain("'services/systemDictApi.ts'");
       expect(src).not.toContain("'services/ontology/ontologyExportApi.ts'");
@@ -236,8 +236,10 @@ describe('A 源形 — 两文件私设传输与硬编码基址归零（C2′ 棘
     const declaredSum = Number(
       /expect\(entries\.reduce\(\(n, \[, c\]\) => n \+ c, 0\)\)\.toBe\((\d+)\)/.exec(SRC_RATCHET)?.[1] ?? -1,
     );
-    expect(declaredCount).toBe(14);
-    expect(declaredSum).toBe(15);
+    // 14/15 → 11/12：#143/B5-11g 剪除页面域三腿后的实测口径。
+    // 本断言故意读门禁源码而非复制常量——棘轮声明若与实际收口脱节，这里会变红。
+    expect(declaredCount).toBe(11);
+    expect(declaredSum).toBe(12);
   });
 });
 

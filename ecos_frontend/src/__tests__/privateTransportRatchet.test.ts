@@ -30,6 +30,13 @@
  * 它们的帧序已由 #143/B5-2~B5-5b 收口至单源，但传输腿仍是裸 fetch，
  * 归本门渐进收敛（不因「另有 SSE 门」而豁免，否则判据出现洞）。
  *
+ * 页面域三腿（#143/B5-11g）的合流口径：三处原本写 `fetch(url, { headers: authHeaders() })`，
+ * 而 `authHeaders()` 含 `Content-Type: application/json`、`rawAuthedUrlFetch` 的单源底头
+ * **只有 Authorization**（该通道刻意不设 Content-Type，交由调用方按腿决定）。
+ * 直接替换会让这批 GET 丢掉 `Content-Type`——`Guardrails/helpers#apiCall` 另有 POST/PUT 腿，
+ * 丢掉即有 415 风险。故本批三腿统一传 `{ headers: { 'Content-Type': 'application/json' } }`，
+ * 头集合逐键不变，只把传输封装收进单源。
+ *
  * 基线数字为 2026-10-19 #143/B5-11c（alertsApi+AlertPanel → worldModelGraphApi+dataAssetsApi
  * → kbFetch+agentMeshApi 三批收口后）实跑值，非估算。首批订立时实测 26 文件 / 45 处。
  * #143/B5-11d 剪除 `services/knowledgeQueryApi.ts`(5) + `pages/knowledge/services/extract.ts`(3)
@@ -40,6 +47,10 @@
  * #143/B5-11f 剪除 `services/systemDictApi.ts`(1) + `services/ontology/ontologyExportApi.ts`(1)
  * 两条带 Bearer 腿（合流 `rawAuthedUrlFetch`）⇒ 16/17 → **14 文件 / 15 命中行**
  * （同批实跑校验：改前先跑一次本门读出实测值 14/15，再剪基线，非推算）。
+ * #143/B5-11g 剪除 `pages/EngineMonitor.tsx`(1) + `pages/Guardrails/helpers.ts`(1)
+ * + `pages/MonitoringCenter.tsx`(1) 三条页面域 helper 腿（合流 `rawAuthedUrlFetch`
+ * 并显式补回 `Content-Type`，见下「页面域三腿」注）⇒ 14/15 → **11 文件 / 12 命中行**
+ * （同批实跑校验：改前先跑一次本门读出实测值 11/12，再剪基线，非推算）。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -54,14 +65,11 @@ const SRC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CANONICAL = 'services/httpClient.ts';
 
 /**
- * 基线（存量登记，#143/B5-11f 收口 systemDictApi + ontologyExportApi 后实测
- * 14 文件 / 15 命中行；只减不增）。
+ * 基线（存量登记，#143/B5-11g 收口 EngineMonitor + Guardrails/helpers + MonitoringCenter
+ * 后实测 11 文件 / 12 命中行；只减不增）。
  * 值 = 该文件允许的最大命中行数，剪项/降数必须与该文件的真实收口同批。
  */
 const BASELINE: Readonly<Record<string, number>> = Object.freeze({
-  'pages/EngineMonitor.tsx': 1,
-  'pages/Guardrails/helpers.ts': 1,
-  'pages/MonitoringCenter.tsx': 1,
   'pages/aiworkbench/AgentStudioView.tsx': 1,
   'pages/aiworkbench/api.ts': 1,
   'pages/data-workbench/api/unstructured.ts': 1,
@@ -169,8 +177,8 @@ describe('privateTransportRatchet — C2′ 私设传输棘轮门 (#143/B5-11a)'
 
   it('基线自身可校验：条目数与合计命中上限与文档口径一致', () => {
     const entries = Object.entries(BASELINE);
-    expect(entries.length).toBe(14);
-    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(15);
+    expect(entries.length).toBe(11);
+    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(12);
     // 键必须是 POSIX 相对路径且非基线外文件形态
     for (const [rel] of entries) {
       expect(rel.startsWith('./')).toBe(false);

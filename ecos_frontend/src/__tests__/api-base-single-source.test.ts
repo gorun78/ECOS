@@ -38,6 +38,11 @@
  * 2026-10-19 #143/B5-11f 收口减 2：`services/systemDictApi.ts` 一腿与
  * `services/ontology/ontologyExportApi.ts` 的 `EXPORT_BASE` 改由 API_BASE 派生
  * （取值逐字不变），两文件同批从 privateTransportRatchet 基线一并剪除。
+ * 2026-10-19 #143/B5-11g 收口减 2：`pages/EngineMonitor.tsx`（health/config/status 三枚
+ * 调用点 + `ENGINE_META.data.configPath` 共 4 处）与 `pages/MonitoringCenter.tsx`
+ * （`ENGINES` 六枚 `apiBase`）的 `"/api/v1/engine/…"` 字面量全改 API_BASE 派生，
+ * 取值逐字不变；两文件同批从 privateTransportRatchet 基线一并剪除
+ * （`pages/Guardrails/helpers.ts` 只收传输，本就无基址字面量，不在本清单）。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -67,8 +72,6 @@ const BASELINE = new Set([
   'pages/ContractManager.tsx',
   'pages/DataAssetsDashboard.tsx',
   'pages/DataLineage.tsx',
-  'pages/EngineMonitor.tsx',
-  'pages/MonitoringCenter.tsx',
   'pages/OntologyObjectBrowser.tsx',
   'pages/ProjectTracker.tsx',
   'pages/ScenarioManagementView.tsx',

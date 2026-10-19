@@ -28,19 +28,27 @@ interface EngineDef {
 }
 
 const ENGINES: EngineDef[] = [
-  { id: "eng-security",  labelKey: "dashboard.monitoring.engine.security",  icon: Shield,   engine: "security",  apiBase: "/api/v1/engine/security" },
-  { id: "eng-data",      labelKey: "dashboard.monitoring.engine.data",      icon: Database, engine: "data",      apiBase: "/api/v1/engine/data" },
-  { id: "eng-ontology",  labelKey: "dashboard.monitoring.engine.ontology",  icon: Network,  engine: "ontology",  apiBase: "/api/v1/engine/ontology" },
-  { id: "eng-cognitive", labelKey: "dashboard.monitoring.engine.cognitive", icon: Brain,    engine: "cognitive", apiBase: "/api/v1/engine/cognitive" },
-  { id: "eng-knowledge", labelKey: "dashboard.monitoring.engine.knowledge", icon: BookOpen, engine: "knowledge", apiBase: "/api/v1/engine/knowledge" },
-  { id: "eng-ai",        labelKey: "dashboard.monitoring.engine.ai",        icon: Sparkles, engine: "ai",        apiBase: "/api/v1/engine/ai" },
+  { id: "eng-security",  labelKey: "dashboard.monitoring.engine.security",  icon: Shield,   engine: "security",  apiBase: `${API_BASE}/v1/engine/security` },
+  { id: "eng-data",      labelKey: "dashboard.monitoring.engine.data",      icon: Database, engine: "data",      apiBase: `${API_BASE}/v1/engine/data` },
+  { id: "eng-ontology",  labelKey: "dashboard.monitoring.engine.ontology",  icon: Network,  engine: "ontology",  apiBase: `${API_BASE}/v1/engine/ontology` },
+  { id: "eng-cognitive", labelKey: "dashboard.monitoring.engine.cognitive", icon: Brain,    engine: "cognitive", apiBase: `${API_BASE}/v1/engine/cognitive` },
+  { id: "eng-knowledge", labelKey: "dashboard.monitoring.engine.knowledge", icon: BookOpen, engine: "knowledge", apiBase: `${API_BASE}/v1/engine/knowledge` },
+  { id: "eng-ai",        labelKey: "dashboard.monitoring.engine.ai",        icon: Sparkles, engine: "ai",        apiBase: `${API_BASE}/v1/engine/ai` },
 ];
 
-// 鉴权头单源定义见 services/auth.ts (H6-T1)
-import { authHeaders, clearAuthToken } from '../services/auth';
+// 鉴权头单源定义见 services/auth.ts (H6-T1)；传输单源见 services/httpClient.ts（#143/B5-11g）
+import { clearAuthToken } from '../services/auth';
+import { API_BASE, rawAuthedUrlFetch } from '../services/httpClient';
 
 /**
  * 请求结果分类：403(denied) / 网络不可达(offline) / 5xx 等 HTTP 错误(error) 不再同归 null→UNKNOWN。
+ *
+ * <p>#143/B5-11g 传输合流：裸 `fetch(` 换成单源 `rawAuthedUrlFetch`，头集合逐键不变
+ * （改前 `authHeaders()` = Content-Type + 条件 Authorization，单源只拼 Authorization，
+ * 故 Content-Type 由调用面显式带上）；401/403/`ecos-403` 事件、content-type 容差、
+ * 信封解包、`offline` 归类四面逐字留在本域。合流新增的唯一共享面 = PMO-43 网络态归一，
+ * 它把传输故障改抛 `NetworkError` 并派发 `ecos-network-down`——本函数 `catch` 不分错误类型
+ * 一律返回 `{kind:"offline"}` ⇒ 分类结果不变。</p>
  */
 type FetchOutcome<T> =
   | { kind: "ok"; data: T | null }
@@ -50,7 +58,7 @@ type FetchOutcome<T> =
 
 async function apiFetch<T>(url: string, id?: string): Promise<FetchOutcome<T>> {
   try {
-    const res = await fetch(url, { headers: authHeaders() });
+    const res = await rawAuthedUrlFetch(url, { headers: { 'Content-Type': 'application/json' } });
     if (res.status === 401) {
       // Login expired — force re-login (PMO-43 T4). auth 单源清理，禁手删单键。
       clearAuthToken();

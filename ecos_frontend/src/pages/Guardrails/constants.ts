@@ -7,7 +7,7 @@ import { API_BASE as API_ROOT } from '../../services/httpClient';
 // ─────────────────────────────────────────────────────────────
 
 /**
- * 护栏策略端点基址（完整路径，供 helpers#apiCall 裸 fetch 使用）。
+ * 护栏策略端点基址（完整路径，供 helpers#apiCall 经单源 `rawAuthedUrlFetch` 取用）。
  * 前缀由 httpClient#API_BASE 单源派生 —— W206/C188 禁本文件再写字面前缀。
  */
 export const API_BASE = `${API_ROOT}/v1/guardrails/policies`;
