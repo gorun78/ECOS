@@ -24,6 +24,7 @@ import { apiFetchData } from "../api";
 import { fetchLineageTopology, rebuildLineage, fetchLineageImpact } from "./data-workbench/api";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
+import { API_BASE } from "../services/httpClient";
 
 /**
  * Lineage 视图模式
@@ -164,7 +165,7 @@ export default function DataLineage({ initialTable }: DataLineageProps = {}) {
     setMode("table");
     setQueryMsg(null);
     setLoading(true);
-    const url = `/api/v1/engine/data/lineage?tableName=${encodeURIComponent(tbl)}`;
+    const url = `${API_BASE}/v1/engine/data/lineage?tableName=${encodeURIComponent(tbl)}`;
     try {
       const data: any = await apiFetchData(url);
       if (data?.nodes?.length > 0) {

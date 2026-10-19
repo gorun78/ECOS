@@ -10,6 +10,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { API_BASE } from '../../../services/httpClient';
 import {
   Download, RefreshCw, Loader2, ChevronDown, ChevronRight,
   Eye, PlayCircle, ListOrdered,
@@ -65,7 +66,7 @@ export default function DataWorkbenchImportTab({ showToast }: TabProps) {
   const loadVersions = useCallback(async () => {
     setVersionsLoading(true);
     try {
-      const data = await apiFetchData<OntologyVersionOption[]>('/api/v1/ecos/versions');
+      const data = await apiFetchData<OntologyVersionOption[]>(`${API_BASE}/v1/ecos/versions`);
       const list = Array.isArray(data) ? data : [];
       setVersions(list.map(v => ({
         id: String(v.id ?? ''),

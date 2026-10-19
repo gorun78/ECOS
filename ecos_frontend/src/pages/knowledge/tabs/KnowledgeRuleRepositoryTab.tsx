@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { API_BASE } from '../../../services/httpClient';
 import {
   FileText, Plus, Search, Edit3, Trash2, ChevronDown, ChevronRight,
   History, BookOpen, Bookmark, ScrollText, ExternalLink, Scale,
@@ -73,7 +74,7 @@ export default function KnowledgeRuleRepositoryTab() {
 
   const loadRules = () => {
     setLoading(true);
-    apiFetchData<RulesResponse>('/api/v1/knowledge/rules?groupBy=regulation')
+    apiFetchData<RulesResponse>(`${API_BASE}/v1/knowledge/rules?groupBy=regulation`)
       .then((data) => {
         const envelope = data as RulesEnvelope;
         const list = envelope?.list || envelope?.data || data || [];

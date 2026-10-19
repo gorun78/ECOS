@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetchData } from '../api';
+import { API_BASE } from '../services/httpClient';
 
 /** 三层归属：子图 / 横切 / 出口（铁律 §0.6.1）。 */
 export type BindingTier = 'SUBGRAPH' | 'CROSS' | 'OUTPUT';
@@ -35,7 +36,7 @@ export interface BindingCatalogState {
   reload: () => void;
 }
 
-const BINDING_CATALOG_URL = '/api/v1/workspace/binding-catalog';
+const BINDING_CATALOG_URL = `${API_BASE}/v1/workspace/binding-catalog`;
 
 export function useBindingCatalog(opts: { enabled?: boolean } = {}): BindingCatalogState {
   const enabled = opts.enabled ?? true;

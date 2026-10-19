@@ -16,6 +16,7 @@ import {
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { knowledgeApi } from '../services/knowledgeApi';
+import { API_BASE } from '../../../services/httpClient';
 import type { GraphBuildJob, GraphBuildPreview } from '../typesAndConstants';
 
 type TabProps = { showToast?: (type: 'success' | 'info' | 'error', msg: string) => void };
@@ -172,7 +173,7 @@ export default function GraphBuilderTab({ showToast }: TabProps) {
                 <tr><td colSpan={5} className={`p-12 text-center ${styles.muted} text-xs space-y-2`}>
                   <Database size={24} className={`mx-auto ${styles.muted}`} />
                   <p>{zh ? '暂无图谱构建任务。点击「全量构建」触发一次 →' : 'No graph build jobs yet. Click "Full Build" to start one →'}</p>
-                  <p className={`text-[10px] ${styles.muted} font-mono`}>waiting PMO-56 backend `/api/v1/knowledge/sync/jobs`</p>
+                  <p className={`text-[10px] ${styles.muted} font-mono`}>{`waiting PMO-56 backend \`${API_BASE}/v1/knowledge/sync/jobs\``}</p>
                 </td></tr>
               ) : jobs.map(job => (
                 <tr key={job.jobId} className={`border-b ${styles.appBorder} ${styles.sidebarHoverBg} transition`}>

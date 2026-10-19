@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { API_BASE } from "../services/httpClient";
 import {
   FileText, Search, RefreshCw, AlertCircle, Loader2,
   DollarSign, Calendar, User, Building2, CheckCircle,
@@ -82,7 +83,7 @@ export default function ContractManager() {
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (searchQ.trim()) params.set("search", searchQ.trim());
 
-      const data: any = await apiFetchData(`/api/v1/ecos/objects/Contract?${params.toString()}`);
+      const data: any = await apiFetchData(`${API_BASE}/v1/ecos/objects/Contract?${params.toString()}`);
 
       if (Array.isArray(data)) {
         setContracts(data);

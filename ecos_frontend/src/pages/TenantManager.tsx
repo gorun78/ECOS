@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { API_BASE } from "../services/httpClient";
 import {
   Building,
   Gauge,
@@ -210,7 +211,7 @@ export default function TenantManager() {
     setLoadingUsage(true);
     setUsageError("");
     try {
-      const result: any = await apiFetchData(`/api/v1/system/tenants/${selectedTenantId}/usage?range=${usageRange}`);
+      const result: any = await apiFetchData(`${API_BASE}/v1/system/tenants/${selectedTenantId}/usage?range=${usageRange}`);
       setDailyUsage(result?.daily_usage ?? []);
     } catch (e: any) {
       setUsageError(e.message || "Failed to load usage");
@@ -227,7 +228,7 @@ export default function TenantManager() {
     setLoadingInvoice(true);
     setInvoiceError("");
     try {
-      const result: any = await apiFetchData(`/api/v1/system/tenants/${selectedTenantId}/invoice?month=${invoiceMonth}`);
+      const result: any = await apiFetchData(`${API_BASE}/v1/system/tenants/${selectedTenantId}/invoice?month=${invoiceMonth}`);
       setInvoice(result && result.line_items ? result : null);
     } catch (e: any) {
       setInvoiceError(e.message || "Failed to load invoice");

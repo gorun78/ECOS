@@ -1,8 +1,9 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from '@apollo/client';
+import { API_BASE } from '../services/httpClient';
 
 const graphqlClient = new ApolloClient({
   link: createHttpLink({
-    uri: '/api/graphql',
+    uri: `${API_BASE}/graphql`,
   }),
   cache: new InMemoryCache(),
   defaultOptions: {

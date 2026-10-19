@@ -125,6 +125,17 @@
  * **含 API_BASE 的 import 行**而非新增行。同批 `pages/aiworkbench` 整域 29 个生产文件零私设基址
  * ⇒ 该域闭合（B5-24 只收 `logic-canvas/useLogicPipelineRun.ts`，当时明示不宣称闭合）。
  * 16 → 15 枚系实跑读出后剪除。
+ * 2026-10-19 #143/B5-26 **基线归零**：残余散点 15 文件代码行私设基址 **21 处**（形态拆分 = 单引号 8 +
+ * 双引号 2 + 反引号 11，跨 5 个目录深度）改由 `API_BASE` 派生，取值逐字不变。其中两枚是本波此前没有的
+ * 形状——`RuleRepoTable.tsx` 一条**跨行模板**（行级判据吃不进换行）与 `GraphBuilderTab.tsx` 一条
+ * **JSX 显示文本**（不是传输 URL，派生须走转义反引号才不改渲染字节），两枚各由批级门
+ * `__tests__/c1FinalScatterBaseSingleSource.spec.ts` 单列逐字腿钉死。同批自伤一处被该门的
+ * 派生还原腿抓出：转换脚本对 10 枚单/双引号站点漏剥前缀 ⇒ `` `${API_BASE}/api/v1/…` `` 双前缀，
+ * 故该门把「零 /api/api」按整 src 代码行扫。归零后本门判据形态改变：`BASELINE` 空集 ⇒
+ * 「基线外新增即红」等价于**全 src 零私设基址**，「陈旧即红」腿恒空转（不再有豁免位可陈旧），
+ * C1 只剩单源本体 `services/httpClient.ts` 的 2 处合法字面量（`API_BASE` 定义 + 健康探针）。
+ * 这**不等于 C1 全闭合**：`urlFamilyDualFormRatchet` 的 dupBoth 30 族 / 69 属主（同一 URL 族第二生产方）
+ * 属 B6 存量债，D-B5-40 的派生态盲区仍是那 30 族——基线归零只清了「私设基址」这一面。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -138,24 +149,12 @@ const SRC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 /** 单源正主：允许硬编码前缀。 */
 const CANONICAL = 'services/httpClient.ts';
 
-/** 基线（存量登记，2026-10 拆分 ontologyApi 后全量实测；只减不增）。 */
-const BASELINE = new Set([
-  'hooks/useBindingCatalog.ts',
-  'pages/ContractManager.tsx',
-  'pages/DataAssetsDashboard.tsx',
-  'pages/DataLineage.tsx',
-  'pages/ProjectTracker.tsx',
-  'pages/TenantManager.tsx',
-  'pages/TokenDashboard.tsx',
-  'pages/data-quality/api/_base.ts',
-  'pages/knowledge/pages/ExtractionPage.tsx',
-  'pages/knowledge/pages/components/govern/RuleRepoTable.tsx',
-  'pages/knowledge/tabs/DataWorkbenchImportTab.tsx',
-  'pages/knowledge/tabs/DocumentUploadTab.tsx',
-  'pages/knowledge/tabs/GraphBuilderTab.tsx',
-  'pages/knowledge/tabs/KnowledgeRuleRepositoryTab.tsx',
-  'providers/graphqlClient.ts',
-]);
+/**
+ * 基线（存量登记，只减不增）。#143/B5-26 归零：仓内除单源本体外已无待收口的私设基址文件。
+ * 空集不是「删掉判据」——本清单仍是唯一豁免通道，往里加条目即绕过 C1，故保留结构并按
+ * 「清单只减不增 + 陈旧即红 + 全 src 零私设面」三条腿共同承重（新增违例文件必落进第三条腿）。
+ */
+const BASELINE: ReadonlySet<string> = new Set([]);
 
 /** 代码行硬编码 "/api 前缀（引号或反引号后紧跟 /api）。 */
 const HARDCODED_RE = /["'`]\/api\b/;
@@ -233,6 +232,25 @@ describe('api-base-single-source — API 前缀基址单源 (W206/C188, §十)',
         ? `httpClient 之外新硬编码 "/api" 前缀（基线只减不增，新增即红；应收口到 httpClient/API_BASE 单源）：\n${newViolations.join('\n')}`
         : undefined,
     ).toEqual([]);
+  }, 30_000);
+
+  it('zeroBaselineCanonicalFaceOnly — 基线归零后全 src 代码行私设基址只剩单源本体 2 处（#143/B5-26）', () => {
+    expect(BASELINE.size, '基线已于 #143/B5-26 归零，任何回插都是绕过 C1').toBe(0);
+    const files: string[] = [];
+    walk(SRC_ROOT, files);
+    const hits: string[] = [];
+    for (const f of files) {
+      const rel = relative(SRC_ROOT, f).split(sep).join('/');
+      if (isTestFile(rel)) continue;
+      for (const line of readFileSync(f, 'utf8').split('\n')) {
+        if (!isComment(line) && HARDCODED_RE.test(line)) hits.push(`${rel} — ${line.trim()}`);
+      }
+    }
+    // 判据归零后的等价面：私设基址命中只允许是单源本体的 API_BASE 定义与健康探针（逐字钉死，非计数）
+    expect(hits.sort()).toEqual([
+      `${CANONICAL} — const r = await fetch("/api/health");`,
+      `${CANONICAL} — export const API_BASE = "/api";`,
+    ]);
   }, 30_000);
 
   it('noStaleExemptionInsideBaseline — 基线内陈旧豁免同批判红（#143/B5-12）', () => {

@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { API_BASE } from "../services/httpClient";
 import {
   Briefcase, Search, RefreshCw, AlertCircle, Loader2,
   ChevronDown, ChevronRight, Calendar, User, DollarSign,
@@ -69,7 +70,7 @@ export default function ProjectTracker() {
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (searchQ.trim()) params.set("search", searchQ.trim());
 
-      const data: any = await apiFetchData(`/api/v1/ecos/objects/Project?${params.toString()}`);
+      const data: any = await apiFetchData(`${API_BASE}/v1/ecos/objects/Project?${params.toString()}`);
       if (Array.isArray(data)) {
         setProjects(data);
         setTotal(data.length);

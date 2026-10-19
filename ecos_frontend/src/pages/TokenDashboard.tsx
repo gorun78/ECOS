@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from "react";
+import { API_BASE } from "../services/httpClient";
 import {
   Coins,
   BarChart3,
@@ -64,7 +65,7 @@ export default function TokenDashboard() {
     setError("");
     try {
       const result = await apiFetchData<TokenSummary>(
-        `/api/telemetry/tokens/summary?range=${range}`
+        `${API_BASE}/telemetry/tokens/summary?range=${range}`
       );
       setData(result);
     } catch (e: any) {

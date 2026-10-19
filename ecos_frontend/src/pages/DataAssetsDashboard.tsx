@@ -18,6 +18,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useTheme, type ThemeStyles } from '../components/ThemeContext';
 import { dataAssetsRequest as api } from '../services/dataAssetsApi';
 import type { DataAssetVO, DataAssetFieldVO, DataLevelDef, DataCategoryTreeItem } from '../types/dataAssets';
+import { API_BASE } from '../services/httpClient';
 
 interface Props {
   showToast: (type: 'success' | 'info' | 'error', msg: string) => void;
@@ -25,7 +26,7 @@ interface Props {
   locale?: string;
 }
 
-const API = '/api/v1/datanet';
+const API = `${API_BASE}/v1/datanet`;
 
 /** 4 级敏感度 → 语义主题令牌（L1 低危=sucess / L2=info / L3 中危=warning / L4 高危=danger）。 */
 const levelClass = (code: string, s: ThemeStyles): string => {

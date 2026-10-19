@@ -6,10 +6,11 @@
  */
 
 import type { DqFallbackRecord } from "./types";
+import { API_BASE } from "../../../services/httpClient";
 
-export const DQ_GOV_BASE = "/api/v1/dq";
+export const DQ_GOV_BASE = `${API_BASE}/v1/dq`;
 /** legacy 只读端点前缀 — 与数据工作台「数据质量」页同源 (DqController) */
-export const DQ_LEGACY_BASE = "/api/v1/ecos/dq";
+export const DQ_LEGACY_BASE = `${API_BASE}/v1/ecos/dq`;
 
 declare global {
   // 允许 vitest / Playwright / devtools 读；不污染 DOM API

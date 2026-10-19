@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { API_BASE } from '../../../services/httpClient';
 import {
   FileText, Upload, Clock, RotateCw, Sparkles, Database, Trash2, History, Lock,
 } from 'lucide-react';
@@ -172,7 +173,7 @@ export default function DocumentUploadTab({ showToast: showToastFromProps }: { s
   const fetchHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const data = await apiFetchData<unknown[]>('/api/v1/knowledge/extract/history');
+      const data = await apiFetchData<unknown[]>(`${API_BASE}/v1/knowledge/extract/history`);
       const list = Array.isArray(data) ? (data as HistoryItem[]) : [];
       setHistory(list);
     } catch {
