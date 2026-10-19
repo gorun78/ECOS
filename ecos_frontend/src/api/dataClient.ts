@@ -10,11 +10,11 @@ import type {
   DataField,
 } from "../types";
 import { MOCK_DATA_ASSETS } from "../mockData";
-import { apiFetchData, doFetch } from "../services/httpClient";
+import { API_BASE, apiFetchData, doFetch } from "../services/httpClient";
 
 // ── Datasets ────────────────────────────────────────────
 
-export const DATANET_ASSETS_BASE = "/api/v1/datanet/assets";
+export const DATANET_ASSETS_BASE = `${API_BASE}/v1/datanet/assets`;
 
 /**
  * GET {DATANET_ASSETS_BASE}?page={page}&pageSize={pageSize} — 已登记数据资产清单
@@ -33,7 +33,7 @@ export async function listDataAssets(page = 1, pageSize = 500): Promise<unknown[
  * （HealthCheck{status, components?, version?, uptimeMs?}）。
  */
 export async function fetchDataEngineHealth(): Promise<Record<string, unknown>> {
-  return apiFetchData<Record<string, unknown>>("/api/v1/engine/data/health");
+  return apiFetchData<Record<string, unknown>>(`${API_BASE}/v1/engine/data/health`);
 }
 
 /**
@@ -51,7 +51,7 @@ const MOCK_DATA_ASSETS_TAGGED: DataAsset[] = MOCK_DATA_ASSETS.map((a) => ({
 export async function fetchDatasets(): Promise<DataAsset[]> {
   try {
     // Get first active datasource and its resources
-    const dsResp = await doFetch("/api/v1/datanet/datasource");
+    const dsResp = await doFetch(`${API_BASE}/v1/datanet/datasource`);
     const sources = dsResp?.data ?? [];
     if (!Array.isArray(sources) || sources.length === 0) {
       console.warn("fetchDatasets: no datasources registered, using mock");
@@ -63,7 +63,7 @@ export async function fetchDatasets(): Promise<DataAsset[]> {
       return MOCK_DATA_ASSETS_TAGGED;
     }
     // Try to get resources from this datasource
-    const resResp = await doFetch(`/api/v1/datanet/metadata/resources/${active.datasourceId}`);
+    const resResp = await doFetch(`${API_BASE}/v1/datanet/metadata/resources/${active.datasourceId}`);
     const resources = resResp?.data ?? [];
     const items = Array.isArray(resources) ? resources : [];
     if (items.length === 0) {
@@ -170,7 +170,7 @@ export async function fetchDataset(id: string): Promise<DataAsset | null> {
 
 
 // ── Pipeline Builder ──────────────────────────────────────────
-const PIPELINE_BASE = "/api/v1/pipeline/definitions";
+const PIPELINE_BASE = `${API_BASE}/v1/pipeline/definitions`;
 
 export interface PipelineDefinition {
   id?: string;
@@ -236,11 +236,11 @@ export async function executePipeline(id: string): Promise<PipelineExecution> {
 
 /** GET /api/pipeline/executions/{id} — 执行状态 */
 export async function getExecution(executionId: string): Promise<PipelineExecution> {
-  return apiFetchData(`/api/v1/pipeline/executions/${executionId}`);
+  return apiFetchData(`${API_BASE}/v1/pipeline/executions/${executionId}`);
 }
 
 // ── Data Quality Dashboard ────────────────────────────────────
-const DQ_BASE = "/api/v1/dq";
+const DQ_BASE = `${API_BASE}/v1/dq`;
 
 export async function fetchDqRules(): Promise<any> {
   const resp = await doFetch(`${DQ_BASE}/rules`);
@@ -293,9 +293,9 @@ export async function resolveDqIssue(issueId: string, body: any): Promise<any> {
 
 
 // ── Datanet: 物理表注册 & 元数据采集 ───────────────────────────
-const DATANET_DS = "/api/v1/datanet/datasource";
-const DATANET_META = "/api/v1/datanet/metadata";
-const DATANET_CATALOG = "/api/v1/datanet/catalog";
+const DATANET_DS = `${API_BASE}/v1/datanet/datasource`;
+const DATANET_META = `${API_BASE}/v1/datanet/metadata`;
+const DATANET_CATALOG = `${API_BASE}/v1/datanet/catalog`;
 
 /** GET /datanet/datasource — 获取所有数据源列表 */
 export async function fetchDataSources(): Promise<DataSource[]> {

@@ -14,7 +14,10 @@
  *  5. B.6 limit 钳制契约（默认 10 / 上限 50 / 必传）。
  *  6. D.5 错误码 → 文案键映射（traceId 可复制 UI 存在）。
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+// D-B5-27 同型补漏（#143/B5-16 全量跑实测读出）：本门禁含 pages 目录遍历腿，全量并发下
+// 5s 默认超时被 CPU 争用吃成假红（单跑 160ms 通过）⇒ 遍历型门禁一律带 test 级超时。
+vi.setConfig({ testTimeout: 30_000 });
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as fs from 'node:fs';

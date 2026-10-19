@@ -6,7 +6,7 @@ import type {
   AuditEvent,
   AuditStats,
 } from "../types";
-import { apiFetch, apiFetchData, toNetworkError, notifyNetworkDown } from "../services/httpClient";
+import { API_BASE, apiFetch, apiFetchData, toNetworkError, notifyNetworkDown } from "../services/httpClient";
 
 // ── Engine Health ──────────────────────────────────────────
 /**
@@ -14,7 +14,7 @@ import { apiFetch, apiFetchData, toNetworkError, notifyNetworkDown } from "../se
  * （HealthCheck{status, components?, version?, uptimeMs?}）。
  */
 export async function fetchSecurityEngineHealth(): Promise<Record<string, unknown>> {
-  return apiFetchData<Record<string, unknown>>("/api/v1/engine/security/health");
+  return apiFetchData<Record<string, unknown>>(`${API_BASE}/v1/engine/security/health`);
 }
 
 // ── Security Profile ───────────────────────────────────────
@@ -60,7 +60,7 @@ export async function updateSecurityProfile(
 export async function fetchUserSecurityProfile(userId: string): Promise<SecurityProfile & { levelName?: string; isDefault?: boolean }> {
   try {
     return await apiFetchData<SecurityProfile & { levelName?: string; isDefault?: boolean }>(
-      `/api/v1/security-profiles/user/${userId}`
+      `${API_BASE}/v1/security-profiles/user/${userId}`
     );
   } catch (e) {
     console.warn("fetchUserSecurityProfile: backend unavailable", e);
@@ -74,7 +74,7 @@ export async function updateUserSecurityProfile(
   body: Partial<SecurityProfile>
 ): Promise<SecurityProfile & { levelName?: string }> {
   return apiFetchData<SecurityProfile & { levelName?: string }>(
-    `/api/v1/security-profiles/user/${userId}`,
+    `${API_BASE}/v1/security-profiles/user/${userId}`,
     { method: "PUT", body: JSON.stringify(body) }
   );
 }
@@ -101,7 +101,7 @@ export async function fetchAuditLogs(
     params.set('page', String(page));
     params.set('pageSize', String(pageSize));
     try {
-      return await apiFetchData(`/api/v1/audit/logs?${params.toString()}`);
+      return await apiFetchData(`${API_BASE}/v1/audit/logs?${params.toString()}`);
     } catch (e) {
       // T1: catch must propagate — no silent empty return. Surface the
       // outage to the global NetworkErrorBanner, then rethrow a typed
@@ -115,7 +115,7 @@ export async function fetchAuditLogs(
 // 对接 AuditController: GET /api/v1/audit/stats
 export async function fetchAuditStats(): Promise<AuditStats> {
   try {
-    return await apiFetchData<AuditStats>('/api/v1/audit/stats');
+    return await apiFetchData<AuditStats>(`${API_BASE}/v1/audit/stats`);
   } catch (e) {
     console.warn("fetchAuditStats: backend unavailable", e);
     return { todayCount: 0, failureCount: 0, activeUsers: 0, anomalyIps: 0 };
@@ -138,7 +138,7 @@ export interface VerifyChainResult {
 /** POST /api/v1/security/audit/verify-chain — 增量哈希链区间校验（非吞错面：失败必须上抛） */
 export async function verifyAuditHashChainRange(from: number, to: number): Promise<VerifyChainResult> {
   try {
-    return await apiFetchData<VerifyChainResult>('/api/v1/security/audit/verify-chain', {
+    return await apiFetchData<VerifyChainResult>(`${API_BASE}/v1/security/audit/verify-chain`, {
       method: 'POST',
       body: JSON.stringify({ from, to }),
     });
@@ -385,14 +385,14 @@ export async function fetchRlsPolicies(params?: {
   if (params?.tableName) sp.set('tableName', params.tableName);
   sp.set('page', String(params?.page || 1));
   sp.set('pageSize', String(params?.pageSize || 50));
-  const raw = await apiFetchData<any[]>(`/api/v1/security/rls/policies?${sp.toString()}`);
+  const raw = await apiFetchData<any[]>(`${API_BASE}/v1/security/rls/policies?${sp.toString()}`);
   const list = Array.isArray(raw) ? raw.map(mapRlsPolicy) : [];
   return { data: list, total: list.length };
 }
 
 /** POST /api/v1/security/rls/policies — 创建RLS策略 */
 export async function createRlsPolicy(data: Partial<RlsPolicy>): Promise<RlsPolicy> {
-  const res = await apiFetchData<any>('/api/v1/security/rls/policies', {
+  const res = await apiFetchData<any>(`${API_BASE}/v1/security/rls/policies`, {
     method: 'POST',
     body: JSON.stringify(mapToRlsBackend(data)),
   });
@@ -401,7 +401,7 @@ export async function createRlsPolicy(data: Partial<RlsPolicy>): Promise<RlsPoli
 
 /** PUT /api/v1/security/rls/policies/{id} — 更新RLS策略 */
 export async function updateRlsPolicy(id: string | number, data: Partial<RlsPolicy>): Promise<RlsPolicy> {
-  const res = await apiFetchData<any>(`/api/v1/security/rls/policies/${id}`, {
+  const res = await apiFetchData<any>(`${API_BASE}/v1/security/rls/policies/${id}`, {
     method: 'PUT',
     body: JSON.stringify(mapToRlsBackend(data)),
   });
@@ -410,7 +410,7 @@ export async function updateRlsPolicy(id: string | number, data: Partial<RlsPoli
 
 /** DELETE /api/v1/security/rls/policies/{id} — 删除RLS策略 */
 export async function deleteRlsPolicy(id: string | number): Promise<void> {
-  await apiFetchData(`/api/v1/security/rls/policies/${id}`, { method: 'DELETE' });
+  await apiFetchData(`${API_BASE}/v1/security/rls/policies/${id}`, { method: 'DELETE' });
 }
 
 /** GET /api/v1/security/cls/policies — 列表CLS策略
@@ -422,14 +422,14 @@ export async function fetchClsPolicies(params?: {
   if (params?.tableName) sp.set('tableName', params.tableName);
   sp.set('page', String(params?.page || 1));
   sp.set('pageSize', String(params?.pageSize || 50));
-  const raw = await apiFetchData<any[]>(`/api/v1/security/cls/policies?${sp.toString()}`);
+  const raw = await apiFetchData<any[]>(`${API_BASE}/v1/security/cls/policies?${sp.toString()}`);
   const list = Array.isArray(raw) ? raw.map(mapClsPolicy) : [];
   return { data: list, total: list.length };
 }
 
 /** POST /api/v1/security/cls/policies — 创建CLS策略 */
 export async function createClsPolicy(data: Partial<ClsPolicy>): Promise<ClsPolicy> {
-  const res = await apiFetchData<any>('/api/v1/security/cls/policies', {
+  const res = await apiFetchData<any>(`${API_BASE}/v1/security/cls/policies`, {
     method: 'POST',
     body: JSON.stringify(mapToClsBackend(data)),
   });
@@ -438,7 +438,7 @@ export async function createClsPolicy(data: Partial<ClsPolicy>): Promise<ClsPoli
 
 /** PUT /api/v1/security/cls/policies/{id} — 更新CLS策略 */
 export async function updateClsPolicy(id: string | number, data: Partial<ClsPolicy>): Promise<ClsPolicy> {
-  const res = await apiFetchData<any>(`/api/v1/security/cls/policies/${id}`, {
+  const res = await apiFetchData<any>(`${API_BASE}/v1/security/cls/policies/${id}`, {
     method: 'PUT',
     body: JSON.stringify(mapToClsBackend(data)),
   });
@@ -447,14 +447,14 @@ export async function updateClsPolicy(id: string | number, data: Partial<ClsPoli
 
 /** DELETE /api/v1/security/cls/policies/{id} — 删除CLS策略 */
 export async function deleteClsPolicy(id: string | number): Promise<void> {
-  await apiFetchData(`/api/v1/security/cls/policies/${id}`, { method: 'DELETE' });
+  await apiFetchData(`${API_BASE}/v1/security/cls/policies/${id}`, { method: 'DELETE' });
 }
 
 /** POST /api/v1/security/policy/evaluate — ABAC策略评估 */
 export async function evaluateAbacPolicy(
   data: AbacEvaluateRequest
 ): Promise<AbacEvaluateResponse> {
-  const raw = await apiFetchData<any>('/api/v1/security/policy/evaluate', {
+  const raw = await apiFetchData<any>(`${API_BASE}/v1/security/policy/evaluate`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -475,7 +475,7 @@ export async function maskData(data: MaskRequest): Promise<MaskResponse> {
     SHA256: 'phone', AMOUNT: 'phone', // 不支持的类型降级到phone
   };
   const rule = ruleMap[data.maskType] || data.maskType.toLowerCase();
-  const raw = await apiFetchData<any>('/api/v1/data-masking/apply', {
+  const raw = await apiFetchData<any>(`${API_BASE}/v1/data-masking/apply`, {
     method: 'POST',
     body: JSON.stringify({ data: [data.input], rules: [rule] }),
   });
@@ -553,7 +553,7 @@ export async function fetchAbacPolicies(
   params.set("page", String(page));
   params.set("pageSize", String(pageSize));
   const data: any = await apiFetchData(
-    `/api/v1/abac/policies?${params.toString()}`
+    `${API_BASE}/v1/abac/policies?${params.toString()}`
   );
   const rawList: any[] = data?.data || [];
   return {
@@ -566,7 +566,7 @@ export async function fetchAbacPolicies(
 
 /** POST /api/v1/abac/policies — create */
 export async function createAbacPolicy(body: Partial<AbacPolicy>): Promise<AbacPolicy> {
-  const raw: any = await apiFetchData("/api/v1/abac/policies", {
+  const raw: any = await apiFetchData(`${API_BASE}/v1/abac/policies`, {
     method: "POST",
     body: JSON.stringify(mapToBackendPolicy(body)),
   });
@@ -578,7 +578,7 @@ export async function updateAbacPolicy(
   id: string | number,
   body: Partial<AbacPolicy>
 ): Promise<AbacPolicy> {
-  const raw: any = await apiFetchData(`/api/v1/abac/policies/${id}`, {
+  const raw: any = await apiFetchData(`${API_BASE}/v1/abac/policies/${id}`, {
     method: "PUT",
     body: JSON.stringify(mapToBackendPolicy(body)),
   });
@@ -587,7 +587,7 @@ export async function updateAbacPolicy(
 
 /** DELETE /api/v1/abac/policies/{id} — delete */
 export async function deleteAbacPolicy(id: string | number): Promise<void> {
-  await apiFetchData(`/api/v1/abac/policies/${id}`, { method: "DELETE" });
+  await apiFetchData(`${API_BASE}/v1/abac/policies/${id}`, { method: "DELETE" });
 }
 
 

@@ -9,7 +9,7 @@ import type {
   CausalLink,
   Scenario,
 } from "../types";
-import { apiFetch, apiFetchData, doFetch } from "../services/httpClient";
+import { API_BASE, apiFetch, apiFetchData, doFetch } from "../services/httpClient";
 import { fetchWorldGoals, fetchWorldScenarios, fetchWorldCausalLinks } from "./monitorClient";
 
 // ── Knowledge Graph ─────────────────────────────────────
@@ -50,7 +50,7 @@ export async function fetchKnowledgeGraph(): Promise<{
 
 
 // ── Knowledge Search (Cognitive Operating System) ─────────────
-const KNOWLEDGE_SEARCH_BASE = "/api/v1/knowledge";
+const KNOWLEDGE_SEARCH_BASE = `${API_BASE}/v1/knowledge`;
 
 /**
  * GET /api/v1/engine/knowledge/health — 知识引擎公开健康 VO
@@ -58,7 +58,7 @@ const KNOWLEDGE_SEARCH_BASE = "/api/v1/knowledge";
  * 返回 HealthCheck{status, components?, version?, uptimeMs?}）。
  */
 export async function fetchKnowledgeEngineHealth(): Promise<Record<string, unknown>> {
-  return apiFetchData<Record<string, unknown>>("/api/v1/engine/knowledge/health");
+  return apiFetchData<Record<string, unknown>>(`${API_BASE}/v1/engine/knowledge/health`);
 }
 
 export async function searchKnowledge(q: string): Promise<any> {
@@ -130,7 +130,7 @@ export async function globalSearch(
   q: string,
   type: string = 'all'
 ): Promise<SearchHit[]> {
-  return apiFetchData<SearchHit[]>(`/api/v1/portal/search?q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}`);
+  return apiFetchData<SearchHit[]>(`${API_BASE}/v1/portal/search?q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}`);
 }
 
 // ── Goals / Causal / Scenarios (async with mock fallback) ─
@@ -141,6 +141,6 @@ export async function getScenarios(): Promise<Scenario[]> { return fetchWorldSce
 
 // ── ECOS Knowledge Graph ─────────────────────────────────
 export async function fetchEcosKnowledgeGraph(): Promise<any> {
-  return apiFetchData('/api/v1/knowledge/ecos-graph');
+  return apiFetchData(`${API_BASE}/v1/knowledge/ecos-graph`);
 }
 

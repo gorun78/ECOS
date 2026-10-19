@@ -7,10 +7,10 @@ import type {
   CausalLink,
   Scenario,
 } from "../types";
-import { apiFetchData, doFetch } from "../services/httpClient";
+import { API_BASE, apiFetchData, doFetch } from "../services/httpClient";
 
 // ── World Model Viewer ────────────────────────────────────────
-const WM_BASE = "/api/v1/ecos/world-model-graph";
+const WM_BASE = `${API_BASE}/v1/ecos/world-model-graph`;
 
 export async function fetchWorldGoals(): Promise<Goal[]> {
   const resp = await doFetch(`${WM_BASE}/goals`);
@@ -72,7 +72,7 @@ export async function compareWorldScenarios(body: any): Promise<any> {
 }
 
 // ── Pareto Optimization ───────────────────────────────────────
-const PARETO_BASE = "/api/v1/pareto";
+const PARETO_BASE = `${API_BASE}/v1/pareto`;
 
 export interface ParetoSolution {
   variables: Record<string, number>;
@@ -148,7 +148,7 @@ export async function compareCausalScenarios(body: any): Promise<any> {
 
 // ── Monitoring Dashboard ───────────────────────────────
 // 对接 MonitorController (/api/monitor)
-export const MONITOR_BASE = "/api/v1/monitor";
+export const MONITOR_BASE = `${API_BASE}/v1/monitor`;
 
 export interface MonitoringKpi {
   label: string;
@@ -254,7 +254,7 @@ export async function runSystemDiagnostics(): Promise<{ database: { status: stri
 
 // ── Biz Dashboard ──────────────────────────────────────────
 export async function fetchBizDashboard(): Promise<any> {
-  return apiFetchData('/api/v1/ecos/biz/dashboard');
+  return apiFetchData(`${API_BASE}/v1/ecos/biz/dashboard`);
 }
 
 // ── Goal Tracking ────────────────────────────────────────
@@ -262,7 +262,7 @@ export async function fetchBizDashboard(): Promise<any> {
 //       不用 /api/v1/dq（DqGovernanceController 没有 goal-tracking 子路径）
 export async function fetchGoalTracking(goalId?: number): Promise<any> {
   const qs = goalId ? `?goalId=${goalId}` : '';
-  return apiFetchData(`/api/dq/goal-tracking${qs}`);
+  return apiFetchData(`${API_BASE}/dq/goal-tracking${qs}`);
 }
 
 
@@ -309,7 +309,7 @@ export interface TwinCommandResult {
 
 export async function fetchTwinHealth(): Promise<TwinHealth> {
   try {
-    return await apiFetchData<TwinHealth>('/api/v1/twins/health');
+    return await apiFetchData<TwinHealth>(`${API_BASE}/v1/twins/health`);
   } catch {
     console.warn('fetchTwinHealth: backend unavailable');
     return { mqtt: { status: 'DOWN' }, device_count: 0 };
@@ -318,7 +318,7 @@ export async function fetchTwinHealth(): Promise<TwinHealth> {
 
 export async function fetchTwinDevices(): Promise<TwinDevice[]> {
   try {
-    return await apiFetchData<TwinDevice[]>('/api/v1/twins/devices');
+    return await apiFetchData<TwinDevice[]>(`${API_BASE}/v1/twins/devices`);
   } catch {
     console.warn('fetchTwinDevices: backend unavailable');
     return [];
@@ -327,7 +327,7 @@ export async function fetchTwinDevices(): Promise<TwinDevice[]> {
 
 export async function fetchTwinTelemetry(deviceId: string, limit = 20): Promise<TwinTelemetry[]> {
   try {
-    return await apiFetchData<TwinTelemetry[]>(`/api/v1/twins/${encodeURIComponent(deviceId)}/telemetry?limit=${limit}`);
+    return await apiFetchData<TwinTelemetry[]>(`${API_BASE}/v1/twins/${encodeURIComponent(deviceId)}/telemetry?limit=${limit}`);
   } catch {
     console.warn(`fetchTwinTelemetry(${deviceId}): backend unavailable`);
     return [];
@@ -335,7 +335,7 @@ export async function fetchTwinTelemetry(deviceId: string, limit = 20): Promise<
 }
 
 export async function sendTwinCommand(deviceId: string, command: string, params: Record<string, any> = {}): Promise<TwinCommandResult> {
-  return apiFetchData<TwinCommandResult>(`/api/v1/twins/${encodeURIComponent(deviceId)}/command`, {
+  return apiFetchData<TwinCommandResult>(`${API_BASE}/v1/twins/${encodeURIComponent(deviceId)}/command`, {
     method: 'POST',
     body: JSON.stringify({ command, params }),
   });
@@ -343,7 +343,7 @@ export async function sendTwinCommand(deviceId: string, command: string, params:
 
 export async function fetchTwinDeviceStatus(deviceId: string): Promise<TwinDeviceStatus> {
   try {
-    return await apiFetchData<TwinDeviceStatus>(`/api/v1/twins/${encodeURIComponent(deviceId)}/status`);
+    return await apiFetchData<TwinDeviceStatus>(`${API_BASE}/v1/twins/${encodeURIComponent(deviceId)}/status`);
   } catch {
     console.warn(`fetchTwinDeviceStatus(${deviceId}): backend unavailable`);
     return { deviceId, status: 'offline', shadow: { desired: {}, reported: {} }, telemetryCount: 0 };

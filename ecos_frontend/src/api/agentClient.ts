@@ -7,7 +7,7 @@ import type {
   ToolDefinition,
   PromptTemplate,
 } from "../types";
-import { apiFetch, apiFetchData } from "../services/httpClient";
+import { API_BASE, apiFetch, apiFetchData } from "../services/httpClient";
 
 // ── Agent Chat ──────────────────────────────────────────
 /** @deprecated legacy path `/agent/chat`; please use `/api/v1/agent/chat` via the primary entry `pages/aiworkbench/api`. 保留本函数仅为兼容 AgentTestConsole 等旧调用方。 */
@@ -94,7 +94,7 @@ export async function fetchPrompts(): Promise<PromptTemplate[]> {
 
 
 // ── Agent Mesh ───────────────────────────────────────────────
-const AGENT_MESH_BASE = "/api/v1/agent-mesh";
+const AGENT_MESH_BASE = `${API_BASE}/v1/agent-mesh`;
 
 export interface AgentMeshAgent {
   id: string;
@@ -165,7 +165,7 @@ export async function executeAgentMeshMission(id: string): Promise<AgentMeshMiss
 }
 
 // ── Workflow Designer ────────────────────────────────────────
-const WF_BASE = "/api/v1/ecos/workflows";
+const WF_BASE = `${API_BASE}/v1/ecos/workflows`;
 
 export async function fetchWorkflows(pageSize = 50): Promise<{ data: any[]; total: number }> {
   return apiFetchData(`${WF_BASE}?pageSize=${pageSize}`);
@@ -203,7 +203,7 @@ export async function testWorkflow(id: string, body?: any): Promise<any> {
 
 // ── Diagnostic Agent ──────────────────────────────────────
 export async function callDiagnosticAgent(query: string): Promise<any> {
-  return apiFetchData('/api/v1/agent/call', {
+  return apiFetchData(`${API_BASE}/v1/agent/call`, {
     method: "POST",
     body: JSON.stringify({ agent: "diagnostic", query }),
   });

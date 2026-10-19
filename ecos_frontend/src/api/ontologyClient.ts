@@ -8,7 +8,7 @@ import type {
   RelationshipDefinition,
   ActionDefinition,
 } from "../types";
-import { apiFetchData } from "../services/httpClient";
+import { API_BASE, apiFetchData } from "../services/httpClient";
 
 // ── Ontology ────────────────────────────────────────────
 export async function fetchOntology(): Promise<{
@@ -16,7 +16,7 @@ export async function fetchOntology(): Promise<{
   instances: Record<string, EntityInstance[]>;
 }> {
   try {
-    const resp = await apiFetchData<{ data?: any[]; records?: any[] }>(`/api/v1/ecos/ontologies/ont001/entities`);
+    const resp = await apiFetchData<{ data?: any[]; records?: any[] }>(`${API_BASE}/v1/ecos/ontologies/ont001/entities`);
     const records = resp?.data || resp?.records || [];
 
     if (records.length > 0) {
@@ -98,7 +98,7 @@ function buildFallbackEntity(name: string, instances: EntityInstance[]): EntityD
 
 
 // ── Object Explorer (Object Runtime) ─────────────────────────
-const OBJ_BASE = "/api/v1/ecos/objects";
+const OBJ_BASE = `${API_BASE}/v1/ecos/objects`;
 
 export interface ObjectData {
   id: string;
@@ -228,7 +228,7 @@ export async function fetchObjectTimeline(entityCode: string, id: string, page =
 // ── Entity Instances (Operational Apps) ──────────────────
 export async function fetchEntityInstances(entityType: string): Promise<any[]> {
   try {
-    return await apiFetchData<any[]>(`/api/v1/ontology/entities/${entityType}/instances`);
+    return await apiFetchData<any[]>(`${API_BASE}/v1/ontology/entities/${entityType}/instances`);
   } catch {
     return [];
   }

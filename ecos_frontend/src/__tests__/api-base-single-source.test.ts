@@ -59,6 +59,11 @@
  * SchemaTree,TemplatePanel,api}`；3 枚在位但代码行 0 命中 = 早批已收口：
  * `components/data-workbench/GitPanel.tsx`、`pages/aiworkbench/ChatbotStudioView.tsx`、`services/auth.ts`）。
  * 另配一条合成数据反向自检（缺失/零命中/有命中三例），证明该判据本身能变红。
+ * 2026-10-19 #143/B5-16 收口减 7：`src/api/` 域七文件（agentClient / dataClient / iamClient /
+ * knowledgeClient / monitorClient / ontologyClient / securityClient）代码行 `"/api…"` 字面量
+ * **83 处**全部改由 `API_BASE` 派生（取值逐字不变：`API_BASE === "/api"`，拼接结果与改前同串），
+ * 只动代码行、注释里的端点说明不动（判据本就不计注释行，改注释属无谓抖动）。
+ * 72 → 65 枚系本批实跑读出后剪除，非推算。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -74,13 +79,6 @@ const CANONICAL = 'services/httpClient.ts';
 
 /** 基线（存量登记，2026-10 拆分 ontologyApi 后全量实测；只减不增）。 */
 const BASELINE = new Set([
-  'api/agentClient.ts',
-  'api/dataClient.ts',
-  'api/iamClient.ts',
-  'api/knowledgeClient.ts',
-  'api/monitorClient.ts',
-  'api/ontologyClient.ts',
-  'api/securityClient.ts',
   'components/ontology-workbench/OntologyDomainPanel.tsx',
   'hooks/useBindingCatalog.ts',
   'pages/ContractManager.tsx',
