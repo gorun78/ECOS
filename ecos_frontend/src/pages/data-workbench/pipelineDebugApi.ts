@@ -21,9 +21,10 @@
 
 // 传输/解包/auth 头单源见 api/_base.ts（§13.2.4 C2 / #143/B5-10）
 import { del, get, post } from './api/_base';
+import { API_BASE } from '../../services/httpClient';
 
-const DBG_BASE = '/api/v1/pipeline/debug/sessions';
-const LOG_BASE = '/api/v1/pipeline/debug/executions';
+const DBG_BASE = `${API_BASE}/v1/pipeline/debug/sessions`;
+const LOG_BASE = `${API_BASE}/v1/pipeline/debug/executions`;
 
 /** 步骤级快照 (debug 会话下保留 rows/sample/schema)。 */
 export interface NodeStepSnapshot {

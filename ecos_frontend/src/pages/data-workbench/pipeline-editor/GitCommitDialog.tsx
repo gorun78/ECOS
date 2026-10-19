@@ -9,6 +9,7 @@ import {
   Loader2, X, Check, ChevronDown, Plus,
 } from 'lucide-react';
 import { apiFetch, apiFetchData } from '../../../api';
+import { API_BASE } from '../../../services/httpClient';
 import { getErrorMessage } from '../helpers';
 import { useTheme } from '../../../components/ThemeContext';
 
@@ -70,10 +71,10 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
       try {
         const [branchesData, statusData] = await Promise.all([
           apiFetchData<{ data?: GitBranch[]; branches?: GitBranch[] }>(
-            `/api/v1/engine/data/pipeline/git/branches?pipelineId=${encodeURIComponent(pipelineId)}`
+            `${API_BASE}/v1/engine/data/pipeline/git/branches?pipelineId=${encodeURIComponent(pipelineId)}`
           ).catch((): { data?: GitBranch[]; branches?: GitBranch[] } => ({ data: [{ name: 'main', current: true }] })),
           apiFetchData<{ data?: { files?: GitFileStatus[] }; files?: GitFileStatus[] }>(
-            `/api/v1/engine/data/pipeline/tasks/${encodeURIComponent(pipelineId)}/git/status`
+            `${API_BASE}/v1/engine/data/pipeline/tasks/${encodeURIComponent(pipelineId)}/git/status`
           ).catch((): { data: { files: GitFileStatus[] } } => ({ data: { files: [] as GitFileStatus[] } })),
         ]);
 
@@ -126,7 +127,7 @@ const GitCommitDialog: React.FC<GitCommitDialogProps> = ({
     try {
       const branchName = showNewBranch && newBranchName.trim() ? newBranchName.trim() : selectedBranch;
       const resp = await apiFetchData<{ data?: { commitId?: string }; commitId?: string }>(
-        `/api/v1/engine/data/pipeline/tasks/${encodeURIComponent(pipelineId)}/git/commit`,
+        `${API_BASE}/v1/engine/data/pipeline/tasks/${encodeURIComponent(pipelineId)}/git/commit`,
         {
           method: 'POST',
           body: JSON.stringify({

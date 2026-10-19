@@ -11,6 +11,7 @@ import React from 'react';
 import { GripVertical } from 'lucide-react';
 import { buildPaletteItems } from './constants';
 import { apiFetchData } from '../../../api';
+import { API_BASE } from '../../../services/httpClient';
 import { useLanguage } from '../../../components/LanguageContext';
 
 /** Shape of /api/v1/pipeline/node-types response entries (subset). */
@@ -50,7 +51,7 @@ const NodePalette: React.FC<NodePaletteProps> = ({
 
   React.useEffect(() => {
     let cancelled = false;
-    apiFetchData<NodeTypeResponse>('/api/v1/pipeline/node-types')
+    apiFetchData<NodeTypeResponse>(`${API_BASE}/v1/pipeline/node-types`)
       .then((resp) => {
         if (cancelled || !resp) return;
         const list = (

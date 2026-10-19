@@ -10,6 +10,7 @@ import {
   Send, Sparkles, X, Trash2, Loader2,
 } from 'lucide-react';
 import { apiFetch } from '../../../api';
+import { API_BASE } from '../../../services/httpClient';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import { QUICK_ACTIONS, type ChatMessage, type CopilotPanelProps } from './CopilotPanelTypes';
@@ -67,7 +68,7 @@ const CopilotPanel: React.FC<CopilotPanelProps> = ({ className = '', onClose }) 
 
     try {
       const resp = await apiFetch<{ data?: { reply?: string }; reply?: string }>(
-        '/api/v1/engine/data/copilot/chat',
+        `${API_BASE}/v1/engine/data/copilot/chat`,
         {
           method: 'POST',
           body: JSON.stringify({

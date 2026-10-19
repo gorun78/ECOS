@@ -12,6 +12,7 @@ import { GitBranch, History, Loader2, X, RotateCcw } from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import { apiFetchData } from '../../../api';
+import { API_BASE } from '../../../services/httpClient';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 /** Props for the GitVersionPanel. */
@@ -59,7 +60,7 @@ const GitVersionPanel: React.FC<GitVersionPanelProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const url = `/api/v1/engine/data/pipeline/git/versions/${encodeURIComponent(pipelineId)}`;
+      const url = `${API_BASE}/v1/engine/data/pipeline/git/versions/${encodeURIComponent(pipelineId)}`;
       const raw = (await apiFetchData<unknown>(url)) as
         | string[]
         | { data?: string[] }

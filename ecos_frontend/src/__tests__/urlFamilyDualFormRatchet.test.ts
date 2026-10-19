@@ -10,6 +10,11 @@
  * （两面之和 **334 恒定**，纯转换只挪点位）/ dupBoth 30 / dupRawOnly **5** / blind **25**：
  * 该批把 data-workbench/api 域 26 处裸面派生化，`/v1/engine/data/pipeline/runs/{}` 一族只剩
  * `pipeline-editor/PipelineExecutionMonitor.tsx` 一个裸面属主 ⇒ 又掉出旧判据视野。
+ * #143/B5-22 复跑 = 680 / 258 / 裸面 **71** / 派生面 **263**（和仍 334）/ dupBoth 30 / dupRawOnly 5 /
+ * blind 25 —— 三个 dup 数**未随本批再动**：本批把 data-workbench 页面域 16 处裸面派生化，涉及的两族
+ * （`…/pipeline/runs/{}`、`/v1/engine/data/settings`）的另一属主在改前就已是纯派生态（各 raw 0 / der 1，
+ * settings 另一属主 EngineMonitor.tsx 系 #143/B5-11g 已派生）⇒ 旧判据视野本来就不含这两族，无族可掉。
+ * 登记此归因以防「dupRawOnly 必随裸面总数单调下降」的误推断：它数的是**族内 ≥2 裸面属主**，不是裸面条数。
  * 三个 pin 随批更新，读的是当批实测而非建门批快照。逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。

@@ -10,6 +10,7 @@ import {
   ChevronRight, Loader2, CheckCircle, XCircle,
 } from 'lucide-react';
 import { apiFetch, apiFetchData } from '../../../api';
+import { API_BASE } from '../../../services/httpClient';
 import { getErrorMessage } from '../helpers';
 import { useTheme } from '../../../components/ThemeContext';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
@@ -52,7 +53,7 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
     if (!inputCode.trim()) return;
     try {
       const resp = await apiFetchData<{ code?: string; data?: { code?: string } }>(
-        '/api/v1/engine/data/udf/convert',
+        `${API_BASE}/v1/engine/data/udf/convert`,
         {
           method: 'POST',
           body: JSON.stringify({
@@ -116,7 +117,7 @@ const UdfBuilderPanel: React.FC<UdfBuilderPanelProps> = ({ className = '' }) => 
     setTestResult(null);
     try {
       const resp = await apiFetchData<UdfTestResult & { data?: UdfTestResult }>(
-        `/api/v1/engine/data/udf/test`,
+        `${API_BASE}/v1/engine/data/udf/test`,
         {
           method: 'POST',
           body: JSON.stringify({

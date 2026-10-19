@@ -10,6 +10,7 @@ import {
   Loader2, ChevronRight, X, AlertCircle,
 } from 'lucide-react';
 import { apiFetchData } from '../../../api';
+import { API_BASE } from '../../../services/httpClient';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import {
@@ -54,7 +55,7 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
   const fetchRunStatus = useCallback(async (rid: string) => {
     try {
       const resp = await apiFetchData<RunInfo & { data?: RunInfo }>(
-        `/api/v1/engine/data/pipeline/runs/${encodeURIComponent(rid)}`
+        `${API_BASE}/v1/engine/data/pipeline/runs/${encodeURIComponent(rid)}`
       );
       const data = resp?.data || resp;
       setRunInfo(data);

@@ -14,6 +14,7 @@ import type { NodeConfig, NodeStatus, PipelineNodeType } from './types';
 import type { DataConnection } from '../types';
 import { PALETTE_LABELS, buildPaletteItems } from './constants';
 import { apiFetchData } from '../../../api';
+import { API_BASE } from '../../../services/httpClient';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import UdfBuilderPanel from './UdfBuilderPanel';
@@ -85,7 +86,7 @@ const UdfForm: React.FC<FormSharedProps> = React.memo(({ styles, t, nodeConfig, 
   );
 
   const loadUdfs = useCallback(() => {
-    apiFetchData<{ data?: UdfItem[]; list?: UdfItem[] } | UdfItem[]>('/api/v1/engine/data/udf/list')
+    apiFetchData<{ data?: UdfItem[]; list?: UdfItem[] } | UdfItem[]>(`${API_BASE}/v1/engine/data/udf/list`)
       .then((resp) => {
         const list = Array.isArray(resp) ? resp : (resp?.data ?? resp?.list ?? []);
         if (Array.isArray(list)) setUdfs(list);

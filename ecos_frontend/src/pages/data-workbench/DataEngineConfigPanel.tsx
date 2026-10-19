@@ -13,6 +13,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Settings } from 'lucide-react';
 import { apiFetchData } from '../../api';
+import { API_BASE } from '../../services/httpClient';
 import { getErrorMessage } from './helpers';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
@@ -136,9 +137,9 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
     try {
       const [groupsResp, defaultsResp] = await Promise.all([
         apiFetchData<{ code: number; data: { segments?: SegmentPayload[] } }>(
-          '/api/v1/engine/data/settings/groups'),
+          `${API_BASE}/v1/engine/data/settings/groups`),
         apiFetchData<{ code: number; data: Record<string, unknown> }>(
-          '/api/v1/engine/data/settings/defaults'),
+          `${API_BASE}/v1/engine/data/settings/defaults`),
       ]);
 
       const segments = ((groupsResp?.data ?? groupsResp) as { segments?: SegmentPayload[] })
@@ -224,7 +225,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
         return;
       }
 
-      await apiFetchData('/api/v1/engine/data/settings', {
+      await apiFetchData(`${API_BASE}/v1/engine/data/settings`, {
         method: 'PUT',
         body: JSON.stringify(changedItems),
       });
@@ -243,7 +244,7 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
   const handleRefreshCache = useCallback(async () => {
     setRefreshing(true);
     try {
-      await apiFetchData('/api/v1/engine/data/settings/refresh', { method: 'POST' });
+      await apiFetchData(`${API_BASE}/v1/engine/data/settings/refresh`, { method: 'POST' });
       showToast?.('success', t('dw.cfg.toast.cacheRefreshed'));
     } catch (e) {
       showToast?.('error', t('dw.cfg.toast.refreshFailed', { error: getErrorMessage(e) }));

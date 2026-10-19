@@ -92,6 +92,13 @@
  * 的比对面为 **27** 条＝26 条裸形态 + 1 条改前既有派生态（`unstructured.ts` 上传腿，#143/B5-14），
  * 漏计既有派生态会让「多重集相等」假绿；`_base.ts` 三枚常量系 #143/B5-8 即已派生，只由
  * 「整域八个 `.ts` 零私设基址」腿覆盖、不计入本批派生点数。42 → 37 枚系实跑读出后剪除。
+ * 2026-10-19 #143/B5-22 收口减 9：`src/pages/data-workbench/` **页面侧**九个基线在册文件
+ * （pipeline-editor 七个 + pipelineDebugApi + DataEngineConfigPanel）代码行私设基址 **16 处**
+ * （逐文件 1 + 3 + 1 + 1 + 1 + 1 + 2 + 2 + 4）改由 `API_BASE` 派生，形态拆分 = 单引号 10 +
+ * **反引号 6** + 双引号 0。域级取证门 `pages/data-workbench/__tests__/dataWorkbenchPageBaseSingleSource.spec.ts`
+ * 递归扫整域 78 个生产文件（排除 `__tests__` 与 `*.test.*`/`*.spec.*`）判零私设基址——至此
+ * 数据工作台域（api/ 子域系 #143/B5-21）整体收口；该门比对面 16 条＝全部裸形态，
+ * 因这九文件改前零派生态（与 B5-21 有一条既有上传腿须计入不同）。37 → 28 枚系实跑读出后剪除。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -121,15 +128,6 @@ const BASELINE = new Set([
   'pages/aiworkbench/logic-canvas/useLogicPipelineRun.ts',
   'pages/business-workbench/BusinessWorkbenchLayout.tsx',
   'pages/data-quality/api/_base.ts',
-  'pages/data-workbench/DataEngineConfigPanel.tsx',
-  'pages/data-workbench/pipeline-editor/CopilotPanel.tsx',
-  'pages/data-workbench/pipeline-editor/GitCommitDialog.tsx',
-  'pages/data-workbench/pipeline-editor/GitVersionPanel.tsx',
-  'pages/data-workbench/pipeline-editor/NodePalette.tsx',
-  'pages/data-workbench/pipeline-editor/PipelineExecutionMonitor.tsx',
-  'pages/data-workbench/pipeline-editor/PropertyPanel.tsx',
-  'pages/data-workbench/pipeline-editor/UdfBuilderPanel.tsx',
-  'pages/data-workbench/pipelineDebugApi.ts',
   'pages/knowledge/pages/ExtractionPage.tsx',
   'pages/knowledge/pages/components/govern/RuleRepoTable.tsx',
   'pages/knowledge/tabs/DataWorkbenchImportTab.tsx',
