@@ -393,10 +393,12 @@ describe('两腿源级判据 + 全仓 multipart 面', () => {
       SRC_RATCHET.indexOf('});', SRC_RATCHET.indexOf('const BASELINE')),
     );
     const entries = (baseline.match(/'[^']+':\s*\d+/g) ?? []).map((s) => Number(s.split(':')[1]));
-    expect(entries.length).toBe(2);
-    expect(entries.reduce((n, c) => n + c, 0)).toBe(2);
-    expect(SRC_RATCHET).toContain('expect(entries.length).toBe(2)');
-    expect(SRC_RATCHET).toContain('expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(2)');
+    // #143/B5-15：最后两条整域基座合流后基线归零 ⇒ 本跨批 pin 同步为 0/0。
+    // （留着 2/2 就是「上一批的数字冒充这一批」——棘轮归零必须同批改所有 pin。）
+    expect(entries.length).toBe(0);
+    expect(entries.reduce((n, c) => n + c, 0)).toBe(0);
+    expect(SRC_RATCHET).toContain('expect(entries.length).toBe(0)');
+    expect(SRC_RATCHET).toContain('expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(0)');
   });
 });
 

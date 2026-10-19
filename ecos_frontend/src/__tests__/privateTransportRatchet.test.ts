@@ -29,7 +29,7 @@
  * `services/agentLoopStream.ts`、`services/wagentRunStream.ts`）曾在此占基线——
  * 帧序由 #143/B5-2~B5-5b 收口后，传输腿仍逐条计入本门（不因「另有 SSE 门」而豁免，
  * 否则判据出现洞）。四条已于 #143/B5-13（三条流式腿 → `rawStreamUrlFetch`）与
- * #143/B5-14（govern 的 seed 上传腿 → `rawAuthedUrlFetch`）全部剪除，基线归零。
+ * #143/B5-14（govern 的 seed 上传腿 → `rawAuthedUrlFetch`）全部剪除。
  *
  * 页面域三腿（#143/B5-11g）的合流口径：三处原本写 `fetch(url, { headers: authHeaders() })`，
  * 而 `authHeaders()` 含 `Content-Type: application/json`、`rawAuthedUrlFetch` 的单源底头
@@ -84,6 +84,22 @@
  * 余 2 条 = `services/capabilityClient.ts` + `services/scenarioActionClient.ts`，
  * 两条是「域内自设网络分态 + 自持会话副作用」的整域基座（不是单条腿），
  * 合流前需先裁决该域的网络分类与会话副作用归属（台账 §13.2.4 C2′ 注余项②）。
+ * #143/B5-15 该裁决已做并落码 ⇒ 2/2 → **0 文件 / 0 命中行（基线空集，C2′ 存量清零）**。
+ * 裁决三选一（依据 = 「传输合流」的授权面只有零语义变化，与 B5-13 同口径）：
+ * ① 复用 `rawAuthedUrlFetch` ✗ —— PMO-43 归一把两基座自持的
+ *    `code:'NETWORK', status:0` 分态折叠成 `NetworkError` 并广播全局掉线，
+ *    且该通道底头刻意无 `Content-Type` ⇒ POST/PUT 的 JSON 体丢类型（415 风险），双重越权；
+ * ② 复用 `apiFetchEnvelope` ✗ —— 它会 401 → `handleAuthExpired()`（清会话 + 跳 `#/login`）
+ *    与 403 → `notifyNoAccess()`，两基座改前均无此副作用 ⇒「打开能力目录盘就被踢回登录页」
+ *    是行为变更，超出授权面；
+ * ③ 新增具名通道 `rawAuthedJsonUrlFetch`（带身份 + `Content-Type: application/json`
+ *    默认头 + 逐键合并 + **零副作用、零归一**）✓ —— 与 `rawStreamUrlFetch` 共用
+ *    `sendUrlFetch` 内核，两基座的错误矩阵、`X-Trace-Id` 取号顺位、头集合逐字保留，
+ *    请求字节面与错误面零变化。全仓 grep `rawAuthedJsonUrlFetch` 即「自持分态整域基座」
+ *    传输面清单（当前恰两条：本门剪除的两文件）。
+ * 遗留待裁决（不是本批缺陷，已登记台账）：上述 ② 的会话副作用缺失本身是
+ * 「域内自持 vs 平台单源」口径分叉——其余通道一律 401 清会话，这两条基座不清，
+ * 是否统一须产品裁决（统一 = 语义变更），不在传输合流批内顺手做。
  *
  * `services/engineProbeApi.ts` 的处置 = **下线，不是收口**（判据口径要写清，
  * 否则后来者会以为那两条腿被合流了）：全仓取证（ripgrep，排除 node_modules/target）
@@ -107,17 +123,15 @@ const SRC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CANONICAL = 'services/httpClient.ts';
 
 /**
- * 基线（存量登记，#143/B5-11h 收口 SyncTab + InlineSqlConsole + AgentStudioView
- * 三腿并下线零消费者的 engineProbeApi 后实测 7 文件 / 7 命中行；
- * #143/B5-13 收口 SSE 流式三腿（`pages/aiworkbench/api.ts` 的 `oagPlaygroundStream`、
- * `services/agentLoopStream.ts`、`services/wagentRunStream.ts`，改走新增具名通道
- * `rawStreamUrlFetch`）后实测 **4 文件 / 4 命中行**；只减不增）。
+ * 基线（存量登记）。#143/B5-15 剪除最后两条整域基座后**归零**：
+ * 26/45 → … → 7/7（B5-11h）→ 4/4（B5-13）→ 2/2（B5-14）→ **0/0**。
+ * 空基线不是「门失效」——判据本身与「基线外新增即红」「陈旧豁免即红」两条分支都还在跑，
+ * 任何生产文件重新出现裸 `fetch(` / `new WebSocket(` / XHR / axios 立刻变红；
+ * 之后若要再登记基线项，必须与本批同款的「零语义变化 + 具名通道 + 单源 spec」一起做，
+ * 不得只加基线数字（基线预算用来豁免散落封装 = 最坏用法，见 `engineProbeApi` 处置注）。
  * 值 = 该文件允许的最大命中行数，剪项/降数必须与该文件的真实收口同批。
  */
-const BASELINE: Readonly<Record<string, number>> = Object.freeze({
-  'services/capabilityClient.ts': 1,
-  'services/scenarioActionClient.ts': 1,
-});
+const BASELINE: Readonly<Record<string, number>> = Object.freeze({});
 
 /** 私设传输判据：裸 fetch / 私设 WebSocket / XHR / axios。 */
 const PRIVATE_TRANSPORT_RE = /(?:[^A-Za-z0-9_.$-]fetch\s*\(|new\s+WebSocket\s*\(|XMLHttpRequest|\baxios\b)/;
@@ -213,8 +227,11 @@ describe('privateTransportRatchet — C2′ 私设传输棘轮门 (#143/B5-11a)'
 
   it('基线自身可校验：条目数与合计命中上限与文档口径一致', () => {
     const entries = Object.entries(BASELINE);
-    expect(entries.length).toBe(2);
-    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(2);
+    // #143/B5-15：C2′ 私设传输存量清零 ⇒ 基线必须停在空集。
+    // 任何新增条目都要与本批同款的「具名通道 + 零语义变化 + 单源 spec」同批出现，
+    // 只加基线数字（豁免新私设传输）在此被钉死为红。
+    expect(entries.length).toBe(0);
+    expect(entries.reduce((n, [, c]) => n + c, 0)).toBe(0);
     // 键必须是 POSIX 相对路径且非基线外文件形态
     for (const [rel] of entries) {
       expect(rel.startsWith('./')).toBe(false);

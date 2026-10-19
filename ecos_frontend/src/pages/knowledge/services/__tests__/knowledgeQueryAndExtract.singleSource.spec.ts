@@ -173,7 +173,8 @@ describe('源形 — 两文件私设传输归零（C2′ 棘轮第四批）', ()
 
     const entryRe = /^\s*'([^']+)':\s*(\d+),$/gm;
     const entries = [...SRC_RATCHET.matchAll(entryRe)];
-    expect(entries.length).toBeGreaterThan(0);
+    // 原 `toBeGreaterThan(0)` 把「基线仍非空」当本批不变量——#143/B5-15 存量清零后终态即空集，
+    // 该假设失效；自证面由下面「声明数字 == 实体条目数/和」两条承担。
     const declaredCount = Number(SRC_RATCHET.match(/expect\(entries\.length\)\.toBe\((\d+)\)/)?.[1]);
     const declaredSum = Number(SRC_RATCHET.match(/n \+ c, 0\)\)\.toBe\((\d+)\)/)?.[1]);
     expect(declaredCount).toBe(entries.length);

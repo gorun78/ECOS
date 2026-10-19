@@ -11,6 +11,14 @@
  * <p>路径单源（api-base-single-source 门禁）：以 {@link API_BASE}（httpClient 导出）
  * 拼接，本文件不出现 `"/api` 字面量；组件一律经本模块导出常量/函数取路径。</p>
  *
+ * <p>传输单源（C2′ 私设传输门禁，#143/B5-15）：唯一一条传输腿改经
+ * {@link rawAuthedJsonUrlFetch}——Bearer 拼接与默认 `Content-Type: application/json`
+ * 及调用方头逐键合并都在该单源内完成（身份取 `auth.ts#getAuthToken()`，禁直读
+ * `localStorage['token']`）。选这条而不是 `rawAuthedUrlFetch`/`apiFetchEnvelope`：
+ * 本域自持 NETWORK/400 逐字段/503/409 分态与 `X-Trace-Id` 取号顺位，
+ * 前者的 PMO-43 归一会把网络失败折叠成全局掉线、后者会加 401 清会话副作用，
+ * 两者都超出「传输合流」的零语义变化授权面（裁决依据见该通道文档注释）。</p>
+ *
  * <p>审批人反伪造（卷07 F07-10 / 详设-09 §五）：后端审批人主体一律取 JWT subject，
  * **绝不从请求体取**。前端表单只把登录主体作为「审批人」只读展示以完成 5 必填的即时提示，
  * 提交载荷必须不含 approver 字段。</p>
@@ -24,8 +32,7 @@
  * @license Apache-2.0
  */
 
-import { getAuthToken } from './auth';
-import { API_BASE } from './httpClient';
+import { API_BASE, rawAuthedJsonUrlFetch } from './httpClient';
 
 // ── 路径单源（唯一出口）───────────────────────────────
 
@@ -250,16 +257,9 @@ interface Envelope {
 }
 
 async function rawCall(url: string, init: RequestInit = {}): Promise<Envelope> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const token = getAuthToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const merged: Record<string, string> = {
-    ...headers,
-    ...((init.headers as Record<string, string> | undefined) ?? {}),
-  };
   let res: Response;
   try {
-    res = await fetch(url, { ...init, headers: merged });
+    res = await rawAuthedJsonUrlFetch(url, init);
   } catch (e) {
     throw new ScenarioActionError({
       code: 'NETWORK',

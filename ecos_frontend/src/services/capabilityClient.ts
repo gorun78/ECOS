@@ -23,13 +23,16 @@
  * 404/400/503/NETWORK 归 {@link CapabilityApiError}，绝不本地合成状态或伪装 200；
  * 目录为空即真空态（禁补默认能力项）。costUnit/toolset 未知词返回 null（禁默认值伪装）。</p>
  *
- * <p>auth 单源：所有 fetch 经 {@link getAuthToken} 拼 Bearer，禁直读 localStorage['token']。</p>
+ * <p>auth 单源：本域不再自建传输——唯一一条腿改经 {@link rawAuthedJsonUrlFetch}
+ * （#143/B5-15），Bearer 拼接在该单源内完成（其内部即 {@code auth.ts#getAuthToken()}，
+ * 三 key union），禁直读 localStorage['token']；通道的默认头与逐键合并规则与本文件改前
+ * 逐字相同，网络失败仍归 {@link CapabilityApiError}(code=NETWORK, status=0)，
+ * 不套 PMO-43 归一、不做 401 清会话/403 广播（域内自持分态，取舍依据见通道文档注释）。</p>
  *
  * @license Apache-2.0
  */
 
-import { getAuthToken } from './auth';
-import { API_BASE } from './httpClient';
+import { API_BASE, rawAuthedJsonUrlFetch } from './httpClient';
 
 // ── 静态前缀（唯一出口）─────────────────────────────
 
@@ -202,16 +205,9 @@ function normalizeCode(status: number, _errorCode?: string, message?: string): C
 // ── 传输核心（透传后端语义，禁合成）───────────────────
 
 async function callCapability(url: string, init: RequestInit = {}): Promise<unknown> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const token = getAuthToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const merged: Record<string, string> = {
-    ...headers,
-    ...((init.headers as Record<string, string> | undefined) ?? {}),
-  };
   let res: Response;
   try {
-    res = await fetch(url, { ...init, headers: merged });
+    res = await rawAuthedJsonUrlFetch(url, init);
   } catch (e) {
     throw new CapabilityApiError({
       code: 'NETWORK',

@@ -209,7 +209,9 @@ describe('源形 — 三文件私设传输归零（C2′ 棘轮第五批）', ()
 
     const entryRe = /^\s*'([^']+)':\s*(\d+),$/gm;
     const entries = [...SRC_RATCHET.matchAll(entryRe)];
-    expect(entries.length).toBeGreaterThan(0);
+    // 原此处 `toBeGreaterThan(0)` 是把「基线仍非空」当本批不变量——#143/B5-15 存量清零后
+    // 该假设失效（终态就是空集）。自证面改由下面两条承担：声明数字必须等于实体条目数与和，
+    // 空集时两边同为 0，仍然检得出「剪代码不剪声明」这类漂移。
     const declaredCount = Number(SRC_RATCHET.match(/expect\(entries\.length\)\.toBe\((\d+)\)/)?.[1]);
     const declaredSum = Number(SRC_RATCHET.match(/n \+ c, 0\)\)\.toBe\((\d+)\)/)?.[1]);
     expect(declaredCount).toBe(entries.length);

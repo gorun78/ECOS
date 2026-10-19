@@ -507,6 +507,36 @@ export async function rawStreamUrlFetch(url: string, options?: RequestInit): Pro
 }
 
 /**
+ * 整域 REST 基座专用具名通道 — 「带身份 + `Content-Type: application/json` 默认头 +
+ * **零副作用**」：不套 PMO-43 网络态归一，也不做 401 清会话 / 403 广播。
+ *
+ * <p>为什么既不能用 `rawAuthedUrlFetch` 也不能用 `apiFetchEnvelope`（#143/B5-15 的裁决点）：
+ * 这两类文件（`capabilityClient` / `scenarioActionClient`）不是「一条腿」而是**整域基座**，
+ * 域内自带错误矩阵（`NETWORK`/`NOT_FOUND`/`BAD_REQUEST`/`ENGINE_DISABLED`/
+ * `SCHEMA_NOT_READY`/`BUSINESS_ERROR` 与 `ACTION_FIELDS_MISSING`+`missingFields`
+ * 结构化回传、`COGNITIVE_UNAVAILABLE`、`BASELINE_RUN_MODE_MISMATCH`），
+ * 三条通道里任何一条都会改掉其中一件既存事实：</p>
+ * ① `rawAuthedUrlFetch` — 网络失败被折叠成 `NetworkError` 并广播 `ecos-network-down`，
+ *    域内 `code:'NETWORK', status:0` 分支永不触发（调用方分态被摧毁）；且该通道底头
+ *    刻意不含 `Content-Type`，本类文件的 POST/PUT JSON 体丢掉它即有 415 风险。
+ * ② `apiFetchEnvelope` — 401 会先经 `handleAuthExpired()` 清会话并跳 `#/login`、
+ *    403 会先发 `ecos-no-access`。这两条基座改前**没有**这类会话副作用，
+ *    「打开能力目录盘遇到过期 token 就被踢回登录页」是行为变更，不属传输合流的授权面。
+ * 本通道只做「拼身份头 + 逐键合并 + 发请求 + 原样抛错」，响应体一字不读，
+ * 域内矩阵与 `X-Trace-Id` 取号顺位逐字保留 ⇒ 合流后请求字节面与错误面零变化。
+ * 全仓 grep `rawAuthedJsonUrlFetch` 即「自持分态的整域基座」传输面清单。</p>
+ *
+ * <p>⚠ 遗留待裁决（不是本批缺陷）：上述 ② 的会话副作用缺失本身是「域内自持 vs 平台单源」
+ * 的口径分叉（其余通道都会 401 清会话），是否统一须产品裁决，已登记台账 §13.2.4 C2′ 余项。</p>
+ */
+export async function rawAuthedJsonUrlFetch(url: string, options?: RequestInit): Promise<Response> {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return sendUrlFetch(url, headers, options);
+}
+
+/**
  * 裸响应通道的共用传输体：只负责拼头（调用方 headers 逐键覆盖 baseHeaders）+ 发请求，
  * **不做 401/403 副作用、不解析响应体、不改写错误对象**
  * （返回未消费的 `Response`，供流式/二进制腿 `getReader()`/`blob()`）。
