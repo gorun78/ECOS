@@ -429,7 +429,14 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     // 隐形的是 `Guardrails/constants.ts` 那枚影子族根（strict 恒 0、wide 显形 1），它使 pin 面值少减 1：
     // 以 wide 回读 HEAD 归档树是 291，wide 对 wide 才是 −4（删 5 增 1）。两口径差额本就不必相等，
     // B6-7 已实证（那里差 1 枚），此处差 5 枚且成因两类，逐档读数见 `urlFamilyDualFormRatchet` 文件头形状⑤。
-    expect(derTotal, '行内派生态面须随批累积，低于 304 即扫描根或判据漂移').toBeGreaterThanOrEqual(304);
+    // #145/B6-12 订正为 302（−2，实测读出）：删 2 枚 `${API_BASE}` 行内站点——`ontologyWorkbenchApi`
+    // 的 data 族根直写腿 1 枚 + `pages/knowledge/services/overview.ts` 的 export 族根直写腿 1 枚，
+    // 两条都改成导入属主常量的**裸引用**（裸名不带 URL 体 ⇒ 对本门脱面）。两枚属主声明只是
+    // 「私有改名 + 加 export」，仍在原声明位以 `` `${API_BASE}/v1/…` `` 形态书写 ⇒ 净增 0。
+    // 本批两口径**不同值**：棘轮 pin 面值 287→285（−2）与本门同值，但属主枚 14→10（−4）——
+    // −4 里的另 2 枚是两属主文件**自身**的族根书写点（改前各算一枚属主），它们在本门始终只计 1 枚
+    // 声明行，故不重复出现在 −2 里；两口径的差是「同一声明位在两把尺子里的记法不同」，非漂移。
+    expect(derTotal, '行内派生态面须随批累积，低于 302 即扫描根或判据漂移').toBeGreaterThanOrEqual(302);
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
   });
 

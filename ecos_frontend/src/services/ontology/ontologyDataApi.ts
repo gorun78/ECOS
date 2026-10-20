@@ -4,6 +4,11 @@
  * 域：Ontology Data（T2.3）+ Function Sandbox（T9）。
  * 端点前缀：/api/v1/ontology/data、/api/v1/ontology/functions。
  * 对外唯一导入入口仍是 `src/services/ontologyApi.ts`（纯 re-export 兼容入口）。
+ *
+ * #145/B6-12：私有 `DATA_BASE` 改名并 **export** 为 `ONTOLOGY_DATA_BASE`（同一声明位、
+ * 面值逐字不变），作为 `/v1/ontology/data` 族根单源。另一生产方
+ * `services/ontologyWorkbenchApi.ts` 改为取值导入 ⇒ 该族退出双写重复面。
+ * 改名而非新增：属主枚数不变，避免历史快照里凭空多一枚未登记的声明。
  */
 
 import { apiFetchData } from "../../api";
@@ -19,7 +24,7 @@ import type {
 // 本体数据 (Ontology Data) — T2.3
 // ================================================================
 
-const DATA_BASE = `${API_BASE}/v1/ontology/data`;
+export const ONTOLOGY_DATA_BASE = `${API_BASE}/v1/ontology/data`;
 
 export async function fetchOntologyData(params?: { type?: string; objectTypeId?: string; page?: number; size?: number }) {
   const qs = new URLSearchParams();
@@ -28,37 +33,37 @@ export async function fetchOntologyData(params?: { type?: string; objectTypeId?:
   if (params?.page) qs.set("page", String(params.page));
   if (params?.size) qs.set("size", String(params.size));
   const query = qs.toString() ? `?${qs.toString()}` : "";
-  return apiFetchData<PaginatedDataResponse>(`${DATA_BASE}${query}`);
+  return apiFetchData<PaginatedDataResponse>(`${ONTOLOGY_DATA_BASE}${query}`);
 }
 
 export async function fetchOntologyDataObjects() {
-  return apiFetchData(`${DATA_BASE}/objects`);
+  return apiFetchData(`${ONTOLOGY_DATA_BASE}/objects`);
 }
 
 export async function fetchOntologyDataRecord(id: string) {
-  return apiFetchData<DataRecord>(`${DATA_BASE}/${id}`);
+  return apiFetchData<DataRecord>(`${ONTOLOGY_DATA_BASE}/${id}`);
 }
 
 export async function createOntologyData(data: CreateDataDTO) {
-  return apiFetchData<DataRecord>(DATA_BASE, {
+  return apiFetchData<DataRecord>(ONTOLOGY_DATA_BASE, {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
 export async function updateOntologyData(id: string, data: UpdateDataDTO) {
-  return apiFetchData<DataRecord>(`${DATA_BASE}/${id}`, {
+  return apiFetchData<DataRecord>(`${ONTOLOGY_DATA_BASE}/${id}`, {
     method: "PUT",
     body: JSON.stringify(data),
   });
 }
 
 export async function deleteOntologyData(id: string) {
-  await apiFetchData(`${DATA_BASE}/${id}`, { method: "DELETE" });
+  await apiFetchData(`${ONTOLOGY_DATA_BASE}/${id}`, { method: "DELETE" });
 }
 
 export async function clearOntologyDataByType(objectTypeId: string) {
-  await apiFetchData(`${DATA_BASE}?objectTypeId=${encodeURIComponent(objectTypeId)}`, { method: "DELETE" });
+  await apiFetchData(`${ONTOLOGY_DATA_BASE}?objectTypeId=${encodeURIComponent(objectTypeId)}`, { method: "DELETE" });
 }
 
 // ================================================================

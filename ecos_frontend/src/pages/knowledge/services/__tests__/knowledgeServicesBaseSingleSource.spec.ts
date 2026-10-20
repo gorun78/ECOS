@@ -150,7 +150,14 @@ const EXPECTED_AFTER_B64 = EXPECTED_AFTER_B61.filter((v) => v !== CONSOLIDATED_B
  * 只写一个总数会让"扣错族"读成绿。25 − 4 = **21**（本批改后实跑读出）。
  * 「16 条消费者腿面值逐字未变」不在本门证明范围——本门只看**本域 `${API_BASE}` 派生态书写面**，
  * 常量化后的腿对 DERIVED_RE 隐形，由 `src/__tests__/b6KnowledgeQueryRagGlossarySingleSource.spec.ts`
- * 按常量链解析承证。
+ * 按常量链解析承证。</p>
+ *
+ * <p>#145/B6-12 第四次同形减法（单族单腿）：`overview.ts` 的 `exportOntology` 那条
+ * `` `${API_BASE}/v1/ontology/export` `` 直写腿改引属主 `services/ontology/ontologyExportApi.ts`
+ * 导出的 `ONTOLOGY_EXPORT_BASE` ⇒ 本域派生态面 21−1=**20**。减法仍按面值筛除并自检恰 1 条，
+ * KB 子族 8 条边界自检不动（本批没碰 KB 族）。属主侧 8 条腿与另一生产方
+ * `services/ontologyWorkbenchApi.ts` 的守恒，由 `src/__tests__/b6OntologyDataExportSingleSource.spec.ts`
+ * 按 HEAD 快照承证——本门只看本域书写面。</p>
  */
 const CONSOLIDATED_B66_VALUES: ReadonlyArray<{ val: string; legs: number }> = [
   { val: '/api/v1/ontology/glossary', legs: 1 },
@@ -160,6 +167,17 @@ const CONSOLIDATED_B66_VALUES: ReadonlyArray<{ val: string; legs: number }> = [
 const EXPECTED_AFTER_B66 = EXPECTED_AFTER_B64.filter(
   (v) => !CONSOLIDATED_B66_VALUES.some((c) => c.val === v),
 );
+
+/**
+ * #145/B6-12 第四次同形减法（单族单腿）：本域 `overview.ts` 的 `exportOntology` 那条
+ * `` `${API_BASE}/v1/ontology/export` `` 直写腿，改为 import 属主
+ * `services/ontology/ontologyExportApi.ts` 导出的 `ONTOLOGY_EXPORT_BASE` 裸引用 ⇒ 该面值离开本域
+ * 书写面（族根声明只在属主一处）。减法形状与 B6-4 相同：按面值筛除并自检恰 1 条，21 − 1 = **20**。
+ * 「裸引用腿面值一字未改」不在本门证明范围，由 `src/__tests__/b6OntologyDataExportSingleSource.spec.ts`
+ * 按 HEAD 快照守恒承证。
+ */
+const CONSOLIDATED_B612_FAM_ROOT = '/api/v1/ontology/export';
+const EXPECTED_AFTER_B612 = EXPECTED_AFTER_B66.filter((v) => v !== CONSOLIDATED_B612_FAM_ROOT);
 
 describe('pages/knowledge/services 域基址单源 — 私设基址清零 (#143/B5-20)', () => {
   it('前提：API_BASE 单源取值 = "/api"（派生即取值不变的根据）', () => {
@@ -191,11 +209,11 @@ describe('pages/knowledge/services 域基址单源 — 私设基址清零 (#143/
     }
   });
 
-  it('面值逐字不变：还原后的 URL 多重集 = 改前快照减去 5 条 B6-1 + 2 条 B6-4 + 4 条 B6-6 在册收口项（32−5−2−4=21，改后实跑读出）', () => {
+  it('面值逐字不变：还原后的 URL 多重集 = 改前快照减去 5 条 B6-1 + 2 条 B6-4 + 4 条 B6-6 + 1 条 B6-12 在册收口项（32−5−2−4−1=20，改后实跑读出）', () => {
     const all: string[] = [];
     for (const rel of FILES) all.push(...derivedValues(read(rel)));
-    expect(all.length).toBe(21);
-    expect([...all].sort()).toEqual([...EXPECTED_AFTER_B66].sort());
+    expect(all.length).toBe(20);
+    expect([...all].sort()).toEqual([...EXPECTED_AFTER_B612].sort());
   });
 
   it('快照自身可校验：32 条 = 25 单引号 + 7 反引号 + 0 双引号且全部以 /api/ 开头（防快照清空成恒真）', () => {
@@ -217,6 +235,11 @@ describe('pages/knowledge/services 域基址单源 — 私设基址清零 (#143/
     }
     expect(CONSOLIDATED_B66_VALUES.reduce((n, c) => n + c.legs, 0)).toBe(4);
     expect(EXPECTED_AFTER_B66.length).toBe(21);
+    // B6-12 减法腿自检：筛掉的必须恰是 1 条 `/v1/ontology/export` 族根本体（overview.ts exportOntology），
+    // 且扣完该面值在本域面里归零——KB 子族计数不受影响（下一段照旧钉 8 条）
+    expect(EXPECTED_AFTER_B66.filter((v) => v === CONSOLIDATED_B612_FAM_ROOT).length).toBe(1);
+    expect(EXPECTED_AFTER_B612.filter((v) => v === CONSOLIDATED_B612_FAM_ROOT)).toEqual([]);
+    expect(EXPECTED_AFTER_B612.length).toBe(20);
     // 减法后剩余面里仍有 8 条 KB **子族**腿（compliance-rules／stats×2／sync／graph×2／nav×2，
     // 即 11 条减去 B6-6 收走的 rag 2 + query 1），证明三批只动登记过的族，没顺手收别的族
     expect(EXPECTED_AFTER_B64.filter((v) => v.startsWith(`${CONSOLIDATED_FAM_ROOT}/`)).length).toBe(11);

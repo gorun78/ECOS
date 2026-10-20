@@ -48,6 +48,16 @@
  * （`DECL_LINE_RE` 由 `BARE_REF_NAMES` 派生，不会与集合漂移），本域 50 条面值与 PER_FILE/FORM_COUNTS
  * **一律不动**。这条腿的可变性由「判据能变红」里新增的三段 fixture 承证（声明行不计、裸引用各计一枚、
  * 非集合成员的 const 声明行照常计腿——最后一段防把跳过规则扩大成"所有声明都不算腿"）。</p>
+ *
+ * <p>**#145/B6-12 起的第四枚裸引用常量（属主在本域之外的子目录）**：`ontologyWorkbenchApi.ts`
+ * 的 `fetchOntologyDataJson` 由 `` `${API_BASE}/v1/ontology/data` `` 改取
+ * `services/ontology/ontologyDataApi.ts` 导出的 `ONTOLOGY_DATA_BASE`。形状与 B6-3 的 AIP 两枚同类
+ * （声明位不在本域十个文件里 ⇒ 无「声明 + 使用」双计风险），故快照 50 条、`FORM_COUNTS`、
+ * `PER_FILE['ontologyWorkbenchApi.ts'] = 1` **一律不动**，只把解析表与裸引用集合各加一枚。
+ * 「十文件基址来源恰 1 条」这条腿的形状随之改写：`FAM_BASE_SOURCE` 白名单里的文件（现两枚 =
+ * `dataCatalogClient.ts` / `ontologyWorkbenchApi.ts`）必须是族单源导入且零 `API_BASE` 导入，
+ * 其余八文件仍必须从 `./httpClient` 导入 `API_BASE`——两边都反向钉死，防止把族单源当成免检通道，
+ * 也防止白名单被悄悄扩大。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -58,6 +68,7 @@ import { API_BASE } from '../httpClient';
 import { AIP_AGENTS_BASE, AIP_AUDIT_LOGS_BASE } from '../../pages/aiworkbench/api';
 import { DATANET_METADATA_BASE } from '../../api/dataClient';
 import { GUARDRAILS_POLICIES_BASE } from '../cognitiveEngineApi';
+import { ONTOLOGY_DATA_BASE } from '../ontology/ontologyDataApi';
 
 const SVC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -80,13 +91,14 @@ const HARDCODED_RE = /["'`]\/api\b/;
 /** 派生形态：`` `${常量}<path>` ``，捕获组即拼出来的路径段（#145/B6-3 起含 AIP 域单源常量）。 */
 const SITE_RE = /`\$\{([A-Za-z0-9_]+)\}((?:\\.|(?!`)[^\\])*)`/g;
 
-/** 面值解析表：`API_BASE` 单源 + #145/B6-3 移到页面 api 层的两枚 AIP 基址常量 + #145/B6-8 的 datanet 元数据族单源 + #145/B6-11 的护栏策略族单源。 */
+/** 面值解析表：`API_BASE` 单源 + #145/B6-3 移到页面 api 层的两枚 AIP 基址常量 + #145/B6-8 的 datanet 元数据族单源 + #145/B6-11 的护栏策略族单源 + #145/B6-12 的本体数据族单源。 */
 const CONST_VALUES: ReadonlyMap<string, string> = new Map([
   ['API_BASE', API_BASE],
   ['AIP_AGENTS_BASE', AIP_AGENTS_BASE],
   ['AIP_AUDIT_LOGS_BASE', AIP_AUDIT_LOGS_BASE],
   ['DATANET_METADATA_BASE', DATANET_METADATA_BASE],
   ['GUARDRAILS_POLICIES_BASE', GUARDRAILS_POLICIES_BASE],
+  ['ONTOLOGY_DATA_BASE', ONTOLOGY_DATA_BASE],
 ]);
 
 /**
@@ -101,8 +113,22 @@ const CONST_VALUES: ReadonlyMap<string, string> = new Map([
  * 故这里采用与 `b6*SingleSource` 各批门一致的口径：**声明行整行跳过，裸引用行照常计腿**，
  * 本域快照维持 50 条面值不动（改前 list + create + delete 三条腿，改后仍是三条）。
  * 该规则由 `DECL_LINE_RE` 从 `BARE_REF_NAMES` 派生，两者不可能各走各路。
+ *
+ * **#145/B6-12 起的第四枚裸引用常量**：`ontologyWorkbenchApi.ts` 的 `fetchOntologyDataJson`
+ * 腿改取 `services/ontology/ontologyDataApi.ts` 导出的 `ONTOLOGY_DATA_BASE`（属主在本域之外的
+ * 子目录，形状同 B6-3 的 AIP 两枚 ⇒ 本域无声明行、不存在双计，`DECL_LINE_RE` 对本文件只是空转）。
+ * 快照里那枚 `'"/api/v1/ontology/data"'` 由解析表还原成同面值，PER_FILE 仍记 1 条、TOTAL 仍 50。
  */
-const BARE_REF_NAMES = ['AIP_AGENTS_BASE', 'AIP_AUDIT_LOGS_BASE', 'GUARDRAILS_POLICIES_BASE'] as const;
+const BARE_REF_NAMES = ['AIP_AGENTS_BASE', 'AIP_AUDIT_LOGS_BASE', 'GUARDRAILS_POLICIES_BASE', 'ONTOLOGY_DATA_BASE'] as const;
+
+/** 族单源导入名（#145/B6-8 起本域允许的第二处基址来源；一枚文件至多一种来源）。 */
+const FAM_BASE_NAMES = ['DATANET_METADATA_BASE', 'ONTOLOGY_DATA_BASE'] as const;
+
+/** 允许从族单源取基址的文件 → 期望的导入路径；其余文件必须仍从 `./httpClient` 导入 `API_BASE`。 */
+const FAM_BASE_SOURCE: Readonly<Record<string, string>> = {
+  'dataCatalogClient.ts': '../api/dataClient',
+  'ontologyWorkbenchApi.ts': './ontology/ontologyDataApi',
+};
 
 /** 属主声明行（B6-5 ⑧）：只匹配「以本集合成员为声明目标」的 const/let/var 行，别的行一律照常数腿。 */
 const DECL_LINE_RE = new RegExp('^\\s*(?:export\\s+)?(?:const|let|var)\\s+(?:' + BARE_REF_NAMES.join('|') + ')\\s*=');
@@ -243,12 +269,17 @@ describe('services 根域基址单源 — 私设基址清零 (#143/B5-18)', () =
     for (const rel of FILES) {
       const lines = codeLines(read(rel));
       const apiImports = lines.filter((l) => /^\s*import\s/.test(l) && /\bAPI_BASE\b/.test(l));
-      const famImports = lines.filter((l) => /^\s*import\s/.test(l) && /\bDATANET_METADATA_BASE\b/.test(l));
+      const famImports = lines.filter(
+        (l) => /^\s*import\s/.test(l) && FAM_BASE_NAMES.some((n) => new RegExp('\\b' + n + '\\b').test(l)),
+      );
       expect(apiImports.length + famImports.length, `${rel} 基址来源导入须恰 1 条`).toBe(1);
-      if (rel === 'dataCatalogClient.ts') {
-        // 本批收口：族根声明升为 api 层单源，服务侧只留族单源一跳
+      const expectedSource = FAM_BASE_SOURCE[rel];
+      if (expectedSource) {
+        // 本批收口：族根声明升为族单源，服务侧只留族单源一跳
         expect(apiImports, `${rel} 已上收族单源，不得再导入 API_BASE`).toEqual([]);
-        expect(famImports[0]).toMatch(/from ['"]\.\.\/api\/dataClient['"]/);
+        expect(famImports.length, `${rel} 族单源导入不得多于 1 条`).toBe(1);
+        // 该域源码用双引号书写 import 路径，先归一引号再比对（避免为两种引号各写一条正则）
+        expect(famImports[0].replace(/"/g, "'")).toContain(`from '${expectedSource}'`);
       } else {
         expect(famImports, `${rel} 不该出现族单源导入`).toEqual([]);
         expect(apiImports[0]).toMatch(/from ['"]\.\/httpClient['"]/);
@@ -342,5 +373,17 @@ describe('services 根域基址单源 — 私设基址清零 (#143/B5-18)', () =
     expect(derivedValues('const GUARDRAILS_POLICIES_BASEX = `${API_BASE}/v1/guardrails/other`;')).toEqual(['/api/v1/guardrails/other']);
     // 把常量名当属性访问（`cfg.AIP_AGENTS_BASE`）不构成腿——防裸名判据吃进无关面
     expect(derivedValues('const n = cfg.AIP_AGENTS_BASE;')).toEqual([]);
+    // #145/B6-12：属主在**本域之外**（services/ontology/）的裸引用常量必须读成腿——
+    // 漏读会把 `fetchOntologyDataJson` 这条真实请求读成删请求（50 变 49 却无人解释）。
+    expect(
+      derivedValues(
+        [
+          'import { ONTOLOGY_DATA_BASE } from "./ontology/ontologyDataApi";',
+          'return doFetch(ONTOLOGY_DATA_BASE);',
+        ].join('\n'),
+      ),
+    ).toEqual(['/api/v1/ontology/data']);
+    // 反向：前缀相似的标识符（`…BASEX`）不得被当成该常量的腿
+    expect(derivedValues('return doFetch(ONTOLOGY_DATA_BASEX);')).toEqual([]);
   });
 });

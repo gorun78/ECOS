@@ -205,7 +205,9 @@ describe('A 源形 — 两文件私设传输与硬编码基址归零（C2′ 棘
     expect(countMatches(codeOnly(SRC_DICT), HARDCODED_API)).toBe(0);
     expect(countMatches(codeOnly(SRC_EXPORT), HARDCODED_API)).toBe(0);
     expect(SRC_DICT).toContain('`${API_BASE}/v1/system/dict/${dictType}`');
-    expect(SRC_EXPORT).toContain('const EXPORT_BASE = `${API_BASE}/v1/ontology/export`;');
+    // #145/B6-12：该声明位改名并 export 为族根单源 `ONTOLOGY_EXPORT_BASE`（同一行位、面值逐字不变），
+    // 本行钉的是**当前形状**；若改名回退或面值被动即红。
+    expect(SRC_EXPORT).toContain('export const ONTOLOGY_EXPORT_BASE = `${API_BASE}/v1/ontology/export`;');
   });
 
   // D-B5-27 同型防线：遍历 src 全树的用例必须自带超时，否则并行 worker 下冷读会被 5s 默认值掐死（假红）

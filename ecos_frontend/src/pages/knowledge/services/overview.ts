@@ -12,6 +12,8 @@ import { kbFetchData } from './kbFetch';
 import { KNOWLEDGE_BASE } from '../../../api/knowledgeClient';
 // #145/B6-4：本体映射族基址单源（services/ontology/ontologyMappingApi 导出），本文件不再自拼 /v1/ontology/mappings
 import { ONTOLOGY_MAPPINGS_BASE } from '../../../services/ontology/ontologyMappingApi';
+// #145/B6-12：本体导出族基址单源（services/ontology/ontologyExportApi 导出），本文件不再自拼 /v1/ontology/export
+import { ONTOLOGY_EXPORT_BASE } from '../../../services/ontology/ontologyExportApi';
 import type {
   SyncStatus,
   SyncLog,
@@ -169,7 +171,7 @@ export async function saveOntologyMappings(mappings: unknown) {
 
 export async function exportOntology() {
   try {
-    return await apiFetchData(`${API_BASE}/v1/ontology/export`);
+    return await apiFetchData(ONTOLOGY_EXPORT_BASE);
   } catch {
     return '';
   }
