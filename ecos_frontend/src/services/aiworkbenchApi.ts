@@ -14,6 +14,8 @@ import {
   fetchManagedAgents,
   fetchAgentModels,
   fetchGuardrailPolicies,
+  AIP_AGENTS_BASE,
+  AIP_AUDIT_LOGS_BASE,
 } from "../pages/aiworkbench/api";
 
 // ── Auth Helpers ────────────────────────────────────────────────
@@ -110,12 +112,12 @@ export async function deletePipeline(id: string): Promise<void> {
 
 /** Fetch all AIP agents. Errors propagate (re-throw) — see fetchPipelines. */
 export async function fetchAgents(): Promise<AIPAgent[]> {
-  return apiFetchData<AIPAgent[]>(`${API_BASE}/v1/aip/agents`);
+  return apiFetchData<AIPAgent[]>(AIP_AGENTS_BASE);
 }
 
 /** Create a new AIP agent */
 export async function createAgent(body: Partial<AIPAgent>): Promise<AIPAgent> {
-  return apiFetchData<AIPAgent>(`${API_BASE}/v1/aip/agents`, {
+  return apiFetchData<AIPAgent>(AIP_AGENTS_BASE, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -123,7 +125,7 @@ export async function createAgent(body: Partial<AIPAgent>): Promise<AIPAgent> {
 
 /** Update an existing AIP agent */
 export async function updateAgent(id: string, body: Partial<AIPAgent>): Promise<AIPAgent> {
-  return apiFetchData<AIPAgent>(`${API_BASE}/v1/aip/agents/${id}`, {
+  return apiFetchData<AIPAgent>(`${AIP_AGENTS_BASE}/${id}`, {
     method: "PUT",
     body: JSON.stringify(body),
   });
@@ -131,7 +133,7 @@ export async function updateAgent(id: string, body: Partial<AIPAgent>): Promise<
 
 /** Delete an AIP agent */
 export async function deleteAgent(id: string): Promise<void> {
-  return apiFetchData<void>(`${API_BASE}/v1/aip/agents/${id}`, {
+  return apiFetchData<void>(`${AIP_AGENTS_BASE}/${id}`, {
     method: "DELETE",
   });
 }
@@ -172,5 +174,5 @@ export async function createGuardrail(body: Partial<AIPGuardrail>): Promise<AIPG
  *  建议调用方迁到 pages/aiworkbench/api 或独立封装)。保留导出名以兼容旧调用。 */
 export async function fetchAuditLogs(): Promise<AIPAuditLog[]> {
   console.warn("legacy api, please use /api/v1/aip/audit-logs directly");
-  return apiFetchData<AIPAuditLog[]>(`${API_BASE}/v1/aip/audit-logs`);
+  return apiFetchData<AIPAuditLog[]>(AIP_AUDIT_LOGS_BASE);
 }

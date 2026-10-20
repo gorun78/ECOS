@@ -13,6 +13,15 @@ import { API_BASE, rawStreamUrlFetch } from '../../services/httpClient';
 import { createSseParser, decodeFrameData, type SseRawEvent } from '../../services/sseParser';
 import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel, AIPActionType, ExecuteActionResult, AIPAgentTemplate, AIPAgentMetrics, AIPAgentError, AIPAuditLog } from '../../types/aiworkbench';
 
+/**
+ * AIP 域基址单源：`/api/v1/aip/agents` 与 `/api/v1/aip/audit-logs`（#145/B6-3）。
+ * 本域两族的裸拼/派生点只允许出现在这里，`services/aiworkbenchApi.ts` 一律 import 取值。
+ * 子路径族 `/v1/aip/agents/templates`、`/v1/aip/agents/instantiate` 各只有本文件一个生产方，
+ * 按 #145/B6-1 口径保持 `${API_BASE}` 原样，不并进常量（并进会让族面对棘轮隐形）。
+ */
+export const AIP_AGENTS_BASE = `${API_BASE}/v1/aip/agents`;
+export const AIP_AUDIT_LOGS_BASE = `${API_BASE}/v1/aip/audit-logs`;
+
 // ── AgentMesh ──────────────────────────────────────────────────
 
 interface AgentMeshAgentRaw {
@@ -349,7 +358,7 @@ export async function instantiateAgent(
 // ── Agent Manager (T9-2) ─────────────────────────────────────
 
 export async function fetchManagedAgents(): Promise<AIPAgent[]> {
-  const raw = await apiFetchData<any[]>(`${API_BASE}/v1/aip/agents`);
+  const raw = await apiFetchData<any[]>(AIP_AGENTS_BASE);
   return (Array.isArray(raw) ? raw : []).map((a: any) => ({
     id: a.id,
     name: a.name || a.id,
@@ -369,7 +378,7 @@ export async function updateManagedAgent(
   id: string,
   data: { name?: string; systemPrompt?: string; model?: string; temperature?: number; maxIterations?: number }
 ): Promise<void> {
-  await apiFetchData(`${API_BASE}/v1/aip/agents/${encodeURIComponent(id)}`, {
+  await apiFetchData(`${AIP_AGENTS_BASE}/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
@@ -666,7 +675,7 @@ interface AipAuditLogRaw {
  * 两个字段记 0 并把真实上报值放进 details 文本（不合成、不拆假）。
  */
 export async function fetchAIPAuditLogs(): Promise<AIPAuditLog[]> {
-  const raw = await apiFetchData<AipAuditLogRaw[]>(`${API_BASE}/v1/aip/audit-logs`);
+  const raw = await apiFetchData<AipAuditLogRaw[]>(AIP_AUDIT_LOGS_BASE);
   const statusMap: Record<string, AIPAuditLog['status']> = {
     success: 'allowed', SUCCESS: 'allowed', allowed: 'allowed',
     blocked: 'blocked', BLOCKED: 'blocked',

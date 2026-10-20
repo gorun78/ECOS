@@ -15,6 +15,14 @@
  * <p>`/api/api` 双前缀腿只对代码行判定：`taskCenter.ts` 头部注释里有一句「避免拼成 /api/api/…」的
  * 历史防错说明（HEAD 既存，非本批新增），整文判定会把一句注释判成违例；注释面另由 `HARDCODED_RE`
  * 的行首剔除口径统一处理，与本门族其余判据一致。</p>
+ *
+ * <p>**#145/B6-3 起的判据形状（常量化会让面值面隐形）**：本批把 `aiworkbenchApi.ts` 的 5 条 AIP 腿
+ * 改由 `pages/aiworkbench/api.ts` 导出的 `AIP_AGENTS_BASE` / `AIP_AUDIT_LOGS_BASE` 承载（2 条裸引用 +
+ * 2 条 `` `${AIP_AGENTS_BASE}/${id}` `` 模板腿 + 1 条裸引用）。只认 `` `${API_BASE}…` `` 的旧判据对这
+ * 5 条全盲——单模自跑读出 43 对 48，正是要防的「收口读成删请求」。故本门把解析表扩成三枚常量，并把
+ * 裸引用计入腿（该文件不声明这两枚常量，不存在声明/使用双计）。**import 语句必须先整条剥**（含多行
+ * 花括号体）：续行 `  AIP_AGENTS_BASE,` 若留下会被裸名判据吃成假腿。裸引用面只认这两枚 AIP 常量，
+ * 不认 `API_BASE`——后者裸引用不构成 URL，纳入会把 import 行读成腿。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -22,6 +30,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../httpClient';
+import { AIP_AGENTS_BASE, AIP_AUDIT_LOGS_BASE } from '../../pages/aiworkbench/api';
 
 const SVC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -41,8 +50,24 @@ const FILES = [
 /** 私设基址判据：引号/单引号/反引号后紧跟 `/api`（与 `api-base-single-source` 同口径，含反引号）。 */
 const HARDCODED_RE = /["'`]\/api\b/;
 
-/** 派生形态：`` `${API_BASE}<path>` ``，捕获组即拼出来的路径段。 */
-const DERIVED_RE = /`\$\{API_BASE\}((?:\\.|(?!`)[^\\])*)`/g;
+/** 派生形态：`` `${常量}<path>` ``，捕获组即拼出来的路径段（#145/B6-3 起含 AIP 域单源常量）。 */
+const SITE_RE = /`\$\{([A-Za-z0-9_]+)\}((?:\\.|(?!`)[^\\])*)`/g;
+
+/** 面值解析表：`API_BASE` 单源 + #145/B6-3 移到页面 api 层的两枚 AIP 基址常量。 */
+const CONST_VALUES: ReadonlyMap<string, string> = new Map([
+  ['API_BASE', API_BASE],
+  ['AIP_AGENTS_BASE', AIP_AGENTS_BASE],
+  ['AIP_AUDIT_LOGS_BASE', AIP_AUDIT_LOGS_BASE],
+]);
+
+/**
+ * 裸引用面只认这两枚 AIP 常量：本域十个文件都不声明它们（声明在页面 api 层），
+ * 所以不存在「声明 + 使用」双计；`API_BASE` 不在此列——它裸引用不构成 URL。
+ */
+const BARE_REF_NAMES = ['AIP_AGENTS_BASE', 'AIP_AUDIT_LOGS_BASE'] as const;
+
+/** import 语句整条先剥（含多行花括号体），否则续行 `  AIP_AGENTS_BASE,` 会被裸名判据吃成假腿。 */
+const IMPORT_STMT_RE = /^\s*import\s[\s\S]*?;/gm;
 
 function isComment(line: string): boolean {
   const t = line.trim();
@@ -60,8 +85,21 @@ function read(rel: string): string {
 /** 把派生点还原成运行期字符串面值（`${…}` 插值按字面保留，改前后同一写法）。 */
 function derivedValues(src: string): string[] {
   const out: string[] = [];
-  for (const line of codeLines(src)) {
-    for (const m of line.matchAll(DERIVED_RE)) out.push(`${API_BASE}${m[1]}`);
+  for (const line of codeLines(src.replace(IMPORT_STMT_RE, ''))) {
+    let rest = line;
+    for (const m of line.matchAll(SITE_RE)) {
+      rest = rest.split(m[0]).join('');
+      const base = CONST_VALUES.get(m[1]);
+      if (base !== undefined) out.push(base + m[2]);
+    }
+    for (const name of BARE_REF_NAMES) {
+      const parts = rest.split(name);
+      for (let i = 0; i < parts.length - 1; i++) {
+        const before = parts[i].slice(-1);
+        if (before === '{' || before === '.') continue;
+        out.push(CONST_VALUES.get(name)!);
+      }
+    }
   }
   return out;
 }
@@ -209,5 +247,22 @@ describe('services 根域基址单源 — 私设基址清零 (#143/B5-18)', () =
     expect(derivedValues(DEFECT)).toEqual([]);
     expect(derivedValues(CLEAN)).toEqual(['/api/v1/system/users']);
     expect(codeLines(CLEAN).filter((l) => /\/api\/api\b/.test(l))).toEqual([]);
+    // #145/B6-3：常量化后的三种形态必须仍被读成腿；多行 import 的续行必须不算腿
+    const AIP = [
+      'import {',
+      '  AIP_AGENTS_BASE,',
+      '  AIP_AUDIT_LOGS_BASE,',
+      '} from "../pages/aiworkbench/api";',
+      'return apiFetchData(AIP_AGENTS_BASE);',
+      'return apiFetchData(`${AIP_AGENTS_BASE}/${id}`, { method: "PUT" });',
+      'return apiFetchData(AIP_AUDIT_LOGS_BASE);',
+    ].join('\n');
+    expect(derivedValues(AIP)).toEqual([
+      '/api/v1/aip/agents',
+      '/api/v1/aip/agents/${id}',
+      '/api/v1/aip/audit-logs',
+    ]);
+    // 把常量名当属性访问（`cfg.AIP_AGENTS_BASE`）不构成腿——防裸名判据吃进无关面
+    expect(derivedValues('const n = cfg.AIP_AGENTS_BASE;')).toEqual([]);
   });
 });

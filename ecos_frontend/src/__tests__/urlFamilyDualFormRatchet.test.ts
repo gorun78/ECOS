@@ -73,6 +73,20 @@
  *      不记进度。
  * 收口的 9 条腿是否一条不少、面值是否一字未改，**不在本门证明范围内**（本门对隐形腿无能为力），
  * 由同批新增的 `b6WorkspaceScenariosSingleSource.spec.ts` 用常量解析器按 HEAD 快照守恒承证。
+ * #145/B6-3 复跑 = 680 / **256** / 裸面 **0** / 派生面 **317** / dupBoth **24** / dupRawOnly **0** /
+ * blind **24**：存量债第三批收口 **AIP 域三族同一对生产方**——`/v1/aip/agents`（2 属主）、
+ * `/v1/aip/agents/{}`（2 属主）、`/v1/aip/audit-logs`（2 属主）全部由
+ * `pages/aiworkbench/api.ts` 与 `services/aiworkbenchApi.ts` 各写一份，现收口为该页 api 层
+ * **导出**的 `AIP_AGENTS_BASE` + `AIP_AUDIT_LOGS_BASE` 双常量，服务层改为 import。三处形状须记清：
+ *   ① **属主方向由 import 图决定，不是挑好看的**：`services/aiworkbenchApi.ts` 本来就 import
+ *      `pages/aiworkbench/api`（既有四个 fetch 函数），反向放常量会成环 ⇒ 本批单源落在**页面 api 层**。
+ *      B6-1/B6-2 的「单源在 api/services 层」不是普适规则，后继批先查 import 方向再定属主。
+ *   ② **族面第二次下降**（257→256）：`/v1/aip/agents/{}` 两属主全退出族体书写 ⇒ 族从索引整体消失；
+ *      derSites 323→317 = **删 8 枚派生点（3+5）增 2 枚属主声明**。两者皆副产物，账仍只记 dupBoth 与属主。
+ *   ③ **同根子路径族刻意不并进常量**：`/v1/aip/agents/templates`、`/v1/aip/agents/instantiate` 各只有
+ *      页面 api 层一个生产方（不在重复面），按 #145/B6-1 口径保持 `${API_BASE}` 原样以保住族面可见性；
+ *      并进去会让两族对棘轮隐形而**不减少任何债**。此判断由新门反向钉死（子路径腿仍在原位可扫）。
+ * 收口的 8 条腿面值守恒不在本门证明范围内，由同批新增的 `b6AipFamilySingleSource.spec.ts` 承证。
  * 逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。
@@ -85,9 +99,9 @@
  * 棘轮口径 = **族 → 属主清单**（两侧都只减不增）：
  *   新族出现在重复面 → 红；基线族新增属主 → 红；基线族/属主已不再重复 → 陈旧豁免亦红
  *   （与 privateTransportRatchet「陈旧豁免即红」同口径：基线预算不留给已收口的项）。
- *   本门**不宣称**证明单源成立——基线剩 27 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
+ *   本门**不宣称**证明单源成立——基线剩 24 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
  *   `/v1/knowledge` 一族后 29 族 62 属主，#145/B6-2 收口 `/v1/workspace/scenarios` 两族一对后 27 族 57 属主，
- *   余属 B6 后续批），
+ *   #145/B6-3 收口 AIP 域三族（同一对生产方）后 24 族 51 属主，余属 B6 后续批），
  *   本门钉死的是「债不再增 + 派生态不再隐身」。
  *
  * 三防恒绿：
@@ -211,9 +225,6 @@ function dupByRawOnly(idx: Index): Map<string, string[]> {
  */
 const BASELINE: Readonly<Record<string, readonly string[]>> = Object.freeze({
   '/v1/agent-mesh': ['api/agentClient.ts', 'services/agentMeshApi.ts'],
-  '/v1/aip/agents': ['pages/aiworkbench/api.ts', 'services/aiworkbenchApi.ts'],
-  '/v1/aip/agents/{}': ['pages/aiworkbench/api.ts', 'services/aiworkbenchApi.ts'],
-  '/v1/aip/audit-logs': ['pages/aiworkbench/api.ts', 'services/aiworkbenchApi.ts'],
   '/v1/audit/stats': ['api/securityClient.ts', 'pages/SecurityAudit.tsx'],
   '/v1/cognitive/beliefs?domain={}': ['pages/scenario/OverrideTab.tsx', 'pages/scenario/ReplayTab.tsx'],
   '/v1/datanet/metadata': ['api/dataClient.ts', 'services/dataCatalogClient.ts'],
@@ -287,7 +298,7 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 真降（本批 334→**328**，差额恰为被删的 6 条 `${API_BASE}/v1/knowledge` 基址声明）。
     // 恒等式的含义由此从「点数守恒」退成「点数等于本批实跑读出」，仍是有效的防空扫/防漂移钉，
     // 但**不得**再拿它的升降当进度：债的收敛只认 dupBoth 下降（见文件头 B5-25 归因）。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(323);
+    expect(snapshot.rawSites + snapshot.derSites).toBe(317);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     expect(dupBoth.size).toBeGreaterThan(dupRawOnly.size);
@@ -310,10 +321,15 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 合一为 `services/scenarioActionClient.ts` 的 `WORKSPACE_SCENARIOS_BASE` 单源 ⇒ **dupBoth 29 → 27**、
     // BASELINE 同批剪除两族（属主 62 → 57）。族面 258 → 257 的 1 族消失是**可见性**变化（该详情族的
     // 两个属主恰是本批唯一写出族体的人），不是新增重复，归因见文件头 ①。
-    expect(dupBoth.size).toBe(27);
+    // #145/B6-3（存量债第三批）：`/v1/aip/agents` 两属主 + `/v1/aip/agents/{}` 两属主 + `/v1/aip/audit-logs`
+    // 两属主（同一对生产方 `pages/aiworkbench/api.ts` 与 `services/aiworkbenchApi.ts`）合一为该页 api 层
+    // 导出的 `AIP_AGENTS_BASE` / `AIP_AUDIT_LOGS_BASE` 双单源 ⇒ **dupBoth 27 → 24**、BASELINE 同批剪除三族
+    // （属主 57 → 51）。族面 257 → 256 的又是**可见性**变化（`/v1/aip/agents/{}` 的两属主全退出族体书写），
+    // derSites 323 → 317 = 删 8 枚派生点、增 2 枚属主声明，同为副产物；归因与隐形交代见文件头 B6-3 段。
+    expect(dupBoth.size).toBe(24);
     expect(dupRawOnly.size).toBe(0);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(27);
+    expect(blind.length).toBe(24);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);
@@ -346,11 +362,16 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     const entries = Object.entries(BASELINE);
     // #145/B6-1 起 29 族 / 62 属主（`/v1/knowledge` 一族 7 属主收口单源，与本批同款改动同批剪除）
     // #145/B6-2 起 27 族 / 57 属主（`/v1/workspace/scenarios` 两族一对共 5 属主收口单源，同批剪除）
-    expect(entries.length).toBe(27);
-    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(57);
+    // #145/B6-3 起 24 族 / 51 属主（`/v1/aip/agents`、`/v1/aip/agents/{}`、`/v1/aip/audit-logs` 三族
+    // 共 6 属主收口为页 api 层双常量，同批剪除）
+    expect(entries.length).toBe(24);
+    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(51);
     expect(BASELINE['/v1/knowledge']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios/{}']).toBeUndefined();
+    expect(BASELINE['/v1/aip/agents']).toBeUndefined();
+    expect(BASELINE['/v1/aip/agents/{}']).toBeUndefined();
+    expect(BASELINE['/v1/aip/audit-logs']).toBeUndefined();
     for (const [fam, owners] of entries) {
       expect(fam.startsWith('/v1/')).toBe(true);
       expect(fam.includes('\\')).toBe(false);

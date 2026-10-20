@@ -23,6 +23,14 @@
  * <p>另记一条口径差，防后续批误推：`/v1/ontology/proposals` 与 `/v1/aip/agents` 这类族在双形态
  * 棘轮门里是**跨文件重复族**，本批只挪属主形态、不删属主，故棘轮 dupBoth 不因本批下降；
  * 「族面不变」不等于「本文件干净」，两门各判各的。</p>
+ *
+ * <p>**#145/B6-3 起的判据形状**：本域属主 `api.ts` 把 `/v1/aip/agents`、`/v1/aip/audit-logs` 两条
+ * 单引号腿挪成了两枚**导出常量声明**（面值不变，站点从使用处上移到声明行），第三条 `` `${API_BASE}
+ * /v1/aip/agents/${encodeURIComponent(id)}` `` 改由常量派生。只认 `` `${API_BASE}…` `` 的旧判据会
+ * 把这条派生腿读成隐形（实跑 27 对 28）。故解析表扩进 `AIP_AGENTS_BASE` / `AIP_AUDIT_LOGS_BASE`，
+ * 28 条面值钉死不变。**本门刻意不把裸引用（`` apiFetchData(AIP_AGENTS_BASE) ``）计为站点**——声明行
+ * 与使用行会双计同一枚面值，把条数虚抬；裸引用面由 #145/B6-3 的 `b6AipFamilySingleSource` 门按
+ * 「绑定行不算腿、裸引用算腿」的口径承证，两门合起来才是完整面。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -30,6 +38,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../../../services/httpClient';
+import { AIP_AGENTS_BASE, AIP_AUDIT_LOGS_BASE } from '../../../pages/aiworkbench/api';
 
 // 本门位于 `src/pages/aiworkbench/__tests__/`，到 `src/` 的相对深度是三档（少一档即读不到被测域）
 const SRC_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -48,7 +57,13 @@ const SITES_PER_FILE: Readonly<Record<string, number>> = {
 };
 
 const HARDCODED_RE = /["'`]\/api\b/;
-const DERIVED_RE = /`\$\{API_BASE\}((?:\\.|(?!`)[^\\])*)`/g;
+/** 站点形态：`` `${已知常量}<尾串>` ``（#145/B6-3 起解析表含 AIP 域单源常量）。 */
+const SITE_RE = /`\$\{([A-Za-z0-9_]+)\}((?:\\.|(?!`)[^\\])*)`/g;
+const CONST_VALUES: ReadonlyMap<string, string> = new Map([
+  ['API_BASE', API_BASE],
+  ['AIP_AGENTS_BASE', AIP_AGENTS_BASE],
+  ['AIP_AUDIT_LOGS_BASE', AIP_AUDIT_LOGS_BASE],
+]);
 
 function isComment(line: string): boolean {
   const t = line.trim();
@@ -88,7 +103,10 @@ function walk(dirRoot: string, out: string[]): string[] {
 function derivedValues(src: string): string[] {
   const out: string[] = [];
   for (const line of codeLines(src)) {
-    for (const m of line.matchAll(DERIVED_RE)) out.push(`${API_BASE}${m[1]}`);
+    for (const m of line.matchAll(SITE_RE)) {
+      const base = CONST_VALUES.get(m[1]);
+      if (base !== undefined) out.push(base + m[2]);
+    }
   }
   return out;
 }
@@ -210,5 +228,10 @@ describe('pages/aiworkbench 域基址单源 — 私设基址清零 (#143/B5-25)'
       '/api/v1/aip/models',
       '/api/v1/ontology/proposals/${encodeURIComponent(id)}/execute',
     ]);
+    // #145/B6-3：常量派生腿必须还原成同面值；未知常量不参与解析（防把任意 `${x}` 吃成 URL）
+    expect(derivedValues('  await apiFetchData(`${AIP_AGENTS_BASE}/${encodeURIComponent(id)}`, { method: "PUT" });')).toEqual([
+      '/api/v1/aip/agents/${encodeURIComponent(id)}',
+    ]);
+    expect(derivedValues('  await apiFetchData(`${SOME_UNKNOWN_BASE}/v1/aip/agents`);')).toEqual([]);
   });
 });
