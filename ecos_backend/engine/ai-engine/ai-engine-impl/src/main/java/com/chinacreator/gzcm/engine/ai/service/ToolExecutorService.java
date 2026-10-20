@@ -11,6 +11,7 @@ import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlWhitelist;
 import com.chinacreator.gzcm.engine.ai.security.AiToolColumnSurfaceGate;
 import com.chinacreator.gzcm.engine.ai.security.AiToolRateLimitGate;
+import com.chinacreator.gzcm.engine.ai.security.GuardrailAuditPublisher;
 import com.chinacreator.gzcm.engine.ai.security.ToolObligationApplier;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.tool.ScenarioToolCatalog;
@@ -138,6 +139,7 @@ public class ToolExecutorService {
     private ToolSubjectResolver subjectResolver;
     private ToolObligationApplier obligationApplier;
     private AiToolRateLimitGate rateLimitGate;
+    private GuardrailAuditPublisher guardrailAuditPublisher;
     private AgentToolSqlWhitelist sqlWhitelist;
 
     @Autowired(required = false)
@@ -165,6 +167,22 @@ public class ToolExecutorService {
     @Autowired(required = false)
     public void setRateLimitGate(AiToolRateLimitGate rateLimitGate) {
         this.rateLimitGate = rateLimitGate;
+    }
+
+    /**
+     * 阶段 2.5 拒绝态的留痕出口（#142/B4-3e-1，收口差距 <b>D-B4-33</b>）。
+     *
+     * <p>裁决闸内的发布器只记闸侧结论（ALLOW／DENY／FAIL_CLOSED），本腿在闸<b>之后</b>：
+     * 没有这个装配位，一次"策略放行但限流义务拒绝执行"的调用在 V204 台账上只剩 ALLOW，
+     * §1.5-1 对账会把它读成"放行且执行成功"。</p>
+     *
+     * <p>未装配时拒绝结论<b>不翻转</b>（对外分类已由本腿成立），只记
+     * {@link GuardrailAuditPublisher#TRACE_FAILURE_MARKER} 的 ERROR —— 留痕失败改不成"更拒绝"，
+     * 把它翻成 503 反而会把 403 的配额用尽洗成护栏不可用。理由全文见该方法注释。</p>
+     */
+    @Autowired(required = false)
+    public void setGuardrailAuditPublisher(GuardrailAuditPublisher guardrailAuditPublisher) {
+        this.guardrailAuditPublisher = guardrailAuditPublisher;
     }
 
     @Autowired(required = false)
@@ -368,7 +386,8 @@ public class ToolExecutorService {
         }
 
         // ── 阶段 2.5: rateLimitEnforce —— ALLOW 签发的限流义务必须在 dispatch 之前消费（D-B4-21） ──
-        ToolResult rateBlock = rateLimitEnforce(toolName, decision, callId, startNs);
+        ToolResult rateBlock = rateLimitEnforce(toolName, decision, adjudication.subject(),
+                callId, startNs);
         if (rateBlock != null) {
             return rateBlock;
         }
@@ -551,9 +570,14 @@ public class ToolExecutorService {
      * （D.5 码表冻结 + {@code LLM_RATE_LIMITED} 自带"降级备用 provider"语义，
      * 用它会把护栏拒绝冒充成 provider 限流）。</p>
      *
+     * <p><b>三个拒绝分支都必须留痕</b>（差距 D-B4-33 的收口点，见
+     * {@link #traceRateLimitDenial}）：漏一个分支就等于台账上"策略放行、执行未拒"，
+     * 而对账查询只看得到闸侧那条 ALLOW。</p>
+     *
      * @return 拒绝执行的 ToolResult；{@code null} 表示本层无阻断
      */
     private ToolResult rateLimitEnforce(String toolName, ToolDecision decision,
+                                        ToolAdjudicationRequest.Subject subject,
                                         String callId, long startNs) {
         ToolObligations obligations = decision == null ? null : decision.obligations();
         if (obligations == null || !obligations.declaresRateLimit()) {
@@ -562,25 +586,68 @@ public class ToolExecutorService {
         if (rateLimitGate == null) {
             log.warn("F06-02 限流义务消费方未装配，拒绝执行（fail-closed）: tool={} key={}",
                     toolName, obligations.rateLimitKey());
+            traceRateLimitDenial(toolName, subject, decision, AiToolRateLimitGate.Verdict.FAIL_CLOSED,
+                    AiToolRateLimitGate.REASON_GATE_UNWIRED, startNs);
             return buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
-                    "限流义务消费方不可用（AI_TOOL_RATE_LIMIT_GATE_UNWIRED），拒绝执行", startNs, decision);
+                    "限流义务消费方不可用（" + AiToolRateLimitGate.REASON_GATE_UNWIRED + "），拒绝执行",
+                    startNs, decision);
         }
         AiToolRateLimitGate.RateOutcome outcome = rateLimitGate.enforce(obligations);
         switch (outcome.verdict()) {
             case DENIED:
                 log.info("F06-02 限流义务拒绝工具调用（策略结论）: tool={} reason={}",
                         toolName, outcome.reason());
+                traceRateLimitDenial(toolName, subject, decision, outcome.verdict(),
+                        outcome.reasonCode(), startNs);
                 return buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_DENIED,
                         "工具调用限流义务配额已用尽: " + outcome.reason(), startNs, decision);
             case FAIL_CLOSED:
                 log.warn("F06-02 限流义务形态不合契约，拒绝执行（fail-closed）: tool={} reason={}",
                         toolName, outcome.reason());
+                traceRateLimitDenial(toolName, subject, decision, outcome.verdict(),
+                        outcome.reasonCode(), startNs);
                 return buildGuardrailError(callId, toolName, AiErrorClass.GUARDRAIL_FAIL_CLOSED,
                         "限流义务无法消费: " + outcome.reason(), startNs, decision);
             case PASS:
             default:
                 return null;
         }
+    }
+
+    /**
+     * 限流腿拒绝态的双写留痕（#142/B4-3e-1，收口差距 <b>D-B4-33</b>）。
+     *
+     * <p>三条纪律都在这一处，禁在别处重述：</p>
+     * <ul>
+     *   <li><b>词映射</b>取 {@code Verdict#ledgerDecision()}（{@code DENIED}→台账词 {@code DENY}）——
+     *       直写枚举名会撞 V204 {@code ck_agdl_decision} 检查约束，留痕当场失败；</li>
+     *   <li><b>载荷</b>取义务摘要 + 拒绝态码段，两处都不含限流键原文
+     *       （键里带主体 ID，进审计库＝把标识符搬进对账面，与 {@code ToolObligations#summary} 同红线）；</li>
+     *   <li><b>不外抛</b>：拒绝结论已由调用方成立，留痕失败只记
+     *       {@link GuardrailAuditPublisher#TRACE_FAILURE_MARKER} 的 ERROR。把 DENIED 因留痕失败
+     *       改成 FAIL_CLOSED 等于 §4.7.2 两态折叠，比"缺一行台账"严重得多。</li>
+     * </ul>
+     */
+    private void traceRateLimitDenial(String toolName, ToolAdjudicationRequest.Subject subject,
+                                      ToolDecision decision, AiToolRateLimitGate.Verdict verdict,
+                                      String reasonCode, long startNs) {
+        String decisionWord = verdict == null ? null : verdict.ledgerDecision();
+        if (decisionWord == null) {
+            return;
+        }
+        if (guardrailAuditPublisher == null) {
+            log.error("{} 护栏审计出口未装配 ⇒ 限流拒绝态无痕（拒绝结论与对外分类保持不变）: "
+                            + "tool={} stage={} decision={}",
+                    GuardrailAuditPublisher.TRACE_FAILURE_MARKER, toolName,
+                    AiToolRateLimitGate.AUDIT_STAGE, decisionWord);
+            return;
+        }
+        long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
+        guardrailAuditPublisher.auditExecutionLegDenial(new GuardrailAuditPublisher.ExecutionLegDenial(
+                toolName, subject, AiToolRateLimitGate.AUDIT_STAGE, decisionWord, reasonCode,
+                decision == null ? null : decision.policyId(),
+                (int) Math.min(Integer.MAX_VALUE, Math.max(0L, elapsedMs)),
+                decision == null ? List.of() : decision.obligationSummary()));
     }
 
     // ── 阶段 4: obligationsApply ──────────────────────────────────────────
@@ -1694,7 +1761,11 @@ public class ToolExecutorService {
         r.setErrorClass(errorClass.name());
         r.setTraceId(error.traceId());
         r.setDecision(decision != null ? decision.verdict().name()
-                : (errorClass == AiErrorClass.GUARDRAIL_FAIL_CLOSED ? "FAIL_CLOSED" : "DENY"));
+                : (errorClass == AiErrorClass.GUARDRAIL_FAIL_CLOSED
+                        // 无裁决对象的护栏错误（本腿/接线缺失等执行侧拒绝）也取同一枚举名：
+                        // decision 词的单源是 ToolDecision.Verdict（与 V204 ck_agdl_decision 逐字对齐），
+                        // 在此内联 "DENY"/"FAIL_CLOSED" 就是第二套词面（D-B4-33 的同族缺陷形态）
+                        ? ToolDecision.Verdict.FAIL_CLOSED.name() : ToolDecision.Verdict.DENY.name()));
         if (decision != null) r.setPolicyId(decision.policyId());
         return r;
     }

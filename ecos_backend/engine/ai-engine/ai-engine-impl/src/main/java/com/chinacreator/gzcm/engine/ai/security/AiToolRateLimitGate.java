@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.security;
 
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
+import com.chinacreator.gzcm.engine.ai.guardrail.ToolDecision;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolObligations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,10 +47,25 @@ import java.util.function.LongSupplier;
  *
  * <p><b>诚实边界</b>：计数是<b>本进程内存</b>的固定窗口，多实例部署下各实例独立计额、
  * 进程重启即清零。本类因此不具备分布式配额语义，也不冒充具备；
- * 跨实例配额与窗口持久化归后续批（差距 D-B4-32）。
- * 另：本腿的 DENIED／FAIL_CLOSED 目前只经分类后的 {@code ToolResult} 与日志外显，
- * <b>未写 V204 {@code GuardrailDecisionLedger}</b>（发布器在 {@code AgentToolPolicyGate} 内，
- * 本腿在闸之后）⇒ 台账侧看不到"义务已放行但执行被拒"这一态，登记为差距 D-B4-33。</p>
+ * 跨实例配额与窗口持久化归后续批（差距 D-B4-32）。</p>
+ *
+ * <p><b>拒绝态留痕</b>（差距 <b>D-B4-33</b>，#142/B4-3e-1 收口）：DENIED／FAIL_CLOSED 除经分类后的
+ * {@code ToolResult} 与日志外显，还必须在咽喉处经 {@code GuardrailAuditPublisher#auditExecutionLegDenial}
+ * 落一条 {@code GUARDRAIL_EVAL} 事件 + 一行 V204 {@code GuardrailDecisionLedger}，
+ * 台账侧才看得见"义务已放行但执行被拒"这一态（否则 PRD-06 §1.5-1 的对账面上
+ * 只有一条 ALLOW，被拒这次调用读起来像"放行且执行成功"）。两条约束由本类持有：</p>
+ * <ul>
+ *   <li><b>词映射</b>{@link Verdict#ledgerDecision()} —— V204 的
+ *       {@code ck_agdl_decision CHECK (decision IN ('ALLOW','DENY','FAIL_CLOSED'))} 不含
+ *       {@code DENIED}，直接写 {@code Verdict.DENIED.name()} 会让 INSERT 当场失败、
+ *       留痕再次归零，故 {@code DENIED}→{@code DENY} 的折算必须在本类单点完成，
+ *       取值一律引用 {@code ToolDecision.Verdict}（该枚举名已与检查约束逐字对齐）；
+ *       {@code PASS} 返回 {@code null}＝<b>本腿不留痕</b>，闸侧已写过 ALLOW 行，
+ *       再补一行会把"每次裁决一条"的对账口径变成两次；</li>
+ *   <li><b>键面不外传</b> {@link RateOutcome#reasonCode()} —— 拒绝原因串按
+ *       {@code 码段 + ": " + 明细} 书写，明细段可能含限流键原文（键由主体 ID 拼成），
+ *       台账/事件只记码段，与"摘要不 echo 键"（{@code ToolObligations#summary}）同一条红线。</li>
+ * </ul>
  */
 @Component
 public class AiToolRateLimitGate {
@@ -66,7 +82,35 @@ public class AiToolRateLimitGate {
     static final long SWEEP_INTERVAL_MILLIS = 5 * 60_000L;
 
     /** 限流腿三态（与 {@code ToolDecision.Verdict} 同族语义，禁与护栏三态混写）。 */
-    public enum Verdict { PASS, DENIED, FAIL_CLOSED }
+    public enum Verdict {
+        PASS, DENIED, FAIL_CLOSED;
+
+        /**
+         * 本态在 V204 台账／审计事件上的 {@code decision} 词（差距 D-B4-33 的词映射单点）。
+         *
+         * <p>取值一律引用 {@link ToolDecision.Verdict} —— 该枚举名与
+         * {@code ck_agdl_decision CHECK (decision IN ('ALLOW','DENY','FAIL_CLOSED'))} 逐字对齐，
+         * 本腿的 {@code DENIED} 若按 {@code name()} 直写会撞检查约束、留痕当场失效。</p>
+         *
+         * @return 台账词；{@code PASS} 返回 {@code null}＝本腿不留痕（闸侧已写 ALLOW 行）
+         */
+        public String ledgerDecision() {
+            return switch (this) {
+                case PASS -> null;
+                case DENIED -> ToolDecision.Verdict.DENY.name();
+                case FAIL_CLOSED -> ToolDecision.Verdict.FAIL_CLOSED.name();
+            };
+        }
+    }
+
+    /**
+     * 本腿在审计面/台账面上的阶段标识（唯一持有者；咽喉与发布器只引用本常量）。
+     *
+     * <p>存在的理由＝V204 表没有 stage 列、也不许为它加列（IR03 只加不删 + 一次改表要过 DDL 批），
+     * 而同一 traceId 下现在会有两行（闸侧 ALLOW + 本腿 DENY／FAIL_CLOSED）——
+     * 没有这个串，两行在库里无法区分，收口 D-B4-33 就等于白做。</p>
+     */
+    public static final String AUDIT_STAGE = "rate_limit_enforce";
 
     /**
      * 限流判定结果。
@@ -79,6 +123,18 @@ public class AiToolRateLimitGate {
 
         public boolean blocks() {
             return verdict != Verdict.PASS;
+        }
+
+        /**
+         * 拒绝态码段（{@code 码段 + ": " + 明细} 的前半段）—— 台账/审计事件只记这一段。
+         *
+         * <p>明细段可能含限流键原文（键里带主体 ID），留痕面 echo 键等于把标识符搬进审计库，
+         * 与 {@code ToolObligations#summary()} 的"摘要不记键原文"是同一条红线。</p>
+         */
+        public String reasonCode() {
+            if (reason == null) return null;
+            int sep = reason.indexOf(": ");
+            return sep < 0 ? reason : reason.substring(0, sep);
         }
 
         static RateOutcome noObligation() {
@@ -177,6 +233,13 @@ public class AiToolRateLimitGate {
     public static final String REASON_SUBJECT_SEGMENT_EMPTY = "AI_TOOL_RATE_LIMIT_SUBJECT_EMPTY";
     /** 窗口内配额用尽 ⇒ 义务未满足（策略结论，非不可用）。 */
     public static final String REASON_QUOTA_EXCEEDED = "AI_TOOL_RATE_LIMIT_EXCEEDED";
+    /**
+     * 消费方（本类）未装配 ⇒ 义务存在却无人计额（咽喉侧使用，D-B4-21 的原形态标记）。
+     *
+     * <p>本类是它的唯一持有者：咽喉文案若内联同一串字面量，就有两处真值可各自漂移
+     * （静态门 {@code RateLimitObligationConsumerGateTest} 按"主源码内单持有者"钉住）。</p>
+     */
+    public static final String REASON_GATE_UNWIRED = "AI_TOOL_RATE_LIMIT_GATE_UNWIRED";
 
     /** 只读观测面：某键本窗口已用次数（无记录＝0）。 */
     public int usedCalls(String rateLimitKey) {

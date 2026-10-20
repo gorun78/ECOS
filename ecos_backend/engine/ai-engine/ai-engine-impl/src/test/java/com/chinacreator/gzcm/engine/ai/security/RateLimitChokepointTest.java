@@ -97,6 +97,8 @@ class RateLimitChokepointTest {
         // dispatch 次数不增：这一条才是"在 dispatch 之前消费"的证据
         verify(f.registry, times(AiToolRateLimitGate.MAX_CALLS_PER_WINDOW)).execute(eq("query_db"), any());
         assertEquals(AiToolRateLimitGate.MAX_CALLS_PER_WINDOW + 1, gate.usedCalls(RATE_KEY));
+        // 拒绝态必须喊留痕出口（D-B4-33：形态由 RateLimitDenialTraceTest 验，本条只验"在链上"）
+        verify(f.audit, times(1)).auditExecutionLegDenial(any());
     }
 
     @Test
@@ -136,6 +138,7 @@ class RateLimitChokepointTest {
         assertTrue(gate.windowSnapshot().isEmpty(),
                 "无义务却计额＝在执行面自造计额键（键面唯一来源应是策略义务）");
         verify(f.registry, times(25)).execute(eq("query_db"), any());
+        verify(f.audit, never()).auditExecutionLegDenial(any());
     }
 
     @Test
@@ -170,6 +173,7 @@ class RateLimitChokepointTest {
         verify(f.registry, never()).execute(eq("query_db"), any());
         assertFalse(String.valueOf(r.getError()).contains(drifted),
                 "自造/漂移键原文不得上浮到响应面（X-49）: " + r.getError());
+        verify(f.audit, times(1)).auditExecutionLegDenial(any());
     }
 
     @Test
@@ -183,6 +187,7 @@ class RateLimitChokepointTest {
 
         assertEquals("GUARDRAIL_FAIL_CLOSED", r.getErrorClass(), String.valueOf(r.getError()));
         verify(f.registry, never()).execute(eq("query_db"), any());
+        verify(f.audit, times(1)).auditExecutionLegDenial(any());
     }
 
     @Test
@@ -196,6 +201,7 @@ class RateLimitChokepointTest {
         assertFalse(r.isSuccess());
         assertEquals("GUARDRAIL_FAIL_CLOSED", r.getErrorClass(), String.valueOf(r.getError()));
         verify(f.registry, never()).execute(eq("query_db"), any());
+        verify(f.audit, times(1)).auditExecutionLegDenial(any());
     }
 
     // ── 验收 4：DENIED 与 FAIL_CLOSED 的对外分类互斥 ───────────────────────
@@ -228,6 +234,11 @@ class RateLimitChokepointTest {
     private static final class Fixture {
         final ToolExecutorService service = new ToolExecutorService();
         final ToolRegistry registry = mock(ToolRegistry.class);
+        /**
+         * 留痕出口的装配位（#142/B4-3e-1，D-B4-33）。本类用 mock 只验"拒绝分支确实喊了留痕"，
+         * 事件与台账行的<b>形态</b>由 {@code RateLimitDenialTraceTest} 用真发布器验收。
+         */
+        final GuardrailAuditPublisher audit = mock(GuardrailAuditPublisher.class);
 
         Fixture(ToolDecision decision, String resultJson, AiToolRateLimitGate gate) {
             ToolDao toolDao = mock(ToolDao.class);
@@ -246,6 +257,7 @@ class RateLimitChokepointTest {
             service.setObligationApplier(new ToolObligationApplier(
                     securityStub, new ObjectMapper(), new AiToolColumnSurfaceGate(securityStub)));
             service.setRateLimitGate(gate);
+            service.setGuardrailAuditPublisher(audit);
             ReflectionTestUtils.setField(service, "toolRegistry", registry);
         }
 

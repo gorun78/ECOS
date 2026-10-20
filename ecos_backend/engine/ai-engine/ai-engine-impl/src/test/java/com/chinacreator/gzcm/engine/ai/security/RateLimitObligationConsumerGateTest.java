@@ -67,6 +67,9 @@ class RateLimitObligationConsumerGateTest {
     private static final String ERROR_CLASS_PATH =
             "ecos_backend/runtime/common-api/src/main/java/"
                     + "com/chinacreator/gzcm/common/error/AiErrorClass.java";
+    private static final String PUBLISHER_PATH =
+            "ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/ai/security/GuardrailAuditPublisher.java";
 
     /** dispatch 的代码位置标记（限流腿必须排在它之前）。 */
     private static final String DISPATCH_MARKER = "toolRegistry.execute(toolName, arguments)";
@@ -186,7 +189,7 @@ class RateLimitObligationConsumerGateTest {
     void rateLimitLegRunsBeforeDispatch() {
         String code = codeOf(EXECUTOR_PATH);
 
-        int enforceAt = code.indexOf("rateLimitEnforce(toolName, decision, callId, startNs)");
+        int enforceAt = code.indexOf("rateLimitEnforce(toolName,");
         int dispatchAt = code.indexOf(DISPATCH_MARKER);
         assertTrue(enforceAt >= 0, "咽喉未调用限流腿（摘掉这一行就该红，而不是靠单测里没人调的类）");
         assertTrue(dispatchAt >= 0, "未识别到 dispatch 位置标记，本断言不得默认通过: " + DISPATCH_MARKER);
@@ -204,8 +207,12 @@ class RateLimitObligationConsumerGateTest {
 
         assertTrue(executor.contains("setRateLimitGate"), "咽喉未暴露限流消费方装配位");
         assertTrue(executor.contains("AiToolRateLimitGate.RateOutcome"), "咽喉未使用限流判定结果类型");
-        assertTrue(executor.contains("AI_TOOL_RATE_LIMIT_GATE_UNWIRED"),
+        assertTrue(executor.contains("AiToolRateLimitGate.REASON_GATE_UNWIRED"),
                 "消费方未装配时未落显式不可用标记 ⇒ 会被静默放行（D-B4-21 原形态）");
+        assertTrue(gate.contains("\"AI_TOOL_RATE_LIMIT_GATE_UNWIRED\""),
+                "不可用标记的码段字面量必须由消费方单源持有（咽喉内联同一串＝两处可各自漂移）");
+        assertEquals(1, filesHoldingLiteral("\"AI_TOOL_RATE_LIMIT_GATE_UNWIRED\"").size(),
+                "同一拒绝态码串有第二个持有者 ⇒ 台账面上的码面开始分叉");
         assertTrue(gate.contains("@Component"), "消费方不是可装配组件");
         assertTrue(gate.contains("GuardrailDecisionContract.RATE_LIMIT_KEY_PREFIX"),
                 "消费方未委托单源前缀（那意味着第二套键面回来了）");
@@ -243,7 +250,7 @@ class RateLimitObligationConsumerGateTest {
     }
 
     @Test
-    @DisplayName("登记不闭项在位（D-B4-31/32/33 不得被\"顺手标已闭\"）")
+    @DisplayName("登记不闭项在位（D-B4-31/32 不得被\"顺手标已闭\"；D-B4-33 已转代码收口，另腿钉）")
     void followUpGapsAreRegistered() {
         String contract = readString(CONTRACT_PATH);
         String gate = readString(GATE_PATH);
@@ -252,6 +259,96 @@ class RateLimitObligationConsumerGateTest {
                 "义务词单源未扩的差距登记被抹掉 ⇒ 后续批无从判断本门禁为何只钉两个字面量");
         assertTrue(gate.contains("D-B4-32"), "跨实例配额/数值配置化的差距登记被抹掉");
         assertTrue(gate.contains("D-B4-33"),
-                "限流腿拒绝态未落 V204 台账的差距登记被抹掉 ⇒ 台账面缺口会被读成已收口");
+                "D-B4-33 已收口但必须在代码里留下收口凭据引用，否则后续批无法判断这一腿为何存在");
+    }
+
+    // ── 验收 3：拒绝态留痕（D-B4-33 的收口钉） ──────────────────────────────
+
+    @Test
+    @DisplayName("限流腿的每个拒绝分支都走审计出口（漏一条＝台账上\"策略放行、执行未拒\"）")
+    void everyRejectionBranchTraces() {
+        String executor = codeOf(EXECUTOR_PATH);
+        int legStart = executor.indexOf("private ToolResult rateLimitEnforce(");
+        assertTrue(legStart >= 0, "未定位到限流腿方法体，本断言不得默认通过");
+        int traceStart = executor.indexOf("private void traceRateLimitDenial(", legStart);
+        assertTrue(traceStart > legStart, "咽喉未暴露拒绝态留痕位（D-B4-33 的收口形态被摘掉）");
+        String legBody = executor.substring(legStart, traceStart);
+
+        // 三条拒绝分支（消费方未装配 / DENIED / FAIL_CLOSED）与三次留痕调用必须一一对应
+        assertEquals(3, countOccurrences(legBody, "return buildGuardrailError("),
+                "拒绝分支数与既有基线不符（改动分支形态时须同步改本钉）");
+        assertEquals(3, countOccurrences(legBody, "traceRateLimitDenial("),
+                "有一条拒绝分支不留痕 ⇒ 台账面只看得到闸侧 ALLOW，正是 D-B4-33 的原形态:\n" + legBody);
+        assertTrue(executor.contains("setGuardrailAuditPublisher"), "咽喉未暴露审计出口装配位");
+    }
+
+    @Test
+    @DisplayName("台账词只在闸侧折算一次：禁把 DENIED 原名写进 decision 列，也禁第二处映射")
+    void ledgerWordHasSingleMappingPoint() {
+        String gate = codeOf(GATE_PATH);
+        String executor = codeOf(EXECUTOR_PATH);
+        String publisher = codeOf(PUBLISHER_PATH);
+
+        assertTrue(gate.contains("ledgerDecision()"), "闸侧未持有台账词映射（映射散到咽喉/发布器＝三处真值）");
+        assertTrue(gate.contains("ToolDecision.Verdict.DENY.name()"),
+                "DENIED→DENY 必须引用与 V204 检查约束逐字对齐的枚举名，禁写自由字面量");
+        assertFalse(gate.contains("DENIED.name()"), "把本腿的 DENIED 原名当台账词＝撞 ck_agdl_decision 检查约束");
+        // 咽喉与发布器只搬运、不映射（"DENY"/"FAIL_CLOSED" 字面量不得出现在这两处的主代码里）
+        assertFalse(executor.contains("\"DENY\""), "咽喉内联台账词＝第二套映射");
+        assertFalse(publisher.contains("\"DENY\""), "发布器内联台账词＝第二套映射");
+    }
+
+    @Test
+    @DisplayName("留痕面禁 echo 限流键原文：只记码段与义务摘要")
+    void traceCarriesNoRateLimitKey() {
+        String executor = codeOf(EXECUTOR_PATH);
+        String publisher = codeOf(PUBLISHER_PATH);
+        String gate = codeOf(GATE_PATH);
+
+        assertTrue(gate.contains("reasonCode()"), "拒绝态码段未单点切出（明细段可能带键原文，禁整串入台账）");
+        assertTrue(executor.contains("outcome.reasonCode()") || executor.contains("reasonCode()"),
+                "咽喉把整条 reason 传给留痕面 ⇒ 键原文进审计库");
+        assertFalse(publisher.contains("rateLimitKey("),
+                "发布器不得回头取限流键原文（键面进台账＝把主体标识搬进对账面）");
+    }
+
+    @Test
+    @DisplayName("stage 词面单源：\"rate_limit_enforce\" 在主源码内恰一个持有者")
+    void legStageWordHasSingleOwner() {
+        List<String> holders = filesHoldingLiteral("\"rate_limit_enforce\"");
+        assertEquals(1, holders.size(),
+                "本腿的 stage 词有第二个持有者（两行台账靠 stage 区分，词面分叉＝区分失效）:\n"
+                        + String.join("\n", holders));
+        assertTrue(holders.get(0).replace('\\', '/').endsWith(GATE_PATH),
+                "stage 词的持有者应当是限流消费方本身: " + holders);
+    }
+
+    // ── 装置辅助 ────────────────────────────────────────────────────────────
+
+    /** 主源码内含该<b>带引号</b>字面量的文件（已剥注释 ⇒ 文档提及不算持有）。 */
+    private static List<String> filesHoldingLiteral(String quotedLiteral) {
+        List<String> hits = new ArrayList<>();
+        try {
+            for (Path f : backendMainSources()) {
+                String code = stripComments(new String(readBytes(f), StandardCharsets.UTF_8));
+                if (code.contains(quotedLiteral)) {
+                    hits.add(f.toString());
+                }
+            }
+        } catch (IOException e) {
+            throw new AssertionError("扫描主源码失败: " + e.getMessage(), e);
+        }
+        return hits;
+    }
+
+    private static int countOccurrences(String haystack, String needle) {
+        int count = 0;
+        int from = 0;
+        while (true) {
+            int at = haystack.indexOf(needle, from);
+            if (at < 0) return count;
+            count++;
+            from = at + needle.length();
+        }
     }
 }
