@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.workspace.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor;
@@ -276,9 +277,9 @@ public class WorkspaceSecurityEngineClient {
             input.put("subject", Map.of("userId", currentUserId(), "role", "user"));
             body.put("input", input);
             Map<String, Object> resp = postJson("/api/v1/security/policy-engine/evaluate", body);
-            if (resp == null || !(resp.get("data") instanceof Map)) return false;
-            Object result = ((Map<String, Object>) resp.get("data")).get("result");
-            return Boolean.TRUE.equals(result);
+            // 裁决读数走单源：本类此前只认历史别名 result，而现契约（OpaPolicyService）
+            // 的 data 段发的是 allow ⇒ 恒读到 null、无论策略怎么判都 DENY（差距 D-B4-39）。
+            return AbacEvaluateResponseContract.isExplicitAllow(resp == null ? null : resp.get("data"));
         } catch (SecurityEngineUnavailableException e) {
             throw e; // 可用性故障不得冒充"策略拒绝"（§4.5.4 分态）
         } catch (Exception e) {

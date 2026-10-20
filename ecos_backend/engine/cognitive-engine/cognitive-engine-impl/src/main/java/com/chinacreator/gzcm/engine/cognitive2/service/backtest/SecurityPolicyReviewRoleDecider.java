@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.cognitive2.service.backtest;
 
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -135,8 +136,10 @@ public class SecurityPolicyReviewRoleDecider implements BacktestReviewRoleDecide
         String decisionRef = data.path(GuardrailDecisionContract.KEY_POLICY_REF).asText(POLICY_NAME)
                 + "#" + data.path("inputDigest").asText("-")
                 + "@" + PATH_POLICY_EVALUATE;
-        if ("fallback".equalsIgnoreCase(data.path("source").asText(""))
-                || "DENY_OPA_DOWN".equalsIgnoreCase(data.path("fallback").asText(""))) {
+        if (AbacEvaluateResponseContract.VALUE_SOURCE_FALLBACK.equalsIgnoreCase(
+                    data.path(AbacEvaluateResponseContract.KEY_SOURCE).asText(""))
+                || AbacEvaluateResponseContract.VALUE_FALLBACK_DENY_OPA_DOWN.equalsIgnoreCase(
+                    data.path(AbacEvaluateResponseContract.KEY_FALLBACK).asText(""))) {
             return ReviewRoleDecision.unavailable(decisionRef,
                     "policy engine answered fail-close fallback (DENY_OPA_DOWN): unavailable, not a policy DENY");
         }

@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.runtime.llm.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract.Verdict;
 import com.chinacreator.gzcm.common.trace.EcosTraceContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.MediaType;
@@ -21,7 +23,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -295,49 +296,26 @@ public class SecurityEngineBridge {
     }
 
     /**
-     * 恰为显式 ALLOW 才放行。
+     * 恰为显式 ALLOW 才放行 —— 裁决键面改读
+     * {@link AbacEvaluateResponseContract#verdictOf(Object)}（#142/B4-3e-4，D-B4-37）。
      *
-     * <p>识别顺序与 ai-engine 侧 {@code AiSecurityEngineClient#verdictOf} 对齐：显式
-     * {@code decision}/{@code verdict} 字段优先，其次布尔裁决键 {@code allow}（兼容历史别名
-     * {@code result}）；{@code source=fallback} 或带 {@code opaError} 是 security 自身兜底
-     * 而非策略裁决 → 不放行；其余（含缺失）默认 DENY。</p>
+     * <p>收口前本方法自带一套 {@code decision}/{@code verdict}/{@code allow}/{@code result}
+     * 内联字面量，与 ai-engine 侧同型重复，且<b>不看 {@code policyState}</b>：
+     * 护栏处于「策略未加载／OPA 不可达兜底」时它按 DENY 处理，日志里说的是
+     * "未放行"，实际是"护栏没说话"。现在两态都由单源给出，本方法只保留
+     * 未放行原因的留痕（{@link Verdict} 原文进日志，禁在此再解释一遍键面）。</p>
      */
     private boolean isExplicitAllow(Map<String, Object> data, String action, String callerId) {
+        Verdict verdict = AbacEvaluateResponseContract.verdictOf(data);
+        if (verdict == Verdict.ALLOW) return true;
         if (data == null) {
             log.warn("[llm-gateway] security-engine 裁决无 data 段（默认 DENY）: action={}, caller={}",
                     action, callerId);
-            return false;
+        } else {
+            log.warn("[llm-gateway] security-engine 裁决未放行（默认 DENY）: action={}, caller={}, verdict={}",
+                    action, callerId, verdict);
         }
-        Object source = data.get("source");
-        if (data.containsKey("opaError")
-                || (source != null && "fallback".equalsIgnoreCase(String.valueOf(source).trim()))) {
-            log.warn("[llm-gateway] security-engine 处于 fallback 兜底态而非策略裁决（默认 DENY）: action={}", action);
-            return false;
-        }
-        Object explicit = data.get("decision") != null ? data.get("decision") : data.get("verdict");
-        if (explicit != null) {
-            String s = String.valueOf(explicit).trim().toUpperCase(Locale.ROOT);
-            boolean allow = "ALLOW".equals(s) || "PERMIT".equals(s) || "TRUE".equals(s);
-            if (!allow) {
-                log.warn("[llm-gateway] security-engine 裁决未放行（默认 DENY）: action={}, caller={}, verdict={}",
-                        action, callerId, s);
-            }
-            return allow;
-        }
-        Object flag = data.get("allow") != null ? data.get("allow") : data.get("result");
-        if (flag == null) {
-            log.warn("[llm-gateway] security-engine 裁决键缺失（默认 DENY）: action={}, caller={}", action, callerId);
-            return false;
-        }
-        if (flag instanceof Boolean b) {
-            if (!b) {
-                log.warn("[llm-gateway] security-engine 裁决未放行（默认 DENY）: action={}, caller={}",
-                        action, callerId);
-            }
-            return b;
-        }
-        String s = String.valueOf(flag).trim().toLowerCase(Locale.ROOT);
-        return "true".equals(s) || "allow".equals(s) || "permit".equals(s);
+        return false;
     }
 
     // ═══════════════ 3. 审计（Kafka ecos.audit，经 runtime-event 横切出口） ═══════════════

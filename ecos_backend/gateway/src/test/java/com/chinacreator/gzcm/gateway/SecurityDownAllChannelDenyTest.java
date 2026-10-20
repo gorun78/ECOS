@@ -261,6 +261,7 @@ class SecurityDownAllChannelDenyTest {
             } else if (url.endsWith("/cls/columns")) {
                 data.put("allowedColumns", List.of());
             } else {
+                // 刻意用历史别名形态（现行生产应答写 allow）：本夹具同时覆盖契约的 result 兼容读腿
                 data.put("result", false);
             }
             Map<String, Object> body = new LinkedHashMap<>();

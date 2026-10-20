@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ontology.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
@@ -350,11 +351,10 @@ public class SecurityEngineClient {
                     "role", "user"));
             body.put("input", input);
             Map<String, Object> resp = postJson("/api/v1/security/policy-engine/evaluate", body);
-            if (resp == null || resp.get("data") == null) return false;
-            Object dataObj = resp.get("data");
-            if (!(dataObj instanceof Map)) return false;
-            Object result = ((Map<String, Object>) dataObj).get("result");
-            return Boolean.TRUE.equals(result);
+            if (resp == null) return false;
+            // 裁决读数走单源：本类此前只认历史别名 result，而现契约应答 data 段发的是 allow，
+            // 实测恒读到 null ⇒ 无论策略怎么判都 DENY（差距 D-B4-39）。
+            return AbacEvaluateResponseContract.isExplicitAllow(resp.get("data"));
         } catch (Exception e) {
             log.warn("SecurityEngineClient.evaluatePolicy DENY: action={} reason={}",
                     action, e.getMessage());

@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.kb.security;
 
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.header.ServiceContext;
 import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
@@ -108,11 +109,9 @@ public class KnowledgeNavSecurityEngineClient {
                 return false;
             }
             Object dataObj = resp.get("data");
-            if (!(dataObj instanceof Map)) {
-                return false;
-            }
-            Object result = ((Map<String, Object>) dataObj).get("result");
-            return Boolean.TRUE.equals(result);
+            // 裁决读数走单源：本类此前只认历史别名 result，而现契约应答 data 段发的是 allow，
+            // 实测恒读到 null ⇒ 无论策略怎么判都 DENY（差距 D-B4-39）。
+            return AbacEvaluateResponseContract.isExplicitAllow(dataObj);
         } catch (Exception e) {
             log.warn("KNavSecurityEngineClient.evaluatePolicy DENY: action={} reason={}",
                     action, e.getMessage());

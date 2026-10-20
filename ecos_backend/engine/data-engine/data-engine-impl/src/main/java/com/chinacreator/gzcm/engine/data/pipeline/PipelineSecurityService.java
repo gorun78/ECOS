@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -271,10 +272,9 @@ public class PipelineSecurityService {
                 // fallback: 若 data 为空（旧版 security-engine 兼容），尝试直接从顶层取
                 data = apiResp;
             }
-            Object allow = data.get("allow");
-            boolean allowed = Boolean.TRUE.equals(allow);
-            String reason = data.get("fallback") != null
-                    ? data.get("fallback").toString()
+            boolean allowed = AbacEvaluateResponseContract.isExplicitAllow(data);
+            String reason = data.get(AbacEvaluateResponseContract.KEY_FALLBACK) != null
+                    ? data.get(AbacEvaluateResponseContract.KEY_FALLBACK).toString()
                     : (allowed ? "ALLOW" : "DENY");
             if (allowed) {
                 log.info("ABAC allow pipeline execute: definitionId={}, reason={}", definitionId, reason);
@@ -330,9 +330,9 @@ public class PipelineSecurityService {
             if (data == null || data.isEmpty()) {
                 data = apiResp;
             }
-            boolean allowed = Boolean.TRUE.equals(data.get("allow"));
-            String reason = data.get("fallback") != null
-                    ? data.get("fallback").toString()
+            boolean allowed = AbacEvaluateResponseContract.isExplicitAllow(data);
+            String reason = data.get(AbacEvaluateResponseContract.KEY_FALLBACK) != null
+                    ? data.get(AbacEvaluateResponseContract.KEY_FALLBACK).toString()
                     : (allowed ? "ALLOW" : "DENY");
             if (allowed) {
                 log.info("ABAC allow data governance apply: candidateId={}, reason={}", candidateId, reason);
@@ -351,7 +351,8 @@ public class PipelineSecurityService {
     /**
      * 通用策略裁决（H-3 交付①：期间关账财务角色门槛，卷09 §十一；后续数据域写操作权限判定统一走本咽喉）。
      * <p>与 {@link #evaluateExecute} / {@link #evaluateDataGovernanceApply} 同一 policy-engine 端点、
-     * 同一响应解析（ApiResponse.data.allow）；<b>fail-closed</b>：security-engine 不可用 / 响应异常 /
+     * 同一响应解析（{@code AbacEvaluateResponseContract#isExplicitAllow} 读 ApiResponse.data）；
+     * <b>fail-closed</b>：security-engine 不可用 / 响应异常 /
      * 空响应 ⇒ deny（§2.4 第 6 条 / SUP-DATA-02）。
      *
      * <p>调用方约束：{@code role} 只准透传调用方身份声明（如 UserContext claims 原值），
@@ -394,9 +395,9 @@ public class PipelineSecurityService {
             if (data == null || data.isEmpty()) {
                 data = apiResp;
             }
-            boolean allowed = Boolean.TRUE.equals(data.get("allow"));
-            String reason = data.get("fallback") != null
-                    ? data.get("fallback").toString()
+            boolean allowed = AbacEvaluateResponseContract.isExplicitAllow(data);
+            String reason = data.get(AbacEvaluateResponseContract.KEY_FALLBACK) != null
+                    ? data.get(AbacEvaluateResponseContract.KEY_FALLBACK).toString()
                     : (allowed ? "ALLOW" : "DENY");
             if (allowed) {
                 log.info("ABAC allow {}: resource={}, reason={}", action, resource, reason);

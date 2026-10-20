@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.security.service;
 
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -170,7 +171,7 @@ public class OpaPolicyService {
             out.put(GuardrailDecisionContract.KEY_ALLOW, false);
             out.put(GuardrailDecisionContract.KEY_POLICY_STATE, STATE_POLICY_UNDEFINED);
             out.put("opaStatus", statusCode);
-            out.put("source", "opa");
+            out.put(AbacEvaluateResponseContract.KEY_SOURCE, AbacEvaluateResponseContract.VALUE_SOURCE_OPA);
             out.put(GuardrailDecisionContract.KEY_POLICY_REF, "ecos." + policy);
             out.put(GuardrailDecisionContract.KEY_OBLIGATIONS, List.of(Map.of(
                     GuardrailDecisionContract.KEY_OBLIGATION, GuardrailDecisionContract.OBLIGATION_DENIED,
@@ -185,7 +186,7 @@ public class OpaPolicyService {
         out.put(GuardrailDecisionContract.KEY_ALLOW, allow);
         out.put(GuardrailDecisionContract.KEY_POLICY_STATE, allow ? STATE_ALLOW : STATE_DENY);
         out.put("opaStatus", statusCode);
-        out.put("source", "opa");
+        out.put(AbacEvaluateResponseContract.KEY_SOURCE, AbacEvaluateResponseContract.VALUE_SOURCE_OPA);
         out.put(GuardrailDecisionContract.KEY_POLICY_REF, "ecos." + policy);
         // C.2.5 ③：裁决结果携带 obligations（deniedReason/maskHints/watermark/rateLimitKey）。
         out.put(GuardrailDecisionContract.KEY_OBLIGATIONS, obligations);
@@ -199,12 +200,13 @@ public class OpaPolicyService {
                                             String deniedReason, String error, Integer statusCode) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("policy", policy);
-        result.put("source", "fallback");
+        result.put(AbacEvaluateResponseContract.KEY_SOURCE, AbacEvaluateResponseContract.VALUE_SOURCE_FALLBACK);
         result.put(GuardrailDecisionContract.KEY_ALLOW, false);
         result.put(GuardrailDecisionContract.KEY_POLICY_STATE, STATE_UNAVAILABLE);
-        result.put("fallback", "DENY_OPA_DOWN");
+        result.put(AbacEvaluateResponseContract.KEY_FALLBACK,
+                AbacEvaluateResponseContract.VALUE_FALLBACK_DENY_OPA_DOWN);
         result.put("eccode", "ECOS-SEC-502");
-        if (error != null) result.put("opaError", error);
+        if (error != null) result.put(AbacEvaluateResponseContract.KEY_OPA_ERROR, error);
         if (statusCode != null) result.put("opaStatus", statusCode);
         result.put(GuardrailDecisionContract.KEY_OBLIGATIONS, List.of(Map.of(
                 GuardrailDecisionContract.KEY_OBLIGATION, GuardrailDecisionContract.OBLIGATION_DENIED,

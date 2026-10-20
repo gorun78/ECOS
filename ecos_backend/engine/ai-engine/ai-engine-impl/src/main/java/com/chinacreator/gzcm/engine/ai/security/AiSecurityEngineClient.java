@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
@@ -23,7 +24,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -120,55 +120,29 @@ public class AiSecurityEngineClient {
     public static final String V_FAIL_CLOSED = "FAIL_CLOSED";
 
     /**
-     * 把 security 响应 {@code data} 段解析成三态，禁在此折叠语义：
+     * 把 security 响应 {@code data} 段解析成三态。
      *
-     * <ol>
-     *   <li><b>{@code policyState} 优先</b>（B4-3c，#142）：显式为
-     *       {@code POLICY_UNDEFINED}（OPA 可达但本策略未加载）或 {@code OPA_UNAVAILABLE}
-     *       （不可达/超时/非 2xx/不可解析）⇒ <b>FAIL_CLOSED</b>。这两态的含义是"护栏没说话"，
-     *       与策略拒绝（403）分态（§4.7.2「不可用 ≠ 无权限」/ F06-14）。缺该键＝旧形态，
-     *       继续走下面的兼容分支；</li>
-     *   <li>显式 {@code decision}/{@code verdict} 字段（ALLOW/PERMIT、DENY/DENIED，未知取值 →
-     *       FAIL_CLOSED，禁默认放行兜底）；</li>
-     *   <li>无显式字段时读布尔裁决键 —— 分册 01 现契约（{@code OpaPolicyService.evaluate}）用
-     *       <b>{@code allow}</b>，{@code result} 为历史别名，两者都要认（只认一个即恒 DENY）；</li>
-     *   <li>{@code source=fallback} 或带 {@code opaError} 时，security 自己走的是 fail-close 兜底
-     *       <b>而非策略裁决</b> —— 引擎侧必须记为 FAIL_CLOSED（503、可告警），不得算 DENY（403）；</li>
-     *   <li>裁决键缺失/不可识别 → FAIL_CLOSED。</li>
-     * </ol>
+     * <p><b>#142/B4-3e-4（差距 D-B4-37）起本方法只做形态映射，不再自带键面</b>：
+     * 裁决键（{@code allow} 与历史别名 {@code result}、显式 {@code decision}/
+     * {@code verdict} 及其词表、{@code source=fallback}/{@code opaError} 兜底识别）
+     * 全部收敛到 {@link AbacEvaluateResponseContract#verdictOf(Object)}，
+     * 由 {@code AbacEvaluateResponseSingleSourceTest} 静态门禁钉住「evaluate 应答消费面
+     * 零内联裁决键字面量」。三态到本类常量的映射保持逐字不变：
+     * {@code ALLOW→V_ALLOW}、{@code DENY→V_DENY}、
+     * {@code UNEVALUATED→V_FAIL_CLOSED}（护栏没说话＝503 可告警，禁算 403 策略拒绝，
+     * §4.7.2「不可用 ≠ 无权限」/ F06-14）。</p>
      */
     public static String verdictOf(Map<String, Object> data) {
-        if (data == null) return V_FAIL_CLOSED;
-        String policyState = GuardrailDecisionContract.stateOf(data);
-        if (GuardrailDecisionContract.isUnevaluated(policyState)) return V_FAIL_CLOSED;
-        if (isUnavailableSource(data)) return V_FAIL_CLOSED;
-        Object explicit = data.get("decision") != null ? data.get("decision") : data.get("verdict");
-        if (explicit != null) {
-            String s = String.valueOf(explicit).trim().toUpperCase(Locale.ROOT);
-            if ("ALLOW".equals(s) || "PERMIT".equals(s) || "TRUE".equals(s)) return V_ALLOW;
-            if ("DENY".equals(s) || "DENIED".equals(s) || "REJECT".equals(s)) return V_DENY;
-            return V_FAIL_CLOSED;
-        }
-        if (GuardrailDecisionContract.STATE_DENY.equals(policyState)) return V_DENY;
-        if (GuardrailDecisionContract.STATE_ALLOW.equals(policyState)) return V_ALLOW;
-        Object flag = data.get("allow") != null ? data.get("allow") : data.get("result");
-        if (flag == null) return V_FAIL_CLOSED;
-        if (flag instanceof Boolean b) return b ? V_ALLOW : V_DENY;
-        String s = String.valueOf(flag).trim().toLowerCase(Locale.ROOT);
-        if ("true".equals(s) || "allow".equals(s) || "permit".equals(s)) return V_ALLOW;
-        if ("false".equals(s) || "deny".equals(s) || "denied".equals(s)) return V_DENY;
-        return V_FAIL_CLOSED;
+        return switch (AbacEvaluateResponseContract.verdictOf(data)) {
+            case ALLOW -> V_ALLOW;
+            case DENY -> V_DENY;
+            case UNEVALUATED -> V_FAIL_CLOSED;
+        };
     }
 
     /** 恰为显式 ALLOW 才 true（其余形态 false，调用方仍须用 {@link #verdictOf} 分态）。 */
     public static boolean isExplicitAllow(Map<String, Object> data) {
         return V_ALLOW.equals(verdictOf(data));
-    }
-
-    private static boolean isUnavailableSource(Map<String, Object> data) {
-        if (data.containsKey("opaError")) return true;
-        Object source = data.get("source");
-        return source != null && "fallback".equalsIgnoreCase(String.valueOf(source).trim());
     }
 
     /**
