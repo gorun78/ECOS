@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.security.decision;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.security.dao.SecurityDecisionDao;
 import com.chinacreator.gzcm.engine.security.rls.RlsPredicate;
@@ -106,7 +107,7 @@ public class SecurityDecisionService {
                 rlsPart.get(RlsExecutionContract.KEY_PREDICATE_TEMPLATE), columnsPart.get("mode"),
                 columnsPart.get(ColumnSurfaceContract.KEY_COLUMN_UNIVERSE_SOURCE),
                 columnCountOf(columnsPart), columnsPart.get(ColumnSurfaceContract.KEY_CLS_DENY_REASON),
-                masks.size(), opaPart.get("allow"));
+                masks.size(), opaPart.get(GuardrailDecisionContract.KEY_ALLOW));
         return new DecisionBundle(rlsPart, columnsPart, masks, opaPart, decisionId, traceId);
     }
 
@@ -292,8 +293,9 @@ public class SecurityDecisionService {
             List<Map<String, Object>> out = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 Map<String, Object> mm = new LinkedHashMap<>();
-                mm.put("column", row.get("column"));
-                mm.put("strategy", String.valueOf(row.get("strategy")));
+                // 写的是裁决线上的 mask 义务形态（键面单源）；row 侧同名键属 DAO 结果集别名面，不混用。
+                mm.put(GuardrailDecisionContract.KEY_MASK_COLUMN, row.get("column"));
+                mm.put(GuardrailDecisionContract.KEY_MASK_STRATEGY, String.valueOf(row.get("strategy")));
                 out.add(mm);
             }
             // 只返回目录中显式登记 mask 的列，不做全表放大（无登记 = 无强制脱敏）
@@ -363,21 +365,27 @@ public class SecurityDecisionService {
         try {
             Map<String, Object> r = opa.evaluate(OpaPolicyService.POLICY_DATA_ACCESS, input);
             Map<String, Object> out = new LinkedHashMap<>();
-            out.put("allow", r.getOrDefault("allow", false));
-            out.put("policyState", r.getOrDefault("policyState", OpaPolicyService.STATE_UNAVAILABLE));
-            out.put("policyRef", r.getOrDefault("policyRef", policyRef));
-            Object ob = r.get("obligations");
-            out.put("obligations", ob instanceof List<?> l ? l : new ArrayList<>());
+            out.put(GuardrailDecisionContract.KEY_ALLOW,
+                    r.getOrDefault(GuardrailDecisionContract.KEY_ALLOW, false));
+            out.put(GuardrailDecisionContract.KEY_POLICY_STATE,
+                    r.getOrDefault(GuardrailDecisionContract.KEY_POLICY_STATE,
+                            OpaPolicyService.STATE_UNAVAILABLE));
+            out.put(GuardrailDecisionContract.KEY_POLICY_REF,
+                    r.getOrDefault(GuardrailDecisionContract.KEY_POLICY_REF, policyRef));
+            Object ob = r.get(GuardrailDecisionContract.KEY_OBLIGATIONS);
+            out.put(GuardrailDecisionContract.KEY_OBLIGATIONS, ob instanceof List<?> l ? l : new ArrayList<>());
             return out;
         } catch (Exception e) {
             // OpaPolicyService.evaluate 内部已 fail-close；这里再兜一层：绝不因 OPA 抛错而放行。
             // 状态记 UNAVAILABLE 而非 DENY —— 本分支恰恰意味着"护栏没被咨询"，禁伪装成策略裁决。
             log.warn("decide OPA 源异常，fail-close → allow=false: {}", e.getMessage());
             Map<String, Object> out = new LinkedHashMap<>();
-            out.put("allow", false);
-            out.put("policyState", OpaPolicyService.STATE_UNAVAILABLE);
-            out.put("policyRef", policyRef);
-            out.put("obligations", List.of(Map.of("obligation", "DENIED", "deniedReason", "OPA_ERROR_FAIL_CLOSED")));
+            out.put(GuardrailDecisionContract.KEY_ALLOW, false);
+            out.put(GuardrailDecisionContract.KEY_POLICY_STATE, OpaPolicyService.STATE_UNAVAILABLE);
+            out.put(GuardrailDecisionContract.KEY_POLICY_REF, policyRef);
+            out.put(GuardrailDecisionContract.KEY_OBLIGATIONS, List.of(Map.of(
+                    GuardrailDecisionContract.KEY_OBLIGATION, GuardrailDecisionContract.OBLIGATION_DENIED,
+                    GuardrailDecisionContract.KEY_DENIED_REASON, "OPA_ERROR_FAIL_CLOSED")));
             return out;
         }
     }

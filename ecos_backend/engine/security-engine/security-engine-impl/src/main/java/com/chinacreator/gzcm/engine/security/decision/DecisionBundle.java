@@ -243,26 +243,14 @@ public final class DecisionBundle {
      * OPA 水印义务文本（§2.10.2 五件套之四 / 从零实施版 line 2542：
      * {@code obligations.watermark} → 导出文件页眉页脚）。
      *
-     * <p>兼容三种义务书写形态：{@code {obligation:"watermark", watermark:"..."}}、
-     * {@code {watermark:"..."}}、{@code "watermark"} 字符串项。<b>无义务时返回 null</b>
+     * <p>兼容的三种义务书写形态收敛到单源读数
+     * {@link GuardrailDecisionContract#readWatermark(Object)}（D-B4-31）——
+     * 键名字面量只允许存在于底座。<b>无义务时返回 null</b>
      * —— 消费方须原样落 {@code NOT_ISSUED} 标记，禁把"没有水印义务"渲染成"已加水印"。</p>
      */
     public String watermarkObligation() {
-        Object raw = opa == null ? null : opa.get("obligations");
-        if (!(raw instanceof List<?> list)) return null;
-        for (Object item : list) {
-            if (item instanceof Map<?, ?> m) {
-                Object wm = m.get("watermark");
-                if (wm != null && !String.valueOf(wm).isBlank()) return String.valueOf(wm);
-                if ("watermark".equals(String.valueOf(m.get("obligation")))) {
-                    Object value = m.get("value");
-                    if (value != null && !String.valueOf(value).isBlank()) return String.valueOf(value);
-                }
-            } else if (item instanceof String s && s.toLowerCase().startsWith("watermark")) {
-                return s;
-            }
-        }
-        return null;
+        return GuardrailDecisionContract.readWatermark(
+                GuardrailDecisionContract.obligationsOf(opa));
     }
 
     // ── #142/B4-3c 只增：OPA 护栏四态消费面 ─────────────────────────────
@@ -280,7 +268,8 @@ public final class DecisionBundle {
     /** 护栏是否明确放行（{@code allow=true} 且状态为 ALLOW；仅布尔为真不算）。 */
     public boolean opaAllowed() {
         return GuardrailDecisionContract.STATE_ALLOW.equals(opaPolicyState())
-                || (opaPolicyState() == null && Boolean.TRUE.equals(opa == null ? null : opa.get("allow")));
+                || (opaPolicyState() == null && Boolean.TRUE.equals(opa == null ? null
+                        : opa.get(GuardrailDecisionContract.KEY_ALLOW)));
     }
 
     /** 护栏是否给出了策略裁决（ALLOW / DENY）。false ⇒ 部署缺陷或不可用态，走 503 分支。 */
@@ -300,16 +289,10 @@ public final class DecisionBundle {
         return state == null || GuardrailDecisionContract.isUnevaluated(state);
     }
 
-    /** OPA 拒绝原因（义务集里第一条 {@code deniedReason}；无则 null）。 */
+    /** OPA 拒绝原因（义务集里第一条 {@code deniedReason}；无则 null，读数单源见底座）。 */
     public String opaDeniedReason() {
-        Object raw = opa == null ? null : opa.get(GuardrailDecisionContract.KEY_OBLIGATIONS);
-        if (!(raw instanceof List<?> list)) return null;
-        for (Object item : list) {
-            if (item instanceof Map<?, ?> m && m.get(GuardrailDecisionContract.KEY_DENIED_REASON) != null) {
-                return String.valueOf(m.get(GuardrailDecisionContract.KEY_DENIED_REASON));
-            }
-        }
-        return null;
+        return GuardrailDecisionContract.readDeniedReason(
+                GuardrailDecisionContract.obligationsOf(opa));
     }
 
     private static List<String> policyNames(Object raw) {

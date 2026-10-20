@@ -231,7 +231,7 @@ class WAgentContractToolChannelTest {
         args.put("goalId", "g-9");
         args.put("label", "降本选项");
         args.put("url", "http://127.0.0.1:1/ssrf-target");
-        args.put("sql", "DROP TABLE ecos_dw.contract");
+        args.put("sql", "DROP TABLE t_contract");
         ToolResult r = h.call("create_decision_option", args);
 
         assertTrue(r.isSuccess(), "候选写工具应经契约通道出向: " + r.getErrorCode());

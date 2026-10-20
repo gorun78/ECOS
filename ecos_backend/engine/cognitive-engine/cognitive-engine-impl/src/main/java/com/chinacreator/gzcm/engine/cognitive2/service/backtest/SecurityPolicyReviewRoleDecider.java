@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.cognitive2.service.backtest;
 
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
@@ -131,7 +132,7 @@ public class SecurityPolicyReviewRoleDecider implements BacktestReviewRoleDecide
             return ReviewRoleDecision.unavailable(PATH_POLICY_EVALUATE,
                     "policy-engine envelope without data (contract break)");
         }
-        String decisionRef = data.path("policyRef").asText(POLICY_NAME)
+        String decisionRef = data.path(GuardrailDecisionContract.KEY_POLICY_REF).asText(POLICY_NAME)
                 + "#" + data.path("inputDigest").asText("-")
                 + "@" + PATH_POLICY_EVALUATE;
         if ("fallback".equalsIgnoreCase(data.path("source").asText(""))
@@ -139,7 +140,7 @@ public class SecurityPolicyReviewRoleDecider implements BacktestReviewRoleDecide
             return ReviewRoleDecision.unavailable(decisionRef,
                     "policy engine answered fail-close fallback (DENY_OPA_DOWN): unavailable, not a policy DENY");
         }
-        if (!data.path("allow").asBoolean(false)) {
+        if (!data.path(GuardrailDecisionContract.KEY_ALLOW).asBoolean(false)) {
             return ReviewRoleDecision.deny(decisionRef,
                     "policy denied review assignment" + deniedReasonOf(data));
         }
@@ -153,7 +154,7 @@ public class SecurityPolicyReviewRoleDecider implements BacktestReviewRoleDecide
 
     /** 角色只从 obligations 透传；认知侧零映射。 */
     private String roleFromObligations(JsonNode data) {
-        JsonNode obligations = data.path("obligations");
+        JsonNode obligations = data.path(GuardrailDecisionContract.KEY_OBLIGATIONS);
         if (!obligations.isArray()) {
             return null;
         }
@@ -169,10 +170,10 @@ public class SecurityPolicyReviewRoleDecider implements BacktestReviewRoleDecide
     }
 
     private String deniedReasonOf(JsonNode data) {
-        JsonNode obligations = data.path("obligations");
+        JsonNode obligations = data.path(GuardrailDecisionContract.KEY_OBLIGATIONS);
         if (obligations.isArray()) {
             for (JsonNode o : obligations) {
-                JsonNode r = o.path("deniedReason");
+                JsonNode r = o.path(GuardrailDecisionContract.KEY_DENIED_REASON);
                 if (!r.isMissingNode() && !r.isNull() && !r.asText().isBlank()) {
                     return " deniedReason=" + r.asText();
                 }

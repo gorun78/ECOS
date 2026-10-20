@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.security.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.security.decision.AssetRef;
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
 import com.chinacreator.gzcm.engine.security.decision.DecisionContext;
@@ -91,7 +92,8 @@ public class DecisionController {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
             log.warn("decide 端点异常: asset={}, purpose={}", asset.key(), purpose, e);
-            return ApiResponse.error(503, "ECOS-SEC-501：security 内部裁决失败（fail-closed）");
+            return ApiResponse.error(503,
+                    RlsExecutionContract.SEC_UNAVAILABLE_CODE + "：security 内部裁决失败（fail-closed）");
         }
     }
 

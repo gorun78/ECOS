@@ -192,8 +192,8 @@ public class QueryController {
         }
     }
 
-    /** 不可用态的对外错误码（与 {@code DecisionController}、gateway 既有口径同值）。 */
-    static final String ERROR_SEC_UNAVAILABLE = "ECOS-SEC-501";
+    /** 不可用态的对外错误码（单源 {@link RlsExecutionContract#SEC_UNAVAILABLE_CODE}，禁再抄字面量）。 */
+    static final String ERROR_SEC_UNAVAILABLE = RlsExecutionContract.SEC_UNAVAILABLE_CODE;
 
     /**
      * 详细设计-01 W32：security-engine 端点经 {@link ServiceEndpointResolver}（单源

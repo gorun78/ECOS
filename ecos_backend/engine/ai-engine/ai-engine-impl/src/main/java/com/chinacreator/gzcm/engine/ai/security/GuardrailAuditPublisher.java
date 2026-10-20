@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ai.security;
 
 import com.chinacreator.gzcm.common.event.EventTypes;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.engine.ai.dao.GuardrailDecisionLedgerDao;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolDecision;
@@ -195,7 +196,8 @@ public class GuardrailAuditPublisher {
         detail.put("reasonCode", denial.reasonCode() == null ? "-" : denial.reasonCode());
         detail.put("policyId", denial.policyId() == null ? "-" : denial.policyId());
         detail.put("latencyMs", denial.latencyMs());
-        detail.put("obligations", denial.obligations() == null ? List.of() : denial.obligations());
+        detail.put(GuardrailDecisionContract.KEY_OBLIGATIONS,
+                denial.obligations() == null ? List.of() : denial.obligations());
         event.put("detail", detail);
         return event;
     }
@@ -226,7 +228,8 @@ public class GuardrailAuditPublisher {
         Map<String, Object> cache = new LinkedHashMap<>();
         cache.put("stage", legStage(denial));
         cache.put("reasonCode", denial.reasonCode());
-        cache.put("obligations", denial.obligations() == null ? List.of() : denial.obligations());
+        cache.put(GuardrailDecisionContract.KEY_OBLIGATIONS,
+                denial.obligations() == null ? List.of() : denial.obligations());
         return cache;
     }
 

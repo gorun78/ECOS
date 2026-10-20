@@ -30,12 +30,15 @@ import static org.junit.jupiter.api.Assertions.fail;
  * D-B4-21 的原形态是"策略签发、生产侧零消费方"，只加类不加门禁，
  * 下一版重构就能把这个类静默摘掉而全绿。</p>
  *
- * <p><b>为什么只钉这两个字面量</b>（刻意取舍，不是遗漏 ⇒ 登记 <b>D-B4-31</b>）：
- * 义务词 {@code "obligations"}/{@code "obligation"} 与 {@code "mask"}/{@code "watermark"}/
- * {@code "deniedReason"} 在主源码里还有多处<b>与护栏裁决无关</b>的同名用途
- * （实测 {@code "deniedReason"} 7 个文件、{@code "watermark"} 5 个文件持有），
- * 把它们一并钉进本门禁会得到一份需要逐条做属主判定的违例清单，反而稀释信号。
- * 该面的收敛须先做属主裁决再扩白名单，登记为 D-B4-31。</p>
+ * <p><b>为什么只钉这两个字面量</b>（刻意取舍 ⇒ 原登记 <b>D-B4-31</b>，本批已闭）：
+ * 本门禁建批时，义务词 {@code "obligations"}/{@code "obligation"}/{@code "mask"}/
+ * {@code "watermark"}/{@code "deniedReason"} 在主源码里还散布着逐文件手抄的键面，
+ * 一并钉进来会得到一份需要先做属主判定的违例清单，反而稀释本门禁的限流信号。
+ * <b>该面已由 #142/B4-3e-2 收口</b>：单源 + 真消费的全量词表门禁落在
+ * {@code GuardrailObligationVocabularySingleSourceTest}（common-api 侧），
+ * 12 枚义务词字面量在主源码内除单源外零持有（仅两处登记属主的同名用途白名单）。
+ * 本门禁因此<b>不扩白名单、也不摘除</b>：它守的是限流腿的<b>位置事实</b>
+ * （dispatch 之前 / 三态分类 / 拒绝留痕），那是扩词表门禁钉不住的语义层。</p>
  *
  * <p><b>假绿防护</b>：① 扫描根解析 0 个文件即失败；② 先剥注释再比对代码位置（注释里提键名
  * 是文档行为）；③ 复核 {@code data_access.rego} 仍在签发这两个字面量，

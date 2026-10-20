@@ -10,6 +10,7 @@ import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.workspace.security.ExportDecision;
 import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
 
@@ -99,7 +100,7 @@ public class ForecastExportService {
         meta.put("taskId", results.get("taskId"));
         meta.put("permissionScope", decision.permissionScope());
         meta.put("decisionId", decision.decisionId());
-        meta.put("watermark", decision.watermark());
+        meta.put(GuardrailDecisionContract.KEY_WATERMARK, decision.watermark());
 
         String watermarkLine = "# watermark: " + decision.watermark() + '\n';
         StringBuilder sb = new StringBuilder();

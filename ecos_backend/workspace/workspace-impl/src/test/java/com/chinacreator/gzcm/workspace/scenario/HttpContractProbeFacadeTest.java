@@ -160,7 +160,7 @@ class HttpContractProbeFacadeTest {
     void businessErrorEnvelopeThrows() {
         MockRestServiceServer server = MockRestServiceServer.bindTo(ontologyRest).build();
         server.expect(requestTo(MAPPING_URL)).andRespond(withSuccess(
-                "{\"code":500,\"errorCode\":\"ECOS-ONT-001\",\"message\":\"boom\",\"data\":null}",
+                "{\"code\":500,\"errorCode\":\"ECOS-ONT-001\",\"message\":\"boom\",\"data\":null}",
                 MediaType.APPLICATION_JSON));
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () ->
@@ -214,7 +214,7 @@ class HttpContractProbeFacadeTest {
     @Test
     void noRequestContextMeansNoForgedCredentials() {
         MockRestServiceServer server = MockRestServiceServer.bindTo(ontologyRest).build();
-        server.expect(requestTo(MAPPING_URL)).andExpect((url, method, request) -> {
+        server.expect(requestTo(MAPPING_URL)).andExpect(request -> {
             assertTrue(request.getHeaders().getOrEmpty(HttpHeaders.AUTHORIZATION).isEmpty(),
                     "无入口请求上下文时不得伪造 Authorization（保持 fail-closed）");
         }).andRespond(withSuccess("{\"code\":0,\"data\":[]}", MediaType.APPLICATION_JSON));
@@ -227,7 +227,8 @@ class HttpContractProbeFacadeTest {
 
     @Test
     void parseTimestampHandlesEngineForms() {
-        assertEquals(localInstant("2026-10-17T02:44:40"),
+        // PG timestamp 的微秒段必须保留（实现 javadoc 明写该形态；截断＝丢精度的静默改写）
+        assertEquals(localInstant("2026-10-17T02:44:40.631153"),
                 HttpContractProbeFacade.parseTimestamp("2026-10-17 02:44:40.631153"));
         assertEquals(Instant.parse("2026-10-17T02:44:40Z"),
                 HttpContractProbeFacade.parseTimestamp("2026-10-17T02:44:40Z"));

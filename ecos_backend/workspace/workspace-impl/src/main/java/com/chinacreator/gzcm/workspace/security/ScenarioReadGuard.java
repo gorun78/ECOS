@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.workspace.security;
 
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException;
@@ -163,7 +164,7 @@ public class ScenarioReadGuard {
         if (decision.guardrailDenied()) {
             throw new ForbiddenOperationException("scenario:export:" + entityCode,
                     Map.of("reason", "OPA 策略裁决 DENY",
-                            "deniedReason", String.valueOf(decision.opaState()),
+                            GuardrailDecisionContract.KEY_DENIED_REASON, String.valueOf(decision.opaState()),
                             "decision", String.valueOf(decision.decisionId())));
         }
         if (decision.rlsDenied()) {

@@ -158,11 +158,16 @@ public class HttpContractProbeFacade implements ContractProbeFacade {
             return null;
         }
         String normalized = text.replace(' ', 'T');
+        // 先按「带时区段」形态整体解析，再回落「无时区段」本地形态。
+        // 原先用 regionMatches(10, "+", …) 探偏移，索引 10 恒落在日期后的 T/时分首位，
+        // `2026-10-17T02:44:40+01:00` 只走到 LocalDateTime.parse ⇒ 抛异常后被吞成 null
+        // （= 契约探测把"引擎给了时间"误判成"引擎没给"，probe 假缺）。
         try {
-            if (normalized.endsWith("Z") || normalized.regionMatches(10, "+", 0, 1)
-                    || normalized.regionMatches(10, "-", 0, 1)) {
-                return OffsetDateTime.parse(normalized).toInstant();
-            }
+            return OffsetDateTime.parse(normalized).toInstant();
+        } catch (DateTimeParseException ignored) {
+            // 落到本地无时区形态
+        }
+        try {
             return LocalDateTime.parse(normalized).atZone(java.time.ZoneId.systemDefault()).toInstant();
         } catch (DateTimeParseException ex) {
             return null;

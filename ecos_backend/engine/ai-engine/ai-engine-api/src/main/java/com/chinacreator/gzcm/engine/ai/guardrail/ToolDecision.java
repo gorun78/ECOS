@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.guardrail;
 
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
+
 import java.util.List;
 import java.util.Map;
 
@@ -85,7 +87,7 @@ public final class ToolDecision {
                 "decision", verdict.name(),
                 "policyId", policyId == null ? "-" : policyId,
                 "latencyMs", latencyMs,
-                "obligations", obligationSummary());
+                GuardrailDecisionContract.KEY_OBLIGATIONS, obligationSummary());
     }
 
     /** obligations 摘要（列名/规则名，不含数据值）。 */

@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.workspace.exception;
 
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
+
 /**
  * security-engine <b>进程不可用</b>（详细设计-01 §4.5.4 六×四降级矩阵 / §4.7.1 三通道全 DENY
  * 门禁行 / §4.7.2「security 不可用（全角色）」格，HTTP 503 + {@code ECOS-SEC-501}，
@@ -28,7 +30,7 @@ public class SecurityEngineUnavailableException extends WorkspaceDomainException
     private final String technicalReason;
 
     public SecurityEngineUnavailableException(String path, String reason, Throwable cause) {
-        super(503, "ECOS-SEC-501",
+        super(503, RlsExecutionContract.SEC_UNAVAILABLE_CODE,
                 "安全引擎暂不可用，操作已按 fail-closed 拒绝，请稍后重试或凭追踪号联系管理员", cause);
         this.technicalReason = "path=" + path + " reason=" + reason;
         putDetail("engine", "security");

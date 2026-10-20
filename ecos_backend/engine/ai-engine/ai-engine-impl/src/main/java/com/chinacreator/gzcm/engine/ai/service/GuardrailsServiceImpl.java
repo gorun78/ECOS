@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.common.error.AiError;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.engine.ai.GuardrailsService;
 import com.chinacreator.gzcm.engine.ai.dao.GuardrailsPolicyDao;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
@@ -174,7 +175,7 @@ public class GuardrailsServiceImpl implements GuardrailsService {
         result.put("advisory", Map.of(
                 "coarseHits", hitTypes(coarse),
                 "appliedMaskRules", appliedRules,
-                "obligations", obligations.summary()));
+                GuardrailDecisionContract.KEY_OBLIGATIONS, obligations.summary()));
         result.put("policyId", policyIdOf(data));
         result.put("traceId", AiTraceSupport.currentTraceId());
         return result;
@@ -409,29 +410,16 @@ public class GuardrailsServiceImpl implements GuardrailsService {
     private static String policyIdOf(Map<String, Object> data) {
         if (data == null) return null;
         Object id = data.get("policyId");
-        if (id == null) id = data.get("policyRef");
+        if (id == null) id = data.get(GuardrailDecisionContract.KEY_POLICY_REF);
         if (id == null) id = data.get("policy");
         return id == null ? null : String.valueOf(id);
     }
 
-    /** security 明确 DENY 时的可读原因（obligations 里的 deniedReason，缺省泛化表述）。 */
+    /** security 明确 DENY 时的可读原因（义务集里的 deniedReason，缺省泛化表述）。 */
     private static String deniedReasonOf(Map<String, Object> data) {
-        Object ob = data == null ? null : data.get("obligations");
-        if (ob instanceof List<?> list) {
-            for (Object o : list) {
-                if (o instanceof Map<?, ?> m) {
-                    Object reason = m.get("deniedReason");
-                    if (reason != null && !String.valueOf(reason).isBlank()) {
-                        return String.valueOf(reason);
-                    }
-                }
-            }
-        }
-        if (ob instanceof Map<?, ?> m) {
-            Object reason = m.get("deniedReason");
-            if (reason != null && !String.valueOf(reason).isBlank()) return String.valueOf(reason);
-        }
-        return "security-engine 裁决 DENY";
+        String reason = GuardrailDecisionContract.readDeniedReason(
+                GuardrailDecisionContract.obligationsOf(data));
+        return reason != null ? reason : "security-engine 裁决 DENY";
     }
 
     /** 审计用内容摘要：SHA-256 前 16 位十六进制，禁入原文（F06-03 要点 2）。 */

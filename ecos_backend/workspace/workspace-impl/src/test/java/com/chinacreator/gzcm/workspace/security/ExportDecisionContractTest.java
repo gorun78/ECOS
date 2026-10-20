@@ -246,9 +246,13 @@ class ExportDecisionContractTest {
             assertTrue(contractSrc.contains(literal),
                     "GuardrailDecisionContract 不再定义 " + literal + "：词表单源被拆，三消费方失配");
         }
-        // security 侧生产面写入 policyState（护栏态是 403/503 分态的唯一依据）
-        assertTrue(decisionSrc.contains("\"policyState\""),
+        // security 侧生产面写入 policyState（护栏态是 403/503 分态的唯一依据）。
+        // #142/B4-3e-2 收口形态：生产侧与消费侧一律经单源常量，禁任一侧内联字面量
+        // （本断言原钉 "policyState" 裸字面量，那是收口前的形态，钉它会与单源门禁互相矛盾）。
+        assertTrue(decisionSrc.contains("GuardrailDecisionContract.KEY_POLICY_STATE"),
                 "裁决入口必须把护栏态写进 bundle.opa，否则消费侧只能靠布尔反推（旧假绿形态）");
+        assertReadThroughSingleSourceConstant(decisionSrc, contractSrc,
+                "KEY_POLICY_STATE", "policyState", "security 裁决生产面");
         // workspace 侧只经单源读键与判态，代码位不得再出现内联字面量
         assertTrue(consumerSrc.contains("GuardrailDecisionContract.stateOf(")
                         && consumerSrc.contains("GuardrailDecisionContract.isUnevaluated("),

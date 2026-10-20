@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.security.crypto.KeyManagementService.KeyManagementException;
 import com.chinacreator.gzcm.engine.security.crypto.service.CryptoKeyRegistryService;
 import com.chinacreator.gzcm.engine.security.service.SecurityAuditService;
@@ -70,8 +71,8 @@ public class CryptoKeyAdminController {
     /** 428：轮换缺二次确认（详设「L4 且二次确认」的失败分支，前端据此弹确认框）。 */
     public static final String ERROR_ROTATE_CONFIRM_REQUIRED = "CRYPTO_KEY_ROTATE_CONFIRM_REQUIRED";
 
-    /** §4.3.3 L2600+：security-engine 底座不可用 → 503，操作 DENY。 */
-    public static final String ERROR_SEC_UNAVAILABLE = "ECOS-SEC-501";
+    /** §4.3.3 L2600+：security-engine 底座不可用 → 503，操作 DENY（码单源见 {@link RlsExecutionContract#SEC_UNAVAILABLE_CODE}）。 */
+    public static final String ERROR_SEC_UNAVAILABLE = RlsExecutionContract.SEC_UNAVAILABLE_CODE;
 
     /** §4.3.3：加密主密钥缺失 → 500 {@code ECOS-SEC-430}（单源取 service 常量，禁两处漂移）。 */
     public static final String ERROR_MASTER_KEY_MISSING =

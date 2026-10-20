@@ -158,8 +158,8 @@ public class OpaPolicyService {
         List<Map<String, Object>> obligations = new ArrayList<>();
         if (result instanceof Map<?, ?> r) {
             Map<String, Object> doc = (Map<String, Object>) r;
-            allow = asBoolean(doc.get("allow"));
-            obligations = obligationsOf(doc.get("obligations"));
+            allow = asBoolean(doc.get(GuardrailDecisionContract.KEY_ALLOW));
+            obligations = obligationsOf(doc.get(GuardrailDecisionContract.KEY_OBLIGATIONS));
         } else if (result != null) {
             allow = asBoolean(result);   // 兼容裸布尔形态（旧 .../allow 查询）
         }
@@ -167,13 +167,14 @@ public class OpaPolicyService {
             // OPA 应答里没有本策略的 allow ⇒ 策略未加载/未定义，护栏等于没被咨询
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("policy", policy);
-            out.put("allow", false);
-            out.put("policyState", STATE_POLICY_UNDEFINED);
+            out.put(GuardrailDecisionContract.KEY_ALLOW, false);
+            out.put(GuardrailDecisionContract.KEY_POLICY_STATE, STATE_POLICY_UNDEFINED);
             out.put("opaStatus", statusCode);
             out.put("source", "opa");
-            out.put("policyRef", "ecos." + policy);
-            out.put("obligations", List.of(Map.of("obligation", "DENIED",
-                    "deniedReason", "OPA_POLICY_UNDEFINED")));
+            out.put(GuardrailDecisionContract.KEY_POLICY_REF, "ecos." + policy);
+            out.put(GuardrailDecisionContract.KEY_OBLIGATIONS, List.of(Map.of(
+                    GuardrailDecisionContract.KEY_OBLIGATION, GuardrailDecisionContract.OBLIGATION_DENIED,
+                    GuardrailDecisionContract.KEY_DENIED_REASON, "OPA_POLICY_UNDEFINED")));
             out.put("inputDigest", sha256Hex(safeJson(input)));
             log.warn("OPA 应答无 {}.allow（策略未加载/未定义），fail-closed 且状态如实上报: state={}",
                     policy, STATE_POLICY_UNDEFINED);
@@ -181,13 +182,13 @@ public class OpaPolicyService {
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("policy", policy);
-        out.put("allow", allow);
-        out.put("policyState", allow ? STATE_ALLOW : STATE_DENY);
+        out.put(GuardrailDecisionContract.KEY_ALLOW, allow);
+        out.put(GuardrailDecisionContract.KEY_POLICY_STATE, allow ? STATE_ALLOW : STATE_DENY);
         out.put("opaStatus", statusCode);
         out.put("source", "opa");
-        out.put("policyRef", "ecos." + policy);
+        out.put(GuardrailDecisionContract.KEY_POLICY_REF, "ecos." + policy);
         // C.2.5 ③：裁决结果携带 obligations（deniedReason/maskHints/watermark/rateLimitKey）。
-        out.put("obligations", obligations);
+        out.put(GuardrailDecisionContract.KEY_OBLIGATIONS, obligations);
         // C.2.5 ④：裁决落审计线索（input 摘要，不落原文避免敏感外泄）
         out.put("inputDigest", sha256Hex(safeJson(input)));
         return out;
@@ -199,14 +200,15 @@ public class OpaPolicyService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("policy", policy);
         result.put("source", "fallback");
-        result.put("allow", false);
-        result.put("policyState", STATE_UNAVAILABLE);
+        result.put(GuardrailDecisionContract.KEY_ALLOW, false);
+        result.put(GuardrailDecisionContract.KEY_POLICY_STATE, STATE_UNAVAILABLE);
         result.put("fallback", "DENY_OPA_DOWN");
         result.put("eccode", "ECOS-SEC-502");
         if (error != null) result.put("opaError", error);
         if (statusCode != null) result.put("opaStatus", statusCode);
-        result.put("obligations", List.of(
-                Map.of("obligation", "DENIED", "deniedReason", deniedReason)));
+        result.put(GuardrailDecisionContract.KEY_OBLIGATIONS, List.of(Map.of(
+                GuardrailDecisionContract.KEY_OBLIGATION, GuardrailDecisionContract.OBLIGATION_DENIED,
+                GuardrailDecisionContract.KEY_DENIED_REASON, deniedReason)));
         result.put("inputDigest", sha256Hex(safeJson(input)));
         log.warn("OPA fail-close → DENY: policy={} reason={}", policy, deniedReason);
         return result;
@@ -227,7 +229,7 @@ public class OpaPolicyService {
                 Map<String, Object> mm = (Map<String, Object>) om;
                 out.add(mm);
             } else if (o != null && !String.valueOf(o).isBlank()) {
-                out.add(Map.of("obligation", String.valueOf(o)));
+                out.add(Map.of(GuardrailDecisionContract.KEY_OBLIGATION, String.valueOf(o)));
             }
         }
         return out;

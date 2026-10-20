@@ -121,7 +121,9 @@ public final class ToolObligations {
     /** 从单个义务对象收集 mask 与 rowFilter（可递归一层子数组）。 */
     @SuppressWarnings("unchecked")
     private static void collectFromMap(Map<String, Object> map, List<Mask> masks, String[] rowFilterHolder) {
-        Object maskObj = firstNonNull(map.get("mask"), map.get("maskHints"));
+        Object maskObj = firstNonNull(
+                map.get(GuardrailDecisionContract.OBLIGATION_MASK),
+                map.get(GuardrailDecisionContract.KEY_MASK_HINTS));
         if (maskObj instanceof List<?> list) {
             for (Object o : list) {
                 if (o instanceof Map<?, ?> item) {
@@ -130,18 +132,22 @@ public final class ToolObligations {
                     masks.add(new Mask(s.trim(), null));
                 }
             }
-        } else if (map.containsKey("column") || map.containsKey("field")) {
+        } else if (map.containsKey(GuardrailDecisionContract.KEY_MASK_COLUMN)
+                || map.containsKey(GuardrailDecisionContract.KEY_MASK_COLUMN_ALT)) {
             addMask(map, masks);
         }
-        String rf = str(map.get("rowFilter"), str(map.get("row_filter"), null));
+        String rf = str(map.get(GuardrailDecisionContract.KEY_ROW_FILTER),
+                str(map.get(GuardrailDecisionContract.KEY_ROW_FILTER_ALT), null));
         if (rf != null && (rowFilterHolder[0] == null || rowFilterHolder[0].isBlank())) {
             rowFilterHolder[0] = rf;
         }
     }
 
     private static void addMask(Map<String, Object> im, List<Mask> masks) {
-        String column = str(im.get("column"), str(im.get("field"), null));
-        String rule = str(im.get("rule"), str(im.get("strategy"), null));
+        String column = str(im.get(GuardrailDecisionContract.KEY_MASK_COLUMN),
+                str(im.get(GuardrailDecisionContract.KEY_MASK_COLUMN_ALT), null));
+        String rule = str(im.get(GuardrailDecisionContract.KEY_MASK_RULE_ALT),
+                str(im.get(GuardrailDecisionContract.KEY_MASK_STRATEGY), null));
         if (column != null && !column.isBlank() && rule != null && !rule.isBlank()) {
             masks.add(new Mask(column.trim(), rule.trim()));
         }

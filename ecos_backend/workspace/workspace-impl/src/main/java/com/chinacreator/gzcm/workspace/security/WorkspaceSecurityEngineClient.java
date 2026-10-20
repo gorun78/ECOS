@@ -5,6 +5,7 @@ import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor;
 import com.chinacreator.gzcm.common.security.header.ServiceContext;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -245,16 +246,14 @@ public class WorkspaceSecurityEngineClient {
     }
 
     /**
-     * 是否为「不可用」信封：{@code ApiResponse.code == 503} 或 message 以
-     * {@code ECOS-SEC-501} 起头（{@code DecisionController} 的 fail-closed 出口形态）。
+     * 是否为「不可用」信封：委托单源
+     * {@link RlsExecutionContract#isUnavailableEnvelope(Map)}（判据 {@code code == 503}
+     * 或 message 以 {@code ECOS-SEC-501} 起头，#142/B4-3d-10 起由该单源持有）。
      * 4xx 业务信封（400 参数错 / 403 无上下文）不算不可用 —— 那是明确的"无裁决"，
      * 由调用方走 403 分支。
      */
     private static boolean unavailableEnvelope(Map<String, Object> resp) {
-        Object code = resp.get("code");
-        if (code instanceof Number n && n.intValue() == 503) return true;
-        Object message = resp.get("message");
-        return message != null && String.valueOf(message).startsWith("ECOS-SEC-501");
+        return RlsExecutionContract.isUnavailableEnvelope(resp);
     }
 
     // ═══════════════ ABAC（默认 DENY false） ═══════════════

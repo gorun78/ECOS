@@ -67,8 +67,11 @@ public final class GuardrailDecisionContract {
     // 与策略源 {@code ecos-docker/opa-policies/data_access.rego} 的
     // {@code deny/mask/watermark/rate_obligations} 四组规则逐字对齐，
     // 由 {@code GuardrailRateLimitVocabularyTest} 做 rego 交叉核对。
-    // 本批只把 rateLimit 一族收进来（消费方在本批落地）；mask/watermark 一族
-    // 的生产侧内联字面量尚未迁移，属主登记为差距 D-B4-31，禁在本批做半截门禁。
+    // <b>#142/B4-3e-2（D-B4-31）起四类义务词全部收口</b>：deniedReason / mask /
+    // watermark / rateLimit 及其项内键在生产侧（security-engine）与三侧消费方
+    // （ai-engine 裁决闸、cognitive 复核腿、workspace 导出咽喉）一律引用本类常量，
+    // 由 {@code GuardrailObligationVocabularySingleSourceTest} 静态门禁钉住
+    // 「main 源码禁裸义务词字面量」（含一条能变红的反向 fixture）。
 
     /** 义务类型值：明确拒绝（项内带 {@link #KEY_DENIED_REASON}）。 */
     public static final String OBLIGATION_DENIED = "DENIED";
@@ -94,6 +97,44 @@ public final class GuardrailDecisionContract {
      * 必须报 FAIL_CLOSED 而不是按自造键计数（后者会把拒绝态洗成放行态）。</p>
      */
     public static final String RATE_LIMIT_KEY_PREFIX = "ai.tool.";
+
+    // ── 义务项内承载键（D-B4-31 收口批新增；与 rego 逐字对齐） ──
+
+    /**
+     * 水印文本键（{@code obligation == "watermark"} 的项内承载键）。
+     *
+     * <p>与 {@link #OBLIGATION_WATERMARK} <b>同值但不同职</b>：一个是义务类型取值，
+     * 一个是该项里放水水印串本身的键。两者分开定义，读数点才不必靠位置推断。</p>
+     */
+    public static final String KEY_WATERMARK = "watermark";
+    /** 脱敏列键（{@code obligation == "mask"} 的项内列名，rego {@code "column"}）。 */
+    public static final String KEY_MASK_COLUMN = "column";
+    /** 脱敏列键的驼峰外别名（旧书写 {@code "field"}，消费侧兼容读）。 */
+    public static final String KEY_MASK_COLUMN_ALT = "field";
+    /** 脱敏规则键（rego {@code "strategy"}）。 */
+    public static final String KEY_MASK_STRATEGY = "strategy";
+    /** 脱敏规则键的别名（旧书写 {@code "rule"}，消费侧兼容读）。 */
+    public static final String KEY_MASK_RULE_ALT = "rule";
+    /**
+     * 义务集容器键的旧书写别名（{@code obligations.maskHints}）。
+     *
+     * <p>策略现形已改用 {@code obligation == "mask"} 的对象数组；本键仅存于消费侧
+     * 的兼容读数（security 侧 {@code OpaPolicyService} 注释仍以此称呼 mask 义务），
+     * 保留常量而非删除，是为了让「兼容哪一代书写」在单源上可见、可被门禁核对。</p>
+     */
+    public static final String KEY_MASK_HINTS = "maskHints";
+    /**
+     * 行过滤声明键（义务集里的行过滤书写，值＝RLS 表名/条件引用）。
+     *
+     * <p><b>当前 rego 不签发该义务</b>（{@code data_access.rego} 只有 deniedReason /
+     * mask / watermark / rateLimit 四组）—— 本常量是给消费侧的兼容读数定名，
+     * 不表示策略契约里存在第五类义务；把它当成已生效的义务会造出假绿。</p>
+     */
+    public static final String KEY_ROW_FILTER = "rowFilter";
+    /** 行过滤声明键的蛇形别名（旧书写 {@code "row_filter"}，消费侧兼容读）。 */
+    public static final String KEY_ROW_FILTER_ALT = "row_filter";
+    /** 水印义务的别名承载键（旧书写 {@code {obligation:"watermark", value:"…"}}）。 */
+    public static final String KEY_WATERMARK_VALUE_ALT = "value";
 
     // ── 状态判定（唯一实现点，禁各消费方各自字符串比对） ──
 
@@ -173,6 +214,81 @@ public final class GuardrailDecisionContract {
         }
         Object raw = item.get(KEY_RATE_LIMIT_KEY);
         return new RateLimitDeclaration(true, raw == null ? null : String.valueOf(raw));
+    }
+
+    /**
+     * 从义务集读<b>水印文本</b>（D-B4-31 收口：此前 workspace/导出侧各自遍历义务数组
+     * 比对 {@code "watermark"} 字面量，键名一改即静默失去水印）。
+     *
+     * <p>兼容策略侧三种书写，取<b>首个非空</b>：
+     * ①{@code {obligation:"watermark", watermark:"…"}}（rego 现形）；
+     * ②{@code {watermark:"…"}} 或 {@code {obligation:"watermark", value:"…"}}（简写/别名承载键）；
+     * ③{@code "watermark…"} 字符串项（一代前的字符串数组形态）。</p>
+     *
+     * <p>无义务时返回 {@code null} —— 消费方须原样落「未签发」标记，
+     * 禁把「没有水印义务」渲染成「已加水印」。</p>
+     */
+    public static String readWatermark(Object obligationsRaw) {
+        if (obligationsRaw instanceof List<?> list) {
+            for (Object item : list) {
+                String wm = watermarkOfItem(item);
+                if (wm != null) return wm;
+            }
+            return null;
+        }
+        return watermarkOfItem(obligationsRaw);
+    }
+
+    /** 单个义务项的水印读数（非水印项／无承载值＝ null）。 */
+    private static String watermarkOfItem(Object item) {
+        if (item instanceof Map<?, ?> m) {
+            Map<String, Object> mm = asMap(m);
+            String direct = nonBlank(mm.get(KEY_WATERMARK));
+            if (direct != null) return direct;
+            if (OBLIGATION_WATERMARK.equals(String.valueOf(mm.get(KEY_OBLIGATION)))) {
+                return nonBlank(mm.get(KEY_WATERMARK_VALUE_ALT));
+            }
+            return null;
+        }
+        if (item instanceof String s && s.toLowerCase(java.util.Locale.ROOT).startsWith(OBLIGATION_WATERMARK)) {
+            return s;
+        }
+        return null;
+    }
+
+    /**
+     * 从义务集读<b>拒绝原因</b>（{@code obligation == "DENIED"} 项的
+     * {@link #KEY_DENIED_REASON}），兼容对象数组与单对象两种容器形态。
+     *
+     * <p>多条拒绝项取首个非空 —— 生产侧（{@code OpaPolicyService}）恒按单条签发，
+     * 多条属形态异常，交由消费方按原文展示，不在读数点做合并。</p>
+     */
+    public static String readDeniedReason(Object obligationsRaw) {
+        if (obligationsRaw instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> m) {
+                    String r = nonBlank(asMap(m).get(KEY_DENIED_REASON));
+                    if (r != null) return r;
+                }
+            }
+            return null;
+        }
+        if (obligationsRaw instanceof Map<?, ?> single) {
+            return nonBlank(asMap(single).get(KEY_DENIED_REASON));
+        }
+        return null;
+    }
+
+    /** 义务容器读数：把应答的 {@code obligations} 段原样交给读数方法，禁各自键名遍历。 */
+    public static Object obligationsOf(Map<String, Object> data) {
+        return data == null ? null : data.get(KEY_OBLIGATIONS);
+    }
+
+    /** 空串／空白视同缺键（返回 null），避免"键在值空"被当成有义务。 */
+    private static String nonBlank(Object raw) {
+        if (raw == null) return null;
+        String s = String.valueOf(raw);
+        return s.isBlank() ? null : s;
     }
 
     @SuppressWarnings("unchecked")

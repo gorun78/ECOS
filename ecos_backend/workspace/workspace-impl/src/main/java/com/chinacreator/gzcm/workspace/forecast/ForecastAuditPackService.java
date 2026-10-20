@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException;
 import com.chinacreator.gzcm.workspace.security.WorkspaceSecurityEngineClient;
 
@@ -137,7 +138,7 @@ public class ForecastAuditPackService {
         manifest.put("permissionScope", export.getMeta().get("permissionScope"));
         // #142/B4-3b：水印与裁决号引用导出件真值（同源，禁在包层再拼一套）。
         // 义务未签发时值为 NOT_ISSUED —— 那是 D-B4-12 的在册痕迹，不是"已加水印"。
-        manifest.put("watermark", export.getMeta().get("watermark"));
+        manifest.put(GuardrailDecisionContract.KEY_WATERMARK, export.getMeta().get(GuardrailDecisionContract.KEY_WATERMARK));
         manifest.put("decisionId", export.getMeta().get("decisionId"));
         manifest.put("currency", export.getMeta().get("currency"));
         manifest.put("unit", export.getMeta().get("unit"));
