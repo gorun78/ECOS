@@ -21,6 +21,7 @@
  * 消费面 `useAgentStore` / `useEcosApi` 五处均写 `json.data || json`，解包后无 `data` 键 ⇒ 回落整包，零改动。</p>
  */
 import { API_BASE, apiFetchData } from "./httpClient";
+import { AGENT_MESH_BASE } from "../api/agentClient";
 
 async function getJson(url: string, errorMessage?: string): Promise<any> {
   try {
@@ -47,23 +48,22 @@ async function postJson(url: string, errorMessage?: string, body?: unknown): Pro
   }
 }
 
-const MESH = `${API_BASE}/v1/agent-mesh`;
 const RUNTIME = `${API_BASE}/v1/agent-runtime`;
 
 export function fetchMeshAgentsJson(errorMessage?: string): Promise<any> {
-  return getJson(`${MESH}/agents`, errorMessage);
+  return getJson(`${AGENT_MESH_BASE}/agents`, errorMessage);
 }
 
 export function fetchMeshMissionsJson(errorMessage?: string): Promise<any> {
-  return getJson(`${MESH}/missions`, errorMessage);
+  return getJson(`${AGENT_MESH_BASE}/missions`, errorMessage);
 }
 
 export function createMeshMissionJson(mission: Record<string, unknown>, errorMessage?: string): Promise<any> {
-  return postJson(`${MESH}/missions`, errorMessage, mission);
+  return postJson(`${AGENT_MESH_BASE}/missions`, errorMessage, mission);
 }
 
 export function executeMeshMissionJson(missionId: string, errorMessage?: string): Promise<any> {
-  return postJson(`${MESH}/missions/${missionId}/execute`, errorMessage);
+  return postJson(`${AGENT_MESH_BASE}/missions/${missionId}/execute`, errorMessage);
 }
 
 export function fetchAgentTelemetryJson(errorMessage?: string): Promise<any> {

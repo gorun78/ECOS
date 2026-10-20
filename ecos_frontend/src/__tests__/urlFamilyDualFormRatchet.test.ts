@@ -245,6 +245,42 @@
  *      `` `${API_BASE}/v1/…` `` ⇒ 第二裸面写手即红。
  * 收口的 3 族 6 枚属主合并后的面值守恒与属主唯一性不在本门证明范围内，
  * 由同批新增的 `b6EcosFamiliesSingleSource.spec.ts` 承证。
+ * #145/B6-11 复跑 = 680 / **253** / 裸面 **0** / 派生面 **287** / dupBoth **7** / dupRawOnly **0** /
+ * blind **7**（改前 680 / 253 / 0 / 290 / 9 / 0 / 9 = 上一批落地后工作树的同门实跑读出，非推算）：
+ * 存量债第十一批收口 **两族各两属主**——`/v1/agent-mesh`（`api/agentClient.ts` 的私有 `MESH` ＋
+ * `services/agentMeshApi.ts` 的私有 `MESH`，把前者**升为导出** `AGENT_MESH_BASE`、后者改 import）、
+ * `/v1/guardrails/policies`（`services/cognitiveEngineApi.ts` 的两枚内联腿 ＋
+ * `pages/aiworkbench/api.ts` 的一枚内联腿，新建并导出 `GUARDRAILS_POLICIES_BASE` 落在服务侧）。
+ * 四处形状须记清：
+ *   ① **属主方向按 B6-3/B6-8 判据裁到服务层**：`pages/aiworkbench/api.ts` 与 `pages/Guardrails/constants.ts`
+ *      都是页面侧，把单源放任一页面会让另一侧「页面→页面」取常量（B6-9 ① 分层倒置），故落服务侧。
+ *   ② **别名重导出行不是属主**：`pages/Guardrails/constants.ts` 原来是本族的**第三个**真实生产方，
+ *      但它写的是 `import { API_BASE as API_ROOT }` ＋ `` export const API_BASE = `${API_ROOT}/v1/…` ``，
+ *      两个 token 名都不在本门 DER_RE 的写死口径里 ⇒ 从来隐形。本批把它换成不含 URL 体的
+ *      `export { GUARDRAILS_POLICIES_BASE } from '../../services/cognitiveEngineApi';`（B6-5 ② 判例）。
+ *      **门面口径记 4→2，真实生产方口径记 3→1**——台账两个数都写，防止后来者以为门面即全集。
+ *   ③ **NEW：D-B5-40 在名字轴上的同形缺陷（登记为缺陷，非只补常量）**：判据把基址 token 名写死成
+ *      `API_BASE`，于是 `API_BASE as X` 别名之后的 `` `${X}/v1/…` `` 构造点对本门完全不可见——
+ *      形态是派生的、只换了名字。实测 prod 面改前**恰 1 枚**（即 ② 那处）。修法两条一起做：
+ *      判据侧按文件取 token 集（`derivedRe`，`API_BASE` ∪ 本文件 `API_BASE as X` 的 X），
+ *      生产侧把这个形状**禁绝**（'扫描面合规' 里硬钉 prod 面零枚 `API_BASE as X` 导入别名）。
+ *      只补判据不禁形状 ⇒ 下一个人还能造出别的名字；只禁形状不补判据 ⇒ 门本身仍是瞎的。
+ *   ④ **同根子路径族按 B6-3 ③/B6-9 ④ 口径刻意不并进常量**：`/v1/guardrails/policies/{}` 的 DELETE 腿
+ *      保持 `` `${API_BASE}/v1/guardrails/policies/${id}` `` 行内形态，保住该子族在族索引里的可见性。
+ *      故族面 253 一点不降（两族族根声明各剩 1 枚 ⇒ 第二裸面写手即红）。
+ *   ⑤ **本批 pin 面值 290→287 里混进了「判据变宽 +1」，必须拆开记**（同一份扫描器分别指向
+ *      `git archive HEAD` 解出树与本工作树，各按 strict＝旧写死名／wide＝本批补别名 token 集读一遍，
+ *      只取本批涉及的 7 个文件）：HEAD strict 39 → 工作树 wide 36 ＝ pin 的 −3；同口径 wide 对 wide
+ *      是 40 → 36 ＝ 净 **−4**，明细＝`agentMeshApi` 私有 `MESH` 声明 −1、`cognitiveEngineApi` 列表＋新增
+ *      2 枚并为属主声明 1 枚 −1、`pages/aiworkbench/api.ts` 护栏列表腿 −1、`pages/Guardrails/constants.ts`
+ *      影子族根 −1（这枚只在 wide 档显形、strict 档恒 0 ⇒ pin 面因此少减 1，是判据修形的代价不是进度）。
+ *      另照登一处**与本批无关的既有口径差**：`pages/GuardrailsView.tsx` 的 5 枚 `` `${API_BASE}/…` `` 腿
+ *      在两档都读 0——`familiesOf` 只认捕获体以 `/v1/` 开头的族体，而该文件的族根已在导入常量里、
+ *      拼接段是 `/${encodeURIComponent(id)}` 归一成 `/{}` ⇒ 天然脱面；C1 门按行级 token 计数照常计入。
+ *      这就是本批 C1 地板 −8 而棘轮同口径 −4 的全部来源，不得误读成「棘轮漏计」。
+ *      账只记 dupBoth 9→7 与属主 18→14。
+ * 收口的 2 族面值守恒与属主唯一性不在本门证明范围内，由同批新增的
+ * `b6AgentMeshGuardrailsSingleSource.spec.ts` 承证。
  * 逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。
@@ -257,24 +293,29 @@
  * 棘轮口径 = **族 → 属主清单**（两侧都只减不增）：
  *   新族出现在重复面 → 红；基线族新增属主 → 红；基线族/属主已不再重复 → 陈旧豁免亦红
  *   （与 privateTransportRatchet「陈旧豁免即红」同口径：基线预算不留给已收口的项）。
- *   本门**不宣称**证明单源成立——基线剩 12 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
+ *   本门**不宣称**证明单源成立——基线剩 7 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
  *   `/v1/knowledge` 一族后 29 族 62 属主，#145/B6-2 收口 `/v1/workspace/scenarios` 两族一对后 27 族 57 属主，
  *   #145/B6-3 收口 AIP 域三族（同一对生产方）后 24 族 51 属主，#145/B6-4 收口本体域两族六属主后 22 族 45 属主，
  *   #145/B6-5 收口 pipeline 定义族三属主后 21 族 42 属主，#145/B6-6 收口知识域三族六属主后 18 族 36 属主，
  *   #145/B6-7 收口 `/v1/knowledge/compliance-rules` 族两属主后 17 族 34 属主——该族属主合并后，
  *   两个单属主子族（`/{}` 与 `?{}` 形态）随唯一生产方改引属主常量而退出族面（族面 256→254，
  *   属主合并≠漏检：新生产方若再写族体裸串/派生串仍会被本门抓到，论证见文件头 B6-7 形状②），
- *   #145/B6-8 收口数据网元数据两族四属主（族根双声明合一 + preview 族动一腿）后 **15 族 30 属主**
+ *   #145/B6-8 收口数据网元数据两族四属主（族根双声明合一 + preview 族动一腿）后 15 族 30 属主
  *   ——两族收口后各留 1 属主、仍留在族索引里（详见文件头 B6-8 形状②③），
- *   余属 B6 后续批），
- *   本门钉死的是「债不再增 + 派生态不再隐身」。
+ *   #145/B6-9 收口引擎监控域三族六属主后 12 族 24 属主，#145/B6-10 收口 ecos 域三族六属主后 9 族 18 属主，
+ *   #145/B6-11 收口 `/v1/agent-mesh` + `/v1/guardrails/policies` 两族后 **7 族 14 属主**），
+ *   本门钉死的是「债不再增 + 派生态不再隐身 + 基址 token 名不再被写死」。
  *
- * 三防恒绿：
+ * 四防恒绿：
  *   ① 两条分支真在扫：派生分支拿 prod 面 `derSites > 0` 证，裸形态分支自 #143/B5-26 起 prod 面为 0、
  *      改由合成 fixture 证（防正则形状漂移后该分支恒 0 命中）；
  *   ② 双形态计数严格大于裸形态计数（结构性证明本门比旧判据强，不是等价改写）；
  *   ③ DEFECT/CLEAN 双向 fixture，且 DEFECT 面专门放一条「两文件都用派生态造同一族」
- *      ——旧判据对它零命中，本门必须判红。
+ *      ——旧判据对它零命中，本门必须判红；
+ *   ④ #145/B6-11 起补**名字变体** fixture：一族由 `` `${API_BASE}/…` `` 与
+ *      `` `${API_ROOT}/…` ``（`import { API_BASE as API_ROOT }`）两文件各造一次，
+ *      写死 token 名的判据对它零命中 ⇒ 本门必须判红；反向腿：无别名导入时 `` `${API_ROOT}/…` ``
+ *      不得被误认成基址构造点（防把任意 `${VAR}/v1/…` 吃进来造成误红面）。
  */
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
@@ -297,7 +338,24 @@ const normalize = (body: string): string => {
 };
 
 const RAW_RE = /["'`]\/api((?:\\.|(?!["'`])[^\\])*)["'`]/g;
-const DER_RE = /`\$\{API_BASE\}((?:\\.|(?!`)[^\\])*)`/g;
+const DER_BODY = '((?:\\\\.|(?!`)[^\\\\])*)';
+const DER_RE = new RegExp('`\\$\\{API_BASE\\}' + DER_BODY + '`', 'g');
+
+/**
+ * #145/B6-11 补的名字变体腿：派生态判据原本把 token 名**写死**成 `API_BASE`，于是
+ * `import { API_BASE as X }` 之后写 `` `${X}/v1/…` `` 的族根构造点对本门完全隐形——
+ * 这是 D-B5-40（"判据对派生态不可见"）在**名字轴**上的同形缺陷：形态是派生的、只是换了个名字。
+ * 实测 prod 面改前仅一枚（`pages/Guardrails/constants.ts` 的 `API_BASE as API_ROOT`，它自持的常量
+ * 恰好也叫 `API_BASE`、取值却是 `/api/v1/guardrails/policies`，本批随族单源一起收口）。
+ * 这里按文件把 `API_BASE as X` 的 X 并进取 token 集，别名腿与本体腿同口径计入。
+ */
+const ALIAS_IMPORT_RE = /(?:^|[,{\s])API_BASE\s+as\s+([A-Za-z0-9_]+)/g;
+
+function derivedRe(code: string): RegExp {
+  const aliases = [...code.matchAll(ALIAS_IMPORT_RE)].map((m) => m[1]);
+  if (aliases.length === 0) return DER_RE;
+  return new RegExp('`\\$\\{(?:API_BASE|' + aliases.join('|') + ')\\}' + DER_BODY + '`', 'g');
+}
 
 function isComment(line: string): boolean {
   const t = line.trim();
@@ -326,7 +384,7 @@ function familiesOf(code: string): Map<string, Forms> {
     const b = normalize(m[1]);
     if (b.startsWith('/v1/')) bump(b, 'raw');
   }
-  for (const m of lines.matchAll(DER_RE)) {
+  for (const m of lines.matchAll(derivedRe(lines))) {
     const b = normalize(m[1]);
     if (b.startsWith('/v1/')) bump(b, 'der');
   }
@@ -389,12 +447,10 @@ function dupByRawOnly(idx: Index): Map<string, string[]> {
  * 族 → 属主清单；只减不增，收口一族/一属主必须与本批同款改动同批剪除。
  */
 const BASELINE: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  '/v1/agent-mesh': ['api/agentClient.ts', 'services/agentMeshApi.ts'],
   '/v1/audit/stats': ['api/securityClient.ts', 'pages/SecurityAudit.tsx'],
   '/v1/cognitive/beliefs?domain={}': ['pages/scenario/OverrideTab.tsx', 'pages/scenario/ReplayTab.tsx'],
   '/v1/dq': ['api/dataClient.ts', 'pages/data-quality/api/_base.ts'],
   '/v1/engine/data/pipeline/runs/{}': ['pages/data-workbench/api/pipeline.ts', 'pages/data-workbench/pipeline-editor/PipelineExecutionMonitor.tsx'],
-  '/v1/guardrails/policies': ['pages/aiworkbench/api.ts', 'services/cognitiveEngineApi.ts'],
   '/v1/ontology/data': ['services/ontology/ontologyDataApi.ts', 'services/ontologyWorkbenchApi.ts'],
   '/v1/ontology/export': ['pages/knowledge/services/overview.ts', 'services/ontology/ontologyExportApi.ts'],
   '/v1/system/organizations/tree': ['api/iamClient.ts', 'pages/WorldModelViewer.tsx'],
@@ -474,7 +530,18 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `DataWorkbenchImportTab.tsx` 的版本列表腿 ＋ `worldModelGraphApi.ts` 的私有 `WMG` 声明）、
     // 增 1 枚新建属主声明（`services/ontology/ontologyModelApi.ts` 的 `ECOS_ONTOLOGIES_BASE`；
     // `ECOS_VERSIONS_BASE`/`ECOS_WORLD_MODEL_GRAPH_BASE` 只是私有升导出、位上未增未减）。净 −4 全属形态搬运。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(290);
+    // #145/B6-11（存量债第十一批）：290 → **287** = 删 4 枚 `` `${API_BASE}` `` 站点（`agentMeshApi.ts`
+    // 的 `MESH` 族根声明 1 ＋ `cognitiveEngineApi.ts` 的 list/create 两枚内联腿 ＋ `aiworkbench/api.ts`
+    // 的列表腿 1）、增 1 枚新建属主声明（`cognitiveEngineApi.ts` 的 `GUARDRAILS_POLICIES_BASE`；
+    // `AGENT_MESH_BASE` 只是私有升导出、位上未增未减）。净 −3 全属形态搬运。
+    // 另记一笔**隐形**变化（不在 derSites 面里）：`pages/Guardrails/constants.ts` 改前的
+    // `` `${API_ROOT}/v1/guardrails/policies` `` 一枚族根声明从来不被 DER_RE 认（token 名写死为
+    // `API_BASE`），本批把它换成不含 URL 体的别名重导出 ⇒ 该族的真实生产方 3→1，而本门面只见 2→1。
+    // 判据侧同步补上「`API_BASE as X` 导入别名也算基址 token」的腿，见 familiesOf/derivedRe，
+    // 并由「判据能变红」批里的 ALIAS_A/ALIAS_B 合成 fixture 承证其活性（prod 面零枚，不能靠 prod 面证）。
+    // 因此 290→287 这两档不同判据的读数**不可直接相减当进度**：以本批 wide 判据回读 HEAD 归档树是 291
+    // （多出的 1 枚正是上面那枚从来隐形的影子族根），wide 对 wide 才是 −4。逐文件实测明细见文件头 B6-11 形状⑤。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(287);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     expect(dupBoth.size).toBeGreaterThan(dupRawOnly.size);
@@ -552,10 +619,15 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // （`api/monitorClient.ts` ＋ `services/worldModelGraphApi.ts`）收口为三枚导出常量单源
     // ⇒ **dupBoth 12 → 9**、BASELINE 同批剪除三行（属主 24 → 18）。族面 253 一点不降：三族各留
     // 1 枚写成 `` `${API_BASE}/v1/…` `` 的族根声明 ⇒ 第二裸面写手即红（同 B6-9 形状）。
-    expect(dupBoth.size).toBe(9);
+    // #145/B6-11：dupBoth 9 → **7**、盲区 9 → **7**（`/v1/agent-mesh` 两属主合一为
+    // `api/agentClient.ts` 的 `AGENT_MESH_BASE`，`/v1/guardrails/policies` 两属主合一为
+    // `services/cognitiveEngineApi.ts` 的 `GUARDRAILS_POLICIES_BASE`）。族面 253 一点不降：
+    // 两族族根声明各留 1 枚且仍写 `` `${API_BASE}/v1/…` ``（同 B6-9/B6-10 形状），
+    // 且 `/v1/guardrails/policies/{}` 的 DELETE 腿刻意保持行内形态以保住该子族可见性（B6-3 ③ 判例）。
+    expect(dupBoth.size).toBe(7);
     expect(dupRawOnly.size).toBe(0);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(9);
+    expect(blind.length).toBe(7);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);
@@ -582,6 +654,39 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     expect(dupByRawOnly(idx).has('/v1/fixture/dup{}')).toBe(false);
     // 注释行不计（与 api-base / privateTransportRatchet 同口径）
     expect([...familiesOf("// const X = `${API_BASE}/v1/fixture/in-comment`;\n/* `${API_BASE}/v1/fixture/block` */")].length).toBe(0);
+  }, 30_000);
+
+  it('判据能变红（名字轴，#145/B6-11）：`API_BASE as X` 别名构造点必须计入族面，且不得把任意 `${VAR}/v1/…` 误吃进来', () => {
+    // 本体腿 + 别名腿造同一族 —— 这是 prod 面实测过的形状（pages/Guardrails/constants.ts）。
+    // token 名写死为 `API_BASE` 的旧 DER_RE 对 ALIAS_B 零命中 ⇒ 两属主族掉出重复面＝假绿复发。
+    const ALIAS_A = ['import { API_BASE } from "./httpClient";', 'const A = `${API_BASE}/v1/fixture/alias-dup${id}`;', 'fetch(A);'].join('\n');
+    const ALIAS_B = ['import { API_BASE as API_ROOT } from "./httpClient";', 'const B = `${API_ROOT}/v1/fixture/alias-dup${id}`;', 'fetch(B);'].join('\n');
+
+    // ① 别名腿被本门读到（派生态计数，非裸形态）
+    expect(familiesOf(ALIAS_B).get('/v1/fixture/alias-dup{}')).toEqual({ raw: 0, der: 1 });
+    // ② 旧判据形状（token 名写死）对同一份代码零命中 —— 证明这条腿真的在补瞎点，不是等价改写
+    expect([...ALIAS_B.matchAll(DER_RE)].length, 'DER_RE 若已能吃到别名，说明 derivedRe 的补腿失去意义').toBe(0);
+    // ③ 两属主在双形态口径下构成重复族（= 本门会判红），在旧口径下仍然隐形
+    const aliasIdx: Index = new Map();
+    for (const [rel, code] of [['fixture/A.ts', ALIAS_A], ['fixture/B.ts', ALIAS_B]] as const) {
+      for (const [fam, forms] of familiesOf(code)) {
+        if (!aliasIdx.has(fam)) aliasIdx.set(fam, new Map());
+        aliasIdx.get(fam)!.set(rel, forms);
+      }
+    }
+    expect(dupByBothForms(aliasIdx).get('/v1/fixture/alias-dup{}')).toEqual(['fixture/A.ts', 'fixture/B.ts']);
+    expect(dupByRawOnly(aliasIdx).has('/v1/fixture/alias-dup{}')).toBe(false);
+    // ④ 反向腿：没有 `API_BASE as X` 导入时，`API_ROOT` 只是别人家的变量，不得被认成基址构造点
+    //    （否则派生态判据从"认基址"漂成"认任意模板变量"，会把 `${apiRoot}`/`${RUNTIME}` 之类一起吃进族面）
+    const NO_ALIAS = ['import { API_BASE } from "./httpClient";', 'const C = `${API_ROOT}/v1/fixture/alias-negative`;', 'fetch(C);'].join('\n');
+    expect([...familiesOf(NO_ALIAS).keys()]).toEqual([]);
+    // ⑤ 多别名/同行导入形状也吃到（import { API_BASE as A, OTHER } 与两处别名各计一枚）
+    const MULTI_ALIAS = [
+      'import { API_BASE as P, API_BASE as Q, OTHER } from "./httpClient";',
+      'const D = `${P}/v1/fixture/multi-a`;',
+      'const E = `${Q}/v1/fixture/multi-b`;',
+    ].join('\n');
+    expect([...familiesOf(MULTI_ALIAS).entries()].map(([f, n]) => [f, n.der])).toEqual([['/v1/fixture/multi-a', 1], ['/v1/fixture/multi-b', 1]]);
   }, 30_000);
 
   it('基线自身可校验：族面/属主面形态合规且与实跑读出同数', () => {
@@ -613,8 +718,13 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `/v1/ecos/world-model-graph` 为 `api/monitorClient.ts` + `services/worldModelGraphApi.ts`——
     // 收口为三枚导出常量（`ECOS_ONTOLOGIES_BASE` / `ECOS_VERSIONS_BASE` /
     // `ECOS_WORLD_MODEL_GRAPH_BASE`），同批剪除三行；三族族根声明各留 1 枚 ⇒ 族面 253 不降）
-    expect(entries.length).toBe(9);
-    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(18);
+    // #145/B6-11 起 7 族 / 14 属主（`/v1/agent-mesh` 的 `api/agentClient.ts` + `services/agentMeshApi.ts`
+    // 合一为前者导出的 `AGENT_MESH_BASE`；`/v1/guardrails/policies` 的 `pages/aiworkbench/api.ts` +
+    // `services/cognitiveEngineApi.ts` 合一为后者导出的 `GUARDRAILS_POLICIES_BASE`，页面侧
+    // `pages/Guardrails/constants.ts` 的同族根声明改为不含 URL 体的别名重导出——它本来就不在本门面里，
+    // 属主面按门面口径记 4→2；两族族根声明各留 1 枚 ⇒ 族面 253 不降）
+    expect(entries.length).toBe(7);
+    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(14);
     expect(BASELINE['/v1/knowledge']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios/{}']).toBeUndefined();
@@ -634,6 +744,8 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     expect(BASELINE['/v1/ecos/ontologies']).toBeUndefined();
     expect(BASELINE['/v1/ecos/versions']).toBeUndefined();
     expect(BASELINE['/v1/ecos/world-model-graph']).toBeUndefined();
+    expect(BASELINE['/v1/agent-mesh']).toBeUndefined();
+    expect(BASELINE['/v1/guardrails/policies']).toBeUndefined();
     for (const [fam, owners] of entries) {
       expect(fam.startsWith('/v1/')).toBe(true);
       expect(fam.includes('\\')).toBe(false);
@@ -652,7 +764,23 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
   it('扫描面合规：生产文件数与豁免面与本门口径一致（防扫描根漂移成零命中）', () => {
     expect(snapshot.prodFiles).toBeGreaterThanOrEqual(600);
     expect(snapshot.idx.size).toBeGreaterThanOrEqual(200);
+    // 族索引面硬钉（#145/B6-11 起）：`>=200` 只能防空扫，读不出"本批族面降了几枚"这种可见性变化；
+    // B6 各批的族面升降必须在这里显形，才配得上文件头「族面变化一律记为可见性副产物、不作进度读」。
+    // 253 = 本批实跑读出（`/v1/agent-mesh` 与 `/v1/guardrails/policies` 两族族根声明各留 1 枚，
+    // `/v1/guardrails/policies/{}` 的 DELETE 腿刻意保持行内形态 ⇒ 本批一族未退出索引）。
+    expect(snapshot.idx.size, '族索引面与本批实跑读出脱钩 ⇒ 有族的可见性被关掉而台账没记').toBe(253);
     for (const owners of snapshot.idx.values()) expect(owners.has(CANONICAL)).toBe(false);
+    // 名字变体面归零（#145/B6-11）：prod 面不得再有 `import { API_BASE as X }` 形态的基址别名——
+    // 它虽然已被 derivedRe 计入族面，但这个形状本身就是 D-B5-40 在名字轴上的成因，出现即红。
+    // 用非全局正则（全局 `.test` 会因 lastIndex 前进而漏判，属判据自身缺陷）。
+    const aliasImportRe = /^\s*import\s[^\n]*\bAPI_BASE\s+as\s+[A-Za-z0-9_]+/m;
+    const files: string[] = [];
+    walk(SRC_ROOT, files);
+    const aliased = files
+      .map((f) => relative(SRC_ROOT, f).split(sep).join('/'))
+      .filter((rel) => rel !== CANONICAL && !isTestFile(rel))
+      .filter((rel) => aliasImportRe.test(readFileSync(join(SRC_ROOT, rel), 'utf8')));
+    expect(aliased, 'prod 面出现 API_BASE 导入别名（名字变体隐形腿的成因形状）').toEqual([]);
     // 量级自播报：台账里的四个数（生产文件面/族面/裸形态命中行/派生态命中行）一律取自此行输出，
     // 防止「写进文档的数字其实是上一代判据的估算」——本台账反复要防的正是凭记忆断言。
     console.info(

@@ -94,7 +94,7 @@ export async function fetchPrompts(): Promise<PromptTemplate[]> {
 
 
 // ── Agent Mesh ───────────────────────────────────────────────
-const AGENT_MESH_BASE = `${API_BASE}/v1/agent-mesh`;
+export const AGENT_MESH_BASE = `${API_BASE}/v1/agent-mesh`;
 
 export interface AgentMeshAgent {
   id: string;

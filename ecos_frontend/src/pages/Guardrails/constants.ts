@@ -1,6 +1,5 @@
 import { FileLock2, Filter, Users, EyeOff, ShieldCheck } from 'lucide-react';
 import type { PolicyType } from './types';
-import { API_BASE as API_ROOT } from '../../services/httpClient';
 
 // ─────────────────────────────────────────────────────────────
 // Constants
@@ -8,9 +7,13 @@ import { API_BASE as API_ROOT } from '../../services/httpClient';
 
 /**
  * 护栏策略端点基址（完整路径，供 helpers#apiCall 经单源 `rawAuthedUrlFetch` 取用）。
- * 前缀由 httpClient#API_BASE 单源派生 —— W206/C188 禁本文件再写字面前缀。
+ * #145/B6-11 起族根上收至 `services/cognitiveEngineApi.ts` 的 `GUARDRAILS_POLICIES_BASE` 单源，
+ * 本行只是**别名重导出**（不含 URL 体 ⇒ 不构成第二个族根构造方，#145/B6-5 ② 判例）。
+ * 改前两处形状对本仓基址单源判据不可见：`API_BASE as API_ROOT` 的导入别名让族根派生态写成
+ * `${API_ROOT}/v1/…`，而所有派生态判据按 token 名 `API_BASE` 匹配（D-B5-40 的名字变体腿）；
+ * 加上本文件把常量**也叫** `API_BASE`，取值却是 `/api/v1/guardrails/policies`。
  */
-export const API_BASE = `${API_ROOT}/v1/guardrails/policies`;
+export { GUARDRAILS_POLICIES_BASE } from '../../services/cognitiveEngineApi';
 
 export const POLICY_TYPE_META: Record<PolicyType, { labelKey: string; icon: any; color: string }> = {
   column_masking: { labelKey: 'gw.type.column_masking', icon: FileLock2, color: 'text-blue-500' },

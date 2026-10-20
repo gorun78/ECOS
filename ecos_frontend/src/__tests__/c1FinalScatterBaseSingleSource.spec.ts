@@ -417,7 +417,19 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     // worldModelGraphApi 的私有 `WMG` 声明），增 1 枚**新建**属主声明（`ECOS_ONTOLOGIES_BASE`；
     // `ECOS_VERSIONS_BASE`/`ECOS_WORLD_MODEL_GRAPH_BASE` 只是私有升导出、同一声明位不计）。
     // 本批两口径差额又同值（棘轮 derSites 294→290），仍是巧合，不作通则。
-    expect(derTotal, '行内派生态面须随批累积，低于 312 即扫描根或判据漂移').toBeGreaterThanOrEqual(312);
+    // #145/B6-11 订正为 304（−8，实测读出）：删 9 枚 `${API_BASE}` 行内站点——`GuardrailsView` 5 枚
+    // 更新/删除/编译/预览腿（改前基址是 `./Guardrails/constants` 的**影子** `API_BASE`，本门按 token 名
+    // 计数故照常计入；改后写 `${GUARDRAILS_POLICIES_BASE}/…` 与本门脱面）+ `cognitiveEngineApi` 的
+    // 列表/新增 2 枚 + `pages/aiworkbench/api.ts` 的护栏列表腿 1 枚 + `agentMeshApi` 的私有 `MESH`
+    // 族根声明 1 枚；增 1 枚**新建**属主声明（`GUARDRAILS_POLICIES_BASE`；`AGENT_MESH_BASE` 只是
+    // 私有升导出、同一声明位不计）。本批两口径**不同值**（棘轮 pin 面值 290→287，−3），差 5 枚的成因实测拆清：
+    // `GuardrailsView` 那 5 枚在棘轮里 strict／wide **两档都读 0**——棘轮 `familiesOf` 只认捕获体以 `/v1/`
+    // 开头的族体，而该文件的族根本体已在导入常量里、拼接段是 `/${encodeURIComponent(id)}` 归一成 `/{}`
+    // ⇒ 天然脱面（**与名字轴无关**，B6-11 首版此处曾误记成「别名隐形」，已按逐文件实测订正）；棘轮侧真正
+    // 隐形的是 `Guardrails/constants.ts` 那枚影子族根（strict 恒 0、wide 显形 1），它使 pin 面值少减 1：
+    // 以 wide 回读 HEAD 归档树是 291，wide 对 wide 才是 −4（删 5 增 1）。两口径差额本就不必相等，
+    // B6-7 已实证（那里差 1 枚），此处差 5 枚且成因两类，逐档读数见 `urlFamilyDualFormRatchet` 文件头形状⑤。
+    expect(derTotal, '行内派生态面须随批累积，低于 304 即扫描根或判据漂移').toBeGreaterThanOrEqual(304);
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
   });
 

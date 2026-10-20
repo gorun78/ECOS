@@ -37,6 +37,17 @@
  * 且这三枚运行期 URL 在改前同样会被请求出去——所以快照按运行期面值面登记为 3 条（形态由双引号 1 枚
  * 改记反引号 3 枚：dq 16→15、bt 25→28，dq+sq+bt 与 PER_FILE 之和同步为 50）。这不是债的增减，
  * 是同一面值守恒在更宽解析表下的正确读数。</p>
+ *
+ * <p>**#145/B6-11 起的第三处形状（本域自声明的族单源）**：本批把 `cognitiveEngineApi.ts` 的
+ * list/create 两条 `` `${API_BASE}/v1/guardrails/policies` `` 内联腿收口为该文件自声明并导出的
+ * `GUARDRAILS_POLICIES_BASE`（DELETE 腿 `` `${API_BASE}/v1/guardrails/policies/${id}` `` 按 B6-3 ③
+ * 口径刻意保持行内以保住子族可见性）。这是本门第一次遇到**声明行与裸引用行同在本域文件内**的常量：
+ * B6-3 那两枚 AIP 常量声明在页面层，本域只有使用行，所以「裸引用算腿」从来没有双计风险；本批若沿用
+ * 「只算模板腿」会读出 49 对 50（把两条真实请求读成删请求），若「声明 + 两条裸引用」全算又读成 51
+ * （把一枚声明位虚抬成请求）。故按 `b6*SingleSource` 各批门既有的形状 ⑧ 立**声明行整行跳过**规则
+ * （`DECL_LINE_RE` 由 `BARE_REF_NAMES` 派生，不会与集合漂移），本域 50 条面值与 PER_FILE/FORM_COUNTS
+ * **一律不动**。这条腿的可变性由「判据能变红」里新增的三段 fixture 承证（声明行不计、裸引用各计一枚、
+ * 非集合成员的 const 声明行照常计腿——最后一段防把跳过规则扩大成"所有声明都不算腿"）。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -46,6 +57,7 @@ import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../httpClient';
 import { AIP_AGENTS_BASE, AIP_AUDIT_LOGS_BASE } from '../../pages/aiworkbench/api';
 import { DATANET_METADATA_BASE } from '../../api/dataClient';
+import { GUARDRAILS_POLICIES_BASE } from '../cognitiveEngineApi';
 
 const SVC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -68,19 +80,32 @@ const HARDCODED_RE = /["'`]\/api\b/;
 /** 派生形态：`` `${常量}<path>` ``，捕获组即拼出来的路径段（#145/B6-3 起含 AIP 域单源常量）。 */
 const SITE_RE = /`\$\{([A-Za-z0-9_]+)\}((?:\\.|(?!`)[^\\])*)`/g;
 
-/** 面值解析表：`API_BASE` 单源 + #145/B6-3 移到页面 api 层的两枚 AIP 基址常量 + #145/B6-8 的 datanet 元数据族单源。 */
+/** 面值解析表：`API_BASE` 单源 + #145/B6-3 移到页面 api 层的两枚 AIP 基址常量 + #145/B6-8 的 datanet 元数据族单源 + #145/B6-11 的护栏策略族单源。 */
 const CONST_VALUES: ReadonlyMap<string, string> = new Map([
   ['API_BASE', API_BASE],
   ['AIP_AGENTS_BASE', AIP_AGENTS_BASE],
   ['AIP_AUDIT_LOGS_BASE', AIP_AUDIT_LOGS_BASE],
   ['DATANET_METADATA_BASE', DATANET_METADATA_BASE],
+  ['GUARDRAILS_POLICIES_BASE', GUARDRAILS_POLICIES_BASE],
 ]);
 
 /**
- * 裸引用面只认这两枚 AIP 常量：本域十个文件都不声明它们（声明在页面 api 层），
- * 所以不存在「声明 + 使用」双计；`API_BASE` 不在此列——它裸引用不构成 URL。
+ * 裸引用面：`AIP_AGENTS_BASE` / `AIP_AUDIT_LOGS_BASE` 两枚在本域十个文件里**没有声明行**（声明在
+ * 页面 api 层），所以不存在「声明 + 使用」双计；`API_BASE` 不在此列——它裸引用不构成 URL。
+ *
+ * **#145/B6-11 起本集合第一次出现"在本域自声明"的成员**：`GUARDRAILS_POLICIES_BASE` 就声明在
+ * `cognitiveEngineApi.ts`（属主即该文件），若不处理就会撞上 B6-5 登记过的判据形状 ⑧
+ * 「属主声明行自身不算腿」——声明行 `` export const X = `${API_BASE}/v1/guardrails/policies`; `` 里的
+ * `${API_BASE}` 是一条**声明位**面值，同一文件另有两条裸引用（list / create）才是**请求腿**；
+ * 三者全计会把 3 条腿读成 4 条（虚抬），三者全不计又把两条真实请求读成删请求（假红→误判为漏挪）。
+ * 故这里采用与 `b6*SingleSource` 各批门一致的口径：**声明行整行跳过，裸引用行照常计腿**，
+ * 本域快照维持 50 条面值不动（改前 list + create + delete 三条腿，改后仍是三条）。
+ * 该规则由 `DECL_LINE_RE` 从 `BARE_REF_NAMES` 派生，两者不可能各走各路。
  */
-const BARE_REF_NAMES = ['AIP_AGENTS_BASE', 'AIP_AUDIT_LOGS_BASE'] as const;
+const BARE_REF_NAMES = ['AIP_AGENTS_BASE', 'AIP_AUDIT_LOGS_BASE', 'GUARDRAILS_POLICIES_BASE'] as const;
+
+/** 属主声明行（B6-5 ⑧）：只匹配「以本集合成员为声明目标」的 const/let/var 行，别的行一律照常数腿。 */
+const DECL_LINE_RE = new RegExp('^\\s*(?:export\\s+)?(?:const|let|var)\\s+(?:' + BARE_REF_NAMES.join('|') + ')\\s*=');
 
 /** import 语句整条先剥（含多行花括号体），否则续行 `  AIP_AGENTS_BASE,` 会被裸名判据吃成假腿。 */
 const IMPORT_STMT_RE = /^\s*import\s[\s\S]*?;/gm;
@@ -102,6 +127,7 @@ function read(rel: string): string {
 function derivedValues(src: string): string[] {
   const out: string[] = [];
   for (const line of codeLines(src.replace(IMPORT_STMT_RE, ''))) {
+    if (DECL_LINE_RE.test(line)) continue;
     let rest = line;
     for (const m of line.matchAll(SITE_RE)) {
       rest = rest.split(m[0]).join('');
@@ -113,6 +139,11 @@ function derivedValues(src: string): string[] {
       for (let i = 0; i < parts.length - 1; i++) {
         const before = parts[i].slice(-1);
         if (before === '{' || before === '.') continue;
+        // **#145/B6-11 补的名字边界判据**：`split(name)` 会把 `GUARDRAILS_POLICIES_BASEX` 这类前缀相似
+        // 的更长标识符吃成一条腿（反向腿 2 的 fixture 即为此而设）。裸名判据必须两头都看：前一位已有
+        // `{`/`.` 两条护栏，后一位只要还是标识符字符就不算这个常量的引用（`parts[i+1]` 首字符即后一位）。
+        const after = parts[i + 1].charAt(0);
+        if (/[A-Za-z0-9_$]/.test(after)) continue;
         out.push(CONST_VALUES.get(name)!);
       }
     }
@@ -288,6 +319,27 @@ describe('services 根域基址单源 — 私设基址清零 (#143/B5-18)', () =
       '/api/v1/aip/agents/${id}',
       '/api/v1/aip/audit-logs',
     ]);
+    // #145/B6-11：本域**自声明**的族单源走 B6-5 形状 ⑧「声明行不算腿、裸引用算腿」。
+    // 三条请求腿（list/create/delete）面值逐字可读；那一枚声明位不得虚抬成第四条。
+    // 判据退化方向有两个，这里同时钉住：只算模板腿 ⇒ 读出 2 条（把两条真实请求读成删请求）；
+    // 声明 + 裸引用全计 ⇒ 读出 4 条（把声明位读成请求）。正解是 3。
+    const SELF_DECL = [
+      "import { API_BASE, apiFetchData } from './httpClient';",
+      'export const GUARDRAILS_POLICIES_BASE = `${API_BASE}/v1/guardrails/policies`;',
+      'return apiFetchData(GUARDRAILS_POLICIES_BASE);',
+      'return apiFetchData(GUARDRAILS_POLICIES_BASE, { method: "POST" });',
+      'return apiFetchData(`${API_BASE}/v1/guardrails/policies/${id}`, { method: "DELETE" });',
+    ].join('\n');
+    expect(derivedValues(SELF_DECL)).toEqual([
+      '/api/v1/guardrails/policies',
+      '/api/v1/guardrails/policies',
+      '/api/v1/guardrails/policies/${id}',
+    ]);
+    // 反向腿 1：跳过规则只认「声明目标是集合成员」的行；集合外的常量声明照常计腿
+    //（防把 ⑧ 扩大成"所有声明行都不算腿"，那会让本域 50 条快照静默漏计）。
+    expect(derivedValues('const OTHER_BASE = `${API_BASE}/v1/guardrails/other`;')).toEqual(['/api/v1/guardrails/other']);
+    // 反向腿 2：名字前缀相似（`…BASEX`）不得被当成集合成员的声明行——正则组后紧跟 `\s*=` 即词边界判据。
+    expect(derivedValues('const GUARDRAILS_POLICIES_BASEX = `${API_BASE}/v1/guardrails/other`;')).toEqual(['/api/v1/guardrails/other']);
     // 把常量名当属性访问（`cfg.AIP_AGENTS_BASE`）不构成腿——防裸名判据吃进无关面
     expect(derivedValues('const n = cfg.AIP_AGENTS_BASE;')).toEqual([]);
   });

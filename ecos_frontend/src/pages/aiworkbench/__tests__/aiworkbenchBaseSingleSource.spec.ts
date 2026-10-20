@@ -45,6 +45,19 @@
  * **28 条面值钉死不动**（还原值仍是 `/api/v1/pipeline/definitions`）。到此「导入裸名」集合已三枚，
  * 后续批若再把别的族上收，仍按本口径只扩集合、不动条数；跨文件守恒由
  * `src/__tests__/b6PipelineDefinitionsSingleSource.spec.ts` 承证。</p>
+ *
+ * <p>**#145/B6-11 同一条判据第三次复用（导入裸名集合第四枚）**：本文件 `fetchGuardrailPolicies`
+ * 的 `` `${API_BASE}/v1/guardrails/policies` `` 内联腿上收至属主 `services/cognitiveEngineApi` 导出的
+ * `GUARDRAILS_POLICIES_BASE`，使用处同样变成裸引用 ⇒ 解析表与 `IMPORTED_BARE_NAMES` 各加一枚，
+ * **28 条面值与快照逐字不动**（还原值仍是 `/api/v1/guardrails/policies`）。同批的 `constants.ts`
+ * 别名重导出与 DELETE 子路径腿不在本域门面里，由 `src/__tests__/b6AgentMeshGuardrailsSingleSource.spec.ts`
+ * 承证。本文件里的 4 条 `agent-mesh/agents` 腿**本批不动**：族键是 `/v1/agent-mesh/agents`
+ * 与 `/v1/agent-mesh/agents/${}`（比 `/v1/agent-mesh` 更深一层），各只有一个生产方、从来不在重复面，
+ * 按 B6-1/B6-3 的可见性口径保持 `${API_BASE}` 行内形态 ⇒ 把它们并进 `AGENT_MESH_BASE` 只会对棘轮隐形
+ * 而不减债。
+ * ⚠ 登记一条判据自身的盲区（防后续批误推）：`IMPORTED_BARE_NAMES` 是**白名单**，本门只认登记过的常量名，
+ * 本域若新写一个未登记的族常量并裸引用，腿会静默丢计（本门读成条数不足而红——红是好的，
+ * 但归因要先查解析表而不是先怀疑生产代码漏挪）。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -55,6 +68,7 @@ import { API_BASE } from '../../../services/httpClient';
 import { AIP_AGENTS_BASE, AIP_AUDIT_LOGS_BASE } from '../../../pages/aiworkbench/api';
 import { ONTOLOGY_PROPOSALS_BASE } from '../../../services/ontology/ontologyProposalApi';
 import { PIPELINE_DEFINITIONS_BASE } from '../../../api/dataClient';
+import { GUARDRAILS_POLICIES_BASE } from '../../../services/cognitiveEngineApi';
 
 // 本门位于 `src/pages/aiworkbench/__tests__/`，到 `src/` 的相对深度是三档（少一档即读不到被测域）
 const SRC_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -81,6 +95,7 @@ const CONST_VALUES: ReadonlyMap<string, string> = new Map([
   ['AIP_AUDIT_LOGS_BASE', AIP_AUDIT_LOGS_BASE],
   ['ONTOLOGY_PROPOSALS_BASE', ONTOLOGY_PROPOSALS_BASE],
   ['PIPELINE_DEFINITIONS_BASE', PIPELINE_DEFINITIONS_BASE],
+  ['GUARDRAILS_POLICIES_BASE', GUARDRAILS_POLICIES_BASE],
 ]);
 /**
  * **按来源分治的裸引用判据（#145/B6-4 立、#145/B6-5 复用）**：B6-3 定的「本门不计裸引用」只成立于
@@ -89,8 +104,9 @@ const CONST_VALUES: ReadonlyMap<string, string> = new Map([
  * 声明行 ⇒ 不计裸引用就是丢腿（28→27、28→27 假红）。故这里只对**导入进来的**常量名计裸引用，
  * 且必须先摘掉同行的模板腿、导入行本身不计（否则 import 语句读成一次请求）。
  * 后续批再把别的族上收时：只扩本集合 + `CONST_VALUES`，**28 条面值快照一律不动**。
+ * #145/B6-11 加进第四枚 `GUARDRAILS_POLICIES_BASE`（属主在 `services/cognitiveEngineApi.ts`）。
  */
-const IMPORTED_BARE_NAMES: readonly string[] = ['ONTOLOGY_PROPOSALS_BASE', 'PIPELINE_DEFINITIONS_BASE'];
+const IMPORTED_BARE_NAMES: readonly string[] = ['ONTOLOGY_PROPOSALS_BASE', 'PIPELINE_DEFINITIONS_BASE', 'GUARDRAILS_POLICIES_BASE'];
 
 function isComment(line: string): boolean {
   const t = line.trim();
@@ -141,8 +157,15 @@ function derivedValues(src: string): string[] {
     for (const name of IMPORTED_BARE_NAMES) {
       const value = CONST_VALUES.get(name);
       if (value === undefined) continue;
-      const bare = rest.split(name).length - 1;
-      for (let i = 0; i < bare; i += 1) out.push(value);
+      // #145/B6-11 与 `servicesRootBaseSingleSource` 同批补的**名字边界判据**：`split(name)` 会把
+      // `GUARDRAILS_POLICIES_BASEX` 这类前缀相似的更长标识符吃成一条腿，`cfg.X_BASE`/`x.X_BASE`
+      // 这类属性访问同样不构成腿。裸名判据必须两头都验。
+      const parts = rest.split(name);
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (/[A-Za-z0-9_.$]/.test(parts[i].slice(-1))) continue;
+        if (/[A-Za-z0-9_$]/.test(parts[i + 1].charAt(0))) continue;
+        out.push(value);
+      }
     }
   }
   return out;
@@ -288,5 +311,16 @@ describe('pages/aiworkbench 域基址单源 — 私设基址清零 (#143/B5-25)'
     expect(derivedValues('  return apiFetchData(`${PIPELINE_DEFINITIONS_BASE}/${id}`);')).toEqual([
       '/api/v1/pipeline/definitions/${id}',
     ]);
+    // #145/B6-11：第四枚导入常量同口径（本批 api.ts 的护栏列表腿变成裸引用，面值必须原样还原）
+    expect(derivedValues('  const data = await apiFetchData<GuardrailPolicyRaw[]>(GUARDRAILS_POLICIES_BASE);')).toEqual([
+      '/api/v1/guardrails/policies',
+    ]);
+    expect(derivedValues("import { GUARDRAILS_POLICIES_BASE } from '../../services/cognitiveEngineApi';")).toEqual([]);
+    expect(derivedValues('  return apiFetchData(`${GUARDRAILS_POLICIES_BASE}/${id}`, { method: "DELETE" });')).toEqual([
+      '/api/v1/guardrails/policies/${id}',
+    ]);
+    // 名字边界判据（#145/B6-11）：前缀相似的更长标识符与属性访问都不构成腿
+    expect(derivedValues('  const flag = cfg.GUARDRAILS_POLICIES_BASEX;')).toEqual([]);
+    expect(derivedValues('  if (GUARDRAILS_POLICIES_BASEX) throw new Error("x");')).toEqual([]);
   });
 });

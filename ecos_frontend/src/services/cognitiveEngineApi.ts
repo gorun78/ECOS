@@ -447,14 +447,17 @@ export async function validateGuardrails(body: { content: string }) {
   });
 }
 
+/** 护栏策略族根单源（#145/B6-11）：页面侧 `pages/Guardrails/constants.ts` 与 AI 台 api 层均引此常量。 */
+export const GUARDRAILS_POLICIES_BASE = `${API_BASE}/v1/guardrails/policies`;
+
 /** GET /api/v1/guardrails/policies — 护栏策略列表 */
 export async function fetchGuardrailPolicies() {
-  return apiFetchData(`${API_BASE}/v1/guardrails/policies`);
+  return apiFetchData(GUARDRAILS_POLICIES_BASE);
 }
 
 /** POST /api/v1/guardrails/policies — 新增护栏策略 */
 export async function createGuardrailPolicy(body: Record<string, unknown>) {
-  return apiFetchData(`${API_BASE}/v1/guardrails/policies`, {
+  return apiFetchData(GUARDRAILS_POLICIES_BASE, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

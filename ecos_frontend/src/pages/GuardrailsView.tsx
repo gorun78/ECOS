@@ -25,7 +25,7 @@ import { showToastGlobal } from '../components/common/Toast';
 import type {
   GuardrailPolicy, PreviewData, AuditLogEntry, PolicyStatus,
 } from './Guardrails/types';
-import { API_BASE } from './Guardrails/constants';
+import { GUARDRAILS_POLICIES_BASE } from './Guardrails/constants';
 import { apiCall, normalizePolicy, emptyPolicy } from './Guardrails/helpers';
 import PolicyListPanel from './Guardrails/PolicyListPanel';
 import PolicyEditor from './Guardrails/PolicyEditor';
@@ -87,7 +87,7 @@ export default function GuardrailsView() {
     setLoadingList(true);
     setListError(null);
     try {
-      const raw = await apiCall<any>(API_BASE);
+      const raw = await apiCall<any>(GUARDRAILS_POLICIES_BASE);
       const list: any[] = Array.isArray(raw) ? raw : (raw?.policies ?? raw?.items ?? raw?.list ?? []);
       const normalized = list.map(normalizePolicy);
       setPolicies(normalized);
@@ -132,7 +132,7 @@ export default function GuardrailsView() {
         config: editing.config,
       };
       if (formMode === 'create') {
-        const created = await apiCall<any>(API_BASE, {
+        const created = await apiCall<any>(GUARDRAILS_POLICIES_BASE, {
           method: 'POST',
           body: JSON.stringify(payload),
         });
@@ -141,7 +141,7 @@ export default function GuardrailsView() {
         setPolicies(prev => [...prev, np]);
         setSelectedId(np.id);
       } else if (formMode === 'edit' && editing.id) {
-        await apiCall<any>(`${API_BASE}/${encodeURIComponent(editing.id)}`, {
+        await apiCall<any>(`${GUARDRAILS_POLICIES_BASE}/${encodeURIComponent(editing.id)}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
         });
@@ -161,7 +161,7 @@ export default function GuardrailsView() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
-      await apiCall<any>(`${API_BASE}/${encodeURIComponent(deleteTarget.id)}`, { method: 'DELETE' });
+      await apiCall<any>(`${GUARDRAILS_POLICIES_BASE}/${encodeURIComponent(deleteTarget.id)}`, { method: 'DELETE' });
       showToast('success', t('gwv.deleted', { name: deleteTarget.name }));
       setPolicies(prev => prev.filter(p => p.id !== deleteTarget.id));
       if (selectedId === deleteTarget.id) setSelectedId(null);
@@ -178,7 +178,7 @@ export default function GuardrailsView() {
     // optimistic
     setPolicies(prev => prev.map(p => (p.id === policy.id ? next : p)));
     try {
-      await apiCall<any>(`${API_BASE}/${encodeURIComponent(policy.id)}`, {
+      await apiCall<any>(`${GUARDRAILS_POLICIES_BASE}/${encodeURIComponent(policy.id)}`, {
         method: 'PUT',
         body: JSON.stringify({ isEnabled: next.isEnabled }),
       });
@@ -196,7 +196,7 @@ export default function GuardrailsView() {
     setIsCompiling(true);
     setCompileLogs([]);
     try {
-      const result = await apiCall<any>(`${API_BASE}/${encodeURIComponent(policy.id)}/compile`, {
+      const result = await apiCall<any>(`${GUARDRAILS_POLICIES_BASE}/${encodeURIComponent(policy.id)}/compile`, {
         method: 'POST',
       });
       const logs: string[] = result?.compileLogs ?? result?.logs ?? result?.compile_logs ?? [];
@@ -223,7 +223,7 @@ export default function GuardrailsView() {
     setLoadingPreview(true);
     setPreviewData(null);
     try {
-      const result = await apiCall<any>(`${API_BASE}/${encodeURIComponent(policy.id)}/preview`);
+      const result = await apiCall<any>(`${GUARDRAILS_POLICIES_BASE}/${encodeURIComponent(policy.id)}/preview`);
       setPreviewData(result as PreviewData);
     } catch (e: any) {
       showToast('error', t('gwv.previewFailed', { msg: e.message }));
