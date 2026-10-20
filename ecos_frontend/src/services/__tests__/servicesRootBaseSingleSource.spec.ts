@@ -23,6 +23,20 @@
  * 裸引用计入腿（该文件不声明这两枚常量，不存在声明/使用双计）。**import 语句必须先整条剥**（含多行
  * 花括号体）：续行 `  AIP_AGENTS_BASE,` 若留下会被裸名判据吃成假腿。裸引用面只认这两枚 AIP 常量，
  * 不认 `API_BASE`——后者裸引用不构成 URL，纳入会把 import 行读成腿。</p>
+ *
+ * <p>**#145/B6-8 起的第二处基址来源**：本批把 `dataCatalogClient.ts` 的族根声明 `DATANET_BASE` 收口为
+ * `api/dataClient.ts` 导出的 `DATANET_METADATA_BASE` 单源（属主落 api 层而非服务侧：该文件本就值导入
+ * `../api` 门面，反向引用会成 `api.ts → dataClient → dataCatalogClient → api.ts` 循环）。该文件因此
+ * **不再导入 `API_BASE`**，三条消费腿变成 `` `${DATANET_METADATA_BASE}/…` `` 形态——面值一条不少（快照里那枚
+ * `'"/api/v1/datanet/metadata"'` 是改前族根声明，现由常量解析表还原成同面值），但「十文件一律
+ * 从 ./httpClient 导入 API_BASE」这条腿的形状已不成立。本门把它改写成**每文件基址来源恰 1 条**：
+ * 其余九文件仍是 `./httpClient` 的 `API_BASE`，`dataCatalogClient.ts` 是 `../api/dataClient` 的族单源；
+ * 出现第二条来源（无论哪一种）即红。常量解析表同步增一枚，防止「单模自跑读出 47 对 48」的收口读成删请求。
+ * **快照随之由 48 条订正为 50 条**：改前解析表不认 `DATANET_BASE`，该文件在册的只有族根声明那一枚面值
+ * （三条消费腿对旧判据隐形，读出 1 条）；改后声明位消失、三枚腿经族单源常量还原成面值，读出 3 条，
+ * 且这三枚运行期 URL 在改前同样会被请求出去——所以快照按运行期面值面登记为 3 条（形态由双引号 1 枚
+ * 改记反引号 3 枚：dq 16→15、bt 25→28，dq+sq+bt 与 PER_FILE 之和同步为 50）。这不是债的增减，
+ * 是同一面值守恒在更宽解析表下的正确读数。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -31,6 +45,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../httpClient';
 import { AIP_AGENTS_BASE, AIP_AUDIT_LOGS_BASE } from '../../pages/aiworkbench/api';
+import { DATANET_METADATA_BASE } from '../../api/dataClient';
 
 const SVC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -53,11 +68,12 @@ const HARDCODED_RE = /["'`]\/api\b/;
 /** 派生形态：`` `${常量}<path>` ``，捕获组即拼出来的路径段（#145/B6-3 起含 AIP 域单源常量）。 */
 const SITE_RE = /`\$\{([A-Za-z0-9_]+)\}((?:\\.|(?!`)[^\\])*)`/g;
 
-/** 面值解析表：`API_BASE` 单源 + #145/B6-3 移到页面 api 层的两枚 AIP 基址常量。 */
+/** 面值解析表：`API_BASE` 单源 + #145/B6-3 移到页面 api 层的两枚 AIP 基址常量 + #145/B6-8 的 datanet 元数据族单源。 */
 const CONST_VALUES: ReadonlyMap<string, string> = new Map([
   ['API_BASE', API_BASE],
   ['AIP_AGENTS_BASE', AIP_AGENTS_BASE],
   ['AIP_AUDIT_LOGS_BASE', AIP_AUDIT_LOGS_BASE],
+  ['DATANET_METADATA_BASE', DATANET_METADATA_BASE],
 ]);
 
 /**
@@ -132,7 +148,9 @@ const RAW_PRE_BATCH_URL_LITERALS: readonly string[] = [
   '`/api/v1/ecos/git/push${q(repoId)}`',
   '`/api/v1/ecos/git/pull${q(repoId)}`',
   '`/api/v1/ecos/git/${action}${q(repoId)}`',
-  '"/api/v1/datanet/metadata"',
+  '`/api/v1/datanet/metadata/resources/all`',
+  '`/api/v1/datanet/metadata/fields/${resourceId}`',
+  '`/api/v1/datanet/metadata/preview/${resourceId}?limit=${limit}`',
   '`/api/v1/world-model/state`',
   '`/api/v1/world-model/scenarios`',
   '`/api/v1/world-model/strategy/recommend`',
@@ -161,15 +179,15 @@ const RAW_PRE_BATCH_URL_LITERALS: readonly string[] = [
 
 const PRE_BATCH_URL_LITERALS: readonly string[] = RAW_PRE_BATCH_URL_LITERALS.map((s) => s.slice(1, -1));
 
-/** 快照规模与三形态拆分（HEAD 实扫读出）。 */
-const TOTAL = 48;
-const FORM_COUNTS = { dq: 16, sq: 7, bt: 25 } as const;
+/** 快照规模与三形态拆分（HEAD 实扫读出；#145/B6-8 起本域快照由 48 条订正为 50 条，见文件头）。 */
+const TOTAL = 50;
+const FORM_COUNTS = { dq: 15, sq: 7, bt: 28 } as const;
 /** 每文件处数（HEAD 实扫读出，供「漏文件」自检）。 */
 const PER_FILE = {
   'aiworkbenchApi.ts': 9,
   'cognitiveClient.ts': 4,
   'cognitiveEngineApi.ts': 11,
-  'dataCatalogClient.ts': 1,
+  'dataCatalogClient.ts': 3,
   'gitService.ts': 11,
   'knowledgeNavApi.ts': 2,
   'ontologyClient.ts': 2,
@@ -190,12 +208,20 @@ describe('services 根域基址单源 — 私设基址清零 (#143/B5-18)', () =
     }
   });
 
-  it('十文件一律从 ./httpClient 导入 API_BASE（第二处来源即红）', () => {
+  it('十文件基址来源各恰 1 条（第二处来源即红，#145/B6-8 起含族单源形态）', () => {
     for (const rel of FILES) {
-      const src = read(rel);
-      const imports = codeLines(src).filter((l) => /\bAPI_BASE\b/.test(l) && l.trimStart().startsWith('import '));
-      expect(imports.length, `${rel} 应有且仅有 1 条 API_BASE 导入`).toBe(1);
-      expect(imports[0]).toMatch(/from ['"]\.\/httpClient['"]/);
+      const lines = codeLines(read(rel));
+      const apiImports = lines.filter((l) => /^\s*import\s/.test(l) && /\bAPI_BASE\b/.test(l));
+      const famImports = lines.filter((l) => /^\s*import\s/.test(l) && /\bDATANET_METADATA_BASE\b/.test(l));
+      expect(apiImports.length + famImports.length, `${rel} 基址来源导入须恰 1 条`).toBe(1);
+      if (rel === 'dataCatalogClient.ts') {
+        // 本批收口：族根声明升为 api 层单源，服务侧只留族单源一跳
+        expect(apiImports, `${rel} 已上收族单源，不得再导入 API_BASE`).toEqual([]);
+        expect(famImports[0]).toMatch(/from ['"]\.\.\/api\/dataClient['"]/);
+      } else {
+        expect(famImports, `${rel} 不该出现族单源导入`).toEqual([]);
+        expect(apiImports[0]).toMatch(/from ['"]\.\/httpClient['"]/);
+      }
     }
   });
 
@@ -209,7 +235,7 @@ describe('services 根域基址单源 — 私设基址清零 (#143/B5-18)', () =
     }
   });
 
-  it('面值逐字不变：还原后的 URL 多重集 = 改前快照（48 条，HEAD 实跑读出）', () => {
+  it('面值逐字不变：还原后的 URL 多重集 = 快照（50 条，HEAD 实跑读出 + #145/B6-8 解析表订正）', () => {
     const all: string[] = [];
     for (const rel of FILES) all.push(...derivedValues(read(rel)));
     expect(all.length).toBe(TOTAL);

@@ -392,7 +392,12 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     // 棘轮只认 `/v1/` 族体），此前各批恰好"两口径同时看见同一批站点"才使差额同值。
     // 属主声明 `COMPLIANCE_RULES_BASE` 仍是 `${API_BASE}` 裸形态（只是从私有升为导出）⇒ 计数不变；
     // wiki 侧 6 枚消费腿改引属主常量，改前也不是 `${API_BASE}` 形态 ⇒ 同样不计数。净 −4 全在 RuleRepoTable。
-    expect(derTotal, '行内派生态面须随批累积，低于 322 即扫描根或判据漂移').toBeGreaterThanOrEqual(322);
+    // #145/B6-8 订正为 319（−3，实测读出）：删 `services/dataCatalogClient.ts` 的 `DATANET_BASE` 族根声明
+    // 1 枚 + `services/datanetMetadataApi.ts` 两枚行内腿；该两文件改后的 5 枚腿一律写
+    // `` `${DATANET_METADATA_BASE}/…` `` ⇒ 与本门 `${API_BASE}` 判据脱面。属主声明
+    // `DATANET_METADATA_BASE` 只是 `api/dataClient.ts` 里 `DATANET_META` 改名并 export、同一声明位，
+    // 计数不变（与 B6-7 的 `COMPLIANCE_RULES_BASE` 同形）。差额与本批棘轮 derSites 300→297 同值。
+    expect(derTotal, '行内派生态面须随批累积，低于 319 即扫描根或判据漂移').toBeGreaterThanOrEqual(319);
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
   });
 

@@ -5,6 +5,8 @@
  * <p>**传输合流（#143/B5-11e）**：两条腿改走单源匿名通道 `rawAnonUrlFetch`
  * （C2′「匿名腿不算豁免」判据，见台账 §13.2.4 C2′ 注⑬），基址由 `API_BASE` 派生，
  * 两条 URL 逐字不变；同时从 `api-base-single-source` 基线剪除本文件。
+ * **#145/B6-8**：两条腿基址改取 `/v1/datanet/metadata` 族根单源 `DATANET_METADATA_BASE`
+ * （属主 `api/dataClient.ts`），拼出的两条 URL 面值仍逐字不变；`API_BASE` 用途归零后其导入一并清除。
  * 抛错文案保持域内自造的 `HTTP ${status}`（单源 `apiFetchEnvelope` 会先解包并透出
  * 信封字段，但改前这两条腿读的是**整包 JSON** 且没有信封概念 ⇒ 换通道即换解包语义，
  * 超出传输收口授权）。</p>
@@ -21,16 +23,17 @@
  * 未做百分号编码 ⇒ 含 `/` 或 `..` 的 id 会改写请求路径本身。是否收口为
  * `encodeURIComponent` 属接口行为变化，交 #108/DW 域队列裁决，本批不动。</p>
  */
-import { API_BASE, rawAnonUrlFetch } from './httpClient';
+import { rawAnonUrlFetch } from './httpClient';
+import { DATANET_METADATA_BASE } from '../api/dataClient';
 
 export async function fetchDatanetResourcesAll(): Promise<any> {
-  const resp = await rawAnonUrlFetch(`${API_BASE}/v1/datanet/metadata/resources/all`);
+  const resp = await rawAnonUrlFetch(`${DATANET_METADATA_BASE}/resources/all`);
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return resp.json();
 }
 
 export async function fetchDatanetPreview(resourceId: string, limit = 50): Promise<any> {
-  const resp = await rawAnonUrlFetch(`${API_BASE}/v1/datanet/metadata/preview/${resourceId}?limit=${limit}`);
+  const resp = await rawAnonUrlFetch(`${DATANET_METADATA_BASE}/preview/${resourceId}?limit=${limit}`);
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return resp.json();
 }

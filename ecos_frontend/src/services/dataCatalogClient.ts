@@ -13,16 +13,11 @@
  */
 
 import { apiFetchData } from "../api";
-import { API_BASE } from "./httpClient";
+import { DATANET_METADATA_BASE } from "../api/dataClient";
 import type {
   BulkResource,
   WorkbenchDataField,
 } from "../types/workbench";
-
-// ── 配置常量 ──────────────────────────────────────────────
-
-/** 数据底座 metadata 基础路径 */
-const DATANET_BASE = `${API_BASE}/v1/datanet/metadata`;
 
 // ── 降级错误 ──────────────────────────────────────────────
 
@@ -52,7 +47,7 @@ function handleError(err: unknown): never {
 export async function fetchAllResources(): Promise<BulkResource[]> {
   try {
     const data = await apiFetchData<BulkResource[]>(
-      `${DATANET_BASE}/resources/all`
+      `${DATANET_METADATA_BASE}/resources/all`
     );
     return Array.isArray(data) ? data : [];
   } catch (err) {
@@ -73,7 +68,7 @@ export async function fetchFields(
 ): Promise<WorkbenchDataField[]> {
   try {
     const data = await apiFetchData<WorkbenchDataField[]>(
-      `${DATANET_BASE}/fields/${resourceId}`
+      `${DATANET_METADATA_BASE}/fields/${resourceId}`
     );
     return Array.isArray(data) ? data : [];
   } catch (err) {
@@ -96,7 +91,7 @@ export async function fetchPreview(
 ): Promise<Record<string, any>[]> {
   try {
     const data = await apiFetchData<{ rows?: Record<string, any>[] }>(
-      `${DATANET_BASE}/preview/${resourceId}?limit=${limit}`
+      `${DATANET_METADATA_BASE}/preview/${resourceId}?limit=${limit}`
     );
     // 兼容多种响应格式：{ rows: [...] } / [...]
     if (data && Array.isArray(data)) return data;

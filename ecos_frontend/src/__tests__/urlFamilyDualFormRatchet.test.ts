@@ -161,6 +161,40 @@
  *   ③ derSites 305→300 = 删 5 枚内联派生态站点、属主声明一枚未动，同为副产物。
  * 收口的 2 文件面值守恒（wiki 声明 1 ＋ 消费腿 9、RuleRepoTable 5 枚腿）不在本门证明范围内，
  * 由同批新增的 `b6ComplianceRulesSingleSource.spec.ts` 承证。
+ * #145/B6-8 复跑 = 680 / **253** / 裸面 **0** / 派生面 **297** / dupBoth **15** / dupRawOnly **0** /
+ * blind **15**（改前 680 / 254 / 0 / 300 / 17 / 0 / 17 系把同款扫描器指向 `git archive HEAD` 解出的
+ * src 树实跑读出，非推算）：存量债第八批收口 **数据网元数据两族四属主**——`/v1/datanet/metadata`
+ * 改前两属主＝`api/dataClient.ts` 的私有 `DATANET_META` ＋ `services/dataCatalogClient.ts` 的私有
+ * `DATANET_BASE`（同一族根的两枚 `` `${API_BASE}/v1/datanet/metadata` `` 声明，该文件的 3 枚消费腿
+ * 走 `` `${DATANET_BASE}/…` `` ⇒ 对本门 DER_RE **从来隐形**）；`/v1/datanet/metadata/preview/{}?limit={}`
+ * 改前两属主＝`pages/data-workbench/api/metadata.ts` ＋ `services/datanetMetadataApi.ts`（后者该族两条腿
+ * 均为行内 `` `${API_BASE}/v1/…` ``，含 `resources/all` 一枚）。单源＝在 `api/dataClient.ts` 把
+ * `DATANET_META` **改名并 export** 为 `DATANET_METADATA_BASE`，另两文件改成常量引用；页面门面
+ * `metadata.ts` 本批一字未动。五处形状须记清：
+ *   ① **属主层位由 import 图裁决到 api 层**（与 B6-5 同判据、与 B6-3「落在原属主之一」相对）：
+ *      `services/dataCatalogClient.ts` 本来就值导入 `../api` 门面取 `apiFetchData`，而 `src/api.ts`
+ *      又 re-export `api/dataClient.ts`。单源若落服务侧、让 api 层反向引它，即成
+ *      `api.ts → dataClient → dataCatalogClient → api.ts` 循环。导入方向只能是 services/页面 → api。
+ *   ② **preview 族只动一腿即闭合**：`metadata.ts` 保持原样 ⇒ 改后它是该族**唯一**属主，从 dupBoth 面
+ *      退出但仍留在族索引里（实测本族 owners=1），再冒出第二个裸面写手照样变红。动的是
+ *      `datanetMetadataApi.ts` 那枚行内腿——「收口一条腿就够」只在族确为两属主、且另一属主是本批
+ *      刻意不动的页面门面时成立，不是普适做法。
+ *   ③ **属主文件内部混用单源常量与裸派生态不是遗漏**：`dataClient.ts` 仍留
+ *      `` `${API_BASE}/v1/datanet/metadata/resources/${active.datasourceId}` `` 一枚在册裸面腿
+ *      （该族实扫 owners=1）。B6 只按 dupBoth 属主数记账，动这枚在册的裸面属主＝把可见性关掉而不减债
+ *      （B6-1 文件头 ② 判例）。
+ *   ④ **族面降 1**（254→253）：消失的那枚是 `/v1/datanet/metadata/resources/all`——改前唯一生产方就是
+ *      `datanetMetadataApi.ts` 的行内腿，改成引常量后对 `familiesOf` 整体隐形；`dataCatalogClient` 的
+ *      同名腿本来就隐形（见本段开头），`fields/{}?limit={}` 等 12 枚 datanet 元数据子族仍在册。
+ *      同 B6-2/B6-3/B6-7：族面升降一律不作进度读，账只记 dupBoth 17→15 与属主 34→30。
+ *      **族根本体构造点判据必须带族边界负向前查**（`` `(?!…[A-Za-z0-9_/-])` ``），否则
+ *      `/v1/datanet/metadata/preview` 这类族内腿被误吃成族根第二构造方 ⇒ 新门第一条腿假红。
+ *   ⑤ derSites 300→297 = 删 3 枚 `` `${API_BASE}` `` 站点（`dataCatalogClient.ts` 的 `DATANET_BASE` 声明 1
+ *      ＋ `datanetMetadataApi.ts` 行内腿 2）、增 0（`DATANET_METADATA_BASE` 只是 `DATANET_META` 改名并
+ *      export，同一枚 `` `${API_BASE}/v1/datanet/metadata` `` 声明位）。净 −3 全属形态搬运，不计进度；
+ *      与本门 dupBoth −2 不同值，因为 `dataCatalogClient` 的 3 枚消费腿从来不在本门面里。
+ * 收口的 3 文件面值守恒（5 条面值逐字不变 + 属主唯一性）不在本门证明范围内，
+ * 由同批新增的 `b6DatanetMetadataSingleSource.spec.ts` 承证。
  * 逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。
@@ -173,13 +207,15 @@
  * 棘轮口径 = **族 → 属主清单**（两侧都只减不增）：
  *   新族出现在重复面 → 红；基线族新增属主 → 红；基线族/属主已不再重复 → 陈旧豁免亦红
  *   （与 privateTransportRatchet「陈旧豁免即红」同口径：基线预算不留给已收口的项）。
- *   本门**不宣称**证明单源成立——基线剩 17 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
+ *   本门**不宣称**证明单源成立——基线剩 15 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
  *   `/v1/knowledge` 一族后 29 族 62 属主，#145/B6-2 收口 `/v1/workspace/scenarios` 两族一对后 27 族 57 属主，
  *   #145/B6-3 收口 AIP 域三族（同一对生产方）后 24 族 51 属主，#145/B6-4 收口本体域两族六属主后 22 族 45 属主，
  *   #145/B6-5 收口 pipeline 定义族三属主后 21 族 42 属主，#145/B6-6 收口知识域三族六属主后 18 族 36 属主，
  *   #145/B6-7 收口 `/v1/knowledge/compliance-rules` 族两属主后 17 族 34 属主——该族属主合并后，
  *   两个单属主子族（`/{}` 与 `?{}` 形态）随唯一生产方改引属主常量而退出族面（族面 256→254，
  *   属主合并≠漏检：新生产方若再写族体裸串/派生串仍会被本门抓到，论证见文件头 B6-7 形状②），
+ *   #145/B6-8 收口数据网元数据两族四属主（族根双声明合一 + preview 族动一腿）后 **15 族 30 属主**
+ *   ——两族收口后各留 1 属主、仍留在族索引里（详见文件头 B6-8 形状②③），
  *   余属 B6 后续批），
  *   本门钉死的是「债不再增 + 派生态不再隐身」。
  *
@@ -306,8 +342,6 @@ const BASELINE: Readonly<Record<string, readonly string[]>> = Object.freeze({
   '/v1/agent-mesh': ['api/agentClient.ts', 'services/agentMeshApi.ts'],
   '/v1/audit/stats': ['api/securityClient.ts', 'pages/SecurityAudit.tsx'],
   '/v1/cognitive/beliefs?domain={}': ['pages/scenario/OverrideTab.tsx', 'pages/scenario/ReplayTab.tsx'],
-  '/v1/datanet/metadata': ['api/dataClient.ts', 'services/dataCatalogClient.ts'],
-  '/v1/datanet/metadata/preview/{}?limit={}': ['pages/data-workbench/api/metadata.ts', 'services/datanetMetadataApi.ts'],
   '/v1/dq': ['api/dataClient.ts', 'pages/data-quality/api/_base.ts'],
   '/v1/ecos/ontologies': ['components/ontology-workbench/OntologyDomainPanel.tsx', 'pages/business-workbench/BusinessWorkbenchLayout.tsx'],
   '/v1/ecos/versions': ['pages/knowledge/tabs/DataWorkbenchImportTab.tsx', 'services/ontology/ontologyVersionApi.ts'],
@@ -380,7 +414,13 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 内联腿：1 枚列表腿＋1 枚建腿＋2 枚 PUT 腿＋1 枚 DELETE 腿），属主声明位一枚未动（`wiki.ts` 的
     // RULES_BASE 只是改名并 export，仍是同一枚 `` `${API_BASE}/v1/knowledge/compliance-rules` ``）。
     // 净 −5 同属形态搬运；债的账只记 dupBoth 18 → 17 与属主 36 → 34。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(300);
+    // #145/B6-8：300 → **297** = 删 3 枚 `` `${API_BASE}` `` 站点（`dataCatalogClient.ts` 的 `DATANET_BASE`
+    // 族根声明 1 ＋ `datanetMetadataApi.ts` 两枚行内腿，后者 `API_BASE` 导入随之清零）、增 0
+    // （`api/dataClient.ts` 的 `DATANET_METADATA_BASE` 只是 `DATANET_META` 改名并 export，
+    // 仍写 `` `${API_BASE}/v1/datanet/metadata` `` 同一声明位）。`dataCatalogClient.ts` 的 3 枚消费腿
+    // 改前写 `` `${DATANET_BASE}/…` ``、改后写 `` `${DATANET_METADATA_BASE}/…` ``，两形态都不在本门
+    // DER_RE 面里 ⇒ 本门面只见它的声明位。净 −3 全属形态搬运；债的账只记 dupBoth 17 → 15 与属主 34 → 30。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(297);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     expect(dupBoth.size).toBeGreaterThan(dupRawOnly.size);
@@ -430,10 +470,19 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 常量 ⇒ 对 `familiesOf` 整体隐形（＝B6-1 文件头 ② 预告、B6-2/B6-3 各兑现一次的同一机制，本批一次
     // 隐两枚）。检测面不受损：任何人再写第二枚族体腿仍会被判红，隐形只发生在「经属主常量拼出的腿」，
     // 而那正是单源的定义。族面升降一律不作进度读，进度仍只认 dupBoth 与属主两栏。
-    expect(dupBoth.size).toBe(17);
+    // #145/B6-8（存量债第八批）：数据网元数据两族四属主——`/v1/datanet/metadata`（`api/dataClient.ts`
+    // 私有 `DATANET_META` ＋ `services/dataCatalogClient.ts` 私有 `DATANET_BASE`，同一族根的两枚基址声明）
+    // 与 `/v1/datanet/metadata/preview/{}?limit={}`（`pages/data-workbench/api/metadata.ts` ＋
+    // `services/datanetMetadataApi.ts` 各一枚内联腿）收口为 `api/dataClient.ts` 一枚**改名并 export** 的
+    // `DATANET_METADATA_BASE` ⇒ **dupBoth 17 → 15**、BASELINE 同批剪除两行（属主 34 → 30）。三点形状：
+    // 属主层位由 import 图裁决到 api 层（服务侧反向引用会成 `api.ts → dataClient → dataCatalogClient → api.ts`
+    // 循环，见文件头 B6-8 ①）；preview 族**只动一腿即闭合**、页面门面保持原样（②）；属主文件内部仍留
+    // 一枚在册裸面腿（`…/resources/${…}`）不动——动它是关可见性而不减债（③）。族面 254 → 253 降 1 属
+    // 可见性副产物（④），账只记 dupBoth 与属主。dupRawOnly 仍 0（prod 面裸形态自 #143/B5-26 归零）。
+    expect(dupBoth.size).toBe(15);
     expect(dupRawOnly.size).toBe(0);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(17);
+    expect(blind.length).toBe(15);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);
@@ -476,8 +525,11 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 三族共 6 属主收口为三枚导出常量，同批剪除）
     // #145/B6-7 起 17 族 / 34 属主（`/v1/knowledge/compliance-rules` 两属主收口为 `pages/knowledge/services/`
     // `wiki.ts` 一枚改名并 export 的 `COMPLIANCE_RULES_BASE`，同批剪除；属主声明位未增未减）
-    expect(entries.length).toBe(17);
-    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(34);
+    // #145/B6-8 起 15 族 / 30 属主（`/v1/datanet/metadata` 族根双声明合一为 `api/dataClient.ts` 的
+    // `DATANET_METADATA_BASE` ＋ `/v1/datanet/metadata/preview/{}?limit={}` 动一腿即闭合，同批剪除两行；
+    // 两族收口后各留 1 属主、仍留在族索引里 ⇒ 在册性探针按「族不退出索引、只退出重复面」口径验）
+    expect(entries.length).toBe(15);
+    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(30);
     expect(BASELINE['/v1/knowledge']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios/{}']).toBeUndefined();

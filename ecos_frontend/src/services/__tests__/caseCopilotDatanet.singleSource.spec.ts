@@ -183,11 +183,20 @@ describe('源形 — 三文件私设传输归零（C2′ 棘轮第五批）', ()
     }
   });
 
-  it('三文件 + knowledgeQueryApi 的 "/api" 字面量归零：基址一律 API_BASE 派生', () => {
-    for (const src of [SRC_COPILOT, SRC_DATANET, SRC_KQAPI]) {
+  it('三文件 + knowledgeQueryApi 的 "/api" 字面量归零：基址一律派生常量（#145/B6-8 起 datanet 改认族单源）', () => {
+    for (const src of [SRC_COPILOT, SRC_KQAPI]) {
       expect(countMatches(codeOnly(src), HARDCODED_API)).toBe(0);
       expect(codeOnly(src)).toContain('API_BASE');
     }
+    // #145/B6-8 把 `datanetMetadataApi.ts` 两条腿的基址上收为 `/v1/datanet/metadata` 族根单源
+    // `DATANET_METADATA_BASE` ⇒ 该文件代码面 `API_BASE` 归零、只在头部注释里留历史叙述。本腿原判据
+    // 「含 API_BASE」对注释同样为真（`codeOnly` 只剥**行级**注释，`/** … * 基址由 API_BASE 派生 …`
+    // 这类块注释行以 `*` 开头才被滤掉），留着会变成「靠注释过门」的假绿面 ⇒ 翻转正反面：
+    // 字面 `/api` 仍零、代码面不得再出现 `API_BASE`（出现即第二处基址来源）、必须出现族单源名。
+    const datanet = codeOnly(SRC_DATANET);
+    expect(countMatches(datanet, HARDCODED_API)).toBe(0);
+    expect(datanet).not.toContain('API_BASE');
+    expect(datanet).toContain('DATANET_METADATA_BASE');
     // caseLibrary 基址是 /cases（不属 /api 族），必须**不**拼 API_BASE，否则换掉承流路径
     const cases = codeOnly(SRC_CASES);
     expect(cases).not.toContain('API_BASE');

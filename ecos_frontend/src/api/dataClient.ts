@@ -106,7 +106,7 @@ export async function fetchDataset(id: string): Promise<DataAsset | null> {
       // 获取字段详情
       let schema: any[] = [];
       try {
-        const fieldsResp = await doFetch(`${DATANET_META}/fields/${found.resourceId || id}`);
+        const fieldsResp = await doFetch(`${DATANET_METADATA_BASE}/fields/${found.resourceId || id}`);
         const fields: any[] = Array.isArray(fieldsResp?.data) ? fieldsResp.data :
                               Array.isArray(fieldsResp?.data?.data) ? fieldsResp.data.data : [];
         schema = fields.map((f: any) => ({
@@ -299,7 +299,13 @@ export async function resolveDqIssue(issueId: string, body: any): Promise<any> {
 
 // ── Datanet: 物理表注册 & 元数据采集 ───────────────────────────
 const DATANET_DS = `${API_BASE}/v1/datanet/datasource`;
-const DATANET_META = `${API_BASE}/v1/datanet/metadata`;
+/**
+ * `/v1/datanet/metadata` 族根单源 (#145/B6-8)。services/dataCatalogClient.ts、
+ * services/datanetMetadataApi.ts 与页面门面都从本导出取基址，不得再各自私设。
+ * 属主落 api 层而非服务侧：`dataCatalogClient` 本就值导入 `../api` 门面，反向引用会成
+ * `api.ts → dataClient → dataCatalogClient → api.ts` 循环。
+ */
+export const DATANET_METADATA_BASE = `${API_BASE}/v1/datanet/metadata`;
 const DATANET_CATALOG = `${API_BASE}/v1/datanet/catalog`;
 
 /** GET /datanet/datasource — 获取所有数据源列表 */
@@ -341,13 +347,13 @@ export async function testDataSourceConnection(id: string): Promise<{ success: b
 
 /** POST /datanet/metadata/collect/{datasourceId} — 触发元数据采集 */
 export async function collectMetadata(datasourceId: string): Promise<{ resourcesCollected: number; elapsedMs: number }> {
-  const resp = await doFetch(`${DATANET_META}/collect/${datasourceId}`, { method: "POST" });
+  const resp = await doFetch(`${DATANET_METADATA_BASE}/collect/${datasourceId}`, { method: "POST" });
   return (resp?.data ?? resp) as { resourcesCollected: number; elapsedMs: number };
 }
 
 /** GET /datanet/metadata/resources/{datasourceId} — 获取数据源的资源（表/视图）列表 */
 export async function fetchResources(datasourceId: string): Promise<DataResource[]> {
-  const resp = await doFetch(`${DATANET_META}/resources/${datasourceId}`);
+  const resp = await doFetch(`${DATANET_METADATA_BASE}/resources/${datasourceId}`);
   const arr = resp?.data?.data ?? resp?.data;
   if (Array.isArray(arr)) return arr as DataResource[];
   return [];
@@ -365,7 +371,7 @@ export interface BulkResource {
   datasourceType: string;
 }
 export async function fetchAllResources(): Promise<BulkResource[]> {
-  const resp = await doFetch(`${DATANET_META}/resources/all`);
+  const resp = await doFetch(`${DATANET_METADATA_BASE}/resources/all`);
   const arr = resp?.data?.data ?? resp?.data;
   if (Array.isArray(arr)) return arr as BulkResource[];
   return [];
@@ -373,7 +379,7 @@ export async function fetchAllResources(): Promise<BulkResource[]> {
 
 /** GET /datanet/metadata/fields/{resourceId} — 获取资源的字段列表 */
 export async function fetchFields(resourceId: string): Promise<DataField[]> {
-  const resp = await doFetch(`${DATANET_META}/fields/${resourceId}`);
+  const resp = await doFetch(`${DATANET_METADATA_BASE}/fields/${resourceId}`);
   const arr = resp?.data?.data ?? resp?.data;
   if (Array.isArray(arr)) return arr as DataField[];
   return [];
@@ -388,7 +394,7 @@ export interface DataPreview {
 }
 
 export async function fetchPreview(resourceId: string, limit = 50): Promise<DataPreview> {
-  const resp = await doFetch(`${DATANET_META}/preview/${resourceId}?limit=${limit}`);
+  const resp = await doFetch(`${DATANET_METADATA_BASE}/preview/${resourceId}?limit=${limit}`);
   const d = resp?.data;
   if (!d) return { rows: [], columns: [], rowCount: 0 };
   return {
