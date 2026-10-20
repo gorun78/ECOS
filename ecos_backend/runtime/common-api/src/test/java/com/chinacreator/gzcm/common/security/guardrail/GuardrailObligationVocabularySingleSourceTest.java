@@ -293,11 +293,19 @@ class GuardrailObligationVocabularySingleSourceTest {
         String decider = codeOf("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/"
                 + "com/chinacreator/gzcm/engine/cognitive2/service/backtest/SecurityPolicyReviewRoleDecider.java");
         for (String ref : List.of("GuardrailDecisionContract.KEY_POLICY_REF",
-                "GuardrailDecisionContract.KEY_ALLOW",
                 "GuardrailDecisionContract.KEY_OBLIGATIONS",
                 "GuardrailDecisionContract.KEY_DENIED_REASON")) {
             assertTrue(decider.contains(ref), "认知回测裁决读面未引用单源键 " + ref);
         }
+        // #142/B4-3e-6（D-B4-41）：布尔放行位不再是认知侧本地读数——裁决三态整体上交给
+        // ABAC 应答单源。此处钉的是「委托到位」，KEY_ALLOW 由该单源独占读取；
+        // 若有人改回 data.path(KEY_ALLOW).asBoolean(false)，本断言与裸键断言双双变红。
+        assertTrue(decider.contains("AbacEvaluateResponseContract.verdictOfTree")
+                        && decider.contains("AbacEvaluateResponseContract.Verdict.UNEVALUATED"),
+                "认知回测裁决未委托 ABAC 应答单源读三态（D-B4-41 的折叠形态：键缺失即当策略拒绝）");
+        assertFalse(decider.contains("GuardrailDecisionContract.KEY_ALLOW"),
+                "认知侧又直接读布尔放行位（该键的读数自 #142/B4-3e-6 起归 ABAC 应答单源）");
+        assertNoBareKeyRead(decider, GuardrailDecisionContract.KEY_ALLOW);
 
         String readGuard = codeOf("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/"
                 + "gzcm/workspace/security/ScenarioReadGuard.java");

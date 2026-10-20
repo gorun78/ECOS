@@ -49,7 +49,10 @@ import java.util.UUID;
  * （HTTP 503 / ECOS-SEC-501）上抛，禁再折叠成 {@code "1=0"} / 空列集 / {@code false} ——
  * 旧形态把"安全引擎故障"渲染成"你没有数据"（200 + 空列表），
  * 违从零实施版 line 2602「503 DENY 且禁渲染空列表冒充无数据」。
- * 4xx（含默认 DENY 的 403）与响应缺段不可解析仍按既有兜底走 DENY 语义，分态不外溢。</p>
+ * 4xx（含默认 DENY 的 403）仍按既有兜底走 DENY 语义，分态不外溢。<b>但 HTTP 200 里
+ * "无可识别裁决"（{@code UNEVALUATED}）同属不可用</b> —— {@code postJson} 只能按传输层分类，
+ * 应答体形态的不可用需由各裁决方法按 {@link AbacEvaluateResponseContract} 三态补分态，
+ * 详见 {@link #evaluate}（差距 D-B4-41，#142/B4-3e-6 收口）。</p>
  *
  * <p>卷07 F07-17 底座收口（对齐 ai-engine W89 先例）：
  * <ul>
@@ -265,6 +268,17 @@ public class WorkspaceSecurityEngineClient {
      * <p>导出通道（{@code audit:export}）咽喉：security 明确 DENY → {@code false}
      * （调用方转 403）；进程不可用 → 503 {@link SecurityEngineUnavailableException} 上抛，
      * 由 {@code SecurityDownAllChannelDenyTest#export} 钉住"拒绝产出任何字节"。</p>
+     *
+     * <p><b>#142/B4-3e-6 分态（差距 D-B4-41）</b>：本方法此前用
+     * {@link AbacEvaluateResponseContract#isExplicitAllow} 做布尔结论，而该读数对
+     * {@code DENY} 与 {@code UNEVALUATED} 一律返回 {@code false}。于是 HTTP 200 的兜底应答
+     * （{@code source=fallback}／{@code fallback=DENY_OPA_DOWN}／{@code allow} 键缺失）
+     * 被当成本方法内的"策略拒绝"，绕过 {@code postJson} 的可用性分态直接落成 403 ——
+     * 即"护栏没说话"冒充"你没权限"。现在三态在本方法内分态：ALLOW→{@code true}、
+     * DENY→{@code false}、UNEVALUATED→与传输故障同一个 503 通道上抛。</p>
+     *
+     * @throws SecurityEngineUnavailableException 传输不可用，或应答里无可识别裁决
+     *         （{@code UNEVALUATED}，§4.7.2「不可用 ≠ 无权限」）
      */
     @SuppressWarnings("unchecked")
     public boolean evaluate(String action, Map<String, Object> attrs) {
@@ -279,7 +293,15 @@ public class WorkspaceSecurityEngineClient {
             Map<String, Object> resp = postJson("/api/v1/security/policy-engine/evaluate", body);
             // 裁决读数走单源：本类此前只认历史别名 result，而现契约（OpaPolicyService）
             // 的 data 段发的是 allow ⇒ 恒读到 null、无论策略怎么判都 DENY（差距 D-B4-39）。
-            return AbacEvaluateResponseContract.isExplicitAllow(resp == null ? null : resp.get("data"));
+            AbacEvaluateResponseContract.Verdict verdict =
+                    AbacEvaluateResponseContract.verdictOf(resp == null ? null : resp.get("data"));
+            if (verdict == AbacEvaluateResponseContract.Verdict.UNEVALUATED) {
+                throw new SecurityEngineUnavailableException(
+                        "/api/v1/security/policy-engine/evaluate",
+                        "policy engine answered HTTP 200 without a recognizable verdict "
+                        + "(UNEVALUATED): unavailable, not a policy DENY", null);
+            }
+            return verdict == AbacEvaluateResponseContract.Verdict.ALLOW;
         } catch (SecurityEngineUnavailableException e) {
             throw e; // 可用性故障不得冒充"策略拒绝"（§4.5.4 分态）
         } catch (Exception e) {

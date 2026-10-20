@@ -33,10 +33,13 @@ import java.util.Map;
  * 复审角色只准从 {@code obligations[]} 里<b>透传</b>（键 {@code reviewerRole}，兼容 {@code role}）；
  * 认知侧不解释、不映射、不兜底（禁"角色名→权限"硬编码）。</p>
  *
- * <p><b>fail-closed 三态</b>：OPA 不可用（服务端自身 fail-close 返 {@code allow=false} +
- * {@code fallback=DENY_OPA_DOWN}）/ 网络不可达 / 当前请求无凭证可透传 ⇒
- * 一律 {@link ReviewRoleDecision#unavailable}（上层 503，禁默认放行）；
- * 明确 DENY ⇒ {@code deny}（上层 403）。两者在结局词表上分列，不混为一谈（DG-6）。</p>
+ * <p><b>fail-closed 三态</b>：裁决读数一律取
+ * {@link AbacEvaluateResponseContract#verdictOfTree(JsonNode)}（禁在本类拼键面判断，
+ * 差距 <b>D-B4-41</b>／#142/B4-3e-6）。OPA 不可用（服务端自身 fail-close 返
+ * {@code allow=false} + {@code fallback=DENY_OPA_DOWN}）/ 网络不可达 / 当前请求无凭证可透传 /
+ * {@code allow} 键缺失或值形态不可识别 ⇒ 一律 {@link ReviewRoleDecision#unavailable}
+ * （上层 503，禁默认放行）；{@code DENY} ⇒ {@code deny}（上层 403）。
+ * 两态在结局词表上分列，不混为一谈（DG-6）。</p>
  *
  * <p><b>底座收口</b>：复用 runtime 共享客户端 {@code cognitiveRestTemplate} +
  * {@link ServiceEndpointResolver} 两态寻址（铁律 §2.5，禁 new RestTemplate；
@@ -136,14 +139,17 @@ public class SecurityPolicyReviewRoleDecider implements BacktestReviewRoleDecide
         String decisionRef = data.path(GuardrailDecisionContract.KEY_POLICY_REF).asText(POLICY_NAME)
                 + "#" + data.path("inputDigest").asText("-")
                 + "@" + PATH_POLICY_EVALUATE;
-        if (AbacEvaluateResponseContract.VALUE_SOURCE_FALLBACK.equalsIgnoreCase(
-                    data.path(AbacEvaluateResponseContract.KEY_SOURCE).asText(""))
-                || AbacEvaluateResponseContract.VALUE_FALLBACK_DENY_OPA_DOWN.equalsIgnoreCase(
-                    data.path(AbacEvaluateResponseContract.KEY_FALLBACK).asText(""))) {
+        // 三态读数整体交给应答契约（#142/B4-3e-6，D-B4-41）：本类此前自己拼"source/fallback
+        // 命中 ⇒ 不可用，其余非 allow ⇒ 拒绝"，于是 allow 键缺失、值形态不可识别、policyState
+        // 未评估这三种"护栏没说话"全被落成 deny(403)。折叠的后果不是保守，而是把链路缺陷
+        // 伪装成业务结论 —— 上层拿到 403 就不会再报依赖故障，运维面永远看不到 security 侧的问题。
+        AbacEvaluateResponseContract.Verdict verdict = AbacEvaluateResponseContract.verdictOfTree(data);
+        if (verdict == AbacEvaluateResponseContract.Verdict.UNEVALUATED) {
             return ReviewRoleDecision.unavailable(decisionRef,
-                    "policy engine answered fail-close fallback (DENY_OPA_DOWN): unavailable, not a policy DENY");
+                    "policy engine returned no recognizable verdict (UNEVALUATED): unavailable, "
+                            + "not a policy DENY (fail-closed, no review task created)");
         }
-        if (!data.path(GuardrailDecisionContract.KEY_ALLOW).asBoolean(false)) {
+        if (verdict == AbacEvaluateResponseContract.Verdict.DENY) {
             return ReviewRoleDecision.deny(decisionRef,
                     "policy denied review assignment" + deniedReasonOf(data));
         }

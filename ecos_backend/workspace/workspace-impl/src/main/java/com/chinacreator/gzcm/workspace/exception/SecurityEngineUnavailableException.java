@@ -15,11 +15,13 @@ import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
  * 读咽喉 {@code ScenarioReadGuard} 则把不可用误报成 403 PERMISSION_DENIED。
  * 本类型只承载<b>可用性故障</b>这一态。</p>
  *
- * <p><b>分态口径（不得越界）</b>：security-engine 正常应答后的 DENY、4xx 鉴权失败、
- * 响应缺段不可解析，仍走各自既有兜底（{@code "1=0"} / 空列集 / {@code false} → 403 语义），
- * 分类点唯一在
- * {@link com.chinacreator.gzcm.workspace.security.WorkspaceSecurityEngineClient}
- * 的传输层出口。</p>
+ * <p><b>分态口径（不得越界）</b>：security-engine 正常应答后的 DENY、4xx 鉴权失败仍走
+ * 各自既有兜底（{@code "1=0"} / 空列集 / {@code false} → 403 语义），分类点唯一在
+ * {@link com.chinacreator.gzcm.workspace.security.WorkspaceSecurityEngineClient}。
+ * <b>#142/B4-3e-6 订正（差距 D-B4-41）</b>：原文把"响应缺段不可解析"归入 403 兜底，
+ * 该口径已被推翻 —— 应答里<b>无可识别裁决</b>（{@code UNEVALUATED}：缺 {@code allow} 键／
+ * {@code source=fallback}／带 {@code opaError}／{@code policyState} 未评估）属"护栏没说话"，
+ * 与连不上同源，一律走本类型（503 + {@code ECOS-SEC-501}），禁冒充"策略拒绝"。</p>
  *
  * <p>X-41 治理沿用：下游原文（path / reason / cause）只进日志面供回查，
  * 不进响应体 message 与 details。</p>

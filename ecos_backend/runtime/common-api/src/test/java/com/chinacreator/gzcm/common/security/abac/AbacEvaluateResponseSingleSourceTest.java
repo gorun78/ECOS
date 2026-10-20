@@ -21,6 +21,7 @@ import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -298,11 +299,11 @@ class AbacEvaluateResponseSingleSourceTest {
                 "AbacEvaluateResponseContract.KEY_FALLBACK"));
         expected.put(KB_CLIENT, List.of("AbacEvaluateResponseContract.isExplicitAllow"));
         expected.put(ONTOLOGY_CLIENT, List.of("AbacEvaluateResponseContract.isExplicitAllow"));
-        expected.put(WORKSPACE_CLIENT, List.of("AbacEvaluateResponseContract.isExplicitAllow"));
-        expected.put(COGNITIVE_DECIDER, List.of("AbacEvaluateResponseContract.KEY_SOURCE",
-                "AbacEvaluateResponseContract.KEY_FALLBACK",
-                "AbacEvaluateResponseContract.VALUE_SOURCE_FALLBACK",
-                "AbacEvaluateResponseContract.VALUE_FALLBACK_DENY_OPA_DOWN"));
+        // #142/B4-3e-6（D-B4-41）：两支咽喉改取三态读数——isExplicitAllow 对 DENY 与
+        // UNEVALUATED 同值，拿它做布尔结论即把"护栏没说话"折成"策略拒绝"。
+        expected.put(WORKSPACE_CLIENT, List.of("AbacEvaluateResponseContract.verdictOf("));
+        expected.put(COGNITIVE_DECIDER, List.of("AbacEvaluateResponseContract.verdictOfTree",
+                "AbacEvaluateResponseContract.Verdict"));
 
         for (Map.Entry<String, List<String>> e : expected.entrySet()) {
             String code = codeOf(e.getKey());
@@ -317,13 +318,86 @@ class AbacEvaluateResponseSingleSourceTest {
     @Test
     @DisplayName("D-B4-39 三支恒 DENY 咽喉必须走 allow 单源读数，不得只剩别名读法")
     void theThreeSilentlyDenyingGatesReadTheCurrentForm() {
-        for (String rel : List.of(KB_CLIENT, ONTOLOGY_CLIENT, WORKSPACE_CLIENT)) {
+        for (String rel : List.of(KB_CLIENT, ONTOLOGY_CLIENT)) {
             String code = codeOf(rel);
             assertTrue(code.contains("AbacEvaluateResponseContract.isExplicitAllow"),
                     rel + " 未改读单源（收口前它只认历史别名 result，现契约应答恒读到 null ⇒ 恒 DENY）");
             assertFalse(code.contains("Boolean.TRUE.equals"),
                     rel + " 又回到裸布尔判定形态（该形态正是 D-B4-39 的发生位置）");
         }
+        // workspace 咽喉在 #142/B4-3e-6 进一步改取三态（D-B4-41）：读数升级后不再允许退回布尔helper
+        String workspace = codeOf(WORKSPACE_CLIENT);
+        assertTrue(workspace.contains("AbacEvaluateResponseContract.verdictOf("),
+                WORKSPACE_CLIENT + " 未取三态读数（D-B4-41 的折叠形态已回归）");
+        assertFalse(workspace.contains("AbacEvaluateResponseContract.isExplicitAllow"),
+                WORKSPACE_CLIENT + " 退回布尔 helper ⇒ DENY 与 UNEVALUATED 再次同值");
+    }
+
+    // ── 验收 3b：不可用折叠面棘轮（#142/B4-3e-6，D-B4-41／新登记 D-B4-44） ────
+
+    /**
+     * 把裁决读数做成<b>布尔结论</b>的消费点（DENY 与 UNEVALUATED 同值）。
+     *
+     * <p>两条形态：①直接调
+     * {@code AbacEvaluateResponseContract.isExplicitAllow(...)}——该 helper 只对 ALLOW 返回
+     * {@code true}，对 DENY 与 UNEVALUATED 都返回 {@code false}；②本类自带一个
+     * {@code private/static boolean isExplicitAllow(…)} helper，内部虽委托
+     * {@code verdictOf} 拿三态，但对外只回布尔，调用方无从分态。两种都是差距
+     * <b>D-B4-41</b> 的形态。本批只闭合台账在册的两支（认知 decider／workspace 导出咽喉）；
+     * 复扫时另发现同型四处（kb 导航写闸、本体操作授权、data pipeline 执行裁决三处调用、
+     * llm-gateway 本地布尔 helper）—— 它们把不可用落成 403/拒绝 reason，形态与 workspace
+     * 收口前一致，但分别需要各自的模块异常类型与状态映射，<b>不在本批顺手动刀</b>，登记为
+     * <b>D-B4-44</b> 并以下面这份清单做棘轮：清单只准缩短，新增未登记折叠点即红。</p>
+     */
+    private static final Set<String> UNEVALUATED_FOLDING_SITES = Set.of(
+            KB_CLIENT, ONTOLOGY_CLIENT, PIPELINE_SVC, LLM_BRIDGE);
+
+    @Test
+    @Timeout(value = 120)
+    @DisplayName("折叠面棘轮：仍用布尔结论做裁决的读侧必须逐个在册（D-B4-44），新增即红、收口须同步删项")
+    void unevaluatedFoldingSitesAreRatcheted() {
+        Map<String, List<String>> found = new TreeMap<>();
+        for (Scanned s : backendMainSources()) {
+            if (!s.code().contains("policy-engine/evaluate")) continue;
+            String shape = booleanConclusionShape(s.code());
+            if (shape != null) {
+                found.put(s.relPath(), List.of(shape));
+            }
+        }
+        assertEquals(UNEVALUATED_FOLDING_SITES, found.keySet(),
+                "ABAC 不可用折叠面与在册清单不符（新增未登记＝又一个没人知道的假 403；"
+                        + "收口未删项＝棘轮失效）。实测=" + found);
+        // 已闭合的两支不得回归（同一条判据对它们必须为假）
+        for (String closed : List.of(COGNITIVE_DECIDER, WORKSPACE_CLIENT)) {
+            assertNull(booleanConclusionShape(codeOf(closed)),
+                    closed + " 退回布尔 helper ⇒ D-B4-41 复发");
+        }
+    }
+
+    /**
+     * 该文件是否存在"对外只回布尔"的裁决结论形态；命中则返回形态说明（供断言消息定位），
+     * 未命中返回 {@code null}。
+     *
+     * <p>形态②要求<b>同文件内确有调用点</b>（出现次数 &gt; 1 即声明之外还有调用）：
+     * ai-engine 的 {@code AiSecurityEngineClient#isExplicitAllow} 只有声明、<b>零调用方</b>
+     * （实测全仓 main 面仅 1 处命中＝声明本身），其裁决消费链一律走
+     * {@code verdictOf} 的三态串（{@code AgentToolPolicyGate}／{@code GuardrailsServiceImpl}
+     * 把 UNEVALUATED 映射成 {@code FAIL_CLOSED}＋503，实测），故不在册；
+     * 若日后有人调用它，本判据立刻把它抓进清单——那时要么分态改造，要么显式登记。</p>
+     */
+    private static String booleanConclusionShape(String code) {
+        int contractHelper = code.indexOf("AbacEvaluateResponseContract.isExplicitAllow");
+        if (contractHelper >= 0) {
+            return "调用契约布尔 helper，offset " + contractHelper;
+        }
+        int hits = 0;
+        for (int i = code.indexOf("isExplicitAllow("); i >= 0; i = code.indexOf("isExplicitAllow(", i + 1)) {
+            hits++;
+        }
+        if (hits > 1 && code.contains("boolean isExplicitAllow(")) {
+            return "本类自带 boolean isExplicitAllow(…) helper 且同文件有调用点（三态在内部被压成布尔）";
+        }
+        return null;
     }
 
     @Test
@@ -384,6 +458,11 @@ class AbacEvaluateResponseSingleSourceTest {
         assertTrue(contract.contains("#142/B4-3e-4"), "本批收口标记缺失");
         assertTrue(contract.contains("GuardrailDecisionContract"),
                 "两份契约的分工（义务词表／envelope 读数）登记缺失");
+        // #142/B4-3e-6（D-B4-41）：折叠纪律与树形态读数点必须留在单源里
+        assertTrue(contract.contains("D-B4-41") && contract.contains("#142/B4-3e-6"),
+                "单源丢失 D-B4-41 的折叠纪律登记 ⇒ \"只调 isExplicitAllow 即合规\"的误读会回来");
+        assertTrue(contract.contains("verdictOfTree"),
+                "树形态读数点缺失 ⇒ 认知侧的 JsonNode 消费形态又要自己抄一份判定顺序");
     }
 
     // ── 验收 5：判据自身可信（反向 fixture + 剥离器可靠性） ──────────────────

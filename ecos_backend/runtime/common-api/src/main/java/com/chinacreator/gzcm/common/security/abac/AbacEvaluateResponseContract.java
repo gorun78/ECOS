@@ -1,6 +1,9 @@
 package com.chinacreator.gzcm.common.security.abac;
 
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Locale;
 import java.util.Map;
@@ -27,7 +30,10 @@ import java.util.Map;
  * <p><b>读数≠判定</b>：本类只把应答翻译成三态，不产生业务结论；
  * {@link Verdict#UNEVALUATED} 的含义是「应答里没有可识别裁决」，调用方必须报
  * 503／FAIL_CLOSED，禁折叠成 403 策略拒绝（§4.7.2「不可用 ≠ 无权限」、
- * {@link GuardrailDecisionContract#isUnevaluated}）。</p>
+ * {@link GuardrailDecisionContract#isUnevaluated}）。
+ * <b>只调 {@link #isExplicitAllow} 不构成合规</b>：该方法对 DENY 与 UNEVALUATED 都返回
+ * {@code false}，用它做布尔结论即把两态折叠成一态（差距 <b>D-B4-41</b>，
+ * #142/B4-3e-6 收口：咽喉侧必须取 {@link #verdictOf}／{@link #verdictOfTree} 的三态并分态上报）。</p>
  */
 public final class AbacEvaluateResponseContract {
 
@@ -161,6 +167,28 @@ public final class AbacEvaluateResponseContract {
     public static boolean isExplicitAllow(Object dataSegment) {
         return verdictOf(dataSegment) == Verdict.ALLOW;
     }
+
+    /**
+     * {@code JsonNode} 形态应答的同一读数入口（#142/B4-3e-6，差距 <b>D-B4-41</b>）。
+     *
+     * <p><b>为什么要有第二支</b>：以 {@code RestTemplate}/{@code WebClient} 取 {@code JsonNode}
+     * 的读侧（实测唯一一支＝认知 {@code SecurityPolicyReviewRoleDecider}）此前把三态判断
+     * 手抄在消费方里 —— 布尔键缺失时 {@code data.path("allow").asBoolean(false)} 直接落
+     * {@code false} ⇒ 「护栏没说话」被折叠成「策略判了拒绝」（403），而 403 与 503 的
+     * 用户可见结论不同（§4.7.2「不可用 ≠ 无权限」）。转换放在单源内，是为了让树形态
+     * 与 Map 形态共用<b>同一条判定顺序</b>，避免消费方各写一份"看起来等价"的翻译。
+     * 非对象节点（数组/标量/缺失/null）一律 {@link Verdict#UNEVALUATED}，不做递归放宽。</p>
+     */
+    public static Verdict verdictOfTree(JsonNode dataNode) {
+        if (dataNode == null || !dataNode.isObject()) {
+            return Verdict.UNEVALUATED;
+        }
+        return verdictOf(TREE.convertValue(dataNode, new TypeReference<Map<String, Object>>() {
+        }));
+    }
+
+    /** 只用于把 {@code JsonNode} 应答摊成 {@link #verdictOf} 的输入形态，不做任何业务绑定。 */
+    private static final ObjectMapper TREE = new ObjectMapper();
 
     /**
      * 两种 envelope 形态归一。

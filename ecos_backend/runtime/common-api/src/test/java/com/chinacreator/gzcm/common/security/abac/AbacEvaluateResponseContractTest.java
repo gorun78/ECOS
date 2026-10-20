@@ -2,6 +2,8 @@ package com.chinacreator.gzcm.common.security.abac;
 
 import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract.Verdict;
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -29,6 +31,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 收口前只认第二代，而现网应答只有第一代。</p>
  */
 class AbacEvaluateResponseContractTest {
+
+    /** 只用于把夹具摊成 JsonNode，验证树形态读数与 Map 形态同判（D-B4-41）。 */
+    private static final ObjectMapper TREE = new ObjectMapper();
 
     /** 现契约形态：{@code data} 段摊平，裁决键＝{@code allow}。 */
     private static Map<String, Object> data(Object... kv) {
@@ -211,5 +216,61 @@ class AbacEvaluateResponseContractTest {
         assertEquals(GuardrailDecisionContract.KEY_ALLOW, AbacEvaluateResponseContract.KEY_ALLOW);
         assertEquals("fallback", AbacEvaluateResponseContract.VALUE_SOURCE_FALLBACK);
         assertEquals("DENY_OPA_DOWN", AbacEvaluateResponseContract.VALUE_FALLBACK_DENY_OPA_DOWN);
+    }
+
+    // ── 二、JsonNode 形态与 Map 形态同判（#142/B4-3e-6，D-B4-41） ─────────────
+
+    @Test
+    @DisplayName("树形态读数与 Map 形态逐形一致：两种消费形态共用同一条判定顺序")
+    void treeReadingParityWithMapReading() {
+        List<Map<String, Object>> forms = List.of(
+                data(GuardrailDecisionContract.KEY_ALLOW, true),
+                data(GuardrailDecisionContract.KEY_ALLOW, false),
+                data(AbacEvaluateResponseContract.KEY_SOURCE,
+                        AbacEvaluateResponseContract.VALUE_SOURCE_FALLBACK,
+                        GuardrailDecisionContract.KEY_ALLOW, false),
+                data(AbacEvaluateResponseContract.KEY_FALLBACK,
+                        AbacEvaluateResponseContract.VALUE_FALLBACK_DENY_OPA_DOWN),
+                data("opaError", "boom"),
+                data(GuardrailDecisionContract.KEY_POLICY_STATE,
+                        GuardrailDecisionContract.STATE_POLICY_UNDEFINED),
+                data(GuardrailDecisionContract.KEY_POLICY_STATE, GuardrailDecisionContract.STATE_DENY),
+                data(AbacEvaluateResponseContract.KEY_DECISION, "permit"),
+                data(AbacEvaluateResponseContract.KEY_ALLOW, "maybe"),
+                data(GuardrailDecisionContract.KEY_POLICY_REF, "rbac"));
+        for (Map<String, Object> form : forms) {
+            JsonNode node = TREE.valueToTree(form);
+            assertEquals(AbacEvaluateResponseContract.verdictOf(form),
+                    AbacEvaluateResponseContract.verdictOfTree(node),
+                    "树形态与 Map 形态读数分叉（同一份判定顺序被复制成两份）: " + form);
+        }
+    }
+
+    @Test
+    @DisplayName("树形态的非对象节点（缺失/null/数组/标量）一律 UNEVALUATED，不做递归放宽")
+    void nonObjectTreeNodesAreUnevaluated() {
+        assertEquals(Verdict.UNEVALUATED, AbacEvaluateResponseContract.verdictOfTree(null));
+        assertEquals(Verdict.UNEVALUATED, AbacEvaluateResponseContract.verdictOfTree(
+                TREE.nullNode()));
+        assertEquals(Verdict.UNEVALUATED, AbacEvaluateResponseContract.verdictOfTree(
+                TREE.createArrayNode().add(Boolean.FALSE)));
+        assertEquals(Verdict.UNEVALUATED, AbacEvaluateResponseContract.verdictOfTree(
+                TREE.getNodeFactory().booleanNode(false)),
+                "标量布尔不得在树形态被直接读成 DENY —— 那等于把 D-B4-41 的折叠换个位置复发");
+        assertEquals(Verdict.UNEVALUATED, AbacEvaluateResponseContract.verdictOfTree(
+                TREE.createObjectNode()));
+    }
+
+    @Test
+    @DisplayName("折叠口径的反面证据：isExplicitAllow 对 DENY 与 UNEVALUATED 同值，故咽喉必须取三态")
+    void booleanHelperCannotDistinguishDenyFromUnevaluated() {
+        assertFalse(AbacEvaluateResponseContract.isExplicitAllow(
+                data(GuardrailDecisionContract.KEY_ALLOW, false)));
+        assertFalse(AbacEvaluateResponseContract.isExplicitAllow(
+                data(GuardrailDecisionContract.KEY_POLICY_REF, "rbac")));
+        assertEquals(Verdict.DENY, AbacEvaluateResponseContract.verdictOf(
+                data(GuardrailDecisionContract.KEY_ALLOW, false)));
+        assertEquals(Verdict.UNEVALUATED, AbacEvaluateResponseContract.verdictOf(
+                data(GuardrailDecisionContract.KEY_POLICY_REF, "rbac")));
     }
 }
