@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.common.security.guardrail;
 
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
+import com.chinacreator.gzcm.common.testscan.SourceCommentStripper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -127,11 +128,15 @@ class GuardrailObligationVocabularySingleSourceTest {
         }
     }
 
-    /** 只判代码行为：块注释与行注释一律抹平（换行保留 ⇒ 违例定位仍可读）。 */
+    /**
+     * 只判代码行为：块注释与行注释一律抹平（换行保留 ⇒ 违例定位仍可读）。
+     *
+     * <p>口径单源在 {@link SourceCommentStripper}：朴素正则会把字符串里的 {@code //}
+     * 当行注释起点，连带整行代码一起吃掉 ⇒ 消费方枚举假阴性（D-B4-40）。
+     * 由 {@code NaiveCommentStripperBanTest} 全域禁止改回正则。</p>
+     */
     private static String stripComments(String source) {
-        return source
-                .replaceAll("(?s)/\\*.*?\\*/", " ")
-                .replaceAll("//[^\\n]*", " ");
+        return SourceCommentStripper.strip(source);
     }
 
     private static List<Scanned> backendMainSources() {

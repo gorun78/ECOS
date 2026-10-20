@@ -41,11 +41,7 @@ class CognitiveSqlDialectTest {
 
     /** 剥离块/行注释（保行数）：红线只管 SQL 字面量，Javadoc 里的禁词示例不是违例。 */
     static String stripComments(String src) {
-        String noBlock = java.util.regex.Pattern.compile("(?s)/\\*.*?\\*/").matcher(src)
-                .replaceAll(mr -> java.util.regex.Matcher.quoteReplacement(
-                        mr.group().replaceAll("[^\\n]", "")));
-        return java.util.regex.Pattern.compile("//[^\\n]*").matcher(noBlock)
-                .replaceAll(mr -> java.util.regex.Matcher.quoteReplacement(""));
+        return CogScope.stripComments(src);
     }
 
     private static void scan(Pattern p, String label, String src, java.nio.file.Path f, List<String> sink) {

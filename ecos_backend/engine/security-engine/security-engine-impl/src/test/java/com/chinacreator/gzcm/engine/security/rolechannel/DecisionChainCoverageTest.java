@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.security.rolechannel;
 
+import com.chinacreator.gzcm.engine.security.testscan.SourceCommentStripper;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -145,10 +147,9 @@ class DecisionChainCoverageTest {
         return blob;
     }
 
-    /** 剥 {@code /* ... *}{@code /}（含 javadoc）与 {@code //} 行注释；只用于本类扫描面。 */
+    /** 剥块注释与行注释（保行数）；只用于本类扫描面，口径单源见 {@link SourceCommentStripper}。 */
     private static String stripComments(String src) {
-        return src.replaceAll("(?s)/\\*.*?\\*/", " ")
-                .replaceAll("(?m)//[^\\n]*", " ");
+        return SourceCommentStripper.strip(src);
     }
 
     /** 本模块测试源码根（与 {@link #everyDecisionShapedCaseIsReplayedViaUniqueEntry()} 同根）。 */

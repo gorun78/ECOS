@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.security;
 
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
+import com.chinacreator.gzcm.engine.ai.testscan.SourceCommentStripper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -114,9 +115,7 @@ class RateLimitObligationConsumerGateTest {
 
     /** 只判代码行为：块注释与行注释一律抹平（换行保留 ⇒ 违例行号仍可定位）。 */
     private static String stripComments(String source) {
-        return source
-                .replaceAll("(?s)/\\*.*?\\*/", " ")
-                .replaceAll("//[^\\n]*", " ");
+        return SourceCommentStripper.strip(source);
     }
 
     private static String codeOf(String relativePath) {

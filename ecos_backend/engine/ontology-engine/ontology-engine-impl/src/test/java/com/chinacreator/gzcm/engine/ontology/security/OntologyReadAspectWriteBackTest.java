@@ -33,6 +33,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
+import com.chinacreator.gzcm.engine.ontology.testscan.SourceCommentStripper;
 
 /**
  * 本体读切面的<b>写回</b>门禁（#142/B4-3d-8，差距 D-B4-34）。
@@ -518,7 +519,6 @@ class OntologyReadAspectWriteBackTest {
     }
 
     private static String stripComments(String src) {
-        return src.replaceAll("/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/", " ")
-                .replaceAll("(?m)//.*$", " ");
+        return SourceCommentStripper.strip(src);
     }
 }

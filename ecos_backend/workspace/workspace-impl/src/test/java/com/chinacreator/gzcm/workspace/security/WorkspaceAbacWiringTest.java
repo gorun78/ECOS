@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.workspace.security;
 
+import com.chinacreator.gzcm.workspace.testscan.SourceCommentStripper;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException;
@@ -176,7 +177,6 @@ class WorkspaceAbacWiringTest {
     }
 
     private static String stripComments(String src) {
-        return src.replaceAll("/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/", " ")
-                .replaceAll("//[^\\r\\n]*", " ");
+        return SourceCommentStripper.strip(src);
     }
 }

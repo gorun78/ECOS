@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.cognitive2.guard;
 
+import com.chinacreator.gzcm.engine.cognitive2.testscan.SourceCommentStripper;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -63,11 +65,7 @@ public final class CogScope {
 
     /** 剥离块/行注释（保行数）：源码门禁只判代码，Javadoc 里的禁词示例不是违例。 */
     public static String stripComments(String src) {
-        String noBlock = java.util.regex.Pattern.compile("(?s)/\\*.*?\\*/").matcher(src)
-                .replaceAll(mr -> java.util.regex.Matcher.quoteReplacement(
-                        mr.group().replaceAll("[^\\n]", "")));
-        return java.util.regex.Pattern.compile("//[^\\n]*").matcher(noBlock)
-                .replaceAll(mr -> java.util.regex.Matcher.quoteReplacement(""));
+        return SourceCommentStripper.strip(src);
     }
 
     /** 遍历某 root 下所有 .java（用于 pom / DDL 等定点扫描），跳过 test 目录（跨平台）。 */

@@ -5,6 +5,7 @@ import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolDecision;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolObligations;
 import com.chinacreator.gzcm.engine.ai.service.ToolExecutorService;
+import com.chinacreator.gzcm.engine.ai.testscan.SourceCommentStripper;
 import com.chinacreator.gzcm.engine.ai.service.ToolRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -361,9 +362,7 @@ class ObligationsApplyTest {
      * 但代码里出现 URL 字面量或 {@code PATH_*} 常量就是自行拼请求 = §2.5 底座泄漏。
      */
     private static String stripComments(String source) {
-        return source
-                .replaceAll("(?s)/\\*.*?\\*/", " ")
-                .replaceAll("//[^\\n]*", " ");
+        return SourceCommentStripper.strip(source);
     }
 
     private static List<Path> aiEngineMainSources() {

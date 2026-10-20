@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.common.security.abac;
 
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
+import com.chinacreator.gzcm.common.testscan.SourceCommentStripper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -180,50 +181,12 @@ class AbacEvaluateResponseSingleSourceTest {
      * <p>同族门禁沿用的朴素正则 {@code replaceAll("//[^\\n]*", " ")} 会把
      * {@code postForObject("http://localhost:8080/api/v1/policy-engine/evaluate", …)}
      * 整行吃掉 —— 本批实测正是靠它才发现 {@code CheckPermissionTool} 在朴素口径下
-     * <b>从消费集里消失</b>。同一个盲区只要落在违例行上，就会把"有违例"读成"无违例"，
-     * 所以这里不用正则，改状态机；{@code codeDoesNotStripUrlCommentMarkers} 反向钉住这条。</p>
+     * <b>从消费集里消失</b>（差距 <b>D-B4-40</b>）。口径实现单源在
+     * {@link SourceCommentStripper}，本处只作委托；{@code codeDoesNotStripUrlCommentMarkers}
+     * 与 {@code NaiveCommentStripperBanTest} 双向钉住"不得改回正则"。</p>
      */
     private static String stripComments(String src) {
-        StringBuilder out = new StringBuilder(src.length());
-        int i = 0;
-        int n = src.length();
-        while (i < n) {
-            char c = src.charAt(i);
-            char d = i + 1 < n ? src.charAt(i + 1) : '\0';
-            if (c == '/' && d == '*') {
-                i += 2;
-                while (i < n && !(src.charAt(i) == '*' && i + 1 < n && src.charAt(i + 1) == '/')) i++;
-                i += 2;
-                out.append(' ');
-            } else if (c == '/' && d == '/') {
-                while (i < n && src.charAt(i) != '\n') i++;
-                out.append(' ');
-            } else if (c == '"' || c == '\'') {
-                char quote = c;
-                out.append(c);
-                i++;
-                while (i < n) {
-                    char s = src.charAt(i);
-                    if (s == '\\' && i + 1 < n) {
-                        out.append(s).append(src.charAt(i + 1));
-                        i += 2;
-                        continue;
-                    }
-                    if (s == quote) {
-                        out.append(s);
-                        i++;
-                        break;
-                    }
-                    if (s == '\n') break; // 未闭合字面量（异常源码）：保守停在行尾
-                    out.append(s);
-                    i++;
-                }
-            } else {
-                out.append(c);
-                i++;
-            }
-        }
-        return out.toString();
+        return SourceCommentStripper.strip(src);
     }
 
     private static List<Scanned> backendMainSources() {
@@ -449,7 +412,7 @@ class AbacEvaluateResponseSingleSourceTest {
         assertTrue(stripComments(urlOnly).contains("policy-engine/evaluate"),
                 "引号感知剥离失灵 ⇒ 消费集枚举会漏掉整支消费方（D-B4-40 的成因）");
         // 朴素正则口径确实会吃掉这一行：把它当"反面证据"钉住，防止有人改回正则
-        assertTrue(urlOnly.replaceAll("//[^\\n]*", " ").indexOf("policy-engine/evaluate") < 0,
+        assertTrue(SourceCommentStripper.naiveStrip(urlOnly).indexOf("policy-engine/evaluate") < 0,
                 "反面证据失效：正则不再吃掉 URL ⇒ D-B4-40 的登记依据需要重写");
 
         // ④ 豁免粒度不可外溢：换一个文件用同一读法必须仍被识别

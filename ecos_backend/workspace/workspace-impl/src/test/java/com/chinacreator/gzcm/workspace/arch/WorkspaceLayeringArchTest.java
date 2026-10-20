@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.workspace.arch;
 
+import com.chinacreator.gzcm.workspace.testscan.SourceCommentStripper;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -152,8 +153,7 @@ class WorkspaceLayeringArchTest {
 
     /** 剥离行注释与块注释，只留代码本体 —— 注释里的表名是文档陈述，不计 SQL 违约。 */
     private static String stripComments(String src) {
-        return src.replaceAll("/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/", " ")
-                .replaceAll("//[^\\r\\n]*", " ");
+        return SourceCommentStripper.strip(src);
     }
 
     private static Path mainSourceRoot() {

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.workspace.security;
 
+import com.chinacreator.gzcm.workspace.testscan.SourceCommentStripper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -318,8 +319,7 @@ class PageChannelDecisionLegGateTest {
 
     /** 剥块注释与行注释（与既有跨模块门禁同口径，避免注释里的示例字面量造成假命中）。 */
     private static String stripComments(String src) {
-        return src.replaceAll("/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/", " ")
-                .replaceAll("//[^\\r\\n]*", " ");
+        return SourceCommentStripper.strip(src);
     }
 }
 

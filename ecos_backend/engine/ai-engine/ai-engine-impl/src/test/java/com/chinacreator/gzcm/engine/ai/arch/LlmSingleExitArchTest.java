@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.arch;
 
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
+import com.chinacreator.gzcm.engine.ai.testscan.SourceCommentStripper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -119,7 +120,7 @@ class LlmSingleExitArchTest {
 
     /** 去注释后再匹配，避免文档/日志文案里的端点名造成误判（与 ObligationsApplyTest 同口径）。 */
     private static String stripComments(String source) {
-        return source.replaceAll("(?s)/\\*.*?\\*/", " ").replaceAll("//[^\\n]*", " ");
+        return SourceCommentStripper.strip(source);
     }
 
     private static boolean containsIdentifier(String code, String identifier) {

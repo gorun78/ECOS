@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.kb.service;
 import com.chinacreator.gzcm.engine.kb.KgSyncService;
 import com.chinacreator.gzcm.engine.kb.dao.EcosKnowledgeGraphDao;
 import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
+import com.chinacreator.gzcm.engine.kb.testscan.SourceCommentStripper;
 import com.chinacreator.gzcm.runtime.access.graph.Neo4jClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -121,21 +123,26 @@ class GraphDualFormTest {
     @Test
     void noReadyToSyncLiteralRemains() throws IOException {
         Pattern lit = Pattern.compile("ready_to_sync");
-        List<String> offenders = Files.walk(MAIN_SRC)
-                .filter(Files::isRegularFile)
-                .filter(p -> p.toString().endsWith(".java"))
-                .flatMap(p -> {
-                    try {
-                        return Files.readAllLines(p, StandardCharsets.UTF_8)
-                                .stream().map(l -> l.replaceAll("//.*$", "").replaceAll(".*//", ""));
-                    } catch (IOException e) {
-                        return Stream.<String>empty();
-                    }
-                })
-                // 剔除 Javadoc 注释行（含 {@code ready_to_sync} 的说明性文字），只保留真实代码行
-                .filter(l -> !l.contains("*"))
-                .filter(l -> lit.matcher(l).find())
-                .toList();
+        // 口径改为引号感知剥离整份文件后再逐行判（D-B4-40）：历史写法用
+        // l.replaceAll(".*//", "") + 剔除含 * 的行，既吃掉 URL 字面量、又把
+        // 通配 import／乘法表达式里的真代码行整体排除在扫描面外＝双重假阴性面。
+        List<String> offenders = new ArrayList<>();
+        List<Path> files;
+        try (Stream<Path> walk = Files.walk(MAIN_SRC)) {
+            files = walk.filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".java"))
+                    .toList();
+        }
+        for (Path f : files) {
+            String code = SourceCommentStripper.strip(
+                    new String(Files.readAllBytes(f), StandardCharsets.UTF_8));
+            String[] lines = code.split("\n", -1);
+            for (int i = 0; i < lines.length; i++) {
+                if (lit.matcher(lines[i]).find()) {
+                    offenders.add(MAIN_SRC.relativize(f) + ":" + (i + 1) + " " + lines[i].trim());
+                }
+            }
+        }
         assertTrue(offenders.isEmpty(),
                 "kb 主源码发现 ready_to_sync 伪成功字面量残留（F04-10 伪成功清零）: " + offenders);
     }

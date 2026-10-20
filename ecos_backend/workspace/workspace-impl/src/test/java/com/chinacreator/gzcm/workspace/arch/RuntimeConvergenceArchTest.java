@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.workspace.arch;
 
+import com.chinacreator.gzcm.workspace.testscan.SourceCommentStripper;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -134,8 +135,7 @@ class RuntimeConvergenceArchTest {
 
     /** 剥离行注释与块注释（同 WorkspaceLayeringArchTest 口径）。 */
     private static String stripComments(String src) {
-        return src.replaceAll("/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/", " ")
-                .replaceAll("//[^\\r\\n]*", " ");
+        return SourceCommentStripper.strip(src);
     }
 
     private static Path mainSourceRoot() {

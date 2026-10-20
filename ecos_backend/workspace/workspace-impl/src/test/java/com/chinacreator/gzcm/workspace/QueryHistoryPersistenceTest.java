@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.workspace;
 
+import com.chinacreator.gzcm.workspace.testscan.SourceCommentStripper;
 import com.chinacreator.gzcm.workspace.repository.QueryHistoryEntry;
 import com.chinacreator.gzcm.workspace.repository.QueryHistoryRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -172,9 +173,8 @@ class QueryHistoryPersistenceTest {
             base = Path.of("workspace-impl/src/main/java/com/chinacreator/gzcm/workspace");
         }
         // 判据源=代码本体；Javadoc 里对 X-55 反例的描述不计违约（同 WorkspaceLayeringArchTest 口径）
-        return Files.readString(base.resolve(relativeToWorkspacePkg), StandardCharsets.UTF_8)
-                .replaceAll("/\\*[^*]*\\*+(?:[^/*][^*]*\\*+)*/", " ")
-                .replaceAll("//[^\\r\\n]*", " ");
+        return SourceCommentStripper.strip(
+                Files.readString(base.resolve(relativeToWorkspacePkg), StandardCharsets.UTF_8));
     }
 
     /** 铁律 §2.5：JdbcTemplate 只准出现在 repository 层，本类的判据源就是这条。 */
