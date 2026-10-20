@@ -21,6 +21,16 @@
  * <p>本域另有跨族意义：`/v1/cognitive/beliefs?domain={}`、`/v1/workspace/scenarios`、
  * `/v1/workspace/scenarios/{}` 三族的裸面属主在本批后归零，只认裸字面量的旧判据对它们更瞎
  * ——由 `urlFamilyDualFormRatchet` 按实测重钉，不在本门重复断言。</p>
+ *
+ * <p>#145/B6-2 追加口径（本门形状变了，必须记清防误读）：该批把本域 `workbench/index.tsx`、
+ * `workbench/[scenarioId]/index.tsx`、`ScenarioManagementView.tsx` 三文件共 **5** 条
+ * `/v1/workspace/scenarios` 族腿**上收**到族单源 `services/scenarioActionClient.ts` 的
+ * `WORKSPACE_SCENARIOS_BASE`（该常量本身仍是 `${API_BASE}` 派生态 ⇒ 基址单源性质**传递成立**）。
+ * 于是本门两条断言的形状改了：① "每文件恰有 1 条 API_BASE 导入" 对这三文件不再成立（合法地变 0），
+ * 改为「API_BASE 至多 1 条，为 0 时必须有且仅有 1 条族单源导入腿」；② 面值快照**不剪腿**——
+ * `derivedValues` 增解 `${WORKSPACE_SCENARIOS_BASE}…` 与裸引用两种形态，17 条面值仍逐字还原，
+ * 这样"改基址写法"与"偷偷删请求"在红绿上可分辨（剪腿会让快照变 12 条却看着像进度）。
+ * 三文件是否真的只挪了属主、没动族体，由 `b6WorkspaceScenariosSingleSource.spec.ts` 按 HEAD 快照守恒承证。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -28,6 +38,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../../services/httpClient';
+import { WORKSPACE_SCENARIOS_BASE } from '../../services/scenarioActionClient';
 
 const PAGES_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -66,6 +77,9 @@ const HARDCODED_RE = /["'`]\/api\b/;
 
 /** 派生形态：`` `${API_BASE}<path>` ``，捕获组即拼出来的路径段。 */
 const DERIVED_RE = /`\$\{API_BASE\}((?:\\.|(?!`)[^\\])*)`/g;
+/** #145/B6-2 起本域三文件改取的族单源形态：`` `${WORKSPACE_SCENARIOS_BASE}<path>` ``。 */
+const FAM_SITE_RE = /`\$\{WORKSPACE_SCENARIOS_BASE\}((?:\\.|(?!`)[^\\])*)`/g;
+const FAM_NAME = 'WORKSPACE_SCENARIOS_BASE';
 
 function isComment(line: string): boolean {
   const t = line.trim();
@@ -103,11 +117,24 @@ function walk(dir: string, out: string[]): string[] {
   return out;
 }
 
-/** 把派生点还原成运行期字符串面值（`${…}` 插值按字面保留，改前后同一写法）。 */
+/**
+ * 把派生点还原成运行期字符串面值（`${…}` 插值按字面保留，改前后同一写法）。
+ * #145/B6-2 起增解族单源两种形态：模板腿 `` `${WORKSPACE_SCENARIOS_BASE}/x` `` 与**裸引用**
+ * `apiFetchData(WORKSPACE_SCENARIOS_BASE)`。裸引用必须先摘掉模板腿再数，且导入行不计，
+ * 否则一条腿会被计两次（模板 + 裸名）或把 import 语句当成一次请求。
+ */
 function derivedValues(src: string): string[] {
   const out: string[] = [];
   for (const line of codeLines(src)) {
     for (const m of line.matchAll(DERIVED_RE)) out.push(`${API_BASE}${m[1]}`);
+    if (/^\s*import\s/.test(line)) continue;
+    let rest = line;
+    for (const m of line.matchAll(FAM_SITE_RE)) {
+      rest = rest.split(m[0]).join('');
+      out.push(`${WORKSPACE_SCENARIOS_BASE}${m[1]}`);
+    }
+    const bare = rest.split(FAM_NAME).length - 1;
+    for (let i = 0; i < bare; i += 1) out.push(WORKSPACE_SCENARIOS_BASE);
   }
   return out;
 }
@@ -155,12 +182,30 @@ describe('pages/ 场景域基址单源 — 私设基址清零 (#143/B5-23)', () 
     expect(smv, 'ScenarioManagementView.tsx 仍有私设基址').toEqual([]);
   });
 
-  it('八文件一律从 httpClient 导入 API_BASE（第二处来源即红）', () => {
+  it('基址来源唯一：API_BASE 至多 1 条 httpClient 导入；上收到族单源的文件必须恰有 1 条族单源导入腿 (#143/B5-23 / #145/B6-2)', () => {
+    const importLines = (rel: string) =>
+      codeLines(read(rel)).filter((l) => l.trimStart().startsWith('import '));
     for (const { rel, importPath } of FILES) {
-      const imports = codeLines(read(rel)).filter((l) => /\bAPI_BASE\b/.test(l) && l.trimStart().startsWith('import '));
-      expect(imports.length, `${rel} 应有且仅有 1 条 API_BASE 导入`).toBe(1);
-      expect(imports[0]).toContain(`from '${importPath}'`);
+      const imports = importLines(rel);
+      const apiImports = imports.filter((l) => /\bAPI_BASE\b/.test(l));
+      expect(apiImports.length, `${rel} 的 API_BASE 导入不得多于 1 条`).toBeLessThanOrEqual(1);
+      if (apiImports.length === 1) expect(apiImports[0]).toContain(`from '${importPath}'`);
+      const famImports = imports.filter((l) => l.includes(FAM_NAME));
+      expect(famImports.length, `${rel} 的族单源导入不得多于 1 条（第二处来源即红）`).toBeLessThanOrEqual(1);
+      if (apiImports.length === 0) {
+        expect(famImports.length, `${rel} 已无 API_BASE 导入 ⇒ 必须恰有一条族单源导入腿`).toBe(1);
+        expect(famImports[0]).toMatch(/from '[^']*services\/scenarioActionClient'/);
+      }
     }
+    // 上收面必须**恰好**是这三文件：多一个说明扫描根漂了，少一个说明有文件被静默改成零来源（假绿）
+    const moved = FILES.filter(({ rel }) => importLines(rel).some((l) => l.includes(FAM_NAME)))
+      .map((f) => f.rel)
+      .sort();
+    expect(moved).toEqual([
+      'ScenarioManagementView.tsx',
+      'workbench/[scenarioId]/index.tsx',
+      'workbench/index.tsx',
+    ]);
   });
 
   it('派生形态唯一：`${API_BASE}` 后必接 /（防漏段），八文件零 /api/api 双前缀', () => {

@@ -20,6 +20,8 @@ import { CopilotPanel } from '../components/CopilotPanel';
 import GitPanel from '../components/data-workbench/GitPanel';
 import { apiFetchData } from '../api';
 import { API_BASE } from '../services/httpClient';
+// #145/B6-2：场景集合基址单源（services/scenarioActionClient 导出），页面不再自拼 /v1/workspace/scenarios
+import { WORKSPACE_SCENARIOS_BASE } from '../services/scenarioActionClient';
 import logger from '../services/logger';
 import type { BusinessScenario } from './project-workbench/types';
 import { calcMetrics } from './project-workbench/helpers';
@@ -153,7 +155,7 @@ export default function ScenarioManagementView({
   // ── 场景列表：真实 API（替代 localStorage mock） ──
   const refreshScenarios = async () => {
     try {
-      const d = await apiFetchData<ScenarioApiVO[]>(`${API_BASE}/v1/workspace/scenarios`);
+      const d = await apiFetchData<ScenarioApiVO[]>(WORKSPACE_SCENARIOS_BASE);
       const list = (Array.isArray(d) ? d : []).map(toVM);
       setScenarios(list);
       if (list.length > 0 && !list.some((s) => s.id === selectedScenarioId)) {
@@ -339,13 +341,13 @@ export default function ScenarioManagementView({
     };
     try {
       if (wizardScenarioId) {
-        await apiFetchData(`${API_BASE}/v1/workspace/scenarios/${wizardScenarioId}`, {
+        await apiFetchData(`${WORKSPACE_SCENARIOS_BASE}/${wizardScenarioId}`, {
           method: 'PUT',
           body: JSON.stringify(body),
         });
         toast('success', t('scenario.cog.saveSuccess', { name: wName }));
       } else {
-        const created = await apiFetchData<{ id: string }>(`${API_BASE}/v1/workspace/scenarios`, {
+        const created = await apiFetchData<{ id: string }>(WORKSPACE_SCENARIOS_BASE, {
           method: 'POST',
           body: JSON.stringify(body),
         });

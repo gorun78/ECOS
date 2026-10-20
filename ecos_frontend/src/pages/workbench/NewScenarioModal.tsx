@@ -14,7 +14,9 @@ import Modal from '../../components/common/Modal';
 import LucideIcon from '../../components/LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
-import { API_BASE, apiFetchData } from '../../api';
+import { apiFetchData } from '../../api';
+// #145/B6-2：场景集合基址单源
+import { WORKSPACE_SCENARIOS_BASE } from '../../services/scenarioActionClient';
 import { showToastGlobal } from '../../components/common/Toast';
 import logger from '../../services/logger';
 
@@ -30,8 +32,8 @@ interface CreatedScenarioVO {
   id?: string;
 }
 
-/** 创建端点完整 URL：前缀由 httpClient#API_BASE 单源派生（W206/C188 基址单源） */
-const SCENARIOS_URL = `${API_BASE}/v1/workspace/scenarios`;
+/** 创建端点完整 URL：基址由 services/scenarioActionClient 的 WORKSPACE_SCENARIOS_BASE 单源持有（#145/B6-2） */
+const SCENARIOS_URL = WORKSPACE_SCENARIOS_BASE;
 
 export default function NewScenarioModal({
   isOpen,

@@ -17,7 +17,8 @@ import { useLanguage } from '../../../components/LanguageContext';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
 import { useCognition } from '../../../hooks/useCognition';
 import { apiFetchData } from '../../../api';
-import { API_BASE } from '../../../services/httpClient';
+// #145/B6-2：场景集合基址单源（页面不再自拼 /v1/workspace/scenarios）
+import { WORKSPACE_SCENARIOS_BASE } from '../../../services/scenarioActionClient';
 import type { OperationEvalRow } from '../../../services/cognitiveClient';
 import {
   isScenarioActionError,
@@ -65,7 +66,7 @@ export default function WorkbenchScenarioDetail() {
     setError(null);
     setNotFound(false);
     setDenied(false);
-    apiFetchData<ScenarioDetailVO>(`${API_BASE}/v1/workspace/scenarios/${scenarioId}`)
+    apiFetchData<ScenarioDetailVO>(`${WORKSPACE_SCENARIOS_BASE}/${scenarioId}`)
       .then((d) => {
         if (!cancelled) setScenario(d);
       })

@@ -39,14 +39,20 @@ import { API_BASE, rawAuthedJsonUrlFetch } from './httpClient';
 /** workspace 域基址（派生自 API_BASE，不重复定义前缀）。 */
 const WORKSPACE_BASE = `${API_BASE}/v1/workspace`;
 
+/**
+ * 场景集合基址单源：`/api/v1/workspace/scenarios`（#145/B6-2）。
+ * 本域三个 URL 工厂与页面域四文件一律取该常量，不再各自拼 `/v1/workspace/scenarios`。
+ */
+export const WORKSPACE_SCENARIOS_BASE = `${API_BASE}/v1/workspace/scenarios`;
+
 /** 场景动作集合：`/api/v1/workspace/scenarios/{id}/actions`。 */
 export function scenarioActionsUrl(scenarioId: string): string {
-  return `${WORKSPACE_BASE}/scenarios/${encodeURIComponent(scenarioId)}/actions`;
+  return `${WORKSPACE_SCENARIOS_BASE}/${encodeURIComponent(scenarioId)}/actions`;
 }
 
 /** 场景决策流：`/api/v1/workspace/scenarios/{id}/decisions`。 */
 export function scenarioDecisionsUrl(scenarioId: string): string {
-  return `${WORKSPACE_BASE}/scenarios/${encodeURIComponent(scenarioId)}/decisions`;
+  return `${WORKSPACE_SCENARIOS_BASE}/${encodeURIComponent(scenarioId)}/decisions`;
 }
 
 /** 动作审批：`/api/v1/workspace/actions/{actionId}/approve`。 */
@@ -56,7 +62,7 @@ export function actionApproveUrl(actionId: string): string {
 
 /** 场景清单：`/api/v1/workspace/scenarios`（GET 全量列表，决策面板边界内只投影 id/name/businessGoal/status）。 */
 export function workspaceScenariosUrl(): string {
-  return `${WORKSPACE_BASE}/scenarios`;
+  return WORKSPACE_SCENARIOS_BASE;
 }
 
 // ── 五必填单源（与 ActionProposalValidator 逐字对齐）────

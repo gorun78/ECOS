@@ -15,7 +15,8 @@ import { useTheme, type ThemeStyles } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { apiFetchData } from '../../api';
-import { API_BASE } from '../../services/httpClient';
+// #145/B6-2：场景集合基址单源（页面不再自拼 /v1/workspace/scenarios）
+import { WORKSPACE_SCENARIOS_BASE } from '../../services/scenarioActionClient';
 import logger from '../../services/logger';
 import NewScenarioModal from './NewScenarioModal';
 
@@ -44,7 +45,7 @@ export default function WorkbenchHome() {
     setLoading(true);
     setError(null);
     try {
-      const d = await apiFetchData<ScenarioSummaryVO[]>(`${API_BASE}/v1/workspace/scenarios`);
+      const d = await apiFetchData<ScenarioSummaryVO[]>(WORKSPACE_SCENARIOS_BASE);
       setScenarios(Array.isArray(d) ? d : []);
       setOffline(false);
     } catch (e) {

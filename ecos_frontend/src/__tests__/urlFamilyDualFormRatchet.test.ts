@@ -60,6 +60,19 @@
  *      的具体子路径腿（graph.ts 2 处、overview.ts 3 处、wiki.ts 6 处、knowledgeClient.ts 3 处）**保持原样**，
  *      故族面 258 一点未动。后继 B6 批若要连子路径一起合流，必须预期族面会降，且那降是可见性变化
  *      而非新增重复——不得反过来当成"族面变小=债少了"。
+ * #145/B6-2 复跑 = 680 / **257** / 裸面 **0** / 派生面 **323** / dupBoth **27** / dupRawOnly **0** /
+ * blind **27**：存量债第二批收口 **两族一对**——`/v1/workspace/scenarios`（3 属主）与
+ * `/v1/workspace/scenarios/{}`（2 属主），五文件合一为 `services/scenarioActionClient.ts` 导出的
+ * `WORKSPACE_SCENARIOS_BASE` 单源，四页面改成 import。本批与 B6-1 有两处形状差，都必须记清：
+ *   ① **族面第一次下降**（258→257）：`/v1/workspace/scenarios/{}` 的两个属主（ScenarioManagementView +
+ *      `[scenarioId]/index`）是本批**唯一**写出该族体的人，收口后该族在生产面一条构造点都不剩 ⇒
+ *      族从 `familiesOf` 索引里整体消失。这正是 B6-1 文件头 ② 预告过的「连子路径一起合流则族面必降」
+ *      的兑现，降的是**可见性**，不是新增重复；`dupBoth` 的账仍只按属主数记（29→27 即两族退出）。
+ *   ② derSites 328→323 的 **5 点净差额 = 删 6 增 1**：改前 6 条 `` `${API_BASE}/v1/workspace/scenarios…` ``
+ *      （两页面根腿 3+1+1、详情腿 1）被单源取代，改后只剩属主的 1 条基址声明。同 B6-1：点数是副产物，
+ *      不记进度。
+ * 收口的 9 条腿是否一条不少、面值是否一字未改，**不在本门证明范围内**（本门对隐形腿无能为力），
+ * 由同批新增的 `b6WorkspaceScenariosSingleSource.spec.ts` 用常量解析器按 HEAD 快照守恒承证。
  * 逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。
@@ -72,8 +85,9 @@
  * 棘轮口径 = **族 → 属主清单**（两侧都只减不增）：
  *   新族出现在重复面 → 红；基线族新增属主 → 红；基线族/属主已不再重复 → 陈旧豁免亦红
  *   （与 privateTransportRatchet「陈旧豁免即红」同口径：基线预算不留给已收口的项）。
- *   本门**不宣称**证明单源成立——基线剩 29 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
- *   `/v1/knowledge` 一族后 29 族 62 属主，余属 B6 后续批），
+ *   本门**不宣称**证明单源成立——基线剩 27 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
+ *   `/v1/knowledge` 一族后 29 族 62 属主，#145/B6-2 收口 `/v1/workspace/scenarios` 两族一对后 27 族 57 属主，
+ *   余属 B6 后续批），
  *   本门钉死的是「债不再增 + 派生态不再隐身」。
  *
  * 三防恒绿：
@@ -223,8 +237,6 @@ const BASELINE: Readonly<Record<string, readonly string[]>> = Object.freeze({
   '/v1/ontology/proposals': ['pages/ScenarioManagementView.tsx', 'pages/aiworkbench/api.ts', 'services/ontology/ontologyProposalApi.ts'],
   '/v1/pipeline/definitions': ['api/dataClient.ts', 'pages/aiworkbench/api.ts', 'pages/data-workbench/api/_base.ts'],
   '/v1/system/organizations/tree': ['api/iamClient.ts', 'pages/WorldModelViewer.tsx'],
-  '/v1/workspace/scenarios': ['pages/ScenarioManagementView.tsx', 'pages/workbench/NewScenarioModal.tsx', 'pages/workbench/index.tsx'],
-  '/v1/workspace/scenarios/{}': ['pages/ScenarioManagementView.tsx', 'pages/workbench/[scenarioId]/index.tsx'],
 });
 
 describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 (#143/B5-19 / D-B5-40)', () => {
@@ -275,7 +287,7 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 真降（本批 334→**328**，差额恰为被删的 6 条 `${API_BASE}/v1/knowledge` 基址声明）。
     // 恒等式的含义由此从「点数守恒」退成「点数等于本批实跑读出」，仍是有效的防空扫/防漂移钉，
     // 但**不得**再拿它的升降当进度：债的收敛只认 dupBoth 下降（见文件头 B5-25 归因）。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(328);
+    expect(snapshot.rawSites + snapshot.derSites).toBe(323);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     expect(dupBoth.size).toBeGreaterThan(dupRawOnly.size);
@@ -294,10 +306,14 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `KNOWLEDGE_BASE` + 6 文件改为 import」⇒ **dupBoth 30 → 29**、BASELINE 同批剪除该族（属主 69 → 62）。
     // 这是本门建成（#143/B5-19）以来 dupBoth 的**第一次真实下降**，与 B5-21~26 各批的「原地不动」相对：
     // 那六批改的是形态、本批改的是生产方个数，正是文件头「dupBoth 下降才代表存量债真收敛」的兑现。
-    expect(dupBoth.size).toBe(29);
+    // #145/B6-2（存量债第二批）：`/v1/workspace/scenarios` 三属主 + `/v1/workspace/scenarios/{}` 两属主
+    // 合一为 `services/scenarioActionClient.ts` 的 `WORKSPACE_SCENARIOS_BASE` 单源 ⇒ **dupBoth 29 → 27**、
+    // BASELINE 同批剪除两族（属主 62 → 57）。族面 258 → 257 的 1 族消失是**可见性**变化（该详情族的
+    // 两个属主恰是本批唯一写出族体的人），不是新增重复，归因见文件头 ①。
+    expect(dupBoth.size).toBe(27);
     expect(dupRawOnly.size).toBe(0);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(29);
+    expect(blind.length).toBe(27);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);
@@ -329,9 +345,12 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
   it('基线自身可校验：族面/属主面形态合规且与实跑读出同数', () => {
     const entries = Object.entries(BASELINE);
     // #145/B6-1 起 29 族 / 62 属主（`/v1/knowledge` 一族 7 属主收口单源，与本批同款改动同批剪除）
-    expect(entries.length).toBe(29);
-    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(62);
+    // #145/B6-2 起 27 族 / 57 属主（`/v1/workspace/scenarios` 两族一对共 5 属主收口单源，同批剪除）
+    expect(entries.length).toBe(27);
+    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(57);
     expect(BASELINE['/v1/knowledge']).toBeUndefined();
+    expect(BASELINE['/v1/workspace/scenarios']).toBeUndefined();
+    expect(BASELINE['/v1/workspace/scenarios/{}']).toBeUndefined();
     for (const [fam, owners] of entries) {
       expect(fam.startsWith('/v1/')).toBe(true);
       expect(fam.includes('\\')).toBe(false);
