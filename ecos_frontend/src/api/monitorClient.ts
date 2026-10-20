@@ -10,10 +10,21 @@ import type {
 import { API_BASE, apiFetchData, doFetch } from "../services/httpClient";
 
 // ── World Model Viewer ────────────────────────────────────────
-const WM_BASE = `${API_BASE}/v1/ecos/world-model-graph`;
+/**
+ * `/v1/ecos/world-model-graph` 族根单源（#145/B6-10 属主上收）。
+ *
+ * <p>**改前形状**：本文件私有 `WM_BASE`（9 枚腿）＋ `services/worldModelGraphApi.ts` 私有 `WMG`
+ * （5 枚腿）＝在册重复族两属主。取本文件当属主：本域是 world-model 端点的正典实现面，
+ * 且 `api → services` 是本仓既有依赖方向（同判例 #145/B6-8：`services/datanetMetadataApi.ts`
+ * 从 `api/dataClient.ts` 取 `DATANET_METADATA_BASE`）。服务侧改从这里 import，不得另立面值。</p>
+ *
+ * <p>写成 `${API_BASE}` 派生态而非裸字面量，理由同 #145/B6-1 ② 判例：族根本体必须在
+ * 棘轮双形态面里恰有 1 个构造点，否则是关掉可见性而非减债。</p>
+ */
+export const ECOS_WORLD_MODEL_GRAPH_BASE = `${API_BASE}/v1/ecos/world-model-graph`;
 
 export async function fetchWorldGoals(): Promise<Goal[]> {
-  const resp = await doFetch(`${WM_BASE}/goals`);
+  const resp = await doFetch(`${ECOS_WORLD_MODEL_GRAPH_BASE}/goals`);
   const arr = resp?.data?.data;  // API returns {data:{data:[...],total}}
   if (Array.isArray(arr)) return arr as Goal[];
   return [];
@@ -21,7 +32,7 @@ export async function fetchWorldGoals(): Promise<Goal[]> {
 
 export async function fetchWorldScenarios(): Promise<Scenario[]> {
   try {
-    const resp = await doFetch(`${WM_BASE}/scenarios`);
+    const resp = await doFetch(`${ECOS_WORLD_MODEL_GRAPH_BASE}/scenarios`);
     const arr = resp?.data?.data;
     if (Array.isArray(arr)) return arr as Scenario[];
   } catch { /* not yet available */ }
@@ -29,7 +40,7 @@ export async function fetchWorldScenarios(): Promise<Scenario[]> {
 }
 
 export async function fetchWorldCausalLinks(): Promise<CausalLink[]> {
-  const resp = await doFetch(`${WM_BASE}/links`);
+  const resp = await doFetch(`${ECOS_WORLD_MODEL_GRAPH_BASE}/links`);
   const arr = resp?.data?.data;
   if (Array.isArray(arr)) return arr as CausalLink[];
   return [];
@@ -37,13 +48,13 @@ export async function fetchWorldCausalLinks(): Promise<CausalLink[]> {
 
 export async function fetchWorldCausalGraph(): Promise<any> {
   try {
-    return await doFetch(`${WM_BASE}/causal-graph`);
+    return await doFetch(`${ECOS_WORLD_MODEL_GRAPH_BASE}/causal-graph`);
   } catch { /* not yet available */ }
   return { nodes: [], edges: [] };
 }
 
 export async function fetchWorldGoalTree(): Promise<any> {
-  const resp = await doFetch(`${WM_BASE}/goals/tree`);
+  const resp = await doFetch(`${ECOS_WORLD_MODEL_GRAPH_BASE}/goals/tree`);
   return resp?.data ?? [];
 }
 
@@ -56,19 +67,19 @@ export async function fetchWorldModelAll(): Promise<[any, any, any, any, any]> {
 }
 
 export async function createWorldModelItem(type: string, body: any): Promise<any> {
-  return doFetch(`${WM_BASE}/${type}`, { method: "POST", body: JSON.stringify(body) });
+  return doFetch(`${ECOS_WORLD_MODEL_GRAPH_BASE}/${type}`, { method: "POST", body: JSON.stringify(body) });
 }
 
 export async function updateWorldModelItem(type: string, id: string, body: any): Promise<any> {
-  return doFetch(`${WM_BASE}/${type}/${id}`, { method: "PUT", body: JSON.stringify(body) });
+  return doFetch(`${ECOS_WORLD_MODEL_GRAPH_BASE}/${type}/${id}`, { method: "PUT", body: JSON.stringify(body) });
 }
 
 export async function deleteWorldModelItem(type: string, id: string): Promise<any> {
-  return doFetch(`${WM_BASE}/${type}/${id}`, { method: "DELETE" });
+  return doFetch(`${ECOS_WORLD_MODEL_GRAPH_BASE}/${type}/${id}`, { method: "DELETE" });
 }
 
 export async function compareWorldScenarios(body: any): Promise<any> {
-  return doFetch(`${WM_BASE}/compare`, { method: "POST", body: JSON.stringify(body) });
+  return doFetch(`${ECOS_WORLD_MODEL_GRAPH_BASE}/compare`, { method: "POST", body: JSON.stringify(body) });
 }
 
 // ── Pareto Optimization ───────────────────────────────────────
@@ -131,7 +142,7 @@ export async function paretoFromScenario(body: { scenarioId?: string }): Promise
 }
 
 // ── P2-4: Causal Graph (Neo4j-backed) ─────────────────────────
-const CAUSAL_BASE = WM_BASE; // 单值收敛：因果图与世界模型图同前缀（原同值双别名，X-50）
+const CAUSAL_BASE = ECOS_WORLD_MODEL_GRAPH_BASE; // 单值收敛：因果图与世界模型图同前缀（原同值双别名，X-50）
 
 export async function fetchCausalGraph(): Promise<any> {
   return doFetch(`${CAUSAL_BASE}/causal-graph`);

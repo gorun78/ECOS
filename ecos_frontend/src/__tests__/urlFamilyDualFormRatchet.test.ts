@@ -220,6 +220,31 @@
  *      `` `${API_BASE}/v1/…` `` ⇒ 族留在索引、只退出 dupBoth，第二裸面写手即红。
  * 收口的 3 族 6 枚属主合并后的面值守恒与属主唯一性不在本门证明范围内，
  * 由同批新增的 `b6EngineFamiliesSingleSource.spec.ts` 承证。
+ * #145/B6-10 复跑 = 680 / **253** / 裸面 **0** / 派生面 **290** / dupBoth **9** / dupRawOnly **0** /
+ * blind **9**（改前 680 / 253 / 0 / 294 / 12 / 0 / 12 = 上一批落地后工作树的同门实跑读出，非推算）：
+ * 存量债第十批收口 **ecos 域三族各两属主**——`/v1/ecos/ontologies`
+ * （`components/ontology-workbench/OntologyDomainPanel.tsx` 的 `ONTOLOGY_API` 与 `ENTITY_API`
+ * ——同文件两枚常量、同一面值，加上 `pages/business-workbench/BusinessWorkbenchLayout.tsx`
+ * 的 `ENGINES` 取数腿——本批唯一「两属主都在页面侧」的族）、
+ * `/v1/ecos/versions`（`pages/knowledge/tabs/DataWorkbenchImportTab.tsx` ＋
+ * `services/ontology/ontologyVersionApi.ts` 的私有 `VERSION_BASE`）、
+ * `/v1/ecos/world-model-graph`（`api/monitorClient.ts` 的私有 `WM_BASE` ＋
+ * `services/worldModelGraphApi.ts` 的私有 `WMG`）。三处形状须记清：
+ *   ① **两属主都在页面侧 ⇒ 属主落服务侧**：ontologies 族两个写手都是页面，任挑其一都会让另一侧
+ *      「页面→页面」取常量（分层倒置，B6-9 ① 同判据），故新建 `ECOS_ONTOLOGIES_BASE` 落在
+ *      `services/ontology/ontologyModelApi.ts`——该文件本就是 `/v1/ecos/ontologies` 的正典实现面。
+ *   ② **api → services 方向已有判例**：world-model-graph 族两属主分属 api 层与 services 层，
+ *      属主裁到 `api/monitorClient.ts`（腿多的一侧＝正典实现），服务侧反向 import——与 #145/B6-8
+ *      的 `services/datanetMetadataApi.ts → api/dataClient.ts` 同方向，不成环。
+ *   ③ **同值双别名一并收**：`monitorClient.ts` 内 `const CAUSAL_BASE = WM_BASE;` 改前是同族第三个
+ *      构造点（面值同值），改后引属主常量 ⇒ 它不在 DER_RE 面里，族根构造点计数仍恰 1。
+ *   ④ derSites 294→290 = 删 5 枚消费/声明点（OntologyDomainPanel 2 ＋ BusinessWorkbenchLayout 1 ＋
+ *      DataWorkbenchImportTab 1 ＋ worldModelGraphApi 的 `WMG` 声明 1）、增 1 枚新建属主声明
+ *      （`ECOS_ONTOLOGIES_BASE`；另两枚是私有升导出）。净 −4 全属形态搬运，不计进度；
+ *      账只记 dupBoth 12→9 与属主 24→18。族面 253 一点不降：三族族根声明各剩 1 枚且仍写
+ *      `` `${API_BASE}/v1/…` `` ⇒ 第二裸面写手即红。
+ * 收口的 3 族 6 枚属主合并后的面值守恒与属主唯一性不在本门证明范围内，
+ * 由同批新增的 `b6EcosFamiliesSingleSource.spec.ts` 承证。
  * 逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。
@@ -368,9 +393,6 @@ const BASELINE: Readonly<Record<string, readonly string[]>> = Object.freeze({
   '/v1/audit/stats': ['api/securityClient.ts', 'pages/SecurityAudit.tsx'],
   '/v1/cognitive/beliefs?domain={}': ['pages/scenario/OverrideTab.tsx', 'pages/scenario/ReplayTab.tsx'],
   '/v1/dq': ['api/dataClient.ts', 'pages/data-quality/api/_base.ts'],
-  '/v1/ecos/ontologies': ['components/ontology-workbench/OntologyDomainPanel.tsx', 'pages/business-workbench/BusinessWorkbenchLayout.tsx'],
-  '/v1/ecos/versions': ['pages/knowledge/tabs/DataWorkbenchImportTab.tsx', 'services/ontology/ontologyVersionApi.ts'],
-  '/v1/ecos/world-model-graph': ['api/monitorClient.ts', 'services/worldModelGraphApi.ts'],
   '/v1/engine/data/pipeline/runs/{}': ['pages/data-workbench/api/pipeline.ts', 'pages/data-workbench/pipeline-editor/PipelineExecutionMonitor.tsx'],
   '/v1/guardrails/policies': ['pages/aiworkbench/api.ts', 'services/cognitiveEngineApi.ts'],
   '/v1/ontology/data': ['services/ontology/ontologyDataApi.ts', 'services/ontologyWorkbenchApi.ts'],
@@ -447,7 +469,12 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `ENGINE_META.data.configPath`、`DataEngineConfigPanel.tsx` 的 PUT 保存腿），
     // 增 1 枚新建属主声明（`api/dataClient.ts` 的 `DATA_ENGINE_SETTINGS_BASE`）；
     // cognitive/ontology 两枚声明只是私有升导出、位上未增未减。净 −3 全属形态搬运，不计进度。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(294);
+    // #145/B6-10：294 → **290** = 删 5 枚 `` `${API_BASE}` `` 站点（`OntologyDomainPanel.tsx` 同文件两枚
+    // 同值常量 `ONTOLOGY_API`/`ENTITY_API` ＋ `BusinessWorkbenchLayout.tsx` 的 `ENGINES` 取数腿 ＋
+    // `DataWorkbenchImportTab.tsx` 的版本列表腿 ＋ `worldModelGraphApi.ts` 的私有 `WMG` 声明）、
+    // 增 1 枚新建属主声明（`services/ontology/ontologyModelApi.ts` 的 `ECOS_ONTOLOGIES_BASE`；
+    // `ECOS_VERSIONS_BASE`/`ECOS_WORLD_MODEL_GRAPH_BASE` 只是私有升导出、位上未增未减）。净 −4 全属形态搬运。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(290);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     expect(dupBoth.size).toBeGreaterThan(dupRawOnly.size);
@@ -517,10 +544,18 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // = 删 4 枚消费点（MonitoringCenter 2 ＋ EngineMonitor 1 ＋ DataEngineConfigPanel 1）、
     // 增 1 枚属主声明（`api/dataClient.ts` 的 `DATA_ENGINE_SETTINGS_BASE`；另两枚常量本来就在属主文件里，
     // 只是从私有升为导出）——净 −3 全属形态搬运，账只记 dupBoth 与属主两栏。
-    expect(dupBoth.size).toBe(12);
+    // #145/B6-10（存量债第十批）：ecos 域三族各两属主——`/v1/ecos/ontologies`
+    // （`components/ontology-workbench/OntologyDomainPanel.tsx` 的同文件两枚同值常量 ＋
+    // `pages/business-workbench/BusinessWorkbenchLayout.tsx` 的取数腿）、
+    // `/v1/ecos/versions`（`pages/knowledge/tabs/DataWorkbenchImportTab.tsx` ＋
+    // `services/ontology/ontologyVersionApi.ts`）、`/v1/ecos/world-model-graph`
+    // （`api/monitorClient.ts` ＋ `services/worldModelGraphApi.ts`）收口为三枚导出常量单源
+    // ⇒ **dupBoth 12 → 9**、BASELINE 同批剪除三行（属主 24 → 18）。族面 253 一点不降：三族各留
+    // 1 枚写成 `` `${API_BASE}/v1/…` `` 的族根声明 ⇒ 第二裸面写手即红（同 B6-9 形状）。
+    expect(dupBoth.size).toBe(9);
     expect(dupRawOnly.size).toBe(0);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(12);
+    expect(blind.length).toBe(9);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);
@@ -571,8 +606,15 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `pages/EngineMonitor.tsx` + `pages/data-workbench/DataEngineConfigPanel.tsx`——收口为三枚导出常量
     // （`COGNITIVE_ENGINE_BASE` / `ONTOLOGY_ENGINE_BASE` / `DATA_ENGINE_SETTINGS_BASE`），同批剪除三行；
     // 三族族根声明各留 1 枚 ⇒ 族面 253 不降、只退出重复面，归因见文件头 B6-9 段）
-    expect(entries.length).toBe(12);
-    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(24);
+    // #145/B6-10 起 9 族 / 18 属主（ecos 域三族各两属主——`/v1/ecos/ontologies` 为
+    // `components/ontology-workbench/OntologyDomainPanel.tsx`（同文件两枚同值常量）+
+    // `pages/business-workbench/BusinessWorkbenchLayout.tsx`，`/v1/ecos/versions` 为
+    // `pages/knowledge/tabs/DataWorkbenchImportTab.tsx` + `services/ontology/ontologyVersionApi.ts`，
+    // `/v1/ecos/world-model-graph` 为 `api/monitorClient.ts` + `services/worldModelGraphApi.ts`——
+    // 收口为三枚导出常量（`ECOS_ONTOLOGIES_BASE` / `ECOS_VERSIONS_BASE` /
+    // `ECOS_WORLD_MODEL_GRAPH_BASE`），同批剪除三行；三族族根声明各留 1 枚 ⇒ 族面 253 不降）
+    expect(entries.length).toBe(9);
+    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(18);
     expect(BASELINE['/v1/knowledge']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios/{}']).toBeUndefined();
@@ -589,6 +631,9 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     expect(BASELINE['/v1/engine/cognitive']).toBeUndefined();
     expect(BASELINE['/v1/engine/ontology']).toBeUndefined();
     expect(BASELINE['/v1/engine/data/settings']).toBeUndefined();
+    expect(BASELINE['/v1/ecos/ontologies']).toBeUndefined();
+    expect(BASELINE['/v1/ecos/versions']).toBeUndefined();
+    expect(BASELINE['/v1/ecos/world-model-graph']).toBeUndefined();
     for (const [fam, owners] of entries) {
       expect(fam.startsWith('/v1/')).toBe(true);
       expect(fam.includes('\\')).toBe(false);

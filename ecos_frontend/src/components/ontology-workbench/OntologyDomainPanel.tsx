@@ -12,7 +12,7 @@ import { Globe, Box, Database, Layers, Plus, Pencil, Trash2, X, Save, Loader2 } 
 import { useTheme } from '../ThemeContext';
 import { useLanguage } from '../LanguageContext';
 import { ontologyDomainApiFetch as apiFetch } from '../../services/ontologyWorkbenchApi';
-import { API_BASE } from '../../services/httpClient';
+import { ECOS_ONTOLOGIES_BASE } from '../../services/ontologyApi';
 
 // ── 本体 → 图标映射 ──
 const ONTOLOGY_ICONS: Record<string, React.FC<{ className?: string }>> = {
@@ -21,16 +21,14 @@ const ONTOLOGY_ICONS: Record<string, React.FC<{ className?: string }>> = {
 };
 
 // ── API helpers ──
-const ONTOLOGY_API = `${API_BASE}/v1/ecos/ontologies`;
-const ENTITY_API = `${API_BASE}/v1/ecos/ontologies`; // {ontologyId}/entities
-
+// `/v1/ecos/ontologies` 族根单源常量（#145/B6-10 属主上收至 services/ontology/ontologyModelApi.ts）
 async function fetchOntologies(): Promise<OntologyItem[]> {
-  return apiFetch(ONTOLOGY_API);
+  return apiFetch(ECOS_ONTOLOGIES_BASE);
 }
 
 async function fetchEntityCount(ontologyId: string): Promise<number> {
   try {
-    const data = await apiFetch(`${ENTITY_API}/${ontologyId}/entities`);
+    const data = await apiFetch(`${ECOS_ONTOLOGIES_BASE}/${ontologyId}/entities`);
     return Array.isArray(data) ? data.length : 0;
   } catch {
     return 0;
@@ -110,7 +108,7 @@ export default function OntologyDomainPanel({
     if (!formCode || !formName) return;
     setSaving(true);
     try {
-      await apiFetch(ONTOLOGY_API, {
+      await apiFetch(ECOS_ONTOLOGIES_BASE, {
         method: 'POST',
         body: JSON.stringify({ code: formCode, name: formName, description: formDescription }),
       });
@@ -131,7 +129,7 @@ export default function OntologyDomainPanel({
     if (!editingId || !formName) return;
     setSaving(true);
     try {
-      await apiFetch(`${ONTOLOGY_API}/${editingId}`, {
+      await apiFetch(`${ECOS_ONTOLOGIES_BASE}/${editingId}`, {
         method: 'PUT',
         body: JSON.stringify({ name: formName, description: formDescription }),
       });
@@ -149,7 +147,7 @@ export default function OntologyDomainPanel({
     if (!deletingId) return;
     setSaving(true);
     try {
-      await apiFetch(`${ONTOLOGY_API}/${deletingId}`, { method: 'DELETE' });
+      await apiFetch(`${ECOS_ONTOLOGIES_BASE}/${deletingId}`, { method: 'DELETE' });
       setDeletingId(null);
       // 如果删除的是当前选中，切到第一个
       if (deletingId === ontologyId && ontologies.length > 1) {

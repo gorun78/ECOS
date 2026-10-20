@@ -13,9 +13,8 @@
  * @ `/api/v1/world-model`，`data.stub=true`），是否把腿改挂过去属入口定档，
  * 触 R-52① ⇒ 待产品裁决，本批不动 URL。
  */
-import { API_BASE, apiFetchData } from "./httpClient";
-
-const WMG = `${API_BASE}/v1/ecos/world-model-graph`;
+import { apiFetchData } from "./httpClient";
+import { ECOS_WORLD_MODEL_GRAPH_BASE } from "../api/monitorClient";
 
 async function getJson(url: string, errorMessage?: string): Promise<any> {
   try {
@@ -40,21 +39,21 @@ async function postJson(url: string, errorMessage?: string, body?: unknown): Pro
 }
 
 export function fetchWorldStateJson(errorMessage?: string): Promise<any> {
-  return getJson(`${WMG}/state`, errorMessage);
+  return getJson(`${ECOS_WORLD_MODEL_GRAPH_BASE}/state`, errorMessage);
 }
 
 export function fetchScenariosJson(errorMessage?: string): Promise<any> {
-  return getJson(`${WMG}/scenarios`, errorMessage);
+  return getJson(`${ECOS_WORLD_MODEL_GRAPH_BASE}/scenarios`, errorMessage);
 }
 
 export function fetchCausalGraphJson(errorMessage?: string): Promise<any> {
-  return getJson(`${WMG}/causal-graph`, errorMessage);
+  return getJson(`${ECOS_WORLD_MODEL_GRAPH_BASE}/causal-graph`, errorMessage);
 }
 
 export function postSimulationJson(scenario: Record<string, unknown>, errorMessage?: string): Promise<any> {
-  return postJson(`${WMG}/scenarios`, errorMessage, scenario);
+  return postJson(`${ECOS_WORLD_MODEL_GRAPH_BASE}/scenarios`, errorMessage, scenario);
 }
 
 export function postStrategyRecommendJson(goal: string, errorMessage?: string): Promise<any> {
-  return postJson(`${WMG}/strategy/recommend?goal=${encodeURIComponent(goal)}`, errorMessage);
+  return postJson(`${ECOS_WORLD_MODEL_GRAPH_BASE}/strategy/recommend?goal=${encodeURIComponent(goal)}`, errorMessage);
 }

@@ -86,6 +86,34 @@ const RAW_PRE_BATCH_URL_LITERALS: readonly string[] = [
 
 const PRE_BATCH_URL_LITERALS: readonly string[] = RAW_PRE_BATCH_URL_LITERALS.map((s) => s.slice(1, -1));
 
+/**
+ * 后续批**净新增**到本域的 `` `${API_BASE}` `` 属主声明台账（只增需登记，不登记即红）。
+ *
+ * <p>#145/B6-10 起有 1 条：`/v1/ecos/ontologies` 族根单源上收进 `ontologyModelApi.ts`。
+ * 同一批的 `ECOS_VERSIONS_BASE` **不进这本账**——`git show HEAD` 实读该声明位改前就是
+ * `const VERSION_BASE = \`\${API_BASE}/v1/ecos/versions\`;`（第 18 行），本批只改名并 export，
+ * 面值原本就在 17 条快照里 ⇒ 计数不变。ontologies 那枚则不同：改前本文件只有 `import { API_BASE }`
+ * 与 `const BASE = \`\${API_BASE}/v1/ecos\`` 两处派生位，五枚 ontologies 腿一律写
+ * `\`\${BASE}/ontologies…\``（私有 BASE 派生态，不在 `DERIVED_RE` 面）⇒ 族根面值
+ * `/api/v1/ecos/ontologies` 改前在本域**不存在**，属主上收是净新增声明位。
+ * 故快照必须保持 17 条**逐字是改前面值**，新增位单列，两类判据各自成立。</p>
+ */
+const OWNER_DECL_ADDITIONS: ReadonlyArray<{
+  batch: string;
+  file: string;
+  name: string;
+  value: string;
+  why: string;
+}> = [
+  {
+    batch: '#145/B6-10',
+    file: 'ontologyModelApi.ts',
+    name: 'ECOS_ONTOLOGIES_BASE',
+    value: '/api/v1/ecos/ontologies',
+    why: '族两属主分在两个页面侧文件（OntologyDomainPanel 两枚私有常量 + BusinessWorkbenchLayout 取数腿），改前本域该面值只以 `${BASE}` 私有派生态存在 ⇒ 页面反向引页面不可行，属主按 import 图落服务侧正典实现文件，声明位净新增',
+  },
+];
+
 describe('services/ontology 域基址单源 — 私设基址清零 (#143/B5-17)', () => {
   it('前提：API_BASE 单源取值 = "/api"（派生即取值不变的根据）', () => {
     expect(API_BASE).toBe('/api');
@@ -117,11 +145,31 @@ describe('services/ontology 域基址单源 — 私设基址清零 (#143/B5-17)'
     }
   });
 
-  it('面值逐字不变：还原后的 URL 多重集 = 改前快照（17 条，HEAD 实跑读出）', () => {
+  it('面值逐字不变：还原后的 URL 多重集 = 改前快照 + 后续批属主声明台账（17 + 1 条）', () => {
     const all: string[] = [];
     for (const rel of FILES) all.push(...derivedValues(read(rel)));
-    expect(all.length).toBe(17);
-    expect([...all].sort()).toEqual([...PRE_BATCH_URL_LITERALS].sort());
+    expect(all.length).toBe(18);
+    expect([...all].sort()).toEqual([...PRE_BATCH_URL_LITERALS, ...OWNER_DECL_ADDITIONS.map((o) => o.value)].sort());
+  });
+
+  it('#145/B6-10 属主声明台账：本域新增的 ${API_BASE} 声明位逐条登记且面值可追到属主常量', () => {
+    // 快照 17 条是 **#143/B5-17 改前**实跑读出的消费腿面值，代表「派生不该改变运行期面值」这条不变式。
+    // 后续 B6 批把某个族的**属主常量上收进本域文件**时，声明位可能是**净新增**（不是搬运），
+    // 混进快照会让「改前根本不存在这条腿」失真；单列台账才能同时保住两条判据：
+    //   ① 快照 17 条逐字不动（谁把消费腿面值改了即红）；
+    //   ② 新增声明位逐条登记（谁再加一枚未登记的 `${API_BASE}` 声明即红，防属主面悄悄膨胀）。
+    expect(OWNER_DECL_ADDITIONS.length).toBe(1);
+    for (const o of OWNER_DECL_ADDITIONS) {
+      const src = read(o.file);
+      expect(derivedValues(src), `${o.file} 找不到登记的属主声明面值`).toContain(o.value);
+      // 声明形状用**字符串拼接**比对（不用 RegExp：反引号/`${` 的正则转义在本类文件里极易写出语法洞）
+      const declNeedle = 'export const ' + o.name + ' = `' + '${API_BASE}' + o.value.slice('/api'.length) + '`;';
+      expect(src, `${o.file} 的 ${o.name} 声明形状异常（必须写 API_BASE 派生态、不得回退裸字面量）`).toContain(declNeedle);
+      expect(FILES).toContain(o.file);
+    }
+    // 反向自检：判据本身能变红（防台账退化成空数组时的恒真绿）。
+    expect(derivedValues(read('ontologyModelApi.ts'))).not.toContain('/api/v1/fixture/not-declared');
+    expect(OWNER_DECL_ADDITIONS.every((o) => o.value.startsWith('/api/'))).toBe(true);
   });
 
   it('快照自身可校验：17 条 = 13 引号 + 4 反引号且全部以 /api/ 开头（防快照清空成恒真）', () => {

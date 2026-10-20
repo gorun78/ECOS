@@ -30,6 +30,22 @@ export const DEFAULT_ONTOLOGY_ID = "ont001";
 /** API 基础路径 */
 const BASE = `${API_BASE}/v1/ecos`;
 
+/**
+ * `/v1/ecos/ontologies` 族根单源（#145/B6-10 属主上收）。
+ *
+ * <p>**改前形状**：两枚页面侧文件各写一份族根体——`components/ontology-workbench/OntologyDomainPanel.tsx`
+ * 的 `ONTOLOGY_API` 与 `ENTITY_API`（同文件两枚常量、同一面值）＋
+ * `pages/business-workbench/BusinessWorkbenchLayout.tsx` 的 `ENGINES` 取数腿——
+ * 是双形态棘轮在册的重复族。两属主都在页面侧，谁当属主都会让另一侧反向引页面（分层倒置），
+ * 故落本域服务侧：本文件既有 `${BASE}/ontologies` 五枚腿就是该端点的正典实现，
+ * 族根常量与它的正典消费面同域，两个页面经门面 `services/ontologyApi.ts` 取值。</p>
+ *
+ * <p>**为什么写 `${API_BASE}` 派生态而不是 `${BASE}/ontologies`**：棘轮的双形态面只扫 `${API_BASE}`
+ * 派生态，若从 `BASE` 派生则该族在生产面零构造点＝把可见性关掉而不减债（#145/B6-1 ② 判例）。
+ * 写成派生态后族根本体在册恰 1 条，再冒第二个裸面写手即变红。</p>
+ */
+export const ECOS_ONTOLOGIES_BASE = `${API_BASE}/v1/ecos/ontologies`;
+
 // ================================================================
 // 本体基础类型定义 (T2: 由 api.ts 收敛迁移至此)
 // 原位置: api.ts "Ontology Designer" 段落中的 export interface
@@ -80,7 +96,7 @@ export interface OntologyRelationship {
 
 /** 动态路径拼接 (T2 备注: 此函数仅作为私有 helper, 不对前端页面暴露) */
 const ontPath = (ontologyId: string, path: string) =>
-  `${BASE}/ontologies/${ontologyId}${path}`;
+  `${ECOS_ONTOLOGIES_BASE}/${ontologyId}${path}`;
 
 /** 实体列表摘要 — 仅保留 code/name/description/entityType (T2: 由 api.ts 收敛迁移至此) */
 export interface EntityListItem {
@@ -95,7 +111,7 @@ export interface EntityListItem {
  * T2: 由 api.ts GET /api/v1/ecos/ontologies/ont001/entities 收敛迁移至此
  */
 export async function fetchEntityList(): Promise<EntityListItem[]> {
-  return apiFetchData<EntityListItem[]>(`${BASE}/ontologies/ont001/entities`);
+  return apiFetchData<EntityListItem[]>(`${ECOS_ONTOLOGIES_BASE}/ont001/entities`);
 }
 
 // ================================================================
@@ -119,14 +135,14 @@ export async function fetchKnowledgeGraph(): Promise<KnowledgeGraphResponse> {
  * GET /api/v1/ecos/ontologies
  */
 export async function fetchOntologies(): Promise<Array<{ id: string; code: string; name: string; version?: string; status?: string; description?: string }>> {
-  return apiFetchData(`${BASE}/ontologies`);
+  return apiFetchData(ECOS_ONTOLOGIES_BASE);
 }
 
 /**
  * 创建本体
  */
 export async function createOntology(data: { code: string; name: string; description?: string }): Promise<any> {
-  return apiFetchData(`${BASE}/ontologies`, {
+  return apiFetchData(ECOS_ONTOLOGIES_BASE, {
     method: "POST",
     body: JSON.stringify(data),
   });
@@ -136,7 +152,7 @@ export async function createOntology(data: { code: string; name: string; descrip
  * 更新本体
  */
 export async function updateOntology(id: string, data: { name?: string; description?: string; status?: string }): Promise<any> {
-  return apiFetchData(`${BASE}/ontologies/${id}`, {
+  return apiFetchData(`${ECOS_ONTOLOGIES_BASE}/${id}`, {
     method: "PUT",
     body: JSON.stringify(data),
   });
@@ -146,7 +162,7 @@ export async function updateOntology(id: string, data: { name?: string; descript
  * 删除本体
  */
 export async function deleteOntology(id: string): Promise<void> {
-  await apiFetchData(`${BASE}/ontologies/${id}`, { method: "DELETE" });
+  await apiFetchData(`${ECOS_ONTOLOGIES_BASE}/${id}`, { method: "DELETE" });
 }
 
 // ================================================================

@@ -74,6 +74,7 @@ import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../services/httpClient';
 import { ONTOLOGY_MAPPINGS_BASE } from '../services/ontology/ontologyMappingApi';
 import { COMPLIANCE_RULES_BASE } from '../pages/knowledge/services/wiki';
+import { ECOS_VERSIONS_BASE } from '../services/ontology/ontologyVersionApi';
 
 // 本门位于 `src/__tests__/`，到 `src/` 的相对深度是一档
 const SRC_ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -105,7 +106,7 @@ const FILES: ReadonlyArray<{ rel: string; importPath: string; sites: number }> =
 const MULTILINE_REL = 'pages/knowledge/pages/components/govern/RuleRepoTable.tsx';
 const JSX_REL = 'pages/knowledge/tabs/GraphBuilderTab.tsx';
 /**
- * 被后续存量债批上收到**族单源常量**的本批文件（#145/B6-4 一枚 → #145/B6-7 两枚）。这些页的
+ * 被后续存量债批上收到**族单源常量**的本批文件（#145/B6-4 一枚 → #145/B6-7 两枚 → #145/B6-10 三枚）。这些页的
  * `API_BASE` 导入合法归零 ⇒ 本门「导入腿恰 1 条」对它们必须换成「恰 1 条族单源导入腿且取自属主」。
  * 面快照**不剪腿**（`faceValues` 接住模板腿 + 裸引用两种形态），剪腿会让 19 条掉到 18 条却看着像进度。
  *
@@ -123,6 +124,12 @@ const FAMILY_OWNER: ReadonlyMap<string, { name: string; ownerRe: RegExp }> = new
   [
     MULTILINE_REL,
     { name: 'COMPLIANCE_RULES_BASE', ownerRe: /from '[^']*services\/wiki'/ },
+  ],
+  // #145/B6-10：版本列表腿上收到 `services/ontology/ontologyVersionApi.ts` 的 `ECOS_VERSIONS_BASE`，
+  // 页面经门面 `services/ontologyApi.ts` 取值 ⇒ ownerRe 认门面路径而非分册路径。
+  [
+    'pages/knowledge/tabs/DataWorkbenchImportTab.tsx',
+    { name: 'ECOS_VERSIONS_BASE', ownerRe: /from '[^']*services\/ontologyApi'/ },
   ],
 ]);
 /**
@@ -192,12 +199,13 @@ function derivedValues(src: string): string[] {
 }
 
 /**
- * 族单源常量表（#145/B6-4 一枚 → #145/B6-7 两枚）：名字 + 运行期面值。判据按表驱动，
+ * 族单源常量表（#145/B6-4 一枚 → #145/B6-7 两枚 → #145/B6-10 三枚）：名字 + 运行期面值。判据按表驱动，
  * 后续批再上收一枚只需加一行——上一版的单常量硬编码正是本门第一次需要跟着改形状的原因。
  */
 const FAM_SITES: ReadonlyArray<{ name: string; value: string; re: RegExp }> = [
   { name: 'ONTOLOGY_MAPPINGS_BASE', value: ONTOLOGY_MAPPINGS_BASE },
   { name: 'COMPLIANCE_RULES_BASE', value: COMPLIANCE_RULES_BASE },
+  { name: 'ECOS_VERSIONS_BASE', value: ECOS_VERSIONS_BASE },
 ].map((f) => ({
   ...f,
   // 与 DERIVED_RE 同款尾体：`(?:\\.|(?!`)[^\\])*` —— 反引号不做正文、反斜杠只吃转义对
@@ -301,7 +309,8 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     expect([...FAMILY_OWNER.keys()].sort()).toEqual([
       'pages/knowledge/pages/ExtractionPage.tsx',
       MULTILINE_REL,
-    ]);
+      'pages/knowledge/tabs/DataWorkbenchImportTab.tsx',
+    ].sort());
   });
 
   it('面值逐字不变：19 条行内站点（API_BASE 派生态 + 族单源常量两形态）还原后 = 改前裸形态快照（排序多重集 + 逐文件条数）', () => {
@@ -403,7 +412,12 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     // （`api/dataClient.ts` 的 `DATA_ENGINE_SETTINGS_BASE`；前两批的 `COGNITIVE_ENGINE_BASE`/
     // `ONTOLOGY_ENGINE_BASE` 只是私有升导出、同一声明位不计）。差额与本批棘轮 derSites 297→294 **同值**，
     // 但这是「三族族体全在 `/v1/` 面内」才成立巧合，不得当成通则（B6-7 已实证两口径可以差 1 枚）。
-    expect(derTotal, '行内派生态面须随批累积，低于 316 即扫描根或判据漂移').toBeGreaterThanOrEqual(316);
+    // #145/B6-10 订正为 312（−4，实测读出）：删 5 枚（OntologyDomainPanel 同文件两枚同值常量 +
+    // BusinessWorkbenchLayout 的 `ENGINES` 取数腿 + 本批 DataWorkbenchImportTab 的版本列表腿 +
+    // worldModelGraphApi 的私有 `WMG` 声明），增 1 枚**新建**属主声明（`ECOS_ONTOLOGIES_BASE`；
+    // `ECOS_VERSIONS_BASE`/`ECOS_WORLD_MODEL_GRAPH_BASE` 只是私有升导出、同一声明位不计）。
+    // 本批两口径差额又同值（棘轮 derSites 294→290），仍是巧合，不作通则。
+    expect(derTotal, '行内派生态面须随批累积，低于 312 即扫描根或判据漂移').toBeGreaterThanOrEqual(312);
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
   });
 

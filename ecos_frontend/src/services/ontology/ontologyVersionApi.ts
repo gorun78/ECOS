@@ -15,7 +15,18 @@ import { API_BASE } from "../httpClient";
 // 版本管理 (Version Timeline) — T3
 // ================================================================
 
-const VERSION_BASE = `${API_BASE}/v1/ecos/versions`;
+/**
+ * `/v1/ecos/versions` 族根单源（#145/B6-10 属主上收）。
+ *
+ * <p>**改前形状**：本文件的私有 `VERSION_BASE` ＋ `pages/knowledge/tabs/DataWorkbenchImportTab.tsx`
+ * 的一枚裸面写手（`${API_BASE}/v1/ecos/versions`）构成在册重复族。页面侧属主反向引另一页面不可行，
+ * 正典实现在本域（版本列表/详情两枚腿），故常量留本文件并 export，页面经门面
+ * `services/ontologyApi.ts` 取值。</p>
+ *
+ * <p>写成 `${API_BASE}` 派生态而非裸字面量，理由同 #145/B6-1 ② 判例：
+ * 族根本体必须在棘轮双形态面里恰有 1 个构造点，否则是关掉可见性而非减债。</p>
+ */
+export const ECOS_VERSIONS_BASE = `${API_BASE}/v1/ecos/versions`;
 
 /** 版本列表项 — 对齐后端 OntologyVersionVO (T16-5 简化端点强类型化) */
 export interface VersionItem {
@@ -82,7 +93,7 @@ export interface VersionPreviousDiff {
  */
 export async function fetchVersions(domainCode: string): Promise<VersionItem[]> {
   return apiFetchData<VersionItem[]>(
-    `${VERSION_BASE}?domainCode=${encodeURIComponent(domainCode)}`
+    `${ECOS_VERSIONS_BASE}?domainCode=${encodeURIComponent(domainCode)}`
   );
 }
 
@@ -94,7 +105,7 @@ export async function fetchVersions(domainCode: string): Promise<VersionItem[]> 
  */
 export async function fetchVersionDetail(id: string): Promise<VersionItem & { snapshot?: unknown }> {
   return apiFetchData<VersionItem & { snapshot?: unknown }>(
-    `${VERSION_BASE}/${encodeURIComponent(id)}`
+    `${ECOS_VERSIONS_BASE}/${encodeURIComponent(id)}`
   );
 }
 

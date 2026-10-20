@@ -18,6 +18,17 @@
  * <p>本批另一特色：`TelemetryViewer.tsx` 三条腿是**无版本段**的 `/api/telemetry/…`（不带 `v1/`），
  * 双形态棘轮门按 `b.startsWith('/v1/')` 收族，故这三条本就不在族面内；但 C1 判据
  * `["'`]/api\b` 对它们可见⇒仍属必须收口的私设基址。域门的多重集与自检对这类腿同样逐字比。</p>
+ *
+ * <p>**#145/B6-10 对本门的影响（必读，否则后批会把 8 条当成'快照被改小'）**：
+ * `/v1/ecos/ontologies` 族根构造点上收为 `services/ontology/ontologyModelApi.ts` 的
+ * `ECOS_ONTOLOGIES_BASE`，本门两文件（`BusinessWorkbenchLayout` 1 枚 ＋ `OntologyDomainPanel` 2 枚
+ * 同值常量）共 3 条派生态改为引属主常量 ⇒ 派生面 11→8。快照**保持 11 条逐字是改前面值**，
+ * 上收的 3 条改由两条独立判据承证：① 面值等价（运行期 import 属主常量 = 快照里那条面值）；
+ * ② 本门四文件代码行对 `/v1/ecos/ontologies` 字面量零命中（谁回退成私设派生即红）。
+ * 属主唯一性（全仓该族只有一处族根构造点）不在本门证明范围内，由同批新增的
+ * `b6EcosFamiliesSingleSource.spec.ts` 承证。
+ * 另须记清消费点数与改前构造点数**不是 1:1**：`OntologyDomainPanel` 改前 2 枚常量喂 5 枚腿，
+ * 改后是 0 派生态 + 5 枚属主常量消费点 ⇒ 本门按两张表各自钉死，不做加减等式。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -25,6 +36,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../services/httpClient';
+import { ECOS_ONTOLOGIES_BASE } from '../services/ontologyApi';
 
 const SRC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -42,13 +54,34 @@ const FILES: ReadonlyArray<{ rel: string; importPath: string }> = [
   { rel: 'pages/TelemetryViewer.tsx', importPath: '../services/httpClient' },
 ];
 
-/** 本批每文件应还原出的派生态条数（实跑读出，防「剪一处漏一处」）。 */
+/** 本批每文件应还原出的派生态条数（实跑读出，防「剪一处漏一处」）——**改前**口径。 */
 const SITES_PER_FILE: Readonly<Record<string, number>> = {
   'pages/business-workbench/BusinessWorkbenchLayout.tsx': 4,
   'components/ontology-workbench/OntologyDomainPanel.tsx': 2,
   'pages/aiworkbench/logic-canvas/useLogicPipelineRun.ts': 2,
   'pages/TelemetryViewer.tsx': 3,
 };
+
+/** #145/B6-10 属主上收后，同四文件的 `` `${API_BASE}` `` 派生态条数（实测读出）。 */
+const DERIVED_AFTER_B6_10: Readonly<Record<string, number>> = {
+  'pages/business-workbench/BusinessWorkbenchLayout.tsx': 3,
+  'components/ontology-workbench/OntologyDomainPanel.tsx': 0,
+  'pages/aiworkbench/logic-canvas/useLogicPipelineRun.ts': 2,
+  'pages/TelemetryViewer.tsx': 3,
+};
+
+/**
+ * #145/B6-10 属主常量在本门文件面的消费点数（实测读出，含模板串与裸引用两种写法）。
+ * 与 {@link SITES_PER_FILE} **不做加减等式**：改前 `OntologyDomainPanel` 的 2 枚同值常量喂 5 枚腿，
+ * 上收后派生态 0 枚、消费点 5 枚，两个数各自钉死才有意义。
+ */
+const OWNER_USE_PER_FILE: Readonly<Record<string, number>> = {
+  'pages/business-workbench/BusinessWorkbenchLayout.tsx': 1,
+  'components/ontology-workbench/OntologyDomainPanel.tsx': 5,
+};
+
+/** 本门快照里被上收的族根面值（出现次数由下方 `PRE_BATCH` 计数钉死为 3）。 */
+const UPLIFTED_FAMILY_FACE = '/api/v1/ecos/ontologies';
 
 /** 私设基址判据：引号/反引号后紧跟 `/api`（与 `api-base-single-source` 同口径）。 */
 const HARDCODED_RE = /["'`]\/api\b/;
@@ -143,15 +176,32 @@ describe('工作台散点批基址单源 — 私设基址清零 (#143/B5-24)', (
     }
   });
 
-  it('四文件一律从 httpClient 导入 API_BASE（第二处来源即红），且相对路径随目录深度正确', () => {
+  it('四文件基址来源唯一：API_BASE 导入按文件钉死（B6-10 后 OntologyDomainPanel 归零），属主常量 import 恰 1 条', () => {
+    // `OntologyDomainPanel.tsx` 的 API_BASE 导入数 1→0 是本批上收的直接后果：该文件改后**没有任何**
+    // `${API_BASE}` 派生态，族根一律取属主常量 ⇒ 继续要求它「有 1 条 API_BASE 导入」会变成
+    // 「逼着文件留一枚未使用的 import」，那是假绿而不是判据。改而钉两条：基址来源归零 + 属主常量入面。
+    const API_BASE_IMPORTS: Readonly<Record<string, number>> = {
+      'pages/business-workbench/BusinessWorkbenchLayout.tsx': 1,
+      'components/ontology-workbench/OntologyDomainPanel.tsx': 0,
+      'pages/aiworkbench/logic-canvas/useLogicPipelineRun.ts': 1,
+      'pages/TelemetryViewer.tsx': 1,
+    };
     for (const { rel, importPath } of FILES) {
-      const imports = codeLines(read(rel)).filter((l) => /\bAPI_BASE\b/.test(l) && l.trimStart().startsWith('import '));
-      expect(imports.length, `${rel} 应有且仅有 1 条 API_BASE 导入`).toBe(1);
+      const lines = codeLines(read(rel));
+      const imports = lines.filter((l) => /\bAPI_BASE\b/.test(l) && l.trimStart().startsWith('import '));
+      expect(imports.length, `${rel} 的 API_BASE 导入条数与本批实跑不符`).toBe(API_BASE_IMPORTS[rel]);
       // 两种引号风格都要吃：`TelemetryViewer.tsx` 全文件用双引号，写死单引号会把该文件判成
       // 「没有正确的导入」＝假红；反向只查 `services/httpClient` 子串则放过错误的目录深度。
-      expect(imports[0], `${rel} 导入路径不是 ${importPath}`).toMatch(
-        new RegExp(`from '${importPath}'|from "${importPath}"`),
-      );
+      if (API_BASE_IMPORTS[rel] === 1) {
+        expect(imports[0], `${rel} 导入路径不是 ${importPath}`).toMatch(
+          new RegExp(`from '${importPath}'|from "${importPath}"`),
+        );
+      }
+      if (OWNER_USE_PER_FILE[rel] !== undefined) {
+        const familyImports = lines.filter((l) => /\bECOS_ONTOLOGIES_BASE\b/.test(l) && l.trimStart().startsWith('import '));
+        expect(familyImports.length, `${rel} 应有且仅有 1 条属主常量导入`).toBe(1);
+        expect(familyImports[0], `${rel} 的属主常量不经门面取值`).toContain("from '../../services/ontologyApi'");
+      }
     }
   });
 
@@ -164,15 +214,37 @@ describe('工作台散点批基址单源 — 私设基址清零 (#143/B5-24)', (
     }
   });
 
-  it('面值逐字不变：还原后的 11 条 URL 多重集 = 改前快照，且逐文件条数吻合（4/2/2/3）', () => {
+  it('面值逐字不变：派生态 8 条 = 改前 11 条 − 上收的 3 条同族面值，且逐文件条数吻合（3/0/2/3）', () => {
     const all: string[] = [];
     for (const { rel } of FILES) {
       const vals = derivedValues(read(rel));
-      expect(vals.length, `${rel} 派生态条数不符`).toBe(SITES_PER_FILE[rel]);
+      expect(vals.length, `${rel} 派生态条数不符`).toBe(DERIVED_AFTER_B6_10[rel]);
       all.push(...vals);
     }
-    expect(all.length).toBe(11);
-    expect([...all].sort()).toEqual([...PRE_BATCH_URL_LITERALS].sort());
+    // 上收的三条只能是 ontologies 族根那一枚面值，出现次数逐字钉死为 3（1 枚页面腿 + 2 枚同文件常量）
+    const uplifted = PRE_BATCH_URL_LITERALS.filter((v) => v === UPLIFTED_FAMILY_FACE);
+    expect(uplifted.length).toBe(3);
+    expect([...all].sort()).toEqual(PRE_BATCH_URL_LITERALS.filter((v) => v !== UPLIFTED_FAMILY_FACE).sort());
+    // 上收后本门四文件不得再出现该族根面值的任何私设写法（引号/反引号/派生形态一律算违例）
+    for (const { rel } of FILES) {
+      const leaks = codeLines(read(rel)).filter((l) => l.includes(UPLIFTED_FAMILY_FACE));
+      expect(leaks, `${rel} 回退成私设基址：\n${leaks.join('\n')}`).toEqual([]);
+    }
+    for (const [rel, n] of Object.entries(OWNER_USE_PER_FILE)) {
+      const uses = codeLines(read(rel)).filter(
+        (l) => l.includes('ECOS_ONTOLOGIES_BASE') && !l.trimStart().startsWith('import '),
+      );
+      expect(uses.length, `${rel} 属主常量消费点数不符`).toBe(n);
+    }
+  });
+
+  it('#145/B6-10 面值等价：运行期 import 的属主常量 = 快照里那条族根面值（上收不改一个字符）', () => {
+    expect(ECOS_ONTOLOGIES_BASE).toBe(UPLIFTED_FAMILY_FACE);
+    // 反向自检：等价判据对同族其他腿不许成立（防把整族面值都当成族根）
+    expect(ECOS_ONTOLOGIES_BASE).not.toBe('/api/v1/ecos/ontologies/ont001/entities');
+    // 净减数守恒：本门派生态总数只减掉上收那 3 条，别的一条也不许悄悄消失
+    const sum = (t: Readonly<Record<string, number>>) => Object.values(t).reduce((a, b) => a + b, 0);
+    expect(sum(SITES_PER_FILE) - sum(DERIVED_AFTER_B6_10)).toBe(3);
   });
 
   it('快照自身可校验：11 条 = 6 单引号 + 3 反引号 + 2 双引号且全部以 /api/ 开头（防快照清空成恒真）', () => {
