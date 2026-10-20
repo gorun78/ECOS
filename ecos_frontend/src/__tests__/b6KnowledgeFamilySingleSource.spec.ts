@@ -316,7 +316,7 @@ describe('b6KnowledgeFamilySingleSource — 重复族 /v1/knowledge 单源化取
     expect(constructors().size).toBe(1);
   });
 
-  it('棘轮在册性：/v1/knowledge 已随本批从 urlFamilyDualFormRatchet 的 BASELINE 剪除（不留陈旧豁免）', () => {
+  it('棘轮在册性：/v1/knowledge 已随本批从 urlFamilyDualFormRatchet 的 BASELINE 剪除，关账后活性改由合成行承证 (#145/B6-1 / #145/B6-15)', () => {
     const ratchet = read('__tests__/urlFamilyDualFormRatchet.test.ts');
     expect(ratchet).not.toContain("'/v1/knowledge': [");
     // 反向腿：判据不是在空表上跑。**探针不钉族名**——BASELINE 只减不增，硬编码任何在册族都会随
@@ -327,15 +327,24 @@ describe('b6KnowledgeFamilySingleSource — 重复族 /v1/knowledge 单源化取
     //      这条同时挡掉「单行探针落在空表也挡不住」的旧形状；
     //   ③ 规模对账：行集条数 ≡ 棘轮自己的 dupBoth 定点 ≡ entries.length 定点。
     //      数字单源在棘轮文件里，本门只引用不复制 ⇒ 基线收缩不再需要动本腿。
+    //
+    // **#145/B6-15 关账把 ①② 的承载面换掉、判据强度不降**（本批把最后两族收口 ⇒ BASELINE 是**空对象**，
+    // 空集从此是目标态而不是失灵态）：① 反转为「行集必须恰读 0 行」，读出非 0 即有人把已收口族塞回基线
+    // 以逃逸 `noNewDuplicateUrlOwner`；② 的活性不能靠 prod 面（空表上 contains 恒假与探针失灵同形）⇒
+    // 改由**合成行**承证，形状与本门解析的书写格式逐字对齐，探针一漂立即变红；③ 原样保留、两值同为 0。
+    // 「本族已收口」的正面证据另起一腿：`/v1/knowledge` 必须仍在 CLOSED_FAMILIES 清单里（防清单被剪薄）。
     const rows = [...ratchet.matchAll(/^ {2}'([^']+)':\s*\[/gm)].map((m) => m[1]);
-    expect(rows.length, 'BASELINE 行集解析为空 ⇒ contains 类探针在此恒真，本腿失去意义').toBeGreaterThan(0);
-    const probe = (name: string) => ratchet.includes(`'${name}': [`);
-    expect(probe(rows[0]), '同形探针连在册行都判不出 ⇒ 探针形状与 BASELINE 书写形状已脱钩').toBe(true);
-    const dupPin = Number((ratchet.match(/expect\(dupBoth\.size\)\.toBe\((\d+)\)/) ?? [])[1]);
+    expect(rows, 'BASELINE 已于 #145/B6-15 关账为空 ⇒ 任何读出的在册行都是重新引入豁免').toEqual([]);
+    const SYNTH = "const BASELINE = Object.freeze({\n  '/v1/fixture/dup': ['a.ts', 'b.ts'],\n});";
+    expect([...SYNTH.matchAll(/^ {2}'([^']+)':\s*\[/gm)].map((m) => m[1])).toEqual(['/v1/fixture/dup']);
+    expect(SYNTH.includes(`'/v1/fixture/dup': [`), '同形合成探针失灵 ⇒ contains 类判据在此恒真').toBe(true);
+    const dupPin = Number((ratchet.match(/expect\(dupBoth\.size[^)]*\)\.toBe\((\d+)\)/) ?? [])[1]);
     const entriesPin = Number((ratchet.match(/expect\(entries\.length\)\.toBe\((\d+)\)/) ?? [])[1]);
     expect(Number.isInteger(dupPin) && Number.isInteger(entriesPin), '棘轮源码里两处规模定点形状变了').toBe(true);
     expect(rows.length).toBe(dupPin);
     expect(entriesPin).toBe(dupPin);
+    expect(dupPin).toBe(0);
+    expect(ratchet.includes("'/v1/knowledge',"), 'CLOSED_FAMILIES 里找不到 /v1/knowledge ⇒ 收口清单被剪薄').toBe(true);
     // 本批口径：`/v1/knowledge` 根族与知识域一切子族行都不得回到基线（不留陈旧豁免）
     expect(rows.filter((r) => r.startsWith('/v1/knowledge'))).toEqual([]);
   });

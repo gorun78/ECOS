@@ -209,18 +209,32 @@ describe('b6DatanetMetadataSingleSource — 重复族 /v1/datanet/metadata 单�
     ]);
   });
 
-  it('棘轮在册性：两枚 datanet 族已随本批从 urlFamilyDualFormRatchet 的 BASELINE 剪除（不留陈旧豁免）', () => {
+  it('棘轮在册性：两枚 datanet 族已退出 BASELINE 且在册于 CLOSED_FAMILIES，空基线下探针活性改由合成行承证 (#145/B6-8 / #145/B6-15 关账)', () => {
     const ratchet = read('__tests__/urlFamilyDualFormRatchet.test.ts');
     const rows = [...ratchet.matchAll(/^ {2}'([^']+)':\s*\[/gm)].map((m) => m[1]);
-    expect(rows.length, 'BASELINE 行集解析为空 ⇒ contains 类探针在此恒真，本腿失去意义').toBeGreaterThan(0);
+    // #145/B6-15 关账：BASELINE 现为空对象 ⇒ 原判据「行集非空」反转为「行集必须恰读 0 行」，
+    // 读出非 0 即有人把已收口的族重新塞回基线以逃逸 `noNewDuplicateUrlOwner`。
+    expect(rows, 'BASELINE 已于 #145/B6-15 关账为空 ⇒ 任何读出的在册行都是重新引入豁免').toEqual([]);
+    // 但「空集」与「解析器失灵」同形（原腿的 `toBeGreaterThan(0)` 正是为堵这一手而设）。关账后这条
+    // 防恒真职责改由**合成行**承担——同形状文本必须同时被行集正则与 contains 探针吃到，
+    // 与 B6-15 把 dupBoth 的 prod 面活性证据搬到合成 fixture 是同一裁决（空 prod 面不能自证判据）。
+    const SYNTH = "const BASELINE = Object.freeze({\n  '/v1/fixture/dup': ['a.ts', 'b.ts'],\n});";
+    expect([...SYNTH.matchAll(/^ {2}'([^']+)':\s*\[/gm)].map((m) => m[1])).toEqual(['/v1/fixture/dup']);
+    expect(SYNTH.includes(`'/v1/fixture/dup': [`), '合成行探针失灵 ⇒ contains 类判据在此恒真').toBe(true);
     const probe = (name: string) => ratchet.includes(`'${name}': [`);
-    expect(probe(rows[0]), '同形探针连在册行都判不出 ⇒ 探针形状与 BASELINE 书写形状已脱钩').toBe(true);
-    const dupPin = Number((ratchet.match(/expect\(dupBoth\.size\)\.toBe\((\d+)\)/) ?? [])[1]);
+    for (const fam of ['/v1/datanet/metadata', '/v1/datanet/metadata/preview/{}?limit={}']) {
+      expect(probe(fam), `${fam} 仍在 BASELINE 里挂着陈旧豁免位`).toBe(false);
+      // 退出重复面 ≠ 从台账消失：两枚族键必须仍逐枚在册于 CLOSED_FAMILIES（收口面的正面证据）
+      expect(ratchet.includes(`'${fam}'`), `CLOSED_FAMILIES 里找不到 ${fam} ⇒ 收口清单被剪薄`).toBe(true);
+    }
+    // 两处规模定点仍须从棘轮源码读出（形状变了读不到 = 本腿失去意义）；关账后两值同为 0。
+    // dupBoth 那条现在带 message 实参，正则须容许 `expect(x, 'msg').toBe(n)` 形状。
+    const dupPin = Number((ratchet.match(/expect\(dupBoth\.size[^)]*\)\.toBe\((\d+)\)/) ?? [])[1]);
     const entriesPin = Number((ratchet.match(/expect\(entries\.length\)\.toBe\((\d+)\)/) ?? [])[1]);
     expect(Number.isInteger(dupPin) && Number.isInteger(entriesPin), '棘轮源码里两处规模定点形状变了').toBe(true);
     expect(rows.length).toBe(dupPin);
     expect(entriesPin).toBe(dupPin);
-    expect(rows.filter((r) => r.startsWith('/v1/datanet/metadata'))).toEqual([]);
+    expect(dupPin).toBe(0);
   });
 
   it('判据能变红：私设基址、族根第二写手、面值漂移、边界误吃各造违例且必被对应腿吃出（防恒绿）', () => {

@@ -48,6 +48,7 @@ import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../../services/httpClient';
 import { WORKSPACE_SCENARIOS_BASE } from '../../services/scenarioActionClient';
 import { ONTOLOGY_PROPOSALS_BASE } from '../../services/ontology/ontologyProposalApi';
+import { COGNITIVE_BELIEFS_BASE } from '../../services/cognitiveClient';
 
 const PAGES_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -101,6 +102,17 @@ const FAM_SOURCES: ReadonlyArray<{ name: string; value: string; re: RegExp; owne
     value: ONTOLOGY_PROPOSALS_BASE,
     re: /`\$\{ONTOLOGY_PROPOSALS_BASE\}((?:\\.|(?!`)[^\\])*)`/g,
     ownerRe: /from '[^']*services\/ontology\/ontologyProposalApi'/,
+  },
+  {
+    // #145/B6-15（关账批）：OverrideTab / ReplayTab 的 beliefs 列表腿（快照里的两枚
+    // `/api/v1/cognitive/beliefs?domain=${encodeURIComponent(domainValue)}`）上收到
+    // `services/cognitiveClient.ts` 导出的族根。同值上收 ⇒ 17 条快照与逐文件条数（各 2）一律不动，
+    // 只把解析表加一枚；两文件的 `/override`、`/replay` 子路径腿单属主、刻意留 `${API_BASE}` 行内形态
+    // 以保住子族可见性（#145/B6-1 ②／B6-3 ③／B6-9 ④ 判例），故 API_BASE 导入腿仍在。
+    name: 'COGNITIVE_BELIEFS_BASE',
+    value: COGNITIVE_BELIEFS_BASE,
+    re: /`\$\{COGNITIVE_BELIEFS_BASE\}((?:\\.|(?!`)[^\\])*)`/g,
+    ownerRe: /from '[^']*services\/cognitiveClient'/,
   },
 ];
 
@@ -219,7 +231,10 @@ describe('pages/ 场景域基址单源 — 私设基址清零 (#143/B5-23)', () 
       for (const fam of FAM_SOURCES) {
         const famImports = imports.filter((l) => l.includes(fam.name));
         expect(famImports.length, `${rel} 的 ${fam.name} 导入不得多于 1 条（第二处来源即红）`).toBeLessThanOrEqual(1);
-        if (apiImports.length === 0 && famImports.length === 1) {
+        // #145/B6-15 起把条件从「apiImports 为 0 且 famImports 为 1」放宽到「famImports 为 1」：
+        // OverrideTab/ReplayTab 是**双来源文件**（族根引常量、子路径腿仍行内 `${API_BASE}`），
+        // 旧条件下它们的族单源导入腿来源不受验——那正是本批要在册的形状，不能留成免检面。
+        if (famImports.length === 1) {
           expect(famImports[0], `${rel} 的 ${fam.name} 导入未取自该族属主`).toMatch(fam.ownerRe);
         }
       }
@@ -239,6 +254,8 @@ describe('pages/ 场景域基址单源 — 私设基址清零 (#143/B5-23)', () 
       'workbench/index.tsx',
     ]);
     expect(movedOf('ONTOLOGY_PROPOSALS_BASE')).toEqual(['ScenarioManagementView.tsx']);
+    // #145/B6-15：beliefs 列表腿上收面＝恰好两枚列表腿所在页（两文件的子路径腿不在面里）
+    expect(movedOf('COGNITIVE_BELIEFS_BASE')).toEqual(['scenario/OverrideTab.tsx', 'scenario/ReplayTab.tsx']);
   });
 
   it('派生形态唯一：`${API_BASE}` 后必接 /（防漏段），八文件零 /api/api 双前缀', () => {

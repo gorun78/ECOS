@@ -14,6 +14,7 @@ import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 import { apiFetchData } from '../../api';
 import { API_BASE } from '../../services/httpClient';
+import { COGNITIVE_BELIEFS_BASE } from '../../services/cognitiveClient';
 import { showToastGlobal } from '../../components/common/Toast';
 import {
   formatNum,
@@ -62,8 +63,9 @@ export default function ReplayTab() {
   const loadBeliefs = useCallback(async (domainValue: string) => {
     setLoadingBeliefs(true);
     try {
+      // 族根自 #145/B6-15 起取服务层族单源常量，本文件不再书写该族根体（属主唯一）
       const data = await apiFetchData<BeliefDistribution[]>(
-        `${API_BASE}/v1/cognitive/beliefs?domain=${encodeURIComponent(domainValue)}`
+        `${COGNITIVE_BELIEFS_BASE}?domain=${encodeURIComponent(domainValue)}`
       );
       setBeliefs(Array.isArray(data) ? data : []);
     } catch (e) {

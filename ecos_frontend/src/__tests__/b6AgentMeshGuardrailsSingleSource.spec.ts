@@ -545,21 +545,29 @@ describe('b6AgentMeshGuardrailsSingleSource — 两族单源化取证 (#145/B6-1
       .toBe('/api/v1/guardrails/policies');
   });
 
-  it('棘轮在册性：两族已从 urlFamilyDualFormRatchet 的 BASELINE 剪除，且两处定点与解析行集互相对得上', () => {
+  it('棘轮在册性：两族已退出 BASELINE 且在册于 CLOSED_FAMILIES，空基线下反向探针改由合成行承证 (#145/B6-11 / #145/B6-15 关账)', () => {
     const ratchet = read('__tests__/urlFamilyDualFormRatchet.test.ts');
     const rows = [...ratchet.matchAll(/^ {2}'([^']+)':\s*\[/gm)].map((m) => m[1]);
-    expect(rows.length, 'BASELINE 行集解析为空 ⇒ contains 类探针在此恒真，本腿失去意义').toBeGreaterThan(0);
+    // #145/B6-15 关账：BASELINE 为空对象 ⇒「行集非空」的反向探针已无在册族可指（原探针借下一批在册族
+    // `/v1/cognitive/beliefs?domain={}` 防"把整段 BASELINE 读空"，那族也在末批收口了）。判据活性由此
+    // 改由合成行承证（同 B6-15 把 dupBoth 的 prod 面证据搬到 DERIVED_A/B 的裁决）：形状一旦漂移，
+    // 合成行读不出来 ⇒ 本腿立即变红，不会退化成"空集上的恒真"。
+    expect(rows, 'BASELINE 已于 #145/B6-15 关账为空 ⇒ 任何读出的在册行都是重新引入豁免').toEqual([]);
+    const SYNTH = "const BASELINE = Object.freeze({\n  '/v1/fixture/dup': ['a.ts', 'b.ts'],\n});";
+    expect([...SYNTH.matchAll(/^ {2}'([^']+)':\s*\[/gm)].map((m) => m[1])).toEqual(['/v1/fixture/dup']);
     const probe = (name: string) => ratchet.includes(`'${name}': [`);
-    expect(probe(rows[0]), '同形探针连在册行都判不出 ⇒ 探针形状与 BASELINE 书写形状已脱钩').toBe(true);
-    const dupPin = Number((ratchet.match(/expect\(dupBoth\.size\)\.toBe\((\d+)\)/) ?? [])[1]);
+    expect(SYNTH.includes(`'/v1/fixture/dup': [`), '同形合成探针失灵 ⇒ contains 类判据在此恒真').toBe(true);
+    const dupPin = Number((ratchet.match(/expect\(dupBoth\.size[^)]*\)\.toBe\((\d+)\)/) ?? [])[1]);
     const entriesPin = Number((ratchet.match(/expect\(entries\.length\)\.toBe\((\d+)\)/) ?? [])[1]);
     expect(Number.isInteger(dupPin) && Number.isInteger(entriesPin), '棘轮源码里两处规模定点形状变了').toBe(true);
     expect(rows.length).toBe(dupPin);
     expect(entriesPin).toBe(dupPin);
+    expect(dupPin).toBe(0);
     for (const fam of OWNERS) expect(probe(fam.body.slice('/api'.length))).toBe(false);
-    // 反向探针：本批刻意留在册的下一族必须仍看得见（防"探针把整段 BASELINE 读空"这种假绿）。
-    // #145/B6-14 起改用 `/v1/cognitive/beliefs?domain={}`：原探针 `/v1/dq` 已在本批从 BASELINE 剪除，留在原地会让本腿恒红。
-    expect(probe('/v1/cognitive/beliefs?domain={}')).toBe(true);
+    // 退出重复面 ≠ 从台账消失：两枚族键必须仍逐枚在册于 CLOSED_FAMILIES（收口面的正面证据）
+    for (const fam of ['/v1/agent-mesh', '/v1/guardrails/policies']) {
+      expect(ratchet.includes(`'${fam}'`), `CLOSED_FAMILIES 里找不到 ${fam} ⇒ 收口清单被剪薄`).toBe(true);
+    }
   });
 
   it('判据能变红：别名族根、影子声明、跟值失灵、名字边界、面值漂移各造违例且被对应腿吃出（防恒绿）', () => {

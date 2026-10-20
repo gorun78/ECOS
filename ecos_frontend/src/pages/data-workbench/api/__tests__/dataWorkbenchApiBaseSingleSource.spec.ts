@@ -16,6 +16,13 @@
  *
  * <p>`_base.ts` 系 #143/B5-8 传输合流批即已从 `API_BASE` 派生四枚域常量，本批不重复计入
  * 派生点数（其 3 条 `${API_BASE}` 属改前既有），只由「整域零私设基址」腿覆盖。</p>
+ *
+ * <p>**#145/B6-15 同批翻转**：`pipeline.ts` 的 `runs/{runId}` 腿基址上收为 `api/dataClient.ts`
+ * 导出的 `ENGINE_DATA_PIPELINE_RUNS_BASE` ⇒ 该行不再是 `` `${API_BASE}…` `` 形态。按**剪腿禁止**
+ * 口径（#145/B6-5 ④）判据换成表驱动解析（`SITE_RE` + `CONST_VALUES`），快照 27 条**一条不剪**，
+ * 并新增「常量取值逐字 = 改前族根」等价判据与「该腿只准引 api/dataClient」来源判据作根据。
+ * 同文件的三枚 `/tasks` 子路径腿各只有本域一个生产方、不在重复面，仍写 `${API_BASE}` 原样
+ * 以保住棘轮族面可见性（#145/B6-1/B6-3 口径）。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -23,6 +30,9 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../../../../services/httpClient';
+// #145/B6-15：本域 `pipeline.ts` 的 `runs/{runId}` 腿改取属主常量面值。按**剪腿禁止**口径（#145/B6-5 ④），
+// 面值解析表必须认这枚常量，否则该腿对本门隐形 ⇒ 多重集少一条、把「形态搬运」误读成「请求消失」。
+import { ENGINE_DATA_PIPELINE_RUNS_BASE } from '../../../../api/dataClient';
 
 const DOMAIN_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -38,8 +48,14 @@ const FILES = [
 /** 私设基址判据：引号/反引号后紧跟 `/api`（与 `api-base-single-source` 同口径）。 */
 const HARDCODED_RE = /["'`]\/api\b/;
 
-/** 派生形态：`` `${API_BASE}<path>` ``，捕获组即拼出来的路径段。 */
-const DERIVED_RE = /`\$\{API_BASE\}((?:\\.|(?!`)[^\\])*)`/g;
+/** 派生形态：`` `${常量}<path>` ``，捕获组即拼出来的路径段（#145/B6-15 起含族单源常量）。 */
+const SITE_RE = /`\$\{([A-Za-z0-9_]+)\}((?:\\.|(?!`)[^\\])*)`/g;
+
+/** 面值解析表：`API_BASE` 单源 + #145/B6-15 上收到 api 层的管道 runs 族根。 */
+const CONST_VALUES: ReadonlyMap<string, string> = new Map([
+  ['API_BASE', API_BASE],
+  ['ENGINE_DATA_PIPELINE_RUNS_BASE', ENGINE_DATA_PIPELINE_RUNS_BASE],
+]);
 
 function isComment(line: string): boolean {
   const t = line.trim();
@@ -58,7 +74,10 @@ function read(rel: string): string {
 function derivedValues(src: string): string[] {
   const out: string[] = [];
   for (const line of codeLines(src)) {
-    for (const m of line.matchAll(DERIVED_RE)) out.push(`${API_BASE}${m[1]}`);
+    for (const m of line.matchAll(SITE_RE)) {
+      const base = CONST_VALUES.get(m[1]);
+      if (base !== undefined) out.push(base + m[2]);
+    }
   }
   return out;
 }
@@ -128,13 +147,24 @@ describe('pages/data-workbench/api 域基址单源 — 私设基址清零 (#143/
     }
   });
 
-  it('派生形态唯一：`${API_BASE}` 后必接 /（防漏段），全域零 /api/api 双前缀', () => {
+  it('派生形态唯一：解析表内常量后必接 /（防漏段），全域零 /api/api 双前缀', () => {
+    const names = [...CONST_VALUES.keys()];
+    const NO_SLASH_RE = new RegExp('`\\$\\{(?:' + names.join('|') + ')\\}(?!/)');
     for (const rel of FILES) {
       const src = read(rel);
-      const bad = codeLines(src).filter((l) => /`\$\{API_BASE\}(?!\/)/.test(l));
-      expect(bad, `${rel} 存在 \`\${API_BASE}\` 后不接斜杠的派生`).toEqual([]);
+      const bad = codeLines(src).filter((l) => NO_SLASH_RE.test(l));
+      expect(bad, `${rel} 存在 \`\${…}\` 基址常量后不接斜杠的派生`).toEqual([]);
       expect(src).not.toMatch(/\/api\/api\b/);
     }
+  });
+
+  it('#145/B6-15 族根来源唯一：pipeline.ts 的 runs 腿只准引 api/dataClient，且 API_BASE 不得多于 1 条 (#145/B6-5 ④)', () => {
+    const imports = codeLines(read('pipeline.ts')).filter((l) => l.trimStart().startsWith('import '));
+    const runsImports = imports.filter((l) => /\bENGINE_DATA_PIPELINE_RUNS_BASE\b/.test(l));
+    expect(runsImports.length, 'runs 族根导入必须恰为 1 条（第二处来源即红）').toBe(1);
+    expect(runsImports[0]).toContain("from '../../../api/dataClient'");
+    // 面值前提：属主常量必须真等于该族根，否则解析表还原出来的面值与运行期不一致，多重集比对失去意义
+    expect(ENGINE_DATA_PIPELINE_RUNS_BASE).toBe('/api/v1/engine/data/pipeline/runs');
   });
 
   it('面值逐字不变：还原后的 URL 多重集 = 改前快照（27 条 = 裸形态 26 + 既有派生 1）', () => {

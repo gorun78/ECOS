@@ -445,11 +445,16 @@ function dupByRawOnly(idx: Index): Map<string, string[]> {
 /**
  * 基线 = 2026-10-19 #143/B5-19 本门实跑读出值（先跑门读实测、再登记，非推算）。
  * 族 → 属主清单；只减不增，收口一族/一属主必须与本批同款改动同批剪除。
+ *
+ * <p>**#145/B6-15 关账：基线归零 ⇒ 本门从「只减不增」升为「零豁免」。** B6 首批（#145/B6-1）
+ * 建线时 30 族 69 属主，经十五批收口至 0 族 0 属主。空基线的含义不是本门失效，而是它变严：
+ * 从此任何一族出现第二生产方都落进 `noNewDuplicateUrlOwner` 的「基线外新重复族」腿直接判红，
+ * 不再有在册豁免可读。本门的**活性**（双形态判据不是裸形态口径的等价改写）原先由 prod 面
+ * `dupBoth.size > dupRawOnly.size` 承证，两侧同归零后该证法失效（0>0 恒假＝假绿），故判据活性
+ * 全部改由「判据能变红」两批合成 fixture（DERIVED_A/B 与 ALIAS_A/B）承证 —— 与 #143/B5-26
+ * 把 `rawSites > 0` 钉成 `= 0` 后改用 RAW_SQ/RAW_DQ fixture 承证裸形态分支活性是同一手法。</p>
  */
-const BASELINE: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  '/v1/cognitive/beliefs?domain={}': ['pages/scenario/OverrideTab.tsx', 'pages/scenario/ReplayTab.tsx'],
-  '/v1/engine/data/pipeline/runs/{}': ['pages/data-workbench/api/pipeline.ts', 'pages/data-workbench/pipeline-editor/PipelineExecutionMonitor.tsx'],
-});
+const BASELINE: Readonly<Record<string, readonly string[]>> = Object.freeze({});
 
 describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 (#143/B5-19 / D-B5-40)', () => {
   const snapshot = scan(SRC_ROOT);
@@ -541,21 +546,16 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // #145/B6-13：285 → **284** = 删 1 枚站点（`SecurityAudit.tsx` 直连腿 1→0 改裸引用；属主 `securityClient.ts` 20→20，消费腿换成同值族根声明、计数不动）。
     // #145/B6-14：284 → **282** = 删 2 枚（`pages/data-quality/api/_base.ts` 族根声明改成不含 URL 体的名别名 1 ＋ `WorldModelViewer.tsx` 整 URL 内联腿改裸名取值 1）；
     // 两枚属主声明都是同值派生态（dq＝私有 `DQ_BASE` 改名并 export、org-tree＝内联腿提为声明）⇒ 净新增枚 0，账只记 dupBoth 与属主。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(282);
+    // #145/B6-15（关账批）：282 → **280** = 删 4 枚消费点（beliefs 族 OverrideTab/ReplayTab 列表腿各 1 ＋ runs 族
+    // `api/pipeline.ts`/`PipelineExecutionMonitor.tsx` 轮询腿各 1）、增 2 枚新建属主声明
+    // （`services/cognitiveClient.ts` 的 `COGNITIVE_BELIEFS_BASE` ＋ `api/dataClient.ts` 的
+    // `ENGINE_DATA_PIPELINE_RUNS_BASE`）。净 −2 仍是形态搬运；本批的账是 **dupBoth 2 → 0、属主 4 → 0**。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(280);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
-    expect(dupBoth.size).toBeGreaterThan(dupRawOnly.size);
-    // 三个数 = 本门实跑读出值，与 BASELINE 同批改动（重复面一变，这里必红，防「基线改了、盲区量化注记没跟上」）
-    // #143/B5-20：知识服务域 32 处裸面派生化，dupBoth 不变（30），裸形态口径丢三族
-    // （/v1/knowledge 五属主全裸面归零、/v1/ontology/mappings 与 /v1/knowledge/compliance-rules
-    // 各降到单属主）⇒ 盲区 21 → 24。
-    // #143/B5-21：data-workbench/api 域 26 处裸面派生化，dupBoth 仍 30，/v1/engine/data/pipeline/runs/{}
-    // 只剩 1 个裸面属主 ⇒ dupRawOnly 6 → 5、盲区 24 → 25。这正是 D-B5-40 的预期行为：
-    // C1 每收口一批，只认裸形态的旧判据就更瞎，不是本门放松。
-    // #143/B5-22 dupRawOnly/blind 未动（归因见文件头）。#143/B5-23：场景域页面 17 处派生化一次抹掉
-    // 四族的裸面可见性 ⇒ dupRawOnly 5 → **1**、盲区 25 → **29**；dupBoth 仍 30（基线不动、无陈旧豁免）。
-    // #143/B5-24：散点域 11 处派生化把幸存最后一族 `/v1/ecos/ontologies` 的两个裸面属主同批转尽
-    // ⇒ dupRawOnly 1 → **0**、盲区 29 → **30**（= dupBoth 全集）；dupBoth 仍 30、基线不动。
+    // 三个数 = 本批实跑读出值，与 BASELINE 同批改动（重复面一变，这里必红，防「基线改了、盲区量化注记没跟上」）。
+    // dupBoth 与盲区的逐批演化见下面 B6-1~B6-14 各段；dupRawOnly 自 #143/B5-24 起恒 0
+    // （prod 面裸形态随 C1 基址单源归零 ⇒ 只认裸形态的旧判据彻底失明，正是 D-B5-40 的预期行为）。
     // #145/B6-1（存量债首批）：`/v1/knowledge` 一族 7 属主收口为「`api/knowledgeClient.ts` 单源导出
     // `KNOWLEDGE_BASE` + 6 文件改为 import」⇒ **dupBoth 30 → 29**、BASELINE 同批剪除该族（属主 69 → 62）。
     // 这是本门建成（#143/B5-19）以来 dupBoth 的**第一次真实下降**，与 B5-21~26 各批的「原地不动」相对：
@@ -581,25 +581,8 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `services/knowledgeQueryApi` + `pages/knowledge/services/wiki`；`/v1/ontology/glossary` 为
     // `services/glossary` + 同一 wiki）收口为三枚导出常量单源 ⇒ **dupBoth 21 → 18**、BASELINE 同批剪除
     // 三族（属主 42 → 36 = 三族 × 2 条基线记录，每族收口后仍各留 1 枚族根声明 ⇒ 族面不降、只退出重复面）。
-    // #145/B6-7（存量债第七批）：`/v1/knowledge/compliance-rules` 两属主（`pages/knowledge/services/wiki`
-    // 的族根声明＋`pages/knowledge/pages/components/govern/RuleRepoTable` 的 5 枚内联腿）收口为 wiki 一枚
-    // **改名并 export** 的 `COMPLIANCE_RULES_BASE` 单源 ⇒ **dupBoth 18 → 17**、BASELINE 同批剪除该族
-    // （属主 36 → 34）。本批族面**第一次降两枚**（256 → 254）：消失的不是被收口的族本身（属主声明留在
-    // wiki，族继续在索引里），而是只由 RuleRepoTable 一家书写的两枚**同根子族** ——
-    // `/v1/knowledge/compliance-rules/{}`（PUT/DELETE 腿归一化后）与 `/v1/knowledge/compliance-rules?{}`
-    // （跨行模板字面量的列表腿）。它们改前各只有 1 个生产方、从来不在重复面，收口后写族体的人换成引
-    // 常量 ⇒ 对 `familiesOf` 整体隐形（＝B6-1 文件头 ② 预告、B6-2/B6-3 各兑现一次的同一机制，本批一次
-    // 隐两枚）。检测面不受损：任何人再写第二枚族体腿仍会被判红，隐形只发生在「经属主常量拼出的腿」，
-    // 而那正是单源的定义。族面升降一律不作进度读，进度仍只认 dupBoth 与属主两栏。
-    // #145/B6-8（存量债第八批）：数据网元数据两族四属主——`/v1/datanet/metadata`（`api/dataClient.ts`
-    // 私有 `DATANET_META` ＋ `services/dataCatalogClient.ts` 私有 `DATANET_BASE`，同一族根的两枚基址声明）
-    // 与 `/v1/datanet/metadata/preview/{}?limit={}`（`pages/data-workbench/api/metadata.ts` ＋
-    // `services/datanetMetadataApi.ts` 各一枚内联腿）收口为 `api/dataClient.ts` 一枚**改名并 export** 的
-    // `DATANET_METADATA_BASE` ⇒ **dupBoth 17 → 15**、BASELINE 同批剪除两行（属主 34 → 30）。三点形状：
-    // 属主层位由 import 图裁决到 api 层（服务侧反向引用会成 `api.ts → dataClient → dataCatalogClient → api.ts`
-    // 循环，见文件头 B6-8 ①）；preview 族**只动一腿即闭合**、页面门面保持原样（②）；属主文件内部仍留
-    // 一枚在册裸面腿（`…/resources/${…}`）不动——动它是关可见性而不减债（③）。族面 254 → 253 降 1 属
-    // 可见性副产物（④），账只记 dupBoth 与属主。dupRawOnly 仍 0（prod 面裸形态自 #143/B5-26 归零）。
+    // #145/B6-7（存量债第七批）：`/v1/knowledge/compliance-rules` 两属主（`pages/knowledge/services/wiki` 的族根声明＋`pages/knowledge/pages/components/govern/RuleRepoTable` 的 5 枚内联腿）收口为 wiki 一枚**改名并 export** 的 `COMPLIANCE_RULES_BASE` 单源 ⇒ **dupBoth 18 → 17**、BASELINE 同批剪除该族（属主 36 → 34）。本批族面**第一次降两枚**（256 → 254）：消失的不是被收口的族本身（属主声明留在 wiki，族继续在索引里），而是只由 RuleRepoTable 一家书写的两枚**同根子族** —— `/v1/knowledge/compliance-rules/{}`（PUT/DELETE 腿归一化后）与 `/v1/knowledge/compliance-rules?{}`（跨行模板字面量的列表腿）。它们改前各只有 1 个生产方、从来不在重复面，收口后写族体的人换成引常量 ⇒ 对 `familiesOf` 整体隐形（＝B6-1 文件头 ② 预告、B6-2/B6-3 各兑现一次的同一机制，本批一次隐两枚）。检测面不受损：任何人再写第二枚族体腿仍会被判红，隐形只发生在「经属主常量拼出的腿」，而那正是单源的定义。族面升降一律不作进度读，进度仍只认 dupBoth 与属主两栏。
+    // #145/B6-8（存量债第八批）：数据网元数据两族四属主——`/v1/datanet/metadata`（`api/dataClient.ts` 私有 `DATANET_META` ＋ `services/dataCatalogClient.ts` 私有 `DATANET_BASE`，同一族根的两枚基址声明）与 `/v1/datanet/metadata/preview/{}?limit={}`（`pages/data-workbench/api/metadata.ts` ＋ `services/datanetMetadataApi.ts` 各一枚内联腿）收口为 `api/dataClient.ts` 一枚**改名并 export** 的 `DATANET_METADATA_BASE` ⇒ **dupBoth 17 → 15**、BASELINE 同批剪除两行（属主 34 → 30）。三点形状：属主层位由 import 图裁决到 api 层（服务侧反向引用会成 `api.ts → dataClient → dataCatalogClient → api.ts` 循环，见文件头 B6-8 ①）；preview 族**只动一腿即闭合**、页面门面保持原样（②）；属主文件内部仍留一枚在册裸面腿（`…/resources/${…}`）不动——动它是关可见性而不减债（③）。族面 254 → 253 降 1 属可见性副产物（④），账只记 dupBoth 与属主。dupRawOnly 仍 0（prod 面裸形态自 #143/B5-26 归零）。
     // #145/B6-9（存量债第九批）：引擎监控域三族各两属主——`/v1/engine/cognitive`
     // （`pages/MonitoringCenter.tsx` ＋ `services/cognitiveClient.ts` 的 `COGNITIVE_ENGINE_BASE`）、
     // `/v1/engine/ontology`（`pages/MonitoringCenter.tsx` ＋ `services/ontology/ontologyEngineApi.ts`
@@ -629,11 +612,23 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `` `${API_BASE}/v1/…` ``，且两处都是**改名并 export 既有私有常量**（同一声明位）⇒ 无净新增属主枚。
     // #145/B6-13：dupBoth 5 → **4**、盲区 5 → **4**（`/v1/audit/stats` 两属主合一为 `api/securityClient.ts` 的 `AUDIT_STATS_BASE`；族面 253 不降，族根声明仍写 `` `${API_BASE}/v1/…` ``，页面侧裸名引用不带 URL 体故对本门隐形）
     // #145/B6-14：dupBoth 4 → **2**、盲区 4 → **2**（`/v1/dq` 与 `/v1/system/organizations/tree` 各两属主合一；两族族根声明各留 1 枚且仍写派生态 ⇒ 族面 253 不降、只退出重复面，dq 的别名层与 org-tree 的裸名腿对本门隐形）
-    expect(dupBoth.size).toBe(2);
+    // #145/B6-15（存量债末批＝关账批）：dupBoth 2 → **0**、盲区 2 → **0**、属主 4 → **0**
+    // （`/v1/cognitive/beliefs?domain={}` 两属主合一为 `services/cognitiveClient.ts` 导出的 `COGNITIVE_BELIEFS_BASE`、
+    // `/v1/engine/data/pipeline/runs/{}` 两属主合一为 `api/dataClient.ts` 导出的 `ENGINE_DATA_PIPELINE_RUNS_BASE`；
+    // 两族族根声明各留 1 枚且仍写 `` `${API_BASE}/v1/…` `` ⇒ 族面 253 不降、只退出重复面，
+    // OverrideTab 的 `/override` 腿与 ReplayTab 的 `/replay` 腿、pipeline.ts 的三枚 `/tasks` 腿单属主、
+    // 刻意保持行内派生态以保住子族可见性（#145/B6-1 ②／B6-3 ③／B6-9 ④ 判例））
+    // 关账后本门升为**零豁免**：`dupBoth.size` 钉 0 ⇒ 任何一族再出现第二生产方即落进
+    // `noNewDuplicateUrlOwner` 的「基线外新重复族」腿。原 `dupBoth.size > dupRawOnly.size`
+    // （双形态严格强于裸形态的 prod 面证据）两侧同归零后不可证（0>0 恒假＝换了个假绿形状），
+    // 判据活性改由下面「判据能变红」两批合成 fixture 承证 —— 与 #143/B5-26 把 `rawSites`
+    // 钉成 0 后改用 RAW_SQ/RAW_DQ 承证裸形态分支活性同一手法（见 BASELINE 文件头）。
+    expect(dupBoth.size, 'B6 已于 #145/B6-15 关账：空基线下出现任何重复族即回归').toBe(0);
     expect(dupRawOnly.size).toBe(0);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(2);
-    expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
+    expect(blind.length).toBe(0);
+    // 在册性腿保留（空集下恒真是 vacuous，但它约束的是「凡在册盲区族必须进基线」这条方向，
+    // 一旦有人新增重复族并试图写进基线逃逸，上面 `toBe(0)` 先红，这条腿不构成豁免通道）
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);
 
@@ -729,34 +724,29 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // #145/B6-12 起 5 族 / 10 属主：`/v1/ontology/data` 与 `/v1/ontology/export` 各两属主合一为属主文件导出的 `ONTOLOGY_DATA_BASE`／`ONTOLOGY_EXPORT_BASE`（各−2 属主，两处都是既有私有常量改名并 export ⇒ 无净新增枚）；
     // #145/B6-13 起 4 族 / 8 属主：`/v1/audit/stats` 两属主合一为 `api/securityClient.ts` 导出的 `AUDIT_STATS_BASE`
     // #145/B6-14 起 2 族 / 4 属主：`/v1/dq` 两属主合一为 `api/dataClient.ts` 导出的 `DQ_GOVERNANCE_BASE`（页面侧 `_base.ts` 改成名别名）、`/v1/system/organizations/tree` 两属主合一为 `api/iamClient.ts` 导出的 `SYSTEM_ORGANIZATIONS_TREE_URL`
-    expect(entries.length).toBe(2);
-    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(4);
-    expect(BASELINE['/v1/knowledge']).toBeUndefined();
-    expect(BASELINE['/v1/workspace/scenarios']).toBeUndefined();
-    expect(BASELINE['/v1/workspace/scenarios/{}']).toBeUndefined();
-    expect(BASELINE['/v1/aip/agents']).toBeUndefined();
-    expect(BASELINE['/v1/aip/agents/{}']).toBeUndefined();
-    expect(BASELINE['/v1/aip/audit-logs']).toBeUndefined();
-    expect(BASELINE['/v1/ontology/mappings']).toBeUndefined();
-    expect(BASELINE['/v1/ontology/proposals']).toBeUndefined();
-    expect(BASELINE['/v1/pipeline/definitions']).toBeUndefined();
-    expect(BASELINE['/v1/knowledge/query']).toBeUndefined();
-    expect(BASELINE['/v1/knowledge/rag']).toBeUndefined();
-    expect(BASELINE['/v1/ontology/glossary']).toBeUndefined();
-    expect(BASELINE['/v1/knowledge/compliance-rules']).toBeUndefined();
-    expect(BASELINE['/v1/engine/cognitive']).toBeUndefined();
-    expect(BASELINE['/v1/engine/ontology']).toBeUndefined();
-    expect(BASELINE['/v1/engine/data/settings']).toBeUndefined();
-    expect(BASELINE['/v1/ecos/ontologies']).toBeUndefined();
-    expect(BASELINE['/v1/ecos/versions']).toBeUndefined();
-    expect(BASELINE['/v1/ecos/world-model-graph']).toBeUndefined();
-    expect(BASELINE['/v1/agent-mesh']).toBeUndefined();
-    expect(BASELINE['/v1/guardrails/policies']).toBeUndefined();
-    expect(BASELINE['/v1/ontology/data']).toBeUndefined();
-    expect(BASELINE['/v1/ontology/export']).toBeUndefined();
-    expect(BASELINE['/v1/audit/stats']).toBeUndefined();
-    for (const fam of ['/v1/dq', '/v1/system/organizations/tree']) expect(BASELINE[fam], `${fam} 已于 #145/B6-14 退出重复面，陈旧豁免位必须剪除`).toBeUndefined();
+    // #145/B6-15 起 **0 族 / 0 属主（B6 存量债关账）**：本门由「只减不增」升为「零豁免」，见 BASELINE 文件头。
+    expect(entries.length).toBe(0);
+    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(0);
+    // 已收口族不得保留陈旧豁免位（B6 全 30 族逐族在册；关账后这条腿是「空基线」的正面证据，
+    // 也是防止有人把刚收口的族重新塞回基线以逃逸 `noNewDuplicateUrlOwner` 的门）。
+    const CLOSED_FAMILIES = [
+      '/v1/knowledge', '/v1/workspace/scenarios', '/v1/workspace/scenarios/{}',
+      '/v1/aip/agents', '/v1/aip/agents/{}', '/v1/aip/audit-logs',
+      '/v1/ontology/mappings', '/v1/ontology/proposals', '/v1/pipeline/definitions',
+      '/v1/knowledge/query', '/v1/knowledge/rag', '/v1/ontology/glossary',
+      '/v1/knowledge/compliance-rules', '/v1/engine/cognitive', '/v1/engine/ontology',
+      '/v1/engine/data/settings', '/v1/ecos/ontologies', '/v1/ecos/versions',
+      '/v1/ecos/world-model-graph', '/v1/agent-mesh', '/v1/guardrails/policies',
+      '/v1/ontology/data', '/v1/ontology/export', '/v1/audit/stats',
+      '/v1/datanet/metadata', '/v1/datanet/metadata/preview/{}?limit={}',
+      '/v1/dq', '/v1/system/organizations/tree',
+      '/v1/cognitive/beliefs?domain={}', '/v1/engine/data/pipeline/runs/{}',
+    ];
+    expect(CLOSED_FAMILIES.length, 'B6 累计收口族清单必须与 dupBoth 30→0 的逐批降幅对得上').toBe(30);
+    for (const fam of CLOSED_FAMILIES) expect(BASELINE[fam], `${fam} 已收口，陈旧豁免位必须剪除`).toBeUndefined();
     for (const [fam, owners] of entries) {
+      // 空基线下此腿恒真（vacuous），保留是为了让「有人往基线塞族」时立即生效：
+      // 塞进来的族必须满足族键/属主路径的全部形状约束，且 `noNewDuplicateUrlOwner` 与 dupBoth 钉 0 先红。
       expect(fam.startsWith('/v1/')).toBe(true);
       expect(fam.includes('\\')).toBe(false);
       expect(owners.length).toBeGreaterThanOrEqual(2);

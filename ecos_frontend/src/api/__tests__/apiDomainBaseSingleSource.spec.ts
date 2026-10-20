@@ -162,6 +162,12 @@ const PRE_BATCH_URL_LITERALS: readonly string[] = RAW_PRE_BATCH_URL_LITERALS.map
  * B6-2~B6-7 的属主全在 services/ 或 pages/ 域，不进本域扫描面。
  * 本条是唯一"该面值原本不在本域任何腿上"的上收（改前两枚消费腿分属两个页面），
  * 故快照必须保持 83 条**逐字是改前面值**，新增位单列，两类判据各自成立。</p>
+ *
+ * <p>#145/B6-15 起有第 2 条：`/v1/engine/data/pipeline/runs` 族根单源上收进同一 `dataClient.ts`。
+ * 同 B6-9 形状（净新增声明位，非改名）：改前两枚轮询腿分属 `pages/data-workbench/api/pipeline.ts`
+ * 与 `pages/data-workbench/pipeline-editor/PipelineExecutionMonitor.tsx`，本域从未持该面值 ⇒ 台账
+ * 1→2 条、面值多重集 84→85 条。B6-14 的 `DQ_GOVERNANCE_BASE` 不进这本账（私有 `DQ_BASE` 改名并
+ * export，同一声明位、面值原本就在 83 条里），与 B6-1/B6-5/B6-8 同因。</p>
  */
 const OWNER_DECL_ADDITIONS: ReadonlyArray<{
   batch: string;
@@ -176,6 +182,13 @@ const OWNER_DECL_ADDITIONS: ReadonlyArray<{
     name: 'DATA_ENGINE_SETTINGS_BASE',
     value: '/api/v1/engine/data/settings',
     why: '族两属主分属两个页面（EngineMonitor configPath + DataEngineConfigPanel 保存腿），改前本域无该面值 ⇒ 属主按 import 图落 api 层，声明位净新增',
+  },
+  {
+    batch: '#145/B6-15',
+    file: 'dataClient.ts',
+    name: 'ENGINE_DATA_PIPELINE_RUNS_BASE',
+    value: '/api/v1/engine/data/pipeline/runs',
+    why: '族两属主分属域内 api 层与组件层（pipeline.ts 轮询腿 + PipelineExecutionMonitor 轮询腿），任选其一为属主都会让另一枚反向引页面 ⇒ 按 import 图落 api 层，声明位净新增',
   },
 ];
 
@@ -209,20 +222,20 @@ describe('api 域基址单源 — 私设基址清零 (#143/B5-16)', () => {
     }
   });
 
-  it('面值逐字不变：还原后的 URL 多重集 = 改前快照 + 后续批属主声明台账（83 + 1 条）', () => {
+  it('面值逐字不变：还原后的 URL 多重集 = 改前快照 + 后续批属主声明台账（83 + 2 条）', () => {
     const all: string[] = [];
     for (const rel of FILES) all.push(...derivedValues(read(rel)));
-    expect(all.length).toBe(84);
+    expect(all.length).toBe(85);
     expect([...all].sort()).toEqual([...PRE_BATCH_URL_LITERALS, ...OWNER_DECL_ADDITIONS.map((o) => o.value)].sort());
   });
 
-  it('#145/B6-9 属主声明台账：本域新增的 ${API_BASE} 声明位逐条登记且面值可追到属主常量', () => {
+  it('属主声明台账（#145/B6-9／#145/B6-15）：本域新增的 ${API_BASE} 声明位逐条登记且面值可追到属主常量', () => {
     // 快照 83 条是 **#143/B5-16 改前**实跑读出的消费腿面值，代表「派生不该改变运行期面值」这条不变式。
     // 后续 B6 批把某个族的**属主常量上收进本域文件**时，声明位可能是**净新增**（不是搬运），
     // 混进快照会让「改前根本不存在这条腿」失真；单列台账才能同时保住两条判据：
     //   ① 快照 83 条逐字不动（谁把消费腿面值改了即红）；
     //   ② 新增声明位逐条登记（谁再加一枚未登记的 `${API_BASE}` 声明即红，防属主面悄悄膨胀）。
-    expect(OWNER_DECL_ADDITIONS.length).toBe(1);
+    expect(OWNER_DECL_ADDITIONS.length).toBe(2);
     for (const o of OWNER_DECL_ADDITIONS) {
       const src = read(o.file);
       expect(derivedValues(src), `${o.file} 找不到登记的属主声明面值`).toContain(o.value);

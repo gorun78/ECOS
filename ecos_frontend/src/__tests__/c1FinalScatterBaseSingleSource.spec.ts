@@ -453,7 +453,13 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     // 的 `DQ_GOV_BASE` 族根声明改成不含 URL 体的名别名 ＋ `pages/WorldModelViewer.tsx` 的整 URL 内联腿改裸名），
     // 与本批棘轮 derSites 284→282 同值（两族族体全在 `/v1/` 面内且无跨行站 ⇒ 两口径这次恰好同面，B6-7 已证不可当通则）；
     // 两枚属主声明（`api/dataClient.ts` 改名并 export ＋ `api/iamClient.ts` 内联提为声明）都是同值派生态 ⇒ 净新增 0。
-    expect(derTotal, '行内派生态面须随批累积，低于 299 即扫描根或判据漂移').toBeGreaterThanOrEqual(299);
+    // #145/B6-15（存量债末批＝关账批）：299 → **297** = 删 4 枚行内派生态站点（beliefs 族 `pages/scenario/OverrideTab.tsx`
+    // ＋ `ReplayTab.tsx` 各 1 枚列表腿、runs 族 `pages/data-workbench/api/pipeline.ts` ＋ `pipeline-editor/PipelineExecutionMonitor.tsx`
+    // 各 1 枚轮询腿）、增 2 枚新建属主声明（`services/cognitiveClient.ts` 的 `COGNITIVE_BELIEFS_BASE` ＋
+    // `api/dataClient.ts` 的 `ENGINE_DATA_PIPELINE_RUNS_BASE`，两枚都写 `` `${API_BASE}/v1/…` `` 行内形态、本门照计）
+    // ⇒ 净 −2，与本批棘轮 derSites 282→280 同值（两族族体全在 `/v1/` 面内且无跨行站；B6-7 已证两口径同值不可当通则）。
+    // 本批的账不在这里：dupBoth 2→0、BASELINE 属主 4→0 关账，详 `urlFamilyDualFormRatchet` 的 B6-15 段。
+    expect(derTotal, '行内派生态面须随批累积，低于 297 即扫描根或判据漂移').toBeGreaterThanOrEqual(297);
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
   });
 

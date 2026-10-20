@@ -79,6 +79,16 @@ export function clampCognitionLimit(limit?: number): number {
 /** 认知引擎裸域前缀（旧 17-controller 端点，`/api/v1/cognitive/*`）。 */
 export const COGNITIVE_BASE = `${API_BASE}/v1/cognitive`;
 
+/**
+ * `/v1/cognitive/beliefs` 族基址单源（#145/B6-15）：本文件即属主（唯一持 URL 体者），
+ * `pages/scenario/OverrideTab.tsx` 与 `ReplayTab.tsx` 的列表腿一律 import 取值。
+ * 落服务层由 import 图裁决：两枚改前属主都是页面，放任一页面都会让另一侧「页面→页面」取常量
+ * （分层倒置，判据见 #145/B6-9 ①／#145/B6-10 ①／#145/B6-11 ①）；同族的子路径腿
+ * （`/beliefs/{variable}/override`、`/beliefs/{variable}/{version}/replay`）各只有一个生产方，
+ * 刻意保持 `${API_BASE}` 行内形态以保住族面可见性（#145/B6-9 ④ 口径），不并进本常量。
+ */
+export const COGNITIVE_BELIEFS_BASE = `${API_BASE}/v1/cognitive/beliefs`;
+
 /** 场景级认知契约前缀（PRD-05 E1~E4，`/api/v1/business/scenarios/{id}/cognition/[...]`）。 */
 export const SCENARIO_COGNITION_BASE = `${API_BASE}/v1/business/scenarios`;
 

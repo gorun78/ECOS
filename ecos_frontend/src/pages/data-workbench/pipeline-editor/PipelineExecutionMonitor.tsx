@@ -9,8 +9,9 @@ import {
   Play, CheckCircle, XCircle, AlertTriangle,
   Loader2, ChevronRight, X, AlertCircle,
 } from 'lucide-react';
-import { apiFetchData } from '../../../api';
-import { API_BASE } from '../../../services/httpClient';
+// #145/B6-15：轮询腿的族根改取 `api/dataClient` 单源常量（经 `src/api.ts` 门面），
+// 本文件不再持 URL 体 ⇒ 原 `API_BASE` 导入腿随之撤除。
+import { apiFetchData, ENGINE_DATA_PIPELINE_RUNS_BASE } from '../../../api';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import {
@@ -55,7 +56,7 @@ const PipelineExecutionMonitor: React.FC<PipelineExecutionMonitorProps> = ({
   const fetchRunStatus = useCallback(async (rid: string) => {
     try {
       const resp = await apiFetchData<RunInfo & { data?: RunInfo }>(
-        `${API_BASE}/v1/engine/data/pipeline/runs/${encodeURIComponent(rid)}`
+        `${ENGINE_DATA_PIPELINE_RUNS_BASE}/${encodeURIComponent(rid)}`
       );
       const data = resp?.data || resp;
       setRunInfo(data);

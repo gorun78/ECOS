@@ -195,6 +195,18 @@ export async function fetchDataset(id: string): Promise<DataAsset | null> {
  */
 export const PIPELINE_DEFINITIONS_BASE = `${API_BASE}/v1/pipeline/definitions`;
 
+/**
+ * `/v1/engine/data/pipeline/runs` 族基址单源（#145/B6-15）：本文件即属主（唯一持 URL 体者），
+ * `pages/data-workbench/api/pipeline.ts` 与 `pipeline-editor/PipelineExecutionMonitor.tsx`
+ * 的轮询腿一律 import 取值。落 api 层由 import 图裁决（同 #145/B6-9 ①／B6-10 ①／B6-11 ①／B6-14 ①）：
+ * 一枚写手在域内 api 层、一枚在组件层，任选其一为属主都会让另一枚反向引页面文件；本文件同段已册
+ * `PIPELINE_DEFINITIONS_BASE` 为管道族先例，域内 `_base.ts:24` 的纯重导出行不算第二属主（#145/B6-5 ② 口径）。
+ *
+ * <p>**只收族根**：`runs/{runId}` 两腿的尾段是 encodeURIComponent 插值，留在消费方行内。同族无其他
+ * 单属主子路径腿需要照 #145/B6-1 ②／B6-3 ③ 保持行内可见性——本族收的即全部两腿。</p>
+ */
+export const ENGINE_DATA_PIPELINE_RUNS_BASE = `${API_BASE}/v1/engine/data/pipeline/runs`;
+
 export interface PipelineDefinition {
   id?: string;
   name: string;

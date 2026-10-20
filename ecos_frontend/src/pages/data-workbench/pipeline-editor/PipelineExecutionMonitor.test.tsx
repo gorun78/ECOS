@@ -16,24 +16,32 @@ import PipelineExecutionMonitor from './PipelineExecutionMonitor';
 import type { PipelineExecutionMonitorProps } from './PipelineExecutionMonitorTypes';
 
 // mock 监控轮询端点
-vi.mock('../../../api', () => ({
-  apiFetchData: vi.fn(async () => ({
-    data: {
-      runId: 'run-1',
-      status: 'running',
-      completedSteps: 1,
-      totalSteps: 3,
-      elapsedMs: 1200,
-      statusText: 'running',
-      errmsg: null,
-      steps: [
-        { id: 's1', nodeId: 'n1', nodeName: 'source', status: 'succeeded', rowsInput: 100, rowsOutput: 100, elapsedMs: 200 },
-        { id: 's2', nodeId: 'n2', nodeName: 'transform', status: 'running', rowsInput: 100, rowsOutput: 0, elapsedMs: 0 },
-        { id: 's3', nodeId: 'n3', nodeName: 'sink', status: 'pending', rowsInput: 0, rowsOutput: 0, elapsedMs: 0 },
-      ],
-    },
-  })),
-}));
+// #145/B6-15：轮询腿的族根上收到 `api/dataClient` 的 `ENGINE_DATA_PIPELINE_RUNS_BASE`，经 `src/api.ts`
+// 门面导出。`vi.mock` 的工厂是**整模块替换**，不在工厂里补这枚导出，被测文件取到的就是 undefined
+// （vitest 对 mock 模块的缺失具名导出直接抛错，两个用例即以此形态变红），故门面导出面必须同步在册。
+vi.mock('../../../api', async (importOriginal) => {
+  // 展开真实门面 ⇒ 导出面随 `src/api.ts` 单源演进，本文件不再手工维护第二份清单（漏一条即假红）
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    apiFetchData: vi.fn(async () => ({
+      data: {
+        runId: 'run-1',
+        status: 'running',
+        completedSteps: 1,
+        totalSteps: 3,
+        elapsedMs: 1200,
+        statusText: 'running',
+        errmsg: null,
+        steps: [
+          { id: 's1', nodeId: 'n1', nodeName: 'source', status: 'succeeded', rowsInput: 100, rowsOutput: 100, elapsedMs: 200 },
+          { id: 's2', nodeId: 'n2', nodeName: 'transform', status: 'running', rowsInput: 100, rowsOutput: 0, elapsedMs: 0 },
+          { id: 's3', nodeId: 'n3', nodeName: 'sink', status: 'pending', rowsInput: 0, rowsOutput: 0, elapsedMs: 0 },
+        ],
+      },
+    })),
+  };
+});
 
 function renderWithProviders(props: Partial<PipelineExecutionMonitorProps> = {}) {
   return render(

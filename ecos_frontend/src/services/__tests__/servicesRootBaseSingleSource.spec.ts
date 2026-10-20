@@ -69,6 +69,7 @@ import { AIP_AGENTS_BASE, AIP_AUDIT_LOGS_BASE } from '../../pages/aiworkbench/ap
 import { DATANET_METADATA_BASE } from '../../api/dataClient';
 import { GUARDRAILS_POLICIES_BASE } from '../cognitiveEngineApi';
 import { ONTOLOGY_DATA_BASE } from '../ontology/ontologyDataApi';
+import { COGNITIVE_BELIEFS_BASE } from '../cognitiveClient';
 
 const SVC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -99,6 +100,7 @@ const CONST_VALUES: ReadonlyMap<string, string> = new Map([
   ['DATANET_METADATA_BASE', DATANET_METADATA_BASE],
   ['GUARDRAILS_POLICIES_BASE', GUARDRAILS_POLICIES_BASE],
   ['ONTOLOGY_DATA_BASE', ONTOLOGY_DATA_BASE],
+  ['COGNITIVE_BELIEFS_BASE', COGNITIVE_BELIEFS_BASE],
 ]);
 
 /**
@@ -118,8 +120,15 @@ const CONST_VALUES: ReadonlyMap<string, string> = new Map([
  * 腿改取 `services/ontology/ontologyDataApi.ts` 导出的 `ONTOLOGY_DATA_BASE`（属主在本域之外的
  * 子目录，形状同 B6-3 的 AIP 两枚 ⇒ 本域无声明行、不存在双计，`DECL_LINE_RE` 对本文件只是空转）。
  * 快照里那枚 `'"/api/v1/ontology/data"'` 由解析表还原成同面值，PER_FILE 仍记 1 条、TOTAL 仍 50。
+ *
+ * **#145/B6-15 起的第五枚裸引用常量＝本域第五批属主声明**：`COGNITIVE_BELIEFS_BASE` 声明在
+ * `cognitiveClient.ts`（属主即该文件，同 B6-11 的 `GUARDRAILS_POLICIES_BASE` 形状），两条消费腿在
+ * `pages/scenario/` 域外。若不登记，这条 `export const X = \`${API_BASE}/v1/cognitive/beliefs\`;`
+ * 声明位会被 SITE_RE 的 `API_BASE` 腿吃成第 51 条面值（实跑读出 50→51 即此）。按 B6-5 ⑧
+ * 「属主声明行不算腿」入 `BARE_REF_NAMES` ⇒ `DECL_LINE_RE` 整行跳过，本域快照 50 条不动、
+ * `PER_FILE['cognitiveClient.ts']` 仍 4 条——本批本域一条请求腿也未增减，收口发生在域外两页面。
  */
-const BARE_REF_NAMES = ['AIP_AGENTS_BASE', 'AIP_AUDIT_LOGS_BASE', 'GUARDRAILS_POLICIES_BASE', 'ONTOLOGY_DATA_BASE'] as const;
+const BARE_REF_NAMES = ['AIP_AGENTS_BASE', 'AIP_AUDIT_LOGS_BASE', 'GUARDRAILS_POLICIES_BASE', 'ONTOLOGY_DATA_BASE', 'COGNITIVE_BELIEFS_BASE'] as const;
 
 /** 族单源导入名（#145/B6-8 起本域允许的第二处基址来源；一枚文件至多一种来源）。 */
 const FAM_BASE_NAMES = ['DATANET_METADATA_BASE', 'ONTOLOGY_DATA_BASE'] as const;

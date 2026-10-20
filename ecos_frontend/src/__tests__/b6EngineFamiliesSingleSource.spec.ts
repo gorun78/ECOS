@@ -343,20 +343,29 @@ describe('b6EngineFamiliesSingleSource — 引擎域三枚重复族单源化取�
     expect(bareUseFaces(center, 'COGNITIVE_ENGINE_BASE', '/api/v1/engine/cognitive').length).toBe(1);
   });
 
-  it('棘轮在册性：三族已从 urlFamilyDualFormRatchet 的 BASELINE 剪除，且两处定点与解析行集互相对得上', () => {
+  it('棘轮在册性：三族已从 urlFamilyDualFormRatchet 的 BASELINE 剪除，关账后活性改由合成行承证 (#145/B6-8 / #145/B6-15)', () => {
     const ratchet = read('__tests__/urlFamilyDualFormRatchet.test.ts');
+    // #145/B6-15 关账 ⇒ BASELINE 是**空对象**，空集从此是目标态而不是失灵态。原三重判据里
+    // ①「行集非空」反转为「行集必须恰读 0 行」（读出非 0 即有人把已收口族塞回基线以逃逸
+    // `noNewDuplicateUrlOwner`）；②「同形正控」的活性不能靠 prod 面（空表上 contains 恒假与探针失灵同形）
+    // ⇒ 改由合成行承证，书写形状与本门解析格式逐字对齐，探针一漂立即变红；③ 规模对账原样保留、两值同为 0。
     const rows = [...ratchet.matchAll(/^ {2}'([^']+)':\s*\[/gm)].map((m) => m[1]);
-    expect(rows.length, 'BASELINE 行集解析为空 ⇒ contains 类探针在此恒真，本腿失去意义').toBeGreaterThan(0);
-    const probe = (name: string) => ratchet.includes(`'${name}': [`);
-    expect(probe(rows[0]), '同形探针连在册行都判不出 ⇒ 探针形状与 BASELINE 书写形状已脱钩').toBe(true);
-    const dupPin = Number((ratchet.match(/expect\(dupBoth\.size\)\.toBe\((\d+)\)/) ?? [])[1]);
+    expect(rows, 'BASELINE 已于 #145/B6-15 关账为空 ⇒ 任何读出的在册行都是重新引入豁免').toEqual([]);
+    const SYNTH = "const BASELINE = Object.freeze({\n  '/v1/fixture/dup': ['a.ts', 'b.ts'],\n});";
+    expect([...SYNTH.matchAll(/^ {2}'([^']+)':\s*\[/gm)].map((m) => m[1])).toEqual(['/v1/fixture/dup']);
+    expect(SYNTH.includes(`'/v1/fixture/dup': [`), '同形合成探针失灵 ⇒ contains 类判据在此恒真').toBe(true);
+    const dupPin = Number((ratchet.match(/expect\(dupBoth\.size[^)]*\)\.toBe\((\d+)\)/) ?? [])[1]);
     const entriesPin = Number((ratchet.match(/expect\(entries\.length\)\.toBe\((\d+)\)/) ?? [])[1]);
     expect(Number.isInteger(dupPin) && Number.isInteger(entriesPin), '棘轮源码里两处规模定点形状变了').toBe(true);
     expect(rows.length).toBe(dupPin);
     expect(entriesPin).toBe(dupPin);
-    expect(rows.filter((r) => r.startsWith('/v1/engine/cognitive') || r === '/v1/engine/ontology' || r === '/v1/engine/data/settings')).toEqual([]);
-    // 反向探针：本批刻意留在册的单属主族根构造点，改前也在 BASELINE 之外的必须仍然不在（防探针形状漂成恒真）
-    expect(probe('/v1/engine/ontology')).toBe(false);
+    expect(dupPin).toBe(0);
+    // 「本批三族已收口」的正面证据另起：逐族必须在册于 CLOSED_FAMILIES（防收口清单被剪薄）
+    for (const fam of FAMS) {
+      const key = fam.body.slice('/api'.length);
+      expect(ratchet.includes(`'${key}',`), `CLOSED_FAMILIES 里找不到 ${key} ⇒ 收口清单被剪薄`).toBe(true);
+      expect(ratchet.includes(`'${key}': [`), `${key} 已收口，不得回到 BASELINE 豁免位`).toBe(false);
+    }
   });
 
   it('判据能变红：私设第二写手、族边界误吃、裸引用漏计、面值漂移各造违例且被对应腿吃出（防恒绿）', () => {

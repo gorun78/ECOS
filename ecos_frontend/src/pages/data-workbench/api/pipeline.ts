@@ -6,6 +6,8 @@
 import { del, get, post, postEmpty, put, PIPELINE_DEFS, INTEGRATION } from './_base';
 import { mapPipelineDef, mapSyncTask, normalizeBackendPipelineNode } from './mappers';
 import { API_BASE } from '../../../services/httpClient';
+// #145/B6-15：`/v1/engine/data/pipeline/runs` 族根属主在 `api/dataClient`，本行只取值不持体。
+import { ENGINE_DATA_PIPELINE_RUNS_BASE } from '../../../api/dataClient';
 import type { DataPipeline, DataSyncTask } from '../types';
 
 /** Pipeline save payload (PMO-3J T3) — matches backend PipelineController createDefinition. */
@@ -85,7 +87,7 @@ export async function fetchPipelineRunStatus(
 ): Promise<{ status?: string; errorMsg?: string } | null> {
   try {
     const data = await get<{ status?: string; errorMsg?: string; data?: { status?: string; errorMsg?: string } }>(
-      `${API_BASE}/v1/engine/data/pipeline/runs/${encodeURIComponent(runId)}`
+      `${ENGINE_DATA_PIPELINE_RUNS_BASE}/${encodeURIComponent(runId)}`
     );
     return data?.data && typeof data.data === 'object' ? data.data : data;
   } catch (e) {

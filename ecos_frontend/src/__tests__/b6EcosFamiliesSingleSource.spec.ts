@@ -417,20 +417,29 @@ describe('b6EcosFamiliesSingleSource — ecos 域三枚重复族单源化取证 
     expect(codeLines(mon).filter((l) => l.includes('${CAUSAL_BASE}')).length).toBe(3);
   });
 
-  it('棘轮在册性：三族已从 urlFamilyDualFormRatchet 的 BASELINE 剪除，且两处定点与解析行集互相对得上', () => {
+  it('棘轮在册性：三族已从 urlFamilyDualFormRatchet 的 BASELINE 剪除，关账后活性改由合成行承证 (#145/B6-10 / #145/B6-15)', () => {
     const ratchet = read('__tests__/urlFamilyDualFormRatchet.test.ts');
+    // #145/B6-15 关账 ⇒ BASELINE 是**空对象**，空集从此是目标态而不是失灵态（与知识域门的三重判据同批换承载面）：
+    // 行集非空反转为「恰读 0 行」，同形正控改由合成行承证，规模对账两值同为 0。
     const rows = [...ratchet.matchAll(/^ {2}'([^']+)':\s*\[/gm)].map((m) => m[1]);
-    expect(rows.length, 'BASELINE 行集解析为空 ⇒ contains 类探针在此恒真，本腿失去意义').toBeGreaterThan(0);
-    const probe = (name: string) => ratchet.includes(`'${name}': [`);
-    expect(probe(rows[0]), '同形探针连在册行都判不出 ⇒ 探针形状与 BASELINE 书写形状已脱钩').toBe(true);
-    const dupPin = Number((ratchet.match(/expect\(dupBoth\.size\)\.toBe\((\d+)\)/) ?? [])[1]);
+    expect(rows, 'BASELINE 已于 #145/B6-15 关账为空 ⇒ 任何读出的在册行都是重新引入豁免').toEqual([]);
+    const SYNTH = "const BASELINE = Object.freeze({\n  '/v1/fixture/dup': ['a.ts', 'b.ts'],\n});";
+    expect([...SYNTH.matchAll(/^ {2}'([^']+)':\s*\[/gm)].map((m) => m[1])).toEqual(['/v1/fixture/dup']);
+    expect(SYNTH.includes(`'/v1/fixture/dup': [`), '同形合成探针失灵 ⇒ contains 类判据在此恒真').toBe(true);
+    const dupPin = Number((ratchet.match(/expect\(dupBoth\.size[^)]*\)\.toBe\((\d+)\)/) ?? [])[1]);
     const entriesPin = Number((ratchet.match(/expect\(entries\.length\)\.toBe\((\d+)\)/) ?? [])[1]);
     expect(Number.isInteger(dupPin) && Number.isInteger(entriesPin), '棘轮源码里两处规模定点形状变了').toBe(true);
     expect(rows.length).toBe(dupPin);
     expect(entriesPin).toBe(dupPin);
-    for (const fam of OWNERS) expect(probe(fam.body.slice('/api'.length))).toBe(false);
-    // 反向探针：本批刻意留在册的单属主子路径族根，改前改后都不许出现在 BASELINE
-    expect(probe('/v1/ecos/ontologies/ont001')).toBe(false);
+    expect(dupPin).toBe(0);
+    // 「本批三族已收口」的正面证据另起：逐族必须在册于 CLOSED_FAMILIES（防收口清单被剪薄）
+    for (const fam of OWNERS) {
+      const key = fam.body.slice('/api'.length);
+      expect(ratchet.includes(`'${key}',`), `CLOSED_FAMILIES 里找不到 ${key} ⇒ 收口清单被剪薄`).toBe(true);
+      expect(ratchet.includes(`'${key}': [`), `${key} 已收口，不得回到 BASELINE 豁免位`).toBe(false);
+    }
+    // 单属主子路径族根从来不在基线，空基线下该形状探针恒假 ⇒ 只对 `rows` 有意义，改由行集判据整体覆盖
+    expect(rows.filter((r) => r.startsWith('/v1/ecos/'))).toEqual([]);
   });
 
   it('判据能变红：私设第二写手、族边界误吃、别名重复计、面值漂移各造违例且被对应腿吃出（防恒绿）', () => {
