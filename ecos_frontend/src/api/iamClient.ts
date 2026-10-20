@@ -74,11 +74,15 @@ export async function deleteRole(id:string) {
 export async function fetchOrgs(): Promise<IamOrg[]> {
   return apiFetchData(`${API_BASE}/v1/system/organizations/all`);
 }
+// 族根单源属主（#145/B6-14）：`/v1/system/organizations/tree` 族根的唯二书写点之一上收于此，
+// 页面侧 `pages/WorldModelViewer.tsx` 的同值直写腿改为取值引用。
+export const SYSTEM_ORGANIZATIONS_TREE_URL = `${API_BASE}/v1/system/organizations/tree`;
+
 /** Fetch organization tree — returns nested children structure.
  *  Backend returns single root node wrapped in ApiResponse.data (Map, not Array).
  *  Normalize to IamOrg[] so callers can safely use .map(). */
 export async function fetchOrgTree(): Promise<IamOrg[]> {
-  const data = await apiFetchData<any>(`${API_BASE}/v1/system/organizations/tree`);
+  const data = await apiFetchData<any>(SYSTEM_ORGANIZATIONS_TREE_URL);
   if (Array.isArray(data)) return data;
   return data ? [data] : [];
 }

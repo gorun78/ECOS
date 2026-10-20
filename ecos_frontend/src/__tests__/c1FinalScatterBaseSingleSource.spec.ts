@@ -75,6 +75,7 @@ import { API_BASE } from '../services/httpClient';
 import { ONTOLOGY_MAPPINGS_BASE } from '../services/ontology/ontologyMappingApi';
 import { COMPLIANCE_RULES_BASE } from '../pages/knowledge/services/wiki';
 import { ECOS_VERSIONS_BASE } from '../services/ontology/ontologyVersionApi';
+import { DQ_GOV_BASE } from '../pages/data-quality/api/_base';
 
 // 本门位于 `src/__tests__/`，到 `src/` 的相对深度是一档
 const SRC_ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -199,13 +200,19 @@ function derivedValues(src: string): string[] {
 }
 
 /**
- * 族单源常量表（#145/B6-4 一枚 → #145/B6-7 两枚 → #145/B6-10 三枚）：名字 + 运行期面值。判据按表驱动，
- * 后续批再上收一枚只需加一行——上一版的单常量硬编码正是本门第一次需要跟着改形状的原因。
+ * 族单源常量表（#145/B6-4 一枚 → #145/B6-7 两枚 → #145/B6-10 三枚 → #145/B6-14 四枚）：名字 + 运行期面值。
+ * 判据按表驱动，后续批再上收一枚只需加一行——上一版的单常量硬编码正是本门第一次需要跟着改形状的原因。
+ *
+ * <p>`DQ_GOV_BASE` 是表里第一枚**别名层**成员：`_base.ts` 自 #145/B6-14 起不再书写 URL 体
+ * （`export const DQ_GOV_BASE = DQ_GOVERNANCE_BASE;`），本门按裸名计数把该行计成一条面值腿——
+ * 这是刻意口径：本门判的是「B5-26 那 21 处站点的运行期面值逐字不变」，别名重导出行确实原样携带该面值。
+ * 「书写权是否已收归属主」不在本门面，由 `b6OrgTreeDqSingleSource` 的族根构造点判据钉死。</p>
  */
 const FAM_SITES: ReadonlyArray<{ name: string; value: string; re: RegExp }> = [
   { name: 'ONTOLOGY_MAPPINGS_BASE', value: ONTOLOGY_MAPPINGS_BASE },
   { name: 'COMPLIANCE_RULES_BASE', value: COMPLIANCE_RULES_BASE },
   { name: 'ECOS_VERSIONS_BASE', value: ECOS_VERSIONS_BASE },
+  { name: 'DQ_GOV_BASE', value: DQ_GOV_BASE },
 ].map((f) => ({
   ...f,
   // 与 DERIVED_RE 同款尾体：`(?:\\.|(?!`)[^\\])*` —— 反引号不做正文、反斜杠只吃转义对
@@ -442,7 +449,11 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     // api 域兄弟门 `apiDomainBaseSingleSource` 的多重集因此仍读 84：83 条改前快照 ⊎ 1 条 B6-9 台账，
     // 本批**不进** `OWNER_DECL_ADDITIONS`——该台账只登「面值原本不在本域任何腿上」的净新增声明位，
     // 而 `/api/v1/audit/stats` 改前就是 securityClient 的一条在册腿（登记会让期望值变 85、实测 84 即红）。
-    expect(derTotal, '行内派生态面须随批累积，低于 301 即扫描根或判据漂移').toBeGreaterThanOrEqual(301);
+    // #145/B6-14（存量债第十四批）：301 → **299** = 删 2 枚行内派生态站点（`pages/data-quality/api/_base.ts`
+    // 的 `DQ_GOV_BASE` 族根声明改成不含 URL 体的名别名 ＋ `pages/WorldModelViewer.tsx` 的整 URL 内联腿改裸名），
+    // 与本批棘轮 derSites 284→282 同值（两族族体全在 `/v1/` 面内且无跨行站 ⇒ 两口径这次恰好同面，B6-7 已证不可当通则）；
+    // 两枚属主声明（`api/dataClient.ts` 改名并 export ＋ `api/iamClient.ts` 内联提为声明）都是同值派生态 ⇒ 净新增 0。
+    expect(derTotal, '行内派生态面须随批累积，低于 299 即扫描根或判据漂移').toBeGreaterThanOrEqual(299);
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
   });
 

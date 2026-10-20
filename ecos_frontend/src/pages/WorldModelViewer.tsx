@@ -47,6 +47,7 @@ import ScenariosTab from "./worldmodel/tabs/ScenariosTab";
 import ReviewTab from "./worldmodel/tabs/ReviewTab";
 import ParetoTab from "./worldmodel/tabs/ParetoTab";
 import { API_BASE, apiFetchData } from "../services/httpClient";
+import { SYSTEM_ORGANIZATIONS_TREE_URL } from "../api/iamClient";
 
 // ── Main Component ───────────────────────────
 export default function WorldModelViewer() {
@@ -233,7 +234,8 @@ export default function WorldModelViewer() {
   async function fetchOrgs() {
     try {
       // §5.3：ApiResponse 解包只在 httpClient（apiFetchData），页面不手拆信封
-      const org = await apiFetchData<any>(`${API_BASE}/v1/system/organizations/tree`);
+      // 基址自 #145/B6-14 起取 api 层族单源常量，本文件不再书写该族根体（属主唯一）
+      const org = await apiFetchData<any>(SYSTEM_ORGANIZATIONS_TREE_URL);
       if (org) setOrgTree([org]);
     } catch {}
   }

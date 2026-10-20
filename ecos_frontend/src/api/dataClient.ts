@@ -263,24 +263,26 @@ export async function getExecution(executionId: string): Promise<PipelineExecuti
 }
 
 // ── Data Quality Dashboard ────────────────────────────────────
-const DQ_BASE = `${API_BASE}/v1/dq`;
+// 族根单源属主（#145/B6-14）：`/v1/dq` 族根的唯二书写点之一上收于此，页面侧
+// `pages/data-quality/api/_base.ts` 的 `DQ_GOV_BASE` 改为不含 URL 体的别名重导出。
+export const DQ_GOVERNANCE_BASE = `${API_BASE}/v1/dq`;
 
 export async function fetchDqRules(): Promise<any> {
-  const resp = await doFetch(`${DQ_BASE}/rules`);
+  const resp = await doFetch(`${DQ_GOVERNANCE_BASE}/rules`);
   const arr = resp?.data?.data;  // ApiResponse<{data:[...],total}>
   if (Array.isArray(arr)) return arr;
   return resp?.data || resp || [];
 }
 
 export async function fetchDqIssues(): Promise<any> {
-  const resp = await doFetch(`${DQ_BASE}/issues`);
+  const resp = await doFetch(`${DQ_GOVERNANCE_BASE}/issues`);
   const arr = resp?.data?.data;  // ApiResponse<{data:[...],total}>
   if (Array.isArray(arr)) return arr;
   return resp?.data || resp || [];
 }
 
 export async function fetchDqDashboard(): Promise<any> {
-  const resp = await doFetch(`${DQ_BASE}/dashboard`);
+  const resp = await doFetch(`${DQ_GOVERNANCE_BASE}/dashboard`);
   return resp?.data || resp || null;
 }
 
@@ -294,24 +296,24 @@ export async function fetchDqAll(): Promise<[any, any, any]> {
 }
 
 export async function createDqItem(type: string, body: any): Promise<any> {
-  return doFetch(`${DQ_BASE}/${type}`, { method: "POST", body: JSON.stringify(body) });
+  return doFetch(`${DQ_GOVERNANCE_BASE}/${type}`, { method: "POST", body: JSON.stringify(body) });
 }
 
 export async function updateDqItem(type: string, id: string, body: any): Promise<any> {
-  return doFetch(`${DQ_BASE}/${type}/${id}`, { method: "PUT", body: JSON.stringify(body) });
+  return doFetch(`${DQ_GOVERNANCE_BASE}/${type}/${id}`, { method: "PUT", body: JSON.stringify(body) });
 }
 
 export async function deleteDqItem(type: string, id: string): Promise<any> {
-  return doFetch(`${DQ_BASE}/${type}/${id}`, { method: "DELETE" });
+  return doFetch(`${DQ_GOVERNANCE_BASE}/${type}/${id}`, { method: "DELETE" });
 }
 
 export async function runDqCheck(): Promise<any> {
-  return doFetch(`${DQ_BASE}/check`, { method: "POST" });
+  return doFetch(`${DQ_GOVERNANCE_BASE}/check`, { method: "POST" });
 }
 
 export async function resolveDqIssue(issueId: string, body: any): Promise<any> {
   // Backend uses PUT /api/dq/issues/{id} with status in body
-  return doFetch(`${DQ_BASE}/issues/${issueId}`, { method: "PUT", body: JSON.stringify(body) });
+  return doFetch(`${DQ_GOVERNANCE_BASE}/issues/${issueId}`, { method: "PUT", body: JSON.stringify(body) });
 }
 
 

@@ -448,9 +448,7 @@ function dupByRawOnly(idx: Index): Map<string, string[]> {
  */
 const BASELINE: Readonly<Record<string, readonly string[]>> = Object.freeze({
   '/v1/cognitive/beliefs?domain={}': ['pages/scenario/OverrideTab.tsx', 'pages/scenario/ReplayTab.tsx'],
-  '/v1/dq': ['api/dataClient.ts', 'pages/data-quality/api/_base.ts'],
   '/v1/engine/data/pipeline/runs/{}': ['pages/data-workbench/api/pipeline.ts', 'pages/data-workbench/pipeline-editor/PipelineExecutionMonitor.tsx'],
-  '/v1/system/organizations/tree': ['api/iamClient.ts', 'pages/WorldModelViewer.tsx'],
 });
 
 describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 (#143/B5-19 / D-B5-40)', () => {
@@ -541,7 +539,9 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // #145/B6-12（存量债第十二批）：287 → **285** = 删 2 枚 `` `${API_BASE}` `` 站点，**判据本批未动**
     // ⇒ 两侧同口径可比（无需 wide/wide 换算）。逐文件实测：`ontologyWorkbenchApi` 1→0 ＋ `overview.ts` 7→6（改裸引用）；两属主 2→2／1→1（族根仅改名并 export）。
     // #145/B6-13：285 → **284** = 删 1 枚站点（`SecurityAudit.tsx` 直连腿 1→0 改裸引用；属主 `securityClient.ts` 20→20，消费腿换成同值族根声明、计数不动）。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(284);
+    // #145/B6-14：284 → **282** = 删 2 枚（`pages/data-quality/api/_base.ts` 族根声明改成不含 URL 体的名别名 1 ＋ `WorldModelViewer.tsx` 整 URL 内联腿改裸名取值 1）；
+    // 两枚属主声明都是同值派生态（dq＝私有 `DQ_BASE` 改名并 export、org-tree＝内联腿提为声明）⇒ 净新增枚 0，账只记 dupBoth 与属主。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(282);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     expect(dupBoth.size).toBeGreaterThan(dupRawOnly.size);
@@ -628,10 +628,11 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `ONTOLOGY_DATA_BASE`／`ONTOLOGY_EXPORT_BASE`）。族面 253 一点不降：两枚族根声明各留 1 枚且仍写
     // `` `${API_BASE}/v1/…` ``，且两处都是**改名并 export 既有私有常量**（同一声明位）⇒ 无净新增属主枚。
     // #145/B6-13：dupBoth 5 → **4**、盲区 5 → **4**（`/v1/audit/stats` 两属主合一为 `api/securityClient.ts` 的 `AUDIT_STATS_BASE`；族面 253 不降，族根声明仍写 `` `${API_BASE}/v1/…` ``，页面侧裸名引用不带 URL 体故对本门隐形）
-    expect(dupBoth.size).toBe(4);
+    // #145/B6-14：dupBoth 4 → **2**、盲区 4 → **2**（`/v1/dq` 与 `/v1/system/organizations/tree` 各两属主合一；两族族根声明各留 1 枚且仍写派生态 ⇒ 族面 253 不降、只退出重复面，dq 的别名层与 org-tree 的裸名腿对本门隐形）
+    expect(dupBoth.size).toBe(2);
     expect(dupRawOnly.size).toBe(0);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(4);
+    expect(blind.length).toBe(2);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);
@@ -697,10 +698,8 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     const entries = Object.entries(BASELINE);
     // #145/B6-1 起 29 族 / 62 属主（`/v1/knowledge` 一族 7 属主收口单源，与本批同款改动同批剪除）
     // #145/B6-2 起 27 族 / 57 属主（`/v1/workspace/scenarios` 两族一对共 5 属主收口单源，同批剪除）
-    // #145/B6-3 起 24 族 / 51 属主（`/v1/aip/agents`、`/v1/aip/agents/{}`、`/v1/aip/audit-logs` 三族
-    // 共 6 属主收口为页 api 层双常量，同批剪除）
-    // #145/B6-4 起 22 族 / 45 属主（`/v1/ontology/mappings`、`/v1/ontology/proposals` 两族共 6 属主
-    // 收口为 `services/ontology/` 两分册各一枚导出常量，同批剪除）
+    // #145/B6-3 起 24 族 / 51 属主（`/v1/aip/agents`、`/v1/aip/agents/{}`、`/v1/aip/audit-logs` 三族共 6 属主收口为页 api 层双常量，同批剪除）
+    // #145/B6-4 起 22 族 / 45 属主（`/v1/ontology/mappings`、`/v1/ontology/proposals` 两族共 6 属主收口为 `services/ontology/` 两分册各一枚导出常量，同批剪除）
     // #145/B6-5 起 21 族 / 42 属主（`/v1/pipeline/definitions` 三属主收口为 `api/dataClient.ts` 的
     // `PIPELINE_DEFINITIONS_BASE` 单源，同批剪除；三属主里两枚声明位消失、一枚改 import 裸引用）
     // #145/B6-6 起 18 族 / 36 属主（知识域 `/v1/knowledge/query`、`/v1/knowledge/rag`、`/v1/ontology/glossary`
@@ -727,11 +726,11 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `services/cognitiveEngineApi.ts` 合一为后者导出的 `GUARDRAILS_POLICIES_BASE`，页面侧
     // `pages/Guardrails/constants.ts` 的同族根声明改为不含 URL 体的别名重导出——它本来就不在本门面里，
     // 属主面按门面口径记 4→2；两族族根声明各留 1 枚 ⇒ 族面 253 不降）
-    // #145/B6-12 起 5 族 / 10 属主：`/v1/ontology/data` 与 `/v1/ontology/export` 各两属主合一为属主文件导出的
-    // `ONTOLOGY_DATA_BASE`／`ONTOLOGY_EXPORT_BASE`（各−2 属主，两处都是既有私有常量改名并 export ⇒ 无净新增枚）；
+    // #145/B6-12 起 5 族 / 10 属主：`/v1/ontology/data` 与 `/v1/ontology/export` 各两属主合一为属主文件导出的 `ONTOLOGY_DATA_BASE`／`ONTOLOGY_EXPORT_BASE`（各−2 属主，两处都是既有私有常量改名并 export ⇒ 无净新增枚）；
     // #145/B6-13 起 4 族 / 8 属主：`/v1/audit/stats` 两属主合一为 `api/securityClient.ts` 导出的 `AUDIT_STATS_BASE`
-    expect(entries.length).toBe(4);
-    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(8);
+    // #145/B6-14 起 2 族 / 4 属主：`/v1/dq` 两属主合一为 `api/dataClient.ts` 导出的 `DQ_GOVERNANCE_BASE`（页面侧 `_base.ts` 改成名别名）、`/v1/system/organizations/tree` 两属主合一为 `api/iamClient.ts` 导出的 `SYSTEM_ORGANIZATIONS_TREE_URL`
+    expect(entries.length).toBe(2);
+    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(4);
     expect(BASELINE['/v1/knowledge']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios/{}']).toBeUndefined();
@@ -756,6 +755,7 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     expect(BASELINE['/v1/ontology/data']).toBeUndefined();
     expect(BASELINE['/v1/ontology/export']).toBeUndefined();
     expect(BASELINE['/v1/audit/stats']).toBeUndefined();
+    for (const fam of ['/v1/dq', '/v1/system/organizations/tree']) expect(BASELINE[fam], `${fam} 已于 #145/B6-14 退出重复面，陈旧豁免位必须剪除`).toBeUndefined();
     for (const [fam, owners] of entries) {
       expect(fam.startsWith('/v1/')).toBe(true);
       expect(fam.includes('\\')).toBe(false);

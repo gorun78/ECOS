@@ -7,8 +7,14 @@
 
 import type { DqFallbackRecord } from "./types";
 import { API_BASE } from "../../../services/httpClient";
+import { DQ_GOVERNANCE_BASE } from "../../../api/dataClient";
 
-export const DQ_GOV_BASE = `${API_BASE}/v1/dq`;
+/**
+ * 族根单源的消费别名（#145/B6-14）：`/v1/dq` 族根体的唯一书写点在 `api/dataClient.ts`
+ * 导出的 `DQ_GOVERNANCE_BASE`，本行只搬运名字、不再书写 URL 体——本域 30+ 条腿的历史
+ * 导入面（`./_base`）因此零改动，且别名与属主的面值等价由守恒门的运行期对拍钉死。
+ */
+export const DQ_GOV_BASE = DQ_GOVERNANCE_BASE;
 /** legacy 只读端点前缀 — 与数据工作台「数据质量」页同源 (DqController) */
 export const DQ_LEGACY_BASE = `${API_BASE}/v1/ecos/dq`;
 
