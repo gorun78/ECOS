@@ -29,7 +29,7 @@ import com.chinacreator.gzcm.gateway.DdlShapeScanner.Table;
  * {@code MigrationVersionUniquenessTest} 均不存在 ⇒ <b>违例可长期静默累积</b>」。
  * 前两者已由 #140/E-1 与本批 {@link Mc02TypeWhitelistTest} 补上，本类补 {@code DrBaselineColumnsTest}。
  * 既有载体 {@code AiDdlComplianceTest}、{@code WAgentDdlShapeComplianceTest} 只各自校验
- * AI 域段/WAgent 域段的建表形态 ⇒ 全源 239 枚脚本的<b>基线列面</b>无人守护（域内局部覆盖冒充
+ * AI 域段/WAgent 域段的建表形态 ⇒ 全源 240 枚脚本的<b>基线列面</b>无人守护（域内局部覆盖冒充
  * 全域不变量＝差距文档定义的假绿形态）。按 R9①「缺的门禁＝补代码实现」补本类。</p>
  *
  * <p><b>红线依据</b>（《数据库访问规范》v1.4 §一 原文，逐字对应）：
@@ -125,8 +125,10 @@ class DrBaselineColumnsTest {
     private static final int TOTAL_TABLE_FLOOR = 300;
 
     /** 全源脚本数下限（DDL 单源目录，铁律 v2.2 §3.1）。
-     *  2026-10-16 二期 W2：V289（td_user IAM 读面补列）落地 ⇒ 238→239；V288 由规范 §十 预留给 #144-c，本批不占。 */
-    private static final int SCRIPT_FLOOR = 239;
+     *  2026-10-16 二期 W2：V289（td_user IAM 读面补列）落地 ⇒ 238→239；V288 由规范 §十 预留给 #144-c，本批不占。
+     *  2026-10-17 二期 W5（a982d713）：V290 落地只加脚本未改本锚 ⇒ 模块全量 test 红；
+     *  2026-10-21 #142/B4-3e-3 按实测订正 239→240。 */
+    private static final int SCRIPT_FLOOR = 240;
 
     @Test
     @DisplayName("锁①：扫描面非空——脚本数、建表数、V200+ 建表数均达下限（空扫描面=假绿）")
