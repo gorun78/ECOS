@@ -170,7 +170,12 @@ export async function fetchDataset(id: string): Promise<DataAsset | null> {
 
 
 // ── Pipeline Builder ──────────────────────────────────────────
-const PIPELINE_BASE = `${API_BASE}/v1/pipeline/definitions`;
+/**
+ * `/v1/pipeline/definitions` 族基址单源（#145/B6-5）：本文件即属主（唯一持 URL 体者），
+ * `pages/data-workbench/api/_base.ts` 与 `pages/aiworkbench/api.ts` 一律 import 取值。
+ * 落 api 层由 import 图裁决：aiworkbench 本就经 `src/api.ts` 吃 dataClient，反向放页面层会倒置分层。
+ */
+export const PIPELINE_DEFINITIONS_BASE = `${API_BASE}/v1/pipeline/definitions`;
 
 export interface PipelineDefinition {
   id?: string;
@@ -195,12 +200,12 @@ export interface PipelineExecution {
 
 /** GET /api/pipeline/definitions — 列表 */
 export async function fetchPipelines(pageSize = 50): Promise<{ data: PipelineDefinition[]; total: number }> {
-  return apiFetchData(`${PIPELINE_BASE}?pageSize=${pageSize}`);
+  return apiFetchData(`${PIPELINE_DEFINITIONS_BASE}?pageSize=${pageSize}`);
 }
 
 /** GET /api/pipeline/definitions/{id} — 详情 */
 export async function fetchPipeline(id: string): Promise<PipelineDefinition> {
-  return apiFetchData(`${PIPELINE_BASE}/${id}`);
+  return apiFetchData(`${PIPELINE_DEFINITIONS_BASE}/${id}`);
 }
 
 /** POST /api/pipeline/definitions — 创建 */
@@ -210,7 +215,7 @@ export async function createPipeline(body: {
   nodes?: { nodeId: string; type: string; config?: Record<string, any> }[];
   edges?: { from: string; to: string; label?: string }[];
 }): Promise<PipelineDefinition> {
-  return apiFetchData(PIPELINE_BASE, {
+  return apiFetchData(PIPELINE_DEFINITIONS_BASE, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -218,7 +223,7 @@ export async function createPipeline(body: {
 
 /** PUT /api/pipeline/definitions/{id} — 更新 */
 export async function updatePipeline(id: string, body: Partial<PipelineDefinition>): Promise<PipelineDefinition> {
-  return apiFetchData(`${PIPELINE_BASE}/${id}`, {
+  return apiFetchData(`${PIPELINE_DEFINITIONS_BASE}/${id}`, {
     method: "PUT",
     body: JSON.stringify(body),
   });
@@ -226,12 +231,12 @@ export async function updatePipeline(id: string, body: Partial<PipelineDefinitio
 
 /** DELETE /api/pipeline/definitions/{id} — 删除 */
 export async function deletePipeline(id: string): Promise<void> {
-  await apiFetchData(`${PIPELINE_BASE}/${id}`, { method: "DELETE" });
+  await apiFetchData(`${PIPELINE_DEFINITIONS_BASE}/${id}`, { method: "DELETE" });
 }
 
 /** POST /api/pipeline/definitions/{id}/execute — 执行 */
 export async function executePipeline(id: string): Promise<PipelineExecution> {
-  return apiFetchData(`${PIPELINE_BASE}/${id}/execute`, { method: "POST" });
+  return apiFetchData(`${PIPELINE_DEFINITIONS_BASE}/${id}/execute`, { method: "POST" });
 }
 
 /** GET /api/pipeline/executions/{id} — 执行状态 */

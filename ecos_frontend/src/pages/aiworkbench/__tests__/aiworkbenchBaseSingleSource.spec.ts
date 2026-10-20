@@ -38,6 +38,13 @@
  * 就双计）；本批这枚在本文件没有声明行，不计即丢腿（28→27 假红）。故引入 `IMPORTED_BARE_NAMES`：
  * 只有从外部 import 进来的常量名才计裸引用，且先摘同行模板腿、导入行不计。28 条面值与快照逐字不动，
  * 该页是否漏挪/多挪由 `src/__tests__/b6OntologyFamilySingleSource.spec.ts` 承证。</p>
+ *
+ * <p>**#145/B6-5 同一条判据第二次复用（形状相同、常量为第三枚）**：本文件 `fetchPipelineDefinitions`
+ * 的 `` `${API_BASE}/v1/pipeline/definitions` `` 内联腿上收至属主 `api/dataClient` 导出的
+ * `PIPELINE_DEFINITIONS_BASE`，使用处同样变成裸引用 ⇒ 解析表与 `IMPORTED_BARE_NAMES` 各加一枚，
+ * **28 条面值钉死不动**（还原值仍是 `/api/v1/pipeline/definitions`）。到此「导入裸名」集合已三枚，
+ * 后续批若再把别的族上收，仍按本口径只扩集合、不动条数；跨文件守恒由
+ * `src/__tests__/b6PipelineDefinitionsSingleSource.spec.ts` 承证。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -47,6 +54,7 @@ import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../../../services/httpClient';
 import { AIP_AGENTS_BASE, AIP_AUDIT_LOGS_BASE } from '../../../pages/aiworkbench/api';
 import { ONTOLOGY_PROPOSALS_BASE } from '../../../services/ontology/ontologyProposalApi';
+import { PIPELINE_DEFINITIONS_BASE } from '../../../api/dataClient';
 
 // 本门位于 `src/pages/aiworkbench/__tests__/`，到 `src/` 的相对深度是三档（少一档即读不到被测域）
 const SRC_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -72,15 +80,17 @@ const CONST_VALUES: ReadonlyMap<string, string> = new Map([
   ['AIP_AGENTS_BASE', AIP_AGENTS_BASE],
   ['AIP_AUDIT_LOGS_BASE', AIP_AUDIT_LOGS_BASE],
   ['ONTOLOGY_PROPOSALS_BASE', ONTOLOGY_PROPOSALS_BASE],
+  ['PIPELINE_DEFINITIONS_BASE', PIPELINE_DEFINITIONS_BASE],
 ]);
 /**
- * **按来源分治的裸引用判据（#145/B6-4 新增）**：B6-3 立的「本门不计裸引用」只成立于**本文件自声明**
- * 常量（声明行 + 使用行会双计同一枚面值，把条数虚抬）。`ONTOLOGY_PROPOSALS_BASE` 是从属主
- * `services/ontology/ontologyProposalApi.ts` import 进来的，本文件没有它的声明行 ⇒ 不计裸引用就是
- * 丢一条腿（28→27 假红）。故这里只对**导入进来的**常量名计裸引用，且必须先摘掉同行的模板腿、
- * 导入行本身不计（否则 import 语句读成一次请求）。
+ * **按来源分治的裸引用判据（#145/B6-4 立、#145/B6-5 复用）**：B6-3 定的「本门不计裸引用」只成立于
+ * **本文件自声明**常量（声明行 + 使用行会双计同一枚面值，把条数虚抬）。`ONTOLOGY_PROPOSALS_BASE`
+ * （B6-4）与 `PIPELINE_DEFINITIONS_BASE`（B6-5）都是从别处属主 import 进来的，本文件没有它们的
+ * 声明行 ⇒ 不计裸引用就是丢腿（28→27、28→27 假红）。故这里只对**导入进来的**常量名计裸引用，
+ * 且必须先摘掉同行的模板腿、导入行本身不计（否则 import 语句读成一次请求）。
+ * 后续批再把别的族上收时：只扩本集合 + `CONST_VALUES`，**28 条面值快照一律不动**。
  */
-const IMPORTED_BARE_NAMES: readonly string[] = ['ONTOLOGY_PROPOSALS_BASE'];
+const IMPORTED_BARE_NAMES: readonly string[] = ['ONTOLOGY_PROPOSALS_BASE', 'PIPELINE_DEFINITIONS_BASE'];
 
 function isComment(line: string): boolean {
   const t = line.trim();
@@ -269,6 +279,14 @@ describe('pages/aiworkbench 域基址单源 — 私设基址清零 (#143/B5-25)'
     expect(derivedValues('  const u = `${ONTOLOGY_PROPOSALS_BASE}/${id}/execute`; await call(ONTOLOGY_PROPOSALS_BASE, u);')).toEqual([
       '/api/v1/ontology/proposals/${id}/execute',
       '/api/v1/ontology/proposals',
+    ]);
+    // #145/B6-5：第三枚导入常量同口径——裸引用计一条腿、导入行不计、派生形态还原成同面值
+    expect(derivedValues('  const data = await apiFetchData<PipelineDefinitionRaw[]>(PIPELINE_DEFINITIONS_BASE);')).toEqual([
+      '/api/v1/pipeline/definitions',
+    ]);
+    expect(derivedValues("import { PIPELINE_DEFINITIONS_BASE } from '../../api/dataClient';")).toEqual([]);
+    expect(derivedValues('  return apiFetchData(`${PIPELINE_DEFINITIONS_BASE}/${id}`);')).toEqual([
+      '/api/v1/pipeline/definitions/${id}',
     ]);
   });
 });

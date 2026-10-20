@@ -12,6 +12,8 @@ import { apiFetchData } from '../../api';
 import { API_BASE, rawStreamUrlFetch } from '../../services/httpClient';
 // #145/B6-4：本体提案族基址单源（services/ontology/ontologyProposalApi 导出）；execute 子路径腿仍走 ${API_BASE} 保可见
 import { ONTOLOGY_PROPOSALS_BASE } from '../../services/ontology/ontologyProposalApi';
+// #145/B6-5：pipeline 定义族基址单源（属主 = api/dataClient 的导出常量）；走显式属主路径而非 src/api 门面，供守恒门钉来源
+import { PIPELINE_DEFINITIONS_BASE } from '../../api/dataClient';
 import { createSseParser, decodeFrameData, type SseRawEvent } from '../../services/sseParser';
 import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel, AIPActionType, ExecuteActionResult, AIPAgentTemplate, AIPAgentMetrics, AIPAgentError, AIPAuditLog } from '../../types/aiworkbench';
 
@@ -192,7 +194,7 @@ interface PipelineDefinitionRaw {
 }
 
 export async function fetchPipelineDefinitions(): Promise<AIPLogicPipeline[]> {
-  const data = await apiFetchData<PipelineDefinitionRaw[]>(`${API_BASE}/v1/pipeline/definitions`);
+  const data = await apiFetchData<PipelineDefinitionRaw[]>(PIPELINE_DEFINITIONS_BASE);
   return (Array.isArray(data) ? data : []).map((p: PipelineDefinitionRaw) => ({
     id: p.id || p.name,
     name: p.name,

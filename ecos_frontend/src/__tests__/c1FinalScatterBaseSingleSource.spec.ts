@@ -33,6 +33,12 @@
  * 「导入腿恰 1 条」对这唯一一枚上收文件换成「API_BASE 恰 0 条 + 族单源导入腿恰 1 条且取自属主」，
  * 并把上收面钉成恰该一个文件。C1 闭合面腿的 `derTotal` 口径不变（只看全仓 `${API_BASE}` 派生态），
  * 上收会把该计数按面值减少 ⇒ 下限按复跑实测订正，订正理由记在棘轮门与本门注释，不得当成进度。</p>
+ *
+ * <p>#145/B6-5 再次同形订正下限 333→**331**（实测读出，与本批棘轮 derSites 312→310 差额同值）：
+ * 本门 FILES 面**不含**该批两文件（`pages/data-workbench/api/_base.ts` 属 #143/B5-21 域门、且该域门
+ * 只由「整域零私设基址」腿覆盖、不钉 `_base.ts` 条数；`pages/aiworkbench/api.ts` 由 B5-25 域门钉 28 条
+ * 面值、上收后靠「导入裸名」判据接住，条数一字未动）。故本门只有全仓 `derTotal` 这一条腿需要跟着动，
+ * 19 条面快照与逐文件条数一律不剪。下限每动一次都必须带实测号 + 缘由 + 与棘轮差额对账，缺一即视为漂移。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -297,7 +303,10 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     // #145/B6-4 订正为 333：该批把 5 枚**消费者**派生态上收为族单源 import 裸引用（属主声明一枚未动），
     // 本门只看 `${API_BASE}` 派生态 ⇒ 按面值减 5。这是可见性搬运、不是进度，下限随之同步下调并注明缘由；
     // 债的账仍只在 `urlFamilyDualFormRatchet` 的 dupBoth/属主面上记。
-    expect(derTotal, '行内派生态面须随批累积，低于 333 即扫描根或判据漂移').toBeGreaterThanOrEqual(333);
+    // #145/B6-5 订正为 331：同形状再减 2 枚——`pages/data-workbench/api/_base.ts` 的 `PIPELINE_DEFS`
+    // 声明改成不含 URL 体的别名重导出 + `pages/aiworkbench/api.ts` 的一枚内联派生态改 import 裸引用，
+    // 属主声明（`api/dataClient`）一枚未动。与本批棘轮 derSites 312→310 的实测差额同值，互相对得上。
+    expect(derTotal, '行内派生态面须随批累积，低于 331 即扫描根或判据漂移').toBeGreaterThanOrEqual(331);
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
   });
 

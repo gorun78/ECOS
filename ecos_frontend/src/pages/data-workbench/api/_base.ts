@@ -19,10 +19,13 @@
 
 import { API_BASE, ApiRequestError, NoAccessError, apiFetchData } from '../../../services/httpClient';
 
+// #145/B6-5：`/v1/pipeline/definitions` 族属主在 `api/dataClient`，本行只做域内别名重导出——
+// 不含 URL 体 ⇒ 不构成第二个属主，域内 `PIPELINE_DEFS` 导出面逐字不变（API 只增不改）。
+export { PIPELINE_DEFINITIONS_BASE as PIPELINE_DEFS } from '../../../api/dataClient';
+
 // ─── API 端点常量 ──────────────────────────────────────────
 export const DATANET_DS = '/datanet/datasource';           // DataSourceController
 export const INTEGRATION  = `${API_BASE}/integration/metadata`;   // IntegrationMetadataController (connections + syncTasks)
-export const PIPELINE_DEFS = `${API_BASE}/v1/pipeline/definitions`; // PipelineController
 export const LINEAGE_TOPOL = `${API_BASE}/v1/engine/data/lineage/topology`;
 
 /**
