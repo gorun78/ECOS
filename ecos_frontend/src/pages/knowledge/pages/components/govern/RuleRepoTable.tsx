@@ -10,7 +10,7 @@
  * i18n §4.3：0 硬编码中文（key: knowledge.govern.rule_*）
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { API_BASE } from '../../../../../services/httpClient';
+import { COMPLIANCE_RULES_BASE } from '../../../services/wiki';
 import {
   Archive, BookOpen, CheckCircle2, Edit3, Loader2, Pencil, Plus, RefreshCw,
   Search, ShieldCheck, Trash2, X,
@@ -69,7 +69,7 @@ export default function RuleRepoTable() {
     setErrorBanner(null);
     try {
       const data = await apiFetchData<RuleItem[]>(
-        `${API_BASE}/v1/knowledge/compliance-rules?${
+        `${COMPLIANCE_RULES_BASE}?${
           (keywords ? `keyword=${encodeURIComponent(keywords)}` : '') +
           (keywords && domainFilter ? '&' : '') +
           (domainFilter ? `domain=${encodeURIComponent(domainFilter)}` : '')
@@ -106,7 +106,7 @@ export default function RuleRepoTable() {
     setSaving(true);
     try {
       await apiFetchData<RuleItem>(
-        `${API_BASE}/v1/knowledge/compliance-rules`,
+        `${COMPLIANCE_RULES_BASE}`,
         { method: 'POST', body: JSON.stringify({ name: createForm.name, domain: createForm.domain, status: createForm.status }) },
       );
       setShowCreate(false);
@@ -129,7 +129,7 @@ export default function RuleRepoTable() {
     }
     setSaving(true);
     try {
-      await apiFetchData<RuleItem>(`${API_BASE}/v1/knowledge/compliance-rules/${editingId}`, {
+      await apiFetchData<RuleItem>(`${COMPLIANCE_RULES_BASE}/${editingId}`, {
         method: 'PUT',
         body: JSON.stringify({ name: editForm.name, domain: editForm.domain, status: editForm.status }),
       });
@@ -154,7 +154,7 @@ export default function RuleRepoTable() {
   const handleDisable = useCallback(async (r: RuleItem) => {
     setSaving(true);
     try {
-      await apiFetchData<RuleItem>(`${API_BASE}/v1/knowledge/compliance-rules/${r.id}`, {
+      await apiFetchData<RuleItem>(`${COMPLIANCE_RULES_BASE}/${r.id}`, {
         method: 'PUT',
         body: JSON.stringify({ name: r.name, domain: r.domain, status: 'DEPRECATED' }),
       });
@@ -171,7 +171,7 @@ export default function RuleRepoTable() {
   const handleDelete = useCallback(async (r: RuleItem) => {
     setSaving(true);
     try {
-      await apiFetchData<void>(`${API_BASE}/v1/knowledge/compliance-rules/${r.id}`, { method: 'DELETE' });
+      await apiFetchData<void>(`${COMPLIANCE_RULES_BASE}/${r.id}`, { method: 'DELETE' });
       await loadRules(search, domain);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

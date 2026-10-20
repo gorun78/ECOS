@@ -276,13 +276,18 @@ describe('b6KnowledgeFamilySingleSource — 重复族 /v1/knowledge 单源化取
         return m !== null && m[2] === '/v1/knowledge';
       });
       expect(privateBase, `${rel} 不得再私设 KB 族基址`).toEqual([]);
-      // 判据只吃族根：更细的族（compliance-rules 等）本批不动，仍按在册基线保持私设形态
+      // 判据只吃族根：更细的族本批不动。**#145/B6-7 变更**：wiki 侧这枚子族基址由私有 `RULES_BASE`
+      // 改名并 export 为 `COMPLIANCE_RULES_BASE`（该子族的族单源），声明形态仍是 `${API_BASE}/v1/knowledge/…`
+      // ⇒ 计数腿不增不减，本腿把「唯一那枚子族声明必须就是 B6-7 的属主声明」钉成逐字，防止改名后
+      // 悄悄多出一枚私设基址（计数 1 对同值双声明的畸形形状在本域真实存在过，见棘轮 B6-6 注①）。
       const subFamilyBase = lines.filter((l) => {
         const m = l.match(BASE_DECL_RE);
         return m !== null && m[2].startsWith('/v1/knowledge/');
       });
-      if (rel === 'pages/knowledge/services/wiki.ts') expect(subFamilyBase.length, 'wiki.ts 的子族基址 RULES_BASE 属另一族，本批不动').toBe(1);
-      else expect(subFamilyBase, `${rel} 本批不涉子族基址`).toEqual([]);
+      if (rel === 'pages/knowledge/services/wiki.ts') {
+        expect(subFamilyBase.length, 'wiki.ts 的子族基址属 /v1/knowledge/compliance-rules 一族，本批不动').toBe(1);
+        expect(subFamilyBase[0].trim()).toBe('export const COMPLIANCE_RULES_BASE = `${API_BASE}/v1/knowledge/compliance-rules`;');
+      } else expect(subFamilyBase, `${rel} 本批不涉子族基址`).toEqual([]);
       const usesApiBase = lines.filter((l) => /\bAPI_BASE\b/.test(l) && !l.trim().startsWith('import '));
       // govern.ts 的 API_BASE 唯一用途就是被收口那枚声明 ⇒ 收口后导入必须一起清
       if (rel === 'pages/knowledge/services/govern.ts') expect(usesApiBase, 'govern.ts 收口后不应残留 API_BASE 用途').toEqual([]);
@@ -314,11 +319,25 @@ describe('b6KnowledgeFamilySingleSource — 重复族 /v1/knowledge 单源化取
   it('棘轮在册性：/v1/knowledge 已随本批从 urlFamilyDualFormRatchet 的 BASELINE 剪除（不留陈旧豁免）', () => {
     const ratchet = read('__tests__/urlFamilyDualFormRatchet.test.ts');
     expect(ratchet).not.toContain("'/v1/knowledge': [");
-    // 反向腿：判据不是在空串上跑——同文件里在册族必须还能被这条 contains 判出。
-    // #145/B6-6 起探针族换掉：旧探针 `/v1/knowledge/rag` 那一行随该批收口被剪除，留着即假红
-    // （探针本身随基线收缩漂移是这一类反向腿的固有形状 ⇒ 补一条规模计数腿，单行探针落在空表也真是它挡不住的）。
-    expect(ratchet).toContain("'/v1/knowledge/compliance-rules': [");
-    expect((ratchet.match(/^ {2}'\/v1\//gm) ?? []).length).toBe(18);
+    // 反向腿：判据不是在空表上跑。**探针不钉族名**——BASELINE 只减不增，硬编码任何在册族都会随
+    // 后续批收口漂移成假红（#145/B6-6 的 `/v1/knowledge/rag`、#145/B6-7 的 `/v1/knowledge/compliance-rules`
+    // 已各漂一次，两次都得改本门，这正是该形状的固有缺陷）。改为三重不漂移判据：
+    //   ① 行集非空（空表上任何 contains/not-contains 都恒真）；
+    //   ② 同形正控：与上面 `not.toContain` **逐字同形**的探针必须能在解析出的在册行上判出为真，
+    //      这条同时挡掉「单行探针落在空表也挡不住」的旧形状；
+    //   ③ 规模对账：行集条数 ≡ 棘轮自己的 dupBoth 定点 ≡ entries.length 定点。
+    //      数字单源在棘轮文件里，本门只引用不复制 ⇒ 基线收缩不再需要动本腿。
+    const rows = [...ratchet.matchAll(/^ {2}'([^']+)':\s*\[/gm)].map((m) => m[1]);
+    expect(rows.length, 'BASELINE 行集解析为空 ⇒ contains 类探针在此恒真，本腿失去意义').toBeGreaterThan(0);
+    const probe = (name: string) => ratchet.includes(`'${name}': [`);
+    expect(probe(rows[0]), '同形探针连在册行都判不出 ⇒ 探针形状与 BASELINE 书写形状已脱钩').toBe(true);
+    const dupPin = Number((ratchet.match(/expect\(dupBoth\.size\)\.toBe\((\d+)\)/) ?? [])[1]);
+    const entriesPin = Number((ratchet.match(/expect\(entries\.length\)\.toBe\((\d+)\)/) ?? [])[1]);
+    expect(Number.isInteger(dupPin) && Number.isInteger(entriesPin), '棘轮源码里两处规模定点形状变了').toBe(true);
+    expect(rows.length).toBe(dupPin);
+    expect(entriesPin).toBe(dupPin);
+    // 本批口径：`/v1/knowledge` 根族与知识域一切子族行都不得回到基线（不留陈旧豁免）
+    expect(rows.filter((r) => r.startsWith('/v1/knowledge'))).toEqual([]);
   });
 
   it('快照自检：72 条全部落在族内、有重复腿（非去重集合）且逐文件条数与本批口径相符（防快照清空成恒真）', () => {

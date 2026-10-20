@@ -44,6 +44,27 @@
  * **首批"消费腿减少 + 属主声明净增"同时发生**的账：query/rag 两族改前没有任何常量，收口时新建 2 枚
  * `` `${API_BASE}…` `` 声明，同时 7 枚消费腿改成裸引用/上收 ⇒ 明细 −7/+2，不能按"消费腿条数"一口价写成 −7。
  * 本门 FILES 面仍不含该批三文件（各由 B5-18/B5-20/B6-6 域门覆盖），故依旧只动 `derTotal` 一条腿。</p>
+ *
+ * <p>#145/B6-7 是本批 15 文件里**第一次有 FILES 面成员被后续存量债批上收**（前两枚上收都落在别批的文件上，
+ * B6-4 的 `ExtractionPage.tsx` 是本批成员但那批只有一枚站点）。`RuleRepoTable.tsx` 的 5 枚站点全部改引
+ * 该族属主 `COMPLIANCE_RULES_BASE` ⇒ 本门三处形状随之变：① `FAMILY_OWNER` 从一枚变两枚（上收面按名字排序
+ * 逐字钉死）；② `faceValues` 从"单常量硬编码"改成**常量表驱动**，否则这 4 枚行内腿凭空消失、19 条面快照
+ * 掉到 15 条却看着像进度；③ 跨行腿的左半逐字从 `` `${API_BASE}` `` 形换成属主常量形，「行内还原恰 4 条」
+ * 的判据口径同步从 `derivedValues` 换成 `faceValues`。</p>
+ *
+ * <p>**本批自伤一处、由条数腿抓出，记此防复发**：表驱动把「裸引用也算腿」这条 B6-4 引入的判据一并作用到了
+ * 跨行模板的**开口行**上——模板腿正则要求同行收尾反引号吃不进，裸名 `split(name)` 却照样吃到，于是
+ * RuleRepoTable 的行级面从 4 变 5（实测 `expected 5 to be 4`）。修法不是把条数改成像对，而是补
+ * `isOpenTemplateLine`（奇数枚未转义反引号 ⇒ 该行不属于行级面，该站由跨行腿单独判），并把「开口行不造腿」
+ * 与「同线两枚常量各计一次」两条 fixture 钉进「判据能变红」腿。旧形状没有这一缺陷：`API_BASE` 从不参与
+ * 裸名计数。</p>
+ *
+ * <p>下限订正 326→**322**（−4，实测读出）。**首批与本批棘轮差额不同值**（棘轮 derSites 305→300 = −5）：
+ * 差的 1 枚正是 RuleRepoTable 的跨行站——本门逐行跑 `DERIVED_RE` 看不到它，棘轮 `familiesOf` 滤掉注释行后
+ * **拼回整串**再全局 `matchAll`，而 `[^\\]` 能吃换行 ⇒ 那一枚一直在棘轮面里。两口径本非同一面（棘轮只认
+ * `/v1/` 族体，本门还计 `/api/telemetry`、`/api/graphql`），此前各批"两口径恰好同时看见同一批站点"才使
+ * 差额同值，不得再按「差额必同值」外推。属主声明 `COMPLIANCE_RULES_BASE` 仍是 `${API_BASE}` 裸形态
+ * （只是私有升导出）、wiki 侧 6 枚消费腿改前也不是 `${API_BASE}` 形态 ⇒ 两者都不计数，净 −4 全在该页。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -52,6 +73,7 @@ import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../services/httpClient';
 import { ONTOLOGY_MAPPINGS_BASE } from '../services/ontology/ontologyMappingApi';
+import { COMPLIANCE_RULES_BASE } from '../pages/knowledge/services/wiki';
 
 // 本门位于 `src/__tests__/`，到 `src/` 的相对深度是一档
 const SRC_ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -83,15 +105,24 @@ const FILES: ReadonlyArray<{ rel: string; importPath: string; sites: number }> =
 const MULTILINE_REL = 'pages/knowledge/pages/components/govern/RuleRepoTable.tsx';
 const JSX_REL = 'pages/knowledge/tabs/GraphBuilderTab.tsx';
 /**
- * #145/B6-4：本批 21 处里唯一一枚被后续存量债批上收到**族单源常量**的文件。该页只有一枚站点，
- * 收口后 `API_BASE` 导入合法归零 ⇒ 本门「导入腿恰 1 条」对这一文件必须换成「恰 1 条族单源导入腿
- * 且取自属主」。面快照**不剪腿**（下面 `faceValues` 接住模板腿 + 裸引用两种形态），剪腿会让
- * 19 条掉到 18 条却看着像进度。
+ * 被后续存量债批上收到**族单源常量**的本批文件（#145/B6-4 一枚 → #145/B6-7 两枚）。这些页的
+ * `API_BASE` 导入合法归零 ⇒ 本门「导入腿恰 1 条」对它们必须换成「恰 1 条族单源导入腿且取自属主」。
+ * 面快照**不剪腿**（`faceValues` 接住模板腿 + 裸引用两种形态），剪腿会让 19 条掉到 18 条却看着像进度。
+ *
+ * <p>#145/B6-7 的 `RuleRepoTable.tsx` 是本批唯一含跨行模板站的页，其 5 枚站点（跨行 1 + 行内 4）
+ * 全部改引 `COMPLIANCE_RULES_BASE` ⇒ 该页 `${API_BASE}` 派生态归零，本门的三处形状随之变：
+ * ① `FAMILY_OWNER` 多一枚；② `faceValues` 从「单一常量」改为常量表驱动（否则 4 枚行内腿凭空消失）；
+ * ③ 跨行腿的左半逐字从 `${API_BASE}` 形换成属主常量形，「行内还原恰 4 条」的判据口径同步从
+ * `derivedValues` 换成 `faceValues`——差额仍是那 1 枚跨行站，一点不多一点不少。</p>
  */
 const FAMILY_OWNER: ReadonlyMap<string, { name: string; ownerRe: RegExp }> = new Map([
   [
     'pages/knowledge/pages/ExtractionPage.tsx',
     { name: 'ONTOLOGY_MAPPINGS_BASE', ownerRe: /from '[^']*services\/ontology\/ontologyMappingApi'/ },
+  ],
+  [
+    MULTILINE_REL,
+    { name: 'COMPLIANCE_RULES_BASE', ownerRe: /from '[^']*services\/wiki'/ },
   ],
 ]);
 /**
@@ -102,8 +133,9 @@ const LINE_VISIBLE = FILES
   .filter((f) => f.rel !== JSX_REL)
   .map((f) => (f.rel === MULTILINE_REL ? { ...f, sites: f.sites - 1 } : f));
 
-/** 跨行模板站点：改后左半 / 改前左半（快照里右半在后续行，脚本以 ` …<<MULTILINE>>` 标注截断）。 */
-const MULTILINE_HEAD = '`${API_BASE}/v1/knowledge/compliance-rules?${';
+/** 跨行模板站点：改后左半 / 改前左半（快照里右半在后续行，脚本以 ` …<<MULTILINE>>` 标注截断）。
+ *  #145/B6-7：改后左半的基址名从 `${API_BASE}` 换成该族属主常量，面值等价由下面的替换律证明。 */
+const MULTILINE_HEAD = '`${COMPLIANCE_RULES_BASE}?${';
 const MULTILINE_SNAP_HEAD = '`/api/v1/knowledge/compliance-rules?${';
 /** JSX 显示文本站：改前整行（`git show HEAD:` 读出）与其中的渲染面值。 */
 const JSX_PRE_HEAD =
@@ -159,26 +191,55 @@ function derivedValues(src: string): string[] {
   return out;
 }
 
-/** `ONTOLOGY_MAPPINGS_BASE` 的模板腿形态（裸引用形态在下面先摘掉模板腿后再数）。 */
-const FAM_NAME = 'ONTOLOGY_MAPPINGS_BASE';
-const FAM_SITE_RE = /`\$\{ONTOLOGY_MAPPINGS_BASE\}((?:\\.|(?!`)[^\\])*)`/g;
+/**
+ * 族单源常量表（#145/B6-4 一枚 → #145/B6-7 两枚）：名字 + 运行期面值。判据按表驱动，
+ * 后续批再上收一枚只需加一行——上一版的单常量硬编码正是本门第一次需要跟着改形状的原因。
+ */
+const FAM_SITES: ReadonlyArray<{ name: string; value: string; re: RegExp }> = [
+  { name: 'ONTOLOGY_MAPPINGS_BASE', value: ONTOLOGY_MAPPINGS_BASE },
+  { name: 'COMPLIANCE_RULES_BASE', value: COMPLIANCE_RULES_BASE },
+].map((f) => ({
+  ...f,
+  // 与 DERIVED_RE 同款尾体：`(?:\\.|(?!`)[^\\])*` —— 反引号不做正文、反斜杠只吃转义对
+  re: new RegExp('`' + String.raw`\$\{` + f.name + String.raw`\}` + '((?:\\\\.|(?!`)[^\\\\])*)' + '`', 'g'),
+}));
 
 /**
- * 面值逐字不变腿的站点面 = 行内 `` `${API_BASE}…` `` 派生态 + 族单源常量的两种形态
- * （模板腿与裸引用）。裸引用必须先摘模板腿、且导入行不计，否则一条腿计两次、
- * 或把 import 语句当成一次请求。C1 闭合面腿不看这里（口径 = 全仓 `${API_BASE}` 派生态总量）。
+ * 未闭合反引号（奇数枚未转义反引号）⇒ 该行是跨行模板的**开口半边**。#145/B6-7 起必须显式跳过裸名计数：
+ * 模板腿正则要求同行收尾反引号、吃不进 `` `${COMPLIANCE_RULES_BASE}?${ ``，但裸名 `split(name)`
+ * 不看反引号，于是凭空造出第 5 枚腿（实测 `faceValues(RuleRepoTable)` = 5 而非 4）。
+ * 这一站由跨行腿单独判，行级面不吃。旧形状无此缺陷——`API_BASE` 从不参与裸名计数。
+ */
+function isOpenTemplateLine(line: string): boolean {
+  let n = 0;
+  for (let i = 0; i < line.length; i += 1) {
+    if (line[i] === '\\') { i += 1; continue; }
+    if (line[i] === '`') n += 1;
+  }
+  return n % 2 === 1;
+}
+
+/**
+ * 面值逐字不变腿的站点面 = 行内 `` `${API_BASE}…` `` 派生态 + 每枚族单源常量的两种形态
+ * （模板腿与裸引用）。裸引用必须先摘模板腿、导入行不计、开口行不计，否则一条腿计两次、
+ * 把 import 语句当成一次请求、或把跨行站造出第二条腿。
+ * C1 闭合面腿不看这里（口径 = 全仓 `${API_BASE}` 派生态总量）。
  */
 function faceValues(src: string): string[] {
   const out = derivedValues(src);
   for (const line of codeLines(src)) {
     if (/^\s*import\s/.test(line)) continue;
+    const open = isOpenTemplateLine(line);
     let rest = line;
-    for (const m of line.matchAll(FAM_SITE_RE)) {
-      rest = rest.split(m[0]).join('');
-      out.push(`${ONTOLOGY_MAPPINGS_BASE}${m[1]}`);
+    for (const f of FAM_SITES) {
+      for (const m of line.matchAll(f.re)) {
+        rest = rest.split(m[0]).join('');
+        out.push(`${f.value}${m[1]}`);
+      }
+      if (open) continue;
+      const bare = rest.split(f.name).length - 1;
+      for (let i = 0; i < bare; i += 1) out.push(f.value);
     }
-    const bare = rest.split(FAM_NAME).length - 1;
-    for (let i = 0; i < bare; i += 1) out.push(ONTOLOGY_MAPPINGS_BASE);
   }
   return out;
 }
@@ -235,11 +296,15 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
         expect(famImports[0], `${rel} 的 ${fam.name} 导入未取自该族属主`).toMatch(fam.ownerRe);
       }
     }
-    // 上收面必须恰好是这一文件：多一个说明根漂，少一个说明有文件被静默改成零来源（假绿）
-    expect([...FAMILY_OWNER.keys()].sort()).toEqual(['pages/knowledge/pages/ExtractionPage.tsx']);
+    // 上收面必须钉死：多一个说明有文件被静默改成零来源以外的形状，少一个说明本批把某枚上收漏判成
+    // 私设基址残留（假红/假绿双向）。#145/B6-7 起该面从 1 枚变 2 枚，按名字排序逐字钉。
+    expect([...FAMILY_OWNER.keys()].sort()).toEqual([
+      'pages/knowledge/pages/ExtractionPage.tsx',
+      MULTILINE_REL,
+    ]);
   });
 
-  it('面值逐字不变：19 条行内派生态按 API_BASE 还原后 = 改前裸形态快照（排序多重集 + 逐文件条数）', () => {
+  it('面值逐字不变：19 条行内站点（API_BASE 派生态 + 族单源常量两形态）还原后 = 改前裸形态快照（排序多重集 + 逐文件条数）', () => {
     const all: string[] = [];
     for (const { rel, sites } of LINE_VISIBLE) {
       const vals = faceValues(read(rel));
@@ -250,11 +315,15 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     expect([...all].sort()).toEqual([...UNWRAPPED].sort());
   });
 
-  it('跨行模板腿：左半派生逐字 + 行内还原恰 4 条（差额即本腿这条跨行站）+ 整文件零裸面', () => {
+  it('跨行模板腿：左半逐字（属主常量形）+ 行内还原恰 4 条（差额即本腿这条跨行站）+ 整文件零裸面', () => {
     const src = read(MULTILINE_REL);
     expect(codeLines(src).filter((l) => l.trim() === MULTILINE_HEAD).length).toBe(1);
-    expect(MULTILINE_HEAD.replace('`${API_BASE}', API_BASE)).toBe(MULTILINE_SNAP_HEAD.slice(1));
-    expect(derivedValues(src).length, '5 点里跨行那 1 点不该被行级还原吃到').toBe(4);
+    // 替换律：把左半的基址名换成该族属主常量的运行期面值，必须逐字等于改前快照左半
+    // （#145/B6-7 之前这里换的是 `${API_BASE}` → API_BASE，形状同款、只是基址名换了）
+    expect(MULTILINE_HEAD.replace('`${COMPLIANCE_RULES_BASE}', COMPLIANCE_RULES_BASE)).toBe(
+      MULTILINE_SNAP_HEAD.slice(1),
+    );
+    expect(faceValues(src).length, '5 点里跨行那 1 点不该被行级还原吃到').toBe(4);
     expect(HARDCODED_RE.test(src), '跨行模板体里不得夹带 /api 字面量').toBe(false);
   });
 
@@ -316,7 +385,14 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     // query 1）上收；同文件新建 2 枚属主声明（query/rag 两族改前**没有常量**，见
     // `b6KnowledgeQueryRagGlossarySingleSource` 的声明面 2→3 归因）。glossary 那枚族根声明只是改名导出、
     // `${API_BASE}` 形态未动 ⇒ 不计数。差额与本批棘轮 derSites 310→305 同值，互相对得上。
-    expect(derTotal, '行内派生态面须随批累积，低于 326 即扫描根或判据漂移').toBeGreaterThanOrEqual(326);
+    // #145/B6-7 订正为 322（−4，实测读出）。**首批与本批棘轮差额不同值（棘轮 −5），差的那 1 枚是
+    // RuleRepoTable 的跨行站**：本门逐行跑 DERIVED_RE，跨行模板的开口行没有收尾反引号 ⇒ 改前改后都不计；
+    // 棘轮 `familiesOf` 先把注释行滤掉再**拼回整串**全局 matchAll，而 `[^\\]` 能吃换行 ⇒ 那一枚一直在它的
+    // 面里。两口径本就不是同一面（C1 还含 `/api/telemetry`、`/api/graphql` 这类非 `/v1/` 前缀派生态，
+    // 棘轮只认 `/v1/` 族体），此前各批恰好"两口径同时看见同一批站点"才使差额同值。
+    // 属主声明 `COMPLIANCE_RULES_BASE` 仍是 `${API_BASE}` 裸形态（只是从私有升为导出）⇒ 计数不变；
+    // wiki 侧 6 枚消费腿改引属主常量，改前也不是 `${API_BASE}` 形态 ⇒ 同样不计数。净 −4 全在 RuleRepoTable。
+    expect(derTotal, '行内派生态面须随批累积，低于 322 即扫描根或判据漂移').toBeGreaterThanOrEqual(322);
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
   });
 
@@ -331,7 +407,7 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     expect(LINE_VISIBLE.reduce((acc, f) => acc + f.sites, 0)).toBe(19);
   });
 
-  it('判据能变红：双前缀/不接斜杠/裸形态三类违例各被判出，合规源不命中（防恒绿）', () => {
+  it('判据能变红：双前缀/不接斜杠/裸形态三类违例各被判出，合规源不命中；族单源三形态与跨行开口造腿亦各判出（防恒绿）', () => {
     const DEFECT = [
       '  const url = `${API_BASE}/api/v1/datanet`;', // 双前缀（本批真实自伤形状）
       '  const u2 = `${API_BASE}v1/ecos/versions`;', // 派生后不接斜杠
@@ -360,5 +436,21 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
       '/api/v1/ontology/mappings/objects',
     ]);
     expect(faceValues("import { ONTOLOGY_MAPPINGS_BASE } from '../../../services/ontology/ontologyMappingApi';")).toEqual([]);
+    // #145/B6-7：表驱动后第二枚族常量必须同样吃到三种形态，且**开口行不造腿**（本批真实自伤形状：
+    // 加了裸名计数、忘加跨行守卫 ⇒ RuleRepoTable 行级面从 4 变 5，守恒腿一比即红）
+    expect(faceValues('  await apiFetchData<void>(`${COMPLIANCE_RULES_BASE}/${r.id}`, { method: "DELETE" });')).toEqual([
+      '/api/v1/knowledge/compliance-rules/${r.id}',
+    ]);
+    expect(faceValues('        `${COMPLIANCE_RULES_BASE}`')).toEqual(['/api/v1/knowledge/compliance-rules']);
+    expect(faceValues('  const data = await apiFetchData(COMPLIANCE_RULES_BASE);')).toEqual([
+      '/api/v1/knowledge/compliance-rules',
+    ]);
+    expect(faceValues('        `${COMPLIANCE_RULES_BASE}?${')).toEqual([]);
+    expect(isOpenTemplateLine('        `${COMPLIANCE_RULES_BASE}?${')).toBe(true);
+    expect(isOpenTemplateLine('        `${COMPLIANCE_RULES_BASE}`')).toBe(false);
+    // 两枚常量的腿在同一条线上各计一次，互不吞并（防表驱动退化成"只认第一枚"）
+    expect(
+      faceValues('  const u = [ONTOLOGY_MAPPINGS_BASE, `${COMPLIANCE_RULES_BASE}/objects`];'),
+    ).toEqual(['/api/v1/ontology/mappings', '/api/v1/knowledge/compliance-rules/objects']);
   });
 });

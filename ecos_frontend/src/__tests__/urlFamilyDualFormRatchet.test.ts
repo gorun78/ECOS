@@ -145,6 +145,22 @@
  *      第二生产方出现即红。同根子路径族 `/v1/knowledge/compliance-rules` 与 nav 两族本批不动（B6-7 议题）。
  * 收口的 3 文件 18→19 枚面值守恒不在本门证明范围内，由同批新增的
  * `b6KnowledgeQueryRagGlossarySingleSource.spec.ts` 承证。
+ * #145/B6-7 复跑 = 680 / **254** / 裸面 **0** / 派生面 **300** / dupBoth **17** / dupRawOnly **0** /
+ * blind **17**：存量债第七批收口 **知识域规则仓族两属主**——`/v1/knowledge/compliance-rules`
+ * （`pages/knowledge/services/wiki.ts` 的私有 `const RULES_BASE` ＋
+ * `pages/knowledge/pages/components/govern/RuleRepoTable.tsx` 的 5 枚内联 `` `${API_BASE}/v1/…` `` 腿），
+ * 单源＝把 wiki 那枚**改名并 export** 为 `COMPLIANCE_RULES_BASE`，页面侧改成 import。三处形状须记清：
+ *   ① **属主声明位不增不减**（与 B6-6 的「新增 2 枚声明」相对）：本族改前已有一枚族根声明，收口只是
+ *      把它从私有升为导出 ⇒ 声明面 1→1、面值一字未动，属主从 2 降到 1 全靠页面侧 5 枚内联腿改引常量。
+ *   ② **族面第一次降两枚**（256→254）：消失的不是被收口的族本身，而是只由 RuleRepoTable 一家书写的
+ *      两枚**同根子族** `/v1/knowledge/compliance-rules/{}`（PUT/DELETE 腿归一化）与
+ *      `/v1/knowledge/compliance-rules?{}`（跨行模板字面量的列表腿）。此即 B6-1 文件头 ② 预告、
+ *      B6-2/B6-3 各兑现一次的「经属主常量拼出的腿对 `familiesOf` 隐形」机制，本批一次隐两枚。
+ *      **检测面不受损**：再有人直接写第二枚族体腿仍判红；隐形只发生在引常量的合法消费腿——那正是单源的定义。
+ *      族面降 2 属可见性变化，严禁读成「债多还了两族」；账仍只记 dupBoth 18→17 与属主 36→34。
+ *   ③ derSites 305→300 = 删 5 枚内联派生态站点、属主声明一枚未动，同为副产物。
+ * 收口的 2 文件面值守恒（wiki 声明 1 ＋ 消费腿 9、RuleRepoTable 5 枚腿）不在本门证明范围内，
+ * 由同批新增的 `b6ComplianceRulesSingleSource.spec.ts` 承证。
  * 逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。
@@ -157,10 +173,13 @@
  * 棘轮口径 = **族 → 属主清单**（两侧都只减不增）：
  *   新族出现在重复面 → 红；基线族新增属主 → 红；基线族/属主已不再重复 → 陈旧豁免亦红
  *   （与 privateTransportRatchet「陈旧豁免即红」同口径：基线预算不留给已收口的项）。
- *   本门**不宣称**证明单源成立——基线剩 18 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
+ *   本门**不宣称**证明单源成立——基线剩 17 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
  *   `/v1/knowledge` 一族后 29 族 62 属主，#145/B6-2 收口 `/v1/workspace/scenarios` 两族一对后 27 族 57 属主，
  *   #145/B6-3 收口 AIP 域三族（同一对生产方）后 24 族 51 属主，#145/B6-4 收口本体域两族六属主后 22 族 45 属主，
  *   #145/B6-5 收口 pipeline 定义族三属主后 21 族 42 属主，#145/B6-6 收口知识域三族六属主后 18 族 36 属主，
+ *   #145/B6-7 收口 `/v1/knowledge/compliance-rules` 族两属主后 17 族 34 属主——该族属主合并后，
+ *   两个单属主子族（`/{}` 与 `?{}` 形态）随唯一生产方改引属主常量而退出族面（族面 256→254，
+ *   属主合并≠漏检：新生产方若再写族体裸串/派生串仍会被本门抓到，论证见文件头 B6-7 形状②），
  *   余属 B6 后续批），
  *   本门钉死的是「债不再增 + 派生态不再隐身」。
  *
@@ -298,7 +317,6 @@ const BASELINE: Readonly<Record<string, readonly string[]>> = Object.freeze({
   '/v1/engine/data/settings': ['pages/EngineMonitor.tsx', 'pages/data-workbench/DataEngineConfigPanel.tsx'],
   '/v1/engine/ontology': ['pages/MonitoringCenter.tsx', 'services/ontology/ontologyEngineApi.ts'],
   '/v1/guardrails/policies': ['pages/aiworkbench/api.ts', 'services/cognitiveEngineApi.ts'],
-  '/v1/knowledge/compliance-rules': ['pages/knowledge/pages/components/govern/RuleRepoTable.tsx', 'pages/knowledge/services/wiki.ts'],
   '/v1/ontology/data': ['services/ontology/ontologyDataApi.ts', 'services/ontologyWorkbenchApi.ts'],
   '/v1/ontology/export': ['pages/knowledge/services/overview.ts', 'services/ontology/ontologyExportApi.ts'],
   '/v1/system/organizations/tree': ['api/iamClient.ts', 'pages/WorldModelViewer.tsx'],
@@ -358,7 +376,11 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // wiki 4 枚：glossary 族根声明 1 + rag 2 + query 1）、增 2 枚新建属主声明（query/rag，仍写 `${API_BASE}`
     // 形态）；glossary 族根声明只是从 wiki 搬到属主文件、计数不变。净 −5 全是形态搬运，债的账只记
     // dupBoth 21 → 18 与属主 42 → 36。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(305);
+    // #145/B6-7：305 → **300** = 删 5 枚 `` `${API_BASE}` `` 站点（全部落在 `govern/RuleRepoTable.tsx` 的
+    // 内联腿：1 枚列表腿＋1 枚建腿＋2 枚 PUT 腿＋1 枚 DELETE 腿），属主声明位一枚未动（`wiki.ts` 的
+    // RULES_BASE 只是改名并 export，仍是同一枚 `` `${API_BASE}/v1/knowledge/compliance-rules` ``）。
+    // 净 −5 同属形态搬运；债的账只记 dupBoth 18 → 17 与属主 36 → 34。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(300);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     expect(dupBoth.size).toBeGreaterThan(dupRawOnly.size);
@@ -398,10 +420,20 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `services/knowledgeQueryApi` + `pages/knowledge/services/wiki`；`/v1/ontology/glossary` 为
     // `services/glossary` + 同一 wiki）收口为三枚导出常量单源 ⇒ **dupBoth 21 → 18**、BASELINE 同批剪除
     // 三族（属主 42 → 36 = 三族 × 2 条基线记录，每族收口后仍各留 1 枚族根声明 ⇒ 族面不降、只退出重复面）。
-    expect(dupBoth.size).toBe(18);
+    // #145/B6-7（存量债第七批）：`/v1/knowledge/compliance-rules` 两属主（`pages/knowledge/services/wiki`
+    // 的族根声明＋`pages/knowledge/pages/components/govern/RuleRepoTable` 的 5 枚内联腿）收口为 wiki 一枚
+    // **改名并 export** 的 `COMPLIANCE_RULES_BASE` 单源 ⇒ **dupBoth 18 → 17**、BASELINE 同批剪除该族
+    // （属主 36 → 34）。本批族面**第一次降两枚**（256 → 254）：消失的不是被收口的族本身（属主声明留在
+    // wiki，族继续在索引里），而是只由 RuleRepoTable 一家书写的两枚**同根子族** ——
+    // `/v1/knowledge/compliance-rules/{}`（PUT/DELETE 腿归一化后）与 `/v1/knowledge/compliance-rules?{}`
+    // （跨行模板字面量的列表腿）。它们改前各只有 1 个生产方、从来不在重复面，收口后写族体的人换成引
+    // 常量 ⇒ 对 `familiesOf` 整体隐形（＝B6-1 文件头 ② 预告、B6-2/B6-3 各兑现一次的同一机制，本批一次
+    // 隐两枚）。检测面不受损：任何人再写第二枚族体腿仍会被判红，隐形只发生在「经属主常量拼出的腿」，
+    // 而那正是单源的定义。族面升降一律不作进度读，进度仍只认 dupBoth 与属主两栏。
+    expect(dupBoth.size).toBe(17);
     expect(dupRawOnly.size).toBe(0);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(18);
+    expect(blind.length).toBe(17);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);
@@ -442,8 +474,10 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `PIPELINE_DEFINITIONS_BASE` 单源，同批剪除；三属主里两枚声明位消失、一枚改 import 裸引用）
     // #145/B6-6 起 18 族 / 36 属主（知识域 `/v1/knowledge/query`、`/v1/knowledge/rag`、`/v1/ontology/glossary`
     // 三族共 6 属主收口为三枚导出常量，同批剪除）
-    expect(entries.length).toBe(18);
-    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(36);
+    // #145/B6-7 起 17 族 / 34 属主（`/v1/knowledge/compliance-rules` 两属主收口为 `pages/knowledge/services/`
+    // `wiki.ts` 一枚改名并 export 的 `COMPLIANCE_RULES_BASE`，同批剪除；属主声明位未增未减）
+    expect(entries.length).toBe(17);
+    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(34);
     expect(BASELINE['/v1/knowledge']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios/{}']).toBeUndefined();
@@ -456,6 +490,7 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     expect(BASELINE['/v1/knowledge/query']).toBeUndefined();
     expect(BASELINE['/v1/knowledge/rag']).toBeUndefined();
     expect(BASELINE['/v1/ontology/glossary']).toBeUndefined();
+    expect(BASELINE['/v1/knowledge/compliance-rules']).toBeUndefined();
     for (const [fam, owners] of entries) {
       expect(fam.startsWith('/v1/')).toBe(true);
       expect(fam.includes('\\')).toBe(false);

@@ -5,7 +5,9 @@
  * base 单源：
  *   - KNOWLEDGE_BASE = /api/v1/knowledge
  *   - ONTOLOGY_GLOSSARY_BASE = /api/v1/ontology/glossary（族属主 services/glossary.ts，#145/B6-6 上收）
- *   - RULES_BASE     = /api/v1/knowledge/compliance-rules
+ *   - COMPLIANCE_RULES_BASE = /api/v1/knowledge/compliance-rules
+ *     （#145/B6-7 族单源：本文件即该族属主，声明导出供
+ *      `pages/components/govern/RuleRepoTable.tsx` 引用；方向＝页面引服务，不成环）
  *
  * 错误态语义（F04-03）：
  *   - wiki 主数据源（nav taxon / settings）走 `kbFetchData` → 5xx 或 `ECOS-KB-*`
@@ -35,7 +37,8 @@ import type {
 } from '../typesAndConstants';
 
 const KB_V1 = KNOWLEDGE_BASE;
-const RULES_BASE = `${API_BASE}/v1/knowledge/compliance-rules`;
+/** #145/B6-7：`/v1/knowledge/compliance-rules` 族单源声明（全仓唯一族体书写点，棘轮在册）。 */
+export const COMPLIANCE_RULES_BASE = `${API_BASE}/v1/knowledge/compliance-rules`;
 
 // ── KB Workbench settings（检索参数：vector/chunk/overlap/maxRetrieval） ─────────
 
@@ -205,7 +208,7 @@ export async function fetchRules(
   if (params?.status) qs.set('status', params.status);
   if (params?.keyword) qs.set('keyword', params.keyword);
   const query = qs.toString();
-  const url = query ? `${RULES_BASE}?${query}` : RULES_BASE;
+  const url = query ? `${COMPLIANCE_RULES_BASE}?${query}` : COMPLIANCE_RULES_BASE;
   try {
     const data = await apiFetchData<RuleRepository[]>(url);
     return Array.isArray(data) ? data : [];
@@ -222,25 +225,25 @@ export async function kbFetchRules(
   if (params?.status) qs.set('status', params.status);
   if (params?.keyword) qs.set('keyword', params.keyword);
   const query = qs.toString();
-  const url = query ? `${RULES_BASE}?${query}` : RULES_BASE;
+  const url = query ? `${COMPLIANCE_RULES_BASE}?${query}` : COMPLIANCE_RULES_BASE;
   return kbFetchData<RuleRepository[]>(url);
 }
 
 export async function createRule(data: Partial<RuleRepository>) {
-  return apiFetchData<RuleRepository>(RULES_BASE, { method: 'POST', body: JSON.stringify(data) });
+  return apiFetchData<RuleRepository>(COMPLIANCE_RULES_BASE, { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function updateRule(id: string, data: Partial<RuleRepository>) {
-  return apiFetchData<RuleRepository>(`${RULES_BASE}/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  return apiFetchData<RuleRepository>(`${COMPLIANCE_RULES_BASE}/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
 
 export async function deleteRule(id: string) {
-  return apiFetchData(`${RULES_BASE}/${id}`, { method: 'DELETE' });
+  return apiFetchData(`${COMPLIANCE_RULES_BASE}/${id}`, { method: 'DELETE' });
 }
 
 export async function fetchRuleVersions(ruleId: string): Promise<RuleVersion[]> {
   try {
-    const data = await apiFetchData<RuleVersion[]>(`${RULES_BASE}/${ruleId}/versions`);
+    const data = await apiFetchData<RuleVersion[]>(`${COMPLIANCE_RULES_BASE}/${ruleId}/versions`);
     return Array.isArray(data) ? data : [];
   } catch {
     return [];
@@ -248,5 +251,5 @@ export async function fetchRuleVersions(ruleId: string): Promise<RuleVersion[]> 
 }
 
 export async function kbFetchRuleVersions(ruleId: string): Promise<RuleVersion[]> {
-  return kbFetchData<RuleVersion[]>(`${RULES_BASE}/${ruleId}/versions`);
+  return kbFetchData<RuleVersion[]>(`${COMPLIANCE_RULES_BASE}/${ruleId}/versions`);
 }
