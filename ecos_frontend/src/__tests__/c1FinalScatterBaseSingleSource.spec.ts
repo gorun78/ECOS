@@ -436,7 +436,13 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     // 本批两口径**不同值**：棘轮 pin 面值 287→285（−2）与本门同值，但属主枚 14→10（−4）——
     // −4 里的另 2 枚是两属主文件**自身**的族根书写点（改前各算一枚属主），它们在本门始终只计 1 枚
     // 声明行，故不重复出现在 −2 里；两口径的差是「同一声明位在两把尺子里的记法不同」，非漂移。
-    expect(derTotal, '行内派生态面须随批累积，低于 302 即扫描根或判据漂移').toBeGreaterThanOrEqual(302);
+    // #145/B6-13（存量债第十三批）：302 → **301** = 删 1 枚行内派生态站点（`pages/SecurityAudit.tsx` 的
+    // audit/stats 直写腿 1→0，改导入 `api/securityClient.ts` 导出的 `AUDIT_STATS_BASE` 裸引用）。属主文件那枚
+    // 面值从「消费腿」搬到「族根声明」，两者都是 `` `${API_BASE}/v1/…` `` 行内形态 ⇒ 本门对它计数不变（20→20）。
+    // api 域兄弟门 `apiDomainBaseSingleSource` 的多重集因此仍读 84：83 条改前快照 ⊎ 1 条 B6-9 台账，
+    // 本批**不进** `OWNER_DECL_ADDITIONS`——该台账只登「面值原本不在本域任何腿上」的净新增声明位，
+    // 而 `/api/v1/audit/stats` 改前就是 securityClient 的一条在册腿（登记会让期望值变 85、实测 84 即红）。
+    expect(derTotal, '行内派生态面须随批累积，低于 301 即扫描根或判据漂移').toBeGreaterThanOrEqual(301);
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
   });
 

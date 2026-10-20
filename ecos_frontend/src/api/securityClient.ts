@@ -112,10 +112,12 @@ export async function fetchAuditLogs(
 }
 
 // ── Audit Stats ───────────────────────────────────────────
+// 族根单源属主（#145/B6-13）：本枚是 AUDIT_STATS 族在生产的唯一书写点，页面侧只取值
+export const AUDIT_STATS_BASE = `${API_BASE}/v1/audit/stats`;
 // 对接 AuditController: GET /api/v1/audit/stats
 export async function fetchAuditStats(): Promise<AuditStats> {
   try {
-    return await apiFetchData<AuditStats>(`${API_BASE}/v1/audit/stats`);
+    return await apiFetchData<AuditStats>(AUDIT_STATS_BASE);
   } catch (e) {
     console.warn("fetchAuditStats: backend unavailable", e);
     return { todayCount: 0, failureCount: 0, activeUsers: 0, anomalyIps: 0 };

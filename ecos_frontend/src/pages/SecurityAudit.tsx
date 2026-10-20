@@ -11,7 +11,7 @@ import {
   FileJson, Monitor, Timer, ChevronDown, ChevronUp, Filter,
 } from "lucide-react";
 import { AuditEvent, AuditStats } from "../types";
-import { fetchAuditLogs, fetchUsers, apiFetchData, extractErrorTraceId, isNoAccessError, API_BASE } from "../api";
+import { fetchAuditLogs, fetchUsers, apiFetchData, extractErrorTraceId, isNoAccessError, AUDIT_STATS_BASE } from "../api";
 import type { IamUser } from "../api";
 import { useLanguage } from "../components/LanguageContext";
 import { useTheme } from "../components/ThemeContext";
@@ -23,9 +23,10 @@ const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
 
 /** GET /api/v1/audit/stats — 直连传输原语（报告行283/305：现用 fetchAuditStats
  *  在 transport 层把失败吞成零值 → 「今日 0 条审计」假安静。此处不经吞错门面，
- *  失败上抛给页面渲染真错误态。securityClient 属他册属主，禁在本批次改动。） */
+ *  失败上抛给页面渲染真错误态。基址自 #145/B6-13 起取 api 层族单源常量，
+ *  本文件不再书写族根体（属主唯一），绕开门面的语义保持不变。） */
 async function loadAuditStats(): Promise<AuditStats> {
-  return apiFetchData<AuditStats>(`${API_BASE}/v1/audit/stats`);
+  return apiFetchData<AuditStats>(AUDIT_STATS_BASE);
 }
 
 /** 本地错误描述（无假真理：失败必须带原因 + traceId，绝不回落空列表/零值） */

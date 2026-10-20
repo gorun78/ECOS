@@ -557,8 +557,9 @@ describe('b6AgentMeshGuardrailsSingleSource — 两族单源化取证 (#145/B6-1
     expect(rows.length).toBe(dupPin);
     expect(entriesPin).toBe(dupPin);
     for (const fam of OWNERS) expect(probe(fam.body.slice('/api'.length))).toBe(false);
-    // 反向探针：本批刻意留在册的下一族必须仍看得见（防"探针把整段 BASELINE 读空"这种假绿）
-    expect(probe('/v1/audit/stats')).toBe(true);
+    // 反向探针：本批刻意留在册的下一族必须仍看得见（防"探针把整段 BASELINE 读空"这种假绿）。
+    // #145/B6-13 起改用 `/v1/dq`：原探针 `/v1/audit/stats` 已在本批从 BASELINE 剪除，留在原地会让本腿恒红。
+    expect(probe('/v1/dq')).toBe(true);
   });
 
   it('判据能变红：别名族根、影子声明、跟值失灵、名字边界、面值漂移各造违例且被对应腿吃出（防恒绿）', () => {
