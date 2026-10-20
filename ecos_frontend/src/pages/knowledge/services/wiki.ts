@@ -4,7 +4,7 @@
  * 覆盖 Tab：`wiki` + `govern/retrieval`（RAG 调试）
  * base 单源：
  *   - KNOWLEDGE_BASE = /api/v1/knowledge
- *   - GLOSSARY_BASE  = /api/v1/ontology/glossary
+ *   - ONTOLOGY_GLOSSARY_BASE = /api/v1/ontology/glossary（族属主 services/glossary.ts，#145/B6-6 上收）
  *   - RULES_BASE     = /api/v1/knowledge/compliance-rules
  *
  * 错误态语义（F04-03）：
@@ -16,6 +16,9 @@
 import { apiFetchData } from '../../../api';
 import { kbFetchData } from './kbFetch';
 import { KNOWLEDGE_BASE } from '../../../api/knowledgeClient';
+// #145/B6-6：query/rag/glossary 三族基址上收至各族属主，本域只 import 取值（旧私设声明删除）
+import { KNOWLEDGE_QUERY_BASE, KNOWLEDGE_RAG_BASE } from '../../../services/knowledgeQueryApi';
+import { ONTOLOGY_GLOSSARY_BASE } from '../../../services/glossary';
 import { API_BASE, encodeQueryString } from '../../../services/httpClient';
 import type {
   NavProductQuery,
@@ -32,7 +35,6 @@ import type {
 } from '../typesAndConstants';
 
 const KB_V1 = KNOWLEDGE_BASE;
-const GLOSSARY_BASE = `${API_BASE}/v1/ontology/glossary`;
 const RULES_BASE = `${API_BASE}/v1/knowledge/compliance-rules`;
 
 // ── KB Workbench settings（检索参数：vector/chunk/overlap/maxRetrieval） ─────────
@@ -78,21 +80,21 @@ export async function kbFetchGlossaryTerms(
   if (params?.domain) qs.set('domain', params.domain);
   if (params?.status) qs.set('status', params.status);
   qs.set('limit', String(limit));
-  const url = `${GLOSSARY_BASE}/terms?${qs.toString()}`;
+  const url = `${ONTOLOGY_GLOSSARY_BASE}/terms?${qs.toString()}`;
   return kbFetchData<GlossaryTerm[]>(url);
 }
 
 /** 通用 lexicon CRUD（拿 KbApiError 供 Tab 判定 error/empty 分治） */
 export async function kbCreateGlossaryTerm(data: { name: string; definition: string; domain?: string }) {
-  return kbFetchData(`${GLOSSARY_BASE}/terms`, { method: 'POST', body: JSON.stringify(data) });
+  return kbFetchData(`${ONTOLOGY_GLOSSARY_BASE}/terms`, { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function kbUpdateGlossaryTerm(id: string, data: Record<string, unknown>) {
-  return kbFetchData(`${GLOSSARY_BASE}/terms/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  return kbFetchData(`${ONTOLOGY_GLOSSARY_BASE}/terms/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
 
 export async function kbDeleteGlossaryTerm(id: string) {
-  return kbFetchData(`${GLOSSARY_BASE}/terms/${id}`, { method: 'DELETE' });
+  return kbFetchData(`${ONTOLOGY_GLOSSARY_BASE}/terms/${id}`, { method: 'DELETE' });
 }
 
 // 兼容：保留旧 silent 版（旧 Tab 不 catch KbApiError 时不会崩）
@@ -106,7 +108,7 @@ export async function fetchGlossaryTerms(
         if (params?.domain) qs.set('domain', params.domain);
         if (params?.status) qs.set('status', params.status);
         const q = qs.toString();
-        return q ? `${GLOSSARY_BASE}/terms?${q}` : `${GLOSSARY_BASE}/terms`;
+        return q ? `${ONTOLOGY_GLOSSARY_BASE}/terms?${q}` : `${ONTOLOGY_GLOSSARY_BASE}/terms`;
       })(),
     );
     return Array.isArray(data) ? data : [];
@@ -116,22 +118,22 @@ export async function fetchGlossaryTerms(
 }
 
 export async function createGlossaryTerm(data: { name: string; definition: string; domain?: string }) {
-  return apiFetchData(`${GLOSSARY_BASE}/terms`, { method: 'POST', body: JSON.stringify(data) });
+  return apiFetchData(`${ONTOLOGY_GLOSSARY_BASE}/terms`, { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function updateGlossaryTerm(id: string, data: Record<string, unknown>) {
-  return apiFetchData(`${GLOSSARY_BASE}/terms/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  return apiFetchData(`${ONTOLOGY_GLOSSARY_BASE}/terms/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
 
 export async function deleteGlossaryTerm(id: string) {
-  return apiFetchData(`${GLOSSARY_BASE}/terms/${id}`, { method: 'DELETE' });
+  return apiFetchData(`${ONTOLOGY_GLOSSARY_BASE}/terms/${id}`, { method: 'DELETE' });
 }
 
 // ── RAG / retrieval（govern/retrieval Tab） ─────────────────────────────────────
 
 export async function runRAGQuery(req: RagRequest): Promise<RagResult> {
   try {
-    const data = await apiFetchData<RagResult>(`${API_BASE}/v1/knowledge/rag`, {
+    const data = await apiFetchData<RagResult>(KNOWLEDGE_RAG_BASE, {
       method: 'POST',
       body: JSON.stringify(req),
     });
@@ -146,7 +148,7 @@ export async function runRAGQuery(req: RagRequest): Promise<RagResult> {
  * `RagResult.vectorDegraded?` 由 govern/retrieval Tab 展示「向量降级」横幅。
  */
 export async function kbRunRAGQuery(req: RagRequest): Promise<RagResult> {
-  return kbFetchData<RagResult>(`${API_BASE}/v1/knowledge/rag`, {
+  return kbFetchData<RagResult>(KNOWLEDGE_RAG_BASE, {
     method: 'POST',
     body: JSON.stringify(req),
   });
@@ -154,7 +156,7 @@ export async function kbRunRAGQuery(req: RagRequest): Promise<RagResult> {
 
 export async function runKnowledgeQuery(query: string) {
   try {
-    return await apiFetchData(`${API_BASE}/v1/knowledge/query`, {
+    return await apiFetchData(KNOWLEDGE_QUERY_BASE, {
       method: 'POST',
       body: JSON.stringify({ query }),
     });

@@ -126,6 +126,25 @@
  *      （朴素裸名计数会凭空造出两枚）。
  * 收口的 4 文件 15→14 枚面值守恒不在本门证明范围内，由同批新增的
  * `b6PipelineDefinitionsSingleSource.spec.ts` 承证。
+ * #145/B6-6 复跑 = 680 / **256** / 裸面 **0** / 派生面 **305** / dupBoth **18** / dupRawOnly **0** /
+ * blind **18**：存量债第六批收口 **知识域三族（各两属主）**——`/v1/knowledge/query` 与
+ * `/v1/knowledge/rag` 同为 `services/knowledgeQueryApi` + `pages/knowledge/services/wiki`，
+ * `/v1/ontology/glossary` 为 `services/glossary` + 同一 wiki。三枚单源分别落在各族原服务文件
+ * （`KNOWLEDGE_QUERY_BASE` / `KNOWLEDGE_RAG_BASE` / `ONTOLOGY_GLOSSARY_BASE`），wiki 侧改成 import。
+ * 两处形状须记清：
+ *   ① **一枚属主可以搬走而非删除**：glossary 族根声明本来就有两枚（`glossary.ts` 私有 + wiki 私有），
+ *      本批把 wiki 那枚删掉、`glossary.ts` 那枚改名并 export ⇒ 声明位 2→1，面值一字未动。这与
+ *      B6-1~B6-5 的「N 枚声明里留 1 枚」同形，但本批第一次出现"同一文件（wiki）在同一批里退出
+ *      三个族"，故守恒门把 wiki 的 13→12 条面按**整文件**扣、不按面值筛（面值筛会把同值的消费腿一起吃掉）。
+ *   ② **query/rag 两族改前没有常量**：wiki 与属主各写 `` `${API_BASE}/v1/knowledge/rag` `` 裸派生态，
+ *      收口后新增 2 枚属主声明 ⇒ 面总量 18→19 是 **+1**（增 2 枚声明、删 1 枚重复声明），
+ *      消费者腿 16→16 逐字不变。守恒判据因此拆成两面分别钉，不能只比总量——总量升 1 看着像"多请求"，
+ *      拆开才是"声明位搬移 + 请求面不动"。derSites 310→305 的 −5 同理（删 7 枚 `${API_BASE}` 站点、
+ *      增 2 枚声明），仍只作可见性副产物记账，进度只认 dupBoth 21→18 与属主 42→36。
+ *   ③ **族面 256 不变**：三族收口后各剩 1 枚族根声明（写成 `${API_BASE}` 裸形态）⇒ 族继续留在索引里，
+ *      第二生产方出现即红。同根子路径族 `/v1/knowledge/compliance-rules` 与 nav 两族本批不动（B6-7 议题）。
+ * 收口的 3 文件 18→19 枚面值守恒不在本门证明范围内，由同批新增的
+ * `b6KnowledgeQueryRagGlossarySingleSource.spec.ts` 承证。
  * 逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。
@@ -138,10 +157,11 @@
  * 棘轮口径 = **族 → 属主清单**（两侧都只减不增）：
  *   新族出现在重复面 → 红；基线族新增属主 → 红；基线族/属主已不再重复 → 陈旧豁免亦红
  *   （与 privateTransportRatchet「陈旧豁免即红」同口径：基线预算不留给已收口的项）。
- *   本门**不宣称**证明单源成立——基线剩 21 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
+ *   本门**不宣称**证明单源成立——基线剩 18 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
  *   `/v1/knowledge` 一族后 29 族 62 属主，#145/B6-2 收口 `/v1/workspace/scenarios` 两族一对后 27 族 57 属主，
  *   #145/B6-3 收口 AIP 域三族（同一对生产方）后 24 族 51 属主，#145/B6-4 收口本体域两族六属主后 22 族 45 属主，
- *   #145/B6-5 收口 pipeline 定义族三属主后 21 族 42 属主，余属 B6 后续批），
+ *   #145/B6-5 收口 pipeline 定义族三属主后 21 族 42 属主，#145/B6-6 收口知识域三族六属主后 18 族 36 属主，
+ *   余属 B6 后续批），
  *   本门钉死的是「债不再增 + 派生态不再隐身」。
  *
  * 三防恒绿：
@@ -279,11 +299,8 @@ const BASELINE: Readonly<Record<string, readonly string[]>> = Object.freeze({
   '/v1/engine/ontology': ['pages/MonitoringCenter.tsx', 'services/ontology/ontologyEngineApi.ts'],
   '/v1/guardrails/policies': ['pages/aiworkbench/api.ts', 'services/cognitiveEngineApi.ts'],
   '/v1/knowledge/compliance-rules': ['pages/knowledge/pages/components/govern/RuleRepoTable.tsx', 'pages/knowledge/services/wiki.ts'],
-  '/v1/knowledge/query': ['pages/knowledge/services/wiki.ts', 'services/knowledgeQueryApi.ts'],
-  '/v1/knowledge/rag': ['pages/knowledge/services/wiki.ts', 'services/knowledgeQueryApi.ts'],
   '/v1/ontology/data': ['services/ontology/ontologyDataApi.ts', 'services/ontologyWorkbenchApi.ts'],
   '/v1/ontology/export': ['pages/knowledge/services/overview.ts', 'services/ontology/ontologyExportApi.ts'],
-  '/v1/ontology/glossary': ['pages/knowledge/services/wiki.ts', 'services/glossary.ts'],
   '/v1/system/organizations/tree': ['api/iamClient.ts', 'pages/WorldModelViewer.tsx'],
 });
 
@@ -337,7 +354,11 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 但**不得**再拿它的升降当进度：债的收敛只认 dupBoth 下降（见文件头 B5-25 归因）。
     // #145/B6-5：312 → **310** = `_base.ts` 一枚属主声明改成别名重导出（不含 URL 体）+ AI 台一枚
     // 内联派生态改成 import 裸引用，属主声明本身留在 dataClient 未动。同为可见性副产物，不计进度。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(310);
+    // #145/B6-6：310 → **305** = 删 7 枚 `` `${API_BASE}` `` 站点（knowledgeQueryApi 3 枚内联消费点 +
+    // wiki 4 枚：glossary 族根声明 1 + rag 2 + query 1）、增 2 枚新建属主声明（query/rag，仍写 `${API_BASE}`
+    // 形态）；glossary 族根声明只是从 wiki 搬到属主文件、计数不变。净 −5 全是形态搬运，债的账只记
+    // dupBoth 21 → 18 与属主 42 → 36。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(305);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     expect(dupBoth.size).toBeGreaterThan(dupRawOnly.size);
@@ -373,10 +394,14 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // + pages/data-workbench/api/_base）收口为 dataClient 一枚导出常量 ⇒ **dupBoth 22 → 21**、BASELINE 同批
     // 剪除该族（属主 45 → 42）。族面 256 不变（本族仍有单属主写出族体），是本波第一次「剪族而族面一分不动」：
     // 前两批族面各降 1 是因为收口把该族唯一写族体的两个人都搬走了，本批属主声明留在原处。
-    expect(dupBoth.size).toBe(21);
+    // #145/B6-6（存量债第六批）：知识域三族各两属主（`/v1/knowledge/query`、`/v1/knowledge/rag` 同为
+    // `services/knowledgeQueryApi` + `pages/knowledge/services/wiki`；`/v1/ontology/glossary` 为
+    // `services/glossary` + 同一 wiki）收口为三枚导出常量单源 ⇒ **dupBoth 21 → 18**、BASELINE 同批剪除
+    // 三族（属主 42 → 36 = 三族 × 2 条基线记录，每族收口后仍各留 1 枚族根声明 ⇒ 族面不降、只退出重复面）。
+    expect(dupBoth.size).toBe(18);
     expect(dupRawOnly.size).toBe(0);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(21);
+    expect(blind.length).toBe(18);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);
@@ -415,8 +440,10 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 收口为 `services/ontology/` 两分册各一枚导出常量，同批剪除）
     // #145/B6-5 起 21 族 / 42 属主（`/v1/pipeline/definitions` 三属主收口为 `api/dataClient.ts` 的
     // `PIPELINE_DEFINITIONS_BASE` 单源，同批剪除；三属主里两枚声明位消失、一枚改 import 裸引用）
-    expect(entries.length).toBe(21);
-    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(42);
+    // #145/B6-6 起 18 族 / 36 属主（知识域 `/v1/knowledge/query`、`/v1/knowledge/rag`、`/v1/ontology/glossary`
+    // 三族共 6 属主收口为三枚导出常量，同批剪除）
+    expect(entries.length).toBe(18);
+    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(36);
     expect(BASELINE['/v1/knowledge']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios/{}']).toBeUndefined();
@@ -426,6 +453,9 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     expect(BASELINE['/v1/ontology/mappings']).toBeUndefined();
     expect(BASELINE['/v1/ontology/proposals']).toBeUndefined();
     expect(BASELINE['/v1/pipeline/definitions']).toBeUndefined();
+    expect(BASELINE['/v1/knowledge/query']).toBeUndefined();
+    expect(BASELINE['/v1/knowledge/rag']).toBeUndefined();
+    expect(BASELINE['/v1/ontology/glossary']).toBeUndefined();
     for (const [fam, owners] of entries) {
       expect(fam.startsWith('/v1/')).toBe(true);
       expect(fam.includes('\\')).toBe(false);

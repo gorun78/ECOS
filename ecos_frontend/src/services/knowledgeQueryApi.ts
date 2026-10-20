@@ -19,12 +19,25 @@
  * <p>**基址单源（#143/B5-11e 同批追加）**：5 条腿的 `/api` 前缀全部改由 `API_BASE` 派生
  * ⇒ 从 `api-base-single-source` 基线剪除本文件（URL 逐字不变，`"/api/v1/…"` 与
  * `` `${API_BASE}/v1/…` `` 展开后同一串）。</p>
+ *
+ * <p>**#145/B6-6 族基址单源**：`/v1/knowledge/query`、`/v1/knowledge/rag` 两族改前由本文件与
+ * `pages/knowledge/services/wiki.ts` 各写一份（棘轮 dupBoth 在册），现由本文件导出
+ * `KNOWLEDGE_QUERY_BASE` / `KNOWLEDGE_RAG_BASE` 单源持有，wiki 侧改 import。属主落本文件（该族原服务
+ * 拆分文件，只依赖 `./httpClient` ⇒ wiki 引它不成环）与 #145/B6-4「属主 = 该族原服务拆分文件」同口径。
+ * 两枚声明**刻意保持** `` `${API_BASE}/v1/…` `` 裸形态而非拼常量：族体留在生产面 ⇒ 该族继续在棘轮索引
+ * 里、只是属主降到 1；若写成二级常量会让族隐形＝关掉可见性却不减少债。</p>
  */
 import { API_BASE, rawAnonUrlFetch, rawAuthedUrlFetch } from "./httpClient";
 
+/** 族 `/v1/knowledge/query` 单源基址（#145/B6-6）。 */
+export const KNOWLEDGE_QUERY_BASE = `${API_BASE}/v1/knowledge/query`;
+
+/** 族 `/v1/knowledge/rag` 单源基址（#145/B6-6）。 */
+export const KNOWLEDGE_RAG_BASE = `${API_BASE}/v1/knowledge/rag`;
+
 /** POST /api/v1/knowledge/query — 带 Bearer（自 AIPKnowledgeView 迁入），返回整包 JSON */
 export async function knowledgeQueryWithAuth(body: Record<string, unknown>): Promise<any> {
-  const resp = await rawAuthedUrlFetch(`${API_BASE}/v1/knowledge/query`, {
+  const resp = await rawAuthedUrlFetch(KNOWLEDGE_QUERY_BASE, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -34,7 +47,7 @@ export async function knowledgeQueryWithAuth(body: Record<string, unknown>): Pro
 
 /** POST /api/v1/knowledge/query — 仅 Content-Type 无鉴权（自 AIPCopilotDrawer 迁入） */
 export async function knowledgeQueryAnonymous(body: Record<string, unknown>): Promise<any> {
-  const resp = await rawAnonUrlFetch(`${API_BASE}/v1/knowledge/query`, {
+  const resp = await rawAnonUrlFetch(KNOWLEDGE_QUERY_BASE, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -50,7 +63,7 @@ export async function fetchSecurityAuditLogs(): Promise<{ ok: boolean; json?: an
 
 /** POST /api/v1/knowledge/rag — 无鉴权（自 queries/useEcosApi 迁入） */
 export async function ragQueryRaw(request: Record<string, unknown>, errorMessage?: string): Promise<any> {
-  const resp = await rawAnonUrlFetch(`${API_BASE}/v1/knowledge/rag`, {
+  const resp = await rawAnonUrlFetch(KNOWLEDGE_RAG_BASE, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),

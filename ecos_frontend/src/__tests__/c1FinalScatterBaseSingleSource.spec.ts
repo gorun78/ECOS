@@ -39,6 +39,11 @@
  * 只由「整域零私设基址」腿覆盖、不钉 `_base.ts` 条数；`pages/aiworkbench/api.ts` 由 B5-25 域门钉 28 条
  * 面值、上收后靠「导入裸名」判据接住，条数一字未动）。故本门只有全仓 `derTotal` 这一条腿需要跟着动，
  * 19 条面快照与逐文件条数一律不剪。下限每动一次都必须带实测号 + 缘由 + 与棘轮差额对账，缺一即视为漂移。</p>
+ *
+ * <p>#145/B6-6 订正下限 331→**326**（−5，实测读出，与本批棘轮 derSites 310→305 同值）。这是 B6 各批里
+ * **首批"消费腿减少 + 属主声明净增"同时发生**的账：query/rag 两族改前没有任何常量，收口时新建 2 枚
+ * `` `${API_BASE}…` `` 声明，同时 7 枚消费腿改成裸引用/上收 ⇒ 明细 −7/+2，不能按"消费腿条数"一口价写成 −7。
+ * 本门 FILES 面仍不含该批三文件（各由 B5-18/B5-20/B6-6 域门覆盖），故依旧只动 `derTotal` 一条腿。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -306,7 +311,12 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     // #145/B6-5 订正为 331：同形状再减 2 枚——`pages/data-workbench/api/_base.ts` 的 `PIPELINE_DEFS`
     // 声明改成不含 URL 体的别名重导出 + `pages/aiworkbench/api.ts` 的一枚内联派生态改 import 裸引用，
     // 属主声明（`api/dataClient`）一枚未动。与本批棘轮 derSites 312→310 的实测差额同值，互相对得上。
-    expect(derTotal, '行内派生态面须随批累积，低于 331 即扫描根或判据漂移').toBeGreaterThanOrEqual(331);
+    // #145/B6-6 订正为 326：本批**首批出现净增声明**，明细 −7/+2 = −5 ——`services/knowledgeQueryApi.ts`
+    // 3 枚消费者派生态改裸引用、`pages/knowledge/services/wiki.ts` 4 枚（glossary 族根声明 1 + rag 2 +
+    // query 1）上收；同文件新建 2 枚属主声明（query/rag 两族改前**没有常量**，见
+    // `b6KnowledgeQueryRagGlossarySingleSource` 的声明面 2→3 归因）。glossary 那枚族根声明只是改名导出、
+    // `${API_BASE}` 形态未动 ⇒ 不计数。差额与本批棘轮 derSites 310→305 同值，互相对得上。
+    expect(derTotal, '行内派生态面须随批累积，低于 326 即扫描根或判据漂移').toBeGreaterThanOrEqual(326);
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
   });
 

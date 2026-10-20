@@ -27,6 +27,15 @@
  * 属主 `services/ontology/ontologyMappingApi.ts` 导出的 `ONTOLOGY_MAPPINGS_BASE`，本域书写面再减
  * 2 条**在册收口项**（27−2=25），仍按面值筛除并自检恰 2 条。两批减法合计必须能对上 32→25，
  * 且剩余 11 条 KB 子族腿不许动——动了说明减法筛到了别的族。</p>
+ *
+ * <p>#145/B6-6 第三次同形减法，但**一批跨三族**：`wiki.ts` 的 glossary 族根声明 1 枚上收至
+ * `services/glossary.ts`（导出 `ONTOLOGY_GLOSSARY_BASE`）、rag 直写腿 2 枚与 query 直写腿 1 枚上收至
+ * `services/knowledgeQueryApi.ts` 的两枚导出常量 ⇒ 本域 `${API_BASE}` 面 25−4=**21**。因跨族，
+ * 减法登记改成「面值 → 应扣条数」成对自检（1/2/1），不再用单值常量；扣错族或把子族一起筛走都会
+ * 让总数仍为 21 而明细不对，故同时保留「KB 子族腿 11→8」这条边界自检。
+ * 注意本门判据只看**本域书写面**：收口后 `` `${ONTOLOGY_GLOSSARY_BASE}/terms/${id}` `` 这类腿
+ * 对 DERIVED_RE 隐形，"请求面一条没少"由 `src/__tests__/b6KnowledgeQueryRagGlossarySingleSource.spec.ts`
+ * 按常量链解析另证（HEAD 16 条消费者腿逐字守恒）。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -133,6 +142,25 @@ const EXPECTED_AFTER_B61 = PRE_BATCH_URL_LITERALS.filter((v) => v !== CONSOLIDAT
 const CONSOLIDATED_B64_FAM_ROOT = '/api/v1/ontology/mappings';
 const EXPECTED_AFTER_B64 = EXPECTED_AFTER_B61.filter((v) => v !== CONSOLIDATED_B64_FAM_ROOT);
 
+/**
+ * #145/B6-6 在册收口项：本域 `wiki.ts` 的 4 枚 `` `${API_BASE}…` `` 站点上收至三族属主常量
+ * （glossary 族根声明 1 → `services/glossary.ts` 的 `ONTOLOGY_GLOSSARY_BASE`；rag 直写腿 2 与
+ * query 直写腿 1 → `services/knowledgeQueryApi.ts` 的两枚导出常量的裸引用）。减法形状与前两批不同：
+ * **同一批跨三个族**，故按「面值 → 应扣条数」成对登记并逐值自检（1/2/1，合计 4），
+ * 只写一个总数会让"扣错族"读成绿。25 − 4 = **21**（本批改后实跑读出）。
+ * 「16 条消费者腿面值逐字未变」不在本门证明范围——本门只看**本域 `${API_BASE}` 派生态书写面**，
+ * 常量化后的腿对 DERIVED_RE 隐形，由 `src/__tests__/b6KnowledgeQueryRagGlossarySingleSource.spec.ts`
+ * 按常量链解析承证。
+ */
+const CONSOLIDATED_B66_VALUES: ReadonlyArray<{ val: string; legs: number }> = [
+  { val: '/api/v1/ontology/glossary', legs: 1 },
+  { val: `${CONSOLIDATED_FAM_ROOT}/rag`, legs: 2 },
+  { val: `${CONSOLIDATED_FAM_ROOT}/query`, legs: 1 },
+];
+const EXPECTED_AFTER_B66 = EXPECTED_AFTER_B64.filter(
+  (v) => !CONSOLIDATED_B66_VALUES.some((c) => c.val === v),
+);
+
 describe('pages/knowledge/services 域基址单源 — 私设基址清零 (#143/B5-20)', () => {
   it('前提：API_BASE 单源取值 = "/api"（派生即取值不变的根据）', () => {
     expect(API_BASE).toBe('/api');
@@ -163,11 +191,11 @@ describe('pages/knowledge/services 域基址单源 — 私设基址清零 (#143/
     }
   });
 
-  it('面值逐字不变：还原后的 URL 多重集 = 改前快照减去 5 条 B6-1 + 2 条 B6-4 在册收口项（32−5−2=25，HEAD 实跑读出）', () => {
+  it('面值逐字不变：还原后的 URL 多重集 = 改前快照减去 5 条 B6-1 + 2 条 B6-4 + 4 条 B6-6 在册收口项（32−5−2−4=21，改后实跑读出）', () => {
     const all: string[] = [];
     for (const rel of FILES) all.push(...derivedValues(read(rel)));
-    expect(all.length).toBe(25);
-    expect([...all].sort()).toEqual([...EXPECTED_AFTER_B64].sort());
+    expect(all.length).toBe(21);
+    expect([...all].sort()).toEqual([...EXPECTED_AFTER_B66].sort());
   });
 
   it('快照自身可校验：32 条 = 25 单引号 + 7 反引号 + 0 双引号且全部以 /api/ 开头（防快照清空成恒真）', () => {
@@ -182,9 +210,17 @@ describe('pages/knowledge/services 域基址单源 — 私设基址清零 (#143/
     // B6-4 减法腿自检：筛掉的必须恰是 2 条 `/v1/ontology/mappings` 族根本体（overview.ts 读写各一条）
     expect(EXPECTED_AFTER_B61.filter((v) => v === CONSOLIDATED_B64_FAM_ROOT).length).toBe(2);
     expect(EXPECTED_AFTER_B64.length).toBe(25);
-    // 减法后剩余面里仍有 11 条 KB **子族**腿（compliance-rules／rag／query／stats／sync／nav／graph），
-    // 证明 B6 两批只动族根、没顺手收别的族（子族面一变即说明减法筛多了）
+    // B6-6 减法腿自检：三个族各按登记条数扣（1/2/1），扣完必须恰剩 21 且这 4 枚面值在本域面里归零
+    for (const { val, legs } of CONSOLIDATED_B66_VALUES) {
+      expect(EXPECTED_AFTER_B64.filter((v) => v === val).length, `${val} 应扣条数不符`).toBe(legs);
+      expect(EXPECTED_AFTER_B66.filter((v) => v === val), `${val} 不得还留在本域派生态面`).toEqual([]);
+    }
+    expect(CONSOLIDATED_B66_VALUES.reduce((n, c) => n + c.legs, 0)).toBe(4);
+    expect(EXPECTED_AFTER_B66.length).toBe(21);
+    // 减法后剩余面里仍有 8 条 KB **子族**腿（compliance-rules／stats×2／sync／graph×2／nav×2，
+    // 即 11 条减去 B6-6 收走的 rag 2 + query 1），证明三批只动登记过的族，没顺手收别的族
     expect(EXPECTED_AFTER_B64.filter((v) => v.startsWith(`${CONSOLIDATED_FAM_ROOT}/`)).length).toBe(11);
+    expect(EXPECTED_AFTER_B66.filter((v) => v.startsWith(`${CONSOLIDATED_FAM_ROOT}/`)).length).toBe(8);
   });
 
   it('判据能变红：违例源命中（含反引号形态）、合规源不命中（防恒绿）', () => {

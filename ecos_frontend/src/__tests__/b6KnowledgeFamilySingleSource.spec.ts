@@ -314,8 +314,11 @@ describe('b6KnowledgeFamilySingleSource — 重复族 /v1/knowledge 单源化取
   it('棘轮在册性：/v1/knowledge 已随本批从 urlFamilyDualFormRatchet 的 BASELINE 剪除（不留陈旧豁免）', () => {
     const ratchet = read('__tests__/urlFamilyDualFormRatchet.test.ts');
     expect(ratchet).not.toContain("'/v1/knowledge': [");
-    // 反向腿：判据不是在空串上跑——同文件里在册族必须还能被这条 contains 判出
-    expect(ratchet).toContain("'/v1/knowledge/rag': [");
+    // 反向腿：判据不是在空串上跑——同文件里在册族必须还能被这条 contains 判出。
+    // #145/B6-6 起探针族换掉：旧探针 `/v1/knowledge/rag` 那一行随该批收口被剪除，留着即假红
+    // （探针本身随基线收缩漂移是这一类反向腿的固有形状 ⇒ 补一条规模计数腿，单行探针落在空表也真是它挡不住的）。
+    expect(ratchet).toContain("'/v1/knowledge/compliance-rules': [");
+    expect((ratchet.match(/^ {2}'\/v1\//gm) ?? []).length).toBe(18);
   });
 
   it('快照自检：72 条全部落在族内、有重复腿（非去重集合）且逐文件条数与本批口径相符（防快照清空成恒真）', () => {

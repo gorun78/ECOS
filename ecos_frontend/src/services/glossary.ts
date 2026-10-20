@@ -19,8 +19,14 @@ import type {
   GlossaryTerm as WorkbenchGlossaryTerm,
 } from "../types/workbench";
 
-/** 基址由 httpClient#API_BASE 派生（W206/C188 基址单源；改前本文件私设字面 "/api/v1/ontology/glossary"） */
-const GLOSSARY_BASE = `${API_BASE}/v1/ontology/glossary`;
+/**
+ * 族 `/v1/ontology/glossary` 单源基址（#145/B6-6）。
+ *
+ * 改前本文件与 `pages/knowledge/services/wiki.ts` 各写一份同面值基址（棘轮 dupBoth 在册），
+ * 现由本文件（该族原服务拆分文件、头注即自认「唯一服务出口」）导出持有，wiki 侧改 import。
+ * 声明刻意保持 `${API_BASE}/…` 裸形态：族体留在生产面 ⇒ 族继续在棘轮索引里，第二生产方出现即红。
+ */
+export const ONTOLOGY_GLOSSARY_BASE = `${API_BASE}/v1/ontology/glossary`;
 
 /** 词条类型枚举：本体实体 / 关系 / 指标 / 函数 / 概念 */
 export type GlossaryTermType = "ENTITY" | "RELATION" | "METRIC" | "FUNCTION" | "CONCEPT";
@@ -207,7 +213,7 @@ export function readGlossaryError(e: unknown): { message: string; traceId?: stri
  */
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   try {
-    return await apiFetchData<T>(`${GLOSSARY_BASE}${path}`, options);
+    return await apiFetchData<T>(`${ONTOLOGY_GLOSSARY_BASE}${path}`, options);
   } catch (e) {
     if (e instanceof ApiRequestError) {
       throw new GlossaryApiError(e.message, { traceId: e.traceId, httpStatus: e.httpStatus });
