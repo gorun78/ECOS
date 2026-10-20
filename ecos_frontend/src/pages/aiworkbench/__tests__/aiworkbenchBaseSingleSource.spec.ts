@@ -31,6 +31,13 @@
  * 28 条面值钉死不变。**本门刻意不把裸引用（`` apiFetchData(AIP_AGENTS_BASE) ``）计为站点**——声明行
  * 与使用行会双计同一枚面值，把条数虚抬；裸引用面由 #145/B6-3 的 `b6AipFamilySingleSource` 门按
  * 「绑定行不算腿、裸引用算腿」的口径承证，两门合起来才是完整面。</p>
+ *
+ * <p>**#145/B6-4 再改一次形状（判据按来源分治，勿误推）**：本文件 `submitOntologyProposal` 的那条
+ * 提案族腿上收至**别处**属主 `services/ontology/ontologyProposalApi.ts` 导出的 `ONTOLOGY_PROPOSALS_BASE`，
+ * 使用处变成裸引用。B6-3 的「裸引用不计」前提是常量在**本文件自声明**（声明行已是一条腿，再计使用行
+ * 就双计）；本批这枚在本文件没有声明行，不计即丢腿（28→27 假红）。故引入 `IMPORTED_BARE_NAMES`：
+ * 只有从外部 import 进来的常量名才计裸引用，且先摘同行模板腿、导入行不计。28 条面值与快照逐字不动，
+ * 该页是否漏挪/多挪由 `src/__tests__/b6OntologyFamilySingleSource.spec.ts` 承证。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -39,6 +46,7 @@ import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../../../services/httpClient';
 import { AIP_AGENTS_BASE, AIP_AUDIT_LOGS_BASE } from '../../../pages/aiworkbench/api';
+import { ONTOLOGY_PROPOSALS_BASE } from '../../../services/ontology/ontologyProposalApi';
 
 // 本门位于 `src/pages/aiworkbench/__tests__/`，到 `src/` 的相对深度是三档（少一档即读不到被测域）
 const SRC_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -63,7 +71,16 @@ const CONST_VALUES: ReadonlyMap<string, string> = new Map([
   ['API_BASE', API_BASE],
   ['AIP_AGENTS_BASE', AIP_AGENTS_BASE],
   ['AIP_AUDIT_LOGS_BASE', AIP_AUDIT_LOGS_BASE],
+  ['ONTOLOGY_PROPOSALS_BASE', ONTOLOGY_PROPOSALS_BASE],
 ]);
+/**
+ * **按来源分治的裸引用判据（#145/B6-4 新增）**：B6-3 立的「本门不计裸引用」只成立于**本文件自声明**
+ * 常量（声明行 + 使用行会双计同一枚面值，把条数虚抬）。`ONTOLOGY_PROPOSALS_BASE` 是从属主
+ * `services/ontology/ontologyProposalApi.ts` import 进来的，本文件没有它的声明行 ⇒ 不计裸引用就是
+ * 丢一条腿（28→27 假红）。故这里只对**导入进来的**常量名计裸引用，且必须先摘掉同行的模板腿、
+ * 导入行本身不计（否则 import 语句读成一次请求）。
+ */
+const IMPORTED_BARE_NAMES: readonly string[] = ['ONTOLOGY_PROPOSALS_BASE'];
 
 function isComment(line: string): boolean {
   const t = line.trim();
@@ -103,9 +120,19 @@ function walk(dirRoot: string, out: string[]): string[] {
 function derivedValues(src: string): string[] {
   const out: string[] = [];
   for (const line of codeLines(src)) {
+    let rest = line;
     for (const m of line.matchAll(SITE_RE)) {
       const base = CONST_VALUES.get(m[1]);
-      if (base !== undefined) out.push(base + m[2]);
+      if (base === undefined) continue;
+      out.push(base + m[2]);
+      rest = rest.split(m[0]).join('');
+    }
+    if (/^\s*import\s/.test(line)) continue;
+    for (const name of IMPORTED_BARE_NAMES) {
+      const value = CONST_VALUES.get(name);
+      if (value === undefined) continue;
+      const bare = rest.split(name).length - 1;
+      for (let i = 0; i < bare; i += 1) out.push(value);
     }
   }
   return out;
@@ -233,5 +260,15 @@ describe('pages/aiworkbench 域基址单源 — 私设基址清零 (#143/B5-25)'
       '/api/v1/aip/agents/${encodeURIComponent(id)}',
     ]);
     expect(derivedValues('  await apiFetchData(`${SOME_UNKNOWN_BASE}/v1/aip/agents`);')).toEqual([]);
+    // #145/B6-4：**导入**常量的裸引用必须计为一条腿；但导入行本身不计（防把 import 读成一次请求）
+    expect(derivedValues('  return apiFetchData<OntologyProposalVo>(ONTOLOGY_PROPOSALS_BASE, { method: "POST" });')).toEqual([
+      '/api/v1/ontology/proposals',
+    ]);
+    expect(derivedValues("import { ONTOLOGY_PROPOSALS_BASE } from '../../services/ontology/ontologyProposalApi';")).toEqual([]);
+    // 同行既有模板腿又有裸名时，摘完模板腿再数（防一条腿计两次）
+    expect(derivedValues('  const u = `${ONTOLOGY_PROPOSALS_BASE}/${id}/execute`; await call(ONTOLOGY_PROPOSALS_BASE, u);')).toEqual([
+      '/api/v1/ontology/proposals/${id}/execute',
+      '/api/v1/ontology/proposals',
+    ]);
   });
 });

@@ -10,6 +10,8 @@
  */
 import { apiFetchData } from '../../api';
 import { API_BASE, rawStreamUrlFetch } from '../../services/httpClient';
+// #145/B6-4：本体提案族基址单源（services/ontology/ontologyProposalApi 导出）；execute 子路径腿仍走 ${API_BASE} 保可见
+import { ONTOLOGY_PROPOSALS_BASE } from '../../services/ontology/ontologyProposalApi';
 import { createSseParser, decodeFrameData, type SseRawEvent } from '../../services/sseParser';
 import type { AIPAgent, AIPGuardrail, AIPLogicPipeline, AIPModel, AIPActionType, ExecuteActionResult, AIPAgentTemplate, AIPAgentMetrics, AIPAgentError, AIPAuditLog } from '../../types/aiworkbench';
 
@@ -724,7 +726,7 @@ export async function submitOntologyProposal(body: {
   payload: Record<string, string>;
   proposedBy: string;
 }): Promise<OntologyProposalVo> {
-  return apiFetchData<OntologyProposalVo>(`${API_BASE}/v1/ontology/proposals`, {
+  return apiFetchData<OntologyProposalVo>(ONTOLOGY_PROPOSALS_BASE, {
     method: 'POST',
     body: JSON.stringify(body),
   });

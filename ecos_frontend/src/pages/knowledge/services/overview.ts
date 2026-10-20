@@ -10,6 +10,8 @@ import { apiFetchData } from '../../../api';
 import { API_BASE } from '../../../services/httpClient';
 import { kbFetchData } from './kbFetch';
 import { KNOWLEDGE_BASE } from '../../../api/knowledgeClient';
+// #145/B6-4：本体映射族基址单源（services/ontology/ontologyMappingApi 导出），本文件不再自拼 /v1/ontology/mappings
+import { ONTOLOGY_MAPPINGS_BASE } from '../../../services/ontology/ontologyMappingApi';
 import type {
   SyncStatus,
   SyncLog,
@@ -148,7 +150,7 @@ export async function fetchSyncLogs(): Promise<SyncLog[]> {
 
 export async function fetchOntologyMappings() {
   try {
-    return await apiFetchData(`${API_BASE}/v1/ontology/mappings`);
+    return await apiFetchData(ONTOLOGY_MAPPINGS_BASE);
   } catch {
     return { mappings: [] };
   }
@@ -156,7 +158,7 @@ export async function fetchOntologyMappings() {
 
 export async function saveOntologyMappings(mappings: unknown) {
   try {
-    return await apiFetchData(`${API_BASE}/v1/ontology/mappings`, {
+    return await apiFetchData(ONTOLOGY_MAPPINGS_BASE, {
       method: 'POST',
       body: JSON.stringify(mappings),
     });

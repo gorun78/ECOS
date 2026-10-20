@@ -21,7 +21,8 @@ import type {
 // 本体提案 (Ontology Proposal) — T2.4
 // ================================================================
 
-const PROPOSAL_BASE = `${API_BASE}/v1/ontology/proposals`;
+/** `/v1/ontology/proposals` 族基址单源（#145/B6-4）：全仓构造该族根的唯一书写点，消费者一律 import。 */
+export const ONTOLOGY_PROPOSALS_BASE = `${API_BASE}/v1/ontology/proposals`;
 
 /**
  * 提案状态归一化（API 边界适配器）
@@ -96,17 +97,17 @@ export async function fetchProposals(params?: { status?: string; targetType?: st
   if (params?.status) qs.set("status", params.status);
   if (params?.targetType) qs.set("targetType", params.targetType);
   const query = qs.toString() ? `?${qs.toString()}` : "";
-  const proposals = await apiFetchData<Proposal[]>(`${PROPOSAL_BASE}${query}`);
+  const proposals = await apiFetchData<Proposal[]>(`${ONTOLOGY_PROPOSALS_BASE}${query}`);
   return proposals.map(normalizeProposal);
 }
 
 export async function fetchProposal(id: string) {
-  return normalizeProposal(await apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}`));
+  return normalizeProposal(await apiFetchData<Proposal>(`${ONTOLOGY_PROPOSALS_BASE}/${id}`));
 }
 
 export async function createProposal(data: CreateProposalDTO) {
   return normalizeProposal(
-    await apiFetchData<Proposal>(PROPOSAL_BASE, {
+    await apiFetchData<Proposal>(ONTOLOGY_PROPOSALS_BASE, {
       method: "POST",
       body: JSON.stringify(data),
     })
@@ -115,7 +116,7 @@ export async function createProposal(data: CreateProposalDTO) {
 
 export async function updateProposal(id: string, data: UpdateProposalDTO) {
   return normalizeProposal(
-    await apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}`, {
+    await apiFetchData<Proposal>(`${ONTOLOGY_PROPOSALS_BASE}/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     })
@@ -123,16 +124,16 @@ export async function updateProposal(id: string, data: UpdateProposalDTO) {
 }
 
 export async function deleteProposal(id: string) {
-  await apiFetchData(`${PROPOSAL_BASE}/${id}`, { method: "DELETE" });
+  await apiFetchData(`${ONTOLOGY_PROPOSALS_BASE}/${id}`, { method: "DELETE" });
 }
 
 export async function submitProposal(id: string) {
-  return normalizeProposal(await apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/submit`, { method: "POST" }));
+  return normalizeProposal(await apiFetchData<Proposal>(`${ONTOLOGY_PROPOSALS_BASE}/${id}/submit`, { method: "POST" }));
 }
 
 export async function approveProposal(id: string, body: ReviewProposalDTO = {}) {
   return normalizeProposal(
-    await apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/approve`, {
+    await apiFetchData<Proposal>(`${ONTOLOGY_PROPOSALS_BASE}/${id}/approve`, {
       method: "POST",
       body: JSON.stringify(body),
     })
@@ -141,7 +142,7 @@ export async function approveProposal(id: string, body: ReviewProposalDTO = {}) 
 
 export async function rejectProposal(id: string, body: ReviewProposalDTO = {}) {
   return normalizeProposal(
-    await apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/reject`, {
+    await apiFetchData<Proposal>(`${ONTOLOGY_PROPOSALS_BASE}/${id}/reject`, {
       method: "POST",
       body: JSON.stringify(body),
     })
@@ -149,10 +150,10 @@ export async function rejectProposal(id: string, body: ReviewProposalDTO = {}) {
 }
 
 export async function verifyProposal(id: string): Promise<VerifyProposalResult> {
-  const result = await apiFetchData<VerifyProposalResult>(`${PROPOSAL_BASE}/${id}/verify`, { method: "POST" });
+  const result = await apiFetchData<VerifyProposalResult>(`${ONTOLOGY_PROPOSALS_BASE}/${id}/verify`, { method: "POST" });
   return { ...result, proposal: normalizeProposal(result.proposal) };
 }
 
 export async function executeProposal(id: string) {
-  return normalizeProposal(await apiFetchData<Proposal>(`${PROPOSAL_BASE}/${id}/execute`, { method: "POST" }));
+  return normalizeProposal(await apiFetchData<Proposal>(`${ONTOLOGY_PROPOSALS_BASE}/${id}/execute`, { method: "POST" }));
 }

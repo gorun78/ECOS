@@ -27,40 +27,41 @@ import type {
 // 本体映射 (Ontology Mapping) — T2.1
 // ================================================================
 
-const MAPPING_BASE = `${API_BASE}/v1/ontology/mappings`;
+/** `/v1/ontology/mappings` 族基址单源（#145/B6-4）：全仓构造该族根的唯一书写点，消费者一律 import。 */
+export const ONTOLOGY_MAPPINGS_BASE = `${API_BASE}/v1/ontology/mappings`;
 
 export async function fetchMappings(params?: { objectId?: string; sourceType?: string }) {
   const qs = new URLSearchParams();
   if (params?.objectId) qs.set("objectId", params.objectId);
   if (params?.sourceType) qs.set("sourceType", params.sourceType);
   const query = qs.toString() ? `?${qs.toString()}` : "";
-  return apiFetchData<OntologyMappingRecord[]>(`${MAPPING_BASE}${query}`);
+  return apiFetchData<OntologyMappingRecord[]>(`${ONTOLOGY_MAPPINGS_BASE}${query}`);
 }
 
 export async function fetchMapping(id: string) {
-  return apiFetchData<OntologyMappingRecord>(`${MAPPING_BASE}/${id}`);
+  return apiFetchData<OntologyMappingRecord>(`${ONTOLOGY_MAPPINGS_BASE}/${id}`);
 }
 
 export async function createMapping(data: CreateMappingDTO) {
-  return apiFetchData<OntologyMappingRecord>(MAPPING_BASE, {
+  return apiFetchData<OntologyMappingRecord>(ONTOLOGY_MAPPINGS_BASE, {
     method: "POST",
     body: JSON.stringify(data),
   });
 }
 
 export async function updateMapping(id: string, data: UpdateMappingDTO) {
-  return apiFetchData<OntologyMappingRecord>(`${MAPPING_BASE}/${id}`, {
+  return apiFetchData<OntologyMappingRecord>(`${ONTOLOGY_MAPPINGS_BASE}/${id}`, {
     method: "PUT",
     body: JSON.stringify(data),
   });
 }
 
 export async function deleteMapping(id: string) {
-  await apiFetchData(`${MAPPING_BASE}/${id}`, { method: "DELETE" });
+  await apiFetchData(`${ONTOLOGY_MAPPINGS_BASE}/${id}`, { method: "DELETE" });
 }
 
 export async function fetchMappableObjects() {
-  return apiFetchData(`${MAPPING_BASE}/objects`);
+  return apiFetchData(`${ONTOLOGY_MAPPINGS_BASE}/objects`);
 }
 
 /**
@@ -72,7 +73,7 @@ export async function fetchMappableObjects() {
  * 失败不抛错（后端始终返回 200 + valid=true/false），由调用方消费 report 渲染。
  */
 export async function validateEntityMappings(objectTypeId: string): Promise<MappingValidationReport> {
-  return apiFetchData<MappingValidationReport>(`${MAPPING_BASE}/validate`, {
+  return apiFetchData<MappingValidationReport>(`${ONTOLOGY_MAPPINGS_BASE}/validate`, {
     method: "POST",
     body: JSON.stringify({ entityCode: objectTypeId }),
   });

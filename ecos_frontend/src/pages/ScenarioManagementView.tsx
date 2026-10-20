@@ -22,6 +22,8 @@ import { apiFetchData } from '../api';
 import { API_BASE } from '../services/httpClient';
 // #145/B6-2：场景集合基址单源（services/scenarioActionClient 导出），页面不再自拼 /v1/workspace/scenarios
 import { WORKSPACE_SCENARIOS_BASE } from '../services/scenarioActionClient';
+// #145/B6-4：本体提案族基址单源（services/ontology/ontologyProposalApi 导出）；子路径腿（approve/reject）仍走 ${API_BASE} 保可见
+import { ONTOLOGY_PROPOSALS_BASE } from '../services/ontology/ontologyProposalApi';
 import logger from '../services/logger';
 import type { BusinessScenario } from './project-workbench/types';
 import { calcMetrics } from './project-workbench/helpers';
@@ -179,7 +181,7 @@ export default function ScenarioManagementView({
   const fetchProposalsList = async () => {
     setIsLoadingProposals(true);
     try {
-      const d = await apiFetchData<unknown[]>(`${API_BASE}/v1/ontology/proposals`);
+      const d = await apiFetchData<unknown[]>(ONTOLOGY_PROPOSALS_BASE);
       setProposals(Array.isArray(d) ? d : []);
       setProposalsError(null);
     } catch (e) {

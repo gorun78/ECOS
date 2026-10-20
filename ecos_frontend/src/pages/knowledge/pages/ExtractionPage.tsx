@@ -24,7 +24,7 @@
  * i18n §4.3：0 硬编码中文（knowledge.extract.*）
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { API_BASE } from '../../../services/httpClient';
+import { ONTOLOGY_MAPPINGS_BASE } from '../../../services/ontology/ontologyMappingApi';
 import {
   AlertCircle, ArrowDownUp, Boxes, Check, FileUp, Loader2,
   Layers, Send, Sparkles, ScanEye, Scissors, Network,
@@ -92,7 +92,7 @@ export default function ExtractionPage() {
     setMappingsLoading(true);
     setMappingsError(null);
     try {
-      const data = await apiFetchData<Array<OntologyMapping> | { mappings?: OntologyMapping[] }>(`${API_BASE}/v1/ontology/mappings`);
+      const data = await apiFetchData<Array<OntologyMapping> | { mappings?: OntologyMapping[] }>(ONTOLOGY_MAPPINGS_BASE);
       let list: OntologyMapping[];
       if (Array.isArray(data)) {
         list = data;

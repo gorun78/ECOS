@@ -25,6 +25,14 @@
  * `services/httpClient.ts` 的 2 处（`export const API_BASE = "/api"` + 健康探针 `fetch("/api/health")`）
  * ⇒ C1 私设基址面清零。另记与 D-B5-40 的分工，防止把「基线归零」读成「C1 全闭合」：
  * 「同一 URL 族的第二生产方」仍由 `urlFamilyDualFormRatchet`（dupBoth 30 族 / 69 属主）记账，属 B6 存量债。</p>
+ *
+ * <p>#145/B6-4 追加口径（本门形状变一次，防误读成"批次回退"）：本批 21 处中的 `ExtractionPage.tsx`
+ * 唯一一枚站点（`/api/v1/ontology/mappings` 族根）被后续存量债批上收到属主 `services/ontology/`
+ * `ontologyMappingApi.ts` 导出的 `ONTOLOGY_MAPPINGS_BASE`，该页 `API_BASE` 导入合法归零、使用处变裸引用。
+ * 本门**不剪腿**（19 条面值与逐文件条数一字不动，改由 `faceValues` 接住模板腿 + 裸引用两种形态），
+ * 「导入腿恰 1 条」对这唯一一枚上收文件换成「API_BASE 恰 0 条 + 族单源导入腿恰 1 条且取自属主」，
+ * 并把上收面钉成恰该一个文件。C1 闭合面腿的 `derTotal` 口径不变（只看全仓 `${API_BASE}` 派生态），
+ * 上收会把该计数按面值减少 ⇒ 下限按复跑实测订正，订正理由记在棘轮门与本门注释，不得当成进度。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -32,6 +40,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../services/httpClient';
+import { ONTOLOGY_MAPPINGS_BASE } from '../services/ontology/ontologyMappingApi';
 
 // 本门位于 `src/__tests__/`，到 `src/` 的相对深度是一档
 const SRC_ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -62,6 +71,18 @@ const FILES: ReadonlyArray<{ rel: string; importPath: string; sites: number }> =
 
 const MULTILINE_REL = 'pages/knowledge/pages/components/govern/RuleRepoTable.tsx';
 const JSX_REL = 'pages/knowledge/tabs/GraphBuilderTab.tsx';
+/**
+ * #145/B6-4：本批 21 处里唯一一枚被后续存量债批上收到**族单源常量**的文件。该页只有一枚站点，
+ * 收口后 `API_BASE` 导入合法归零 ⇒ 本门「导入腿恰 1 条」对这一文件必须换成「恰 1 条族单源导入腿
+ * 且取自属主」。面快照**不剪腿**（下面 `faceValues` 接住模板腿 + 裸引用两种形态），剪腿会让
+ * 19 条掉到 18 条却看着像进度。
+ */
+const FAMILY_OWNER: ReadonlyMap<string, { name: string; ownerRe: RegExp }> = new Map([
+  [
+    'pages/knowledge/pages/ExtractionPage.tsx',
+    { name: 'ONTOLOGY_MAPPINGS_BASE', ownerRe: /from '[^']*services\/ontology\/ontologyMappingApi'/ },
+  ],
+]);
 /**
  * 通用行级还原可吃到的站点：跨行模板那 1 点从 RuleRepoTable 的 5 点里减掉，
  * JSX 显示文本站整个不吃 ⇒ 19 = 21 − 1（跨行）− 1（JSX）。
@@ -127,6 +148,30 @@ function derivedValues(src: string): string[] {
   return out;
 }
 
+/** `ONTOLOGY_MAPPINGS_BASE` 的模板腿形态（裸引用形态在下面先摘掉模板腿后再数）。 */
+const FAM_NAME = 'ONTOLOGY_MAPPINGS_BASE';
+const FAM_SITE_RE = /`\$\{ONTOLOGY_MAPPINGS_BASE\}((?:\\.|(?!`)[^\\])*)`/g;
+
+/**
+ * 面值逐字不变腿的站点面 = 行内 `` `${API_BASE}…` `` 派生态 + 族单源常量的两种形态
+ * （模板腿与裸引用）。裸引用必须先摘模板腿、且导入行不计，否则一条腿计两次、
+ * 或把 import 语句当成一次请求。C1 闭合面腿不看这里（口径 = 全仓 `${API_BASE}` 派生态总量）。
+ */
+function faceValues(src: string): string[] {
+  const out = derivedValues(src);
+  for (const line of codeLines(src)) {
+    if (/^\s*import\s/.test(line)) continue;
+    let rest = line;
+    for (const m of line.matchAll(FAM_SITE_RE)) {
+      rest = rest.split(m[0]).join('');
+      out.push(`${ONTOLOGY_MAPPINGS_BASE}${m[1]}`);
+    }
+    const bare = rest.split(FAM_NAME).length - 1;
+    for (let i = 0; i < bare; i += 1) out.push(ONTOLOGY_MAPPINGS_BASE);
+  }
+  return out;
+}
+
 /**
  * 改前裸形态快照（21 条 = 本腿 19 条 + 跨行 1 条 + JSX 1 条，带定界符原样收录，
  * `git show HEAD:` 实跑读出）：19 条走通用行级还原腿。
@@ -160,23 +205,33 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     expect(API_BASE).toBe('/api');
   });
 
-  it('本批 15 文件代码行零私设基址，且各自从 httpClient 导入 API_BASE（导入腿恰 1 条、相对路径随目录深度正确）', () => {
+  it('本批 15 文件代码行零私设基址，且基址来源唯一：httpClient 的 API_BASE 恰 1 条；已上收到族单源的文件改为恰 1 条族单源导入腿 (#143/B5-26 / #145/B6-4)', () => {
     for (const { rel, importPath } of FILES) {
       const lines = codeLines(read(rel));
       const hits = lines.filter((l) => HARDCODED_RE.test(l));
       expect(hits, `${rel} 仍有 ${hits.length} 处代码行 "/api 字面量`).toEqual([]);
+      const fam = FAMILY_OWNER.get(rel);
       const imports = lines.filter((l) => /\bAPI_BASE\b/.test(l) && l.trimStart().startsWith('import '));
-      expect(imports.length, `${rel} 应有且仅有 1 条 API_BASE 导入`).toBe(1);
-      expect(imports[0], `${rel} 导入路径不是 ${importPath}`).toMatch(
-        new RegExp(`from '${importPath}'|from "${importPath}"`),
-      );
+      if (fam === undefined) {
+        expect(imports.length, `${rel} 应有且仅有 1 条 API_BASE 导入`).toBe(1);
+        expect(imports[0], `${rel} 导入路径不是 ${importPath}`).toMatch(
+          new RegExp(`from '${importPath}'|from "${importPath}"`),
+        );
+      } else {
+        expect(imports.length, `${rel} 已上收到族单源 ⇒ API_BASE 导入必须归零（非零即双来源）`).toBe(0);
+        const famImports = lines.filter((l) => l.includes(fam.name) && l.trimStart().startsWith('import '));
+        expect(famImports.length, `${rel} 应有且仅有 1 条 ${fam.name} 导入`).toBe(1);
+        expect(famImports[0], `${rel} 的 ${fam.name} 导入未取自该族属主`).toMatch(fam.ownerRe);
+      }
     }
+    // 上收面必须恰好是这一文件：多一个说明根漂，少一个说明有文件被静默改成零来源（假绿）
+    expect([...FAMILY_OWNER.keys()].sort()).toEqual(['pages/knowledge/pages/ExtractionPage.tsx']);
   });
 
   it('面值逐字不变：19 条行内派生态按 API_BASE 还原后 = 改前裸形态快照（排序多重集 + 逐文件条数）', () => {
     const all: string[] = [];
     for (const { rel, sites } of LINE_VISIBLE) {
-      const vals = derivedValues(read(rel));
+      const vals = faceValues(read(rel));
       expect(vals.length, `${rel} 行内派生态条数不符`).toBe(sites);
       all.push(...vals);
     }
@@ -238,8 +293,11 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
       `${CANONICAL} — const r = await fetch("/api/health");`,
       `${CANONICAL} — export const API_BASE = "/api";`,
     ]);
-    // 全仓行内派生态下限锚在棘轮门 B5-25 实跑的 derSites 315 + 本批 21 −（跨行/JSX 两枚行级不吃）= 334
-    expect(derTotal, '行内派生态面须随批累积，低于 334 即扫描根或判据漂移').toBeGreaterThanOrEqual(334);
+    // 全仓行内派生态下限锚在棘轮门 B5-25 实跑的 derSites 315 + 本批 21 −（跨行/JSX 两枚行级不吃）= 334。
+    // #145/B6-4 订正为 333：该批把 5 枚**消费者**派生态上收为族单源 import 裸引用（属主声明一枚未动），
+    // 本门只看 `${API_BASE}` 派生态 ⇒ 按面值减 5。这是可见性搬运、不是进度，下限随之同步下调并注明缘由；
+    // 债的账仍只在 `urlFamilyDualFormRatchet` 的 dupBoth/属主面上记。
+    expect(derTotal, '行内派生态面须随批累积，低于 333 即扫描根或判据漂移').toBeGreaterThanOrEqual(333);
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
   });
 
@@ -275,5 +333,13 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     expect(codeLines(CLEAN).filter((l) => HARDCODED_RE.test(l))).toEqual([]);
     expect(codeLines(CLEAN).filter((l) => NO_SLASH_AFTER_BASE.test(l))).toEqual([]);
     expect(derivedValues(CLEAN)).toEqual(['/api/v1/datanet', '/api/v1/knowledge/rules?groupBy=regulation']);
+    // #145/B6-4：族单源常量的裸引用与模板腿都必须还原成同面值，导入行不计
+    expect(faceValues('  const data = await apiFetchData(ONTOLOGY_MAPPINGS_BASE);')).toEqual([
+      '/api/v1/ontology/mappings',
+    ]);
+    expect(faceValues('  await apiFetchData(`${ONTOLOGY_MAPPINGS_BASE}/objects`);')).toEqual([
+      '/api/v1/ontology/mappings/objects',
+    ]);
+    expect(faceValues("import { ONTOLOGY_MAPPINGS_BASE } from '../../../services/ontology/ontologyMappingApi';")).toEqual([]);
   });
 });

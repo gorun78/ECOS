@@ -31,6 +31,14 @@
  * `derivedValues` 增解 `${WORKSPACE_SCENARIOS_BASE}…` 与裸引用两种形态，17 条面值仍逐字还原，
  * 这样"改基址写法"与"偷偷删请求"在红绿上可分辨（剪腿会让快照变 12 条却看着像进度）。
  * 三文件是否真的只挪了属主、没动族体，由 `b6WorkspaceScenariosSingleSource.spec.ts` 按 HEAD 快照守恒承证。</p>
+ *
+ * <p>#145/B6-4 追加口径（本门形状第二次变，判读同上）：`ScenarioManagementView.tsx` 的提案列表腿
+ * 上收到属主 `services/ontology/ontologyProposalApi.ts` 导出的 `ONTOLOGY_PROPOSALS_BASE`（该常量本身
+ * 仍是 `${API_BASE}` 派生态 ⇒ 基址单源性质传递成立）。本门沿用 B6-2 的**不剪腿**政策：把该常量接进
+ * 同一套族单源解析器（`FAM_SOURCES`），17 条面值与 `ScenarioManagementView.tsx` 的 6 条逐字不动；
+ * 上收面改为按常量名逐族钉死（场景族三文件 / 提案族仅此页）。该页的 approve/reject 两条子路径腿
+ * 刻意保持 `${API_BASE}` 原样（单一生产方、保住棘轮可见性），是否漏挪/多挪由
+ * `src/__tests__/b6OntologyFamilySingleSource.spec.ts` 承证。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -39,6 +47,7 @@ import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../../services/httpClient';
 import { WORKSPACE_SCENARIOS_BASE } from '../../services/scenarioActionClient';
+import { ONTOLOGY_PROPOSALS_BASE } from '../../services/ontology/ontologyProposalApi';
 
 const PAGES_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -77,9 +86,23 @@ const HARDCODED_RE = /["'`]\/api\b/;
 
 /** 派生形态：`` `${API_BASE}<path>` ``，捕获组即拼出来的路径段。 */
 const DERIVED_RE = /`\$\{API_BASE\}((?:\\.|(?!`)[^\\])*)`/g;
-/** #145/B6-2 起本域三文件改取的族单源形态：`` `${WORKSPACE_SCENARIOS_BASE}<path>` ``。 */
-const FAM_SITE_RE = /`\$\{WORKSPACE_SCENARIOS_BASE\}((?:\\.|(?!`)[^\\])*)`/g;
-const FAM_NAME = 'WORKSPACE_SCENARIOS_BASE';
+/** 本域文件改取的族单源形态：`` `${<族单源>}<path>` ``（两种形态 + 裸引用一并解析）。 */
+const FAM_SOURCES: ReadonlyArray<{ name: string; value: string; re: RegExp; ownerRe: RegExp }> = [
+  {
+    name: 'WORKSPACE_SCENARIOS_BASE',
+    value: WORKSPACE_SCENARIOS_BASE,
+    re: /`\$\{WORKSPACE_SCENARIOS_BASE\}((?:\\.|(?!`)[^\\])*)`/g,
+    ownerRe: /from '[^']*services\/scenarioActionClient'/,
+  },
+  {
+    // #145/B6-4：`ScenarioManagementView.tsx` 的提案列表腿（原 17 条快照里的 `'/api/v1/ontology/proposals'`）
+    // 上收到属主导出的常量。剪腿会让快照从 17 掉到 16 却看着像进度，故与上面同一套解析器接住。
+    name: 'ONTOLOGY_PROPOSALS_BASE',
+    value: ONTOLOGY_PROPOSALS_BASE,
+    re: /`\$\{ONTOLOGY_PROPOSALS_BASE\}((?:\\.|(?!`)[^\\])*)`/g,
+    ownerRe: /from '[^']*services\/ontology\/ontologyProposalApi'/,
+  },
+];
 
 function isComment(line: string): boolean {
   const t = line.trim();
@@ -120,7 +143,8 @@ function walk(dir: string, out: string[]): string[] {
 /**
  * 把派生点还原成运行期字符串面值（`${…}` 插值按字面保留，改前后同一写法）。
  * #145/B6-2 起增解族单源两种形态：模板腿 `` `${WORKSPACE_SCENARIOS_BASE}/x` `` 与**裸引用**
- * `apiFetchData(WORKSPACE_SCENARIOS_BASE)`。裸引用必须先摘掉模板腿再数，且导入行不计，
+ * `apiFetchData(WORKSPACE_SCENARIOS_BASE)`；#145/B6-4 起第二个族单源 `ONTOLOGY_PROPOSALS_BASE`
+ * 走同一套解析器（见 `FAM_SOURCES`）。裸引用必须先摘掉模板腿再数，且导入行不计，
  * 否则一条腿会被计两次（模板 + 裸名）或把 import 语句当成一次请求。
  */
 function derivedValues(src: string): string[] {
@@ -129,12 +153,14 @@ function derivedValues(src: string): string[] {
     for (const m of line.matchAll(DERIVED_RE)) out.push(`${API_BASE}${m[1]}`);
     if (/^\s*import\s/.test(line)) continue;
     let rest = line;
-    for (const m of line.matchAll(FAM_SITE_RE)) {
-      rest = rest.split(m[0]).join('');
-      out.push(`${WORKSPACE_SCENARIOS_BASE}${m[1]}`);
+    for (const fam of FAM_SOURCES) {
+      for (const m of rest.matchAll(fam.re)) {
+        rest = rest.split(m[0]).join('');
+        out.push(`${fam.value}${m[1]}`);
+      }
+      const bare = rest.split(fam.name).length - 1;
+      for (let i = 0; i < bare; i += 1) out.push(fam.value);
     }
-    const bare = rest.split(FAM_NAME).length - 1;
-    for (let i = 0; i < bare; i += 1) out.push(WORKSPACE_SCENARIOS_BASE);
   }
   return out;
 }
@@ -182,7 +208,7 @@ describe('pages/ 场景域基址单源 — 私设基址清零 (#143/B5-23)', () 
     expect(smv, 'ScenarioManagementView.tsx 仍有私设基址').toEqual([]);
   });
 
-  it('基址来源唯一：API_BASE 至多 1 条 httpClient 导入；上收到族单源的文件必须恰有 1 条族单源导入腿 (#143/B5-23 / #145/B6-2)', () => {
+  it('基址来源唯一：API_BASE 至多 1 条 httpClient 导入；上收到族单源的文件必须恰有 1 条族单源导入腿 (#143/B5-23 / #145/B6-2 / #145/B6-4)', () => {
     const importLines = (rel: string) =>
       codeLines(read(rel)).filter((l) => l.trimStart().startsWith('import '));
     for (const { rel, importPath } of FILES) {
@@ -190,22 +216,29 @@ describe('pages/ 场景域基址单源 — 私设基址清零 (#143/B5-23)', () 
       const apiImports = imports.filter((l) => /\bAPI_BASE\b/.test(l));
       expect(apiImports.length, `${rel} 的 API_BASE 导入不得多于 1 条`).toBeLessThanOrEqual(1);
       if (apiImports.length === 1) expect(apiImports[0]).toContain(`from '${importPath}'`);
-      const famImports = imports.filter((l) => l.includes(FAM_NAME));
-      expect(famImports.length, `${rel} 的族单源导入不得多于 1 条（第二处来源即红）`).toBeLessThanOrEqual(1);
+      for (const fam of FAM_SOURCES) {
+        const famImports = imports.filter((l) => l.includes(fam.name));
+        expect(famImports.length, `${rel} 的 ${fam.name} 导入不得多于 1 条（第二处来源即红）`).toBeLessThanOrEqual(1);
+        if (apiImports.length === 0 && famImports.length === 1) {
+          expect(famImports[0], `${rel} 的 ${fam.name} 导入未取自该族属主`).toMatch(fam.ownerRe);
+        }
+      }
       if (apiImports.length === 0) {
-        expect(famImports.length, `${rel} 已无 API_BASE 导入 ⇒ 必须恰有一条族单源导入腿`).toBe(1);
-        expect(famImports[0]).toMatch(/from '[^']*services\/scenarioActionClient'/);
+        const famTotal = imports.filter((l) => FAM_SOURCES.some((f) => l.includes(f.name))).length;
+        expect(famTotal, `${rel} 已无 API_BASE 导入 ⇒ 必须恰有一条族单源导入腿`).toBe(1);
       }
     }
-    // 上收面必须**恰好**是这三文件：多一个说明扫描根漂了，少一个说明有文件被静默改成零来源（假绿）
-    const moved = FILES.filter(({ rel }) => importLines(rel).some((l) => l.includes(FAM_NAME)))
-      .map((f) => f.rel)
-      .sort();
-    expect(moved).toEqual([
+    // 上收面必须**恰好**是对应文件：多一个说明扫描根漂了，少一个说明有文件被静默改成零来源（假绿）
+    const movedOf = (name: string) =>
+      FILES.filter(({ rel }) => importLines(rel).some((l) => l.includes(name)))
+        .map((f) => f.rel)
+        .sort();
+    expect(movedOf('WORKSPACE_SCENARIOS_BASE')).toEqual([
       'ScenarioManagementView.tsx',
       'workbench/[scenarioId]/index.tsx',
       'workbench/index.tsx',
     ]);
+    expect(movedOf('ONTOLOGY_PROPOSALS_BASE')).toEqual(['ScenarioManagementView.tsx']);
   });
 
   it('派生形态唯一：`${API_BASE}` 后必接 /（防漏段），八文件零 /api/api 双前缀', () => {
@@ -254,6 +287,14 @@ describe('pages/ 场景域基址单源 — 私设基址清零 (#143/B5-23)', () 
     expect(derivedValues(CLEAN)).toEqual([
       '/api/v1/workspace/scenarios',
       '/api/v1/cognitive/beliefs?domain=${encodeURIComponent(domainValue)}',
+    ]);
+    // #145/B6-4：第二个族单源的裸引用必须还原成同面值，导入行不计（否则一条腿读成两次／import 当成请求）
+    expect(derivedValues('  const d = await apiFetchData<unknown[]>(ONTOLOGY_PROPOSALS_BASE);')).toEqual([
+      '/api/v1/ontology/proposals',
+    ]);
+    expect(derivedValues("import { ONTOLOGY_PROPOSALS_BASE } from '../services/ontology/ontologyProposalApi';")).toEqual([]);
+    expect(derivedValues('  await apiFetchData(`${ONTOLOGY_PROPOSALS_BASE}/${id}/approve`);')).toEqual([
+      '/api/v1/ontology/proposals/${id}/approve',
     ]);
   });
 });
