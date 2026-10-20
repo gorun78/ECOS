@@ -397,7 +397,13 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     // `` `${DATANET_METADATA_BASE}/…` `` ⇒ 与本门 `${API_BASE}` 判据脱面。属主声明
     // `DATANET_METADATA_BASE` 只是 `api/dataClient.ts` 里 `DATANET_META` 改名并 export、同一声明位，
     // 计数不变（与 B6-7 的 `COMPLIANCE_RULES_BASE` 同形）。差额与本批棘轮 derSites 300→297 同值。
-    expect(derTotal, '行内派生态面须随批累积，低于 319 即扫描根或判据漂移').toBeGreaterThanOrEqual(319);
+    // #145/B6-9 订正为 316（−3，实测读出）：删 4 枚消费点（`pages/MonitoringCenter.tsx` 的
+    // ontology/cognitive 两枚 `ENGINES` 腿 + `pages/EngineMonitor.tsx` 的 `ENGINE_META.data.configPath`
+    // + `pages/data-workbench/DataEngineConfigPanel.tsx` 的 PUT 保存腿），增 1 枚**新建**属主声明
+    // （`api/dataClient.ts` 的 `DATA_ENGINE_SETTINGS_BASE`；前两批的 `COGNITIVE_ENGINE_BASE`/
+    // `ONTOLOGY_ENGINE_BASE` 只是私有升导出、同一声明位不计）。差额与本批棘轮 derSites 297→294 **同值**，
+    // 但这是「三族族体全在 `/v1/` 面内」才成立巧合，不得当成通则（B6-7 已实证两口径可以差 1 枚）。
+    expect(derTotal, '行内派生态面须随批累积，低于 316 即扫描根或判据漂移').toBeGreaterThanOrEqual(316);
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
   });
 

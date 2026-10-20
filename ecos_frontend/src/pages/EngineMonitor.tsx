@@ -24,7 +24,7 @@ import {
 import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
 import { useToast } from '../components/common/Toast';
-import { NoAccessError, isNoAccessError } from '../api';
+import { NoAccessError, isNoAccessError, DATA_ENGINE_SETTINGS_BASE } from '../api';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -53,9 +53,12 @@ interface StatusData {
   [key: string]: any;
 }
 
+// #145/B6-9：`configPath` 取 `/v1/engine/data/settings` 族根单源（属主 `api/dataClient.ts`，
+// 经 `'../api'` 门面取值），面值与改前 `${API_BASE}/v1/engine/data/settings` 逐字相同；
+// 本页其余三枚 `${API_BASE}` 腿（health/status/兜底 config）是各自族唯一生产方，按 B6 口径原样保留。
 const ENGINE_META: Record<string, { icon: React.ComponentType<{ className?: string }>; configPath?: string }> = {
   security: { icon: Shield },
-  data:     { icon: Database, configPath: `${API_BASE}/v1/engine/data/settings` },
+  data:     { icon: Database, configPath: DATA_ENGINE_SETTINGS_BASE },
   ontology: { icon: Network },
   cognitive:{ icon: Brain },
   knowledge:{ icon: BookOpen },

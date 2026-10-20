@@ -134,7 +134,7 @@ describe('services/ontology 域基址单源 — 私设基址清零 (#143/B5-17)'
   it('判据能变红：违例源命中（含反引号形态）、合规源不命中（防恒绿）', () => {
     const DEFECT = [
       'const MAPPING_BASE = "/api/v1/ontology/mappings";',
-      'const ENGINE_BASE = \'/api/v1/engine/ontology\';',
+      'const ONTOLOGY_ENGINE_BASE = \'/api/v1/engine/ontology\';',
       'return apiFetchData(`/api/v1/lineage`);',
     ].join('\n');
     const CLEAN = [

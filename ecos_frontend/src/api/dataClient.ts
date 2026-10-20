@@ -37,6 +37,24 @@ export async function fetchDataEngineHealth(): Promise<Record<string, unknown>> 
 }
 
 /**
+ * `/v1/engine/data/settings` 族根单源（#145/B6-9 属主上收）。
+ *
+ * <p>**改前形状**：两枚页面各写一份族根体——`pages/EngineMonitor.tsx` 的
+ * `ENGINE_META.data.configPath` 与 `pages/data-workbench/DataEngineConfigPanel.tsx`
+ * 的保存腿 ⇒ 双形态棘轮在册的重复族。两文件都是页面，谁当属主都会让另一个页面
+ * 反向引页面（分层倒置），故按 #145/B6-5/B6-8 同款判据把单源落到分层底部的 api 层，
+ * 两个页面经既有的 `'../api'` / `'../../api'` 门面导入腿取值
+ * （`src/api.ts` 对本文件是 `export * from "./api/dataClient"`，门面行不含 URL 体）。</p>
+ *
+ * <p>**只收族根，子路径三腿保持 `${API_BASE}` 原样**：`/settings/groups`、
+ * `/settings/defaults`、`/settings/refresh` 各只有 DataEngineConfigPanel 一个生产方、
+ * 从来不在重复面，并进常量只会让三枚族体对棘轮 `familiesOf` 隐形而不减少任何债
+ * （#145/B6-1 文件头 ② / #145/B6-3 ③ 判例）。合并后果：本族 owners 2→1、仍留在族索引里，
+ * 第二个裸面写手出现即红。</p>
+ */
+export const DATA_ENGINE_SETTINGS_BASE = `${API_BASE}/v1/engine/data/settings`;
+
+/**
  * PMO-43 T1 — tag mock-fallback data with `error: 'MOCK'` so UI and tests can
  * distinguish provable real backend data from placeholder enrichment rows.
  * Each entry is shallow-copied (shallow is sufficient because the status items

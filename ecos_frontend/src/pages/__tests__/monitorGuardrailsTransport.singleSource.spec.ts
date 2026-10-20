@@ -34,6 +34,13 @@
  * 不宣布这三条腿的真实应答面已验证。401 腿的手删单键（EngineMonitor `localStorage.removeItem`
  * 而 MonitoringCenter 已用 `clearAuthToken()`）登记在 #108 队列，本批不夹带修复、
  * 也不把该形态断言为正确。</p>
+ *
+ * <p>**#145/B6-9 属主上收同批翻转的正是 A5**：本域两页面里 3 枚腿改引族单源常量
+ * （`DATA_ENGINE_SETTINGS_BASE` / `ONTOLOGY_ENGINE_BASE` / `COGNITIVE_ENGINE_BASE`）⇒
+ * 「`${API_BASE}` 点数恰 4/6」这条按形态数写死的判据必然变红。任何**逐文件枚举基址形态**的门
+ * （api-base 单源门、各域单源 spec 的 per-file 计数）在族上收时都会撞上同一形状，
+ * 属主批必须同批改钉；本门改钉口径为「派生态 + 使用态常量 = 原腿数」，让**换源**不变红、
+ * **丢腿/重复书写**变红。</p>
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -238,14 +245,42 @@ describe('A 源形 — 三文件私设传输与硬编码基址归零（C2′ 棘
     }
   });
 
-  it('A5 基址单源：两页面零 /api 字面量且改由 ${API_BASE} 派生；helpers 本就无基址字面量', () => {
+  it('A5 基址单源：两页面零 /api 字面量，基址腿由 ${API_BASE} 或族单源常量给出；helpers 本就无基址字面量', () => {
     expect(countInCode(SRC_MONITOR, HARDCODED_API)).toBe(0);
     expect(countInCode(SRC_CENTER, HARDCODED_API)).toBe(0);
     expect(countInCode(SRC_HELPERS, HARDCODED_API)).toBe(0);
-    // EngineMonitor 4 处（health/config/status 三点 + ENGINE_META.data.configPath）、
+    // 改前形状（#143/B5-11g）：EngineMonitor 4 处（health/config/status 三点 + ENGINE_META.data.configPath）、
     // MonitoringCenter 6 处（ENGINES 六枚 apiBase）都由 API_BASE 派生。
-    expect(countInCode(SRC_MONITOR, /\$\{API_BASE\}/g)).toBe(4);
-    expect(countInCode(SRC_CENTER, /\$\{API_BASE\}/g)).toBe(6);
+    // **#145/B6-9 属主上收后本判据必须同时翻转**：其中 3 枚腿改成引族单源常量
+    // （EngineMonitor 的 configPath → `DATA_ENGINE_SETTINGS_BASE`；MonitoringCenter 的
+    // ontology/cognitive 两枚 → `ONTOLOGY_ENGINE_BASE` / `COGNITIVE_ENGINE_BASE`）⇒
+    // 只按 `${API_BASE}` 计数会随批下降，而下降是**换源**不是**丢腿**。故加第二条恒等判据：
+    // 「`${API_BASE}` 派生态点数 ＋ 族单源常量的**使用**点数（逐字排除 import 行）」必须等于
+    // B5-11g 建立时的原腿数 4 / 6 —— 腿少一条即红，多一条亦红。
+    expect(countInCode(SRC_MONITOR, /\$\{API_BASE\}/g)).toBe(3);
+    expect(countInCode(SRC_CENTER, /\$\{API_BASE\}/g)).toBe(4);
+    const usesOf = (src: string, name: RegExp): number =>
+      src
+        .split(/\r?\n/)
+        .filter((l) => {
+          const t = l.trim();
+          return !(t.startsWith('//') || t.startsWith('*') || t.startsWith('/*') || t.startsWith('///') || t.startsWith('import '));
+        })
+        .join('\n')
+        .match(new RegExp(name.source, name.flags.includes('g') ? name.flags : `${name.flags}g`))?.length ?? 0;
+    expect(usesOf(SRC_MONITOR, /\bDATA_ENGINE_SETTINGS_BASE\b/) + countInCode(SRC_MONITOR, /\$\{API_BASE\}/g)).toBe(4);
+    expect(
+      usesOf(SRC_CENTER, /\bONTOLOGY_ENGINE_BASE\b/) + usesOf(SRC_CENTER, /\bCOGNITIVE_ENGINE_BASE\b/) + countInCode(SRC_CENTER, /\$\{API_BASE\}/g),
+    ).toBe(6);
+    expect(usesOf(SRC_MONITOR, /\bDATA_ENGINE_SETTINGS_BASE\b/), 'configPath 只准有一枚使用点（多出即重复书写基址）').toBe(1);
+    expect(usesOf(SRC_CENTER, /\bONTOLOGY_ENGINE_BASE\b/)).toBe(1);
+    expect(usesOf(SRC_CENTER, /\bCOGNITIVE_ENGINE_BASE\b/)).toBe(1);
+    // 反向自检：使用点计数必须能吃到真实腿、又不吃 import 腿（防本判据恒 0 假绿）
+    expect(usesOf("import { X } from './a';\nconst u = `${X}/health`;", /\bX\b/)).toBe(1);
+    // 每枚常量的「属主文件」必须真是棘轮认的那一个（引错门面/引错分册即在此变红）
+    expect(SRC_MONITOR).toMatch(/import\s*{[^}]*\bDATA_ENGINE_SETTINGS_BASE\b[^}]*}\s*from\s*'\.\.\/api'/);
+    expect(SRC_CENTER).toMatch(/import\s*{[^}]*\bONTOLOGY_ENGINE_BASE\b[^}]*}\s*from\s*'\.\.\/services\/ontologyApi'/);
+    expect(SRC_CENTER).toMatch(/import\s*{[^}]*\bCOGNITIVE_ENGINE_BASE\b[^}]*}\s*from\s*'\.\.\/services\/cognitiveClient'/);
     expect(SRC_MONITOR).toContain("from '../services/httpClient'");
     expect(SRC_CENTER).toContain("from '../services/httpClient'");
   });

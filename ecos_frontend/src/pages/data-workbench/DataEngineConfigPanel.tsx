@@ -12,7 +12,7 @@
  */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Settings } from 'lucide-react';
-import { apiFetchData } from '../../api';
+import { apiFetchData, DATA_ENGINE_SETTINGS_BASE } from '../../api';
 import { API_BASE } from '../../services/httpClient';
 import { getErrorMessage } from './helpers';
 import { useTheme } from '../../components/ThemeContext';
@@ -225,7 +225,11 @@ export default function DataEngineConfigPanel({ showToast }: Props) {
         return;
       }
 
-      await apiFetchData(`${API_BASE}/v1/engine/data/settings`, {
+      // #145/B6-9：批量保存腿取 `/v1/engine/data/settings` 族根单源（属主 `api/dataClient.ts`），
+      // 面值与改前 `${API_BASE}/v1/engine/data/settings` 逐字相同。下方 `/groups`、`/defaults`、
+      // `/refresh` 三枚子路径腿仍写 `${API_BASE}` —— 它们各只有本页一个生产方、不在重复面，
+      // 并进常量只会让族体对双形态棘轮隐形而不减债（台账 #145/B6-3 ③ 口径）。
+      await apiFetchData(DATA_ENGINE_SETTINGS_BASE, {
         method: 'PUT',
         body: JSON.stringify(changedItems),
       });

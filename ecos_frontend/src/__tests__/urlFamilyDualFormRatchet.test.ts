@@ -195,6 +195,31 @@
  *      与本门 dupBoth −2 不同值，因为 `dataCatalogClient` 的 3 枚消费腿从来不在本门面里。
  * 收口的 3 文件面值守恒（5 条面值逐字不变 + 属主唯一性）不在本门证明范围内，
  * 由同批新增的 `b6DatanetMetadataSingleSource.spec.ts` 承证。
+ * #145/B6-9 复跑 = 680 / **253** / 裸面 **0** / 派生面 **294** / dupBoth **12** / dupRawOnly **0** /
+ * blind **12**（改前 680 / 253 / 0 / 297 / 15 / 0 / 15 系把同款扫描器指向 `git archive HEAD` 解出的
+ * src 树实跑读出，非推算）：存量债第九批收口 **引擎监控域三族各两属主**——
+ * `/v1/engine/cognitive`（`pages/MonitoringCenter.tsx` 的 `ENGINES` 一行 ＋ 服务侧
+ * `services/cognitiveClient.ts` 已有的 `COGNITIVE_ENGINE_BASE` 声明，本批只把它从私有升为导出）、
+ * `/v1/engine/ontology`（`pages/MonitoringCenter.tsx` ＋ `services/ontology/ontologyEngineApi.ts`
+ * 的文件私有 `ENGINE_BASE`，改名并 export 为 `ONTOLOGY_ENGINE_BASE`）、
+ * `/v1/engine/data/settings`（`pages/EngineMonitor.tsx` 的 `ENGINE_META.data.configPath` ＋
+ * `pages/data-workbench/DataEngineConfigPanel.tsx` 的保存腿，两枚都是行内 `` `${API_BASE}/v1/…` ``，
+ * 改前**没有**任何族根常量）。四处形状须记清：
+ *   ① **属主层位不是一套规则**：cognitive/ontology 两族按 B6-4 判据落在**原属主之一的服务文件**
+ *      （页面引它不成环）；settings 族按 B6-5/B6-8 判据必须落到 **api 层** `api/dataClient.ts`——
+ *      两枚消费腿分属两个页面，若把单源放任一页面，另一页面就得"页面→页面"取常量，属分层倒置。
+ *      先查 import 图再定属主，不看哪个文件顺眼。
+ *   ② **门面不是第二属主**：`services/ontologyApi.ts` 的 `export * from "./ontology/ontologyEngineApi"`
+ *      行不含 URL 体 ⇒ 页面经门面取值不会造出第二个族根构造方（B6-5 ② 别名判例的又一兑现）。
+ *   ③ **声明位三种命运同批并存**：cognitive/ontology 两枚是「私有升导出」（0 增 0 删）、
+ *      settings 是「新建一枚导出常量」（+1）。derSites 297→294 = 删 4 枚消费点（MonitoringCenter 2 ＋
+ *      EngineMonitor 1 ＋ DataEngineConfigPanel 1）增 1 枚声明，净 −3 全属形态搬运，不计进度。
+ *   ④ **同根子路径族仍按 B6-3/B6-1 口径不并进常量**：`/v1/engine/data/settings/groups`、`/defaults`、
+ *      `/refresh` 三枚各只有一个生产方（不在重复面），保持 `${API_BASE}` 行内形态以保住族面可见性；
+ *      并进去只是对棘轮隐形而不减债。故族面 253 一点不降：三族族根声明各剩 1 枚且仍写
+ *      `` `${API_BASE}/v1/…` `` ⇒ 族留在索引、只退出 dupBoth，第二裸面写手即红。
+ * 收口的 3 族 6 枚属主合并后的面值守恒与属主唯一性不在本门证明范围内，
+ * 由同批新增的 `b6EngineFamiliesSingleSource.spec.ts` 承证。
  * 逐门去改 12 个遗留门的正则形状是开放式工作量且会再次漂移，
  * 本批改为在**树级**用一条双形态门覆盖这些腿共同保护的性质：
  * 「同一 URL 族在生产代码里只允许一个生产方」。
@@ -207,7 +232,7 @@
  * 棘轮口径 = **族 → 属主清单**（两侧都只减不增）：
  *   新族出现在重复面 → 红；基线族新增属主 → 红；基线族/属主已不再重复 → 陈旧豁免亦红
  *   （与 privateTransportRatchet「陈旧豁免即红」同口径：基线预算不留给已收口的项）。
- *   本门**不宣称**证明单源成立——基线剩 15 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
+ *   本门**不宣称**证明单源成立——基线剩 12 个重复族（#143/B5-19 建门 30 族 69 属主，#145/B6-1 收口
  *   `/v1/knowledge` 一族后 29 族 62 属主，#145/B6-2 收口 `/v1/workspace/scenarios` 两族一对后 27 族 57 属主，
  *   #145/B6-3 收口 AIP 域三族（同一对生产方）后 24 族 51 属主，#145/B6-4 收口本体域两族六属主后 22 族 45 属主，
  *   #145/B6-5 收口 pipeline 定义族三属主后 21 族 42 属主，#145/B6-6 收口知识域三族六属主后 18 族 36 属主，
@@ -346,10 +371,7 @@ const BASELINE: Readonly<Record<string, readonly string[]>> = Object.freeze({
   '/v1/ecos/ontologies': ['components/ontology-workbench/OntologyDomainPanel.tsx', 'pages/business-workbench/BusinessWorkbenchLayout.tsx'],
   '/v1/ecos/versions': ['pages/knowledge/tabs/DataWorkbenchImportTab.tsx', 'services/ontology/ontologyVersionApi.ts'],
   '/v1/ecos/world-model-graph': ['api/monitorClient.ts', 'services/worldModelGraphApi.ts'],
-  '/v1/engine/cognitive': ['pages/MonitoringCenter.tsx', 'services/cognitiveClient.ts'],
   '/v1/engine/data/pipeline/runs/{}': ['pages/data-workbench/api/pipeline.ts', 'pages/data-workbench/pipeline-editor/PipelineExecutionMonitor.tsx'],
-  '/v1/engine/data/settings': ['pages/EngineMonitor.tsx', 'pages/data-workbench/DataEngineConfigPanel.tsx'],
-  '/v1/engine/ontology': ['pages/MonitoringCenter.tsx', 'services/ontology/ontologyEngineApi.ts'],
   '/v1/guardrails/policies': ['pages/aiworkbench/api.ts', 'services/cognitiveEngineApi.ts'],
   '/v1/ontology/data': ['services/ontology/ontologyDataApi.ts', 'services/ontologyWorkbenchApi.ts'],
   '/v1/ontology/export': ['pages/knowledge/services/overview.ts', 'services/ontology/ontologyExportApi.ts'],
@@ -420,7 +442,12 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 仍写 `` `${API_BASE}/v1/datanet/metadata` `` 同一声明位）。`dataCatalogClient.ts` 的 3 枚消费腿
     // 改前写 `` `${DATANET_BASE}/…` ``、改后写 `` `${DATANET_METADATA_BASE}/…` ``，两形态都不在本门
     // DER_RE 面里 ⇒ 本门面只见它的声明位。净 −3 全属形态搬运；债的账只记 dupBoth 17 → 15 与属主 34 → 30。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(297);
+    // #145/B6-9：297 → **294** = 删 4 枚 `` `${API_BASE}/v1/engine/… `` 消费点
+    // （`MonitoringCenter.tsx` 的 ontology/cognitive 两枚 `ENGINES` 腿、`EngineMonitor.tsx` 的
+    // `ENGINE_META.data.configPath`、`DataEngineConfigPanel.tsx` 的 PUT 保存腿），
+    // 增 1 枚新建属主声明（`api/dataClient.ts` 的 `DATA_ENGINE_SETTINGS_BASE`）；
+    // cognitive/ontology 两枚声明只是私有升导出、位上未增未减。净 −3 全属形态搬运，不计进度。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(294);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     expect(dupBoth.size).toBeGreaterThan(dupRawOnly.size);
@@ -479,10 +506,21 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 循环，见文件头 B6-8 ①）；preview 族**只动一腿即闭合**、页面门面保持原样（②）；属主文件内部仍留
     // 一枚在册裸面腿（`…/resources/${…}`）不动——动它是关可见性而不减债（③）。族面 254 → 253 降 1 属
     // 可见性副产物（④），账只记 dupBoth 与属主。dupRawOnly 仍 0（prod 面裸形态自 #143/B5-26 归零）。
-    expect(dupBoth.size).toBe(15);
+    // #145/B6-9（存量债第九批）：引擎监控域三族各两属主——`/v1/engine/cognitive`
+    // （`pages/MonitoringCenter.tsx` ＋ `services/cognitiveClient.ts` 的 `COGNITIVE_ENGINE_BASE`）、
+    // `/v1/engine/ontology`（`pages/MonitoringCenter.tsx` ＋ `services/ontology/ontologyEngineApi.ts`
+    // 的 25 枚内联腿）、`/v1/engine/data/settings`（`pages/EngineMonitor.tsx` 的 `configPath` ＋
+    // `pages/data-workbench/DataEngineConfigPanel.tsx` 的保存腿）收口为三枚导出常量单源
+    // ⇒ **dupBoth 15 → 12**、BASELINE 同批剪除三行（属主 30 → 24）。族面 253 一点不降：三族各留
+    // 1 枚族根声明且仍写成 `` `${API_BASE}/v1/…` `` ⇒ 族继续留在索引里，第二裸面写手即红
+    // （同 B6-4/B6-5/B6-6/B6-8 形状，与 B6-2/B6-3/B6-7 的「族整体消失」相对）。derSites 297 → **294**
+    // = 删 4 枚消费点（MonitoringCenter 2 ＋ EngineMonitor 1 ＋ DataEngineConfigPanel 1）、
+    // 增 1 枚属主声明（`api/dataClient.ts` 的 `DATA_ENGINE_SETTINGS_BASE`；另两枚常量本来就在属主文件里，
+    // 只是从私有升为导出）——净 −3 全属形态搬运，账只记 dupBoth 与属主两栏。
+    expect(dupBoth.size).toBe(12);
     expect(dupRawOnly.size).toBe(0);
     const blind = [...dupBoth.keys()].filter((f) => !dupRawOnly.has(f)).sort();
-    expect(blind.length).toBe(15);
+    expect(blind.length).toBe(12);
     expect(blind.length, '盲区族清单必须非空且全部在册（否则基线口径与本门不符）').toBeGreaterThan(0);
     for (const f of blind) expect(Object.keys(BASELINE)).toContain(f);
   }, 30_000);
@@ -528,8 +566,13 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // #145/B6-8 起 15 族 / 30 属主（`/v1/datanet/metadata` 族根双声明合一为 `api/dataClient.ts` 的
     // `DATANET_METADATA_BASE` ＋ `/v1/datanet/metadata/preview/{}?limit={}` 动一腿即闭合，同批剪除两行；
     // 两族收口后各留 1 属主、仍留在族索引里 ⇒ 在册性探针按「族不退出索引、只退出重复面」口径验）
-    expect(entries.length).toBe(15);
-    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(30);
+    // #145/B6-9 起 12 族 / 24 属主（引擎监控域三族各两属主——`/v1/engine/cognitive`、`/v1/engine/ontology`
+    // 同为 `pages/MonitoringCenter.tsx` + 各自服务文件，`/v1/engine/data/settings` 为
+    // `pages/EngineMonitor.tsx` + `pages/data-workbench/DataEngineConfigPanel.tsx`——收口为三枚导出常量
+    // （`COGNITIVE_ENGINE_BASE` / `ONTOLOGY_ENGINE_BASE` / `DATA_ENGINE_SETTINGS_BASE`），同批剪除三行；
+    // 三族族根声明各留 1 枚 ⇒ 族面 253 不降、只退出重复面，归因见文件头 B6-9 段）
+    expect(entries.length).toBe(12);
+    expect(entries.reduce((n, [, o]) => n + o.length, 0)).toBe(24);
     expect(BASELINE['/v1/knowledge']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios']).toBeUndefined();
     expect(BASELINE['/v1/workspace/scenarios/{}']).toBeUndefined();
@@ -543,6 +586,9 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     expect(BASELINE['/v1/knowledge/rag']).toBeUndefined();
     expect(BASELINE['/v1/ontology/glossary']).toBeUndefined();
     expect(BASELINE['/v1/knowledge/compliance-rules']).toBeUndefined();
+    expect(BASELINE['/v1/engine/cognitive']).toBeUndefined();
+    expect(BASELINE['/v1/engine/ontology']).toBeUndefined();
+    expect(BASELINE['/v1/engine/data/settings']).toBeUndefined();
     for (const [fam, owners] of entries) {
       expect(fam.startsWith('/v1/')).toBe(true);
       expect(fam.includes('\\')).toBe(false);

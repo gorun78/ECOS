@@ -16,6 +16,16 @@
  * <p>判据含**反引号**：本批 16 处里 6 处是模板串（含 `${encodeURIComponent(…)}` 插值），
  * 只吃引号的"清零"是假绿（D-B5-40 实证过的同一个坑）。快照里的 `${…}` 按字面保留，
  * 改前后同一写法，比对的是源码字面形态而非求值结果。</p>
+ *
+ * <p>**#145/B6-9 属主上收后的同批翻转**（本门是兄弟门耦合规则的第 N 次兑现：任何逐文件枚举
+ * 基址形态的门，族上收时必红或经注释假绿，属主批必须同批改钉）：`DataEngineConfigPanel.tsx`
+ * 的 PUT 保存腿改成引 `api/dataClient.ts` 导出的 `DATA_ENGINE_SETTINGS_BASE` ⇒ 该行不再是
+ * `` `${API_BASE}…` `` 形态，`derivedValues` 吃不到。本门的处理是**快照不剪腿**、判据从
+ * 派生态面换成**面值面**（模板腿 + 常量使用腿两形态都接住，import 行与注释行不算），
+ * 并新增一条「常量取值逐字 = 改前那枚裸字面量」的等价判据作为唯一根据。
+ * 剪腿会让「少一条请求」看着像进度（与 #145/B6-7 的 `faceValues` 同一口径）；
+ * 本域其余三枚子路径腿（`/groups`、`/defaults`、`/refresh`）各只有本页一个生产方、
+ * 不在重复面，按 #145/B6-1/B6-3 口径保持 `${API_BASE}` 原样以保住棘轮族面可见性。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -23,6 +33,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { API_BASE } from '../../../services/httpClient';
+import { DATA_ENGINE_SETTINGS_BASE } from '../../../api/dataClient';
 
 const DOMAIN_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -49,6 +60,8 @@ const SITES_PER_FILE: Readonly<Record<string, number>> = {
   'pipeline-editor/PropertyPanel.tsx': 1,
   'pipeline-editor/UdfBuilderPanel.tsx': 2,
   'pipelineDebugApi.ts': 2,
+  // 4 枚里 1 枚（PUT 保存腿）系 #145/B6-9 上收为族单源常量 `DATA_ENGINE_SETTINGS_BASE`，
+  // 面值由 faceValues 的常量表接住 ⇒ 条数判据仍取**改前腿数**，剪腿会让「少一条腿」看着像进度
   'DataEngineConfigPanel.tsx': 4,
 };
 
@@ -99,6 +112,31 @@ function derivedValues(src: string): string[] {
   const out: string[] = [];
   for (const line of codeLines(src)) {
     for (const m of line.matchAll(DERIVED_RE)) out.push(`${API_BASE}${m[1]}`);
+  }
+  return out;
+}
+
+/**
+ * 族单源常量表（#145/B6-9 起）：本域某枚腿的基址被上收为其他文件的导出常量后，
+ * 页面里不再是 `` `${API_BASE}…` `` 形态 ⇒ `derivedValues` 吃不到它。判据按表驱动换成
+ * **面值面**（模板腿 + 常量使用腿两种形态都接住），快照**不剪腿**：剪一条会让「少一条请求」
+ * 看着像进度（#145/B6-7 同一口径）。后继批再上收一枚只需加一行。
+ */
+const FAM_SITE_RE = /(?:^|[^A-Za-z0-9_.$])DATA_ENGINE_SETTINGS_BASE\b/;
+const FAM_SITES: ReadonlyArray<{ value: string; re: RegExp }> = [
+  { value: DATA_ENGINE_SETTINGS_BASE, re: FAM_SITE_RE },
+];
+
+/** 逐字排除 import 行（导入腿只是取名，不构成一条 URL 站点）。 */
+function nonImportCodeLines(src: string): string[] {
+  return codeLines(src).filter((l) => !l.trimStart().startsWith('import '));
+}
+
+/** 面值面 = 派生态还原值 + 属主常量使用腿的取值。 */
+function faceValues(src: string): string[] {
+  const out = derivedValues(src);
+  for (const line of nonImportCodeLines(src)) {
+    for (const f of FAM_SITES) if (f.re.test(line)) out.push(f.value);
   }
   return out;
 }
@@ -164,12 +202,22 @@ describe('pages/data-workbench 页面域基址单源 — 私设基址清零 (#14
   it('面值逐字不变：还原后的 16 条 URL 多重集 = 改前快照，且逐文件条数吻合', () => {
     const all: string[] = [];
     for (const { rel } of FILES) {
-      const vals = derivedValues(read(rel));
-      expect(vals.length, `${rel} 派生态条数不符`).toBe(SITES_PER_FILE[rel]);
+      const vals = faceValues(read(rel));
+      expect(vals.length, `${rel} 面值面条数不符`).toBe(SITES_PER_FILE[rel]);
       all.push(...vals);
     }
     expect(all.length).toBe(16);
     expect([...all].sort()).toEqual([...PRE_BATCH_URL_LITERALS].sort());
+  });
+
+  it('#145/B6-9 属主常量面值等价：DATA_ENGINE_SETTINGS_BASE 取值 = 改前那枚裸字面量', () => {
+    // 这条是本门允许快照不剪腿的**唯一根据**：常量必须逐字等于改前面值，否则「面值不变」是假的。
+    expect(DATA_ENGINE_SETTINGS_BASE).toBe('/api/v1/engine/data/settings');
+    // 且该页确实只剩这一枚常量使用腿（保存腿），三枚子路径腿仍写 `${API_BASE}` 原样
+    const src = read('DataEngineConfigPanel.tsx');
+    expect(derivedValues(src).length).toBe(3);
+    expect(faceValues(src).length).toBe(4);
+    expect(nonImportCodeLines(src).filter((l) => FAM_SITE_RE.test(l)).length).toBe(1);
   });
 
   it('快照自身可校验：16 条 = 10 单引号 + 6 反引号 + 0 双引号且全部以 /api/ 开头（防快照清空成恒真）', () => {
@@ -199,5 +247,13 @@ describe('pages/data-workbench 页面域基址单源 — 私设基址清零 (#14
       '/api/v1/pipeline/debug/sessions',
       '/api/v1/engine/data/pipeline/runs/${encodeURIComponent(rid)}',
     ]);
+    // 面值面自身的形状自检（#145/B6-9）：常量**使用腿**计 1 条、**import 腿**与注释行都不计
+    const FAM = [
+      "import { DATA_ENGINE_SETTINGS_BASE } from '../../api';",
+      "await apiFetchData(DATA_ENGINE_SETTINGS_BASE, { method: 'PUT' });",
+      '// 注释里的 DATA_ENGINE_SETTINGS_BASE 不算腿',
+    ].join('\n');
+    expect(faceValues(FAM)).toEqual(['/api/v1/engine/data/settings']);
+    expect(derivedValues(FAM)).toEqual([]);
   });
 });

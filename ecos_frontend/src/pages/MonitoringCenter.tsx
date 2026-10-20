@@ -30,8 +30,8 @@ interface EngineDef {
 const ENGINES: EngineDef[] = [
   { id: "eng-security",  labelKey: "dashboard.monitoring.engine.security",  icon: Shield,   engine: "security",  apiBase: `${API_BASE}/v1/engine/security` },
   { id: "eng-data",      labelKey: "dashboard.monitoring.engine.data",      icon: Database, engine: "data",      apiBase: `${API_BASE}/v1/engine/data` },
-  { id: "eng-ontology",  labelKey: "dashboard.monitoring.engine.ontology",  icon: Network,  engine: "ontology",  apiBase: `${API_BASE}/v1/engine/ontology` },
-  { id: "eng-cognitive", labelKey: "dashboard.monitoring.engine.cognitive", icon: Brain,    engine: "cognitive", apiBase: `${API_BASE}/v1/engine/cognitive` },
+  { id: "eng-ontology",  labelKey: "dashboard.monitoring.engine.ontology",  icon: Network,  engine: "ontology",  apiBase: ONTOLOGY_ENGINE_BASE },
+  { id: "eng-cognitive", labelKey: "dashboard.monitoring.engine.cognitive", icon: Brain,    engine: "cognitive", apiBase: COGNITIVE_ENGINE_BASE },
   { id: "eng-knowledge", labelKey: "dashboard.monitoring.engine.knowledge", icon: BookOpen, engine: "knowledge", apiBase: `${API_BASE}/v1/engine/knowledge` },
   { id: "eng-ai",        labelKey: "dashboard.monitoring.engine.ai",        icon: Sparkles, engine: "ai",        apiBase: `${API_BASE}/v1/engine/ai` },
 ];
@@ -39,6 +39,13 @@ const ENGINES: EngineDef[] = [
 // 鉴权头单源定义见 services/auth.ts (H6-T1)；传输单源见 services/httpClient.ts（#143/B5-11g）
 import { clearAuthToken } from '../services/auth';
 import { API_BASE, rawAuthedUrlFetch } from '../services/httpClient';
+// #145/B6-9 族根单源：`/v1/engine/ontology` 属主 = `services/ontology/ontologyEngineApi.ts`
+// （经门面 `services/ontologyApi.ts` 的 `export *` 取值，门面行不含 URL 体 ⇒ 不是第二属主）；
+// `/v1/engine/cognitive` 属主 = `services/cognitiveClient.ts` 的 `COGNITIVE_ENGINE_BASE`。
+// 其余四枚引擎腿（security/data/knowledge/ai）在本页只有一个生产方、不在重复面，
+// 按 #145/B6-1/B6-3 ③ 口径保持 `${API_BASE}` 原样以保住棘轮族面可见性。
+import { ONTOLOGY_ENGINE_BASE } from '../services/ontologyApi';
+import { COGNITIVE_ENGINE_BASE } from '../services/cognitiveClient';
 
 /**
  * 请求结果分类：403(denied) / 网络不可达(offline) / 5xx 等 HTTP 错误(error) 不再同归 null→UNKNOWN。
