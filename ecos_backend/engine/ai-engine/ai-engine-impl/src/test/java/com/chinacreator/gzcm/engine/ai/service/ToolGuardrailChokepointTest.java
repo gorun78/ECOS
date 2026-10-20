@@ -19,6 +19,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -262,6 +263,89 @@ class ToolGuardrailChokepointTest {
         assertEquals("GUARDRAIL_FAIL_CLOSED", r.getErrorClass());
         verify(f.toolDao, times(1)).insertSandboxAudit(eq(USER), eq("query_db"), anyString());
         verify(f.registry, never()).execute(anyString(), any());
+    }
+
+    // ── D-B4-42 反射腿分态：沙盒真拒绝（403 面）⇄ 引擎没答（503 面） ────────
+
+    /** 高危指令 + 沙盒在位：注入一个由契约工厂组应答的替身 bean。 */
+    private ApplicationContext appWithSandbox(SandboxStubSecuritySandboxService stub) {
+        ApplicationContext appCtx = mock(ApplicationContext.class);
+        when(appCtx.getBeansOfType(Object.class)).thenReturn(Map.of("securitySandboxService", stub));
+        return appCtx;
+    }
+
+    private Fixture highRiskFixtureWith(SandboxStubSecuritySandboxService stub) {
+        Fixture f = new Fixture();
+        f.stub(ToolCase.registry("query_db"));
+        f.verdict(ToolDecision.allow("p-allow", null, 1L));
+        when(f.toolDao.querySandboxMandatory(USER))
+                .thenReturn(List.of(Map.of("sandbox_mandatory", Boolean.TRUE)));
+        ReflectionTestUtils.setField(f.service, "applicationContext", appWithSandbox(stub));
+        return f;
+    }
+
+    @Test
+    @DisplayName("D-B4-42 沙盒显式放行＋高危指令 → 进 dispatch（证明拒绝用例不是恒真）")
+    void sandboxExplicitAllowReachesDispatch() {
+        SandboxStubSecuritySandboxService stub = SandboxStubSecuritySandboxService.allow();
+        Fixture f = highRiskFixtureWith(stub);
+
+        ToolResult r = f.service.execute("query_db", Map.of("sql", "DELETE FROM ecos_dw.contract"));
+
+        assertTrue(r.isSuccess(), "沙盒放行的高危指令必须到达 dispatch: " + r.getError());
+        assertEquals(1, stub.calls, "反射腿未被真正调用 ⇒ 下面的分态断言会恒真");
+        assertNotNull(stub.lastRowData, "沙盒必须收到指令上下文，不能只凭表达式空转");
+        f.assertExactlyOneAdjudication(ToolCase.registry("query_db"));
+        verify(f.registry, times(1)).execute(eq("query_db"), any());
+    }
+
+    @Test
+    @DisplayName("D-B4-42 沙盒策略真拒绝 → 403 GUARDRAIL_DENIED／sandbox_block，与不可用态分开")
+    void sandboxPolicyDenyIsGuardrailDenied() {
+        SandboxStubSecuritySandboxService stub = SandboxStubSecuritySandboxService.policyDeny();
+        Fixture f = highRiskFixtureWith(stub);
+
+        ToolResult r = f.service.execute("query_db", Map.of("sql", "DELETE FROM ecos_dw.contract"));
+
+        assertFalse(r.isSuccess());
+        assertEquals("GUARDRAIL_DENIED", r.getErrorClass(),
+                "判定完成且结论为拒绝＝授权问题，必须留在 403 面: " + r.getError());
+        assertEquals("DENY", r.getDecision(),
+                "decision 词面必须与 FAIL_CLOSED 分开（V204 ck_agdl_decision 同源词表）");
+        assertEquals(1, stub.calls);
+        verify(f.toolDao, times(1)).insertSandboxAudit(eq(USER), eq("query_db"), anyString());
+        verify(f.registry, never()).execute(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("D-B4-42 沙盒引擎没答（success=false）→ 503 GUARDRAIL_FAIL_CLOSED，不再折成 403")
+    void sandboxEngineFailureIsFailClosedNotGuardrailDenied() {
+        SandboxStubSecuritySandboxService stub = SandboxStubSecuritySandboxService.engineFailure();
+        Fixture f = highRiskFixtureWith(stub);
+
+        ToolResult r = f.service.execute("query_db", Map.of("sql", "DELETE FROM ecos_dw.contract"));
+
+        assertFalse(r.isSuccess(), "不可用时仍然拒绝执行（fail-closed 取向不变）");
+        assertEquals("GUARDRAIL_FAIL_CLOSED", r.getErrorClass(),
+                "D-B4-42 复发：引擎故障又被折成 sandbox_block ⇒ 一次故障被写成一次授权问题");
+        assertEquals("FAIL_CLOSED", r.getDecision());
+        assertNotEquals("GUARDRAIL_DENIED", r.getErrorClass());
+        assertEquals(1, stub.calls);
+        verify(f.registry, never()).execute(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("D-B4-42 旧形态应答（只有 allowed、无 success）→ 按不可用归 503，禁默认放行")
+    void sandboxLegacyShapeWithoutSuccessIsFailClosed() {
+        SandboxStubSecuritySandboxService stub = SandboxStubSecuritySandboxService.legacyAllowedOnlyShape();
+        Fixture f = highRiskFixtureWith(stub);
+
+        ToolResult r = f.service.execute("query_db", Map.of("sql", "DELETE FROM ecos_dw.contract"));
+
+        assertFalse(r.isSuccess(),
+                "缺 success 键的应答不属于本契约 ⇒ 不得猜成放行（那会把行过滤面的折叠复制到沙盒面）");
+        assertEquals("GUARDRAIL_FAIL_CLOSED", r.getErrorClass(), r.getError());
+        assertEquals(1, stub.calls);
     }
 
     // ── 咽喉自身缺件：闸缺失/主体缺失都必须 FAIL_CLOSED（§2.4-6） ──────────

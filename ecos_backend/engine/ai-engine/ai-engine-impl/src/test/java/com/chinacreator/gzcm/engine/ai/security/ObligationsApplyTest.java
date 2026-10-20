@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.security;
 
+import com.chinacreator.gzcm.common.security.filter.RowFilterVerdictContract;
 import com.chinacreator.gzcm.engine.ai.dao.ToolDao;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolDecision;
@@ -28,6 +29,7 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -182,9 +184,10 @@ class ObligationsApplyTest {
                 .thenAnswer(inv -> {
                     Map<String, Object> row = inv.getArgument(1);
                     boolean ok = Integer.valueOf(2).equals(row.get("id"));
-                    Map<String, Object> verdict = new LinkedHashMap<>();
-                    verdict.put("allowed", ok);
-                    return verdict;
+                    // 夹具形态＝真生产侧（SecuritySandboxService#evaluateFilter）的应答段：
+                    // 判定完成必带 success=true。收口前这里只写 allowed 一键，
+                    // 于是"引擎抛异常"与"策略判了拒绝"在本用例里同值（差距 D-B4-42）。
+                    return RowFilterVerdictContract.evaluated(ok, inv.getArgument(0));
                 });
 
         ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper(), gateFor(client));
@@ -199,19 +202,62 @@ class ObligationsApplyTest {
         verify(client, times(2)).evaluateFilter(anyString(), any(), anyString());
     }
 
+    // ── D-B4-42 分态不变式：真拒绝＝丢行后照常返回，引擎没答＝整条 fail-closed ──
+
     @Test
-    @DisplayName("F06-02 行过滤判定缺放行字段 → 整行不放行（fail-closed，不默认放行）")
+    @DisplayName("D-B4-42 同输入两态必异：allowed=false＋success=true 丢行放行，success=false 整条 FAIL_CLOSED")
+    void rowFilterDenyAndEngineFailureAreSplitAtBothLegs() throws Exception {
+        // ① DENY 腿：判定完成、结论为拒绝 ⇒ 义务"已落实"，只是 0 行
+        AiSecurityEngineClient denyClient = mock(AiSecurityEngineClient.class);
+        when(denyClient.evaluateFilter(anyString(), any(), anyString()))
+                .thenAnswer(inv -> RowFilterVerdictContract.evaluated(false, inv.getArgument(0)));
+        ToolObligationApplier.Outcome denyOutcome =
+                new ToolObligationApplier(denyClient, new ObjectMapper(), gateFor(denyClient))
+                        .apply("query_db", RESULT_JSON,
+                                new ToolObligations(List.of(), "dept = 'dept-a'", Map.of()), SUBJECT, null);
+        assertTrue(denyOutcome.applied(),
+                "真策略拒绝属 DENY 面：义务已落实，不得报成护栏不可用: " + denyOutcome.failReason());
+        assertEquals(0, denyOutcome.filtered());
+        assertFalse(denyOutcome.json().contains(RAW_PHONE), denyOutcome.json());
+
+        // ② UNEVALUATED 腿：外形一模一样（allowed=false），只是 success=false
+        AiSecurityEngineClient failedClient = mock(AiSecurityEngineClient.class);
+        when(failedClient.evaluateFilter(anyString(), any(), anyString()))
+                .thenAnswer(inv -> RowFilterVerdictContract.evaluationFailed("Evaluation error: boom"));
+        ToolObligationApplier.Outcome failedOutcome =
+                new ToolObligationApplier(failedClient, new ObjectMapper(), gateFor(failedClient))
+                        .apply("query_db", RESULT_JSON,
+                                new ToolObligations(List.of(), "dept = 'dept-a'", Map.of()), SUBJECT, null);
+        assertFalse(failedOutcome.applied(),
+                "引擎没答却被当成『这一行没权限』 ⇒ 静默丢行后返回 200（D-B4-42 的正身）");
+        assertNull(failedOutcome.json(), "不可用时整条结果必须丢弃，禁抽样放行");
+        assertTrue(failedOutcome.failReason().contains("不可用"), failedOutcome.failReason());
+        assertNotEquals(denyOutcome.failReason(), failedOutcome.failReason(),
+                "两态的理由串必异：审计侧不得把故障写成授权问题");
+
+        // ③ 咽喉层：不可用归 503 GUARDRAIL_FAIL_CLOSED（DENY 腿在①已证明是成功返回）
+        Fixture f = new Fixture(failedClient);
+        ToolExecutorService.ToolResult r = f.service.execute("query_db", Map.of("scenarioId", "s-1"));
+        assertFalse(r.isSuccess());
+        assertEquals("GUARDRAIL_FAIL_CLOSED", r.getErrorClass(), r.getError());
+    }
+
+    @Test
+    @DisplayName("F06-02 行过滤应答无可识别裁决 → 按不可用 fail-closed（不再冒充行级拒绝）")
     void rowWithoutExplicitAllowIsDropped() throws Exception {
         AiSecurityEngineClient client = mock(AiSecurityEngineClient.class);
+        // 收口前本用例断言的是"applied()==true、filtered==0"，即把空应答当成一次行级拒绝；
+        // 而 §4.7.2「不可用 ≠ 无权限」要求这种形态（连 success 键都没有＝应答不属于契约）
+        // 归 fail-closed。D-B4-42 订正：本用例从"恒真通过"改为"整条丢弃 + 503"。
         when(client.evaluateFilter(anyString(), any(), anyString())).thenReturn(Map.of());
 
         ToolObligationApplier applier = new ToolObligationApplier(client, new ObjectMapper(), gateFor(client));
         ToolObligationApplier.Outcome outcome = applier.apply("query_db", RESULT_JSON,
                 new ToolObligations(List.of(), "dept = 'dept-a'", Map.of()), SUBJECT, null);
 
-        assertTrue(outcome.applied(), "判定本身可用，只是不放行 —— 属 DENY 面而非不可用面");
-        assertEquals(0, outcome.filtered());
-        assertFalse(outcome.json().contains(RAW_PHONE), outcome.json());
+        assertFalse(outcome.applied(), "无 success 键的应答不可识别 ⇒ 必须按不可用上报，禁默认放行也禁默认拒绝");
+        assertNull(outcome.json());
+        assertTrue(outcome.failReason().contains("不可用"), outcome.failReason());
     }
 
     // ── 四种 fail-closed 形态：整条结果丢弃，禁"先返回再说明" ────────────────

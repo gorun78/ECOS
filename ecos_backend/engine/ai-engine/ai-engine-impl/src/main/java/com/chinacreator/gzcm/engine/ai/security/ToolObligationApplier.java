@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.security;
 
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
+import com.chinacreator.gzcm.common.security.filter.RowFilterVerdictContract;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolObligations;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -246,36 +248,37 @@ public class ToolObligationApplier {
         return rowsWithColumns;
     }
 
-    /** 逐行交 security evaluate-filter；不放行的行丢弃。 */
+    /**
+     * 逐行交 security evaluate-filter，按<b>三态</b>处置（#142/B4-3e-7 收口 <b>D-B4-42</b>）。
+     *
+     * <p>收口前这里调 {@code rowAllowed(布尔)}：自造 {@code allowed}→{@code pass}→{@code result}
+     * 三级别名、完全不看 {@code success}，于是"引擎抛异常"（{@code success=false}＋
+     * {@code allowed=false}）与"策略判了这一行拒绝"（{@code success=true}＋{@code allowed=false}）
+     * 得到同一个结论 —— 整条结果照样 200，只是行被静默丢掉。现在 DENY 只丢行，
+     * UNEVALUATED 抛异常交 {@link #apply} 的 fail-closed 腿归 503
+     * （§4.7.2「不可用 ≠ 无权限」）。</p>
+     */
     private List<Map<String, Object>> filterRows(String toolKey, List<Map<String, Object>> rows,
                                                  String rowFilter,
                                                  ToolAdjudicationRequest.Subject subject) throws Exception {
-        String userRole = subject != null && !subject.roles().isEmpty() ? subject.roles().get(0) : "viewer";
+        String userRole = subject != null && !subject.roles().isEmpty()
+                ? subject.roles().get(0) : RowFilterVerdictContract.VALUE_DEFAULT_ROLE;
         List<Map<String, Object>> kept = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
             Map<String, Object> verdict = securityClient.evaluateFilter(rowFilter, row, userRole);
-            if (rowAllowed(verdict)) kept.add(row);
+            AbacEvaluateResponseContract.Verdict state = RowFilterVerdictContract.verdictOf(verdict);
+            switch (state) {
+                case ALLOW -> kept.add(row);
+                case DENY -> {
+                    // 真实策略判定：丢弃该行（判定权在 security，本类不复算谓词）
+                }
+                case UNEVALUATED -> throw new AiSecurityEngineClient.SecurityResponseUnparsableException(
+                        "行过滤裁决不可用（不可用 ≠ 行级拒绝，整条结果 fail-closed）: "
+                                + RowFilterVerdictContract.diagnose(verdict));
+            }
         }
         log.debug("H10 rowFilter 完成: tool={} before={} after={}", toolKey, rows.size(), kept.size());
         return kept;
-    }
-
-    /**
-     * security evaluate-filter 放行判定：只认显式放行标记，缺字段一律视为不放行（fail-closed）。
-     * 这里只做布尔读取，不做任何谓词求值 —— 谓词语义全在 security 侧。
-     */
-    private boolean rowAllowed(Map<String, Object> verdict) {
-        if (verdict == null) return false;
-        Object flag = verdict.get("allowed");
-        if (flag == null) flag = verdict.get("pass");
-        if (flag == null) flag = verdict.get("result");
-        if (flag instanceof Boolean b) return b;
-        if (flag instanceof Number n) return n.intValue() != 0;
-        if (flag instanceof String s) {
-            String v = s.trim();
-            return "true".equalsIgnoreCase(v) || "ALLOW".equalsIgnoreCase(v) || "PASS".equalsIgnoreCase(v);
-        }
-        return false;
     }
 
     /** 单列脱敏：列值一次性交 security masking/apply，返回值按 index 写回。 */

@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.security.service;
 
 import com.chinacreator.gzcm.common.event.PipelineEvent;
+import com.chinacreator.gzcm.common.security.filter.RowFilterVerdictContract;
 import com.chinacreator.gzcm.engine.security.dao.SecuritySandboxDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,8 +70,16 @@ public class SecuritySandboxService {
         return result;
     }
 
+    /**
+     * 行过滤谓词求值（{@code /api/security/evaluate-filter} 的真生产侧，#142/B4-3e-7）。
+     *
+     * <p>应答段一律经 {@link RowFilterVerdictContract} 工厂组装：判定完成走
+     * {@link RowFilterVerdictContract#evaluated}，捕获到异常走
+     * {@link RowFilterVerdictContract#evaluationFailed}。两者外形相同（都带
+     * {@code allowed}），差别只在 {@code success} —— 读侧据此把"引擎没答"与
+     * "策略判了拒绝"分开（差距 D-B4-42；收口前这两条腿在消费侧完全同值）。</p>
+     */
     public Map<String, Object> evaluateFilter(String expression, Map<String, Object> rowData, String userRole) {
-        Map<String, Object> result = new LinkedHashMap<>();
         boolean allowed;
         try {
             if (expression.contains("classification") || expression.contains("level")) {
@@ -88,19 +97,12 @@ public class SecuritySandboxService {
             } else {
                 allowed = "admin".equalsIgnoreCase(userRole);
             }
-            result.put("success", true);
-            result.put("allowed", allowed);
-            result.put("engine", "Rust rhai v1.x (via Java expression parser)");
-            result.put("expression", expression);
             auditLog("POLICY_EVAL", allowed ? "GRANTED" : "DENIED",
                     "Expr: " + expression.substring(0, Math.min(80, expression.length())));
+            return RowFilterVerdictContract.evaluated(allowed, expression);
         } catch (Exception e) {
-            result.put("success", false);
-            result.put("allowed", false);
-            result.put("error", "Evaluation error: " + e.getMessage());
-            result.put("engine", "Java-fallback-failed");
+            return RowFilterVerdictContract.evaluationFailed("Evaluation error: " + e.getMessage());
         }
-        return result;
     }
 
     public Map<String, Object> decrypt(String userId, String orgId, String datasetId) {

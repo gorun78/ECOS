@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.ai.security;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
+import com.chinacreator.gzcm.common.security.filter.RowFilterVerdictContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
@@ -482,16 +483,23 @@ public class AiSecurityEngineClient {
     /**
      * POST {@value #PATH_EVALUATE_FILTER} — security 侧行过滤判定（分册 01 SEC-03 契约）。
      *
-     * @return security 判定结果（含放行标记）
+     * <p>本方法只负责传输与 envelope 拆段（缺 {@code data} 段＝不可解析，抛出），
+     * <b>不</b>解读裁决三态：读数属 {@code RowFilterVerdictContract}，由消费腿
+     * （{@code ToolObligationApplier}／{@code ToolExecutorService}）按 ALLOW／DENY／UNEVALUATED
+     * 分态处置（#142/B4-3e-7，差距 D-B4-42）。请求键面同样取契约常量，禁在此内联。</p>
+     *
+     * @return security 判定结果段（键面见 {@code RowFilterVerdictContract}）
      * @throws Exception 不可用 / 响应不可解析（调用方整条结果丢弃 + FAIL_CLOSED）
      */
     @SuppressWarnings("unchecked")
     public Map<String, Object> evaluateFilter(String expression, Map<String, Object> rowData,
                                               String userRole) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("expression", expression);
-        body.put("rowData", rowData == null ? Map.of() : rowData);
-        body.put("userRole", userRole == null ? "viewer" : userRole);
+        body.put(RowFilterVerdictContract.KEY_EXPRESSION, expression);
+        body.put(RowFilterVerdictContract.REQ_KEY_ROW_DATA,
+                rowData == null ? Map.of() : rowData);
+        body.put(RowFilterVerdictContract.REQ_KEY_USER_ROLE,
+                userRole == null ? RowFilterVerdictContract.VALUE_DEFAULT_ROLE : userRole);
         Map<String, Object> resp = postJson(PATH_EVALUATE_FILTER, body);
         if (resp == null || !(resp.get("data") instanceof Map)) {
             throw new SecurityResponseUnparsableException("evaluate-filter 响应不可解析: " + summarize(resp));

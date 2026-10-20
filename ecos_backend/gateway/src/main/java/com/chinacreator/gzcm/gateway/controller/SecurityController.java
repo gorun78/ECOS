@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.gateway.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.security.filter.RowFilterVerdictContract;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -87,14 +88,25 @@ public class SecurityController {
     //  2. 策略评估 (Rhai 脚本引擎)
     // ═══════════════════════════════════════════════════════════
 
+    /**
+     * 行过滤端点（gateway 宿主复刻版）。
+     *
+     * <p><b>本批只做键面单源化，不裁撤这份复刻谓词链</b>：应答外形与请求键面一律改取
+     * {@link RowFilterVerdictContract}（写面走工厂，读面走常量），而"由哪个宿主承流
+     * {@code /api/security/evaluate-filter}"是架构问题而非键面问题 —— 端点删除属签名变更
+     * （约束 §10「API 只增不改」），承流归属又需要 PM 裁决（铁律 §2.4-1「安全裁决一律走
+     * security-engine REST，禁宿主内重复实现」）。登记为 <b>D-B4-45</b> 交后续批次，
+     * 由 {@code RowFilterVerdictSingleSourceTest} 的谓词面棘轮清单钉住（当前 2 项，只准缩短）。</p>
+     */
     @PostMapping("/evaluate-filter")
     public ApiResponse<Map<String, Object>> evaluateFilter(@RequestBody Map<String, Object> body) {
-        String expression = (String) body.getOrDefault("expression", "");
+        String expression = (String) body.getOrDefault(RowFilterVerdictContract.KEY_EXPRESSION, "");
         @SuppressWarnings("unchecked")
-        Map<String, Object> rowData = (Map<String, Object>) body.getOrDefault("rowData", Map.of());
-        String userRole = (String) body.getOrDefault("userRole", "viewer");
+        Map<String, Object> rowData = (Map<String, Object>) body.getOrDefault(
+                RowFilterVerdictContract.REQ_KEY_ROW_DATA, Map.of());
+        String userRole = (String) body.getOrDefault(
+                RowFilterVerdictContract.REQ_KEY_USER_ROLE, RowFilterVerdictContract.VALUE_DEFAULT_ROLE);
 
-        Map<String, Object> result = new LinkedHashMap<>();
         boolean allowed;
 
         try {
@@ -116,22 +128,14 @@ public class SecurityController {
                 allowed = "admin".equalsIgnoreCase(userRole);
             }
 
-            result.put("success", true);
-            result.put("allowed", allowed);
-            result.put("engine", "Rust rhai v1.x (via Java expression parser)");
-            result.put("expression", expression);
-
             auditLog("POLICY_EVAL", allowed ? "GRANTED" : "DENIED",
                     "Expr: " + expression.substring(0, Math.min(80, expression.length())));
+            return ApiResponse.success(RowFilterVerdictContract.evaluated(allowed, expression));
         } catch (Exception e) {
             log.error("策略评估失败: expression={}", expression, e);
-            result.put("success", false);
-            result.put("allowed", false);
-            result.put("error", "Evaluation failed");
-            result.put("engine", "Java-fallback-failed");
+            // 故障形态仍回 200（外形不变），但 success=false ⇒ 读侧归 UNEVALUATED 而非行拒绝
+            return ApiResponse.success(RowFilterVerdictContract.evaluationFailed("Evaluation failed"));
         }
-
-        return ApiResponse.success(result);
     }
 
     // ═══════════════════════════════════════════════════════════

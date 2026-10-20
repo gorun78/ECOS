@@ -2,6 +2,8 @@ package com.chinacreator.gzcm.engine.ai.service;
 
 import com.chinacreator.gzcm.common.error.AiError;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
+import com.chinacreator.gzcm.common.security.filter.RowFilterVerdictContract;
 import com.chinacreator.gzcm.engine.ai.config.AiRestClientConfig;
 import com.chinacreator.gzcm.engine.ai.dao.ToolDao;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
@@ -830,10 +832,10 @@ public class ToolExecutorService {
                 return null; // 非强制沙盒用户：主裁决已在阶段 1 无条件完成
             }
 
-            Boolean highRisk = reviewBySandboxService(instruction, userId);
-            if (highRisk == null) {
-                log.warn("R1.3/H8-T4 SecuritySandboxService 不可用，高危指令默认拒绝（fail-closed）: "
-                                + "tool={}, user={}, instruction={}",
+            AbacEvaluateResponseContract.Verdict sandboxVerdict = reviewBySandboxService(instruction, userId);
+            if (sandboxVerdict == AbacEvaluateResponseContract.Verdict.UNEVALUATED) {
+                log.warn("R1.3/H8-T4 SecuritySandboxService 不可用或未给出可识别裁决，"
+                                + "高危指令默认拒绝（fail-closed）: tool={}, user={}, instruction={}",
                         toolName, userId, truncate(instruction, 200),
                         new IllegalStateException("SecuritySandboxService unavailable (RLS §2.4-6 DENY)"));
                 writeSandboxBlockAudit(userId, toolName, instruction);
@@ -841,7 +843,7 @@ public class ToolExecutorService {
                         "安全裁决服务不可用，高危指令默认拒绝（fail-closed，铁律 §2.4-6）", startNs);
             }
 
-            if (highRisk) {
+            if (sandboxVerdict == AbacEvaluateResponseContract.Verdict.DENY) {
                 log.warn("R1.3 沙盒拦截高危指令: tool={}, user={}, instruction={}",
                         toolName, userId, truncate(instruction, 200));
                 writeSandboxBlockAudit(userId, toolName, instruction);
@@ -911,17 +913,27 @@ public class ToolExecutorService {
     }
 
     /**
-     * R1.3: 调用 SecuritySandboxService 审查指令风险。
+     * R1.3: 调用 SecuritySandboxService 审查指令风险（三态版，#142/B4-3e-7 收口 <b>D-B4-42</b>）。
      * <p>SecuritySandboxService 位于 security-engine-impl（编译期不可见），
-     * 通过 ApplicationContext 查找 bean 后反射调用 evaluateFilter，
-     * 返回 allowed=false 即视为高风险。
+     * 通过 ApplicationContext 查找 bean 后反射调用 evaluateFilter，应答交
+     * {@link RowFilterVerdictContract#verdictOf} 归三态。
      *
-     * @return true=高风险(拒绝), false=低风险(放行), null=服务不可用(降级放行)
+     * <p><b>本方法改判的原因</b>：收口前返回 {@code Boolean} 并只读 {@code allowed} 键 ——
+     * 引擎自己抛异常时应答是 {@code success=false}＋{@code allowed=false}，反射腿读到
+     * {@code allowed=false} 就回"高风险"，调用方据此报 403 {@code GUARDRAIL_DENIED}，
+     * 把一次引擎故障写成了一次沙盒策略拦截（§4.7.2「不可用 ≠ 无权限」，且审计里的
+     * sandbox_block 留痕是假的）。原注释还写着「null=服务不可用(降级放行)」，与调用方
+     * 实测行为（null → FAIL_CLOSED 503）相反，一并订正。现在三态各自对应调用方的一个分支，
+     * 布尔折叠形态无从回归。</p>
+     *
+     * @return {@link AbacEvaluateResponseContract.Verdict#ALLOW} 低风险放行／
+     *         {@link AbacEvaluateResponseContract.Verdict#DENY} 沙盒拦截（403 面）／
+     *         {@link AbacEvaluateResponseContract.Verdict#UNEVALUATED} 服务缺失或应答无裁决
+     *         （503 面，fail-closed，<b>不</b>是降级放行）
      */
-    @SuppressWarnings("unchecked")
-    private Boolean reviewBySandboxService(String instruction, String userId) {
+    private AbacEvaluateResponseContract.Verdict reviewBySandboxService(String instruction, String userId) {
         if (applicationContext == null) {
-            return null;
+            return AbacEvaluateResponseContract.Verdict.UNEVALUATED;
         }
         try {
             Object sandboxService = null;
@@ -933,7 +945,7 @@ public class ToolExecutorService {
                 }
             }
             if (sandboxService == null) {
-                return null; // 服务不可用 → 降级
+                return AbacEvaluateResponseContract.Verdict.UNEVALUATED; // 服务不可用 → FAIL_CLOSED
             }
             // 调用 evaluateFilter(String expression, Map rowData, String userRole)
             // expression 传入高危指令标记，userRole 传 userId，让沙盒策略评估是否允许
@@ -941,16 +953,11 @@ public class ToolExecutorService {
                     "evaluateFilter", String.class, Map.class, String.class);
             Map<String, Object> rowData = Map.of("instruction", instruction, "classification", "RESTRICTED");
             Object result = evalMethod.invoke(sandboxService, "command contains blocked", rowData, userId);
-            if (result instanceof Map<?, ?> m) {
-                Object allowed = m.get("allowed");
-                if (allowed instanceof Boolean b) {
-                    return !b; // allowed=false → 高风险
-                }
-            }
-            return null;
+            return RowFilterVerdictContract.verdictOf(result);
         } catch (Exception e) {
-            log.debug("R1.3 SecuritySandboxService 审查降级: {}", e.getMessage());
-            return null;
+            log.debug("R1.3 SecuritySandboxService 审查不可用（按 UNEVALUATED 归 503，非降级放行）: {}",
+                    e.getMessage());
+            return AbacEvaluateResponseContract.Verdict.UNEVALUATED;
         }
     }
 
