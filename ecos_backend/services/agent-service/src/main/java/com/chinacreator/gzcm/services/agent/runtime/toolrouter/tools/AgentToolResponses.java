@@ -17,6 +17,14 @@ final class AgentToolResponses {
     /** 载荷键：面向 LLM 的如实说明。 */
     static final String KEY_MESSAGE = "message";
 
+    /**
+     * 载荷键：结论态名（{@link Outcome} 的枚举名，机读）。
+     *
+     * <p>#142/B4-3e-22 起键面单源在此：此前该键由 {@code QueryPhysicalTableTool} 私有持有，
+     * 两支写腿收口时若各自再声明一遍，就会出现三个定义点。</p>
+     */
+    static final String KEY_STATE = "state";
+
     private AgentToolResponses() {
     }
 

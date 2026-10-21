@@ -71,14 +71,6 @@ public class AgentToolDao extends JdbcTemplateDaoSupport {
             "ORDER BY score DESC LIMIT ?", queryText, topK);
     }
 
-    /** RunQualityCheckTool */
-    public int insertQualityCheck(String checkId, String ruleId, String datasourceId, String tableName, int sampleSize) {
-        return jdbcTemplate.update(
-            "INSERT INTO ecos_quality_check (id, rule_id, datasource_id, table_name, sample_size, status, created_at) " +
-            "VALUES (?, ?, ?, ?, ?, 'RUNNING', NOW())",
-            checkId, ruleId, datasourceId, tableName, sampleSize);
-    }
-
     /** SearchCatalogTool */
     public List<Map<String, Object>> searchCatalog(String keyword) {
         return jdbcTemplate.queryForList(
@@ -103,10 +95,12 @@ public class AgentToolDao extends JdbcTemplateDaoSupport {
             "%" + query + "%");
     }
 
-    /** TriggerPipelineTool */
-    public int insertPipelineRun(String runId, String taskId) {
-        return jdbcTemplate.update(
-            "INSERT INTO ecos_pipeline_run (id, task_id, status, created_at) VALUES (?, ?, 'PENDING', NOW())",
-            runId, taskId);
-    }
+    // 写原语已于 #142/B4-3e-22 全部撤除：本 DAO 只剩只读面。
+    //
+    // 收口前这里有 insertPipelineRun（往 data-engine 的 ecos_pipeline_run 运行台账插行）
+    // 与 insertQualityCheck（往 ecos_quality_check 插行，而该表在 DDL 单源目录
+    // docs/50-db_script/02-flyway-migration/ 内实扫 CREATE TABLE 零枚＝幽灵表）。
+    // 两支都由工具腿改指属主端点替代，铁律约束 5「写通道与历史台账归属主」在 agent 侧的
+    // 这条旁路就此断开；由 AgentToolOwnerWriteChannelSingleSourceTest 钉成硬零面
+    // （本 DAO 出现 jdbcTemplate.update( 即红）。
 }

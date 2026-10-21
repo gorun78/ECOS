@@ -30,16 +30,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 整串内联在请求点上，绕开 route-manifest 两态寻址单源——切流后即断，
  * 而 gateway 与 monolith 同端口的现网形态把问题掩盖住了（D-B4-43 的正身即此族的 security 裁决腿）。</p>
  *
- * <p><b>工具面实测定数（#142/B4-3e-9 首跑变红后订正，#142/B4-3e-16 族迁移后再次订正）</b>：
- * 本目录 {@code *Tool.java} 共 <b>20</b> 支，分两族——①<b>HTTP 出腿族 10 支</b>（判据=源码含
+ * <p><b>工具面实测定数（#142/B4-3e-9 首跑变红后订正，#142/B4-3e-16、#142/B4-3e-22 族迁移后再次订正）</b>：
+ * 本目录 {@code *Tool.java} 共 <b>20</b> 支，分两族——①<b>HTTP 出腿族 12 支</b>（判据=源码含
  * {@code RestTemplate}，实测为 8 支在册 + {@code CheckPermissionTool} +
- * 从纯 DAO 族迁来的 {@code QueryPhysicalTableTool}），基址必须经解析器；②<b>纯 DAO 族 10 支</b>
+ * 从纯 DAO 族迁来的 {@code QueryPhysicalTableTool} + #142/B4-3e-22 迁来的两支写腿
+ * {@code RunQualityCheckTool}／{@code TriggerPipelineTool}），基址必须经解析器；②<b>纯 DAO 族 8 支</b>
  * （{@code ExecuteExpertRuleTool} 等，只有 {@code AgentToolDao} 一条腿、零 HTTP 出腿），
  * 本门对它们没有基址可钉。首版把 D-B4-46 记成"9 支工具"是把工具面总数当成了 HTTP 出腿数，
  * 现按实测口径钉死两族清单。<b>纯 DAO 族直连引擎表是另一条独立缺陷 D-B4-49</b>
  * （绕开 security-engine 裁决与引擎写通道，铁律 §0.6/§5 第 3、5 条）；其中<b>任意 SQL 下推</b>
  * 子项已由 #142/B4-3e-16 收口（{@code QueryPhysicalTableTool} 迁入 HTTP 出腿族），
- * 其余表直连子项仍在册、不在本批顺手动刀。</p>
+ * <b>进程内写腿</b>（往属主台账／幽灵表插行）由 #142/B4-3e-22 收口（另两支迁入 HTTP 出腿族，
+ * 由 {@code AgentToolOwnerWriteChannelSingleSourceTest} 钉写面归零），
+ * 其余表直连只读子项仍在册、不在本批顺手动刀。</p>
  *
  * <p><b>判据为什么锚在调用形态上</b>：请求点字面量前必然带
  * {@code getForObject("}／{@code postForObject("}／{@code exchange("} 等调用形，
@@ -50,7 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code private static final String BASE = "http://localhost:8080"} 再拼上去绕过调用形态判据；
  * 故同时钉①零硬编码请求点、②HTTP 出腿族逐支经 {@link AgentToolEndpointResolver} 取基址、
  * ③工具包里不得出现任何以 {@code http} 开头的字符串常量。族归属由实测推导后再与在册清单比对，
- * 新增第十一支 HTTP 腿必须先登记属主与访问器。</p>
+ * 新增第十三支 HTTP 腿必须先登记属主与访问器。</p>
  */
 class AgentToolHardcodedBaseRatchetTest {
 
@@ -62,8 +65,9 @@ class AgentToolHardcodedBaseRatchetTest {
     private static final Pattern HTTP_LITERAL_CONSTANT = Pattern.compile(
             "\\bString\\s+\\w+\\s*=\\s*\"http://");
 
-    /** HTTP 出腿族（实测 10 支 = D-B4-46 在册 8 支 + B4-3e-8 先收口的 CheckPermissionTool
-     *  + B4-3e-16 从纯 DAO 族迁入的 QueryPhysicalTableTool）。 */
+    /** HTTP 出腿族（实测 12 支 = D-B4-46 在册 8 支 + B4-3e-8 先收口的 CheckPermissionTool
+     *  + B4-3e-16 从纯 DAO 族迁入的 QueryPhysicalTableTool
+     *  + B4-3e-22 从纯 DAO 族迁入的两支写腿 RunQualityCheckTool／TriggerPipelineTool）。 */
     private static final Set<String> HTTP_EGRESS_TOOLS = Set.of(
             "AuditAccessLogTool.java",
             "CheckPermissionTool.java",
@@ -73,10 +77,13 @@ class AgentToolHardcodedBaseRatchetTest {
             "GetSecurityProfileTool.java",
             "ListObjectTypesTool.java",
             "QueryPhysicalTableTool.java",
+            "RunQualityCheckTool.java",
             "SearchOntologyGraphTool.java",
+            "TriggerPipelineTool.java",
             "ValidateMappingTool.java");
 
-    /** 纯 DAO 族（实测 10 支，无 HTTP 出腿 ⇒ 无基址可钉；其直连引擎表问题归 D-B4-49 余项）。 */
+    /** 纯 DAO 族（实测 8 支，无 HTTP 出腿 ⇒ 无基址可钉。B4-3e-22 起两支写腿已迁出本族，
+     *  余下均为只读直连腿；其直连引擎表问题归 D-B4-49 余项。 */
     private static final Set<String> DAO_ONLY_TOOLS = Set.of(
             "ExecuteExpertRuleTool.java",
             "FindGraphPathTool.java",
@@ -84,10 +91,8 @@ class AgentToolHardcodedBaseRatchetTest {
             "GetTableSchemaTool.java",
             "ListDataSourcesTool.java",
             "RAGQueryTool.java",
-            "RunQualityCheckTool.java",
             "SearchCatalogTool.java",
-            "SearchKnowledgeGraphTool.java",
-            "TriggerPipelineTool.java");
+            "SearchKnowledgeGraphTool.java");
 
     /** 工具族 → 该族必须使用的基址访问器（属主名由解析器单源持有，见 D-B4-48）。 */
     private static final Set<String> RESOLVER_ACCESSORS = Set.of(
@@ -144,7 +149,7 @@ class AgentToolHardcodedBaseRatchetTest {
 
     @Test
     @Timeout(value = 60)
-    @DisplayName("工具面总数钉死 20 支（10 HTTP 出腿 + 10 纯 DAO）：新增须先定族，删支同步删项")
+    @DisplayName("工具面总数钉死 20 支（12 HTTP 出腿 + 8 纯 DAO）：新增须先定族，删支同步删项")
     void toolInventoryMatchesRegisteredBaseline() throws IOException {
         Set<String> actual = new TreeSet<>();
         for (Path p : toolSources()) {

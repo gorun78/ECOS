@@ -75,7 +75,7 @@ public class QueryPhysicalTableTool implements ToolExecutor {
     static final String PATH_DATA_QUERY_EXECUTE = "/api/v1/engine/data/query/execute";
 
     /** 载荷键：结论态名（{@link Outcome}），与 {@code available} 一起构成本腿的机读分态面。 */
-    static final String KEY_STATE = "state";
+    static final String KEY_STATE = AgentToolResponses.KEY_STATE;
 
     /** 载荷键：实际下发到属主端点的物理表名（放行时必填，供调用方核对 RLS 作用对象）。 */
     static final String KEY_TABLE_NAME = "tableName";
@@ -192,47 +192,22 @@ public class QueryPhysicalTableTool implements ToolExecutor {
     }
 
     private static Outcome outcomeOfEnvelopeCode(Integer code, String errorCode) {
-        if (code == null) {
-            return Outcome.UNREACHABLE;
-        }
-        if (code == 0) {
-            return Outcome.DATA_RETURNED;
-        }
-        if (RlsExecutionContract.SEC_UNAVAILABLE_CODE.equals(errorCode)) {
-            // 分态权威看 errorCode：503 与「护栏不可用」在 code 上都可能重叠，键面单源优先
-            return Outcome.SECURITY_UNAVAILABLE;
-        }
-        return switch (code) {
-            case 403 -> Outcome.DENIED;
-            case 503 -> Outcome.SECURITY_UNAVAILABLE;
-            default -> Outcome.ENGINE_FAILED;
-        };
+        // 词表与映射判据单源在 Outcome（#142/B4-3e-22 上收）；读腿终态仍为 DATA_RETURNED，机读值一字未动
+        return Outcome.fromEnvelope(code, errorCode, Outcome.DATA_RETURNED);
     }
 
-    /** 真 4xx/5xx（网关前置过滤器也可能先行裁决）与 envelope {@code code} 共用同一套分态词表。 */
+    /** 真 4xx/5xx（网关前置过滤器也可能先行裁决）与 envelope {@code code} 共用 {@link Outcome} 这一套词表。 */
     private static Outcome outcomeOfHttpStatus(int status) {
-        return switch (status) {
-            case 401, 403 -> Outcome.DENIED;
-            case 503 -> Outcome.SECURITY_UNAVAILABLE;
-            default -> Outcome.ENGINE_FAILED;
-        };
+        return Outcome.fromHttpStatus(status);
     }
 
     private static Map<String, Object> outcome(Outcome outcome, String message) {
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put(AgentToolResponses.KEY_AVAILABLE, outcome == Outcome.DATA_RETURNED);
-        out.put(KEY_STATE, outcome.name());
-        if (message != null && !message.isBlank()) {
-            out.put(AgentToolResponses.KEY_MESSAGE, message);
-        }
-        return out;
+        return Outcome.payload(outcome, message);
     }
 
     /** 在族内单源文案（{@link AgentToolResponses}）上补本腿的 {@code state} 键，不改其既有键值。 */
     private static Map<String, Object> stateOn(Map<String, Object> payload, Outcome outcome) {
-        Map<String, Object> out = new LinkedHashMap<>(payload);
-        out.put(KEY_STATE, outcome.name());
-        return out;
+        return Outcome.stateOn(payload, outcome);
     }
 
     private static Integer codeOf(Map<String, Object> env) {
@@ -263,25 +238,4 @@ public class QueryPhysicalTableTool implements ToolExecutor {
         return (Map<String, Object>) m;
     }
 
-    /**
-     * 本腿结论词表（单源，机读值即枚举名）。
-     *
-     * <p>四态划分的依据是 §4.7.2 与降级矩阵：「没放行」「护栏不可用」「属主报错」「取到了」
-     * 是四件不同的事，折叠任何两件都会让调用方作出错误的下一步（把不可用重试成拒绝、
-     * 把拒绝当成空集）。</p>
-     */
-    enum Outcome {
-        /** 前置判据不通过（非只读／跨表／多语句／注释形态），<b>未发起调用</b>。 */
-        GUARD_REJECTED,
-        /** 基址不可解析或传输层失败，结论未知。 */
-        UNREACHABLE,
-        /** 属主或网关明确拒绝（401/403）：无权限。 */
-        DENIED,
-        /** 行级安全服务不可用（503 / {@code ECOS-SEC-501}）：可告警可重试，非「无权限」。 */
-        SECURITY_UNAVAILABLE,
-        /** 属主返回其它非零业务/系统码：执行失败，与权限无关。 */
-        ENGINE_FAILED,
-        /** 取数成功，透传属主 {@code data} 段。 */
-        DATA_RETURNED
-    }
 }
