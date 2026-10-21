@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.data.fact.service;
 import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.exception.ForbiddenException;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.data.fact.dao.PeriodStatusMapper;
 import com.chinacreator.gzcm.engine.data.fact.period.DatabasePeriodLock;
 import com.chinacreator.gzcm.engine.data.fact.period.OpenPeriodsPeriodLock;
@@ -37,8 +38,9 @@ import java.util.regex.Pattern;
  *   <li><b>角色门槛（OPA，禁硬编码角色映射）</b>：经 {@link PipelineSecurityService#evaluate}
  *       同一咽喉调 security-engine policy-engine（action {@code data.period.close}），
  *       role 取调用方 token claims（roles 声明）原样透传；
- *       DENY / security 不可用 ⇒ {@link ForbiddenException} 403 <b>fail-closed</b>，
- *       不落库不发事件；</li>
+ *       DENY ⇒ {@link ForbiddenException} 403，UNEVALUATED（security-engine 不可用）⇒ 503
+ *       {@code ECOS-SEC-501}（两者均 <b>fail-closed</b> 不放行，但按 §4.7.2「不可用 ≠ 无权限」
+ *       分态，#142/B4-3e-13）；两者都不落库不发事件；</li>
  *   <li>幂等关账：无登记行 → INSERT(CLOSED)；OPEN 行 → UPDATE→CLOSED（version_no 进位）；
  *       已 CLOSED 行 → 回放（alreadyClosed=true，零写入、零第二次审计事件，首写留痕不改）；
  *       并发双写由 UPDATE 的 {@code WHERE status='OPEN'} 双保险收敛；</li>
@@ -95,13 +97,18 @@ public class PeriodCloseService {
     public PeriodCloseResultVO close(String rawPeriod, PeriodCloseRequestVO request) {
         String period = normalizePeriod(rawPeriod);
 
-        // ① OPA 角色门槛（fail-closed：DENY/不可用都进 403，禁硬编码角色映射——role 原样透传 claims）
+        // ① OPA 角色门槛（fail-closed：不放行；role 原样透传 claims，禁硬编码角色映射）
+        //    #142/B4-3e-13（D-B4-44）：DENY（策略说不行）→ 403；UNEVALUATED（护栏没说话）→ 503
+        //    + ECOS-SEC-501。收口前 !allowed() 一律 403，违 §4.7.2「不可用 ≠ 无权限」。
         PipelineSecurityService.AllowedResult verdict = securityService.evaluate(
                 OPA_ACTION_PERIOD_CLOSE, OPA_RESOURCE_PREFIX + period, currentRoleClaims());
-        if (!verdict.allowed()) {
-            throw new ForbiddenException(DataDomainErrorCode.ECOS_DATA_031
-                    + "：关账被拒绝（security-engine OPA，fail-closed）action=" + OPA_ACTION_PERIOD_CLOSE
+        switch (verdict.verdict()) {
+            case ALLOW -> {
+            }
+            case DENY -> throw new ForbiddenException(DataDomainErrorCode.ECOS_DATA_031
+                    + "：关账被策略拒绝（security-engine OPA DENY）action=" + OPA_ACTION_PERIOD_CLOSE
                     + ", period=" + period + ", reason=" + verdict.reason());
+            case UNEVALUATED -> throw abacUnavailable(OPA_ACTION_PERIOD_CLOSE);
         }
 
         String actor = currentActor();
@@ -176,6 +183,21 @@ public class PeriodCloseService {
         out.setAlreadyClosed(!newlyClosed);
         out.setReason(reason);
         return out;
+    }
+
+    /**
+     * UNEVALUATED 的落码出口（503 + 机读码取 {@link RlsExecutionContract} 单源常量，禁本类字面量）。
+     *
+     * <p>与本体/KB 腿同一形态：不可用态的状态串在本方法起就与 403 策略拒绝分开。
+     * 数据域没有模块局部 advice，异常经网关 {@code handleDataBridge} 以 {@code ApiResponse.code}
+     * 承载 httpStatus ⇒「HTTP 面仍 200」属既有 shortfall，已登记台账（D-B4-52）。</p>
+     */
+    private static DataBridgeException abacUnavailable(String action) {
+        return new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_CODE + ": " + action
+                        + " 未获安全裁决（security-engine 不可用），按 fail-closed 拒绝，非「用户无权限」"
+                        + "(§4.7.2 / 铁律 §2.4)");
     }
 
     /**

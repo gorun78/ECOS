@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.data.pipeline;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,7 +35,7 @@ import static org.mockito.Mockito.when;
 
 /**
  * PipelineSecurityIntegrationTest — 架构铁律 §2.4「安全集成强制卡」三连：
- * 审计 / 脱敏 / ABAC 默认 DENY（Wave 4 T1，Coverage of P0 安全集成硬项）。
+ * 审计 / 脱敏 / ABAC fail-closed 且不可用与拒绝分态（Wave 4 T1，Coverage of P0 安全集成硬项）。
  *
  * <p>所有 security-engine REST 用 RestTemplate mock（java.lang.reflect 注入），
  * 不触网、不触 PG。
@@ -161,10 +162,10 @@ class PipelineSecurityIntegrationTest {
         assertTrue(security.parseAndMaskConfig("not-json").isEmpty());
     }
 
-    // =============== 3. ABAC 默认 DENY（§2.4 ⑥） ===============
+    // =============== 3. ABAC fail-closed 且分态（§2.4 ⑥ + §4.7.2） ===============
 
     @Test
-    @DisplayName("ABAC — RestTemplate Connection Refused → AllowedResult(false, SECURITY_ENGINE_UNAVAILABLE)")
+    @DisplayName("ABAC — RestTemplate Connection Refused → AllowedResult(false, SECURITY_ENGINE_UNAVAILABLE, UNEVALUATED)")
     void abacDenyWhenSecurityEngineUnavailable() {
         doThrow(new org.springframework.web.client.ResourceAccessException("refused"))
                 .when(restTemplate).postForEntity(
@@ -175,10 +176,13 @@ class PipelineSecurityIntegrationTest {
         PipelineSecurityService.AllowedResult r = security.evaluateExecute("p-1");
         assertFalse(r.allowed());
         assertEquals("SECURITY_ENGINE_UNAVAILABLE", r.reason());
+        // #142/B4-3e-13（D-B4-44）：传输故障＝护栏没说话，不得再报成策略拒绝
+        assertEquals(AbacEvaluateResponseContract.Verdict.UNEVALUATED, r.verdict(),
+                "不可用态必须与 DENY 分态（§4.7.2）");
     }
 
     @Test
-    @DisplayName("ABAC — 响应 allow=false → AllowedResult(false, fallback/deny)")
+    @DisplayName("ABAC — 响应 allow=false → AllowedResult(false, fallback/deny, DENY)")
     void abacDenyWhenPolicyDenies() {
         when(restTemplate.postForEntity(
                 org.mockito.ArgumentMatchers.anyString(),
@@ -189,10 +193,12 @@ class PipelineSecurityIntegrationTest {
         PipelineSecurityService.AllowedResult r = security.evaluateExecute("p-2");
         assertFalse(r.allowed());
         assertEquals("POLICY_DENY", r.reason());
+        assertEquals(AbacEvaluateResponseContract.Verdict.DENY, r.verdict(),
+                "策略显式拒绝必须是 DENY，与不可用态不同串");
     }
 
     @Test
-    @DisplayName("ABAC — 响应 allow=true → AllowedResult(true, ALLOW)")
+    @DisplayName("ABAC — 响应 allow=true → AllowedResult(true, ALLOW, ALLOW)")
     void abacAllowWhenPolicyAllows() {
         when(restTemplate.postForEntity(
                 org.mockito.ArgumentMatchers.anyString(),
@@ -204,6 +210,7 @@ class PipelineSecurityIntegrationTest {
         assertTrue(r.allowed());
         // reason 取 fallback 字段（此处 null → 默认 ALLOW）
         assertEquals("ALLOW", r.reason());
+        assertEquals(AbacEvaluateResponseContract.Verdict.ALLOW, r.verdict());
     }
 
     // =============== 4. Controller 端 ABAC 拒绝路径 ===============

@@ -1,8 +1,10 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -160,15 +162,36 @@ public class PipelineServiceImpl implements PipelineService {
     // ==================== ABAC 裁决（execute 前置） ====================
 
     /**
-     * 执行前置 ABAC 裁决：security-engine 允许才放行，不可用默认 DENY。
+     * 执行前置 ABAC 裁决：security-engine 允许才放行。
+     *
+     * <p><b>#142/B4-3e-13（差距 D-B4-44）</b>：收口前只判 {@code allowed()}，于是「策略说不行」
+     * 与「护栏没说话（security-engine 不可用）」同报 403，违 §4.7.2「不可用 ≠ 无权限」。
+     * 现按 {@code verdict()} 分态：DENY 维持原 403 文案外形（API/行为不变），
+     * UNEVALUATED 落 503 + {@code ECOS-SEC-501} 机读码。</p>
      *
      * @param id Pipeline 定义 ID
      */
     public void checkAbacBeforeExecute(String id) {
         PipelineSecurityService.AllowedResult result = securityService.evaluateExecute(id);
-        if (!result.allowed()) {
-            throw new BusinessException(403, "Pipeline 执行被 ABAC 策略拒绝: " + result.reason());
+        switch (result.verdict()) {
+            case ALLOW -> {
+            }
+            case DENY -> throw new BusinessException(403, "Pipeline 执行被 ABAC 策略拒绝: " + result.reason());
+            case UNEVALUATED -> throw abacUnavailable("pipeline.execute");
         }
+    }
+
+    /**
+     * UNEVALUATED 的落码出口（503 + 机读码取 {@link RlsExecutionContract} 单源常量，禁本类字面量）。
+     * 数据域无模块局部 advice，异常经网关 {@code handleDataBridge} 以 {@code ApiResponse.code}
+     * 承载 httpStatus；状态串在本方法起即与 403 分态。HTTP 面保真属既有 shortfall，已登记台账。
+     */
+    private static DataBridgeException abacUnavailable(String action) {
+        return new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_CODE + ": " + action
+                        + " 未获安全裁决（security-engine 不可用），按 fail-closed 拒绝，非「用户无权限」"
+                        + "(§4.7.2 / 铁律 §2.4)");
     }
 
     // ==================== 转换辅助 ====================

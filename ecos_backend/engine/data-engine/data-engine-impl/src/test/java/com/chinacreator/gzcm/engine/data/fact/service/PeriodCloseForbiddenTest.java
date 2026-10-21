@@ -28,8 +28,9 @@ import static org.mockito.Mockito.when;
  * 关账越权 403 fail-closed（H-3 冻结测试类⑤，详设-09 v1.2 §十一 H-3 交付①）：
  * <ul>
  *   <li>OPA 判 DENY → 403 {@link ForbiddenException}，消息带 reason，落库/审计零接触；</li>
- *   <li>security-engine 不可用（evaluate 返回 SECURITY_ENGINE_UNAVAILABLE）→ 同样 403
- *       ——<b>不可用即拒绝（fail-closed），绝不允许降级放行</b>；</li>
+ *   <li>security-engine 不可用（契约三态里的 UNEVALUATED）→ 503 {@code ECOS-SEC-501}
+ *       ——<b>不可用即拒绝（fail-closed），绝不允许降级放行</b>；但按 §4.7.2
+ *       「不可用 ≠ 无权限」它<b>不得</b>与策略拒绝共用 403（#142/B4-3e-13 收口 D-B4-44）；</li>
  *   <li>DENY 时序在落库之前（先门槛后写入），且 role 为 claims 原值透传
  *       （本域不做"角色名→权限"硬编码映射——测试以 action/resource 入参核对调用形态）；</li>
  *   <li>非法期间形态 → 400 且 OPA/DB 均未触达（入口即拒）。</li>
@@ -70,17 +71,26 @@ class PeriodCloseForbiddenTest {
     }
 
     @Test
-    @DisplayName("security-engine 不可用（SECURITY_ENGINE_UNAVAILABLE）→ 仍 403，不得放行（fail-closed）")
-    void securityEngineUnavailableIsDenyNotAllow() {
+    @DisplayName("security-engine 不可用（UNEVALUATED）→ 503 ECOS-SEC-501，不放行也不报 403（§4.7.2 分态）")
+    void securityEngineUnavailableRendersAsUnavailableNotForbidden() {
+        // #142/B4-3e-13（D-B4-44）：收口前本支桩的是 deny("SECURITY_ENGINE_UNAVAILABLE") 并断言 403，
+        // 等于把"不可用折叠成无权限"钉成期望。现按契约三态分面：不可用 ⇒ 503 + ECOS-SEC-501。
         when(securityService.evaluate(eq("data.period.close"), anyString(), any()))
-                .thenReturn(PipelineSecurityService.AllowedResult.deny("SECURITY_ENGINE_UNAVAILABLE"));
+                .thenReturn(PipelineSecurityService.AllowedResult.unavailable("SECURITY_ENGINE_UNAVAILABLE"));
 
-        ForbiddenException ex = assertThrows(ForbiddenException.class,
+        DataBridgeException ex = assertThrows(DataBridgeException.class,
                 () -> service.close("202502", null));
 
-        assertEquals(403, ex.getHttpStatus());
+        assertEquals(503, ex.getHttpStatus(),
+                "不可用必须 503，不得与策略拒绝共用 403（同输入下两态状态串必异）");
         org.junit.jupiter.api.Assertions.assertTrue(
-                ex.getMessage().contains("SECURITY_ENGINE_UNAVAILABLE"));
+                ex.getMessage().startsWith("ECOS-SEC-501"), "机读码取 RlsExecutionContract 单源");
+        org.junit.jupiter.api.Assertions.assertTrue(
+                ex.getMessage().contains("data.period.close"),
+                "不可用态文案须点明被拒动作（reason 由生产侧 PipelineSecurityService 落 WARN 日志，"
+                        + "与本体/KB 腿同形态，禁在本类另抄一份）");
+        org.junit.jupiter.api.Assertions.assertFalse(
+                ex instanceof ForbiddenException, "不可用态不得是 ForbiddenException 形态");
         verifyNoInteractions(periodStatusMapper);
         verifyNoInteractions(eventBus);
     }

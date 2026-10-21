@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.common.event.EventTypes;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.data.governance.conf.GovernanceConfidenceResolver;
 import com.chinacreator.gzcm.engine.data.governance.conf.GovernanceConfidenceResolver.ResolvedConfidence;
 import com.chinacreator.gzcm.engine.data.governance.dao.DataGovernanceCandidateDao;
@@ -42,7 +44,7 @@ import com.chinacreator.gzcm.sysman.iam.context.UserContext;
  * <h3>写操作裁决（§7.5 / 铁律 §2.4）</h3>
  * DATA_CHANGE_PROPOSAL 候选创建与 APPROVED→APPLIED 迁移必须先过 security-engine
  * ABAC（{@link PipelineSecurityService} 同型裁决，action={@code data.governance.apply}）；
- * 裁决 FAILED / security 不可用 → fail-closed DENY（SUP-DATA-02）。
+ * 裁决 DENY / security 不可用 → 一律 fail-closed 不放行，但分态落地（SUP-DATA-02、§4.7.2）。
  *
  * <h3>事件</h3>
  * 生成/审批推进经 runtime-event {@link EventBusService} 发既有事件
@@ -326,12 +328,13 @@ public class DataGovernanceCandidateService {
      * <b>写操作裁决（§7.5 / SUP-GOV-01 语义）</b>：APPROVED 即授予后续
      * DATA_CHANGE_APPLY 写权限的凭证，属写操作咽喉 —— 先过 security-engine
      * ABAC（{@code data.governance.apply} 同咽喉，approve 前置同型裁决），
-     * 裁决 FAILED / security 不可用 → fail-closed DENY（403）。
+     * 裁决 DENY → 403；security 不可用（UNEVALUATED）→ 503／ECOS-SEC-501（两者均不放行，§4.7.2）。
      *
      * @param candidateId 候选 ID
      * @param approvalRef 审批记录引用（必填，§7.4 应用侧门禁）
      * @param approver    审批人（缺省取登录态）
-     * @throws SecurityDenyException security 裁决拒绝 / 不可用（Controller 转 403）
+     * @throws SecurityDenyException security 裁决 DENY（Controller 转 403）
+     * @throws DataBridgeException   security-engine 不可用（UNEVALUATED，503／ECOS-SEC-501，非"无权限"）
      */
     public Map<String, Object> approve(String candidateId, String approvalRef, String approver) {
         if (isBlank(candidateId)) {
@@ -347,15 +350,21 @@ public class DataGovernanceCandidateService {
         }
         PipelineSecurityService.AllowedResult verdict =
                 security.evaluateDataGovernanceApply(candidateId.trim());
-        if (!verdict.allowed()) {
-            publishCandidateEvent(EventTypes.Agent.POLICY_DENIED, candidateId.trim(),
-                    String.valueOf(current.getOrDefault("tenantId", "")),
-                    String.valueOf(current.getOrDefault("traceId", "")),
-                    resolveActor(approver), current.get("sourceRunId") == null
-                            ? null : String.valueOf(current.get("sourceRunId")));
-            throw new SecurityDenyException(
-                    "data.governance.approve 裁决 DENY（reason=" + verdict.reason()
-                            + "）；security 不可用时 fail-closed（SUP-GOV-01）");
+        // #142/B4-3e-13（D-B4-44）：DENY（策略说不行）才发 POLICY_DENIED + 403；
+        // UNEVALUATED（护栏没说话＝不可用）不得冒充策略拒绝、也不得发策略拒绝事件（§4.7.2）。
+        switch (verdict.verdict()) {
+            case ALLOW -> {
+            }
+            case DENY -> {
+                publishCandidateEvent(EventTypes.Agent.POLICY_DENIED, candidateId.trim(),
+                        String.valueOf(current.getOrDefault("tenantId", "")),
+                        String.valueOf(current.getOrDefault("traceId", "")),
+                        resolveActor(approver), current.get("sourceRunId") == null
+                                ? null : String.valueOf(current.get("sourceRunId")));
+                throw new SecurityDenyException(
+                        "data.governance.approve 裁决 DENY（reason=" + verdict.reason() + "）");
+            }
+            case UNEVALUATED -> throw abacUnavailable("data.governance.approve");
         }
         return transition(candidateId, STATUS_APPROVED, approvalRef.trim(),
                 "approve by " + resolveActor(approver));
@@ -636,12 +645,14 @@ public class DataGovernanceCandidateService {
      *   <li>候选必须为 APPROVED（§7.4：VALIDATED 不得当 APPROVED）；</li>
      *   <li>必须携带 approvalRef（审批记录）；</li>
      *   <li>security-engine ABAC {@code data.governance.apply} 裁决 ALLOW；
-     *       裁决 FAILED / 不可用 → fail-closed DENY（SUP-DATA-02，铁律 §2.4）。</li>
+     *       裁决 DENY → 403，不可用（UNEVALUATED）→ 503（SUP-DATA-02 fail-closed 不放行，
+     *       铁律 §2.4；两态分面见 §4.7.2）。</li>
      * </ol>
      * 本方法只标记候选 APPLIED（应用回执 + 版本引用）；<b>正式变更执行由 data-engine
      * 既有写端点（DQ rules 审批链 / 数据源变更审批）承载</b>，本类不直接改正式资产。
      *
-     * @throws SecurityDenyException security 裁决拒绝（Controller 转 403）
+     * @throws SecurityDenyException security 裁决 DENY（Controller 转 403）
+     * @throws DataBridgeException   security-engine 不可用（UNEVALUATED，503／ECOS-SEC-501，非"无权限"）
      */
     public Map<String, Object> applyApprovedProposal(String candidateId) {
         if (isBlank(candidateId)) {
@@ -662,18 +673,22 @@ public class DataGovernanceCandidateService {
             throw new IllegalStateException("候选缺少 approvalRef（审批记录引用），禁应用");
         }
 
-        // security-engine 裁决咽喉（§7.5 写操作必须过统一裁决；FAILED → DENY）
+        // security-engine 裁决咽喉（§7.5 写操作必须过统一裁决；不可用与 DENY 分态，D-B4-44）
         PipelineSecurityService.AllowedResult verdict =
                 security.evaluateDataGovernanceApply(candidateId.trim());
-        if (!verdict.allowed()) {
-            publishCandidateEvent(EventTypes.Agent.POLICY_DENIED, candidateId.trim(),
-                    String.valueOf(current.getOrDefault("tenantId", "")),
-                    String.valueOf(current.getOrDefault("traceId", "")),
-                    resolveActor(null), current.get("sourceRunId") == null
-                            ? null : String.valueOf(current.get("sourceRunId")));
-            throw new SecurityDenyException(
-                    "data.governance.apply 裁决 DENY（reason=" + verdict.reason()
-                            + "）；security 不可用时 fail-closed");
+        switch (verdict.verdict()) {
+            case ALLOW -> {
+            }
+            case DENY -> {
+                publishCandidateEvent(EventTypes.Agent.POLICY_DENIED, candidateId.trim(),
+                        String.valueOf(current.getOrDefault("tenantId", "")),
+                        String.valueOf(current.getOrDefault("traceId", "")),
+                        resolveActor(null), current.get("sourceRunId") == null
+                                ? null : String.valueOf(current.get("sourceRunId")));
+                throw new SecurityDenyException(
+                        "data.governance.apply 裁决 DENY（reason=" + verdict.reason() + "）");
+            }
+            case UNEVALUATED -> throw abacUnavailable("data.governance.apply");
         }
 
         int affected = dao.transitionStatus(candidateId.trim(), STATUS_APPROVED, STATUS_APPLIED,
@@ -712,6 +727,22 @@ public class DataGovernanceCandidateService {
                 value, dto.getConfidenceKind(), dto.getCalibrated(),
                 /* sourceLlm */ dto.getConfidenceValue() != null
                         && "LLM".equalsIgnoreCase(trimToNull(dto.getConfidenceKind())));
+    }
+
+    /**
+     * UNEVALUATED 的落码出口（503 + 机读码取 {@link RlsExecutionContract} 单源常量，禁本类字面量）。
+     *
+     * <p>治理写操作在 §7.5 下必须 fail-closed，但 §4.7.2 要求"护栏没说话"与"策略说这人不行"
+     * 分态，故本方法造的异常与 {@link SecurityDenyException}（403）在 httpStatus／码面／文案
+     * 三处均不同。数据域无模块局部 advice，经网关 {@code handleDataBridge} 以 {@code ApiResponse.code}
+     * 承载 httpStatus ⇒「HTTP 面仍 200」属既有 shortfall（D-B4-52），已登记台账。</p>
+     */
+    private static DataBridgeException abacUnavailable(String action) {
+        return new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_CODE + ": " + action
+                        + " 未获安全裁决（security-engine 不可用），按 fail-closed 拒绝，非「用户无权限」"
+                        + "(§7.5 / §4.7.2 / 铁律 §2.4)");
     }
 
     private void publishCandidateEvent(String eventType, String candidateId, String tenantId,

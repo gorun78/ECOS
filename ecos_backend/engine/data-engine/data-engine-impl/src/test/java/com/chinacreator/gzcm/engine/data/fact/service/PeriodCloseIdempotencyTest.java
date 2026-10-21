@@ -69,7 +69,7 @@ class PeriodCloseIdempotencyTest {
 
     private void allow() {
         when(securityService.evaluate(eq("data.period.close"), anyString(), any()))
-                .thenReturn(new PipelineSecurityService.AllowedResult(true, "RBAC_ALLOW"));
+                .thenReturn(PipelineSecurityService.AllowedResult.allow("RBAC_ALLOW"));
     }
 
     @Test

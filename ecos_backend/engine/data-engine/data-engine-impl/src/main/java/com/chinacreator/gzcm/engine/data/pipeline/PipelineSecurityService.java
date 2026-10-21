@@ -31,7 +31,8 @@ import java.util.Set;
  *   <li>敏感字段脱敏：{@link #maskNodeConfig(Map)} 将 SOURCE_JDBC/SOURCE_REST 节点的
  *       password/token 等替换为 {@code ******}，明文仅入库（§4.3）。</li>
  *   <li>ABAC 裁决：{@link #evaluateExecute(String)} 执行前调
- *       {@code POST /api/v1/security/policy-engine/evaluate}，security 不可用时默认 DENY。</li>
+ *       {@code POST /api/v1/security/policy-engine/evaluate}，security 不可用时落
+ *       {@link AbacEvaluateResponseContract.Verdict#UNEVALUATED}（不放行，但不冒充"无权限"，§4.7.2）。</li>
  * </ol>
  * 统一经本类 REST 调用 security-engine，禁止各调用点重复实现安全逻辑（§2.4 第 7 条）。
  *
@@ -65,7 +66,7 @@ public class PipelineSecurityService {
 
     /**
      * REST 客户端（P2#4：SimpleClientHttpRequestFactory 显式 30s/60s connect/read 超时，
-     * 第三方迟延或不可达时快速失败走默认 DENY/默认脱敏分支）。
+     * 第三方迟延或不可达时快速失败走不可用态/默认脱敏分支）。
      */
     private final RestTemplate restTemplate = newRestTemplateWithTimeouts(CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS);
 
@@ -229,8 +230,10 @@ public class PipelineSecurityService {
     /**
      * 执行前置 ABAC 裁决。
      * <p>调 security-engine {@code POST /api/v1/security/policy-engine/evaluate}，
-     * 命中 allow 才放行。security-engine 不可用（连接/调用异常）时默认 DENY（§2.4 第 6 条），
-     * 返回 {@code AllowedResult(false, "SECURITY_ENGINE_UNAVAILABLE")}。
+     * 命中 allow 才放行。security-engine 不可用（连接/调用异常）时<b>不放行</b>（§2.4 第 6 条
+     * fail-closed 成立），但落不可用态而非策略拒绝：
+     * {@code AllowedResult(allowed=false, "SECURITY_ENGINE_UNAVAILABLE", UNEVALUATED)}（§4.7.2），
+     * 消费侧禁据此报 403。
      *
      * @param definitionId Pipeline 定义 ID
      * @return 裁决结果
@@ -256,14 +259,14 @@ public class PipelineSecurityService {
             String bodyStr = response.getBody();
             if (bodyStr == null || bodyStr.isEmpty()) {
                 log.warn("ABAC evaluate returned empty body: definitionId={}", definitionId);
-                return AllowedResult.deny("ABAC_EVALUATE_FAILED");
+                return AllowedResult.unavailable("ABAC_EVALUATE_FAILED");
             }
             // 解析 JSON 响应
             Map<String, Object> apiResp = MAPPER.readValue(bodyStr,
                     new TypeReference<Map<String, Object>>() {});
             if (apiResp == null) {
                 log.warn("ABAC evaluate returned null: definitionId={}", definitionId);
-                return AllowedResult.deny("ABAC_EVALUATE_FAILED");
+                return AllowedResult.unavailable("ABAC_EVALUATE_FAILED");
             }
             // ApiResponse 包装：业务数据在 "data" 字段内
             @SuppressWarnings("unchecked")
@@ -272,20 +275,33 @@ public class PipelineSecurityService {
                 // fallback: 若 data 为空（旧版 security-engine 兼容），尝试直接从顶层取
                 data = apiResp;
             }
-            boolean allowed = AbacEvaluateResponseContract.isExplicitAllow(data);
+            AbacEvaluateResponseContract.Verdict verdict =
+                    AbacEvaluateResponseContract.verdictOf(data);
             String reason = data.get(AbacEvaluateResponseContract.KEY_FALLBACK) != null
                     ? data.get(AbacEvaluateResponseContract.KEY_FALLBACK).toString()
-                    : (allowed ? "ALLOW" : "DENY");
-            if (allowed) {
-                log.info("ABAC allow pipeline execute: definitionId={}, reason={}", definitionId, reason);
-            } else {
-                log.warn("ABAC deny pipeline execute: definitionId={}, reason={}", definitionId, reason);
+                    : switch (verdict) {
+                        case ALLOW -> "ALLOW";
+                        case DENY -> "DENY";
+                        case UNEVALUATED -> "ABAC_UNEVALUATED";
+                    };
+            switch (verdict) {
+                case ALLOW -> log.info("ABAC allow pipeline execute: definitionId={}, reason={}",
+                        definitionId, reason);
+                case DENY -> log.warn("ABAC DENY (策略拒绝) pipeline execute: definitionId={}, reason={}",
+                        definitionId, reason);
+                case UNEVALUATED -> log.warn("ABAC UNEVALUATED (护栏未评估/不可用，非策略拒绝，§4.7.2) "
+                        + "pipeline execute: definitionId={}, reason={}", definitionId, reason);
             }
-            return new AllowedResult(allowed, reason);
+            return switch (verdict) {
+                case ALLOW -> AllowedResult.allow(reason);
+                case DENY -> AllowedResult.deny(reason);
+                case UNEVALUATED -> AllowedResult.unavailable(reason);
+            };
         } catch (Exception e) {
-            // security-engine 不可用 → 默认 DENY（架构铁律 §2.4 第 6 条）
-            log.warn("ABAC evaluate failed (default DENY): definitionId={}, error={}", definitionId, e.getMessage());
-            return AllowedResult.deny("SECURITY_ENGINE_UNAVAILABLE");
+            // security-engine 不可用 → 不可用态（仍不放行，但不冒充"这人没权限"，§4.7.2）
+            log.warn("ABAC evaluate failed (fail-closed UNEVALUATED): definitionId={}, error={}",
+                    definitionId, e.getMessage());
+            return AllowedResult.unavailable("SECURITY_ENGINE_UNAVAILABLE");
         }
     }
 
@@ -293,7 +309,8 @@ public class PipelineSecurityService {
      * 数据治理候选 apply 前置 ABAC 裁决（《补充详细设计 v1.0》§7.5 DATA_CHANGE_APPLY）。
      * <p>与 {@link #evaluateExecute} 同一咽喉（POST /api/v1/security/policy-engine/evaluate），
      * 但 action 为 {@code data.governance.apply}（治理写操作独立策略语义）。
-     * security-engine 不可用/裁决 FAILED → 默认 DENY（fail-closed，SUP-DATA-02）。
+     * security-engine 不可用/裁决 FAILED → 不可用态（fail-closed 不放行，SUP-DATA-02；
+     * 与"策略拒绝"分态，§4.7.2）。
      *
      * @param candidateId 候选 ID（resource 引用）
      * @return 裁决结果（allowed=false + reason 供审计留痕）
@@ -318,42 +335,54 @@ public class PipelineSecurityService {
             String bodyStr = response.getBody();
             if (bodyStr == null || bodyStr.isEmpty()) {
                 log.warn("ABAC evaluate_data_governance_apply returned empty body: candidateId={}", candidateId);
-                return AllowedResult.deny("ABAC_EVALUATE_FAILED");
+                return AllowedResult.unavailable("ABAC_EVALUATE_FAILED");
             }
             Map<String, Object> apiResp = MAPPER.readValue(bodyStr,
                     new TypeReference<Map<String, Object>>() {});
             if (apiResp == null) {
-                return AllowedResult.deny("ABAC_EVALUATE_FAILED");
+                return AllowedResult.unavailable("ABAC_EVALUATE_FAILED");
             }
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) apiResp.get("data");
             if (data == null || data.isEmpty()) {
                 data = apiResp;
             }
-            boolean allowed = AbacEvaluateResponseContract.isExplicitAllow(data);
+            AbacEvaluateResponseContract.Verdict verdict =
+                    AbacEvaluateResponseContract.verdictOf(data);
             String reason = data.get(AbacEvaluateResponseContract.KEY_FALLBACK) != null
                     ? data.get(AbacEvaluateResponseContract.KEY_FALLBACK).toString()
-                    : (allowed ? "ALLOW" : "DENY");
-            if (allowed) {
-                log.info("ABAC allow data governance apply: candidateId={}, reason={}", candidateId, reason);
-            } else {
-                log.warn("ABAC deny data governance apply: candidateId={}, reason={}", candidateId, reason);
+                    : switch (verdict) {
+                        case ALLOW -> "ALLOW";
+                        case DENY -> "DENY";
+                        case UNEVALUATED -> "ABAC_UNEVALUATED";
+                    };
+            switch (verdict) {
+                case ALLOW -> log.info("ABAC allow data governance apply: candidateId={}, reason={}",
+                        candidateId, reason);
+                case DENY -> log.warn("ABAC DENY (策略拒绝) data governance apply: candidateId={}, reason={}",
+                        candidateId, reason);
+                case UNEVALUATED -> log.warn("ABAC UNEVALUATED (护栏未评估/不可用，非策略拒绝，§4.7.2) "
+                        + "data governance apply: candidateId={}, reason={}", candidateId, reason);
             }
-            return new AllowedResult(allowed, reason);
+            return switch (verdict) {
+                case ALLOW -> AllowedResult.allow(reason);
+                case DENY -> AllowedResult.deny(reason);
+                case UNEVALUATED -> AllowedResult.unavailable(reason);
+            };
         } catch (Exception e) {
-            // security-engine 不可用 → 默认 DENY（§7.5 策略依赖失败 → DENY）
-            log.warn("ABAC evaluate_data_governance_apply failed (fail-closed DENY): candidateId={}, error={}",
+            // security-engine 不可用 → 不可用态（不放行，但不冒充无权限，§7.5 / §4.7.2）
+            log.warn("ABAC evaluate_data_governance_apply failed (fail-closed UNEVALUATED): candidateId={}, error={}",
                     candidateId, e.getMessage());
-            return AllowedResult.deny("SECURITY_ENGINE_UNAVAILABLE");
+            return AllowedResult.unavailable("SECURITY_ENGINE_UNAVAILABLE");
         }
     }
 
     /**
      * 通用策略裁决（H-3 交付①：期间关账财务角色门槛，卷09 §十一；后续数据域写操作权限判定统一走本咽喉）。
      * <p>与 {@link #evaluateExecute} / {@link #evaluateDataGovernanceApply} 同一 policy-engine 端点、
-     * 同一响应解析（{@code AbacEvaluateResponseContract#isExplicitAllow} 读 ApiResponse.data）；
-     * <b>fail-closed</b>：security-engine 不可用 / 响应异常 /
-     * 空响应 ⇒ deny（§2.4 第 6 条 / SUP-DATA-02）。
+     * 同一响应解析（{@code AbacEvaluateResponseContract#verdictOf} 读 ApiResponse.data）；
+     * <b>fail-closed 但不折叠</b>：security-engine 不可用 / 响应异常 /
+     * 空响应 ⇒ UNEVALUATED（§2.4 第 6 条 / SUP-DATA-02 不放行；§4.7.2 禁报成 403）。
      *
      * <p>调用方约束：{@code role} 只准透传调用方身份声明（如 UserContext claims 原值），
      * <b>禁</b>在数据域内做"角色名 → 权限"硬编码映射——角色语义归 security-engine 策略承载。
@@ -361,7 +390,7 @@ public class PipelineSecurityService {
      * @param action   策略动作名（如 {@code data.period.close}）
      * @param resource 资源引用（如 {@code ecos_data_period_status:2025-01}）
      * @param role     调用方角色声明原值（可空 → 传空串，由策略裁决）
-     * @return 裁决结果（allowed=false + reason 供审计留痕与 403 文案）
+     * @return 裁决结果（不放行时 verdict 区分 DENY／UNEVALUATED，reason 供审计留痕与文案）
      */
     public AllowedResult evaluate(String action, String resource, String role) {
         try {
@@ -382,47 +411,76 @@ public class PipelineSecurityService {
 
             String bodyStr = response.getBody();
             if (bodyStr == null || bodyStr.isEmpty()) {
-                log.warn("ABAC evaluate({}) returned empty body (fail-closed DENY)", action);
-                return AllowedResult.deny("ABAC_EVALUATE_FAILED");
+                log.warn("ABAC evaluate({}) returned empty body (fail-closed UNEVALUATED)", action);
+                return AllowedResult.unavailable("ABAC_EVALUATE_FAILED");
             }
             Map<String, Object> apiResp = MAPPER.readValue(bodyStr,
                     new TypeReference<Map<String, Object>>() {});
             if (apiResp == null) {
-                return AllowedResult.deny("ABAC_EVALUATE_FAILED");
+                return AllowedResult.unavailable("ABAC_EVALUATE_FAILED");
             }
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) apiResp.get("data");
             if (data == null || data.isEmpty()) {
                 data = apiResp;
             }
-            boolean allowed = AbacEvaluateResponseContract.isExplicitAllow(data);
+            AbacEvaluateResponseContract.Verdict verdict =
+                    AbacEvaluateResponseContract.verdictOf(data);
             String reason = data.get(AbacEvaluateResponseContract.KEY_FALLBACK) != null
                     ? data.get(AbacEvaluateResponseContract.KEY_FALLBACK).toString()
-                    : (allowed ? "ALLOW" : "DENY");
-            if (allowed) {
-                log.info("ABAC allow {}: resource={}, reason={}", action, resource, reason);
-            } else {
-                log.warn("ABAC deny {}: resource={}, reason={}", action, resource, reason);
+                    : switch (verdict) {
+                        case ALLOW -> "ALLOW";
+                        case DENY -> "DENY";
+                        case UNEVALUATED -> "ABAC_UNEVALUATED";
+                    };
+            switch (verdict) {
+                case ALLOW -> log.info("ABAC allow {}: resource={}, reason={}", action, resource, reason);
+                case DENY -> log.warn("ABAC DENY (策略拒绝) {}: resource={}, reason={}", action, resource, reason);
+                case UNEVALUATED -> log.warn("ABAC UNEVALUATED (护栏未评估/不可用，非策略拒绝，§4.7.2) "
+                        + "{}: resource={}, reason={}", action, resource, reason);
             }
-            return new AllowedResult(allowed, reason);
+            return switch (verdict) {
+                case ALLOW -> AllowedResult.allow(reason);
+                case DENY -> AllowedResult.deny(reason);
+                case UNEVALUATED -> AllowedResult.unavailable(reason);
+            };
         } catch (Exception e) {
-            // security-engine 不可用 → 默认 DENY（§2.4 第 6 条；关账场景=403 fail-closed）
-            log.warn("ABAC evaluate({}) failed (fail-closed DENY): resource={}, error={}",
+            // security-engine 不可用 → 不可用态（§2.4 第 6 条 fail-closed 仍成立：不放行；
+            // 但 §4.7.2 要求它与"无权限"分态，故不得再报成 403——关账场景由调用方落 503）
+            log.warn("ABAC evaluate({}) failed (fail-closed UNEVALUATED): resource={}, error={}",
                     action, resource, e.getMessage());
-            return AllowedResult.deny("SECURITY_ENGINE_UNAVAILABLE");
+            return AllowedResult.unavailable("SECURITY_ENGINE_UNAVAILABLE");
         }
     }
 
     /**
      * ABAC 裁决结果。
+     *
+     * <p><b>#142/B4-3e-13（差距 D-B4-44）</b>：载荷自此带第三态位 {@code verdict}。收口前只有
+     * 布尔 {@code allowed}，于是「策略说不行」与「护栏没说话（security-engine 不可用）」
+     * 同值，四个消费点一律转 403 —— 违 §4.7.2「不可用 ≠ 无权限」。</p>
+     *
+     * <p>生产侧一律经 {@link #allow}／{@link #deny}／{@link #unavailable} 三个工厂，
+     * <b>禁</b>直接调三参规范构造器（绕开工厂＝状态位可以凭空丢失，本类的
+     * {@code allowed} 与 {@code verdict} 只在工厂里保持互推）。消费侧判据取
+     * {@link #verdict()}，{@link #allowed()} 只留给"放行/不放行"的二值展示，
+     * 不得据它反推拒绝原因。</p>
      */
-    public record AllowedResult(boolean allowed, String reason) {
-        public static AllowedResult deny(String reason) {
-            return new AllowedResult(false, reason);
-        }
+    public record AllowedResult(boolean allowed, String reason,
+                                AbacEvaluateResponseContract.Verdict verdict) {
 
         public static AllowedResult allow(String reason) {
-            return new AllowedResult(true, reason);
+            return new AllowedResult(true, reason, AbacEvaluateResponseContract.Verdict.ALLOW);
+        }
+
+        /** 策略显式拒绝 —— 护栏说话了，结论是不行。 */
+        public static AllowedResult deny(String reason) {
+            return new AllowedResult(false, reason, AbacEvaluateResponseContract.Verdict.DENY);
+        }
+
+        /** 护栏不可用／未评估 —— 不可用 ≠ 无权限（§4.7.2），消费侧禁转 403。 */
+        public static AllowedResult unavailable(String reason) {
+            return new AllowedResult(false, reason, AbacEvaluateResponseContract.Verdict.UNEVALUATED);
         }
     }
 }

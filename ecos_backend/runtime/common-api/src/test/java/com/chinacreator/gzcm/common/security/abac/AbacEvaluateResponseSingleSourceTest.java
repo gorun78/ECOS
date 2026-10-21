@@ -297,7 +297,10 @@ class AbacEvaluateResponseSingleSourceTest {
         expected.put(AI_CLIENT, List.of("AbacEvaluateResponseContract.verdictOf"));
         expected.put(LLM_BRIDGE, List.of("AbacEvaluateResponseContract.verdictOf",
                 "AbacEvaluateResponseContract.Verdict"));
-        expected.put(PIPELINE_SVC, List.of("AbacEvaluateResponseContract.isExplicitAllow",
+        // #142/B4-3e-13（D-B4-44 第三腿）：pipeline 三支裁决改取三态，AllowedResult 携带 verdict，
+        // 不可用态由消费侧落成 503 ECOS-SEC-501（§4.7.2），不再经布尔 helper。
+        expected.put(PIPELINE_SVC, List.of("AbacEvaluateResponseContract.verdictOf(",
+                "AbacEvaluateResponseContract.Verdict",
                 "AbacEvaluateResponseContract.KEY_FALLBACK"));
         // #142/B4-3e-12（D-B4-44）：kb 导航写闸／本体操作授权两支改取三态，
         // 并把 security 侧「HTTP 200 + 失败信封」的不可用判据委托给 RlsExecutionContract 单源。
@@ -364,10 +367,16 @@ class AbacEvaluateResponseSingleSourceTest {
      * {@code ONTOLOGY_CLIENT}）：两条腿的客户端 {@code evaluatePolicy} 改回
      * {@code AbacEvaluateResponseContract.Verdict}，消费点按 §4.7.2 分面
      * （DENY→403 策略拒绝，UNEVALUATED→不可用态码面 {@code ECOS-SEC-501}），
-     * 故从本清单删项。余两支（{@code PIPELINE_SVC}／{@code LLM_BRIDGE}）仍在册。</p>
+     * 故从本清单删项。</p>
+     *
+     * <p>#142/B4-3e-13 收口第三支（data pipeline 执行／治理候选裁决 {@code PIPELINE_SVC}）：
+     * 三支调用点的布尔结论改取 {@code verdictOf} 三态，并把 {@code Verdict} 装进
+     * {@code AllowedResult} 往外传；四个消费点（pipeline 执行、关账、治理候选 approve/apply）
+     * 按 §4.7.2 分态——DENY 保持原 403 形态，UNEVALUATED 落 503＋{@code ECOS-SEC-501}，
+     * 故从本清单删项。余一支（{@code LLM_BRIDGE}）仍在册。</p>
      */
     private static final Set<String> UNEVALUATED_FOLDING_SITES = Set.of(
-            PIPELINE_SVC, LLM_BRIDGE);
+            LLM_BRIDGE);
 
     @Test
     @Timeout(value = 120)
@@ -384,8 +393,9 @@ class AbacEvaluateResponseSingleSourceTest {
         assertEquals(UNEVALUATED_FOLDING_SITES, found.keySet(),
                 "ABAC 不可用折叠面与在册清单不符（新增未登记＝又一个没人知道的假 403；"
                         + "收口未删项＝棘轮失效）。实测=" + found);
-        // 已闭合的四支不得回归（同一条判据对它们必须为假）
-        for (String closed : List.of(COGNITIVE_DECIDER, WORKSPACE_CLIENT, KB_CLIENT, ONTOLOGY_CLIENT)) {
+        // 已闭合的五支不得回归（同一条判据对它们必须为假）
+        for (String closed : List.of(COGNITIVE_DECIDER, WORKSPACE_CLIENT, KB_CLIENT,
+                ONTOLOGY_CLIENT, PIPELINE_SVC)) {
             assertNull(booleanConclusionShape(codeOf(closed)),
                     closed + " 退回布尔 helper ⇒ D-B4-41／D-B4-44 复发");
         }

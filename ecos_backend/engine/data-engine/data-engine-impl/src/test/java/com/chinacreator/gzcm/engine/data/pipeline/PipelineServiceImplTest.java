@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
@@ -108,6 +110,21 @@ class PipelineServiceImplTest {
         when(securityService.evaluateExecute("p-1"))
                 .thenReturn(PipelineSecurityService.AllowedResult.allow("ALLOW"));
         service().checkAbacBeforeExecute("p-1");
+    }
+
+    @Test
+    @DisplayName("checkAbacBeforeExecute — UNEVALUATED → 503 ECOS-SEC-501，不得折叠成 DENY 的 403（§4.7.2，D-B4-44）")
+    void abacUnavailableBlocksExecutionAs503Not403() {
+        when(securityService.evaluateExecute("p-1"))
+                .thenReturn(PipelineSecurityService.AllowedResult.unavailable("SECURITY_ENGINE_UNAVAILABLE"));
+
+        DataBridgeException ex = assertThrows(DataBridgeException.class,
+                () -> service().checkAbacBeforeExecute("p-1"));
+
+        assertEquals(503, ex.getHttpStatus(),
+                "不可用与策略拒绝的状态串必异：DENY 那条是 403 BusinessException，本条必须 503");
+        assertTrue(ex.getMessage().startsWith("ECOS-SEC-501"), "机读码取 RlsExecutionContract 单源");
+        assertFalse(ex instanceof BusinessException, "不可用态不得复用策略拒绝的异常形态");
     }
 
     @Test

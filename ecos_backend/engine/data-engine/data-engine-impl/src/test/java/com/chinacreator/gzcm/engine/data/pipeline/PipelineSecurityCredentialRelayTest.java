@@ -100,7 +100,7 @@ class PipelineSecurityCredentialRelayTest {
     }
 
     @Test
-    @DisplayName("无入口请求上下文（异步/定时线程）— 不伪造凭证，security 不可用仍默认 DENY")
+    @DisplayName("无入口请求上下文（异步/定时线程）— 不伪造凭证，security 不可用仍不放行（UNEVALUATED）")
     void noRequestContextMeansNoFabricatedCredentials() {
         RequestContextHolder.resetRequestAttributes();
         doThrow(new ResourceAccessException("refused"))

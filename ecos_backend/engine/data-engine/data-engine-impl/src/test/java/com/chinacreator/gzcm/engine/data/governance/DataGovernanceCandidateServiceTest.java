@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.data.governance;
 
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.data.governance.conf.GovernanceConfidenceResolver;
 import com.chinacreator.gzcm.engine.data.governance.dao.DataGovernanceCandidateDao;
 import com.chinacreator.gzcm.engine.data.governance.dto.DataGovernanceCandidateCreateDTO;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -177,7 +179,7 @@ class DataGovernanceCandidateServiceTest {
         when(dao.findByCandidateId(CAND_ID)).thenReturn(
                 candidateRow(DataGovernanceCandidateService.STATUS_APPROVED, "approval-9001"));
         when(security.evaluateDataGovernanceApply(CAND_ID))
-                .thenReturn(new PipelineSecurityService.AllowedResult(false, "opa policy deny"));
+                .thenReturn(PipelineSecurityService.AllowedResult.deny("opa policy deny"));
 
         SecurityDenyException ex = assertThrows(SecurityDenyException.class,
                 () -> service.applyApprovedProposal(CAND_ID));
@@ -190,12 +192,34 @@ class DataGovernanceCandidateServiceTest {
     }
 
     @Test
+    @DisplayName("D-B4-44: apply 时 security 不可用 (UNEVALUATED) -> 503 ECOS-SEC-501，非 403、不发 POLICY_DENIED 事件、状态禁迁")
+    void applyWithSecurityUnavailableRendersAsUnavailableNotDeny() {
+        // 同输入下 DENY 与 UNEVALUATED 状态串必异：上一条走 403 SecurityDenyException，本条须走 503 码面。
+        when(dao.findByCandidateId(CAND_ID)).thenReturn(
+                candidateRow(DataGovernanceCandidateService.STATUS_APPROVED, "approval-9001"));
+        when(security.evaluateDataGovernanceApply(CAND_ID))
+                .thenReturn(PipelineSecurityService.AllowedResult.unavailable("SECURITY_ENGINE_UNAVAILABLE"));
+
+        DataBridgeException ex = assertThrows(DataBridgeException.class,
+                () -> service.applyApprovedProposal(CAND_ID));
+
+        assertEquals(503, ex.getHttpStatus(), "不可用不得折叠成策略拒绝的 403（§4.7.2）");
+        assertTrue(ex.getMessage().startsWith("ECOS-SEC-501"), "机读码取 RlsExecutionContract 单源");
+        assertFalse(ex instanceof SecurityDenyException,
+                "不可用态不得是策略拒绝异常形态");
+        // 护栏没说话 ⇒ 不得对外发"策略拒绝"事件（把不可用重述成拒绝即是折叠复发）
+        verify(eventBusProvider, never()).getIfAvailable();
+        verify(dao, never()).transitionStatus(anyString(), anyString(), anyString(), nullable(String.class),
+                anyString());
+    }
+
+    @Test
     @DisplayName("SUP-DATA-02: apply 裁决 ALLOW -> APPROVED->APPLIED CAS 成功落库")
     void applyAllowedTransitionsToApplied() {
         when(dao.findByCandidateId(CAND_ID)).thenReturn(
                 candidateRow(DataGovernanceCandidateService.STATUS_APPROVED, "approval-9001"));
         when(security.evaluateDataGovernanceApply(CAND_ID))
-                .thenReturn(new PipelineSecurityService.AllowedResult(true, "ok"));
+                .thenReturn(PipelineSecurityService.AllowedResult.allow("ok"));
         when(dao.transitionStatus(eq(CAND_ID),
                 eq(DataGovernanceCandidateService.STATUS_APPROVED),
                 eq(DataGovernanceCandidateService.STATUS_APPLIED),
@@ -249,6 +273,36 @@ class DataGovernanceCandidateServiceTest {
         assertThrows(IllegalArgumentException.class,
                 () -> service.approve(CAND_ID, "  ", "approver-1"));
         verify(security, never()).evaluateDataGovernanceApply(anyString());
+        verify(dao, never()).transitionStatus(anyString(), anyString(), anyString(), nullable(String.class),
+                anyString());
+    }
+
+    @Test
+    @DisplayName("D-B4-44: approve 咽喉同输入下 DENY 与 UNEVALUATED 状态串必异（403 vs 503，§4.7.2）")
+    void approveDenyAndUnavailableRenderDifferentStates() {
+        // 「不可用 ≠ 无权限」的可达性判据：同一个 approve 咽喉、同一入口状态，
+        // 策略拒绝必须仍是 403 SecurityDenyException，护栏不可用必须换成 503 码面。
+        when(dao.findByCandidateId(CAND_ID)).thenReturn(
+                candidateRow(DataGovernanceCandidateService.STATUS_PENDING_APPROVAL, null));
+        when(security.evaluateDataGovernanceApply(CAND_ID))
+                .thenReturn(PipelineSecurityService.AllowedResult.deny("opa policy deny"));
+
+        SecurityDenyException denied = assertThrows(SecurityDenyException.class,
+                () -> service.approve(CAND_ID, "approval-9001", "approver-1"));
+        assertEquals(SecurityDenyException.DEFAULT_HTTP_STATUS, denied.getHttpStatus(),
+                "DENY 腿的状态串不得被本批改动");
+
+        when(security.evaluateDataGovernanceApply(CAND_ID))
+                .thenReturn(PipelineSecurityService.AllowedResult.unavailable(
+                        "SECURITY_ENGINE_UNAVAILABLE"));
+        DataBridgeException unavailable = assertThrows(DataBridgeException.class,
+                () -> service.approve(CAND_ID, "approval-9001", "approver-1"));
+
+        assertEquals(503, unavailable.getHttpStatus(),
+                "不可用与策略拒绝的状态串必异：同输入下两态若同为 403 即折叠复发（§4.7.2）");
+        assertFalse(unavailable instanceof SecurityDenyException,
+                "不可用态不得是策略拒绝异常形态");
+        // 护栏没说话 ⇒ 不得发"策略拒绝"事件，也不得迁状态
         verify(dao, never()).transitionStatus(anyString(), anyString(), anyString(), nullable(String.class),
                 anyString());
     }
