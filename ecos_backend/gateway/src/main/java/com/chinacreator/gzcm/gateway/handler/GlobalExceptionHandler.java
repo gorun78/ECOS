@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.gateway.handler;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.base.MachineErrorCode;
 import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.DataAccessException;
@@ -47,6 +48,10 @@ public class GlobalExceptionHandler {
      * 的 503 语义（security-engine 不可用）与 403 策略拒绝在 HTTP 面同形，前端按
      * {@code res.ok} 分态的通道全部失明（"护栏没说话"被读成成功信封）。现按携带值落
      * 状态行；携带值不在 4xx/5xx 区间时回退 500（禁把非法值原样写进状态行）。</p>
+     *
+     * <p><b>#142/B4-3e-24（差距 D-B4-55）</b>：{@code ApiResponse.errorCode} 收口前由
+     * {@code String.valueOf(int)} 填充 ⇒ 机读码只在 message 前缀，改由
+     * {@link MachineErrorCode#orNumeric} 单源取值（message 起始位命中机器码即用，否则回落数字串）。</p>
      */
     @ExceptionHandler(DataBridgeException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataBridge(DataBridgeException ex) {
@@ -54,18 +59,24 @@ public class GlobalExceptionHandler {
         log.error("DataBridgeException: httpStatus={}, errorCode={}, message={}",
                 status, ex.getErrorCode(), ex.getMessage(), ex.getCause());
         return ResponseEntity.status(status).body(
-                ApiResponse.error(ex.getErrorCode(), String.valueOf(ex.getErrorCode()), ex.getMessage()));
+                ApiResponse.error(ex.getErrorCode(),
+                        MachineErrorCode.orNumeric(ex.getMessage(), ex.getErrorCode()), ex.getMessage()));
     }
 
 
     /**
      * 业务异常 → 400 业务错误
+     *
+     * <p>#142/B4-3e-24：{@code errorCode} 字段改走 {@link MachineErrorCode#orNumeric} 单源；
+     * 状态行仍由本方法上的 {@code @ResponseStatus(BAD_REQUEST)} 决定（裸回形态属另一在册项 D-B4-56，
+     * 本批不扩面）。</p>
      */
     @ExceptionHandler(BusinessException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleBusiness(BusinessException ex) {
         log.warn("BusinessException: {}", ex.getMessage(), ex);
-        return ApiResponse.error(ex.getErrorCode(), String.valueOf(ex.getErrorCode()), ex.getMessage());
+        return ApiResponse.error(ex.getErrorCode(),
+                MachineErrorCode.orNumeric(ex.getMessage(), ex.getErrorCode()), ex.getMessage());
     }
 
     /**
@@ -155,7 +166,9 @@ public class GlobalExceptionHandler {
         int status = resolveHttpStatus(ex.getHttpStatus());
         log.error("DataAccessException: httpStatus={}, message={}", status, ex.getMessage(), ex);
         return ResponseEntity.status(status).body(
-                ApiResponse.error(ex.getErrorCode(), String.valueOf(ex.getErrorCode()), "系统繁忙，请稍后重试"));
+                ApiResponse.error(ex.getErrorCode(),
+                        MachineErrorCode.orNumeric(ex.getMessage(), ex.getErrorCode()),
+                        "系统繁忙，请稍后重试"));
     }
 
     /**

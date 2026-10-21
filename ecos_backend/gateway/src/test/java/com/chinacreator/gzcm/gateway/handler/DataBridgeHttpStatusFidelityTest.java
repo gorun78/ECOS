@@ -60,14 +60,16 @@ class DataBridgeHttpStatusFidelityTest {
                 "security-engine 不可用的 503 必须落在 HTTP 状态行（B4-3e-15 前恒 200）");
         ApiResponse<Void> body = resp.getBody();
         assertNotNull(body);
-        // 契约现状（本批实测登记，不扩面）：DataBridgeException.errorCode 是 int，
-        // handleDataBridge 用 String.valueOf(errorCode) 填 ApiResponse.errorCode，
-        // ⇒ 机读码 "ECOS-SEC-501" 只活在 message 前缀，错误码字段承载的是 "503"。
-        // 前端若按 errorCode 字符串匹配 ECOS-SEC-* 会落空，属独立缺陷，另行立项。
-        assertEquals("503", body.getErrorCode(),
-                "errorCode 字段现由 int errorCode 字符串化（机读码未进该字段＝实测契约）");
+        // #142/B4-3e-24 收口 D-B4-55：本断言在收口前是「把缺陷钉成契约」的
+        // assertEquals("503", body.getErrorCode())。DataBridgeException.errorCode 仍是 int
+        // （签名不动），但信封 errorCode 字段改由 MachineErrorCode.orNumeric(message, int) 单源取值
+        // ⇒ message 起始位的机读码 ECOS-SEC-501 现在真的上了 errorCode 字段，前端可按码匹配。
+        assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_CODE, body.getErrorCode(),
+                "机读码必须落在 errorCode 字段（收口前该字段被 String.valueOf(int) 冒充为 503）");
+        assertEquals("503", String.valueOf(body.getCode()),
+                "code 仍是异常携带的数字语义值，与状态行同源（本批不动该契约）");
         assertTrue(body.getMessage() != null && body.getMessage().startsWith(RlsExecutionContract.SEC_UNAVAILABLE_CODE),
-                "ECOS-SEC-501 机读码当前只在 message 前缀，实际=" + body.getMessage());
+                "message 前缀形态保持不变（errorCode 与 message 同源不同字段），实际=" + body.getMessage());
     }
 
     // ── 验收 2：策略拒绝 → 状态行 403，且与 503 腿在状态行分形 ─────────────────
