@@ -12,6 +12,7 @@ import com.chinacreator.gzcm.common.exception.ValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseBody;
@@ -40,13 +41,22 @@ public class GlobalExceptionHandler {
     /**
      * DataBridge 根异常兜底：未匹配到具体子类时按异常携带的 httpStatus 透出。
      * 该 handler 必须在所有具体子类 handler 之后声明（Spring 按类型精确匹配选择 handler）。
+     *
+     * <p><b>#142/B4-3e-15（差距 D-B4-52）</b>：收口前本方法返回裸 {@code ApiResponse}，
+     * 状态行恒 HTTP 200，"httpStatus 透出"只写在注释里 —— 于是 {@code ECOS-SEC-501}
+     * 的 503 语义（security-engine 不可用）与 403 策略拒绝在 HTTP 面同形，前端按
+     * {@code res.ok} 分态的通道全部失明（"护栏没说话"被读成成功信封）。现按携带值落
+     * 状态行；携带值不在 4xx/5xx 区间时回退 500（禁把非法值原样写进状态行）。</p>
      */
     @ExceptionHandler(DataBridgeException.class)
-    public ApiResponse<Void> handleDataBridge(DataBridgeException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleDataBridge(DataBridgeException ex) {
+        int status = resolveHttpStatus(ex.getHttpStatus());
         log.error("DataBridgeException: httpStatus={}, errorCode={}, message={}",
-                ex.getHttpStatus(), ex.getErrorCode(), ex.getMessage(), ex.getCause());
-        return ApiResponse.error(ex.getErrorCode(), String.valueOf(ex.getErrorCode()), ex.getMessage());
+                status, ex.getErrorCode(), ex.getMessage(), ex.getCause());
+        return ResponseEntity.status(status).body(
+                ApiResponse.error(ex.getErrorCode(), String.valueOf(ex.getErrorCode()), ex.getMessage()));
     }
+
 
     /**
      * 业务异常 → 400 业务错误
@@ -132,12 +142,20 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 数据层访问异常（DB/Neo4j/MinIO 等）→ 跟随异常携带的 httpStatus，默认 500
+     * 数据层访问异常（DB/Neo4j/MinIO 等）→ 跟随异常携带的 httpStatus，默认 500。
+     *
+     * <p><b>#142/B4-3e-15（差距 D-B4-52 同族）</b>：本方法注释自 v1 起即承诺"跟随 httpStatus"，
+     * 而收口前返回裸 {@code ApiResponse} ⇒ 状态行恒 HTTP 200，DB 故障在 HTTP 面伪装成成功。
+     * 现兑现该承诺：状态行取携带值（{@link DataAccessException#DEFAULT_HTTP_STATUS}＝500），
+     * body 仍走脱敏文案，{@code ApiResponse.code} 保持 {@code errorCode} 不变
+     * （-100 与状态行不一致属信封侧既有形态，本批不扩面，已按实测登记台账）。</p>
      */
     @ExceptionHandler(DataAccessException.class)
-    public ApiResponse<Void> handleDataAccess(DataAccessException ex) {
-        log.error("DataAccessException: httpStatus={}, message={}", ex.getHttpStatus(), ex.getMessage(), ex);
-        return ApiResponse.error(ex.getErrorCode(), String.valueOf(ex.getErrorCode()), "系统繁忙，请稍后重试");
+    public ResponseEntity<ApiResponse<Void>> handleDataAccess(DataAccessException ex) {
+        int status = resolveHttpStatus(ex.getHttpStatus());
+        log.error("DataAccessException: httpStatus={}, message={}", status, ex.getMessage(), ex);
+        return ResponseEntity.status(status).body(
+                ApiResponse.error(ex.getErrorCode(), String.valueOf(ex.getErrorCode()), "系统繁忙，请稍后重试"));
     }
 
     /**
@@ -237,5 +255,15 @@ public class GlobalExceptionHandler {
         ApiResponse<Void> resp =
                 ApiResponse.error(500, "ECOS-SYS-500", "服务内部错误，请稍后重试或联系管理员");
         return resp.withTraceIdFromMdc();
+    }
+
+    /**
+     * 异常携带的 httpStatus → 可写进状态行的值。
+     *
+     * <p>只有 4xx/5xx 才是合法的"本异常自述的失败状态"；其余（0、-100、2xx、>599）
+     * 一律回退 500，禁把非法值原样写进状态行（那会让容器报 500 之外的假语义）。</p>
+     */
+    static int resolveHttpStatus(int httpStatus) {
+        return httpStatus >= 400 && httpStatus <= 599 ? httpStatus : 500;
     }
 }

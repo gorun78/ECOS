@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes.DomainException;
 import org.springframework.dao.DataAccessException;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -22,8 +23,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  *   <li>别家 {@link DataBridgeException}（跨域桥异常）→ 502 + ECOS-KB-501。</li>
  * </ul>
  * 不改网关 {@code GlobalExceptionHandler}；本 advice 仅在 kb 引擎包范围内生效。
+ *
+ * <p><b>#142/B4-3e-15（差距 D-B4-52）</b>：上一段注释自 v1 起就声明"仅在 kb 包范围内生效"，
+ * 而注解实为无 {@code basePackages} 的全局 advice —— 在 gateway fat-jar 组合面里，它与
+ * {@code GlobalExceptionHandler} 同为全局且都声明处理 {@link DataBridgeException}，
+ * 排序未定义 ⇒ 别域（data／ontology／runtime）的 403／503 会被本类改写成 502／ECOS-KB-501，
+ * "哪个域的错误由哪个域渲染"取决于 Bean 名排序这种实现细节。现把注释兑现成注解：
+ * {@code basePackages} 限定 kb 引擎包，{@code @Order(1)} 显式声明先于网关兜底命中
+ * （对齐同仓既有 {@code CognitiveErrorAdvice}／{@code ContextBuildErrorAdvice} 先例）。</p>
  */
-@RestControllerAdvice
+@Order(1)
+@RestControllerAdvice(basePackages = {"com.chinacreator.gzcm.engine.kb"})
 public class KbErrorAdvice {
 
     /** DataAccessException（含"table does not exist"）→ 500 + ECOS-KB-050 */

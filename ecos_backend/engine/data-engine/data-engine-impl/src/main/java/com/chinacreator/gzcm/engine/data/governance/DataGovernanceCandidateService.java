@@ -734,8 +734,10 @@ public class DataGovernanceCandidateService {
      *
      * <p>治理写操作在 §7.5 下必须 fail-closed，但 §4.7.2 要求"护栏没说话"与"策略说这人不行"
      * 分态，故本方法造的异常与 {@link SecurityDenyException}（403）在 httpStatus／码面／文案
-     * 三处均不同。数据域无模块局部 advice，经网关 {@code handleDataBridge} 以 {@code ApiResponse.code}
-     * 承载 httpStatus ⇒「HTTP 面仍 200」属既有 shortfall（D-B4-52），已登记台账。</p>
+     * 三处均不同。数据域无模块局部 advice，经网关 {@code handleDataBridge} 透出——
+     * <b>#142/B4-3e-15（D-B4-52 收口）</b>后该 handler 已按携带值落状态行，本异常的真 503
+     * 与 {@link SecurityDenyException} 的真 403 在 HTTP 面上同形可分；原「HTTP 面仍 200」
+     * shortfall（D-B4-52）已闭合。</p>
      */
     private static DataBridgeException abacUnavailable(String action) {
         return new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,

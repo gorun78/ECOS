@@ -1,10 +1,10 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
-import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
+import com.chinacreator.gzcm.engine.data.governance.SecurityDenyException;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -22,7 +22,8 @@ import java.util.stream.Collectors;
  * Pipeline 定义管理服务实现 — 基于 JdbcTemplate 持久化。
  * <p>
  * 强类型契约（XxxSaveDTO/XxxVO/XxxQuery），异常统一走 DataBridgeException 体系
- * （BusinessException/NotFoundException/ValidationException），日志分级，不打印敏感信息。
+ * （ValidationException／{@link SecurityDenyException}／{@link DataBridgeException} 直投），
+ * 日志分级，不打印敏感信息。
  * 定时调度走 runtime-task（TaskSchedulerService），遵循架构规则 2.3。
  * 写操作异步审计 + 敏感字段脱敏 + ABAC 裁决统一收敛 {@link PipelineSecurityService}（架构铁律 §2.4）。
  *
@@ -169,6 +170,12 @@ public class PipelineServiceImpl implements PipelineService {
      * 现按 {@code verdict()} 分态：DENY 维持原 403 文案外形（API/行为不变），
      * UNEVALUATED 落 503 + {@code ECOS-SEC-501} 机读码。</p>
      *
+     * <p><b>#142/B4-3e-15（差距 D-B4-53）</b>：DENY 腿收口前投 {@code BusinessException(403, …)}，
+     * 但该异常把 httpStatus 钉成 400（403 只落进 body 的 {@code code} 字段），于是"策略拒绝"
+     * 在状态行上与参数错误同形，前端按 {@code res.status} 分态的通道读不到 403。现改投本域
+     * 专用拒绝型 {@link SecurityDenyException}（§7.5 写操作裁决拒绝，403/403），
+     * body 三字段一字未动，状态行 400→403。</p>
+     *
      * @param id Pipeline 定义 ID
      */
     public void checkAbacBeforeExecute(String id) {
@@ -176,15 +183,16 @@ public class PipelineServiceImpl implements PipelineService {
         switch (result.verdict()) {
             case ALLOW -> {
             }
-            case DENY -> throw new BusinessException(403, "Pipeline 执行被 ABAC 策略拒绝: " + result.reason());
+            case DENY -> throw new SecurityDenyException("Pipeline 执行被 ABAC 策略拒绝: " + result.reason());
             case UNEVALUATED -> throw abacUnavailable("pipeline.execute");
         }
     }
 
     /**
      * UNEVALUATED 的落码出口（503 + 机读码取 {@link RlsExecutionContract} 单源常量，禁本类字面量）。
-     * 数据域无模块局部 advice，异常经网关 {@code handleDataBridge} 以 {@code ApiResponse.code}
-     * 承载 httpStatus；状态串在本方法起即与 403 分态。HTTP 面保真属既有 shortfall，已登记台账。
+     * 数据域无模块局部 advice，异常经网关 {@code handleDataBridge} 透出——
+     * <b>#142/B4-3e-15（D-B4-52）后</b>：该 handler 已按携带值落状态行，故 503 真出现在
+     * HTTP 面上，与 DENY 腿的 403 在状态行／body 码面／文案三处均不同形。
      */
     private static DataBridgeException abacUnavailable(String action) {
         return new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,

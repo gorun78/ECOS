@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
-import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
+import com.chinacreator.gzcm.engine.data.governance.SecurityDenyException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
  * <ul>
  *   <li>updateDefinition 定义不存在 → NotFoundException</li>
  *   <li>deleteDefinition 逻辑删除 + 审计（架构铁律 §2.4 第 5 条）</li>
- *   <li>checkAbacBeforeExecute security DENY → BusinessException(403)（§2.4 第 6 条）</li>
+ *   <li>checkAbacBeforeExecute security DENY → {@link SecurityDenyException}（403 真状态承载，§2.4 第 6 条）</li>
  *   <li>listExecutions 页大小上限 200 / 页参数下限 1（SQL 规范 §六）</li>
  * </ul>
  *
@@ -91,13 +91,16 @@ class PipelineServiceImplTest {
     }
 
     @Test
-    @DisplayName("checkAbacBeforeExecute — security DENY → BusinessException errorCode=403（§2.4 ⑥ 默认 DENY 可达）")
+    @DisplayName("checkAbacBeforeExecute — security DENY → SecurityDenyException 403/403（§2.4 ⑥ 默认 DENY 可达，D-B4-53）")
     void abacDenyBlocksExecution() {
         when(securityService.evaluateExecute("p-1"))
                 .thenReturn(PipelineSecurityService.AllowedResult.deny("DENY_BY_POLICY"));
 
-        BusinessException ex = assertThrows(BusinessException.class,
+        SecurityDenyException ex = assertThrows(SecurityDenyException.class,
                 () -> service().checkAbacBeforeExecute("p-1"));
+        assertEquals(403, ex.getHttpStatus(),
+                "ABAC DENY 必须由 403 状态码承载（B4-3e-15 前投 BusinessException(403) ⇒ 状态行恒 400），实际 httpStatus="
+                        + ex.getHttpStatus());
         assertEquals(403, ex.getErrorCode(),
                 "ABAC DENY 必须以 403 业务码透出，实际 errorCode=" + ex.getErrorCode());
         assertTrue(ex.getMessage().contains("POLICY") || ex.getMessage().contains("DENY_BY_POLICY"),
@@ -122,9 +125,9 @@ class PipelineServiceImplTest {
                 () -> service().checkAbacBeforeExecute("p-1"));
 
         assertEquals(503, ex.getHttpStatus(),
-                "不可用与策略拒绝的状态串必异：DENY 那条是 403 BusinessException，本条必须 503");
+                "不可用与策略拒绝的状态串必异：DENY 那条是 403 SecurityDenyException，本条必须 503");
         assertTrue(ex.getMessage().startsWith("ECOS-SEC-501"), "机读码取 RlsExecutionContract 单源");
-        assertFalse(ex instanceof BusinessException, "不可用态不得复用策略拒绝的异常形态");
+        assertFalse(ex instanceof SecurityDenyException, "不可用态不得复用策略拒绝的异常形态");
     }
 
     @Test

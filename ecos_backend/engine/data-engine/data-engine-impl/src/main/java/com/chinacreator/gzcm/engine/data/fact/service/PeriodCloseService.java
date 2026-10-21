@@ -189,8 +189,9 @@ public class PeriodCloseService {
      * UNEVALUATED 的落码出口（503 + 机读码取 {@link RlsExecutionContract} 单源常量，禁本类字面量）。
      *
      * <p>与本体/KB 腿同一形态：不可用态的状态串在本方法起就与 403 策略拒绝分开。
-     * 数据域没有模块局部 advice，异常经网关 {@code handleDataBridge} 以 {@code ApiResponse.code}
-     * 承载 httpStatus ⇒「HTTP 面仍 200」属既有 shortfall，已登记台账（D-B4-52）。</p>
+     * 数据域没有模块局部 advice，异常经网关 {@code handleDataBridge} 透出——
+     * <b>#142/B4-3e-15（D-B4-52 收口）</b>后该 handler 已按携带值落状态行，
+     * 故 503 真出现在 HTTP 面上；原「HTTP 面仍 200」shortfall 已闭合。</p>
      */
     private static DataBridgeException abacUnavailable(String action) {
         return new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,

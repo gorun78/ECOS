@@ -1,8 +1,8 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
-import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
+import com.chinacreator.gzcm.engine.data.governance.SecurityDenyException;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -224,8 +224,10 @@ class PipelineSecurityIntegrationTest {
                 security,
                 org.mockito.Mockito.mock(PipelineNodeTypesService.class));
 
-        BusinessException ex = assertThrows(BusinessException.class,
+        SecurityDenyException ex = assertThrows(SecurityDenyException.class,
                 () -> controller.executeDefinition("p-deny"));
+        assertEquals(403, ex.getHttpStatus(),
+                "ABAC 拒绝必须由 403 状态码承载（D-B4-53），实际 httpStatus=" + ex.getHttpStatus());
         assertEquals(403, ex.getErrorCode(),
                 "ABAC 拒绝必须以 403 业务码透出，实际 errorCode=" + ex.getErrorCode());
         assertTrue(ex.getMessage().contains("POLICY_DENY"),
@@ -234,11 +236,12 @@ class PipelineSecurityIntegrationTest {
 
     /**
      * 构造一个永远 DENY 的 PipelineService（仅用于 ABAC 拒绝路径）。
+     * 抛型与 {@code PipelineServiceImpl#checkAbacBeforeExecute} 生产腿保持一致（D-B4-53）。
      */
     private PipelineService mockSecurityDeny() {
         PipelineService svc = mock(PipelineService.class);
         // checkAbacBeforeExecute 是 void，必须用 doThrow(...).when(svc).method()
-        org.mockito.Mockito.doThrow(new BusinessException(403, "Pipeline 执行被 ABAC 策略拒绝: POLICY_DENY"))
+        org.mockito.Mockito.doThrow(new SecurityDenyException("Pipeline 执行被 ABAC 策略拒绝: POLICY_DENY"))
                 .when(svc).checkAbacBeforeExecute(anyString());
         return svc;
     }

@@ -960,10 +960,10 @@ public class OntologyCandidateService {
      * UNEVALUATED 的落码出口（503 + 机读 {@code ECOS-SEC-501}，码面取
      * {@link RlsExecutionContract} 单源常量，禁本类字面量）。
      *
-     * <p>本体域没有模块局部 advice，异常经网关 {@code handleDataBridge} 以
-     * {@code ApiResponse.code} 承载 httpStatus；不可用态与 403 策略拒绝的状态串
-     * 在本方法起就已分开，验收见 {@code OntologyCandidateServiceTest}。
-     * 「HTTP 面仍 200」属本体域缺局部 advice 的既有 shortfall，已登记台账。</p>
+     * <p>本体域没有模块局部 advice，异常经网关 {@code handleDataBridge} 透出；不可用态与
+     * 403 策略拒绝的状态串在本方法起就已分开，验收见 {@code OntologyCandidateServiceTest}。
+     * <b>#142/B4-3e-15（D-B4-52 收口）</b>后该 handler 已按携带值落状态行，
+     * 原「HTTP 面仍 200＝本体域缺局部 advice」的 shortfall 已闭合。</p>
      */
     private static DataBridgeException abacUnavailable(String action) {
         return new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
