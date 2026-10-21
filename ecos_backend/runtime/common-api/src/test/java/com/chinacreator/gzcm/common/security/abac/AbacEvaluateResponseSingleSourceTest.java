@@ -38,7 +38,8 @@ import static org.junit.jupiter.api.Assertions.fail;
  *   <li><b>消费集枚举</b>：扫描根内所有主源码经<b>引号感知</b>剥注释后仍含
  *       {@code policy-engine/evaluate} 字面量的文件＝该应答的消费方，必须与登记清单
  *       逐字相等。新增消费方不登记即红（"没人知道有第八个读侧"正是 D-B4-39 能活下来的原因）。</li>
- *   <li><b>键面单源</b>：七个读侧文件内，裁决词（{@code allow}/{@code result}/
+ *   <li><b>键面单源</b>：七个读侧文件内（建批口径；#142/B4-3e-8 收口 D-B4-43 后为八个，工具腿 {@code CheckPermissionTool}
+ *       由透传应答原文改为三态读数，从此也受本判据约束），裁决词（{@code allow}/{@code result}/
  *       {@code decision}/{@code verdict}/{@code source}/{@code fallback}/{@code opaError}/
  *       {@code DENY_OPA_DOWN}）的<b>读形态访问器</b>（{@code .get("…")}/{@code .path("…")}/
  *       {@code .getOrDefault("…")}/{@code .containsKey("…")}/{@code .has("…")}）零命中，
@@ -100,19 +101,20 @@ class AbacEvaluateResponseSingleSourceTest {
     private static final String COGNITIVE_DECIDER =
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/cognitive2/service/backtest/SecurityPolicyReviewRoleDecider.java";
-    /** 只持端点路径、不读应答的两支（限流表 / 工具透传）。 */
+    /** 只持端点路径、不读应答的一支（限流表）。 */
     private static final String RATE_LIMIT_FILTER =
             "ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/filter/RateLimitFilter.java";
+    /** 工具透传腿：#142/B4-3e-8（D-B4-43）前只持路径不读数，现改为三态归一读侧。 */
     private static final String CHECK_PERMISSION_TOOL =
             "ecos_backend/services/agent-service/src/main/java/com/chinacreator/gzcm/services/"
                     + "agent/runtime/toolrouter/tools/CheckPermissionTool.java";
 
-    /** 真正读取应答、必须委托单源读数的七个文件（＝ D-B4-39 的受影响面）。 */
+    /** 真正读取应答、必须委托单源读数的八个文件（＝ D-B4-39 的受影响面 + 工具腿）。 */
     private static final Set<String> READERS = Set.of(
             AI_CLIENT, LLM_BRIDGE, PIPELINE_SVC, KB_CLIENT, ONTOLOGY_CLIENT,
-            WORKSPACE_CLIENT, COGNITIVE_DECIDER);
+            WORKSPACE_CLIENT, COGNITIVE_DECIDER, CHECK_PERMISSION_TOOL);
 
-    /** 全量登记清单＝实测消费集（读侧 7 + 只持路径不读数 2）。 */
+    /** 全量登记清单＝实测消费集（读侧 8 + 只持路径不读数 1）。 */
     private static final Set<String> REGISTERED_CONSUMERS = Set.of(
             AI_CLIENT, LLM_BRIDGE, PIPELINE_SVC, KB_CLIENT, ONTOLOGY_CLIENT,
             WORKSPACE_CLIENT, COGNITIVE_DECIDER, RATE_LIMIT_FILTER, CHECK_PERMISSION_TOOL);
@@ -259,14 +261,14 @@ class AbacEvaluateResponseSingleSourceTest {
                 "policy-engine/evaluate 消费集与登记清单不符。新增消费方＝又一个没人知道的读侧，"
                         + "必须先把它纳进本批验收 2/3（D-B4-39 的成因形态）；"
                         + "实测消费集=" + consumers);
-        assertTrue(consumers.containsAll(READERS), "七个读侧咽喉有文件掉出消费集");
+        assertTrue(consumers.containsAll(READERS), "八个读侧咽喉有文件掉出消费集");
     }
 
     // ── 验收 2：读侧键面零内联 ──────────────────────────────────────────────
 
     @Test
     @Timeout(value = 120)
-    @DisplayName("七个读侧文件内裁决键面零裸读：读形态访问器与兜底取值字面量都不得出现")
+    @DisplayName("八个读侧文件内裁决键面零裸读：读形态访问器与兜底取值字面量都不得出现")
     void readersCarryNoInlineVerdictKeys() {
         List<Scanned> scanned = backendMainSources();
         Map<String, String> byRel = new TreeMap<>();
@@ -274,7 +276,7 @@ class AbacEvaluateResponseSingleSourceTest {
             if (READERS.contains(s.relPath())) byRel.put(s.relPath(), s.code());
         }
         assertEquals(READERS.size(), byRel.size(),
-                "读侧文件未全部进入扫描结果（应为 7 个），不得对缺文件默认放行: " + byRel.keySet());
+                "读侧文件未全部进入扫描结果（应为 8 个），不得对缺文件默认放行: " + byRel.keySet());
 
         Map<String, Set<String>> violations = new TreeMap<>();
         for (Map.Entry<String, String> e : byRel.entrySet()) {
@@ -303,6 +305,10 @@ class AbacEvaluateResponseSingleSourceTest {
         // UNEVALUATED 同值，拿它做布尔结论即把"护栏没说话"折成"策略拒绝"。
         expected.put(WORKSPACE_CLIENT, List.of("AbacEvaluateResponseContract.verdictOf("));
         expected.put(COGNITIVE_DECIDER, List.of("AbacEvaluateResponseContract.verdictOfTree",
+                "AbacEvaluateResponseContract.Verdict"));
+        // #142/B4-3e-8（D-B4-43）：CheckPermission 工具腿收口前把应答原文透传给 LLM（零读数），
+        // 现改取三态并只回载荷 —— 它从此也是读侧，委托被摘掉即回到"模型看到一坨 envelope"的形态。
+        expected.put(CHECK_PERMISSION_TOOL, List.of("AbacEvaluateResponseContract.verdictOf",
                 "AbacEvaluateResponseContract.Verdict"));
 
         for (Map.Entry<String, List<String>> e : expected.entrySet()) {

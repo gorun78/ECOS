@@ -32,6 +32,12 @@
             <artifactId>runtime-core</artifactId>
             <version>${databridge.version}</version>
         </dependency>
+        <!-- #142/B4-3e-8 (D-B4-43): 工具出向调用的 base-url 唯一寻址出口（route-manifest 两态寻址单源） -->
+        <dependency>
+            <groupId>com.chinacreator.gzcm</groupId>
+            <artifactId>runtime-access</artifactId>
+            <version>${databridge.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
