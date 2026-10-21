@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.runtime.llm.gateway;
 
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.runtime.llm.config.LLMGatewayProperties;
 import com.chinacreator.gzcm.runtime.llm.security.SecurityEngineBridge;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -159,8 +160,12 @@ class AiFaultInjectionIT {
         setField(gateway, "llmGatewayProperties", properties);
 
         SecurityEngineBridge bridge = Mockito.mock(SecurityEngineBridge.class);
-        Mockito.when(bridge.evaluate(Mockito.anyString(), Mockito.nullable(String.class),
-                Mockito.anyString(), Mockito.<Map<String, Object>>any())).thenReturn(abacAllow);
+        // #142/B4-3e-14：桥的裁决出口已改三态（evaluateVerdict）。本夹具只关心"DENY 腿 0 重试"，
+        // 故布尔入参在这里显式映射成 DENY（不是 UNEVALUATED —— 那是另一条腿，见 GatewayAbacModeTest）。
+        Mockito.when(bridge.evaluateVerdict(Mockito.anyString(), Mockito.nullable(String.class),
+                Mockito.anyString(), Mockito.<Map<String, Object>>any()))
+                .thenReturn(abacAllow ? AbacEvaluateResponseContract.Verdict.ALLOW
+                        : AbacEvaluateResponseContract.Verdict.DENY);
         Mockito.when(bridge.resolveSecret(Mockito.anyString(), Mockito.anyString()))
                 .thenReturn("itest-provider-key");
         setField(gateway, "securityEngineBridge", bridge);

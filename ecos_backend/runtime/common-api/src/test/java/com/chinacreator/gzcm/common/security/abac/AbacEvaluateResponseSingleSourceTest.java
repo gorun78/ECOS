@@ -295,8 +295,11 @@ class AbacEvaluateResponseSingleSourceTest {
     void everyReaderDelegatesToTheContract() {
         Map<String, List<String>> expected = new LinkedHashMap<>();
         expected.put(AI_CLIENT, List.of("AbacEvaluateResponseContract.verdictOf"));
-        expected.put(LLM_BRIDGE, List.of("AbacEvaluateResponseContract.verdictOf",
-                "AbacEvaluateResponseContract.Verdict"));
+        // #142/B4-3e-14：桥侧读数钉到 verdictOf( 并钉三态出口签名在位
+        // （只验"读了单源"验不出"读完成布尔又折叠掉"，故 evaluateVerdict 这一段也要在面）。
+        expected.put(LLM_BRIDGE, List.of("AbacEvaluateResponseContract.verdictOf(",
+                "AbacEvaluateResponseContract.Verdict",
+                "public Verdict evaluateVerdict("));
         // #142/B4-3e-13（D-B4-44 第三腿）：pipeline 三支裁决改取三态，AllowedResult 携带 verdict，
         // 不可用态由消费侧落成 503 ECOS-SEC-501（§4.7.2），不再经布尔 helper。
         expected.put(PIPELINE_SVC, List.of("AbacEvaluateResponseContract.verdictOf(",
@@ -373,10 +376,19 @@ class AbacEvaluateResponseSingleSourceTest {
      * 三支调用点的布尔结论改取 {@code verdictOf} 三态，并把 {@code Verdict} 装进
      * {@code AllowedResult} 往外传；四个消费点（pipeline 执行、关账、治理候选 approve/apply）
      * 按 §4.7.2 分态——DENY 保持原 403 形态，UNEVALUATED 落 503＋{@code ECOS-SEC-501}，
-     * 故从本清单删项。余一支（{@code LLM_BRIDGE}）仍在册。</p>
+     * 故从本清单删项。</p>
+     *
+     * <p>#142/B4-3e-14 收口末支（llm-gateway 桥 {@code LLM_BRIDGE}）：
+     * {@code SecurityEngineBridge} 的 {@code private boolean isExplicitAllow(…)} 连声明带调用
+     * 一并删除，{@code evaluate} 改为 {@code evaluateVerdict} 三态外传；消费方
+     * {@code LLMGatewayImpl#abacVerdictForLlmCall} 按 §4.7.2 分面——DENY 保持
+     * {@code GUARDRAIL_DENIED}(403) 原文案，UNEVALUATED 落
+     * {@code GUARDRAIL_FAIL_CLOSED}(503)＋{@code ECOS-SEC-501} 码面，审计结果位改记
+     * {@link AbacEvaluateResponseContract.Verdict} 原文。<b>清单至此清空</b>：
+     * 折叠面归零后本棘轮只剩"新增即红 + 六支不得回归"两个作用，
+     * 变异取证见台账 v1.0.96。</p>
      */
-    private static final Set<String> UNEVALUATED_FOLDING_SITES = Set.of(
-            LLM_BRIDGE);
+    private static final Set<String> UNEVALUATED_FOLDING_SITES = Set.of();
 
     @Test
     @Timeout(value = 120)
@@ -393,9 +405,9 @@ class AbacEvaluateResponseSingleSourceTest {
         assertEquals(UNEVALUATED_FOLDING_SITES, found.keySet(),
                 "ABAC 不可用折叠面与在册清单不符（新增未登记＝又一个没人知道的假 403；"
                         + "收口未删项＝棘轮失效）。实测=" + found);
-        // 已闭合的五支不得回归（同一条判据对它们必须为假）
+        // 已闭合的六支不得回归（同一条判据对它们必须为假）
         for (String closed : List.of(COGNITIVE_DECIDER, WORKSPACE_CLIENT, KB_CLIENT,
-                ONTOLOGY_CLIENT, PIPELINE_SVC)) {
+                ONTOLOGY_CLIENT, PIPELINE_SVC, LLM_BRIDGE)) {
             assertNull(booleanConclusionShape(codeOf(closed)),
                     closed + " 退回布尔 helper ⇒ D-B4-41／D-B4-44 复发");
         }

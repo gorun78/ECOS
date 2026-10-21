@@ -52,16 +52,19 @@ import java.util.concurrent.TimeUnit;
  *       经 {@code ISecretService.getSecretValue} 或 {@code IDataEncryptionService.decrypt}
  *       （security-engine crypto 域）还原明文密钥，<b>仅在本方法返回值中短暂存在</b>，
  *       日志/审计一律只出掩码引用。</li>
- *   <li><b>ABAC 裁决</b>：{@link #evaluate(String, String, String, Map)} 经 security-engine
- *       {@code POST /api/v1/security/policy-engine/evaluate}（{@link #POLICY_TIMEOUT_MS} 预算）。</li>
+ *   <li><b>ABAC 裁决</b>：{@link #evaluateVerdict(String, String, String, Map)} 经 security-engine
+ *       {@code POST /api/v1/security/policy-engine/evaluate}（{@link #POLICY_TIMEOUT_MS} 预算），
+ *       给出 {@link Verdict} 三态 —— 不可用（寻址失败／底座缺席／非 2xx／不可解析／调用异常）
+ *       与策略拒绝（DENY）<b>不同值</b>（§4.7.2「不可用 ≠ 无权限」，#142/B4-3e-14 收口 D-B4-44 末腿）。</li>
  *   <li><b>审计</b>：{@link #audit(String, String, String, String)} 优先 runtime-event
  *       {@code EventBusService}，其次 {@code kafkaTemplate} 反射兜底，topic =
  *       {@link KafkaTopics#AUDIT}（铁律 §2.4#5 新代码走 Kafka）。</li>
  * </ol>
  *
  * <p>🔴 fail-closed（铁律 §2.4#6）：security-engine 类/bean 不在 classpath、REST 非 2xx、
- * 超时、响应不可解析、引用无法解析 — 一律返回「不可用」（null / false）并 {@code log.warn}，
- * 由调用方默认 DENY；<b>绝不回退到调用方自报的明文密钥，绝不放行直连</b>。</p>
+ * 超时、响应不可解析、引用无法解析 — 一律返回「不可用」（密钥＝{@code null}／裁决＝
+ * {@link Verdict#UNEVALUATED}）并 {@code log.warn}，由调用方拒绝放行；
+ * <b>绝不回退到调用方自报的明文密钥，绝不放行直连，也绝不把不可用冒充策略拒绝</b>（§4.7.2）。</p>
  */
 @Component
 public class SecurityEngineBridge {
@@ -211,34 +214,45 @@ public class SecurityEngineBridge {
         }
     }
 
-    // ═══════════════ 2. ABAC 裁决（security-engine REST，默认 DENY） ═══════════════
+    // ═══════════════ 2. ABAC 裁决（security-engine REST，三态 fail-closed） ═══════════════
 
     /**
-     * 经 security-engine REST {@value #PATH_POLICY_EVALUATE} 做操作授权裁决。
+     * 经 security-engine REST {@value #PATH_POLICY_EVALUATE} 做操作授权裁决，<b>对外给出三态</b>。
      *
      * <p>F06-05 要点 4：两态（gateway fat-JAR / 独立 service）一致走 HTTP，不再有
      * "security 类不在 classpath 即恒 DENY" 与 "配置开关可关裁决" 两个绕过面。
-     * 铁律 §2.4#4/#6：不可用 / 超时 / 非明确 ALLOW → 一律 false（默认 DENY）。</p>
+     * 铁律 §2.4#4/#6：拿不到明确 ALLOW 一律不放行（fail-closed）。</p>
+     *
+     * <p><b>#142/B4-3e-14（差距 D-B4-44 末腿）</b>：收口前本方法签名是 {@code boolean}，
+     * 内部虽已委托 {@link AbacEvaluateResponseContract#verdictOf} 取三态，出参却把
+     * DENY 与 UNEVALUATED 压成同一个 {@code false} —— 消费方 {@code LLMGatewayImpl}
+     * 只能把"护栏没说话"（寻址失败／底座缺席／HTTP 非 2xx／响应不可解析／调用异常）
+     * 一并报成策略拒绝，违 §4.7.2「不可用 ≠ 无权限」。现在三态原样外传，
+     * 分态落码由消费侧做；本类<b>不得</b>再提供布尔结论形态的出口。</p>
+     *
+     * @return {@link Verdict#ALLOW} 仅当应答明确放行；{@link Verdict#DENY} 仅当应答明确拒绝；
+     *         其余（不可达／非 2xx／无 data 段／键面不可识别／兜底态）为 {@link Verdict#UNEVALUATED}
      */
-    public boolean evaluate(String callerId, String tenantId, String action, Map<String, Object> attrs) {
+    public Verdict evaluateVerdict(String callerId, String tenantId, String action,
+                                   Map<String, Object> attrs) {
         String baseUrl = securityBaseUrl();
         if (baseUrl.isEmpty()) {
             log.warn("[llm-gateway] security base URL 不可得（service.security.base-url 未配置且 route-manifest 寻址失败），"
-                    + "ABAC 裁决默认 DENY: action={}, caller={}", action, callerId);
-            return false;
+                    + "护栏未参与裁决（UNEVALUATED，按 fail-closed 拒绝）: action={}, caller={}", action, callerId);
+            return Verdict.UNEVALUATED;
         }
         OkHttpClient base;
         try {
             base = httpClientProvider == null ? null : httpClientProvider.getIfAvailable();
         } catch (Exception e) {
-            log.warn("[llm-gateway] llm-gateway 底座 OkHttpClient 不可解析 — ABAC 裁决不可用，默认 DENY: action={}, reason={}",
+            log.warn("[llm-gateway] llm-gateway 底座 OkHttpClient 不可解析 — 裁决不可用（UNEVALUATED）: action={}, reason={}",
                     action, rootMessage(e));
-            return false;
+            return Verdict.UNEVALUATED;
         }
         if (base == null) {
-            log.warn("[llm-gateway] llm-gateway 底座 OkHttpClient 未装配 — ABAC 裁决不可用，默认 DENY: action={}, caller={}",
+            log.warn("[llm-gateway] llm-gateway 底座 OkHttpClient 未装配 — 裁决不可用（UNEVALUATED）: action={}, caller={}",
                     action, callerId);
-            return false;
+            return Verdict.UNEVALUATED;
         }
         Map<String, Object> body = evaluateBody(callerId, tenantId, action, attrs);
         try {
@@ -254,16 +268,16 @@ public class SecurityEngineBridge {
                     .build();
             try (Response resp = client.newCall(httpReq).execute()) {
                 if (!resp.isSuccessful() || resp.body() == null) {
-                    log.warn("[llm-gateway] security-engine 裁决 HTTP 异常（默认 DENY）: action={}, code={}",
+                    log.warn("[llm-gateway] security-engine 裁决 HTTP 异常（UNEVALUATED，非策略拒绝）: action={}, code={}",
                             action, resp.code());
-                    return false;
+                    return Verdict.UNEVALUATED;
                 }
-                return isExplicitAllow(parseDataSegment(resp.body().string()), action, callerId);
+                return logUnevaluatedOrDeny(parseDataSegment(resp.body().string()), action, callerId);
             }
         } catch (Exception e) {
-            log.warn("[llm-gateway] security-engine 裁决调用异常（默认 DENY）: action={}, reason={}",
+            log.warn("[llm-gateway] security-engine 裁决调用异常（UNEVALUATED，非策略拒绝）: action={}, reason={}",
                     action, rootMessage(e));
-            return false;
+            return Verdict.UNEVALUATED;
         }
     }
 
@@ -283,39 +297,42 @@ public class SecurityEngineBridge {
         return body;
     }
 
-    /** 响应 {@code data} 段；缺段/不可解析 → null（由 {@link #isExplicitAllow} 判 DENY）。 */
+    /** 响应 {@code data} 段；缺段/不可解析 → null（单源读数对 null 给 UNEVALUATED）。 */
     @SuppressWarnings("unchecked")
     private Map<String, Object> parseDataSegment(String json) {
         try {
             Map<String, Object> resp = objectMapper.readValue(json, Map.class);
             return resp.get("data") instanceof Map<?, ?> map ? (Map<String, Object>) map : null;
         } catch (Exception e) {
-            log.warn("[llm-gateway] security-engine 裁决响应不可解析（默认 DENY）: {}", rootMessage(e));
+            log.warn("[llm-gateway] security-engine 裁决响应不可解析（UNEVALUATED，非策略拒绝）: {}", rootMessage(e));
             return null;
         }
     }
 
     /**
-     * 恰为显式 ALLOW 才放行 —— 裁决键面改读
-     * {@link AbacEvaluateResponseContract#verdictOf(Object)}（#142/B4-3e-4，D-B4-37）。
+     * 三态读数 + 未放行留痕 —— 判定面全交
+     * {@link AbacEvaluateResponseContract#verdictOf(Object)}（#142/B4-3e-4，D-B4-37），
+     * 本方法只负责把未放行原因写进日志并<b>原样把三态传出去</b>。
      *
-     * <p>收口前本方法自带一套 {@code decision}/{@code verdict}/{@code allow}/{@code result}
-     * 内联字面量，与 ai-engine 侧同型重复，且<b>不看 {@code policyState}</b>：
-     * 护栏处于「策略未加载／OPA 不可达兜底」时它按 DENY 处理，日志里说的是
-     * "未放行"，实际是"护栏没说话"。现在两态都由单源给出，本方法只保留
-     * 未放行原因的留痕（{@link Verdict} 原文进日志，禁在此再解释一遍键面）。</p>
+     * <p>#142/B4-3e-14（D-B4-44 末腿）：收口前本方法签名是 {@code private boolean
+     * isExplicitAllow(…)}，三态在方法内部就被压成布尔，调用方无从分态 —— 那正是差距
+     * D-B4-41 在本支的落位形态。现在<b>禁</b>在本类再出现"对外只回布尔"的裁决出口，
+     * 由 {@code AbacEvaluateResponseSingleSourceTest#unevaluatedFoldingSitesAreRatcheted}
+     * 的折叠面棘轮钉住（清单已清空，本文件进入"已闭合不得回归"循环）。</p>
+     *
+     * <p>{@link Verdict} 原文进日志，禁在此再解释一遍键面。</p>
      */
-    private boolean isExplicitAllow(Map<String, Object> data, String action, String callerId) {
+    private Verdict logUnevaluatedOrDeny(Map<String, Object> data, String action, String callerId) {
         Verdict verdict = AbacEvaluateResponseContract.verdictOf(data);
-        if (verdict == Verdict.ALLOW) return true;
+        if (verdict == Verdict.ALLOW) return verdict;
         if (data == null) {
-            log.warn("[llm-gateway] security-engine 裁决无 data 段（默认 DENY）: action={}, caller={}",
-                    action, callerId);
+            log.warn("[llm-gateway] security-engine 裁决无 data 段（护栏未说话，{}）: action={}, caller={}",
+                    verdict, action, callerId);
         } else {
-            log.warn("[llm-gateway] security-engine 裁决未放行（默认 DENY）: action={}, caller={}, verdict={}",
+            log.warn("[llm-gateway] security-engine 裁决未放行: action={}, caller={}, verdict={}",
                     action, callerId, verdict);
         }
-        return false;
+        return verdict;
     }
 
     // ═══════════════ 3. 审计（Kafka ecos.audit，经 runtime-event 横切出口） ═══════════════

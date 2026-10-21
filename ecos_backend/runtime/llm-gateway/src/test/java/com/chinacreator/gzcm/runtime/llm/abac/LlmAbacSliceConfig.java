@@ -24,7 +24,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
  * {@link #securityEngineBridge} 通过 bean 依赖在<b>装配期</b>把桩的实时端口
  * 注入base-url —— 于是「桩端口写死」与「@Value 读隔离 yml」两个假阳性路径
  * （X-73/X-86）都被堵死：桩是边界、基址来自边界，测试只翻 verdict 而<b>不</b>
- * 伪造 {@code evaluate} 返回布尔（R-18 反假阳性口径，与
+ * 伪造 {@code evaluateVerdict} 返回三态（R-18 反假阳性口径，与
  * {@code SecurityEngineBridgeAbacTest.Harness} 同源）。</p>
  */
 @Configuration

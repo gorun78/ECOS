@@ -2,6 +2,8 @@ package com.chinacreator.gzcm.runtime.llm.gateway;
 
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract.Verdict;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.common.trace.EcosTraceContext;
 import com.chinacreator.gzcm.runtime.llm.config.LLMGatewayProperties;
 import com.chinacreator.gzcm.runtime.llm.metrics.LlmUsageMeter;
@@ -67,7 +69,8 @@ public class LLMGatewayImpl implements LLMGateway {
 
     /**
      * security-engine 桥（密钥解析 / ABAC 裁决 / 审计，PMO-74 N14 + 铁律 §2.4）。
-     * required=false：未装配视为 security 不可用 → 默认 DENY（不放行直连、不回退明文）。
+     * required=false：未装配视为护栏未参与裁决（{@link Verdict#UNEVALUATED}）
+     * → 拒绝外发、不回退明文（#142/B4-3e-14：不可用态，冒充策略拒绝违 §4.7.2）。
      */
     @Autowired(required = false)
     private SecurityEngineBridge securityEngineBridge;
@@ -247,10 +250,11 @@ public class LLMGatewayImpl implements LLMGateway {
                     caller, request.getModel());
         }
 
-        // ABAC 裁决（security 不可用/未放行 → 默认 DENY）
-        if (!abacAllowLlmCall(caller, provider, request.getModel())) {
-            return ChatResponse.fail(AiErrorClass.GUARDRAIL_DENIED,
-                    "LLM 调用被拒绝：security-engine ABAC 裁决未放行（默认 DENY，不降级放行）");
+        // ABAC 裁决（三态分面，#142/B4-3e-14：DENY＝策略拒绝／UNEVALUATED＝护栏没说话，两者码面必异）
+        Verdict abacVerdict = abacVerdictForLlmCall(caller, provider, request.getModel());
+        if (abacVerdict != Verdict.ALLOW) {
+            return ChatResponse.fail(guardrailErrorClassFor(abacVerdict),
+                    guardrailReasonFor(abacVerdict, "LLM"));
         }
 
         String apiKey = resolveProviderApiKey(request.getApiKeyRef(), caller,
@@ -379,8 +383,9 @@ public class LLMGatewayImpl implements LLMGateway {
         // 密钥与 chat 同闸（PMO-74 N14）：只经 security-engine 密钥服务取，取不到默认 DENY
         String embedCaller = request.getCallerId() != null && !request.getCallerId().isBlank()
                 ? request.getCallerId() : "service:llm-gateway";
-        if (!abacAllowLlmCall(embedCaller, provider, model)) {
-            return EmbeddingResponse.fail("embedding 调用被拒绝：security-engine ABAC 裁决未放行（默认 DENY）");
+        Verdict embedVerdict = abacVerdictForLlmCall(embedCaller, provider, model);
+        if (embedVerdict != Verdict.ALLOW) {
+            return EmbeddingResponse.fail(guardrailReasonFor(embedVerdict, "embedding"));
         }
         String embedApiKey = resolveProviderApiKey(request.getApiKeyRef(), embedCaller,
                 provider + ":" + model);
@@ -493,12 +498,20 @@ public class LLMGatewayImpl implements LLMGateway {
 
     /**
      * LLM 调用前 ABAC 裁决（铁律 §2.4#4，F06-05 要点 4：<b>无降级开关</b>）。
-     * security 不可用 / 超时 / 明确拒绝 → false（默认 DENY）。
+     *
+     * <p><b>#142/B4-3e-14（差距 D-B4-44 末腿）</b>：收口前本方法把桥侧三态折成布尔
+     * （{@code allow ? "ALLOW" : "DENY"} 进审计、调用方一律报"未放行"），于是
+     * 「护栏没说话」（桥未装配／寻址失败／底座缺席／非 2xx／不可解析／调用异常）与
+     * 「策略说不行」在 LLM 出口同值，违 §4.7.2「不可用 ≠ 无权限」。现在三态原样外传，
+     * 由 {@link #guardrailErrorClassFor}／{@link #guardrailReasonFor} 分态落码面；
+     * 审计结果位同样记 {@link Verdict} 原文，禁在此折叠。</p>
+     *
+     * <p>fail-closed 不变：只有 {@link Verdict#ALLOW} 才放行，其余一律拒绝外发。</p>
      */
-    private boolean abacAllowLlmCall(String caller, String provider, String model) {
+    private Verdict abacVerdictForLlmCall(String caller, String provider, String model) {
         if (securityEngineBridge == null) {
-            log.warn("[llm-gateway] SecurityEngineBridge 未装配 — ABAC 裁决不可用，默认 DENY: caller={}", caller);
-            return false;
+            log.warn("[llm-gateway] SecurityEngineBridge 未装配 — 护栏未参与裁决（UNEVALUATED，按 fail-closed 拒绝）: caller={}", caller);
+            return Verdict.UNEVALUATED;
         }
         Map<String, Object> attrs = new LinkedHashMap<>();
         attrs.put("provider", provider);
@@ -509,9 +522,43 @@ public class LLMGatewayImpl implements LLMGateway {
         } catch (Exception ignored) {
             // 无租户上下文 → 由桥侧回退 default
         }
-        boolean allow = securityEngineBridge.evaluate(caller, tenantId, "llm:chat", attrs);
-        securityEngineBridge.audit(caller, "LLM_CHAT_ABAC", provider + ":" + model, allow ? "ALLOW" : "DENY");
-        return allow;
+        Verdict verdict = securityEngineBridge.evaluateVerdict(caller, tenantId, "llm:chat", attrs);
+        securityEngineBridge.audit(caller, "LLM_CHAT_ABAC", provider + ":" + model, verdict.name());
+        return verdict;
+    }
+
+    /**
+     * 未放行态 → AI 域错误分类（详细设计-06 §3.2 / §5.5 冻结码表）。
+     *
+     * <p>DENY＝403 {@link AiErrorClass#GUARDRAIL_DENIED}；UNEVALUATED＝503
+     * {@link AiErrorClass#GUARDRAIL_FAIL_CLOSED}（该分类的注释即「护栏不可用
+     * （超时/异常/非明确 ALLOW 三态）」）。码面由 {@link AiErrorClass} 单源给出，
+     * <b>禁</b>在本类写 {@code ECOS-AI-*} 字面量。</p>
+     */
+    static AiErrorClass guardrailErrorClassFor(Verdict verdict) {
+        return verdict == Verdict.DENY
+                ? AiErrorClass.GUARDRAIL_DENIED
+                : AiErrorClass.GUARDRAIL_FAIL_CLOSED;
+    }
+
+    /**
+     * 未放行文案分态（§4.7.2）。
+     *
+     * <p>DENY 保持收口前的"策略拒绝"文案不变；UNEVALUATED 走不可用语义并带跨域机读码
+     * {@link RlsExecutionContract#SEC_UNAVAILABLE_CODE}／
+     * {@link RlsExecutionContract#SEC_UNAVAILABLE_HTTP}（与 pipeline／本体／KB 三支同码面）。
+     * {@code EmbeddingResponse} 只有 {@code errorMsg} 一栏，码面必须写进文案才可辨态。</p>
+     */
+    static String guardrailReasonFor(Verdict verdict, String scene) {
+        if (verdict == Verdict.DENY) {
+            return scene + " 调用被拒绝：security-engine ABAC 裁决未放行（默认 DENY，不降级放行）";
+        }
+        return scene + " 调用已暂停：security-engine 未给出裁决（"
+                + guardrailErrorClassFor(verdict).errorCode() + " HTTP "
+                + guardrailErrorClassFor(verdict).httpStatus() + "／"
+                + RlsExecutionContract.SEC_UNAVAILABLE_CODE + " HTTP "
+                + RlsExecutionContract.SEC_UNAVAILABLE_HTTP + "），"
+                + "按 fail-closed 拒绝，非「用户无权限」(§4.7.2 / 铁律 §2.4)";
     }
 
     /**

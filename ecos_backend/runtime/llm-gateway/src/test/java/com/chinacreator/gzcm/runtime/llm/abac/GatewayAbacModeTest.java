@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.runtime.llm.abac;
 
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
@@ -16,6 +17,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -33,6 +35,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>本用例与 ai-engine-impl 侧 {@code AiTestHarnessSmokeTest}（fat-JAR 态）成对：
  * 同一条「DENY 不静默跳过」契约在两种部署形态各跑一次，杜绝"gateway 态测过
  * = 能力存在"的假阳性。</p>
+ *
+ * <p><b>#142/B4-3e-14（差距 D-B4-44 末腿）</b>：新增
+ * {@link #denyAndUnavailableRenderDifferentStatesOnSameRequest()} 钉住 §4.7.2 的不变式 ——
+ * 同一条请求在「策略说不行」与「护栏没说话」两态下，错误分类／码面／原因文案必异。
+ * 收口前桥把三态折成布尔、消费方一律报 GUARDRAIL_DENIED，本用例即使存在也只能断言两态同值；
+ * 原 {@code serviceModeSecurityFaultsStillDenyNotSkip} 把该折叠写成"刻意设计"，
+ * 现已按 §4.7.2 改判为不可用态（FAIL_CLOSED／503）。</p>
  */
 @SpringBootTest(classes = LlmAbacSliceConfig.class,
         webEnvironment = SpringBootTest.WebEnvironment.MOCK)
@@ -74,22 +83,50 @@ class GatewayAbacModeTest {
     }
 
     @Test
-    @DisplayName("service 态底座故障（限流 429 / 不可解析）同样 deny-not-skip：不上成功面、不外发")
-    void serviceModeSecurityFaultsStillDenyNotSkip() {
-        // ABAC 咽喉是二元裁决面：security 给不出显式 ALLOW（限流 429 / 响应不可解析 / 断连）
-        // 一律折叠为不放行 → GUARDRAIL_DENIED（deny 面），绝不静默上成功面或放行走 provider。
-        // （§3.2 的 DENY vs FAIL_CLOSED 细粒度分态由 security 桩边界层[test]承载，见 ai-engine 侧
-        //  HarnessProbeController 契约；LLM 出口这层只承诺「非放行=不上成功面」。）
+    @DisplayName("D-B4-44 末腿不变式：同一条请求在 DENY 与不可用两态下，错误分类与状态串必异（§4.7.2）")
+    void denyAndUnavailableRenderDifferentStatesOnSameRequest() {
+        ChatRequest request = request();
+
+        fakeSecurity.setVerdict(FakeSecurityHttpServer.FakeVerdict.DENY);
+        ChatResponse denied = gateway.call(request);
+
+        fakeSecurity.setVerdict(FakeSecurityHttpServer.FakeVerdict.UNSAFE_UNPARSEABLE);
+        ChatResponse unavailable = gateway.call(request);
+
+        assertFalse(denied.isSuccess(), "策略拒绝不得放行");
+        assertFalse(unavailable.isSuccess(), "护栏不可用同样不得放行（fail-closed 不因分态而放宽）");
+        assertEquals(AiErrorClass.GUARDRAIL_DENIED, denied.aiErrorClass(),
+                "DENY 腿保持收口前形态：403 策略拒绝");
+        assertEquals(AiErrorClass.GUARDRAIL_FAIL_CLOSED, unavailable.aiErrorClass(),
+                "不可用腿必须落 FAIL_CLOSED（收口前它和 DENY 同值，就是 D-B4-44 的折叠形态）");
+        assertNotEquals(denied.aiErrorClass(), unavailable.aiErrorClass(),
+                "§4.7.2「不可用 ≠ 无权限」：两态的错误分类不得相同");
+        assertNotEquals(denied.getErrorCode(), unavailable.getErrorCode(),
+                "码面（ECOS-AI-*）随分类单源漂移，两态必异");
+        assertNotEquals(denied.getErrorMsg(), unavailable.getErrorMsg(),
+                "原因文案必异：不可用态要点明「护栏没说话」，禁冒充用户无权限");
+        assertTrue(unavailable.getErrorMsg().contains(RlsExecutionContract.SEC_UNAVAILABLE_CODE),
+                "不可用态须带跨域机读码 " + RlsExecutionContract.SEC_UNAVAILABLE_CODE
+                        + "（与 pipeline／本体／KB 三支同码面）: " + unavailable.getErrorMsg());
+    }
+
+    @Test
+    @DisplayName("service 态底座故障（限流 429 / 不可解析）→ 不可用态：落 FAIL_CLOSED、不上成功面、不外发")
+    void serviceModeSecurityFaultsAreFailClosedNotDeny() {
+        // #142/B4-3e-14 订正本用例原口径：原注释声称"折叠成 deny 面"是刻意设计，
+        // 实际正是差距 D-B4-44 —— security 给不出明确裁决（限流／不可解析）＝护栏没说话，
+        // 按 §4.7.2 只能报不可用（503 FAIL_CLOSED），不得冒充策略拒绝（403）。
+        // 桩的 FakeVerdict 注释（"生产代码须映射 FAIL_CLOSED 而非 DENY"）自此与生产代码一致。
         fakeSecurity.setVerdict(FakeSecurityHttpServer.FakeVerdict.RATE_LIMITED_429);
         ChatResponse limited = gateway.call(request());
-        assertEquals(AiErrorClass.GUARDRAIL_DENIED, limited.aiErrorClass(),
-                "security 底座限流 = 未显式放行 → 坍缩到 deny 面，禁上成功面");
-        assertFalse(limited.isSuccess());
+        assertEquals(AiErrorClass.GUARDRAIL_FAIL_CLOSED, limited.aiErrorClass(),
+                "security 底座限流 = 未给出裁决 → 不可用态，禁落 403 策略拒绝");
+        assertFalse(limited.isSuccess(), "不可用同样不放行（fail-closed 不变）");
 
         fakeSecurity.setVerdict(FakeSecurityHttpServer.FakeVerdict.UNSAFE_UNPARSEABLE);
         ChatResponse unparseable = gateway.call(request());
-        assertEquals(AiErrorClass.GUARDRAIL_DENIED, unparseable.aiErrorClass(),
-                "security 响应不可解析 = 未显式放行 → 同样坍缩到 deny 面");
+        assertEquals(AiErrorClass.GUARDRAIL_FAIL_CLOSED, unparseable.aiErrorClass(),
+                "security 响应不可解析 = 未给出裁决 → 同样落不可用态");
         assertFalse(unparseable.isSuccess());
     }
 
