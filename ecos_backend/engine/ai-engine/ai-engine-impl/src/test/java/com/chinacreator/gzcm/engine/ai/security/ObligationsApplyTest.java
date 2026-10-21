@@ -94,7 +94,10 @@ class ObligationsApplyTest {
             "AiSecurityEngineClient.java",   // security 脱敏/行过滤端点的唯一出口
             "ToolObligations.java",          // 义务载荷容器（只解析结构）
             "ToolObligationApplier.java",    // 拆结果集 + 委托 security + 写回
-            "AgentToolPolicyGate.java",      // maskLiterals：SQL 字面量归一，非数据脱敏
+            // 2026-10-21 #142/B4-3e-20（收口 D-B4-60）从本清单移除 AgentToolPolicyGate.java：
+            // 它此前入列的唯一原因是私有 helper maskLiterals()（SQL 字面量归一，与数据脱敏无关），
+            // 属名单误登记；该 helper 已单源化到 runtime/common-api 的 SqlReadOnlyFloor，
+            // 本门只扫 ai-engine 生产源码，故不另立条目。清单按「只减不增」方向缩短（现命中 0 处 mask）。
             "GuardrailsServiceImpl.java",    // 片段定位 + 委托 security
             "ToolExecutorService.java",      // 仅注释提及 mask[] 义务
             "AgentLoopService.java",         // 仅变量名 masked（承载 security 返回值）

@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.security;
 
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.common.security.sql.SqlReadOnlyFloor;
 import com.chinacreator.gzcm.engine.ai.dao.ToolPermissionBindingDao;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolDecision;
@@ -15,8 +16,6 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 工具裁决闸（详细设计-06 F06-01/F06-02/F06-03；由 {@code AgentToolSqlSecurityGate} 升格改名，
@@ -40,8 +39,12 @@ import java.util.regex.Pattern;
  * <p>本类<b>不持有</b> RestTemplate：HTTP 一律经 {@link AiSecurityEngineClient}
  * （§2.5-3 底座收口，同时消掉 W148 基线里的一条 self-owned RestTemplate）。</p>
  *
- * <p>本地 SQL 地板（只读校验 + 表/列白名单）是<b>附加</b>防御：命中即 DENY（本地硬性下限），
- * 但"通过本地地板"绝不构成放行依据 —— 放行权只在 security-engine（§2.4-7 禁重复实现裁决）。</p>
+ * <p>本地 SQL 地板是<b>附加</b>防御：命中即 DENY（本地硬性下限），
+ * 但"通过本地地板"绝不构成放行依据 —— 放行权只在 security-engine（§2.4-7 禁重复实现裁决）。
+ * 其中<em>只读形态判据</em>（注释／多语句／语句头部／危险关键字／危险函数／字面量掩码／表引用
+ * 提取）自 #142/B4-3e-20 起单源在 {@link SqlReadOnlyFloor}（收口 D-B4-60「只读判据双源」），
+ * 本类只保留<em>面专属</em>的表／列白名单腿；与属主查表面 {@code PhysicalQueryGuard} 的
+ * 唯一口径差异是 {@code allowWith=true}（工具面允许 CTE）。</p>
  */
 @Component
 public class AgentToolPolicyGate {
@@ -51,21 +54,9 @@ public class AgentToolPolicyGate {
     /** ABAC 动作前缀（security 侧策略可按此授权/审计过滤）。 */
     public static final String ACTION_PREFIX = "agent:tool:";
 
-    // ── SQL 地板用静态校验（自旧 AgentToolSqlSecurityGate 平移，语义不变） ──
-    private static final Pattern COMMENT_PATTERN = Pattern.compile("--|/\\*|\\*/|#");
-    private static final Pattern TRAILING_SEMICOLON = Pattern.compile(";\\s*$");
-    private static final Pattern STRING_LITERAL = Pattern.compile("'(?:''|[^'])*'");
-    private static final Pattern DANGEROUS_KEYWORDS = Pattern.compile(
-            "(?i)\\b(?:DROP|ALTER|TRUNCATE|GRANT|REVOKE|COPY|VACUUM|ANALYZE|REINDEX|CLUSTER|"
-            + "REFRESH|CHECKPOINT|LISTEN|NOTIFY|LOCK|INSERT|UPDATE|DELETE|MERGE|CREATE|"
-            + "EXEC|EXECUTE|CALL|DO|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|PREPARE|DEALLOCATE|"
-            + "RESET|SET|SHUTDOWN|INTO)\\b");
-    private static final Pattern DANGEROUS_FUNCTIONS = Pattern.compile(
-            "(?i)\\b(?:pg_read_file|pg_read_binary_file|pg_ls_dir|pg_stat_file|pg_sleep|"
-            + "pg_advisory_lock|pg_advisory_unlock|lo_import|lo_export|dblink|"
-            + "pg_terminate_backend|pg_cancel_backend|pg_create_physical_replication_slot)\\b");
-    private static final Pattern TABLE_REF = Pattern.compile(
-            "(?i)\\b(?:from|join)\\s+([a-z_][a-z0-9_$]*(?:\\.[a-z_][a-z0-9_$]*)?)");
+    // ── SQL 地板的面专属校验（表／列白名单） ────────────────────────────
+    // 只读形态判据（注释、多语句、语句头部、危险关键字、危险函数、字面量掩码、表引用提取）
+    // 已单源化到 runtime/common-api 的 SqlReadOnlyFloor（#142/B4-3e-20 收口 D-B4-60）。
 
     private final AgentToolSqlWhitelist sqlWhitelist;
     private final AiSecurityEngineClient securityClient;
@@ -174,27 +165,11 @@ public class AgentToolPolicyGate {
 
     /** @return null = 地板通过（仍须 ABAC）；非 null = 拒绝原因 */
     private String sqlLocalFloor(String toolKey, String sql, Collection<String> boundParams) {
-        if (COMMENT_PATTERN.matcher(sql).find()) {
-            return "检测到注释符（-- /**/ #），Agent SQL 不允许注释（规避检测风险）";
+        SqlReadOnlyFloor.Decision floor = SqlReadOnlyFloor.inspect(sql, true);
+        if (!floor.allowed()) {
+            return "检测到非只读形态: " + floor.reason();
         }
-        String noTrailing = TRAILING_SEMICOLON.matcher(sql.trim()).replaceAll("");
-        if (noTrailing.indexOf(';') >= 0) {
-            return "检测到多条语句（分号拼接），仅允许单条 SELECT";
-        }
-        String upper = noTrailing.toUpperCase(Locale.ROOT);
-        if (!upper.startsWith("SELECT") && !upper.startsWith("WITH")) {
-            return "Agent 工具 SQL 仅允许 SELECT / WITH 只读查询";
-        }
-        String masked = maskLiterals(noTrailing);
-        Matcher km = DANGEROUS_KEYWORDS.matcher(masked);
-        if (km.find()) {
-            return "检测到非只读/危险关键字: " + km.group();
-        }
-        Matcher fm = DANGEROUS_FUNCTIONS.matcher(masked);
-        if (fm.find()) {
-            return "检测到文件系统/运维危险函数: " + fm.group();
-        }
-        Set<String> tables = extractTables(masked.toLowerCase(Locale.ROOT));
+        Set<String> tables = floor.tables();
         if (tables.isEmpty()) {
             return "未识别到受白名单管控的表引用（禁止无表执行或 SQL 形态超出受控范围）";
         }
@@ -229,32 +204,18 @@ public class AgentToolPolicyGate {
         return null;
     }
 
-    private String maskLiterals(String sql) {
-        return STRING_LITERAL.matcher(sql).replaceAll("' '");
-    }
-
     private Set<String> extractTables(String sql) {
-        Set<String> tables = new LinkedHashSet<>();
-        if (sql == null) return tables;
-        try {
-            String masked = maskLiterals(sql).toLowerCase(Locale.ROOT);
-            Matcher tm = TABLE_REF.matcher(masked);
-            while (tm.find()) {
-                if (tm.group(1) != null) tables.add(tm.group(1));
-            }
-        } catch (Exception e) {
-            log.debug("表引用提取失败，交由 SQL 地板拒绝: {}", e.getMessage());
-        }
-        return tables;
+        return SqlReadOnlyFloor.extractTables(sql);
     }
 
     /**
      * 受控表面（#142/B4-3d-6，D-B4-28 的取表入口）。
      *
-     * <p>列面闸需要"这次工具调用涉及哪张（些）表"来定资产基数，而本方法是全链路上
-     * <b>唯一</b>的表引用提取器（SQL 地板与 ABAC 载荷都用它）。把它只以本公共方法暴露给
-     * 咽喉，禁 {@code ToolExecutorService} 或列面闸再自写一套 {@code TABLE_REF} 解析 ——
-     * 两套解析器会对同一 SQL 给出不同表集，"该裁哪张表"于是变成第二个真值。</p>
+     * <p>列面闸需要"这次工具调用涉及哪张（些）表"来定资产基数，而表引用提取自
+     * #142/B4-3e-20 起单源在 {@link SqlReadOnlyFloor}（SQL 地板与 ABAC 载荷共用同一解析器）。
+     * 本方法只是把单源结果按本面语义暴露给咽喉，禁 {@code ToolExecutorService} 或列面闸
+     * 再自写一套 {@code FROM}/{@code JOIN} 解析 —— 两套解析器会对同一 SQL 给出不同表集，
+     * "该裁哪张表"于是变成第二个真值。</p>
      *
      * <p>返回集合的基数不在这里判定（0/1/≥2 的语义属于
      * {@link AiToolColumnSurfaceGate.Asset#of(java.util.Collection)}），本方法只保证

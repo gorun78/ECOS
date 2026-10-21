@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.security;
 
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.common.security.sql.PhysicalQueryGuard;
 import com.chinacreator.gzcm.engine.ai.dao.ToolPermissionBindingDao;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolDecision;
@@ -260,6 +261,43 @@ class AgentToolPolicyGateTest {
         assertEquals(ToolDecision.Verdict.DENY,
                 gate().review(request(), "SELECT id FROM ecos_dw.unlisted_table", List.of()).verdict());
         verify(client, never()).evaluateData(any());
+    }
+
+    @Test
+    @DisplayName("D-B4-60 对账：同一串危险 SQL 在工具面与属主查表面拿到同一句前置理由（单源，不是两套）")
+    void readOnlyFloorSharesOneSourceWithPhysicalQueryFace() throws Exception {
+        // 合流前这两套判据各有一批对方没有的词：checkpoint 只有旧工具面知道，
+        // 而 dblink_connect 在旧查表面靠裸前缀（连表名一起误拒）、在旧工具面靠具名清单（清单外即漏判）。
+        // 本例钉的是「两面命中同一句理由」——日后任何一侧私自加词或换文案，这里立刻变红。
+        for (String sql : new String[] {
+                "SELECT id FROM DW_Sales.t WHERE checkpoint = 1",
+                "SELECT dblink_connect('x') FROM DW_Sales.t",
+                "SELECT id FROM DW_Sales.t; DELETE FROM DW_Sales.t",
+                "SELECT id FROM DW_Sales.t /* cut */"}) {
+            ToolDecision d = gate().review(request(), sql, List.of());
+            PhysicalQueryGuard.Decision q = PhysicalQueryGuard.inspect(sql);
+
+            assertEquals(ToolDecision.Verdict.DENY, d.verdict(), sql);
+            assertFalse(q.allowed(), sql);
+            String shared = q.reason().substring(PhysicalQueryGuard.PREFIX.length());
+            assertTrue(d.reason().contains(shared),
+                    "工具面理由应内嵌单源那句「" + shared + "」，实际: " + d.reason());
+        }
+        verify(client, never()).evaluateData(any());
+    }
+
+    @Test
+    @DisplayName("D-B4-60 差异只剩一个参数：WITH 在工具面进白名单腿，在查表面被前置拒")
+    void withHeadIsAllowedOnToolFaceButNotOnQueryFace() throws Exception {
+        stubEvaluate(Map.of("allow", true));
+        String cte = "WITH c AS (SELECT id FROM DW_Sales.t) SELECT id FROM c";
+
+        assertEquals(ToolDecision.Verdict.ALLOW, gate().review(request(), cte, List.of()).verdict(),
+                "工具面按既有语义允许 CTE（allowWith=true），仍须 ABAC 才放行");
+
+        PhysicalQueryGuard.Decision q = PhysicalQueryGuard.inspect(cte);
+        assertFalse(q.allowed());
+        assertTrue(q.reason().contains("SELECT 起首"), q.reason());
     }
 
     @Test

@@ -1,7 +1,5 @@
 package com.chinacreator.gzcm.common.security.sql;
 
-import java.util.LinkedHashSet;
-import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -21,17 +19,17 @@ import java.util.regex.Pattern;
  * 带注释、{@code SELECT ... INTO}、{@code FOR UPDATE} 一律拒绝——这是有意收窄而不是漏判：
  * 工具面服务的是「查一张物理表」，跨表拼装属于本体／管道腿的职责。</p>
  *
- * <p><b>已知粗糙处（如实登记）</b>：关键字与形态扫描按整词在<b>未剥离字符串字面量</b>的
- * 文本上进行，故 {@code WHERE remark = 'please delete this'} 会被误拒。误拒属 fail-closed
- * 的可接受代价，误放不可接受，本批不做词法解析器（全仓无 JSqlParser 依赖）。
- * 数据库侧函数另走一条<b>前缀</b>判据（{@link #DANGEROUS_FUNCTION_PREFIXES}）：
- * {@code pg_sleep}／{@code dblink_connect} 与列名 {@code call_id} 在正则里同形，
- * 只按词边界扫会两头都错（前者漏判、后者误判），故把函数命名空间单独按前缀拒绝。</p>
+ * <p><b>判据单源（#142/B4-3e-20 收口 D-B4-60）</b>：只读地板的公共部分（空语句／多语句／
+ * 注释／语句头部／危险关键字／危险函数／字面量掩码／表引用提取）已单源化到
+ * {@link SqlReadOnlyFloor}，本类只保留<b>查表面专属</b>的附加约束：必须单表、必须能唯一定位
+ * 物理表、禁 CTE。原先与本类并存的第二套判据（ai-engine {@code AgentToolPolicyGate} 的
+ * {@code sqlLocalFloor}）同样改为委托该单源，两侧差异只剩参数 {@code allowWith}；
+ * 合流前两面各自缺词的关键字集已取并集，故两面都只变严不变宽。
+ * 拒绝理由的前缀 {@link #PREFIX} 属本面的机读约定，仍由本类自持。</p>
  *
- * <p><b>判据双源在册（D-B4-60）</b>：ai-engine {@code AgentToolPolicyGate} 第 176-229 行已有
- * 一整套只读判据（含表／列白名单），本类是第二份实现面。两者口径一致、载体不同：前者绑
- * ai-engine 的白名单装载与工具语义，后者只回答「单表只读吗？表名是什么？」。合流到本单源
- * 属后续批次（并轨会牵动 ai-engine 白名单装配），本批只登记不并轨。</p>
+ * <p><b>已知粗糙处（如实登记）</b>：整词与函数扫描在未剥离字符串字面量之外的文本上进行，
+ * 形态之外的旁路（如 dollar-quoted {@code $$...$$}）不在覆盖内；解析不出唯一表名即拒，
+ * 误拒属 fail-closed 的可接受代价，误放不可接受，本批不做词法解析器（全仓无 JSqlParser 依赖）。</p>
  */
 public final class PhysicalQueryGuard {
 
@@ -44,26 +42,10 @@ public final class PhysicalQueryGuard {
     /** 缺省取数行数（与工具收口前的缺省值同形，避免外形变更）。 */
     public static final int DEFAULT_MAX_ROWS = 1000;
 
-    /** 允许的唯一语句形态：{@code SELECT} 起首（CTE 的 {@code WITH} 明确不在服务面内）。 */
-    private static final Pattern READ_ONLY_HEAD = Pattern.compile("^select\\s");
-
-    /** 物理表名提取：{@code FROM} 后的限定名（schema.table 或 table）。 */
-    private static final Pattern FROM_TABLE = Pattern.compile(
-            "\\bfrom\\s+([a-z_][a-z0-9_$]*(\\.[a-z_][a-z0-9_$]*)?)", Pattern.CASE_INSENSITIVE);
-
     /**
-     * 整词拒绝表：命中任一即判为「非只读单表查询」。
-     *
-     * <p>按词边界匹配，故 {@code created_at}／{@code call_id} 这类含子串的列名不会被误杀；
-     * 反之 {@code into}／{@code lock}／{@code set} 这类"看起来无害"的词必须拒——
-     * {@code SELECT ... INTO} 是写，{@code ... FOR UPDATE} 是锁。</p>
+     * 显式跨表形态（单列一条，堵住「一条 FROM + N 个 JOIN」这种只有一处 FROM 的写法）。
+     * 与本面的单表约束绑定，不进公共地板——工具面按表／列白名单允许多表。
      */
-    private static final Set<String> FORBIDDEN_WORDS = Set.of(
-            "insert", "update", "delete", "drop", "alter", "truncate", "create", "rename",
-            "grant", "revoke", "merge", "upsert", "call", "exec", "execute", "copy",
-            "lock", "into", "set", "do", "vacuum", "analyze", "refresh", "comment");
-
-    /** 显式跨表形态（单列一条，堵住「一条 FROM + N 个 JOIN」这种只有一处 FROM 的写法）。 */
     private static final Set<String> MULTI_TABLE_WORDS = Set.of(
             "join", "union", "intersect", "except");
 
@@ -74,18 +56,6 @@ public final class PhysicalQueryGuard {
      */
     private static final Pattern FROM_COMMA_LIST = Pattern.compile(
             "\\bfrom\\s+[a-z_][a-z0-9_$]*(\\.[a-z_][a-z0-9_$]*)?\\s*,", Pattern.CASE_INSENSITIVE);
-
-    /**
-     * 数据库侧危险函数<b>前缀</b>（按子串命中，不带右词边界）。
-     *
-     * <p>为什么单独一条腿：{@code pg_sleep}／{@code dblink_connect}／{@code lo_export} 这类
-     * 标识符内部含 {@code _}，与列名 {@code call_id}／{@code created_at} 在正则里是同一种形状，
-     * 按词边界扫会「{@code dblink_connect} 漏判、{@code call_id} 误判」两头都错。前缀扫描把这
-     * 两类分开：函数命名空间（{@code pg_*}／{@code dblink_*}／{@code lo_*}／{@code xp_*}）
-     * 整体拒绝，列名一律不受影响。</p>
-     */
-    private static final Set<String> DANGEROUS_FUNCTION_PREFIXES = Set.of(
-            "pg_", "dblink_", "lo_import", "lo_export", "lo_get", "lo_put", "xp_");
 
     private PhysicalQueryGuard() {
     }
@@ -115,50 +85,24 @@ public final class PhysicalQueryGuard {
      * @return 结论，见 {@link Decision}
      */
     public static Decision inspect(String sql) {
-        if (sql == null || sql.isBlank()) {
-            return Decision.reject("SQL 为空");
+        SqlReadOnlyFloor.Decision floor = SqlReadOnlyFloor.inspect(sql, false);
+        if (!floor.allowed()) {
+            return Decision.reject(floor.reason());
         }
-        String body = sql.strip();
-        if (body.endsWith(";")) {
-            body = body.substring(0, body.length() - 1).strip();
-        }
-        if (body.indexOf(';') >= 0) {
-            return Decision.reject("含多语句分隔符（禁一次提交多条语句）");
-        }
-        if (body.contains("--") || body.contains("/*") || body.contains("*/") || body.contains("#")) {
-            return Decision.reject("含注释形态（注释是语句截断的常用绕行面）");
-        }
-        String lower = body.toLowerCase(Locale.ROOT);
-        if (!READ_ONLY_HEAD.matcher(lower).find()) {
-            return Decision.reject("非只读查询（语句必须 SELECT 起首）");
-        }
+        String lower = floor.normalized();
         if (countWords(lower, "select") > 1) {
             // 子查询／CTE 体里的 SELECT 会让「提取到的表名」与实际读到的表脱钩，宁可误拒
             return Decision.reject("含嵌套 SELECT（子查询形态，无法定位唯一物理表）");
-        }
-        for (String word : FORBIDDEN_WORDS) {
-            if (containsWord(lower, word)) {
-                return Decision.reject("含非只读关键字 " + word);
-            }
-        }
-        for (String prefix : DANGEROUS_FUNCTION_PREFIXES) {
-            if (lower.contains(prefix)) {
-                return Decision.reject("含数据库侧危险函数命名空间 " + prefix + "*");
-            }
         }
         for (String word : MULTI_TABLE_WORDS) {
             if (containsWord(lower, word)) {
                 return Decision.reject("含跨表形态 " + word + "（本工具面只支持单表查询）");
             }
         }
-        if (FROM_COMMA_LIST.matcher(body).find()) {
+        if (FROM_COMMA_LIST.matcher(sql).find()) {
             return Decision.reject("含 FROM 逗号多表形态（隐式笛卡尔积，本工具面只支持单表查询）");
         }
-        Set<String> tables = new LinkedHashSet<>();
-        Matcher m = FROM_TABLE.matcher(body);
-        while (m.find()) {
-            tables.add(m.group(1).toLowerCase(Locale.ROOT));
-        }
+        Set<String> tables = floor.tables();
         if (tables.isEmpty()) {
             return Decision.reject("未能从 FROM 提取到物理表名（属主端点需要表名定位行级安全策略）");
         }
