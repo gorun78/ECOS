@@ -15,8 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
+import com.chinacreator.gzcm.common.security.caller.CallerCredentialSource;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -191,12 +190,12 @@ public class SecurityPolicyReviewRoleDecider implements BacktestReviewRoleDecide
         return "";
     }
 
-    /** 透传调用方 Authorization 头（与 workspace/identity 安全客户端同纪律；无请求上下文 ⇒ null）。 */
+    /**
+     * 透传调用方 Authorization 头（判据单源在 {@link CallerCredentialSource}，
+     * #142/B4-3e-21 收口 D-B4-61）。无请求上下文 ⇒ {@code null}，
+     * 由 {@link #decide} 翻成<b>显式不可用</b>而不是策略 DENY（§4.7.2「不可用 ≠ 无权限」）。
+     */
     private String currentAuthorization() {
-        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs) {
-            String value = attrs.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
-            return value == null || value.isBlank() ? null : value;
-        }
-        return null;
+        return CallerCredentialSource.currentAuthorization();
     }
 }

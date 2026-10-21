@@ -2,14 +2,13 @@ package com.chinacreator.gzcm.workspace.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
+import com.chinacreator.gzcm.common.security.caller.CallerCredentialSource;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
-import com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor;
 import com.chinacreator.gzcm.common.security.header.ServiceContext;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
-import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -24,9 +23,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.context.request.RequestAttributes;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -401,31 +397,8 @@ public class WorkspaceSecurityEngineClient {
      * 保持 fail-closed 语义不变，只修"把合法已认证用户误判为不可用"这一 plumbing 缺口。</p>
      */
     private void relayCallerCredentials(HttpHeaders headers) {
-        RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
-        if (!(attrs instanceof ServletRequestAttributes servletAttrs)) {
-            return; // 无请求上下文：不带凭证，由 security-engine 默认 DENY（宁 DENY 不超发）
-        }
-        HttpServletRequest request = servletAttrs.getRequest();
-        String authorization = trimToNull(request.getHeader(HttpHeaders.AUTHORIZATION));
-        if (authorization != null) {
-            headers.set(HttpHeaders.AUTHORIZATION, authorization);
-        }
-        copyIfPresent(request, headers, HeaderAuthInterceptor.H_USER);
-        copyIfPresent(request, headers, HeaderAuthInterceptor.H_ROLE);
-        copyIfPresent(request, headers, HeaderAuthInterceptor.H_TENANT);
-        copyIfPresent(request, headers, HeaderAuthInterceptor.H_DOMAIN);
-    }
-
-    private static void copyIfPresent(HttpServletRequest request, HttpHeaders headers, String header) {
-        String value = trimToNull(request.getHeader(header));
-        if (value != null) {
-            headers.set(header, value);
-        }
-    }
-
-    private static String trimToNull(String s) {
-        if (s == null) return null;
-        String t = s.trim();
-        return t.isEmpty() ? null : t;
+        // 判据单源在 CallerCredentialSource（#142/B4-3e-21 收口 D-B4-61）：
+        // 无请求上下文即原样不加，由 security-engine 默认 DENY（宁 DENY 不超发）。
+        CallerCredentialSource.applyTo(headers);
     }
 }

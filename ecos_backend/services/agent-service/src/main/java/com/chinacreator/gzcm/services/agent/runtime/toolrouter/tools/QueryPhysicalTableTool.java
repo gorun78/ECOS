@@ -13,8 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
+import com.chinacreator.gzcm.common.security.caller.CallerCredentialSource;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -50,12 +49,14 @@ import java.util.Optional;
  * {@code errorCode} 仍是<b>权威</b>分态来源——单体包装、网关前置改写或历史部署都可能只给
  * 200 信封，两个来源共用 {@link Outcome} 这一套词表，谁先到用谁，绝不互相折叠。</p>
  *
- * <p><b>身份载体（在册余项）</b>：属主侧 RLS 以 {@code UserContext}／转发的
- * {@code Authorization} 定主语。agent-service 现无请求上下文单源（全仓本域
- * {@code RequestContextHolder} 使用点为零），本腿只在<b>同步请求线程上 best-effort 透传</b>；
+ * <p><b>身份载体</b>：属主侧 RLS 以 {@code UserContext}／转发的请求头定主语。本腿取头不再自己读
+ * {@code RequestContextHolder}，而是并轨到 #142/B4-3e-21 收口 <b>D-B4-61</b> 建成的单源
+ * {@link CallerCredentialSource#currentAuthorization()}（取头＋中继纪律单源，逐字转发不升权）；
  * 取不到载体时<b>不伪造身份、也不静默放行</b>，由属主侧「默认 DENY」裁决，
  * 本腿把结论如实归一成 {@code DENIED}/{@code SECURITY_UNAVAILABLE}。
- * 把身份载体做成单源（含异步/SSE 执行腿）属 D-B4-49 余项，登记为 <b>D-B4-61</b>。</p>
+ * <b>在册余项</b>：agent 的执行腿常在<b>异步/SSE 线程</b>上跑，线程绑定的请求上下文在那里取不到
+ * ⇒ 恒为空载体 ⇒ 属主默认 DENY。补齐要的是<b>服务凭证签名</b>（跨线程不靠中继用户 JWT），
+ * 属另一批次，不在本批夹带。</p>
  */
 @Component
 public class QueryPhysicalTableTool implements ToolExecutor {
@@ -251,13 +252,10 @@ public class QueryPhysicalTableTool implements ToolExecutor {
     /**
      * 当前线程绑定的 HTTP 请求上的 {@code Authorization} 头；无绑定（非请求线程/异步腿）返回
      * {@code null} —— <b>不伪造身份、不回落到任何默认主体</b>，主语缺失交由属主侧默认 DENY 裁决。
+     * 取头判据单源在 {@link CallerCredentialSource}（#142/B4-3e-21 收口 D-B4-61）。
      */
     private static String currentAuthorizationHeader() {
-        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs)) {
-            return null;
-        }
-        String header = attrs.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
-        return header == null || header.isBlank() ? null : header;
+        return CallerCredentialSource.currentAuthorization();
     }
 
     @SuppressWarnings("unchecked")

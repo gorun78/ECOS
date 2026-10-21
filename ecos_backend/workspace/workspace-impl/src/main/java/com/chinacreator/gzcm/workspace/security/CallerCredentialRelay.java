@@ -1,11 +1,7 @@
 package com.chinacreator.gzcm.workspace.security;
 
-import com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor;
-import jakarta.servlet.http.HttpServletRequest;
+import com.chinacreator.gzcm.common.security.caller.CallerCredentialSource;
 import org.springframework.http.HttpHeaders;
-import org.springframework.web.context.request.RequestAttributes;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * 出站调用凭证中继（H10 服务凭证收口前的 ADR-7 信任链唯一合法通道，卷07 F07-17 口径）。
@@ -20,7 +16,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * {@code X-ECOS-USER/ROLE/TENANT/DOMAIN} 信任头，逐字转发、不升权、不拼接。</p>
  *
  * <p>本类是把 {@code WorkspaceSecurityEngineClient} 内的同义私有方法抽为可复用件，
- * 供新增的认知域 run 适配器使用；security 客户端自身的收敛属后续批次（不在本批夹带）。</p>
+ * 供新增的认知域 run 适配器使用；<b>#142/B4-3e-21 起</b>取头与中继的判据本身
+ * 单源在 {@link CallerCredentialSource}（收口 D-B4-61「身份载体无单源」），
+ * 本类只保留 workspace 侧的调用外形，不再自带一套读头逻辑。</p>
  */
 public final class CallerCredentialRelay {
 
@@ -28,36 +26,6 @@ public final class CallerCredentialRelay {
 
     /** 把当前入口请求的凭证与信任头中继到出站请求头（无请求上下文时原样不加）。 */
     public static void applyTo(HttpHeaders headers) {
-        if (headers == null) {
-            return;
-        }
-        RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
-        if (!(attrs instanceof ServletRequestAttributes servletAttrs)) {
-            return;
-        }
-        HttpServletRequest request = servletAttrs.getRequest();
-        String authorization = trimToNull(request.getHeader(HttpHeaders.AUTHORIZATION));
-        if (authorization != null) {
-            headers.set(HttpHeaders.AUTHORIZATION, authorization);
-        }
-        copyIfPresent(request, headers, HeaderAuthInterceptor.H_USER);
-        copyIfPresent(request, headers, HeaderAuthInterceptor.H_ROLE);
-        copyIfPresent(request, headers, HeaderAuthInterceptor.H_TENANT);
-        copyIfPresent(request, headers, HeaderAuthInterceptor.H_DOMAIN);
-    }
-
-    private static void copyIfPresent(HttpServletRequest request, HttpHeaders headers, String header) {
-        String value = trimToNull(request.getHeader(header));
-        if (value != null) {
-            headers.set(header, value);
-        }
-    }
-
-    private static String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
+        CallerCredentialSource.applyTo(headers);
     }
 }

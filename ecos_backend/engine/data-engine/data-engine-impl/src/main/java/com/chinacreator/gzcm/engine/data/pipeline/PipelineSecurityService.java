@@ -1,10 +1,9 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
 import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
-import com.chinacreator.gzcm.common.security.header.HeaderAuthInterceptor;
+import com.chinacreator.gzcm.common.security.caller.CallerCredentialSource;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,9 +12,6 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.context.request.RequestAttributes;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -177,34 +173,9 @@ public class PipelineSecurityService {
      * {@code X-ECOS-USER/ROLE/TENANT/DOMAIN}，不升权、不拼接、不加兜底租户。
      */
     private static void relayCallerCredentials(HttpHeaders headers) {
-        RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
-        if (!(attrs instanceof ServletRequestAttributes servletAttrs)) {
-            return;
-        }
-        HttpServletRequest request = servletAttrs.getRequest();
-        String authorization = trimToNull(request.getHeader(HttpHeaders.AUTHORIZATION));
-        if (authorization != null) {
-            headers.set(HttpHeaders.AUTHORIZATION, authorization);
-        }
-        copyIfPresent(request, headers, HeaderAuthInterceptor.H_USER);
-        copyIfPresent(request, headers, HeaderAuthInterceptor.H_ROLE);
-        copyIfPresent(request, headers, HeaderAuthInterceptor.H_TENANT);
-        copyIfPresent(request, headers, HeaderAuthInterceptor.H_DOMAIN);
-    }
-
-    private static void copyIfPresent(HttpServletRequest request, HttpHeaders headers, String header) {
-        String value = trimToNull(request.getHeader(header));
-        if (value != null) {
-            headers.set(header, value);
-        }
-    }
-
-    private static String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
+        // 判据单源在 CallerCredentialSource（#142/B4-3e-21 收口 D-B4-61）：
+        // 无请求上下文即原样不加，由被调方按默认策略裁决。
+        CallerCredentialSource.applyTo(headers);
     }
 
     /**

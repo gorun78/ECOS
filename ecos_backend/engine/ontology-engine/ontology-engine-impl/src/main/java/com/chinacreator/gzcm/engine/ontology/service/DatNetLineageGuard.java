@@ -12,9 +12,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.context.request.RequestAttributes;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
+import com.chinacreator.gzcm.common.security.caller.CallerCredentialSource;
 
 import java.util.List;
 import java.util.Map;
@@ -204,13 +202,12 @@ public final class DatNetLineageGuard {
             return headers;
         }
 
-        /** 从当前请求上下文取入站 Authorization；非 HTTP 线程（异步/定时）返回 {@code null}。 */
+        /**
+         * 从当前请求上下文取入站 Authorization（判据单源在 {@link CallerCredentialSource}，
+         * #142/B4-3e-21 收口 D-B4-61）；非 HTTP 线程（异步/定时）返回 {@code null}。
+         */
         static String currentInboundAuthorization() {
-            RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
-            if (attributes instanceof ServletRequestAttributes servletAttributes) {
-                return servletAttributes.getRequest().getHeader(HttpHeaders.AUTHORIZATION);
-            }
-            return null;
+            return CallerCredentialSource.currentAuthorization();
         }
     }
 }
