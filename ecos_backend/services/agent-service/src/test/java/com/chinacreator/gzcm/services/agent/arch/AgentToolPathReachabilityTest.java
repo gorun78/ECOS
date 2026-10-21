@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.services.agent.arch;
 
 import com.chinacreator.gzcm.services.agent.runtime.toolrouter.AgentToolEndpointResolver;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -37,12 +39,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code params} 形态一致），故裁决为<b>改指既有端点</b>而非新增 API。幻影清单随之<b>清空</b>：
  * 此后任何工具声明无 Controller 服务的路径即红（清单只准为空，"补齐不删项"的齿由同一断言承担）。</p>
  *
- * <p><b>D-B4-48 的另一面</b>：{@link ServiceEndpointResolver} 的查表键是 route-manifest 的
- * {@code owner} 字段而不是 URL 前缀，所以 {@code /api/v1/ecos}、{@code /api/v1/engine/ontology}、
- * {@code /api/v1/policy-engine} 三族虽然分别由 ontology-engine-impl（属主 {@code buszhi}）与
- * security-engine-impl（属主 {@code sysman}）提供，manifest 里却一条都没有登记 ⇒ 族到属主的映射
- * 只存在于调用方的口头声明里。本门把"未登记前缀清单"钉成实测三条且只准缩短：补进 manifest 后
- * 清单变空、门禁翻红一次，逼 ledger 同步关账。</p>
+ * <p><b>D-B4-48 的另一面（#142/B4-3e-11 已关账）</b>：{@link ServiceEndpointResolver} 的查表键是
+ * route-manifest 的 {@code owner} 字段而不是 URL 前缀，所以工具族的 {@code /api/v1/ecos}、
+ * {@code /api/v1/engine/ontology}、{@code /api/v1/policy-engine} 三根前缀即使一条都没登记，
+ * 基址照样解析得出来（属主名由调用方在 {@link AgentToolEndpointResolver} 里声明）——
+ * 门禁看着全绿，族→属主的映射却只存在于注释里，切流时无人能核对打到 18083 的请求是否真由
+ * buszhi 承流。本批按<b>子族</b>补登（{@code /api/v1/ecos/entities}、{@code /api/v1/ecos/ontologies}、
+ * {@code /api/v1/engine/ontology} → {@code buszhi}；{@code /api/v1/policy-engine} → {@code sysman}），
+ * <b>不登记整根 {@code /api/v1/ecos}</b>：实测该根由 ontology-engine-impl 与 workspace-impl
+ * （{@code ObjectStateMachineController} 的 {@code /objects}、{@code /state-machine} 子族）双宿主
+ * 同根不同属主，判给单一属主就是一句谎。关账后本门不再做"缺口棘轮"，改成两条正向不变式：
+ * ①每条工具路径的<b>最长匹配登记前缀</b>其 owner 必须等于该工具实际调用的解析器访问器属主；
+ * ②同一 owner 的多条 entry 的 artifact/route/ports 必须一致（resolver 按 owner 装 HashMap，
+ * 后写覆盖，不一致会静默漂移）。清单为空＝零容忍。</p>
  */
 class AgentToolPathReachabilityTest {
 
@@ -58,11 +67,9 @@ class AgentToolPathReachabilityTest {
     private static final Pattern METHOD_LEVEL_MAPPING = Pattern.compile(
             "@(?:Get|Post|Put|Delete|Patch)Mapping\\s*\\(\\s*\\{?\\s*\"([^\"]+)\"");
 
-    /** route-manifest 属主名抽取。 */
-    private static final Pattern MANIFEST_OWNER = Pattern.compile("\"owner\"\\s*:\\s*\"([^\"]+)\"");
-
-    /** route-manifest 前缀抽取。 */
-    private static final Pattern MANIFEST_PREFIX = Pattern.compile("\"prefix\"\\s*:\\s*\"([^\"]+)\"");
+    /** 工具取基址的访问器调用形态：一个访问器唯一对应一个属主，族→属主映射由此实证而非注释。 */
+    private static final Pattern RESOLVER_ACCESSOR_CALL = Pattern.compile(
+            "\\bendpoints\\.(securityBaseUrl|auditBaseUrl|ontologyBaseUrl)\\(\\)");
 
     /**
      * D-B4-47 在册幻影路径清单：<b>#142/B4-3e-10 关账后为空</b>（原唯一一项
@@ -71,17 +78,15 @@ class AgentToolPathReachabilityTest {
      */
     private static final Set<String> KNOWN_PHANTOM_PATHS = Set.of();
 
-    /**
-     * D-B4-48 在册未登记前缀清单（实测 3 条）：工具族根在 route-manifest 里没有前缀条目，
-     * 属主只能由调用方声明。只准缩短，补进 manifest 后须同步删项。
-     */
-    private static final Set<String> KNOWN_UNREGISTERED_PREFIXES = Set.of(
-            "/api/v1/ecos",
-            "/api/v1/engine/ontology",
-            "/api/v1/policy-engine");
-
     /** 扫描面阈值守卫：全仓 Controller 路径数低于此值＝扫错了根，不得把空集读成"路径都不存在"或"都存在"。 */
     private static final int MIN_CONTROLLER_PATHS = 300;
+
+    /**
+     * route-manifest 条目数下限（#142/B4-3e-11 补登 4 条后实测 19 条，只增不减）：
+     * 解析器口径出错、文件被截断或读错根时，条目数会掉到下限以下——此时不得让
+     * 「最长前缀匹配不到」被读成"这些路径全都合法"。
+     */
+    private static final int MIN_MANIFEST_ENTRIES = 19;
 
     @Test
     @Timeout(value = 180)
@@ -123,7 +128,10 @@ class AgentToolPathReachabilityTest {
     @Timeout(value = 120)
     @DisplayName("工具族用到的属主必须真在 route-manifest 登记（否则基址恒解析为空）")
     void resolverOwnersAreRegisteredInManifest() throws IOException {
-        Set<String> owners = manifestOwners();
+        Set<String> owners = new TreeSet<>();
+        for (ManifestEntry e : manifestEntries()) {
+            owners.add(e.owner());
+        }
         for (String owner : List.of(AgentToolEndpointResolver.SYSMAN_ROUTE_OWNER,
                 AgentToolEndpointResolver.ONTOLOGY_ROUTE_OWNER)) {
             assertTrue(owners.contains(owner),
@@ -132,22 +140,60 @@ class AgentToolPathReachabilityTest {
         }
     }
 
+    /**
+     * D-B4-48 关账后的正向不变式：工具每条路径都要能在 route-manifest 找到<b>最长匹配前缀</b>，
+     * 且该前缀登记的 owner 必须等于该工具实际调用的解析器访问器所属 owner。
+     * 两个方向各自堵一种假绿——「找不到前缀」＝族→属主仍只活在注释里；
+     * 「owner 不匹配」＝拿 buszhi 的基址去打 sysman 承流的族（切流后打到不承流的端口）。
+     */
     @Test
     @Timeout(value = 120)
-    @DisplayName("工具族用到的属主必须真在 route-manifest 登记，前缀缺口只准在册这三条（D-B4-48）")
-    void unregisteredFamilyPrefixesAreRatcheted() throws IOException {
-        Set<String> prefixes = manifestPrefixes();
-        Set<String> unregistered = new TreeSet<>();
-        for (String toolPath : toolPathConstants().values()) {
-            String root = familyRoot(toolPath);
-            boolean registered = prefixes.stream().anyMatch(root::startsWith);
-            if (!registered) {
-                unregistered.add(root);
+    @DisplayName("每条工具路径的最长匹配登记前缀，其 owner 必须等于该工具访问器的属主（D-B4-48 关账）")
+    void everyToolPathIsRegisteredUnderTheOwnerItsAccessorDeclares() throws IOException {
+        List<ManifestEntry> entries = manifestEntries();
+        Map<String, String> toolPaths = toolPathConstants();
+        Map<String, String> ownersByToolFile = toolAccessorOwners();
+
+        List<String> violations = new ArrayList<>();
+        for (Map.Entry<String, String> e : toolPaths.entrySet()) {
+            String file = e.getKey().substring(0, e.getKey().indexOf('#'));
+            String declaredOwner = ownersByToolFile.get(file);
+            assertTrue(declaredOwner != null,
+                    "工具 " + file + " 声明了路径常量却没有任何解析器访问器调用 ⇒ 无从核对族属主");
+            ManifestEntry matched = longestMatchingPrefix(entries, e.getValue());
+            if (matched == null) {
+                violations.add(e.getValue() + "（" + file + "）在 route-manifest 无任何登记前缀");
+            } else if (!matched.owner().equals(declaredOwner)) {
+                violations.add(e.getValue() + " 最长匹配前缀 " + matched.prefix() + " 登记属主="
+                        + matched.owner() + "，而 " + file + " 取基址用的访问器属主=" + declaredOwner);
             }
         }
-        assertEquals(KNOWN_UNREGISTERED_PREFIXES, unregistered,
-                "route-manifest 前缀登记缺口与 D-B4-48 在册清单不符（实测=" + unregistered
-                        + "）。补齐一条就删一项并同步台账，别让族→属主映射继续只活在调用方注释里");
+        assertEquals(List.of(), violations,
+                "agent 工具族到属主的映射与 route-manifest 不符（D-B4-48 复发）："
+                        + "新增未登记前缀＝族属主只活在调用方注释里，owner 不匹配＝基址与承流服务错位");
+    }
+
+    /**
+     * resolver 按 {@code owner} 装 HashMap，同一属主的多条 entry 是<b>后写覆盖</b>关系：
+     * artifact/route/ports 不一致时，生效的是数组里最后一条，前面的登记静默失效。
+     * 本腿把"同属主必同寻址参数"钉成不变式，防止补登记前缀时顺手写错端口。
+     */
+    @Test
+    @Timeout(value = 60)
+    @DisplayName("同一 owner 的多条 entry 必须 artifact/route/ports 全一致（HashMap 后写覆盖不可静默漂移）")
+    void entriesOfTheSameOwnerAgreeOnAddressingParameters() throws IOException {
+        Map<String, ManifestEntry> first = new LinkedHashMap<>();
+        List<String> conflicts = new ArrayList<>();
+        for (ManifestEntry e : manifestEntries()) {
+            ManifestEntry ref = first.putIfAbsent(e.owner(), e);
+            if (ref != null && !ref.sameAddressingAs(e)) {
+                conflicts.add("owner=" + e.owner() + " 的 " + e.prefix() + " 与 " + ref.prefix()
+                        + " 寻址参数不一致（artifact/route/ports）");
+            }
+        }
+        assertEquals(List.of(), conflicts,
+                "route-manifest 里同一属主登记了两套寻址参数：ServiceEndpointResolver 按 owner 装表，"
+                        + "后写覆盖 ⇒ 只有一条真正生效，其余是幻影登记");
     }
 
     /**
@@ -155,13 +201,20 @@ class AgentToolPathReachabilityTest {
      * 走同一条私有比较逻辑，不依赖真实源码。
      */
     @Test
-    @DisplayName("合成幻影路径能变红（可达性判据非恒真）")
+    @DisplayName("合成幻影路径能变红（可达性与前缀匹配判据均非恒真）")
     void syntheticPhantomIsDetected() throws IOException {
         Set<String> controllerPaths = controllerPaths();
         assertTrue(!controllerPaths.contains(normalize("/api/v1/definitely/not/registered")),
                 "合成幻影竟被判可达 ⇒ 可达性判据恒真，本门是假绿");
         assertTrue(controllerPaths.contains("/api/v1/ecos/ontologies"),
                 "扫描器读出的真实路径集里找不到 /api/v1/ecos/ontologies ⇒ 解析器口径坏了");
+
+        // 正向夹具：真实登记过的路径必须能匹配到前缀（否则上一条断言会因匹配器全空而假过）
+        assertTrue(longestMatchingPrefix(manifestEntries(), "/api/v1/ontology/mappings/validate") != null,
+                "已登记族根匹配不到 ⇒ 最长前缀匹配器恒空，属主一致性腿会变成假的零违例");
+        // 反向夹具：段边界不得被当成前缀命中（naive startsWith 会把 /api/v1/ontology 命中到 /api/v1/ontologyx）
+        assertTrue(longestMatchingPrefix(manifestEntries(), "/api/v1/ontologyx/actions") == null,
+                "合成越界路径被判成已登记 ⇒ 前缀匹配未对齐段边界，任何同前缀字面量都能蒙过属主核对");
     }
 
     // ---------- helpers ----------
@@ -205,39 +258,89 @@ class AgentToolPathReachabilityTest {
         return out;
     }
 
-    private static Set<String> manifestOwners() throws IOException {
-        return literals(MANIFEST_OWNER);
-    }
-
-    private static Set<String> manifestPrefixes() throws IOException {
-        return literals(MANIFEST_PREFIX);
-    }
-
-    private static Set<String> literals(Pattern pattern) throws IOException {
-        String json = Files.readString(backendRoot()
-                .resolve("runtime/runtime-access/src/main/resources/route-manifest.json"),
-                StandardCharsets.UTF_8);
-        Set<String> out = new LinkedHashSet<>();
-        Matcher m = pattern.matcher(json);
-        while (m.find()) {
-            out.add(m.group(1));
+    /**
+     * 读 route-manifest 单源的全部条目（prefix + owner + 寻址参数）。
+     * 走 JSON 解析而不是"前缀清单/属主清单各抓一遍"：两条独立清单会丢掉配对关系，
+     * 而本门的判据恰好就是配对（哪条前缀挂在哪个属主下）。
+     */
+    private static List<ManifestEntry> manifestEntries() throws IOException {
+        Path manifest = backendRoot().resolve(
+                "runtime/runtime-access/src/main/resources/route-manifest.json");
+        assertTrue(Files.isRegularFile(manifest), "route-manifest 单源不存在: " + manifest);
+        JsonNode entries = new ObjectMapper()
+                .readTree(Files.readString(manifest, StandardCharsets.UTF_8))
+                .path("entries");
+        assertTrue(entries.isArray() && entries.size() >= MIN_MANIFEST_ENTRIES,
+                "route-manifest 条目扫描面异常（实扫 " + (entries.isArray() ? entries.size() : -1)
+                        + " 条 < 下限 " + MIN_MANIFEST_ENTRIES + "），不得对可疑扫描面判定前缀可达性");
+        List<ManifestEntry> out = new ArrayList<>();
+        for (JsonNode e : entries) {
+            assertTrue(e.path("prefix").isTextual() && e.path("owner").isTextual(),
+                    "route-manifest 有条目缺 prefix/owner: " + e);
+            JsonNode ports = e.path("ports");
+            out.add(new ManifestEntry(e.path("prefix").asText(), e.path("owner").asText(),
+                    e.path("artifact").asText(), e.path("route").asText(),
+                    ports.path("monolith").asInt(-1), ports.path("service").asInt(-1)));
         }
-        assertTrue(!out.isEmpty(), "route-manifest 解析出空集合 ⇒ 判据不得对空面放行");
         return out;
     }
 
     /**
-     * 族根＝前 3 段（{@code /api/v1/x}），{@code engine} 族取前 4 段（{@code /api/v1/engine/x}），
-     * 与 route-manifest 现有前缀粒度一致。
+     * 最长匹配登记前缀；<b>按段边界对齐</b>（完全相等或后接 {@code /}），
+     * 免得 {@code /api/v1/ec} 之类同前缀字面量蒙过属主核对。匹配不到返回 null。
      */
-    private static String familyRoot(String path) {
-        String[] seg = path.split("/");
-        int take = "engine".equals(seg.length > 3 ? seg[3] : "") ? 4 : 3;
-        StringBuilder sb = new StringBuilder();
-        for (int i = 1; i < seg.length && i <= take; i++) {
-            sb.append('/').append(seg[i]);
+    private static ManifestEntry longestMatchingPrefix(List<ManifestEntry> entries, String path) {
+        ManifestEntry best = null;
+        for (ManifestEntry e : entries) {
+            String p = e.prefix();
+            boolean hit = path.equals(p) || path.startsWith(p.endsWith("/") ? p : p + "/");
+            if (hit && (best == null || p.length() > best.prefix().length())) {
+                best = e;
+            }
         }
-        return sb.toString();
+        return best;
+    }
+
+    /**
+     * 工具文件 → 该文件实际调用的解析器访问器所声明的<b>属主名</b>（与
+     * {@link AgentToolEndpointResolver} 的 owner 常量同源，不另写字面量）。
+     * 一个文件里出现两个不同属主的访问器即红：那说明族归属又开始靠调用方现场决定了。
+     */
+    private static Map<String, String> toolAccessorOwners() throws IOException {
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Path p : filesIn(toolsDir())) {
+            Matcher m = RESOLVER_ACCESSOR_CALL.matcher(Files.readString(p, StandardCharsets.UTF_8));
+            Set<String> owners = new TreeSet<>();
+            while (m.find()) {
+                owners.add(ownerOfAccessor(m.group(1)));
+            }
+            if (owners.size() > 1) {
+                throw new IllegalStateException("工具 " + p.getFileName() + " 同时调用两个属主的基址访问器 "
+                        + owners + "，族属主归属不明，本门拒绝判定");
+            }
+            if (!owners.isEmpty()) {
+                out.put(p.getFileName().toString(), owners.iterator().next());
+            }
+        }
+        return out;
+    }
+
+    private static String ownerOfAccessor(String accessor) {
+        return switch (accessor) {
+            case "securityBaseUrl", "auditBaseUrl" -> AgentToolEndpointResolver.SYSMAN_ROUTE_OWNER;
+            case "ontologyBaseUrl" -> AgentToolEndpointResolver.ONTOLOGY_ROUTE_OWNER;
+            default -> throw new IllegalStateException("未知解析器访问器: " + accessor);
+        };
+    }
+
+    /** route-manifest 一条登记的寻址参数（同属主多条目必须逐项一致）。 */
+    private record ManifestEntry(String prefix, String owner, String artifact, String route,
+                                 int monolithPort, int servicePort) {
+
+        boolean sameAddressingAs(ManifestEntry o) {
+            return artifact.equals(o.artifact) && route.equals(o.route)
+                    && monolithPort == o.monolithPort && servicePort == o.servicePort;
+        }
     }
 
     private static String join(String prefix, String suffix) {

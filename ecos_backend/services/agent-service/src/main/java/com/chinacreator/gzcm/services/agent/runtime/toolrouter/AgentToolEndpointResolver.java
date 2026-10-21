@@ -25,18 +25,22 @@ import java.util.Optional;
  * <b>owner 字段</b>（非 URL 前缀）查表的，所以本类每个访问器绑定一个属主名，族与属主的对应
  * 关系只在本文说清、不散落到各工具：
  * <ul>
- *   <li>{@code sysman} —— 同时服务 {@code /api/v1/security}（裁决面）与 {@code /api/v1/audit}
- *       （审计面）两族，manifest 里两条前缀的 {@code owner} 都是 {@code sysman}
- *       （ports monolith 8080 / service 18081）。不存在独立的 {@code security} 或
- *       {@code audit} owner，禁另立键名。</li>
+ *   <li>{@code sysman} —— 同时服务 {@code /api/v1/security}（裁决面）、{@code /api/v1/audit}
+ *       （审计面）与 {@code /api/v1/policy-engine}（ABAC 裁决族，security-engine-impl
+ *       {@code PolicyEngineController} 由 gateway+sysman 双宿主）三族，manifest 里这三条前缀的
+ *       {@code owner} 都是 {@code sysman}（ports monolith 8080 / service 18081）。
+ *       不存在独立的 {@code security} 或 {@code audit} owner，禁另立键名。</li>
  *   <li>{@code buszhi} —— 服务本体族 {@code /api/v1/ontology}，以及同样由
  *       ontology-engine-impl 提供、被 gateway / buszhi / workspace 三处宿主复用的
- *       {@code /api/v1/ecos} 与 {@code /api/v1/engine/ontology} 两族
- *       （ports monolith 8080 / service 18083）。kb 域
+ *       {@code /api/v1/ecos/entities}、{@code /api/v1/ecos/ontologies} 与
+ *       {@code /api/v1/engine/ontology} 三族（ports monolith 8080 / service 18083）。kb 域
  *       {@code KbEntityInstanceExtractionService} 已是把 {@code buszhi} 当本体族属主的先例。
- *       <b>后两族的前缀在 manifest 里尚未登记</b>（只登记了 {@code /api/v1/ontology}），
- *       属主关系目前只能由调用方声明 ⇒ 该文档缺口已登记为 <b>D-B4-48</b>，
- *       解除条件是把两枚前缀补进 route-manifest 单源。</li>
+ *       <b>D-B4-48 已在 #142/B4-3e-11 关账</b>：上述前缀均已按<b>子族</b>登进 route-manifest 单源，
+ *       族→属主映射不再只存在于本注释里。注意 {@code /api/v1/ecos} <b>整根属主不唯一</b>
+ *       （workspace-impl {@code ObjectStateMachineController} 亦声明 {@code /objects}、
+ *       {@code /state-machine} 子族，属主 {@code workspace}），故 manifest 只登记子族，
+ *       本类也不得把整根判给单一属主。可达性与属主一致性由
+ *       {@code AgentToolPathReachabilityTest} 钉住。</li>
  * </ul>
  * 现网形态下这些属主都还是 {@code route=monolith}，resolver 内部回落 monolith 端口，
  * 故解析结果与收口前的 :8080 逐字相同，属外形不变。</p>
