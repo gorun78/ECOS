@@ -41,9 +41,17 @@ import java.util.Optional;
  *       {@code /state-machine} 子族，属主 {@code workspace}），故 manifest 只登记子族，
  *       本类也不得把整根判给单一属主。可达性与属主一致性由
  *       {@code AgentToolPathReachabilityTest} 钉住。</li>
+ *   <li>{@code datanet} —— 服务数据引擎族 {@code /api/v1/engine/data}（ports monolith 8080 /
+ *       service 18082）。{@code #142/B4-3e-16} 起由 {@code QueryPhysicalTableTool} 使用；
+ *       不存在 {@code data}／{@code data-engine} 属主名，禁另立键名。</li>
  * </ul>
- * 现网形态下这些属主都还是 {@code route=monolith}，resolver 内部回落 monolith 端口，
- * 故解析结果与收口前的 :8080 逐字相同，属外形不变。</p>
+ * 三个属主的 route 形态<b>不是一致的</b>（route-manifest 实测：sysman 四条前缀与 buszhi 四条前缀
+ * 都还是 {@code route=monolith}，resolver 内部回落 monolith 端口 ⇒ 解析结果与收口前的 :8080 逐字相同；
+ * 而 {@code datanet} 的三条前缀（{@code /api/v1/data}／{@code /api/v1/datanet}／
+ * {@code /api/v1/engine/data}）登记为 {@code route=service}，SERVICE 模式解析到 :18082）。
+ * 因此本类<b>不承诺</b>「解析结果恒等于 :8080」：切流状态由 manifest 单源决定，工具侧只如实使用
+ * 解析结果。datanet 未起独立进程时该腿落 {@code UNREACHABLE}（属主侧不可用），而不是被折成
+ * 「查询无结果」或「无权限」——见 {@code QueryPhysicalTableTool} 的分态表。</p>
  *
  * <p><b>为什么返回空而不是抛异常</b>：抛异常会被工具咽喉折成通用工具错误，调用方无从区分
  * 「服务不可解析」与「服务答了失败」；返回空则把不可用如实交回读侧（§4.7.2
@@ -81,18 +89,35 @@ public class AgentToolEndpointResolver {
     /** buszhi 族基址<b>覆盖项键名</b>单源。 */
     public static final String ONTOLOGY_BASE_URL_PROPERTY = "ecos.endpoints." + ONTOLOGY_ROUTE_OWNER;
 
+    /**
+     * 数据族（{@code /api/v1/engine/data}）在 route-manifest 的<b>属主名</b>单源。
+     *
+     * <p>{@code #142/B4-3e-16} 随 {@code QueryPhysicalTableTool} 从进程内任意 SQL 下推
+     * 改指 data-engine 属主端点而新增。manifest 里 {@code /api/v1/engine/data} 的 {@code owner}
+     * ＝{@code datanet}（ports monolith 8080 / service 18082），不存在 {@code data} 或
+     * {@code data-engine} 属主名，禁另立键名。</p>
+     */
+    public static final String DATA_ROUTE_OWNER = "datanet";
+
+    /** data 族基址<b>覆盖项键名</b>单源。 */
+    public static final String DATA_BASE_URL_PROPERTY = "ecos.endpoints." + DATA_ROUTE_OWNER;
+
     private final ObjectProvider<ServiceEndpointResolver> endpointProvider;
 
     private final String sysmanBaseUrlOverride;
 
     private final String ontologyBaseUrlOverride;
 
+    private final String dataBaseUrlOverride;
+
     public AgentToolEndpointResolver(ObjectProvider<ServiceEndpointResolver> endpointProvider,
             @Value("${" + SYSMAN_BASE_URL_PROPERTY + ":}") String sysmanBaseUrlOverride,
-            @Value("${" + ONTOLOGY_BASE_URL_PROPERTY + ":}") String ontologyBaseUrlOverride) {
+            @Value("${" + ONTOLOGY_BASE_URL_PROPERTY + ":}") String ontologyBaseUrlOverride,
+            @Value("${" + DATA_BASE_URL_PROPERTY + ":}") String dataBaseUrlOverride) {
         this.endpointProvider = endpointProvider;
         this.sysmanBaseUrlOverride = trim(sysmanBaseUrlOverride);
         this.ontologyBaseUrlOverride = trim(ontologyBaseUrlOverride);
+        this.dataBaseUrlOverride = trim(dataBaseUrlOverride);
     }
 
     /**
@@ -121,6 +146,17 @@ public class AgentToolEndpointResolver {
      */
     public Optional<String> ontologyBaseUrl() {
         return resolveOwner(ONTOLOGY_ROUTE_OWNER, ONTOLOGY_BASE_URL_PROPERTY, ontologyBaseUrlOverride);
+    }
+
+    /**
+     * 数据族（{@code /api/v1/engine/data/**}）的 base-url（不含尾斜杠）。
+     *
+     * <p>{@code #142/B4-3e-16} 随 {@code QueryPhysicalTableTool} 收口 D-B4-49 任意 SQL 下推面而新增：
+     * 该工具不再用本进程 {@code JdbcTemplate} 直接执行上游 SQL，改 POST 到 data-engine 属主端点，
+     * 由属主侧做 RLS/列过滤/脱敏（铁律「安全一律走 security-engine REST，禁引擎内重复实现」）。</p>
+     */
+    public Optional<String> dataBaseUrl() {
+        return resolveOwner(DATA_ROUTE_OWNER, DATA_BASE_URL_PROPERTY, dataBaseUrlOverride);
     }
 
     private Optional<String> resolveOwner(String owner, String property, String override) {

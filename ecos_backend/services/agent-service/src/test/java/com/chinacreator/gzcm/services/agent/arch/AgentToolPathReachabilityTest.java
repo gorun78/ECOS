@@ -69,7 +69,7 @@ class AgentToolPathReachabilityTest {
 
     /** 工具取基址的访问器调用形态：一个访问器唯一对应一个属主，族→属主映射由此实证而非注释。 */
     private static final Pattern RESOLVER_ACCESSOR_CALL = Pattern.compile(
-            "\\bendpoints\\.(securityBaseUrl|auditBaseUrl|ontologyBaseUrl)\\(\\)");
+            "\\bendpoints\\.(securityBaseUrl|auditBaseUrl|ontologyBaseUrl|dataBaseUrl)\\(\\)");
 
     /**
      * D-B4-47 在册幻影路径清单：<b>#142/B4-3e-10 关账后为空</b>（原唯一一项
@@ -133,7 +133,8 @@ class AgentToolPathReachabilityTest {
             owners.add(e.owner());
         }
         for (String owner : List.of(AgentToolEndpointResolver.SYSMAN_ROUTE_OWNER,
-                AgentToolEndpointResolver.ONTOLOGY_ROUTE_OWNER)) {
+                AgentToolEndpointResolver.ONTOLOGY_ROUTE_OWNER,
+                AgentToolEndpointResolver.DATA_ROUTE_OWNER)) {
             assertTrue(owners.contains(owner),
                     "解析器声明的属主 " + owner + " 不在 route-manifest 的 owner 集合 " + owners
                             + " 里 ⇒ 该族基址恒为空，工具腿会静默走『未发起调用』分支");
@@ -329,6 +330,7 @@ class AgentToolPathReachabilityTest {
         return switch (accessor) {
             case "securityBaseUrl", "auditBaseUrl" -> AgentToolEndpointResolver.SYSMAN_ROUTE_OWNER;
             case "ontologyBaseUrl" -> AgentToolEndpointResolver.ONTOLOGY_ROUTE_OWNER;
+            case "dataBaseUrl" -> AgentToolEndpointResolver.DATA_ROUTE_OWNER;
             default -> throw new IllegalStateException("未知解析器访问器: " + accessor);
         };
     }

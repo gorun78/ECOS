@@ -8,13 +8,19 @@ import java.util.Map;
 
 /**
  * R2-B4b 数据访问收口（架构铁律 §2.5 #1 / IR06）：agent-service {@code toolrouter/tools}
- * 9 个工具内联 SQL 的统一落点。
+ * 工具内联 SQL 的统一落点。
  *
  * <p>只搬不改：SQL 文本 / 表名 / 字段 / 参数序与原 Tool 逐字节一致。</p>
  *
- * <p>承接原文件：ExecuteExpertRuleTool / FindGraphPathTool / GetDataLineageTool /
- * GetTableSchemaTool / ListDataSourcesTool / QueryPhysicalTableTool / RAGQueryTool /
+ * <p>承接原文件（#142/B4-3e-16 后实数 10 支）：ExecuteExpertRuleTool / FindGraphPathTool /
+ * GetDataLineageTool / GetTableSchemaTool / ListDataSourcesTool / RAGQueryTool /
  * RunQualityCheckTool / SearchCatalogTool / SearchKnowledgeGraphTool / TriggerPipelineTool。</p>
+ *
+ * <p><b>已从此面摘除</b>：{@code QueryPhysicalTableTool} 的两条腿（原 {@code queryPhysicalTable}
+ * 任意 SQL 下推 + 原 {@code insertQueryLog} 自记台账）随 #142/B4-3e-16 收口 <b>D-B4-49</b>
+ * 整删 —— 该腿改走 data-engine 属主端点，取数与查询历史都由属主侧的既有通道负责。
+ * 「其余 10 支仍在本 DAO 直连数据库」这一事实本身在册为 <b>D-B4-49</b> 余项，
+ * 由 {@code AgentToolHardcodedBaseRatchetTest} 的 {@code DAO_ONLY_TOOLS} 清单棘轮盯住。</p>
  */
 @Repository
 public class AgentToolDao extends JdbcTemplateDaoSupport {
@@ -55,19 +61,6 @@ public class AgentToolDao extends JdbcTemplateDaoSupport {
     public List<Map<String, Object>> listDataSources() {
         return jdbcTemplate.queryForList(
             "SELECT id, name, type, host, port, database_name, status, created_at FROM ecos_datasource ORDER BY name");
-    }
-
-    /** QueryPhysicalTableTool */
-    public int insertQueryLog(String id, String datasourceId, String sql, int maxRows) {
-        return jdbcTemplate.update(
-            "INSERT INTO ecos_query_log (id, datasource_id, sql_text, max_rows, status, created_at) " +
-            "VALUES (?, ?, ?, ?, 'SUBMITTED', NOW())",
-            id, datasourceId, sql, maxRows);
-    }
-
-    /** QueryPhysicalTableTool 动态物理查表（sql 为上游已解析的物理查询，原样下推 LIMIT） */
-    public List<Map<String, Object>> queryPhysicalTable(String sql, int maxRows) {
-        return jdbcTemplate.queryForList(sql + " LIMIT " + maxRows);
     }
 
     /** RAGQueryTool */

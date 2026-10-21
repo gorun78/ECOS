@@ -66,7 +66,7 @@ class CheckPermissionToolVerdictTest {
         private final Optional<String> result;
 
         StubResolver(Optional<String> result) {
-            super((ObjectProvider<ServiceEndpointResolver>) null, "", "");
+            super((ObjectProvider<ServiceEndpointResolver>) null, "", "", "");
             this.result = result;
         }
 
