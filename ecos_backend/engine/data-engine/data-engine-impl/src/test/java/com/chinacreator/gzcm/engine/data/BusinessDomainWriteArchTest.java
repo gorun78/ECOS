@@ -14,8 +14,10 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -29,6 +31,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>非严格 SQL 现场：Java 源码里出现 {@code "ecos_dw."} 字面量也一起扫（F02-14 A3
  * 时代 kb 里 {@code INSERT INTO ecos_knowledge.kb_doc_chunk} 就是同族反例；W65 已清偿，
  * 本测试永久守卫）。
+ *
+ * <p><b>本门自身的两个假绿形态已于 #142/B4-3e-17 收口（缺陷台账 D-B4-62）</b>：
+ * ①判据大小写敏感 ⇒ {@code ECOS_DW.T} 这类形态整枚门看不见，而 PG 的非加引号标识符
+ * 本就把两者折叠到同一张表；②{@link FileCheck} 每文件只记首个违例后 {@code return}
+ * ⇒ 违例<b>条数不可计数</b>，一个文件 1 处与 20 处在失败信息里长得一样，扩面被静默吞掉。
+ * 两者各配一枚具名反回归用例（{@code qualifiedNamePatternIsCaseInsensitive} ／
+ * {@code fileCheckAggregatesEveryViolationInOneFile}），后者用 {@code @TempDir} 合成夹具取证，
+ * 不需要往仓库里塞违例文件。
  */
 @DisplayName("C.3.6：非 data-engine 模块禁 MyBatis 直读写 ecos_dw 业务域表")
 class BusinessDomainWriteArchTest {
@@ -36,9 +46,25 @@ class BusinessDomainWriteArchTest {
     /** 唯一的合法承载 module 目录（相对 ecos_backend/）。 */
     private static final String DATA_ENGINE_IMPL = "engine/data-engine/data-engine-impl/";
 
-    /** 触发条件 = {@code ecos_dw.} 带点源限定名（Java 或 XML 或 SQL 字面量）。 */
+    /**
+     * 触发条件 = {@code ecos_dw.} 带点源限定名（Java 或 XML 或 SQL 字面量）。
+     *
+     * <p><b>为什么必须大小写不敏感（#142/B4-3e-17 收口 D-B4-62 ①）</b>：本判据此前是
+     * 裸 {@code Pattern.compile("ecos_dw\\.[A-Za-z_]\\w*")}，于是 {@code ECOS_DW.STAGE_FACT}
+     * 这类形态对整枚门<b>完全不可见</b>——而 PG 的非加引号标识符本就折叠到小写，
+     * {@code ECOS_DW.T} 与 {@code ecos_dw.t} 是同一张表。大写形态在本仓不是假想：
+     * 实测全 {@code ecos_backend}（排除 {@code target/}，且排除本门测试文件自身——它现在
+     * 刻意含大写夹具）的非纯小写命中有 <b>1</b> 处
+     * （{@code data-engine-impl/src/test/.../metadata/ColumnCatalogQueryServiceTest:118}
+     * {@code ECOS_DW.STAGE_FACT}），恰好落在合法承载侧，说明这种写法是仓库里<b>在用的</b>形态。
+     * 判据收紧后非 data-engine 侧新增违例 <b>0</b>：同一命令实扫该侧大小写不敏感限定名原始命中
+     * 49 处，其中非纯小写形态 <b>0</b> 处（⇒ 本改动在该侧不可能新拦到东西），其余 49 处经
+     * 逐行注释口径 + 三层豁免后由 {@code noEcosDwOutsideDataEngine} 实跑判定为 <b>0 违例</b>，
+     * 因此这不是「放宽」而是「补上原本就该看见的面」。反回归由
+     * {@link #qualifiedNamePatternIsCaseInsensitive()} 具名用例钉住。</p>
+     */
     private static final Pattern ECOS_DW_QUALIFIED = Pattern.compile(
-            "ecos_dw\\.[A-Za-z_]\\w*");
+            "ecos_dw\\.[A-Za-z_]\\w*", Pattern.CASE_INSENSITIVE);
 
     /** 白名单：非 data-engine 但仅出现在注释 / 文档 / SQL 白名单配置字面量（只用作校验）。 */
     private static final Set<String> KNOWN_PREEXISTING = Set.of(
@@ -166,15 +192,16 @@ class BusinessDomainWriteArchTest {
                 // 第三类登记面：相对路径逐字命中才豁免（严于文件名白名单），
                 // 其「纯字面量、零建连」前提由 guardrailFixtureRegistryStillLiveAndConnectionFree 守卫
                 if (GUARDRAIL_FIXTURE_FILES.contains(rel)) continue;
-                FileCheck.check(rel, name, f, violations);
-                if (!violations.isEmpty()
-                        && violations.get(violations.size() - 1).startsWith(name + ":")) {
+                int hits = FileCheck.check(rel, name, f, violations);
+                if (hits > 0) {
                     offenders.add(name);
                 }
             }
         }
         assertTrue(violations.isEmpty(),
-                "C.3.6 越权：以下非 data-engine 文件含 ecos_dw 限定名（应走 /write-channel）:\n"
+                "C.3.6 越权：以下非 data-engine 文件含 ecos_dw 限定名（应走 /write-channel）"
+                        + "，实扫违例 " + violations.size() + " 处／涉及文件 "
+                        + offenders.size() + " 个:\n"
                         + String.join("\n", violations)
                         + "\noffenders: " + offenders);
     }
@@ -277,12 +304,27 @@ class BusinessDomainWriteArchTest {
                 || (DDL_INVENTORY_FILES.contains(rel) && raw.contains(DDL_INVENTORY_TOKEN));
     }
 
-    /** 单文件扫描：Java 忽略 行首 // * /* 注释；XML 忽略 行首 <!--。 */
+    /**
+     * 单文件扫描：Java 忽略 行首 // * /* 注释；XML 忽略 行首 &lt;!--。
+     *
+     * <p><b>逐条计数（#142/B4-3e-17 收口 D-B4-62 ②）</b>：本方法此前在记下首条违例后
+     * {@code return}（注释写的是「长行降噪」），后果是<b>违例「条数」在这枚门上根本不可计数</b>
+     * ——一个文件里 1 处和 20 处越权在失败信息里长得一样，扩面被静默吞掉，也无法回答
+     * 「这批清了几处」。现改为逐条如实记录并回传统计数，降噪改由<b>单行文本截断</b>
+     * （{@link #MAX_LINE_TEXT}）承担：压的是行宽，不是条数。</p>
+     *
+     * @return 该文件内未被豁免的违例行数（0 ＝ 干净）
+     */
     private static final class FileCheck {
-        static void check(String rel, String name, Path f, List<String> violations)
+
+        /** 单条违例的行文本上限：只截行宽，绝不截条数。 */
+        private static final int MAX_LINE_TEXT = 200;
+
+        static int check(String rel, String name, Path f, List<String> violations)
                 throws IOException {
             String text = Files.readString(f, StandardCharsets.UTF_8);
             int lin = 0;
+            int hits = 0;
             for (String raw : text.split("\\R", -1)) {
                 lin++;
                 String t = raw.trim();
@@ -297,11 +339,68 @@ class BusinessDomainWriteArchTest {
                     if (exempted(rel, raw)) {
                         continue;
                     }
-                    violations.add(name + ":" + lin + " (" + rel + "): " + t);
-                    return; // 每文件只记首个（长行降噪）
+                    hits++;
+                    violations.add(name + ":" + lin + " (" + rel + "): "
+                            + (t.length() > MAX_LINE_TEXT ? t.substring(0, MAX_LINE_TEXT) + "…" : t));
                 }
             }
+            return hits;
         }
+    }
+
+    /**
+     * 判据形态自证（D-B4-62 ①的反回归）。
+     *
+     * <p>这枚用例不需要往仓库里塞违例夹具：它直接对判据本身取证。若有人把
+     * {@link #ECOS_DW_QUALIFIED} 的 {@code CASE_INSENSITIVE} 摘掉，大写形态立刻逃逸、
+     * 本用例即刻变红——而 {@code noEcosDwOutsideDataEngine} 在全仓零大写命中时会<b>静默通过</b>，
+     * 这正是原缺陷能长期存在的形态原因。</p>
+     */
+    @Test
+    @DisplayName("判据必须吃三种大小写形态，且只认带点限定名")
+    void qualifiedNamePatternIsCaseInsensitive() {
+        assertTrue(ECOS_DW_QUALIFIED.matcher("select * from ecos_dw.fc_lower").find(),
+                "小写形态必须命中");
+        assertTrue(ECOS_DW_QUALIFIED.matcher("select * from ECOS_DW.STAGE_FACT").find(),
+                "大写形态必须命中（收口前此处漏判＝D-B4-62）");
+        assertTrue(ECOS_DW_QUALIFIED.matcher("select * from Ecos_Dw.Mixed_Case").find(),
+                "混合大小写必须命中");
+        assertFalse(ECOS_DW_QUALIFIED.matcher("select * from ecos_dw").find(),
+                "无点裸 schema 词不在判据面内（禁把泛词判成越权）");
+        assertFalse(ECOS_DW_QUALIFIED.matcher("select * from ecos_dw2.fc_x").find(),
+                "近似 schema 名不得被前缀式判据误食");
+    }
+
+    /**
+     * 违例计数自证（D-B4-62 ②的反回归）：同一文件内多处越权必须逐条计数。
+     *
+     * <p>夹具走 {@link TempDir}（用完随目录销毁，不落仓、不进扫描面），且刻意用
+     * 三种大小写形态各一处 + 一处注释形态，一并验证「条数如实、注释口径不变」。
+     */
+    @Test
+    @DisplayName("单文件多处违例必须逐条计数，不得只记首个")
+    void fileCheckAggregatesEveryViolationInOneFile(@TempDir Path tmp) throws IOException {
+        Path carrier = tmp.resolve("SyntheticEscapeCarrier.java");
+        Files.writeString(carrier, String.join("\n", List.of(
+                "class SyntheticEscapeCarrier {",
+                "    String a = \"select * from ecos_dw.fc_lower\";",
+                "    String b = \"select * from ECOS_DW.FC_UPPER\";",
+                "    String c = \"select * from Ecos_Dw.Mixed_Case\";",
+                "    // 注释里的 ecos_dw.fc_comment 不算（判据的注释口径保持不变）",
+                "}")), StandardCharsets.UTF_8);
+
+        List<String> violations = new ArrayList<>();
+        int hits = FileCheck.check("synthetic/SyntheticEscapeCarrier.java",
+                "SyntheticEscapeCarrier.java", carrier, violations);
+
+        assertEquals(3, hits, "同文件 3 处非注释违例必须全部计数（旧形态只记首个）");
+        assertEquals(3, violations.size(), "违例条目数必须与计数一致");
+        assertTrue(violations.get(1).contains("FC_UPPER"),
+                "大写形态违例必须进入违规清单：" + violations.get(1));
+        assertTrue(violations.get(2).contains("Mixed_Case"),
+                "混合大小写违例必须进入违规清单：" + violations.get(2));
+        assertTrue(violations.stream().noneMatch(v -> v.contains("fc_comment")),
+                "注释行不得计入违例");
     }
 
     private static Path repoRoot() {
