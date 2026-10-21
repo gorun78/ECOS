@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.kb;
 
 import com.chinacreator.gzcm.common.annotation.RequirePermission;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.header.ServiceContext;
 import com.chinacreator.gzcm.engine.kb.controller.KbAssumptionController;
 import com.chinacreator.gzcm.engine.kb.controller.KbProfileController;
@@ -68,7 +69,8 @@ class KbIsolationTest {
 
     private NavTaxonServiceImpl buildService() {
         // ABAC 放行（测试聚焦写入归因，而非 ABAC 裁决）
-        lenient().when(securityClient.evaluatePolicy(anyString(), any())).thenReturn(true);
+        lenient().when(securityClient.evaluatePolicy(anyString(), any()))
+                .thenReturn(AbacEvaluateResponseContract.Verdict.ALLOW);
         return new NavTaxonServiceImpl(dao, securityClient, llmRecommendService);
     }
 

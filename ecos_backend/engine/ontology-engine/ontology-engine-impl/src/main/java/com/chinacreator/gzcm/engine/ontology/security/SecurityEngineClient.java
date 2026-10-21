@@ -43,7 +43,9 @@ import java.util.regex.Pattern;
  *   <li><b>脱敏</b>：调 {@code POST /api/v1/security/masking/apply}</li>
  *   <li><b>操作授权</b>：调 {@code POST /api/v1/security/policy-engine/evaluate}（OPA）</li>
  *   <li><b>审计</b>：发 Kafka {@code ecos.audit} topic（common-api KafkaTopics.AUDIT 常量）</li>
- *   <li><b>默认 DENY</b>：security-engine 不可用时默认拒绝，不降级</li>
+ *   <li><b>fail-closed</b>：security-engine 不可用时一律拒绝、不降级放行；但
+ *       「不可用」与「策略拒绝」分态（ABAC 腿返回契约三态，见
+ *       {@link #evaluatePolicy}，差距 D-B4-44）</li>
  * </ul>
  *
  * <p>不 import 其他 engine-impl（架构铁律 2.1），仅走 REST。</p>
@@ -122,6 +124,16 @@ public class SecurityEngineClient {
         factory.setConnectTimeout(timeoutMs);
         factory.setReadTimeout(timeoutMs);
         this.serviceRestTemplate = new RestTemplate(factory);
+    }
+
+    /**
+     * 测试缝（#142/B4-3e-12）：注入替身 {@link RestTemplate} 以覆盖 ABAC 三态读数面。
+     * <p>生产装配仍走上面的自建口径，本构造只供同包单测构造裁决替身应答，禁业务代码调用。</p>
+     */
+    SecurityEngineClient(String baseUrl, int timeoutMs, RestTemplate serviceRestTemplate) {
+        this.baseUrl = baseUrl;
+        this.timeoutMs = timeoutMs;
+        this.serviceRestTemplate = serviceRestTemplate;
     }
 
     // ═══════════════ 1. RLS — 行级安全 ═══════════════
@@ -330,14 +342,23 @@ public class SecurityEngineClient {
     // ═══════════════ 4. ABAC — OPA 策略引擎 ═══════════════
 
     /**
-     * ABAC — OPA 策略裁决。
-     * @return true 表示允许；DENY 或不可用时返回 false
+     * ABAC — OPA 策略裁决，返回<b>契约三态</b>，不在本类做布尔结论。
+     *
+     * <p><b>#142/B4-3e-12 分态（差距 D-B4-44）</b>：收口前本方法用
+     * {@link AbacEvaluateResponseContract#isExplicitAllow} 返回 {@code boolean}，
+     * 该读数对 {@code DENY} 与 {@code UNEVALUATED} 一律给 {@code false} —— 于是
+     * ①RestTemplate 缺失 ②空信封／security 5xx／传输解析异常
+     * ③HTTP 200 但应答无可识别裁决，这三种"护栏没说话"与真实策略 DENY 同值，
+     * 调用方统一转 403，把依赖故障伪装成"这人没权限"（违 §4.7.2）。
+     * 现三态原样返回，由 {@code OntologyCandidateService} 分面落码
+     * （DENY→403／UNEVALUATED→503 + ECOS-SEC-501），与 workspace 腿（D-B4-41）同口径。</p>
+     *
+     * @return {@code ALLOW} 放行／{@code DENY} 策略拒绝／{@code UNEVALUATED} 护栏未说话（不可用）
      */
     @SuppressWarnings("unchecked")
-    public boolean evaluatePolicy(String action, Map<String, Object> attrs) {
+    public AbacEvaluateResponseContract.Verdict evaluatePolicy(String action, Map<String, Object> attrs) {
         if (serviceRestTemplate == null) {
-            log.warn("SecurityEngineClient.evaluatePolicy DENY (no RestTemplate): action={}", action);
-            return false;
+            return unevaluated(action, "RestTemplate 未装配（security-engine 客户端缺失）");
         }
         try {
             Map<String, Object> body = new LinkedHashMap<>();
@@ -351,15 +372,37 @@ public class SecurityEngineClient {
                     "role", "user"));
             body.put("input", input);
             Map<String, Object> resp = postJson("/api/v1/security/policy-engine/evaluate", body);
-            if (resp == null) return false;
+            if (resp == null) {
+                return unevaluated(action, "应答为空信封");
+            }
+            // security 侧内部裁决失败以 HTTP 200 + 失败信封应答（没有 data 段），同属不可用，
+            // 不得读成"应答形态漂移"＝策略拒绝；判据单源在 RlsExecutionContract。
+            if (RlsExecutionContract.isUnavailableEnvelope(resp)) {
+                return unevaluated(action, "security 失败信封 code=" + resp.get("code"));
+            }
+            Object dataObj = resp.get("data");
+            if (dataObj == null) {
+                return unevaluated(action, "应答缺 data 段（契约断裂）");
+            }
             // 裁决读数走单源：本类此前只认历史别名 result，而现契约应答 data 段发的是 allow，
             // 实测恒读到 null ⇒ 无论策略怎么判都 DENY（差距 D-B4-39）。
-            return AbacEvaluateResponseContract.isExplicitAllow(resp.get("data"));
+            AbacEvaluateResponseContract.Verdict verdict =
+                    AbacEvaluateResponseContract.verdictOf(dataObj);
+            if (verdict == AbacEvaluateResponseContract.Verdict.UNEVALUATED) {
+                return unevaluated(action, "HTTP 200 但应答无可识别裁决");
+            }
+            return verdict;
         } catch (Exception e) {
-            log.warn("SecurityEngineClient.evaluatePolicy DENY: action={} reason={}",
-                    action, e.getMessage());
-            return false;
+            return unevaluated(action, "传输/解析失败 " + e.getClass().getSimpleName()
+                    + ": " + e.getMessage());
         }
+    }
+
+    /** UNEVALUATED 归一出口：留 warn 日志（含原因）后原样返回三态，不在本类折叠成布尔。 */
+    private AbacEvaluateResponseContract.Verdict unevaluated(String action, String reason) {
+        log.warn("SecurityEngineClient.evaluatePolicy UNEVALUATED (不可用，非策略 DENY): "
+                + "action={} reason={}", action, reason);
+        return AbacEvaluateResponseContract.Verdict.UNEVALUATED;
     }
 
     // ═══════════════ 5. 审计 — Kafka ecos.audit ═══════════════

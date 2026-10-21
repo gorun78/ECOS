@@ -14,6 +14,9 @@ import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.common.event.EventTypes;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.ontology.governance.dao.OntologyCandidateDao;
 import com.chinacreator.gzcm.engine.ontology.governance.dto.OntologyCandidateCreateDTO;
 import com.chinacreator.gzcm.engine.ontology.security.SecurityEngineClient;
@@ -717,15 +720,20 @@ public class OntologyCandidateService {
         attrs.put("candidateType", asString(current.get("candidateType")));
         attrs.put("tenantId", asString(current.get("tenantId")));
         attrs.put("domain", asString(current.get("domain")));
-        boolean allowed = evaluateSecurityPolicy(ACTION_APPROVE, attrs);
-        if (!allowed) {
+        AbacEvaluateResponseContract.Verdict verdict = evaluateSecurityPolicy(ACTION_APPROVE, attrs);
+        if (verdict != AbacEvaluateResponseContract.Verdict.ALLOW) {
+            // 分态出口（D-B4-44）：DENY 才是策略拒绝（发 POLICY_DENIED 事件 + 403）；
+            // UNEVALUATED 是护栏没说话（不可用），不得冒充策略拒绝，也不得发策略拒绝事件。
+            if (verdict == AbacEvaluateResponseContract.Verdict.UNEVALUATED) {
+                audit("ontology.candidate.approve.unavailable", "candidateId=" + candidateId.trim());
+                throw abacUnavailable(ACTION_APPROVE);
+            }
             publishCandidateEvent(EventTypes.Agent.POLICY_DENIED, candidateId.trim(),
                     asString(current.get("tenantId")), asString(current.get("traceId")),
                     resolveActor(approver), asString(current.get("sourceRunId")));
             audit("ontology.candidate.approve.denied", "candidateId=" + candidateId.trim());
             throw new com.chinacreator.gzcm.common.exception.ForbiddenException(
-                    "ontology.candidate.approve 裁决 DENY;security 不可用时 fail-closed"
-                            + "(§7.5 / 铁律 §2.4)");
+                    "ontology.candidate.approve 裁决 DENY(§7.5 / 铁律 §2.4)");
         }
         int affected = dao.transitionStatus(candidateId.trim(), STATUS_PENDING_APPROVAL,
                 STATUS_APPROVED, approvalRef.trim(), resolveActor(approver));
@@ -808,15 +816,19 @@ public class OntologyCandidateService {
         attrs.put("candidateType", asString(current.get("candidateType")));
         attrs.put("tenantId", asString(current.get("tenantId")));
         attrs.put("domain", asString(current.get("domain")));
-        boolean allowed = evaluateSecurityPolicy(ACTION_APPLY, attrs);
-        if (!allowed) {
+        AbacEvaluateResponseContract.Verdict verdict = evaluateSecurityPolicy(ACTION_APPLY, attrs);
+        if (verdict != AbacEvaluateResponseContract.Verdict.ALLOW) {
+            // 同 approve 腿：DENY→403，UNEVALUATED→503 + ECOS-SEC-501（D-B4-44 分态）
+            if (verdict == AbacEvaluateResponseContract.Verdict.UNEVALUATED) {
+                audit("ontology.candidate.apply.unavailable", "candidateId=" + candidateId.trim());
+                throw abacUnavailable(ACTION_APPLY);
+            }
             publishCandidateEvent(EventTypes.Agent.POLICY_DENIED, candidateId.trim(),
                     asString(current.get("tenantId")), asString(current.get("traceId")),
                     resolveActor(null), asString(current.get("sourceRunId")));
             audit("ontology.candidate.apply.denied", "candidateId=" + candidateId.trim());
             throw new com.chinacreator.gzcm.common.exception.ForbiddenException(
-                    "ontology.candidate.apply 裁决 DENY;security 不可用时 fail-closed"
-                            + "(§7.5 / 铁律 §2.4)");
+                    "ontology.candidate.apply 裁决 DENY(§7.5 / 铁律 §2.4)");
         }
         String approvalRef = asString(current.get("approvalRef"));
         int affected = dao.transitionStatus(candidateId.trim(), STATUS_APPROVED,
@@ -922,18 +934,43 @@ public class OntologyCandidateService {
         }
     }
 
-    /** security-engine ABAC 裁决(fail-closed:bean 缺失 / 裁决 false → false)。 */
-    private boolean evaluateSecurityPolicy(String action, Map<String, Object> attrs) {
+    /**
+     * security-engine ABAC 裁决 — 原样返回契约三态（fail-closed 但<b>不分态即违 §4.7.2</b>）。
+     *
+     * <p>#142/B4-3e-12（差距 D-B4-44）：收口前本方法返回 {@code boolean}，bean 缺失与
+     * 客户端任何失败都折叠成 {@code false}，调用点再统一抛 403 —— 把"护栏没说话"
+     * 报成"这人没权限"。现 bean 缺失／客户端异常一律 {@code UNEVALUATED}，
+     * 与策略 {@code DENY} 在调用点分面（403 vs 503 + ECOS-SEC-501）。</p>
+     */
+    private AbacEvaluateResponseContract.Verdict evaluateSecurityPolicy(
+            String action, Map<String, Object> attrs) {
         SecurityEngineClient security = securityProvider.getIfAvailable();
         if (security == null) {
-            // fail-closed(§7.5 / 铁律 §2.4):security 不可用默认 DENY
-            return false;
+            // 护栏未参与裁决（bean 缺失）＝不可用，不是策略拒绝
+            return AbacEvaluateResponseContract.Verdict.UNEVALUATED;
         }
         try {
             return security.evaluatePolicy(action, attrs);
         } catch (Exception e) {
-            return false;
+            return AbacEvaluateResponseContract.Verdict.UNEVALUATED;
         }
+    }
+
+    /**
+     * UNEVALUATED 的落码出口（503 + 机读 {@code ECOS-SEC-501}，码面取
+     * {@link RlsExecutionContract} 单源常量，禁本类字面量）。
+     *
+     * <p>本体域没有模块局部 advice，异常经网关 {@code handleDataBridge} 以
+     * {@code ApiResponse.code} 承载 httpStatus；不可用态与 403 策略拒绝的状态串
+     * 在本方法起就已分开，验收见 {@code OntologyCandidateServiceTest}。
+     * 「HTTP 面仍 200」属本体域缺局部 advice 的既有 shortfall，已登记台账。</p>
+     */
+    private static DataBridgeException abacUnavailable(String action) {
+        return new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_CODE + ": " + action
+                        + " 未获安全裁决（security-engine 不可用），按 fail-closed 拒绝，非「用户无权限」"
+                        + "(§7.5 / §4.7.2 / 铁律 §2.4)");
     }
 
     /** 审计留痕(security 客户端可用时非阻塞发送;缺失仅 debug)。 */

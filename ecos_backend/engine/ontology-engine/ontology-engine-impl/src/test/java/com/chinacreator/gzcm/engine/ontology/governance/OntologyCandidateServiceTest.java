@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ontology.governance;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -31,7 +32,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.exception.ForbiddenException;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract.Verdict;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.ontology.governance.dao.OntologyCandidateDao;
 import com.chinacreator.gzcm.engine.ontology.governance.dto.OntologyCandidateCreateDTO;
 import com.chinacreator.gzcm.engine.ontology.security.SecurityEngineClient;
@@ -172,7 +176,8 @@ class OntologyCandidateServiceTest {
         row.put("approvalRef", "appr-1");
         when(dao.findByCandidateId("c-1")).thenReturn(row);
         when(securityProvider.getIfAvailable()).thenReturn(securityClient);
-        when(securityClient.evaluatePolicy(eq("ontology.candidate.apply"), anyMap())).thenReturn(true);
+        when(securityClient.evaluatePolicy(eq("ontology.candidate.apply"), anyMap()))
+                .thenReturn(Verdict.ALLOW);
         when(dao.transitionStatus(eq("c-1"),
                 eq(OntologyCandidateService.STATUS_APPROVED),
                 eq(OntologyCandidateService.STATUS_APPLIED),
@@ -339,7 +344,7 @@ class OntologyCandidateServiceTest {
         when(dao.findByCandidateId("c-1")).thenReturn(row);
         when(securityProvider.getIfAvailable()).thenReturn(securityClient);
         when(securityClient.evaluatePolicy(eq("ontology.candidate.approve"), anyMap()))
-                .thenReturn(false);
+                .thenReturn(Verdict.DENY);
 
         ForbiddenException ex = assertThrows(ForbiddenException.class,
                 () -> service.approve("c-1", "appr-1", "approver"),
@@ -361,7 +366,7 @@ class OntologyCandidateServiceTest {
         when(dao.findByCandidateId("c-1")).thenReturn(row);
         when(securityProvider.getIfAvailable()).thenReturn(securityClient);
         when(securityClient.evaluatePolicy(eq("ontology.candidate.approve"), anyMap()))
-                .thenReturn(true);
+                .thenReturn(Verdict.ALLOW);
         when(dao.transitionStatus(eq("c-1"),
                 eq(OntologyCandidateService.STATUS_PENDING_APPROVAL),
                 eq(OntologyCandidateService.STATUS_APPROVED),
@@ -377,6 +382,66 @@ class OntologyCandidateServiceTest {
         assertNotNull(out);
         verify(securityClient).audit(eq("ontology.candidate.approve"),
                 org.mockito.ArgumentMatchers.any());
+    }
+
+    // ── D-B4-44 分态不变式（#142/B4-3e-12）──
+
+    @Test
+    @DisplayName("D-B4-44:同一 approve 输入下 DENY→403 与 UNEVALUATED→503/ECOS-SEC-501 状态串必异，两态都不迁状态")
+    void approveRendersDenyAndUnevaluatedDifferently() {
+        Map<String, Object> row = candidateRow(OntologyCandidateService.STATUS_PENDING_APPROVAL);
+        when(dao.findByCandidateId("c-1")).thenReturn(row);
+        when(securityProvider.getIfAvailable()).thenReturn(securityClient);
+        when(securityClient.evaluatePolicy(eq("ontology.candidate.approve"), anyMap()))
+                .thenReturn(Verdict.DENY);
+
+        ForbiddenException denied = assertThrows(ForbiddenException.class,
+                () -> service.approve("c-1", "appr-1", "approver"),
+                "策略 DENY → 403 无权限");
+
+        // UNEVALUATED 取样用「护栏缺席」这一支（bean 未装配），与策略拒绝必须异串
+        when(securityProvider.getIfAvailable()).thenReturn(null);
+        DataBridgeException unavailable = assertThrows(DataBridgeException.class,
+                () -> service.approve("c-1", "appr-1", "approver"),
+                "security 缺席＝不可用，不得抛 ForbiddenException 冒充无权限");
+
+        assertEquals(403, denied.getHttpStatus());
+        assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_HTTP, unavailable.getHttpStatus(),
+                "不可用态落 503（§4.7.2「不可用 ≠ 无权限」）");
+        assertTrue(unavailable.getMessage().startsWith(RlsExecutionContract.SEC_UNAVAILABLE_CODE),
+                "不可用态必须带机读 ECOS-SEC-501 前缀，供 RlsExecutionContract#isUnavailableEnvelope 识别: "
+                        + unavailable.getMessage());
+        assertNotEquals(denied.getHttpStatus(), unavailable.getHttpStatus(),
+                "两态 httpStatus 相同＝把\"引擎没答\"报成\"这人没权限\"（D-B4-44 复发）");
+        assertNotEquals(denied.getMessage(), unavailable.getMessage());
+        verify(dao, never()).transitionStatus(anyString(), anyString(),
+                eq(OntologyCandidateService.STATUS_APPROVED), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("D-B4-44:apply 腿同样分态 — DENY→403 与 UNEVALUATED→503/ECOS-SEC-501 必异串")
+    void applyRendersDenyAndUnevaluatedDifferently() {
+        Map<String, Object> row = candidateRow(OntologyCandidateService.STATUS_APPROVED);
+        row.put("approvalRef", "appr-1");
+        when(dao.findByCandidateId("c-1")).thenReturn(row);
+        when(securityProvider.getIfAvailable()).thenReturn(securityClient);
+        when(securityClient.evaluatePolicy(eq("ontology.candidate.apply"), anyMap()))
+                .thenReturn(Verdict.DENY);
+
+        ForbiddenException denied = assertThrows(ForbiddenException.class,
+                () -> service.applyCandidate("c-1"));
+
+        when(securityClient.evaluatePolicy(eq("ontology.candidate.apply"), anyMap()))
+                .thenReturn(Verdict.UNEVALUATED);
+        DataBridgeException unavailable = assertThrows(DataBridgeException.class,
+                () -> service.applyCandidate("c-1"));
+
+        assertEquals(403, denied.getHttpStatus());
+        assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_HTTP, unavailable.getHttpStatus());
+        assertTrue(unavailable.getMessage().startsWith(RlsExecutionContract.SEC_UNAVAILABLE_CODE),
+                "不可用态机读码缺失: " + unavailable.getMessage());
+        verify(dao, never()).transitionStatus(anyString(), anyString(),
+                eq(OntologyCandidateService.STATUS_APPLIED), anyString(), anyString());
     }
 
     // ── 置信度规则 ──

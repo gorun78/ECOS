@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.kb.service.nav;
 import com.chinacreator.gzcm.common.exception.ForbiddenException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
+import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.header.ServiceContext;
 import com.chinacreator.gzcm.engine.kb.dao.NavTaxonDao;
 import com.chinacreator.gzcm.engine.kb.nav.INavService;
@@ -14,6 +15,7 @@ import com.chinacreator.gzcm.engine.kb.nav.model.NavProductItemVO;
 import com.chinacreator.gzcm.engine.kb.nav.model.NavRecommendVO;
 import com.chinacreator.gzcm.engine.kb.nav.model.NavTagVO;
 import com.chinacreator.gzcm.engine.kb.security.KnowledgeNavSecurityEngineClient;
+import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,8 +44,10 @@ import java.util.Set;
  * {@link NavTaxonDao}，本类仅保留业务编排（ABAC / 越界校验 / 审计 / undo / VO 映射），
  * schema {@code ecos_knowledge}（不跨引擎 SQL）。</p>
  *
- * <p><b>ABAC</b>：写操作前调用 {@code KnowledgeNavSecurityEngineClient.evaluatePolicy}，
- * 不可用/拒绝一律抛 403（铁律 §2.4-6：宁可误拒）。</p>
+ * <p><b>ABAC</b>：写操作前调用 {@link KnowledgeNavSecurityEngineClient#evaluatePolicy}
+ * 取契约三态，按 {@link #checkAbac} 分面：策略 DENY → 403，护栏未说话
+ * （{@code UNEVALUATED}）→ 503 {@link KbErrorCodes#SECURITY_UNAVAILABLE}。
+ * 两者都 fail-closed（铁律 §2.4-6 宁可误拒），但不得相互冒充（§4.7.2，差距 D-B4-44）。</p>
  *
  * <p><b>审计</b>：写操作成功后调 {@code KnowledgeNavSecurityEngineClient.audit(...)}
  * 经 EventBus 发 {@code ecos.audit}；F04-15 fail-closed：audit 抛 DomainException 时
@@ -628,9 +632,25 @@ public class NavTaxonServiceImpl implements INavService {
         return m;
     }
 
+    /**
+     * ABAC 咽喉 — 按 {@link AbacEvaluateResponseContract.Verdict} 三态分面落码
+     * （#142/B4-3e-12，差距 D-B4-44）。
+     *
+     * <p>收口前两态同值：客户端用契约布尔 helper 做结论，护栏没说话（无客户端／
+     * 空信封／传输异常／应答无可识别裁决）与策略 DENY 都读到 {@code false}，
+     * 本方法一律抛 403 ⇒ 把依赖故障伪装成"这人没权限"（§4.7.2）。现在
+     * DENY→403 {@link ForbiddenException}，UNEVALUATED→503
+     * {@link KbErrorCodes#SECURITY_UNAVAILABLE}（ECOS-KB-020，由 {@code KbErrorAdvice}
+     * 落成真实 HTTP 503），两者都 fail-closed、但状态串必异。</p>
+     */
     private void checkAbac(String action, Map<String, Object> attrs) {
-        if (!securityClient.evaluatePolicy(action, attrs)) {
+        AbacEvaluateResponseContract.Verdict verdict = securityClient.evaluatePolicy(action, attrs);
+        if (verdict == AbacEvaluateResponseContract.Verdict.DENY) {
             throw new ForbiddenException("知识导航: " + action + " 被安全策略拒绝");
+        }
+        if (verdict == AbacEvaluateResponseContract.Verdict.UNEVALUATED) {
+            throw KbErrorCodes.SECURITY_UNAVAILABLE.exception(
+                    "知识导航: " + action + " 未获安全裁决（security-engine 不可用），按 fail-closed 拒绝");
         }
     }
 

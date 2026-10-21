@@ -299,8 +299,14 @@ class AbacEvaluateResponseSingleSourceTest {
                 "AbacEvaluateResponseContract.Verdict"));
         expected.put(PIPELINE_SVC, List.of("AbacEvaluateResponseContract.isExplicitAllow",
                 "AbacEvaluateResponseContract.KEY_FALLBACK"));
-        expected.put(KB_CLIENT, List.of("AbacEvaluateResponseContract.isExplicitAllow"));
-        expected.put(ONTOLOGY_CLIENT, List.of("AbacEvaluateResponseContract.isExplicitAllow"));
+        // #142/B4-3e-12（D-B4-44）：kb 导航写闸／本体操作授权两支改取三态，
+        // 并把 security 侧「HTTP 200 + 失败信封」的不可用判据委托给 RlsExecutionContract 单源。
+        expected.put(KB_CLIENT, List.of("AbacEvaluateResponseContract.verdictOf(",
+                "AbacEvaluateResponseContract.Verdict",
+                "RlsExecutionContract.isUnavailableEnvelope"));
+        expected.put(ONTOLOGY_CLIENT, List.of("AbacEvaluateResponseContract.verdictOf(",
+                "AbacEvaluateResponseContract.Verdict",
+                "RlsExecutionContract.isUnavailableEnvelope"));
         // #142/B4-3e-6（D-B4-41）：两支咽喉改取三态读数——isExplicitAllow 对 DENY 与
         // UNEVALUATED 同值，拿它做布尔结论即把"护栏没说话"折成"策略拒绝"。
         expected.put(WORKSPACE_CLIENT, List.of("AbacEvaluateResponseContract.verdictOf("));
@@ -322,21 +328,20 @@ class AbacEvaluateResponseSingleSourceTest {
     }
 
     @Test
-    @DisplayName("D-B4-39 三支恒 DENY 咽喉必须走 allow 单源读数，不得只剩别名读法")
+    @DisplayName("D-B4-39 三支恒 DENY 咽喉必须走单源读数，且不得停在布尔 helper 上")
     void theThreeSilentlyDenyingGatesReadTheCurrentForm() {
-        for (String rel : List.of(KB_CLIENT, ONTOLOGY_CLIENT)) {
+        // 读数面在 #142/B4-3e-12 从「布尔 helper」升级为「三态」：D-B4-39 要求的是走单源，
+        // D-B4-44 要求的是走单源的<b>哪一个</b>形态——isExplicitAllow 只回布尔，
+        // DENY 与 UNEVALUATED 同值，故这三支现在一律钉 verdictOf( 并禁 isExplicitAllow。
+        for (String rel : List.of(KB_CLIENT, ONTOLOGY_CLIENT, WORKSPACE_CLIENT)) {
             String code = codeOf(rel);
-            assertTrue(code.contains("AbacEvaluateResponseContract.isExplicitAllow"),
-                    rel + " 未改读单源（收口前它只认历史别名 result，现契约应答恒读到 null ⇒ 恒 DENY）");
+            assertTrue(code.contains("AbacEvaluateResponseContract.verdictOf("),
+                    rel + " 未取三态读数（D-B4-41／D-B4-44 的折叠形态已回归）");
+            assertFalse(code.contains("AbacEvaluateResponseContract.isExplicitAllow"),
+                    rel + " 退回契约布尔 helper ⇒ DENY 与 UNEVALUATED 再次同值");
             assertFalse(code.contains("Boolean.TRUE.equals"),
                     rel + " 又回到裸布尔判定形态（该形态正是 D-B4-39 的发生位置）");
         }
-        // workspace 咽喉在 #142/B4-3e-6 进一步改取三态（D-B4-41）：读数升级后不再允许退回布尔helper
-        String workspace = codeOf(WORKSPACE_CLIENT);
-        assertTrue(workspace.contains("AbacEvaluateResponseContract.verdictOf("),
-                WORKSPACE_CLIENT + " 未取三态读数（D-B4-41 的折叠形态已回归）");
-        assertFalse(workspace.contains("AbacEvaluateResponseContract.isExplicitAllow"),
-                WORKSPACE_CLIENT + " 退回布尔 helper ⇒ DENY 与 UNEVALUATED 再次同值");
     }
 
     // ── 验收 3b：不可用折叠面棘轮（#142/B4-3e-6，D-B4-41／新登记 D-B4-44） ────
@@ -349,14 +354,20 @@ class AbacEvaluateResponseSingleSourceTest {
      * {@code true}，对 DENY 与 UNEVALUATED 都返回 {@code false}；②本类自带一个
      * {@code private/static boolean isExplicitAllow(…)} helper，内部虽委托
      * {@code verdictOf} 拿三态，但对外只回布尔，调用方无从分态。两种都是差距
-     * <b>D-B4-41</b> 的形态。本批只闭合台账在册的两支（认知 decider／workspace 导出咽喉）；
+     * <b>D-B4-41</b> 的形态。#142/B4-3e-6 只闭合台账在册的两支（认知 decider／workspace 导出咽喉）；
      * 复扫时另发现同型四处（kb 导航写闸、本体操作授权、data pipeline 执行裁决三处调用、
      * llm-gateway 本地布尔 helper）—— 它们把不可用落成 403/拒绝 reason，形态与 workspace
      * 收口前一致，但分别需要各自的模块异常类型与状态映射，<b>不在本批顺手动刀</b>，登记为
      * <b>D-B4-44</b> 并以下面这份清单做棘轮：清单只准缩短，新增未登记折叠点即红。</p>
+     *
+     * <p>#142/B4-3e-12 收口前两支（kb 导航写闸 {@code KB_CLIENT}／本体操作授权
+     * {@code ONTOLOGY_CLIENT}）：两条腿的客户端 {@code evaluatePolicy} 改回
+     * {@code AbacEvaluateResponseContract.Verdict}，消费点按 §4.7.2 分面
+     * （DENY→403 策略拒绝，UNEVALUATED→不可用态码面 {@code ECOS-SEC-501}），
+     * 故从本清单删项。余两支（{@code PIPELINE_SVC}／{@code LLM_BRIDGE}）仍在册。</p>
      */
     private static final Set<String> UNEVALUATED_FOLDING_SITES = Set.of(
-            KB_CLIENT, ONTOLOGY_CLIENT, PIPELINE_SVC, LLM_BRIDGE);
+            PIPELINE_SVC, LLM_BRIDGE);
 
     @Test
     @Timeout(value = 120)
@@ -373,10 +384,10 @@ class AbacEvaluateResponseSingleSourceTest {
         assertEquals(UNEVALUATED_FOLDING_SITES, found.keySet(),
                 "ABAC 不可用折叠面与在册清单不符（新增未登记＝又一个没人知道的假 403；"
                         + "收口未删项＝棘轮失效）。实测=" + found);
-        // 已闭合的两支不得回归（同一条判据对它们必须为假）
-        for (String closed : List.of(COGNITIVE_DECIDER, WORKSPACE_CLIENT)) {
+        // 已闭合的四支不得回归（同一条判据对它们必须为假）
+        for (String closed : List.of(COGNITIVE_DECIDER, WORKSPACE_CLIENT, KB_CLIENT, ONTOLOGY_CLIENT)) {
             assertNull(booleanConclusionShape(codeOf(closed)),
-                    closed + " 退回布尔 helper ⇒ D-B4-41 复发");
+                    closed + " 退回布尔 helper ⇒ D-B4-41／D-B4-44 复发");
         }
     }
 
