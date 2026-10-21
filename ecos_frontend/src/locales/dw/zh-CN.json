@@ -435,6 +435,7 @@
   "dw.enterRuleName": "请输入规则名称",
   "dw.execFailed": "执行失败",
   "dw.execFailedMsg": "执行失败: {msg}",
+  "dw.rlsScopeUndeclared": "未能从 SQL 中识别出查询作用域的表，行级安全无法裁决，已拒绝执行（默认 DENY）。请显式写明 FROM/JOIN 的表名后重试。",
   "dw.executing": "执行中...",
   "dw.folder.colModified": "修改时间",
   "dw.folder.colName": "文件名",

@@ -15,6 +15,26 @@ function isRiskySql(sql: string): boolean {
   return /\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|MERGE|REPLACE)\b/i.test(sql);
 }
 
+/**
+ * 提取本次 SQL 的<b>行级安全作用域</b>声明（#142/B4-3e-19，差距 D-B4-63）。
+ *
+ * 属主端点现在要求调用方显式声明表集：不声明＝403 `ECOS-SEC-520`（默认 DENY）。
+ * 本函数只负责「声明」，不负责「判定」——裁决永远在 security-engine 一侧。
+ * 提取不到表名时调用方必须停下来问用户，禁退化成"不带作用域照样发"，
+ * 那正是收口前的绕过路径（页面通道行过滤覆盖面恒为零）。
+ */
+function extractTableScope(sql: string): string[] {
+  const stripped = sql.replace(/--[^\n]*/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const found = new Set<string>();
+  const pattern = /\b(?:from|join)\s+([a-zA-Z_][\w$]*(?:\.[a-zA-Z_][\w$]*){0,2})/gi;
+  let match: RegExpExecArray | null = pattern.exec(stripped);
+  while (match !== null) {
+    found.add(match[1]);
+    match = pattern.exec(stripped);
+  }
+  return [...found];
+}
+
 // Inline SQL Query Console (embedded, reuses datasource ID)
 /** 后端 QueryExecutionServiceImpl.execute 返回 Map：columns[{name,label,type}] / rows(以列 label 为键) / rowCount / elapsedMs */
 interface QueryExecuteColumn { name?: string; label?: string; type?: string }
@@ -41,12 +61,21 @@ export default function InlineSqlConsole({ datasourceId }: { datasourceId: strin
   const [confirmRisky, setConfirmRisky] = React.useState(false);
 
   const execute = async () => {
+    // 行级安全作用域声明门（D-B4-63）：提取不到表名就不发请求——属主侧未声明即 403，
+    // 在这里拦掉既避免一次无谓往返，也把「这条 SQL 没有可裁决的作用域」讲给用户，
+    // 禁静默降级成"不带作用域照发"（那正是收口前的绕过路径）。
+    const scope = extractTableScope(sql);
+    if (scope.length === 0) {
+      setError(t("dw.rlsScopeUndeclared"));
+      setResult(null);
+      return;
+    }
     setLoading(true); setError(null);
     try {
       const res = await rawAuthedUrlFetch(`${API_BASE}/v1/engine/data/query/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ datasource_id: datasourceId, sql: sql.trim(), max_rows: 500, timeout_seconds: 30 })
+        body: JSON.stringify({ datasource_id: datasourceId, sql: sql.trim(), table_names: scope, max_rows: 500, timeout_seconds: 30 })
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();

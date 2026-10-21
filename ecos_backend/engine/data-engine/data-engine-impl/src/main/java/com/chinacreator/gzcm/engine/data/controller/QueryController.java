@@ -15,7 +15,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -82,6 +85,16 @@ public class QueryController {
      * 信封体逐字段一字未动（{@code code}/{@code errorCode}/{@code message} 原形保留），
      * 因此既有按 {@code code} 分派的消费者不受影响；成功与非安全类失败出口
      * 有意保持 HTTP 200（不扩面，余面由 {@code SecurityDenialHttpStatusRatchetTest} 量化在册）。</p>
+     *
+     * <p><b>#142/B4-3e-19 收口（差距 D-B4-63 的作用域声明腿）</b>：上面四条拒绝腿有个共同前提——
+     * <b>本方法真的发起了裁决</b>。此前 RLS 只在请求体 {@code table_name} 非空时才跑，
+     * 「不声明作用域」既不是放行也不是拒绝，而是<b>整条安全线根本不参与</b>：属主直接执行
+     * 调用方给的任意 SQL，日志里一条 DENY 都不留。实测两个消费者里页面通道
+     * （{@code InlineSqlConsole}）正好就是不带 {@code table_name} 的那一支，所以页面 SQL 控制台的
+     * 行级安全覆盖面此前为<b>零</b>。现在作用域必须由调用方显式声明（单表
+     * {@code table_name} 保留兼容＋多表加性键 {@code table_names}），<b>未声明＝403
+     * {@code ECOS-SEC-520}</b>——与策略拒绝分码，因为要修的是调用方代码而不是找管理员申请权限。
+     * 多表时逐表各跑一次四态裁决，谓词按 {@code AND} 合取、命名槽位续编防互撞。</p>
      */
     @PostMapping("/execute")
     public ResponseEntity<ApiResponse<Map<String, Object>>> execute(
@@ -90,7 +103,6 @@ public class QueryController {
         try {
             String datasourceId = (String) body.get("datasource_id");
             String sql = (String) body.get("sql");
-            String tableName = (String) body.get("table_name");
             @SuppressWarnings("unchecked")
             Map<String, Object> params = new LinkedHashMap<>((Map<String, Object>) body.getOrDefault("params", Map.of()));
             int maxRows = body.containsKey("max_rows") ? ((Number) body.get("max_rows")).intValue() : 10000;
@@ -100,19 +112,36 @@ public class QueryController {
                 return ResponseEntity.ok(ApiResponse.badRequest("数据源 ID 和 SQL 不能为空"));
             }
 
-            // ── 架构规则 2.4: RLS 行级过滤接入（执行契约单源 + 四态分流，D-B4-24）──
-            if (tableName != null && !tableName.isEmpty()) {
-                String userId = UserContext.getCurrentUserId();
-                if (userId == null) {
-                    userId = "anonymous";
-                }
+            // ── 架构规则 2.4: RLS 行级过滤接入（作用域显式声明 + 执行契约单源 + 四态分流）──
+            // D-B4-63：作用域是「本查询要不要跑行过滤」的唯一开关。此前只在 table_name 非空时
+            // 才跑，于是「不声明」本身就是一条绕过路径——属主从未发起裁决，日志里连一条 DENY
+            // 都不会留，读面看起来"一切正常"。修法取「调用方显式声明」而非「从 SQL 反推表名」：
+            // 反推需要解析器，而解析器认不出的语句只能二选一——放行（同一个洞换个位置）或全拒
+            // （打脸合法多表），两者都比一条声明契约更贵。
+            List<String> scope = declaredRlsScope(body);
+            if (scope.isEmpty()) {
+                log.warn("RLS 作用域未声明，默认 DENY（调用方违约态，非策略拒绝）: datasourceId={}, userId={}",
+                        datasourceId, UserContext.getCurrentUserId());
+                return ResponseEntity.status(RlsExecutionContract.SCOPE_UNDECLARED_HTTP)
+                        .body(ApiResponse.error(RlsExecutionContract.SCOPE_UNDECLARED_HTTP,
+                                RlsExecutionContract.SCOPE_UNDECLARED_CODE,
+                                "查询未声明行级安全作用域，请求被拒绝（默认 DENY：作用域须由调用方显式声明）"));
+            }
 
-                RlsExecutionContract.Execution rls = applyRls(tableName, userId, authHeader);
+            String userId = UserContext.getCurrentUserId();
+            if (userId == null) {
+                userId = "anonymous";
+            }
+
+            StringBuilder rlsConjunction = new StringBuilder();
+            int boundSlots = 0;
+            for (String table : scope) {
+                RlsExecutionContract.Execution rls = applyRls(table, userId, authHeader);
                 if (rls.unavailable()) {
                     // §4.5.4：不可用与「无权限」分态——503 可告警、可重试，禁冒充 403「没权限」。
                     // 状态行与信封同源（RlsExecutionContract.SEC_UNAVAILABLE_HTTP），禁两处各写一遍
                     log.warn("RLS 服务不可用，默认 DENY（503 分态）: tableName={}, userId={}, reason={}",
-                            tableName, userId, rls.reason());
+                            table, userId, rls.reason());
                     return ResponseEntity.status(RlsExecutionContract.SEC_UNAVAILABLE_HTTP)
                             .body(ApiResponse.error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
                                     ERROR_SEC_UNAVAILABLE,
@@ -120,28 +149,35 @@ public class QueryController {
                 }
                 if (rls.denied()) {
                     log.warn("RLS 裁决拒绝，默认 DENY: tableName={}, userId={}, reason={}, noPolicyMatched={}",
-                            tableName, userId, rls.reason(), rls.noPolicyMatched());
+                            table, userId, rls.reason(), rls.noPolicyMatched());
                     return ResponseEntity.status(HttpStatus.FORBIDDEN)
                             .body(ApiResponse.forbidden("无匹配的行级安全策略，访问被拒绝（默认 DENY）"));
                 }
                 if (rls.allowAll()) {
                     // 恒真＝裁决明确「不限制行」，与「应答没给谓词」是两个态（后者已在上两分支拒绝）
-                    log.info("RLS 裁决恒真（不限制行），本查询不追加行过滤: tableName={}, userId={}",
-                            tableName, userId);
-                } else {
-                    RlsPredicateBinder.Bound bound =
-                            RlsPredicateBinder.toNamedForm(rls.clause(), rls.params(), params);
-                    if (!bound.ok()) {
-                        log.warn("RLS 片段不可安全绑定，默认 DENY: tableName={}, userId={}, reason={}",
-                                tableName, userId, bound.reason());
-                        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                                .body(ApiResponse.forbidden("行级安全谓词无法安全绑定，查询被拒绝（默认 DENY）"));
-                    }
-                    params.putAll(bound.namedParams());
-                    sql = wrapWithRlsPredicate(sql, bound.template());
-                    log.info("RLS 参数化谓词已注入: tableName={}, userId={}, bindings={}",
-                            tableName, userId, bound.namedParams().size());
+                    log.info("RLS 裁决恒真（不限制行），该作用域不追加行过滤: tableName={}, userId={}",
+                            table, userId);
+                    continue;
                 }
+                RlsPredicateBinder.Bound bound =
+                        RlsPredicateBinder.toNamedForm(rls.clause(), rls.params(), params, boundSlots);
+                if (!bound.ok()) {
+                    log.warn("RLS 片段不可安全绑定，默认 DENY: tableName={}, userId={}, reason={}",
+                            table, userId, bound.reason());
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .body(ApiResponse.forbidden("行级安全谓词无法安全绑定，查询被拒绝（默认 DENY）"));
+                }
+                params.putAll(bound.namedParams());
+                boundSlots += bound.namedParams().size();
+                if (rlsConjunction.length() > 0) {
+                    rlsConjunction.append(" AND ");
+                }
+                // 逐段加括号：策略片段自带 OR 时，不加括号的 AND 合取会因优先级被读宽（＝放行面）
+                rlsConjunction.append('(').append(bound.template()).append(')');
+            }
+            if (rlsConjunction.length() > 0) {
+                sql = wrapWithRlsPredicate(sql, rlsConjunction.toString());
+                log.info("RLS 参数化谓词已注入: scope={}, userId={}, bindings={}", scope, userId, boundSlots);
             }
 
             // 大表查询保护：ExecutorService 超时保护 (30秒)
@@ -167,6 +203,33 @@ public class QueryController {
             log.error("Query execution failed", e);
             return ResponseEntity.ok(ApiResponse.internalError("查询执行失败"));
         }
+    }
+
+    /**
+     * 读取调用方声明的行级安全作用域（D-B4-63）。
+     *
+     * <p>两个键都是<b>请求体加性键</b>（既有路径与签名一字未动）：{@code table_name}＝单表旧形态，
+     * 保留给既有消费者；{@code table_names}＝多表声明形态。取并集去重是因为"单表＋多表混传"
+     * 只能有两种合理解释——以某一个为准（另一个声明作废＝静默丢作用域）或并集。选并集：
+     * 多算一张表＝多跑一次裁决（更严），漏算一张＝那一表的行过滤根本没跑（正是本缺陷形态）。</p>
+     *
+     * @return 去重后的表名集；<b>空集＝未声明</b>，由调用方转默认 DENY，禁在此兜底猜测
+     */
+    static List<String> declaredRlsScope(Map<String, Object> body) {
+        java.util.Set<String> scope = new LinkedHashSet<>();
+        Object single = body.get("table_name");
+        if (single instanceof String text && !text.isBlank()) {
+            scope.add(text.trim());
+        }
+        Object many = body.get("table_names");
+        if (many instanceof Collection<?> values) {
+            for (Object value : values) {
+                if (value instanceof String text && !text.isBlank()) {
+                    scope.add(text.trim());
+                }
+            }
+        }
+        return List.copyOf(scope);
     }
 
     /**

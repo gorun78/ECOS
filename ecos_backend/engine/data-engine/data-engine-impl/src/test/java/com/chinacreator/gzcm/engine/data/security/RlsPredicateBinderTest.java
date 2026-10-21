@@ -146,6 +146,36 @@ class RlsPredicateBinderTest {
     }
 
     @Test
+    @DisplayName("多作用域续编（D-B4-63）：slotOffset 让第二张表从下一槽起编，两个合法片段不再互撞")
+    void slotOffsetContinuesNumberingAcrossScopes() {
+        // 无 offset 时第二次调用会撞 rlsP0 —— 那是"合法多表"被判成越权冲突的形态
+        RlsPredicateBinder.Bound second = RlsPredicateBinder.toNamedForm(
+                "b = ? OR c = ?", List.of("v-b", "v-c"),
+                Map.of(RlsPredicateBinder.PARAM_NAME_PREFIX + "0", "v-a"), 1);
+
+        assertTrue(second.ok(), second.reason());
+        assertEquals("b = :rlsP1 OR c = :rlsP2", second.template());
+        assertEquals(Map.of("rlsP1", "v-b", "rlsP2", "v-c"), second.namedParams());
+
+        // offset 不豁免冲突检测：真正落到已占用名字仍须拒绝，且报的是实际落到的槽（rlsP1 而非 rlsP0）
+        RlsPredicateBinder.Bound collide = RlsPredicateBinder.toNamedForm(
+                "d = ?", List.of("v-d"),
+                Map.of(RlsPredicateBinder.PARAM_NAME_PREFIX + "1", "user-supplied"), 1);
+        assertFalse(collide.ok());
+        assertTrue(collide.reason().contains("rlsP1"), collide.reason());
+    }
+
+    @Test
+    @DisplayName("三参形态＝offset 0（既有调用点语义一字未变）")
+    void threeArgFormDelegatesToZeroOffset() {
+        RlsPredicateBinder.Bound plain = RlsPredicateBinder.toNamedForm("a = ?", List.of("v"), Map.of());
+        RlsPredicateBinder.Bound explicit = RlsPredicateBinder.toNamedForm("a = ?", List.of("v"), Map.of(), 0);
+
+        assertEquals(plain.template(), explicit.template());
+        assertEquals(plain.namedParams(), explicit.namedParams());
+    }
+
+    @Test
     @DisplayName("计数与改写共用同一字符态机：countPlaceholders == 改写出的绑定数")
     void counterAndRewriterAgree() {
         List<String> clauses = List.of(

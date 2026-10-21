@@ -32,6 +32,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.data.QueryExecutionService;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 
@@ -62,17 +63,17 @@ import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
  * 线上契约的键面漂移（D-B4-17 的根因）只有用真实键面才测得出来——若夹具与读侧共用同一常量，
  * 两侧一起改名时本类会恒绿。</p>
  *
- * <p><b>范围边界（如实登记，不冒充）</b>：本类只钉「请求带 {@code table_name}」时的四态分流；
- * 不带 {@code table_name} 的裸 SQL 面由 {@code QueryExecutorBindingTest}（值不入 SQL 文本）
- * 与 {@code RlsInjectionGuardArchTest}（禁裸拼谓词）守，不在本批改判据。
- * 「{@code table_name} 为空即整条 RLS 不跑」这一<b>触发条件覆盖面</b>不在本批修法内，
- * 已按实测另立差距 <b>D-B4-63</b> 在册。成功面与非安全类失败面（{@code badRequest}／
+ * <p><b>范围边界（如实登记，不冒充）</b>：本类钉「请求声明了作用域」时的四态分流，
+ * 以及「请求<b>没</b>声明作用域」时的调用方违约态（#142/B4-3e-19 收口差距 <b>D-B4-63</b>：
+ * 收口前不带 {@code table_name} ＝ 整条 RLS 根本不参与，属主直接执行调用方给的任意 SQL）。
+ * 谓词本身的值不入 SQL 文本由 {@code QueryExecutorBindingTest} 守，禁裸拼谓词由
+ * {@code RlsInjectionGuardArchTest} 守，不在本批改判据。成功面与非安全类失败面（{@code badRequest}／
  * {@code internalError}）有意保持 HTTP 200（不扩面），余下裸回面由
  * {@code SecurityDenialHttpStatusRatchetTest} 量化为只减不增基线。
  * {@code restTemplate} 是 {@code private final} 且无测试接缝，用反射注入而非为此改生产签名
  * （API 只增不改），注入失败即抛——禁「注入不上就跳过」的假绿。</p>
  */
-@DisplayName("B4-3d-5／B4-3e-18：data-engine 查询通道 —— RLS 四态分流、参数化注入与 HTTP 状态行保真")
+@DisplayName("B4-3d-5／3e-18／3e-19：data-engine 查询通道 —— 作用域声明门、RLS 四态分流、参数化注入与 HTTP 状态行保真")
 class QueryControllerRlsFourStateTest {
 
     private static final String TABLE = "t_order";
@@ -116,7 +117,7 @@ class QueryControllerRlsFourStateTest {
         assertEquals(200, status(resp), "过滤放行腿状态行 = 200");
         assertEquals(ApiResponse.CODE_SUCCESS, envelope(resp).getCode());
         Map<String, Object> captured = capturedExecute();
-        assertEquals("SELECT * FROM (" + INTENT_SQL + ") AS _rls WHERE (org_id = :rlsP0)",
+        assertEquals("SELECT * FROM (" + INTENT_SQL + ") AS _rls WHERE ((org_id = :rlsP0))",
                 captured.get("sql"));
         assertEquals(Map.of("rlsP0", "o-42"), asParams(captured.get("params")));
         assertFalse(String.valueOf(captured.get("sql")).contains("o-42"),
@@ -276,6 +277,114 @@ class QueryControllerRlsFourStateTest {
                         + "信封里的 403/503 会被 Spring 落成 HTTP 200（D-B4-59 复现形态）");
     }
 
+    // ═══════════════ 作用域声明门（D-B4-63） ═══════════════
+
+    @Test
+    @DisplayName("未声明作用域＝403 ECOS-SEC-520，且既不发起裁决也不触达执行层（旧形态＝整条 RLS 不参与、放行任意 SQL）")
+    void undeclaredScopeIsForbiddenAndNeverReachesTheEngine() {
+        RestTemplate transport = transportReturning(applyResponse(data("whereClause", "1=1")));
+        stubQueryReturnsOneRow();
+        Map<String, Object> undeclared = new LinkedHashMap<>();
+        undeclared.put("datasource_id", "ds-1");
+        undeclared.put("sql", INTENT_SQL);
+
+        ResponseEntity<ApiResponse<Map<String, Object>>> resp =
+                controllerWith(transport, resolverReturning(APPLY_BASE)).execute(undeclared, null);
+
+        assertScopeUndeclaredShape(resp);
+        verifyNoInteractions(queryExecutionService);
+        verify(transport, never()).postForObject(anyString(), any(HttpEntity.class), eq(Map.class));
+    }
+
+    @Test
+    @DisplayName("空白表名＝未声明（禁把 \"  \" 当成一个作用域而静默放行，也不允许 trim 后猜表）")
+    void blankTableNameIsUndeclaredNotAnEmptyScopePass() {
+        Map<String, Object> body = body(Map.of());
+        body.put("table_name", "   ");
+        body.put("table_names", List.of("", "  "));
+        stubQueryReturnsOneRow();
+
+        assertScopeUndeclaredShape(controllerWith(
+                transportReturning(applyResponse(data("whereClause", "1=1"))),
+                resolverReturning(APPLY_BASE)).execute(body, null));
+        verifyNoInteractions(queryExecutionService);
+    }
+
+    @Test
+    @DisplayName("未声明态与策略拒绝态必须分码：前者是调用方违约（修代码），后者是无权限（走申请）")
+    void undeclaredScopeIsNotFoldedIntoPolicyDenial() {
+        Map<String, Object> body = body(Map.of());
+        body.remove("table_name");
+        ResponseEntity<ApiResponse<Map<String, Object>>> undeclared = controllerWith(
+                transportReturning(applyResponse(data("whereClause", "1=1"))),
+                resolverReturning(APPLY_BASE)).execute(body, null);
+        ResponseEntity<ApiResponse<Map<String, Object>>> denied =
+                run(data("whereClause", "1=0", "rlsDenyReason", "RLS_NO_POLICY_MATCHED"));
+
+        assertEquals(status(undeclared), status(denied), "两态同走 403 状态行（都是「请求本身不被接受」）");
+        assertNotEquals(envelope(undeclared).getErrorCode(), envelope(denied).getErrorCode(),
+                "状态行同形时，信封的机读码必须把「调用方没声明作用域」与「策略判你没权限」分开");
+    }
+
+    @Test
+    @DisplayName("多表声明：逐表各裁一次，谓词按 AND 合取加括号，命名槽位续编不互撞")
+    void multiTableScopeAdjudicatesPerTableAndConjoinsPredicates() {
+        stubQueryReturnsOneRow();
+        RestTemplate transport = mock(RestTemplate.class);
+        when(transport.postForObject(anyString(), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(applyResponse(data("whereClause", "a = ?", "whereParams", List.of("v-a"))))
+                .thenReturn(applyResponse(data("whereClause", "b = ? OR c = ?", "whereParams",
+                        List.of("v-b", "v-c"))));
+
+        Map<String, Object> body = body(Map.of());
+        body.remove("table_name");
+        body.put("table_names", List.of("t_a", "t_b"));
+        controllerWith(transport, resolverReturning(APPLY_BASE)).execute(body, null);
+
+        verify(transport, org.mockito.Mockito.times(2))
+                .postForObject(anyString(), any(HttpEntity.class), eq(Map.class));
+        Map<String, Object> captured = capturedExecute();
+        String sql = String.valueOf(captured.get("sql"));
+        Map<String, Object> sentParams = asParams(captured.get("params"));
+
+        // 第二张表的片段含 OR：不加括号则 `a AND b OR c` 会被优先级读宽＝放行面（本断言专防这个）
+        assertTrue(sql.contains("(a = :rlsP0) AND (b = :rlsP1 OR c = :rlsP2)"),
+                "多表谓词未按段加括号合取，实际送达 SQL: " + sql);
+        assertEquals(Map.of("rlsP0", "v-a", "rlsP1", "v-b", "rlsP2", "v-c"), sentParams,
+                "槽位续编失效＝第二张表撞名（撞名会被 binder 判 DENY，这里必须能绑定）");
+        assertFalse(sql.contains("v-a"), "绑定值禁进 SQL 文本（IR05）");
+    }
+
+    @Test
+    @DisplayName("单表旧键与多表新键同传＝取并集，任一表 DENY 即整体 DENY（禁以某一个为准而静默丢作用域）")
+    void unionOfSingleAndMultiKeyScopesAndAnyDenialBlocksWholeQuery() {
+        RestTemplate transport = mock(RestTemplate.class);
+        when(transport.postForObject(anyString(), any(HttpEntity.class), eq(Map.class)))
+                .thenReturn(applyResponse(data("whereClause", "1=1")))
+                .thenReturn(applyResponse(data("whereClause", "1=0", "rlsDenyReason", "RLS_NO_POLICY_MATCHED")));
+
+        Map<String, Object> body = body(Map.of());
+        body.put("table_names", List.of("t_b"));
+        ResponseEntity<ApiResponse<Map<String, Object>>> resp = controllerWith(transport,
+                resolverReturning(APPLY_BASE)).execute(body, null);
+
+        assertDeniedShape(resp, "并集里第二张表被策略拒绝，整条查询必须 DENY");
+        verifyNoInteractions(queryExecutionService);
+    }
+
+    @Test
+    @DisplayName("作用域解析单源：并集去重、空白剔除、顺序稳定（表序影响谓词拼接，必须可预期）")
+    void scopeReaderDeduplicatesAndKeepsDeclarationOrder() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("table_name", " t_a ");
+        body.put("table_names", List.of("t_a", " ", "t_b", "t_c"));
+
+        assertEquals(List.of("t_a", "t_b", "t_c"), QueryController.declaredRlsScope(body));
+        assertEquals(List.of(), QueryController.declaredRlsScope(Map.of("table_names", List.of())));
+        assertEquals(List.of(), QueryController.declaredRlsScope(Map.of("table_names", "not-a-list")),
+                "非集合形态的声明必须按未声明处理（禁宽容成放行）");
+    }
+
     // ═══════════════ 寻址单源（W32） ═══════════════
 
     @Test
@@ -427,8 +536,24 @@ class QueryControllerRlsFourStateTest {
         assertEquals(ApiResponse.CODE_FORBIDDEN, envelope(resp).getCode(), why + "（信封 code）");
     }
 
-    private void assert503(RestTemplate transport) {
-        assert503Shape(runWithTransport(transport));
+    /**
+     * 未声明作用域态的双面目判据（D-B4-63）：状态行 403 ＋ 信封 403 ＋ 机读码
+     * {@code ECOS-SEC-520}（取 {@link RlsExecutionContract#SCOPE_UNDECLARED_CODE} 单源，
+     * 断言侧不抄字面量，否则常量漂移与判据漂移会互相掩盖）。
+     */
+    private static void assertScopeUndeclaredShape(ResponseEntity<ApiResponse<Map<String, Object>>> resp) {
+        assertEquals(RlsExecutionContract.SCOPE_UNDECLARED_HTTP, status(resp),
+                "未声明作用域的拒绝必须落真状态行（不是恒 200 的信封）");
+        ApiResponse<Map<String, Object>> env = envelope(resp);
+        assertEquals(RlsExecutionContract.SCOPE_UNDECLARED_HTTP, env.getCode(),
+                "状态行与信封码必须同源（两处各写一遍＝会漂移）");
+        assertEquals(RlsExecutionContract.SCOPE_UNDECLARED_CODE, env.getErrorCode(),
+                "调用方违约态必须有独立机读码：与策略拒绝同码会让前端弹「去申请权限」的错窗工单");
+        assertNotEquals(QueryController.ERROR_SEC_UNAVAILABLE, env.getErrorCode(),
+                "未声明作用域不是「安全服务没答」，禁复用 501");
+    }
+
+    private void assert503(RestTemplate transport) {        assert503Shape(runWithTransport(transport));
         verifyNoInteractions(queryExecutionService);
     }
 

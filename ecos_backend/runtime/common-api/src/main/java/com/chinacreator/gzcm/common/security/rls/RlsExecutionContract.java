@@ -156,6 +156,28 @@ public final class RlsExecutionContract {
      */
     public static final int SEC_UNAVAILABLE_HTTP = 503;
 
+    /**
+     * <b>#142/B4-3e-19（D-B4-63）</b>：调用方<b>未声明行级安全作用域</b>时的对外信封码。
+     *
+     * <p>与 501／502 分成三个态是必需的，不是文案偏好：501＝「裁决机构没答」（运维告警、可重试），
+     * 502＝「OPA 没答」（策略引擎侧），本码＝<b>调用方违约</b>（请求体没有可寻址的安全作用域，
+     * 属主<b>从未发起裁决</b>）。把它折进 403「无权限」会让前端弹「找管理员申请权限」的工单，
+     * 而真正要修的是调用方代码——所以两者必须有不同的码，日志与告警才寻址得到。</p>
+     *
+     * <p>取 520 段而非 503：{@code ECOS-SEC-5xx} 是安全裁决族，编号复用 HTTP 状态值会让
+     * 「信封码 503」与「HTTP 503」在检索时混成一条（本族既有 501/502 不与 HTTP 值同形）。</p>
+     */
+    public static final String SCOPE_UNDECLARED_CODE = "ECOS-SEC-520";
+
+    /**
+     * 未声明作用域的 HTTP 状态行（与 {@code ApiResponse.error(403, ECOS-SEC-520, …)} 同源）。
+     *
+     * <p>用 403 而非 503：这不是「服务没答」而是「请求本身不被接受」，重试不会变好；
+     * 但信封码必须与策略拒绝（无 501 语义的裸 403）区分，判据见
+     * {@code QueryControllerRlsFourStateTest}。</p>
+     */
+    public static final int SCOPE_UNDECLARED_HTTP = 403;
+
     /** 占位符残留检测（与生产者 {@code RlsPredicateRenderer.PLACEHOLDER} 同形）。 */
     private static final Pattern RESIDUAL_PLACEHOLDER = Pattern.compile(":(\\w+)");
 

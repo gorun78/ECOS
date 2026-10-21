@@ -435,6 +435,7 @@
   "dw.enterRuleName": "Please enter a rule name",
   "dw.execFailed": "Execution failed",
   "dw.execFailedMsg": "Execution failed: {msg}",
+  "dw.rlsScopeUndeclared": "No table scope could be identified from the SQL, so row-level security cannot adjudicate; execution refused (default DENY). Please state the FROM/JOIN tables explicitly and retry.",
   "dw.executing": "Executing...",
   "dw.folder.colModified": "Modified",
   "dw.folder.colName": "File Name",

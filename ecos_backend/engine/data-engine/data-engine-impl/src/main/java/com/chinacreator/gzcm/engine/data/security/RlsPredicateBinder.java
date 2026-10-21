@@ -77,6 +77,18 @@ public final class RlsPredicateBinder {
      * @param existingNames 调用方已有参数名集（用于冲突检测，可为 {@code null}）
      */
     public static Bound toNamedForm(String clause, List<Object> values, Map<String, Object> existingNames) {
+        return toNamedForm(clause, values, existingNames, 0);
+    }
+
+    /**
+     * 多作用域形态（#142/B4-3e-19，D-B4-63）：同一请求声明了多张表时，逐表绑定必须
+     * 从不同槽位起编，否则第二张表的 {@code rlsP0} 会撞上第一张表已生成的名字——
+     * 那不是「冲突即拒绝」要防的越权覆盖，而是两个合法作用域互相挤掉。
+     *
+     * @param slotOffset 已占用合成槽位数（本批从累计绑定数起编）
+     */
+    public static Bound toNamedForm(String clause, List<Object> values, Map<String, Object> existingNames,
+                                    int slotOffset) {
         if (clause == null || clause.isBlank()) {
             return Bound.fail(REASON_CLAUSE_ABSENT);
         }
@@ -112,7 +124,7 @@ public final class RlsPredicateBinder {
                 continue;
             }
             if (c == '?') {
-                String key = PARAM_NAME_PREFIX + slot;
+                String key = PARAM_NAME_PREFIX + (slotOffset + slot);
                 if ((existingNames != null && existingNames.containsKey(key)) || named.containsKey(key)) {
                     return Bound.fail(REASON_NAME_COLLISION + "(" + key + ")");
                 }
