@@ -166,6 +166,29 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- #142/B4-3e-23（收口 D-B4-57）：本模块 `KbNavMissingTableReturnsServerError.java`
+                 是详设-04 §F04-03 冻结的验收标识（`mvn -Dtest=KbNavMissingTableReturnsServerError#absentTableYields500Not404`，
+                 见 docs/30-设计/详细设计-04-知识域-dccheng与kb-engine-2026-09-29.md:199），
+                 类名既不匹配 surefire 默认四项、也不匹配根 pom 补的 *IT 形态 ⇒ 此前只编译不执行（假绿面）。
+                 名称为文档契约不可改，故在此显式补执行面；`-Dtest` 手工跑会绕过 includes，
+                 所以文档里的验收命令一直是绿的，`mvn test` 却从未跑过它。
+                 ⚠ 显式 includes 覆盖语义下必须把根 pom 的全部形态一并声明（此处 = 默认四项 + *IT + 该具名类）。
+                 门禁：gateway `RepoTestSurfaceExecutabilityTest`。 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <includes>
+                        <include>**/Test*.java</include>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                        <include>**/*TestCase.java</include>
+                        <include>**/*IT.java</include>
+                        <include>**/KbNavMissingTableReturnsServerError.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>

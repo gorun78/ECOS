@@ -185,25 +185,12 @@
                 </executions>
             </plugin>
 
-            <!-- 2026-10-11 F02-15 收口批次实测：surefire 默认 includes 只认
-                 Test*/*Test/*Tests/*TestCase，本模块三个 *IT 冻结验收类
-                 （ScenarioToolInvocationIT / CitationInducementIT / WAgentGoalControllerIT）
-                 从未被 mvn test 实跑过 —— 属假绿面。此处在本模块补齐 IT 执行面
-                 （默认四项 pattern 必须一并声明，显式 includes 会覆盖默认值）。
-                 其余模块的 *IT 登记为后续批次缺口，见补充详设 §19.6。 -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <includes>
-                        <include>**/Test*.java</include>
-                        <include>**/*Test.java</include>
-                        <include>**/*Tests.java</include>
-                        <include>**/*TestCase.java</include>
-                        <include>**/*IT.java</include>
-                    </includes>
-                </configuration>
-            </plugin>
+            <!-- 2026-10-11 F02-15 收口批次曾在「本模块」补 surefire IT 执行面（当时属半截子改动，
+                 补充详设 §19.6 第 7 条登记其余模块 *IT 缺口）。
+                 2026-10-22 #142/B4-3e-23 收口 D-B4-54/D-B4-57：IT 执行面已按该条根治口径
+                 「全仓 surefire 配置上收父 POM」落到根 pom.xml pluginManagement，
+                 本模块不再重复声明（重复即双源）。执行面由 gateway
+                 `RepoTestSurfaceExecutabilityTest` 门禁 + `mvn test` 实跑用例数取证。 -->
         </plugins>
     </build>
 </project>

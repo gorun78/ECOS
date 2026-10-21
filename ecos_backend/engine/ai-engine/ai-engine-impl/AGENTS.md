@@ -6,7 +6,7 @@
 ## 本模块干什么
 - **实现层（业务）**：Agent 循环 (AgentLoopService) + 工具执行 (ToolExecutorService) + 会话 (AgentSessionService) + 委托 (AgentDelegationService) + OAG 管线 (OagPipelineEngine/SecurityCheckerNode/AgentToolPolicyGate) + LLM 网关适配 + SSE 流式。
 - **测试充分（2026-10-09 实测：33 个 test 类 / 144 个 {@code @Test} 用例）**：以目录为准（`src/test/java/.../ai/**/*Test*.java`），文档禁手写闭包清单。门禁 `ModuleDocTruthfulnessTest` 会实测并对账，漂移即 FAIL。
-- **测试执行面（2026-10-11 订正）**：surefire 默认 includes 不认 `*IT.java`，本模块 3 个 IT 冻结验收类（`ScenarioToolInvocationIT`/`CitationInducementIT`/`WAgentGoalControllerIT`，共 7 用例）此前从未被 `mvn test` 实跑；模块 pom 已显式补 `**/*IT.java`（默认四项 pattern 一并声明），现 `mvn test` 实跑 203 用例全绿。其余模块的 `*IT` 仍属未执行面（见补充详设 §19.6）。
+- **测试执行面（2026-10-22 #142/B4-3e-23 订正）**：surefire 默认 includes 不认 `*IT.java`，本模块 3 个 IT 冻结验收类（`ScenarioToolInvocationIT`/`CitationInducementIT`/`WAgentGoalControllerIT`）2026-10-11 起曾在**本模块 pom** 显式补 `**/*IT.java`＝半截子改动；该形态已按补充详设 §19.6 第 7 条的根治口径**上收根 `ecos_backend/pom.xml` 的 surefire pluginManagement 单源**，本模块不再重复声明。2026-10-22 六模块 reactor 实跑（`mvn -o -fae -pl engine/ai-engine/ai-engine-impl,...,gateway test`，日志 `_win_tasks/logs/b4-3e-23-itface-test2.log`）本模块 = **547 用例 / 0 失败 / 0 错误 / 0 跳过**，3 枚 IT 均在执行面内。防复发门禁＝gateway `RepoTestSurfaceExecutabilityTest`（含活动测试注解的测试面文件不被生效 includes 命中即红）。
 - **出向寻址（F02-15，2026-10-11 收口）**：`ToolExecutorService` 场景工具 base-url 一律经 runtime-access `ServiceEndpointResolver.resolve("workspace", SERVICE)` 按 `/route-manifest.json` 两态寻址；`service.scenario.base-url` 仅作运维显式覆盖位（默认空），解析不到即 fail-loud（禁回落硬编码 localhost 字面量）。
 
 ## 主要 code（控制器/服务/实体）

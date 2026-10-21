@@ -583,12 +583,28 @@
                         <maxmem>1024m</maxmem>
                     </configuration>
                 </plugin>
+                <!-- #142/B4-3e-23（收口 D-B4-54/D-B4-57）：*IT 执行面上收父 POM 单源。
+                     surefire 默认 includes 只有 Test*/*Test/*Tests/*TestCase，不含 *IT.java，
+                     导致 data-engine-impl `DqPhase4E2eIT`、llm-gateway `AiFaultInjectionIT`、
+                     workspace-impl `WorkspaceRouteReachabilityIT` 长期只编译不执行（编译绿≠跑绿）。
+                     原 ai-engine-impl 本模块 pom 的补齐属半截子改动（补充详设 §19.6 第 7 条登记的
+                     根治口径 = 「命名规约统一 + 全仓 surefire 配置上收父 POM」），此处落根治。
+                     ⚠ 显式 includes 会覆盖默认值，故默认四项必须一并声明、只增不减。
+                     门禁：gateway `RepoTestSurfaceExecutabilityTest`（含活动测试注解的测试面文件
+                     必须被所在模块生效 includes 命中，否则红）。 -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${maven-surefire-plugin.version}</version>
                     <configuration>
                         <failIfNoTests>false</failIfNoTests>
+                        <includes>
+                            <include>**/Test*.java</include>
+                            <include>**/*Test.java</include>
+                            <include>**/*Tests.java</include>
+                            <include>**/*TestCase.java</include>
+                            <include>**/*IT.java</include>
+                        </includes>
                     </configuration>
                 </plugin>
                 <plugin>
