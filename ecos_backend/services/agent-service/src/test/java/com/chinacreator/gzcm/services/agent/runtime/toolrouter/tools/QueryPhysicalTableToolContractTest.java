@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       （{@link #guardRejectionNeverReachesTheOwnerEndpoint()}）。否则改指属主端点只是把
  *       任意 SQL 换了个执行地点，风险一点没降。</li>
  *   <li><b>表名如实随体下发</b>：属主 {@code QueryController#execute} 只在
- *       {@code table_name} 非空时才跑 RLS（该条件在册为 <b>D-B4-59</b>），所以
+ *       {@code table_name} 非空时才跑 RLS（该触发条件覆盖面在 #142/B4-3e-18 另立为 <b>D-B4-63</b>），所以
  *       {@code table_name} 缺失＝本腿自愿放弃行级安全
  *       （{@link #tableNameIsCarriedInTheBodySoOwnerRlsApplies()} 把它钉成必带项）。</li>
  *   <li><b>分态不折叠</b>：§4.7.2「不可用 ≠ 无权限」在这里落成
@@ -256,7 +256,7 @@ class QueryPhysicalTableToolContractTest {
         assertEquals("ds-9", body.get(QueryPhysicalTableTool.BODY_DATASOURCE_ID), "数据源 ID 必须原形带给属主");
         assertEquals(READ_ONLY_SQL, body.get(QueryPhysicalTableTool.BODY_SQL));
         assertEquals("dw_sales.order_detail", body.get(QueryPhysicalTableTool.BODY_TABLE_NAME),
-                "FROM 提取的物理表名（小写归一）必须进 table_name —— 属主端点以此决定是否跑行级安全（D-B4-59）");
+                "FROM 提取的物理表名（小写归一）必须进 table_name —— 属主端点以此决定是否跑行级安全（触发条件覆盖面在册为 D-B4-63）");
         assertEquals(1000, ((Number) body.get(QueryPhysicalTableTool.BODY_MAX_ROWS)).intValue(),
                 "缺省行数与收口前缺省值同形（外形只增不改）");
     }

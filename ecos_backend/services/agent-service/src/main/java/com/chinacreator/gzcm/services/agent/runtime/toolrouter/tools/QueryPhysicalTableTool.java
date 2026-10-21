@@ -35,19 +35,20 @@ import java.util.Optional;
  * <p><b>现口径</b>：①前置判据 {@link PhysicalQueryGuard} 只放行「SELECT 起首 + 单表 +
  * 无注释/多语句/写关键字」，判据不过<b>不发起调用</b>；②放行时把 FROM 提取到的表名
  * <b>如实带进请求体 {@code table_name}</b> —— 属主端点
- * {@code QueryController#execute} 只在 {@code table_name} 非空时才跑 RLS（该条件本身在册为
- * <b>D-B4-59</b>），所以"带上表名"不是装饰，而是这条腿能否被行级安全覆盖的分界；
+ * {@code QueryController#execute} 只在 {@code table_name} 非空时才跑 RLS（该触发条件覆盖面在
+ * #142/B4-3e-18 按实测另立为差距 <b>D-B4-63</b>，与已收口的 D-B4-59「裸回状态行」是两件事），
+ * 所以"带上表名"不是装饰，而是这条腿能否被行级安全覆盖的分界；
  * ③基址经 {@link AgentToolEndpointResolver#dataBaseUrl()}（属主 {@code datanet}，
  * 禁内联 {@code localhost:8080}）；④应答按 {@link Outcome} <b>分态</b>归一，
  * §4.7.2「不可用 ≠ 无权限」在此落到 {@code SECURITY_UNAVAILABLE} 与 {@code DENIED} 两个态上，
  * 禁把 503 折成 403；⑤入参键面与返回的 {@code rows}/{@code rowCount} 保持原形（只增不改），
  * 新增 {@code historyId} 等段来自属主应答原样透传。</p>
  *
- * <p><b>为什么读 envelope 的 {@code code} 而不是 HTTP 状态</b>：属主端点把 DENIED/UNAVAILABLE
- * 都用 {@code ApiResponse} 裸回，HTTP 层看到的仍是 200（缺陷 <b>D-B4-59</b> 已在台账登记，
- * 属主侧修法不在本批），故本腿以 {@code code}/{@code errorCode} 为权威分态来源；
- * 同时兼顾<b>真</b> 4xx/5xx（网关自身过滤器也可能先行 DENY），由
- * {@link #outcomeOfHttpStatus(int)} 做同一套分态，两个来源共用一套词表。</p>
+ * <p><b>为什么两套来源都读</b>：属主端点自 #142/B4-3e-18（收口 <b>D-B4-59</b> 的 HTTP 保真腿）
+ * 起，把 DENIED／UNAVAILABLE 经 {@code ResponseEntity} 落成<b>真状态行</b>（403／503），
+ * 本腿的 {@link HttpStatusCodeException} 分支因此不再是纸面分支；但 {@code code}／
+ * {@code errorCode} 仍是<b>权威</b>分态来源——单体包装、网关前置改写或历史部署都可能只给
+ * 200 信封，两个来源共用 {@link Outcome} 这一套词表，谁先到用谁，绝不互相折叠。</p>
  *
  * <p><b>身份载体（在册余项）</b>：属主侧 RLS 以 {@code UserContext}／转发的
  * {@code Authorization} 定主语。agent-service 现无请求上下文单源（全仓本域

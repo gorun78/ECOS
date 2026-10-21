@@ -9,7 +9,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
@@ -69,10 +71,22 @@ public class QueryController {
      * {@code UNAVAILABLE}＝503 {@code ECOS-SEC-501}，与「无权限」分态（§4.5.4 降级矩阵
      * 「security-engine 不可用 → 503 DENY」，与 {@code DecisionController} 的 fail-closed
      * 出口同形）。裸 RLS 条件字符串拼接的旧形态仍禁止（{@code RlsInjectionGuardArchTest}）。</p>
+     *
+     * <p><b>#142/B4-3e-18 收口（差距 D-B4-59 的 HTTP 保真腿）</b>：本方法此前返回裸
+     * {@code ApiResponse}，{@code ApiResponse} 只描述 body、没有任何 HTTP 状态能力
+     * ⇒ 三条安全拒绝出口（不可用 503／策略 DENY 403／绑定失败 403）在传输层一律是
+     * <b>HTTP 200</b>：§4.5.4「不可用 ≠ 无权限」的分态只在信封里成立，状态行上
+     * 403 与 503 同形，且都被 {@code res.ok} 读成成功（与
+     * {@code DataBridgeHttpStatusFidelityTest} 钉住的 gateway 域桥缺陷同根）。
+     * 现在拒绝态经 {@link ResponseEntity} 把携带值落成<b>真状态行</b>，
+     * 信封体逐字段一字未动（{@code code}/{@code errorCode}/{@code message} 原形保留），
+     * 因此既有按 {@code code} 分派的消费者不受影响；成功与非安全类失败出口
+     * 有意保持 HTTP 200（不扩面，余面由 {@code SecurityDenialHttpStatusRatchetTest} 量化在册）。</p>
      */
     @PostMapping("/execute")
-    public ApiResponse<Map<String, Object>> execute(@RequestBody Map<String, Object> body,
-                                                     @RequestHeader(value = "Authorization", required = false) String authHeader) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> execute(
+            @RequestBody Map<String, Object> body,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
             String datasourceId = (String) body.get("datasource_id");
             String sql = (String) body.get("sql");
@@ -83,7 +97,7 @@ public class QueryController {
             int timeoutSeconds = body.containsKey("timeout_seconds") ? ((Number) body.get("timeout_seconds")).intValue() : 30;
 
             if (datasourceId == null || sql == null) {
-                return ApiResponse.badRequest("数据源 ID 和 SQL 不能为空");
+                return ResponseEntity.ok(ApiResponse.badRequest("数据源 ID 和 SQL 不能为空"));
             }
 
             // ── 架构规则 2.4: RLS 行级过滤接入（执行契约单源 + 四态分流，D-B4-24）──
@@ -95,16 +109,20 @@ public class QueryController {
 
                 RlsExecutionContract.Execution rls = applyRls(tableName, userId, authHeader);
                 if (rls.unavailable()) {
-                    // §4.5.4：不可用与「无权限」分态——503 可告警、可重试，禁冒充 403「没权限」
+                    // §4.5.4：不可用与「无权限」分态——503 可告警、可重试，禁冒充 403「没权限」。
+                    // 状态行与信封同源（RlsExecutionContract.SEC_UNAVAILABLE_HTTP），禁两处各写一遍
                     log.warn("RLS 服务不可用，默认 DENY（503 分态）: tableName={}, userId={}, reason={}",
                             tableName, userId, rls.reason());
-                    return ApiResponse.error(503, ERROR_SEC_UNAVAILABLE,
-                            "行级安全服务不可用，查询被拒绝（默认 DENY，非「无权限」）");
+                    return ResponseEntity.status(RlsExecutionContract.SEC_UNAVAILABLE_HTTP)
+                            .body(ApiResponse.error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                                    ERROR_SEC_UNAVAILABLE,
+                                    "行级安全服务不可用，查询被拒绝（默认 DENY，非「无权限」）"));
                 }
                 if (rls.denied()) {
                     log.warn("RLS 裁决拒绝，默认 DENY: tableName={}, userId={}, reason={}, noPolicyMatched={}",
                             tableName, userId, rls.reason(), rls.noPolicyMatched());
-                    return ApiResponse.forbidden("无匹配的行级安全策略，访问被拒绝（默认 DENY）");
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .body(ApiResponse.forbidden("无匹配的行级安全策略，访问被拒绝（默认 DENY）"));
                 }
                 if (rls.allowAll()) {
                     // 恒真＝裁决明确「不限制行」，与「应答没给谓词」是两个态（后者已在上两分支拒绝）
@@ -116,7 +134,8 @@ public class QueryController {
                     if (!bound.ok()) {
                         log.warn("RLS 片段不可安全绑定，默认 DENY: tableName={}, userId={}, reason={}",
                                 tableName, userId, bound.reason());
-                        return ApiResponse.forbidden("行级安全谓词无法安全绑定，查询被拒绝（默认 DENY）");
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .body(ApiResponse.forbidden("行级安全谓词无法安全绑定，查询被拒绝（默认 DENY）"));
                     }
                     params.putAll(bound.namedParams());
                     sql = wrapWithRlsPredicate(sql, bound.template());
@@ -132,21 +151,21 @@ public class QueryController {
                 Future<Map<String, Object>> future = executor.submit(() ->
                         queryExecutionService.execute(datasourceId, finalSql, params, maxRows, timeoutSeconds));
                 Map<String, Object> result = future.get(30, TimeUnit.SECONDS);
-                return ApiResponse.success(result);
+                return ResponseEntity.ok(ApiResponse.success(result));
             } catch (TimeoutException e) {
                 log.warn("Query execution timeout after 30s for datasource={}", datasourceId);
                 Map<String, Object> timeoutResult = new LinkedHashMap<>();
                 timeoutResult.put("timeout", true);
                 timeoutResult.put("message", "查询超时（30秒）");
-                return ApiResponse.success(timeoutResult);
+                return ResponseEntity.ok(ApiResponse.success(timeoutResult));
             } finally {
                 executor.shutdownNow();
             }
         } catch (IllegalArgumentException e) {
-            return ApiResponse.badRequest(e.getMessage());
+            return ResponseEntity.ok(ApiResponse.badRequest(e.getMessage()));
         } catch (Exception e) {
             log.error("Query execution failed", e);
-            return ApiResponse.internalError("查询执行失败");
+            return ResponseEntity.ok(ApiResponse.internalError("查询执行失败"));
         }
     }
 
