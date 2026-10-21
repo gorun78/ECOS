@@ -29,11 +29,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>为什么基址收口必须同批钉路径</b>：把 {@code http://localhost:8080} 换成属主解析器
  * 只解决"打到哪台机器"，不解决"这台机器上有没有这个端点"。若某条腿的路径在全仓没有
  * 任何 Controller 服务，那么基址单源化之后它依然恒 404，而门禁看着比改前更"合规"——
- * 这正是本批要堵的假绿面。实测本域 9 条腿里 <b>1 条是幻影路径</b>（{@code ValidateMappingTool}
- * 的 {@code /api/v1/ecos/ontology-mappings}，全仓无 Controller，真实端点是
- * {@code /api/v1/ontology/mappings} 单条 CRUD 与 {@code /api/v1/ecos/mappings} 全局视图），
- * 已登记为 <b>D-B4-47</b>；本批按属主纪律只收基址、不动路径（改路径需要校验语义归属裁决），
- * 但把它显式钉在幻影清单里：幻影变多＝红，幻影被补齐而未删项＝同样红。</p>
+ * 这正是本批要堵的假绿面。实测本域 9 条腿里曾有 <b>1 条幻影路径</b>（{@code ValidateMappingTool}
+ * 的 {@code /api/v1/ecos/ontology-mappings}，全仓无 Controller），登记为 <b>D-B4-47</b>，
+ * 已在 <b>#142/B4-3e-10 关账</b>：本体域存在语义对口的真实端点
+ * {@code OntologyMappingController#validateMappings}＝{@code POST /api/v1/ontology/mappings/validate}
+ * （入参 DTO 支持 mappingId／内联 datasetId+fieldMappings／entityCode／全量，与工具整包透传的
+ * {@code params} 形态一致），故裁决为<b>改指既有端点</b>而非新增 API。幻影清单随之<b>清空</b>：
+ * 此后任何工具声明无 Controller 服务的路径即红（清单只准为空，"补齐不删项"的齿由同一断言承担）。</p>
  *
  * <p><b>D-B4-48 的另一面</b>：{@link ServiceEndpointResolver} 的查表键是 route-manifest 的
  * {@code owner} 字段而不是 URL 前缀，所以 {@code /api/v1/ecos}、{@code /api/v1/engine/ontology}、
@@ -63,11 +65,11 @@ class AgentToolPathReachabilityTest {
     private static final Pattern MANIFEST_PREFIX = Pattern.compile("\"prefix\"\\s*:\\s*\"([^\"]+)\"");
 
     /**
-     * D-B4-47 在册幻影路径清单（实测 1 条）：工具声明了、但全仓没有 Controller 服务的路径。
-     * 双向棘轮——新增幻影即红，幻影被补齐而不删项也红。
+     * D-B4-47 在册幻影路径清单：<b>#142/B4-3e-10 关账后为空</b>（原唯一一项
+     * {@code /api/v1/ecos/ontology-mappings} 已改指 {@code /api/v1/ontology/mappings/validate}）。
+     * 零容忍——任何工具声明无 Controller 服务的路径即红，包括退回上一条死路径。
      */
-    private static final Set<String> KNOWN_PHANTOM_PATHS = Set.of(
-            "/api/v1/ecos/ontology-mappings");
+    private static final Set<String> KNOWN_PHANTOM_PATHS = Set.of();
 
     /**
      * D-B4-48 在册未登记前缀清单（实测 3 条）：工具族根在 route-manifest 里没有前缀条目，
@@ -83,7 +85,7 @@ class AgentToolPathReachabilityTest {
 
     @Test
     @Timeout(value = 180)
-    @DisplayName("工具路径必须真有 Controller 服务；幻影路径只准在册那一条（D-B4-47）")
+    @DisplayName("工具路径必须真有 Controller 服务；幻影清单已关账为空（D-B4-47）")
     void toolPathsResolveToRealControllersUnlessRegisteredAsPhantom() throws IOException {
         Map<String, String> toolPaths = toolPathConstants();
         Set<String> controllerPaths = controllerPaths();
@@ -98,10 +100,23 @@ class AgentToolPathReachabilityTest {
             }
         }
         assertEquals(KNOWN_PHANTOM_PATHS, phantoms,
-                "agent 工具幻影路径面与 D-B4-47 在册清单不符（新增＝又一条恒 404 的腿；"
-                        + "已补齐未删项＝棘轮失效）。实测=" + phantoms);
+                "agent 工具出现幻影路径：清单在册项已在 #142/B4-3e-10 关账为空，"
+                        + "非空即等于又一条恒 404 的腿（D-B4-47 复发或新增）。实测=" + phantoms);
         assertTrue(toolPaths.size() >= 9,
                 "工具路径常量扫描面异常（实扫 " + toolPaths.size() + " 条），不得对空清单判可达性");
+    }
+
+    @Test
+    @Timeout(value = 60)
+    @DisplayName("D-B4-47 关账形态钉死：校验腿走 mappings/validate，不得退回死路径")
+    void validateMappingToolUsesTheRealValidationEndpoint() throws IOException {
+        Map<String, String> toolPaths = toolPathConstants();
+        assertTrue(toolPaths.containsKey("ValidateMappingTool.java#PATH_ONTOLOGY_MAPPINGS_VALIDATE"),
+                "ValidateMappingTool 的路径常量不再是 PATH_ONTOLOGY_MAPPINGS_VALIDATE ⇒ "
+                        + "D-B4-47 的关账形态被拆掉（删常量不等于修缺陷）");
+        assertEquals("/api/v1/ontology/mappings/validate",
+                toolPaths.get("ValidateMappingTool.java#PATH_ONTOLOGY_MAPPINGS_VALIDATE"),
+                "映射校验腿未指向实测存在的 OntologyMappingController#validateMappings");
     }
 
     @Test
