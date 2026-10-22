@@ -2,10 +2,12 @@ package com.chinacreator.gzcm.engine.kb.controller;
 
 import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.kb.service.assumption.KbAssumptionDO;
 import com.chinacreator.gzcm.engine.kb.service.assumption.KbAssumptionService;
 import com.chinacreator.gzcm.engine.kb.service.assumption.KbAssumptionStore;
 import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -72,12 +74,13 @@ public class KbAssumptionController {
     /** POST /{id}/submit → DRAFT→PENDING_APPROVAL。 */
     @PostMapping("/{id}/submit")
     @RequirePermission(value = "提交假设审批", permission = "knowledge:assumption:write")
-    public ApiResponse<KbAssumptionDO> submit(@PathVariable String id,
+    public ResponseEntity<ApiResponse<KbAssumptionDO>> submit(@PathVariable String id,
                                               @RequestHeader(value = "X-Ecos-User", required = false)
                                               String user) {
         String actor = user == null || user.isBlank() ? "system" : user;
         try {
-            return ApiResponse.<KbAssumptionDO>success(service.submit(id, actor)).withTraceIdFromMdc();
+            return ResponseEntity.ok(ApiResponse.<KbAssumptionDO>success(service.submit(id, actor))
+                    .withTraceIdFromMdc());
         } catch (KbErrorCodes.DomainException e) {
             return mapDomain(e);
         }
@@ -86,14 +89,15 @@ public class KbAssumptionController {
     /** POST /{id}/approve → PENDING→ACTIVE（需审批角色校验由上层 SecurityDecisionService 负责，此处传 actor）。 */
     @PostMapping("/{id}/approve")
     @RequirePermission(value = "批准假设", permission = "knowledge:assumption:approve")
-    public ApiResponse<KbAssumptionDO> approve(@PathVariable String id,
+    public ResponseEntity<ApiResponse<KbAssumptionDO>> approve(@PathVariable String id,
                                                @RequestHeader(value = "X-Ecos-User", required = false)
                                                String user,
                                                @RequestHeader(value = ROLE_HEADER, required = false)
                                                String role) {
         String actor = user == null || user.isBlank() ? (role == null ? "system" : role) : user;
         try {
-            return ApiResponse.<KbAssumptionDO>success(service.approve(id, actor)).withTraceIdFromMdc();
+            return ResponseEntity.ok(ApiResponse.<KbAssumptionDO>success(service.approve(id, actor))
+                    .withTraceIdFromMdc());
         } catch (KbErrorCodes.DomainException e) {
             return mapDomain(e);
         }
@@ -132,8 +136,22 @@ public class KbAssumptionController {
 
     private static final String ROLE_HEADER = "X-Ecos-Role";
 
-    private static ApiResponse<KbAssumptionDO> mapDomain(KbErrorCodes.DomainException e) {
-        return ApiResponse.<KbAssumptionDO>error(
-                e.getHttpStatus() == 0 ? 500 : e.getHttpStatus(), e.getCode(), e.getMessage());
+    /**
+     * 领域异常 → 带状态行的失败信封（#142/B4-3e-30，收口差距 <b>D-B4-67 后半</b>）。
+     *
+     * <p>收口前本方法返裸 {@code ApiResponse}：路径/入参/信封字段一项未变，但 Spring 落的状态行
+     * 恒 <b>HTTP 200</b>，于是 D.3 承诺的「409 非法跃迁」「403 非知识管理员」「410 假设已过期」
+     * 在传输层全部同形成「成功」——前端 {@code if (!res.ok) throw} 读成成功、渲染成「操作完成 0 行」，
+     * 网关/重试/Playwright 只看状态行的分派面拿不到分态（与已收口的 D-B4-59 属主端点同一缺陷形态）。</p>
+     *
+     * <p>修法与 {@code KbErrorAdvice#onDomain} 同构：状态行只经 common-api 单源
+     * {@link DataBridgeException#resolveHttpStatus(int)} 裁决（合法 4xx/5xx 逐字透出，其余回退 500），
+     * 不再在本域自写 {@code == 0 ? 500 : …} 第二判据源；body 的 {@code code} 与状态行同号，
+     * 机读码仍取异常自带的 {@code ECOS-KB-***}。API 面（路径、参数、信封字段）不变，只补状态行。</p>
+     */
+    private static ResponseEntity<ApiResponse<KbAssumptionDO>> mapDomain(KbErrorCodes.DomainException e) {
+        int status = DataBridgeException.resolveHttpStatus(e.getHttpStatus());
+        return ResponseEntity.status(status)
+                .body(ApiResponse.<KbAssumptionDO>error(status, e.getCode(), e.getMessage()));
     }
 }

@@ -92,15 +92,15 @@ class RootCarrierHttpStatusSingleSourceRatchetTest {
 
     /**
      * 「显式常量覆盖」点名豁免表（{@code 相对路径#方法名}），双向基线。
-     * <p>kb {@code onBridge} 是本族唯一一枚<b>有意</b>不用携带值的根型腿：注释即契约
-     * 「别家 DataBridge 领域异常 → 502」，状态行取显式常量 {@code BAD_GATEWAY}，既不裸回 200
-     * 也不折成 403。但它确实把别域携带的 403 报成 502，属 §4.7.2「不可用 ≠ 无权限」的反向可疑面，
-     * 是否改走携带值需 kb 域裁决 ⇒ 已登记余项 <b>D-B4-67</b>，本批不扩面。
-     * 该腿一旦改走单源，残留的豁免条目即红，逼基线同批下调。</p>
+     *
+     * <p><b>现为空表</b>（#142/B4-3e-30 收口差距 <b>D-B4-67 前半</b>）：表内曾唯一点名
+     * kb {@code KbErrorAdvice.java#onBridge} —— 该腿恒写 502，把别域携带的 403 策略拒绝／503
+     * 不可用折成「上游坏掉」，属 §4.7.2「不可用 ≠ 无权限」的反向可疑面，B4-3e-29 当时只登记不改。
+     * 本域裁决后该腿已改走 {@code DataBridgeException.resolveHttpStatus} 单源、域归属证据留在
+     * 机读码 {@code ECOS-KB-501}，故同批删除豁免条目。双向语义保留：今后任何根型腿改用显式常量，
+     * 必须在本表重新点名并说明理由，否则判据 A 即红；本表若残留已不存在的条目同样即红。</p>
      */
-    private static final List<String> EXEMPT_OVERRIDE_LEGS = List.of(
-            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/"
-                    + "engine/kb/support/KbErrorAdvice.java#onBridge");
+    private static final List<String> EXEMPT_OVERRIDE_LEGS = List.of();
 
     /** 覆盖腿的最低要求：显式 HTTP 常量直接上状态行（禁裸回、禁注释承诺）。 */
     private static final Pattern EXPLICIT_STATUS_CONSTANT = Pattern.compile(

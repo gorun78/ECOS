@@ -56,11 +56,26 @@ public class KbErrorAdvice {
                 .body(ApiResponse.error(status, code, ex.getMessage()));
     }
 
-    /** 别家 DataBridge 领域异常 → 502 */
+    /**
+     * 别家 DataBridge 领域异常 → 跟随异常自述状态行（渲染域归属仍由 {@code ECOS-KB-501} 承载）。
+     *
+     * <p><b>#142/B4-3e-30（差距 D-B4-67 前半，由本域裁决收口）</b>：收口前本腿恒写 502，注释即契约
+     * 「别家 DataBridge 领域异常 → 502」。该契约在 HTTP 面上把<b>别域的 403 策略拒绝与 503 不可用
+     * 一律折成 502</b>：§4.7.2「不可用 ≠ 无权限」要求分态在状态行可见，而 502 既非拒绝也非不可用，
+     * 客户端按状态行分派时会把它当「上游坏掉」重试 —— 真实语义是「被策略拒绝」或「上游不可用」。
+     * 本类的存在理由（W94 三级掩蔽链）是<b>不被网关兜底改写成 404</b>，而不是把别域状态改写成
+     * 本域偏好的状态；域归属证据走机读码 {@code ECOS-KB-501}，状态行走 {@code DataBridgeException}
+     * 单源裁决，两者不再互相覆盖。同批删除 {@code RootCarrierHttpStatusSingleSourceRatchetTest}
+     * 点名豁免表里 {@code KbErrorAdvice.java#onBridge} 一条（豁免表双向：腿改走单源而豁免未删＝陈旧即红）。</p>
+     *
+     * <p>body 侧 {@code code} 取裁决后的状态值、{@code errorCode} 取机读码，与 {@link #onDomain} 同构；
+     * message 保留「数据桥域异常: 」前缀，供人读面定位渲染域。</p>
+     */
     @ExceptionHandler(DataBridgeException.class)
     public ResponseEntity<ApiResponse<Void>> onBridge(DataBridgeException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                .body(ApiResponse.error(502, "ECOS-KB-501", "数据桥域异常: " + ex.getMessage()));
+        int status = DataBridgeException.resolveHttpStatus(ex.getHttpStatus());
+        return ResponseEntity.status(status)
+                .body(ApiResponse.error(status, "ECOS-KB-501", "数据桥域异常: " + ex.getMessage()));
     }
 
     private static String rootMsg(Throwable t) {
