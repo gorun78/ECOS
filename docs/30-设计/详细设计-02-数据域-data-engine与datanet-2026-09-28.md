@@ -425,11 +425,14 @@ publish：仅 PASSED→PUBLISHED；PUBLISHED 行 UPDATE → 新行 + 旧行 is_a
 | `ECOS-DATA-022` | 409 | 期间已关账，拒绝写入 |
 | `ECOS-DATA-023` | 400 | DQ 门禁拒绝（携带 rejected 明细） |
 | `ECOS-DATA-031` | 500 | 数据层 SQL/映射异常（**不再掩蔽为 404**，附 traceId） |
+| `ECOS-DATA-032` | 404 | 数据源记录不存在（#142/B4-3e-44 补登：本表此前<b>无任何 404 段数据层码</b>，`previewSchema` 的「查无此源」只得以无码 `RuntimeException` 抛出、再被端点折成「200＋信封 404」；与 031 的「SQL/映射异常」严格区分，承 `ECOS-DQ-111` 的真实 404 口径） |
 | `ECOS-DATA-041` | 503 | 跨引擎取数依赖不可用（fail-loud，禁空值降级） |
 | `ECOS-DATA-05x` | 503 | 降级矩阵（access/MinIO/OLAP/DQ 告警/Git/DuckDB） |
 | `ECOS-DQ-101` | 409 | 规则状态机非法迁移（DRAFT→APPROVED 需签核人） |
 | `ECOS-DQ-102` | 400 | 规则表达式含禁用构造（自由 SQL/裸表名） |
 | `ECOS-DQ-111` | 404 | 治理记录不存在（真实 404，与 031 严格区分） |
+
+**数据源结构预览通道的分态契约**（`POST /api/v1/datasource/preview-schema` 与其 `/datasource/...` 兼容别名，#142/B4-3e-44 登记）：该通道三类失败必须落<b>状态行</b>而非只落信封 `code`，且状态行与信封同号、机读码取本表——入参缺失 → `400`、记录不存在 → `404`＋`ECOS-DATA-032`、runtime-access 底座不可用 → `503`＋`ECOS-DATA-051`（§4.7.2「不可用 ≠ 无权限 ≠ 空结果」）。成功体内<b>不得出现 `error` 键</b>；`objects` 已取到而<b>列预览</b>单独失败时，采加性键显式声明部分可用：`columnPreviewDegraded`（布尔 `true`）＋`columnPreviewReason`（原始原因），此时 `columnPreview` 为 `[]` 但客户端可据此与「该表确实无列」分态。该两枚键为本批<b>只增</b>字段，既有消费方读不到即忽略，不改任何既有键名与入参签名。
 
 ### D.2 REST 清单（新增只增不改；operationId 小驼峰唯一）
 

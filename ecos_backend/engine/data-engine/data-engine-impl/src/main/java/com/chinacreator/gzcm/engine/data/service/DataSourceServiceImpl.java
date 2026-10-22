@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.engine.data.service;
 
+import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import com.chinacreator.gzcm.common.data.dto.DataSourceDTO;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.data.DataSourceService;
 import com.chinacreator.gzcm.engine.data.dao.DataSourceDao;
@@ -696,11 +698,19 @@ public class DataSourceServiceImpl implements DataSourceService {
      *
      * @param datasourceId 数据源 ID
      * @return Map 包含 type, objects(List<String>), columnPreview(List<Map>)
+     * @throws DataBridgeException 404 — 数据源记录不存在（{@code ECOS-DATA-032}）；
+     *         503 — runtime-access 预览通道不可用（{@code ECOS-DATA-051}）。
+     *         #142/B4-3e-44（D-B4-74／D-B4-75）起本方法<b>不再返回带 {@code error} 键的成功体</b>：
+     *         改前「底座取不到」被折成 HTTP 200 的成功信封，客户端读到的只是「0 个对象」，
+     *         与「该源确实没有对象」同形＝§4.7.2「不可用 ≠ 无权限／≠ 空结果」失效。
      */
     public Map<String, Object> previewSchema(String datasourceId) {
         DataSourceEntity ds = getInternal(datasourceId);
         if (ds == null) {
-            throw new RuntimeException("数据源不存在: " + datasourceId);
+            // #142/B4-3e-44（D-B4-75）：改前抛无码 RuntimeException，由端点折成「200＋code 404」。
+            // 携带状态行与信封码同号（三参构造），机读码取本域码表，端点不再自写第二个 404。
+            throw new DataBridgeException(404, 404,
+                    DataDomainErrorCode.ECOS_DATA_032 + " — 数据源不存在: " + datasourceId);
         }
         // PMO-49: 解密回填（与 testConnectionById 同路由）
         String cfgResolved = resolvePassword(ds.getConnectionConfig(), ds.getPasswordEncrypted());
@@ -736,17 +746,28 @@ public class DataSourceServiceImpl implements DataSourceService {
                     try {
                         List<Map<String, Object>> rows = connector.queryPreview(cfg, firstObj, 5);
                         columnPreview = rows;
-                    } catch (Exception ignored) {
-                        log.debug("列预览取数失败，返回结果不含 columnPreview: object={} reason={}", firstObj, ignored.getMessage());
+                    } catch (Exception partial) {
+                        // #142/B4-3e-44（D-B4-75 同方法内层腿）：改前 catch (Exception ignored) 静默丢弃，
+                        // 客户端读 columnPreview=[] 时无法区分「该表没有列」与「取列失败」。
+                        // 本腿<b>有意不上抛</b>：objects 面已经取到、整单并非不可用（抛 503 会把可用面
+                        // 一起作废＝过度失败）。修法＝把降级显式声明出来（加性键 columnPreviewDegraded
+                        // ＋ warn 级原因），让「部分可用」成为契约的一部分而非沉默。详设-02 §D.1 同批登记。
+                        log.warn("列预览取数失败，显式声明为部分可用: object={} reason={}",
+                                firstObj, partial.getMessage());
+                        result.put("columnPreviewDegraded", true);
+                        result.put("columnPreviewReason", partial.getMessage());
                     }
                 }
             }
             result.put("columnPreview", columnPreview);
         } catch (Exception e) {
-            log.warn("previewSchema failed for datasource={}: {}", datasourceId, e.getMessage());
-            result.put("objects", List.of());
-            result.put("columnPreview", List.of());
-            result.put("error", "预览失败: " + e.getMessage());
+            // #142/B4-3e-44（D-B4-74／D-B4-75，§3.2.7＋§4.7.2）：改前此处 put("error", …) 后
+            // return result ⇒ 端点写 HTTP 200 成功信封，「预览通道不可用」被读成「该源 0 个对象」。
+            // 本域此前没有 503 之外的可用出口，故改抛携带态：状态行 503 与信封 code 同号，
+            // 机读码取 ECOS-DATA-051（runtime-access JDBC 管道失败），原始原因随 cause 保留。
+            log.warn("previewSchema 底座不可用 datasource={}: {}", datasourceId, e.getMessage());
+            throw new DataBridgeException(503, 503,
+                    DataDomainErrorCode.ECOS_DATA_051 + " — 数据源结构预览通道不可用: " + e.getMessage(), e);
         }
         return result;
     }

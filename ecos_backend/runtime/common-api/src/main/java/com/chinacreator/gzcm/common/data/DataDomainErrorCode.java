@@ -36,6 +36,15 @@ public final class DataDomainErrorCode {
     // ── 数据层异常（F02-08）───────────────────────────────────────────
     /** 500 — 数据层 SQL/映射异常（不再掩蔽为 404），响应体附 traceId */
     public static final String ECOS_DATA_031 = "ECOS-DATA-031";
+    /**
+     * 404 — 数据源／元数据记录不存在（#142/B4-3e-44 新占位，详设-02 §D.1 同批补行）。
+     *
+     * <p>登记理由：本域此前<b>没有一枚 404 码</b>，于是 {@code DataSourceServiceImpl#previewSchema}
+     * 的「数据源不存在」腿只能抛无码 {@code RuntimeException}，被端点折成
+     * 「HTTP 200 ＋ 信封 code 404」（缺陷 <b>D-B4-74／D-B4-75</b>）。与
+     * {@code ECOS_DQ_111}（治理记录不存在）严格区分：本码指<b>连接元数据主记录</b>。</p>
+     */
+    public static final String ECOS_DATA_032 = "ECOS-DATA-032";
 
     // ── 跨引擎依赖（C.7）──────────────────────────────────────────────
     /** 503 — 跨引擎取数依赖不可用（fail-loud，禁"返回空列表"降级） */
