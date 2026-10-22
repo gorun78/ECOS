@@ -73,26 +73,45 @@ class SecurityDenialHttpStatusRatchetTest {
      * ＝状态行恒 200。只认 {@code return ApiResponse.xxx(} 这一「直接返回」形态：
      * 收口后的 {@code return ResponseEntity.status(...).body(ApiResponse.forbidden(...))}
      * 不命中，正是「信封不变、只补状态行」这一修法应有的读数。
+     *
+     * <p><b>类型见证分支（#142/B4-3e-31 收口差距 D-B4-68）</b>：本判据在 2026-10-22 前只写
+     * {@code ApiResponse\s*\.\s*(?:forbidden...)}，而 Java 允许显式类型见证
+     * {@code return ApiResponse.<Map<String, Object>>error(503, ...)}——点号后先跟
+     * {@code <…>}，原式在 {@code <} 处断链，于是这类腿<b>结构性失明</b>（不是漏登记，是看不见）。
+     * 实测盲区面＝5 处／2 文件（gateway {@code RuntimeAlertV1Controller} 3×503、
+     * kb {@code KbProfileController} 1×503＋1×403），真实裸回拒绝面＝27＋5＝32 处／11 文件。
+     * 见证分组写成 {@code <[^();]*?>}：禁 {@code (} 与 {@code ;} ⇒ 只吃类型参数，绝不跨到
+     * 实参表或下一条语句；{@code return} 锚点保证 {@code ResponseEntity...body(ApiResponse.<T>...)}
+     * 这类已收口形态仍不误伤。</p>
      */
     private static final Pattern BARE_DENIAL_LEG = Pattern.compile(
-            "return\\s+ApiResponse\\s*\\.\\s*(?:forbidden\\s*\\(|unauthorized\\s*\\(|error\\s*\\(\\s*(?:401|403|503)\\b)");
+            "return\\s+ApiResponse\\s*\\.\\s*(?:<[^();]*?>\\s*)?"
+                    + "(?:forbidden\\s*\\(|unauthorized\\s*\\(|error\\s*\\(\\s*(?:401|403|503)\\b)");
 
-    /** 判据 B（面外登记量）：其它失败码裸回（400/404/405/409/410/500），只记量不判违例。 */
+    /**
+     * 判据 B（面外登记量）：其它失败码裸回（400/404/405/409/410/500），只记量不判违例。
+     * 同批补同一枚类型见证分支——判据 B 若仍瞎，「面外量化」就只是「同一盲区的另一个读数」，
+     * 上限会冒充成已收口的证据。
+     */
     private static final Pattern BARE_OTHER_FAILURE_LEG = Pattern.compile(
-            "return\\s+ApiResponse\\s*\\.\\s*(?:badRequest\\s*\\(|notFound\\s*\\(|internalError\\s*\\("
+            "return\\s+ApiResponse\\s*\\.\\s*(?:<[^();]*?>\\s*)?"
+                    + "(?:badRequest\\s*\\(|notFound\\s*\\(|internalError\\s*\\("
                     + "|error\\s*\\(\\s*(?:400|404|405|409|410|500)\\b)");
 
     /**
-     * 判据 B 的只减不增上限（#142/B4-3e-18 实测登记，本批不收口）：全后端主源码裸回非拒绝态
-     * <b>155 个文件／910 处</b>（同一口径两处独立比对一致：本门剥注释后逐行计数，与
-     * {@code grep -rcE} 排除 {@code target/archive/src/test} 后求和同为 910）。
+     * 判据 B 的只减不增上限（#142/B4-3e-31 按补盲后的口径<b>重测</b>登记，本批不收口）：
+     * 全后端主源码裸回非拒绝态 <b>921 处</b>（盲前面 910 ⇒ 类型见证补盲净新增 11 处；
+     * 读数由 {@code nonDenialFailureLegsAreRecordedNotSilentlyIgnored} 的上限断言在本批
+     * 门禁会话里实跑产出，非估算——同批手工 grep 估成 922，被该读数推翻后照实订正）。
      *
      * <p>这个量级正是 {@code ApiResponse}「只描述 body、不带状态行」的代价面，比 D-B4-59 的
-     * 属主锚点大两个数量级 —— 因此本批只把<b>安全裁决线</b>（判据 A，实测 27 处／9 文件）
-     * 逐文件入基线并收口属主锚点，非拒绝态面以总量上限登记在册。上限写成 910 而非"顺手归零"，
-     * 是为了让「有意不扩面」成为一个<b>可被读数推翻</b>的声明，而不是一句注释。</p>
+     * 属主锚点大两个数量级 ⇒ 本门只把<b>安全裁决线</b>（判据 A，补盲后实测 32 处／11 文件）
+     * 逐文件入基线，非拒绝态面以总量上限登记在册。上限写成实测值而非"顺手归零"，是为了让
+     * 「有意不扩面」成为一个<b>可被读数推翻</b>的声明，而不是一句注释。旧值 910 系 D-B4-68
+     * 盲区口径下的读数，保留在此作为口径变更凭据：任何「上限＝历史读数」的比对都必须先确认
+     * 判据面是否含类型见证分支。</p>
      */
-    private static final int OTHER_LEG_CEILING = 910;
+    private static final int OTHER_LEG_CEILING = 921;
 
     /**
      * 基线（实测于 #142/B4-3e-18）：文件 → 裸回安全拒绝态处数。
@@ -121,6 +140,11 @@ class SecurityDenialHttpStatusRatchetTest {
                 + "engine/ai/controller/AIPAgentController.java", 1);
         m.put("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/"
                 + "engine/data/controller/WriteChannelController.java", 1);
+        // ── #142/B4-3e-31（收口 D-B4-68）：判据补类型见证分支后新入面的两枚持有者 ──
+        m.put("ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/controller/"
+                + "RuntimeAlertV1Controller.java", 3);
+        m.put("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                + "engine/kb/controller/KbProfileController.java", 2);
         return m;
     }
 
@@ -238,6 +262,28 @@ class SecurityDenialHttpStatusRatchetTest {
         assertEquals(0, countHits(BARE_DENIAL_LEG, otherCode), "非安全裁决线码不在本门面内（刻意取舍）");
         assertEquals(1, countHits(BARE_OTHER_FAILURE_LEG, otherCode),
                 "非安全裁决线码必须被判据 B 计量，否则「不入面」就变成「看不见」");
+
+        // ── D-B4-68 反向取证：类型见证形态（补盲前的失明面）必须被抓到 ──
+        String witnessed = "return ApiResponse.<Map<String, Object>>error(503, \"ECOS-AUTH-005\", \"底座不可用\");";
+        assertEquals(1, countHits(BARE_DENIAL_LEG, witnessed),
+                "判据对 ApiResponse.<T>error(503,…) 类型见证形态失明＝D-B4-68 复现，"
+                        + "该形态的状态行同样恒 200，看不见就等于没有门");
+        String witnessedForbidden = "return ApiResponse.<KbProfileDO>forbidden(\"权限不足\");";
+        assertEquals(1, countHits(BARE_DENIAL_LEG, witnessedForbidden),
+                "类型见证后的 forbidden()/unauthorized() 同样必须在面内");
+        String witnessedOther = "return ApiResponse.<String>notFound(\"没有匹配画像\");";
+        assertEquals(0, countHits(BARE_DENIAL_LEG, witnessedOther), "见证分支不得把非裁决线码拉进面内");
+        assertEquals(1, countHits(BARE_OTHER_FAILURE_LEG, witnessedOther),
+                "判据 B 必须同等看见类型见证形态（否则「面外量化」沿用同一盲区读数）");
+
+        String witnessedClosed = "return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)"
+                + ".body(ApiResponse.<Map<String, Object>>error(503, CODE, \"不可用\"));";
+        assertEquals(0, countHits(BARE_DENIAL_LEG, witnessedClosed),
+                "收口后的类型见证形态判成违例＝把修法本身拦在门外，基线永远降不下去");
+
+        String witnessedNotStatement = "return ApiResponse.<Void>error(ApiResponse.CODE_BAD_REQUEST, \"BAD_REQUEST\");";
+        assertEquals(0, countHits(BARE_DENIAL_LEG, witnessedNotStatement),
+                "见证分组必须只吃类型参数：实参表里的常量名/字符串不得被当成状态字面量（防跨界误判）");
     }
 
     // ── 扫描与夹具 ────────────────────────────────────────────────────────────
