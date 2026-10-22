@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.data.writechannel;
 
 import com.chinacreator.gzcm.common.data.model.DataResource;
 import com.chinacreator.gzcm.common.event.PipelineEvent;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.data.dto.WriteChannelRequest;
 import com.chinacreator.gzcm.engine.data.dto.WriteChannelResult;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
@@ -94,7 +95,7 @@ class NonOlapControlWriteGuardTest {
     }
 
     @Test
-    @DisplayName("未启用 OLAP（dw.olap.engine 空）任何 OLAP 载体 → 拒（默认 fail-close）")
+    @DisplayName("未启用 OLAP（dw.olap.engine 空）任何 OLAP 载体 → 503 不可用（非 403 无权限）")
     void olapNotConfiguredRejected() {
         // 无参 OlapEngineResolver = 未配置
         WriteChannelTestFixtures.Ctx ctx = WriteChannelTestFixtures.wire(mock(EventBusService.class));
@@ -104,9 +105,15 @@ class NonOlapControlWriteGuardTest {
         req.setCarrierRef("ecos_dw.app_metrics");
         req.setStorageKind("CLICKHOUSE");
 
-        IllegalStateException e = assertThrows(IllegalStateException.class,
+        // #142/B4-3e-43（D-B4-71 属主侧第四批）：本腿断言从「抛 ISE 且带 ECOS-DATA-054」改为
+        // 「抛携带 503 的 DataBridgeException 且带 D.1 单源表内语义对应的 ECOS-DATA-053」。
+        // 收口前它走属主端点的 catch (IllegalStateException) → forbidden(403)，
+        // 与 MC04 不变式违规（真·策略拒绝）在状态行同形，违 §4.7.2「不可用 ≠ 无权限」。
+        DataBridgeException e = assertThrows(DataBridgeException.class,
             () -> ctx.service.write(req));
-        assertTrue(e.getMessage().contains("ECOS-DATA-054"), "未启用 OLAP 应 fail-close: " + e.getMessage());
+        assertEquals(503, e.getHttpStatus(), "OLAP 未启用＝本部署档不可用，须携带 503: " + e.getHttpStatus());
+        assertTrue(e.getMessage().contains("ECOS-DATA-053"),
+                "未启用 OLAP 应 fail-close 并带 D.1 表内 OLAP 降级码: " + e.getMessage());
     }
 
     // ── 配置了 OLAP 引擎的装配（走公开 @Value 构造器注入引擎名）──

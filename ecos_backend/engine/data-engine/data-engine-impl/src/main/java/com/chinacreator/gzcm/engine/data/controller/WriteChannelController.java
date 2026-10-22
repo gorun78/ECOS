@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.base.MachineErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.data.dto.WriteChannelRequest;
 import com.chinacreator.gzcm.engine.data.dto.WriteChannelResult;
@@ -66,9 +67,23 @@ public class WriteChannelController {
             log.warn("写通道入参拒绝: {}", e.getMessage());
             return failure(ApiResponse.badRequest(e.getMessage()));
         } catch (IllegalStateException e) {
-            // ECOS-DATA-052 MC02 裸 JSON 列 / ECOS-DATA-054 MC04 OLAP 违规
+            // ECOS-DATA-052 MC02 裸 JSON 列 / ECOS-DATA-054 MC04 OLAP 违规（不变式违反＝策略拒绝 403）
+            // 注：#142/B4-3e-43 起「OLAP 引擎未启用」不再落本腿——它是不可用而非无权限，见下一条腿。
             log.warn("写通道守卫拒绝: {}", e.getMessage());
             return failure(ApiResponse.forbidden(e.getMessage()));
+        } catch (DataBridgeException e) {
+            // #142/B4-3e-43（D-B4-71 属主侧第四批，§4.7.2「不可用 ≠ 无权限」）：本腿必须排在
+            // catch (Exception) <b>之前</b>——否则携带 503 的「OLAP 写通道在本部署档不可用」会被下面
+            // 折成 ECOS-DATA-055 ＋ CODE_INTERNAL_ERROR(-1)，经 resolveHttpStatus 回 500，
+            // 属主侧改抛不落到状态行＝假绿。状态行取异常携带值经单源裁决；信封机读码取
+            // message 前缀（MachineErrorCode.orNumeric 与 gateway 兜底同一函数），
+            // 数字码取携带值——三者同源，本类不再写第二个状态字面量。
+            int status = DataBridgeException.resolveHttpStatus(e.getHttpStatus());
+            log.warn("写通道底座不可用: {}", e.getMessage());
+            return ResponseEntity.status(status)
+                    .body(ApiResponse.error(status,
+                            MachineErrorCode.orNumeric(e.getMessage(), e.getErrorCode()),
+                            e.getMessage()));
         } catch (Exception e) {
             log.error("写通道内部错误: {}", e.getMessage(), e);
             return failure(ApiResponse.error(ApiResponse.CODE_INTERNAL_ERROR,

@@ -134,12 +134,26 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * （承载腿 13 未动）。该文件其余 {@code IllegalStateException} 站点数为 <b>0</b>（本批前实扫即 1 枚），
      * 故整行退出本表；渲染链的证据在 {@link #kbOwnerSideLegRendersCarriedUnavailableStatusInsteadOfFallback()}。</p>
      *
+     * <p><b>#142/B4-3e-43 属主侧第四批后现值＝6 个持有者／15 枚腿</b>：data-engine
+     * {@code OlapEngineResolver}（曾为 DEPENDENCY／1 枚＋CARRIER／{@code ENTRY_FALLBACK_500}）整行退出本面——
+     * 它的「OLAP 引擎未启用」腿改抛携带 503 的 {@code DataBridgeException}，机读码取 D.1 单源表内语义
+     * 对应的 {@code ECOS-DATA-053}（收口前借用的 {@code ECOS-DATA-054} 表内＝Kafka 降级，号义漂移登 D-B4-73）。
+     * 总站点 134→<b>133</b>、DEPENDENCY 16→<b>15</b>、落兜底腿 11→<b>10</b>、真欠账面 11→<b>10</b>
+     * （承载腿 13 未动）。该文件其余 <b>3</b> 枚 ISE 站点（控制域写 OLAP／层不合法／双引擎并存）语义是
+     * <b>MC04 不变式被破坏＝策略拒绝</b>，留在 OTHER 面按属主端点的 403 渲染，不在本批折叠。
+     * 本腿收口前并非真「落入口兜底 500」——它被 {@code WriteChannelController.write} 的
+     * {@code catch (IllegalStateException)} 折成 403，而 CARRIER 面判据只认 {@code @ControllerAdvice}、
+     * 读不到属主端点局部 catch，故账面读数 500 与真实读数 403 <b>两个都不对</b>（新登记 D-B4-72，
+     * 判据扩展为余项，本批以 {@link #dataEngineOwnerEndpointRendersUnavailableInsteadOfDenial()}
+     * 钉住渲染链）。</p>
+     *
      * <p>词表扩到 {@code 未注入|未启用} 后新增的两枚，语义裁决如下（不是随手加的匹配串）：
      * data-engine {@code BaseJdbcAdapter} 的「runtime-access JdbcConnector 建连桥未注入」＝
      * F02-13 建连通道缺失；{@code OlapEngineResolver} 的「OLAP 引擎未启用（dw.olap.engine 未配置）」
-     * ＝该部署档未开通这条写通道，消息里已自带 {@code ECOS-DATA-054} 机读码。两者都是
+     * ＝该部署档未开通这条写通道。两者都是
      * 「制品在本部署不可用」（§3.2.7 ⇒ 属主端点显式 503），不是「不变式被破坏」，
-     * 也不是 ENV_ALGO 那种「JVM 自己坏了」。</p>
+     * 也不是 ENV_ALGO 那种「JVM 自己坏了」。后者已于 #142/B4-3e-43 按本裁决收口退出 ISE 面，
+     * 前者仍在册。</p>
      */
     private static final Map<String, Integer> DEPENDENCY_BASELINE = Map.ofEntries(
             Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
@@ -153,9 +167,7 @@ class DependencyUnreadyIllegalStateRatchetTest {
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/data/datadescription/discovery/impl/DataDescriptionDiscoveryImpl.java", 1),
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
-                    + "gzcm/engine/data/datasource/storage/adapter/jdbc/BaseJdbcAdapter.java", 1),
-            Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
-                    + "gzcm/engine/data/writechannel/OlapEngineResolver.java", 1));
+                    + "gzcm/engine/data/datasource/storage/adapter/jdbc/BaseJdbcAdapter.java", 1));
 
     /**
      * ENV_ALGO 面基线（故意保持 500 的豁免面，登记制、必须点名）：
@@ -203,9 +215,16 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 差 2 来自 workspace {@code DcchengClient} 的「cognitive 服务不可用」两腿改抛本域 503 载体。
      * 同批还要改的是承载面：该文件行退出 {@code CARRIER_BASELINE}、已承载腿 15 → <b>13</b>、
      * 真欠账面 14 → <b>12</b>——四处任一单独改都会红。</p>
+     *
+     * <p><b>#142/B4-3e-43 属主侧第四批后的现值</b>：134 → <b>133</b>、DEPENDENCY 面 16 → <b>15</b>，
+     * 差 1 来自 data-engine {@code OlapEngineResolver} 的「OLAP 引擎未启用」腿改抛携带 503 的
+     * {@code DataBridgeException}。同批还要改的是承载面与账面：该文件行退出两张表、落兜底腿
+     * 11 → <b>10</b>、真欠账面 11 → <b>10</b>——已承载腿 13 未动（data-engine 零枚 advice，
+     * 该腿此前本就不在承载面上；承载面判定的盲区另登 D-B4-72，见 {@code CARRIER_BASELINE} 注释）。
+     * 该文件剩下的 3 枚 MC04 违规腿是策略拒绝，留在 OTHER 面（值 100 未动）。</p>
      */
-    private static final int TOTAL_SITE_BASELINE = 134;
-    private static final int DEPENDENCY_FACE_BASELINE = 16;
+    private static final int TOTAL_SITE_BASELINE = 133;
+    private static final int DEPENDENCY_FACE_BASELINE = 15;
     private static final int ENV_ALGO_FACE_BASELINE = 10;
     private static final int OTHER_FACE_BASELINE = 100;
     private static final int UNREADABLE_FACE_BASELINE = 8;
@@ -695,6 +714,17 @@ class DependencyUnreadyIllegalStateRatchetTest {
     private static final String KB_EXTRACT_CONTROLLER =
             "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/kb/controller/StructuredExtractController.java";
+    /** #142/B4-3e-43：data-engine 属主侧第四批渲染取证所依赖的两个源（属主腿／属主端点）。 */
+    private static final String DATA_OLAP_RESOLVER =
+            "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/data/writechannel/OlapEngineResolver.java";
+    private static final String DATA_WRITE_CHANNEL_CONTROLLER =
+            "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/data/controller/WriteChannelController.java";
+    /** #142/B4-3e-43：D.1 单源表（机读码 503 段）所在码表——号义漂移 D-B4-73 的取证基准。 */
+    private static final String DATA_DOMAIN_ERROR_CODE =
+            "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/"
+                    + "gzcm/common/data/DataDomainErrorCode.java";
 
     /**
      * 承载 advice 面基线（相对路径 → 「是否裸 Exception 兜底｜作用域选择器规范化文本」）。
@@ -764,6 +794,17 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * {@code KbEntityInstanceExtractionService}（曾为 {@code ENTRY_FALLBACK_500}／1 枚）整行退出本面——
      * 它的那枚腿改抛本域 503 载体，由 {@code KbErrorAdvice.onDomain}（无裸 Exception 兜底、按异常携带状态渲染）
      * 接住，不再落 gateway 入口兜底。落兜底面 12→<b>11</b>（全在 data-engine 3 个持有者），承载面 13 未动。</p>
+     *
+     * <p><b>#142/B4-3e-43 属主侧第四批后现值＝6 个持有者／23 枚腿</b>：data-engine
+     * {@code OlapEngineResolver}（曾为 {@code ENTRY_FALLBACK_500}／1 枚）整行退出本面。
+     * 落兜底面 11→<b>10</b>（data-engine <b>2</b> 个持有者：{@code DataDescriptionDiscoveryImpl} 1 枚＋
+     * {@code BaseJdbcAdapter} 9 枚），承载面 13 未动。<b>但本面的「兜底」二字对 data-engine 是判据盲区</b>：
+     * {@code carrierOf()} 只在 {@code @ControllerAdvice} 里找承载者，而 data-engine 全域<b>零枚 advice</b>
+     * （实扫 {@code @RestControllerAdvice} 命中 0），它的腿实际由属主端点自己的 catch 面渲染——
+     * {@code OlapEngineResolver} 那枚被 {@code WriteChannelController} 折成 403，本面却记 500。
+     * 差距 D-B4-72 登记在册，把端点局部 catch 纳为第三类承载者的判据扩展属余项；本批不扩面，
+     * 只把已收口的腿删掉、并用 {@code dataEngineOwnerEndpointRendersUnavailableInsteadOfDenial()}
+     * 把「不可用落 503、MC04 违规仍落 403」两条渲染腿钉住。</p>
      */
     private static final Map<String, String> CARRIER_BASELINE = Map.ofEntries(
             Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
@@ -779,9 +820,7 @@ class DependencyUnreadyIllegalStateRatchetTest {
                     "ENTRY_FALLBACK_500"),
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/data/datasource/storage/adapter/jdbc/BaseJdbcAdapter.java",
-                    "ENTRY_FALLBACK_500"),
-            Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
-                    + "gzcm/engine/data/writechannel/OlapEngineResolver.java", "ENTRY_FALLBACK_500"));
+                    "ENTRY_FALLBACK_500"));
 
     /**
      * 承载者实际渲染的状态行（键＝advice 文件名；锚点逐条钉在
@@ -803,9 +842,11 @@ class DependencyUnreadyIllegalStateRatchetTest {
     /** 按承载者聚合的腿数（禁算式推出；#142/B4-3e-39 探测实扫，#142/B4-3e-40 属主侧首批后现值，
      *  #142/B4-3e-41 属主侧第二批后现值＝承载 13／兜底 12，
      *  <b>#142/B4-3e-42 属主侧第三批后现值＝承载 13／兜底 11</b>——kb 那枚脱离 ISE 站点面，
-     *  承载面一枚未动，全在 ai）。 */
+     *  承载面一枚未动，全在 ai）。
+     *  <b>#142/B4-3e-43 属主侧第四批后现值＝承载 13／兜底 10</b>——data-engine 那枚脱离 ISE 站点面，
+     *  承载面仍一枚未动（该域零枚 advice，判据盲区见 {@code CARRIER_BASELINE} 注释的 D-B4-72）。 */
     private static final int CARRIED_LEGS_BASELINE = 13;
-    private static final int ENTRY_FALLBACK_LEGS_BASELINE = 11;
+    private static final int ENTRY_FALLBACK_LEGS_BASELINE = 10;
 
     /**
      * <b>真欠账面</b>＝落入口兜底的腿＋被承载后仍回 500 的腿。
@@ -818,9 +859,12 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * <b>#142/B4-3e-42 第三批再收掉 kb {@code KbEntityInstanceExtractionService} 1 枚</b>
      * （改抛 {@code KbErrorCodes.ONTOLOGY_BASE_UNAVAILABLE.exception(…)}＝503＋ECOS-KB-024，
      * 经 {@code KbErrorAdvice.onDomain} 按携带状态渲染）后现值 <b>11＋0＝11</b>。
+     * <b>#142/B4-3e-43 第四批再收掉 data-engine {@code OlapEngineResolver} 1 枚</b>
+     * （改抛携带 503 的 {@code DataBridgeException}＋{@code ECOS-DATA-053}，由属主端点
+     * {@code WriteChannelController.write} 的新承载腿按携带状态渲染）后现值 <b>10＋0＝10</b>。
      * 属主侧每批改码必须同批下调本值与本面基线，两头都红才算动过。</p>
      */
-    private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 11;
+    private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 10;
 
     private static volatile List<Advice> cachedAdvices;
 
@@ -1130,5 +1174,71 @@ class DependencyUnreadyIllegalStateRatchetTest {
         assertTrue(triggerWindow.contains("catch (ValidationException e)")
                         && !triggerWindow.contains("catch (Exception e)"),
                 "E3 同步路径新增长 catch＝本域 503 会在控制器层被折叠，本批承流承诺作废");
+    }
+
+    /**
+     * <b>#142/B4-3e-43 属主侧第四批的渲染取证</b>（差距 D-B4-71，形态与 3e-41 同族）：data-engine
+     * 全域零枚 {@code @ControllerAdvice}，本门的 {@code carrierOf} 因此把该域所有依赖腿记成
+     * {@code ENTRY_FALLBACK_500}——而 {@code WriteChannelController.write} 实际把 {@code IllegalStateException}
+     * 一律折成 {@code forbidden}＝403。账面 500 与真实 403 两个读数都不对（新登记 D-B4-72），
+     * 本案就是把这个「判据看不见的那条腿」按源码锚点钉到真实渲染链上：属主腿携带 503 →
+     * 承载腿排在宽 {@code catch (Exception)} <b>之前</b> → 状态行取携带值经单源裁决 →
+     * 信封机读码取 message 前缀 → MC04 违规腿仍归 403（不可用与无权限不得互折，§4.7.2）→
+     * 机读码号义与 D.1 单源表一致（D-B4-73）。
+     */
+    @Test
+    void dataEngineOwnerEndpointRendersUnavailableInsteadOfDenial() {
+        String resolver = codeOf(DATA_OLAP_RESOLVER);
+        assertTrue(resolver.contains("throw new DataBridgeException(503, 503,")
+                        && resolver.contains("DataDomainErrorCode.ECOS_DATA_053 + \" — OLAP 引擎未启用"),
+                "「OLAP 引擎未启用」腿不再抛携带 503＋ECOS-DATA-053 的载体＝属主侧改码被回退，"
+                        + "该腿会重新落 catch (IllegalStateException) 折成 403 无权限");
+        assertEquals(3, literalCount(resolver, "throw new IllegalStateException("),
+                "OlapEngineResolver 的 IllegalStateException 站点数变了：本批只收「未启用」这一枚，"
+                        + "另外 3 枚 MC04 违规腿是策略拒绝（403），不得随批改型");
+        assertEquals(1, literalCount(resolver, "throw new DataBridgeException(503, 503,"),
+                "该文件的 503 承载腿不止一枚＝本批范围被悄悄扩大，MC04 违规腿可能已被一起改型");
+
+        String controller = codeOf(DATA_WRITE_CHANNEL_CONTROLLER);
+        int carried = controller.indexOf("catch (DataBridgeException e) {");
+        int broad = controller.indexOf("catch (Exception e) {");
+        assertTrue(carried > 0,
+                "WriteChannelController.write 的承载腿被摘＝携带 503 的不可用态重新落宽 catch，"
+                        + "折成 ECOS-DATA-055＋CODE_INTERNAL_ERROR(-1)＝假绿");
+        assertTrue(broad > 0 && carried < broad,
+                "承载腿排在 catch (Exception) 之后＝Java  catches 顺序失效，503 永远走不到本腿");
+        String carriedBody = controller.substring(carried, Math.min(controller.length(), carried + 800));
+        assertTrue(carriedBody.contains("DataBridgeException.resolveHttpStatus(e.getHttpStatus())")
+                        && carriedBody.contains("ResponseEntity.status(status)")
+                        && carriedBody.contains("MachineErrorCode.orNumeric(e.getMessage(), e.getErrorCode())"),
+                "承载腿不再按携带状态渲染或不再取 message 前缀机读码＝状态行/机读码回落字面量，"
+                        + "属主侧携带值与出口读数脱钩");
+
+        int ise = controller.indexOf("catch (IllegalStateException e) {");
+        assertTrue(ise > 0 && ise < carried,
+                "IllegalStateException 腿不再先于承载腿＝MC04 违规腿的 403 策略拒绝会被改判成 503，"
+                        + "§4.7.2 的反向折叠（无权限折成不可用）同样禁止");
+        assertTrue(controller.substring(ise, Math.min(controller.length(), ise + 400))
+                        .contains("return failure(ApiResponse.forbidden(e.getMessage()));"),
+                "MC04 违规腿的 forbidden 出口被改＝不变式违反与部署不可用两类状态行重新混用");
+
+        // 号义（「053＝OLAP 降级」）写在码表的 javadoc 上，本门其余判据一律剥注释；这里刻意取原文，
+        // 因为本案要钉的是「码表对外的语义承诺」而不是可执行语句——与 D-B4-40 的反向用法，须点名才可这样读。
+        String codes = readRepoFile(DATA_DOMAIN_ERROR_CODE);
+        int at053 = codes.indexOf("ECOS_DATA_053 = \"ECOS-DATA-053\"");
+        assertTrue(at053 > 0
+                        && codes.substring(Math.max(0, at053 - 160), at053)
+                                .contains("Doris/ClickHouse OLAP 降级"),
+                "ECOS-DATA-053 在 D.1 单源表里的号义不再是 OLAP 降级＝本批属主腿的机读码语义失去单源依据"
+                        + "（号义漂移 D-B4-73 的取证锚，改号须同批改本断言与分册 02 D.1）");
+    }
+
+    /** 字面量出现次数（本门不用正则，避免 {@code (} 等元字符把锚点吃掉）。 */
+    private static int literalCount(String haystack, String needle) {
+        int n = 0;
+        for (int i = haystack.indexOf(needle); i >= 0; i = haystack.indexOf(needle, i + needle.length())) {
+            n++;
+        }
+        return n;
     }
 }
