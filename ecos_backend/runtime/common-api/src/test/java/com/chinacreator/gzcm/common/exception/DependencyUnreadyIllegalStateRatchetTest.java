@@ -110,6 +110,13 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * {@code _win_tasks/logs/mvn_b4-3e-38_probe3.log}，非算式推出）：10 个持有者 / <b>21</b> 枚腿。
      * 属主侧收口批必须同批下调本表。</p>
      *
+     * <p><b>#142/B4-3e-40 属主侧首批后现值＝9 个持有者／19 枚腿</b>：runtime-core
+     * {@code SecurityCryptoEgress} 的 2 枚「出口不可用」腿已改抛
+     * {@code DataBridgeException(503, 503, "ECOS-SYS-503: …")}，脱离 ISE 站点面 ⇒
+     * 总站点 139→<b>137</b>、DEPENDENCY 21→<b>19</b>、落兜底腿 14→<b>12</b>、真欠账面 16→<b>14</b>。
+     * 该文件剩余 4 枚 ISE 腿（{@code ensureKey 失败／反射调用失败} 两族）语义是<b>本服务自身故障</b>，
+     * 留在 OTHER 面按 500，不在本批折叠。</p>
+     *
      * <p>词表扩到 {@code 未注入|未启用} 后新增的两枚，语义裁决如下（不是随手加的匹配串）：
      * data-engine {@code BaseJdbcAdapter} 的「runtime-access JdbcConnector 建连桥未注入」＝
      * F02-13 建连通道缺失；{@code OlapEngineResolver} 的「OLAP 引擎未启用（dw.olap.engine 未配置）」
@@ -134,8 +141,6 @@ class DependencyUnreadyIllegalStateRatchetTest {
                     + "gzcm/engine/data/writechannel/OlapEngineResolver.java", 1),
             Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/kb/service/KbEntityInstanceExtractionService.java", 1),
-            Map.entry("ecos_backend/runtime/runtime-core/src/main/java/com/chinacreator/"
-                    + "gzcm/runtime/core/crypto/SecurityCryptoEgress.java", 2),
             Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/"
                     + "gzcm/workspace/scenario/DcchengClient.java", 2));
 
@@ -175,9 +180,14 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 字面写着这句抛出语句的判据原文（那段注释正是在登记「实扫 140 枚」），朴素 grep 会把注释
      * 自己数进去。剥注释后真实站点为 {@code TOTAL_SITE_BASELINE}——D-B4-40/62「注释面冒充
      * 代码面」的同族形态，已同批在该注释处订正。</p>
+     *
+     * <p><b>#142/B4-3e-40 属主侧首批后的现值</b>：139 → 137、DEPENDENCY 面 21 → 19，差 2 来自
+     * {@code SecurityCryptoEgress} 的「出口不可用」两腿改抛 {@code DataBridgeException(503)}——
+     * 抛出语句本身不再属于本门判据面（改的是属主侧代码，不是判据）。总站点数与 DEPENDENCY 面
+     * <b>同批</b>下调、逐文件基线里该文件行删除，三处任一单独改都会红（漏改即红＝本门的设计）。</p>
      */
-    private static final int TOTAL_SITE_BASELINE = 139;
-    private static final int DEPENDENCY_FACE_BASELINE = 21;
+    private static final int TOTAL_SITE_BASELINE = 137;
+    private static final int DEPENDENCY_FACE_BASELINE = 19;
     private static final int ENV_ALGO_FACE_BASELINE = 10;
     private static final int OTHER_FACE_BASELINE = 100;
     private static final int UNREADABLE_FACE_BASELINE = 8;
@@ -706,8 +716,13 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * <p>探测实扫：<b>10</b> 个持有者／<b>29</b> 枚腿，其中被域内 advice 承载 <b>6</b> 个持有者／
      * <b>15</b> 枚腿（ai 4／13 ＋ workspace 1／2），落入口兜底 <b>4</b> 个持有者／<b>14</b> 枚腿
      * （data-engine 3／11 ＋ kb 1／1 ＋ runtime-core 1／2；BaseJdbcAdapter 一家就占 9 枚）。
-     * <b>这把 D-B4-71 登记时的「21＋8 枚全欠 503」批定罪改窄成 14 枚真欠账面</b>：ai 的 13 枚
+     * <b>这把 D-B4-71 登记时的「21＋8 枚全欠 503」批定罪改窄成 16 枚真欠账面</b>：ai 的 13 枚
      * 已由分册 06 D.5 冻结表归属为 502＋{@code ECOS-AI-502}，改它反而违背冻结值。</p>
+     *
+     * <p><b>#142/B4-3e-40 属主侧首批后现值＝9 个持有者／27 枚腿</b>：runtime-core
+     * {@code SecurityCryptoEgress}（曾为 ENTRY_FALLBACK_500／2 枚）整行退出本面——它的两枚腿已改抛
+     * 携带 503 的 {@code DataBridgeException}，不再是 ISE 站点。承载面 15 枚不变，落兜底面
+     * 14→12（data-engine 3／11 ＋ kb 1／1）。</p>
      */
     private static final Map<String, String> CARRIER_BASELINE = Map.ofEntries(
             Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
@@ -728,8 +743,6 @@ class DependencyUnreadyIllegalStateRatchetTest {
                     + "gzcm/engine/data/writechannel/OlapEngineResolver.java", "ENTRY_FALLBACK_500"),
             Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/kb/service/KbEntityInstanceExtractionService.java", "ENTRY_FALLBACK_500"),
-            Map.entry("ecos_backend/runtime/runtime-core/src/main/java/com/chinacreator/"
-                    + "gzcm/runtime/core/crypto/SecurityCryptoEgress.java", "ENTRY_FALLBACK_500"),
             Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/"
                     + "gzcm/workspace/scenario/DcchengClient.java", "WorkspaceExceptionHandler.java"));
 
@@ -745,15 +758,19 @@ class DependencyUnreadyIllegalStateRatchetTest {
             "AiErrorAdvice.java", 502,
             "WorkspaceExceptionHandler.java", 500);
 
-    /** 按承载者聚合的腿数（禁算式推出；#142/B4-3e-39 探测实扫）。 */
+    /** 按承载者聚合的腿数（禁算式推出；#142/B4-3e-39 探测实扫，#142/B4-3e-40 属主侧首批后现值）。 */
     private static final int CARRIED_LEGS_BASELINE = 15;
-    private static final int ENTRY_FALLBACK_LEGS_BASELINE = 14;
+    private static final int ENTRY_FALLBACK_LEGS_BASELINE = 12;
 
     /**
-     * <b>真欠账面</b>＝落入口兜底的腿＋被承载后仍回 500 的腿（实扫 14＋2＝16）。
-     * 属主侧每批改码必须同批下调本值与本面基线，两头都红才算动过。
+     * <b>真欠账面</b>＝落入口兜底的腿＋被承载后仍回 500 的腿。
+     *
+     * <p>#142/B4-3e-39 实扫为 14＋2＝16；<b>#142/B4-3e-40 首批收掉 runtime-core
+     * {@code SecurityCryptoEgress} 2 枚</b>（改抛 {@code DataBridgeException(503, …,
+     * "ECOS-SYS-503: …")}）后现值 <b>12＋2＝14</b>。属主侧每批改码必须同批下调本值与本面基线，
+     * 两头都红才算动过。</p>
      */
-    private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 16;
+    private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 14;
 
     private static volatile List<Advice> cachedAdvices;
 

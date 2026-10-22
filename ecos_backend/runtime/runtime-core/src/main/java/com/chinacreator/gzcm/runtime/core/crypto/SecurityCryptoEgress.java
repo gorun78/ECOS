@@ -6,6 +6,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
+import com.chinacreator.gzcm.common.error.SystemErrorCode;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
@@ -25,8 +28,11 @@ import java.lang.reflect.Method;
  * 本类只搬移<b>访问通道</b>；密钥持久化是 H3-T-KMS-PERSIST 的独立议题。</p>
  *
  * <p>fail-closed：security-engine 类不在 classpath 时 {@link #available()} 返回 false，
- * {@code encrypt}/{@code decrypt} 抛 {@link IllegalStateException} 而不返回原文，
- * 由调用方按其既有降级策略处置（数据源写路径降级明文 + WARN，读路径返回 null）。</p>
+ * {@code encrypt}/{@code decrypt} 抛异常而不返回原文：<b>出口本身不可用</b>抛
+ * {@link DataBridgeException}（503＋{@code ECOS-SYS-503}，§3.2.7 下游制品不可用，
+ * #142/B4-3e-40 收口 D-B4-71 属主侧首域），<b>调用 security-engine 失败／反射失败</b>仍抛
+ * {@link IllegalStateException}（＝本服务自身故障，非下游未就绪）。
+ * 两者都由调用方按其既有降级策略处置（数据源写路径降级明文 + WARN，读路径返回 null）。</p>
  */
 @Component
 public class SecurityCryptoEgress {
@@ -72,7 +78,8 @@ public class SecurityCryptoEgress {
      * @param data  明文
      * @param keyId 密钥标识
      * @return 密文
-     * @throws IllegalStateException 出口不可用或 security-engine 抛错（不返回原文）
+     * @throws DataBridgeException 出口不可用（下游制品缺失＝503 + {@code ECOS-SYS-503}，不返回原文）
+     * @throws IllegalStateException security-engine 抛错或反射调用失败（＝本服务自身故障）
      */
     public String encrypt(String data, String keyId) {
         return invoke("encrypt", data, keyId);
@@ -84,7 +91,8 @@ public class SecurityCryptoEgress {
      * @param encryptedData 密文
      * @param keyId         密钥标识
      * @return 明文
-     * @throws IllegalStateException 出口不可用或解密失败（密钥丢失/轮换由调用方降级）
+     * @throws DataBridgeException 出口不可用（下游制品缺失＝503 + {@code ECOS-SYS-503}，不返回原文）
+     * @throws IllegalStateException 解密失败或反射调用失败（密钥丢失/轮换由调用方降级）
      */
     public String decrypt(String encryptedData, String keyId) {
         return invoke("decrypt", encryptedData, keyId);
@@ -96,13 +104,17 @@ public class SecurityCryptoEgress {
      * @param keyId     密钥标识
      * @param algorithm 算法（本项目用 {@code AES}）
      * @param keySize   密钥长度（bit）
-     * @throws IllegalStateException 出口不可用
+     * @throws DataBridgeException 出口不可用（下游制品缺失＝503 + {@code ECOS-SYS-503}）
+     * @throws IllegalStateException ensureKey 调用失败或反射调用失败（＝本服务自身故障）
      */
     public void ensureKey(String keyId, String algorithm, int keySize) {
         resolve();
         Object kms = keyManagementService;
         if (kms == null) {
-            throw new IllegalStateException("security-engine KMS 不可用, keyId=" + keyId);
+            // #142/B4-3e-40（D-B4-71 属主侧首域）：出口缺失＝下游制品不可用，按 §3.2.7 落显式
+            // 503＋机读码 ECOS-SYS-503，禁再由 gateway 入口兜底折成 500（「不可用」不等于「服务内部错误」）。
+            throw new DataBridgeException(503, 503,
+                    SystemErrorCode.ECOS_SYS_503 + ": security-engine KMS 不可用, keyId=" + keyId);
         }
         try {
             Object existing = kms.getClass().getMethod("getKeyBytes", String.class).invoke(kms, keyId);
@@ -124,7 +136,10 @@ public class SecurityCryptoEgress {
         resolve();
         Object target = encryptionService;
         if (target == null) {
-            throw new IllegalStateException("security-engine crypto 出口不可用, method=" + method);
+            // #142/B4-3e-40（D-B4-71 属主侧首域）：同 JVM 无 Bean 且反射自持实例也不可用＝
+            // 下游制品不可用 ⇒ 显式 503＋ECOS-SYS-503，禁落入口兜底折成 500（fail-closed 不变：绝不返回原文）。
+            throw new DataBridgeException(503, 503,
+                    SystemErrorCode.ECOS_SYS_503 + ": security-engine crypto 出口不可用, method=" + method);
         }
         try {
             Method m = target.getClass().getMethod(method, String.class, String.class);
