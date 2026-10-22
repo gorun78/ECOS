@@ -14,6 +14,10 @@
  * `setTestResult({ok:false,msg:result.error})` 渲染 ⇒ 文案必须经单源还原口径取得，
  * 禁在域内重拆信封。还原口径由 `_base` 单点提供（`httpStatusText`／`envelopeErrorText`）。</p>
  *
+ * <p>#142/B4-3e-47 起，预览腿的出参从 `{fields,tableNames} | {ok:false,error}` 改为
+ * 按属主七键契约的判别联合，页面按 `kind` 出分态文案（§4.7.2「不可用 ≠ 无权限 ≠ 空结果」）；
+ * 文案还原口径不变，仍是 `_base` 单点。</p>
+ *
  * <p>兼容性红线：URL 拼装（含 `?_=<ts>` 缓存破坏串与 `cache:'no-store'`）、body 形态
  * （含两个 body-less POST 采集端点）、成功面返回形状逐字保持。差异腿如实锁定并在用例内
  * 注明改前形状，属登记的收口差异而非回归。</p>
@@ -35,6 +39,8 @@ import {
   fetchDataSourceResources,
 } from '../metadata';
 import { fetchSchemaPreview } from '../datasource';
+// #142/B4-3e-47：预览腿的属主族根（面值同时由 `dataWorkbenchApiBaseSingleSource` 门钉住）
+import { DATANET_DATASOURCE_BASE } from '../../../../api/dataClient';
 
 const DOMAIN_FILES: { readonly label: string; readonly src: string }[] = [
   { label: 'api/metadata.ts', src: readFileSync(fileURLToPath(new URL('../metadata.ts', import.meta.url)), 'utf8') },
@@ -342,46 +348,125 @@ describe('资源/字段/策略 — 信封缺失与多层形状的收口口径', 
   });
 });
 
-describe('fetchSchemaPreview — 非 2xx 文案优先取后端 message/error，取不到才回落 HTTP n', () => {
-  const payload = { type: 'mysql' as const, host: 'h', port: 3306, username: 'u', password: 'p', database: 'db' };
+describe('fetchSchemaPreview — 属主通道 + 七键契约 + §4.7.2 分态 (#142/B4-3e-47)', () => {
+  const payload = { name: '订单库', type: 'mysql' as const, host: 'h', port: 3306, username: 'u', password: 'p', database: 'db' };
+  /** 属主端点面值（族根取 `api/dataClient` 的导出常量，本门按面值钉住路径段） */
+  const OWNER_URL = `${DATANET_DATASOURCE_BASE}/preview-schema`;
 
-  it('POST preview-schema 上送 buildPreviewSchemaPayload 的结果，成功面透出 fields/tableNames', async () => {
-    const spy = stubFetch(makeRes({ body: { code: 0, data: { fields: [{ name: 'id' }], tableNames: ['T1'] } } }));
+  it('POST 打属主端点，上送 DataSourceDTO 三枚属主键（扁平第二形态已退役）', async () => {
+    const spy = stubFetch(makeRes({
+      body: { code: 0, data: { type: 'MYSQL', tableNames: ['T1'], fields: [{ name: 'id', type: 'int', required: true, comment: null }], fieldsObject: 'T1' } },
+    }));
     const r = await fetchSchemaPreview(payload);
-    expect(r).toEqual({ fields: [{ name: 'id' }], tableNames: ['T1'] });
+    expect(r).toEqual({
+      ok: true, type: 'MYSQL', tableNames: ['T1'],
+      fields: [{ name: 'id', type: 'int', required: true, comment: null }],
+      fieldsObject: 'T1', fieldsDegraded: false, fieldsReason: null, note: null,
+    });
     const { url, init } = lastCall(spy);
-    expect(url).toBe('/api/v1/ecos/data/datasource/preview-schema');
+    expect(url).toBe('/api/v1/datanet/datasource/preview-schema');
+    expect(OWNER_URL).toBe(url);
     expect(init.method).toBe('POST');
-    expect(JSON.parse(String(init.body))).toMatchObject({ type: 'MYSQL', host: 'h', port: 3306, username: 'u', database: 'db' });
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(['connectionConfig', 'datasourceName', 'datasourceType']);
+    expect(body.datasourceType).toBe('MYSQL');
+    expect(body.datasourceName).toBe('订单库');
+    // 连接配置只准 `buildConnectionConfig` 一种拼法：JDBC 腿的键面＝username/password/jdbcUrl
+    expect(JSON.parse(String(body.connectionConfig))).toEqual({ username: 'u', password: 'p', jdbcUrl: 'jdbc:mysql://h:3306/db' });
   });
 
-  it('非 2xx + JSON 信封带 message → 用户看到后端原文（不是整段 body 文本）', async () => {
-    stubFetch(makeRes({ status: 400, raw: '{"code":400,"message":"连接被拒绝"}' }));
-    expect(await fetchSchemaPreview(payload)).toEqual({ ok: false, error: '连接被拒绝' });
+  it('名称缺省时走占位名，不送空串（后端把空名当入参不合法的那条腿不由前端制造）', async () => {
+    const spy = stubFetch(makeRes({ body: { code: 0, data: { type: 'MYSQL', tableNames: [], fields: [] } } }));
+    await fetchSchemaPreview({ ...payload, name: '  ' });
+    expect(JSON.parse(String(lastCall(spy).init.body)).datasourceName).toBe('schema-preview');
   });
 
-  it('非 2xx + JSON 只有 error 字段 → 取 error', async () => {
-    stubFetch(makeRes({ status: 400, raw: '{"error":"bad type"}' }));
-    expect(await fetchSchemaPreview(payload)).toEqual({ ok: false, error: 'bad type' });
+  it('列面的 null 属性逐列保留＝未知，禁折成空串/false 冒充「已知无」', async () => {
+    // 两列各压一条腿：① 后端显式给 null；② 后端整键不给（缺键与给 null 同义＝未知）
+    // 变异取证：把 `f.name ?? null` 折成 `?? ''`、`f.type` 折成 `''`、`req` 折成 `false` 都必须在此变红
+    stubFetch(makeRes({
+      body: {
+        code: 0,
+        data: {
+          type: 'MYSQL', tableNames: ['T1'], fieldsObject: 'T1',
+          fields: [{ name: 'c', type: null, required: null, comment: null }, {}],
+        },
+      },
+    }));
+    const r = await fetchSchemaPreview(payload);
+    expect(r.ok).toBe(true);
+    expect((r as { fields: unknown[] }).fields).toEqual([
+      { name: 'c', type: null, required: null, comment: null },
+      { name: null, type: null, required: null, comment: null },
+    ]);
   });
 
-  it('非 2xx + body 非 JSON → 回落 `HTTP ${status}`（改前 try/catch 后同形状）', async () => {
-    stubFetch(makeRes({ status: 502, raw: 'bad gateway', brokenJson: true }));
-    expect(await fetchSchemaPreview(payload)).toEqual({ ok: false, error: 'HTTP 502' });
+  it('列面降级＝部分可用显式声明：对象面不透出为零，reason 原文上屏', async () => {
+    stubFetch(makeRes({
+      body: { code: 0, data: { type: 'REST_API', tableNames: ['r1'], fieldsObject: 'r1', fields: [], fieldsDegraded: true, fieldsReason: 'no declarative columns' } },
+    }));
+    const r = await fetchSchemaPreview(payload);
+    expect(r).toMatchObject({ ok: true, tableNames: ['r1'], fields: [], fieldsDegraded: true, fieldsReason: 'no declarative columns' });
   });
 
-  it('差异腿：网络层失败由裸 TypeError 文案转单源 NetworkError 文案，仍呈 {ok:false,error}', async () => {
-    // 改前：fetch 抛 TypeError('Failed to fetch') → catch 分支 error='Failed to fetch'
-    // 改后：单源归一 NetworkError（并广播 ecos-network-down）→ error 为单源文案
+  it('对象存储／本地文件占位面：note 与「对象面为空」分态，不写 fieldsDegraded', async () => {
+    stubFetch(makeRes({ body: { code: 0, data: { type: 'MINIO', tableNames: [], fields: [], note: 'enum pending' } } }));
+    const r = await fetchSchemaPreview(payload);
+    expect(r).toMatchObject({ ok: true, tableNames: [], fields: [], fieldsDegraded: false, note: 'enum pending' });
+  });
+
+  it('状态行分态：400/403/404/500/503 各归一类，未列举状态不猜语义落 unknown 且带原号', async () => {
+    // 401 不在此列：单源对 401 先走 `handleAuthExpired`（清会话＋跳 #/login），
+    // 在 node 环境里那条腿根本到不了错误分类，属会话面而非本腿契约面。
+    const CASES: readonly [number, string][] = [
+      [400, 'invalid_input'], [403, 'denied'], [404, 'not_found'],
+      [500, 'server_error'], [502, 'unavailable'], [503, 'unavailable'], [504, 'unavailable'],
+      [429, 'unknown'],
+    ];
+    for (const [status, kind] of CASES) {
+      stubFetch(makeRes({ status, raw: `{"code":${status},"message":"m${status}"}` }));
+      const r = await fetchSchemaPreview(payload);
+      expect(r, `HTTP ${status}`).toMatchObject({ ok: false, kind, error: `m${status}`, status });
+    }
+  });
+
+  it('伪失败（HTTP 200 + success:false）判 failed_envelope，绝不折成空面成功', async () => {
+    stubFetch(makeRes({ body: { code: 0, success: false, message: 'preview rejected' } }));
+    const r = await fetchSchemaPreview(payload);
+    expect(r).toMatchObject({ ok: false, kind: 'failed_envelope', error: 'preview rejected' });
+    expect(r).not.toMatchObject({ fields: [] });
+  });
+
+  it('差异腿：网络层失败判 network（后端无应答），与 failed_envelope 分态', async () => {
     stubNetworkDown();
     const r = await fetchSchemaPreview(payload);
-    expect(r).toMatchObject({ ok: false });
+    expect(r).toMatchObject({ ok: false, kind: 'network' });
     expect((r as { error: string }).error).toMatch(/^Network error: fetch /);
   });
 
-  it('伪失败（HTTP 200 + success:false）不再被当成功渲染', async () => {
-    stubFetch(makeRes({ body: { code: 0, success: false, message: '预览失败' } }));
-    // 改前：json.data ?? json ⇒ data 缺失回落整封 ⇒ fields/tableNames 均非数组 ⇒ 返回 {fields:[],tableNames:[]}（假成功）
-    expect(await fetchSchemaPreview(payload)).toEqual({ ok: false, error: '预览失败' });
+  it('键面违约整单判 invalid_response（缺 tableNames／fields 非数组／列项非对象）', async () => {
+    const BAD: readonly unknown[] = [
+      { type: 'MYSQL', fields: [] },
+      { type: 'MYSQL', tableNames: ['T1'], fields: 'oops' },
+      { type: 'MYSQL', tableNames: ['T1'], fields: ['not-an-object'] },
+      { type: 'MYSQL', tableNames: ['T1'], fields: [], fieldsDegraded: 'true' },
+      null,
+    ];
+    for (const data of BAD) {
+      stubFetch(makeRes({ body: { code: 0, data } }));
+      const r = await fetchSchemaPreview(payload);
+      expect(r, JSON.stringify(data)).toMatchObject({ ok: false, kind: 'invalid_response' });
+    }
+  });
+
+  it('判据能变红：幻影路径与扁平第二形态已从域源码消失，且原形仍被同一判据命中', () => {
+    const src = readFileSync(fileURLToPath(new URL('../datasource.ts', import.meta.url)), 'utf8');
+    const PHANTOM = /\/v1\/ecos\/data\/datasource\/preview-schema/;
+    const FLAT_BODY = /body\.feHttpPort\s*=|body\.bootstrapServers\s*=/;
+    expect(PHANTOM.test(src), 'datasource.ts 仍在打幻影预览路径').toBe(false);
+    expect(FLAT_BODY.test(src), 'datasource.ts 仍私设第二份扁平连接配置形态').toBe(false);
+    const DEFECT = "post('/api/v1/ecos/data/datasource/preview-schema', body); body.feHttpPort = 1;";
+    expect(PHANTOM.test(DEFECT)).toBe(true);
+    expect(FLAT_BODY.test(DEFECT)).toBe(true);
   });
 });

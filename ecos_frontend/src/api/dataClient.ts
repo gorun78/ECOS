@@ -330,7 +330,13 @@ export async function resolveDqIssue(issueId: string, body: any): Promise<any> {
 
 
 // ── Datanet: 物理表注册 & 元数据采集 ───────────────────────────
-const DATANET_DS = `${API_BASE}/v1/datanet/datasource`;
+/**
+ * `/v1/datanet/datasource` 族根单源（#142/B4-3e-47 由模块私设 `DATANET_DS` 上收为导出常量）。
+ * 属主落 api 层：本文件六腿与 `pages/data-workbench/api/datasource.ts` 的 schema 预览腿共用同一族根，
+ * 域侧只准引本常量（不得再私设第二形态）。`pages/data-workbench/api/_base.ts` 的 `DATANET_DS`
+ * ＝无 `/api` 前缀的历史形态，系另一属主，已登记差距台账 D-B4-79 待收口。
+ */
+export const DATANET_DATASOURCE_BASE = `${API_BASE}/v1/datanet/datasource`;
 /**
  * `/v1/datanet/metadata` 族根单源 (#145/B6-8)。services/dataCatalogClient.ts、
  * services/datanetMetadataApi.ts 与页面门面都从本导出取基址，不得再各自私设。
@@ -342,7 +348,7 @@ const DATANET_CATALOG = `${API_BASE}/v1/datanet/catalog`;
 
 /** GET /datanet/datasource — 获取所有数据源列表 */
 export async function fetchDataSources(): Promise<DataSource[]> {
-  const resp = await doFetch(DATANET_DS);
+  const resp = await doFetch(DATANET_DATASOURCE_BASE);
   const arr = resp?.data?.data ?? resp?.data;
   if (Array.isArray(arr)) return arr as DataSource[];
   return [];
@@ -350,7 +356,7 @@ export async function fetchDataSources(): Promise<DataSource[]> {
 
 /** POST /datanet/datasource — 创建数据源 */
 export async function createDataSource(body: Record<string, any>): Promise<DataSource> {
-  const resp = await doFetch(DATANET_DS, {
+  const resp = await doFetch(DATANET_DATASOURCE_BASE, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -359,12 +365,12 @@ export async function createDataSource(body: Record<string, any>): Promise<DataS
 
 /** DELETE /datanet/datasource/{id} — 删除数据源 */
 export async function deleteDataSource(id: string): Promise<void> {
-  await doFetch(`${DATANET_DS}/${id}`, { method: "DELETE" });
+  await doFetch(`${DATANET_DATASOURCE_BASE}/${id}`, { method: "DELETE" });
 }
 
 /** POST /datanet/datasource/test — 前置连接测试（不保存） */
 export async function testRawConnection(body: { datasourceType: string; connectionConfig: string }): Promise<{ success: boolean; message: string }> {
-  const resp = await doFetch(`${DATANET_DS}/test`, {
+  const resp = await doFetch(`${DATANET_DATASOURCE_BASE}/test`, {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -373,7 +379,7 @@ export async function testRawConnection(body: { datasourceType: string; connecti
 
 /** POST /datanet/datasource/{id}/test — 测试数据源连接 */
 export async function testDataSourceConnection(id: string): Promise<{ success: boolean }> {
-  const resp = await doFetch(`${DATANET_DS}/${id}/test`, { method: "POST" });
+  const resp = await doFetch(`${DATANET_DATASOURCE_BASE}/${id}/test`, { method: "POST" });
   return (resp?.data ?? resp) as { success: boolean };
 }
 

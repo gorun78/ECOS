@@ -459,8 +459,46 @@ describe('C1 基址单源末批散点 15 文件 — 私设基址派生化 (#143/
     // `api/dataClient.ts` 的 `ENGINE_DATA_PIPELINE_RUNS_BASE`，两枚都写 `` `${API_BASE}/v1/…` `` 行内形态、本门照计）
     // ⇒ 净 −2，与本批棘轮 derSites 282→280 同值（两族族体全在 `/v1/` 面内且无跨行站；B6-7 已证两口径同值不可当通则）。
     // 本批的账不在这里：dupBoth 2→0、BASELINE 属主 4→0 关账，详 `urlFamilyDualFormRatchet` 的 B6-15 段。
-    expect(derTotal, '行内派生态面须随批累积，低于 297 即扫描根或判据漂移').toBeGreaterThanOrEqual(297);
+    // #142/B4-3e-47（差距 D-B4-76 前端腿）：297 → **296** = 删 1 枚行内派生态站点
+    // （`pages/data-workbench/api/datasource.ts` 的 schema 预览腿，改前 1 枚 → 改后 0 枚，实测 `grep -c 'API_BASE}'`
+    // 两侧 1/0；该腿族根上收为 `api/dataClient` 导出的 `DATANET_DATASOURCE_BASE` 裸引用 ⇒ 对本门脱面）。
+    // 属主声明位 `` `${API_BASE}/v1/datanet/datasource` `` 只是「私有改名 + 加 export」，形态与位都没动 ⇒ 净增 0，
+    // 全账净 −1 是幻影面退出的直接后果（幻影 URL 只有这一行在生产面上，prod 面 `ecos/data/datasource` 现零枚）。
+    // 判据活性由本批两向实跑证得：改前 HEAD 实跑读 297 且旧锚通过，改后首跑即在 296 变红 ⇒ 不是把数字改成当前值。
+    expect(derTotal, '行内派生态面须随批累积，低于 296 即扫描根或判据漂移').toBeGreaterThanOrEqual(296);
     expect(doubles, `全仓派生态 /api/api 双前缀：\n${doubles.join('\n')}`).toEqual([]);
+  });
+
+  /**
+   * #142/B4-3e-47 新锚 296 的「能变红」承证。
+   *
+   * <p>棘轮锚一旦下调，光靠「改前 297 通过 / 改后 296 变红」只证明过一次。本腿把造成那 −1 的
+   * 两行形状差直接喂给同一把尺子（`derivedValues`），断言旧形状吃到 1 枚、新形状脱面 ⇒
+   * 若有人把预览腿改回 `` `${API_BASE}/v1/ecos/data/datasource/…` `` 内联形态，本门立即把该枚
+   * 重新计回派生态面；反之若把属主常量声明写成不含 `API_BASE` 的形态，判据读数下降同样触锚。
+   * 两向都由判据本身决定，不靠注释里的数字。</p>
+   */
+  it('判据能变红（#142/B4-3e-47）：预览腿旧幻影形状被计一枚、上收属主常量后的裸引用脱面', () => {
+    const PRE_SHAPE = [
+      "import { API_BASE } from '../../../services/httpClient';",
+      'const raw = await post(`$' + '{API_BASE}/v1/ecos/data/datasource/preview-schema`, body);',
+    ].join('\n');
+    const POST_SHAPE = [
+      "import { DATANET_DATASOURCE_BASE } from '../../../api/dataClient';",
+      'const raw = await post(`$' + '{DATANET_DATASOURCE_BASE}/preview-schema`, body);',
+    ].join('\n');
+    expect(derivedValues(PRE_SHAPE)).toEqual([`${API_BASE}/v1/ecos/data/datasource/preview-schema`]);
+    expect(derivedValues(POST_SHAPE)).toEqual([]);
+    // 注释里出现旧形状不计（与 derTotal 扫描同一 `codeLines` 口径）：否则「写了个 TODO」也能把锚推上去
+    expect(derivedValues(['  // 改前打的是 `' + '${API_BASE}/v1/ecos/data/datasource/preview-schema`;', 'fetch(x);'].join('\n'))).toEqual([]);
+    // 生产面复核：改后全仓不得再有任何一行以 `API_BASE` 造 `/v1/ecos/data/datasource` 族（幻影族零生产成员）
+    const revived: string[] = [];
+    for (const rel of walk('.', [])) {
+      for (const v of derivedValues(read(rel))) {
+        if (v.startsWith(`${API_BASE}/v1/ecos/data/datasource`)) revived.push(`${rel}: ${v}`);
+      }
+    }
+    expect(revived, `幻影族复活：\n${revived.join('\n')}`).toEqual([]);
   });
 
   it('快照自身可校验：21 条 = 8 单引号 + 2 双引号 + 11 反引号且全部以 /api 开头（防快照清空成恒真）', () => {

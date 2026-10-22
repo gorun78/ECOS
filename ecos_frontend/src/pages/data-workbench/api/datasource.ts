@@ -3,8 +3,14 @@
  * (从原单文件 api.ts 拆分, 见 W66 前端 <800 行约定)
  * @license Apache-2.0
  */
-import { get, post, put, del, toApiType, envelopeErrorText, DATANET_DS } from './_base';
-import { API_BASE } from '../../../services/httpClient';
+import {
+  get, post, put, del, toApiType, envelopeErrorText,
+  statusOfResponse, isNetworkFailure, httpStatusText, DATANET_DS,
+} from './_base';
+// #142/B4-3e-47（D-B4-76 前端腿）：预览腿的族根取 `api/dataClient` 导出的属主常量（含 `/api` 前缀、
+// 生产 BFF 与 vite dev 双轨皆可承流）。本域 `_base.DATANET_DS` 的无 `/api` 形态只在该文件的既有五腿
+// 里活着，属同族第二属主且仅 dev 可用，已登记 D-B4-79 待收口——新腿不得沿用，否则把 dev-only 面再扩一处。
+import { DATANET_DATASOURCE_BASE } from '../../../api/dataClient';
 import { mapDsToConn } from './mappers';
 import type { DataConnection } from '../types';
 
@@ -269,123 +275,207 @@ export async function testDataSourceRaw(payload: {
 }
 
 // ────────────────────────────────────────────────────────────
-// PMO-48-T5: Schema Preview API
-// 违反契约返回 400/404，前端不伪装成功
+// #142/B4-3e-47（差距 D-B4-76 前端腿）：Schema Preview 属主通道
+//
+// <p>改前三处同时错：①路径打幻影形态（全仓零承流，见本域基址单源门的退役条目）；
+// ②上送「扁平表单字段」这第二份连接配置形态，而属主端点收的是 `DataSourceDTO`
+// （`datasourceName`/`datasourceType`/`connectionConfig`）；③只读 `fields`/`tableNames`
+// 两键，属主腿的键面是七键。三者合并的后果＝预览恒空、后端 400/503 被读成
+// 「0 个字段」的成功面。本批按契约单源 `DataSourceServiceImpl#previewSchemaByConfig`
+// 与承流端点 `DataSourceController#previewSchema` 的状态口径接线，请求体复用
+// `buildConnectionConfig`（与 `POST /test` 同一拼法，域内不得再有第二份连接配置形态）。</p>
+//
+// <p>**分态口径（详设 §4.7.2「不可用 ≠ 无权限 ≠ 空结果」）**：出参是判别联合，
+// `ok:false` 带 `kind`（状态行 → 语义类别）与 `status`（原始状态行；未列举状态不猜语义、
+// 落 `unknown`）。「通道不可用」「无权限」「成功但对象面为空」三类在页面必须可读地分开——
+// 空面只在 `ok:true` 且 `tableNames.length === 0` 且未降级时才成立。</p>
 // ────────────────────────────────────────────────────────────
 
+/** 契约列面的一列。底座给不出的属性逐列留 `null`＝未知，禁折成空串/false 冒充「已知无」 */
 export interface SchemaField {
-  name: string;
-  type: string;
-  required: boolean;
-  comment?: string;
+  name: string | null;
+  type: string | null;
+  required: boolean | null;
+  comment: string | null;
 }
 
+/** 未保存连接的表单字段（预览与 `POST /test` 共用同一份连接配置拼法） */
 export interface SchemaPreviewPayload {
   type: string; host: string; port: number; username: string;
   database?: string; password?: string; schema?: string;
-  bucket?: string; endpointUrl?: string; extra?: Record<string, string | number | boolean>;
+  bucket?: string; endpointUrl?: string; role?: string;
+  /** 预览发生在保存之前，名称只作后端侧标识用；缺省走占位名 */
+  name?: string;
+  extra?: Record<string, string | number | boolean>;
 }
 
-/** PMO-48-T5: 前端表单 → preview-schema 请求体 */
-export function buildPreviewSchemaPayload(payload: SchemaPreviewPayload): Record<string, unknown> {
-  const extra = payload.extra ?? {};
-  const body: Record<string, unknown> = {
-    type: toApiType(payload.type),
-    host: payload.host || 'localhost',
-    port: payload.port || 0,
-    username: payload.username || '',
-    password: payload.password || '',
+/**
+ * 失败语义类别（§4.7.2 分态，每类一条独立文案）：
+ * `invalid_input`＝400 入参不合法；`denied`＝401/403 安全拒绝；`not_found`＝404 属主侧寻址不到；
+ * `unavailable`＝502/503/504 通道或底座不可用；`server_error`＝500 后端自称的未预期失败；
+ * `failed_envelope`＝HTTP 200 上的显式失败信封；`network`＝网络层无应答；
+ * `invalid_response`＝信封成功但键面违约；`unknown`＝未列举状态行／未知抛出物。
+ */
+export type SchemaPreviewFailureKind =
+  | 'invalid_input'
+  | 'denied'
+  | 'not_found'
+  | 'unavailable'
+  | 'server_error'
+  | 'failed_envelope'
+  | 'network'
+  | 'invalid_response'
+  | 'unknown';
+
+/** 成功面：七键按契约逐键落位，缺省键取后端语义的空值而非猜值 */
+export interface SchemaPreviewSuccess {
+  ok: true;
+  type: string;
+  tableNames: string[];
+  fields: SchemaField[];
+  /** `fields` 所属对象名；`null`＝列面未取（禁把「哪张表的列」读丢） */
+  fieldsObject: string | null;
+  /** 后端只在列面腿失败时写该键；缺省＝未降级 */
+  fieldsDegraded: boolean;
+  fieldsReason: string | null;
+  /** 仅对象存储／本地文件占位面携带，明写枚举待实现，与「该源确实没有对象」分态 */
+  note: string | null;
+}
+
+export interface SchemaPreviewFailure {
+  ok: false;
+  kind: SchemaPreviewFailureKind;
+  /** 后端原文优先（单源 `envelopeErrorText` 腿），取不到才留空、由页面按 `kind` 出文案 */
+  error: string;
+  status?: number;
+}
+
+/**
+ * 出参判别联合。与 `SchemaPreviewParseResult` 同一缩窄口径：成功面独有 `tableNames`，
+ * 失败面独有 `kind`，消费方用 `in` 判据分支（`ok` 只作运行时可读标记）。
+ */
+export type SchemaPreviewOutcome = SchemaPreviewSuccess | SchemaPreviewFailure;
+
+/**
+ * 解析结果面：`ok:false` 只带开发者可读的违约原因，绝不带半截成功面。
+ *
+ * <p>**判别方式（本仓 tsconfig 无 `strict`／`strictNullChecks` 关闭 ⇒ `ok: true`/`ok: false`
+ * 字面量不参与缩窄，实测 tsc 报 TS2339）**：两侧各自带独有键（`value`／`reason`），
+ * 消费方一律用 `in` 判据缩窄。`ok` 仍在运行时可见，供断言与页面分支读，但类型缩窄不靠它。</p>
+ */
+export type SchemaPreviewParseResult =
+  | { ok: true; value: SchemaPreviewSuccess }
+  | { ok: false; reason: string };
+
+/**
+ * 后端状态行 → 语义类别。只列承流端点可达且语义明确的状态；未列者落 `unknown`。
+ * 按「相近」折算（503 折成 403、404 折成空结果）正是本批要防的形态。
+ */
+const FAILURE_STATUS_KINDS: Readonly<Record<number, SchemaPreviewFailureKind>> = {
+  400: 'invalid_input',
+  401: 'denied',
+  403: 'denied',
+  404: 'not_found',
+  500: 'server_error',
+  502: 'unavailable',
+  503: 'unavailable',
+  504: 'unavailable',
+};
+
+/** 请求体＝`DataSourceDTO` 的三枚属主校验项；类型名走 `toApiType` 单源归一 */
+export function buildSchemaPreviewDto(payload: SchemaPreviewPayload): Record<string, string> {
+  return {
+    datasourceName: (payload.name ?? '').trim() || 'schema-preview',
+    datasourceType: toApiType(payload.type),
+    connectionConfig: buildConnectionConfig(payload),
   };
-  if (payload.database) body.database = payload.database;
-  if (payload.schema) body.schema = payload.schema;
-  if (payload.bucket) body.bucket = payload.bucket;
-  if (payload.endpointUrl) body.endpointUrl = payload.endpointUrl;
-
-  // PMO-48-T5: 专属字段透传
-  // JDBC 类
-  if (payload.type === 'oracle') {
-    body.dbType = (extra.dbType as string) || 'SERVICE_NAME';
-  }
-  // Doris (FE 地址 + HTTP 端口)
-  if ((extra as Record<string, unknown>).feHost) body.feHost = (extra as Record<string, unknown>).feHost;
-  if ((extra as Record<string, unknown>).feHttpPort) body.feHttpPort = (extra as Record<string, unknown>).feHttpPort;
-  // MinIO (STS 三阶梯)
-  if (payload.type === 'minio') {
-    if (extra.listenPort) body.listenPort = (extra.listenPort as number);
-    if (extra.roleArn) body.roleArn = (extra.roleArn as string);
-    if (extra.accessKey) body.accessKey = (extra.accessKey as string);
-    if (extra.secretKey) body.secretKey = (extra.secretKey as string);
-    if (extra.pathPrefix) body.pathPrefix = (extra.pathPrefix as string);
-  }
-  // 对象存储 (S3/OSS/MinIO 共享)
-  if (payload.type === 'minio' || payload.type === 's3') {
-    if (extra.accessKey) body.accessKey = (extra.accessKey as string);
-    if (extra.secretKey) body.secretKey = (extra.secretKey as string);
-    if (extra.region) body.region = (extra.region as string);
-  }
-  // 文件类
-  if (payload.type === 'fs') {
-    body.rootPath = (extra.rootPath as string) || '';
-    body.pattern = (extra.pattern as string) || '';
-    body.recursive = extra.recursive === true;
-  }
-  if (payload.type === 'csv') {
-    body.filePath = (extra.filePath as string) || '';
-    body.delimiter = (extra.delimiter as string) || ',';
-    body.encoding = (extra.encoding as string) || 'UTF-8';
-    body.hasHeader = extra.hasHeader === true;
-    body.rowLimit = (extra.rowLimit as number) || 0;
-  }
-  // SFTP/SAP
-  if (payload.type === 'sftp') {
-    if (extra.key) body.key = (extra.key as string);
-    if (extra.algo) body.algo = (extra.algo as string);
-  }
-  if (payload.type === 'sap') {
-    body.system = (extra.systemId as string) || '';
-    body.client = (extra.client as string) || '';
-    if (extra.appServer) body.appServer = (extra.appServer as string);
-    if (extra.instance) body.instance = (extra.instance as string);
-    if (extra.sysNum) body.sysNum = (extra.sysNum as string);
-    if (extra.funcModule) body.funcModule = (extra.funcModule as string);
-    if (extra.charset) body.charset = (extra.charset as string);
-  }
-  // REST API
-  if (payload.type === 'rest_api') {
-    if (extra.apiSubPath) body.apiSubPath = (extra.apiSubPath as string);
-    if (extra.apiMethod) body.apiMethod = (extra.apiMethod as string);
-    if (extra.apiKey) body.apiKey = (extra.apiKey as string);
-    if (extra.clientCreds) body.clientCreds = (extra.clientCreds as string);
-    if (extra.timeoutMs) body.timeoutMs = (extra.timeoutMs as number);
-  }
-  // Kafka
-  if (payload.type === 'kafka') {
-    body.bootstrapServers = (extra.bootstrapServers as string) || payload.host;
-    body.topic = (extra.topic as string) || '';
-    body.protocol = (extra.protocol as string) || 'PLAINTEXT';
-  }
-  // MongoDB
-  if (payload.type === 'mongodb') {
-    body.authSource = (extra.authSource as string) || 'admin';
-    if (extra.username) body.username = (extra.username as string);
-  }
-
-  return body;
 }
 
-/** PMO-48-T5: 调用 preview-schema 接口
- *  独立 try/catch 隔离，失败不污染 createConnection 的 toast
- *  违反契约 (400/404/500) 返回 { ok: false, error } 而非抛错 */
-export async function fetchSchemaPreview(payload: SchemaPreviewPayload): Promise<{ fields: SchemaField[]; tableNames: string[] } | { ok: false; error: string }> {
-  const body = buildPreviewSchemaPayload(payload);
+/**
+ * 七键契约解析。必需键 `type`/`tableNames`/`fields`，可选键 `fieldsObject`/`fieldsDegraded`/
+ * `fieldsReason`/`note`；任一键形状违约即整单判失败——把违约应答折成空面＝改前的假成功形态。
+ */
+export function parseSchemaPreviewResponse(raw: unknown): SchemaPreviewParseResult {
+  const fail = (reason: string): SchemaPreviewParseResult => ({ ok: false, reason });
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return fail('payload is not an object');
+  const r = raw as Record<string, unknown>;
+  if (typeof r.type !== 'string') return fail('key "type" is not a string');
+  if (!Array.isArray(r.tableNames)) return fail('key "tableNames" is not an array');
+  if (r.tableNames.some((v) => typeof v !== 'string')) return fail('tableNames has a non-string item');
+  if (!Array.isArray(r.fields)) return fail('key "fields" is not an array');
+
+  const fields: SchemaField[] = [];
+  for (const item of r.fields as unknown[]) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return fail('fields has a non-object item');
+    const f = item as Record<string, unknown>;
+    for (const k of ['name', 'type', 'comment'] as const) {
+      const v = f[k];
+      if (v !== undefined && v !== null && typeof v !== 'string') return fail(`field.${k} is neither string nor null`);
+    }
+    const req = f.required;
+    if (req !== undefined && req !== null && typeof req !== 'boolean') return fail('field.required is neither boolean nor null');
+    fields.push({
+      name: (f.name ?? null) as string | null,
+      type: (f.type ?? null) as string | null,
+      required: (req ?? null) as boolean | null,
+      comment: (f.comment ?? null) as string | null,
+    });
+  }
+
+  const fo = r.fieldsObject;
+  if (fo !== undefined && fo !== null && typeof fo !== 'string') return fail('fieldsObject is neither string nor null');
+  const fd = r.fieldsDegraded;
+  if (fd !== undefined && typeof fd !== 'boolean') return fail('fieldsDegraded is not a boolean');
+  const fr = r.fieldsReason;
+  if (fr !== undefined && fr !== null && typeof fr !== 'string') return fail('fieldsReason is neither string nor null');
+  const nt = r.note;
+  if (nt !== undefined && nt !== null && typeof nt !== 'string') return fail('note is neither string nor null');
+
+  return {
+    ok: true,
+    value: {
+      ok: true,
+      type: r.type,
+      tableNames: r.tableNames as string[],
+      fields,
+      fieldsObject: (fo ?? null) as string | null,
+      fieldsDegraded: fd === true,
+      fieldsReason: (fr ?? null) as string | null,
+      note: (nt ?? null) as string | null,
+    },
+  };
+}
+
+/**
+ * 单源错误 → 分态失败面。四腿互斥且顺序即判据：有状态行 → 查表；无状态行但属「后端有应答」
+ * 错误族（`httpStatusText` 非 null）→ HTTP 200 伪失败信封；网络层 → `network`；其余 → `unknown`。
+ * 把「后端有应答但没给状态行」与「请求没到达服务端」折成同一态，等于重犯 §4.7.2 的折叠。
+ */
+export function classifySchemaPreviewError(e: unknown): SchemaPreviewFailure {
+  const error = envelopeErrorText(e, '');
+  const status = statusOfResponse(e);
+  if (typeof status === 'number') {
+    const mapped = FAILURE_STATUS_KINDS[status] as SchemaPreviewFailureKind | undefined;
+    return { ok: false, kind: mapped ?? 'unknown', error, status };
+  }
+  if (httpStatusText(e, '') !== null) return { ok: false, kind: 'failed_envelope', error };
+  if (isNetworkFailure(e)) return { ok: false, kind: 'network', error };
+  return { ok: false, kind: 'unknown', error };
+}
+
+/**
+ * 属主通道：`POST` 预览端点（族根取 `api/dataClient` 的属主常量）。
+ * 一律以 `ok` 判别、不抛错——本腿在「新建连接」弹窗里，失败不得污染保存动作的提示，
+ * 但也不得把失败伪装成空面（伪装即 D-B4-76 的原始形态）。
+ */
+export async function fetchSchemaPreview(payload: SchemaPreviewPayload): Promise<SchemaPreviewOutcome> {
   try {
-    const raw = await post<{ fields?: unknown; tableNames?: unknown }>(`${API_BASE}/v1/ecos/data/datasource/preview-schema`, body);
-    const rawFields = raw?.fields;
-    const rawTableNames = raw?.tableNames;
-    const fields: SchemaField[] = Array.isArray(rawFields) ? rawFields as SchemaField[] : [];
-    const tableNames: string[] = Array.isArray(rawTableNames) ? rawTableNames as string[] : [];
-    return { fields, tableNames };
+    const raw = await post<unknown>(`${DATANET_DATASOURCE_BASE}/preview-schema`, buildSchemaPreviewDto(payload));
+    const parsed = parseSchemaPreviewResponse(raw);
+    // 用 `in` 缩窄而非 `parsed.ok`：本仓 tsconfig 无 strict，布尔字面量判别不参与类型缩窄（实测 TS2339）
+    if ('value' in parsed) return parsed.value;
+    return { ok: false, kind: 'invalid_response', error: parsed.reason };
   } catch (e) {
-    return { ok: false, error: envelopeErrorText(e, 'network error') };
+    return classifySchemaPreviewError(e);
   }
 }

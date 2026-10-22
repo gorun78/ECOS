@@ -8,6 +8,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
 import type { DataConnection, ConnType } from './types';
+// #142/B4-3e-47（D-B4-76 前端腿）：预览出参按属主契约的判别联合消费，页面不得再自设第二份键面
+import type { SchemaPreviewSuccess, SchemaPreviewFailureKind } from './api';
 import { getErrorMessage } from './helpers';
 import { CONNECTION_TYPES, STANDARD_DISABLED_TYPES } from './types';
 import { detectEdition, type EcosEdition } from './DataEngineConfigPanelTypes';
@@ -19,6 +21,25 @@ import {
   type SftpProps, type SapProps, type RestApiProps,
   type KafkaProps, type MongoProps, type MinioProps, type FsProps,
 } from './ConfigForms';
+
+/**
+ * §4.7.2 分态文案键（#142/B4-3e-47）：预览失败的每一种语义各出一句，禁互相折叠。
+ *
+ * <p>改前本弹窗把 `ok:false` 一律渲染成 `dw.conn.previewFailed`，且成功面被恒空的幻影
+ * 通道喂成「0 个字段」——「通道不可用」「无权限」「对象面确实为空」三种对用户完全不同的
+ * 结论在界面上是同一句话。`kind` 由 API 层按后端状态行推出，页面只负责出文案。</p>
+ */
+const PREVIEW_FAILURE_KEYS: Record<SchemaPreviewFailureKind, string> = {
+  invalid_input: 'dw.conn.previewKindInvalid',
+  denied: 'dw.conn.previewKindDenied',
+  not_found: 'dw.conn.previewKindNotFound',
+  unavailable: 'dw.conn.previewKindUnavailable',
+  server_error: 'dw.conn.previewKindServerError',
+  failed_envelope: 'dw.conn.previewKindEnvelope',
+  network: 'dw.conn.previewKindNetwork',
+  invalid_response: 'dw.conn.previewKindInvalidResponse',
+  unknown: 'dw.conn.previewKindUnknown',
+};
 
 interface AddConnectionModalProps {
   t: (key: string) => string;
@@ -54,7 +75,7 @@ export function AddConnectionModal({
   const [testResult, setTestResult] = useState<null | { ok: boolean; msg: string }>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewResult, setPreviewResult] = useState<{ fields: { name: string; type: string; required: boolean; comment?: string }[]; tableNames: string[] } | null>(null);
+  const [previewResult, setPreviewResult] = useState<SchemaPreviewSuccess | null>(null);
 
   // PMO-48-T5: Edition 检测
   const edition = useRef<EcosEdition>(detectEdition()).current;
@@ -334,9 +355,11 @@ export function AddConnectionModal({
               onClick={async () => {
                 setPreviewLoading(true);
                 setPreviewResult(null);
+                setPreviewVisible(false);
                 try {
                   const { fetchSchemaPreview } = await import('./api');
                   const result = await fetchSchemaPreview({
+                    name: newConnName || undefined,
                     type: newConnType,
                     host: newConnHost || 'localhost',
                     port: newConnPort || 0,
@@ -347,14 +370,15 @@ export function AddConnectionModal({
                     endpointUrl: (ncExtra.endpointUrl as string) || undefined,
                     extra: ncExtra,
                   });
-                  if ('fields' in result) {
+                  // 判别用 `in`（失败面独有 `kind`）：本仓 tsconfig 无 strict，`result.ok` 不参与类型缩窄
+                  if ('kind' in result) {
+                    // 类别句 + 后端原文各占一段（ASCII 分隔，禁把原文并进句子以免混淆口径）
+                    const kindText = t(PREVIEW_FAILURE_KEYS[result.kind]);
+                    setTestResult({ ok: false, msg: result.error ? `${kindText} | ${result.error}` : kindText });
+                  } else {
                     setPreviewResult(result);
                     setPreviewVisible(true);
-                  } else {
-                    setTestResult({ ok: false, msg: result.error || t('dw.conn.previewFailed') });
                   }
-                } catch {
-                  setTestResult({ ok: false, msg: t('dw.conn.previewFailed') });
                 } finally {
                   setPreviewLoading(false);
                 }
@@ -372,14 +396,29 @@ export function AddConnectionModal({
           </div>
           {previewVisible && previewResult && (
             <div className={`max-h-32 overflow-y-auto border ${styles.cardBorder} rounded text-[10px] font-mono space-y-1 p-2 ${styles.appBg}`}>
+              {previewResult.note && (
+                <div className={`text-[9px] ${styles.warningText}`}>{previewResult.note}</div>
+              )}
               {previewResult.tableNames.length > 0 && (
                 <div className={`text-[9px] ${styles.muted} uppercase`}>{t('dw.conn.previewTables')}: {previewResult.tableNames.join(', ')}</div>
               )}
-              {previewResult.fields.map(f => (
-                <div key={f.name} className={`font-mono ${styles.cardTextMuted}`}>
-                  <span className={`${styles.cardText} font-semibold`}>{f.name}</span>
-                  <span className={`${styles.cardTextMuted} ml-1`}>{f.type}</span>
-                  {f.required && <span className={`${styles.dangerText} ml-1`}>*</span>}
+              {previewResult.fieldsObject && (
+                <div className={`text-[9px] ${styles.muted}`}>{t('dw.conn.previewFieldsObject')}: {previewResult.fieldsObject}</div>
+              )}
+              {previewResult.fieldsDegraded && (
+                <div className={`text-[9px] ${styles.warningText}`}>
+                  {t('dw.conn.previewDegraded')}
+                  {previewResult.fieldsReason ? ` | ${previewResult.fieldsReason}` : ''}
+                </div>
+              )}
+              {previewResult.fields.length === 0 && !previewResult.fieldsDegraded && (
+                <div className={`text-[9px] ${styles.muted}`}>{t('dw.conn.previewNoFields')}</div>
+              )}
+              {previewResult.fields.map((f, i) => (
+                <div key={`${f.name ?? 'col'}-${i}`} className={`font-mono ${styles.cardTextMuted}`}>
+                  <span className={`${styles.cardText} font-semibold`}>{f.name ?? t('dw.conn.previewUnknownAttr')}</span>
+                  <span className={`${styles.cardTextMuted} ml-1`}>{f.type ?? t('dw.conn.previewUnknownAttr')}</span>
+                  {f.required === true && <span className={`${styles.dangerText} ml-1`}>*</span>}
                   {f.comment && <span className={`text-[9px] ${styles.muted} ml-1`}>{f.comment}</span>}
                 </div>
               ))}

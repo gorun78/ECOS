@@ -323,124 +323,11 @@ vi.setConfig({ testTimeout: 30_000 });
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  CANONICAL, DER_RE, SRC_ROOT, dupByBothForms, dupByRawOnly, familiesOf, isTestFile, scan, walk,
+} from './urlFamilyDualFormJudge';
+import type { Index } from './urlFamilyDualFormJudge';
 
-const SRC_ROOT = fileURLToPath(new URL('..', import.meta.url));
-const CANONICAL = 'services/httpClient.ts';
-
-type Forms = { raw: number; der: number };
-type Index = Map<string, Map<string, Forms>>;
-
-/** 族键 = 去掉基址前缀并以 `{}` 归一插值后的路径串（含 query 骨架）。 */
-const normalize = (body: string): string => {
-  let s = body;
-  for (let i = 0; i < 5 && /\$\{[^{}]*\}/.test(s); i += 1) s = s.replace(/\$\{[^{}]*\}/g, '{}');
-  return s.replace(/\$\{[^{}]*\}/g, '{}');
-};
-
-const RAW_RE = /["'`]\/api((?:\\.|(?!["'`])[^\\])*)["'`]/g;
-const DER_BODY = '((?:\\\\.|(?!`)[^\\\\])*)';
-const DER_RE = new RegExp('`\\$\\{API_BASE\\}' + DER_BODY + '`', 'g');
-
-/**
- * #145/B6-11 补的名字变体腿：派生态判据原本把 token 名**写死**成 `API_BASE`，于是
- * `import { API_BASE as X }` 之后写 `` `${X}/v1/…` `` 的族根构造点对本门完全隐形——
- * 这是 D-B5-40（"判据对派生态不可见"）在**名字轴**上的同形缺陷：形态是派生的、只是换了个名字。
- * 实测 prod 面改前仅一枚（`pages/Guardrails/constants.ts` 的 `API_BASE as API_ROOT`，它自持的常量
- * 恰好也叫 `API_BASE`、取值却是 `/api/v1/guardrails/policies`，本批随族单源一起收口）。
- * 这里按文件把 `API_BASE as X` 的 X 并进取 token 集，别名腿与本体腿同口径计入。
- */
-const ALIAS_IMPORT_RE = /(?:^|[,{\s])API_BASE\s+as\s+([A-Za-z0-9_]+)/g;
-
-function derivedRe(code: string): RegExp {
-  const aliases = [...code.matchAll(ALIAS_IMPORT_RE)].map((m) => m[1]);
-  if (aliases.length === 0) return DER_RE;
-  return new RegExp('`\\$\\{(?:API_BASE|' + aliases.join('|') + ')\\}' + DER_BODY + '`', 'g');
-}
-
-function isComment(line: string): boolean {
-  const t = line.trim();
-  return t.startsWith('//') || t.startsWith('*') || t.startsWith('/*') || t.startsWith('///');
-}
-
-function isTestFile(rel: string): boolean {
-  return (
-    rel.includes('__tests__') ||
-    rel.endsWith('.test.ts') || rel.endsWith('.test.tsx') ||
-    rel.endsWith('.spec.ts') || rel.endsWith('.spec.tsx') ||
-    rel.startsWith('test/')
-  );
-}
-
-/** 纯函数：从一段源码文本读出 {family → 形态计数}，供树级扫描与 fixture 双向复用。 */
-function familiesOf(code: string): Map<string, Forms> {
-  const out = new Map<string, Forms>();
-  const bump = (f: string, kind: keyof Forms) => {
-    const cur = out.get(f) ?? { raw: 0, der: 0 };
-    cur[kind] += 1;
-    out.set(f, cur);
-  };
-  const lines = code.split('\n').filter((l) => !isComment(l)).join('\n');
-  for (const m of lines.matchAll(RAW_RE)) {
-    const b = normalize(m[1]);
-    if (b.startsWith('/v1/')) bump(b, 'raw');
-  }
-  for (const m of lines.matchAll(derivedRe(lines))) {
-    const b = normalize(m[1]);
-    if (b.startsWith('/v1/')) bump(b, 'der');
-  }
-  return out;
-}
-
-function walk(dir: string, out: string[]): void {
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (entry === 'node_modules' || entry.startsWith('.')) continue;
-    const st = statSync(full);
-    if (st.isDirectory()) walk(full, out);
-    else if ((entry.endsWith('.ts') || entry.endsWith('.tsx')) && !entry.endsWith('.d.ts')) out.push(full);
-  }
-}
-
-function scan(srcRoot: string): { idx: Index; rawSites: number; derSites: number; prodFiles: number } {
-  const files: string[] = [];
-  walk(srcRoot, files);
-  const idx: Index = new Map();
-  let rawSites = 0;
-  let derSites = 0;
-  let prodFiles = 0;
-  for (const f of files) {
-    const rel = relative(srcRoot, f).split(sep).join('/');
-    if (rel === CANONICAL || isTestFile(rel)) continue;
-    prodFiles += 1;
-    for (const [fam, forms] of familiesOf(readFileSync(f, 'utf8'))) {
-      if (!idx.has(fam)) idx.set(fam, new Map());
-      const owners = idx.get(fam)!;
-      const cur = owners.get(rel) ?? { raw: 0, der: 0 };
-      cur.raw += forms.raw;
-      cur.der += forms.der;
-      owners.set(rel, cur);
-      rawSites += forms.raw;
-      derSites += forms.der;
-    }
-  }
-  return { idx, rawSites, derSites, prodFiles };
-}
-
-function dupByBothForms(idx: Index): Map<string, string[]> {
-  const out = new Map<string, string[]>();
-  for (const [fam, owners] of idx) if (owners.size > 1) out.set(fam, [...owners.keys()].sort());
-  return out;
-}
-
-/** 旧判据口径（只认裸字面量）在同一索引上能看到的重复族 —— 用于量化盲区。 */
-function dupByRawOnly(idx: Index): Map<string, string[]> {
-  const out = new Map<string, string[]>();
-  for (const [fam, owners] of idx) {
-    const rawOwners = [...owners.entries()].filter(([, f]) => f.raw > 0).map(([o]) => o).sort();
-    if (rawOwners.length > 1) out.set(fam, rawOwners);
-  }
-  return out;
-}
 
 /**
  * 基线 = 2026-10-19 #143/B5-19 本门实跑读出值（先跑门读实测、再登记，非推算）。
@@ -550,7 +437,12 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `api/pipeline.ts`/`PipelineExecutionMonitor.tsx` 轮询腿各 1）、增 2 枚新建属主声明
     // （`services/cognitiveClient.ts` 的 `COGNITIVE_BELIEFS_BASE` ＋ `api/dataClient.ts` 的
     // `ENGINE_DATA_PIPELINE_RUNS_BASE`）。净 −2 仍是形态搬运；本批的账是 **dupBoth 2 → 0、属主 4 → 0**。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(280);
+    // #142/B4-3e-47（差距 D-B4-76 前端腿）：280 → **279** = 删 1 枚派生态站点（`pages/data-workbench/api/datasource.ts`
+    // 的 schema 预览腿从 `` `${API_BASE}/v1/ecos/data/datasource/preview-schema` `` 改成裸引用属主常量
+    // `DATANET_DATASOURCE_BASE` ⇒ 只在属主声明位计数一次、本文件对两把尺子都脱面）。裸形态面 0 变（该幻影 URL 改前
+    // 就不以裸字面量形态存在，见同批 `dataWorkbenchApiBaseSingleSource` 的退役条目）。
+    // 两向实跑：改前 HEAD 读 280 且旧锚通过、改后首跑在 279 变红 ⇒ 判据活性成立，非把数字改成当前值。
+    expect(snapshot.rawSites + snapshot.derSites).toBe(279);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     // 三个数 = 本批实跑读出值，与 BASELINE 同批改动（重复面一变，这里必红，防「基线改了、盲区量化注记没跟上」）。
@@ -689,6 +581,33 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     expect([...familiesOf(MULTI_ALIAS).entries()].map(([f, n]) => [f, n.der])).toEqual([['/v1/fixture/multi-a', 1], ['/v1/fixture/multi-b', 1]]);
   }, 30_000);
 
+  /**
+   * #142/B4-3e-47 三枚新锚（本门 279 / 252 ＋ `c1FinalScatter` 296）的「能变红」承证。
+   *
+   * <p>把造成那 −1 的两行形状差直接喂给同一把尺子（`familiesOf`）：旧幻影腿被计 1 枚派生态、
+   * 并把幻影族送进族索引；上收属主常量后的裸引用对两把尺子同时脱面。⇒ 任何人把预览腿改回
+   * `API_BASE` 内联形态，本门两枚硬锚与 c1 棘轮会一起回到改前读数并判红；反之若把属主声明
+   * 改成不含 `API_BASE` 的裸字面量，派生态面下降同样触锚。锚的红/绿由判据读出，不由注释数字决定。</p>
+   */
+  it('判据能变红（#142/B4-3e-47）：预览腿旧幻影形状进族面、上收属主常量后同时脱面', () => {
+    const PRE_SHAPE = [
+      "import { API_BASE } from '../../../services/httpClient';",
+      'const raw = await post(`$' + '{API_BASE}/v1/ecos/data/datasource/preview-schema`, body);',
+    ].join('\n');
+    const POST_SHAPE = [
+      "import { DATANET_DATASOURCE_BASE } from '../../../api/dataClient';",
+      'const raw = await post(`$' + '{DATANET_DATASOURCE_BASE}/preview-schema`, body);',
+    ].join('\n');
+    const pre = familiesOf(PRE_SHAPE);
+    expect([...pre.keys()]).toEqual(['/v1/ecos/data/datasource/preview-schema']);
+    expect(pre.get('/v1/ecos/data/datasource/preview-schema')).toEqual({ raw: 0, der: 1 });
+    expect([...familiesOf(POST_SHAPE).keys()]).toEqual([]);
+    // 生产面复核：幻影族在本门扫描面上必须零成员（族若因别处新增而复活，这里先红，不等 idx 锚）
+    const phantomOwners = [...snapshot.idx.get('/v1/ecos/data/datasource/preview-schema')?.keys() ?? []];
+    expect(phantomOwners, `幻影族仍有生产成员：${phantomOwners.join(', ')}`).toEqual([]);
+    expect(snapshot.idx.has('/v1/ecos/data/datasource/preview-schema')).toBe(false);
+  }, 30_000);
+
   it('基线自身可校验：族面/属主面形态合规且与实跑读出同数', () => {
     const entries = Object.entries(BASELINE);
     // #145/B6-1 起 29 族 / 62 属主（`/v1/knowledge` 一族 7 属主收口单源，与本批同款改动同批剪除）
@@ -768,7 +687,13 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // B6 各批的族面升降必须在这里显形，才配得上文件头「族面变化一律记为可见性副产物、不作进度读」。
     // 253 = 本批实跑读出（`/v1/agent-mesh` 与 `/v1/guardrails/policies` 两族族根声明各留 1 枚，
     // `/v1/guardrails/policies/{}` 的 DELETE 腿刻意保持行内形态 ⇒ 本批一族未退出索引）。
-    expect(snapshot.idx.size, '族索引面与本批实跑读出脱钩 ⇒ 有族的可见性被关掉而台账没记').toBe(253);
+    // #142/B4-3e-47（差距 D-B4-76 前端腿）：253 → **252** = 一族退出索引面，且这正是要显形的可见性变化：
+    // `/v1/ecos/data/datasource/preview-schema` 族改前全仓生产面只有 1 枚成员（`git grep -n "ecos/data/datasource" HEAD`
+    // 排除 `__tests__` 后只命中 `pages/data-workbench/api/datasource.ts` 的预览腿一行），本批把该行改指 data-engine
+    // 属主族根 ⇒ 幻影族零生产成员、从 idx 消失。族面 −1 不是进度倒退，而是「一张只有幻影的族谱行」被注销；
+    // 若台账不记这一笔，`toBe(253)` 会把「幻影被清干净」判成缺陷 ⇒ 硬锚必须随实跑读数走。
+    // 两向实跑：改前 HEAD 读 253 且旧锚通过、改后首跑在 252 变红 ⇒ 判据活性成立。
+    expect(snapshot.idx.size, '族索引面与本批实跑读出脱钩 ⇒ 有族的可见性被关掉而台账没记').toBe(252);
     for (const owners of snapshot.idx.values()) expect(owners.has(CANONICAL)).toBe(false);
     // 名字变体面归零（#145/B6-11）：prod 面不得再有 `import { API_BASE as X }` 形态的基址别名——
     // 它虽然已被 derivedRe 计入族面，但这个形状本身就是 D-B5-40 在名字轴上的成因，出现即红。

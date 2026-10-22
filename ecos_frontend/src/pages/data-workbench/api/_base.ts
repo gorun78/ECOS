@@ -17,7 +17,7 @@
  * @license Apache-2.0
  */
 
-import { API_BASE, ApiRequestError, NoAccessError, apiFetchData } from '../../../services/httpClient';
+import { API_BASE, ApiRequestError, NetworkError, NoAccessError, apiFetchData } from '../../../services/httpClient';
 
 // #145/B6-5：`/v1/pipeline/definitions` 族属主在 `api/dataClient`，本行只做域内别名重导出——
 // 不含 URL 体 ⇒ 不构成第二个属主，域内 `PIPELINE_DEFS` 导出面逐字不变（API 只增不改）。
@@ -116,6 +116,26 @@ export function httpStatusText(e: unknown, fallback: string): string | null {
   const status = statusOf(e);
   if (typeof status === 'number') return `HTTP ${status}`;
   return e.message || fallback;
+}
+
+/**
+ * 分态取号唯一口（#142/B4-3e-47）：HTTP 状态行数字，供调用方按 §4.7.2「不可用 ≠ 无权限 ≠ 空结果」分态。
+ *
+ * <p>`undefined` ＝「后端没有给出可读的状态行」：网络层失败，或 HTTP 200 上的伪失败信封
+ * （单源对伪失败抛的 `ApiRequestError` 不带 `httpStatus`）。把这两种都折算成某个状态码，
+ * 等于把「不可用」与「无权限」重新折回同一个形状——正是本批要防的折叠形态。</p>
+ */
+export function statusOfResponse(e: unknown): number | undefined {
+  return isSourcedError(e) ? statusOf(e) : undefined;
+}
+
+/**
+ * 网络层失败判据：与 `httpClient#isErrorResponse` 的 `kind:'network'` 同口径
+ * （`NetworkError` 或裸 `TypeError`）。独立成口，是让分态调用方不必各自 `instanceof`——
+ * 各自写的判据迟早漏掉 `TypeError` 那条腿（域内改前就是把网络失败当业务失败渲染的）。
+ */
+export function isNetworkFailure(e: unknown): boolean {
+  return e instanceof NetworkError || e instanceof TypeError;
 }
 
 /** 错误体可能是 JSON 信封，也可能是网关 HTML/纯文本 ⇒ 尽力解析，解析不出不编造 */
