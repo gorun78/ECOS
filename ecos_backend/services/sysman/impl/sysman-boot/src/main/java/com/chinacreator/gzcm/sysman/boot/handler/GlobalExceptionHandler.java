@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.sysman.boot.handler;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.base.MachineErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.exception.ForbiddenException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -185,13 +187,33 @@ public class GlobalExceptionHandler {
 
     /**
      * DataBridge 领域异常通用处理（使用异常内置的 httpStatus 和 errorCode）
+     *
+     * <p><b>#142/B4-3e-29（差距 D-B4-66）</b>：收口前本腿返回裸 {@code ApiResponse}，状态行由方法上的
+     * {@code @ResponseStatus(INTERNAL_SERVER_ERROR)} 恒定决定 ⇒ 参数型为根异常型
+     * {@link DataBridgeException}（可携带任意 4xx/5xx，无 {@code DEFAULT_HTTP_STATUS} 锚定）的腿
+     * 上，注解锁死的 500 与 {@code ex.getHttpStatus()} <b>不可能同号</b>；403 拒绝在 HTTP 面伪装成
+     * 500，与已收口的 gateway 同型腿（{@code handleDataBridge}）是同一缺陷在另一宿主的副本。
+     * 现兑现本类头部注释「使用异常内置的 httpStatus」：状态行走
+     * {@link DataBridgeException#resolveHttpStatus(int)} 单源（非法携带值回退 500）。
+     * 方法上的 {@code @ResponseStatus(INTERNAL_SERVER_ERROR)} <b>有意保留</b>为默认声明面：
+     * 它与单源的回退值同号，且在 {@code ResponseEntity} 路径上不再生效，删它属另一批裁决。</p>
+     *
+     * <p>同批补齐 {@code errorCode} 机读码腿（D-B4-65 在本腿的余面）：收口前两参
+     * {@code error(int code, String message)} 走无码工厂 ⇒ JSON 面连 {@code errorCode} 键都不出现；
+     * 现与 gateway 逐字同法改走三参 + {@link MachineErrorCode#orNumeric} 单源。
+     * {@code ApiResponse.code} 仍取 {@code ex.getErrorCode()}（int，可能为 -1/-100 负数码），
+     * 与状态行不一致属信封侧既有形态，本批不扩面。</p>
      */
     @ExceptionHandler(DataBridgeException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public ApiResponse<Void> handleDataBridgeException(DataBridgeException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleDataBridgeException(DataBridgeException ex) {
+        int status = DataBridgeException.resolveHttpStatus(ex.getHttpStatus());
         log.warn("DataBridge exception (httpStatus={}, errorCode={}): {}",
-                ex.getHttpStatus(), ex.getErrorCode(), ex.getMessage());
-        return ApiResponse.error(ex.getErrorCode(), ex.getMessage());
+                status, ex.getErrorCode(), ex.getMessage());
+        return ResponseEntity.status(status).body(
+                ApiResponse.error(ex.getErrorCode(),
+                        MachineErrorCode.orNumeric(ex.getMessage(), ex.getErrorCode()),
+                        ex.getMessage()));
     }
 
     // ── 500 Internal Server Error ────────────────────

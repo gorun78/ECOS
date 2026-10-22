@@ -326,8 +326,15 @@ public class GlobalExceptionHandler {
      *
      * <p>只有 4xx/5xx 才是合法的"本异常自述的失败状态"；其余（0、-100、2xx、>599）
      * 一律回退 500，禁把非法值原样写进状态行（那会让容器报 500 之外的假语义）。</p>
+     *
+     * <p><b>#142/B4-3e-29（差距 D-B4-66）</b>：区间判定单源已下沉到携带者所在的
+     * {@link DataBridgeException#resolveHttpStatus(int)}（参数型为根异常型的 {@code @ExceptionHandler}
+     * 腿分属 gateway / kb / sysman-boot 三个模块，判据留在本宿主必然逼出第二份复制）。
+     * 本方法保留为<b>委托</b>：既有 {@code DataBridgeHttpStatusFidelityTest} 的
+     * {@code GlobalExceptionHandler.resolveHttpStatus(...)} 锚点不动、行为逐字不变，
+     * 且本方法体内不得再出现区间字面量（判据 B 只允许单源一处）。</p>
      */
     static int resolveHttpStatus(int httpStatus) {
-        return httpStatus >= 400 && httpStatus <= 599 ? httpStatus : 500;
+        return DataBridgeException.resolveHttpStatus(httpStatus);
     }
 }

@@ -46,7 +46,11 @@ public class KbErrorAdvice {
     /** kb DomainException → 使用其携带的 httpStatus + code */
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ApiResponse<Void>> onDomain(DomainException ex) {
-        int status = ex.getHttpStatus() > 0 ? ex.getHttpStatus() : 500;
+        // #142/B4-3e-29（差距 D-B4-66 同族，登记 D-B4-67 前半）：收口前本行写
+        // ex.getHttpStatus() > 0 ? … : 500 —— 只判正数、不判区间，700／200 之类越界携带值会被
+        // 原样写进状态行，且判据散落本域构成第二源。现改走 common-api 单源（4xx/5xx 原样透出，
+        // 其余回退 500），合法 4xx/5xx 取值逐字不变。
+        int status = DataBridgeException.resolveHttpStatus(ex.getHttpStatus());
         String code = ex.getCode() == null ? "ECOS-KB-500" : ex.getCode();
         return ResponseEntity.status(status)
                 .body(ApiResponse.error(status, code, ex.getMessage()));
