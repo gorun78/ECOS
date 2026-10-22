@@ -127,6 +127,47 @@ class SecurityDenialHttpStatusRatchetTest {
     private static final int OTHER_LEG_CEILING = 871;
 
     /**
+     * 判据 A 的合法承载态识别（#142/B4-3e-34，收口差距 <b>D-B4-69</b>「判据对
+     * {@code @ResponseStatus} 注解承载态不可见」）。
+     *
+     * <p>差距形态与前两枚同族——不是漏登记，是<b>结构性看不见</b>：判据只锚
+     * {@code return ApiResponse.} 的文本形态，而 {@code @ExceptionHandler} 方法上的
+     * {@code @ResponseStatus} 由 Spring 在异常解析阶段直接写响应状态行，这类裸回的
+     * 状态行<b>并不恒 200</b>。对余面 14 处逐腿解析上位方法注解块后实测：
+     * <b>5 处</b>属注解承载（gateway {@code GlobalExceptionHandler} L165/175/204、
+     * sysman-boot {@code GlobalExceptionHandler} L114/126），真裸回 <b>9 处</b>。
+     * 危险的方向不是「基线虚高」本身，而是「已保真的和未保长的在同一个数字里长得一样」
+     * ⇒ 收口进度不可读、后续批次的差异归因失去基准，且一旦有人为降基数而给普通
+     * {@code @RequestMapping} 方法补 {@code @ResponseStatus}，会造出「成功腿配 403 行」的新缺陷。</p>
+     *
+     * <p>识别口径因此写成「同一方法<b>同时</b>带 {@code @ExceptionHandler} 与
+     * {@code @ResponseStatus}」，而非「方法上有 {@code @ResponseStatus}」：普通映射方法上的
+     * 该注解对成功腿同样生效，单注解不构成豁免。定不到属主方法时<b>不豁免</b>
+     * （向红兜底），使解析器本身的失效方向是「多报」而不是「漏报」。</p>
+     */
+    private static final Pattern HANDLER_METHOD_SIGNATURE = Pattern.compile(
+            "^\\s*(?:(?:public|protected|private|static|final|synchronized|abstract)\\s+)+"
+                    + "[\\w<>.,?\\[\\]\\s]+\\s+\\w+\\s*\\(");
+
+    /**
+     * 注解承载面基线（实测于 #142/B4-3e-34）：文件 → 由 {@code @ResponseStatus} 真实承载
+     * 状态行的裸回腿数。与判据 A 一样做<b>双向等值</b>断言——这条面既不是违例面也不是
+     * 免检面：它上涨＝有人把新拒绝腿留在裸回形态、只靠注解兜底（属主侧修法未落地）；
+     * 它下跌＝注解被摘掉而腿没接上状态行，那 1 枚会同时出现在判据 A 面并被抓住。
+     */
+    private static final Map<String, Integer> ANNOTATION_CARRIED_BASELINE =
+            annotationCarriedBaseline();
+
+    private static Map<String, Integer> annotationCarriedBaseline() {
+        Map<String, Integer> m = new LinkedHashMap<>();
+        m.put("ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/handler/"
+                + "GlobalExceptionHandler.java", 3);
+        m.put("ecos_backend/services/sysman/impl/sysman-boot/src/main/java/com/chinacreator/"
+                + "gzcm/sysman/boot/handler/GlobalExceptionHandler.java", 2);
+        return m;
+    }
+
+    /**
      * 基线（实测于 #142/B4-3e-18）：文件 → 裸回安全拒绝态处数。
      * <b>只减不增</b>；下调必须与收口批同批改，让「基线」永远等于「实扫」。
      */
@@ -138,12 +179,15 @@ class SecurityDenialHttpStatusRatchetTest {
         // ── #142/B4-3e-33 归零：本组最大持有者（13 枚 403 裸回腿）属主侧状态行已落地 ──
         m.put("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/"
                 + "engine/kb/controller/NavTaxonController.java", 0);
+        // ── #142/B4-3e-34 归零（判据侧，非属主侧）：gateway／sysman-boot 属主 handler 的 5 枚腿
+        //    经实测由 @ExceptionHandler＋@ResponseStatus 同法声明真实承载状态行，
+        //    移出违例面、改钉入 ANNOTATION_CARRIED_BASELINE；此处钉 0＝注解被摘即回退成红 ──
         m.put("ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/handler/"
-                + "GlobalExceptionHandler.java", 3);
+                + "GlobalExceptionHandler.java", 0);
         m.put("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/"
                 + "sysman/security/RequirePermissionAspect.java", 3);
-        m.put("ecos_backend/services/sysman/impl/sysman-boot/src/main/java/com/chinacreator/gzcm/"
-                + "sysman/boot/handler/GlobalExceptionHandler.java", 2);
+        m.put("ecos_backend/services/sysman/impl/sysman-boot/src/main/java/com/chinacreator/"
+                + "gzcm/sysman/boot/handler/GlobalExceptionHandler.java", 0);
         m.put("ecos_backend/engine/security-engine/security-engine-impl/src/main/java/com/chinacreator/"
                 + "gzcm/engine/security/controller/DecisionController.java", 2);
         m.put("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/"
@@ -194,7 +238,7 @@ class SecurityDenialHttpStatusRatchetTest {
 
         Map<String, Integer> actual = new TreeMap<>();
         for (Scanned s : scanned) {
-            int hits = countHits(BARE_DENIAL_LEG, s.code());
+            int hits = countDenialLegsByCarrier(s.code())[0];
             if (hits > 0) {
                 actual.put(s.relPath(), hits);
             }
@@ -221,6 +265,53 @@ class SecurityDenialHttpStatusRatchetTest {
         assertTrue(diff.isEmpty(),
                 "安全拒绝态的 HTTP 状态行保真面失真（实扫合计 " + totalActual + " 处／基线合计 "
                         + totalExpected + " 处）:\n" + String.join("\n", diff));
+    }
+
+    // ── 验收 1b：注解承载面单独入基线，双向等值（#142/B4-3e-34 收口 D-B4-69） ────
+
+    @Test
+    @DisplayName("注解承载面 = 登记基线逐文件同数：腿被挪进豁免面或注解被摘都即红")
+    void annotationCarriedLegsArePinnedNotSilentlyExcluded() {
+        Map<String, Integer> actual = new TreeMap<>();
+        int totalBare = 0;
+        for (Scanned s : backendMainSources()) {
+            int[] split = countDenialLegsByCarrier(s.code());
+            totalBare += split[0];
+            if (split[1] > 0) {
+                actual.put(s.relPath(), split[1]);
+            }
+        }
+
+        Map<String, Integer> expected = new TreeMap<>(ANNOTATION_CARRIED_BASELINE);
+        List<String> diff = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : expected.entrySet()) {
+            int got = actual.getOrDefault(e.getKey(), 0);
+            if (got > e.getValue()) {
+                diff.add("豁免面扩张（新拒绝腿只靠注解兜底、属主侧状态行未落地）: "
+                        + e.getKey() + " 基线 " + e.getValue() + " → 实扫 " + got);
+            } else if (got < e.getValue()) {
+                diff.add("注解被摘或方法结构改到解析器看不见（该腿应已出现在判据 A 面并被抓住）: "
+                        + e.getKey() + " 基线 " + e.getValue() + " → 实扫 " + got);
+            }
+        }
+        for (Map.Entry<String, Integer> e : actual.entrySet()) {
+            if (!expected.containsKey(e.getKey())) {
+                diff.add("未登记的豁免持有者（豁免必须点名，否则「看不见」就冒充「已判过」）: "
+                        + e.getKey() + " 实扫 " + e.getValue());
+            }
+        }
+        assertTrue(diff.isEmpty(),
+                "@ResponseStatus 注解承载面失真:\n" + String.join("\n", diff));
+
+        int totalExpectedCarried = expected.values().stream().mapToInt(Integer::intValue).sum();
+        int totalActualCarried = actual.values().stream().mapToInt(Integer::intValue).sum();
+        assertEquals(5, totalExpectedCarried,
+                "豁免面登记量已偏离 #142/B4-3e-34 的逐腿实测值 5——判据口径变更必须重测后同批改注释");
+        assertEquals(totalExpectedCarried, totalActualCarried,
+                "豁免面合计与实扫不符（实扫 " + totalActualCarried + "）");
+        assertEquals(9, totalBare,
+                "判据 A 真裸回合计应为 #142/B4-3e-34 实测的 9 处，实扫 " + totalBare
+                        + "——与基线合计不一致时，说明承载态识别把不该豁免的腿豁免了（或反之）");
     }
 
     // ── 验收 2：锚点委托真在链上（摘掉 ResponseEntity 即红） ──────────────────
@@ -354,6 +445,58 @@ class SecurityDenialHttpStatusRatchetTest {
                 "见证分组必须只吃类型参数：实参表里的常量名/字符串不得被当成状态字面量（防跨界误判）");
     }
 
+    // ── 验收 4b：承载态拆分能变红（#142/B4-3e-34 收口 D-B4-69） ────────────────
+
+    @Test
+    @DisplayName("反向取证：@ResponseStatus 注解承载腿计入豁免面，摘掉注解必须落回违例面")
+    void carrierSplitTurnsRedWhenAnnotationIsRemoved() {
+        String annotatedHandler = String.join("\n", List.of(
+                "class SyntheticHandlers {",
+                "    @ExceptionHandler(AccessDeniedException.class)",
+                "    @ResponseStatus(HttpStatus.FORBIDDEN)",
+                "    public ApiResponse<Map<String,Object>> handleDenied(AccessDeniedException e) {",
+                "        return ApiResponse.forbidden(\"权限不足\");",
+                "    }",
+                "}"));
+        int[] withAnnotation = countDenialLegsByCarrier(annotatedHandler);
+        assertEquals(0, withAnnotation[0],
+                "同一方法带 @ExceptionHandler＋@ResponseStatus 时状态行由注解真实承载，"
+                        + "仍计入违例面＝D-B4-69 的「已保真与未保真长得一样」，收口进度不可读");
+        assertEquals(1, withAnnotation[1], "注解承载腿必须计入豁免面：不记就等于不判");
+
+        String stripped = annotatedHandler.replace(
+                "    @ResponseStatus(HttpStatus.FORBIDDEN)\n", "");
+        int[] withoutAnnotation = countDenialLegsByCarrier(stripped);
+        assertEquals(1, withoutAnnotation[0],
+                "拆掉 @ResponseStatus 后该腿状态行恒 200＝真裸回。判据不随之回弹＝"
+                        + "豁免面成了一张只进不出的免检票（本批门会恒绿）");
+        assertEquals(0, withoutAnnotation[1], "注解已不在，豁免面不得继续记这一腿");
+
+        assertEquals(countHits(BARE_DENIAL_LEG, annotatedHandler),
+                withAnnotation[0] + withAnnotation[1],
+                "拆分只改变记账面、不得改变看见的腿数（旧口径总数与新口径两面之和必须相等）");
+
+        String plainMapping = String.join("\n", List.of(
+                "class SyntheticPlainMapping {",
+                "    @GetMapping(\"/deny\")",
+                "    @ResponseStatus(HttpStatus.FORBIDDEN)",
+                "    public ApiResponse<Map<String,Object>> deny() {",
+                "        return ApiResponse.forbidden(\"权限不足\");",
+                "    }",
+                "}"));
+        int[] plain = countDenialLegsByCarrier(plainMapping);
+        assertEquals(1, plain[0],
+                "普通映射方法单挂 @ResponseStatus 对成功腿同样生效＝会造出「成功腿配 403 行」"
+                        + "的新缺陷，单注解不构成豁免；此处放过＝为降基数开后门");
+        assertEquals(0, plain[1], "未与 @ExceptionHandler 同法的注解不得进豁免面");
+
+        String orphanLeg = "        return ApiResponse.forbidden(\"权限不足\");";
+        int[] orphan = countDenialLegsByCarrier(orphanLeg);
+        assertEquals(1, orphan[0],
+                "解析器定不到属主方法时必须向红兜底（多报可解释，漏报＝盲区重新长回来）");
+        assertEquals(0, orphan[1], "定不到属主的腿不得记为注解承载");
+    }
+
     // ── 扫描与夹具 ────────────────────────────────────────────────────────────
 
     private record Scanned(String relPath, String code) {
@@ -408,6 +551,65 @@ class SecurityDenialHttpStatusRatchetTest {
             }
         }
         return hits;
+    }
+
+    /**
+     * 判据 A 的承载态拆分（#142/B4-3e-34 收口 D-B4-69）。
+     *
+     * <p>返回 {@code [真裸回, 注解承载]}：前者进违例面（基线只减不增），后者进
+     * {@link #ANNOTATION_CARRIED_BASELINE}（同样只减不增）。两数之和必须等于旧口径的
+     * 总命中数——拆分只改变「哪一面记账」，不改变「看见多少腿」，所以本方法不得吃掉任何一腿：
+     * 逐腿判定后一律归入两面之一。</p>
+     */
+    private static int[] countDenialLegsByCarrier(String code) {
+        String[] lines = code.split("\\R", -1);
+        int bare = 0, annotated = 0;
+        for (int i = 0; i < lines.length; i++) {
+            Matcher m = BARE_DENIAL_LEG.matcher(lines[i]);
+            while (m.find()) {
+                if (enclosingHandlerCarriesResponseStatus(lines, i)) {
+                    annotated++;
+                } else {
+                    bare++;
+                }
+            }
+        }
+        return new int[] {bare, annotated};
+    }
+
+    /**
+     * 命中行的上位方法是否「同时」声明 {@code @ExceptionHandler} 与 {@code @ResponseStatus}。
+     *
+     * <p>解析方向必须是<b>从签名向上</b>收集连续的注解行：向下扫会把方法体内的其它语句
+     * 当成注解块（实测恒判 NONE＝把 5 处真实注解承载读成裸回，反向假绿）。
+     * 签名定位失败或注解块不邻接（中间隔了空行以外的内容）时返回 {@code false}，
+     * 让解析器的失效方向是「多报违例」而不是「漏报违例」。</p>
+     */
+    private static boolean enclosingHandlerCarriesResponseStatus(String[] lines, int hitLine) {
+        int sig = -1;
+        for (int i = hitLine; i >= 0 && sig < 0; i--) {
+            if (HANDLER_METHOD_SIGNATURE.matcher(lines[i]).find()) {
+                sig = i;
+            }
+        }
+        if (sig < 0) {
+            return false;
+        }
+        boolean responseStatus = false;
+        boolean exceptionHandler = false;
+        for (int i = sig - 1; i >= 0; i--) {
+            String t = lines[i].trim();
+            if (t.isEmpty()) {
+                continue;
+            }
+            if (t.startsWith("@")) {
+                responseStatus |= t.startsWith("@ResponseStatus");
+                exceptionHandler |= t.startsWith("@ExceptionHandler");
+                continue;
+            }
+            break;
+        }
+        return responseStatus && exceptionHandler;
     }
 
     private static String codeOf(String relative) {
