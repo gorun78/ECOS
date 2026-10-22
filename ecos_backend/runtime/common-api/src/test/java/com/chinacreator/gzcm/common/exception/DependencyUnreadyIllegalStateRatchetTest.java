@@ -588,4 +588,434 @@ class DependencyUnreadyIllegalStateRatchetTest {
         assertTrue(h.contains("SystemErrorCode.ECOS_SYS_500"),
                 "500 腿的机读码不再取单源常量＝「改码不改行」的漂移形态（D-B4-52 同族）");
     }
+
+    // ══ 验收 5（#142/B4-3e-39）：承流面——「该改 503」的前提是它真的落到了兜底 ══════
+
+    /**
+     * <b>本面要纠的是 D-B4-71 自己登记时的一个前提错误。</b>
+     *
+     * <p>#142/B4-3e-38 把 DEPENDENCY 21 枚＋UNREADABLE 8 枚整批登记为「属主侧应改抛 503」，
+     * 依据是 §3.2.7「下游制品不可用 ⇒ 显式 503」。这句话默认了这些腿<b>都会走到 gateway 入口兜底</b>
+     * ＝本文件第 6 案钉住的 500。实扫承流面后发现这个默认不成立：
+     * {@code AiErrorAdvice}（作用域 {@code com.chinacreator.gzcm.engine.ai}）声明了
+     * {@code @ExceptionHandler(Exception.class)}，智能域内抛出的 {@code IllegalStateException}
+     * 在<b>本地就被承载</b>，经 {@code ErrorCodeMapper.resolve()} 的 GENERIC 兜底落
+     * {@code TOOL_BACKEND_ERROR}＝HTTP 502＋机读码 {@code ECOS-AI-502}，
+     * 而该类的 javadoc 明写「执行器未就绪同样归此类（禁 mock-success，X-50）」——
+     * 分册 06 D.5 冻结表<b>已经对这一族做过归属裁决</b>。同理 {@code WorkspaceExceptionHandler}
+     * 的 {@code handleUnexpected} 承载后回 {@code build(500, "INTERNAL", …)}。</p>
+     *
+     * <p>所以「21＋8 枚全欠 503」是个<b>没有承流读数的批量定罪</b>：真正需要属主批改码的，
+     * 只有实测落进兜底（或被承载后仍回 500）的那一面；已按冻结表落 5xx＋域内机读码的腿，
+     * 改它反而违背分册 06 的冻结值。本面把每条腿的<b>承流归属</b>做成实扫读数并双向钉死，
+     * 判据错一次就要红一次。</p>
+     *
+     * <p><b>在册限制（不伪装成已判完）</b>：Spring 的 {@code @RestControllerAdvice} 作用域按
+     * <b>控制器所在包</b>匹配，而本面按<b>抛出腿所在包的包名</b>判「该包是否被某个声明了
+     * {@code Exception.class} 兜底的 advice 覆盖」＝承流的<b>必要条件</b>而非充分条件：
+     * 一条 ai 域的腿若由 gateway 侧控制器调用，实际承载者是网关兜底。故本面登记的是
+     * 「静态可达的承载 advice」，属主批动手前仍须逐条核到实际入口控制器；
+     * 这条限制写在门里，就是为了让下一个读数的人不把「有 advice」读成「已判过」。
+     * 另：{@code assignableTypes} 形态的作用域无法按包判定，本面把它单列为
+     * {@code TYPE_SCOPED}，不参与承载判定（宁可漏判成兜底，也不虚判成已承载）。</p>
+     */
+    private static final Pattern ADVICE_ANNOTATION =
+            Pattern.compile("^ *@(?:Rest)?ControllerAdvice\\b", Pattern.MULTILINE);
+
+    private static final Pattern EXCEPTION_HANDLER_ANNOT =
+            Pattern.compile("@ExceptionHandler\\s*\\(");
+
+    /** 裸 {@code Exception.class}（左侧不得是标识符字符或点，排除 {@code DataAccessException.class} 这类）。 */
+    private static final Pattern BARE_EXCEPTION_CLASS =
+            Pattern.compile("(?<![\\w.])Exception\\.class");
+
+    private static final Pattern PACKAGE_DECL =
+            Pattern.compile("^package\\s+([\\w.]+)\\s*;", Pattern.MULTILINE);
+
+    /** advice 选择器里的引号字符串＝包名（{@code assignableTypes} 形态不含引号）。 */
+    private static final Pattern QUOTED_SELECTOR = Pattern.compile("\"([\\w.]+)\"");
+
+    /** 一个 {@code @ControllerAdvice}：文件、选择器原文（空白归一）、是否声明裸 Exception 兜底。 */
+    record Advice(String relPath, String selector, boolean hasExceptionFallback) {
+    }
+
+    private static final String AI_ADVICE =
+            "ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/ai/controller/AiErrorAdvice.java";
+    private static final String AI_ERROR_MAPPER =
+            "ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/ai/service/ErrorCodeMapper.java";
+    private static final String AI_ERROR_CLASS =
+            "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/"
+                    + "gzcm/common/error/AiErrorClass.java";
+    private static final String WS_ADVICE =
+            "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/workspace/exception/WorkspaceExceptionHandler.java";
+    private static final String KB_ADVICE =
+            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/kb/support/KbErrorAdvice.java";
+
+    /**
+     * 承载 advice 面基线（相对路径 → 「是否裸 Exception 兜底｜作用域选择器规范化文本」）。
+     *
+     * <p>#142/B4-3e-39 上限置 0 探测实扫取证：<b>8</b> 枚 {@code @ControllerAdvice}，其中
+     * {@code EXCEPTION_FALLBACK}（能接住任意 {@code IllegalStateException}）5 枚、
+     * {@code NO_EXCEPTION_FALLBACK} 3 枚中的 kb 一枚作用域正好覆盖 kb 依赖腿。
+     * 两枚 {@code GLOBAL}（gateway / sysman-boot {@code GlobalExceptionHandler}）分属<b>不同部署件</b>
+     * 的入口兜底，本面在 {@code carrierOf} 里<b>显式排除</b> GLOBAL——它们不是「域内承载者」，
+     * 而是「落兜底」这件事本身（读数名 {@code ENTRY_FALLBACK_500}，由本文件第 6 案钉住其 500）。</p>
+     *
+     * <p>{@code WAgentOrchestrationAdvice}／{@code ContextBuildErrorAdvice} 是
+     * {@code assignableTypes} 形态，按在册限制不参与承载判定。</p>
+     */
+    private static final Map<String, String> ADVICE_BASELINE = Map.ofEntries(
+            Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
+                            + "gzcm/engine/ai/controller/AiErrorAdvice.java",
+                    "EXCEPTION_FALLBACK | basePackages = {\"com.chinacreator.gzcm.engine.ai\"}"),
+            Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
+                            + "gzcm/engine/ai/wagent/web/WAgentOrchestrationAdvice.java",
+                    "EXCEPTION_FALLBACK | assignableTypes = {WAgentGoalController.class, "
+                            + "WAgentQuestionController.class, WAgentRunController.class, "
+                            + "WAgentRunEventStreamController.class, WAgentKillSwitchController.class, "
+                            + "WAgentReadinessController.class, WAgentToolContractController.class, "
+                            + "WAgentCandidateController.class, WAgentEvidenceTraceController.class, "
+                            + "WAgentDecisionActionController.class}"),
+            Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/"
+                            + "chinacreator/gzcm/engine/cognitive2/controller/ContextBuildErrorAdvice.java",
+                    "NO_EXCEPTION_FALLBACK | assignableTypes = ContextBuildController.class"),
+            Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/"
+                            + "chinacreator/gzcm/engine/cognitive2/controller/scenario/CognitiveErrorAdvice.java",
+                    "EXCEPTION_FALLBACK | basePackages = {\"com.chinacreator.gzcm.engine.cognitive2.controller"
+                            + ".scenario\", \"com.chinacreator.gzcm.engine.cognitive2.controller\"}"),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
+                            + "gzcm/engine/kb/support/KbErrorAdvice.java",
+                    "NO_EXCEPTION_FALLBACK | basePackages = {\"com.chinacreator.gzcm.engine.kb\"}"),
+            Map.entry("ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/handler/"
+                            + "GlobalExceptionHandler.java",
+                    "EXCEPTION_FALLBACK | GLOBAL"),
+            Map.entry("ecos_backend/services/sysman/impl/sysman-boot/src/main/java/com/chinacreator/"
+                            + "gzcm/sysman/boot/handler/GlobalExceptionHandler.java",
+                    "EXCEPTION_FALLBACK | GLOBAL"),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/"
+                            + "gzcm/workspace/exception/WorkspaceExceptionHandler.java",
+                    "EXCEPTION_FALLBACK | basePackages = \"com.chinacreator.gzcm.workspace\""));
+
+    /**
+     * DEPENDENCY＋UNREADABLE 面持有者的承流归属基线（相对路径 → 承载者标识）。
+     *
+     * <p>探测实扫：<b>10</b> 个持有者／<b>29</b> 枚腿，其中被域内 advice 承载 <b>6</b> 个持有者／
+     * <b>15</b> 枚腿（ai 4／13 ＋ workspace 1／2），落入口兜底 <b>4</b> 个持有者／<b>14</b> 枚腿
+     * （data-engine 3／11 ＋ kb 1／1 ＋ runtime-core 1／2；BaseJdbcAdapter 一家就占 9 枚）。
+     * <b>这把 D-B4-71 登记时的「21＋8 枚全欠 503」批定罪改窄成 14 枚真欠账面</b>：ai 的 13 枚
+     * 已由分册 06 D.5 冻结表归属为 502＋{@code ECOS-AI-502}，改它反而违背冻结值。</p>
+     */
+    private static final Map<String, String> CARRIER_BASELINE = Map.ofEntries(
+            Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/ai/agent/mesh/knowledge/Neo4jQueryService.java", "AiErrorAdvice.java"),
+            Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/ai/capability/ModelCapabilityExecutorImpl.java", "AiErrorAdvice.java"),
+            Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/ai/service/AgentTemplateService.java", "AiErrorAdvice.java"),
+            Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/ai/service/ToolExecutorService.java", "AiErrorAdvice.java"),
+            Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/data/datadescription/discovery/impl/DataDescriptionDiscoveryImpl.java",
+                    "ENTRY_FALLBACK_500"),
+            Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/data/datasource/storage/adapter/jdbc/BaseJdbcAdapter.java",
+                    "ENTRY_FALLBACK_500"),
+            Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/data/writechannel/OlapEngineResolver.java", "ENTRY_FALLBACK_500"),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/kb/service/KbEntityInstanceExtractionService.java", "ENTRY_FALLBACK_500"),
+            Map.entry("ecos_backend/runtime/runtime-core/src/main/java/com/chinacreator/"
+                    + "gzcm/runtime/core/crypto/SecurityCryptoEgress.java", "ENTRY_FALLBACK_500"),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/workspace/scenario/DcchengClient.java", "WorkspaceExceptionHandler.java"));
+
+    /**
+     * 承载者实际渲染的状态行（键＝advice 文件名；锚点逐条钉在
+     * {@link #carriersRenderTheStatusTheyArePinnedFor()}，禁凭「有 advice」推断状态）。
+     *
+     * <p>500 这一枚就是 {@code WorkspaceExceptionHandler.handleUnexpected} 的
+     * {@code build(500, "INTERNAL", …)}——<b>被承载≠已改对</b>：它的状态行仍是 500，
+     * 且 {@code "INTERNAL"} 不是机读码（D-B4-55 同族，单独在册）。</p>
+     */
+    private static final Map<String, Integer> CARRIER_STATUS_BASELINE = Map.of(
+            "AiErrorAdvice.java", 502,
+            "WorkspaceExceptionHandler.java", 500);
+
+    /** 按承载者聚合的腿数（禁算式推出；#142/B4-3e-39 探测实扫）。 */
+    private static final int CARRIED_LEGS_BASELINE = 15;
+    private static final int ENTRY_FALLBACK_LEGS_BASELINE = 14;
+
+    /**
+     * <b>真欠账面</b>＝落入口兜底的腿＋被承载后仍回 500 的腿（实扫 14＋2＝16）。
+     * 属主侧每批改码必须同批下调本值与本面基线，两头都红才算动过。
+     */
+    private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 16;
+
+    private static volatile List<Advice> cachedAdvices;
+
+    private static List<Advice> advices() {
+        List<Advice> cached = cachedAdvices;
+        if (cached != null) {
+            return cached;
+        }
+        List<Advice> out = new ArrayList<>();
+        for (Scanned s : backendMainSources()) {
+            if (!ADVICE_ANNOTATION.matcher(s.code()).find()) {
+                continue;
+            }
+            out.add(new Advice(s.relPath(), adviceSelector(s.code()),
+                    hasBareExceptionFallback(s.code())));
+        }
+        out.sort((a, b) -> a.relPath().compareTo(b.relPath()));
+        cachedAdvices = List.copyOf(out);
+        return cachedAdvices;
+    }
+
+    /** 取 advice 注解的圆括号参数表并归一空白；注解名后无圆括号＝全局 advice，返回 {@code GLOBAL}。 */
+    private static String adviceSelector(String code) {
+        Matcher m = ADVICE_ANNOTATION.matcher(code);
+        if (!m.find()) {
+            return fail("本方法只应在含 @ControllerAdvice 的文件上调用: 扫描器失步");
+        }
+        int i = m.end();
+        while (i < code.length() && Character.isWhitespace(code.charAt(i))) {
+            i++;
+        }
+        // 注解名之后第一个非空白字符必须是 '('；否则视为无参数注解（全局作用域）。
+        // 若不是 '(' 也不是换行后的元素（例如被截断），保守返回 GLOBAL 而不 fail——
+        // 承载面宁可把「读不懂」判成「无作用域」，也不虚判成「已承载」。
+        if (i >= code.length() || code.charAt(i) != '(') {
+            return "GLOBAL";
+        }
+        String args = argumentText(code, i + 1);
+        return args.replaceAll("\\s+", " ").trim();
+    }
+
+    /** 该 advice 是否声明了能接住任意异常（含 IllegalStateException）的裸 {@code Exception.class} 兜底。 */
+    private static boolean hasBareExceptionFallback(String code) {
+        Matcher m = EXCEPTION_HANDLER_ANNOT.matcher(code);
+        while (m.find()) {
+            String args = argumentText(code, m.end());
+            if (BARE_EXCEPTION_CLASS.matcher(args).find()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String packageOf(String relPath) {
+        Matcher m = PACKAGE_DECL.matcher(codeOf(relPath));
+        if (!m.find()) {
+            return fail("读不到 package 声明，承流归属不得默认判成兜底: " + relPath);
+        }
+        return m.group(1);
+    }
+
+    /** 该 advice 的作用域是否覆盖给定包；{@code assignableTypes}（无引号包名）形态不参与判定。 */
+    private static boolean covers(Advice a, String pkg) {
+        if ("GLOBAL".equals(a.selector())) {
+            return true;
+        }
+        Matcher q = QUOTED_SELECTOR.matcher(a.selector());
+        while (q.find()) {
+            String scope = q.group(1);
+            if (pkg.equals(scope) || pkg.startsWith(scope + ".")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 一条腿所在包的承流归属：能接住任意异常的作用域内 advice（多个以 {@code +} 连接文件名）
+     * 或 {@code ENTRY_FALLBACK_500}（只能落 gateway 入口兜底，本文件第 6 案钉住的 500）。
+     */
+    private static String carrierOf(String relPath) {
+        String pkg = packageOf(relPath);
+        List<String> carriers = new ArrayList<>();
+        for (Advice a : advices()) {
+            if (!"GLOBAL".equals(a.selector()) && !a.selector().contains("assignableTypes")
+                    && a.hasExceptionFallback() && covers(a, pkg)) {
+                carriers.add(Path.of(a.relPath()).getFileName().toString());
+            }
+        }
+        if (carriers.isEmpty()) {
+            return "ENTRY_FALLBACK_500";
+        }
+        carriers.sort(String::compareTo);
+        return String.join("+", carriers);
+    }
+
+    private static Map<String, String> carrierFace() {
+        Map<String, String> out = new TreeMap<>();
+        List<Leg> legs = new ArrayList<>();
+        legs.addAll(dependencyLegs());
+        legs.addAll(unreadableLegs());
+        for (Leg l : legs) {
+            out.putIfAbsent(l.relPath(), carrierOf(l.relPath()));
+        }
+        return out;
+    }
+
+    /**
+     * 某文件在 DEPENDENCY＋UNREADABLE 两面里的腿数（不含同文件的 ENV_ALGO／OTHER 腿——
+     * {@code BaseJdbcAdapter} 正是 1 枚依赖腿＋8 枚读不出腿的混合持有者）。
+     */
+    private static int countOf(String relPath) {
+        int n = 0;
+        for (Leg l : dependencyLegs()) {
+            if (l.relPath().equals(relPath)) {
+                n++;
+            }
+        }
+        for (Leg l : unreadableLegs()) {
+            if (l.relPath().equals(relPath)) {
+                n++;
+            }
+        }
+        if (n == 0) {
+            return fail("承流面出现非依赖面持有者，计数辅助失步: " + relPath);
+        }
+        return n;
+    }
+
+    private static String renderStrings(Map<String, String> map) {
+        StringBuilder sb = new StringBuilder();
+        map.forEach((k, v) -> sb.append("    ").append(k).append(" = ").append(v).append('\n'));
+        return sb.length() == 0 ? "    (空)\n" : sb.toString();
+    }
+
+    /**
+     * 字符串值面的逐文件双向对账（承流归属是文本，不是腿数）。
+     *
+     * <p>三面漂移各有独立文案：基线里有而实扫没有＝持有者消失；值变了＝归属漂移；
+     * 实扫里有而基线没有＝未登记持有者。任何一条都必须显式改注释＋同批重测，
+     * 与腿数面（{@link #assertPinnedBidirectionally}）同一套纪律。</p>
+     */
+    private static void assertStringFacePinnedBidirectionally(String faceName,
+                                                              Map<String, String> actual,
+                                                              Map<String, String> expected) {
+        List<String> diff = new ArrayList<>();
+        for (Map.Entry<String, String> e : expected.entrySet()) {
+            String got = actual.get(e.getKey());
+            if (got == null) {
+                diff.add(faceName + " 面登记的持有者已从实扫消失（陈旧读数＝下一批人按虚高余面排产）: "
+                        + e.getKey() + " 基线 " + e.getValue());
+            } else if (!got.equals(e.getValue())) {
+                diff.add(faceName + " 面归属漂移（承载关系变了必须重测后同批改）: "
+                        + e.getKey() + " 基线 " + e.getValue() + " → 实扫 " + got);
+            }
+        }
+        for (Map.Entry<String, String> e : actual.entrySet()) {
+            if (!expected.containsKey(e.getKey())) {
+                diff.add(faceName + " 面出现未登记持有者（豁免与欠账都必须点名）: "
+                        + e.getKey() + " 实扫 " + e.getValue());
+            }
+        }
+        assertTrue(diff.isEmpty(), faceName + " 面失真（登记基线如下）:\n"
+                + String.join("\n", diff) + "\n  登记面:\n" + renderStrings(expected)
+                + "  实扫面:\n" + renderStrings(actual));
+    }
+
+    @Test
+    @Timeout(value = 240)
+    @DisplayName("承载 advice 面逐文件双向等值：作用域／裸 Exception 兜底任一改动即红")
+    void adviceInventoryIsPinnedBidirectionally() {
+        Map<String, String> actual = new TreeMap<>();
+        for (Advice a : advices()) {
+            actual.put(a.relPath(), (a.hasExceptionFallback() ? "EXCEPTION_FALLBACK" : "NO_EXCEPTION_FALLBACK")
+                    + " | " + a.selector());
+        }
+        assertStringFacePinnedBidirectionally("ADVICE", actual, ADVICE_BASELINE);
+    }
+
+    @Test
+    @Timeout(value = 240)
+    @DisplayName("DEPENDENCY＋UNREADABLE 每条腿的承流归属逐文件双向等值（禁批量定罪）")
+    void dependencyLegsCarriersArePinnedPerFile() {
+        assertStringFacePinnedBidirectionally("CARRIER", carrierFace(), CARRIER_BASELINE);
+    }
+
+    @Test
+    @Timeout(value = 240)
+    @DisplayName("承流两面腿数钉死：已承载 vs 落兜底，二者之和＝依赖面腿数（各自独立钉值）")
+    void carriedVersusFallbackLegCountsArePinned() {
+        int carried = 0;
+        int fallback = 0;
+        for (Map.Entry<String, String> e : carrierFace().entrySet()) {
+            int n = countOf(e.getKey());
+            if ("ENTRY_FALLBACK_500".equals(e.getValue())) {
+                fallback += n;
+            } else {
+                carried += n;
+            }
+        }
+        List<String> drift = new ArrayList<>();
+        accountFor(drift, "已承载 advice 腿数", CARRIED_LEGS_BASELINE, carried,
+                "＝有腿在承载面进出未登记；「该改 503」的批量定罪不能再靠减法得出");
+        accountFor(drift, "落入口兜底腿数", ENTRY_FALLBACK_LEGS_BASELINE, fallback,
+                "＝真正的属主侧欠账面，漂了就必须重测后同批改");
+        accountFor(drift, "两面腿数之和",
+                DEPENDENCY_FACE_BASELINE + UNREADABLE_FACE_BASELINE, carried + fallback,
+                "＝承流面没有覆盖全部依赖腿（有持有者读不到包名或被静默漏掉）");
+        assertTrue(drift.isEmpty(), "承流账失真:\n" + String.join("\n", drift));
+    }
+
+    @Test
+    @Timeout(value = 240)
+    @DisplayName("真欠账面＝落兜底腿＋承载后仍 500 腿：属主侧批的排产依据，禁批量定罪")
+    void ownerSideDebtLegsAreMeasuredFromCarriersRenderedStatus() {
+        int debt = 0;
+        for (Map.Entry<String, String> e : carrierFace().entrySet()) {
+            int n = countOf(e.getKey());
+            if ("ENTRY_FALLBACK_500".equals(e.getValue())) {
+                debt += n;
+                continue;
+            }
+            Integer status = CARRIER_STATUS_BASELINE.get(e.getValue());
+            if (status == null) {
+                fail("承载者没有登记渲染状态行读数，不得凭「有 advice」推断已改对: "
+                        + e.getValue() + "（持有者 " + e.getKey() + "）");
+                return;
+            }
+            if (status == 500) {
+                debt += n;
+            }
+        }
+        assertEquals(OWNER_SIDE_DEBT_LEGS_BASELINE, debt,
+                "属主侧欠账面漂走：落兜底或被承载后仍回 500 的腿发生增减。"
+                        + "已按域内冻结表落 5xx＋机读码的腿（ai 13 枚→502 ECOS-AI-502）不是欠账，"
+                        + "把它们算进欠账面＝#142/B4-3e-38 那句未实测的批量定罪复发");
+    }
+
+    @Test
+    @Timeout(value = 240)
+    @DisplayName("承载者实际渲染的状态行有锚可回读：advice 在位≠状态行正确")
+    void carriersRenderTheStatusTheyArePinnedFor() {
+        String aiAdvice = codeOf(AI_ADVICE);
+        assertTrue(aiAdvice.contains("@ExceptionHandler(Exception.class)"),
+                "AiErrorAdvice 的裸 Exception 兜底被摘＝ai 域依赖腿改落网关 500，承流面整体作废");
+        String mapper = codeOf(AI_ERROR_MAPPER);
+        assertTrue(mapper.contains("case TOOL, PERSISTENCE, GENERIC -> AiErrorClass.TOOL_BACKEND_ERROR;"),
+                "GENERIC 面兜底不再归 TOOL_BACKEND_ERROR＝承载状态行变了，本门 CARRIER 基线必须重测");
+        String aiClass = codeOf(AI_ERROR_CLASS);
+        assertTrue(aiClass.contains("TOOL_BACKEND_ERROR(\"ECOS-AI-502\", 502"),
+                "分册 06 D.5 的 ECOS-AI-502 冻结值被改＝域内归属变了（该值冻结，禁改写）");
+
+        String ws = codeOf(WS_ADVICE);
+        int idx = ws.indexOf("handleUnexpected");
+        assertTrue(idx > 0, "WorkspaceExceptionHandler.handleUnexpected 不在位＝承流面变了");
+        String body = ws.substring(idx, Math.min(ws.length(), idx + 400));
+        assertTrue(body.contains("build(500, \"INTERNAL\""),
+                "workspace 承载者不再回 500＋\"INTERNAL\"＝CARRIER 基线须重测；"
+                        + "注意 \"INTERNAL\" 不是机读码面（D-B4-55 同族），该条单独在册");
+
+        String kb = codeOf(KB_ADVICE);
+        assertFalse(hasBareExceptionFallback(kb),
+                "KbErrorAdvice 新增了裸 Exception 兜底＝kb 域依赖腿的承载者换了，不能再按落网关兜底判");
+    }
 }
