@@ -114,8 +114,17 @@ class SecurityDenialHttpStatusRatchetTest {
      * 「有意不扩面」成为一个<b>可被读数推翻</b>的声明，而不是一句注释。历史读数 910（D-B4-68
      * 盲区口径）与 921（补盲后、属主侧收口前）保留在此作为口径变更凭据：任何「上限＝历史读数」
      * 的比对都必须先确认判据面是否含类型见证分支、以及该批是否已做属主侧收口。</p>
+     *
+     * <p><b>#142/B4-3e-33 重设＝915→871</b>：kb {@code NavTaxonController} 一条 505 行的
+     * CRUD 控制器独占判据 A 的 13 枚 403 腿，同方法内的非拒绝腿（badRequest 15＋notFound 12
+     * ＋internalError 17＝44 枚）与本批 6 次同型收口不同——本批是把整个方法签名一次性改成
+     * {@code ResponseEntity}，非拒绝腿若留在裸回形态根本编不过（＝「只补拒绝态」在这种
+     * 满篇 try/catch 的控制器上没有可选形态）。故 44 枚一并写上状态行，且状态行取信封
+     * {@code code} 经 {@code DataBridgeException.resolveHttpStatus} 单源推出。读数由本批
+     * 门禁会话的「上限置 0 探测」实跑产出（871），与旧值做算术差的 915−44＝871 只是归因核对，
+     * 二者相符。</p>
      */
-    private static final int OTHER_LEG_CEILING = 915;
+    private static final int OTHER_LEG_CEILING = 871;
 
     /**
      * 基线（实测于 #142/B4-3e-18）：文件 → 裸回安全拒绝态处数。
@@ -126,8 +135,9 @@ class SecurityDenialHttpStatusRatchetTest {
     private static Map<String, Integer> baseline() {
         Map<String, Integer> m = new LinkedHashMap<>();
         m.put(QUERY_CONTROLLER, 0);
+        // ── #142/B4-3e-33 归零：本组最大持有者（13 枚 403 裸回腿）属主侧状态行已落地 ──
         m.put("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/"
-                + "engine/kb/controller/NavTaxonController.java", 13);
+                + "engine/kb/controller/NavTaxonController.java", 0);
         m.put("ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/handler/"
                 + "GlobalExceptionHandler.java", 3);
         m.put("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/"
@@ -169,7 +179,9 @@ class SecurityDenialHttpStatusRatchetTest {
             "ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/controller/"
                     + "RuntimeAlertV1Controller.java",
             "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/"
-                    + "engine/kb/controller/KbProfileController.java");
+                    + "engine/kb/controller/KbProfileController.java",
+            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/kb/controller/NavTaxonController.java");
 
     // ── 验收 1：全后端裸回面逐文件计数，只减不增 ──────────────────────────────
 
@@ -246,7 +258,7 @@ class SecurityDenialHttpStatusRatchetTest {
      * 同时在链为前提，缺行为门即半只眼。
      */
     @Test
-    @DisplayName("本批收口的两枚持有者：判据 A 零命中且确有状态行承载手段在链上")
+    @DisplayName("本批收口的三枚持有者：判据 A 零命中且确有状态行承载手段在链上")
     void convertedOwnersCarryTheirStatusLine() {
         for (String owner : CONVERTED_OWNERS) {
             String code = codeOf(owner);
@@ -263,6 +275,10 @@ class SecurityDenialHttpStatusRatchetTest {
         assertTrue(profile.contains("KbErrorCodes.PERMISSION_DENIED.httpStatus()")
                         && profile.contains("KbErrorCodes.TASK_BASE_UNAVAILABLE.httpStatus()"),
                 "KbProfileController 的 403/503 状态行未取本域码表单源（改码不改行＝保真会漂移）");
+        String nav = codeOf(CONVERTED_OWNERS.get(2));
+        assertTrue(nav.contains("DataBridgeException.resolveHttpStatus(body.getCode())"),
+                "NavTaxonController 的状态行不再从信封 code 单源推出＝本类 13 枚 403 腿的"
+                        + "「改码即改行」不变式被摘掉，退回两处各写一遍的漂移形态");
     }
 
     // ── 验收 3：面外失败码的量化登记（取舍是登记的，不是漏判） ────────────────
