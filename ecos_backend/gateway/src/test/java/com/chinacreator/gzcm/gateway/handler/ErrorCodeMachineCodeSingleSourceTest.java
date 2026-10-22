@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.gateway.handler;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.SystemErrorCode;
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.DataAccessException;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
@@ -9,6 +10,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -39,10 +46,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       {@code String.valueOf(x.getErrorCode())}（改前实测 3 处，收口后 0）。</li>
  *   <li><b>B 属主在位</b>：{@code GlobalExceptionHandler} 的三条异常出口
  *       （DataBridge／Business／DataAccess）必须各经 {@code MachineErrorCode.orNumeric} 一次。</li>
- *   <li><b>C 只减不增棘轮</b>：以字面量三位数充当 {@code errorCode} 的承载点（登记为
- *       <b>D-B4-64</b> 余项，本批未关账）基线实测 <b>2</b> 枚 —— 多于 2 即新增违例，
- *       少于 2 即基线陈旧（关账后必须剪基线，防"已清零却仍挂基线"的假进度）。</li>
+ *   <li><b>C 只减不增棘轮</b>：以字面量三位数充当 {@code errorCode} 的承载点（<b>D-B4-64</b>，
+ *       已于 <b>#142/B4-3e-25</b> 关账）基线 <b>0</b> 枚。登记时实测 2 枚（404 路由腿／409 冲突腿），
+ *       改指 §3.2.7 {@code ECOS-SYS-*} 族登记码后归零。零基线同样双向：任何一枚出现即红，
+ *       且「实 0 而基线仍挂 2」也红——基线与文件白名单必须同批下修，由判据内的元自证枚看守。</li>
  * </ol>
+ *
+ * <p>关账前逐项实测（改面值不是纯内部重构，须先证明没有按旧面值匹配的下游）：
+ * 前端读 {@code errorCode} 共 69 处，其中与 {@code "404"}／{@code "409"} 字面量比较的 <b>0</b> 处；
+ * {@code ecos-tests} 只断言 {@code ECOS-COG-503D}／{@code ENGINE_DISABLED}；
+ * 后端测试面无任何一条腿绑这两枚字面量。故 {@code code} 与状态行保持原值即可保证契约不回归。</p>
  *
  * <p>取证纪律：三条判据各配 {@code @TempDir} 合成夹具，先证明「能变红」再宣布过门；
  * 预处理<b>按判据分模式</b>——A/B 剥注释＋抹字符串字面量（本类的 javadoc 里就写了违例形态的原样文本），
@@ -61,14 +74,18 @@ class ErrorCodeMachineCodeSingleSourceTest {
     private static final Pattern OWNER_CALL = Pattern.compile(
             "MachineErrorCode\\.orNumeric\\s*\\(");
 
-    /** 判据 C：字面量三位数当 errorCode 的形态（D-B4-64 余项）。 */
+    /** 判据 C：字面量三位数当 errorCode 的形态（D-B4-64，已于 #142/B4-3e-25 关账）。 */
     private static final Pattern LITERAL_NUMERIC_CODE = Pattern.compile(
             "ApiResponse\\.(?:<[A-Za-z]+>)?error\\(\\s*\\d{3}\\s*,\\s*\"\\d{3}\"");
 
-    /** 判据 C 基线：2026-10-22 实测两枚，均在 GlobalExceptionHandler（404 路由腿、409 冲突腿）。 */
-    private static final int LITERAL_NUMERIC_BASELINE = 2;
-    private static final List<String> LITERAL_NUMERIC_BASELINE_FILES = List.of(
-            "gateway/src/main/java/com/chinacreator/gzcm/gateway/handler/GlobalExceptionHandler.java");
+    /**
+     * 判据 C 基线：<b>0 枚</b>（2026-10-22 #142/B4-3e-25 把 404 路由腿与 409 冲突腿改指
+     * {@code ECOS-SYS-404}／{@code ECOS-SYS-409} 后实测归零）。
+     * <p>基线与文件白名单必须<b>同批</b>下修，且二者自相一致（下面的元自证枚）——
+     * 「实 0 而基线仍挂 2」也是一种假进度，因为它会让下一枚违例被基线吸收掉。</p>
+     */
+    private static final int LITERAL_NUMERIC_BASELINE = 0;
+    private static final List<String> LITERAL_NUMERIC_BASELINE_FILES = List.of();
 
     /** 扫描面阈值守卫：2026-10-22 实测 main/java 文件数远大于此。 */
     private static final int MIN_SCANNED_MAIN_FILES = 800;
@@ -105,15 +122,19 @@ class ErrorCodeMachineCodeSingleSourceTest {
     }
 
     @Test
-    @DisplayName("判据C — 字面量三位数当 errorCode 的余面 = 基线 2 枚且逐枚对得上（只减不增）")
+    @DisplayName("判据C — 字面量三位数当 errorCode 的余面 = 基线 0 枚（只减不增，D-B4-64 已关账）")
     void literalNumericErrorCodeFaceIsRatcheted() throws IOException {
+        // 元自证：基线与文件白名单必须同批下修。「实 0 而基线挂 2」＝假进度，
+        // 因为下一枚违例会被残留基线吸收；本断言让这种半关账直接红。
+        assertEquals(LITERAL_NUMERIC_BASELINE, LITERAL_NUMERIC_BASELINE_FILES.size(),
+                "基线枚数与文件白名单条数不一致＝关账只剪了一半（同批必剪两处）");
         Path backend = locateRepoRoot().resolve("ecos_backend");
         List<Hit> hits = scan(backend, "src/main/java", LITERAL_NUMERIC_CODE, true);
         List<String> files = hits.stream().map(Hit::rel).distinct().sorted().toList();
         assertEquals(LITERAL_NUMERIC_BASELINE, hits.size(),
-                "D-B4-64 余项基线漂移：实测 " + hits.size() + " 枚（基线 " + LITERAL_NUMERIC_BASELINE
+                "D-B4-64 余面漂移：实测 " + hits.size() + " 枚（基线 " + LITERAL_NUMERIC_BASELINE
                         + "），明细：\n  " + render(hits)
-                        + "\n多于基线＝新增违例；少于基线＝已关账，须同批剪 LITERAL_NUMERIC_BASELINE 与文件白名单。");
+                        + "\n多于基线＝新增违例；基线已归零，任何一枚都算红。");
         assertEquals(LITERAL_NUMERIC_BASELINE_FILES, files,
                 "基线文件清单与实际命中文件不一致（按路径钉死，防改到别处仍算过门）");
     }
@@ -160,6 +181,50 @@ class ErrorCodeMachineCodeSingleSourceTest {
                 "文案中间转述的码不得冒充本请求错误码（只认 message 起始位）");
     }
 
+    /**
+     * #142/B4-3e-25 关账 D-B4-64 的行为腿：404 路由腿与 409 冲突腿的 {@code errorCode} 必须是
+     * §3.2.7 {@code ECOS-SYS-*} 登记码，而 {@code code} 与 {@code @ResponseStatus} 状态行必须
+     * <b>逐字不变</b>——本批改的是机读码字段，不碰 HTTP 语义（§4.5.4「API 路径与状态语义只增不改」）。
+     */
+    @Test
+    @DisplayName("行为 — 404/409/兜底 500 出口：errorCode 上登记码，code 与状态行不变（D-B4-64 关账腿）")
+    void literalNumericCarriersNowEmitRegisteredMachineCodes() throws NoSuchMethodException {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+        ApiResponse<Void> notFound = handler.handleRouteNotFound(
+                new NoResourceFoundException(HttpMethod.GET, "api/v1/no-such-route"));
+        assertEquals(SystemErrorCode.ECOS_SYS_404, notFound.getErrorCode(),
+                "404 出口的 errorCode 必须是登记机读码，实际=" + notFound.getErrorCode());
+        assertEquals(404, notFound.getCode(), "code 字段仍承载 HTTP 语义（不得被机读码顶替）");
+        assertEquals(HttpStatus.NOT_FOUND,
+                statusLineOf("handleRouteNotFound", Exception.class), "状态行必须仍为 404");
+
+        ApiResponse<Void> conflict = handler.handleDataIntegrityViolation(
+                new DuplicateKeyException("duplicate key value violates unique constraint \"t_code_key\""));
+        assertEquals(SystemErrorCode.ECOS_SYS_409, conflict.getErrorCode(),
+                "409 出口的 errorCode 必须是登记机读码，实际=" + conflict.getErrorCode());
+        assertEquals(409, conflict.getCode(), "code 字段仍承载 HTTP 语义");
+        assertEquals(HttpStatus.CONFLICT,
+                statusLineOf("handleDataIntegrityViolation", DataIntegrityViolationException.class),
+                "状态行必须仍为 409");
+
+        ApiResponse<Void> any = handler.handleAny(new IllegalStateException("unexpected"));
+        assertEquals(SystemErrorCode.ECOS_SYS_500, any.getErrorCode(),
+                "兜底出口同样取常量单源，不再是散落的字面量");
+        assertEquals(500, any.getCode(), "兜底 code 不变");
+
+        assertNotEquals(notFound.getErrorCode(), conflict.getErrorCode(),
+                "两枚出口必须彼此可分辨（旧形态是 HTTP 状态抄送，域语义缺失）");
+    }
+
+    /** 读 handler 方法上的 {@code @ResponseStatus}，证明本批未改 HTTP 状态行。 */
+    private static HttpStatus statusLineOf(String method, Class<?> param) throws NoSuchMethodException {
+        ResponseStatus ann = GlobalExceptionHandler.class.getMethod(method, param)
+                .getAnnotation(ResponseStatus.class);
+        assertNotNull(ann, method + " 必须仍带 @ResponseStatus（状态行单源在注解）");
+        return ann.value();
+    }
+
     // ── 夹具：先证明能变红 ─────────────────────────────
 
     @Test
@@ -204,7 +269,7 @@ class ErrorCodeMachineCodeSingleSourceTest {
     }
 
     @Test
-    @DisplayName("夹具③ — C 腿对基线漂移双向变红（新增 3 枚即红；关账到 1 枚仍挂基线 2 即红）")
+    @DisplayName("夹具③ — C 腿面值计数对「新增/残留/清零」三态可分辨（零基线下任何一枚即红）")
     void fixtureC_isRedOnBothSidesOfBaseline(@TempDir Path tmp) throws IOException {
         write(tmp.resolve("svc/c/src/main/java/p/One.java"),
                 "class One { Object r = ApiResponse.<Void>error(404, \"404\", m); }");
@@ -213,7 +278,7 @@ class ErrorCodeMachineCodeSingleSourceTest {
         write(tmp.resolve("svc/c/src/main/java/p/Three.java"),
                 "class Three { Object r = ApiResponse.error(500, \"500\", m); }");
         assertEquals(3, scan(tmp, "src/main/java", LITERAL_NUMERIC_CODE, true).size(),
-                "三枚字面量数字码必须全部计入（多于基线 ⇒ 真仓判据红）");
+                "三枚字面量数字码必须全部计入（基线 0 ⇒ 多出的每一枚都会让真仓判据红，不是只看'有没有超过 3'）");
         // 「只剥注释、保留字面量」模式的反面：注释里的同形文本不得算命中，
         // 否则该模式会退化成「原文扫描」，把 javadoc 里的例子读成违例。
         write(tmp.resolve("svc/c/src/main/java/p/OnlyComment.java"),

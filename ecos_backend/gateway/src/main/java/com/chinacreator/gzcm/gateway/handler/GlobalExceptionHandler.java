@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.gateway.handler;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.base.MachineErrorCode;
 import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
+import com.chinacreator.gzcm.common.error.SystemErrorCode;
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.common.exception.DataAccessException;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
@@ -104,12 +105,16 @@ public class GlobalExceptionHandler {
      * <p>Spring Boot 3.2 未匹配路由抛 {@link NoResourceFoundException}，未匹配 handler 抛
      * {@link NoHandlerFoundException}。这是<b>唯一</b>合法返回 404 的业务外路径，
      * 与 {@code ECOS-DATA-031}（500 数据层异常）严格区分（分册 00 D.5 错误码表同步）。</p>
+     * <p><b>#142/B4-3e-25（差距 D-B4-64）</b>：{@code errorCode} 字段原样承载十进制串 {@code "404"}
+     * ＝把 HTTP 状态又抄了一遍，既不可枚举也无域语义（与 D-B4-55 同一缺陷形态的另一面值）。
+     * 现改指 §3.2.7 {@code ECOS-SYS-*} 族登记码 {@link SystemErrorCode#ECOS_SYS_404}，
+     * {@code code}＝404 与状态行不变。</p>
      */
     @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ApiResponse<Void> handleRouteNotFound(Exception ex) {
         log.info("Route/Resource not found: {}", ex.getMessage());
-        return ApiResponse.<Void>error(404, "404", "资源不存在").withTraceIdFromMdc();
+        return ApiResponse.<Void>error(404, SystemErrorCode.ECOS_SYS_404, "资源不存在").withTraceIdFromMdc();
     }
 
     /**
@@ -237,6 +242,9 @@ public class GlobalExceptionHandler {
      * 应归 409 (Conflict), 不应裸露 500。
      * 典型触发: POST /api/v1/ecos/ontologies/x/entities {code:probe_a} 重放,
      *         POST /api/v1/knowledge/edges 重送相同 source+target+relationship。
+     * <p><b>#142/B4-3e-25（差距 D-B4-64）</b>：{@code errorCode} 字段改指
+     * {@link SystemErrorCode#ECOS_SYS_409}（原为 HTTP 状态抄送串 {@code "409"}），
+     * {@code code}＝409 与状态行不变；{@code msg} 仍透传最内层数据库原因（运维定位用，非新增暴露面）。</p>
      */
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
@@ -245,7 +253,7 @@ public class GlobalExceptionHandler {
         String msg = ex.getMostSpecificCause() != null && ex.getMostSpecificCause().getMessage() != null
                 ? ex.getMostSpecificCause().getMessage() : String.valueOf(ex);
         log.warn("DataIntegrityViolationException (likely duplicate key or NOT NULL): {}", msg);
-        return ApiResponse.error(409, "409", "资源冲突: 唯一约束/必填字段违反 [" + msg + "]");
+        return ApiResponse.error(409, SystemErrorCode.ECOS_SYS_409, "资源冲突: 唯一约束/必填字段违反 [" + msg + "]");
     }
 
     /**
@@ -266,7 +274,7 @@ public class GlobalExceptionHandler {
         String msg = ex.getMessage() != null ? ex.getMessage() : "";
         log.error("Unhandled exception (server internal error): type={}, msg={}", type, msg, ex);
         ApiResponse<Void> resp =
-                ApiResponse.error(500, "ECOS-SYS-500", "服务内部错误，请稍后重试或联系管理员");
+                ApiResponse.error(500, SystemErrorCode.ECOS_SYS_500, "服务内部错误，请稍后重试或联系管理员");
         return resp.withTraceIdFromMdc();
     }
 
