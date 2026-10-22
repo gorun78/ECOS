@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.runtime.access.connector;
 
+import com.chinacreator.gzcm.common.data.model.ColumnMetadata;
 import com.chinacreator.gzcm.common.data.model.DataResource;
 import com.chinacreator.gzcm.common.exception.DataAccessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -296,6 +297,66 @@ public class JdbcConnector implements Connector {
             }
         }
         return schemas;
+    }
+
+    @Override
+    public List<ColumnMetadata> listColumns(String connectionConfig, String objectRef) {
+        if (objectRef == null || objectRef.isBlank()) {
+            throw new IllegalArgumentException("列面取数必须指定对象定位（schema.table 或表名）");
+        }
+        Map<String, String> config = readConnectionConfig(connectionConfig);
+        List<ColumnMetadata> columns = new ArrayList<>();
+        try (Connection conn = DriverManager.getConnection(
+                config.get("jdbcUrl"),
+                config.get("username"),
+                config.get("password"))) {
+            DatabaseMetaData metaData = conn.getMetaData();
+            String catalog = conn.getCatalog();
+            // 与 listResources 同一口径：配置里的 schema 优先，缺省回落连接当前 schema
+            String defaultSchema = config.getOrDefault("schema", conn.getSchema());
+            String schema = defaultSchema;
+            String table = objectRef;
+            int dot = objectRef.lastIndexOf('.');
+            if (dot > 0 && dot < objectRef.length() - 1) {
+                schema = objectRef.substring(0, dot);
+                table = objectRef.substring(dot + 1);
+            }
+            try (ResultSet rs = metaData.getColumns(catalog, schema, table, "%")) {
+                while (rs.next()) {
+                    String name = rs.getString("COLUMN_NAME");
+                    if (name == null || name.isBlank()) {
+                        continue;
+                    }
+                    String typeName = blankToNull(rs.getString("TYPE_NAME"));
+                    Boolean required = nullableToRequired(rs.getShort("NULLABLE"));
+                    String comment = blankToNull(rs.getString("REMARKS"));
+                    columns.add(new ColumnMetadata(name, typeName, required, comment));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("数据源列面读取失败（请检查对象名/账号权限）: " + e.getMessage(), e);
+        }
+        return columns;
+    }
+
+    /**
+     * {@code NULLABLE} → 必填面。只有驱动明确说 {@code columnNoNulls} 才是 {@code true}、
+     * 明确说 {@code columnNullable} 才是 {@code false}；{@code columnNullableUnknown} 一律
+     * {@code null}＝未知（把未知写成「可空」＝替驱动说话）。
+     */
+    private static Boolean nullableToRequired(short nullable) {
+        if (nullable == DatabaseMetaData.columnNoNulls) {
+            return Boolean.TRUE;
+        }
+        if (nullable == DatabaseMetaData.columnNullable) {
+            return Boolean.FALSE;
+        }
+        return null;
+    }
+
+    /** 驱动常以空串表达「没有备注／没有类型名」，归一成 {@code null} 以对齐列面的未知口径。 */
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     @Override

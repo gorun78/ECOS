@@ -79,6 +79,20 @@ public class DataSourceRegistryService {
         }
     }
 
+    public Map<String, Object> previewSchemaRaw(DataSourceDTO dto) {
+        if (dto == null) {
+            throw new IllegalArgumentException("请求体不能为空");
+        }
+        if (dto.getDatasourceType() == null || dto.getDatasourceType().isBlank()) {
+            throw new IllegalArgumentException("数据源类型不能为空");
+        }
+        if (dto.getConnectionConfig() == null || dto.getConnectionConfig().isBlank()) {
+            throw new IllegalArgumentException("连接配置不能为空");
+        }
+        return dataSourceService.previewSchemaByConfig(
+                dto.getDatasourceType().toUpperCase(), dto.getConnectionConfig());
+    }
+
     public void remove(String id) {
         dataSourceService.remove(id);
         dsListCache.invalidate(CACHE_KEY);

@@ -114,14 +114,20 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      *   <li>第 3 次探测（修好片段规则后，{@code b43e44-probe3.log}）＝总数 169／折叠 0／状态行 27／
      *       <b>裸回 99</b>／helper 8／纯信封 35。五类之和 27+99+8+35 = 169 = 总数，
      *       对账（判据 2）成立。四枚上限即按本次实测值钉住。</li>
+     *   <li>#142/B4-3e-46 重设（新增「按原始连接配置预览」端点 <b>3</b> 枚信封出现点后由本门实跑变红
+     *       产出，{@code t-3e46-full.log}）＝总数 <b>172</b>／折叠 0／状态行承载 <b>28</b>／
+     *       裸回 <b>99</b>（未漂移，新端点零裸回）／属主 helper <b>10</b>／纯信封 <b>35</b>（未漂移）。
+     *       三类归位与本仓惯用法一致：{@code ResponseEntity.status(..).body(ApiResponse.error(..))}
+     *       记状态行承载 ＋1，两枚 {@code failure(ApiResponse.error(..))} 记属主 helper ＋2；
+     *       28+99+10+35 = 172 = 总数，对账仍成立。只重设被突破的两枚上限，其余两面按实测保持。</li>
      * </ul>
      *
      * <p>裸回面 99 枚<b>本门有意不判其对错</b>（归 {@code D-B4-59} 族棘轮门管账），
      * 此处只做「只减不增」计数：该族每收口一枚，本上限随批下调。</p>
      */
-    private static final int STATUS_CARRIER_CEILING = 27;
+    private static final int STATUS_CARRIER_CEILING = 28;
     private static final int BARE_RETURN_CEILING = 99;
-    private static final int OWNER_HELPER_CEILING = 8;
+    private static final int OWNER_HELPER_CEILING = 10;
     private static final int ENVELOPE_ONLY_CEILING = 35;
 
     /** 本批属主侧承载见证锚（文件 → 必须出现的形态片段）。缺任一即红＝「删腿」不算修好。 */
@@ -138,7 +144,17 @@ class SuccessStatusFailureEnvelopeRatchetTest {
             List.of("new DataBridgeException(404, 404,",
                     "new DataBridgeException(503, 503,",
                     "DataDomainErrorCode.ECOS_DATA_032",
-                    "DataDomainErrorCode.ECOS_DATA_051"));
+                    "DataDomainErrorCode.ECOS_DATA_051",
+                    // #142/B4-3e-46：按原始配置预览属主腿＋内层列面显式降级键（删键即红）
+                    "public Map<String, Object> previewSchemaByConfig(",
+                    "result.put(\"fieldsDegraded\", true)",
+                    "result.put(\"fieldsReason\""),
+            "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/data/controller/DataSourceController.java",
+            List.of("@PostMapping(\"/preview-schema\")",
+                    "previewSchema(@RequestBody DataSourceDTO dto)",
+                    "return ResponseEntity.status(status).body(ApiResponse.error(status,",
+                    "return failure(ApiResponse.error(400, e.getMessage()));"));
 
     // ── 判据 1：违例面 = 基线逐文件同数 ──────────────────────────────────────
 

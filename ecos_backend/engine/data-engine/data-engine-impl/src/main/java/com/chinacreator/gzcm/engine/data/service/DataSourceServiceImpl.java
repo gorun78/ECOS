@@ -17,6 +17,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -769,6 +770,124 @@ public class DataSourceServiceImpl implements DataSourceService {
             throw new DataBridgeException(503, 503,
                     DataDomainErrorCode.ECOS_DATA_051 + " — 数据源结构预览通道不可用: " + e.getMessage(), e);
         }
+        return result;
+    }
+
+    /**
+     * #142/B4-3e-46（差距 <b>D-B4-76</b>）：未保存连接的<b>原始配置</b>结构预览 —— 承流端点
+     * {@code POST /api/v1/datanet/datasource/preview-schema} 的属主腿。
+     *
+     * <p><b>为什么要新开这一腿</b>：前端「测试连接」弹窗里的 schema 预览发生在<b>保存之前</b>，
+     * 手里只有表单拼出的连接配置、没有 datasourceId；而既有 {@link #previewSchema(String)} 只认
+     * 登记表里的 ID。改前前端打的是 {@code /api/v1/ecos/data/datasource/preview-schema}
+     * （全仓零承流＝幻影路径），并读 {@code fields}/{@code tableNames} 两键——后端既无该路径、
+     * 返回键面又是 {@code objects}/{@code columnPreview}，于是<b>恒读空</b>：预览按钮永远
+     * 「0 个字段」而不报错。本批把通道接通并把键面对上。</p>
+     *
+     * <p><b>键面契约（单源，前端 3e-47 批按此读）</b>：
+     * <ul>
+     *   <li>{@code type} — 归一化后的数据源类型；</li>
+     *   <li>{@code tableNames} — 对象名列表（与 {@link #previewSchema(String)} 的
+     *       {@code objects} 同一取名口径：sourcePath 优先、回落 resourceName）；</li>
+     *   <li>{@code fields} — <b>首个对象</b>的列面，每列
+     *       {@code {name, type, required, comment}}；底座给不出的属性<b>逐列留 null</b>
+     *       （＝未知），禁折叠成 {@code "varchar"}/{@code false}/{@code ""}；</li>
+     *   <li>{@code fieldsObject} — {@code fields} 所属对象名，缺省＝列面未取（禁把「哪张表的列」读丢）；</li>
+     *   <li>{@code fieldsDegraded} + {@code fieldsReason} — 对象面已取到、列面腿失败的<b>部分可用</b>
+     *       显式声明（承 #142/B4-3e-44 的 {@code columnPreviewDegraded} 手法：可用面不整单作废，
+     *       失败也不沉默）；</li>
+     *   <li>{@code note} — 仅 MINIO/FILESYSTEM 占位面携带，明写「枚举待实现」，
+     *       与「该源确实没有对象」分态。</li>
+     * </ul>
+     *
+     * <p><b>状态口径（§4.7.2「不可用 ≠ 无权限 ≠ 空结果」）</b>：入参不合法＝
+     * {@link IllegalArgumentException}（端点落 400）；连接配置无法解析或底座取不到对象面＝
+     * 携带 503 的 {@link DataBridgeException}（机读码 ECOS-DATA-051），<b>不返回带空数组的成功体</b>
+     * ——那正是本批要收掉的折叠形态。</p>
+     *
+     * @param type             数据源类型（大写的后端规范名）
+     * @param connectionConfig 连接配置 JSON 串（与 {@code POST /test} 同一形态）
+     * @return 键面见上文契约
+     */
+    public Map<String, Object> previewSchemaByConfig(String type, String connectionConfig) {
+        String upper = type == null ? "" : type.toUpperCase();
+        validateType(upper);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("type", upper);
+
+        if (MINIO_TYPE.equals(upper) || "FILESYSTEM".equals(upper)) {
+            // 与 previewSchema 同一占位口径：空数组 + note，显式声明「枚举待实现」而非「没有对象」。
+            result.put("tableNames", List.of());
+            result.put("fields", List.of());
+            result.put("note", "对象存储/文件路径枚举待实现（承 PMO-45 后续任务）");
+            return result;
+        }
+
+        com.chinacreator.gzcm.runtime.access.connector.Connector connector;
+        try {
+            connector = connectorFactory.getConnector(upper);
+        } catch (IllegalArgumentException e) {
+            // 类型在白名单内却无连接器 bean＝服务端装配缺陷，属不可用而非入参错误（不折成 400）。
+            log.warn("previewSchemaByConfig 连接器不可用 type={}: {}", upper, e.getMessage());
+            throw new DataBridgeException(503, 503,
+                    DataDomainErrorCode.ECOS_DATA_051 + " — 数据源结构预览通道不可用: " + e.getMessage(), e);
+        }
+
+        List<String> tableNames = new ArrayList<>();
+        try {
+            List<com.chinacreator.gzcm.common.data.model.DataResource> objects =
+                    connector.listResources(connectionConfig, null, null);
+            if (objects != null) {
+                for (com.chinacreator.gzcm.common.data.model.DataResource obj : objects) {
+                    String ref = obj.getSourcePath();
+                    if (ref == null || ref.isBlank()) {
+                        ref = obj.getResourceName();
+                    }
+                    if (ref != null && !ref.isBlank()) {
+                        tableNames.add(ref);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("previewSchemaByConfig 底座不可用 type={}: {}", upper, e.getMessage());
+            throw new DataBridgeException(503, 503,
+                    DataDomainErrorCode.ECOS_DATA_051 + " — 数据源结构预览通道不可用: " + e.getMessage(), e);
+        }
+        result.put("tableNames", tableNames);
+
+        // 列面腿：取首个对象，失败只声明部分可用（对象面已成立，整单不作废）。
+        List<Map<String, Object>> fields = new ArrayList<>();
+        if (!tableNames.isEmpty()) {
+            String first = tableNames.get(0);
+            result.put("fieldsObject", first);
+            try {
+                for (com.chinacreator.gzcm.common.data.model.ColumnMetadata column
+                        : connector.listColumns(connectionConfig, first)) {
+                    Map<String, Object> field = new LinkedHashMap<>();
+                    field.put("name", column.getName());
+                    field.put("type", column.getTypeName());
+                    field.put("required", column.getRequired());
+                    field.put("comment", column.getComment());
+                    fields.add(field);
+                }
+            } catch (UnsupportedOperationException e) {
+                // 该类型根本没有声明式列面（REST）＝「面不可问」，与「取列失败」不同义，分开写。
+                log.warn("previewSchemaByConfig 列面不可问 type={} object={}: {}",
+                        upper, first, e.getMessage());
+                result.put("fieldsDegraded", true);
+                result.put("fieldsReason", "该数据源类型不提供声明式列面: " + e.getMessage());
+            } catch (Exception e) {
+                log.warn("previewSchemaByConfig 列面取数失败 type={} object={}: {}",
+                        upper, first, e.getMessage());
+                result.put("fieldsDegraded", true);
+                result.put("fieldsReason", e.getMessage());
+            }
+        } else {
+            // 对象面确实为空（成功取到 0 个对象）：不写 fieldsDegraded，让「空」与「失败」在键面上可分。
+            log.info("previewSchemaByConfig 对象面为空 type={}", upper);
+        }
+        result.put("fields", fields);
         return result;
     }
 }

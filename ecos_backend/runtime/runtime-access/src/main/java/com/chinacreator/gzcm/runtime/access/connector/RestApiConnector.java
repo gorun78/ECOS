@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.runtime.access.connector;
 
+import com.chinacreator.gzcm.common.data.model.ColumnMetadata;
 import com.chinacreator.gzcm.common.data.model.DataResource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -139,6 +140,17 @@ public class RestApiConnector implements Connector {
         }
 
         return resources;
+    }
+
+    /**
+     * REST 端点没有声明式列面 —— 响应体是运行期才知道的 JSON，接口层不存在「列名/类型/可空」元数据。
+     * <p>
+     * 这里显式抛 {@link UnsupportedOperationException} 表示「该面不可问」，而不是返回空集合：
+     * 空集合会被调用方读成「该对象确实没有列」，属于把不可用折叠成无，禁止。
+     */
+    @Override
+    public List<ColumnMetadata> listColumns(String connectionConfig, String objectRef) {
+        throw new UnsupportedOperationException("REST 数据源不提供声明式列面，列结构需在样本数据读取后由调用方按实际响应推断");
     }
 
     @Override

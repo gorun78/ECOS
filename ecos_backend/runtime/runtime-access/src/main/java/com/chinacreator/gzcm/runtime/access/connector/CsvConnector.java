@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.runtime.access.connector;
 
+import com.chinacreator.gzcm.common.data.model.ColumnMetadata;
 import com.chinacreator.gzcm.common.data.model.DataResource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -122,6 +123,37 @@ public class CsvConnector implements Connector {
         }
 
         return resources;
+    }
+
+    /**
+     * CSV 列面＝表头行（或无表头时生成的 C1..Cn）。
+     *
+     * <p>#142/B4-3e-46（D-B4-76）。文本文件<b>没有</b>类型／可空／备注概念，故三面一律
+     * {@code null}＝未知；消费侧须显示「—」而不是猜一个 {@code varchar}。</p>
+     */
+    @Override
+    public List<ColumnMetadata> listColumns(String connectionConfig, String objectRef) {
+        Map<String, Object> config = parseConfig(connectionConfig);
+        String filePath = (String) config.get("filePath");
+        if (filePath == null || filePath.isBlank()) {
+            throw new RuntimeException("CSV 列面读取失败：连接配置缺少 filePath");
+        }
+        Path path = Path.of(filePath);
+        if (!Files.exists(path) || !Files.isReadable(path)) {
+            throw new RuntimeException("CSV 列面读取失败：文件不存在或不可读 " + filePath);
+        }
+        String delimiter = (String) config.getOrDefault("delimiter", ",");
+        boolean hasHeader = Boolean.TRUE.equals(config.get("hasHeader"));
+        try {
+            List<String> headers = readHeaders(path, delimiter, hasHeader);
+            List<ColumnMetadata> columns = new ArrayList<>(headers.size());
+            for (String header : headers) {
+                columns.add(ColumnMetadata.nameOnly(header));
+            }
+            return columns;
+        } catch (IOException e) {
+            throw new RuntimeException("CSV 列面读取失败: " + e.getMessage(), e);
+        }
     }
 
     @Override
