@@ -251,12 +251,17 @@ public class GlobalExceptionHandler {
      * 客户端与运维各自都被误导。</p>
      *
      * <p><b>为何不在兜底处按消息嗅探分 503／500</b>（裁决依据）：main 面
-     * {@code throw new IllegalStateException(} 实扫 140 枚（142 行，判据＝全后端 {@code src/main/java}
-     * 排除 {@code target/}／{@code archive/} 的逐次计数），其中「未就绪／不可用／未接入」语义
-     * 18 枚、明确的「不变式被破坏」7 枚，其余按消息无法归类；在兜底 handler 里读消息猜状态
+     * {@code throw new IllegalStateException(} 剥注释后实扫 <b>139</b> 枚（判据＝全后端 {@code src/main/java}
+     * 排除 {@code target/}／{@code archive/}；#142/B4-3e-26 当年登记的 140 枚是把本段 javadoc 里
+     * 这句判据原文自己数了进去＝D-B4-40/62「注释面冒充代码面」同族，#142/B4-3e-38 已订正）。
+     * #142/B4-3e-38 把消息面判据定型为四面向（判据与逐文件基线见
+     * {@code runtime/common-api/src/test/java/com/chinacreator/gzcm/common/exception/DependencyUnreadyIllegalStateRatchetTest}）：
+     * 依赖未就绪 21 枚、JVM/JDK 强制算法缺失 10 枚（消息即带「不可用」，按 §4.7.2 必须留 500）、
+     * 消息来自 i18n 键面判据读不出的 8 枚、其余 100 枚。在兜底 handler 里读消息猜状态
      * ＝把折叠判定散抄回运行时，正是 D-B4-44／D-B4-55 的成因形态。故本批一律按「抛到了入口兜底
-     * ＝未被任何具名通道分类」归 500，<b>在册余项</b>：那 18 枚未就绪腿应由属主端点显式返回
-     * 503＋域内不可用码（§3.2.7「下游制品不可用」），属逐域接线工作、不在本批扩面。</p>
+     * ＝未被任何具名通道分类」归 500，<b>在册余项（D-B4-71）</b>：那 21＋8 枚应由属主端点显式返回
+     * 503＋域内不可用码（§3.2.7「下游制品不可用」），属逐域接线工作、不在本批扩面；
+     * 10 枚算法腿与 100 枚其余腿留在 500 是<b>有意的</b>，不得为"少几枚 500"折叠。</p>
      */
     @ExceptionHandler(IllegalStateException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
