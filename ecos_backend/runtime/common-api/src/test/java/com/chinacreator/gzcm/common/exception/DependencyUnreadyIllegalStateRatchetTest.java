@@ -37,6 +37,12 @@ import static org.junit.jupiter.api.Assertions.fail;
  * UNREADABLE 8／OTHER 100，其中依赖词表命中的 21 枚与当年粗扫的 18 枚<b>并不相同</b>
  * （当年口径既漏了「未注入／未启用」两族，又把 JVM 算法腿算了进去）。</p>
  *
+ * <p><b>上面那段是 #142/B4-3e-38 的首版读数，后续批已把它压干</b>：3e-39 按承流面实测订正＋
+ * 3e-40～3e-43 四批属主侧改抛之后，本门现值＝总站点 <b>133</b>、DEPENDENCY 面 <b>15</b>、
+ * ENV_ALGO 10、UNREADABLE 8、OTHER 100（15＋10＋100＋8＝133，四面各自独立钉值、禁减法）。
+ * 引用这段历史数字时一律以 {@code TOTAL_SITE_BASELINE}／{@code DEPENDENCY_FACE_BASELINE}
+ * 的声明现值为准，否则等于把已收口的腿再判一次欠账。</p>
+ *
  * <p>这条余项的危险在于它<b>同时</b>藏着一个过度矫正的坑：§3.2.7 要求「下游制品不可用」落 <b>503</b>，而
  * {@code throw new IllegalStateException("SHA-256 不可用")} 这类
  * <b>JVM/JDK 强制算法缺失＝环境故障</b>的腿，按 §4.7.2 就该留 <b>500</b>——
@@ -48,7 +54,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * 属主侧（依赖腿改抛 {@code DataBridgeException(503, 域内不可用码, …)}）按域另立
  * #142/B4-3e-39+ 逐批做，每批必须同批下调本门基线——「只减不增＋减了要登记」两头都红。</p>
  *
- * <h3>本门钉四件事</h3>
+ * <h3>本门钉五件事</h3>
  * <ol>
  *   <li><b>四面读数全部钉死，禁恒等式对账</b>：每条 {@code throw new IllegalStateException(…)} 语句
  *       的消息字面量按「JVM/JDK 强制算法（{@code SHA-256}/{@code HMAC}）」→ ENV_ALGO、
@@ -66,6 +72,12 @@ import static org.junit.jupiter.api.Assertions.fail;
  *   <li><b>兜底归型回钉</b>：gateway {@code handleIllegalState} 的 500 归型（D-B4-58 的收口面）
  *       由文本锚钉住；若有人为了"少几枚 500"把它改回 400，本门与
  *       {@code BusinessExceptionStatusParityRatchetTest} 同时红。</li>
+ *   <li><b>承流归属第三档</b>（#142/B4-3e-45，新登记 <b>D-B4-77</b>）：「落入口兜底」隐含
+ *       「该腿会冒泡到某个 HTTP 属主端点」这个从未验证的前提。本门把兜底面再拆成
+ *       <b>无 HTTP 承流</b>（持有对象零调用点／被上游宽 catch 折成非 HTTP 语义）与
+ *       <b>可承流欠账</b>两面独立钉值，每条「不可达」宣称由真仓引用计数逐条背书并配正向对照——
+ *       账面由此从「余 10 枚待补 503」订正为「0 枚可补 503＋10 枚死面」，
+ *       堵住「给没有通路的腿伪造状态行」这条假修路线。</li>
  * </ol>
  *
  * <p>取证纪律：判据全部先经 {@link SourceCommentStripper} 剥注释（D-B4-40/62 同口径，
@@ -109,6 +121,13 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * <p>#142/B4-3e-38 按「上限置 0 探测」同法<b>实扫</b>填入（取证：
      * {@code _win_tasks/logs/mvn_b4-3e-38_probe3.log}，非算式推出）：10 个持有者 / <b>21</b> 枚腿。
      * 属主侧收口批必须同批下调本表。</p>
+     *
+     * <p><b>#142/B4-3e-45 对「余 10 枚＝data-engine 两持有者」这句话的订正（不改数，改口径）</b>：
+     * 这 10 枚的账面动作此前被写成「属主端点补 503」，而实测它们<b>没有一条 HTTP 通路</b>
+     * （9 枚持有对象在真仓里零调用点＋1 枚被两级宽 catch 折成修复台账字段）。
+     * 本批不动生产码，改为把承流归属再切第三档，见 {@code NO_HTTP_CARRIER_LEGS_BASELINE}
+     * 与 {@code D-B4-77}；故本表的 15 枚／{@code OWNER_SIDE_DEBT_LEGS_BASELINE} 的 10 枚
+     * 读数为<b>实测未变</b>，变的是「这 10 枚该由谁、以什么方式收口」。</p>
      *
      * <p><b>#142/B4-3e-40 属主侧首批后现值＝9 个持有者／19 枚腿</b>：runtime-core
      * {@code SecurityCryptoEgress} 的 2 枚「出口不可用」腿已改抛
@@ -866,6 +885,85 @@ class DependencyUnreadyIllegalStateRatchetTest {
      */
     private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 10;
 
+    // ── #142/B4-3e-45：承流归属第三档（无 HTTP 承流面）与其可重跑证据 ────────────
+
+    /** 死 SPI 面持有者（那枚「建连器未注入」腿所在文件）。 */
+    private static final String DATA_DISCOVERY_IMPL =
+            "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/data/datadescription/discovery/impl/DataDescriptionDiscoveryImpl.java";
+
+    /** 该死 SPI 面在真仓里的唯一装配者（无参构造里 {@code new} 出上面那个实现）。 */
+    private static final String DATA_SCHEMA_REGISTRY_IMPL =
+            "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/data/datadescription/service/impl/SchemaRegistryServiceImpl.java";
+
+    /** 存储适配器基类：本面 9 枚腿的持有者（1 枚建连桥＋8 枚未连接守卫）。 */
+    private static final String DATA_BASE_JDBC_ADAPTER =
+            "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/data/datasource/storage/adapter/jdbc/BaseJdbcAdapter.java";
+
+    /** 适配器在真仓里的<b>唯一</b>生产消费者（只走 createAdapter→testConnection→disconnect）。 */
+    private static final String DATA_ADAPTER_CONSUMER =
+            "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/data/datasource/service/impl/DataSourceServiceImpl.java";
+
+    /** 建连桥那条<b>可达</b>腿的实际出口：DQ 自动修复台账的 {@code lastError} 字段，不是状态行。 */
+    private static final String DATA_DQ_AUTO_REPAIR =
+            "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/data/quality/service/DqAutoRepairServiceImpl.java";
+
+    /** 八枚「未连接」守卫腿对应方法的调用面——真仓实扫调用点恒 0，即不可达证据本体。 */
+    private static final String[] ADAPTER_GUARD_CALLS = {
+            "adapter.query(", "adapter.write(", "adapter.count(", "adapter.update(",
+            "adapter.delete(", "adapter.getSchema(", "adapter.getMetadata(", "adapter.beginTransaction("
+    };
+
+    /** 同一消费者文件里<b>确有</b>调用的两条腿：不可达判定的正向对照，缺它则「恒 0」可能只是扫描器失明。 */
+    private static final String[] ADAPTER_LIVE_CALLS = {"adapter.testConnection(", "adapter.disconnect("};
+
+    /**
+     * <b>无 HTTP 承流面</b>基线（#142/B4-3e-45 新登记 <b>D-B4-77</b> 的修法；键＝持有文件，值＝腿数）。
+     *
+     * <p><b>差距形态</b>：{@code carrierOf()} 此前只有两档——域内 {@code @ControllerAdvice} 承载，
+     * 或 {@code ENTRY_FALLBACK_500}「落 gateway 入口兜底」。后者隐含一个从未验证的前提：
+     * <b>这条腿会沿调用栈冒泡到某个 HTTP 属主端点</b>。data-engine 余下的 10 枚一枚都不满足——</p>
+     * <ul>
+     *   <li>{@code DataDescriptionDiscoveryImpl} 的腿只在 {@code jdbcConnector == null} 时触发，
+     *       该对象全仓唯一构造点写在 {@code SchemaRegistryServiceImpl} 的无参构造里，
+     *       而该无参构造的调用点实扫 <b>0</b>；</li>
+     *   <li>{@code BaseJdbcAdapter} 的 8 枚「未连接」守卫腿所在方法
+     *       （query／write／count／update／delete／getSchema／getMetadata／beginTransaction）
+     *       在真仓里<b>没有任何适配器调用点</b>——适配器唯一消费者只走
+     *       createAdapter→testConnection→disconnect 三条腿；{@code ScoringContext} 的类注释亦自证
+     *       「IStorageAdapter 拉样本属 Phase 3，本阶段评估器仅读既有字段」；</li>
+     *   <li>第 9 枚（建连桥未注入）<b>可达</b>，但被两级宽 {@code catch (Exception)} 依次折成
+     *       {@code DataSourceException}（无码、无状态行的 checked 异常）与修复台账的
+     *       {@code lastError} 字段，永远到不了 HTTP 状态行。</li>
+     * </ul>
+     *
+     * <p><b>为什么必须单列这一档</b>：把这 10 枚记成「属主端点补 503」的待收口队列，下一批人只能写假修——
+     * 给一条没有 HTTP 通路的腿配状态行，本门只看到「ISE 站点少一枚」而客户端读数什么都没变
+     * （#142/B4-3e-41 同族）。故把「该谁改」再切一刀：<b>可 HTTP 承流的欠账</b> vs <b>无承流路径的死面</b>，
+     * 两面各自独立遍历得出、各自双向钉值，<b>减法不参与</b>（D-B4-71 首版「恒等式假绿」的教训）。</p>
+     *
+     * <p><b>豁免必须点名，宣称必须可重跑</b>：本面每个持有者由
+     * {@link #unreachableCarrierClaimsAreReMeasuredFromReferenceScan()} 的引用计数逐条背书；
+     * 有人把死面接上通路时该案即红，账面必须重测。死代码本身的删除治理撞「只增不改」＋备份前置，
+     * 另立余项，不在本批。</p>
+     */
+    private static final Map<String, Integer> NO_HTTP_CARRIER_LEGS_BASELINE = Map.ofEntries(
+            Map.entry(DATA_DISCOVERY_IMPL, 1),
+            Map.entry(DATA_BASE_JDBC_ADAPTER, 9));
+
+    /** 无承流路径腿数合计（独立钉值；不由 {@code NO_HTTP_CARRIER_LEGS_BASELINE} 求和推出）。 */
+    private static final int NO_HTTP_CARRIER_LEGS_TOTAL_BASELINE = 10;
+
+    /**
+     * 落兜底腿里<b>确有</b> HTTP 承流路径的枚数。现值 <b>0</b>＝D-B4-71 的属主侧队列在 data-engine
+     * 这一域没有可收口项（此前 10 枚是按「落兜底必然渲染 500」的未验证前提排产的）。
+     */
+    private static final int HTTP_REACHABLE_OWNER_SIDE_DEBT_BASELINE = 0;
+
     private static volatile List<Advice> cachedAdvices;
 
     private static List<Advice> advices() {
@@ -1231,6 +1329,163 @@ class DependencyUnreadyIllegalStateRatchetTest {
                                 .contains("Doris/ClickHouse OLAP 降级"),
                 "ECOS-DATA-053 在 D.1 单源表里的号义不再是 OLAP 降级＝本批属主腿的机读码语义失去单源依据"
                         + "（号义漂移 D-B4-73 的取证锚，改号须同批改本断言与分册 02 D.1）");
+    }
+
+    /**
+     * 主源码缓存：本批三案都要在全后端做引用计数，逐案走树会把门禁拖进超时区
+     * （与 {@code cachedLegs}／{@code cachedAdvices} 同法，只增缓存不改判据）。
+     */
+    private static volatile List<Scanned> cachedMainSources;
+
+    private static List<Scanned> mainSources() {
+        List<Scanned> cached = cachedMainSources;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (DependencyUnreadyIllegalStateRatchetTest.class) {
+            if (cachedMainSources == null) {
+                cachedMainSources = List.copyOf(backendMainSources());
+            }
+            return cachedMainSources;
+        }
+    }
+
+    /** 剥注释后含该字面量的主源码文件（repo-root 相对路径，字典序；空清单＝真仓零引用）。 */
+    private static List<String> filesContaining(String needle) {
+        List<String> out = new ArrayList<>();
+        for (Scanned s : mainSources()) {
+            if (s.code().contains(needle)) {
+                out.add(s.relPath());
+            }
+        }
+        out.sort(String::compareTo);
+        return out;
+    }
+
+    /**
+     * <b>#142/B4-3e-45 的第三档拆分</b>（新登记 D-B4-77）：落入口兜底的腿按「有没有 HTTP 承流路径」
+     * 分成两面，各自独立遍历 {@code carrierFace()} 得出（<b>不用减法</b>），再加一条守恒断言。
+     * 三种漂移各有独立文案：出现一枚没归类的兜底腿＝分档不完备；死面腿数变了却没改合计＝接通路时
+     * 顺手挪数字；可承流欠账由 0 变大＝真的来了新的属主侧排产项，必须显式登记。
+     */
+    @Test
+    @Timeout(value = 240)
+    @DisplayName("落兜底腿再拆两档：无 HTTP 承流 vs 可承流欠账，未归类即红（D-B4-77 的修法）")
+    void fallbackLegsAreSplitByCarrierReachability() {
+        Map<String, Integer> noCarrier = new TreeMap<>();
+        Map<String, Integer> reachable = new TreeMap<>();
+        for (Map.Entry<String, String> e : carrierFace().entrySet()) {
+            if (!"ENTRY_FALLBACK_500".equals(e.getValue())) {
+                continue;
+            }
+            if (NO_HTTP_CARRIER_LEGS_BASELINE.containsKey(e.getKey())) {
+                noCarrier.put(e.getKey(), countOf(e.getKey()));
+            } else {
+                reachable.put(e.getKey(), countOf(e.getKey()));
+            }
+        }
+        assertPinnedBidirectionally("无 HTTP 承流", noCarrier, NO_HTTP_CARRIER_LEGS_BASELINE);
+        assertPinnedBidirectionally("可 HTTP 承流欠账", reachable, Map.of());
+
+        List<String> drift = new ArrayList<>();
+        accountFor(drift, "无 HTTP 承流腿数合计", NO_HTTP_CARRIER_LEGS_TOTAL_BASELINE, sum(noCarrier),
+                "＝死面腿数变了却没同批改合计钉值：把死面接上通路属承流判定变更，须整面重测");
+        accountFor(drift, "可 HTTP 承流的属主欠账", HTTP_REACHABLE_OWNER_SIDE_DEBT_BASELINE, sum(reachable),
+                "＝出现一条真有 HTTP 通路的兜底腿：它才是「属主端点补 503」的合法排产项，"
+                        + "登记后同批改本钉值（禁凭旧读数把死面数字继续挂着）");
+        accountFor(drift, "第三档两面之和", ENTRY_FALLBACK_LEGS_BASELINE, sum(noCarrier) + sum(reachable),
+                "＝有一枚兜底腿没进任何一面＝分档不完备，正是本档要堵的盲区");
+        assertTrue(drift.isEmpty(), "承流第三档账失真:\n" + String.join("\n", drift));
+    }
+
+    /**
+     * 死面宣称的<b>可重跑背书</b>：每条「不可达」都由真仓引用面计数产出，并配<b>正向对照</b>
+     * （同一消费者文件里确有调用的两条腿必须读到 1）——没有正向对照的「恒 0」与 D-B4-68
+     * （锚点切片不吃判据 token）、D-B4-62（注释面冒充代码面）是同一种假绿：扫描器读不到，
+     * 判据却把它当成「不存在」。
+     */
+    @Test
+    @Timeout(value = 240)
+    @DisplayName("无承流面逐条重跑引用计数：一旦接上通路即红，禁凭注释豁免（D-B4-77）")
+    void unreachableCarrierClaimsAreReMeasuredFromReferenceScan() {
+        List<String> blind = new ArrayList<>();
+
+        // 面 A：发现服务（死 SPI 面）——装配面与构造点
+        assertEquals(List.of(DATA_DISCOVERY_IMPL, DATA_SCHEMA_REGISTRY_IMPL),
+                filesContaining("DataDescriptionDiscoveryImpl("),
+                "发现服务实现的引用文件集合变了＝该 SPI 被接上装配，其「建连器未注入」腿重新有承流路径，"
+                        + "本面承流归属与真欠账面必须重测");
+        assertEquals(2, literalCount(codeOf(DATA_DISCOVERY_IMPL), "requireJdbcConnector("),
+                "requireJdbcConnector( 的发生面不再是 2 枚（实测＝方法定义 1 枚＋唯一调用点 1 枚）。"
+                        + "调用点增多＝该腿的触发面被扩大，定义与调用各自要重数");
+        assertEquals(1, literalCount(codeOf(DATA_SCHEMA_REGISTRY_IMPL), "new DataDescriptionDiscoveryImpl("),
+                "SchemaRegistryServiceImpl 里发现服务实现的构造点不再是 1 枚＝本案的引用基准失步");
+        assertEquals(List.of(), filesContaining("new SchemaRegistryServiceImpl("),
+                "SchemaRegistryServiceImpl 的无参构造出现调用点＝死 SPI 面复活，"
+                        + "DataDescriptionDiscoveryImpl 那枚腿须按属主侧批重判（届时还要读它的建连器注入来源）");
+
+        // 面 B：适配器八枚「未连接」守卫腿——唯一消费者的调用面
+        String consumer = codeOf(DATA_ADAPTER_CONSUMER);
+        for (String call : ADAPTER_GUARD_CALLS) {
+            int got = literalCount(consumer, call);
+            if (got != 0) {
+                blind.add("适配器取数／写入腿出现调用点（" + call + " 实扫 " + got
+                        + "，登记 0）＝八枚「未连接」守卫腿重新有承流路径");
+            }
+        }
+        for (String call : ADAPTER_LIVE_CALLS) {
+            int got = literalCount(consumer, call);
+            if (got != 1) {
+                blind.add("正向对照失效（" + call + " 实扫 " + got
+                        + "，登记 1）＝本案读的不是真消费者文件，或该文件已不含这条调用，"
+                        + "此时上面那八个 0 不可信（扫描器失明而非真不可达）");
+            }
+        }
+        assertEquals(List.of(DATA_ADAPTER_CONSUMER), filesContaining("new JdbcAdapterFactory("),
+                "适配器工厂的实例化点不再唯一＝出现了新的适配器持有者，取数面的可达性判定须重跑");
+        assertEquals(List.of(), filesContaining(".getAdapter("),
+                "工厂的 getAdapter 门面出现调用点＝适配器可能经它流向别处，八枚守卫腿不再恒不可达");
+
+        // 面 C：建连桥那条可达腿的折叠链（两级宽 catch，出口是台账字段而非状态行）
+        assertEquals(List.of(DATA_DQ_AUTO_REPAIR), filesContaining(".testDataSource("),
+                "连接测试的调用面变了＝该腿可能新增 HTTP 属主通路，折叠链判定须重跑");
+        assertTrue(consumer.contains("catch (Exception e) {")
+                        && consumer.contains("throw new DataSourceException("),
+                "消费者不再用宽 catch 折成 DataSourceException＝建连桥腿的承流形态变了，本面须重测");
+        String repair = codeOf(DATA_DQ_AUTO_REPAIR);
+        assertTrue(repair.contains("catch (Exception e) {")
+                        && repair.contains("errMsg = truncate(e.getMessage(), 200);"),
+                "修复台账不再把异常消息落成字段＝建连桥腿的出口从台账语义改回异常冒泡，须重判承流档位");
+
+        assertTrue(blind.isEmpty(), "无 HTTP 承流的宣称被真实引用面推翻:\n" + String.join("\n", blind));
+    }
+
+    /**
+     * 本批<b>零生产改动</b>的自证，兼作假修路线的具名拦截：两枚持有者的腿必须仍是
+     * {@code IllegalStateException}，且文件里不得出现 503 载体或本域机读码常量——给没有
+     * HTTP 通路的腿配状态行，本门只看见「ISE 站点少一枚」而客户端读数什么都没变。
+     * 谁要走这条路，先被 {@link #unreachableCarrierClaimsAreReMeasuredFromReferenceScan()}
+     * 的引用计数拦住（没接通路就配状态行＝本案红），而不是被账面数字放行。
+     */
+    @Test
+    @Timeout(value = 240)
+    @DisplayName("死面腿保持原抛型：本批零生产改动，禁给无通路腿伪造 503（假修拦截）")
+    void deadCarrierLegsStayUnreachableAndMustNotGainAFabricatedStatusLine() {
+        String discovery = codeOf(DATA_DISCOVERY_IMPL);
+        String adapter = codeOf(DATA_BASE_JDBC_ADAPTER);
+        assertEquals(1, literalCount(discovery, "throw new IllegalStateException("),
+                "发现服务的 ISE 站点数变了＝本批「零生产改动」不成立，须回写台账并同批重测承流三档");
+        assertEquals(9, literalCount(adapter, "throw new IllegalStateException("),
+                "适配器基类的 ISE 站点数变了＝本批「零生产改动」不成立，须回写台账并同批重测承流三档");
+        assertFalse(discovery.contains("DataBridgeException"),
+                "死 SPI 面被写上 503 载体＝给无 HTTP 通路的腿伪造状态行（本批裁决明禁的假修）");
+        assertFalse(adapter.contains("DataBridgeException"),
+                "适配器死面被写上 503 载体＝同上；建连桥那枚的合法修法要先解两级宽 catch 的折叠，"
+                        + "而不是在守卫处换个异常类型");
+        assertFalse(discovery.contains("ECOS-DATA-05"),
+                "死 SPI 面出现本域降级机读码字面量＝号义被挂到一条永不出口的腿上，D.1 单源表与代码脱钩");
+        assertFalse(adapter.contains("ECOS-DATA-05"),
+                "适配器死面出现本域降级机读码字面量＝同上");
     }
 
     /** 字面量出现次数（本门不用正则，避免 {@code (} 等元字符把锚点吃掉）。 */
