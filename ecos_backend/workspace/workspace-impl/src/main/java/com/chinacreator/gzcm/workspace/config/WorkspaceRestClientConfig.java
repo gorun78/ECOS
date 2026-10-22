@@ -179,7 +179,7 @@ public class WorkspaceRestClientConfig {
                 return trimTrailingSlash(host.get());
             }
         }
-        throw new BusinessException(500, "F07-17 底座收口：无法解析 service " + service
+        throw new BusinessException(500, 500, "F07-17 底座收口：无法解析 service " + service
                 + " 的基址 —— ecos.endpoints." + service + " 未配置且 route-manifest 未登记该 owner"
                 + "（fail-loud，禁止回落硬编码地址）");
     }

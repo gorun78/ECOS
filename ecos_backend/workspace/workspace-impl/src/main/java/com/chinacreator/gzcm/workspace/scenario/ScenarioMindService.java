@@ -68,7 +68,7 @@ public class ScenarioMindService {
      */
     @Transactional
     public ScenarioMindVO upsertMind(String scenarioId, MindSaveDTO dto, String forceLabel, boolean activateIfNew) {
-        throw new BusinessException(501, STOPPED_WRITE_MSG);
+        throw new BusinessException(501, 501, STOPPED_WRITE_MSG);
     }
 
     /** 查询场景下所有心智（未删除，激活优先排序）。 */
@@ -93,7 +93,7 @@ public class ScenarioMindService {
      */
     @Transactional
     public ScenarioMindVO activateMind(String scenarioId, Long mindId) {
-        throw new BusinessException(501, STOPPED_WRITE_MSG);
+        throw new BusinessException(501, 501, STOPPED_WRITE_MSG);
     }
 
     /**
@@ -105,7 +105,7 @@ public class ScenarioMindService {
      */
     @Transactional
     public boolean deleteMind(String scenarioId, Long mindId) {
-        throw new BusinessException(501, STOPPED_WRITE_MSG);
+        throw new BusinessException(501, 501, STOPPED_WRITE_MSG);
     }
 
     /**

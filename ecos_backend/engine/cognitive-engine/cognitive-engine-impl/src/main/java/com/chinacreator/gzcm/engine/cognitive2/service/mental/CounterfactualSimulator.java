@@ -105,7 +105,7 @@ public class CounterfactualSimulator {
         String domain = require(request.getDomain(), "domain");
         Map<String, Object> row = beliefStore.findIfExists(variable, domain, version);
         if (row == null) {
-            throw new BusinessException(404,
+            throw new BusinessException(404, 404,
                 "COG-404: 不确定性判断版本不存在: variable=" + variable + ", domain=" + domain
                     + ", version=" + version);
         }
@@ -177,7 +177,7 @@ public class CounterfactualSimulator {
             Map<String, Object> overrideRow = rowOverrides.get(v);
             Map<String, Object> row = overrideRow != null ? overrideRow : beliefStore.findLatest(v, domain);
             if (row == null) {
-                throw new BusinessException(404, "COG-404: 不确定性判断不存在: variable=" + v + ", domain=" + domain);
+                throw new BusinessException(404, 404, "COG-404: 不确定性判断不存在: variable=" + v + ", domain=" + domain);
             }
             List<DistinctOutcome> outcomes = toOutcomes(v, row, request);
             outcomeSets.add(outcomes);

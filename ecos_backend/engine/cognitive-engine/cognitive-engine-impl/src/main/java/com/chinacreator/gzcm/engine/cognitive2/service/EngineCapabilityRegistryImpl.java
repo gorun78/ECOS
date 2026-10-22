@@ -64,7 +64,7 @@ public class EngineCapabilityRegistryImpl implements EngineCapabilityRegistry {
         this.restTemplate = restTemplate;
         this.internalBase = endpointResolver
                 .resolve(INTERNAL_OWNER_SERVICE, ServiceEndpointResolver.RouteMode.MONOLITH)
-                .orElseThrow(() -> new BusinessException(500, CognitiveErrorCode.E504_INTERNAL
+                .orElseThrow(() -> new BusinessException(500, 500, CognitiveErrorCode.E504_INTERNAL
                         + ": route-manifest 未登记服务 " + INTERNAL_OWNER_SERVICE
                         + "，认知管线跨引擎 REST 基址无法解析（fail-loud）"));
     }

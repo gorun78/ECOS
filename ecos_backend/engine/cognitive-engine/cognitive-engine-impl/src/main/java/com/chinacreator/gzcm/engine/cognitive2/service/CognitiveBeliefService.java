@@ -125,11 +125,11 @@ public class CognitiveBeliefService {
 
         Map<String, Object> evidenceRow = evidenceStore.findById(evidenceId);
         if (evidenceRow == null) {
-            throw new BusinessException(404, "COG-404: 证据不存在: id=" + evidenceId);
+            throw new BusinessException(404, 404, "COG-404: 证据不存在: id=" + evidenceId);
         }
         Map<String, Object> latest = store.findLatest(variable, domain);
         if (latest == null) {
-            throw new BusinessException(404,
+            throw new BusinessException(404, 404,
                 "COG-404: 不确定性判断不存在: variable=" + variable + ", domain=" + domain);
         }
 

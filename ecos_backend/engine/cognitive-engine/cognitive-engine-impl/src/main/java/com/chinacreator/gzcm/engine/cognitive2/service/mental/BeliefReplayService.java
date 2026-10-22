@@ -72,7 +72,7 @@ public class BeliefReplayService {
         }
         int currentVersion = beliefStore.maxVersion(variableName.trim(), domain.trim());
         if (currentVersion == 0) {
-            throw new BusinessException(404,
+            throw new BusinessException(404, 404,
                 "COG-404: 不确定性判断不存在: variable=" + variableName + ", domain=" + domain);
         }
 

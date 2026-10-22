@@ -66,18 +66,29 @@ public class GlobalExceptionHandler {
 
 
     /**
-     * 业务异常 → 400 业务错误
+     * 业务异常 → 状态行由异常携带值决定（默认 400）
      *
-     * <p>#142/B4-3e-24：{@code errorCode} 字段改走 {@link MachineErrorCode#orNumeric} 单源；
-     * 状态行仍由本方法上的 {@code @ResponseStatus(BAD_REQUEST)} 决定（裸回形态属另一在册项 D-B4-56，
-     * 本批不扩面）。</p>
+     * <p>#142/B4-3e-24：{@code errorCode} 字段改走 {@link MachineErrorCode#orNumeric} 单源。</p>
+     *
+     * <p><b>#142/B4-3e-28（差距 D-B4-56）</b>：收口前本方法返回裸 {@code ApiResponse}，状态行由
+     * 方法上的 {@code @ResponseStatus(BAD_REQUEST)} 恒定决定 ⇒ 异常自述的 httpStatus 从不上 HTTP 面；
+     * 叠加 {@code BusinessException} 旧构造把 httpStatus 写死 400，形成「双重折叠」。现与
+     * {@link #handleDataBridge} 同法改回 {@link ResponseEntity}，状态行走
+     * {@link #resolveHttpStatus} 单源判定（非法携带值回退 500）。方法上的
+     * {@code @ResponseStatus(BAD_REQUEST)} <b>有意保留</b>为「默认声明面」：单参／
+     * {@code (errorCode, message)} 两枚既有构造仍携带 400 ⇒ 状态行 400，行为逐字不变；
+     * 该注解同时是 {@code ServerDefectExceptionStatusTest} 判据 B 的反射锚，删它等于把
+     * 「入参型出口留在 4xx」这条反向腿改成凭注释成立。</p>
      */
     @ExceptionHandler(BusinessException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiResponse<Void> handleBusiness(BusinessException ex) {
-        log.warn("BusinessException: {}", ex.getMessage(), ex);
-        return ApiResponse.error(ex.getErrorCode(),
-                MachineErrorCode.orNumeric(ex.getMessage(), ex.getErrorCode()), ex.getMessage());
+    public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException ex) {
+        int status = resolveHttpStatus(ex.getHttpStatus());
+        log.warn("BusinessException: httpStatus={}, errorCode={}, message={}",
+                status, ex.getErrorCode(), ex.getMessage(), ex);
+        return ResponseEntity.status(status).body(
+                ApiResponse.error(ex.getErrorCode(),
+                        MachineErrorCode.orNumeric(ex.getMessage(), ex.getErrorCode()), ex.getMessage()));
     }
 
     /**

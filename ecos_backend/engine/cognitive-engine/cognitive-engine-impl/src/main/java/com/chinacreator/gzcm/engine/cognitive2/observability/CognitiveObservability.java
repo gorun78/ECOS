@@ -106,7 +106,7 @@ public class CognitiveObservability {
         } catch (Exception fe) {
             log.error("认知审计兜底同样失败，按 fail-closed 拒绝业务动作: action={} err={}",
                     action, fe.getMessage());
-            throw new BusinessException(500, CognitiveErrorCode.E504_INTERNAL
+            throw new BusinessException(500, 500, CognitiveErrorCode.E504_INTERNAL
                     + ": 审计主通道与本地兜底均不可用，操作已拒绝（fail-closed）: action=" + action);
         }
     }

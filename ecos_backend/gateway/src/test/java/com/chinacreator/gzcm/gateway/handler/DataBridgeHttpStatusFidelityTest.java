@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.gateway.handler;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,6 +20,7 @@ import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -121,24 +124,47 @@ class DataBridgeHttpStatusFidelityTest {
     // ── 验收 4：BusinessException(403) 陷阱仍被钉住（本批有意不扩面）────────────
 
     @Test
-    @DisplayName("handleBusiness — BusinessException(403,…) 仍落 400：异常型钉死 httpStatus，非 handler 缺陷")
-    void businessExceptionHandlerStillPins400DocumentingTheTrap() throws Exception {
-        // BusinessException 两个 ctor 都把 httpStatus 写死 400，首参只进 body code。
-        // ⇒「投 BusinessException(403) 得到 HTTP 403」是个不成立的假设（D-B4-53 的根因），
-        // 本批的修法 = 让策略拒绝改投真正的 403 承载型异常，而不是改 handler 去猜 body 码。
-        assertEquals(400, new BusinessException(403, "策略拒绝").getHttpStatus(),
-                "钉住陷阱本身：BusinessException 的 httpStatus 恒 400");
+    @DisplayName("handleBusiness — 三参携带 403 → 状态行 403；旧双参腿仍 400（由零容忍门禁新增）")
+    void businessExceptionHandlerHonoursExplicitCarrier() throws Exception {
+        // #142/B4-3e-28 改钉：本方法收口前钉的是「陷阱本身」——BusinessException 两枚旧构造
+        // 都把 httpStatus 写死 400 且 handler 恒 400，于是断言写成 400 也算"契约"。
+        // 现判据换成两半：①新三参构造的携带值必须上状态行（同号，§3.2.7）；
+        // ②旧双参构造仍折叠 400 —— 这条不再合法，但由 BusinessExceptionStatusParityRatchetTest
+        // 按「调用点零容忍」禁新增，而不是由 handler 去猜 body 码（D-B4-53 的裁决不得反转）。
+        ResponseEntity<ApiResponse<Void>> explicit =
+                handler.handleBusiness(new BusinessException(403, 403, "策略拒绝"));
+        assertEquals(403, explicit.getStatusCode().value(),
+                "三参携带的 403 必须落在 HTTP 状态行（收口前恒 400）");
+        ApiResponse<Void> body = explicit.getBody();
+        assertNotNull(body);
+        assertEquals(403, body.getCode(), "状态行与 body code 必须同号（§3.2.7）");
 
-        ApiResponse<Void> resp = handler.handleBusiness(new BusinessException(403, "策略拒绝"));
-        assertNotNull(resp);
-        assertEquals(403, resp.getCode(), "body code 仍是调用方传入的业务码");
+        ResponseEntity<ApiResponse<Void>> legacy = handler.handleBusiness(new BusinessException(403, "策略拒绝"));
+        assertEquals(400, legacy.getStatusCode().value(),
+                "旧双参构造的 httpStatus 恒 400 ⇒ 状态行仍 400（本批只加通道，不改这枚语义）");
+        assertEquals(403, legacy.getBody().getCode(), "旧双参腿 body code 取值逐字不变（不回归）");
+
+        ResponseEntity<ApiResponse<Void>> illegal =
+                handler.handleBusiness(new BusinessException(0, 4001, "非法携带"));
+        assertEquals(500, illegal.getStatusCode().value(),
+                "三参携带非法值（0）必须回退 500，不得写进状态行（走 resolveHttpStatus 单源）");
 
         Method m = GlobalExceptionHandler.class.getDeclaredMethod(
                 "handleBusiness", BusinessException.class);
+        Type ret = m.getGenericReturnType();
+        assertInstanceOf(ParameterizedType.class, ret,
+                "返体必须是参数化类型——裸回 ApiResponse 形态＝D-B4-56 复发（状态行由注解恒决定）");
+        ParameterizedType pt = (ParameterizedType) ret;
+        assertEquals(ResponseEntity.class, pt.getRawType(), "handleBusiness 必须返回 ResponseEntity");
+        Type inner = pt.getActualTypeArguments()[0];
+        assertInstanceOf(ParameterizedType.class, inner,
+                "信封实参必须是参数化 ApiResponse<Void>（裸 ApiResponse ＝状态行恒定的旧形态）");
+        assertEquals(ApiResponse.class, ((ParameterizedType) inner).getRawType(),
+                "信封类必须是 ApiResponse（返回体契约不变）");
         ResponseStatus ann = m.getAnnotation(ResponseStatus.class);
-        assertNotNull(ann, "handleBusiness 必须仍声明 @ResponseStatus");
+        assertNotNull(ann, "handleBusiness 保留 @ResponseStatus 作为默认声明面与判据B 反射锚");
         assertEquals(HttpStatus.BAD_REQUEST, ann.value(),
-                "handleBusiness 保持 400（改它会波及 250+ 既有 BusinessException 站点，本批不扩面）");
+                "默认声明仍 400：单参／双参构造携带 400，与注解同值（ServerDefectExceptionStatusTest 判据B）");
     }
 
     // ── 验收 5：数据访问异常 → 状态行 500，body 仍脱敏 ─────────────────────────

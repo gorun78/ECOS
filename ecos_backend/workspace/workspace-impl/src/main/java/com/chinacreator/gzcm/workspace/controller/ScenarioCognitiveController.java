@@ -119,7 +119,7 @@ public class ScenarioCognitiveController {
             mind = mindService.getActiveMind(scenarioId);
         }
         if (mind == null) {
-            throw new BusinessException(404, "no_active_mind_for_scenario=" + scenarioId);
+            throw new BusinessException(404, 404, "no_active_mind_for_scenario=" + scenarioId);
         }
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("scenarioId", scenarioId);

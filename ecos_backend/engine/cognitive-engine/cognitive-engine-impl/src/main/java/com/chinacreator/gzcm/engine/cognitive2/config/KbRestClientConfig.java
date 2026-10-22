@@ -99,7 +99,7 @@ public class KbRestClientConfig {
                 return host + "/api/v1";
             }
         }
-        throw new BusinessException(500, CognitiveErrorCode.E504_INTERNAL
+        throw new BusinessException(500, 500, CognitiveErrorCode.E504_INTERNAL
                 + ": KB 基址不可解析——ecos.kb-base 未配置且 route-manifest 未登记服务 "
                 + KB_OWNER_SERVICE + "（fail-loud，禁止回落硬编码地址）");
     }

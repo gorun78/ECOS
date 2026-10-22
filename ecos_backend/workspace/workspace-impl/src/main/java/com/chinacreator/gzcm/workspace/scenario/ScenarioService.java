@@ -354,7 +354,7 @@ public class ScenarioService {
         try {
             return objectMapper.writeValueAsString(obj);
         } catch (Exception e) {
-            throw new BusinessException(500, "SCEN-500: metrics JSON 序列化失败: " + e.getMessage());
+            throw new BusinessException(500, 500, "SCEN-500: metrics JSON 序列化失败: " + e.getMessage());
         }
     }
 

@@ -114,7 +114,7 @@ public class CognitiveHypothesisService {
         }
         Map<String, Object> row = store.findById(id);
         if (row == null) {
-            throw new BusinessException(404, "COG-404: 假设不存在: id=" + id);
+            throw new BusinessException(404, 404, "COG-404: 假设不存在: id=" + id);
         }
         if (!"VALID".equals(evidenceStore.fieldString(row, "status"))) {
             throw new BusinessException(400, "COG-400: 仅 VALID 假设可失效（当前 status="
@@ -163,7 +163,7 @@ public class CognitiveHypothesisService {
     public HypothesisVO archive(String id) {
         Map<String, Object> row = store.findById(id);
         if (row == null) {
-            throw new BusinessException(404, "COG-404: 假设不存在: id=" + id);
+            throw new BusinessException(404, 404, "COG-404: 假设不存在: id=" + id);
         }
         boolean updated = store.updateStatus(id, "ARCHIVED", false, null, "archived");
         if (!updated) {
@@ -230,7 +230,7 @@ public class CognitiveHypothesisService {
         } catch (Exception fe) {
             log.error("认知假设审计兜底同样失败，按 fail-closed 拒绝业务动作: action={} err={}",
                 action, fe.getMessage());
-            throw new BusinessException(503,
+            throw new BusinessException(503, 503,
                 "COG-503: 审计通道与本地兜底均不可用，操作已拒绝（fail-closed）: action=" + action);
         }
     }

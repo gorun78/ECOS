@@ -56,7 +56,7 @@ public class EntityLinker {
         this.restTemplate = restTemplate;
         String base = endpointResolver
                 .resolve(KB_OWNER_SERVICE, ServiceEndpointResolver.RouteMode.MONOLITH)
-                .orElseThrow(() -> new BusinessException(500, CognitiveErrorCode.E504_INTERNAL
+                .orElseThrow(() -> new BusinessException(500, 500, CognitiveErrorCode.E504_INTERNAL
                         + ": route-manifest 未登记服务 " + KB_OWNER_SERVICE
                         + "，kb 实体链接 REST 基址无法解析（fail-loud）"));
         this.kbEntityLinkUrl = base + KB_ENTITY_LINK_PATH;

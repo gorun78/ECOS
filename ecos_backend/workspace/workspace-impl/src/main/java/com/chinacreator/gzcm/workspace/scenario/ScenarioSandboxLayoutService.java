@@ -89,7 +89,7 @@ public class ScenarioSandboxLayoutService {
         try {
             layoutJson = objectMapper.writeValueAsString(layout);
         } catch (Exception e) {
-            throw new BusinessException(500, "SBX-500: 布局 JSON 序列化失败: " + e.getMessage());
+            throw new BusinessException(500, 500, "SBX-500: 布局 JSON 序列化失败: " + e.getMessage());
         }
 
         // 乐观锁：UPDATE 现有记录（version 匹配）或 INSERT 新记录（无现有）
@@ -102,17 +102,17 @@ public class ScenarioSandboxLayoutService {
                 // 版本冲突
                 Integer currentVersion = dao.currentLayoutVersion(scenarioId) != null
                         ? dao.currentLayoutVersion(scenarioId) : 1;
-                throw new BusinessException(409, "version_conflict: expected=" + expected + " current=" + currentVersion);
+                throw new BusinessException(409, 409, "version_conflict: expected=" + expected + " current=" + currentVersion);
             }
             // 首次保存 → INSERT
             if (expected != 0) {
-                throw new BusinessException(409, "version_conflict: expected=" + expected + " but no record exists");
+                throw new BusinessException(409, 409, "version_conflict: expected=" + expected + " but no record exists");
             }
             try {
                 dao.insertLayout(scenarioId, layoutJson, operator);
             } catch (DataIntegrityViolationException e) {
                 log.warn("saveLayout INSERT 唯一约束冲突: scenario={}", scenarioId);
-                throw new BusinessException(409, "version_conflict: 并发首次保存冲突");
+                throw new BusinessException(409, 409, "version_conflict: 并发首次保存冲突");
             }
         }
 

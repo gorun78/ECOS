@@ -163,7 +163,7 @@ class ErrorCodeMachineCodeSingleSourceTest {
                 "§4.7.2：不可用与无权限必须在 errorCode 字段也可分辨");
 
         BusinessException plain = new BusinessException(400, "参数缺失");
-        assertEquals("400", handler.handleBusiness(plain).getErrorCode(),
+        assertEquals("400", handler.handleBusiness(plain).getBody().getErrorCode(),
                 "BusinessException 无码腿同样回落数字串");
 
         // DataAccessException 无 (httpStatus, errorCode, message) 三参构造：默认形态即
