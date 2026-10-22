@@ -194,8 +194,12 @@ class SecurityDenialHttpStatusRatchetTest {
         //    移出违例面、改钉入 ANNOTATION_CARRIED_BASELINE；此处钉 0＝注解被摘即回退成红 ──
         m.put("ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/handler/"
                 + "GlobalExceptionHandler.java", 0);
+        // ── #142/B4-3e-36 归零：AOP 切面 3 枚拒绝腿改抛 UnauthorizedException/ForbiddenException，
+        //    状态行由注解承载面（gateway/sysman-boot handler）写定。此处钉 0＝退回 return 信封即红。
+        //    判据形态与真裸回族不同：切面返回值由调用点按被拦截方法声明类型消费，
+        //    「折成 ResponseEntity」对切面不是修法而是新缺陷，故本枚走抛异常通路。──
         m.put("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/"
-                + "sysman/security/RequirePermissionAspect.java", 3);
+                + "sysman/security/RequirePermissionAspect.java", 0);
         m.put("ecos_backend/services/sysman/impl/sysman-boot/src/main/java/com/chinacreator/"
                 + "gzcm/sysman/boot/handler/GlobalExceptionHandler.java", 0);
         // ── #142/B4-3e-35 归零：security／sysman／ai／data-engine 四枚属主端点的真裸回腿
@@ -359,8 +363,9 @@ class SecurityDenialHttpStatusRatchetTest {
                 "豁免面登记量已偏离 #142/B4-3e-34 的逐腿实测值 5——判据口径变更必须重测后同批改注释");
         assertEquals(totalExpectedCarried, totalActualCarried,
                 "豁免面合计与实扫不符（实扫 " + totalActualCarried + "）");
-        assertEquals(4, totalBare,
-                "判据 A 真裸回合计应为 #142/B4-3e-35 属主侧收口后的 4 处，实扫 " + totalBare
+        assertEquals(1, totalBare,
+                "判据 A 真裸回合计应为 #142/B4-3e-36 切面腿收口后的 1 处（余 PublishGateService "
+                        + "静态 helper，另立 #142/B4-3e-37），实扫 " + totalBare
                         + "——与基线合计不一致时，说明承载态识别把不该豁免的腿豁免了（或反之）");
     }
 
@@ -394,6 +399,87 @@ class SecurityDenialHttpStatusRatchetTest {
             String gateCode = codeOf("ecos_backend/" + gate);
             assertTrue(gateCode.contains("getStatusCode()"),
                     "行为门 " + gate + " 不再读状态行数值＝本批只剩半只眼（文本门看不见折叠变异）");
+        }
+    }
+
+    /**
+     * #142/B4-3e-36 新增的收口持有者：AOP 切面拒绝腿（判据 A 面上的<b>第三族形态</b>）。
+     *
+     * <p>族差在于「修法方向」不同于前两族。端点族（{@link #DENIAL_OWNERS_3E35}）的返回值由
+     * Spring MVC 消费 ⇒ 把签名折成 {@code ResponseEntity} 就能上状态行；切面的返回值由<b>调用点
+     * 按被拦截方法的声明类型</b> checkcast ⇒ 同一条修法在这里会当场 ClassCastException（拒绝动作
+     * 把请求变成 500），而反向「切面返 {@code ResponseEntity}」在声明仍为 {@code ApiResponse} 的
+     * 方法上会把整个 ResponseEntity 当 body 序列化＝假修。切面腿唯一与返回类型解耦的通路是
+     * <b>抛携带异常</b>，状态行由注解承载面（{@link #ANNOTATION_CARRIED_BASELINE} 两枚宿主 handler）
+     * 写定。故本组判据不含 {@code ResponseEntity.status(}——那条锚在切面上恒假，会把真收口读成红。</p>
+     */
+    private static final List<String> DENIAL_OWNERS_3E36 = List.of(
+            "ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "sysman/security/RequirePermissionAspect.java");
+
+    /**
+     * 承载异常所依赖的注解承载面（宿主 handler）。
+     *
+     * <p>登记理由：切面改抛之后，本批的保真责任整体转移到这两枚 handler——若宿主把
+     * {@code @ExceptionHandler(UnauthorizedException.class)} 摘掉或改挂到别的类型上，
+     * 抛异常只会落到 {@code Exception} 兜底腿＝HTTP 500，比原来的假 200 更糟。
+     * {@link #ANNOTATION_CARRIED_BASELINE} 的双向等值只数「腿的条数」，看不见「腿挂错类型」
+     * 这一变异，故这里逐枚点名异常类型。</p>
+     */
+    private static final List<String> CARRIER_HANDLERS_3E36 = List.of(
+            "ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/handler/"
+                    + "GlobalExceptionHandler.java",
+            "ecos_backend/services/sysman/impl/sysman-boot/src/main/java/com/chinacreator/"
+                    + "gzcm/sysman/boot/handler/GlobalExceptionHandler.java");
+
+    /** 本批切面的行为门：真代理腿才能复现「返回值 vs 声明类型」碰撞，文本门看不见这一族缺陷。 */
+    private static final List<String> BEHAVIOR_GATES_3E36 = List.of(
+            "services/sysman/impl/sysman-impl/src/test/java/com/chinacreator/gzcm/sysman/"
+                    + "security/RequirePermissionAspectDenialShapeTest.java");
+
+    /** 承载异常注解腿：{异常类型, 状态行注解文本}——两枚都必须在宿主 handler 上成对出现。 */
+    private static final String[][] CARRIER_EXCEPTION_TO_STATUS_3E36 = {
+            {"UnauthorizedException.class", "@ResponseStatus(HttpStatus.UNAUTHORIZED)"},
+            {"ForbiddenException.class", "@ResponseStatus(HttpStatus.FORBIDDEN)"},
+    };
+
+    @Test
+    @DisplayName("#142/B4-3e-36 切面腿：拒绝出口＝抛承载异常＋注解承载面两枚宿主点名在链＋行为门用真代理")
+    void the3e36AspectLegIsThrownNotReturnedAndItsCarriersAreInPlace() {
+        for (String owner : DENIAL_OWNERS_3E36) {
+            String code = codeOf(owner);
+            assertFalse(BARE_DENIAL_LEG.matcher(code).find(),
+                    owner + " 又出现裸回的安全拒绝出口＝D-B4-59 的 AOP 腿在本文件复现");
+            assertFalse(code.contains("return ApiResponse."),
+                    owner + " 里任何信封出口都不合法：放行腿只允许 return joinPoint.proceed()，"
+                            + "拒绝腿必须走抛异常（返回值由调用点按声明类型 cast）");
+            assertTrue(code.contains("throw new UnauthorizedException("),
+                    owner + " 的未认证腿不再抛 UnauthorizedException＝401 语义丢失");
+            assertTrue(code.contains("throw new ForbiddenException("),
+                    owner + " 的拒绝腿不再抛 ForbiddenException＝403 语义丢失（ABAC DENY／权限不足两条都要）");
+        }
+
+        for (String handler : CARRIER_HANDLERS_3E36) {
+            String code = codeOf(handler);
+            for (String[] pair : CARRIER_EXCEPTION_TO_STATUS_3E36) {
+                int idx = code.indexOf("@ExceptionHandler(" + pair[0] + ")");
+                assertTrue(idx >= 0,
+                        "承载面 " + handler + " 缺失 @ExceptionHandler(" + pair[0]
+                                + ")＝切面抛出的异常将落到兜底腿＝HTTP 500（比假 200 更糟）");
+                assertTrue(code.substring(idx, Math.min(idx + 200, code.length())).contains(pair[1]),
+                        "承载面 " + handler + " 的 " + pair[0]
+                                + " 腿近旁不再有 " + pair[1] + "＝状态行回落 200");
+            }
+        }
+
+        for (String gate : BEHAVIOR_GATES_3E36) {
+            String gateCode = codeOf("ecos_backend/" + gate);
+            assertTrue(gateCode.contains("AspectJProxyFactory"),
+                    "行为门 " + gate + " 不再走真代理＝检不了「切面返回值 vs 被拦截方法声明类型」碰撞，"
+                            + "本族缺陷退回半只眼");
+            assertTrue(gateCode.contains("ClassCastException"),
+                    "行为门 " + gate + " 的断言不再显式针对 ClassCastException＝回退成 return 信封时"
+                            + "本门读不到那条变异");
         }
     }
 

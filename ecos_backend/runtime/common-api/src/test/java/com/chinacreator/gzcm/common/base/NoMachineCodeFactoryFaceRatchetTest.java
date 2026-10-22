@@ -98,15 +98,23 @@ class NoMachineCodeFactoryFaceRatchetTest {
      * 六枚迁到带码重载（badRequest −3、unauthorized −1、forbidden −2，{@code handleNotFound} 登记豁免
      * 保留单参）⇒ −6。改前分枚由 {@code git show HEAD} 的 handler 腿清单逐枚对账（7 腿：90/198/260
      * badRequest、100 notFound、147 unauthorized、157/186 forbidden）。
+     *
+     * <p><b>#142/B4-3e-36 同批下调（−3 处／−1 文件）**：sysman {@code RequirePermissionAspect} 的三枚
+     * 拒绝腿（{@code unauthorized} 1／{@code forbidden} 2）由「返回单参信封」整体改为抛
+     * {@code UnauthorizedException}／{@code ForbiddenException}——改后该类不再出现在本判据面上，
+     * 故文件数一并 −1。这不是「给它们补机读码」，而是<b>换通路</b>：机读码改由承载面（gateway／
+     * sysman-boot {@code GlobalExceptionHandler}）经 {@code SystemErrorCode.ECOS_SYS_401/403} 统一注入，
+     * 属主侧只携带语义。该文件此前是本枚余面在 sysman 域的唯一持有者，归零＝该域从这条面上退出，
+     * 基线若不同批下调，本门会以「基线陈旧」报红（本门双向）。</p>
      */
-    private static final int BASELINE_SITES = 939;
-    private static final int BASELINE_FILES = 151;
+    private static final int BASELINE_SITES = 936;
+    private static final int BASELINE_FILES = 150;
 
     /** 分枚基线：只减不增，且合计必须等于 {@link #BASELINE_SITES}（防「拆细了但总数对不上」）。 */
     private static final Map<String, Integer> BASELINE_BY_FACTORY = new TreeMap<>(Map.of(
             "badRequest", 330,
-            "unauthorized", 13,
-            "forbidden", 24,
+            "unauthorized", 12,
+            "forbidden", 22,
             "notFound", 255,
             "internalError", 317));
 
