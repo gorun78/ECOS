@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalPublishVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalSaveDTO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalVO;
@@ -546,30 +548,37 @@ public class OntologyProposalController {
 
     /**
      * POST /api/v1/ontology/proposals/{id}/execute — 执行已验证提案。
+     *
+     * <p>#142/B4-3e-37（D-B4-59 末腿）：返回型折叠为 {@code ResponseEntity<ApiResponse<T>>}，
+     * 拒绝态的状态行由信封 {@code code} 经 {@link #failure} →
+     * {@link DataBridgeException#resolveHttpStatus(int)} 单源推出；
+     * 成功态由 {@link #ok} 显式 200（{@code CODE_SUCCESS=0} 不可进 resolveHttpStatus，否则折成 500）。
+     * 入参签名与路径不变。</p>
      */
     @PostMapping("/{id}/execute")
-    public ApiResponse<OntologyProposalVO> executeProposal(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<OntologyProposalVO>> executeProposal(@PathVariable String id) {
         Map<String, Object> existing;
         try {
             existing = proposalService.queryForMap(
                     "SELECT " + ID_COLUMNS + " FROM " + qualifiedTable() + " WHERE id=?", id);
         } catch (EmptyResultDataAccessException e) {
-            return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
+            return failure(ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found"));
         }
 
         String status = String.valueOf(existing.get("status"));
         if (!ALLOWED_FOR_EXECUTE.contains(status.toUpperCase())) {
             // F03-08 (W74/C58)：PENDING 直达 = 绕过审批。设计口径 409；ApiResponse 无 conflict() 工厂方法，
-            // 用 error(409, msg) 保留 409 HTTP 语义 + ECOS-ONTO-012 错误码（fidelity gap 见类注释）。
+            // 用 error(409, msg) 保留 409 HTTP 语义 + ECOS-ONTO-012 错误码（状态行由 failure() 单源推出）。
             if (STATUS_PENDING.equalsIgnoreCase(status)) {
-                return ApiResponse.error(409,
-                        "ECOS-ONTO-012: proposal must be VERIFIED or APPROVED, not PENDING (bypassing review)");
+                return failure(ApiResponse.error(409,
+                        "ECOS-ONTO-012: proposal must be VERIFIED or APPROVED, not PENDING (bypassing review)"));
             }
-            return ApiResponse.badRequest("ECOS-ONTO-012: proposal status " + status + " not executable");
+            return failure(ApiResponse.badRequest("ECOS-ONTO-012: proposal status " + status + " not executable"));
         }
 
         // W75 F03-03 发布门禁：状态校验之后、executeAndPublish 之前（stage + fail-closed）。
-        ApiResponse<OntologyProposalVO> gate = PublishGateService.toApiResponse(publishGate.validate(existing));
+        ResponseEntity<ApiResponse<OntologyProposalVO>> gate =
+                PublishGateService.toResponseEntity(publishGate.validate(existing));
         if (gate != null) {
             return gate;
         }
@@ -580,12 +589,12 @@ public class OntologyProposalController {
             executeAndPublish(id, existing, UserContext.getCurrentUsername());
         } catch (Exception e) {
             log.error("Proposal {} execute failed: {}", id, e.getMessage(), e);
-            return ApiResponse.badRequest("ONT-006: Execution failed: " + e.getMessage());
+            return failure(ApiResponse.badRequest("ONT-006: Execution failed: " + e.getMessage()));
         }
 
         Map<String, Object> updated = proposalService.queryForMap(
                 "SELECT " + ID_COLUMNS + " FROM " + qualifiedTable() + " WHERE id=?", id);
-        return ApiResponse.success(toVO(updated));
+        return ok(ApiResponse.success(toVO(updated)));
     }
 
     // ═══════════════ T3: 审批+执行+版本发布联动 ═══════════════════
@@ -603,22 +612,25 @@ public class OntologyProposalController {
      *   <li>更新提案状态为 EXECUTED，回填 version_id</li>
      *   <li>返回 {@link OntologyProposalPublishVO}</li>
      * </ol>
+     *
+     * <p>#142/B4-3e-37（D-B4-59 末腿）：返回型折叠同 {@link #executeProposal}，
+     * 拒绝态状态行与信封码同号单源。入参签名与路径不变。</p>
      */
     @PostMapping("/{id}/approve-and-publish")
-    public ApiResponse<OntologyProposalPublishVO> approveAndPublish(
+    public ResponseEntity<ApiResponse<OntologyProposalPublishVO>> approveAndPublish(
             @PathVariable String id,
             @RequestBody(required = false) OntologyProposalSaveDTO body) {
         // 1. 查询提案
         Map<String, Object> proposal = proposalService.findProposalById(id);
         if (proposal == null) {
-            return ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found");
+            return failure(ApiResponse.notFound("ONT-001: Proposal '" + id + "' not found"));
         }
 
         // 检查状态为 PENDING 或 APPROVED
         String currentStatus = String.valueOf(proposal.get("status"));
         if (!STATUS_PENDING.equals(currentStatus) && !STATUS_APPROVED.equals(currentStatus)) {
-            return ApiResponse.badRequest(
-                    "ONT-004: Proposal '" + id + "' must be PENDING or APPROVED, current: " + currentStatus);
+            return failure(ApiResponse.badRequest(
+                    "ONT-004: Proposal '" + id + "' must be PENDING or APPROVED, current: " + currentStatus));
         }
 
         // 2. 解析审批人身份并强制「提交人 ≠ 审核人」（同 transition 判据，禁止自审自批）
@@ -626,20 +638,21 @@ public class OntologyProposalController {
         String reviewer = firstNonBlank(UserContext.getCurrentUsername(),
                 body != null ? body.getReviewer() : null);
         if (reviewer == null || reviewer.isBlank()) {
-            return ApiResponse.badRequest(
-                    "ONT-008: cannot resolve reviewer identity, login required for approve");
+            return failure(ApiResponse.badRequest(
+                    "ONT-008: cannot resolve reviewer identity, login required for approve"));
         }
         reviewer = reviewer.trim();
         if (reviewer.equalsIgnoreCase(proposalAuthor)) {
-            return ApiResponse.badRequest(
-                    "ONT-007: reviewer '" + reviewer + "' must differ from author '" + proposalAuthor + "'");
+            return failure(ApiResponse.badRequest(
+                    "ONT-007: reviewer '" + reviewer + "' must differ from author '" + proposalAuthor + "'"));
         }
         String reviewerComment = body != null && body.getReviewComment() != null ? body.getReviewComment() : "";
 
         proposalService.approve(id, STATUS_APPROVED, reviewer, reviewerComment);
 
         // W75 F03-03 发布门禁：approve 之后、executeAndPublish 之前（stage + fail-closed）。
-        ApiResponse<OntologyProposalPublishVO> gate = PublishGateService.toApiResponse(publishGate.validate(proposal));
+        ResponseEntity<ApiResponse<OntologyProposalPublishVO>> gate =
+                PublishGateService.toResponseEntity(publishGate.validate(proposal));
         if (gate != null) {
             return gate;
         }
@@ -650,7 +663,7 @@ public class OntologyProposalController {
             versionIdStr = executeAndPublish(id, proposal, reviewer);
         } catch (Exception e) {
             log.error("Proposal {} approve-and-publish failed: {}", id, e.getMessage(), e);
-            return ApiResponse.badRequest("ONT-006: Execution failed: " + e.getMessage());
+            return failure(ApiResponse.badRequest("ONT-006: Execution failed: " + e.getMessage()));
         }
 
         // 7. 返回结果
@@ -660,7 +673,26 @@ public class OntologyProposalController {
         vo.setStatus(STATUS_EXECUTED);
         vo.setVersionId(versionIdStr);
         vo.setProposal(finalProposal);
-        return ApiResponse.success(vo);
+        return ok(ApiResponse.success(vo));
+    }
+
+    /**
+     * 成功出口：显式 200。
+     *
+     * <p>不走 {@link DataBridgeException#resolveHttpStatus(int)}——本域成功码 {@code CODE_SUCCESS=0}
+     * 不落在 400..599 区间，被折成 500 即是假修。</p>
+     */
+    private static <T> ResponseEntity<ApiResponse<T>> ok(ApiResponse<T> body) {
+        return ResponseEntity.ok(body);
+    }
+
+    /**
+     * 失败出口：状态行取信封 {@code code} 单源（{@link DataBridgeException#resolveHttpStatus(int)}）。
+     *
+     * <p>不在调用点另写 400/404/409/503 字面量：两处各写一遍即是「改码不改行」的漂移源。</p>
+     */
+    private static <T> ResponseEntity<ApiResponse<T>> failure(ApiResponse<T> body) {
+        return ResponseEntity.status(DataBridgeException.resolveHttpStatus(body.getCode())).body(body);
     }
 
     /**

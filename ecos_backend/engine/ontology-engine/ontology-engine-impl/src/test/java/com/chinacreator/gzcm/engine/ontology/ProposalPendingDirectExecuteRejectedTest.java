@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ontology;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -11,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ontology.controller.OntologyProposalController;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalVO;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyProposalService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyVersionService;
@@ -27,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.http.ResponseEntity;
 
 /**
  * W74 / C58 《ProposalPendingDirectExecuteRejectedTest》—
@@ -62,8 +65,14 @@ class ProposalPendingDirectExecuteRejectedTest {
         row.put("proposal_type", "CREATE_ENTITY");
         when(proposalService.queryForMap(anyString(), any())).thenReturn(row);
 
-        ApiResponse<?> resp = controller.executeProposal("p1");
+        ResponseEntity<ApiResponse<OntologyProposalVO>> entity = controller.executeProposal("p1");
+        ApiResponse<OntologyProposalVO> resp = entity.getBody();
 
+        assertNotNull(resp, "拒绝态必须带信封体");
+        // #142/B4-3e-37（D-B4-59）：状态行与信封码同号，不得只改码把行留在 200
+        assertEquals(409, entity.getStatusCode().value(),
+                "PENDING 直执的 HTTP 状态行应为 409，实际 " + entity.getStatusCode());
+        assertEquals(409, resp.getCode(), "信封 code 应与状态行同号");
         // 400 之上的 4xx（PENDING = 409）+ ECOS-ONTO-012 语义
         assertTrue(resp.getCode() >= 400, "PENDING 直执应返回 4xx, 实际 code=" + resp.getCode());
         assertTrue(resp.getMessage() != null && resp.getMessage().contains("ECOS-ONTO-012"),

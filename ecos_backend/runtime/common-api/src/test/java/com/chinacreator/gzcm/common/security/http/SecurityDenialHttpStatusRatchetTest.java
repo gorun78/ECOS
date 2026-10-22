@@ -133,8 +133,18 @@ class SecurityDenialHttpStatusRatchetTest {
      * 与逐腿归因（1＋3＋2＋2＝8）相符；二者不符时以读数为准。注意 ai 域这 2 枚 404 腿
      * 此前是 {@code HttpStatus} 与 D.5 码表两处各写一遍的形态，本批合流到「状态行取信封
      * code 单源推出」，所以这 2 枚同时是判据 A 的收口腿与判据 B 的读数变化腿。</p>
+     *
+     * <p><b>#142/B4-3e-37 重设＝863→853</b>：本批把判据 A 的最后一枚真裸回属主
+     * （{@code PublishGateService} 静态 helper）连同其两枚消费端点
+     * （{@code OntologyProposalController#executeProposal}/{@code #approveAndPublish}）
+     * 一起折成 {@code ResponseEntity} ⇒ 同方法内的非裁决腿（{@code /execute} 的
+     * 404/409/400/ONT-006 共 4 枚、{@code /approve-and-publish} 的 404/400×3/ONT-006 共 5 枚、
+     * helper 的 400 violations 腿 1 枚）从裸回形态消失 ⇒ 读数下降 10。读数由本批
+     * 「上限置 0 探测」实跑产出（<b>853</b>，同一批日志里该类其余 9 项全绿），与逐腿归因
+     * （4＋5＋1＝10）相符；二者不符时以读数为准。判据 A 面自本批起为 <b>0</b>：这条线不再
+     * 是「余面还有多少待收」的账，而是「新增即红＋被折掉的腿回退成裸回亦红」的双向门。</p>
      */
-    private static final int OTHER_LEG_CEILING = 863;
+    private static final int OTHER_LEG_CEILING = 853;
 
     /**
      * 判据 A 的合法承载态识别（#142/B4-3e-34，收口差距 <b>D-B4-69</b>「判据对
@@ -209,7 +219,7 @@ class SecurityDenialHttpStatusRatchetTest {
         m.put("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/"
                 + "sysman/controller/SecurityPolicyController.java", 0);
         m.put("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/"
-                + "gzcm/engine/ontology/service/PublishGateService.java", 1);
+                + "gzcm/engine/ontology/service/PublishGateService.java", 0);
         m.put("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/"
                 + "engine/ai/controller/AIPAgentController.java", 0);
         m.put("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/"
@@ -363,9 +373,10 @@ class SecurityDenialHttpStatusRatchetTest {
                 "豁免面登记量已偏离 #142/B4-3e-34 的逐腿实测值 5——判据口径变更必须重测后同批改注释");
         assertEquals(totalExpectedCarried, totalActualCarried,
                 "豁免面合计与实扫不符（实扫 " + totalActualCarried + "）");
-        assertEquals(1, totalBare,
-                "判据 A 真裸回合计应为 #142/B4-3e-36 切面腿收口后的 1 处（余 PublishGateService "
-                        + "静态 helper，另立 #142/B4-3e-37），实扫 " + totalBare
+        assertEquals(0, totalBare,
+                "判据 A 真裸回合计应为 #142/B4-3e-37 末腿（PublishGateService 静态 helper）收口后的 "
+                        + "0 处——D-B4-59 的判据 A 面自本批起全线清零：新增即红，且基线钉 0 后"
+                        + "「被折掉的腿回退成裸回」同样即红；实扫 " + totalBare
                         + "——与基线合计不一致时，说明承载态识别把不该豁免的腿豁免了（或反之）");
     }
 
@@ -480,6 +491,66 @@ class SecurityDenialHttpStatusRatchetTest {
             assertTrue(gateCode.contains("ClassCastException"),
                     "行为门 " + gate + " 的断言不再显式针对 ClassCastException＝回退成 return 信封时"
                             + "本门读不到那条变异");
+        }
+    }
+
+    /**
+     * #142/B4-3e-37 新增的收口持有者（D-B4-59 判据 A 面的<b>最后一枚</b>真裸回）。
+     *
+     * <p>族差：这枚不是端点、不是切面，而是<b>静态 helper 造信封＋端点原样 return</b>。
+     * 缺陷面因此分两处：helper 里 {@code return ApiResponse.error(503/400, …)} 是判据 A 的
+     * 最后一处命中，而消费它的 {@code OntologyProposalController} 两枚端点声明的是裸
+     * {@code ApiResponse} ⇒ 即便 helper 改成返回 {@code ResponseEntity}，端点也接不住。
+     * 修法必须两侧同批改，只改一侧要么编不过、要么假修。</p>
+     */
+    private static final List<String> DENIAL_OWNERS_3E37 = List.of(
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/ontology/service/PublishGateService.java",
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/ontology/controller/OntologyProposalController.java");
+
+    /**
+     * 本批行为门：钉的是「状态行值」而非「裸回形态」——文本判据把 {@code ok()} 折成 200
+     * 或把 503 折成 403 都读不出来，只有真调端点读 {@code getStatusCode()} 才能变红。
+     */
+    private static final List<String> BEHAVIOR_GATES_3E37 = List.of(
+            "engine/ontology-engine/ontology-engine-impl/src/test/java/com/chinacreator/gzcm/"
+                    + "engine/ontology/OntologyProposalPublishStatusFidelityTest.java",
+            "engine/ontology-engine/ontology-engine-impl/src/test/java/com/chinacreator/gzcm/"
+                    + "engine/ontology/service/PublishGate/PublishGateV3Test.java");
+
+    @Test
+    @DisplayName("#142/B4-3e-37 末腿：helper 造信封＋端点折叠同批落地，成功腿显式 ok()")
+    void the3e37HelperAndEndpointLegsBothCarryStatusLine() {
+        String gate = codeOf(DENIAL_OWNERS_3E37.get(0));
+        assertFalse(BARE_DENIAL_LEG.matcher(gate).find(),
+                "PublishGateService 又出现裸回的安全拒绝／不可用出口＝D-B4-59 的最后一枚真裸回复现");
+        assertTrue(gate.contains("ResponseEntity<ApiResponse<T>> toResponseEntity(GateResult"),
+                "PublishGateService 的对外出口不再是 toResponseEntity＝拒绝态又回到只给信封的形态");
+        assertTrue(gate.contains("DataBridgeException.resolveHttpStatus(body.getCode())"),
+                "PublishGateService 的状态行不再从信封 code 单源推出＝「改码不改行」的漂移形态回归");
+        assertFalse(gate.contains("toApiResponse("),
+                "已摘除的裸回 helper toApiResponse 被重新引入＝调用点会绕开状态行通路");
+
+        String ctrl = codeOf(DENIAL_OWNERS_3E37.get(1));
+        assertTrue(ctrl.contains("ResponseEntity<ApiResponse<OntologyProposalVO>> executeProposal"),
+                "/execute 端点签名退回裸 ApiResponse＝门禁 helper 的状态行在端点侧接不住（假修）");
+        assertTrue(ctrl.contains("ResponseEntity<ApiResponse<OntologyProposalPublishVO>> approveAndPublish"),
+                "/approve-and-publish 端点签名退回裸 ApiResponse＝同上");
+        assertTrue(ctrl.contains("DataBridgeException.resolveHttpStatus(body.getCode())"),
+                "端点的 failure() 出口不再从信封 code 单源推出状态行");
+        assertTrue(ctrl.contains("return ResponseEntity.ok(body);"),
+                "成功腿未显式 200：CODE_SUCCESS=0 若被折进 resolveHttpStatus 会得到 500＝把成功判成失败");
+
+        for (String rel : BEHAVIOR_GATES_3E37) {
+            String gateCode = codeOf("ecos_backend/" + rel);
+            assertTrue(gateCode.contains("getStatusCode()"),
+                    "行为门 " + rel + " 不再读 HTTP 状态行＝本族缺陷（只改码不改行）退回半只眼");
+        }
+        String fidelity = codeOf("ecos_backend/" + BEHAVIOR_GATES_3E37.get(0));
+        for (String leg : List.of("404", "409", "400", "503", "200")) {
+            assertTrue(fidelity.contains(leg + ","),
+                    "行为门缺 " + leg + " 腿的状态行断言＝D-B4-59 该腿无人守（缺腿即红）");
         }
     }
 

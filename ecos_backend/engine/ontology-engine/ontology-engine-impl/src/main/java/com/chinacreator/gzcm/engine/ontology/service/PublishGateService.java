@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ontology.service;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.ontology.dto.GateResult;
 import com.chinacreator.gzcm.engine.ontology.service.CaliberService.CaliberMissingException;
 import com.chinacreator.gzcm.engine.ontology.service.CaliberService.CaliberNotApprovedException;
@@ -9,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -31,16 +33,16 @@ import java.util.function.Supplier;
  * 依赖不可用（V3 调 data-engine 失败、V1 口径服务 fail-closed）
  * = 503 {@code ECOS-ONTO-050} / 500 {@code ECOS-ONTO-042}，<b>不得默认通过</b>。</p>
  *
- * <h3>接入说明（W75/M0：本任务不改动 Controller）</h3>
+ * <h3>接入说明（W75/M0；#142/B4-3e-37 起改走状态行保真通路）</h3>
  * <p>Call from {@code OntologyProposalController#executeProposal}/{@code #approveAndPublish}
  * <b>after the status keyword check and before {@code executeAndPublish}</b> — see 详细设计-03 §F03-03.
- * If {@code dependencyErrors} is non-empty, return
- * {@code ApiResponse.error(503, "ECOS-ONTO-050", "...")} (do NOT proceed).
- * If {@code violations} non-empty, return
- * {@code ApiResponse.badRequest("ECOS-ONTO-publish-gate-failed: " + violations)}.</p>
+ * 拒绝态必须由 <b>HTTP 状态行</b> 承载（D-B4-59）：{@code dependencyErrors} → 503 {@code ECOS-ONTO-050}、
+ * {@code violations} → 400，二者均 <b>不得继续执行</b>；状态行由信封 {@code code} 经
+ * {@link DataBridgeException#resolveHttpStatus(int)} 单源推出，本类不另写状态字面量。</p>
  * <pre>
  *   // 状态校验之后、executeAndPublish 之前：
- *   ApiResponse&lt;?&gt; gate = PublishGateService.toApiResponse(publishGateway.validate(proposalRow));
+ *   ResponseEntity&lt;ApiResponse&lt;T&gt;&gt; gate =
+ *           PublishGateService.toResponseEntity(publishGateway.validate(proposalRow));
  *   if (gate != null) return gate;       // 400（violations）或 503（dependencyErrors）
  *   // 门禁通过 → 继续 executeAndPublish
  * </pre>
@@ -112,25 +114,35 @@ public class PublishGateService {
     }
 
     /**
-     * 便捷出口：把 {@link GateResult} 映射为 Controller 可直接返回的 {@link ApiResponse}（见类注释「接入说明」）。
-     * <p>{@code dependencyErrors} 优先（503 fail-closed，且<B>不得继续执行</B>）→ 否则 violations 400 → 全通过返回 null。</p>
+     * 便捷出口：把 {@link GateResult} 映射为 Controller 可直接返回的 {@link ResponseEntity}，
+     * <b>状态行与信封 {@code code} 同源</b>（见类注释「接入说明」）。
+     *
+     * <p>#142/B4-3e-37（D-B4-59 末腿）：门禁拒绝态必须由 HTTP 状态行承载，不得只改信封码
+     * 而把状态行留在 200。状态行一律由
+     * {@link DataBridgeException#resolveHttpStatus(int)} 从信封 code 单源推出——
+     * 本方法内不写 503/400 状态字面量，避免「改码不改行」的漂移。</p>
+     *
+     * <p>{@code dependencyErrors} 优先（503 fail-closed，且<B>不得继续执行</B>）→ 否则 violations 400
+     * → 全通过返回 null。</p>
      */
-    public static <T> ApiResponse<T> toApiResponse(GateResult result) {
+    public static <T> ResponseEntity<ApiResponse<T>> toResponseEntity(GateResult result) {
         if (result == null) {
             return null;
         }
+        ApiResponse<T> body;
         if (result.hasDependencyErrors()) {
             String code = result.getDependencyErrors().get(0).getCode();
-            return ApiResponse.error(503, code, "ECOS-ONTO-050: publish-gate dependency unavailable");
-        }
-        if (!result.isPassed()) {
+            body = ApiResponse.error(503, code, "ECOS-ONTO-050: publish-gate dependency unavailable");
+        } else if (!result.isPassed()) {
             // 4xx 拒绝：errorCode = 第一个违反项的 code（如 ECOS-ONTO-040/021/030）
             String code = result.getViolations().isEmpty()
                     ? GateResult.CODE_CALIBER_METRIC_MISSING : result.getViolations().get(0).getCode();
-            return ApiResponse.error(400, code,
+            body = ApiResponse.error(400, code,
                     "ECOS-ONTO-publish-gate-failed: " + result.getViolations());
+        } else {
+            return null; // OK → proceed
         }
-        return null; // OK → proceed
+        return ResponseEntity.status(DataBridgeException.resolveHttpStatus(body.getCode())).body(body);
     }
 
     // ── V1 口径（内联） ────────────────────────────────────────────

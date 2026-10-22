@@ -33,6 +33,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.http.ResponseEntity;
 
 /**
  * W74 / C58 《ProposalLifecycleTest》— 提案状态机表驱动。
@@ -117,7 +118,12 @@ class ProposalLifecycleTest {
                 version.put("versionNo", 1);
                 when(versionService.createVersion(anyString(), any())).thenReturn(version);
 
-                ApiResponse<OntologyProposalVO> resp = controller.executeProposal("p1");
+                ResponseEntity<ApiResponse<OntologyProposalVO>> entity = controller.executeProposal("p1");
+                // #142/B4-3e-37（D-B4-59）：成功态状态行显式 200（CODE_SUCCESS=0 不得折成 500）
+                assertEquals(200, entity.getStatusCode().value(),
+                        "VERIFIED→execute 成功态状态行应为 200，实际 " + entity.getStatusCode());
+                ApiResponse<OntologyProposalVO> resp = entity.getBody();
+                assertNotNull(resp, "成功态必须带信封体");
                 assertTrue(resp.isSuccess(), "VERIFIED→execute 应成功, code=" + resp.getCode()
                         + " msg=" + resp.getMessage());
                 assertEquals("EXECUTED", resp.getData().getStatus());
@@ -125,7 +131,12 @@ class ProposalLifecycleTest {
             }
             case "draft_execute_rejected" -> {
                 when(proposalService.queryForMap(anyString(), any())).thenReturn(row("p1", "DRAFT", "alice"));
-                ApiResponse<?> resp = controller.executeProposal("p1");
+                ResponseEntity<ApiResponse<OntologyProposalVO>> entity = controller.executeProposal("p1");
+                ApiResponse<OntologyProposalVO> resp = entity.getBody();
+                assertNotNull(resp, "拒绝态必须带信封体");
+                // #142/B4-3e-37（D-B4-59）：状态行与信封码同号
+                assertEquals(400, entity.getStatusCode().value(),
+                        "DRAFT execute 状态行应为 400，实际 " + entity.getStatusCode());
                 assertEquals(400, resp.getCode(), "DRAFT execute → 400");
                 assertTrue(resp.getMessage().contains("ECOS-ONTO-012"),
                         "应携带 ECOS-ONTO-012, 实际=" + resp.getMessage());
@@ -134,7 +145,12 @@ class ProposalLifecycleTest {
             case "pending_execute_rejected" -> {
                 when(proposalService.queryForMap(anyString(), any()))
                         .thenReturn(row("p1", "PENDING", "alice"));
-                ApiResponse<?> resp = controller.executeProposal("p1");
+                ResponseEntity<ApiResponse<OntologyProposalVO>> entity = controller.executeProposal("p1");
+                ApiResponse<OntologyProposalVO> resp = entity.getBody();
+                assertNotNull(resp, "拒绝态必须带信封体");
+                // #142/B4-3e-37（D-B4-59）：409 语义不得折叠成 200/400
+                assertEquals(409, entity.getStatusCode().value(),
+                        "PENDING execute 状态行应为 409，实际 " + entity.getStatusCode());
                 assertEquals(409, resp.getCode(), "PENDING execute → 409 (绕过审批)");
                 assertTrue(resp.getMessage().contains("ECOS-ONTO-012"),
                         "应携带 ECOS-ONTO-012, 实际=" + resp.getMessage());
