@@ -34,6 +34,18 @@ public final class KbErrorCodes {
     public static final KbError EVENT_BASE_UNAVAILABLE = new KbError(500, "ECOS-KB-022");
     /** LLM 底座不可用（非降级路径）。 */
     public static final KbError LLM_BASE_UNAVAILABLE = new KbError(503, "ECOS-KB-023");
+    /**
+     * 本体寻址底座不可用（{@code ServiceEndpointResolver} 未接入 ⇒ 本体集成硬依赖缺失）。
+     *
+     * <p><b>#142/B4-3e-42 补登</b>（差距 D-B4-71 属主侧第三批）：收口前
+     * {@code KbEntityInstanceExtractionService.ontologyBase()} 抛
+     * {@code IllegalStateException}，消息里写 {@code ECOS-KB-404} —— 该号既不在本表、
+     * 全仓亦零引用，且 kb 局部 advice 无裸 {@code Exception} 兜底 ⇒ 只能落 gateway 入口兜底回 500。
+     * 语义是「制品在本部署不可用」（架构铁律 §3.2.7 ⇒ 属主端点显式 503），不是「不变式被破坏」，
+     * 故按本块「底座不可用」序列取次空号 <b>024</b>（020 安全／021 任务／022 事件／023 LLM 之后）。
+     * 机读码走 {@link KbError#code()} 字段，不再冒充 message 前缀（D-B4-55 同族）。</p>
+     */
+    public static final KbError ONTOLOGY_BASE_UNAVAILABLE = new KbError(503, "ECOS-KB-024");
 
     // ── 存储 / 上传 ─────────────────────────────────────────────
     /** 对象存储（MinIO）不可用（上传）。 */

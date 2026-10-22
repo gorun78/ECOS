@@ -126,6 +126,14 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * （{@code dccheng 返回空}／{@code dccheng 业务错误} 两族）语义是<b>下游应答异常而非未就绪</b>，
      * 词表不命中、留在 OTHER 面，不在本批折叠。</p>
      *
+     * <p><b>#142/B4-3e-42 属主侧第三批后现值＝7 个持有者／16 枚腿</b>：kb
+     * {@code KbEntityInstanceExtractionService.ontologyBase()} 的「ServiceEndpointResolver 未接入」腿
+     * 已改抛本域 503 载体 {@code KbErrorCodes.ONTOLOGY_BASE_UNAVAILABLE.exception(…)}
+     * （{@code 503 + ECOS-KB-024}，经 {@code KbErrorAdvice.onDomain} 按携带状态渲染），脱离 ISE 站点面 ⇒
+     * 总站点 135→<b>134</b>、DEPENDENCY 17→<b>16</b>、落兜底腿 12→<b>11</b>、真欠账面 12→<b>11</b>
+     * （承载腿 13 未动）。该文件其余 {@code IllegalStateException} 站点数为 <b>0</b>（本批前实扫即 1 枚），
+     * 故整行退出本表；渲染链的证据在 {@link #kbOwnerSideLegRendersCarriedUnavailableStatusInsteadOfFallback()}。</p>
+     *
      * <p>词表扩到 {@code 未注入|未启用} 后新增的两枚，语义裁决如下（不是随手加的匹配串）：
      * data-engine {@code BaseJdbcAdapter} 的「runtime-access JdbcConnector 建连桥未注入」＝
      * F02-13 建连通道缺失；{@code OlapEngineResolver} 的「OLAP 引擎未启用（dw.olap.engine 未配置）」
@@ -147,9 +155,7 @@ class DependencyUnreadyIllegalStateRatchetTest {
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/data/datasource/storage/adapter/jdbc/BaseJdbcAdapter.java", 1),
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
-                    + "gzcm/engine/data/writechannel/OlapEngineResolver.java", 1),
-            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
-                    + "gzcm/engine/kb/service/KbEntityInstanceExtractionService.java", 1));
+                    + "gzcm/engine/data/writechannel/OlapEngineResolver.java", 1));
 
     /**
      * ENV_ALGO 面基线（故意保持 500 的豁免面，登记制、必须点名）：
@@ -198,8 +204,8 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 同批还要改的是承载面：该文件行退出 {@code CARRIER_BASELINE}、已承载腿 15 → <b>13</b>、
      * 真欠账面 14 → <b>12</b>——四处任一单独改都会红。</p>
      */
-    private static final int TOTAL_SITE_BASELINE = 135;
-    private static final int DEPENDENCY_FACE_BASELINE = 17;
+    private static final int TOTAL_SITE_BASELINE = 134;
+    private static final int DEPENDENCY_FACE_BASELINE = 16;
     private static final int ENV_ALGO_FACE_BASELINE = 10;
     private static final int OTHER_FACE_BASELINE = 100;
     private static final int UNREADABLE_FACE_BASELINE = 8;
@@ -676,6 +682,19 @@ class DependencyUnreadyIllegalStateRatchetTest {
     private static final String KB_ADVICE =
             "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/kb/support/KbErrorAdvice.java";
+    /** #142/B4-3e-42：kb 属主侧第三批渲染取证所依赖的四个源（码表／属主腿／两条 HTTP 承流路径）。 */
+    private static final String KB_ERROR_CODES =
+            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/kb/support/KbErrorCodes.java";
+    private static final String KB_EXTRACTION_SERVICE =
+            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/kb/service/KbEntityInstanceExtractionService.java";
+    private static final String KB_INGEST_CONTROLLER =
+            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/kb/controller/KnowledgeIngestController.java";
+    private static final String KB_EXTRACT_CONTROLLER =
+            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/kb/controller/StructuredExtractController.java";
 
     /**
      * 承载 advice 面基线（相对路径 → 「是否裸 Exception 兜底｜作用域选择器规范化文本」）。
@@ -740,6 +759,11 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * {@code DcchengClient}（曾为 {@code WorkspaceExceptionHandler.java}／2 枚）整行退出本面——
      * 它的两枚腿改抛本域 503 载体，经 {@code handleDomain} 而非 {@code handleUnexpected} 渲染。
      * 承载面 15→<b>13</b>（全在 ai），落兜底面 12 不变。</p>
+     *
+     * <p><b>#142/B4-3e-42 属主侧第三批后现值＝7 个持有者／24 枚腿</b>：kb
+     * {@code KbEntityInstanceExtractionService}（曾为 {@code ENTRY_FALLBACK_500}／1 枚）整行退出本面——
+     * 它的那枚腿改抛本域 503 载体，由 {@code KbErrorAdvice.onDomain}（无裸 Exception 兜底、按异常携带状态渲染）
+     * 接住，不再落 gateway 入口兜底。落兜底面 12→<b>11</b>（全在 data-engine 3 个持有者），承载面 13 未动。</p>
      */
     private static final Map<String, String> CARRIER_BASELINE = Map.ofEntries(
             Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
@@ -757,9 +781,7 @@ class DependencyUnreadyIllegalStateRatchetTest {
                     + "gzcm/engine/data/datasource/storage/adapter/jdbc/BaseJdbcAdapter.java",
                     "ENTRY_FALLBACK_500"),
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
-                    + "gzcm/engine/data/writechannel/OlapEngineResolver.java", "ENTRY_FALLBACK_500"),
-            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
-                    + "gzcm/engine/kb/service/KbEntityInstanceExtractionService.java", "ENTRY_FALLBACK_500"));
+                    + "gzcm/engine/data/writechannel/OlapEngineResolver.java", "ENTRY_FALLBACK_500"));
 
     /**
      * 承载者实际渲染的状态行（键＝advice 文件名；锚点逐条钉在
@@ -779,9 +801,11 @@ class DependencyUnreadyIllegalStateRatchetTest {
             "WorkspaceExceptionHandler.java", 500);
 
     /** 按承载者聚合的腿数（禁算式推出；#142/B4-3e-39 探测实扫，#142/B4-3e-40 属主侧首批后现值，
-     *  #142/B4-3e-41 属主侧第二批后现值＝承载 13／兜底 12）。 */
+     *  #142/B4-3e-41 属主侧第二批后现值＝承载 13／兜底 12，
+     *  <b>#142/B4-3e-42 属主侧第三批后现值＝承载 13／兜底 11</b>——kb 那枚脱离 ISE 站点面，
+     *  承载面一枚未动，全在 ai）。 */
     private static final int CARRIED_LEGS_BASELINE = 13;
-    private static final int ENTRY_FALLBACK_LEGS_BASELINE = 12;
+    private static final int ENTRY_FALLBACK_LEGS_BASELINE = 11;
 
     /**
      * <b>真欠账面</b>＝落入口兜底的腿＋被承载后仍回 500 的腿。
@@ -791,9 +815,12 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * "ECOS-SYS-503: …")}）后现值 <b>12＋2＝14</b>。<b>#142/B4-3e-41 第二批再收掉 workspace
      * {@code DcchengClient} 2 枚</b>（改抛本域 503 载体，经 {@code handleDomain} 渲染 503）后
      * 现值 <b>12＋0＝12</b>：承载面剩下的 13 枚全在 ai，已由分册 06 D.5 冻结为 502，不是欠账。
+     * <b>#142/B4-3e-42 第三批再收掉 kb {@code KbEntityInstanceExtractionService} 1 枚</b>
+     * （改抛 {@code KbErrorCodes.ONTOLOGY_BASE_UNAVAILABLE.exception(…)}＝503＋ECOS-KB-024，
+     * 经 {@code KbErrorAdvice.onDomain} 按携带状态渲染）后现值 <b>11＋0＝11</b>。
      * 属主侧每批改码必须同批下调本值与本面基线，两头都红才算动过。</p>
      */
-    private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 12;
+    private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 11;
 
     private static volatile List<Advice> cachedAdvices;
 
@@ -1057,5 +1084,51 @@ class DependencyUnreadyIllegalStateRatchetTest {
         String kb = codeOf(KB_ADVICE);
         assertFalse(hasBareExceptionFallback(kb),
                 "KbErrorAdvice 新增了裸 Exception 兜底＝kb 域依赖腿的承载者换了，不能再按落网关兜底判");
+    }
+
+    /**
+     * <b>#142/B4-3e-42 属主侧第三批的渲染取证</b>（差距 D-B4-71）：本门其余判据只看得到「ISE 站点少了一枚」，
+     * 那是<b>脱离判据面</b>的证据，不等于「改抛的类型真被接住、且真渲染成 503」。#142/B4-3e-41 的教训正是
+     * 属主侧改了抛出类型、控制器的宽 {@code catch (Exception)} 仍把它折成 {@code badRequest}——那样账面
+     * 一样变好，HTTP 面却什么都没变＝假绿。故本案把 kb 这一枚的<b>整条承流链</b>按源码锚点钉死：
+     * 码表冻结值 → advice 显式接住并按携带状态渲染 → 属主腿改抛形态 → 错号不得复活 →
+     * 放行腿在位 → 另一条 HTTP 路径（E3 同步 dry-run）不得新增长 catch。
+     */
+    @Test
+    void kbOwnerSideLegRendersCarriedUnavailableStatusInsteadOfFallback() {
+        String codes = codeOf(KB_ERROR_CODES);
+        assertTrue(codes.contains("ONTOLOGY_BASE_UNAVAILABLE = new KbError(503, \"ECOS-KB-024\")"),
+                "kb 本体寻址 503 条目（ECOS-KB-024）被改号或改状态＝本批属主腿的渲染值变了，承流面须重测");
+
+        String advice = codeOf(KB_ADVICE);
+        int onDomain = advice.indexOf("@ExceptionHandler(DomainException.class)");
+        assertTrue(onDomain > 0,
+                "KbErrorAdvice 不再显式接住本域 DomainException＝属主腿改抛后没人接，503 仍会落网关 500 兜底");
+        String onDomainBody = advice.substring(onDomain, Math.min(advice.length(), onDomain + 700));
+        assertTrue(onDomainBody.contains("DataBridgeException.resolveHttpStatus(ex.getHttpStatus())")
+                        && onDomainBody.contains("ResponseEntity.status(status)"),
+                "onDomain 不再按异常携带状态渲染＝机读码在位而状态行回落固定值，本批 503 承诺作废");
+
+        String svc = codeOf(KB_EXTRACTION_SERVICE);
+        assertTrue(svc.contains("throw KbErrorCodes.ONTOLOGY_BASE_UNAVAILABLE.exception("),
+                "ontologyBase() 的寻址不可用腿不再抛本域 503 载体＝属主侧改码被回退");
+        assertFalse(svc.contains("ECOS-KB-404"),
+                "错号 ECOS-KB-404 复活：该号不在分册 04 D.5 冻结表、全仓零引用，且在 message 前缀冒充机读码（D-B4-55 同族）");
+
+        String ingest = codeOf(KB_INGEST_CONTROLLER);
+        int pass = ingest.indexOf("catch (KbErrorCodes.DomainException e) {");
+        assertTrue(pass > 0,
+                "previewBuild 的 503 放行腿被摘＝不可用态重新被同方法宽 catch 折成 internalError（HTTP 200＋code -1）");
+        assertTrue(ingest.substring(pass, Math.min(ingest.length(), pass + 400)).contains("throw e;"),
+                "放行腿不再原样抛出＝折叠面复活");
+
+        String extract = codeOf(KB_EXTRACT_CONTROLLER);
+        int trigger = extract.indexOf(
+                "extractionService.extract(req.getOntologyId(), jobId, incremental, true);");
+        assertTrue(trigger > 0, "E3 同步 dry-run 调用腿改了形态＝该端点的承流判定须重测");
+        String triggerWindow = extract.substring(trigger, Math.min(extract.length(), trigger + 400));
+        assertTrue(triggerWindow.contains("catch (ValidationException e)")
+                        && !triggerWindow.contains("catch (Exception e)"),
+                "E3 同步路径新增长 catch＝本域 503 会在控制器层被折叠，本批承流承诺作废");
     }
 }

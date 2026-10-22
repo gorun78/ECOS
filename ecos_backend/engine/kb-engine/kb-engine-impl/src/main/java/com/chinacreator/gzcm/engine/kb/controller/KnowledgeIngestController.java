@@ -238,6 +238,12 @@ public class KnowledgeIngestController {
                     "jobId=" + jobId + " create=" + preview.getCreate() + " update=" + preview.getUpdate()
                             + " skip=" + preview.getSkip());
             return ApiResponse.success(preview);
+        } catch (KbErrorCodes.DomainException e) {
+            // #142/B4-3e-42（D-B4-71 属主侧第三批）放行腿＝本批必要条件而非附带：本域领域异常
+            // （含本体寻址不可用 ECOS-KB-024／503）必须原样抛给 KbErrorAdvice 渲染状态行，
+            // 否则会被下面的宽 catch 折成 internalError（HTTP 200＋code -1）＝不可用态在 HTTP 面消失。
+            // 写法对齐本文件 emitAudit 失败腿（同域既有同型），宽 catch 的其余存量折叠面另属 D-B4-70 队列。
+            throw e;
         } catch (Exception e) {
             log.error("图谱构建 dry-run 预览失败: jobId={}, {}", jobId, e.getMessage(), e);
             return ApiResponse.internalError("预览失败: " + e.getMessage());

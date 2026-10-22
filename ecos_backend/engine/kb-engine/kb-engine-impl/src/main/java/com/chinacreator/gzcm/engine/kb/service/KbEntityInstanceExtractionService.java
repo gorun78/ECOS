@@ -140,14 +140,18 @@ public class KbEntityInstanceExtractionService {
 
     /**
      * ontology-engine base URL：经 ServiceEndpointResolver 两态寻址（route-manifest owner=buszhi）；
-     * resolver bean 缺席 → fail-loud（本体集成硬依赖，禁自拼 / 回落 :8080 自环，O-6/W84）；
+     * resolver bean 缺席 → fail-loud 503＋ECOS-KB-024（本体集成硬依赖，禁自拼 / 回落 :8080 自环，O-6/W84）；
      * bean 在场但 route-manifest 缺条 → 回落 gateway 兜底 base（保留历史默认）。
      */
     private String ontologyBase() {
         if (endpointResolver == null) {
-            // FAIL-LOUD: required for ontology integration
-            throw new IllegalStateException(
-                    "ECOS-KB-404: ServiceEndpointResolver not wired; kb cannot reach ontology entity-mappings endpoint");
+            // #142/B4-3e-42（D-B4-71 属主侧第三批，kb 域）：本腿原抛 IllegalStateException，
+            // 而 KbErrorAdvice 只声明 DataAccessException／DomainException／DataBridgeException
+            // 三支、无裸 Exception 兜底 ⇒ 这条「寻址底座未接入」只能落 gateway 入口兜底回 500，
+            // §4.7.2 的不可用态在 HTTP 面上消失。现改抛本域 503 载体（ECOS-KB-024，见该常量 javadoc
+            // 对原消息错号 ECOS-KB-404 的订正）；机读码由 KbError.code 字段承载，message 只留人读文案。
+            throw KbErrorCodes.ONTOLOGY_BASE_UNAVAILABLE.exception(
+                    "本体寻址底座不可用：ServiceEndpointResolver 未接入，无法访问本体 entity-mappings 端点");
         }
         return endpointResolver.resolve("buszhi", ServiceEndpointResolver.RouteMode.MONOLITH)
                 .map(s -> s + "/api/v1")

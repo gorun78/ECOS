@@ -556,6 +556,7 @@ GET  /api/v1/knowledge/assumptions/resolve?scenarioType=&metric=&dims=&period=
 | ECOS-KB-021 | 任务底座不可用 | 503 | K-38 纠正 |
 | ECOS-KB-022 | 事件底座不可用且兜底失败 | 500 | K-44 纠正 |
 | ECOS-KB-023 | LLM 底座不可用（非降级路径） | 503 | K-35 收口后语义 |
+| ECOS-KB-024 | 本体寻址底座不可用（`ServiceEndpointResolver` 未接入） | 503 | #142/B4-3e-42 补登：原腿抛 `IllegalStateException` 且在 message 前缀写错号 `ECOS-KB-404`（本表无此号、全仓零引用），kb 局部 advice 无裸 `Exception` 兜底 ⇒ 只能落网关 500；现按本块「底座不可用」序列取次空号，机读码走 `KbError.code` 字段 |
 | ECOS-KB-030 | 对象存储不可用（上传） | 500 | K-37 纠正 |
 | ECOS-KB-031 | 上传文件类型/大小不合规 | 415/413 | 边界校验 |
 | ECOS-KB-040 | CURATED 供数不可达（画像取数） | 502 | C.3 |
