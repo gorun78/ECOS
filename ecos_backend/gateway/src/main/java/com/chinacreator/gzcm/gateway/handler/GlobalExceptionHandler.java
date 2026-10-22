@@ -199,28 +199,52 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * NullPointerException → 400 参数缺失或服务未就绪。
-     * <p>覆盖 Controller/Service 层因入参 Map.get() 返回 null 导致的 NPE
-     * （如 POST /api/v1/knowledge/edges 的 sourceNodeId 为 null）。
-     * 不区分具体原因统一返回 400，避免 500 暴露内部实现细节。
+     * NullPointerException → 500 未分类内部错误（{@code ECOS-SYS-500}）＋ traceId。
+     *
+     * <p><b>#142/B4-3e-26（差距 D-B4-58）</b>：收口前声明 {@code @ResponseStatus(BAD_REQUEST)}
+     * 并以「请求参数不完整或缺少必要字段」对外——那是<b>把服务端缺陷归成客户端错误</b>：
+     * NPE 只说明「服务端解引用了 null」，异常本身不携带任何「客户端少传了字段」的证据，
+     * 而它比 {@link #handleAny(Exception)} 更具体因而先命中，于是真实的服务端故障在 HTTP 面上
+     * 被洗成 4xx，既不进 5xx 告警面、也让客户端去改一个本来没错的请求。</p>
+     *
+     * <p><b>400 通道并未因此减少</b>（裁决依据，实测非推测）：真正的入参类失败本就有各自的具名出口
+     * ——{@code ValidationException}／{@code NumberFormatException}／
+     * {@code HttpMessageNotReadableException}／{@code BusinessException} 仍回 400，
+     * 「缺字段」的正确修法是端点显式校验并走这些通道，而不是留一条把缺陷冒充参数错的兜底。</p>
+     *
+     * <p>响应体只给通用提示＋traceId（堆栈入 error 日志，避免技术侦察）；
+     * 旧文案「请求参数不完整或缺少必要字段」的对外承诺按实测零依赖（全仓该串仅本行自身命中）后撤下。</p>
      */
     @ExceptionHandler(NullPointerException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleNullPointerException(NullPointerException ex) {
-        log.warn("NullPointerException in request processing: {}", ex.getMessage(), ex);
-        return ApiResponse.badRequest("请求参数不完整或缺少必要字段");
+        log.error("NullPointerException in request processing (server-side defect): {}", ex.getMessage(), ex);
+        return ApiResponse.<Void>error(500, SystemErrorCode.ECOS_SYS_500, "服务内部错误，请稍后重试或联系管理员")
+                .withTraceIdFromMdc();
     }
 
     /**
-     * IllegalStateException → 400 服务未就绪。
-     * <p>覆盖 AgentMeshController 等使用 @Autowired(required=false) 注入时
-     * Bean 未就绪的场景（如 POST /api/agent-mesh/agents）。
+     * IllegalStateException → 500 未分类内部错误（{@code ECOS-SYS-500}）＋ traceId。
+     *
+     * <p><b>#142/B4-3e-26（差距 D-B4-58）</b>：收口前同样声明
+     * {@code @ResponseStatus(BAD_REQUEST)}、对外「服务未就绪，请稍后重试」。该文案与实际
+     * 状态行互不成立：既写着「服务未就绪」（＝服务端不可用），又回 400（＝客户端错），
+     * 客户端与运维各自都被误导。</p>
+     *
+     * <p><b>为何不在兜底处按消息嗅探分 503／500</b>（裁决依据）：main 面
+     * {@code throw new IllegalStateException(} 实扫 140 枚（142 行，判据＝全后端 {@code src/main/java}
+     * 排除 {@code target/}／{@code archive/} 的逐次计数），其中「未就绪／不可用／未接入」语义
+     * 18 枚、明确的「不变式被破坏」7 枚，其余按消息无法归类；在兜底 handler 里读消息猜状态
+     * ＝把折叠判定散抄回运行时，正是 D-B4-44／D-B4-55 的成因形态。故本批一律按「抛到了入口兜底
+     * ＝未被任何具名通道分类」归 500，<b>在册余项</b>：那 18 枚未就绪腿应由属主端点显式返回
+     * 503＋域内不可用码（§3.2.7「下游制品不可用」），属逐域接线工作、不在本批扩面。</p>
      */
     @ExceptionHandler(IllegalStateException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleIllegalState(IllegalStateException ex) {
-        log.warn("IllegalStateException: {}", ex.getMessage());
-        return ApiResponse.badRequest("服务未就绪，请稍后重试");
+        log.error("IllegalStateException (server-side defect, not a client error): {}", ex.getMessage(), ex);
+        return ApiResponse.<Void>error(500, SystemErrorCode.ECOS_SYS_500, "服务内部错误，请稍后重试或联系管理员")
+                .withTraceIdFromMdc();
     }
 
     /**
