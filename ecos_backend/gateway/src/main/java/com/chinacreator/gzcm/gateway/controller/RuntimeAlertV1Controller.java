@@ -1,11 +1,14 @@
 package com.chinacreator.gzcm.gateway.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.gateway.service.RuntimeAlertRepository;
 import com.chinacreator.gzcm.sysman.security.MinimumClearance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,6 +27,17 @@ import java.util.Map;
  * <p>承载 §6.2 落库表 {@code ecos_runtime_alert_record} 的列表 / 详情 / ack，
  * 以及 DLQ 列表 / 重放。持久化经 {@link RuntimeAlertRepository}（Controller 不直连
  * JdbcTemplate — ArchitectureTest 门禁）。ack 权限 = L2+，replay = L3+。</p>
+ *
+ * <p><b>状态行保真（#142/B4-3e-32，收口裸回面 D-B4-59 在本类的类型见证腿）</b>：
+ * {@code list}／{@code close}／{@code dlq} 三枚方法原先直接 {@code return ApiResponse.xxx(...)}，
+ * Spring 落的状态行因此恒 <b>HTTP 200</b>——信封里写着 503/404/400，传输层却报成功，
+ * 前端 {@code apiFetchData} 只看 {@code res.ok} 会把「依赖不可用」解成 {@code data=undefined}
+ * 并渲染成「成功 0 条」（§4.5.4／§4.7.2 的分态在状态行上同形）。现三枚方法的失败腿逐枚经
+ * {@code ResponseEntity.status(...)} 落真状态行：不可用态取 {@link RlsExecutionContract}
+ * 的 503 单源常量（信封码与状态行同源，禁两处各写一遍），其余腿取对应 {@link HttpStatus}；
+ * <b>路径、入参、信封字段三样零改动</b>（API 只增不改红线：只补状态行，同 D-B4-59 属主端点先例）。
+ * {@code detail}／{@code ack}／{@code replay} 腿本批未动——它们不含安全裁决线出口，
+ * 属非拒绝态裸回登记面（判据 B 只减不增），改判随该面另批。</p>
  */
 @RestController
 @RequestMapping("/api/v1/monitor")
@@ -39,7 +53,7 @@ public class RuntimeAlertV1Controller {
 
     @GetMapping("/alerts")
     @PreAuthorize("hasAuthority('platform:alert:read') or hasRole('ADMIN')")
-    public ApiResponse<Map<String, Object>> list(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> list(
             @RequestParam(required = false) String severity,
             @RequestParam(required = false, defaultValue = "open") String status,
             @RequestParam(required = false, defaultValue = "1") int page,
@@ -53,11 +67,12 @@ public class RuntimeAlertV1Controller {
             out.put("total", total);
             out.put("page", page);
             out.put("size", size);
-            return ApiResponse.success(out).withTraceIdFromMdc();
+            return ResponseEntity.ok(ApiResponse.<Map<String, Object>>success(out).withTraceIdFromMdc());
         } catch (Exception ex) {
             log.error("RuntimeAlertV1 list failed (fail-closed): {}", ex.getMessage());
-            return ApiResponse.<Map<String, Object>>error(503, "ECOS-AUTH-005",
-                    "用户权限依赖不可用，请稍后重试").withTraceIdFromMdc();
+            return ResponseEntity.status(RlsExecutionContract.SEC_UNAVAILABLE_HTTP)
+                    .body(ApiResponse.<Map<String, Object>>error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                            "ECOS-AUTH-005", "用户权限依赖不可用，请稍后重试").withTraceIdFromMdc());
         }
     }
 
@@ -112,26 +127,29 @@ public class RuntimeAlertV1Controller {
     @PostMapping("/alerts/{id}/close")
     @MinimumClearance(level = 2)
     @PreAuthorize("hasAuthority('platform:alert:close') or hasRole('ADMIN')")
-    public ApiResponse<Map<String, Object>> close(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> close(@PathVariable String id) {
         try {
             int updated = repo.closeAlert(id);
             if (updated == 0) {
                 List<Map<String, Object>> rows = repo.findAlertById(id);
                 if (rows.isEmpty()) {
-                    return ApiResponse.<Map<String, Object>>notFound("告警不存在或已删除").withTraceIdFromMdc();
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body(ApiResponse.<Map<String, Object>>notFound("告警不存在或已删除").withTraceIdFromMdc());
                 }
-                return ApiResponse.<Map<String, Object>>badRequest(
-                        "告警状态不可关闭（仅 open/acked 可关闭）").withTraceIdFromMdc();
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.<Map<String, Object>>badRequest(
+                                "告警状态不可关闭（仅 open/acked 可关闭）").withTraceIdFromMdc());
             }
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("id", id);
             out.put("status", "closed");
             out.put("closeTime", readCloseTime(id));
-            return ApiResponse.success(out).withTraceIdFromMdc();
+            return ResponseEntity.ok(ApiResponse.<Map<String, Object>>success(out).withTraceIdFromMdc());
         } catch (Exception ex) {
             log.error("RuntimeAlertV1 close failed (fail-closed): {}", ex.getMessage());
-            return ApiResponse.<Map<String, Object>>error(503, "ECOS-AUTH-005",
-                    "告警关闭依赖不可用，请稍后重试").withTraceIdFromMdc();
+            return ResponseEntity.status(RlsExecutionContract.SEC_UNAVAILABLE_HTTP)
+                    .body(ApiResponse.<Map<String, Object>>error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                            "ECOS-AUTH-005", "告警关闭依赖不可用，请稍后重试").withTraceIdFromMdc());
         }
     }
 
@@ -147,7 +165,7 @@ public class RuntimeAlertV1Controller {
     /** DLQ 列表（W13；表由 V243 建立）。 */
     @GetMapping("/dlq")
     @PreAuthorize("hasAuthority('platform:alert:read') or hasRole('ADMIN')")
-    public ApiResponse<Map<String, Object>> dlq(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> dlq(
             @RequestParam(required = false, defaultValue = "pending") String status,
             @RequestParam(required = false, defaultValue = "1") int page,
             @RequestParam(required = false, defaultValue = "20") int size) {
@@ -160,11 +178,12 @@ public class RuntimeAlertV1Controller {
             out.put("total", total);
             out.put("page", page);
             out.put("size", size);
-            return ApiResponse.success(out).withTraceIdFromMdc();
+            return ResponseEntity.ok(ApiResponse.<Map<String, Object>>success(out).withTraceIdFromMdc());
         } catch (Exception ex) {
             log.error("dlq list failed: {}", ex.getMessage());
-            return ApiResponse.<Map<String, Object>>error(503, "ECOS-AUTH-005",
-                    "dlq 依赖不可用").withTraceIdFromMdc();
+            return ResponseEntity.status(RlsExecutionContract.SEC_UNAVAILABLE_HTTP)
+                    .body(ApiResponse.<Map<String, Object>>error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                            "ECOS-AUTH-005", "dlq 依赖不可用").withTraceIdFromMdc());
         }
     }
 

@@ -54,7 +54,8 @@ class KbTaskDelegationTest {
         req.setWindowFrom("2026-01-01");
         req.setWindowTo("2026-06-30");
 
-        var resp = controller.generate(req);
+        var resp = controller.generate(req).getBody();
+        assertNotNull(resp, "generate 必须携带信封（ResponseEntity 不得空 body）");
         assertEquals(0, resp.getCode(), "generate → success code=0");
         Object data = resp.getData();
         assertNotNull(data);

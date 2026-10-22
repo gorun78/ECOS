@@ -11,6 +11,8 @@ import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService.TaskManagementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,6 +37,18 @@ import java.util.UUID;
  *   <li>POST /{id}/publish → 403 ECOS-KB-062（非知识管理员）；409 状态机 / I-6（由 {@link KbErrorCodes.DomainException} 透传）</li>
  *   <li>GET  /resolve     → 命中画像 + 完整退化链</li>
  * </ul>
+ *
+ * <p><b>状态行保真（#142/B4-3e-32，收口裸回面 D-B4-59 在本类的类型见证腿）</b>：
+ * {@code generate}／{@code publish}（含其私有 helper {@code mapMessage}）原先返裸
+ * {@code ApiResponse}——该类只描述信封、不带 HTTP 状态能力，Spring 落的状态行恒 <b>HTTP 200</b>，
+ * 于是 D.3 契约里的「503 runtime-task 不可用／403 非知识管理员／409 非法跃迁与 I-6／404 记录不存在」
+ * 在传输层与成功同形（§4.7.2「不可用 ≠ 无权限」在状态行上无从判别）。现逐枚腿经
+ * {@code ResponseEntity.status(...)} 落真状态行，<b>状态值与机读码同源取 {@link KbErrorCodes}
+ * 的 {@code KbError} 记录</b>（{@code httpStatus()} 与 {@code code()} 成对，禁在 Controller 里
+ * 另写一遍数字），其余腿取对应 {@link HttpStatus}；成功腿显式 {@code ResponseEntity.ok(...)}
+ * 保持 200。<b>路径、入参、信封字段与签名三样零改动</b>（API 只增不改：只补状态行，
+ * 同 D-B4-59 属主端点先例）。{@code list}／{@code resolve} 本批未动——不含拒绝态腿，
+ * 属非拒绝态裸回登记面（判据 B 只减不增），改判随该面另批。</p>
  */
 @RestController
 @RequestMapping("/api/v1/knowledge/profiles")
@@ -60,9 +74,10 @@ public class KbProfileController {
     /** POST /generate：body = {@code ProfileGenerateRequest}。202 提交；503 底座不可用（C.3）。 */
     @PostMapping("/generate")
     @RequirePermission(value = "提交画像生成任务", permission = "knowledge:profile:generate")
-    public ApiResponse<Map<String, Object>> generate(@RequestBody ProfileGenerateRequest req) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> generate(@RequestBody ProfileGenerateRequest req) {
         if (req == null || req.getMetricCodes() == null || req.getMetricCodes().isEmpty()) {
-            return ApiResponse.badRequest("metricCodes 不能为空");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.badRequest("metricCodes 不能为空"));
         }
         try {
             TaskDescription d = new TaskDescription();
@@ -84,11 +99,15 @@ public class KbProfileController {
             out.put("taskId", taskId);
             out.put("status", "SUBMITTED");
             out.put("traceId", UUID.randomUUID().toString());
-            return ApiResponse.<Map<String, Object>>success("已提交", out).withTraceId((String) out.get("traceId"));
+            return ResponseEntity.ok(ApiResponse.<Map<String, Object>>success("已提交", out)
+                    .withTraceId((String) out.get("traceId")));
         } catch (TaskManagementException | RuntimeException e) {
             log.error("画像生成提交失败: {}", e.getMessage(), e);
-            return ApiResponse.<Map<String, Object>>error(503, KbErrorCodes.TASK_BASE_UNAVAILABLE.code(),
-                    "runtime-task 不可用，禁降级为本地同步计算: " + e.getMessage());
+            return statusOf(KbErrorCodes.TASK_BASE_UNAVAILABLE,
+                    ApiResponse.<Map<String, Object>>error(
+                            KbErrorCodes.TASK_BASE_UNAVAILABLE.httpStatus(),
+                            KbErrorCodes.TASK_BASE_UNAVAILABLE.code(),
+                            "runtime-task 不可用，禁降级为本地同步计算: " + e.getMessage()));
         }
     }
 
@@ -107,18 +126,21 @@ public class KbProfileController {
     /** POST /{id}/publish → 403 ECOS-KB-062（非管理员；D.3） | 409 ECOS-KB-061/060（由 DomainException 透传）。 */
     @PostMapping("/{id}/publish")
     @RequirePermission(value = "发布画像", permission = "knowledge:profile:publish")
-    public ApiResponse<KbProfileDO> publish(@PathVariable String id,
+    public ResponseEntity<ApiResponse<KbProfileDO>> publish(@PathVariable String id,
                                             @RequestHeader(value = ROLE_HEADER, required = false) String role,
                                             @RequestHeader(value = "X-Ecos-User", required = false)
                                             String user) {
         String actor = (user == null || user.isBlank()) ? role : user;
         if (role == null || !role.contains(ROLE_KB_ADMIN)) {
-            return ApiResponse.<KbProfileDO>error(403, KbErrorCodes.PERMISSION_DENIED.code(),
-                    "权限不足：需 knowledge_admin 角色");
+            return statusOf(KbErrorCodes.PERMISSION_DENIED,
+                    ApiResponse.<KbProfileDO>error(
+                            KbErrorCodes.PERMISSION_DENIED.httpStatus(),
+                            KbErrorCodes.PERMISSION_DENIED.code(),
+                            "权限不足：需 knowledge_admin 角色"));
         }
         try {
             KbProfileDO row = service.publish(id, actor);
-            return ApiResponse.<KbProfileDO>success(row).withTraceIdFromMdc();
+            return ResponseEntity.ok(ApiResponse.<KbProfileDO>success(row).withTraceIdFromMdc());
         } catch (IllegalStateException e) {
             return mapMessage(e);
         }
@@ -142,15 +164,28 @@ public class KbProfileController {
 
     // ── 领域异常 → ApiResponse 映射 ──────────────────────────────────────
 
-    private ApiResponse<KbProfileDO> mapMessage(IllegalStateException e) {
+    private ResponseEntity<ApiResponse<KbProfileDO>> mapMessage(IllegalStateException e) {
         String m = e.getMessage() == null ? "" : e.getMessage();
-        if (m.contains("ECOS-KB-061")) {
-            return ApiResponse.<KbProfileDO>error(409, "ECOS-KB-061", m);
+        if (m.contains(KbErrorCodes.PUBLISHED_IMMUTABLE.code())) {
+            return statusOf(KbErrorCodes.PUBLISHED_IMMUTABLE,
+                    ApiResponse.<KbProfileDO>error(KbErrorCodes.PUBLISHED_IMMUTABLE.httpStatus(),
+                            KbErrorCodes.PUBLISHED_IMMUTABLE.code(), m));
         }
-        if (m.contains("ECOS-KB-060")) {
-            return ApiResponse.<KbProfileDO>error(409, "ECOS-KB-060", m);
+        if (m.contains(KbErrorCodes.STATUS_TRANSITION_INVALID.code())) {
+            return statusOf(KbErrorCodes.STATUS_TRANSITION_INVALID,
+                    ApiResponse.<KbProfileDO>error(KbErrorCodes.STATUS_TRANSITION_INVALID.httpStatus(),
+                            KbErrorCodes.STATUS_TRANSITION_INVALID.code(), m));
         }
-        return ApiResponse.<KbProfileDO>notFound(m);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.<KbProfileDO>notFound(m));
+    }
+
+    /**
+     * 状态行与信封码同源：两者都取 {@link KbErrorCodes} 的同一枚 {@code KbError}，
+     * 避免「body 写 409、状态行另写一遍 409」的双源漂移（改一处不改另一处即假保真）。
+     */
+    private static <T> ResponseEntity<ApiResponse<T>> statusOf(KbErrorCodes.KbError error,
+                                                               ApiResponse<T> body) {
+        return ResponseEntity.status(HttpStatus.valueOf(error.httpStatus())).body(body);
     }
 
     /** D.3 生成请求体（metrics×dims×window，可 dryRun 预览样本量）。 */

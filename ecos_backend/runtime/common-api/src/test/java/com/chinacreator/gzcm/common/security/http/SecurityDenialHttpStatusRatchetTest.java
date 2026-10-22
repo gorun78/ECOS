@@ -99,19 +99,23 @@ class SecurityDenialHttpStatusRatchetTest {
                     + "|error\\s*\\(\\s*(?:400|404|405|409|410|500)\\b)");
 
     /**
-     * 判据 B 的只减不增上限（#142/B4-3e-31 按补盲后的口径<b>重测</b>登记，本批不收口）：
-     * 全后端主源码裸回非拒绝态 <b>921 处</b>（盲前面 910 ⇒ 类型见证补盲净新增 11 处；
-     * 读数由 {@code nonDenialFailureLegsAreRecordedNotSilentlyIgnored} 的上限断言在本批
-     * 门禁会话里实跑产出，非估算——同批手工 grep 估成 922，被该读数推翻后照实订正）。
+     * 判据 B 的只减不增上限（#142/B4-3e-32 按属主侧收口后<b>重测</b>登记）：
+     * 全后端主源码裸回非拒绝态 <b>915 处</b>（上一读数为 #142/B4-3e-31 的 921，本批把
+     * gateway {@code RuntimeAlertV1Controller#close}（404＋400）与 kb {@code KbProfileController}
+     * （400＋409×2＋404）共 <b>6 枚</b>同方法内的非拒绝腿一并写上状态行 ⇒ 921−6＝915；
+     * 读数由 {@code nonDenialFailureLegsAreRecordedNotSilentlyIgnored} 的上限断言在本批门禁会话里
+     * 以「上限置 0 探测」实跑产出，非估算，也非由旧值做算术推出——算式只用作差异归因，
+     * 归因与实际读数不符时以读数为准）。
      *
      * <p>这个量级正是 {@code ApiResponse}「只描述 body、不带状态行」的代价面，比 D-B4-59 的
-     * 属主锚点大两个数量级 ⇒ 本门只把<b>安全裁决线</b>（判据 A，补盲后实测 32 处／11 文件）
-     * 逐文件入基线，非拒绝态面以总量上限登记在册。上限写成实测值而非"顺手归零"，是为了让
-     * 「有意不扩面」成为一个<b>可被读数推翻</b>的声明，而不是一句注释。旧值 910 系 D-B4-68
-     * 盲区口径下的读数，保留在此作为口径变更凭据：任何「上限＝历史读数」的比对都必须先确认
-     * 判据面是否含类型见证分支。</p>
+     * 属主锚点大两个数量级 ⇒ 本门只把<b>安全裁决线</b>（判据 A，#142/B4-3e-31 补盲后实测
+     * 32 处／11 文件，#142/B4-3e-32 属主侧收口后 <b>27 处／9 文件</b>）逐文件入基线，
+     * 非拒绝态面以总量上限登记在册。上限写成实测值而非"顺手归零"，是为了让
+     * 「有意不扩面」成为一个<b>可被读数推翻</b>的声明，而不是一句注释。历史读数 910（D-B4-68
+     * 盲区口径）与 921（补盲后、属主侧收口前）保留在此作为口径变更凭据：任何「上限＝历史读数」
+     * 的比对都必须先确认判据面是否含类型见证分支、以及该批是否已做属主侧收口。</p>
      */
-    private static final int OTHER_LEG_CEILING = 921;
+    private static final int OTHER_LEG_CEILING = 915;
 
     /**
      * 基线（实测于 #142/B4-3e-18）：文件 → 裸回安全拒绝态处数。
@@ -141,15 +145,31 @@ class SecurityDenialHttpStatusRatchetTest {
         m.put("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/"
                 + "engine/data/controller/WriteChannelController.java", 1);
         // ── #142/B4-3e-31（收口 D-B4-68）：判据补类型见证分支后新入面的两枚持有者 ──
+        // ── #142/B4-3e-32 归零：两枚持有者的属主侧状态行已落地，基线钉 0＝回退即红 ──
         m.put("ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/controller/"
-                + "RuntimeAlertV1Controller.java", 3);
+                + "RuntimeAlertV1Controller.java", 0);
         m.put("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/"
-                + "engine/kb/controller/KbProfileController.java", 2);
+                + "engine/kb/controller/KbProfileController.java", 0);
         return m;
     }
 
     /** 属主侧「修法登记」：这些出口已被判为「必须走状态行」，禁再退回头。 */
     private static final List<String> CLOSED_OWNERS = List.of(QUERY_CONTROLLER);
+
+    /**
+     * #142/B4-3e-32 新增的收口持有者：判据 A 归零且必须自己声明状态行承载手段。
+     *
+     * <p>与 {@link #CLOSED_OWNERS} 分开列，因两者的单源不同——QueryController 的不可用态取
+     * {@link RlsExecutionContract#SEC_UNAVAILABLE_HTTP}，而本组一枚取该契约常量
+     * （RuntimeAlertV1）、一枚取本域码表 {@code KbErrorCodes.httpStatus()}（KbProfile，
+     * 域内 403/503/409 属 {@code ECOS-KB-*} 而非安全裁决线）。故这里只钉「确有状态行承载手段
+     * ＋判据 A 零命中」这两条共性，不假装它们共用同一枚常量。</p>
+     */
+    private static final List<String> CONVERTED_OWNERS = List.of(
+            "ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/controller/"
+                    + "RuntimeAlertV1Controller.java",
+            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/kb/controller/KbProfileController.java");
 
     // ── 验收 1：全后端裸回面逐文件计数，只减不增 ──────────────────────────────
 
@@ -211,6 +231,38 @@ class SecurityDenialHttpStatusRatchetTest {
             assertTrue(codeOf(owner).contains("RlsExecutionContract"),
                     owner + " 登记为已收口锚点，却不再引用安全裁决契约单源");
         }
+    }
+
+    // ── 验收 2b：#142/B4-3e-32 收口持有者自证状态行承载手段 ──────────────────
+
+    /**
+     * <b>本门的失明面（登记，不假装没有）</b>：判据 A 与这里的 {@code contains(...)} 都是
+     * 文本层判据，只会看见「形态」，看不见「状态值」。变异取证（夹具用后已清，复扫
+     * {@code MUTANT} = 0）实测：把属主腿折成 {@code ResponseEntity.status(HttpStatus.OK)}
+     * 或 {@code ResponseEntity.ok(...)} 时，本门 5/5 <b>全绿</b>，而两枚行为门各自变红
+     * （kb {@code KbProfileStatusFidelityTest} 2 红 403→200、gateway
+     * {@code AlertCloseEndpointContractTest#repositoryFailureIs503} 1 红 503→200）。
+     * ⇒ 本门的职责是「裸回面只减不增」，「折叠保真」由行为门守；关账 D-B4-59 必须以两门
+     * 同时在链为前提，缺行为门即半只眼。
+     */
+    @Test
+    @DisplayName("本批收口的两枚持有者：判据 A 零命中且确有状态行承载手段在链上")
+    void convertedOwnersCarryTheirStatusLine() {
+        for (String owner : CONVERTED_OWNERS) {
+            String code = codeOf(owner);
+            assertFalse(BARE_DENIAL_LEG.matcher(code).find(),
+                    owner + " 又出现裸回的安全拒绝／不可用出口＝D-B4-59＋D-B4-68 在本文件复现");
+            assertTrue(code.contains("ResponseEntity.status("),
+                    owner + " 登记为已收口持有者，源码里却没有任何 ResponseEntity.status(...) 腿"
+                            + "（只靠基线归零＝摘掉修法仍全绿的假绿面）");
+        }
+        String alert = codeOf(CONVERTED_OWNERS.get(0));
+        assertTrue(alert.contains("RlsExecutionContract.SEC_UNAVAILABLE_HTTP"),
+                "RuntimeAlertV1Controller 的 503 未取不可用态单源常量（状态行与信封两处各写一遍＝会漂移）");
+        String profile = codeOf(CONVERTED_OWNERS.get(1));
+        assertTrue(profile.contains("KbErrorCodes.PERMISSION_DENIED.httpStatus()")
+                        && profile.contains("KbErrorCodes.TASK_BASE_UNAVAILABLE.httpStatus()"),
+                "KbProfileController 的 403/503 状态行未取本域码表单源（改码不改行＝保真会漂移）");
     }
 
     // ── 验收 3：面外失败码的量化登记（取舍是登记的，不是漏判） ────────────────
