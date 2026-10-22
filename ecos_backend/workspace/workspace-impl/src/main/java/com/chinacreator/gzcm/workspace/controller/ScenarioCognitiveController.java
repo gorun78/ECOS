@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.workspace.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.BusinessException;
+import com.chinacreator.gzcm.workspace.scenario.CognitiveEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.scenario.DcchengClient;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioMindService;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioMindVO;
@@ -19,6 +20,12 @@ import java.util.stream.Collectors;
  * workspace 自身不计算认知，只做 inline_context 组装与 REST 透传。</p>
  *
  * <p>端点前缀：{@code /api/v1/workspace/scenarios}</p>
+ *
+ * <p>#142/B4-3e-41：下游 cognitive 不可用时，{@code DcchengClient} 抛本域 503 载体
+ * {@code CognitiveEngineUnavailableException}，本类四个端点各自把它原样放行给
+ * {@code WorkspaceExceptionHandler.handleDomain}（对齐 {@code ScenarioCognitionV2Controller}
+ * 既有同型写法），禁被下面的 {@code catch (Exception)} 折成 {@code badRequest}。
+ * 该 {@code catch (Exception)} 面（把其它故障折成 400 响应体）属 D-B4-70 队列，本批不折叠。</p>
  */
 @RestController
 @RequestMapping("/api/v1/workspace/scenarios")
@@ -42,6 +49,8 @@ public class ScenarioCognitiveController {
         try {
             Map<String, Object> result = cognitiveClient.diagnose(payload);
             return ApiResponse.success(result);
+        } catch (CognitiveEngineUnavailableException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("cognitive/diagnose failed for scenario={}: {}", scenarioId, e.getMessage());
             return ApiResponse.badRequest("cognitive_service_unavailable: " + e.getMessage());
@@ -56,6 +65,8 @@ public class ScenarioCognitiveController {
         try {
             Map<String, Object> result = cognitiveClient.forecast(payload);
             return ApiResponse.success(result);
+        } catch (CognitiveEngineUnavailableException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("cognitive/forecast failed for scenario={}: {}", scenarioId, e.getMessage());
             return ApiResponse.badRequest("cognitive_service_unavailable: " + e.getMessage());
@@ -87,6 +98,8 @@ public class ScenarioCognitiveController {
         try {
             Map<String, Object> result = cognitiveClient.simulate(payload);
             return ApiResponse.success(result);
+        } catch (CognitiveEngineUnavailableException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("cognitive/simulate failed for scenario={}: {}", scenarioId, e.getMessage());
             return ApiResponse.badRequest("cognitive_service_unavailable: " + e.getMessage());
@@ -101,6 +114,8 @@ public class ScenarioCognitiveController {
         try {
             Map<String, Object> result = cognitiveClient.plan(payload);
             return ApiResponse.success(result);
+        } catch (CognitiveEngineUnavailableException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("cognitive/policy failed for scenario={}: {}", scenarioId, e.getMessage());
             return ApiResponse.badRequest("cognitive_service_unavailable: " + e.getMessage());

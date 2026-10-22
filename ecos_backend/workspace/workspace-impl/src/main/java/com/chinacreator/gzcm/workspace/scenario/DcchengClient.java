@@ -101,7 +101,10 @@ public class DcchengClient {
             throw e;
         } catch (Exception e) {
             log.warn("dccheng 调用失败 {}: {}", path, e.getMessage());
-            throw new IllegalStateException("cognitive 服务不可用: " + e.getMessage(), e);
+            // #142/B4-3e-41（D-B4-71 属主侧第二批，workspace 域）：下游认知服务调用失败＝
+            // 「服务不可用」，按 §4.7.2 落本域既有 503 载体（COGNITIVE_UNAVAILABLE），
+            // 禁再以 IllegalStateException 落 advice 的 500 兜底。原文经 technicalReason 只进日志面（X-41）。
+            throw new CognitiveEngineUnavailableException("cognitive 服务不可用: " + e.getMessage(), e);
         }
     }
 
@@ -128,7 +131,10 @@ public class DcchengClient {
             throw e;
         } catch (Exception e) {
             log.warn("dccheng 调用失败 {}: {}", path, e.getMessage());
-            throw new IllegalStateException("cognitive 服务不可用: " + e.getMessage(), e);
+            // #142/B4-3e-41（D-B4-71 属主侧第二批，workspace 域）：下游认知服务调用失败＝
+            // 「服务不可用」，按 §4.7.2 落本域既有 503 载体（COGNITIVE_UNAVAILABLE），
+            // 禁再以 IllegalStateException 落 advice 的 500 兜底。原文经 technicalReason 只进日志面（X-41）。
+            throw new CognitiveEngineUnavailableException("cognitive 服务不可用: " + e.getMessage(), e);
         }
     }
 }

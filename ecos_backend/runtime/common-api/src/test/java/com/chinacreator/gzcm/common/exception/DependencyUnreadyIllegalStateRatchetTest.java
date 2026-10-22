@@ -117,6 +117,15 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 该文件剩余 4 枚 ISE 腿（{@code ensureKey 失败／反射调用失败} 两族）语义是<b>本服务自身故障</b>，
      * 留在 OTHER 面按 500，不在本批折叠。</p>
      *
+     * <p><b>#142/B4-3e-41 属主侧第二批后现值＝8 个持有者／17 枚腿</b>：workspace
+     * {@code DcchengClient} 的 2 枚「cognitive 服务不可用」腿已改抛本域既有 503 载体
+     * {@code CognitiveEngineUnavailableException}（经 {@code WorkspaceExceptionHandler
+     * .handleDomain} 渲染为 {@code 503 + COGNITIVE_UNAVAILABLE}），脱离 ISE 站点面 ⇒
+     * 总站点 137→<b>135</b>、DEPENDENCY 19→<b>17</b>、已承载腿 15→<b>13</b>、真欠账面 14→<b>12</b>
+     * （落兜底 12＋承载后仍 500 的 2 枚，本批收掉后者）。该文件剩余 4 枚 ISE 腿
+     * （{@code dccheng 返回空}／{@code dccheng 业务错误} 两族）语义是<b>下游应答异常而非未就绪</b>，
+     * 词表不命中、留在 OTHER 面，不在本批折叠。</p>
+     *
      * <p>词表扩到 {@code 未注入|未启用} 后新增的两枚，语义裁决如下（不是随手加的匹配串）：
      * data-engine {@code BaseJdbcAdapter} 的「runtime-access JdbcConnector 建连桥未注入」＝
      * F02-13 建连通道缺失；{@code OlapEngineResolver} 的「OLAP 引擎未启用（dw.olap.engine 未配置）」
@@ -140,9 +149,7 @@ class DependencyUnreadyIllegalStateRatchetTest {
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/data/writechannel/OlapEngineResolver.java", 1),
             Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
-                    + "gzcm/engine/kb/service/KbEntityInstanceExtractionService.java", 1),
-            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/"
-                    + "gzcm/workspace/scenario/DcchengClient.java", 2));
+                    + "gzcm/engine/kb/service/KbEntityInstanceExtractionService.java", 1));
 
     /**
      * ENV_ALGO 面基线（故意保持 500 的豁免面，登记制、必须点名）：
@@ -185,9 +192,14 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * {@code SecurityCryptoEgress} 的「出口不可用」两腿改抛 {@code DataBridgeException(503)}——
      * 抛出语句本身不再属于本门判据面（改的是属主侧代码，不是判据）。总站点数与 DEPENDENCY 面
      * <b>同批</b>下调、逐文件基线里该文件行删除，三处任一单独改都会红（漏改即红＝本门的设计）。</p>
+     *
+     * <p><b>#142/B4-3e-41 属主侧第二批后的现值</b>：137 → <b>135</b>、DEPENDENCY 面 19 → <b>17</b>，
+     * 差 2 来自 workspace {@code DcchengClient} 的「cognitive 服务不可用」两腿改抛本域 503 载体。
+     * 同批还要改的是承载面：该文件行退出 {@code CARRIER_BASELINE}、已承载腿 15 → <b>13</b>、
+     * 真欠账面 14 → <b>12</b>——四处任一单独改都会红。</p>
      */
-    private static final int TOTAL_SITE_BASELINE = 137;
-    private static final int DEPENDENCY_FACE_BASELINE = 19;
+    private static final int TOTAL_SITE_BASELINE = 135;
+    private static final int DEPENDENCY_FACE_BASELINE = 17;
     private static final int ENV_ALGO_FACE_BASELINE = 10;
     private static final int OTHER_FACE_BASELINE = 100;
     private static final int UNREADABLE_FACE_BASELINE = 8;
@@ -723,6 +735,11 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * {@code SecurityCryptoEgress}（曾为 ENTRY_FALLBACK_500／2 枚）整行退出本面——它的两枚腿已改抛
      * 携带 503 的 {@code DataBridgeException}，不再是 ISE 站点。承载面 15 枚不变，落兜底面
      * 14→12（data-engine 3／11 ＋ kb 1／1）。</p>
+     *
+     * <p><b>#142/B4-3e-41 属主侧第二批后现值＝8 个持有者／25 枚腿</b>：workspace
+     * {@code DcchengClient}（曾为 {@code WorkspaceExceptionHandler.java}／2 枚）整行退出本面——
+     * 它的两枚腿改抛本域 503 载体，经 {@code handleDomain} 而非 {@code handleUnexpected} 渲染。
+     * 承载面 15→<b>13</b>（全在 ai），落兜底面 12 不变。</p>
      */
     private static final Map<String, String> CARRIER_BASELINE = Map.ofEntries(
             Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
@@ -742,9 +759,7 @@ class DependencyUnreadyIllegalStateRatchetTest {
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/data/writechannel/OlapEngineResolver.java", "ENTRY_FALLBACK_500"),
             Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/"
-                    + "gzcm/engine/kb/service/KbEntityInstanceExtractionService.java", "ENTRY_FALLBACK_500"),
-            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/"
-                    + "gzcm/workspace/scenario/DcchengClient.java", "WorkspaceExceptionHandler.java"));
+                    + "gzcm/engine/kb/service/KbEntityInstanceExtractionService.java", "ENTRY_FALLBACK_500"));
 
     /**
      * 承载者实际渲染的状态行（键＝advice 文件名；锚点逐条钉在
@@ -753,13 +768,19 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * <p>500 这一枚就是 {@code WorkspaceExceptionHandler.handleUnexpected} 的
      * {@code build(500, "INTERNAL", …)}——<b>被承载≠已改对</b>：它的状态行仍是 500，
      * 且 {@code "INTERNAL"} 不是机读码（D-B4-55 同族，单独在册）。</p>
+     *
+     * <p><b>#142/B4-3e-41 后的读法</b>：workspace 已无 ISE 腿映射到该 advice（{@code DcchengClient}
+     * 两枚改抛本域 503 载体，走 {@code handleDomain}），本行不再被 {@code carrierFace()} 查到；
+     * 保留它是因为 {@link #carriersRenderTheStatusTheyArePinnedFor()} 仍按源码锚点钉住该 advice
+     * 的 500＋"INTERNAL" 兜底形态——兜底还在，只是不再有腿落在它上面。</p>
      */
     private static final Map<String, Integer> CARRIER_STATUS_BASELINE = Map.of(
             "AiErrorAdvice.java", 502,
             "WorkspaceExceptionHandler.java", 500);
 
-    /** 按承载者聚合的腿数（禁算式推出；#142/B4-3e-39 探测实扫，#142/B4-3e-40 属主侧首批后现值）。 */
-    private static final int CARRIED_LEGS_BASELINE = 15;
+    /** 按承载者聚合的腿数（禁算式推出；#142/B4-3e-39 探测实扫，#142/B4-3e-40 属主侧首批后现值，
+     *  #142/B4-3e-41 属主侧第二批后现值＝承载 13／兜底 12）。 */
+    private static final int CARRIED_LEGS_BASELINE = 13;
     private static final int ENTRY_FALLBACK_LEGS_BASELINE = 12;
 
     /**
@@ -767,10 +788,12 @@ class DependencyUnreadyIllegalStateRatchetTest {
      *
      * <p>#142/B4-3e-39 实扫为 14＋2＝16；<b>#142/B4-3e-40 首批收掉 runtime-core
      * {@code SecurityCryptoEgress} 2 枚</b>（改抛 {@code DataBridgeException(503, …,
-     * "ECOS-SYS-503: …")}）后现值 <b>12＋2＝14</b>。属主侧每批改码必须同批下调本值与本面基线，
-     * 两头都红才算动过。</p>
+     * "ECOS-SYS-503: …")}）后现值 <b>12＋2＝14</b>。<b>#142/B4-3e-41 第二批再收掉 workspace
+     * {@code DcchengClient} 2 枚</b>（改抛本域 503 载体，经 {@code handleDomain} 渲染 503）后
+     * 现值 <b>12＋0＝12</b>：承载面剩下的 13 枚全在 ai，已由分册 06 D.5 冻结为 502，不是欠账。
+     * 属主侧每批改码必须同批下调本值与本面基线，两头都红才算动过。</p>
      */
-    private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 14;
+    private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 12;
 
     private static volatile List<Advice> cachedAdvices;
 
