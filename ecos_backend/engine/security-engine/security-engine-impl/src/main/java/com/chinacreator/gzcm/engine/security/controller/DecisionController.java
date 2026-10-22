@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
@@ -10,6 +11,7 @@ import com.chinacreator.gzcm.engine.security.decision.DecisionContext;
 import com.chinacreator.gzcm.engine.security.decision.SecurityDecisionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -49,11 +51,11 @@ public class DecisionController {
     }
 
     @PostMapping
-    public ApiResponse<Map<String, Object>> decide(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> decide(@RequestBody Map<String, Object> body) {
         AssetRef asset = AssetRef.fromMap(asMap(body.get(DecisionChannelContract.KEY_ASSET_REF)));
         if (asset == null) {
-            return ApiResponse.badRequest(DecisionChannelContract.KEY_ASSET_REF + "."
-                    + DecisionChannelContract.KEY_ASSET_TABLE + " 不能为空");
+            return failure(ApiResponse.badRequest(DecisionChannelContract.KEY_ASSET_REF + "."
+                    + DecisionChannelContract.KEY_ASSET_TABLE + " 不能为空"));
         }
         String rawPurpose = asStr(body.get(DecisionChannelContract.KEY_PURPOSE));
         DecisionBundle.Purpose purpose = resolvePurpose(rawPurpose);
@@ -61,7 +63,7 @@ public class DecisionController {
             // D-B4-27：未识别的 purpose 过去被静默当 PAGE 放行（导出/AI 调用一旦词面失配，
             // 就以页面档的护栏矩阵被裁决并返回 200 —— 无错误、无日志、消费方无从察觉）。
             // 现按 400 显式拒绝；缺失/空白仍是既约定的 PAGE 默认，既有调用方行为不变。
-            return ApiResponse.badRequest(DecisionChannelContract.unrecognizedReason(rawPurpose));
+            return failure(ApiResponse.badRequest(DecisionChannelContract.unrecognizedReason(rawPurpose)));
         }
 
         String userId = ctxUserId();
@@ -75,7 +77,7 @@ public class DecisionController {
             if (sid != null && !sid.toString().isBlank()) userId = sid.toString();
         }
         if (userId == null || userId.isBlank()) {
-            return ApiResponse.forbidden("无用户上下文（ECOS-AUTH-010），拒绝裁决");
+            return failure(ApiResponse.forbidden("无用户上下文（ECOS-AUTH-010），拒绝裁决"));
         }
 
         DecisionContext ctx = DecisionContext.of(userId, tenantId, null, null, roles, traceId)
@@ -87,14 +89,41 @@ public class DecisionController {
                 .withDataScope(DataScopeContract.read(body.get(DataScopeContract.KEY_RESOURCE)));
         try {
             DecisionBundle bundle = service.decide(asset, purpose, ctx);
-            return ApiResponse.success(bundle.toMap());
+            return ok(ApiResponse.success(bundle.toMap()));
         } catch (IllegalArgumentException e) {
-            return ApiResponse.badRequest(e.getMessage());
+            return failure(ApiResponse.badRequest(e.getMessage()));
         } catch (Exception e) {
             log.warn("decide 端点异常: asset={}, purpose={}", asset.key(), purpose, e);
-            return ApiResponse.error(503,
-                    RlsExecutionContract.SEC_UNAVAILABLE_CODE + "：security 内部裁决失败（fail-closed）");
+            return failure(ApiResponse.error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                    RlsExecutionContract.SEC_UNAVAILABLE_CODE + "：security 内部裁决失败（fail-closed）"));
         }
+    }
+
+    /**
+     * #142/B4-3e-35（收口 D-B4-59 属主侧 9 枚真裸回腿之 security 裁决端点）：
+     * 成功腿显式 {@code 200}。
+     *
+     * <p>本端点只增信封、不改签名语义——{@code ApiResponse} 只描述 body、没有任何 HTTP 状态能力，
+     * 裸回时 403「无用户上下文」与 503「security 内部裁决失败（fail-closed）」都落 HTTP 200，
+     * §4.7.2 要求的「不可用 ≠ 无权限」分态在最关键的这一个端点上恰好失效，任何只看状态行的
+     * 中间层（网关、重试、告警、Playwright 用例）无从分派。修法＝信封不动、包
+     * {@code ResponseEntity}，状态行一律从 {@code body.getCode()} 经
+     * {@link DataBridgeException#resolveHttpStatus(int)} 单源推出（改码即改行）。</p>
+     */
+    private static <T> ResponseEntity<ApiResponse<T>> ok(ApiResponse<T> body) {
+        return ResponseEntity.ok(body);
+    }
+
+    /**
+     * #142/B4-3e-35：失败腿的状态行从信封 code 单源推出。
+     *
+     * <p>不可用腿的 503 由 {@code ApiResponse.error(503, …)} 的字面量改取
+     * {@link RlsExecutionContract#SEC_UNAVAILABLE_HTTP} 单源常量——本类此前已引用
+     * {@link RlsExecutionContract#SEC_UNAVAILABLE_CODE}，把同一枚不可用态的码与行分写两处
+     * 正是 D-B4-52 的漂移形态。</p>
+     */
+    private static <T> ResponseEntity<ApiResponse<T>> failure(ApiResponse<T> body) {
+        return ResponseEntity.status(DataBridgeException.resolveHttpStatus(body.getCode())).body(body);
     }
 
     /**

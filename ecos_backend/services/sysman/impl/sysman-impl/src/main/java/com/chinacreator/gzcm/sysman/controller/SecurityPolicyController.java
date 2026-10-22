@@ -1,11 +1,13 @@
 package com.chinacreator.gzcm.sysman.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.sysman.dto.SkySecurityPolicyUpsertDTO;
 import com.chinacreator.gzcm.sysman.service.SecurityPolicyQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -91,22 +93,46 @@ public class SecurityPolicyController {
 
     /** B12: 需 admin 角色（HeaderAuthInterceptor 的 X-ECOS-ROLE 判定）才可查完整 ABAC 表达式原文。 */
     @GetMapping("/{id}/expr")
-    public ApiResponse<Map<String, Object>> getFullExpr(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getFullExpr(
             @PathVariable String id,
             @RequestHeader(value = "X-ECOS-ROLE", required = false) String role) {
         if (!"ADMIN".equalsIgnoreCase(role) && !"SECURITY_AUDITOR".equalsIgnoreCase(role)) {
-            return ApiResponse.forbidden("需要 admin 或 security_auditor 角色才能查看策略表达式原文");
+            return failure(ApiResponse.forbidden("需要 admin 或 security_auditor 角色才能查看策略表达式原文"));
         }
         try {
             Map<String, Object> row = policyService.findFullExprById(id);
             if (row == null) {
-                return ApiResponse.notFound("安全策略不存在: " + id);
+                return failure(ApiResponse.notFound("安全策略不存在: " + id));
             }
-            return ApiResponse.success(row);
+            return ok(ApiResponse.success(row));
         } catch (Exception e) {
             log.error("查询策略表达式失败: id={}", id, e);
-            return ApiResponse.internalError("查询失败: " + e.getMessage());
+            return failure(ApiResponse.internalError("查询失败: " + e.getMessage()));
         }
+    }
+
+    /**
+     * #142/B4-3e-35（收口 D-B4-59 属主侧 9 枚真裸回腿之策略表达式读端点）：成功腿显式 {@code 200}。
+     *
+     * <p>本腿是 B12 角色门的唯一拒绝出口——裸回时「非 admin／非 security_auditor」的 403
+     * 落 HTTP 200，而 {@code ApiResponse} 只描述 body、没有任何 HTTP 状态能力，于是任何只看
+     * 状态行的中间层（网关、审计、E2E 用例）把权限拒绝读成成功。</p>
+     */
+    private static <T> ResponseEntity<ApiResponse<T>> ok(ApiResponse<T> body) {
+        return ResponseEntity.ok(body);
+    }
+
+    /**
+     * #142/B4-3e-35：状态行从信封 {@code code} 经 {@link DataBridgeException#resolveHttpStatus(int)}
+     * 单源推出（改码即改行，禁在本方法再写第二个状态字面量）。
+     *
+     * <p>签名转 {@code ResponseEntity} 后，同方法内的 404／internalError 非拒绝腿必须一并上
+     * 状态行——留在裸回形态根本编不过，这正是「只补拒绝态」在本类没有可选形态的原因。
+     * {@code internalError} 的信封值是 {@code -1} 而非 500 ⇒ 状态行 500、信封仍 {@code -1}，
+     * 该同号差属 D-B4-65 余项，由行为门显式钉住两侧读数、不靠沉默掩盖。</p>
+     */
+    private static <T> ResponseEntity<ApiResponse<T>> failure(ApiResponse<T> body) {
+        return ResponseEntity.status(DataBridgeException.resolveHttpStatus(body.getCode())).body(body);
     }
 
     // ── POST / — 创建 ─────────────────────────────────────────────

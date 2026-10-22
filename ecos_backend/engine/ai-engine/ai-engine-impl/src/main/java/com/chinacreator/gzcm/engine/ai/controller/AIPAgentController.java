@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.ai.service.AgentStudioService;
 import com.chinacreator.gzcm.engine.ai.service.AgentStudioService.AgentTestResult;
 import com.chinacreator.gzcm.engine.ai.service.AgentTemplateService;
@@ -154,23 +155,41 @@ public class AIPAgentController {
     // ═══════════════ 删除 ═══════════════════
 
     @DeleteMapping("/agents/{id}")
-    public ApiResponse<Map<String, Object>> deleteAgent(@PathVariable String id) {
-        if (agentRepo == null) return AiResponseSupport.dependencyUnavailable("AgentRegistryRepository");
+    public ResponseEntity<ApiResponse<Map<String, Object>>> deleteAgent(@PathVariable String id) {
+        if (agentRepo == null) return failure(AiResponseSupport.dependencyUnavailable("AgentRegistryRepository"));
 
         // 内置 Agent 删除保护
         AgentRegistryEntity existing = agentRepo.findById(id);
-        if (existing == null) return ApiResponse.notFound("Agent " + id + " 不存在");
+        if (existing == null) return failure(ApiResponse.notFound("Agent " + id + " 不存在"));
         if ("builtin".equals(existing.getRole())) {
             log.warn("Attempt to delete built-in agent: {}", id);
-            return ApiResponse.forbidden("AIP-403: 内置 Agent '" + id + "' 不允许删除。内置 Agent 由系统管理。");
+            return failure(ApiResponse.forbidden("AIP-403: 内置 Agent '" + id + "' 不允许删除。内置 Agent 由系统管理。"));
         }
 
         int rows = agentRepo.delete(id);
         if (rows > 0) {
             log.info("AIP Agent deleted: {}", id);
-            return ApiResponse.success(Map.of("deleted", true, "id", id));
+            return ok(ApiResponse.success(Map.of("deleted", true, "id", id)));
         }
-        return ApiResponse.notFound("Agent " + id + " 不存在");
+        return failure(ApiResponse.notFound("Agent " + id + " 不存在"));
+    }
+
+    /**
+     * 成功腿：状态行 200 ＋ 信封不变（#142/B4-3e-35，收口 D-B4-59 真裸回面）。
+     *
+     * <p>{@link ApiResponse} 只描述 body、没有任何 HTTP 状态能力，直接 {@code return}
+     * 拒绝信封时 Spring 落的状态行恒 200 ⇒ 只看状态行的中间层（网关、告警、Playwright 用例）
+     * 无法分派。本类 {@code testAgent} 早前已用 {@code ResponseEntity.status(HttpStatus.X)}
+     * 两式各写一遍（状态常量和 {@code AiErrorClass.httpStatus()} 两处），本方法的写法改成
+     * 状态行从信封 {@code code} 单源推出＝改码即改行。</p>
+     */
+    private static <T> ResponseEntity<ApiResponse<T>> ok(ApiResponse<T> body) {
+        return ResponseEntity.ok(body);
+    }
+
+    /** 失败腿：状态行由信封 {@code code} 经 {@link DataBridgeException#resolveHttpStatus(int)} 推出。 */
+    private static <T> ResponseEntity<ApiResponse<T>> failure(ApiResponse<T> body) {
+        return ResponseEntity.status(DataBridgeException.resolveHttpStatus(body.getCode())).body(body);
     }
 
     // ═══════════════ 模板列表 ═══════════════════

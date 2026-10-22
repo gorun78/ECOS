@@ -123,8 +123,18 @@ class SecurityDenialHttpStatusRatchetTest {
      * {@code code} 经 {@code DataBridgeException.resolveHttpStatus} 单源推出。读数由本批
      * 门禁会话的「上限置 0 探测」实跑产出（871），与旧值做算术差的 915−44＝871 只是归因核对，
      * 二者相符。</p>
+     *
+     * <p><b>#142/B4-3e-35 重设＝871→863</b>：本批把判据 A 的 4 枚真裸回属主
+     * （security {@code DecisionController#decide}、sysman {@code SecurityPolicyController#getFullExpr}、
+     * ai {@code AIPAgentController#deleteAgent}、data-engine {@code WriteChannelController#write}）
+     * 的方法签名整体折成 {@code ResponseEntity}，同方法内的非裁决腿（400×3／404×3／
+     * internalError×1／badRequest×1）随之从裸回形态消失 ⇒ 读数下降 8。下降量由本批
+     * 门禁会话的「上限置 0 探测」实跑产出（<b>863</b>，同一批日志里该类其余 7 项全绿），
+     * 与逐腿归因（1＋3＋2＋2＝8）相符；二者不符时以读数为准。注意 ai 域这 2 枚 404 腿
+     * 此前是 {@code HttpStatus} 与 D.5 码表两处各写一遍的形态，本批合流到「状态行取信封
+     * code 单源推出」，所以这 2 枚同时是判据 A 的收口腿与判据 B 的读数变化腿。</p>
      */
-    private static final int OTHER_LEG_CEILING = 871;
+    private static final int OTHER_LEG_CEILING = 863;
 
     /**
      * 判据 A 的合法承载态识别（#142/B4-3e-34，收口差距 <b>D-B4-69</b>「判据对
@@ -188,16 +198,18 @@ class SecurityDenialHttpStatusRatchetTest {
                 + "sysman/security/RequirePermissionAspect.java", 3);
         m.put("ecos_backend/services/sysman/impl/sysman-boot/src/main/java/com/chinacreator/"
                 + "gzcm/sysman/boot/handler/GlobalExceptionHandler.java", 0);
+        // ── #142/B4-3e-35 归零：security／sysman／ai／data-engine 四枚属主端点的真裸回腿
+        //    已写上状态行（各自的行为门同批在链），基线钉 0＝退回裸回即红 ──
         m.put("ecos_backend/engine/security-engine/security-engine-impl/src/main/java/com/chinacreator/"
-                + "gzcm/engine/security/controller/DecisionController.java", 2);
+                + "gzcm/engine/security/controller/DecisionController.java", 0);
         m.put("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/"
-                + "sysman/controller/SecurityPolicyController.java", 1);
+                + "sysman/controller/SecurityPolicyController.java", 0);
         m.put("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/"
                 + "gzcm/engine/ontology/service/PublishGateService.java", 1);
         m.put("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/"
-                + "engine/ai/controller/AIPAgentController.java", 1);
+                + "engine/ai/controller/AIPAgentController.java", 0);
         m.put("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/"
-                + "engine/data/controller/WriteChannelController.java", 1);
+                + "engine/data/controller/WriteChannelController.java", 0);
         // ── #142/B4-3e-31（收口 D-B4-68）：判据补类型见证分支后新入面的两枚持有者 ──
         // ── #142/B4-3e-32 归零：两枚持有者的属主侧状态行已落地，基线钉 0＝回退即红 ──
         m.put("ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/controller/"
@@ -226,6 +238,44 @@ class SecurityDenialHttpStatusRatchetTest {
                     + "engine/kb/controller/KbProfileController.java",
             "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/"
                     + "engine/kb/controller/NavTaxonController.java");
+
+    /**
+     * #142/B4-3e-35 新增的收口持有者（判据 A 的<b>真裸回</b>腿所属 4 枚端点）。
+     *
+     * <p>与前两组的区分点：本组四枚都是「方法签名整体折成 {@code ResponseEntity}」，
+     * 因此同方法内的非裁决腿（400/404/500）也必须一并上状态行才编得过 ⇒
+     * {@link #OTHER_LEG_CEILING} 的读数在本批<b>必然下降</b>，下降量以实测重设、不由算式推出。
+     * 每枚都要求状态行从信封 {@code code} 经 {@code DataBridgeException.resolveHttpStatus}
+     * 单源推出（ai 域此前是 {@code HttpStatus.X} ＋ 码表两处各写一遍的漂移形态，本批合流）。</p>
+     */
+    private static final List<String> DENIAL_OWNERS_3E35 = List.of(
+            "ecos_backend/engine/security-engine/security-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/security/controller/DecisionController.java",
+            "ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "sysman/controller/SecurityPolicyController.java",
+            "ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/ai/controller/AIPAgentController.java",
+            "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/data/controller/WriteChannelController.java");
+
+    /**
+     * 本批四枚属主的<b>行为门</b>（读状态行数值的那一半）。
+     *
+     * <p>登记理由：文本门＋属主源码里出现 {@code ResponseEntity.status(} 仍不等于保真——
+     * 把属主腿折成 {@code ResponseEntity.ok(...)} 时判据 A 与这里的 {@code contains(...)}
+     * 都看不见（{@code SecurityDenialHttpStatusRatchetTest#convertedOwnersCarryTheirStatusLine}
+     * 的 javadoc 已把该失明面登记在册）。只有对应行为门变红才算「状态行真的在链上」。
+     * 四枚门的名字写死在这里：文件被删／改名即红，防止「行为门悄悄不存在」的假绿。</p>
+     */
+    private static final List<String> BEHAVIOR_GATES_3E35 = List.of(
+            "engine/security-engine/security-engine-impl/src/test/java/com/chinacreator/gzcm/"
+                    + "engine/security/BundleColumnSurfaceTest.java",
+            "services/sysman/impl/sysman-impl/src/test/java/com/chinacreator/gzcm/sysman/"
+                    + "controller/SecurityPolicyExprStatusFidelityTest.java",
+            "engine/ai-engine/ai-engine-impl/src/test/java/com/chinacreator/gzcm/engine/ai/"
+                    + "controller/AipDeleteAgentStatusFidelityTest.java",
+            "engine/data-engine/data-engine-impl/src/test/java/com/chinacreator/gzcm/engine/data/"
+                    + "controller/WriteChannelStatusFidelityTest.java");
 
     // ── 验收 1：全后端裸回面逐文件计数，只减不增 ──────────────────────────────
 
@@ -309,12 +359,43 @@ class SecurityDenialHttpStatusRatchetTest {
                 "豁免面登记量已偏离 #142/B4-3e-34 的逐腿实测值 5——判据口径变更必须重测后同批改注释");
         assertEquals(totalExpectedCarried, totalActualCarried,
                 "豁免面合计与实扫不符（实扫 " + totalActualCarried + "）");
-        assertEquals(9, totalBare,
-                "判据 A 真裸回合计应为 #142/B4-3e-34 实测的 9 处，实扫 " + totalBare
+        assertEquals(4, totalBare,
+                "判据 A 真裸回合计应为 #142/B4-3e-35 属主侧收口后的 4 处，实扫 " + totalBare
                         + "——与基线合计不一致时，说明承载态识别把不该豁免的腿豁免了（或反之）");
     }
 
     // ── 验收 2：锚点委托真在链上（摘掉 ResponseEntity 即红） ──────────────────
+
+    /**
+     * #142/B4-3e-35：四枚真裸回属主的收口自证 ＋ 行为门在链。
+     *
+     * <p>三件共性判据：① 判据 A 零命中（退回裸回即红）；② 状态行从信封 {@code code}
+     * 经 {@code resolveHttpStatus} 单源推出（写第二枚状态字面量即红）；③ 本批四枚行为门
+     * 文件必须实存且真读到 {@code getStatusCode()}——文本门看不见「折成 ok()」这一变异，
+     * 只有行为门看得见，所以行为门缺失时本门必须红，不允许「行为门悄悄不存在」。</p>
+     */
+    @Test
+    @DisplayName("#142/B4-3e-35 四枚属主：判据 A 归零＋单源推行，且四枚行为门实存在链")
+    void the3e35OwnersAreClosedAndTheirBehaviorGatesExist() {
+        for (String owner : DENIAL_OWNERS_3E35) {
+            String code = codeOf(owner);
+            assertFalse(BARE_DENIAL_LEG.matcher(code).find(),
+                    owner + " 又出现裸回的安全拒绝／不可用出口＝D-B4-59 在本文件复现");
+            assertTrue(code.contains("ResponseEntity.status("),
+                    owner + " 登记为已收口持有者，源码里却没有 ResponseEntity.status(...) 腿");
+            assertTrue(code.contains("resolveHttpStatus(body.getCode())"),
+                    owner + " 的状态行不再从信封 code 单源推出＝退回「改码不改行」的漂移形态");
+        }
+        String decision = codeOf(DENIAL_OWNERS_3E35.get(0));
+        assertTrue(decision.contains("RlsExecutionContract.SEC_UNAVAILABLE_HTTP"),
+                "DecisionController 的不可用腿 503 未取单源常量＝状态行与信封两处各写一遍");
+
+        for (String gate : BEHAVIOR_GATES_3E35) {
+            String gateCode = codeOf("ecos_backend/" + gate);
+            assertTrue(gateCode.contains("getStatusCode()"),
+                    "行为门 " + gate + " 不再读状态行数值＝本批只剩半只眼（文本门看不见折叠变异）");
+        }
+    }
 
     @Test
     @DisplayName("已收口锚点必须引用状态行承载手段与不可用态单源常量")

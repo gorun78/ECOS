@@ -11,6 +11,7 @@ import com.chinacreator.gzcm.engine.security.decision.DecisionContext;
 import com.chinacreator.gzcm.engine.security.decision.SecurityDecisionService;
 import com.chinacreator.gzcm.engine.security.service.ColumnLevelSecurityServiceImpl;
 import com.chinacreator.gzcm.engine.security.service.OpaPolicyService;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl;
 import com.chinacreator.gzcm.engine.security.rls.RlsSubjectContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +19,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -402,12 +405,82 @@ class BundleColumnSurfaceTest {
                     List.of(), new LinkedHashMap<>(), "d-1", "t-1");
         }
 
+        /**
+         * #142/B4-3e-35（收口 D-B4-59 属主侧）：{@code decide} 现返回
+         * {@code ResponseEntity<ApiResponse<...>>}，信封经此取出。
+         * body 为 null 即红——静默 NPE 会让"状态行有了、信封丢了"读成绿。
+         */
+        private ApiResponse<Map<String, Object>> envelope(
+                ResponseEntity<ApiResponse<Map<String, Object>>> resp) {
+            assertNotNull(resp.getBody(), "ResponseEntity 的 body 不得为 null");
+            return resp.getBody();
+        }
+
+        @Test
+        @DisplayName("成功腿状态行 200：信封 code=0 与状态行同号")
+        void successLegCarries200() {
+            when(service.decide(any(), any(), any())).thenReturn(stubBundle());
+
+            Map<String, Object> m = body(DecisionChannelContract.PURPOSE_PAGE);
+            m.put("subject", Map.of(DecisionChannelContract.KEY_SUBJECT_ID, "u1"));
+
+            assertEquals(HttpStatus.OK.value(), controller.decide(m).getStatusCode().value(),
+                    "成功腿状态行不是 200＝把成功报成失败（§4.7.2 禁反向折叠）");
+        }
+
+        @Test
+        @DisplayName("无用户上下文的 403 腿状态行＝403，不再是恒 200 的裸回（D-B4-59 本尊）")
+        void forbiddenLegCarries403OnTheStatusLine() {
+            Map<String, Object> m = body(DecisionChannelContract.PURPOSE_PAGE);
+            m.remove("subject"); // 信任链在单测里为空 ＋ 请求体无 subject ⇒ userId 空 ⇒ 403 腿
+
+            ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller.decide(m);
+
+            assertEquals(HttpStatus.FORBIDDEN.value(), resp.getStatusCode().value(),
+                    "拒绝语义只活在信封 code 里、状态行仍 200 ⇒ D-B4-59 在本端点复现");
+            assertEquals(ApiResponse.CODE_FORBIDDEN, envelope(resp).getCode(),
+                    "状态行与信封必须同号，否则只看其中一层的中间层读到的是两种结论");
+            verifyNoInteractions(service);
+        }
+
+        @Test
+        @DisplayName("内部裁决失败的不可用腿状态行＝503 单源常量，且不落成 403（§4.7.2 不可用≠无权限）")
+        void unavailableLegCarries503FromSingleSource() {
+            when(service.decide(any(), any(), any())).thenThrow(new RuntimeException("opa down"));
+
+            Map<String, Object> m = body(DecisionChannelContract.PURPOSE_PAGE);
+            m.put("subject", Map.of(DecisionChannelContract.KEY_SUBJECT_ID, "u1"));
+
+            ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller.decide(m);
+
+            assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_HTTP, resp.getStatusCode().value(),
+                    "不可用腿的状态行未取单源常量＝状态行与信封两处各写一遍、会漂移");
+            assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_HTTP, envelope(resp).getCode(),
+                    "状态行与信封的不可用态必须同号");
+        }
+
+        @Test
+        @DisplayName("入参校验 400 腿状态行＝400：参数错误不得与拒绝/不可用同形")
+        void badRequestLegCarries400() {
+            // assetRef 缺 table ⇒ AssetRef.fromMap 返回 null ⇒ 走 400 腿（service 不得被调用：
+            // 未打桩的 mock 返回 null 会在裁决腿抛 NPE、被 catch 折成 503，那样本例读到的就不是 400 腿）
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("assetRef", Map.of("columns", UNIVERSE));
+            m.put("purpose", DecisionChannelContract.PURPOSE_PAGE);
+
+            ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller.decide(m);
+
+            assertEquals(HttpStatus.BAD_REQUEST.value(), resp.getStatusCode().value());
+            assertEquals(ApiResponse.CODE_BAD_REQUEST, envelope(resp).getCode());
+            verifyNoInteractions(service);
+        }
+
         @Test
         @DisplayName("purpose 缺失 → 按既约定默认 PAGE 且不报错（API 只增不改）")
         void absentPurposeKeepsPageDefault() {
             when(service.decide(any(), any(), any())).thenReturn(stubBundle());
 
-            ApiResponse<Map<String, Object>> resp = controller.decide(body(null));
+            ApiResponse<Map<String, Object>> resp = envelope(controller.decide(body(null)));
 
             assertEquals(ApiResponse.CODE_SUCCESS, resp.getCode());
             verify(service).decide(any(AssetRef.class), eq(DecisionBundle.Purpose.PAGE), any());
@@ -418,7 +491,7 @@ class BundleColumnSurfaceTest {
         void blankPurposeKeepsPageDefault() {
             when(service.decide(any(), any(), any())).thenReturn(stubBundle());
 
-            assertEquals(ApiResponse.CODE_SUCCESS, controller.decide(body("   ")).getCode());
+            assertEquals(ApiResponse.CODE_SUCCESS, envelope(controller.decide(body("   "))).getCode());
             verify(service).decide(any(AssetRef.class), eq(DecisionBundle.Purpose.PAGE), any());
         }
 
@@ -427,7 +500,7 @@ class BundleColumnSurfaceTest {
         void casedKnownWordResolves() {
             when(service.decide(any(), any(), any())).thenReturn(stubBundle());
 
-            assertEquals(ApiResponse.CODE_SUCCESS, controller.decide(body(" Export ")).getCode());
+            assertEquals(ApiResponse.CODE_SUCCESS, envelope(controller.decide(body(" Export "))).getCode());
             verify(service).decide(any(AssetRef.class), eq(DecisionBundle.Purpose.EXPORT), any());
         }
 
@@ -435,7 +508,7 @@ class BundleColumnSurfaceTest {
         @DisplayName("未识别词（exprt/download）→ 400 带机读理由，且 service 零调用")
         void unknownWordIsRejectedNotDowngraded() {
             for (String raw : List.of("exprt", "download", "pages")) {
-                ApiResponse<Map<String, Object>> resp = controller.decide(body(raw));
+                ApiResponse<Map<String, Object>> resp = envelope(controller.decide(body(raw)));
 
                 assertEquals(ApiResponse.CODE_BAD_REQUEST, resp.getCode(),
                         raw + " 被接受＝静默降级回潮：导出请求以页面档被裁决并返回 200");
@@ -452,7 +525,7 @@ class BundleColumnSurfaceTest {
             when(service.decide(any(), any(), any())).thenReturn(stubBundle());
 
             for (String word : DecisionChannelContract.known()) {
-                assertEquals(ApiResponse.CODE_SUCCESS, controller.decide(body(word)).getCode(), word);
+                assertEquals(ApiResponse.CODE_SUCCESS, envelope(controller.decide(body(word))).getCode(), word);
             }
             // 三词各解析一次 ⇒ 服务被调三次（若未识别词也被接受，这里会多调）
             verify(service, times(DecisionChannelContract.known().size()))
@@ -467,7 +540,7 @@ class BundleColumnSurfaceTest {
             m.put("purpose", DecisionChannelContract.PURPOSE_PAGE);
             m.put("subject", Map.of("subjectId", "u1"));
 
-            assertEquals(ApiResponse.CODE_BAD_REQUEST, controller.decide(m).getCode());
+            assertEquals(ApiResponse.CODE_BAD_REQUEST, envelope(controller.decide(m)).getCode());
             verifyNoInteractions(service);
         }
     }

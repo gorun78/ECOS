@@ -1,11 +1,13 @@
 package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.data.dto.WriteChannelRequest;
 import com.chinacreator.gzcm.engine.data.dto.WriteChannelResult;
 import com.chinacreator.gzcm.engine.data.writechannel.DwWriteChannelService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -56,21 +58,44 @@ public class WriteChannelController {
      * @return writeId / declared(存在性) / idempotentReplay(是否重放命中)
      */
     @PostMapping
-    public ApiResponse<WriteChannelResult> write(@RequestBody WriteChannelRequest request) {
+    public ResponseEntity<ApiResponse<WriteChannelResult>> write(@RequestBody WriteChannelRequest request) {
         try {
-            return ApiResponse.success(writeChannelService.write(request));
+            return ok(ApiResponse.success(writeChannelService.write(request)));
         } catch (IllegalArgumentException e) {
             // ECOS-DATA-050 入参缺失 / ECOS-DATA-051 限定名残缺 / ECOS-DATA-053 非法层
             log.warn("写通道入参拒绝: {}", e.getMessage());
-            return ApiResponse.badRequest(e.getMessage());
+            return failure(ApiResponse.badRequest(e.getMessage()));
         } catch (IllegalStateException e) {
             // ECOS-DATA-052 MC02 裸 JSON 列 / ECOS-DATA-054 MC04 OLAP 违规
             log.warn("写通道守卫拒绝: {}", e.getMessage());
-            return ApiResponse.forbidden(e.getMessage());
+            return failure(ApiResponse.forbidden(e.getMessage()));
         } catch (Exception e) {
             log.error("写通道内部错误: {}", e.getMessage(), e);
-            return ApiResponse.error(ApiResponse.CODE_INTERNAL_ERROR,
-                    "ECOS-DATA-055", "写通道内部错误: " + e.getMessage());
+            return failure(ApiResponse.error(ApiResponse.CODE_INTERNAL_ERROR,
+                    "ECOS-DATA-055", "写通道内部错误: " + e.getMessage()));
         }
+    }
+
+    /**
+     * 成功腿承载（#142/B4-3e-35，收口差距 D-B4-59 的写通道裸回腿）。
+     *
+     * <p>信封一字不动，只补状态行——{@code ApiResponse} 只描述 body、没有任何 HTTP 能力，
+     * 裸回时 MC02/MC04 守卫拒绝的 403 与内部错误的 500 全落 HTTP 200，§4.7.2「不可用≠无权限」
+     * 的分态在传输层同形。</p>
+     */
+    private static <T> ResponseEntity<ApiResponse<T>> ok(ApiResponse<T> body) {
+        return ResponseEntity.ok(body);
+    }
+
+    /**
+     * 失败腿承载：状态行一律从信封 {@code code} 经 {@link DataBridgeException#resolveHttpStatus(int)}
+     * 单源推出（改码即改行，禁在本类再写第二个状态字面量）。
+     *
+     * <p>{@code CODE_INTERNAL_ERROR} 的信封值是 {@code -1} 而非 500 ⇒ 本 helper 会落状态行 500
+     * 而信封仍  {@code -1}。这个同号差不在本批收口面内（属 D-B4-65 余项），由行为门显式钉住
+     * 两侧读数，不靠沉默掩盖。</p>
+     */
+    private static <T> ResponseEntity<ApiResponse<T>> failure(ApiResponse<T> body) {
+        return ResponseEntity.status(DataBridgeException.resolveHttpStatus(body.getCode())).body(body);
     }
 }
