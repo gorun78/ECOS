@@ -37,6 +37,30 @@ public final class SystemErrorCode {
     public static final String ECOS_SYS_404 = "ECOS-SYS-404";
 
     /**
+     * 400 — 入口面请求解析／校验失败（{@code MethodArgumentNotValidException}／
+     * {@code NumberFormatException}／{@code HttpMessageNotReadableException} 兜底腿）。
+     * <p>#142/B4-3e-27（差距 D-B4-65）按 §3.2.7 表内既有形态<b>追加登记</b>。
+     * 只承载<b>平台入口</b>语义：域内参数校验错误仍归各域码表，禁借本码绕过归属。</p>
+     */
+    public static final String ECOS_SYS_400 = "ECOS-SYS-400";
+
+    /**
+     * 401 — 入口兜底"未认证"（Token 缺失／无效／过期，未细分为具体认证缺陷时）。
+     * <p>#142/B4-3e-27 追加登记。与 {@code ECOS-AUTH-00x} 序列码的分工：后者是
+     * {@code JwtAuthenticationFilter} 已具名的细分缺陷码（缺 Token／过期／验签失败…），
+     * 本码只给「已到入口兜底腿、无细分」的场景；编号形态不同属两族既有事实，
+     * 族归并在册待裁（见差距台账 D-B4-65 余项），禁在本批把 {@code ECOS-AUTH-00x} 改号。</p>
+     */
+    public static final String ECOS_SYS_401 = "ECOS-SYS-401";
+
+    /**
+     * 403 — 入口兜底"无访问权限"（{@code ForbiddenException}／{@code AccessDeniedException}）。
+     * <p>#142/B4-3e-27 追加登记。<b>不</b>用于 ABAC／OPA 的策略拒绝：那类必须带
+     * {@code ECOS-SEC-*}（§4.3.3），把策略拒绝写成平台 403 ＝抹掉"谁拒的"这一层归因。</p>
+     */
+    public static final String ECOS_SYS_403 = "ECOS-SYS-403";
+
+    /**
      * 409 — 资源冲突（唯一约束／必填字段违反），客户端重复提交或语义上已存在。
      */
     public static final String ECOS_SYS_409 = "ECOS-SYS-409";
@@ -45,4 +69,14 @@ public final class SystemErrorCode {
      * 500 — 未分类内部错误（{@code handleAny} 兜底），响应体只给通用提示 + traceId，堆栈只入日志。
      */
     public static final String ECOS_SYS_500 = "ECOS-SYS-500";
+
+    /**
+     * 503 — 下游制品不可用（§3.2.7 表内既有登记；代码侧此前只存在于
+     * {@code SystemEventTopicsV1Controller.ERROR_SYS_UNAVAILABLE} 的一处字面量）。
+     * <p>#142/B4-3e-27 把该码登记进本族并让上述副本改指本常量，族码字面量自此在
+     * {@code src/main/java} 面只允许本类承载（由 {@code NoMachineCodeFactoryFaceRatchetTest}
+     * 的零容忍腿钉住）。§4.7.2「不可用 ≠ 无权限」要求这条腿与 {@link #ECOS_SYS_403}
+     * 分形，禁互相折叠。</p>
+     */
+    public static final String ECOS_SYS_503 = "ECOS-SYS-503";
 }

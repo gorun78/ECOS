@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.gateway.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.SystemErrorCode;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.event.TopicLagSource;
 import com.chinacreator.gzcm.sysman.security.MinimumClearance;
@@ -68,8 +69,15 @@ public class SystemEventTopicsV1Controller {
 
     private static final Logger log = LoggerFactory.getLogger(SystemEventTopicsV1Controller.class);
 
-    /** §4.3.3 之外的系统类错误码：设计 §3.3 L2127 对 listEventTopics 只点 {@code ECOS-SYS-503}。 */
-    public static final String ERROR_SYS_UNAVAILABLE = "ECOS-SYS-503";
+    /**
+     * §4.3.3 之外的系统类错误码：设计 §3.3 L2127 对 listEventTopics 只点 {@code ECOS-SYS-503}。
+     * <p>#142/B4-3e-27（差距 D-B4-65 余项「族码副本」）：面值改取 §3.2.7 族常量单源
+     * {@link SystemErrorCode#ECOS_SYS_503}，本类不再自带 {@code "ECOS-SYS-"} 字面量副本
+     * （该形态由 {@code NoMachineCodeFactoryFaceRatchetTest} 在 main 面零容忍钉住）。
+     * 常量值不变 ⇒ 应答面逐字不变，既有断言
+     * {@code EventTopicsEndpointTest} 取的也是本常量引用而非串。</p>
+     */
+    public static final String ERROR_SYS_UNAVAILABLE = SystemErrorCode.ECOS_SYS_503;
 
     /** 指标源缺席时的取值标记（{@code lagSource} 字段）。 */
     public static final String LAG_SOURCE_NOT_WIRED = "NOT_WIRED";

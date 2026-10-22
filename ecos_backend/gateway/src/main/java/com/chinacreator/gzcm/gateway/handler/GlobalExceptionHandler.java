@@ -87,11 +87,18 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleValidation(ValidationException ex) {
         log.warn("ValidationException: {}", ex.getMessage(), ex);
-        return ApiResponse.badRequest(ex.getMessage());
+        return ApiResponse.badRequest(SystemErrorCode.ECOS_SYS_400, ex.getMessage());
     }
 
     /**
      * 资源不存在 → 404 Not Found
+     * <p><b>#142/B4-3e-27 登记豁免</b>：本腿<b>有意</b>继续用单参 {@code ApiResponse.notFound(..)}
+     * （机读码缺席），不是漏改。{@code NotFoundException} 是各业务域共用的「域内资源不存在」
+     * 出口，其机读码归各域码表（§3.2.7「禁把域错误塞进本族以绕过归属」），由信封类或本 handler
+     * 替它统一指定 {@code ECOS-SYS-404} ＝用批量替换冒充归因；{@code ECOS-SYS-404} 只承载
+     * 「路由/资源不存在」这条业务外路径（见 {@link #handleRouteNotFound}）。
+     * 该腿由 {@code NoMachineCodeFactoryFaceRatchetTest} 按名登记为入口面唯一豁免，
+     * 补码时须同批撤豁免。</p>
      */
     @ExceptionHandler(NotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
@@ -144,7 +151,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ApiResponse<Void> handleUnauthorized(UnauthorizedException ex) {
         log.warn("UnauthorizedException: {}", ex.getMessage(), ex);
-        return ApiResponse.unauthorized(ex.getMessage());
+        return ApiResponse.unauthorized(SystemErrorCode.ECOS_SYS_401, ex.getMessage());
     }
 
     /**
@@ -154,7 +161,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiResponse<Void> handleForbidden(ForbiddenException ex) {
         log.warn("ForbiddenException: {}", ex.getMessage(), ex);
-        return ApiResponse.forbidden(ex.getMessage());
+        return ApiResponse.forbidden(SystemErrorCode.ECOS_SYS_403, ex.getMessage());
     }
 
     /**
@@ -183,7 +190,8 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiResponse<Void> handleAccessDenied(AccessDeniedException ex) {
         log.warn("AccessDeniedException: {}", ex.getMessage());
-        return ApiResponse.forbidden(ex.getMessage() != null ? ex.getMessage() : "无访问权限");
+        return ApiResponse.forbidden(SystemErrorCode.ECOS_SYS_403,
+                ex.getMessage() != null ? ex.getMessage() : "无访问权限");
     }
 
     /**
@@ -195,7 +203,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleNumberFormat(NumberFormatException ex) {
         log.warn("NumberFormatException: {}", ex.getMessage());
-        return ApiResponse.badRequest("参数格式错误，请检查路径或请求参数");
+        return ApiResponse.badRequest(SystemErrorCode.ECOS_SYS_400, "参数格式错误，请检查路径或请求参数");
     }
 
     /**
@@ -257,7 +265,7 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleHttpMessageNotReadable(
             org.springframework.http.converter.HttpMessageNotReadableException ex) {
         log.warn("HttpMessageNotReadableException: {}", ex.getMessage());
-        return ApiResponse.badRequest("请求体必须为合法 JSON 格式");
+        return ApiResponse.badRequest(SystemErrorCode.ECOS_SYS_400, "请求体必须为合法 JSON 格式");
     }
 
     /**

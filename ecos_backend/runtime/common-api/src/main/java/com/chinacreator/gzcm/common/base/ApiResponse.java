@@ -41,8 +41,14 @@ public class ApiResponse<T> implements Serializable {
     public static final int CODE_FORBIDDEN = 403;
     /** 资源不存在 */
     public static final int CODE_NOT_FOUND = 404;
-    /** 系统内部错误 */
+    /** 系统内部错误（信封 v1 约定：{@code code < 0} ＝系统错误；保留不改，见 #142/B4-3e-27 裁决） */
     public static final int CODE_INTERNAL_ERROR = -1;
+    /**
+     * 服务端错误且要与 HTTP 状态行<b>同号</b>时使用（§3.2.7 5xx 透传＋#142/B4-3e-26 同号判据）。
+     * <p>与 {@link #CODE_INTERNAL_ERROR} 的分工：-1 是信封 v1 的「系统错误」负数码约定，
+     * 500 是与状态行同号的携带值；新出口（带机读码重载）一律取本常量，旧 -1 面由棘轮门只减不增追缴。</p>
+     */
+    public static final int CODE_SERVER_ERROR = 500;
 
     // ── 字段 ────────────────────────────────────────
     private int code;
@@ -153,6 +159,68 @@ public class ApiResponse<T> implements Serializable {
     /** 系统内部错误 */
     public static <T> ApiResponse<T> internalError(String message) {
         return new ApiResponse<>(CODE_INTERNAL_ERROR, message, null);
+    }
+
+    // ── 带机读码重载（#142/B4-3e-27 收口差距 D-B4-65，只增不改）─────────
+    /*
+     * <p><b>本批缺陷的成因</b>：上面五枚单参工厂走的是三参私有构造器，<b>从不填</b>
+     * {@code errorCode}；本类带 {@code @JsonInclude(NON_NULL)} ⇒ 机读码键在 JSON 面
+     * <b>整个不出现</b>（不是空串、不是 null 键，是压根没有这个字段）。余面有两种口径，
+     * 登记时必须写清用哪一把尺：粗口径（{@code grep} 直扫 {@code src/main/java}，含注释与
+     * javadoc 里的提及，且把带码重载也算进调用串）＝本批改前 <b>946 处／152 文件</b>；
+     * 门禁口径（先经 {@code SourceCommentStripper} 剥注释、再用带否定预查的判据只认
+     * <b>单参</b>调用）＝改前 <b>945 处／151 文件</b>，本批把 gateway 入口六枚腿迁到带码
+     * 重载后 <b>939 处／151 文件</b>（分枚 badRequest 330／internalError 317／notFound 255／
+     * forbidden 24／unauthorized 13）。棘轮门钉的是<b>门禁口径</b>；含 test 面粗口径读数
+     * 954 处／155 文件，仅作规模参考，不入判据。这与 D-B4-55 是同一坑的
+     * 两半：55 关的是「把 {@code String.valueOf(int)} 当机读码填进去」，本条是「干脆没填」。</p>
+     *
+     * <p><b>为何不五枚工厂一次性补码</b>（裁决依据）：{@code ECOS-*} 码表按域归属
+     * （§3.2.7「域内业务错误码仍归各域码表，禁把域错误塞进本族以绕过归属」），而调用点里
+     * 大量「资源不存在／参数错误」是<b>域内业务语义</b>，由信封类替它们统一指定一个平台码
+     * ＝用批量替换冒充归因，正是本台账反复登记的折叠面成因（D-B4-44／55／58）。故本批
+     * 只提供带码通道＋把入口面（gateway {@code GlobalExceptionHandler}）迁过来，
+     * 余面由 {@code NoMachineCodeFactoryFaceRatchetTest} 按实跑基线<b>只减不增</b>追缴。</p>
+     *
+     * <p><b>形参顺序</b>取 {@code (errorCode, message)}，与既有
+     * {@link #error(int, String, String)} 里 {@code errorCode} 在 {@code message} 之前同形。
+     * 重载不校验码值形态：形态判据（禁数字串冒充机读码）已由
+     * {@code ErrorCodeMachineCodeSingleSourceTest} 单源持有，在构造期抛异常会把一条 4xx
+     * 兜底腿变成 5xx 面，属新的折叠风险。</p>
+     */
+
+    /** 业务错误（带机读码，§3.2.7 码表取登记值） */
+    public static <T> ApiResponse<T> badRequest(String errorCode, String message) {
+        return new ApiResponse<>(CODE_BAD_REQUEST, errorCode, message, null);
+    }
+
+    /** 未认证（带机读码） */
+    public static <T> ApiResponse<T> unauthorized(String errorCode, String message) {
+        return new ApiResponse<>(CODE_UNAUTHORIZED, errorCode, message, null);
+    }
+
+    /** 无权限（带机读码） */
+    public static <T> ApiResponse<T> forbidden(String errorCode, String message) {
+        return new ApiResponse<>(CODE_FORBIDDEN, errorCode, message, null);
+    }
+
+    /** 资源不存在（带机读码） */
+    public static <T> ApiResponse<T> notFound(String errorCode, String message) {
+        return new ApiResponse<>(CODE_NOT_FOUND, errorCode, message, null);
+    }
+
+    /**
+     * 系统内部错误（带机读码）。
+     * <p><b>{@code code} 取 500 而非 {@link #CODE_INTERNAL_ERROR}</b>（本批裁决）：§3.2.7
+     * 要求 5xx 透传、#142/B4-3e-15 已把状态行保真做实，而带码通道是给「已知是服务端错误」
+     * 的出口用的——此时把包体数字码写成 -1 会造出「状态行 500／包体 -1」的新分叉，
+     * 与 #142/B4-3e-26 为 NPE/ISE 两腿钉下的「{@code code} 与状态行同号」判据同型。
+     * 旧单参 {@link #internalError(String)} 的 -1 面属信封类 javadoc 自 v1 定义的
+     * 「{@code code < 0} ＝系统错误」约定，改它要连带动 317 处存量语义面＋前端
+     * {@code code < 0} 分支，属另批裁决，本批不动、由棘轮门只减不增追缴。</p>
+     */
+    public static <T> ApiResponse<T> internalError(String errorCode, String message) {
+        return new ApiResponse<>(CODE_SERVER_ERROR, errorCode, message, null);
     }
 
     // ── getter/setter ───────────────────────────────
