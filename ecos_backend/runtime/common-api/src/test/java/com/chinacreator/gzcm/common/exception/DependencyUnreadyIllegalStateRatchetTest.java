@@ -964,6 +964,15 @@ class DependencyUnreadyIllegalStateRatchetTest {
      */
     private static final int HTTP_REACHABLE_OWNER_SIDE_DEBT_BASELINE = 0;
 
+    /**
+     * 死面持有者文件里必须出现的<b>停写标记</b>原文（#142/B4-3e-48 对 D-B4-77 的通路侧裁决＝
+     * 不接承流、按「显式停写＋下线登记」处置）。标记写在类注释里而不是代码里，是因为本面对它的
+     * 要求正是「让读代码的人知道此面禁接」；引用面仍由 {@code codeOf} 的剥注释口径判可达性，
+     * 两个口径各读各的层面，不许互相冒充（D-B4-62 的镜像形态由
+     * {@link #writeStopMarkersAndUnreachableClaimsCrossCertifyEachOther()} 拦）。
+     */
+    private static final String DEAD_SURFACE_STOP_MARKER = "【死面停写登记 D-B4-77】";
+
     private static volatile List<Advice> cachedAdvices;
 
     private static List<Advice> advices() {
@@ -1486,6 +1495,51 @@ class DependencyUnreadyIllegalStateRatchetTest {
                 "死 SPI 面出现本域降级机读码字面量＝号义被挂到一条永不出口的腿上，D.1 单源表与代码脱钩");
         assertFalse(adapter.contains("ECOS-DATA-05"),
                 "适配器死面出现本域降级机读码字面量＝同上");
+    }
+
+    /**
+     * <b>#142/B4-3e-48 通路侧处置的在位门</b>（收口 D-B4-77 的「下线登记」腿）。
+     *
+     * <p><b>裁决</b>＝<b>不接承流，按「显式停写＋下线登记」处置</b>，三条实测依据：①详设-02 未规定本域
+     * 属主端点，接通须先凭空新增路径与签名；②唯一可达通路 {@code testDataSource} 的生产调用方是
+     * DQ 自动修复取证链，它把异常当重试轮次文本消费，接通即改既有取证语义；③删除死面撞
+     * 「只增不改」＋备份前置，另立余项。</p>
+     *
+     * <p><b>为什么还要门</b>：停写宣称只写在测试注释里＝读代码的人无从得知此面禁接；
+     * 反过来，注释挂上「停写」而真仓已把它接上＝账面在说谎，是 D-B4-62（注释面冒充代码面）的镜像形态。
+     * 故把两面<b>互为背书</b>：引用面为 0 时标记不得缺席，引用面非 0 时标记不得仍在——单向下一侧即红。</p>
+     */
+    @Test
+    @Timeout(value = 240)
+    @DisplayName("死面停写标记与引用面互为背书：标记缺席即红，接通后仍挂停写亦红（D-B4-77 下线登记）")
+    void writeStopMarkersAndUnreachableClaimsCrossCertifyEachOther() {
+        boolean discoveryWired = !filesContaining("new SchemaRegistryServiceImpl(").isEmpty();
+        checkStopMarkerTracksWiring(DATA_DISCOVERY_IMPL, discoveryWired,
+                "死 SPI 面（发现服务的建连器未注入腿）");
+
+        int guardCallSites = 0;
+        for (String call : ADAPTER_GUARD_CALLS) {
+            guardCallSites += literalCount(codeOf(DATA_ADAPTER_CONSUMER), call);
+        }
+        checkStopMarkerTracksWiring(DATA_BASE_JDBC_ADAPTER, guardCallSites != 0,
+                "适配器取数／写入面（八枚「未连接」守卫腿）");
+    }
+
+    /**
+     * 停写标记取<b>原文</b>（注释面本来就承载在原文里），可达性取<b>剥注释后的引用面</b>——
+     * 两个口径各按各自该看的层面读，混用即「注释冒充代码」。
+     */
+    private static void checkStopMarkerTracksWiring(String relative, boolean wired, String label) {
+        boolean markerInPlace = readRepoFile(relative).contains(DEAD_SURFACE_STOP_MARKER);
+        if (wired) {
+            assertFalse(markerInPlace, label + "已被接上通路，「" + DEAD_SURFACE_STOP_MARKER + "」却仍在位＝"
+                    + "注释宣称的死面与真仓引用面矛盾（镜像的注释冒充代码）。须同批把标记改为「已接通」，"
+                    + "并重测承流三档账面与无承流面合计基线");
+        } else {
+            assertTrue(markerInPlace, label + "在真仓仍无承流路径，但持有文件里找不到「"
+                    + DEAD_SURFACE_STOP_MARKER + "」＝下线登记只活在测试注释里，"
+                    + "读代码的人无从得知此面禁接（只增不改红线没有载体）");
+        }
     }
 
     /** 字面量出现次数（本门不用正则，避免 {@code (} 等元字符把锚点吃掉）。 */

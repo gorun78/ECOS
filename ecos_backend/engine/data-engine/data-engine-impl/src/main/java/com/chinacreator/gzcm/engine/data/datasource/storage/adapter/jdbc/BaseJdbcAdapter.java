@@ -36,7 +36,22 @@ import com.chinacreator.gzcm.runtime.core.i18n.LocaleResolver;
 /**
  * JDBC存储适配器基类
  * 提供基于JDBC的统一数据访问实现
- * 
+ *
+ * <p><b>【死面停写登记 D-B4-77】</b>（处置裁决见 #142/B4-3e-48）：本类 9 枚 {@code IllegalStateException}
+ * 站点分两形态。<b>八枚「未连接」守卫腿</b>（query／write／count／update／delete／getSchema／
+ * getMetadata／beginTransaction）在真仓内<b>没有任何适配器调用点</b>——适配器唯一生产消费者
+ * （{@code DataSourceServiceImpl}）只走 createAdapter→testConnection→disconnect 三条腿；
+ * {@code ScoringContext} 的类注释亦自证「IStorageAdapter 拉样本属下一阶段，本阶段评估器仅读既有字段」。
+ * 这八枚腿因此<b>无 HTTP 承流路径</b>，补 503 状态行＝伪造可观测面，本域明禁。
+ *
+ * <p><b>第 9 枚（建连桥未注入）形态不同</b>：它可达，但出口被两级宽 {@code catch (Exception)} 依次折成
+ * 无码 checked 异常与修复台账的 {@code lastError} 字段，永远到不了状态行——属「折叠」问题而非「死面」问题，
+ * 修法要先解折叠，不得在守卫处换个异常类型蒙过承流三档判据。
+ *
+ * <p><b>停写含义</b>：禁新增本类取数／写入面（上述八个方法）的调用方，也禁在本类之外为这八枚腿编造
+ * 承流通路。确要接通取数面时，须<b>同批</b>把本标记改为「已接通」并回写承流三档账面（含无承流面合计 10 枚的基线），
+ * 否则 {@code DependencyUnreadyIllegalStateRatchetTest} 的停写面双向门即红。
+ *
  * @author CDRC Runtime Team
  */
 public abstract class BaseJdbcAdapter implements IStorageAdapter {
