@@ -11,12 +11,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -52,6 +55,13 @@ import static org.junit.jupiter.api.Assertions.fail;
  * 这类<b>真装配载体</b>是瞎的（仓内实存一枚 {@code .imports}，见 {@link #AUTO_CONFIG_IMPORTS_FACE}），
  * 被它们点名的实现类会被<b>误判成死面</b>。修法＝资源面改按 {@code src/main/resources} <b>目录</b>收、
  * 不再按扩展名收，并配一枚「载体必须在面内且拿到原文」的见证案——退回白名单收面即红。</p>
+ *
+ * <p><b>#142/B4-3e-51 追加（D-B4-80 逐枚分型的机械化）</b>：死面集回答「有没有装配入口」，但下线还是补承流
+ * 要问的是<b>另一件事</b>——接口侧还有没有活消费者、有没有别的已装配实现。这三档不能靠手抄名单
+ * （抄一次就过期），故本门把分型也做成<b>派生面</b>：对每一枚死面取它 {@code implements} 的接口简名，
+ * <b>断链档</b>＝该接口既无已装配替代实现、又存在<b>裸类型引用</b>的消费者。两条判据都写死在
+ * {@link #hasAssembledAlternative} 与 {@link #bareConsumersOf} 的注释里，负见证（替代实现腿／
+ * 嵌套限定形态腿）任一失效即红。</p>
  */
 class NoAssemblyEntryFaceRatchetTest {
 
@@ -59,6 +69,12 @@ class NoAssemblyEntryFaceRatchetTest {
     private static final Set<String> ASSEMBLY_ANNOTATIONS = Set.of(
             "@Service", "@Component", "@Repository", "@Controller", "@RestController",
             "@Configuration", "@ControllerAdvice", "@Mapper");
+
+    /** 泛型实参（含嵌套一层）：{@code IFoo<Bar<Baz>>} 只留 {@code IFoo}。 */
+    private static final Pattern GENERIC_ARGS = Pattern.compile("<[^<>]*>");
+
+    /** {@code @Bean} 工厂腿判据缓存：接口简名 → 「方法返回该接口」的签名形态。 */
+    private static final Map<String, Pattern> BEAN_FACTORY_CACHE = new ConcurrentHashMap<>();
 
     /**
      * 派生死面集的钉值基线（<b>只减不增</b>：消死面即下移，须书面重设；新增死面直接红）。
@@ -121,6 +137,64 @@ class NoAssemblyEntryFaceRatchetTest {
      * 「面拿到原文」兜住，不靠人工分类。</p>
      */
     private static final int OUTSIDE_LEGACY_WHITELIST_CARRIER_BASELINE = 14;
+
+    /**
+     * 断链档（甲档）枚数钉值——死面集里「接口有裸消费者、且没有任何已装配替代实现」的成员数。
+     * 取值只能来自本门实跑红字读数（#142/B4-3e-51 首派＝<b>4</b>）。<b>只减不增</b>：补上承流或显式下线即下移，
+     * 新增断链直接红——这一档就是 3e-49/3e-50 判据侧收口之后<b>属主侧真正要还的账</b>，
+     * 禁靠「死面反正都没装配入口」一句话把两种去向混在一个数里。
+     *
+     * <p><b>4 枚名单（红字点名，非推算）</b>：{@code AbacPermissionCheckerImpl}（接口
+     * {@code IAbacPermissionChecker} 被 {@code AssetService}／{@code PreconditionEngine} 裸引用）、
+     * {@code AlertServiceImpl}（{@code IAlertService} 被 data-engine 三处 {@code required=false}／
+     * {@code ObjectProvider} 腿等它）、{@code ConfigVersionServiceImpl}（{@code IConfigVersionService}
+     * 被 {@code ConfigController} 裸引用）、{@code SystemParamServiceImpl}（{@code ISystemParamService}
+     * 被 {@code SystemParamController} 裸引用）。</p>
+     *
+     * <p><b>首派读到过 7，两个盲区各贡献一部分</b>（订正后才得 4，两条机制各由一枚负见证钉住）：
+     * ①{@code DataDescriptionDiscoveryImpl}／{@code DataDescriptionServiceImpl} 被误分——同一文件里还写着
+     * {@code private static class DataDescriptionImpl implements DataDescription}，<b>内部类 DTO 的
+     * {@code implements} 被当成这枚死面实现的接口</b>，一个谁都不要的 DTO 接口冒充出断链欠账；
+     * 修法＝只取与文件同名那个类型的 {@code implements} 段。②{@code I18nMessageSourceImpl} 被误分——
+     * 它的接口由 {@code I18nConfig} 的 {@code @Bean} 工厂腿产出 {@code SpringMessageSourceImpl} 承流，
+     * 而替代实现判据原先先按 {@code implements} 过滤，配置类自己不 {@code implements} 该接口就被跳过；
+     * 修法＝{@code @Bean} 腿独立判、不被 {@code implements} 门挡住。<b>两处偏差都朝「账面虚高」方向</b>：
+     * 判据一松，只需下线的成员就被记成承流欠账，逼后来人去补一条本来就有人承的链。</p>
+     */
+    private static final int BROKEN_CHAIN_BASELINE = 4;
+
+    /** 断链档正见证：接口 {@code ISystemParamService} 被控制器裸引用，实现体却无装配入口。 */
+    private static final String BROKEN_CHAIN_WITNESS =
+            "ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "sysman/config/service/impl/SystemParamServiceImpl.java";
+
+    /**
+     * 断链档负见证（替代实现腿）：{@code AbacPolicyServiceImpl} 判死，但它实现的
+     * {@code IAbacPolicyService} 另有 {@code @Service} 的 {@code InMemoryAbacPolicyService} 承流
+     * ——该文件<b>不是</b> {@code *Impl.java}，故替代实现扫描必须覆盖整个引用面，
+     * 只扫候选面就会把它错分进断链档。
+     */
+    private static final String SUPERSEDED_DUPLICATE_WITNESS =
+            "ecos_backend/engine/security-engine/security-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/security/abac/service/impl/AbacPolicyServiceImpl.java";
+
+    /**
+     * 断链档负见证（{@code @Bean} 工厂腿）：{@code I18nMessageSourceImpl} 判死，但
+     * {@code I18nConfig} 以 {@code @Bean} 产出 {@code SpringMessageSourceImpl} 承同一接口。
+     * 替代实现的第二种形态——只认类面注解就漏它。
+     */
+    private static final String BEAN_FACTORY_ALT_WITNESS =
+            "ecos_backend/runtime/runtime-core/src/main/java/com/chinacreator/gzcm/runtime/core/i18n/"
+                    + "impl/I18nMessageSourceImpl.java";
+
+    /**
+     * 断链档负见证（嵌套限定形态）：{@code PEPImpl} 判死，接口 {@code PDP} 在 {@code sysman-api} 的
+     * {@code PEP.java} 里<b>只以 {@code PDP.Decision} 嵌套限定形态</b>出现（用的是接口里声明的枚举，
+     * 不是要一个 PDP 实现）。裸类型判据一旦被摘掉，这类成员会被错分进断链档、把下线账算成承流欠账。
+     */
+    private static final String NESTED_QUALIFIED_WITNESS =
+            "ecos_backend/engine/security-engine/security-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/security/policy/engine/impl/PDPImpl.java";
 
     // ── 扫描面 ─────────────────────────────────────────────────────────
 
@@ -190,11 +264,12 @@ class NoAssemblyEntryFaceRatchetTest {
         return out;
     }
 
-    /** 扫描面在一次 JVM 会话内算一次即可（五个门案共用，避免全仓遍历被跑五遍）。 */
+    /** 扫描面在一次 JVM 会话内算一次即可（全部门案共用，避免全仓遍历被跑多遍）。 */
     private static final class Scan {
         private static final List<Face> FACE = scanReferenceFace();
         private static final Map<String, String> CANDIDATES = implCandidates(FACE);
         private static final Set<String> DEAD = deriveDeadFaces(FACE, CANDIDATES);
+        private static final Set<String> BROKEN_CHAIN = deriveBrokenChain(FACE, CANDIDATES, DEAD);
     }
 
     private static List<Face> face() {
@@ -207,6 +282,11 @@ class NoAssemblyEntryFaceRatchetTest {
 
     private static Set<String> dead() {
         return Scan.DEAD;
+    }
+
+    /** 断链档（甲档）派生面：死面里「接口有裸消费者且无已装配替代实现」的成员。 */
+    private static Set<String> brokenChain() {
+        return Scan.BROKEN_CHAIN;
     }
 
     /** 资源载体面：{@code src/main/resources} 下的非 {@code java} 文件（原文口径）。 */
@@ -317,6 +397,204 @@ class NoAssemblyEntryFaceRatchetTest {
         return hits;
     }
 
+    // ── 分型派生（#142/B4-3e-51） ────────────────────────────────────────
+
+    /**
+     * 死面所实现的接口简名：取<b>与文件同名的那个类型</b>的 {@code implements} 段（到类体第一个
+     * <code>{</code> 为止），逗号切分、去泛型实参、取最后一段限定名。
+     *
+     * <p><b>口径边界一（只认主类型）</b>：文件内部还写着别的 {@code implements} 一律不取——取证跑实测
+     * 到 {@code DataDescriptionDiscoveryImpl}／{@code DataDescriptionServiceImpl} 两枚内部各有一枚
+     * {@code private static class DataDescriptionImpl implements DataDescription}（DTO 形态的内部类）。
+     * 若把内部类的 implements 也算成「这枚死面实现的接口」，一个谁都不要的 DTO 接口就会冒充成断链欠账，
+     * 账面凭空多两枚。<b>口径边界二（只取 implements）</b>：{@code extends} 抽象基类不构成断链形态
+     * （基类自身若有活子类引用，本门早已把它判成活面）。一枚死面实现多接口时，<b>任一</b>接口断链
+     * 即整枚入档：要问的是「这枚死面背后有没有还在等它的调用方」，一个就够。</p>
+     */
+    private static Set<String> interfacesOf(String rel, String code) {
+        Set<String> out = new TreeSet<>();
+        int anchor = code.indexOf("class " + simpleName(rel));
+        if (anchor < 0) {
+            return out;
+        }
+        int bodyBrace = code.indexOf('{', anchor);
+        int implementsAt = code.indexOf("implements", anchor);
+        if (implementsAt < 0 || (bodyBrace >= 0 && implementsAt > bodyBrace)) {
+            return out;
+        }
+        int segmentEnd = code.indexOf('{', implementsAt);
+        String segment = segmentEnd > implementsAt
+                ? code.substring(implementsAt + "implements".length(), segmentEnd)
+                : code.substring(implementsAt + "implements".length());
+        for (String part : segment.split(",")) {
+            String t = part.trim();
+            while (t.indexOf('<') >= 0) {
+                t = GENERIC_ARGS.matcher(t).replaceAll("");
+            }
+            t = t.trim();
+            if (t.isEmpty()) {
+                continue;
+            }
+            int dot = t.lastIndexOf('.');
+            out.add(dot >= 0 ? t.substring(dot + 1) : t);
+        }
+        return out;
+    }
+
+    private static boolean hasAssemblyAnnotation(String code) {
+        for (String annotation : ASSEMBLY_ANNOTATIONS) {
+            if (code.contains(annotation)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 已装配替代实现：<b>在整个引用面上找</b>（不只候选面）——非 {@code *Impl.java} 形态的承流实现
+     * 真实存在（{@code InMemoryAbacPolicyService} 带 {@code @Service} 承 {@code IAbacPolicyService}），
+     * 只扫候选面就会把「被取代的重复实现」错分进断链档。
+     *
+     * <p>两种装配形态都算（都要求持有文件自己带装配注解，否则容器根本不会实例化它）：
+     * ①类面 {@code implements} 该接口且带 Spring 装配注解；②类面带 {@code @Configuration}／
+     * {@code @Component} 且有 {@code @Bean} 方法以该接口为返回类型（{@code I18nConfig
+     * .i18nMessageSource} 形态——接口由配置类产出<b>另一个</b>实现来满足，它自己不 {@code implements}
+     * 该接口，故 {@code @Bean} 腿必须先于 {@code implements} 腿判、不能被 implements 过滤掉；
+     * 取证跑实测：漏掉这条腿就把已承流的 {@code I18nMessageSourceImpl} 记成了断链欠账）。</p>
+     */
+    private static List<String> assembledAlternatives(String itf, Set<String> deadFaces,
+                                                      Map<String, Set<String>> supertypes) {
+        List<String> out = new ArrayList<>();
+        String declSuffix = "/" + itf + ".java";
+        for (Face f : face()) {
+            String rel = "ecos_backend/" + f.relPath();
+            if (!rel.endsWith(".java") || deadFaces.contains(rel) || rel.endsWith(declSuffix)) {
+                continue;
+            }
+            String code = f.text();
+            if (!hasAssemblyAnnotation(code)) {
+                continue;
+            }
+            if (supertypes.getOrDefault(rel, Set.of()).contains(itf) || producesBeanOf(code, itf)) {
+                out.add(rel);
+            }
+        }
+        return out;
+    }
+
+    private static boolean producesBeanOf(String code, String itf) {
+        return code.contains("@Bean") && BEAN_FACTORY_CACHE.computeIfAbsent(itf,
+                k -> Pattern.compile("(?m)^\\s*(public|protected)\\s+" + Pattern.quote(k)
+                        + "\\s+\\w+\\s*\\(")).matcher(code).find();
+    }
+
+    /**
+     * 裸类型消费者：在引用面上（排除死面自身与接口声明文件）出现该接口名，且<b>该次出现后面不跟
+     * {@code .}</b>。
+     *
+     * <p><b>为什么要排掉 {@code 接口名.嵌套成员} 形态</b>：{@code PEP.java} 里的
+     * {@code PDP.Decision}、{@code DataDescriptionDao} 里的
+     * {@code import ….IDataDescriptionService.QueryCondition}，用的都是接口文件里<b>声明的嵌套类型</b>
+     * ——这类依赖不需要任何实现类，把接口判死不会断它们的链。若不排，它们会把「只等一个下线决定」的
+     * 成员冒充成「等着接承流」的欠账，账面虚高。反过来，静态常量限定形态（{@code IAlertService.XXX}）
+     * 同样不入消费者面，这是<b>偏保守侧</b>：宁可少算欠账，不可造出假欠账。</p>
+     */
+    private static List<String> bareConsumersOf(String itf, Set<String> deadFaces) {
+        List<String> out = new ArrayList<>();
+        String declSuffix = "/" + itf + ".java";
+        for (Face f : face()) {
+            String rel = "ecos_backend/" + f.relPath();
+            if (deadFaces.contains(rel) || rel.endsWith(declSuffix)) {
+                continue;
+            }
+            if (containsBareWord(f.text(), itf)) {
+                out.add(rel);
+            }
+        }
+        return out;
+    }
+
+    /** 整词命中且<b>非嵌套限定</b>形态（见 {@link #bareConsumersOf}）。 */
+    private static boolean containsBareWord(String text, String word) {
+        for (int i = text.indexOf(word); i >= 0; i = text.indexOf(word, i + 1)) {
+            boolean leftOk = i == 0 || !isWordChar(text.charAt(i - 1));
+            int after = i + word.length();
+            if (!leftOk || after >= text.length() || text.charAt(after) == '.') {
+                continue;
+            }
+            if (!isWordChar(text.charAt(after))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 断链档派生：逐枚死面取其接口，接口<b>既无已装配替代实现、又有裸类型消费者</b> ⇒ 该枚入档。
+     * 三档去向由这一个派生面决定：入档＝甲（须接承流或改显式不可用），未入档但判死＝乙（只停写下线），
+     * 「丙」不单列成档——构建侧具名（{@code pom.xml} 的 jacoco 名单）本来就被挡在引用面外，
+     * 它只影响死面集大小，不影响去向。
+     *
+     * <p>每文件的 {@code implements} 段只解析一次，每个接口名只扫两遍面（替代实现腿＋裸引用腿），
+     * 避免「逐枚 × 整面正则」把本门跑成十几分钟。</p>
+     */
+    private static Set<String> deriveBrokenChain(List<Face> face, Map<String, String> candidates,
+                                                 Set<String> deadFaces) {
+        Map<String, Set<String>> supertypes = supertypesByFile();
+        Set<String> itfs = new TreeSet<>();
+        for (String rel : deadFaces) {
+            if (candidates.containsKey(rel)) {
+                itfs.addAll(supertypes.getOrDefault(rel, Set.of()));
+            }
+        }
+        Map<String, List<String>> alternatives = new LinkedHashMap<>();
+        Map<String, List<String>> bare = new LinkedHashMap<>();
+        for (String itf : itfs) {
+            alternatives.put(itf, assembledAlternatives(itf, deadFaces, supertypes));
+            bare.put(itf, bareConsumersOf(itf, deadFaces));
+        }
+        Set<String> out = new TreeSet<>();
+        for (String rel : deadFaces) {
+            for (String itf : supertypes.getOrDefault(rel, Set.of())) {
+                if (alternatives.getOrDefault(itf, List.of()).isEmpty()
+                        && !bare.getOrDefault(itf, List.of()).isEmpty()) {
+                    out.add(rel);
+                    break;
+                }
+            }
+        }
+        assertFalse(out.isEmpty(),
+                "断链档派生结果恒空＝分型判据失明（接口面/替代实现面/裸引用面任一被摘掉都会这样），"
+                        + "不得按「所有死面都只需下线」放行");
+        return out;
+    }
+
+    /** 引用面上每个 {@code .java} 文件的 {@code implements} 段（只解析一次的复用面）。 */
+    private static Map<String, Set<String>> supertypesByFile() {
+        Map<String, Set<String>> out = new LinkedHashMap<>();
+        for (Face f : face()) {
+            String rel = "ecos_backend/" + f.relPath();
+            if (rel.endsWith(".java")) {
+                out.put(rel, interfacesOf(rel, f.text()));
+            }
+        }
+        return out;
+    }
+
+    /** 分型诊断：某枚死面的接口面、各接口的替代实现腿与裸消费者腿（红字里点名，禁靠猜定位）。 */
+    private static String tierDiagnosis(String rel) {
+        Map<String, Set<String>> supertypes = supertypesByFile();
+        StringBuilder sb = new StringBuilder(rel).append(" 接口面=")
+                .append(supertypes.getOrDefault(rel, Set.of()));
+        for (String itf : supertypes.getOrDefault(rel, Set.of())) {
+            sb.append(" | ").append(itf).append(" 替代实现=")
+                    .append(tail(assembledAlternatives(itf, dead(), supertypes), 3))
+                    .append(" 裸消费者=")
+                    .append(tail(bareConsumersOf(itf, dead()), 3));
+        }
+        return sb.toString();
+    }
+
     // ── 门案 ───────────────────────────────────────────────────────────
 
     @Test
@@ -405,11 +683,44 @@ class NoAssemblyEntryFaceRatchetTest {
                         + "删除形态须说明去向，两边都不得静默通过。当前集外成员＝" + String.join(" | ", outside));
     }
 
+    @Test
+    @Timeout(value = 600)
+    @DisplayName("断链档由判据派生并钉值：甲（等承流）与乙（等下线）两档不得混成一张清单（D-B4-80 逐枚分型）")
+    void brokenChainTierIsDerivedAndNailed() {
+        Set<String> dead = dead();
+        Set<String> chain = brokenChain();
+        assertTrue(dead.containsAll(chain),
+                () -> "断链档必须先是被判死的成员——混进活面就是把已承流的功能记成欠账。越界成员＝"
+                        + tail(whatNotIn(dead, chain), 16));
+        assertEquals(BROKEN_CHAIN_BASELINE, chain.size(),
+                () -> "实跑派生断链档 " + chain.size() + " 枚，与钉值 " + BROKEN_CHAIN_BASELINE
+                        + " 不符。多出的成员（新断链：接口有裸消费者却无已装配实现）＝" + tail(chain, 32)
+                        + "；少掉的成员（承流补上或改显式不可用）须逐枚说明去向，禁静默归零");
+        // 正见证：这枚的接口被控制器裸字段引用，实现体既无装配注解也无 @Bean 替代腿
+        assertTrue(chain.contains(BROKEN_CHAIN_WITNESS),
+                () -> "「" + BROKEN_CHAIN_WITNESS + "」应入断链档而未入＝分型判据被摘掉（裸消费者腿或"
+                        + "替代实现腿失效）。诊断＝" + tierDiagnosis(BROKEN_CHAIN_WITNESS));
+        // 三条负见证：三种「看着像断链、其实不是」的形态各钉一条，任一被误分即红
+        for (String negative : List.of(SUPERSEDED_DUPLICATE_WITNESS, BEAN_FACTORY_ALT_WITNESS,
+                NESTED_QUALIFIED_WITNESS)) {
+            assertTrue(dead.contains(negative),
+                    () -> "负见证「" + negative + "」已不在死面集＝死面集口径被动过，本见证失去意义");
+            assertFalse(chain.contains(negative),
+                    () -> "「" + negative + "」被错分进断链档＝分型判据放宽。" + tierDiagnosis(negative));
+        }
+    }
+
+    private static Set<String> whatNotIn(Set<String> all, Set<String> subset) {
+        Set<String> out = new TreeSet<>(subset);
+        out.removeAll(all);
+        return out;
+    }
+
     private static final String DATASOURCE_IMPL_HOLDER =
             "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/"
                     + "engine/data/datasource/service/impl/DataSourceServiceImpl.java";
 
-    private static String tail(Set<String> items, int limit) {
+    private static String tail(Collection<String> items, int limit) {
         Set<String> out = new LinkedHashSet<>();
         for (String s : items) {
             if (out.size() >= limit) {
