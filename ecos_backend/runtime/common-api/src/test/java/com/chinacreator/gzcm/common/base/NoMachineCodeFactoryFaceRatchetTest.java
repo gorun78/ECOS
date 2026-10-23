@@ -106,8 +106,15 @@ class NoMachineCodeFactoryFaceRatchetTest {
      * sysman-boot {@code GlobalExceptionHandler}）经 {@code SystemErrorCode.ECOS_SYS_401/403} 统一注入，
      * 属主侧只携带语义。该文件此前是本枚余面在 sysman 域的唯一持有者，归零＝该域从这条面上退出，
      * 基线若不同批下调，本门会以「基线陈旧」报红（本门双向）。</p>
+     *
+     * <p><b>#142/B4-3e-53 同批下调（−9 处／0 文件）**：sysman 配置面三文件（{@code ConfigController}
+     * ／{@code SystemParamController}／{@code SysConfigController}）的 15 枚「依赖未装配」腿由
+     * 返回单参 {@code internalError} 信封改为抛 {@code DataBridgeException(503, …, ECOS-SYS-503)}
+     * 承载（差距 <b>D-B4-83</b> 收口件）。−9 而非 −15：其中 6 枚原本就在 {@code catch} 内表达
+     * 真实服务故障，不属本判据的迁移面。文件数不变＝三文件各自仍持有 {@code internalError} 兜底腿，
+     * 只是不再用它掩盖缺装配。</p>
      */
-    private static final int BASELINE_SITES = 936;
+    private static final int BASELINE_SITES = 927;
     private static final int BASELINE_FILES = 150;
 
     /** 分枚基线：只减不增，且合计必须等于 {@link #BASELINE_SITES}（防「拆细了但总数对不上」）。 */
@@ -116,7 +123,7 @@ class NoMachineCodeFactoryFaceRatchetTest {
             "unauthorized", 12,
             "forbidden", 22,
             "notFound", 255,
-            "internalError", 317));
+            "internalError", 308));
 
     /** gateway 入口面已带码的六枚腿（锚点，不得回退）。 */
     private static final int ENTRY_LEGS_CODED = 6;

@@ -2,11 +2,12 @@ package com.chinacreator.gzcm.sysman.controller;
 
 import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,12 +24,24 @@ public class SysConfigController {
 
     private static final Logger log = LoggerFactory.getLogger(SysConfigController.class);
 
-    @Autowired(required = false)
-    private SysConfigQueryService sysConfigQueryService;
+    private final ObjectProvider<SysConfigQueryService> queryProvider;
 
     /** 当前版本标识，来自 Maven profile (standard / enterprise / ultimate) */
     @Value("${ecos.edition:all}")
     private String currentEdition;
+
+    public SysConfigController(ObjectProvider<SysConfigQueryService> queryProvider) {
+        this.queryProvider = queryProvider;
+    }
+
+    /**
+     * #142/B4-3e-53（D-B4-83）：可选装配缺席时的统一载体＝显式不可用（503＋{@code ECOS-SYS-503}）。
+     * <p>原口径把「查询服务没装配」折成 200＋空集（＝谎报无数据）或 500（＝谎报本服务故障），
+     * 两侧都违详设 §4.7.2「不可用 ≠ 无权限 ≠ 空结果」。真实空结果不受影响。</p>
+     */
+    private static DataBridgeException queryUnavailable() {
+        return ConfigController.unavailability("系统配置查询服务 SysConfigQueryService");
+    }
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -49,11 +62,12 @@ public class SysConfigController {
     public ApiResponse<Map<String, Object>> listByGroup(
             @RequestParam(defaultValue = "") String group,
             @RequestParam(defaultValue = "") String edition) {
+        SysConfigQueryService sysConfigQueryService = queryProvider.getIfAvailable();
+        if (sysConfigQueryService == null) {
+            log.error("SysConfigQueryService 未装配，系统配置列表不可用（fail-closed）");
+            throw queryUnavailable();
+        }
         try {
-            if (sysConfigQueryService == null) {
-                return ApiResponse.success(Map.of("data", List.of(), "total", 0));
-            }
-
             // 构建 SQL: 包含 config_options, impact_scope, edition 字段
             StringBuilder sqlBuilder = new StringBuilder(
                 "SELECT id, config_group, config_key, config_value, config_type, " +
@@ -103,6 +117,8 @@ public class SysConfigController {
             r.put("data", rows);
             r.put("total", rows.size());
             return ApiResponse.success(r);
+        } catch (DataBridgeException e) {
+            throw e;
         } catch (Exception e) {
             log.error("查询配置失败", e);
             return ApiResponse.internalError("查询配置失败");
@@ -112,9 +128,12 @@ public class SysConfigController {
     /** PUT /api/v1/system/config/{configKey} → 更新单个配置值 */
     @PutMapping("/{configKey}")
     public ApiResponse<?> update(@PathVariable String configKey, @RequestBody Map<String, String> body) {
+        SysConfigQueryService sysConfigQueryService = queryProvider.getIfAvailable();
+        if (sysConfigQueryService == null) {
+            log.error("SysConfigQueryService 未装配，配置项 {} 更新不可用（fail-closed）", configKey);
+            throw queryUnavailable();
+        }
         try {
-            if (sysConfigQueryService == null) return ApiResponse.internalError("数据源不可用");
-
             // 兼容多种 body 字段名: value > configValue > config_value
             String val = body.get("value");
             if (val == null) val = body.get("configValue");
@@ -131,6 +150,8 @@ public class SysConfigController {
             r.put("config_value", val);
             r.put("updated", true);
             return ApiResponse.success(r);
+        } catch (DataBridgeException e) {
+            throw e;
         } catch (Exception e) {
             log.error("更新配置失败", e);
             return ApiResponse.internalError("更新失败");
@@ -144,11 +165,12 @@ public class SysConfigController {
      */
     @GetMapping("/metadata")
     public ApiResponse<List<Map<String, Object>>> metadata() {
+        SysConfigQueryService sysConfigQueryService = queryProvider.getIfAvailable();
+        if (sysConfigQueryService == null) {
+            log.error("SysConfigQueryService 未装配，配置元数据不可用（fail-closed）");
+            throw queryUnavailable();
+        }
         try {
-            if (sysConfigQueryService == null) {
-                return ApiResponse.success(List.of());
-            }
-
             String sql = "SELECT id, config_group, config_key, config_value, config_type, " +
                          "config_label, config_label_en, description, impact_scope, edition " +
                          "FROM sys_config ORDER BY config_group, sort_order";
@@ -175,6 +197,8 @@ public class SysConfigController {
             }
 
             return ApiResponse.success(result);
+        } catch (DataBridgeException e) {
+            throw e;
         } catch (Exception e) {
             log.error("查询配置元数据失败", e);
             return ApiResponse.internalError("查询配置元数据失败");
@@ -189,11 +213,12 @@ public class SysConfigController {
      */
     @GetMapping("/audit")
     public ApiResponse<Map<String, Object>> audit() {
+        SysConfigQueryService sysConfigQueryService = queryProvider.getIfAvailable();
+        if (sysConfigQueryService == null) {
+            log.error("SysConfigQueryService 未装配，配置消费审计不可用（fail-closed）");
+            throw queryUnavailable();
+        }
         try {
-            if (sysConfigQueryService == null) {
-                return ApiResponse.success(Map.of("total", 0, "consumed", 0, "unconsumed", 0, "items", List.of()));
-            }
-
             String sql = "SELECT config_key, config_group, config_label, description FROM sys_config ORDER BY config_group, sort_order";
             List<Map<String, Object>> rows = sysConfigQueryService.queryForList(sql);
             List<Map<String, Object>> result = new ArrayList<>();
@@ -236,6 +261,8 @@ public class SysConfigController {
             wrapper.put("items", result);
 
             return ApiResponse.success(wrapper);
+        } catch (DataBridgeException e) {
+            throw e;
         } catch (Exception e) {
             log.error("配置审计失败", e);
             return ApiResponse.internalError("配置审计失败");

@@ -54,8 +54,15 @@ class NaiveCommentStripperBanTest {
     private static final Pattern STRIPPER_DECL = Pattern.compile(
             "\\b(?:stripComments|codeOnly|normalize|strip)\\s*\\(");
 
-    /** 同名剥离器副本的注册数（2026-10-21 实扫 ecos_backend 的读数）。 */
-    private static final int REGISTERED_STRIPPER_COPIES = 7;
+    /**
+     * 同名剥离器副本的注册数。
+     * <p>2026-10-21 实扫 ecos_backend 的读数＝7；#142/B4-3e-53 为 sysman-impl 的
+     * D-B4-83 源码面门禁新增第 8 枚（{@code services/sysman/impl/sysman-impl/src/test/java/
+     * com/chinacreator/gzcm/sysman/testscan/SourceCommentStripper.java}，除 package 行外逐字符相同，
+     * 由 {@link #stripperCopiesAreIdenticalAcrossModules()} 判据核验）。新增副本必须同步本数，
+     * 否则本判据红＝要么漂移要么漏注册，两种都不许默认通过。</p>
+     */
+    private static final int REGISTERED_STRIPPER_COPIES = 8;
 
     /** 迁移在册清单：这批从朴素口径改到剥离器的门禁文件（must-hit，防"改了个空集"）。 */
     private static final List<String> MIGRATED_GATES = List.of(
