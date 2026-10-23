@@ -125,20 +125,33 @@ public class RequirePermissionAspect {
         }
 
         // 5. ABAC策略评估（在RBAC之后，可覆盖RBAC结果）
-        String abacResult = evaluateAbacPolicies(
+        EvaluationVerdict abac = evaluateAbacPolicies(
             requiredPermissions, userPermissions, auth.getName());
-        if ("DENY".equals(abacResult)) {
+        if (abac == EvaluationVerdict.DENY) {
             log.warn("ABAC DENY policy matched: userId={}, required={}",
                 auth.getName(), Arrays.toString(requiredPermissions));
             throw new ForbiddenException("访问被安全策略拒绝");
         }
-        if ("ALLOW".equals(abacResult)) {
+        if (abac == EvaluationVerdict.ALLOW) {
             log.debug("ABAC ALLOW policy matched: userId={}, required={}",
                 auth.getName(), Arrays.toString(requiredPermissions));
             return joinPoint.proceed();
         }
 
-        // 6. 无ABAC匹配，回退到RBAC结果
+        // 回退 RBAC 的两条不同成因腿必须可分辨——本批收口 D-B4-87 就是把它们从
+        // 「同读 null」拆成两枚具名态（NOT_ASSESSED ≠ NO_MATCH）。
+        if (abac == EvaluationVerdict.NOT_ASSESSED) {
+            // ABAC 层不可评估（服务未装配 或 评估中途抛异常）：ABAC 经
+            // @Autowired(required = false) 声明为 RBAC 之上的可叠加层，回退 RBAC 是设计意图，
+            // 非 fail-open（RBAC 裁决腿仍在下方生效）。
+            log.warn("ABAC 层未评估（服务未装配或评估失败），按可叠加层回退 RBAC 裁决: userId={}",
+                auth.getName());
+        } else {
+            // NO_MATCH：服务在位、评估完成、无策略命中 = 真「无匹配」，与上面的不可用不得混读。
+            log.debug("ABAC 无命中策略，回退 RBAC 裁决: userId={}", auth.getName());
+        }
+
+        // 6. 回退到RBAC结果
         if (rbacPassed) {
             return joinPoint.proceed();
         }
@@ -151,7 +164,30 @@ public class RequirePermissionAspect {
     }
 
     /**
-     * 评估ABAC策略，返回 "ALLOW"（放行）、"DENY"（拒绝）或 null（无匹配）。
+     * ABAC 评估四态（#142/B4-3e-57，收口 D-B4-87）。
+     *
+     * <p>原形态（登记 D-B4-87 时）用 {@code String}：{@code "ALLOW"}／{@code "DENY"}／{@code null}，
+     * 其中 {@code null} 同时承载<b>两种不可分辨成因</b>：①ABAC 服务未装配（Bean null）、
+     * ②策略面为空（无策略）、③循环无命中、④catch 兜底无命中。
+     * 调用侧统一读为「无匹配，回退 RBAC」。修法不改变回退行为（ABAC 经
+     * {@code @Autowired(required = false)} 声明为可叠加层，回退是设计意图），
+     * 而是拆成两枚<b>不可混读</b>的具名态：
+     * <ul>
+     *   <li>{@link #NOT_ASSESSED}＝ABAC 层未能给出裁决（服务未装配／评估中途抛异常），
+     *       属「依赖缺席」而非「真无匹配」；</li>
+     *   <li>{@link #NO_MATCH}＝服务在位、评估完成、无策略命中；</li>
+     * </ul>
+     * 两态在日志口径上可分辨，把「查不了」与「真没匹配」分开。</p>
+     */
+    enum EvaluationVerdict {
+        ALLOW,
+        DENY,
+        NO_MATCH,
+        NOT_ASSESSED
+    }
+
+    /**
+     * 评估ABAC策略，返回 {@link EvaluationVerdict} 四态之一。
      * <p>
      * 策略按 priority 升序排序（数值越小优先级越高），
      * DENY 策略优先于 ALLOW 策略生效。
@@ -159,31 +195,31 @@ public class RequirePermissionAspect {
      * @param requiredPermissions 方法所需的权限码
      * @param userPermissions     当前用户持有的权限码
      * @param userId              当前用户ID
-     * @return "ALLOW" / "DENY" / null
+     * @return {@link EvaluationVerdict#ALLOW}／{@link EvaluationVerdict#DENY}／
+     *         {@link EvaluationVerdict#NO_MATCH}（无策略命中）／
+     *         {@link EvaluationVerdict#NOT_ASSESSED}（不可评估）
      */
-    private String evaluateAbacPolicies(String[] requiredPermissions,
-                                         Set<String> userPermissions,
-                                         String userId) {
+    private EvaluationVerdict evaluateAbacPolicies(String[] requiredPermissions,
+                                             Set<String> userPermissions,
+                                             String userId) {
         if (abacPolicyService == null) {
-            return null; // ABAC服务不可用，跳过
+            return EvaluationVerdict.NOT_ASSESSED;
         }
         try {
             List<AbacPolicy> fetched = abacPolicyService.listPolicies();
             if (fetched == null || fetched.isEmpty()) {
-                return null;
+                return EvaluationVerdict.NO_MATCH;
             }
 
             // 按 priority 升序排序（null 值排最后）。
-            // **#142/B4-3e-36（新登记 D-B4-70）**：这里必须先复制一份再排，不得对协作者返回值
-            // 原地 {@code sort}——本仓策略装载腿已有 {@code List.copyOf(...)} 与
-            // {@code Collectors.toList()} 两种返回值形态，而不可变列表上的 {@code sort} 抛
-            // {@code UnsupportedOperationException}，会被本方法外层的宽 catch 折成「ABAC 未评估」
-            // ⇒ 所有策略（含 DENY）静默失效、无声回退 RBAC。缺陷方向是 fail-open，比报错更危险。
+            // #142/B4-3e-36（D-B4-70）：必须复制一份再排，不得对协作者返回值原地 sort——
+            // 本仓策略装载腿有 {@code List.copyOf(...)}／{@code Collectors.toList()} 两种返回
+            // 形态，不可变列表上的 sort 抛 UnsupportedOperationException，会被下方 catch 折成
+            // NOT_ASSESSED ⇒ 所有策略（含 DENY）静默失效、无声回退 RBAC。缺陷方向是 fail-open。
             List<AbacPolicy> policies = new ArrayList<>(fetched);
             policies.sort(Comparator.comparing(
                 p -> p.getPriority() != null ? p.getPriority() : Integer.MAX_VALUE));
 
-            // 获取当前HTTP方法作为 action
             String httpMethod = getCurrentHttpMethod();
 
             for (AbacPolicy policy : policies) {
@@ -203,17 +239,18 @@ public class RequirePermissionAspect {
                         userId, Arrays.toString(requiredPermissions), httpMethod);
 
                     if ("DENY".equalsIgnoreCase(policy.getEffect())) {
-                        return "DENY";
+                        return EvaluationVerdict.DENY;
                     }
                     if ("ALLOW".equalsIgnoreCase(policy.getEffect())) {
-                        return "ALLOW";
+                        return EvaluationVerdict.ALLOW;
                     }
                 }
             }
+            return EvaluationVerdict.NO_MATCH;
         } catch (Exception e) {
             log.warn("ABAC policy evaluation failed, falling back to RBAC: {}", e.getMessage());
+            return EvaluationVerdict.NOT_ASSESSED;
         }
-        return null;
     }
 
     /**
