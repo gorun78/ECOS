@@ -32,8 +32,9 @@ import static org.junit.jupiter.api.Assertions.fail;
  *
  * <p><b>判据（全部可推导，禁逐枚手工抄）</b>：候选面 = {@code ecos_backend/**&#47;src/main/java/**} 下文件名
  * 以 {@code Impl.java} 结尾的类（排除 {@code /target/} 与 {@code /archive/}）；
- * 判死 = ①<b>剥注释后的代码面</b>不含任何 Spring 装配型注解 ②在「主源码＋测试源码＋资源文件」三个面上，
- * 除自身文件外<b>零整词引用</b>；②还要做<b>传递闭包</b>——只被同样判死的类引用的成员，引用不算数，
+ * 判死 = ①<b>剥注释后的代码面</b>不含任何 Spring 装配型注解 ②在「主源码 {@code java}（剥注释）＋
+ * {@code src/main/resources} 全部资源载体（原文）」两档引用面上，除自身文件外<b>零整词引用</b>；
+ * ②还要做<b>传递闭包</b>——只被同样判死的类引用的成员，引用不算数，
  * 否则「父死子活」会把整条死链误判成活面。</p>
  *
  * <p><b>两枚见证各有分工</b>：{@code SchemaRegistryServiceImpl} 的所谓引用全部写在注释里
@@ -45,6 +46,12 @@ import static org.junit.jupiter.api.Assertions.fail;
  * 它有子类引用、类本身是活面，死的是它内部八枚方法腿（<b>方法级</b>形态），由
  * {@code DependencyUnreadyIllegalStateRatchetTest} 的承流三档账面管账；这条口径边界由负见证案显式钉住，
  * 禁把两种形态混成一张清单。</p>
+ *
+ * <p><b>#142/B4-3e-50 追加（D-B4-81）</b>：3e-49 的资源面按扩展名白名单收，对
+ * {@code META-INF/spring/*.AutoConfiguration.imports} 与 SPI 的 {@code META-INF/services/*}
+ * 这类<b>真装配载体</b>是瞎的（仓内实存一枚 {@code .imports}，见 {@link #AUTO_CONFIG_IMPORTS_FACE}），
+ * 被它们点名的实现类会被<b>误判成死面</b>。修法＝资源面改按 {@code src/main/resources} <b>目录</b>收、
+ * 不再按扩展名收，并配一枚「载体必须在面内且拿到原文」的见证案——退回白名单收面即红。</p>
  */
 class NoAssemblyEntryFaceRatchetTest {
 
@@ -55,9 +62,18 @@ class NoAssemblyEntryFaceRatchetTest {
 
     /**
      * 派生死面集的钉值基线（<b>只减不增</b>：消死面即下移，须书面重设；新增死面直接红）。
-     * 取值只能来自本门实跑红字读数，禁算式推出——实测读数 44（#142/B4-3e-49 首次派生）。
+     * 取值只能来自本门实跑红字读数——3e-49 首次派生＝<b>44</b>，3e-50 资源面改目录口径后重派生＝<b>46</b>。
+     *
+     * <p><b>46 不是笔误，是订正</b>：加宽引用面反而让死面集<b>变大</b>两枚，方向与「扩面只会更保守」的
+     * 直觉相反。原因是资源面由「扩展名白名单」改为「{@code src/main/resources} 目录」后，
+     * <b>各模块 {@code pom.xml} 这类非资源载体被剔出了引用面</b>——而 {@code PDPImpl}／
+     * {@code AbacPermissionCheckerImpl} 两枚在全仓除自身文件外的唯一具名，正是
+     * {@code engine/security-engine/security-engine-impl/pom.xml} 里 {@code jacoco-maven-plugin}
+     * 的 {@code per-module-check} 规则（{@code element = CLASS} 的 {@code includes} 覆盖率地板名单）。
+     * 那是<b>构建侧豁免具名，不是装配入口</b>：jacoco 点名一枚类只要求它被测试覆盖，不代表容器会实例化它。
+     * 旧面白名单把它们误当活引用，新面才露出真死面身份。<b>结论写死：口径净效果必须实测，禁凭推定。</b></p>
      */
-    private static final int DERIVED_DEAD_FACE_BASELINE = 44;
+    private static final int DERIVED_DEAD_FACE_BASELINE = 46;
 
     /**
      * 主源码 {@code *Impl.java} 候选面下限（防扫描器失明的假绿；只设下限，新增合法）。
@@ -79,6 +95,32 @@ class NoAssemblyEntryFaceRatchetTest {
     private static final String METHOD_LEVEL_FACE =
             "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/"
                     + "engine/data/datasource/storage/adapter/jdbc/BaseJdbcAdapter.java";
+
+    /**
+     * 资源载体盲区见证（D-B4-81）：这是仓内实存的<b>真装配载体</b>，扩展名不在旧白名单
+     * （{@code xml}/{@code yml}/{@code yaml}/{@code properties}）内——按扩展名收面就看不见它。
+     */
+    private static final String AUTO_CONFIG_IMPORTS_FACE =
+            "runtime/common-api/src/main/resources/META-INF/spring/"
+                    + "org.springframework.boot.autoconfigure.AutoConfiguration.imports";
+
+    /** 上述载体里被点名的类名，用来证明资源面拿到的是<b>原文</b>而不是空面。 */
+    private static final String AUTO_CONFIG_IMPORTS_CLASS = "HeaderAuthAutoConfiguration";
+
+    /**
+     * 旧白名单之外的资源载体枚数钉值（<b>钉住即具名</b>：新增载体形态必须先看它是不是真装配面，
+     * 删除载体必须说明去向，两边都不得静默漂移）。取值只能来自本门实跑红字读数＝<b>14</b>
+     * （#142/B4-3e-50 实测，另以 {@code find} 扫 {@code src/main/resources} 下排除
+     * {@code xml|yml|yaml|properties} 四种扩展名独立复算，两侧同号）。
+     *
+     * <p><b>这 14 枚的分型</b>：真装配载体 1 枚（{@code META-INF/spring/…AutoConfiguration.imports}）；
+     * 其余 13 枚是数据／模板／路由载体（{@code agent-templates} 6 枚、{@code eval-questions} 4 枚、
+     * {@code templates} 目录下的报告模板 1 枚、{@code route-manifest.json} 2 枚）。实测只有报告模板那枚
+     * 正文里出现了实现类名（{@code DqReportServiceImpl}），而该类带 {@code @Service} 装配注解、
+     * 另有控制器引用，本即活面——模板提及不改变判定。载体<b>必须留在面内</b>：判据靠
+     * 「面拿到原文」兜住，不靠人工分类。</p>
+     */
+    private static final int OUTSIDE_LEGACY_WHITELIST_CARRIER_BASELINE = 14;
 
     // ── 扫描面 ─────────────────────────────────────────────────────────
 
@@ -102,9 +144,19 @@ class NoAssemblyEntryFaceRatchetTest {
     }
 
     /**
-     * 引用面两档：主源码 java ＋ 资源文件（{@code xml}/{@code yml}/{@code yaml}/{@code properties}）。
+     * 引用面两档：主源码 java ＋ <b>{@code src/main/resources} 下的全部资源载体</b>。
      * java 取<b>剥注释后</b>代码面；资源面取<b>原文</b>——装配描述符里的命中本来就可能是真装配，
-     * 注释命中只会让死面集变小（偏保守），不会把活面误判成死面。
+     * 而注释里的具名不是。两档方向不同：<b>剥注释让死面集变大</b>（只被注释点名的成员露出死身），
+     * <b>资源面拿原文让死面集变小</b>（被载体点名的成员判为有装配入口）。净效果不可推定，只能实测
+     * ——见 {@link #DERIVED_DEAD_FACE_BASELINE} 的 44→46 订正案。
+     *
+     * <p><b>资源面按目录收、不按扩展名白名单收（D-B4-81 的修法）</b>：扩展名白名单
+     * （{@code xml}/{@code yml}/{@code yaml}/{@code properties}）对<b>真装配载体</b>是瞎的——
+     * Spring Boot 的 {@code META-INF/spring/*.AutoConfiguration.imports} 与 SPI 的
+     * {@code META-INF/services/<接口全名>} 都以「非白名单扩展名／无扩展名」形态承载类名，
+     * 被这类文件点名的实现类是被容器或 {@code ServiceLoader} 实例化的<b>活面</b>。仓内实存一枚
+     * {@code AutoConfiguration.imports}（见 {@link #AUTO_CONFIG_IMPORTS_FACE}），故盲区不是假设；
+     * 目录口径还把未来新增的任何载体形态一并覆盖，不需要再改判据。</p>
      *
      * <p><b>测试源码被有意排除</b>，两条理由都写死在这里：①本口径问的是<b>装配入口</b>，
      * 测试里的 {@code new XxxImpl()} 不构成生产承流路径（同一判断见 3e-45 的「无 HTTP 承流路径」档与
@@ -122,8 +174,7 @@ class NoAssemblyEntryFaceRatchetTest {
                 if (rel.contains("/target/") || rel.contains("/archive/") || rel.contains("/src/test/")) {
                     return;
                 }
-                if (rel.endsWith(".java") || rel.endsWith(".xml")
-                        || rel.endsWith(".yml") || rel.endsWith(".yaml") || rel.endsWith(".properties")) {
+                if (rel.endsWith(".java") || rel.contains("/src/main/resources/")) {
                     files.add(p);
                 }
             });
@@ -156,6 +207,34 @@ class NoAssemblyEntryFaceRatchetTest {
 
     private static Set<String> dead() {
         return Scan.DEAD;
+    }
+
+    /** 资源载体面：{@code src/main/resources} 下的非 {@code java} 文件（原文口径）。 */
+    private static Map<String, String> resourceCarriers() {
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Face f : face()) {
+            String rel = f.relPath();
+            if (rel.contains("/src/main/resources/") && !rel.endsWith(".java")) {
+                out.put(rel, f.text());
+            }
+        }
+        return out;
+    }
+
+    /** 旧扩展名白名单——本门用它只为<b>量出盲区有多大</b>，判据本身不按它收面。 */
+    private static boolean inLegacyWhitelist(String relPath) {
+        return relPath.endsWith(".xml") || relPath.endsWith(".yml")
+                || relPath.endsWith(".yaml") || relPath.endsWith(".properties");
+    }
+
+    private static List<String> carriersOutsideLegacyWhitelist() {
+        List<String> out = new ArrayList<>();
+        for (String rel : new TreeSet<>(resourceCarriers().keySet())) {
+            if (!inLegacyWhitelist(rel)) {
+                out.add(rel);
+            }
+        }
+        return out;
     }
 
     /** 候选面：主源码 {@code *Impl.java}，返回「相对路径 → 剥注释代码面」。 */
@@ -305,6 +384,25 @@ class NoAssemblyEntryFaceRatchetTest {
                 () -> "主源码 *Impl.java 只扫到 " + candidates().size() + " 枚，低于下限 "
                         + MAIN_IMPL_FILE_FLOOR + "＝扫描面失明（路径口径／排除规则被动过），"
                         + "此时任何「死面为零」的读数都是假绿");
+    }
+
+    @Test
+    @Timeout(value = 600)
+    @DisplayName("资源面按目录收不按扩展名白名单收：*.imports／SPI 形态漏一档即盲区（D-B4-81）")
+    void assemblyCarrierResourcesAreInsideTheReferenceFace() {
+        Map<String, String> carriers = resourceCarriers();
+        assertTrue(carriers.containsKey(AUTO_CONFIG_IMPORTS_FACE),
+                "「" + AUTO_CONFIG_IMPORTS_FACE + "」不在资源面内＝资源面又退回扩展名白名单收面，"
+                        + "被这类载体点名的实现类会被误判成死面（真装配面对门禁不可见）");
+        assertTrue(carriers.get(AUTO_CONFIG_IMPORTS_FACE).contains(AUTO_CONFIG_IMPORTS_CLASS),
+                "资源面里读不到「" + AUTO_CONFIG_IMPORTS_CLASS + "」＝拿到的不是原文（空面或被加工过），"
+                        + "装配具名不可见，死面集会虚高");
+        List<String> outside = carriersOutsideLegacyWhitelist();
+        assertEquals(OUTSIDE_LEGACY_WHITELIST_CARRIER_BASELINE, outside.size(),
+                () -> "旧白名单之外的资源载体实测 " + outside.size() + " 枚，与钉值 "
+                        + OUTSIDE_LEGACY_WHITELIST_CARRIER_BASELINE + " 不符＝载体面漂移。"
+                        + "新增形态须先判它是否真装配载体（是则死面集可能虚高，须补判据），"
+                        + "删除形态须说明去向，两边都不得静默通过。当前集外成员＝" + String.join(" | ", outside));
     }
 
     private static final String DATASOURCE_IMPL_HOLDER =
