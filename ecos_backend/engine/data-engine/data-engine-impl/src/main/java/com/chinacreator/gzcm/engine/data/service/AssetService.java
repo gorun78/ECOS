@@ -2,6 +2,9 @@ package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.common.event.DataAssetSecurityTaggedEvent;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
+import com.chinacreator.gzcm.common.exception.ForbiddenException;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.data.dao.AssetDao;
 import com.chinacreator.gzcm.engine.data.dto.*;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
@@ -81,16 +84,52 @@ public class AssetService {
      * action=data.asset.security-tag，resource 带 assetId/resourceId/domain。
      * <p><b>2026-10-12 复盘订正（fail-open → fail-closed）</b>：ABAC 不可用（Bean 未装配）时
      * 原实现仅 log.warn 放行，与全平台 fail-closed（架构铁律 #3 默认 DENY）相悖；
-     * 现对齐 OpaPolicyService 常量化 fail-close 先例 → 默认拒绝抛 {@link SecurityException}。
-     * DENY 抛 {@link SecurityException}；NOT_APPLICABLE/PERMIT 放行。
+     * 现对齐 OpaPolicyService 常量化 fail-close 先例 → 默认拒绝抛异常。
+     * DENY 拒绝；NOT_APPLICABLE/PERMIT 放行。
+     *
+     * <p><b>#142/B4-3e-55（差距 D-B4-85）三态分离</b>：收口前「Bean 未装配」（原第 92 行）／
+     * 「策略 DENY」（原第 108 行）／「策略评估抛异常」（原第 115 行）三条腿<b>都</b>抛
+     * {@link SecurityException}，而全仓主源码面
+     * {@code @ExceptionHandler(SecurityException.class)} 实扫 <b>0</b> 命中（登记为
+     * {@code AssetServiceAbacTriStateCarrierTest} 的判据 A 前提）⇒ 三态在 HTTP 面一律落进
+     * {@code GlobalExceptionHandler.handleAny}＝<b>500＋{@code ECOS-SYS-500}</b>：
+     * 「裁决机构没答」（该触发运维告警、可重试）与「用户没权限」（该走权限申诉）被折成同一枚
+     * 服务端内部错误，违详设 §4.7.2「不可用 ≠ 无权限 ≠ 空结果」。现按既有具名承载分态，
+     * <b>不放行</b>语义一条不减：</p>
+     * <ul>
+     *   <li><b>不可用</b>（未装配／评估异常）→ 抛 {@link DataBridgeException}，携带
+     *       {@link RlsExecutionContract#SEC_UNAVAILABLE_HTTP}＝503 与机读码
+     *       {@link RlsExecutionContract#SEC_UNAVAILABLE_CODE}＝{@code ECOS-SEC-501}，
+     *       与本模块 {@code PeriodCloseService.abacUnavailable}（#142/B4-3e-13 同族收口）同源，
+     *       禁在本域另立「ABAC 不可用」码面；</li>
+     *   <li><b>拒绝</b>（DENY）→ 抛 {@link ForbiddenException}（{@code extends DataBridgeException}
+     *       且自带 403）→ {@code handleForbidden} 显式命中 ⇒ 状态行 403＋机读码
+     *       {@code ECOS-SYS-403}，与本模块 {@code PeriodCloseService} 的 DENY 腿同形；</li>
+     *   <li><b>放行</b>（PERMIT／NOT_APPLICABLE）→ 正常返回，不落库前置的拒绝码不出现。</li>
+     * </ul>
+     * <p>三态各自可寻址且互斥：503 不得写成 403，403 不得写成 500，两者都不得升成 200。
+     * {@code ASSET-040／042／041} 三枚串保留为<b>消息内标签</b>（供日志检索），
+     * 对外机读码一律由承载提供；原「{@code ASSET-041}＝操作被拒绝」的措辞按 §4.7.2 订正为
+     * 「未获裁决」，不再把评估失败说成拒绝。</p>
+     *
+     * <p><b>本批不做、另立余项 D-B4-90</b>：{@code checker.check(..)} 若抛
+     * {@link IAbacPermissionChecker.PolicyEvaluationException} <b>之外</b>的运行时异常
+     * （如 HTTP 传输层故障），仍会落进 {@code handleAny}＝500；该面属「安全调用异常类型白名单」
+     * 判据扩展，与本批三腿分态不同事务。另原第 110 行 {@code catch (SecurityException)} 保护腿
+     * 在全仓主源码面已无抛出方（{@code IAbacPermissionChecker} 实现面零命中），
+     * 属 {@code D-B4-77} 死代码族的死面，按「数得到优先于数得漂亮」原样保留、归该治理腿处置。</p>
      */
     private void abacCheck(String assetId, String resourceId, String operator, String action) {
         IAbacPermissionChecker checker = abacProvider.getIfAvailable();
         if (checker == null) {
-            // fail-closed DENY：security 不可用不放行（对齐铁律 #3 / OpaPolicyService 先例）
-            log.error("ABAC 不可用，动作 {} 默认 DENY 拒绝 (asset={} resource={})", action, assetId, resourceId);
-            throw new SecurityException(
-                "ASSET-042: ABAC 不可用，操作默认拒绝 fail-closed (asset=" + assetId + " action=" + action + ")");
+            // fail-closed：security 不可用不放行（对齐铁律 #3），承载＝「未获裁决」503 面（D-B4-85）
+            log.error("ABAC 不可用，动作 {} 未获裁决，按 fail-closed 拒绝 (asset={} resource={})",
+                action, assetId, resourceId);
+            throw new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_CODE + ": ASSET-042 未获安全裁决（ABAC Bean 未装配），"
+                    + "动作 " + action + " 按 fail-closed 拒绝，非「用户无权限」"
+                    + " (§4.7.2 / 铁律 §2.4) (asset=" + assetId + ")");
         }
         AbacContext ctx = new AbacContext();
         Map<String, Object> subject = new HashMap<>();
@@ -104,15 +143,21 @@ public class AssetService {
         try {
             IAbacPermissionChecker.Decision d = checker.check(ctx);
             if (d == IAbacPermissionChecker.Decision.DENY) {
+                // 拒绝态：策略答了「不行」＝403（D-B4-85），禁与「裁决没答」的 503 共用一枚载体
                 log.warn("ABAC DENY asset={} action={} by={}", assetId, action, operator);
-                throw new SecurityException("ASSET-040: ABAC 拒绝 (asset=" + assetId + " action=" + action + ")");
+                throw new ForbiddenException(
+                    "ASSET-040: ABAC 策略拒绝，动作 " + action + " 无权执行 (asset=" + assetId + ")");
             }
         } catch (SecurityException se) {
             throw se;
         } catch (IAbacPermissionChecker.PolicyEvaluationException e) {
-            // 默认 Fail-Closed 安全红线（PMO-data10）
+            // 默认 Fail-Closed 安全红线（PMO-data10）：评估失败＝裁决不可得＝503，非「操作被拒绝」
             log.error("ABAC 策略评估异常 (asset={} action={}): {}", assetId, action, e.getMessage(), e);
-            throw new SecurityException("ASSET-041: ABAC 策略评估失败，操作被拒绝", e);
+            throw new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_CODE + ": ASSET-041 未获安全裁决（ABAC 策略评估失败），"
+                    + "动作 " + action + " 按 fail-closed 拒绝，非「用户无权限」"
+                    + " (§4.7.2 / 铁律 §2.4) (asset=" + assetId + ")", e);
         }
     }
 

@@ -2,6 +2,9 @@ package com.chinacreator.gzcm.engine.data.service;
 
 import com.chinacreator.gzcm.common.event.DataAssetSecurityTaggedEvent;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
+import com.chinacreator.gzcm.common.exception.ForbiddenException;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.data.dao.AssetDao;
 import com.chinacreator.gzcm.engine.data.dto.*;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
@@ -33,7 +36,9 @@ import static org.mockito.Mockito.*;
  *   <li>deleteAsset 逻辑删除（DAO 落 is_deleted）</li>
  *   <li>tagAssetFields confirmed=true → 发 Kafka topic DATA_SECURITY_TAGGED</li>
  *   <li>tagAssetFields confirmed=false → 仅写 recommend_*，不发事件</li>
- *   <li>ABAC DENY → 打标抛 SecurityException (Fail-Closed)</li>
+ *   <li>ABAC 三态（#142/B4-3e-55／差距 D-B4-85）：DENY → 403 {@code ForbiddenException}；
+ *       Bean 未装配／策略评估抛异常 → 503 {@code ECOS-SEC-501}。三态<b>都</b>不放行、不落库、不发事件，
+ *       但对外状态行与机读码必须互不相同（§4.7.2「不可用 ≠ 无权限 ≠ 空结果」）</li>
  * </ul>
  */
 class AssetServiceTest {
@@ -233,7 +238,7 @@ class AssetServiceTest {
     }
 
     @Test
-    @DisplayName("tagAssetFields — ABAC DENY → 抛 SecurityException (Fail-Closed)")
+    @DisplayName("tagAssetFields — ABAC DENY → 抛 ForbiddenException 403 (Fail-Closed, #142/B4-3e-55 三态分离)")
     void tagAssetFieldsAbacDenySecurityException() throws Exception {
         when(abac.check(any(AbacContext.class))).thenReturn(IAbacPermissionChecker.Decision.DENY);
         when(assetDao.findAssetRows("asset-1")).thenReturn(List.of(existingAsset("asset-1", "res-1", "L1")));
@@ -249,17 +254,25 @@ class AssetServiceTest {
         it.setMaskStrategy("middle4");
         dto.setFields(List.of(it));
 
-        assertThrows(SecurityException.class, () -> service.tagAssetFields("asset-1", dto));
+        // #142/B4-3e-55（D-B4-85）：拒绝态由 SecurityException（HTTP 面塌成 500）改指自带 403 的具名承载。
+        ForbiddenException ex = assertThrows(ForbiddenException.class,
+            () -> service.tagAssetFields("asset-1", dto));
+        assertEquals(403, ForbiddenException.DEFAULT_HTTP_STATUS, "拒绝态承载自带 403");
+        assertEquals(403, DataBridgeException.resolveHttpStatus(ex.getHttpStatus()), "状态行跟随携带值");
+        assertTrue(ex.getMessage().contains("ASSET-040"), "拒绝腿保留 ASSET-040 标签供日志检索");
+        assertInstanceOf(RuntimeException.class, ex, "RuntimeException ⇒ @Transactional 回滚语义不变");
         verify(eventBus, never()).publish(eq(KafkaTopics.DATA_SECURITY_TAGGED), any());
         verify(assetDao, never()).insertField(anyString(), any(), anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyString(), any(Timestamp.class));
         verify(assetDao, never()).updateField(anyString(), any(), anyString(), anyString(), anyString(), anyBoolean(), anyString());
     }
 
     @Test
-    @DisplayName("tagAssetFields — ABAC 不可用（Bean 未装配）→ 默认 DENY 拒绝 (Fail-Closed, 2026-10-12 复盘订正)")
+    @DisplayName("tagAssetFields — ABAC 不可用（Bean 未装配）→ 503 未获裁决 (Fail-Closed, 2026-10-12 订正 + #142/B4-3e-55 分态)")
     void tagAssetFieldsAbacUnavailableFailsClosed() {
         // 复盘前实现：checker==null 仅 log.warn 放行（fail-open，违反铁律 #3 默认 DENY）；
-        // 订正后：抛 SecurityException(ASSET-042)，不落库、不发事件。
+        // 2026-10-12 订正：抛 SecurityException(ASSET-042) 不落库、不发事件——但三态在 HTTP 面塌成同一枚 500；
+        // #142/B4-3e-55（D-B4-85）：不可用腿改抛 503＋ECOS-SEC-501（与 PeriodCloseService 同源），
+        // 「不放行」侧（抛异常＝打标失败）一条不减。
         AssetService svc = serviceWith(null);
         when(assetDao.findAssetRows("asset-1")).thenReturn(List.of(existingAsset("asset-1", "res-1", "L1")));
 
@@ -274,8 +287,51 @@ class AssetServiceTest {
         it.setMaskStrategy("middle4");
         dto.setFields(List.of(it));
 
-        SecurityException ex = assertThrows(SecurityException.class, () -> svc.tagAssetFields("asset-1", dto));
-        assertTrue(ex.getMessage().contains("ASSET-042"), "fail-closed 语义 = ASSET-042 拒绝码");
+        DataBridgeException ex = assertThrows(DataBridgeException.class,
+            () -> svc.tagAssetFields("asset-1", dto));
+        assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_HTTP, ex.getHttpStatus(),
+            "不可用态＝503，禁折成 403（无权限）或 500（内部错误）");
+        assertEquals(503, DataBridgeException.resolveHttpStatus(ex.getHttpStatus()), "状态行跟随携带值");
+        assertTrue(ex.getMessage().startsWith(RlsExecutionContract.SEC_UNAVAILABLE_CODE),
+            "机读码单源＝ECOS-SEC-501，禁本域另立码面");
+        assertTrue(ex.getMessage().contains("ASSET-042"), "未装配腿保留 ASSET-042 标签供日志检索");
+        assertInstanceOf(RuntimeException.class, ex, "RuntimeException ⇒ @Transactional 回滚语义不变");
+        verify(assetDao, never()).insertField(anyString(), any(), anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyString(), any(Timestamp.class));
+        verify(eventBus, never()).publish(eq(KafkaTopics.DATA_SECURITY_TAGGED), any());
+    }
+
+    @Test
+    @DisplayName("tagAssetFields — ABAC 策略评估抛异常 → 503 未获裁决，禁折成「操作被拒绝」(#142/B4-3e-55)")
+    void tagAssetFieldsAbacEvaluationFailureCarriesUnavailable() throws Exception {
+        // 收口前：评估异常腿抛 SecurityException("ASSET-041: … 操作被拒绝")，
+        // 既在 HTTP 面塌成 500，又用「被拒绝」措辞把「裁决没答」说成「用户没权限」（§4.7.2 反向折叠）。
+        when(abac.check(any(AbacContext.class)))
+            .thenThrow(new IAbacPermissionChecker.PolicyEvaluationException("OPA 连接中断"));
+        when(assetDao.findAssetRows("asset-1")).thenReturn(List.of(existingAsset("asset-1", "res-1", "L1")));
+
+        DataAssetFieldTagDTO dto = new DataAssetFieldTagDTO();
+        dto.setConfirmed(true);
+        dto.setOperator("tester");
+        DataAssetFieldTagDTO.FieldTagItem it = new DataAssetFieldTagDTO.FieldTagItem();
+        it.setFieldId("id_card");
+        it.setFieldName("id_card");
+        it.setFieldSensitivity("L3");
+        it.setDataType("ID_CARD");
+        it.setMaskStrategy("middle4");
+        dto.setFields(List.of(it));
+
+        DataBridgeException ex = assertThrows(DataBridgeException.class,
+            () -> service.tagAssetFields("asset-1", dto));
+        assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_HTTP, ex.getHttpStatus(),
+            "评估失败＝裁决不可得＝503，禁与 DENY 的 403 或内部错误的 500 共用一枚载体");
+        assertEquals(503, DataBridgeException.resolveHttpStatus(ex.getHttpStatus()), "状态行跟随携带值");
+        assertTrue(ex.getMessage().startsWith(RlsExecutionContract.SEC_UNAVAILABLE_CODE),
+            "机读码单源＝ECOS-SEC-501");
+        assertTrue(ex.getMessage().contains("ASSET-041"), "评估失败腿保留 ASSET-041 标签供日志检索");
+        assertFalse(ex.getMessage().contains("操作被拒绝"),
+            "禁把「裁决没答」写成「操作被拒绝」（D-B4-85 的反向折叠侧）");
+        assertInstanceOf(IAbacPermissionChecker.PolicyEvaluationException.class, ex.getCause(),
+            "原异常作为 cause 保留，堆栈不因改承载而丢失");
         verify(assetDao, never()).insertField(anyString(), any(), anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyString(), any(Timestamp.class));
         verify(eventBus, never()).publish(eq(KafkaTopics.DATA_SECURITY_TAGGED), any());
     }
