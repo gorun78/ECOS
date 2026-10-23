@@ -32,7 +32,7 @@ import java.util.Optional;
  *   <li>lt — 小于</li>
  *   <li>contains — 字符串包含</li>
  *   <li>regex — 正则匹配</li>
- *   <li>hasRole — 角色检查（从 context 中取 userId）</li>
+ *   <li>hasRole — 角色检查（从 context 中取 userId）；角色数据面异常＝显式不可用（503），非宽容通过</li>
  *   <li>abac — ABAC 权限校验 (T5-2, 使用 IAbacPermissionChecker)；检查器未装配＝显式不可用（503），非宽容通过</li>
  * </ul>
  */
@@ -168,8 +168,11 @@ public class PreconditionEngine {
                 && actual.toString().contains(expected.toString());
             case "regex" -> actual != null && expected != null
                 && actual.toString().matches(expected.toString());
-            case "hasRole" -> {
-                // 从 context 中取 userId，通过 security-engine 检查角色
+            case "hasrole" -> {
+                // 从 context 中取 userId，通过 security-engine 检查角色。
+                // #142/B4-3e-54（D-B4-89）：标签必须取归一后的小写形态——本 switch 的 subject 在
+                // 第 147 行已 toLowerCase()，原标签 "hasRole" 恒不命中 ⇒ 角色前置条件一律落 default
+                // 判不过（并让 catch 里的 fail-open 腿成为死面）。改标签即恢复该腿可达。
                 String userId = String.valueOf(context.getOrDefault("userId", ""));
                 yield checkUserRole(userId, String.valueOf(expected));
             }
@@ -209,17 +212,46 @@ public class PreconditionEngine {
 
     /**
      * 通过 security-engine 的 /api/security/policy/evaluate 检查用户角色（简化实现：DB 查询）。
+     *
+     * <p>#142/B4-3e-54 收口 <b>D-B4-84</b>：原口径在 {@code catch (Exception)} 里 {@code return true}
+     * （注释自证「宽容模式：表不存在时默认通过」），把<b>数据访问故障</b>当成<b>角色校验通过</b>——
+     * 一处违架构铁律 #3（security 不可用默认 DENY），一处违详设 §4.7.2（不可用 ≠ 无权限 ≠ 空结果）。
+     * 改后三态分离：</p>
+     * <ul>
+     *   <li><b>拒绝</b>（返回 {@code false}）：主体缺失、角色计数为空值、计数为 0——角色确实不匹配；</li>
+     *   <li><b>通过</b>（返回 {@code true}）：计数 &gt; 0；</li>
+     *   <li><b>不可用</b>（抛 {@link DataBridgeException}，httpStatus=503，机读码
+     *       {@code ECOS-SYS-503}）：数据访问抛异常。禁折成 {@code false}（那会把「查不了」谎报成
+     *       「没权限」），也禁折成 {@code true}（原缺陷）。</li>
+     * </ul>
+     *
+     * <p>承载形态与同文件 {@link #evaluateAbac}（<b>D-B4-82</b>，#142/B4-3e-52 收口件）逐字同族，
+     * 不另立第三形态；{@code ActionTypeController.execute} 第 115 行的 {@code DataBridgeException}
+     * 显式上抛腿已覆盖本路径（本枚在 {@code check()} 的同一 {@code try} 内），故无需改端点。
+     * {@code dao} 面只抛 Spring {@code DataAccessException}，不会抛承载型异常，因此本 {@code try}
+     * 不配 {@code catch (DataBridgeException)} 保护腿——配了即属新死面。</p>
+     *
+     * @throws DataBridgeException 角色数据面不可用（httpStatus=503）
      */
     private boolean checkUserRole(String userId, String role) {
-        if (userId == null || userId.isBlank()) return false;
-        try {
-            Integer count = dao.countUserRole(userId, role);
-            return count != null && count > 0;
-        } catch (Exception e) {
-            log.debug("Role check skipped (table may not exist): {}", e.getMessage());
-            // 宽容模式：表不存在时默认通过
-            return true;
+        if (userId == null || userId.isBlank()) {
+            log.warn("hasRole precondition denied: subject userId is missing (role={})", role);
+            return false;
         }
+        Integer count;
+        try {
+            count = dao.countUserRole(userId, role);
+        } catch (Exception e) {
+            log.error("hasRole precondition unavailable: role data access failed "
+                + "(userId={}, role={}): {}", userId, role, e.getMessage());
+            throw new DataBridgeException(503, 503,
+                SystemErrorCode.ECOS_SYS_503 + ": 角色数据面不可用，hasRole 前置条件无法判定");
+        }
+        if (count == null) {
+            log.warn("hasRole precondition denied: role count is null (userId={}, role={})", userId, role);
+            return false;
+        }
+        return count > 0;
     }
 
     /**
