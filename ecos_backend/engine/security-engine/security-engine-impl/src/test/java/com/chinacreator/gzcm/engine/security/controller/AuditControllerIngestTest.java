@@ -1,6 +1,9 @@
 package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
+import com.chinacreator.gzcm.engine.security.service.AuditHashChainService;
 import com.chinacreator.gzcm.sysman.audit.model.AuditEvent;
 import com.chinacreator.gzcm.sysman.audit.service.IAuditLogService;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
@@ -12,8 +15,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.HashMap;
 import java.util.List;
@@ -23,9 +26,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,16 +48,36 @@ class AuditControllerIngestTest {
     @Mock
     private IAuditLogService auditLogService;
 
+    @Mock
+    private AuditHashChainService hashChainService;
+
     private AuditController controller;
     private MockHttpServletRequest request;
 
     @BeforeEach
     void setUp() {
-        controller = new AuditController();
-        ReflectionTestUtils.setField(controller, "auditLogService", auditLogService);
+        // #142/B4-3e-56：本类改为 ObjectProvider 构造注入（未装配腿显式抛 503，见 AuditUnavailableCarrierTest）
+        controller = new AuditController(availableProvider(auditLogService),
+                availableProvider(hashChainService));
         request = new MockHttpServletRequest();
         request.setRemoteAddr("203.0.113.9");
         request.addHeader("User-Agent", "ecos-gateway/1.0");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> ObjectProvider<T> availableProvider(T instance) {
+        ObjectProvider<T> provider = mock(ObjectProvider.class);
+        // setUp 里为两枚通道都装了桩，个别用例只走其中一枚 ⇒ 取 lenient 以免 strict-stubs 误报
+        org.mockito.Mockito.lenient().when(provider.getIfAvailable()).thenReturn(instance);
+        return provider;
+    }
+
+    /** 未装配通道：{@code getIfAvailable()} 返回 null，即线上「Bean 没装配」的读数。 */
+    @SuppressWarnings("unchecked")
+    private static <T> ObjectProvider<T> absentProvider() {
+        ObjectProvider<T> provider = mock(ObjectProvider.class);
+        org.mockito.Mockito.lenient().when(provider.getIfAvailable()).thenReturn(null);
+        return provider;
     }
 
     @AfterEach
@@ -155,7 +180,7 @@ class AuditControllerIngestTest {
     }
 
     @Test
-    @DisplayName("读路径（list/stats/verify）异常细节同样不回显")
+    @DisplayName("读路径（list/stats）异常细节不回显")
     void readFailuresDoNotLeakDetailToClient() {
         when(auditLogService.query(any()))
                 .thenThrow(new RuntimeException("token=eyJhbGciOi  leak-marker"));
@@ -165,22 +190,24 @@ class AuditControllerIngestTest {
         ApiResponse<Map<String, Object>> stats = controller.stats();
         assertFalse(stats.isSuccess());
         assertFalse(stats.getMessage().contains("leak-marker"));
-
-        ReflectionTestUtils.setField(controller, "hashChainService", null);
-        ApiResponse<Map<String, Object>> missing = controller.verifyIntegrity();
-        assertTrue(missing.isSuccess());
-        assertEquals(Boolean.FALSE, missing.getData().get("valid"));
     }
 
+    /**
+     * #142/B4-3e-56 订正：原案断言「服务未就绪时 list 仍返回空集而非 500（降级契约不变）」，
+     * 那条断言钉的正是差距 <b>D-B4-86</b> 本身——把「依赖没装配」谎报成「库里没有数据」，
+     * 违详设 §4.7.2「不可用 ≠ 无权限 ≠ 空结果」。现按收口后的契约改钉显式不可用承载。
+     */
     @Test
-    @DisplayName("服务未就绪时 list 仍返回空集而非 500（降级契约不变）")
-    void listDegradesToEmptyPageWhenServiceMissing() {
-        ReflectionTestUtils.setField(controller, "auditLogService", null);
+    @DisplayName("服务未装配时 list 抛 503＋ECOS-SEC-501，不再折成 200＋空集")
+    void listFailsClosedWhenServiceMissing() {
+        AuditController down = new AuditController(absentProvider(), absentProvider());
 
-        ApiResponse<Map<String, Object>> resp = controller.list("u-1", null, null, null, null, 1, 20);
+        DataBridgeException thrown = assertThrows(DataBridgeException.class,
+                () -> down.list("u-1", null, null, null, null, 1, 20));
 
-        assertTrue(resp.isSuccess());
-        assertEquals(0, resp.getData().get("total"));
-        assertEquals(List.of(), resp.getData().get("data"));
+        assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_HTTP, thrown.getHttpStatus());
+        assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_HTTP, thrown.getErrorCode());
+        assertTrue(thrown.getMessage().startsWith(RlsExecutionContract.SEC_UNAVAILABLE_CODE + ":"),
+                "消息首段必须是机读码 ECOS-SEC-501，实际：" + thrown.getMessage());
     }
 }

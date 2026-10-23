@@ -113,8 +113,20 @@ class NoMachineCodeFactoryFaceRatchetTest {
      * 承载（差距 <b>D-B4-83</b> 收口件）。−9 而非 −15：其中 6 枚原本就在 {@code catch} 内表达
      * 真实服务故障，不属本判据的迁移面。文件数不变＝三文件各自仍持有 {@code internalError} 兜底腿，
      * 只是不再用它掩盖缺装配。</p>
+     *
+     * <p><b>#142/B4-3e-56 同批下调（−2 处／0 文件）**：security 属主 {@code AuditController} 的
+     * 「审计服务未就绪」折叠腿（{@code get}／{@code writeLog} 各 1 枚
+     * {@code return ApiResponse.internalError("审计服务未就绪")}）改为抛
+     * {@code DataBridgeException(503, 503, ECOS-SEC-501)} 承载（差距 <b>D-B4-86</b> 收口件）。
+     * 本批实际迁移的未装配腿有 6 枚，但入本判据面的只有这 2 枚：另 4 枚折叠形态是
+     * {@code 200＋空集}／{@code 200＋全 0 计数}／{@code 200＋valid=false}（走 {@code success(...)}，
+     * 不在单参无机读码工厂面内），由 {@code AuditUnavailableCarrierTest} 的源码面判据钉零。
+     * 文件数不变＝该类仍持 6 枚 {@code catch} 内真实故障兜底 {@code internalError}，
+     * 那是与缺装配不同的态，本批不动。读数取自本批门禁会话内 {@code -pl runtime/common-api} 全量实跑
+     * 的失败报文（{@code sites=925, files=150, internalError=306}），非由旧值做算术推出；
+     * 算式 927−2＝925 与 308−2＝306 只用作差异归因，归因与实跑读数不符时以实跑读数为准。</p>
      */
-    private static final int BASELINE_SITES = 927;
+    private static final int BASELINE_SITES = 925;
     private static final int BASELINE_FILES = 150;
 
     /** 分枚基线：只减不增，且合计必须等于 {@link #BASELINE_SITES}（防「拆细了但总数对不上」）。 */
@@ -123,7 +135,7 @@ class NoMachineCodeFactoryFaceRatchetTest {
             "unauthorized", 12,
             "forbidden", 22,
             "notFound", 255,
-            "internalError", 308));
+            "internalError", 306));
 
     /** gateway 入口面已带码的六枚腿（锚点，不得回退）。 */
     private static final int ENTRY_LEGS_CODED = 6;

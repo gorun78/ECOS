@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
+import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.sysman.audit.model.AuditEvent;
 import com.chinacreator.gzcm.sysman.audit.service.IAuditLogService;
 import com.chinacreator.gzcm.engine.security.service.AuditHashChainService;
@@ -8,7 +10,7 @@ import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,11 +25,46 @@ public class AuditController {
 
     static final String ANONYMOUS_OPERATOR = "anonymous";
 
-    @Autowired(required = false)
-    private IAuditLogService auditLogService;
+    /**
+     * 依赖未装配（可选装配取不到 Bean）＝<b>不可用</b>态的显式承载（#142/B4-3e-56，差距 <b>D-B4-86</b>）。
+     *
+     * <p>详设 §4.7.2「不可用 ≠ 无权限 ≠ 空结果」＋铁律 §2.4（security 侧不可用一律 fail-closed）要求本态
+     * 在返回面上<b>可被分辨</b>。收口前本类 <b>6 枚</b>未装配腿分四种折叠形态（逐枚勘察，登记时只记到
+     * {@code internalError} 那两枚，成因见差距台账 B4-3e-56 段）：① {@code /logs}＝200＋空集、
+     * ② {@code /stats}＝200＋全 0 计数、③ {@code /verify-integrity} 与 {@code /verify-chain}＝200＋
+     * {@code valid=false} 载荷、④ 详情与写入两枚端点＝{@code ApiResponse.internalError("审计服务未就绪")}。
+     * 前三种把「查不了」谎报成「没有数据」或「校验不通过」，第四种把「依赖缺席」谎报成「本服务自身故障」
+     * ＝{@code code=-1/500} 且状态行仍恒 HTTP 200（裸回 {@code ApiResponse} 无 HTTP 状态能力，
+     * 见 D-B4-59 族）——两侧都在禁列。</p>
+     *
+     * <p><b>为什么走抛型而不是改返回值</b>：{@code ApiResponse} 只描述 body、没有任何 HTTP 状态能力，
+     * 改信封里的 {@code code} 写不出 503。本批沿用 3e-40~43／3e-52／3e-53／3e-55 在册承载族的<b>抛型形态</b>
+     * ——端点签名一字不动（不触「既有签名不可变」红线），状态行交给宿主：抛
+     * {@link DataBridgeException} 携带态，由双宿主 gateway／sysman-boot 的
+     * {@code GlobalExceptionHandler}（#142/B4-3e-26／3e-29 已收口「携带码与状态行同号」）写上状态行。
+     * 码面与行面同取 {@link RlsExecutionContract} 单源常量（与本模块 {@code DecisionController}、
+     * data-engine {@code QueryController} 的不可用腿同源），禁在本类另立字面量。
+     * 抛出后各端点<b>必须同时具备</b> {@code catch (DataBridgeException e) { throw e; }} 放行腿，
+     * 否则同方法既有的 {@code catch (Exception)} 会把它再折回 500——该形态由
+     * {@code AuditUnavailableCarrierTest} 逐枚钉住（守卫 6 枚／放行腿 6 枚）。</p>
+     *
+     * <p><b>真实空结果不受影响</b>：服务在位且查到零条仍是 200＋空集，正向对照同样入门。</p>
+     */
+    static DataBridgeException unassembled(String channel) {
+        return new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_CODE + ": " + channel + "未装配，审计面不可用，"
+                        + "按 fail-closed 拒绝服务（§4.7.2 不可用 ≠ 无权限 ≠ 空结果）");
+    }
 
-    @Autowired(required = false)
-    private AuditHashChainService hashChainService;  // P1-3: 哈希链验证
+    private final ObjectProvider<IAuditLogService> auditLogProvider;
+    private final ObjectProvider<AuditHashChainService> hashChainProvider;  // P1-3: 哈希链验证
+
+    public AuditController(ObjectProvider<IAuditLogService> auditLogProvider,
+                           ObjectProvider<AuditHashChainService> hashChainProvider) {
+        this.auditLogProvider = auditLogProvider;
+        this.hashChainProvider = hashChainProvider;
+    }
 
     @GetMapping("/logs")
     public ApiResponse<Map<String, Object>> list(
@@ -38,22 +75,19 @@ public class AuditController {
             @RequestParam(required = false) String endTime,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
+        IAuditLogService service = auditLogProvider.getIfAvailable();
+        if (service == null) {
+            log.error("IAuditLogService 未装配，审计日志查询不可用（fail-closed，D-B4-86）");
+            throw unassembled("审计日志服务 IAuditLogService");
+        }
         try {
-            if (auditLogService == null) {
-                Map<String, Object> empty = new LinkedHashMap<>();
-                empty.put("data", Collections.emptyList());
-                empty.put("total", 0);
-                empty.put("page", page);
-                empty.put("pageSize", pageSize);
-                return ApiResponse.success(empty);
-            }
             IAuditLogService.AuditQueryCondition cond = new IAuditLogService.AuditQueryCondition();
             cond.setUserId(userId);
             if (action != null) cond.setEventType(action);
             if (resourceType != null) cond.setResource(resourceType);
             cond.setPage(page);
             cond.setPageSize(pageSize);
-            List<AuditEvent> logs = auditLogService.query(cond);
+            List<AuditEvent> logs = service.query(cond);
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("data", logs);
@@ -61,6 +95,8 @@ public class AuditController {
             result.put("page", page);
             result.put("pageSize", pageSize);
             return ApiResponse.success(result);
+        } catch (DataBridgeException e) {
+            throw e;
         } catch (Exception e) {
             log.error("查询审计日志失败", e);
             return ApiResponse.internalError("查询审计日志失败");
@@ -69,11 +105,17 @@ public class AuditController {
 
     @GetMapping("/logs/{id}")
     public ApiResponse<?> get(@PathVariable String id) {
+        IAuditLogService service = auditLogProvider.getIfAvailable();
+        if (service == null) {
+            log.error("IAuditLogService 未装配，审计日志详情不可用（fail-closed，D-B4-86）");
+            throw unassembled("审计日志服务 IAuditLogService");
+        }
         try {
-            if (auditLogService == null) return ApiResponse.internalError("审计服务未就绪");
-            AuditEvent log = auditLogService.getById(id);
+            AuditEvent log = service.getById(id);
             if (log == null) return ApiResponse.notFound("日志不存在");
             return ApiResponse.success(log);
+        } catch (DataBridgeException e) {
+            throw e;
         } catch (Exception e) {
             log.error("查询审计日志详情失败: id={}", id, e);
             return ApiResponse.internalError("查询审计日志详情失败");
@@ -86,22 +128,18 @@ public class AuditController {
      */
     @GetMapping("/stats")
     public ApiResponse<Map<String, Object>> stats() {
+        IAuditLogService service = auditLogProvider.getIfAvailable();
+        if (service == null) {
+            log.error("IAuditLogService 未装配，审计统计不可用（fail-closed，D-B4-86）");
+            throw unassembled("审计日志服务 IAuditLogService");
+        }
         try {
             Map<String, Object> result = new LinkedHashMap<>();
-            if (auditLogService == null) {
-                result.put("todayCount", 0);
-                result.put("failureCount", 0);
-                result.put("activeUsers", 0);
-                result.put("anomalyIps", 0);
-                result.put("totalCount", 0);
-                result.put("successCount", 0);
-                return ApiResponse.success(result);
-            }
             // Query all logs for stats (page 1, large page size)
             IAuditLogService.AuditQueryCondition cond = new IAuditLogService.AuditQueryCondition();
             cond.setPage(1);
             cond.setPageSize(1000);
-            List<AuditEvent> allLogs = auditLogService.query(cond);
+            List<AuditEvent> allLogs = service.query(cond);
 
             // Today count
             java.time.LocalDate today = java.time.LocalDate.now();
@@ -135,6 +173,8 @@ public class AuditController {
             result.put("totalCount", (long) allLogs.size());
             result.put("successCount", allLogs.stream().filter(l -> "SUCCESS".equals(l.getResult())).count());
             return ApiResponse.success(result);
+        } catch (DataBridgeException e) {
+            throw e;
         } catch (Exception e) {
             log.error("审计统计失败", e);
             return ApiResponse.internalError("审计统计失败");
@@ -147,14 +187,15 @@ public class AuditController {
      */
     @GetMapping("/verify-integrity")
     public ApiResponse<Map<String, Object>> verifyIntegrity() {
+        AuditHashChainService chain = hashChainProvider.getIfAvailable();
+        if (chain == null) {
+            log.error("AuditHashChainService 未装配，哈希链全量校验不可用（fail-closed，D-B4-86）");
+            throw unassembled("哈希链服务 AuditHashChainService");
+        }
         try {
-            if (hashChainService == null) {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("valid", false);
-                m.put("error", "哈希链服务未就绪");
-                return ApiResponse.success(m);
-            }
-            return ApiResponse.success(hashChainService.verifyHashChain());
+            return ApiResponse.success(chain.verifyHashChain());
+        } catch (DataBridgeException e) {
+            throw e;
         } catch (Exception e) {
             log.error("审计哈希链验证失败", e);
             return ApiResponse.internalError("审计哈希链验证失败");
@@ -167,14 +208,12 @@ public class AuditController {
      */
     @PostMapping("/verify-chain")
     public ApiResponse<Map<String, Object>> verifyChain(@RequestBody Map<String, Object> body) {
+        AuditHashChainService chain = hashChainProvider.getIfAvailable();
+        if (chain == null) {
+            log.error("AuditHashChainService 未装配，哈希链区间校验不可用（fail-closed，D-B4-86）");
+            throw unassembled("哈希链服务 AuditHashChainService");
+        }
         try {
-            if (hashChainService == null) {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("valid", false);
-                m.put("brokenAt", Collections.emptyList());
-                m.put("error", "哈希链服务未就绪");
-                return ApiResponse.success(m);
-            }
             Long from = asLong(body.get("from"));
             Long to = asLong(body.get("to"));
             if (from == null || to == null) {
@@ -183,7 +222,9 @@ public class AuditController {
             if (from > to) {
                 return ApiResponse.badRequest("from 不能大于 to");
             }
-            return ApiResponse.success(hashChainService.verifyHashChainRange(from, to));
+            return ApiResponse.success(chain.verifyHashChainRange(from, to));
+        } catch (DataBridgeException e) {
+            throw e;
         } catch (Exception e) {
             log.error("审计哈希链区间校验失败", e);
             return ApiResponse.internalError("审计哈希链区间校验失败");
@@ -209,11 +250,12 @@ public class AuditController {
     @PostMapping("/log")
     public ApiResponse<Map<String, Object>> writeLog(@RequestBody Map<String, Object> body,
                                                      HttpServletRequest request) {
+        IAuditLogService service = auditLogProvider.getIfAvailable();
+        if (service == null) {
+            log.error("IAuditLogService 未装配，审计写入不可用（fail-closed，D-B4-86）");
+            throw unassembled("审计日志服务 IAuditLogService");
+        }
         try {
-            if (auditLogService == null) {
-                return ApiResponse.internalError("审计服务未就绪");
-            }
-
             // 构造审计事件
             AuditEvent event = new AuditEvent();
             event.setEventId(UUID.randomUUID().toString());
@@ -246,9 +288,11 @@ public class AuditController {
             // N-24 取证：主体仍由调用方自报（信任模型待裁 Q15），此处旁录服务端已认证主体供对账
             log.info("审计摄取: claimedUserId={} action={} ingestActor={} eventId={}",
                     event.getUserId(), event.getAction(), resolveIngestActor(), event.getEventId());
-            auditLogService.log(event);
+            service.log(event);
 
             return ApiResponse.success(Map.of("status", "accepted"));
+        } catch (DataBridgeException e) {
+            throw e;
         } catch (Exception e) {
             log.error("写入审计日志失败", e);
             return ApiResponse.internalError("写入审计日志失败");
