@@ -55,3 +55,8 @@ ecos_backend/_win_tasks/
 # 运行产物（2026-09-30 提交批次时补）：ecos_frontend 侧 _win_tasks 构建日志不入库
 /ecos_frontend/_win_tasks/logs/
 /ecos_frontend/_win_tasks/*.log
+*.log
+*.log
+*.log
+*.log
+*.log
