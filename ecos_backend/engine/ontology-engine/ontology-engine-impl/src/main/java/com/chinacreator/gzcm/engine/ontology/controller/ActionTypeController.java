@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.ontology.ActionTypeService;
 import com.chinacreator.gzcm.engine.ontology.dto.ActionTypeExecuteQuery;
 import com.chinacreator.gzcm.engine.ontology.dto.ActionTypeExecuteVO;
@@ -111,6 +112,10 @@ public class ActionTypeController {
         try {
             Map<String, Object> result = actionTypeService.executeAction(id, toPayload(query));
             return ApiResponse.success(toVO(result));
+        } catch (DataBridgeException e) {
+            // #142/B4-3e-52（D-B4-82）：承载型不可用（如 ABAC 检查器未装配＝503）显式上抛，
+            // 由 gateway GlobalExceptionHandler 按 getHttpStatus() 透出状态行，禁在此折成 internalError(500)。
+            throw e;
         } catch (IllegalArgumentException e) {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {

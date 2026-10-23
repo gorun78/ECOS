@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.ontology.engine;
 
+import com.chinacreator.gzcm.common.error.SystemErrorCode;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.ontology.dao.PreconditionDao;
 import com.chinacreator.gzcm.engine.ontology.model.ActionType;
 import com.chinacreator.gzcm.sysman.abac.model.AbacContext;
@@ -31,7 +33,7 @@ import java.util.Optional;
  *   <li>contains — 字符串包含</li>
  *   <li>regex — 正则匹配</li>
  *   <li>hasRole — 角色检查（从 context 中取 userId）</li>
- *   <li>abac — ABAC 权限校验 (T5-2, 使用 IAbacPermissionChecker)</li>
+ *   <li>abac — ABAC 权限校验 (T5-2, 使用 IAbacPermissionChecker)；检查器未装配＝显式不可用（503），非宽容通过</li>
  * </ul>
  */
 @Component
@@ -42,7 +44,12 @@ public class PreconditionEngine {
 
     private final PreconditionDao dao;
 
-    /** ABAC 权限检查器（可选注入，未配置时 ABAC 操作符宽容通过）。 */
+    /**
+     * ABAC 权限检查器（可选注入；缺席时 {@code abac} 操作符抛显式不可用，禁宽容通过）。
+     *
+     * <p>#142/B4-3e-52 收口 D-B4-82：原口径「未配置即返回 true」＝fail-open，违架构铁律 #3
+     * （security 不可用默认 DENY）与详设 §4.7.2（不可用 ≠ 无权限 ≠ 空结果）。</p>
+     */
     private final IAbacPermissionChecker abacPermissionChecker;
 
     public PreconditionEngine(PreconditionDao dao,
@@ -229,13 +236,19 @@ public class PreconditionEngine {
      * }</pre>
      *
      * <p>同时支持从运行时 context 中注入动态值：{@code ${context.userId}} 等占位符。</p>
+     *
+     * @throws DataBridgeException ABAC 检查器未装配（httpStatus=503，机读码 {@code ECOS-SYS-503}）——
+     *         「不可用」独立于「策略拒绝」（返回 false）与「前置条件为空」（直接通过）
      */
     @SuppressWarnings("unchecked")
     private boolean evaluateAbac(Map<String, Object> cond, Map<String, Object> context) {
-        // ABAC 检查器未配置时，宽容通过
+        // #142/B4-3e-52（D-B4-82）：检查器未装配＝下游制品不可用，按 §3.2.7 落显式 503＋机读码
+        // ECOS-SYS-503，与同接口 data-engine AssetService 侧 fail-closed 口径对齐；
+        // 禁 return true 的 fail-open（违架构铁律 #3），也禁折成「策略拒绝」或空结果（§4.7.2）。
         if (abacPermissionChecker == null) {
-            log.debug("ABAC permission checker not configured, allowing by default");
-            return true;
+            log.error("ABAC permission checker not assembled; abac precondition leg is unavailable (fail-closed)");
+            throw new DataBridgeException(503, 503,
+                SystemErrorCode.ECOS_SYS_503 + ": ABAC 检查器未装配，前置条件无法判定");
         }
 
         Object value = cond.get("value");
