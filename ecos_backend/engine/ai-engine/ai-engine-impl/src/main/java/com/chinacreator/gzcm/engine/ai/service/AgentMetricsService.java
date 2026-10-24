@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.service;
 
+import com.chinacreator.gzcm.common.error.SystemErrorCode;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.ai.dao.AgentMetricsDao;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +52,14 @@ public class AgentMetricsService {
      * <p>主路径 {@link AgentMetricsController} 是 COUNT 永不报错（SUM 0），
      * 兼容性路径需要显式 404，因此走 exists 探测。
      *
+     * <p><b>#142/B4-3e-58（差距 D-B4-88）</b>：收口前本方法在 {@code catch (Exception)} 顶层
+     * {@code return true}，注释自证「宽松降级：查询失败不判 404，继续走主流程」——把「查不了」
+     * 洗成「查到了」，调用方（{@code AgentMetricsCompatController}）随后按「存在」渲染空指标，
+     * 违 §4.7.2「不可用 ≠ 无权限 ≠ 空结果」。本腿不能改判 {@code false}：那会把「查不了」
+     * 折成「Agent 不存在 → 404」，是同一条铁律的反向违例。现改抛携带 503 ＋
+     * {@code ECOS-SYS-503} 机读码的 {@link DataBridgeException}，由 {@code AiErrorAdvice}
+     * 的根型腿按 {@code resolveHttpStatus} 单源透出状态行。</p>
+     *
      * @return true 只要 ecos_agent_metrics 中有 ≥1 行记录
      */
     public boolean exists(String agentId) {
@@ -57,8 +67,9 @@ public class AgentMetricsService {
             Integer cnt = dao.queryExists(agentId);
             return cnt != null && cnt > 0;
         } catch (Exception e) {
-            log.warn("exists() failed for agentId={}: {}", agentId, e.getMessage());
-            return true; // 宽松降级：查询失败不判 404，继续走主流程
+            log.error("exists() 判定通道不可用, agentId={}: {}", agentId, e.getMessage(), e);
+            throw new DataBridgeException(503, 503,
+                    SystemErrorCode.ECOS_SYS_503 + ": Agent 指标存在性判定通道不可用");
         }
     }
 

@@ -37,7 +37,8 @@ import static org.junit.jupiter.api.Assertions.fail;
  * <p><b>本门钉五件事</b>：</p>
  * <ol>
  *   <li><b>判据 A</b>：全后端 main 面参数型为根的 {@code @ExceptionHandler} 腿按文件分枚
- *       {@code equals} 基线（实测 3 枚／3 文件：kb-engine、gateway、sysman-boot），
+ *       {@code equals} 基线（实测 4 枚／4 文件：ai-engine、kb-engine、gateway、sysman-boot；
+ *       ai 一枚系 #142/B4-3e-58 为 D-B4-88 服务侧显式承载补的生效前提腿），
  *       且逐枚断言返回类型以 {@code ResponseEntity} 开头、方法体引用 {@code resolveHttpStatus}。
  *       增＝新宿主又开一枚裸回根腿，减＝基线陈旧，同样红。</li>
  *   <li><b>判据 B</b>：区间判定字面量（{@code 400} 与 {@code 599} 同现的合法携带区间）在
@@ -112,8 +113,19 @@ class RootCarrierHttpStatusSingleSourceRatchetTest {
     /** 扫描面阈值守卫：2026-10-22 实测 ecos_backend main 面 .java 文件 2339 枚。 */
     private static final int MIN_SCANNED_MAIN_FILES = 2000;
 
-    /** 基线：根型 handler 腿逐文件枚数（实测 3 枚／3 文件，合计 3）。 */
+    /**
+     * 基线：根型 handler 腿逐文件枚数（实测 <b>4 枚／4 文件</b>，合计 4）。
+     *
+     * <p><b>#142/B4-3e-58（D-B4-88）3→4</b>：ai 域新增 {@code AiErrorAdvice#onBridge}。该腿是
+     * 服务侧显式抛 503 载体的<b>生效前提</b>——收口前 ai 的 {@code Exception} 兜底走
+     * {@code ErrorCodeMapper.classify}，而分类器反射只认 {@code getStatus()}（根的携带通道是
+     * {@code getHttpStatus()}），根型异常按 GENERIC 面落 {@code TOOL_BACKEND_ERROR}/502，
+     * 即 D-B4-67 在第四宿主的副本：服务侧刚把「判定通道不可用」显式抛出来，渲染面又折成 502。
+     * 新腿与 kb 同法走 {@code resolveHttpStatus} 单源，故判据 A 的逐枚断言自动覆盖它。</p>
+     */
     private static final Map<String, Integer> BASELINE_ROOT_LEGS = baseline(
+            "ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/ai/controller/AiErrorAdvice.java", 1,
             "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/"
                     + "engine/kb/support/KbErrorAdvice.java", 1,
             "ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/handler/"
@@ -127,7 +139,7 @@ class RootCarrierHttpStatusSingleSourceRatchetTest {
     // ── 判据 A：根型腿分枚基线 + 逐枚落状态行 ──────────────
 
     @Test
-    @DisplayName("判据A — 根型 @ExceptionHandler 腿 = 基线 3 枚／3 文件，且逐枚走 ResponseEntity + resolveHttpStatus")
+    @DisplayName("判据A — 根型 @ExceptionHandler 腿 = 基线 4 枚／4 文件，且逐枚走 ResponseEntity + resolveHttpStatus")
     void rootCarrierLegsCarryTheirOwnStatus() throws IOException {
         Scan scan = scanMainFace();
         assertTrue(scan.scannedFiles >= MIN_SCANNED_MAIN_FILES,

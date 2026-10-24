@@ -1,8 +1,10 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.base.MachineErrorCode;
 import com.chinacreator.gzcm.common.error.AiError;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.engine.ai.service.ErrorCodeMapper;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
@@ -63,6 +65,30 @@ public class AiErrorAdvice {
     public ResponseEntity<ApiResponse<Map<String, Object>>> onOther(Exception e) {
         return render(ErrorCodeMapper.classify(e, ErrorCodeMapper.Context.generic(),
                 AiTraceSupport.currentTraceId()), e);
+    }
+
+    /**
+     * 跨域承载型异常 → <b>跟随异常自述状态行</b>（#142/B4-3e-58，差距 D-B4-88 的生效前提腿）。
+     *
+     * <p><b>为什么必须单列一条腿</b>：本 advice 的兜底 {@link #onOther} 走
+     * {@code ErrorCodeMapper.classify}，而该分类器沿 cause 链只认 {@code getStatus()}（反射取
+     * 下游 HTTP 码），根异常型 {@link DataBridgeException} 的携带通道是 {@code getHttpStatus()}
+     * ⇒ 不可识别，按 {@code GENERIC} 面兜底落 {@code TOOL_BACKEND_ERROR}（{@code ECOS-AI-502}／502）。
+     * 于是服务侧刚把「判定通道不可用」显式抛出来（503），渲染面又把它折成 502 ——
+     * 与已收口的 {@code KbErrorAdvice#onBridge}（#142/B4-3e-30，D-B4-67 前半）是同一缺陷在另一宿主：
+     * §4.7.2「不可用 ≠ 上游坏掉」，客户端按状态行分派时会把 503 当可退避重试的 502。
+     * 状态行走 {@link DataBridgeException#resolveHttpStatus} 单源，机读码走
+     * {@link MachineErrorCode#orNumeric} 单源（携带码原样透出），本类不再自带区间判据。</p>
+     */
+    @ExceptionHandler(DataBridgeException.class)
+    public ResponseEntity<ApiResponse<Void>> onBridge(DataBridgeException ex) {
+        int status = DataBridgeException.resolveHttpStatus(ex.getHttpStatus());
+        log.error("AI 域收到跨域承载异常 → status={} errorCode={} message={}",
+                status, ex.getErrorCode(), ex.getMessage(), ex);
+        return ResponseEntity.status(status).body(
+                ApiResponse.error(status,
+                        MachineErrorCode.orNumeric(ex.getMessage(), ex.getErrorCode()),
+                        "判定通道暂不可用，请稍后重试"));
     }
 
     /**

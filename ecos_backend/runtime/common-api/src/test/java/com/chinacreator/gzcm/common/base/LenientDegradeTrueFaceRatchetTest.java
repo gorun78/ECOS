@@ -55,6 +55,10 @@ import org.junit.jupiter.api.io.TempDir;
  * {@link #BASELINE_FACE}／{@link #BASELINE_SITES} 并在台账留痕。基线按「文件相对路径 → 枚数」
  * 整张比对（不只比总数），防止「修掉一枚 A 同时新写一枚 B」的总数对冲。</p>
  *
+ * <p><b>当前面状态（#142/B4-3e-58 起）＝零枚</b>：{@link #BASELINE_FACE} 为空表，本门由「棘轮」
+ * 收紧为「零容忍」——面上再出现任何一枚都直接红，不存在「还有存量所以先放行」的中间态。
+ * 沿革与逐枚收口形态见 {@link #BASELINE_FACE} 注释。</p>
+ *
  * <p><b>已声明盲区</b>（随 <b>D-B4-72</b> 判据扩展收口，不在本门静默放行）：
  * ① 顶层只数 {@code return true;} 字面形态，{@code return Boolean.TRUE;} 与「先把 true 赋给局部
  * 变量再返回」不在其内；② 嵌套块内的宽松降级（{@code if (…) \{ return true; \}}）属故意不计——
@@ -78,47 +82,86 @@ class LenientDegradeTrueFaceRatchetTest {
             "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/"
             + "com/chinacreator/gzcm/engine/ontology/engine/PreconditionEngine.java";
 
+    /** 收口件：数据源存在性预览通道（ontology）。 */
+    private static final String COLLECTED_AUTO_DISCOVER_PREVIEW_CONTROLLER =
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/"
+            + "com/chinacreator/gzcm/engine/ontology/controller/AutoDiscoverPreviewController.java";
+
+    /** 收口件：认知 schema 预检（cognitive）。 */
+    private static final String COLLECTED_MIND_ASSET_DAO =
+            "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/"
+            + "com/chinacreator/gzcm/engine/cognitive2/dao/MindAssetDao.java";
+
+    /** 收口件：Agent 指标存在性探测（ai）。 */
+    private static final String COLLECTED_AGENT_METRICS_SERVICE =
+            "ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/"
+            + "com/chinacreator/gzcm/engine/ai/service/AgentMetricsService.java";
+
+    /** 收口件（死面删除腿）：Neo4j 写开关（kb）。 */
+    private static final String COLLECTED_RULE_GRAPH_SERVICE =
+            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+            + "com/chinacreator/gzcm/engine/kb/service/RuleGraphService.java";
+
+    /** 承载型不可用腿：抛携带 503 的根异常。 */
+    private static final Pattern BRIDGE_503_CARRIER = Pattern.compile(
+            "throw new DataBridgeException\\(\\s*503\\s*,\\s*503\\s*,");
+
+    /** 承载型不可用腿：认知域前置门异常（ECOS-COG-501 → 503）。 */
+    private static final Pattern COGNITIVE_503_CARRIER = Pattern.compile(
+            "throw new CognitiveGuardException\\(\\s*CognitiveErrorCode\\.E501_SCHEMA_NOT_READY\\s*,");
+
+    /** 保护腿：控制器兜底前显式放行根异常。 */
+    private static final Pattern BRIDGE_PASSTHROUGH_LEG = Pattern.compile(
+            "catch\\s*\\(\\s*DataBridgeException\\s+\\w+\\s*\\)");
+
     /**
-     * 面集基线（#142/B4-3e-54 本批实跑读数＝<b>4 枚／4 文件</b>，判据见类注释；
-     * 键＝仓根相对路径，值＝该文件顶层违例枚数）。
+     * 面集基线（#142/B4-3e-58 收口 D-B4-88 <b>整批余面</b>后实跑读数＝<b>0 枚／0 文件</b>；
+     * 键＝仓根相对路径，值＝该文件顶层违例枚数。本表为空＝「面已清零 + 只准减不准增」的
+     * 零容忍态，任何新写宽松降级腿都直接红）。
      *
-     * <p>收口前同判据实跑读数＝<b>5 枚／5 文件</b>（#142/B4-3e-54 变异跑取证：把
-     * {@code PreconditionEngine} 的 {@code catch} 腿退回原形态后本门 4 枚案报 <b>2 failures</b> ⇒
-     * {@code lenientDegradeTrueFaceIsRatcheted} 打印「门禁结果：违例 5 ＞ 基线 4」且面集含
-     * {@code PreconditionEngine.java=1}；{@code collectedRoleCheckLegMustCarryExplicitly} 报
-     * 「实读 1，应为 abac（D-B4-82）与 hasRole（D-B4-84）两枚」{@code expected: <2> but was: <1>}），
-     * 其中一枚由本批收口（差距
-     * <b>D-B4-84</b>：{@code checkUserRole} 的 {@code catch (Exception)} 后 {@code return true}，
-     * 注释自证「宽容模式：表不存在时默认通过」）⇒ 基线 −1。余下 4 枚逐枚实读源码确认
-     * {@code return true;} 位于该 {@code catch} 块<b>顶层</b>：</p>
+     * <p><b>基线沿革（逐批读数，禁凭记忆改数）</b>：</p>
      * <ul>
-     *   <li>{@code AutoDiscoverPreviewController}：数据源存在性＋归属校验失败 ⇒ 「宽松降级：允许预览继续」；</li>
-     *   <li>{@code MindAssetDao.mindTableExists}：schema 预探测抛异常 ⇒ 注释自称「保守」实为宽松，
-     *       与该文件 javadoc 自述的「{@code to_regclass IS NULL → 503 ECOS-COG-501}」自相矛盾；</li>
-     *   <li>{@code AgentMetricsService}：{@code exists()} 查询失败 ⇒ 「宽松降级：不判 404，继续走主流程」；</li>
-     *   <li>{@code RuleGraphService.switchNeo4jEnabled}：{@code Boolean.parseBoolean} 按规范不抛异常
-     *       ⇒ 该 {@code catch} 体<b>不可达</b>，属 D-B4-77 死代码族的<b>死面</b>，不是运行期 fail-open；
-     *       仍留在面集内不豁免，因为「数得到」优先于「数得漂亮」，删除它属 D-B4-77 治理腿。</li>
+     *   <li>#142/B4-3e-54 建门时收口前读数＝5 枚／5 文件，收口 {@code PreconditionEngine.checkUserRole}
+     *       （<b>D-B4-84</b>）后基线落下＝<b>4 枚／4 文件</b>；</li>
+     *   <li>#142/B4-3e-58（<b>D-B4-88</b>）把余下 4 枚逐枚收口 ⇒ 本表归零：
+     *     <ol>
+     *       <li>{@code AutoDiscoverPreviewController.datasourceExists}——数据源存在性判定通道故障
+     *           折成「允许预览继续」⇒ 改抛 {@code DataBridgeException(503, 503, ECOS-SYS-503…)}，
+     *           并在 {@code preview()} 的兜底前加 {@code catch (DataBridgeException) → throw e}
+     *           保护腿（否则被 {@code internalError(500)} 反向折叠）；</li>
+     *       <li>{@code MindAssetDao.mindTableExists}——schema 预探测故障自称「保守」实为报「表在」，
+     *           与该文件 javadoc 自述的「{@code to_regclass IS NULL → 503 ECOS-COG-501}」自相矛盾
+     *           ⇒ 改抛同包 {@code BeliefScorer} 既有形态的 {@code CognitiveGuardException}
+     *           （503／ECOS-COG-501，{@code missing} 带表名），只有<b>真取到</b> {@code false}
+     *           才走返回值；</li>
+     *       <li>{@code AgentMetricsService.exists}——查询故障折成「Agent 存在」⇒ 改抛 503 载体。
+     *           本枚的生效前提腿在 {@code AiErrorAdvice}：该 advice 的 {@code Exception} 兜底走
+     *           {@code ErrorCodeMapper.classify}，而分类器只反射 {@code getStatus()}（根的携带通道是
+     *           {@code getHttpStatus()}）⇒ 根型异常按 GENERIC 面落 {@code TOOL_BACKEND_ERROR}/502，
+     *           即 D-B4-67 在 ai 宿主的副本；同批新增 {@code onBridge} 根型腿走
+     *           {@code resolveHttpStatus} 单源（该腿须与
+     *           {@code RootCarrierHttpStatusSingleSourceRatchetTest} 判据 A 基线同号，属主表 3→4）；</li>
+     *       <li>{@code RuleGraphService.switchNeo4jEnabled}——{@code Boolean.parseBoolean} 按规范
+     *           不抛异常 ⇒ {@code catch} 体<b>不可达</b>，属 D-B4-77 死代码族的<b>死面</b>而非运行期
+     *           fail-open；本批按 D-B4-77 治理腿删除不可达 {@code try/catch}（语义不变）。
+     *           此前「数得到优先于数得漂亮」的登记口径随收口一并作废：死面留在面上只会让基线
+     *           失去「一枚＝一条真实宽松降级腿」的计数意义。</li>
+     *     </ol>
+     *   </li>
      * </ul>
      *
-     * <p><b>同批勘察中被本判据正确排除的一枚近似形态</b>（如实登记，不当成已收口）：
+     * <p><b>同批勘察中被本判据正确排除、仍留作余项的近似形态</b>（不当成已收口）：
      * {@code data-engine QualityServiceImpl} 的「无法解析的表达式，默认通过」写在
-     * {@code catch (NumberFormatException)} 块<b>之后的公共出口</b>，即表达式既不匹配前缀语法也不
-     * 数值化时统一返回通过——违的是同一条 §4.7.2，但落点不在 {@code catch} 顶层，故本门数不到它。
-     * 该枚属「无效输入折成通过」另一族，登记为 <b>D-B4-88</b> 余项的判据扩展面（随 D-B4-72 收口）。</p>
+     * {@code catch (NumberFormatException)} 块<b>之后的公共出口</b>，落点不在 {@code catch} 顶层，
+     * 故本门数不到它。该枚属「无效输入折成通过」另一族，判据扩展与收口已拆到
+     * <b>#142/B4-3e-59</b>（保持单主题事务）。同批新登记的相近形态：同文件
+     * {@code alreadyExists} 探测腿把查询失败折成「实体不存在」（值面 falsy，不上状态行），
+     * 亦归该族。</p>
      */
-    private static final Map<String, Integer> BASELINE_FACE = new TreeMap<>(Map.of(
-            "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/"
-            + "com/chinacreator/gzcm/engine/cognitive2/dao/MindAssetDao.java", 1,
-            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
-            + "com/chinacreator/gzcm/engine/kb/service/RuleGraphService.java", 1,
-            "ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/"
-            + "com/chinacreator/gzcm/engine/ai/service/AgentMetricsService.java", 1,
-            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/"
-            + "com/chinacreator/gzcm/engine/ontology/controller/AutoDiscoverPreviewController.java", 1));
+    private static final Map<String, Integer> BASELINE_FACE = new TreeMap<>();
 
     /** 面集总数基线（必须与 {@link #BASELINE_FACE} 各值之和同号，防拆细后总数对不上）。 */
-    private static final int BASELINE_SITES = 4;
+    private static final int BASELINE_SITES = 0;
 
     /** 收口件锚点：{@code PreconditionEngine} 内承载型不可用腿数（abac ＋ hasRole 两枚，不得回退）。 */
     private static final int ANCHOR_UNAVAILABLE_LEGS = 2;
@@ -173,7 +216,50 @@ class LenientDegradeTrueFaceRatchetTest {
                 "收口件仍在宽松降级面上：" + scan.face);
     }
 
-    // ── 3. 判据自证（能变红 + 不许改过头）───────────
+    // ── 3. 收口件锚点（D-B4-88 四枚）──────────────────
+
+    @Test
+    @DisplayName("D-B4-88 收口件锚点：四枚宽松降级腿逐枚改判后承载腿在位、死面方法体不再有 catch")
+    void collectedFourLenientLegsCarryExplicitly() throws IOException {
+        // ① ontology 预览通道：503 载体 + 兜底前的显式放行腿
+        String preview = stripped(COLLECTED_AUTO_DISCOVER_PREVIEW_CONTROLLER);
+        assertEquals(1, count(BRIDGE_503_CARRIER, preview),
+                "AutoDiscoverPreviewController 的 503 承载腿数与凭证不符（回退即红）");
+        assertEquals(1, count(BRIDGE_PASSTHROUGH_LEG, preview),
+                "AutoDiscoverPreviewController 缺 catch (DataBridgeException) → throw e 保护腿："
+                        + "只在服务侧抛载体而端点仍兜底折叠＝反向折叠，状态行照旧丢");
+
+        // ② cognitive schema 预检：改抛认知域前置门（503／ECOS-COG-501）
+        String mindDao = stripped(COLLECTED_MIND_ASSET_DAO);
+        assertEquals(1, count(COGNITIVE_503_CARRIER, mindDao),
+                "MindAssetDao.mindTableExists 的 CognitiveGuardException(E501) 承载腿不在位");
+
+        // ③ ai 指标存在性探测：503 载体
+        assertEquals(1, count(BRIDGE_503_CARRIER, stripped(COLLECTED_AGENT_METRICS_SERVICE)),
+                "AgentMetricsService.exists 的 503 承载腿数与凭证不符");
+
+        // ④ kb Neo4j 开关：不可达 catch 已删——方法体内不得再出现 catch
+        String kb = stripped(COLLECTED_RULE_GRAPH_SERVICE);
+        int sig = kb.indexOf("public boolean switchNeo4jEnabled()");
+        assertTrue(sig >= 0, "RuleGraphService.switchNeo4jEnabled 签名消失，判据锚点失效");
+        int open = kb.indexOf('{', sig);
+        int close = matchingBrace(kb, open);
+        assertTrue(close > open, "switchNeo4jEnabled 方法体花括号不闭合，判据不可信");
+        String body = kb.substring(open, close + 1);
+        assertFalse(body.contains("catch"),
+                "死面回退：switchNeo4jEnabled 体内再现 catch（Boolean.parseBoolean 不抛异常，"
+                        + "该腿不可达＝D-B4-77 死面而非运行期降级）");
+
+        Scan scan = scanMainFace();
+        for (String collected : new String[] {COLLECTED_AUTO_DISCOVER_PREVIEW_CONTROLLER,
+                COLLECTED_MIND_ASSET_DAO, COLLECTED_AGENT_METRICS_SERVICE,
+                COLLECTED_RULE_GRAPH_SERVICE}) {
+            assertFalse(scan.face.containsKey(collected),
+                    "D-B4-88 收口件回退到宽松降级面上：" + collected + "，面集=" + scan.face);
+        }
+    }
+
+    // ── 4. 判据自证（能变红 + 不许改过头）───────────
 
     @Test
     @DisplayName("合成夹具取证：顶层违例计入、嵌套块与 catch 之外的 return true 不计、字面量花括号不破深度")
@@ -257,6 +343,22 @@ class LenientDegradeTrueFaceRatchetTest {
     }
 
     // ── 扫描实现 ────────────────────────────────────
+
+    /** 读仓根相对路径的主源码并剥注释（锚点判据与门面判据同一口径）。 */
+    private static String stripped(String repoRelPath) throws IOException {
+        Path file = locateRepoRoot().resolve(repoRelPath);
+        assertTrue(Files.exists(file), "收口件文件不在位：" + file);
+        return SourceCommentStripper.strip(Files.readString(file, StandardCharsets.UTF_8));
+    }
+
+    private static int count(Pattern p, String src) {
+        int n = 0;
+        Matcher m = p.matcher(src);
+        while (m.find()) {
+            n++;
+        }
+        return n;
+    }
 
     private static final class Scan {
         int scannedFiles;

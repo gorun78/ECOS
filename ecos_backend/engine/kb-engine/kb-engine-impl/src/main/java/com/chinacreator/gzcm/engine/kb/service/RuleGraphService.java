@@ -86,11 +86,13 @@ public class RuleGraphService {
         if (sw == null || sw.isBlank()) {
             return true; // 默认启用 (enterprise/ultimate 档)
         }
-        try {
-            return Boolean.parseBoolean(sw.trim());
-        } catch (Exception e) {
-            return true;
-        }
+        // #142/B4-3e-58（D-B4-88 第 4 枚＝D-B4-77 死面）：收口前这里包了一层
+        // try { return Boolean.parseBoolean(sw.trim()); } catch (Exception e) { return true; }。
+        // Boolean.parseBoolean 按 JLS 对任意字符串都不抛异常（非 "true" 一律 false），
+        // 该 catch 体不可达 ⇒ 它不是运行期 fail-open，而是「数得到的死面」：
+        // 宽松降级棘轮门把它计在面上，掩盖了「本方法其实没有判定通道故障态」的事实。
+        // 按 D-B4-77 治理腿处置：删除不可达 try/catch，语义（null/空→true，"true"→true，其余→false）不变。
+        return Boolean.parseBoolean(sw.trim());
     }
 
     // ── Public API ──

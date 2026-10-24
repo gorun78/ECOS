@@ -1,6 +1,10 @@
 package com.chinacreator.gzcm.engine.cognitive2.dao;
 
+import com.chinacreator.gzcm.engine.cognitive.api.CognitiveErrorCode;
+import com.chinacreator.gzcm.engine.cognitive2.service.scenario.CognitiveGuardException;
 import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Repository;
 
@@ -17,6 +21,8 @@ import java.util.Map;
 @Repository
 public class MindAssetDao extends JdbcTemplateDaoSupport {
 
+    private static final Logger log = LoggerFactory.getLogger(MindAssetDao.class);
+
     static final String MIND_TABLE  = "ecos_cognitive.ecos_cognitive_mind";
     static final String SCEN_MIND_TABLE = "ecos_cognitive.ecos_cognitive_scenario_mind";
 
@@ -29,7 +35,16 @@ public class MindAssetDao extends JdbcTemplateDaoSupport {
             "id, scenario_id, mind_id, binding_role, priority, trace_id, " +
             "domain, version_no, is_deleted, create_by, update_by, create_time, update_time";
 
-    /** schema 预检：@see 设计-05 C.1 前置门（to_regclass IS NULL → 503 ECOS-COG-501）。 */
+    /**
+     * schema 预检：@see 设计-05 C.1 前置门（to_regclass IS NULL → 503 ECOS-COG-501）。
+     *
+     * <p><b>#142/B4-3e-58（差距 D-B4-88）</b>：收口前本方法在 {@code catch (Exception)} 顶层
+     * {@code return true}，注释自称「保守」实为<b>宽松降级</b>——探测通道故障时把「存在性未知」
+     * 报成「表在」，与该文件 javadoc 自述的「缺表 → 503 {@code ECOS-COG-501}」前置门自相矛盾
+     * （违 §4.7.2「不可用 ≠ 无权限 ≠ 空结果」）。现按同包 {@link BeliefScorer#readScoreInputs}
+     * 既有形态改抛 {@link CognitiveGuardException}：探测失败与「探测到缺表」都落 503，
+     * 但只有<b>真取到</b> {@code false} 才走返回值，未知值不再冒充真值。</p>
+     */
     public boolean mindTableExists() {
         try {
             Boolean present = jdbcTemplate.queryForObject(
@@ -37,8 +52,9 @@ public class MindAssetDao extends JdbcTemplateDaoSupport {
                     Boolean.class, "ecos_cognitive.ecos_cognitive_mind");
             return Boolean.TRUE.equals(present);
         } catch (Exception e) {
-            // 保守：探测即失败时视为存在性未知，不上抛，由后续 SELECT 404 兜底（观测项在日志）
-            return true;
+            log.error("schema 预检通道不可用：to_regclass({}) 探测失败", MIND_TABLE, e);
+            throw new CognitiveGuardException(CognitiveErrorCode.E501_SCHEMA_NOT_READY,
+                    CognitiveErrorCode.MSG_SCHEMA_NOT_READY, MIND_TABLE);
         }
     }
 

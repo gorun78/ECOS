@@ -1,6 +1,8 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.SystemErrorCode;
+import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.ontology.service.AutoDiscoverPreviewQueryService;
 import com.chinacreator.gzcm.engine.ontology.service.AutoDiscoverService;
 import org.slf4j.Logger;
@@ -50,14 +52,24 @@ public class AutoDiscoverPreviewController {
     /**
      * 只读校验数据源存在性 + 资源归属（跨引擎只读校验，不操作 data-engine 任何表，
      * 仅 SELECT 用于归属确认，§0.3 跨引擎数据访问判定为只读合规）。
+     *
+     * <p><b>#142/B4-3e-58（差距 D-B4-88）</b>：收口前本方法在 {@code catch (Exception)} 顶层
+     * {@code return true}，注释自证「宽松降级：允许预览继续」——把「查不了」洗成「查得到且通过」，
+     * 违详设 §4.7.2「不可用 ≠ 无权限 ≠ 空结果」，且直接绕过调用方的 {@code NotFoundException} 分支
+     * （数据源根本不存在时也照样放行去拉 DW 资源清单）。现改判为<b>显式不可用承载</b>：抛携带
+     * 503 状态行 + {@code ECOS-SYS-503} 机读码的 {@link DataBridgeException}，由
+     * {@link #preview} 的 {@code catch (DataBridgeException) → throw e} 保护腿透出，
+     * 禁被外层 {@code catch (Exception) → internalError(500)} 反向折叠。</p>
      */
     private boolean datasourceExists(String datasourceId) {
         try {
             Integer cnt = previewQueryService.countDatasourceById(datasourceId);
             return cnt != null && cnt > 0;
         } catch (Exception e) {
-            log.warn("Preview: datasource existence check failed: {}", e.getMessage());
-            return true; // 宽松降级：允许预览继续
+            log.error("Preview: datasource existence check unavailable, datasourceId={}: {}",
+                    datasourceId, e.getMessage(), e);
+            throw new DataBridgeException(503, 503,
+                    SystemErrorCode.ECOS_SYS_503 + ": 数据源存在性判定通道不可用，预览无法继续");
         }
     }
 
@@ -163,6 +175,11 @@ public class AutoDiscoverPreviewController {
             data.put("note", "预览模式（dryRun=true），未写入数据库");
 
             return ApiResponse.success(data);
+        } catch (DataBridgeException e) {
+            // #142/B4-3e-58（D-B4-88）：承载型不可用（判定通道故障＝503）显式上抛，
+            // 由 gateway GlobalExceptionHandler 按 getHttpStatus() 透出状态行，
+            // 禁在此折成 internalError(500)——那会把「查不了」再次洗成「服务器错误」的无码面。
+            throw e;
         } catch (Exception e) {
             log.error("Preview failed for domain={}: {}", domainCode, e.getMessage(), e);
             return ApiResponse.internalError("预览失败: " + e.getMessage());

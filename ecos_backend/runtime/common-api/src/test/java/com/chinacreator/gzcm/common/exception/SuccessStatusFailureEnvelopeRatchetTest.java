@@ -120,12 +120,20 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      *       三类归位与本仓惯用法一致：{@code ResponseEntity.status(..).body(ApiResponse.error(..))}
      *       记状态行承载 ＋1，两枚 {@code failure(ApiResponse.error(..))} 记属主 helper ＋2；
      *       28+99+10+35 = 172 = 总数，对账仍成立。只重设被突破的两枚上限，其余两面按实测保持。</li>
+     *   <li>#142/B4-3e-58 重设（D-B4-88 收口批，common-api 全模块红跑实测，
+     *       {@code /tmp/full-common-api.log}）＝总数 <b>173</b>／折叠 0／状态行承载 <b>29</b>／
+     *       裸回 <b>99</b>（未漂移）／属主 helper <b>10</b>（未漂移）／纯信封 <b>35</b>（未漂移）。
+     *       唯一漂移源＝{@code AiErrorAdvice#onBridge} 的
+     *       {@code ResponseEntity.status(status).body(ApiResponse.error(status, …))} 新状态行承载腿
+     *       （DataBridge 根型异常 advice 补状态行承载腿，收口 D-B4-88 的 503 载体由此腿出状态行），计承载 ＋1；
+     *       29+99+10+35 = 173 = 总数，对账成立。只重设被突破的 {@link #STATUS_CARRIER_CEILING}，
+     *       其余三面按实测保持。</li>
      * </ul>
      *
      * <p>裸回面 99 枚<b>本门有意不判其对错</b>（归 {@code D-B4-59} 族棘轮门管账），
      * 此处只做「只减不增」计数：该族每收口一枚，本上限随批下调。</p>
      */
-    private static final int STATUS_CARRIER_CEILING = 28;
+    private static final int STATUS_CARRIER_CEILING = 29;
     private static final int BARE_RETURN_CEILING = 99;
     private static final int OWNER_HELPER_CEILING = 10;
     private static final int ENVELOPE_ONLY_CEILING = 35;
