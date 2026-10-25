@@ -56,8 +56,18 @@ class QualifiedTableNameArchTest {
 
     private static final String MAPPER_REL =
             "ecos_backend/engine/data-engine/data-engine-impl/src/main/resources/mapper";
+    /**
+     * 迁移单源（架构铁律 v2.2 §3.1，2026-10-11 卷09 H-7 用户裁决订正）=
+     * {@code docs/50-db_script/02-flyway-migration/gateway}，DDL 单源目录。
+     *
+     * <p>历史上本常量指 {@code ecos_backend/gateway/src/main/resources/db/migration}
+     * （V200 schema 治理批 {@code cda0810d} 后为 0 个 SQL 的空目录：gitignore 的
+     * {@code migration} 模式在 V241 落地前曾吞掉该目录全部脚本，单一源曾因此失明）。
+     * 该门 2026-10-25 据此改为守真实单源（#142/B4-3e-69 台账同行登记既有红处置）；
+     * 判定模式（PUBLIC_BUCKET_WRITE / UNQUALIFIED_CREATE）与第一案零改动，判据不放宽。</p>
+     */
     private static final String MIGRATION_REL =
-            "ecos_backend/gateway/src/main/resources/db/migration";
+            "docs/50-db_script/02-flyway-migration/gateway";
 
     @Test
     @DisplayName("Mapper XML 数据域表名必须 schema 限定 + 禁 public 桶")

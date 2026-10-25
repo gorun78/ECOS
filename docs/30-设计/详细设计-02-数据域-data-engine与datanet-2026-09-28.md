@@ -427,6 +427,9 @@ publish：仅 PASSED→PUBLISHED；PUBLISHED 行 UPDATE → 新行 + 旧行 is_a
 | `ECOS-DATA-031` | 500 | 数据层 SQL/映射异常（**不再掩蔽为 404**，附 traceId） |
 | `ECOS-DATA-032` | 404 | 数据源记录不存在（#142/B4-3e-44 补登：本表此前<b>无任何 404 段数据层码</b>，`previewSchema` 的「查无此源」只得以无码 `RuntimeException` 抛出、再被端点折成「200＋信封 404」；与 031 的「SQL/映射异常」严格区分，承 `ECOS-DQ-111` 的真实 404 口径） |
 | `ECOS-DATA-041` | 503 | 跨引擎取数依赖不可用（fail-loud，禁空值降级） |
+| `ECOS-DATA-061` | 400 | 业务域唯一写通道入参非法（缺 layer/carrierRef/traceId/idempotencyKey、非法 layer、carrierRef 限定名残缺；#142/B4-3e-69 补登：收口前该腿借用 053/051 两枚 503 段降级码占位） |
+| `ECOS-DATA-062` | 403 | MC04 OLAP 双例外守卫违规（控制域写 OLAP／层不合法／双 OLAP 并存不一致）——不变式违反＝策略拒绝，与 `ECOS-DATA-053`「OLAP 未启用（503 真降级）」在状态行与机读码上可互分派（#142/B4-3e-69 补登：收口前三枚违规腿借用 054） |
+| `ECOS-DATA-063` | 403 | MC02 列类型白名单守卫违规（裸 JSON/JSONB 列或 `*_json` 语义列参与 WHERE）；与 062 同段分码，客户端按码区分「改列投影」与「改载体/层/引擎配置」两类违规（#142/B4-3e-69 补登：收口前两枚违规腿借用 052） |
 | `ECOS-DATA-05x` | 503 | 降级矩阵（access/MinIO/OLAP/DQ 告警/Git/DuckDB） |
 | `ECOS-DQ-101` | 409 | 规则状态机非法迁移（DRAFT→APPROVED 需签核人） |
 | `ECOS-DQ-102` | 400 | 规则表达式含禁用构造（自由 SQL/裸表名） |

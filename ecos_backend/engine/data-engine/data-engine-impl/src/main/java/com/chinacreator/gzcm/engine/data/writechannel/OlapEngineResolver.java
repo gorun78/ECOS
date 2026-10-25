@@ -89,7 +89,7 @@ public class OlapEngineResolver {
         // ── 控制域禁入 OLAP（MC04 铁律）─────────────────────────────
         if (domain == DwSchemaQualifier.Domain.CONTROL) {
             throw new IllegalStateException(
-                    "ECOS-DATA-054: MC04 违规 — 控制域写 OLAP 被拒（" + storageKind
+                    DataDomainErrorCode.ECOS_DATA_062 + ": MC04 违规 — 控制域写 OLAP 被拒（" + storageKind
                             + "）：OLAP 仅承载业务域 DW/APPLICATION，控制域数据禁入湖/OLAP 载体");
         }
 
@@ -97,7 +97,7 @@ public class OlapEngineResolver {
         String lyr = layer == null ? "" : layer.trim().toUpperCase();
         if (!OLAP_ALLOWED_LAYERS.contains(lyr)) {
             throw new IllegalStateException(
-                    "ECOS-DATA-054: MC04 违规 — 层 " + layer + " 不可落 OLAP（仅 CURATED/APPLICATION）");
+                    DataDomainErrorCode.ECOS_DATA_062 + ": MC04 违规 — 层 " + layer + " 不可落 OLAP（仅 CURATED/APPLICATION）");
         }
 
         // ── 单 OLAP 引擎二选一（禁双写 / 未启用即拒，ST02）──────────
@@ -111,7 +111,7 @@ public class OlapEngineResolver {
         }
         if (!configuredOlapEngine.equals(expected)) {
             throw new IllegalStateException(
-                    "ECOS-DATA-054: MC04 违规 — 部署选中 dw.olap.engine=" + configuredOlapEngine
+                    DataDomainErrorCode.ECOS_DATA_062 + ": MC04 违规 — 部署选中 dw.olap.engine=" + configuredOlapEngine
                             + "，与请求载体 " + storageKind + " 不一致（禁双 OLAP 并存）");
         }
     }

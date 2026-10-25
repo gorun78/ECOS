@@ -55,7 +55,7 @@ class WriteChannelStatusFidelityTest {
     @DisplayName("守卫拒绝腿（MC02/MC04）：状态行 403 且与信封同号——不再恒 200（D-B4-59 本尊）")
     void guardDenialLegCarries403OnTheStatusLine() {
         when(service.write(any(WriteChannelRequest.class)))
-                .thenThrow(new IllegalStateException("ECOS-DATA-052 MC02 裸 JSON 列"));
+                .thenThrow(new IllegalStateException("ECOS-DATA-063 MC02 裸 JSON 列"));
 
         ResponseEntity<ApiResponse<WriteChannelResult>> resp = controller.write(request);
 
@@ -69,7 +69,7 @@ class WriteChannelStatusFidelityTest {
     @DisplayName("入参拒绝腿：状态行 400，与守卫拒绝（403）在状态行上可区分")
     void badRequestLegIsNotTheSameAsDenial() {
         when(service.write(any(WriteChannelRequest.class)))
-                .thenThrow(new IllegalArgumentException("ECOS-DATA-050 layer 缺失"));
+                .thenThrow(new IllegalArgumentException("ECOS-DATA-061 layer 非法"));
 
         ResponseEntity<ApiResponse<WriteChannelResult>> resp = controller.write(request);
 

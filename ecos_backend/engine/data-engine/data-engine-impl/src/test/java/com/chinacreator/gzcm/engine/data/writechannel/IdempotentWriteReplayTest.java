@@ -100,7 +100,7 @@ class IdempotentWriteReplayTest {
     }
 
     @Test
-    @DisplayName("缺 idempotencyKey → 拒 ECOS-DATA-050（不登记任何行）")
+    @DisplayName("缺 idempotencyKey → 拒 ECOS-DATA-061（不登记任何行）")
     void missingIdempotencyKeyRejected() {
         WriteChannelTestFixtures.Ctx ctx = wire(mock(EventBusService.class));
         ctx.buildService();
@@ -110,7 +110,7 @@ class IdempotentWriteReplayTest {
 
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
             () -> ctx.service.write(req));
-        assertTrue(e.getMessage().contains("ECOS-DATA-050"));
+        assertTrue(e.getMessage().contains("ECOS-DATA-061"));
         verify(ctx.idempotencyMapper, never()).insert(any());
         verify(ctx.dataResourceRepository, never()).insert(any());
     }

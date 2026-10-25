@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
  *
  * <p>断言：
  * <ul>
- *   <li>控制域 schema + OLAP 载体（DORIS）→ <b>拒</b>（控制域禁入 OLAP，{@code ECOS-DATA-054}），
+ *   <li>控制域 schema + OLAP 载体（DORIS）→ <b>拒</b>（控制域禁入 OLAP，{@code ECOS-DATA-062}），
  *       不登记载体/幂等、不发布 PipelineEvent；</li>
  *   <li>业务域 DW/CURATED + OLAP 载体（与 dw.olap.engine 一致）→ 放行（对照）；</li>
  *   <li>OLAP 载体与部署选中引擎不一致（禁双写）→ 拒。</li>
@@ -51,7 +51,7 @@ class NonOlapControlWriteGuardTest {
 
         IllegalStateException e = assertThrows(IllegalStateException.class,
             () -> ctx.service.write(req));
-        assertTrue(e.getMessage().contains("ECOS-DATA-054"), "应命中 MC04 错误码: " + e.getMessage());
+        assertTrue(e.getMessage().contains("ECOS-DATA-062"), "应命中 MC04 错误码: " + e.getMessage());
         assertTrue(e.getMessage().contains("MC04"), "应明示 MC04 违规");
 
         // 守卫拒后不得有任何写行为
@@ -90,7 +90,7 @@ class NonOlapControlWriteGuardTest {
 
         IllegalStateException e = assertThrows(IllegalStateException.class,
             () -> ctx.service.write(req));
-        assertTrue(e.getMessage().contains("ECOS-DATA-054"));
+        assertTrue(e.getMessage().contains("ECOS-DATA-062"));
         verify(ctx.dataResourceRepository, never()).insert(any(DataResource.class));
     }
 
@@ -105,10 +105,11 @@ class NonOlapControlWriteGuardTest {
         req.setCarrierRef("ecos_dw.app_metrics");
         req.setStorageKind("CLICKHOUSE");
 
-        // #142/B4-3e-43（D-B4-71 属主侧第四批）：本腿断言从「抛 ISE 且带 ECOS-DATA-054」改为
-        // 「抛携带 503 的 DataBridgeException 且带 D.1 单源表内语义对应的 ECOS-DATA-053」。
-        // 收口前它走属主端点的 catch (IllegalStateException) → forbidden(403)，
-        // 与 MC04 不变式违规（真·策略拒绝）在状态行同形，违 §4.7.2「不可用 ≠ 无权限」。
+        // #142/B4-3e-43（D-B4-71 属主侧第四批）：本腿断言从「抛 ISE 且带 ECOS-DATA-054（当时
+        // 503 段被 MC04 违规腿借用）」改为「抛携带 503 的 DataBridgeException 且带 D.1 单源
+        // 表内语义对应的 ECOS-DATA-053」。收口前它走属主端点的 catch (IllegalStateException)
+        // → forbidden(403)，与 MC04 不变式违规（真·策略拒绝，#142/B4-3e-69 起带 ECOS-DATA-062）
+        // 在状态行同形，违 §4.7.2「不可用 ≠ 无权限」。
         DataBridgeException e = assertThrows(DataBridgeException.class,
             () -> ctx.service.write(req));
         assertEquals(503, e.getHttpStatus(), "OLAP 未启用＝本部署档不可用，须携带 503: " + e.getHttpStatus());

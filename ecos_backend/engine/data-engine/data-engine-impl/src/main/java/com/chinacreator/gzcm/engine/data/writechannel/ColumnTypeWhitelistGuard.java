@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.data.writechannel;
 
+import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
+
 import java.util.Set;
 
 /**
@@ -57,7 +59,7 @@ public final class ColumnTypeWhitelistGuard {
             // ① 命名判：DR04/MC02 JSON 语义列（*_json）本就禁入 WHERE
             if (c.toLowerCase().endsWith("_json")) {
                 throw new IllegalStateException(
-                        "ECOS-DATA-052: MC02 违规 — JSON 语义列 " + c
+                        DataDomainErrorCode.ECOS_DATA_063 + ": MC02 违规 — JSON 语义列 " + c
                                 + " 不得参与 WHERE（须投影为独立列，DR04/MC02）");
             }
 
@@ -65,7 +67,7 @@ public final class ColumnTypeWhitelistGuard {
             String type = resolver == null ? null : resolver.typeOf(qualifiedTable, c);
             if (type != null && JSON_TYPES.contains(type.trim().toUpperCase())) {
                 throw new IllegalStateException(
-                        "ECOS-DATA-052: MC02 违规 — 裸 JSON 列 " + c + "(" + type + ") 不得参与 WHERE（"
+                        DataDomainErrorCode.ECOS_DATA_063 + ": MC02 违规 — 裸 JSON 列 " + c + "(" + type + ") 不得参与 WHERE（"
                                 + qualifiedTable + "）");
             }
         }

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.data.writechannel;
 
+import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import com.chinacreator.gzcm.common.data.model.DataResource;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.event.PipelineEvent;
@@ -31,7 +32,7 @@ import java.util.UUID;
  * <p>本服务的数据域职责（编排层，Driver 归 runtime-access，铁律 §2.5）：
  * <ol>
  *   <li><b>入参红线</b>：{@code layer / carrierRef / traceId / idempotencyKey} 缺一即拒
- *       （{@code ECOS-DATA-050}），layer 必须为五层之一（DataLayer 枚举）；</li>
+ *       （{@code ECOS-DATA-061}），layer 必须为五层之一（DataLayer 枚举）；</li>
  *   <li><b>幂等</b>（同键重放不产生第二行）：首查台账
  *       {@link DwWriteChannelIdempotencyMapper#findByKey}，命中即回放首次
  *       {@code writeId}，不重复登记、不重复发事件；首次才登记台账行
@@ -85,14 +86,14 @@ public class DwWriteChannelService {
      *
      * @param request 强类型入参（layer/carrierRef/traceId/idempotencyKey 必填）
      * @return 写通道结果（writeId + declared 存在性 + 是否幂等重放）
-     * @throws IllegalArgumentException 入参缺失 / 非法层（ECOS-DATA-050/053）
-     * @throws IllegalStateException    MC02/MC04 守卫违规（ECOS-DATA-052/054）
+     * @throws IllegalArgumentException 入参缺失 / 非法层 / 限定名残缺（ECOS-DATA-061，属主端点折 400）
+     * @throws IllegalStateException    MC02/MC04 守卫违规（ECOS-DATA-062/063，属主端点折 403）
      */
     @Transactional
     public WriteChannelResult write(WriteChannelRequest request) {
         // ── 1) 入参红线（缺一即拒）─────────────────────────────────
         if (request == null) {
-            throw new IllegalArgumentException("ECOS-DATA-050: 写通道入参为空");
+            throw new IllegalArgumentException(DataDomainErrorCode.ECOS_DATA_061 + ": 写通道入参为空");
         }
         String layer = require("layer", request.getLayer());
         String carrierRef = require("carrierRef", request.getCarrierRef());
@@ -249,8 +250,11 @@ public class DwWriteChannelService {
         try {
             return DataLayer.valueOf(raw.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
+            // #142/B4-3e-69（收口 D-B4-73）：非法 layer 是 400 入参错误，收口前借用
+            // ECOS-DATA-053（表义＝OLAP 降级，503 段）——降级码被入参腿占用。现取 D.1
+            // 单源表 400 段新登的机读码，码值经常量而非第二处字面量。
             throw new IllegalArgumentException(
-                    "ECOS-DATA-053: 非法 layer（须为 SOURCE/RAW/CURATED/SEMANTIC/APPLICATION）: " + raw);
+                    DataDomainErrorCode.ECOS_DATA_061 + ": 非法 layer（须为 SOURCE/RAW/CURATED/SEMANTIC/APPLICATION）: " + raw);
         }
     }
 
@@ -265,8 +269,10 @@ public class DwWriteChannelService {
 
     private static String require(String field, String value) {
         if (value == null || value.isBlank()) {
+            // #142/B4-3e-69（收口 D-B4-73）：050 收口前不在 D.1 单源表内（表外码），
+            // 与非法 layer／限定名残缺同属「写通道入参非法」语义，统一归 061。
             throw new IllegalArgumentException(
-                    "ECOS-DATA-050: 写通道入参 " + field + " 必填（F02-05 第 3 条）");
+                    DataDomainErrorCode.ECOS_DATA_061 + ": 写通道入参 " + field + " 必填（F02-05 第 3 条）");
         }
         return value.trim();
     }

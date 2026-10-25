@@ -63,11 +63,11 @@ public class WriteChannelController {
         try {
             return ok(ApiResponse.success(writeChannelService.write(request)));
         } catch (IllegalArgumentException e) {
-            // ECOS-DATA-050 入参缺失 / ECOS-DATA-051 限定名残缺 / ECOS-DATA-053 非法层
+            // ECOS-DATA-061 入参非法：缺失必填项 / 限定名残缺 / 非法层（#142/B4-3e-69 起归位 D.1 表 400 段）
             log.warn("写通道入参拒绝: {}", e.getMessage());
             return failure(ApiResponse.badRequest(e.getMessage()));
         } catch (IllegalStateException e) {
-            // ECOS-DATA-052 MC02 裸 JSON 列 / ECOS-DATA-054 MC04 OLAP 违规（不变式违反＝策略拒绝 403）
+            // ECOS-DATA-062 MC04 OLAP 违规 / ECOS-DATA-063 MC02 裸 JSON 列（不变式违反＝策略拒绝 403）
             // 注：#142/B4-3e-43 起「OLAP 引擎未启用」不再落本腿——它是不可用而非无权限，见下一条腿。
             log.warn("写通道守卫拒绝: {}", e.getMessage());
             return failure(ApiResponse.forbidden(e.getMessage()));

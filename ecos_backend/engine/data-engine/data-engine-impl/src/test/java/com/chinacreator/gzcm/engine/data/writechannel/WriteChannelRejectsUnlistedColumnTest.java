@@ -25,7 +25,7 @@ import static org.mockito.Mockito.when;
  * F02-05 验收 · 第 3 条 / MC02 —— 列类型白名单（裸 JSON 列参与 WHERE 即拒）。
  *
  * <p>断言：写通道 {@code whereColumns} 里若含 JSON 类型列（类型判）或
- * {@code *_json} 语义列（命名判），一律拒（{@code ECOS-DATA-052}），
+ * {@code *_json} 语义列（命名判），一律拒（{@code ECOS-DATA-063}），
  * 不登记载体、不登记幂等台账、不发 PipelineEvent。
  *
  * <p>纯 Mockito：{@link DwCarrierCatalogMapper#columnTypeOf} 提供列类型元数据。
@@ -33,7 +33,7 @@ import static org.mockito.Mockito.when;
 class WriteChannelRejectsUnlistedColumnTest {
 
     @Test
-    @DisplayName("裸 JSON 列参与 WHERE（类型判）→ 拒 ECOS-DATA-052")
+    @DisplayName("裸 JSON 列参与 WHERE（类型判）→ 拒 ECOS-DATA-063")
     void bareJsonColumnTypeRejected() {
         WriteChannelTestFixtures.Ctx ctx = wire(mock(EventBusService.class));
         when(ctx.catalogMapper.columnTypeOf(eq("ecos_dw"), eq("fact_order"), eq("order_ext")))
@@ -45,7 +45,7 @@ class WriteChannelRejectsUnlistedColumnTest {
 
         IllegalStateException e = assertThrows(IllegalStateException.class,
             () -> ctx.service.write(req));
-        assertTrue(e.getMessage().contains("ECOS-DATA-052"), "应命中 MC02 错误码: " + e.getMessage());
+        assertTrue(e.getMessage().contains("ECOS-DATA-063"), "应命中 MC02 错误码: " + e.getMessage());
 
         verify(ctx.dataResourceRepository, never()).insert(any());
         verify(ctx.idempotencyMapper, never()).insert(any());
@@ -53,7 +53,7 @@ class WriteChannelRejectsUnlistedColumnTest {
     }
 
     @Test
-    @DisplayName("*_json 语义列参与 WHERE（命名判）→ 拒 ECOS-DATA-052，不触达元数据")
+    @DisplayName("*_json 语义列参与 WHERE（命名判）→ 拒 ECOS-DATA-063，不触达元数据")
     void jsonSemanticColumnNamingRejected() {
         WriteChannelTestFixtures.Ctx ctx = wire(mock(EventBusService.class));
         ctx.buildService();
@@ -63,7 +63,7 @@ class WriteChannelRejectsUnlistedColumnTest {
 
         IllegalStateException e = assertThrows(IllegalStateException.class,
             () -> ctx.service.write(req));
-        assertTrue(e.getMessage().contains("ECOS-DATA-052"));
+        assertTrue(e.getMessage().contains("ECOS-DATA-063"));
 
         // 命名判先命中，不应触达元数据查询
         verify(ctx.catalogMapper, never()).columnTypeOf(anyString(), anyString(), anyString());

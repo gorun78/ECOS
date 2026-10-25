@@ -50,6 +50,39 @@ public final class DataDomainErrorCode {
     /** 503 — 跨引擎取数依赖不可用（fail-loud，禁"返回空列表"降级） */
     public static final String ECOS_DATA_041 = "ECOS-DATA-041";
 
+    // ── 业务域唯一写通道守卫段（#142/B4-3e-69，详设-02 §D.1 同批补行）─────────
+    /**
+     * 400 — 业务域唯一写通道入参非法（缺 layer/carrierRef/traceId/idempotencyKey、
+     * 非法 layer、carrierRef 限定名残缺）。
+     *
+     * <p><b>#142/B4-3e-69（收口 D-B4-73）新登</b>：收口前这枚腿在
+     * {@code DwWriteChannelService#parseLayer} 借用 {@code ECOS-DATA-053}
+     * （表义＝OLAP 降级）、在 {@code DwSchemaQualifier#resolve} 借用
+     * {@code ECOS-DATA-051}（表义＝JDBC 管道失败）——503 段降级码被 400 入参腿
+     * 占用，客户端拿到「入参非法」的 message 却看到「基础设施降级」的机读码。</p>
+     */
+    public static final String ECOS_DATA_061 = "ECOS-DATA-061";
+    /**
+     * 403 — MC04 OLAP 双例外守卫违规（控制域写 OLAP／层不合法／双 OLAP 并存不一致）。
+     *
+     * <p><b>#142/B4-3e-69（收口 D-B4-73）新登</b>：收口前 {@code OlapEngineResolver.guard()}
+     * 三枚违规腿借用 {@code ECOS-DATA-054}（表义＝Kafka 事件/审计降级）。MC04 违规是
+     * <b>不变式违反＝策略拒绝</b>（属主端点折 403），不是基础设施降级——机读码号义
+     * 与本段 400/403 语义/状态行三态对齐后，与「OLAP 未启用」腿的 503＋
+     * {@code ECOS_DATA_053}（真降级，§4.7.2「不可用 ≠ 无权限」）在状态行与机读码
+     * 上可互分派。</p>
+     */
+    public static final String ECOS_DATA_062 = "ECOS-DATA-062";
+    /**
+     * 403 — MC02 列类型白名单守卫违规（裸 JSON/JSONB 列或 {@code *_json} 语义列参与 WHERE）。
+     *
+     * <p><b>#142/B4-3e-69（收口 D-B4-73）新登</b>：收口前 {@code ColumnTypeWhitelistGuard}
+     * 两枚违规腿借用 {@code ECOS-DATA-052}（表义＝MinIO RAW 层采集失败）——同 062，
+     * 503 段降级码被 403 策略拒绝腿占用。与 062 同段分码：MC02/MC04 是两个独立守卫，
+     * 客户端按码分派补救动作时应能区分「改列投影」与「改载体/层/引擎配置」两类违规。</p>
+     */
+    public static final String ECOS_DATA_063 = "ECOS-DATA-063";
+
     // ── 基础设施降级矩阵（C.8，503 段）────────────────────────────────
     /** 503 — runtime-access JDBC 管道/SQL 控制台执行失败 */
     public static final String ECOS_DATA_051 = "ECOS-DATA-051";

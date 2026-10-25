@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.data.writechannel;
 
+import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -80,7 +81,8 @@ public final class DwSchemaQualifier {
             String schema = ref.substring(0, dot);
             String table = ref.substring(dot + 1);
             if (schema.isEmpty() || table.isEmpty()) {
-                throw new IllegalArgumentException("ECOS-DATA-051: 非法 carrierRef（限定名残缺）: " + carrierRef);
+                throw new IllegalArgumentException(DataDomainErrorCode.ECOS_DATA_061
+                        + ": 非法 carrierRef（限定名残缺）: " + carrierRef);
             }
             return new Qualified(schema, table);
         }
