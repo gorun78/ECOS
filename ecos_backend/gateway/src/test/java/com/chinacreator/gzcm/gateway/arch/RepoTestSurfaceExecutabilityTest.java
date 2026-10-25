@@ -62,6 +62,34 @@ class RepoTestSurfaceExecutabilityTest {
     /** 夹具用：显式类型的空豁免清单（裸 {@code List.of()} 在此处推断成 {@code List<Object>} 会撞编译）。 */
     private static final List<String> NO_EXEMPTIONS = List.of();
 
+    /**
+     * 根 pom {@code pluginManagement} 的 surefire 形态全集 = 执行面单源（2026-10-25 实测 5 项）。
+     *
+     * <p>#142/B4-3e-23 把 {@code *IT} 上收根 pom 时，在 kb-engine-impl 模块 pom 留了一枚<b>具名
+     * 单文件 include</b>（文档冻结的验收类名）。模块侧显式 {@code <includes>} 是<b>覆盖而非并集</b>，
+     * 所以那枚具名项要求该模块把五形态连同一起重声明——少写一形态，该模块就静掉一批执行面，
+     * 而当时没有任何门盯住这件事（本批补，见 {@code moduleIncludesReDeclareRootFormsAndNameNothingElse}）。</p>
+     */
+    private static final List<String> ROOT_FORMS_BASELINE = List.of(
+            "**/Test*.java", "**/*Test.java", "**/*Tests.java", "**/*TestCase.java", "**/*IT.java");
+
+    /**
+     * 具名 include 登记闭集（只减不增）。允许登记的唯一理由＝类名是设计文档冻结的验收标识；
+     * 每条要双证据在位（文档实存且含该验收命令／该类文件实存且带活动测试注解），
+     * 证据一失效该登记项即红——禁「登记过＝现在还成立」。
+     */
+    private static final List<NamedInclude> NAMED_INCLUDE_REGISTRY = List.of(
+            new NamedInclude("engine/kb-engine/kb-engine-impl/pom.xml",
+                    "**/KbNavMissingTableReturnsServerError.java",
+                    "docs/30-设计/详细设计-04-知识域-dccheng与kb-engine-2026-09-29.md",
+                    "mvn -Dtest=KbNavMissingTableReturnsServerError#absentTableYields500Not404"));
+
+    /** 具名 include 面基线＝1 枚（F04-03 验收类）；改名或新留具名项都必须先动这条。 */
+    private static final int NAMED_INCLUDE_LEGS_BASELINE = 1;
+
+    /** {@code *Gate} 命名面正向对照下限（2026-10-25 实测 25 枚）：防「扫不到＝绿」。 */
+    private static final int MIN_SCANNED_GATE_NAMED_FILES = 20;
+
     // ── 真仓判定 ─────────────────────────────────────────
 
     @Test
@@ -110,6 +138,50 @@ class RepoTestSurfaceExecutabilityTest {
         // 根 pom 必须真的含 *IT 形态（否则上面 6 枚靠模块 pom 兜住＝半截子改动，违反 §19.6-7 根治口径）
         assertTrue(rootIncludes.contains("**/*IT.java"),
                 "IT 执行面已上收根 pom 单源，实际根 pom includes=" + rootIncludes);
+    }
+
+    // ── #142/B4-3e-62 复核：形态单源 + 具名 include 闭集 ────────
+
+    @Test
+    @DisplayName("根 pom 五形态单源不减不增；*Gate 命名面实测全部合形态，不合形态的活动测试面只能是指名登记的那一枚")
+    void rootFormsAreSingleSourceAndNamedFaceIsClosed() throws IOException {
+        Path backend = locateRepoRoot().resolve("ecos_backend");
+        assertEquals(ROOT_FORMS_BASELINE, includesOfRootPom(backend),
+                "根 pom surefire 形态集发生增减。显式 includes 是覆盖语义，删一形态＝该形态下全部活动测试面"
+                        + "从 mvn test 静掉（编译绿≠跑绿），加一形态则须先重设本钉值并说明归属批次");
+
+        // 正向对照：Gate 命名面确实落在扫描半径里（阈值失效说明扫描器失明，不许拿空集合当证据）
+        List<String> gateNamed = gateNamedTestFiles(backend);
+        assertTrue(gateNamed.size() >= MIN_SCANNED_GATE_NAMED_FILES,
+                "含 Gate 的测试面文件实扫 " + gateNamed.size() + " 枚 < 阈值 " + MIN_SCANNED_GATE_NAMED_FILES
+                        + "——「*Gate 命名覆盖性」这条结论必须先有面再谈覆盖");
+        // 只收「Gate 结尾且不带任一形态后缀」的门面类名（ZzGate.java 命中，ZzGateTest.java 不命中）
+        List<String> bareGate = gateNamed.stream().filter(s -> s.endsWith("Gate.java")).toList();
+        assertTrue(bareGate.isEmpty(),
+                "出现以 Gate 结尾却不带任一生效形态的测试面（根 pom 五形态对这类命名不覆盖）：\n  "
+                        + String.join("\n  ", bareGate));
+
+        List<String> oddNamed = nonFormNamedTestFiles(backend);
+        assertEquals(NAMED_INCLUDE_LEGS_BASELINE, oddNamed.size(),
+                "带活动测试注解、却不被根 pom 五形态命中的文件数（具名豁免面，只减不增）：\n  "
+                        + String.join("\n  ", oddNamed)
+                        + "\n新增一枚＝要么改名合形态（*Test/*Tests/*TestCase/Test*/*IT），要么走登记闭集"
+                        + "并写明「类名是文档冻结标识不可改」的依据；靠模块 pom 随手补具名 include 而不登记，"
+                        + "就是把本批要收口的半截子改动再复制一遍");
+        for (String rel : oddNamed) {
+            String simple = rel.substring(rel.lastIndexOf('/') + 1);
+            assertTrue(NAMED_INCLUDE_REGISTRY.stream().anyMatch(n -> simple.equals(n.fileName() + ".java")),
+                    rel + " 属具名面却不在 NAMED_INCLUDE_REGISTRY 里（模块 pom 里那枚 include 无人认领）");
+        }
+    }
+
+    @Test
+    @DisplayName("模块 pom 覆盖 includes：五形态一个不能少，多出的只能是指名登记且双证据在位的具名类（双向棘轮）")
+    void moduleIncludesReDeclareRootFormsAndNameNothingElse() throws IOException {
+        List<String> problems = includeProblems(locateRepoRoot(), NAMED_INCLUDE_REGISTRY);
+        assertTrue(problems.isEmpty(), "模块侧 surefire includes 配置失真：\n  " + String.join("\n  ", problems));
+        assertEquals(NAMED_INCLUDE_LEGS_BASELINE, liveNamedIncludeCount(locateRepoRoot().resolve("ecos_backend")),
+                "仓里实扫的具名 include 枚数与登记表基线不符（独立钉值，禁由登记表推导）");
     }
 
     // ── 夹具：证明本门能变红 ─────────────────────────────
@@ -212,7 +284,206 @@ class RepoTestSurfaceExecutabilityTest {
         assertTrue(dead.get(0).contains("com/x/y/z/DeepIT.java"), dead.toString());
     }
 
+    @Test
+    @DisplayName("夹具⑦：模块覆盖 includes 漏形态／具名项未登记／登记项失效／证据缺失——四种失真各自变红，补齐转绿")
+    void moduleIncludeFailuresAreVisible(@TempDir Path tmp) throws IOException {
+        Fixture fx = new Fixture(tmp).withRootIncludes(ROOT_FORMS_BASELINE);
+
+        // ① 只声明五形态、无具名项 ⇒ 绿（正向对照，防把「覆盖语义」判成恒红）
+        fx.modulePom("svc/g", "<includes>" + join(ROOT_FORMS_BASELINE) + "</includes>");
+        assertEquals(0, fx.findIncludeProblems(NO_NAMED_INCLUDES).size(),
+                "模块把根形态完整重声明且无具名项时不得报失真：" + fx.findIncludeProblems(NO_NAMED_INCLUDES));
+
+        // ② 漏一枚根形态 ⇒ 红（该模块的 *IT 面会从这里起静掉，而 mvn 照旧绿）
+        fx.modulePom("svc/g", "<includes><include>**/Test*.java</include>"
+                + "<include>**/*Test.java</include><include>**/*Tests.java</include>"
+                + "<include>**/*TestCase.java</include></includes>");
+        List<String> missingForm = fx.findIncludeProblems(NO_NAMED_INCLUDES);
+        assertEquals(1, missingForm.size(), missingForm.toString());
+        assertTrue(missingForm.get(0).contains("**/*IT.java"), missingForm.toString());
+
+        // ③ 多出一枚未登记的具名 include ⇒ 红
+        fx.modulePom("svc/g", "<includes>" + join(ROOT_FORMS_BASELINE)
+                + "<include>**/AdHocNamedCase.java</include></includes>");
+        List<String> unregistered = fx.findIncludeProblems(NO_NAMED_INCLUDES);
+        assertEquals(1, unregistered.size(), unregistered.toString());
+        assertTrue(unregistered.get(0).contains("AdHocNamedCase"), unregistered.toString());
+
+        // ④ 具名项登记齐全＋双证据在位 ⇒ 绿；随后任撤一样证据即红（禁「登记过＝现在还成立」）
+        NamedInclude reg = new NamedInclude("svc/g/pom.xml", "**/AdHocNamedCase.java",
+                "docs/fake.md", "mvn -Dtest=AdHocNamedCase#t");
+        fx.addTestSource("svc/g", "AdHocNamedCase.java", "class AdHocNamedCase { @Test void t() {} }");
+        fx.writeAt("docs/fake.md", "验收：mvn -Dtest=AdHocNamedCase#t");
+        assertEquals(0, fx.findIncludeProblems(List.of(reg)).size(),
+                "具名项已登记且文档/类文件双证据在位时应为绿");
+
+        // ④b 类文件被改名合形态、具名 include 却还挂着 ⇒ 登记项失效即红
+        fx.modulePom("svc/g", "<includes>" + join(ROOT_FORMS_BASELINE) + "</includes>");
+        List<String> stale = fx.findIncludeProblems(List.of(reg));
+        assertEquals(1, stale.size(), "具名 include 已从模块 pom 消失，登记项必须报失效：" + stale);
+        assertTrue(stale.get(0).startsWith("STALE-NAMED-INCLUDE"), stale.toString());
+
+        // ④c 文档锚点不含冻结的验收命令 ⇒ 证据失效即红
+        fx.modulePom("svc/g", "<includes>" + join(ROOT_FORMS_BASELINE)
+                + "<include>**/AdHocNamedCase.java</include></includes>");
+        fx.writeAt("docs/fake.md", "这里没有那条验收命令");
+        List<String> noEvidence = fx.findIncludeProblems(List.of(reg));
+        assertEquals(1, noEvidence.size(), "文档锚点失去冻结标识必须变红：" + noEvidence);
+        assertTrue(noEvidence.get(0).contains("证据缺失"), noEvidence.toString());
+    }
+
     // ── 核心实现 ─────────────────────────────────────────
+
+    /** 夹具用：空具名登记清单（真仓登记表只减不增，夹具需要各自的独立清单）。 */
+    private static final List<NamedInclude> NO_NAMED_INCLUDES = List.of();
+
+    /**
+     * 一枚具名 include 的登记项。
+     *
+     * @param pomRel                  相对 {@code ecos_backend/} 的 pom 路径
+     * @param include                 该 pom 里的非形态 include
+     * @param docRel                  相对仓库根的文档锚点（冻结该验收类名的设计分册）
+     * @param frozenAcceptanceCommand 文档里必须原样存在的验收命令
+     */
+    private record NamedInclude(String pomRel, String include, String docRel, String frozenAcceptanceCommand) {
+
+        /** 具名 include 形态去掉前缀与 {@code .java} 后缀后的类名。 */
+        String fileName() {
+            String s = include.startsWith("**/") ? include.substring(3) : include;
+            int dot = s.lastIndexOf(".java");
+            return dot < 0 ? s : s.substring(0, dot);
+        }
+    }
+
+    /**
+     * 模块侧 surefire includes 的失真清单：漏根形态／具名项未登记／具名项证据失效／登记项在仓里已不存在。
+     * 真仓与夹具共用同一段判据，夹具才能证明「同一套规则能变红」。
+     */
+    private static List<String> includeProblems(Path repoRoot, List<NamedInclude> registry) throws IOException {
+        Path backend = repoRoot.resolve("ecos_backend");
+        List<String> out = new ArrayList<>();
+        List<NamedInclude> claimed = new ArrayList<>();
+        for (Path pom : modulePoms(backend)) {
+            String pomRel = backend.relativize(pom).toString().replace('\\', '/');
+            List<String> inc = surefireIncludesOf(Files.readString(pom, StandardCharsets.UTF_8));
+            for (String form : ROOT_FORMS_BASELINE) {
+                if (!inc.isEmpty() && !inc.contains(form)) {
+                    out.add(pomRel + " 覆盖 surefire includes 却漏了根形态 " + form
+                            + "（显式 includes 是覆盖语义 ⇒ 该形态在本模块的整批活动测试面从 mvn test 静掉，"
+                            + "而 mvn test 照旧绿）");
+                }
+            }
+            for (String extra : inc) {
+                if (ROOT_FORMS_BASELINE.contains(extra)) {
+                    continue;
+                }
+                NamedInclude reg = registry.stream()
+                        .filter(n -> n.pomRel().equals(pomRel) && n.include().equals(extra))
+                        .findFirst().orElse(null);
+                if (reg == null) {
+                    out.add(pomRel + " 出现未登记的具名 include " + extra
+                            + "（具名豁免面必须闭集登记；补进 NAMED_INCLUDE_REGISTRY 要同时给文档冻结依据）");
+                    continue;
+                }
+                claimed.add(reg);
+                String miss = missingEvidence(repoRoot, pom, reg);
+                if (miss != null) {
+                    out.add(pomRel + " 的具名 include " + extra + " 证据缺失：" + miss);
+                }
+            }
+        }
+        for (NamedInclude n : registry) {
+            if (!claimed.contains(n)) {
+                out.add("STALE-NAMED-INCLUDE(登记项在仓里已不存在，须删除该行) "
+                        + n.pomRel() + " -> " + n.include());
+            }
+        }
+        return out;
+    }
+
+    /** {@code null}＝双证据在位；否则给出失效说明。 */
+    private static String missingEvidence(Path repoRoot, Path pomFile, NamedInclude reg) throws IOException {
+        Path doc = repoRoot.resolve(reg.docRel());
+        if (!Files.isRegularFile(doc)) {
+            return "文档锚点不存在：" + reg.docRel();
+        }
+        if (!Files.readString(doc, StandardCharsets.UTF_8).contains(reg.frozenAcceptanceCommand())) {
+            return "文档 " + reg.docRel() + " 里已找不到冻结的验收标识「" + reg.frozenAcceptanceCommand() + "」";
+        }
+        Path srcTest = pomFile.getParent().resolve("src/test/java");
+        if (!Files.isDirectory(srcTest)) {
+            return "该模块没有 src/test/java 目录";
+        }
+        List<Path> hits;
+        try (Stream<Path> w = Files.walk(srcTest)) {
+            hits = w.filter(p -> p.getFileName().toString().equals(reg.fileName() + ".java")).toList();
+        }
+        if (hits.size() != 1) {
+            return "具名类文件实扫 " + hits.size() + " 枚（应为 1 枚）：" + reg.fileName();
+        }
+        if (!hasActiveTestAnnotation(hits.get(0))) {
+            return hits.get(0) + " 已不带活动测试注解";
+        }
+        return null;
+    }
+
+    /** 仓里实际存在的非形态 include 枚数（独立钉值用，禁由登记表推导）。 */
+    private static int liveNamedIncludeCount(Path backend) throws IOException {
+        int n = 0;
+        for (Path pom : modulePoms(backend)) {
+            for (String inc : surefireIncludesOf(Files.readString(pom, StandardCharsets.UTF_8))) {
+                if (!ROOT_FORMS_BASELINE.contains(inc)) {
+                    n++;
+                }
+            }
+        }
+        return n;
+    }
+
+    /** 模块 pom（排根 pom、target/、archive/），排序保证信息确定性。 */
+    private static List<Path> modulePoms(Path backend) throws IOException {
+        try (Stream<Path> walk = Files.walk(backend)) {
+            return walk.filter(p -> p.getFileName().toString().equals("pom.xml"))
+                    .filter(p -> {
+                        String s = p.toString().replace('\\', '/');
+                        return !s.contains("/target/") && !s.contains("/archive/");
+                    })
+                    .filter(p -> !backend.relativize(p).toString().replace('\\', '/').equals("pom.xml"))
+                    .sorted().toList();
+        }
+    }
+
+    /** 文件名含 Gate 的测试面（相对 ecos_backend），用于「*Gate 命名覆盖性」的正向对照。 */
+    private static List<String> gateNamedTestFiles(Path backend) throws IOException {
+        try (Stream<Path> walk = Files.walk(backend)) {
+            return walk.filter(RepoTestSurfaceExecutabilityTest::isTestSourceFile)
+                    .filter(p -> p.getFileName().toString().contains("Gate"))
+                    .map(p -> backend.relativize(p).toString().replace('\\', '/'))
+                    .sorted().toList();
+        }
+    }
+
+    /** 带活动测试注解、却不被根 pom 五形态命中的测试面（相对 ecos_backend）＝具名豁免面。 */
+    private static List<String> nonFormNamedTestFiles(Path backend) throws IOException {
+        List<String> out = new ArrayList<>();
+        try (Stream<Path> walk = Files.walk(backend)) {
+            for (Path p : walk.filter(RepoTestSurfaceExecutabilityTest::isTestSourceFile).sorted().toList()) {
+                if (!hasActiveTestAnnotation(p)) {
+                    continue;
+                }
+                Path srcTestJava = srcTestJavaDirOf(p);
+                if (srcTestJava == null) {
+                    continue;
+                }
+                String rel = srcTestJava.relativize(p).toString().replace('\\', '/');
+                boolean matched = ROOT_FORMS_BASELINE.stream().anyMatch(form -> antMatches(form, rel));
+                if (!matched) {
+                    out.add(backend.relativize(p).toString().replace('\\', '/'));
+                }
+            }
+        }
+        return out;
+    }
 
     /** 扫描违例清单。{@code rootIncludes} 为回落形态；{@code exemptions} 为相对 backendDir 的登记项。 */
     private static List<String> scanDead(Path backendDir, List<String> rootIncludes,
@@ -485,12 +756,22 @@ class RepoTestSurfaceExecutabilityTest {
                             + "</plugin></plugins></build></project>");
         }
 
+        /** 夹具文档锚点（相对夹具根，与真仓一样从仓库根起算）。 */
+        void writeAt(String rel, String body) {
+            write(root.resolve(rel), body);
+        }
+
         List<String> findDead() throws IOException {
             return scanDead(root.resolve("ecos_backend"), rootIncludes, NO_EXEMPTIONS);
         }
 
         List<String> findDead(List<String> exemptions) throws IOException {
             return scanDead(root.resolve("ecos_backend"), rootIncludes, exemptions);
+        }
+
+        /** 与真仓共用同一段判据：模块 includes 失真清单。 */
+        List<String> findIncludeProblems(List<NamedInclude> registry) throws IOException {
+            return includeProblems(root, registry);
         }
 
         private static void write(Path p, String body) {
