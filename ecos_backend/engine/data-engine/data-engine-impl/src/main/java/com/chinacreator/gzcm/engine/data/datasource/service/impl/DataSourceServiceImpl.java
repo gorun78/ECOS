@@ -51,8 +51,11 @@ public class DataSourceServiceImpl implements IDataSourceService {
 
     /**
      * 兼容构造器（无 JdbcConnector）：桥留空，适配器 {@code connect} fail-fast。
-     * 保留供非 Spring 环境 / 既有调用方（如 {@code SchemaRegistryServiceImpl}）以
-     * {@code new DataSourceServiceImpl()} 形式直接构造；建连仍强制经 runtime-access，绝不降级。
+     * 保留供非 Spring 环境的纯单元测试以 {@code new DataSourceServiceImpl()} 形式直接构造；
+     * 建连仍强制经 runtime-access，绝不降级。
+     * <p>（原「既有调用方 = SchemaRegistryServiceImpl」的登记已随 D-B4-77 死码删除治理
+     * 下线，#142/B4-3e-70：该调用方为死面，无 HTTP 承流路径，见
+     * DependencyUnreadyIllegalStateRatchetTest 的 D-B4-77 在位门。）</p>
      */
     public DataSourceServiceImpl() {
         this(null);

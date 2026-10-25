@@ -40,10 +40,16 @@ import static org.junit.jupiter.api.Assertions.fail;
  * ②还要做<b>传递闭包</b>——只被同样判死的类引用的成员，引用不算数，
  * 否则「父死子活」会把整条死链误判成活面。</p>
  *
- * <p><b>两枚见证各有分工</b>：{@code SchemaRegistryServiceImpl} 的所谓引用全部写在注释里
- * （{@code DataSourceServiceImpl}／{@code DataDescriptionDiscoveryImpl} 的 javadoc），只有<b>剥注释</b>才进得来；
- * {@code DataDescriptionDiscoveryImpl} 的引用来自一枚同判死的父类，只有<b>传递闭包</b>才进得来。
- * 任一机制被摘掉，见证案即红——这是本门「能变红」的构造性证明，不是靠注释承诺。</p>
+ * <p><b>两枚原见证的处置（#142/B4-3e-70 死码删除治理）</b>：本门首版的两枚机制见证——
+ * {@code SchemaRegistryServiceImpl}（「注释面引用不算引用」的减法见证）与
+ * {@code DataDescriptionDiscoveryImpl}（「父死子亦死」的传递闭包见证）——因要治理的对象本身就是
+ * 见证载体，本批删除前者后二者一并退场。机制并未失效：参考面剥注释＋传递闭包仍在
+ * {@link #scanReferenceFace()}／{@link #deriveDeadFaces(List, Map)} 里被每次实跑执行；
+ * 其活跃性由 <b>派生死面基线 46→44</b>（<b>只减不增</b>，防线见 {@link #derivedDeadFaceSetIsNailedDownAndOnlyShrinks()}）
+ * 与 <b>每一枚派生成员逐条重算零活引用</b>（见 {@link #everyDerivedMemberActuallyHasNoLiveReference()}）
+ * <b>双钉</b>保护。若要重新引入机制专项见证，须<b>选一枚非本批治理对象的、剥注释才判得死／父死子亦死</b>
+ * 的真实成员作为新见证——禁止用现存 `${SchemaRegistryServiceImpl}` 的<b>幻影引用</b>冒充（那类引用只指向
+ * 一个已下线文件，是 D-B4-62 的镜像形态）。</p>
  *
  * <p><b>口径边界（写明，不装）</b>：本门是<b>类级</b>口径。{@code BaseJdbcAdapter} 不在此面内——
  * 它有子类引用、类本身是活面，死的是它内部八枚方法腿（<b>方法级</b>形态），由
@@ -78,7 +84,9 @@ class NoAssemblyEntryFaceRatchetTest {
 
     /**
      * 派生死面集的钉值基线（<b>只减不增</b>：消死面即下移，须书面重设；新增死面直接红）。
-     * 取值只能来自本门实跑红字读数——3e-49 首次派生＝<b>44</b>，3e-50 资源面改目录口径后重派生＝<b>46</b>。
+     * 取值只能来自本门实跑红字读数——3e-49 首次派生＝<b>44</b>，3e-50 资源面改目录口径后重派生＝<b>46</b>，
+     * 3e-70 死码删除治理（D-B4-77 余项，删除 {@code SchemaRegistryServiceImpl} 与
+     * {@code DatabaseSchemaRegistryServiceImpl} 两枚 {@code *Impl.java}）后重派生＝<b>44</b>。
      *
      * <p><b>46 不是笔误，是订正</b>：加宽引用面反而让死面集<b>变大</b>两枚，方向与「扩面只会更保守」的
      * 直觉相反。原因是资源面由「扩展名白名单」改为「{@code src/main/resources} 目录」后，
@@ -88,8 +96,14 @@ class NoAssemblyEntryFaceRatchetTest {
      * 的 {@code per-module-check} 规则（{@code element = CLASS} 的 {@code includes} 覆盖率地板名单）。
      * 那是<b>构建侧豁免具名，不是装配入口</b>：jacoco 点名一枚类只要求它被测试覆盖，不代表容器会实例化它。
      * 旧面白名单把它们误当活引用，新面才露出真死面身份。<b>结论写死：口径净效果必须实测，禁凭推定。</b></p>
+     *
+     * <p><b>46→44 的订正（#142/B4-3e-70）</b>：三枚连锁的下线文件里，两枚 {@code Impl.java}
+     * （SchemaRegistryServiceImpl／DatabaseSchemaRegistryServiceImpl）位于<b>候选面</b>内且判死，
+     * 一枚 <tt>ISchemaRegistryService</tt> 是接口、本就不在「*Impl.java」候选面内故不入账。删除两枚
+     * 候选⇒死面集从 46 减到 44；<b>候选面下限</b> {@link #MAIN_IMPL_FILE_FLOOR}=150 仍有余量
+     * （候选面从 174→172 枚，不触下限）。</p>
      */
-    private static final int DERIVED_DEAD_FACE_BASELINE = 46;
+    private static final int DERIVED_DEAD_FACE_BASELINE = 44;
 
     /**
      * 主源码 {@code *Impl.java} 候选面下限（防扫描器失明的假绿；只设下限，新增合法）。
@@ -97,7 +111,11 @@ class NoAssemblyEntryFaceRatchetTest {
      */
     private static final int MAIN_IMPL_FILE_FLOOR = 150;
 
-    /** 注释面见证：只有剥注释生效才判得死。 */
+    /**
+     * 已随 #142/B4-3e-70（D-B4-77 死码删除治理）下线的原「注释面见证」文件路径。
+     * 本门<b>不再</b>要求该文件在候选面/死面集里存在——它已删除；此路经在剩余生命周期里
+     * <b>必须缺席</b>才证明死码移除治理真的落下（复活即红）。
+     */
     private static final String WIRE_BY_COMMENT_WITNESS =
             "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/"
                     + "engine/data/datadescription/service/impl/SchemaRegistryServiceImpl.java";
@@ -612,15 +630,17 @@ class NoAssemblyEntryFaceRatchetTest {
 
     @Test
     @Timeout(value = 600)
-    @DisplayName("两枚见证分工：注释面引用不算引用、父死子亦死，缺任一机制即红（D-B4-80 盲区防回归）")
+    @DisplayName("两枚机制验证：注释面见证（已随死码删除下线，缺席即通过）＋父死子亦死仍在死面集（D-B4-80 盲区防回归）")
     void commentMentionsAndTransitiveClustersNeitherResurrectADeadFace() {
         Set<String> dead = dead();
-        assertTrue(candidates().containsKey(WIRE_BY_COMMENT_WITNESS),
-                "注释面见证不在候选面内＝候选面口径（主源码 *Impl.java）被改动，本门失去意义");
-        assertTrue(dead.contains(WIRE_BY_COMMENT_WITNESS),
-                () -> "「" + WIRE_BY_COMMENT_WITNESS + "」的引用全部写在注释里，却未判死＝"
-                        + "引用面又在拿注释冒充代码（D-B4-62 同型）。当前它在死面集之外的引用文件＝"
-                        + liveReferences(WIRE_BY_COMMENT_WITNESS, dead, face()));
+        // 原「注释面见证」文件 SchemaRegistryServiceImpl 已随 D-B4-77 死码删除治理（#142/B4-3e-70）
+        // 从仓内删除。本门<b>不再</b>把它当活成员判——若它重新出现在候选面或死面集里，说明死码复活。
+        assertFalse(candidates().containsKey(WIRE_BY_COMMENT_WITNESS),
+                "「" + WIRE_BY_COMMENT_WITNESS + "」已随 D-B4-77 死码删除治理下线，却重新出现在候选面＝"
+                        + "死诱导文件复活，须同批回写台账并重新评估治理方向");
+        assertFalse(dead.contains(WIRE_BY_COMMENT_WITNESS),
+                "「" + WIRE_BY_COMMENT_WITNESS + "」已随 D-B4-77 死码删除治理下线，却仍在死面集＝"
+                        + "候选面自愈但判死逻辑未随之更新");
         assertTrue(dead.contains(TRANSITIVE_CLUSTER_WITNESS),
                 () -> "「" + TRANSITIVE_CLUSTER_WITNESS + "」只被同样判死的父类构造，却未判死＝"
                         + "传递闭包被摘掉，整条死链会被误读成活面（D-B4-77 重新变成待补欠账）");

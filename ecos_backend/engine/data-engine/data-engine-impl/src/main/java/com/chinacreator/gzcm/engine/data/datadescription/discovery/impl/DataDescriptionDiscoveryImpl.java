@@ -31,9 +31,10 @@ import com.chinacreator.gzcm.runtime.access.connector.JdbcConnector;
  * 支持数据库表、文件和API的自动发现
  *
  * <p><b>【死面停写登记 D-B4-77】</b>（处置裁决见 #142/B4-3e-48）：本类在真仓内<b>没有装配入口</b>——
- * 唯一构造点写在 {@code SchemaRegistryServiceImpl} 的无参构造里，而 {@code new SchemaRegistryServiceImpl(}
- * 的调用点实扫为 0。故 {@link #requireJdbcConnector()} 那条「建连器未注入」腿<b>无 HTTP 承流路径</b>：
- * 给它补 503 状态行＝伪造可观测面（客户端读数什么都没变），本域明禁。
+ * 唯一构造点写在 {@code SchemaRegistryServiceImpl} 的无参构造里，而该构造体随
+ * D-B4-77 死码删除治理（#142/B4-3e-70）已从仓内删除，故 {@code new DataDescriptionDiscoveryImpl(}
+ * 的<b>主源码</b>调用点实扫为 0。故 {@link #requireJdbcConnector()} 那条「建连器未注入」腿
+ * <b>无 HTTP 承流路径</b>：给它补 503 状态行＝伪造可观测面（客户端读数什么都没变），本域明禁。
  *
  * <p><b>为什么选「停写」而不是「接承流」</b>：①详设-02 未规定本域任何属主端点，接通须先新增路径与签名，
  * 而新增端点的前提是需求侧有号位；②既有可达通路 {@code testDataSource} 的唯一生产调用方是

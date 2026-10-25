@@ -1018,7 +1018,13 @@ class DependencyUnreadyIllegalStateRatchetTest {
             "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/data/datadescription/discovery/impl/DataDescriptionDiscoveryImpl.java";
 
-    /** 该死 SPI 面在真仓里的唯一装配者（无参构造里 {@code new} 出上面那个实现）。 */
+    /**
+     * 该死 SPI 面唯一的原装配者（无参构造里 {@code new} 出上面那个实现）。
+     * <b>#142/B4-3e-70 起该文件已随 D-B4-77 余项死码删除治理从仓内删除</b>——
+     * 本常量保留此路径仅用于「死码复活」的<b>负向见证</b>：任何 main 源码重新出现
+     * {@code new DataDescriptionDiscoveryImpl(} 的调用点（尤其在含该文件名的路径里）
+     * 即视为死 SPI 复活，须同批回写台账并重新评估承流方向。
+     */
     private static final String DATA_SCHEMA_REGISTRY_IMPL =
             "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/data/datadescription/service/impl/SchemaRegistryServiceImpl.java";
@@ -1835,17 +1841,23 @@ class DependencyUnreadyIllegalStateRatchetTest {
         List<String> blind = new ArrayList<>();
 
         // 面 A：发现服务（死 SPI 面）——装配面与构造点
-        assertEquals(List.of(DATA_DISCOVERY_IMPL, DATA_SCHEMA_REGISTRY_IMPL),
+        // #142/B4-3e-70：原唯一的构造点所在文件 SchemaRegistryServiceImpl 已删除，
+        // filesContaining("DataDescriptionDiscoveryImpl(") 应恒等于发现者自身（类构造签名 3 处）
+        assertEquals(List.of(DATA_DISCOVERY_IMPL),
                 filesContaining("DataDescriptionDiscoveryImpl("),
                 "发现服务实现的引用文件集合变了＝该 SPI 被接上装配，其「建连器未注入」腿重新有承流路径，"
                         + "本面承流归属与真欠账面必须重测");
         assertEquals(2, literalCount(codeOf(DATA_DISCOVERY_IMPL), "requireJdbcConnector("),
                 "requireJdbcConnector( 的发生面不再是 2 枚（实测＝方法定义 1 枚＋唯一调用点 1 枚）。"
                         + "调用点增多＝该腿的触发面被扩大，定义与调用各自要重数");
-        assertEquals(1, literalCount(codeOf(DATA_SCHEMA_REGISTRY_IMPL), "new DataDescriptionDiscoveryImpl("),
-                "SchemaRegistryServiceImpl 里发现服务实现的构造点不再是 1 枚＝本案的引用基准失步");
+        // 死码复活负向见证 1：原构造点所在文件必须缺席
+        java.nio.file.Path deleted = repoRoot().resolve(DATA_SCHEMA_REGISTRY_IMPL);
+        assertFalse(java.nio.file.Files.exists(deleted),
+                "「" + DATA_SCHEMA_REGISTRY_IMPL + "」已随 D-B4-77 死码删除治理（#142/B4-3e-70）删除，"
+                        + "却重新出现在仓内＝死诱导文件复活，须同批回写台账并重新评估治理方向");
+        // 死码复活负向见证 2：任何 main 源码不得再出现该文件的构造调用
         assertEquals(List.of(), filesContaining("new SchemaRegistryServiceImpl("),
-                "SchemaRegistryServiceImpl 的无参构造出现调用点＝死 SPI 面复活，"
+                "SchemaRegistryServiceImpl 的构造出现调用点＝死 SPI 面复活，"
                         + "DataDescriptionDiscoveryImpl 那枚腿须按属主侧批重判（届时还要读它的建连器注入来源）");
 
         // 面 B：适配器八枚「未连接」守卫腿——唯一消费者的调用面
