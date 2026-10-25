@@ -1,7 +1,7 @@
 /* Extracted from ConnectionsTab.tsx */
 import React from 'react';
 import LucideIcon from '../../LucideIcon';
-import { getSourceIcon, getSourceTypeLabel, connTypeBadgeText } from '../../helpers';
+import { getSourceIcon, connTypeBadgeText, connTypeDescText } from '../../helpers';
 import type { DataConnection } from '../../types';
 import { useTheme } from "../../../../components/ThemeContext";
 
@@ -33,7 +33,10 @@ export default function ConnectionDetailBanner({
                   {connTypeBadgeText(conn, t)}
                 </span>
               </div>
-              <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{getSourceTypeLabel(conn.type, t)}</p>
+              {/* #142/B4-3e-65（D-B4-94）：副标题说明文案改走 CONNECTION_TYPES.descKey 单源。
+                  改前这里是 helpers.ts 自带的 5 枚私有 switch 表，14 枚已知类型一律显示「未知数据源」，
+                  与上一行徽章（19 枚单源）在同一块横幅里互相矛盾。 */}
+              <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{connTypeDescText(conn, t)}</p>
             </div>
           </div>
 

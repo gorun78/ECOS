@@ -43,11 +43,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ④ 反方向对账——准入面每一枚都必须在前端显示面有归属（{@code unresolvedCanonical} 恒空），
  * 与正向「前端可选⇒后端承流」成对，堵住「后端扩一枚而前端下拉悄悄少一枚」。</p>
  *
- * <p><b>在册余项（台账 v1.0.146）</b>：{@code doris} 是否准入；被拒闭集 9 枚——{@code doris}/{@code s3}/
+ * <p><b>同批已做（#142/B4-3e-65 追加）</b>：⑤ 第三处显示通道归一——{@code helpers.ts#getSourceTypeLabel}
+ * 的 5 枚私有说明表已删除，类型说明改由 {@code CONNECTION_TYPES.descKey} 承载（19 枚逐枚在位），
+ * 由前端门 {@code b4ConnTypeDescChannel.spec.ts} 持有面值与行为对账，本门不重复钉（避免第二属主）。</p>
+ *
+ * <p><b>在册余项（台账 v1.0.147）</b>：{@code doris} 是否准入；被拒闭集 9 枚——{@code doris}/{@code s3}/
  * {@code oss}/{@code csv}/{@code sftp}/{@code kafka}/{@code mongodb}/{@code sap}/{@code rest_api}——的逐枚定档
- * （下线或接承流）：本批把它们从<b>可选面</b>裁掉，但 19 枚显示元数据面仍在（历史连接记录要出名字），下线须另批处置；
- * {@code helpers.ts#getSourceTypeLabel} 的 5 枚局部显示面（只覆盖 postgresql/s3/rest_api/sftp/sap，
- * 其余落 {@code dw.src.unknown}）与本批的 19 枚显示面口径不一致，同族待归一。</p>
+ * （下线或接承流）：#142/B4-3e-64 把它们从<b>可选面</b>裁掉，但 19 枚显示元数据面仍在（历史连接记录要出名字），
+ * 下线须另批处置；{@code helpers.ts#getSourceIcon} 的 5 枚私有图标表（其余落 {@code HardDrive} 默认）
+ * 与已归一的名称／说明两面口径不一致，登记为 <b>D-B4-95</b> 待归一。</p>
  */
 class DatasourceTypeVocabularySingleSourceTest {
 

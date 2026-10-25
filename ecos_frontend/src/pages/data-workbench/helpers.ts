@@ -18,15 +18,30 @@ export const getSourceIcon = (type: string) => {
   }
 };
 
-export const getSourceTypeLabel = (type: string, t: (key: string) => string) => {
-  switch (type) {
-    case 'postgresql': return t('dw.src.postgresql');
-    case 's3': return t('dw.src.s3');
-    case 'rest_api': return t('dw.src.rest_api');
-    case 'sftp': return t('dw.src.sftp');
-    case 'sap': return t('dw.src.sap');
-    default: return t('dw.src.unknown');
+/**
+ * 连接类型说明文案（#142/B4-3e-65，差距 <b>D-B4-94</b> 的用户面读数）。
+ *
+ * <p>改前本文件自带一份 {@code getSourceTypeLabel} 的 5 枚私有 switch 表
+ * （postgresql/s3/rest_api/sftp/sap），其余 14 枚<b>已知</b>类型一律落 {@code dw.src.unknown}
+ * ——MySQL 连接在详情页副标题上显示「未知数据源」，与同族 D-B4-93「把不知道折成一个具体值」
+ * 互为反向（这里是把已知折成未知）。现单源＝{@code CONNECTION_TYPES.descKey}，
+ * 与名称通道 {@code i18nKey}、徽章通道 {@link connTypeBadgeText} 同一份表。</p>
+ *
+ * <p>未解析（{@code 'unknown'} 或运行时值在显示面无归属）一律显式出「未知数据源（原值 X）」，
+ * <b>禁借用任何一枚已知类型的说明</b>——那正是被本函数收口的折叠形态。</p>
+ */
+export const connTypeDescText = (
+  conn: Pick<DataConnection, 'type' | 'typeRaw'>,
+  t: (key: string) => string,
+): string => {
+  const unresolved = t('dw.src.unknown');
+  if (conn.type === 'unknown') {
+    const raw = (conn.typeRaw ?? '').trim();
+    return raw ? `${unresolved} (${raw})` : unresolved;
   }
+  const option = CONNECTION_TYPES.find((o) => o.value === conn.type);
+  // 运行时值在显示面无归属＝显示面与类型面分裂，同样按未解析出并点名原值
+  return option ? t(option.descKey) : `${unresolved} (${conn.type})`;
 };
 
 /**
