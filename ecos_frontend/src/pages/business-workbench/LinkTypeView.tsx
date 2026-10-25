@@ -5,7 +5,12 @@
 
 import React from 'react';
 import { LinkType, ObjectType, Dataset } from '../../types/ontology';
-import LucideIcon from './LucideIcon';
+import {
+  Eye,
+  GitMerge,
+  Trash2
+} from 'lucide-react';
+import { Icon } from '../../components/LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 
@@ -86,7 +91,7 @@ export default function LinkTypeView({
       <div className={`px-6 py-4 border-b ${styles.appBorder} flex justify-between items-center ${styles.appBg}`}>
         <div className="flex items-center gap-3">
           <div className={`p-2.5 rounded-lg border ${styles.appBorder} ${styles.cardBg} ${styles.cardText} flex items-center justify-center`}>
-            <LucideIcon name="GitMerge" size={20} />
+            <GitMerge size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -106,7 +111,7 @@ export default function LinkTypeView({
           onClick={() => onDelete(linkType.id)}
           className={`text-xs ${styles.dangerText} hover:opacity-80 px-2.5 py-1.5 rounded border ${styles.dangerBorder} transition-colors flex items-center gap-1.5`}
         >
-          <LucideIcon name="Trash2" size={13} />
+          <Trash2 size={13} />
           {t('ow.link.delete')}
         </button>
       </div>
@@ -115,7 +120,7 @@ export default function LinkTypeView({
         {/* Visual Link Diagram */}
         <div className={`${styles.appBg} border ${styles.appBorder} rounded-xl p-6`}>
           <h3 className={`text-xs font-semibold ${styles.cardText} mb-4 flex items-center gap-1.5`}>
-            <LucideIcon name="Eye" size={14} className={styles.cardTextMuted} />
+            <Eye size={14} className={styles.cardTextMuted} />
             {t('ow.link.topology')}
           </h3>
           <div className="flex items-center justify-center gap-6">
@@ -125,7 +130,7 @@ export default function LinkTypeView({
                 onClick={() => onNavigateToObject(sourceObj.id)}
                 className={`w-36 p-3 rounded-lg border-2 ${styles.cardBg} flex flex-col items-center justify-center cursor-pointer hover:shadow-xs transition-shadow ${sourceObj.color}`}
               >
-                <LucideIcon name={sourceObj.icon} size={18} />
+                <Icon name={sourceObj.icon} size={18} />
                 <span className="text-xs font-semibold mt-1">{sourceObj.displayName}</span>
                 <span className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>{sourceObj.id}</span>
               </div>
@@ -154,7 +159,7 @@ export default function LinkTypeView({
                 onClick={() => onNavigateToObject(targetObj.id)}
                 className={`w-36 p-3 rounded-lg border-2 ${styles.cardBg} flex flex-col items-center justify-center cursor-pointer hover:shadow-xs transition-shadow ${targetObj.color}`}
               >
-                <LucideIcon name={targetObj.icon} size={18} />
+                <Icon name={targetObj.icon} size={18} />
                 <span className="text-xs font-semibold mt-1">{targetObj.displayName}</span>
                 <span className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>{targetObj.id}</span>
               </div>

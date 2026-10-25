@@ -1,6 +1,10 @@
 /* Extracted from ConnectionsTab.tsx */
 import React from 'react';
-import LucideIcon from '../../LucideIcon';
+import {
+  GitBranch,
+  GitCommit,
+  Loader2
+} from 'lucide-react';
 import { useTheme } from "../../../../components/ThemeContext";
 import type { CollectDiffRecord } from './types';
 
@@ -22,10 +26,10 @@ export default function CollectDiffRecords({
               <div className={`border ${styles.cardBorder} rounded-lg overflow-hidden ${styles.appBg}`}>
                 <div className={`px-3 py-2 border-b ${styles.cardBorder} ${styles.sidebarBg}/60 flex items-center justify-between`}>
                   <span className={`text-[10px] font-semibold ${styles.cardText} flex items-center gap-1.5`}>
-                    <LucideIcon name="GitCommit" size={12} className={styles.accentText} />
+                    <GitCommit size={12} className={styles.accentText} />
                     {t('dw.strategy.diffTitle') || '采集差异记录'}
                   </span>
-                  {loadingDiff && <LucideIcon name="Loader2" size={11} className="animate-spin" />}
+                  {loadingDiff && <Loader2 size={11} className="animate-spin" />}
                 </div>
                 <div className="divide-y" style={{ borderColor: styles.cardBorder }}>
                   {diffRecords.map((rec, idx) => (
@@ -52,7 +56,7 @@ export default function CollectDiffRecords({
                           </div>
                           {rec.gitCommit && (
                             <div className={`text-[9px] font-mono ${styles.cardTextMuted} mt-1 flex items-center gap-1`}>
-                              <LucideIcon name="GitBranch" size={9} />
+                              <GitBranch size={9} />
                               {rec.gitCommit}
                             </div>
                           )}

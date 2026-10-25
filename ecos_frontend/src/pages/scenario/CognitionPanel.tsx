@@ -6,7 +6,14 @@
  * + 统计基线预测（SVG 置信区间图）+ 情景模拟/策略摘要 + 运行历史 + 模型注册表。</p>
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import LucideIcon from '../../components/LucideIcon';
+import {
+  BrainCircuit,
+  Info,
+  Play,
+  RefreshCw,
+  TrendingUp
+} from 'lucide-react';
+import { Icon } from '../../components/LucideIcon';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme, type ThemeStyles } from '../../components/ThemeContext';
 import { showToastGlobal } from '../../components/common/Toast';
@@ -238,7 +245,7 @@ export default function CognitionPanel({
                 : `${styles.inputBg} ${styles.inputBorder} ${styles.cardTextMuted} hover:opacity-80`
             }`}
           >
-            <LucideIcon name={st.icon} size={11} />
+            <Icon name={st.icon} size={11} />
             {t(st.labelKey)}
           </button>
         ))}
@@ -253,7 +260,7 @@ export default function CognitionPanel({
       {/* ── 运行配置 ── */}
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4 space-y-3`}>
         <div className="flex items-center gap-2">
-          <LucideIcon name="BrainCircuit" size={14} />
+          <BrainCircuit size={14} />
           <span className="text-sm font-semibold">{t('scenario.cog.title')}</span>
         </div>
         <p className={`text-xs ${styles.cardTextMuted} leading-normal`}>{t('scenario.cog.desc')}</p>
@@ -309,7 +316,7 @@ export default function CognitionPanel({
               disabled={running || !scenario || runTypes.length === 0}
               className={`w-full px-3 py-1.5 rounded ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-50 text-[11px] font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5`}
             >
-              <LucideIcon name="Play" size={12} className={running ? 'animate-pulse' : ''} />
+              <Play size={12} className={running ? 'animate-pulse' : ''} />
               {running ? t('scenario.cog.running') : t('scenario.cog.run')}
             </button>
           </div>
@@ -321,7 +328,7 @@ export default function CognitionPanel({
       {!scenario && <p className={`text-xs ${styles.cardTextMuted}`}>{t('scenario.cog.loading')}</p>}
       {scenario && !result && (
         <p className={`text-xs ${styles.cardTextMuted} flex items-center gap-1.5`}>
-          <LucideIcon name="Info" size={12} />
+          <Info size={12} />
           {t('scenario.cog.empty')}
         </p>
       )}
@@ -504,7 +511,7 @@ export default function CognitionPanel({
             <p className={`text-xs ${styles.dangerText}`}>{t('scenario.cog.historyLoadFailed')}</p>
             <button type="button" onClick={() => void fetchHistory()}
               className={`px-3 py-1 border ${styles.cardBorder} ${styles.cardText} text-[11px] font-bold rounded flex items-center gap-1 mx-auto cursor-pointer hover:opacity-80`}>
-              <LucideIcon name="RefreshCw" size={11} />{t('scenario.decision.retry')}
+              <RefreshCw size={11} />{t('scenario.decision.retry')}
             </button>
           </div>
         ) : history.length === 0 ? (
@@ -550,7 +557,7 @@ export default function CognitionPanel({
             <p className={`text-xs ${styles.dangerText}`}>{t('scenario.cog.modelsLoadFailed')}</p>
             <button type="button" onClick={() => void fetchModels()}
               className={`px-3 py-1 border ${styles.cardBorder} ${styles.cardText} text-[11px] font-bold rounded flex items-center gap-1 mx-auto cursor-pointer hover:opacity-80`}>
-              <LucideIcon name="RefreshCw" size={11} />{t('scenario.decision.retry')}
+              <RefreshCw size={11} />{t('scenario.decision.retry')}
             </button>
           </div>
         ) : models.length === 0 ? (
@@ -625,7 +632,7 @@ function StatusChip({
 function SectionHeader({ icon, title }: { icon: string; title: string }) {
   return (
     <div className="p-3 border-b flex items-center gap-2">
-      <LucideIcon name={icon} size={13} />
+      <Icon name={icon} size={13} />
       <span className="text-xs font-bold">{title}</span>
     </div>
   );
@@ -722,7 +729,7 @@ function ForecastChart({ points }: { points: NonNullable<ForecastResult['points'
       role="img"
       aria-label={`${t('scenario.cog.forecast')}: min ${min.toFixed(2)}, max ${max.toFixed(2)}, band ${band}`}
     >
-      <LucideIcon name="TrendingUp" size={16} className={styles.cardTextMuted} />
+      <TrendingUp size={16} className={styles.cardTextMuted} />
       <span className={`font-mono ${styles.cardTextMuted}`}>min {min.toFixed(2)}</span>
       <span className={`font-mono ${styles.cardTextMuted}`}>max {max.toFixed(2)}</span>
       <span className={`font-mono ${styles.cardText}`}>

@@ -10,7 +10,11 @@
  * {@link ScenarioBlueprintVO} 字段。遵守主题 token 与 i18n 铁律。</p>
  */
 import React from 'react';
-import LucideIcon from '../../../../components/LucideIcon';
+import {
+  AlertOctagon,
+  GitBranch
+} from 'lucide-react';
+import { Icon } from '../../../../components/LucideIcon';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useLanguage } from '../../../../components/LanguageContext';
 import {
@@ -88,10 +92,10 @@ export default function BlueprintStatusTrack({ blueprint, onTransition, busy }: 
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3`}>
       <div className="flex items-center gap-1.5 mb-3">
-        <LucideIcon name="GitBranch" size={13} className={styles.accentText} />
+        <GitBranch size={13} className={styles.accentText} />
         <h3 className={`text-xs font-bold uppercase ${styles.cardTextMuted}`}>{t('workspace.bp.current_state')}</h3>
         <span className={`ml-auto inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded border ${tc.text} ${tc.ring}`}>
-          <LucideIcon name={TONE_ICON[tone]} size={11} />
+          <Icon name={TONE_ICON[tone]} size={11} />
           {status ? t(`workspace.bp.step.${status}`) : t('workspace.bp.empty_field')}
         </span>
       </div>
@@ -135,7 +139,7 @@ export default function BlueprintStatusTrack({ blueprint, onTransition, busy }: 
       {/* 异常态：醒目横幅 + 原因（actor/时间/traceId 由父层 detail 呈现） */}
       {exception && status && (
         <div className={`mt-2 flex items-start gap-1.5 text-[11px] rounded border px-2 py-1.5 ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
-          <LucideIcon name="AlertOctagon" size={12} className="mt-0.5 shrink-0" />
+          <AlertOctagon size={12} className="mt-0.5 shrink-0" />
           <div>
             <span className="font-bold">{t(`workspace.bp.step.${status}`)}</span>
             {blueprint?.transitionReason ? <span className="ml-1">{blueprint.transitionReason}</span> : null}

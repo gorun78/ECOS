@@ -1,6 +1,10 @@
 /* Extracted from ConnectionsTab.tsx */
 import React, { useState, useCallback, useRef } from 'react';
-import LucideIcon from '../../LucideIcon';
+import {
+  ChevronDown,
+  RefreshCw,
+  Table
+} from 'lucide-react';
 import type { TableInfo } from '../../types';
 import { useTheme } from "../../../../components/ThemeContext";
 import { useLanguage } from "../../../../components/LanguageContext";
@@ -79,7 +83,7 @@ export default function TableExpandRow({ connId, table, selected, onToggle }: { 
               title={t('dw.ingest.selectTables') || '选择采集'}
             />
           )}
-          <LucideIcon name="Table" size={13} className={styles.accentText} />
+          <Table size={13} className={styles.accentText} />
           <span className={`font-bold font-mono ${styles.cardText} truncate`}>{table.name}</span>
           {table.resourceId && (
             <span className="text-[9px] font-mono" style={{ color: styles.cardTextMuted }} title={table.resourceId}>
@@ -102,7 +106,7 @@ export default function TableExpandRow({ connId, table, selected, onToggle }: { 
               expanded ? 'rotate-180' : ''
             } ${styles.cardTextMuted} hover:${styles.accentText}`}
           >
-            <LucideIcon name="ChevronDown" size={14} />
+            <ChevronDown size={14} />
           </button>
         </div>
       </div>
@@ -116,7 +120,7 @@ export default function TableExpandRow({ connId, table, selected, onToggle }: { 
         <div className={`p-3 ${styles.cardBg} space-y-2`}>
           {isLoading ? (
             <div className={`flex items-center justify-center py-4 text-xs ${styles.cardTextMuted}`}>
-              <LucideIcon name="RefreshCw" size={13} className="animate-spin mr-2" />
+              <RefreshCw size={13} className="animate-spin mr-2" />
               {t('dw.loading') || 'Loading...'}
             </div>
           ) : error ? (

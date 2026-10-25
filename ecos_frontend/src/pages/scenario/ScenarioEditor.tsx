@@ -10,7 +10,8 @@
  * ④ 下拉值窄化到联合类型，禁 as any。</p>
  */
 import React, { useEffect, useRef } from 'react';
-import LucideIcon from '../../components/LucideIcon';
+
+import { Icon } from '../../components/LucideIcon';
 import type { ThemeStyles } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -58,7 +59,7 @@ export default function ScenarioEditor({wizard,onClose,onStepChange,onSave,setWN
 
   const next=()=>{if(wizardStep===1&&(!wName.trim()||!wGoal.trim())){toast('error',t('scenario.validator.requiredFields'));return;}onStepChange(wizardStep+1);};
   const prev=()=>{if(wizardStep>1)onStepChange(wizardStep-1);};
-  const Ic=(n:string,s:number)=>React.createElement(LucideIcon,{name:n,size:s});
+  const Ic=(n:string,s:number)=>React.createElement(Icon,{name:n,size:s});
   const labelCls=`block text-[10px] font-bold ${styles.cardTextMuted}`;
   const fieldCls=`w-full p-2.5 ${styles.inputBg} border ${styles.inputBorder} rounded ${styles.inputText} outline-none focus:ring-1 focus:ring-current transition-colors`;
   const infoCls=`p-3 ${styles.inputBg} border ${styles.inputBorder} rounded-lg space-y-1`;

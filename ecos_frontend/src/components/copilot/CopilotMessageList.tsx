@@ -7,7 +7,10 @@
  */
 
 import React, { Fragment } from 'react';
-import LucideIcon from '../LucideIcon';
+import {
+  Bot,
+  User
+} from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useTheme } from '../ThemeContext';
 
@@ -73,11 +76,7 @@ export default function CopilotMessageList({ messages, isTyping, scrollRef }: Co
             className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
           >
             <div className={`flex items-center gap-1.5 text-[9px] ${styles.cardTextMuted} mb-1 font-semibold`}>
-              <LucideIcon
-                name={isUser ? 'User' : 'Bot'}
-                size={10}
-                className={isUser ? `${styles.cardTextMuted}` : 'text-indigo-500'}
-              />
+              {isUser ? <User size={10} className={styles.cardTextMuted} /> : <Bot size={10} className="text-indigo-500" />}
               <span>{isUser ? userLabel : agentLabel}</span>
               <span>•</span>
               <span>{msg.timestamp}</span>
@@ -121,7 +120,7 @@ export default function CopilotMessageList({ messages, isTyping, scrollRef }: Co
       {isTyping && (
         <div className="flex flex-col items-start">
           <div className={`flex items-center gap-1 text-[9px] ${styles.cardTextMuted} mb-1 font-semibold`}>
-            <LucideIcon name="Bot" size={10} className="text-indigo-500" />
+            <Bot size={10} className="text-indigo-500" />
             <span>{t('copilot.chat.typing')}</span>
           </div>
           <div className={`${styles.cardBg} rounded-2xl px-4 py-3 border ${styles.cardBorder} rounded-tl-none shadow-xs`}>

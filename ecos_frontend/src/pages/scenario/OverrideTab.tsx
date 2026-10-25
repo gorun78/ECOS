@@ -7,7 +7,11 @@
  * 覆写前弹项目通用确认框（二次确认），成功后重拉版本链并标记「人工覆写」。</p>
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import LucideIcon from '../../components/LucideIcon';
+import {
+  Plus,
+  Trash2,
+  UserCog
+} from 'lucide-react';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 import { apiFetchData } from '../../api';
@@ -162,7 +166,7 @@ export default function OverrideTab() {
       {/* ── 覆写配置 ── */}
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4 space-y-3`}>
         <div className="flex items-center gap-2">
-          <LucideIcon name="UserCog" size={14} />
+          <UserCog size={14} />
           <span className="text-sm font-semibold">{t('scenario.iv.ov.title')}</span>
         </div>
         <p className={`text-xs ${styles.cardTextMuted} leading-normal`}>{t('scenario.iv.ov.desc')}</p>
@@ -216,7 +220,7 @@ export default function OverrideTab() {
                 onClick={addDraft}
                 className={`text-[10px] font-bold px-2 py-1 rounded border ${styles.inputBorder} ${styles.cardTextMuted} hover:border-indigo-500/50 transition-colors cursor-pointer flex items-center gap-1`}
               >
-                <LucideIcon name="Plus" size={10} />
+                <Plus size={10} />
                 {t('scenario.iv.ov.addOutcome')}
               </button>
             </div>
@@ -247,7 +251,7 @@ export default function OverrideTab() {
                 title={t('scenario.iv.ov.removeOutcome')}
                 className={`col-span-1 flex items-center justify-center py-1.5 rounded border ${styles.inputBorder} ${styles.cardTextMuted} hover:border-red-500/60 hover:text-red-400 transition-colors cursor-pointer`}
               >
-                <LucideIcon name="Trash2" size={11} />
+                <Trash2 size={11} />
               </button>
             </div>
           ))}
@@ -284,7 +288,7 @@ export default function OverrideTab() {
             disabled={submitting}
             className="px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1.5"
           >
-            <LucideIcon name="UserCog" size={12} className={submitting ? 'animate-pulse' : ''} />
+            <UserCog size={12} className={submitting ? 'animate-pulse' : ''} />
             {submitting ? t('scenario.iv.ov.submitting') : t('scenario.iv.ov.submit')}
           </button>
         </div>

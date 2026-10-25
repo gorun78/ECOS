@@ -10,7 +10,19 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import LucideIcon from '../../components/LucideIcon';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Building,
+  ChevronDown,
+  ChevronUp,
+  Inbox,
+  LayoutDashboard,
+  Plus,
+  SlidersHorizontal,
+  WifiOff
+} from 'lucide-react';
+import { Icon } from '../../components/LucideIcon';
 import { useTheme, type ThemeStyles } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -84,7 +96,7 @@ export default function WorkbenchHome() {
       <div className={`p-4 ${styles.cardBg} border-b ${styles.cardBorder} shrink-0`}>
         <div className="flex items-center gap-2">
           <span className={`p-1.5 rounded-md ${styles.accentBg} ${styles.cardText} flex items-center justify-center`}>
-            <LucideIcon name="LayoutDashboard" size={16} />
+            <LayoutDashboard size={16} />
           </span>
           <h1 className={`text-lg font-bold tracking-tight ${styles.appText}`}>{t('workspace.l1.title')}</h1>
         </div>
@@ -94,7 +106,7 @@ export default function WorkbenchHome() {
       {/* 离线 banner（离线态） */}
       {offline && (
         <div className={`mx-4 mt-4 px-3 py-2 rounded border text-xs ${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`}>
-          <LucideIcon name="WifiOff" size={12} className="inline mr-1" />
+          <WifiOff size={12} className="inline mr-1" />
           {t('workspace.l1.offline')}
         </div>
       )}
@@ -109,7 +121,7 @@ export default function WorkbenchHome() {
             className={`${styles.accentBg} ${styles.accentSolidText} rounded-lg p-3 flex items-center gap-2 transition-all hover:opacity-90 cursor-pointer`}
             aria-label={t('workspace.l1.entry.new_scenario')}
           >
-            <LucideIcon name="Plus" size={16} />
+            <Plus size={16} />
             <span className="text-xs font-bold">{t('workspace.l1.entry.new_scenario')}</span>
           </button>
           {navEntries.map((e) => (
@@ -119,7 +131,7 @@ export default function WorkbenchHome() {
               className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3 flex items-center gap-2 transition-all hover:opacity-90 cursor-pointer`}
             >
               <span className={e.accent(styles)}>
-                <LucideIcon name={e.icon} size={16} />
+                <Icon name={e.icon} size={16} />
               </span>
               <span className={`text-xs font-semibold ${styles.cardText}`}>{t(e.labelKey)}</span>
             </Link>
@@ -136,7 +148,7 @@ export default function WorkbenchHome() {
             onClick={() => setCreateOpen(true)}
             className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded border ${styles.accentBg} ${styles.accentBorder} ${styles.accentText} cursor-pointer hover:opacity-90 transition`}
           >
-            <LucideIcon name="Plus" size={12} />
+            <Plus size={12} />
             {t('workspace.l1.entry.new_scenario')}
           </button>
         </div>
@@ -152,7 +164,7 @@ export default function WorkbenchHome() {
         {/* 错误态（权限/网络） */}
         {!loading && error && (
           <div className={`px-3 py-3 rounded border text-xs ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
-            <LucideIcon name="AlertTriangle" size={12} className="inline mr-1" />
+            <AlertTriangle size={12} className="inline mr-1" />
             {t('workspace.l1.refresh_failed', { msg: error })}
             <button
               onClick={() => void load()}
@@ -166,7 +178,7 @@ export default function WorkbenchHome() {
         {/* 空态 / 边界态（无场景） */}
         {!loading && !error && scenarios.length === 0 && (
           <div className={`px-4 py-8 rounded border text-center ${styles.cardBorder} ${styles.cardBg}`}>
-            <LucideIcon name="Inbox" size={22} className={`${styles.cardTextMuted} mb-2`} />
+            <Inbox size={22} className={`${styles.cardTextMuted} mb-2`} />
             <p className={`text-sm font-semibold ${styles.cardText}`}>{t('workspace.l1.no_scenarios')}</p>
             <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{t('workspace.l1.no_scenarios_hint')}</p>
           </div>
@@ -192,7 +204,7 @@ export default function WorkbenchHome() {
                 <p className={`text-xs ${styles.cardTextMuted} line-clamp-2`}>{s.businessGoal || s.description || '—'}</p>
                 <div className="flex items-center gap-3 text-[11px] font-mono">
                   <span className={styles.cardTextMuted}>
-                    <LucideIcon name="Building" size={11} className="inline mr-1" />
+                    <Building size={11} className="inline mr-1" />
                     {s.department ?? '—'}
                   </span>
                 </div>
@@ -201,7 +213,7 @@ export default function WorkbenchHome() {
                   className={`mt-1 inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded border ${styles.accentBg} ${styles.accentBorder} ${styles.cardText} cursor-pointer w-fit`}
                 >
                   {t('workspace.l1.card.open')}
-                  <LucideIcon name="ArrowRight" size={12} />
+                  <ArrowRight size={12} />
                 </Link>
               </article>
             ))}
@@ -216,10 +228,10 @@ export default function WorkbenchHome() {
           className={`w-full flex items-center justify-between px-3 py-2 rounded border text-xs font-bold cursor-pointer ${styles.cardBg} ${styles.cardBorder} ${styles.cardText}`}
         >
           <span className="flex items-center gap-2">
-            <LucideIcon name="SlidersHorizontal" size={13} />
+            <SlidersHorizontal size={13} />
             {t('workspace.l1.advanced')}
           </span>
-          <LucideIcon name={showAdvanced ? 'ChevronUp' : 'ChevronDown'} size={14} />
+          {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
         {showAdvanced && (
           <div className={`mt-2 px-3 py-3 rounded border text-xs ${styles.cardBg} ${styles.cardBorder} ${styles.cardTextMuted}`}>

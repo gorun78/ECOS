@@ -1,6 +1,11 @@
 /* Extracted from ConnectionsTab.tsx */
 import React from 'react';
-import LucideIcon from '../../LucideIcon';
+import {
+  ExternalLink,
+  Loader2,
+  RefreshCw,
+  Save
+} from 'lucide-react';
 import type { DataConnection } from '../../types';
 import type { FolderFileVo } from '../../api';
 import { useTheme } from "../../../../components/ThemeContext";
@@ -159,7 +164,7 @@ export default function MetadataStrategyPanel({
                       }}
                       className={`px-2 py-1 text-[11px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.cardText} transition-colors cursor-pointer disabled:opacity-40 flex items-center gap-1`}
                     >
-                      <LucideIcon name="Save" size={11} />
+                      <Save size={11} />
                       {t('dw.strategy.saveParams')}
                     </button>
 
@@ -212,7 +217,7 @@ export default function MetadataStrategyPanel({
                       }}
                       className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors flex items-center gap-1 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-40`}
                     >
-                      <LucideIcon name="RefreshCw" size={11} className={(collecting || collectTaskId !== null) ? 'animate-spin' : ''} />
+                      <RefreshCw size={11} className={(collecting || collectTaskId !== null) ? 'animate-spin' : ''} />
                       {(collecting || collectTaskId !== null) ? t('dw.strategy.collecting') : t('dw.strategy.collectNow')}
                     </button>
 
@@ -229,7 +234,7 @@ export default function MetadataStrategyPanel({
                   {activeTasks.length > 0 && (
                     <div className={`space-y-1.5 p-2 rounded-lg ${styles.appBg} border ${styles.cardBorder}`}>
                       <div className={`flex items-center gap-2 text-[11px]`}>
-                        <LucideIcon name="Loader2" size={13} className={`animate-spin ${styles.accentText}`} />
+                        <Loader2 size={13} className={`animate-spin ${styles.accentText}`} />
                         <span className={`font-semibold ${styles.cardText}`}>
                           {t('dw.strategy.taskRunning')}
                         </span>
@@ -249,7 +254,7 @@ export default function MetadataStrategyPanel({
                         onClick={() => window.open('#/task-center', '_blank')}
                         className={`text-[10px] ${styles.accentText} hover:underline cursor-pointer flex items-center gap-1`}
                       >
-                        <LucideIcon name="ExternalLink" size={10} />
+                        <ExternalLink size={10} />
                         {t('dw.strategy.viewInTaskCenter')}
                       </button>
                     </div>

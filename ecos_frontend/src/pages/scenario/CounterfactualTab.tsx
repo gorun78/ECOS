@@ -7,7 +7,13 @@
  * （assumptionRefs 有效假设 / excludedAssumptions 已排除假设）。</p>
  */
 import React, { useState } from 'react';
-import LucideIcon from '../../components/LucideIcon';
+import {
+  Info,
+  Play,
+  Plus,
+  SlidersHorizontal,
+  Trash2
+} from 'lucide-react';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 import { apiFetchData } from '../../api';
@@ -90,7 +96,7 @@ export default function CounterfactualTab() {
       {/* ── 干预配置 ── */}
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4 space-y-3`}>
         <div className="flex items-center gap-2">
-          <LucideIcon name="SlidersHorizontal" size={14} />
+          <SlidersHorizontal size={14} />
           <span className="text-sm font-semibold">{t('scenario.iv.cf.title')}</span>
         </div>
         <p className={`text-xs ${styles.cardTextMuted} leading-normal`}>{t('scenario.iv.cf.desc')}</p>
@@ -153,7 +159,7 @@ export default function CounterfactualTab() {
               onClick={addDraft}
               className={`text-[10px] font-bold px-2 py-1 rounded border ${styles.inputBorder} ${styles.cardTextMuted} hover:border-indigo-500/50 transition-colors cursor-pointer flex items-center gap-1`}
             >
-              <LucideIcon name="Plus" size={10} />
+              <Plus size={10} />
               {t('scenario.iv.cf.addIntervention')}
             </button>
           </div>
@@ -186,7 +192,7 @@ export default function CounterfactualTab() {
                 title={t('scenario.iv.cf.removeIntervention')}
                 className={`col-span-1 flex items-center justify-center py-1.5 rounded border ${styles.inputBorder} ${styles.cardTextMuted} hover:border-red-500/60 hover:text-red-400 transition-colors cursor-pointer`}
               >
-                <LucideIcon name="Trash2" size={11} />
+                <Trash2 size={11} />
               </button>
             </div>
           ))}
@@ -198,7 +204,7 @@ export default function CounterfactualTab() {
             disabled={running}
             className="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1.5"
           >
-            <LucideIcon name="Play" size={12} className={running ? 'animate-pulse' : ''} />
+            <Play size={12} className={running ? 'animate-pulse' : ''} />
             {running ? t('scenario.iv.cf.running') : t('scenario.iv.cf.run')}
           </button>
         </div>
@@ -207,7 +213,7 @@ export default function CounterfactualTab() {
       {/* ── 推演结果 ── */}
       {!result && (
         <p className={`text-xs ${styles.cardTextMuted} flex items-center gap-1.5`}>
-          <LucideIcon name="Info" size={12} />
+          <Info size={12} />
           {t('scenario.iv.cf.idle')}
         </p>
       )}

@@ -5,7 +5,15 @@
  * @license Apache-2.0
  */
 import React, { useState, useRef, useEffect } from 'react';
-import LucideIcon from './LucideIcon';
+import {
+  AlertTriangle,
+  CheckCircle,
+  Database,
+  Import,
+  Loader2,
+  X,
+  XCircle
+} from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import type { DataConnection } from './types';
 // #142/B4-3e-47（D-B4-76 前端腿）：预览出参按属主契约的判别联合消费，页面不得再自设第二份键面
@@ -351,11 +359,11 @@ export function AddConnectionModal({
       <div className={`${styles.cardBg} rounded-xl shadow-lg border ${styles.cardBorder} max-w-lg w-full overflow-hidden flex flex-col`}>
         <div className={`px-5 py-4 border-b ${styles.cardBorder} flex justify-between items-center ${styles.cardBg}`}>
           <h3 className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}>
-            <LucideIcon name="Database" size={14} className={styles.infoText} />
+            <Database size={14} className={styles.infoText} />
             <span>{t('dw.txt.332103')}</span>
           </h3>
           <button type="button" onClick={onClose} className={`${styles.cardTextMuted} p-1`}>
-            <LucideIcon name="X" size={14} />
+            <X size={14} />
           </button>
         </div>
 
@@ -399,13 +407,13 @@ export function AddConnectionModal({
           {/* #142/B4-3e-64（D-B4-78 前端侧腿）：类型目录通道三态读数——加载/失败/部分未解析各出一句，禁折叠 */}
           {catalog.phase === 'loading' && (
             <div className={`flex items-center gap-2 px-3 py-2 rounded text-[11px] font-mono ${styles.cardBorder} ${styles.cardTextMuted} border`}>
-              <LucideIcon name="Loader2" size={14} />
+              <Loader2 size={14} />
               <span>{t('dw.conn.typeCatalogLoading')}</span>
             </div>
           )}
           {catalogFailure && (
             <div className={`flex items-start gap-2 px-3 py-2 rounded text-[11px] font-mono ${styles.dangerBg} ${styles.dangerText}`}>
-              <LucideIcon name="XCircle" size={14} />
+              <XCircle size={14} />
               <div className="space-y-1">
                 {/* 类别句 + 后端原文各占一段（ASCII 分隔，禁把原文并进句子以免混淆口径）*/}
                 <div>{t(CATALOG_FAILURE_KEYS[catalogFailure.kind])}</div>
@@ -421,13 +429,13 @@ export function AddConnectionModal({
           )}
           {unresolvedCanonical.length > 0 && (
             <div className={`flex items-start gap-2 px-3 py-2 rounded text-[11px] font-mono ${styles.warningBg} ${styles.warningText}`}>
-              <LucideIcon name="AlertTriangle" size={14} />
+              <AlertTriangle size={14} />
               <span>{t('dw.conn.typeCatalogUnresolved')}: {unresolvedCanonical.join(', ')}</span>
             </div>
           )}
           {supportedOptions !== null && !selectionSupported && (
             <div className={`flex items-start gap-2 px-3 py-2 rounded text-[11px] font-mono ${styles.warningBg} ${styles.warningText}`}>
-              <LucideIcon name="AlertTriangle" size={14} />
+              <AlertTriangle size={14} />
               {/* 承流面已撤回当前选种（或目录内无默认项）：显式提示并阻塞动作，禁静默按这一枚提交 */}
               <span>{t('dw.conn.typeCatalogSelectionUnsupported')}{newConnType ? ` | ${newConnType}` : ''}</span>
             </div>
@@ -445,7 +453,7 @@ export function AddConnectionModal({
                 ? `${styles.successBg} ${styles.successText}`
                 : `${styles.dangerBg} ${styles.dangerText}`
             }`}>
-              <LucideIcon name={testResult.ok ? 'CheckCircle' : 'XCircle'} size={14} />
+              {testResult.ok ? <CheckCircle size={14} /> : <XCircle size={14} />}
               <span>{testResult.msg}</span>
             </div>
           )}
@@ -566,8 +574,8 @@ export function AddSyncModal({ t, locale, newSyncName, setNewSyncName, newSyncCo
     <div className={`absolute inset-0 ${styles.overlayBg} backdrop-blur-xs flex items-center justify-center z-50 p-4 select-none`}>
       <div className={`${styles.cardBg} rounded-xl shadow-lg border ${styles.cardBorder} max-w-md w-full overflow-hidden flex flex-col`}>
         <div className={`px-5 py-4 border-b ${styles.cardBorder} flex justify-between items-center ${styles.cardBg}`}>
-          <h3 className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}><LucideIcon name="Import" size={14} className={`${styles.successText}`} /><span>{t('dw.txt.ca4caf')}</span></h3>
-          <button type="button" onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} p-1`}><LucideIcon name="X" size={14} /></button>
+          <h3 className={`text-xs font-bold ${styles.cardText} flex items-center gap-1.5`}><Import size={14} className={`${styles.successText}`} /><span>{t('dw.txt.ca4caf')}</span></h3>
+          <button type="button" onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.cardTextMuted} p-1`}><X size={14} /></button>
         </div>
         <div className="p-5 space-y-3 text-xs">
           <div className="grid grid-cols-2 gap-3">

@@ -14,7 +14,10 @@
 
 import React, { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import LucideIcon from '../../../components/LucideIcon';
+import {
+  ArrowLeft,
+  Gavel
+} from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
@@ -41,12 +44,12 @@ export default function WorkbenchDecisions() {
           to={`/workbench/${scenarioId}`}
           className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded border cursor-pointer mb-2 ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
         >
-          <LucideIcon name="ArrowLeft" size={12} />
+          <ArrowLeft size={12} />
           {t('workspace.l3.back')}
         </Link>
         <div className="flex items-center gap-2 flex-wrap">
           <h1 className={`text-lg font-bold tracking-tight ${styles.appText} flex items-center gap-2`}>
-            <LucideIcon name="Gavel" size={16} className={styles.infoText} />
+            <Gavel size={16} className={styles.infoText} />
             {t('scenario.decisions.title')}
           </h1>
           <DemoBadge />

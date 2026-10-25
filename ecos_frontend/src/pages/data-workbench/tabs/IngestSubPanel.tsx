@@ -14,7 +14,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import logger from '../../../services/logger';
-import LucideIcon from '../LucideIcon';
+import {
+  Database,
+  Play
+} from 'lucide-react';
 import { getErrorMessage } from '../helpers';
 import type { DataConnection } from '../types';
 import {
@@ -233,7 +236,7 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
       {/* 区块标题 */}
       <div className={`flex items-center justify-between`}>
         <span className={`text-[10px] font-bold uppercase tracking-wider ${styles.accentText} flex items-center gap-1`}>
-          <LucideIcon name="Database" size={12} />
+          <Database size={12} />
           {t('dw.ingest.title')}
         </span>
         {/* 数据湖状态（unknown/失败时明示，不永显 '...'） */}
@@ -293,7 +296,7 @@ const IngestSubPanel: React.FC<Props> = ({ conn, selectedNames, setSelectedNames
           disabled={running || selectedNames.size === 0}
           className={`px-2 py-1 text-[10px] font-semibold rounded transition flex items-center gap-1 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} disabled:opacity-40`}
         >
-          <LucideIcon name="Play" size={11} className={running ? 'animate-pulse' : ''} />
+          <Play size={11} className={running ? 'animate-pulse' : ''} />
           {running ? t('dw.ingest.running') : t('dw.ingest.runNow')}
         </button>
 

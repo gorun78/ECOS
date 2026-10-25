@@ -7,7 +7,9 @@
 // Extracted verbatim by H6-T4.
 
 import React from 'react';
-import LucideIcon from './LucideIcon';
+import {
+  AreaChart
+} from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 
@@ -25,7 +27,7 @@ export function ExplorerAnalytics({ analyticsData, processedCount, onDrillFilter
     <div className={`flex-1 ${styles.cardBg} p-6 space-y-6 overflow-y-auto`}>
       <div className="space-y-1">
         <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
-          <LucideIcon name="AreaChart" size={14} className="text-blue-600" />
+          <AreaChart size={14} className="text-blue-600" />
           {t('ow.boe.distTitle')}
         </h3>
         <p className={`text-[10px] ${styles.cardTextMuted}`}>

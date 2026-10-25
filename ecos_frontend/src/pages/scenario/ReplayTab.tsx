@@ -9,7 +9,10 @@
  * <p>版本来源：`GET /api/v1/cognitive/beliefs?domain=` 读取 V129 版本链（同变量多版本行）。</p>
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import LucideIcon from '../../components/LucideIcon';
+import {
+  History,
+  Info
+} from 'lucide-react';
 import { useLanguage } from '../../components/LanguageContext';
 import { useTheme } from '../../components/ThemeContext';
 import { apiFetchData } from '../../api';
@@ -149,7 +152,7 @@ export default function ReplayTab() {
       {/* ── 回放配置 ── */}
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4 space-y-3`}>
         <div className="flex items-center gap-2">
-          <LucideIcon name="History" size={14} />
+          <History size={14} />
           <span className="text-sm font-semibold">{t('scenario.iv.rp.title')}</span>
         </div>
         <p className={`text-xs ${styles.cardTextMuted} leading-normal`}>{t('scenario.iv.rp.desc')}</p>
@@ -266,7 +269,7 @@ export default function ReplayTab() {
             disabled={running}
             className="px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1.5"
           >
-            <LucideIcon name="History" size={12} className={running ? 'animate-pulse' : ''} />
+            <History size={12} className={running ? 'animate-pulse' : ''} />
             {running ? t('scenario.iv.rp.running') : t('scenario.iv.rp.run')}
           </button>
         </div>
@@ -274,7 +277,7 @@ export default function ReplayTab() {
 
       {!result && (
         <p className={`text-xs ${styles.cardTextMuted} flex items-center gap-1.5`}>
-          <LucideIcon name="Info" size={12} />
+          <Info size={12} />
           {t('scenario.iv.rp.idle')}
         </p>
       )}

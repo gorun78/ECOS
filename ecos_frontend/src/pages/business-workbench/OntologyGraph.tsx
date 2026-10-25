@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ObjectType, LinkType } from '../../types/ontology';
-import LucideIcon from './LucideIcon';
+import { Icon } from '../../components/LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 
@@ -267,7 +267,7 @@ export default function OntologyGraph({
               </div>
             )}
             <div className="flex items-center gap-1.5 font-medium text-xs">
-              <LucideIcon name={node.icon} size={14} />
+              <Icon name={node.icon} size={14} />
               <span>{node.label}</span>
             </div>
             <div className={`text-[10px] ${styles.cardTextMuted} font-mono mt-1 opacity-80`}>

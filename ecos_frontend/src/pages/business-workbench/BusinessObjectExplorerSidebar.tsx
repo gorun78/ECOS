@@ -8,7 +8,12 @@
 
 import React from 'react';
 import { ObjectType, Dataset } from '../../types/ontology';
-import LucideIcon from './LucideIcon';
+import {
+  Bookmark,
+  Compass,
+  Trash2
+} from 'lucide-react';
+import { Icon } from '../../components/LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import { SavedSearch } from './businessObjectExplorerTypes';
@@ -44,7 +49,7 @@ export function ExplorerSidebar({
       {/* Section title */}
       <div className={`p-4 border-b ${styles.divider} flex items-center justify-between`}>
         <div className={`font-semibold ${styles.cardText} flex items-center gap-1.5`}>
-          <LucideIcon name="Compass" size={14} className="text-blue-600" />
+          <Compass size={14} className="text-blue-600" />
           <span>{t('ow.boe.sidebarTitle')}</span>
           {apiLoading && (
             <span className="ml-1 inline-flex items-center gap-1 text-[9px] font-normal text-blue-500">
@@ -85,7 +90,7 @@ export function ExplorerSidebar({
             >
               <div className="flex items-center gap-2 truncate">
                 <span className={`p-1 rounded border ${isActive ? 'bg-blue-500 border-blue-400 text-white' : ot.color}`}>
-                  <LucideIcon name={ot.icon} size={12} />
+                  <Icon name={ot.icon} size={12} />
                 </span>
                 <span className="truncate">{ot.displayName}</span>
               </div>
@@ -118,7 +123,7 @@ export function ExplorerSidebar({
                 className={`group flex items-center justify-between p-2 rounded-lg border ${styles.divider} hover:border-blue-400 ${styles.appBg} hover:bg-blue-50/20 cursor-pointer transition-all`}
               >
                 <div className="flex items-center gap-1.5 truncate">
-                  <LucideIcon name="Bookmark" size={11} className="text-blue-500 shrink-0" />
+                  <Bookmark size={11} className="text-blue-500 shrink-0" />
                   <span className={`font-medium ${styles.accentText} truncate`}>{search.name}</span>
                 </div>
                 <button
@@ -126,7 +131,7 @@ export function ExplorerSidebar({
                   onClick={(e) => onDeleteSavedSearch(search.id, e)}
                   className={`opacity-0 group-hover:opacity-100 hover:text-red-500 ${styles.cardTextMuted} transition-opacity p-0.5`}
                 >
-                  <LucideIcon name="Trash2" size={11} />
+                  <Trash2 size={11} />
                 </button>
               </div>
             ))}
@@ -150,7 +155,7 @@ export function ExplorerWelcome({ objectTypes, datasets, onSelectObjectType }: E
   return (
     <div className={`flex flex-col items-center justify-center h-full p-8 text-center ${styles.appBg}`}>
       <div className="w-16 h-16 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 mb-4 animate-pulse">
-        <LucideIcon name="Compass" size={32} />
+        <Compass size={32} />
       </div>
       <h2 className={`text-sm font-semibold ${styles.cardText}`}>{t('ow.boe.welcomeTitle')}</h2>
       <p className={`text-xs ${styles.cardTextMuted} max-w-lg leading-relaxed mt-2`}>
@@ -169,7 +174,7 @@ export function ExplorerWelcome({ objectTypes, datasets, onSelectObjectType }: E
               className={`${styles.cardBg} border ${styles.appBorder} hover:border-blue-500 p-4 rounded-xl shadow-3xs hover:shadow-xs transition-all cursor-pointer flex items-start gap-3 group text-left`}
             >
               <span className={`p-2.5 rounded-lg border ${ot.color} shrink-0`}>
-                <LucideIcon name={ot.icon} size={16} />
+                <Icon name={ot.icon} size={16} />
               </span>
               <div className="space-y-0.5">
                 <div className={`text-xs font-semibold ${styles.cardText} group-hover:text-blue-600`}>{ot.displayName}</div>

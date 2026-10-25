@@ -12,7 +12,13 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import LucideIcon from '../components/LucideIcon';
+import {
+  Briefcase,
+  LayoutDashboard,
+  MessageSquare,
+  Settings
+} from 'lucide-react';
+import { Icon } from '../components/LucideIcon';
 import { useLanguage } from '../components/LanguageContext';
 import { showToastGlobal } from '../components/common/Toast';
 import { useTheme, type ThemeStyles } from '../components/ThemeContext';
@@ -413,7 +419,7 @@ export default function ScenarioManagementView({
         <div>
           <div className="flex items-center gap-2">
             <span className={`p-1.5 rounded-md ${styles.accentBg} ${styles.cardText} flex items-center justify-center`}>
-              <LucideIcon name="Briefcase" size={16} />
+              <Briefcase size={16} />
             </span>
             <h1 className={`text-lg font-bold tracking-tight ${styles.appText} flex items-center gap-2`}>
               {t('scenario.page.title')}{' '}
@@ -434,7 +440,7 @@ export default function ScenarioManagementView({
               onClick={() => setShowCopilot(!showCopilot)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded border transition-colors cursor-pointer text-xs font-bold ${showCopilot ? `${styles.accentBg} ${styles.cardText} ${styles.accentBorder}` : `${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder} hover:opacity-80`}`}
             >
-              <LucideIcon name="MessageSquare" size={12} />
+              <MessageSquare size={12} />
               {showCopilot ? t('scenario.copilot.close') : t('scenario.copilot.open')}
             </button>
           </div>
@@ -478,7 +484,7 @@ export default function ScenarioManagementView({
                     to={`/workbench/${activeScenario.id}`}
                     className={`px-3 py-1 border ${styles.accentBorder} ${styles.accentBg} ${styles.cardText} text-[11px] font-bold rounded flex items-center gap-1 transition-all cursor-pointer hover:opacity-90`}
                   >
-                    <LucideIcon name="LayoutDashboard" size={11} />
+                    <LayoutDashboard size={11} />
                     {t('scenario.advanced.openL2')}
                   </Link>
                   <span className={`text-xs ${styles.cardTextMuted}`}>
@@ -491,7 +497,7 @@ export default function ScenarioManagementView({
                     onClick={() => openEditWizard(activeScenario)}
                     className={`px-3 py-1 border ${styles.accentBorder} ${styles.accentBg} ${styles.cardText} text-[11px] font-bold rounded flex items-center gap-1 transition-all cursor-pointer shadow-xs hover:opacity-90`}
                   >
-                    <LucideIcon name="Settings" size={11} />
+                    <Settings size={11} />
                     {t('scenario.editBtn')}
                   </button>
                 </div>
@@ -524,7 +530,7 @@ export default function ScenarioManagementView({
                     onClick={() => setActiveTab(tab)}
                     className={`px-4 h-10 border-b-2 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${activeTab === tab ? `${styles.accentBorder} ${styles.accentText}` : `border-transparent ${styles.cardTextMuted} hover:opacity-80`}`}
                   >
-                    <LucideIcon name={tabIcon[tab]} size={13} />
+                    <Icon name={tabIcon[tab]} size={13} />
                     <span>{tabLabel[tab]}</span>
                     {tab === 'decision' && pendingCount > 0 && (
                       <span className={`${styles.dangerBg} ${styles.dangerText} text-[9px] px-1.5 py-0.2 rounded-full animate-bounce`}>

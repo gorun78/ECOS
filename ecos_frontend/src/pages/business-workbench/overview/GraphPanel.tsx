@@ -6,7 +6,9 @@
 import React from 'react';
 import { ObjectType, LinkType, OntologyDomain } from '../../../types/ontology';
 import OntologyGraph from '../OntologyGraph';
-import LucideIcon from '../LucideIcon';
+import {
+  Network
+} from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import { getDomainColorClasses } from './domainColorClasses';
@@ -40,7 +42,7 @@ export default function GraphPanel({
       <div className={`flex flex-col md:flex-row md:items-center justify-between gap-3 border-b ${styles.divider} pb-3`}>
         <div className="space-y-0.5">
           <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
-            <LucideIcon name="Network" size={15} className="text-blue-600" />
+            <Network size={15} className="text-blue-600" />
             {t('ow.graph.title')}
           </h3>
           <p className={`text-[11px] ${styles.cardTextMuted}`}>{t('ow.graph.subtitle')}</p>

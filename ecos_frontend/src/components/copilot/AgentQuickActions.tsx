@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import LucideIcon from '../LucideIcon';
+import { Icon } from '../LucideIcon';
 import { useLanguage } from '../LanguageContext';
 import { useTheme } from '../ThemeContext';
 import { useAgentScenarios, AgentScenarioView, AgentScenarioType } from './AgentScenarioData';
@@ -62,11 +62,7 @@ export default function AgentQuickActions({ viewMode, isExecuting, onRun }: Agen
           >
             <div className="flex items-center justify-between w-full">
               <span className={`font-extrabold ${styles.cardText} flex items-center gap-1.5`}>
-                <LucideIcon
-                  name={ICON_BY_SCENARIO[s.type]}
-                  size={13}
-                  className="text-indigo-500 group-hover:scale-110 transition-transform"
-                />
+                <Icon name={ICON_BY_SCENARIO[s.type]} size={13} className="text-indigo-500 group-hover:scale-110 transition-transform" />
                 {s.title}
               </span>
               <span className="text-[9px] text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded font-mono font-bold opacity-0 group-hover:opacity-100 transition-opacity">

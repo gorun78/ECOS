@@ -5,7 +5,10 @@
 
 import React from 'react';
 import { ObjectType, OntologyDomain } from '../../../types/ontology';
-import LucideIcon from '../LucideIcon';
+import {
+  PlusCircle,
+  Settings
+} from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import DomainFormBlock from './DomainFormBlock';
@@ -68,7 +71,7 @@ export default function DomainManagerDeck({
       <div className={`flex justify-between items-center border-b ${styles.divider} pb-3`}>
         <div>
           <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
-            <LucideIcon name="Settings" size={15} className={styles.cardTextMuted} />
+            <Settings size={15} className={styles.cardTextMuted} />
             {t('ow.dommgr.title')}
           </h3>
           <p className={`text-[11px] ${styles.cardTextMuted} mt-0.5`}>{t('ow.dommgr.subtitle')}</p>
@@ -79,7 +82,7 @@ export default function DomainManagerDeck({
             onClick={handleStartAdd}
             className="bg-[var(--card,#0F172A)] hover:bg-[var(--muted,#1E293B)] text-white text-xs px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 shadow-xs"
           >
-            <LucideIcon name="PlusCircle" size={14} />
+            <PlusCircle size={14} />
             {t('ow.dommgr.createNew')}
           </button>
         )}

@@ -5,7 +5,12 @@
 
 import React from 'react';
 import { ObjectType, LinkType, InterfaceType, SharedProperty, OntologyDomain } from '../../../types/ontology';
-import LucideIcon from '../LucideIcon';
+import {
+  Box,
+  GitMerge,
+  Layers,
+  Tag
+} from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 
@@ -41,7 +46,7 @@ export default function SummaryCards({
           </div>
         </div>
         <span className="p-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
-          <LucideIcon name="Box" size={18} />
+          <Box size={18} />
         </span>
       </div>
 
@@ -55,7 +60,7 @@ export default function SummaryCards({
           </div>
         </div>
         <span className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
-          <LucideIcon name="GitMerge" size={18} />
+          <GitMerge size={18} />
         </span>
       </div>
 
@@ -69,7 +74,7 @@ export default function SummaryCards({
           </div>
         </div>
         <span className="p-2.5 rounded-xl bg-purple-50 text-purple-600 border border-purple-100">
-          <LucideIcon name="Layers" size={18} />
+          <Layers size={18} />
         </span>
       </div>
 
@@ -83,7 +88,7 @@ export default function SummaryCards({
           </div>
         </div>
         <span className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-100">
-          <LucideIcon name="Tag" size={18} />
+          <Tag size={18} />
         </span>
       </div>
     </div>

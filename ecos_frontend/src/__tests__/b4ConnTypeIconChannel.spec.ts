@@ -1,6 +1,7 @@
 // @vitest-environment node
 /**
- * b4ConnTypeIconChannel.spec.ts — 数据源类型「图标面」单源取证（#142/B4-3e-66，收口 D-B4-95）
+ * b4ConnTypeIconChannel.spec.ts — 数据源类型「图标面」单源取证（#142/B4-3e-66，收口 D-B4-95；
+ * #142/B4-3e-76 桥锚改指）
  *
  * <p><b>本门盯的病灶</b>：`helpers.ts#getSourceIcon` 自带一份 <b>5 枚</b>私有 switch 表
  * （postgresql→Database／s3→Cloud／rest_api→Globe／sftp→FolderGit／sap→Cpu），
@@ -17,18 +18,23 @@
  * `HardDrive` 归还给 `fs`。未解析读数改用显式的 `CircleQuestionMark`，由 `helpers.ts`
  * 单点持有、不入本表（与 `'unknown'` 不入选项面同构）。</p>
  *
- * <p><b>桥接面是本域特有的一层</b>：图标名是字符串，须经 `LucideIcon.tsx` 的 `iconMap`
- * 查表才画得出来。查不到时该包装器 `console.warn` 后静默落 `AlertTriangle`——
- * 单源表配得再对，桥缺一枚就又是一次「全部折成同一个读数」。故本门把
- * import 面、`iconMap` 键面、`lucide-react` 导出面三侧逐枚对账。</p>
+ * <p><b>桥接面是本域特有的一层</b>（#142/B4-3e-76 改锚）：图标名是字符串，须经
+ * <b>全仓唯一</b>「字符串→图标组件」注册表 `components/LucideIcon.tsx` 的
+ * `ICON_NAMES` 查表才画得出来。此前该表曾三枚过渡桥散置（{@code components/}、
+ * {@code business-workbench/}、{@code data-workbench/} 各一份 {@code LucideIcon.tsx}，
+ * 各自私有 `iconMap`），缺一枚就又是一次「全部折成同一个读数」——三枚桥已于本源
+ * 下线（两枚页内桥物理删除，全局桥重写为注册表单源）。查不到名称时现回落
+ * {@code HelpCircle}（诊断型，控制台先 {@code console.warn}）。故本门把
+ * lucide-react import 面、`ICON_NAMES` 键面、`lucide-react` 导出面
+ * 与横幅的动态渲染通道（`<Icon name={getSourceIcon(...)}>`）四侧逐枚对账。</p>
  *
  * <p><b>判据失明防护</b>：面值腿按行解析元素对象逐枚要求 value＋iconName 同现
  * （只数两侧总数会被错位配对糊过去）；独立钉值 19 枚、未解析图标名、被折叠的那枚
  * `HardDrive` 三处均为字面量。真实仓面违例集须为空，夹具每段须具名违例——
  * 两条一起堵「判据恒真」与「空集即绿」。</p>
  *
- * <p><b>能变红的证明</b>：夹具五段式（去键／空串／指向未解析图标名／两枚共用同一枚／
- * 名字不在 lucide-react 导出面）＋桥接缺一枚，各段具名违例。
+ * <p><b>能变红的证明</b>：夹具六段式（去键／空串／指向未解析图标名／两枚共用同一枚／
+ * 名字不在 lucide-react 导出面／注册表缺一枚）各段具名违例。
  * @license Apache-2.0</p>
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -43,15 +49,21 @@ const SRC = fileURLToPath(new URL('..', import.meta.url)); // src/
 const FRONTEND_ROOT = path.resolve(SRC, '..');
 const TYPES = path.join(SRC, 'pages/data-workbench/types.ts');
 const HELPERS = path.join(SRC, 'pages/data-workbench/helpers.ts');
-const LUCIDE_BRIDGE = path.join(SRC, 'pages/data-workbench/LucideIcon.tsx');
+const REGISTRY_SOURCE = path.join(SRC, 'components/LucideIcon.tsx');
 const BANNER = path.join(SRC, 'pages/data-workbench/tabs/connections/ConnectionDetailBanner.tsx');
 const LUCIDE_DTS = path.join(FRONTEND_ROOT, 'node_modules/lucide-react/dist/lucide-react.d.ts');
 
+/** #142/B4-3e-76 下线锚：两枚页内过渡桥必须已物理删除（删了又建＝桥回潮）。 */
+const RETIRED_BRIDGES = [
+  path.join(SRC, 'pages/business-workbench/LucideIcon.tsx'),
+  path.join(SRC, 'pages/data-workbench/LucideIcon.tsx'),
+];
+
 /**
  * 读仓面文本并把 CRLF 归一为 LF。
- * 本域三个文件（{@code types.ts}／{@code helpers.ts}／{@code LucideIcon.tsx}）实测<b>全为 CRLF</b>
- * （{@code helpers.ts} 85 行含 {@code \r}）。归一不是本门判据的生效前提——{@code '\n};'} 在
- * CRLF 面上同样命中（{@code \r\n};} 内含 {@code \n};}），实测该定位在原文面得 500、归一面得 488；
+ * 本域文件（{@code types.ts}／{@code helpers.ts}／{@code LucideIcon.tsx}）历史上实测
+ * 以 CRLF 为主。归一不是本门判据的生效前提——{@code '\n};'} 在
+ * CRLF 面上同样命中（{@code \r\n};} 内含 {@code \n};}）；
  * 归一是让<b>跨行正则</b>（如 {@code /^\s*\/\/.*$/gm} 剥注释、{@code \{\r?\n} 型定界）只面对一种换行，
  * 换行风格一改判据不会静默改义。函数体定界另由 ① 的 {@code bodyAt > 0} 显式钉住，
  * 面被改成单行或嵌套闭合时立即红，不靠「碰巧命中」。
@@ -127,7 +139,7 @@ function iconFaceViolations(rows: IconFaceRow[]): string[] {
       continue;
     }
     if (row.iconName.length === 0) {
-      out.push(`${row.value}: iconName 为空串（iconMap 查不到＝静默落 AlertTriangle）`);
+      out.push(`${row.value}: iconName 为空串（注册表查不到＝静默落诊断型回落，又一次折叠）`);
     } else if (row.iconName === UNRESOLVED_ICON) {
       out.push(`${row.value}: iconName 指向未解析图标（已知类型被折成「没答案」＝D-B4-95 病灶）`);
     } else if (!/^[A-Z][A-Za-z0-9]*$/.test(row.iconName)) {
@@ -145,25 +157,25 @@ function iconFaceViolations(rows: IconFaceRow[]): string[] {
   return out;
 }
 
-/** 取 `const iconMap` 的对象块（首 `{` 到匹配的 `};`），返回去掉类型的代码面文本。 */
-function iconMapBlock(src: string): string {
+/** 取 `export const ICON_NAMES` 的对象块（首 `{` 到匹配的 `};`），返回去掉类型的代码面文本。 */
+function registryBlock(src: string): string {
   const code = stripComments(src);
-  const start = code.indexOf('const iconMap');
-  expect(start, 'LucideIcon.tsx 里找不到 iconMap（桥接表改名＝本门失明）').toBeGreaterThanOrEqual(0);
+  const start = code.indexOf('export const ICON_NAMES');
+  expect(start, 'LucideIcon.tsx 里找不到 ICON_NAMES（注册表改名＝本门失明）').toBeGreaterThanOrEqual(0);
   const brace = code.indexOf('{', start);
-  expect(brace, 'iconMap 对象块未开启').toBeGreaterThan(start);
+  expect(brace, 'ICON_NAMES 对象块未开启').toBeGreaterThan(start);
   const end = code.indexOf('};', brace);
-  expect(end, 'iconMap 对象块未闭合').toBeGreaterThan(brace);
+  expect(end, 'ICON_NAMES 对象块未闭合').toBeGreaterThan(brace);
   return code.slice(brace + 1, end);
 }
 
-/** iconMap 的键面：简写属性名逐枚取出（`Record<string, LucideIconType>` 里的类型名不计）。 */
-function iconMapKeys(block: string): Set<string> {
+/** ICON_NAMES 的键面：简写属性名逐枚取出。 */
+function registryKeys(block: string): Set<string> {
   return new Set(block.match(/\b[A-Z][A-Za-z0-9]*\b/g) ?? []);
 }
 
-/** LucideIcon.tsx 从 lucide-react 的具名 import 面。 */
-function bridgeImportNames(src: string): Set<string> {
+/** components/LucideIcon.tsx 从 lucide-react 的具名 import 面（回落本体 HelpCircle 计入）。 */
+function registryImportNames(src: string): Set<string> {
   const code = stripComments(src);
   const start = code.indexOf("from 'lucide-react'");
   expect(start, 'LucideIcon.tsx 的 lucide-react import 面缺失（改导入路径＝本门失明）').toBeGreaterThan(-1);
@@ -171,6 +183,19 @@ function bridgeImportNames(src: string): Set<string> {
   expect(decl, 'LucideIcon.tsx 的 lucide-react import 声明缺失').toBeGreaterThan(-1);
   const block = code.slice(decl, start);
   return new Set((block.match(/\b[A-Z][A-Za-z0-9]*\b/g) ?? []).filter((n) => n !== 'LucideIcon'));
+}
+
+/**
+ * 横幅 `ConnectionDetailBanner.tsx` 的<b>动态渲染通道在位</b>判据：19 枚图标名经
+ * {@link getSourceIcon} 出字符串后，必须由单源注册表组件 `Icon` 落图（lucide-react
+ * 具名 import 那张面孔只管 `Wifi` 这种字面量站点，不含数据面图标）。横幅改用任何
+ * 其它渲染方式（直连 `lucide-react` 查表、重建私包）＝本门失明，须在此红。
+ */
+function bannerUsesRegistryIcon(src: string): boolean {
+  const code = stripComments(src);
+  const importOk = /import\s*\{\s*Icon\s*\}\s*from\s*'\.\.\/\.\.\/\.\.\/\.\.\/components\/LucideIcon'/.test(code);
+  const usageOk = /<Icon\s+name=\{getSourceIcon\(/.test(code);
+  return importOk && usageOk;
 }
 
 /** lucide-react 导出面：`declare const <Name>:` 逐枚收集（0.546.0 实测该形态是权威判据）。 */
@@ -214,7 +239,7 @@ function filesHardcodingFoldedIcon(): string[] {
   return hits;
 }
 
-describe('b4ConnTypeIconChannel: 类型图标面归一 CONNECTION_TYPES 单源 (#142/B4-3e-66)', () => {
+describe('b4ConnTypeIconChannel: 类型图标面归一 CONNECTION_TYPES 单源 (#142/B4-3e-66 / 桥锚 #142/B4-3e-76)', () => {
   it('① helpers.ts 的 5 枚私有图标表已删除，全仓零折叠字面量残留', () => {
     const helpers = stripComments(read(HELPERS));
     // 私表形态防回潮：helpers.ts 内不得再出现 case '类型名': return '图标名' 的映射腿
@@ -251,20 +276,21 @@ describe('b4ConnTypeIconChannel: 类型图标面归一 CONNECTION_TYPES 单源 (
     expect(imported, '未解析图标混进了显示面').not.toContain(UNRESOLVED_ICON);
   });
 
-  it('③ 19 枚图标名逐枚在 LucideIcon 的 import 面与 iconMap 键面（缺桥＝静默落 AlertTriangle）', () => {
-    const bridgeSrc = read(LUCIDE_BRIDGE);
-    const mapKeys = iconMapKeys(iconMapBlock(bridgeSrc));
-    const imports = bridgeImportNames(bridgeSrc);
+  it('③ 19 枚图标名＋未解析名逐枚在单源注册表的 import 面与 ICON_NAMES 键面，横幅动态通道在位', () => {
+    const registrySrc = read(REGISTRY_SOURCE);
+    const keys = registryKeys(registryBlock(registrySrc));
+    const imports = registryImportNames(registrySrc);
+    expect(bannerUsesRegistryIcon(read(BANNER)), 'ConnectionDetailBanner 未按 <Icon name={getSourceIcon(...)}> 走单源渲染通道（该域图标改道＝本门失明）').toBe(true);
     const expectIcon = (name: string) => {
       expect(imports, `LucideIcon.tsx 未 import ${name}（图标名编译期即不存在）`).toContain(name);
-      expect(mapKeys, `LucideIcon.iconMap 缺 ${name}（桥缺位＝界面静默落 AlertTriangle＝又一处折叠）`).toContain(name);
+      expect(keys, `ICON_NAMES 缺 ${name}（注册表缺位＝诊断型回落＝又一处折叠）`).toContain(name);
     };
     for (const o of CONNECTION_TYPES) {
       expectIcon(o.iconName);
     }
     expectIcon(UNRESOLVED_ICON);
-    // 正向对照：桥面确有内容（解析器失明时不得空集即绿）
-    expect(mapKeys.size, 'iconMap 键面解析到 0 枚（解析器失明）').toBeGreaterThan(FROZEN_COUNT);
+    // 正向对照：注册表面确有内容（解析器失明时不得空集即绿）
+    expect(keys.size, 'ICON_NAMES 键面解析到 0 枚（解析器失明）').toBeGreaterThan(FROZEN_COUNT);
   });
 
   it('④ 19 枚图标名＋未解析名逐枚在 lucide-react 导出面（禁指向不存在的组件）', () => {
@@ -272,6 +298,12 @@ describe('b4ConnTypeIconChannel: 类型图标面归一 CONNECTION_TYPES 单源 (
     const ghosts = CONNECTION_TYPES.map((o) => o.iconName).concat(UNRESOLVED_ICON)
       .filter((n) => !declared.has(n));
     expect(ghosts, `图标名不在 lucide-react 导出面（运行时 undefined）：${ghosts.join(', ')}`).toEqual([]);
+  });
+
+  it('④b 两枚页内过渡桥已物理删除（重建＝桥回潮，文件名判据即红）', () => {
+    for (const bridge of RETIRED_BRIDGES) {
+      expect(existsSync(bridge), `${path.relative(SRC, bridge)} 复活（页内桥回潮）`).toBe(false);
+    }
   });
 
   it('⑤ 行为腿：19 枚逐枚出各自图标，未解析显式出未解析名，既有 5 枚读数不漂移', () => {
@@ -300,7 +332,7 @@ describe('b4ConnTypeIconChannel: 类型图标面归一 CONNECTION_TYPES 单源 (
     expect(CONNECTION_TYPES.map((o) => o.iconName)).not.toContain(UNRESOLVED_ICON);
   });
 
-  it('⑥ 夹具六段式：判据对「去键／空串／指向未解析名／共用同枚／导出面不存在／桥缺一枚」逐段具名变红', () => {
+  it('⑥ 夹具六段式：判据对「去键／空串／指向未解析名／共用同枚／导出面不存在／注册表缺一枚」逐段具名变红', () => {
     const base = parseIconFaceRows(connectionTypesBlock(read(TYPES)));
     expect(base.length).toBe(FROZEN_COUNT);
 
@@ -325,11 +357,13 @@ describe('b4ConnTypeIconChannel: 类型图标面归一 CONNECTION_TYPES 单源 (
     expect([...CONNECTION_TYPES.map((o) => o.iconName), 'CircleHelp'].filter((n) => !declared.has(n)))
       .toEqual(['CircleHelp']);
 
-    // 桥接腿能变红：从 iconMap 键面与 import 面各摘掉一枚
-    const bridgeSrc = read(LUCIDE_BRIDGE);
-    const withoutBridge = [...iconMapKeys(iconMapBlock(bridgeSrc))].filter((k) => k !== 'DatabaseZap');
-    expect(withoutBridge).not.toContain('DatabaseZap');
-    expect([...bridgeImportNames(bridgeSrc)]).toContain('DatabaseZap');
+    // 注册表腿能变红：从 ICON_NAMES 键面与 import 面各摘掉一枚（内存构造集，断言真实键面非空）
+    const registrySrc = read(REGISTRY_SOURCE);
+    const keys = registryKeys(registryBlock(registrySrc));
+    const withoutRegistry = [...keys].filter((k) => k !== 'DatabaseZap');
+    expect(withoutRegistry).not.toContain('DatabaseZap');
+    expect([...registryImportNames(registrySrc)]).toContain('DatabaseZap');
+    expect(keys.size, '注册表键面解析到 0 枚（解析器失明＝空集即绿）').toBeGreaterThan(FROZEN_COUNT);
 
     // 失明防护：解析到 0 枚（面改名/块截断）必须红，禁「空集＝绿」
     expect(iconFaceViolations([]).join('\n')).toMatch(/显示面枚数 0 ≠ 独立钉值 19/);

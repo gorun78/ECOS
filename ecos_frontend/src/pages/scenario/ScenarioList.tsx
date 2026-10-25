@@ -4,7 +4,14 @@
  */
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import LucideIcon from '../../components/LucideIcon';
+import {
+  Info,
+  Layers,
+  ListCollapse,
+  Plus,
+  Search,
+  Users
+} from 'lucide-react';
 import { useLanguage } from '../../components/LanguageContext';
 import type { ThemeStyles } from '../../components/ThemeContext';
 import type { BusinessScenario } from '../project-workbench/types';
@@ -49,25 +56,21 @@ export default function ScenarioList({
       <div className={`p-3 border-b ${styles.cardBorder} flex flex-col gap-2 shrink-0 ${styles.cardBg}`}>
         <div className="flex items-center justify-between">
           <span className={`text-xs font-bold ${styles.cardTextMuted} flex items-center gap-1.5`}>
-            <LucideIcon name="ListCollapse" size={12} className={styles.accentText} />
+            <ListCollapse size={12} className={styles.accentText} />
             {t('scenario.list.title')}
           </span>
           <button type="button"
             onClick={onCreateNew}
             className={`text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1 transition-all cursor-pointer border ${styles.accentBg} ${styles.accentSolidText} ${styles.accentBorder}`}
           >
-            <LucideIcon name="Plus" size={10} />
+            <Plus size={10} />
             {t('scenario.list.new')}
           </button>
         </div>
 
         {/* Search input */}
         <div className="relative">
-          <LucideIcon
-            name="Search"
-            size={12}
-            className={`absolute left-2 top-1/2 -translate-y-1/2 ${styles.cardTextMuted}`}
-          />
+          <Search size={12} className={`absolute left-2 top-1/2 -translate-y-1/2 ${styles.cardTextMuted}`} />
           <input
             type="text"
             placeholder={t('scenario.list.search')}
@@ -137,7 +140,7 @@ export default function ScenarioList({
                 className={`flex items-center justify-between mt-3 pt-2.5 border-t ${styles.cardBorder} text-[10px] ${styles.cardTextMuted} font-mono`}
               >
                 <span className="flex items-center gap-1">
-                  <LucideIcon name="Users" size={10} className={styles.cardTextMuted} />
+                  <Users size={10} className={styles.cardTextMuted} />
                   {scen.department.slice(0, 8)}
                 </span>
                 <span
@@ -159,7 +162,7 @@ export default function ScenarioList({
                   className={`flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded border transition-all opacity-60 hover:opacity-100 ${styles.cardBorder} ${styles.cardTextMuted}`}
                   title={t('scenario.list.enterSandbox')}
                 >
-                  <LucideIcon name="Layers" size={10} />
+                  <Layers size={10} />
                   {t('scenario.list.sandbox')}
                 </Link>
               </div>
@@ -173,7 +176,7 @@ export default function ScenarioList({
         className={`p-3 ${styles.cardBg} border-t ${styles.cardBorder} text-[10px] ${styles.cardTextMuted} space-y-1 font-sans`}
       >
         <p className={`flex items-center gap-1 font-semibold ${styles.cardTextMuted}`}>
-          <LucideIcon name="Info" size={11} className={styles.accentText} />
+          <Info size={11} className={styles.accentText} />
           {t('scenario.list.howTitle')}
         </p>
         <p className="leading-relaxed">

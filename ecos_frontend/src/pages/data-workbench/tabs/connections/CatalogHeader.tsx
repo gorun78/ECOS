@@ -1,7 +1,10 @@
 /* Extracted from ConnectionsTab.tsx */
 import React from 'react';
 import { GitCompare } from 'lucide-react';
-import LucideIcon from '../../LucideIcon';
+import {
+  FolderTree,
+  RefreshCw
+} from 'lucide-react';
 import type { DataConnection } from '../../types';
 import type { FolderFileVo } from '../../api';
 import { useTheme } from "../../../../components/ThemeContext";
@@ -27,7 +30,7 @@ export default function CatalogHeader({
   return (
             <h4 className={`text-xs font-bold ${styles.cardText} flex items-center justify-between`}>
               <span className="flex items-center gap-1.5">
-                <LucideIcon name="FolderTree" size={13} className={styles.accentText} />
+                <FolderTree size={13} className={styles.accentText} />
                 <span>{t("dw.txt.42bc1b")}</span>
               </span>
               <div className="flex items-center gap-3">
@@ -54,7 +57,7 @@ export default function CatalogHeader({
                     className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.accentText} transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1 text-[10px]`}
                     title={t("dw.conn.refreshTables")}
                   >
-                    <LucideIcon name="RefreshCw" size={12} className={folderFilesLoading ? 'animate-spin' : ''} />
+                    <RefreshCw size={12} className={folderFilesLoading ? 'animate-spin' : ''} />
                     <span>{t("dw.conn.refreshTables")}</span>
                   </button>
                 )}

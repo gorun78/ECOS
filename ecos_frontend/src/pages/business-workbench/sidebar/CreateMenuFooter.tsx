@@ -4,7 +4,17 @@
  */
 
 import React from 'react';
-import LucideIcon from '../LucideIcon';
+import {
+  Box,
+  ChevronDown,
+  ChevronUp,
+  Code,
+  GitMerge,
+  Layers,
+  PlusCircle,
+  Tag,
+  Zap
+} from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 
@@ -29,9 +39,9 @@ export default function CreateMenuFooter({
         onClick={() => setShowCreateDropdown(!showCreateDropdown)}
         className="w-full bg-[var(--card,#0F172A)] hover:bg-[var(--muted,#1E293B)] text-white font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors shadow-xs"
       >
-        <LucideIcon name="PlusCircle" size={14} />
+        <PlusCircle size={14} />
         <span>{t('ow.create.menuTitle')}</span>
-        <LucideIcon name={showCreateDropdown ? "ChevronDown" : "ChevronUp"} size={12} />
+        {showCreateDropdown ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
       </button>
 
       {/* Create Dropdown */}
@@ -46,7 +56,7 @@ export default function CreateMenuFooter({
             className={`w-full text-left px-3 py-2 ${styles.cardText} hover:bg-blue-50/20 flex items-center gap-2 transition-colors`}
           >
             <span className="text-blue-500">
-              <LucideIcon name="Box" size={13} />
+              <Box size={13} />
             </span>
             <span>{t('ow.create.object')}</span>
           </button>
@@ -59,7 +69,7 @@ export default function CreateMenuFooter({
             className={`w-full text-left px-3 py-2 ${styles.cardText} hover:bg-blue-50/20 flex items-center gap-2 transition-colors`}
           >
             <span className={styles.cardTextMuted}>
-              <LucideIcon name="GitMerge" size={13} />
+              <GitMerge size={13} />
             </span>
             <span>{t('ow.create.link')}</span>
           </button>
@@ -72,7 +82,7 @@ export default function CreateMenuFooter({
             className={`w-full text-left px-3 py-2 ${styles.cardText} hover:bg-blue-50/20 flex items-center gap-2 transition-colors`}
           >
             <span className="text-amber-500">
-              <LucideIcon name="Zap" size={13} />
+              <Zap size={13} />
             </span>
             <span>{t('ow.create.action')}</span>
           </button>
@@ -85,7 +95,7 @@ export default function CreateMenuFooter({
             className={`w-full text-left px-3 py-2 ${styles.cardText} hover:bg-blue-50/20 flex items-center gap-2 transition-colors`}
           >
             <span className="text-indigo-500">
-              <LucideIcon name="Layers" size={13} />
+              <Layers size={13} />
             </span>
             <span>{t('ow.create.interface')}</span>
           </button>
@@ -98,7 +108,7 @@ export default function CreateMenuFooter({
             className={`w-full text-left px-3 py-2 ${styles.cardText} hover:bg-blue-50/20 flex items-center gap-2 transition-colors`}
           >
             <span className="text-teal-500">
-              <LucideIcon name="Tag" size={13} />
+              <Tag size={13} />
             </span>
             <span>{t('ow.create.sharedProp')}</span>
           </button>
@@ -111,7 +121,7 @@ export default function CreateMenuFooter({
             className={`w-full text-left px-3 py-2 ${styles.cardText} hover:bg-blue-50/20 flex items-center gap-2 transition-colors`}
           >
             <span className="text-violet-500">
-              <LucideIcon name="Code" size={13} />
+              <Code size={13} />
             </span>
             <span>{t('ow.create.function')}</span>
           </button>

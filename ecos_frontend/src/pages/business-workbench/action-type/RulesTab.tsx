@@ -5,7 +5,15 @@
 
 import React from 'react';
 import { ActionType, ActionRule, ActionRuleType, ObjectType } from '../../../types/ontology';
-import LucideIcon from '../LucideIcon';
+import {
+  Activity,
+  Edit3,
+  FilePlus,
+  Key,
+  Tag,
+  Trash,
+  Trash2
+} from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 
@@ -46,7 +54,7 @@ export default function RulesTab({
             onClick={() => handleAddRule('modify_object')}
             className={`border ${styles.sidebarBorder} hover:bg-blue-50/20 ${styles.cardText} text-xs px-3 py-1.5 rounded transition-all flex items-center gap-1.5`}
           >
-            <LucideIcon name="Edit3" size={13} />
+            <Edit3 size={13} />
             {t('ow.act.rule.btnModify')}
           </button>
           <button
@@ -54,7 +62,7 @@ export default function RulesTab({
             onClick={() => handleAddRule('create_object')}
             className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded transition-all flex items-center gap-1.5"
           >
-            <LucideIcon name="FilePlus" size={13} />
+            <FilePlus size={13} />
             {t('ow.act.rule.btnCreate')}
           </button>
           <button
@@ -62,7 +70,7 @@ export default function RulesTab({
             onClick={() => handleAddRule('delete_object')}
             className="border border-red-300 hover:bg-red-50 text-red-700 text-xs px-3 py-1.5 rounded transition-all flex items-center gap-1.5"
           >
-            <LucideIcon name="Trash2" size={13} className="text-red-500" />
+            <Trash2 size={13} className="text-red-500" />
             {t('ow.act.rule.btnDelete')}
           </button>
         </div>
@@ -70,7 +78,7 @@ export default function RulesTab({
 
       {actionType.rules.length === 0 ? (
         <div className={`text-center py-12 border-2 border-dashed ${styles.sidebarBorder} rounded-xl ${styles.cardTextMuted} text-xs space-y-2`}>
-          <LucideIcon name="Activity" size={24} className={`mx-auto ${styles.muted}`} />
+          <Activity size={24} className={`mx-auto ${styles.muted}`} />
           <div>{t('ow.act.rule.empty')}</div>
         </div>
       ) : (
@@ -89,7 +97,7 @@ export default function RulesTab({
                   className={`absolute top-4 right-4 ${styles.cardTextMuted} opacity-70 hover:opacity-100 hover:text-red-500 transition-colors p-1 rounded ${styles.cardBg}`}
                   title={t('ow.act.rule.removeTitle')}
                 >
-                  <LucideIcon name="Trash" size={14} />
+                  <Trash size={14} />
                 </button>
 
                 <div className="flex items-center gap-2">
@@ -197,7 +205,7 @@ export default function RulesTab({
                           return (
                             <div key={edit.propertyId} className={`flex items-center gap-3 ${styles.cardBg} px-3 py-2 rounded border ${styles.divider} text-xs`}>
                               <div className="w-1/3 flex items-center gap-1.5">
-                                <LucideIcon name={targetObjType.primaryKey === edit.propertyId ? 'Key' : 'Tag'} size={12} className={targetObjType.primaryKey === edit.propertyId ? 'text-amber-500' : styles.cardTextMuted} />
+                                {targetObjType.primaryKey === edit.propertyId ? <Key size={12} className={targetObjType.primaryKey === edit.propertyId ? 'text-amber-500' : styles.cardTextMuted} /> : <Tag size={12} className={targetObjType.primaryKey === edit.propertyId ? 'text-amber-500' : styles.cardTextMuted} />}
                                 <span className={`font-semibold ${styles.cardText}`}>{propDef?.displayName || edit.propertyId}</span>
                                 <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>({propDef?.dataType})</span>
                               </div>
@@ -216,7 +224,7 @@ export default function RulesTab({
                                 onClick={() => handleRemovePropertyEdit(rule.id, edit.propertyId)}
                                 className={`p-1 ${styles.cardTextMuted} opacity-70 hover:opacity-100 hover:text-red-500`}
                               >
-                                <LucideIcon name="Trash2" size={13} />
+                                <Trash2 size={13} />
                               </button>
                             </div>
                           );

@@ -9,7 +9,17 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import LucideIcon from '../../../../components/LucideIcon';
+import {
+  AlertOctagon,
+  AlertTriangle,
+  Map,
+  PlugZap,
+  Plus,
+  RefreshCw,
+  Scale,
+  TrendingUp
+} from 'lucide-react';
+import { Icon } from '../../../../components/LucideIcon';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useLanguage } from '../../../../components/LanguageContext';
 import logger from '../../../../services/logger';
@@ -221,7 +231,7 @@ export default function BlueprintPanel({ scenarioId }: Props) {
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-4`}>
       <div className="flex items-center gap-2 flex-wrap mb-3">
-        <LucideIcon name="Map" size={15} className={styles.accentText} />
+        <Map size={15} className={styles.accentText} />
         <h2 className={`text-sm font-extrabold ${styles.cardText}`}>{t('workspace.bp.title')}</h2>
         <span className={`text-[11px] ${styles.cardTextMuted}`}>{t('workspace.bp.subtitle')}</span>
         <button
@@ -229,7 +239,7 @@ export default function BlueprintPanel({ scenarioId }: Props) {
           onClick={load}
           className={`ml-auto inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded border cursor-pointer ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
         >
-          <LucideIcon name="RefreshCw" size={12} />
+          <RefreshCw size={12} />
           {t('workspace.bp.retry')}
         </button>
       </div>
@@ -264,7 +274,7 @@ export default function BlueprintPanel({ scenarioId }: Props) {
       {/* 空 */}
       {phase === 'empty' && (
         <div className={`p-6 rounded border text-center ${styles.cardBorder} ${styles.cardBg}`}>
-          <LucideIcon name="Map" size={22} className={`${styles.cardTextMuted} mb-2`} />
+          <Map size={22} className={`${styles.cardTextMuted}`} />
           <p className={`text-sm font-semibold ${styles.cardText}`}>{t('workspace.bp.empty')}</p>
           <p className={`text-xs ${styles.cardTextMuted} mt-1 mb-3 max-w-md mx-auto`}>{t('workspace.bp.empty_hint')}</p>
           <button
@@ -272,7 +282,7 @@ export default function BlueprintPanel({ scenarioId }: Props) {
             onClick={() => setShowCreate((s) => !s)}
             className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded border cursor-pointer ${styles.accentBorder} ${styles.accentText} ${styles.cardBg}`}
           >
-            <LucideIcon name="Plus" size={12} />
+            <Plus size={12} />
             {t('workspace.bp.new')}
           </button>
         </div>
@@ -281,7 +291,7 @@ export default function BlueprintPanel({ scenarioId }: Props) {
       {/* 未找到 / 无权限 */}
       {(phase === 'not_found' || phase === 'denied') && (
         <div className={`p-4 rounded border text-sm ${phase === 'denied' ? `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}` : `${styles.cardBorder} ${styles.cardBg} ${styles.cardText}`}`}>
-          <LucideIcon name={phase === 'denied' ? 'ShieldAlert' : 'FileQuestion'} size={14} className="inline mr-1" />
+          <Icon name={phase === 'denied' ? 'ShieldAlert' : 'FileQuestion'} size={14} className="inline mr-1" />
           {phase === 'denied' ? t('workspace.bp.no_permission') : t('workspace.bp.not_found')}
         </div>
       )}
@@ -289,7 +299,7 @@ export default function BlueprintPanel({ scenarioId }: Props) {
       {/* 引擎不可用 503：横幅 + traceId，不伪造 */}
       {phase === 'engine' && (
         <div className={`p-4 rounded border text-xs ${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`}>
-          <LucideIcon name="PlugZap" size={14} className="inline mr-1" />
+          <PlugZap size={14} className="inline mr-1" />
           {t('workspace.bp.engine_unavailable', { code: loadCode ?? 'ENGINE_DISABLED', traceId: loadTraceId ?? '—' })}
           <button onClick={load} className={`ml-2 underline cursor-pointer`}>{t('workspace.bp.retry')}</button>
         </div>
@@ -298,7 +308,7 @@ export default function BlueprintPanel({ scenarioId }: Props) {
       {/* 通用错误 */}
       {phase === 'error' && (
         <div className={`p-4 rounded border text-xs ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
-          <LucideIcon name="AlertTriangle" size={12} className="inline mr-1" />
+          <AlertTriangle size={12} className="inline mr-1" />
           {t('workspace.bp.error', { msg: loadMsg ?? '' })}
           <button onClick={load} className={`ml-2 underline cursor-pointer`}>{t('workspace.bp.retry')}</button>
         </div>
@@ -332,7 +342,7 @@ export default function BlueprintPanel({ scenarioId }: Props) {
                 onClick={() => setShowCreate(true)}
                 className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded border cursor-pointer ${styles.cardBg} ${styles.accentText} ${styles.accentBorder}`}
               >
-                <LucideIcon name="Plus" size={11} />
+                <Plus size={11} />
                 {t('workspace.bp.new')}
               </button>
             </div>
@@ -439,7 +449,7 @@ function buildWizardSteps(ctx: {
 
         {actionError && (
           <div className={`text-[11px] rounded border px-2 py-1.5 flex items-start gap-1.5 ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
-            <LucideIcon name="AlertOctagon" size={12} className="mt-0.5 shrink-0" />
+            <AlertOctagon size={12} className="mt-0.5 shrink-0" />
             <span>
               {errKey(actionError.code) === 'workspace.bp.err.unknown'
                 ? t('workspace.bp.err.unknown', { msg: actionError.msg })
@@ -461,14 +471,14 @@ function buildWizardSteps(ctx: {
           to={`/workbench/${scenarioId}/forecast`}
           className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded border cursor-pointer ${styles.accentBg} ${styles.cardText} ${styles.accentBorder}`}
         >
-          <LucideIcon name="TrendingUp" size={12} />
+          <TrendingUp size={12} />
           {t('workspace.wiz.go_forecast')}
         </Link>
         <Link
           to={`/workbench/${scenarioId}/decisions`}
           className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded border cursor-pointer ${styles.cardBg} ${styles.cardText} ${styles.cardBorder}`}
         >
-          <LucideIcon name="Scale" size={12} />
+          <Scale size={12} />
           {t('workspace.wiz.go_decisions')}
         </Link>
       </div>
@@ -511,7 +521,7 @@ function ActionButton({ icon, label, busy, disabled, onClick, variant }: { icon:
           : `${styles.accentBg} ${styles.accentSolidText} ${styles.accentBorder}`,
       ].join(' ')}
     >
-      <LucideIcon name={icon} size={12} />
+      <Icon name={icon} size={12} />
       {label}
     </button>
   );

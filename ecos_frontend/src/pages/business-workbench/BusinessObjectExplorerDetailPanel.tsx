@@ -8,7 +8,15 @@
 
 import React from 'react';
 import { ActionType, ObjectType } from '../../types/ontology';
-import LucideIcon from './LucideIcon';
+import {
+  ChevronRight,
+  Compass,
+  GitMerge,
+  Terminal,
+  X,
+  Zap
+} from 'lucide-react';
+import { Icon } from '../../components/LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import { ResolvedRelation } from './businessObjectExplorerTypes';
@@ -47,7 +55,7 @@ export function ExplorerDetailPanel({
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-2">
             <span className={`p-1.5 rounded-lg border ${activeObjectType.color}`}>
-              <LucideIcon name={activeObjectType.icon} size={14} />
+              <Icon name={activeObjectType.icon} size={14} />
             </span>
             <div>
               <div className={`text-[10px] ${styles.cardTextMuted} font-bold uppercase tracking-wider`}>{t('ow.bod.detail', { name: activeObjectType.displayName })}</div>
@@ -61,7 +69,7 @@ export function ExplorerDetailPanel({
             onClick={onClose}
             className={`p-1 rounded hover:bg-blue-50/20 ${styles.cardTextMuted} opacity-80 hover:opacity-100 transition-opacity`}
           >
-            <LucideIcon name="X" size={14} />
+            <X size={14} />
           </button>
         </div>
 
@@ -69,7 +77,7 @@ export function ExplorerDetailPanel({
         {availableActions.length > 0 && (
           <div className="pt-1.5">
             <div className={`text-[10px] ${styles.cardTextMuted} uppercase tracking-wider font-semibold mb-1 flex items-center gap-1`}>
-              <LucideIcon name="Terminal" size={10} />
+              <Terminal size={10} />
               <span>{t('ow.bod.actionsLabel')}</span>
             </div>
             <div className="flex flex-col gap-1">
@@ -81,10 +89,10 @@ export function ExplorerDetailPanel({
                   className="w-full h-8 px-2.5 rounded border border-amber-200 bg-amber-50/40 hover:bg-amber-50 text-amber-800 text-[10px] font-semibold flex items-center justify-between transition-all"
                 >
                   <div className="flex items-center gap-1.5">
-                    <LucideIcon name="Zap" size={12} className="fill-amber-400/20 text-amber-600" />
+                    <Zap size={12} className="fill-amber-400/20 text-amber-600" />
                     <span>{t('ow.bod.trigger', { name: act.displayName })}</span>
                   </div>
-                  <LucideIcon name="ChevronRight" size={10} className="text-amber-500" />
+                  <ChevronRight size={10} className="text-amber-500" />
                 </button>
               ))}
             </div>
@@ -185,7 +193,7 @@ export function ExplorerDetailPanel({
                     {/* Header */}
                     <div className={`flex items-center justify-between text-[11px] pb-1.5 border-b ${styles.divider}`}>
                       <div className={`flex items-center gap-1.5 font-semibold ${styles.cardText}`}>
-                        <LucideIcon name="GitMerge" size={12} className="text-emerald-600" />
+                        <GitMerge size={12} className="text-emerald-600" />
                         <span>{rel.linkType.displayName}</span>
                       </div>
                       <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1 py-0.2 rounded font-mono font-bold uppercase">
@@ -210,7 +218,7 @@ export function ExplorerDetailPanel({
                           >
                             <div className="flex items-center gap-2 truncate">
                               <span className={`p-1 rounded ${rel.otherObjectType.color}`}>
-                                <LucideIcon name={rel.otherObjectType.icon} size={11} />
+                                <Icon name={rel.otherObjectType.icon} size={11} />
                               </span>
                               <span className={`font-mono text-xs font-semibold ${styles.text}`}>
                                 {inst[rel.otherObjectType.primaryKey]}
@@ -219,7 +227,7 @@ export function ExplorerDetailPanel({
                                 ({inst[rel.otherObjectType.titleProperty]})
                               </span>
                             </div>
-                            <LucideIcon name="Compass" size={11} className={`${styles.cardTextMuted} group-hover:text-blue-600 transition-colors`} />
+                            <Compass size={11} className={`${styles.cardTextMuted}`} />
                           </div>
                         ))}
                       </div>

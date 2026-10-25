@@ -5,7 +5,11 @@
 
 import React from 'react';
 import { ObjectType, OntologyDomain } from '../../../types/ontology';
-import LucideIcon from '../LucideIcon';
+import {
+  ChevronRight,
+  Compass
+} from 'lucide-react';
+import { Icon } from '../../../components/LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import { getDomainColorClasses } from './domainColorClasses';
@@ -27,7 +31,7 @@ export default function QuickNavPanel({
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-xl p-5 shadow-xs space-y-3`}>
       <h3 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
-        <LucideIcon name="Compass" size={14} className={styles.cardTextMuted} />
+        <Compass size={14} className={styles.cardTextMuted} />
         {t('ow.qnav.title')}
       </h3>
 
@@ -53,11 +57,11 @@ export default function QuickNavPanel({
                   >
                     <div className="flex items-center gap-2 truncate">
                       <span className={`p-0.5 rounded border ${ot.color}`}>
-                        <LucideIcon name={ot.icon} size={11} />
+                        <Icon name={ot.icon} size={11} />
                       </span>
                       <span className={`text-xs font-medium ${styles.cardText}`}>{ot.displayName}</span>
                     </div>
-                    <LucideIcon name="ChevronRight" size={11} className={`${styles.muted} group-hover:translate-x-0.5 transition-transform`} />
+                    <ChevronRight size={11} className={`${styles.muted}`} />
                   </div>
                 ))}
               </div>
@@ -81,11 +85,11 @@ export default function QuickNavPanel({
                 >
                   <div className="flex items-center gap-2 truncate">
                     <span className={`p-0.5 rounded border ${ot.color}`}>
-                      <LucideIcon name={ot.icon} size={11} />
+                      <Icon name={ot.icon} size={11} />
                     </span>
                     <span className={`text-xs font-medium ${styles.cardText}`}>{ot.displayName}</span>
                   </div>
-                  <LucideIcon name="ChevronRight" size={11} className={`${styles.muted} group-hover:translate-x-0.5 transition-transform`} />
+                  <ChevronRight size={11} className={`${styles.muted}`} />
                 </div>
               ))}
             </div>

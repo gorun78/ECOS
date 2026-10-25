@@ -12,7 +12,16 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import LucideIcon from '../../../components/LucideIcon';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BookOpen,
+  Inbox,
+  ServerCrash,
+  Sparkles,
+  TrendingUp,
+  WifiOff
+} from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
@@ -61,11 +70,11 @@ export default function WorkbenchForecast() {
           to={`/workbench/${scenarioId}`}
           className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded border cursor-pointer mb-2 ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
         >
-          <LucideIcon name="ArrowLeft" size={12} />
+          <ArrowLeft size={12} />
           {t('workspace.l3.back')}
         </Link>
         <h1 className={`text-lg font-bold tracking-tight ${styles.appText} flex items-center gap-2`}>
-          <LucideIcon name="TrendingUp" size={16} className={styles.infoText} />
+          <TrendingUp size={16} className={styles.infoText} />
           {t('workspace.l3.title')}
           {/* DEMO 徽标（PRD-09 §八 演练⑥）：四源未串通前恒显示，单源判定见
               services/forecastScenarioMode.ts */}
@@ -78,7 +87,7 @@ export default function WorkbenchForecast() {
         {/* 离线态 */}
         {offline && (
           <div className={`px-3 py-2 rounded border text-xs ${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`}>
-            <LucideIcon name="WifiOff" size={12} className="inline mr-1" />
+            <WifiOff size={12} className="inline mr-1" />
             {t('workspace.l3.offline')}
           </div>
         )}
@@ -94,7 +103,7 @@ export default function WorkbenchForecast() {
         {/* unavailable (503) → banner only, never fabricate */}
         {!loading && unavailable && (
           <div className={`px-3 py-2 rounded border text-xs ${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`}>
-            <LucideIcon name="ServerCrash" size={12} className="inline mr-1" />
+            <ServerCrash size={12} className="inline mr-1" />
             {t('workspace.l3.unavailable')}
             <button onClick={hypotheses.reload} className={`ml-2 underline cursor-pointer`}>{t('workspace.l1.retry')}</button>
           </div>
@@ -103,7 +112,7 @@ export default function WorkbenchForecast() {
         {/* 普通错误（含 403/网络中断，后端 message 原样直排，禁掩成空态） */}
         {!loading && !unavailable && loadError && (
           <div className={`px-3 py-2 rounded border text-xs ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
-            <LucideIcon name="AlertTriangle" size={12} className="inline mr-1" />
+            <AlertTriangle size={12} className="inline mr-1" />
             {t('workspace.l3.error', { msg: String(loadError) })}
             <button onClick={() => { hypotheses.reload(); beliefs.reload(); }} className={`ml-2 underline cursor-pointer`}>{t('workspace.l1.retry')}</button>
           </div>
@@ -112,7 +121,7 @@ export default function WorkbenchForecast() {
         {/* empty */}
         {isEmpty && (
           <div className={`px-4 py-8 rounded border text-center ${styles.cardBorder} ${styles.cardBg}`}>
-            <LucideIcon name="Inbox" size={22} className={`${styles.cardTextMuted} mb-2`} />
+            <Inbox size={22} className={`${styles.cardTextMuted}`} />
             <p className={`text-xs ${styles.cardTextMuted}`}>{t('workspace.l3.empty')}</p>
           </div>
         )}
@@ -122,7 +131,7 @@ export default function WorkbenchForecast() {
         {!loading && !unavailable && !loadError && hasHyp && (
           <section className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3`}>
             <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted} mb-2 flex items-center gap-1.5`}>
-              <LucideIcon name="Sparkles" size={13} />
+              <Sparkles size={13} />
               {t('workspace.l3.hyp.title')}
             </h2>
             <ul className="space-y-1.5">
@@ -132,7 +141,7 @@ export default function WorkbenchForecast() {
                 const statusLabel = statusKey ? t(statusKey, String(h.status ?? '')) : '';
                 return (
                   <li key={h.hypothesisId ?? i} className={`text-xs ${styles.cardText} flex items-start gap-2`}>
-                    <LucideIcon name="Sparkles" size={12} className={styles.infoText} />
+                    <Sparkles size={12} className={styles.infoText} />
                     <span className="min-w-0 flex-1">{h.reason || t('workspace.l3.hyp.no_reason')}</span>
                     <span className={`shrink-0 font-mono ${styles.cardTextMuted}`}>
                       {conf}
@@ -149,7 +158,7 @@ export default function WorkbenchForecast() {
         {!loading && !unavailable && !loadError && hasBeliefs && (
           <section className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3`}>
             <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted} mb-2 flex items-center gap-1.5`}>
-              <LucideIcon name="BookOpen" size={13} />
+              <BookOpen size={13} />
               {t('workspace.l3.belief.title')}
             </h2>
             <ul className="space-y-1.5">
@@ -159,7 +168,7 @@ export default function WorkbenchForecast() {
                 const domainLabel = b.domain ? `${b.domain} · ` : '';
                 return (
                   <li key={`${b.variableName ?? ''}-${i}`} className={`text-xs ${styles.cardText} flex items-start gap-2`}>
-                    <LucideIcon name="BookOpen" size={12} className={styles.successText} />
+                    <BookOpen size={12} className={styles.successText} />
                     <span className="min-w-0 flex-1">{domainLabel}{cap}</span>
                     <span className={`shrink-0 font-mono ${styles.cardTextMuted}`}>{prob}</span>
                   </li>

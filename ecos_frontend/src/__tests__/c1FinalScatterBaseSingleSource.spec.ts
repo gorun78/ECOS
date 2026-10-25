@@ -21,7 +21,8 @@
  * 还原后的派生态面值而非源码行——本门据此把整 src 面按面值判，并在「能变红」腿里把「源码面 0 命中 /
  * 面值面 1 命中」并列表出来，作为 D-B5-40 盲区形状的第二例实证。</p>
  *
- * <p>闭合面（末条腿，实跑读出）：全仓 681 个生产文件里代码行 `["'`]/api` 命中**只剩单源本体**
+ * <p>闭合面（末条腿，实跑读出）：全仓 681（#142/B4-3e-76 删两枚页内 LucideIcon 桥后 679）个
+ * 生产文件里代码行 `["'`]/api` 命中**只剩单源本体**
  * `services/httpClient.ts` 的 2 处（`export const API_BASE = "/api"` + 健康探针 `fetch("/api/health")`）
  * ⇒ C1 私设基址面清零。另记与 D-B5-40 的分工，防止把「基线归零」读成「C1 全闭合」：
  * 「同一 URL 族的第二生产方」仍由 `urlFamilyDualFormRatchet`（dupBoth 30 族 / 69 属主）记账，属 B6 存量债。</p>
@@ -80,8 +81,12 @@ import { DQ_GOV_BASE } from '../pages/data-quality/api/_base';
 // 本门位于 `src/__tests__/`，到 `src/` 的相对深度是一档
 const SRC_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const CANONICAL = 'services/httpClient.ts';
-/** 全仓生产文件数（与本门同口径实跑读出，防扫描根漂移成零命中）。 */
-const PROD_FILES = 681;
+/**
+ * 全仓生产文件数（与本门同口径实跑读出，防扫描根漂移成零命中）。
+ * #142/B4-3e-76 摘除两枚页内桥 `LucideIcon.tsx`（business/data-workbench，全局桥保留重写）
+ * ⇒ 681→679（同批实扫实测读出：删两枚生产文件，−2，非手算；本门全量 run 实走面值与独立复走双证）。
+ */
+const PROD_FILES = 679;
 
 /** 本批 15 文件：rel →（导入腿相对路径、本批派生点数）。 */
 const FILES: ReadonlyArray<{ rel: string; importPath: string; sites: number }> = [

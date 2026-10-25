@@ -5,7 +5,11 @@
 
 import React from 'react';
 import { ActionType } from '../../../types/ontology';
-import LucideIcon from '../LucideIcon';
+import {
+  Shield,
+  ShieldCheck,
+  Trash2
+} from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 
@@ -80,7 +84,7 @@ export default function ValidationTab({
           onClick={handleAddValidation}
           className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 py-1.5 rounded font-medium transition-colors flex items-center gap-1.5"
         >
-          <LucideIcon name="Shield" size={13} />
+          <Shield size={13} />
           {t('ow.act.val.addBtn')}
         </button>
       </div>
@@ -98,7 +102,7 @@ export default function ValidationTab({
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="p-1 rounded-full bg-emerald-50 text-emerald-600">
-                      <LucideIcon name="ShieldCheck" size={14} />
+                      <ShieldCheck size={14} />
                     </span>
                     <span className={`text-xs font-semibold ${styles.cardText}`}>{val.displayName}</span>
                   </div>
@@ -115,7 +119,7 @@ export default function ValidationTab({
                   className={`p-1 ${styles.cardTextMuted} opacity-70 hover:opacity-100 hover:text-red-500`}
                   title={t('ow.act.val.removeTitle')}
                 >
-                  <LucideIcon name="Trash2" size={14} />
+                  <Trash2 size={14} />
                 </button>
               </div>
             ))}

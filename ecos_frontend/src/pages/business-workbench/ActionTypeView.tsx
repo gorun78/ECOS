@@ -5,7 +5,10 @@
 
 import React, { useState } from 'react';
 import { ActionType, ActionParameter, ActionRule, ActionValidationRule, ObjectType, ActionParamDataType, ActionRuleType } from '../../types/ontology';
-import LucideIcon from './LucideIcon';
+import {
+  Trash2,
+  Zap
+} from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import ParametersTab from './action-type/ParametersTab';
@@ -86,7 +89,7 @@ export default function ActionTypeView({
       <div className={`px-6 py-4 border-b ${styles.appBorder} flex justify-between items-center ${styles.appBg}`}>
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-full border border-amber-300 bg-amber-50 text-amber-700 flex items-center justify-center">
-            <LucideIcon name="Zap" size={20} className="fill-amber-500" />
+            <Zap size={20} className="fill-amber-500" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -106,7 +109,7 @@ export default function ActionTypeView({
           onClick={() => onDelete(actionType.id)}
           className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"
         >
-          <LucideIcon name="Trash2" size={13} />
+          <Trash2 size={13} />
           {t('ow.act.type.deleteBtn')}
         </button>
       </div>

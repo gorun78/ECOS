@@ -1,6 +1,10 @@
 /* Extracted from ConnectionsTab.tsx */
 import React from 'react';
-import LucideIcon from '../../LucideIcon';
+import {
+  ChevronDown,
+  ChevronUp,
+  Terminal
+} from 'lucide-react';
 import { getErrorMessage } from '../../helpers';
 import { useTheme } from "../../../../components/ThemeContext";
 import { useLanguage } from "../../../../components/LanguageContext";
@@ -104,10 +108,10 @@ export default function InlineSqlConsole({ datasourceId }: { datasourceId: strin
       <div className={`${styles.sidebarBg} px-4 py-2 flex items-center justify-between cursor-pointer select-none`}
            onClick={() => setCollapsed(!collapsed)}>
         <div className={`flex items-center gap-2 text-xs font-bold ${styles.cardText}`}>
-          <LucideIcon name="Terminal" size={14} className={`${styles.accentText}`} />
+          <Terminal size={14} className={`${styles.accentText}`} />
           <span>{t("dw.sqlConsole")}</span>
         </div>
-        <LucideIcon name={collapsed ? 'ChevronDown' : 'ChevronUp'} size={14} className={`${styles.cardTextMuted}`} />
+        {collapsed ? <ChevronDown size={14} className={`${styles.cardTextMuted}`} /> : <ChevronUp size={14} className={`${styles.cardTextMuted}`} />}
       </div>
       {!collapsed && (
         <div className={`${styles.cardBg} p-3 space-y-3`}>

@@ -5,7 +5,11 @@
 
 import React from 'react';
 import { ActionType, ActionParameter, ObjectType, ActionParamDataType } from '../../../types/ontology';
-import LucideIcon from '../LucideIcon';
+import {
+  Box,
+  Plus,
+  X
+} from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 
@@ -83,7 +87,7 @@ export default function ParametersTab({
             onClick={handleAddParam}
             className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition-colors flex items-center gap-1"
           >
-            <LucideIcon name="Plus" size={13} />
+            <Plus size={13} />
             {t('ow.act.param.addBtn')}
           </button>
         </div>
@@ -126,7 +130,7 @@ export default function ParametersTab({
                 <td className="py-2.5 px-4">
                   {param.dataType === 'object' ? (
                     <div className="flex items-center gap-1 text-blue-600 font-semibold cursor-pointer" onClick={() => param.objectTypeId && onNavigateToObject(param.objectTypeId)}>
-                      <LucideIcon name="Box" size={12} />
+                      <Box size={12} />
                       <span>{objectTypes.find(o => o.id === param.objectTypeId)?.displayName || param.objectTypeId}</span>
                     </div>
                   ) : (
@@ -148,7 +152,7 @@ export default function ParametersTab({
                     onClick={() => handleRemoveParam(param.id)}
                     className={`p-1 ${styles.cardTextMuted} opacity-70 hover:opacity-100 hover:text-red-500 rounded transition-opacity`}
                   >
-                    <LucideIcon name="X" size={14} />
+                    <X size={14} />
                   </button>
                 </td>
               </tr>

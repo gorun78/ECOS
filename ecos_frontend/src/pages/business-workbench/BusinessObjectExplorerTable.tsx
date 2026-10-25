@@ -7,7 +7,11 @@
 
 import React from 'react';
 import { ObjectType } from '../../types/ontology';
-import LucideIcon from './LucideIcon';
+import {
+  ChevronsUpDown,
+  Search
+} from 'lucide-react';
+import { Icon } from '../../components/LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 
@@ -45,7 +49,7 @@ export function ExplorerTable({
       <div className={`px-6 py-2 ${styles.appBg} border-b ${styles.appBorder} flex items-center justify-between`}>
         <div className="relative w-80">
           <span className={`absolute left-2.5 top-2.5 ${styles.cardTextMuted}`}>
-            <LucideIcon name="Search" size={12} />
+            <Search size={12} />
           </span>
           <input
             type="text"
@@ -77,9 +81,9 @@ export function ExplorerTable({
                     <div className="flex items-center gap-1">
                       <span>{prop.displayName}</span>
                       {isSorting ? (
-                        <LucideIcon name={sortOrder === 'asc' ? 'ChevronUp' : 'ChevronDown'} size={11} className="text-blue-600" />
+                        <Icon name={sortOrder === 'asc' ? 'ChevronUp' : 'ChevronDown'} size={11} className="text-blue-600" />
                       ) : (
-                        <LucideIcon name="ChevronsUpDown" size={10} className={styles.cardTextMuted} />
+                        <ChevronsUpDown size={10} className={styles.cardTextMuted} />
                       )}
                     </div>
                   </th>

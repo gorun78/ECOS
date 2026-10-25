@@ -1,6 +1,11 @@
 /* Extracted from ConnectionsTab.tsx */
 import React from 'react';
-import LucideIcon from '../../LucideIcon';
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw
+} from 'lucide-react';
 import type { DataConnection } from '../../types';
 import { useTheme } from "../../../../components/ThemeContext";
 import TableExpandRow from './TableExpandRow';
@@ -26,7 +31,7 @@ export default function TableCatalogPanel({
   if (loadingTables) {
     return (
               <div className={`p-8 text-center ${styles.cardTextMuted} text-xs flex items-center justify-center gap-2`}>
-                <LucideIcon name="RefreshCw" size={14} className="animate-spin" />
+                <RefreshCw size={14} className="animate-spin" />
                 {t('dw.loading') || 'Loading...'}
               </div>
     );
@@ -35,7 +40,7 @@ export default function TableCatalogPanel({
   if (conn.tablesAvailable.length === 0) {
     return (
               <div className={`p-8 border border-dashed ${styles.cardBorder} rounded-xl text-center ${styles.cardTextMuted} text-xs flex flex-col items-center gap-2`}>
-                <LucideIcon name="AlertTriangle" size={24} className={`${styles.warningText}`} />
+                <AlertTriangle size={24} className={`${styles.warningText}`} />
                 <span>{t("dw.txt.2ce9e0")}</span>
                 <span>{t("dw.txt.44e8b3")}</span>
               </div>
@@ -66,7 +71,7 @@ export default function TableCatalogPanel({
                       disabled={tablePage <= 1}
                       className={`px-3 py-1 text-[10px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.accentText} cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1`}
                     >
-                      <LucideIcon name="ChevronLeft" size={11} />
+                      <ChevronLeft size={11} />
                       {t("dw.conn.pagePrev")}
                     </button>
                     <span className={`text-[10px] ${styles.cardTextMuted} font-mono`}>
@@ -78,7 +83,7 @@ export default function TableCatalogPanel({
                       className={`px-3 py-1 text-[10px] rounded border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.accentText} cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1`}
                     >
                       {t("dw.conn.pageNext")}
-                      <LucideIcon name="ChevronRight" size={11} />
+                      <ChevronRight size={11} />
                     </button>
                   </div>
                 )}

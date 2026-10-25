@@ -5,7 +5,12 @@
 
 import React from 'react';
 import { ObjectType, OntologyDomain } from '../../../types/ontology';
-import LucideIcon from '../LucideIcon';
+import {
+  AlertCircle,
+  Edit,
+  Trash2
+} from 'lucide-react';
+import { Icon } from '../../../components/LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import { getDomainColorClasses } from './domainColorClasses';
@@ -54,7 +59,7 @@ export default function DomainCardsGrid({
                     className={`p-1 ${styles.cardTextMuted} opacity-80 hover:opacity-100 rounded ${styles.sidebarHoverBg}`}
                     title={t('ow.domaincards.editTitle')}
                   >
-                    <LucideIcon name="Edit" size={12} />
+                    <Edit size={12} />
                   </button>
                   <button
                     type="button"
@@ -62,7 +67,7 @@ export default function DomainCardsGrid({
                     className={`p-1 ${styles.cardTextMuted} hover:text-red-600 rounded hover:bg-red-50`}
                     title={t('ow.domaincards.deleteTitle')}
                   >
-                    <LucideIcon name="Trash2" size={12} />
+                    <Trash2 size={12} />
                   </button>
                 </div>
               </div>
@@ -86,7 +91,7 @@ export default function DomainCardsGrid({
                       onClick={() => onQuickNavigate('object', ot.id)}
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${styles.cardBorder} ${styles.appBg} ${styles.cardTextMuted} text-[10px] font-medium hover:border-blue-400 hover:bg-blue-50/20 cursor-pointer transition-colors`}
                     >
-                      <LucideIcon name={ot.icon} size={10} className={styles.cardTextMuted} />
+                      <Icon name={ot.icon} size={10} className={styles.cardTextMuted} />
                       <span>{ot.displayName.split(' (')[0]}</span>
                     </div>
                   ))}
@@ -105,7 +110,7 @@ export default function DomainCardsGrid({
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
               <h4 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1`}>
-                <LucideIcon name="AlertCircle" size={13} className="text-amber-500" />
+                <AlertCircle size={13} className="text-amber-500" />
                 <span>{t('ow.domaincards.unassignedTitle')}</span>
               </h4>
               <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 font-semibold font-mono">
@@ -124,7 +129,7 @@ export default function DomainCardsGrid({
                 onClick={() => onQuickNavigate('object', ot.id)}
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border ${styles.cardBorder} ${styles.cardBg} ${styles.cardTextMuted} text-[10px] hover:border-amber-400 hover:bg-amber-50/20 cursor-pointer transition-colors`}
               >
-                <LucideIcon name={ot.icon} size={10} />
+                <Icon name={ot.icon} size={10} />
                 <span>{ot.displayName.split(' (')[0]}</span>
               </div>
             ))}

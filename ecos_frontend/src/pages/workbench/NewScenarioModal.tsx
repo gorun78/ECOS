@@ -11,7 +11,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/common/Modal';
-import LucideIcon from '../../components/LucideIcon';
+import {
+  Check,
+  Lightbulb
+} from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import { apiFetchData } from '../../api';
@@ -133,7 +136,7 @@ export default function NewScenarioModal({
             {submitting ? (
               <span className="inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
             ) : (
-              <LucideIcon name="Check" size={12} />
+              <Check size={12} />
             )}
             {t('common.confirm')}
           </button>
@@ -191,7 +194,7 @@ export default function NewScenarioModal({
           <input className={`${inputCls} font-mono opacity-80`} value={TEMPLATE_PRESETS[tpl].caliber} readOnly />
         </div>
         <p className={tipCls}>
-          <LucideIcon name="Lightbulb" size={12} />
+          <Lightbulb size={12} />
           {t('workspace.create.after_hint')}
         </p>
       </div>

@@ -5,7 +5,17 @@
 
 import React from 'react';
 import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, FunctionType } from '../../../types/ontology';
-import LucideIcon from '../LucideIcon';
+import {
+  ChevronDown,
+  ChevronRight,
+  Code,
+  Database,
+  GitMerge,
+  Layers,
+  Tag,
+  Zap
+} from 'lucide-react';
+import { Icon } from '../../../components/LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 
@@ -42,7 +52,7 @@ export function ObjectTypesAccordion({
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
-          <LucideIcon name={expanded.object ? "ChevronDown" : "ChevronRight"} size={12} />
+          {expanded.object ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           <span>{t('ow.side.objectLabel')}</span>
         </div>
         <span>{objectTypes.length}</span>
@@ -64,7 +74,7 @@ export function ObjectTypesAccordion({
               >
                 <div className="flex items-center gap-2 truncate">
                   <span className={`p-0.5 rounded border ${isActive ? 'bg-blue-100 border-blue-300 text-blue-800' : `${styles.cardBg} ${styles.sidebarBorder} ${styles.cardTextMuted}`}`}>
-                    <LucideIcon name={ot.icon} size={11} />
+                    <Icon name={ot.icon} size={11} />
                   </span>
                   <span className="truncate">{ot.displayName}</span>
                 </div>
@@ -101,7 +111,7 @@ export function LinkTypesAccordion({
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
-          <LucideIcon name={expanded.link ? "ChevronDown" : "ChevronRight"} size={12} />
+          {expanded.link ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           <span>{t('ow.side.linkLabel')}</span>
         </div>
         <span>{linkTypes.length}</span>
@@ -123,7 +133,7 @@ export function LinkTypesAccordion({
               >
                 <div className="flex items-center gap-2 truncate">
                   <span className={styles.cardTextMuted}>
-                    <LucideIcon name="GitMerge" size={11} />
+                    <GitMerge size={11} />
                   </span>
                   <span className="truncate">{lt.displayName}</span>
                 </div>
@@ -160,7 +170,7 @@ export function ActionTypesAccordion({
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
-          <LucideIcon name={expanded.action ? "ChevronDown" : "ChevronRight"} size={12} />
+          {expanded.action ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           <span>{t('ow.side.actionLabel')}</span>
         </div>
         <span>{actionTypes.length}</span>
@@ -182,7 +192,7 @@ export function ActionTypesAccordion({
               >
                 <div className="flex items-center gap-2 truncate">
                   <span className="text-amber-500">
-                    <LucideIcon name="Zap" size={11} className="fill-amber-400/30" />
+                    <Zap size={11} className="fill-amber-400/30" />
                   </span>
                   <span className="truncate">{at.displayName}</span>
                 </div>
@@ -218,7 +228,7 @@ export function FunctionTypesAccordion({
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
-          <LucideIcon name={expanded.function ? "ChevronDown" : "ChevronRight"} size={12} />
+          {expanded.function ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           <span>{t('ow.side.functionLabel')}</span>
         </div>
         <span>{functionTypes.length}</span>
@@ -240,7 +250,7 @@ export function FunctionTypesAccordion({
               >
                 <div className="flex items-center gap-2 truncate">
                   <span className="text-violet-500">
-                    <LucideIcon name="Code" size={11} />
+                    <Code size={11} />
                   </span>
                   <span className="truncate">{fn.displayName}</span>
                 </div>
@@ -277,7 +287,7 @@ export function InterfacesAccordion({
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
-          <LucideIcon name={expanded.interface ? "ChevronDown" : "ChevronRight"} size={12} />
+          {expanded.interface ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           <span>{t('ow.side.interfaceLabel')}</span>
         </div>
         <span>{interfaces.length}</span>
@@ -299,7 +309,7 @@ export function InterfacesAccordion({
               >
                 <div className="flex items-center gap-2 truncate">
                   <span className="text-indigo-500">
-                    <LucideIcon name="Layers" size={11} />
+                    <Layers size={11} />
                   </span>
                   <span className="truncate">{it.displayName}</span>
                 </div>
@@ -335,7 +345,7 @@ export function SharedPropertiesAccordion({
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
-          <LucideIcon name={expanded.shared_property ? "ChevronDown" : "ChevronRight"} size={12} />
+          {expanded.shared_property ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           <span>{t('ow.side.sharedPropLabel')}</span>
         </div>
         <span>{sharedProperties.length}</span>
@@ -357,7 +367,7 @@ export function SharedPropertiesAccordion({
               >
                 <div className="flex items-center gap-2 truncate">
                   <span className="text-teal-500">
-                    <LucideIcon name="Tag" size={11} />
+                    <Tag size={11} />
                   </span>
                   <span className="truncate">{sp.displayName}</span>
                 </div>
@@ -393,7 +403,7 @@ export function DatasetsAccordion({
         className={`w-full py-1.5 px-3 flex items-center justify-between ${styles.cardTextMuted} opacity-80 hover:opacity-100 font-semibold uppercase tracking-wider text-[10px]`}
       >
         <div className="flex items-center gap-1">
-          <LucideIcon name={expanded.dataset ? "ChevronDown" : "ChevronRight"} size={12} />
+          {expanded.dataset ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           <span>{t('ow.side.datasetLabel')}</span>
         </div>
         <span>{datasets.length}</span>
@@ -415,7 +425,7 @@ export function DatasetsAccordion({
               >
                 <div className="flex items-center gap-2 truncate">
                   <span className={styles.cardTextMuted}>
-                    <LucideIcon name="Database" size={11} />
+                    <Database size={11} />
                   </span>
                   <span className="truncate font-mono text-[10px]">{ds.name}</span>
                 </div>

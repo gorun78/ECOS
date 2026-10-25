@@ -5,7 +5,15 @@
 
 import React from 'react';
 import { ObjectType, OntologyDomain } from '../../../types/ontology';
-import LucideIcon from '../LucideIcon';
+import {
+  Check,
+  ChevronDown,
+  Edit,
+  Layers,
+  LayoutDashboard,
+  Plus,
+  Trash2
+} from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import { getDomainColorText, getDomainColorDotClass } from './domainColors';
@@ -62,10 +70,10 @@ export default function DomainSelectorHeader({
               }`}
             >
               <div className="flex items-center gap-1.5 truncate">
-                <LucideIcon name={selectedDomain ? "Layers" : "LayoutDashboard"} size={13} className={selectedDomain ? getDomainColorText(selectedDomain.color) : 'text-blue-500'} />
+                {selectedDomain ? <Layers size={13} className={selectedDomain ? getDomainColorText(selectedDomain.color) : 'text-blue-500'} /> : <LayoutDashboard size={13} className={selectedDomain ? getDomainColorText(selectedDomain.color) : 'text-blue-500'} />}
                 <span className="truncate">{selectedDomain ? selectedDomain.displayName.split(' (')[0] : t('ow.domhdr.overviewTitle')}</span>
               </div>
-              <LucideIcon name="ChevronDown" size={12} className="opacity-60" />
+              <ChevronDown size={12} className="opacity-60" />
             </button>
 
             {/* Dropdown Menu */}
@@ -83,10 +91,10 @@ export default function DomainSelectorHeader({
                   }`}
                 >
                   <div className="flex items-center gap-1.5">
-                    <LucideIcon name="LayoutDashboard" size={12} className="text-blue-500" />
+                    <LayoutDashboard size={12} className="text-blue-500" />
                     <span>{t('ow.domhdr.globalAll')}</span>
                   </div>
-                  {selectedDomainId === null && <LucideIcon name="Check" size={11} className="text-blue-600" />}
+                  {selectedDomainId === null && <Check size={11} className="text-blue-600" />}
                 </div>
 
                 {/* 2. Domains Options with Edit/Delete */}
@@ -122,7 +130,7 @@ export default function DomainSelectorHeader({
                           className={`p-1 ${styles.sidebarHoverBg} ${styles.cardTextMuted} rounded transition-colors`}
                           title={t('ow.domhdr.editDomain')}
                         >
-                          <LucideIcon name="Edit" size={11} />
+                          <Edit size={11} />
                         </button>
                         <button
                           type="button"
@@ -133,7 +141,7 @@ export default function DomainSelectorHeader({
                           className={`p-1 hover:bg-red-50 ${styles.cardTextMuted} hover:text-red-600 rounded transition-colors`}
                           title={t('ow.domhdr.deleteDomain')}
                         >
-                          <LucideIcon name="Trash2" size={11} />
+                          <Trash2 size={11} />
                         </button>
                       </div>
                     </div>
@@ -150,7 +158,7 @@ export default function DomainSelectorHeader({
             className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-lg hover:shadow-xs transition-all cursor-pointer shrink-0"
             title={t('ow.domhdr.addDomain')}
           >
-            <LucideIcon name="Plus" size={14} />
+            <Plus size={14} />
           </button>
         </div>
 
@@ -163,7 +171,7 @@ export default function DomainSelectorHeader({
             }}
             className={`w-full py-1.5 rounded-md text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${styles.cardBg} ${styles.cardText} shadow-xs cursor-pointer`}
           >
-            <LucideIcon name="LayoutDashboard" size={11} className="text-blue-600" />
+            <LayoutDashboard size={11} className="text-blue-600" />
             <span>{t('ow.domhdr.overviewTab')}</span>
           </button>
         </div>

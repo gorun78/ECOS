@@ -1,6 +1,10 @@
 /* Extracted from ConnectionsTab.tsx */
 import React from 'react';
-import LucideIcon from '../../LucideIcon';
+import {
+  Edit3,
+  Plus,
+  Trash2
+} from 'lucide-react';
 import type { DataConnection } from '../../types';
 import { connTypeBadgeText } from '../../helpers';
 import { useTheme } from "../../../../components/ThemeContext";
@@ -33,7 +37,7 @@ export default function ConnectionListPanel({
         onClick={() => setShowAddConn(true)}
         className={`p-1 rounded ${styles.accentBg} ${styles.cardText} ${styles.accentHover} text-xs flex items-center gap-1 cursor-pointer font-medium`}
       >
-        <LucideIcon name="Plus" size={12} />
+        <Plus size={12} />
         <span>{t("dw.txt.30f7dd")}</span>
       </button>
     </div>
@@ -73,7 +77,7 @@ export default function ConnectionListPanel({
                   className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.accentText} transition-colors cursor-pointer`}
                   title={tt('dw.conn.edit')}
                 >
-                  <LucideIcon name="Edit3" size={11} />
+                  <Edit3 size={11} />
                 </button>
                 <button type="button"
                   onClick={(e) => { e.stopPropagation(); handleDelete(conn.id, conn.name); }}
@@ -81,7 +85,7 @@ export default function ConnectionListPanel({
                   className={`p-1 rounded ${styles.cardTextMuted} hover:${styles.dangerText} transition-colors cursor-pointer disabled:opacity-50`}
                   title={tt('dw.conn.delete')}
                 >
-                  <LucideIcon name="Trash2" size={11} />
+                  <Trash2 size={11} />
                 </button>
                 <span className={`h-2 w-2 rounded-full ${
                   conn.status === 'connected' ? styles.successBg :

@@ -5,7 +5,13 @@
 
 import React, { useState } from 'react';
 import { InterfaceType, SharedProperty, Dataset, ObjectType } from '../../types/ontology';
-import LucideIcon from './LucideIcon';
+import {
+  Database,
+  Layers,
+  Table,
+  Tag
+} from 'lucide-react';
+import { Icon } from '../../components/LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 
@@ -29,7 +35,7 @@ export function InterfaceView({ intf, objectTypes, onDelete, onNavigateToObject 
       <div className={`px-6 py-4 border-b ${styles.appBorder} flex justify-between items-center ${styles.appBg}`}>
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 flex items-center justify-center">
-            <LucideIcon name="Layers" size={20} />
+            <Layers size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -101,7 +107,7 @@ export function InterfaceView({ intf, objectTypes, onDelete, onNavigateToObject 
                   onClick={() => onNavigateToObject(ot.id)}
                   className={`p-3 rounded-lg border-2 ${styles.cardBg} flex items-center gap-3 cursor-pointer hover:shadow-xs transition-shadow ${ot.color}`}
                 >
-                  <LucideIcon name={ot.icon} size={16} />
+                  <Icon name={ot.icon} size={16} />
                   <div>
                     <div className="text-xs font-semibold">{ot.displayName}</div>
                     <div className="text-[10px] opacity-80 mt-0.5 font-mono">{ot.apiName}</div>
@@ -138,7 +144,7 @@ export function SharedPropertyView({ sp, objectTypes, onDelete, onNavigateToObje
       <div className={`px-6 py-4 border-b ${styles.appBorder} flex justify-between items-center ${styles.appBg}`}>
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-lg border border-teal-200 bg-teal-50 text-teal-700 flex items-center justify-center">
-            <LucideIcon name="Tag" size={20} />
+            <Tag size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -199,7 +205,7 @@ export function SharedPropertyView({ sp, objectTypes, onDelete, onNavigateToObje
                   >
                     <div className="flex items-center gap-2 mb-2">
                       <span className={`p-1.5 rounded-md border ${ot.color}`}>
-                        <LucideIcon name={ot.icon} size={14} />
+                        <Icon name={ot.icon} size={14} />
                       </span>
                       <span className={`text-xs font-semibold ${styles.cardText} group-hover:text-teal-600`}>{ot.displayName}</span>
                     </div>
@@ -241,7 +247,7 @@ export function DatasetView({ dataset, objectTypes, onNavigateToObject }: Datase
       <div className={`px-6 py-4 border-b ${styles.appBorder} flex justify-between items-center ${styles.appBg}`}>
         <div className="flex items-center gap-3">
           <div className={`p-2.5 rounded-lg border ${styles.appBorder} ${styles.cardBg} ${styles.cardText} flex items-center justify-center shadow-3xs`}>
-            <LucideIcon name="Database" size={20} className={styles.cardTextMuted} />
+            <Database size={20} className={styles.cardTextMuted} />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -259,7 +265,7 @@ export function DatasetView({ dataset, objectTypes, onNavigateToObject }: Datase
             onClick={() => onNavigateToObject(mappedObject.id)}
             className={`px-3 py-1.5 rounded-lg border text-xs cursor-pointer hover:shadow-xs transition-shadow flex items-center gap-1.5 ${mappedObject.color}`}
           >
-            <LucideIcon name="Layers" size={13} />
+            <Layers size={13} />
             <span>{t('ow.dsv.mappedTo')}：<strong>{mappedObject.displayName}</strong></span>
           </div>
         )}
@@ -282,7 +288,7 @@ export function DatasetView({ dataset, objectTypes, onNavigateToObject }: Datase
         {/* Tabular Preview */}
         <div className={`flex-1 flex flex-col space-y-2 overflow-hidden border ${styles.appBorder} rounded-lg`}>
           <div className={`${styles.appBg} px-4 py-2 text-xs font-semibold ${styles.cardText} border-b ${styles.appBorder} flex items-center gap-1.5`}>
-            <LucideIcon name="Table" size={14} className={styles.cardTextMuted} />
+            <Table size={14} className={styles.cardTextMuted} />
             {t('ow.dsv.preview')}
           </div>
           <div className={`flex-1 overflow-auto ${styles.cardBg}`}>

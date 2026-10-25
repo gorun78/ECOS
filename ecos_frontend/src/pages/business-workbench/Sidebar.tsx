@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, FunctionType, OntologyDomain, PropertyType } from '../../types/ontology';
-import LucideIcon from './LucideIcon';
+
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import ConfirmDialog from '../../components/common/ConfirmDialog';

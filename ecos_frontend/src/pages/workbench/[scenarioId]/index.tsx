@@ -11,7 +11,13 @@
  */
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import LucideIcon from '../../../components/LucideIcon';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BrainCircuit,
+  FileQuestion,
+  ShieldAlert
+} from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useMediaQuery } from '../../../hooks/useMediaQuery';
@@ -134,7 +140,7 @@ export default function WorkbenchScenarioDetail() {
           to="/workbench"
           className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-1 rounded border cursor-pointer ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
         >
-          <LucideIcon name="ArrowLeft" size={12} />
+          <ArrowLeft size={12} />
           {t('workspace.l2.back')}
         </Link>
       </div>
@@ -150,7 +156,7 @@ export default function WorkbenchScenarioDetail() {
       {/* 未找到（404） */}
       {!loading && notFound && (
         <div className={`m-4 p-6 rounded border text-center ${styles.cardBorder} ${styles.cardBg}`}>
-          <LucideIcon name="FileQuestion" size={22} className={`${styles.cardTextMuted} mb-2`} />
+          <FileQuestion size={22} className={`${styles.cardTextMuted}`} />
           <p className={`text-sm font-semibold ${styles.cardText}`}>{t('workspace.l2.not_found')}</p>
           <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{t('workspace.l2.not_found_hint')}</p>
         </div>
@@ -159,7 +165,7 @@ export default function WorkbenchScenarioDetail() {
       {/* 无权限（403/401） */}
       {!loading && denied && (
         <div className={`m-4 p-4 rounded border text-sm ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
-          <LucideIcon name="ShieldAlert" size={14} className="inline mr-1" />
+          <ShieldAlert size={14} className="inline mr-1" />
           {t('workspace.l2.no_permission')}
         </div>
       )}
@@ -167,7 +173,7 @@ export default function WorkbenchScenarioDetail() {
       {/* 错误 */}
       {!loading && error && !notFound && !denied && (
         <div className={`m-4 p-4 rounded border text-xs ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
-          <LucideIcon name="AlertTriangle" size={12} className="inline mr-1" />
+          <AlertTriangle size={12} className="inline mr-1" />
           {t('workspace.l2.error', { msg: error })}
         </div>
       )}
@@ -211,7 +217,7 @@ export default function WorkbenchScenarioDetail() {
             <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3`}>
               <div className="flex items-center justify-between gap-2 mb-2">
                 <h2 className={`text-xs font-bold uppercase ${styles.cardTextMuted} flex items-center gap-1.5`}>
-                  <LucideIcon name="BrainCircuit" size={13} />
+                  <BrainCircuit size={13} />
                   {t('workspace.l2.cognition.title')}
                 </h2>
                 <Link

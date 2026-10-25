@@ -1,6 +1,9 @@
 /* Extracted from ConnectionsTab.tsx */
 import React from 'react';
-import LucideIcon from '../../LucideIcon';
+import {
+  Wifi
+} from 'lucide-react';
+import { Icon } from '../../../../components/LucideIcon';
 import { getSourceIcon, connTypeBadgeText, connTypeDescText } from '../../helpers';
 import type { DataConnection } from '../../types';
 import { useTheme } from "../../../../components/ThemeContext";
@@ -22,7 +25,7 @@ export default function ConnectionDetailBanner({
         <div className={`p-6 border-b ${styles.cardBorder} flex justify-between items-center ${styles.appBg}/50`}>
           <div className="flex items-center gap-3">
             <div className={`p-2.5 rounded-full border ${styles.accentBorder} ${styles.badgeBg} ${styles.badgeText} flex items-center justify-center`}>
-              <LucideIcon name={getSourceIcon(conn.type)} size={20} />
+              <Icon name={getSourceIcon(conn.type)} size={20} />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -46,7 +49,7 @@ export default function ConnectionDetailBanner({
               disabled={testingConnId !== null}
               className={`px-3 py-1.5 ${styles.accentBg} ${styles.accentHover} ${styles.cardText} text-xs font-semibold rounded transition-all cursor-pointer flex items-center gap-1.5`}
             >
-              <LucideIcon name="Wifi" size={13} />
+              <Wifi size={13} />
               <span>{t("dw.conn.testBtn")}</span>
             </button>
           </div>

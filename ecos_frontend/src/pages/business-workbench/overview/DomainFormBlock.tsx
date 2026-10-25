@@ -5,7 +5,13 @@
 
 import React from 'react';
 import { ObjectType, OntologyDomain } from '../../../types/ontology';
-import LucideIcon from '../LucideIcon';
+import {
+  AlertCircle,
+  Check,
+  Edit3,
+  X
+} from 'lucide-react';
+import { Icon } from '../../../components/LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import { getDomainColorClasses } from './domainColorClasses';
@@ -57,7 +63,7 @@ export default function DomainFormBlock({
     <form onSubmit={handleSaveDomain} className={`${styles.appBg} border ${styles.cardBorder} rounded-xl p-5 space-y-4`}>
       <div className={`flex items-center justify-between border-b ${styles.divider} pb-2`}>
         <h4 className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1.5`}>
-          <LucideIcon name="Edit3" size={14} className="text-blue-500" />
+          <Edit3 size={14} className="text-blue-500" />
           <span>{editingDomain ? t('ow.domainform.editTitle', { name: editingDomain.displayName }) : t('ow.domainform.newTitle')}</span>
         </h4>
         <button
@@ -65,13 +71,13 @@ export default function DomainFormBlock({
           onClick={() => { setIsAddingNew(false); setEditingDomain(null); }}
           className={`${styles.cardTextMuted} opacity-70 hover:opacity-100 p-1 rounded hover:bg-blue-50/20`}
         >
-          <LucideIcon name="X" size={16} />
+          <X size={16} />
         </button>
       </div>
 
       {formError && (
         <div className="p-2.5 bg-red-50 border border-red-200 text-red-600 text-[11px] rounded-md flex items-center gap-1.5">
-          <LucideIcon name="AlertCircle" size={14} />
+          <AlertCircle size={14} />
           <span>{formError}</span>
         </div>
       )}
@@ -158,7 +164,7 @@ export default function DomainFormBlock({
               >
                 <div className="flex items-center gap-2 truncate">
                   <span className={`p-0.5 rounded border ${isChecked ? 'bg-blue-100 border-blue-200' : `${styles.appBg} ${styles.cardBorder}`}`}>
-                    <LucideIcon name={ot.icon} size={12} />
+                    <Icon name={ot.icon} size={12} />
                   </span>
                   <span className="truncate">{ot.displayName}</span>
                 </div>
@@ -169,7 +175,7 @@ export default function DomainFormBlock({
                     </span>
                   ) : (
                     <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${isChecked ? 'bg-blue-600 border-blue-600 text-white' : `${styles.cardBorder} ${styles.cardBg}`}`}>
-                      {isChecked && <LucideIcon name="Check" size={10} />}
+                      {isChecked && <Check size={10} />}
                     </span>
                   )}
                 </div>

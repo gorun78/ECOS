@@ -5,7 +5,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { FunctionType, FunctionParameter, ObjectType } from '../../types/ontology';
-import LucideIcon from './LucideIcon';
+import {
+  Calculator,
+  CheckCircle,
+  Code,
+  Info,
+  Play,
+  Plus,
+  Shield,
+  Sparkles,
+  Terminal,
+  Trash2,
+  TrendingUp,
+  X
+} from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 
 interface FunctionTypeViewProps {
@@ -235,7 +248,7 @@ export class ${className} {
       <div className={`px-6 py-4 border-b ${styles.appBorder} flex justify-between items-center ${styles.appBg}`}>
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-full border border-violet-300 bg-violet-50 text-violet-700 flex items-center justify-center">
-            <LucideIcon name="Code" size={20} />
+            <Code size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -265,7 +278,7 @@ export class ${className} {
           onClick={() => onDelete(func.id)}
           className="text-xs text-red-500 hover:bg-red-50 px-2.5 py-1.5 rounded border border-red-200 transition-colors flex items-center gap-1.5"
         >
-          <LucideIcon name="Trash2" size={13} />
+          <Trash2 size={13} />
           删除函数
         </button>
       </div>
@@ -407,7 +420,7 @@ export class ${className} {
                     onClick={handleAddParam}
                     className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition-colors flex items-center gap-1"
                   >
-                    <LucideIcon name="Plus" size={13} />
+                    <Plus size={13} />
                     添加参数
                   </button>
                 </div>
@@ -474,7 +487,7 @@ export class ${className} {
                               onClick={() => handleRemoveParam(p.name)}
                               className={`p-1 ${styles.cardTextMuted} opacity-70 hover:opacity-100 hover:text-red-500 rounded`}
                             >
-                              <LucideIcon name="X" size={14} />
+                              <X size={14} />
                             </button>
                           </td>
                         </tr>
@@ -501,7 +514,7 @@ export class ${className} {
                   onClick={() => loadTemplate('validation')}
                   className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.sidebarBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardText} transition-all flex items-start gap-2`}
                 >
-                  <LucideIcon name="Shield" size={14} className="text-emerald-500 mt-0.5 shrink-0" />
+                  <Shield size={14} className="text-emerald-500 mt-0.5 shrink-0" />
                   <div>
                     <div className="text-[11px] font-semibold">拦截校验模板</div>
                     <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>限制Action提交</div>
@@ -511,7 +524,7 @@ export class ${className} {
                   onClick={() => loadTemplate('default')}
                   className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.sidebarBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardText} transition-all flex items-start gap-2`}
                 >
-                  <LucideIcon name="Sparkles" size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                  <Sparkles size={14} className="text-amber-500 mt-0.5 shrink-0" />
                   <div>
                     <div className="text-[11px] font-semibold">动态入参默认值</div>
                     <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>默认值公式计算</div>
@@ -521,7 +534,7 @@ export class ${className} {
                   onClick={() => loadTemplate('computed')}
                   className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.sidebarBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardText} transition-all flex items-start gap-2`}
                 >
-                  <LucideIcon name="Calculator" size={14} className="text-blue-500 mt-0.5 shrink-0" />
+                  <Calculator size={14} className="text-blue-500 mt-0.5 shrink-0" />
                   <div>
                     <div className="text-[11px] font-semibold">派生计算属性</div>
                     <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>实体派生衍生指标</div>
@@ -531,7 +544,7 @@ export class ${className} {
                   onClick={() => loadTemplate('aggregation')}
                   className={`w-full text-left p-2.5 ${styles.cardBg} border ${styles.sidebarBorder} hover:border-blue-500 rounded-lg text-xs font-medium ${styles.cardText} transition-all flex items-start gap-2`}
                 >
-                  <LucideIcon name="TrendingUp" size={14} className="text-indigo-500 mt-0.5 shrink-0" />
+                  <TrendingUp size={14} className="text-indigo-500 mt-0.5 shrink-0" />
                   <div>
                     <div className="text-[11px] font-semibold">对象集统计聚合</div>
                     <div className={`text-[10px] font-normal ${styles.cardTextMuted} mt-0.5`}>多实体合并聚合计算</div>
@@ -540,7 +553,7 @@ export class ${className} {
               </div>
               <div className="mt-auto bg-blue-50 border border-blue-100 rounded-lg p-3 text-[11px] text-blue-700 leading-relaxed">
                 <div className="font-semibold flex items-center gap-1 mb-1">
-                  <LucideIcon name="Info" size={12} />
+                  <Info size={12} />
                   <span>TS代码要求:</span>
                 </div>
                 必须通过 <code>@Function()</code> 装饰器公开核心函数，以使 Workshop 应用和操作 (Actions) 能够发现并进行远程绑定。
@@ -698,7 +711,7 @@ export class ${className} {
                   </>
                 ) : (
                   <>
-                    <LucideIcon name="Play" size={14} className="fill-white" />
+                    <Play size={14} className="fill-white" />
                     <span>运行测试 (Run Function)</span>
                   </>
                 )}
@@ -711,7 +724,7 @@ export class ${className} {
                 <span>函数模拟输出终端 (Foundry Console)</span>
                 {testResult !== null && (
                   <span className="text-emerald-500 font-semibold flex items-center gap-1 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                    <LucideIcon name="CheckCircle" size={11} /> SUCCESS
+                    <CheckCircle size={11} /> SUCCESS
                   </span>
                 )}
               </h4>
@@ -719,7 +732,7 @@ export class ${className} {
               {/* Logs area */}
               {testLogs.length === 0 ? (
                 <div className="flex-1 flex flex-col justify-center items-center text-[var(--card,#64748B)] italic">
-                  <LucideIcon name="Terminal" size={24} className="mb-2 text-[var(--card,#475569)]" />
+                  <Terminal size={24} className="mb-2 text-[var(--card,#475569)]" />
                   <div>配置完左侧测试入参后，点击下方 "运行测试" 按钮。</div>
                   <div>系统将在编译并在虚拟沙盒中运行您的 TS 代码。</div>
                 </div>

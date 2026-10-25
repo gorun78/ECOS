@@ -1,6 +1,9 @@
 /* Extracted from ConnectionsTab.tsx */
 import React from 'react';
-import LucideIcon from '../../LucideIcon';
+import {
+  FolderOpen,
+  RefreshCw
+} from 'lucide-react';
 import { useTheme } from "../../../../components/ThemeContext";
 import type { FolderFileVo } from '../../api';
 import { fmtBytes } from './constants';
@@ -22,7 +25,7 @@ export default function FolderFilesPanel({
   if (folderFilesLoading) {
     return (
                 <div className={`p-8 text-center ${styles.cardTextMuted} text-xs flex items-center justify-center gap-2`}>
-                  <LucideIcon name="RefreshCw" size={14} className="animate-spin" />
+                  <RefreshCw size={14} className="animate-spin" />
                   {t('dw.loading') || 'Loading...'}
                 </div>
     );
@@ -31,7 +34,7 @@ export default function FolderFilesPanel({
   if (folderFiles.length === 0) {
     return (
                 <div className={`p-8 border border-dashed ${styles.cardBorder} rounded-xl text-center ${styles.cardTextMuted} text-xs flex flex-col items-center gap-2`}>
-                  <LucideIcon name="FolderOpen" size={24} className={`${styles.warningText}`} />
+                  <FolderOpen size={24} className={`${styles.warningText}`} />
                   <span>{t('dw.folder.empty')}</span>
                   <span>{t('dw.folder.emptyHint')}</span>
                 </div>

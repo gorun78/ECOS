@@ -16,7 +16,11 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import LucideIcon from '../LucideIcon';
+import {
+  Bot,
+  Loader2,
+  X
+} from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useTheme } from '../ThemeContext';
 import AgentQuickActions from './AgentQuickActions';
@@ -282,7 +286,7 @@ export default function AIPCopilotDrawer({
       <div className={`h-14 ${styles.sidebarBg} text-white flex items-center justify-between px-4 shrink-0`}>
         <div className="flex items-center gap-2">
           <span className="p-1.5 rounded-lg bg-indigo-600 text-white flex items-center justify-center animate-pulse">
-            <LucideIcon name="Bot" size={15} />
+            <Bot size={15} />
           </span>
           <div>
             <h3 className="text-xs font-black tracking-wide font-sans text-white">ECOS AIP Copilot</h3>
@@ -294,14 +298,14 @@ export default function AIPCopilotDrawer({
           aria-label={t('common.close')}
           className={`p-1.5 text-[var(--text-muted)] hover:text-white hover:bg-black/20 rounded-lg transition-colors cursor-pointer`}
         >
-          <LucideIcon name="X" size={16} />
+          <X size={16} />
         </button>
       </div>
 
       {/* 2. Live Agent Steps Indicator Banner */}
       {currentStep && (
         <div className="bg-indigo-900/90 text-indigo-100 px-3 py-2 flex items-center gap-2 text-[10px] font-mono shrink-0 border-b border-indigo-950">
-          <LucideIcon name="Loader2" size={12} className="animate-spin text-indigo-400" />
+          <Loader2 size={12} className="animate-spin text-indigo-400" />
           <span className="flex-1 font-bold">{currentStep}</span>
           <span className="bg-indigo-950 px-1.5 py-0.5 rounded text-[8px] text-indigo-400">Agent Action</span>
         </div>

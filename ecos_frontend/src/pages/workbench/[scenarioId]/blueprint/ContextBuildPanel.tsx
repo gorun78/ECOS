@@ -14,7 +14,16 @@
  * <p>六态：表单(idle)/提交中/结果/错误族/引擎 503 横幅(含 traceId)/未选蓝图。</p>
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import LucideIcon from '../../../../components/LucideIcon';
+import {
+  AlertOctagon,
+  CircleCheck,
+  CircleOff,
+  Hammer,
+  PackageSearch,
+  PlugZap,
+  Plus,
+  X
+} from 'lucide-react';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useLanguage } from '../../../../components/LanguageContext';
 import {
@@ -120,7 +129,7 @@ export default function ContextBuildPanel({ scenarioId, blueprint }: Props) {
   if (!blueprint) {
     return (
       <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3 text-xs ${styles.cardTextMuted}`}>
-        <LucideIcon name="PackageSearch" size={13} className="inline mr-1" />
+        <PackageSearch size={13} className="inline mr-1" />
         {t('workspace.ctx.no_blueprint')}
       </div>
     );
@@ -147,7 +156,7 @@ export default function ContextBuildPanel({ scenarioId, blueprint }: Props) {
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3 space-y-3`}>
       <div className="flex items-center gap-2 flex-wrap">
-        <LucideIcon name="PackageSearch" size={15} className={styles.accentText} />
+        <PackageSearch size={15} className={styles.accentText} />
         <h3 className={`text-xs font-extrabold ${styles.cardText}`}>{t('workspace.ctx.title')}</h3>
         <span className={`text-[10px] ${styles.cardTextMuted}`}>{t('workspace.ctx.subtitle')}</span>
       </div>
@@ -183,7 +192,7 @@ export default function ContextBuildPanel({ scenarioId, blueprint }: Props) {
             onClick={() => setRows((prev) => [...prev, newRow()])}
             className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded border cursor-pointer ${styles.cardBg} ${styles.accentText} ${styles.accentBorder}`}
           >
-            <LucideIcon name="Plus" size={11} />
+            <Plus size={11} />
             {t('workspace.ctx.asset_add')}
           </button>
         </div>
@@ -233,7 +242,7 @@ export default function ContextBuildPanel({ scenarioId, blueprint }: Props) {
               className={`text-[10px] font-bold px-1 rounded border cursor-pointer ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
               aria-label={t('workspace.ctx.asset_remove')}
             >
-              <LucideIcon name="X" size={11} />
+              <X size={11} />
             </button>
           </div>
         ))}
@@ -246,7 +255,7 @@ export default function ContextBuildPanel({ scenarioId, blueprint }: Props) {
           disabled={!canSubmit || phase.kind === 'submitting'}
           className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded border cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${styles.accentBg} ${styles.accentSolidText} ${styles.accentBorder}`}
         >
-          <LucideIcon name="Hammer" size={12} />
+          <Hammer size={12} />
           {phase.kind === 'submitting' ? t('workspace.ctx.submitting') : t('workspace.ctx.submit')}
         </button>
         {!canSubmit && <span className={`text-[10px] ${styles.cardTextMuted}`}>{t('workspace.ctx.need_inputs')}</span>}
@@ -256,7 +265,7 @@ export default function ContextBuildPanel({ scenarioId, blueprint }: Props) {
       {phase.kind === 'error' && (
         <div className={`rounded border p-3 text-[11px] space-y-1 ${phase.status === 503 ? `${styles.warningBg} ${styles.warningText} ${styles.warningBorder}` : `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}`}>
           <div className="flex items-center gap-1.5 font-bold">
-            <LucideIcon name={phase.status === 503 ? 'PlugZap' : 'AlertOctagon'} size={12} />
+            {phase.status === 503 ? <PlugZap size={12} /> : <AlertOctagon size={12} />}
             {t(ctxErrKey(phase.status))}
           </div>
           <div className="opacity-80 break-words">{phase.msg}</div>
@@ -273,7 +282,7 @@ export default function ContextBuildPanel({ scenarioId, blueprint }: Props) {
                 result.ready ? `${styles.successBg} ${styles.successText} ${styles.successBorder}` : `${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`
               }`}
             >
-              <LucideIcon name={result.ready ? 'CircleCheck' : 'CircleOff'} size={11} />
+              {result.ready ? <CircleCheck size={11} /> : <CircleOff size={11} />}
               {result.ready ? t('workspace.ctx.ready') : t('workspace.ctx.not_ready')}
             </span>
             {result.truncated && (

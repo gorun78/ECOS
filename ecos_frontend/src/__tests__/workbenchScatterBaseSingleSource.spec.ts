@@ -5,7 +5,7 @@
  * <p>本批把 4 个在册文件的代码行私设基址 **11 处**（逐文件 4 + 2 + 2 + 3）改由 `API_BASE`
  * 派生，形态拆分 = **单引号 6 + 反引号 3 + 双引号 2**（逐条取自 `git show HEAD:` 实跑读出）。
  * 与前六批不同，本批四个落点不共属一个目录域，故本门是**批级文件集门 + 两个整目录闭合门**的合体：
- * `pages/business-workbench`（38 生产文件）与 `components/ontology-workbench`（14 生产文件）
+ * `pages/business-workbench`（37 生产文件）与 `components/ontology-workbench`（14 生产文件）
  * 自此整域零私设基址；`pages/aiworkbench` 仍有 `api.ts` 27 处未在册⇒该域本批不宣称闭合。</p>
  *
  * <p>派生只有一种正确性可证：**运行期面值逐字不变**。故本门把每个派生点按 `API_BASE` 实际值
@@ -42,7 +42,9 @@ const SRC_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 /** 整域闭合的两个目录 + 各自生产文件数（实跑读出）。 */
 const CLOSED_DIRS: ReadonlyArray<{ dir: string; files: number }> = [
-  { dir: 'pages/business-workbench', files: 38 },
+  // #142/B4-3e-76 同批摘除 `pages/business-workbench/LucideIcon.tsx` 页内桥（git rm，LucideIcon 过渡桥下线）
+  // ⇒ 38→37（实扫读出，非手算）。
+  { dir: 'pages/business-workbench', files: 37 },
   { dir: 'components/ontology-workbench', files: 14 },
 ];
 
@@ -161,7 +163,7 @@ describe('工作台散点批基址单源 — 私设基址清零 (#143/B5-24)', (
     expect(API_BASE).toBe('/api');
   });
 
-  it('两整域 38+14 个生产文件 + 两散点文件代码行零私设基址（递归扫，注释里的端点说明不计）', () => {
+  it('两整域 37+14 个生产文件 + 两散点文件代码行零私设基址（递归扫，注释里的端点说明不计）', () => {
     for (const { dir, files } of CLOSED_DIRS) {
       const prodFiles = walk(dir, []);
       expect(prodFiles.length, `${dir} 生产文件数与本批实跑读数不符（扫描面漂移即红）`).toBe(files);

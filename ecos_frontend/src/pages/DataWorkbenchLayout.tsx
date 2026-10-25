@@ -17,7 +17,7 @@ import { useLanguage } from '../components/LanguageContext';
 import { useTheme } from '../components/ThemeContext';
 import { showToastGlobal } from '../components/common/Toast';
 import type { ObjectType, Dataset } from './data-workbench/types';
-import LucideIcon from './data-workbench/LucideIcon';
+import { Icon } from '../components/LucideIcon';
 import ConnectionsTab from './data-workbench/tabs/ConnectionsTab';
 import DataLineageTab from './data-workbench/tabs/DataLineageTab';
 import PipelineBuilderTab from './data-workbench/tabs/PipelineBuilderTab';
@@ -117,7 +117,7 @@ export default function DataWorkbenchLayout({
     return (
       <button key={tab.id} onClick={() => setActiveTab(tab.id)}
           className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-md transition-all font-semibold ${active ? `${styles.sidebarActiveBg} ${styles.sidebarActiveText} border-l-2 ${styles.accentBorder} font-extrabold shadow-sm` : `${styles.cardTextMuted} hover:opacity-80`}`}>
-          <LucideIcon name={tab.icon} size={14} className={active ? styles.accentText : styles.cardTextMuted} />
+          <Icon name={tab.icon} size={14} className={active ? styles.accentText : styles.cardTextMuted} />
           <span className="truncate">{t(tab.i18nKey)}</span>
       </button>
     );

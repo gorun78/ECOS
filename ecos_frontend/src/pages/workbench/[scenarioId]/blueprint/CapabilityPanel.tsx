@@ -14,7 +14,13 @@
  * 交叉引用「所需」列只做集合命中判断，不改写任何后端真值。</p>
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import LucideIcon from '../../../../components/LucideIcon';
+import {
+  AlertTriangle,
+  Boxes,
+  PlugZap,
+  RefreshCw,
+  Star
+} from 'lucide-react';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useLanguage } from '../../../../components/LanguageContext';
 import logger from '../../../../services/logger';
@@ -108,7 +114,7 @@ export default function CapabilityPanel({ declaredCapabilities }: Props) {
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3`}>
       <div className="flex items-center gap-2 flex-wrap mb-2">
-        <LucideIcon name="Boxes" size={13} className={styles.accentText} />
+        <Boxes size={13} className={styles.accentText} />
         <h3 className={`text-xs font-bold uppercase ${styles.cardTextMuted}`}>{t('workspace.cap.title')}</h3>
         <span className={`text-[10px] ${styles.cardTextMuted}`}>{t('workspace.cap.subtitle')}</span>
         <button
@@ -116,7 +122,7 @@ export default function CapabilityPanel({ declaredCapabilities }: Props) {
           onClick={() => void load()}
           className={`ml-auto inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded border cursor-pointer ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
         >
-          <LucideIcon name="RefreshCw" size={11} />
+          <RefreshCw size={11} />
           {t('workspace.cap.retry')}
         </button>
       </div>
@@ -132,7 +138,7 @@ export default function CapabilityPanel({ declaredCapabilities }: Props) {
       {/* 空（冻结目录理论非空；真后端空即诚实呈现，禁补默认项） */}
       {phase === 'empty' && (
         <div className={`p-4 rounded border text-center text-xs ${styles.cardBorder} ${styles.cardBg} ${styles.cardTextMuted}`}>
-          <LucideIcon name="Boxes" size={18} className={`${styles.cardTextMuted} mb-1`} />
+          <Boxes size={18} className={`${styles.cardTextMuted}`} />
           <p>{t('workspace.cap.empty')}</p>
         </div>
       )}
@@ -140,7 +146,7 @@ export default function CapabilityPanel({ declaredCapabilities }: Props) {
       {/* 引擎不可用 503：横幅 + traceId */}
       {phase === 'engine' && (
         <div className={`p-3 rounded border text-[11px] ${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`}>
-          <LucideIcon name="PlugZap" size={12} className="inline mr-1" />
+          <PlugZap size={12} className="inline mr-1" />
           {t('workspace.cap.engine_unavailable', { code: errCode ?? 'ENGINE_DISABLED', traceId: traceId ?? '—' })}
         </div>
       )}
@@ -148,7 +154,7 @@ export default function CapabilityPanel({ declaredCapabilities }: Props) {
       {/* 通用错误 */}
       {phase === 'error' && (
         <div className={`p-3 rounded border text-[11px] ${styles.dangerBg} ${styles.dangerText} ${styles.dangerBorder}`}>
-          <LucideIcon name="AlertTriangle" size={12} className="inline mr-1" />
+          <AlertTriangle size={12} className="inline mr-1" />
           {t('workspace.cap.error', { msg: errMsg ?? '' })}
           {traceId ? <span className={`ml-1 font-mono ${styles.cardTextMuted}`}>traceId={traceId}</span> : null}
         </div>
@@ -185,7 +191,7 @@ export default function CapabilityPanel({ declaredCapabilities }: Props) {
                     <tr key={r.capabilityId} className={`${styles.cardBorder} border-b`}>
                       <td className={`py-1 pr-2 font-mono ${styles.cardText}`}>
                         <span className="inline-flex items-center gap-1">
-                          {required ? <LucideIcon name="Star" size={10} className={styles.accentText} /> : null}
+                          {required ? <Star size={10} className={styles.accentText} /> : null}
                           {r.capabilityId}
                         </span>
                       </td>

@@ -8,7 +8,12 @@
 
 import React from 'react';
 import { ActionType, ObjectType } from '../../types/ontology';
-import LucideIcon from './LucideIcon';
+import {
+  Bookmark,
+  CheckCircle,
+  X,
+  Zap
+} from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 
@@ -28,11 +33,11 @@ export function SaveSearchListModal({ newSearchName, onNameChange, onClose, onSa
       <div className={`${styles.cardBg} border ${styles.appBorder} rounded-xl shadow-2xl p-5 w-96 space-y-4`}>
         <div className={`flex justify-between items-center pb-2 border-b ${styles.divider}`}>
           <h3 className={`text-xs font-semibold ${styles.text} flex items-center gap-1.5`}>
-            <LucideIcon name="Bookmark" size={13} className="text-blue-600" />
+            <Bookmark size={13} className="text-blue-600" />
             {t('ow.boem.save.title')}
           </h3>
           <button type="button" onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.text}`}>
-            <LucideIcon name="X" size={14} />
+            <X size={14} />
           </button>
         </div>
         <div>
@@ -94,13 +99,13 @@ export function ExecuteActionModal({
       <div className={`${styles.cardBg} border ${styles.appBorder} rounded-xl shadow-2xl p-5 w-full sm:w-[420px] mx-4 sm:mx-auto space-y-4`}>
         <div className={`flex justify-between items-center pb-2.5 border-b ${styles.divider}`}>
           <div className="flex items-center gap-1.5">
-            <LucideIcon name="Zap" size={14} className="text-amber-500 fill-amber-500/10" />
+            <Zap size={14} className="text-amber-500 fill-amber-500/10" />
             <h3 className={`text-xs font-semibold ${styles.text}`}>
               {t('ow.boem.exec.title')}：{action.displayName}
             </h3>
           </div>
           <button type="button" onClick={onClose} className={`${styles.cardTextMuted} hover:${styles.text}`}>
-            <LucideIcon name="X" size={14} />
+            <X size={14} />
           </button>
         </div>
 
@@ -191,7 +196,7 @@ export function ExecuteActionModal({
             onClick={onExecute}
             className="h-8 px-4 rounded bg-amber-500 hover:bg-amber-400 text-white font-semibold flex items-center gap-1"
           >
-            <LucideIcon name="CheckCircle" size={12} />
+            <CheckCircle size={12} />
             <span>{t('ow.boem.exec.execute')}</span>
           </button>
         </div>

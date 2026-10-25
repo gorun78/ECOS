@@ -6,7 +6,7 @@
  * 原始后端字段名不外泄为面向业务用户的标题（标题走 i18n）。</p>
  */
 import React from 'react';
-import LucideIcon from '../../../../components/LucideIcon';
+import { Icon } from '../../../../components/LucideIcon';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useLanguage } from '../../../../components/LanguageContext';
 import type { ScenarioBlueprintVO } from '../../../../services/scenarioBlueprintClient';
@@ -168,7 +168,7 @@ function Section({ icon, title, children }: { icon: string; title: string; child
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3`}>
       <h4 className={`text-[10px] font-bold uppercase mb-1.5 flex items-center gap-1.5 ${styles.cardTextMuted}`}>
-        <LucideIcon name={icon} size={12} />
+        <Icon name={icon} size={12} />
         {title}
       </h4>
       {children}

@@ -13,7 +13,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Brain, Compass, Inbox, RefreshCw } from "lucide-react";
-import LucideIcon from "../components/LucideIcon";
+import { Icon } from '../components/LucideIcon';
 import { useTheme } from "../components/ThemeContext";
 import { useLanguage } from "../components/LanguageContext";
 import { apiFetchData, apiHealth } from "../api";
@@ -142,7 +142,7 @@ export default function DecisionBoard() {
   const kpiCard = (key: string, titleKey: string, icon: string, body: React.ReactNode) => (
     <div key={key} className={`rounded-lg border p-3 min-w-0 ${styles.cardBg} ${styles.cardBorder}`}>
       <div className={`flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide ${styles.cardTextMuted}`}>
-        <LucideIcon name={icon} size={13} />
+        <Icon name={icon} size={13} />
         {t(titleKey)}
       </div>
       <div className="mt-2 text-sm font-bold font-mono">{body}</div>

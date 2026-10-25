@@ -13,7 +13,12 @@
  */
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import LucideIcon from '../../../../components/LucideIcon';
+import {
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  FlaskConical
+} from 'lucide-react';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useLanguage } from '../../../../components/LanguageContext';
 import CognitionPanel from '../../../scenario/CognitionPanel';
@@ -42,12 +47,12 @@ export default function AdvancedDebugPanel({ scenarioId }: { scenarioId: string 
         className={`w-full flex items-center justify-between gap-2 px-3 py-2 cursor-pointer text-left ${styles.cardBg} hover:opacity-90`}
       >
         <span className={`flex items-center gap-1.5 text-xs font-bold uppercase ${styles.cardTextMuted}`}>
-          <LucideIcon name="FlaskConical" size={13} />
+          <FlaskConical size={13} />
           {t('workspace.adv.title')}
         </span>
         <span className={`flex items-center gap-1 text-[10px] ${styles.cardTextMuted}`}>
           {expanded ? t('workspace.adv.collapse') : t('workspace.adv.expand')}
-          <LucideIcon name={expanded ? 'ChevronUp' : 'ChevronDown'} size={12} />
+          {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </span>
       </button>
 
@@ -72,7 +77,7 @@ export default function AdvancedDebugPanel({ scenarioId }: { scenarioId: string 
               to="/project_workbench"
               className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded border cursor-pointer ${styles.cardBg} ${styles.accentText} ${styles.cardBorder} hover:opacity-80`}
             >
-              <LucideIcon name="ExternalLink" size={11} />
+              <ExternalLink size={11} />
               {t('workspace.adv.legacy_link')}
             </Link>
           </div>

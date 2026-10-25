@@ -6,6 +6,7 @@
  * DataEngineConfigPanel.tsx）代码行的 16 处私设基址改由 `API_BASE` 派生，至此
  * `pages/data-workbench` 整域 78 个生产文件零私设基址（api/ 子域 8 文件系 #143/B5-21，
  * `_base.ts` 三枚常量系 #143/B5-8，`tabs/connections/InlineSqlConsole.tsx` 一枚系 #143/B5-11h）。
+ * **#142/B4-3e-76 面收缩 78→77**：域内原 LucideIcon.tsx 过渡桥随本批桥下线被删，生产文件面减一枚。</p>
  * 派生只有一种正确性可证：**运行期面值逐字不变**。故本门把每个派生点按 `API_BASE` 实际值
  * 还原成字符串，与改前快照（16 条，2026-10-19 实跑读出，非手抄）做排序多重集比对，
  * 并逐文件核对条数（1+3+1+1+1+1+2+2+4）——多一条、少一条、差一个斜杠都判红。</p>
@@ -207,9 +208,9 @@ describe('pages/data-workbench 页面域基址单源 — 私设基址清零 (#14
     expect(API_BASE).toBe('/api');
   });
 
-  it('整域 78 个生产文件代码行零私设基址（递归扫，注释里的端点说明不计）', () => {
+  it('整域 77 个生产文件代码行零私设基址（递归扫，注释里的端点说明不计；78→77 系 #142/B4-3e-76 删 LucideIcon 桥）', () => {
     const prodFiles = walk(DOMAIN_ROOT, []);
-    expect(prodFiles.length).toBe(78);
+    expect(prodFiles.length, '生产文件面漂移：新增/删除样本文件须同步本门判据').toBe(77);
     for (const rel of prodFiles) {
       const hits = codeLines(read(rel)).filter((l) => HARDCODED_RE.test(l));
       expect(hits, `${rel} 仍有 ${hits.length} 处代码行 "/api 字面量`).toEqual([]);

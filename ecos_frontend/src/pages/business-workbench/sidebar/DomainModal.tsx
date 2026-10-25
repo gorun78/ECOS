@@ -5,7 +5,13 @@
 
 import React from 'react';
 import { ObjectType, OntologyDomain } from '../../../types/ontology';
-import LucideIcon from '../LucideIcon';
+import {
+  AlertCircle,
+  Check,
+  Layers,
+  X
+} from 'lucide-react';
+import { Icon } from '../../../components/LucideIcon';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 
@@ -57,7 +63,7 @@ export default function DomainModal({
         <div className={`px-4 py-3 border-b ${styles.divider} ${styles.appBg} flex items-center justify-between`}>
           <div className="flex items-center gap-2">
             <span className="p-1 rounded bg-blue-100 text-blue-600">
-              <LucideIcon name="Layers" size={14} />
+              <Layers size={14} />
             </span>
             <h3 className={`text-sm font-bold ${styles.cardText}`}>
               {editingDomain ? t('ow.domainmodal.editTitle') : t('ow.domainmodal.newTitle')}
@@ -71,7 +77,7 @@ export default function DomainModal({
             }}
             className={`p-1 ${styles.cardTextMuted} opacity-80 hover:opacity-100 rounded-lg ${styles.sidebarHoverBg} transition-colors cursor-pointer`}
           >
-            <LucideIcon name="X" size={16} />
+            <X size={16} />
           </button>
         </div>
 
@@ -79,7 +85,7 @@ export default function DomainModal({
         <form onSubmit={handleSaveDomain} className="flex-1 overflow-y-auto p-4 space-y-4">
           {formError && (
             <div className="p-2.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-semibold flex items-center gap-2">
-              <LucideIcon name="AlertCircle" size={13} />
+              <AlertCircle size={13} />
               <span>{formError}</span>
             </div>
           )}
@@ -154,7 +160,7 @@ export default function DomainModal({
                       color === 'indigo' ? '#6366f1' : '#64748b'
                     }}
                   >
-                    {isSelected && <LucideIcon name="Check" size={12} className="text-white font-bold" />}
+                    {isSelected && <Check size={12} className="text-white font-bold" />}
                   </button>
                 );
               })}
@@ -183,7 +189,7 @@ export default function DomainModal({
                       className={`rounded border ${styles.inputBorder} text-blue-600 focus:ring-blue-500 h-3 w-3 pointer-events-none`}
                     />
                     <span className={`p-0.5 rounded border ${styles.cardBg} ${styles.cardTextMuted} ${styles.sidebarBorder}`}>
-                      <LucideIcon name={ot.icon} size={11} />
+                      <Icon name={ot.icon} size={11} />
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className={`font-semibold ${styles.cardText} truncate text-[11px]`}>{ot.displayName}</p>

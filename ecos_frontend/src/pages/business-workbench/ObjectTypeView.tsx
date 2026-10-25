@@ -5,7 +5,22 @@
 
 import React, { useState } from 'react';
 import { ObjectType, PropertyType, Dataset, LinkType, ActionType, SharedProperty, InterfaceType, OntologyDomain } from '../../types/ontology';
-import LucideIcon from './LucideIcon';
+import {
+  ChevronRight,
+  CircleDot,
+  Compass,
+  Database,
+  GitMerge,
+  Key,
+  Layers,
+  Plus,
+  Table,
+  Trash2,
+  Wand2,
+  X,
+  Zap
+} from 'lucide-react';
+import { Icon } from '../../components/LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 
@@ -187,7 +202,7 @@ export default function ObjectTypeView({
       <div className={`px-6 py-4 border-b ${styles.appBorder} flex justify-between items-center ${styles.appBg}`}>
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg border-2 ${objectType.color} flex items-center justify-center`}>
-            <LucideIcon name={objectType.icon} size={20} />
+            <Icon name={objectType.icon} size={20} />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -210,7 +225,7 @@ export default function ObjectTypeView({
               onClick={() => onExploreData(objectType.id)}
               className={`text-xs ${styles.successText} hover:bg-blue-50 px-2.5 py-1.5 rounded border ${styles.infoBorder} transition-colors flex items-center gap-1.5 font-semibold`}
             >
-              <LucideIcon name="Compass" size={13} />
+              <Compass size={13} />
               {t('ow.object.exploreData')}
             </button>
           )}
@@ -218,7 +233,7 @@ export default function ObjectTypeView({
             onClick={() => onDelete(objectType.id)}
             className={`text-xs ${styles.dangerText} hover:bg-red-50 px-2.5 py-1.5 rounded border ${styles.dangerBorder} transition-colors flex items-center gap-1.5`}
           >
-            <LucideIcon name="Trash2" size={13} />
+            <Trash2 size={13} />
             {t('ow.object.deleteObject')}
           </button>
         </div>
@@ -284,7 +299,7 @@ export default function ObjectTypeView({
                   onClick={handleAddProperty}
                   className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1 rounded transition-colors flex items-center gap-1"
                 >
-                  <LucideIcon name="Plus" size={13} />
+                  <Plus size={13} />
                   {t('ow.object.add_property')}
                 </button>
               </div>
@@ -316,7 +331,7 @@ export default function ObjectTypeView({
                           }`}
                           title={objectType.primaryKey === prop.id ? t('ow.object.pk_current') : t('ow.object.pk_set')}
                         >
-                          <LucideIcon name="Key" size={14} className={objectType.primaryKey === prop.id ? 'fill-amber-500' : ''} />
+                          <Key size={14} className={objectType.primaryKey === prop.id ? 'fill-amber-500' : ''} />
                         </button>
                       </td>
                       <td className="py-2.5 px-4">
@@ -377,7 +392,7 @@ export default function ObjectTypeView({
                           className={`text-xs ${styles.cardTextMuted} hover:text-red-500 p-1 rounded hover:bg-blue-50/20 transition-colors`}
                           title={t('ow.object.delete_prop')}
                         >
-                          <LucideIcon name="X" size={14} />
+                          <X size={14} />
                         </button>
                       </td>
                     </tr>
@@ -524,7 +539,7 @@ export default function ObjectTypeView({
                         }}
                         className="sr-only"
                       />
-                      <LucideIcon name="Layers" size={13} />
+                      <Layers size={13} />
                       <span>{intf.displayName}</span>
                     </label>
                   );
@@ -540,7 +555,7 @@ export default function ObjectTypeView({
           <div className="space-y-6">
             <div className={`${styles.appBg} border ${styles.appBorder} rounded-lg p-4 flex justify-between items-center`}>
               <div className="flex items-center gap-3">
-                <LucideIcon name="Database" className={styles.cardTextMuted} size={18} />
+                <Database size={18} className={styles.cardTextMuted} />
                 <div>
                   <div className={`text-xs font-semibold ${styles.cardText}`}>{t('ow.object.map_bound_dataset')}</div>
                   <div className={`text-[10px] ${styles.cardTextMuted} font-mono mt-0.5`}>{selectedDataset?.path}</div>
@@ -560,7 +575,7 @@ export default function ObjectTypeView({
                   onClick={handleAutoMap}
                   className={`bg-[var(--card,#94A3B8)] hover:bg-[var(--card,#64748B)] ${styles.cardText} text-xs px-3 py-1.5 rounded font-medium transition-colors flex items-center gap-1`}
                 >
-                  <LucideIcon name="Wand2" size={13} />
+                  <Wand2 size={13} />
                   {t('ow.object.map_auto')}
                 </button>
               </div>
@@ -572,7 +587,7 @@ export default function ObjectTypeView({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1`}>
-                    <LucideIcon name="Table" size={14} />
+                    <Table size={14} />
                     {t('ow.object.map_schema')}
                   </div>
                   <span className={`text-[10px] ${styles.sidebarBg} ${styles.cardTextMuted} px-1.5 py-0.5 rounded font-mono`}>
@@ -595,7 +610,7 @@ export default function ObjectTypeView({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className={`text-xs font-semibold ${styles.cardText} flex items-center gap-1`}>
-                    <LucideIcon name="Layers" size={14} />
+                    <Layers size={14} />
                     {t('ow.object.map_props')}
                   </div>
                   <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono">
@@ -609,7 +624,7 @@ export default function ObjectTypeView({
                       <div key={prop.id} className={`flex justify-between items-center px-4 py-2.5 ${styles.cardBg} hover:bg-blue-50/20`}>
                         <div className="flex items-center gap-2">
                           <span className={objectType.primaryKey === prop.id ? 'text-amber-500' : styles.cardTextMuted}>
-                            <LucideIcon name={objectType.primaryKey === prop.id ? 'Key' : 'CircleDot'} size={12} />
+                            {objectType.primaryKey === prop.id ? <Key size={12} /> : <CircleDot size={12} />}
                           </span>
                           <div>
                             <div className={`text-xs font-medium ${styles.text}`}>{prop.displayName}</div>
@@ -667,7 +682,7 @@ export default function ObjectTypeView({
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span className={`p-1 rounded-md ${styles.sidebarBg} ${styles.cardTextMuted} group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors`}>
-                            <LucideIcon name="GitMerge" size={14} />
+                            <GitMerge size={14} />
                           </span>
                           <div className={`font-semibold text-xs ${styles.cardText} group-hover:text-blue-600`}>
                             {link.displayName}
@@ -689,7 +704,7 @@ export default function ObjectTypeView({
                       </div>
                       <div className="flex items-center gap-1 text-[10px] text-blue-500 group-hover:translate-x-0.5 transition-transform">
                         <span>{t('ow.object.jump_config')}</span>
-                        <LucideIcon name="ChevronRight" size={12} />
+                        <ChevronRight size={12} />
                       </div>
                     </div>
                   );
@@ -720,7 +735,7 @@ export default function ObjectTypeView({
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <span className="p-1.5 rounded-full bg-amber-50 text-amber-600 group-hover:bg-amber-100 transition-colors">
-                          <LucideIcon name="Zap" size={13} className="fill-amber-500" />
+                          <Zap size={13} className="fill-amber-500" />
                         </span>
                         <div className={`font-semibold text-xs ${styles.cardText} group-hover:text-blue-600`}>
                           {action.displayName}
@@ -735,7 +750,7 @@ export default function ObjectTypeView({
                     </div>
                     <div className="flex items-center gap-1 text-[10px] text-blue-500 group-hover:translate-x-0.5 transition-transform">
                       <span>{t('ow.object.jump_config')}</span>
-                      <LucideIcon name="ChevronRight" size={12} />
+                      <ChevronRight size={12} />
                     </div>
                   </div>
                 ))}

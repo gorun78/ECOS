@@ -8,7 +8,14 @@
 
 import React from 'react';
 import { ObjectType } from '../../types/ontology';
-import LucideIcon from './LucideIcon';
+import {
+  BarChart3,
+  Bookmark,
+  Filter,
+  Plus,
+  Table2
+} from 'lucide-react';
+import { Icon } from '../../components/LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import { FilterQuery } from './businessObjectExplorerTypes';
@@ -57,7 +64,7 @@ export function ExplorerHeader({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <span className={`p-1.5 rounded-lg border ${activeObjectType.color}`}>
-            <LucideIcon name={activeObjectType.icon} size={15} />
+            <Icon name={activeObjectType.icon} size={15} />
           </span>
           <div>
             <h2 className={`text-sm font-bold ${styles.text} flex items-center gap-1.5`}>
@@ -77,7 +84,7 @@ export function ExplorerHeader({
               activeTab === 'table' ? `${styles.cardBg} ${styles.text} shadow-3xs` : `${styles.cardTextMuted} hover:${styles.text}`
             }`}
           >
-            <LucideIcon name="Table2" size={13} />
+            <Table2 size={13} />
             {t('ow.boeh.tabTable')}
           </button>
           <button
@@ -87,7 +94,7 @@ export function ExplorerHeader({
               activeTab === 'analytics' ? `${styles.cardBg} ${styles.text} shadow-3xs` : `${styles.cardTextMuted} hover:${styles.text}`
             }`}
           >
-            <LucideIcon name="BarChart3" size={13} />
+            <BarChart3 size={13} />
             {t('ow.boeh.tabAnalytics')}
           </button>
         </div>
@@ -96,7 +103,7 @@ export function ExplorerHeader({
       {/* Quick Filter & Save Search Toolbar */}
       <div className={`flex flex-wrap items-center gap-3 ${styles.appBg} p-2.5 rounded-lg border ${styles.divider}`}>
         <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${styles.cardTextMuted} shrink-0`}>
-          <LucideIcon name="Filter" size={13} />
+          <Filter size={13} />
           {t('ow.boeh.filterLabel')}:
         </div>
 
@@ -139,7 +146,7 @@ export function ExplorerHeader({
             onClick={() => onToggleFilterCreator(!showFilterCreator)}
             className={`${styles.cardBg} border ${styles.inputBorder} ${styles.inputText} hover:bg-blue-50/20 text-[10px] font-semibold py-1 px-2 rounded-md flex items-center gap-1 transition-colors`}
           >
-            <LucideIcon name="Plus" size={11} />
+            <Plus size={11} />
             {t('ow.boeh.addFilter')}
           </button>
 
@@ -219,7 +226,7 @@ export function ExplorerHeader({
               onClick={onOpenSaveModal}
               className="bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 text-[10px] font-semibold py-1 px-2.5 rounded-md flex items-center gap-1 transition-colors"
             >
-              <LucideIcon name="Bookmark" size={11} />
+              <Bookmark size={11} />
               {t('ow.boeh.saveList')}
             </button>
           )}

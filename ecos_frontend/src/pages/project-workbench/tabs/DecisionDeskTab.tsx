@@ -15,7 +15,14 @@
  * ⑥ catch 吞错 → 渲染错误态 + 重试。</p>
  */
 import React, { useState } from 'react';
-import LucideIcon from '../../../components/LucideIcon';
+import {
+  AlertTriangle,
+  Archive,
+  Check,
+  Inbox,
+  RefreshCw,
+  User
+} from 'lucide-react';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
@@ -90,7 +97,7 @@ export default function DecisionDeskTab({
             disabled={isLoadingProposals}
             className={`shrink-0 px-3 py-1.5 border ${styles.cardBorder} ${styles.cardText} text-xs font-bold rounded flex items-center gap-1 transition-all cursor-pointer hover:opacity-80 disabled:opacity-50`}
           >
-            <LucideIcon name="RefreshCw" size={11} className={isLoadingProposals ? 'animate-spin' : ''} />
+            <RefreshCw size={11} className={isLoadingProposals ? 'animate-spin' : ''} />
             {t('scenario.decision.refresh')}
           </button>
         </div>
@@ -98,7 +105,7 @@ export default function DecisionDeskTab({
         {/* 错误态（catch 吞错 → 渲染错误 + 重试，绝不伪装「暂无提案」） */}
         {proposalsError && (
           <div className={`p-6 text-center space-y-2`}>
-            <LucideIcon name="AlertTriangle" size={28} className={`mx-auto ${styles.dangerText} opacity-70`} />
+            <AlertTriangle size={28} className={`mx-auto ${styles.dangerText}`} />
             <p className={`text-xs ${styles.dangerText}`}>{t('scenario.decision.loadError')}</p>
             <p className={`text-[10px] ${styles.cardTextMuted} font-mono break-all`}>{proposalsError}</p>
             <button
@@ -106,7 +113,7 @@ export default function DecisionDeskTab({
               disabled={isLoadingProposals}
               className={`mt-1 px-3 py-1.5 border ${styles.cardBorder} ${styles.cardText} text-xs font-bold rounded flex items-center gap-1 mx-auto transition-all cursor-pointer hover:opacity-80 disabled:opacity-50`}
             >
-              <LucideIcon name="RefreshCw" size={11} className={isLoadingProposals ? 'animate-spin' : ''} />
+              <RefreshCw size={11} className={isLoadingProposals ? 'animate-spin' : ''} />
               {t('scenario.decision.retry')}
             </button>
           </div>
@@ -120,7 +127,7 @@ export default function DecisionDeskTab({
         {/* 空态 */}
         {!proposalsError && !isLoadingProposals && rows.length === 0 && (
           <div className={`p-8 text-center ${styles.cardTextMuted} space-y-2`}>
-            <LucideIcon name="Inbox" size={32} className={`mx-auto opacity-40`} />
+            <Inbox size={32} className={`mx-auto opacity-40`} />
             <p className="text-xs">{t('scenario.decision.empty')}</p>
           </div>
         )}
@@ -150,7 +157,7 @@ export default function DecisionDeskTab({
                     </details>
                     <div className={`flex items-center gap-4 text-[10px] ${styles.cardTextMuted} font-mono`}>
                       <span className="flex items-center gap-1">
-                        <LucideIcon name="User" size={10} />
+                        <User size={10} />
                         {t('scenario.decision.source')}: {prop.proposedBy || t('scenario.decision.sourceAgent')}
                       </span>
                       {prop.rejectReason && (
@@ -175,15 +182,15 @@ export default function DecisionDeskTab({
                           className={`px-3 py-1.5 ${styles.accentBg} border ${styles.accentBorder} ${styles.cardText} text-xs font-bold rounded flex items-center gap-1 cursor-pointer transition-all disabled:opacity-50`}
                         >
                           {resolvingProposalId === prop.id ? (
-                            <><LucideIcon name="RefreshCw" size={11} className="animate-spin" />{t('scenario.decision.writing')}</>
+                            <><RefreshCw size={11} className="animate-spin" />{t('scenario.decision.writing')}</>
                           ) : (
-                            <><LucideIcon name="Check" size={12} />{t('scenario.decision.approve')}</>
+                            <><Check size={12} />{t('scenario.decision.approve')}</>
                           )}
                         </button>
                       </>
                     ) : (
                       <span className={`text-[11px] ${styles.cardTextMuted} font-bold flex items-center gap-1`}>
-                        <LucideIcon name="Archive" size={12} />
+                        <Archive size={12} />
                         {t('scenario.decision.archived')}
                       </span>
                     )}

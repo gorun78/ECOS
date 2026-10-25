@@ -1,6 +1,8 @@
 /* Extracted from ConnectionsTab.tsx */
 import React from 'react';
-import LucideIcon from '../../LucideIcon';
+import {
+  Settings
+} from 'lucide-react';
 import type { DataConnection } from '../../types';
 import { useTheme } from "../../../../components/ThemeContext";
 
@@ -17,7 +19,7 @@ export default function ConnectionParamsCard({ conn, t }: ConnectionParamsCardPr
           <div className={`${styles.appBg} border ${styles.cardBorder} rounded-xl p-4`}>
             <div className="flex flex-wrap items-end gap-6">
               <div className="flex items-center gap-2 mr-6">
-                <LucideIcon name="Settings" size={12} className={`${styles.cardTextMuted}`} />
+                <Settings size={12} className={`${styles.cardTextMuted}`} />
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${styles.cardTextMuted}`}>{t("dw.connConfigParams")}</span>
               </div>
               {conn.config.host && (

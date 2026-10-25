@@ -11,7 +11,12 @@
  * 取得后注入本壳，本壳不另开第二条取数通道（blueprintPaths.singleSource 守卫口径）。
  */
 import React, { useEffect, useState } from 'react';
-import LucideIcon from '../../../../components/LucideIcon';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Route
+} from 'lucide-react';
+import { Icon } from '../../../../components/LucideIcon';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useLanguage } from '../../../../components/LanguageContext';
 import { parseBlueprintStatus, statusTone } from '../../../../services/scenarioBlueprintClient';
@@ -73,7 +78,7 @@ export default function WizardShell({ steps, status }: Props) {
   return (
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3 space-y-3`}>
       <div className="flex items-center gap-2 flex-wrap">
-        <LucideIcon name="Route" size={14} className={styles.accentText} />
+        <Route size={14} className={styles.accentText} />
         <h3 className={`text-xs font-bold uppercase ${styles.cardTextMuted}`}>{t('workspace.wiz.title')}</h3>
         <span className={`ml-auto text-[10px] font-mono ${styles.cardTextMuted}`}>
           {t('workspace.wiz.progress', { cur: cur + 1, total: steps.length })}
@@ -99,7 +104,7 @@ export default function WizardShell({ steps, status }: Props) {
                 onClick={() => pick(i)}
                 className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded border cursor-pointer transition-colors ${cls}`}
               >
-                <LucideIcon name={s.icon} size={11} />
+                <Icon name={s.icon} size={11} />
                 {t(`workspace.wiz.step.${s.key}`)}
               </button>
               {i < steps.length - 1 && <span className={`w-2 h-px ${styles.cardTextMuted} bg-current opacity-40`} aria-hidden />}
@@ -118,7 +123,7 @@ export default function WizardShell({ steps, status }: Props) {
           disabled={cur === 0}
           className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded border cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${styles.cardBg} ${styles.cardTextMuted} ${styles.cardBorder}`}
         >
-          <LucideIcon name="ChevronLeft" size={12} />
+          <ChevronLeft size={12} />
           {t('workspace.wiz.prev')}
         </button>
         <span className={`text-[10px] ${styles.cardTextMuted} max-w-md`}>{t('workspace.wiz.note')}</span>
@@ -129,7 +134,7 @@ export default function WizardShell({ steps, status }: Props) {
           className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded border cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${styles.accentBg} ${styles.cardText} ${styles.accentBorder}`}
         >
           {t('workspace.wiz.next')}
-          <LucideIcon name="ChevronRight" size={12} />
+          <ChevronRight size={12} />
         </button>
       </div>
     </div>

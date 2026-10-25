@@ -9,7 +9,12 @@
  * @license Apache-2.0
  */
 import React from 'react';
-import LucideIcon from '../../components/LucideIcon';
+import {
+  AlertTriangle,
+  BrainCircuit,
+  Loader,
+  XCircle
+} from 'lucide-react';
 import type { ThemeStyles } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import { useCognition } from '../../hooks/useCognition';
@@ -39,7 +44,7 @@ export default function SimulationResultPanel({ scenarioId, styles }: Simulation
     <div className="space-y-4">
       <div className={`p-3 ${styles.cardBg} border ${styles.cardBorder} rounded-lg`}>
         <div className="flex items-center gap-2">
-          <LucideIcon name="BrainCircuit" size={14} className={styles.accentText} />
+          <BrainCircuit size={14} className={styles.accentText} />
           <span className={`text-xs font-bold ${styles.cardText}`}>{t('scenario.cognition.detect')}</span>
         </div>
         <p className={`text-[11px] ${styles.cardTextMuted} mt-1`}>{t('scenario.cog.desc')}</p>
@@ -48,7 +53,7 @@ export default function SimulationResultPanel({ scenarioId, styles }: Simulation
       {/* 加载态 */}
       {detect.loading && (
         <div className={`p-6 ${styles.cardBg} border ${styles.cardBorder} rounded-lg flex items-center justify-center gap-2 text-xs ${styles.cardTextMuted}`}>
-          <LucideIcon name="Loader" size={14} className="animate-spin" />
+          <Loader size={14} className="animate-spin" />
           {t(stateLabelKey(detect) ?? 'scenario.cognition.loading')}
         </div>
       )}
@@ -57,7 +62,7 @@ export default function SimulationResultPanel({ scenarioId, styles }: Simulation
       {!detect.loading && detect.unavailable && (
         <div className={`p-4 ${styles.cardBg} border ${styles.warningBorder ?? styles.cardBorder} ${styles.warningBg ?? styles.cardBg} rounded-lg flex items-start justify-between gap-3`}>
           <div className="flex items-start gap-2">
-            <LucideIcon name="AlertTriangle" size={16} className={styles.warningText} />
+            <AlertTriangle size={16} className={styles.warningText} />
             <div>
               <p className={`text-xs font-bold ${styles.warningText}`}>{t('scenario.cognition.notEnabled')}</p>
               {detect.traceId && (
@@ -79,7 +84,7 @@ export default function SimulationResultPanel({ scenarioId, styles }: Simulation
       {/* 普通错误态（400/404/403）：诚实文案，不白屏 */}
       {!detect.loading && !detect.unavailable && detect.error && (
         <div className={`p-4 ${styles.cardBg} border ${styles.cardBorder} rounded-lg flex items-start gap-2`}>
-          <LucideIcon name="XCircle" size={16} className={styles.dangerText} />
+          <XCircle size={16} className={styles.dangerText} />
           <div>
             <p className={`text-xs font-bold ${styles.dangerText}`}>{t('scenario.cognition.error')}</p>
             <p className={`text-[11px] ${styles.cardTextMuted} mt-0.5`}>{detect.error}</p>
@@ -90,7 +95,7 @@ export default function SimulationResultPanel({ scenarioId, styles }: Simulation
       {/* 空态 */}
       {!detect.loading && !detect.unavailable && !detect.error && minds.length === 0 && (
         <div className={`p-8 ${styles.cardBg} border ${styles.cardBorder} rounded-lg text-center`}>
-          <LucideIcon name="BrainCircuit" size={24} className={`mx-auto mb-2 ${styles.cardTextMuted}`} />
+          <BrainCircuit size={24} className={`mx-auto mb-2 ${styles.cardTextMuted}`} />
           <p className={`text-xs ${styles.cardTextMuted}`}>{t('scenario.cognition.empty')}</p>
         </div>
       )}

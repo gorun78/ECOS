@@ -6,7 +6,11 @@
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
-import LucideIcon from '../../components/LucideIcon';
+import {
+  Briefcase,
+  Compass,
+  LayoutDashboard
+} from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -24,7 +28,7 @@ export default function NotFoundWorkbench() {
         }`}
       >
         <div className={`mx-auto mb-4 h-14 w-14 rounded-full flex items-center justify-center ${styles.accentBg} ${styles.accentText}`}>
-          <LucideIcon name="Compass" size={28} />
+          <Compass size={28} />
         </div>
         <p className={`text-[11px] font-mono ${styles.cardTextMuted} mb-1`}>{t('workspace.404.status')}</p>
         <h1 className={`text-xl font-extrabold ${styles.cardText}`}>{t('workspace.404.title')}</h1>
@@ -35,14 +39,14 @@ export default function NotFoundWorkbench() {
             to="/workbench"
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded border text-xs font-bold cursor-pointer ${styles.accentBg} ${styles.accentBorder} ${styles.cardText}`}
           >
-            <LucideIcon name="LayoutDashboard" size={13} />
+            <LayoutDashboard size={13} />
             {t('workspace.404.go_home')}
           </Link>
           <Link
             to="/project_workbench"
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded border text-xs font-bold cursor-pointer ${styles.cardBg} ${styles.inputBorder} ${styles.inputText}`}
           >
-            <LucideIcon name="Briefcase" size={13} />
+            <Briefcase size={13} />
             {t('workspace.404.go_scenario')}
           </Link>
         </div>

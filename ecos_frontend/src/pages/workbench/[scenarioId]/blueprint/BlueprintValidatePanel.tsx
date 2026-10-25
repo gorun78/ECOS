@@ -6,7 +6,11 @@
  * 无任何本地判定：通过与否、明细行全部来自后端。禁伪造 passed=true。</p>
  */
 import React from 'react';
-import LucideIcon from '../../../../components/LucideIcon';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ShieldCheck
+} from 'lucide-react';
 import { useTheme } from '../../../../components/ThemeContext';
 import { useLanguage } from '../../../../components/LanguageContext';
 import type { BlueprintValidateResult } from '../../../../services/scenarioBlueprintClient';
@@ -34,7 +38,7 @@ export default function BlueprintValidatePanel({ result, loading, error, onRun, 
     <div className={`${styles.cardBg} border ${styles.cardBorder} rounded-lg p-3`}>
       <div className="flex items-center justify-between gap-2 mb-2">
         <h3 className={`text-xs font-bold uppercase ${styles.cardTextMuted} flex items-center gap-1.5`}>
-          <LucideIcon name="ShieldCheck" size={13} />
+          <ShieldCheck size={13} />
           {t('workspace.bp.validate')}
         </h3>
         <button
@@ -61,7 +65,7 @@ export default function BlueprintValidatePanel({ result, loading, error, onRun, 
               : `${styles.warningBg} ${styles.warningText} ${styles.warningBorder}`
           }`}
         >
-          <LucideIcon name={result.passed ? 'CheckCircle2' : 'AlertTriangle'} size={12} />
+          {result.passed ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
           {result.passed ? t('workspace.bp.validate_passed') : t('workspace.bp.validate_failed', { n: result.reasons.length })}
         </div>
       )}

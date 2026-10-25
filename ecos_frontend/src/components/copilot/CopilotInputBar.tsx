@@ -6,7 +6,9 @@
  */
 
 import React from 'react';
-import LucideIcon from '../LucideIcon';
+import {
+  Send
+} from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useTheme } from '../ThemeContext';
 
@@ -40,7 +42,7 @@ export default function CopilotInputBar({ value, onChange, onSubmit, disabled }:
         aria-label={t('copilot.chat.runAgent')}
         className="h-9 w-9 bg-indigo-600 text-white rounded-lg flex items-center justify-center hover:bg-indigo-700 active:bg-indigo-800 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <LucideIcon name="Send" size={13} />
+        <Send size={13} />
       </button>
     </form>
   );

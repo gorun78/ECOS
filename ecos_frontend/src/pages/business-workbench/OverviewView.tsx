@@ -6,7 +6,10 @@
 import React, { useState } from 'react';
 import { ObjectType, LinkType, ActionType, InterfaceType, SharedProperty, Dataset, OntologyDomain } from '../../types/ontology';
 import OntologyGraph from './OntologyGraph';
-import LucideIcon from './LucideIcon';
+import {
+  ShieldCheck,
+  Workflow
+} from 'lucide-react';
 import { useTheme } from '../../components/ThemeContext';
 import { useLanguage } from '../../components/LanguageContext';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -116,7 +119,7 @@ export default function OverviewView({
       <div className={`${styles.cardBg} border ${styles.appBorder} rounded-xl p-5 shadow-xs flex items-center justify-between`}>
         <div className="space-y-1 flex-1">
           <h2 className={`text-sm font-semibold ${styles.cardText} flex items-center gap-1.5`}>
-            <LucideIcon name="Workflow" className="text-blue-600" size={16} />
+            <Workflow size={16} className="text-blue-600" />
             航空资产与运行智能本体 (Aviation Core Ontology)
           </h2>
           <p className={`text-xs ${styles.cardTextMuted} max-w-3xl leading-relaxed`}>
@@ -125,7 +128,7 @@ export default function OverviewView({
           </p>
         </div>
         <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-medium shrink-0">
-          <LucideIcon name="ShieldCheck" size={13} />
+          <ShieldCheck size={13} />
           <span>域分级已就绪 · 共 {domains.length} 个业务域</span>
         </div>
       </div>

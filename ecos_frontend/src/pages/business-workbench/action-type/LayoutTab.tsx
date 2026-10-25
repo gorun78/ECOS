@@ -5,7 +5,10 @@
 
 import React from 'react';
 import { ActionType } from '../../../types/ontology';
-import LucideIcon from '../LucideIcon';
+import {
+  Layers,
+  Trash
+} from 'lucide-react';
 import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 
@@ -156,12 +159,12 @@ export default function LayoutTab({
                       className={`absolute top-4 right-4 ${styles.cardTextMuted} opacity-70 hover:opacity-100 hover:text-red-500 transition-colors`}
                       title={t('ow.act.layout.removeSectionTitle')}
                     >
-                      <LucideIcon name="Trash" size={13} />
+                      <Trash size={13} />
                     </button>
                   )}
 
                   <div className={`flex items-center gap-2 border-b ${styles.divider} pb-2`}>
-                    <LucideIcon name="Layers" size={13} className="text-blue-500" />
+                    <Layers size={13} className="text-blue-500" />
                     <span className={`text-xs font-semibold ${styles.cardText}`}>{section.title}</span>
                     <span className={`text-[10px] ${styles.cardTextMuted}`}>({section.parameterIds.length} {t('ow.act.layout.fieldUnit')})</span>
                   </div>
