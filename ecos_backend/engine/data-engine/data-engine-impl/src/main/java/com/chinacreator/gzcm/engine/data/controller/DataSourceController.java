@@ -7,11 +7,14 @@ import com.chinacreator.gzcm.common.data.dto.DataSourceDTO;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.data.service.DataSourceRegistryService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
+import com.chinacreator.gzcm.runtime.access.connector.DataSourceTypeVocabulary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -112,6 +115,73 @@ public class DataSourceController {
             return failure(ApiResponse.error(500,
                     DataDomainErrorCode.ECOS_DATA_031, "数据源结构预览失败: " + e.getMessage()));
         }
+    }
+
+    /**
+     * #142/B4-3e-64（差距 <b>D-B4-78 前端侧腿</b>，并为 <b>D-B4-93</b> 的显示面收敛提供属主目录）：
+     * 数据源类型目录的<b>承流出口</b>。
+     *
+     * <p><b>为什么必须在承流面新增而不是让前端去读别名面</b>：本目录此前只存在于
+     * {@code PMO45DataSourceController}（{@code /api/v1/datasource/supported-types}，
+     * F02-01 已判定为<b>兼容别名</b>、约定 ≥2 迭代后删除）。前端若绑别名面，等于把
+     * 一枚「将被删除的出口」写成新的依赖面；本类是 {@code /api/v1/datanet/datasource}
+     * 唯一承流面（{@code DatasourceSingleSurfaceArchTest} 守护），故在此补一枚同口径出口，
+     * 别名面保持原样不动（API 只增不改）。</p>
+     *
+     * <p><b>键面契约（前端唯一解析依据）</b>：数组元素恰两键
+     * {@code canonical}（{@link String}，词表规范名）＋ {@code aliases}
+     * （{@link java.util.List}，同物异名，可为空列表）。数据单源 =
+     * {@link DataSourceTypeVocabulary}，取 {@code registrable()} 为真的成员、按枚举声明序输出，
+     * <b>与服务准入面 {@code DataSourceServiceImpl.SUPPORTED_TYPES} 同一来源</b>——
+     * 本端点不写第二份类型表，前端切到本通道后「下拉可选」与「后端能登」恒等。</p>
+     *
+     * <p>纯内存枚举遍历，不含 I/O，故<b>没有通道失败腿</b>（不会出现 503／超时）；
+     * 但<b>有数据缺陷腿</b>：{@code registrable} 成员缺规范名或缺别名表时 {@link #typeCatalogRow}
+     * 显式抛出，不折叠成「少一枚」。成功腿走 {@link #ok(ApiResponse)} 显式 200，与本域
+     * 「失败必须有状态行」的口径成对。前端读取侧的分态（不可用／无权限／空目录）
+     * 见 {@code ecos_frontend/src/pages/data-workbench/api/datasource.ts}。</p>
+     */
+    @GetMapping("/supported-types")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> supportedTypes() {
+        return ok(ApiResponse.success(registrableTypeCatalog()));
+    }
+
+    /**
+     * 目录构造（包内可见供单测直接调用）：逐枚取词表 {@code registrable} 成员的
+     * 规范名与别名表，按枚举声明序输出。
+     */
+    static List<Map<String, Object>> registrableTypeCatalog() {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (DataSourceTypeVocabulary v : DataSourceTypeVocabulary.values()) {
+            if (!v.registrable()) {
+                continue;
+            }
+            out.add(typeCatalogRow(v.name(), v.canonical(), v.aliases()));
+        }
+        return out;
+    }
+
+    /**
+     * 目录单行构造（包内可见供夹具直调）：{@code registrable} 成员 → 恰两键
+     * {@code {canonical, aliases}}。
+     *
+     * <p><b>非法入参一律抛，不静默跳过、不补默认值</b>：词表被改成「可登记却无规范名／
+     * 无别名表」属数据缺陷，若在此折叠过去，用户面读数就是「前端下拉少一枚而日志无痕」——
+     * 与 D-B4-78 的原始病灶（两面各自演化、无人报错）同型。抛出的消息带枚名，便于定位。</p>
+     */
+    static Map<String, Object> typeCatalogRow(String enumName, String canonical, List<String> aliases) {
+        if (canonical == null || canonical.isBlank()) {
+            throw new IllegalStateException("词表成员 " + enumName
+                    + " registrable=true 但规范名为空——数据源类型目录无法构造（禁静默跳过）");
+        }
+        if (aliases == null) {
+            throw new IllegalStateException("词表成员 " + enumName
+                    + " 的别名表为 null——契约要求数组（可为空数组），禁落 null 给前端（缺省即空面的语义由属主显式给出）");
+        }
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("canonical", canonical);
+        item.put("aliases", aliases);
+        return item;
     }
 
     /**

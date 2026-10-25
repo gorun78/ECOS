@@ -479,3 +479,90 @@ export async function fetchSchemaPreview(payload: SchemaPreviewPayload): Promise
     return classifySchemaPreviewError(e);
   }
 }
+
+// ────────────────────────────────────────────────────────────
+// #142/B4-3e-64（差距 D-B4-78 前端侧腿 ＋ D-B4-93 前置）：数据源类型目录属主通道
+//
+// <p>改前「可新建哪些数据源」这件事在前端只有一处事实源——`types.ts` 的
+// `CONNECTION_TYPES` 硬编码 19 枚，后端承流面（`DataSourceTypeVocabulary.registrable()`
+// ＝服务准入面 `SUPPORTED_TYPES`）只有 10 枚，两处零对账。后果即 D-B4-78 的用户面：
+// 下拉里能选 `doris/s3/oss/csv/sftp/kafka/mongodb/sap/rest_api` 这 9 枚后端不承流的类型，
+// 提交只能撞 400。后端属主出口 `supported-types` 早已存在（且只存在于 F02-01 判定的
+// <b>兼容别名面</b> `/api/v1/datasource`，前端零消费）。本批：承流面补同口径出口
+// （`DataSourceController#supportedTypes`），前端改消费承流面 ⇒ 下拉与准入恒等。</p>
+//
+// <p>**分态口径（§4.7.2「不可用 ≠ 无权限 ≠ 空目录」）**：目录读取失败一律以判别联合上抛，
+// 页面按 `kind` 出文案并禁用类型选择与创建动作（fail-closed）。
+// <b>禁止回落本地 19 枚</b>——回落本地表正是本批收口的「第二事实源」形态。
+// 空数组同样判失败：承流面按枚举派生恒非空，读到空目录只能是解析/通道问题。</p>
+//
+// <p>错误分类单源复用 `classifySchemaPreviewError`（其语义是「状态行 → 语义类别」，
+// 与预览腿同一份判据；函数名带 preview 前缀属既有命名债，本批不改名以免波及
+// `schemaPreviewContract.spec.ts` 的冻结引用）。</p>
+// ────────────────────────────────────────────────────────────
+
+/** 属主目录的一条类型。键面契约 = `DataSourceController#supportedTypes`（恰两键） */
+export interface DataSourceTypeCatalogEntry {
+  canonical: string;
+  aliases: string[];
+}
+
+/** 目录读取成功面 */
+export interface SupportedTypesSuccess {
+  ok: true;
+  entries: DataSourceTypeCatalogEntry[];
+}
+
+/** 目录读取失败面：`kind` 由后端状态行经单源判据推出，未列举状态不猜语义落 `unknown` */
+export interface SupportedTypesFailure {
+  ok: false;
+  kind: SchemaPreviewFailureKind;
+  error: string;
+  status?: number;
+}
+
+/** 出参判别联合（两侧各带独有键 `entries`／`kind`，消费方用 `in` 缩窄——同 `SchemaPreviewOutcome` 口径） */
+export type SupportedTypesOutcome = SupportedTypesSuccess | SupportedTypesFailure;
+
+/** 解析结果面：`ok:false` 只带开发者可读的违约原因，绝不带半截目录 */
+export type SupportedTypesParseResult =
+  | { ok: true; entries: DataSourceTypeCatalogEntry[] }
+  | { ok: false; reason: string };
+
+/**
+ * 两键契约解析。任一元素形状违约（非对象／`canonical` 非非空字符串／`aliases` 非字符串数组）
+ * 或目录为空 ⇒ 整单判失败。把违约应答折成「少一枚」或「空目录」＝ 让用户面对一个
+ * 悄悄缺项的下拉面，与本批要防的假成功同型。
+ */
+export function parseSupportedTypesResponse(raw: unknown): SupportedTypesParseResult {
+  const fail = (reason: string): SupportedTypesParseResult => ({ ok: false, reason });
+  if (!Array.isArray(raw)) return fail('payload is not an array');
+  if (raw.length === 0) return fail('catalog is empty (承流面按枚举派生恒非空，空目录＝通道或解析故障)');
+  const entries: DataSourceTypeCatalogEntry[] = [];
+  for (const item of raw as unknown[]) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return fail('item is not an object');
+    const r = item as Record<string, unknown>;
+    if (typeof r.canonical !== 'string' || r.canonical.trim() === '') {
+      return fail('key "canonical" is not a non-blank string');
+    }
+    if (!Array.isArray(r.aliases)) return fail('key "aliases" is not an array');
+    if (r.aliases.some((v) => typeof v !== 'string')) return fail('aliases has a non-string item');
+    entries.push({ canonical: r.canonical, aliases: r.aliases as string[] });
+  }
+  return { ok: true, entries };
+}
+
+/**
+ * 属主通道：`GET` 类型目录（族根取 `api/dataClient` 的属主常量，与预览腿同一族根）。
+ * 一律以判别联合返回、不抛错；失败不回落本地 `CONNECTION_TYPES`。
+ */
+export async function fetchSupportedDataSourceTypes(): Promise<SupportedTypesOutcome> {
+  try {
+    const raw = await get<unknown>(`${DATANET_DATASOURCE_BASE}/supported-types`);
+    const parsed = parseSupportedTypesResponse(raw);
+    if ('entries' in parsed) return { ok: true, entries: parsed.entries };
+    return { ok: false, kind: 'invalid_response', error: parsed.reason };
+  } catch (e) {
+    return classifySchemaPreviewError(e);
+  }
+}

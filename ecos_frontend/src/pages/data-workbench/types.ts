@@ -39,7 +39,13 @@ export interface TableInfo {
 export interface DataConnection {
   id: string;
   name: string;
-  type: ConnType;
+  /**
+   * #142/B4-3e-64（D-B4-93）：显示面取值含 `unknown`——后端类型名解析不到时
+   * 显示「未知类型」并保留 `typeRaw`，禁回落成 PostgreSQL 这枚具体类型。
+   */
+  type: DisplayConnType;
+  /** 后端 `datasourceType` 原文（`unknown` 时页面据此出「未知类型（原值 X）」） */
+  typeRaw?: string;
   status: 'connected' | 'disconnected' | 'error' | 'pending' | 'testing';
   config: {
     host: string;
@@ -105,7 +111,31 @@ export type ConnType =
   | 'mongodb'
   | 'fs';
 
-/** PMO-48-T5: 18 项连接类型(分类排序: 关系型→国产→对象存储→文件→消息→API) */
+/**
+ * #142/B4-3e-64（差距 <b>D-B4-93</b> 收口）—— 显示面取值。
+ *
+ * <p>改前 `mapDsType` 在 17 条 `includes` 分支之后<b>无条件 `return 'postgresql'`</b>：
+ * 词表外名、空串（后端 `datasourceType` 为 null 时前端传 `''`）一律显示成 PostgreSQL，
+ * 与同批收口的 `JdbcConnector`「无方言静默按 PG 拼 URL」同族（详设 §4.7.2
+ * 「无配置＝按别族猜」）。现改为：解析不到即 `'unknown'`，页面出「未知类型（原值 X）」
+ * 并保留后端原文，禁把「不知道」折成一个具体类型。</p>
+ *
+ * <p>{@link ConnType} 本身保持 19 枚不变——它是「前端可显示的类型名」面，受
+ * `DatasourceTypeVocabularySingleSourceTest` 与属主目录对账；`unknown`
+ * 不是类型，是「未解析」的读数，故不入 `CONNECTION_TYPES` 选项面。</p>
+ */
+export type DisplayConnType = ConnType | 'unknown';
+
+/**
+ * PMO-48-T5: 连接类型显示元数据面（分类排序: 关系型→国产→对象存储→文件→消息→API）。
+ *
+ * #142/B4-3e-64（D-B4-78 前端侧腿）：<b>本表不再是「可新建哪些数据源」的准入面。</b>
+ * 准入面唯一属主 = 后端承流出口 `GET /api/v1/datanet/datasource/supported-types`
+ * （数据单源 `DataSourceTypeVocabulary`）。下拉实际渲染的是
+ * `deriveSupportedOptions()` 用属主目录裁剪本表后的子集；此前 19 枚里有 9 枚
+ * （`doris/s3/oss/csv/sftp/kafka/mongodb/sap/rest_api`）后端不承流，用户选了只能撞 400
+ * ——本批起该 9 枚不再进入下拉（显示元数据保留，用于历史行的标签）。
+ */
 export const CONNECTION_TYPES: { value: ConnType; i18nKey: string; tier: 'relational' | 'domestic' | 'object-storage' | 'file' | 'message' | 'api' }[] = [
   // 关系型
   { value: 'postgresql', i18nKey: 'dw.connType.postgresql', tier: 'relational' },

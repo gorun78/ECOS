@@ -36,11 +36,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>判据全部读真实仓面文本（禁把 19 枚抄成第二份手抄表），枚数独立钉值 19：
  * 解析器失明（读到 0 枚）时「空被拒集＝绿」的假绿路径由 {@link #criterionGoesRedOnFixtures()} 的夹具堵住。</p>
  *
- * <p><b>本批未做（在册余项，见台账 v1.0.145）</b>：前端把 {@code CONNECTION_TYPES} 改为消费
- * {@code GET /api/v1/datasource/supported-types}（唯一属主出口已存在，前端零消费）；
- * {@code mapDsType} 词表外名回落 {@code postgresql} 的显示面 fail-open（新登记 D-B4-93）；
- * {@code doris} 是否准入、{@code s3}/{@code oss}/{@code sftp}/{@code kafka}/{@code sap}/{@code rest_api}/
- * {@code csv} 幻影选项的处置。</p>
+ * <p><b>同批已做（#142/B4-3e-64 追加的对账腿，见下）</b>：① 承流面补 {@code supported-types} 出口
+ * 并钉住它挂在 {@code /api/v1/datanet/datasource}（而非 F02-01 判定的兼容别名面）；② 前端弹窗改消费
+ * 该出口，显示元数据面 {@code CONNECTION_TYPES} 不再是可选面；③ 显示回落 {@code mapDsType} 末腿由
+ * {@code 'postgresql'} 改显式 {@code 'unknown'}（D-B4-93），且 {@code unknown} 不入选项面；
+ * ④ 反方向对账——准入面每一枚都必须在前端显示面有归属（{@code unresolvedCanonical} 恒空），
+ * 与正向「前端可选⇒后端承流」成对，堵住「后端扩一枚而前端下拉悄悄少一枚」。</p>
+ *
+ * <p><b>在册余项（台账 v1.0.146）</b>：{@code doris} 是否准入；被拒闭集 9 枚——{@code doris}/{@code s3}/
+ * {@code oss}/{@code csv}/{@code sftp}/{@code kafka}/{@code mongodb}/{@code sap}/{@code rest_api}——的逐枚定档
+ * （下线或接承流）：本批把它们从<b>可选面</b>裁掉，但 19 枚显示元数据面仍在（历史连接记录要出名字），下线须另批处置；
+ * {@code helpers.ts#getSourceTypeLabel} 的 5 枚局部显示面（只覆盖 postgresql/s3/rest_api/sftp/sap，
+ * 其余落 {@code dw.src.unknown}）与本批的 19 枚显示面口径不一致，同族待归一。</p>
  */
 class DatasourceTypeVocabularySingleSourceTest {
 
@@ -68,6 +75,17 @@ class DatasourceTypeVocabularySingleSourceTest {
             REPO_ROOT.resolve("ecos_frontend/src/pages/data-workbench/api/_base.ts");
     private static final Path MAPPERS_TS =
             REPO_ROOT.resolve("ecos_frontend/src/pages/data-workbench/api/mappers.ts");
+    /** #142/B4-3e-64：新增三条面——承流出口本体、目录消费方弹窗、前端通道文件。 */
+    private static final Path CARRIER_CONTROLLER =
+            REPO_ROOT.resolve("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/data/controller/DataSourceController.java");
+    private static final Path MODALS_TSX =
+            REPO_ROOT.resolve("ecos_frontend/src/pages/data-workbench/Modals.tsx");
+    private static final Path DATASOURCE_API_TS =
+            REPO_ROOT.resolve("ecos_frontend/src/pages/data-workbench/api/datasource.ts");
+    private static final Path PMO45_CONTROLLER =
+            REPO_ROOT.resolve("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/data/controller/PMO45DataSourceController.java");
 
     // ─── 正向面：前端 19 枚逐枚判定承流／被拒 ──────────────────────────
 
@@ -116,6 +134,93 @@ class DatasourceTypeVocabularySingleSourceTest {
         assertFalse(branches.isEmpty(), "mapDsType 分支未解析到（解析器失明）");
         List<String> problems = displayBranchProblems(DataSourceTypeVocabulary.registrableTypes(), branches);
         assertTrue(problems.isEmpty(), () -> "显示面对账：" + problems);
+    }
+
+    // ─── 承流出口面 ＋ 前端消费面（#142/B4-3e-64）───────────────────────
+
+    @Test
+    @DisplayName("承流面已导出 supported-types 出口，且未把新出口挂到兼容别名面")
+    void carrierFaceExposesCatalog() throws IOException {
+        String carrier = Files.readString(CARRIER_CONTROLLER, StandardCharsets.UTF_8);
+        assertTrue(carrier.contains("@GetMapping(\"/supported-types\")"),
+                "唯一承流面须自带类型目录出口——前端绑别名面等于新增一条「将被删除的依赖面」");
+        assertTrue(carrier.contains("\"/api/v1/datanet/datasource\""),
+                "出口须挂在 /api/v1/datanet/datasource 族根下");
+        String classMapping = carrier.substring(0, carrier.indexOf("public class DataSourceController"));
+        assertFalse(classMapping.contains("\"/api/v1/datasource\""),
+                "承流面的类级映射不得吞下别名面族根（两族由两个 Controller 分持，F02-01 口径）");
+        // 别名面自身保持原样（API 只增不改；本批不裁它，删除另批处置）
+        assertTrue(Files.readString(PMO45_CONTROLLER, StandardCharsets.UTF_8)
+                        .contains("@GetMapping(\"/supported-types\")"),
+                "别名面既有出口属存量面，本批只增不改；若被删则历史调用方无过渡期");
+    }
+
+    @Test
+    @DisplayName("前端弹窗消费属主目录而非本地显示面；通道走 dataClient 族根常量")
+    void frontendConsumesOwnerCatalog() throws IOException {
+        String modals = Files.readString(MODALS_TSX, StandardCharsets.UTF_8);
+        StringBuilder imports = new StringBuilder();
+        for (String line : modals.split("\n")) {
+            if (line.trim().startsWith("import")) {
+                imports.append(line).append('\n');
+            }
+        }
+        assertFalse(imports.toString().contains("CONNECTION_TYPES"),
+                "可选面一旦重新 import 显示元数据面＝本地第二事实源回潮（D-B4-78 病灶面）");
+        assertTrue(imports.toString().contains("fetchSupportedDataSourceTypes"), "须引属主通道");
+        assertTrue(imports.toString().contains("deriveSupportedOptions"), "下拉须由目录裁剪派生");
+
+        String api = Files.readString(DATASOURCE_API_TS, StandardCharsets.UTF_8);
+        assertTrue(api.contains("`${DATANET_DATASOURCE_BASE}/supported-types`"),
+                "URL 须由 api/dataClient 的族根常量派生（D-B4-79：禁域内私设第二形态基址）");
+        assertFalse(api.contains("/api/v1/datasource/supported-types"), "前端不得绑兼容别名面");
+    }
+
+    @Test
+    @DisplayName("反向归属对账：准入面 10 枚在前端显示面各有归属（属主目录的 unresolvedCanonical 恒空）")
+    void everyAcceptedTypeHasDisplayOwner() throws IOException {
+        List<String> frontend = parseConnectionTypes(Files.readString(TYPES_TS, StandardCharsets.UTF_8));
+        List<String> problems = displayOwnerProblems(frontend, API_ALIAS_FROZEN, realOwnerRequirements());
+        assertTrue(problems.isEmpty(), () -> "反向归属对账：" + problems);
+    }
+
+    @Test
+    @DisplayName("夹具：前端丢一枚显示归属（fs 下线／后端新增枚未接）⇒ 反向对账具名红")
+    void displayOwnerCriterionGoesRed() {
+        List<OwnerRequirement> real = realOwnerRequirements();
+        assertEquals(10, real.size(), "准入面枚数独立钉值 10（解析器失明＝空需求集会让本腿恒绿）");
+
+        List<String> withoutFs = new ArrayList<>(FRONTEND_TYPES_FROZEN);
+        withoutFs.remove("fs");
+        List<String> p1 = displayOwnerProblems(withoutFs, API_ALIAS_FROZEN, real);
+        assertEquals(1, p1.size(), () -> "FILESYSTEM 的唯一显示归属是 fs，下线须报 1 条具名红，实报 " + p1);
+        assertTrue(p1.get(0).contains("FILESYSTEM"), p1.toString());
+
+        List<String> p2 = displayOwnerProblems(FRONTEND_TYPES_FROZEN, API_ALIAS_FROZEN,
+                List.of(new OwnerRequirement("POSTGRESQL", Set.of("POSTGRESQL")),
+                        new OwnerRequirement("TimescaleNew", Set.of("TimescaleNew"))));
+        assertEquals(1, p2.size(), () -> "新增承流名无显示归属须报 1 条，实报 " + p2);
+        assertTrue(p2.get(0).contains("TimescaleNew"), p2.toString());
+    }
+
+    @Test
+    @DisplayName("D-B4-93 收口：mapDsType 末腿＝显式 unknown，且 unknown 不入 19 枚选项面")
+    void displayFallbackIsExplicitUnknown() throws IOException {
+        String body = displayBranchBlock(Files.readString(MAPPERS_TS, StandardCharsets.UTF_8));
+        String lastReturn = null;
+        for (String rawLine : body.split("\n")) {
+            String line = rawLine.trim();
+            if (line.startsWith("return")) {
+                lastReturn = line;
+            }
+        }
+        assertEquals("return 'unknown';", lastReturn,
+                "词表外名的显示回落必须是显式 unknown；回落具体类型＝按别族猜（详设 §4.7.2 禁项，D-B4-93）");
+
+        List<String> frontend = parseConnectionTypes(Files.readString(TYPES_TS, StandardCharsets.UTF_8));
+        assertFalse(frontend.contains("unknown"),
+                "unknown 是「未解析」的读数而不是类型；进选项面即让用户能选一枚必然 400 的值");
+        assertEquals(19, frontend.size(), "显示元数据面枚数仍由本门冻结为 19（前端切属主目录不改本面）");
     }
 
     // ─── 夹具：证明判据能变红 ───────────────────────────────────────────
@@ -215,8 +320,7 @@ class DatasourceTypeVocabularySingleSourceTest {
     }
 
     /** 显示面判据：每个规范名在 mapDsType 里必须落到一个前端合法类型名，且回环到同一规范名。 */
-    private static List<String> displayBranchProblems(Set<String> canonicalTypes, List<TokenBranch> branches) {
-        List<String> out = new ArrayList<>();
+    private static List<String> displayBranchProblems(Set<String> canonicalTypes, List<TokenBranch> branches) {        List<String> out = new ArrayList<>();
         for (String canonical : canonicalTypes) {
             String incoming = canonical.toLowerCase();
             String target = null;
@@ -238,6 +342,56 @@ class DatasourceTypeVocabularySingleSourceTest {
             }
         }
         return out;
+    }
+
+    /**
+     * 反向归属判据（#142/B4-3e-64）：准入面的每一枚，前端显示面里必须有人能叫出它的名字。
+     *
+     * <p>与正向 {@link #crossFaceProblems} 成对：正向管「前端列了后端不承流的名」（用户选了撞 400），
+     * 反向管「后端承流的名字前端解析不到」（下拉静默少一枚，属主目录把它报进
+     * {@code unresolvedCanonical}）。命中口径与前端 {@code DISPLAY_TYPE_BY_API_NAME} 逐字一致：
+     * 显示枚经 {@code toApiType} 大写后等于规范名<b>或</b>落在该枚的别名表里。</p>
+     */
+    private static List<String> displayOwnerProblems(
+            List<String> frontend, Map<String, String> aliases, List<OwnerRequirement> requirements) {
+        Set<String> displayNames = new LinkedHashSet<>();
+        for (String f : frontend) {
+            displayNames.add(toApiType(f, aliases).toUpperCase());
+        }
+        List<String> out = new ArrayList<>();
+        for (OwnerRequirement r : requirements) {
+            boolean hit = false;
+            for (String n : r.names()) {
+                if (displayNames.contains(n.toUpperCase())) {
+                    hit = true;
+                    break;
+                }
+            }
+            if (!hit) {
+                out.add(r.canonical() + " 在前端显示面无归属（可登记名 " + r.names()
+                        + " 无一命中）——前端下拉会缺这一枚，禁靠 unknown 兜过去");
+            }
+        }
+        return out;
+    }
+
+    /** 由词表实时构造反向归属需求（规范名 ∪ 别名表），禁手抄第二份名表。 */
+    private static List<OwnerRequirement> realOwnerRequirements() {
+        List<OwnerRequirement> out = new ArrayList<>();
+        for (DataSourceTypeVocabulary v : DataSourceTypeVocabulary.values()) {
+            if (!v.registrable()) {
+                continue;
+            }
+            Set<String> names = new LinkedHashSet<>();
+            names.add(v.canonical());
+            names.addAll(v.aliases());
+            out.add(new OwnerRequirement(v.canonical(), names));
+        }
+        return out;
+    }
+
+    /** 一条反向归属需求：规范名 ＋ 它在显示面上可被叫出的全部名字。 */
+    private record OwnerRequirement(String canonical, Set<String> names) {
     }
 
     // ─── 仓面解析 ───────────────────────────────────────────────────────
@@ -279,14 +433,19 @@ class DatasourceTypeVocabularySingleSourceTest {
         return out;
     }
 
-    /** 解析 {@code mapDsType} 的 {@code includes('token')}→{@code return 'target'} 分支（按出现序，逐行取）。 */
-    private static List<TokenBranch> parseDisplayBranches(String mappersTs) {
+    /** 定位 {@code mapDsType} 函数体（末腿判定与分支解析共用同一份定界，防两判据各读各的面）。 */
+    private static String displayBranchBlock(String mappersTs) {
         int start = mappersTs.indexOf("export function mapDsType");
         if (start < 0) {
             throw new IllegalStateException("mappers.ts 里找不到 mapDsType（前端显示通道改名＝本门失明）");
         }
         int end = mappersTs.indexOf("\n}", start);
-        String block = mappersTs.substring(start, end < 0 ? mappersTs.length() : end);
+        return mappersTs.substring(start, end < 0 ? mappersTs.length() : end);
+    }
+
+    /** 解析 {@code mapDsType} 的 {@code includes('token')}→{@code return 'target'} 分支（按出现序，逐行取）。 */
+    private static List<TokenBranch> parseDisplayBranches(String mappersTs) {
+        String block = displayBranchBlock(mappersTs);
         List<TokenBranch> out = new ArrayList<>();
         Pattern condPattern = Pattern.compile("if\\s*\\(\\s*(.*?)\\s*\\)\\s*return\\s+'([A-Za-z0-9_]+)'\\s*;");
         for (String rawLine : block.split("\n")) {

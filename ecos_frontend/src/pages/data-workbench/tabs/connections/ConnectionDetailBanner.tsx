@@ -1,7 +1,7 @@
 /* Extracted from ConnectionsTab.tsx */
 import React from 'react';
 import LucideIcon from '../../LucideIcon';
-import { getSourceIcon, getSourceTypeLabel } from '../../helpers';
+import { getSourceIcon, getSourceTypeLabel, connTypeBadgeText } from '../../helpers';
 import type { DataConnection } from '../../types';
 import { useTheme } from "../../../../components/ThemeContext";
 
@@ -27,8 +27,10 @@ export default function ConnectionDetailBanner({
             <div>
               <div className="flex items-center gap-2">
                 <span className={`text-sm font-bold ${styles.cardText}`}>{conn.name}</span>
-                <span className={`text-[10px] ${styles.sidebarBg} ${styles.cardTextMuted} font-mono px-2 py-0.5 rounded-full uppercase`}>
-                  {conn.type}
+                {/* #142/B4-3e-64（D-B4-93）：徽章改走 i18n 单源文案；未解析显式出「未知类型 (原值 X)」。
+                    原 `uppercase` 会把中文标签与后端原值一起强推成大写，故随本行去掉。 */}
+                <span className={`text-[10px] ${styles.sidebarBg} ${styles.cardTextMuted} font-mono px-2 py-0.5 rounded-full`}>
+                  {connTypeBadgeText(conn, t)}
                 </span>
               </div>
               <p className={`text-xs ${styles.cardTextMuted} mt-1`}>{getSourceTypeLabel(conn.type, t)}</p>

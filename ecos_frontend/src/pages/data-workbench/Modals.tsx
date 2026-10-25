@@ -7,11 +7,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import LucideIcon from './LucideIcon';
 import { useTheme } from '../../components/ThemeContext';
-import type { DataConnection, ConnType } from './types';
+import type { DataConnection } from './types';
 // #142/B4-3e-47（D-B4-76 前端腿）：预览出参按属主契约的判别联合消费，页面不得再自设第二份键面
 import type { SchemaPreviewSuccess, SchemaPreviewFailureKind } from './api';
+// #142/B4-3e-64（D-B4-78 前端侧腿）：「可新建哪些数据源」的唯一事实源 = 承流出口
+// `GET /api/v1/datanet/datasource/supported-types`（数据单源 DataSourceTypeVocabulary）。
+// 本弹窗因此<b>不再 import CONNECTION_TYPES</b>——那是显示元数据面，19 枚里有 9 枚后端不承流，
+// 直接渲染就是 D-B4-78 的用户面病灶（选了只能撞 400）。下拉渲染的是
+// `deriveSupportedOptions(属主目录)` 裁剪后的子集。
+import type { SupportedTypesFailure, SupportedTypesSuccess } from './api';
+import { fetchSupportedDataSourceTypes, deriveSupportedOptions } from './api';
 import { getErrorMessage } from './helpers';
-import { CONNECTION_TYPES, STANDARD_DISABLED_TYPES } from './types';
+import { STANDARD_DISABLED_TYPES } from './types';
 import { detectEdition, type EcosEdition } from './DataEngineConfigPanelTypes';
 import {
   JdbcConfigForm, ObjectStorageConfigForm, FileSourceConfigForm,
@@ -40,6 +47,33 @@ const PREVIEW_FAILURE_KEYS: Record<SchemaPreviewFailureKind, string> = {
   invalid_response: 'dw.conn.previewKindInvalidResponse',
   unknown: 'dw.conn.previewKindUnknown',
 };
+
+/**
+ * §4.7.2 分态文案键（#142/B4-3e-64）：类型目录读取失败的每一种语义各出一句。
+ *
+ * <p>词汇与 {@link PREVIEW_FAILURE_KEYS} 同一份（`kind` 由 API 层按后端状态行经单源判据
+ * 推出），但句子说的是本通道自己的事——把「预览失败」的文案复用到「目录失败」上，
+ * 用户读到的是另一件事的结论。目录失败时本弹窗按 <b>fail-closed</b> 处置：禁用类型选择，
+ * 并阻塞测试/预览/创建三个动作，<b>禁止回落本地 19 枚显示面</b>（回落即本批收口的
+ * 「第二事实源」形态）。</p>
+ */
+const CATALOG_FAILURE_KEYS: Record<SchemaPreviewFailureKind, string> = {
+  invalid_input: 'dw.conn.typeCatalogKindInvalidInput',
+  denied: 'dw.conn.typeCatalogKindDenied',
+  not_found: 'dw.conn.typeCatalogKindNotFound',
+  unavailable: 'dw.conn.typeCatalogKindUnavailable',
+  server_error: 'dw.conn.typeCatalogKindServerError',
+  failed_envelope: 'dw.conn.typeCatalogKindEnvelope',
+  network: 'dw.conn.typeCatalogKindNetwork',
+  invalid_response: 'dw.conn.typeCatalogKindInvalidResponse',
+  unknown: 'dw.conn.typeCatalogKindUnknown',
+};
+
+/** 类型目录通道的面板态（#142/B4-3e-64）：加载／成功／失败三态各自可判读，禁折叠 */
+type TypeCatalogPanel =
+  | { phase: 'loading' }
+  | { phase: 'ready'; value: SupportedTypesSuccess }
+  | { phase: 'failed'; value: SupportedTypesFailure };
 
 interface AddConnectionModalProps {
   t: (key: string) => string;
@@ -76,6 +110,34 @@ export function AddConnectionModal({
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewResult, setPreviewResult] = useState<SchemaPreviewSuccess | null>(null);
+
+  // #142/B4-3e-64（D-B4-78 前端侧腿）：类型目录从属主出口取，取不到就什么都不给选。
+  // 三态（loading／ready／failed）分开持，禁把「还没读到」和「读失败」折成同一个画面——
+  // 后者会让用户以为目录里就只有默认那一枚。
+  const [catalog, setCatalog] = useState<TypeCatalogPanel>({ phase: 'loading' });
+  const [catalogReloadTick, setCatalogReloadTick] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCatalog({ phase: 'loading' });
+    fetchSupportedDataSourceTypes().then((outcome) => {
+      if (cancelled) return;
+      // 判别用 `in`（成功面独有 `entries`）：本仓 tsconfig 无 strict，`outcome.ok` 不参与类型缩窄
+      setCatalog('entries' in outcome ? { phase: 'ready', value: outcome } : { phase: 'failed', value: outcome });
+    });
+    return () => { cancelled = true; };
+  }, [catalogReloadTick]);
+
+  const catalogEntries = catalog.phase === 'ready' ? catalog.value.entries : null;
+  /** 属主目录裁剪显示面后的下拉项；目录未就绪 = 空面（禁回落本地 19 枚） */
+  const supportedOptions = catalogEntries ? deriveSupportedOptions(catalogEntries) : null;
+  const typeOptions = supportedOptions ? supportedOptions.options : [];
+  /** 属主已登记而前端显示面无归属的类型：必须显式可读，禁静默丢枚（丢的后果＝后端能登而前端看不到） */
+  const unresolvedCanonical = supportedOptions ? supportedOptions.unresolvedCanonical : [];
+  const catalogFailure = catalog.phase === 'failed' ? catalog.value : null;
+  /** 当前选中类型是否在属主目录内：目录就绪但选种不被承流时，动作一律阻塞，禁把 400 留给用户去撞 */
+  const selectionSupported = typeOptions.some((o) => o.value === newConnType);
+  const actionsBlocked = supportedOptions === null || !selectionSupported;
 
   // PMO-48-T5: Edition 检测
   const edition = useRef<EcosEdition>(detectEdition()).current;
@@ -310,8 +372,10 @@ export function AddConnectionModal({
             <div className="space-y-1">
               <label className={`text-[10px] font-semibold ${styles.cardTextMuted} block`}>{t('dw.ct.type')}</label>
               <select value={newConnType} onChange={e => { setNewConnType(e.target.value as string); setPreviewVisible(false); setPreviewResult(null); }}
-                className={`w-full px-2.5 py-1.5 border ${styles.inputBorder} rounded ${styles.cardBg} font-mono`}>
-                {CONNECTION_TYPES.map(type => {
+                disabled={supportedOptions === null}
+                className={`w-full px-2.5 py-1.5 border ${styles.inputBorder} rounded ${styles.cardBg} font-mono ${supportedOptions === null ? 'opacity-50' : ''}`}>
+                {/* #142/B4-3e-64：数据源 = 属主目录裁剪后的子集，不再是 CONNECTION_TYPES 全 19 枚 */}
+                {typeOptions.map(type => {
                   // PMO-48-T5: 标准版禁用 gaussdb/minio（fs 全版本可用）
                   const disabled = isStandard && STANDARD_DISABLED_TYPES.includes(type.value);
                   return (
@@ -331,6 +395,43 @@ export function AddConnectionModal({
               </div>
             )}
           </div>
+
+          {/* #142/B4-3e-64（D-B4-78 前端侧腿）：类型目录通道三态读数——加载/失败/部分未解析各出一句，禁折叠 */}
+          {catalog.phase === 'loading' && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded text-[11px] font-mono ${styles.cardBorder} ${styles.cardTextMuted} border`}>
+              <LucideIcon name="Loader2" size={14} />
+              <span>{t('dw.conn.typeCatalogLoading')}</span>
+            </div>
+          )}
+          {catalogFailure && (
+            <div className={`flex items-start gap-2 px-3 py-2 rounded text-[11px] font-mono ${styles.dangerBg} ${styles.dangerText}`}>
+              <LucideIcon name="XCircle" size={14} />
+              <div className="space-y-1">
+                {/* 类别句 + 后端原文各占一段（ASCII 分隔，禁把原文并进句子以免混淆口径）*/}
+                <div>{t(CATALOG_FAILURE_KEYS[catalogFailure.kind])}</div>
+                {catalogFailure.error && <div className="text-[9px]">{catalogFailure.error}</div>}
+                <div className={`text-[9px] ${styles.cardTextMuted}`}>{t('dw.conn.typeCatalogFailClosed')}</div>
+                <button type="button"
+                  onClick={() => setCatalogReloadTick((n) => n + 1)}
+                  className={`px-2 py-0.5 border ${styles.cardBorder} ${styles.cardText} rounded text-[10px] cursor-pointer`}>
+                  {t('dw.conn.typeCatalogRetry')}
+                </button>
+              </div>
+            </div>
+          )}
+          {unresolvedCanonical.length > 0 && (
+            <div className={`flex items-start gap-2 px-3 py-2 rounded text-[11px] font-mono ${styles.warningBg} ${styles.warningText}`}>
+              <LucideIcon name="AlertTriangle" size={14} />
+              <span>{t('dw.conn.typeCatalogUnresolved')}: {unresolvedCanonical.join(', ')}</span>
+            </div>
+          )}
+          {supportedOptions !== null && !selectionSupported && (
+            <div className={`flex items-start gap-2 px-3 py-2 rounded text-[11px] font-mono ${styles.warningBg} ${styles.warningText}`}>
+              <LucideIcon name="AlertTriangle" size={14} />
+              {/* 承流面已撤回当前选种（或目录内无默认项）：显式提示并阻塞动作，禁静默按这一枚提交 */}
+              <span>{t('dw.conn.typeCatalogSelectionUnsupported')}{newConnType ? ` | ${newConnType}` : ''}</span>
+            </div>
+          )}
 
           {/* Type-specific config form */}
           <div className={`pt-3 border-t ${styles.cardBorder} space-y-3`}>
@@ -383,8 +484,8 @@ export function AddConnectionModal({
                   setPreviewLoading(false);
                 }
               }}
-              disabled={previewLoading}
-              className={`px-2.5 py-1 border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.appBg} rounded text-[10px] font-mono transition-colors cursor-pointer ${previewLoading ? 'opacity-50' : ''}`}
+              disabled={previewLoading || actionsBlocked}
+              className={`px-2.5 py-1 border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.appBg} rounded text-[10px] font-mono transition-colors ${previewLoading || actionsBlocked ? 'opacity-50 cursor-default' : 'cursor-pointer'}`}
             >
               {previewLoading ? t('dw.modal.previewing') : t('dw.conn.previewSchema')}
             </button>
@@ -431,12 +532,13 @@ export function AddConnectionModal({
             className={`px-3 py-1.5 ${styles.cardBg} border ${styles.cardBorder} ${styles.cardTextMuted} hover:${styles.appBg} rounded text-xs transition-colors cursor-pointer`}>
             {t('dw.modal.cancel')}
           </button>
-          <button type="button" onClick={handleTest} disabled={testing}
-            className={`px-3.5 py-1.5 border ${styles.cardBorder} ${styles.cardText} hover:${styles.appBg} rounded text-xs transition-colors cursor-pointer ${testing ? 'opacity-50' : ''}`}>
+          <button type="button" onClick={handleTest} disabled={testing || actionsBlocked}
+            className={`px-3.5 py-1.5 border ${styles.cardBorder} ${styles.cardText} hover:${styles.appBg} rounded text-xs transition-colors ${testing || actionsBlocked ? 'opacity-50 cursor-default' : 'cursor-pointer'}`}>
             {testing ? t('dw.modal.testing') : t('dw.conn.testConn')}
           </button>
-          <button type="button" onClick={onCreate}
-            className={`px-3.5 py-1.5 ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} font-semibold rounded text-xs transition-colors cursor-pointer`}>
+          {/* #142/B4-3e-64：目录未就绪或选种不被承流时禁创建（fail-closed）——宁可不给点，不给一个必然 400 的请求 */}
+          <button type="button" onClick={onCreate} disabled={actionsBlocked}
+            className={`px-3.5 py-1.5 ${styles.accentBg} hover:${styles.accentBg} ${styles.cardText} font-semibold rounded text-xs transition-colors ${actionsBlocked ? 'opacity-50 cursor-default' : 'cursor-pointer'}`}>
             {t('dw.modal.saveAndConnect')}
           </button>
         </div>

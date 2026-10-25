@@ -2,6 +2,7 @@
 import React from 'react';
 import LucideIcon from '../../LucideIcon';
 import type { DataConnection } from '../../types';
+import { connTypeBadgeText } from '../../helpers';
 import { useTheme } from "../../../../components/ThemeContext";
 import { useLanguage } from "../../../../components/LanguageContext";
 
@@ -89,7 +90,8 @@ export default function ConnectionListPanel({
               </div>
             </div>
             <div className={`flex justify-between text-[10px] ${styles.cardTextMuted} font-mono`}>
-              <span>{t("dw.type")} {conn.type.toUpperCase()}</span>
+              {/* #142/B4-3e-64（D-B4-93）：类型标签走 i18n 单源；未解析显式出「未知类型 (原值 X)」，禁折成 PostgreSQL */}
+              <span>{t("dw.type")} {connTypeBadgeText(conn, t)}</span>
               <span>{conn.tablesAvailable.length} {t("dw.tablesDirs")}</span>
             </div>
           </div>

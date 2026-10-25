@@ -164,10 +164,25 @@ const ADDED_AT_BATCH_URL_LITERALS: readonly string[] = [
   '/api/v1/datanet/datasource/preview-schema',
 ];
 
-/** 改后期望多重集：总数不变（27），只换一条面值——剪腿与加腿都必须在这里留下痕迹。 */
+/**
+ * #142/B4-3e-64 之后批次合法新增的面值（闭集棘轮：新增一枚须在这里点名，只增不静默）。
+ *
+ * <p>本域在 B5-21 收口之后仍会继续长出口，这不可免——可免的是「长出来的面值没在这儿留下痕迹」。
+ * 因此把「本批换一条」与「后续批次净增」分成两张表：前者是 B5-21 改面的守恒证据（剪腿与加腿
+ * 一一对应，数量守恒），后者是净增登记（枚数独立钉值，多一枚少一枚都红）。</p>
+ *
+ * <p>`supported-types` 的属主＝data-engine 承流面 `DataSourceController#supportedTypes`
+ * （族根同样取 `api/dataClient` 的 `DATANET_DATASOURCE_BASE`，不另立基址）。</p>
+ */
+const ADDED_BY_LATER_BATCHES_URL_LITERALS: readonly string[] = [
+  '/api/v1/datanet/datasource/supported-types',
+];
+
+/** 改后期望多重集：27 条改前全集 − 退役幻影 1 ＋ B5-21 换入 1 ＋ 后续批次净增 1。 */
 const EXPECTED_URL_LITERALS: readonly string[] = [
   ...PRE_BATCH_URL_LITERALS.filter((v) => !RETIRED_PHANTOM_URL_LITERALS.includes(v)),
   ...ADDED_AT_BATCH_URL_LITERALS,
+  ...ADDED_BY_LATER_BATCHES_URL_LITERALS,
 ];
 
 /** 域内全部 `.ts`（含 `_base.ts`/`index.ts`/`mappers.ts`）：幻影复活判据扫这个全集。 */
@@ -244,10 +259,10 @@ describe('pages/data-workbench/api 域基址单源 — 私设基址清零 (#143/
     expect(ENGINE_DATA_PIPELINE_RUNS_BASE).toBe('/api/v1/engine/data/pipeline/runs');
   });
 
-  it('面值不变量：还原后的 URL 多重集 = 改前全集换一条（27 条 = 26 - 幻影 1 + 属主 1）', () => {
+  it('面值不变量：还原后的 URL 多重集 = 改前全集换一条 + 后续批次净增一条（28 条 = 27 - 幻影 1 + 属主 1 + 净增 1）', () => {
     const all: string[] = [];
     for (const rel of FILES) all.push(...derivedValues(read(rel)));
-    expect(all.length).toBe(27);
+    expect(all.length).toBe(28);
     expect([...all].sort()).toEqual([...EXPECTED_URL_LITERALS].sort());
   });
 
@@ -262,18 +277,21 @@ describe('pages/data-workbench/api 域基址单源 — 私设基址清零 (#143/
   it('改表面值表自身可校验：幻影与新增互不重叠、各自确在/不在改前全集（防 EXPECTED 被手改歪）', () => {
     expect(RETIRED_PHANTOM_URL_LITERALS.length).toBe(1);
     expect(ADDED_AT_BATCH_URL_LITERALS.length).toBe(1);
+    expect(ADDED_BY_LATER_BATCHES_URL_LITERALS.length).toBe(1);
     expect(PRE_BATCH_URL_LITERALS.length).toBe(27);
     for (const v of RETIRED_PHANTOM_URL_LITERALS) expect(PRE_BATCH_URL_LITERALS).toContain(v);
-    for (const v of ADDED_AT_BATCH_URL_LITERALS) {
+    for (const v of [...ADDED_AT_BATCH_URL_LITERALS, ...ADDED_BY_LATER_BATCHES_URL_LITERALS]) {
       expect(PRE_BATCH_URL_LITERALS).not.toContain(v);
       expect(RETIRED_PHANTOM_URL_LITERALS).not.toContain(v);
     }
-    // 只许换一条：数量守恒 + 差集恰为这两条，任何第三条漂移都在这里变红
-    expect(EXPECTED_URL_LITERALS.length).toBe(PRE_BATCH_URL_LITERALS.length);
+    // 换一条 + 净增一条：差集恰为这几条，任何其它漂移都在这里变红
+    expect(EXPECTED_URL_LITERALS.length).toBe(PRE_BATCH_URL_LITERALS.length + ADDED_BY_LATER_BATCHES_URL_LITERALS.length);
     const removed = PRE_BATCH_URL_LITERALS.filter((v) => !EXPECTED_URL_LITERALS.includes(v)).sort();
     const added = EXPECTED_URL_LITERALS.filter((v) => !PRE_BATCH_URL_LITERALS.includes(v)).sort();
     expect(removed).toEqual([...RETIRED_PHANTOM_URL_LITERALS].sort());
-    expect(added).toEqual([...ADDED_AT_BATCH_URL_LITERALS].sort());
+    expect(added).toEqual(
+      [...ADDED_AT_BATCH_URL_LITERALS, ...ADDED_BY_LATER_BATCHES_URL_LITERALS].sort(),
+    );
   });
 
   it('判据能变红：违例源命中（含反引号形态）、合规源不命中（防恒绿）', () => {
