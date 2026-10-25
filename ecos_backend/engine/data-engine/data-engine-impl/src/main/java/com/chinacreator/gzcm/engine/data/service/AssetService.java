@@ -112,12 +112,26 @@ public class AssetService {
      * 对外机读码一律由承载提供；原「{@code ASSET-041}＝操作被拒绝」的措辞按 §4.7.2 订正为
      * 「未获裁决」，不再把评估失败说成拒绝。</p>
      *
-     * <p><b>本批不做、另立余项 D-B4-90</b>：{@code checker.check(..)} 若抛
-     * {@link IAbacPermissionChecker.PolicyEvaluationException} <b>之外</b>的运行时异常
-     * （如 HTTP 传输层故障），仍会落进 {@code handleAny}＝500；该面属「安全调用异常类型白名单」
-     * 判据扩展，与本批三腿分态不同事务。另原第 110 行 {@code catch (SecurityException)} 保护腿
-     * 在全仓主源码面已无抛出方（{@code IAbacPermissionChecker} 实现面零命中），
-     * 属 {@code D-B4-77} 死代码族的死面，按「数得到优先于数得漂亮」原样保留、归该治理腿处置。</p>
+     * <p><b>#142/B4-3e-60（差距 D-B4-90）本批收口第 4 腿</b>：{@code checker.check(..)} 的接口契约
+     * 只声明受检的 {@link IAbacPermissionChecker.PolicyEvaluationException}，实现体抛出的<b>任何
+     * 未分类运行时异常</b>（如 HTTP 传输层故障、NPE）原会漏出本方法、落进
+     * {@code GlobalExceptionHandler.handleAny}＝<b>500</b>——即「裁决机构没答」在状态行上被报成
+     * 「本服务自身故障」。本批把它并入既有不可用承载（{@code catch (RuntimeException)} →
+     * 503＋{@code ECOS-SEC-501}，消息内标签沿用 {@code ASSET-041} 并附原异常简单类名供运维检索、
+     * {@code cause} 保留），理由＝从调用方视角「check() 抛任何异常」的语义都是<b>没拿到裁决</b>，
+     * 与评估异常同归不可用态；该形态因此不再需要独立的第四枚机读码面（单源纪律同 D-B4-85）。
+     * <b>与 DENY 的 403 严格互斥</b>：未分类异常一律不得写成「操作被拒绝」。
+     * 互斥的工程前提＝DENY 判定腿<b>不得</b>写在该 {@code try} 内——{@link ForbiddenException}
+     * 继承 {@code DataBridgeException} 而后者是 {@code RuntimeException}，写在 try 内会被
+     * 自己的兜底腿捕获并折成 503（＝本批要禁的折叠形态），故结构上钉成
+     * 「try 只取裁决 → catch 两枚 503 承载 → try 外判 DENY 抛 403」三段。</p>
+     *
+     * <p><b>同批删除的原 {@code catch (SecurityException)} 保护腿（D-B4-77 死面族）</b>：
+     * 全仓主源码面 {@code IAbacPermissionChecker} 实现面对该型零抛出（{@code throw new
+     * SecurityException} 实扫命中仅 ai {@code FileToolService} 与 security
+     * {@code OpaPolicyService} 两文件，均与本接口无关），该腿恒不触发；保留它反而会让读代码的人
+     * 以为「ABAC 实现会抛 SecurityException 且被原样上抛」。删除后该形态若真出现，
+     * 由上面的 {@code RuntimeException} 承载腿接住并显式报 503，<b>覆盖面只增不减</b>。</p>
      */
     private void abacCheck(String assetId, String resourceId, String operator, String action) {
         IAbacPermissionChecker checker = abacProvider.getIfAvailable();
@@ -140,16 +154,12 @@ public class AssetService {
         resource.put("resourceId", resourceId);
         resource.put("action", action);
         ctx.setResource(resource);
+        // 裁决读取与拒绝判定分两段：ForbiddenException 系 unchecked 且继承 DataBridgeException，
+        // 若在同一段 try 内抛出会被下面「未分类运行时异常」腿自我吞掉＝把 403 折成 503，
+        // 正是 D-B4-90 立志要禁的反向折叠，故 DENY 腿必须落在 try 之外。
+        IAbacPermissionChecker.Decision decision;
         try {
-            IAbacPermissionChecker.Decision d = checker.check(ctx);
-            if (d == IAbacPermissionChecker.Decision.DENY) {
-                // 拒绝态：策略答了「不行」＝403（D-B4-85），禁与「裁决没答」的 503 共用一枚载体
-                log.warn("ABAC DENY asset={} action={} by={}", assetId, action, operator);
-                throw new ForbiddenException(
-                    "ASSET-040: ABAC 策略拒绝，动作 " + action + " 无权执行 (asset=" + assetId + ")");
-            }
-        } catch (SecurityException se) {
-            throw se;
+            decision = checker.check(ctx);
         } catch (IAbacPermissionChecker.PolicyEvaluationException e) {
             // 默认 Fail-Closed 安全红线（PMO-data10）：评估失败＝裁决不可得＝503，非「操作被拒绝」
             log.error("ABAC 策略评估异常 (asset={} action={}): {}", assetId, action, e.getMessage(), e);
@@ -158,6 +168,24 @@ public class AssetService {
                 RlsExecutionContract.SEC_UNAVAILABLE_CODE + ": ASSET-041 未获安全裁决（ABAC 策略评估失败），"
                     + "动作 " + action + " 按 fail-closed 拒绝，非「用户无权限」"
                     + " (§4.7.2 / 铁律 §2.4) (asset=" + assetId + ")", e);
+        } catch (RuntimeException unexpected) {
+            // D-B4-90（#142/B4-3e-60）：check() 的契约只声明受检的 PolicyEvaluationException，
+            // 实现体任何未分类运行时异常（如 HTTP 传输层故障）都会「裁决没答」——必须与
+            // DENY 的 403／内部错误的 500 分态：落同一枚 503 不可用承载，保留原类型名供运维检索。
+            log.error("ABAC 裁决腿未分类异常 (asset={} action={} type={}): {}",
+                assetId, action, unexpected.getClass().getName(), unexpected.getMessage(), unexpected);
+            throw new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_CODE + ": ASSET-041 未获安全裁决（ABAC 裁决腿异常，"
+                    + unexpected.getClass().getSimpleName() + "），动作 " + action
+                    + " 按 fail-closed 拒绝，非「用户无权限」 (§4.7.2 / 铁律 §2.4) (asset=" + assetId + ")",
+                unexpected);
+        }
+        // 拒绝态：策略答了「不行」＝403（D-B4-85），禁与「裁决没答」的 503 共用一枚载体
+        if (decision == IAbacPermissionChecker.Decision.DENY) {
+            log.warn("ABAC DENY asset={} action={} by={}", assetId, action, operator);
+            throw new ForbiddenException(
+                "ASSET-040: ABAC 策略拒绝，动作 " + action + " 无权执行 (asset=" + assetId + ")");
         }
     }
 

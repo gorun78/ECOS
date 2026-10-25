@@ -338,12 +338,25 @@ public class OpaPolicyService {
         }
     }
 
-    /** SEC-P0-3: 安全解析文件路径 — 确保最终路径在 policyDir 内 */
+    /**
+     * SEC-P0-3: 安全解析文件路径。
+     *
+     * <p><b>#142/B4-3e-60 死面删除（差距 D-B4-91②，随 D-B4-77 治理腿）</b>：本方法原带一条
+     * {@code if (!file.startsWith(policyDir)) throw new SecurityException("路径越界…")} 后置守卫。
+     * 该分支<b>恒不可达</b>，依据三条实读：① 本方法两个调用点（{@code getPolicy}／
+     * {@code updatePolicy}）都在调用前先过 {@link #validatePolicyName(String)}，其白名单
+     * {@code ^[a-zA-Z0-9_-]{1,64}$} 不含 {@code /}、{@code \}、{@code .}，故拼出的
+     * {@code name + ".rego"} 不可能含分隔符或 {@code ..}，归一后必落在 {@code policyDir} 内；
+     * ② 全仓 {@code main}/{@code test} 源码面 {@code resolveSafe} 命中仅本文件定义 1 处＋调用 2 处，
+     * 无第三调用方可绕过白名单；③ 抛的是 {@code SecurityException}，主源码面
+     * {@code @ExceptionHandler} 对该型实扫 0 命中 ⇒ 即便可达也只会塌成 500，不构成任何有效防线。
+     * 与 {@code RuleGraphService.switchNeo4jEnabled}（#142/B4-3e-58／D-B4-88）同判：死面的唯一治理是
+     * <b>删除</b>——把它改成可抛的活体（或换成携带状态行的载体）等于给永不触发的分支刷成「已收口」＝假绿。
+     * 真正的越界防线是 {@code validatePolicyName}，它在 {@code try} 之外抛
+     * {@link IllegalArgumentException}（＝400 入参错误，归型正确）。路径归一与
+     * {@code policyDir.resolve} 的拼接口径一字未动。</p>
+     */
     private Path resolveSafe(String name) {
-        Path file = policyDir.resolve(name + ".rego").normalize();
-        if (!file.startsWith(policyDir)) {
-            throw new SecurityException("路径越界: 禁止访问 policyDir 之外的文件");
-        }
-        return file;
+        return policyDir.resolve(name + ".rego").normalize();
     }
 }

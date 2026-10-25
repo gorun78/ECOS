@@ -39,6 +39,8 @@ import static org.mockito.Mockito.*;
  *   <li>ABAC 三态（#142/B4-3e-55／差距 D-B4-85）：DENY → 403 {@code ForbiddenException}；
  *       Bean 未装配／策略评估抛异常 → 503 {@code ECOS-SEC-501}。三态<b>都</b>不放行、不落库、不发事件，
  *       但对外状态行与机读码必须互不相同（§4.7.2「不可用 ≠ 无权限 ≠ 空结果」）</li>
+ *   <li>ABAC 裁决腿抛<b>未分类运行时异常</b>（#142/B4-3e-60／差距 D-B4-90）→ 同样并入 503 不可用承载，
+ *       禁漏出成 500，也禁写成 403「被拒绝」</li>
  * </ul>
  */
 class AssetServiceTest {
@@ -332,6 +334,45 @@ class AssetServiceTest {
             "禁把「裁决没答」写成「操作被拒绝」（D-B4-85 的反向折叠侧）");
         assertInstanceOf(IAbacPermissionChecker.PolicyEvaluationException.class, ex.getCause(),
             "原异常作为 cause 保留，堆栈不因改承载而丢失");
+        verify(assetDao, never()).insertField(anyString(), any(), anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyString(), any(Timestamp.class));
+        verify(eventBus, never()).publish(eq(KafkaTopics.DATA_SECURITY_TAGGED), any());
+    }
+
+    @Test
+    @DisplayName("tagAssetFields — ABAC 裁决腿抛未分类 RuntimeException → 并入 503 不可用承载，禁漏 500／禁写 403 (#142/B4-3e-60 / D-B4-90)")
+    void tagAssetFieldsAbacUnexpectedRuntimeFailureJoinsUnavailableCarrier() throws Exception {
+        // 收口前：check() 契约只声明受检 PolicyEvaluationException，实现体抛出的任何运行时异常
+        // （下例用 IllegalStateException 代表 HTTP 传输层故障）漏出本方法 ⇒ 落 handleAny＝500，
+        // 「裁决机构没答」在状态行上被报成「本服务自身故障」。
+        when(abac.check(any(AbacContext.class)))
+            .thenThrow(new IllegalStateException("OPA 传输层中断"));
+        when(assetDao.findAssetRows("asset-1")).thenReturn(List.of(existingAsset("asset-1", "res-1", "L1")));
+
+        DataAssetFieldTagDTO dto = new DataAssetFieldTagDTO();
+        dto.setConfirmed(true);
+        dto.setOperator("tester");
+        DataAssetFieldTagDTO.FieldTagItem it = new DataAssetFieldTagDTO.FieldTagItem();
+        it.setFieldId("id_card");
+        it.setFieldName("id_card");
+        it.setFieldSensitivity("L3");
+        it.setDataType("ID_CARD");
+        it.setMaskStrategy("middle4");
+        dto.setFields(List.of(it));
+
+        DataBridgeException ex = assertThrows(DataBridgeException.class,
+            () -> service.tagAssetFields("asset-1", dto));
+        assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_HTTP, ex.getHttpStatus(),
+            "未分类裁决故障＝没拿到裁决＝503，禁落 500（内部错误）");
+        assertFalse(ex instanceof ForbiddenException,
+            "禁写成 403 拒绝态——那会把「查不了」谎报成「你没权限」（§4.7.2 反向折叠）");
+        assertEquals(503, DataBridgeException.resolveHttpStatus(ex.getHttpStatus()), "状态行跟随携带值");
+        assertTrue(ex.getMessage().startsWith(RlsExecutionContract.SEC_UNAVAILABLE_CODE),
+            "机读码单源＝ECOS-SEC-501，禁为第 4 腿另立码面");
+        assertTrue(ex.getMessage().contains("ASSET-041"), "并入既有「未获裁决」标签，日志检索口径不断");
+        assertTrue(ex.getMessage().contains("IllegalStateException"),
+            "原异常简单类名入消息，供运维区分「评估失败」与「未分类故障」");
+        assertFalse(ex.getMessage().contains("操作被拒绝"), "禁把「裁决没答」写成「操作被拒绝」");
+        assertSame(ex.getCause().getClass(), IllegalStateException.class, "原异常作为 cause 保留");
         verify(assetDao, never()).insertField(anyString(), any(), anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyString(), any(Timestamp.class));
         verify(eventBus, never()).publish(eq(KafkaTopics.DATA_SECURITY_TAGGED), any());
     }
