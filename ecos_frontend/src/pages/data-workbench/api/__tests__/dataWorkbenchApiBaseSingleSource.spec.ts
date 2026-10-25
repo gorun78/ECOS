@@ -32,6 +32,22 @@
  * `RETIRED_PHANTOM_URL_LITERALS` 并新增「退役面值再出现即红」的判据腿——幻影复活与请求消失
  * 是两种必须各自能变红的失败。同时 `API_BASE` 导入腿改表驱动：`datasource.ts` 期望 **0**
  * （该文件已无 `${API_BASE}` 站点），其余四文件仍期望 1。</p>
+ *
+ * <p>**#142/B4-3e-68（D-B4-79 收口同批换口径）**：`_base.ts` 的 `DATANET_DS` 原为不含 `/api`
+ * 前缀的 dev-only 第二属主（生产 BFF 面打不通），按 B6-5 的**别名重导出**同法退役本地声明——
+ * `_base.ts` 只剩一行 `export { DATANET_DATASOURCE_BASE as DATANET_DS }`（同 `PIPELINE_DEFS`
+ * 判例，B6-5 守恒门判据形状批上已钉死），六腿引用名逐字不变、运行期 URL 由
+ * `/datanet/datasource…` 改为 `/api/v1/datanet/datasource…`（后端 `DataSourceController`
+ * 类级映射双路径 `{/api/v1/datanet/datasource, /datanet/datasource}` 均承流、后者存量不动，
+ * 面值变更属「同一端点换承流轨道」、逐腿端点与动词不变）。本门口径三连改：
+ * ① `CONST_VALUES` 再认 `DATANET_DS` 别名（值＝属主族根），**四条反引号模板腿**（`` `${id}/test` ``／
+ *  `` `${id}` `×2` ``／`/test`）首次进面值多重集 ⇒ 改后期望 **32**（27 − 幻影 1 + 换入 1 +
+ * 净增 1 + D79 四条模板腿 4）；另两条<b>裸引用腿</b>（列表 GET＋创建 POST，`get/post(DATANET_DS, …)`
+ * 无插值段）对 `SITE_RE` 按口径不可见，其承流凭据由新增的 **D-B4-79 别名腿**案钉死
+ * （域门面恰好一行重导出＋全域零本地 `const DATANET_DS` 声明＋运行期面值 = 属主族根），不另补面值；
+ * ② 基址后必接斜杠腿无需豁免：`DATANET_DS` 的全部模板站点后均接 `/`（裸引用腿不在该判据面里）；
+ * ③ `datasource.ts` 的 `DATANET_DATASOURCE_BASE` 导入仍恰 1 条（既有案不动），
+ * 面值表自检案把 D79 四条腿一并纳入差集闭合。</p>
  */
 import { describe, expect, it, vi } from 'vitest';
 vi.setConfig({ testTimeout: 30_000 });
@@ -43,6 +59,7 @@ import { API_BASE } from '../../../../services/httpClient';
 // 面值解析表必须认这枚常量，否则该腿对本门隐形 ⇒ 多重集少一条、把「形态搬运」误读成「请求消失」。
 // #142/B4-3e-47：同表再认 `DATANET_DATASOURCE_BASE`（`datasource.ts` 的预览腿族根），理由同上。
 import { ENGINE_DATA_PIPELINE_RUNS_BASE, DATANET_DATASOURCE_BASE } from '../../../../api/dataClient';
+import { DATANET_DS } from '../_base';
 
 const DOMAIN_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -61,11 +78,15 @@ const HARDCODED_RE = /["'`]\/api\b/;
 /** 派生形态：`` `${常量}<path>` ``，捕获组即拼出来的路径段（#145/B6-15 起含族单源常量）。 */
 const SITE_RE = /`\$\{([A-Za-z0-9_]+)\}((?:\\.|(?!`)[^\\])*)`/g;
 
-/** 面值解析表：`API_BASE` 单源 + 上收到 api 层的两枚族根（管道 runs／数据源，#142/B4-3e-47 起）。 */
+/** 面值解析表：`API_BASE` 单源 + 上收到 api 层的族根。
+ *  #145/B6-15 认 `ENGINE_DATA_PIPELINE_RUNS_BASE`；#142/B4-3e-47 认 `DATANET_DATASOURCE_BASE`；
+ *  #142/B4-3e-68 再认域别名 `DATANET_DS`（B6-5 同法重导出，值＝属主族根；六条 CRUD/测试腿里的
+ *  四条模板站点由此进入面值多重集——不吃它们就把「形态搬运」误读成「请求消失」，同 B6-5 ④ 失面判例）。 */
 const CONST_VALUES: ReadonlyMap<string, string> = new Map([
   ['API_BASE', API_BASE],
   ['ENGINE_DATA_PIPELINE_RUNS_BASE', ENGINE_DATA_PIPELINE_RUNS_BASE],
   ['DATANET_DATASOURCE_BASE', DATANET_DATASOURCE_BASE],
+  ['DATANET_DS', DATANET_DATASOURCE_BASE],
 ]);
 
 function isComment(line: string): boolean {
@@ -178,11 +199,29 @@ const ADDED_BY_LATER_BATCHES_URL_LITERALS: readonly string[] = [
   '/api/v1/datanet/datasource/supported-types',
 ];
 
-/** 改后期望多重集：27 条改前全集 − 退役幻影 1 ＋ B5-21 换入 1 ＋ 后续批次净增 1。 */
+/**
+ * #142/B4-3e-68 D-B4-79 收口本批合法新增面值：`_base.DATANET_DS` 声明退役为属主常量的
+ * 别名重导出（B6-5 同法）后，`datasource.ts` 四条**反引号模板腿**首次进入本门面值面
+ * （改前它们打 dev-only 的 `/datanet/datasource…`，不含 `/api` 前缀 ⇒ `HARDCODED_RE`/
+ * `SITE_RE` 双口径都吃不到，门对它们长期失明，正是 D-B4-79 的病灶形状）。
+ * 四条面值 = 属主族根 × {`` `${id}/test` ``、`` `${id}` ``（PUT/DELETE 两腿同值）、`/test`}。
+ * 另两条<b>裸引用腿</b>（列表 GET ＋ 创建 POST，`get/post(DATANET_DS, …)` 无插值段）对
+ * `SITE_RE` 按口径不可见——其承流凭据是 `DATANET_DS` 别名腿（见「D-B4-79 别名腿」案），
+ * 不在此处补记面值，避免另一个口径外的面值表。
+ */
+const ADDED_BY_D79_URL_LITERALS: readonly string[] = [
+  '/api/v1/datanet/datasource/${id}/test',
+  '/api/v1/datanet/datasource/${id}',
+  '/api/v1/datanet/datasource/${id}',
+  '/api/v1/datanet/datasource/test',
+];
+
+/** 改后期望多重集：27 条改前全集 − 退役幻影 1 ＋ B5-47 换入 1 ＋ 后续批次净增 1 ＋ D-B4-79 四条模板腿 ＝ 32。 */
 const EXPECTED_URL_LITERALS: readonly string[] = [
   ...PRE_BATCH_URL_LITERALS.filter((v) => !RETIRED_PHANTOM_URL_LITERALS.includes(v)),
   ...ADDED_AT_BATCH_URL_LITERALS,
   ...ADDED_BY_LATER_BATCHES_URL_LITERALS,
+  ...ADDED_BY_D79_URL_LITERALS,
 ];
 
 /** 域内全部 `.ts`（含 `_base.ts`/`index.ts`/`mappers.ts`）：幻影复活判据扫这个全集。 */
@@ -259,10 +298,10 @@ describe('pages/data-workbench/api 域基址单源 — 私设基址清零 (#143/
     expect(ENGINE_DATA_PIPELINE_RUNS_BASE).toBe('/api/v1/engine/data/pipeline/runs');
   });
 
-  it('面值不变量：还原后的 URL 多重集 = 改前全集换一条 + 后续批次净增一条（28 条 = 27 - 幻影 1 + 属主 1 + 净增 1）', () => {
+  it('面值不变量：还原后的 URL 多重集守恒（#142/B4-3e-68 起 32 条 = 改前 27 − 幻影 1 + 属主 1 + 净增 1 + D-B4-79 四条模板腿 4）', () => {
     const all: string[] = [];
     for (const rel of FILES) all.push(...derivedValues(read(rel)));
-    expect(all.length).toBe(28);
+    expect(all.length, `实读 ${all.length} 条：${all.sort().join(' | ')}`).toBe(32);
     expect([...all].sort()).toEqual([...EXPECTED_URL_LITERALS].sort());
   });
 
@@ -278,20 +317,43 @@ describe('pages/data-workbench/api 域基址单源 — 私设基址清零 (#143/
     expect(RETIRED_PHANTOM_URL_LITERALS.length).toBe(1);
     expect(ADDED_AT_BATCH_URL_LITERALS.length).toBe(1);
     expect(ADDED_BY_LATER_BATCHES_URL_LITERALS.length).toBe(1);
+    expect(ADDED_BY_D79_URL_LITERALS.length).toBe(4);
     expect(PRE_BATCH_URL_LITERALS.length).toBe(27);
     for (const v of RETIRED_PHANTOM_URL_LITERALS) expect(PRE_BATCH_URL_LITERALS).toContain(v);
-    for (const v of [...ADDED_AT_BATCH_URL_LITERALS, ...ADDED_BY_LATER_BATCHES_URL_LITERALS]) {
+    for (const v of [...ADDED_AT_BATCH_URL_LITERALS, ...ADDED_BY_LATER_BATCHES_URL_LITERALS, ...ADDED_BY_D79_URL_LITERALS]) {
       expect(PRE_BATCH_URL_LITERALS).not.toContain(v);
       expect(RETIRED_PHANTOM_URL_LITERALS).not.toContain(v);
     }
-    // 换一条 + 净增一条：差集恰为这几条，任何其它漂移都在这里变红
-    expect(EXPECTED_URL_LITERALS.length).toBe(PRE_BATCH_URL_LITERALS.length + ADDED_BY_LATER_BATCHES_URL_LITERALS.length);
+    // 换一条 + 净增一条 + D79 四条模板腿：差集恰为这几条，任何其它漂移都在这里变红
+    expect(EXPECTED_URL_LITERALS.length).toBe(
+      PRE_BATCH_URL_LITERALS.length + ADDED_BY_LATER_BATCHES_URL_LITERALS.length + ADDED_BY_D79_URL_LITERALS.length,
+    );
     const removed = PRE_BATCH_URL_LITERALS.filter((v) => !EXPECTED_URL_LITERALS.includes(v)).sort();
     const added = EXPECTED_URL_LITERALS.filter((v) => !PRE_BATCH_URL_LITERALS.includes(v)).sort();
     expect(removed).toEqual([...RETIRED_PHANTOM_URL_LITERALS].sort());
     expect(added).toEqual(
-      [...ADDED_AT_BATCH_URL_LITERALS, ...ADDED_BY_LATER_BATCHES_URL_LITERALS].sort(),
+      [...ADDED_AT_BATCH_URL_LITERALS, ...ADDED_BY_LATER_BATCHES_URL_LITERALS, ...ADDED_BY_D79_URL_LITERALS].sort(),
     );
+  });
+
+  it('#142/B4-3e-68 D-B4-79 别名腿：DATANET_DS 恰 1 行重导出且零本地声明，运行期面值 = 属主族根', () => {
+    // _base.ts 代码行：DATANET_DS 只准以下列别名重导出形态出现，第二处声明即红
+    // （本仓文件走 CRLF，先 .trimEnd() 剥 \r；测试自身/file 都是 eq 判定，剥掉不放松任何东西）
+    const aliasLines = codeLines(read('_base.ts'))
+      .filter((l) => /\bDATANET_DS\b/.test(l))
+      .map((l) => l.trimEnd());
+    expect(aliasLines).toEqual([
+      "export { DATANET_DATASOURCE_BASE as DATANET_DS } from '../../../api/dataClient';",
+    ]);
+    // 域内任何代码行不得再有另一枚同族基址的本地 const 声明
+    for (const rel of allDomainTsFiles()) {
+      const hits = codeLines(read(rel))
+        .filter((l) => /\bconst\s+DATANET_DS\b/.test(l))
+        .map((l) => l.trimEnd());
+      expect(hits, `${rel} 仍有 DATANET_DS 的本地声明（第二属主复形）`).toEqual([]);
+    }
+    // 运行期面值：域门面导出的 DATANET_DS 必须与属主族根同源同值
+    expect(DATANET_DS).toBe(DATANET_DATASOURCE_BASE);
   });
 
   it('判据能变红：违例源命中（含反引号形态）、合规源不命中（防恒绿）', () => {

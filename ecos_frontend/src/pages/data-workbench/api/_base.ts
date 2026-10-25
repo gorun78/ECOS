@@ -22,9 +22,13 @@ import { API_BASE, ApiRequestError, NetworkError, NoAccessError, apiFetchData } 
 // #145/B6-5：`/v1/pipeline/definitions` 族属主在 `api/dataClient`，本行只做域内别名重导出——
 // 不含 URL 体 ⇒ 不构成第二个属主，域内 `PIPELINE_DEFS` 导出面逐字不变（API 只增不改）。
 export { PIPELINE_DEFINITIONS_BASE as PIPELINE_DEFS } from '../../../api/dataClient';
+// #142/B4-3e-68（差距 D-B4-79 收口）：`/datanet/datasource` 族根原在本文件私设为 `DATANET_DS`
+// ＝不含 `/api` 前缀的 dev-only 形态（生产 BFF 面打不通），与 `api/dataClient` 的
+// `DATANET_DATASOURCE_BASE` 构成同族两属主。本行按 B6-5 的别名重导出同法退役本地声明、
+// 保留域内 `DATANET_DS` 导出面（门面 `index.ts` 的 `export *` 逐字不变）。
+export { DATANET_DATASOURCE_BASE as DATANET_DS } from '../../../api/dataClient';
 
 // ─── API 端点常量 ──────────────────────────────────────────
-export const DATANET_DS = '/datanet/datasource';           // DataSourceController
 export const INTEGRATION  = `${API_BASE}/integration/metadata`;   // IntegrationMetadataController (connections + syncTasks)
 export const LINEAGE_TOPOL = `${API_BASE}/v1/engine/data/lineage/topology`;
 

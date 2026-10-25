@@ -334,7 +334,7 @@ export async function resolveDqIssue(issueId: string, body: any): Promise<any> {
  * `/v1/datanet/datasource` 族根单源（#142/B4-3e-47 由模块私设 `DATANET_DS` 上收为导出常量）。
  * 属主落 api 层：本文件六腿与 `pages/data-workbench/api/datasource.ts` 的 schema 预览腿共用同一族根，
  * 域侧只准引本常量（不得再私设第二形态）。`pages/data-workbench/api/_base.ts` 的 `DATANET_DS`
- * ＝无 `/api` 前缀的历史形态，系另一属主，已登记差距台账 D-B4-79 待收口。
+ * 原系无 `/api` 前缀的另一属主（已登记 D-B4-79），#142/B4-3e-68 退役为指向本常量的域内别名重导出。
  */
 export const DATANET_DATASOURCE_BASE = `${API_BASE}/v1/datanet/datasource`;
 /**

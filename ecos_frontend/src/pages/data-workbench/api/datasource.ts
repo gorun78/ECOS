@@ -8,8 +8,11 @@ import {
   statusOfResponse, isNetworkFailure, httpStatusText, DATANET_DS,
 } from './_base';
 // #142/B4-3e-47（D-B4-76 前端腿）：预览腿的族根取 `api/dataClient` 导出的属主常量（含 `/api` 前缀、
-// 生产 BFF 与 vite dev 双轨皆可承流）。本域 `_base.DATANET_DS` 的无 `/api` 形态只在该文件的既有五腿
-// 里活着，属同族第二属主且仅 dev 可用，已登记 D-B4-79 待收口——新腿不得沿用，否则把 dev-only 面再扩一处。
+// 生产 BFF 与 vite dev 双轨皆可承流）。#142/B4-3e-68（D-B4-79 收口）：本域 `_base.DATANET_DS`
+// 的无 `/api` 第二形态已按别名重导出口径退役——六腿引用名逐字不变、逐腿端点与动词不变，但
+// 四个反引号模板腿的运行期 URL 由 `/datanet/datasource/…` 换承流轨道为 `/api/v1/datanet/datasource/…`
+// （后端 `DataSourceController` 类级映射双路径 `{/api/v1/…, /…}` 均承流、后者存量不动），
+// D-B4-79 登记的两形态并存已消除，新腿与旧腿同取一枚族根。
 import { DATANET_DATASOURCE_BASE } from '../../../api/dataClient';
 import { mapDsToConn } from './mappers';
 import type { DataConnection } from '../types';

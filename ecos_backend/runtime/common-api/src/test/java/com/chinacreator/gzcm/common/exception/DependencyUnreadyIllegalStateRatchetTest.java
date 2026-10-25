@@ -41,8 +41,12 @@ import static org.junit.jupiter.api.Assertions.fail;
  * （当年口径既漏了「未注入／未启用」两族，又把 JVM 算法腿算了进去）。</p>
  *
  * <p><b>上面那段是 #142/B4-3e-38 的首版读数，后续批已把它压干</b>：3e-39 按承流面实测订正＋
- * 3e-40～3e-43 四批属主侧改抛之后，本门现值＝总站点 <b>133</b>、DEPENDENCY 面 <b>15</b>、
- * ENV_ALGO 10、UNREADABLE 8、OTHER 100（15＋10＋100＋8＝133，四面各自独立钉值、禁减法）。
+ * 3e-40～3e-43 四批属主侧改抛之后，本门现值＝总站点 <b>137</b>、DEPENDENCY 面 <b>15</b>、
+ * ENV_ALGO 10、UNREADABLE 8、OTHER 104（15＋10＋104＋8＝137，四面各自独立钉值、禁减法；
+ * 133→137 的 +4 是 #142/B4-3e-63／3e-64 数据源类型词表收口批在同后端面新增的四枚
+ * 契约违约腿（runtime-access {@code DataSourceTypeVocabulary} 两枚＋data-engine
+ * {@code DataSourceController} 两枚），词表不命中、语义为构造期违约即抛，落入 OTHER
+ * 面而未随批重测本门——本批（#142/B4-3e-68）按门规「重测后同批改」补齐重设）。
  * 引用这段历史数字时一律以 {@code TOTAL_SITE_BASELINE}／{@code DEPENDENCY_FACE_BASELINE}
  * 的声明现值为准，否则等于把已收口的腿再判一次欠账。</p>
  *
@@ -251,11 +255,19 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 11 → <b>10</b>、真欠账面 11 → <b>10</b>——已承载腿 13 未动（data-engine 零枚 advice，
      * 该腿此前本就不在承载面上；承载面判定的盲区另登 D-B4-72，见 {@code CARRIER_BASELINE} 注释）。
      * 该文件剩下的 3 枚 MC04 违规腿是策略拒绝，留在 OTHER 面（值 100 未动）。</p>
+     *
+     * <p><b>#142/B4-3e-68 同批重设（词表收口批漏测补账）</b>：3e-63／3e-64 在
+     * runtime-access {@code DataSourceTypeVocabulary}（词表规范名重复／别名冲突两枚）与
+     * data-engine {@code DataSourceController}（词表成员规范名为空／别名表 null 两枚）新增
+     * 四枚<b>构造期契约违约腿</b>（词表不命中、语义为「数据源类型目录无法构造，禁静默跳过」，
+     * 非依赖未就绪），落入 OTHER 面而未随批重测本门，致本门在下批全模块跑中按设计变红。
+     * 本批按门规「必须重测后同批改」重设：总站点 133 → <b>137</b>、OTHER 面 100 → <b>104</b>，
+     * DEPENDENCY／ENV_ALGO／UNREADABLE 三面未动（15／10／8）。</p>
      */
-    private static final int TOTAL_SITE_BASELINE = 133;
+    private static final int TOTAL_SITE_BASELINE = 137;
     private static final int DEPENDENCY_FACE_BASELINE = 15;
     private static final int ENV_ALGO_FACE_BASELINE = 10;
-    private static final int OTHER_FACE_BASELINE = 100;
+    private static final int OTHER_FACE_BASELINE = 104;
     private static final int UNREADABLE_FACE_BASELINE = 8;
 
     /**
