@@ -114,6 +114,20 @@ public class SecurityEngineClient {
      */
     private final RestTemplate serviceRestTemplate;
 
+    /**
+     * <b>装配契约（#142/B4-3e-75）</b>：本类两条构造器面＝
+     * 生产 {@link #SecurityEngineClient(String, int)}（{@code @Value} 路由，带本注解）
+     * ＋ 包私有测试缝 {@code SecurityEngineClient(String,int,RestTemplate)}（无注解、同包单测注入替身）。
+     * <p><b>本 {@code @Autowired} 是必填的</b>：Spring 6 规则——含 ≥2 构造器且无
+     * {@code @Autowired} 显式标注时，若也没有公共无参候选，实例化策略退化为
+     * {@code SimpleInstantiationStrategy} 试图调 {@code <init>()} ⇒
+     * {@code NoSuchMethodException / BeanInstantiationException "No default constructor found"}，
+     * 宿主 context refresh 直接失败（本批实取证：gateway :8080 / buszhi :18083 /
+     * workspace :18090 三 fat-jar 全量 context 起不来的同一根因）。
+     * 缺失时"绿"反而更糟——单测对本类全部是手工 {@code new}，装载 Spring context 的
+     * 集成用例在这个模块下零枚，回归靠生产启动才会现形。</p>
+     */
+    @Autowired
     public SecurityEngineClient(
             @Value("${service.security.base-url:http://localhost:18081}") String baseUrl,
             @Value("${service.security.timeout-ms:5000}") int timeoutMs) {

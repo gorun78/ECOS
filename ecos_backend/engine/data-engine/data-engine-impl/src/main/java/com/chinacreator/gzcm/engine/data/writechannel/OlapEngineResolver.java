@@ -47,6 +47,12 @@ public class OlapEngineResolver {
 
     private final String configuredOlapEngine;
 
+    /**
+     * <b>装配契约（#142/B4-3e-75）</b>：{@code @Autowired} 钉生产构造器。
+     * 缺一枚时 Spring 6 规则下会选无参腿（静默丢 {@code dw.olap.engine} 配置），
+     * 与 SecurityEngineClient「选不了⇒炸」同族异果，见该类 javadoc。
+     */
+    @org.springframework.beans.factory.annotation.Autowired
     public OlapEngineResolver(@Value("${dw.olap.engine:}") String configuredOlapEngine) {
         this.configuredOlapEngine = configuredOlapEngine == null ? "" : configuredOlapEngine.trim().toLowerCase();
     }
