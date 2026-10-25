@@ -7,15 +7,32 @@ import type { DataConnection } from './types';
 export const getErrorMessage = (e: unknown): string =>
   e instanceof Error ? e.message : '';
 
-export const getSourceIcon = (type: string) => {
-  switch (type) {
-    case 'postgresql': return 'Database';
-    case 's3': return 'Cloud';
-    case 'rest_api': return 'Globe';
-    case 'sftp': return 'FolderGit';
-    case 'sap': return 'Cpu';
-    default: return 'HardDrive';
-  }
+/**
+ * 未解析图标的唯一读数（#142/B4-3e-66，差距 <b>D-B4-95</b>）。
+ *
+ * <p>与 {@code 'unknown'} 不入 {@code CONNECTION_TYPES} 选项面同理：它不是某一枚类型，
+ * 而是「没解析出来」的读数，所以放在表外、由 {@link getSourceIcon} 单点持有。
+ * 改前 `default` 落 {@code 'HardDrive'}，而 HardDrive 正是本地文件系统（{@code fs}）的图标
+ * ——14 枚已知类型（MySQL/Oracle/DM/KingBase/GaussDB/OSS/MinIO/CSV/Kafka/MongoDB/Doris/
+ * ClickHouse/MSSQL/MongoDB 等）全部显示成「本地磁盘」＝同族第四处「已知折成同一个默认读数」。</p>
+ */
+export const UNRESOLVED_ICON = 'CircleQuestionMark';
+
+/**
+ * 连接类型图标名（单源 = {@code CONNECTION_TYPES.iconName}，19 枚逐枚在位）。
+ *
+ * <p>改前本函数自带 5 枚私有 switch＋{@code default 'HardDrive'}；现与名称面
+ * {@code i18nKey}、说明面 {@code descKey} 读同一份表。解析不到（含 {@code 'unknown'}
+ * 读数与运行时表外值）出 {@link UNRESOLVED_ICON} 显式未解析图标，<b>禁借用任何一枚
+ * 已知类型的图标</b>。</p>
+ *
+ * <p>图标名须经 {@code LucideIcon.tsx} 的 {@code iconMap} 桥接才会画出来，桥接缺位时
+ * 该包装器 {@code console.warn} 后落 {@code AlertTriangle}——那又是一次静默折叠，
+ * 故逐枚在位由前端门 {@code b4ConnTypeIconChannel.spec.ts} 对账。</p>
+ */
+export const getSourceIcon = (type: string): string => {
+  const option = CONNECTION_TYPES.find((o) => o.value === type);
+  return option ? option.iconName : UNRESOLVED_ICON;
 };
 
 /**

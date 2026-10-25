@@ -141,32 +141,42 @@ export type DisplayConnType = ConnType | 'unknown';
  * `helpers.ts#getSourceTypeLabel` 自带一份 5 枚私有 switch 表（只覆盖
  * postgresql/s3/rest_api/sftp/sap），其余 14 枚已知类型一律落 `dw.src.unknown`
  * ＝把「我们知道」显示成「未知数据源」，与同族 D-B4-93「无配置即猜」同形。
+ *
+ * #142/B4-3e-66（差距 <b>D-B4-95</b> 收口）：本表新增 `iconName`＝lucide-react 图标名，
+ * 使图标面也归一到同一份表。改前图标由 `helpers.ts#getSourceIcon` 自带一份 <b>5 枚</b>
+ * 私有 switch（postgresql→Database／s3→Cloud／rest_api→Globe／sftp→FolderGit／sap→Cpu），
+ * `default` 一律落 `'HardDrive'`——其余 <b>14 枚已知类型</b>共用同一枚图标，是与 D-B4-94
+ * 同族的第四处「已知折成同一个默认读数」。现 19 枚逐枚配图且两两不重复，
+ * `HardDrive` 归还给它真正对应的 `fs`；未解析读数改用显式的 `CircleQuestionMark`
+ * （由 `helpers.ts#getSourceIcon` 单点持有，不入本表）。图标名须经 `LucideIcon.tsx`
+ * 的 `iconMap` 桥接才可见，故该桥接面逐枚在位由前端门 `b4ConnTypeIconChannel.spec.ts` 对账
+ * （缺桥＝界面静默落 `AlertTriangle`＝又一次折叠）。
  */
-export const CONNECTION_TYPES: { value: ConnType; i18nKey: string; descKey: string; tier: 'relational' | 'domestic' | 'object-storage' | 'file' | 'message' | 'api' }[] = [
+export const CONNECTION_TYPES: { value: ConnType; i18nKey: string; descKey: string; iconName: string; tier: 'relational' | 'domestic' | 'object-storage' | 'file' | 'message' | 'api' }[] = [
   // 关系型
-  { value: 'postgresql', i18nKey: 'dw.connType.postgresql', descKey: 'dw.src.postgresql', tier: 'relational' },
-  { value: 'mysql', i18nKey: 'dw.connType.mysql', descKey: 'dw.src.mysql', tier: 'relational' },
-  { value: 'doris', i18nKey: 'dw.connType.doris', descKey: 'dw.src.doris', tier: 'relational' },
-  { value: 'clickhouse', i18nKey: 'dw.connType.clickhouse', descKey: 'dw.src.clickhouse', tier: 'relational' },
-  { value: 'oracle', i18nKey: 'dw.connType.oracle', descKey: 'dw.src.oracle', tier: 'relational' },
-  { value: 'mssql', i18nKey: 'dw.connType.mssql', descKey: 'dw.src.mssql', tier: 'relational' },
+  { value: 'postgresql', i18nKey: 'dw.connType.postgresql', descKey: 'dw.src.postgresql', iconName: 'Database', tier: 'relational' },
+  { value: 'mysql', i18nKey: 'dw.connType.mysql', descKey: 'dw.src.mysql', iconName: 'DatabaseZap', tier: 'relational' },
+  { value: 'doris', i18nKey: 'dw.connType.doris', descKey: 'dw.src.doris', iconName: 'Layers', tier: 'relational' },
+  { value: 'clickhouse', i18nKey: 'dw.connType.clickhouse', descKey: 'dw.src.clickhouse', iconName: 'Zap', tier: 'relational' },
+  { value: 'oracle', i18nKey: 'dw.connType.oracle', descKey: 'dw.src.oracle', iconName: 'Server', tier: 'relational' },
+  { value: 'mssql', i18nKey: 'dw.connType.mssql', descKey: 'dw.src.mssql', iconName: 'DatabaseBackup', tier: 'relational' },
   // 国产库
-  { value: 'dm', i18nKey: 'dw.connType.dm', descKey: 'dw.src.dm', tier: 'domestic' },
-  { value: 'kingbase', i18nKey: 'dw.connType.kingbase', descKey: 'dw.src.kingbase', tier: 'domestic' },
-  { value: 'gaussdb', i18nKey: 'dw.connType.gaussdb', descKey: 'dw.src.gaussdb', tier: 'domestic' },
+  { value: 'dm', i18nKey: 'dw.connType.dm', descKey: 'dw.src.dm', iconName: 'Landmark', tier: 'domestic' },
+  { value: 'kingbase', i18nKey: 'dw.connType.kingbase', descKey: 'dw.src.kingbase', iconName: 'KeyRound', tier: 'domestic' },
+  { value: 'gaussdb', i18nKey: 'dw.connType.gaussdb', descKey: 'dw.src.gaussdb', iconName: 'Gauge', tier: 'domestic' },
   // 对象存储
-  { value: 's3', i18nKey: 'dw.connType.s3', descKey: 'dw.src.s3', tier: 'object-storage' },
-  { value: 'oss', i18nKey: 'dw.connType.oss', descKey: 'dw.src.oss', tier: 'object-storage' },
-  { value: 'minio', i18nKey: 'dw.connType.minio', descKey: 'dw.src.minio', tier: 'object-storage' },
+  { value: 's3', i18nKey: 'dw.connType.s3', descKey: 'dw.src.s3', iconName: 'Cloud', tier: 'object-storage' },
+  { value: 'oss', i18nKey: 'dw.connType.oss', descKey: 'dw.src.oss', iconName: 'CloudCog', tier: 'object-storage' },
+  { value: 'minio', i18nKey: 'dw.connType.minio', descKey: 'dw.src.minio', iconName: 'Boxes', tier: 'object-storage' },
   // 文件
-  { value: 'csv', i18nKey: 'dw.connType.csv', descKey: 'dw.src.csv', tier: 'file' },
-  { value: 'sftp', i18nKey: 'dw.connType.sftp', descKey: 'dw.src.sftp', tier: 'file' },
-  { value: 'fs', i18nKey: 'dw.connType.fs', descKey: 'dw.src.fs', tier: 'file' },
+  { value: 'csv', i18nKey: 'dw.connType.csv', descKey: 'dw.src.csv', iconName: 'FileSpreadsheet', tier: 'file' },
+  { value: 'sftp', i18nKey: 'dw.connType.sftp', descKey: 'dw.src.sftp', iconName: 'FolderGit', tier: 'file' },
+  { value: 'fs', i18nKey: 'dw.connType.fs', descKey: 'dw.src.fs', iconName: 'HardDrive', tier: 'file' },
   // 消息/API
-  { value: 'kafka', i18nKey: 'dw.connType.kafka', descKey: 'dw.src.kafka', tier: 'message' },
-  { value: 'mongodb', i18nKey: 'dw.connType.mongodb', descKey: 'dw.src.mongodb', tier: 'relational' },
-  { value: 'sap', i18nKey: 'dw.connType.sap', descKey: 'dw.src.sap', tier: 'api' },
-  { value: 'rest_api', i18nKey: 'dw.connType.restApi', descKey: 'dw.src.rest_api', tier: 'api' },
+  { value: 'kafka', i18nKey: 'dw.connType.kafka', descKey: 'dw.src.kafka', iconName: 'Radio', tier: 'message' },
+  { value: 'mongodb', i18nKey: 'dw.connType.mongodb', descKey: 'dw.src.mongodb', iconName: 'Leaf', tier: 'relational' },
+  { value: 'sap', i18nKey: 'dw.connType.sap', descKey: 'dw.src.sap', iconName: 'Cpu', tier: 'api' },
+  { value: 'rest_api', i18nKey: 'dw.connType.restApi', descKey: 'dw.src.rest_api', iconName: 'Globe', tier: 'api' },
 ];
 
 /** PMO-48-T5: 标准版禁用的类型(旗舰/企业专属)。fs(本地文件/文件夹数据源) 全版本可用，不在此列。 */

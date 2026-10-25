@@ -47,11 +47,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 的 5 枚私有说明表已删除，类型说明改由 {@code CONNECTION_TYPES.descKey} 承载（19 枚逐枚在位），
  * 由前端门 {@code b4ConnTypeDescChannel.spec.ts} 持有面值与行为对账，本门不重复钉（避免第二属主）。</p>
  *
- * <p><b>在册余项（台账 v1.0.147）</b>：{@code doris} 是否准入；被拒闭集 9 枚——{@code doris}/{@code s3}/
+ * <p><b>同批已做（#142/B4-3e-66 追加）</b>：⑥ 第四处显示通道归一——{@code helpers.ts#getSourceIcon}
+ * 的 5 枚私有图标表已删除（{@code default} 曾把其余 14 枚已知类型一律折成 {@code fs} 的那枚图标），
+ * 图标名改由 {@code CONNECTION_TYPES.iconName} 承载（19 枚逐枚在位且两两不重复），
+ * 未解析读数表外单点持有；面值、{@code LucideIcon.tsx} 的 {@code iconMap} 桥接面与
+ * {@code lucide-react} 导出面三侧对账由前端门 {@code b4ConnTypeIconChannel.spec.ts} 持有，
+ * 本门不重复钉（同上，避免第二属主）。</p>
+ *
+ * <p><b>在册余项（台账 v1.0.148）</b>：{@code doris} 是否准入；被拒闭集 9 枚——{@code doris}/{@code s3}/
  * {@code oss}/{@code csv}/{@code sftp}/{@code kafka}/{@code mongodb}/{@code sap}/{@code rest_api}——的逐枚定档
  * （下线或接承流）：#142/B4-3e-64 把它们从<b>可选面</b>裁掉，但 19 枚显示元数据面仍在（历史连接记录要出名字），
- * 下线须另批处置；{@code helpers.ts#getSourceIcon} 的 5 枚私有图标表（其余落 {@code HardDrive} 默认）
- * 与已归一的名称／说明两面口径不一致，登记为 <b>D-B4-95</b> 待归一。</p>
+ * 下线须另批处置；名称／说明／图标三条显示通道至此均已归一到同一份显示元数据面，
+ * 第四条候选面已逐处判定不立案（台账 v1.0.148）：{@code Modals.tsx} 里以字符串出现的图标名
+ * 实测 9 处站点／7 枚具名——弹窗标题装饰（{@code Database}、{@code Import}）、关闭钮（{@code X}×2）、
+ * 加载态（{@code Loader2}）、失败态与测试结果三元式（{@code XCircle}×2、{@code CheckCircle}）、
+ * 告警态（{@code AlertTriangle}×2）——<b>均为状态/装饰通道，不由数据源类型驱动</b>，
+ * 与本族「类型→显示读数折叠」病灶不同形，不入单源表。</p>
  */
 class DatasourceTypeVocabularySingleSourceTest {
 
