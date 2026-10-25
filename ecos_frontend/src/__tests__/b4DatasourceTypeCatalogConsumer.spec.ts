@@ -4,12 +4,14 @@
  *
  * <p><b>本门盯的病灶（D-B4-78 前端侧腿 ＋ D-B4-93）</b>：改前「能新建哪些数据源」在前端只有一处
  * 事实源——`types.ts` 的 `CONNECTION_TYPES` 硬编码 19 枚，后端承流面（`DataSourceTypeVocabulary.registrable()`
- * ＝ `DataSourceServiceImpl.SUPPORTED_TYPES`）只有 10 枚，两处零机器对账。后果是 9 枚幻影选项
- * （`doris`/`s3`/`oss`/`csv`/`sftp`/`kafka`/`mongodb`/`sap`/`rest_api`）在下拉里可选、提交只能撞 400；
+ * ＝ `DataSourceServiceImpl.SUPPORTED_TYPES`）只有 10 枚（#142/B4-3e-71 起 doris 接承流扩 11 枚），两处零机器对账。
+ * 后果是 8 枚幻影选项
+ * （`s3`/`oss`/`csv`/`sftp`/`kafka`/`mongodb`/`sap`/`rest_api`）在下拉里可选、提交只能撞 400；
  * 另一枚同族 fail-open（D-B4-93）是显示通道 `mapDsType` 的词表外名一律回落 `'postgresql'`——
  * 「这条数据源到底是什么类型」在界面上被猜成了默认值，与详设 §4.7.2「无配置＝按别族猜」同型。</p>
  *
- * <p><b>本门的分工</b>：跨面枚数对账（19 枚显示面 ↔ 10 枚准入面，逐枚承流／被拒闭集）由后端
+ * <p><b>本门的分工</b>：跨面枚数对账（19 枚显示面 ↔ 准入面 11 枚，#142/B4-3e-71
+ * 起含 doris；逐枚承流／被拒闭集）由后端
  * `gateway/arch/DatasourceTypeVocabularySingleSourceTest` 持有——它是唯一同时能读 Java 枚举与 TS 面的门。
  * 本门只管<b>前端消费侧</b>：① 弹窗不再引 `CONNECTION_TYPES` 作可选面，改消费属主出口；
  * ② 通道 URL 落在承流面族根、不落 F02-01 判定的兼容别名面；③ 目录解析的分态判据（空目录／坏形状＝失败，
@@ -154,21 +156,25 @@ describe('b4DatasourceTypeCatalogConsumer: 弹窗类型面切属主单源通道 
       { value: 'gaussdb', i18nKey: 'x', tier: 'domestic' },
       { value: 'fs', i18nKey: 'x', tier: 'file' },
       { value: 'doris', i18nKey: 'x', tier: 'relational' },
+      { value: 's3', i18nKey: 'x', tier: 'object' },
     ] as unknown as typeof CONNECTION_TYPES;
 
     const catalog = [
       { canonical: 'POSTGRESQL', aliases: [] },
       { canonical: 'GAUSS', aliases: ['GAUSSDB'] },
       { canonical: 'FILESYSTEM', aliases: [] },
+      { canonical: 'DORIS', aliases: [] },
       { canonical: 'TIMESCALE_NEW', aliases: [] },
     ];
     const got = deriveSupportedOptions(catalog, face);
-    // 别名承载同物异名（GAUSSDB→gaussdb）、toApiType 反查承载 fs→FILESYSTEM，均无需新增第二份表
-    expect(got.options.map((o) => o.value)).toEqual(['postgresql', 'gaussdb', 'fs']);
+    // 别名承载同物异名（GAUSSDB→gaussdb）、toApiType 反查承载 fs→FILESYSTEM，均无需新增第二份表；
+    // #142/B4-3e-71 起 DORIS 接承流：目录含 DORIS ⇒ doris 显示枚保留在选项面
+    expect(got.options.map((o) => o.value)).toEqual(['postgresql', 'gaussdb', 'fs', 'doris']);
     // 属主新增而前端无显示归属：具名上报，禁静默丢枚（页面据此出告警横幅）
     expect(got.unresolvedCanonical).toEqual(['TIMESCALE_NEW']);
-    // 目录外的显示枚（doris）被裁剪——D-B4-78 用户面的直接收口：下拉里不再有撞 400 的选项
-    expect(got.options.map((o) => o.value)).not.toContain('doris');
+    // #142/B4-3e-71 定档「保留显示面、永不入业务准入」：s3 在承流目录外 ⇒ 选项面剔除，
+    // 同 D-B4-78 用户面的直接收口：下拉里没有必撞 400 的选项
+    expect(got.options.map((o) => o.value)).not.toContain('s3');
 
     // 反向夹具：目录一枚都解析不到 ⇒ options 空而 unresolved 全量具名（堵住「裁剪判据恒真」）
     const none = deriveSupportedOptions([{ canonical: 'ZZZ', aliases: [] }], face);
@@ -191,8 +197,9 @@ describe('b4DatasourceTypeCatalogConsumer: 弹窗类型面切属主单源通道 
     expect(connTypeBadgeText({ type: 'unknown', typeRaw: 'TIMESCALE_NEW' }, t))
       .toBe(`${zh['dw.connType.unknown']} (TIMESCALE_NEW)`);
     expect(connTypeBadgeText({ type: 'unknown', typeRaw: '' }, t)).toBe(zh['dw.connType.unknown']);
-    // 显示枚面被裁（type 不在 CONNECTION_TYPES）也须带原值上抛，禁落回裸标识键
-    const pruned = connTypeBadgeText({ type: 'doris', typeRaw: 'DORIS' }, t);
-    expect(pruned.length, '显示枚无 i18n 归属时须带原值显式上报').toBeGreaterThan(0);
+    // 运行时值在显示面无归属（伪造枚 ZZZ 不在 CONNECTION_TYPES）也须带原值上抛，禁落回裸标识键；
+    // #142/B4-3e-71 起 doris 是有显示归属的承流枚，不再充当「被裁样例」
+    const forged = connTypeBadgeText({ type: 'ZZZ' as never, typeRaw: 'ZZZ' }, t);
+    expect(forged, '显示枚无 i18n 归属时须带原值显式上报').toBe(`${zh['dw.connType.unknown']} (ZZZ)`);
   });
 });

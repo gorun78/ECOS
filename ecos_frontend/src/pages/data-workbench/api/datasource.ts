@@ -488,9 +488,10 @@ export async function fetchSchemaPreview(payload: SchemaPreviewPayload): Promise
 //
 // <p>改前「可新建哪些数据源」这件事在前端只有一处事实源——`types.ts` 的
 // `CONNECTION_TYPES` 硬编码 19 枚，后端承流面（`DataSourceTypeVocabulary.registrable()`
-// ＝服务准入面 `SUPPORTED_TYPES`）只有 10 枚，两处零对账。后果即 D-B4-78 的用户面：
-// 下拉里能选 `doris/s3/oss/csv/sftp/kafka/mongodb/sap/rest_api` 这 9 枚后端不承流的类型，
-// 提交只能撞 400。后端属主出口 `supported-types` 早已存在（且只存在于 F02-01 判定的
+// ＝服务准入面 `SUPPORTED_TYPES`）只有 10 枚（#142/B4-3e-71 起 doris 接承流扩 11 枚），两处零对账。
+// 后果即 D-B4-78 的用户面：
+// 下拉里能选 `doris/s3/oss/csv/sftp/kafka/mongodb/sap/rest_api` 这 9 枚中 8 枚后端不承流的类型，
+// 提交只能撞 400（doris 已在 B4-3e-71 显式接承流）。后端属主出口 `supported-types` 早已存在（且只存在于 F02-01 判定的
 // <b>兼容别名面</b> `/api/v1/datasource`，前端零消费）。本批：承流面补同口径出口
 // （`DataSourceController#supportedTypes`），前端改消费承流面 ⇒ 下拉与准入恒等。</p>
 //

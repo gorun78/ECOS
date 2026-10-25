@@ -23,7 +23,8 @@ import java.util.Set;
  * <p>收敛后的分工（本批只动承流侧，准入集不扩面）：</p>
  * <ul>
  *   <li>{@link #registrable()} 决定服务准入面——{@code DataSourceServiceImpl.SUPPORTED_TYPES}
- *       改为由本枚举派生，枚数与收口前<b>逐枚相同</b>（10 枚），本批不因归一命名而放宽准入；</li>
+ *       改为由本枚举派生，枚数与收口前<b>逐枚相同</b>（10 枚），本批不因归一命名而放宽准入；
+ *       其后 #142/B4-3e-71 被拒闭集逐枚定档，DORIS 显式接承流，准入面 10→11 枚；</li>
  *   <li>{@link #connectorTarget()} 决定连接器归一面——{@code ConnectorFactory} 的白名单与
  *       别名表改为由本枚举派生，原有 16 条别名键的解析结果不变（由回归案钉住）；</li>
  *   <li>{@link #dialect()}／{@link #defaultPort()}／{@link #driverClass()} 决定 JDBC 方言面——
@@ -78,11 +79,27 @@ public enum DataSourceTypeVocabulary {
     /** 本地文件系统 —— 同上，无连接器 bean。 */
     FILESYSTEM(List.of(), "FILESYSTEM", null, null, null, true, false),
 
-    // ── 工厂别名面既有、但服务准入面从未纳入的类型（registrable ＝ false，本批不扩准入）──
+    // ── 工厂别名面既有、但服务准入面从未纳入的类型（DORIS 已判「接承流」；其余 registrable＝未裁面 false）──
 
-    /** Doris —— 铁律 2.5#1 要求统一经 JdbcConnector；FE 走 MySQL 协议，方言按 MySQL 承流，但登记为数据源仍属未裁余项。 */
+    /**
+     * Doris —— 铁律 2.5#1 要求统一经 JdbcConnector；FE 走 MySQL 协议，方言按 MySQL 承流。
+     *
+     * <p>#142/B4-3e-71（B4 被拒闭集 9 枚逐枚定档）：本枚判「接承流」——
+     * ①后端承流已有真实承重：{@code data-engine-impl} {@code SqlConsoleRegressionDorisTest}
+     * 证 DORIS 归一 JDBC 走 DORIS_CONFIG 建连、{@code JdbcAdapterFactory#DorisAdapter} 注册、
+     * {@code StorageType.DORIS} 落 APPLICATION 层（详设-02 §4.6 storage_kind 三枚之一）；
+     * ②前端面早已存在 {@code DORIS} 显示枚（{@code CONNECTION_TYPES} 声明序第 3 枚，
+     * i18n／desc／icon 通道三侧齐备）；③数据面既有 PMO-48-T5 字段（{@code feHost}／
+     * {@code feHttpPort}）。本枚因此扩准——不属于「静默扩面」，是显式裁决：
+     * 承流已有、前端已备、显示面已备，草案里唯一欠的
+     * {@code should be registered but false} 属「候选未裁」而非「应拒」。
+     * 扩面时三门同批：{@link #registrable()} → true、gate
+     * {@code DatasourceTypeVocabularySingleSourceTest.ACCEPTED_FROZEN} 10→11 加 "doris"
+     * 并剪 "doris" 出 {@code REJECTED_FROZEN}、{@code DataSourceTypeCatalogCarrierTest}
+     * {@code REGISTRABLE_ORDER} 10→11 加 "DORIS"。</p>
+     */
     DORIS(List.of(), "JDBC", Dialect.MYSQL, "9030",
-            "com.mysql.cj.jdbc.Driver", false, false),
+            "com.mysql.cj.jdbc.Driver", true, false),
 
     /** MariaDB —— 收口前在别名表内归一 JDBC，却无任何方言，静默按 PostgreSQL 拼 URL（本批改显式）。 */
     MARIADB(List.of(), "JDBC", null, null, null, false, false),

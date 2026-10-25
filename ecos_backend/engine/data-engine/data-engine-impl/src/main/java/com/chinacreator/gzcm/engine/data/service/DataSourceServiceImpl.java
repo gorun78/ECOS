@@ -57,10 +57,11 @@ public class DataSourceServiceImpl implements DataSourceService {
      *
      * <p>#142/B4-3e-63（D-B4-78）：由手抄 {@code Set.of(...)} 改为
      * {@link DataSourceTypeVocabulary#registrableTypes()} 单源派生。枚数与成员与收口前
-     * <b>逐枚相同</b>（10 枚：POSTGRESQL／MYSQL／ORACLE／MSSQL／DM／KINGBASE／GAUSS／
-     * CLICKHOUSE／MINIO／FILESYSTEM）——本批只做命名归一与单源化，<b>不因归一而放宽准入</b>：
-     * 词表里 DORIS／MARIADB／HSQLDB／DB2／MONGODB 与 pipeline 规范类型仍不可登记。
-     * 枚数由 {@code DataSourceTypeVocabularyTest} 钉值。</p>
+     * <b>逐枚相同</b>（收口时 10 枚：POSTGRESQL／MYSQL／ORACLE／MSSQL／DM／KINGBASE／GAUSS／
+     * CLICKHOUSE／MINIO／FILESYSTEM）——本批只做命名归一与单源化，<b>不因归一而放宽准入</b>。
+     * 其后 #142/B4-3e-71 被拒闭集逐枚定档，DORIS 显式接承流扩入第 11 枚；
+     * MARIADB／HSQLDB／DB2／MONGODB 与 pipeline 规范类型仍不可登记。
+     * 枚数由 {@code DataSourceTypeVocabularyTest} 钉值（现 11 枚）。</p>
      */
     public static final Set<String> SUPPORTED_TYPES = DataSourceTypeVocabulary.registrableTypes();
 

@@ -29,7 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * DataSourceTypeCatalogCarrierTest — 数据源类型目录的承流侧取证（#142/B4-3e-64，D-B4-78 前端侧腿的属主出口）。
  *
  * <p><b>本门盯的病灶</b>：改前「可登记哪些数据源」有三个各自演化的面——服务准入面
- * {@code DataSourceServiceImpl.SUPPORTED_TYPES}（10 枚）、工厂别名面（含 {@code SQLSERVER}/{@code GAUSSDB}
+ * {@code DataSourceServiceImpl.SUPPORTED_TYPES}（2026-10-25 收口 10 枚、#142/B4-3e-71
+ * 起 DORIS 接承流扩 11 枚）、工厂别名面（含 {@code SQLSERVER}/{@code GAUSSDB}
  * 等异名）、前端下拉面 {@code CONNECTION_TYPES}（19 枚，含 9 枚后端根本不承流的幻影选项，即 D-B4-78
  * 的用户面读数：选了只能撞 400）。B4-3e-63 把前两枚归一到属主枚举
  * {@link DataSourceTypeVocabulary}；本批补的是<b>承流出口</b>：前端改读
@@ -43,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>判据失明防护</b>：冻结表按「枚举声明序 + 枚名」双重钉值，且源码扫描要求目录构造只遍历
  * {@code DataSourceTypeVocabulary.values()} 并按 {@code registrable()} 过滤、不得出现任何类型名硬编码——
- * 一旦有人在本类手抄第二份表（D-B4-78 的原始形态），即使 10 枚数值仍对得上也会变红。</p>
+ * 一旦有人在本类手抄第二份表（D-B4-78 的原始形态），即使 11 枚数值仍对得上也会变红。</p>
  */
 @DisplayName("#142/B4-3e-64 数据源类型目录承流出口（单源＋恰两键＋禁第二份表）")
 class DataSourceTypeCatalogCarrierTest {
@@ -61,20 +62,24 @@ class DataSourceTypeCatalogCarrierTest {
      * 冻结表：{@code registrable} 成员的枚举声明序（2026-10-25 自
      * {@link DataSourceTypeVocabulary} 逐枚读出，非手抄）。任何扩面／改序都要在此显式订正，
      * 并与前端 {@code deriveSupportedOptions} 的裁剪结果一起过门。
+     *
+     * <p>#142/B4-3e-71：被拒闭集 9 枚逐枚定档，DORIS 判「接承流」——末位追加第 11 枚
+     * {@code DORIS}（声明序上它排在未裁组首位，恰好落在 registrable 面尾）。其余 8 枚
+     * （s3/oss/csv/sftp/kafka/mongodb/sap/rest_api）保留显示面、永不入业务准入，本表不扩。</p>
      */
     private static final List<String> REGISTRABLE_ORDER = List.of(
             "POSTGRESQL", "MYSQL", "ORACLE", "MSSQL", "DM", "KINGBASE", "GAUSS",
-            "CLICKHOUSE", "MINIO", "FILESYSTEM");
+            "CLICKHOUSE", "MINIO", "FILESYSTEM", "DORIS");
 
     // ── ① 目录成员＝服务准入面（禁第二份表，运行期对账）──────────────────
 
     @Test
-    @DisplayName("目录成员与顺序恒等于词表 registrable 声明序（10 枚冻结）")
+    @DisplayName("目录成员与顺序恒等于词表 registrable 声明序（11 枚冻结）")
     void catalogIsRegistrableInDeclarationOrder() {
         List<Map<String, Object>> catalog = DataSourceController.registrableTypeCatalog();
 
         assertEquals(REGISTRABLE_ORDER.size(), catalog.size(),
-                "准入面成员数变动须逐枚订正冻结表（本批不扩准入；DORIS 等未裁类型不得进入）");
+                "准入面成员数变动须逐枚订正冻结表（#142/B4-3e-71 已扩准入：DORIS 接承流入第 11 枚）");
 
         for (int i = 0; i < REGISTRABLE_ORDER.size(); i++) {
             assertEquals(REGISTRABLE_ORDER.get(i), catalog.get(i).get("canonical"),
@@ -159,7 +164,7 @@ class DataSourceTypeCatalogCarrierTest {
     // ── ③ 运行期成功腿：显式 200 ＋ 信封 code=0 ＋ 目录在位 ──────────────
 
     @Test
-    @DisplayName("supportedTypes() 显式 200＋成功信封＋10 枚（纯内存枚举遍历，无通道失败腿）")
+    @DisplayName("supportedTypes() 显式 200＋成功信封＋11 枚（纯内存枚举遍历，无通道失败腿）")
     void endpointReturnsCarrierEnvelope() {
         ResponseEntity<ApiResponse<List<Map<String, Object>>>> resp =
                 new DataSourceController(null).supportedTypes();

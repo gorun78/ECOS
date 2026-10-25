@@ -79,19 +79,33 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DatasourceTypeVocabularySingleSourceTest {
 
-    /** 独立钉值：收口前前端 {@code CONNECTION_TYPES} 实列 19 枚（声明序）。 */
+    /** 独立钉值：前端 {@code CONNECTION_TYPES} 实列 19 枚（声明序）。 */
     private static final List<String> FRONTEND_TYPES_FROZEN = List.of(
             "postgresql", "mysql", "doris", "clickhouse", "oracle", "mssql", "dm", "kingbase",
             "gaussdb", "s3", "oss", "minio", "csv", "sftp", "fs", "kafka", "mongodb", "sap", "rest_api");
 
-    /** 独立钉值：收口前实测「前端可选且后端承流」的 10 枚（本批 GAUSSDB 命名归一后由 9→10）。 */
+    /**
+     * 独立钉值：实测「前端可选且后端承流」的 11 枚。
+     * #142/B4-3e-71（B4 被拒闭集 9 枚逐枚定档）起：{@code doris} 由 REJECTED_FROZEN 剪出、
+     * 加入本集——后端承流（{@code SqlConsoleRegressionDorisTest}＋{@code JdbcAdapterFactory}
+     * DorisAdapter 注册）与前端承流（{@code CONNECTION_TYPES} 已列、三侧 i18n 齐备、
+     * {@code feHost}／{@code feHttpPort} 字段备用）均在位，草案的
+     * {@code registrable=false} 属「候选未裁」而非「应拒」。
+     */
     private static final List<String> ACCEPTED_FROZEN = List.of(
-            "postgresql", "mysql", "clickhouse", "oracle", "mssql", "dm", "kingbase",
+            "postgresql", "mysql", "doris", "clickhouse", "oracle", "mssql", "dm", "kingbase",
             "gaussdb", "minio", "fs");
-
-    /** 闭集棘轮基线：后端承流面未覆盖的前端选项 9 枚（只减不增；新增即红，收口一枚须同时从本集删除）。 */
+    /**
+     * 闭集棘轮基线：后端承流面未覆盖的前端选项 <b>8 枚</b>（只减不增；新增即红，收口一枚须同时
+     * 从本集删除并同步台账 v1.0.153）。#142/B4-3e-71 剪 doris（判「接承流」）后余 8 枚——
+     * {@code s3}/{@code oss}（对象存储语义，MINIO 独立枚已承接，本批不下线）／
+     * {@code csv}/{@code rest_api}（属 pipeline 规范类型 SOURCE_CSV／SOURCE_REST 的
+     * business 面永远禁止——pipeline whitelist 与业务类型是两枚不同档，见词表
+     * {@code pipelineWhitelist()}）／{@code sftp}/{@code kafka}/{@code mongodb}/{@code sap}
+     * （无对应后端承流：mongodb 在词表但 {@code registrable=false}、sftp/kafka/sap 词表外不属任何登记）。
+     */
     private static final List<String> REJECTED_FROZEN = List.of(
-            "doris", "s3", "oss", "csv", "sftp", "kafka", "mongodb", "sap", "rest_api");
+            "s3", "oss", "csv", "sftp", "kafka", "mongodb", "sap", "rest_api");
 
     /** 独立钉值：前端 {@code toApiType} 的别名规则面（收口前只有 fs→FILESYSTEM 一条）。 */
     private static final Map<String, String> API_ALIAS_FROZEN = Map.of("fs", "FILESYSTEM");
@@ -127,7 +141,7 @@ class DatasourceTypeVocabularySingleSourceTest {
     // ─── 正向面：前端 19 枚逐枚判定承流／被拒 ──────────────────────────
 
     @Test
-    @DisplayName("前端 CONNECTION_TYPES 19 枚逐枚对账：承流 10 枚不变，被拒 9 枚闭集只减不增")
+    @DisplayName("前端 CONNECTION_TYPES 19 枚逐枚对账：承流 11 枚（含 doris）、被拒 8 枚闭集只减不增")
     void frontendFaceReconciledWithCarrierFace() throws IOException {
         List<String> frontend = parseConnectionTypes(Files.readString(TYPES_TS, StandardCharsets.UTF_8));
         Map<String, String> apiAliases = parseApiTypeAliases(Files.readString(BASE_TS, StandardCharsets.UTF_8));
@@ -158,14 +172,15 @@ class DatasourceTypeVocabularySingleSourceTest {
         Set<String> rejected = new LinkedHashSet<>(rejectedOf(frontend, API_ALIAS_FROZEN));
         assertEquals(new LinkedHashSet<>(REJECTED_FROZEN), rejected,
                 "被拒面必须逐枚等于闭集基线（新增＝前端又列了后端不承流的名；减少＝该枚已承接，须从基线删除并同步台账）");
-        // 正向对照：承流判定面非空（10 枚），否则「全被拒＝0 新增」也会假绿
-        assertEquals(10, acceptedOf(frontend, API_ALIAS_FROZEN).size(), "承流枚数独立钉值 10");
+        // 正向对照：承流判定面非空（11 枚），否则「全被拒＝0 新增」也会假绿
+        assertEquals(ACCEPTED_FROZEN.size(), acceptedOf(frontend, API_ALIAS_FROZEN).size(),
+                "承流枚数独立钉值 " + ACCEPTED_FROZEN.size());
     }
 
-    // ─── 逆向面：10 枚规范名在前端标签通道各有归属 ─────────────────────
+    // ─── 逆向面：11 枚规范名在前端标签通道各有归属 ─────────────────────
 
     @Test
-    @DisplayName("逆向对账：承流面 10 枚规范名在前端别名表各有归属且可回环")
+    @DisplayName("逆向对账：承流面 11 枚规范名（#142/B4-3e-71 起含 DORIS）在前端别名表各有归属且可回环")
     void carrierFaceHasDisplayBranch() throws IOException {
         List<AliasRow> rows = parseHistoricalAliasTable(Files.readString(MAPPERS_TS, StandardCharsets.UTF_8));
         assertFalse(rows.isEmpty(), "HISTORICAL_TYPE_ALIASES 未解析到（解析器失明）");
@@ -257,7 +272,7 @@ class DatasourceTypeVocabularySingleSourceTest {
     }
 
     @Test
-    @DisplayName("反向归属对账：准入面 10 枚在前端显示面各有归属（属主目录的 unresolvedCanonical 恒空）")
+    @DisplayName("反向归属对账：准入面 11 枚（#142/B4-3e-71 起含 DORIS）在前端显示面各有归属（属主目录的 unresolvedCanonical 恒空）")
     void everyAcceptedTypeHasDisplayOwner() throws IOException {
         List<String> frontend = parseConnectionTypes(Files.readString(TYPES_TS, StandardCharsets.UTF_8));
         List<String> problems = displayOwnerProblems(frontend, API_ALIAS_FROZEN, realOwnerRequirements());
@@ -268,7 +283,8 @@ class DatasourceTypeVocabularySingleSourceTest {
     @DisplayName("夹具：前端丢一枚显示归属（fs 下线／后端新增枚未接）⇒ 反向对账具名红")
     void displayOwnerCriterionGoesRed() {
         List<OwnerRequirement> real = realOwnerRequirements();
-        assertEquals(10, real.size(), "准入面枚数独立钉值 10（解析器失明＝空需求集会让本腿恒绿）");
+        assertEquals(11, real.size(),
+                "准入面枚数独立钉值 11（#142/B4-3e-71 起含 DORIS；解析器失明＝空需求集会让本腿恒绿）");
 
         List<String> withoutFs = new ArrayList<>(FRONTEND_TYPES_FROZEN);
         withoutFs.remove("fs");
@@ -404,7 +420,7 @@ class DatasourceTypeVocabularySingleSourceTest {
      * 类型名，且回环到同一规范名。
      *
      * <p>归位规则与前端 {@code resolveHistoricalType} 逐字同构（整词命中，或长度 ≥5 的 alias
-     * 在归一化串上命中；最长命中者胜，同长分属两枚＝歧义）。本门只钉「10 枚规范名 ⇄ 显示枚 ⇄
+     * 在归一化串上命中；最长命中者胜，同长分属两枚＝歧义）。本门只钉「11 枚规范名 ⇄ 显示枚 ⇄
      * {@code toApiType} 回环」三面同名，标签通道的行为面由前端门
      * {@code b4MapDsTypeAliasTable.spec.ts} 持有——本门不重复钉逐串读数，避免第二属主。</p>
      */

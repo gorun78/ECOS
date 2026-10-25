@@ -40,10 +40,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DataSourceTypeVocabularyTest {
 
-    /** 独立钉值（收口前 {@code DataSourceServiceImpl.SUPPORTED_TYPES} 手抄 10 枚，声明序）。 */
+    /**
+     * 独立钉值：服务准入面声明序。#142/B4-3e-71 起 = 11 枚：
+     * 收口前的 10 枚＋DORIS（B4 被拒闭集 9 枚逐枚定档批显式接承流——
+     * 承流 / 前端面 / 显示面三维均已备，草案的
+     * {@code registrable=false} 属「候选未裁」而非「应拒」）。
+     */
     private static final List<String> REGISTRABLE_FROZEN = List.of(
             "POSTGRESQL", "MYSQL", "ORACLE", "MSSQL", "DM",
-            "KINGBASE", "GAUSS", "CLICKHOUSE", "MINIO", "FILESYSTEM");
+            "KINGBASE", "GAUSS", "CLICKHOUSE", "MINIO", "FILESYSTEM",
+            "DORIS");
 
     /** 独立钉值（收口前 {@code ConnectorFactory.SOURCE_TYPES} 手抄 4 枚）。 */
     private static final List<String> PIPELINE_WHITELIST_FROZEN = List.of(
@@ -59,12 +65,13 @@ class DataSourceTypeVocabularyTest {
     // ─── 准入面／白名单面：枚数与成员逐枚不变 ───────────────────────────
 
     @Test
-    @DisplayName("准入面＝收口前 10 枚逐枚一致（命名归一不等于准入扩面）")
+    @DisplayName("准入面＝收口 11 枚逐枚一致（#142/B4-3e-71 起 DORIS 扩面；改此项须同批订正台账）")
     void registrableFaceUnchanged() {
         List<String> actual = List.copyOf(DataSourceTypeVocabulary.registrableTypes());
         assertEquals(REGISTRABLE_FROZEN, actual,
-                "服务准入面成员或顺序与收口前登记不符（扩面须另立批并同步台账）");
-        assertEquals(10, actual.size(), "准入面枚数钉值 10");
+                "服务准入面成员或顺序与已登记基线不符（扩面须同批改本基线并同步台账 v1.0.153）");
+        assertEquals(REGISTRABLE_FROZEN.size(), actual.size(),
+                "准入面枚数钉值 " + REGISTRABLE_FROZEN.size());
         // 正向对照：派生面自身非空（防空枚举＝假绿）
         assertEquals(REGISTRABLE_FROZEN.size(),
                 DataSourceTypeVocabulary.registrableTypes().size());
@@ -132,8 +139,9 @@ class DataSourceTypeVocabularyTest {
         List<String> problems = dialectFaceProblems(broken);
         assertEquals(1, problems.size(), () -> "夹具应报 1 条，实报 " + problems);
         assertTrue(problems.get(0).contains("KINGBASE"), problems.toString());
-        // 正向对照：真实面 8 枚业务成员带方言（若扫描面为空则上面两条都是假绿）
-        assertEquals(8, registrableDialectFace().size(), "带方言的可登记业务成员枚数钉值 8");
+        // 正向对照：真实面 9 枚业务成员带方言 —— #142/B4-3e-71 起 DORIS 接承流后随 8→9
+        //（若扫描面为空则上面两条都是假绿）
+        assertEquals(9, registrableDialectFace().size(), "带方言的可登记业务成员枚数钉值 9");
     }
 
     /** 真实词表里「可登记业务成员 → 方言」（8 枚，白名单泛型入口不计）。 */

@@ -49,7 +49,7 @@ public class ConnectorFactory {
      * 现由 {@link DataSourceTypeVocabulary} 单源派生：键＝业务成员规范名＋别名，
      * 值＝该成员的连接器目标。收口前 16 条键的解析结果逐枚不变，唯一新增键是别名
      * {@code GAUSSDB → JDBC}（命名归一，非准入扩面——可登记集仍由
-     * {@code registrable()} 决定，枚数钉值 10）。</p>
+     * {@code registrable()} 决定，枚数现由词表钉值 11，#142/B4-3e-71 起含 DORIS）。</p>
      */
     private static final Map<String, String> RELATIONAL_ALIASES = DataSourceTypeVocabulary.aliasIndex();
 

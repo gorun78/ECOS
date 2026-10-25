@@ -135,6 +135,7 @@ export type DisplayConnType = ConnType | 'unknown';
  * `deriveSupportedOptions()` 用属主目录裁剪本表后的子集；此前 19 枚里有 9 枚
  * （`doris/s3/oss/csv/sftp/kafka/mongodb/sap/rest_api`）后端不承流，用户选了只能撞 400
  * ——本批起该 9 枚不再进入下拉（显示元数据保留，用于历史行的标签）。
+ * #142/B4-3e-71 起其中 doris 显式接承流（准入面 10→11 枚），被拒闭集收窄到 8 枚。
  *
  * #142/B4-3e-65（差距 <b>D-B4-94</b> 收口）：本表新增 `descKey`＝类型说明文案键，
  * 使「名称（i18nKey）＋说明（descKey）＋分层（tier）」三通道同源。改前说明文案由
