@@ -1728,5 +1728,8 @@
   "ontology.graph.domain.operations": "Operations",
   "ontology.graph.empty": "No object types yet — the canvas is empty",
   "ontology.graph.schematic": "Schematic layout (positions are a deterministic frontend arrangement, not spatial data)",
+  "ontology.graph.drag_hint": "Node positions are a schematic arrangement only and are never written back as spatial data",
+  "ontology.graph.select_node_aria": "Select object type {label}",
+  "ontology.graph.node_meta": "{count} properties · {id}",
   "ontology.graph.title": "Ontology Graph"
 }

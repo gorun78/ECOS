@@ -258,16 +258,16 @@ export function useSandbox(scenarioId: string | null): UseSandboxReturn {
   }, [scenarioId]);
 
   // ── 拉某类资源（带 cache）────
+  // 铁律「无假绿」：palette 每次打开都必须拉取最新清单——盲命中可用缓存会把
+  // 陈清单直接送上屏（C3 实证：二次打开 picker 里新增可用项永不出现）。
+  // 缓存仅作同批次内并发读，写操作后须整体失效。
   const fetchAvailable = useCallback(
     async (cat: SandboxAvailableCategory): Promise<SdResourceItem[]> => {
-      if (availableCache[cat]) return availableCache[cat] ?? [];
       const items = await fetchSandboxAvailable(cat);
-      if (availableCache !== null) {
-        setAvailableCache((prev) => ({ ...prev, [cat]: items }));
-      }
+      setAvailableCache((prev) => ({ ...prev, [cat]: items }));
       return items;
     },
-    [availableCache]
+    []
   );
 
   // ── 心智 variants API ──────────────────────────────────

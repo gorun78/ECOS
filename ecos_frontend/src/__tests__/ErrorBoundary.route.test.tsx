@@ -17,6 +17,9 @@ import { ThemeProvider } from '../components/ThemeContext';
 vi.mock('../api', () => ({
   apiHealth: () => Promise.resolve('UP'),
   notifyNetworkUp: vi.fn(),
+  // App.tsx pollVersion 启动即调用（Sidebar 认知引擎版本面板）：mock 缺导出会把
+  // 边界行为测试拖进 defineComponent 崩道——siblingRoutesSurviveThrow 红（W214/C196 既有红收口）。
+  apiCognitiveHealth: () => Promise.reject(new Error('mock-not-required')),
 }));
 vi.mock('../services/taskCenter', () => ({
   apiTaskStats: () =>
@@ -76,7 +79,7 @@ describe('route-level ErrorBoundary (W214)', () => {
               <Route element={<App />}>
                 <Route path="boom" element={<Boom />} />
                 <Route path="monitor" element={<Fine />} />
-                <Route path="world_model" element={<Fine />} />
+                <Route path="workbench" element={<Fine />} />
               </Route>
             </Routes>
           </ThemeProvider>
@@ -89,11 +92,14 @@ describe('route-level ErrorBoundary (W214)', () => {
     expect(screen.queryByText('FINE_SIBLING_OK')).not.toBeInTheDocument();
     expect(consoleErrorSpy).toHaveBeenCalled();
 
-    // 2) 应用外壳（Sidebar 导航按钮）不受影响 —— 崩溃被限制在 Outlet 内
-    expect(document.getElementById('side-nav-world_model'), 'sidebar shell must survive').not.toBeNull();
+    // 2) 应用外壳（Sidebar 导航按钮）不受影响 —— 崩溃被限制在 Outlet 内。
+    // 注：2026-10-14 菜单重构后「总览/工作区/资源概览」三组平铺渲染，控制面板组
+    // 靠底默认折叠（side-nav-monitor 等控制项在折叠态不在 DOM）；原断言 world_model
+    // 已摘出菜单（2026-10-14 菜单外保留），路由按钮侧改用平铺工作区项 workbench。
+    expect(document.getElementById('side-nav-workbench'), 'sidebar shell must survive').not.toBeNull();
 
     // 3) 导航到兄弟路由：key=路由根 使边界整体重挂载，兄弟路由正常渲染
-    const navBtn = document.getElementById('side-nav-monitor');
+    const navBtn = document.getElementById('side-nav-workbench');
     expect(navBtn, 'sidebar nav button for sibling route must exist').not.toBeNull();
     fireEvent.click(navBtn as HTMLElement);
 

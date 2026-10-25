@@ -1728,5 +1728,8 @@
   "ontology.graph.domain.operations": "运营域",
   "ontology.graph.empty": "暂无对象类型，画布为空",
   "ontology.graph.schematic": "示意布局（位置为前端确定性排版，非空间数据）",
+  "ontology.graph.drag_hint": "节点位置仅示意布局，不会回写为空间数据",
+  "ontology.graph.select_node_aria": "选择对象类型 {label}",
+  "ontology.graph.node_meta": "{count} 属性 · {id}",
   "ontology.graph.title": "本体图谱"
 }

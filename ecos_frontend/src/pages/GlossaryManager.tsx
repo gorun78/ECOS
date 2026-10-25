@@ -212,10 +212,10 @@ export default function GlossaryManager() {
     setSaving(true);
     try {
       await deleteGlossaryTerm(target.id);
-      // 书名号拼接文案改为 i18n 插值键（缺词期以既有键组合兜底，见 .fixtmp/need-locale-onto2.md）
+      // 占位符插值键（{name}）：键补全后内联串回落被忽略会丢词条名，改对象参透传（单花括号插值）
       showToast(
         "success",
-        t("glossary.toast.deleted_named", `${target.name} ${t("glossary.toast.deleted")}`),
+        t("glossary.toast.deleted_named", { name: target.name }),
       );
       setDeleteTarget(null);
       if (selectedId === target.id) {
@@ -355,7 +355,7 @@ export default function GlossaryManager() {
               {search || statusFilter
                 ? t(
                   "glossary.no_match_named",
-                  `${t("glossary.no_match")}${search ? ` ${search}` : ""}${statusNoMatch ? ` · ${statusNoMatch}` : ""}`,
+                  { detail: `${search}${statusNoMatch ? ` · ${statusNoMatch}` : ""}` },
                 )
                 : t("glossary.empty")}
             </div>

@@ -142,7 +142,7 @@ describe('AssetListPage — 8 列表格 + 空态 + 批量 status', () => {
     });
   });
 
-  it('图谱/向量 glyph：graph=true → ✓，vector=false → ⏳（本用例 vector=false 时显示 ⏳ 占位）', async () => {
+  it('图谱/向量 glyph：graph/vector 四态按 lucide 图标 aria-label 见证（✓→graph_done、⏳→vector_syncing_hint 等）', async () => {
     mockFetchAssetStatuses.mockImplementation(async (ids: string[]) =>
       ids.map(v => {
         const map: Record<string, boolean> = { a001: true, a002: false };
@@ -151,19 +151,23 @@ describe('AssetListPage — 8 列表格 + 空态 + 批量 status', () => {
     );
     const { container } = renderPage('zh');
     await waitFor(() => {
-      // a001: graph=true (✓ emerald) + vector=false (⏳)
+      // 生产侧裁决（2026-10）：文本 glyph（✓/⏳/—）已由 lucide 图标 + aria-label 替代，
+      // 断言面改钉「图标 aria-label = locale 键值」，仍逐格逐态见证（不放宽判据）。
       const tds = Array.from(container.querySelectorAll('tbody tr'));
       expect(tds.length).toBe(2);
-      const rowA001 = tds[0].querySelectorAll('td')[5]?.textContent ?? ''; // col_graph index 5
-      const rowA001Vector = tds[0].querySelectorAll('td')[6]?.textContent ?? ''; // col_vector index 6
-      expect(rowA001).toContain('✓');
-      // vector 在 a001=false 时显示「⏳」（renderVectorGlyph：!it.vector → opacity ⏳）；
-      // a002 vector=true 时显示 ⏳ 等待动画，对「⏳」字符的存在统一断言：
-      expect(rowA001Vector.trim()).toBe('⏳');
-      const rowA002Graph = tds[1].querySelectorAll('td')[5]?.textContent ?? '';
-      const rowA002Vector = tds[1].querySelectorAll('td')[6]?.textContent ?? '';
-      expect(rowA002Graph).toContain('—'); // graph=false
-      expect(rowA002Vector).toContain('✓'); // vector=true → ✓
+      const rowA001 = tds[0].querySelectorAll('td');
+      const rowA002 = tds[1].querySelectorAll('td');
+      // a001: graph=true → Check（已建图谱实体）；vector=false → Loader2 旋转（向量索引同步中）
+      const a001Graph = rowA001[5].querySelector('svg[aria-label]');
+      expect(a001Graph?.getAttribute('aria-label')).toBe('已建图谱实体');
+      const a001Vector = rowA001[6].querySelector('svg[aria-label]');
+      expect(a001Vector?.getAttribute('aria-label')).toBe('向量索引同步中');
+      expect(a001Vector?.getAttribute('class') ?? '').toContain('animate-spin');
+      // a002: graph=false → Minus（未建图谱实体）；vector=true → Check（已向量化）
+      const a002Graph = rowA002[5].querySelector('svg[aria-label]');
+      expect(a002Graph?.getAttribute('aria-label')).toBe('未建图谱实体');
+      const a002Vector = rowA002[6].querySelector('svg[aria-label]');
+      expect(a002Vector?.getAttribute('aria-label')).toBe('已向量化');
     });
   });
 

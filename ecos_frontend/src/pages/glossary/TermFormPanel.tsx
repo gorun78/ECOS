@@ -167,10 +167,10 @@ export default function TermFormPanel({
     try {
       const updated = await updateGlossaryTerm(term.id, { status });
       setPendingTransition(null);
-      // 书名号拼接改走 i18n 插值键（缺词期以既有键组合兜底，见 .fixtmp/need-locale-onto2.md）
+      // 占位符插值键（{status}）：键补全后内联串回落被忽略，改对象参透传（单花括号插值）
       showToast(
         "success",
-        t("glossary.toast.status_changed_to", `${t("glossary.toast.status_changed")} ${getLabel(status)}`),
+        t("glossary.toast.status_changed_to", { status: getLabel(status) }),
       );
       onSaved(updated);
     } catch (e) {
@@ -436,11 +436,8 @@ export default function TermFormPanel({
       {/* 危险流转确认门（废弃 = 终态，须显式确认；role=alertdialog 由 ConfirmDialog 提供） */}
       <ConfirmDialog
         open={!!pendingTransition}
-        title={t(
-          "glossary.transition.confirm_title",
-          `${t("glossary.actions")} · ${term?.name ?? ""}`,
-        )}
-        message={t("glossary.transition.deprecate_confirm_msg", `${term?.name ?? ""} · ${t("common.confirm.irreversible")}`)}
+        title={t("glossary.transition.confirm_title")}
+        message={t("glossary.transition.deprecate_confirm_msg", { name: term?.name ?? "" })}
         confirmText={t("glossary.transition.deprecate")}
         cancelText={t("glossary.cancel")}
         variant="danger"
