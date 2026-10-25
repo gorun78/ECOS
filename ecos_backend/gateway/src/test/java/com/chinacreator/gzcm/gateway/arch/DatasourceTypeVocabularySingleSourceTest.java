@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -20,6 +21,7 @@ import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -54,11 +56,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code lucide-react} 导出面三侧对账由前端门 {@code b4ConnTypeIconChannel.spec.ts} 持有，
  * 本门不重复钉（同上，避免第二属主）。</p>
  *
- * <p><b>在册余项（台账 v1.0.148）</b>：{@code doris} 是否准入；被拒闭集 9 枚——{@code doris}/{@code s3}/
+ * <p><b>同批已做（#142/B4-3e-67 追加）</b>：⑦ 第四条通道——历史行标签通道 {@code mapDsType} 的
+ * 18 条 {@code includes} 子串猜测链改 {@code mappers.ts#HISTORICAL_TYPE_ALIASES} 表驱动
+ * （差距 <b>D-B4-96</b>：短子串把 {@code hdfs}／{@code lossless}／{@code OpenAPI} 折成具体类型、
+ * 书写顺序把 {@code GaussDB(for MySQL)} 裁决成 mysql、{@code oss} 一枚被 s3 腿吞掉永不可达）。
+ * 本门随之把<b>逆向对账的读取面</b>从「{@code mapDsType} 分支」迁到「别名表」——
+ * 标签通道的行为属主是前端门 {@code b4MapDsTypeAliasTable.spec.ts}，本门只钉规范名回环；
+ * 两份实现（Java {@link #resolveByAliasTable} 与前端 {@code resolveHistoricalType}）的
+ * <b>整词门槛跨语言同值</b>由 {@link #thresholdIsSameOnBothSides()} 读前端字面量对账，
+ * 数值分叉会让回环与真实显示读数各自恒绿。</p>
+ *
+ * <p><b>在册余项（台账 v1.0.149）</b>：{@code doris} 是否准入；被拒闭集 9 枚——{@code doris}/{@code s3}/
  * {@code oss}/{@code csv}/{@code sftp}/{@code kafka}/{@code mongodb}/{@code sap}/{@code rest_api}——的逐枚定档
  * （下线或接承流）：#142/B4-3e-64 把它们从<b>可选面</b>裁掉，但 19 枚显示元数据面仍在（历史连接记录要出名字），
- * 下线须另批处置；名称／说明／图标三条显示通道至此均已归一到同一份显示元数据面，
- * 第四条候选面已逐处判定不立案（台账 v1.0.148）：{@code Modals.tsx} 里以字符串出现的图标名
+ * 下线须另批处置；名称／说明／图标／历史标签四条显示通道至此均已归一（前三条到同一份显示元数据面，
+ * 第四条到 {@code HISTORICAL_TYPE_ALIASES} 表）；另一枚候选面判定于台账 v1.0.148、此处沿用：
+ * {@code Modals.tsx} 里以字符串出现的图标名
  * 实测 9 处站点／7 枚具名——弹窗标题装饰（{@code Database}、{@code Import}）、关闭钮（{@code X}×2）、
  * 加载态（{@code Loader2}）、失败态与测试结果三元式（{@code XCircle}×2、{@code CheckCircle}）、
  * 告警态（{@code AlertTriangle}×2）——<b>均为状态/装饰通道，不由数据源类型驱动</b>，
@@ -82,6 +95,15 @@ class DatasourceTypeVocabularySingleSourceTest {
 
     /** 独立钉值：前端 {@code toApiType} 的别名规则面（收口前只有 fs→FILESYSTEM 一条）。 */
     private static final Map<String, String> API_ALIAS_FROZEN = Map.of("fs", "FILESYSTEM");
+
+    /**
+     * 跨语言同构门槛（#142/B4-3e-67）：alias 短于此值只做<b>整词</b>命中，禁子串包含。
+     *
+     * <p>本门与前端 {@code mappers.ts#WHOLE_WORD_ONLY_BELOW} 是两份实现（Java 侧只为逆向对账
+     * 而存在，行为属主仍是前端），<b>数值不符会让回环判定与真实显示读数分叉</b>而两边各自恒绿——
+     * 由 {@link #thresholdIsSameOnBothSides()} 逐字比对前端字面量，改一处必同批改另一处。</p>
+     */
+    private static final int CONTAIN_MIN_LEN_FROZEN = 5;
 
     private static final Path REPO_ROOT = locateRepoRoot();
     private static final Path TYPES_TS =
@@ -140,15 +162,58 @@ class DatasourceTypeVocabularySingleSourceTest {
         assertEquals(10, acceptedOf(frontend, API_ALIAS_FROZEN).size(), "承流枚数独立钉值 10");
     }
 
-    // ─── 逆向面：10 枚规范名在前端显示通道 mapDsType 各有归属 ─────────────
+    // ─── 逆向面：10 枚规范名在前端标签通道各有归属 ─────────────────────
 
     @Test
-    @DisplayName("逆向对账：承流面 10 枚规范名在前端 mapDsType 显示分支各有归属且可回环")
+    @DisplayName("逆向对账：承流面 10 枚规范名在前端别名表各有归属且可回环")
     void carrierFaceHasDisplayBranch() throws IOException {
-        List<TokenBranch> branches = parseDisplayBranches(Files.readString(MAPPERS_TS, StandardCharsets.UTF_8));
-        assertFalse(branches.isEmpty(), "mapDsType 分支未解析到（解析器失明）");
-        List<String> problems = displayBranchProblems(DataSourceTypeVocabulary.registrableTypes(), branches);
+        List<AliasRow> rows = parseHistoricalAliasTable(Files.readString(MAPPERS_TS, StandardCharsets.UTF_8));
+        assertFalse(rows.isEmpty(), "HISTORICAL_TYPE_ALIASES 未解析到（解析器失明）");
+        List<String> problems = displayAliasProblems(DataSourceTypeVocabulary.registrableTypes(), rows);
         assertTrue(problems.isEmpty(), () -> "显示面对账：" + problems);
+    }
+
+    /**
+     * 跨语言门槛对账（#142/B4-3e-67）：本门 {@code resolveByAliasTable} 与前端
+     * {@code resolveHistoricalType} 是两份实现，只有<b>整词/包含门槛同值</b>时逆向对账才不失明。
+     *
+     * <p>判据读前端真仓面的字面量（改名或删常量即红），并把门槛本身跑进回环：把
+     * {@code POSTGRESQL} 的规范名换成短名形态 {@code dm} 与 {@code s3} 逐枚验证——
+     * 门槛一旦被放宽到 1，{@code s3} 会在 {@code lossless} 这类串上假命中，本腿的
+     * 反例夹具（{@link #thresholdCriterionGoesRedOnFixtures()}）即红。</p>
+     */
+    @Test
+    @DisplayName("跨语言同构：前端 WHOLE_WORD_ONLY_BELOW 字面量与本门门槛同值 5")
+    void thresholdIsSameOnBothSides() throws IOException {
+        String mappers = Files.readString(MAPPERS_TS, StandardCharsets.UTF_8);
+        Matcher m = Pattern.compile("const\\s+WHOLE_WORD_ONLY_BELOW\\s*=\\s*(\\d+)\\s*;").matcher(mappers);
+        assertTrue(m.find(), "mappers.ts 里读不到 WHOLE_WORD_ONLY_BELOW 字面量（前端门槛改名/内联＝跨语言对账失明）");
+        assertEquals(CONTAIN_MIN_LEN_FROZEN, Integer.parseInt(m.group(1)),
+                "前端整词门槛与本门 CONTAIN_MIN_LEN_FROZEN 不符 ⇒ 逆向回环与真实显示读数分叉，两边各自恒绿");
+
+        List<AliasRow> rows = parseHistoricalAliasTable(mappers);
+        assertEquals("dm", resolveByAliasTable("dm", rows), "短 alias 靠整词命中仍可归位（门槛不是禁短名）");
+        assertEquals("s3", resolveByAliasTable("S3", rows), "同上：'S3' 整词命中 s3");
+        assertNull(resolveByAliasTable("lossless", rows),
+                "lossless 解析出值＝短 alias 子串猜测回潮（D-B4-96 复发）");
+        assertNull(resolveByAliasTable("hdfs", rows),
+                "hdfs 解析出值＝短 alias 子串猜测回潮（D-B4-96 复发）");
+    }
+
+    @Test
+    @DisplayName("夹具：门槛形同虚设（短 alias 允许子串）时，同构判据具名红")
+    void thresholdCriterionGoesRedOnFixtures() {
+        // 反例夹具：给 s3 的 alias 面塞一枚 2 字符 'ss' —— 门槛 5 下它只能整词命中；
+        // 门槛若被降到 1，'lossless' 会被折成 s3，本腿即红（堵住「门槛常量改了但没人管」）。
+        List<AliasRow> poisoned = List.of(new AliasRow("s3", List.of("s3", "amazons3", "ss")));
+        assertNull(resolveByAliasTable("lossless", poisoned),
+                "门槛 5 之下 'ss' 只能整词命中；能解析出值即门槛失效");
+        assertEquals("s3", resolveByAliasTable("ss", poisoned), "整词 'ss' 命中＝门槛未禁短名本身");
+
+        List<String> problems = displayAliasProblems(Set.of("GAUSS"),
+                List.of(new AliasRow("minio", List.of("minio"))));
+        assertEquals(1, problems.size(), () -> "规范名 GAUSS 无显示归属须报 1 条，实报 " + problems);
+        assertTrue(problems.get(0).contains("GAUSS"), problems.toString());
     }
 
     // ─── 承流出口面 ＋ 前端消费面（#142/B4-3e-64）───────────────────────
@@ -262,14 +327,14 @@ class DatasourceTypeVocabularySingleSourceTest {
         assertTrue(p3.stream().anyMatch(s -> s.contains("未登记的被拒选项") && s.contains("fs")),
                 () -> "实报 " + p3);
 
-        // ④ 显示面丢一枚归属（后端新增可登记类型而前端 mapDsType 未接）
-        List<TokenBranch> branches = new ArrayList<>();
+        // ④ 显示面丢一枚归属（后端新增可登记类型而前端别名表未接）
+        List<AliasRow> rows = new ArrayList<>();
         try {
-            branches = parseDisplayBranches(Files.readString(MAPPERS_TS, StandardCharsets.UTF_8));
+            rows = parseHistoricalAliasTable(Files.readString(MAPPERS_TS, StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new AssertionError("读取 mappers.ts 失败", e);
         }
-        List<String> p4 = displayBranchProblems(Set.of("POSTGRESQL", "TimescaleNew"), branches);
+        List<String> p4 = displayAliasProblems(Set.of("POSTGRESQL", "TimescaleNew"), rows);
         assertEquals(1, p4.size(), () -> "新增承流名无显示归属须报 1 条，实报 " + p4);
         assertTrue(p4.get(0).contains("TimescaleNew"), p4.toString());
     }
@@ -334,29 +399,74 @@ class DatasourceTypeVocabularySingleSourceTest {
         return out;
     }
 
-    /** 显示面判据：每个规范名在 mapDsType 里必须落到一个前端合法类型名，且回环到同一规范名。 */
-    private static List<String> displayBranchProblems(Set<String> canonicalTypes, List<TokenBranch> branches) {        List<String> out = new ArrayList<>();
+    /**
+     * 显示面判据（#142/B4-3e-67 起改读别名表）：每个规范名在前端标签通道必须落到一个前端合法
+     * 类型名，且回环到同一规范名。
+     *
+     * <p>归位规则与前端 {@code resolveHistoricalType} 逐字同构（整词命中，或长度 ≥5 的 alias
+     * 在归一化串上命中；最长命中者胜，同长分属两枚＝歧义）。本门只钉「10 枚规范名 ⇄ 显示枚 ⇄
+     * {@code toApiType} 回环」三面同名，标签通道的行为面由前端门
+     * {@code b4MapDsTypeAliasTable.spec.ts} 持有——本门不重复钉逐串读数，避免第二属主。</p>
+     */
+    private static List<String> displayAliasProblems(Set<String> canonicalTypes, List<AliasRow> rows) {
+        List<String> out = new ArrayList<>();
         for (String canonical : canonicalTypes) {
-            String incoming = canonical.toLowerCase();
-            String target = null;
-            for (TokenBranch b : branches) {
-                if (incoming.contains(b.token())) {
-                    target = b.target();
-                    break;
-                }
-            }
+            String target = resolveByAliasTable(canonical, rows);
             if (target == null) {
-                out.add(canonical + " 在前端 mapDsType 无显示分支（新增承流名须同批改前端，禁靠默认回落）");
+                out.add(canonical + " 在前端 HISTORICAL_TYPE_ALIASES 无显示归属"
+                        + "（新增承流名须同批改前端别名表，禁靠默认回落）");
                 continue;
             }
-            DataSourceTypeVocabulary back = DataSourceTypeVocabulary.find(
-                    toApiType(target, API_ALIAS_FROZEN));
+            DataSourceTypeVocabulary back = DataSourceTypeVocabulary.find(toApiType(target, API_ALIAS_FROZEN));
             if (back == null || !back.canonical().equals(canonical)) {
-                out.add(canonical + " 的显示分支落到 " + target
+                out.add(canonical + " 的显示归属是 " + target
                         + "，回环解析为 " + (back == null ? "词表外" : back.canonical()) + "（三面不同名）");
             }
         }
         return out;
+    }
+
+    /**
+     * 与前端同构的归位判据：命中集里最长 alias 所属类型胜；同长跨类型并列返回 null。
+     * 门槛常量与前端 {@code WHOLE_WORD_ONLY_BELOW} 同值 5，两处不符即由本腿报红。
+     * 大小写归一与前端一致（先 {@code toLowerCase()} 再切词/归一），调用方可传原文。
+     */
+    private static String resolveByAliasTable(String incomingRaw, List<AliasRow> rows) {
+        String incoming = incomingRaw.toLowerCase(Locale.ROOT);
+        String norm = incoming.replaceAll("[^a-z0-9]+", "");
+        if (norm.isEmpty()) {
+            return null;
+        }
+        List<String> tokens = new ArrayList<>();
+        for (String token : incoming.split("[^a-z0-9]+")) {
+            if (!token.isEmpty()) {
+                tokens.add(token);
+            }
+        }
+        int best = 0;
+        String winner = null;
+        boolean contested = false;
+        for (AliasRow row : rows) {
+            int bestForValue = 0;
+            for (String alias : row.aliases()) {
+                boolean hit = tokens.contains(alias)
+                        || (alias.length() >= CONTAIN_MIN_LEN_FROZEN && norm.contains(alias));
+                if (hit && alias.length() > bestForValue) {
+                    bestForValue = alias.length();
+                }
+            }
+            if (bestForValue <= 0) {
+                continue;
+            }
+            if (bestForValue > best) {
+                best = bestForValue;
+                winner = row.value();
+                contested = false;
+            } else if (bestForValue == best && !row.value().equals(winner)) {
+                contested = true;
+            }
+        }
+        return contested ? null : winner;
     }
 
     /**
@@ -448,7 +558,7 @@ class DatasourceTypeVocabularySingleSourceTest {
         return out;
     }
 
-    /** 定位 {@code mapDsType} 函数体（末腿判定与分支解析共用同一份定界，防两判据各读各的面）。 */
+    /** 定位 {@code mapDsType} 函数体（末腿判定用；标签通道自 #142/B4-3e-67 起不再由本门逐分支解析）。 */
     private static String displayBranchBlock(String mappersTs) {
         int start = mappersTs.indexOf("export function mapDsType");
         if (start < 0) {
@@ -458,38 +568,57 @@ class DatasourceTypeVocabularySingleSourceTest {
         return mappersTs.substring(start, end < 0 ? mappersTs.length() : end);
     }
 
-    /** 解析 {@code mapDsType} 的 {@code includes('token')}→{@code return 'target'} 分支（按出现序，逐行取）。 */
-    private static List<TokenBranch> parseDisplayBranches(String mappersTs) {
-        String block = displayBranchBlock(mappersTs);
-        List<TokenBranch> out = new ArrayList<>();
-        Pattern condPattern = Pattern.compile("if\\s*\\(\\s*(.*?)\\s*\\)\\s*return\\s+'([A-Za-z0-9_]+)'\\s*;");
-        for (String rawLine : block.split("\n")) {
+    /**
+     * 解析前端 {@code HISTORICAL_TYPE_ALIASES} 数组块内的 {@code { value: 'x', aliases: ['a', 'b'] }}
+     * 行（按声明序；#142/B4-3e-67 起本门逆向对账读这份表，不再读 {@code mapDsType} 的 {@code includes} 链）。
+     *
+     * <p>失明即红：声明改名／块未闭合／解析 0 行一律抛错，禁「空表＝无违例」的假绿。
+     * 行的字面形态由前端门 {@code b4MapDsTypeAliasTable.spec.ts} 管（枚数／alias 语义／去重），
+     * 本门只取「显示枚 ⇄ alias 集合」用于规范名回环，不重复钉行为面。</p>
+     */
+    private static List<AliasRow> parseHistoricalAliasTable(String mappersTs) {
+        int start = mappersTs.indexOf("export const HISTORICAL_TYPE_ALIASES");
+        if (start < 0) {
+            throw new IllegalStateException(
+                    "mappers.ts 里找不到 HISTORICAL_TYPE_ALIASES 声明（前端别名表改名＝本门失明）");
+        }
+        int end = mappersTs.indexOf("];", start);
+        if (end < 0) {
+            throw new IllegalStateException("HISTORICAL_TYPE_ALIASES 数组块未闭合");
+        }
+        List<AliasRow> out = new ArrayList<>();
+        Pattern rowPattern = Pattern.compile(
+                "\\{\\s*value:\\s*'([A-Za-z0-9_]+)',\\s*aliases:\\s*\\[([^\\]]*)\\]\\s*\\}");
+        for (String rawLine : mappersTs.substring(start, end).split("\n")) {
             String line = rawLine.trim();
-            if (!line.startsWith("if")) {
+            if (line.isEmpty() || line.startsWith("//") || line.startsWith("*") || line.startsWith("/*")) {
                 continue;
             }
-            Matcher m = condPattern.matcher(line);
-            if (!m.matches()) {
-                throw new IllegalStateException("mapDsType 出现无法归类的分支行（判据失明即红）：" + line);
+            if (!line.startsWith("{")) {
+                continue; // 声明行（含类型标注）不是数据行
             }
-            Matcher tok = Pattern.compile("includes\\('([A-Za-z0-9_]+)'\\)").matcher(m.group(1));
-            boolean any = false;
-            while (tok.find()) {
-                out.add(new TokenBranch(tok.group(1), m.group(2)));
-                any = true;
+            Matcher m = rowPattern.matcher(line);
+            if (!m.find()) {
+                throw new IllegalStateException("别名表出现无法归类的行（判据失明即红）：" + line);
             }
-            if (!any) {
-                throw new IllegalStateException("mapDsType 分支行无 includes('x') 条件（判据失明即红）：" + line);
+            List<String> aliases = new ArrayList<>();
+            Matcher q = Pattern.compile("'([A-Za-z0-9_]+)'").matcher(m.group(2));
+            while (q.find()) {
+                aliases.add(q.group(1));
             }
+            if (aliases.isEmpty()) {
+                throw new IllegalStateException("别名表枚 " + m.group(1) + " 的 aliases 解析为空（判据失明即红）");
+            }
+            out.add(new AliasRow(m.group(1), aliases));
         }
         if (out.isEmpty()) {
-            throw new IllegalStateException("mapDsType 分支解析为 0 条（判据失明）");
+            throw new IllegalStateException("HISTORICAL_TYPE_ALIASES 解析为 0 枚（判据失明）");
         }
         return out;
     }
 
-    /** mapDsType 的一条显示分支：命中 token 即归到 target 前端类型名。 */
-    private record TokenBranch(String token, String target) {
+    /** 历史标签通道的一行：显示枚＋它可被叫出的全部原文 alias（小写）。 */
+    private record AliasRow(String value, List<String> aliases) {
     }
 
     private static Path locateRepoRoot() {

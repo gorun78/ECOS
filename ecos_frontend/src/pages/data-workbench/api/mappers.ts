@@ -85,6 +85,98 @@ export function extractDb(cfg: Record<string, unknown>): string | undefined {
 }
 
 /**
+ * 历史库存量拼写 → 显示枚的别名表（单源＝本表；#142/B4-3e-67，差距 <b>D-B4-96</b>）。
+ *
+ * <p>本表只服务一条通道：把库里<b>已持久化</b>的 `datasourceType` 原文翻译成显示枚，
+ * 也就是「这条数据源到底是什么类型」的历史行标签。<b>「能新建哪些类型」不走这里</b>——
+ * 那条通道自 #142/B4-3e-64 起属主唯一＝`GET .../datasource/supported-types` →
+ * {@link resolveConnTypeFromApi}，本表若被当成第二事实源即 D-B4-78 的复形。</p>
+ *
+ * <p>keys 取 {@link ConnType} ⇒ 表外类型名编译期即红；{@code CONNECTION_TYPES} 的 19 枚
+ * 逐枚至少一条 alias（改前 `oss` 一枚在标签通道<b>永不可达</b>，见 {@link mapDsType} 头注），
+ * 逐枚在位由前端门 `b4MapDsTypeAliasTable.spec.ts` 对账。</p>
+ */
+export const HISTORICAL_TYPE_ALIASES: ReadonlyArray<{ value: ConnType; aliases: readonly string[] }> = [
+  { value: 'postgresql', aliases: ['postgresql', 'postgres'] },
+  { value: 'mysql', aliases: ['mysql'] },
+  { value: 'doris', aliases: ['doris'] },
+  { value: 'clickhouse', aliases: ['clickhouse'] },
+  { value: 'oracle', aliases: ['oracle'] },
+  { value: 'mssql', aliases: ['mssql', 'sqlserver'] },
+  { value: 'dm', aliases: ['dm', 'dm8', 'dameng'] },
+  { value: 'kingbase', aliases: ['kingbase'] },
+  { value: 'gaussdb', aliases: ['gauss', 'gaussdb', 'opengauss'] },
+  { value: 'minio', aliases: ['minio'] },
+  { value: 's3', aliases: ['s3', 'amazons3'] },
+  { value: 'oss', aliases: ['oss', 'aliyunoss'] },
+  { value: 'csv', aliases: ['csv'] },
+  { value: 'sftp', aliases: ['sftp'] },
+  { value: 'fs', aliases: ['fs', 'filesystem', 'localfs'] },
+  { value: 'kafka', aliases: ['kafka'] },
+  { value: 'mongodb', aliases: ['mongo', 'mongodb'] },
+  { value: 'sap', aliases: ['sap', 'saphana'] },
+  { value: 'rest_api', aliases: ['rest', 'restapi', 'http', 'https', 'api'] },
+];
+
+/**
+ * 归一化：小写后只留 `[a-z0-9]`。分隔符（空格／下划线／连字符／点）与非拉丁前缀一并落到
+ * 词边界上——`'Microsoft SQL Server'` → `microsoftsqlserver`，`'阿里云OSS'` → `oss`。
+ */
+const normalizeTypeKey = (t: string): string => t.toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+/** 切词：以「非字母数字」为分隔，中文前缀因此成为词边界（`'阿里云OSS'` → `['oss']`）。 */
+const splitTypeTokens = (t: string): string[] =>
+  t.toLowerCase().split(/[^a-z0-9]+/).filter((x) => x.length > 0);
+
+/**
+ * 短 alias 只做<b>整词</b>命中，长度门槛以下禁子串包含。
+ *
+ * <p>门槛值 5 的实测依据（#142/B4-3e-67，改前 18 条 `includes` 腿的用户面读数）：
+ * `fs`／`s3`／`oss`／`api`／`dm` 五枚 ≤4 字符的子串腿把
+ * {@code hdfs}／{@code gpfs}／{@code offsets} 折成 `fs`、
+ * {@code lossless}／{@code cross_oss} 折成 `s3`、
+ * {@code OpenAPI}／{@code rapid_miner} 折成 `rest_api`——都是「串里恰好有这几个字母」。</p>
+ */
+const WHOLE_WORD_ONLY_BELOW = 5;
+
+/**
+ * 按别名表解析历史原文：命中集里<b>最长 alias</b> 胜（最具体优先），最长并列且分属两枚
+ * 不同类型 ⇒ 显式 `null`（＝读不准，交给 `mapDsType` 出未解析读数），禁由表的书写顺序裁决。
+ *
+ * <p>改前的顺序隐式裁决实测：{@code 'GaussDB(for MySQL)'} → `mysql`（`mysql` 是第 2 条腿、
+ * `gauss` 第 9 条，达梦系国产库的 MySQL 兼容模式被抢走）；{@code 'S3 CSV'}／{@code 'csv on s3'}
+ * → `s3`（`s3` 第 11 条腿、`csv` 第 12 条）。现按最长 alias：前者 `gaussdb`(7)＞`mysql`(5)
+ * ⇒ gaussdb，后者 `csv`(3)＞`s3`(2) ⇒ csv。</p>
+ */
+function resolveHistoricalType(t: string): ConnType | null {
+  const norm = normalizeTypeKey(t);
+  if (norm.length === 0) {
+    return null;
+  }
+  const tokens = splitTypeTokens(t);
+  const hits: { value: ConnType; len: number }[] = [];
+  for (const row of HISTORICAL_TYPE_ALIASES) {
+    let bestForValue = 0;
+    for (const alias of row.aliases) {
+      const hit = tokens.includes(alias) || (alias.length >= WHOLE_WORD_ONLY_BELOW && norm.includes(alias));
+      if (hit && alias.length > bestForValue) {
+        bestForValue = alias.length;
+      }
+    }
+    if (bestForValue > 0) {
+      hits.push({ value: row.value, len: bestForValue });
+    }
+  }
+  if (hits.length === 0) {
+    return null;
+  }
+  const max = Math.max(...hits.map((h) => h.len));
+  const winners = new Set(hits.filter((h) => h.len === max).map((h) => h.value));
+  // 最长唯一＝最具体者胜；同长分属两枚＝串本身歧义，显式未解析，禁由表的书写顺序择一
+  return winners.size === 1 ? (winners.values().next().value as ConnType) : null;
+}
+
+/**
  * 后端类型名 → 前端显示类型（历史行标签通道）。
  *
  * <p>#142/B4-3e-64（差距 <b>D-B4-93</b>）：改前本函数在 17 条 `includes` 分支之后
@@ -93,31 +185,23 @@ export function extractDb(cfg: Record<string, unknown>): string | undefined {
  * 现两处改动：①补 `csv` 显式腿；②末腿改 `return 'unknown'`——「解析不到」是一个可读结论，
  * 不是一枚具体类型。页面用 `DataConnection.typeRaw` 出「未知类型（原值 X）」。</p>
  *
- * <p>中间的 `includes` 关键词链保持原样：它承担历史库存量拼写（`GAUSSDB`/`Dameng`/
- * `Microsoft SQL Server` 等）的宽松匹配，且已被跨面对账门逐枚钉住
- * 「承流面规范名 ⇄ 显示分支 ⇄ 回环同名」三面一致。收紧这条链属显示面与词表的进一步合一，
- * 见台账余项。</p>
+ * <p>#142/B4-3e-67（差距 <b>D-B4-96</b>）：中间的关键词链由 18 条 `includes` 子串猜测
+ * 改为 {@link HISTORICAL_TYPE_ALIASES} 表驱动（整词／长 alias＋最长优先），收口三形：
+ * ①<b>过宽</b>——`hdfs`／`lossless`／`OpenAPI` 等无关串被短子串折成具体类型；
+ * ②<b>顺序裁决</b>——`GaussDB(for MySQL)`→mysql；
+ * ③<b>永不可达</b>——`oss` 一枚被 `s3` 腿吞掉：显示面 19 枚逐枚自名回环实测 18/19，
+ * 唯一失败枚正是 `oss`，后果还包括 {@code api/datasource.ts} 里已存在的
+ * `c.type === 'oss'` 独立分支（5 枚字段腿）在本通道上永不进入。
+ * 同时补上改前<b>过窄</b>的一枚：`'Microsoft SQL Server'` 因带空格不匹配 `sqlserver`
+ * 而落 `unknown`＝把已知具体类型折成未知（与 D-B4-94 同形）。</p>
+ *
+ * <p>收紧的代价如实登记：alias `file` 已删，故原文恰为 `FILE` 的行现出未解析读数（改前折成 `fs`）；
+ * 整词命中仍会纳到形如 `cross_oss` 的自造串（＝`oss`），但判据已从「串里有这几个字母」
+ * 收紧为「有一个词就是它」。</p>
  */
 export function mapDsType(t: string): DisplayConnType {
-  const lower = t.toLowerCase();
-  if (lower.includes('postgres')) return 'postgresql';
-  if (lower.includes('mysql')) return 'mysql';
-  if (lower.includes('doris')) return 'doris';
-  if (lower.includes('clickhouse')) return 'clickhouse';
-  if (lower.includes('oracle')) return 'oracle';
-  if (lower.includes('sqlserver') || lower.includes('mssql')) return 'mssql';
-  if (lower.includes('dm') || lower.includes('dameng')) return 'dm';
-  if (lower.includes('kingbase')) return 'kingbase';
-  if (lower.includes('gauss')) return 'gaussdb';
-  if (lower.includes('minio')) return 'minio';
-  if (lower.includes('s3') || lower.includes('oss')) return 's3';
-  if (lower.includes('csv')) return 'csv';
-  if (lower.includes('sftp')) return 'sftp';
-  if (lower.includes('sap')) return 'sap';
-  if (lower.includes('rest') || lower.includes('http') || lower.includes('api')) return 'rest_api';
-  if (lower.includes('kafka')) return 'kafka';
-  if (lower.includes('mongo')) return 'mongodb';
-  if (lower.includes('fs') || lower.includes('file')) return 'fs';
+  const resolved = resolveHistoricalType(t);
+  if (resolved !== null) return resolved;
   return 'unknown';
 }
 
