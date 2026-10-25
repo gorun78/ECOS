@@ -361,6 +361,24 @@ public class SecurityDecisionService {
         if (resource != null) {
             input.put(DataScopeContract.KEY_RESOURCE, resource);
         }
+        // #142/B4-3e-78 只增（D-B4-30）：AI 主裁决腿并入 /decision 后的通道推断面 +
+        // SQL 结构派生值。仅 purpose==AI 且键存在时写出——页面/导出通道的载荷
+        // 逐字节不变（三键全未携带）。键面取 DecisionChannelContract 单源。
+        // environment 段只承 channel（策略侧 object.get 链据此判 agent_channel）；
+        // 未携带时整段不写，禁写空对象冒充"声明过环境"。
+        if (purpose == DecisionBundle.Purpose.AI && ctx != null) {
+            if (ctx.environmentChannel() != null) {
+                Map<String, Object> environment = new LinkedHashMap<>();
+                environment.put(DecisionChannelContract.KEY_CHANNEL, ctx.environmentChannel());
+                input.put(DecisionChannelContract.KEY_ENVIRONMENT, environment);
+            }
+            if (ctx.tables() != null) {
+                input.put(DecisionChannelContract.KEY_TABLES, ctx.tables());
+            }
+            if (ctx.sqlDigest() != null) {
+                input.put(DecisionChannelContract.KEY_SQL_DIGEST, ctx.sqlDigest());
+            }
+        }
         String policyRef = "ecos." + OpaPolicyService.POLICY_DATA_ACCESS;
         try {
             Map<String, Object> r = opa.evaluate(OpaPolicyService.POLICY_DATA_ACCESS, input);

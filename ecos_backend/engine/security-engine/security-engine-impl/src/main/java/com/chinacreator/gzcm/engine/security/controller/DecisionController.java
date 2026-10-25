@@ -86,7 +86,13 @@ public class DecisionController {
                 // <b>服务端派生</b>的 subject.department 比（分册 00：客户端 X-Org-Id 已被剥离），
                 // 故谎报只会落 DENY（AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT），不会落放行；
                 // 未声明则整段不写（页面/导出通道载荷逐字节不变）。键面走单源 DataScopeContract。
-                .withDataScope(DataScopeContract.read(body.get(DataScopeContract.KEY_RESOURCE)));
+                .withDataScope(DataScopeContract.read(body.get(DataScopeContract.KEY_RESOURCE)))
+                // #142/B4-3e-78 只增（D-B4-30）：AI 主裁决腿并入 /decision 的三枚可选键
+                // （environment.channel / tables / sqlDigest）。只入参、缺省不写；
+                // safeOpa 仅在 purpose==AI 时写出，非 AI 通道即使收到也忽略（载荷不变）。
+                .withAiAdjudication(aiChannelOf(asMap(body.get(DecisionChannelContract.KEY_ENVIRONMENT))),
+                        aiTablesOf(body.get(DecisionChannelContract.KEY_TABLES)),
+                        aiSqlDigestOf(body.get(DecisionChannelContract.KEY_SQL_DIGEST)));
         try {
             DecisionBundle bundle = service.decide(asset, purpose, ctx);
             return ok(ApiResponse.success(bundle.toMap()));
@@ -143,6 +149,46 @@ public class DecisionController {
             // 词表里有、枚举里没有＝两侧失配（新增通道只改了一处），同样拒绝而非降级
             return null;
         }
+    }
+
+    /** AI 工具载荷的通道标识（现成词表的竖写值，与录制 oracle 的 environment.channel 同源）。 */
+    private static final String CHANNEL_AGENT = "AGENT";
+
+    /**
+     * #142/B4-3e-78（D-B4-30）：从请求体 {@code environment} 段读 AI 通道标识。
+     *
+     * <p>只承现成词表的值（{@code ToolAdjudicationRequest.CHANNEL_AGENT} 同值
+     * {@value #CHANNEL_AGENT}，security 不依赖 ai-engine 故本类内定名、词表值不新造）；
+     * 段存在但 channel 缺失/非文本/空白 ⇒ 按 AI 形态承流（该段本身就是 AI 工具载荷的
+     * 通道推断面，生产唯一调用方恒带 channel，此兜底只防漏键把"AI 形状"降格成"无形状"）；
+     * 段缺失或非 object ⇒ {@code null}（不携带，safeOpa 整段不写）。</p>
+     */
+    private static String aiChannelOf(Map<String, Object> environmentSegment) {
+        if (environmentSegment == null) return null;
+        Object channel = environmentSegment.get(DecisionChannelContract.KEY_CHANNEL);
+        if (channel instanceof String s && !s.isBlank()) return s.trim();
+        // channel 缺失/空：段存在即 AI 形态，承现成词表值（任务口径；生产调用方恒带 channel）
+        return CHANNEL_AGENT;
+    }
+
+    /**
+     * #142/B4-3e-78（D-B4-30）：请求体 {@code tables}（list of string，只入参）。
+     * 非列表形态 ⇒ {@code null}（不携带）；列表内 null/空白元素丢弃（禁替调用方伪造表名）。
+     */
+    @SuppressWarnings({"rawtypes"})
+    private static java.util.List<String> aiTablesOf(Object raw) {
+        if (!(raw instanceof java.util.List)) return null;
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (Object o : (java.util.List) raw) {
+            if (o instanceof String s && !s.isBlank()) out.add(s);
+        }
+        return out;
+    }
+
+    /** #142/B4-3e-78（D-B4-30）：请求体 {@code sqlDigest}（string，只入参；非文本 ⇒ 不携带）。 */
+    private static String aiSqlDigestOf(Object raw) {
+        if (raw instanceof String s && !s.isBlank()) return s;
+        return null;
     }
 
     @SuppressWarnings("unchecked")

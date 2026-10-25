@@ -17,7 +17,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -29,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -98,14 +96,10 @@ class AgentToolPolicyGateTest {
     }
 
     private void stubEvaluate(Map<String, Object> data) throws Exception {
-        // doAnswer/doReturn 形态：重复桩配时不会触发上一轮 answer（when() 会以 null 实参调用桩）
-        doAnswer(inv -> {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("policy", "rbac");
-            body.put("input", inv.getArgument(0));
-            return body;
-        }).when(client).evaluateBodyForAdjudication(any());
-        doReturn(data).when(client).evaluateData(any());
+        // #142/B4-3e-78（D-B4-30 收口）：主裁决腿切到 /decision。
+        // stub 现在只钉 decideData 的返回段（＝bundle.data.opa 形态），
+        // 请求体的构造走真静态 AiSecurityEngineClient.decisionBody，无需桩。
+        doReturn(data).when(client).decideData(any());
     }
 
     // ── 验收 1：2s 预算（X-19 / W145） ───────────────────────────────────
@@ -231,7 +225,7 @@ class AgentToolPolicyGateTest {
         ToolDecision d = gate().review(anon);
 
         assertEquals(ToolDecision.Verdict.FAIL_CLOSED, d.verdict());
-        verify(client, never()).evaluateData(any());
+        verify(client, never()).decideData(any());
     }
 
     // ── 验收 3：SQL 本地地板 = 附加防御 ─────────────────────────────────
@@ -243,7 +237,7 @@ class AgentToolPolicyGateTest {
 
         assertEquals(ToolDecision.Verdict.DENY, d.verdict());
         assertEquals(AiErrorClass.GUARDRAIL_DENIED, AgentToolPolicyGate.errorClassFor(d));
-        verify(client, never()).evaluateData(any());
+        verify(client, never()).decideData(any());
         verify(publisher, times(1)).auditOrThrow(any(), any());
     }
 
@@ -260,7 +254,7 @@ class AgentToolPolicyGateTest {
         when(whitelist.allowedColumns("ecos_dw.unlisted_table")).thenReturn(null);
         assertEquals(ToolDecision.Verdict.DENY,
                 gate().review(request(), "SELECT id FROM ecos_dw.unlisted_table", List.of()).verdict());
-        verify(client, never()).evaluateData(any());
+        verify(client, never()).decideData(any());
     }
 
     @Test
@@ -283,7 +277,7 @@ class AgentToolPolicyGateTest {
             assertTrue(d.reason().contains(shared),
                     "工具面理由应内嵌单源那句「" + shared + "」，实际: " + d.reason());
         }
-        verify(client, never()).evaluateData(any());
+        verify(client, never()).decideData(any());
     }
 
     @Test
@@ -301,7 +295,7 @@ class AgentToolPolicyGateTest {
     }
 
     @Test
-    @DisplayName("F06-02 SQL 原文不入裁决载荷，只送 sqlDigest/readOnly/tables 派生值")
+    @DisplayName("F06-02 SQL 原文不入裁决载荷，只送 sqlDigest/tables 派生值（D-B4-30：/decision 请求体面）")
     void sqlTextNeverEntersAdjudicationPayload() throws Exception {
         stubEvaluate(Map.of("allow", true));
         String secretSql = "SELECT salary FROM ecos_dw.hr_payroll WHERE dept = 'FINANCE-SECRET'";
@@ -311,11 +305,11 @@ class AgentToolPolicyGateTest {
         assertEquals(ToolDecision.Verdict.ALLOW, d.verdict(), "地板通过后仍须 security 才放行");
         @SuppressWarnings("rawtypes")
         ArgumentCaptor<Map> captor = ArgumentCaptor.forClass(Map.class);
-        verify(client).evaluateBodyForAdjudication(captor.capture());
-        Map<String, Object> input = captor.getValue();
-        assertTrue(input.containsKey("sqlDigest"), "载荷应带摘要: " + input.keySet());
-        assertEquals(Boolean.TRUE, input.get("readOnly"));
-        String rendered = String.valueOf(input);
+        verify(client).decideData(captor.capture());
+        Map<String, Object> body = captor.getValue();
+        assertTrue(body.containsKey("sqlDigest"), "载荷应带摘要: " + body.keySet());
+        assertTrue(body.containsKey("tables"), "载荷应带结构表集: " + body.keySet());
+        String rendered = String.valueOf(body);
         assertFalse(rendered.contains("FINANCE-SECRET"), "字面量禁入载荷");
         assertFalse(rendered.contains("SELECT salary"), "SQL 原文禁入载荷（F06-02 要点 1）");
     }
@@ -341,11 +335,11 @@ class AgentToolPolicyGateTest {
         gate().review(request());
         stubEvaluate(Map.of("allow", false));
         gate().review(request());
-        when(client.evaluateData(any())).thenThrow(new IllegalStateException("security down"));
+        when(client.decideData(any())).thenThrow(new IllegalStateException("security down"));
         gate().review(request());
 
         verify(publisher, times(3)).auditOrThrow(any(), any());
-        verify(client, times(3)).evaluateData(any());
+        verify(client, times(3)).decideData(any());
     }
 
     @Test

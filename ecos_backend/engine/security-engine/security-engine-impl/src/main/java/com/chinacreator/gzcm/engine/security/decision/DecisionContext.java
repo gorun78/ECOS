@@ -28,6 +28,11 @@ public final class DecisionContext {
     private final List<String> roles;
     private final String traceId;
     private final DataScopeContract.Declared dataScope;   // 可为 null（＝未声明请求域）
+    // ── #142/B4-3e-78 只增（D-B4-30）：AI 工具载荷的通道推断面 + SQL 结构派生值 ──
+    // 全为 null＝未携带（页面/导出通道），safeOpa 不写相应段，既有载荷逐字节不变。
+    private final String environmentChannel;  // 可为 null（＝未携带 environment 段）
+    private final List<String> tables;        // 可为 null（＝未携带 tables 段）
+    private final String sqlDigest;           // 可为 null（＝未携带 sqlDigest 段）
 
     public DecisionContext(String userId, String tenantId, String orgId,
                            Integer clearanceLevel, List<String> roles, String traceId) {
@@ -42,6 +47,21 @@ public final class DecisionContext {
     public DecisionContext(String userId, String tenantId, String orgId,
                            Integer clearanceLevel, List<String> roles, String traceId,
                            DataScopeContract.Declared dataScope) {
+        this(userId, tenantId, orgId, clearanceLevel, roles, traceId, dataScope, null, null, null);
+    }
+
+    /**
+     * 全字段构造器（#142/B4-3e-78 只增：加 environment 通道 / tables / sqlDigest，
+     * 不动既有构造器 —— API 只增不改，三键全 {@code null}＝未携带，载荷形态不变）。
+     *
+     * @param environmentChannel AI 工具载荷的通道标识（如 {@code "AGENT"}）；未携带＝{@code null}
+     * @param tables             AI 工具 SQL 结构派生值的受控表集合；未携带＝{@code null}
+     * @param sqlDigest          AI 工具 SQL 摘要（禁原文）；未携带＝{@code null}
+     */
+    public DecisionContext(String userId, String tenantId, String orgId,
+                           Integer clearanceLevel, List<String> roles, String traceId,
+                           DataScopeContract.Declared dataScope,
+                           String environmentChannel, List<String> tables, String sqlDigest) {
         this.userId = userId;
         this.tenantId = tenantId;
         this.orgId = orgId;
@@ -49,6 +69,9 @@ public final class DecisionContext {
         this.roles = roles == null ? Collections.emptyList() : List.copyOf(roles);
         this.traceId = traceId;
         this.dataScope = dataScope;
+        this.environmentChannel = environmentChannel;
+        this.tables = tables == null ? null : List.copyOf(tables);
+        this.sqlDigest = sqlDigest;
     }
 
     public String userId()     { return userId; }
@@ -64,13 +87,43 @@ public final class DecisionContext {
     }
 
     /**
+     * AI 工具载荷的通道标识（#142/B4-3e-78 只增，D-B4-30）。
+     *
+     * <p>未携带（页面/导出通道）时为 {@code null} —— {@code safeOpa} 据此<b>不写</b>
+     * {@code environment} 段，既有载荷形态逐字节不变。</p>
+     */
+    public String environmentChannel() {
+        return environmentChannel;
+    }
+
+    /** AI 工具 SQL 结构派生值的受控表集合；未携带时为 {@code null}。 */
+    public List<String> tables() {
+        return tables;
+    }
+
+    /** AI 工具 SQL 摘要（禁原文）；未携带时为 {@code null}。 */
+    public String sqlDigest() {
+        return sqlDigest;
+    }
+
+    /**
      * 只增式副本：在既有上下文上挂声明域（AI 通道用），其余字段逐字沿用。
      *
      * <p>之所以返回新实例而不是 setter：本类是不可变信任链载体，中途改写声明域会让
      * "谁声明了什么"在审计上失去出处（与 {@code orgId} 只服务端派生同纪律）。</p>
      */
     public DecisionContext withDataScope(DataScopeContract.Declared scope) {
-        return new DecisionContext(userId, tenantId, orgId, clearanceLevel, roles, traceId, scope);
+        return new DecisionContext(userId, tenantId, orgId, clearanceLevel, roles, traceId, scope,
+                environmentChannel, tables, sqlDigest);
+    }
+
+    /**
+     * 只增式副本：在既有上下文上挂 AI 工具载荷的三键（#142/B4-3e-78 只增，D-B4-30），
+     * 其余字段（含声明域）逐字沿用。{@code null} 实参＝该键未携带（写出侧不写）。
+     */
+    public DecisionContext withAiAdjudication(String channel, List<String> tables, String sqlDigest) {
+        return new DecisionContext(userId, tenantId, orgId, clearanceLevel, roles, traceId, dataScope,
+                channel, tables, sqlDigest);
     }
 
     /** 从 raw map 组装（REST 只接受 userId/tenantId 显式字段；orgId/clearanceLevel 走服务端派生）。 */

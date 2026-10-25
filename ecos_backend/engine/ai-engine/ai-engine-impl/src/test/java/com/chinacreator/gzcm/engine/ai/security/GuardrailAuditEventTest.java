@@ -19,7 +19,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -97,13 +96,9 @@ class GuardrailAuditEventTest {
         when(bindings.getIfAvailable()).thenReturn(null);
         gate = new AgentToolPolicyGate(whitelist, client, publisher, bindings);
 
-        when(client.evaluateBodyForAdjudication(any())).thenAnswer(inv -> {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("policy", "rbac");
-            body.put("input", inv.getArgument(0));
-            return body;
-        });
-        // payroll 表放行（本地地板只验形态，裁决态由下面的 data 决定）
+        // #142/B4-3e-78（D-B4-30 收口）：主裁决腿已切 /decision，
+        // 请求体构造走真静态 AiSecurityEngineClient.decisionBody，旧 evaluate 桩只保留备查意义、已删。
+        // payroll 表放行（本地地板只验形态，裁决态由各用例的 decideData 桩决定）
         when(whitelist.allowedColumns("ecos_dw.payroll")).thenReturn(Set.of("*"));
     }
 
@@ -112,22 +107,22 @@ class GuardrailAuditEventTest {
     @Test
     @DisplayName("F06-03 ALLOW / DENY / FAIL_CLOSED 三态各发恰一条 GUARDRAIL_EVAL 事件")
     void allowDenyAndFailClosedEachEmitOneEvent() throws Exception {
-        when(client.evaluateData(any())).thenReturn(Map.of(
+        when(client.decideData(any())).thenAnswer(inv -> Map.of(
                 "allow", true, "policyId", "p-allow",
                 "obligations", List.of(Map.of("column", "phone", "rule", "phone"))));
         ToolDecision allow = gate.review(request(), RAW_SQL, List.of());
         assertEquals(ToolDecision.Verdict.ALLOW, allow.verdict());
 
-        when(client.evaluateData(any())).thenReturn(Map.of("allow", false, "policyId", "p-deny"));
+        when(client.decideData(any())).thenAnswer(inv -> Map.of("allow", false, "policyId", "p-deny"));
         ToolDecision deny = gate.review(request(), RAW_SQL, List.of());
         assertEquals(ToolDecision.Verdict.DENY, deny.verdict());
 
-        when(client.evaluateData(any())).thenThrow(new RuntimeException("security-engine 503"));
+        when(client.decideData(any())).thenThrow(new RuntimeException("security-engine 503"));
         ToolDecision failClosed = gate.review(request(), RAW_SQL, List.of());
         assertEquals(ToolDecision.Verdict.FAIL_CLOSED, failClosed.verdict());
 
-        // 三态都留痕：3 次 evaluate ↔ 3 条事件 ↔ 3 条台账（I-1 对账口径）
-        verify(client, times(3)).evaluateData(any());
+        // 三态都留痕：3 次 decideData ↔ 3 条事件 ↔ 3 条台账（I-1 对账口径）
+        verify(client, times(3)).decideData(any());
         List<Map<String, Object>> events = capturePublishes(3);
         assertEnvelope(events.get(0), ToolDecision.Verdict.ALLOW);
         assertEnvelope(events.get(1), ToolDecision.Verdict.DENY);
@@ -168,13 +163,7 @@ class GuardrailAuditEventTest {
         AgentToolPolicyGate noBusGate = new AgentToolPolicyGate(whitelist, client,
                 new GuardrailAuditPublisher(emptyProvider, ledgerDao), bindings());
 
-        when(client.evaluateBodyForAdjudication(any())).thenAnswer(inv -> {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("policy", "rbac");
-            body.put("input", inv.getArgument(0));
-            return body;
-        });
-        when(client.evaluateData(any())).thenReturn(Map.of("allow", true, "policyId", "p-1"));
+        when(client.decideData(any())).thenAnswer(inv -> Map.of("allow", true, "policyId", "p-1"));
 
         ToolDecision decision = noBusGate.review(request(), null, null);
         assertEquals(ToolDecision.Verdict.FAIL_CLOSED, decision.verdict(),
@@ -187,7 +176,7 @@ class GuardrailAuditEventTest {
     @Test
     @DisplayName("F06-03 事件只带摘要与 ID：无 sql/content/arguments 键，无 SQL/入参/结果原文")
     void eventCarriesNoRawPayload() throws Exception {
-        when(client.evaluateData(any())).thenReturn(Map.of(
+        when(client.decideData(any())).thenAnswer(inv -> Map.of(
                 "allow", true, "policyId", "p-allow",
                 "obligations", List.of(Map.of("column", "phone", "rule", "phone"))));
         gate.review(request(), RAW_SQL, List.of());
@@ -231,7 +220,7 @@ class GuardrailAuditEventTest {
         doThrow(new RuntimeException("ledger table missing")).when(ledgerDao).insert(
                 anyString(), anyString(), any(), anyString(), anyString(), any(), any(),
                 anyInt(), anyString(), anyString());
-        when(client.evaluateData(any())).thenReturn(Map.of("allow", true, "policyId", "p-1"));
+        when(client.decideData(any())).thenAnswer(inv -> Map.of("allow", true, "policyId", "p-1"));
 
         ToolDecision decision = gate.review(request(), null, null);
 

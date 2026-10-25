@@ -8,6 +8,7 @@ import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlWhitelist;
 import com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient;
 import com.chinacreator.gzcm.engine.ai.security.GuardrailAuditPublisher;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
+import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,19 +24,19 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 详细设计-06 F06-02 要点 1 验收 —— 四段裁决载荷（PRD-06 §1.3）。
+ * 详细设计-06 F06-02 要点 1 验收 —— 裁决下发载荷（PRD-06 §1.3）。
  *
- * <p>doc 冻结的两个标识：</p>
+ * <p>doc 冻结的两个方法标识（方法名换掉即视为测试丢失）：</p>
  * <ul>
  *   <li>{@code ToolAdjudicationPayloadTest#payloadCarriesFourSectionsWithServerSideSubject}；</li>
  *   <li>{@code ToolAdjudicationPayloadTest#llmSuppliedUnauthorizedArgsNeverEnterPayload}。</li>
@@ -45,6 +46,12 @@ import static org.mockito.Mockito.when;
  * 桩捕获），而不是中间对象 —— 只有线上载荷形态才决定 security 侧策略能否正确判权。
  * 装置用<b>真闸</b>（{@code AgentToolPolicyGate}）+ 假 security 客户端：载荷渲染发生在闸内，
  * 假客户端会跳过这段逻辑，测不到红线。</p>
+ *
+ * <p><b>#142/B4-3e-78（D-B4-30 收口）</b>：主裁决腿已并入三通道唯一入口 {@code /decision}，
+ * 断言面从旧四段 input 载荷改为 {@code DecisionChannelContract} 键面（purpose/environment
+ * 恒在；assetRef/tables/sqlDigest 仅 SQL 派生值齐全时在场）；主体纪律从"wire 带服务端
+ * subject"改为"<b>wire 根本无 subject 键位</b>，服务端 token 主体在闸内消费、自报值无处可进
+ * 报文"（更严形态，四段 payload 仅本地留痕，见 {@code GuardrailAuditEventTest}）。</p>
  */
 class ToolAdjudicationPayloadTest {
 
@@ -62,7 +69,7 @@ class ToolAdjudicationPayloadTest {
     // ── 验收 1：四段齐备 + 主体只来自服务端 ──────────────────────────────────
 
     @Test
-    @DisplayName("F06-02 载荷四段齐备；subject 由服务端 token 上下文构造，非调用方自填")
+    @DisplayName("F06-02 /decision 载荷按单源键面成形；主体只剩服务端解析器来源（wire 无自报位）")
     void payloadCarriesFourSectionsWithServerSideSubject() throws Exception {
         Map<String, Object> arguments = new LinkedHashMap<>();
         arguments.put("scenarioId", "s-7");
@@ -71,34 +78,29 @@ class ToolAdjudicationPayloadTest {
         arguments.put("periods", List.of("2026-Q1"));
         arguments.put("userId", SPOOFED_ADMIN);
 
-        Map<String, Object> input = inputOf(adjudicate(arguments));
+        Map<String, Object> body = adjudicate(arguments);
+        String rendered = objectMapper.writeValueAsString(body);
 
-        // ① 四段齐备（缺任一段 = 无有效裁决记录）
-        assertTrue(input.keySet().containsAll(
-                        List.of("subject", "action", "resource", "environment", "type", "tool", "operation")),
-                "载荷缺段: " + input.keySet());
-        // ② subject 必须是解析器的服务端值
-        Map<?, ?> subject = (Map<?, ?>) input.get("subject");
-        assertEquals(SERVER_USER, subject.get("userId"),
-                "主体被入参自报值污染 = 参数注入式越权");
-        assertFalse(String.valueOf(subject).contains(SPOOFED_ADMIN), String.valueOf(subject));
-        assertEquals(SERVER_TENANT, subject.get("tenantId"));
-        assertEquals(List.of("analyst"), subject.get("roles"));
-        assertEquals("dept-a", subject.get("department"), "PRD §1.3 要求 department 在场");
-        // ③ action / resource / environment 逐段验真值
-        assertEquals(ToolAdjudicationRequest.ACTION_TYPE, input.get("type"));
-        assertEquals(TOOL, input.get("tool"));
-        assertEquals("read", input.get("operation"));
-        Map<?, ?> resource = (Map<?, ?>) input.get("resource");
-        assertEquals("s-7", resource.get("scenarioId"));
-        assertEquals("run-3", resource.get("forecastRunId"));
-        Map<?, ?> scope = (Map<?, ?>) resource.get("dataScope");
-        assertEquals(List.of("p-1", "p-2"), scope.get("projectIds"));
-        assertEquals(List.of("2026-Q1"), scope.get("periods"));
-        Map<?, ?> env = (Map<?, ?>) input.get("environment");
-        assertEquals(ToolAdjudicationRequest.CHANNEL_AGENT, env.get("channel"));
-        assertNotNull(env.get("traceId"), "environment.traceId 缺失则审计对账断链");
-        assertNotNull(env.get("timestamp"));
+        // ① /decision 请求体恒在段齐备：purpose=ai＋environment.channel=AGENT，键面全取
+        //    DecisionChannelContract 单源（#142/B4-3e-78，D-B4-30）
+        assertEquals(DecisionChannelContract.PURPOSE_AI, body.get(DecisionChannelContract.KEY_PURPOSE),
+                "purpose 段缺失或漂移: " + rendered);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> env = (Map<String, Object>) body.get(DecisionChannelContract.KEY_ENVIRONMENT);
+        assertTrue(env != null, "environment 段缺失: " + rendered);
+        assertEquals(ToolAdjudicationRequest.CHANNEL_AGENT, env.get(DecisionChannelContract.KEY_CHANNEL),
+                "channel 段缺失或漂移: " + rendered);
+        // ② 无 SQL 的调用不得凭空造资产段（registry 工具即使带 "sql" 入参也不进 body）
+        assertFalse(body.containsKey(DecisionChannelContract.KEY_ASSET_REF), rendered);
+        assertFalse(body.containsKey(DecisionChannelContract.KEY_TABLES), rendered);
+        assertFalse(body.containsKey(DecisionChannelContract.KEY_SQL_DIGEST), rendered);
+        // ③ 主体源纪律：/decision wire 不携带 subject（服务端 token 上下文在闸内裁决直接消费，
+        //    LLM 自报 userId 连可进入报文的位置都没有）；闸内仍须以服务端解析器主体运行，
+        //    匿名主体在发 HTTP 之前即 FAIL_CLOSED（AgentToolPolicyGateTest 已钉）
+        assertFalse(rendered.contains(SPOOFED_ADMIN), "主体面出现 LLM 自报值: " + rendered);
+        // ④ 键面枚举防漂移（只许写真实存在的键，禁静默加键）
+        assertEquals(Set.of(DecisionChannelContract.KEY_PURPOSE, DecisionChannelContract.KEY_ENVIRONMENT),
+                body.keySet(), rendered);
     }
 
     // ── 验收 2：LLM 自报入参不入载荷 ────────────────────────────────────────
@@ -131,18 +133,25 @@ class ToolAdjudicationPayloadTest {
         assertFalse(rendered.contains("ignore previous instructions"),
                 "prompt 原文禁入载荷: " + rendered);
         assertFalse(rendered.contains("rm -rf"), "command 原文禁入载荷: " + rendered);
-        // ③ 白名单字段 + 派生结构值在场（排除"载荷整体为空"造成的假通过）
-        assertTrue(rendered.contains("s-7"), rendered);
-        assertTrue(rendered.contains(SERVER_USER), rendered);
-        assertTrue(rendered.contains("sqlDigest"), "SQL 只允许以摘要形态进入: " + rendered);
-        assertTrue(rendered.contains("readOnly"), rendered);
-        assertTrue(rendered.contains("ecos_dw.payroll"),
+        // ③ 服务端派生值在场（排除"载荷整体为空"造成的假通过）
+        assertEquals(DecisionChannelContract.PURPOSE_AI, body.get(DecisionChannelContract.KEY_PURPOSE), rendered);
+        assertTrue(body.containsKey(DecisionChannelContract.KEY_SQL_DIGEST),
+                "SQL 只允许以摘要形态进入: " + rendered);
+        assertEquals(List.of("ecos_dw.payroll"), body.get(DecisionChannelContract.KEY_TABLES),
                 "表引用是策略判读所需的派生值，应当在场: " + rendered);
-        // ④ 非白名单入参连 resource 段都进不去
-        Map<?, ?> resource = (Map<?, ?>) inputOf(body).get("resource");
-        assertFalse(resource.containsKey("sql"), String.valueOf(resource));
-        assertFalse(resource.containsKey("prompt"), String.valueOf(resource));
-        assertFalse(resource.containsKey("command"), String.valueOf(resource));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> assetRef = (Map<String, Object>) body.get(DecisionChannelContract.KEY_ASSET_REF);
+        assertEquals("ecos_dw.payroll", assetRef == null ? null : assetRef.get(DecisionChannelContract.KEY_ASSET_TABLE),
+                "恰一张受控表时资产归属必须宣告: " + rendered);
+        // ④ 非白名单入参不落 wire（/decision 键面里根本没有它们的键位，连 resource 段都不存在）
+        assertFalse(rendered.contains("scenarioId"), "非白名单业务参数漏出到 wire: " + rendered);
+        assertEquals(Set.of(
+                        DecisionChannelContract.KEY_ASSET_REF,
+                        DecisionChannelContract.KEY_PURPOSE,
+                        DecisionChannelContract.KEY_ENVIRONMENT,
+                        DecisionChannelContract.KEY_TABLES,
+                        DecisionChannelContract.KEY_SQL_DIGEST),
+                body.keySet(), rendered);
     }
 
     // ── 投影与构造器纪律 ────────────────────────────────────────────────────
@@ -219,21 +228,17 @@ class ToolAdjudicationPayloadTest {
     // ── 装置：真闸 + 假 security 客户端（捕获真实下发体） ────────────────────
 
     /**
-     * 跑一次咽喉工具调用，返回 security 客户端实际收到的裁决请求体。
+     * 跑一次咽喉工具调用，返回 security 客户端实际收到的 /decision 裁决请求体。
      *
-     * <p>闸必须是真实现：载荷四段渲染、SQL 派生值注入都发生在
-     * {@code AgentToolPolicyGate#adjudicate} 内，mock 掉闸就测不到本项红线。</p>
+     * <p>闸必须是真实现：/decision 请求体渲染（{@code AiSecurityEngineClient#decisionBody}）与
+     * SQL 派生值注入都发生在 {@code AgentToolPolicyGate#adjudicate} 内，mock 掉闸就测不到本项红线。</p>
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> adjudicate(Map<String, Object> arguments) throws Exception {
         AiSecurityEngineClient client = mock(AiSecurityEngineClient.class);
-        when(client.evaluateBodyForAdjudication(any())).thenAnswer(inv -> {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("policy", "rbac");
-            body.put("input", inv.getArgument(0));
-            return body;
-        });
-        when(client.evaluateData(any())).thenReturn(Map.of("allow", true, "policyId", "p-1"));
+        // #142/B4-3e-78（D-B4-30 收口）：主裁决腿已切 /decision（decideData），
+        // 旧 evaluate 桩对本路径已死，删除（桩必须与在网腿同形，禁遗留旁路桩面）。
+        doReturn(Map.of("allow", true, "policyId", "p-1")).when(client).decideData(any());
 
         AgentToolSqlWhitelist whitelist = mock(AgentToolSqlWhitelist.class);
         when(whitelist.allowedColumns("ecos_dw.payroll")).thenReturn(Set.of("*"));
@@ -259,7 +264,7 @@ class ToolAdjudicationPayloadTest {
         service.execute(TOOL, arguments);
 
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(client).evaluateData(captor.capture());
+        verify(client).decideData(captor.capture());
         return captor.getValue();
     }
 
@@ -268,12 +273,5 @@ class ToolAdjudicationPayloadTest {
         ObjectProvider<ToolPermissionBindingDao> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(null);
         return provider;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> inputOf(Map<String, Object> body) {
-        Object input = body.get("input");
-        assertTrue(input instanceof Map, "下发体缺 input 段: " + body.keySet());
-        return (Map<String, Object>) input;
     }
 }

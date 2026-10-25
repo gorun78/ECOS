@@ -7,6 +7,7 @@ import com.chinacreator.gzcm.common.security.filter.RowFilterVerdictContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
+import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
 import org.slf4j.Logger;
@@ -160,6 +161,98 @@ public class AiSecurityEngineClient {
                     "policy-engine/evaluate 响应不可解析（缺 data 段）: " + summarize(resp));
         }
         return (Map<String, Object>) resp.get("data");
+    }
+
+    /**
+     * POST {@value #PATH_DECISION} —— <b>AI 工具主裁决腿</b>（#142/B4-3e-78 收口差距 D-B4-30）。
+     *
+     * <p><b>为什么新增一条传输而不改 {@link #evaluateData}</b>：主裁决腿原问
+     * {@value #PATH_POLICY_EVALUATE}（策略名 {@code data_access}、四段载荷），与三通道唯一入口
+     * 是两个真值面；本批把 {@code AgentToolPolicyGate} 的主裁决改问本端点，载荷只走
+     * {@link DecisionChannelContract} 的键面（{@code assetRef}＋{@code purpose=ai}＋
+     * {@code environment.channel}＋可选 {@code tables}/{@code sqlDigest}/{@code resource}），
+     * 策略侧只读 {@code environment.channel} 判 {@code agent_channel}，{@code tables}/
+     * {@code sqlDigest} 是审计派生值（rego 不引用，同 {@code action} 的容许口径）。
+     * {@code /policy-engine/evaluate} 的非裁决消费方（OAG 前置过滤、Guardrails 面）
+     * 仍走 {@link #evaluateData}，本方法不替它们切线路。</p>
+     *
+     * <p><b>分态纪律与 {@link #columnSurface} 同族、不吞异常</b>：传输/寻址故障照抛（FAIL_CLOSED）；
+     * security 内部裁决失败以 HTTP 200 + code=503 信封应答（{@code DecisionController} 的
+     * fail-closed 出口），这里必须认信封转为不可解析异常，否则"引擎没结论"会被读成"无裁决段"。
+     * 应答的 {@code data} 段是<b>整份 DecisionBundle</b>（含恒在的 rls／columns／masks
+     * 固定段），裁决三态由其中的 {@code opa} 子段单点承载（allow/policyState/
+     * policyRef/obligations，{@code SecurityDecisionService#safeOpa} 写出）——
+     * 本方法只取该子段返回，调用方统一经 {@link #verdictOf} →
+     * {@code AbacEvaluateResponseContract} 读三态，禁按 policy-engine 应答面自抄键名，
+     * 也禁把整份 bundle 当成裁决段读（固定段里没有任何裁决键，那样读会恒落
+     * FAIL_CLOSED，正是 §4.7.2「不可用 ≠ 无权限」纪律禁止的形态）。</p>
+     *
+     * @param body {@link #decisionBody} 产出的请求体
+     * @return 裁决 data 段（永不为 {@code null}）
+     * @throws Exception 传输/寻址故障＝不可用态，原样上抛；应答不可解析同样抛出
+     */
+    public Map<String, Object> decideData(Map<String, Object> body) throws Exception {
+        Map<String, Object> resp = postJson(PATH_DECISION, body);
+        if (resp == null) {
+            throw new SecurityResponseUnparsableException("decision 应答为空信封");
+        }
+        if (RlsExecutionContract.isUnavailableEnvelope(resp)) {
+            throw new SecurityResponseUnparsableException(
+                    "security 内部裁决失败（" + RlsExecutionContract.SEC_UNAVAILABLE_CODE
+                            + " 信封）: code=" + resp.get("code") + " message=" + resp.get("message"));
+        }
+        Object data = resp.get("data");
+        if (!(data instanceof Map<?, ?> dataMap) || dataMap.isEmpty()) {
+            throw new SecurityResponseUnparsableException(
+                    "decision 应答缺 data 段或为空: " + summarize(resp));
+        }
+        // data 段是整份 bundle（含恒在的 rls/columns/masks 固定段），裁决三态落在 opa 子段。
+        // 段/键缺失或空＝裁决段不可解析（生产侧 safeOpa 恒写非空，走到这里只可能是形态漂移）——
+        // 抛而非按"无裁决段"默认放行或折算 DENY。
+        Object opaSegment = dataMap.get("opa");
+        if (!(opaSegment instanceof Map<?, ?> opaMap) || opaMap.isEmpty()) {
+            throw new SecurityResponseUnparsableException(
+                    "decision 应答 data 段缺 opa 裁决段或为空: dataKeys=" + dataMap.keySet());
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> out = (Map<String, Object>) opaMap;
+        return out;
+    }
+
+    /**
+     * 三通道唯一入口的 AI 工具形态请求体（#142/B4-3e-78，D-B4-30）。
+     *
+     * <p>键面全部取 {@link DecisionChannelContract} 单源，禁本类内联：{@code assetRef}
+     * （资产定位符，缺失＝不落资产段，由 strategy 层按无资产处置）、
+     * {@code purpose=ai}、{@code environment.channel=AGENT}（现成词表
+     * {@code ToolAdjudicationRequest.CHANNEL_AGENT} 同值）；SQL 结构派生值
+     * {@code tables}/{@code sqlDigest} 仅存在时写（缺失＝不写，页面/导出载荷形态不受影响）。
+     * <b>SQL 原文禁入载荷</b>（F06-02 要点 1，与 {@code AgentToolPolicyGate} 的
+     * digest 纪律同源）——入参契约里就不存在原文位置。</p>
+     *
+     * @param assetKey  资产定位符（如 {@code schema.table}）；null/空白＝不落
+     * @param tables    SQL 结构派生的受控表集合；null/空＝不落
+     * @param sqlDigest SQL 摘要（禁原文）；null/空白＝不落
+     */
+    public static Map<String, Object> decisionBody(String assetKey,
+                                                   List<String> tables, String sqlDigest) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (assetKey != null && !assetKey.isBlank()) {
+            Map<String, Object> asset = new LinkedHashMap<>();
+            asset.put(DecisionChannelContract.KEY_ASSET_TABLE, assetKey);
+            body.put(DecisionChannelContract.KEY_ASSET_REF, asset);
+        }
+        body.put(DecisionChannelContract.KEY_PURPOSE, DecisionChannelContract.PURPOSE_AI);
+        Map<String, Object> environment = new LinkedHashMap<>();
+        environment.put(DecisionChannelContract.KEY_CHANNEL, ToolAdjudicationRequest.CHANNEL_AGENT);
+        body.put(DecisionChannelContract.KEY_ENVIRONMENT, environment);
+        if (tables != null && !tables.isEmpty()) {
+            body.put(DecisionChannelContract.KEY_TABLES, tables);
+        }
+        if (sqlDigest != null && !sqlDigest.isBlank()) {
+            body.put(DecisionChannelContract.KEY_SQL_DIGEST, sqlDigest);
+        }
+        return body;
     }
 
     private Map<String, Object> buildEvaluateBody(String userId, String tenantId, String action,

@@ -83,6 +83,33 @@ public final class DecisionChannelContract {
     /** 应答体 {@code data} 里的列面段（其内部键面见 {@code ColumnSurfaceContract}）。 */
     public static final String KEY_BUNDLE_COLUMNS = "columns";
 
+    // ── #142/B4-3e-78 只增：AI 主裁决腿并入 /decision 的三枚可选键（差距 D-B4-30） ──
+    //
+    // 动机：{@code AgentToolPolicyGate} 主裁决腿此前问 /policy-engine/evaluate（策略名
+    // {@code data_access}，四段载荷），与三通道唯一入口是两个真值面。本批只增三枚键让
+    // /decision 能表达 AI 工具载荷的通道推断面（{@code environment.channel}）与 SQL 结构
+    // 派生值（{@code tables} / {@code sqlDigest}）：缺失＝不写（页面/导出载荷逐字节不变），
+    // 供 {@code SecurityDecisionService#safeOpa} 单点写出、oracle 回放可比性钉按段比对。
+
+    /** 请求体：AI 工具通道环境段（object；策略侧只读其 {@code channel} 判通道）。 */
+    public static final String KEY_ENVIRONMENT = "environment";
+
+    /**
+     * 请求体：{@code environment} 内的通道标识。
+     *
+     * <p>取值词表<b>沿用现成词表不新造词</b>：{@code "AGENT"}＝
+     * {@code ToolAdjudicationRequest.CHANNEL_AGENT}（AI 工具通道），与录制
+     * oracle 的 {@code environment.channel} 逐字同源；缺省/空白时按 AI 形态承流
+     * （见 {@code DecisionController#decide}），不再引入第二套通道词。</p>
+     */
+    public static final String KEY_CHANNEL = "channel";
+
+    /** 请求体：AI 工具 SQL 结构派生值的受控表集合（list of string，与表提取单源同源）。 */
+    public static final String KEY_TABLES = "tables";
+
+    /** 请求体：AI 工具 SQL 摘要（string；禁 SQL 原文入裁决载荷，F06-02 要点 1 同源纪律）。 */
+    public static final String KEY_SQL_DIGEST = "sqlDigest";
+
     private DecisionChannelContract() {
     }
 

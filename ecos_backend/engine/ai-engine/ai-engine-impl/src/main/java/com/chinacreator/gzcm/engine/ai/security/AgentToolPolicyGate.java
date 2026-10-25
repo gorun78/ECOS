@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -115,16 +116,29 @@ public class AgentToolPolicyGate {
         }
 
         // 2) security-engine ABAC（唯一裁决权威，一次且仅一次）
-        Map<String, Object> input = request.toEvaluateInput();
+        //
+        // #142/B4-3e-78 收口 D-B4-30：主裁决腿从 /policy-engine/evaluate 切到三通道
+        // 唯一入口 /decision（purpose=ai＋environment.channel=AGENT＋SQL 结构派生值
+        // tables/sqlDigest，键面全走 AiSecurityEngineClient.decisionBody 单源）。
+        // 载荷里禁 SQL 原文（F06-02 要点 1）：digest 与表集在客户端派生，且表集与
+        // AiToolColumnSurfaceGate 的资产基数判定共用同一提取器（禁第二套 FROM/JOIN 解析）。
+        String decisionTable = null;
+        List<String> decisionTables = List.of();
+        String sqlDigest = null;
         if (sqlText != null && !sqlText.isBlank()) {
-            // 只给策略判定必需的结构性派生值，禁 SQL 原文入载荷（F06-02 要点 1）
-            input.put("sqlDigest", digest(sqlText));
-            input.put("readOnly", Boolean.TRUE);
-            input.put("tables", extractTables(sqlText));
+            Set<String> tables = extractTables(sqlText);
+            if (tables.size() == 1) {
+                // /decision 的 assetRef 只承关系表资产：恰一张受控表时才宣告资产归属；
+                // 0 张或 ≥2 张不写 asset 段（诚实的无资产形态，rego 违规判定不读 asset）。
+                // ≥2 张（join）最终由阶段 4 列面闸的 AMBIGUOUS 钉拦，策略腿不替它猜主体。
+                decisionTable = tables.iterator().next();
+            }
+            decisionTables = List.copyOf(tables);
+            sqlDigest = digest(sqlText);
         }
         try {
-            Map<String, Object> data = securityClient.evaluateData(
-                    securityClient.evaluateBodyForAdjudication(input));
+            Map<String, Object> data = securityClient.decideData(
+                    AiSecurityEngineClient.decisionBody(decisionTable, decisionTables, sqlDigest));
             long latency = elapsedMs(startNs);
             String verdict = AiSecurityEngineClient.verdictOf(data);
             if (AiSecurityEngineClient.V_DENY.equals(verdict)) {
