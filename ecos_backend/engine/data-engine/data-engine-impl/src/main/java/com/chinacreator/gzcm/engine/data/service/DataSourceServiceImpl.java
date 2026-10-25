@@ -9,6 +9,7 @@ import com.chinacreator.gzcm.engine.data.dao.DataSourceDao;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
 import com.chinacreator.gzcm.engine.data.metadata.MetadataAsyncTrigger;
 import com.chinacreator.gzcm.engine.data.metadata.MetadataStrategyConfig;
+import com.chinacreator.gzcm.runtime.access.connector.DataSourceTypeVocabulary;
 import com.chinacreator.gzcm.runtime.core.crypto.SecurityCryptoEgress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,11 +52,17 @@ public class DataSourceServiceImpl implements DataSourceService {
     static final String FAIL_CLOSED_MASKED_CONFIG =
             "{\"masked\":\"********\",\"reason\":\"connectionConfig 无法解析，响应层按 fail-closed 掩码\"}";
 
-    /** PMO-45: 支持的全部数据源类型（与数据模型 7 种基础类型对齐） */
-    public static final Set<String> SUPPORTED_TYPES = Set.of(
-            "POSTGRESQL", "MYSQL", "ORACLE", "MSSQL",
-            "DM", "KINGBASE", "GAUSS", "CLICKHOUSE", "MINIO", "FILESYSTEM"
-    );
+    /**
+     * 支持的全部数据源类型（服务准入面）。
+     *
+     * <p>#142/B4-3e-63（D-B4-78）：由手抄 {@code Set.of(...)} 改为
+     * {@link DataSourceTypeVocabulary#registrableTypes()} 单源派生。枚数与成员与收口前
+     * <b>逐枚相同</b>（10 枚：POSTGRESQL／MYSQL／ORACLE／MSSQL／DM／KINGBASE／GAUSS／
+     * CLICKHOUSE／MINIO／FILESYSTEM）——本批只做命名归一与单源化，<b>不因归一而放宽准入</b>：
+     * 词表里 DORIS／MARIADB／HSQLDB／DB2／MONGODB 与 pipeline 规范类型仍不可登记。
+     * 枚数由 {@code DataSourceTypeVocabularyTest} 钉值。</p>
+     */
+    public static final Set<String> SUPPORTED_TYPES = DataSourceTypeVocabulary.registrableTypes();
 
     /** PMO-45: MINIO 对象存储 — enterprise/ultimate 版本才可用 */
     public static final String MINIO_TYPE = "MINIO";
@@ -283,7 +290,8 @@ public class DataSourceServiceImpl implements DataSourceService {
     @Override
     public DataSourceEntity register(DataSourceDTO dto) {
         // PMO-45: 类型合法性校验
-        validateType(dto.getDatasourceType());
+        // #142/B4-3e-63（D-B4-78）：落库取词表规范名，禁把入参别名形态原样写进 td_datasource
+        String datasourceType = validateType(dto.getDatasourceType());
         String id = UUID.randomUUID().toString().replace("-", "");
         Timestamp now = new Timestamp(System.currentTimeMillis());
         String metadataConfigJson = buildMetadataConfigJson(dto, "MANUAL");
@@ -292,7 +300,7 @@ public class DataSourceServiceImpl implements DataSourceService {
         String passwordEnc = encryptPassword(extractPassword(dto.getConnectionConfig()));
         String storedConfig = stripSensitiveFields(dto.getConnectionConfig());
         dataSourceDao.register(
-                id, dto.getDatasourceName(), dto.getDatasourceType(), dto.getOrgId(),
+                id, dto.getDatasourceName(), datasourceType, dto.getOrgId(),
                 dto.getDescription(), storedConfig, dto.getTags(),
                 metadataConfigJson, now, passwordEnc);
         log.info("Registered datasource: id={}, name={}, strategy={}",
@@ -381,7 +389,8 @@ public class DataSourceServiceImpl implements DataSourceService {
     @Override
     public DataSourceEntity updateDataSource(String datasourceId, DataSourceDTO dto) {
         // PMO-45: 类型合法性校验
-        validateType(dto.getDatasourceType());
+        // #142/B4-3e-63（D-B4-78）：更新同样写回规范名（与 register 同一口径）
+        String datasourceType = validateType(dto.getDatasourceType());
         DataSourceEntity existing = getInternal(datasourceId);
         if (existing == null) {
             return null;
@@ -412,7 +421,7 @@ public class DataSourceServiceImpl implements DataSourceService {
         String storedConfig = stripSensitiveFields(dto.getConnectionConfig());
         dataSourceDao.updateDataSource(
             datasourceId,
-            dto.getDatasourceName(), dto.getDatasourceType(), dto.getOrgId(),
+            dto.getDatasourceName(), datasourceType, dto.getOrgId(),
             dto.getDescription(), storedConfig, dto.getTags(),
             metadataConfigJson, newEnc, now
         );
@@ -472,19 +481,26 @@ public class DataSourceServiceImpl implements DataSourceService {
      * PMO-45: 校验数据源类型合法性 + 版本约束。
      * MINIO 对象存储仅 enterprise/ultimate 版本支持，standard 版本返回业务错误码 "invalid_type"。
      *
+     * <p>#142/B4-3e-63（D-B4-78）：准入判定改由词表单源解析（规范名＋别名皆可命中），
+     * 且<b>返回规范名</b>——收口前只做大写包含判断，别名形态（如前端 {@code gaussdb} 归一成
+     * {@code GAUSSDB}）因不等于后端规范名 {@code GAUSS} 被 400 拒，同时落库值与承流值两套拼写。
+     * 现由调用方把规范名写回，准入面与承流面同名。</p>
+     *
+     * @return 词表规范名（大写）
      * @throws IllegalArgumentException 类型不支持或版本不满足
      */
-    private void validateType(String type) {
+    private String validateType(String type) {
         if (type == null || type.isBlank()) {
             throw new IllegalArgumentException("数据源类型 datasourceType 不能为空");
         }
-        String upper = type.toUpperCase();
-        if (!SUPPORTED_TYPES.contains(upper)) {
+        DataSourceTypeVocabulary vocab = DataSourceTypeVocabulary.find(type);
+        if (vocab == null || !vocab.registrable()) {
             throw new IllegalArgumentException(
                 "不支持的数据源类型: " + type + "。支持: " + SUPPORTED_TYPES);
         }
+        String canonical = vocab.canonical();
         // MINIO 版本约束
-        if (MINIO_TYPE.equals(upper)) {
+        if (MINIO_TYPE.equals(canonical)) {
             String profile = resolveProfile();
             boolean ok = profile != null &&
                     (profile.contains("enterprise") || profile.contains("ultimate"));
@@ -494,6 +510,7 @@ public class DataSourceServiceImpl implements DataSourceService {
                     + (profile != null ? profile : "standard(default)"));
             }
         }
+        return canonical;
     }
 
     /**
@@ -810,8 +827,10 @@ public class DataSourceServiceImpl implements DataSourceService {
      * @return 键面见上文契约
      */
     public Map<String, Object> previewSchemaByConfig(String type, String connectionConfig) {
-        String upper = type == null ? "" : type.toUpperCase();
-        validateType(upper);
+        // #142/B4-3e-63（D-B4-78）：入参经词表解析取规范名，别名形态（GAUSSDB）不再因大小写包含
+        // 判断通过却拿不到连接器（承流面与准入面同名）。词表外＝显式 400，禁猜默认。
+        String canonical = validateType(type);
+        String upper = canonical;
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("type", upper);

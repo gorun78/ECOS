@@ -72,9 +72,10 @@
          Activate: `mvn clean install -Pjdbc-drivers`
          When NOT active the 5 third-party drivers are excluded from the build
          so that builds work in offline/narrow-network environments.
-         The JdbcConnector falls back to the postgres driver (always present)
-         for types where no driver is available, and returns a clear error
-         for types whose driver jar is not on the classpath.
+         #142/B4-3e-63 (D-B4-78)订正：JdbcConnector 不再对「没有驱动的类型」静默回落到
+         postgres driver——驱动解析取 DataSourceTypeVocabulary.driverClass()，解析不出即
+         显式失败（"数据源类型未登记 JDBC 驱动类"）；驱动类已登记但 jar 不在 classpath 时，
+         由 SQLException 分类成 "无可用 JDBC 驱动适配 URL"。两种形态都不再拿 PG 驱动去连非 PG 库。
          ================================================================ -->
     <profiles>
         <profile>

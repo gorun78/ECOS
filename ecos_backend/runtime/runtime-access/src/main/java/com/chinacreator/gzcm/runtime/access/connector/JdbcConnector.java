@@ -63,12 +63,28 @@ public class JdbcConnector implements Connector {
         r.put("type", type);
         try {
             Map<String, String> cfg = readConnectionConfig(connectionConfig);
+            boolean directUrl = cfg.get("jdbcUrl") != null && !cfg.get("jdbcUrl").isBlank();
+            DataSourceTypeVocabulary.Dialect dialect = dialectOf(type);
             String url = buildJdbcUrl(type, cfg);
             String driver = resolveDriverClass(type, url);
             r.put("driverClass", driver);
             if (url == null || url.isBlank()) {
                 r.put("success", false);
-                String err = "连接配置缺少 jdbcUrl 或 host/port 参数，无法拼装 JDBC URL (type=" + type + ")";
+                // #142/B4-3e-63（D-B4-78）：收口前「拼不出」只有一种文案，把「类型无方言登记」与
+                // 「配置缺参数」混成同一句，前者被误读成用户少填了 host。现分腿，且无方言者不再静默按 PG 拼。
+                String err = (!directUrl && dialect == null)
+                    ? "数据源类型未登记 JDBC 方言，无法拼装 JDBC URL (type=" + type + ") —— "
+                        + "该类型不在 JDBC 承载面内：请在 DataSourceTypeVocabulary 登记其方言/驱动，或改走对应连接器"
+                    : "连接配置缺少 jdbcUrl 或 host/port 参数，无法拼装 JDBC URL (type=" + type + ")";
+                r.put("error", err);
+                r.put("message", err);
+                return r;
+            }
+            if (driver == null) {
+                r.put("success", false);
+                String err = "数据源类型未登记 JDBC 驱动类，无法加载驱动 (type=" + type + ", url=" + url + ") —— "
+                    + "收口前此处静默回落 org.postgresql.Driver，会拿 PG 驱动去连非 PG 库；"
+                    + "现改为显式失败，请在 DataSourceTypeVocabulary 登记该类型驱动类";
                 r.put("error", err);
                 r.put("message", err);
                 return r;
@@ -125,59 +141,73 @@ public class JdbcConnector implements Connector {
 
     /**
      * 按数据源类型拼装 JDBC URL。优先使用 config.jdbcUrl；缺失时按 host/port 拼装。
+     *
+     * <p>#142/B4-3e-63（D-B4-78）：方言族由本类自带的类型分支改为
+     * {@link DataSourceTypeVocabulary.Dialect} 单源派发。收口前 {@code default} 腿把
+     * <b>任何</b>未列名的类型静默拼成 {@code jdbc:postgresql://}（MARIADB／DB2／HSQLDB／MONGODB
+     * 乃至 {@code SQLSERVER} 都会拿 PG 驱动连出去），属「无配置＝按别族猜」的 fail-open；
+     * 现改为<b>无方言即拼不出</b>——返回 {@code null} 由调用方给出显式失败原因，禁回落他族。</p>
      */
     private String buildJdbcUrl(String type, Map<String, String> cfg) {
         String direct = cfg.get("jdbcUrl");
         if (direct != null && !direct.isBlank()) return direct;
         String host = cfg.get("host");
-        String port = cfg.get("port");
         if (host == null || host.isBlank()) return null;
-        if (port == null) port = defaultPort(type);
-        switch (type) {
-            case "ORACLE": {
+        DataSourceTypeVocabulary.Dialect dialect = dialectOf(type);
+        if (dialect == null) return null;
+        String port = cfg.get("port");
+        if (port == null) port = defaultPort(type, dialect);
+        String db = cfg.getOrDefault("database", "");
+        switch (dialect) {
+            case ORACLE: {
                 String svc = cfg.getOrDefault("serviceName", cfg.getOrDefault("sid", ""));
                 return "jdbc:oracle:thin:@//" + host + ":" + port + "/" + svc;
             }
-            case "MSSQL": {
-                String db = cfg.getOrDefault("databaseName", cfg.getOrDefault("database", ""));
-                return "jdbc:sqlserver://" + host + ":" + port + ";databaseName=" + db
+            case SQLSERVER: {
+                String sqlServerDb = cfg.getOrDefault("databaseName", db);
+                return "jdbc:sqlserver://" + host + ":" + port + ";databaseName=" + sqlServerDb
                     + ";encrypt=false;trustServerCertificate=true;connectTimeout=10;socketTimeout=10";
             }
-            case "DM":
+            case DM:
                 return "jdbc:dm://" + host + ":" + port + "/" + cfg.getOrDefault("schema", "").replaceFirst("^/", "");
-            case "KINGBASE":
-                return "jdbc:kingbase8://" + host + ":" + port + "/" + cfg.getOrDefault("database", "");
-            case "GAUSS":
-                return "jdbc:opengauss://" + host + ":" + port + "/" + cfg.getOrDefault("database", "");
-            case "CLICKHOUSE":
-                return "jdbc:clickhouse://" + host + ":" + port + "/" + cfg.getOrDefault("database", "")
+            case KINGBASE:
+                return "jdbc:kingbase8://" + host + ":" + port + "/" + db;
+            case GAUSS:
+                return "jdbc:opengauss://" + host + ":" + port + "/" + db;
+            case CLICKHOUSE:
+                return "jdbc:clickhouse://" + host + ":" + port + "/" + db
                     + "?connect_timeout=10000&socket_timeout=10000";
-            case "MYSQL":
-                return "jdbc:mysql://" + host + ":" + port + "/" + cfg.getOrDefault("database", "")
+            case MYSQL:
+                return "jdbc:mysql://" + host + ":" + port + "/" + db
                     + "?connectTimeout=10000&socketTimeout=10000&useSSL=false";
-            case "POSTGRESQL":
+            case POSTGRESQL:
             default:
-                return "jdbc:postgresql://" + host + ":" + port + "/" + cfg.getOrDefault("database", "")
+                return "jdbc:postgresql://" + host + ":" + port + "/" + db
                     + "?connectTimeout=10&socketTimeout=10";
         }
     }
 
-    private static String defaultPort(String type) {
-        switch (type) {
-            case "ORACLE": return "1521";
-            case "MSSQL": return "1433";
-            case "DM": return "5236";
-            case "KINGBASE": return "54321";
-            case "GAUSS": return "5432";
-            case "CLICKHOUSE": return "8123";
-            case "MYSQL": return "3306";
-            case "POSTGRESQL":
-            default: return "5432";
+    /** 该数据源类型在词表里的 JDBC 方言；词表外或无方言者返回 {@code null}（＝拼不出 URL）。 */
+    private static DataSourceTypeVocabulary.Dialect dialectOf(String type) {
+        DataSourceTypeVocabulary v = DataSourceTypeVocabulary.find(type);
+        return v == null ? null : v.dialect();
+    }
+
+    /** 词表登记的缺省端口；缺省值为 {@code null} 时按方言族回落到 PG 端口（仅方言基准 POSTGRESQL 会走到）。 */
+    private static String defaultPort(String type, DataSourceTypeVocabulary.Dialect dialect) {
+        DataSourceTypeVocabulary v = DataSourceTypeVocabulary.find(type);
+        if (v != null && v.defaultPort() != null) {
+            return v.defaultPort();
         }
+        return "5432";
     }
 
     /**
      * 依 URL scheme 或业务类型解析 JDBC 驱动类。
+     *
+     * <p>#142/B4-3e-63（D-B4-78）：类型分支改取词表 {@link DataSourceTypeVocabulary#driverClass()}，
+     * 且<b>不再</b>对未知类型回落 {@code org.postgresql.Driver}——两面都给不出驱动时返回
+     * {@code null}，由调用方按「驱动无法解析」显式失败。</p>
      */
     private String resolveDriverClass(String type, String jdbcUrl) {
         if (jdbcUrl != null) {
@@ -190,17 +220,8 @@ public class JdbcConnector implements Connector {
             if (jdbcUrl.startsWith("jdbc:postgresql")) return "org.postgresql.Driver";
             if (jdbcUrl.startsWith("jdbc:mysql")) return "com.mysql.cj.jdbc.Driver";
         }
-        switch (type) {
-            case "ORACLE": return "oracle.jdbc.OracleDriver";
-            case "MSSQL": return "com.microsoft.sqlserver.jdbc.SQLServerDriver";
-            case "DM": return "dm.jdbc.driver.DmDriver";
-            case "KINGBASE": return "com.kingbase8.Driver";
-            case "GAUSS": return "org.opengauss.Driver";
-            case "CLICKHOUSE": return "com.clickhouse.jdbc.ClickHouseDriver";
-            case "MYSQL": return "com.mysql.cj.jdbc.Driver";
-            case "POSTGRESQL":
-            default: return "org.postgresql.Driver";
-        }
+        DataSourceTypeVocabulary v = DataSourceTypeVocabulary.find(type);
+        return v == null ? null : v.driverClass();
     }
 
     /**

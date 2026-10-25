@@ -30,42 +30,28 @@ public class ConnectorFactory {
 
     private final List<Connector> connectors;
 
-    /** Pipeline 节点类型白名单 — 所有合法的 SOURCE 类型 */
-    private static final Set<String> SOURCE_TYPES = Set.of(
-            "JDBC", "SOURCE_JDBC",
-            "SOURCE_CSV",
-            "SOURCE_REST"
-    );
+    /**
+     * Pipeline 节点类型白名单 — 所有合法的 SOURCE 类型。
+     *
+     * <p>#142/B4-3e-63（D-B4-78）：由手抄枚举改为 {@link DataSourceTypeVocabulary} 派生。
+     * 成员集不变（JDBC／SOURCE_JDBC／SOURCE_CSV／SOURCE_REST），由
+     * {@code DataSourceTypeVocabularyTest} 逐枚钉住。</p>
+     */
+    private static final Set<String> SOURCE_TYPES = DataSourceTypeVocabulary.pipelineWhitelistTypes();
 
     /**
-     * 数据源业务类型 → pipeline 规范类型映射（PMO-37 T1）。
-     * 键全部大写。未列出的 JDBC 兼容业务类型（如 DB2 / HSQLDB / MARIADB / MONGODB）
-     * 也归一到 JDBC。注意：MONGODB 走 JDBC 是简化归一，后续可换 mongo connector。
+     * 数据源业务类型（含别名）→ pipeline 规范类型映射（PMO-37 T1）。
      *
-     * PMO-45 新增: MSSQL / DM / KINGBASE / GAUSS (关系型, 归一 JDBC);
-     *               MINIO (S3 对象存储, 归一 JDBC 使 testConnection 走 JdbcConnector 返回 false);
-     *               FILESYSTEM (本地文件, 不走 Connector, 由 DataSourceServiceImpl 特殊处理)
+     * <p>#142/B4-3e-63（D-B4-78）：本表原先手抄 16 条，与服务准入面
+     * {@code DataSourceServiceImpl.SUPPORTED_TYPES}、{@code JdbcConnector} 的方言分支各自演化，
+     * 造成「前端 {@code gaussdb} ↔ 后端 {@code GAUSS} 同物异名被 400 拒」与
+     * 「归一到 JDBC 却无方言的类型静默按 PostgreSQL 拼 URL」两类真缺陷。
+     * 现由 {@link DataSourceTypeVocabulary} 单源派生：键＝业务成员规范名＋别名，
+     * 值＝该成员的连接器目标。收口前 16 条键的解析结果逐枚不变，唯一新增键是别名
+     * {@code GAUSSDB → JDBC}（命名归一，非准入扩面——可登记集仍由
+     * {@code registrable()} 决定，枚数钉值 10）。</p>
      */
-    private static final Map<String, String> RELATIONAL_ALIASES = Map.ofEntries(
-            Map.entry("POSTGRESQL", "JDBC"),
-            Map.entry("MYSQL", "JDBC"),
-            Map.entry("ORACLE", "JDBC"),
-            Map.entry("SQLSERVER", "JDBC"),
-            Map.entry("CLICKHOUSE", "JDBC"),
-            Map.entry("DORIS", "JDBC"),
-            Map.entry("MARIADB", "JDBC"),
-            Map.entry("HSQLDB", "JDBC"),
-            Map.entry("DB2", "JDBC"),
-            Map.entry("MONGODB", "JDBC"),
-            // ── PMO-45 新增: 关系型数据库 (归一 JDBC) ──
-            Map.entry("MSSQL", "JDBC"),
-            Map.entry("DM", "JDBC"),
-            Map.entry("KINGBASE", "JDBC"),
-            Map.entry("GAUSS", "JDBC"),
-            // ── PMO-45 新增: 对象存储/文件 (不走 JDBC, 登记为白名单类型) ──
-            Map.entry("MINIO", "MINIO"),
-            Map.entry("FILESYSTEM", "FILESYSTEM")
-    );
+    private static final Map<String, String> RELATIONAL_ALIASES = DataSourceTypeVocabulary.aliasIndex();
 
     public ConnectorFactory(List<Connector> connectors) {
         this.connectors = connectors;
