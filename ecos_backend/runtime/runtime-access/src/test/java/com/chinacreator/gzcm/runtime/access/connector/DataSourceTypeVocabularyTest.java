@@ -58,9 +58,13 @@ class DataSourceTypeVocabularyTest {
     /** 独立钉值（收口前 {@code ConnectorFactory.RELATIONAL_ALIASES} 手抄 16 条键→值，逐枚冻结）。 */
     private static final Map<String, String> PRE_CLOSE_ALIAS_KEYS = frozenAliasKeys();
 
-    /** 词表可登记且归一到 JDBC 的成员，必须全部带方言（承流面自洽判据的输入面）。 */
+    /**
+     * 词表可登记且归一到 JDBC 的成员，必须全部带方言（承流面自洽判据的输入面）。
+     * #142/B4-3e-72 起 MARIADB 摘出（已按 MySQL 族补方言，正向断言见
+     * {@link #mariadbResolvesMysqlDialectFace()}）；余 3 枚仍无方言＝建连必须显式失败。
+     */
     private static final List<String> NO_DIALECT_BUSINESS_TYPES = List.of(
-            "MARIADB", "HSQLDB", "DB2", "MONGODB");
+            "HSQLDB", "DB2", "MONGODB");
 
     // ─── 准入面／白名单面：枚数与成员逐枚不变 ───────────────────────────
 
@@ -171,6 +175,37 @@ class DataSourceTypeVocabularyTest {
             assertFalse(err.contains("缺少 jdbcUrl 或 host"),
                     type + " 已有 host，不得误报成「配置缺参数」（实得：" + err + "）");
         }
+    }
+
+    @Test
+    @DisplayName("#142/B4-3e-72：MARIADB 已补 MySQL 族方言／3306／MySQL 驱动，且仍不可登记（承流腿补全、准入面不扩）")
+    void mariadbResolvesMysqlDialectFace() {
+        DataSourceTypeVocabulary v = DataSourceTypeVocabulary.find("MARIADB");
+        assertNotNull(v, "MARIADB 必须在词表内（归一面收口前既有键）");
+        assertEquals(DataSourceTypeVocabulary.Dialect.MYSQL, v.dialect(),
+                "MARIADB 方言须为 MYSQL 族（MariaDB 与 MySQL 同协议；族归属改动须另行定档）");
+        assertEquals("3306", v.defaultPort(), "MARIADB 缺省端口钉值 3306（同 MySQL 族）");
+        assertEquals("com.mysql.cj.jdbc.Driver", v.driverClass(),
+                "MARIADB 驱动类须与 MYSQL 同枚（驱动族随方言走）");
+        assertFalse(v.registrable(),
+                "本批只补方言腿，不扩准入面——扩准入是另一枚裁决（同 DORIS 才扩的口径），"
+                        + "且前端 19 枚可选面无 mariadb，扩面会被 gateway 门双向对账点名");
+
+        // 建连腿真值：driverClass 由词表给出、不再落「未登记 JDBC 方言」腿
+        JdbcConnector jdbc = new JdbcConnector();
+        String cfg = "{\"host\":\"127.0.0.1\",\"port\":\"3306\",\"database\":\"d\"}";
+        Map<String, Object> r = jdbc.testConnectionDetailed(cfg, "MARIADB");
+        assertEquals("com.mysql.cj.jdbc.Driver", r.get("driverClass"),
+                "MARIADB 的驱动类须由词表派生（键面 type/driverClass/success/error/message 不变）");
+        String err = String.valueOf(r.get("error"));
+        assertFalse(err.contains("未登记 JDBC 方言"),
+                "MARIADB 已带方言，不得落「未登记 JDBC 方言」腿（实得：" + err + "）");
+        assertFalse(err.contains("缺少 jdbcUrl 或 host"),
+                "MARIADB 已有 host，不得误报「配置缺参数」（实得：" + err + "）");
+        // URL 走 MySQL 拼腿（本模块默认构建无驱动 JAR，落「驱动未加载」可读腿＝真建连路径的直达前态）
+        assertTrue(err.contains("JDBC 驱动未加载") || err.contains("JDBC 连接失败") || err.contains("认证失败")
+                || err.contains("网络不可达") || err.contains("无可用 JDBC 驱动适配") || err.contains("isValid"),
+                "MARIADB 建连必须到达真建连腿（驱动加载检测/建连/分类任一），不得折回方言缺失腿，实得：" + err);
     }
 
     @Test

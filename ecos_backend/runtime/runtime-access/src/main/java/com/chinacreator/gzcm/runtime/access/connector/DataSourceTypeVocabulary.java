@@ -101,8 +101,21 @@ public enum DataSourceTypeVocabulary {
     DORIS(List.of(), "JDBC", Dialect.MYSQL, "9030",
             "com.mysql.cj.jdbc.Driver", true, false),
 
-    /** MariaDB —— 收口前在别名表内归一 JDBC，却无任何方言，静默按 PostgreSQL 拼 URL（本批改显式）。 */
-    MARIADB(List.of(), "JDBC", null, null, null, false, false),
+    /**
+     * MariaDB —— 方言按 MySQL 协议承流（MariaDB 与 MySQL 同协议族，MySQL 驱动按 URL
+     * {@code jdbc:mysql://} 连接 MariaDB 为发行方文档的常态形态），缺省端口 3306 同 MySQL 族。
+     *
+     * <p>#142/B4-3e-72：本枚此前 {@code dialect()=null}＝建连腿显式失败（收口 D-B4-78 时按
+     * 「无方言＝显式失败」处置的 4 枚之一）。本批<b>只补方言腿，不扩准入面</b>：
+     * {@code registrable} 仍为 {@code false}——服务准入面是否接承流是另一枚裁决
+     * （B4 被拒闭集 9 枚逐枚定档口径，同 DORIS 的显式接承流才扩面），且前端可选面
+     * 19 枚无 {@code mariadb}，扩准入会被 {@code DatasourceTypeVocabularySingleSourceTest}
+     * 双向对账点名。补方言后本枚的建连腿从「未登记 JDBC 方言」移到真建连腿：
+     * 驱动缺失时回落 3e-63 建立的「JDBC 驱动未加载」可读文案，不再静默按他族拼 URL（收口前形态），
+     * 也不会再拿 PG 驱动去连（收口前 default 腿形态）。</p>
+     */
+    MARIADB(List.of(), "JDBC", Dialect.MYSQL, "3306",
+            "com.mysql.cj.jdbc.Driver", false, false),
 
     /** HSQLDB —— 同上，且 runtime-access 无该驱动依赖。 */
     HSQLDB(List.of(), "JDBC", null, null, null, false, false),
@@ -122,8 +135,8 @@ public enum DataSourceTypeVocabulary {
      * {@code JdbcConnector.testConnection(config)} 与 pipeline 侧
      * {@code resolveDriverClass("JDBC", jdbcUrl)} 都以 {@code JDBC} 为名进来，
      * 收口前落到 {@code default} 腿按 PostgreSQL 形态拼装。本批把这条回落<b>显式登记</b>在此，
-     * 而不是继续藏在 switch 的 {@code default} 里——业务类型（MARIADB／DB2／HSQLDB／MONGODB）
-     * 从此拿不到这条回落，无方言即显式失败。</p>
+     * 而不是继续藏在 switch 的 {@code default} 里——未裁业务类型（DB2／HSQLDB／MONGODB；
+     * MARIADB 已于 #142/B4-3e-72 按 MySQL 族补方言）从此拿不到这条回落，无方言即显式失败。</p>
      */
     JDBC(List.of(), "JDBC", Dialect.POSTGRESQL, "5432",
             "org.postgresql.Driver", false, true),

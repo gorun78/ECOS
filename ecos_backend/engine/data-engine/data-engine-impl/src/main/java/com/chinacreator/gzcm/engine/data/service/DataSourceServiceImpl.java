@@ -60,7 +60,8 @@ public class DataSourceServiceImpl implements DataSourceService {
      * <b>逐枚相同</b>（收口时 10 枚：POSTGRESQL／MYSQL／ORACLE／MSSQL／DM／KINGBASE／GAUSS／
      * CLICKHOUSE／MINIO／FILESYSTEM）——本批只做命名归一与单源化，<b>不因归一而放宽准入</b>。
      * 其后 #142/B4-3e-71 被拒闭集逐枚定档，DORIS 显式接承流扩入第 11 枚；
-     * MARIADB／HSQLDB／DB2／MONGODB 与 pipeline 规范类型仍不可登记。
+     * MARIADB／HSQLDB／DB2／MONGODB 与 pipeline 规范类型仍不可登记
+     *（MARIADB 的承流腿已于 #142/B4-3e-72 补 MySQL 族方言，建连可读通，但准入面不扩）。
      * 枚数由 {@code DataSourceTypeVocabularyTest} 钉值（现 11 枚）。</p>
      */
     public static final Set<String> SUPPORTED_TYPES = DataSourceTypeVocabulary.registrableTypes();

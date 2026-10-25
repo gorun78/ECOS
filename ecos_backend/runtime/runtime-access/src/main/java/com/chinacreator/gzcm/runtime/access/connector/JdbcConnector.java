@@ -145,7 +145,8 @@ public class JdbcConnector implements Connector {
      * <p>#142/B4-3e-63（D-B4-78）：方言族由本类自带的类型分支改为
      * {@link DataSourceTypeVocabulary.Dialect} 单源派发。收口前 {@code default} 腿把
      * <b>任何</b>未列名的类型静默拼成 {@code jdbc:postgresql://}（MARIADB／DB2／HSQLDB／MONGODB
-     * 乃至 {@code SQLSERVER} 都会拿 PG 驱动连出去），属「无配置＝按别族猜」的 fail-open；
+     * 乃至 {@code SQLSERVER} 都会拿 PG 驱动连出去；MARIADB 已于 #142/B4-3e-72 补 MySQL 族方言），
+     * 属「无配置＝按别族猜」的 fail-open；
      * 现改为<b>无方言即拼不出</b>——返回 {@code null} 由调用方给出显式失败原因，禁回落他族。</p>
      */
     private String buildJdbcUrl(String type, Map<String, String> cfg) {
