@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.security.service;
 
 import com.chinacreator.gzcm.engine.security.dao.SecurityConfigDao;
 import com.chinacreator.gzcm.sysman.model.SecurityProfile;
+import com.chinacreator.gzcm.sysman.security.profile.service.ISecurityProfileQueryService;
 import com.chinacreator.gzcm.sysman.iam.context.TenantContext;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import org.slf4j.Logger;
@@ -17,8 +18,20 @@ public class SecurityConfigService {
 
     private final SecurityConfigDao dao;
 
-    public SecurityConfigService(SecurityConfigDao dao) {
+    /**
+     * 属主 api 门面（#142/B4-3e-83，收口 D-B4-99 d)）。本类原经 {@link SecurityConfigDao}
+     * 自带一份 {@code JOIN td_user_role …} 逐字副本，与 sysman 属主侧同形语句必然漂移
+     * （副本未排除空密级行，PG 的 {@code DESC} 默认 NULLS FIRST 会把空值档读成 L0）。
+     * 现「取用户最高角色档」不再写在引擎侧，只走本门面（铁律 #5）。
+     * <p><b>必装配</b>：四枚宿主（gateway、sysman、data-engine、security-engine-boot）都带
+     * sysman-impl 且扫描 {@code com.chinacreator.gzcm.sysman}，缺席即 context 起不来——
+     * 不做「拿不到就跳档」的折叠。
+     */
+    private final ISecurityProfileQueryService profileQueryService;
+
+    public SecurityConfigService(SecurityConfigDao dao, ISecurityProfileQueryService profileQueryService) {
         this.dao = dao;
+        this.profileQueryService = profileQueryService;
     }
 
     public String getCurrentTenantId() {
@@ -63,8 +76,7 @@ public class SecurityConfigService {
     public SecurityProfile queryHighestRoleProfileForUser(String userId) {
         try {
             String tenantId = getCurrentTenantId();
-            List<SecurityProfile> list = dao.queryHighestRoleProfileForUser(userId, tenantId);
-            return list.isEmpty() ? null : list.get(0);
+            return profileQueryService.findHighestRoleForUser(userId, tenantId);
         } catch (Exception e) {
             log.warn("查询用户最高角色安全配置异常: userId={}, {}", userId, e.getMessage());
             return null;

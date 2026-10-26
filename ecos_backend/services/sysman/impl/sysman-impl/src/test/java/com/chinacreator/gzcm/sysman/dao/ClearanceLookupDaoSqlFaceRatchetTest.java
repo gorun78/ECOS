@@ -43,9 +43,9 @@ import org.junit.jupiter.api.Timeout;
  * ① 格式化家族恒 0：{@code String.format}／{@code formatted(}／{@code %s}／{@code MessageFormat}；
  * ② SQL 行内标识符拼接恒 0：同一行内既含 SQL 关键字（SELECT/FROM/WHERE/JOIN）又含
  * {@code + 变量} 的行读数 0（字面量续行形如 {@code + "FROM …"} 不误计——{@code +} 后紧跟引号）；
- * ③ 语句字面量多重集＝9 枚（文本块 2 + 普通字面量 7）且表名闭包＝三枚在册表；
+ * ③ 语句字面量多重集＝7 枚（普通字面量 7，零文本块——角色档聚合腿已归一属主行读）且表名闭包＝在本册一枚表；
  * ④ 白名单条目闭包＝{@code {USER_PROFILE}}，逐枚钉 table/idColumn/两形态语句原文；
- * ⑤ 占位符 arity <b>多重集</b>＝九枚语句逐枚同号（实跑 {@code [0,1,1,1,1,1,2,2,2]}），
+ * ⑤ 占位符 arity <b>多重集</b>＝七枚语句逐枚同号（实跑 {@code [0,1,1,1,1,2,2]}），
  *    且零占位符形态只许出现在登记过的无参语句（全局默认档不带租户腿）上——防「语句改了、参数没改」
  *    与「值被拼进 SQL」两件事（不写「每枚都必须有 ?」：那条会把合法的无参语句判成违例）；
  * ⑥ 反射面：{@code findOrgById} 不存在；{@code queryClearanceRows} 只有一枚且形参恰为
@@ -90,15 +90,26 @@ class ClearanceLookupDaoSqlFaceRatchetTest {
     /** 语句字面量抽取：文本块。 */
     private static final Pattern TEXT_BLOCK = Pattern.compile("\"\"\"(?s:(.*?))\"\"\"");
 
-    /** ③ 语句字面量基线枚数（#142/B4-3e-82 建门批实跑读数＝白名单 2 + COALESCE 2 + 默认档 2 + 机构档 2 + 租户档 1）。 */
-    private static final int BASELINE_SQL_LITERALS = 9;
-
-    /** ③ 表名闭包：密级取数只许读这三枚属主侧在册表。 */
-    private static final Set<String> BASELINE_TABLES = Set.of(
-            "td_user_security_profile", "td_user_role", "td_role_security_profile");
+    /**
+     * ③ 语句字面量基线枚数（#142/B4-3e-83 实跑读数＝白名单 2 + 默认档 2 + 机构档 2 + 租户档 1）。
+     *
+     * <p>建门批（3e-82）为 9 枚：其中 2 枚是角色档 {@code COALESCE(MAX(...), -1)} 聚合腿的文本块。
+     * 3e-83 收口 D-B4-99 d) 后该腿归一属主行读 {@code SecurityProfileQueryDao#findHighestRoleForUser}，
+     * 本类不再有文本块语句——本条基线随之从 9 降到 7。</p>
+     */
+    private static final int BASELINE_SQL_LITERALS = 7;
 
     /**
-     * ③′ 占位符 arity <b>多重集</b>基线（#142/B4-3e-82 建门批实跑读数，与九枚语句一一对应）。
+     * ③ 表名闭包：密级取数只许读这一枚属主侧在册表。
+     *
+     * <p>建门批为三枚（含 {@code td_user_role} / {@code td_role_security_profile}）。3e-83 起角色档
+     * 归 {@link SecurityProfileQueryDao#findHighestRoleForUser}，本类若再出现这两枚表，就是
+     * 「最高角色档」第二实现面复活。</p>
+     */
+    private static final Set<String> BASELINE_TABLES = Set.of("td_user_security_profile");
+
+    /**
+     * ③′ 占位符 arity <b>多重集</b>基线（#142/B4-3e-83 实跑读数，与七枚语句一一对应）。
      *
      * <p>存在理由：判据③原本写「每枚语句都必须含占位符」，被实跑否掉——全局默认档的
      * 不带租户形态（{@code WHERE is_default = TRUE LIMIT 1}）本就无参数，DAO 侧传的也是
@@ -107,7 +118,7 @@ class ClearanceLookupDaoSqlFaceRatchetTest {
      * 以及「零参数只许出现在登记过的无参形态上」三件事同时可取证——有人把 {@code ?} 换成拼接、
      * 或新加一枚 arity 对不上的语句，都会在这里变红，而不是靠注释约定。</p>
      */
-    private static final List<Integer> BASELINE_PLACEHOLDER_ARITIES = List.of(0, 1, 1, 1, 1, 1, 2, 2, 2);
+    private static final List<Integer> BASELINE_PLACEHOLDER_ARITIES = List.of(0, 1, 1, 1, 1, 2, 2);
 
     /** ③″ 唯一在册的「零占位符」语句形态（按列名识别，不按整句文本，免得语句改写即假红）。 */
     private static final String ALLOWED_ZERO_ARITY_MARK = "is_default";
@@ -206,12 +217,16 @@ class ClearanceLookupDaoSqlFaceRatchetTest {
     @DisplayName("抽取判据本身可复跑：文本块与普通字面量各按形态计数，不重不漏")
     void literalExtractorShapeIsPinned() {
         List<String> sqls = extractSqlLiterals(DAO_SRC);
-        long fromTextBlocks = sqls.stream().filter(s -> s.startsWith("SELECT COALESCE")).count();
-        assertEquals(2, fromTextBlocks,
-                "COALESCE 腿（角色档两形态）枚数变化：" + fromTextBlocks
-                        + "。它与文本块形态绑定，判据③的 9 枚拆分口径随之失效");
+        long coalesceLegs = sqls.stream().filter(s -> s.startsWith("SELECT COALESCE")).count();
+        assertEquals(0, coalesceLegs,
+                "角色档聚合腿（{@code COALESCE(MAX(rsp.clearance_level), -1)}）复活：" + coalesceLegs
+                        + " 枚。该腿已归一属主行读 SecurityProfileQueryDao#findHighestRoleForUser"
+                        + "（#142/B4-3e-83 / D-B4-99 d)）——聚合忽略 NULL、行读默认 NULLS FIRST，"
+                        + "两条腿对空密级行读数相反");
         assertTrue(sqls.stream().anyMatch(s -> s.contains("LIMIT 1")),
                 "白名单语句形态漂移：抽不到含 LIMIT 1 的语句，抽取判据可能已失效");
+        assertTrue(sqls.stream().noneMatch(s -> s.contains("td_user_role")),
+                "本 DAO 又出现 td_user_role：最高角色档属主语句只许在 SecurityProfileQueryDao 一处");
     }
 
     // ── 3. 白名单条目本体 ───────────────────────────

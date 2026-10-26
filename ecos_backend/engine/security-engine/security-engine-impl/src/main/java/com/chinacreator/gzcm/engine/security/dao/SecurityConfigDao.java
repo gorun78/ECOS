@@ -11,10 +11,19 @@ import java.util.List;
 /**
  * 安全配置（clearance/level 画像）DAO（R2-B3b 数据访问收口；只搬不改语义）。
  *
- * <p>表：{@code td_user_security_profile} / {@code td_role_security_profile}
- * （+ {@code td_user_role} JOIN）。tenant-aware 双分支 SQL 原样搬迁，
- * {@code tenantId} 由调用方解析后传入。两个 {@link RowMapper}
+ * <p>表：{@code td_user_security_profile} / {@code td_role_security_profile}。tenant-aware 双分支
+ * SQL 原样搬迁，{@code tenantId} 由调用方解析后传入。两个 {@link RowMapper}
  * （{@link #userProfileMapper} / {@link #roleProfileMapper}）随 SQL 一起搬入本 DAO。</p>
+ *
+ * <p><b>「取用户最高角色档」已迁出本类</b>（#142/B4-3e-83，收口 D-B4-99 d)）：原
+ * {@code queryHighestRoleProfileForUser} 是 sysman {@code SecurityProfileQueryDao.findHighestRoleForUser}
+ * 的逐字副本（{@code JOIN td_user_role … ORDER BY rsp.clearance_level DESC LIMIT 1}）。
+ * 同一事实两处语句必然漂移，且本类副本没有排除空密级行，读数与属主侧相反。现该腿改走属主
+ * api 门面 {@code ISecurityProfileQueryService}（铁律 #5），本类不再出现 {@code td_user_role}。</p>
+ *
+ * <p><b>本类其余查询仍是直读属主表</b>（用户/角色/全局默认/按作用域四组，登记为 <b>D-B4-100</b>）：
+ * 它们与 sysman {@code SecurityProfileQueryDao} 中的同形语句仍是两份，只是本批只收口
+ * 「取最高角色档」这一族，不顺手扩面——扩面须逐条对白名单与基线，另批处置。</p>
  */
 @Repository
 public class SecurityConfigDao extends JdbcTemplateDaoSupport {
@@ -89,27 +98,6 @@ public class SecurityConfigDao extends JdbcTemplateDaoSupport {
         return jdbcTemplate.query(
                 "SELECT * FROM " + ROLE_TABLE + " WHERE role_id = ? LIMIT 1",
                 roleProfileMapper, roleId);
-    }
-
-    public List<SecurityProfile> queryHighestRoleProfileForUser(String userId, String tenantId) {
-        if (tenantId != null) {
-            return jdbcTemplate.query("""
-                        SELECT rsp.* FROM td_role_security_profile rsp
-                        JOIN td_user_role ur ON ur.ROLE_ID = rsp.role_id
-                        WHERE ur.USER_ID = ? AND (rsp.tenant_id = ? OR rsp.tenant_id IS NULL)
-                        ORDER BY rsp.clearance_level DESC
-                        LIMIT 1
-                        """,
-                    roleProfileMapper, userId, tenantId);
-        }
-        return jdbcTemplate.query("""
-                        SELECT rsp.* FROM td_role_security_profile rsp
-                        JOIN td_user_role ur ON ur.ROLE_ID = rsp.role_id
-                        WHERE ur.USER_ID = ?
-                        ORDER BY rsp.clearance_level DESC
-                        LIMIT 1
-                        """,
-                roleProfileMapper, userId);
     }
 
     public List<SecurityProfile> queryGlobalDefaultProfile(String tenantId) {

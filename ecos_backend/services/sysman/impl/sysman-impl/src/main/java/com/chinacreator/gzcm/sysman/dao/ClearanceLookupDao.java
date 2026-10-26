@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.sysman.dao;
 
+import com.chinacreator.gzcm.sysman.model.SecurityProfile;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -20,11 +21,24 @@ import java.util.Map;
  * {@code findOrgById}（唯一调用点 {@code ClearanceInterceptor#getCurrentOrgId} 已改走
  * 属主 api 门面 {@code getUserOrganizationAffiliations} + {@code PrimaryOrganizationRule}
  * 单源判据；判据本体与死码治理见 #142/B4-3e-70 惯例）。
+ * <p><b>角色档不再自带 SQL</b>（#142/B4-3e-83，收口 D-B4-99 d)）：{@code highestRoleClearanceLevel}
+ * 原是一条 {@code COALESCE(MAX(rsp.clearance_level), -1)} 聚合腿，与
+ * {@link SecurityProfileQueryDao#findHighestRoleForUser} 的行读、以及安全引擎侧的逐字副本
+ * 构成三处实现面——同一主体的「最高角色档」可以有三个答案（空密级行在两个面读数相反）。
+ * 现聚合语句删除，本方法委派属主行读单源，只保留 {@code -1}＝「无配置」的读取值归一。
  * <p>门禁：{@code ClearanceLookupDaoSqlFaceRatchetTest} 把本类的 SQL 字面量集合钉成多重集，
- * 并硬钉零枚 {@code String.format}／{@code %s}，新增任何一条语句必须先过对白名单。
+ * 并硬钉零枚 {@code String.format}／{@code %s}，新增任何一条语句必须先过对白名单；
+ * {@code HighestRoleProfileSingleSourceRatchetTest} 另钉「全仓只有一枚最高档语句」。
  */
 @Repository
 public class ClearanceLookupDao extends com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport {
+
+    /** 最高角色档的属主行读（本类不再自带该语句，见类注释 D-B4-99 d) 段）。 */
+    private final SecurityProfileQueryDao securityProfileQueryDao;
+
+    public ClearanceLookupDao(SecurityProfileQueryDao securityProfileQueryDao) {
+        this.securityProfileQueryDao = securityProfileQueryDao;
+    }
 
     /**
      * 密级取数的<b>具名行表白名单</b>（#142/B4-3e-82）：一枚条目＝一套完整的两形态语句，
@@ -87,28 +101,20 @@ public class ClearanceLookupDao extends com.chinacreator.gzcm.runtime.core.datab
         return jdbcTemplate.queryForList(sql, params);
     }
 
-    /** 查询该用户最大一级 clearance_level（可能为负，表示无配置）。 */
+    /**
+     * 查询该用户最高角色档的 clearance_level，{@code -1}＝无配置（调用方按「该档未命中」继续下探）。
+     *
+     * <p>语句已归一属主行读 {@link SecurityProfileQueryDao#findHighestRoleForUser}（#142/B4-3e-83）：
+     * 本方法只做「无档案 ⇒ {@code -1}」的读取值归一，不再自带聚合 SQL——聚合腿
+     * {@code MAX()} 忽略 NULL 而行读 {@code ORDER BY … DESC} 默认 NULLS FIRST，两条腿对
+     * 空密级行给出相反读数，这正是 D-B4-99 d) 的缺陷本体。</p>
+     */
     public Integer highestRoleClearanceLevel(String userId, String tenantId) {
-        String sql;
-        Object[] params;
-        if (tenantId != null) {
-            sql = """
-                    SELECT COALESCE(MAX(rsp.clearance_level), -1) AS max_level
-                    FROM td_user_role ur
-                    JOIN td_role_security_profile rsp ON ur.ROLE_ID = rsp.role_id
-                    WHERE ur.USER_ID = ? AND (rsp.tenant_id = ? OR rsp.tenant_id IS NULL)
-                    """;
-            params = new Object[]{userId, tenantId};
-        } else {
-            sql = """
-                    SELECT COALESCE(MAX(rsp.clearance_level), -1) AS max_level
-                    FROM td_user_role ur
-                    JOIN td_role_security_profile rsp ON ur.ROLE_ID = rsp.role_id
-                    WHERE ur.USER_ID = ?
-                    """;
-            params = new Object[]{userId};
+        SecurityProfile profile = securityProfileQueryDao.findHighestRoleForUser(userId, tenantId);
+        if (profile == null || profile.getClearanceLevel() == null) {
+            return -1;
         }
-        return jdbcTemplate.queryForObject(sql, Integer.class, params);
+        return profile.getClearanceLevel();
     }
 
     public Integer globalDefaultClearanceLevel(String tenantId) {

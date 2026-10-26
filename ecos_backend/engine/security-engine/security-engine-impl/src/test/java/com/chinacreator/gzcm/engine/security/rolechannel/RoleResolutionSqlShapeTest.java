@@ -29,11 +29,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * CLS 侧异常直接 {@code visibleColumns=[]} 全拒绝。<b>整个 §4.7.2 矩阵在这个缺陷上不可能通过</b>。</p>
  *
  * <p><b>判定口径（本批实跑校准出来的，不是先验写的）</b>：缺陷形态是<b>双引号包全大写</b>
- * （PG 视其为大小写敏感标识符），而<b>不加引号的大写</b>（{@code SecurityConfigDao} 的
- * {@code JOIN td_user_role ur ON ur.ROLE_ID = rsp.role_id}）会被 PG 折叠成小写、<b>可执行</b>，
+ * （PG 视其为大小写敏感标识符），而<b>不加引号的大写</b>会被 PG 折叠成小写、<b>可执行</b>，
  * 故门禁只禁前者、不禁后者——若把后者也判红，就是拿"改写风格"冒充缺陷，属假红。
- * 首版门禁正是没带这条对照而被实跑打回（命中 SecurityConfigDao 的合法 JOIN 形态），
- * 现以 {@link #unquotedUppercaseJoinFormIsAccepted()} 把该边界钉成用例。</p>
+ * 建门批（3a）曾以「{@code SecurityConfigDao} 的 {@code JOIN td_user_role ur ON ur.ROLE_ID = …}
+ * 是合法形态」作为反向对照；#142/B4-3e-83 收口 D-B4-99 d) 后该 JOIN 已从引擎侧下线
+ * （取最高角色档改走 sysman 属主门面 {@code ISecurityProfileQueryService}），
+ * 故对照用例改为钉<b>其缺席</b>：{@link #highestRoleJoinIsGoneFromEngineSide()}。
+ * 「不加引号不算违例」这条口径本身仍成立——现在由 RLS/CLS 的两条小写子查询承载。</p>
  *
  * <p><b>为什么只看 {@code """} SQL 文本块</b>：本批先量过一次——对 security-impl 全量 main 源
  * 直接 grep {@code "[A-Z][A-Z0-9_]*"} 会命中大量非 SQL 字面量（{@code "UP"/"ALLOW"/"SECRET"…}），
@@ -84,15 +86,24 @@ class RoleResolutionSqlShapeTest {
     }
 
     @Test
-    @DisplayName("合法形态不误伤 — td_user_role 以不加引号大写（ur.ROLE_ID）参与 JOIN 是 PG 折叠合法的，不得判违例")
-    void unquotedUppercaseJoinFormIsAccepted() throws IOException {
-        // SecurityConfigDao.queryHighestRoleProfileForUser 用 `JOIN td_user_role ur ON ur.ROLE_ID = ...`：
-        // 未加引号 ⇒ PG 折叠为小写 ⇒ 可执行。门禁只禁「双引号包全大写」，不强制小写拼写，
-        // 否则就是把合法 SQL 改成红，属假红而非防回归。
-        boolean hasJoinSite = roleSubqueryBlocks().stream()
-                .anyMatch(b -> b.sql().toUpperCase().contains("JOIN TD_USER_ROLE"));
-        assertTrue(hasJoinSite, "SecurityConfigDao 的 JOIN 形态应出现在扫描面里（证本用例确有覆盖）");
-        for (SqlBlock b : roleSubqueryBlocks()) {
+    @DisplayName("反向下线 — 引擎侧不得再有 JOIN td_user_role（取最高角色档已归 sysman 属主门面）")
+    void highestRoleJoinIsGoneFromEngineSide() throws IOException {
+        // #142/B4-3e-83：SecurityConfigDao.queryHighestRoleProfileForUser 的逐字副本已删除，
+        // 取最高角色档改走 sysman 属主门面 ISecurityProfileQueryService（铁律 #5：跨域事实经属主门面）。
+        // 门禁在此钉「缺席」——副本复活即红，而不是靠注释约定。
+        List<SqlBlock> blocks = roleSubqueryBlocks();
+        assertTrue(blocks.size() >= 2,
+                "引用 td_user_role 的文本块少于 2 个（RLS + CLS 两条小写子查询）: " + describe(blocks)
+                        + "。本用例不能因扫描面塌陷而空转");
+        List<String> rejoinSites = blocks.stream()
+                .filter(b -> b.sql().toUpperCase().contains("JOIN TD_USER_ROLE"))
+                .map(SqlBlock::where)
+                .toList();
+        assertTrue(rejoinSites.isEmpty(),
+                "引擎侧又出现 JOIN td_user_role（取最高角色档必须在 sysman 属主侧单源，"
+                        + "见 D-B4-99 d) 收口）：" + rejoinSites);
+        // 「不加引号不算违例」的口径仍然成立：现在由 RLS/CLS 的小写子查询承载，照旧不得有引号全大写
+        for (SqlBlock b : blocks) {
             assertFalse(QUOTED_UPPER_IDENT.matcher(b.sql()).find(),
                     "引用 td_user_role 的文本块内含双引号全大写标识符: " + b.where());
         }

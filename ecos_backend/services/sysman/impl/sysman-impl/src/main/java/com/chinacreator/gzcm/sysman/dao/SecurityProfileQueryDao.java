@@ -91,6 +91,21 @@ public class SecurityProfileQueryDao extends com.chinacreator.gzcm.runtime.core.
         return list.isEmpty() ? null : list.get(0);
     }
 
+    /**
+     * 「取用户最高角色档」的<b>属主单源语句</b>（#142/B4-3e-83，收口 D-B4-99 d)）。
+     *
+     * <p>全仓只有这一处写 {@code td_user_role} 的最高档行读：sysman 密级五档链（经
+     * {@code ClearanceLookupDao} 委派）与安全引擎（经 {@code ISecurityProfileQueryService} 门面）
+     * 都走这里。收口前引擎侧有一份逐字副本、密级链另有一条
+     * {@code COALESCE(MAX(rsp.clearance_level), -1)} 聚合腿，同一主体可拿到不同档位。</p>
+     *
+     * <p><b>为什么必须显式排除空值档</b>：{@code clearance_level} 在 DDL 上可空
+     * （{@code 02_ecos_security.sql}：{@code clearance_level INT DEFAULT 0}，显式写 NULL 即落空），
+     * 而 PG 的 {@code ORDER BY … DESC} 默认 <b>NULLS FIRST</b>；不排除的话「最高档」会取到那条
+     * 空密级行（{@code rs.getInt} 读成 {@code 0}＝L0 公开），与聚合腿 {@code MAX()} 忽略 NULL 的
+     * 口径相反。加了本谓词后，「最高档」只有一个含义：<b>非空密级里的最大值</b>；
+     * 没有任何非空档 ⇒ {@code null}（未解析，禁兜底成任何档位）。</p>
+     */
     public SecurityProfile findHighestRoleForUser(String userId, String tenantId) {
         String sql;
         Object[] params;
@@ -99,6 +114,7 @@ public class SecurityProfileQueryDao extends com.chinacreator.gzcm.runtime.core.
                     SELECT rsp.* FROM td_role_security_profile rsp
                     JOIN td_user_role ur ON ur.ROLE_ID = rsp.role_id
                     WHERE ur.USER_ID = ? AND (rsp.tenant_id = ? OR rsp.tenant_id IS NULL)
+                      AND rsp.clearance_level IS NOT NULL
                     ORDER BY rsp.clearance_level DESC
                     LIMIT 1
                     """;
@@ -107,7 +123,7 @@ public class SecurityProfileQueryDao extends com.chinacreator.gzcm.runtime.core.
             sql = """
                     SELECT rsp.* FROM td_role_security_profile rsp
                     JOIN td_user_role ur ON ur.ROLE_ID = rsp.role_id
-                    WHERE ur.USER_ID = ?
+                    WHERE ur.USER_ID = ? AND rsp.clearance_level IS NOT NULL
                     ORDER BY rsp.clearance_level DESC
                     LIMIT 1
                     """;
