@@ -82,4 +82,22 @@
         <if test="dqStatus != null"> AND dq_status = #{dqStatus}</if>
     </select>
 
+    <!--
+      声明域真值读回（#142/B4-3e-79，D-B4-36）：只读权威态。
+      PASSED/PUBLISHED = 通过 DQ 门禁的当前态与关账终态；PENDING/REJECTED 非权威，
+      is_active = 0 是废止历史态（V167 唯一索引含 is_active，同一行可存在多态）。
+      判定（一项目多部门／跨项目不一致／缺归属）不在本 SQL，归消费侧单点。
+    -->
+    <select id="listDepartmentRowsByProjectIds" resultType="java.util.LinkedHashMap">
+        SELECT DISTINCT project_id AS projectId, department_id AS departmentId
+        FROM ecos_dw.ecos_biz_project_attribution
+        WHERE is_deleted = 0 AND is_active = 1
+          AND dq_status IN ('PASSED', 'PUBLISHED')
+          AND project_id IN
+          <foreach collection="projectIds" item="pid" open="(" separator="," close=")">
+              #{pid}
+          </foreach>
+        ORDER BY projectId ASC, departmentId ASC
+    </select>
+
 </mapper>

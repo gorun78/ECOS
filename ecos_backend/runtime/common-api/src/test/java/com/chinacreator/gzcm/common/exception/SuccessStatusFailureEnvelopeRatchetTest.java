@@ -128,6 +128,14 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      *       （DataBridge 根型异常 advice 补状态行承载腿，收口 D-B4-88 的 503 载体由此腿出状态行），计承载 ＋1；
      *       29+99+10+35 = 173 = 总数，对账成立。只重设被突破的 {@link #STATUS_CARRIER_CEILING}，
      *       其余三面按实测保持。</li>
+     *   <li>#142/B4-3e-79 重设（D-B4-36 收口批，common-api 全模块红跑实测，
+     *       {@code _win_tasks/logs/g79/common-api.log}）＝总数 <b>174</b>／折叠 0／状态行承载 <b>29</b>
+     *       （未漂移）／裸回 <b>99</b>（未漂移）／属主 helper <b>11</b>／纯信封 <b>35</b>（未漂移）。
+     *       唯一漂移源＝{@code DecisionController#decide} 为「声明域真值源不可用」新增的一条
+     *       {@code catch (ScopeSourceUnavailableException) → failure(ApiResponse.error(503, …))}
+     *       腿——它必须由 helper 推导状态行（禁在本类里写 503 字面量，也禁折成 403/裸回），
+     *       故记属主 helper ＋1；29+99+11+35 = 174 = 总数，对账成立。
+     *       只重设被突破的 {@link #OWNER_HELPER_CEILING}，其余三面按实测保持。</li>
      * </ul>
      *
      * <p>裸回面 99 枚<b>本门有意不判其对错</b>（归 {@code D-B4-59} 族棘轮门管账），
@@ -135,7 +143,7 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      */
     private static final int STATUS_CARRIER_CEILING = 29;
     private static final int BARE_RETURN_CEILING = 99;
-    private static final int OWNER_HELPER_CEILING = 10;
+    private static final int OWNER_HELPER_CEILING = 11;
     private static final int ENVELOPE_ONLY_CEILING = 35;
 
     /** 本批属主侧承载见证锚（文件 → 必须出现的形态片段）。缺任一即红＝「删腿」不算修好。 */

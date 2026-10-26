@@ -6,6 +6,7 @@ import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.engine.security.controller.DecisionController;
 import com.chinacreator.gzcm.engine.security.dao.SecurityDecisionDao;
 import com.chinacreator.gzcm.engine.security.decision.AssetRef;
+import com.chinacreator.gzcm.engine.security.decision.DeclaredScopeResolutionService;
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
 import com.chinacreator.gzcm.engine.security.decision.DecisionContext;
 import com.chinacreator.gzcm.engine.security.decision.SecurityDecisionService;
@@ -390,7 +391,19 @@ class BundleColumnSurfaceTest {
     class EntryParsing {
 
         private final SecurityDecisionService service = mock(SecurityDecisionService.class);
-        private final DecisionController controller = new DecisionController(service);
+        /**
+         * #142/B4-3e-79（D-B4-36）：入口解析组只验「词 → 通道」，声明域真值解析器原样回显
+         * 入参（不取数）。真值解析的正反判据在
+         * {@code DeclaredScopeResolutionServiceTest}／{@code DecisionControllerDeclaredScopeWiringTest}。
+         */
+        private final DeclaredScopeResolutionService declaredScopeResolver =
+                mock(DeclaredScopeResolutionService.class);
+        private final DecisionController controller =
+                new DecisionController(service, declaredScopeResolver);
+
+        {
+            when(declaredScopeResolver.resolveForAiTool(any())).thenAnswer(inv -> inv.getArgument(0));
+        }
 
         private Map<String, Object> body(Object purpose) {
             Map<String, Object> m = new LinkedHashMap<>();

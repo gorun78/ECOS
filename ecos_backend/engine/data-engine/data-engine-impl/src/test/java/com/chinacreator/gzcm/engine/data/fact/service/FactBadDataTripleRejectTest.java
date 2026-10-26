@@ -51,6 +51,11 @@ class FactBadDataTripleRejectTest {
         @Override public int touchUpdate(String a, String b) { return 0; }
         @Override public List<Map<String, Object>> pageQuery(int o, int l, String p, String pp, String b, String d) { return List.of(); }
         @Override public int countQuery(String p, String pp, String b, String d) { return 0; }
+        // #142/B4-3e-79 新增的属主只读腿：本组用例只跑 DQ 拒收，绝不走项目集取数。
+        // 抛而非回空表——回空表会把「将来误走这条腿」读成「该项目没归属」（假绿）。
+        @Override public List<Map<String, Object>> listDepartmentRowsByProjectIds(List<String> projectIds) {
+            throw new UnsupportedOperationException("DB 禁用（本组用例不触属主取数腿）");
+        }
     };
     private static final StageFactMapper STAGE_MAPPER = new StageFactMapper() {
         @Override public int insertBatch(List<Map<String, Object>> rows) { throw new UnsupportedOperationException("DB 禁用"); }

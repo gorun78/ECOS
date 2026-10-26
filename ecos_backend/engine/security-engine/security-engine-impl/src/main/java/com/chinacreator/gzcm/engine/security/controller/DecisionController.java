@@ -8,6 +8,7 @@ import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.security.decision.AssetRef;
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
 import com.chinacreator.gzcm.engine.security.decision.DecisionContext;
+import com.chinacreator.gzcm.engine.security.decision.DeclaredScopeResolutionService;
 import com.chinacreator.gzcm.engine.security.decision.SecurityDecisionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,11 +33,13 @@ import java.util.Map;
  * userId/tenantId 优先取信任链 {@link com.chinacreator.gzcm.common.security.header.ServiceContext}，
  * 缺失时回退到 subject；orgId/clearance 由服务端派生（暂不在此注入，W40 关闭时接）。</p>
  *
- * <p>{@code resource}（#142/B4-3d-3 只增，D-B4-20）：AI 通道的<b>请求数据域声明</b>段，
- * 形态为 {@code resource.dataScope} 下的 {@code departmentId} 与 {@code projectIds} 两键。
- * 它不是主体属性而是调用方声明，读/写一律经 {@link DataScopeContract} 单源
- * （信任边界与"未声明即不写"的理由在该类内声明）。页面/导出通道不传该段 ⇒ 护栏输入形态
- * 与本批之前逐字节一致。</p>
+ * <p>{@code resource}（#142/B4-3d-3 只增，D-B4-20；#142/B4-3e-79 真值化，D-B4-36）：
+ * AI 通道的<b>请求数据域声明</b>段，形态为 {@code resource.dataScope} 下的
+ * {@code departmentId} 与 {@code projectIds} 两键。它不是主体属性而是调用方声明，读/写
+ * 一律经 {@link DataScopeContract} 单源。<b>AI 通道的 {@code departmentId} 只允许由
+ * {@link DeclaredScopeResolutionService} 按 {@code projectIds} 向属主域（data-engine）
+ * 展开真值后写入</b>，调用方自报值在此无条件丢弃（D-B4-29 剔除工具入参白名单后，
+ * 本端点是同一个洞的另一张面孔）。页面/导出通道不传该段 ⇒ 护栏输入形态与本批之前逐字节一致。</p>
  */
 @RestController
 @RequestMapping({"/api/security/decision", "/api/v1/security/decision"})
@@ -45,9 +48,12 @@ public class DecisionController {
     private static final Logger log = LoggerFactory.getLogger(DecisionController.class);
 
     private final SecurityDecisionService service;
+    private final DeclaredScopeResolutionService declaredScopeResolver;
 
-    public DecisionController(SecurityDecisionService service) {
+    public DecisionController(SecurityDecisionService service,
+                              DeclaredScopeResolutionService declaredScopeResolver) {
         this.service = service;
+        this.declaredScopeResolver = declaredScopeResolver;
     }
 
     @PostMapping
@@ -80,29 +86,56 @@ public class DecisionController {
             return failure(ApiResponse.forbidden("无用户上下文（ECOS-AUTH-010），拒绝裁决"));
         }
 
-        DecisionContext ctx = DecisionContext.of(userId, tenantId, null, null, roles, traceId)
-                // #142/B4-3d-3 只增：调用方声明的请求数据域（AI 通道的 §4.7.2 判据面）。
-                // 信任边界——本段是「声明」不是「主体属性」：策略侧的横向越权地板拿它和
-                // <b>服务端派生</b>的 subject.department 比（分册 00：客户端 X-Org-Id 已被剥离），
-                // 故谎报只会落 DENY（AI_SCOPE_OUT_OF_SUBJECT_DEPARTMENT），不会落放行；
-                // 未声明则整段不写（页面/导出通道载荷逐字节不变）。键面走单源 DataScopeContract。
-                .withDataScope(DataScopeContract.read(body.get(DataScopeContract.KEY_RESOURCE)))
-                // #142/B4-3e-78 只增（D-B4-30）：AI 主裁决腿并入 /decision 的三枚可选键
-                // （environment.channel / tables / sqlDigest）。只入参、缺省不写；
-                // safeOpa 仅在 purpose==AI 时写出，非 AI 通道即使收到也忽略（载荷不变）。
-                .withAiAdjudication(aiChannelOf(asMap(body.get(DecisionChannelContract.KEY_ENVIRONMENT))),
-                        aiTablesOf(body.get(DecisionChannelContract.KEY_TABLES)),
-                        aiSqlDigestOf(body.get(DecisionChannelContract.KEY_SQL_DIGEST)));
         try {
+            DecisionContext ctx = DecisionContext.of(userId, tenantId, null, null, roles, traceId)
+                    // #142/B4-3d-3 只增：调用方声明的请求数据域（AI 通道的 §4.7.2 判据面）。
+                    // #142/B4-3e-79 语义收口（D-B4-36）：AI 通道这段的 departmentId 不再取调用方自报，
+                    // 改由服务端向属主域（data-engine）按 projectIds 展开真值——信任边界原文见下。
+                    .withDataScope(resolveDeclaredScope(purpose,
+                            DataScopeContract.read(body.get(DataScopeContract.KEY_RESOURCE))))
+                    // #142/B4-3e-78 只增（D-B4-30）：AI 主裁决腿并入 /decision 的三枚可选键
+                    // （environment.channel / tables / sqlDigest）。只入参、缺省不写；
+                    // safeOpa 仅在 purpose==AI 时写出，非 AI 通道即使收到也忽略（载荷不变）。
+                    .withAiAdjudication(aiChannelOf(asMap(body.get(DecisionChannelContract.KEY_ENVIRONMENT))),
+                            aiTablesOf(body.get(DecisionChannelContract.KEY_TABLES)),
+                            aiSqlDigestOf(body.get(DecisionChannelContract.KEY_SQL_DIGEST)));
             DecisionBundle bundle = service.decide(asset, purpose, ctx);
             return ok(ApiResponse.success(bundle.toMap()));
         } catch (IllegalArgumentException e) {
             return failure(ApiResponse.badRequest(e.getMessage()));
+        } catch (DeclaredScopeResolutionService.ScopeSourceUnavailableException e) {
+            // 真值源不可达 ＝ 不可用态（503），禁折成"该项目没归属"（那会让策略落越权理由，理由是假的）
+            log.warn("decide 声明域真值源不可用: asset={}, purpose={}, reason={}",
+                    asset.key(), purpose, e.getMessage());
+            return failure(ApiResponse.error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                    RlsExecutionContract.SEC_UNAVAILABLE_CODE + "：声明域真值源不可用（fail-closed）"));
         } catch (Exception e) {
             log.warn("decide 端点异常: asset={}, purpose={}", asset.key(), purpose, e);
             return failure(ApiResponse.error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
                     RlsExecutionContract.SEC_UNAVAILABLE_CODE + "：security 内部裁决失败（fail-closed）"));
         }
+    }
+
+    /**
+     * 声明域的服务端真值化（#142/B4-3e-79，收口差距 D-B4-36）。
+     *
+     * <p><b>只有 AI 通道进解析</b>：{@code resource.dataScope} 在策略侧的唯一读者是
+     * {@code data_access} 的 AI 列判据（p1 域内 ALLOW / p2 越域 DENY），页面/导出通道
+     * 的护栏输入形态与本批之前<b>逐字节一致</b>（{@code DataScopeContract.read} 的读数
+     * 原样透传），不引入任何取数开销，也不改变既有载荷形态。判据面里"页面通道靠 RLS 行级
+     * 下推、AI 通道靠声明域比对"的不对称，正是 D-B4-29 把本键从工具入参剔除的理由。</p>
+     *
+     * <p><b>AI 通道的两条纪律</b>：① 调用方自报的 {@code departmentId} 无条件丢弃
+     * （恢复它等于恢复 D-B4-29 刚关掉的洞——本端点没有 RLS 下推，这条比对是唯一行范围闸）；
+     * ② 真值只来自属主域取数，取不到就是取不到（落策略侧
+     * {@code AI_DEPARTMENT_NOT_DECLARED}），<b>禁</b>伪造或折算成其中之一。</p>
+     */
+    private DataScopeContract.Declared resolveDeclaredScope(DecisionBundle.Purpose purpose,
+                                                            DataScopeContract.Declared declared) {
+        if (purpose != DecisionBundle.Purpose.AI) {
+            return declared;
+        }
+        return declaredScopeResolver.resolveForAiTool(declared);
     }
 
     /**

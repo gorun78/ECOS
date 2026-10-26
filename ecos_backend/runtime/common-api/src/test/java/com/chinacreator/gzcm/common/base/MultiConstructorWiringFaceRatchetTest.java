@@ -106,7 +106,10 @@ class MultiConstructorWiringFaceRatchetTest {
      *       主构造器 FQ 形 {@code @Autowired}）；</li>
      *   <li><b>「测试缝薄接旧签名＋生产腿 {@code @Autowired}」＝良性（钉名防迁）</b>：
      *       {@code SessionManagerImpl}（1 参 {@code @Autowired}＋包私有 2 参数值腿）、
-     *       {@code ForecastRunOrchestrationService}（3 参兼容腿薄接 4 参 {@code @Autowired} 主）。</li>
+     *       {@code ForecastRunOrchestrationService}（3 参兼容腿薄接 4 参 {@code @Autowired} 主）、
+     *       {@code DeclaredScopeResolutionService}（#142/B4-3e-79 新增：公共 2 参
+     *       {@code @Autowired} 生产腿＝{@code @Value} 覆写＋{@code Optional<ServiceEndpointResolver>}，
+     *       包私有 1 参 {@code Supplier<String>} 腿仅供测试注入寻址源）。</li>
      * </ul>
      * <p>双向：新增文件＝同期 regressed D-B4-97/97b（context 起不来或静默丢配置）直红；
      * 收口批须同步下调此表并在台账留痕。</p>
@@ -132,6 +135,8 @@ class MultiConstructorWiringFaceRatchetTest {
                     + "com/chinacreator/gzcm/engine/ontology/service/OntologyVersionService.java", 3),
             Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/"
                     + "com/chinacreator/gzcm/engine/ontology/service/PublishGateService.java", 2),
+            Map.entry("ecos_backend/engine/security-engine/security-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/security/decision/DeclaredScopeResolutionService.java", 2),
             Map.entry("ecos_backend/runtime/llm-gateway/src/main/java/"
                     + "com/chinacreator/gzcm/runtime/llm/session/SessionManagerImpl.java", 2),
             Map.entry("ecos_backend/runtime/runtime-core/src/main/java/"

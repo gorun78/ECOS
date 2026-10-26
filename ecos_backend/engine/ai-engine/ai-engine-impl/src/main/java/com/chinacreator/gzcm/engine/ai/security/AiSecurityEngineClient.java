@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.common.security.filter.RowFilterVerdictContract;
+import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
@@ -236,6 +237,33 @@ public class AiSecurityEngineClient {
      */
     public static Map<String, Object> decisionBody(String assetKey,
                                                    List<String> tables, String sqlDigest) {
+        return decisionBody(assetKey, tables, sqlDigest, null);
+    }
+
+    /**
+     * 同上，并携带 AI 通道的<b>请求数据域声明</b>段（#142/B4-3e-79，收口 D-B4-36）。
+     *
+     * <p><b>为什么这一段必须出现在 AI 主裁决腿上</b>：{@code data_access.rego} 的 AI 列
+     * （p1 域内 ALLOW／p2 越域 DENY）完全由 {@code input.resource.dataScope} 表达，而
+     * #142/B4-3e-78 把主裁决腿切到 {@code /decision} 之后，请求体只写 {@code assetRef}/
+     * {@code purpose}/{@code environment}/{@code tables}/{@code sqlDigest} 五段 ——
+     * 数据域语义在唯一入口上<b>结构上不可表达</b>（D-B4-20 的同一缺陷在 AI 侧的读数），
+     * 策略侧只能落 {@code AI_SCOPE_NOT_DECLARED}。本重载把项目集补上，让 AI 腿真正带上声明域。</p>
+     *
+     * <p><b>只写 {@code projectIds}，绝不写 {@code departmentId}</b>（D-B4-29 信任边界的写出侧
+     * 镜像）：所属域是<b>服务端真值</b>，由 security 侧 {@code DeclaredScopeResolutionService}
+     * 从 data-engine 属主只读端点解析；被裁决者若自报所属域，就把「声明域 ≠ 主体域」这道
+     * 唯一行范围闸变成了自我声明 ⇒ 谎报即放行。故本类没有任何写 {@code departmentId} 的通道。</p>
+     *
+     * <p>键面与写出形态一律经 {@link DataScopeContract} 单源（禁内联字面量；空声明整段不写，
+     * 保持三参重载与本批之前的载荷逐字节一致）。page/export 通道不走本类。</p>
+     *
+     * @param projectIds 请求项目集（工具入参白名单里的场景项目，非主体属性）；null/空＝不落
+     *                   {@code resource} 段（诚实的未声明形态，策略侧落 {@code AI_SCOPE_NOT_DECLARED}）
+     */
+    public static Map<String, Object> decisionBody(String assetKey,
+                                                   List<String> tables, String sqlDigest,
+                                                   List<String> projectIds) {
         Map<String, Object> body = new LinkedHashMap<>();
         if (assetKey != null && !assetKey.isBlank()) {
             Map<String, Object> asset = new LinkedHashMap<>();
@@ -251,6 +279,13 @@ public class AiSecurityEngineClient {
         }
         if (sqlDigest != null && !sqlDigest.isBlank()) {
             body.put(DecisionChannelContract.KEY_SQL_DIGEST, sqlDigest);
+        }
+        // 声明域段：departmentId 恒为 null（写出侧没有该通道），未声明项目集 ⇒ toResourceSegment
+        // 返回 null ⇒ 整段不写，与三参重载同形。
+        Map<String, Object> resource = DataScopeContract.toResourceSegment(
+                new DataScopeContract.Declared(null, projectIds));
+        if (resource != null) {
+            body.put(DataScopeContract.KEY_RESOURCE, resource);
         }
         return body;
     }

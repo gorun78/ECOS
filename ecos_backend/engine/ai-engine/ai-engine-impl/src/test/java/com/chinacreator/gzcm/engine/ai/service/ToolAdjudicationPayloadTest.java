@@ -8,6 +8,7 @@ import com.chinacreator.gzcm.engine.ai.security.AgentToolSqlWhitelist;
 import com.chinacreator.gzcm.engine.ai.security.AiSecurityEngineClient;
 import com.chinacreator.gzcm.engine.ai.security.GuardrailAuditPublisher;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
+import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -66,6 +67,21 @@ class ToolAdjudicationPayloadTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * 取 {@code /decision} 请求体里的 {@code resource.dataScope} 段。
+     *
+     * <p>读键面同样取 {@link DataScopeContract} 单源——本类若内联 {@code "resource"}/{@code "dataScope"}
+     * 字面量，就等于在生产者之外再留第二套键名读数（D-B4-20 的原始缺陷形态）。</p>
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> dataScopeOf(Map<String, Object> body) {
+        Object resource = body.get(DataScopeContract.KEY_RESOURCE);
+        assertTrue(resource instanceof Map, "resource 段缺失或形态漂移: " + body);
+        Object scope = ((Map<String, Object>) resource).get(DataScopeContract.KEY_DATA_SCOPE);
+        assertTrue(scope instanceof Map, "dataScope 段缺失或形态漂移: " + resource);
+        return (Map<String, Object>) scope;
+    }
+
     // ── 验收 1：四段齐备 + 主体只来自服务端 ──────────────────────────────────
 
     @Test
@@ -98,9 +114,53 @@ class ToolAdjudicationPayloadTest {
         //    LLM 自报 userId 连可进入报文的位置都没有）；闸内仍须以服务端解析器主体运行，
         //    匿名主体在发 HTTP 之前即 FAIL_CLOSED（AgentToolPolicyGateTest 已钉）
         assertFalse(rendered.contains(SPOOFED_ADMIN), "主体面出现 LLM 自报值: " + rendered);
-        // ④ 键面枚举防漂移（只许写真实存在的键，禁静默加键）
-        assertEquals(Set.of(DecisionChannelContract.KEY_PURPOSE, DecisionChannelContract.KEY_ENVIRONMENT),
+        // ④ 声明域段在场（#142/B4-3e-79，收口 D-B4-36）：入参里的 projectIds 必须真的到达
+        //    /decision，否则 AI 主裁决腿在唯一入口上仍表达不了数据域（策略只能落
+        //    AI_SCOPE_NOT_DECLARED，§4.7.2 p1 域内 ALLOW 结构上不可达）。
+        //    写出侧只有 projectIds，绝没有 departmentId（D-B4-29 信任边界的写出镜像）。
+        Map<String, Object> scope = dataScopeOf(body);
+        assertEquals(List.of("p-1", "p-2"), scope.get(DataScopeContract.KEY_PROJECT_IDS), rendered);
+        assertFalse(scope.containsKey(DataScopeContract.KEY_DEPARTMENT_ID),
+                "所属域只允许 security 侧向属主域取真值展开，AI 写出侧不得有任何该键通道: " + rendered);
+        // ⑤ 键面枚举防漂移（只许写真实存在的键，禁静默加键）
+        assertEquals(Set.of(DecisionChannelContract.KEY_PURPOSE, DecisionChannelContract.KEY_ENVIRONMENT,
+                        DataScopeContract.KEY_RESOURCE),
                 body.keySet(), rendered);
+    }
+
+    // ── 验收 1b：声明域写出面（D-B4-36 的 AI 侧腿） ──────────────────────────
+
+    @Test
+    @DisplayName("D-B4-36 未声明项目集：resource 段整体不写，载荷与本批之前逐字节同形")
+    void undeclaredProjectScopeLeavesNoResourceSegment() throws Exception {
+        Map<String, Object> arguments = new LinkedHashMap<>();
+        arguments.put("scenarioId", "s-7");
+        arguments.put("forecastRunId", "run-3");
+
+        Map<String, Object> body = adjudicate(arguments);
+
+        assertFalse(body.containsKey(DataScopeContract.KEY_RESOURCE),
+                "未声明项目集却写出 resource 段＝替调用方伪造一个它没声明的范围: " + body);
+        // 三参重载（列面消费腿在用）必须与"projectIds 为 null"同形，否则那条腿的载荷被动过
+        Map<String, Object> threeArg = AiSecurityEngineClient.decisionBody("ecos_dw.payroll",
+                List.of("ecos_dw.payroll"), "sha-digest", null);
+        assertEquals(AiSecurityEngineClient.decisionBody("ecos_dw.payroll",
+                        List.of("ecos_dw.payroll"), "sha-digest"),
+                threeArg, "四参重载传 null 项目集必须与三参重载逐字一致");
+        assertFalse(threeArg.containsKey(DataScopeContract.KEY_RESOURCE), String.valueOf(threeArg));
+    }
+
+    @Test
+    @DisplayName("D-B4-36 空白/重复项目集归一：不入载荷的键面禁有空值冒充声明")
+    void blankProjectIdsNeverProduceAnEmptyScopeSegment() {
+        Map<String, Object> body = AiSecurityEngineClient.decisionBody(
+                null, List.of(), null, List.of());
+        assertFalse(body.containsKey(DataScopeContract.KEY_RESOURCE), String.valueOf(body));
+
+        Map<String, Object> withProjects = AiSecurityEngineClient.decisionBody(
+                null, List.of(), null, List.of("p-1"));
+        assertEquals(List.of("p-1"),
+                dataScopeOf(withProjects).get(DataScopeContract.KEY_PROJECT_IDS), String.valueOf(withProjects));
     }
 
     // ── 验收 2：LLM 自报入参不入载荷 ────────────────────────────────────────

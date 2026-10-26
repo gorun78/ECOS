@@ -69,6 +69,8 @@ public class FactImportService {
 
     static final int MAX_ROWS_PER_BATCH = 100;      // EN03
     static final int INSERT_CHUNK = 100;            // EN03 批量切片
+    /** 声明域真值读回的单次项目集上限（#142/B4-3e-79，D-B4-36；EN03 同族量级）。 */
+    static final int MAX_PROJECT_IDS_PER_LOOKUP = 100;
     static final String DQ_STATUS_PASSED = "PASSED";
     static final String DQ_STATUS_PUBLISHED = "PUBLISHED";
     static final String RULE_DQ_F05 = "DQ-F05";
@@ -246,6 +248,71 @@ public class FactImportService {
         out.put("page", p);
         out.put("pageSize", ps);
         out.put("items", rows);
+        return out;
+    }
+
+    /**
+     * 声明域真值读回（#142/B4-3e-79，差距 D-B4-36 属主侧）：把受控项目集展开成
+     * {@code byProject = {projectId: [departmentId...]}} 的<b>原始归属事实</b>，
+     * 供 security 侧解析服务派生真实所属域（属主=数据域，铁律 #5 禁跨引擎直读表）。
+     *
+     * <p><b>本方法只供数、不判定</b>：一个项目对应多部门、某项目查无权威行、多项目跨部门
+     * 三种形态都原样返回（{@code byProject} 里该项缺失＝空表）。判定唯一落在
+     * {@code DeclaredScopeResolutionService}——若属主侧也做"算不算数"的裁决，
+     * 同一个真值面就有两处口径，与 D-B4-36 要收的病灶同形。</p>
+     *
+     * <p><b>入参纪律</b>：项目集为空 → 400（禁全表扫描，与
+     * {@link #listActionOutcomes} 同判据）；去空白、去重后仍超
+     * {@link #MAX_PROJECT_IDS_PER_LOOKUP} → 400（EN03 同族上限，护栏输入里的
+     * 项目集来自被裁决方声明，不设上限等于把一次裁决变成一次无界 IN 查询）。</p>
+     *
+     * @return {@code {requested, byProject, departments}}；键序即响应形态，消费方按名取用
+     */
+    public Map<String, Object> listAttributionDepartments(List<String> projectIds) {
+        List<String> requested = normalizeProjectIds(projectIds);
+        if (requested.isEmpty()) {
+            throw badRequest(DataDomainErrorCode.ECOS_DATA_023,
+                    "projectIds 必填（声明域真值解析禁无项目集的全表展开）");
+        }
+        if (requested.size() > MAX_PROJECT_IDS_PER_LOOKUP) {
+            throw badRequest(DataDomainErrorCode.ECOS_DATA_023,
+                    "单次最多 " + MAX_PROJECT_IDS_PER_LOOKUP + " 个 projectId，当前 "
+                            + requested.size() + " 个");
+        }
+        Map<String, List<String>> byProject = new LinkedHashMap<>();
+        requested.forEach(pid -> byProject.put(pid, new ArrayList<>()));
+        Set<String> departments = new java.util.TreeSet<>();
+        for (Map<String, Object> row : attributionMapper.listDepartmentRowsByProjectIds(requested)) {
+            String pid = str(row.get("projectId"));
+            String dept = str(row.get("departmentId"));
+            if (pid == null || dept == null) {
+                continue;
+            }
+            List<String> depts = byProject.computeIfAbsent(pid, k -> new ArrayList<>());
+            if (!depts.contains(dept)) {
+                depts.add(dept);
+            }
+            departments.add(dept);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("requested", requested);
+        out.put("byProject", byProject);
+        out.put("departments", new ArrayList<>(departments));
+        return out;
+    }
+
+    /** 项目集归一：去 null/空白、去重、保持声明顺序（顺序进响应，便于消费方逐值对账）。 */
+    private static List<String> normalizeProjectIds(List<String> raw) {
+        List<String> out = new ArrayList<>();
+        if (raw == null) {
+            return out;
+        }
+        for (String s : raw) {
+            String v = trimToNull(s);
+            if (v != null && !out.contains(v)) {
+                out.add(v);
+            }
+        }
         return out;
     }
 

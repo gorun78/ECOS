@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.data.fact.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
+import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
 import com.chinacreator.gzcm.engine.data.fact.FactType;
 import com.chinacreator.gzcm.engine.data.fact.model.ActionOutcomeRequest;
 import com.chinacreator.gzcm.engine.data.fact.model.FactBatchSummary;
@@ -107,6 +108,32 @@ public class FactController {
             @RequestParam(value = "forecastRunId", required = false) String forecastRunId,
             @RequestParam(value = "actionId", required = false) String actionId) {
         return ApiResponse.success(importService.listActionOutcomes(forecastRunId, actionId));
+    }
+
+    /**
+     * listAttributionDepartments — 项目→部门归属真值读回（#142/B4-3e-79，差距 D-B4-36 属主侧；只读）。
+     *
+     * <p><b>为什么由本域供数而不是 security 侧直读表</b>：{@code
+     * ecos_dw.ecos_biz_project_attribution} 的属主是 data-engine（铁律 #5 跨引擎禁操作对方表），
+     * 而"AI 工具声明的 projectIds 展开成真实所属域"这件事必须在裁决链的服务端一侧完成
+     * ——被裁决方自报的 {@code departmentId} 不可信（D-B4-29 已把该键从工具入参白名单剔除）。
+     * 因此真值面留在属主、判定面在 security，两侧各一枚端点/服务，不再有第三份口径。</p>
+     *
+     * <p><b>形态</b>：{@code {requested, byProject:{projectId:[departmentId...]}, departments:[...]}}，
+     * 只含权威态行（{@code is_deleted=0 ∧ is_active=1 ∧ dq_status∈{PASSED,PUBLISHED}}）。
+     * 一项目多部门／缺归属一律如实返回空或多值，<b>不</b>在本端点判"能不能采信"
+     * ——那是 {@code DeclaredScopeResolutionService} 的单点裁决。</p>
+     *
+     * <p><b>失败形态</b>：入参违规（项目集空 / 超上限）由 {@link FactImportService}
+     * 抛 {@code DataBridgeException}(400, {@code ECOS-DATA-023})，经全局 handler 上状态行；
+     * 本方法不返回裸回失败信封（全后端裸回棘轮门判据 B 的只减不增上限，扩面须同批登记）。</p>
+     *
+     * @param projectIds 受控项目集（可重复参数或逗号分隔，键名取 {@link DataScopeContract} 单源）
+     */
+    @GetMapping("/attribution/departments")
+    public ApiResponse<Map<String, Object>> listAttributionDepartments(
+            @RequestParam(value = DataScopeContract.KEY_PROJECT_IDS, required = false) List<String> projectIds) {
+        return ApiResponse.success(importService.listAttributionDepartments(projectIds));
     }
 
     private static FactType parseType(String factType) {

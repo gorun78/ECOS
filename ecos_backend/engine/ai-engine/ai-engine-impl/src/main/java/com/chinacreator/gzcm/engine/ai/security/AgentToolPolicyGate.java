@@ -137,8 +137,13 @@ public class AgentToolPolicyGate {
             sqlDigest = digest(sqlText);
         }
         try {
+            // #142/B4-3e-79（D-B4-36）：把工具入参白名单里的请求项目集带上 /decision 的
+            // resource.dataScope 段——此前 AI 主裁决腿在唯一入口上结构性发不出声明域，
+            // 策略侧只能落 AI_SCOPE_NOT_DECLARED。所属域不在这里写（写出侧没有该通道）：
+            // 由 security 侧从 data-engine 属主只读端点做服务端真值解析（D-B4-29 信任边界）。
             Map<String, Object> data = securityClient.decideData(
-                    AiSecurityEngineClient.decisionBody(decisionTable, decisionTables, sqlDigest));
+                    AiSecurityEngineClient.decisionBody(decisionTable, decisionTables, sqlDigest,
+                            declaredProjectIds(request)));
             long latency = elapsedMs(startNs);
             String verdict = AiSecurityEngineClient.verdictOf(data);
             if (AiSecurityEngineClient.V_DENY.equals(verdict)) {
@@ -245,6 +250,23 @@ public class AgentToolPolicyGate {
     private String digest(String sql) {
         String s = sql.replaceAll("\\s+", " ").trim();
         return "len=" + s.length() + " sha=" + Integer.toHexString(s.hashCode());
+    }
+
+    /**
+     * AI 工具通道的项目集声明（#142/B4-3e-79，D-B4-36 的写出侧起点）。
+     *
+     * <p>取值面只有 {@link ToolAdjudicationRequest.Resource#projectIds()}：该字段是工具入参
+     * 白名单投影（{@code ToolPayloadDataScopeNailTest} 钉着"白名单加成员即刻变红"），
+     * 而 {@code departmentId} 从不在这里出现——所属域由 security 侧经 data-engine 属主
+     * 只读端点做服务端真值解析（D-B4-29 信任边界）。</p>
+     *
+     * <p>本方法不改写、不补全、不兜默认：未声明就是空集，下游整段 {@code resource} 不落，
+     * 策略侧诚实落 {@code AI_SCOPE_NOT_DECLARED}（禁在这里伪装成"全域"）。</p>
+     */
+    private static List<String> declaredProjectIds(ToolAdjudicationRequest request) {
+        if (request == null || request.resource() == null) return List.of();
+        List<String> projectIds = request.resource().projectIds();
+        return projectIds == null ? List.of() : projectIds;
     }
 
     // ── 小工具 ─────────────────────────────────────────────────────────
