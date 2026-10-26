@@ -6,6 +6,8 @@ import com.chinacreator.gzcm.engine.ai.guardrail.ToolDecision;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.service.ToolExecutorService.ToolResult;
+import com.chinacreator.gzcm.sysman.model.SecurityProfile;
+import com.chinacreator.gzcm.sysman.security.profile.service.ISecurityProfileQueryService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -92,8 +94,16 @@ class ToolGuardrailChokepointTest {
 
     // ── 测试装置：每个 case 一套独立 mock，保证"恰 1 次"计数不被上一轮污染 ──
 
+    /** 属主门面桩档案（D-B4-102：沙盒强制位改经 ISecurityProfileQueryService.findUser 取数）。 */
+    private static SecurityProfile profileWithSandbox(Boolean sandbox) {
+        SecurityProfile p = new SecurityProfile();
+        p.setSandboxMandatory(sandbox);
+        return p;
+    }
+
     private static final class Fixture {
         final ToolDao toolDao = mock(ToolDao.class);
+        final ISecurityProfileQueryService profileFacade = mock(ISecurityProfileQueryService.class);
         final AgentToolPolicyGate gate = mock(AgentToolPolicyGate.class);
         final ToolSubjectResolver subject = mock(ToolSubjectResolver.class);
         final ToolRegistry registry = mock(ToolRegistry.class);
@@ -101,11 +111,14 @@ class ToolGuardrailChokepointTest {
 
         Fixture() {
             service.setToolDao(toolDao);
+            service.setProfileQueryService(profileFacade);
             service.setPolicyGate(gate);
             service.setSubjectResolver(subject);
             ReflectionTestUtils.setField(service, "toolRegistry", registry);
             when(subject.resolve()).thenReturn(new ToolAdjudicationRequest.Subject(
                     USER, List.of("analyst"), "dept-a", TENANT));
+            // 默认：非强制沙盒（原有高危用例的基线行为；强制/异常态由具体用例覆写）
+            when(profileFacade.findUser(USER, null)).thenReturn(profileWithSandbox(Boolean.FALSE));
         }
 
         void stub(ToolCase c) {
@@ -233,7 +246,7 @@ class ToolGuardrailChokepointTest {
         Fixture f = new Fixture();
         f.stub(ToolCase.registry("query_db"));
         f.verdict(ToolDecision.allow("p-allow", null, 1L));
-        when(f.toolDao.querySandboxMandatory(USER)).thenThrow(new RuntimeException("db down"));
+        when(f.profileFacade.findUser(USER, null)).thenThrow(new RuntimeException("db down"));
 
         ToolResult r = f.service.execute("query_db", Map.of("sql", "DROP TABLE ecos_dw.contract"));
 
@@ -251,8 +264,8 @@ class ToolGuardrailChokepointTest {
         Fixture f = new Fixture();
         f.stub(ToolCase.registry("query_db"));
         f.verdict(ToolDecision.allow("p-allow", null, 1L));
-        when(f.toolDao.querySandboxMandatory(USER))
-                .thenReturn(List.of(Map.of("sandbox_mandatory", Boolean.TRUE)));
+        when(f.profileFacade.findUser(USER, null))
+                .thenReturn(profileWithSandbox(Boolean.TRUE));
         ApplicationContext appCtx = mock(ApplicationContext.class);
         when(appCtx.getBeansOfType(Object.class)).thenReturn(Map.of());
         ReflectionTestUtils.setField(f.service, "applicationContext", appCtx);
@@ -278,8 +291,8 @@ class ToolGuardrailChokepointTest {
         Fixture f = new Fixture();
         f.stub(ToolCase.registry("query_db"));
         f.verdict(ToolDecision.allow("p-allow", null, 1L));
-        when(f.toolDao.querySandboxMandatory(USER))
-                .thenReturn(List.of(Map.of("sandbox_mandatory", Boolean.TRUE)));
+        when(f.profileFacade.findUser(USER, null))
+                .thenReturn(profileWithSandbox(Boolean.TRUE));
         ReflectionTestUtils.setField(f.service, "applicationContext", appWithSandbox(stub));
         return f;
     }

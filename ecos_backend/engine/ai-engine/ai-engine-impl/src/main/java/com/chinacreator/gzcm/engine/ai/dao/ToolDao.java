@@ -23,14 +23,6 @@ public class ToolDao extends JdbcTemplateDaoSupport {
             toolName);
     }
 
-    /** 查询用户是否强制沙盒（producer: ToolExecutorService.querySandboxMandatory）。 */
-    public List<Map<String, Object>> querySandboxMandatory(String userId) {
-        return jdbcTemplate.queryForList(
-            "SELECT sandbox_mandatory FROM td_user_security_profile " +
-            "WHERE scope_type = 'user' AND user_id = ? LIMIT 1",
-            userId);
-    }
-
     /** 写沙盒拦截审计（producer: ToolExecutorService.writeSandboxBlockAudit）。 */
     public void insertSandboxAudit(String userId, String toolName, String changesJson) {
         jdbcTemplate.update(

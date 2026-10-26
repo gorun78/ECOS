@@ -78,6 +78,9 @@ class WAgentContractToolChannelTest {
         final RestTemplate rest = mock(RestTemplate.class);
         final IContractToolSource source = mock(IContractToolSource.class);
         final ServiceEndpointResolver resolver = mock(ServiceEndpointResolver.class);
+        final com.chinacreator.gzcm.sysman.security.profile.service.ISecurityProfileQueryService
+                profileFacade = mock(
+                com.chinacreator.gzcm.sysman.security.profile.service.ISecurityProfileQueryService.class);
         final ToolExecutorService service = new ToolExecutorService();
 
         Harness() {
@@ -87,6 +90,11 @@ class WAgentContractToolChannelTest {
             service.setContractToolSource(source);
             service.setContractBaseUrl(BASE);
             service.setRestTemplate(rest);
+            // D-B4-102：属主门面未装配＝不可判定⇒FAIL_CLOSED；本装置断言契约出向语义，
+            // 默认桩「档案缺失＝不强制」，如用例需要强制沙盒可单独改桩。
+            when(profileFacade.findUser(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.nullable(String.class)))
+                    .thenReturn(null);
+            service.setProfileQueryService(profileFacade);
             when(subject.resolve()).thenReturn(new ToolAdjudicationRequest.Subject(
                     USER, List.of("analyst"), "dept-a", TENANT));
             when(gate.review(any(), any(), any())).thenReturn(ToolDecision.allow("p-allow", null, 1L));

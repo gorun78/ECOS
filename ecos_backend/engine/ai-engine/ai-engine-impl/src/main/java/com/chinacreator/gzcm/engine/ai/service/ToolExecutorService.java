@@ -22,6 +22,8 @@ import com.chinacreator.gzcm.engine.ai.tool.ScenarioToolRegistry;
 import com.chinacreator.gzcm.engine.ai.tool.ToolCitation;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.common.trace.EcosTraceContext;
+import com.chinacreator.gzcm.sysman.model.SecurityProfile;
+import com.chinacreator.gzcm.sysman.security.profile.service.ISecurityProfileQueryService;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -82,6 +84,9 @@ public class ToolExecutorService {
 
     private ToolDao toolDao;
 
+    /** 沙盒强制位的属主门面（见 {@link #setProfileQueryService}）；未装配＝不可判定。 */
+    private ISecurityProfileQueryService profileQueryService;
+
     /**
      * F06-17 待收口项（X-24 计 3 处 {@code new RestTemplate()} 之一）：本实例仍是自建 REST 客户端，
      * 收口到 runtime-access 属 WP8 排期。<b>非 final</b> 是 F06-11 集成测试的注入面 ——
@@ -122,6 +127,21 @@ public class ToolExecutorService {
     @Autowired(required = false)
     public void setToolDao(ToolDao toolDao) {
         this.toolDao = toolDao;
+    }
+
+    /**
+     * 属主门面（sysman {@code ISecurityProfileQueryService}）——沙盒强制位 {@code sandbox_mandatory}
+     * 的唯一取数通道（#142/B4-3e-85，收口 D-B4-102）。
+     *
+     * <p>{@code td_user_security_profile} 是 sysman 属主表（铁律 #5），本域原先在 {@code ToolDao}
+     * 另存一条同形查询，且谓词写成小写的 {@code scope_type = 'user'}——DDL 与 V41 的口径是
+     * 大写 {@code USER/ROLE/TENANT/ORG/GLOBAL}，该腿恒取空集 ⇒ 高危指令的沙盒审查被静默跳过
+     * （fail-open）。现统一经属主门面取档；未装配或取数异常一律回 {@code null}＝不可判定，
+     * 由 {@code sandboxReview} 按 FAIL_CLOSED 拒绝（禁把"读不到"折叠成"不强制"）。</p>
+     */
+    @Autowired(required = false)
+    public void setProfileQueryService(ISecurityProfileQueryService profileQueryService) {
+        this.profileQueryService = profileQueryService;
     }
 
     // 使用 @Lazy 打破 AgentDelegationService → AgentLoopService → ToolExecutorService 循环依赖
@@ -875,15 +895,25 @@ public class ToolExecutorService {
     /**
      * R1.3: 查询用户的 sandbox_mandatory 配置。
      *
-     * @return true=强制沙盒, false=不强制, null=查询失败/无配置
+     * <p>#142/B4-3e-85（D-B4-102）：取数只经属主门面 {@code findUser}——属主表
+     * {@code td_user_security_profile} 的语句只存在于 sysman；本域不再自存 SQL（原腿把
+     * {@code scope_type} 写成小写 {@code 'user'}，与实际大写口径相反，恒取空 ⇒ 强制沙盒
+     * 用户被当成"不强制"，高危指令绕过审查）。</p>
+     *
+     * @return true=强制沙盒, false=不强制/无档案, null=门面未装配或取数失败（不可判定 ⇒ 调用方 FAIL_CLOSED）
      */
     private Boolean querySandboxMandatory(String userId) {
+        if (profileQueryService == null) {
+            log.warn("R1.3 sandbox_mandatory 属主门面未装配，按不可判定处理（fail-closed）: user={}",
+                    userId);
+            return null;
+        }
         try {
-            List<Map<String, Object>> rows = toolDao.querySandboxMandatory(userId);
-            if (rows.isEmpty() || rows.get(0).get("sandbox_mandatory") == null) {
+            SecurityProfile profile = profileQueryService.findUser(userId, null);
+            if (profile == null || profile.getSandboxMandatory() == null) {
                 return false;
             }
-            return ((Boolean) rows.get(0).get("sandbox_mandatory"));
+            return profile.getSandboxMandatory();
         } catch (Exception e) {
             log.debug("R1.3 查询 sandbox_mandatory 失败 user={}: {}", userId, e.getMessage());
             return null;
