@@ -71,8 +71,8 @@ public final class V246SeedFixtures {
     public static final List<String> RESOURCE_COLUMNS =
             List.of("project_id", "department_id", "staff_ref", "hours", "hourly_rate");
 
-    private static final String RLS_INSERT_PREFIX = "INSERT INTO public.ecos_rls_policy";
-    private static final String CLS_INSERT_PREFIX = "INSERT INTO public.ecos_cls_policy";
+    private static final String RLS_INSERT_PREFIX = "INSERT INTO ecos_control.ecos_rls_policy";
+    private static final String CLS_INSERT_PREFIX = "INSERT INTO ecos_control.ecos_cls_policy";
 
     /** V246 rls 12 列序（与 seed 文件 INSERT 列清单一致）。 */
     private static final List<String> RLS_COLS = List.of(

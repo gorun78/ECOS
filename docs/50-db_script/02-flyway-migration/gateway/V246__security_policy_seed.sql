@@ -9,7 +9,7 @@
 -- 说明: 策略表 id 采用可读固定键（非 UUID），保证跨 seed/测试可预期；NOT NULL 存量列 filter_expr/visible_cols 以合规占位满足。
 
 -- ── 1. 敏感数据目录（六类对象落库：fc_* 事实表的敏感列 + 整表）─────────────
-INSERT INTO public.ecos_security_asset
+INSERT INTO ecos_control.ecos_security_asset
     (id, asset_key, kind, sensitivity, guard_combo, exemption_ref, owner_role,
      description, version_no, is_deleted, domain, tenant_id, create_by)
 VALUES
@@ -27,7 +27,7 @@ ON CONFLICT ON CONSTRAINT uniq_sec_asset_key DO NOTHING;
 
 -- ── 2. RLS 策略种子（参数化谓词, source_kind='parameterized'）─────────────
 -- rls-project-owner: 项目负责人看本项目(部门归属子查询)
-INSERT INTO public.ecos_rls_policy
+INSERT INTO ecos_control.ecos_rls_policy
     (id, policy_name, table_name, filter_expr, role_id, priority, enabled, description,
      predicate_template, bindings_json, source_kind, create_by)
 VALUES
@@ -36,7 +36,7 @@ VALUES
      'project_id IN (SELECT project_id FROM ecos_dw.biz_project_attribution WHERE department_id = :userDeptId)',
      '[{"name":"userDeptId","source":"CONTEXT_ORG","value":null}]', 'parameterized', 'seed-v246')
 ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.ecos_rls_policy
+INSERT INTO ecos_control.ecos_rls_policy
     (id, policy_name, table_name, filter_expr, role_id, priority, enabled, description,
      predicate_template, bindings_json, source_kind, create_by)
 VALUES
@@ -45,7 +45,7 @@ VALUES
      'project_id IN (SELECT project_id FROM ecos_dw.biz_project_attribution WHERE department_id = :userDeptId)',
      '[{"name":"userDeptId","source":"CONTEXT_ORG","value":null}]', 'parameterized', 'seed-v246')
 ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.ecos_rls_policy
+INSERT INTO ecos_control.ecos_rls_policy
     (id, policy_name, table_name, filter_expr, role_id, priority, enabled, description,
      predicate_template, bindings_json, source_kind, create_by)
 VALUES
@@ -56,7 +56,7 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- rls-dept-scope: 部门用户按部门维度行级限定
-INSERT INTO public.ecos_rls_policy
+INSERT INTO ecos_control.ecos_rls_policy
     (id, policy_name, table_name, filter_expr, role_id, priority, enabled, description,
      predicate_template, bindings_json, source_kind, create_by)
 VALUES
@@ -65,7 +65,7 @@ VALUES
      'department_id = :userDeptId',
      '[{"name":"userDeptId","source":"CONTEXT_ORG","value":null}]', 'parameterized', 'seed-v246')
 ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.ecos_rls_policy
+INSERT INTO ecos_control.ecos_rls_policy
     (id, policy_name, table_name, filter_expr, role_id, priority, enabled, description,
      predicate_template, bindings_json, source_kind, create_by)
 VALUES
@@ -74,7 +74,7 @@ VALUES
      'department_id = :userDeptId',
      '[{"name":"userDeptId","source":"CONTEXT_ORG","value":null}]', 'parameterized', 'seed-v246')
 ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.ecos_rls_policy
+INSERT INTO ecos_control.ecos_rls_policy
     (id, policy_name, table_name, filter_expr, role_id, priority, enabled, description,
      predicate_template, bindings_json, source_kind, create_by)
 VALUES
@@ -85,7 +85,7 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- rls-finance-all: 财务负责人唯一允许 1=1（全量可见），登记于 asset.guard_combo
-INSERT INTO public.ecos_rls_policy
+INSERT INTO ecos_control.ecos_rls_policy
     (id, policy_name, table_name, filter_expr, role_id, priority, enabled, description,
      predicate_template, bindings_json, source_kind, create_by)
 VALUES
@@ -93,7 +93,7 @@ VALUES
      'finance_lead', 200, true, '财务负责人-全量(唯一1=1主体)', '1=1',
      '[]', 'legacy_text', 'seed-v246')
 ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.ecos_rls_policy
+INSERT INTO ecos_control.ecos_rls_policy
     (id, policy_name, table_name, filter_expr, role_id, priority, enabled, description,
      predicate_template, bindings_json, source_kind, create_by)
 VALUES
@@ -101,7 +101,7 @@ VALUES
      'finance_lead', 200, true, '财务负责人-全量(唯一1=1主体)', '1=1',
      '[]', 'legacy_text', 'seed-v246')
 ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.ecos_rls_policy
+INSERT INTO ecos_control.ecos_rls_policy
     (id, policy_name, table_name, filter_expr, role_id, priority, enabled, description,
      predicate_template, bindings_json, source_kind, create_by)
 VALUES
@@ -111,7 +111,7 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- ── 3. CLS 策略种子（非财务隐藏时薪/金额列, mode=deny）─────────────────────
-INSERT INTO public.ecos_cls_policy
+INSERT INTO ecos_control.ecos_cls_policy
     (id, policy_name, table_name, visible_cols, blocked_cols, role_id, priority, enabled,
      description, column_name, mode, scope_type, scope_id, create_by)
 VALUES
@@ -119,7 +119,7 @@ VALUES
      '[]', '["hourly_rate","amount"]', 'non_finance', 100, true,
      '非财务角色-隐藏时薪与金额列', NULL, 'deny', 'ROLE', 'non_finance', 'seed-v246')
 ON CONFLICT (id) DO NOTHING;
-INSERT INTO public.ecos_cls_policy
+INSERT INTO ecos_control.ecos_cls_policy
     (id, policy_name, table_name, visible_cols, blocked_cols, role_id, priority, enabled,
      description, column_name, mode, scope_type, scope_id, create_by)
 VALUES

@@ -91,9 +91,11 @@ class SecuritySeedConsistencyTest {
 
     private List<List<String>> extractRlsValues(String sql) {
         List<List<String>> rows = new ArrayList<>();
-        // 注：V246 冻结迁移脚本仍用 `public.ecos_rls_policy`（F01-09 单源 DDL，R1 不迁移冻结脚本），
-        // 本扫描串必须与种子文件字面一致，勿随 V200 运行时 schema 改写。
-        for (int s = 0; (s = sql.indexOf("INSERT INTO public.ecos_rls_policy", s)) >= 0; ) {
+        // 注：D-B4-19（#142/B4-3e-90，2026-10-27 用户裁决）V246 三类 INSERT 目标 schema
+        // 已由 public.* 订正为 ecos_control.*（dev 实测三张策略表只在 ecos_control，
+        // 详见差距文档 §4.7.2 行订正注 ⑪）；本扫描串必须与种子文件字面一致，
+        // 防「扫的是旧字面、种的是新字面」的静默漂移（V246SeedSchemaGateTest 钉字面归属）。
+        for (int s = 0; (s = sql.indexOf("INSERT INTO ecos_control.ecos_rls_policy", s)) >= 0; ) {
             int v = sql.indexOf("VALUES", s);
             if (v < 0) break;
             int open = sql.indexOf('(', v);
