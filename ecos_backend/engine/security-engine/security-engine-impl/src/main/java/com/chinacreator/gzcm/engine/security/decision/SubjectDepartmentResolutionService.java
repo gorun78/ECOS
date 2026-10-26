@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.security.decision;
 
 import com.chinacreator.gzcm.sysman.iam.entity.UserOrganization;
 import com.chinacreator.gzcm.sysman.iam.service.IOrganizationService;
+import com.chinacreator.gzcm.sysman.iam.support.PrimaryOrganizationRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.TreeSet;
 
 /**
  * 主体域（{@code subject.department} / RLS {@code CONTEXT_ORG}）的<b>服务端真值解析单源</b>
@@ -31,13 +31,16 @@ import java.util.TreeSet;
  *
  * <p><b>为什么不复用现成的 {@code getUserOrganizations}</b>：那条把 {@code is_primary}
  * 只用作 {@code ORDER BY}、投影里没有它 ⇒ 消费方分不出「0 枚主机构」与「2 枚主机构」，
- * 只能取第一条。仓内两处既有实现正是这个形态（{@code PIPImpl} 的 {@code orgs.get(0)}、
- * sysman {@code ClearanceLookupDao.findOrgById} 的 {@code LIMIT 1}）——那是把「事实不完备」
+ * 只能取第一条。仓内一处既有实现仍是这个形态（{@code PIPImpl} 的 {@code orgs.get(0)}，
+ * 台账 D-B4-99 b) 在册余项；改它等于改策略属性契约，属裁决事项）——那是把「事实不完备」
  * 谎报成「事实就是它」，与 D-B4-29/D-B4-36 在声明侧禁掉的「取其一」同罪。本类要求属主把
  * 多重性如实交付（属主侧只增读面见同批 {@code Organization-sql.xml}
- * {@code getUserOrganizationAffiliations}），判定留在这里。</p>
+ * {@code getUserOrganizationAffiliations}）。判据本体自 #142/B4-3e-82 起在属主侧
+ * {@link PrimaryOrganizationRule}（同批把 sysman {@code ClearanceInterceptor#getCurrentOrgId}
+ * 的「{@code LIMIT 1} + 取第一条」第二份实现合流到同一判据），本类只委托、不再自持一份。</p>
  *
- * <p><b>判定纪律（本类是唯一裁决点）</b>：主机构行<b>恰好</b>指向一个机构时才返回该机构号。
+ * <p><b>判定纪律</b>：主机构行<b>恰好</b>指向一个机构时才返回该机构号（判据见
+ * {@link PrimaryOrganizationRule#uniquePrimaryOrg(List)}）。
  * 其余形态（无主机构行、多枚互异主机构、主机构行机构号为空）一律 {@code null}＝如实未解析，
  * 由下游按既有语义处置（RLS 谓词拒绝；OPA 侧 {@code subject.department} 落空串 ⇒
  * 策略理由 {@code AI_SUBJECT_DEPARTMENT_UNRESOLVED}，禁伪装成
@@ -111,47 +114,21 @@ public class SubjectDepartmentResolutionService {
     }
 
     /**
-     * 真值判定单点：主机构行是否<b>恰好</b>指向一个机构。
+     * 真值判定——<b>委托</b>给属主单源 {@link PrimaryOrganizationRule#uniquePrimaryOrg(List)}
+     * （#142/B4-3e-82，收口 D-B4-99 b)）。
      *
-     * <p>包可见以便用例直读判定的四条腿（无主机构／多枚互异／机构号为空／同机构重复行），
-     * 不靠属主夹具凑形态。同一机构被重复登记为主机构（{@code PK(user_id, org_id)} 下
-     * 只可能来自属主数据修复）按「恰好一枚」成立——多重性比对的是机构集合，不是行数。</p>
+     * <p>本方法原先持有判据本体；同一判据在 sysman 准入面另有一份「{@code LIMIT 1} + 取第一条」
+     * 的实现，两份对同一事实给不同答案，故判据上收到属主 api 侧成一份，本类只保留委托。
+     * 保留包可见签名是刻意的：既有用例直读判定的四条腿（无主机构／多枚互异／机构号为空／同机构重复行），
+     * 不靠属主夹具凑形态——判据本体已挪走，用例仍在本包内取证委托不失真。</p>
+     *
+     * <p>门禁：{@code PrimaryOrganizationRuleSingleSourceRatchetTest} 把「判据定义面」钉成单源
+     * （本类内不得再出现去重-取唯一裁决的形体），新长一份即红。</p>
      *
      * @return 唯一主机构号；无主机构行、机构号为空、或去重后集合 ≠ 1 ⇒ {@code null}
      */
     static String uniquePrimaryOrg(List<UserOrganization> affiliations) {
-        if (affiliations == null || affiliations.isEmpty()) {
-            return null;
-        }
-        TreeSet<String> distinct = new TreeSet<>();
-        for (UserOrganization row : affiliations) {
-            if (row == null || !isPrimaryRow(row.getIsPrimary())) {
-                continue;
-            }
-            String orgId = row.getOrgId();
-            if (orgId == null || orgId.isBlank()) {
-                // 主机构行却没有机构号＝事实残缺，禁替主体编一个机构
-                return null;
-            }
-            distinct.add(orgId.trim());
-        }
-        return distinct.size() == 1 ? distinct.first() : null;
-    }
-
-    /**
-     * {@code is_primary} 读数归一。
-     *
-     * <p>存在理由：列形是 {@code VARCHAR(1) DEFAULT '1'}（属主写入侧 {@code assignUserToOrg}
-     * 已按 '1'/'0' 归一），但多方言 DDL 与 {@code mapToObject} 的取值链可能交回
-     * {@code "true"}／带空白的形态；不认全这些会把有主机构的主体误判成「无主机构」。
-     * 除此之外不猜：任何其它值（含 {@code null}）都按非主机构行处理。</p>
-     */
-    private static boolean isPrimaryRow(String isPrimary) {
-        if (isPrimary == null) {
-            return false;
-        }
-        String v = isPrimary.trim();
-        return "1".equals(v) || "true".equalsIgnoreCase(v);
+        return PrimaryOrganizationRule.uniquePrimaryOrg(affiliations);
     }
 
     private static SubjectSourceUnavailableException unavailable(String reason) {

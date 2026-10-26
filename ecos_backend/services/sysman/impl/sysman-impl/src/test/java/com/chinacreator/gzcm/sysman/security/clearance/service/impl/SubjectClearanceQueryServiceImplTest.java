@@ -36,8 +36,13 @@ import static org.mockito.Mockito.verify;
  *   <li><b>禁兜底成任何档位</b>：五档查尽交付 {@code level=null} 的未解析事实——
  *       旧实现在这里 {@code return 1}，把「没配档案」冒充成「L1 内部」，
  *       这是本批唯一的行为面改动，也是下面 {@code fiveTiersAllMissYieldsNoLevel} 存在的理由；</li>
- *   <li><b>机构档只在拿到机构号时才查</b>：机构号由调用方（#3e-80 的唯一主机构裁决）传入，
- *       属主侧不自行解析机构，以免造出第二套「恰好一枚主机构」判据。</li>
+ *   <li><b>机构档只在拿到机构号时才查</b>：机构号由调用方传入，属主侧不自行解析机构，
+ *       以免造出第二套「恰好一枚主机构」判据（#142/B4-3e-82 起，准入面与策略面共用
+ *       {@code PrimaryOrganizationRule} 这一份判据，本条钉住「本服务不解析机构」的边界）；</li>
+ *   <li><b>USER 档取数只能走白名单条目</b>：#142/B4-3e-82 把 DAO 的 {@code (tableName, idColumn)}
+ *       两个 {@code String} 参换成 {@code ClearanceRowKey} 具名白名单，本门用
+ *       {@code eq(ClearanceRowKey.USER_PROFILE)} 钉住实际交付的条目——改回字符串拼装即编译不过，
+ *       换成别的条目即本门变红。</li>
  * </ol>
  *
  * <p>夹具全部用 {@code doReturn/doThrow} 形态而非 {@code when(...)}：默认替身把每一档钉成
@@ -73,7 +78,7 @@ class SubjectClearanceQueryServiceImplTest {
     @BeforeEach
     void noProfileRowOnAnyTier() {
         doReturn(List.of()).when(dao)
-                .queryClearanceRows(anyString(), anyString(), anyString(), any());
+                .queryClearanceRows(any(ClearanceLookupDao.ClearanceRowKey.class), anyString(), any());
         doReturn(-1).when(dao).highestRoleClearanceLevel(anyString(), any());
         doThrow(emptyRow()).when(dao).orgClearanceLevel(anyString(), any());
         doThrow(emptyRow()).when(dao).tenantClearanceLevel(anyString());
@@ -83,7 +88,8 @@ class SubjectClearanceQueryServiceImplTest {
     /** USER 档有档案行的夹具（其它档保持「没行」的默认替身形态）。 */
     private void userRow(Object level) {
         doReturn(level == null ? List.of(Map.of()) : List.of(Map.of("clearance_level", level)))
-                .when(dao).queryClearanceRows(eq("td_user_security_profile"), eq("user_id"), eq(USER), any());
+                .when(dao).queryClearanceRows(
+                        eq(ClearanceLookupDao.ClearanceRowKey.USER_PROFILE), eq(USER), any());
     }
 
     private static EmptyResultDataAccessException emptyRow() {
@@ -158,7 +164,7 @@ class SubjectClearanceQueryServiceImplTest {
     @DisplayName("取数抛错＝该档断腿，如实记进 degradedTiers 交消费方裁决")
     void fetchFailureIsRecordedAsDegradedTier() {
         doThrow(new RuntimeException("datasource down")).when(dao)
-                .queryClearanceRows(anyString(), anyString(), anyString(), any());
+                .queryClearanceRows(any(ClearanceLookupDao.ClearanceRowKey.class), anyString(), any());
         doReturn(2).when(dao).highestRoleClearanceLevel(USER, TENANT);
 
         SubjectClearanceFact fact = service.resolveSubjectClearance(USER, TENANT, null);
@@ -208,6 +214,7 @@ class SubjectClearanceQueryServiceImplTest {
 
         assertFalse(fact.isResolved());
         assertNull(fact.level());
-        verify(dao, never()).queryClearanceRows(anyString(), anyString(), anyString(), any());
+        verify(dao, never()).queryClearanceRows(
+                any(ClearanceLookupDao.ClearanceRowKey.class), anyString(), any());
     }
 }

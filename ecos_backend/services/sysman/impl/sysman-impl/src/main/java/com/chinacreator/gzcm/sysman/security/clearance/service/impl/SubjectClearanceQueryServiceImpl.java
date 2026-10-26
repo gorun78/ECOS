@@ -37,8 +37,12 @@ public class SubjectClearanceQueryServiceImpl implements ISubjectClearanceQueryS
 
     private static final Logger log = LoggerFactory.getLogger(SubjectClearanceQueryServiceImpl.class);
 
-    /** 用户级档案表（与 {@code ClearanceInterceptor} 原常量同源）。 */
-    private static final String USER_PROFILE_TABLE = "td_user_security_profile";
+    /**
+     * 用户级密级档案的行表（#142/B4-3e-82：由字符串常量改为 {@link ClearanceLookupDao.ClearanceRowKey}
+     * 白名单条目——标识符不再以 {@code String} 流经 DAO，DAO 侧的 {@code String.format} 拼接面随之消失）。
+     */
+    private static final ClearanceLookupDao.ClearanceRowKey USER_PROFILE_KEY =
+            ClearanceLookupDao.ClearanceRowKey.USER_PROFILE;
 
     private final ClearanceLookupDao clearanceLookupDao;
 
@@ -55,7 +59,7 @@ public class SubjectClearanceQueryServiceImpl implements ISubjectClearanceQueryS
         List<String> degraded = new ArrayList<>();
 
         // ── 1. 用户级 ────────────────────────────────
-        Integer level = queryProfileRowLevel(USER_PROFILE_TABLE, "user_id", userId, tenantId,
+        Integer level = queryProfileRowLevel(USER_PROFILE_KEY, userId, tenantId,
                 SubjectClearanceFact.TIER_USER, degraded);
         if (level != null) {
             return SubjectClearanceFact.resolved(SubjectClearanceFact.TIER_USER, level, degraded);
@@ -99,19 +103,18 @@ public class SubjectClearanceQueryServiceImpl implements ISubjectClearanceQueryS
 
     // ── 逐档查询（判据与原拦截器一致，异常面改为记录降级）──────
 
-    /** 按行表 + id 列取一档（USER 档）。空行集＝该档无档案；取数异常＝该档断腿。 */
-    private Integer queryProfileRowLevel(String tableName, String idColumn, String idValue,
+    /** 按白名单行表取一档（USER 档）。空行集＝该档无档案；取数异常＝该档断腿。 */
+    private Integer queryProfileRowLevel(ClearanceLookupDao.ClearanceRowKey key, String idValue,
                                          String tenantId, String tier, List<String> degraded) {
         try {
-            List<Map<String, Object>> rows =
-                    clearanceLookupDao.queryClearanceRows(tableName, idColumn, idValue, tenantId);
+            List<Map<String, Object>> rows = clearanceLookupDao.queryClearanceRows(key, idValue, tenantId);
             if (rows == null || rows.isEmpty()) {
                 return null;
             }
             return asLevel(rows.get(0).get("clearance_level"), tier, degraded);
         } catch (Exception e) {
             degraded.add(tier);
-            log.warn("查询{}安全配置失败，记入降级档交回消费方（原实现为静默继续下探）", tableName, e);
+            log.warn("查询{}安全配置失败，记入降级档交回消费方（原实现为静默继续下探）", key.table(), e);
             return null;
         }
     }

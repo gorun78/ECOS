@@ -3,6 +3,8 @@ package com.chinacreator.gzcm.sysman.security;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.sysman.iam.context.TenantContext;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
+import com.chinacreator.gzcm.sysman.iam.entity.UserOrganization;
+import com.chinacreator.gzcm.sysman.iam.support.PrimaryOrganizationRule;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -51,27 +53,45 @@ public class ClearanceInterceptor implements HandlerInterceptor {
      */
     private final com.chinacreator.gzcm.sysman.security.clearance.service.ISubjectClearanceQueryService clearanceQueryService;
 
+    /**
+     * 机构隶属的属主 api 门面（#142/B4-3e-82，收口 D-B4-99 b) 腿）。
+     * <p>存在理由：本类原经 {@code ClearanceLookupDao.findOrgById} 直读对方表
+     * （{@code is_primary = '1' … LIMIT 1}）再取 {@code rows.get(0)}——那是「多枚主机构时取其一」，
+     * 交回哪枚由数据库顺序决定；而策略面（security 引擎）对同一事实要求「恰好一枚才写值」。
+     * 两套判据在同一个主体上给出不同答案，机构级密级档因此可落在主体并不属于的机构上。
+     * 现与策略面共用属主单源判据 {@link PrimaryOrganizationRule}，取数改走属主 api 门面
+     * （铁律 #5：跨域事实经属主门面；铁律 §2.5：本类不持 JdbcTemplate，DAO 也不该抄写别人的表）。
+     * <p>这是<b>必装配</b>腿：缺席即 context 起不来，不在本类内做「拿不到就跳档」的折叠
+     * （折叠族见台账 D-B4-83／D-B4-99 b) 说明）。
+     */
+    private final com.chinacreator.gzcm.sysman.iam.service.IOrganizationService organizationService;
+
     /** ThreadLocal 保存当前请求，供辅助方法获取 orgId/tenantId */
     private final ThreadLocal<HttpServletRequest> currentRequest = new ThreadLocal<>();
 
     @Autowired
     public ClearanceInterceptor(com.chinacreator.gzcm.sysman.dao.ClearanceLookupDao clearanceLookupDao,
                                 org.springframework.beans.factory.ObjectProvider<Object> eventBusProvider,
-                                com.chinacreator.gzcm.sysman.security.clearance.service.ISubjectClearanceQueryService clearanceQueryService) {
+                                com.chinacreator.gzcm.sysman.security.clearance.service.ISubjectClearanceQueryService clearanceQueryService,
+                                com.chinacreator.gzcm.sysman.iam.service.IOrganizationService organizationService) {
         this.clearanceLookupDao = clearanceLookupDao;
         this.eventBusProvider = eventBusProvider;
         this.clearanceQueryService = clearanceQueryService;
+        this.organizationService = organizationService;
     }
 
     /**
      * 兼容构造器（无事件总线）：超管旁路审计仅落日志。保留供既有单测与非注入装配使用。
      * <p>密级链不可缺省——它是本类唯一的判据来源，缺失即装配失败（禁再造一份内联级联）。
+     * 机构门面同属必给参数（#142/B4-3e-82），测试须显式给替身，禁传 {@code null} 走折叠腿。
      */
     public ClearanceInterceptor(com.chinacreator.gzcm.sysman.dao.ClearanceLookupDao clearanceLookupDao,
-                                com.chinacreator.gzcm.sysman.security.clearance.service.ISubjectClearanceQueryService clearanceQueryService) {
+                                com.chinacreator.gzcm.sysman.security.clearance.service.ISubjectClearanceQueryService clearanceQueryService,
+                                com.chinacreator.gzcm.sysman.iam.service.IOrganizationService organizationService) {
         this.clearanceLookupDao = clearanceLookupDao;
         this.eventBusProvider = null;
         this.clearanceQueryService = clearanceQueryService;
+        this.organizationService = organizationService;
     }
 
     @Override
@@ -239,13 +259,20 @@ public class ClearanceInterceptor implements HandlerInterceptor {
         // 详细设计-01 W40：机构上下文只从服务端解析（td_user_organization 主组织），
         // 不再信任客户端 X-Org-Id 头 / orgId 参数（水平越权面）。客户端头已在
         // gateway EcosTrustHeaderFilter 剥离；此处兜底彻底移除客户端来源，双重保险。
+        // #142/B4-3e-82：取数改走属主 api 门面、判定改用属主单源判据（与策略面同一份规则）。
         if (userId != null) {
             try {
-                List<Map<String, Object>> rows = clearanceLookupDao.findOrgById(userId);
-                if (rows != null && !rows.isEmpty()) {
-                    Object oid = rows.get(0).get("org_id");
-                    return oid != null ? oid.toString() : null;
+                List<UserOrganization> affiliations =
+                        organizationService.getUserOrganizationAffiliations(userId);
+                String orgId = PrimaryOrganizationRule.uniquePrimaryOrg(affiliations);
+                if (orgId == null && affiliations != null && !affiliations.isEmpty()) {
+                    // 有关联行却裁不出唯一主机构＝事实不完备（0 枚主机构行或多枚互异主机构）。
+                    // 旧实现在这里取 rows.get(0) 谎报成「就是它」；现如实跳机构级，
+                    // 密级链继续下探到租户/全局档（准入面 fail-soft 语义不变，不放宽档位）。
+                    log.warn("用户主机构不唯一或缺失，跳过机构级: userId={}, rows={}",
+                            userId, affiliations.size());
                 }
+                return orgId;
             } catch (Exception e) {
                 log.warn("查询用户机构失败，跳过机构级: userId={}", userId, e);
             }

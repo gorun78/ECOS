@@ -51,8 +51,11 @@ class ClearanceInterceptorTest {
 
     private boolean preHandle(ClearanceLookupDao dao, String path) throws Exception {
         // 五档密级链已抽为属主单源（#142/B4-3e-81）：拦截器只保留准入兜底，判据取自同一份实现
+        // 机构门面（#142/B4-3e-82）：默认替身返回空关联行集＝「无主机构」⇒ 机构级跳过，
+        // 与本用例改前经 findOrgById 拿到空集的结果形态一致（本门不测机构腿，见 ClearanceInterceptorOrgResolutionTest）
         ClearanceInterceptor interceptor = new ClearanceInterceptor(dao,
-                new com.chinacreator.gzcm.sysman.security.clearance.service.impl.SubjectClearanceQueryServiceImpl(dao));
+                new com.chinacreator.gzcm.sysman.security.clearance.service.impl.SubjectClearanceQueryServiceImpl(dao),
+                mock(com.chinacreator.gzcm.sysman.iam.service.IOrganizationService.class));
         MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
         request.setRequestURI(path);
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -67,7 +70,7 @@ class ClearanceInterceptorTest {
 
     private ClearanceLookupDao daoThrowingOnEveryQuery() {
         ClearanceLookupDao dao = mock(ClearanceLookupDao.class);
-        when(dao.queryClearanceRows(anyString(), anyString(), anyString(), any()))
+        when(dao.queryClearanceRows(any(ClearanceLookupDao.ClearanceRowKey.class), anyString(), any()))
                 .thenThrow(new RuntimeException("security profile table unreachable"));
         when(dao.highestRoleClearanceLevel(anyString(), any()))
                 .thenThrow(new RuntimeException("security profile table unreachable"));
@@ -78,7 +81,7 @@ class ClearanceInterceptorTest {
 
     private ClearanceLookupDao daoWithUserLevel(int level) {
         ClearanceLookupDao dao = mock(ClearanceLookupDao.class);
-        when(dao.queryClearanceRows(anyString(), anyString(), anyString(), any()))
+        when(dao.queryClearanceRows(any(ClearanceLookupDao.ClearanceRowKey.class), anyString(), any()))
                 .thenReturn(List.of(Map.of("clearance_level", level)));
         return dao;
     }

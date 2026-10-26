@@ -91,7 +91,7 @@ class SuperAdminBypassAuditTest {
     /** 放行路径用的 DAO：所有 clearance 查询都成功返回低等级（证明非超管不靠旁路，超管不到这步）。 */
     private ClearanceLookupDao daoLevel(int level) {
         ClearanceLookupDao dao = mock(ClearanceLookupDao.class);
-        when(dao.queryClearanceRows(anyString(), anyString(), anyString(), any()))
+        when(dao.queryClearanceRows(any(ClearanceLookupDao.ClearanceRowKey.class), anyString(), any()))
                 .thenReturn(List.of(Map.of("clearance_level", level)));
         return dao;
     }
@@ -107,9 +107,13 @@ class SuperAdminBypassAuditTest {
      * 拦截器装配替身。
      * <p>存在理由（#142/B4-3e-81）：五档密级链已从拦截器抽到 sysman 属主单源，本用例只测超管旁路
      * 与审计腿，判定链必须走<b>同一份真实实现</b>（只把 DAO 换成替身），禁再造一份内联级联假象。
+     * <p>机构门面（#142/B4-3e-82）给的是 Mockito 默认替身——它返 {@code List} 的方法默认给空集，
+     * 于是属主判据得出「无主机构」⇒ 机构级档整体跳过。本组用例断言的是旁路与审计腿，
+     * 机构档读数与它无关，但装配面必须显式给（缺参即编译不过＝防「未装配折叠腿」再现）。
      */
     private ClearanceInterceptor bypassInterceptor(ClearanceLookupDao dao, ObjectProvider<Object> provider) {
-        return new ClearanceInterceptor(dao, provider, new SubjectClearanceQueryServiceImpl(dao));
+        return new ClearanceInterceptor(dao, provider, new SubjectClearanceQueryServiceImpl(dao),
+                mock(com.chinacreator.gzcm.sysman.iam.service.IOrganizationService.class));
     }
 
     @Test
@@ -130,7 +134,7 @@ class SuperAdminBypassAuditTest {
 
         verify(bus, times(1)).publish(eq("ecos.audit"), any(Object.class));
         // 旁路发生在 clearance 级联之前，不应触发 clearance 查询
-        verify(dao, never()).queryClearanceRows(anyString(), anyString(), anyString(), any());
+        verify(dao, never()).queryClearanceRows(any(ClearanceLookupDao.ClearanceRowKey.class), anyString(), any());
     }
 
     @Test
