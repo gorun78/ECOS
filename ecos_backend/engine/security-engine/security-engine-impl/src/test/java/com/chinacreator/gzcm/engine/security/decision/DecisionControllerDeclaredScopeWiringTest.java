@@ -89,7 +89,8 @@ class DecisionControllerDeclaredScopeWiringTest {
                 return new DataScopeContract.Declared("D-REAL", declared.projectIds());
             }
         };
-        DecisionController controller = new DecisionController(service, resolver, mock(SubjectDepartmentResolutionService.class));
+        DecisionController controller = new DecisionController(service, resolver,
+                mock(SubjectDepartmentResolutionService.class), mock(SubjectClearanceResolutionService.class));
 
         ResponseEntity<ApiResponse<Map<String, Object>>> resp =
                 controller.decide(body(DecisionChannelContract.PURPOSE_AI, "D-FAKE", List.of("P1")));
@@ -116,7 +117,8 @@ class DecisionControllerDeclaredScopeWiringTest {
                 throw new AssertionError("非 AI 通道不得触发真值解析");
             }
         };
-        DecisionController controller = new DecisionController(service, resolver, mock(SubjectDepartmentResolutionService.class));
+        DecisionController controller = new DecisionController(service, resolver,
+                mock(SubjectDepartmentResolutionService.class), mock(SubjectClearanceResolutionService.class));
 
         for (String purpose : List.of(DecisionChannelContract.PURPOSE_PAGE,
                 DecisionChannelContract.PURPOSE_EXPORT)) {
@@ -150,7 +152,8 @@ class DecisionControllerDeclaredScopeWiringTest {
                         : new DataScopeContract.Declared("D-REAL", declared.projectIds());
             }
         };
-        DecisionController controller = new DecisionController(service, resolver, mock(SubjectDepartmentResolutionService.class));
+        DecisionController controller = new DecisionController(service, resolver,
+                mock(SubjectDepartmentResolutionService.class), mock(SubjectClearanceResolutionService.class));
 
         assertEquals(ApiResponse.CODE_SUCCESS,
                 controller.decide(body(DecisionChannelContract.PURPOSE_AI, null, null))
@@ -175,7 +178,8 @@ class DecisionControllerDeclaredScopeWiringTest {
                         DeclaredScopeResolutionService.REASON_SOURCE_UNAVAILABLE + ": 桩不可达");
             }
         };
-        DecisionController controller = new DecisionController(service, resolver, mock(SubjectDepartmentResolutionService.class));
+        DecisionController controller = new DecisionController(service, resolver,
+                mock(SubjectDepartmentResolutionService.class), mock(SubjectClearanceResolutionService.class));
 
         ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller.decide(
                 body(DecisionChannelContract.PURPOSE_AI, null, List.of("P1")));
@@ -202,7 +206,8 @@ class DecisionControllerDeclaredScopeWiringTest {
                 throw new IllegalStateException("未预期故障（非声明的不可用态）");
             }
         };
-        DecisionController controller = new DecisionController(service, resolver, mock(SubjectDepartmentResolutionService.class));
+        DecisionController controller = new DecisionController(service, resolver,
+                mock(SubjectDepartmentResolutionService.class), mock(SubjectClearanceResolutionService.class));
 
         ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller.decide(
                 body(DecisionChannelContract.PURPOSE_AI, null, List.of("P1")));

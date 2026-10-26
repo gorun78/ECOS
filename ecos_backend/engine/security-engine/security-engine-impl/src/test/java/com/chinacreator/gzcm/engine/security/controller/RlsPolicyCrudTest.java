@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.security.decision.SubjectClearanceResolutionService;
 import com.chinacreator.gzcm.engine.security.decision.SubjectDepartmentResolutionService;
 import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,9 +34,11 @@ class RlsPolicyCrudTest {
     @BeforeEach
     void setUp() {
         // 主体域真值单源与本组 CRUD 端点无关（/policies* 不构造主体上下文）；
-        // orgId 通路由 RlsControllerSubjectDepartmentWiringTest 具名覆盖。
+        // orgId 通路由 RlsControllerSubjectDepartmentWiringTest、密级通路由
+        // RlsControllerSubjectClearanceWiringTest 具名覆盖。
         this.controller = new RlsController(rlsService,
-                mock(SubjectDepartmentResolutionService.class));
+                mock(SubjectDepartmentResolutionService.class),
+                mock(SubjectClearanceResolutionService.class));
     }
 
     @Test

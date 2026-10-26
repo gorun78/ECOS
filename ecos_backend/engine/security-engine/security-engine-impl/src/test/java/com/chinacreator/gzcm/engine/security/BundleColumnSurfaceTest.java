@@ -10,6 +10,7 @@ import com.chinacreator.gzcm.engine.security.decision.DeclaredScopeResolutionSer
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
 import com.chinacreator.gzcm.engine.security.decision.DecisionContext;
 import com.chinacreator.gzcm.engine.security.decision.SecurityDecisionService;
+import com.chinacreator.gzcm.engine.security.decision.SubjectClearanceResolutionService;
 import com.chinacreator.gzcm.engine.security.decision.SubjectDepartmentResolutionService;
 import com.chinacreator.gzcm.engine.security.service.ColumnLevelSecurityServiceImpl;
 import com.chinacreator.gzcm.engine.security.service.OpaPolicyService;
@@ -406,8 +407,16 @@ class BundleColumnSurfaceTest {
          */
         private final SubjectDepartmentResolutionService subjectDepartmentResolver =
                 mock(SubjectDepartmentResolutionService.class);
+        /**
+         * #142/B4-3e-81（D-B4-23 主体密级腿）：同上口径，密级真值器 mock 后返回 {@code null}
+         * ＝如实未解析，与收口前写死 null 的行为面等价，列面判据不受影响。
+         * 三态判据在 {@code DecisionControllerSubjectClearanceWiringTest}。
+         */
+        private final SubjectClearanceResolutionService subjectClearanceResolver =
+                mock(SubjectClearanceResolutionService.class);
         private final DecisionController controller =
-                new DecisionController(service, declaredScopeResolver, subjectDepartmentResolver);
+                new DecisionController(service, declaredScopeResolver, subjectDepartmentResolver,
+                        subjectClearanceResolver);
 
         {
             when(declaredScopeResolver.resolveForAiTool(any())).thenAnswer(inv -> inv.getArgument(0));

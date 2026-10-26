@@ -83,6 +83,19 @@ class DecisionControllerSubjectDepartmentWiringTest {
         return resolver;
     }
 
+    /**
+     * 装配被测入口。
+     * <p>存在理由（#142/B4-3e-81）：主体<b>密级</b>腿与本门的主体<b>机构</b>腿各有独立替身，
+     * 密级替身返回 {@code null}＝如实未解析（策略面禁兜底成任何档位）。两腿混用同一份夹具时，
+     * 一旦失败无法从断言归因到哪条腿——这正是 D-B4-85／D-B4-90 分态族禁掉的形态。
+     * 密级三态判据由 {@code DecisionControllerSubjectClearanceWiringTest} 具名覆盖。
+     */
+    private static DecisionController controller(SecurityDecisionService service,
+                                                 SubjectDepartmentResolutionService subjectResolver) {
+        return new DecisionController(service, echoDeclaredResolver(), subjectResolver,
+                mock(SubjectClearanceResolutionService.class));
+    }
+
     @Test
     @DisplayName("页面通道：真值机构写进上下文，且取自信任链 userId（不是自报 subjectId 的改写形态）")
     void resolvedOrgReachesTheDecisionContext() {
@@ -90,8 +103,7 @@ class DecisionControllerSubjectDepartmentWiringTest {
         SubjectDepartmentResolutionService subjectResolver = mock(SubjectDepartmentResolutionService.class);
         when(subjectResolver.resolvePrimaryOrgId(anyString())).thenReturn("ORG-REAL");
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp = new DecisionController(
-                service, echoDeclaredResolver(), subjectResolver)
+        ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller(service, subjectResolver)
                 .decide(body(DecisionChannelContract.PURPOSE_PAGE, null));
 
         assertEquals(ApiResponse.CODE_SUCCESS, resp.getBody().getCode(), String.valueOf(resp));
@@ -108,7 +120,8 @@ class DecisionControllerSubjectDepartmentWiringTest {
         SubjectDepartmentResolutionService subjectResolver = mock(SubjectDepartmentResolutionService.class);
         when(subjectResolver.resolvePrimaryOrgId(anyString())).thenReturn("ORG-REAL");
 
-        new DecisionController(service, echoDeclaredResolver(), subjectResolver).decide(
+        new DecisionController(service, echoDeclaredResolver(), subjectResolver,
+                mock(SubjectClearanceResolutionService.class)).decide(
                 body(DecisionChannelContract.PURPOSE_PAGE,
                         Map.of("department", "ORG-FORGED", "orgId", "ORG-FORGED-2")));
 
@@ -124,8 +137,7 @@ class DecisionControllerSubjectDepartmentWiringTest {
         SubjectDepartmentResolutionService subjectResolver = mock(SubjectDepartmentResolutionService.class);
         when(subjectResolver.resolvePrimaryOrgId(anyString())).thenReturn("ORG-AI");
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp = new DecisionController(
-                service, echoDeclaredResolver(), subjectResolver)
+        ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller(service, subjectResolver)
                 .decide(body(DecisionChannelContract.PURPOSE_AI, null));
 
         assertEquals(ApiResponse.CODE_SUCCESS, resp.getBody().getCode(), String.valueOf(resp));
@@ -139,8 +151,7 @@ class DecisionControllerSubjectDepartmentWiringTest {
         SubjectDepartmentResolutionService subjectResolver = mock(SubjectDepartmentResolutionService.class);
         when(subjectResolver.resolvePrimaryOrgId(anyString())).thenReturn(null);
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp = new DecisionController(
-                service, echoDeclaredResolver(), subjectResolver)
+        ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller(service, subjectResolver)
                 .decide(body(DecisionChannelContract.PURPOSE_PAGE, null));
 
         assertEquals(ApiResponse.CODE_SUCCESS, resp.getBody().getCode(), String.valueOf(resp));
@@ -156,8 +167,7 @@ class DecisionControllerSubjectDepartmentWiringTest {
                 new SubjectDepartmentResolutionService.SubjectSourceUnavailableException(
                         SubjectDepartmentResolutionService.REASON_SOURCE_UNAVAILABLE + ": 属主取数失败"));
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp = new DecisionController(
-                service, echoDeclaredResolver(), subjectResolver)
+        ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller(service, subjectResolver)
                 .decide(body(DecisionChannelContract.PURPOSE_PAGE, null));
 
         assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_HTTP, resp.getStatusCode().value(),
@@ -183,8 +193,7 @@ class DecisionControllerSubjectDepartmentWiringTest {
         Map<String, Object> m = body(DecisionChannelContract.PURPOSE_PAGE, null);
         m.put(DecisionChannelContract.KEY_SUBJECT, Map.of(DecisionChannelContract.KEY_SUBJECT_ID, "  "));
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp = new DecisionController(
-                service, echoDeclaredResolver(), subjectResolver).decide(m);
+        ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller(service, subjectResolver).decide(m);
 
         assertEquals(HttpStatus.FORBIDDEN, resp.getStatusCode(), String.valueOf(resp));
         verify(subjectResolver, never()).resolvePrimaryOrgId(anyString());

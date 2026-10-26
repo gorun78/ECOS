@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.security.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
+import com.chinacreator.gzcm.engine.security.decision.SubjectClearanceResolutionService;
 import com.chinacreator.gzcm.engine.security.decision.SubjectDepartmentResolutionService;
 import com.chinacreator.gzcm.engine.security.rls.RlsSubjectContext;
 import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl;
@@ -20,11 +21,14 @@ public class RlsController {
 
     private final RowLevelSecurityServiceImpl rlsService;
     private final SubjectDepartmentResolutionService subjectDepartmentResolver;
+    private final SubjectClearanceResolutionService subjectClearanceResolver;
 
     public RlsController(RowLevelSecurityServiceImpl rlsService,
-                         SubjectDepartmentResolutionService subjectDepartmentResolver) {
+                         SubjectDepartmentResolutionService subjectDepartmentResolver,
+                         SubjectClearanceResolutionService subjectClearanceResolver) {
         this.rlsService = rlsService;
         this.subjectDepartmentResolver = subjectDepartmentResolver;
+        this.subjectClearanceResolver = subjectClearanceResolver;
     }
 
     /**
@@ -43,15 +47,20 @@ public class RlsController {
      * 主机构关联）服务端解析真值（#142/B4-3e-80 收口 D-B4-23 主体域腿），同样
      * <b>不接受</b>请求体自报机构；主机构不唯一或关联缺失 ⇒ 如实未解析 ⇒ 依赖
      * {@code CONTEXT_ORG} 的策略被拒绝，而不是被渲染成 {@code department_id = NULL}。
-     * {@code clearanceLevel} 仍为未解析（五档链路锁在 {@code ClearanceInterceptor} 私有方法内，
-     * 属台账余项，另批处置）。</p>
+     * {@code clearanceLevel} 同样由 {@link SubjectClearanceResolutionService} 经属主（sysman
+     * 五档密级链 {@code USER > ROLE > ORG > TENANT > GLOBAL}）服务端解析真值
+     * （#142/B4-3e-81 收口 D-B4-23 余项腿）。<b>未解析就是未解析</b>：五档查尽无档案行 ⇒
+     * 如实 {@code null} ⇒ 依赖 {@code CONTEXT_CLEARANCE_LEVEL} 的策略落
+     * {@code RLS_CONTEXT_UNRESOLVED}；<b>不</b>照抄准入拦截器末端的「无档案兜底 L1」，
+     * 那等于对一个不存在的事实做行范围放行。</p>
      *
      * <p><b>主体域真值源不可用 ≠ 策略不匹配</b>：属主门面缺席或取数报错时，本端点<b>抛</b>
      * {@link DataBridgeException} 携 503 态（{@link RlsExecutionContract#SEC_UNAVAILABLE_HTTP}／
      * {@link RlsExecutionContract#SEC_UNAVAILABLE_CODE} 单源），由宿主全局处理器写上状态行；
      * 裸回 {@code ApiResponse} 无 HTTP 状态能力，改返回值写不出 503（D-B4-59 族）。
      * {@code catch (DataBridgeException e) { throw e; }} 放行腿必须与 {@code catch (Exception)}
-     * 兜底同时存在，否则不可用态会被折回 500。</p>
+     * 兜底同时存在，否则不可用态会被折回 500。机构腿与密级腿各用独立 helper 承载，
+     * 理由片段点明断的是哪条腿（取证要能分面，禁两条腿共用一句「主体域不可用」）。</p>
      */
     @PostMapping("/apply")
     public ApiResponse<Map<String, Object>> apply(@RequestBody Map<String, Object> body) {
@@ -75,7 +84,7 @@ public class RlsController {
     }
 
     /**
-     * 主体域真值源不可用的 HTTP 承载：裸回 {@code ApiResponse} 写不出状态行，沿用抛型形态
+     * 主体域<b>机构</b>真值源不可用的 HTTP 承载：裸回 {@code ApiResponse} 写不出状态行，沿用抛型形态
      * （与 {@code AuditController#unassembled}、{@code DecisionController} 同源，
      * 码/号取 {@link RlsExecutionContract} 单源常量，禁在本类另立字面量）。
      */
@@ -87,8 +96,22 @@ public class RlsController {
     }
 
     /**
+     * 主体域<b>密级</b>真值源不可用的 HTTP 承载（#142/B4-3e-81）：形态与
+     * {@link #subjectSourceUnavailable(Throwable)} 同族（同码同状态，仍取 {@link RlsExecutionContract}
+     * 单源），但<b>理由片段独立成句</b>——两条腿共用一句理由，取证就分不出断的是机构隶属还是
+     * 密级档案链（同族教训见 D-B4-85／D-B4-90 的分态收口）。
+     */
+    static DataBridgeException subjectClearanceSourceUnavailable(Throwable cause) {
+        return new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                RlsExecutionContract.SEC_UNAVAILABLE_CODE + ": 主体密级真值源不可用（含五档链断腿），"
+                        + "RLS 密级谓词无从构造，按 fail-closed 拒绝服务"
+                        + "（§4.7.2 不可用 ≠ 无权限 ≠ 空结果）", cause);
+    }
+
+    /**
      * 上下文组装：userId 走既有请求体契约，tenantId 走信任链单源，
-     * orgId 走属主真值单源（不可用即抛承载），密级如实未解析。
+     * orgId 与 clearanceLevel 走属主真值单源（不可用即抛承载）。
      */
     private RlsSubjectContext subjectContext(String userId) {
         String tenantId = null;
@@ -104,7 +127,13 @@ public class RlsController {
         } catch (SubjectDepartmentResolutionService.SubjectSourceUnavailableException e) {
             throw subjectSourceUnavailable(e);
         }
-        return new RlsSubjectContext(userId, tenantId, orgId, null);
+        Integer clearanceLevel;
+        try {
+            clearanceLevel = subjectClearanceResolver.resolveClearanceLevel(userId, tenantId, orgId);
+        } catch (SubjectClearanceResolutionService.SubjectClearanceSourceUnavailableException e) {
+            throw subjectClearanceSourceUnavailable(e);
+        }
+        return new RlsSubjectContext(userId, tenantId, orgId, clearanceLevel);
     }
 
     @GetMapping("/policies")

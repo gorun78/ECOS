@@ -10,6 +10,7 @@ import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
 import com.chinacreator.gzcm.engine.security.decision.DecisionContext;
 import com.chinacreator.gzcm.engine.security.decision.DeclaredScopeResolutionService;
 import com.chinacreator.gzcm.engine.security.decision.SecurityDecisionService;
+import com.chinacreator.gzcm.engine.security.decision.SubjectClearanceResolutionService;
 import com.chinacreator.gzcm.engine.security.decision.SubjectDepartmentResolutionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,8 +37,11 @@ import java.util.Map;
  * 向属主域（sysman）服务端解析真值</b>（#142/B4-3e-80，收口 D-B4-23 主体侧腿：此前恒写
  * {@code null}，令 §4.7.2 p1「域内 ALLOW」结构上不可达）。请求体里任何形式的自报机构
  * 在本端点<b>无读数通道</b>——被裁决者自报主体域＝恢复 D-B4-29 刚关掉的洞。
- * {@code clearanceLevel} 仍未解析（{@code null}）：其五档优先链目前锁在 sysman
- * {@code ClearanceInterceptor} 的私有方法里，复用需先做属主侧抽取，另批处置。</p>
+ * <b>{@code clearanceLevel} 由 {@link SubjectClearanceResolutionService} 向属主域（sysman
+ * 五档密级链 USER&gt;ROLE&gt;ORG&gt;TENANT&gt;GLOBAL）服务端解析真值</b>（#142/B4-3e-81，
+ * 收口 D-B4-23 余项腿：此前恒写 {@code null}）。未解析（五档无档案行）保持 {@code null}，
+ * 本端点<b>不</b>照抄准入拦截器末端的「无档案兜底 L1」——那是把一个不存在的事实当成 L1 真值
+ * 参与裁决；链含断腿或属主门面缺席则转 503（理由片段独立成句，与机构腿/声明域腿分面可取证）。</p>
  *
  * <p>{@code resource}（#142/B4-3d-3 只增，D-B4-20；#142/B4-3e-79 真值化，D-B4-36）：
  * AI 通道的<b>请求数据域声明</b>段，形态为 {@code resource.dataScope} 下的
@@ -56,13 +60,16 @@ public class DecisionController {
     private final SecurityDecisionService service;
     private final DeclaredScopeResolutionService declaredScopeResolver;
     private final SubjectDepartmentResolutionService subjectDepartmentResolver;
+    private final SubjectClearanceResolutionService subjectClearanceResolver;
 
     public DecisionController(SecurityDecisionService service,
                               DeclaredScopeResolutionService declaredScopeResolver,
-                              SubjectDepartmentResolutionService subjectDepartmentResolver) {
+                              SubjectDepartmentResolutionService subjectDepartmentResolver,
+                              SubjectClearanceResolutionService subjectClearanceResolver) {
         this.service = service;
         this.declaredScopeResolver = declaredScopeResolver;
         this.subjectDepartmentResolver = subjectDepartmentResolver;
+        this.subjectClearanceResolver = subjectClearanceResolver;
     }
 
     @PostMapping
@@ -100,7 +107,13 @@ public class DecisionController {
             // 解析未果（无主机构/多枚主机构歧义）仍是 null＝如实未解析；取数不可用则抛
             // SubjectSourceUnavailableException 转下面的 503 腿，禁折成「该用户没机构」。
             String orgId = subjectDepartmentResolver.resolvePrimaryOrgId(userId);
-            DecisionContext ctx = DecisionContext.of(userId, tenantId, orgId, null, roles, traceId)
+            // #142/B4-3e-81（D-B4-23 余项腿）：clearanceLevel 同样改由属主域（五档密级链）服务端解析。
+            // 未解析（五档无档案行）仍是 null＝如实未解析，禁照抄准入拦截器的「无档案兜底 L1」；
+            // 链含断腿／门面缺席则抛 SubjectClearanceSourceUnavailableException 转下面的 503 腿。
+            // orgId 先解析后传给密级链：机构档要比对机构号，两条腿共用同一份唯一主机构裁决，
+            // 不在属主侧再解析一次机构（那会造出第二套「恰好一枚主机构」判据）。
+            Integer clearanceLevel = subjectClearanceResolver.resolveClearanceLevel(userId, tenantId, orgId);
+            DecisionContext ctx = DecisionContext.of(userId, tenantId, orgId, clearanceLevel, roles, traceId)
                     // #142/B4-3d-3 只增：调用方声明的请求数据域（AI 通道的 §4.7.2 判据面）。
                     // #142/B4-3e-79 语义收口（D-B4-36）：AI 通道这段的 departmentId 不再取调用方自报，
                     // 改由服务端向属主域（data-engine）按 projectIds 展开真值——信任边界原文见下。
@@ -129,6 +142,15 @@ public class DecisionController {
                     asset.key(), purpose, e.getMessage());
             return failure(ApiResponse.error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
                     RlsExecutionContract.SEC_UNAVAILABLE_CODE + "：主体域真值源不可用（fail-closed）"));
+        } catch (SubjectClearanceResolutionService.SubjectClearanceSourceUnavailableException e) {
+            // #142/B4-3e-81：密级链不可用（门面缺席或任一档取数断腿）单独一条 503 腿——
+            // 与机构腿、声明域腿各自独立成句，是为了取证能定位断的是哪条腿（合并成一条 catch
+            // 就等于承认「三条腿的因由同一个理由承载」，那是 D-B4-85 刚收口的三态不可分辨形态）。
+            // 更禁折成「该用户没密级档案」：那会把部署/取数缺陷伪装成用户权限不足。
+            log.warn("decide 主体密级真值源不可用: asset={}, purpose={}, reason={}",
+                    asset.key(), purpose, e.getMessage());
+            return failure(ApiResponse.error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
+                    RlsExecutionContract.SEC_UNAVAILABLE_CODE + "：主体密级真值源不可用（fail-closed）"));
         } catch (Exception e) {
             log.warn("decide 端点异常: asset={}, purpose={}", asset.key(), purpose, e);
             return failure(ApiResponse.error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,

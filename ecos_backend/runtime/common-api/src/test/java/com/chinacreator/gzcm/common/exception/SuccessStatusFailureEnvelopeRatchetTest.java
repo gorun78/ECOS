@@ -147,6 +147,23 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      *       29+99+12+35 = 175 = 总数，对账成立。
      *       只重设被突破的 {@link #OWNER_HELPER_CEILING}，其余三面按实测保持；同批把两条腿的形态
      *       片段挂进 {@link #OWNER_SIDE_CARRIERS}（删腿即红，禁以「上限下调」冒充收口）。</li>
+     *   <li>#142/B4-3e-81 重设（D-B4-23 主体域<b>密级</b>腿收口批，本门「上限置 0 探测」实跑产出，
+     *       {@code _win_tasks/logs/3e81-probe-ceiling0.log}）＝总数 <b>176</b>／折叠 0／状态行承载
+     *       <b>29</b>（未漂移）／裸回 <b>99</b>（未漂移）／属主 helper <b>13</b>／纯信封 <b>35</b>（未漂移）。
+     *       唯一漂移源＝{@code DecisionController#decide} 为「主体密级真值源不可用」新增的第三条
+     *       {@code catch (SubjectClearanceSourceUnavailableException) → failure(ApiResponse.error(503, …))} 腿。
+     *       {@code RlsController#subjectClearanceSourceUnavailable(Throwable)} 虽是同批新增的第二枚承载
+     *       helper，却<b>不进本门计数</b>：它 {@code return new DataBridgeException(..)}，一个
+     *       {@code ApiResponse.error} 出现点都没有，而本门数的正是出现点归类。于是出现了一条要写明的
+     *       口径差：三条不可用腿（声明域／主体域／主体密级）在 {@code DecisionController} 里同用类内
+     *       既有的 {@code failure(..)} 单源 helper，本门对「{@code failure(ApiResponse.error(..))}」
+     *       <b>逐出现点</b>计数故三条腿各计一枚（合流于计数）；但删掉任一条 catch 腿都会让对应的
+     *       {@link #OWNER_SIDE_CARRIERS} 片段缺失而变红（分立於取证）。即<b>计数可以合流、取证不得合流</b>。
+     *       29+99+13+35 = 176 = 总数，对账成立。
+     *       只重设被突破的 {@link #OWNER_HELPER_CEILING}；同批把密级腿在两个端的形态片段
+     *       （{@code DecisionController} 的真值入上下文＋catch 腿＋机读码理由句，
+     *       {@code RlsController} 的 {@code throw subjectClearanceSourceUnavailable(e)}＋helper 声明＋理由句）
+     *       挂进 {@link #OWNER_SIDE_CARRIERS}（摘腿即红，禁以「上限下调」冒充收口）。</li>
      * </ul>
      *
      * <p>裸回面 99 枚<b>本门有意不判其对错</b>（归 {@code D-B4-59} 族棘轮门管账），
@@ -154,7 +171,7 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      */
     private static final int STATUS_CARRIER_CEILING = 29;
     private static final int BARE_RETURN_CEILING = 99;
-    private static final int OWNER_HELPER_CEILING = 12;
+    private static final int OWNER_HELPER_CEILING = 13;
     private static final int ENVELOPE_ONLY_CEILING = 35;
 
     /** 本批属主侧承载见证锚（文件 → 必须出现的形态片段）。缺任一即红＝「删腿」不算修好。 */
@@ -188,14 +205,25 @@ class SuccessStatusFailureEnvelopeRatchetTest {
                     + "com/chinacreator/gzcm/engine/security/controller/DecisionController.java",
             List.of("catch (SubjectDepartmentResolutionService.SubjectSourceUnavailableException e) {",
                     "String orgId = subjectDepartmentResolver.resolvePrimaryOrgId(userId);",
-                    "RlsExecutionContract.SEC_UNAVAILABLE_CODE + \"：主体域真值源不可用（fail-closed）\""),
+                    "RlsExecutionContract.SEC_UNAVAILABLE_CODE + \"：主体域真值源不可用（fail-closed）\"",
+                    // #142/B4-3e-81（D-B4-23 密级腿）：真值取到即入上下文＋独立 503 腿。
+                    // 摘任一＝「接线被拆」或「不可用态被折回通用兜底」，两者都不算收口。
+                    "Integer clearanceLevel = subjectClearanceResolver.resolveClearanceLevel(userId, tenantId, orgId);",
+                    "catch (SubjectClearanceResolutionService.SubjectClearanceSourceUnavailableException e) {",
+                    "RlsExecutionContract.SEC_UNAVAILABLE_CODE + \"：主体密级真值源不可用（fail-closed）\""),
             // #142/B4-3e-80 同批：/rls/apply 是裸回端点（无状态行能力），不可用腿只能以
             // DataBridgeException 形式抛给宿主 handler；摘掉放行腿＝503 被兜底折回 500，此处钉死。
             "ecos_backend/engine/security-engine/security-engine-impl/src/main/java/"
                     + "com/chinacreator/gzcm/engine/security/controller/RlsController.java",
             List.of("catch (DataBridgeException e) {",
                     "throw subjectSourceUnavailable(e);",
-                    "RlsExecutionContract.SEC_UNAVAILABLE_CODE + \": 主体域真值源不可用"));
+                    "RlsExecutionContract.SEC_UNAVAILABLE_CODE + \": 主体域真值源不可用",
+                    // #142/B4-3e-81：密级腿第二条承载 helper＋对应抛型腿。有意不复用
+                    // subjectSourceUnavailable——两条腿共用一句理由，日志里就分不出断的是
+                    // 机构隶属还是密级档案链（D-B4-85／D-B4-90 分态同族）。
+                    "throw subjectClearanceSourceUnavailable(e);",
+                    "static DataBridgeException subjectClearanceSourceUnavailable(Throwable cause)",
+                    "RlsExecutionContract.SEC_UNAVAILABLE_CODE + \": 主体密级真值源不可用（含五档链断腿）"));
 
     // ── 判据 1：违例面 = 基线逐文件同数 ──────────────────────────────────────
 

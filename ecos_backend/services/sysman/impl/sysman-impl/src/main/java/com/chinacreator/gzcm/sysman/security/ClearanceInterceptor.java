@@ -9,7 +9,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -44,20 +43,35 @@ public class ClearanceInterceptor implements HandlerInterceptor {
     /** 可选注入 EventBusService（避免编译期硬依赖 runtime-event / Kafka；不可用时跳过审计）。 */
     private final org.springframework.beans.factory.ObjectProvider<Object> eventBusProvider;
 
+    /**
+     * 五档密级链的单源读面（#142/B4-3e-81，收口 D-B4-23 余项腿）。
+     * <p>本类原先自带一份私有级联实现，与 security 引擎消费的是同一批表；链只保留属主一份，
+     * 免得两套判据各自漂移（同族见台账 D-B4-92）。<b>准入语义仍由本类裁决</b>：读面只交付
+     * 三态事实，无档案时本类照旧兜底 L1（见 {@link #resolveUserClearanceLevel}）。
+     */
+    private final com.chinacreator.gzcm.sysman.security.clearance.service.ISubjectClearanceQueryService clearanceQueryService;
+
     /** ThreadLocal 保存当前请求，供辅助方法获取 orgId/tenantId */
     private final ThreadLocal<HttpServletRequest> currentRequest = new ThreadLocal<>();
 
     @Autowired
     public ClearanceInterceptor(com.chinacreator.gzcm.sysman.dao.ClearanceLookupDao clearanceLookupDao,
-                                org.springframework.beans.factory.ObjectProvider<Object> eventBusProvider) {
+                                org.springframework.beans.factory.ObjectProvider<Object> eventBusProvider,
+                                com.chinacreator.gzcm.sysman.security.clearance.service.ISubjectClearanceQueryService clearanceQueryService) {
         this.clearanceLookupDao = clearanceLookupDao;
         this.eventBusProvider = eventBusProvider;
+        this.clearanceQueryService = clearanceQueryService;
     }
 
-    /** 兼容构造器（无事件总线）：超管旁路审计仅落日志。保留供既有单测与非注入装配使用。 */
-    public ClearanceInterceptor(com.chinacreator.gzcm.sysman.dao.ClearanceLookupDao clearanceLookupDao) {
+    /**
+     * 兼容构造器（无事件总线）：超管旁路审计仅落日志。保留供既有单测与非注入装配使用。
+     * <p>密级链不可缺省——它是本类唯一的判据来源，缺失即装配失败（禁再造一份内联级联）。
+     */
+    public ClearanceInterceptor(com.chinacreator.gzcm.sysman.dao.ClearanceLookupDao clearanceLookupDao,
+                                com.chinacreator.gzcm.sysman.security.clearance.service.ISubjectClearanceQueryService clearanceQueryService) {
         this.clearanceLookupDao = clearanceLookupDao;
         this.eventBusProvider = null;
+        this.clearanceQueryService = clearanceQueryService;
     }
 
     @Override
@@ -173,53 +187,32 @@ public class ClearanceInterceptor implements HandlerInterceptor {
         return 0; // L0 公开
     }
 
-    // ── 解析用户准入等级（级联查询）────────────────────
-    // 级联顺序: USER > ROLE > ORG > TENANT > GLOBAL
+    // ── 解析用户准入等级（级联取属主单源，兜底留在准入面）───
+    // 级联顺序: USER > ROLE > ORG > TENANT > GLOBAL（判据单源见 ISubjectClearanceQueryService）
 
     private int resolveUserClearanceLevel(String userId, HttpServletRequest request) {
         String tenantId = getCurrentTenantId();
         String orgId = getCurrentOrgId(userId);
 
-        // 1. 查用户级配置
-        Integer userLevel = queryClearanceLevel("td_user_security_profile", "user_id", userId, tenantId);
-        if (userLevel != null) {
-            log.debug("用户级安全配置命中: userId={}, level={}", userId, userLevel);
-            return userLevel;
-        }
-
-        // 2. 查角色级配置（取用户拥有角色中 clearance_level 最高的）
-        Integer roleLevel = queryHighestRoleClearanceLevel(userId, tenantId);
-        if (roleLevel != null) {
-            log.debug("角色级安全配置命中: userId={}, level={}", userId, roleLevel);
-            return roleLevel;
-        }
-
-        // 2.5 查机构级配置 (organization level)
-        if (orgId != null) {
-            Integer orgLevel = queryClearanceLevelByOrg(orgId, tenantId);
-            if (orgLevel != null) {
-                log.debug("机构级安全配置命中: userId={}, orgId={}, level={}", userId, orgId, orgLevel);
-                return orgLevel;
+        com.chinacreator.gzcm.sysman.security.clearance.model.SubjectClearanceFact fact =
+                clearanceQueryService.resolveSubjectClearance(userId, tenantId, orgId);
+        if (fact.isResolved()) {
+            if (fact.isDegraded()) {
+                // 高优先档断了而低优先档读到值：准入面沿用既有「取到即用」，但把断腿如实留痕，
+                // 不再像原实现那样静默下探（策略面 security 引擎对同一形态转不可用态，两侧各按语义处置）
+                log.warn("准入等级取自降级链: userId={}, tier={}, level={}, degradedTiers={}",
+                        userId, fact.tier(), fact.level(), fact.degradedTiers());
+            } else {
+                log.debug("准入等级命中: userId={}, tier={}, level={}", userId, fact.tier(), fact.level());
             }
+            return fact.level();
         }
 
-        // 2.8 查租户级配置
-        if (tenantId != null) {
-            Integer tenantLevel = queryClearanceLevelByTenant(tenantId);
-            if (tenantLevel != null) {
-                log.debug("租户级安全配置命中: userId={}, tenantId={}, level={}", userId, tenantId, tenantLevel);
-                return tenantLevel;
-            }
-        }
-
-        // 3. 回退到全局默认配置
-        Integer globalLevel = queryGlobalDefaultClearanceLevel(tenantId);
-        if (globalLevel != null) {
-            log.debug("全局默认安全配置命中: userId={}, level={}", userId, globalLevel);
-            return globalLevel;
-        }
-
-        // 4. 硬编码默认值 L1
+        // 无档案兜底 L1：这是准入语义裁决（收紧方向的历史既定值），不是事实缺失时的真值宣称。
+        // 属主单源刻意不内置它——策略面禁兜底（见 RlsSubjectContext 的 clearanceLevel 口径）。
+        // 改它会改变现网准入判定结果，属裁决事项，台账在册待裁。
+        log.debug("五档密级链未解析（degradedTiers={}），准入面按既有语义兜底 L1: userId={}",
+                fact.degradedTiers(), userId);
         return 1;
     }
 
@@ -287,74 +280,6 @@ public class ClearanceInterceptor implements HandlerInterceptor {
         } catch (Exception e) {
             log.warn("[audit] 超管旁路审计发布失败（不阻断旁路）: operator={}, path={}, {}",
                     operator, path, e.getMessage());
-        }
-    }
-
-    // ── 查询方法（带租户过滤）───────────────────────────
-
-    private Integer queryClearanceLevel(String tableName, String idColumn, String idValue, String tenantId) {
-        try {
-            List<Map<String, Object>> rows = clearanceLookupDao.queryClearanceRows(tableName, idColumn, idValue, tenantId);
-            if (!rows.isEmpty()) {
-                Object val = rows.get(0).get("clearance_level");
-                if (val instanceof Number n) {
-                    return n.intValue();
-                }
-            }
-        } catch (Exception e) {
-            log.warn("查询{}安全配置失败，级联继续下一档", tableName, e);
-        }
-        return null;
-    }
-
-    private Integer queryHighestRoleClearanceLevel(String userId, String tenantId) {
-        try {
-            Integer val = clearanceLookupDao.highestRoleClearanceLevel(userId, tenantId);
-            return (val != null && val >= 0) ? val : null;
-        } catch (Exception e) {
-            log.warn("查询用户角色安全配置失败，级联继续下一档: userId={}", userId, e);
-            return null;
-        }
-    }
-
-    private Integer queryGlobalDefaultClearanceLevel(String tenantId) {
-        try {
-            Integer val = clearanceLookupDao.globalDefaultClearanceLevel(tenantId);
-            return val;
-        } catch (EmptyResultDataAccessException e) {
-            log.debug("未查到全局默认安全配置行: tenantId={}", tenantId);
-            return null;
-        } catch (Exception e) {
-            log.warn("查询全局默认安全配置失败，落到兜底等级", e);
-            return null;
-        }
-    }
-
-    // ── 机构/租户级查询 ──────────────────────────────
-
-    private Integer queryClearanceLevelByOrg(String orgId, String tenantId) {
-        try {
-            Integer val = clearanceLookupDao.orgClearanceLevel(orgId, tenantId);
-            return val;
-        } catch (EmptyResultDataAccessException e) {
-            log.debug("未查到机构级安全配置行: orgId={}", orgId);
-            return null;
-        } catch (Exception e) {
-            log.warn("查询机构级安全配置失败，级联继续下一档: orgId={}", orgId, e);
-            return null;
-        }
-    }
-
-    private Integer queryClearanceLevelByTenant(String tenantId) {
-        try {
-            Integer val = clearanceLookupDao.tenantClearanceLevel(tenantId);
-            return val;
-        } catch (EmptyResultDataAccessException e) {
-            log.debug("未查到租户级安全配置行: tenantId={}", tenantId);
-            return null;
-        } catch (Exception e) {
-            log.warn("查询租户级安全配置失败，级联继续下一档: tenantId={}", tenantId, e);
-            return null;
         }
     }
 

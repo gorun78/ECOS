@@ -50,7 +50,9 @@ class ClearanceInterceptorTest {
     }
 
     private boolean preHandle(ClearanceLookupDao dao, String path) throws Exception {
-        ClearanceInterceptor interceptor = new ClearanceInterceptor(dao);
+        // 五档密级链已抽为属主单源（#142/B4-3e-81）：拦截器只保留准入兜底，判据取自同一份实现
+        ClearanceInterceptor interceptor = new ClearanceInterceptor(dao,
+                new com.chinacreator.gzcm.sysman.security.clearance.service.impl.SubjectClearanceQueryServiceImpl(dao));
         MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
         request.setRequestURI(path);
         MockHttpServletResponse response = new MockHttpServletResponse();

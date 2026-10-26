@@ -88,8 +88,9 @@ class MultiConstructorWiringFaceRatchetTest {
      * 值＝该文件内被本门判据认定的<b>构造器声明格数</b>（顶格数，不论腿是否已标注，便于钉迁移）。
      * 沿革：#142/B4-3e-79（D-B4-36 收口）+{@code DeclaredScopeResolutionService}=2 ⇒ <b>19/39</b>；
      * #142/B4-3e-80（D-B4-23 主体域腿收口）+{@code SubjectDepartmentResolutionService}=2 ⇒
-     * <b>20 文件 / 41 处</b>（现值，两枚均为「生产腿钉 {@code @Autowired}＋测试缝腿」的良性档，
-     * 入表是为钉名防迁，不是豁免）。
+     * 20 文件／41 处；#142/B4-3e-81（D-B4-23 主体域密级腿收口）
+     * +{@code SubjectClearanceResolutionService}=2 ⇒ <b>21 文件 / 43 处</b>（现值，三枚均为
+     * 「生产腿钉 {@code @Autowired}＋测试缝腿」的良性档，入表是为钉名防迁，不是豁免）。
      * 初版 5/8 手工基线凭逐枚备忘录推算，实跑判据因内部类构造器误计+非法正则歇工到本批修完，
      * 现基线＝判据自证后实跑读数，双向锁；逐枚盯面分型如下：</p>
      *
@@ -117,7 +118,12 @@ class MultiConstructorWiringFaceRatchetTest {
      *       {@code SubjectDepartmentResolutionService}（#142/B4-3e-80 新增：公共 1 参
      *       {@code @Autowired} 生产腿＝{@code Optional<IOrganizationService>} 装配面，
      *       包私有 1 参 {@code IOrganizationService} 腿仅供测试直给属主门面；两腿同形不同源，
-     *       无公共无参候选 ⇒ 生产腿必须钉住 {@code @Autowired}，摘除即本门变红）。</li>
+     *       无公共无参候选 ⇒ 生产腿必须钉住 {@code @Autowired}，摘除即本门变红）、
+     *       {@code SubjectClearanceResolutionService}（#142/B4-3e-81 新增：与上一枚同形——公共 1 参
+     *       {@code @Autowired} 生产腿＝{@code Optional<ISubjectClearanceQueryService>}，包私有
+     *       1 参腿仅供测试直给属主门面（可为 {@code null}＝取证「未装配形态」）。同因钉名：
+     *       摘掉生产腿的 {@code @Autowired} 即两腿无标注＋无公共无参候选＝三宿主 context 起不来，
+     *       而密级真值源失效在运行期只会表现为「整链不可用」，比装配失败更难取证）。</li>
      * </ul>
      * <p>双向：新增文件＝同期 regressed D-B4-97/97b（context 起不来或静默丢配置）直红；
      * 收口批须同步下调此表并在台账留痕。</p>
@@ -145,6 +151,8 @@ class MultiConstructorWiringFaceRatchetTest {
                     + "com/chinacreator/gzcm/engine/ontology/service/PublishGateService.java", 2),
             Map.entry("ecos_backend/engine/security-engine/security-engine-impl/src/main/java/"
                     + "com/chinacreator/gzcm/engine/security/decision/DeclaredScopeResolutionService.java", 2),
+            Map.entry("ecos_backend/engine/security-engine/security-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/security/decision/SubjectClearanceResolutionService.java", 2),
             Map.entry("ecos_backend/engine/security-engine/security-engine-impl/src/main/java/"
                     + "com/chinacreator/gzcm/engine/security/decision/SubjectDepartmentResolutionService.java", 2),
             Map.entry("ecos_backend/runtime/llm-gateway/src/main/java/"

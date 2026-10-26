@@ -16,9 +16,13 @@ package com.chinacreator.gzcm.engine.security.rls;
  *       {@code TD_USER_ORGANIZATION.is_primary}，经其 api 门面只读取全部关联行，由
  *       {@code decision.SubjectDepartmentResolutionService} 裁决「恰好一枚主机构」才写值；
  *       0 枚或多枚互异一律落 {@code null}（禁取其一）。本字段仍不得由请求体自报；</li>
- *   <li>{@code clearanceLevel} —— <b>仍无单源</b>（D-B4-23 本批未收口的另一半）：详设-01 假设的
- *       {@code TD_USER.ORG_ID} 在 dev 库 {@code ecos_control.td_user} 的 17 列里不存在，
- *       仓内也没有 {@code td_org} 表，五档密级链目前私有在 {@code ClearanceInterceptor}。
+ *   <li>{@code clearanceLevel} —— <b>#142/B4-3e-81 起有单源</b>：五档优先链
+ *       （USER &gt; ROLE &gt; ORG &gt; TENANT &gt; GLOBAL）原私有在 sysman 的
+ *       {@code ClearanceInterceptor}，现抽为属主 api 门面
+ *       {@code sysman.security.clearance.service.ISubjectClearanceQueryService}，经
+ *       {@code decision.SubjectClearanceResolutionService} 交付真值。
+ *       <b>策略面不兜底</b>：五档查尽无档案行＝未解析（{@code null}），禁照抄准入拦截器末端
+ *       的「无档案冒充 L1」；链上任一档取数抛错＝不可用（调用方转 503），禁折成未解析。
  *       取不到即为 {@code null}，渲染器按"未解析"处理并
  *       <b>拒绝</b>（禁把 {@code col = NULL} 当谓词下发，那等于把所有行都过滤掉之外的
  *       一切误解 —— 且掩盖了"上下文解析没接"这一缺陷）。</li>

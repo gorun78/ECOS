@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.security.dao.RowLevelSecurityDao;
+import com.chinacreator.gzcm.engine.security.decision.SubjectClearanceResolutionService;
 import com.chinacreator.gzcm.engine.security.decision.SubjectDepartmentResolutionService;
 import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +41,10 @@ class RlsControllerTest {
         // RlsControllerSubjectDepartmentWiringTest 具名覆盖，不在此处重复）。
         SubjectDepartmentResolutionService subjectResolver = mock(SubjectDepartmentResolutionService.class);
         when(subjectResolver.resolvePrimaryOrgId(anyString())).thenReturn("ORG-TEST-1");
-        this.controller = new RlsController(rlsService, subjectResolver);
+        // 主体密级真值：本组用例只验 snippet 透传，替身返回 null＝如实未解析（策略面禁兜底成
+        // 任何档位）。密级腿三态判据由 RlsControllerSubjectClearanceWiringTest 具名覆盖。
+        this.controller = new RlsController(rlsService, subjectResolver,
+                mock(SubjectClearanceResolutionService.class));
     }
 
     @Test

@@ -12,8 +12,10 @@ import java.util.List;
  * <ul>
  *   <li>{@code userId / tenantId / roles / traceId} — 分册 00 信任链（{@code ServiceContext.current()}）；
  *       W40 之后 orgId 只服务端解析（TD_USER.ORG_ID），客户端 X-Org-Id 被剥离，无法影响。</li>
- *   <li>{@code orgId / clearanceLevel} — 服务端派生；本页 M0 用 nullable 表示"尚未解析"，
- *       调用方不得把它当作可信输入。W40 关闭后由 org/clearance 服务端解析器填。</li>
+ *   <li>{@code orgId / clearanceLevel} — 服务端派生，两条腿各有属主单源：{@code orgId} 由
+ *       #142/B4-3e-80 的唯一主机构裁决填（真值源不可用＝503 承载，禁折成"没机构"），
+ *       {@code clearanceLevel} 由 #142/B4-3e-81 的属主五档密级链填（{@code null}＝<b>如实未解析</b>，
+ *       即五档都无档案行；禁照抄准入拦截器的"无档案兜底 L1"）。调用方不得把它当作可信输入。</li>
  *   <li>{@code dataScope}（#142/B4-3d-2 之后只增，D-B4-20）— <b>调用方声明</b>的请求数据域
  *       （AI 通道的 {@code projectIds} / {@code departmentId}）。它<b>不是</b>主体属性：
  *       横向越权判据是"声明域 vs 服务端派生的 {@code orgId}"，谎报只会落 DENY，不会落放行。

@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.security.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
+import com.chinacreator.gzcm.engine.security.decision.SubjectClearanceResolutionService;
 import com.chinacreator.gzcm.engine.security.decision.SubjectDepartmentResolutionService;
 import com.chinacreator.gzcm.engine.security.rls.RlsSubjectContext;
 import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl;
@@ -61,8 +62,12 @@ class RlsControllerSubjectDepartmentWiringTest {
         when(rlsService.apply(anyString(), any(RlsSubjectContext.class))).thenReturn(new LinkedHashMap<>());
         SubjectDepartmentResolutionService resolver = mock(SubjectDepartmentResolutionService.class);
         when(resolver.resolvePrimaryOrgId(anyString())).thenReturn("ORG-REAL");
+        // 密级腿（#142/B4-3e-81）在本用例只验「真值进得了上下文」；三态判据由
+        // RlsControllerSubjectClearanceWiringTest 具名覆盖，不在此处重复。
+        SubjectClearanceResolutionService clearanceResolver = mock(SubjectClearanceResolutionService.class);
+        when(clearanceResolver.resolveClearanceLevel(anyString(), any(), any())).thenReturn(3);
 
-        ApiResponse<Map<String, Object>> resp = new RlsController(rlsService, resolver)
+        ApiResponse<Map<String, Object>> resp = new RlsController(rlsService, resolver, clearanceResolver)
                 .apply(body("u-9", Map.of("orgId", "ORG-FORGED", "department", "ORG-FORGED-2")));
 
         assertEquals(ApiResponse.CODE_SUCCESS, resp.getCode(), String.valueOf(resp));
@@ -71,8 +76,11 @@ class RlsControllerSubjectDepartmentWiringTest {
         RlsSubjectContext ctx = captor.getValue();
         assertEquals("ORG-REAL", ctx.orgId(), "主体域真值必须进 RLS 上下文，否则 CONTEXT_ORG 谓词恒拒");
         assertEquals("u-9", ctx.userId());
-        assertNull(ctx.clearanceLevel(), "密级腿本批未接（台账余项），禁顺手伪造一个档位");
+        assertEquals(Integer.valueOf(3), ctx.clearanceLevel(),
+                "主体密级真值必须进 RLS 上下文，否则 CONTEXT_CLEARANCE_LEVEL 谓词恒按未解析拒绝");
         verify(resolver).resolvePrimaryOrgId("u-9");
+        // 机构腿先解析、密级腿随后取同一份机构真值：属主级联的 ORG 档只有拿到真值机构才可达。
+        verify(clearanceResolver).resolveClearanceLevel(eq("u-9"), any(), eq("ORG-REAL"));
     }
 
     @Test
@@ -83,8 +91,8 @@ class RlsControllerSubjectDepartmentWiringTest {
         SubjectDepartmentResolutionService resolver = mock(SubjectDepartmentResolutionService.class);
         when(resolver.resolvePrimaryOrgId(anyString())).thenReturn(null);
 
-        ApiResponse<Map<String, Object>> resp = new RlsController(rlsService, resolver)
-                .apply(body("u-9", null));
+        ApiResponse<Map<String, Object>> resp = new RlsController(rlsService, resolver,
+                mock(SubjectClearanceResolutionService.class)).apply(body("u-9", null));
 
         assertEquals(ApiResponse.CODE_SUCCESS, resp.getCode(), String.valueOf(resp));
         ArgumentCaptor<RlsSubjectContext> captor = ArgumentCaptor.forClass(RlsSubjectContext.class);
@@ -102,7 +110,8 @@ class RlsControllerSubjectDepartmentWiringTest {
                         SubjectDepartmentResolutionService.REASON_SOURCE_UNAVAILABLE + ": IOrganizationService 未装配"));
 
         DataBridgeException carried = assertThrows(DataBridgeException.class,
-                () -> new RlsController(rlsService, resolver).apply(body("u-9", null)));
+                () -> new RlsController(rlsService, resolver,
+                        mock(SubjectClearanceResolutionService.class)).apply(body("u-9", null)));
 
         assertEquals(RlsExecutionContract.SEC_UNAVAILABLE_HTTP, carried.getHttpStatus(),
                 "裸回端点的不可用态只能靠抛型写上状态行（D-B4-59 族）");
@@ -120,11 +129,13 @@ class RlsControllerSubjectDepartmentWiringTest {
     void validationPrecedesTheFetch() {
         RowLevelSecurityServiceImpl rlsService = mock(RowLevelSecurityServiceImpl.class);
         SubjectDepartmentResolutionService resolver = mock(SubjectDepartmentResolutionService.class);
-        RlsController controller = new RlsController(rlsService, resolver);
+        SubjectClearanceResolutionService clearanceResolver = mock(SubjectClearanceResolutionService.class);
+        RlsController controller = new RlsController(rlsService, resolver, clearanceResolver);
 
         assertEquals(ApiResponse.CODE_BAD_REQUEST, controller.apply(body("  ", null)).getCode());
         assertEquals(ApiResponse.CODE_BAD_REQUEST, controller.apply(Map.of("userId", "u-9")).getCode());
         verify(resolver, never()).resolvePrimaryOrgId(anyString());
+        verify(clearanceResolver, never()).resolveClearanceLevel(anyString(), any(), any());
         verify(rlsService, never()).apply(anyString(), any(RlsSubjectContext.class));
     }
 }
