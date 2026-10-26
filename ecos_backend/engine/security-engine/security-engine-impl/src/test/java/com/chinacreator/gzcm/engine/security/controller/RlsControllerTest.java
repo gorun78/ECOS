@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.security.dao.RowLevelSecurityDao;
+import com.chinacreator.gzcm.engine.security.decision.SubjectDepartmentResolutionService;
 import com.chinacreator.gzcm.engine.security.service.RowLevelSecurityServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,7 +36,11 @@ class RlsControllerTest {
         when(dao.findPoliciesForUser(anyString(), anyString()))
                 .thenThrow(new RuntimeException("DB not available in unit test"));
         RowLevelSecurityServiceImpl rlsService = new RowLevelSecurityServiceImpl(dao);
-        this.controller = new RlsController(rlsService);
+        // 主体域真值：本组用例只验 snippet 透传，给一个固定 org 即可（判据腿由
+        // RlsControllerSubjectDepartmentWiringTest 具名覆盖，不在此处重复）。
+        SubjectDepartmentResolutionService subjectResolver = mock(SubjectDepartmentResolutionService.class);
+        when(subjectResolver.resolvePrimaryOrgId(anyString())).thenReturn("ORG-TEST-1");
+        this.controller = new RlsController(rlsService, subjectResolver);
     }
 
     @Test

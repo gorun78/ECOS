@@ -38,6 +38,10 @@ import static org.mockito.Mockito.when;
  *       （{@code ECOS-SEC-501} = {@code RlsExecutionContract.SEC_UNAVAILABLE_CODE} 单源读数），
  *       <b>禁</b>折成 403「越权」或 200「裁决通过」。</li>
  * </ol>
+ *
+ * <p>构造参数里的 {@code SubjectDepartmentResolutionService} 一律 mock（mock 默认返回
+ * {@code null}＝如实未解析），使本门只看声明域一条腿；主体域腿的接线判据另见
+ * {@code DecisionControllerSubjectDepartmentWiringTest}（#142/B4-3e-80，D-B4-23）。</p>
  */
 @Timeout(60)
 class DecisionControllerDeclaredScopeWiringTest {
@@ -85,7 +89,7 @@ class DecisionControllerDeclaredScopeWiringTest {
                 return new DataScopeContract.Declared("D-REAL", declared.projectIds());
             }
         };
-        DecisionController controller = new DecisionController(service, resolver);
+        DecisionController controller = new DecisionController(service, resolver, mock(SubjectDepartmentResolutionService.class));
 
         ResponseEntity<ApiResponse<Map<String, Object>>> resp =
                 controller.decide(body(DecisionChannelContract.PURPOSE_AI, "D-FAKE", List.of("P1")));
@@ -112,7 +116,7 @@ class DecisionControllerDeclaredScopeWiringTest {
                 throw new AssertionError("非 AI 通道不得触发真值解析");
             }
         };
-        DecisionController controller = new DecisionController(service, resolver);
+        DecisionController controller = new DecisionController(service, resolver, mock(SubjectDepartmentResolutionService.class));
 
         for (String purpose : List.of(DecisionChannelContract.PURPOSE_PAGE,
                 DecisionChannelContract.PURPOSE_EXPORT)) {
@@ -146,7 +150,7 @@ class DecisionControllerDeclaredScopeWiringTest {
                         : new DataScopeContract.Declared("D-REAL", declared.projectIds());
             }
         };
-        DecisionController controller = new DecisionController(service, resolver);
+        DecisionController controller = new DecisionController(service, resolver, mock(SubjectDepartmentResolutionService.class));
 
         assertEquals(ApiResponse.CODE_SUCCESS,
                 controller.decide(body(DecisionChannelContract.PURPOSE_AI, null, null))
@@ -171,7 +175,7 @@ class DecisionControllerDeclaredScopeWiringTest {
                         DeclaredScopeResolutionService.REASON_SOURCE_UNAVAILABLE + ": 桩不可达");
             }
         };
-        DecisionController controller = new DecisionController(service, resolver);
+        DecisionController controller = new DecisionController(service, resolver, mock(SubjectDepartmentResolutionService.class));
 
         ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller.decide(
                 body(DecisionChannelContract.PURPOSE_AI, null, List.of("P1")));
@@ -198,7 +202,7 @@ class DecisionControllerDeclaredScopeWiringTest {
                 throw new IllegalStateException("未预期故障（非声明的不可用态）");
             }
         };
-        DecisionController controller = new DecisionController(service, resolver);
+        DecisionController controller = new DecisionController(service, resolver, mock(SubjectDepartmentResolutionService.class));
 
         ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller.decide(
                 body(DecisionChannelContract.PURPOSE_AI, null, List.of("P1")));

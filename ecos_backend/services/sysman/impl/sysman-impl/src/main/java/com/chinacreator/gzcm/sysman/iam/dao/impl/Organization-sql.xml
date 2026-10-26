@@ -87,6 +87,19 @@
         ORDER BY uo.is_primary DESC, o.created_time ASC
     </select>
 
+    <!-- #142/B4-3e-80 只增（D-B4-23 主体域真值的属主侧读回）。
+         与上一条的分工在判据面：上一条把 is_primary 只用作 ORDER BY、投影里没有它，
+         消费方因此分不出「0 枚主机构」与「2 枚主机构」，只能取其一。
+         本条不排序、不 LIMIT、不按 is_primary 过滤，把关联行的多重性原样交给调用方判定。
+         INNER JOIN td_organization 只停写不读已删机构：主机构指向 DELETED 机构时如实读不到
+         ⇒ 消费侧落「未解析」，而不是拿一个已注销机构号去比对行范围。 -->
+    <select id="getUserOrganizationAffiliations">
+        SELECT uo.user_id, uo.org_id, uo.is_primary, uo.created_time, uo.created_by
+        FROM TD_USER_ORGANIZATION uo
+        INNER JOIN TD_ORGANIZATION o ON o.org_id = uo.org_id
+        WHERE uo.user_id = ? AND o.status != 'DELETED'
+    </select>
+
     <update id="setPrimaryOrg">
         UPDATE TD_USER_ORGANIZATION SET
             is_primary = CASE WHEN org_id = ? THEN '1' ELSE '0' END

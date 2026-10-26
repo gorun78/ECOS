@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.chinacreator.gzcm.sysman.iam.entity.Organization;
 import com.chinacreator.gzcm.sysman.iam.entity.OrgPermission;
+import com.chinacreator.gzcm.sysman.iam.entity.UserOrganization;
 
 /**
  * 机构服务接口
@@ -117,6 +118,20 @@ public interface IOrganizationService {
      * @throws OrganizationException
      */
     List<Organization> getUserOrganizations(String userId) throws OrganizationException;
+    
+    /**
+     * 查询用户机构关联行（#142/B4-3e-80 只增，D-B4-23 主体域服务端真值的属主侧单源）。
+     * <p>存在理由：{@link #getUserOrganizations(String)} 把 {@code is_primary} 只用作
+     * ORDER BY、投影里没有它 ⇒ 任何消费方都无法区分「没有主机构」与「有多个主机构」，
+     * 只能取第一条（{@code PIPImpl} 的 {@code orgs.get(0)} 正是这个形态）。
+     * 裁决主体域（{@code subject.department}）必须有这条区分：主机构不唯一就是事实不完备，
+     * 如实按未解析处置，禁折成其中之一。本方法只交付事实，判定留给属主之外的裁决侧。</p>
+     * 
+     * @param userId 用户ID
+     * @return 关联行列表（含 {@code isPrimary}；机构已注销的行不返回）
+     * @throws OrganizationException 取数失败（调用方须按不可用态处置，禁当「没有机构」）
+     */
+    List<UserOrganization> getUserOrganizationAffiliations(String userId) throws OrganizationException;
     
     /**
      * 设置用户主机构

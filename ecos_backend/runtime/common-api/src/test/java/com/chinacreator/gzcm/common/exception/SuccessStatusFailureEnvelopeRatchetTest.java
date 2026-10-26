@@ -133,9 +133,20 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      *       （未漂移）／裸回 <b>99</b>（未漂移）／属主 helper <b>11</b>／纯信封 <b>35</b>（未漂移）。
      *       唯一漂移源＝{@code DecisionController#decide} 为「声明域真值源不可用」新增的一条
      *       {@code catch (ScopeSourceUnavailableException) → failure(ApiResponse.error(503, …))}
-     *       腿——它必须由 helper 推导状态行（禁在本类里写 503 字面量，也禁折成 403/裸回），
+     *       腿——它必须由 helper 推导状态行（禁在本类里写 503 字面量，禁折成 403/裸回），
      *       故记属主 helper ＋1；29+99+11+35 = 174 = 总数，对账成立。
      *       只重设被突破的 {@link #OWNER_HELPER_CEILING}，其余三面按实测保持。</li>
+     *   <li>#142/B4-3e-80 重设（D-B4-23 主体域腿收口批，common-api 全模块<b>红跑</b>实测，
+     *       {@code _win_tasks/logs/3e80-commonapi.log}）＝总数 <b>175</b>／折叠 0／状态行承载 <b>29</b>
+     *       （未漂移）／裸回 <b>99</b>（未漂移）／属主 helper <b>12</b>／纯信封 <b>35</b>（未漂移）。
+     *       唯一漂移源＝{@code DecisionController#decide} 为「主体域真值源不可用」新增的第二条
+     *       {@code catch (SubjectSourceUnavailableException) → failure(ApiResponse.error(503, …))} 腿。
+     *       该腿<b>有意不与 #3e-79 的声明域腿合并成 multi-catch</b>：两条腿的机读理由必须能分开取证
+     *       （「声明域真值源不可用」＝data-engine 侧断，「主体域真值源不可用」＝sysman 属主侧断），
+     *       合并即要在消息里做 instanceof 派生——那是把可审计性换成一个计数，不成立。
+     *       29+99+12+35 = 175 = 总数，对账成立。
+     *       只重设被突破的 {@link #OWNER_HELPER_CEILING}，其余三面按实测保持；同批把两条腿的形态
+     *       片段挂进 {@link #OWNER_SIDE_CARRIERS}（删腿即红，禁以「上限下调」冒充收口）。</li>
      * </ul>
      *
      * <p>裸回面 99 枚<b>本门有意不判其对错</b>（归 {@code D-B4-59} 族棘轮门管账），
@@ -143,7 +154,7 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      */
     private static final int STATUS_CARRIER_CEILING = 29;
     private static final int BARE_RETURN_CEILING = 99;
-    private static final int OWNER_HELPER_CEILING = 11;
+    private static final int OWNER_HELPER_CEILING = 12;
     private static final int ENVELOPE_ONLY_CEILING = 35;
 
     /** 本批属主侧承载见证锚（文件 → 必须出现的形态片段）。缺任一即红＝「删腿」不算修好。 */
@@ -170,7 +181,21 @@ class SuccessStatusFailureEnvelopeRatchetTest {
             List.of("@PostMapping(\"/preview-schema\")",
                     "previewSchema(@RequestBody DataSourceDTO dto)",
                     "return ResponseEntity.status(status).body(ApiResponse.error(status,",
-                    "return failure(ApiResponse.error(400, e.getMessage()));"));
+                    "return failure(ApiResponse.error(400, e.getMessage()));"),
+            // #142/B4-3e-80（D-B4-23 主体域腿）：/decision 主体域不可用腿与 /rls/apply 的
+            // 「抛承载＋放行腿」两条腿。缺任一即红＝不可用态被摘回折叠形态不算收口。
+            "ecos_backend/engine/security-engine/security-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/security/controller/DecisionController.java",
+            List.of("catch (SubjectDepartmentResolutionService.SubjectSourceUnavailableException e) {",
+                    "String orgId = subjectDepartmentResolver.resolvePrimaryOrgId(userId);",
+                    "RlsExecutionContract.SEC_UNAVAILABLE_CODE + \"：主体域真值源不可用（fail-closed）\""),
+            // #142/B4-3e-80 同批：/rls/apply 是裸回端点（无状态行能力），不可用腿只能以
+            // DataBridgeException 形式抛给宿主 handler；摘掉放行腿＝503 被兜底折回 500，此处钉死。
+            "ecos_backend/engine/security-engine/security-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/security/controller/RlsController.java",
+            List.of("catch (DataBridgeException e) {",
+                    "throw subjectSourceUnavailable(e);",
+                    "RlsExecutionContract.SEC_UNAVAILABLE_CODE + \": 主体域真值源不可用"));
 
     // ── 判据 1：违例面 = 基线逐文件同数 ──────────────────────────────────────
 

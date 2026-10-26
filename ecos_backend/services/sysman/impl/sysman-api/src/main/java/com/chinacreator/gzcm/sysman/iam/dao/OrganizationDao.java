@@ -101,6 +101,18 @@ public interface OrganizationDao {
     List<Organization> getUserOrganizations(String userId) throws Exception;
     
     /**
+     * 查询用户机构关联行（#142/B4-3e-80 只增，D-B4-23 主体域真值的属主侧读回）。
+     * <p>与 {@link #getUserOrganizations(String)} 的分工：那条按 {@code is_primary DESC}
+     * 排序但不投影该列，消费方分不出「0 枚主机构」与「2 枚主机构」，只能取其一。
+     * 本条原样读出关联行（含 {@code isPrimary}），不排序、不 LIMIT，把多重性如实交给调用方判定。
+     * 
+     * @param userId 用户ID
+     * @return 关联行列表（含机构已注销的行不返回）
+     * @throws Exception
+     */
+    List<UserOrganization> getUserOrganizationAffiliations(String userId) throws Exception;
+    
+    /**
      * 设置用户主机构
      * 
      * @param userId 用户ID

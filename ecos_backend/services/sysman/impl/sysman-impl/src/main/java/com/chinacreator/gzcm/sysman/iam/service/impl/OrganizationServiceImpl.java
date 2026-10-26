@@ -311,6 +311,22 @@ public class OrganizationServiceImpl implements IOrganizationService {
             throw new OrganizationException("QUERY_FAILED", "查询用户机构失败: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * #142/B4-3e-80 只增（D-B4-23 主体域服务端真值的属主侧单源）。
+     * 异常一律上抛为 {@code OrganizationException}：属主查不到＝事实不可用，
+     * <b>禁</b>在此吞成空列表——空列表会被裁决侧读成「该用户没有主机构」，
+     * 而真相是「取数失败」（§4.7.2「不可用 ≠ 无权限 ≠ 空结果」三态）。
+     */
+    @Override
+    public List<UserOrganization> getUserOrganizationAffiliations(String userId)
+            throws OrganizationException {
+        try {
+            return organizationDao.getUserOrganizationAffiliations(userId);
+        } catch (Exception e) {
+            throw new OrganizationException("QUERY_FAILED", "查询用户机构关联行失败: " + e.getMessage(), e);
+        }
+    }
     
     @Override
     public void setPrimaryOrg(String userId, String orgId) throws OrganizationException {

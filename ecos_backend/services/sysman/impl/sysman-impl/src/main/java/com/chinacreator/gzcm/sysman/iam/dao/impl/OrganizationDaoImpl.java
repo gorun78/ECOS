@@ -137,6 +137,20 @@ public class OrganizationDaoImpl implements OrganizationDao {
             throw new Exception("查询用户机构列表失败: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * #142/B4-3e-80 只增（D-B4-23 属主侧读回）：原样交付关联行，含 {@code is_primary}。
+     * 不吞空结果、不在 DAO 里筛主机构——多重性判定属裁决侧，DAO 折叠任何一种都会丢信息。
+     */
+    @Override
+    public List<UserOrganization> getUserOrganizationAffiliations(String userId) throws Exception {
+        try {
+            return databaseAccess.queryListFromConfig(SQL_CONFIG_PATH,
+                    "getUserOrganizationAffiliations", UserOrganization.class, userId);
+        } catch (ISystemDatabaseAccess.DatabaseAccessException e) {
+            throw new Exception("查询用户机构关联行失败: " + e.getMessage(), e);
+        }
+    }
     
     @Override
     public void setPrimaryOrg(String userId, String orgId) throws Exception {

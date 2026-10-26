@@ -10,6 +10,7 @@ import com.chinacreator.gzcm.engine.security.decision.DeclaredScopeResolutionSer
 import com.chinacreator.gzcm.engine.security.decision.DecisionBundle;
 import com.chinacreator.gzcm.engine.security.decision.DecisionContext;
 import com.chinacreator.gzcm.engine.security.decision.SecurityDecisionService;
+import com.chinacreator.gzcm.engine.security.decision.SubjectDepartmentResolutionService;
 import com.chinacreator.gzcm.engine.security.service.ColumnLevelSecurityServiceImpl;
 import com.chinacreator.gzcm.engine.security.service.OpaPolicyService;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
@@ -398,8 +399,15 @@ class BundleColumnSurfaceTest {
          */
         private final DeclaredScopeResolutionService declaredScopeResolver =
                 mock(DeclaredScopeResolutionService.class);
+        /**
+         * #142/B4-3e-80（D-B4-23 主体域腿）：本组同样只验入口解析，主体域真值器 mock 后
+         * 返回 {@code null}＝如实未解析，与收口前写死 null 的行为面等价，列面判据不受影响。
+         * orgId 真值通路的正反判据在 {@code DecisionControllerSubjectDepartmentWiringTest}。
+         */
+        private final SubjectDepartmentResolutionService subjectDepartmentResolver =
+                mock(SubjectDepartmentResolutionService.class);
         private final DecisionController controller =
-                new DecisionController(service, declaredScopeResolver);
+                new DecisionController(service, declaredScopeResolver, subjectDepartmentResolver);
 
         {
             when(declaredScopeResolver.resolveForAiTool(any())).thenAnswer(inv -> inv.getArgument(0));
