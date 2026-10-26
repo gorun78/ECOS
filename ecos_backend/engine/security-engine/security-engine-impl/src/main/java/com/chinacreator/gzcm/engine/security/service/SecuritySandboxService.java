@@ -2,9 +2,10 @@ package com.chinacreator.gzcm.engine.security.service;
 
 import com.chinacreator.gzcm.common.event.PipelineEvent;
 import com.chinacreator.gzcm.common.security.filter.RowFilterVerdictContract;
-import com.chinacreator.gzcm.engine.security.dao.SecuritySandboxDao;
+import com.chinacreator.gzcm.sysman.security.profile.service.ISecurityProfileQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -20,12 +21,23 @@ public class SecuritySandboxService {
 
     private final List<Map<String, Object>> auditLogs = new CopyOnWriteArrayList<>();
     private final ApplicationEventPublisher eventPublisher;
-    private final SecuritySandboxDao sandboxDao;  // SEC-P0-5: 用于查询用户角色
+    /**
+     * 属主门面（sysman {@code ISecurityProfileQueryService}）——SEC-P0-5 超管角色判定
+     * 只经此面（#142/B4-3e-86，D-B4-103：原 {@code SecuritySandboxDao.countSuperAdminRole}
+     * 幻影列 JOIN，两表主键为 user_id/role_id、无 profile_id/role_name 列 ⇒ 恒 SQL 错被
+     * catch 折 0 ⇒ 超管永假。单源语句现落 sysman 属主 DAO 的 td_user_role→td_role 真列）。
+     */
+    @Autowired(required = false)
+    private ISecurityProfileQueryService profileQueryService;
 
-    public SecuritySandboxService(ApplicationEventPublisher eventPublisher, SecuritySandboxDao sandboxDao) {
+    public SecuritySandboxService(ApplicationEventPublisher eventPublisher) {
         this.eventPublisher = eventPublisher;
-        this.sandboxDao = sandboxDao;
         seedAuditLogs();
+    }
+
+    /** 装配入口（可选装配：monolith 宿主同 context 注入；独立引擎进程缺装配时按不可用走 fail-closed）。 */
+    public void setProfileQueryService(ISecurityProfileQueryService profileQueryService) {
+        this.profileQueryService = profileQueryService;
     }
 
     public Map<String, Object> maskValue(String value, String maskType) {
@@ -226,13 +238,22 @@ public class SecuritySandboxService {
         }
     }
 
-    /** SEC-P0-5: 基于数据库角色判断超级管理员，替代硬编码用户名 */
+    /**
+     * SEC-P0-5: 基于数据库角色判断超级管理员，替代硬编码用户名。
+     *
+     * <p>（#142/B4-3e-86，D-B4-103）取数改经属主门面 {@code hasRoleCode}。
+     * 这是<b>授权增益位</b>（true 即解密放行），故异常处置方向＝fail-closed：
+     * 门面未装配或取数异常 ⇒ 判否（谁都别多拿权限），与既有 catch→false 同向，
+     * 但取数通路换真列（幻影列腿已删，SQL 不再恒错）。</p>
+     */
     private boolean isSuperAdminRole(String userId) {
         if (userId == null || userId.isBlank()) return false;
-        // 通过 DAO 查询用户角色
+        if (profileQueryService == null) {
+            log.warn("SEC-P0-5 属主门面未装配，超管角色判读按不可用处理（fail-closed 判否）: user={}", userId);
+            return false;
+        }
         try {
-            int count = sandboxDao.countSuperAdminRole(userId);
-            return count > 0;
+            return profileQueryService.hasRoleCode(userId, "ROLE_SUPER_ADMIN");
         } catch (Exception e) {
             log.warn("超级管理员角色查询失败, userId={}, error={}", userId, e.getMessage());
             return false;

@@ -11,7 +11,7 @@ import java.util.List;
  * {@code td_user_role}（用户↔角色隶属）都在 sysman。铁律 #5：跨域事实经属主 api 门面，
  * 故安全引擎侧不再抄这些语句、也不新增一跳 REST。</p>
  *
- * <p><b>两批收口</b>：</p>
+ * <p><b>三批收口</b>：</p>
  * <ol>
  *   <li><b>D-B4-99 d)（#142/B4-3e-83）</b>：{@link #findHighestRoleForUser} —— 原有三处独立实现
  *       （sysman 行读、安全引擎逐字副本、密级链 {@code COALESCE(MAX(...), -1)} 聚合腿）。
@@ -26,6 +26,12 @@ import java.util.List;
  *       全量用户档、全量角色档、按作用域取档／列档。安全引擎 {@code SecurityConfigDao}
  *       原先各存一份同形语句（与 sysman {@code SecurityProfileQueryDao} 两存），
  *       本批改为只经本门面。</li>
+ *   <li><b>D-B4-103（#142/B4-3e-86）</b>：{@link #hasRoleCode} —— 角色码判读面。
+ *       安全引擎原 {@code SecuritySandboxDao.countSuperAdminRole} 用两枚安全档案表间
+ *       的幻影列（{@code profile_id}）JOIN 并按 {@code role_name} 过滤，两表 DDL 均无此二列
+ *       ⇒ SQL 恒 PG error 被 catch 折 0，角色判读永远为否。本批把判读谓词落在属主真列
+ *       （{@code td_user_role → td_role} 的 {@code role_code}/{@code role_name}）上，
+ *       幻影腿 DAO 整文件删除。</li>
  * </ol>
  *
  * <p><b>本接口只交付事实，不做裁决</b>：单条读面返回 {@code null} 表示无命中（未解析），
@@ -54,6 +60,23 @@ public interface ISecurityProfileQueryService {
      * @return 命中的档案；无命中 ⇒ {@code null}
      */
     SecurityProfile findUser(String userId, String tenantId);
+
+    /**
+     * 判定该用户是否挂有指定角色码（#142/B4-3e-86，收口 D-B4-103）。
+     *
+     * <p><b>语义裁决</b>（本机单源）：平台超管角色 {@code ROLE_SUPER_ADMIN} 在真库同时落
+     * {@code td_role.role_code} 与 {@code td_role.role_name} 两列同文，故本判据按
+     * {@code role_code 或 role_name} 带内等值命中其一即认定；谓词落在
+     * {@code td_user_role}/{@code td_role} 真列上（属主单源语句见
+     * {@code SecurityProfileQueryDao#hasRoleCode}）。平台级裁决，不带租户过滤
+     * （与 {@code Authorization} 头角色面口径一致）。</p>
+     *
+     * @param userId   主体用户 id（只取信任链读数，禁取客户端自报）
+     * @param roleCode 角色码（本面消费：{@code ROLE_SUPER_ADMIN}）
+     * @return 命中任一角色列 ⇒ {@code true}；无命中 ⇒ {@code false}。
+     *         <b>取数失败上抛</b>（三分态由调用方处置，本读面不吞异常、禁兜底 true）
+     */
+    boolean hasRoleCode(String userId, String roleCode);
 
     /**
      * 取角色级安全档案（{@code td_role_security_profile}）。

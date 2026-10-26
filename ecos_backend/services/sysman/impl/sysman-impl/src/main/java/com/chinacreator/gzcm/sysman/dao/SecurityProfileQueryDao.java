@@ -134,6 +134,29 @@ public class SecurityProfileQueryDao extends com.chinacreator.gzcm.runtime.core.
         return list.isEmpty() ? null : list.get(0);
     }
 
+    /**
+     * 「用户是否挂指定角色码」的<b>属主单源语句</b>（#142/B4-3e-86，收口 D-B4-103）。
+     *
+     * <p>收口前安全引擎 {@code SecuritySandboxDao.countSuperAdminRole} 在两枚
+     * {@code *_security_profile} 表上 JOIN {@code profile_id}＋按 {@code role_name} 过滤——
+     * 两表主键分别是 {@code user_id}/{@code role_id}、<b>均无 profile_id 与 role_name 列</b>，
+     * 故该语句恒 PG error 被调用方 catch 折 0，超管裁决<b>永假</b>。本语句走真实隶属链
+     * {@code td_user_role → td_role}（真列 {@code role_code}/{@code role_name}）；
+     * 两列带内命中是因为平台超管角色在两列上同文落库（本机语义单源）。</p>
+     */
+    public boolean hasRoleCode(String userId, String roleCode) {
+        if (jdbcTemplate == null) {
+            throw new IllegalStateException(
+                    "IAM 绑定库连接未装配（td_user_role/td_role 所在库 JdbcTemplate 缺失）：hasRoleCode 不可用");
+        }
+        Integer n = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM td_user_role ur "
+                        + "JOIN td_role r ON ur.role_id = r.role_id "
+                        + "WHERE ur.user_id = ? AND (r.role_code = ? OR r.role_name = ?)",
+                Integer.class, userId, roleCode, roleCode);
+        return n != null && n > 0;
+    }
+
     public SecurityProfile findGlobalDefault(String tenantId) {
         String sql;
         Object[] params;

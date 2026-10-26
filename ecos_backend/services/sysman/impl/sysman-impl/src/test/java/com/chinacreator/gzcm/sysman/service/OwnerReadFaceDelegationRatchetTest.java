@@ -61,6 +61,9 @@ class OwnerReadFaceDelegationRatchetTest {
         DELEGATIONS.put("listAllRole", "return dao.listAllRole(tenantId);");
         DELEGATIONS.put("findUserByScope", "return dao.findUserByScope(scopeType, scopeId);");
         DELEGATIONS.put("listProfilesByScope", "return dao.listProfilesByScope(scopeType, scopeId);");
+        // #142/B4-3e-86（D-B4-103）：角色码判读承接「用户是否挂某角色码」的属主单源腿
+        // （真列 td_user_role→td_role 的 role_code/role_name，禁幻影 profile_id/role_name 回流）。
+        DELEGATIONS.put("hasRoleCode", "return dao.hasRoleCode(userId, roleCode);");
     }
 
     // ── ① 源码面：逐条原样委派、无折叠 ─────────────────
@@ -83,9 +86,9 @@ class OwnerReadFaceDelegationRatchetTest {
             assertFalse(body.toLowerCase().contains("emptylist"),
                     e.getKey() + " 出现空表兜底：同上");
         }
-        // 扫描面防塌陷：八个 @Override 与唯一的既有 update 腿都还在
-        assertEquals(8, countOccurrences(src, "@Override"),
-                "实现类的 @Override 数 ≠ 8：门面读面被削减或扫描面被截断");
+        // 扫描面防塌陷：九个 @Override 与唯一的既有 update 腿都还在
+        assertEquals(9, countOccurrences(src, "@Override"),
+                "实现类的 @Override 数 ≠ 9（八档案读面 + hasRoleCode 角色码判读）：门面读面被削减或扫描面被截断");
         assertTrue(src.contains("public int update(String sql, Object... args)"),
                 "既有 update 腿被顺手删除（本批只动读面，不得扩面改行为）");
         assertTrue(src.contains("private final SecurityProfileQueryDao dao;"),
@@ -201,6 +204,9 @@ class OwnerReadFaceDelegationRatchetTest {
     // ── 工具 ────────────────────────────────────────
 
     private static String resultTypeOf(String method) {
+        if ("hasRoleCode".equals(method)) {
+            return "boolean";
+        }
         return DELEGATIONS.get(method).startsWith("return dao.list") ? "List<SecurityProfile>" : "SecurityProfile";
     }
 

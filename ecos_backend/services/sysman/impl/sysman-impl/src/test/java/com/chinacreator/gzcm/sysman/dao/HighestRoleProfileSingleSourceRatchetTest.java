@@ -240,10 +240,11 @@ class HighestRoleProfileSingleSourceRatchetTest {
     // ── ⑥ 门面面钉值 ────────────────────────────────
 
     @Test
-    @DisplayName("门面钉值：接口恰一枚方法 (String,String)->SecurityProfile；实现者恰 sysman 服务一枚")
+    @DisplayName("门面钉值：九枚读面集合完整；实现者恰 sysman 服务一枚")
     void facadeShapeIsPinned() throws IOException {
         Method[] methods = ISecurityProfileQueryService.class.getDeclaredMethods();
-        // #142/B4-3e-84（D-B4-100）把其余六组读面并入本门面：方法集从 1 枚扩到 8 枚。
+        // #142/B4-3e-84（D-B4-100）把其余六组读面并入本门面：方法集从 1 枚扩到 8 枚；
+        // #142/B4-3e-86（D-B4-103）并入角色码判读 hasRoleCode：8 枚扩到 9 枚。
         // 门面扩面必须同批扩判据（禁顺手加方法），故此处钉的是「完整方法名集合」。
         Set<String> names = new TreeSet<>();
         for (Method m : methods) {
@@ -251,7 +252,8 @@ class HighestRoleProfileSingleSourceRatchetTest {
         }
         assertEquals(new TreeSet<>(Set.of(
                         "findHighestRoleForUser", "findUser", "findRole", "findGlobalDefault",
-                        "listAllUser", "listAllRole", "findUserByScope", "listProfilesByScope")),
+                        "listAllUser", "listAllRole", "findUserByScope", "listProfilesByScope",
+                        "hasRoleCode")),
                 names, "门面方法集漂移（实跑 " + names + "）：扩面须同批扩本判据");
         Method highest = Arrays.stream(methods)
                 .filter(m -> "findHighestRoleForUser".equals(m.getName()))
@@ -259,6 +261,13 @@ class HighestRoleProfileSingleSourceRatchetTest {
         assertEquals(SecurityProfile.class, highest.getReturnType());
         assertEquals(List.of(String.class, String.class), Arrays.asList(highest.getParameterTypes()),
                 "门面签名漂移：首参主体、次参租户（可为 null）是与既有调用面约定的形态");
+        Method hasRole = Arrays.stream(methods)
+                .filter(m -> "hasRoleCode".equals(m.getName()))
+                .findFirst().orElseThrow();
+        assertEquals(boolean.class, hasRole.getReturnType(),
+                "hasRoleCode 返回类型漂移：本面裁决布尔（命中/未命中），非三态对象");
+        assertEquals(List.of(String.class, String.class), Arrays.asList(hasRole.getParameterTypes()),
+                "hasRoleCode 签名漂移：首参主体、次参角色码");
 
         assertTrue(ISecurityProfileQueryService.class.isAssignableFrom(SecurityProfileQueryService.class),
                 "SecurityProfileQueryService 不再实现门面（sysman 侧消费方与安全引擎会同时断腿）");

@@ -2,7 +2,6 @@ package com.chinacreator.gzcm.engine.security.service;
 
 import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract.Verdict;
 import com.chinacreator.gzcm.common.security.filter.RowFilterVerdictContract;
-import com.chinacreator.gzcm.engine.security.dao.SecuritySandboxDao;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
@@ -40,8 +39,7 @@ import static org.mockito.Mockito.mock;
 class SecuritySandboxRowFilterVerdictTest {
 
     private static SecuritySandboxService newService() {
-        return new SecuritySandboxService(mock(ApplicationEventPublisher.class),
-                mock(SecuritySandboxDao.class));
+        return new SecuritySandboxService(mock(ApplicationEventPublisher.class));
     }
 
     // ── 一、真谓词 ⇒ 三态归位 ───────────────────────────────────────────────
