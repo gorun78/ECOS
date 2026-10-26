@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -190,5 +191,40 @@ public class SecurityProfileQueryDao extends com.chinacreator.gzcm.runtime.core.
         }
         List<SecurityProfile> list = jdbcTemplate.query(sql, USER_PROFILE_MAPPER, params);
         return list.isEmpty() ? null : list.get(0);
+    }
+
+    /**
+     * 按作用域列举档案的<b>属主单源语句</b>（#142/B4-3e-84，收口 D-B4-100）。
+     *
+     * <p>语义自安全引擎 {@code SecurityConfigDao#queryProfilesByScope} 原样迁入：
+     * {@code TENANT}＝该租户用户档与角色档合并；{@code ORG}＝该机构用户档；
+     * 其余（含 {@code scopeId} 空白）＝按 {@code scope_type} 匹配用户档，均按
+     * {@code updated_at DESC}。这是跨租户管理面列举，不叠加租户过滤。</p>
+     */
+    public List<SecurityProfile> listProfilesByScope(String scopeType, String scopeId) {
+        if (scopeId != null && !scopeId.isBlank()) {
+            switch (scopeType.toUpperCase()) {
+                case "TENANT": {
+                    List<SecurityProfile> all = new ArrayList<>(jdbcTemplate.query(
+                            "SELECT * FROM td_user_security_profile WHERE tenant_id = ? ORDER BY updated_at DESC",
+                            USER_PROFILE_MAPPER, scopeId));
+                    all.addAll(jdbcTemplate.query(
+                            "SELECT * FROM td_role_security_profile WHERE tenant_id = ? ORDER BY updated_at DESC",
+                            ROLE_PROFILE_MAPPER, scopeId));
+                    return all;
+                }
+                case "ORG":
+                    return jdbcTemplate.query(
+                            "SELECT * FROM td_user_security_profile WHERE org_id = ? ORDER BY updated_at DESC",
+                            USER_PROFILE_MAPPER, scopeId);
+                default:
+                    return jdbcTemplate.query(
+                            "SELECT * FROM td_user_security_profile WHERE scope_type = ? ORDER BY updated_at DESC",
+                            USER_PROFILE_MAPPER, scopeType.toUpperCase());
+            }
+        }
+        return jdbcTemplate.query(
+                "SELECT * FROM td_user_security_profile WHERE scope_type = ? ORDER BY updated_at DESC",
+                USER_PROFILE_MAPPER, scopeType.toUpperCase());
     }
 }

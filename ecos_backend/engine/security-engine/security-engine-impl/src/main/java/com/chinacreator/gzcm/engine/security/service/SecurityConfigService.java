@@ -53,9 +53,7 @@ public class SecurityConfigService {
 
     public SecurityProfile queryUserProfile(String userId) {
         try {
-            String tenantId = getCurrentTenantId();
-            List<SecurityProfile> list = dao.queryUserProfile(userId, tenantId);
-            return list.isEmpty() ? null : list.get(0);
+            return profileQueryService.findUser(userId, getCurrentTenantId());
         } catch (Exception e) {
             log.warn("查询用户安全配置异常: userId={}, {}", userId, e.getMessage());
             return null;
@@ -64,9 +62,7 @@ public class SecurityConfigService {
 
     public SecurityProfile queryRoleProfile(String roleId) {
         try {
-            String tenantId = getCurrentTenantId();
-            List<SecurityProfile> list = dao.queryRoleProfile(roleId, tenantId);
-            return list.isEmpty() ? null : list.get(0);
+            return profileQueryService.findRole(roleId, getCurrentTenantId());
         } catch (Exception e) {
             log.warn("查询角色安全配置异常: roleId={}, {}", roleId, e.getMessage());
             return null;
@@ -85,9 +81,7 @@ public class SecurityConfigService {
 
     public SecurityProfile queryGlobalDefaultProfile() {
         try {
-            String tenantId = getCurrentTenantId();
-            List<SecurityProfile> list = dao.queryGlobalDefaultProfile(tenantId);
-            return list.isEmpty() ? null : list.get(0);
+            return profileQueryService.findGlobalDefault(getCurrentTenantId());
         } catch (Exception e) {
             log.warn("查询全局默认安全配置异常: {}", e.getMessage());
             return null;
@@ -96,8 +90,7 @@ public class SecurityConfigService {
 
     public List<SecurityProfile> queryAllUserProfiles() {
         try {
-            String tenantId = getCurrentTenantId();
-            return dao.queryAllUserProfiles(tenantId);
+            return profileQueryService.listAllUser(getCurrentTenantId());
         } catch (Exception e) {
             log.warn("查询所有用户安全配置异常: {}", e.getMessage());
             return Collections.emptyList();
@@ -106,8 +99,7 @@ public class SecurityConfigService {
 
     public List<SecurityProfile> queryAllRoleProfiles() {
         try {
-            String tenantId = getCurrentTenantId();
-            return dao.queryAllRoleProfiles(tenantId);
+            return profileQueryService.listAllRole(getCurrentTenantId());
         } catch (Exception e) {
             log.warn("查询所有角色安全配置异常: {}", e.getMessage());
             return Collections.emptyList();
@@ -120,8 +112,7 @@ public class SecurityConfigService {
                 log.debug("未知作用域类型: {}", scopeType);
                 return null;
             }
-            List<SecurityProfile> list = dao.queryProfileByScope(scopeType, scopeId);
-            return list.isEmpty() ? null : list.get(0);
+            return profileQueryService.findUserByScope(scopeType, scopeId);
         } catch (Exception e) {
             log.warn("按作用域查询安全配置异常: scopeType={}, scopeId={}, {}", scopeType, scopeId, e.getMessage());
             return null;
@@ -130,7 +121,7 @@ public class SecurityConfigService {
 
     public List<SecurityProfile> queryProfilesByScope(String scopeType, String scopeId) {
         try {
-            return dao.queryProfilesByScope(scopeType, scopeId);
+            return profileQueryService.listProfilesByScope(scopeType, scopeId);
         } catch (Exception e) {
             log.warn("按作用域列出安全配置异常: scopeType={}, scopeId={}, {}", scopeType, scopeId, e.getMessage());
             return Collections.emptyList();

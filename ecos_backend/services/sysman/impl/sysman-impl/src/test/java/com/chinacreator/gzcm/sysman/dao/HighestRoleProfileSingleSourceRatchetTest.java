@@ -22,7 +22,9 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -241,13 +243,21 @@ class HighestRoleProfileSingleSourceRatchetTest {
     @DisplayName("门面钉值：接口恰一枚方法 (String,String)->SecurityProfile；实现者恰 sysman 服务一枚")
     void facadeShapeIsPinned() throws IOException {
         Method[] methods = ISecurityProfileQueryService.class.getDeclaredMethods();
-        assertEquals(1, methods.length,
-                "门面方法数 ≠ 1（实跑 " + Arrays.toString(methods)
-                        + "）：门面扩面须同批扩判据，禁顺手加方法");
-        Method m = methods[0];
-        assertEquals("findHighestRoleForUser", m.getName());
-        assertEquals(SecurityProfile.class, m.getReturnType());
-        assertEquals(List.of(String.class, String.class), Arrays.asList(m.getParameterTypes()),
+        // #142/B4-3e-84（D-B4-100）把其余六组读面并入本门面：方法集从 1 枚扩到 8 枚。
+        // 门面扩面必须同批扩判据（禁顺手加方法），故此处钉的是「完整方法名集合」。
+        Set<String> names = new TreeSet<>();
+        for (Method m : methods) {
+            names.add(m.getName());
+        }
+        assertEquals(new TreeSet<>(Set.of(
+                        "findHighestRoleForUser", "findUser", "findRole", "findGlobalDefault",
+                        "listAllUser", "listAllRole", "findUserByScope", "listProfilesByScope")),
+                names, "门面方法集漂移（实跑 " + names + "）：扩面须同批扩本判据");
+        Method highest = Arrays.stream(methods)
+                .filter(m -> "findHighestRoleForUser".equals(m.getName()))
+                .findFirst().orElseThrow();
+        assertEquals(SecurityProfile.class, highest.getReturnType());
+        assertEquals(List.of(String.class, String.class), Arrays.asList(highest.getParameterTypes()),
                 "门面签名漂移：首参主体、次参租户（可为 null）是与既有调用面约定的形态");
 
         assertTrue(ISecurityProfileQueryService.class.isAssignableFrom(SecurityProfileQueryService.class),

@@ -1,181 +1,29 @@
 package com.chinacreator.gzcm.engine.security.dao;
 
 import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
-import com.chinacreator.gzcm.sysman.model.SecurityProfile;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-import java.sql.Timestamp;
-import java.util.List;
-
 /**
- * 安全配置（clearance/level 画像）DAO（R2-B3b 数据访问收口；只搬不改语义）。
+ * 安全档案<b>写面</b> DAO（R2-B3b 数据访问收口；只搬不改语义）。
  *
- * <p>表：{@code td_user_security_profile} / {@code td_role_security_profile}。tenant-aware 双分支
- * SQL 原样搬迁，{@code tenantId} 由调用方解析后传入。两个 {@link RowMapper}
- * （{@link #userProfileMapper} / {@link #roleProfileMapper}）随 SQL 一起搬入本 DAO。</p>
+ * <p><b>读面已全部迁出本类</b>：{@code td_user_security_profile} / {@code td_role_security_profile}
+ * 是 sysman 属主表（铁律 #5），本类原先另存了七组同形查询语句（用户档、角色档、全局默认档、
+ * 全量用户档、全量角色档、按作用域取档／列档），与 sysman {@code SecurityProfileQueryDao} 两存。
+ * 现已逐批改为只经属主 api 门面 {@code ISecurityProfileQueryService}：
+ * 「取最高角色档」见 #142/B4-3e-83（D-B4-99 d)），其余六组见 #142/B4-3e-84（D-B4-100）。</p>
  *
- * <p><b>「取用户最高角色档」已迁出本类</b>（#142/B4-3e-83，收口 D-B4-99 d)）：原
- * {@code queryHighestRoleProfileForUser} 是 sysman {@code SecurityProfileQueryDao.findHighestRoleForUser}
- * 的逐字副本（{@code JOIN td_user_role … ORDER BY rsp.clearance_level DESC LIMIT 1}）。
- * 同一事实两处语句必然漂移，且本类副本没有排除空密级行，读数与属主侧相反。现该腿改走属主
- * api 门面 {@code ISecurityProfileQueryService}（铁律 #5），本类不再出现 {@code td_user_role}。</p>
- *
- * <p><b>本类其余查询仍是直读属主表</b>（用户/角色/全局默认/按作用域四组，登记为 <b>D-B4-100</b>）：
- * 它们与 sysman {@code SecurityProfileQueryDao} 中的同形语句仍是两份，只是本批只收口
- * 「取最高角色档」这一族，不顺手扩面——扩面须逐条对白名单与基线，另批处置。</p>
+ * <p><b>写面仍在册为 D-B4-101</b>（本批不扩面）：{@code upsert*} / {@code delete*} /
+ * {@code updateProfileFields} / {@code cloneProfile} / {@code activateProfile} /
+ * {@code clearAllDefaults} 仍是引擎侧直写属主表，且 {@link #upsertProfile} 以
+ * {@code String.format} 拼表名与列名。这些语句与 sysman 属主写面同样两存，改法须逐条对
+ * 白名单与迁移期行为（含 {@code ON CONFLICT} 上的 {@code is_default}／{@code sandbox_mandatory}
+ * 语义差），另批处置。</p>
  */
 @Repository
 public class SecurityConfigDao extends JdbcTemplateDaoSupport {
 
     private static final String USER_TABLE = "td_user_security_profile";
     private static final String ROLE_TABLE = "td_role_security_profile";
-
-    private static final String[] LEVEL_NAMES = {"L0公开", "L1内部", "L2保密", "L3机密", "L4绝密"};
-
-    static RowMapper<SecurityProfile> userProfileMapper = (rs, rowNum) -> {
-        SecurityProfile p = new SecurityProfile();
-        p.setUserId(rs.getString("user_id"));
-        p.setClearanceLevel(rs.getInt("clearance_level"));
-        p.setLevel(rs.getInt("clearance_level"));
-        p.setLevelName(levelNameFor(rs.getInt("clearance_level")));
-        p.setLinkedWorkstation(rs.getString("linked_workstation"));
-        p.setAuditMode(rs.getString("audit_mode"));
-        p.setSandboxMandatory(rs.getBoolean("sandbox_mandatory"));
-        p.setIsDefault(rs.getBoolean("is_default"));
-        p.setScopeType(rs.getString("scope_type"));
-        p.setTenantId(rs.getString("tenant_id"));
-        p.setOrgId(rs.getString("org_id"));
-        Timestamp ca = rs.getTimestamp("created_at");
-        p.setCreatedAt(ca != null ? ca.getTime() : null);
-        Timestamp ua = rs.getTimestamp("updated_at");
-        p.setUpdatedAt(ua != null ? ua.getTime() : null);
-        return p;
-    };
-
-    static RowMapper<SecurityProfile> roleProfileMapper = (rs, rowNum) -> {
-        SecurityProfile p = new SecurityProfile();
-        p.setRoleId(rs.getString("role_id"));
-        p.setClearanceLevel(rs.getInt("clearance_level"));
-        p.setLevel(rs.getInt("clearance_level"));
-        p.setLevelName(levelNameFor(rs.getInt("clearance_level")));
-        p.setLinkedWorkstation(rs.getString("linked_workstation"));
-        p.setAuditMode(rs.getString("audit_mode"));
-        p.setSandboxMandatory(rs.getBoolean("sandbox_mandatory"));
-        p.setScopeType(rs.getString("scope_type"));
-        p.setTenantId(rs.getString("tenant_id"));
-        p.setOrgId(rs.getString("org_id"));
-        Timestamp ca = rs.getTimestamp("created_at");
-        p.setCreatedAt(ca != null ? ca.getTime() : null);
-        Timestamp ua = rs.getTimestamp("updated_at");
-        p.setUpdatedAt(ua != null ? ua.getTime() : null);
-        return p;
-    };
-
-    private static String levelNameFor(int level) {
-        return level >= 0 && level < LEVEL_NAMES.length ? LEVEL_NAMES[level] : ("L" + level);
-    }
-
-    // ── 查询（tenant-aware 双分支，tenantId=null 走无租户分支）──
-
-    public List<SecurityProfile> queryUserProfile(String userId, String tenantId) {
-        if (tenantId != null) {
-            return jdbcTemplate.query(
-                    "SELECT * FROM " + USER_TABLE + " WHERE user_id = ? AND (tenant_id = ? OR tenant_id IS NULL) LIMIT 1",
-                    userProfileMapper, userId, tenantId);
-        }
-        return jdbcTemplate.query(
-                "SELECT * FROM " + USER_TABLE + " WHERE user_id = ? LIMIT 1",
-                userProfileMapper, userId);
-    }
-
-    public List<SecurityProfile> queryRoleProfile(String roleId, String tenantId) {
-        if (tenantId != null) {
-            return jdbcTemplate.query(
-                    "SELECT * FROM " + ROLE_TABLE + " WHERE role_id = ? AND (tenant_id = ? OR tenant_id IS NULL) LIMIT 1",
-                    roleProfileMapper, roleId, tenantId);
-        }
-        return jdbcTemplate.query(
-                "SELECT * FROM " + ROLE_TABLE + " WHERE role_id = ? LIMIT 1",
-                roleProfileMapper, roleId);
-    }
-
-    public List<SecurityProfile> queryGlobalDefaultProfile(String tenantId) {
-        if (tenantId != null) {
-            return jdbcTemplate.query(
-                    "SELECT * FROM " + USER_TABLE + " WHERE is_default = TRUE AND (tenant_id = ? OR tenant_id IS NULL) LIMIT 1",
-                    userProfileMapper, tenantId);
-        }
-        return jdbcTemplate.query(
-                "SELECT * FROM " + USER_TABLE + " WHERE is_default = TRUE LIMIT 1",
-                userProfileMapper);
-    }
-
-    public List<SecurityProfile> queryAllUserProfiles(String tenantId) {
-        if (tenantId != null) {
-            return jdbcTemplate.query(
-                    "SELECT * FROM " + USER_TABLE + " WHERE tenant_id = ? OR tenant_id IS NULL ORDER BY updated_at DESC",
-                    userProfileMapper, tenantId);
-        }
-        return jdbcTemplate.query(
-                "SELECT * FROM " + USER_TABLE + " ORDER BY updated_at DESC",
-                userProfileMapper);
-    }
-
-    public List<SecurityProfile> queryAllRoleProfiles(String tenantId) {
-        if (tenantId != null) {
-            return jdbcTemplate.query(
-                    "SELECT * FROM " + ROLE_TABLE + " WHERE tenant_id = ? OR tenant_id IS NULL ORDER BY clearance_level DESC",
-                    roleProfileMapper, tenantId);
-        }
-        return jdbcTemplate.query(
-                "SELECT * FROM " + ROLE_TABLE + " ORDER BY clearance_level DESC",
-                roleProfileMapper);
-    }
-
-    public List<SecurityProfile> queryProfileByScope(String scopeType, String scopeId) {
-        String sql;
-        switch (scopeType) {
-            case "TENANT":
-                sql = "SELECT * FROM " + USER_TABLE + " WHERE tenant_id = ? AND scope_type = 'TENANT' LIMIT 1";
-                break;
-            case "ORG":
-                sql = "SELECT * FROM " + USER_TABLE + " WHERE org_id = ? AND scope_type = 'ORG' LIMIT 1";
-                break;
-            default:
-                return java.util.Collections.emptyList();
-        }
-        return jdbcTemplate.query(sql, userProfileMapper, scopeId);
-    }
-
-    public List<SecurityProfile> queryProfilesByScope(String scopeType, String scopeId) {
-        if (scopeId != null && !scopeId.isBlank()) {
-            switch (scopeType.toUpperCase()) {
-                case "TENANT": {
-                    List<SecurityProfile> userProfiles = jdbcTemplate.query(
-                            "SELECT * FROM " + USER_TABLE + " WHERE tenant_id = ? ORDER BY updated_at DESC",
-                            userProfileMapper, scopeId);
-                    List<SecurityProfile> roleProfiles = jdbcTemplate.query(
-                            "SELECT * FROM " + ROLE_TABLE + " WHERE tenant_id = ? ORDER BY updated_at DESC",
-                            roleProfileMapper, scopeId);
-                    List<SecurityProfile> all = new java.util.ArrayList<>(userProfiles);
-                    all.addAll(roleProfiles);
-                    return all;
-                }
-                case "ORG":
-                    return jdbcTemplate.query(
-                            "SELECT * FROM " + USER_TABLE + " WHERE org_id = ? ORDER BY updated_at DESC",
-                            userProfileMapper, scopeId);
-                default:
-                    return jdbcTemplate.query(
-                            "SELECT * FROM " + USER_TABLE + " WHERE scope_type = ? ORDER BY updated_at DESC",
-                            userProfileMapper, scopeType.toUpperCase());
-            }
-        }
-        return jdbcTemplate.query(
-                "SELECT * FROM " + USER_TABLE + " WHERE scope_type = ? ORDER BY updated_at DESC",
-                userProfileMapper, scopeType.toUpperCase());
-    }
 
     // ── 写 ──
 
