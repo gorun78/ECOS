@@ -32,6 +32,18 @@ import java.util.List;
  *       ⇒ SQL 恒 PG error 被 catch 折 0，角色判读永远为否。本批把判读谓词落在属主真列
  *       （{@code td_user_role → td_role} 的 {@code role_code}/{@code role_name}）上，
  *       幻影腿 DAO 整文件删除。</li>
+ *   <li><b>D-B4-101（#142/B4-3e-87）</b>：写面三组 —— 安全引擎 {@code SecurityConfigDao}
+ *       原九腿（upsert×3／clearAllDefaults／activate／delete×2／updateFields／clone）
+ *       直写本域属主表，{@code upsertProfile} 以 {@code String.format} 拼表名列名。
+ *       本批把写语句收到 {@code SecurityProfileQueryDao} 单源，引擎侧九腿全部
+ *       {@code UnsupportedOperationException} 删除、只经本门面写。
+ *       写面语义裁决（DDL 实证 + 属主控制器现存行为）：角色表<b>无</b> {@code is_default} 列
+ *       （V24/V41），故 {@link #upsertCoalescing} 对角色表写入被引擎面拒绝；自定义
+ *       {@code isDefault} 只允许经 {@link #setUserAsDefault}/{@link #activateDefault}
+ *       两腿；克隆腿固定 {@code is_default=FALSE}；通用 UPSERT 的 {@code ON CONFLICT}
+ *       子句<b>不碰</b> {@code is_default}（属主通用腿现状），用户专属 UPSERT 的
+ *       {@code ON CONFLICT} 子句<b>不收</b> {@code is_default}（属主 {@code PUT /user/{userId}}
+ *       现状），这两处与引擎原八处 {@code COALESCE(?, is_default)} 的差即本批改法。</li>
  * </ol>
  *
  * <p><b>本接口只交付事实，不做裁决</b>：单条读面返回 {@code null} 表示无命中（未解析），
@@ -131,4 +143,91 @@ public interface ISecurityProfileQueryService {
      * @return 列表，无命中 ⇒ 空表
      */
     List<SecurityProfile> listProfilesByScope(String scopeType, String scopeId);
+
+    // ──────────────────────────────────────────────────────────────────
+    // 写面（#142/B4-3e-87，收口 D-B4-101）
+    // ──────────────────────────────────────────────────────────────────
+
+    /**
+     * 用户级档案 UPSERT（属主单源语句）。
+     *
+     * <p><b>语义裁决</b>：INSERT 阶段 {@code is_default} 取 {@code isDefault}；
+     * {@code ON CONFLICT (user_id)} 阶段更新七字段 + {@code updated_at}，
+     * <b>不</b>碰 {@code is_default}（属主 {@code PUT /user/{userId}} 既有语义）。
+     * 默认档切换只走 {@link #clearAllDefaults}/{@link #activateDefault}。</p>
+     *
+     * @return 影响行数
+     */
+    int upsertUserProfile(String userId, Integer clearanceLevel, String linkedWorkstation,
+                          String auditMode, Boolean sandboxMandatory, boolean isDefault,
+                          String scopeType, String tenantId, String orgId);
+
+    /**
+     * 角色级档案 UPSERT（属主单源语句）。
+     *
+     * <p>{@code td_role_security_profile} 无 {@code is_default} 列（V24/V41），
+     * 本问句与用户腿同形除键列外一致。</p>
+     *
+     * @return 影响行数
+     */
+    int upsertRoleProfile(String roleId, Integer clearanceLevel, String linkedWorkstation,
+                          String auditMode, Boolean sandboxMandatory,
+                          String scopeType, String tenantId, String orgId);
+
+    /**
+     * 按具名目标档 UPSERT（属主单源语句，替代原引擎面 {@code String.format} 拼标识符腿）。
+     *
+     * @param profileTarget {@code USER} 或 {@code ROLE}（大写）；<b>非白名单值（含
+     *        {@code null} 与任意标识符）抛 {@link IllegalArgumentException}，拼不出语句</b>
+     * @param isDefault     仅进 INSERT 阶段；{@code ON CONFLICT} 阶段不碰 {@code is_default}
+     * @return 影响行数
+     */
+    int upsertCoalescing(String profileTarget, String idValue, Integer clearanceLevel,
+                         String linkedWorkstation, String auditMode, Boolean sandboxMandatory,
+                         boolean isDefault, String scopeType, String tenantId, String orgId);
+
+    /**
+     * 清除全部用户档默认位（属主单源，全表无租户过滤＝属主既有语义）。
+     *
+     * @return 影响行数
+     */
+    int clearAllDefaults();
+
+    /**
+     * 激活指定用户档为全局默认（属主单源，{@code is_default=TRUE} + {@code updated_at=NOW()}）。
+     *
+     * @return 影响行数
+     */
+    int activateDefault(String userId);
+
+    /**
+     * 删除指定用户档（属主单源）。
+     *
+     * @return 影响行数
+     */
+    int deleteUserProfile(String userId);
+
+    /**
+     * 删除指定角色档（属主单源）。
+     *
+     * @return 影响行数
+     */
+    int deleteRoleProfile(String roleId);
+
+    /**
+     * 按主键部分更新用户档字段（属主单源，六字段 + {@code updated_at}）。
+     *
+     * @return 影响行数
+     */
+    int updateProfileFields(String userId, Integer clearanceLevel, String linkedWorkstation,
+                            String auditMode, Boolean sandboxMandatory, boolean isDefault);
+
+    /**
+     * 克隆一份用户档（属主单源，固定 {@code is_default=FALSE}）。
+     *
+     * @return 影响行数
+     */
+    int cloneUserProfile(String newUserId, Integer clearanceLevel, String linkedWorkstation,
+                         String auditMode, Boolean sandboxMandatory,
+                         String scopeType, String tenantId, String orgId);
 }

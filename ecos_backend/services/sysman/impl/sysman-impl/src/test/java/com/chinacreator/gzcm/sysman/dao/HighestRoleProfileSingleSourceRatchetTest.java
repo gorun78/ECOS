@@ -240,20 +240,28 @@ class HighestRoleProfileSingleSourceRatchetTest {
     // ── ⑥ 门面面钉值 ────────────────────────────────
 
     @Test
-    @DisplayName("门面钉值：九枚读面集合完整；实现者恰 sysman 服务一枚")
+    @DisplayName("门面钉值：九组读面 + 九腿写面集合完整；实现者恰 sysman 服务一枚")
     void facadeShapeIsPinned() throws IOException {
         Method[] methods = ISecurityProfileQueryService.class.getDeclaredMethods();
         // #142/B4-3e-84（D-B4-100）把其余六组读面并入本门面：方法集从 1 枚扩到 8 枚；
-        // #142/B4-3e-86（D-B4-103）并入角色码判读 hasRoleCode：8 枚扩到 9 枚。
+        // #142/B4-3e-86（D-B4-103）并入角色码判读 hasRoleCode：8 枚扩到 9 枚；
+        // #142/B4-3e-87（D-B4-101）并入写面九腿（upsert×3/clearAllDefaults/activateDefault/
+        // delete×2/updateProfileFields/cloneUserProfile）：9 枚扩到 18 枚。
         // 门面扩面必须同批扩判据（禁顺手加方法），故此处钉的是「完整方法名集合」。
         Set<String> names = new TreeSet<>();
         for (Method m : methods) {
             names.add(m.getName());
         }
         assertEquals(new TreeSet<>(Set.of(
+                        // 读面九组
                         "findHighestRoleForUser", "findUser", "findRole", "findGlobalDefault",
                         "listAllUser", "listAllRole", "findUserByScope", "listProfilesByScope",
-                        "hasRoleCode")),
+                        "hasRoleCode",
+                        // 写面九腿（#142/B4-3e-87）：语句单源在属主 DAO，行为判据归
+                        // OwnerReadFaceDelegationRatchetTest 托管
+                        "upsertUserProfile", "upsertRoleProfile", "upsertCoalescing",
+                        "clearAllDefaults", "activateDefault", "deleteUserProfile",
+                        "deleteRoleProfile", "updateProfileFields", "cloneUserProfile")),
                 names, "门面方法集漂移（实跑 " + names + "）：扩面须同批扩本判据");
         Method highest = Arrays.stream(methods)
                 .filter(m -> "findHighestRoleForUser".equals(m.getName()))

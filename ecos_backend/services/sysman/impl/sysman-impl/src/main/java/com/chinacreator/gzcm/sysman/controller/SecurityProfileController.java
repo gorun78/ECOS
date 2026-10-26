@@ -134,23 +134,23 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
         try {
             String effectiveUserId = userId != null ? userId : UserContext.getCurrentUserId();
 
-            // 确定写入哪张表
-            String targetTable;
+            // 确定写入哪一档（#142/B4-3e-87：具名目标档，语句单源在属主 DAO）
+            String profileTarget;
             String idColumn;
             String idValue;
             boolean isGlobal = false;
 
             if (effectiveUserId != null) {
-                targetTable = "td_user_security_profile";
+                profileTarget = "USER";
                 idColumn = "user_id";
                 idValue = effectiveUserId;
             } else if (roleId != null) {
-                targetTable = "td_role_security_profile";
+                profileTarget = "ROLE";
                 idColumn = "role_id";
                 idValue = roleId;
             } else {
                 // 写入全局默认（user_id = '_global_default_'）
-                targetTable = "td_user_security_profile";
+                profileTarget = "USER";
                 idColumn = "user_id";
                 idValue = "_global_default_";
                 isGlobal = true;
@@ -172,35 +172,16 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
             String orgId = body.containsKey("orgId")
                     ? (String) body.get("orgId") : null;
 
-            // UPSERT (with scope columns)
-            String upsertSql = String.format("""
-                    INSERT INTO %s (%s, clearance_level, linked_workstation, audit_mode, sandbox_mandatory, is_default, scope_type, tenant_id, org_id, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-                    ON CONFLICT (%s) DO UPDATE SET
-                        clearance_level = COALESCE(?, %s.clearance_level),
-                        linked_workstation = COALESCE(?, %s.linked_workstation),
-                        audit_mode = COALESCE(?, %s.audit_mode),
-                        sandbox_mandatory = COALESCE(?, %s.sandbox_mandatory),
-                        scope_type = COALESCE(?, %s.scope_type),
-                        tenant_id = COALESCE(?, %s.tenant_id),
-                        org_id = COALESCE(?, %s.org_id),
-                        updated_at = NOW()
-                    """,
-                    targetTable, idColumn, idColumn, targetTable, targetTable, targetTable, targetTable, targetTable, targetTable, targetTable);
+            int rows = securityProfileQueryService.upsertCoalescing(profileTarget, idValue,
+                    clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory,
+                    isGlobal, scopeType, bodyTenantId, orgId);
 
-            int rows = securityProfileQueryService.update(upsertSql,
-                    idValue,
-                    clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, isGlobal, scopeType, bodyTenantId, orgId,
-                    // ON CONFLICT UPDATE 参数
-                    clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory ? true : null,
-                    scopeType, bodyTenantId, orgId);
-
-            log.info("安全配置更新成功: table={}, id={}, rows={}, scopeType={}", targetTable, idValue, rows, scopeType);
+            log.info("安全配置更新成功: target={}, id={}, rows={}, scopeType={}", profileTarget, idValue, rows, scopeType);
 
             // 返回更新后的配置
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("success", true);
-            result.put("table", targetTable);
+            result.put("table", "USER".equals(profileTarget) ? "td_user_security_profile" : "td_role_security_profile");
             result.put(idColumn, idValue);
             if (clearanceLevel != null) result.put("clearanceLevel", clearanceLevel);
             if (linkedWorkstation != null) result.put("linkedWorkstation", linkedWorkstation);
@@ -260,25 +241,10 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
             String orgId = body.containsKey("orgId")
                     ? (String) body.get("orgId") : null;
 
-            String upsertSql = """
-                    INSERT INTO td_user_security_profile
-                        (user_id, clearance_level, linked_workstation, audit_mode, sandbox_mandatory, is_default, scope_type, tenant_id, org_id, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, FALSE, ?, ?, ?, NOW(), NOW())
-                    ON CONFLICT (user_id) DO UPDATE SET
-                        clearance_level = COALESCE(?, td_user_security_profile.clearance_level),
-                        linked_workstation = COALESCE(?, td_user_security_profile.linked_workstation),
-                        audit_mode = COALESCE(?, td_user_security_profile.audit_mode),
-                        sandbox_mandatory = COALESCE(?, td_user_security_profile.sandbox_mandatory),
-                        scope_type = COALESCE(?, td_user_security_profile.scope_type),
-                        tenant_id = COALESCE(?, td_user_security_profile.tenant_id),
-                        org_id = COALESCE(?, td_user_security_profile.org_id),
-                        updated_at = NOW()
-                    """;
-
-            securityProfileQueryService.update(upsertSql,
-                    userId,
-                    clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, scopeType, bodyTenantId, orgId,
-                    clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, scopeType, bodyTenantId, orgId);
+            // #142/B4-3e-87：语句单源收口属主 DAO（原内联 15 参 upsert 已删除）
+            securityProfileQueryService.upsertUserProfile(userId,
+                    clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory,
+                    false, scopeType, bodyTenantId, orgId);
 
             log.info("用户安全配置更新成功: userId={}, scopeType={}", userId, scopeType);
 
@@ -330,25 +296,10 @@ private static final Logger log = LoggerFactory.getLogger(SecurityProfileControl
             String orgId = body.containsKey("orgId")
                     ? (String) body.get("orgId") : null;
 
-            String upsertSql = """
-                    INSERT INTO td_role_security_profile
-                        (role_id, clearance_level, linked_workstation, audit_mode, sandbox_mandatory, scope_type, tenant_id, org_id, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-                    ON CONFLICT (role_id) DO UPDATE SET
-                        clearance_level = COALESCE(?, td_role_security_profile.clearance_level),
-                        linked_workstation = COALESCE(?, td_role_security_profile.linked_workstation),
-                        audit_mode = COALESCE(?, td_role_security_profile.audit_mode),
-                        sandbox_mandatory = COALESCE(?, td_role_security_profile.sandbox_mandatory),
-                        scope_type = COALESCE(?, td_role_security_profile.scope_type),
-                        tenant_id = COALESCE(?, td_role_security_profile.tenant_id),
-                        org_id = COALESCE(?, td_role_security_profile.org_id),
-                        updated_at = NOW()
-                    """;
-
-            securityProfileQueryService.update(upsertSql,
-                    roleId,
-                    clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, scopeType, bodyTenantId, orgId,
-                    clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, scopeType, bodyTenantId, orgId);
+            // #142/B4-3e-87：语句单源收口属主 DAO（原内联 15 参 upsert 已删除）
+            securityProfileQueryService.upsertRoleProfile(roleId,
+                    clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory,
+                    scopeType, bodyTenantId, orgId);
 
             log.info("角色安全配置更新成功: roleId={}, scopeType={}", roleId, scopeType);
 

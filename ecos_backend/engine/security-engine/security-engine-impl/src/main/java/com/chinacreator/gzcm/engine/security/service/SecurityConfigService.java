@@ -156,44 +156,64 @@ public class SecurityConfigService {
     public void upsertUserProfile(String userId, Integer clearanceLevel, String linkedWorkstation,
                                   String auditMode, Boolean sandboxMandatory, boolean isDefault,
                                   String scopeType, String tenantId, String orgId) {
-        dao.upsertUserProfile(userId, clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory,
-                isDefault, scopeType, tenantId, orgId);
+        profileQueryService.upsertUserProfile(userId, clearanceLevel, linkedWorkstation,
+                auditMode, sandboxMandatory, isDefault, scopeType, tenantId, orgId);
     }
 
     public void upsertRoleProfile(String roleId, Integer clearanceLevel, String linkedWorkstation,
                                   String auditMode, Boolean sandboxMandatory,
                                   String scopeType, String tenantId, String orgId) {
-        dao.upsertRoleProfile(roleId, clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory,
-                scopeType, tenantId, orgId);
+        profileQueryService.upsertRoleProfile(roleId, clearanceLevel, linkedWorkstation,
+                auditMode, sandboxMandatory, scopeType, tenantId, orgId);
     }
 
+    /**
+     * 通用 UPSERT 入口（#142/B4-3e-87，收口 D-B4-101）。
+     *
+     * <p><b>参数形态保持不变</b>（对外服务契约）：原 {@code targetTable} 与 {@code idColumn}
+     * 不再下传属主侧拼标识符，本类先对目标档做 OPEN 集校验再映射到属主具名目标档
+     * （{@code USER}/{@code ROLE}）——非白名单值在本腿抛 {@link IllegalArgumentException}
+     * （原行为是 {@code String.format} 拼出非法语句后由 JDBC 报错，分态不变：调用方
+     * catch→internalError）。</p>
+     */
     public void upsertProfile(String targetTable, String idColumn, String idValue,
                               Integer clearanceLevel, String linkedWorkstation,
                               String auditMode, Boolean sandboxMandatory, boolean isDefault,
                               String scopeType, String tenantId, String orgId) {
-        dao.upsertProfile(targetTable, idColumn, idValue, clearanceLevel, linkedWorkstation,
-                auditMode, sandboxMandatory, isDefault, scopeType, tenantId, orgId);
+        String profileTarget;
+        if ("td_user_security_profile".equals(targetTable) && "user_id".equals(idColumn)) {
+            profileTarget = "USER";
+        } else if ("td_role_security_profile".equals(targetTable) && "role_id".equals(idColumn)) {
+            profileTarget = "ROLE";
+        } else {
+            throw new IllegalArgumentException(
+                    "未知档案目标: table=" + targetTable + ", column=" + idColumn
+                            + "（只允许 td_user_security_profile/user_id 或 td_role_security_profile/role_id）");
+        }
+        profileQueryService.upsertCoalescing(profileTarget, idValue, clearanceLevel,
+                linkedWorkstation, auditMode, sandboxMandatory, isDefault, scopeType, tenantId, orgId);
     }
 
     public void clearAllDefaults() {
-        dao.clearAllDefaults();
+        profileQueryService.clearAllDefaults();
     }
 
     public void activateProfile(String id) {
-        dao.activateProfile(id);
+        profileQueryService.activateDefault(id);
     }
 
     public int deleteUserProfile(String id) {
-        return dao.deleteUserProfile(id);
+        return profileQueryService.deleteUserProfile(id);
     }
 
     public int deleteRoleProfile(String id) {
-        return dao.deleteRoleProfile(id);
+        return profileQueryService.deleteRoleProfile(id);
     }
 
     public void updateProfileFields(String id, Integer clearanceLevel, String linkedWorkstation,
                                      String auditMode, Boolean sandboxMandatory, boolean isDefault) {
-        dao.updateProfileFields(id, clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, isDefault);
+        profileQueryService.updateProfileFields(id, clearanceLevel, linkedWorkstation,
+                auditMode, sandboxMandatory, isDefault);
     }
 
     public void cloneProfile(String sourceId, String newId) {
@@ -204,7 +224,7 @@ public class SecurityConfigService {
         if (source == null) {
             throw new IllegalArgumentException("源安全配置不存在: " + sourceId);
         }
-        dao.cloneProfile(newId,
+        profileQueryService.cloneUserProfile(newId,
                 source.getClearanceLevel(), source.getLinkedWorkstation(),
                 source.getAuditMode(), source.getSandboxMandatory(),
                 source.getScopeType(), source.getTenantId(), source.getOrgId());

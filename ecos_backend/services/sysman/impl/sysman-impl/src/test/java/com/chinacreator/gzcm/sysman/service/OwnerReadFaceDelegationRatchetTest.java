@@ -30,17 +30,20 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * 属主读面<b>委派单源</b>棘轮门（#142/B4-3e-84，收口台账 <b>D-B4-100</b>）。
+ * 属主读面+写面<b>委派单源</b>棘轮门（#142/B4-3e-84 收口 <b>D-B4-100</b>；
+ * #142/B4-3e-87 扩面收口 <b>D-B4-101</b> 九腿写面纯委派判据）。
  *
- * <p><b>为什么钉属主这一侧</b>：引擎侧门禁
- * （{@code SecurityConfigReadFaceSingleSourceRatchetTest}）只能证明「引擎不再直读」，
- * 它拿门面当黑盒——门面实现如果把取数折叠成 {@code null}／空表、或把参数改写后再下发，
- * 引擎侧仍然全绿，而两个宿主看到的「同一事实」又分叉了。故本门钉门面的<b>唯一实现者</b>：
- * 八组读面必须逐条 {@code return dao.<同名>(原样参数)}，禁 try/catch 折叠、禁兜底值。</p>
+ * <p><b>为什么钉属主这一侧</b>：引擎侧门禁（读面
+ * {@code SecurityConfigReadFaceSingleSourceRatchetTest} 与写面
+ * {@code SecurityConfigWriteFaceSingleSourceRatchetTest}）只能证明「引擎不再直读／直写」，
+ * 拿门面当黑盒——门面实现如果把取数折叠成 {@code null}／空表、把写腿折叠成 0 行、
+ * 或把参数改写后下发，引擎侧仍全绿，两宿主看到的「同一事实」反而分叉。
+ * 故本门钉门面唯一实现者：九组读面与九腿写面必须逐条
+ * {@code return dao.<同名>(原样参数)}，禁 try/catch 折叠、禁兜底值。</p>
  *
- * <p><b>三态纪律</b>：本类（服务）是纯委派层，取数失败一律<b>上抛</b>——
- * 「断腿」与「无配置」必须能被调用方分辨（引擎侧按 fail-soft / fail-loud 各自处置）。
- * 若在实现类里 catch 后折 {@code null}／空表，调用方无从分辨，正是本门要拦的形态。</p>
+ * <p><b>三态纪律</b>：本类（服务）是纯委派层，取数／落写失败一律<b>上抛</b>——
+ * 「断腿」与「无配置」「0 行」必须可被调用方分辨。实现类里 catch 后折
+ * {@code null}／空表／0 行，调用方无从分辨，正是本门要拦的形态。</p>
  */
 @Timeout(120)
 class OwnerReadFaceDelegationRatchetTest {
@@ -49,7 +52,7 @@ class OwnerReadFaceDelegationRatchetTest {
             "ecos_backend/services/sysman/impl/sysman-impl/src/main/java/"
                     + "com/chinacreator/gzcm/sysman/service/SecurityProfileQueryService.java";
 
-    /** 门面八组读面：方法名 → 委派语句（参数原样透传，禁改写）。 */
+    /** 门面九组读面 + 九腿写面：方法名 → 委派语句（参数原样透传，禁改写）。 */
     private static final Map<String, String> DELEGATIONS = new LinkedHashMap<>();
 
     static {
@@ -62,14 +65,34 @@ class OwnerReadFaceDelegationRatchetTest {
         DELEGATIONS.put("findUserByScope", "return dao.findUserByScope(scopeType, scopeId);");
         DELEGATIONS.put("listProfilesByScope", "return dao.listProfilesByScope(scopeType, scopeId);");
         // #142/B4-3e-86（D-B4-103）：角色码判读承接「用户是否挂某角色码」的属主单源腿
-        // （真列 td_user_role→td_role 的 role_code/role_name，禁幻影 profile_id/role_name 回流）。
         DELEGATIONS.put("hasRoleCode", "return dao.hasRoleCode(userId, roleCode);");
+        // #142/B4-3e-87（D-B4-101）：九腿写面（语句单源在属主 DAO，本类只纯委派）
+        DELEGATIONS.put("upsertUserProfile",
+                "return dao.upsertUserProfile(userId, clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, isDefault, scopeType, tenantId, orgId);");
+        DELEGATIONS.put("upsertRoleProfile",
+                "return dao.upsertRoleProfile(roleId, clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, scopeType, tenantId, orgId);");
+        DELEGATIONS.put("upsertCoalescing",
+                "return dao.upsertCoalescing(profileTarget, idValue, clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, isDefault, scopeType, tenantId, orgId);");
+        DELEGATIONS.put("clearAllDefaults", "return dao.clearAllDefaults();");
+        DELEGATIONS.put("activateDefault", "return dao.activateDefault(userId);");
+        DELEGATIONS.put("deleteUserProfile", "return dao.deleteUserProfile(userId);");
+        DELEGATIONS.put("deleteRoleProfile", "return dao.deleteRoleProfile(roleId);");
+        DELEGATIONS.put("updateProfileFields",
+                "return dao.updateProfileFields(userId, clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, isDefault);");
+        DELEGATIONS.put("cloneUserProfile",
+                "return dao.cloneUserProfile(newUserId, clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, scopeType, tenantId, orgId);");
     }
+
+    /** 九腿写面方法名（D-B4-101 判据命名用）。 */
+    private static final List<String> WRITE_LEGS = List.of(
+            "upsertUserProfile", "upsertRoleProfile", "upsertCoalescing",
+            "clearAllDefaults", "activateDefault", "deleteUserProfile", "deleteRoleProfile",
+            "updateProfileFields", "cloneUserProfile");
 
     // ── ① 源码面：逐条原样委派、无折叠 ─────────────────
 
     @Test
-    @DisplayName("八组读面逐条 return dao.<同名>(原样参数)：禁 try/catch、禁兜底 null/空表")
+    @DisplayName("十八方法逐条 return dao.<同名>(原样参数)：禁 try/catch、禁兜底 null/空表/0 行")
     void everyReadDelegatesVerbatimWithoutFold() throws IOException {
         String src = stripAt(IMPL);
         for (Map.Entry<String, String> e : DELEGATIONS.entrySet()) {
@@ -78,7 +101,7 @@ class OwnerReadFaceDelegationRatchetTest {
             assertTrue(compact.contains(e.getValue()),
                     e.getKey() + " 未原样委派属主 DAO（期望含 " + e.getValue() + "；实得 " + compact + "）");
             assertFalse(body.contains("try"),
-                    e.getKey() + " 出现 try：取数异常必须上抛，由调用方分态（断腿 ≠ 无配置）");
+                    e.getKey() + " 出现 try：取数/落写异常必须上抛，由调用方分态（断腿 ≠ 无配置／0 行）");
             assertFalse(body.contains("catch"),
                     e.getKey() + " 出现 catch：折叠会吞掉「断腿」证据");
             assertFalse(body.contains("return null"),
@@ -86,19 +109,25 @@ class OwnerReadFaceDelegationRatchetTest {
             assertFalse(body.toLowerCase().contains("emptylist"),
                     e.getKey() + " 出现空表兜底：同上");
         }
-        // 扫描面防塌陷：九个 @Override 与唯一的既有 update 腿都还在
-        assertEquals(9, countOccurrences(src, "@Override"),
-                "实现类的 @Override 数 ≠ 9（八档案读面 + hasRoleCode 角色码判读）：门面读面被削减或扫描面被截断");
+        // 写腿不得折 0 行（0 行＝「没写进去」的信号，被折叠就与断腿不可分辨）
+        for (String w : WRITE_LEGS) {
+            String body = methodBody(src, "public int " + w + "(");
+            assertFalse(body.contains("return 0;"),
+                    w + " 出现折 0 行兜底：写腿异常/未命中被折叠成 0 行，调用方无从分辨断腿");
+        }
+        // 扫描面防塌陷：十八 @Override 与唯一的既有 update 腿都还在
+        assertEquals(18, countOccurrences(src, "@Override"),
+                "实现类的 @Override 数 ≠ 18（九读面 + 九写腿）：门面面被削减或扫描面被截断");
         assertTrue(src.contains("public int update(String sql, Object... args)"),
-                "既有 update 腿被顺手删除（本批只动读面，不得扩面改行为）");
+                "既有 update 腿被顺手删除（本批不扩面改行为）");
         assertTrue(src.contains("private final SecurityProfileQueryDao dao;"),
                 "DAO 依赖形态漂移（构造注入的单依赖是本类的全部取数面）");
     }
 
-    // ── ② 形状面：实现者恰九枚公开方法（八读面 + update）────
+    // ── ② 形状面：实现者恰十八枚公开方法（九读 + 九写 + update）─
 
     @Test
-    @DisplayName("实现类公开方法集恰为八读面 + update；接口方法全部落地")
+    @DisplayName("实现类公开方法集恰为十八门面方法 + update；接口方法全部落地")
     void publicMethodSetIsPinned() {
         Set<String> actual = new TreeSet<>();
         for (Method m : SecurityProfileQueryService.class.getDeclaredMethods()) {
@@ -109,7 +138,7 @@ class OwnerReadFaceDelegationRatchetTest {
         Set<String> expected = new TreeSet<>(DELEGATIONS.keySet());
         expected.add("update");
         assertEquals(expected, actual,
-                "实现类公开方法集漂移（实跑 " + actual + "）：新增/删改读面须同批扩本判据");
+                "实现类公开方法集漂移（实跑 " + actual + "）：新增/删改面须同批扩本判据");
 
         assertTrue(ISecurityProfileQueryService.class.isAssignableFrom(SecurityProfileQueryService.class),
                 "实现类不再实现属主门面（引擎侧与密级五档链会同时断腿）");
@@ -124,7 +153,7 @@ class OwnerReadFaceDelegationRatchetTest {
     // ── ③ 行为面：返回值与参数逐条透传，异常上抛 ──────────
 
     @Test
-    @DisplayName("行为钉值：八组读面返回值同一实例透传、参数原样下发；DAO 异常原样上抛")
+    @DisplayName("行为钉值：读面返回值同一实例透传、参数原样下发；DAO 异常原样上抛")
     void behaviourPassesThroughValuesAndArguments() {
         SecurityProfileQueryDao dao = mock(SecurityProfileQueryDao.class);
         SecurityProfileQueryService service = new SecurityProfileQueryService(dao);
@@ -170,10 +199,69 @@ class OwnerReadFaceDelegationRatchetTest {
         assertEquals("db down", thrown.getMessage());
     }
 
-    // ── ④ 活性：合成折叠夹具命中本门判据 ─────────────────
+    // ── ④ 写面行为：参数原样下发、行数透传、异常上抛（D-B4-101）──
 
     @Test
-    @DisplayName("活性取证：折叠夹具（catch→null／空表）逐条命中判据，证明判据能变红")
+    @DisplayName("写面九腿：参数原样下发属主 DAO、影响行数透传、DAO 异常原样上抛")
+    void writeLegsPassThroughArgumentsAndRows() {
+        SecurityProfileQueryDao dao = mock(SecurityProfileQueryDao.class);
+        SecurityProfileQueryService service = new SecurityProfileQueryService(dao);
+
+        when(dao.upsertUserProfile("u-1", 3, "ws-1", "full", true, false, "USER", "t-1", null))
+                .thenReturn(1);
+        assertEquals(1, service.upsertUserProfile("u-1", 3, "ws-1", "full", true, false, "USER", "t-1", null),
+                "upsertUserProfile 影响行数被改写（0 行折叠会掩盖「没写进去」）");
+        verify(dao).upsertUserProfile("u-1", 3, "ws-1", "full", true, false, "USER", "t-1", null);
+
+        when(dao.upsertRoleProfile("r-1", 2, null, "basic", null, "ROLE", "t-1", null))
+                .thenReturn(1);
+        assertEquals(1, service.upsertRoleProfile("r-1", 2, null, "basic", null, "ROLE", "t-1", null),
+                "upsertRoleProfile 影响行数被改写");
+        verify(dao).upsertRoleProfile("r-1", 2, null, "basic", null, "ROLE", "t-1", null);
+
+        when(dao.upsertCoalescing("USER", "_global_default_", 1, null, null, null, true, null, "t-1", null))
+                .thenReturn(1);
+        assertEquals(1, service.upsertCoalescing("USER", "_global_default_", 1, null, null, null, true, null, "t-1", null),
+                "upsertCoalescing 影响行数被改写");
+        verify(dao).upsertCoalescing("USER", "_global_default_", 1, null, null, null, true, null, "t-1", null);
+
+        when(dao.clearAllDefaults()).thenReturn(2);
+        assertEquals(2, service.clearAllDefaults(), "clearAllDefaults 影响行数被改写");
+        verify(dao).clearAllDefaults();
+
+        when(dao.activateDefault("u-9")).thenReturn(1);
+        assertEquals(1, service.activateDefault("u-9"), "activateDefault 影响行数被改写");
+        verify(dao).activateDefault("u-9");
+
+        when(dao.deleteUserProfile("u-2")).thenReturn(1);
+        assertEquals(1, service.deleteUserProfile("u-2"), "deleteUserProfile 影响行数被改写");
+        verify(dao).deleteUserProfile("u-2");
+
+        when(dao.deleteRoleProfile("r-2")).thenReturn(0);
+        assertEquals(0, service.deleteRoleProfile("r-2"), "deleteRoleProfile 须把 0 行原样透传（0 行＝不存在的信号）");
+        verify(dao).deleteRoleProfile("r-2");
+
+        when(dao.updateProfileFields("u-3", 4, "ws-3", "audit", true, false)).thenReturn(1);
+        assertEquals(1, service.updateProfileFields("u-3", 4, "ws-3", "audit", true, false),
+                "updateProfileFields 影响行数被改写");
+        verify(dao).updateProfileFields("u-3", 4, "ws-3", "audit", true, false);
+
+        when(dao.cloneUserProfile("new-1", 3, "ws-1", "full", true, "USER", "t-1", null)).thenReturn(1);
+        assertEquals(1, service.cloneUserProfile("new-1", 3, "ws-1", "full", true, "USER", "t-1", null),
+                "cloneUserProfile 影响行数被改写");
+        verify(dao).cloneUserProfile("new-1", 3, "ws-1", "full", true, "USER", "t-1", null);
+
+        when(dao.activateDefault("boom")).thenThrow(new IllegalStateException("db down"));
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> service.activateDefault("boom"),
+                "写腿 DAO 异常被实现类吞掉／折 0＝「断腿」折叠成「0 行」，调用方无从分辨");
+        assertEquals("db down", thrown.getMessage());
+    }
+
+    // ── ⑤ 活性：合成折叠夹具命中本门判据 ─────────────────
+
+    @Test
+    @DisplayName("活性取证：折叠夹具（catch→null／空表／0 行）逐条命中判据，证明判据能变红")
     void judgementsFireOnSyntheticFold() {
         String folded = SourceCommentStripper.strip("""
                 class FixtureService {
@@ -191,6 +279,16 @@ class OwnerReadFaceDelegationRatchetTest {
                             return java.util.Collections.emptyList();
                         }
                     }
+                    int upsertUserProfile(String userId, Integer clearanceLevel, String linkedWorkstation,
+                                          String auditMode, Boolean sandboxMandatory, boolean isDefault,
+                                          String scopeType, String tenantId, String orgId) {
+                        try {
+                            return dao.upsertUserProfile(userId, clearanceLevel, linkedWorkstation,
+                                    auditMode, sandboxMandatory, isDefault, scopeType, tenantId, orgId);
+                        } catch (Exception e) {
+                            return 0;
+                        }
+                    }
                 }
                 """);
         String single = methodBody(folded, "Object findUser(").replaceAll("\\s+", " ").trim();
@@ -199,6 +297,9 @@ class OwnerReadFaceDelegationRatchetTest {
 
         String list = methodBody(folded, "java.util.List<Object> listAllUser(").toLowerCase();
         assertTrue(list.contains("emptylist"), "空表兜底判据对夹具不命中＝本门①恒绿（假绿）");
+
+        String write = methodBody(folded, "int upsertUserProfile(").replaceAll("\\s+", " ").trim();
+        assertTrue(write.contains("return 0;"), "写腿折 0 行判据对夹具不命中＝本门①恒绿（假绿）");
     }
 
     // ── 工具 ────────────────────────────────────────
@@ -206,6 +307,9 @@ class OwnerReadFaceDelegationRatchetTest {
     private static String resultTypeOf(String method) {
         if ("hasRoleCode".equals(method)) {
             return "boolean";
+        }
+        if (WRITE_LEGS.contains(method)) {
+            return "int";
         }
         return DELEGATIONS.get(method).startsWith("return dao.list") ? "List<SecurityProfile>" : "SecurityProfile";
     }

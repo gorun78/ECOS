@@ -64,6 +64,143 @@ public class SecurityProfileQueryDao extends com.chinacreator.gzcm.runtime.core.
         return jdbcTemplate.update(sql, args);
     }
 
+    // ──────────────────────────────────────────────────────────────────
+    // 写面（#142/B4-3e-87，收口 D-B4-101）—— 属主单源
+    // ──────────────────────────────────────────────────────────────────
+    //
+    // 九腿写语句在此单源；消费方两条：
+    //   ① 属主 {@code SecurityProfileController}（三枚路由 UPSERT，现改经本 DAO）；
+    //   ② 安全引擎 {@code SecurityConfigService}（经属主 api 门面，不写本表语句）。
+    //
+    // 语义裁决（DDL 实证 = V24 + V41）：
+    //   - td_role_security_profile 无 is_default 列 ⇒ 角色腿不含该列；
+    //   - 通用 UPSERT（coalescing）ON CONFLICT 不碰 is_default（属主既有语义）；
+    //   - 用户专属 UPSERT ON CONFLICT 不收 is_default（属主 PUT /user/{userId} 既有语义）；
+    //   - 默认档切换只走 clearAllDefaults / activateDefault 两腿；
+    //   - 克隆腿固定 is_default=FALSE。
+
+    public int upsertUserProfile(String userId, Integer clearanceLevel, String linkedWorkstation,
+                                 String auditMode, Boolean sandboxMandatory, boolean isDefault,
+                                 String scopeType, String tenantId, String orgId) {
+        String sql = """
+                INSERT INTO td_user_security_profile
+                    (user_id, clearance_level, linked_workstation, audit_mode, sandbox_mandatory, is_default, scope_type, tenant_id, org_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                ON CONFLICT (user_id) DO UPDATE SET
+                    clearance_level = COALESCE(?, td_user_security_profile.clearance_level),
+                    linked_workstation = COALESCE(?, td_user_security_profile.linked_workstation),
+                    audit_mode = COALESCE(?, td_user_security_profile.audit_mode),
+                    sandbox_mandatory = COALESCE(?, td_user_security_profile.sandbox_mandatory),
+                    scope_type = COALESCE(?, td_user_security_profile.scope_type),
+                    tenant_id = COALESCE(?, td_user_security_profile.tenant_id),
+                    org_id = COALESCE(?, td_user_security_profile.org_id),
+                    updated_at = NOW()
+                """;
+        return jdbcTemplate.update(sql,
+                userId,
+                clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, isDefault, scopeType, tenantId, orgId,
+                clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory,
+                scopeType, tenantId, orgId);
+    }
+
+    public int upsertRoleProfile(String roleId, Integer clearanceLevel, String linkedWorkstation,
+                                 String auditMode, Boolean sandboxMandatory,
+                                 String scopeType, String tenantId, String orgId) {
+        String sql = """
+                INSERT INTO td_role_security_profile
+                    (role_id, clearance_level, linked_workstation, audit_mode, sandbox_mandatory, scope_type, tenant_id, org_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                ON CONFLICT (role_id) DO UPDATE SET
+                    clearance_level = COALESCE(?, td_role_security_profile.clearance_level),
+                    linked_workstation = COALESCE(?, td_role_security_profile.linked_workstation),
+                    audit_mode = COALESCE(?, td_role_security_profile.audit_mode),
+                    sandbox_mandatory = COALESCE(?, td_role_security_profile.sandbox_mandatory),
+                    scope_type = COALESCE(?, td_role_security_profile.scope_type),
+                    tenant_id = COALESCE(?, td_role_security_profile.tenant_id),
+                    org_id = COALESCE(?, td_role_security_profile.org_id),
+                    updated_at = NOW()
+                """;
+        return jdbcTemplate.update(sql,
+                roleId,
+                clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory, scopeType, tenantId, orgId,
+                clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory,
+                scopeType, tenantId, orgId);
+    }
+
+    /**
+     * 按具名目标档 UPSERT（属主单源，替代原引擎面 {@code String.format} 拼标识符腿）。
+     *
+     * <p>目标档闭合枚举：{@code USER} → {@code td_user_security_profile}/user_id
+     * （含 {@code is_default} INSERT 参数）；{@code ROLE} → {@code td_role_security_profile}/
+     * role_id（该表无 {@code is_default} 列）。非白名单值（含 {@code null}）抛
+     * {@link IllegalArgumentException}——拼不出语句，也不接受调用方递来的任意标识符。</p>
+     */
+    public int upsertCoalescing(String profileTarget, String idValue, Integer clearanceLevel,
+                                String linkedWorkstation, String auditMode, Boolean sandboxMandatory,
+                                boolean isDefault, String scopeType, String tenantId, String orgId) {
+        if ("USER".equalsIgnoreCase(profileTarget)) {
+            return upsertUserProfile(idValue, clearanceLevel, linkedWorkstation,
+                    auditMode, sandboxMandatory, isDefault, scopeType, tenantId, orgId);
+        }
+        if ("ROLE".equalsIgnoreCase(profileTarget)) {
+            return upsertRoleProfile(idValue, clearanceLevel, linkedWorkstation,
+                    auditMode, sandboxMandatory, scopeType, tenantId, orgId);
+        }
+        throw new IllegalArgumentException("未知档案目标档: " + profileTarget
+                + "（只允许 USER / ROLE，拒拼任意标识符）");
+    }
+
+    public int clearAllDefaults() {
+        return jdbcTemplate.update(
+                "UPDATE td_user_security_profile SET is_default = FALSE WHERE is_default = TRUE");
+    }
+
+    public int activateDefault(String userId) {
+        return jdbcTemplate.update(
+                "UPDATE td_user_security_profile SET is_default = TRUE, updated_at = NOW() WHERE user_id = ?",
+                userId);
+    }
+
+    public int deleteUserProfile(String userId) {
+        return jdbcTemplate.update(
+                "DELETE FROM td_user_security_profile WHERE user_id = ?", userId);
+    }
+
+    public int deleteRoleProfile(String roleId) {
+        return jdbcTemplate.update(
+                "DELETE FROM td_role_security_profile WHERE role_id = ?", roleId);
+    }
+
+    public int updateProfileFields(String userId, Integer clearanceLevel, String linkedWorkstation,
+                                   String auditMode, Boolean sandboxMandatory, boolean isDefault) {
+        String sql = """
+                UPDATE td_user_security_profile SET
+                    clearance_level = COALESCE(?, clearance_level),
+                    linked_workstation = COALESCE(?, linked_workstation),
+                    audit_mode = COALESCE(?, audit_mode),
+                    sandbox_mandatory = COALESCE(?, sandbox_mandatory),
+                    is_default = COALESCE(?, is_default),
+                    updated_at = NOW()
+                WHERE user_id = ?
+                """;
+        return jdbcTemplate.update(sql, clearanceLevel, linkedWorkstation, auditMode,
+                sandboxMandatory, isDefault, userId);
+    }
+
+    public int cloneUserProfile(String newUserId, Integer clearanceLevel, String linkedWorkstation,
+                                String auditMode, Boolean sandboxMandatory,
+                                String scopeType, String tenantId, String orgId) {
+        String sql = """
+                INSERT INTO td_user_security_profile
+                    (user_id, clearance_level, linked_workstation, audit_mode, sandbox_mandatory, is_default, scope_type, tenant_id, org_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, FALSE, ?, ?, ?, NOW(), NOW())
+                """;
+        return jdbcTemplate.update(sql, newUserId,
+                clearanceLevel, linkedWorkstation,
+                auditMode, sandboxMandatory,
+                scopeType, tenantId, orgId);
+    }
+
     public SecurityProfile findUser(String userId, String tenantId) {
         String sql;
         Object[] params;

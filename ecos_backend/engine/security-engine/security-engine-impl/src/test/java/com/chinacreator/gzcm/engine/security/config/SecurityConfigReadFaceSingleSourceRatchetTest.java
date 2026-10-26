@@ -44,9 +44,10 @@ import org.junit.jupiter.api.Timeout;
  * 同一事实两处语句必然漂移，且属主侧改动不会传导到引擎侧。</p>
  *
  * <p><b>本批处置</b>：七组读面改走属主 api 门面 {@link ISecurityProfileQueryService}，
- * 引擎 DAO 不再持有任何 {@code SELECT *}／{@code RowMapper}；写面仍直写属主表，
- * 登记为 <b>D-B4-101</b>（含 {@code upsertProfile} 的 {@code String.format} 拼标识符），
- * 故本门禁<b>只钉读面</b>，同时断言写面未被顺手清空（防「删干净＝假绿」）。</p>
+ * 引擎 DAO 不再持有任何 {@code SELECT *}／{@code RowMapper}。写面九腿由
+ * <b>SecurityConfigWriteFaceSingleSourceRatchetTest</b>（#142/B4-3e-87，收口 D-B4-101）
+ * 单独钉单源——同门同时双向钉（读缺席+写缺席）会把「两存」误判成「删干净＝假绿」，
+ * 故写面判据归专属写面门托管。</p>
  */
 @Timeout(120)
 class SecurityConfigReadFaceSingleSourceRatchetTest {
@@ -88,7 +89,7 @@ class SecurityConfigReadFaceSingleSourceRatchetTest {
     // ── ① 引擎 DAO 不再持有读面 ─────────────────────
 
     @Test
-    @DisplayName("引擎 DAO 无读面：七个查询方法、SELECT *、RowMapper 一律缺席；写面九腿仍在（防清空假绿）")
+    @DisplayName("引擎 DAO 无读面：七个查询方法、SELECT *、RowMapper 一律缺席")
     void engineDaoCarriesNoReadFace() throws IOException {
         String src = stripAt(ENGINE_DAO);
         for (String retired : RETIRED_READS) {
@@ -96,20 +97,26 @@ class SecurityConfigReadFaceSingleSourceRatchetTest {
                     "引擎 DAO 又出现读方法 " + retired + "（读写两存复发，D-B4-100）");
         }
         assertFalse(src.contains("SELECT *"),
-                "引擎 DAO 又出现 SELECT *（读面回流；写面用 INSERT/UPDATE/DELETE 不含此形态）");
+                "引擎 DAO 又出现 SELECT *（读面回流）");
         assertFalse(src.contains("RowMapper"),
                 "引擎 DAO 又出现 RowMapper（行映射应随读面留在 sysman 属主侧）");
         assertFalse(src.contains("jdbcTemplate.query("),
                 "引擎 DAO 又出现 jdbcTemplate.query(（列表/映射查询＝读面回流）");
-
-        // 写面未被顺手清空：九条写腿逐条钉名
-        for (String write : List.of("upsertUserProfile(", "upsertRoleProfile(", "upsertProfile(",
-                "clearAllDefaults(", "activateProfile(", "deleteUserProfile(", "deleteRoleProfile(",
-                "updateProfileFields(", "cloneProfile(")) {
-            assertTrue(src.contains(write), "写腿 " + write + " 缺席：本门禁的扫描面已塌陷（不是收口）");
-        }
-        assertTrue(countOccurrences(src, "jdbcTemplate.update(") >= 9,
-                "写语句少于 9 条（实测 " + countOccurrences(src, "jdbcTemplate.update(") + "）：扫描面疑似被截断");
+        // #142/B4-3e-87（D-B4-101 收口后）：本 DAO 只留 ping() 一枚自检腿，
+        // 写面九腿与拼标识符腿应已迁往属主单源 —— 见
+        // SecurityConfigWriteFaceSingleSourceRatchetTest
+        assertTrue(src.contains("SELECT 1"),
+                "引擎 DAO 的自检探针（SELECT 1 连接存活）缺席：Carrier 基石塌陷");
+        assertFalse(src.contains("td_user_security_profile"),
+                "引擎 DAO 又出现属主用户表名（写面回流，D-B4-101）");
+        assertFalse(src.contains("td_role_security_profile"),
+                "引擎 DAO 又出现属主角色表名（写面回流，D-B4-101）");
+        assertFalse(src.toLowerCase().contains("insert into"),
+                "引擎 DAO 又出现 INSERT（写面回流，D-B4-101）");
+        assertFalse(src.toLowerCase().contains("on conflict"),
+                "引擎 DAO 又出现 ON CONFLICT UPSERT（写面回流，D-B4-101）");
+        assertFalse(src.contains("String.format"),
+                "引擎 DAO 又出现 String.format（拼标识符形态回流，D-B4-101）");
     }
 
     // ── ② 引擎服务只经门面 ──────────────────────────
