@@ -173,7 +173,8 @@ class CognitiveIronLawsTest {
             "ecos_cognitive.ecos_business_scenario",         // V193（错放镜像，只停写 IR03）
             "ecos_cognitive.ecos_scenario_binding",          // V193（错放镜像，只停写 IR03）
             "ecos_cognitive.ecos_scenario_binding_link",     // V193（错放镜像，只停写 IR03）
-            "ecos_cognitive.ecos_cognitive_outcome_evaluation"); // V267 建 / V274 幂等补列（W→D 结果评估记录，补充设计 §9）
+            "ecos_cognitive.ecos_cognitive_outcome_evaluation",      // V267 建 / V274 幂等补列（W→D 结果评估记录，补充设计 §9）
+            "ecos_cognitive.ecos_cognitive_mind_update");            // V292 建（R4 Mind 候选更新闸门，差异分析 P0-6 / 详设 §8.4.2）
 
     @Test
     @DisplayName("认知域 DDL 白名单外零新表（REQ-COG-05 守护项 2，ArchUnit 面 = DDL 单源目录扫描）")

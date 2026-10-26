@@ -92,26 +92,45 @@ public class ScenarioCognitiveQueryService {
     public List<CognitiveContractSchema.MindVO> detect(String scenarioId) {
         assertSchemaReady();
         List<Map<String, Object>> rows = mindDao.detectActiveMindsForScenario(scenarioId);
+        // R4（V292）：三轴列是否已落库一次探测 + 批量投影（禁 N+1）；
+        // 未迁移环境整列回显 null（诚实「未迁移」态，禁假值）
+        boolean r4Ready = mindDao.r4AxisColumnsExist();
+        Map<String, Map<String, Object>> axisByMind = r4Ready
+                ? mindDao.readAxisViews(rows.stream()
+                        .map(r -> (String) r.get("mind_id")).toList())
+                : Collections.emptyMap();
         List<CognitiveContractSchema.MindVO> out = new ArrayList<>(rows.size());
         for (Map<String, Object> r : rows) {
-            out.add(toMindVO(r));
+            out.add(toMindVO(r, axisByMind));
         }
         return out;
     }
 
-    private CognitiveContractSchema.MindVO toMindVO(Map<String, Object> r) {
+    private CognitiveContractSchema.MindVO toMindVO(Map<String, Object> r,
+                                                    Map<String, Map<String, Object>> axisByMind) {
         String maskJson = (String) r.get("capability_mask_json");
         List<String> caps = maskJson == null ? Collections.emptyList()
                 : MindCapabilityMaskCodec.decode(maskJson).stream().map(MindCapabilityMask::name).toList();
         String boundsJson = (String) r.get("closed_loop_bounds_json");
         List<String> bounds = safeBounds(boundsJson);
         Number isActive = (Number) r.get("is_active");
+        String validityStatus = null, reviewStatus = null, adoptionStatus = null,
+                changeReason = null, supersededBy = null;
+        Map<String, Object> axis = axisByMind.get((String) r.get("mind_id"));
+        if (axis != null) {
+            validityStatus = (String) axis.get("validity_status");
+            reviewStatus   = (String) axis.get("review_status");
+            adoptionStatus = (String) axis.get("adoption_status");
+            changeReason   = (String) axis.get("change_reason");
+            supersededBy   = (String) axis.get("superseded_by");
+        }
         return new CognitiveContractSchema.MindVO(
                 (String) r.get("mind_id"),
                 (String) r.get("mind_name"),
                 caps,
                 bounds,
-                isActive == null ? Boolean.TRUE : isActive.intValue() == 1);
+                isActive == null ? Boolean.TRUE : isActive.intValue() == 1,
+                validityStatus, reviewStatus, adoptionStatus, changeReason, supersededBy);
     }
 
     private List<String> safeBounds(String json) {

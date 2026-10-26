@@ -26,7 +26,7 @@ import com.chinacreator.gzcm.gateway.DdlShapeScanner.Scan;
  * <p><b>差距来源</b>：差距文档 篇6 原文「kb/cognitive 多处 {@code ?::jsonb}、{@code jsonb_array_length}、
  * {@code @> ?::jsonb}、{@code ILIKE} … 违 MC01/MC02/MC03；…{@code Mc03PortabilityTest} …均不存在
  * ⇒ 违例可长期静默累积，后续收口成本与<b>不可移植风险</b>最高」。既有载体只校验 Mapper/Java 侧
- * 的个别域段 ⇒ <b>DDL 单源 240 枚脚本</b>的 MC03 面无人守护。按 R9①「缺的门禁＝补代码实现」补本类。</p>
+ * 的个别域段 ⇒ <b>DDL 单源 242 枚脚本</b>的 MC03 面无人守护。按 R9①「缺的门禁＝补代码实现」补本类。</p>
  *
  * <p><b>判定面 = DDL 单源文本，不含 Mapper XML</b>（裁决 D-#144A-2，理由照直写）：
  * MC03 原文的处置手段是「必须 MyBatis {@code databaseId} 方言片段或 Adapter 层，且提供降级分支」，
@@ -45,7 +45,7 @@ import com.chinacreator.gzcm.gateway.DdlShapeScanner.Scan;
  * "治理段零违例"必须由<b>存量段确实命中 25</b> 这条实文件反向对照 + 合成串自检共同支撑，
  * 否则零命中只是解析面空转的另一种假绿形态（正是差距文档 D-15/D-16 两个 lint 假绿的成因形态）。</p>
  *
- * <p><b>反假绿四锁</b>：①扫描面非空（240 枚脚本、正文非空）；②<b>反向对照</b>——必须真的看见
+ * <p><b>反假绿四锁</b>：①扫描面非空（242 枚脚本、正文非空）；②<b>反向对照</b>——必须真的看见
  * 已知密集命中点（V111 的 {@code ::} 18 处、V12 的 {@code ON CONFLICT} 11 处、V18 的
  * {@code RETURNING} 4 处、V48 的 {@code gen_random_uuid}），看不见已知违例＝谓词空转；
  * ③GOVERNED 名录与存量计数<b>双向相等</b>（新增红、消失也红）；④合成串自检——每个 PG 专有形态
@@ -86,10 +86,12 @@ class Mc03TimeFormTest {
      * GOVERNED 段（V200+）成员级名录：键=文件名，值=该文件内 PG 专有语法命中数（实测 2026-10-15）。
      *
      * <p>8 枚文件 = 7 枚种子脚本的 {@code ON CONFLICT} upsert（V246/V263/V264/V265/V266/V280/V281）
-     * + V276 的 1 处 {@code ::} cast。这些是 V200 治理<b>之后</b>新增脚本里的现行违例 ⇒ 按裁决
+     * + V276 的 1 处 {@code ::} cast；2026-10-27 #141/B3 补 V291（3e-89 属主密级字典种子，
+     * {@code ON CONFLICT} 1 处，实测 2026-10-27）⇒ 9 枚。这些是 V200 治理<b>之后</b>新增脚本里的
+     * 现行违例 ⇒ 按裁决
      * D-#144A-3 进「待收口＋新增禁止」名录：存量脚本已实跑、按 IR03 不回改，收口去向 =
      * 为多方言交付另立 01-ddl-多方言 对应脚本（属 144-c 需授权范围）；
-     * 本门禁的作用是<b>确保 V288 起不再引入第 9 枚</b>。</p>
+     * 本门禁的作用是<b>确保 V292 起不再引入第 10 枚</b>（V292 已实测零命中）。</p>
      */
     private static final Map<String, Integer> GOVERNED_PG_SYNTAX_PIN = Map.ofEntries(
             Map.entry("V246__security_policy_seed.sql", 12),
@@ -99,7 +101,8 @@ class Mc03TimeFormTest {
             Map.entry("V266__wagent_tool_contract_seed.sql", 1),
             Map.entry("V276__ecos_cognitive_model_features_json.sql", 1),
             Map.entry("V280__fc_backtest_review_threshold_seed.sql", 1),
-            Map.entry("V281__ecos_entity_table_mapping.sql", 1));
+            Map.entry("V281__ecos_entity_table_mapping.sql", 1),
+            Map.entry("V291__sys_dict_clearance_level_code0.sql", 1));
 
     /**
      * 存量段计数钉死（键={@code 桶|规则}，值=命中数，实测 2026-10-15；只登记非零项）。
@@ -130,11 +133,13 @@ class Mc03TimeFormTest {
 
     /** 全源脚本数下限（DDL 单源目录，铁律 v2.2 §3.1）。2026-10-16 二期 W2：V289 落地 ⇒ 238→239。
      *  2026-10-17 二期 W5（a982d713）V290 落地只加脚本未改本锚 ⇒ 模块全量 test 红；
-     *  2026-10-21 #142/B4-3e-3 按实测订正 239→240。 */
-    private static final int SCRIPT_FLOOR = 240;
+     *  2026-10-21 #142/B4-3e-3 按实测订正 239→240。
+     *  2026-10-27 #141/B3 认知治理批：V291（3e-89）+ V292（R4 Mind 聚合根）落地只加脚本未改本锚
+     *  ⇒ 按实测订正 240→242。 */
+    private static final int SCRIPT_FLOOR = 242;
 
     @Test
-    @DisplayName("锁①：扫描面非空——240 枚脚本全部可读，正文为空者只允许登记在册的作废脚本")
+    @DisplayName("锁①：扫描面非空——242 枚脚本全部可读，正文为空者只允许登记在册的作废脚本")
     void scanSurfaceIsNonEmpty() throws IOException {
         Map<String, String> srcs = DdlShapeScanner.sources();
         assertEquals(SCRIPT_FLOOR, srcs.size(), "单源脚本数与钉死口径不一致（须同批改本值）");

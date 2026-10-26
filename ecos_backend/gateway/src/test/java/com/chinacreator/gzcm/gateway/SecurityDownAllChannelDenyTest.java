@@ -281,26 +281,33 @@ class SecurityDownAllChannelDenyTest {
         }
     }
 
-    /** AI 通道：security 不可用（客户端不吞异常，交裁决门转 FAIL_CLOSED）。 */
+    /** AI 通道：security 不可用。
+     * <p>桩落在 {@code decideData}——#142/B4-3e-78（D-B4-30）起 {@link AgentToolPolicyGate}
+     * 的主裁决腿直问三通道唯一入口 /decision（键面走 {@code AiSecurityEngineClient#decisionBody}），
+     * 旧 evaluate 腿留桩不再生效（当时本批曾漏挪桩 ⇒ "反向对照 DENY"被真跑 connection refused
+     * 折叠成 FAIL_CLOSED，2026-10-27 #141/B3-d 复跑实红并订正）。
+     * 显式抛传输故障而非依赖 127.0.0.1:1 真拒连：桩不碰网卡，分态真值只由这一处承载。</p> */
     private static final class DownSecurityClient extends AiSecurityEngineClient {
         DownSecurityClient() {
             super("http://127.0.0.1:1", 200, null);
         }
 
         @Override
-        public Map<String, Object> evaluateData(Map<String, Object> requestBody) throws Exception {
+        public Map<String, Object> decideData(Map<String, Object> body) throws Exception {
             throw new ResourceAccessException("Connection refused (security 进程不可用)");
         }
     }
 
-    /** AI 通道反向对照：security 正常应答明确 DENY。 */
+    /** AI 通道反向对照：security 正常应答明确 DENY。
+     * <p>返回的是 {@code /decision} 应答 data 段的 <b>opa 子段</b>形态（decideData 只取该段，
+     * 键面与生产侧 {@code SecurityDecisionService#safeOpa} 写出形态一致：allow=false + policyRef/policyId）。 */
     private static final class DenySecurityClient extends AiSecurityEngineClient {
         DenySecurityClient() {
             super("http://127.0.0.1:1", 200, null);
         }
 
         @Override
-        public Map<String, Object> evaluateData(Map<String, Object> requestBody) {
+        public Map<String, Object> decideData(Map<String, Object> body) {
             return Map.of("allow", false, "policyId", "p-policy-deny");
         }
     }

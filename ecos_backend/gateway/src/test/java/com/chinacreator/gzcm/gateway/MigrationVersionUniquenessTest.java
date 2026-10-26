@@ -47,8 +47,8 @@ import org.junit.jupiter.api.Test;
  * 新增重复即红，重复消失也必须同步收缩本名录（防豁免腐化成后门）；
  * ③ 版本族名录：点号/下划线扩展版本（{@code V4.1}、{@code V25_1}…）逐枚钉死，
  * 防止后来者用 {@code V288.1} 型小版本号绕过「新增脚本须顺延登记」的台账纪律；
- * ④ 台账锚：单源目录内最大基线版本 {@code = 290}（下一枚 {@code V291}），
- * 且脚本总数只增不减（下限 240）。</p>
+ * ④ 台账锚：单源目录内最大基线版本 {@code = 292}（下一枚 {@code V293}），
+ * 且脚本总数只增不减（下限 242）。</p>
  *
  * <p><b>反假绿四锁</b>：①扫描面非空 + 解析成功率 100%（解析不了的文件名直接进失败消息）；
  * ②重复检测的<b>反向对照</b>=解析器必须真的同时看见 V155 与 V50 的两枚实文件
@@ -77,18 +77,22 @@ class MigrationVersionUniquenessTest {
     private static final Pattern LEGAL_NAME =
             Pattern.compile("^V(\\d+(?:[._]\\d+)*)__([^_][^/]*?)\\.sql$");
 
-    /** 锁①：单源脚本总数下限（实测 240，只增不减；上限不钉，避免正常加脚本要改门禁）。 */
-    private static final int SCRIPT_COUNT_FLOOR = 240;
+    /** 锁①：单源脚本总数下限（实测 242，只增不减；上限不钉，避免正常加脚本要改门禁）。
+     *  2026-10-27 #141/B3 认知治理批：V291（3e-89 属主密级字典）+ V292（R4 Mind 聚合根）落地
+     *  ⇒ 按实测订正 240→242（与 DrBaseline/Mc02/Mc03 同批改）。 */
+    private static final int SCRIPT_COUNT_FLOOR = 242;
 
     /**
      * 锁④：台账锚——基线最大版本与下一号（新增脚本必须用 {@code > } 本值的主版本号）。
      * 2026-10-16 二期 W2：V289（td_user IAM 读面补列）落地 ⇒ 287→289 / 下一号 288→290。
      * 2026-10-17 二期 W5（a982d713）：V290（kb 导航面代码契约列）落地，但该批只落脚本、未随批改本锚
-     * ⇒ 本类两例红（登记册与实码分叉的实证）。本批按实测订正 289→290 / 下一号 290→291。
+     * ⇒ 本类两例红（登记册与实码分叉的实证）。按实测订正 289→290 / 下一号 290→291。
+     * 2026-10-27 #141/B3 认知治理批：V291（#142/B4-3e-89 已 live 实跑）+ V292（R4 Mind 聚合根，
+     * 仅落单源文件未实跑＝授权门控）落地 ⇒ 按实测订正 290→292 / 下一号 291→293。
      * V288 仍空置：《数据库访问规范》§十 预留给 #144-c，不占。
      */
-    private static final int MAX_BASELINE_VERSION = 290;
-    private static final int NEXT_FREE_VERSION = 291;
+    private static final int MAX_BASELINE_VERSION = 292;
+    private static final int NEXT_FREE_VERSION = 293;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

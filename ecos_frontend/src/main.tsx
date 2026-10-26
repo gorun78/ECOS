@@ -78,6 +78,8 @@ const GatewayDiagnosticsPage = lazy(() => import('./pages/platform/GatewayDiagno
 const AlertsPage = lazy(() => import('./pages/platform/AlertsPage.tsx'));
 // 2026-10-14 菜单重构（用户裁决）：总览/资源概览/控制面板 三页对
 const DecisionBoard = lazy(() => import('./pages/DecisionBoard.tsx'));
+const DecisionMindList = lazy(() => import('./pages/decision/DecisionMindList.tsx'));
+const DecisionMindDetail = lazy(() => import('./pages/decision/DecisionMindDetail.tsx'));
 const ResourceCenter = lazy(() => import('./pages/ResourceCenter.tsx'));
 const PlatformGovernance = lazy(() => import('./pages/PlatformGovernance.tsx'));
 // EngineMonitor + CognitiveEngineView are imported once eagerly because
@@ -148,6 +150,9 @@ createRoot(document.getElementById('root')!).render(
                     不在首页渲染。index 根仍为 Navigate 重定向（红线：路由根只增不删）。 */}
                 <Route index element={<Navigate to="/decision" replace />} />
                 <Route path="decision" element={<DecisionBoard />} />
+                {/* R4 Mind 治理（差距分析 P0-6 / B3-c）：列表 + 详情（三轴 + 候选闸门） */}
+                <Route path="decision/mind" element={<DecisionMindList />} />
+                <Route path="decision/mind/:mindId" element={<DecisionMindDetail />} />
                 <Route path="mission_control" element={<CognitiveOperatingSystem />} />
                 <Route path="monitor" element={<MonitoringCenter />} />
                 {/* 业务应用 */}

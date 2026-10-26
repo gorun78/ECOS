@@ -16,7 +16,13 @@ public final class CognitiveContractSchema {
 
     private CognitiveContractSchema() {}
 
-    /** E1 场景可用 Mind 探测。 */
+    /**
+     * E1 场景可用 Mind 探测。
+     *
+     * <p>R4（V292 加列）：新增三维状态三轴 + 版本历史可空回显字段——<b>全部可空</b>
+     * （V292 未实跑的环境读不到新列时为 null，前端显式提示「未迁移」，禁以假值冒充）。
+     * 既有五字段名与消费面零改动（@AllArgsConstructor 扩容 ⇒ 构造方限于 impl 内 toMindVO 单源）。</p>
+     */
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class MindVO {
         private String  mindId;
@@ -26,6 +32,18 @@ public final class CognitiveContractSchema {
         /** {@link ClosedLoopBound#name()} 数组；非法值读侧容错为 `[]` + issue。 */
         private List<String> closedLoopBounds;
         private Boolean isActive;
+        // ── R4 三维状态三轴（独立三列，禁合并；未迁移环境为 null，禁回显 V187 单 status）──
+        /** {@link MindStatusAxes.Validity#name()}；V292 未落库时 null。 */
+        private String validityStatus;
+        /** {@link MindStatusAxes.Review#name()}。 */
+        private String reviewStatus;
+        /** {@link MindStatusAxes.Adoption#name()}。 */
+        private String adoptionStatus;
+        // ── R4 版本历史（可空回显）──
+        /** 本版本变化原因；被替代版本行形成链（supersededBy 可空）。 */
+        private String changeReason;
+        /** 替代版本行 id（本行被替代才置）。 */
+        private String supersededBy;
     }
 
     /** E2 运行评价 metric 行。 */

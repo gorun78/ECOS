@@ -85,8 +85,12 @@ const CANONICAL = 'services/httpClient.ts';
  * 全仓生产文件数（与本门同口径实跑读出，防扫描根漂移成零命中）。
  * #142/B4-3e-76 摘除两枚页内桥 `LucideIcon.tsx`（business/data-workbench，全局桥保留重写）
  * ⇒ 681→679（同批实扫实测读出：删两枚生产文件，−2，非手算；本门全量 run 实走面值与独立复走双证）。
+ * #141/B3 认知治理批新增三枚生产文件（`services/cognitive/mindApi.ts` +
+ * `pages/decision/DecisionMindList.tsx` + `pages/decision/DecisionMindDetail.tsx`，
+ * 全量 run 实走面值 679→682，只增；新文件均走 `cognitiveClient` 单源出口、零私设基址，
+ * residual/双前缀两段判据口径不变）。
  */
-const PROD_FILES = 679;
+const PROD_FILES = 682;
 
 /** 本批 15 文件：rel →（导入腿相对路径、本批派生点数）。 */
 const FILES: ReadonlyArray<{ rel: string; importPath: string; sites: number }> = [

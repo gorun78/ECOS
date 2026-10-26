@@ -46,6 +46,11 @@ public final class CognitiveErrorCode {
     public static final String E422_FORMULA_EVALUATION   = "ECOS-COG-422F"; // 422 已校验 DSL 求值期语义失败（未知标识符/维度缺失/除零/量纲冲突）
     public static final String E404_FORECAST_RUN         = "ECOS-COG-404F"; // 404 预测运行快照行不存在（data-engine 读通道回业务 404，禁伪装空快照）
 
+    // ── 差距分析 P0-6 / R4 Mind 聚合根（V292 + MindUpdateGate；只增不改上方冻结表，2026-10-27 #141/B3）──
+    public static final String E404_MIND_UPDATE          = "ECOS-COG-404U";   // 404 候选更新行不存在/已软删
+    public static final String E409_MIND_UPDATE_STATE    = "ECOS-COG-409U";   // 409 候选已置终态（ACCEPTED/REJECTED 不可再受理/驳回）
+    public static final String E404_MIND_AXIS_COLUMN     = "ECOS-COG-404A";   // 404 V292 三轴列未落库（诚实的「未迁移」态，禁冒充 DRAFT/PENDING_REVIEW）
+
     /** 冻结字面量（禁止改写，防前端 i18n 不一致）。 */
     public static final String MSG_MIND_NOT_ON_SCENARIO = "mind not found on this scenario";
     public static final String MSG_MIND_NOT_FOUND       = "mind not found";
@@ -83,4 +88,9 @@ public final class CognitiveErrorCode {
     public static final String MSG_FORMULA_SYNTAX       = "caliber formula dsl syntax violation";
     public static final String MSG_FORMULA_EVALUATION   = "caliber formula evaluation failed";
     public static final String MSG_FORECAST_RUN_NOT_FOUND = "forecast run snapshot not found";
+
+    /** 差距分析 P0-6 / R4 Mind 聚合根增量冻结字面量（同纪律：禁改写，只可新增）。 */
+    public static final String MSG_MIND_UPDATE_NOT_FOUND   = "mind candidate update not found";
+    public static final String MSG_MIND_UPDATE_FINALIZED   = "mind candidate update already finalized";
+    public static final String MSG_MIND_AXIS_COLUMN_NOT_READY = "r4 mind status axes not provisioned";
 }

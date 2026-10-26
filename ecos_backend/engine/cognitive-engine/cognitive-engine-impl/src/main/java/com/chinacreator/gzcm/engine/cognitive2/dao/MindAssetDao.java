@@ -72,6 +72,96 @@ public class MindAssetDao extends JdbcTemplateDaoSupport {
         return rows == null ? new ArrayList<>() : rows;
     }
 
+    /**
+     * {@code GET /api/v1/cognitive/minds} 读面（无场景归属心智构建列表）：
+     * 列 id / mind_key / name / description / is_active；
+     * 全显式列、{@code is_deleted=0} 恒带、ORDER BY (id ASC) 兜底；
+     * LIMIT 夹取调用方（1~200）。
+     */
+    public List<Map<String, Object>> listAll(int limit) {
+        int lim = Math.max(1, Math.min(limit, 200));
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, mind_key, name, description, is_active FROM " + MIND_TABLE +
+                " WHERE is_deleted = 0 ORDER BY name ASC, id ASC LIMIT " + lim);
+        return rows == null ? new ArrayList<>() : rows;
+    }
+
+    /**
+     * R4（V292）三维状态三轴只读探测：{validityStatus, reviewStatus, adoptionStatus, changeReason, supersededBy}。
+     *
+     * <p><b>未迁移动判据</b>：V292 三轴列未落库的库上，SELECT 会落
+     * {@link org.springframework.dao.DataAccessException}（BadSqlGrammar）——本方法<b>返回 null</b>
+     * 表达「三轴投影不可用」（诚实的「未迁移」态，由上层置 404A），
+     * 禁把列缺失折叠成 DRAFT/PENDING_REVIEW 假值。
+     * 探测列用在库时的判别由 {@link #r4AxisColumnsExist()} 提供（无行 mindId 也可判）。</p>
+     *
+     * @return null=三轴列未落库 或 无行（未注册/已软删，由 mindExists 预检区分）；
+     *         非 null=三轴+版本历史字段投影（列值本身可空）。
+     */
+    public Map<String, Object> readAxisView(String mindId) {
+        String sql = "SELECT validity_status, review_status, adoption_status, " +
+                "change_reason, superseded_by " +
+                "  FROM " + MIND_TABLE + " WHERE id = ? AND is_deleted = 0";
+        try {
+            return jdbcTemplate.queryForMap(sql, mindId);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        } catch (org.springframework.dao.TransientDataAccessException e) {
+            throw e; // 瞬时故障必须上抛（→ 5xx 原样穿透），禁冒充「未迁移」
+        } catch (org.springframework.dao.InvalidDataAccessResourceUsageException e) {
+            throw e; // 连接/权限类故障 → 上抛，禁折叠
+        } catch (org.springframework.dao.DataAccessException e) {
+            // BadSqlGrammarException：V292 三轴列未落库 → 白纸「未迁移」，禁冒充假值。
+            return null;
+        }
+    }
+
+    /** R4：三轴列是否在库内（information_schema 探测；通道故障按「未迁移」处置，禁冒充已迁移）。 */
+    public boolean r4AxisColumnsExist() {
+        // 表名按 {schema}.{table} 拆开传参，禁把裸表名写死在 SQL 字面（SchemaDriftLint §四附则1）
+        String[] st = MIND_TABLE.split("\\.", 2);
+        String sql = "SELECT COUNT(1) FROM information_schema.columns " +
+                "  WHERE table_schema = ? " +
+                "   AND table_name = ? " +
+                "   AND column_name IN ('validity_status','review_status','adoption_status')";
+        Integer n;
+        try {
+            n = jdbcTemplate.queryForObject(sql, Integer.class, st[0], st[1]);
+        } catch (Exception e) {
+            log.warn("R4 三轴列可用性探测通道不可用，按「未迁移」处置（禁冒充已迁移）", e);
+            return false;
+        }
+        return n != null && n >= 3;
+    }
+
+    /**
+     * R4：批量三轴投影（E1 单查询防 N+1）。
+     *
+     * @return mindId → {validity_status, review_status, adoption_status, change_reason, superseded_by}；
+     *         空/缺失 id 不在结果中（调用方按 null 投影，禁假值）。
+     */
+    public java.util.Map<String, java.util.Map<String, Object>> readAxisViews(java.util.Collection<String> mindIds) {
+        if (mindIds == null || mindIds.isEmpty()) return java.util.Collections.emptyMap();
+        String sql = "SELECT id, validity_status, review_status, adoption_status, " +
+                "change_reason, superseded_by " +
+                "  FROM " + MIND_TABLE + " WHERE id IN (" +
+                mindIds.stream().map(x -> "?").reduce((a, b) -> a + "," + b).orElse("null") +
+                ") AND is_deleted = 0";
+        List<Object> args = new java.util.ArrayList<>(mindIds);
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, args.toArray());
+            java.util.Map<String, java.util.Map<String, Object>> out =
+                    new java.util.LinkedHashMap<>(rows.size());
+            for (Map<String, Object> r : rows) {
+                out.put(String.valueOf(r.get("id")), r);
+            }
+            return out;
+        } catch (org.springframework.dao.DataAccessException e) {
+            // 列消失（探测与读取之间迁移窗口）→ 按「不可用」空投影，上层按未迁移处理
+            return java.util.Collections.emptyMap();
+        }
+    }
+
     /** MindScopeGuard：判定 mind 是否绑定到给定场景（is_deleted=0）。 */
     public boolean isMindBoundToScenario(String scenarioId, String mindId) {
         Integer n = jdbcTemplate.queryForObject(

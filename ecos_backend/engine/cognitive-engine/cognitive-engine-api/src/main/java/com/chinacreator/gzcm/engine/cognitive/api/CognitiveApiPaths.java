@@ -144,4 +144,29 @@ public final class CognitiveApiPaths {
     public static final String FORECAST_RUNS_BY_KEY = COGNITIVE + FORECAST_RUNS_BY_KEY_REL;
     public static final String FORECAST_RUNS_RESULTS = COGNITIVE + FORECAST_RUNS_RESULTS_REL;
     public static final String FORECAST_RUNS_EVIDENCE = COGNITIVE + FORECAST_RUNS_EVIDENCE_REL;
+
+    // ── 差距分析 P0-6 / R4 Mind 聚合根（V292 + 候选更新闸门；只追加本段，上方行零改写，2026-10-27 #141/B3）──
+
+    /**
+     * Mind 治理与候选更新闸门端点族（R4 §8.4.2 / §8.5.3；属主 cognitive）。
+     *
+     * <p>绝对前缀 = {@link #COGNITIVE} + {@link #MINDS_REL} = {@code /api/v1/cognitive/minds}；
+     * 候选闸门 V292 表 {@code ecos_cognitive.ecos_cognitive_mind_update}：
+     * 提交恒 PROPOSED（W Agent 通道等价字面），受理/驳回只经受控端点置终态。
+     * 网关侧<b>无正向 rewrite 条目</b>（对齐 {@code /api/v1/cognitive/forecast-runs} KEEP 教训）。
+     * 拦截面上列按认知域字母序部署在同族命名器之外——此处命名刻意以 {@code *_MIND*} 区别于
+     * 既有 {@code COGNITIVE_MODELS}（那是认知<b>模型资产</b>注册中心，与 Mind 聚合根两个词、两张表）。</p>
+     */
+    public static final String PARAM_MIND_ID    = "mindId";
+    public static final String PARAM_UPDATE_ID  = "updateId";
+    public static final String MINDS_REL                         = "/minds";
+    public static final String MINDS_SUBMIT_REL                  = MINDS_REL + "/{" + PARAM_MIND_ID + "}/proposals";
+    public static final String MINDS_PROPOSED_REL                = MINDS_REL + "/proposals";
+    public static final String MINDS_ITEM_REL                    = MINDS_REL + "/proposals/{" + PARAM_UPDATE_ID + "}";
+    public static final String MINDS_ITEM_STATUS_REL             = MINDS_REL + "/proposals/{" + PARAM_UPDATE_ID + "}/status";
+    /** 绝对形态（文档/契约引用）。 */
+    public static final String MINDS_SUBMIT = COGNITIVE + MINDS_SUBMIT_REL;
+    public static final String MINDS_PROPOSED = COGNITIVE + MINDS_PROPOSED_REL;
+    public static final String MINDS_ITEM = COGNITIVE + MINDS_ITEM_REL;
+    public static final String MINDS_ITEM_STATUS = COGNITIVE + MINDS_ITEM_STATUS_REL;
 }

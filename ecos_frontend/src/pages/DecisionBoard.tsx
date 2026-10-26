@@ -177,6 +177,15 @@ export default function DecisionBoard() {
             <p className={`text-[11px] ${styles.cardTextMuted} -mt-0.5`}>{t("platform.decision.subtitle")}</p>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          {/* R4 Mind 治理入口（P0-6 / B3-c）：列表+详情嵌套在 /decision 子路由，不另立并行入口树 */}
+          <Link
+            to="/decision/mind"
+            className={`inline-flex items-center gap-1 text-[11px] font-bold rounded border px-2 py-1 ${styles.cardBorder} ${styles.cardTextMuted} hover:opacity-80`}
+          >
+            <Brain size={12} />
+            {t("platform.mind.open")}
+          </Link>
         <button
           type="button"
           onClick={retry}
@@ -185,6 +194,7 @@ export default function DecisionBoard() {
         >
           <RefreshCw size={14} />
         </button>
+        </div>
       </div>
 
       {/* 区段 A：KPI 行 */}
