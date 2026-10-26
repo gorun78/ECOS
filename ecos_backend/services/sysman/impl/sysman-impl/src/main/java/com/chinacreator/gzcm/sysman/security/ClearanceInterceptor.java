@@ -5,6 +5,7 @@ import com.chinacreator.gzcm.sysman.iam.context.TenantContext;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import com.chinacreator.gzcm.sysman.iam.entity.UserOrganization;
 import com.chinacreator.gzcm.sysman.iam.support.PrimaryOrganizationRule;
+import com.chinacreator.gzcm.sysman.security.clearance.model.ClearanceLevel;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -29,8 +30,6 @@ public class ClearanceInterceptor implements HandlerInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(ClearanceInterceptor.class);
 
-    /** 等级名称映射 */
-    private static final String[] LEVEL_NAMES = {"L0公开", "L1内部", "L2保密", "L3机密", "L4绝密"};
 
     /** 路径前缀默认等级 */
     private static final String[][] PATH_RULES = {
@@ -174,7 +173,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
 
         // ── 3. 比对 ──────────────────────────────────
         if (userClearanceLevel < requiredLevel) {
-            String levelName = requiredLevel < LEVEL_NAMES.length ? LEVEL_NAMES[requiredLevel] : ("L" + requiredLevel);
+            String levelName = ClearanceLevel.nameOf(requiredLevel);
             log.warn("准入等级不足: userId={}, userLevel={}, requiredLevel={}, path={}",
                     userId, userClearanceLevel, requiredLevel, path);
             sendForbidden(response,
@@ -228,12 +227,12 @@ public class ClearanceInterceptor implements HandlerInterceptor {
             return fact.level();
         }
 
-        // 无档案兜底 L1：这是准入语义裁决（收紧方向的历史既定值），不是事实缺失时的真值宣称。
+        // 无档案兜底值单源＝ ClearanceLevel.NO_PROFILE_FALLBACK（D-B4-99 a) 上收；
+        // 本批只上收单源、不改值——决策原文「收紧方向的历史既定值」保留；改本常量＝改准入语义＋改 wire，另批裁决。
         // 属主单源刻意不内置它——策略面禁兜底（见 RlsSubjectContext 的 clearanceLevel 口径）。
-        // 改它会改变现网准入判定结果，属裁决事项，台账在册待裁。
-        log.debug("五档密级链未解析（degradedTiers={}），准入面按既有语义兜底 L1: userId={}",
-                fact.degradedTiers(), userId);
-        return 1;
+        log.debug("五档密级链未解析（degradedTiers={}），准入面按单源兜底 L{}: userId={}",
+                fact.degradedTiers(), ClearanceLevel.NO_PROFILE_FALLBACK, userId);
+        return ClearanceLevel.NO_PROFILE_FALLBACK;
     }
 
     // ── 租户/机构 上下文辅助方法 ──────────────────────

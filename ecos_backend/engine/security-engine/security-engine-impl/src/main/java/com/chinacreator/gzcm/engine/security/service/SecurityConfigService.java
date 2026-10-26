@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.security.service;
 import com.chinacreator.gzcm.engine.security.dao.SecurityConfigDao;
 import com.chinacreator.gzcm.sysman.model.SecurityProfile;
 import com.chinacreator.gzcm.sysman.security.profile.service.ISecurityProfileQueryService;
+import com.chinacreator.gzcm.sysman.security.clearance.model.ClearanceLevel;
 import com.chinacreator.gzcm.sysman.iam.context.TenantContext;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import org.slf4j.Logger;
@@ -131,9 +132,9 @@ public class SecurityConfigService {
     public Map<String, Object> populateProfileResult(SecurityProfile profile) {
         Map<String, Object> result = new LinkedHashMap<>();
         if (profile != null) {
-            result.put("clearanceLevel", profile.getClearanceLevel() != null ? profile.getClearanceLevel() : 1);
-            result.put("level", profile.getLevel() != null ? profile.getLevel() : 1);
-            result.put("levelName", profile.getLevelName() != null ? profile.getLevelName() : "L1内部");
+            result.put("clearanceLevel", profile.getClearanceLevel() != null ? profile.getClearanceLevel() : ClearanceLevel.NO_PROFILE_FALLBACK);
+            result.put("level", profile.getLevel() != null ? profile.getLevel() : ClearanceLevel.NO_PROFILE_FALLBACK);
+            result.put("levelName", profile.getLevelName() != null ? profile.getLevelName() : ClearanceLevel.nameOf(ClearanceLevel.NO_PROFILE_FALLBACK));
             result.put("linkedWorkstation", profile.getLinkedWorkstation() != null ? profile.getLinkedWorkstation() : "");
             result.put("auditMode", profile.getAuditMode() != null ? profile.getAuditMode() : "basic");
             result.put("sandboxMandatory", Boolean.TRUE.equals(profile.getSandboxMandatory()));
@@ -143,9 +144,9 @@ public class SecurityConfigService {
             if (profile.getTenantId() != null) result.put("tenantId", profile.getTenantId());
             if (profile.getOrgId() != null) result.put("orgId", profile.getOrgId());
         } else {
-            result.put("clearanceLevel", 1);
-            result.put("level", 1);
-            result.put("levelName", "L1内部");
+            result.put("clearanceLevel", ClearanceLevel.NO_PROFILE_FALLBACK);
+            result.put("level", ClearanceLevel.NO_PROFILE_FALLBACK);
+            result.put("levelName", ClearanceLevel.nameOf(ClearanceLevel.NO_PROFILE_FALLBACK));
             result.put("linkedWorkstation", "");
             result.put("auditMode", "basic");
             result.put("sandboxMandatory", false);

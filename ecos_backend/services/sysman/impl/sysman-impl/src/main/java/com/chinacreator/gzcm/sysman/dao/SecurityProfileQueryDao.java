@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.sysman.dao;
 
 import com.chinacreator.gzcm.sysman.model.SecurityProfile;
+import com.chinacreator.gzcm.sysman.security.clearance.model.ClearanceLevel;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
@@ -15,14 +16,13 @@ import java.util.List;
 @Repository
 public class SecurityProfileQueryDao extends com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport {
 
-    private static final String[] LEVEL_NAMES = {"L0公开", "L1内部", "L2保密", "L3机密", "L4绝密"};
 
     private final RowMapper<SecurityProfile> USER_PROFILE_MAPPER = (rs, rowNum) -> {
         SecurityProfile p = new SecurityProfile();
         p.setUserId(rs.getString("user_id"));
         p.setClearanceLevel(rs.getInt("clearance_level"));
         p.setLevel(rs.getInt("clearance_level"));
-        p.setLevelName(levelNameFor(rs.getInt("clearance_level")));
+        p.setLevelName(ClearanceLevel.nameOf(rs.getInt("clearance_level")));
         p.setLinkedWorkstation(rs.getString("linked_workstation"));
         p.setAuditMode(rs.getString("audit_mode"));
         p.setSandboxMandatory(rs.getBoolean("sandbox_mandatory"));
@@ -42,7 +42,7 @@ public class SecurityProfileQueryDao extends com.chinacreator.gzcm.runtime.core.
         p.setRoleId(rs.getString("role_id"));
         p.setClearanceLevel(rs.getInt("clearance_level"));
         p.setLevel(rs.getInt("clearance_level"));
-        p.setLevelName(levelNameFor(rs.getInt("clearance_level")));
+        p.setLevelName(ClearanceLevel.nameOf(rs.getInt("clearance_level")));
         p.setLinkedWorkstation(rs.getString("linked_workstation"));
         p.setAuditMode(rs.getString("audit_mode"));
         p.setSandboxMandatory(rs.getBoolean("sandbox_mandatory"));
@@ -56,9 +56,6 @@ public class SecurityProfileQueryDao extends com.chinacreator.gzcm.runtime.core.
         return p;
     };
 
-    private static String levelNameFor(int level) {
-        return level >= 0 && level < LEVEL_NAMES.length ? LEVEL_NAMES[level] : ("L" + level);
-    }
 
     public int update(String sql, Object... args) {
         return jdbcTemplate.update(sql, args);
