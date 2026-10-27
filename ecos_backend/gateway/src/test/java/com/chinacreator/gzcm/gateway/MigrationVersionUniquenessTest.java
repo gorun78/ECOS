@@ -47,8 +47,8 @@ import org.junit.jupiter.api.Test;
  * 新增重复即红，重复消失也必须同步收缩本名录（防豁免腐化成后门）；
  * ③ 版本族名录：点号/下划线扩展版本（{@code V4.1}、{@code V25_1}…）逐枚钉死，
  * 防止后来者用 {@code V288.1} 型小版本号绕过「新增脚本须顺延登记」的台账纪律；
- * ④ 台账锚：单源目录内最大基线版本 {@code = 292}（下一枚 {@code V293}），
- * 且脚本总数只增不减（下限 242）。</p>
+ * ④ 台账锚：单源目录内最大基线版本 {@code = 294}（下一枚 {@code V295}），
+ * 且脚本总数只增不减（下限 244）。</p>
  *
  * <p><b>反假绿四锁</b>：①扫描面非空 + 解析成功率 100%（解析不了的文件名直接进失败消息）；
  * ②重复检测的<b>反向对照</b>=解析器必须真的同时看见 V155 与 V50 的两枚实文件
@@ -77,10 +77,13 @@ class MigrationVersionUniquenessTest {
     private static final Pattern LEGAL_NAME =
             Pattern.compile("^V(\\d+(?:[._]\\d+)*)__([^_][^/]*?)\\.sql$");
 
-    /** 锁①：单源脚本总数下限（实测 242，只增不减；上限不钉，避免正常加脚本要改门禁）。
+    /** 锁①：单源脚本总数下限（实测 244，只增不减；上限不钉，避免正常加脚本要改门禁）。
      *  2026-10-27 #141/B3 认知治理批：V291（3e-89 属主密级字典）+ V292（R4 Mind 聚合根）落地
-     *  ⇒ 按实测订正 240→242（与 DrBaseline/Mc02/Mc03 同批改）。 */
-    private static final int SCRIPT_COUNT_FLOOR = 242;
+     *  ⇒ 按实测订正 240→242（与 DrBaseline/Mc02/Mc03 同批改）。
+     *  2026-10-27 #142/B4 #146i：V294（fc_* 三表＋演示主体 seed）落地。
+     *  勘误：V293（#146f td_audit_log 注册）本批锚定时漏数（已入库既有脚本，非本批产出）⇒
+     *  初值 243 系漏数，按实测订正 243→244（= V293 存量 1 枚 + V294 本批 1 枚，242 基线之上 2 枚）。 */
+    private static final int SCRIPT_COUNT_FLOOR = 244;
 
     /**
      * 锁④：台账锚——基线最大版本与下一号（新增脚本必须用 {@code > } 本值的主版本号）。
@@ -89,10 +92,12 @@ class MigrationVersionUniquenessTest {
      * ⇒ 本类两例红（登记册与实码分叉的实证）。按实测订正 289→290 / 下一号 290→291。
      * 2026-10-27 #141/B3 认知治理批：V291（#142/B4-3e-89 已 live 实跑）+ V292（R4 Mind 聚合根，
      * 仅落单源文件未实跑＝授权门控）落地 ⇒ 按实测订正 290→292 / 下一号 291→293。
-     * V288 仍空置：《数据库访问规范》§十 预留给 #144-c，不占。
+     * 2026-10-27 #142/B4 #146i：本批新增 V294（fc_* 三表＋演示主体 seed，已 dev 实跑）。
+     * V293（#146f td_audit_log 注册，已入库）＋ V294 使单源最大版本达 294 ⇒
+     * 按实测订正 292→294 / 下一号 293→295。V288 仍空置：《数据库访问规范》§十 预留给 #144-c，不占。
      */
-    private static final int MAX_BASELINE_VERSION = 292;
-    private static final int NEXT_FREE_VERSION = 293;
+    private static final int MAX_BASELINE_VERSION = 294;
+    private static final int NEXT_FREE_VERSION = 295;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

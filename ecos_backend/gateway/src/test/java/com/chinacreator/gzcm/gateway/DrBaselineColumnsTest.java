@@ -97,6 +97,8 @@ class DrBaselineColumnsTest {
             "V285__td_runtime_task_persistence_create.sql#public.td_runtime_task_log"
                     + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no",
             "V285__td_runtime_task_persistence_create.sql#public.td_runtime_task_execution"
+                    + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no",
+            "V293__ecos_control_td_audit_log_register.sql#ecos_control.td_audit_log"
                     + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no");
 
     /**
@@ -129,8 +131,11 @@ class DrBaselineColumnsTest {
      *  2026-10-17 二期 W5（a982d713）：V290 落地只加脚本未改本锚 ⇒ 模块全量 test 红；
      *  2026-10-21 #142/B4-3e-3 按实测订正 239→240。
      *  2026-10-27 #141/B3 认知治理批：V291（3e-89 属主密级字典）+ V292（R4 Mind 聚合根）落地只加脚本未改本锚
-     *  ⇒ 按实测订正 240→242（与 Mc02/Mc03/MigrationVersionUniquenessTest 同批改）。 */
-    private static final int SCRIPT_FLOOR = 242;
+     *  ⇒ 按实测订正 240→242（与 Mc02/Mc03/MigrationVersionUniquenessTest 同批改）。
+     *  2026-10-27 #142/B4 #146i：V294（fc_* 三表＋演示主体 seed；三表七枚基线列齐建，fc_* 无 ecos_ 前缀按
+     *  knownLegacy 语义冻结、不入本名录计口）落地。勘误：V293（#146f td_audit_log 登记，基线列不全）
+     *  本批锚定时漏数（已入库既有脚本）⇒ 初值 243 系漏数，按实测订正 243→244（四枚同批改）。 */
+    private static final int SCRIPT_FLOOR = 244;
 
     @Test
     @DisplayName("锁①：扫描面非空——脚本数、建表数、V200+ 建表数均达下限（空扫描面=假绿）")

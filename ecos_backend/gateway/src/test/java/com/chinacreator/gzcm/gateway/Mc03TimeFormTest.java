@@ -102,7 +102,8 @@ class Mc03TimeFormTest {
             Map.entry("V276__ecos_cognitive_model_features_json.sql", 1),
             Map.entry("V280__fc_backtest_review_threshold_seed.sql", 1),
             Map.entry("V281__ecos_entity_table_mapping.sql", 1),
-            Map.entry("V291__sys_dict_clearance_level_code0.sql", 1));
+            Map.entry("V291__sys_dict_clearance_level_code0.sql", 1),
+            Map.entry("V294__fc_predictivity_tables_and_demo_subjects.sql", 7));
 
     /**
      * 存量段计数钉死（键={@code 桶|规则}，值=命中数，实测 2026-10-15；只登记非零项）。
@@ -135,8 +136,11 @@ class Mc03TimeFormTest {
      *  2026-10-17 二期 W5（a982d713）V290 落地只加脚本未改本锚 ⇒ 模块全量 test 红；
      *  2026-10-21 #142/B4-3e-3 按实测订正 239→240。
      *  2026-10-27 #141/B3 认知治理批：V291（3e-89）+ V292（R4 Mind 聚合根）落地只加脚本未改本锚
-     *  ⇒ 按实测订正 240→242。 */
-    private static final int SCRIPT_FLOOR = 242;
+     *  ⇒ 按实测订正 240→242。
+     *  2026-10-27 #142/B4 #146i：V294（fc_* 三表＋演示主体 seed，ON CONFLICT 7 处幂等播种）落地。
+     *  勘误：V293（#146f td_audit_log 登记）本批锚定时漏数（已入库既有脚本）⇒
+     *  初值 243 系漏数，按实测订正 243→244。 */
+    private static final int SCRIPT_FLOOR = 244;
 
     @Test
     @DisplayName("锁①：扫描面非空——242 枚脚本全部可读，正文为空者只允许登记在册的作废脚本")

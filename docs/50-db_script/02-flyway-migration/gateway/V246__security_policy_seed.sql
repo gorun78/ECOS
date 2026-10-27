@@ -3,6 +3,9 @@
 -- 前置: V164（ecos_rls_policy / ecos_cls_policy / ecos_security_asset 建表单源）
 -- 纪律: DR01~DR08 / MC01~MC03 / ST07 / IR03（只加不删）
 -- 状态: 仅落迁移脚本文件，**未对 ecos-postgres 实跑**（实跑属设计边界未授权项，需逐项再确认）
+--   [2026-10-27 #146i 订正注] 已 dev 实跑（docker ecos-postgres / sys_man）：asset 5 行＋rls 9 行＋cls 2 行入库，
+--   幂等复跑零新增；原「未实跑」状态作废。同批订正三处谓词表名 biz_project_attribution→ecos_biz_project_attribution
+--   （live 单源带 ecos_ 前缀，见表名映射台账 D-7 定档）。
 -- 幂等: 全部 INSERT ... ON CONFLICT DO NOTHING，可重复执行不重复播种。
 -- 数据契约注: 预测场景表名以 fc_* 前缀落业务域 ecos_dw（与列级加密豁免登记表 4 张预登记表一致）；
 --   PRD-07 §1.2 的 ecos_biz_stage_fact 属业务域命名，最终以 02 册 E 章数据契约为准，本批种子在 02 册定稿后回填（§6.3 注）。
@@ -23,7 +26,11 @@ VALUES
      'ST03A-EX-001', 'finance_lead', '资源投入-时薪(非财务隐藏)', '1', 0, 'predictivity', NULL, 'seed-v246'),
     ('sec-asset-resource-input-staffref', 'ecos_dw.fc_resource_input_fact.staff_ref', 'COLUMN', 'S3', 'mask',
      'ST03A-EX-002', 'all_roles', '资源投入-人员引用(工号哈希+展示掩码)', '1', 0, 'predictivity', NULL, 'seed-v246')
-ON CONFLICT ON CONSTRAINT uniq_sec_asset_key DO NOTHING;
+ON CONFLICT (tenant_id, asset_key) WHERE (is_deleted = 0) DO NOTHING;
+-- [2026-10-27 #146i 订正注] 原「ON CONFLICT ON CONSTRAINT uniq_sec_asset_key」dev 实跑即红：
+--   pg_constraint 实查 uniq_sec_asset_key 是 partial UNIQUE INDEX 而非约束（contype 无 u 行）⇒
+--   ON CONSTRAINT 永远解析失败。改 ON CONFLICT (列组) WHERE 部分索引匹配形态（pg 合法）。
+--   幂等等价：资产键 tenant_id 全 NULL，插入互不冲突；重复执行命中部分索引 ⇒ DO NOTHING。
 
 -- ── 2. RLS 策略种子（参数化谓词, source_kind='parameterized'）─────────────
 -- rls-project-owner: 项目负责人看本项目(部门归属子查询)
@@ -33,7 +40,7 @@ INSERT INTO ecos_control.ecos_rls_policy
 VALUES
     ('rls-project-owner-pcf', 'rls-project-owner', 'ecos_dw.fc_project_period_fact', '1=1',
      'project_owner', 100, true, '项目负责人-本部门项目归属',
-     'project_id IN (SELECT project_id FROM ecos_dw.biz_project_attribution WHERE department_id = :userDeptId)',
+     'project_id IN (SELECT project_id FROM ecos_dw.ecos_biz_project_attribution WHERE department_id = :userDeptId)',
      '[{"name":"userDeptId","source":"CONTEXT_ORG","value":null}]', 'parameterized', 'seed-v246')
 ON CONFLICT (id) DO NOTHING;
 INSERT INTO ecos_control.ecos_rls_policy
@@ -42,7 +49,7 @@ INSERT INTO ecos_control.ecos_rls_policy
 VALUES
     ('rls-project-owner-caf', 'rls-project-owner', 'ecos_dw.fc_cost_allocation_fact', '1=1',
      'project_owner', 100, true, '项目负责人-本部门项目归属',
-     'project_id IN (SELECT project_id FROM ecos_dw.biz_project_attribution WHERE department_id = :userDeptId)',
+     'project_id IN (SELECT project_id FROM ecos_dw.ecos_biz_project_attribution WHERE department_id = :userDeptId)',
      '[{"name":"userDeptId","source":"CONTEXT_ORG","value":null}]', 'parameterized', 'seed-v246')
 ON CONFLICT (id) DO NOTHING;
 INSERT INTO ecos_control.ecos_rls_policy
@@ -51,7 +58,7 @@ INSERT INTO ecos_control.ecos_rls_policy
 VALUES
     ('rls-project-owner-rii', 'rls-project-owner', 'ecos_dw.fc_resource_input_fact', '1=1',
      'project_owner', 100, true, '项目负责人-本部门项目归属',
-     'project_id IN (SELECT project_id FROM ecos_dw.biz_project_attribution WHERE department_id = :userDeptId)',
+     'project_id IN (SELECT project_id FROM ecos_dw.ecos_biz_project_attribution WHERE department_id = :userDeptId)',
      '[{"name":"userDeptId","source":"CONTEXT_ORG","value":null}]', 'parameterized', 'seed-v246')
 ON CONFLICT (id) DO NOTHING;
 
@@ -137,4 +144,5 @@ ON CONFLICT (id) DO NOTHING;
 -- [IR04] 无 SELECT * 拼接 ✓  [MC01] id 应用侧固定键(无 gen_random_uuid) ✓
 -- [ST06] 种子数据落控制域策略表(安全域) ✓  数据契约表(fc_*)在业务域 ecos_dw，本脚本不写其 DDL
 -- [DR05] is_deleted SMALLINT 走表默认值 ✓  [ST07] 策略/目录落主控制 schema public ✓
--- [幂等] 两表 seed 全 ON CONFLICT DO NOTHING ✓  （asset 走部分唯一索引 uniq_sec_asset_key，MySQL 镜像用普通唯一）
+-- [幂等] 三表 seed 全 ON CONFLICT DO NOTHING ✓  （asset 走部分唯一索引 uniq_sec_asset_key，冲突目标形如
+--   ON CONFLICT (tenant_id, asset_key) WHERE is_deleted=0，MySQL 镜像用普通唯一）
