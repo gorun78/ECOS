@@ -42,6 +42,12 @@ class KbProfileResolveTest {
                 rows.add(row);
             }
         }
+
+        @Override
+        public java.util.Map<String, Object> profileStock(String status, String metric, java.util.List<String> domains) {
+            // 契约路径不由 resolve 腿触发；显式抛错即红，防契约扩大后假实现混入。
+            throw new UnsupportedOperationException("resolve 验收腿不消费 profileStock");
+        }
     }
 
     @Test

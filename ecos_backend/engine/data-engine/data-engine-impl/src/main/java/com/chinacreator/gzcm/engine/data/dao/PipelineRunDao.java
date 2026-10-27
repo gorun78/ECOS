@@ -4,8 +4,10 @@ import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSuppor
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * B1 数据访问收口（R2-B1 / 架构铁律 §2.5 #1 / IR06）：{@code PipelineExecutionEngine}
@@ -133,6 +135,22 @@ public class PipelineRunDao extends JdbcTemplateDaoSupport {
             + "log_json::text as log_json, started_at, finished_at, elapsed_ms, error_msg, created_at "
             + "FROM ecos_pipeline_run WHERE id = ?",
             runId);
+    }
+
+    /**
+     * 最近一次 SUCCEEDED run 的 finished_at（用于 WAgent Readiness 的 data.staleness_days 取数）。
+     *
+     * <p>只读；无任何成功行时返回 {@link Optional#empty()}（"没有数据"必须由 null 语义表达，
+     * 禁止返回零时间戳或估算值）。SQL 与既有同 DAO 语句风格一致：无 WHERE 参数、
+     * 无显式 schema 前缀（search_path 已在 JDBC URL currentSchema 中声明）。</p>
+     */
+    public Optional<Instant> lastSucceededFinishedAt() {
+        List<Timestamp> rows = jdbcTemplate.queryForList(
+            "SELECT finished_at FROM ecos_pipeline_run "
+            + "WHERE status = 'SUCCEEDED' AND finished_at IS NOT NULL "
+            + "ORDER BY finished_at DESC LIMIT 1",
+            Timestamp.class);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0).toInstant());
     }
 
     /** SINK 真写入：动态 INSERT（含 ON CONFLICT DO NOTHING 依 writeMode）批量落目标表。 */

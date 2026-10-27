@@ -49,4 +49,9 @@ public class JdbcProfileStore implements KbProfileStore {
     public void insert(KbProfileDO row) {
         dao.insert(row);
     }
+
+    @Override
+    public java.util.Map<String, Object> profileStock(String status, String metricCode, List<String> domains) {
+        return dao.profileStock(status, metricCode, domains);
+    }
 }

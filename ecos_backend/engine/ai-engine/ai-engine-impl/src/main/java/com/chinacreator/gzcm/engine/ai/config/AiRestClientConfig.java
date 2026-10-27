@@ -100,7 +100,7 @@ public class AiRestClientConfig {
      * F10-08 DIKC 四层就绪探测专用客户端（{@code EngineProbeClient} 唯一注入面）。
      *
      * <p>口径与 {@code workspaceEngineHealthProbeRest} 同形：<b>基址经 gateway 承流</b>
-     * （四层的 {@code /api/v1/engine/{layer}/health} 与 {@code /api/v1/knowledge/health}
+     * （四层的 {@code /api/v1/engine/{layer}/health} 与 {@code /api/v1/engine/knowledge/health}
      * 都是 gateway 路由前缀，禁在本类写死任何 {@code localhost:180xx}），超时按 F10-08
      * 原文单层 3s 下发（{@link EngineProbeClient#LAYER_BUDGET_MS} 单源，禁在此另立数值）。</p>
      *
@@ -117,6 +117,23 @@ public class AiRestClientConfig {
         restTemplate.setUriTemplateHandler(new LazyProbeBaseHandler());
         restTemplate.setInterceptors(List.of(traceInterceptor()));
         return restTemplate;
+    }
+
+    /**
+     * F10-08 度量取数面专用出向（#146b：{@code ReadinessMetricFetchClient} 唯一装配位）。
+     *
+     * <p><b>与 {@link #wagentEngineProbeRest()} 同基址口径</b>（owner=gateway 延迟解析 +
+     * fail-loud + 单层 3s 预算）：取数与探测是同一条 gateway 承流面上的两种读法，
+     * 基址解析、超时、trace 透传三项纪律必须同形——另立一枚 Bean 就要再写一遍
+     * Handler + 覆盖项，正是 D-B4 重复族要消灭的形态。禁在此复用业务
+     * {@code aiRestTemplate}（read 10s 超时会把一次评估拖过聚合预算，且该 Bean
+     * 不接探测基址 Handler）。</p>
+     */
+    @Bean
+    public com.chinacreator.gzcm.engine.ai.wagent.readiness.ReadinessMetricFetchClient
+            readinessMetricFetchClient(RestTemplate wagentEngineProbeRest) {
+        return new com.chinacreator.gzcm.engine.ai.wagent.readiness.ReadinessMetricFetchClient(
+                wagentEngineProbeRest);
     }
 
     // ── 内部 ─────────────────────────────────────────

@@ -37,7 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 禁散落 URL 字面量」）：层位 → EngineKey → 该 Engine 在位前缀族里取 {@code /api/v1/engine/} 形态的
  * 引擎健康前缀（该族没有时才回落脚首前缀），再拼 {@code health} 段。本类因此<b>不出现任何完整 URL 字面量</b>，
  * 落点实测：D {@code /api/v1/engine/data/health}、I {@code /api/v1/engine/ontology/health}、
- * K {@code /api/v1/knowledge/health}、C {@code /api/v1/engine/cognitive/health}。</p>
+ * K {@code /api/v1/engine/knowledge/health}、C {@code /api/v1/engine/cognitive/health}。</p>
  *
  * <p><b>解包口径对齐 {@code workspace/knowledge/service/KnowledgeHealthAggregator}</b>（同仓既有 health 探针，
  * 不另立协议）：{@code ApiResponse} 包裹时取 {@code data} 段的 {@code {status, components}}；

@@ -75,6 +75,18 @@ public record MetricValue(Kind kind, BigDecimal number, Boolean bool, Map<String
         return new MetricValue(Kind.ABSENT, null, null, ev);
     }
 
+    /**
+     * 未测到 + 具名取证（调用方自带 evidence：endpoint/ownerSource 等取证线索，
+     * "reason" 键由调用方自备（禁与本工厂的 reason 放键互相覆盖成另一形态））。
+     *（#146b：跨引擎取数源的失败腿需带端点取证，无法只走 absent(String) 单参形态）
+     */
+    public static MetricValue absent(String reason, Map<String, Object> evidence) {
+        if (evidence == null || evidence.isEmpty()) {
+            return absent(reason);
+        }
+        return new MetricValue(Kind.ABSENT, null, null, evidence);
+    }
+
     /** 是否可用（ABSENT ⇒ 不可用，检查项只能记 UNKNOWN）。 */
     public boolean available() {
         return kind != Kind.ABSENT;

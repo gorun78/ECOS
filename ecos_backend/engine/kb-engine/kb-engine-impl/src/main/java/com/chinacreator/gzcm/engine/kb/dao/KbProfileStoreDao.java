@@ -7,7 +7,9 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 数据访问收口（R2-B2b kb 子包 / 架构铁律 §2.5 / IR06）：知识库历史画像 JDBC 落点。
@@ -105,6 +107,58 @@ public class KbProfileStoreDao extends JdbcTemplateDaoSupport {
         return jdbcTemplate.query(
                 "SELECT * FROM " + TABLE + " WHERE is_deleted = 0 AND id = ?",
                 ROW_MAPPER, id);
+    }
+
+    /**
+     * 画像存量两计（只读，一次查询）：命中行数 + {@code sample_count} 合计
+     * （供 WAgent Readiness 定级 {@code know.sample_size} 度量取数）。
+     *
+     * <p>SQL 形态（动态 WHERE 与 {@link #query} 同风格，等值列全部 {@code ?} 参数化）：
+     * <pre>SELECT COUNT(*), COALESCE(SUM(sample_count), 0)
+     *      FROM {schema}.ecos_kb_profile WHERE is_deleted = 0
+     *      [AND status = ?] [AND metric_code = ?] [AND domain IN (...)]</pre>
+     *
+     * <p>口径：{@code hasStatusFilter}/{@code metricCode}/{@code domains} 为空则不过滤；
+     * {@code domains} 逐枚 trim 后经 {@code IN (?,...)} 展开，禁拼接值；
+     * 本方法<b>不内置任何默认过滤值</b>（status 缺省策略属服务层安全裁决，不下沉 SQL）。
+     *
+     * @return {@code {profiles: int, sampleSum: long}}；行集为空时
+     *         {@code COUNT(*)=0} 且 {@code COALESCE(SUM(...),0)=0}，两计恒有值。
+     */
+    public Map<String, Object> profileStock(String status, String metricCode, List<String> domains) {
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*), COALESCE(SUM(sample_count), 0)")
+                .append(" FROM ").append(TABLE).append(" WHERE is_deleted = 0");
+        List<Object> args = new ArrayList<>();
+        if (status != null && !status.isBlank()) {
+            sql.append(" AND status = ?");
+            args.add(status.trim());
+        }
+        if (metricCode != null && !metricCode.isBlank()) {
+            sql.append(" AND metric_code = ?");
+            args.add(metricCode.trim());
+        }
+        if (domains != null) {
+            List<String> valid = domains.stream()
+                    .filter(d -> d != null && !d.isBlank())
+                    .map(String::trim)
+                    .toList();
+            if (!valid.isEmpty()) {
+                sql.append(" AND domain IN (")
+                        .append(String.join(", ", java.util.Collections.nCopies(valid.size(), "?")))
+                        .append(")");
+                args.addAll(valid);
+            }
+        }
+        // 两计单行聚合：与既有 DAO 腿同口径走 RowMapper（禁在 DAO 外扩 ResultSetExtractor 绑定面）
+        Object[] row = jdbcTemplate.queryForObject(
+                sql.toString(), (rs, rowNum) -> new Object[]{
+                        rs.getInt(1),
+                        rs.getObject(2) == null ? null : ((Number) rs.getObject(2)).longValue()},
+                args.toArray());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("profiles", row[0]);
+        out.put("sampleSum", row[1]);
+        return out;
     }
 
     public void insert(KbProfileDO row) {

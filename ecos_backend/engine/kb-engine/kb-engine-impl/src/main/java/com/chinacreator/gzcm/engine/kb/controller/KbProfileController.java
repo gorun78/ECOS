@@ -162,6 +162,26 @@ public class KbProfileController {
         return ApiResponse.<Map<String, Object>>success(data).withTraceIdFromMdc();
     }
 
+    /**
+     * GET /stock → 画像存量两计（只读，WAgent Readiness 定级 {@code know.sample_size}
+     * 度量取数端点；业务数据面，默认 authenticated，不登记匿名面）。
+     *
+     * <p>查询参数均可选：{@code metricCode} / {@code domain}（逗号分隔多枚）/
+     * {@code status}（缺省 {@code PUBLISHED}，默认值在本层承载，禁写死 SQL）。
+     * 字面段 {@code /stock} 与 {@code /resolve} 等字面路径并存（无 {@code {profileKey}}
+     * 单段 GET 映射，字面优先恒成立，无需改挂 engine 命名空间）。
+     * 响应 data 段键面固定：profiles / sampleSum / statusFilter / metricCode / domain / evidence。
+     */
+    @GetMapping("/stock")
+    public ApiResponse<Map<String, Object>> stock(
+            @RequestParam(value = "metricCode", required = false) String metricCode,
+            @RequestParam(value = "domain", required = false) String domain,
+            @RequestParam(value = "status", defaultValue = "PUBLISHED") String status) {
+        return ApiResponse.<Map<String, Object>>success(
+                        service.profileStock(status, metricCode, domain))
+                .withTraceIdFromMdc();
+    }
+
     // ── 领域异常 → ApiResponse 映射 ──────────────────────────────────────
 
     private ResponseEntity<ApiResponse<KbProfileDO>> mapMessage(IllegalStateException e) {

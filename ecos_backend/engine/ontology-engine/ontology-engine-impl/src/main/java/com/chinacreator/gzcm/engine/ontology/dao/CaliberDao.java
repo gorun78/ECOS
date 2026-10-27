@@ -183,6 +183,27 @@ public class CaliberDao extends JdbcTemplateDaoSupport {
         }
     }
 
+    /**
+     * WAgent Readiness 供数：统计同指标多口径冲突的 caliber code 数。
+     *
+     * <p>判据：同一 {@code caliber.code} 下存在 ≥2 条 {@code status='APPROVED'} AND
+     * {@code is_deleted=0} 的版本行 ⇒ 冲突指标。</p>
+     */
+    public int countConflictedCaliberCodes() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ("
+                        + "  SELECT c.code "
+                        + "  FROM " + schema + ".ecos_caliber c "
+                        + "  JOIN " + schema + ".ecos_caliber_version cv "
+                        + "    ON cv.caliber_id = c.id AND cv.is_deleted = 0 AND cv.status = 'APPROVED' "
+                        + "  WHERE c.is_deleted = 0 "
+                        + "  GROUP BY c.code "
+                        + "  HAVING COUNT(cv.id) > 1"
+                        + ") t",
+                Integer.class);
+        return count == null ? 0 : count;
+    }
+
     /** rule 3 护栏：读指标当前 caliber_snapshot，行不存在返回 null（首次绑定视为可写）。 */
     public String findMetricCaliberSnapshot(String metricCode) {
         try {

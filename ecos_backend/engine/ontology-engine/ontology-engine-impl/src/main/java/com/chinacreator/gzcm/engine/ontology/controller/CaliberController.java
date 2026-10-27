@@ -299,6 +299,26 @@ public class CaliberController {
         }
     }
 
+    /**
+     * WAgent Readiness 供数：同指标多口径冲突数。
+     *
+     * <p>判据：同一 caliber.code 下存在 ≥2 条 APPROVED 且未删除的版本行 ⇒ 冲突。
+     * 字面路径 {@code /conflict-count} 优先于 {@code /{code}} 匹配（Spring 字面段优先）。</p>
+     */
+    @GetMapping("/conflict-count")
+    public ApiResponse<Map<String, Object>> conflictCount() {
+        try {
+            int count = caliberService.countConflictedCaliberCodes();
+            Map<String, Object> data = new java.util.LinkedHashMap<>();
+            data.put("count", count);
+            data.put("evidence", Map.of("criterion", "multi-APPROVED-versions-per-code"));
+            return ApiResponse.success(data);
+        } catch (Exception e) {
+            log.error("caliber conflict-count failed", e);
+            return ApiResponse.error(500, CODE_INTERNAL, "caliber conflict-count failed");
+        }
+    }
+
     /** 现版号 +1（版本号序列，字符串形态 "1"→"2"）。 */
     private String nextVersionNo(String caliberId) {
         List<Map<String, Object>> versions = caliberService.listVersionsByCaliberId(caliberId, null);

@@ -200,6 +200,17 @@ public class CaliberService {
         }
     }
 
+    /**
+     * WAgent Readiness 供数：同指标多口径冲突数。
+     *
+     * <p>判据：同一 caliber.code 下存在 ≥2 条 APPROVED 且未删除的版本行。</p>
+     *
+     * @return 冲突 caliber code 数量
+     */
+    public int countConflictedCaliberCodes() {
+        return caliberDao.countConflictedCaliberCodes();
+    }
+
     // ────────────────────────────────────────────────────────────
     // Metric 口径绑定（rule 4 / rule 3）
     // ────────────────────────────────────────────────────────────

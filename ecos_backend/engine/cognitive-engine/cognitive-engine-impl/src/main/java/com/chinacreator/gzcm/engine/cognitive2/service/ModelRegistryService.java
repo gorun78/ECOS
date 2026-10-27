@@ -63,12 +63,59 @@ public class ModelRegistryService {
 
     /** 模型列表（按 modelType 可选过滤，未删除，按 model_id/version 排序）。 */
     public List<Map<String, Object>> listModels(String modelType) {
-        return modelRegistryDao.listModels(modelType);
+        return decorateRows(modelRegistryDao.listModels(modelType));
     }
 
-    /** 某 model_id 的全部版本（未删除，version 倒序）。 */
+    /**
+     * 模型列表三维可选过滤（#146b-C additive，只增不改上方 {@link #listModels}）：
+     * {@code registryState} 传值必须可解析为 {@link RegistryState}（DRAFT/PUBLISHED），
+     * 非契约值 fail-loud 400（{@code ECOS-COG-400P}），禁静默忽略；
+     * {@code cognitiveModelType} 传值必须可解析为 {@link CognitiveModelType}（CM-01~07）。
+     *
+     * <p>消费方 = WAgent Readiness：{@code ?registryState=PUBLISHED} 命中行即
+     * {@code cog.cm_ready}（类型在册 ∧ 发布态），响应键 {@code backtestGate}
+     * （gate_backtest 列 PASS/FAIL/PENDING 原值透传）供 {@code cog.backtest_ready} 判定。</p>
+     */
+    public List<Map<String, Object>> listModels(String modelType, String registryState,
+                                                String cognitiveModelType) {
+        String stateFilter = validatedFilter(registryState, "registryState",
+                raw -> RegistryState.fromValue(raw).isPresent(),
+                raw -> RegistryState.fromValue(raw).orElseThrow().name());
+        String cmFilter = validatedFilter(cognitiveModelType, "cognitiveModelType",
+                raw -> CognitiveModelType.fromCode(raw).isPresent(),
+                raw -> raw.trim());
+        return decorateRows(modelRegistryDao.listByTypeAndState(modelType, stateFilter, cmFilter));
+    }
+
+    /** {@code GET /models} 响应行加键（additive，只增不改既有 snake_case 列名键）： */
+    private List<Map<String, Object>> decorateRows(List<Map<String, Object>> rows) {
+        for (Map<String, Object> row : rows) {
+            row.put("backtestGate", row.get(GateOutcome.gateColumn(GateOutcome.GATE_BACKTEST)));
+            row.put("backtestScore", row.get("backtest_score"));
+        }
+        return rows;
+    }
+
+    /**
+     * 可选过滤参数校验（函数式合法判据 = api 层枚举单源）：null/空白 ⇒ 原样返回（不附加条件）；
+     * 非契约值 fail-loud 400（CORM-400，同 {@link #registerModel} 校验形态），禁静默忽略；
+     * 合法值返回查库形态（{@code mapper} 归一，如 trim / 大写 name）。
+     */
+    private static String validatedFilter(String raw, String paramName,
+                                          java.util.function.Predicate<String> isValid,
+                                          java.util.function.Function<String, String> mapper) {
+        if (raw == null || raw.isBlank()) {
+            return raw;
+        }
+        if (!isValid.test(raw)) {
+            throw new BusinessException(400, "CORM-400: 非法 " + paramName + ": " + raw);
+        }
+        return mapper.apply(raw);
+    }
+
+    /** 某 model_id 的全部版本（未删除，version 倒序；读面加键与列表同源）。 */
     public List<Map<String, Object>> getModel(String modelId) {
-        return modelRegistryDao.getModel(modelId);
+        return decorateRows(modelRegistryDao.getModel(modelId));
     }
 
     /**

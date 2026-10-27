@@ -40,14 +40,46 @@ public class ModelRegistryDao extends JdbcTemplateDaoSupport {
             "cognitive_model_type, registry_state, content_hash, supersedes_id, " +
             "gate_contract, gate_regression, gate_backtest, gate_calibration, published_at, published_by";
 
-    /** 模型列表（按 modelType 可选过滤，未删除，按 model_id/version 排序）。 */
+    /**
+     * 模型列表（按 modelType 可选过滤，未删除，按 model_id/version 排序）。
+     *
+     * <p>本体经由 {@link #listByTypeAndState(String, String, String)} 共享筛选器构建
+     * （#146b-C Readiness 供数扩参，2026-10-27），既有单参行为字节等价（registryState/cognitiveModelType
+     * 均不附加条件 ⇒ SQL 与参数序不变；旧方法签名保留，API 只增不改）。</p>
+     */
     public List<Map<String, Object>> listModels(String modelType) {
+        return listByTypeAndState(modelType, null, null);
+    }
+
+    /**
+     * 模型列表三维可选过滤（#146b-C additive，只增不改上方既有方法）：
+     * <ul>
+     *   <li>{@code modelType} — 旧判别列 {@code model_type}（大小写不敏感，同既有 upper 行为）；</li>
+     *   <li>{@code registryState} — {@code registry_state}（DRAFT/PUBLISHED，字面量单源
+     *       cognitive-engine-api {@code RegistryState}，本 DAO 只做列读写不声明枚举）；</li>
+     *   <li>{@code cognitiveModelType} — {@code cognitive_model_type}（CM-01~CM-07 字面量，单源
+     *       cognitive-engine-api {@code CognitiveModelType}）。</li>
+     * </ul>
+     * 任一为 null/空白即不附加对应条件；无匹配返回空列表（禁 500）。
+     * 消费方：WAgent Readiness {@code cog.cm_ready}（cognitiveModelType 在册 ∧ registryState=PUBLISHED）
+     * 与 {@code cog.backtest_ready}（gate_backtest=PASS）判定。
+     */
+    public List<Map<String, Object>> listByTypeAndState(String modelType, String registryState,
+                                                        String cognitiveModelType) {
         StringBuilder sql = new StringBuilder(
             "SELECT " + READ_COLUMNS + " FROM ecos_cognitive.ecos_cognitive_model WHERE is_deleted = 0");
         List<Object> args = new ArrayList<>();
         if (modelType != null && !modelType.isBlank()) {
             sql.append(" AND model_type = ?");
             args.add(modelType.toUpperCase());
+        }
+        if (registryState != null && !registryState.isBlank()) {
+            sql.append(" AND registry_state = ?");
+            args.add(registryState.toUpperCase());
+        }
+        if (cognitiveModelType != null && !cognitiveModelType.isBlank()) {
+            sql.append(" AND cognitive_model_type = ?");
+            args.add(cognitiveModelType.trim());
         }
         sql.append(" ORDER BY model_id, version DESC");
         return jdbcTemplate.queryForList(sql.toString(), args.toArray());

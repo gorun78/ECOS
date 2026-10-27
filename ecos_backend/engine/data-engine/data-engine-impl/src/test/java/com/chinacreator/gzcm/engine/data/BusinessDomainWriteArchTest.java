@@ -150,7 +150,12 @@ class BusinessDomainWriteArchTest {
             "engine/security-engine/security-engine-impl/src/test/java/com/chinacreator/gzcm/engine/security/rolechannel/OpaDeptTest.java",
             "engine/security-engine/security-engine-impl/src/test/java/com/chinacreator/gzcm/engine/security/rolechannel/DecisionDataScopePayloadTest.java",
             "engine/security-engine/security-engine-impl/src/test/java/com/chinacreator/gzcm/engine/security/RlsWhereClauseRenderTest.java",
-            "runtime/common-api/src/test/java/com/chinacreator/gzcm/common/security/cls/ColumnSurfaceContractTest.java");
+            "runtime/common-api/src/test/java/com/chinacreator/gzcm/common/security/cls/ColumnSurfaceContractTest.java",
+            // #142/B4-3e-80/81（D-B4-23 orgId／密级两腿）：/rls/apply 主体域接线测试以上表名做
+            // mock 请求体 tableName 键值（钉「主体真值进得了 RLS 上下文」），纯内存 mock、
+            // 全链路零 JDBC/MyBatis 连接（同族先例）；#146b 全量重跑本模块时由本横切门照出。
+            "engine/security-engine/security-engine-impl/src/test/java/com/chinacreator/gzcm/engine/security/controller/RlsControllerSubjectDepartmentWiringTest.java",
+            "engine/security-engine/security-engine-impl/src/test/java/com/chinacreator/gzcm/engine/security/controller/RlsControllerSubjectClearanceWiringTest.java");
 
     /**
      * 登记面内<b>禁止</b>出现的建连／读写载体。出现任一即视为真实越权读写，豁免失效（见

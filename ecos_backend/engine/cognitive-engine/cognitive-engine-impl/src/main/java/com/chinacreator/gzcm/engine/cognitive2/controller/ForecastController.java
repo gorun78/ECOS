@@ -19,7 +19,7 @@ import java.util.Map;
  *
  * <pre>
  * POST /api/v1/cognitive/forecast              — 时序预测
- * GET  /api/v1/cognitive/models                — 模型注册表列表
+ * GET  /api/v1/cognitive/models                — 模型注册表列表（?modelType=&registryState=&cognitiveModelType= 均可选）
  * GET  /api/v1/cognitive/models/{modelId}      — 模型详情
  * POST /api/v1/cognitive/models                — 注册模型（新增版本）
  * —— 以下 REQ-COG-07 注册中心新端点族（只增不改；{id} = 版本行 id）——
@@ -53,10 +53,30 @@ public class ForecastController {
         return ApiResponse.success(forecastService.forecast(request));
     }
 
-    /** 模型注册表列表（按 type 过滤可选）。 */
+    /**
+     * 模型注册表列表（按 type 过滤可选；#146b-C additive 扩参）。
+     *
+     * <p><b>只增不改</b>：端点路径与既有 {@code modelType} 参数行为原样保留；新增两个可选查询参数
+     * 不传时行为与既有端点字节等价：</p>
+     * <ul>
+     *   <li>{@code registryState}（DRAFT/PUBLISHED，单源 {@code RegistryState}；非契约值 ⇒ 400，
+     *       与 registerModel 同 CORM-400 形态）；</li>
+     *   <li>{@code cognitiveModelType}（CM-01~CM-07，单源 {@code CognitiveModelType}；未知字面量 ⇒ 400）。</li>
+     * </ul>
+     * 消费方 = WAgent Readiness：{@code GET /models?registryState=PUBLISHED&cognitiveModelType=CM-03}
+     * 命中行 ⇒ {@code cog.cm_ready}；响应行键 {@code backtestGate}（gate_backtest 原值透传）
+     * 为 PASS ⇒ {@code cog.backtest_ready}。
+     */
     @GetMapping("/models")
-    public ApiResponse<List<Map<String, Object>>> listModels(@RequestParam(required = false) String modelType) {
-        return ApiResponse.success(modelRegistryService.listModels(modelType));
+    public ApiResponse<List<Map<String, Object>>> listModels(
+            @RequestParam(required = false) String modelType,
+            @RequestParam(required = false) String registryState,
+            @RequestParam(required = false) String cognitiveModelType) {
+        if (registryState == null && cognitiveModelType == null) {
+            return ApiResponse.success(modelRegistryService.listModels(modelType));
+        }
+        return ApiResponse.success(
+                modelRegistryService.listModels(modelType, registryState, cognitiveModelType));
     }
 
     /** 模型详情。 */

@@ -66,10 +66,22 @@ import java.util.UUID;
  * 绝不会留下"有头无明细"的假评估——后者会被 #12 端点当当前等级读出去，是假绿方向。</p>
  *
  * <h3>剩余差距（诚实登记，不在本类内掩盖）</h3>
- * <p>八度量中仅 {@code onto.caliber_defined} 有本域取数面（{@link GoalCaliberMetricSource}），
- * 其余七项因四引擎无读端点而恒 {@code absent} ⇒ 恒 UNKNOWN ⇒ 总级恒不高于 C。
- * 这是"证据缺席"的正确表达，不是缺陷掩盖；端点补齐后新增
- * {@link ReadinessMetricSource} 实现即可，本类不改。</p>
+ * <p><b>#146b 订正（原文「七项恒 absent」不再成立者已撤）</b>：八度量现全部有供数面——
+ * 本域证 {@code GoalCaliberMetricSource}（onto.caliber_defined）+ 四枚属主 REST 取数源
+ * （{@code DataFreshnessMetricSource} data.staleness_days / {@code CaliberConflictCountMetricSource}
+ * onto.conflict_count / {@code KbProfileStockMetricSource} know.sample_size /
+ * {@code CognitiveModelReadinessMetricSource} cog.cm_ready+backtest_ready，属主端点
+ * 分别落 data/ontology/kb/cognitive 四引擎，经 {@code ReadinessMetricFetchClient}
+ * 透传凭证出向）。<b>仍然恒 absent 的三项（口径裁决，非缺端点）</b>：
+ * ① {@code data.check_coverage}——"目标口径覆盖的期间/组织单元比例"无属主读端点且
+ * 无本域可推口径（比例没有分母定义），取不到就是取不到，端点补齐后加源即可；
+ * ② {@code know.applicability}——"命中画像对当前 scope 的适用度"需要画像 scope 匹配
+ * 语义，kb 库存量端点（/stock 两计）不承载该语义，禁从样本量反推适用度；
+ * ③ 未映射意图（DIAGNOSE/RANK/MONITOR/BUILD/REVIEW）的 C 层两项——契约
+ * {@code CognitiveModelType.fromLegacyModelType} 只有四枚映射，禁就近猜型。
+ * 另两项已知盲区如实保留：异步腿无凭证载体 ⇒ 取数 401 ⇒ absent（有意 fail-closed，
+ * 服务间凭证签名腿另批）；{@code onto.caliber_defined} 只答"绑没绑"不答"版本侧是否
+ * 仍 PUBLISHED"（属主口径版本状态读端点缺席，known gap (b) 不改）。</p>
  */
 @Service
 public class ReadinessService {

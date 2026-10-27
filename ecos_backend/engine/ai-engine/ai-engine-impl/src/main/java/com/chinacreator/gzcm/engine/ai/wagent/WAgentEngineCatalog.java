@@ -108,8 +108,11 @@ public final class WAgentEngineCatalog {
         // Knowledge Engine：dccheng JAR :18086（卷 04）。在位前缀族：/api/v1/knowledge。
         m.put(EngineKey.KNOWLEDGE, new EngineEntry(EngineKey.KNOWLEDGE, "Knowledge Engine",
                 "kb-engine (dccheng :18086)",
-                List.of("/api/v1/knowledge/"),
-                "卷 04 REQ-KB-*；Readiness K 层 know.select_profiles（F10-08）",
+                List.of("/api/v1/knowledge/", "/api/v1/engine/knowledge/"),
+                "卷 04 REQ-KB-*；Readiness K 层 know.select_profiles（F10-08）；"
+                        + "引擎健康面实测在位前缀 = /api/v1/engine/knowledge（KbEngineHealthController，"
+                        + "与 data/ontology/cognitive 的 /api/v1/engine/{族}/health 同形态；"
+                        + "route-manifest owner=dccheng 同前缀）",
                 "候选（知识项/假设/情景）经属主 Engine 写端点；KB 侧 kb_extract_candidate 以 CandidateAdapterPort 只读映射（F10-20）",
                 false));
         // Cognition Engine：:18089（卷 05）。在位前缀族：/api/v1/cognitive（X-18 复验）、

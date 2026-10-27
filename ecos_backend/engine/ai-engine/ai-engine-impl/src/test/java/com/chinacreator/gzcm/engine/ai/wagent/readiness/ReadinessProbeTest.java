@@ -209,7 +209,10 @@ class ReadinessProbeTest {
     void healthPathsComeFromEngineCatalog() {
         assertEquals("/api/v1/engine/data/health", EngineProbeClient.healthPath(ReadinessLayer.D));
         assertEquals("/api/v1/engine/ontology/health", EngineProbeClient.healthPath(ReadinessLayer.I));
-        assertEquals("/api/v1/knowledge/health", EngineProbeClient.healthPath(ReadinessLayer.K));
+        // K 层：KB 属主健康面实测在位 = /api/v1/engine/knowledge/health（KbEngineHealthController
+        // 挂 /api/v1/engine/knowledge，非 /api/v1/knowledge——#146b 目录前缀族订正，
+        // 与 data/ontology/cognitive 三层的 /api/v1/engine/{族}/health 同形态）
+        assertEquals("/api/v1/engine/knowledge/health", EngineProbeClient.healthPath(ReadinessLayer.K));
         assertEquals("/api/v1/engine/cognitive/health", EngineProbeClient.healthPath(ReadinessLayer.C));
         assertEquals(3000L, EngineProbeClient.LAYER_BUDGET_MS,
                 "F10-08 原文「每层超时 3 秒」，禁另立数值");

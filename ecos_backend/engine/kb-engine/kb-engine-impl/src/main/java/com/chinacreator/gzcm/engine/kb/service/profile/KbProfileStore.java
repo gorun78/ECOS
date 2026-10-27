@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.service.profile;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 历史画像存储端口（解耦生产 JdbcTemplate 实现与单测内存实现）。
@@ -21,4 +22,15 @@ public interface KbProfileStore {
 
     /** 插入新画像行（版本化新增，绝不 UPDATE 已发布行 — I-6）。 */
     void insert(KbProfileDO row);
+
+    /**
+     * 画像存量两计（只读，一次查询，WAgent Readiness {@code know.sample_size} 供数）：
+     * 命中行数 + {@code sample_count} 合计。
+     *
+     * @param status     画像状态过滤（DRAFT/PUBLISHED/SUPERSEDED），空/null 不过滤
+     * @param metricCode 指标编码过滤，空/null 不过滤
+     * @param domains    域过滤集（逗号拆分后逐枚 trim），空/全空不过滤；实现侧按 {@code IN (?,...)} 参数化展开
+     * @return {@code Map}，常量键 {@code profiles}(int) + {@code sampleSum}(long)（无命中行时两计为 0，禁 null）
+     */
+    Map<String, Object> profileStock(String status, String metricCode, List<String> domains);
 }

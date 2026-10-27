@@ -134,12 +134,17 @@ class WAgentForbiddenDependencyArchTest {
      *  2026-10-18 +1（258→259）= #143/B5-5b（D-B5-8 WAgent run 流八帧收口）新增
      *  {@code ai.wagent.stream.WAgentSseFrames}（W 通道唯一出帧面）。包位取 wagent 子树而非 {@code ai.stream}：
      *  首版落 {@code ai.stream} 时被 {@code TerminologyArchTest.wAgentClassesResideInWagentPackageOnly}
-     *  （F10-01 术语门）抓红 ⇒ 按"改码不改闸"迁入 wagent 包，改类名绕门不在选项内。</p>
-     * <p>计数口径 = {@code find src/main/java -name '*.java' | wc -l} 于 2026-10-18 实测 <b>259</b>。</p>
+     *  （F10-01 术语门）抓红 ⇒ 按"改码不改闸"迁入 wagent 包，改类名绕门不在选项内；
+     *  2026-10-26 +5（259→264）= #146b（Readiness 八度量供数面收口）新增五个同包取数实现：
+     *  {@code ai.wagent.readiness.ReadinessMetricFetchClient} / {@code DataFreshnessMetricSource} /
+     *  {@code CaliberConflictCountMetricSource} / {@code KbProfileStockMetricSource} /
+     *  {@code CognitiveModelReadinessMetricSource}（跨引擎取数面，见下方名录断言扩 2 枚）。
+     * <p>计数口径 = {@code find src/main/java -name '*.java' | wc -l} 于 2026-10-26 实测 <b>264</b>。</p>
      */
-    private static final int AI_SOURCE_FILE_FLOOR = 259;
+    private static final int AI_SOURCE_FILE_FLOOR = 264;
 
-    /** 反空集锁④：跨引擎门面引用单点（详设-06 F06-11 forecast.explain 走 cognitive api 常量）。 */
+    /** 反空集锁④：跨引擎门面引用单源（详设-06 F06-11 forecast.explain 走 cognitive api 常量；
+     *  #146b 后 = 3 条，新增两枚同属 cognitive.api 契约枚举/门禁值消费，形态仍是 api 门面）。 */
     private static final Pattern ENGINE_IMPORT =
             Pattern.compile("^import\\s+(static\\s+)?com\\.chinacreator\\.gzcm\\.engine\\.([a-z]+)(\\.[A-Za-z0-9_.$]*)\\s*;");
     /** 反空集锁①（正控制边）：wagent DAO 必须看得见唯一基类依赖，证明依赖图真的建了。 */
@@ -190,7 +195,10 @@ class WAgentForbiddenDependencyArchTest {
                 + String.join("\n", offenders));
 
         List<ImportHit> facadeImports = foreignEngineImportsFromSource();
-        assertEquals(List.of("ScenarioToolCatalog.java -> com.chinacreator.gzcm.engine.cognitive.api.CognitiveApiPaths"),
+        assertEquals(List.of(
+                        "ScenarioToolCatalog.java -> com.chinacreator.gzcm.engine.cognitive.api.CognitiveApiPaths",
+                        "CognitiveModelReadinessMetricSource.java -> com.chinacreator.gzcm.engine.cognitive.api.CognitiveModelType",
+                        "CognitiveModelReadinessMetricSource.java -> com.chinacreator.gzcm.engine.cognitive.api.GateOutcome"),
                 facadeImports.stream()
                         .map(hit -> hit.fileName() + " -> " + hit.fqn())
                         .collect(Collectors.toList()),

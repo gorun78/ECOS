@@ -183,6 +183,40 @@ public class KbProfileService {
     public record ResolveResult(KbProfileDO profile, List<String> degradeChain) {
     }
 
+    /**
+     * 画像存量两计（只读，WAgent Readiness 定级 {@code know.sample_size} 度量属主取数）。
+     *
+     * <p>口径：{@code status}/{@code metricCode}/{@code domain} 为空则不过滤（缺省策略由
+     * 控制器层承载，本方法不内置默认值）；{@code domain} 支持逗号分隔多枚，DAO 侧
+     * 按 {@code IN (?,...)} 参数化展开。返回键面固定：
+     * {@code {profiles:int, sampleSum:long, statusFilter:String|null,
+     * metricCode:String|null, domain:String|null, evidence:{table}}}；
+     * 无命中行时 DAO 侧 {@code COUNT(*)=0} / {@code COALESCE(SUM)=0}，本方法对
+     * {@code sampleSum=null} 再兜底 0（禁把「无存量」回成 null 制造口径歧义）。
+     */
+    public Map<String, Object> profileStock(String status, String metricCode, String domain) {
+        List<String> domains = null;
+        if (domain != null && !domain.isBlank()) {
+            domains = java.util.Arrays.stream(domain.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+        }
+        String statusFilter = (status == null || status.isBlank()) ? null : status.trim();
+        String metric = (metricCode == null || metricCode.isBlank()) ? null : metricCode.trim();
+        Map<String, Object> stock = store.profileStock(statusFilter, metric, domains);
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        Object profiles = stock.get("profiles");
+        Object sampleSum = stock.get("sampleSum");
+        out.put("profiles", profiles == null ? 0 : ((Number) profiles).intValue());
+        out.put("sampleSum", sampleSum == null ? 0L : ((Number) sampleSum).longValue());
+        out.put("statusFilter", statusFilter);
+        out.put("metricCode", metric);
+        out.put("domain", domain == null || domain.isBlank() ? null : domain.trim());
+        out.put("evidence", Map.of("table", "ecos_knowledge.ecos_kb_profile"));
+        return out;
+    }
+
     // ── 内部工具 ─────────────────────────────────────────────────
 
     private List<Number> safeFetch(String metric, List<String> dims, String from, String to) {
