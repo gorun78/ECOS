@@ -35,8 +35,10 @@ import org.junit.jupiter.api.Test;
  *   <li>对 {@code PipelineTaskController.java} 用反射 + 源码正则分别抽取每个写端点的
  *       {@code @PostMapping/@PutMapping/@DeleteMapping} 方法和 {@code throw readonlyConflict(...)}
  *       抛出语句，断言全部 5 个写方法均显式 {@code throw readonlyConflict}（409 桩）。</li>
- *   <li>断言控制器声明了 {@code static final String ECOS_DATA_011 = "ECOS-DATA-011"} 常量
- *       与 {@code readonlyConflict(..)} helper（httpStatus=409）。</li>
+ *   <li>断言控制器声明的 409 消息常量单源取自
+ *       {@link com.chinacreator.gzcm.common.data.DataDomainErrorCode#ECOS_DATA_011}（ECOS-DATA-011，
+ *       #146l/B4-3e-93 起改指属主常量，不再本地承载字面量），与
+ *       {@code readonlyConflict(..)} helper（httpStatus=409）。</li>
  *   <li>对 {@link com.chinacreator.gzcm.common.exception.DataBridgeException} 反射调用
  *       {@code getHttpStatus()}，断言 {@code new DataBridgeException(409, 409, msg)} 的 httpStatus=409
  *       → 即 {@code readonlyConflict(..)} 抛出的异常的 httpStatus 必为 409。</li>
@@ -77,9 +79,9 @@ class YamlTaskReadOnlyTest {
         assertTrue(Files.isRegularFile(src), "缺 PipelineTaskController 源文件: " + src);
         String contents = Files.readString(src, StandardCharsets.UTF_8);
 
-        // ① 常量声明：ECOS_DATA_011 = "ECOS-DATA-011"（消息首段固定错误码）
-        assertTrue(contents.contains("\"ECOS-DATA-011\""),
-                "PipelineTaskController 必须声明 ECOS_DATA_011 常量值 \"ECOS-DATA-011\"");
+        // ① 常量声明：消息首段机读码单源取 DataDomainErrorCode.ECOS_DATA_011（#146l/B4-3e-93 起改指属主常量）
+        assertTrue(contents.contains("DataDomainErrorCode.ECOS_DATA_011"),
+                "PipelineTaskController 必须从 DataDomainErrorCode 单源取 409 机读码");
         // ② readonlyConflict helper 走 DataBridgeException(httpStatus=409, errorCode=409)
         assertTrue(contents.contains("readonlyConflict"),
                 "PipelineTaskController 必须提供 readonlyConflict(409 桩) helper");

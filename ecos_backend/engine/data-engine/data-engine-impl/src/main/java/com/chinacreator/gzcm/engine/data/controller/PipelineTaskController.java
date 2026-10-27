@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.data.PipelineTaskService;
 import org.slf4j.Logger;
@@ -40,9 +41,8 @@ public class PipelineTaskController {
 
     private static final Logger log = LoggerFactory.getLogger(PipelineTaskController.class);
 
-    /** F02-03 错误码：409，YAML 管道模型只读（详细设计-02 §D.1）。 */
-    static final String ECOS_DATA_011 = "ECOS-DATA-011";
-    static final String READONLY_MESSAGE = ECOS_DATA_011
+    /** F02-03 读端点 409 消息：机读码单源取自 {@link DataDomainErrorCode#ECOS_DATA_011}。 */
+    static final String READONLY_MESSAGE = DataDomainErrorCode.ECOS_DATA_011
             + " YAML 管道模型已只读，请改用 /api/v1/pipeline/definitions";
 
     /** F02-03：写端点冲突码（409 Conflict，带业务错误码字段）。 */

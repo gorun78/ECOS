@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.data.fact.service;
 
+import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import com.chinacreator.gzcm.engine.data.fact.dao.ForecastRunSnapshotMapper;
 import com.chinacreator.gzcm.engine.data.model.ForecastRunSnapshotVO;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -65,7 +66,7 @@ public class ForecastRunSnapshotService {
     public ForecastRunSnapshotVO getSnapshot(String forecastRunId) {
         if (forecastRunId == null || forecastRunId.isBlank()) {
             throw new com.chinacreator.gzcm.common.exception.DataBridgeException(
-                    400, 400, "ECOS-DATA-023：forecastRunId 不能为空（禁全库扫描）", null);
+                    400, 400, DataDomainErrorCode.ECOS_DATA_023 + "：forecastRunId 不能为空（禁全库扫描）", null);
         }
         Map<String, Object> header = snapshotMapper.selectRunHeader(forecastRunId.trim());
         if (header == null) {
@@ -88,7 +89,7 @@ public class ForecastRunSnapshotService {
     public ForecastRunSnapshotVO getSnapshotByIdempotencyKey(String idempotencyKey) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new com.chinacreator.gzcm.common.exception.DataBridgeException(
-                    400, 400, "ECOS-DATA-023：idempotencyKey 不能为空（禁全库扫描）", null);
+                    400, 400, DataDomainErrorCode.ECOS_DATA_023 + "：idempotencyKey 不能为空（禁全库扫描）", null);
         }
         Map<String, Object> header = snapshotMapper.selectRunHeaderByIdempotencyKey(idempotencyKey.trim());
         return header == null ? null : toSnapshotVO(header);

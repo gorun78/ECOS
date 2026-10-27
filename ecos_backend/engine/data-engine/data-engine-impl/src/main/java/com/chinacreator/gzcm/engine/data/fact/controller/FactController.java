@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.data.fact.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
 import com.chinacreator.gzcm.engine.data.fact.FactType;
@@ -141,7 +142,7 @@ public class FactController {
             return FactType.fromPath(factType);
         } catch (IllegalArgumentException e) {
             throw new DataBridgeException(400, 400,
-                    "ECOS-DATA-023：" + e.getMessage(), null);
+                    DataDomainErrorCode.ECOS_DATA_023 + "：" + e.getMessage(), null);
         }
     }
 }

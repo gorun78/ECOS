@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.base.MachineErrorCode;
+import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.data.dto.WriteChannelRequest;
 import com.chinacreator.gzcm.engine.data.dto.WriteChannelResult;
@@ -87,7 +88,7 @@ public class WriteChannelController {
         } catch (Exception e) {
             log.error("写通道内部错误: {}", e.getMessage(), e);
             return failure(ApiResponse.error(ApiResponse.CODE_INTERNAL_ERROR,
-                    "ECOS-DATA-055", "写通道内部错误: " + e.getMessage()));
+                    DataDomainErrorCode.ECOS_DATA_055, "写通道内部错误: " + e.getMessage()));
         }
     }
 

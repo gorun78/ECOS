@@ -373,7 +373,9 @@ public class FactImportService {
     public Map<String, Object> writeActionOutcome(ActionOutcomeRequest req) {
         if (req == null || req.getFactId() == null || req.getFactId().isBlank()
                 || req.getOutcome() == null || req.getOutcome().isBlank()) {
-            throw badRequest("ECOS-DATA-000", "factId 与 outcome 必填");
+            // 入参不合法机读码单源归位：原 "ECOS-DATA-000" 为冻结表 §D.1 未登记码（幽灵码），
+            // 与本文件其余 8 枚兄弟入参腿同取 ECOS_DATA_023（详设-02 §D.1 数据域 400/422 段）
+            throw badRequest(DataDomainErrorCode.ECOS_DATA_023, "factId 与 outcome 必填");
         }
         FactType type = FactType.fromPath(req.getFactType());
         String idemKey = trimToNull(req.getIdempotencyKey());

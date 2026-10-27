@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ontology.client;
 
+import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import com.chinacreator.gzcm.common.exception.DataAccessException;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
@@ -37,8 +38,8 @@ public class DataNetResourceClient {
     private static final Logger log = LoggerFactory.getLogger(DataNetResourceClient.class);
 
     /** 跨引擎取数依赖不可用（F02-15/分册 00 D.5 错误码表；P0 fail-loud）。
-     *  注：common-api 的 DataDomainErrorCode.ECOS_DATA_041 落地后应切换为常量引用。 */
-    static final String CODE_CROSS_ENGINE_UNAVAILABLE = "ECOS-DATA-041";
+     *  机读码单源取自 {@link DataDomainErrorCode#ECOS_DATA_041}（#146l/B4-3e-93 已切换为常量引用）。 */
+    static final String CODE_CROSS_ENGINE_UNAVAILABLE = DataDomainErrorCode.ECOS_DATA_041;
 
     /** fail-loud 的 HTTP 状态（网关 GlobalExceptionHandler 依 DataBridgeException.httpStatus 透出）。 */
     static final int STATUS_CROSS_ENGINE_UNAVAILABLE = 503;

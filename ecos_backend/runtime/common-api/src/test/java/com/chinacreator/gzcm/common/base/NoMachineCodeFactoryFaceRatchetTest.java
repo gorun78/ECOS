@@ -175,6 +175,28 @@ class NoMachineCodeFactoryFaceRatchetTest {
     private static final String QUOTA_FILTER_SOURCE =
             "ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/filter/QuotaFilter.java";
 
+    /**
+     * {@code ECOS-(DATA|DQ)-*} 族码字面量（带引号的串），单源只允许 {@link #DATA_DOMAIN_ERROR_CODE_SOURCE}
+     * 承载。
+     *
+     * <p><b>#142/B4-3e-93 新登</b>（收口差距 P1.1「DATA/DQ 族字面量散落」子项）：与
+     * {@link #SYS_FAMILY_LITERAL}／{@link #RATE_FAMILY_LITERAL} 同型的零容差判据。判据锚
+     * <b>引号起点族前缀</b>（引号-族前缀-数字），把「独立整枚」与「族码＋详情」两形态
+     * 一并钉住——前者如裸 {@code "ECOS-DATA-011"}，后者即消息前缀拼接面（如
+     * {@code "ECOS-DATA-023：" + msg}）。本批已实扫 main 面将全部非属主副本（6 枚独立
+     * 字面量：PipelineTaskController 011／PipelineServiceImpl 012+013／WriteChannelController
+     * 055／FactImportService 幽灵 000 归位 023／DataNetResourceClient 041；加 5 枚消息前缀
+     * 拼接腿：FactController 023／ForecastRunSnapshotService 023×2／KnowledgeDocIngestService
+     * 041／KbEntityInstanceExtractionService 041）改指 {@code DataDomainErrorCode} 常量后，
+     * 全仓 main 面族码字面量应恒 0 枚，故直接零容忍（不设棘轮基线）。
+     * 注释提及不算（判据面先过 {@code SourceCommentStripper.strip}）。</p>
+     */
+    private static final Pattern DATA_FAMILY_LITERAL = Pattern.compile("\"ECOS-(?:DATA|DQ)-\\d+[^\\\"]*\"");
+
+    /** {@code ECOS-DATA-*}／{@code ECOS-DQ-*} 族码字面量单源文件（唯一承载点，22 枚枚定值）。 */
+    private static final String DATA_DOMAIN_ERROR_CODE_SOURCE =
+            "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/gzcm/common/data/DataDomainErrorCode.java";
+
     /** 登记豁免：唯一保留单参的入口腿。 */
     private static final List<String> REGISTERED_ENTRY_EXEMPTIONS = List.of("handleNotFound");
 
@@ -300,6 +322,41 @@ class NoMachineCodeFactoryFaceRatchetTest {
         assertEquals(List.of(), copies,
                 "main 面出现 ECOS-RATE-* 字面量副本：出口应改取 RateLimitErrorCode 常量，"
                         + "新增族请先登记进该族并同步 §3.2.7 冻结表与附录 C。副本清单=" + copies);
+    }
+
+    /**
+     * {@code ECOS-(DATA|DQ)-*} 族码字面量（独立整枚与消息前缀拼接两形态）在 main 面只由
+     * {@code DataDomainErrorCode} 单源承载。此为 P1.1「错误码族系统性漂移」的数据域批
+     * （#142/B4-3e-93）零容忍判据：本批已把 11 枚非属主副本（6 枚独立字面量 + 5 枚
+     * 消息前缀拼接腿）全部改指属主常量，改后全仓 main 面族码字面量应恒 0 枚——故直接
+     * {@code assertEquals(List.of(), …)}，不设棘轮基线（新增即红，无需「只减不增」窗口）。
+     */
+    @Test
+    @DisplayName("ECOS-(DATA|DQ)-* 族码字面量在 main 面只由 DataDomainErrorCode 单源承载（副本即红）")
+    void dataFamilyLiteralsAreSingleSourced() throws IOException {
+        Path root = locateRepoRoot();
+        List<Path> files = new ArrayList<>();
+        collectJavaUnder(root.resolve("ecos_backend"), files);
+        assertTrue(files.size() >= MIN_SCANNED_MAIN_FILES,
+                "扫描面缩水：实扫 main 面 java 文件 " + files.size() + " < 阈值 "
+                        + MIN_SCANNED_MAIN_FILES + "，判据不可信（读不到 ≠ 无副本）");
+
+        List<String> copies = new ArrayList<>();
+        for (Path f : files) {
+            String rel = root.relativize(f).toString().replace('\\', '/');
+            if (DATA_DOMAIN_ERROR_CODE_SOURCE.equals(rel)) {
+                continue;
+            }
+            String stripped = SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+            Matcher m = DATA_FAMILY_LITERAL.matcher(stripped);
+            while (m.find()) {
+                copies.add(rel + " → " + m.group());
+            }
+        }
+        assertEquals(List.of(), copies,
+                "main 面出现 ECOS-(DATA|DQ)-* 字面量副本（独立整枚或消息前缀拼接）：出口应改取 "
+                        + "DataDomainErrorCode 常量，新增族码请先登记进详设-02 §D.1 冻结表并同步本族。"
+                        + "副本清单=" + copies);
     }
 
     /**

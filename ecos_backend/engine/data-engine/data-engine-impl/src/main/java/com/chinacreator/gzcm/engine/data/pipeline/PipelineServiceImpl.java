@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.data.pipeline;
 
+import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
@@ -38,10 +39,10 @@ public class PipelineServiceImpl implements PipelineService {
     /** 节点类型全集（Wave 4 T1 抽到 PipelineNodeTypesCatalog，前后端枚举同源 §4.8.2） */
     private static final Set<String> VALID_NODE_TYPES = PipelineNodeTypesCatalog.SUPPORTED;
 
-    /** F02-04：节点类型不可用（未实现）/ 必填配置缺失 → 400（详细设计-02 §D.1）。 */
-    static final String ECOS_DATA_012 = "ECOS-DATA-012";
-    /** F02-04：DAG 非法（环 / 孤立节点 / 悬挂边）→ 400（详细设计-02 §D.1）。 */
-    static final String ECOS_DATA_013 = "ECOS-DATA-013";
+    /** F02-04：节点类型不可用（未实现）/ 必填配置缺失 → 400（详细设计-02 §D.1）。机读码单源取自 {@link DataDomainErrorCode#ECOS_DATA_012}。 */
+    static final String ECOS_DATA_012 = DataDomainErrorCode.ECOS_DATA_012;
+    /** F02-04：DAG 非法（环 / 孤立节点 / 悬挂边）→ 400（详细设计-02 §D.1）。机读码单源取自 {@link DataDomainErrorCode#ECOS_DATA_013}。 */
+    static final String ECOS_DATA_013 = DataDomainErrorCode.ECOS_DATA_013;
 
     /** 列表（摘要）场景下不返回 nodes */
     private final PipelineRepository repository;

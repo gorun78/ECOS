@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
+import com.chinacreator.gzcm.common.data.DataDomainErrorCode;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.exception.DataAccessException;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
@@ -147,8 +148,8 @@ public class KnowledgeDocIngestService {
     /** 跨引擎依赖不可用 → fail-loud 503 + ECOS-DATA-041（ingest 编排层 catch 中按 DataBridgeException
      *  原样上抛，不再包装为 500 DataAccessException）。 */
     private static DataBridgeException crossEngineUnavailable(String reason) {
-        // 注：common-api DataDomainErrorCode.ECOS_DATA_041 落地后应切换为常量引用
-        return new DataBridgeException(503, 503, "ECOS-DATA-041: " + reason);
+        // #146l/B4-3e-93：机读码已切 common-api 属主常量单源（原文案逐字不变）
+        return new DataBridgeException(503, 503, DataDomainErrorCode.ECOS_DATA_041 + ": " + reason);
     }
 
     /**
