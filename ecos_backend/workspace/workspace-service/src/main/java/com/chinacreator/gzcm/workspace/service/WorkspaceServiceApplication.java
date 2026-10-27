@@ -91,10 +91,15 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 })
 @MapperScan({
         // 卷07 F07-01/X-7：原三条 workspace 通配（**.repository / **.dao / **.mapper）
-        // 全部指向**不存在**的包 —— workspace 目前 0 个 MyBatis Mapper 接口
-        // （数据访问走 dao.WorkspaceDataDao，是 JdbcTemplate DAO 不是 mapper）。
-        // 通配 @MapperScan 扫空包不会报错，但把"没有 mapper"伪装成"已收口"，
-        // 故收成一个显式包名：新增 mapper 必须落在这里才被子产品扫描到。
+        // 收敛成一个显式包名：新增 mapper 必须落在 .mapper 才被子产品扫描到。
+        // 【#146f / D-1 订正，2026-10-27】"workspace 0 个 MyBatis Mapper" 的旧表述失真：
+        // 本包实登 7 个 @Mapper 接口（ScenarioMapper/ScenarioBindingMapper/ScenarioMindMapper/
+        // ScenarioRunMapper/SandboxLayoutMapper/DecisionRecordMapper/BindingLinkMapper），其中
+        // SCENARIO 实体双载体的 ScenarioMapper（V205 ecos_scenario_definition）+
+        // ScenarioBindingMapper（V206 ecos_scenario_asset_binding）经本 @MapperScan 注册为 Bean，
+        // 但全仓生产零注入零消费方（Javadoc 仅指向未建成的"批次 C 收口接缝"），dev 两表均 0 行
+        // ＝规划未启用的休眠腿，运行权威仍是 dao.WorkspaceDataDao（ecos_business_scenario）。
+        // 休眠腿接线纪律由 workspace-impl ScenarioTableMapperLegDormancyGateTest 构建期钉死。
         "com.chinacreator.gzcm.workspace.mapper",
         // buszhi (ObjectRuntime/State Machine 库)
         "com.chinacreator.gzcm.buszhi.**.repository",
