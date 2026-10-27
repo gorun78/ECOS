@@ -18,6 +18,16 @@
 --   1. ecos_knowledge.kb_extract_watermark — 抽取水位线（唯一键 ontology_id + entity_code + resource_id）
 --   2. ecos_knowledge.kg_sync_log.report   — 抽取报告 JSONB（V115 表只加列，不删不改）
 --
+-- 【#146h knownLegacy 注记 2026-10-27】本脚本 dev PG 从未实跑（两腿对象库面均不存在、0 行历史），
+-- 并存在 DR04 违例形态（report 列为 JSONB，DR04 要求 JSON 一律 _json TEXT）。
+-- ① 水位表 kb_extract_watermark 的 live 承接表 = V179 合规新表
+--    ecos_knowledge.ecos_kb_extract_watermark（VARCHAR(36) 应用侧 UUID PK，
+--    updated_at→update_time，唯一键 (ontology_id, entity_code, resource_id, is_deleted)）；
+-- ② 报告列 kg_sync_log.report 的 live 承接列 = V179 新表 ecos_kg_sync_log.report_json（TEXT）。
+-- #146h 起全部生产 DAO 读/写端已切合规范新表/列（映射台账 §D-7 裁决，
+-- kb-engine 回潮门禁 KbExtractBareTableGateTest 钉位）。本脚本判 knownLegacy
+-- 停再跑，不 DROP（IR03）；本头注只登记不改 DDL 本体。
+--
 -- Schema 铁律: 只加不删（铁律 3.1）+ IF NOT EXISTS 幂等
 -- 执行方式: Flyway 已禁用（spring.flyway.enabled=false），本脚本为规范记录，
 --           需人工执行到目标库（sys_man）后方可生效。

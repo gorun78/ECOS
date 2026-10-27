@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * <p>V200/R3-B1: schema 由 `${kb.control-schema:ecos_knowledge}` 注入 (MC06 全面落地)。</p>
@@ -54,8 +55,11 @@ public class EcosKnowledgeGraphDao extends JdbcTemplateDaoSupport {
 
     public void insertNeo4jSyncLog(String jobId) {
         jdbcTemplate.update(
-                    "INSERT INTO " + schema + ".kg_sync_log " +
-                    "(object_type, op, job_id, status, progress) VALUES (?, ?, ?, 'RUNNING', 0)",
-                    "ALL", "NEO4J_SYNC", jobId);
+                    // #146h D-7（2026-10-27）：kg_sync_log（V115，dev 库面不存在）→ V179 合规新表 ecos_kg_sync_log；
+                    // id 应用侧 UUID（MC01）、op 列名 sync_op、create_time 显式补（V179 finish_deny_in-place 语义）。
+                    "INSERT INTO " + schema + ".ecos_kg_sync_log " +
+                    "(id, object_type, sync_op, job_id, status, progress, create_time) " +
+                    "VALUES (?, ?, ?, ?, 'RUNNING', 0, NOW())",
+                    UUID.randomUUID().toString(), "ALL", "NEO4J_SYNC", jobId);
     }
 }

@@ -9,6 +9,14 @@
 --
 -- 恢复说明：2.1-alpha 手工合并时本脚本丢失（迁移序列 V114 → V116 断号），
 -- 而 KgSyncServiceImpl javadoc 与 V116__kb_ontology_snapshot.sql 注释均引用本编号，故按代码实际列用法补齐。
+--
+-- 【#146h knownLegacy 注记 2026-10-27】本脚本 dev PG 从未实跑（to_regclass 归 NULL，表无 0 行历史）。
+-- kg_sync_log 族（含本表）的 live 承接表 = V179 合规新表 ecos_knowledge.ecos_kg_sync_log
+-- （VARCHAR(36) 应用侧 UUID PK；op→sync_op / nodes→node_count / edges→edge_count /
+--  created_at→create_time / finished_at→finished_time / report→report_json TEXT）。
+-- #146h 起全部生产 DAO 读/写端已切 ecos_kg_sync_log（映射台账 §D-7 裁决，
+-- kb-engine 回潮门禁 KbExtractBareTableGateTest 钉位）。本脚本判 knownLegacy 停再跑，
+-- 不 DROP（schema 只加不删，IR03）；本头注只登记不改 DDL 本体。
 
 CREATE TABLE IF NOT EXISTS ecos_knowledge.kg_sync_log (
     id            BIGSERIAL     PRIMARY KEY,

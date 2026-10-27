@@ -180,7 +180,7 @@ public class EcosOntologyEventConsumer {
             try {
                 dao.insertSyncLogFailed(evt.ontologyId(), jobId, truncate(e.getMessage(), 1000));
             } catch (Exception logEx) {
-                log.error("write failed kg_sync_log row: {}", logEx.getMessage());
+                log.error("write failed ecos_kg_sync_log row: {}", logEx.getMessage());
             }
         }
     }

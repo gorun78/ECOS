@@ -16,6 +16,12 @@
 -- Schema 铁律: 只加不删（铁律 3.1）+ IF NOT EXISTS 幂等
 -- 执行方式: Flyway 已禁用（spring.flyway.enabled=false），本脚本为规范记录，
 --           需人工执行到目标库（sys_man）后方可生效。
+--
+-- 【#146h knownLegacy 注记 2026-10-27】本脚本 dev PG 从未实跑（kb_extract_candidate
+-- 库面不存在，0 行历史）。V179 合规新表 ecos_knowledge.ecos_kb_extract_candidate
+-- 在位（0 行）；生产代码无 SQL 消费本族（零读腿零写腿），本脚本判 knownLegacy
+-- 停再跑，不 DROP（IR03）；KbExtractBareTableGateTest 词表含本表名防再入生产。
+-- 本头注只登记不改 DDL 本体。
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS ecos_knowledge.kb_extract_candidate (

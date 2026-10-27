@@ -171,7 +171,7 @@ public class EcosKnowledgeGraphServiceImpl implements EcosKnowledgeGraphService 
         try {
             ecosKnowledgeGraphDao.insertNeo4jSyncLog(jobId);
         } catch (Exception e) {
-            log.warn("insert kg_sync_log for neo4j sync failed: {}", e.getMessage());
+            log.warn("insert ecos_kg_sync_log for neo4j sync failed: {}", e.getMessage());
         }
         try {
             kgSyncService.runKgMapper("ALL", jobId);

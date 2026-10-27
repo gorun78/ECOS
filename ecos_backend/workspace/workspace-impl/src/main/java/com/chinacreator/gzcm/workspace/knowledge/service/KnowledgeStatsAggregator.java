@@ -64,13 +64,16 @@ public class KnowledgeStatsAggregator {
         vo.setOntologySnapshotCount(count("SELECT COUNT(*) FROM kb_ontology_snapshot WHERE is_deleted = 0"));
         vo.setOntologyVersionCount(count(
                 "SELECT COUNT(DISTINCT ontology_id) FROM kb_ontology_snapshot WHERE is_deleted = 0"));
-        vo.setKgSyncLogCount(count("SELECT COUNT(*) FROM ecos_knowledge.kg_sync_log"));
+        // #146h D-7（2026-10-27）：kg_sync_log（V115，dev 库面不存在）→ V179 合规新表 ecos_kg_sync_log
+        // （created_at→create_time）；其余腿维持原表（各自独立裁决面，非 D-7 族）。
+        vo.setKgSyncLogCount(count("SELECT COUNT(*) FROM ecos_knowledge.ecos_kg_sync_log"));
         vo.setCognitivePipelineCount(count("SELECT COUNT(*) FROM kb_cognitive_pipeline WHERE is_deleted = 0"));
         vo.setLineageEventCount(count("SELECT COUNT(*) FROM kb_lineage_event WHERE is_deleted = 0"));
         vo.setPublishedOntologyVersionCount(count(
                 "SELECT COUNT(DISTINCT ontology_id) FROM kb_ontology_snapshot WHERE is_deleted = 0"));
 
-        vo.setLastKgSyncAt(maxTimestamp("SELECT MAX(created_at) FROM ecos_knowledge.kg_sync_log"));
+        // #146h D-7（2026-10-27）：kg_sync_log → ecos_kg_sync_log（new create_time）
+        vo.setLastKgSyncAt(maxTimestamp("SELECT MAX(create_time) FROM ecos_knowledge.ecos_kg_sync_log"));
         vo.setLastOntologySnapshotAt(maxTimestamp("SELECT MAX(created_at) FROM kb_ontology_snapshot WHERE is_deleted = 0"));
         vo.setLastUpdatedAt(maxTimestamp(GREATEST_TS_SQL));
 

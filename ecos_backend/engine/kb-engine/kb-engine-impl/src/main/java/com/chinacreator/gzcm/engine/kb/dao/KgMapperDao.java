@@ -64,11 +64,16 @@ public class KgMapperDao extends JdbcTemplateDaoSupport {
                 version, ontologyId, version);
     }
 
-    /** rollback 前置：读 kg_sync_log 该 job 最新一行的 nodes/edges 计数。 */
+    /**
+     * rollback 前置：读该 job 最新一行的 nodes/edges 计数。
+     * <b>#146h D-7（2026-10-27）</b>：kg_sync_log（V115，dev 库面不存在）→ V179 合规新表
+     * {@code ecos_kg_sync_log}；节点/边计数字段名 {@code nodes/edges → node_count/edge_count}，
+     * 以别名 {@code AS nNodes / AS nEdges} 保持既有 map 键 "nNodes"/"nEdges" 契约不变。
+     */
     public List<Map<String, Object>> rollbackCounts(String jobId) {
         return jdbcTemplate.queryForList(
-                "SELECT nodes AS nNodes, edges AS nEdges FROM " + schema + ".kg_sync_log " +
-                "WHERE job_id = ? ORDER BY created_at DESC LIMIT 1",
+                "SELECT node_count AS nNodes, edge_count AS nEdges FROM " + schema + ".ecos_kg_sync_log " +
+                "WHERE job_id = ? ORDER BY create_time DESC LIMIT 1",
                 jobId);
     }
 

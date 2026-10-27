@@ -37,8 +37,10 @@ public class KnowledgeLifecycleDao extends JdbcTemplateDaoSupport {
 
     public List<Map<String, Object>> listAudit(int limit, int offset) {
         return jdbcTemplate.queryForList(
-                "SELECT id, object_type, op, status, created_at FROM " + schema + ".kg_sync_log "
-                        + "ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                // #146h D-7（2026-10-27）：kg_sync_log（V115，dev 库面不存在）→ V179 合规新表 ecos_kg_sync_log；
+                // 列名 sync_op AS op / create_time AS created_at 保持既有 map 键面合同不变。
+                "SELECT id, object_type, sync_op AS op, status, create_time AS created_at FROM " + schema + ".ecos_kg_sync_log "
+                        + "ORDER BY create_time DESC LIMIT ? OFFSET ?",
                 limit, offset);
     }
 }

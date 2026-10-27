@@ -264,7 +264,7 @@ public class StructuredExtractController {
             List<Map<String, Object>> rows = queryService.findLatestSyncLogByJobId(jobId);
             if (rows.isEmpty()) {
                 vo.setStatus("NOT_FOUND");
-                vo.setDetail("kg_sync_log 中无此 jobId 记录（结构化抽取作业未回填 kg_sync_log，"
+                vo.setDetail("ecos_kg_sync_log 中无此 jobId 记录（结构化抽取作业未回填 ecos_kg_sync_log，"
                         + "详细抽取结果见 E3 返回体 report）");
                 return ApiResponse.success(vo);
             }

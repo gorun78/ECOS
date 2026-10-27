@@ -361,8 +361,16 @@ class ExportDecisionContractTest {
                 "AI 通道必须查单源策略名 data_access（D-B4-22：此前硬编码 rbac ⇒「三通道同源」在策略面上是假的）");
         assertFalse(adjudicationRegion.contains("\"rbac\""),
                 "AI 裁决咽喉回潮查 rbac ⇒ §4.7.2 AI 列（p1 ALLOW / p2 DENY / 按部门域）不可表达");
-        assertTrue(gateSrc.contains("evaluateBodyForAdjudication("),
-                "工具裁决闸必须经咽喉构造裁决体，禁在调用方另拼 policy 字段");
+        // #146h 遗留红收口：本条原钉 gateSrc 含 evaluateBodyForAdjudication(，
+        // 咽喉接线自 #142/B4-3e-78（D-B4-30）并流 /decision 后改经 AiSecurityEngineClient
+        // 的 decisionBody＋decideData，本行漏更（B4-3e-78 只实跑 ai/security/common-api
+        // 三模块，workspace 相从未跑到）掩盖成脱案红 —— 现钉当前咽喉的在位形态：
+        // 裁决体仍必须经咽喉单源构造，禁调用方另拼 policy 字段（汇编位置既非闸也非 client 即红）。
+        assertTrue(gateSrc.contains("AiSecurityEngineClient.decisionBody(")
+                        && gateSrc.contains(".decideData("),
+                "工具裁决闸必须经咽喉单源构造裁决体（#142/B4-3e-78 起主裁决腿并流 /decision，"
+                        + "键面经 AiSecurityEngineClient.decisionBody、传输经 decideData），"
+                        + "禁在调用方另拼 policy 字段");
 
         // 特征化断言（钉现状非认可）：ai-engine 侧剩余 rbac 代码位只许是这两个非咽喉点
         List<String> rbacFiles = findInCodePositions(AI_MAIN_TREE, "\"rbac\"").stream()

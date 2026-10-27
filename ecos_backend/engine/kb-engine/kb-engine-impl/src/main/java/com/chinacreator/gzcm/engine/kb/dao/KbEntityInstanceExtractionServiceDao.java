@@ -6,12 +6,19 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * <p>V200/R3-B1: schema 由 `${kb.control-schema:ecos_knowledge}` 注入 (MC06 全面落地)。</p>
  *
  * <p>数据访问收口（R2 / B2-kb / 架构铁律 §2.5 / IR06）：
  * {@code service.KbEntityInstanceExtractionService} 的图谱实例写入 + 本体快照 + 抽取水位 JDBC 落点。
+ * <b>#146h D-7 收口（2026-10-27·仅水位腿）</b>：{@code readWatermark}/{@code writeWatermark}
+ * 由裸表 {@code kb_extract_watermark}（V136，dev PG 库面不存在）切至 V179 合规新表
+ * {@code ecos_knowledge.ecos_kb_extract_watermark}（VARCHAR(36) 应用侧 UUID PK）；
+ * 列 {@code updated_at→update_time}，写腿补 {@code id} UUID＋唯一键改四列
+ * {@code (ontology_id, entity_code, resource_id, is_deleted)}。
+ * 同文件 graph_node / graph_edge / kb_ontology_snapshot 腿不在 D-7 面（承接在位库面）。
  *
  * <p>SQL 原样搬运自原 service（表 {@code " + schema + ".graph_node / graph_edge /
  * kb_ontology_snapshot / kb_extract_watermark}，<b>带 schema 前缀</b>，verbatim 保留；
@@ -93,23 +100,32 @@ public class KbEntityInstanceExtractionServiceDao extends JdbcTemplateDaoSupport
                 ontologyId);
     }
 
-    /** 读抽取水位（ontologyId + entityCode + resourceId）；无行返回 null。 */
+    /**
+     * 读抽取水位（ontologyId + entityCode + resourceId）；无行返回 null。
+     * <b>#146h D-7 收口（2026-10-27）</b>：裸表 {@code kb_extract_watermark}（V136，
+     * 未实跑、dev 库面不存在）→ V179 合规新表 {@code ecos_kb_extract_watermark}。
+     */
     public String readWatermark(String ontologyId, String entityCode, String resourceId) {
         List<String> rows = jdbcTemplate.queryForList(
-                "SELECT watermark FROM " + schema + ".kb_extract_watermark "
-                        + "WHERE ontology_id = ? AND entity_code = ? AND resource_id = ?",
+                "SELECT watermark FROM " + schema + ".ecos_kb_extract_watermark "
+                        + "WHERE ontology_id = ? AND entity_code = ? AND resource_id = ? AND is_deleted = 0",
                 String.class, ontologyId, entityCode, resourceId);
         return rows.isEmpty() ? null : rows.get(0);
     }
 
-    /** 写本次抽取水位（幂等 upsert）。 */
+    /**
+     * 写本次抽取水位（幂等 upsert）。
+     * <b>#146h D-7 收口（2026-10-27）</b>：切合规新表；PK {@code id} 应用侧 UUID（MC01），
+     * 冲突键改四列 {@code (ontology_id, entity_code, resource_id, is_deleted)}（uniq_ecos_kb_extract_wm），
+     * 时间列 {@code updated_at→update_time}。
+     */
     public void writeWatermark(String ontologyId, String entityCode, String resourceId, String watermark255) {
         jdbcTemplate.update(
-                "INSERT INTO " + schema + ".kb_extract_watermark "
-                        + "(ontology_id, entity_code, resource_id, watermark, updated_at) "
-                        + "VALUES (?, ?, ?, ?, NOW()) "
-                        + "ON CONFLICT (ontology_id, entity_code, resource_id) "
-                        + "DO UPDATE SET watermark = EXCLUDED.watermark, updated_at = NOW()",
-                ontologyId, entityCode, resourceId, watermark255);
+                "INSERT INTO " + schema + ".ecos_kb_extract_watermark "
+                        + "(id, ontology_id, entity_code, resource_id, watermark, update_time) "
+                        + "VALUES (?, ?, ?, ?, ?, NOW()) "
+                        + "ON CONFLICT (ontology_id, entity_code, resource_id, is_deleted) "
+                        + "DO UPDATE SET watermark = EXCLUDED.watermark, update_time = NOW()",
+                UUID.randomUUID().toString(), ontologyId, entityCode, resourceId, watermark255);
     }
 }
