@@ -139,9 +139,10 @@ class WAgentForbiddenDependencyArchTest {
      *  {@code ai.wagent.readiness.ReadinessMetricFetchClient} / {@code DataFreshnessMetricSource} /
      *  {@code CaliberConflictCountMetricSource} / {@code KbProfileStockMetricSource} /
      *  {@code CognitiveModelReadinessMetricSource}（跨引擎取数面，见下方名录断言扩 2 枚）。
-     * <p>计数口径 = {@code find src/main/java -name '*.java' | wc -l} 于 2026-10-26 实测 <b>264</b>。</p>
+     *  <p>计数口径 = {@code find src/main/java -name '*.java' | wc -l} 于 2026-10-26 实测 <b>264</b>；
+     *  2026-10-27 +1（264→265）＝ #146o 会话运维链新增 {@code AgentSessionOpsController}（#12/#13/#15）。</p>
      */
-    private static final int AI_SOURCE_FILE_FLOOR = 264;
+    private static final int AI_SOURCE_FILE_FLOOR = 265;
 
     /** 反空集锁④：跨引擎门面引用单源（详设-06 F06-11 forecast.explain 走 cognitive api 常量；
      *  #146b 后 = 3 条，新增两枚同属 cognitive.api 契约枚举/门禁值消费，形态仍是 api 门面）。 */

@@ -206,6 +206,65 @@ public class AgentSessionDao extends JdbcTemplateDaoSupport {
             sessionId, sessionId);
     }
 
+    // ── 会话预算读数（V202 治理列，P1.3 #12 context）──────────────
+
+    /** 已逻辑归档（compressed=1）的消息条数读面（P1.3 #12 context 的 compressedTurns 承载）。 */
+    public int countCompressedMessages(String sessionId) {
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM sys_agent_message " +
+            "WHERE session_id = ? AND COALESCE(compressed, 0) = 1",
+            Integer.class, sessionId);
+        return count != null ? count : 0;
+    }
+
+    /** V202 会话治理列面的探测缓存（与消息面 {@link #governanceColumnsReady} 同口径，各自缓存不串探）。 */
+    private volatile Boolean sessionGovernanceColumnsPresent;
+
+    /**
+     * V202 会话治理列面是否就位（{@code total_prompt_tokens}/{@code total_completion_tokens}/
+     * {@code compression_mode}）。V202 未实跑时这些列不存在，读面必须先判而非抛错掩蔽
+     * （与 {@link #governanceColumnsReady} 的探针形态同族）。
+     */
+    public boolean sessionGovernanceColumnsReady() {
+        if (Boolean.TRUE.equals(sessionGovernanceColumnsPresent)) {
+            return true;
+        }
+        Integer present = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM information_schema.columns " +
+            "WHERE table_schema = current_schema() AND table_name = 'sys_agent_session' " +
+            "AND column_name IN ('total_prompt_tokens','total_completion_tokens','compression_mode')",
+            Integer.class);
+        boolean ready = present != null && present >= 3;
+        if (ready) {
+            sessionGovernanceColumnsPresent = Boolean.TRUE;
+        }
+        return ready;
+    }
+
+    /**
+     * 会话面的真实计量读数（V202 列，网关计量点的权威记账）与压缩模式。
+     *
+     * <p>返回三元素数组 {@code [totalPromptTokens, totalCompletionTokens, compressionMode]}；
+     * 治理列未就位（V202 未实跑）⇒ 全 null —— 调用方须按"读数不可得"处理，
+     * 禁按 0 冒充"零用量"。</p>
+     */
+    public Object[] tokenStats(String sessionId) {
+        if (!sessionGovernanceColumnsReady()) {
+            return new Object[]{null, null, null};
+        }
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            "SELECT total_prompt_tokens, total_completion_tokens, compression_mode " +
+            "FROM sys_agent_session WHERE id = ?", sessionId);
+        if (rows.isEmpty()) {
+            return new Object[]{null, null, null};
+        }
+        Map<String, Object> row = rows.get(0);
+        return new Object[]{
+            row.get("total_prompt_tokens"),
+            row.get("total_completion_tokens"),
+            row.get("compression_mode")};
+    }
+
     // ── RowMapper ───────────────────────────────────────
 
     private final RowMapper<AgentSessionService.AgentSession> SESSION_ROW_MAPPER = (rs, rowNum) -> {

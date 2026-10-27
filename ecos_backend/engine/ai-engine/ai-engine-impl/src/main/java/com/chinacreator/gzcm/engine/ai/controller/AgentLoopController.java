@@ -311,6 +311,62 @@ public class AgentLoopController {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    //  4b. GET /sessions/{id}/messages — 历史消息分页（P1.3 #4 listSessionMessages）
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * 历史消息分页（附录A #4：P1.3 端点缺口收口，承流不应语义化——详设-06 §9.3.1）。
+     *
+     * <p>读面单源 {@link AgentSessionService#getMessages}（{@code findContextMessages}：
+     * V202 治理列就位 ⇒ 只查活消息（未归档、未逻辑删），未就位回落全量），不另建 SQL。
+     * 分页 {@code page/size} 在 Java 侧切片（按 DAO 落库 id 正序，{@code items} 为当前页子集），
+     * 遵循单源 DAO 原语不重复 SQL 的约束。</p>
+     *
+     * <p>会话不存在 ⇒ {@code ApiResponse.notFound}（与该 Controller 其余端点的 notFound 口径一致，
+     * 不合成空消息列表伪数据）。</p>
+     *
+     * @param page 页码，默认 1（<b>1-based</b>，<=1 视作第 1 页）
+     * @param size 每页条数，默认 50（默认值与 §9.3.2 分页口径一致；上限 500）
+     */
+    @GetMapping("/sessions/{id}/messages")
+    public ApiResponse<Map<String, Object>> listSessionMessages(@PathVariable String id,
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "size", defaultValue = "50") int size) {
+        AgentSessionService.AgentSession session = sessionService.getSession(id);
+        if (session == null) {
+            return ApiResponse.notFound("会话 " + id + " 不存在");
+        }
+        List<AgentSessionService.AgentMessage> all = sessionService.getMessages(id);
+        if (all == null) {
+            all = java.util.Collections.emptyList();
+        }
+        int safePage = Math.max(1, page);
+        int safeSize = size <= 0 ? 50 : Math.min(size, 500);
+        int fromIndex = (safePage - 1) * safeSize;
+        List<AgentSessionService.AgentMessage> slice = (fromIndex >= all.size())
+                ? java.util.Collections.emptyList()
+                : all.subList(fromIndex, Math.min(all.size(), fromIndex + safeSize));
+        List<Map<String, Object>> items = slice.stream().map(m -> {
+            Map<String, Object> msgMap = new LinkedHashMap<>();
+            msgMap.put("id", m.getId());
+            msgMap.put("role", m.getRole());
+            msgMap.put("content", m.getContent());
+            msgMap.put("toolCalls", m.getToolCalls());
+            msgMap.put("toolResults", m.getToolResults());
+            msgMap.put("tokens", m.getTokens());
+            msgMap.put("threadId", m.getThreadId());
+            msgMap.put("createdAt", m.getCreatedAt());
+            return msgMap;
+        }).toList();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("total", all.size());
+        data.put("page", safePage);
+        data.put("size", safeSize);
+        data.put("items", items);
+        return ApiResponse.success(data);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     //  5. POST /api/v1/agent-loop/sessions/{id}/chat — 会话内对话
     // ═══════════════════════════════════════════════════════════════
 

@@ -133,6 +133,18 @@ public class SessionCompressionService {
      * @param traceId   MDC 同源诊断码，进批次台账与事件
      */
     public Outcome compress(String sessionId, String model, String traceId) {
+        return compress(sessionId, model, traceId, null);
+    }
+
+    /**
+     * 一次压缩判定与执行（P1.3 #13 compress 显式触发时的 {@code keepRecent} 覆盖面）。
+     *
+     * <p>与 {@link #compress(String, String, String)} 同一判定流；仅在本重载中被显式提供的
+     * {@code keepRecentOverride} 才替代配置字典读数，其余规则（阈值、开关、治理能力位、
+     * 引用完整性、失败降级）逐条对齐 Loop 内嵌调用。覆盖值 &lt;= 0 视为非法，按配置字典
+     * 读数处理（禁按 0 假装「全压缩」）。</p>
+     */
+    public Outcome compress(String sessionId, String model, String traceId, Integer keepRecentOverride) {
         if (sessionId == null || sessionId.isBlank()) {
             return Outcome.of(Status.NO_SCOPE, "no_session", true);
         }
@@ -181,12 +193,16 @@ public class SessionCompressionService {
                     .withModelLimit(limit.contextLimit());
         }
 
-        Plan plan = planRounds(active, settings.keepRecent(), sessionId);
+        int effectiveKeepRecent = settings.keepRecent();
+        if (keepRecentOverride != null && keepRecentOverride > 0) {
+            effectiveKeepRecent = keepRecentOverride;
+        }
+        Plan plan = planRounds(active, effectiveKeepRecent, sessionId);
         if (plan.compressedRange().isEmpty()) {
             // 保留窗口已覆盖全部历史 —— 无更早轮可压缩，必须显式留痕（禁伪装"已压缩"）
             log.warn("[F06-09] token 超阈值但保留窗口覆盖全部历史 ⇒ 无可压缩段: "
                     + "session={} estimated={} threshold={} keepRecent={}",
-                    sessionId, estimatedBefore, thresholdTokens, settings.keepRecent());
+                    sessionId, estimatedBefore, thresholdTokens, effectiveKeepRecent);
             return new Outcome(Status.NOTHING_TO_COMPRESS, true, null, estimatedBefore, estimatedBefore,
                     thresholdTokens, 0, plan.protectedMessages().size(), plan.compressedTurns(),
                     null, traceId, "keep_window_covers_context").withModelLimit(limit.contextLimit());
@@ -206,7 +222,8 @@ public class SessionCompressionService {
     //  配置读取（单源 = sysman 门面）
     // ═══════════════════════════════════════════════════
 
-    Settings settings() {
+    /** 配置读数面（P1.3 #12 context 阈值计算共享；口径与 {@link #compress} 同单源字典链）。 */
+    public Settings settings() {
         SysConfigService cfg = sysConfigProvider.getIfAvailable();
         if (cfg == null) {
             return new Settings(false, false, DEFAULT_THRESHOLD_RATIO, DEFAULT_KEEP_RECENT_ROUNDS);
@@ -250,8 +267,11 @@ public class SessionCompressionService {
      * <p>逐条消息：provider 上报过的实测量优先（{@code tokens>0}），否则估算文本 +
      * role 固定开销。估算值与实测量<b>不混记</b>：本方法返回的是"预算判定输入"，
      * 任何对外展示数值仍须来自网关计量点（X-68）。</p>
+     *
+     * <p>P1.3 #12 context 公开读数面：真实计量列不可得时的最终兜底（调用方须标
+     * {@code estimated=true}，禁当实测上报）。</p>
      */
-    int estimateSessionTokens(List<AgentSessionService.AgentMessage> messages) {
+    public int estimateSessionTokens(List<AgentSessionService.AgentMessage> messages) {
         return (int) Math.min(Integer.MAX_VALUE, estimateMessageTokens(messages));
     }
 
@@ -781,8 +801,8 @@ public class SessionCompressionService {
         }
     }
 
-    /** 配置读数快照。 */
-    record Settings(boolean facadeAvailable, boolean enabled, double threshold, int keepRecent) {}
+    /** 配置读数快照（P1.3 #12 context 阈值读数面共享；字段皆为字典面单源真值）。 */
+    public record Settings(boolean facadeAvailable, boolean enabled, double threshold, int keepRecent) {}
 
     /** 关键引用（摘要结构里的 keyRefs 单元）。 */
     public record KeyRef(String type, String id, String link) {}
