@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.gateway.filter;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.RateLimitErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -82,6 +83,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             response.setHeader("Retry-After", "60");
             Map<String, Object> body = Map.of(
                 "code", 429,
+                "errorCode", RateLimitErrorCode.ECOS_RATE_429,
                 "message", "请求过于频繁，请稍后重试",
                 "success", false,
                 "retryAfter", 60

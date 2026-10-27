@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.gateway.filter;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.common.error.RateLimitErrorCode;
 import com.chinacreator.gzcm.gateway.dao.QuotaDao;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -225,6 +226,7 @@ public class QuotaFilter extends OncePerRequestFilter {
         response.setStatus(429);
         response.setContentType("application/json;charset=UTF-8");
         ApiResponse<Map<String, Object>> body = ApiResponse.error(429,
+            RateLimitErrorCode.ECOS_RATE_430,
             "配额已用尽 — " + quotaType + " 当日使用量已达上限");
         Map<String, Object> detail = new java.util.LinkedHashMap<>();
         detail.put("tenant_id", tenantId);

@@ -147,6 +147,34 @@ class NoMachineCodeFactoryFaceRatchetTest {
     private static final String SYSTEM_ERROR_CODE_SOURCE =
             "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/gzcm/common/error/SystemErrorCode.java";
 
+    /**
+     * {@code ECOS-RATE-*} 族码字面量（带引号的串），单源只允许 {@link #RATE_LIMIT_ERROR_CODE_SOURCE} 承载。
+     *
+     * <p><b>#142/B4-3e-92 新登</b>（收口差距 P1.1「ECOS-RATE 族不存在」子项）：本批把
+     * {@code RateLimitFilter} 与 {@code QuotaFilter} 两枚 429 出口改指 {@code RateLimitErrorCode}
+     * 常量后，仿 sysFamily 的字面量零容差判据防止后续收口批把族码再复制到任何调用方。</p>
+     */
+    private static final Pattern RATE_FAMILY_LITERAL = Pattern.compile("\"ECOS-RATE-\\d+\"");
+
+    /** {@code ECOS-RATE-*} 族码字面量单源文件（唯一承载点）。 */
+    private static final String RATE_LIMIT_ERROR_CODE_SOURCE =
+            "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/gzcm/common/error/RateLimitErrorCode.java";
+
+    /**
+     * 属主两枚 429 出口的判据：该两文件必须各出现一次 {@code RateLimitErrorCode.ECOS_RATE_<n>}
+     * 常量引用（合法出口＝改指向常量）。校验文本已剥注释，防止 javadoc 提及被误判。
+     */
+    private static final Pattern RATE_CODE_REFERENCE = Pattern.compile(
+            "RateLimitErrorCode\\s*\\.\\s*ECOS_RATE_\\d+");
+
+    /** 属主出口文件（两枚 429 腿的合法性锚点，缺一即红＝判据面漂移）。 */
+    private static final String RATE_LIMIT_FILTER_SOURCE =
+            "ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/filter/RateLimitFilter.java";
+
+    /** 属主出口文件（配额耗尽两腿的合法性锚点）。 */
+    private static final String QUOTA_FILTER_SOURCE =
+            "ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/filter/QuotaFilter.java";
+
     /** 登记豁免：唯一保留单参的入口腿。 */
     private static final List<String> REGISTERED_ENTRY_EXEMPTIONS = List.of("handleNotFound");
 
@@ -243,6 +271,66 @@ class NoMachineCodeFactoryFaceRatchetTest {
         assertEquals(List.of(), copies,
                 "main 面出现 ECOS-SYS-* 字面量副本：出口应改取 SystemErrorCode 常量，"
                         + "新增族码请先登记进该族并同步 §3.2.7。副本清单=" + copies);
+    }
+
+    // ── 2c. ECOS-RATE 族码字面量单源 + 属主 429 出口锚点（#142/B4-3e-92 新登，P1.1）──
+
+    @Test
+    @DisplayName("ECOS-RATE-* 族码字面量在 main 面只由 RateLimitErrorCode 单源承载（副本即红）")
+    void rateFamilyLiteralsAreSingleSourced() throws IOException {
+        Path root = locateRepoRoot();
+        List<Path> files = new ArrayList<>();
+        collectJavaUnder(root.resolve("ecos_backend"), files);
+        assertTrue(files.size() >= MIN_SCANNED_MAIN_FILES,
+                "扫描面缩水：实扫 main 面 java 文件 " + files.size() + " < 阈值 "
+                        + MIN_SCANNED_MAIN_FILES + "，判据不可信（读不到 ≠ 无副本）");
+
+        List<String> copies = new ArrayList<>();
+        for (Path f : files) {
+            String rel = root.relativize(f).toString().replace('\\', '/');
+            if (RATE_LIMIT_ERROR_CODE_SOURCE.equals(rel)) {
+                continue;
+            }
+            String stripped = SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+            Matcher m = RATE_FAMILY_LITERAL.matcher(stripped);
+            while (m.find()) {
+                copies.add(rel + " → " + m.group());
+            }
+        }
+        assertEquals(List.of(), copies,
+                "main 面出现 ECOS-RATE-* 字面量副本：出口应改取 RateLimitErrorCode 常量，"
+                        + "新增族请先登记进该族并同步 §3.2.7 冻结表与附录 C。副本清单=" + copies);
+    }
+
+    /**
+     * 属主两枚 429 出口必须从 {@code RateLimitErrorCode} 单源取码。此为 P1.1「配额耗尽
+     * 仅裸 429」收口的正向锚点，防后续批次改回 {@code ApiResponse.error(429,"...")} 单参
+     * 或加回字面量"ECOS-RATE-429/430"副本。
+     *
+     * <p>判据＝剥注释后每文件恰 1 枚 {@code RateLimitErrorCode.ECOS_RATE_\d+} 引用：
+     * 零枚＝改回单参／新造副本；多枚＝同一出口重复取码，属奇怪但须看板（防未来
+     * Filter 拆分成两个 429 出口而常量只在第一处生效）。</p>
+     */
+    @Test
+    @DisplayName("RateLimitFilter 与 QuotaFilter 两枚 429 出口必须取 RateLimitErrorCode 常量单源")
+    void quotaAndRateLimit429ExitsPointToSingleSource() throws IOException {
+        Path root = locateRepoRoot();
+        assertCarriesRateConstants(root.resolve(RATE_LIMIT_FILTER_SOURCE));
+        assertCarriesRateConstants(root.resolve(QUOTA_FILTER_SOURCE));
+    }
+
+    private static void assertCarriesRateConstants(Path filterPath) throws IOException {
+        assertTrue(Files.exists(filterPath), "属主过滤文件不在位：" + filterPath);
+        String stripped = SourceCommentStripper.strip(Files.readString(filterPath, StandardCharsets.UTF_8));
+        List<String> hits = new ArrayList<>();
+        Matcher m = RATE_CODE_REFERENCE.matcher(stripped);
+        while (m.find()) {
+            hits.add(m.group());
+        }
+        assertEquals(1, hits.size(),
+                "属主 429 出口必须恰 1 处 RateLimitErrorCode.ECOS_RATE_<n> 引用；"
+                        + "0 处＝改回裸 429／单参工厂（判据 C 面亦会红），"
+                        + ">1 处＝出口重复取码必须同批清点。文件=" + filterPath + "，实跑=" + hits);
     }
 
     // ── 3. 重载契约 ─────────────────────────────────
