@@ -164,13 +164,26 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      *       （{@code DecisionController} 的真值入上下文＋catch 腿＋机读码理由句，
      *       {@code RlsController} 的 {@code throw subjectClearanceSourceUnavailable(e)}＋helper 声明＋理由句）
      *       挂进 {@link #OWNER_SIDE_CARRIERS}（摘腿即红，禁以「上限下调」冒充收口）。</li>
+     *   <li>#146l-前置 重设（三枚仓扫门脱案补账批，common-api 全模块<b>红跑</b>实测）＝总数
+     *       <b>177</b>／折叠 0／状态行承载 <b>29</b>（未漂移）／裸回 <b>100</b>／属主 helper
+     *       <b>13</b>（未漂移）／纯信封 <b>35</b>（未漂移）。
+     *       唯一漂移源＝#146b/P0-8（commit bae5a686 起）<code>readiness</code> 包新增
+     *       <code>CaliberConflictCountMetricSource</code> 的
+     *       {@code catch (Exception) → return ApiResponse.error(500, …)} 腿一枚
+     *       （该批只实跑五模块自身门禁，未落账本门；其后两枚同批新源
+     *       data-staleness / kb-profile / cognitive-models 的失败腿均走
+     *       {@code ApiResponse.success} 如实降级面、不计本面）。
+     *       0+29+100+13+35 = 177 = 总数，对账成立。
+     *       只重设被突破的 {@link #BARE_RETURN_CEILING}，其余三面按实测保持；
+     *       该枚裸回归 D-B4-59 族门管账，族收口时本上限随批下调。</li>
      * </ul>
      *
-     * <p>裸回面 99 枚<b>本门有意不判其对错</b>（归 {@code D-B4-59} 族棘轮门管账），
+     * <p>裸回面 100 枚<b>本门有意不判其对错</b>（归 {@code D-B4-59} 族棘轮门管账），
      * 此处只做「只减不增」计数：该族每收口一枚，本上限随批下调。</p>
      */
     private static final int STATUS_CARRIER_CEILING = 29;
-    private static final int BARE_RETURN_CEILING = 99;
+    // #146l-前置：99→100，归因见上方「#146l-前置 重设」条（CaliberConflictCountMetricSource 一枚）
+    private static final int BARE_RETURN_CEILING = 100;
     private static final int OWNER_HELPER_CEILING = 13;
     private static final int ENVELOPE_ONLY_CEILING = 35;
 

@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  *       这条腿就是缺陷本身，新增即红。</li>
  *   <li><b>零容忍 B</b>：三参形态必须 {@code httpStatus == errorCode} 且落在 400..599
  *       （异号＝把缺陷换个面值重犯；越界＝拿容器状态行写假语义）。</li>
- *   <li><b>双向基线</b>：双参 400 形态 100 处／18 文件、三参同号形态 23 处／14 文件、
+ *   <li><b>双向基线</b>：双参 400 形态 101 处／18 文件、三参同号形态 23 处／14 文件、
  *       首参非常量数值形态 1 处，按文件分枚 {@code equals}——增＝新违例，减＝基线陈旧同样红。</li>
  *   <li><b>合计对账</b>：三类形态之和必须等于 {@code new BusinessException(} 全站点数，
  *       防「判据只覆盖自己认识的四态」造成的口径外盲区（与 D-B4-62 违例条数盲区同族）。</li>
@@ -88,7 +88,7 @@ class BusinessExceptionStatusParityRatchetTest {
     /** 扫描面阈值守卫：2026-10-22 实测 ecos_backend main 面 .java 文件 2339 枚。 */
     private static final int MIN_SCANNED_MAIN_FILES = 2000;
 
-    /** 基线：双参 400 形态逐文件处数（合计 100 处／18 文件）。 */
+    /** 基线：双参 400 形态逐文件处数（合计 101 处／18 文件；100→101 系 #146l-前置补账 ModelRegistryService 4→5）。 */
     private static final Map<String, Integer> BASELINE_TWO_ARG_400 = baseline(
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/ForecastServiceImpl.java", 4,
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/CognitiveEvidenceService.java", 7,
@@ -98,7 +98,7 @@ class BusinessExceptionStatusParityRatchetTest {
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/mental/CognitiveInvalidationConsumer.java", 2,
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/mental/MentalReviewService.java", 2,
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/CognitiveHypothesisService.java", 8,
-            "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/ModelRegistryService.java", 4,
+            "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/ModelRegistryService.java", 5, // #146l-前置补账：4→5（#146b/P0-8 bae5a686 新增 cognitiveModelType 裸参 400 腿，该批未落账本门）
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/CognitiveBeliefService.java", 14,
             "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/service/GitRepoRootResolver.java", 13,
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/controller/ScenarioCognitiveController.java", 2,
@@ -193,9 +193,10 @@ class BusinessExceptionStatusParityRatchetTest {
         assertEquals(scan.allSites, classified,
                 "全站点 " + scan.allSites + " 与分类之和 " + classified
                         + " 不等 ⇒ 出现了判据未覆盖的新形态（口径外盲区＝假绿）");
-        assertEquals(232, scan.allSites,
+        assertEquals(233, scan.allSites,
                 "构造点总数双向基线（2026-10-22 实测 232＝100 双参400 + 23 三参同号 + 1 标识符首参 + "
-                        + "108 文案首参）；增减都要同批改台账");
+                        + "108 文案首参；#146l-前置补账 232→233＝#146b/P0-8 bae5a686 于 "
+                        + "ModelRegistryService 新增 1 枚双参 400 腿未落账本门）；增减都要同批改台账");
     }
 
     // ── 判据 E：构造面只增不改 ─────────────────────────

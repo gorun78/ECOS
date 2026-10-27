@@ -47,6 +47,11 @@ import static org.junit.jupiter.api.Assertions.fail;
  * 契约违约腿（runtime-access {@code DataSourceTypeVocabulary} 两枚＋data-engine
  * {@code DataSourceController} 两枚），词表不命中、语义为构造期违约即抛，落入 OTHER
  * 面而未随批重测本门——本批（#142/B4-3e-68）按门规「重测后同批改」补齐重设）。
+ * <b>#146l-前置 再重设</b>：#142/B4-3e-86（D-B4-103 收口批）在 sysman
+ * {@code SecurityProfileQueryDao} 新增 {@code hasRoleCode} 的 ISE 腿 1 枚（依赖未就绪语义），
+ * 未随批落账本门——本批按同一门规重设：总站点 <b>138</b>、DEPENDENCY 面 <b>16</b>、
+ * ENV_ALGO 10、UNREADABLE 8、OTHER 104（16＋10＋104＋8＝138），该枚同时落四档残差
+ * （欠账面 0→1），属主侧收口归 sysman 独立批。
  * 引用这段历史数字时一律以 {@code TOTAL_SITE_BASELINE}／{@code DEPENDENCY_FACE_BASELINE}
  * 的声明现值为准，否则等于把已收口的腿再判一次欠账。</p>
  *
@@ -188,6 +193,16 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 也不是 ENV_ALGO 那种「JVM 自己坏了」。后者已于 #142/B4-3e-43 按本裁决收口退出 ISE 面，
      * 前者仍在册。</p>
      */
+    /**
+     * 属主侧角色码读面 DAO（#142/B4-3e-86 收口 D-B4-103 新增）。其
+     * {@code hasRoleCode} 腿的「td_user_role/td_role 所在库 JdbcTemplate 缺失」ISE
+     * 是本门现行唯一一枚<b>四档残差</b>持有者（sysman 域零域内 advice、无属主端点承载出口、
+     * 非死面、渲染 500）——该批落腿时未随批落账本门，本批按门规「重测后同批改」显式登记。
+     */
+    private static final String SYS_SECURITY_PROFILE_QUERY_DAO =
+            "ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/sysman/dao/SecurityProfileQueryDao.java";
+
     private static final Map<String, Integer> DEPENDENCY_BASELINE = Map.ofEntries(
             Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/ai/agent/mesh/knowledge/Neo4jQueryService.java", 5),
@@ -200,7 +215,9 @@ class DependencyUnreadyIllegalStateRatchetTest {
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/data/datadescription/discovery/impl/DataDescriptionDiscoveryImpl.java", 1),
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
-                    + "gzcm/engine/data/datasource/storage/adapter/jdbc/BaseJdbcAdapter.java", 1));
+                    + "gzcm/engine/data/datasource/storage/adapter/jdbc/BaseJdbcAdapter.java", 1),
+            // #146l-前置补账：#142/B4-3e-86（D-B4-103 收口批）新增 hasRoleCode 腿 1 枚未随批落账本门
+            Map.entry(SYS_SECURITY_PROFILE_QUERY_DAO, 1));
 
     /**
      * ENV_ALGO 面基线（故意保持 500 的豁免面，登记制、必须点名）：
@@ -263,9 +280,16 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 非依赖未就绪），落入 OTHER 面而未随批重测本门，致本门在下批全模块跑中按设计变红。
      * 本批按门规「必须重测后同批改」重设：总站点 133 → <b>137</b>、OTHER 面 100 → <b>104</b>，
      * DEPENDENCY／ENV_ALGO／UNREADABLE 三面未动（15／10／8）。</p>
+     *
+     * <p><b>#146l-前置 重设（D-B4-103 收口批漏测补账）</b>：#142/B4-3e-86（commit c462b3f9）在
+     * sysman {@code SecurityProfileQueryDao} 新增 {@code hasRoleCode} 的
+     * 「td_user_role/td_role 所在库 JdbcTemplate 缺失」ISE 腿 1 枚（语义＝依赖未就绪，
+     * 词表命中「缺失」），落入 DEPENDENCY 面未随批重测本门。本批重设：
+     * 总站点 137 → <b>138</b>、DEPENDENCY 面 15 → <b>16</b>，ENV_ALGO／OTHER／UNREADABLE
+     * 三面未动（10／104／8）。</p>
      */
-    private static final int TOTAL_SITE_BASELINE = 137;
-    private static final int DEPENDENCY_FACE_BASELINE = 15;
+    private static final int TOTAL_SITE_BASELINE = 138;
+    private static final int DEPENDENCY_FACE_BASELINE = 16;
     private static final int ENV_ALGO_FACE_BASELINE = 10;
     private static final int OTHER_FACE_BASELINE = 104;
     private static final int UNREADABLE_FACE_BASELINE = 8;
@@ -950,7 +974,12 @@ class DependencyUnreadyIllegalStateRatchetTest {
                     NO_HTTP_CARRIER_LABEL),
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/"
                     + "gzcm/engine/data/datasource/storage/adapter/jdbc/BaseJdbcAdapter.java",
-                    NO_HTTP_CARRIER_LABEL));
+                    NO_HTTP_CARRIER_LABEL),
+            // #146l-前置补账：sysman 域零域内 advice、未登记属主端点承载出口、非死面——
+            // 按现行 judge 判据落四档残差（渲染读数＝网关入口兜底 500），挂账登记在
+            // 欠账面 0→1。该腿属主侧收口（SysmanErrorAdvice 补 ISE 503 承载或
+            // 端点 catch 腿）归 sysman 独立批，本门只做账面登记不代行裁决。
+            Map.entry(SYS_SECURITY_PROFILE_QUERY_DAO, ENTRY_FALLBACK_LABEL));
 
     /**
      * 承载者实际渲染的状态行（键＝advice 文件名；锚点逐条钉在
@@ -991,10 +1020,12 @@ class DependencyUnreadyIllegalStateRatchetTest {
     /** 二档（域内显式承载出口）腿数：今天 0 枚——登记表那一行的腿已于 3e-43 改抛脱离 ISE 面。 */
     private static final int OWNER_EXIT_LEGS_BASELINE = 0;
     /**
-     * 四档残差（真落 gateway 入口兜底、渲染 500）腿数。<b>现值 0</b>＝本面没有任何一条腿是靠网关兜底
-     * 渲染的。这一档从此是<b>未归类报警位</b>而非默认档：新落一枚进来即红，红字要求先判二档还是三档。
+     * 四档残差（真落 gateway 入口兜底、渲染 500）腿数。<b>现值 1</b>＝sysman
+     * {@code SecurityProfileQueryDao.hasRoleCode} 一枚（#142/B4-3e-86 落腿未随批落账，
+     * #146l-前置 按门规显式登记；此前 3e-61 四档化后一度归零＝未归类报警位，
+     * 新落一枚进来必须先判它是二档还是三档，不能像 D-B4-72 那样靠默认值蒙过去）。
      */
-    private static final int ENTRY_FALLBACK_LEGS_BASELINE = 0;
+    private static final int ENTRY_FALLBACK_LEGS_BASELINE = 1;
 
     /**
      * <b>真欠账面</b>＝四档残差（落入口兜底 500）＋承载者实际渲染的不是「不可用族」状态行的腿。
@@ -1008,8 +1039,13 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * <b>计入欠账</b>（这正是 D-B4-72 登记时的真实形态），只有 5xx 不可用族才算已承载到位。</p>
      *
      * <p>属主侧每批改码必须同批下调本值与本面基线，两头都红才算动过。</p>
+     *
+     * <p><b>#146l-前置 重设：0 → <b>1</b></b>＝被承载≠已改对名义下的真实欠账回来了：
+     * sysman {@code SecurityProfileQueryDao.hasRoleCode}（#142/B4-3e-86 新增）落四档残差、
+     * 渲染 500（非 502/503/504 不可用族），按本门口径继续挂账。收口归 sysman 独立批
+     * 后本值随批下调回 0，禁以「register 了所以不算欠账」替代修码。</p>
      */
-    private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 0;
+    private static final int OWNER_SIDE_DEBT_LEGS_BASELINE = 1;
 
     // ── #142/B4-3e-45：承流归属第三档（无 HTTP 承流面）与其可重跑证据 ────────────
 
@@ -1096,10 +1132,12 @@ class DependencyUnreadyIllegalStateRatchetTest {
     private static final int NO_HTTP_CARRIER_LEGS_TOTAL_BASELINE = 10;
 
     /**
-     * 落兜底腿里<b>确有</b> HTTP 承流路径的枚数。现值 <b>0</b>＝D-B4-71 的属主侧队列在 data-engine
-     * 这一域没有可收口项（此前 10 枚是按「落兜底必然渲染 500」的未验证前提排产的）。
+     * 落兜底腿里<b>确有</b> HTTP 承流路径的枚数。<b>#146l-前置 重设：0 → <b>1</b></b>＝
+     * sysman {@code SecurityProfileQueryDao.hasRoleCode}（#142/B4-3e-86 新增、落四档残差、
+     * HTTP 通路在位）＝可 HTTP 承流的属主欠账，收口排「SysmanErrorAdvice 补 ISE 503
+     * 承载」这一档，归 sysman 独立批；收口后本值随批回 0。
      */
-    private static final int HTTP_REACHABLE_OWNER_SIDE_DEBT_BASELINE = 0;
+    private static final int HTTP_REACHABLE_OWNER_SIDE_DEBT_BASELINE = 1;
 
     /**
      * 死面持有者文件里必须出现的<b>停写标记</b>原文（#142/B4-3e-48 对 D-B4-77 的通路侧裁决＝
@@ -1791,8 +1829,12 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * <p>3e-45 时这一案的职责是「把 {@code ENTRY_FALLBACK_500} 面再按可达性切两半」；四档化后
      * {@code carrierOf()} 自己就产出第三档标签，再按标签切同一刀就成了判据的自我循环。故本案的职责
      * 改为把<b>三档成员表与四档残差面各自逐文件钉死</b>：三档必须与 {@code NO_HTTP_CARRIER_LEGS_BASELINE}
-     * 双向等值（有人撤了死面却没改表即红），四档残差必须是<b>空面</b>——D-B4-72 的原形态正是这一档
-     * 被当作默认值使用，残差非空＝有一枚腿没被任何显式判据接住。</p>
+     * 双向等值（有人撤了死面却没改表即红），四档残差面必须与登记面双向等值——D-B4-72 的原形态正是
+     * 这一档被当作默认值使用，残差非空＝有一枚腿没被任何显式判据接住。
+     * <b>#146l-前置 重设</b>：四档残差空面 → 登记面
+     * {@code Map.of(SYS_SECURITY_PROFILE_QUERY_DAO, 1)}（#142/B4-3e-86 落腿未随批落账，
+     * 本批按门规显式登记持有者与腿数；sysman 属主侧收口批把它摘掉时本锚必须同批回复空面，
+     * <b>删腿不改锚＝按判据蒙面脱账，与 D-B4-72 同族</b>）。</p>
      *
      * <p>三面（实扫面／三档面／四档面）各自独立遍历 {@code carrierFace()} 得出，<b>不用减法</b>；
      * 合计与残差各自另有独立钉值，改一处必须改两处才过得去。</p>
@@ -1812,7 +1854,10 @@ class DependencyUnreadyIllegalStateRatchetTest {
             }
         }
         assertPinnedBidirectionally("三档 无 HTTP 承流", noCarrier, NO_HTTP_CARRIER_LEGS_BASELINE);
-        assertPinnedBidirectionally("四档 入口兜底残差", residual, Map.of());
+        // #146l-前置：四档残差锚 空面 → Map.of(SYS_SECURITY_PROFILE_QUERY_DAO, 1)
+        //（#142/B4-3e-86 hasRoleCode 腿显式登记；摘腿必须同批把本锚回复空面，见方法 javadoc）
+        assertPinnedBidirectionally("四档 入口兜底残差", residual,
+                Map.of(SYS_SECURITY_PROFILE_QUERY_DAO, 1));
 
         List<String> drift = new ArrayList<>();
         accountFor(drift, "三档腿数合计", NO_HTTP_CARRIER_LEGS_TOTAL_BASELINE, sum(noCarrier),
