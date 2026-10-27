@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.common.security.header;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.AuthErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -85,7 +86,7 @@ public class HeaderAuthInterceptor implements HandlerInterceptor {
             log.warn("HeaderAuthInterceptor deny: missing trust headers path={} userPresent={} tenantPresent={}",
                     path, userId != null, tenant != null);
             writeJson(response, HttpServletResponse.SC_FORBIDDEN,
-                    ApiResponse.error(403, "ECOS-AUTH-010",
+                    ApiResponse.error(403, AuthErrorCode.ECOS_AUTH_010,
                             "缺少信任头（X-ECOS-USER 或 X-ECOS-TENANT）"));
             return false;
         }
@@ -100,7 +101,7 @@ public class HeaderAuthInterceptor implements HandlerInterceptor {
             int dot = serviceHeader.indexOf('.');
             if (dot <= 0 || dot == serviceHeader.length() - 1) {
                 writeJson(response, HttpServletResponse.SC_FORBIDDEN,
-                        ApiResponse.error(403, "ECOS-AUTH-011",
+                        ApiResponse.error(403, AuthErrorCode.ECOS_AUTH_011,
                                 "服务凭证格式非法（需 serviceId.sig）"));
                 return false;
             }
@@ -111,7 +112,7 @@ public class HeaderAuthInterceptor implements HandlerInterceptor {
             if (!serviceVerifier.verify(serviceId, body, sig)) {
                 log.warn("HeaderAuthInterceptor sign failed: path={} service={}", path, serviceId);
                 writeJson(response, HttpServletResponse.SC_FORBIDDEN,
-                        ApiResponse.error(403, "ECOS-AUTH-011",
+                        ApiResponse.error(403, AuthErrorCode.ECOS_AUTH_011,
                                 "服务凭证验签失败"));
                 return false;
             }

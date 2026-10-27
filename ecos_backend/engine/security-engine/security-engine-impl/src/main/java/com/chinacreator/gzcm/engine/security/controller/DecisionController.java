@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.AuthErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.security.decision.DataScopeContract;
 import com.chinacreator.gzcm.common.security.decision.DecisionChannelContract;
@@ -99,7 +100,9 @@ public class DecisionController {
             if (sid != null && !sid.toString().isBlank()) userId = sid.toString();
         }
         if (userId == null || userId.isBlank()) {
-            return failure(ApiResponse.forbidden("无用户上下文（ECOS-AUTH-010），拒绝裁决"));
+            // #146m/B4-3e-94（P1.1 AUTH 面）：族码字面量改取 common-api AuthErrorCode 属主常量单源，
+            // 拼接后运行时文案与原字面量逐字节一致（测试面断言不受影响）。
+            return failure(ApiResponse.forbidden("无用户上下文（" + AuthErrorCode.ECOS_AUTH_010 + "），拒绝裁决"));
         }
 
         try {

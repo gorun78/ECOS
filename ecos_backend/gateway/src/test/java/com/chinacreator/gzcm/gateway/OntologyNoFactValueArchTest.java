@@ -152,7 +152,8 @@ class OntologyNoFactValueArchTest {
             "V216__fc_result_detail.sql",
             "V218__fc_action_ext.sql",
             "V279__dw_action_outcome.sql",
-            "V286__ecos_dw_wagent_option_amount.sql");
+            "V286__ecos_dw_wagent_option_amount.sql",
+            "V294__fc_predictivity_tables_and_demo_subjects.sql");
 
     /** 数值度量类型（金额/浮点一律禁入本域；整数类枚举/开关列不在禁列，见 {@link #MONEY_NAME_TOKENS} 的语义列名判据）。 */
     private static final Pattern NUMERIC_TYPE = Pattern.compile(

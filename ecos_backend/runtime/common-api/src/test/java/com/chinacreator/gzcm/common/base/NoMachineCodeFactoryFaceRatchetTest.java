@@ -197,6 +197,27 @@ class NoMachineCodeFactoryFaceRatchetTest {
     private static final String DATA_DOMAIN_ERROR_CODE_SOURCE =
             "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/gzcm/common/data/DataDomainErrorCode.java";
 
+    /**
+     * {@code ECOS-AUTH-0xx} 族码字面量（带引号的串，含数字中段任意前缀文本），单源只允许
+     * {@link #AUTH_ERROR_CODE_SOURCE} 承载。
+     *
+     * <p><b>#142/B4-3e-94 新登</b>（收口差距 P1.1「AUTH 序号 002~011 口径」面词归一子项）：
+     * 与 {@link #SYS_FAMILY_LITERAL}／{@link #RATE_FAMILY_LITERAL}／{@link #DATA_FAMILY_LITERAL}
+     * 同型的零容差判据。判据锚 <b>引号起点族前缀</b>（引号-{@code ECOS-AUTH-}-数字），把
+     * 「独立整枚」与「消息前缀拼接」两形态一并钉住——9 枚 0xx 码（001~006/010/011/020）
+     * 属详设-00 §C.2.5 冻结表在册码，本批只归一承载不裁决改号（0xx 细分语义码与
+     * 401/403/503 分态状态行双口径并行不悖，D-B4-65 族归并属另批）。本批已实扫 main 面
+     * 将全部 14 枚非属主副本（13 枚引号起点 + 1 枚 DecisionController 消息中段拼接腿
+     * {@code "无用户上下文（" + ECOS_AUTH_010 + "）"}）改指 {@code AuthErrorCode} 常量，
+     * 改后全仓 main 面族码字面量应恒 0 枚，故直接零容忍（不设棘轮基线）。
+     * 注释提及不算（判据面先过 {@code SourceCommentStripper.strip}）。</p>
+     */
+    private static final Pattern AUTH_FAMILY_LITERAL = Pattern.compile("\"ECOS-AUTH-\\d[^\\\"]*\"");
+
+    /** {@code ECOS-AUTH-0xx} 族码字面量单源文件（唯一承载点，9 枚枚定值）。 */
+    private static final String AUTH_ERROR_CODE_SOURCE =
+            "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/gzcm/common/error/AuthErrorCode.java";
+
     /** 登记豁免：唯一保留单参的入口腿。 */
     private static final List<String> REGISTERED_ENTRY_EXEMPTIONS = List.of("handleNotFound");
 
@@ -356,6 +377,40 @@ class NoMachineCodeFactoryFaceRatchetTest {
         assertEquals(List.of(), copies,
                 "main 面出现 ECOS-(DATA|DQ)-* 字面量副本（独立整枚或消息前缀拼接）：出口应改取 "
                         + "DataDomainErrorCode 常量，新增族码请先登记进详设-02 §D.1 冻结表并同步本族。"
+                        + "副本清单=" + copies);
+    }
+
+    /**
+     * ECOS-AUTH-0xx 族码字面量零容差判据（#142/B4-3e-94）：本批已把 14 枚非属主副本
+     * （13 枚引号起点 + 1 枚消息中段拼接腿）全部改指属主常量，改后全仓 main 面族码
+     * 字面量应恒 0 枚——故直接 {@code assertEquals(List.of(), …)}，不设棘轮基线
+     * （新增即红，无需「只减不增」窗口）。
+     */
+    @Test
+    @DisplayName("ECOS-AUTH-0xx 族码字面量在 main 面只由 AuthErrorCode 单源承载（副本即红）")
+    void authFamilyLiteralsAreSingleSourced() throws IOException {
+        Path root = locateRepoRoot();
+        List<Path> files = new ArrayList<>();
+        collectJavaUnder(root.resolve("ecos_backend"), files);
+        assertTrue(files.size() >= MIN_SCANNED_MAIN_FILES,
+                "扫描面缩水：实扫 main 面 java 文件 " + files.size() + " < 阈值 "
+                        + MIN_SCANNED_MAIN_FILES + "，判据不可信（读不到 ≠ 无副本）");
+
+        List<String> copies = new ArrayList<>();
+        for (Path f : files) {
+            String rel = root.relativize(f).toString().replace('\\', '/');
+            if (AUTH_ERROR_CODE_SOURCE.equals(rel)) {
+                continue;
+            }
+            String stripped = SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+            Matcher m = AUTH_FAMILY_LITERAL.matcher(stripped);
+            while (m.find()) {
+                copies.add(rel + " → " + m.group());
+            }
+        }
+        assertEquals(List.of(), copies,
+                "main 面出现 ECOS-AUTH-0xx 字面量副本（独立整枚或消息前缀拼接）：出口应改取 "
+                        + "AuthErrorCode 常量，新增族码请先登记进详设-00 §C.2.5 冻结表并同步本族。"
                         + "副本清单=" + copies);
     }
 

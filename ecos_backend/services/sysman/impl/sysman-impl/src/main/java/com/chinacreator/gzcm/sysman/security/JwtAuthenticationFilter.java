@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.sysman.security;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.common.error.AuthErrorCode;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -81,7 +82,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             log.warn("JWT validation failed for path={}: {}", path, e.getMessage());
             SecurityContextHolder.clearContext();
             sendWithTrace(response, HttpServletResponse.SC_UNAUTHORIZED,
-                    "ECOS-AUTH-002", "Token无效或已过期");
+                    AuthErrorCode.ECOS_AUTH_002, "Token无效或已过期");
             return;
         }
 
@@ -90,7 +91,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (!"access".equals(tokenType)) {
             log.warn("Invalid token type: {} for subject {}", tokenType, claims.getSubject());
             sendWithTrace(response, HttpServletResponse.SC_UNAUTHORIZED,
-                    "ECOS-AUTH-003", "Token类型无效（需 access）");
+                    AuthErrorCode.ECOS_AUTH_003, "Token类型无效（需 access）");
             return;
         }
 
@@ -104,13 +105,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             } catch (DataAccessException ex) {
                 log.warn("blacklist query failed (fail-closed): {}", ex.getMessage());
                 sendWithTrace(response, HttpStatus.SERVICE_UNAVAILABLE.value(),
-                        "ECOS-AUTH-005", "token 黑名单依赖不可用，请稍后重试");
+                        AuthErrorCode.ECOS_AUTH_005, "token 黑名单依赖不可用，请稍后重试");
                 return;
             }
             if (black) {
                 log.warn("Token已被强制踢出: userId={}", userId);
                 sendWithTrace(response, HttpServletResponse.SC_UNAUTHORIZED,
-                        "ECOS-AUTH-004", "Token已被强制踢出，请重新登录");
+                        AuthErrorCode.ECOS_AUTH_004, "Token已被强制踢出，请重新登录");
                 return;
             }
         }
@@ -127,7 +128,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (DataAccessException ex) {
             log.error("loadUserPermissions DataAccessException (fail-closed): userId={}", userId, ex);
             sendWithTrace(response, HttpStatus.SERVICE_UNAVAILABLE.value(),
-                    "ECOS-AUTH-005", "用户权限依赖不可用，请稍后重试");
+                    AuthErrorCode.ECOS_AUTH_005, "用户权限依赖不可用，请稍后重试");
             return;
         }
         log.debug("Loaded {} permissions from DB for userId={}", permissionCodes.size(), userId);
@@ -168,14 +169,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             } catch (DataAccessException ex) {
                 log.warn("tenant resolve DataAccessException (fail-closed): userId={}", userId, ex);
                 sendWithTrace(response, HttpStatus.SERVICE_UNAVAILABLE.value(),
-                        "ECOS-AUTH-005", "租户依赖不可用，请稍后重试");
+                        AuthErrorCode.ECOS_AUTH_005, "租户依赖不可用，请稍后重试");
                 return;
             }
             if (tenantId == null || tenantId.isBlank()) {
                 // W06：禁用旧 "tenant-a" 兜底 —— 显式拒绝，避免"默认租户"越权面
                 log.warn("user has no tenant binding: userId={}", userId);
                 sendWithTrace(response, HttpServletResponse.SC_FORBIDDEN,
-                        "ECOS-AUTH-006", "用户未绑定租户");
+                        AuthErrorCode.ECOS_AUTH_006, "用户未绑定租户");
                 return;
             }
         }

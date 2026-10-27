@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.gateway.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.AuthErrorCode;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.gateway.service.RuntimeAlertRepository;
 import com.chinacreator.gzcm.sysman.security.MinimumClearance;
@@ -72,7 +73,7 @@ public class RuntimeAlertV1Controller {
             log.error("RuntimeAlertV1 list failed (fail-closed): {}", ex.getMessage());
             return ResponseEntity.status(RlsExecutionContract.SEC_UNAVAILABLE_HTTP)
                     .body(ApiResponse.<Map<String, Object>>error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
-                            "ECOS-AUTH-005", "用户权限依赖不可用，请稍后重试").withTraceIdFromMdc());
+                            AuthErrorCode.ECOS_AUTH_005, "用户权限依赖不可用，请稍后重试").withTraceIdFromMdc());
         }
     }
 
@@ -149,7 +150,7 @@ public class RuntimeAlertV1Controller {
             log.error("RuntimeAlertV1 close failed (fail-closed): {}", ex.getMessage());
             return ResponseEntity.status(RlsExecutionContract.SEC_UNAVAILABLE_HTTP)
                     .body(ApiResponse.<Map<String, Object>>error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
-                            "ECOS-AUTH-005", "告警关闭依赖不可用，请稍后重试").withTraceIdFromMdc());
+                            AuthErrorCode.ECOS_AUTH_005, "告警关闭依赖不可用，请稍后重试").withTraceIdFromMdc());
         }
     }
 
@@ -183,7 +184,7 @@ public class RuntimeAlertV1Controller {
             log.error("dlq list failed: {}", ex.getMessage());
             return ResponseEntity.status(RlsExecutionContract.SEC_UNAVAILABLE_HTTP)
                     .body(ApiResponse.<Map<String, Object>>error(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,
-                            "ECOS-AUTH-005", "dlq 依赖不可用").withTraceIdFromMdc());
+                            AuthErrorCode.ECOS_AUTH_005, "dlq 依赖不可用").withTraceIdFromMdc());
         }
     }
 
