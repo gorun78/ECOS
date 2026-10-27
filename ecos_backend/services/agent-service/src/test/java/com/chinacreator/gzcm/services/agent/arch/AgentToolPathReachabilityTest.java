@@ -59,17 +59,30 @@ class AgentToolPathReachabilityTest {
     private static final Pattern TOOL_PATH_DECL = Pattern.compile(
             "\\bstatic final String (PATH_\\w+)\\s*=\\s*\"([^\"]+)\"");
 
-    /** 类级前缀：{@code @RequestMapping("...")} 或 {@code @RequestMapping({"...", "..."})}。 */
+    /** 类级前缀：{@code @RequestMapping("...")} 或 {@code @RequestMapping({"...", "..."})} 中的<b>全部字面量</b>。
+     *
+     * <p>{@code #146j/B4-3e-91} 首跑时"{@code MetadataController}
+     * {@code @RequestMapping({"/api/datanet/metadata","/api/v1/datanet/metadata"})}}"
+     * 首字面量是 bare 形态、v1 形态在第二位，而工具腿声明的是 v1 形态——旧判据只取
+     * 第一个字面量 ⇒ 把真实活着的 {@code /api/v1/datanet/metadata/fields/{id}} 判成
+     * 幻影路径（D-B4-47 复发假红）。<b>订正为穷举式</b>：把 {@code @RequestMapping}
+     * 参数列表里出现的全部字符串字面量都当类级前缀候选（与网关实测行为对齐：
+     * Spring {@code @RequestMapping} 数组字面量<b>全部</b>注册到同一 Controller）。
+     * 单字面量 Controller 的可达集合与此前完全一致；多字面量 Controller 的可达
+     * 集合成为严格超集，既不新增幻影决定（v1 之前不可达也不会变可达），
+     * 只是消掉"<b>同一 Controller 有两种活路径、门只看见一种</b>"这一族盲区。</p>
+     */
     private static final Pattern CLASS_LEVEL_MAPPING = Pattern.compile(
-            "@RequestMapping\\s*\\(\\s*\\{?\\s*\"([^\"]+)\"");
+            "@RequestMapping\\s*\\(\\s*([^)]*)\\)");
 
     /** 方法级映射：动词注解只取第一个字面量（与既有 route-rewrite-lint 口径一致）。 */
     private static final Pattern METHOD_LEVEL_MAPPING = Pattern.compile(
             "@(?:Get|Post|Put|Delete|Patch)Mapping\\s*\\(\\s*\\{?\\s*\"([^\"]+)\"");
 
-    /** 工具取基址的访问器调用形态：一个访问器唯一对应一个属主，族→属主映射由此实证而非注释。 */
+    /** 工具取基址的访问器调用形态：一个访问器唯一对应一个属主，族→属主映射由此实证而非注释。
+     * {@code knowledgeBaseUrl}（属主 {@code dccheng}）随 #146j/B4-3e-91 收口 D-B4-49 只读腿入册。 */
     private static final Pattern RESOLVER_ACCESSOR_CALL = Pattern.compile(
-            "\\bendpoints\\.(securityBaseUrl|auditBaseUrl|ontologyBaseUrl|dataBaseUrl)\\(\\)");
+            "\\bendpoints\\.(securityBaseUrl|auditBaseUrl|ontologyBaseUrl|dataBaseUrl|knowledgeBaseUrl)\\(\\)");
 
     /**
      * D-B4-47 在册幻影路径清单：<b>#142/B4-3e-10 关账后为空</b>（原唯一一项
@@ -134,7 +147,8 @@ class AgentToolPathReachabilityTest {
         }
         for (String owner : List.of(AgentToolEndpointResolver.SYSMAN_ROUTE_OWNER,
                 AgentToolEndpointResolver.ONTOLOGY_ROUTE_OWNER,
-                AgentToolEndpointResolver.DATA_ROUTE_OWNER)) {
+                AgentToolEndpointResolver.DATA_ROUTE_OWNER,
+                AgentToolEndpointResolver.KNOWLEDGE_ROUTE_OWNER)) {
             assertTrue(owners.contains(owner),
                     "解析器声明的属主 " + owner + " 不在 route-manifest 的 owner 集合 " + owners
                             + " 里 ⇒ 该族基址恒为空，工具腿会静默走『未发起调用』分支");
@@ -213,6 +227,12 @@ class AgentToolPathReachabilityTest {
         // 正向夹具：真实登记过的路径必须能匹配到前缀（否则上一条断言会因匹配器全空而假过）
         assertTrue(longestMatchingPrefix(manifestEntries(), "/api/v1/ontology/mappings/validate") != null,
                 "已登记族根匹配不到 ⇒ 最长前缀匹配器恒空，属主一致性腿会变成假的零违例");
+        // 多字面量类前缀夹具（#146j/B4-3e-91 订正锚）：MetadataController 声明
+        // @RequestMapping({"/api/datanet/metadata", "/api/v1/datanet/metadata"})，
+        // v1 形态在第二位 —— 旧判据只取首字面量会把它判成幻影（D-B4-47 假红）。
+        assertTrue(controllerPaths().contains("/api/v1/datanet/metadata/fields/{}"),
+                "第二字面量类前缀的后代数还在 ⇒ 多形态类前缀门无攻击点，"
+                        + "GetTableSchemaTool 的 v1 腿会被误判幻影");
         // 反向夹具：段边界不得被当成前缀命中（naive startsWith 会把 /api/v1/ontology 命中到 /api/v1/ontologyx）
         assertTrue(longestMatchingPrefix(manifestEntries(), "/api/v1/ontologyx/actions") == null,
                 "合成越界路径被判成已登记 ⇒ 前缀匹配未对齐段边界，任何同前缀字面量都能蒙过属主核对");
@@ -231,7 +251,10 @@ class AgentToolPathReachabilityTest {
         return out;
     }
 
-    /** 全仓主源码 Controller 的「类级前缀 + 方法级路径」全集（模板变量归一为 {@code {}}）。 */
+    /** 全仓主源码 Controller 的「类级前缀 + 方法级路径」全集（模板变量归一为 {@code {}}）。
+     * 类级前缀取 {@code @RequestMapping} 参数列表里的<b>全部</b>字面量（两形态并存
+     * 的 Controller 两形态都注册，漏一种即把真实活路径判成幻影——见
+     * {@link #CLASS_LEVEL_MAPPING} 判锐注）。 */
     private static Set<String> controllerPaths() throws IOException {
         Set<String> out = new LinkedHashSet<>();
         Path backend = backendRoot();
@@ -244,16 +267,33 @@ class AgentToolPathReachabilityTest {
                     .toList();
             for (Path c : controllers) {
                 String code = Files.readString(c, StandardCharsets.UTF_8);
-                String prefix = firstMatch(CLASS_LEVEL_MAPPING, code);
-                if (prefix == null) {
+                List<String> prefixes = classLevelPrefixLiterals(code);
+                if (prefixes.isEmpty()) {
                     continue;
                 }
                 Matcher m = METHOD_LEVEL_MAPPING.matcher(code);
                 while (m.find()) {
-                    out.add(normalize(join(prefix, m.group(1))));
+                    for (String prefix : prefixes) {
+                        out.add(normalize(join(prefix, m.group(1))));
+                    }
                 }
                 // 类级前缀本身也可能就是一个可寻址端点（无方法级注解的极简形态不在此面）
-                out.add(normalize(prefix));
+                for (String prefix : prefixes) {
+                    out.add(normalize(prefix));
+                }
+            }
+        }
+        return out;
+    }
+
+    /** {@code @RequestMapping} 参数列表里的全部字符串字面量（判据见 {@link #CLASS_LEVEL_MAPPING}）。 */
+    private static List<String> classLevelPrefixLiterals(String code) {
+        List<String> out = new ArrayList<>();
+        Matcher m = CLASS_LEVEL_MAPPING.matcher(code);
+        if (m.find()) {
+            Matcher lit = Pattern.compile("\"([^\"]*)\"").matcher(m.group(1));
+            while (lit.find()) {
+                out.add(lit.group(1));
             }
         }
         return out;
@@ -331,6 +371,7 @@ class AgentToolPathReachabilityTest {
             case "securityBaseUrl", "auditBaseUrl" -> AgentToolEndpointResolver.SYSMAN_ROUTE_OWNER;
             case "ontologyBaseUrl" -> AgentToolEndpointResolver.ONTOLOGY_ROUTE_OWNER;
             case "dataBaseUrl" -> AgentToolEndpointResolver.DATA_ROUTE_OWNER;
+            case "knowledgeBaseUrl" -> AgentToolEndpointResolver.KNOWLEDGE_ROUTE_OWNER;
             default -> throw new IllegalStateException("未知解析器访问器: " + accessor);
         };
     }
@@ -354,11 +395,6 @@ class AgentToolPathReachabilityTest {
     /** 归一：模板变量名不影响可寻址性，统一成 {@code {}}；顺带收掉重复斜杠。 */
     private static String normalize(String path) {
         return path.replaceAll("\\{[^}]*}", "{}").replaceAll("/{2,}", "/");
-    }
-
-    private static String firstMatch(Pattern p, String code) {
-        Matcher m = p.matcher(code);
-        return m.find() ? m.group(1) : null;
     }
 
     private static List<Path> filesIn(Path dir) throws IOException {

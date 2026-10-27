@@ -30,19 +30,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 整串内联在请求点上，绕开 route-manifest 两态寻址单源——切流后即断，
  * 而 gateway 与 monolith 同端口的现网形态把问题掩盖住了（D-B4-43 的正身即此族的 security 裁决腿）。</p>
  *
- * <p><b>工具面实测定数（#142/B4-3e-9 首跑变红后订正，#142/B4-3e-16、#142/B4-3e-22 族迁移后再次订正）</b>：
- * 本目录 {@code *Tool.java} 共 <b>20</b> 支，分两族——①<b>HTTP 出腿族 12 支</b>（判据=源码含
- * {@code RestTemplate}，实测为 8 支在册 + {@code CheckPermissionTool} +
- * 从纯 DAO 族迁来的 {@code QueryPhysicalTableTool} + #142/B4-3e-22 迁来的两支写腿
- * {@code RunQualityCheckTool}／{@code TriggerPipelineTool}），基址必须经解析器；②<b>纯 DAO 族 8 支</b>
- * （{@code ExecuteExpertRuleTool} 等，只有 {@code AgentToolDao} 一条腿、零 HTTP 出腿），
- * 本门对它们没有基址可钉。首版把 D-B4-46 记成"9 支工具"是把工具面总数当成了 HTTP 出腿数，
- * 现按实测口径钉死两族清单。<b>纯 DAO 族直连引擎表是另一条独立缺陷 D-B4-49</b>
- * （绕开 security-engine 裁决与引擎写通道，铁律 §0.6/§5 第 3、5 条）；其中<b>任意 SQL 下推</b>
- * 子项已由 #142/B4-3e-16 收口（{@code QueryPhysicalTableTool} 迁入 HTTP 出腿族），
- * <b>进程内写腿</b>（往属主台账／幽灵表插行）由 #142/B4-3e-22 收口（另两支迁入 HTTP 出腿族，
+ * <p><b>工具面实测定数（#142/B4-3e-9 首跑变红后订正，#142/B4-3e-16、#142/B4-3e-22 族迁移后再次订正，
+ * #146j/B4-3e-91 把纯 DAO 族最后 8 支只读腿全数迁入 HTTP 出腿族后第三度订正）</b>：
+ * 本目录 {@code *Tool.java} 共 <b>20</b> 支，本批起<b>全部 20 支同属 HTTP 出腿族</b>
+ * （判据=源码含 {@code RestTemplate}），基址一律经解析器：原 12 支之外，#146j/B4-3e-91
+ * 把原纯 DAO 族 8 支只读直连腿（{@code ExecuteExpertRuleTool}／{@code FindGraphPathTool}／
+ * {@code GetDataLineageTool}／{@code GetTableSchemaTool}／{@code ListDataSourcesTool}／
+ * {@code RAGQueryTool}／{@code SearchCatalogTool}／{@code SearchKnowledgeGraphTool}）
+ * 全部改指属主 REST 端点（kb 域属主 {@code dccheng}、data 域属主 {@code datanet}），
+ * {@code AgentToolDao} 只读面同批下线（类骨架保留给
+ * {@code AgentToolOwnerWriteChannelSingleSourceTest} 钉写面）。首版把 D-B4-46 记成
+ * "9 支工具"是把工具面总数当成了 HTTP 出腿数。<b>纯 DAO 族直连引擎表 = 独立缺陷
+ * D-B4-49</b>（绕开 security-engine 裁决与引擎写通道，铁律 §0.6/§5 第 3、5 条）；
+ * 其三个子项分批收口：<b>任意 SQL 下推</b>由 #142/B4-3e-16 收口（{@code QueryPhysicalTableTool}
+ * 迁入 HTTP 出腿族），<b>进程内写腿</b>由 #142/B4-3e-22 收口（另两支迁入 HTTP 出腿族，
  * 由 {@code AgentToolOwnerWriteChannelSingleSourceTest} 钉写面归零），
- * 其余表直连只读子项仍在册、不在本批顺手动刀。</p>
+ * <b>只读直连腿 8 支</b>由 <b>#146j/B4-3e-91 本批收口</b>（D-B4-49 关账）。</p>
  *
  * <p><b>判据为什么锚在调用形态上</b>：请求点字面量前必然带
  * {@code getForObject("}／{@code postForObject("}／{@code exchange("} 等调用形，
@@ -65,42 +68,49 @@ class AgentToolHardcodedBaseRatchetTest {
     private static final Pattern HTTP_LITERAL_CONSTANT = Pattern.compile(
             "\\bString\\s+\\w+\\s*=\\s*\"http://");
 
-    /** HTTP 出腿族（实测 12 支 = D-B4-46 在册 8 支 + B4-3e-8 先收口的 CheckPermissionTool
-     *  + B4-3e-16 从纯 DAO 族迁入的 QueryPhysicalTableTool
-     *  + B4-3e-22 从纯 DAO 族迁入的两支写腿 RunQualityCheckTool／TriggerPipelineTool）。 */
+    /** HTTP 出腿族（#146j/B4-3e-91 起实测 <b>20</b> 支＝全量：D-B4-46 在册 8 支 +
+     *  B4-3e-8 先收口的 CheckPermissionTool + B4-3e-16 迁入的 QueryPhysicalTableTool
+     *  + B4-3e-22 迁入的两支写腿 RunQualityCheckTool／TriggerPipelineTool
+     *  + B4-3e-91 从纯 DAO 族迁入的 8 支只读腿 ExecuteExpertRule/FindGraphPath/
+     *  GetDataLineage/GetTableSchema/ListDataSources/RAGQuery/SearchCatalog/
+     *  SearchKnowledgeGraph，D-B4-49 只读直连子项就此关账）。 */
     private static final Set<String> HTTP_EGRESS_TOOLS = Set.of(
             "AuditAccessLogTool.java",
             "CheckPermissionTool.java",
             "ExecuteActionTool.java",
+            "ExecuteExpertRuleTool.java",
+            "FindGraphPathTool.java",
+            "GetDataLineageTool.java",
             "GetObjectPropertiesTool.java",
             "GetObjectRelationshipsTool.java",
             "GetSecurityProfileTool.java",
+            "GetTableSchemaTool.java",
+            "ListDataSourcesTool.java",
             "ListObjectTypesTool.java",
             "QueryPhysicalTableTool.java",
+            "RAGQueryTool.java",
             "RunQualityCheckTool.java",
+            "SearchCatalogTool.java",
+            "SearchKnowledgeGraphTool.java",
             "SearchOntologyGraphTool.java",
             "TriggerPipelineTool.java",
             "ValidateMappingTool.java");
 
-    /** 纯 DAO 族（实测 8 支，无 HTTP 出腿 ⇒ 无基址可钉。B4-3e-22 起两支写腿已迁出本族，
-     *  余下均为只读直连腿；其直连引擎表问题归 D-B4-49 余项。 */
-    private static final Set<String> DAO_ONLY_TOOLS = Set.of(
-            "ExecuteExpertRuleTool.java",
-            "FindGraphPathTool.java",
-            "GetDataLineageTool.java",
-            "GetTableSchemaTool.java",
-            "ListDataSourcesTool.java",
-            "RAGQueryTool.java",
-            "SearchCatalogTool.java",
-            "SearchKnowledgeGraphTool.java");
+    /** 纯 DAO 族：<b>#146j/B4-3e-91 关账 D-B4-49 只读直连子项后归零</b>——原在册 8 支
+     *  只读腿全部迁上 HTTP 出腿族，AgentToolDao 只读面同批下线（类骨架保留给
+     *  AgentToolOwnerWriteChannelSingleSourceTest 钉写面）。任何新增 DAO 直连腿
+     *  须先在本批口径下重新立项，不许默默回潮。 */
+    private static final Set<String> DAO_ONLY_TOOLS = Set.of();
 
-    /** 工具族 → 该族必须使用的基址访问器（属主名由解析器单源持有，见 D-B4-48）。 */
+    /** 工具族 → 该族必须使用的基址访问器（属主名由解析器单源持有，见 D-B4-48）。
+     *  {@code knowledgeBaseUrl()}（属主 dccheng）随 #146j/B4-3e-91 kb 域四条腿入册。 */
     private static final Set<String> RESOLVER_ACCESSORS = Set.of(
-            "securityBaseUrl()", "auditBaseUrl()", "ontologyBaseUrl()", "dataBaseUrl()");
+            "securityBaseUrl()", "auditBaseUrl()", "ontologyBaseUrl()", "dataBaseUrl()",
+            "knowledgeBaseUrl()");
 
     @Test
     @Timeout(value = 60)
-    @DisplayName("D-B4-46 已关账：全 20 支工具零硬编码请求点、零 http 字面量常量")
+    @DisplayName("D-B4-46 已关账：全 20 支工具（#146j/B4-3e-91 起全属 HTTP 出腿族）零硬编码请求点、零 http 字面量常量")
     void noHardcodedBaseSitesRemainInAgentTools() throws IOException {
         List<String> callSiteHits = new ArrayList<>();
         List<String> literalHits = new ArrayList<>();
@@ -149,7 +159,7 @@ class AgentToolHardcodedBaseRatchetTest {
 
     @Test
     @Timeout(value = 60)
-    @DisplayName("工具面总数钉死 20 支（12 HTTP 出腿 + 8 纯 DAO）：新增须先定族，删支同步删项")
+    @DisplayName("工具面总数钉死 20 支（#146j/B4-3e-91 起 20 支全是 HTTP 出腿族、纯 DAO 族归零）：新增须先定族，删支同步删项")
     void toolInventoryMatchesRegisteredBaseline() throws IOException {
         Set<String> actual = new TreeSet<>();
         for (Path p : toolSources()) {
@@ -159,7 +169,8 @@ class AgentToolHardcodedBaseRatchetTest {
         expected.addAll(DAO_ONLY_TOOLS);
         assertEquals(expected, actual,
                 "agent 工具清单与在册基线不符（族划分见 D-B4-46／D-B4-49 口径）："
-                        + "新增工具必须先声明属于 HTTP 出腿族还是纯 DAO 族");
+                        + "新增工具必须先声明属于 HTTP 出腿族还是纯 DAO 族；"
+                        + "纯 DAO 族自 #146j/B4-3e-91（D-B4-49 只读腿收口）起只准为空");
     }
 
     /** 列出工具源码（缺目录 / 空清单一律 fail-loud，不得让扫描面恒空读成过门）。 */

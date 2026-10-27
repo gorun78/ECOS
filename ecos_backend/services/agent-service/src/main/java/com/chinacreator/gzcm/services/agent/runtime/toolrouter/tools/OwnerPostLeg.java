@@ -108,6 +108,40 @@ final class OwnerPostLeg {
     }
 
     /**
+     * 发一次 JSON GET 并把结果归一成 {@link Reply}（#146j/B4-3e-91 D-B4-49 余项读腿收口引入）。
+     *
+     * <p><b>为什么和 {@link #post} 共用骨架</b>：非 2xx 状态与信封码共用同一套
+     * {@link Outcome} 词表、身份载体同一条 {@link CallerCredentialSource#applyTo(HttpHeaders)}
+     * 中继、传输异常同款入 {@link Outcome#UNREACHABLE} —— 凭直觉各写一根 GET 骨架意味着
+     * 同一「一件事」出现两个实现面（D-B4-44/46 的一贯症结）。GET 腿与 POST 腿的差异只剩
+     * 动词与本方法不接请求体这一件事，其他因子完全同形。</p>
+     *
+     * @param base       已由 {@code AgentToolEndpointResolver} 解析出的属主基址（调用方负责取到非空）
+     * @param path       属主端点路径（可含已拼好的查询串；调用方必须已对入参做形状判据）
+     * @param onSuccess  {@code code == 0} 时的终态（读腿传 {@link Outcome#DATA_RETURNED}，
+     *                   读腿已成功交付数据）
+     */
+    static Reply get(RestTemplate restTemplate, String base, String path, Outcome onSuccess) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+        CallerCredentialSource.applyTo(headers);
+
+        Object envelope;
+        try {
+            envelope = restTemplate.exchange(base + path, org.springframework.http.HttpMethod.GET,
+                    new HttpEntity<>(headers), Object.class).getBody();
+        } catch (HttpStatusCodeException e) {
+            Outcome outcome = Outcome.fromHttpStatus(e.getStatusCode().value());
+            log.warn("[agent-tool] 属主返回非 2xx 状态: path={}, status={}, state={}", path, e.getStatusCode(), outcome);
+            return new Reply(outcome, e.getMessage(), null);
+        } catch (RestClientException e) {
+            log.warn("[agent-tool] 调用属主端点失败（按结论未知处置，不冒充结果）: path={}, cause={}", path, e.getMessage());
+            return new Reply(Outcome.UNREACHABLE, "属主端点调用失败：" + e.getMessage(), null);
+        }
+        return readEnvelope(envelope, onSuccess);
+    }
+
+    /**
      * 要拼进 URL 路径段的入参形状判据（单源）。
      *
      * <p>属主端点的 {@code @PathVariable} 是标识符而非自由文本：LLM 给的 id 里出现

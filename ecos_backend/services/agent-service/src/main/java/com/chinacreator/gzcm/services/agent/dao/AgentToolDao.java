@@ -1,106 +1,29 @@
 package com.chinacreator.gzcm.services.agent.dao;
 
-import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.Map;
-
 /**
- * R2-B4b 数据访问收口（架构铁律 §2.5 #1 / IR06）：agent-service {@code toolrouter/tools}
- * 工具内联 SQL 的统一落点。
+ * agent 工具面 {@code JdbcTemplate} 数据访问面 —— <b>只读面已全量下线</b>
+ * （#146j/B4-3e-91 收口 <b>D-B4-49 余项</b> 只读直连子项，本类正文只读方法清零）。
  *
- * <p>只搬不改：SQL 文本 / 表名 / 字段 / 参数序与原 Tool 逐字节一致。</p>
+ * <p><b>为什么留着空壳而不是删文件</b>：{@code AgentToolOwnerWriteChannelSingleSourceTest}
+ * 的 {@code toolDaoSource()} 断言本文件存在——该门对「agent 工具面进程内写腿」做的是
+ * 供扇判决：file 缺失即意味着判据错位（无法证明「本 DAO 里零 DML」），须保
+ * 证该锚点在场。所有只读方法已由各工具腿改指属主 REST 端点（#146j/B4-3e-91 实跑取证），
+ * 写原语早于 #142/B4-3e-22 已全撤。</p>
  *
- * <p>承接原文件（#142/B4-3e-16 后实数 10 支）：ExecuteExpertRuleTool / FindGraphPathTool /
- * GetDataLineageTool / GetTableSchemaTool / ListDataSourcesTool / RAGQueryTool /
- * RunQualityCheckTool / SearchCatalogTool / SearchKnowledgeGraphTool / TriggerPipelineTool。</p>
- *
- * <p><b>已从此面摘除</b>：{@code QueryPhysicalTableTool} 的两条腿（原 {@code queryPhysicalTable}
- * 任意 SQL 下推 + 原 {@code insertQueryLog} 自记台账）随 #142/B4-3e-16 收口 <b>D-B4-49</b>
- * 整删 —— 该腿改走 data-engine 属主端点，取数与查询历史都由属主侧的既有通道负责。
- * 「其余 10 支仍在本 DAO 直连数据库」这一事实本身在册为 <b>D-B4-49</b> 余项，
- * 由 {@code AgentToolHardcodedBaseRatchetTest} 的 {@code DAO_ONLY_TOOLS} 清单棘轮盯住。</p>
+ * <p><b>留下的硬约束</b>：本类仍须保持空体——任何在本类内新增的
+ * {@code jdbcTemplate.update(}/{@code INSERT INTO}/{@code UPDATE ... SET}/
+ * {@code DELETE FROM} 都被该门判红；工具侧的新读需求须经属主端点开同批种子
+ * 登记，不重立本类内联查数面（「agent 进程不持属主 SQL」是 D-B4-49 余项集体
+ * 收口的终局形态）。</p>
  */
 @Repository
-public class AgentToolDao extends JdbcTemplateDaoSupport {
+public class AgentToolDao {
 
-    /** ExecuteExpertRuleTool */
-    public Map<String, Object> findExpertRule(String ruleId) {
-        return jdbcTemplate.queryForMap(
-            "SELECT id, name, rule_type, expression, enabled FROM ecos_expert_rule WHERE id = ?", ruleId);
-    }
-
-    /** FindGraphPathTool */
-    public List<Map<String, Object>> listGraphEdgesForPath(String from, String to) {
-        return jdbcTemplate.queryForList(
-            "SELECT source_id, target_id, relation_type, weight FROM ecos_graph_edge " +
-            "WHERE source_id = ? OR target_id = ? OR source_id = ? OR target_id = ? " +
-            "ORDER BY weight ASC LIMIT 50", from, from, to, to);
-    }
-
-    /** GetDataLineageTool */
-    public Map<String, Object> findPipeline(String pipelineId) {
-        return jdbcTemplate.queryForMap(
-            "SELECT id, name, description, status, created_at, updated_at FROM ecos_pipeline WHERE id = ?", pipelineId);
-    }
-
-    public List<Map<String, Object>> listPipelineSteps(String pipelineId) {
-        return jdbcTemplate.queryForList(
-            "SELECT step_order, step_name, step_type, config FROM ecos_pipeline_step WHERE pipeline_id = ? ORDER BY step_order", pipelineId);
-    }
-
-    /** GetTableSchemaTool */
-    public List<Map<String, Object>> listTableSchemaFields(String resourceId) {
-        return jdbcTemplate.queryForList(
-            "SELECT column_name, data_type, is_nullable, column_default, column_comment " +
-            "FROM ecos_metadata_field WHERE resource_id = ? ORDER BY ordinal_position", resourceId);
-    }
-
-    /** ListDataSourcesTool */
-    public List<Map<String, Object>> listDataSources() {
-        return jdbcTemplate.queryForList(
-            "SELECT id, name, type, host, port, database_name, status, created_at FROM ecos_datasource ORDER BY name");
-    }
-
-    /** RAGQueryTool */
-    public List<Map<String, Object>> searchKnowledgeChunks(String queryText, int topK) {
-        return jdbcTemplate.queryForList(
-            "SELECT id, content, source, score FROM ecos_knowledge_chunk " +
-            "WHERE to_tsvector('chinese', content) @@ plainto_tsquery('chinese', ?) " +
-            "ORDER BY score DESC LIMIT ?", queryText, topK);
-    }
-
-    /** SearchCatalogTool */
-    public List<Map<String, Object>> searchCatalog(String keyword) {
-        return jdbcTemplate.queryForList(
-            "SELECT id, name, type, description, owner, created_at FROM ecos_catalog_item " +
-            "WHERE name ILIKE ? OR description ILIKE ? ORDER BY name LIMIT 50",
-            "%" + keyword + "%", "%" + keyword + "%");
-    }
-
-    /** SearchKnowledgeGraphTool */
-    public List<Map<String, Object>> searchGraphNodes(String query) {
-        return jdbcTemplate.queryForList(
-            "SELECT id, name, type, properties FROM ecos_graph_node " +
-            "WHERE name ILIKE ? OR type ILIKE ? ORDER BY name LIMIT 50",
-            "%" + query + "%", "%" + query + "%");
-    }
-
-    public List<Map<String, Object>> searchGraphEdges(String query) {
-        return jdbcTemplate.queryForList(
-            "SELECT e.id, e.source_id, e.target_id, e.relation_type, e.weight " +
-            "FROM ecos_graph_edge e " +
-            "WHERE e.relation_type ILIKE ? LIMIT 50",
-            "%" + query + "%");
-    }
-
-    // 写原语已于 #142/B4-3e-22 全部撤除：本 DAO 只剩只读面。
-    //
-    // 收口前这里有 insertPipelineRun（往 data-engine 的 ecos_pipeline_run 运行台账插行）
-    // 与 insertQualityCheck（往 ecos_quality_check 插行，而该表在 DDL 单源目录
-    // docs/50-db_script/02-flyway-migration/ 内实扫 CREATE TABLE 零枚＝幽灵表）。
-    // 两支都由工具腿改指属主端点替代，铁律约束 5「写通道与历史台账归属主」在 agent 侧的
-    // 这条旁路就此断开；由 AgentToolOwnerWriteChannelSingleSourceTest 钉成硬零面
-    // （本 DAO 出现 jdbcTemplate.update( 即红）。
+    // 只读面 8 支（ExecuteExpertRule / FindGraphPath / GetDataLineage / GetTableSchema /
+    // ListDataSources / RAGQuery / SearchCatalog / SearchKnowledgeGraph）：
+    // #146j/B4-3e-91 全改指属主端点，本批撤出。写原语（insertPipelineRun/insertQualityCheck）
+    // 早由 #142/B4-3e-22 撤除。本类不再有可移除内容，保留类壳与 @Repository 注解
+    // 就是「agent 工具面进程内 SQL 面已关账」的可读证据。
 }

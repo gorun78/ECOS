@@ -44,14 +44,25 @@ import java.util.Optional;
  *   <li>{@code datanet} —— 服务数据引擎族 {@code /api/v1/engine/data}（ports monolith 8080 /
  *       service 18082）。{@code #142/B4-3e-16} 起由 {@code QueryPhysicalTableTool} 使用；
  *       不存在 {@code data}／{@code data-engine} 属主名，禁另立键名。</li>
+ *   <li>{@code dccheng} —— 服务 kb 族 {@code /api/v1/knowledge}（含 {@code /rag}／
+ *       {@code /rules}／{@code /path}／{@code /search} 子族；ports monolith 8080 / service
+ *       18086）。{@code #146j（/B4-3e-91）D-B4-49 余项收口}起由
+ *       {@code RAGQueryTool}／{@code ExecuteExpertRuleTool}／{@code FindGraphPathTool}／
+ *       {@code SearchKnowledgeGraphTool} 四支 kb 域工具使用。route-manifest 里
+ *       {@code /api/v1/knowledge} 与 {@code /api/v1/engine/knowledge} 两条前缀的
+ *       {@code owner} 都是 {@code dccheng}，不存在独立的 {@code kb}／{@code knowledge}
+ *       属主名；本类只按属主名单源持有，禁另立键名。</li>
  * </ul>
- * 三个属主的 route 形态<b>不是一致的</b>（route-manifest 实测：sysman 四条前缀与 buszhi 四条前缀
- * 都还是 {@code route=monolith}，resolver 内部回落 monolith 端口 ⇒ 解析结果与收口前的 :8080 逐字相同；
- * 而 {@code datanet} 的三条前缀（{@code /api/v1/data}／{@code /api/v1/datanet}／
- * {@code /api/v1/engine/data}）登记为 {@code route=service}，SERVICE 模式解析到 :18082）。
- * 因此本类<b>不承诺</b>「解析结果恒等于 :8080」：切流状态由 manifest 单源决定，工具侧只如实使用
- * 解析结果。datanet 未起独立进程时该腿落 {@code UNREACHABLE}（属主侧不可用），而不是被折成
- * 「查询无结果」或「无权限」——见 {@code QueryPhysicalTableTool} 的分态表。</p>
+ * 四个属主的 route 形态<b>不一致</b>（route-manifest 实测：sysman 四条前缀与 buszhi
+ * 四条前缀都还是 {@code route=monolith}，resolver 内部回落 monolith 端口 ⇒ 解析结果与
+ * 收口前的 :8080 逐字相同；{@code datanet} 的三条前缀（{@code /api/v1/data}／
+ * {@code /api/v1/datanet}／{@code /api/v1/engine/data}）登记为 {@code route=service}，SERVICE
+ * 模式解析到 :18082；{@code dccheng} 的前缀（{@code /api/v1/knowledge}／
+ * {@code /api/v1/engine/knowledge}）登记为 {@code route=monolith}，回落到 monolith 端口
+ * 与收口前 :8080 逐字相同）。因此本类<b>不承诺</b>「解析结果恒等于 :8080」：切流状态由
+ * manifest 单源决定，工具侧只如实使用解析结果。属主未起独立进程或 route 尚未切流时该腿
+ * 落 {@code UNREACHABLE}／会使用 monolith 基址（属主侧不可用），而不是被折成「查询无结果」
+ * 或「无权限」——见 {@code QueryPhysicalTableTool} 与其余读腿的分态表。</p>
  *
  * <p><b>为什么返回空而不是抛异常</b>：抛异常会被工具咽喉折成通用工具错误，调用方无从区分
  * 「服务不可解析」与「服务答了失败」；返回空则把不可用如实交回读侧（§4.7.2
@@ -102,6 +113,24 @@ public class AgentToolEndpointResolver {
     /** data 族基址<b>覆盖项键名</b>单源。 */
     public static final String DATA_BASE_URL_PROPERTY = "ecos.endpoints." + DATA_ROUTE_OWNER;
 
+    /**
+     * kb 族（{@code /api/v1/knowledge/**}：{@code /rag}／{@code /rules}／{@code /path}／
+     * {@code /search} 子族）在 route-manifest 的<b>属主名</b>单源。
+     *
+     * <p>{@code #146j/B4-3e-91} 随 D-B4-49 余项读腿收口而新增：{@code RAGQueryTool}／
+     * {@code ExecuteExpertRuleTool}／{@code FindGraphPathTool}／{@code SearchKnowledgeGraphTool}
+     * 四支从 {@code AgentToolDao} 直读引擎域表改指 kb 属主端点（kb-engine-impl
+     * {@code RagController}／{@code ExpertRuleController}／{@code KnowledgeGraphController}），
+     * 由属主侧做 RLS/列过滤/脱敏/归属核算。route-manifest 里 {@code /api/v1/knowledge} 与
+     * {@code /api/v1/engine/knowledge} 的 {@code owner} 都是 {@code dccheng}（ports
+     * monolith 8080 / service 18086），不存在独立的 {@code kb}／{@code knowledge} 属主名，
+     * 禁另立键名。</p>
+     */
+    public static final String KNOWLEDGE_ROUTE_OWNER = "dccheng";
+
+    /** kb 族基址<b>覆盖项键名</b>单源。 */
+    public static final String KNOWLEDGE_BASE_URL_PROPERTY = "ecos.endpoints." + KNOWLEDGE_ROUTE_OWNER;
+
     private final ObjectProvider<ServiceEndpointResolver> endpointProvider;
 
     private final String sysmanBaseUrlOverride;
@@ -110,14 +139,18 @@ public class AgentToolEndpointResolver {
 
     private final String dataBaseUrlOverride;
 
+    private final String knowledgeBaseUrlOverride;
+
     public AgentToolEndpointResolver(ObjectProvider<ServiceEndpointResolver> endpointProvider,
             @Value("${" + SYSMAN_BASE_URL_PROPERTY + ":}") String sysmanBaseUrlOverride,
             @Value("${" + ONTOLOGY_BASE_URL_PROPERTY + ":}") String ontologyBaseUrlOverride,
-            @Value("${" + DATA_BASE_URL_PROPERTY + ":}") String dataBaseUrlOverride) {
+            @Value("${" + DATA_BASE_URL_PROPERTY + ":}") String dataBaseUrlOverride,
+            @Value("${" + KNOWLEDGE_BASE_URL_PROPERTY + ":}") String knowledgeBaseUrlOverride) {
         this.endpointProvider = endpointProvider;
         this.sysmanBaseUrlOverride = trim(sysmanBaseUrlOverride);
         this.ontologyBaseUrlOverride = trim(ontologyBaseUrlOverride);
         this.dataBaseUrlOverride = trim(dataBaseUrlOverride);
+        this.knowledgeBaseUrlOverride = trim(knowledgeBaseUrlOverride);
     }
 
     /**
@@ -157,6 +190,20 @@ public class AgentToolEndpointResolver {
      */
     public Optional<String> dataBaseUrl() {
         return resolveOwner(DATA_ROUTE_OWNER, DATA_BASE_URL_PROPERTY, dataBaseUrlOverride);
+    }
+
+    /**
+     * kb 族（{@code /api/v1/knowledge/**}）的 base-url（不含尾斜杠）。
+     *
+     * <p>{@code #146j/B4-3e-91} 随 D-B4-49 余项读腿收口而新增：{@code RAGQueryTool}／
+     * {@code ExecuteExpertRuleTool}／{@code FindGraphPathTool}／
+     * {@code SearchKnowledgeGraphTool} 四支从 {@code AgentToolDao} 直读 kb 域表
+     * （{@code ecos_expert_rule}／{@code ecos_graph_node}／{@code ecos_graph_edge}／
+     * {@code ecos_knowledge_chunk}）改指 kb-engine-impl 属主端点。属主未起独立进程时该腿落
+     * {@code UNREACHABLE}（属主侧不可用），而不是被折成「查询无结果」或「无权限」。</p>
+     */
+    public Optional<String> knowledgeBaseUrl() {
+        return resolveOwner(KNOWLEDGE_ROUTE_OWNER, KNOWLEDGE_BASE_URL_PROPERTY, knowledgeBaseUrlOverride);
     }
 
     private Optional<String> resolveOwner(String owner, String property, String override) {
