@@ -9,6 +9,7 @@ import java.util.Map;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import com.chinacreator.gzcm.common.error.SecurityErrorCode;
 import com.chinacreator.gzcm.engine.security.crypto.IKeyManagementService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,8 +42,8 @@ public class KeyManagementServiceImpl implements IKeyManagementService {
     public KeyManagementServiceImpl() {
         this.masterBytes = readMasterKeyFromEnv();
         if (masterBytes == null) {
-            log.warn("主密钥缺失: {} 未设置（写操作将拒绝并映射 ECOS-SEC-430，加解密不静默建钥）",
-                    ENV_MASTER_KEY);
+            log.warn("主密钥缺失: {} 未设置（写操作将拒绝并映射 {}，加解密不静默建钥）",
+                    ENV_MASTER_KEY, SecurityErrorCode.ECOS_SEC_430);
         } else {
             log.info("主密钥已从 env 加载（length={}B，不入日志/密钥不入文件）", masterBytes.length);
         }

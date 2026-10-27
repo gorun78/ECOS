@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.SecurityErrorCode;
 import com.chinacreator.gzcm.engine.security.catalog.SecurityAssetCatalogService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,7 +68,7 @@ public class SecurityAssetCatalogController {
             return ApiResponse.success(row);
         } catch (IllegalArgumentException e) {
             // 400 ECOS-SEC-410：目录参数白名单校验
-            return ApiResponse.badRequest("非法资产参数（ECOS-SEC-410）: " + e.getMessage());
+            return ApiResponse.badRequest("非法资产参数（" + SecurityErrorCode.ECOS_SEC_410 + "）: " + e.getMessage());
         } catch (Exception e) {
             log.error("upsert 安全资产失败: key={}", assetKey, e);
             return ApiResponse.internalError("upsert 失败: " + e.getMessage());

@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.security.crypto;
 
+import com.chinacreator.gzcm.common.error.SecurityErrorCode;
+
 import java.security.Key;
 
 /**
@@ -52,8 +54,8 @@ public interface IKeyManagementService {
     class KeyNotFoundException extends KeyManagementException {
         private static final long serialVersionUID = 1L;
         private final String keyId;
-        /** D.5.1 错误码（端点 500）。 */
-        public static final String ERROR_CODE = "ECOS-SEC-430";
+        /** D.5.1 错误码（端点 500）。单源取 {@link SecurityErrorCode#ECOS_SEC_430}。 */
+        public static final String ERROR_CODE = SecurityErrorCode.ECOS_SEC_430;
 
         public KeyNotFoundException(String keyId) {
             super("密钥不存在且禁止自动建钥（" + ERROR_CODE + "）: keyId=" + keyId);

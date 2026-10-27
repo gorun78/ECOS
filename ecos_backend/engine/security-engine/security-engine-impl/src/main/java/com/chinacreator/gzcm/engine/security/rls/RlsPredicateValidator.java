@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.security.rls;
 
+import com.chinacreator.gzcm.common.error.SecurityErrorCode;
+
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -53,7 +55,7 @@ public final class RlsPredicateValidator {
         // ③ 黑名单：拼接语义 + SQL 关键字
         if (DANGEROUS.matcher(t).find()) {
             throw new TemplateRejectedException(
-                    "谓词模板含非白名单字面量/关键字（ECOS-SEC-410）: " + t);
+                    "谓词模板含非白名单字面量/关键字（" + SecurityErrorCode.ECOS_SEC_410 + "）: " + t);
         }
 
         if (bindings == null) bindings = java.util.Collections.emptyList();

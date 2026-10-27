@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.security;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.common.error.SecurityErrorCode;
 import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.cls.ColumnSurfaceContract;
 import com.chinacreator.gzcm.common.security.filter.RowFilterVerdictContract;
@@ -489,8 +490,8 @@ public class AiSecurityEngineClient {
                 return List.of();
             }
             if (reading.visible().isEmpty()) {
-                log.warn("AiSecurityEngineClient.allowedColumns 策略拒绝全部列(ECOS-SEC-402): entityType={}",
-                        entityType);
+                log.warn("AiSecurityEngineClient.allowedColumns 策略拒绝全部列({}): entityType={}",
+                        SecurityErrorCode.ECOS_SEC_402, entityType);
             } else if (reading.legacyKeyUsed()) {
                 log.warn("AiSecurityEngineClient.allowedColumns 走 legacy 别名键: entityType={} size={}",
                         entityType, reading.visible().size());

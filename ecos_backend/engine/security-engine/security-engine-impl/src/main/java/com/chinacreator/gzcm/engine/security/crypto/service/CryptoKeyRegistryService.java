@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.security.crypto.service;
 
+import com.chinacreator.gzcm.common.error.SecurityErrorCode;
 import com.chinacreator.gzcm.engine.security.crypto.KeyManagementService;
 import com.chinacreator.gzcm.engine.security.crypto.KeyManagementService.KeyManagementException;
 import com.chinacreator.gzcm.engine.security.crypto.model.KeyMetadata;
@@ -55,8 +56,8 @@ public class CryptoKeyRegistryService {
 
     private static final Logger log = LoggerFactory.getLogger(CryptoKeyRegistryService.class);
 
-    /** §4.3.3：加密主密钥缺失 → 500 {@code ECOS-SEC-430}（禁静默建钥）。 */
-    public static final String ERROR_MASTER_KEY_MISSING = "ECOS-SEC-430";
+    /** §4.3.3：加密主密钥缺失 → 500 {@code ECOS-SEC-430}（禁静默建钥）。单源取 {@link SecurityErrorCode#ECOS_SEC_430}。 */
+    public static final String ERROR_MASTER_KEY_MISSING = SecurityErrorCode.ECOS_SEC_430;
 
     /** 已登记但未在用的状态值（退役/软删/停用三态），用于 {@code retiredAt} 的取值判定。 */
     private static final Set<String> NON_ACTIVE_STATES = Set.of("RETIRED", "DELETED", "INACTIVE");

@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.security.service;
 
+import com.chinacreator.gzcm.common.error.SecurityErrorCode;
 import com.chinacreator.gzcm.common.security.abac.AbacEvaluateResponseContract;
 import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -205,7 +206,7 @@ public class OpaPolicyService {
         result.put(GuardrailDecisionContract.KEY_POLICY_STATE, STATE_UNAVAILABLE);
         result.put(AbacEvaluateResponseContract.KEY_FALLBACK,
                 AbacEvaluateResponseContract.VALUE_FALLBACK_DENY_OPA_DOWN);
-        result.put("eccode", "ECOS-SEC-502");
+        result.put("eccode", SecurityErrorCode.ECOS_SEC_502);
         if (error != null) result.put(AbacEvaluateResponseContract.KEY_OPA_ERROR, error);
         if (statusCode != null) result.put("opaStatus", statusCode);
         result.put(GuardrailDecisionContract.KEY_OBLIGATIONS, List.of(Map.of(

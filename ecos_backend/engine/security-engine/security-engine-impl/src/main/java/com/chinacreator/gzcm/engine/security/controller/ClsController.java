@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.SecurityErrorCode;
 import com.chinacreator.gzcm.engine.security.service.ColumnLevelSecurityServiceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,8 +15,8 @@ public class ClsController {
 
     private static final Logger log = LoggerFactory.getLogger(ClsController.class);
 
-    /** §4.3.3 {@code ECOS-SEC-402}（CLS 允许列为空集）的机读码值，只在新 GET 别名上出现。 */
-    public static final String ERROR_CLS_EMPTY_DENY = "ECOS-SEC-402";
+    /** §4.3.3 {@code ECOS-SEC-402}（CLS 允许列为空集）的机读码值，只在新 GET 别名上出现。单源取 {@link SecurityErrorCode#ECOS_SEC_402}。 */
+    public static final String ERROR_CLS_EMPTY_DENY = SecurityErrorCode.ECOS_SEC_402;
 
     private final ColumnLevelSecurityServiceImpl clsService;
 

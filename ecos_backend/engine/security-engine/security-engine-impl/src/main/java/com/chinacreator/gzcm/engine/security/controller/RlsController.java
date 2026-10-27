@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.SecurityErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.security.decision.SubjectClearanceResolutionService;
@@ -177,7 +178,7 @@ public class RlsController {
             return ApiResponse.success(rlsService.upsertPolicy(body));
         } catch (com.chinacreator.gzcm.engine.security.rls.RlsPredicateValidator.TemplateRejectedException e) {
             // 400 ECOS-SEC-410：谓词模板含非白名单字面量/关键字
-            return ApiResponse.badRequest("非法谓词模板（ECOS-SEC-410）: " + e.getMessage());
+            return ApiResponse.badRequest("非法谓词模板（" + SecurityErrorCode.ECOS_SEC_410 + "）: " + e.getMessage());
         } catch (IllegalArgumentException e) {
             return ApiResponse.badRequest(e.getMessage());
         } catch (Exception e) {
