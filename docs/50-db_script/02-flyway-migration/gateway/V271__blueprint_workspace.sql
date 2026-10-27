@@ -16,6 +16,8 @@
 --   * 审批引用 approval_ref 指向 security-engine 裁决/批准记录（security 权威，本表只存引用）。
 -- 状态: 2026-10-11 修订落点后，经用户「授权实跑」增量迁移之续授权（同一 live 契约核验目的，
 --       见 goal 决议「拉起全栈核验契约后继续实现剩余面」）对本机开发 ecos-postgres/sys_man 实跑
+--       （#146g 2026-10-27 复验：重放 psql 打印 already exists, skipping = 在位省证；
+--        库面 4 行数据，uk_v271_bp_scen_ver + idx_v271_bp_tenant_status 2 索引在位）
 -- 纪律: DR01~DR08 / MC01~MC03 / ST07 / IR02 / IR03(只加不删)
 
 CREATE TABLE IF NOT EXISTS ecos_control.ecos_scenario_blueprint (

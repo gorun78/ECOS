@@ -6,7 +6,7 @@
 --       * is_evidence_output（V236）                ←→ evidence_required（新列；两者并存，语义 = 是否要求来源引用）
 --       * side_effect / rollback_plan_text（V236）  ←→ side_effect_scope / rollback_*（新列细化，旧列停写不改）
 --       * 幂等键：V236 无 → 本批 idempotent / idempotency_key_required
--- 状态: 仅落迁移脚本文件，**未对 ecos-postgres 实跑**
+-- 状态: 2026-10-27 已对 dev PG（sys_man）实跑（#146g 授权迁移实跑批，手动 psql ON_ERROR_STOP=1 exit 0；库面证据：ecos_ai.ecos_wagent_tool_contract 18 枚契约列全部在位，information_schema 实测 18/18）
 -- 纪律: DR01~DR08 / MC01~MC03 / ST07 / IR02 / IR03(只加不删)
 
 -- ── 1. 补列（幂等；DDL 不建 CHECK，词表单源 Java 契约层，R-15 同纪律）──────────────────

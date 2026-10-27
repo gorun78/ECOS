@@ -9,7 +9,7 @@
 --   * GENERATED/VALIDATED ≠ APPROVED（§7.4 末段：三态禁混淆，生成与申请必须两个动作/两个审计事件）；
 --   * preview_pass_rate 等预览产物只来自**只读预览**，禁改变正式资产/版本/水位线（SUP-DATA-01 断言面）；
 --   * 幂等：同 idempotency_key（租户内唯一约束）重试不得重复创建（§7.5）。
--- 状态: 仅落迁移脚本文件，**未对 ecos-postgres 实跑**
+-- 状态: 2026-10-27 已对 dev PG（sys_man）实跑（#146g 授权迁移实跑批，手动 psql ON_ERROR_STOP=1 exit 0；库面证据：ecos_data.ecos_data_governance_candidate 在位 0 行）
 -- 纪律: DR01~DR08 / MC01~MC03 / ST07 / IR02 / IR03(只加不删)
 -- 类型映射: proposal/evidence/confidence/impact/assumptions/conflicts/review_log → JSON-TEXT；
 --           preview_pass_rate = NUMERIC(6,5)（比率非金额，MC02 带精度同族）

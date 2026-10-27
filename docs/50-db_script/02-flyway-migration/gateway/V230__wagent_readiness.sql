@@ -1,7 +1,7 @@
 -- V230 (卷10 §6.2): DIKC 就绪评估 ecos_ai.ecos_wagent_readiness——§3.1 三表合并主表（item/gap 见 V231/V232）
 -- 追溯: W245~W277 ↔ C227~C259（卷 10 §七）；需求依据 REQ-WAG-08（F10-08 Readiness 评估与定级）
 -- 批准: 需求检视报告 §十四 14.1（2026-09-29）之 R-33=①、R-35=①；执行边界 §14.4 = 脚本文件落地
--- 状态: 仅落迁移脚本文件，**未对 ecos-postgres 实跑**（实跑属 §14.4 未授权项，需逐项再确认）
+-- 状态: 2026-10-27 已对 dev PG（sys_man）实跑（#146g 授权迁移实跑批，手动 psql ON_ERROR_STOP=1 exit 0；重放输出全数 already exists, skipping = 库面早已在位的省证；ecos_ai.ecos_wagent_readiness 在位 0 行）
 -- 纪律: DR01~DR08 / MC01~MC03 / ST06 / ST07 / ST09 / IR02 / IR03(只加不删)
 -- 命名口径: 未列类型者按 §6.1 通用列 + ECOS 类型映射展开；JSON 语义一律 *_json TEXT（2026-09-30 DR04 收口，卷 10 §6.1 同步勘误）
 

@@ -9,7 +9,7 @@
 --     （模型注册与门禁在 CM registry / sys_config 族）；
 --   * 降级不满足质量门槛时 status 必须 DEGRADED/FAILED，禁伪装 SUCCEEDED（§10.6）；
 --   * 非 Token 模型按调用次数/输入规模计量（cost_unit 列），与 LLM_USAGE 事件同源互补（§10.6 计量条）。
--- 状态: 仅落迁移脚本文件，**未对 ecos-postgres 实跑**
+-- 状态: 2026-10-27 已对 dev PG（sys_man）实跑（#146g 授权迁移实跑批，手动 psql ON_ERROR_STOP=1 exit 0；库面证据：ecos_ai.ecos_ai_capability_task 在位 0 行）
 -- 纪律: DR01~DR08 / MC01~MC03 / ST07 / IR02 / IR03(只加不删)
 
 CREATE TABLE IF NOT EXISTS ecos_ai.ecos_ai_capability_task (

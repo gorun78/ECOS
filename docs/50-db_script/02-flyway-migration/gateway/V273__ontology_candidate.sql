@@ -7,7 +7,7 @@
 --   * 桥接：ONTOLOGY_PROPOSAL_CREATE 容量时把已 VALIDATED 候选投影到提案流，
 --     本表记 proposal_ref（逻辑引用，ST09 禁跨表 FK），本表不承载正式发布（§7.3：候选禁直发，SUP-ONTO-01/02）；
 --   * 状态词表与 §7.4 统一候选状态机一致（与 data 候选同构，语义单源 = 本体域 DO constants）。
--- 状态: 仅落迁移脚本文件，**未对 ecos-postgres 实跑**
+-- 状态: 2026-10-27 已对 dev PG（sys_man）实跑（#146g 授权迁移实跑批，手动 psql ON_ERROR_STOP=1 exit 0；库面证据：ecos_ontology.ecos_ontology_candidate 在位 0 行）
 -- 纪律: DR01~DR08 / MC01~MC03 / ST07 / IR02 / IR03(只加不删)
 
 CREATE TABLE IF NOT EXISTS ecos_ontology.ecos_ontology_candidate (

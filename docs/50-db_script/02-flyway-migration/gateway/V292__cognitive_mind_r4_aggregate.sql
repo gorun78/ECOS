@@ -4,7 +4,7 @@
 --
 -- 批准口径: 差距分析 B3 行「既成事实表列演进需架构裁决」→ 用户授权 /goal 批（完整补齐差距 + 不漏项无假绿）；
 --           演进路径 = 只加不删（IR03）：V187 单 status 列保留停写，原值 stop-not-copy（不回填，读面恒走三轴）。
--- 状态: 仅落迁移脚本文件，未对 ecos-postgres 实跑（实跑属 dev PG 授权门控项，与 V288+ MC02 实收口并批）。
+-- 状态: 2026-10-27 已对 dev PG（sys_man）实跑（#146g 授权迁移实跑批，紧跟 V187 手动 psql ON_ERROR_STOP=1 exit 0；库面证据：11 ALTER + ecos_cognitive_mind_update 表 + 2 索引 + 13 COMMENT 全部落地，mind 表 28 列三轴六段在位）
 -- 纪律: DR01~DR08 / MC01~MC03 / ST03-A / ST07 / IR02(手动 psql) / IR03(只加不删) / DP01 列演进须过 DBA
 --
 -- ── 设计依据（唯一真源 docs/30-设计/ECOS详细设计说明书-从零实施版 §8.4.2/§8.4.3 R4 轮）──────────

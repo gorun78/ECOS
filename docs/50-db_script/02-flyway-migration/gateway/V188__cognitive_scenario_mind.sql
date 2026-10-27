@@ -1,7 +1,7 @@
 -- V188 (卷05 附录 E.2 / F05-02 要点1·3): 场景↔Mind 绑定表 ecos_cognitive_scenario_mind 新建（替代库内缺失的 legacy ecos_scenario_mind/V146）
 -- 追溯: W116/C98（mind_id 列全库 0 个；V146 迁移在、库内无表而 ScenarioMindService 仍 INSERT）；需求依据 REQ-COG-01（E1 JOIN 数据源）
 -- 批准: 需求检视报告 §十四 14.1（2026-09-29）之 R-13 ①（新建 mind 两表入 ecos_cognitive，本表为第二张）；执行边界 §14.4 = 脚本文件落地
--- 状态: 仅落迁移脚本文件，**未对 ecos-postgres 实跑**（实跑属 §14.4 未授权项，需逐项再确认）
+-- 状态: 2026-10-27 已对 dev PG（sys_man）实跑（#146g 授权迁移实跑批，手动 psql ON_ERROR_STOP=1 exit 0；库面证据：ecos_cognitive.ecos_cognitive_scenario_mind 在位 0 行）
 -- 纪律: DR01~DR08 / MC02~MC03 / MC01 / ST03-A / ST07 / IR02(手动 psql) / IR03(只加不删；legacy 名不重建)
 --
 -- ── legacy 处置（E.3 定版口径）───────────────────────────────

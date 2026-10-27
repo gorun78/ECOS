@@ -1,7 +1,7 @@
 -- V187 (卷05 附录 E.2 / F05-02 要点1): 认知模型资产注册表 ecos_cognitive_mind 新建（E1 数据源从"不存在"建成）
 -- 追溯: W116/C98（E1 数据源物理缺失，全库无 mind 表）、W117/C99（kb_* 误名正名 cognitive_*，ADR-8 明令）；需求依据 REQ-COG-01（E1 detect 数据源）
 -- 批准: 需求检视报告 §十四 14.1（2026-09-29）之 R-13 ①（认知真身归位 ecos_cognitive：本批新建 mind 两表入 ecos_cognitive + 存量 belief/hypothesis 原地合规化）；执行边界 §14.4 = 脚本文件落地
--- 状态: 仅落迁移脚本文件，**未对 ecos-postgres 实跑**（实跑属 §14.4 未授权项，需逐项再确认）
+-- 状态: 2026-10-27 已对 dev PG（sys_man）实跑（#146g 授权迁移实跑批，手动 psql ON_ERROR_STOP=1 exit 0；库面证据：ecos_cognitive.ecos_cognitive_mind 在位，V292 叠加列后 28 列全在位）
 -- 纪律: DR01~DR08 / MC01~MC03 / ST03-A / ST07 / IR02(手动 psql) / IR03(只加不删；存量 11 张错放表只停写)
 --
 -- ── schema 占用声明（R-13 ① 已批准口径）──────────────────────

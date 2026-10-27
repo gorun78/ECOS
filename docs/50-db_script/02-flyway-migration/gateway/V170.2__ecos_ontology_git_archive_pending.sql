@@ -3,7 +3,7 @@
 -- 关联: V170.1 已给 public.ecos_ontology_version 与 ecos_ontology.ecos_ontology_version 补 git_ref 列
 -- 批准: 需求检视报告 §十四 14.1（2026-09-29）之 R-5=①+③；R-5③ = Function/版本归档"归主控制域"
 -- 号段: V170 整 = 卷02；V170.1 = 卷03 快照列合规化；V170.2 = 本批补偿队（同主版本子序列）
--- 状态: 仅落迁移脚本文件，**未对 ecos-postgres 实跑**（实跑属 §14.4 未授权项，需逐项再确认）
+-- 状态: 2026-10-27 已对 dev PG（sys_man）实跑（#146g 授权迁移实跑批，手动 psql ON_ERROR_STOP=1 exit 0；库面证据：public.ecos_ontology_git_archive_pending 在位）
 -- 纪律: DR01~DR08 / MC01~MC03 / ST07 / IR02(手动 psql) / IR03(只加不删)
 -- 定位: 控制域 → 落 public.ecos_ontology_git_archive_pending，与 V244 ecos_runtime_audit_retry 同族
 --       由 runtime/runtime-task 统一消费（禁止引擎自建 @Scheduled，铁律 §2.5-4）
@@ -56,4 +56,4 @@ CREATE INDEX IF NOT EXISTS idx_ontology_git_archive_onto
 -- [MC01] PK VARCHAR(36) 应用侧生成，无 SERIAL/BIGSERIAL/gen_random_uuid() ✓
 -- [MC02] 无 JSON 类型列 ✓  [MC03] 无 partial index / :: cast / CREATE POLICY / PARTITION BY ✓
 -- [ST07] 落 public（控制域主控制 schema 现名，与 V244 ecos_runtime_audit_retry 同族） ✓
--- [IR02] 手动 psql，未实跑 ✓  [IR03] 无 DROP / 无 RENAME / 无 ALTER TYPE ✓
+-- [IR02] 手动 psql 已实跑（2026-10-27 exit 0）✓  [IR03] 无 DROP / 无 RENAME / 无 ALTER TYPE ✓
