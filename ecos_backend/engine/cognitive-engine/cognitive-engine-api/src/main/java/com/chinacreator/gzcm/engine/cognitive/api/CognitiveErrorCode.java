@@ -93,4 +93,19 @@ public final class CognitiveErrorCode {
     public static final String MSG_MIND_UPDATE_NOT_FOUND   = "mind candidate update not found";
     public static final String MSG_MIND_UPDATE_FINALIZED   = "mind candidate update already finalized";
     public static final String MSG_MIND_AXIS_COLUMN_NOT_READY = "r4 mind status axes not provisioned";
+
+    /**
+     * 差距分析附录A 第 19 条 Decision Basis 只读解析增量冻结码（同纪律：禁改写，只可新增）。
+     *
+     * <p>404 覆盖两种真实不存在：① 决策行在认知底座不存在；② 调用方引用了 pinned 版本/hash
+     * 而该引用无法锚定（认知底座 {@code ecos_cognitive.ecos_decision} 无 version/hash 列，
+     * 唯一带 (decision_id, version_no, hash) 三要素的载体 {@code ecos_cognitive.ecos_decision_source_ref}
+     * 的 decision_id 按 V211 头注指向控制域回执表，不属认知决策 id 空间）。
+     * 时间锚定原则（补充设计 §10.2.9）禁止把无法锚定的引用静默降级成"最新版本"返回，
+     * 因此 ② 必须走 404 + {@code data.missing} 显式取证，禁 200 伪锚定。</p>
+     */
+    public static final String E404_DECISION_BASIS = "ECOS-COG-404D";
+
+    /** 附录A 第 19 条增量冻结字面量（响应 message 只取本常量，禁拼接角色信息）。 */
+    public static final String MSG_DECISION_BASIS_NOT_FOUND = "decision basis not found";
 }

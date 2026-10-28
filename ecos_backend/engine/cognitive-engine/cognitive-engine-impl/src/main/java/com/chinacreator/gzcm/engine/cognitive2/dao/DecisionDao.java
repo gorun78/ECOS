@@ -111,4 +111,50 @@ public class DecisionDao extends JdbcTemplateDaoSupport {
             entityType, entityId
         );
     }
+
+    // ── 差距分析附录A 第 19 条（2026-10-28 #146v 追加，只追加本段，上方行零改写）──
+
+    /**
+     * 审批链查询（决策依据解析面的"授权范围/审批"段供数，V103 五元组之 ApprovalChain）。
+     *
+     * <p><b>新增读一律 schema 限定</b>（数据库访问规范 §四附则1）：本段两条查询写
+     * {@code ecos_cognitive.} 全限定表名；上方 B2-b 收口时逐字节搬迁的六条 legacy 查询仍是
+     * 裸表名（F05-13 M1 存量收敛面，已登记，不在本批改动范围）。排序 = {@code level} 后
+     * {@code created_at}，同决策多级审批按层级定序，禁依赖物理行序。</p>
+     */
+    public List<Map<String, Object>> findApprovalsByDecision(String decisionId) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, approver, level, status, comment, created_at " +
+            "FROM ecos_cognitive.ecos_decision_approval WHERE decision_id = ? " +
+            "ORDER BY level NULLS LAST, created_at",
+            decisionId
+        );
+    }
+
+    /** 先例查询（决策依据解析面的"先例引用"段供数，V103 五元组之 Precedent）。 */
+    public List<Map<String, Object>> findPrecedentsByDecision(String decisionId) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, similar_decision_id, similarity, note, created_at " +
+            "FROM ecos_cognitive.ecos_decision_precedent WHERE decision_id = ? " +
+            "ORDER BY similarity DESC NULLS LAST, created_at",
+            decisionId
+        );
+    }
+
+    /**
+     * 适用策略查询（决策依据解析面的"约束与口径"供数）。
+     *
+     * <p>与上方 legacy {@code findPolicies(String)} 谓词同形（{@code category} 精确 + active），
+     * 但列面收窄：<b>不出 {@code rules} 载体列</b>（jsonb，本面不解析规则体，禁把未解析 JSON
+     * 冒充结构化依据段），并补出 {@code version} 供"策略版本"事实呈现。两条查询各自服务
+     * 不同读面（legacy 面走合规门判定需要规则体，本面是依据解析），故不合并。</p>
+     */
+    public List<Map<String, Object>> findActivePoliciesForBasis(String category) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, name, category, version, status, created_at " +
+            "FROM ecos_cognitive.ecos_decision_policy WHERE category = ? AND status = 'active' " +
+            "ORDER BY version DESC NULLS LAST, created_at",
+            category
+        );
+    }
 }

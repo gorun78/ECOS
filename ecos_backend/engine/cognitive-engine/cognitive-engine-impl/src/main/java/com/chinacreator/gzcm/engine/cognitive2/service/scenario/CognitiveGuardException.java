@@ -38,7 +38,7 @@ public class CognitiveGuardException extends RuntimeException {
             case "ECOS-COG-400", "ECOS-COG-400M", "ECOS-COG-400P", "ECOS-COG-400C",
                  "ECOS-COG-400S", "ECOS-COG-400O", "ECOS-COG-400F" -> 400;   // 400F = 公式 DSL V1 语法（详设-09 H-2b）
             case "ECOS-COG-404", "ECOS-COG-404R", "ECOS-COG-404O", "ECOS-COG-404F",
-                 "ECOS-COG-404U", "ECOS-COG-404A" -> 404;                        // 404U/404A = R4 Mind 候选行不存在 / 三轴列未落库
+                 "ECOS-COG-404U", "ECOS-COG-404A", "ECOS-COG-404D" -> 404;    // 404U/404A = R4 候选行不存在 / 三轴列未落库；404D = 附录A 第 19 条决策依据解析不存在（含 pinned 引用无法锚定）
             case "ECOS-COG-403", "ECOS-COG-403S" -> 403;
             case "ECOS-COG-409R", "ECOS-COG-409S", "ECOS-COG-409V", "ECOS-COG-409U" -> 409; // + 409U = R4 候选已置终态
             case "ECOS-COG-422R", "ECOS-COG-422G", "ECOS-COG-422C", "ECOS-COG-422F" -> 422; // 422F = 公式求值期语义失败

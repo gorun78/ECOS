@@ -181,4 +181,27 @@ public final class CognitiveApiPaths {
      * 既有 {@code /objects} 与 {@code /objects/{objectKey}} 路径、载荷一字未动（只增不改）。</p>
      */
     public static final String OBJECT_CATALOG_REL = "/object-catalog";
+
+    // ── 差距分析附录A 第 19 条（2026-10-28 #146v 追加，只追加本段，上方行零改写）──
+
+    /**
+     * Decision Basis 只读解析端点（详设接口总表第 5416 行 {@code getDecisionBasis}）。
+     *
+     * <p>绝对形态 = {@link #COGNITIVE} + {@link #DECISION_BASIS_REL} =
+     * {@code /api/v1/cognitive/decision-basis/{decisionId}}；请求三要素 = 路径段
+     * {@code decisionId} + 查询段 {@code version} / {@code hash}（契约原文"Agent 引用
+     * id+version+hash"，两查询段可缺省，缺省 = 不做 pinned 版本锚定的当前态解析）。</p>
+     *
+     * <p>{@code PARAM_VERSION} / {@code PARAM_HASH} 命名与既有 {@code PARAM_*} 同族，
+     * 供 Controller 侧 {@code @RequestParam} 绑定，禁前端字段漂移。响应面只读、零写回
+     * （Decision Basis 是跨域<b>契约</b>而非新表 —— 补充设计 §10.2.9，铁律 REQ-COG-05
+     * "认知不新增 DB 表"）；网关侧无正向 rewrite 条目（{@code /api/v1/cognitive/} 族 KEEP）。</p>
+     */
+    public static final String PARAM_DECISION_ID = "decisionId";
+    public static final String PARAM_VERSION = "version";
+    public static final String PARAM_HASH = "hash";
+    /** 类级前缀下的相对段（Controller 侧只用相对段，绝对常量供契约/文档面引用）。 */
+    public static final String DECISION_BASIS_REL = "/decision-basis/{" + PARAM_DECISION_ID + "}";
+    /** 绝对形态（文档/契约引用）。 */
+    public static final String DECISION_BASIS = COGNITIVE + DECISION_BASIS_REL;
 }

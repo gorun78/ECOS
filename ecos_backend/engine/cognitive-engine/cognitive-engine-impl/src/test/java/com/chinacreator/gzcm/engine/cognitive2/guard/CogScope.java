@@ -40,7 +40,11 @@ public final class CogScope {
                 // schema 限定 + 方言 + 三层纪律门禁（::jsonb 随 features_json TEXT 化移除）
                 || s.endsWith("/dao/ModelRegistryDao.java")
                 || s.endsWith("/service/ModelRegistryService.java")
-                || s.endsWith("/service/ModelPublishGateEvaluator.java");
+                || s.endsWith("/service/ModelPublishGateEvaluator.java")
+                // 差距分析附录A 第 19 条（#146v）：Decision Basis 只读解析面自落地即纳入门禁
+                // （schema 限定 / 方言 / 零 DML / 空集回落 / 不泄漏 message 五门逐行判定）
+                || s.endsWith("/service/decision/DecisionBasisService.java")
+                || s.endsWith("/controller/DecisionBasisController.java");
     }
 
     /** 遍历 in-scope 的 .java 生产源（跳过 test）。 */
