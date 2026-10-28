@@ -17,6 +17,12 @@ public final class AiCapabilityApiPaths {
     // ── Path param names single-source (must be declared before use) ──
     public static final String P_ID = "id";
     public static final String P_TASK_ID = "taskId";
+    /** Contract #17/#19 model key (appendix A row 28, detailed-design §9.3.1). */
+    public static final String P_MODEL_KEY = "modelKey";
+    /** Contract #17 filter: capability (no carrier in llm-gateway catalog; face returns 400). */
+    public static final String Q_CAPABILITY = "capability";
+    /** Contract #17 filter: dataClassification (no carrier; face returns 400). */
+    public static final String Q_DATA_CLASSIFICATION = "dataClassification";
 
     /** Versioned canonical prefix (§13 table baseline). */
     public static final String BASE_PREFIX = "/api/v1/ai";
@@ -36,4 +42,19 @@ public final class AiCapabilityApiPaths {
     /** Task status by ID: GET /capabilities/tasks/{taskId}/status (validation constant). */
     public static final String CAPABILITY_TASK_STATUS_BY_ID = CAPABILITIES_COLLECTION
             + "/tasks/{" + P_TASK_ID + "}/status";
+
+    /**
+     * #146x / appendix A row 28 — model catalog collection faces:
+     * GET {@code /api/v1/ai/models} (contract #17 listLlmModels) + POST (contract #18 registerLlmModel).
+     */
+    public static final String MODELS_REL = "/models";
+
+    /** #146x / appendix A row 28 — contract #19 health face, relative to {@link #BASE_PREFIX}. */
+    public static final String MODEL_HEALTH_REL = MODELS_REL + "/{" + P_MODEL_KEY + "}/health";
+
+    /** #146x absolute collection path (test/validation constant). */
+    public static final String MODELS_COLLECTION = BASE_PREFIX + MODELS_REL;
+
+    /** #146x / appendix A row 28 — contract #19 GET {@code /api/v1/ai/models/{modelKey}/health}. */
+    public static final String MODEL_HEALTH = BASE_PREFIX + MODEL_HEALTH_REL;
 }

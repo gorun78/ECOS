@@ -32,7 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       "Agent 周期任务（CronJob 调度）"（impl 主源码零 {@code @Scheduled} 注解，
  *       CronJobController 仅代理外部 MCP，不经本 boot 调度）；</li>
  *   <li>{@code engine/ai-engine/ai-engine-impl/AGENTS.md} —
- *     (a) 不得硬写旧值 "27 个 Controller"（实测 {@link #IMPL_CONTROLLER_BASELINE}=44）；
+ *     (a) 不得硬写旧值 "27 个 Controller"（实测值以 {@link #IMPL_CONTROLLER_BASELINE} 与源码扫描为准，
+ *         本注释不复写数字以免再次陈旧）；
  *     (b) 不得硬写旧值 "6 个 test class … 40 case"（实测见 {@link #countTestClasses()}）；
  *     (c) 不得记载不存在的类 {@code KnowledgeExtractorService}（KAG 抽取承载 =
  *         {@code KnowledgeAgentContext}，非独立 Service 类）；
@@ -72,8 +73,10 @@ class ModuleDocTruthfulnessTest {
      * 44 → 45：+1 = #146o（2026-10-27，commit a212e8ef）{@code AgentSessionOpsController}
      * （会话运维链 messages/context/compress/usage 四端点）。该批只实跑 ai-engine-impl +
      * common-api，未跑 gateway 横切门，故基线未同步；漂移于 #146s 真跑 gateway 时暴露，此处按实测补账。
+     * 45 → 46：+1 = #146x（2026-10-28）{@code AiModelCatalogController}
+     * （附录 A 第 28 条 / §9.3.1 #17 模型目录真值腿 + #18/#19 显式 501 承流面）。
      */
-    private static final int IMPL_CONTROLLER_BASELINE = 45;
+    private static final int IMPL_CONTROLLER_BASELINE = 46;
 
     private static Path backendRoot() throws IOException {
         Path p = Paths.get("").toAbsolutePath();

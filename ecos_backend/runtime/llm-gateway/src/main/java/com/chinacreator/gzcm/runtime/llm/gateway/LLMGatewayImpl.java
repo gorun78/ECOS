@@ -337,6 +337,33 @@ public class LLMGatewayImpl implements LLMGateway {
         return ModelLimit.unavailable(model);
     }
 
+    /**
+     * 模型目录只读展开（#146x／契约 #17 {@code listLlmModels} 供数单源）——按 {@code llm.models.catalog}
+     * 的登记序逐项展开，<b>不</b>追加 {@code default-context-limit}（那是「按键查」的兜底腿，
+     * 全量展开若把兜底值当模型行回显＝造出不存在的模型），也<b>不</b>补任何目录外常量。
+     *
+     * <p>属性未装配或目录为空 ⇒ 空列表；「不可得」由消费方显式回显成 501，本网关不折叠。</p>
+     */
+    @Override
+    public List<ModelLimit> modelCatalog() {
+        if (llmGatewayProperties == null) {
+            log.warn("[llm-gateway] LLMGatewayProperties 未装配 — 模型目录读数按不可得处理（空列表，由消费方显式 501）");
+            return List.of();
+        }
+        LLMGatewayProperties.Models catalog = llmGatewayProperties.getModels();
+        if (catalog == null || catalog.getCatalog() == null || catalog.getCatalog().isEmpty()) {
+            log.warn("[llm-gateway] llm.models.catalog 未配置或为空 — 模型目录读数按不可得处理（空列表）");
+            return List.of();
+        }
+        List<ModelLimit> rows = new ArrayList<>(catalog.getCatalog().size());
+        for (Map.Entry<String, LLMGatewayProperties.Model> entry : catalog.getCatalog().entrySet()) {
+            String key = entry.getKey();
+            int limit = entry.getValue() == null ? 0 : entry.getValue().getContextLimit();
+            rows.add(new ModelLimit(key, limit, true, limit > 0));
+        }
+        return rows;
+    }
+
     @Override
     public ChatResponse callWithRetry(ChatRequest request, int maxRetries) {
         return callWithPolicy(request, Math.max(0, maxRetries));

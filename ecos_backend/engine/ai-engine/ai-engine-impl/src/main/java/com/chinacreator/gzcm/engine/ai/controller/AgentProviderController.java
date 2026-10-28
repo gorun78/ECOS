@@ -1,7 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
-import com.chinacreator.gzcm.common.error.AiError;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.engine.ai.capability.web.AiCapabilityApiPaths;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
@@ -9,7 +8,6 @@ import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -117,16 +115,11 @@ public class AgentProviderController {
         String traceId = AiTraceSupport.currentTraceId();
         log.warn("[AgentProviderController] provider 目录不可得，返回 501 + stub=true: {} (traceId={})",
                 reason, traceId);
-        Map<String, Object> data = new LinkedHashMap<>(
-                AiError.of(AiErrorClass.STUB_CAPABILITY, traceId, reason).toResponseBody());
-        data.put("providers", List.of());
-        data.put("total", 0);
-        data.put("available", 0);
-        data.put("stub", true);
-        ApiResponse<Map<String, Object>> body = ApiResponse.error(
-                HttpStatus.NOT_IMPLEMENTED.value(), AiErrorClass.STUB_CAPABILITY.errorCode(),
-                "provider 目录不可得（" + reason + "），能力未上线");
-        body.setData(data);
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(body);
+        // #146x：信封改由 AiResponseSupport.stubCapability 单源渲染，与模型目录三面同形（禁分叉）
+        Map<String, Object> extra = new LinkedHashMap<>();
+        extra.put("providers", List.of());
+        extra.put("total", 0);
+        extra.put("available", 0);
+        return AiResponseSupport.stubCapability(traceId, reason, extra);
     }
 }

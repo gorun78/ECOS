@@ -1,12 +1,14 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.AiError;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopResult;
 import com.chinacreator.gzcm.engine.ai.service.ErrorCodeMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -76,6 +78,36 @@ public final class AiResponseSupport {
     /** 熔断/依赖不可用这类"非 Loop 产出"的失败态：同样走 D.5 状态，不带异常原文。 */
     public static <T> ApiResponse<T> serviceUnavailable(AiErrorClass errorClass, String message) {
         return classified(errorClass, message);
+    }
+
+    /**
+     * #146x：ai 域「能力尚未上线」501 信封单源（{@code ECOS-AI-501} + {@code data.stub=true}）。
+     *
+     * <p><b>存在理由</b>：provider 目录面（#146s）与模型目录／模型注册／模型健康三面（#146x，
+     * 附录 A 第 28 条）的「未实现」响应必须同形——状态行、机读码、诊断码键面不得分叉
+     * （同 #146w 把 cognitive 两枚「未实现」信封收敛为单一工厂的纪律）。机读码与状态行
+     * 一律取 {@link AiErrorClass#STUB_CAPABILITY}，禁在本类写 {@code 501}／{@code ECOS-AI-501}
+     * 字面量，也禁在控制器里再拼第二套未实现信封。</p>
+     *
+     * <p>X-22 禁令：目录或载体不可得时禁回落 200＋空 items 伪成功。</p>
+     *
+     * @param traceId 诊断码（调用方经 {@code AiTraceSupport} 取得，禁自造）
+     * @param reason  不可得的机读理由（进对外 message，禁异常原文，X-49）
+     * @param extra   面专属取证键（如 {@code missing[]}、如实回显读数）；可为 null，
+     *                {@code stub} 标记由本工厂单点写入
+     */
+    public static ResponseEntity<ApiResponse<Map<String, Object>>> stubCapability(
+            String traceId, String reason, Map<String, Object> extra) {
+        Map<String, Object> data = new LinkedHashMap<>(
+                AiError.of(AiErrorClass.STUB_CAPABILITY, traceId, reason).toResponseBody());
+        if (extra != null) {
+            data.putAll(extra);
+        }
+        data.put("stub", true);
+        ApiResponse<Map<String, Object>> body = classified(
+                AiErrorClass.STUB_CAPABILITY, "该能力尚未上线（" + reason + "）");
+        body.setData(data);
+        return ResponseEntity.status(HttpStatus.valueOf(AiErrorClass.STUB_CAPABILITY.httpStatus())).body(body);
     }
 
     /**

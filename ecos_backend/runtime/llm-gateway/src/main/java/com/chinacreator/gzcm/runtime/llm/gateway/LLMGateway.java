@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.runtime.llm.gateway;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -66,6 +67,21 @@ public interface LLMGateway {
      *         调用方须按"不判定"处理并留痕，禁据此推断"无需压缩"
      */
     ModelLimit modelContextLimit(String model);
+
+    /**
+     * 模型目录的只读展开清单（#146x／详设说明书 §9.3.1 #17 {@code listLlmModels} 的供数单源）。
+     *
+     * <p>属主与口径与 {@link #modelContextLimit(String)} 完全同源——目录仍是本网关的
+     * {@code llm.models.catalog}（部署期形态，V264 头注边界口径），<b>禁</b>消费方注入
+     * {@code LLMGatewayProperties} 自行读表或抄写上限常量（F06-09 要点 1 / X-71 配置单源）。
+     * 本方法只是把「按键查」扩成「按登记序全量读」，不新增第二套目录。</p>
+     *
+     * <p>只增方法（API 只增不改）。</p>
+     *
+     * @return 目录声明序的 {@link ModelLimit} 清单；属性未装配或目录为空 ⇒ 空列表
+     *         （调用方须把「不可得」显式回显成 501，禁折叠成 200＋空 items）
+     */
+    List<ModelLimit> modelCatalog();
 
     /**
      * 模型上下文上限读数。
