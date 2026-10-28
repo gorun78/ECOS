@@ -9,7 +9,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * C 层对象目录只读 REST API（详细设计-05 §8.1 接缝义务「提供对象目录 + 只读解析端点」/ REQ-COG-06）。
@@ -18,6 +21,7 @@ import java.util.List;
  * <pre>
  * GET /api/v1/cognitive/objects             — 11 类全量目录（枚举声明序，稳定可 diff）
  * GET /api/v1/cognitive/objects/{objectKey} — 单对象解析（未登记对象名 ⇒ 400 ECOS-COG-400，fail-loud）
+ * GET /api/v1/cognitive/object-catalog      — 契约名别名（详设接口总表 getCognitiveObjectCatalog，投影形态）
  * </pre>
  *
  * <p><b>零 SQL / 零业务计算</b>：数据只来自 {@link CognitiveObjectCatalogService} 单源枚举视图，
@@ -53,5 +57,31 @@ public class CognitiveObjectCatalogController {
     public ApiResponse<CognitiveObjectClass.CatalogEntry> resolve(
             @PathVariable(CognitiveApiPaths.PARAM_OBJECT_KEY) String objectKey) {
         return ApiResponse.success(catalogService.resolve(objectKey));
+    }
+
+    /**
+     * 契约名别名投影（详设接口总表第 5416 行 {@code getCognitiveObjectCatalog}）。
+     *
+     * <p>与 {@link #catalog()} 同源 {@link CognitiveObjectCatalogService}，只换承载形态：
+     * {@code {items:[{cClass,carrier,carrierKind,readOnlyResolvePath}]}}。{@code carrier} 对
+     * PHYSICAL 态出 schema 限定载体、对 REFERENCE 态出引用表达式，故附 {@code carrierKind}
+     * 供机读区分（禁把引用表达式误读成表名）；{@code readOnlyResolvePath} 指向真实在位的
+     * {@link CognitiveApiPaths#OBJECTS_ITEM_REL}（点号与大小写口径见 {@code CognitiveObjectClass#byKey}）。</p>
+     */
+    @GetMapping(CognitiveApiPaths.OBJECT_CATALOG_REL)
+    public ApiResponse<Map<String, Object>> objectCatalog() {
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (CognitiveObjectClass.CatalogEntry entry : catalogService.catalog()) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("cClass", entry.objectKey());
+            item.put("carrier", entry.carrier() != null ? entry.carrier() : entry.reference());
+            item.put("carrierKind", entry.carrierKind());
+            item.put("readOnlyResolvePath",
+                    CognitiveApiPaths.COGNITIVE + CognitiveApiPaths.OBJECTS_REL + "/" + entry.objectKey());
+            items.add(item);
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("items", items);
+        return ApiResponse.success(data);
     }
 }

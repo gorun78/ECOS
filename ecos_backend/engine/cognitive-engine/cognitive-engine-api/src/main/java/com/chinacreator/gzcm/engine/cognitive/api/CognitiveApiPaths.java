@@ -169,4 +169,16 @@ public final class CognitiveApiPaths {
     public static final String MINDS_PROPOSED = COGNITIVE + MINDS_PROPOSED_REL;
     public static final String MINDS_ITEM = COGNITIVE + MINDS_ITEM_REL;
     public static final String MINDS_ITEM_STATUS = COGNITIVE + MINDS_ITEM_STATUS_REL;
+
+    // ── 差距分析附录A 第 18 条（2026-10-28 #146t 追加，只追加本段，上方行零改写）──
+
+    /**
+     * C 层对象目录契约名别名（{@code GET /api/v1/cognitive/object-catalog}）。
+     *
+     * <p>《详细设计说明书-从零实施版》第 5416 行接口总表定名 {@code object-catalog}
+     * （{@code getCognitiveObjectCatalog}，载荷 {@code {items:[{cClass,carrier,readOnlyResolvePath?}]}}），
+     * 实现侧既有端点名为 {@link #OBJECTS_REL}。此处补的是<b>契约名别名</b>，
+     * 既有 {@code /objects} 与 {@code /objects/{objectKey}} 路径、载荷一字未动（只增不改）。</p>
+     */
+    public static final String OBJECT_CATALOG_REL = "/object-catalog";
 }

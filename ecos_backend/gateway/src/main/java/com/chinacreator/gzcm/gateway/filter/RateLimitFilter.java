@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * - /api/security/decrypt — 10 次/分钟
  * - /api/v1/policy-engine/evaluate — 20 次/分钟
  * - /api/v1/data-masking/apply — 10 次/分钟
+ * - /api/v1/security/mask/apply — 10 次/分钟（详设 §4.3.2 兼容别名的同档限流，防别名绕限）
  * - /api/security/mask — 10 次/分钟
  *
  * 实现方式：基于 IP + 用户ID 的滑动窗口计数器
@@ -44,6 +45,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         "/api/v1/security/policy-engine/evaluate", new int[]{20, 60_000},
         "/api/v1/data-masking/apply", new int[]{10, 60_000},
         "/api/v1/security/masking/apply", new int[]{10, 60_000},
+        "/api/v1/security/mask/apply", new int[]{10, 60_000},
         "/api/security/mask", new int[]{10, 60_000}
     );
 

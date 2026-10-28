@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -81,7 +82,7 @@ class CognitiveObjectCatalogEndpointTest {
     }
 
     @Test
-    @DisplayName("端点表面只读：类前缀取 COGNITIVE 常量、处理器全为 GET、路径取 OBJECTS_* 常量")
+    @DisplayName("端点表面只读：类前缀取 COGNITIVE 常量、处理器全为 GET、路径取 OBJECTS_*/OBJECT_CATALOG 常量")
     void catalogSurfaceIsReadOnlyAndConstantDriven() {
         RequestMapping root = CognitiveObjectCatalogController.class.getAnnotation(RequestMapping.class);
         assertEquals(1, root.value().length, "类级前缀必须单值（禁顺手加 /api/ 旧前缀双写）");
@@ -100,10 +101,52 @@ class CognitiveObjectCatalogEndpointTest {
                 getHandlers++;
                 assertEquals(1, get.value().length, m.getName() + "：路径必须取 CognitiveApiPaths 常量");
                 assertTrue(CognitiveApiPaths.OBJECTS_REL.equals(get.value()[0])
-                                || CognitiveApiPaths.OBJECTS_ITEM_REL.equals(get.value()[0]),
-                        m.getName() + "：路径必须为 OBJECTS_REL 或 OBJECTS_ITEM_REL");
+                                || CognitiveApiPaths.OBJECTS_ITEM_REL.equals(get.value()[0])
+                                || CognitiveApiPaths.OBJECT_CATALOG_REL.equals(get.value()[0]),
+                        m.getName() + "：路径必须为 OBJECTS_REL / OBJECTS_ITEM_REL / OBJECT_CATALOG_REL");
             }
         }
-        assertEquals(2, getHandlers, "端点数 = 列表 + 单项解析 共 2 个 GET");
+        assertEquals(3, getHandlers, "端点数 = 列表 + 单项解析 + 契约名别名 共 3 个 GET");
+    }
+
+    @Test
+    @DisplayName("GET /object-catalog：契约载荷 items[{cClass,carrier,readOnlyResolvePath}]，与枚举单源逐行一致")
+    void objectCatalogAliasProjectsContractPayload() {
+        ApiResponse<Map<String, Object>> resp = controller.objectCatalog();
+        assertTrue(resp.isSuccess(), "目录别名不得返回错误态");
+
+        List<Map<String, Object>> items = itemsOf(resp);
+        assertEquals(FROZEN_COUNT, items.size(), "items 必须等于冻结的 11 类");
+
+        List<String> expectedKeys = new ArrayList<>(CognitiveObjectClass.objectKeys());
+        List<String> actualKeys = new ArrayList<>();
+        List<CognitiveObjectClass.CatalogEntry> source = service.catalog();
+        for (int i = 0; i < items.size(); i++) {
+            Map<String, Object> item = items.get(i);
+            CognitiveObjectClass.CatalogEntry entry = source.get(i);
+
+            actualKeys.add((String) item.get("cClass"));
+            assertEquals(entry.objectKey(), item.get("cClass"), "cClass 缺失或漂移");
+            assertEquals(entry.carrierKind(), item.get("carrierKind"), "carrierKind 必须如实标注两态");
+            if ("PHYSICAL".equals(entry.carrierKind())) {
+                assertEquals(entry.carrier(), item.get("carrier"), "PHYSICAL 态 carrier 必须出 schema 限定载体");
+                assertTrue(((String) item.get("carrier")).contains("."), entry.objectKey() + "：载体必须 schema 限定");
+            } else {
+                assertEquals(entry.reference(), item.get("carrier"), "REFERENCE 态 carrier 必须出引用表达式");
+            }
+            String resolvePath = (String) item.get("readOnlyResolvePath");
+            assertEquals(CognitiveApiPaths.COGNITIVE + CognitiveApiPaths.OBJECTS_REL + "/" + entry.objectKey(),
+                    resolvePath, "readOnlyResolvePath 必须指向真实在位的只读解析路径");
+            assertEquals(entry.objectKey(), controller.resolve(entry.objectKey()).getData().objectKey(),
+                    resolvePath + " 必须真实可达（禁指向不存在端点）");
+        }
+        assertEquals(expectedKeys, actualKeys, "items 顺序必须等于枚举声明序（稳定可 diff）");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> itemsOf(ApiResponse<Map<String, Object>> resp) {
+        Object items = resp.getData().get("items");
+        assertTrue(items instanceof List, "载荷必须含 items 数组");
+        return (List<Map<String, Object>>) items;
     }
 }

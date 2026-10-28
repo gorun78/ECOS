@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
 import java.util.Map;
@@ -79,5 +81,20 @@ class DataMaskingControllerTest {
         assertEquals(ApiResponse.CODE_SUCCESS, resp.getCode());
         assertNotNull(resp.getData());
         verify(service).applyMasking(data, rules);
+    }
+
+    @Test
+    void contractAliasPrefixIsAdditive() throws Exception {
+        RequestMapping rm = DataMaskingController.class.getAnnotation(RequestMapping.class);
+        assertNotNull(rm, "类级 @RequestMapping 缺失");
+        assertEquals(List.of("/api/v1/data-masking", "/api/v1/security/masking", "/api/v1/security/mask"),
+                List.of(rm.value()), "旧两前缀必须原位保留，契约别名只许追加在末位（只增不改）");
+
+        PostMapping apply = DataMaskingController.class.getMethod("apply", Map.class)
+                .getAnnotation(PostMapping.class);
+        assertNotNull(apply, "POST /apply 方法级映射必须保留");
+        assertEquals(List.of("/apply"), List.of(apply.value()));
+        assertEquals("/api/v1/security/mask/apply", rm.value()[2] + apply.value()[0],
+                "别名路径必须与详设 §4.3.2 契约路径逐字一致");
     }
 }

@@ -8,8 +8,22 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+/**
+ * 数据脱敏端点（安全域「护」）。
+ *
+ * <p>类级三前缀（只增不改）：{@code /api/v1/data-masking}、{@code /api/v1/security/masking} 为既有面；
+ * {@code /api/v1/security/mask} 为《详细设计说明书-从零实施版》§4.3.2 / 第4篇接口总表登记的兼容别名，
+ * 原句「{@code POST /api/v1/security/mask/apply}｜保留｜只能作为 {@code decide} 之后的执行器，不得独立决策」。
+ * 故本类只把<b>已裁决通过</b>的脱敏规则作用到值上，不含策略选择与放行判定。</p>
+ *
+ * <p>additive 副产品：{@code GET /api/v1/security/mask/demo} 与既有 {@code /demo} 同体（类级前缀共用的必然结果）；
+ * 旧两前缀下的路径、入参与响应一字未动。</p>
+ *
+ * <p>限流：{@code POST /api/v1/security/mask/apply} 已登记 gateway {@code RateLimitFilter}（10 次/分钟），
+ * 与既有两前缀同档，防新别名成为绕过限流的旁路。</p>
+ */
 @RestController
-@RequestMapping({"/api/v1/data-masking", "/api/v1/security/masking"})
+@RequestMapping({"/api/v1/data-masking", "/api/v1/security/masking", "/api/v1/security/mask"})
 public class DataMaskingController {
 
     private static final Logger log = LoggerFactory.getLogger(DataMaskingController.class);
