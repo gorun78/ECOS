@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.wagent.dao;
 
+import com.chinacreator.gzcm.engine.ai.wagent.WAgentEnums.ToolContractStatus;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentToolContractDO;
 import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
 import org.springframework.stereotype.Repository;
@@ -68,6 +69,22 @@ public class WAgentToolContractDao extends JdbcTemplateDaoSupport {
     public Optional<WAgentToolContractDO> findByNameAndVersion(String name, String version) {
         List<WAgentToolContractDO> rows = queryList("SELECT " + COLUMNS + " FROM " + TABLE
                 + " WHERE name = ? AND version = ? AND is_deleted = 0", WAgentToolContractDO.class, name, version);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+    }
+
+    /**
+     * 按 name 取 active 最新登记（附录 A 第 21 条 {@code GET /api/v1/agent/tools/{name}} 无
+     * {@code version} 参数时的缺省读法）。
+     *
+     * <p>状态词表取 {@link ToolContractStatus#ACTIVE} 单源（禁写字面量）；定序用
+     * {@code update_time DESC, id DESC}——{@code version} 是字符串列，按字面序取"最新"会在
+     * {@code 1.10.0} 与 {@code 1.9.0} 之间给出错值。</p>
+     */
+    public Optional<WAgentToolContractDO> findLatestActiveByName(String name) {
+        List<WAgentToolContractDO> rows = queryList("SELECT " + COLUMNS + " FROM " + TABLE
+                + " WHERE name = ? AND status = ? AND is_deleted = 0"
+                + " ORDER BY update_time DESC, id DESC LIMIT 1",
+                WAgentToolContractDO.class, name, ToolContractStatus.ACTIVE.value());
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
     }
 

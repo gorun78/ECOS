@@ -185,6 +185,14 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      *       {@code failClosedResponse} helper）——形态一律
      *       {@code ResponseEntity.status(..).body(ApiResponse.error(..))}，属「状态行承载」正解，
      *       计数上升是<b>补账</b>而非新欠账。</li>
+     *   <li>#146s 重设（附录 A 第 21 条 {@code describeAgentTool} 批，common-api 全模块<b>红跑</b>实测，
+     *       {@code /tmp/146s_gate1.log}）＝总数 <b>186</b>／折叠 0／状态行承载 <b>38</b>／
+     *       裸回 <b>100</b>（未漂移）／属主 helper <b>13</b>（未漂移）／纯信封 <b>35</b>（未漂移）。
+     *       唯一漂移源＝{@code AgentToolController#describe} 新增的 404 腿
+     *       （{@code ResponseEntity.status(AiErrorClass.NOT_FOUND.httpStatus()).body(ApiResponse.error(..))}），
+     *       形态与同批已计的在册 dry-run 404 腿一致，属「状态行承载」正解；机读码取 {@code AiErrorClass}
+     *       常量，机读码棘轮面零扰动。0+38+100+13+35 = 186 = 总数，对账成立。
+     *       只重设被突破的 {@link #STATUS_CARRIER_CEILING}，其余三面按实测保持。</li>
      * </ul>
      *
      * <p><b>本批（#146p）在判据面上零新增</b>：{@code KnowledgeExtractRunsController} 的 503 腿
@@ -198,8 +206,9 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      * <p>裸回面 100 枚<b>本门有意不判其对错</b>（归 {@code D-B4-59} 族棘轮门管账），
      * 此处只做「只减不增」计数：该族每收口一枚，本上限随批下调。</p>
      */
-    private static final int STATUS_CARRIER_CEILING = 37;
+    private static final int STATUS_CARRIER_CEILING = 38;
     // #146p：29→37，归因见上方「#146p 重设」条（#146o/#146o-2 会话运维链 8 枚状态行承载腿补账）
+    // #146s：37→38，归因见上方「#146s 重设」条（AgentToolController#describe 404 腿一封）
     // #146l-前置：99→100，归因见上方「#146l-前置 重设」条（CaliberConflictCountMetricSource 一枚）
     private static final int BARE_RETURN_CEILING = 100;
     private static final int OWNER_HELPER_CEILING = 13;

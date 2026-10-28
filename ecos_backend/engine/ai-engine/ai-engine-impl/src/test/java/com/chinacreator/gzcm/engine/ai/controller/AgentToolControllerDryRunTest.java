@@ -6,6 +6,7 @@ import com.chinacreator.gzcm.engine.ai.guardrail.ToolObligations;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
 import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.service.ToolRegistry;
+import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentToolContractDao;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +42,7 @@ class AgentToolControllerDryRunTest {
     private ToolRegistry toolRegistry;
     private AgentToolPolicyGate policyGate;
     private ToolSubjectResolver subjectResolver;
+    private WAgentToolContractDao toolContractDao;
     private MockMvc mockMvc;
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -49,9 +51,10 @@ class AgentToolControllerDryRunTest {
         toolRegistry = mock(ToolRegistry.class);
         policyGate = mock(AgentToolPolicyGate.class);
         subjectResolver = mock(ToolSubjectResolver.class);
+        toolContractDao = mock(WAgentToolContractDao.class);
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new AgentToolController(toolRegistry, policyGate,
-                        subjectResolver, new MockEnvironment()))
+                        subjectResolver, toolContractDao, new MockEnvironment()))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())
                 .build();
     }
@@ -73,7 +76,7 @@ class AgentToolControllerDryRunTest {
         MockEnvironment prodEnv = new MockEnvironment();
         prodEnv.setActiveProfiles("production");
         MockMvc prodMvc = MockMvcBuilders.standaloneSetup(new AgentToolController(
-                        toolRegistry, policyGate, subjectResolver, prodEnv))
+                        toolRegistry, policyGate, subjectResolver, toolContractDao, prodEnv))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())
                 .build();
         MvcResult r = prodMvc.perform(post("/api/v1/agent/tools/query_data/dry-run")

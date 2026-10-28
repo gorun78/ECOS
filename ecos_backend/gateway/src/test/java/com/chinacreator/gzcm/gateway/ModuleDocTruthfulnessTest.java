@@ -69,8 +69,11 @@ class ModuleDocTruthfulnessTest {
      * #11~#24 端点族：{@code WAgentKillSwitch/Readiness/Candidate/EvidenceTrace/DecisionAction/}
      * {@code ToolContract} 六 Controller + SSE 实流 {@code WAgentRunEventStreamController}，
      * 计数口径 = 文件名形态 {@code *Controller.java}，测试侧载体不计入。
+     * 44 → 45：+1 = #146o（2026-10-27，commit a212e8ef）{@code AgentSessionOpsController}
+     * （会话运维链 messages/context/compress/usage 四端点）。该批只实跑 ai-engine-impl +
+     * common-api，未跑 gateway 横切门，故基线未同步；漂移于 #146s 真跑 gateway 时暴露，此处按实测补账。
      */
-    private static final int IMPL_CONTROLLER_BASELINE = 44;
+    private static final int IMPL_CONTROLLER_BASELINE = 45;
 
     private static Path backendRoot() throws IOException {
         Path p = Paths.get("").toAbsolutePath();

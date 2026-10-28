@@ -2,11 +2,17 @@ package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,8 +20,10 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 /**
  * 详细设计-06 F06-05 要点 1 验收：provider 目录端点委托 llm-gateway 取真值。
@@ -87,5 +95,42 @@ class AgentProviderControllerTest {
         assertEquals(Boolean.FALSE, providers.get(1).get("available"));
         assertNotEquals("unknown", providers.get(0).get("status"),
                 "真值必须来自网关探测结果，不是占位");
+    }
+
+    @Test
+    @DisplayName("附录A#27 双前缀同端点：/api/v1/ai/providers 与 /api/v1/agent/providers 同源，models 边界如实标注")
+    void dualPrefixServesSameCatalogWithHonestModelBoundary() throws Exception {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("status", "available");
+        status.put("baseUrl", "https://provider-base-url.from-config/v1");
+        Map<String, Object> catalog = new LinkedHashMap<>();
+        catalog.put("deepseek", status);
+
+        LLMGateway gateway = mock(LLMGateway.class);
+        when(gateway.getProviderStatus()).thenReturn(catalog);
+
+        ObjectMapper mapper = new ObjectMapper();
+        for (String path : List.of("/api/v1/agent/providers", "/api/v1/ai/providers")) {
+            MvcResult r = MockMvcBuilders.standaloneSetup(new AgentProviderController(gateway))
+                    .setMessageConverters(new MappingJackson2HttpMessageConverter())
+                    .build()
+                    .perform(get(path))
+                    .andReturn();
+            assertEquals(200, r.getResponse().getStatus(), "前缀 " + path + " 必须可服务");
+            JsonNode d = mapper.readTree(r.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                    .path("data");
+            assertEquals(1, d.path("total").asInt(), path);
+            assertEquals(Boolean.FALSE, d.path("stub").asBoolean(), path);
+            assertEquals(Boolean.FALSE, d.path("modelsApplicable").asBoolean(),
+                    "catalog 无 provider→models 归属列，禁编造归属");
+            assertTrue(d.path("models_source").asText().contains("llm.models.catalog"),
+                    "不可得原因必须响应自证");
+            JsonNode items = d.path("items");
+            assertTrue(items.isArray(), path);
+            assertEquals(1, items.size(), path);
+            assertEquals("deepseek", items.get(0).path("providerKey").asText());
+            assertEquals(0, items.get(0).path("models").size(), "models 出空数组，禁按缺省模型反推");
+            assertEquals(Boolean.FALSE, items.get(0).path("modelsApplicable").asBoolean());
+        }
     }
 }

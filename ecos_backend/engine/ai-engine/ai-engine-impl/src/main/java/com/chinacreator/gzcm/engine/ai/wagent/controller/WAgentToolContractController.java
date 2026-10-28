@@ -185,8 +185,14 @@ public class WAgentToolContractController {
         return m;
     }
 
-    /** #15 完整契约视图（V236 全受控列）。 */
-    static Map<String, Object> contractView(WAgentToolContractDO t) {
+    /**
+     * #15 完整契约视图（V236 全受控列）。
+     *
+     * <p>公开投影单源：{@code GET /api/v1/wagent/tools/{name}} 与
+     * {@code GET /api/v1/agent/tools/{name}}（附录 A 第 21 条）共用本方法，
+     * 禁在旁路另写一套 17 要素字段表。</p>
+     */
+    public static Map<String, Object> contractView(WAgentToolContractDO t) {
         Map<String, Object> m = new LinkedHashMap<>(summaryView(t));
         m.put("tool_id", t.getId());
         m.put("min_level", t.getMinLevel());

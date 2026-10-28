@@ -10,6 +10,9 @@ import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.service.ToolRegistry;
 import com.chinacreator.gzcm.engine.ai.service.ToolSchema;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
+import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentToolContractController;
+import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentToolContractDao;
+import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentToolContractDO;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +29,8 @@ import java.util.stream.Collectors;
  * <h3>端点</h3>
  * <ul>
  *   <li>{@code GET /api/v1/agent/tools} — 列出所有已注册工具</li>
+ *   <li>{@code GET /api/v1/agent/tools/{name}} — 单工具完整契约（执行面 + 17 要素契约面，
+ *       附录 A 第 21 条 describeAgentTool / 详设-06 §5.2 #9）</li>
  *   <li>{@code GET /api/v1/agent/tools/{name}/validate?args=...} — 校验参数是否符合 Schema</li>
  *   <li>{@code POST /api/v1/agent/tools/{name}/dry-run} — 场景工具干跑（开发期验收，
  *       <b>不进产品路径</b>，详设-06 §5.2 #10 / 详设说明书 §9.3.1 第 10 条）</li>
@@ -41,15 +46,18 @@ public class AgentToolController {
     private final ToolRegistry toolRegistry;
     private final AgentToolPolicyGate policyGate;
     private final ToolSubjectResolver subjectResolver;
+    private final WAgentToolContractDao toolContractDao;
     private final Environment environment;
 
     public AgentToolController(@Lazy ToolRegistry toolRegistry,
                                @Lazy AgentToolPolicyGate policyGate,
                                @Lazy ToolSubjectResolver subjectResolver,
+                               WAgentToolContractDao toolContractDao,
                                Environment environment) {
         this.toolRegistry = toolRegistry;
         this.policyGate = policyGate;
         this.subjectResolver = subjectResolver;
+        this.toolContractDao = toolContractDao;
         this.environment = environment;
     }
 
@@ -64,38 +72,55 @@ public class AgentToolController {
     public ApiResponse<List<Map<String, Object>>> listAll() {
         List<ToolSchema> schemas = toolRegistry.listAll();
         List<Map<String, Object>> result = schemas.stream()
-                .map(schema -> {
-                    Map<String, Object> item = new LinkedHashMap<>();
-                    item.put("name", schema.getName());
-                    item.put("description", schema.getDescription());
-
-                    // 扁平化参数为 list（前端更易用）
-                    List<Map<String, Object>> params = new ArrayList<>();
-                    if (schema.getParameters() != null) {
-                        for (Map.Entry<String, ToolSchema.ParamDef> e : schema.getParameters().entrySet()) {
-                            Map<String, Object> param = new LinkedHashMap<>();
-                            param.put("name", e.getKey());
-                            param.put("type", e.getValue().getType());
-                            param.put("required", e.getValue().isRequired());
-                            param.put("description", e.getValue().getDescription());
-                            if (e.getValue().getDefaultValue() != null) {
-                                param.put("default", e.getValue().getDefaultValue());
-                            }
-                            if (e.getValue().getEnumValues() != null) {
-                                param.put("enum", e.getValue().getEnumValues());
-                            }
-                            params.add(param);
-                        }
-                    }
-                    item.put("parameters", params);
-
-                    // 附上完整的 function-calling schema
-                    item.put("functionCallSchema", schema.toFunctionCallSchema());
-                    return item;
-                })
+                .map(AgentToolController::executionView)
                 .collect(Collectors.toList());
 
         return ApiResponse.success(result);
+    }
+
+    /**
+     * 单工具完整契约（附录 A 第 21 条 {@code describeAgentTool}，详设-06 §5.2 #9）。
+     *
+     * <p><b>两个真值面各自单源、禁互相顶替</b>：</p>
+     * <ul>
+     *   <li>执行面 {@code executionSchema} ← {@link ToolRegistry#get}（与 {@code GET /tools}、
+     *       {@code /{name}/validate} 同一单源，决定该工具当前能否被派发）；</li>
+     *   <li>契约面 {@code contract} ← {@code ecos_ai.ecos_wagent_tool_contract}（V236）。
+     *       17 要素投影复用 {@link WAgentToolContractController#contractView}，
+     *       与 {@code GET /api/v1/wagent/tools/{name}} 同源；<b>禁</b>由 {@link ToolSchema}
+     *       反推 17 要素——超时/幂等/回滚/密级等列在 Schema 上无载体，补全是编造。</li>
+     * </ul>
+     *
+     * <p><b>版本闭合</b>：不带 {@code version} 取 {@code status='active'} 的最新登记；
+     * 带 {@code version} 按 {@code uniq(name, version)} 精确取。</p>
+     *
+     * <p><b>404 判据</b>：两面对同一 name 均无记录 ⇒ 404 {@code ECOS-AI-404}（真不存在）；
+     * 只要一面在册即 200，缺席面以 {@code null} 如实留空（禁合成"空契约"伪数据）。
+     * 认证由 {@code /api/v1/agent/**} JWT 面承载（与 {@code GET /tools} 同口径）。</p>
+     */
+    @GetMapping("/{name}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> describe(
+            @PathVariable String name,
+            @RequestParam(value = "version", required = false) String version) {
+        String toolName = name == null ? "" : name.trim();
+        ToolSchema schema = toolRegistry.get(toolName);
+        WAgentToolContractDO contract = resolveContract(toolName, version);
+        if (schema == null && contract == null) {
+            return ResponseEntity.status(AiErrorClass.NOT_FOUND.httpStatus()).body(
+                    ApiResponse.error(AiErrorClass.NOT_FOUND.httpStatus(),
+                            AiErrorClass.NOT_FOUND.errorCode(),
+                            "工具未注册且无工具契约登记: " + toolName));
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("name", toolName);
+        data.put("registered", schema != null);
+        data.put("executionSchema", schema == null ? null : executionView(schema));
+        data.put("contract", contract == null ? null : WAgentToolContractController.contractView(contract));
+        data.put("version", contract == null ? null : contract.getVersion());
+        data.put("sources", Map.of(
+                "execution", "engine.ai.service.ToolRegistry",
+                "contract", "ecos_ai.ecos_wagent_tool_contract#V236"));
+        return ResponseEntity.ok(ApiResponse.success(data));
     }
 
     /**
@@ -284,6 +309,45 @@ public class AgentToolController {
     }
 
     // ── 私有分态/工具方法 ───────────────────────────────────────────────
+
+    /** 契约面读法：版本闭合定位优先，缺省取 active 最新（{@code WAgentToolContractDao} 单源）。 */
+    private WAgentToolContractDO resolveContract(String name, String version) {
+        if (version != null && !version.isBlank()) {
+            return toolContractDao.findByNameAndVersion(name, version.trim()).orElse(null);
+        }
+        return toolContractDao.findLatestActiveByName(name).orElse(null);
+    }
+
+    /** 执行面视图（{@code GET /tools} 列表项与 {@code GET /tools/{name}} 共用同一投影）。 */
+    private static Map<String, Object> executionView(ToolSchema schema) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("name", schema.getName());
+        item.put("description", schema.getDescription());
+
+        // 扁平化参数为 list（前端更易用）
+        List<Map<String, Object>> params = new ArrayList<>();
+        if (schema.getParameters() != null) {
+            for (Map.Entry<String, ToolSchema.ParamDef> e : schema.getParameters().entrySet()) {
+                Map<String, Object> param = new LinkedHashMap<>();
+                param.put("name", e.getKey());
+                param.put("type", e.getValue().getType());
+                param.put("required", e.getValue().isRequired());
+                param.put("description", e.getValue().getDescription());
+                if (e.getValue().getDefaultValue() != null) {
+                    param.put("default", e.getValue().getDefaultValue());
+                }
+                if (e.getValue().getEnumValues() != null) {
+                    param.put("enum", e.getValue().getEnumValues());
+                }
+                params.add(param);
+            }
+        }
+        item.put("parameters", params);
+
+        // 附上完整的 function-calling schema
+        item.put("functionCallSchema", schema.toFunctionCallSchema());
+        return item;
+    }
 
     private ResponseEntity<ApiResponse<Map<String, Object>>> forbiddenResponse(String message) {
         return ResponseEntity.status(AiErrorClass.GUARDRAIL_DENIED.httpStatus()).body(
