@@ -10,9 +10,8 @@ import com.chinacreator.gzcm.engine.kb.dto.KbImportTriggerVO;
 import com.chinacreator.gzcm.engine.kb.dto.StructuredExtractJobDetailVO;
 import com.chinacreator.gzcm.engine.kb.dto.StructuredExtractJobVO;
 import com.chinacreator.gzcm.engine.kb.dto.StructuredExtractRequest;
-import com.chinacreator.gzcm.engine.kb.service.KbEntityInstanceExtractionService;
+import com.chinacreator.gzcm.engine.kb.service.KnowledgeExtractRunService;
 import com.chinacreator.gzcm.engine.kb.service.StructuredExtractQueryService;
-import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskStatus;
 import com.chinacreator.gzcm.runtime.core.task.service.ITaskManagementService;
 import org.slf4j.Logger;
@@ -34,7 +33,6 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -78,32 +76,27 @@ public class StructuredExtractController {
 
     private static final Logger log = LoggerFactory.getLogger(StructuredExtractController.class);
 
-    /** 模式：全量（忽略水位线，重读全部实例行）。 */
-    private static final String MODE_FULL = "FULL";
-
-    /** 模式：增量（按持久化水位线续读），默认。 */
-    private static final String MODE_INCREMENTAL = "INCREMENTAL";
-
-    /** jobId 前缀（E4/E5 反查 job 时按此前缀约束，避免误匹配其他 sync job）。 */
-    private static final String JOB_ID_PREFIX = "KBK1S-";
-
-    /** 异步任务类型（runtime-task 注册名，与 KbImportTaskRegistrar 保持一致）。 */
-    private static final String KB_IMPORT_TASK_TYPE = "KB_IMPORT";
-
     /** 部署环境 tier（standard/enterprise/ultimate），export-log 头部落盘。 */
     private final String tier;
 
-    private final KbEntityInstanceExtractionService extractionService;
+    /**
+     * 提交/预演编排腿（与 {@code /extract/runs} 族共用单源）。
+     *
+     * <p>#146p 起 E3 不再自行拼 {@code TaskDescription} 与 {@code jobId}：参数键面
+     * （{@code ontologyId/mode/dryRun/jobId/biz_kind}）若两入口各写一遍，任一入口漂移都会让
+     * runtime-task 侧读不到参数而静默降级（如 dryRun 丢失 → 预演真写库）。</p>
+     */
+    private final KnowledgeExtractRunService runService;
 
     private final StructuredExtractQueryService queryService;
 
     private final ITaskManagementService taskManagementService;
 
-    public StructuredExtractController(KbEntityInstanceExtractionService extractionService,
+    public StructuredExtractController(KnowledgeExtractRunService runService,
                                        StructuredExtractQueryService queryService,
                                        ITaskManagementService taskManagementService,
                                        @Value("${ecos.architecture.tier:standard}") String tier) {
-        this.extractionService = extractionService;
+        this.runService = runService;
         this.queryService = queryService;
         this.taskManagementService = taskManagementService;
         this.tier = tier;
@@ -126,10 +119,10 @@ public class StructuredExtractController {
     @PostMapping
     public ApiResponse<?> extract(@RequestBody(required = false) StructuredExtractRequest body) {
         StructuredExtractRequest req = body == null ? new StructuredExtractRequest() : body;
-        String mode = normalizeMode(req.getMode());
-        boolean incremental = MODE_INCREMENTAL.equals(mode);
+        String mode = KnowledgeExtractRunService.normalizeMode(req.getMode());
+        boolean incremental = KnowledgeExtractRunService.MODE_INCREMENTAL.equals(mode);
         boolean dryRun = Boolean.TRUE.equals(req.getDryRun());
-        String jobId = JOB_ID_PREFIX + System.currentTimeMillis();
+        String jobId = runService.newJobId();
         log.info("E3 触发结构化抽取: jobId={} mode={} dryRun={} ontologyId={}",
                 jobId, mode, dryRun, req.getOntologyId());
 
@@ -137,7 +130,7 @@ public class StructuredExtractController {
         if (dryRun) {
             EntityInstanceExtractionReportVO report;
             try {
-                report = extractionService.extract(req.getOntologyId(), jobId, incremental, true);
+                report = runService.preview(req.getOntologyId(), jobId, incremental);
             } catch (ValidationException e) {
                 log.warn("E3 触发结构化抽取失败 jobId={}: {}", jobId, e.getMessage());
                 return ApiResponse.badRequest(e.getMessage());
@@ -145,26 +138,12 @@ public class StructuredExtractController {
             return ApiResponse.success(report);
         }
 
-        // ── 异步路径：dryRun=false，走 runtime-task（立即提交，executeTask 持久化到 dispatch queue，
-        //    工作线程异步跑；与数据工作台 DataIngestService.runOnce 同形态：
-        //    desc.setAsync(false) + executeTask 同步派发，**不另起线程**（架构铁律 §1.6-1））
-        TaskDescription desc = new TaskDescription();
-        desc.setTaskName("结构化映射实例抽取: " + jobId);
-        desc.setTaskType(KB_IMPORT_TASK_TYPE);
-        desc.setDescription("结构化映射驱动实例抽取 jobId=" + jobId);
-        Map<String, Object> params = new HashMap<>();
-        params.put("ontologyId", req.getOntologyId());
-        params.put("mode", mode);
-        params.put("dryRun", false);
-        params.put("jobId", jobId);
-        params.put("biz_kind", "KB_EXTRACT");
-        desc.setParameters(params);
-        desc.setAsync(false);   // 即时任务同步派发（不进入调度循环，立即 executeTask）
-
+        // ── 异步路径：dryRun=false，走 runtime-task（提交腿与 /extract/runs 共用
+        //    KnowledgeExtractRunService.submit：desc.setAsync(false) + executeTask 同步派发，
+        //    **不另起线程**（架构铁律 §1.6-1））
         String taskId;
         try {
-            taskId = taskManagementService.submitTask(desc);
-            taskManagementService.executeTask(taskId);   // 同步派发：dispatch queue 入队 + 工作线程异步跑
+            taskId = runService.submit(req.getOntologyId(), mode, false, jobId).taskId();
         } catch (ValidationException e) {
             log.warn("E3 异步提交失败 jobId={}: {}", jobId, e.getMessage());
             return ApiResponse.badRequest(e.getMessage());
@@ -235,7 +214,7 @@ public class StructuredExtractController {
         for (Map<String, Object> row : rows) {
             StructuredExtractJobVO vo = new StructuredExtractJobVO();
             vo.setJobId(null);
-            vo.setMode(MODE_INCREMENTAL);
+            vo.setMode(KnowledgeExtractRunService.MODE_INCREMENTAL);
             vo.setStatus("SUCCESS");
             vo.setStartedAt(formatTs(row.get("updated_at")));
             vo.setDurationMs(null);
@@ -255,7 +234,7 @@ public class StructuredExtractController {
      */
     @GetMapping("/jobs/{jobId}")
     public ApiResponse<StructuredExtractJobDetailVO> getJob(@PathVariable String jobId) {
-        if (jobId == null || !jobId.startsWith(JOB_ID_PREFIX)) {
+        if (jobId == null || !jobId.startsWith(KnowledgeExtractRunService.JOB_ID_PREFIX)) {
             return ApiResponse.notFound("jobId 非法（需以 KBK1S- 开头）: " + jobId);
         }
         StructuredExtractJobDetailVO vo = new StructuredExtractJobDetailVO();
@@ -426,22 +405,6 @@ public class StructuredExtractController {
     /** null 安全 toString。 */
     private static String nvl(String s) {
         return s == null ? "" : s;
-    }
-
-    /** 模式归一化：null/空白 / INCREMENTAL → INCREMENTAL；FULL → FULL；其他抛 {@code ValidationException}。 */
-    private static String normalizeMode(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return MODE_INCREMENTAL;
-        }
-        String value = raw.trim().toUpperCase(Locale.ROOT);
-        if (MODE_FULL.equals(value)) {
-            return MODE_FULL;
-        }
-        if (MODE_INCREMENTAL.equals(value)) {
-            return MODE_INCREMENTAL;
-        }
-        throw new ValidationException(
-                "抽取模式非法: mode=" + raw + "（允许 FULL / INCREMENTAL）");
     }
 
     /** Timestamp → ISO-8601（null 安全，异常降级为原始 toString）。 */

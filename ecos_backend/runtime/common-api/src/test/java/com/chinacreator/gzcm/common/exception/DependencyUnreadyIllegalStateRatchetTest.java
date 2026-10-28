@@ -1600,6 +1600,14 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 一样变好，HTTP 面却什么都没变＝假绿。故本案把 kb 这一枚的<b>整条承流链</b>按源码锚点钉死：
      * 码表冻结值 → advice 显式接住并按携带状态渲染 → 属主腿改抛形态 → 错号不得复活 →
      * 放行腿在位 → 另一条 HTTP 路径（E3 同步 dry-run）不得新增长 catch。
+     *
+     * <p><b>#146p 锚面订正</b>：E3 的编织腿按「单腿服务」重构（{@code KnowledgeExtractRunService}，
+     * 与 {@code POST /extract/runs} 共用同一份 {@code TaskDescription} 参数键面），调用点由
+     * {@code extractionService.extract(req.getOntologyId(), jobId, incremental, true)} 变为
+     * {@code runService.preview(req.getOntologyId(), jobId, incremental)}（{@code dryRun=true}
+     * 下沉到服务侧常量）。判据面<b>不变</b>：同一处 dry-run 调用之后 400 字符窗口内仍必须有
+     * {@code catch (ValidationException e)}、且不得出现 {@code catch (Exception e)}
+     * （实测异步腿的宽 catch 在窗口之外，故"不得新增宽 catch"的语义与本锚点一致）。</p>
      */
     @Test
     void kbOwnerSideLegRendersCarriedUnavailableStatusInsteadOfFallback() {
@@ -1631,7 +1639,7 @@ class DependencyUnreadyIllegalStateRatchetTest {
 
         String extract = codeOf(KB_EXTRACT_CONTROLLER);
         int trigger = extract.indexOf(
-                "extractionService.extract(req.getOntologyId(), jobId, incremental, true);");
+                "runService.preview(req.getOntologyId(), jobId, incremental);");
         assertTrue(trigger > 0, "E3 同步 dry-run 调用腿改了形态＝该端点的承流判定须重测");
         String triggerWindow = extract.substring(trigger, Math.min(extract.length(), trigger + 400));
         assertTrue(triggerWindow.contains("catch (ValidationException e)")

@@ -176,12 +176,30 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      *       0+29+100+13+35 = 177 = 总数，对账成立。
      *       只重设被突破的 {@link #BARE_RETURN_CEILING}，其余三面按实测保持；
      *       该枚裸回归 D-B4-59 族门管账，族收口时本上限随批下调。</li>
+     *   <li>#146p 重设（kb 抽取面 Vol-7 第 12/13 条批，common-api 全模块<b>红跑</b>实测，
+     *       {@code /tmp/commonapi2.log}）＝总数 <b>185</b>／折叠 0／状态行承载 <b>37</b>／
+     *       裸回 <b>100</b>（未漂移）／属主 helper <b>13</b>（未漂移）／纯信封 <b>35</b>（未漂移）。
+     *       八枚漂移源<b>全部来自已提交的 #146o／#146o-2</b>（ai 会话运维链，提交时未跑本横切门），
+     *       逐枚点定位＝{@code AgentSessionOpsController} 6 处（行 116／197／222／290／295／540）＋
+     *       {@code AgentToolController} 2 处（行 225 的 404 腿、行 296 的
+     *       {@code failClosedResponse} helper）——形态一律
+     *       {@code ResponseEntity.status(..).body(ApiResponse.error(..))}，属「状态行承载」正解，
+     *       计数上升是<b>补账</b>而非新欠账。</li>
      * </ul>
+     *
+     * <p><b>本批（#146p）在判据面上零新增</b>：{@code KnowledgeExtractRunsController} 的 503 腿
+     * 抛携带状态的载体由 {@code KbErrorAdvice} 单源渲染（该 advice 的产生点在 #142/B4-3e-67 已计入），
+     * 控制器内不留 {@code ApiResponse.error} 出现点——故「纯信封构造」维持 35 未漂移。
+     * 这一取舍是结构性的：若在控制器里自建 {@code ApiResponse.<T>error(503, …)} 再由同名
+     * {@code statusOf(..)} helper 落状态行，本门会把它归入「纯信封构造」（helper 名不含 {@code status(}），
+     * 既顶破 35 上限，也让同一域的 503 出现两套落法。0+37+100+13+35 = 185 = 总数，对账成立。
+     * 只重设被突破的 {@link #STATUS_CARRIER_CEILING}，其余三面按实测保持。</p>
      *
      * <p>裸回面 100 枚<b>本门有意不判其对错</b>（归 {@code D-B4-59} 族棘轮门管账），
      * 此处只做「只减不增」计数：该族每收口一枚，本上限随批下调。</p>
      */
-    private static final int STATUS_CARRIER_CEILING = 29;
+    private static final int STATUS_CARRIER_CEILING = 37;
+    // #146p：29→37，归因见上方「#146p 重设」条（#146o/#146o-2 会话运维链 8 枚状态行承载腿补账）
     // #146l-前置：99→100，归因见上方「#146l-前置 重设」条（CaliberConflictCountMetricSource 一枚）
     private static final int BARE_RETURN_CEILING = 100;
     private static final int OWNER_HELPER_CEILING = 13;

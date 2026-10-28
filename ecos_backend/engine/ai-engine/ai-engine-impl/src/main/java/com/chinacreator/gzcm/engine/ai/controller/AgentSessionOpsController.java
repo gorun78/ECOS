@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.engine.ai.dao.AgentSessionDao;
 import com.chinacreator.gzcm.engine.ai.dao.GuardrailDecisionLedgerDao;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
@@ -420,7 +421,7 @@ public class AgentSessionOpsController {
             item.put("sessionId", row.get("session_id"));
             item.put("toolKey", row.get("tool_key"));
             item.put("decision", row.get("decision"));
-            item.put("policyRef", row.get("policy_id"));
+            item.put(GuardrailDecisionContract.KEY_POLICY_REF, row.get("policy_id"));
             Object latency = row.get("latency_ms");
             item.put("latencyMs", latency instanceof Number n ? n.intValue() : null);
             item.put("createTime", formatTimestamp(row.get("create_time")));

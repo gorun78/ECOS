@@ -127,16 +127,32 @@ class NoMachineCodeFactoryFaceRatchetTest {
      * 那是与缺装配不同的态，本批不动。读数取自本批门禁会话内 {@code -pl runtime/common-api} 全量实跑
      * 的失败报文（{@code sites=925, files=150, internalError=306}），非由旧值做算术推出；
      * 算式 927−2＝925 与 308−2＝306 只用作差异归因，归因与实跑读数不符时以实跑读数为准。</p>
+     *
+     * <p><b>#146p 同批上调（+3 处／+1 文件，前置补账）</b>：本批（kb 抽取面 Vol-7 第 12/13 条）
+     * 自身在该判据面上<b>零新增</b>（新控制器只用 {@code ApiResponse.<T>badRequest/notFound} 类型见证形态，
+     * 不被 {@link #SINGLE_ARG_FACTORY} 命中）。上调的三枚全部来自已提交的 #146o／#146o-2
+     * （ai 会话运维链，提交时未跑本横切门），逐枚实测对账＝{@code b01b2b00..HEAD} 主源码面
+     * 同判据计数差：{@code AgentLoopController} 4→5（{@code ApiResponse.notFound("会话 " + id + " 不存在")}
+     * 一枚，裸 404 退出）、{@code AgentSessionOpsController} 0→1、{@code AgentToolController} 2→3
+     * （后两者同为 {@code ApiResponse.forbidden(AiErrorClass.GUARDRAIL_DENIED.errorCode(), …)}——
+     * <b>带码</b>但机读码取域内 {@code AiErrorClass} 而非 {@code SystemErrorCode.}，落不进豁免面，
+     * 属判据「只认 SystemErrorCode」的已知边界面，不改判据）；⇒ 分枚
+     * {@code forbidden 22→24}、{@code notFound 255→256}，合计 928。读数取自本批门禁会话内
+     * {@code -pl runtime/common-api} 全量实跑的失败报文（{@code sites=928}，分枚 330/12/24/256/306），
+     * 非由旧值做算术推出。文件数 {@code 150→151}：{@code AgentSessionOpsController} 此前 0 命中、
+     * 本批首次进入判据面（该类经 #146o-2 会话运维链新增一枚 {@code forbidden(AiErrorClass…)}）；
+     * 另两枚落在既有命中文件内，不再贡献文件数——该读数同样取自上述实跑报文
+     * （{@code sites=928, files=151}），不是从「+1 处 ⇒ +? 文件」推出。</p>
      */
-    private static final int BASELINE_SITES = 925;
-    private static final int BASELINE_FILES = 150;
+    private static final int BASELINE_SITES = 928;
+    private static final int BASELINE_FILES = 151;
 
     /** 分枚基线：只减不增，且合计必须等于 {@link #BASELINE_SITES}（防「拆细了但总数对不上」）。 */
     private static final Map<String, Integer> BASELINE_BY_FACTORY = new TreeMap<>(Map.of(
             "badRequest", 330,
             "unauthorized", 12,
-            "forbidden", 22,
-            "notFound", 255,
+            "forbidden", 24,
+            "notFound", 256,
             "internalError", 306));
 
     /** gateway 入口面已带码的六枚腿（锚点，不得回退）。 */

@@ -585,6 +585,17 @@ public class KbEntityInstanceExtractionService {
     // ═══════════════ 引擎间 REST 调用 ═══════════════
 
     /**
+     * 抽取前置闸用只读探测：指定范围是否存在可用本体快照。
+     *
+     * <p>复用 {@link #readSnapshots} 单源（同一 SQL、同一范围归一化口径），不另建查询；
+     * {@code DataAccessException} 原样上浮（由 {@code KbErrorAdvice} 落 500 {@code ECOS-KB-050}），
+     * 禁在探测腿折成「无快照」——那会把 DB 故障伪装成 409 业务拒绝。</p>
+     */
+    public boolean snapshotAvailable(String ontologyId) {
+        return !readSnapshots(ontologyId).isEmpty();
+    }
+
+    /**
      * 读 kb 自有本体快照（版本对齐基准 + C1 类型存在性判据）。
      *
      * <p>scope=ALL 时取每个本体最新一条生效快照；快照的 {@code entity_codes} 作为 C1 校验集合。

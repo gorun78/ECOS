@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
+import com.chinacreator.gzcm.common.security.guardrail.GuardrailDecisionContract;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
 import com.chinacreator.gzcm.engine.ai.guardrail.ToolDecision;
 import com.chinacreator.gzcm.engine.ai.security.AgentToolPolicyGate;
@@ -277,7 +278,8 @@ public class AgentToolController {
         data.put("dryRun", true);
         data.put("executed", false);                                   // dry-run 永不执行副作用
         data.put("adjudication", adjudication);
-        data.put("obligations", decision.obligationSummary());         // 列名/规则名摘要，禁数据值
+        data.put(GuardrailDecisionContract.KEY_OBLIGATIONS,
+                decision.obligationSummary());                          // 列名/规则名摘要，禁数据值
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 

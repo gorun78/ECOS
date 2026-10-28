@@ -57,4 +57,28 @@ public class StructuredExtractQueryService {
     public List<Map<String, Object>> findAuditRowsByJobId(String jobId) {
         return structuredExtractQueryDao.findAuditRowsByJobId(jobId);
     }
+
+    /**
+     * 水位线活行分页（{@code is_deleted=0}），供 {@code GET /extract/watermarks} 使用。
+     *
+     * @return 原始行列表（ontology_id / entity_code / resource_id / watermark / trace_id /
+     *         domain / version_no / updated_at）
+     */
+    public List<Map<String, Object>> listWatermarkItems(int limit, int offset) {
+        return structuredExtractQueryDao.listWatermarkItems(limit, offset);
+    }
+
+    /** 水位线活行总数（与 {@link #listWatermarkItems} 同谓词）。 */
+    public long countWatermarkItems() {
+        return structuredExtractQueryDao.countWatermarkItems();
+    }
+
+    /**
+     * 按 runtime-task {@code task_id} 反查最近一条抽取审计行，供 runs 族报告回读兜底。
+     *
+     * @return 原始行列表（job_id / task_id / mode / status / duration_ms / rows_* / error_message / created_at），最多 1 行
+     */
+    public List<Map<String, Object>> findLatestAuditByTaskId(String taskId) {
+        return structuredExtractQueryDao.findLatestAuditByTaskId(taskId);
+    }
 }

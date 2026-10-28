@@ -54,4 +54,44 @@ public class StructuredExtractQueryDao extends JdbcTemplateDaoSupport {
                         + "ORDER BY create_time DESC LIMIT 100",
                 jobId);
     }
+
+    /**
+     * 水位线活行分页（{@code is_deleted=0}，按 {@code update_time} 倒序），供
+     * {@code GET /api/v1/knowledge/extract/watermarks} 使用。
+     *
+     * <p>与 {@link #listWatermarkRows} 的区别是显式剔除软删行并补齐全列投影：
+     * E4（作业列表）沿用旧投影与旧谓词，本批不改其语义（API 只增不改）。</p>
+     */
+    public List<Map<String, Object>> listWatermarkItems(int limit, int offset) {
+        return jdbcTemplate.queryForList(
+                "SELECT ontology_id, entity_code, resource_id, watermark, trace_id, domain, version_no, "
+                        + "update_time AS updated_at "
+                        + "FROM " + schema + ".ecos_kb_extract_watermark WHERE is_deleted = 0 "
+                        + "ORDER BY update_time DESC LIMIT ? OFFSET ?",
+                limit, offset);
+    }
+
+    /** 水位线活行总数（与 {@link #listWatermarkItems} 同谓词）。 */
+    public long countWatermarkItems() {
+        Long n = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM " + schema + ".ecos_kb_extract_watermark WHERE is_deleted = 0",
+                Long.class);
+        return n == null ? 0L : n;
+    }
+
+    /**
+     * 按 runtime-task {@code task_id} 反查最近一条抽取审计行，供
+     * {@code GET /api/v1/knowledge/extract/runs/{taskId}} 在任务状态存储缺失时兜底。
+     *
+     * <p>runs 族的异步提交里 {@code jobId}（{@code KBK1S-…}）与 {@code taskId}（runtime-task 生成）
+     * 是两个不同标识，审计行的 {@code job_id} 列不能用于反查任务 → 必须按 {@code task_id} 查。</p>
+     */
+    public List<Map<String, Object>> findLatestAuditByTaskId(String taskId) {
+        return jdbcTemplate.queryForList(
+                "SELECT job_id, task_id, extract_mode AS mode, status, duration_ms, "
+                        + "rows_total, rows_ok, rows_failed, error_message, create_time AS created_at "
+                        + "FROM " + schema + ".ecos_kb_extract_audit WHERE task_id = ? "
+                        + "ORDER BY create_time DESC LIMIT 1",
+                taskId);
+    }
 }

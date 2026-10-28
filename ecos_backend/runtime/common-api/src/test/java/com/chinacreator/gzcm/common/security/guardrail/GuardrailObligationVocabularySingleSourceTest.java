@@ -85,7 +85,20 @@ class GuardrailObligationVocabularySingleSourceTest {
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/"
                     + "blueprint/ScenarioBlueprintService.java";
 
-    /** 禁列词 → 允许的第二持有者（空集＝除单源外零持有）。白名单只减不增：新增须走裁决批。 */
+    /**
+     * 同名他域属主登记（#146p）：kb 抽取水位线端点读 {@code ecos_kb_extract_watermark} 的行集键面
+     * （抽取高水位＝FULL／INCREMENTAL 续读断点），与护栏义务词里的 {@code watermark}
+     * （裁决水印义务）<b>同值不同职</b>：生产方不同（DAO 行集 vs 裁决信封）、消费方不同
+     * （抽取续读 vs 导出/裁决渲染）、无共享词表，故不构成 D-B4-31 那种「各写各的第二套写法」。
+     * 登记理由：本判据只认「带引号字面量持有者」，对同形不同职无法自动区分——属主登记放行，
+     * 而非放宽判据；该文件一旦改读裁决面 watermark，应改指 {@link GuardrailDecisionContract} 并撤销本登记。
+     */
+    private static final String KB_EXTRACT_RUNS_CTRL =
+            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/"
+                    + "kb/controller/KnowledgeExtractRunsController.java";
+
+    /** 禁列词 → 允许的第二持有者（空集＝除单源外零持有）。白名单只减不增：新增须走裁决批。
+     *  #146p 新增 {@link #KB_EXTRACT_RUNS_CTRL}＝同名他域登记（抽取水位线，非裁决水印义务），理由见该常量注释。 */
     private static final List<String> BANNED = List.of(
             GuardrailDecisionContract.KEY_OBLIGATIONS,
             GuardrailDecisionContract.KEY_OBLIGATION,
@@ -181,7 +194,7 @@ class GuardrailObligationVocabularySingleSourceTest {
         assertTrue(scanned.size() > 500,
                 "主源码扫描根解析到的文件数异常（" + scanned.size() + "）——「读不到」不得当成「无违例」");
 
-        Set<String> watermarkOwners = Set.of(CONTRACT, DATA_ENGINE_LAYER_SVC);
+        Set<String> watermarkOwners = Set.of(CONTRACT, DATA_ENGINE_LAYER_SVC, KB_EXTRACT_RUNS_CTRL);
         Set<String> policyRefOwners = Set.of(CONTRACT, WS_BLUEPRINT);
 
         List<String> violations = new ArrayList<>();
