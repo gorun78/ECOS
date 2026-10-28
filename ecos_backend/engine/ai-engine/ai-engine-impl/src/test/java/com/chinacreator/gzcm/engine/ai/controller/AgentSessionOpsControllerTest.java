@@ -1,6 +1,9 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.engine.ai.dao.AgentSessionDao;
+import com.chinacreator.gzcm.engine.ai.dao.GuardrailDecisionLedgerDao;
+import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
+import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.service.AgentSessionService;
 import com.chinacreator.gzcm.engine.ai.service.SessionCompressionService;
 import com.chinacreator.gzcm.engine.ai.service.SessionCompressionService.Outcome;
@@ -53,6 +56,8 @@ class AgentSessionOpsControllerTest {
     private SessionTokenQuotaService quotaService;
     private LLMGateway llmGateway;
     private AgentMetrics agentMetrics;
+    private GuardrailDecisionLedgerDao guardrailLedgerDao;
+    private ToolSubjectResolver toolSubjectResolver;
     private MockMvc mockMvc;
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -64,11 +69,14 @@ class AgentSessionOpsControllerTest {
         quotaService         = mock(SessionTokenQuotaService.class);
         llmGateway           = mock(LLMGateway.class);
         agentMetrics         = mock(AgentMetrics.class);
+        guardrailLedgerDao   = mock(GuardrailDecisionLedgerDao.class);
+        toolSubjectResolver  = mock(ToolSubjectResolver.class);
 
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new AgentSessionOpsController(
                         sessionService, sessionDao, compressionService,
-                        quotaService, llmGateway, agentMetrics))
+                        quotaService, llmGateway, agentMetrics,
+                        guardrailLedgerDao, toolSubjectResolver))
                 .setMessageConverters(new MappingJackson2HttpMessageConverter())
                 .build();
     }
@@ -226,6 +234,62 @@ class AgentSessionOpsControllerTest {
         assertEquals(50L, data.path("totals").path("completionTokens").asLong());
         JsonNode item = data.path("items").path(0);
         assertEquals(false, item.path("estimated").asBoolean());
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  #14 GET /api/v1/agent/guardrail-decisions
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @DisplayName("#14 无 token 主体 ⇒ 403 ECOS-AI-403（禁伪造空台账放行）")
+    void guardrailDecisionsNoSubjectIs403() throws Exception {
+        when(toolSubjectResolver.resolve()).thenReturn(null);
+        MvcResult r = mockMvc.perform(get("/api/v1/agent/guardrail-decisions")).andReturn();
+        assertEquals(403, r.getResponse().getStatus());
+        JsonNode json = mapper.readTree(r.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        assertEquals("ECOS-AI-403", json.path("errorCode").asText());
+    }
+
+    @Test
+    @DisplayName("#14 主体无 AI_GUARDIAN 角色 ⇒ 403（角色门禁先于台账读数，禁读面伪造）")
+    void guardrailDecisionsNonGuardianRoleIs403() throws Exception {
+        when(toolSubjectResolver.resolve())
+                .thenReturn(new ToolAdjudicationRequest.Subject("u1", List.of("operator"), null, "t1"));
+        MvcResult r = mockMvc.perform(get("/api/v1/agent/guardrail-decisions")).andReturn();
+        assertEquals(403, r.getResponse().getStatus());
+        assertEquals("ECOS-AI-403",
+                mapper.readTree(r.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                        .path("errorCode").asText());
+    }
+
+    @Test
+    @DisplayName("#14 AI_GUARDIAN 主体 ⇒ 200，items 逐键映射且 items 不投影 obligations/subject 面")
+    void guardrailDecisionsAsGuardianReturnsItems() throws Exception {
+        when(toolSubjectResolver.resolve())
+                .thenReturn(new ToolAdjudicationRequest.Subject("u1", List.of("AI_GUARDIAN"), null, "t1"));
+        java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+        row.put("trace_id", "tr-1");
+        row.put("session_id", "s9");
+        row.put("tool_key", "query_data");
+        row.put("decision", "DENY");
+        row.put("policy_id", "pol-1");
+        row.put("latency_ms", 42);
+        row.put("create_time", java.sql.Timestamp.valueOf(LocalDateTime.of(2026, 10, 27, 9, 0, 0)));
+        when(guardrailLedgerDao.listFiltered(isNull(), isNull(), isNull(), isNull(), isNull(), org.mockito.ArgumentMatchers.eq(100)))
+                .thenReturn(List.of(row));
+
+        MvcResult r = mockMvc.perform(get("/api/v1/agent/guardrail-decisions")).andReturn();
+        assertEquals(200, r.getResponse().getStatus());
+        JsonNode data = mapper.readTree(r.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .path("data");
+        assertEquals(1, data.path("itemCount").asInt());
+        JsonNode item = data.path("items").path(0);
+        assertEquals("tr-1", item.path("traceId").asText());
+        assertEquals("query_data", item.path("toolKey").asText());
+        assertEquals("DENY", item.path("decision").asText());
+        assertEquals("pol-1", item.path("policyRef").asText());
+        assertEquals(42, item.path("latencyMs").asInt());
+        assertEquals("2026-10-27T09:00:00", item.path("createTime").asText());
     }
 
     // ═══════════════════════════════════════════════════════════════

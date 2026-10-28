@@ -41,6 +41,49 @@ public class GuardrailDecisionLedgerDao extends JdbcTemplateDaoSupport {
                 traceId);
     }
 
+    /**
+     * 台账查询（对账面，详设-06 §5.2 / 详设说明书 §9.3.1 #14）：按谓词读的<b>单源</b>读面，
+     * 供 {@code GET /api/v1/agent/guardrail-decisions} 的 {@code traceId}/{@code toolKey}/
+     * {@code decision}/{@code from}/{@code to} 五项过滤。
+     *
+     * <p>口径：条件全为「可空即不约束」；排序固定 {@code create_time DESC, id DESC}（同刻按
+     * 应用侧 UUID 定序，结果确定可复现）；{@code limit} 由调用方夹紧（契约单 500 Ceiling），
+     * 本方法只收已夹紧的正整数。谓词带 {@code is_deleted = 0}（DR05），列面为契约七键投影
+     * （{@code decision/policyRef/latencyMs/createTime} 之外附 {@code traceId/sessionId/toolKey}
+     * 供对账跳转），<b>不投影</b> {@code obligations}/{@code subject_snapshot}
+     * （时点缓存含主体快照，入读响应＝把标识符搬进业务面，与 R-18 ② 禁策略副本同红线）。</p>
+     */
+    public List<Map<String, Object>> listFiltered(String traceId, String toolKey,
+                                                  String decision, String fromIso, String toIso, int limit) {
+        StringBuilder sb = new StringBuilder(
+                "SELECT trace_id, session_id, tool_key, decision, policy_id, latency_ms, create_time "
+                + "FROM ecos_ai.ecos_ai_guardrail_decision_ledger WHERE is_deleted = 0");
+        List<Object> params = new java.util.ArrayList<>(5);
+        if (traceId != null && !traceId.isBlank()) {
+            sb.append(" AND trace_id = ?");
+            params.add(traceId);
+        }
+        if (toolKey != null && !toolKey.isBlank()) {
+            sb.append(" AND tool_key = ?");
+            params.add(toolKey);
+        }
+        if (decision != null && !decision.isBlank()) {
+            sb.append(" AND decision = ?");
+            params.add(decision);
+        }
+        if (fromIso != null && !fromIso.isBlank()) {
+            sb.append(" AND create_time >= CAST(? AS TIMESTAMP)");
+            params.add(fromIso);
+        }
+        if (toIso != null && !toIso.isBlank()) {
+            sb.append(" AND create_time < CAST(? AS TIMESTAMP)");
+            params.add(toIso);
+        }
+        sb.append(" ORDER BY create_time DESC, id DESC LIMIT ?");
+        params.add(limit);
+        return jdbcTemplate.queryForList(sb.toString(), params.toArray());
+    }
+
     /** 对账：统计指定时间窗内的裁决条数（按 decision 分组）。 */
     public List<Map<String, Object>> countByDecisionSince(String sinceIso) {
         return jdbcTemplate.queryForList(

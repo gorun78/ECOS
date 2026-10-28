@@ -3,6 +3,9 @@ package com.chinacreator.gzcm.engine.ai.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.engine.ai.dao.AgentSessionDao;
+import com.chinacreator.gzcm.engine.ai.dao.GuardrailDecisionLedgerDao;
+import com.chinacreator.gzcm.engine.ai.guardrail.ToolAdjudicationRequest;
+import com.chinacreator.gzcm.engine.ai.security.ToolSubjectResolver;
 import com.chinacreator.gzcm.engine.ai.service.AgentSessionService;
 import com.chinacreator.gzcm.engine.ai.service.SessionCompressionService;
 import com.chinacreator.gzcm.engine.ai.service.SessionCompressionService.Outcome;
@@ -26,9 +29,12 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 会话运维链端点（P1.3 #12/#13/#15：附录 A 端点缺口 35 条之 ai 会话运维族首切片）。
@@ -71,19 +77,25 @@ public class AgentSessionOpsController {
     private final SessionTokenQuotaService tokenQuotaService;
     private final LLMGateway llmGateway;
     private final AgentMetrics agentMetrics;
+    private final GuardrailDecisionLedgerDao guardrailLedgerDao;
+    private final ToolSubjectResolver toolSubjectResolver;
 
     public AgentSessionOpsController(AgentSessionService sessionService,
                                      AgentSessionDao sessionDao,
                                      SessionCompressionService compressionService,
                                      SessionTokenQuotaService tokenQuotaService,
                                      LLMGateway llmGateway,
-                                     AgentMetrics agentMetrics) {
+                                     AgentMetrics agentMetrics,
+                                     GuardrailDecisionLedgerDao guardrailLedgerDao,
+                                     ToolSubjectResolver toolSubjectResolver) {
         this.sessionService = sessionService;
         this.sessionDao = sessionDao;
         this.compressionService = compressionService;
         this.tokenQuotaService = tokenQuotaService;
         this.llmGateway = llmGateway;
         this.agentMetrics = agentMetrics;
+        this.guardrailLedgerDao = guardrailLedgerDao;
+        this.toolSubjectResolver = toolSubjectResolver;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -360,6 +372,105 @@ public class AgentSessionOpsController {
         data.put("windowCallCount", counted);
         data.put("windowLimit", 500);
         return ResponseEntity.ok(ApiResponse.success(data));
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  #14 GET /api/v1/agent/guardrail-decisions
+    // ═══════════════════════════════════════════════════════════════
+
+    /** 裁决台账读取角色词表（详设说明书 line 6058 门禁面 {@code role:AI_GUARDIAN}，
+     * 大小写不敏感，含 {@code ROLE_} 前缀形态；与 F10-21 admin 判据同口径）。 */
+    private static final Set<String> GUARDRAIL_ROLES = Set.of("ai_guardian", "role_ai_guardian");
+
+    /**
+     * 裁决台账查询（对账面，详设说明书 line 6058 {@code listGuardrailDecisions}）。
+     *
+     * @param traceId  可选：按链路 traceId 精确过滤
+     * @param toolKey  可选：按工具 code 精确过滤
+     * @param decision 可选：ALLOW / DENY / FAIL_CLOSED 三态字面过滤
+     * @param from     可选：ISO-8601 起始（含）
+     * @param to       可选：ISO-8601 截止（不含）
+     * @param limit    可选：正整数，缺省 100 上限 500（契约单 Ceiling）
+     */
+    @GetMapping("/guardrail-decisions")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> listGuardrailDecisions(
+            @RequestParam(name = "traceId", required = false) String traceId,
+            @RequestParam(name = "toolKey", required = false) String toolKey,
+            @RequestParam(name = "decision", required = false) String decision,
+            @RequestParam(name = "from", required = false) String from,
+            @RequestParam(name = "to", required = false) String to,
+            @RequestParam(name = "limit", required = false, defaultValue = "100") Integer limit) {
+        // 准入门禁（统一门禁层，禁伪造空台账放行）：主体缺失 / 无 AI_GUARDIAN 角色 ⇒ 403
+        if (toolSubjectResolver == null) {
+            return guardrailDeniedResponse("裁决台账主体解析器未装配（fail-closed）");
+        }
+        ToolAdjudicationRequest.Subject subject = toolSubjectResolver.resolve();
+        if (subject == null || !hasGuardianRole(subject.roles())) {
+            return guardrailDeniedResponse("裁决台账仅限 AI_GUARDIAN 角色读取");
+        }
+        int effLimit = clampLimit(limit);
+        List<Map<String, Object>> rows = guardrailLedgerDao.listFiltered(
+                blankToNull(traceId), blankToNull(toolKey), blankToNull(decision),
+                blankToNull(from), blankToNull(to), effLimit);
+
+        List<Map<String, Object>> items = new ArrayList<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("traceId", row.get("trace_id"));
+            item.put("sessionId", row.get("session_id"));
+            item.put("toolKey", row.get("tool_key"));
+            item.put("decision", row.get("decision"));
+            item.put("policyRef", row.get("policy_id"));
+            Object latency = row.get("latency_ms");
+            item.put("latencyMs", latency instanceof Number n ? n.intValue() : null);
+            item.put("createTime", formatTimestamp(row.get("create_time")));
+            items.add(item);
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("itemCount", items.size());
+        data.put("items", items);
+        data.put("limit", effLimit);
+        // 本端点过滤限定 traceId/toolKey/decision/from/to 五键；未命中时由响应面空集如实表达，
+        // 禁合成"空即全量"伪聚合。回显面用 LinkedHashMap（Map.of 拒 null，空过滤即 NPE）
+        Map<String, Object> filters = new LinkedHashMap<>();
+        filters.put("traceId", blankToNull(traceId));
+        filters.put("toolKey", blankToNull(toolKey));
+        filters.put("decision", blankToNull(decision));
+        filters.put("from", blankToNull(from));
+        filters.put("to", blankToNull(to));
+        data.put("filters", filters);
+        return ResponseEntity.ok(ApiResponse.success(data));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> guardrailDeniedResponse(String message) {
+        return ResponseEntity.status(AiErrorClass.GUARDRAIL_DENIED.httpStatus()).body(
+                ApiResponse.forbidden(AiErrorClass.GUARDRAIL_DENIED.errorCode(),
+                        message == null ? AiErrorClass.GUARDRAIL_DENIED.renderMessage(null) : message));
+    }
+
+    private static boolean hasGuardianRole(List<String> roles) {
+        if (roles == null) return false;
+        for (String r : roles) {
+            if (r != null && GUARDRAIL_ROLES.contains(r.toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static int clampLimit(Integer limit) {
+        if (limit == null || limit <= 0) return 100;
+        return Math.min(limit, 500);
+    }
+
+    private static String formatTimestamp(Object raw) {
+        if (raw instanceof Timestamp ts) {
+            return ts.toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+        }
+        if (raw instanceof LocalDateTime ldt) {
+            return ldt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+        }
+        return raw == null ? null : String.valueOf(raw);
     }
 
     // ── 私有工具方法 ────────────────────────────────────────────────
