@@ -10,6 +10,7 @@ import com.chinacreator.gzcm.engine.kb.repository.KnowledgeArticleMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEmbeddingMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEdgeMapper;
+import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -112,11 +113,29 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
     @Override
     public Map<String, Object> ragQuery(String queryText, int topK, double threshold,
                                         List<String> categoryIds, List<String> tags) {
+        // 旧腿（POST /api/v1/knowledge/rag）：供数读失败仍降级为空集（行为保持，只增不改）
+        return runRagQuery(queryText, topK, threshold, categoryIds, tags, false);
+    }
+
+    @Override
+    public Map<String, Object> ragQueryStrict(String queryText, int topK, double threshold,
+                                              List<String> categoryIds, List<String> tags) {
+        // 新腿（POST /api/v1/knowledge/retrieval/search|answer）：供数读失败 ⇒ 502 ECOS-KB-040，
+        // 禁把「查不了」洗成「零命中」
+        return runRagQuery(queryText, topK, threshold, categoryIds, tags, true);
+    }
+
+    /**
+     * RAG 取数主体 — 供数腿宽/严由 {@code strictSupply} 单点决定，两条公开腿只是它的两种口径。
+     */
+    private Map<String, Object> runRagQuery(String queryText, int topK, double threshold,
+                                            List<String> categoryIds, List<String> tags,
+                                            boolean strictSupply) {
         long startTime = System.currentTimeMillis();
         // B4: topK 收敛到 [1, MAX_TOP_K]，防慢 SQL
         int effectiveTopK = Math.min(Math.max(topK, 1), MAX_TOP_K);
         // PMO-B T1: 解析 categoryIds → 子树 path LIKE 集合（空 = 无导航过滤，全量）
-        List<String> subtreePaths = resolveCategorySubtree(categoryIds);
+        List<String> subtreePaths = resolveCategorySubtree(categoryIds, strictSupply);
         boolean navFilter = !subtreePaths.isEmpty();
         // PMO-C T1: tags 下沉（symmetry with navFilter）— 清洗后非空才过滤，兼容旧调用（tags=null → 全量）
         List<String> effectTags = sanitizeTags(tags);
@@ -175,17 +194,18 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                                 }
                                 if (navFilter && tagFilter) {
                                     // 双过滤：需同时命中子树 AND 命中任一标签
-                                    if (!matchesNavFilter(articleId, subtreePaths) || !matchesTagFilter(articleId, effectTags)) {
+                                    if (!matchesNavFilter(articleId, subtreePaths, strictSupply)
+                                            || !matchesTagFilter(articleId, effectTags, strictSupply)) {
                                         continue;
                                     }
                                 } else if (navFilter) {
                                     // 仅子树过滤
-                                    if (!matchesNavFilter(articleId, subtreePaths)) {
+                                    if (!matchesNavFilter(articleId, subtreePaths, strictSupply)) {
                                         continue;
                                     }
                                 } else if (tagFilter) {
                                     // 仅标签过滤
-                                    if (!matchesTagFilter(articleId, effectTags)) {
+                                    if (!matchesTagFilter(articleId, effectTags, strictSupply)) {
                                         continue;
                                     }
                                 }
@@ -211,12 +231,12 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                     }
                 }
                 if (!vectorSuccess) {
-                        sources = fallbackKeywordSearch(queryText, effectiveTopK, subtreePaths, effectTags);
+                        sources = fallbackKeywordSearch(queryText, effectiveTopK, subtreePaths, effectTags, strictSupply);
                     }
             } else {
                 log.warn("RAG 降级关键词检索：pgvector 扩展不可用（镜像需内置 pgvector，query='{}'）", queryText);
                 degradeReason = "pgvector 扩展不可用，回退关键词检索（JSONB 命中）";
-                sources = fallbackKeywordSearch(queryText, effectiveTopK, subtreePaths, effectTags);
+                sources = fallbackKeywordSearch(queryText, effectiveTopK, subtreePaths, effectTags, strictSupply);
             }
         }
 
@@ -264,7 +284,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
      * 任一 id 不存在（软删 / 跨域）时只跳过那一条，不阻塞其他 id。
      * 不可用时返回空 List → 调用方降级为全量检索（回归保证）。</p>
      */
-    private List<String> resolveCategorySubtree(List<String> categoryIds) {
+    private List<String> resolveCategorySubtree(List<String> categoryIds, boolean strictSupply) {
         if (categoryIds == null || categoryIds.isEmpty()) {
             return List.of();
         }
@@ -294,6 +314,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
             }
             return out;
         } catch (Exception e) {
+            supplyFailure(strictSupply, "导航子树解析失败", e);
             log.warn("resolveCategorySubtree 失败，降级为全量检索: {}", e.getMessage(), e);
             return List.of();
         }
@@ -326,7 +347,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
      * PMO-B T1 辅助：判断 articleId 是否命中给定子树 path 任一前缀（复用 kb_nav_article_rel + kb_nav_category）。
      * 文章没有任何导航标签（即零标记）时一律返回 false（要求"命中其中一项 OR 全部 nil"，对应 KISS 语义）。
      */
-    private boolean matchesNavFilter(String articleId, List<String> subtreePaths) {
+    private boolean matchesNavFilter(String articleId, List<String> subtreePaths, boolean strictSupply) {
         if (articleId == null || articleId.isBlank()) {
             return false;
         }
@@ -340,6 +361,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                     return true;
                 }
             } catch (Exception e) {
+                supplyFailure(strictSupply, "导航过滤反查失败（articleId=" + articleId + "）", e);
                 log.debug("matchesNavFilter queryForObject 失败（articleId={}, path={}）: {}",
                         articleId, p, e.getMessage());
                 return false;
@@ -356,7 +378,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
      * （IR05 红线：禁字符串拼接，占位符防注入）。任一 tag_name 命中即返回 true；
      * 文章零标签标记一律 false。</p>
      */
-    private boolean matchesTagFilter(String articleId, List<String> tags) {
+    private boolean matchesTagFilter(String articleId, List<String> tags, boolean strictSupply) {
         if (articleId == null || articleId.isBlank() || tags == null || tags.isEmpty()) {
             return false;
         }
@@ -365,6 +387,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
             long n = retrievalDao.countTagMatch(articleId, tags);
             return n > 0;
         } catch (Exception e) {
+            supplyFailure(strictSupply, "标签过滤反查失败（articleId=" + articleId + "）", e);
             log.debug("matchesTagFilter 失败（articleId={}, tags={}）: {}",
                     articleId, tags, e.getMessage());
             return false;
@@ -395,15 +418,17 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
      * 关键词回退检索 — ILIKE 匹配（PMO-B T1 兼容无导航过滤场景；PMO-C T1 追加 tags 参数重载）。
      */
     private List<Map<String, Object>> fallbackKeywordSearch(String queryText, int topK) {
-        return fallbackKeywordSearch(queryText, topK, null, null);
+        return fallbackKeywordSearch(queryText, topK, null, null, false);
     }
 
     /**
      * 关键词回退检索 — ILIKE 匹配；{@code subtreePaths} 为空 / null 时全量返回（兼容旧调用）。
      * PMO-C T1: 追加 {@code tags} 参数，命中语义与向量路径一致（navFilter OR tagFilter 二选一）。
+     * {@code strictSupply}=true 时供数读失败抛 502 {@code ECOS-KB-040}（见 {@link #ragQueryStrict}）。
      */
     private List<Map<String, Object>> fallbackKeywordSearch(String queryText, int topK,
-                                                            List<String> subtreePaths, List<String> tags) {
+                                                            List<String> subtreePaths, List<String> tags,
+                                                            boolean strictSupply) {
         List<Map<String, Object>> sources = new ArrayList<>();
         try {
             boolean navFilter = subtreePaths != null && !subtreePaths.isEmpty();
@@ -417,15 +442,16 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                 }
                 String articleId = emb.getArticleId();
                 if (navFilter && tagFilter) {
-                    if (!matchesNavFilter(articleId, subtreePaths) || !matchesTagFilter(articleId, tags)) {
+                    if (!matchesNavFilter(articleId, subtreePaths, strictSupply)
+                            || !matchesTagFilter(articleId, tags, strictSupply)) {
                         continue;
                     }
                 } else if (navFilter) {
-                    if (!matchesNavFilter(articleId, subtreePaths)) {
+                    if (!matchesNavFilter(articleId, subtreePaths, strictSupply)) {
                         continue;
                     }
                 } else if (tagFilter) {
-                    if (!matchesTagFilter(articleId, tags)) {
+                    if (!matchesTagFilter(articleId, tags, strictSupply)) {
                         continue;
                     }
                 }
@@ -437,9 +463,25 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
                 sources.add(source);
             }
         } catch (Exception e) {
+            supplyFailure(strictSupply, "关键词回退检索失败", e);
             log.warn("Keyword fallback search failed: {}", e.getMessage(), e);
         }
         return sources;
+    }
+
+    /**
+     * 供数腿失败分面：严格腿（契约端点）抛 502 {@code ECOS-KB-040}，
+     * 宽腿（旧 {@code /rag}）保持既有「留日志 + 降级」行为。
+     *
+     * <p>不能两腿同形：静默降级会把「供数读不了」渲染成「零命中」，客户端据此显示空结果，
+     * 运维面永远看不到供数故障（§4.7.2「不可用 ≠ 空结果」）。</p>
+     */
+    private static void supplyFailure(boolean strictSupply, String reason, Exception e) {
+        if (strictSupply) {
+            throw KbErrorCodes.CURATED_SUPPLY_UNREACHABLE.exception(
+                    "知识检索供数不可达: " + reason + " — " + e.getClass().getSimpleName()
+                            + ": " + e.getMessage());
+        }
     }
 
     @Override

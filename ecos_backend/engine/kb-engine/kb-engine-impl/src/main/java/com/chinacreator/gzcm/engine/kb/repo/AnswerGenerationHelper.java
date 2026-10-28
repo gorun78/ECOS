@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.kb.repo;
 
+import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatMessage;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatRequest;
 import com.chinacreator.gzcm.runtime.llm.gateway.ChatResponse;
@@ -80,6 +81,41 @@ public class AnswerGenerationHelper {
             log.warn("AnswerGenerationHelper: LLM call failed (fallback concatenated answer): {}", e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * 严格 LLM 生成（详设 §7.3.2 附录 A 第 14 行 {@code generateKnowledgeAnswer} 的生成腿）。
+     *
+     * <p>与 {@link #generate(String, List)} 的差异是<b>失败不静默</b>：后者返回 {@code null}，
+     * 由旧 {@code /rag} 腿改拼上下文（既有降级链保留、只增不改）；本方法在 LLM 不可用／
+     * 调用异常／空正文时抛 {@code ECOS-KB-023}（503），由契约端点落成故障态 ——
+     * 答案端点没有"退化为拼接"的语义，静默降级会让「模型没答」与「模型答了」同形。</p>
+     *
+     * @param sources 检索命中（调用方保证非空：零命中是「无据」而不是「LLM 不可用」，由调用方分面）
+     * @throws IllegalArgumentException 依据为空（调用方漏判，属编程缺陷）
+     * @throws com.chinacreator.gzcm.engine.kb.support.KbErrorCodes.DomainException LLM 不可用（503）
+     */
+    public String generateStrict(String question, List<Map<String, Object>> sources) {
+        if (question == null || question.isBlank() || sources == null || sources.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "generateStrict 需非空 question 与 sources（零命中须由调用方先分面，不得进 LLM 腿）");
+        }
+        ChatResponse resp;
+        try {
+            resp = llmGateway.call(buildRequest(question, sources));
+        } catch (Exception e) {
+            throw KbErrorCodes.LLM_BASE_UNAVAILABLE.exception(
+                    "LLM 调用失败: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+        if (resp == null || !resp.isSuccess()) {
+            throw KbErrorCodes.LLM_BASE_UNAVAILABLE.exception(
+                    "LLM 底座不可用: " + (resp == null ? "null response" : resp.getErrorMsg()));
+        }
+        String content = resp.getContent();
+        if (content == null || content.isBlank()) {
+            throw KbErrorCodes.LLM_BASE_UNAVAILABLE.exception("LLM 返回空正文");
+        }
+        return content;
     }
 
     /**

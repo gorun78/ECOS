@@ -35,6 +35,24 @@ public interface KnowledgeRetrievalService {
     Map<String, Object> ragQuery(String queryText, int topK, double threshold,
                                  List<String> categoryIds, List<String> tags);
 
+    /**
+     * 严格供数 RAG 检索（详设 §7.3.2 附录 A 第 14 行 {@code searchKnowledge} 的取数腿）。
+     *
+     * <p>与 5 参 {@link #ragQuery(String, int, double, List, List)} 的<b>唯一语义差异</b>：
+     * 供数链路（导航子树解析／关键词回退／导航-标签过滤反查）读失败时<b>不再折叠为空结果</b>，
+     * 而是抛 {@code ECOS-KB-040}（502 CURATED 供数不可达）。旧腿保持"降级为空集"的
+     * 既有行为（只增不改），新腿供契约端点使用：把「查不到」与「查不了」分成两个状态行，
+     * 否则运维面看到的永远是"零命中"。</p>
+     *
+     * <p>向量腿的异常仍走 {@code vectorDegraded=true} 的显式降级（湖规"降级须显式标记"），
+     * 不属供数不可达：那是形态退化，不是无供给。</p>
+     *
+     * @throws com.chinacreator.gzcm.engine.kb.support.KbErrorCodes.DomainException
+     *         供数不可达（502 {@code ECOS-KB-040}）
+     */
+    Map<String, Object> ragQueryStrict(String queryText, int topK, double threshold,
+                                       List<String> categoryIds, List<String> tags);
+
     KnowledgeArticle createArticle(KnowledgeArticle article);
 
     KnowledgeArticle getArticle(String articleId);
