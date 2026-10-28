@@ -41,7 +41,9 @@ import static org.mockito.Mockito.when;
  *       {@code 200＋空列表}；{@code get/create/update/delete} 未装配 ⇒ {@code internalError(-1/500)}；</li>
  *   <li>{@code SystemParamController}：{@code list} 未装配 ⇒ {@code 200＋空集}，余四枚 ⇒ {@code internalError}；</li>
  *   <li>{@code SysConfigController}：四枚方法（列表／更新／元数据／审计）未装配 ⇒
- *       {@code 200＋空集}（{@code Map.of("data", List.of(), "total", 0)}）或 {@code internalError}。</li>
+ *       {@code 200＋空集}（{@code Map.of("data", List.of(), "total", 0)}）或 {@code internalError}。
+ *       【#146u 承接】该文件 2026-10-28 新增第五枚腿 {@code GET /group}（差距台账附录A 第 3 条），
+ *       本门同步把逐枚计数 4→5，新腿同样按 503 承载，不得回退成折叠形态。</li>
  * </ul>
  * <p>两种折叠方向都违详设 §4.7.2「不可用 ≠ 无权限 ≠ 空结果」：读侧把「服务没装配」谎报成
  * 「库里没数据」，写侧把可预期的缺装配谎报成本服务自身故障。登记时只记到 2 枚端点，
@@ -78,8 +80,8 @@ class SysConfigUnavailableCarrierTest {
     private static final int CONFIG_RETHROWS = 6;
     private static final int PARAM_GUARDS = 5;
     private static final int PARAM_RETHROWS = 5;
-    private static final int SYS_CONFIG_GUARDS = 4;
-    private static final int SYS_CONFIG_RETHROWS = 4;
+    private static final int SYS_CONFIG_GUARDS = 5;
+    private static final int SYS_CONFIG_RETHROWS = 5;
 
     /**
      * 缺陷形态的字面特征（修法前实读），复现即红。
@@ -125,7 +127,7 @@ class SysConfigUnavailableCarrierTest {
 
     @Test
     @Timeout(120)
-    @DisplayName("SysConfigController 四枚腿：查询服务未装配一律抛 503＋ECOS-SYS-503")
+    @DisplayName("SysConfigController 五枚腿：查询服务未装配一律抛 503＋ECOS-SYS-503")
     void sysConfigControllerLegsThrowCarriedUnavailable() throws Exception {
         SysConfigController controller = new SysConfigController(absentProvider());
 
@@ -133,6 +135,9 @@ class SysConfigUnavailableCarrierTest {
         assertCarrier(() -> controller.update("k", Map.of("value", "v")), "update");
         assertCarrier(() -> controller.metadata(), "metadata");
         assertCarrier(() -> controller.audit(), "audit");
+        // #146u：契约面 /group（第 5 枚腿）——凭证先过，再落未装配态，两态不得互折。
+        assertCarrier(() -> controller.getConfigByGroup("global", "", null, "", "svc.sig"),
+                "getConfigByGroup");
     }
 
     // ── 4. 端点显式承载腿：不得被兜底 catch 折回 500 ──────────
@@ -250,7 +255,7 @@ class SysConfigUnavailableCarrierTest {
         assertEquals(PARAM_RETHROWS, occurrences(param, "catch (DataBridgeException"),
                 "SystemParamController 显式承载腿数漂移");
         assertEquals(SYS_CONFIG_GUARDS, occurrences(sysConfig, "getIfAvailable()"),
-                "SysConfigController 未装配守卫数漂移（逐枚勘察＝4 枚腿）");
+                "SysConfigController 未装配守卫数漂移（逐枚勘察＝5 枚腿，含 #146u 契约面 /group）");
         assertEquals(SYS_CONFIG_RETHROWS, occurrences(sysConfig, "catch (DataBridgeException"),
                 "SysConfigController 显式承载腿数漂移");
 

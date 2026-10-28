@@ -98,6 +98,49 @@ public class SysConfigQueryService {
         return dao.queryForList(sql);
     }
 
+    /**
+     * 契约面（详设接口总表 {@code GET /api/v1/system/config/group} → getConfigByGroup）按分组取配置项。
+     *
+     * <p><b>列面口径</b>：只选 DDL 单源实存列（{@code V13__ecos_sys_config.sql} 建表 +
+     * {@code V162} §5 ALTER 的 config_group/description/config_type/config_label/sort_order/edition/status）。
+     * 本方法刻意<b>不</b>复用 {@link #listByGroup} 的列清单——那条腿选的
+     * {@code config_options}/{@code impact_scope} 在 DDL 单源里零 CREATE 载体（2026-10-28 实测 live
+     * {@code ecos_control.sys_config} 13 列亦无此二者），照抄会把新端点一起拖进幻影列失败。</p>
+     *
+     * <p><b>版本面</b>：{@code sys_config} 无 {@code version_no} 列（后端口径＝DB 只存在用版本、
+     * 历史版本一律进 Git，《后端开发规范》§十一.1），故查询不合成版本号；需要时由调用方按
+     * {@code updated_at} 如实呈现。</p>
+     *
+     * @param configGroup     配置分组（必给，调用方已裁决非空）
+     * @param keys            可选配置键白名单；空/未给＝该分组全部在用项
+     * @param edition         调用方指定的版本档；空＝用 {@code currentEdition}
+     * @param currentEdition  当前部署档位（Maven profile）
+     */
+    public List<Map<String, Object>> listByConfigGroupForContract(String configGroup, List<String> keys,
+                                                                 String edition, String currentEdition) {
+        StringBuilder sqlBuilder = new StringBuilder(
+            "SELECT config_key, config_value, config_type, config_group, edition, updated_at " +
+            "FROM sys_config WHERE status='active' AND config_group=?");
+        List<Object> params = new ArrayList<>();
+        params.add(configGroup);
+
+        String effectiveEdition = (edition == null || edition.isBlank()) ? currentEdition : edition;
+        if (effectiveEdition != null && !effectiveEdition.isBlank() && !"all".equals(effectiveEdition)) {
+            sqlBuilder.append(" AND (edition='all' OR edition=?)");
+            params.add(effectiveEdition);
+        }
+
+        if (keys != null && !keys.isEmpty()) {
+            sqlBuilder.append(" AND config_key IN (")
+                     .append(String.join(",", java.util.Collections.nCopies(keys.size(), "?")))
+                     .append(")");
+            params.addAll(keys);
+        }
+
+        sqlBuilder.append(" ORDER BY sort_order, config_key");
+        return dao.queryForList(sqlBuilder.toString(), params.toArray());
+    }
+
     /** 查询用于消费审计的配置项基本信息 */
     public List<Map<String, Object>> queryForAudit() {
         String sql = "SELECT config_key, config_group, config_label, description FROM sys_config ORDER BY config_group, sort_order";
