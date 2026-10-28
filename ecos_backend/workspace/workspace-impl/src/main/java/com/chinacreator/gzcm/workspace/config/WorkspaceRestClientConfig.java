@@ -36,6 +36,10 @@ import java.util.Optional;
  *   <li>双双不可得 → fail-loud 抛异常，禁止静默回落硬编码 localhost 地址。</li>
  * </ol></p>
  *
+ * <p>例外形态：#146y 新增的 {@code workspaceDatanetMonolithRest} 显式取
+ * {@code RouteMode.MONOLITH}（关账面需要 gateway 侧 JWT filter 解析身份，理由见该 Bean 注释），
+ * 其余 Bean 仍为 SERVICE，不因此改动。</p>
+ *
  * <p>本机端口/个人环境值禁止入库：默认值一律走上述解析链，不在代码或 yml 写死
  * {@code localhost:1808x}。</p>
  */
@@ -83,6 +87,13 @@ public class WorkspaceRestClientConfig {
     /** security-engine REST 裁决/审计超时（原 service.security.timeout-ms 默认 5000ms）。 */
     @Value("${ecos.endpoints.timeout.security-ms:5000}")
     private int securityTimeoutMs;
+
+    /**
+     * 期间关账承流超时（#146y 附录A 第 34 条 —— 关账是写侧短事务，5s 与 security 裁决同档；
+     * 口径仍集中在本类下发，业务侧禁自建客户端）。
+     */
+    @Value("${ecos.endpoints.timeout.period-close-ms:5000}")
+    private int periodCloseTimeoutMs;
 
     private final ObjectProvider<ServiceEndpointResolver> endpointProvider;
 
@@ -162,19 +173,48 @@ public class WorkspaceRestClientConfig {
         return restTemplate(resolveBase("sysman", sysmanOverride), securityTimeoutMs);
     }
 
+    // ═══════════════ MONOLITH 承流通道（凭据载体约束） ═══════════════
+
+    /**
+     * datanet MONOLITH 形态客户端（#146y 附录A 第 34 条期间关账承流面专用）。
+     *
+     * <p><b>为什么这一条走 MONOLITH 而非其余 Bean 的 SERVICE</b>：关账面的属主
+     * {@code PeriodCloseController} 需要调用方身份（{@code PeriodCloseService.currentRoleClaims()}
+     * → {@code UserContext}），而 {@code UserContext} 只由 sysman {@code JwtAuthenticationFilter}
+     * 写入 —— 该 filter 在 datanet :18082 的扫描集外（不含 {@code sysman.security}，也无
+     * {@code HeaderAuthInterceptor}）。直连 :18082 时入站 JWT 无人解析 ⇒ 结构性 403，
+     * 是假绿不是功能。gateway :8080 同时持有 filter 与 datanet 面，因此关账承流必须落到
+     * monolith 端口。口径与 {@code DatNetLineageGuard}、{@code DataNetResourceClient} 等
+     * 既存 MONOLITH 先例一致（{@code RouteMode.MONOLITH}）。</p>
+     *
+     * <p>运维逃生口 {@code ecos.endpoints.datanet} 仍按覆盖项优先（与其余 Bean 同规则）。</p>
+     */
+    @Bean("workspaceDatanetMonolithRest")
+    public RestTemplate workspaceDatanetMonolithRest() {
+        return restTemplate(resolveBase("datanet", datanetOverride,
+                ServiceEndpointResolver.RouteMode.MONOLITH) + "/api/v1", periodCloseTimeoutMs);
+    }
+
     // ═══════════════ 私有辅助 ═══════════════
 
     /**
      * base-url 解析链：显式覆盖项 → ServiceEndpointResolver 两态寻址 → fail-loud。
      * （F07-17/X-35 同源铁律：禁止静默回落硬编码 localhost 地址。）
+     *
+     * <p>默认形态 = {@link #ROUTE_MODE}（SERVICE），保持收口以来的既有 Bean 行为逐字节不变。</p>
      */
     String resolveBase(String service, String override) {
+        return resolveBase(service, override, ROUTE_MODE);
+    }
+
+    /** 同上，但由调用方显式指定两态寻址形态（MONOLITH Bean 用，见类注释解析链第 2 步）。 */
+    String resolveBase(String service, String override, ServiceEndpointResolver.RouteMode mode) {
         if (override != null && !override.isBlank()) {
             return trimTrailingSlash(override.trim());
         }
         ServiceEndpointResolver resolver = endpointProvider.getIfAvailable();
         if (resolver != null) {
-            Optional<String> host = resolver.resolve(service, ROUTE_MODE);
+            Optional<String> host = resolver.resolve(service, mode);
             if (host.isPresent()) {
                 return trimTrailingSlash(host.get());
             }

@@ -194,6 +194,33 @@ class NoMachineCodeFactoryFaceRatchetTest {
             "ecos_backend/gateway/src/main/java/com/chinacreator/gzcm/gateway/filter/QuotaFilter.java";
 
     /**
+     * {@code ECOS-WF-*} 族码字面量（带引号的串），单源只允许 {@link #WORKFLOW_ERROR_CODE_SOURCE} 承载。
+     *
+     * <p><b>#146y 新登</b>（收口差距附录A 第 10 条）：本批把 {@code ECOS-WF-020}
+     * （详设 §6.3.3 在册唯一一枚 WF 码）首次落进代码，新建 {@code WorkflowErrorCode} 属主，
+     * buszhi {@code WorkflowInstanceApprovalController} 的 500 出口取常量引用。
+     * 仿 sysFamily/rateFamily 的零容差判据，防止后续批次把 WF 族码复制进调用方，
+     * 也防止「族里凭空多一枚未经 §6.3.3 裁决的码」。</p>
+     */
+    private static final Pattern WF_FAMILY_LITERAL = Pattern.compile("\"ECOS-WF-\\d+\"");
+
+    /** {@code ECOS-WF-*} 族码字面量单源文件（唯一承载点）。 */
+    private static final String WORKFLOW_ERROR_CODE_SOURCE =
+            "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/gzcm/common/error/WorkflowErrorCode.java";
+
+    /**
+     * WF 族出口判据锚：buszhi 实例级审批面必须引用 {@code WorkflowErrorCode.ECOS_WF_020}
+     * 常量（合法出口＝取属主常量，非自造字面量）。
+     */
+    private static final Pattern WF_CODE_REFERENCE = Pattern.compile(
+            "WorkflowErrorCode\\s*\\.\\s*ECOS_WF_\\d+");
+
+    /** 属主出口文件（{@code ECOS-WF-020} 唯一承流腿，缺失即红＝单源常量无人消费＝假单源）。 */
+    private static final String WORKFLOW_INSTANCE_APPROVAL_SOURCE =
+            "ecos_backend/services/buszhi/impl/buszhi-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "buszhi/workflow/controller/WorkflowInstanceApprovalController.java";
+
+    /**
      * {@code ECOS-(DATA|DQ)-*} 族码字面量（带引号的串），单源只允许 {@link #DATA_DOMAIN_ERROR_CODE_SOURCE}
      * 承载。
      *
@@ -410,6 +437,65 @@ class NoMachineCodeFactoryFaceRatchetTest {
         assertEquals(List.of(), copies,
                 "main 面出现 ECOS-RATE-* 字面量副本：出口应改取 RateLimitErrorCode 常量，"
                         + "新增族请先登记进该族并同步 §3.2.7 冻结表与附录 C。副本清单=" + copies);
+    }
+
+    // ── 2c′. ECOS-WF 族码字面量单源 + 属主 500 出口锚点（#146y 新登，附录A 第 10 条）──
+
+    @Test
+    @DisplayName("ECOS-WF-* 族码字面量在 main 面只由 WorkflowErrorCode 单源承载，且族内枚数不超 §6.3.3 在册集")
+    void wfFamilyLiteralsAreSingleSourced() throws IOException {
+        Path root = locateRepoRoot();
+        List<Path> files = new ArrayList<>();
+        collectJavaUnder(root.resolve("ecos_backend"), files);
+        assertTrue(files.size() >= MIN_SCANNED_MAIN_FILES,
+                "扫描面缩水：实扫 main 面 java 文件 " + files.size() + " < 阈值 "
+                        + MIN_SCANNED_MAIN_FILES + "，判据不可信（读不到 ≠ 无副本）");
+
+        List<String> copies = new ArrayList<>();
+        for (Path f : files) {
+            String rel = root.relativize(f).toString().replace('\\', '/');
+            if (WORKFLOW_ERROR_CODE_SOURCE.equals(rel)) {
+                continue;
+            }
+            String stripped = SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+            Matcher m = WF_FAMILY_LITERAL.matcher(stripped);
+            while (m.find()) {
+                copies.add(rel + " → " + m.group());
+            }
+        }
+        assertEquals(List.of(), copies,
+                "main 面出现 ECOS-WF-* 字面量副本：出口应改取 WorkflowErrorCode 常量，"
+                        + "新增族码须先在详设 §6.3.3 错误码族表在册（禁以代码冒充文档裁决）。副本清单=" + copies);
+
+        // 属主面回读（反假绿）：跳过属主后判据恒真并不等于单源真的在位，须独立证实承载内容与在册集一致。
+        Path holder = root.resolve(WORKFLOW_ERROR_CODE_SOURCE);
+        assertTrue(Files.exists(holder), "WF 族单源文件不在位：" + holder);
+        Set<String> holderLiterals = new TreeSet<>();
+        Matcher hm = WF_FAMILY_LITERAL.matcher(
+                SourceCommentStripper.strip(Files.readString(holder, StandardCharsets.UTF_8)));
+        while (hm.find()) {
+            holderLiterals.add(hm.group().replace("\"", ""));
+        }
+        assertEquals(Set.of("ECOS-WF-020"), holderLiterals,
+                "WF 族在册枚集应恰为详设 §6.3.3 表中的 ECOS-WF-020（§6.5 状态矩阵同源）；"
+                        + "多＝有人往族里补未在册码，少＝在册码被删而门禁面仍绿。实得=" + holderLiterals);
+    }
+
+    @Test
+    @DisplayName("buszhi 实例级审批面的 500 出口必须取 WorkflowErrorCode 常量（恰 1 处，缺即红）")
+    void workflowApprovalExitPointsToSingleSource() throws IOException {
+        Path owner = locateRepoRoot().resolve(WORKFLOW_INSTANCE_APPROVAL_SOURCE);
+        assertTrue(Files.exists(owner),
+                "WF-020 属主出口文件不在位（附录A 第 10 条承流面被搬走或删除）：" + owner);
+        String stripped = SourceCommentStripper.strip(Files.readString(owner, StandardCharsets.UTF_8));
+        List<String> hits = new ArrayList<>();
+        Matcher m = WF_CODE_REFERENCE.matcher(stripped);
+        while (m.find()) {
+            hits.add(m.group());
+        }
+        assertEquals(1, hits.size(),
+                "审批面必须恰 1 处 WorkflowErrorCode.ECOS_WF_<n> 引用；0 处＝出口改回裸 500/自造字面量"
+                        + "（族码单源断链），>1 处＝同一族码多出口须同批清点。文件=" + owner + "，实跑=" + hits);
     }
 
     /**
