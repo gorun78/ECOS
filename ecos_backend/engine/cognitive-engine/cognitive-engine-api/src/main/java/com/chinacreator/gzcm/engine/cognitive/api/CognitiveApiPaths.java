@@ -204,4 +204,42 @@ public final class CognitiveApiPaths {
     public static final String DECISION_BASIS_REL = "/decision-basis/{" + PARAM_DECISION_ID + "}";
     /** 绝对形态（文档/契约引用）。 */
     public static final String DECISION_BASIS = COGNITIVE + DECISION_BASIS_REL;
+
+    // ── 差距分析附录A 第 17 条（2026-10-28 #146w 追加，只追加本段，上方行零改写）──
+
+    /**
+     * 世界模型四段只读契约路径（{@code GET /api/v1/cognitive/world-model/{entities|relations|traces|rules}}）。
+     *
+     * <p>契约行单源 = 《ECOS详细设计说明书-从零实施版》第 5415 行（{@code getWorldModelEntities /
+     * getWorldModelRelations / getWorldModelTraces / getWorldModelRules}）与第 10194 行第 8 篇机读码行
+     * {@code ECOS-COG-503（501 + stub）}；处置口径单源 = 详细设计-05 <b>DG-9</b>／X-43／W136（M0）
+     * 「世界模型未实现，禁固定值与硬编码因果边 ⇒ 有真实存储返列表，否则 {@code 501 + stub=true}」。</p>
+     *
+     * <p><b>本族只补承流面，不补能力</b>：四路径按契约逐字可达、回真实 HTTP 501，
+     * 前端据 {@code data.stub=true} 渲染"未实现"占位（与既有 legacy 面
+     * {@code /api/v1/world-model/**} 同法）。差距台账对第 17 条的判定<b>不因本批翻转</b>——
+     * 端点载体在位 ≠ 世界模型能力成立。</p>
+     *
+     * <p>四段名以 {@link WorldModelSegment} 为枚举单源，路径段字面量在本类单源，
+     * 两侧由构造参数绑定（禁 Controller／测试各写一套段名）。段名字面量刻意不叫
+     * {@code state}／{@code causal-graph}——那是 legacy 面 {@code WorldModelController}
+     * 的四个不同词，两套契约不可互替（附录A 第 17 条正是登记该偏差）。</p>
+     *
+     * <p>网关侧无正向 rewrite 条目（{@link #COGNITIVE} 族 KEEP），25 条重写表基线不动。</p>
+     */
+    public static final String WORLD_MODEL_REL = "/world-model";
+    public static final String WORLD_MODEL_SEGMENT_ENTITIES = "entities";
+    public static final String WORLD_MODEL_SEGMENT_RELATIONS = "relations";
+    public static final String WORLD_MODEL_SEGMENT_TRACES = "traces";
+    public static final String WORLD_MODEL_SEGMENT_RULES = "rules";
+    /** 类级前缀下的相对段（Controller 侧只用相对段）。 */
+    public static final String WORLD_MODEL_ENTITIES_REL = WORLD_MODEL_REL + "/" + WORLD_MODEL_SEGMENT_ENTITIES;
+    public static final String WORLD_MODEL_RELATIONS_REL = WORLD_MODEL_REL + "/" + WORLD_MODEL_SEGMENT_RELATIONS;
+    public static final String WORLD_MODEL_TRACES_REL = WORLD_MODEL_REL + "/" + WORLD_MODEL_SEGMENT_TRACES;
+    public static final String WORLD_MODEL_RULES_REL = WORLD_MODEL_REL + "/" + WORLD_MODEL_SEGMENT_RULES;
+    /** 绝对形态（文档/契约引用，亦作 {@code data.path} 定位串的拼装单源）。 */
+    public static final String WORLD_MODEL_ENTITIES = COGNITIVE + WORLD_MODEL_ENTITIES_REL;
+    public static final String WORLD_MODEL_RELATIONS = COGNITIVE + WORLD_MODEL_RELATIONS_REL;
+    public static final String WORLD_MODEL_TRACES = COGNITIVE + WORLD_MODEL_TRACES_REL;
+    public static final String WORLD_MODEL_RULES = COGNITIVE + WORLD_MODEL_RULES_REL;
 }

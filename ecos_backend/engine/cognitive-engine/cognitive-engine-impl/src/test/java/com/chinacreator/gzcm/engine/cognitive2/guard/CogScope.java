@@ -44,7 +44,10 @@ public final class CogScope {
                 // 差距分析附录A 第 19 条（#146v）：Decision Basis 只读解析面自落地即纳入门禁
                 // （schema 限定 / 方言 / 零 DML / 空集回落 / 不泄漏 message 五门逐行判定）
                 || s.endsWith("/service/decision/DecisionBasisService.java")
-                || s.endsWith("/controller/DecisionBasisController.java");
+                || s.endsWith("/controller/DecisionBasisController.java")
+                // 差距分析附录A 第 17 条（#146w）：world-model 四段 501 承流面自落地即纳入同一组
+                // 门禁（零 DML / 禁跨域表引 / 无 cognitive_context* / 无空集回落 / 不泄漏 message）
+                || s.endsWith("/controller/CognitiveWorldModelReadController.java");
     }
 
     /** 遍历 in-scope 的 .java 生产源（跳过 test）。 */
