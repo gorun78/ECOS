@@ -77,4 +77,40 @@ public interface KgSyncService {
      * @param limit 返回条数上限
      */
     List<Map<String, Object>> listJobs(int limit);
+
+    /**
+     * 触发一次 PG→图库投影并落台账（附录 A 第 15 条 {@code POST /api/v1/knowledge/graph/sync}）。
+     *
+     * <p>台账口径：进入即写 RUNNING 行（带 MDC {@code traceId}），投影成功按
+     * {@code written} 节点数＋图库边数收口并回填 {@code report_json}（含对账明细）；
+     * 投影失败标 FAILED 且<b>异常原样上浮</b>（禁「200 ＋ 空对账」伪成功）。</p>
+     *
+     * <p>{@code scope} 只作运维标签与台账/回显：投影恒为 PG→图库全量镜像，不退化为按 scope 的部分镜像
+     * （PG 为唯一权威，图库为可重放的从属副本）。</p>
+     *
+     * @param scope      范围标签（空白按 {@code ALL}；超 20 字符仅截台账列宽，不影响投影）
+     * @param fullResync {@code true} = 先清空投影子图再全量重写
+     * @return 投影结果 {@code {graphForm,attempted,written,notAttempted,reason,reconcileDiff}}
+     *         ＋台账 {@code {jobId,scope,traceId}}
+     */
+    Map<String, Object> runProjection(String scope, boolean fullResync);
+
+    /**
+     * 最近一次成功同步的完成时刻（ISO-8601，{@code ecos_kg_sync_log.finished_time} 最大值）。
+     *
+     * <p>无成功行返回 {@code null}；台账不可读时异常上浮（禁把「读不到」渲染成「从未同步」）。</p>
+     */
+    String getLastSyncTime();
+
+    /**
+     * 分页读取同步日志（附录 A 第 15 条 {@code GET /api/v1/knowledge/graph/sync/logs}）。
+     *
+     * <p>条目含 {@code traceId}（V179 {@code trace_id}）；台账不可读时异常上浮
+     * （由 kb 局部 advice 落 500 {@code ECOS-KB-050}），不做空列表伪装。</p>
+     *
+     * @param page 页码（从 1 起，小于 1 归 1）
+     * @param size 每页条数（1~200，越界钳制）
+     * @return {@code {items,total,page,size}}
+     */
+    Map<String, Object> getSyncLogsPage(int page, int size);
 }

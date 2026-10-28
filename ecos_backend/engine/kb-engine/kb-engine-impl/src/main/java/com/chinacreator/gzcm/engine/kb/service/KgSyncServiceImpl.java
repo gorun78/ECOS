@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.common.event.KafkaTopics;
+import com.chinacreator.gzcm.engine.kb.EcosKnowledgeGraphService;
 import com.chinacreator.gzcm.engine.kb.KgSyncService;
 import com.chinacreator.gzcm.engine.kb.dao.KgSyncLogDao;
 import com.chinacreator.gzcm.engine.kb.dto.EntityInstanceExtractionReportVO;
@@ -9,11 +10,13 @@ import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -52,6 +55,9 @@ public class KgSyncServiceImpl implements KgSyncService {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /** V179 {@code ecos_kg_sync_log.object_type VARCHAR(20)}：台账列宽（超长 scope 仅截台账行，不改执行范围）。 */
+    private static final int OBJECT_TYPE_MAX_LEN = 20;
+
     private final KgSyncLogDao kgSyncLogDao;
     private final KgMapperService kgMapper;
 
@@ -61,14 +67,19 @@ public class KgSyncServiceImpl implements KgSyncService {
     /** 自身代理引用（@Lazy 破循环依赖）——使 trigger* 内部调用走 @Async 代理，避免长任务阻塞 HTTP 线程。 */
     private final KgSyncService self;
 
+    /** 双形态投影面（@Lazy 破与 EcosKnowledgeGraphServiceImpl 的环：后者依赖本服务读台账时间）。 */
+    private final EcosKnowledgeGraphService graphService;
+
     public KgSyncServiceImpl(KgSyncLogDao kgSyncLogDao,
                             @Lazy KgMapperService kgMapper,
                             @Lazy KbEntityInstanceExtractionService instanceExtraction,
-                            @Lazy KgSyncService self) {
+                            @Lazy KgSyncService self,
+                            @Lazy EcosKnowledgeGraphService graphService) {
         this.kgSyncLogDao = kgSyncLogDao;
         this.kgMapper = kgMapper;
         this.instanceExtraction = instanceExtraction;
         this.self = self;
+        this.graphService = graphService;
     }
 
     private String nowIso() {
@@ -259,17 +270,125 @@ public class KgSyncServiceImpl implements KgSyncService {
         }
     }
 
+    /**
+     * 触发投影并落台账（附录 A 第 15 条 POST 腿）。
+     *
+     * <p>失败<b>不吞</b>：投影腿抛出的 {@code ECOS-KB-080} 原样上浮给 kb 局部 advice 落 500 状态行，
+     * 台账只做 FAILED 标记——把失败吞成 200 空对账就是设计明令禁止的「伪成功」。</p>
+     */
+    @Override
+    public Map<String, Object> runProjection(String scope, boolean fullResync) {
+        String effectiveScope = (scope == null || scope.isBlank()) ? "ALL" : scope.trim();
+        String jobId = "graph-sync-" + System.currentTimeMillis();
+        String traceId = currentTraceId();
+        // V179 object_type 列宽 20：超长 scope 只截台账展示值，不影响投影范围
+        String logScope = effectiveScope.length() > OBJECT_TYPE_MAX_LEN
+                ? effectiveScope.substring(0, OBJECT_TYPE_MAX_LEN) : effectiveScope;
+        kgSyncLogDao.insertLog(logScope, "NEO4J_SYNC", jobId, STATUS_RUNNING, 0, 0, 0, null, traceId);
+        emitAudit("kg_sync_graph_projection_submit",
+                jobId + ":" + effectiveScope + ":fullResync=" + fullResync + ":trace=" + traceId);
+
+        Map<String, Object> projected;
+        try {
+            projected = graphService.projectGraph(fullResync);
+        } catch (RuntimeException e) {
+            markLogFailed(jobId, e.getMessage());
+            log.warn("AUDIT kg_sync_failed jobId={} object={}", jobId, effectiveScope);
+            log.error("KG projection failed: scope={}, jobId={}, error={}", effectiveScope, jobId, e.getMessage(), e);
+            throw e;
+        }
+        markLogSuccessWithReport(jobId, asInt(projected.get("written")), projectedEdgeCount(projected),
+                toJson(projected));
+
+        Map<String, Object> out = new LinkedHashMap<>(projected);
+        out.put("jobId", jobId);
+        out.put("scope", effectiveScope);
+        out.put("traceId", traceId);
+        return out;
+    }
+
+    /** 投影结果里的图库边数（missing 时 0，仅作台账展示；对账真值在 {@code reconcileDiff}）。 */
+    private int projectedEdgeCount(Map<String, Object> projected) {
+        Object diff = projected.get("reconcileDiff");
+        if (diff instanceof Map<?, ?> map) {
+            return asInt(map.get("edgesNeo4j"));
+        }
+        return 0;
+    }
+
+    private int asInt(Object value) {
+        return value instanceof Number number ? number.intValue() : 0;
+    }
+
+    /**
+     * 最近一次成功同步的完成时刻（ISO-8601 带时区）；无成功行返回 {@code null}。
+     *
+     * <p>不吞异常：读台账失败是「读不到证据」，必须由 advice 落 500 {@code ECOS-KB-050}，
+     * 禁折成 {@code null} 让端点渲染成「从未同步」。
+     */
+    @Override
+    public String getLastSyncTime() {
+        Timestamp ts = kgSyncLogDao.lastSuccessTime();
+        return ts == null ? null : ISO_FMT.format(ts.toInstant());
+    }
+
+    /**
+     * 同步日志分页（{@code GET /api/v1/knowledge/graph/sync/logs}）：新→旧，含 {@code traceId}。
+     *
+     * <p>异常不吞（同 {@link #getLastSyncTime} 口径）：读不到日志是 500 {@code ECOS-KB-050}，
+     * 不是「没有日志」。
+     */
+    @Override
+    public Map<String, Object> getSyncLogsPage(int page, int size) {
+        int safePage = Math.max(1, page);
+        int safeSize = Math.max(1, Math.min(size, 200));
+        List<Map<String, Object>> rows =
+                kgSyncLogDao.getSyncLogsPage((safePage - 1) * safeSize, safeSize);
+        Integer total = kgSyncLogDao.countSyncLog();
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("jobId", row.getOrDefault("jobId", ""));
+            entry.put("objectType", row.get("objectType"));
+            entry.put("operation", row.getOrDefault("operation", ""));
+            entry.put("status", coerceToUiStatus(row.get("status")));
+            entry.put("progress", row.getOrDefault("progress", 0));
+            entry.put("nodes", row.getOrDefault("nodes", 0));
+            entry.put("edges", row.getOrDefault("edges", 0));
+            entry.put("message", row.getOrDefault("message", ""));
+            entry.put("timestamp", formatTs(row.get("timestamp")));
+            entry.put("finishedAt", formatTs(row.get("finishedAt")));
+            entry.put("traceId", row.get("traceId"));
+            items.add(entry);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("items", items);
+        out.put("total", total == null ? 0 : total);
+        out.put("page", safePage);
+        out.put("size", safeSize);
+        return out;
+    }
+
+    /** 当前请求 tracing id（{@code KbErrorAdvice} 同源 MDC 键），无上下文时 {@code null}。 */
+    private String currentTraceId() {
+        try {
+            return MDC.get("traceId");
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     /** 模式归一化：非 {@code INCREMENTAL} 一律按 {@code FULL}（默认全量，语义不变）。 */
     private String normalizeMode(String mode) {
         return MODE_INCREMENTAL.equalsIgnoreCase(mode == null ? "" : mode.trim()) ? MODE_INCREMENTAL : MODE_FULL;
     }
 
-    /** 抽取报告 → JSON 字符串（序列化失败返回 null，不阻断台账标记）。 */
-    private String toJson(EntityInstanceExtractionReportVO report) {
+    /** 台账报告列 JSON（抽取报告 VO / 投影结果 Map 共用；序列化失败返回 null，不阻断台账标记）。 */
+    private String toJson(Object report) {
         try {
             return MAPPER.writeValueAsString(report);
         } catch (Exception e) {
-            log.warn("抽取报告序列化失败: {}", e.getMessage());
+            log.warn("台账报告序列化失败: {}", e.getMessage());
             return null;
         }
     }

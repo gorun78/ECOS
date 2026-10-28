@@ -53,6 +53,34 @@ public class EcosKnowledgeGraphDao extends JdbcTemplateDaoSupport {
                     String.class);
     }
 
+    /**
+     * 投影装载面的节点列（附录 A 第 15 条投影腿）：只取投影所需四列，不搬 {@code properties}
+     * （大 JSONB 无投影语义）。{@code node_type} 空值在此保持 {@code null}，由服务侧归入
+     * {@code UNKNOWN} 桶参与对账（禁静默丢弃无类型节点）。
+     */
+    public List<Map<String, Object>> loadProjectionNodes() {
+        return jdbcTemplate.queryForList(
+                    "SELECT id, label, node_type AS \"nodeType\", domain " +
+                    "FROM " + schema + ".graph_node ORDER BY id");
+    }
+
+    /** 投影装载面的边列（端点/类型；属性不参与投影对账）。 */
+    public List<Map<String, Object>> loadProjectionEdges() {
+        return jdbcTemplate.queryForList(
+                    "SELECT id, source_id AS \"sourceId\", target_id AS \"targetId\", type " +
+                    "FROM " + schema + ".graph_edge ORDER BY id");
+    }
+
+    /**
+     * 按 {@code node_type} 的 PG 权威计数（§7.2.3 对账行：按 node_type 比对）。
+     * {@code node_type} 空值归 {@code UNKNOWN} 桶（与投影侧 {@code coalesce(n.nodeType,'UNKNOWN')} 同口径）。
+     */
+    public List<Map<String, Object>> countNodesByType() {
+        return jdbcTemplate.queryForList(
+                    "SELECT COALESCE(node_type, 'UNKNOWN') AS \"nodeType\", COUNT(*) AS \"c\" " +
+                    "FROM " + schema + ".graph_node GROUP BY COALESCE(node_type, 'UNKNOWN') ORDER BY 1");
+    }
+
     public void insertNeo4jSyncLog(String jobId) {
         jdbcTemplate.update(
                     // #146h D-7（2026-10-27）：kg_sync_log（V115，dev 库面不存在）→ V179 合规新表 ecos_kg_sync_log；

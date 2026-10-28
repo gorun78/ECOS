@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSuppor
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -84,19 +85,60 @@ public class KgSyncLogDao extends JdbcTemplateDaoSupport {
     }
 
     /**
+     * 分页读取同步日志（附录 A 第 15 条 graph/sync/logs）。
+     *
+     * <p>与 {@link #getSyncLogs(int)} 的差别：带 {@code trace_id} 投影（契约要求条目含 traceId）、
+     * 带 OFFSET 分页，且<b>不吞异常</b>——读故障原样上浮给 kb 局部 advice（500 {@code ECOS-KB-050}），
+     * 禁以空列表把「表坏了」伪装成「没日志」。</p>
+     */
+    public List<Map<String, Object>> getSyncLogsPage(int offset, int limit) {
+        return jdbcTemplate.queryForList(
+                    "SELECT id, object_type AS \"objectType\", sync_op AS \"operation\", " +
+                    "       job_id AS \"jobId\", status, progress, node_count AS \"nodes\", edge_count AS \"edges\", " +
+                    "       error_message AS \"message\", create_time AS \"timestamp\", finished_time AS \"finishedAt\", " +
+                    "       trace_id AS \"traceId\" " +
+                    "FROM " + schema + ".ecos_kg_sync_log ORDER BY create_time DESC, id DESC LIMIT ? OFFSET ?",
+                    limit, offset);
+    }
+
+    /**
+     * 最近一次成功同步完成时刻（{@code MAX(finished_time) WHERE status='SUCCESS'}）。
+     *
+     * <p>聚合恒返回一行，无成功行时该行取值为 {@code null}（与「读不到」区分：后者抛
+     * DataAccessException 上浮 500）。</p>
+     */
+    public Timestamp lastSuccessTime() {
+        List<Timestamp> rows = jdbcTemplate.queryForList(
+                    "SELECT MAX(finished_time) AS \"lastSuccess\" FROM " + schema + ".ecos_kg_sync_log " +
+                    "WHERE status = 'SUCCESS'",
+                    Timestamp.class);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    /**
      * 写 sync log 首条。V179 合规形态：{@code id} 应用侧 UUID、{@code create_time}
      * 默认 CURRENT_TIMESTAMP 显式补，{@code node_count/edge_count} 语义比裸表
      * {@code nodes/edges} 更精确（V115 未实跑，本方法一直是唯一活的旧裸表写点）。
      */
     public void insertLog(String objectType, String op, String jobId, String status,
                           int progress, int nodes, int edges, String errorMessage) {
+        insertLog(objectType, op, jobId, status, progress, nodes, edges, errorMessage, null);
+    }
+
+    /**
+     * 写 sync log 首条并携带全链 {@code trace_id}（V179 列，附录 A 第 15 条日志条目的 traceId 来源）。
+     */
+    public void insertLog(String objectType, String op, String jobId, String status,
+                          int progress, int nodes, int edges, String errorMessage, String traceId) {
         jdbcTemplate.update(
                 "INSERT INTO " + schema + ".ecos_kg_sync_log " +
-                "(id, object_type, sync_op, job_id, status, progress, node_count, edge_count, error_message, create_time) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
+                "(id, object_type, sync_op, job_id, status, progress, node_count, edge_count, " +
+                " error_message, trace_id, create_time) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
                 UUID.randomUUID().toString(),
                 objectType, op, jobId, status, progress, nodes, edges,
-                errorMessage == null ? null : truncate(errorMessage, 200));
+                errorMessage == null ? null : truncate(errorMessage, 200),
+                traceId == null ? null : truncate(traceId, 64));
     }
 
     public void markLogSuccess(String jobId, int nodes, int edges) {
