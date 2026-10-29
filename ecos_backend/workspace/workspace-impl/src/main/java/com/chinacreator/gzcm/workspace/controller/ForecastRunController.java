@@ -18,7 +18,11 @@ import com.chinacreator.gzcm.workspace.forecast.ForecastRunEvidence;
 import com.chinacreator.gzcm.workspace.forecast.ForecastRunOrchestrationService;
 import com.chinacreator.gzcm.workspace.forecast.ForecastRunRequestValidator;
 import com.chinacreator.gzcm.workspace.forecast.ForecastRunView;
+import com.chinacreator.gzcm.workspace.scenario.ActionProposal;
+import com.chinacreator.gzcm.workspace.scenario.ScenarioActionService;
 import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 /**
  * 预测 run 编排面 REST API —— 详细设计-09 v1.2 §十一 H-5（卷 07 移交，只增不改）
@@ -34,6 +38,7 @@ import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
  * POST /api/v1/workspace/forecast-runs/{runId}/scenario-copy — 情景复制
  * GET  /api/v1/workspace/forecast-runs/compare           — 双 run 对比（?baselineRunId=&amp;candidateRunId=）
  * POST /api/v1/workspace/forecast-runs/{runId}/retry      — 重试（派生新 run，回链源）
+ * POST /api/v1/workspace/forecast-runs/{runId}/actions    — 经营动作提案（createFcAction，#146aa 附录A 第 32 条）
  * </pre>
  *
  * <p><b>三滤波器</b>：{@code /api/v1/workspace/**} 已由 SecurityConfig（默认 DENY）+
@@ -54,17 +59,20 @@ public class ForecastRunController {
     private final ScenarioReadGuard readGuard;
     private final ForecastExportService exportService;
     private final ForecastAuditPackService auditPackService;
+    private final ScenarioActionService actionService;
 
     public ForecastRunController(ForecastRunOrchestrationService orchestrationService,
                                  ForecastRunRequestValidator requestValidator,
                                  ScenarioReadGuard readGuard,
                                  ForecastExportService exportService,
-                                 ForecastAuditPackService auditPackService) {
+                                 ForecastAuditPackService auditPackService,
+                                 ScenarioActionService actionService) {
         this.orchestrationService = orchestrationService;
         this.requestValidator = requestValidator;
         this.readGuard = readGuard;
         this.exportService = exportService;
         this.auditPackService = auditPackService;
+        this.actionService = actionService;
     }
 
     /** 创建预测 run：body 需六要素 + idempotencyKey + contentHash；可选 runMode/baselineRunId。 */
@@ -155,6 +163,59 @@ public class ForecastRunController {
         String idempotencyKey = asString(p.get("idempotencyKey"));
         log.info("重试预测 run sourceRunId={}", runId);
         return ApiResponse.success(orchestrationService.retry(runId, idempotencyKey));
+    }
+
+    /**
+     * 经营动作提案（详设 line 8266 / 附录A 第 32 条 {@code createFcAction}，#146aa）。
+     *
+     * <p><b>run 锚定先于一切</b>：路径 runId 经与 {@code GET /{runId}} 同一编排通道读回
+     * （不存在 ⇒ 404 {@code FORECAST_RUN_NOT_FOUND}，禁拿不存在的 run 挂动作）；body 的
+     * {@code forecastRunId} 覆写为路径 runId（提案与 run 的关联以 URL 单源，禁两处自相矛盾）。
+     * 五必填（owner/dueDate/approver/expectedImpact/controlMetric）与「forecastRunId 必指
+     * FORMAL run」的守卫全部在 {@link ScenarioActionService}（与 {@code POST /scenarios/{id}/actions}
+     * 同一校验咽喉，禁第二套）；写侧落点经 {@code DecisionGateway} 委托决策底座，未装配 ⇒
+     * 503 {@code COGNITIVE_UNAVAILABLE}（诚实缺省，禁本地造动作记录冒充已落）。
+     * 审批人取自主体（JWT），绝不取请求体。</p>
+     *
+     * <p><b>缺列诚实位</b>：契约入参列 {@code factorRef}/{@code projectId} 在既有
+     * {@link ActionProposal} 面无字段（改列＝改既有场景动作面签名，触「API 只增不改」）⇒
+     * 回显两键恒 null 并附 {@code factorRefApplicable=false}/{@code projectIdApplicable=false}
+     * 自证，<b>禁</b>造值。</p>
+     */
+    @PostMapping("/{runId}/actions")
+    public ApiResponse<Map<String, Object>> createFcAction(@PathVariable("runId") String runId,
+                                                           @RequestBody ActionProposal proposal) {
+        ForecastRunView view = orchestrationService.status(runId);
+        if (proposal == null) {
+            proposal = new ActionProposal();
+        }
+        proposal.setForecastRunId(runId);
+        String approver = currentSubject();
+        Map<String, Object> result =
+                actionService.propose(view.getScenarioId(), proposal, approver);
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        if (result != null) {
+            out.putAll(result);
+        }
+        out.put("forecastRunId", runId);
+        out.put("factorRef", null);
+        out.put("factorRefApplicable", false);
+        out.put("projectId", null);
+        out.put("projectIdApplicable", false);
+        log.info("经营动作提案（run 锚定） runId={} by={}", runId, approver);
+        return ApiResponse.success(out);
+    }
+
+    private static String currentSubject() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+                return auth.getName();
+            }
+        } catch (Exception ignored) {
+            // 与 ScenarioActionController#currentSubject 同法：主体缺失由服务端五必填判 approver 缺失（400），禁伪造
+        }
+        return null;
     }
 
     private static String asString(Object v) {
