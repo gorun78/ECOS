@@ -287,11 +287,22 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 词表命中「缺失」），落入 DEPENDENCY 面未随批重测本门。本批重设：
      * 总站点 137 → <b>138</b>、DEPENDENCY 面 15 → <b>16</b>，ENV_ALGO／OTHER／UNREADABLE
      * 三面未动（10／104／8）。</p>
+     *
+     * <p><b>#146z 同批重设（附录A 第 11 条 knowledge/ingest 契约面批）</b>：kb-engine-impl
+     * {@code KnowledgeDocIngestService.runByDocId} 新增 {@code IllegalStateException} 腿 1 枚。
+     * 语义＝「受理腿已登记 queued 行、执行腿回读时该行不存在」（提交与执行之间被删除），
+     * 属<b>任务执行腿内部不变式</b>：抛出后由 {@code KbDocIngestTaskExecutor} 的
+     * {@code catch (Exception)} 收口成任务失败回报（{@code onTaskComplete(false)} +
+     * {@code onError}），不上任何 HTTP 入口面，故既非「依赖未就绪」（词表不命中，不改抛 503）
+     * 也非环境故障，落 OTHER 面。同批重设：总站点 138 → <b>139</b>、OTHER 面 104 → <b>105</b>，
+     * DEPENDENCY／ENV_ALGO／UNREADABLE 三面未动（16／10／8）；HTTP 面的 404 由控制器
+     * {@code retryDocument} 显式承载（见 {@code KnowledgeDocumentIngestContractTest}），
+     * 与本腿分态。</p>
      */
-    private static final int TOTAL_SITE_BASELINE = 138;
+    private static final int TOTAL_SITE_BASELINE = 139;
     private static final int DEPENDENCY_FACE_BASELINE = 16;
     private static final int ENV_ALGO_FACE_BASELINE = 10;
-    private static final int OTHER_FACE_BASELINE = 104;
+    private static final int OTHER_FACE_BASELINE = 105;
     private static final int UNREADABLE_FACE_BASELINE = 8;
 
     /**

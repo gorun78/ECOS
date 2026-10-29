@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.util.List;
+
 /**
  * 非结构化文档过渡表 Mapper（A3，表 {@code ecos_knowledge.kb_doc}）。
  */
@@ -50,4 +52,33 @@ public interface KbDocMapper {
             + " error_message, created_at, updated_at "
             + "FROM ecos_knowledge.kb_doc WHERE doc_id = #{docId}")
     KbDoc findById(@Param("docId") String docId);
+
+    /** 接入记录分页列表（#146z 契约行 {@code GET /api/v1/knowledge/ingest/documents}）。
+     *
+     * <p>{@code status} 为真谓词（null/空 = 全部状态），按 {@code updated_at} 倒序；
+     * 只读 {@code ecos_knowledge.kb_doc} 在册列，不合成字段。</p>
+     */
+    @Select("<script>"
+            + "SELECT doc_id, source, original_file_name, object_key, content_type, size_bytes, "
+            + " parse_status, chunk_size, chunk_overlap, chunk_count, text_source_path, "
+            + " error_message, created_at, updated_at "
+            + "FROM ecos_knowledge.kb_doc "
+            + "<where>"
+            + "  <if test=\"status != null and status != ''\"> parse_status = #{status} </if>"
+            + "</where>"
+            + "ORDER BY updated_at DESC, doc_id ASC "
+            + "LIMIT #{limit} OFFSET #{offset}"
+            + "</script>")
+    List<KbDoc> listByStatus(@Param("status") String status,
+                             @Param("limit") int limit,
+                             @Param("offset") int offset);
+
+    /** 接入记录总数（与 {@link #listByStatus} 同谓词口径，供分页 {@code total}）。 */
+    @Select("<script>"
+            + "SELECT COUNT(*) FROM ecos_knowledge.kb_doc "
+            + "<where>"
+            + "  <if test=\"status != null and status != ''\"> parse_status = #{status} </if>"
+            + "</where>"
+            + "</script>")
+    long countByStatus(@Param("status") String status);
 }
