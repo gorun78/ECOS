@@ -47,7 +47,11 @@ public final class CogScope {
                 || s.endsWith("/controller/DecisionBasisController.java")
                 // 差距分析附录A 第 17 条（#146w）：world-model 四段 501 承流面自落地即纳入同一组
                 // 门禁（零 DML / 禁跨域表引 / 无 cognitive_context* / 无空集回落 / 不泄漏 message）
-                || s.endsWith("/controller/CognitiveWorldModelReadController.java");
+                || s.endsWith("/controller/CognitiveWorldModelReadController.java")
+                // 差距分析附录A 第 16 条（#146al）：run 级 replay 501 承流面（无参 stub 定版），
+                // 与上条同一组五门；加工类 CognitiveStubResponses 不在本名单（其出口经控制器
+                // 常量与返回面被读门实际覆盖，同 #146w 接线口径）
+                || s.endsWith("/controller/CognitiveRunReplayController.java");
     }
 
     /** 遍历 in-scope 的 .java 生产源（跳过 test）。 */

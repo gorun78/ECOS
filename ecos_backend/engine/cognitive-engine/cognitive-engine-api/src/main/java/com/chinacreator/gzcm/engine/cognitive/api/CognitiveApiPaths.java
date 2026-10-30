@@ -242,4 +242,25 @@ public final class CognitiveApiPaths {
     public static final String WORLD_MODEL_RELATIONS = COGNITIVE + WORLD_MODEL_RELATIONS_REL;
     public static final String WORLD_MODEL_TRACES = COGNITIVE + WORLD_MODEL_TRACES_REL;
     public static final String WORLD_MODEL_RULES = COGNITIVE + WORLD_MODEL_RULES_REL;
+
+    // ── 差距分析附录A 第 16 条（2026-10-30 #146al 追加，只追加本段，上方行零改写）──
+
+    /**
+     * run 级运行回放契约端点（{@code GET /api/v1/cognitive/replay}）。
+     *
+     * <p>契约行单源 = 《ECOS详细设计说明书-从零实施版》第 5415 行（{@code replayCognitiveRun}，
+     * 档位 C，备注「两种互斥签名定版一种，另一种不建映射」；「回放不落盘」）与第 10194 行第 8 篇
+     * 机读码行 {@code ECOS-COG-503（501 + stub）}。2026-10-30 用户二值裁决定版 = <b>无参纯 stub
+     * 形态</b>：正典路径 {@link #COGNITIVE} + {@link #REPLAY_REL}，0 入参，回真实 HTTP 501 +
+     * {@code stub=true}（与详设 5415 行「否则 501 + stub=true」同法，与 #146w 第 17 条承流面
+     * 同一工厂 {@code CognitiveStubResponses} 出口）。定版另一种（run 级取数回放，回放载体缺位
+     * —— F05-12 守护项 1 推理结果不落盘）<b>不建映射</b>，两种互斥签名不得并存（X-48）。</p>
+     *
+     * <p>与信念版本回放（{@code /api/v1/cognitive/beliefs/{variable}/{version}/replay}）是
+     * <b>不同物、不同前缀</b>：本常量不参与其路径拼装，两签名由
+     * {@code RouteUniquenessTest#cognitiveReplaySingleSignature} 双签白名单钉住不互替。
+     * 网关侧无正向 rewrite 条目（{@link #COGNITIVE} 族 KEEP），25 条重写表基线不动。</p>
+     */
+    public static final String REPLAY_REL = "/replay";
+    public static final String REPLAY = COGNITIVE + REPLAY_REL;
 }

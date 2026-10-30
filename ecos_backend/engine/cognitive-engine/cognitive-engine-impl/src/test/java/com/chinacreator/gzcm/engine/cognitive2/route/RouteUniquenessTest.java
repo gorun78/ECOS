@@ -33,7 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       双类（PMO-55 E-C 定版），gateway/aiming 宿主经 excludeFilters 排 cognitive 新副本
  *       （PMO-57 T5 裁定，生效属主 = ai 侧；cognitive 副本次生效于 standalone 态）；</li>
  *   <li>场景认知四端点以 Spring URI 模板 {@code {scenarioId}} 可寻址（禁 {@code %s} 混入 mapping）；</li>
- *   <li>replay 签名定版唯一（GET 只读，禁 GET/POST 双套并存，X-48）。</li>
+ *   <li>replay 签名定版闭集（2026-10-30 #146al 双签：信念版本回放 + run 级承流面，
+ *       GET 只读，禁第三种签名／禁 GET/POST 互斥双套，X-48「两种互斥签名定版一种，另一种不建映射」）。</li>
  * </ul>
  */
 class RouteUniquenessTest {
@@ -105,11 +106,15 @@ class RouteUniquenessTest {
     }
 
     @Test
-    @DisplayName("cognitive replay 签名定版唯一（GET 只读；禁 GET/POST 互斥双套）")
+    @DisplayName("cognitive replay 签名定版闭集：信念版本回放 + run 级承流双签唯一（GET 只读；禁第三种签名/POST 变体）")
     void cognitiveReplaySingleSignature() throws IOException {
         List<String> replays = new ArrayList<>();
         // X-48 断言范围 = 认知域 replay（cognitive-engine 模块 Controller）；
         // runtime DLQ replay 属告警域，不在认知契约面
+        // 2026-10-30 #146al 用户裁决定版 = 双签白名单：① 信念版本回放（CognitiveBeliefController，
+        // 能力已实装）② run 级运行回放承流面（CognitiveRunReplayController，501 stub）。
+        // 两签名不同前缀/不同入参形态，判据钉「恰好这两枚且全 GET」；run 级承流面映射行经
+        // 常量拼装（行内含 REPLAY_REL 字样）同样被 sweep 命中，第三枚任意形态出现即红。
         try (Stream<Path> walk = Files.walk(BACKEND.resolve("engine").resolve("cognitive-engine"))) {
             walk.filter(f -> f.getFileName().toString().endsWith("Controller.java"))
                     .filter(f -> !f.toString().replace('\\', '/').contains("/target/"))
@@ -120,7 +125,7 @@ class RouteUniquenessTest {
                             for (String line : src.split("\n")) {
                                 String t = line.trim();
                                 if (t.startsWith("@GetMapping") || t.startsWith("@PostMapping")) {
-                                    if (t.contains("replay")) {
+                                    if (t.toLowerCase().contains("replay")) {
                                         replays.add(f.getFileName().toString() + " :: " + t
                                                 + (t.startsWith("@PostMapping") ? " [POST]" : " [GET]"));
                                     }
@@ -129,8 +134,17 @@ class RouteUniquenessTest {
                         } catch (IOException ignored) {}
                     });
         }
-        assertEquals(1, replays.size(), "认知域 replay 映射必须唯一签名，实到：" + replays);
-        assertTrue(replays.get(0).contains("[GET]"), "契约定版 GET 只读，实到：" + replays);
+        assertEquals(2, replays.size(),
+                "认知域 replay 映射必须恰为定版两签（多一枚＝第三种签名，少一枚＝定版签名被偷改），实到：" + replays);
+        assertTrue(replays.stream().allMatch(r -> r.contains("[GET]")),
+                "定版两签均 GET 只读（禁 POST 变体，X-48），实到：" + replays);
+        // 逐枚形态白名单：信念版本回放必须带 {variable}/{version} 槽位；run 级承流面必须裸 GET
+        assertTrue(replays.stream().anyMatch(r -> r.contains("CognitiveBeliefController.java")
+                        && r.contains("[GET]")),
+                "缺信念版本回放签名（能力面），实到：" + replays);
+        assertTrue(replays.stream().anyMatch(r -> r.contains("CognitiveRunReplayController.java")
+                        && r.contains("[GET]")),
+                "缺 run 级承流面签名（附录A 第 16 条无参 stub 定版），实到：" + replays);
     }
 
     private static List<Path> mainControllers() throws IOException {

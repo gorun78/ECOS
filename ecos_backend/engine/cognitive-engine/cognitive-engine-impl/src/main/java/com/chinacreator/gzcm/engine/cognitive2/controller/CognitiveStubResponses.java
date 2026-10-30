@@ -48,6 +48,20 @@ final class CognitiveStubResponses {
                 segment.missingCarrier());
     }
 
+    /**
+     * run 级运行回放（附录A 第 16 条，{@code GET /api/v1/cognitive/replay}）。
+     *
+     * <p>2026-10-30 用户裁决定版 = 无参纯 stub 形态：与 {@link #notImplemented()} 同一状态行、
+     * 同一机读码、同一 {@code stub} 位，额外三枚定位键同 {@code worldModelSegmentNotImplemented}。
+     * 缺载体取证：F05-12 守护项 1「推理结果不落盘」⇒ 无任何 run 级回放载体表，真实可回放对象缺位，
+     * 501 分支是唯一诚实出口（「有真实存储返列表」分支的存储缺位即缺载体本身，禁伪 200／固定值）。</p>
+     */
+    static ResponseEntity<ApiResponse<Map<String, Object>>> runReplayNotImplemented() {
+        return stubResponse("replay", CognitiveApiPaths.REPLAY,
+                "缺 run 级回放载体：F05-12 守护项 1 推理结果不落盘，认知属主内无 run 轨迹/推演留痕表，"
+                        + "回放对象从哪来无真实存储可裁（详设 5415 行「回放不落盘」）");
+    }
+
     private static ResponseEntity<ApiResponse<Map<String, Object>>> stubResponse(
             String segment, String path, String missing) {
         Map<String, Object> data = new LinkedHashMap<>();
