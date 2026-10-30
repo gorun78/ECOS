@@ -95,4 +95,23 @@ public class AuditDao extends JdbcTemplateDaoSupport {
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             id, userId, username, action, resource, result, detail, ip);
     }
+
+    /**
+     * #146ab 附录A 第 6 条 getAuditLogDetail 契约载荷读面：按 bigint 主键 id 读整行。
+     *
+     * <p>列清单 = 契约 data 载荷 13 具名列（prev_hash/curr_hash 链三元组、username
+     * 作 approvedBy、detail 作 detailJson、created_at 作 occurredAt、operation/action
+     * 双列 + resource/entity_type/entity_id/user_id/result 描述列）＋id 主键。
+     * 0 行返 null（区分「拆无」与「依赖除能」由调用方分态，DAO 不吞异常）。</p>
+     */
+    public Map<String, Object> findAuditDetailById(long id) {
+        try {
+            return jdbcTemplate.queryForMap(
+                "SELECT id, prev_hash, curr_hash, username, hash_algorithm, detail, created_at, " +
+                "operation, action, resource, entity_type, entity_id, user_id, result " +
+                "FROM " + AUDIT_LOG + " WHERE id = ?", id);
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
 }

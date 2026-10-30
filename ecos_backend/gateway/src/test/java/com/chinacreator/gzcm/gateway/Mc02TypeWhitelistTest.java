@@ -96,9 +96,16 @@ class Mc02TypeWhitelistTest {
      * 每一项都是<b>已定位、已登记、有收口编号</b>的现行违例，不是豁免——收口（V288 脚本 + 实跑）
      * 后必须把本名录清空，清空前若有人新增别的项，④锁即红。
      *
-     * <p>实测 5 项，全部落在 V200+ 治理段（即"红线生效后再新建的表"）：
-     * V208 的 {@code DOUBLE}、V281 的 {@code JSONB}×2 + {@code BOOLEAN}、V285 的 {@code BIGSERIAL}。
-     * 其中 V281/V285/V208 三张表 dev PG <b>已实跑存在</b>（{@code information_schema} 只读实查），
+     * <p>实测 <b>6</b> 项，全部落在 V200+ 治理段（即"红线生效后再新建的表"）：
+     * V208 的 {@code DOUBLE}、V281 的 {@code JSONB}×2 + {@code BOOLEAN}、V285 的 {@code BIGSERIAL}、
+     * V295 的 {@code BIGSERIAL}（#146ab 新入：{@code public.ecos_audit_log.id}——附录A 第 6 条
+     * {@code prevHash/currentHash} 唯一数据面的<b>存量真身锚定</b>，dev 库该列实测即
+     * {@code BIGSERIAL}＋{@code nextval} 默认值，非 identity。本脚本的任务是「把已在位的真身登记进
+     * 单源」，不是「把真身改成合规形态」：改型＝IR01 违例，且 {@code AuditDao} 的 {@code WHERE id = ?}
+     * 数字主键读面（附录A 契约 {@code {id}} 为 bigint）随之失配 ⇒ 按 V285／V293 同族入待收口名录，
+     * 收口去向仍属 144-c 需授权追加迁移项。</p>
+     *
+     * <p>其中 V281/V285/V208 三张表 dev PG <b>已实跑存在</b>（{@code information_schema} 只读实查），
      * 按 IR03「只加不删」＋「老脚本不改」纪律，收口只能追加新迁移 ⇒ 属 144-c 需授权项。</p>
      */
     private static final Set<String> PENDING_CLOSURE_GOVERNED_VIOLATIONS = Set.of(
@@ -109,7 +116,8 @@ class Mc02TypeWhitelistTest {
                     + ".doc_anchor_json:JSONB",
             "V281__ecos_entity_table_mapping.sql#ecos_ontology.ecos_entity_table_mapping"
                     + ".materialized:BOOLEAN",
-            "V285__td_runtime_task_persistence_create.sql#public.td_runtime_task_log.LOG_SEQ:BIGSERIAL");
+            "V285__td_runtime_task_persistence_create.sql#public.td_runtime_task_log.LOG_SEQ:BIGSERIAL",
+            "V295__ecos_audit_log_anchor.sql#public.ecos_audit_log.id:BIGSERIAL");
 
     /** GOVERNED 段建表/列解析数下限（实测口径由本类首跑钉死，只增不减）。 */
     private static final int GOVERNED_TABLE_FLOOR = 60;
@@ -123,7 +131,9 @@ class Mc02TypeWhitelistTest {
      *  2026-10-27 #142/B4 #146i：V294（fc_* 三表＋演示主体 seed）落地。勘误：V293（#146f td_audit_log
      *  登记）本批锚定时漏数（已入库既有脚本）⇒ 初值 243 系漏数，按实测订正 243→244
      *  （DrBaseline/Mc03/MigrationVersionUniquenessTest 同批改）。 */
-    private static final int SCRIPT_FLOOR = 244;
+    private static final int SCRIPT_FLOOR = 245;
+    // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc03/
+    // MigrationVersionUniquenessTest 同批改锚；单源最大版本 295 ⇒ 下一号 V296）。
 
     /**
      * 存量段计数钉死（键={@code 桶|类型头}，值=违例列数，实测 2026-10-15 取证，双向相等）。

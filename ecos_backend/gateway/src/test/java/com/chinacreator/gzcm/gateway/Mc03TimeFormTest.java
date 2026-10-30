@@ -140,7 +140,11 @@ class Mc03TimeFormTest {
      *  2026-10-27 #142/B4 #146i：V294（fc_* 三表＋演示主体 seed，ON CONFLICT 7 处幂等播种）落地。
      *  勘误：V293（#146f td_audit_log 登记）本批锚定时漏数（已入库既有脚本）⇒
      *  初值 243 系漏数，按实测订正 243→244。 */
-    private static final int SCRIPT_FLOOR = 244;
+    private static final int SCRIPT_FLOOR = 245;
+    // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc02/
+    // MigrationVersionUniquenessTest 同批改锚）。本枚对 GOVERNED_PG_SYNTAX_PIN <b>零贡献</b>：
+    // 实测 V295 正文＋注释对 ::/ON CONFLICT/RETURNING/gen_random_uuid/JSON 运算符五类判据
+    // 均 0 命中（grep 取证），故名录保持 10 枚不扩面。
 
     @Test
     @DisplayName("锁①：扫描面非空——242 枚脚本全部可读，正文为空者只允许登记在册的作废脚本")

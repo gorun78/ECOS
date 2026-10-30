@@ -99,6 +99,12 @@ class DrBaselineColumnsTest {
             "V285__td_runtime_task_persistence_create.sql#public.td_runtime_task_execution"
                     + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no",
             "V293__ecos_control_td_audit_log_register.sql#ecos_control.td_audit_log"
+                    + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no",
+            // #146ab：V295 锚定的是 dev 库「已在位的存量真身」（附录A 第 6 条 prevHash/currentHash
+            // 唯一数据面首次进单源）。列清单取库面实查＝锚定真身，不擅自改型/补列（改型＝IR01 违例，
+            // 补列＝锚定与真身分叉）。七枚基线列全缺按 V293 同族入名录；与 V293 一样，#144-c 追加迁移
+            // 需授权实跑才可收口，本批只登记不假装合规。
+            "V295__ecos_audit_log_anchor.sql#public.ecos_audit_log"
                     + "->create_by,create_time,domain,is_deleted,update_by,update_time,version_no");
 
     /**
@@ -135,7 +141,9 @@ class DrBaselineColumnsTest {
      *  2026-10-27 #142/B4 #146i：V294（fc_* 三表＋演示主体 seed；三表七枚基线列齐建，fc_* 无 ecos_ 前缀按
      *  knownLegacy 语义冻结、不入本名录计口）落地。勘误：V293（#146f td_audit_log 登记，基线列不全）
      *  本批锚定时漏数（已入库既有脚本）⇒ 初值 243 系漏数，按实测订正 243→244（四枚同批改）。 */
-    private static final int SCRIPT_FLOOR = 244;
+    private static final int SCRIPT_FLOOR = 245;
+    // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，按实测订正四枚同批锚）。
+    // 该表属「存量真身锚定」＝七枚基线列全缺，按 V293 同族入待收口名录，不假装合规。
 
     @Test
     @DisplayName("锁①：扫描面非空——脚本数、建表数、V200+ 建表数均达下限（空扫描面=假绿）")

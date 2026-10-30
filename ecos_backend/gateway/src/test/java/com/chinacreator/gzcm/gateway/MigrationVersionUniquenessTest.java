@@ -47,8 +47,8 @@ import org.junit.jupiter.api.Test;
  * 新增重复即红，重复消失也必须同步收缩本名录（防豁免腐化成后门）；
  * ③ 版本族名录：点号/下划线扩展版本（{@code V4.1}、{@code V25_1}…）逐枚钉死，
  * 防止后来者用 {@code V288.1} 型小版本号绕过「新增脚本须顺延登记」的台账纪律；
- * ④ 台账锚：单源目录内最大基线版本 {@code = 294}（下一枚 {@code V295}），
- * 且脚本总数只增不减（下限 244）。</p>
+ * ④ 台账锚：单源目录内最大基线版本 {@code = 295}（下一枚 {@code V296}），
+ * 且脚本总数只增不减（下限 245）。</p>
  *
  * <p><b>反假绿四锁</b>：①扫描面非空 + 解析成功率 100%（解析不了的文件名直接进失败消息）；
  * ②重复检测的<b>反向对照</b>=解析器必须真的同时看见 V155 与 V50 的两枚实文件
@@ -77,13 +77,15 @@ class MigrationVersionUniquenessTest {
     private static final Pattern LEGAL_NAME =
             Pattern.compile("^V(\\d+(?:[._]\\d+)*)__([^_][^/]*?)\\.sql$");
 
-    /** 锁①：单源脚本总数下限（实测 244，只增不减；上限不钉，避免正常加脚本要改门禁）。
+    /** 锁①：单源脚本总数下限（实测 245，只增不减；上限不钉，避免正常加脚本要改门禁）。
      *  2026-10-27 #141/B3 认知治理批：V291（3e-89 属主密级字典）+ V292（R4 Mind 聚合根）落地
      *  ⇒ 按实测订正 240→242（与 DrBaseline/Mc02/Mc03 同批改）。
      *  2026-10-27 #142/B4 #146i：V294（fc_* 三表＋演示主体 seed）落地。
      *  勘误：V293（#146f td_audit_log 注册）本批锚定时漏数（已入库既有脚本，非本批产出）⇒
-     *  初值 243 系漏数，按实测订正 243→244（= V293 存量 1 枚 + V294 本批 1 枚，242 基线之上 2 枚）。 */
-    private static final int SCRIPT_COUNT_FLOOR = 244;
+     *  初值 243 系漏数，按实测订正 243→244（= V293 存量 1 枚 + V294 本批 1 枚，242 基线之上 2 枚）。
+     *  2026-10-29 #146ab：V295（public.ecos_audit_log 单源锚定，附录A 第 6 条数据面断链补登）落地
+     *  ⇒ 按实测订正 244→245（与 DrBaseline/Mc02/Mc03 同批改）。 */
+    private static final int SCRIPT_COUNT_FLOOR = 245;
 
     /**
      * 锁④：台账锚——基线最大版本与下一号（新增脚本必须用 {@code > } 本值的主版本号）。
@@ -95,9 +97,11 @@ class MigrationVersionUniquenessTest {
      * 2026-10-27 #142/B4 #146i：本批新增 V294（fc_* 三表＋演示主体 seed，已 dev 实跑）。
      * V293（#146f td_audit_log 注册，已入库）＋ V294 使单源最大版本达 294 ⇒
      * 按实测订正 292→294 / 下一号 293→295。V288 仍空置：《数据库访问规范》§十 预留给 #144-c，不占。
+     * 2026-10-29 #146ab：V295（public.ecos_audit_log 单源锚定，附录A 第 6 条 prevHash/currentHash
+     * 唯一数据面首次进单源；已 dev PG 实跑）落地 ⇒ 按实测订正 294→295 / 下一号 295→296。
      */
-    private static final int MAX_BASELINE_VERSION = 294;
-    private static final int NEXT_FREE_VERSION = 295;
+    private static final int MAX_BASELINE_VERSION = 295;
+    private static final int NEXT_FREE_VERSION = 296;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。
@@ -162,7 +166,7 @@ class MigrationVersionUniquenessTest {
     // ────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("解析器自检：必须真的同时看见 V155 与 V50 两组重复、14 枚版本族文件、最大基线号 290")
+    @DisplayName("解析器自检：必须真的同时看见 V155 与 V50 两组重复、14 枚版本族文件、最大基线号 295")
     void scannerActuallySeesTheKnownShapes() throws IOException {
         List<ScriptEntry> entries = parseAll();
         Map<String, List<ScriptEntry>> groups = groupByVersion(entries);
@@ -247,7 +251,7 @@ class MigrationVersionUniquenessTest {
     // ────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("台账锚：主版本号连续性与下一号（实测最大 290 ⇒ 新脚本自 291 顺延，禁回填占号；V288 预留未占）")
+    @DisplayName("台账锚：主版本号连续性与下一号（实测最大 295 ⇒ 新脚本自 296 顺延，禁回填占号；V288 预留未占）")
     void baselineSequenceIsAddressableAndNextSlotIsKnown() throws IOException {
         Set<Integer> majors = new TreeSet<>(parseAll().stream()
                 .map(ScriptEntry::majorVersion).toList());

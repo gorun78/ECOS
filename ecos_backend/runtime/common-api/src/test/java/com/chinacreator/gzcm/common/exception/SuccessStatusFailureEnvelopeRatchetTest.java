@@ -193,6 +193,32 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      *       形态与同批已计的在册 dry-run 404 腿一致，属「状态行承载」正解；机读码取 {@code AiErrorClass}
      *       常量，机读码棘轮面零扰动。0+38+100+13+35 = 186 = 总数，对账成立。
      *       只重设被突破的 {@link #STATUS_CARRIER_CEILING}，其余三面按实测保持。</li>
+     *   <li>#146ab 重设（附录A 第 6 条 {@code GET /api/v1/security/audit/{id}} 批，common-api
+     *       全模块<b>红跑</b>实测，{@code _win_tasks/logs/146ab/gates-r1.log}）＝总数 <b>189</b>／
+     *       折叠 0／状态行承载 <b>38</b>（未漂移）／裸回 <b>100</b>（未漂移）／属主 helper <b>17</b>／
+     *       纯信封 <b>34</b>。两面漂移、逐枚归因：
+     *       <b>helper 13→17（＋4，本批新属主）</b>＝{@code AuditDetailController} 的四枚
+     *       {@code failure(ApiResponse.<Void>error(…))} 单源腿（{@code permissionDenied} 403／
+     *       {@code idInvalid} 400／{@code notFound} 404／{@code doRead} 内 500 读腿异常），
+     *       即 D-B4-59 第三族正解形态；该类零枚 {@code return ApiResponse.}（故判据 A／B 两面
+     *       零贡献，漂移只落在本门 helper 面），其 503 承流腿是抛型 {@code DataBridgeException}，
+     *       按 3e-37 末腿口径<b>不进本门计数</b>。
+     *       <b>形态订正（r2 实跑暴露，如实登记）</b>：两枚 helper 首探写成类型参数形态
+     *       {@code static <T> ResponseEntity<ApiResponse<T>> failure(ApiResponse<T> body)}，而端点
+     *       声明是 {@code ResponseEntity<ApiResponse<?>>}——{@code ResponseEntity} 不变型，故
+     *       {@code ApiResponse<Void>} 推不通配面，security-engine-impl 编译面 <b>3 处红</b>
+     *       （{@code gates-r2.log}：106／147／168 行「无法转换」）。现按通配形态
+     *       {@code failure(ApiResponse<?>)}／{@code ok(ApiResponse<?>)} 落地并删除中间转型 helper
+     *       {@code castVoid}，属主承载锚随形态同批改指（锚不匹配＝红，本段即改锚凭据）。
+     *       该红是编译面红、不落本门计数面，但正是本门把「helper 名 + 签名形态」写成字面锚的用处：
+     *       改形态必须同批改锚，否则「摘腿」可以伪装成「换写法」。
+     *       <b>纯信封 35→34（−1，非本批＝#146x 补账）</b>＝{@code AgentProviderController}
+     *       在 commit 49cfb4d6 里把 {@code ApiResponse<Map<String,Object>> body = ApiResponse.error(…)}
+     *       改写成 {@code AiResponseSupport.classified(…)} 属主工厂腿——出现点本身不再匹配
+     *       {@code ApiResponse.(<T>)error(}，故总数 −1 且不入任何承载面（对账：
+     *       186−1＋4＝189，0＋38＋100＋17＋34＝189）。该批未跑本横切门，本批按实跑读数补账。
+     *       只重设被突破的 {@link #OWNER_HELPER_CEILING} 与因补账而收窄的
+     *       {@link #ENVELOPE_ONLY_CEILING}，其余三面按实测保持。</li>
      * </ul>
      *
      * <p><b>本批（#146p）在判据面上零新增</b>：{@code KnowledgeExtractRunsController} 的 503 腿
@@ -211,8 +237,11 @@ class SuccessStatusFailureEnvelopeRatchetTest {
     // #146s：37→38，归因见上方「#146s 重设」条（AgentToolController#describe 404 腿一封）
     // #146l-前置：99→100，归因见上方「#146l-前置 重设」条（CaliberConflictCountMetricSource 一枚）
     private static final int BARE_RETURN_CEILING = 100;
-    private static final int OWNER_HELPER_CEILING = 13;
-    private static final int ENVELOPE_ONLY_CEILING = 35;
+    // #146ab：13→17，归因见上方「#146ab 重设」条（AuditDetailController 四枚 failure(...) 单源腿）
+    private static final int OWNER_HELPER_CEILING = 17;
+    // #146ab：35→34，补账半＝#146x(49cfb4d6) 把 AgentProviderController 一枚纯信封赋值腿
+    // 改写成 AiResponseSupport.classified(...) 属主工厂腿，出现点不再匹配本门判据
+    private static final int ENVELOPE_ONLY_CEILING = 34;
 
     /** 本批属主侧承载见证锚（文件 → 必须出现的形态片段）。缺任一即红＝「删腿」不算修好。 */
     private static final Map<String, List<String>> OWNER_SIDE_CARRIERS = Map.of(
@@ -263,7 +292,17 @@ class SuccessStatusFailureEnvelopeRatchetTest {
                     // 机构隶属还是密级档案链（D-B4-85／D-B4-90 分态同族）。
                     "throw subjectClearanceSourceUnavailable(e);",
                     "static DataBridgeException subjectClearanceSourceUnavailable(Throwable cause)",
-                    "RlsExecutionContract.SEC_UNAVAILABLE_CODE + \": 主体密级真值源不可用（含五档链断腿）"));
+                    "RlsExecutionContract.SEC_UNAVAILABLE_CODE + \": 主体密级真值源不可用（含五档链断腿）"),
+            // #146ab（附录A 第 6 条 audit/{id}）：本批 helper 面 +4 的全部来源。摘任一枚腿＝
+            // 状态行被折回恒 200 或整条失败腿消失，两者都不算收口；503 承流是抛型腿，同 3e-37
+            // 口径不进本门计数，故在此钉片段而非计数。
+            "ecos_backend/engine/security-engine/security-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/security/controller/AuditDetailController.java",
+            List.of("static ResponseEntity<ApiResponse<?>> failure(ApiResponse<?> body)",
+                    "int status = DataBridgeException.resolveHttpStatus(body.getCode())",
+                    "return failure(ApiResponse.<Void>error(403, ERR_PERMISSION,",
+                    "static final String CODE_UNAVAILABLE = SystemErrorCode.ECOS_SYS_503;",
+                    "throw new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,"));
 
     // ── 判据 1：违例面 = 基线逐文件同数 ──────────────────────────────────────
 

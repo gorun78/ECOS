@@ -144,6 +144,28 @@ class SecurityDenialHttpStatusRatchetTest {
      * （4＋5＋1＝10）相符；二者不符时以读数为准。判据 A 面自本批起为 <b>0</b>：这条线不再
      * 是「余面还有多少待收」的账，而是「新增即红＋被折掉的腿回退成裸回亦红」的双向门。</p>
      */
+    /**
+     * <p><b>#146ab 本批零扰动＝853</b>：附录A 第 6 条 {@code GET /api/v1/security/audit/{id}}
+     * 新增属主 {@code AuditDetailController}（security-engine-impl）落地。本枚的读数不变<b>不是</b>
+     * 靠「判据看不见所以不变」，而是靠属主侧走本族第三族正解：失败腿一律
+     * {@code return failure(ApiResponse.<Void>error(403|400|404|500, …))}、成功腿
+     * {@code return ok(ApiResponse.success(…))}，状态行由 {@code failure} 经
+     * {@code DataBridgeException.resolveHttpStatus(body.getCode())} 单源推出 ⇒ 文件内
+     * <b>零枚</b> {@code return ApiResponse.} 裸回出口 ⇒ 判据 A 不新增持有者、判据 B 不新增计数。
+     * 该「零裸回」另由属主行为门 {@code AuditDetailControllerContractTest
+     * #ownerSourceHasNoBareEnvelopeReturn} 直接读源码文本钉死——横切门说「没新增」时，属主侧
+     * 自己也得能证明自己没写，两处口径互相兜（承 3e-35「行为门在名单里点名」同族纪律）。
+     * 503 承流腿走抛型（{@code new DataBridgeException(SEC_UNAVAILABLE_HTTP, …)}），一个
+     * {@code ApiResponse.error} 出现点都没有，故对本门两面均零贡献。</p>
+     *
+     * <p><b>本条的订正凭据（如实登记）</b>：本批首探曾把该属主写成
+     * {@code return ApiResponse.<Void>error(403, …)} ＋ 同名 {@code toResponseEntity(…)} 二次包装——
+     * 该形态下 403 腿<b>会</b>被判据 A 记成「未登记的新持有者」而变红，我当时据旧形态写下的
+     * 「不命中所以零漂移」论断是错的（错在把「helper 里返回」当成「不是 return 语句」）。
+     * 现按 3e-35／3e-37 属主正解改写后判据 A／B 两面读数由本批 common-api 全模块实跑确认保持
+     * 0／853；漂移面转入 {@code SuccessStatusFailureEnvelopeRatchetTest} 的「属主 helper 承载」面。
+     * 判据不变而属主改形＝「上限不变」这一读数必须实跑产出，不得由本段叙述推出。</p>
+     */
     private static final int OTHER_LEG_CEILING = 853;
 
     /**
@@ -518,6 +540,52 @@ class SecurityDenialHttpStatusRatchetTest {
                     + "engine/ontology/OntologyProposalPublishStatusFidelityTest.java",
             "engine/ontology-engine/ontology-engine-impl/src/test/java/com/chinacreator/gzcm/"
                     + "engine/ontology/service/PublishGate/PublishGateV3Test.java");
+
+    // ── #142/B4-3e-68（#146ab，附录A 第 6 条）：audit/{id} 端点整体折成 ResponseEntity ──
+    // ③ 家族（同 #142/B4-3e-35/3e-37）：方法签名折成 ResponseEntity，失败腿状态行
+    //    从信封 code 经 resolveHttpStatus 单源推出；403／400／404／500 四枚失败腿都经同名
+    //    {@code failure(ApiResponse<?>)} helper 落状态行（不裸回），成功腿经同名 {@code ok(..)}
+    //    显式 200。503 承流腿走 DataBridgeException 抛型（不裸回，族差同 3e-37 helper 403 腿）。
+    //    状态行/机读码保真由行为门 3e-68 同链。
+    private static final List<String> DENIAL_OWNERS_3E68 = List.of(
+            "ecos_backend/engine/security-engine/security-engine-impl/src/main/java/com/chinacreator/"
+                    + "gzcm/engine/security/controller/AuditDetailController.java");
+
+    /** 本批行为门：读状态行数值，文本门看不见「折成 ok()」/「403→404」的折叠变异。 */
+    private static final List<String> BEHAVIOR_GATES_3E68 = List.of(
+            "engine/security-engine/security-engine-impl/src/test/java/com/chinacreator/gzcm/"
+                    + "engine/security/controller/AuditDetailControllerContractTest.java");
+
+    /**
+     * #142/B4-3e-68（#146ab，附录A 第 6 条 audit/{id}）收口自证：
+     * 判据 A 判不到裸回（403 折成 ResponseEntity）＋ 不可用 503 单源常量在链
+     * ＋ 状态行由 resolveHttpStatus 单源推出 + 行为门读 getStatusCode() 在链。
+     */
+    @Test
+    @DisplayName("#142/B4-3e-68 附录A 第6条 audit/{id}：403 折成状态行＋503 单源＋resolveHttpStatus 单源＋行为门在链")
+    void the3e68AuditDetailOwnerIsClosedAndItsBehaviorGateExists() {
+        for (String owner : DENIAL_OWNERS_3E68) {
+            String code = codeOf(owner);
+            assertFalse(BARE_DENIAL_LEG.matcher(code).find(),
+                    owner + " 又出现裸回的安全拒绝／不可用出口＝D-B4-59 在本文件复现");
+            assertTrue(code.contains("ResponseEntity.status("),
+                    owner + " 登记为已收口持有者，源码里却没有 ResponseEntity.status(...) 腿"
+                            + "（只靠基线归零＝摘掉修法仍全绿的假绿面）");
+            assertTrue(code.contains("DataBridgeException.resolveHttpStatus(body.getCode())"),
+                    owner + " 的状态行不再从信封 code 单源推出＝「改码不改行」的漂移形态");
+            assertTrue(code.contains("return ResponseEntity.ok(body);"),
+                    owner + " 成功腿未显式 ok()：CODE_SUCCESS 若经 resolveHttpStatus 会被折成 500");
+        }
+        String auditDetail = codeOf(DENIAL_OWNERS_3E68.get(0));
+        assertTrue(auditDetail.contains("RlsExecutionContract.SEC_UNAVAILABLE_HTTP"),
+                "AuditDetailController 的不可用腿 503 未取单源常量＝状态行与信封两处各写一遍");
+
+        for (String gate : BEHAVIOR_GATES_3E68) {
+            String gateCode = codeOf("ecos_backend/" + gate);
+            assertTrue(gateCode.contains("getStatusCode().value()"),
+                    "行为门 " + gate + " 不再读 HTTP 状态行数值＝本族缺陷（只改码不改行）退回半只眼");
+        }
+    }
 
     @Test
     @DisplayName("#142/B4-3e-37 末腿：helper 造信封＋端点折叠同批落地，成功腿显式 ok()")
