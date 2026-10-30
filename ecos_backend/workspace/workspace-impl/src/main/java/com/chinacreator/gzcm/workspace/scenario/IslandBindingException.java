@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.workspace.scenario;
 
+import com.chinacreator.gzcm.common.error.ScenarioErrorCode;
+
 import java.util.List;
 import java.util.Map;
 
@@ -7,7 +9,7 @@ import java.util.Map;
 public class IslandBindingException extends ScenarioDomainException {
 
     public IslandBindingException(List<Map<String, Object>> islands) {
-        super(409, "ISLAND_BINDING", "存在孤岛绑定，禁止激活");
+        super(409, ScenarioErrorCode.CODE_ISLAND_BINDING, "存在孤岛绑定，禁止激活");
         putDetail("islands", islands);
     }
 }

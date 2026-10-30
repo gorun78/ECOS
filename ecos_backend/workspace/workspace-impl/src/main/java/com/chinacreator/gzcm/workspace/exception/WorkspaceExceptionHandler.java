@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.workspace.exception;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.ScenarioErrorCode;
 import com.chinacreator.gzcm.common.trace.EcosTraceContext;
 import com.chinacreator.gzcm.workspace.scenario.ScenarioDomainException;
 import org.slf4j.Logger;
@@ -89,7 +90,7 @@ public class WorkspaceExceptionHandler {
                     .map(FieldError::getField).distinct().toList();
             details.put("missingFields", missing);
         }
-        return build(400, "ACTION_FIELDS_MISSING", "必填字段缺失或格式非法", details);
+        return build(400, ScenarioErrorCode.CODE_ACTION_FIELDS_MISSING, "必填字段缺失或格式非法", details);
     }
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MissingServletRequestParameterException.class})

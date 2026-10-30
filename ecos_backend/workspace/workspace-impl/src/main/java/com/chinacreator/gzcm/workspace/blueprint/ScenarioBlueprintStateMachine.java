@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.workspace.blueprint;
 
+import com.chinacreator.gzcm.common.error.ScenarioErrorCode;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -134,7 +135,7 @@ public class ScenarioBlueprintStateMachine {
             return; // 幂等 no-op
         }
         if (isTerminal(from)) {
-            throw new IllegalBlueprintTransitionException("TERMINAL_STATE",
+            throw new IllegalBlueprintTransitionException(ScenarioErrorCode.CODE_TERMINAL_STATE,
                     "蓝图处于只读终态 " + from + "，不可再迁移"
                             + (from == BlueprintStatus.DEPRECATED
                             ? "（历史版本可追溯，修订请生成 version+1 新行，§6.6）" : "（§6.3）"));
@@ -147,11 +148,11 @@ public class ScenarioBlueprintStateMachine {
         }
         List<BlueprintStatus> allowed = OUT_EDGES.get(from);
         if (allowed == null) {
-            throw new IllegalBlueprintTransitionException("ILLEGAL_TRANSITION",
+            throw new IllegalBlueprintTransitionException(ScenarioErrorCode.CODE_ILLEGAL_TRANSITION,
                     "未知源状态: " + from);
         }
         if (!allowed.contains(to)) {
-            throw new IllegalBlueprintTransitionException("ILLEGAL_TRANSITION",
+            throw new IllegalBlueprintTransitionException(ScenarioErrorCode.CODE_ILLEGAL_TRANSITION,
                     "非法状态迁移: " + from + " → " + to + "（合法出边: " + allowed + "，§6.3 迁移矩阵）");
         }
         // 门槛回调：进入 READY_FOR_APPROVAL 前 BLOCKER gap 必须全 RESOLVED/ACCEPTED_RISK（§6.6）。

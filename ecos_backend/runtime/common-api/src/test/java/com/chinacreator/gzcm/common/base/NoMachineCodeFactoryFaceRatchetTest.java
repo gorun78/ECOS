@@ -708,6 +708,90 @@ class NoMachineCodeFactoryFaceRatchetTest {
             Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
                     + "workspace/scenario/SandboxReferenceForbiddenException.java", 1)));
 
+    // ── 第11篇 ACT/SCN/SBX/INT 语义位单源面（#146am，台账附录C 第 7 条）──────
+
+    /**
+     * 第11篇四枚机读码前缀字面量判据（引号起点 + 前缀 + 三位码位）。
+     *
+     * <p><b>#146am 新登</b>（收口差距附录C 第 7 条「第11篇 ECOS-ACT/SCN/SBX/INT 前缀族
+     * 0 命中」）：治理时点 main 面（含 test 面）带引号机读码 <b>0 枚</b>——冻结表第11篇
+     * 码位的归因坐标是 {@code ECOS-xx} 域锚，码值即语义位本身（如 {@code 400
+     * ACTION_FIELDS_MISSING}），不存在 {@code ECOS-<域>-<三位>} 形态机读码位（建即死码，
+     * DG-9/X-43 红线）。本门腿＝与 sys/rate/FC 腿同型零容差判据：任意一枚带引号
+     * {@code "ECOS-(ACT|SCN|SBX|INT)-\d{3}"} 出现即红，不设属主豁免（本批不建此类机读码
+     * 属主，故不设属主锚；新增＝伪造未经冻结表裁决的族码）。改后恒 0。</p>
+     */
+    private static final Pattern SC_FAMILY_LITERAL =
+            Pattern.compile("\"ECOS-(ACT|SCN|SBX|INT)-(\\d{3})\"");
+
+    /** 第11篇语义位属主（common-api 常量类；9 枚语义位字面量唯一合法家）。 */
+    private static final String SCENARIO_ERROR_CODE_SOURCE =
+            "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/gzcm/common/error/"
+                    + "ScenarioErrorCode.java";
+
+    /**
+     * 第11篇 9 枚语义位字面量判据（逐枚带引号整词）。9 枚＝治理时点有生产出口的
+     * 第11篇属主语义位，字面量单源归 {@code ScenarioErrorCode.CODE_*} 常量；
+     * 属主外 main 面带引号整词出现即红（零容差，不设棘轮）。
+     *
+     * <p><b>刻意不入本表的托管位/异源位</b>（各有归因，均不建本族常量）：
+     * 403 PERMISSION_DENIED／503 SECURITY_UNAVAILABLE（10403／10409 行）属主 ECOS-SEC，
+     * 出口仍在 security 裁决面；503 COGNITIVE_UNAVAILABLE（10408 行）与 400
+     * SANDBOX_REF_FORBIDDEN（10402 行，ECOS-SBX）属主已在 {@code FCScenarioErrorCode}
+     * （双包孪生载体已改指其 {@code CODE_*}，防同值双属主不重复入本表）；500 INTERNAL
+     * （10410 行 ECOS-INT）既有平台承载面取 ECOS-SYS-500 前缀机读码＋workspace 面 3 腿
+     * 信封语义位，均为在案 wire 面。六枚均为跨族共用位／既有单源，逐枚搬流会跨族引用
+     * 违铁律，归属以冻结表原文为准，属主类 javadoc 逐枚注释登记。</p>
+     */
+    private static final Map<String, String> SC_SEMANTIC_SLOTS = new TreeMap<>(Map.of(
+            "ACTION_FIELDS_MISSING", "CODE_ACTION_FIELDS_MISSING",
+            "SCENARIO_NOT_FOUND", "CODE_SCENARIO_NOT_FOUND",
+            "ISLAND_BINDING", "CODE_ISLAND_BINDING",
+            "ILLEGAL_TRANSITION", "CODE_ILLEGAL_TRANSITION",
+            "TERMINAL_STATE", "CODE_TERMINAL_STATE",
+            "NO_FORMAL_RUN", "CODE_NO_FORMAL_RUN",
+            "INCOMPLETE_SCENARIO", "CODE_INCOMPLETE_SCENARIO",
+            "LAYOUT_CONFLICT", "CODE_LAYOUT_CONFLICT"));
+
+    /**
+     * 第11篇消费侧锚点：十一处改指文件必须逐文件<b>恰 N 枚</b> {@code
+     * ScenarioErrorCode.CODE_*} 引用（#146am 本批 17 处——
+     * scenario/IllegalScenarioTransitionException 4 枚，
+     * blueprint/ScenarioBlueprintStateMachine 3 枚，其余 9 文件各 1 枚），
+     * 且各自恰 1 枚属主 import（防改指域外同值常量＝单源名存实亡）。
+     */
+    private static final Pattern SC_CODE_REFERENCE =
+            Pattern.compile("ScenarioErrorCode\\s*\\.\\s*CODE_[A-Z][A-Z0-9_]+");
+
+    private static final Pattern SC_CONSUMER_IMPORT =
+            Pattern.compile("import\\s+com\\.chinacreator\\.gzcm\\.common\\.error\\s*\\.\\s*ScenarioErrorCode\\s*;");
+
+    private static final Map<String, Integer> SC_CONSUMER_EXIT_BASELINE = new TreeMap<>(Map.ofEntries(
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/exception/ActionValidationException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/exception/IslandBindingException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/exception/OptimisticLockConflictException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/exception/ScenarioNotFoundException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/exception/WorkspaceExceptionHandler.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/blueprint/IllegalBlueprintTransitionException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/blueprint/ScenarioBlueprintStateMachine.java", 3),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/scenario/ActionValidationException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/scenario/IllegalScenarioTransitionException.java", 4),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/scenario/IslandBindingException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/scenario/OptimisticLockConflictException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/scenario/ScenarioNotFoundException.java", 1)));
+
     // ── 1. 余面棘轮 ─────────────────────────────────
 
     @Test
@@ -1514,6 +1598,113 @@ class NoMachineCodeFactoryFaceRatchetTest {
         }
         assertEquals(List.of(), drift,
                 "FC 域改指出口侧属主引用枚数漂移（九文件基线＝#146ak 本批实跑读数，回退裸文案/域外同值常量两形态均红）：" + drift);
+    }
+
+    /**
+     * 第11篇 ECOS-ACT/SCN/SBX/INT 四族机读码字面量零容差判据（#146am，台账附录C 第 7 条）：
+     * 治理时点全仓（main＋test 面）带引号 {@code "ECOS-(ACT|SCN|SBX|INT)-\d{3}"}
+     * <b>0 枚</b>——冻结表第11篇不存在 {@code ECOS-<域>-<三位>} 形态码位（码值即语义位
+     * 本身），伪出口先例红线 DG-9/X-43 ⇒ 任意新增即红，不设属主豁免。
+     * 本腿无属主豁免＝「造码即红」；属主在场腿防「文件被搬走 ⇒ 零命中恒绿」假象。
+     */
+    @Test
+    @DisplayName("第11篇四族机读码字面量全仓 0 枚（码位形态不存在，造码即红）")
+    void scFamilyLiteralsAreSingleSourced() throws IOException {
+        Path root = locateRepoRoot();
+        List<Path> files = new ArrayList<>();
+        collectJavaUnder(root.resolve("ecos_backend"), files);
+        assertTrue(files.size() >= MIN_SCANNED_MAIN_FILES,
+                "扫描面缩水：实扫 main 面 java 文件 " + files.size() + " < 阈值 "
+                        + MIN_SCANNED_MAIN_FILES + "，判据不可信（读不到 ≠ 无违例）");
+
+        // 属主面不存在即直接红（防被搬走/改名 ⇒ 零命中恒绿假象）
+        assertTrue(Files.exists(root.resolve(SCENARIO_ERROR_CODE_SOURCE)),
+                "第11篇语义位单源文件不在位：" + SCENARIO_ERROR_CODE_SOURCE);
+
+        List<String> hits = new ArrayList<>();
+        for (Path f : files) {
+            String rel = root.relativize(f).toString().replace('\\', '/');
+            String stripped = SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+            Matcher m = SC_FAMILY_LITERAL.matcher(stripped);
+            while (m.find()) {
+                hits.add(rel + " → " + f.getFileName() + "（伪造第11篇机读码位：冻结表无此形态码，"
+                        + "机读码属主在 ECOS-SEC/SYS 域，禁以代码冒充附录C 冻结表裁决）");
+            }
+        }
+        assertEquals(List.of(), hits,
+                "main 面出现 ECOS-(ACT|SCN|SBX|INT)-NNN 带引号机读码字面量："
+                        + "第11篇码位归因坐标是域锚＋语义位，不存在三位码位形态。清单=" + hits);
+    }
+
+    /**
+     * 第11篇 8 枚属主语义位字面量 + 消费侧出口基线（#146am，台账附录C 第 7 条）：
+     * 8 枚属主语义位（ACTION_FIELDS_MISSING 等）带引号字面量单源归
+     * {@code ScenarioErrorCode.CODE_*} 常量，属主外 main 面任何一枚即红；
+     * 12 个改指文件逐文件<b>恰 N 枚</b>属主常量引用＋恰 1 枚属主 import。
+     *
+     * <p>三段假绿防护（与 FC 腿同型）：①<b>字面量面零容差</b>（改后全仓副本恒 0 枚，
+     * 不设棘轮）；②<b>消费面基线</b>——字面量面绿只证「没扩散」，不证「出口真在取
+     * 常量」，出口改回裸串或新造同值副本会绕过字面量面，仅本腿按逐文件枚数变红；
+     * ③<b>逐枚 import</b>——改指域外同值常量时裸串回读不可分辨，只有 import 那行
+     * 读得见域内/域外。少＝漂移回字面量；多＝重复取码或新改指腿未同批重设基线。</p>
+     */
+    @Test
+    @DisplayName("第11篇 8 枚语义位字面量 main 面 0 副本，且十二处改指出口逐文件恰取属主常量")
+    void scSemanticSlotsAreSingleSourced() throws IOException {
+        Path root = locateRepoRoot();
+        List<Path> files = new ArrayList<>();
+        collectJavaUnder(root.resolve("ecos_backend"), files);
+        assertTrue(files.size() >= MIN_SCANNED_MAIN_FILES,
+                "扫描面缩水：实扫 main 面 java 文件 " + files.size() + " < 阈值 "
+                        + MIN_SCANNED_MAIN_FILES + "，判据不可信（读不到 ≠ 无副本）");
+
+        // ① 第11篇字面量面：属主外任意一枚即红
+        List<String> copies = new ArrayList<>();
+        for (Path f : files) {
+            String rel = root.relativize(f).toString().replace('\\', '/');
+            if (SCENARIO_ERROR_CODE_SOURCE.equals(rel)) {
+                continue;
+            }
+            String stripped = SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+            for (String slot : SC_SEMANTIC_SLOTS.keySet()) {
+                int n = 0;
+                Matcher m = Pattern.compile("\"" + Pattern.quote(slot) + "\"").matcher(stripped);
+                while (m.find()) {
+                    n++;
+                }
+                if (n > 0) {
+                    copies.add(rel + " → " + slot + "（" + n + " 处，应改指 "
+                            + "ScenarioErrorCode." + SC_SEMANTIC_SLOTS.get(slot) + "）");
+                }
+            }
+            // 改指文件专属：import 恰好 1 枚（防改指域外同值常量）
+            if (SC_CONSUMER_EXIT_BASELINE.containsKey(rel)) {
+                long imports = SC_CONSUMER_IMPORT.matcher(stripped).results().count();
+                if (imports != 1) {
+                    copies.add(rel + " 契约 import " + imports + " 枚 ≠ 1（改指域外同值常量＝单源名存实亡）");
+                }
+            }
+        }
+        assertEquals(List.of(), copies,
+                "main 面出现第11篇 8 枚属主语义位字面量副本（或契约 import 漂移）：出口应改取 "
+                        + "ScenarioErrorCode 常量。清单=" + copies);
+
+        // ② 消费面基线：十二文件逐枚恰 N 枚属主常量引用
+        List<String> drift = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : SC_CONSUMER_EXIT_BASELINE.entrySet()) {
+            String stripped = readStripped(root, e.getKey());
+            int hits = 0;
+            Matcher m = SC_CODE_REFERENCE.matcher(stripped);
+            while (m.find()) {
+                hits++;
+            }
+            if (hits != e.getValue()) {
+                drift.add(e.getKey() + " 实跑 " + hits + " 枚 ≠ 登记 " + e.getValue() + " 枚");
+            }
+        }
+        assertEquals(List.of(), drift,
+                "第11篇改指出口侧属主引用枚数漂移（十二文件基线＝#146am 本批实跑读数，"
+                        + "回退裸文案/域外同值常量两形态均红）：" + drift);
     }
 
     /**
