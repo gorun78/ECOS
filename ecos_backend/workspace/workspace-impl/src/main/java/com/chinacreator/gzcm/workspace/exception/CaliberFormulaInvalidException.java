@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.workspace.exception;
 
+import com.chinacreator.gzcm.common.ontology.CaliberDslContract;
+
 import java.util.List;
 import java.util.Map;
 
@@ -20,8 +22,11 @@ import java.util.Map;
  */
 public class CaliberFormulaInvalidException extends WorkspaceDomainException {
 
-    private static final List<String> DSL_GATES =
-            List.of("DSL_V1_SYNTAX", "DSL_V2_REFERENCE", "DSL_V3_DIMENSION", "DSL_V4_CYCLE");
+    private static final List<String> DSL_GATES = List.of(
+            CaliberDslContract.GATE_V1_SYNTAX,
+            CaliberDslContract.GATE_V2_REFERENCE,
+            CaliberDslContract.GATE_V3_DIMENSION,
+            CaliberDslContract.GATE_V4_CYCLE);
 
     public CaliberFormulaInvalidException(List<Map<String, Object>> violations, String target) {
         super(400, "CALIBER_DSL_INVALID", "口径公式 DSL 四关未通过（违一即 400，不落库）");

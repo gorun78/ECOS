@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.chinacreator.gzcm.common.ontology.CaliberDslContract;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberFormulaValidateDTO;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberFormulaValidationVO;
 import com.chinacreator.gzcm.engine.ontology.service.CaliberDslParser.BinaryNode;
@@ -52,17 +53,18 @@ public class CaliberDslValidator {
 
     private static final Logger log = LoggerFactory.getLogger(CaliberDslValidator.class);
 
-    // ── 四关门禁标签（PRD-09 §1.2 V1~V4；与发布门禁 V1_CALIBER/V2_UNIT/V3_LINEAGE 区分）──
-    public static final String GATE_V1_SYNTAX = "DSL_V1_SYNTAX";
-    public static final String GATE_V2_REFERENCE = "DSL_V2_REFERENCE";
-    public static final String GATE_V3_DIMENSION = "DSL_V3_DIMENSION";
-    public static final String GATE_V4_CYCLE = "DSL_V4_CYCLE";
+    // ── 四关门禁标签与机读码：面值取自 common-api 契约单源（#146ah；PRD-09 §1.2 V1~V4，
+    //    与发布门禁 V1_CALIBER/V2_UNIT/V3_LINEAGE 区分）─
+    public static final String GATE_V1_SYNTAX = CaliberDslContract.GATE_V1_SYNTAX;
+    public static final String GATE_V2_REFERENCE = CaliberDslContract.GATE_V2_REFERENCE;
+    public static final String GATE_V3_DIMENSION = CaliberDslContract.GATE_V3_DIMENSION;
+    public static final String GATE_V4_CYCLE = CaliberDslContract.GATE_V4_CYCLE;
 
     // ── 错误码（ECOS-ONTO-07x 号段，避开 012/021/022/030/040~042/050/060/061）──
-    public static final String CODE_SYNTAX = "ECOS-ONTO-070";
-    public static final String CODE_UNRESOLVED_REFERENCE = "ECOS-ONTO-071";
-    public static final String CODE_DIMENSION_CONFLICT = "ECOS-ONTO-072";
-    public static final String CODE_CYCLIC_DEPENDENCY = "ECOS-ONTO-073";
+    public static final String CODE_SYNTAX = CaliberDslContract.CODE_V1_SYNTAX;
+    public static final String CODE_UNRESOLVED_REFERENCE = CaliberDslContract.CODE_V2_REFERENCE;
+    public static final String CODE_DIMENSION_CONFLICT = CaliberDslContract.CODE_V3_DIMENSION;
+    public static final String CODE_CYCLIC_DEPENDENCY = CaliberDslContract.CODE_V4_CYCLE;
 
     /** V3 单位推导递归深度上限（防御注册表脏数据导致的深链）。 */
     private static final int UNIT_DERIVE_MAX_DEPTH = 6;

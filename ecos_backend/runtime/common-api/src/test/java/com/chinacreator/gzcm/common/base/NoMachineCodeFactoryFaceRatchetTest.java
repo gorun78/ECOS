@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.common.base;
 
+import com.chinacreator.gzcm.common.ontology.CaliberDslContract;
 import com.chinacreator.gzcm.common.testscan.SourceCommentStripper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -351,16 +352,34 @@ class NoMachineCodeFactoryFaceRatchetTest {
     /**
      * workspace 侧 DSL 门禁解码表（跨引擎 REST 契约的<b>消费面</b>第二份字面量）。
      *
-     * <p>{@code workspace-impl} 的 pom 只依赖 common-api + runtime-*，对 ontology-engine-impl
-     * 无编译依赖 ⇒ 无法引用 {@code CaliberDslValidator.CODE_*} 常量，只能自带一份解码键。
-     * 该双份属登记在案的架构性重复（消除它需要 DSL 号段下沉 common-api 或入 §6.3.3，待裁决），
-     * 本判据把它钉在「至多两枚属主」面内，禁第三处露面。</p>
+     * <p>#146ah 起解码键改取 common-api {@code CaliberDslContract} 常量单源（本表 path 常量
+     * 保留为判据锚点：消费文件仍在面内，只是字面量来源归一）。#146af 原裁决「至多两枚
+     * 属主」的前提（workspace-impl 对 ontology-engine-impl 无编译依赖）已被该单源腿取代：
+     * workspace-impl 直接依赖 common-api、ontology-engine-impl 经 runtime-core 传递可达，
+     * 零新增 Maven 依赖即可真单源。</p>
      */
     private static final String ONTO_CALIBER_ADDRESSING_SOURCE =
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/caliber/"
                     + "CaliberAddressing.java";
 
-    /** 逐枚登记：码位 → 允许持有其字面量的 main 面文件（白名单只减不增，新增须走裁决批）。 */
+    /**
+     * 口径 DSL 四关（闸名 DSL_V1~V4 + 机读码 070~073）跨模块契约单源（#146ah 收口 r5）。
+     *
+     * <p>该属主面同时承载 070/071/072/073 四枚字面量（070 与 {@code OntologyErrorCode}
+     * 登记在册的面为<b>同名不同语义</b>：那边＝术语悬空 F6-11 锚点，这边＝DSL V1 借用面值
+     * 的现行 wire 映射，两枚面各自回读各自语义，r2 语义冲突裁决不受本判据牵连）。</p>
+     */
+    private static final String CALIBER_DSL_CONTRACT_SOURCE =
+            "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/gzcm/common/ontology/"
+                    + "CaliberDslContract.java";
+
+    /**
+     * 逐枚登记：码位 → 允许持有其字面量的 main 面文件（白名单只减不增，新增须走裁决批）。
+     *
+     * <p>#146ah 订正（原文不删）：070~073 随 r5 收口改由 {@code CaliberDslContract} 单源承载，
+     * {@code CaliberDslValidator}／{@code CaliberAddressing} 从字面量属主降级为纯消费方
+     * （字面量退至 0 枚，由 {@link #caliberDslContractExitsPointToSingleSource} 出口侧基线接管）。</p>
+     */
     private static final Map<String, List<String>> ONTO_LITERAL_HOLDERS = new TreeMap<>(Map.ofEntries(
             Map.entry("000", List.of(ONTO_CALIBER_CONTROLLER_SOURCE)),
             Map.entry("011", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
@@ -374,11 +393,10 @@ class NoMachineCodeFactoryFaceRatchetTest {
             Map.entry("050", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
             Map.entry("060", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
             Map.entry("061", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
-            Map.entry("070", List.of(ONTOLOGY_ERROR_CODE_SOURCE,
-                    ONTO_CALIBER_DSL_VALIDATOR_SOURCE, ONTO_CALIBER_ADDRESSING_SOURCE)),
-            Map.entry("071", List.of(ONTO_CALIBER_DSL_VALIDATOR_SOURCE, ONTO_CALIBER_ADDRESSING_SOURCE)),
-            Map.entry("072", List.of(ONTO_CALIBER_DSL_VALIDATOR_SOURCE, ONTO_CALIBER_ADDRESSING_SOURCE)),
-            Map.entry("073", List.of(ONTO_CALIBER_DSL_VALIDATOR_SOURCE, ONTO_CALIBER_ADDRESSING_SOURCE)),
+            Map.entry("070", List.of(ONTOLOGY_ERROR_CODE_SOURCE, CALIBER_DSL_CONTRACT_SOURCE)),
+            Map.entry("071", List.of(CALIBER_DSL_CONTRACT_SOURCE)),
+            Map.entry("072", List.of(CALIBER_DSL_CONTRACT_SOURCE)),
+            Map.entry("073", List.of(CALIBER_DSL_CONTRACT_SOURCE)),
             Map.entry("080", List.of(ONTOLOGY_ERROR_CODE_SOURCE))));
 
     /**
@@ -412,6 +430,53 @@ class NoMachineCodeFactoryFaceRatchetTest {
 
     /** 登记豁免：唯一保留单参的入口腿。 */
     private static final List<String> REGISTERED_ENTRY_EXEMPTIONS = List.of("handleNotFound");
+
+    // ── 口径 DSL 四关跨模块契约单源面（#146ah 收口 ONTO r5）─────────────────
+
+    /**
+     * DSL 契约消费侧判据锚：四处消费文件必须各自仍在取 {@code CaliberDslContract.} 常量。
+     *
+     * <p>与 {@link #ONTO_CODE_REFERENCE} 分工不同：那边钉的是「§6.3.3 在册码的出口」，
+     * 这边钉的是「DSL 四关结构性映射的出口」——若消费文件哪天改回裸 {@code "DSL_V1_SYNTAX"}
+     * 字面量，ONTO 族字面量面照样干净（DSL 闸名不在数字码族正则覆盖内），<b>只有本腿</b>
+     * 读得见。双表互为镜像 ⇒ 任何一侧字面量/常量面漂移都会撞对称断言或此处基线。</p>
+     */
+    private static final Pattern CALIBER_DSL_CONTRACT_REFERENCE =
+            Pattern.compile("CaliberDslContract\\s*\\.\\s*[A-Z][A-Z0-9_]+");
+
+    /**
+     * DSL 契约消费侧基线 = 本批实跑逐文件读数（非估算）：
+     * <ul>
+     *   <li>ontology 写出面 {@code CaliberDslValidator}：4 闸名授值＋4 码授值＝8 枚；</li>
+     *   <li>workspace 解码面 {@code CaliberAddressing}：OWNER_DSL_GATE 四键八值＝8 枚；
+     *       {@code CaliberFormulaInvalidException}／{@code CaliberReadService} 四闸词表＝各 4 枚。</li>
+     * </ul>
+     * 少＝消费面静默改回字面量（治标于命名漂移的回流），多＝新增取码腿须同批重设本表。
+     */
+    private static final Map<String, Integer> CALIBER_DSL_CONSUMER_EXIT_BASELINE = new TreeMap<>(Map.ofEntries(
+            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/service/CaliberDslValidator.java", 8),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/caliber/CaliberAddressing.java", 8),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/exception/CaliberFormulaInvalidException.java", 4),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/caliber/CaliberReadService.java", 4)));
+
+    /**
+     * 四个消费文件的契约 import 面：单源成立的前提是消费真的经 {@code CaliberDslContract} 取面值。
+     * 改指域外同面值常量后裸文案回读「假绿」时（外观与常量引用不可分辨），<b>只有 import 那行</b>
+     * 读得见域内/域外——出口基线管「改指域外同值常量」，本腿管「改回裸串」。</p>
+     */
+    private static final Pattern CALIBER_DSL_CONSUMER_IMPORT = Pattern.compile(
+            "import\\s+com\\.chinacreator\\.gzcm\\.common\\.ontology\\s*\\.\\s*CaliberDslContract\\s*;");
+
+    /** pom 双向可达面（#146ah 前提锚）：单源在 common-api，两个消费模块须各自依赖可达。 */
+    private static final String WORKSPACE_IMPL_POM =
+            "ecos_backend/workspace/workspace-impl/pom.xml";
+
+    private static final String ONTO_ENGINE_IMPL_POM =
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/pom.xml";
 
     // ── ECOS-COG-* 族单源面（#146ag）─────────────────
 
@@ -929,6 +994,93 @@ class NoMachineCodeFactoryFaceRatchetTest {
         }
         assertEquals(List.of(), drift,
                 "ECOS-ONTO 族出口侧常量引用枚数漂移（八文件基线＝#146af 本批实跑读数）：" + drift);
+    }
+
+    // ── 口径 DSL 四关跨模块契约单源（#146ah 收口 ONTO r5）─────────────
+
+    /**
+     * 口径 DSL 四关契约属主面（#146ah）：{@code CaliberDslContract} 必须同时承载
+     * <b>闸名词表与机读码字面量</b>，且双向映射对称、pom 双向可达前提不被拆断。
+     *
+     * <p>三段假绿防护：①<b>双边字面量回读</b>——4 枚闸名＋4 枚机读码串都在属主源内
+     * （消费侧字面量退到 0 枚后，属主删码面＝全链路同时静默失效，只有回读读得见）；
+     * ②<b>双向映射对称</b>：{@code gateNameByCode} 以 4 枚码探得恰 4 枚区分闸名且
+     * {@code codeByGate} 恒互逆（删一行 Map.of 即红）；③<b>pom 双向可达</b>——
+     * workspace-impl 直挂 common-api、ontology-engine-impl 经 runtime-core 传递可达
+     * （#146af 原裁决「至多两枚属主」的前提「跨模块 import 须新挂依赖」不成立才换来零
+     * 新依赖真单源；任一侧依赖被拔掉即红，防单链条目被动吸走时假单源固化）。</p>
+     */
+    @Test
+    @DisplayName("口径 DSL 四关契约属主：闸名+机读码双边字面量在位、映射对称、pom 双向可达")
+    void caliberDslContractCrossModuleOwnerTest() throws IOException {
+        Path root = locateRepoRoot();
+        String contract = readStripped(root, CALIBER_DSL_CONTRACT_SOURCE);
+
+        String[] gateValues = {
+                "DSL_V1_SYNTAX", "DSL_V2_REFERENCE", "DSL_V3_DIMENSION", "DSL_V4_CYCLE",
+                "ECOS-ONTO-070", "ECOS-ONTO-071", "ECOS-ONTO-072", "ECOS-ONTO-073"};
+        List<String> missing = new ArrayList<>();
+        for (String v : gateValues) {
+            if (!contract.contains(v)) {
+                missing.add(v);
+            }
+        }
+        assertEquals(List.of(), missing,
+                "契约属主缺面值字面量（4 闸名＋4 机读码须同枚在位）：" + missing);
+
+        Set<String> gates = new TreeSet<>();
+        for (String code : List.of("ECOS-ONTO-070", "ECOS-ONTO-071",
+                "ECOS-ONTO-072", "ECOS-ONTO-073")) {
+            String gate = CaliberDslContract.gateNameByCode(code);
+            assertNotNull(gate, "gateNameByCode(" + code + ") = null：结构性映射丢码位");
+            gates.add(gate);
+        }
+        assertEquals(4, gates.size(), "gateNameByCode 返回区分闸名 ≠ 4：码位映射坍缩");
+        for (String gate : gates) {
+            assertEquals(gate, CaliberDslContract.gateNameByCode(CaliberDslContract.codeByGate(gate)),
+                    "gateNameByCode ∘ codeByGate 非恒等（双向映射互逆被拆断）：" + gate);
+        }
+
+        String workspacePom = Files.readString(root.resolve(WORKSPACE_IMPL_POM), StandardCharsets.UTF_8);
+        assertTrue(workspacePom.contains("<artifactId>common-api</artifactId>"),
+                "workspace-impl pom 失去 common-api 依赖＝DSL 契约单源前提断链（编译仍绿、单源名存实亡）");
+        String ontoPom = Files.readString(root.resolve(ONTO_ENGINE_IMPL_POM), StandardCharsets.UTF_8);
+        assertTrue(ontoPom.contains("<artifactId>runtime-core</artifactId>"),
+                "ontology-engine-impl pom 失去 runtime-core 依赖＝经其传递的 common-api 可达性断链");
+    }
+
+    /**
+     * 口径 DSL 四关消费侧出口倒数（#146ah）：4 个消费文件必须<b>逐文件恰 N 枚</b>
+     * {@code CaliberDslContract.<CONSTANT>} 引用，且各自保留契约 import。
+     *
+     * <p>与字面量族白名单的门分工：族腿盯「set 的串还在属主内」，本腿盯「出口真经
+     * 属主取面值」——消费面改回裸串（{@code "DSL_V1_SYNTAX"} 之类）时，DSL 闸名不在
+     * ONTO/COG 数字码族正则覆盖内 <=> 族腿读不到，<b>只有本腿</b>读得到。
+     * 升枚即红（大于登记）同样要打回：新增了取码面就必须同批重设基线，
+     * 禁「消费面扩了，登记表不动」（基线陈旧＝假已收口）。</p>
+     */
+    @Test
+    @DisplayName("口径 DSL 四关消费侧四文件逐文件恰取 CaliberDslContract 常量并保留契约 import")
+    void caliberDslContractExitsPointToSingleSource() throws IOException {
+        Path root = locateRepoRoot();
+        List<String> drift = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : CALIBER_DSL_CONSUMER_EXIT_BASELINE.entrySet()) {
+            String stripped = readStripped(root, e.getKey());
+            int hits = 0;
+            Matcher m = CALIBER_DSL_CONTRACT_REFERENCE.matcher(stripped);
+            while (m.find()) {
+                hits++;
+            }
+            if (hits != e.getValue()) {
+                drift.add(e.getKey() + " 实跑 " + hits + " 枚 ≠ 登记 " + e.getValue() + " 枚");
+            }
+            long imports = CALIBER_DSL_CONSUMER_IMPORT.matcher(stripped).results().count();
+            if (imports != 1) {
+                drift.add(e.getKey() + " 契约 import " + imports + " 枚 ≠ 1（改指域外同值常量＝单源名存实亡）");
+            }
+        }
+        assertEquals(List.of(), drift,
+                "口径 DSL 四关消费侧漂移（基线＝#146ah 本批实跑读数；回退裸串与域外同值常量两形态均红）：" + drift);
     }
 
     /**

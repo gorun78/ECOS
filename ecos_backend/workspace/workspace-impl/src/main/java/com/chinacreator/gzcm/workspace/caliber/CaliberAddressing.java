@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.workspace.caliber;
 
+import com.chinacreator.gzcm.common.ontology.CaliberDslContract;
 import com.chinacreator.gzcm.workspace.caliber.CaliberOwnerClient.OwnerReply;
 import com.chinacreator.gzcm.workspace.exception.CaliberFormulaInvalidException;
 import com.chinacreator.gzcm.workspace.exception.CaliberNotFoundException;
@@ -48,17 +49,18 @@ public class CaliberAddressing {
             "create_time", "createTime");
 
     /**
-     * 属主四关机读码 → 契约闸名（单源；映射不上返回 {@code null}，<b>不猜一关顶替</b>）。
+     * 属主四关机读码 → 契约闸名（#146ah：取 common-api {@link CaliberDslContract} 契约单源，
+     * 与 ontology 写出面同值；<b>不猜一关顶替</b>——映射不上由属主返回 {@code null}）。
      *
      * <p>属主 {@code CaliberDslValidator} 把 V1~V4 分别落在 {@code ECOS-ONTO-070/071/072/073}，
      * 写入咽喉（{@code POST /{code}/versions}）与审批咽喉只回这个机读码、不回 data 段
      * ⇒ 闸名是委托侧唯一可复验的结构化拒绝证据。</p>
      */
     private static final Map<String, String> OWNER_DSL_GATE = Map.of(
-            "ECOS-ONTO-070", "DSL_V1_SYNTAX",
-            "ECOS-ONTO-071", "DSL_V2_REFERENCE",
-            "ECOS-ONTO-072", "DSL_V3_DIMENSION",
-            "ECOS-ONTO-073", "DSL_V4_CYCLE");
+            CaliberDslContract.CODE_V1_SYNTAX, CaliberDslContract.GATE_V1_SYNTAX,
+            CaliberDslContract.CODE_V2_REFERENCE, CaliberDslContract.GATE_V2_REFERENCE,
+            CaliberDslContract.CODE_V3_DIMENSION, CaliberDslContract.GATE_V3_DIMENSION,
+            CaliberDslContract.CODE_V4_CYCLE, CaliberDslContract.GATE_V4_CYCLE);
 
     private final CaliberOwnerClient ownerClient;
 

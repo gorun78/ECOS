@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.workspace.caliber;
 
+import com.chinacreator.gzcm.common.ontology.CaliberDslContract;
 import com.chinacreator.gzcm.workspace.caliber.CaliberOwnerClient.OwnerReply;
 import com.chinacreator.gzcm.workspace.exception.ActionValidationException;
 import com.chinacreator.gzcm.workspace.exception.CaliberFormulaInvalidException;
@@ -52,9 +53,12 @@ public class CaliberReadService {
     private static final List<String> VALIDATE_REQUEST_FIELDS =
             List.of("code", "formula", "factFields", "units", "relatedFormulas");
 
-    /** 四关闸名（属主 {@code CaliberFormulaValidationVO.Violation#gate} 词表，前端按 gate 分组渲染）。 */
-    private static final List<String> DSL_GATES =
-            List.of("DSL_V1_SYNTAX", "DSL_V2_REFERENCE", "DSL_V3_DIMENSION", "DSL_V4_CYCLE");
+    /** 四关闸名（属主 {@code CaliberFormulaValidationVO.Violation#gate} 词表，前端按 gate 分组渲染；#146ah 起取契约单源）。 */
+    private static final List<String> DSL_GATES = List.of(
+            CaliberDslContract.GATE_V1_SYNTAX,
+            CaliberDslContract.GATE_V2_REFERENCE,
+            CaliberDslContract.GATE_V3_DIMENSION,
+            CaliberDslContract.GATE_V4_CYCLE);
 
     /**
      * 真欠原因单源（每条可复验，文案不写跨引擎 schema/表限定名——与
