@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.runtime.llm.agent.spi.AgentRuntimeCapability;
 import com.chinacreator.gzcm.runtime.llm.agent.spi.AgentRuntimeCapabilityUnavailableException;
 import com.chinacreator.gzcm.runtime.llm.agent.spi.AgentRuntimeProvider;
@@ -42,9 +43,7 @@ public class AgentChatController {
 
     private static final Logger log = LoggerFactory.getLogger(AgentChatController.class);
 
-    /** 未装配错误码（增量字段，不改既有成功响应体）。 */
-    private static final String ERROR_CODE_RUNTIME_ABSENT = "ECOS-AI-AGENT-RUNTIME-ABSENT";
-
+    /** 未装配显式 501 + stub（码位数沿 {@link AiErrorClass#ERROR_CODE_RUNTIME_ABSENT} 属主单源）。 */
     private static final int CODE_RUNTIME_NOT_ASSEMBLED = 501;
 
     private final ObjectProvider<AgentRuntimeProvider> runtimeProvider;
@@ -112,7 +111,7 @@ public class AgentChatController {
     /** provider bean 不在 classpath / 未被组件扫描 —— 显式 501 + stub。 */
     private ApiResponse<Map<String, Object>> runtimeAbsent() {
         ApiResponse<Map<String, Object>> resp = ApiResponse.error(
-                CODE_RUNTIME_NOT_ASSEMBLED, ERROR_CODE_RUNTIME_ABSENT,
+                CODE_RUNTIME_NOT_ASSEMBLED, AiErrorClass.ERROR_CODE_RUNTIME_ABSENT,
                 "AgentRuntimeProvider 未在本承流形态中装配（agent-service 不在 classpath 或未被组件扫描）");
         resp.setData(stubBody(null, "no AgentRuntimeProvider bean"));
         return resp;
@@ -121,7 +120,7 @@ public class AgentChatController {
     /** provider 在但能力不可用 —— 显式 501 + stub，禁止静默 no-op。 */
     private ApiResponse<Map<String, Object>> capabilityUnavailable(AgentRuntimeCapabilityUnavailableException e) {
         ApiResponse<Map<String, Object>> resp = ApiResponse.error(
-                CODE_RUNTIME_NOT_ASSEMBLED, ERROR_CODE_RUNTIME_ABSENT,
+                CODE_RUNTIME_NOT_ASSEMBLED, AiErrorClass.ERROR_CODE_RUNTIME_ABSENT,
                 "Agent 运行时能力 " + e.getCapability() + " 不可用: " + e.getReason());
         resp.setData(stubBody(e.getCapability(), e.getReason()));
         return resp;

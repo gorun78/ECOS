@@ -69,6 +69,18 @@ public enum AiErrorClass {
     STUB_CAPABILITY("ECOS-AI-501", 501, 0, RetryKind.NONE, false,
             "该能力尚未上线（诊断码 {traceId}）", Level.INFO, false, false, false);
 
+    /**
+     * 未装配错误码（非数字码位，#146ai 新登属主）——Agent 运行时（agent-service）不在承流
+     * classpath 时的显式 501 + stub 应答专属码。
+     *
+     * <p><b>单源依据</b>：收口前 {@code Engine / Evolution / Skill / CronJob} 四控制器各自私设
+     * {@code ERROR_CODE_RUNTIME_ABSENT} 本地常量复制该字面量（4 份副本同值）；本常量以
+     * <b>原样承值、零新增码表条目</b>建属主，四控制器改指本枚。与数字码位不同，本枚是
+     * 形态码位置命名（描述「装配形态缺失」这一失败态，不对应 HTTP 状态行），不进七类矩阵、
+     * 不占 {@link #SEVEN_CLASSES} 序号。</p>
+     */
+    public static final String ERROR_CODE_RUNTIME_ABSENT = "ECOS-AI-AGENT-RUNTIME-ABSENT";
+
     /** PRD §5.1 七类（矩阵测试的枚举基准，顺序即 PRD 表序）。 */
     public static final AiErrorClass[] SEVEN_CLASSES = {
             LLM_TIMEOUT, LLM_RATE_LIMITED, PARSE_FAILURE, CONTEXT_OVERFLOW,

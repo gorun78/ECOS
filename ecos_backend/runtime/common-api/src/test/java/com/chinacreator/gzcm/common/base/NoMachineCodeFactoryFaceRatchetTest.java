@@ -590,6 +590,48 @@ class NoMachineCodeFactoryFaceRatchetTest {
                     + "com/chinacreator/gzcm/engine/cognitive2/service/decision/"
                     + "DecisionBasisService.java", 6)));
 
+    // ── ECOS-AI-* 族单源面（#146ai）─────────────────
+
+    /**
+     * AI 族码字面量判据（#146ai）：数字码位＝3 位数字＋<b>可选大写字母后缀</b>（400C/500P），
+     * 与 COG 族同型；另有 1 枚<b>非数字形态码</b> {@code ECOS-AI-AGENT-RUNTIME-ABSENT}
+     * （装配形态缺失的失败态命名码，不对应 HTTP 状态行序号）单列判据。
+     */
+    private static final Pattern AI_FAMILY_LITERAL =
+            Pattern.compile("ECOS-AI-(\\d{3}[A-Z]?)(?![\\dA-Za-z-])");
+
+    /** 非数字形态码判据（AGENT-RUNTIME-ABSENT；尾段 (?![A-Za-z0-9]) 防前缀误读）。 */
+    private static final Pattern AI_RUNTIME_ABSENT_LITERAL =
+            Pattern.compile("ECOS-AI-AGENT-RUNTIME-ABSENT");
+
+    /** AI 族属主＝common-api 七类矩阵枚举（12 枚数字码位的字面量唯一合法家）。 */
+    private static final String AI_ERROR_CLASS_SOURCE =
+            "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/gzcm/"
+                    + "common/error/AiErrorClass.java";
+
+    /** 非数字形态码唯一合法持有面＝属主类自身（4 枚控制器改指后 main 面副本归零）。 */
+    private static final Map<String, List<String>> AI_ALPHANUMERIC_LITERAL_HOLDERS = new TreeMap<>(Map.of(
+            "ECOS-AI-AGENT-RUNTIME-ABSENT", List.of(AI_ERROR_CLASS_SOURCE)));
+
+    /**
+     * 改指文件 → 应出现的 {@code AiErrorClass.} 属主引用枚数（#146ai 本批实跑读数）。
+     * 少＝出口漂移回裸串（假单源）；多＝重复取码或新增改指腿未同批重设本表。
+     */
+    private static final Pattern AI_CODE_REFERENCE =
+            Pattern.compile("AiErrorClass\\s*\\.");
+
+    private static final Map<String, Integer> AI_CONSUMER_EXIT_BASELINE = new TreeMap<>(Map.ofEntries(
+            Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/ai/controller/AgentChatController.java", 2),
+            Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/ai/controller/EvolutionController.java", 2),
+            Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/ai/controller/SkillController.java", 1),
+            Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/ai/controller/CronJobController.java", 1),
+            Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/ai/controller/AgentSessionOpsController.java", 19)));
+
     // ── 1. 余面棘轮 ─────────────────────────────────
 
     @Test
@@ -1181,6 +1223,104 @@ class NoMachineCodeFactoryFaceRatchetTest {
         }
         assertEquals(List.of(), drift,
                 "ECOS-COG 族出口侧常量引用枚数漂移（五文件基线＝#146ag 本批实跑读数）：" + drift);
+    }
+
+    /**
+     * ECOS-AI-* 族码字面量单源判据（#146ai）：数字码位（400/403/413/422/429/404/501/502/503/504/
+     * 500P/400C 十二枚）＋非数字形态码（AGENT-RUNTIME-ABSENT）在 main 面只由
+     * {@code AiErrorClass} 属主承载。
+     *
+     * <p>三段假绿防护：①<b>数字码位属主集对账</b>——属主内 12 枚与白名单 {@code equals} 同号
+     * （属主单方面补登/删枚而门禁未同批改即红）；②<b>逐命中白名单外即红</b>——新增裸串复制
+     * 无论在引号、case 标签还是日志格式串内都入账；③<b>形态码三点鼻</b>——非数字
+     * {@code AGENT-RUNTIME-ABSENT} 用独立判据与白名单，且属主文件内回读面值
+     * （防它跨包拆走时判据永远读不到假绿）。</p>
+     */
+    @Test
+    @DisplayName("ECOS-AI-* 族码字面量 main 面仅由 AiErrorClass 承载，属主码位集与白名单同号")
+    void aiFamilyLiteralsAreSingleSourced() throws IOException {
+        Path root = locateRepoRoot();
+        List<Path> files = new ArrayList<>();
+        collectJavaUnder(root.resolve("ecos_backend"), files);
+        assertTrue(files.size() >= MIN_SCANNED_MAIN_FILES,
+                "扫描面缩水：实扫 main 面 java 文件 " + files.size() + " < 阈值 "
+                        + MIN_SCANNED_MAIN_FILES + "，判据不可信（读不到 ≠ 无副本）");
+
+        List<String> violations = new ArrayList<>();
+        for (Path f : files) {
+            String rel = root.relativize(f).toString().replace('\\', '/');
+            String stripped = SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+
+            Matcher m = AI_FAMILY_LITERAL.matcher(stripped);
+            while (m.find()) {
+                String code = m.group(1);
+                if (!AI_ERROR_CLASS_SOURCE.equals(rel)) {
+                    violations.add(rel + " → ECOS-AI-" + code + "（属主之外的数字码位副本）");
+                }
+            }
+
+            Matcher n = AI_RUNTIME_ABSENT_LITERAL.matcher(stripped);
+            while (n.find()) {
+                List<String> holders = AI_ALPHANUMERIC_LITERAL_HOLDERS.get("ECOS-AI-AGENT-RUNTIME-ABSENT");
+                if (holders == null || !holders.contains(rel)) {
+                    violations.add(rel + " → ECOS-AI-AGENT-RUNTIME-ABSENT（属主之外的非数字形态码副本）");
+                }
+            }
+        }
+        assertEquals(List.of(), violations,
+                "main 面 ECOS-AI-* 字面量越权露面（引号、case、消息中段、格式串一律入账）："
+                        + "出口应改取 AiErrorClass 常量；新增族码先在设计冻结表登记再建属主枚，"
+                        + "禁以代码冒充文档裁决。清单=" + violations);
+
+        Set<String> ownerCodes = new TreeSet<>();
+        Matcher ownerScan = AI_FAMILY_LITERAL.matcher(readStripped(root, AI_ERROR_CLASS_SOURCE));
+        while (ownerScan.find()) {
+            ownerCodes.add(ownerScan.group(1));
+        }
+        Set<String> expected = new TreeSet<>(List.of(
+                "400", "400C", "403", "404", "413", "422", "429", "500P", "501", "502", "503", "504"));
+        assertEquals(expected, ownerCodes,
+                "属主 AiErrorClass 在册数字码位集与本门禁白名单不一致：属主单方面补登/删枚"
+                        + "必须同批改判据并回到设计单源裁决，禁让文档冻结表与代码属主各走各路。");
+
+        assertTrue(readStripped(root, AI_ERROR_CLASS_SOURCE).contains("ECOS-AI-AGENT-RUNTIME-ABSENT"),
+                "非数字形态码在属主 AiErrorClass 内已无字面量锚点——该枚已被删除或迁走（值域扩展），"
+                        + "须同批撤销/重设本门禁判据并回到设计单源裁决，禁静默失配");
+    }
+
+    /**
+     * ECOS-AI 族消费侧出口基线（#146ai）：五枚改指文件逐文件<b>恰 N 枚</b>
+     * {@code AiErrorClass.<IDENTIFIER>} 属主引用。
+     *
+     * <p>家族腿只逛「字面量没扩散」，不逛「出口真在取常量」——本批改指后
+     * {@code AgentSessionOpsController:542} 的 {@code "ECOS-AI-503"} 裸串如果未来被
+     * 合回一个字面量，家族腿照样见不到（那个码位属主白名单内），<b>只有本腿</b>
+     * 靠逐文件 {@code AiErrorClass.} 引用数变红兜住。少=改回裸串/域外同值常量；
+     * 多＝新增出口取码未同批重设本表。</p>
+     */
+    @Test
+    @DisplayName("ECOS-AI 族五处改指出口逐文件恰取 AiErrorClass 属主（漂移或假单源即红）")
+    void aiExitsPointToSingleSource() throws IOException {
+        Path root = locateRepoRoot();
+        List<String> drift = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : AI_CONSUMER_EXIT_BASELINE.entrySet()) {
+            String stripped = readStripped(root, e.getKey());
+            int hits = 0;
+            Matcher m = AI_CODE_REFERENCE.matcher(stripped);
+            while (m.find()) {
+                hits++;
+            }
+            if (hits != e.getValue()) {
+                drift.add(e.getKey() + " 实跑 " + hits + " 枚 ≠ 登记 " + e.getValue() + " 枚");
+            }
+            long imports = Pattern.compile("import\\s+com\\.chinacreator\\.gzcm\\.common\\.error\\.AiErrorClass;")
+                    .matcher(stripped).results().count();
+            if (imports != 1) {
+                drift.add(e.getKey() + " 属主 import " + imports + " 枚 ≠ 1（改指域外同值常量＝单源名存实亡）");
+            }
+        }
+        assertEquals(List.of(), drift,
+                "ECOS-AI 族出口侧属主引用枚数漂移（五文件基线＝#146ai 本批实跑读数）：" + drift);
     }
 
     /**

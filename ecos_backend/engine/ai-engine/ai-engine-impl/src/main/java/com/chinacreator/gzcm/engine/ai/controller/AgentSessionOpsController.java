@@ -539,7 +539,7 @@ public class AgentSessionOpsController {
         data.put("reason", reason == null ? "-" : reason);
         return ResponseEntity.status(AiErrorClass.GUARDRAIL_FAIL_CLOSED.httpStatus()).body(ApiResponse.error(
                 AiErrorClass.GUARDRAIL_FAIL_CLOSED.httpStatus(),
-                "ECOS-AI-503",
+                AiErrorClass.GUARDRAIL_FAIL_CLOSED.errorCode(),
                 AiErrorClass.GUARDRAIL_FAIL_CLOSED.renderMessage(null, service)));
     }
 }

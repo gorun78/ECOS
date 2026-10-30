@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.runtime.llm.agent.spi.AgentMcpCapability;
 import com.chinacreator.gzcm.runtime.llm.agent.spi.AgentRuntimeCapability;
 import com.chinacreator.gzcm.runtime.llm.agent.spi.AgentRuntimeCapabilityUnavailableException;
@@ -38,7 +39,6 @@ public class SkillController {
 
     private static final Logger log = LoggerFactory.getLogger(SkillController.class);
 
-    private static final String ERROR_CODE_RUNTIME_ABSENT = "ECOS-AI-AGENT-RUNTIME-ABSENT";
     private static final int CODE_RUNTIME_NOT_ASSEMBLED = 501;
 
     private final ObjectProvider<AgentRuntimeProvider> runtimeProvider;
@@ -94,7 +94,7 @@ public class SkillController {
     private ApiResponse<Object> unavailable(AgentRuntimeCapabilityUnavailableException e) {
         log.warn("skills 依赖的运行时能力不可用: capability={} reason={}", e.getCapability(), e.getReason());
         ApiResponse<Object> resp = ApiResponse.error(
-                CODE_RUNTIME_NOT_ASSEMBLED, ERROR_CODE_RUNTIME_ABSENT,
+                CODE_RUNTIME_NOT_ASSEMBLED, AiErrorClass.ERROR_CODE_RUNTIME_ABSENT,
                 "Agent 运行时能力 " + e.getCapability() + " 不可用: " + e.getReason());
         Map<String, Object> stub = new LinkedHashMap<>();
         stub.put("stub", true);
