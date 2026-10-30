@@ -6,7 +6,17 @@
 --   V217__fc_backtest.sql 表注释已声明"阈值不入列，判定源 = ecos.fc.backtest.review_threshold.*"⇒ 本脚本补齐该声明的数据面。
 -- 需求依据: PRD-09 §5.2 公式与守卫原文（MAPE>15% / 覆盖率<80% / n<5 ⇒ LOW_SAMPLE 不参与告警）——
 --           本组值即 PRD 原值，改判定线只改本行不改代码；公式定义本身在 PRD，不在本脚本重定义。
--- 批准: 与 V277~V279 同批 = **仅落迁移脚本文件，未对 ecos-postgres 实跑**（实跑属逐项授权项，见详设-09 §十二 门禁声明）。
+-- 批准: 同批（V277~V279）**落文件**（头注初稿口径）。
+-- [实跑状态] 2026-10-30 #146ar 澄清：sys_config 本组 4 行
+--            （cfg-fc-bt-min-samples/cfg-fc-bt-mape-ratio/cfg-fc-bt-min-interval-cov/
+--             cfg-fc-bt-min-data-cov）在 dev PG（sysman 域 `sys_config`，
+--            information_schema 实查实际落点 ecos_control.sys_config，
+--            与本脚本裸名 SQL 同源）库面在位：四行 config_value 逐行
+--            = 5/0.15/0.80/0.80，与本脚本原文逐字节一致，落库时间
+--            早于本批（本批零写库动作）：头注"未对 ecos-postgres 实跑"
+--            系文件初稿口径（当时脚本刚落、seed 尚未授权实跑），
+--            库面实况为已由 seed 批走 `ON CONFLICT (config_key) DO NOTHING` 落地，
+--            本批仅订正头注为库面实况，脚本体未动、零 DDL 事件。
 -- 归属纪律: `sys_config` 属 **sysman 域**（控制域主 schema）。认知引擎代码侧零 sys_config 语句，
 --           读全部经 `SysConfigService` 门面（守卫：BacktestThresholdSingleSourceTest + CognitiveConfigSingleSourceTest）。
 -- 键名单源: 五枚键名字面量只出现在 `CognitiveConfigQueryService`（KEY_BACKTEST_*），业务侧只调门面方法；

@@ -48,8 +48,16 @@ CREATE INDEX IF NOT EXISTS idx_afcr_idem
 
 -- ── 4. 登记 ─────────────────────────────────────────────────────────────
 -- [下一枚] V288
--- [实跑状态] 本文件仅落单源目录，未在 dev PG 实跑（dev PG 现无 ecos_dw.ecos_application_forecast_run
---            表，V197/V277 同批未应用 ⇒ 单独应用本脚本必失败）。实跑授权与批次见
---            docs/40-实现/DDL迁移脚本落地登记-2026-09-30.md。
+-- [实跑状态] 2026-10-30 #146ar 已对 dev PG（ecos-postgres/sys_man）按 IR02 手动 psql 实跑：
+--            实跑前库面取证 = 表 ecos_dw.ecos_application_forecast_run 已在位（V197/V277 早已实跑，
+--            V277 四列 snapshot_id/formula_version/reused_from_run_id/task_id 均在位 ⇒ 走增量补列而非建表）；
+--            本脚本真执行 = ADD COLUMN idempotency_key VARCHAR(128) + content_hash VARCHAR(64)
+--            + CREATE INDEX idx_afcr_idem(idempotency_key, is_deleted)，exit 0（IR02 手动 psql，
+--            实跑授权＝用户 2026-10-31 AskUserQuestion「批 live-acceptance 迁移实跑」裁决面）；
+--            库面实查 = information_schema 两列 character varying 宽度 128/64 各 1 枚、
+--            pg_class 索引 idx_afcr_idem 1 枚、存量行 0 行（零回填）；重放脚本 =
+--            ADD/INDEX 三重 skip（already exists）exit 0 零重复；consumer = data-engine
+--            ForecastRunSnapshotMapper.xml（idempotency_key、content_hash 在 SELECT 列面 +
+--            WHERE idempotency_key=? AND is_deleted=0 定位腿，idx_afcr_idem 命中）。
 -- [幂等性] IF NOT EXISTS 三重守卫，重复执行零报错、零重复列/索引。
 -- [回滚面] 只加不删（IR01）；如需回退走「备份 + 应用侧读写先切走 + 人工审批」三步，本批不提供 DROP。
