@@ -205,7 +205,7 @@ public class DecisionBasisService {
         out.put("anchored", false);
         out.put("anchorStatus", "UNPINNED_CURRENT_READ");
         out.put("anchorNote", "cognitive decision base has no version/hash columns;"
-                + " pinned citation requests are rejected with 404 ECOS-COG-404D"
+                + " pinned citation requests are rejected with 404 " + CognitiveErrorCode.E404_DECISION_BASIS
                 + " instead of silently resolving to the current row");
         return out;
     }

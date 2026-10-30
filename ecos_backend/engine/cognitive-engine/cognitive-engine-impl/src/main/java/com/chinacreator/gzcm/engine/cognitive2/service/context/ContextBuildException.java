@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.engine.cognitive2.service.context;
 
+import com.chinacreator.gzcm.engine.cognitive.api.CognitiveErrorCode;
+
 /**
  * Context Builder 失败语义异常（《认知域与智能域补充详细设计 v1.0》§5.5 失败语义表）。
  *
@@ -15,18 +17,28 @@ package com.chinacreator.gzcm.engine.cognitive2.service.context;
  */
 public class ContextBuildException extends RuntimeException {
 
-    /** E503_DEPENDENCY_MISSING：必需源/必需能力不可用（引擎未启用/服务不可达 → 真实 503，禁伪空集合）。 */
+    /**
+     * E503_DEPENDENCY_MISSING：必需源/必需能力不可用（引擎未启用/服务不可达 → 真实 503，禁伪空集合）。
+     *
+     * <p>#146ag 取证：本枚是 COG 族唯一<b>未登记在设计单源错误码表</b>的码位（属主
+     * {@link CognitiveErrorCode} 里依赖不可用登记为 {@code E502_DEPENDENCY_DOWN = "ECOS-COG-502D"}），
+     * 但它已被前端契约三面绑定——{@code ecos_frontend/src/locales/workspace/{zh-CN,en}.json}
+     * 的 {@code workspace.ctx.err.engine} 文案与 {@code cognitiveClient.ts} 的失败语义注释、
+     * 以及 {@code ecos-tests/tests/e2e/workspace/cognition-surfaces-live.spec.ts} 的 503 断言。
+     * 改值＝跨语言契约变更（须先在设计单源登记该码位或裁决迁到 502D），故本批<b>保留字面量</b>
+     * 并在门禁里显式白名单登记为余项，禁以"副本消除"名义顺手改码值。</p>
+     */
     public static final String E503_DEPENDENCY_MISSING = "ECOS-COG-503D";
     /** E403_SOURCE_DENIED：权限/密级拒绝（security 裁剪面不可用 = fail-closed 默认 DENY）。 */
-    public static final String E403_SOURCE_DENIED     = "ECOS-COG-403S";
+    public static final String E403_SOURCE_DENIED     = CognitiveErrorCode.E403_SOURCE_DENIED;
     /** E409_VERSION_STALE：引用版本失配（期望版本 vs 读回版本不一致 ⇒ 拒绝使用旧版本执行）。 */
-    public static final String E409_VERSION_STALE     = "ECOS-COG-409V";
+    public static final String E409_VERSION_STALE     = CognitiveErrorCode.E409_VERSION_STALE;
     /** E422_CONFLICT_UNRESOLVED：语义冲突未解决（禁 LLM 自行裁决为事实）。 */
-    public static final String E422_CONFLICT_UNRESOLVED = "ECOS-COG-422C";
+    public static final String E422_CONFLICT_UNRESOLVED = CognitiveErrorCode.E422_CONFLICT_UNRESOLVED;
     /** E429_BUDGET_EXCEEDED：超 Token/来源预算（显式截断失败态；部分截断走 warnings 不抛）。 */
-    public static final String E429_BUDGET_EXCEEDED   = "ECOS-COG-429B";
+    public static final String E429_BUDGET_EXCEEDED   = CognitiveErrorCode.E429_BUDGET_EXCEEDED;
     /** E400_SOURCE_REF_MISSING：来源引用缺 ID/版本/时点三要素（SUP-CTX-01）。 */
-    public static final String E400_SOURCE_REF_MISSING = "ECOS-COG-400S";
+    public static final String E400_SOURCE_REF_MISSING = CognitiveErrorCode.E400_SOURCE_REF_MISSING;
 
     public final String errorCode;
     public final int httpStatus;

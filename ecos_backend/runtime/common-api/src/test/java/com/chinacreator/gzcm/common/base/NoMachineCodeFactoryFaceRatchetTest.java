@@ -413,6 +413,118 @@ class NoMachineCodeFactoryFaceRatchetTest {
     /** 登记豁免：唯一保留单参的入口腿。 */
     private static final List<String> REGISTERED_ENTRY_EXEMPTIONS = List.of("handleNotFound");
 
+    // ── ECOS-COG-* 族单源面（#146ag）─────────────────
+
+    /**
+     * COG 族码字面量判据：三位数字 + <b>可选大写字母后缀</b>（400M/403S/409V/422G/429B/502D…），
+     * 后缀后不得再接字母数字。
+     *
+     * <p>ONTO 族的 {@code (\\d{2,4})} 形态在本族不可用——COG 在册码位有 23/31 枚带字母后缀，
+     * 只匹配纯数字会把 {@code ECOS-COG-403S} 整枚读成未命中 ⇒ 假绿。位置不限（引号内、
+     * message 中段、拼接片段一律入账）。</p>
+     */
+    private static final Pattern COG_FAMILY_LITERAL =
+            Pattern.compile("ECOS-COG-(\\d{3}[A-Z]?)(?![\\dA-Za-z])");
+
+    /** COG 族属主 = 认知引擎 api 侧冻结表（非 common-api：本族先于 P1.1 单源系列存在）。 */
+    private static final String COG_ERROR_CODE_SOURCE =
+            "ecos_backend/engine/cognitive-engine/cognitive-engine-api/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/cognitive/api/CognitiveErrorCode.java";
+
+    /**
+     * workspace 侧 501 探测腿（#146ag 登记的<b>跨模块第二承载面</b>）。
+     *
+     * <p>{@code workspace-impl/pom.xml} 依赖面 = common-api + runtime 底座，<b>无</b>
+     * cognitive-engine-api（该侧经 HTTP 契约面判认知应答，不建编译耦合），故此枚只能自带字面量。
+     * 风险由本判据兜住：属主改 {@code E503_NOT_IMPLEMENTED} 时，属主码位集腿与
+     * {@link #COG_UNREGISTERED_LITERAL_HOLDERS} 回读同时变红，逼使两侧同批对账，
+     * 禁静默失配（该腿失效＝stub 应答被读成成功）。彻底消除需把 COG 码族下沉 common-api，待裁决。</p>
+     */
+    private static final String COG_FORECAST_GATEWAY_SOURCE =
+            "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/forecast/CognitiveForecastRunGateway.java";
+
+    /** context 子域异常（#146ag 唯一保留字面量枚的承载面）。 */
+    private static final String COG_CONTEXT_BUILD_EXCEPTION_SOURCE =
+            "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/cognitive2/service/context/ContextBuildException.java";
+
+    /** 在册 31 枚码位 → 允许持有其字面量的 main 面文件（只减不增，新增须先在设计单源登记）。 */
+    private static final Map<String, List<String>> COG_LITERAL_HOLDERS = new TreeMap<>(Map.ofEntries(
+            Map.entry("400", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("400C", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("400F", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("400M", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("400O", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("400P", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("400S", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("403", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("403S", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("404", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("404A", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("404D", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("404F", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("404O", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("404R", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("404U", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("409R", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("409S", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("409U", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("409V", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("422C", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("422F", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("422G", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("422R", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("429B", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("500", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("501", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("502", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("502D", List.of(COG_ERROR_CODE_SOURCE)),
+            Map.entry("503", List.of(COG_ERROR_CODE_SOURCE, COG_FORECAST_GATEWAY_SOURCE)),
+            Map.entry("504", List.of(COG_ERROR_CODE_SOURCE))));
+
+    /**
+     * <b>未登记</b>码位的显式承载面（本族唯一一枚）：{@code ECOS-COG-503D}。
+     *
+     * <p>取证（#146ag）：该枚不在《从零实施版》COG 冻结表内，属主里"必需依赖不可用"登记的是
+     * {@code E502_DEPENDENCY_DOWN = "ECOS-COG-502D"}；但 503D 已被跨语言契约三面绑定——
+     * {@code ecos_frontend/src/locales/workspace/{zh-CN,en}.json} 的
+     * {@code workspace.ctx.err.engine} 文案、{@code ecos_frontend/src/services/cognitiveClient.ts}
+     * 的失败语义注释、{@code ecos-tests/tests/e2e/workspace/cognition-surfaces-live.spec.ts}
+     * 的 503 断言。改值＝契约变更，须先在设计单源登记该码位（或裁决迁 502D），
+     * 故本批保留字面量并在此显式登记为余项；属主一旦补登该枚，
+     * {@link #cogFamilyLiteralsAreSingleSourced()} 的属主码位集腿即变红，逼使两处同批对账。</p>
+     */
+    private static final Map<String, List<String>> COG_UNREGISTERED_LITERAL_HOLDERS =
+            Map.of("503D", List.of(COG_CONTEXT_BUILD_EXCEPTION_SOURCE));
+
+    /**
+     * COG 族消费侧锚点（#146ag）：五处改指文件必须逐文件<b>恰 N 枚</b>
+     * {@code CognitiveErrorCode.E<三位>} 常量引用（实跑读数，非估算）。
+     *
+     * <p>只登记本批改指面——既有消费者（各 Controller／Advice 早就是常量取用方）不纳入本基线，
+     * 否则任何一次正常加腿都会把门拖成常红。少＝出口漂移回字面量（假单源），多＝重复取码或
+     * 新增改指腿未同批重设本表。</p>
+     */
+    private static final Pattern COG_CODE_REFERENCE =
+            Pattern.compile("CognitiveErrorCode\\s*\\.\\s*E[0-9]");
+
+    /** 改指文件 → 应出现的属主常量引用枚数。 */
+    private static final Map<String, Integer> COG_CONSUMER_EXIT_BASELINE = new TreeMap<>(Map.ofEntries(
+            Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/cognitive2/service/scenario/"
+                    + "CognitiveGuardException.java", 30),
+            Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/cognitive2/service/context/"
+                    + "ContextBuildException.java", 5),
+            Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/cognitive2/dao/HypothesisReader.java", 2),
+            Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/cognitive2/dao/BeliefReader.java", 1),
+            Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/cognitive2/service/decision/"
+                    + "DecisionBasisService.java", 6)));
+
     // ── 1. 余面棘轮 ─────────────────────────────────
 
     @Test
@@ -817,6 +929,106 @@ class NoMachineCodeFactoryFaceRatchetTest {
         }
         assertEquals(List.of(), drift,
                 "ECOS-ONTO 族出口侧常量引用枚数漂移（八文件基线＝#146af 本批实跑读数）：" + drift);
+    }
+
+    /**
+     * ECOS-COG-* 族码字面量的 <b>(码, 文件) 双键零容差</b>判据（#146ag）。
+     *
+     * <p>本族改指前最大的一片字面量副本面是 {@code CognitiveGuardException.httpOf} 的 30 枚
+     * switch case 标签——case 标签是编译期常量还是裸字面量，源码上看不出来，属主改值时
+     * 运行时静默落到 {@code default -> 500}（403 拒绝被读成 500 内部错误）。现全部改取属主常量。</p>
+     *
+     * <p>三段假绿防护：①逐命中查双键（未登记码位即使在属主文件内也红）；②<b>属主码位集</b>
+     * 与登记表 {@code equals} 对账——属主补一枚或删一枚而门禁未同批改，本腿即红，
+     * 堵住 ONTO 腿那种"白名单和属主各自漂移"的空间；③逐 (码, 承载面) 回读字面量锚点。</p>
+     */
+    @Test
+    @DisplayName("ECOS-COG-* 族码字面量按 (码,文件) 双键仅由登记属主承载，属主码位集与登记表同号")
+    void cogFamilyLiteralsAreSingleSourced() throws IOException {
+        Path root = locateRepoRoot();
+        List<Path> files = new ArrayList<>();
+        collectJavaUnder(root.resolve("ecos_backend"), files);
+        assertTrue(files.size() >= MIN_SCANNED_MAIN_FILES,
+                "扫描面缩水：实扫 main 面 java 文件 " + files.size() + " < 阈值 "
+                        + MIN_SCANNED_MAIN_FILES + "，判据不可信（读不到 ≠ 无副本）");
+
+        List<String> violations = new ArrayList<>();
+        for (Path f : files) {
+            String rel = root.relativize(f).toString().replace('\\', '/');
+            String stripped = SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+            Matcher m = COG_FAMILY_LITERAL.matcher(stripped);
+            while (m.find()) {
+                String code = m.group(1);
+                List<String> holders = COG_LITERAL_HOLDERS.get(code);
+                if (holders == null) {
+                    holders = COG_UNREGISTERED_LITERAL_HOLDERS.get(code);
+                    if (holders == null) {
+                        violations.add(rel + " → ECOS-COG-" + code + "（未登记码位）");
+                    } else if (!holders.contains(rel)) {
+                        violations.add(rel + " → ECOS-COG-" + code + "（未登记码位的登记余项承载面之外副本）");
+                    }
+                } else if (!holders.contains(rel)) {
+                    violations.add(rel + " → ECOS-COG-" + code + "（登记属主之外的副本）");
+                }
+            }
+        }
+        assertEquals(List.of(), violations,
+                "main 面出现 ECOS-ONTO 之外的 ECOS-COG-* 字面量越权露面（switch case 标签、message 中段、"
+                        + "拼接片段一律入账）：出口应改取 CognitiveErrorCode 常量；"
+                        + "新增族码先登记入《从零实施版》COG 冻结表并同步本白名单，禁以代码冒充文档裁决。"
+                        + "清单=" + violations);
+
+        Set<String> ownerCodes = new TreeSet<>();
+        Matcher ownerScan = COG_FAMILY_LITERAL.matcher(readStripped(root, COG_ERROR_CODE_SOURCE));
+        while (ownerScan.find()) {
+            ownerCodes.add(ownerScan.group(1));
+        }
+        assertEquals(COG_LITERAL_HOLDERS.keySet(), ownerCodes,
+                "属主 CognitiveErrorCode 在册码位集与本门禁登记表不一致：属主单方面补登/删枚"
+                        + "（含把未登记余项 503D 直接写进属主）必须同批改判据并回到设计单源裁决，"
+                        + "禁让文档冻结表与代码属主各走各路。");
+
+        for (Map.Entry<String, List<String>> e : COG_LITERAL_HOLDERS.entrySet()) {
+            for (String holderRel : e.getValue()) {
+                assertTrue(readStripped(root, holderRel).contains("ECOS-COG-" + e.getKey()),
+                        "承载面回读失败：ECOS-COG-" + e.getKey() + " 在登记承载面 " + holderRel
+                                + " 内已找不到字面量锚点——白名单陈旧或该枚值被删/搬走，"
+                                + "「白名单外零违例」属假绿，须同批对账");
+            }
+        }
+        for (Map.Entry<String, List<String>> e : COG_UNREGISTERED_LITERAL_HOLDERS.entrySet()) {
+            for (String holderRel : e.getValue()) {
+                assertTrue(readStripped(root, holderRel).contains("ECOS-COG-" + e.getKey()),
+                        "未登记余项 ECOS-COG-" + e.getKey() + " 在登记承载面 " + holderRel
+                                + " 内已无字面量锚点：该枚已被删除或迁走，须同批撤销本余项登记");
+            }
+        }
+    }
+
+    /**
+     * COG 族消费侧锚点（#146ag）：五处改指文件逐文件<b>恰 N 枚</b>属主常量引用。
+     *
+     * <p>判据面绿只证明"字面量没扩散"，不证明"出口还在取常量"——switch 若哪天改回裸字面量，
+     * 族面照样干净（裸枚会撞越权腿，但属主文件内重复声明这类形态靠本腿兜）。</p>
+     */
+    @Test
+    @DisplayName("ECOS-COG 族五处改指出口逐文件恰取 CognitiveErrorCode 常量（假单源或漂移即红）")
+    void cogExitsPointToSingleSource() throws IOException {
+        Path root = locateRepoRoot();
+        List<String> drift = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : COG_CONSUMER_EXIT_BASELINE.entrySet()) {
+            String stripped = readStripped(root, e.getKey());
+            int hits = 0;
+            Matcher m = COG_CODE_REFERENCE.matcher(stripped);
+            while (m.find()) {
+                hits++;
+            }
+            if (hits != e.getValue()) {
+                drift.add(e.getKey() + " 实跑 " + hits + " 枚 ≠ 登记 " + e.getValue() + " 枚");
+            }
+        }
+        assertEquals(List.of(), drift,
+                "ECOS-COG 族出口侧常量引用枚数漂移（五文件基线＝#146ag 本批实跑读数）：" + drift);
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.cognitive2.dao;
 
 import com.chinacreator.gzcm.engine.cognitive.api.CognitiveContractSchema;
+import com.chinacreator.gzcm.engine.cognitive.api.CognitiveErrorCode;
 import com.chinacreator.gzcm.engine.cognitive.api.HypothesisStatus;
 import com.chinacreator.gzcm.engine.cognitive2.service.scenario.CognitiveGuardException;
 import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
@@ -45,8 +46,8 @@ public class HypothesisReader extends JdbcTemplateDaoSupport {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, args);
             return rows.stream().map(this::toVO).toList();
         } catch (DataAccessException e) {
-            throw new CognitiveGuardException("ECOS-COG-501",
-                    com.chinacreator.gzcm.engine.cognitive.api.CognitiveErrorCode.MSG_SCHEMA_NOT_READY);
+            throw new CognitiveGuardException(CognitiveErrorCode.E501_SCHEMA_NOT_READY,
+                    CognitiveErrorCode.MSG_SCHEMA_NOT_READY);
         }
     }
 
@@ -57,8 +58,8 @@ public class HypothesisReader extends JdbcTemplateDaoSupport {
         if (r.get("confidence") instanceof Number n) {
             double v = n.doubleValue();
             if (v < 0.0 || v > 1.0) {
-                throw new CognitiveGuardException("ECOS-COG-504",
-                        com.chinacreator.gzcm.engine.cognitive.api.CognitiveErrorCode.MSG_INTERNAL);
+                throw new CognitiveGuardException(CognitiveErrorCode.E504_INTERNAL,
+                        CognitiveErrorCode.MSG_INTERNAL);
             }
             confidence = v;
         }

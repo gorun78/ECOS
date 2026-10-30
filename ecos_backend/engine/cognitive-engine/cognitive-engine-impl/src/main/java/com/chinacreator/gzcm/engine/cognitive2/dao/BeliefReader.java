@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.cognitive2.dao;
 
 import com.chinacreator.gzcm.engine.cognitive.api.CognitiveContractSchema;
+import com.chinacreator.gzcm.engine.cognitive.api.CognitiveErrorCode;
 import com.chinacreator.gzcm.engine.cognitive.api.mind.MindCapabilityMask;
 import com.chinacreator.gzcm.engine.cognitive2.service.scenario.CognitiveGuardException;
 import com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport;
@@ -53,8 +54,8 @@ public class BeliefReader extends JdbcTemplateDaoSupport {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, args);
             return rows.stream().map(r -> toVO(r, caps, aliasMapper)).toList();
         } catch (DataAccessException e) {
-            throw new CognitiveGuardException("ECOS-COG-501",
-                    com.chinacreator.gzcm.engine.cognitive.api.CognitiveErrorCode.MSG_SCHEMA_NOT_READY);
+            throw new CognitiveGuardException(CognitiveErrorCode.E501_SCHEMA_NOT_READY,
+                    CognitiveErrorCode.MSG_SCHEMA_NOT_READY);
         }
     }
 

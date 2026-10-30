@@ -53,6 +53,8 @@ import java.util.Optional;
  *
  * <p><b>降级策略</b>（铁律 §2.4-6 不阻断主流程）：每个方法 catch Exception →
  * log.warn + 返回空值（emptyList/emptyMap/null），不抛异常、不 break 调用方。
+ * <br><b>唯一例外</b>＝{@code ragQueryStrict}（严格供数腿，见该腿 javadoc）：空集合在该方法上
+ * 就是「查到零条」的假象，与降级无关，故改抛显式不可用。
  *
  * <p><b>REST 端点对齐</b>（kb-engine-impl 现有 Controller）：
  * <pre>
@@ -310,6 +312,32 @@ public class KbRestClientConfig {
                         categoryIds == null ? 0 : categoryIds.size(),
                         tags == null ? 0 : tags.size());
                 return ragQuery(queryText, topK, threshold);
+            }
+
+            /**
+             * 严格供数 RAG 腿的 REST 代理 —— 显式不可用承载，<b>不</b>走本类「降级返回空值」惯例。
+             *
+             * <p>本方法在 {@code #146r}（commit {@code 31a6c71a}，2026-10-28）加入
+             * {@link KnowledgeRetrievalService} 接口，但该批只补了 kb-impl 侧实现，未重编译本消费者
+             * ⇒ cognitive-engine-impl 自那日起编译断（登记台账 {@code D-B4-106}，本批 #146ag-0 关闭）。
+             * 补覆盖前必须先定语义：{@code ragQueryStrict} 的存在理由就是把「供数读不了」与
+             * 「查到零条」分成两个状态行（接口 javadoc：供数读失败 ⇒ 502 {@code ECOS-KB-040}，禁折叠空集），
+             * 而本代理进程只挂着旧腿 {@code /knowledge/rag/rag}（其失败语义就是空 body）。
+             * 若按本类其余只读腿的惯例返回 {@code emptyMap}，就是在新语义腿上重新造出被消除的那次折叠。</p>
+             *
+             * <p>因此这里抛显式不可用。抛错不会打断任何在跑的链路：严格腿的唯一调用方
+             * {@code KnowledgeRetrievalQueryService} 属 kb-impl，而 kb-impl 在场时
+             * {@code @ConditionalOnMissingBean} 已抑制本代理 Bean（gateway），代理激活的 aiming 进程
+             * classpath 内没有 kb-impl（dccheng 连本配置类都不装载）——即<b>本方法在当前任何部署形态下
+             * 都无调用方</b>，抛错只为把将来接线时的失败留在属主侧，而不是伪装成零命中。</p>
+             */
+            @Override
+            public Map<String, Object> ragQueryStrict(String queryText, int topK, double threshold,
+                                                      List<String> categoryIds, List<String> tags) {
+                throw new BusinessException(503, 503, CognitiveErrorCode.E502_DEPENDENCY_DOWN
+                        + ": 严格供数 RAG 腿（ragQueryStrict）在 KB REST 代理面无承载——kb-impl 本地 Bean"
+                        + " 不在本进程，旧腿 /knowledge/rag/rag 无「供数不可达」状态语义，"
+                        + "禁降级为空集伪装零命中: query=" + queryText);
             }
 
             @Override

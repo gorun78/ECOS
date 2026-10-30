@@ -109,7 +109,7 @@ class BusinessExceptionStatusParityRatchetTest {
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/scenario/ScenarioBindingLinkService.java", 7,
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/forecast/ForecastRunRequestValidator.java", 3);
 
-    /** 基线：三参同号形态逐文件处数（合计 23 处／14 文件＝本批 23 处迁移集）。 */
+    /** 基线：三参同号形态逐文件处数（合计 24 处／14 文件；23＝本批迁移集，+1 系 #146ag-0 ragQueryStrict 严格供数腿）。 */
     private static final Map<String, Integer> BASELINE_THREE_ARG = baseline(
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/controller/CognitiveConfigController.java", 1,
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/mental/BeliefReplayService.java", 1,
@@ -118,7 +118,7 @@ class BusinessExceptionStatusParityRatchetTest {
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/EngineCapabilityRegistryImpl.java", 1,
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/EntityLinker.java", 1,
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/service/CognitiveBeliefService.java", 2,
-            "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/config/KbRestClientConfig.java", 1,
+            "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/config/KbRestClientConfig.java", 2, // #146ag-0：1→2（ragQueryStrict 严格供数腿抛 503 显式腿，属新增承载面非迁移）
             "ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/com/chinacreator/gzcm/engine/cognitive2/observability/CognitiveObservability.java", 1,
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/controller/ScenarioCognitiveController.java", 1,
             "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/scenario/ScenarioSandboxLayoutService.java", 4,
@@ -193,10 +193,11 @@ class BusinessExceptionStatusParityRatchetTest {
         assertEquals(scan.allSites, classified,
                 "全站点 " + scan.allSites + " 与分类之和 " + classified
                         + " 不等 ⇒ 出现了判据未覆盖的新形态（口径外盲区＝假绿）");
-        assertEquals(233, scan.allSites,
+        assertEquals(234, scan.allSites,
                 "构造点总数双向基线（2026-10-22 实测 232＝100 双参400 + 23 三参同号 + 1 标识符首参 + "
                         + "108 文案首参；#146l-前置补账 232→233＝#146b/P0-8 bae5a686 于 "
-                        + "ModelRegistryService 新增 1 枚双参 400 腿未落账本门）；增减都要同批改台账");
+                        + "ModelRegistryService 新增 1 枚双参 400 腿未落账本门；#146ag-0 233→234＝"
+                        + "KbRestClientConfig.ragQueryStrict 补抽象方法承载，抛三参 503 显式腿）；增减都要同批改台账");
     }
 
     // ── 判据 E：构造面只增不改 ─────────────────────────
