@@ -35,33 +35,18 @@ import java.util.Map;
  * <h3>契约出参列的真欠（显式 null + {@code *Applicable=false} + 原因单源键，禁兜底值伪装）</h3>
  * 见 {@link #REASONS}——每条都可由 grep/DDL 实扫复验。真欠列存在 ⇒ 本批<b>不翻转</b>台账第 31 条判定
  * （端点可路由且部分列有真值 ≠ 契约面齐备，同 #146aa 第 32/33 条口径）。
+ *
+ * <h3>#146ad 起的单源分工</h3>
+ * id→code 两跳解析、版本行键面归一、信封成功判定与 DSL 违例搬运全部住在
+ * {@link CaliberAddressing}（写面同一条腿，禁两套）；本类只留「读面编排 + 契约列合成 +
+ * 真欠原因表」。{@link #validateOwnerFormula} 是写面 create/升版复用四关预检的唯一入口，
+ * 它<b>不含安全咽喉</b>——调用方必须先自行过一次 {@link ScenarioReadGuard}，
+ * 否则同一请求里会出现两次 RLS 裁决（多一次跨服务调用，且拒绝成因难归因）。</p>
  */
 @Service
 public class CaliberReadService {
 
     private static final Logger log = LoggerFactory.getLogger(CaliberReadService.class);
-
-    /** security-engine RLS 实体编码（{@code caliber:read} 档位在策略面的落点；未注册策略即默认 DENY）。 */
-    static final String ENTITY_CODE = "caliber_definition";
-
-    /** 取数来源标识（调用方据此区分「本面合成」与「属主真值」）。 */
-    static final String DATA_SOURCE = "ontology-owner-rest";
-
-    /** 属主主行面可透传列（其余列属版本行，缺席另记原因）。 */
-    private static final List<String> HEAD_FIELDS =
-            List.of("id", "code", "name", "status", "unit", "currency", "ownerRole", "dimensionJson", "domain");
-
-    /** 属主版本行库侧键 → 契约驼峰键（原样搬运，不换算：additive 是数值码字典位，非布尔）。 */
-    private static final Map<String, String> VERSION_FIELDS = Map.of(
-            "version_no", "versionNo",
-            "status", "status",
-            "formula", "formula",
-            "additive", "additive",
-            "period_granularity", "periodGranularity",
-            "approved_by", "approvedBy",
-            "approved_at", "approvedAt",
-            "git_ref", "gitRef",
-            "create_time", "createTime");
 
     /** 属主 validate 入参白名单（DTO 五字段，多余键不下发，防把无关字段灌进属主）。 */
     private static final List<String> VALIDATE_REQUEST_FIELDS =
@@ -103,10 +88,13 @@ public class CaliberReadService {
 
     private final CaliberOwnerClient ownerClient;
     private final ScenarioReadGuard readGuard;
+    private final CaliberAddressing addressing;
 
-    public CaliberReadService(CaliberOwnerClient ownerClient, ScenarioReadGuard readGuard) {
+    public CaliberReadService(CaliberOwnerClient ownerClient, ScenarioReadGuard readGuard,
+                              CaliberAddressing addressing) {
         this.ownerClient = ownerClient;
         this.readGuard = readGuard;
+        this.addressing = addressing;
     }
 
     /**
@@ -120,9 +108,9 @@ public class CaliberReadService {
      * @throws com.chinacreator.gzcm.workspace.exception.CaliberOwnerUnavailableException 属主不可得（503）
      */
     public Map<String, Object> list(String code, String status) {
-        readGuard.assertReadable(ENTITY_CODE);
+        readGuard.assertReadable(CaliberAddressing.ENTITY_CODE);
         OwnerReply reply = ownerClient.listHeadRows(status);
-        requireSuccess(reply, "list");
+        addressing.requireSuccess(reply, "list");
         List<Map<String, Object>> headRows = reply.rows();
         boolean windowSaturated = headRows.size() >= CaliberOwnerClient.OWNER_WINDOW_LIMIT;
 
@@ -143,7 +131,7 @@ public class CaliberReadService {
         data.put("windowSaturated", windowSaturated);
         // code 过滤在窗口内完成：窗口触顶时结果不保证完整，禁把「窗口内没有」说成「没有」
         data.put("codeFilterComplete", !codeFiltered || !windowSaturated);
-        data.put("dataSource", DATA_SOURCE);
+        data.put("dataSource", CaliberAddressing.DATA_SOURCE);
         data.put("notApplicableReasons", pickReasons("versionChain", "approvedBy", "effectivePeriod", "pagination"));
         log.info("calibers 列表承流 code={} status={} 返回 {} 行（窗口 {} 枚，触顶={}）",
                 code, status, items.size(), CaliberOwnerClient.OWNER_WINDOW_LIMIT, windowSaturated);
@@ -159,22 +147,15 @@ public class CaliberReadService {
      * @throws CaliberOwnerFailureException      属主显式回失败信封（500）
      */
     public Map<String, Object> detail(String caliberId) {
-        readGuard.assertReadable(ENTITY_CODE);
-        String code = resolveCodeById(caliberId);
+        readGuard.assertReadable(CaliberAddressing.ENTITY_CODE);
+        String code = addressing.resolveCodeById(caliberId);
+        Map<String, Object> head = addressing.fetchHeadWithVersions(code, caliberId);
 
-        OwnerReply reply = ownerClient.detailByCode(code);
-        if (reply.notFound()) {
-            // 主行窗口内刚见到它、详情面却说没有 = 并发软删，按「不存在」回，不冒充 500
-            throw new CaliberNotFoundException(caliberId, CaliberOwnerClient.OWNER_WINDOW_LIMIT, false);
-        }
-        requireSuccess(reply, "detail");
-        Map<String, Object> head = reply.object();
-
-        List<Map<String, Object>> versions = normalizeVersions(head.get("versions"));
-        Map<String, Object> current = pickCurrentApproved(versions);
+        List<Map<String, Object>> versions = addressing.normalizeVersions(head.get("versions"));
+        Map<String, Object> current = addressing.currentApproved(versions);
 
         Map<String, Object> data = new LinkedHashMap<>();
-        copyPresent(head, data, List.of("id", "code", "name", "status", "unit", "currency",
+        addressing.copyPresent(head, data, List.of("id", "code", "name", "status", "unit", "currency",
                 "ownerRole", "dimensionJson", "domain", "createTime"));
         data.put("versionChain", versions);
         data.put("dimension", dimensionOf(head, current));
@@ -190,7 +171,7 @@ public class CaliberReadService {
         data.put("symbolTableApplicable", false);
         data.put("derivedDimension", null);
         data.put("derivedDimensionApplicable", false);
-        data.put("dataSource", DATA_SOURCE);
+        data.put("dataSource", CaliberAddressing.DATA_SOURCE);
         data.put("notApplicableReasons",
                 pickReasons("effectivePeriod", "dslRenderedText", "symbolTable", "derivedDimension"));
         log.info("calibers 详情承流 id={} → code={}（版本 {} 枚）", caliberId, code, versions.size());
@@ -198,7 +179,7 @@ public class CaliberReadService {
     }
 
     /**
-     * DSL 四关预检（契约 #7 {@code validateCaliber}，只校验不落库）。
+     * DSL 四关预检（契约 #7 {@code validateCaliber}，只校验不落库）—— 读端点入口，含安全咽喉。
      *
      * @param request 草稿公式入参（{@code formula} 必填；白名单外字段不下发属主）
      * @return 四关全过的结果面（{@code valid=true} + 属主 target/registryMetricCount）
@@ -208,81 +189,72 @@ public class CaliberReadService {
      * @throws com.chinacreator.gzcm.workspace.exception.CaliberOwnerUnavailableException 属主不可得（503）
      */
     public Map<String, Object> validate(Map<String, Object> request) {
+        Map<String, Object> payload = preflightDraft(request);
+        readGuard.assertReadable(CaliberAddressing.ENTITY_CODE);
+        return runOwnerValidate(payload);
+    }
+
+    /**
+     * 写面复用的 DSL 四关预检（#146ad create/升版腿）：判定形态与 {@link #validate} 全同，
+     * <b>差别只在不重复过安全咽喉</b>——写面入口已经过一次 {@code assertReadable}，
+     * 同请求内第二次裁决会多一次跨服务调用，且把拒绝成因混进读档语义。
+     *
+     * @throws ActionValidationException      formula 缺位（400 逐字段）
+     * @throws CaliberFormulaInvalidException 四关违一（400；属主 data 段缺位时闸名取机读码）
+     */
+    public Map<String, Object> validateOwnerFormula(Map<String, Object> request) {
+        return runOwnerValidate(preflightDraft(request));
+    }
+
+    // ═══════════════ 私有辅助 ═══════════════
+
+    /** 白名单投影 + formula 必填先行拦（400 早于安全裁决与属主调用，禁拿空公式空跑属主）。 */
+    private Map<String, Object> preflightDraft(Map<String, Object> request) {
         Map<String, Object> payload = whitelist(request);
         Object formula = payload.get("formula");
         if (formula == null || String.valueOf(formula).isBlank()) {
             throw new ActionValidationException(List.of("formula"));
         }
-        readGuard.assertReadable(ENTITY_CODE);
+        return payload;
+    }
 
+    private Map<String, Object> runOwnerValidate(Map<String, Object> payload) {
         OwnerReply reply = ownerClient.validate(payload);
-        if (!reply.ok() && reply.code() != OwnerReply.CODE_BAD_REQUEST) {
-            throw ownerFailure(reply, "validate");
+        if (reply.code() == OwnerReply.CODE_BAD_REQUEST) {
+            // 属主对四关违一既可能是成功信封里 valid=false，也可能是 400 信封 + ECOS-ONTO-07x；
+            // 两种形态都落契约 400，禁把后者顶成 500/503（客户端公式错误 ≠ 引擎故障）
+            throw addressing.formulaRejection(reply);
         }
+        addressing.requireSuccess(reply, "validate");
         Map<String, Object> vo = reply.object();
         boolean valid = Boolean.TRUE.equals(vo.get("valid"));
-        List<Map<String, Object>> violations = violationRows(vo.get("violations"));
-        String target = vo.get("target") == null ? null : String.valueOf(vo.get("target"));
-
-        if (reply.ok() && !valid) {
-            // 属主信封说成功、载荷说不过 = 键面自相矛盾，按载荷的失败为准并留痕（禁跟着信封报 200）
-            log.warn("属主 validate 信封与载荷不一致（成功码 + valid=false），按 400 承流 target={}", target);
-        }
         if (!valid) {
-            throw new CaliberFormulaInvalidException(violations, target);
+            // 属主信封说成功、载荷说不过 = 键面自相矛盾，按载荷的失败为准并留痕（禁跟着信封报 200）
+            log.warn("属主 validate 信封与载荷不一致（成功码 + valid=false），按 400 承流 target={}",
+                    vo.get("target"));
+            throw new CaliberFormulaInvalidException(
+                    addressing.violationRows(vo.get("violations")), targetOf(vo));
         }
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("valid", true);
         data.put("violations", List.of());
         data.put("gates", DSL_GATES);
-        data.put("target", target);
+        data.put("target", targetOf(vo));
         data.put("registryMetricCount", vo.get("registryMetricCount"));
         data.put("persisted", false);
-        data.put("dataSource", DATA_SOURCE);
+        data.put("dataSource", CaliberAddressing.DATA_SOURCE);
         return data;
     }
 
-    // ═══════════════ 私有辅助 ═══════════════
-
-    /** id → code 两跳解析：属主 list 面主行含 id（{@code CaliberVO} 已暴露），窗口内精确匹配。 */
-    private String resolveCodeById(String caliberId) {
-        OwnerReply reply = ownerClient.listHeadRows(null);
-        requireSuccess(reply, "list");
-        List<Map<String, Object>> headRows = reply.rows();
-        boolean windowSaturated = headRows.size() >= CaliberOwnerClient.OWNER_WINDOW_LIMIT;
-        for (Map<String, Object> row : headRows) {
-            if (caliberId.equals(String.valueOf(row.get("id")))) {
-                Object code = row.get("code");
-                if (code == null || String.valueOf(code).isBlank()) {
-                    // 主行连 code 都没有 = 属主契约漂移，不能拿 null 去拼详情路径
-                    throw new CaliberOwnerUnavailableException("detail");
-                }
-                return String.valueOf(code);
-            }
-        }
-        throw new CaliberNotFoundException(caliberId, CaliberOwnerClient.OWNER_WINDOW_LIMIT, windowSaturated);
-    }
-
-    private void requireSuccess(OwnerReply reply, String operation) {
-        if (!reply.ok()) {
-            throw ownerFailure(reply, operation);
-        }
-    }
-
-    /**
-     * 属主非成功信封 → 真实状态行（属主面 HTTP 恒 200，语义只在信封码面，见
-     * {@link CaliberOwnerClient} 类注释）。404 由 {@link #detail} 就地处置，其余码一律上抛。
-     */
-    private CaliberOwnerFailureException ownerFailure(OwnerReply reply, String operation) {
-        log.warn("口径属主回失败信封 operation={} ownerCode={} ownerErrorCode={}",
-                operation, reply.code(), reply.errorCode());
-        return new CaliberOwnerFailureException(operation, reply.errorCode(), reply.code());
+    private String targetOf(Map<String, Object> vo) {
+        Object target = vo.get("target");
+        return target == null ? null : String.valueOf(target);
     }
 
     private Map<String, Object> toListItem(Map<String, Object> headRow) {
         Map<String, Object> item = new LinkedHashMap<>();
-        copyPresent(headRow, item, HEAD_FIELDS);
+        addressing.copyPresent(headRow, item, CaliberAddressing.HEAD_FIELDS);
         item.put("versionChain", null);
         item.put("versionChainApplicable", false);
         item.put("approvedBy", null);
@@ -292,39 +264,6 @@ public class CaliberReadService {
         return item;
     }
 
-    /** 版本行键面归一（库侧 snake_case → 契约驼峰）；属主已回驼峰时原样保留，不做二次猜测。 */
-    private List<Map<String, Object>> normalizeVersions(Object rawVersions) {
-        List<Map<String, Object>> out = new ArrayList<>();
-        if (!(rawVersions instanceof List<?> list)) {
-            return out;
-        }
-        for (Object entry : list) {
-            if (entry instanceof Map<?, ?> row) {
-                Map<String, Object> version = new LinkedHashMap<>();
-                VERSION_FIELDS.forEach((sourceKey, targetKey) -> {
-                    Object value = row.get(sourceKey);
-                    if (value != null) {
-                        version.put(targetKey, value);
-                    }
-                });
-                if (!version.isEmpty()) {
-                    out.add(version);
-                }
-            }
-        }
-        return out;
-    }
-
-    /** 当前生效版本 = 版本链里首条 APPROVED（属主详情面按 create_time DESC、version_no DESC 排序）。 */
-    private Map<String, Object> pickCurrentApproved(List<Map<String, Object>> versions) {
-        for (Map<String, Object> version : versions) {
-            if ("APPROVED".equals(String.valueOf(version.get("status")))) {
-                return version;
-            }
-        }
-        return null;
-    }
-
     private Map<String, Object> dimensionOf(Map<String, Object> head, Map<String, Object> current) {
         Map<String, Object> dimension = new LinkedHashMap<>();
         dimension.put("unit", head.get("unit"));
@@ -332,20 +271,6 @@ public class CaliberReadService {
         dimension.put("additive", current == null ? null : current.get("additive"));
         dimension.put("periodGranularity", current == null ? null : current.get("periodGranularity"));
         return dimension;
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> violationRows(Object rawViolations) {
-        if (rawViolations instanceof List<?> list) {
-            List<Map<String, Object>> out = new ArrayList<>();
-            for (Object entry : list) {
-                if (entry instanceof Map<?, ?> map) {
-                    out.add(new LinkedHashMap<>((Map<String, Object>) map));
-                }
-            }
-            return out;
-        }
-        return List.of();
     }
 
     private Map<String, Object> whitelist(Map<String, Object> request) {
@@ -361,15 +286,10 @@ public class CaliberReadService {
         return payload;
     }
 
-    private void copyPresent(Map<String, Object> source, Map<String, Object> target, List<String> fields) {
-        for (String field : fields) {
-            if (source.containsKey(field)) {
-                target.put(field, source.get(field));
-            }
-        }
-    }
-
-    private Map<String, String> pickReasons(String... keys) {
+    /**
+     * 真欠原因按键摘取（{@link #REASONS} 是口径族读写两面的唯一原因表，写面复用同一单源）。
+     */
+    static Map<String, String> pickReasons(String... keys) {
         Map<String, String> selected = new LinkedHashMap<>();
         for (String key : keys) {
             selected.put(key, REASONS.get(key));

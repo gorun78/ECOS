@@ -17,35 +17,46 @@ import static org.mockito.Mockito.when;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.workspace.caliber.CaliberOwnerClient.OwnerReply;
+import com.chinacreator.gzcm.workspace.exception.CaliberApproverIdentityMissingException;
 import com.chinacreator.gzcm.workspace.exception.CaliberFormulaInvalidException;
 import com.chinacreator.gzcm.workspace.exception.CaliberNotFoundException;
 import com.chinacreator.gzcm.workspace.exception.CaliberOwnerFailureException;
 import com.chinacreator.gzcm.workspace.exception.CaliberOwnerUnavailableException;
+import com.chinacreator.gzcm.workspace.exception.CaliberStatePreconditionException;
+import com.chinacreator.gzcm.workspace.exception.CaliberWriteNotLiveException;
 import com.chinacreator.gzcm.workspace.exception.SecurityEngineUnavailableException;
 import com.chinacreator.gzcm.workspace.exception.WorkspaceDomainException;
 import com.chinacreator.gzcm.workspace.exception.WorkspaceExceptionHandler;
+import com.chinacreator.gzcm.workspace.scenario.WorkspaceSecurityAudit;
 import com.chinacreator.gzcm.workspace.security.AbacQueryFilter;
 import com.chinacreator.gzcm.workspace.security.RlsFilter;
 import com.chinacreator.gzcm.workspace.security.ScenarioReadGuard;
 import com.chinacreator.gzcm.workspace.security.WorkspaceSecurityEngineClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mockito;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -56,29 +67,47 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 口径读面三枚契约承流面验收（#146ac 附录A 第 31 条 {@code listCalibers} / {@code getCaliber} /
- * {@code validateCaliber}，契约行 = 详设-12 §12.4.2 line 8248~8250、8254）。
+ * 口径契约承流面验收（#146ac 附录A 第 31 条读面三枚 + #146ad 写面四枚，
+ * 契约行 = 详设-12 §12.4.2 line 8248~8255）。
  *
  * <p>形态 = 窄 MockMvc（standaloneSetup + {@code WorkspaceExceptionHandler} 单源 advice，
- * 与 {@code BacktestContractTest} 同法）：三滤波器已由 {@code /api/v1/workspace/**} 既有族统一覆盖，
+ * 与 {@code BacktestContractTest} 同法）：七滤波器已由 {@code /api/v1/workspace/**} 既有族统一覆盖，
  * 本批不新增登记。编排面用属主替身 ⇒ 纯内存无 DB、无网络；委托客户端自身的信封/传输分态
  * 另由 {@link RecordingRest}（真实子类，不是被验对象的 mock）逐条钉住。</p>
  *
- * <p><b>判定不翻转的两处机读见证</b>：写面四枚（create/submit/approve/supersede）显式钉「不在位」；
- * 读面成功腿的真欠列逐枚钉「显式 null + {@code *Applicable=false} + 原因单源键在位」，
- * 禁 200 伪装契约出参面齐备（X-22/X-43/X-44）。</p>
+ * <p><b>判定不翻转的机读见证</b>：写面逐枚按真实形态分档钉死——create/approve 钉「属主真值腿」
+ * （含出网凭证中继与审批主语来源），submit/supersede 钉「前置腿做实 + 落库腿显式 501 +
+ * 逐条可复验 missing」；读面成功腿的真欠列逐枚钉「显式 null + {@code *Applicable=false} +
+ * 原因单源键在位」，禁 200 伪装契约出参面齐备（X-22/X-43/X-44）。</p>
  */
-@DisplayName("calibers 读面三枚（第31条）契约承流面")
+@DisplayName("calibers 读写七枚（第31条）契约承流面")
 class CaliberContractControllerContractTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /**
+     * 凭证载体是线程绑定的：本类既有走 MockMvc 派发（自动绑定/解绑），也有直接绑
+     * {@code RequestContextHolder} 的出网中继腿。测试失败于中途时上下文不会自己清，
+     * 会把上一位调用方的身份泄给下一条用例——那正是生产侧禁止的载体复用形态。
+     */
+    @AfterEach
+    void resetCallerContext() {
+        RequestContextHolder.resetRequestAttributes();
+    }
+
     // ── 装配 ──
 
+    /**
+     * 读/写两面接在同一对替身上：RLS 咽喉与审计出口必须同源，
+     * 禁两面各配一套安全客户端（那样 403 腿在两面可以有不同的拒绝成因）。
+     */
     private static MockMvc mvc(CaliberOwnerClient owner, WorkspaceSecurityEngineClient security) {
-        CaliberReadService service = new CaliberReadService(owner,
-                new ScenarioReadGuard(new AbacQueryFilter(security)));
-        return MockMvcBuilders.standaloneSetup(new CaliberContractController(service))
+        CaliberAddressing addressing = new CaliberAddressing(owner);
+        ScenarioReadGuard guard = new ScenarioReadGuard(new AbacQueryFilter(security));
+        CaliberReadService readService = new CaliberReadService(owner, guard, addressing);
+        CaliberWriteService writeService = new CaliberWriteService(owner, guard, addressing, readService,
+                new WorkspaceSecurityAudit(security));
+        return MockMvcBuilders.standaloneSetup(new CaliberContractController(readService, writeService))
                 .setControllerAdvice(new WorkspaceExceptionHandler())
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(MAPPER))
                 .build();
@@ -128,9 +157,20 @@ class CaliberContractControllerContractTest {
     }
 
     private static MvcResult post(MockMvc mvc, Map<String, Object> body) throws Exception {
-        return mvc.perform(MockMvcRequestBuilders.post("/api/v1/workspace/calibers/validate")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(writeJson(body))).andReturn();
+        return postAt(mvc, "/api/v1/workspace/calibers/validate", body, null);
+    }
+
+    /** 写面出网腿 builder：{@code bearer} 为 null 即「入口不带任何凭证」——审批主语的缺失态要能测出来。 */
+    private static MvcResult postAt(MockMvc mvc, String path, Map<String, Object> body, String bearer)
+            throws Exception {
+        MockHttpServletRequestBuilder builder = MockMvcRequestBuilders.post(path);
+        if (body != null) {
+            builder.contentType(MediaType.APPLICATION_JSON).content(writeJson(body));
+        }
+        if (bearer != null) {
+            builder.header(HttpHeaders.AUTHORIZATION, bearer);
+        }
+        return mvc.perform(builder).andReturn();
     }
 
     private static String writeJson(Map<String, Object> body) {
@@ -144,7 +184,7 @@ class CaliberContractControllerContractTest {
     // ── 契约面形态与状态行保真 ──
 
     @Test
-    @DisplayName("契约路径逐字：/api/v1/workspace/calibers × 裸 GET / GET {id} / POST validate")
+    @DisplayName("契约路径逐字：/api/v1/workspace/calibers × 七枚（读三 + 写四）路径段与 operationId 全对齐")
     void contractPathsAreVerbatim() {
         org.springframework.web.bind.annotation.RequestMapping classMapping =
                 CaliberContractController.class
@@ -157,7 +197,7 @@ class CaliberContractControllerContractTest {
         for (Method m : declaredEndpoints()) {
             byName.put(m.getName(), m);
         }
-        assertEquals(3, byName.size(), "读面三枚 = listCalibers/getCaliber/validateCaliber，禁夹带写面");
+        assertEquals(7, byName.size(), "第31条七枚 = 读三枚 + 写四枚，禁缺禁夹带");
         assertNotNull(byName.get("listCalibers")
                         .getAnnotation(org.springframework.web.bind.annotation.GetMapping.class),
                 "listCalibers 必须是裸 @GetMapping（类级前缀即全路径）");
@@ -175,6 +215,29 @@ class CaliberContractControllerContractTest {
         assertNotNull(byName.get("validateCaliber")
                         .getAnnotation(org.springframework.web.bind.annotation.PostMapping.class),
                 "validateCaliber 按契约 = POST /calibers/validate");
+
+        // 写面四枚（#146ad）：路径段逐字钉契约，operationId 名同样逐字（前端/契约册按名对齐）
+        assertEquals("", postPath(byName.get("createCaliber")), "createCaliber = 裸 POST 类级前缀");
+        assertEquals("/{id}/submit", postPath(byName.get("submitCaliber")));
+        assertEquals("/{id}/approve", postPath(byName.get("approveCaliber")));
+        assertEquals("/{id}/supersede", postPath(byName.get("supersedeCaliber")));
+        for (String writeFace : List.of("submitCaliber", "approveCaliber", "supersedeCaliber")) {
+            org.springframework.web.bind.annotation.PathVariable writePathVar =
+                    firstAnnotation(byName.get(writeFace).getParameterAnnotations(),
+                            org.springframework.web.bind.annotation.PathVariable.class);
+            assertNotNull(writePathVar, writeFace + " 必须按契约以路径 id 寻址");
+            assertEquals("id", writePathVar.value(), writeFace + " 形参名逐字 = id");
+        }
+    }
+
+    /** 取 {@code @PostMapping} 的路径段（裸映射返回空串，不做「缺省即 null」的二次约定）。 */
+    private static String postPath(Method method) {
+        org.springframework.web.bind.annotation.PostMapping mapping =
+                method.getAnnotation(org.springframework.web.bind.annotation.PostMapping.class);
+        assertNotNull(mapping, "写面端点必须带 @PostMapping: " + method.getName());
+        assertTrue(mapping.value().length <= 1,
+                method.getName() + " 的路径段必须唯一（同方法挂多路径＝契约路径面失控）");
+        return mapping.value().length == 0 ? "" : mapping.value()[0];
     }
 
     private static <A extends java.lang.annotation.Annotation> A firstAnnotation(
@@ -197,12 +260,17 @@ class CaliberContractControllerContractTest {
                     "端点返回型 = 成功信封（本类无 ResponseEntity 出口 ⇒ 失败只能上抛，由 advice 唯一渲染）: "
                             + m.getName());
         }
-        // 四枚失败载体与契约错误码列逐枚同号：403 腿另由 F07-18 咽喉承载（见 listRlsDenyIs403）
+        // 七枚失败载体与契约错误码列逐枚同号：403 腿另由 F07-18 咽喉承载（见 listRlsDenyIs403）
         assertFace(new CaliberNotFoundException("c1-id", CaliberOwnerClient.OWNER_WINDOW_LIMIT, false),
                 404, "CALIBER_NOT_FOUND");
         assertFace(new CaliberFormulaInvalidException(List.of(), "CAL_REV"), 400, "CALIBER_DSL_INVALID");
         assertFace(new CaliberOwnerUnavailableException("list"), 503, "ONTOLOGY_UNAVAILABLE");
         assertFace(new CaliberOwnerFailureException("list", "ECOS-ONTO-050", 500), 500, "ONTOLOGY_FAILURE");
+        assertFace(new CaliberStatePreconditionException("c1-id", "CAL_REV", "1", "APPROVED",
+                List.of("DRAFT", "REVIEWING")), 409, "CALIBER_STATE_PRECONDITION");
+        assertFace(new CaliberApproverIdentityMissingException("c1-id"), 403, "APPROVER_IDENTITY_MISSING");
+        assertFace(new CaliberWriteNotLiveException("submitCaliber", "/p", List.of("x")),
+                501, "STUB_CAPABILITY");
     }
 
     /**
@@ -225,16 +293,18 @@ class CaliberContractControllerContractTest {
     }
 
     @Test
-    @DisplayName("写面四枚本批不在位（判定不翻转的机读见证）：create/submit/approve/supersede 无路由方法")
-    void writeFaceFourEndpointsAbsentFromThisBatch() {
+    @DisplayName("写面四枚路由在位（#146ad）：读面类不吞写面，七枚同基路径单 Controller 独占")
+    void writeFaceFourEndpointsAreRoutedHere() {
         List<String> declared = new ArrayList<>();
         for (Method m : declaredEndpoints()) {
             declared.add(m.getName());
         }
-        for (String writeFace : List.of("createCaliber", "submitCaliber", "approveCaliber", "supersedeCaliber")) {
-            assertTrue(!declared.contains(writeFace),
-                    "写面 " + writeFace + " 属 #146ad，本批不得静默混进读面类");
-        }
+        List<String> contract = new ArrayList<>(List.of("listCalibers", "getCaliber", "createCaliber",
+                "submitCaliber", "approveCaliber", "supersedeCaliber", "validateCaliber"));
+        declared.sort(String::compareTo);
+        contract.sort(String::compareTo);
+        assertEquals(contract, declared,
+                "第31条七枚 = 契约 §12.4.2 方法全集（禁缺枚，也禁静默混进别的面）");
     }
 
     // ── listCalibers ──
@@ -596,6 +666,339 @@ class CaliberContractControllerContractTest {
                 "成功码却缺 data 段 = 属主契约漂移，禁按 valid=false 猜（形态不符归不可得）");
     }
 
+    // ── 写面四枚（#146ad）──
+
+    @Test
+    @DisplayName("create 真值双腿：主行走属主兜底、DRAFT 落版本行、载荷按列面分投、非同一事务显式声明")
+    void createBuildsHeadAndFirstDraftVersionLegs() throws Exception {
+        CaliberOwnerClient owner = ownerMock();
+        when(owner.validate(anyMap())).thenReturn(new OwnerReply("validate", 0, "ok",
+                Map.of("valid", true, "violations", List.of())));
+        when(owner.createHeadRow(anyMap()))
+                .thenReturn(new OwnerReply("create", 0, "ok", headRow("c9-id", "CAL_NEW", "ACTIVE")));
+        when(owner.addVersion(eq("CAL_NEW"), anyMap()))
+                .thenReturn(new OwnerReply("createVersion", 0, "ok", versionRow("DRAFT", 1, null, null)));
+
+        Map<String, Object> request = createRequest();
+        MvcResult r = postAt(mvc(owner, rlsAllowAll()), "/api/v1/workspace/calibers", request, null);
+        assertEquals(200, r.getResponse().getStatus());
+        Map<String, Object> body = data(r);
+        assertEquals("c9-id", body.get("caliberId"));
+        assertEquals("CAL_NEW", body.get("code"));
+        assertEquals("ACTIVE", body.get("headStatus"), "主行状态＝属主 insertCaliber 的兜底真值，本面不顶写 DRAFT");
+        assertEquals(1, body.get("versionNo"));
+        assertEquals("DRAFT", body.get("versionStatus"), "契约「新口径（DRAFT）」的真实载体是版本行 status");
+        assertEquals("DRAFT", body.get("status"), "对外状态字段与版本行同值，禁两套口径");
+        assertEquals("versionRow", body.get("draftStatusCarrier"), "DRAFT 落点必须声明，否则前端以为主行是 DRAFT");
+        assertEquals(Boolean.FALSE, body.get("atomic"), "两条属主写端点不在同一事务，禁伪装原子");
+        assertEquals("季度口径调整", body.get("changeReason"), "入参原样回显（收了什么要说清）");
+        assertEquals(Boolean.FALSE, body.get("changeReasonStored"), "属主十六列无变更原因列 ⇒ 未落库");
+        assertEquals("dimensionJson", body.get("dimensionMappingCarrier"), "核算映射走主行 dimensionJson 载体");
+        assertEquals("ontology-owner-rest", body.get("dataSource"));
+        assertEquals(List.of("headStatusDraft", "changeReasonPersistence", "crossCallAtomicity"),
+                new ArrayList<>(((Map<String, String>) body.get("writeNotApplicableReasons")).keySet()),
+                "写面真欠原因逐枚具名，缺一即整族外推");
+
+        InOrder order = Mockito.inOrder(owner);
+        order.verify(owner).validate(anyMap());
+        order.verify(owner).createHeadRow(anyMap());
+        order.verify(owner).addVersion(eq("CAL_NEW"), anyMap());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> headCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(owner).createHeadRow(headCaptor.capture());
+        assertEquals(List.of("code", "name", "unit", "currency", "ownerRole", "dimensionJson"),
+                new ArrayList<>(headCaptor.getValue().keySet()),
+                "主行载荷 = 属主 CaliberSaveDTO 列面；公式与变更原因不许灌进主行");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> versionCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(owner).addVersion(eq("CAL_NEW"), versionCaptor.capture());
+        assertEquals(List.of("formula", "additive", "periodGranularity", "status"),
+                new ArrayList<>(versionCaptor.getValue().keySet()),
+                "版本行载荷 = 属主 CaliberVersionSaveDTO 列面 + 显式 DRAFT（不靠属主缺省态猜）");
+    }
+
+    private static Map<String, Object> createRequest() {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("code", "CAL_NEW");
+        request.put("name", "营业收入口径");
+        request.put("formula", "revenue - cost");
+        request.put("unit", "万元");
+        request.put("currency", "CNY");
+        request.put("ownerRole", "finance_manager");
+        request.put("dimensionJson", "{\"org\":\"dept\"}");
+        request.put("additive", 1);
+        request.put("periodGranularity", "MONTH");
+        request.put("changeReason", "季度口径调整");
+        return request;
+    }
+
+    @Test
+    @DisplayName("create 400 逐字段腿：code/name/formula 缺位先行拦下，属主与四关预检零调用")
+    void createMissingRequiredFieldsIs400BeforeOwner() throws Exception {
+        CaliberOwnerClient owner = ownerMock();
+        MvcResult r = postAt(mvc(owner, rlsAllowAll()), "/api/v1/workspace/calibers", Map.of(), null);
+        assertEquals(400, r.getResponse().getStatus());
+        assertEquals("ACTION_FIELDS_MISSING", json(r).get("errorCode"));
+        assertEquals(List.of("code", "name", "formula"), data(r).get("missingFields"),
+                "三个必填逐枚点名，禁只回「参数非法」");
+        Mockito.verifyNoInteractions(owner);
+    }
+
+    @Test
+    @DisplayName("create DSL 违一腿：属主 400 信封（data 段缺位形态）承成契约 400，闸名取机读码、属主写腿零调用")
+    void createDslRejectionIs400AndOwnerWritesUntouched() throws Exception {
+        CaliberOwnerClient owner = ownerMock();
+        when(owner.validate(anyMap()))
+                .thenReturn(new OwnerReply("validate", 400, "ECOS-ONTO-070", null));
+
+        MvcResult r = postAt(mvc(owner, rlsAllowAll()), "/api/v1/workspace/calibers", createRequest(), null);
+        assertEquals(400, r.getResponse().getStatus(),
+                "属主写入咽喉的 400 信封禁顶成 500/503（客户端公式错误 ≠ 引擎故障）");
+        assertEquals("CALIBER_DSL_INVALID", json(r).get("errorCode"));
+        Map<String, Object> body = data(r);
+        assertEquals(List.of("DSL_V1_SYNTAX", "DSL_V2_REFERENCE", "DSL_V3_DIMENSION", "DSL_V4_CYCLE"),
+                body.get("gates"));
+        assertEquals("DSL_V1_SYNTAX", body.get("rejectedGate"), "data 段缺位时闸名取 ECOS-ONTO-07x 机读码");
+        assertEquals(Boolean.TRUE, body.get("rejectedGateApplicable"));
+        assertNull(body.get("symbolLocation"));
+        assertEquals(Boolean.FALSE, body.get("symbolLocationApplicable"),
+                "符号定位无结构化载体 ⇒ 显式缺席，禁造一个假定位");
+        assertEquals("ECOS-ONTO-070", body.get("ownerErrorCode"));
+        assertEquals(List.of(), body.get("violations"));
+        verify(owner, never()).createHeadRow(anyMap());
+        verify(owner, never()).addVersion(any(), anyMap());
+    }
+
+    @Test
+    @DisplayName("create 腿二失败＝孤儿主行：状态行如实 503 带 operation=createVersion，禁谎报已回滚、禁静默吞")
+    void createSecondLegFailureSurfacesOrphanHead() throws Exception {
+        CaliberOwnerClient owner = ownerMock();
+        when(owner.validate(anyMap())).thenReturn(new OwnerReply("validate", 0, "ok",
+                Map.of("valid", true, "violations", List.of())));
+        when(owner.createHeadRow(anyMap()))
+                .thenReturn(new OwnerReply("create", 0, "ok", headRow("c9-id", "CAL_NEW", "ACTIVE")));
+        when(owner.addVersion(eq("CAL_NEW"), anyMap()))
+                .thenThrow(new CaliberOwnerUnavailableException("createVersion"));
+
+        MvcResult r = postAt(mvc(owner, rlsAllowAll()), "/api/v1/workspace/calibers", createRequest(), null);
+        assertEquals(503, r.getResponse().getStatus());
+        assertEquals("ONTOLOGY_UNAVAILABLE", json(r).get("errorCode"));
+        assertEquals("createVersion", data(r).get("operation"), "缺失的是版本腿，不能报成 create 整体失败");
+        verify(owner).createHeadRow(anyMap());
+        assertTrue(!data(r).containsKey("caliberId"), "失败态禁携带成功面键冒充「已建好」");
+    }
+
+    @Test
+    @DisplayName("approve 真值腿：入口凭证中继出网、状态与 approvedBy 取属主真值、审计只声明已发起")
+    void approveReturnsOwnerTruthWithRelayedIdentity() throws Exception {
+        CaliberOwnerClient owner = approvedByOwnerTruth();
+        WorkspaceSecurityEngineClient security = rlsAllowAll();
+        MvcResult r = postAt(mvc(owner, security), "/api/v1/workspace/calibers/c1-id/approve",
+                Map.of(), "Bearer jwt-finance-user");
+        assertEquals(200, r.getResponse().getStatus());
+        Map<String, Object> body = data(r);
+        assertEquals("c1-id", body.get("caliberId"));
+        assertEquals("CAL_REV", body.get("code"));
+        assertEquals("1", body.get("versionNo"));
+        assertEquals("APPROVED", body.get("status"), "状态行取属主应答真值，本面不自行置态");
+        assertEquals("u-approve", body.get("approvedBy"), "审批人由属主从 UserContext 落库，本面不合成主语");
+        assertEquals(Boolean.TRUE, body.get("auditEventAttempted"));
+        assertEquals(Boolean.FALSE, body.get("auditEventDeliveryConfirmed"),
+                "审计出口 fail-soft ⇒ 只可声明已发起，声明已落达即假绿");
+        assertEquals("PENDING_APPROVAL", body.get("contractPreconditionStatus"));
+        assertEquals(List.of("DRAFT", "REVIEWING"), body.get("observedPreconditionStatuses"),
+                "属主可批状态集合与契约词表不同形 ⇒ 两面都摆出来，不做换算");
+        assertEquals(List.of("approvalRoleAndOpaGate", "auditEventDelivery", "pendingApprovalState"),
+                new ArrayList<>(((Map<String, String>) body.get("writeNotApplicableReasons")).keySet()));
+
+        verify(owner).approveVersion("CAL_REV", "1");
+        verify(security).audit("caliber:approve", "CAL_REV@1", "APPROVED");
+    }
+
+    private static CaliberOwnerClient approvedByOwnerTruth() {
+        CaliberOwnerClient owner = ownerMock();
+        when(owner.listHeadRows(isNull())).thenReturn(okList(List.of(headRow("c1-id", "CAL_REV", "ACTIVE"))));
+        Map<String, Object> head = headRow("c1-id", "CAL_REV", "ACTIVE");
+        head.put("versions", List.of(versionRow("DRAFT", 1, null, null)));
+        when(owner.detailByCode("CAL_REV")).thenReturn(new OwnerReply("detail", 0, "ok", head));
+        when(owner.approveVersion("CAL_REV", "1")).thenReturn(new OwnerReply("approve", 0, "ok",
+                Map.of("code", "CAL_REV", "versionNo", 1, "status", "APPROVED", "approvedBy", "u-approve")));
+        return owner;
+    }
+
+    @Test
+    @DisplayName("approve 无凭证腿：出网前即 403 APPROVER_IDENTITY_MISSING，属主零调用（禁匿名撞属主 400）")
+    void approveWithoutCallerIdentityIs403BeforeEgress() throws Exception {
+        CaliberOwnerClient owner = approvedByOwnerTruth();
+        MvcResult r = postAt(mvc(owner, rlsAllowAll()), "/api/v1/workspace/calibers/c1-id/approve", null, null);
+        assertEquals(403, r.getResponse().getStatus());
+        assertEquals("APPROVER_IDENTITY_MISSING", json(r).get("errorCode"));
+        Map<String, Object> body = data(r);
+        assertEquals("c1-id", body.get("caliberId"));
+        assertEquals("Authorization 或 X-ECOS-USER", body.get("requiredCarriers"));
+        assertEquals(Boolean.FALSE, body.get("ownerCallExecuted"));
+        Mockito.verifyNoInteractions(owner);
+    }
+
+    @Test
+    @DisplayName("approve 409 腿：点名版本行不在可批集合 ⇒ 出网前判 409，属主审批腿零调用（不拿属主 400 当状态机）")
+    void approvePreconditionIs409BeforeEgress() throws Exception {
+        CaliberOwnerClient owner = ownerMock();
+        when(owner.listHeadRows(isNull())).thenReturn(okList(List.of(headRow("c1-id", "CAL_REV", "ACTIVE"))));
+        Map<String, Object> head = headRow("c1-id", "CAL_REV", "ACTIVE");
+        head.put("versions", List.of(versionRow("APPROVED", 2, "u-old", "2026-09-30T10:00:00")));
+        when(owner.detailByCode("CAL_REV")).thenReturn(new OwnerReply("detail", 0, "ok", head));
+
+        MvcResult r = postAt(mvc(owner, rlsAllowAll()), "/api/v1/workspace/calibers/c1-id/approve",
+                Map.of("versionNo", 2), "Bearer jwt-finance-user");
+        assertEquals(409, r.getResponse().getStatus());
+        assertEquals("CALIBER_STATE_PRECONDITION", json(r).get("errorCode"));
+        Map<String, Object> body = data(r);
+        assertEquals("2", body.get("versionNo"), "点名的版本号要在取证里回显");
+        assertEquals("APPROVED", body.get("observedStatus"), "实际观测态要摆出来，禁只说「前置不成立」");
+        assertEquals(List.of("DRAFT", "REVIEWING"), body.get("expectedStatuses"));
+        assertEquals("CAL_REV", body.get("caliberCode"));
+        verify(owner, never()).approveVersion(any(), any());
+
+        // 缺省寻址（不带 versionNo）时版本链里无可批行 ⇒ 同样 409，观测态显式缺席（禁兜一个状态词）
+        CaliberOwnerClient owner2 = ownerMock();
+        when(owner2.listHeadRows(isNull())).thenReturn(okList(List.of(headRow("c1-id", "CAL_REV", "ACTIVE"))));
+        Map<String, Object> approvedHead = headRow("c1-id", "CAL_REV", "ACTIVE");
+        approvedHead.put("versions", List.of(versionRow("APPROVED", 1, "u-old", "2026-09-30T10:00:00")));
+        when(owner2.detailByCode("CAL_REV")).thenReturn(new OwnerReply("detail", 0, "ok", approvedHead));
+        MvcResult noApprovable = postAt(mvc(owner2, rlsAllowAll()), "/api/v1/workspace/calibers/c1-id/approve",
+                Map.of(), "Bearer jwt-finance-user");
+        assertEquals(409, noApprovable.getResponse().getStatus());
+        assertNull(data(noApprovable).get("versionNo"),
+                "缺省寻址未命中任何版本行 ⇒ 版本号无载体，禁伪造首条版本号");
+        verify(owner2, never()).approveVersion(any(), any());
+
+        // 点名一个不存在的版本号：同样是前置不成立，不许退化成「挑首条可批的」
+        CaliberOwnerClient owner3 = ownerMock();
+        when(owner3.listHeadRows(isNull())).thenReturn(okList(List.of(headRow("c1-id", "CAL_REV", "ACTIVE"))));
+        Map<String, Object> head3 = headRow("c1-id", "CAL_REV", "ACTIVE");
+        head3.put("versions", List.of(versionRow("DRAFT", 1, null, null)));
+        when(owner3.detailByCode("CAL_REV")).thenReturn(new OwnerReply("detail", 0, "ok", head3));
+        MvcResult drift = postAt(mvc(owner3, rlsAllowAll()), "/api/v1/workspace/calibers/c1-id/approve",
+                Map.of("versionNo", 9), "Bearer jwt-finance-user");
+        assertEquals(409, drift.getResponse().getStatus());
+        assertEquals("9", data(drift).get("versionNo"), "点名的版本号要在取证里回显");
+        assertNull(data(drift).get("observedStatus"), "点名版本行不存在 ⇒ 观测态无载体，禁兜一个状态词");
+        verify(owner3, never()).approveVersion(any(), any());
+    }
+
+    @Test
+    @DisplayName("submit 真欠腿：DRAFT 前置做实后显式 501 + missing 逐条在册，禁借道属主 approve 把送审写成批准")
+    void submitIsExplicitNotLiveWithoutBorrowingApprove() throws Exception {
+        CaliberOwnerClient owner = ownerMock();
+        when(owner.listHeadRows(isNull())).thenReturn(okList(List.of(headRow("c1-id", "CAL_REV", "ACTIVE"))));
+        Map<String, Object> head = headRow("c1-id", "CAL_REV", "ACTIVE");
+        head.put("versions", List.of(versionRow("DRAFT", 1, null, null)));
+        when(owner.detailByCode("CAL_REV")).thenReturn(new OwnerReply("detail", 0, "ok", head));
+
+        MvcResult r = postAt(mvc(owner, rlsAllowAll()), "/api/v1/workspace/calibers/c1-id/submit", null, null);
+        assertEquals(501, r.getResponse().getStatus());
+        assertEquals("STUB_CAPABILITY", json(r).get("errorCode"));
+        Map<String, Object> body = data(r);
+        assertEquals("submitCaliber", body.get("capability"));
+        assertEquals("/api/v1/workspace/calibers/c1-id/submit", body.get("path"));
+        assertEquals(Boolean.TRUE, body.get("stub"));
+        @SuppressWarnings("unchecked")
+        List<String> missing = (List<String>) body.get("missing");
+        assertEquals(4, missing.size(), "真欠逐条在册，缺一即整族外推");
+        assertTrue(missing.stream().allMatch(entry -> entry != null && !entry.isBlank()));
+        assertTrue(missing.stream().anyMatch(entry -> entry.contains("PENDING_APPROVAL")),
+                "成因必须点名无载体的目标态");
+        verify(owner, never()).approveVersion(any(), any());
+        verify(owner, never()).addVersion(any(), anyMap());
+        verify(owner, never()).createHeadRow(anyMap());
+    }
+
+    @Test
+    @DisplayName("submit 前置腿做实：版本链无 DRAFT ⇒ 409（判据先于能力缺失，禁一律外推成 501）")
+    void submitPreconditionLegIsReal() throws Exception {
+        CaliberOwnerClient owner = ownerMock();
+        when(owner.listHeadRows(isNull())).thenReturn(okList(List.of(headRow("c1-id", "CAL_REV", "ACTIVE"))));
+        Map<String, Object> head = headRow("c1-id", "CAL_REV", "ACTIVE");
+        head.put("versions", List.of(versionRow("APPROVED", 2, "u-a", "2026-09-30T10:00:00")));
+        when(owner.detailByCode("CAL_REV")).thenReturn(new OwnerReply("detail", 0, "ok", head));
+
+        MvcResult r = postAt(mvc(owner, rlsAllowAll()), "/api/v1/workspace/calibers/c1-id/submit", null, null);
+        assertEquals(409, r.getResponse().getStatus(),
+                "状态前置不成立就是 409，不许和「能力未上线」混成一枚 501（两者成因与恢复路径不同）");
+        assertEquals("CALIBER_STATE_PRECONDITION", json(r).get("errorCode"));
+        assertEquals(List.of("DRAFT"), data(r).get("expectedStatuses"));
+    }
+
+    @Test
+    @DisplayName("supersede 前置腿做实：必填逐字段 400 + 无 APPROVED 在位版本 409，均先于 501")
+    void supersedePreconditionLegsAreReal() throws Exception {
+        CaliberOwnerClient owner = ownerMock();
+        MvcResult fields = postAt(mvc(owner, rlsAllowAll()),
+                "/api/v1/workspace/calibers/c1-id/supersede", Map.of(), null);
+        assertEquals(400, fields.getResponse().getStatus());
+        assertEquals(List.of("newVersionId", "changeReason"), data(fields).get("missingFields"),
+                "契约「newVersionId + changeReason（必填）」逐枚点名");
+        Mockito.verifyNoInteractions(owner);
+
+        CaliberOwnerClient owner2 = ownerMock();
+        when(owner2.listHeadRows(isNull())).thenReturn(okList(List.of(headRow("c1-id", "CAL_REV", "ACTIVE"))));
+        Map<String, Object> head = headRow("c1-id", "CAL_REV", "ACTIVE");
+        head.put("versions", List.of(versionRow("DRAFT", 1, null, null)));
+        when(owner2.detailByCode("CAL_REV")).thenReturn(new OwnerReply("detail", 0, "ok", head));
+        MvcResult state = postAt(mvc(owner2, rlsAllowAll()), "/api/v1/workspace/calibers/c1-id/supersede",
+                Map.of("newVersionId", "v9", "changeReason", "口径换形"), null);
+        assertEquals(409, state.getResponse().getStatus(), "无在位版本可取代 ⇒ 前置不成立，不是能力未上线");
+        assertEquals(List.of("APPROVED"), data(state).get("expectedStatuses"));
+    }
+
+    @Test
+    @DisplayName("supersede 真欠腿：在位版本存在但 SUPERSEDED 无数据载体 ⇒ 显式 501，禁借道 retire 冒充取代")
+    void supersedeIsExplicitNotLive() throws Exception {
+        CaliberOwnerClient owner = ownerMock();
+        when(owner.listHeadRows(isNull())).thenReturn(okList(List.of(headRow("c1-id", "CAL_REV", "ACTIVE"))));
+        Map<String, Object> head = headRow("c1-id", "CAL_REV", "ACTIVE");
+        head.put("versions", List.of(versionRow("APPROVED", 2, "u-a", "2026-09-30T10:00:00"),
+                versionRow("SUPERSEDED", 1, "u-a", "2026-06-30T10:00:00")));
+        when(owner.detailByCode("CAL_REV")).thenReturn(new OwnerReply("detail", 0, "ok", head));
+
+        MvcResult r = postAt(mvc(owner, rlsAllowAll()), "/api/v1/workspace/calibers/c1-id/supersede",
+                Map.of("newVersionId", "v3", "changeReason", "口径换形"), null);
+        assertEquals(501, r.getResponse().getStatus());
+        Map<String, Object> body = data(r);
+        assertEquals("supersedeCaliber", body.get("capability"));
+        assertEquals(Boolean.TRUE, body.get("stub"));
+        @SuppressWarnings("unchecked")
+        List<String> missing = (List<String>) body.get("missing");
+        assertEquals(5, missing.size(), "无状态载体/无后向列/无主行指针/白名单无该态/恢复路径，五条缺一不可");
+        assertTrue(missing.stream().anyMatch(entry -> entry.contains("superseded_by")));
+        verify(owner, never()).addVersion(any(), anyMap());
+        verify(owner, never()).approveVersion(any(), any());
+    }
+
+    @Test
+    @DisplayName("写面安全咽喉：四枚同过 caliber_definition 单源，RLS 拒绝即 403 且属主零出网")
+    void writeFaceSharesReadThroat() throws Exception {
+        CaliberOwnerClient owner = ownerMock();
+        MockMvc mvc = mvc(owner, rlsDeny());
+        Map<String, Map<String, Object>> bodies = new LinkedHashMap<>();
+        bodies.put("/api/v1/workspace/calibers", createRequest());
+        bodies.put("/api/v1/workspace/calibers/c1-id/submit", null);
+        bodies.put("/api/v1/workspace/calibers/c1-id/approve", null);
+        bodies.put("/api/v1/workspace/calibers/c1-id/supersede",
+                Map.of("newVersionId", "v3", "changeReason", "口径换形"));
+        for (Map.Entry<String, Map<String, Object>> entry : bodies.entrySet()) {
+            MvcResult r = postAt(mvc, entry.getKey(), entry.getValue(), "Bearer jwt-finance-user");
+            assertEquals(403, r.getResponse().getStatus(), entry.getKey() + " 必须与读面同过安全咽喉");
+            assertEquals("PERMISSION_DENIED", json(r).get("errorCode"));
+            assertTrue(String.valueOf(data(r).get("permission")).endsWith(":caliber_definition"),
+                    entry.getKey() + " 的实体编码不许随场景域默认值漂移");
+        }
+        Mockito.verifyNoInteractions(owner);
+    }
+
     // ── 委托客户端自身分态（用真实子类替身，不 mock 被验对象）──
 
     @Test
@@ -680,6 +1083,48 @@ class CaliberContractControllerContractTest {
         assertThrows(CaliberOwnerUnavailableException.class, detailWithNull::object);
     }
 
+    @Test
+    @DisplayName("出网凭证中继单点在 exchange：三条写腿逐字带上 Authorization/信任头，无上下文时不伪造主语")
+    void everyEgressLegRelaysCallerCredentialsVerbatim() {
+        RecordingRest rest = new RecordingRest();
+        rest.envelope = Map.of("code", 0, "errorCode", "ok", "data", Map.of("status", "APPROVED"));
+        CaliberOwnerClient client = new CaliberOwnerClient(rest);
+        MockHttpServletRequest inbound = new MockHttpServletRequest();
+        inbound.addHeader(HttpHeaders.AUTHORIZATION, "Bearer jwt-finance-user");
+        inbound.addHeader("X-ECOS-USER", "u-approve");
+        inbound.addHeader("X-ECOS-ROLE", "finance_manager");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(inbound));
+
+        client.approveVersion("CAL_REV", "1");
+        assertRelayed(rest.lastEntity.getHeaders(), "Bearer jwt-finance-user", "u-approve", "finance_manager");
+        assertEquals(List.of(MediaType.APPLICATION_JSON),
+                new ArrayList<>(rest.lastEntity.getHeaders().getAccept()),
+                "approve 腿无请求体 ⇒ 只带 Accept，禁给它补 Content-Type");
+        assertNull(rest.lastEntity.getBody(), "审批主语只走凭证头，禁写进请求体（伪造主语）");
+
+        client.createHeadRow(Map.of("code", "CAL_NEW"));
+        assertRelayed(rest.lastEntity.getHeaders(), "Bearer jwt-finance-user", "u-approve", "finance_manager");
+        assertEquals(MediaType.APPLICATION_JSON, rest.lastEntity.getHeaders().getContentType(),
+                "有体腿必须补 Content-Type，否则属主按表单解 ⇒ 七字段全空");
+
+        client.addVersion("CAL_NEW", Map.of("formula", "revenue"));
+        assertRelayed(rest.lastEntity.getHeaders(), "Bearer jwt-finance-user", "u-approve", "finance_manager");
+
+        // 无请求上下文（异步／定时腿）⇒ 中继不加任何身份头，属主端按其默认策略 DENY；
+        // 本面不发明 anonymous 兜底主语（那会把「取不到凭证」伪装成「有凭证」）
+        RequestContextHolder.resetRequestAttributes();
+        client.approveVersion("CAL_REV", "1");
+        assertNull(rest.lastEntity.getHeaders().getFirst(HttpHeaders.AUTHORIZATION),
+                "无上下文时禁伪造 Authorization");
+        assertNull(rest.lastEntity.getHeaders().getFirst("X-ECOS-USER"));
+    }
+
+    private static void assertRelayed(HttpHeaders headers, String authorization, String user, String role) {
+        assertEquals(authorization, headers.getFirst(HttpHeaders.AUTHORIZATION), "凭证逐字中继，不升权不改写");
+        assertEquals(user, headers.getFirst("X-ECOS-USER"));
+        assertEquals(role, headers.getFirst("X-ECOS-ROLE"));
+    }
+
     // ── 实体编码单源 ──
 
     @Test
@@ -692,7 +1137,8 @@ class CaliberContractControllerContractTest {
                         : RlsFilter.deny("WRONG_ENTITY", true, List.of()));
         CaliberOwnerClient owner = ownerMock();
         when(owner.listHeadRows(isNull())).thenReturn(okList(List.of(headRow("c1-id", "CAL_REV", "APPROVED"))));
-        CaliberReadService svc = new CaliberReadService(owner, new ScenarioReadGuard(new AbacQueryFilter(c)));
+        CaliberReadService svc = new CaliberReadService(owner,
+                new ScenarioReadGuard(new AbacQueryFilter(c)), new CaliberAddressing(owner));
 
         assertEquals("ontology-owner-rest", svc.list(null, null).get("dataSource"),
                 "实体编码逐字 caliber_definition ⇒ 过守卫拿到属主真值");
@@ -702,7 +1148,8 @@ class CaliberContractControllerContractTest {
         Mockito.when(drifted.applyRlsFilter(any(), any(), anyMap()))
                 .thenReturn(RlsFilter.deny("WRONG_ENTITY", true, List.of()));
         CaliberOwnerClient owner2 = ownerMock();
-        CaliberReadService svc2 = new CaliberReadService(owner2, new ScenarioReadGuard(new AbacQueryFilter(drifted)));
+        CaliberReadService svc2 = new CaliberReadService(owner2,
+                new ScenarioReadGuard(new AbacQueryFilter(drifted)), new CaliberAddressing(owner2));
         assertThrows(com.chinacreator.gzcm.workspace.scenario.ForbiddenOperationException.class,
                 () -> svc2.list(null, null));
         verify(owner2, never()).listHeadRows(any());
