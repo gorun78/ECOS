@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ontology.service;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.OntologyErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.ontology.dto.GateResult;
 import com.chinacreator.gzcm.engine.ontology.service.CaliberService.CaliberMissingException;
@@ -132,7 +133,8 @@ public class PublishGateService {
         ApiResponse<T> body;
         if (result.hasDependencyErrors()) {
             String code = result.getDependencyErrors().get(0).getCode();
-            body = ApiResponse.error(503, code, "ECOS-ONTO-050: publish-gate dependency unavailable");
+            body = ApiResponse.error(503, code,
+                    OntologyErrorCode.ECOS_ONTO_050 + ": publish-gate dependency unavailable");
         } else if (!result.isPassed()) {
             // 4xx 拒绝：errorCode = 第一个违反项的 code（如 ECOS-ONTO-040/021/030）
             String code = result.getViolations().isEmpty()

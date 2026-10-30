@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.OntologyErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalPublishVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyProposalSaveDTO;
@@ -570,10 +571,11 @@ public class OntologyProposalController {
             // F03-08 (W74/C58)：PENDING 直达 = 绕过审批。设计口径 409；ApiResponse 无 conflict() 工厂方法，
             // 用 error(409, msg) 保留 409 HTTP 语义 + ECOS-ONTO-012 错误码（状态行由 failure() 单源推出）。
             if (STATUS_PENDING.equalsIgnoreCase(status)) {
-                return failure(ApiResponse.error(409,
-                        "ECOS-ONTO-012: proposal must be VERIFIED or APPROVED, not PENDING (bypassing review)"));
+                return failure(ApiResponse.error(409, OntologyErrorCode.ECOS_ONTO_012
+                        + ": proposal must be VERIFIED or APPROVED, not PENDING (bypassing review)"));
             }
-            return failure(ApiResponse.badRequest("ECOS-ONTO-012: proposal status " + status + " not executable"));
+            return failure(ApiResponse.badRequest(OntologyErrorCode.ECOS_ONTO_012
+                    + ": proposal status " + status + " not executable"));
         }
 
         // W75 F03-03 发布门禁：状态校验之后、executeAndPublish 之前（stage + fail-closed）。

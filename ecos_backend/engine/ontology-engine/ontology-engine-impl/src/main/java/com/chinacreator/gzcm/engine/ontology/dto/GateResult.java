@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.chinacreator.gzcm.common.error.OntologyErrorCode;
+
 /**
  * F03-03 / 详细设计-03 §D.3 — {@code PublishGateService.validate(...)} orchestrator result.
  *
@@ -48,20 +50,20 @@ public class GateResult {
     public static final String GATE_V2_UNIT = "V2_UNIT";
     public static final String GATE_V3_LINEAGE = "V3_LINEAGE";
 
-    // ── F03-03 错误码 (详细设计-03 §C.3 中央错误码表) ────────────────
+    // ── F03-03 错误码 (《从零实施版》§6.3.3 冻结表；字面量单源＝common-api OntologyErrorCode) ──
 
     /** V1: 发布态指标缺 caliber_id 或口径版本非 APPROVED. */
-    public static final String CODE_CALIBER_METRIC_MISSING = "ECOS-ONTO-040";
+    public static final String CODE_CALIBER_METRIC_MISSING = OntologyErrorCode.ECOS_ONTO_040;
     /** V1: 口径服务内部失败（fail-closed，500）. */
-    public static final String CODE_CALIBER_SERVICE_UNAVAILABLE = "ECOS-ONTO-042";
+    public static final String CODE_CALIBER_SERVICE_UNAVAILABLE = OntologyErrorCode.ECOS_ONTO_042;
     /** V2: 单位推导冲突（四则代数不适用当前组合）. */
-    public static final String CODE_UNIT_CONFLICT = "ECOS-ONTO-021";
+    public static final String CODE_UNIT_CONFLICT = OntologyErrorCode.ECOS_ONTO_021;
     /** V2: 不可加指标（比率/月）被声明为可加聚合. */
-    public static final String CODE_ADDITIVITY_CONFLICT = "ECOS-ONTO-022";
+    public static final String CODE_ADDITIVITY_CONFLICT = OntologyErrorCode.ECOS_ONTO_022;
     /** V3: 血缘列在事实表上不存在（真实元数据已成功返回，但列缺失）. */
-    public static final String CODE_LINEAGE_COLUMN_MISSING = "ECOS-ONTO-030";
+    public static final String CODE_LINEAGE_COLUMN_MISSING = OntologyErrorCode.ECOS_ONTO_030;
     /** V3: data-engine 元数据 REST 不可用（resolver 空 / 404 / 5xx）= 503 fail-closed. */
-    public static final String CODE_DEPENDENCY_UNAVAILABLE = "ECOS-ONTO-050";
+    public static final String CODE_DEPENDENCY_UNAVAILABLE = OntologyErrorCode.ECOS_ONTO_050;
 
     // ── 嵌套 DTO ────────────────────────────────────────────────────
 

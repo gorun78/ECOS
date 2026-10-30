@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ontology.service;
 
+import com.chinacreator.gzcm.common.error.OntologyErrorCode;
 import com.chinacreator.gzcm.engine.ontology.dto.GateResult;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
 import org.slf4j.Logger;
@@ -67,13 +68,14 @@ public final class DatNetLineageGuard {
         try {
             actual = fetcher.columns(tableRef);
         } catch (ResourceAccessException | HttpClientErrorException | HttpServerErrorException e) {
-            log.error("V3 lineage: datanet metadata REST unavailable tableRef={} — fail-closed ECOS-ONTO-050",
-                    tableRef, e);
+            log.error("V3 lineage: datanet metadata REST unavailable tableRef={} — fail-closed "
+                    + OntologyErrorCode.ECOS_ONTO_050, tableRef, e);
             result.getDependencyErrors().add(
                     new GateResult.DependencyError(DEP_DATANET, GateResult.CODE_DEPENDENCY_UNAVAILABLE));
             return;
         } catch (RuntimeException e) {
-            log.error("V3 lineage: unexpected fetcher failure tableRef={} — fail-closed ECOS-ONTO-050", tableRef, e);
+            log.error("V3 lineage: unexpected fetcher failure tableRef={} — fail-closed "
+                    + OntologyErrorCode.ECOS_ONTO_050, tableRef, e);
             result.getDependencyErrors().add(
                     new GateResult.DependencyError(DEP_DATANET, GateResult.CODE_DEPENDENCY_UNAVAILABLE));
             return;
@@ -81,7 +83,8 @@ public final class DatNetLineageGuard {
 
         // fetcher 返回 null = 依赖不可用（resolver 空 / 404 / 5xx / 响应非法）
         if (actual == null) {
-            log.warn("V3 lineage: datanet metadata column set unresolvable tableRef={} — fail-closed ECOS-ONTO-050", tableRef);
+            log.warn("V3 lineage: datanet metadata column set unresolvable tableRef={} — fail-closed "
+                    + OntologyErrorCode.ECOS_ONTO_050, tableRef);
             result.getDependencyErrors().add(
                     new GateResult.DependencyError(DEP_DATANET, GateResult.CODE_DEPENDENCY_UNAVAILABLE));
             return;

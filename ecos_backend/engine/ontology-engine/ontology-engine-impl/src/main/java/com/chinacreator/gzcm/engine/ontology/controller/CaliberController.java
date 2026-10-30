@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.OntologyErrorCode;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberFormulaValidateDTO;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberFormulaValidationVO;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberSaveDTO;
@@ -65,10 +66,11 @@ public class CaliberController {
 
     private static final Logger log = LoggerFactory.getLogger(CaliberController.class);
 
+    /** 表外码位（§6.3.3 无此枚）：成功信封的域内标记，保留原字面量并登记待裁决，禁搬进族属主类。 */
     private static final String CODE_OK = "ECOS-ONTO-000";
-    private static final String CODE_BAD = "ECOS-ONTO-040";
-    private static final String CODE_FROZEN = "ECOS-ONTO-041";
-    private static final String CODE_INTERNAL = "ECOS-ONTO-042";
+    private static final String CODE_BAD = OntologyErrorCode.ECOS_ONTO_040;
+    private static final String CODE_FROZEN = OntologyErrorCode.ECOS_ONTO_041;
+    private static final String CODE_INTERNAL = OntologyErrorCode.ECOS_ONTO_042;
 
     private final CaliberService caliberService;
     private final CaliberFormulaDslService caliberFormulaDslService;

@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.OntologyErrorCode;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyFunctionAuditVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyFunctionCompileVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyFunctionExecuteQuery;
@@ -49,9 +50,9 @@ public class FunctionController {
     private static final Logger log = LoggerFactory.getLogger(FunctionController.class);
 
     /** 审计上下文缺失 → 400。 */
-    private static final String CODE_NO_AUDIT_CTX = "ECOS-ONTO-060";
+    private static final String CODE_NO_AUDIT_CTX = OntologyErrorCode.ECOS_ONTO_060;
     /** 审计双失败（Kafka + 本地）→ 500。 */
-    private static final String CODE_AUDIT_DUAL_FAIL = "ECOS-ONTO-061";
+    private static final String CODE_AUDIT_DUAL_FAIL = OntologyErrorCode.ECOS_ONTO_061;
 
     private final FunctionValidator validator;
     private final FunctionSandboxEngine engine;

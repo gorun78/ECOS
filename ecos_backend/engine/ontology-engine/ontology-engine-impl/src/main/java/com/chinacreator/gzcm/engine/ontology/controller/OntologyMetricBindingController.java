@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.common.error.OntologyErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.engine.ontology.dto.MetricBindingDTO;
 import com.chinacreator.gzcm.engine.ontology.service.CaliberService;
@@ -61,9 +62,9 @@ public class OntologyMetricBindingController {
 
     private static final Logger log = LoggerFactory.getLogger(OntologyMetricBindingController.class);
 
-    private static final String CODE_BAD = "ECOS-ONTO-040";
-    private static final String CODE_FROZEN = "ECOS-ONTO-041";
-    private static final String CODE_INTERNAL = "ECOS-ONTO-042";
+    private static final String CODE_BAD = OntologyErrorCode.ECOS_ONTO_040;
+    private static final String CODE_FROZEN = OntologyErrorCode.ECOS_ONTO_041;
+    private static final String CODE_INTERNAL = OntologyErrorCode.ECOS_ONTO_042;
 
     private final CaliberService caliberService;
 

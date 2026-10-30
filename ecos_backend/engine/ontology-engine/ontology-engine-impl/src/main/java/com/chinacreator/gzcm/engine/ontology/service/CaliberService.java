@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.chinacreator.gzcm.common.error.OntologyErrorCode;
 import com.chinacreator.gzcm.engine.ontology.dao.CaliberDao;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberFormulaValidationVO;
 
@@ -268,7 +269,8 @@ public class CaliberService {
         Object caliberId = metric.get("caliber_id");
         if (caliberId == null || String.valueOf(caliberId).isBlank()) {
             throw new CaliberMissingException(
-                    "PUBLISHED metric '" + metricCode + "' has no approved caliber (400 ECOS-ONTO-040)");
+                    "PUBLISHED metric '" + metricCode + "' has no approved caliber (400 "
+                            + OntologyErrorCode.ECOS_ONTO_040 + ")");
         }
         String cid = String.valueOf(caliberId);
         String fv = nullToEmpty(String.valueOf(metric.get("formula_version")));
@@ -277,7 +279,8 @@ public class CaliberService {
         if (!"APPROVED".equals(rowStatus)) {
             throw new CaliberNotApprovedException(
                     "PUBLISHED metric '" + metricCode + "' binds caliber version '" + fv
-                            + "' with status " + rowStatus + " != APPROVED (400 ECOS-ONTO-040)");
+                            + "' with status " + rowStatus + " != APPROVED (400 "
+                            + OntologyErrorCode.ECOS_ONTO_040 + ")");
         }
 
         Object snapshot = metric.get("caliber_snapshot");
@@ -293,7 +296,8 @@ public class CaliberService {
         if (snapshot != null && !snapshot.isBlank()) {
             throw new SnapshotFrozenException(
                     "caliber_snapshot for metric '" + metricCode
-                            + "' is already frozen and immutable (409 ECOS-ONTO-041)");
+                            + "' is already frozen and immutable (409 "
+                            + OntologyErrorCode.ECOS_ONTO_041 + ")");
         }
     }
 

@@ -312,6 +312,104 @@ class NoMachineCodeFactoryFaceRatchetTest {
             Map.entry("502", List.of(SECURITY_ERROR_CODE_SOURCE)),
             Map.entry("520", List.of(RLS_CONTRACT_SOURCE))));
 
+    /**
+     * {@code ECOS-ONTO-*} 族码字面量——<b>位置不限</b>判据（本族与 sys/rate/data/auth/sec 五腿的
+     * 唯一判据差异），按 (码, 文件) 双键对账只允许登记属主承载。
+     *
+     * <p><b>#146af 新登</b>（收口差距 P1.1「错误码族字面量散落」的本体域腿）：本族 12 枚在册码
+     * 此前以字面量副本散布在 ontology-engine-impl 的 8 个 main 面文件，common-api 侧零属主。
+     * 已有五腿的判据锚都是<b>引号起点</b>（{@code "ECOS-XXX-\d+..."}），只能吃「独立整枚」与
+     * 「消息起始位拼接」两形态；本体域实测另有两种形态落在引号中段——异常/信封 message
+     * 的<b>人读括号</b>（{@code "...(400 ECOS-ONTO-040)"}，{@code MachineErrorCode} 正则只认
+     * 起始位，故该形态本就不是机读载体）与<b>日志格式串</b>（{@code log.error("... fail-closed
+     * ECOS-ONTO-050", …)}）。引号起点判据对这两形态<b>永不可见</b>＝值可被改写而门恒绿。本族判据
+     * 因此去掉引号锚，凡剥注释后露面即对账；改后 8 文件的这些中段副本全部改指
+     * {@code OntologyErrorCode} 常量（消息文本逐字节不变，仅字面量来源归一）。</p>
+     *
+     * <p>末段 {@code (?![\dA-Za-z])} 用于把文档态简写排除在册枚计数之外：{@code ECOS-ONTO-0xx}
+     * （族前缀＋单数字＋x）与 {@code ECOS-ONTO-07x} 若不加此限制，会被 {@code \d{2,4}} 回切成
+     * 「07」这类伪码位；实扫 main 面两枚简写只在注释/文档串露面，剥注释后本已不计，加此限制
+     * 是防未来有人把简写写进代码。<b>已知不可吃形态</b>：{@code ECOS-ONTO-publish-gate-failed}
+     * （非数字段，属消息前缀文案而非码位，登记在册说明见该方法 javadoc）。</p>
+     */
+    private static final Pattern ONTO_FAMILY_LITERAL = Pattern.compile("ECOS-ONTO-(\\d{2,4})(?![\\dA-Za-z])");
+
+    /** ONTO 族字面量族属主文件（《从零实施版》§6.3.3 在册 13 枚枚定值）。 */
+    private static final String ONTOLOGY_ERROR_CODE_SOURCE =
+            "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/gzcm/common/error/OntologyErrorCode.java";
+
+    /** 表外成功标记 000 的属主（§6.3.3 无此枚，留在原处待裁决，禁搬进族属主类）。 */
+    private static final String ONTO_CALIBER_CONTROLLER_SOURCE =
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/ontology/controller/CaliberController.java";
+
+    /** 口径 DSL 四关机读码属主（071/072/073 为该类私设号段，§6.3.3 未在册；070 与术语枚同位冲突）。 */
+    private static final String ONTO_CALIBER_DSL_VALIDATOR_SOURCE =
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/ontology/service/CaliberDslValidator.java";
+
+    /**
+     * workspace 侧 DSL 门禁解码表（跨引擎 REST 契约的<b>消费面</b>第二份字面量）。
+     *
+     * <p>{@code workspace-impl} 的 pom 只依赖 common-api + runtime-*，对 ontology-engine-impl
+     * 无编译依赖 ⇒ 无法引用 {@code CaliberDslValidator.CODE_*} 常量，只能自带一份解码键。
+     * 该双份属登记在案的架构性重复（消除它需要 DSL 号段下沉 common-api 或入 §6.3.3，待裁决），
+     * 本判据把它钉在「至多两枚属主」面内，禁第三处露面。</p>
+     */
+    private static final String ONTO_CALIBER_ADDRESSING_SOURCE =
+            "ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/workspace/caliber/"
+                    + "CaliberAddressing.java";
+
+    /** 逐枚登记：码位 → 允许持有其字面量的 main 面文件（白名单只减不增，新增须走裁决批）。 */
+    private static final Map<String, List<String>> ONTO_LITERAL_HOLDERS = new TreeMap<>(Map.ofEntries(
+            Map.entry("000", List.of(ONTO_CALIBER_CONTROLLER_SOURCE)),
+            Map.entry("011", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
+            Map.entry("012", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
+            Map.entry("021", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
+            Map.entry("022", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
+            Map.entry("030", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
+            Map.entry("040", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
+            Map.entry("041", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
+            Map.entry("042", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
+            Map.entry("050", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
+            Map.entry("060", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
+            Map.entry("061", List.of(ONTOLOGY_ERROR_CODE_SOURCE)),
+            Map.entry("070", List.of(ONTOLOGY_ERROR_CODE_SOURCE,
+                    ONTO_CALIBER_DSL_VALIDATOR_SOURCE, ONTO_CALIBER_ADDRESSING_SOURCE)),
+            Map.entry("071", List.of(ONTO_CALIBER_DSL_VALIDATOR_SOURCE, ONTO_CALIBER_ADDRESSING_SOURCE)),
+            Map.entry("072", List.of(ONTO_CALIBER_DSL_VALIDATOR_SOURCE, ONTO_CALIBER_ADDRESSING_SOURCE)),
+            Map.entry("073", List.of(ONTO_CALIBER_DSL_VALIDATOR_SOURCE, ONTO_CALIBER_ADDRESSING_SOURCE)),
+            Map.entry("080", List.of(ONTOLOGY_ERROR_CODE_SOURCE))));
+
+    /**
+     * ONTO 族出口侧的常量引用判据锚：8 个改指文件必须各自仍在取 {@code OntologyErrorCode} 常量。
+     *
+     * <p>族属主面绿（字面量只在属主内）并不等于出口真的在用常量——出口若哪天改回裸文案，
+     * 字面量面照样干净，单源就断在消费侧。逐文件<b>恰 N 枚</b>（#146af 本批实跑读数）：
+     * 少＝出口漂移回字面量或漏腿，多＝同一出口重复取码／新增副本改指须同批重设本表。</p>
+     */
+    private static final Pattern ONTO_CODE_REFERENCE = Pattern.compile(
+            "OntologyErrorCode\\s*\\.\\s*ECOS_ONTO_\\d+");
+
+    /** 属主出口文件 → 应出现的常量引用枚数（本批实跑逐文件计数，非估算）。 */
+    private static final Map<String, Integer> ONTO_CONSUMER_EXIT_BASELINE = new TreeMap<>(Map.ofEntries(
+            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/controller/CaliberController.java", 3),
+            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/controller/FunctionController.java", 2),
+            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/controller/OntologyMetricBindingController.java", 3),
+            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/controller/OntologyProposalController.java", 2),
+            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/dto/GateResult.java", 6),
+            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/service/CaliberService.java", 3),
+            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/service/DatNetLineageGuard.java", 3),
+            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/service/PublishGateService.java", 1)));
+
     /** 登记豁免：唯一保留单参的入口腿。 */
     private static final List<String> REGISTERED_ENTRY_EXEMPTIONS = List.of("handleNotFound");
 
@@ -638,6 +736,87 @@ class NoMachineCodeFactoryFaceRatchetTest {
         Path f = root.resolve(rel);
         assertTrue(Files.exists(f), "登记属主文件不在位（scan/目录变更须同步白名单）：" + rel);
         return SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+    }
+
+    /**
+     * ECOS-ONTO-* 族码字面量的 <b>(码, 文件) 双键零容差</b>判据（#146af）：白名单外的任何露面即红，
+     * 未登记码位即便落在登记属主文件内也红（防「族里凭空多一枚未经 §6.3.3 裁决的码」）。
+     *
+     * <p>与 SEC 腿的「先整体跳过属主文件」不同，本族改为<b>逐命中查双键</b>——判据不限位置以后，
+     * 属主文件内部同样可能出现越权枚（{@code CaliberDslValidator} 私设 074、
+     * {@code OntologyErrorCode} 被补第 14 枚），跳过整文件会把这类漂移读成绿。</p>
+     *
+     * <p>假绿防护＝逐 (码, 属主) 回读：白名单里每一对都必须在对应属主文件内仍有字面量锚点，
+     * 否则「白名单外零命中」只是两边都把值删了／搬走了的假象；属主文件不在位由
+     * {@link #readStripped} 的存在性断言先行变红。</p>
+     */
+    @Test
+    @DisplayName("ECOS-ONTO-* 族码字面量按 (码,文件) 双键仅由登记属主承载，message 中段与日志形态同样入账")
+    void ontoFamilyLiteralsAreSingleSourced() throws IOException {
+        Path root = locateRepoRoot();
+        List<Path> files = new ArrayList<>();
+        collectJavaUnder(root.resolve("ecos_backend"), files);
+        assertTrue(files.size() >= MIN_SCANNED_MAIN_FILES,
+                "扫描面缩水：实扫 main 面 java 文件 " + files.size() + " < 阈值 "
+                        + MIN_SCANNED_MAIN_FILES + "，判据不可信（读不到 ≠ 无副本）");
+
+        List<String> violations = new ArrayList<>();
+        for (Path f : files) {
+            String rel = root.relativize(f).toString().replace('\\', '/');
+            String stripped = SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+            Matcher m = ONTO_FAMILY_LITERAL.matcher(stripped);
+            while (m.find()) {
+                String code = m.group(1);
+                List<String> holders = ONTO_LITERAL_HOLDERS.get(code);
+                if (holders == null) {
+                    violations.add(rel + " → ECOS-ONTO-" + code + "（未登记码位）");
+                } else if (!holders.contains(rel)) {
+                    violations.add(rel + " → ECOS-ONTO-" + code + "（登记属主之外的副本）");
+                }
+            }
+        }
+        assertEquals(List.of(), violations,
+                "main 面出现 ECOS-ONTO-* 字面量越权露面（含 message 中段括号与日志格式串两形态）："
+                        + "出口应改取 OntologyErrorCode 常量，DSL 四关/表外 000 只许留在既有登记属主内；"
+                        + "新增族码先登记入《从零实施版》§6.3.3 表并同步本白名单，禁以代码冒充文档裁决。"
+                        + "清单=" + violations);
+
+        for (Map.Entry<String, List<String>> e : ONTO_LITERAL_HOLDERS.entrySet()) {
+            for (String ownerRel : e.getValue()) {
+                assertTrue(readStripped(root, ownerRel).contains("ECOS-ONTO-" + e.getKey()),
+                        "属主面回读失败：ECOS-ONTO-" + e.getKey() + " 在登记属主 " + ownerRel
+                                + " 内已找不到字面量锚点——白名单陈旧或该枚值被删/搬走，"
+                                + "「白名单外零违例」属假绿，须同批对账");
+            }
+        }
+    }
+
+    /**
+     * ONTO 族消费侧锚点（#146af）：八处改指文件必须逐文件<b>恰 N 枚</b> {@code
+     * OntologyErrorCode.ECOS_ONTO_<n>} 引用。
+     *
+     * <p>判据面绿只证明「字面量没扩散」，不证明「出口还在取常量」——出口若改回裸文案或新造副本，
+     * 字面量面照样干净，单源断在消费侧（假单源）。少＝腿漂移回裸文案，多＝同出口重复取码或
+     * 新增改指腿未同批登记。</p>
+     */
+    @Test
+    @DisplayName("ECOS-ONTO 族八处出口逐文件恰取 OntologyErrorCode 常量（假单源或漂移即红）")
+    void ontoExitsPointToSingleSource() throws IOException {
+        Path root = locateRepoRoot();
+        List<String> drift = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : ONTO_CONSUMER_EXIT_BASELINE.entrySet()) {
+            String stripped = readStripped(root, e.getKey());
+            int hits = 0;
+            Matcher m = ONTO_CODE_REFERENCE.matcher(stripped);
+            while (m.find()) {
+                hits++;
+            }
+            if (hits != e.getValue()) {
+                drift.add(e.getKey() + " 实跑 " + hits + " 枚 ≠ 登记 " + e.getValue() + " 枚");
+            }
+        }
+        assertEquals(List.of(), drift,
+                "ECOS-ONTO 族出口侧常量引用枚数漂移（八文件基线＝#146af 本批实跑读数）：" + drift);
     }
 
     /**
