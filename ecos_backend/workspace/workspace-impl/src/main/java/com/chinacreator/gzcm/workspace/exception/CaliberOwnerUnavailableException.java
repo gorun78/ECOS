@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.workspace.exception;
 
+import com.chinacreator.gzcm.common.error.FCScenarioErrorCode;
+
 /**
  * 口径属主引擎不可得（#146ac 附录A 第 31 条读面三枚，HTTP 503 / {@code ONTOLOGY_UNAVAILABLE}）。
  *
@@ -14,7 +16,7 @@ package com.chinacreator.gzcm.workspace.exception;
 public class CaliberOwnerUnavailableException extends WorkspaceDomainException {
 
     public CaliberOwnerUnavailableException(String operation) {
-        super(503, "ONTOLOGY_UNAVAILABLE", "口径属主引擎暂不可用，请稍后重试或凭追踪号联系管理员");
+        super(503, FCScenarioErrorCode.CODE_ONTOLOGY_UNAVAILABLE, "口径属主引擎暂不可用，请稍后重试或凭追踪号联系管理员");
         putDetail("engine", "ontology");
         putDetail("operation", operation);
     }

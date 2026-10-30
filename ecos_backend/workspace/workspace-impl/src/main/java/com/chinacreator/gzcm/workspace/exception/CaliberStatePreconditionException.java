@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.workspace.exception;
 
+import com.chinacreator.gzcm.common.error.FCScenarioErrorCode;
+
 import java.util.List;
 
 /**
@@ -14,7 +16,7 @@ public class CaliberStatePreconditionException extends WorkspaceDomainException 
 
     public CaliberStatePreconditionException(String caliberId, String code, String versionNo,
                                              String observedStatus, List<String> expectedStatuses) {
-        super(409, "CALIBER_STATE_PRECONDITION",
+        super(409, FCScenarioErrorCode.CODE_CALIBER_STATE_PRECONDITION,
                 "口径版本状态不满足该操作前置: " + code);
         putDetail("caliberId", caliberId);
         putDetail("caliberCode", code);

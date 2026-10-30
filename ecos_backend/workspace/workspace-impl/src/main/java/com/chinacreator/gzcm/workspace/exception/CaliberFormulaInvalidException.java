@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.workspace.exception;
 
+import com.chinacreator.gzcm.common.error.FCScenarioErrorCode;
 import com.chinacreator.gzcm.common.ontology.CaliberDslContract;
 
 import java.util.List;
@@ -29,7 +30,7 @@ public class CaliberFormulaInvalidException extends WorkspaceDomainException {
             CaliberDslContract.GATE_V4_CYCLE);
 
     public CaliberFormulaInvalidException(List<Map<String, Object>> violations, String target) {
-        super(400, "CALIBER_DSL_INVALID", "口径公式 DSL 四关未通过（违一即 400，不落库）");
+        super(400, FCScenarioErrorCode.CODE_CALIBER_DSL_INVALID, "口径公式 DSL 四关未通过（违一即 400，不落库）");
         putDetail("violations", violations == null ? List.of() : violations);
         putDetail("gates", DSL_GATES);
         if (target != null && !target.isBlank()) {
@@ -44,7 +45,7 @@ public class CaliberFormulaInvalidException extends WorkspaceDomainException {
      * @param rejectedGate   由该码映射出的四关闸名；映射不上为 {@code null}（不猜一关顶替）
      */
     public CaliberFormulaInvalidException(String ownerErrorCode, String rejectedGate) {
-        super(400, "CALIBER_DSL_INVALID", "口径公式 DSL 四关未通过（违一即 400，不落库）");
+        super(400, FCScenarioErrorCode.CODE_CALIBER_DSL_INVALID, "口径公式 DSL 四关未通过（违一即 400，不落库）");
         putDetail("violations", List.of());
         putDetail("gates", DSL_GATES);
         putDetail("ownerErrorCode", ownerErrorCode);

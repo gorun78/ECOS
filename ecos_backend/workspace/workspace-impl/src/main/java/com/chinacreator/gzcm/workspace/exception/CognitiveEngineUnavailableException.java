@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.workspace.exception;
 
+import com.chinacreator.gzcm.common.error.FCScenarioErrorCode;
+
 /**
  * 认知引擎不可用（F07-12 四端点 / 演练，HTTP 503 / COGNITIVE_UNAVAILABLE，A3 禁 200 空体）。
  *
@@ -14,7 +16,7 @@ public class CognitiveEngineUnavailableException extends WorkspaceDomainExceptio
     }
 
     public CognitiveEngineUnavailableException(String reason, Throwable cause) {
-        super(503, "COGNITIVE_UNAVAILABLE",
+        super(503, FCScenarioErrorCode.CODE_COGNITIVE_UNAVAILABLE,
                 "认知引擎暂不可用，请稍后重试或凭追踪号联系管理员", cause);
         this.technicalReason = reason;
         putDetail("engine", "cognitive");

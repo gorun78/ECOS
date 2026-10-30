@@ -632,6 +632,82 @@ class NoMachineCodeFactoryFaceRatchetTest {
             Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/"
                     + "com/chinacreator/gzcm/engine/ai/controller/AgentSessionOpsController.java", 19)));
 
+    // ── ECOS-FC-* 族单源面（#146ak，台账附录C 第 8 条）─────────────────
+
+    /**
+     * FC 族机读码字面量判据：引号起点 + 三位码位（400/403/404/409/503）。
+     *
+     * <p><b>#146ak 新登</b>（收口差距附录C 第 8 条「第12篇 ECOS-FC-* 全族 0 命中」）：
+     * 治理时点 main 面带引号机读码 0 枚（台账销项判据），信封真身＝
+     * {@code WorkspaceDomainException#getCode()} 的语义 code，机读码族前缀在信封面
+     * 无生产锚（补锚＝API 变更，铁律 #10，本批不做）。本批把冻结表 5 枚码位字面量
+     * 首次落进 {@code FCScenarioErrorCode} 属主本类；本腿＝与 sys/rate/data/auth 腿
+     * 同型的零容差判据：属主字面量面之外出现任意一枚带引号 {@code "ECOS-FC-\d{3}"}
+     * 即红，不设棘轮基线（新增即红）。改后全仓 main 面副本应恒 0 枚。</p>
+     */
+    private static final Pattern FC_FAMILY_LITERAL = Pattern.compile("\"ECOS-FC-(\\d{3})\"");
+
+    /** FC 族机读码属主（common-api 常量类；5 枚码位字面量唯一合法家）。 */
+    private static final String FC_SCENARIO_ERROR_CODE_SOURCE =
+            "ecos_backend/runtime/common-api/src/main/java/com/chinacreator/gzcm/common/error/"
+                    + "FCScenarioErrorCode.java";
+
+    /** 冻结表（《从零实施版》附录C 第12篇 10411~10421 行）在册码位集（与属主面 equals 对账）。 */
+    private static final Set<String> FC_REGISTERED_CODES = Set.of("400", "403", "404", "409", "503");
+
+    /**
+     * FC 域语义位字面量判据（逐枚带引号整词）。7 枚＝治理时点有生产出口的 FC 域自有
+     * 语义位，字面量单源归 {@code FCScenarioErrorCode.CODE_*} 常量；属主之外任何 main 面
+     * 带引号整词出现即红（零容差，不设棘轮）。
+     *
+     * <p><b>刻意不入本表的托管位</b>（各有归因，均不建本域常量）：
+     * 409 PERIOD_CLOSED（409 段唯一枚，owner data-engine 域，独立治理）；
+     * 400 ACTION_FIELDS_MISSING（属主 ECOS-ACT 五必填段）；
+     * 403 PERMISSION_DENIED（属主 SEC 族，出口仍在 security denier）；
+     * 503 SECURITY_UNAVAILABLE（同上，属主 SEC 族）。四枚均为跨族共用位，
+     * 逐枚搬流会跨族引用违铁律，归属以冻结表原文为准，属主类 javadoc 逐枚注释登记。</p>
+     */
+    private static final Map<String, String> FC_SEMANTIC_SLOTS = new TreeMap<>(Map.of(
+            "CALIBER_DSL_INVALID", "CODE_CALIBER_DSL_INVALID",
+            "COGNITIVE_UNAVAILABLE", "CODE_COGNITIVE_UNAVAILABLE",
+            "ONTOLOGY_UNAVAILABLE", "CODE_ONTOLOGY_UNAVAILABLE",
+            "SANDBOX_REF_FORBIDDEN", "CODE_SANDBOX_REF_FORBIDDEN",
+            "FORECAST_RUN_NOT_FOUND", "CODE_FORECAST_RUN_NOT_FOUND",
+            "CALIBER_NOT_FOUND", "CODE_CALIBER_NOT_FOUND",
+            "CALIBER_STATE_PRECONDITION", "CODE_CALIBER_STATE_PRECONDITION"));
+
+    /**
+     * FC 域消费侧锚点：九处改指文件必须逐文件<b>恰 N 枚</b> {@code
+     * FCScenarioErrorCode.CODE_*} 引用（#146ak 本批：9 载体文件 10 处——
+     * CaliberFormulaInvalidException 双构造 2 枚，其余各 1 枚），且各自恰 1 枚
+     * 属主 import（防改指域外同值常量＝单源名存实亡）。
+     */
+    private static final Pattern FC_CODE_REFERENCE =
+            Pattern.compile("FCScenarioErrorCode\\s*\\.\\s*CODE_[A-Z][A-Z0-9_]+");
+
+    private static final Pattern FC_CONSUMER_IMPORT =
+            Pattern.compile("import\\s+com\\.chinacreator\\.gzcm\\.common\\.error\\s*\\.\\s*FCScenarioErrorCode\\s*;");
+
+    private static final Map<String, Integer> FC_CONSUMER_EXIT_BASELINE = new TreeMap<>(Map.ofEntries(
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/exception/CaliberFormulaInvalidException.java", 2),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/exception/CaliberStatePreconditionException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/exception/CaliberOwnerUnavailableException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/exception/CaliberNotFoundException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/exception/CognitiveEngineUnavailableException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/exception/SandboxReferenceForbiddenException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/forecast/ForecastRunNotFoundException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/scenario/CognitiveEngineUnavailableException.java", 1),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "workspace/scenario/SandboxReferenceForbiddenException.java", 1)));
+
     // ── 1. 余面棘轮 ─────────────────────────────────
 
     @Test
@@ -1324,7 +1400,123 @@ class NoMachineCodeFactoryFaceRatchetTest {
     }
 
     /**
-     * 属主两枚 429 出口必须从 {@code RateLimitErrorCode} 单源取码。此为 P1.1「配额耗尽
+     * ECOS-FC-* 族码字面量单源判据（#146ak）：治理时点 main 面带引号机读码 0 枚
+     * （台账附录C 第 8 条销项判据），信封真身＝{@code WorkspaceDomainException#getCode()}
+     * 的语义 code、族前缀在信封面无生产锚（补锚＝API 变更，铁律 #10，本批不做）。
+     * 本批把冻结表 5 枚码位字面量首次落进 {@code FCScenarioErrorCode} 属主，
+     * 三段假绿防护：①<b>属主码位集对账</b>——属主内带引号码位与冻结表登记集
+     * {@code equals} 同号（属主单方面补登/删枚即红），堵住 AI 腿那种"忘锚 503"盲区；
+     * ②逐命中查属主——属主文件内出现未登记码位（如凭空加 401）也红；
+     * ③改后全仓 main 面副本应恒 0 枚，故直接 {@code assertEquals(List.of(), …)}，
+     * 不设棘轮（任何新增副本即红）。
+     */
+    @Test
+    @DisplayName("ECOS-FC-* 族码字面量 main 面仅由 FCScenarioErrorCode 承载，属主码位集与冻结表同款集同号")
+    void fcFamilyLiteralsAreSingleSourced() throws IOException {
+        Path root = locateRepoRoot();
+        List<Path> files = new ArrayList<>();
+        collectJavaUnder(root.resolve("ecos_backend"), files);
+        assertTrue(files.size() >= MIN_SCANNED_MAIN_FILES,
+                "扫描面缩水：实扫 main 面 java 文件 " + files.size() + " < 阈值 "
+                        + MIN_SCANNED_MAIN_FILES + "，判据不可信（读不到 ≠ 无副本）");
+
+        // 属主面不存在即直接红（防“文件被搬走 ⇒ 白名单外零命中恒绿”假象）
+        assertTrue(Files.exists(root.resolve(FC_SCENARIO_ERROR_CODE_SOURCE)),
+                "FC 族机读码单源文件不在位：" + FC_SCENARIO_ERROR_CODE_SOURCE);
+
+        List<String> copies = new ArrayList<>();
+        for (Path f : files) {
+            String rel = root.relativize(f).toString().replace('\\', '/');
+            String stripped = SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+            Matcher m = FC_FAMILY_LITERAL.matcher(stripped);
+            while (m.find()) {
+                String code = m.group(1);
+                if (!FC_SCENARIO_ERROR_CODE_SOURCE.equals(rel)) {
+                    copies.add(rel + " → ECOS-FC-" + code + "（属主之外的副本，应改取常量）");
+                } else if (!FC_REGISTERED_CODES.contains(code)) {
+                    copies.add(rel + " → ECOS-FC-" + code + "（属主内未登记码位：伪造未经附录C 冻结表裁决的族码）");
+                }
+            }
+        }
+        assertEquals(List.of(), copies,
+                "main 面出现 ECOS-FC-* 族码字面量越权露面（属主外出副本、自由新增枚数、属主内未登记枚数）："
+                        + "出口应改取 FCScenarioErrorCode 常量；新增族码先登记入《从零实施版》附录C "
+                        + "冻结表并同步本判据，禁以代码冒充文档裁决。清单=" + copies);
+    }
+
+    /**
+     * FC 域 7 枚语义位字面量 + 消费侧出口基线（#146ak，台账附录C 第 8 条）：
+     * 7 枚 FC 域自有语义位（CALIBER_DSL_INVALID 等）的带引号字面量单源归
+     * {@code FCScenarioErrorCode.CODE_*} 常量，属主外 main 面任何一枚即红；
+     * 9 个改指文件逐文件<b>恰 N 枚</b>属主常量引用 + 恰 1 枚属主 import。
+     *
+     * <p>三段假绿防护：①<b>FC 字面量面零容差</b>（改后全仓副本恒 0 枚，不设棘轮）；
+     * ②<b>消费面基线</b>——字面量面绿只证「没扩散」，不证「出口真在取常量」，
+     * 出口改回裸串或新造同值副本会绕过字面量面，仅本腿按逐文件枚数变红；
+     * ③<b>逐枚 import</b>——改指域外同值常量时裸串回读不可分辨，只有 import 那行
+     * 读得见域内/域外。少＝漂移回字面量；多＝重复取码或新改指腿未同批重设基线。</p>
+     */
+    @Test
+    @DisplayName("FC 域 7 枚语义位字面量 main 面 0 副本，且九处改指出口逐文件恰取属主常量")
+    void fcScenarioSemanticSlotsAreSingleSourced() throws IOException {
+        Path root = locateRepoRoot();
+        List<Path> files = new ArrayList<>();
+        collectJavaUnder(root.resolve("ecos_backend"), files);
+        assertTrue(files.size() >= MIN_SCANNED_MAIN_FILES,
+                "扫描面缩水：实扫 main 面 java 文件 " + files.size() + " < 阈值 "
+                        + MIN_SCANNED_MAIN_FILES + "，判据不可信（读不到 ≠ 无副本）");
+
+        // ① FC 字面量面：属主外任意一枚即红
+        List<String> copies = new ArrayList<>();
+        for (Path f : files) {
+            String rel = root.relativize(f).toString().replace('\\', '/');
+            if (FC_SCENARIO_ERROR_CODE_SOURCE.equals(rel)) {
+                continue;
+            }
+            String stripped = SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+            for (String slot : FC_SEMANTIC_SLOTS.keySet()) {
+                int n = 0;
+                Matcher m = Pattern.compile("\"" + Pattern.quote(slot) + "\"").matcher(stripped);
+                while (m.find()) {
+                    n++;
+                }
+                if (n > 0) {
+                    copies.add(rel + " → " + slot + "（" + n + " 处，应改指 "
+                            + "FCScenarioErrorCode." + FC_SEMANTIC_SLOTS.get(slot) + "）");
+                }
+            }
+            // ③ 改指文件专属：import 恰好 1 枚（防改指域外同值常量）
+            for (String consumer : FC_CONSUMER_EXIT_BASELINE.keySet()) {
+                if (consumer.equals(rel)) {
+                    long imports = FC_CONSUMER_IMPORT.matcher(stripped).results().count();
+                    if (imports != 1) {
+                        copies.add(rel + " 契约 import " + imports + " 枚 ≠ 1（改指域外同值常量＝单源名存实亡）");
+                    }
+                }
+            }
+        }
+        assertEquals(List.of(), copies,
+                "main 面出现 FC 域 7 枚语义位字面量副本（或契约 import 漂移）：出口应改取 "
+                        + "FCScenarioErrorCode 常量。清单=" + copies);
+
+        // ② 消费面基线：九文件逐枚恰 N 枚属主常量引用
+        List<String> drift = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : FC_CONSUMER_EXIT_BASELINE.entrySet()) {
+            String stripped = readStripped(root, e.getKey());
+            int hits = 0;
+            Matcher m = FC_CODE_REFERENCE.matcher(stripped);
+            while (m.find()) {
+                hits++;
+            }
+            if (hits != e.getValue()) {
+                drift.add(e.getKey() + " 实跑 " + hits + " 枚 ≠ 登记 " + e.getValue() + " 枚");
+            }
+        }
+        assertEquals(List.of(), drift,
+                "FC 域改指出口侧属主引用枚数漂移（九文件基线＝#146ak 本批实跑读数，回退裸文案/域外同值常量两形态均红）：" + drift);
+    }
+
+    /**
      * 仅裸 429」收口的正向锚点，防后续批次改回 {@code ApiResponse.error(429,"...")} 单参
      * 或加回字面量"ECOS-RATE-429/430"副本。
      *

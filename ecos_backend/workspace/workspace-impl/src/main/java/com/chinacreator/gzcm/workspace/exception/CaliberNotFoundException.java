@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.workspace.exception;
 
+import com.chinacreator.gzcm.common.error.FCScenarioErrorCode;
+
 /**
  * 口径不存在（#146ac 附录A 第 31 条 {@code GET /api/v1/workspace/calibers/{id}}，HTTP 404）。
  *
@@ -10,7 +12,7 @@ package com.chinacreator.gzcm.workspace.exception;
 public class CaliberNotFoundException extends WorkspaceDomainException {
 
     public CaliberNotFoundException(String caliberId, int resolutionWindow, boolean windowSaturated) {
-        super(404, "CALIBER_NOT_FOUND", "口径不存在: " + caliberId);
+        super(404, FCScenarioErrorCode.CODE_CALIBER_NOT_FOUND, "口径不存在: " + caliberId);
         putDetail("caliberId", caliberId);
         putDetail("resolutionWindow", resolutionWindow);
         putDetail("windowSaturated", windowSaturated);
