@@ -183,7 +183,7 @@ public class CaliberOwnerClient {
      *
      * @param operation 出网点标识（list/detail/validate/create/createVersion/approve），同时用于失败取证
      * @param code      信封数字码（0 = 成功；400/404/500/-1 = 属主侧失败）
-     * @param errorCode 属主机读码（{@code ECOS-ONTO-0xx} / {@code CAL-404} / {@code ok}），不带原文 message
+     * @param errorCode 属主机读码（{@code ECOS-ONTO-0xx} / {@code ok}），不带原文 message
      * @param data      信封 data 段（List／Map／null）
      */
     public record OwnerReply(String operation, int code, String errorCode, Object data) {

@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -57,6 +58,10 @@ import com.chinacreator.gzcm.sysman.iam.context.UserContext;
  *   <li>{@link CaliberService.CaliberFormulaRejectedException} → 400 {@code ECOS-ONTO-070/071/072/073}
  *       （V1 语法 / V2 引用闭合 / V3 量纲 / V4 成环，errorCode 取首条违反项码）;</li>
  *   <li>身份缺失（approve 无 Username） → 400 {@code ECOS-ONTO-040};</li>
+ *   <li>口径／当前 APPROVED 版本不存在（detail／current／写面寻址腿） → 404 {@code ECOS-ONTO-080}
+ *       （本域唯一 404 语义，#146ap 归位属主机读码）;</li>
+ *   <li>显式升版撞 {@code uniq_ecos_caliber_ver} 版本幂等 → 409 {@code ECOS-ONTO-011}
+ *       （#146ap 承流腿，撞唯一键不 5xx 掩蔽、不产生第二版本行）;</li>
  *   <li>其它 → 500 {@code ECOS-ONTO-042}（fail-closed）。</li>
  * </ul>
  */
@@ -71,6 +76,17 @@ public class CaliberController {
     private static final String CODE_BAD = OntologyErrorCode.ECOS_ONTO_040;
     private static final String CODE_FROZEN = OntologyErrorCode.ECOS_ONTO_041;
     private static final String CODE_INTERNAL = OntologyErrorCode.ECOS_ONTO_042;
+    /**
+     * 本域唯一 404 语义（§6.3.3 ECOS-ONTO-080）：口径编码／当前 APPROVED 版本不存在。
+     * 禁 5xx 掩蔽、禁再造域外码位（原私设 "CAL-404"，#146ap 归位属主机读码）。
+     */
+    private static final String CODE_NOT_FOUND = OntologyErrorCode.ECOS_ONTO_080;
+    /**
+     * 版本幂等冲突 409（§6.3.3 ECOS-ONTO-011）：显式升版撞
+     * {@code uniq_ecos_caliber_ver(caliber_id, version_no)}（V167.1 唯一约束），
+     * 不产生第二版本行。
+     */
+    private static final String CODE_VERSION_CONFLICT = OntologyErrorCode.ECOS_ONTO_011;
 
     private final CaliberService caliberService;
     private final CaliberFormulaDslService caliberFormulaDslService;
@@ -103,7 +119,7 @@ public class CaliberController {
             Map<String, Object> row = caliberService.findByCode(code)
                     .orElseGet(() -> null);
             if (row == null) {
-                return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, "CAL-404",
+                return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, CODE_NOT_FOUND,
                         "caliber '" + code + "' not found");
             }
             CaliberVO vo = CaliberVO.of(row);
@@ -130,7 +146,7 @@ public class CaliberController {
             Map<String, Object> row = caliberService.getByCaliberCodeAndCurrentVersion(code)
                     .orElseGet(() -> null);
             if (row == null) {
-                return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, "CAL-404",
+                return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, CODE_NOT_FOUND,
                         "no current APPROVED caliber version for '" + code + "'");
             }
             return ApiResponse.success(row);
@@ -167,7 +183,7 @@ public class CaliberController {
             Map<String, Object> caliber = caliberService.findByCode(code)
                     .orElseGet(() -> null);
             if (caliber == null) {
-                return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, "CAL-404",
+                return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, CODE_NOT_FOUND,
                         "caliber '" + code + "' not found");
             }
             String versionNo = (dto.getVersionNo() == null || dto.getVersionNo().isBlank())
@@ -179,6 +195,12 @@ public class CaliberController {
             return ApiResponse.success(ver);
         } catch (CaliberService.CaliberFormulaRejectedException e) {
             return ApiResponse.error(ApiResponse.CODE_BAD_REQUEST, e.getCode(), e.getMessage());
+        } catch (DuplicateKeyException e) {
+            log.warn("add caliber version duplicate (caliber_id, version_no) code={} versionNo={}",
+                    code, dto.getVersionNo());
+            return ApiResponse.error(409, CODE_VERSION_CONFLICT,
+                    "caliber version '" + code + ":" + dto.getVersionNo()
+                            + "' already exists (同版本重复发布)");
         } catch (Exception e) {
             log.error("add caliber version failed code={}", code, e);
             return ApiResponse.error(500, CODE_INTERNAL, "add caliber version failed");
@@ -204,7 +226,7 @@ public class CaliberController {
             Map<String, Object> caliber = caliberService.findByCode(code)
                     .orElseGet(() -> null);
             if (caliber == null) {
-                return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, "CAL-404",
+                return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, CODE_NOT_FOUND,
                         "caliber '" + code + "' not found");
             }
             String cid = String.valueOf(caliber.get("id"));
@@ -233,7 +255,7 @@ public class CaliberController {
             Map<String, Object> caliber = caliberService.findByCode(code)
                     .orElseGet(() -> null);
             if (caliber == null) {
-                return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, "CAL-404",
+                return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, CODE_NOT_FOUND,
                         "caliber '" + code + "' not found");
             }
             int affected = caliberService.archiveVersion(

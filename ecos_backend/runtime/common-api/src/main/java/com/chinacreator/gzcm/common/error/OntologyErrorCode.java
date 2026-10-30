@@ -33,9 +33,10 @@ package com.chinacreator.gzcm.common.error;
  *       wire 契约且要动跨模块消费面，属裁决批；本批判据按枚做 (文件, 码) 对账，把两种占用
  *       一并钉住在白名单内，禁止出现第三种。</li>
  *   <li>{@code ECOS-ONTO-011}（版本幂等 409）与 {@code ECOS-ONTO-080}（唯一 404 语义）在册，
- *       但 main 面<b>零枚承载出口</b>（实扫 {@code grep -rn "ECOS-ONTO-011\|ECOS-ONTO-080"
- *       --include=*.java | grep src/main}＝0）⇒ 本类给出的是<b>字面量锚点</b>，承流腿仍欠，
- *       台账记为待办，不因本类落码而宣称该两枚已实现。</li>
+ *       #146af 时 main 面零枚承载出口（当时实扫＝0），#146ap 已补属主出口：011＝
+ *       {@code CaliberController#addVersion} 显式升版撞 {@code uniq_ecos_caliber_ver} 腿
+ *       （DuplicateKeyException → 409），080＝{@code CaliberController} 的 detail／current／
+ *       addVersion／approve／retire 五枚不存在腿（原私设 "CAL-404" 归位）。</li>
  *   <li>{@code ECOS-ONTO-040} 在 §6.3.3 只描述「发布态指标缺 caliber_id 或口径版本非
  *       APPROVED」，代码面另有「身份缺失（approve 无 Username）」借用同一枚的腿（见
  *       {@code CaliberController} 类注释）——借用形态在本批保持原值，语义归位属裁决批。</li>
@@ -57,8 +58,10 @@ public final class OntologyErrorCode {
     /**
      * 409 — 版本幂等冲突：同 {@code (domain_code, version_no)} 重复发布。
      *
-     * <p><b>承流欠（#146af 登记）</b>：§6.3.3 在册，但 main 面当前无出口承载该枚；本常量是
-     * 字面量锚点，供后续发布幂等腿取码，禁在任何出口上以字面量副本形态出现。</p>
+     * <p>属主出口＝{@code CaliberController#addVersion}（#146ap 承流腿）：显式
+     * {@code version_no} 撞 {@code uniq_ecos_caliber_ver(caliber_id, version_no)}
+     * （V167.1 唯一约束）时具名捕获 {@code DuplicateKeyException} → 409 ＋ 本枚机读码，
+     * 不 5xx 掩蔽、不产生第二版本行；缺省（自动递增）路径无碰撞面。</p>
      */
     public static final String ECOS_ONTO_011 = "ECOS-ONTO-011";
 
@@ -120,8 +123,10 @@ public final class OntologyErrorCode {
     /**
      * 404 — 对象／关系／口径编码不存在。
      *
-     * <p>§6.3.3 明文：本域<b>唯一允许的 404 语义</b>，禁 5xx 掩蔽。<b>承流欠（#146af 登记）</b>：
-     * main 面当前无出口承载该枚，本常量是字面量锚点。</p>
+     * <p>§6.3.3 明文：本域<b>唯一允许的 404 语义</b>，禁 5xx 掩蔽。属主出口＝
+     * {@code CaliberController} 的 detail／current／addVersion／approve／retire 五枚
+     * 「编码／当前版本不存在」腿（#146ap 归位：原私设 "CAL-404" 字面量退场，message
+     * 原文案不变）。</p>
      */
     public static final String ECOS_ONTO_080 = "ECOS-ONTO-080";
 }

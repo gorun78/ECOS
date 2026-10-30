@@ -219,6 +219,18 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      *       186−1＋4＝189，0＋38＋100＋17＋34＝189）。该批未跑本横切门，本批按实跑读数补账。
      *       只重设被突破的 {@link #OWNER_HELPER_CEILING} 与因补账而收窄的
      *       {@link #ENVELOPE_ONLY_CEILING}，其余三面按实测保持。</li>
+     *   <li>#146ap 重设（附录 C 第 4 条 ECOS-ONTO-011/080 属主出口承流批，common-api 全模块
+     *       <b>红跑</b>实测，{@code /tmp/146ap-envelope.log}）＝总数 <b>190</b>／折叠 0／
+     *       状态行承载 <b>38</b>（未漂移）／裸回 <b>101</b>／属主 helper <b>17</b>（未漂移）／
+     *       纯信封 <b>34</b>（未漂移）。
+     *       唯一漂移源＝{@code CaliberController#addVersion} 为「显式升版撞
+     *       {@code uniq_ecos_caliber_ver} 版本幂等」新增的
+     *       {@code catch (DuplicateKeyException) → return ApiResponse.error(409, ECOS_ONTO_011, …)}
+     *       腿一枚（行 201）——该端点是裸回端点（无状态行能力），409 机读码只能在此裸回出口承载，
+     *       属「版本幂等不 5xx 掩蔽」的正解形态，属<b>补账</b>而非新欠账。
+     *       0+38+101+17+34 = 190 = 总数，对账成立。
+     *       只重设被突破的 {@link #BARE_RETURN_CEILING}，其余三面按实测保持；
+     *       该枚裸回归 D-B4-59 族门管账。</li>
      * </ul>
      *
      * <p><b>本批（#146p）在判据面上零新增</b>：{@code KnowledgeExtractRunsController} 的 503 腿
@@ -229,14 +241,15 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      * 既顶破 35 上限，也让同一域的 503 出现两套落法。0+37+100+13+35 = 185 = 总数，对账成立。
      * 只重设被突破的 {@link #STATUS_CARRIER_CEILING}，其余三面按实测保持。</p>
      *
-     * <p>裸回面 100 枚<b>本门有意不判其对错</b>（归 {@code D-B4-59} 族棘轮门管账），
+     * <p>裸回面（现上限 101）<b>本门有意不判其对错</b>（归 {@code D-B4-59} 族棘轮门管账），
      * 此处只做「只减不增」计数：该族每收口一枚，本上限随批下调。</p>
      */
     private static final int STATUS_CARRIER_CEILING = 38;
     // #146p：29→37，归因见上方「#146p 重设」条（#146o/#146o-2 会话运维链 8 枚状态行承载腿补账）
     // #146s：37→38，归因见上方「#146s 重设」条（AgentToolController#describe 404 腿一封）
     // #146l-前置：99→100，归因见上方「#146l-前置 重设」条（CaliberConflictCountMetricSource 一枚）
-    private static final int BARE_RETURN_CEILING = 100;
+    // #146ap：100→101，归因见上方「#146ap 重设」条（CaliberController#addVersion 409 幂等腿一枚）
+    private static final int BARE_RETURN_CEILING = 101;
     // #146ab：13→17，归因见上方「#146ab 重设」条（AuditDetailController 四枚 failure(...) 单源腿）
     private static final int OWNER_HELPER_CEILING = 17;
     // #146ab：35→34，补账半＝#146x(49cfb4d6) 把 AgentProviderController 一枚纯信封赋值腿

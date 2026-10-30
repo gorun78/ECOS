@@ -410,23 +410,23 @@ class NoMachineCodeFactoryFaceRatchetTest {
             "OntologyErrorCode\\s*\\.\\s*ECOS_ONTO_\\d+");
 
     /** 属主出口文件 → 应出现的常量引用枚数（本批实跑逐文件计数，非估算）。 */
-    private static final Map<String, Integer> ONTO_CONSUMER_EXIT_BASELINE = new TreeMap<>(Map.ofEntries(
-            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
-                    + "chinacreator/gzcm/engine/ontology/controller/CaliberController.java", 3),
-            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
-                    + "chinacreator/gzcm/engine/ontology/controller/FunctionController.java", 2),
-            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
-                    + "chinacreator/gzcm/engine/ontology/controller/OntologyMetricBindingController.java", 3),
-            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
-                    + "chinacreator/gzcm/engine/ontology/controller/OntologyProposalController.java", 2),
-            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
-                    + "chinacreator/gzcm/engine/ontology/dto/GateResult.java", 6),
-            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
-                    + "chinacreator/gzcm/engine/ontology/service/CaliberService.java", 3),
-            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
-                    + "chinacreator/gzcm/engine/ontology/service/DatNetLineageGuard.java", 3),
-            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
-                    + "chinacreator/gzcm/engine/ontology/service/PublishGateService.java", 1)));
+    private static final Map<String, Integer> ONTO_CONSUMER_EXIT_BASELINE = new TreeMap<>(Map.of(
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/controller/CaliberController.java", 5,
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/controller/FunctionController.java", 2,
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/controller/OntologyMetricBindingController.java", 3,
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/controller/OntologyProposalController.java", 2,
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/dto/GateResult.java", 6,
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/service/CaliberService.java", 3,
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/service/DatNetLineageGuard.java", 3,
+            "ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/com/"
+                    + "chinacreator/gzcm/engine/ontology/service/PublishGateService.java", 1));
 
     /** 登记豁免：唯一保留单参的入口腿。 */
     private static final List<String> REGISTERED_ENTRY_EXEMPTIONS = List.of("handleNotFound");
