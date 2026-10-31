@@ -139,8 +139,10 @@ class Mc03TimeFormTest {
      *  ⇒ 按实测订正 240→242。
      *  2026-10-27 #142/B4 #146i：V294（fc_* 三表＋演示主体 seed，ON CONFLICT 7 处幂等播种）落地。
      *  勘误：V293（#146f td_audit_log 登记）本批锚定时漏数（已入库既有脚本）⇒
-     *  初值 243 系漏数，按实测订正 243→244。 */
-    private static final int SCRIPT_FLOOR = 248;
+     *  初值 243 系漏数，按实测订正 243→244。
+     *  2026-10-31 #146bd：V299（cognitive hypothesis status 默认值归一，纯 ALTER）
+     *  落地 ⇒ 按实测订正 248→249（四枚同批锚）。 */
+    private static final int SCRIPT_FLOOR = 249;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc02/
     // MigrationVersionUniquenessTest 同批改锚）。本枚对 GOVERNED_PG_SYNTAX_PIN <b>零贡献</b>：
     // 实测 V295 正文＋注释对 ::/ON CONFLICT/RETURNING/gen_random_uuid/JSON 运算符五类判据
@@ -148,6 +150,7 @@ class Mc03TimeFormTest {
     // #146ay：245→246（V296 纯 ALTER 加列，同 V295 判据零贡献，四枚同批锚）。
     // #146ay：246→247（V297 hypothesis 两列，同判据零贡献）。
     // #146az：247→248（V298 belief 三列纯 ALTER，同判据零贡献，四枚同批锚）。
+    // #146bd：248→249（V299 hypothesis status 默认值归一，纯 ALTER 零贡献，四枚同批锚）。
 
     @Test
     @DisplayName("锁①：扫描面非空——242 枚脚本全部可读，正文为空者只允许登记在册的作废脚本")

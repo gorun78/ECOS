@@ -32,12 +32,17 @@ public class HypothesisDao extends JdbcTemplateDaoSupport {
             "subject_type, subject_id, reason, confidence, evidence_ids_json, scenario_id, mind_id";
 
     /**
-     * 注册一条假设（初始 VALID / is_valid=true / 审计列服务端置位）。
+     * 注册一条假设（初始 PROPOSED / is_valid=true / 审计列服务端置位）。
      *
      * <p>V296/V297（§8.4.2 R4 承参与信心面 + E3 承参过滤列）六枚新列 additive 入参
      * （全 null = 行为与旧签名等价）；词表/越界校验归 Service 层 fail-loud，本 DAO 只读写。
      * 存量 {@code evidence_ids ?::jsonb} 写法保持 knownLegacy 原样（台账 §8.4.4 在册），
      * 新增权威面为 {@code evidence_ids_json}——本方法暂无写入方（V296 头注口径）。</p>
+     *
+     * <p>初始状态 {@code PROPOSED}：R-15 ① 四终态词表白名单（{@code PROPOSED/EVIDENCED/BELIEVED/REFUTED}，
+     * 词表单源 {@code HypothesisStatus}）；旧值 {@code VALID/INVALIDATED/ARCHIVED} 仅读侧别名（存量只读、
+     * 禁新写入）。#146bd 起本方法不再产旧值，DDL 默认值同批（V299）归一。
+     * 门禁：{@code HypothesisWriteWhitelistGateTest} 锁死本方法 INSERT 语句面只认四终态字面量。</p>
      */
     public void insert(String id, String code, String tenantScope, String statement,
                        String domain, String metricRef, String evidenceIds,
@@ -47,7 +52,7 @@ public class HypothesisDao extends JdbcTemplateDaoSupport {
             "INSERT INTO ecos_cognitive_hypothesis (id, hypothesis_code, tenant_scope, statement, domain, " +
             "metric_ref, evidence_ids, is_valid, status, create_by, update_by, is_deleted, " +
             "subject_type, subject_id, reason, confidence, scenario_id, mind_id) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, TRUE, 'VALID', 'system', 'system', 0, ?, ?, ?, ?, ?, ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, TRUE, 'PROPOSED', 'system', 'system', 0, ?, ?, ?, ?, ?, ?)",
             id, code, tenantScope == null || tenantScope.isBlank() ? "default" : tenantScope,
             statement, domain, metricRef, evidenceIds,
             subjectType, subjectId, reason == null || reason.isBlank() ? null : reason,

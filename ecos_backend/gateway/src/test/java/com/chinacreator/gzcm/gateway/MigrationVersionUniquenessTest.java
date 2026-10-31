@@ -89,8 +89,10 @@ class MigrationVersionUniquenessTest {
      *  ⇒ 按实测订正 245→246（与 DrBaseline/Mc02/Mc03 同批改）。
      *  2026-10-31 #146ay：V297（hypothesis 承参过滤两列）落地 ⇒ 246→247。
      *  2026-10-31 #146az：V298（belief 归属三列 mind_id/subject_type/subject_id，dev PG 实跑）
-     *  落地 ⇒ 按实测订正 247→248（四枚同批锚）。 */
-    private static final int SCRIPT_COUNT_FLOOR = 248;
+     *  落地 ⇒ 按实测订正 247→248（四枚同批锚）。
+     *  2026-10-31 #146bd：V299（cognitive hypothesis status 默认值 VALID→PROPOSED，纯 ALTER）
+     *  落地 ⇒ 按实测订正 248→249（四枚同批锚）。 */
+    private static final int SCRIPT_COUNT_FLOOR = 249;
 
     /**
      * 锁④：台账锚——基线最大版本与下一号（新增脚本必须用 {@code > } 本值的主版本号）。
@@ -109,9 +111,12 @@ class MigrationVersionUniquenessTest {
      * 2026-10-31 #146ay：V297（hypothesis 承参过滤两列）落地 ⇒ 296→297 / 下一号 297→298。
      * 2026-10-31 #146az：V298（belief 归属三列，dev PG 实跑＋幂等复跑）落地 ⇒
      * 按实测订正 297→298 / 下一号 298→299。
+     * 2026-10-31 #146bd：V299（cognitive hypothesis status 默认值 VALID→PROPOSED，
+     * 纯 ALTER 默认值 + COMMENT，幂等；dev PG 实跑见 V299 头注状态行）落地 ⇒
+     * 按实测订正 298→299 / 下一号 299→300。
      */
-    private static final int MAX_BASELINE_VERSION = 298;
-    private static final int NEXT_FREE_VERSION = 299;
+    private static final int MAX_BASELINE_VERSION = 299;
+    private static final int NEXT_FREE_VERSION = 300;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。
