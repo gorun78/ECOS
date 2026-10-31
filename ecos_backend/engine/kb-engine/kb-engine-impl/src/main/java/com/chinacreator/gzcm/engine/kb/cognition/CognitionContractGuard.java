@@ -66,6 +66,6 @@ public class CognitionContractGuard {
      */
     public void assertReadOnly() {
         throw KbErrorCodes.COGNITION_WRITE_FORBIDDEN
-                .exception("认知契约（hypothesis/belief/mind）对 kb 只读，禁止经 kb 写代理，405 ECOS-KB-070");
+                .exception("认知契约（hypothesis/belief/mind）对 kb 只读，禁止经 kb 写代理");
     }
 }

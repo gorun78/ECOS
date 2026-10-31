@@ -632,6 +632,68 @@ class NoMachineCodeFactoryFaceRatchetTest {
             Map.entry("ecos_backend/engine/ai-engine/ai-engine-impl/src/main/java/"
                     + "com/chinacreator/gzcm/engine/ai/controller/AgentSessionOpsController.java", 19)));
 
+    // ── ECOS-KB-* 族单源面（#146at）─────────────────
+
+    /**
+     * KB 族码字面量判据（#146at 补落，P1.1 族队列收口位）：三位纯数字码位（011~080 业务码
+     * 段＋500/501 承流码段），位置不限——引号以外（消息中段、日志格式串、单参文案）与
+     * AI/ONTO/COG 族同口径。末段 {@code (?![\dA-Za-z])} 与 ONTO 腿同法，防简写/变长回切伪码位。
+     */
+    private static final Pattern KB_FAMILY_LITERAL = Pattern.compile("ECOS-KB-(\\d{3})(?![\\dA-Za-z])");
+
+    /** KB 族业务码属主＝kb-engine 码表常量类（18 枚《从零实施版》§7.3.3 冻结码＋ 024/073 代码面补登）。 */
+    private static final String KB_ERROR_CODES_SOURCE =
+            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/kb/support/KbErrorCodes.java";
+
+    /**
+     * KB 族承流面属主＝kb 局部异常渲染 advice（W94 三级掩蔽链第 1 级）。
+     * 自持三枚字面量：050（表缺失兜底复用码表值）、500（无码领域异常回退）、
+     * 501（别域 DataBridgeException 域归属码）。
+     */
+    private static final String KB_ERROR_ADVICE_SOURCE =
+            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/kb/support/KbErrorAdvice.java";
+
+    /**
+     * 逐枚登记：码位 → 允许持有其字面量的 main 面文件（#146at 实扫基线，白名单只减不增）。
+     *
+     * <p>归属口径：§7.3.3 冻结表在册 18 枚（011/012/020/021/022/023/030/031/040/041/
+     * 050/051/060/061/062/070/071/072/080）＋024、073 两枚<b>代码面补登</b>（§7.3.3 未在册、
+     * 属主类 javadoc 已逐枚登记补登缘由，文档侧裁定属详设表格面、不另立批）＋500/501 两枚
+     * <b>承流面自持</b>（501＝别域桥异常渲染域归属，域归属证据走机读码不取别族值；
+     * 500＝无码领域异常回退，号位占本族段非引用）。本批字面量面实扫 <b>非属主副本恒 0</b>，
+     * 故零容差直查；KB 族消费面 25 枚文件取的是 {@code KbErrorCodes.X.exception(msg)}
+     * 枚举常量而非码值字面量，出口侧基线腿另立批次（本批不扩面生产文件）。</p>
+     */
+    private static final Map<String, List<String>> KB_LITERAL_HOLDERS = new TreeMap<>(Map.ofEntries(
+            Map.entry("011", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("012", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("020", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("021", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("022", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("023", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("024", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("030", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("031", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("040", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("041", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("050", List.of(KB_ERROR_CODES_SOURCE, KB_ERROR_ADVICE_SOURCE)),
+            Map.entry("051", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("060", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("061", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("062", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("070", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("071", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("072", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("073", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("080", List.of(KB_ERROR_CODES_SOURCE)),
+            Map.entry("500", List.of(KB_ERROR_ADVICE_SOURCE)),
+            Map.entry("501", List.of(KB_ERROR_ADVICE_SOURCE))));
+
+    /** 属主面在册码位集（与 {@link #KB_LITERAL_HOLDERS} 键集对账用，双向 equals）。 */
+    private static final Set<String> KB_REGISTERED_CODES = new TreeSet<>(KB_LITERAL_HOLDERS.keySet());
+
     // ── ECOS-FC-* 族单源面（#146ak，台账附录C 第 8 条）─────────────────
 
     /**
@@ -1481,6 +1543,71 @@ class NoMachineCodeFactoryFaceRatchetTest {
         }
         assertEquals(List.of(), drift,
                 "ECOS-AI 族出口侧属主引用枚数漂移（五文件基线＝#146ai 本批实跑读数）：" + drift);
+    }
+
+    /**
+     * ECOS-KB-* 族码字面量的 <b>(码, 文件) 双键零容差</b>判据（#146at 补落，P1.1 族队列
+     * RATE/DATA/AUTH/SEC/ONTO/COG/AI 之后的 KB 族收口位）：{@link #KB_LITERAL_HOLDERS}
+     * 白名单外的任何 main 面露面即红，未登记码位即便落在登记属主文件内也红。
+     *
+     * <p>与 ONTO/COG/AI 腿同型的位置不限判据：本族此前对五枚「引号起点锚定」引号外形态
+     * 恒盲（如 {@code KbErrorAdvice} 消息中段），本腿剥注释后按族前缀正则全量入账。
+     * <b>不实装出口侧基线腿</b>：KB 族消费面 25 枚文件取的是 {@code KbErrorCodes.X}
+     * 枚举常量（非码值字面量），字面量面＋逐 (码,属主) 回读已覆盖本差距（P1.1 第 1 条
+     * 字面量副本失控形态）；消费面逐文件基线另立批次，避免本批扩面 25 枚生产文件。</p>
+     */
+    @Test
+    @DisplayName("ECOS-KB-* 族码字面量按 (码,文件) 双键仅由登记属主承载，属主码位集与白名单双向同号")
+    void kbFamilyLiteralsAreSingleSourced() throws IOException {
+        Path root = locateRepoRoot();
+        List<Path> files = new ArrayList<>();
+        collectJavaUnder(root.resolve("ecos_backend"), files);
+        assertTrue(files.size() >= MIN_SCANNED_MAIN_FILES,
+                "扫描面缩水：实扫 main 面 java 文件 " + files.size() + " < 阈值 "
+                        + MIN_SCANNED_MAIN_FILES + "，判据不可信（读不到 ≠ 无副本）");
+
+        List<String> violations = new ArrayList<>();
+        for (Path f : files) {
+            String rel = root.relativize(f).toString().replace('\\', '/');
+            String stripped = SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+            Matcher m = KB_FAMILY_LITERAL.matcher(stripped);
+            while (m.find()) {
+                String code = m.group(1);
+                List<String> holders = KB_LITERAL_HOLDERS.get(code);
+                if (holders == null) {
+                    violations.add(rel + " → ECOS-KB-" + code + "（未登记码位）");
+                } else if (!holders.contains(rel)) {
+                    violations.add(rel + " → ECOS-KB-" + code + "（登记属主之外的副本）");
+                }
+            }
+        }
+        assertEquals(List.of(), violations,
+                "main 面出现 ECOS-KB-* 字面量越权露面（引号、消息中段、日志格式串一律入账）："
+                        + "出口应改取 KbErrorCodes 常量；新增族码先登记入《从零实施版》§7.3.3 "
+                        + "表并同步本白名单，禁以代码冒充文档裁决。清单=" + violations);
+
+        // 属主码位集双向对账：属主文件并集自扫 == 白名单键集（少＝属主删枚，多＝属主私补枚）
+        Set<String> ownerCodes = new TreeSet<>();
+        for (String ownerRel : List.of(KB_ERROR_CODES_SOURCE, KB_ERROR_ADVICE_SOURCE)) {
+            Matcher ownerScan = KB_FAMILY_LITERAL.matcher(readStripped(root, ownerRel));
+            while (ownerScan.find()) {
+                ownerCodes.add(ownerScan.group(1));
+            }
+        }
+        assertEquals(KB_REGISTERED_CODES, ownerCodes,
+                "属主面（KbErrorCodes＋KbErrorAdvice 并集）在册码位集与本门禁白名单不一致："
+                        + "属主单方面补登/删枚必须同批改判据并回到 §7.3.3 单源裁决");
+
+        // 逐 (码, 属主) 回读：白名单每一对都须在对应属主文件内仍有字面量锚点，
+        // 防「两侧都删/搬走了值」的假绿；属主文件不在位由 readStripped 存在性断言先行变红
+        for (Map.Entry<String, List<String>> e : KB_LITERAL_HOLDERS.entrySet()) {
+            for (String ownerRel : e.getValue()) {
+                assertTrue(readStripped(root, ownerRel).contains("ECOS-KB-" + e.getKey()),
+                        "属主面回读失败：ECOS-KB-" + e.getKey() + " 在登记属主 " + ownerRel
+                                + " 内已找不到字面量锚点——白名单陈旧或该枚值被删/搬走，"
+                                + "「白名单外零违例」属假绿，须同批对账");
+            }
+        }
     }
 
     /**
