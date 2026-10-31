@@ -694,6 +694,79 @@ class NoMachineCodeFactoryFaceRatchetTest {
     /** 属主面在册码位集（与 {@link #KB_LITERAL_HOLDERS} 键集对账用，双向 equals）。 */
     private static final Set<String> KB_REGISTERED_CODES = new TreeSet<>(KB_LITERAL_HOLDERS.keySet());
 
+    /**
+     * KB 族消费侧出口基线判据（#146au 补落，#146at 明示延后的承继位）：字面量面零容差只证
+     * 「码值没扩散」，不证「出口真在取 {@code KbErrorCodes.X} 枚举常量」——消费面 23 枚文件
+     * 若把取码腿改回裸串（信封码值在 {@link #KB_LITERAL_HOLDERS} 登记内）字面量腿照样恒绿，
+     * 只有本腿按逐文件 {@code KbErrorCodes.} 引用枚数变红兜住（与 AI/ONTO 出口基线同型）。
+     */
+    private static final Pattern KB_CODE_REFERENCE = Pattern.compile("KbErrorCodes\\s*\\.");
+
+    /**
+     * 23 个消费面 main 文件逐文件<b>恰 N 枚</b>{@code KbErrorCodes.<IDENTIFIER>} 剥注释后
+     * 引用（#146au 本批实跑读数，口径=SourceCommentStripper 剥注释后计数，javadoc 计数不入
+     * 基线面）。少=出口漂移回裸串/域外同值常量（假单源）；多=新增取码腿未同批重设本表。
+     *
+     * <p>特例两枚（逐枚归因，禁静默豁免）：{@code KnowledgeRetrievalService}（kb-engine-api，
+     * 跨包）剥后 0 枚——其 {@code KbErrorCodes.DomainException} 写在 {@code @throws} javadoc
+     * 域限定符号里，剥注释后不居留，故不列入本表（列入 0 基线无防漂移收益）；
+     * {@code KbAuditEventPublisher} 与属主同包（{@code ...engine.kb.support}）无 import，
+     * 剥后恰 2 枚代码引用，import 腿豁免 0（同包引用天然是域内单源，改指域外常量须先解决
+     * 可见性，本腿 import=0 锚把这个前提也钉死）。</p>
+     */
+    private static final Map<String, Integer> KB_CONSUMER_EXIT_BASELINE = new TreeMap<>(Map.ofEntries(
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/cognition/CognitionContractGuard.java", 1),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/cognition/CognitionReadService.java", 2),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/controller/GraphSyncController.java", 1),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/controller/KbAssumptionController.java", 4),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/controller/KbProfileController.java", 15),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/controller/KnowledgeDocumentIngestController.java", 3),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/controller/KnowledgeExtractRunsController.java", 1),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/controller/KnowledgeIngestController.java", 2),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/repo/AnswerGenerationHelper.java", 3),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/security/KnowledgeNavSecurityEngineClient.java", 2),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/service/EcosKnowledgeGraphServiceImpl.java", 6),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/service/KbEntityInstanceExtractionService.java", 2),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/service/KgMapperService.java", 1),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/service/KgSyncServiceImpl.java", 1),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/service/KnowledgeDocIngestService.java", 9),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/service/KnowledgeExtractRunService.java", 1),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/service/KnowledgeRetrievalQueryService.java", 2),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/service/KnowledgeRetrievalServiceImpl.java", 1),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/service/assumption/KbAssumptionService.java", 14),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/service/nav/NavTaxonServiceImpl.java", 1),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/service/profile/CuratedFactSourceRestImpl.java", 1),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/service/profile/KbProfileService.java", 4),
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/support/KbAuditEventPublisher.java", 2)));
+
+    /** 同包（无 import）消费文件：属主 import 腿豁免 0 枚，取码枚数腿照常钉死。 */
+    private static final Set<String> KB_IMPORT_EXEMPT = Set.of(
+            "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/"
+                    + "engine/kb/support/KbAuditEventPublisher.java");
+
     // ── ECOS-FC-* 族单源面（#146ak，台账附录C 第 8 条）─────────────────
 
     /**
@@ -1608,6 +1681,50 @@ class NoMachineCodeFactoryFaceRatchetTest {
                                 + "「白名单外零违例」属假绿，须同批对账");
             }
         }
+    }
+
+    /**
+     * ECOS-KB 族消费侧出口基线（#146au，#146at 明示延后的承继位）：23 个消费面 main 文件
+     * 逐文件<b>恰 N 枚</b>{@code KbErrorCodes.<IDENTIFIER>} 剥注释后引用＋逐枚属主 import
+     * （同包 {@link #KB_IMPORT_EXEMPT} 腿豁免 0）。
+     *
+     * <p>家族腿（{@code kbFamilyLiteralsAreSingleSourced}）只逛「码值没扩散」，不逛「出口
+     * 真在取常量」——消费面任何一文件把取码腿改回字面量裸串（信封码值仍在登记属主白名单内）
+     * 家族腿照样恒绿，<b>只有本腿</b>靠逐文件 {@code KbErrorCodes.} 引用数变红兜住。
+     * 少=漂回裸串/域外同值常量（假单源）；多＝新增取码腿未同批重设本表；
+     * import≠1=改指域外同值常量＝单源名存实亡。</p>
+     */
+    @Test
+    @DisplayName("ECOS-KB 族二十三处消费出口逐文件恰取 KbErrorCodes 属主（漂移或假单源即红）")
+    void kbExitsPointToSingleSource() throws IOException {
+        Path root = locateRepoRoot();
+        // 属主文件不在位即直接红（防被搬走/改名 ⇒ readStripped 读空气恒 0 的假绿）
+        assertTrue(Files.exists(root.resolve(KB_ERROR_CODES_SOURCE)),
+                "KB 族码表属主文件不在位：" + KB_ERROR_CODES_SOURCE);
+        List<String> drift = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : KB_CONSUMER_EXIT_BASELINE.entrySet()) {
+            String stripped = readStripped(root, e.getKey());
+            int hits = 0;
+            Matcher m = KB_CODE_REFERENCE.matcher(stripped);
+            while (m.find()) {
+                hits++;
+            }
+            if (hits != e.getValue()) {
+                drift.add(e.getKey() + " 实跑 " + hits + " 枚 ≠ 登记 " + e.getValue()
+                        + " 枚");
+            }
+            long imports = Pattern
+                    .compile("import\\s+com\\.chinacreator\\.gzcm\\.engine\\.kb\\.support\\.KbErrorCodes;")
+                    .matcher(stripped).results().count();
+            long expectedImports = KB_IMPORT_EXEMPT.contains(e.getKey()) ? 0 : 1;
+            if (imports != expectedImports) {
+                drift.add(e.getKey() + " 属主 import " + imports + " 枚 ≠ " + expectedImports
+                        + "（域外同值常量＝单源名存实亡；同包文件豁免 0 枚）");
+            }
+        }
+        assertEquals(List.of(), drift,
+                "ECOS-KB 族出口侧属主引用枚数漂移（二十三文件基线＝#146au 本批实跑读数，"
+                        + "回退裸串/域外同值常量/新增取码腿未重设基线三形态均红）：" + drift);
     }
 
     /**
