@@ -58,11 +58,15 @@ import org.junit.jupiter.api.Timeout;
  *   G_REGCLASS  to_regclass()（dry-run 实测有命中面，同纪律）
  *   H_DIST_ON   DISTINCT ON
  * </pre>
+ * <p><b>防挂死超时</b>：同属仓扫形门禁，超时基线对齐 ErrorCodeMachineCodeSingleSourceTest /
+ * ServerDefectExceptionStatusTest 的 {@code @Timeout(120)}（10s 档在本机全仓冷盘扫描
+ * 2~3 轮下超时误红，2026-10-31 实测 16~24s/轮）。</p>
+ *
  * <b>名录值是实测基线（棘轮，只收紧不放宽）</b>：收口某枚违例（如 ILIKE 改
  * {@code lower() LIKE}）后同批改本名录；新增任何一枚都先红再裁决，禁把新违例直接
  * 补进名录（用门禁给自己放行）。
  */
-@Timeout(10)
+@Timeout(120)
 @DisplayName("#146aj/SqlDialectDerivation：运行期 SQL 方言面（Java 字面量+文本块 / Mapper XML）全源防控门")
 class SqlDialectDerivationTest {
 
