@@ -165,8 +165,18 @@ class SecurityDenialHttpStatusRatchetTest {
      * 现按 3e-35／3e-37 属主正解改写后判据 A／B 两面读数由本批 common-api 全模块实跑确认保持
      * 0／853；漂移面转入 {@code SuccessStatusFailureEnvelopeRatchetTest} 的「属主 helper 承载」面。
      * 判据不变而属主改形＝「上限不变」这一读数必须实跑产出，不得由本段叙述推出。</p>
+     *
+     * <p><b>#146be 重设＝853→860（前置补账，+7）</b>：上一读数后的工作树新增了两枚
+     * F6-07 规范前缀别名控制器（ontology versions/git-history 只读别名 b2ba821f、buszhi
+     * workflows 规范前缀 1:1 同型 17 端点 44eade79，提交时均未跑本横切门），其失败腿为
+     * {@code return ApiResponse.badRequest/notFound("ONT-001/WF-00x: …")} 裸回形态，
+     * 判据 B 计 7 枚（#146av 1 + #146aw 6）。与同批
+     * {@code NoMachineCodeFactoryFaceRatchetTest} 的 +15 不等是本判据口径不同所致：
+     * 本判据带 {@code return} 前缀，需「直接返回」形态才命中，这些文件的非 return 前缀
+     * 行（局部变量／helper 返回）不入本面。读数取自本批 common-api 全模块实跑失败报文
+     * 「非安全裁决线的裸回面已扩张到 860 处（登记上限 853）」，非由旧值做算术推出。</p>
      */
-    private static final int OTHER_LEG_CEILING = 853;
+    private static final int OTHER_LEG_CEILING = 860;
 
     /**
      * 判据 A 的合法承载态识别（#142/B4-3e-34，收口差距 <b>D-B4-69</b>「判据对

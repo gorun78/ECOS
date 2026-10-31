@@ -298,11 +298,20 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * DEPENDENCY／ENV_ALGO／UNREADABLE 三面未动（16／10／8）；HTTP 面的 404 由控制器
      * {@code retryDocument} 显式承载（见 {@code KnowledgeDocumentIngestContractTest}），
      * 与本腿分态。</p>
+     *
+     * <p><b>#146be 同批重设（E.5 两态路由批漏测补账）</b>：#146ax（commit 463a74e7）在
+     * runtime-access {@code EcosRouteOverride} 新增 {@code IllegalStateException} 腿 1 枚
+     * （「E.5 两态路由开关非法值：ecos.route.&#95;…（闭集 = monolith|service，禁静默回落
+     * 默认态）」）。语义＝<b>配置项闭集违约</b>：既非「依赖未就绪」（词表不命中依赖面）
+     * 也非环境/算法故障（词表不命中）⇒ 落 OTHER 面；闸门在启动/装配期抛出，不上任何
+     * HTTP 入口面，不触碰 DEPENDENCY／ENV_ALGO／UNREADABLE 三张逐文件面表。
+     * 同批重设：总站点 139 → <b>140</b>、OTHER 面 105 → <b>106</b>，
+     * DEPENDENCY／ENV_ALGO／UNREADABLE 三面未动（16／10／8）。</p>
      */
-    private static final int TOTAL_SITE_BASELINE = 139;
+    private static final int TOTAL_SITE_BASELINE = 140;
     private static final int DEPENDENCY_FACE_BASELINE = 16;
     private static final int ENV_ALGO_FACE_BASELINE = 10;
-    private static final int OTHER_FACE_BASELINE = 105;
+    private static final int OTHER_FACE_BASELINE = 106;
     private static final int UNREADABLE_FACE_BASELINE = 8;
 
     /**

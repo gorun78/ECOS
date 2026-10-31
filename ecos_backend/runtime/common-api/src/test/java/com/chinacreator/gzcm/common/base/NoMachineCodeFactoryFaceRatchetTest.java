@@ -144,16 +144,30 @@ class NoMachineCodeFactoryFaceRatchetTest {
      * 本批首次进入判据面（该类经 #146o-2 会话运维链新增一枚 {@code forbidden(AiErrorClass…)}）；
      * 另两枚落在既有命中文件内，不再贡献文件数——该读数同样取自上述实跑报文
      * （{@code sites=928, files=151}），不是从「+1 处 ⇒ +? 文件」推出。</p>
+     *
+     * <p><b>#146be 同批上调（+15 处／+2 文件，前置补账）</b>：本批自身在该判据面上
+     * <b>零新增</b>（纯基线补账，不改 main 面）。上调的十五枚全部来自已提交的
+     * #146av／#146aw（F6-07 规范前缀别名端点批，提交时未跑本横切门）：
+     * {@code b2ba821f}（#146av versions/git-history 只读别名端点）新增 1 枚
+     * {@code ApiResponse.notFound("ONT-001: …")} 于新增别名控制器（新入判据面文件），
+     * {@code 44eade79}（#146aw workflows 规范前缀 1:1 同型 17 端点）于新增 workflows 别名
+     * 控制器（新入判据面文件）新增 14 枚物理行：9 WF-001 notFound + 1 WF-003 badRequest
+     * + 4 WF-009 notFound（{@code git show 44eade79 --stat} 单文件 delta 逐行对账，
+     * 每物理行 1 枚命中）⇒ badRequest +1、notFound +1 + 13＝14 枚。⇒ 分枚
+     * {@code badRequest 330→331}、{@code notFound 256→270}，合计 943；文件数
+     * {@code 151→153}＝两枚新入判据面文件各贡献 1。读数取自本批门禁会话内
+     * {@code -pl runtime/common-api} 单条实跑的失败报文（{@code sites=943, files=153}），
+     * 非由旧值做算术推出。</p>
      */
-    private static final int BASELINE_SITES = 928;
-    private static final int BASELINE_FILES = 151;
+    private static final int BASELINE_SITES = 943;
+    private static final int BASELINE_FILES = 153;
 
     /** 分枚基线：只减不增，且合计必须等于 {@link #BASELINE_SITES}（防「拆细了但总数对不上」）。 */
     private static final Map<String, Integer> BASELINE_BY_FACTORY = new TreeMap<>(Map.of(
-            "badRequest", 330,
+            "badRequest", 331,
             "unauthorized", 12,
             "forbidden", 24,
-            "notFound", 256,
+            "notFound", 270,
             "internalError", 306));
 
     /** gateway 入口面已带码的六枚腿（锚点，不得回退）。 */
