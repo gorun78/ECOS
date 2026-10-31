@@ -132,8 +132,10 @@ class Mc02TypeWhitelistTest {
      *  登记）本批锚定时漏数（已入库既有脚本）⇒ 初值 243 系漏数，按实测订正 243→244
      *  （DrBaseline/Mc03/MigrationVersionUniquenessTest 同批改）。
      *  2026-10-31 #146bd：V299（cognitive hypothesis status 默认值 VALID→PROPOSED，纯 ALTER）
-     *  落地 ⇒ 按实测订正 248→249（四枚同批锚）。 */
-    private static final int SCRIPT_FLOOR = 249;
+     *  落地 ⇒ 按实测订正 248→249（四枚同批锚）。
+     *  2026-10-31 #147A：V300（rule 补 4 列 + ecos_git_repo 建表＋种子）落地
+     *  ⇒ 按实测订正 249→250（四枚同批锚）。 */
+    private static final int SCRIPT_FLOOR = 250;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc03/
     // MigrationVersionUniquenessTest 同批改锚；单源最大版本 295 ⇒ 下一号 V296）。
     // #146ay：245→246（V296__cognitive_model_hypo_r4_fields.sql 纯 ALTER 加列，
@@ -141,6 +143,8 @@ class Mc02TypeWhitelistTest {
     // #146ay：246→247（V297 hypothesis 两列，类型头白名单内零违规）。
     // #146az：247→248（V298 belief 三列 VARCHAR(36/20) 白名单内，名录不扩面）。
     // #146bd：248→249（V299 hypothesis status 默认值归一，纯 ALTER 默认值零建表零新类型，名录不扩面）。
+    // #147A：249→250（V300 建表 ecos_git_repo 列型 VARCHAR/TIMESTAMP/SMALLINT 全在白名单头，
+    // rule 四新列 VARCHAR(32/20/64) 同；成员级零违规，名录不扩面）。
 
     /**
      * 存量段计数钉死（键={@code 桶|类型头}，值=违例列数，实测 2026-10-15 取证，双向相等）。

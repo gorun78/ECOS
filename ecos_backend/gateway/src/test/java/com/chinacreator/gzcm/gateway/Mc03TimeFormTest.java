@@ -141,8 +141,10 @@ class Mc03TimeFormTest {
      *  勘误：V293（#146f td_audit_log 登记）本批锚定时漏数（已入库既有脚本）⇒
      *  初值 243 系漏数，按实测订正 243→244。
      *  2026-10-31 #146bd：V299（cognitive hypothesis status 默认值归一，纯 ALTER）
-     *  落地 ⇒ 按实测订正 248→249（四枚同批锚）。 */
-    private static final int SCRIPT_FLOOR = 249;
+     *  落地 ⇒ 按实测订正 248→249（四枚同批锚）。
+     *  2026-10-31 #147A：V300（rule 补 4 列 + ecos_git_repo 建表＋种子）落地
+     *  ⇒ 按实测订正 249→250（四枚同批锚）。 */
+    private static final int SCRIPT_FLOOR = 250;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc02/
     // MigrationVersionUniquenessTest 同批改锚）。本枚对 GOVERNED_PG_SYNTAX_PIN <b>零贡献</b>：
     // 实测 V295 正文＋注释对 ::/ON CONFLICT/RETURNING/gen_random_uuid/JSON 运算符五类判据
@@ -151,6 +153,9 @@ class Mc03TimeFormTest {
     // #146ay：246→247（V297 hypothesis 两列，同判据零贡献）。
     // #146az：247→248（V298 belief 三列纯 ALTER，同判据零贡献，四枚同批锚）。
     // #146bd：248→249（V299 hypothesis status 默认值归一，纯 ALTER 零贡献，四枚同批锚）。
+    // #147A：249→250（V300 首版正文曾用 regclass 显式 cast 与 upsert 冲突短语两枚命中本判据
+    // ⇒ 本批按成员级零新增纪律改写为三表联查守卫 + VALUES 派生表反查守卫（见 V300 A.2/B.2
+    // 订正注与尾注⑦复跑取证），对 GOVERNED_PG_SYNTAX_PIN 终态零贡献，名录保持 10 枚不扩面）。
 
     @Test
     @DisplayName("锁①：扫描面非空——242 枚脚本全部可读，正文为空者只允许登记在册的作废脚本")
