@@ -89,8 +89,12 @@ const CANONICAL = 'services/httpClient.ts';
  * `pages/decision/DecisionMindList.tsx` + `pages/decision/DecisionMindDetail.tsx`，
  * 全量 run 实走面值 679→682，只增；新文件均走 `cognitiveClient` 单源出口、零私设基址，
  * residual/双前缀两段判据口径不变）。
+ * #146ax E.6 落点收口批新增三枚「再导出别名」生产文件（`src/config/navConfig.ts` +
+ * `src/config/route-manifest.ts` + `src/theme/index.ts`，全量 run 实走面值 682→685，只增；
+ * 三枚文件代码面恰一条 `export * from` 再导出、零私设基址／零派生态，
+ * e6Placements 门钉值判据见 `src/__tests__/e6Placements.test.ts`）。
  */
-const PROD_FILES = 682;
+const PROD_FILES = 685;
 
 /** 本批 15 文件：rel →（导入腿相对路径、本批派生点数）。 */
 const FILES: ReadonlyArray<{ rel: string; importPath: string; sites: number }> = [

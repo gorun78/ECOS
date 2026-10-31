@@ -52,6 +52,24 @@ public class ServiceEndpointResolver {
     }
 
     /**
+     * E.5 两态开关链（《从零实施版》§2.5.3）：
+     * ① 显式运营覆写 {@link EcosRouteOverride}（{@code ecos.route.<svc>=monolith|service}）
+     * ② route-manifest {@code route} 字段（切流登记面）
+     * ③ 缺省 MONOLITH（设计默认态）。
+     * 任一层给出 service 形态均受 manifest 切流事实约束：route=monolith 的条目
+     * 即使运营键显式写 service 也回落 monolith port（上层 leg，不改运行期端口）。
+     */
+    public RouteMode effectiveMode(String service) {
+        EcosRouteOverride lit = override;
+        if (lit != null) { RouteMode m = lit.literalFor(service); if (m != null) return m; }
+        ManifestRef ref = lookup(service).orElse(null);
+        if (ref != null && ref.route != null && ref.route.equals("service")) {
+            return RouteMode.SERVICE;
+        }
+        return RouteMode.MONOLITH;
+    }
+
+    /**
      * 按 service 名与运行形态返回 base-url（不含尾斜杠）。
      *
      * @param service 归属服务名（route-manifest 的 {@code owner} 字段：sysman/datanet/.../gateway）
@@ -59,14 +77,26 @@ public class ServiceEndpointResolver {
      * @return base-url，如 {@code http://localhost:18082}；未登记返回 {@link Optional#empty}
      */
     public Optional<String> resolve(String service, RouteMode mode) {
+        RouteMode requested = mode == RouteMode.MONOLITH ? RouteMode.MONOLITH : effectiveMode(service);
+        return resolveWithMode(service, requested);
+    }
+
+    Optional<String> resolveWithMode(String service, RouteMode requested) {
         ManifestRef ref = lookup(service).orElse(null);
         if (ref == null) return Optional.empty();
         // service 形态但 route=monolith（尚未切流）→ 回落 monolith port，避免指向不承流的 service
-        boolean useService = mode == RouteMode.SERVICE
+        boolean useService = requested == RouteMode.SERVICE
                 && ref.route != null && ref.route.equals("service");
         int port = useService ? ref.servicePort : ref.monolithPort;
         return Optional.of(HOST + ":" + port);
     }
+
+    /** E.5 覆写位接线（gateway 单体内 {@code @Autowired @Lazy}；独立 JAR 未装配即 null＝未覆写）。 */
+    void attachOverride(EcosRouteOverride override) {
+        this.override = override;
+    }
+
+    private volatile EcosRouteOverride override;
 
     private Optional<ManifestRef> lookup(String service) {
         Map<String, ManifestRef> m = cache();
