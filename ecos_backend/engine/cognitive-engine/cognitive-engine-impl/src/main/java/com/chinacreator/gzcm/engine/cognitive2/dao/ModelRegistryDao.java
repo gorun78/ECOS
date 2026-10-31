@@ -33,12 +33,17 @@ import java.util.Map;
 @Repository
 public class ModelRegistryDao extends JdbcTemplateDaoSupport {
 
-    /** 读列面：新列并入（注册中心视图），旧列名以别名保持既有响应形态。 */
+    /**
+     * 读列面：新列并入（注册中心视图），旧列名以别名保持既有响应形态。
+     * V296（§8.4.2 R4 九类分类面）追加 model_key/description/phase/compute_owner/
+     * io_contract_json/limits_json/model_category 七枚只增不改。
+     */
     private static final String READ_COLUMNS =
             "id, model_id, model_type, version, features_json AS features, backtest_score, status, " +
             "create_time, update_time, create_by, update_by, " +
             "cognitive_model_type, registry_state, content_hash, supersedes_id, " +
-            "gate_contract, gate_regression, gate_backtest, gate_calibration, published_at, published_by";
+            "gate_contract, gate_regression, gate_backtest, gate_calibration, published_at, published_by, " +
+            "model_key, description, phase, compute_owner, io_contract_json, limits_json, model_category";
 
     /**
      * 模型列表（按 modelType 可选过滤，未删除，按 model_id/version 排序）。
@@ -122,16 +127,24 @@ public class ModelRegistryDao extends JdbcTemplateDaoSupport {
     /**
      * 新增一个模型 version（features_json 为 TEXT 列，MC02 禁 jsonb ⇒ 无强转；
      * registry_state 依 V261 默认 'DRAFT'，四门禁列默认 'PENDING'，发布面禁在此越权写入）。
+     *
+     * <p>V296（§8.4.2 R4 九类分类面）七枚新列 additive 入参（全 null = 行为与旧签名逐字节等价；
+     * 词表/档位校验归 Service 层，本 DAO 只做列读写）。</p>
      */
     public void insertModel(String id, String modelId, String modelType, int version,
                             String featuresJson, BigDecimal backtest, String status,
-                            String cognitiveModelType, String supersedesId) {
+                            String cognitiveModelType, String supersedesId,
+                            String modelKey, String description, Integer phase,
+                            String computeOwner, String ioContractJson,
+                            String limitsJson, String modelCategory) {
         jdbcTemplate.update(
             "INSERT INTO ecos_cognitive.ecos_cognitive_model " +
             "(id, model_id, model_type, version, features_json, backtest_score, status, create_by, update_by, is_deleted, " +
-            " cognitive_model_type, supersedes_id) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?, 'system', 'system', 0, ?, ?)",
-            id, modelId, modelType, version, featuresJson, backtest, status, cognitiveModelType, supersedesId);
+            " cognitive_model_type, supersedes_id, " +
+            " model_key, description, phase, compute_owner, io_contract_json, limits_json, model_category) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?, 'system', 'system', 0, ?, ?, ?, ?, ?, ?, ?, ?)",
+            id, modelId, modelType, version, featuresJson, backtest, status, cognitiveModelType, supersedesId,
+            modelKey, description, phase, computeOwner, ioContractJson, limitsJson, modelCategory);
     }
 
     /**

@@ -141,9 +141,11 @@ class DrBaselineColumnsTest {
      *  2026-10-27 #142/B4 #146i：V294（fc_* 三表＋演示主体 seed；三表七枚基线列齐建，fc_* 无 ecos_ 前缀按
      *  knownLegacy 语义冻结、不入本名录计口）落地。勘误：V293（#146f td_audit_log 登记，基线列不全）
      *  本批锚定时漏数（已入库既有脚本）⇒ 初值 243 系漏数，按实测订正 243→244（四枚同批改）。 */
-    private static final int SCRIPT_FLOOR = 245;
+    private static final int SCRIPT_FLOOR = 247;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，按实测订正四枚同批锚）。
     // 该表属「存量真身锚定」＝七枚基线列全缺，按 V293 同族入待收口名录，不假装合规。
+    // #146ay：245→246（V296__cognitive_model_hypo_r4_fields.sql 纯 ALTER 加列，零建表，
+    // 对治理表名录零贡献，与 Mc02/Mc03/MigrationVersionUniquenessTest 同批锚）。
 
     @Test
     @DisplayName("锁①：扫描面非空——脚本数、建表数、V200+ 建表数均达下限（空扫描面=假绿）")

@@ -20,11 +20,18 @@ import java.util.Map;
  *   <li>必带 {@code is_deleted=0} + {@code scenario_id=?}；带 mind → {@code AND mind_id=?} 严格过滤（禁静默兜底）</li>
  *   <li>排序 {@code update_time desc nulls last + create_time desc}</li>
  * </ul>
+ *
+ * <p><b>载体收口（#146ay / V297）</b>：读腿由幻影载体 {@code public.ecos_cognitive_hypothesis}
+ * （dev PG 无此关系，E3 恒 E501 承流）切指控制域权威载体
+ * {@code ecos_cognitive.ecos_cognitive_hypothesis}（V191 建 + V296 权威五列
+ * subject_type/subject_id/reason/confidence/evidence_ids_json + V297 承参过滤列
+ * mind_id/scenario_id）。列名 {@code reason} / {@code confidence} 与 toVO 既有读键天然吻合，
+ * 响应契约不变（API 只增不改）。</p>
  */
 @Repository
 public class HypothesisReader extends JdbcTemplateDaoSupport {
 
-    static final String TABLE = "public.ecos_cognitive_hypothesis";
+    static final String TABLE = "ecos_cognitive.ecos_cognitive_hypothesis";
 
     public List<CognitiveContractSchema.HypothesisVO> listForScenario(String scenarioId, String mindId) {
         String sql;

@@ -20,21 +20,45 @@ import java.util.Map;
 @Repository
 public class HypothesisDao extends JdbcTemplateDaoSupport {
 
-    /** 全部列显式清单（禁止 SELECT *；与 V128 DDL 逐列一致） */
+    /**
+     * 全部列显式清单（禁止 SELECT *；与 V128 DDL 逐列一致）。
+     * V296（§8.4.2 R4 承参与信心面）追加 subject_type/subject_id/reason/confidence/
+     * evidence_ids_json 五枚只增不改；旧 evidence_ids JSONB 停读保留（knownLegacy）。
+     */
     static final String HYPOTHESIS_COLUMNS =
             "id, hypothesis_code, tenant_scope, statement, domain, metric_ref, evidence_ids, " +
             "is_valid, invalid_at, invalid_reason, status, " +
-            "create_time, update_time, create_by, update_by";
+            "create_time, update_time, create_by, update_by, " +
+            "subject_type, subject_id, reason, confidence, evidence_ids_json, scenario_id, mind_id";
 
-    /** 注册一条假设（初始 VALID / is_valid=true / 审计列服务端置位）。 */
+    /**
+     * 注册一条假设（初始 VALID / is_valid=true / 审计列服务端置位）。
+     *
+     * <p>V296/V297（§8.4.2 R4 承参与信心面 + E3 承参过滤列）六枚新列 additive 入参
+     * （全 null = 行为与旧签名等价）；词表/越界校验归 Service 层 fail-loud，本 DAO 只读写。
+     * 存量 {@code evidence_ids ?::jsonb} 写法保持 knownLegacy 原样（台账 §8.4.4 在册），
+     * 新增权威面为 {@code evidence_ids_json}——本方法暂无写入方（V296 头注口径）。</p>
+     */
     public void insert(String id, String code, String tenantScope, String statement,
-                       String domain, String metricRef, String evidenceIds) {
+                       String domain, String metricRef, String evidenceIds,
+                       String subjectType, String subjectId, String reason,
+                       java.math.BigDecimal confidence, String scenarioId, String mindId) {
         jdbcTemplate.update(
             "INSERT INTO ecos_cognitive_hypothesis (id, hypothesis_code, tenant_scope, statement, domain, " +
-            "metric_ref, evidence_ids, is_valid, status, create_by, update_by, is_deleted) " +
-            "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, TRUE, 'VALID', 'system', 'system', 0)",
+            "metric_ref, evidence_ids, is_valid, status, create_by, update_by, is_deleted, " +
+            "subject_type, subject_id, reason, confidence, scenario_id, mind_id) " +
+            "VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, TRUE, 'VALID', 'system', 'system', 0, ?, ?, ?, ?, ?, ?)",
             id, code, tenantScope == null || tenantScope.isBlank() ? "default" : tenantScope,
-            statement, domain, metricRef, evidenceIds);
+            statement, domain, metricRef, evidenceIds,
+            subjectType, subjectId, reason == null || reason.isBlank() ? null : reason,
+            confidence, scenarioId, mindId);
+    }
+
+    @Deprecated
+    public void insert(String id, String code, String tenantScope, String statement,
+                       String domain, String metricRef, String evidenceIds) {
+        insert(id, code, tenantScope, statement, domain, metricRef, evidenceIds,
+                null, null, null, null, null, null);
     }
 
     /** 校验业务唯一键是否已存在（含逻辑删除行）。 */

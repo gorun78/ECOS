@@ -69,9 +69,17 @@ public class CognitiveHypothesisService {
         if (store.existsByCode(code)) {
             throw new BusinessException(400, "COG-400: hypothesisCode 已存在（幂等拒绝）: " + code);
         }
+        // R4 信心度（V296）：越界 fail-loud 400，禁 clamp/默认（无标定语义 = 显式不传 null）
+        Double confidence = dto.getConfidence();
+        if (confidence != null && (confidence < 0.0 || confidence > 1.0 || Double.isNaN(confidence))) {
+            throw new BusinessException(400, "COG-400: confidence 必须 ∈[0,1]（不标定请省略，禁钳位）: " + confidence);
+        }
         String id = "cog_hyp_" + UUID.randomUUID().toString().substring(0, 12);
         store.insert(id, code, dto.getTenantScope(), dto.getStatement().trim(),
-            trimToNull(dto.getDomain()), trimToNull(dto.getMetricRef()), toJsonArray(dto.getEvidenceIds()));
+            trimToNull(dto.getDomain()), trimToNull(dto.getMetricRef()), toJsonArray(dto.getEvidenceIds()),
+            trimToNull(dto.getSubjectType()), trimToNull(dto.getSubjectId()), trimToNull(dto.getReason()),
+            confidence == null ? null : java.math.BigDecimal.valueOf(confidence),
+            trimToNull(dto.getScenarioId()), trimToNull(dto.getMindId()));
         audit("hypothesis.create", "ecos_cognitive_hypothesis", "success", "id=" + id);
         return toVo(store.toNormalizedRow(store.findById(id), evidenceStore));
     }

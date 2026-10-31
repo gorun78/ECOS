@@ -42,11 +42,21 @@ public class HypothesisStore {
      * @param domain         业务域
      * @param metricRef      关联经营变量
      * @param evidenceIds    支撑证据 id 列表 JSON 数组文本
+     * @param subjectType    承参主体类型（R4，V296；null 落库 NULL，可空）
+     * @param subjectId      承参主体 id（R4，V296；null 落库 NULL，可空）
+     * @param reason         立论理由（R4，V296；空白落 null，列 DEFAULT '' 兜底）
+     * @param confidence     信心度 ∈[0,1]（R4，V296；越界由 Service fail-loud，此处不钳位；null=未标定）
+     * @param scenarioId     关联场景 id（R4，V297；null 落库 NULL，可空）
+     * @param mindId         关联心智 id（R4，V297；null 落库 NULL，可空）
      */
     public void insert(String id, String code, String tenantScope, String statement,
-                       String domain, String metricRef, String evidenceIds) {
-        dao.insert(id, code, tenantScope, statement, domain, metricRef, evidenceIds);
-        log.info("认知假设注册: id={} code={} domain={} metricRef={}", id, code, domain, metricRef);
+                       String domain, String metricRef, String evidenceIds,
+                       String subjectType, String subjectId, String reason,
+                       java.math.BigDecimal confidence, String scenarioId, String mindId) {
+        dao.insert(id, code, tenantScope, statement, domain, metricRef, evidenceIds,
+                subjectType, subjectId, reason, confidence, scenarioId, mindId);
+        log.info("认知假设注册: id={} code={} domain={} metricRef={} subjectType={} confidence={}",
+                id, code, domain, metricRef, subjectType, confidence);
     }
 
     /** 校验业务唯一键是否已存在（含逻辑删除行）。 */

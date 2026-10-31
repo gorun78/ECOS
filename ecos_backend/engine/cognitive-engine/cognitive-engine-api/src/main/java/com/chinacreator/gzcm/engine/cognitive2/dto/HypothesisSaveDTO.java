@@ -32,4 +32,24 @@ public class HypothesisSaveDTO {
 
     /** 支撑证据 id 列表（可选，引用 {@code ecos_cognitive_evidence.id}，建议非空） */
     private List<String> evidenceIds = new ArrayList<>();
+
+    // ── R4 承参与信心面（#146ay / §8.4.2 行 432；V296/V297 列位，additive 只增不改上方既有字段）──
+
+    /** 承参维度主体类型（§8.4.2 禁场景专有列；可选） */
+    private String subjectType;
+
+    /** 承参维度主体标识（与 subjectType 成对） */
+    private String subjectId;
+
+    /** 立据/理由（§8.4.2 与 statement 并列；显式给出必须非空白，省略走列默认空串兼容存量契约） */
+    private String reason;
+
+    /** 信心度 ∈[0,1]（V296 NUMERIC(9,6)；越界 fail-loud 400，禁静默 clamp/默认） */
+    private Double confidence;
+
+    /** 归属场景 id（E3 承参过滤维，V297；可选，注册期绑定） */
+    private String scenarioId;
+
+    /** 归属 Mind id（E3 带 mind 参时严格等值过滤，V297；可选） */
+    private String mindId;
 }

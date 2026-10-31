@@ -200,7 +200,8 @@ class CognitiveModelRegistryTest {
         ArgumentCaptor<String> cm = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> supersedes = ArgumentCaptor.forClass(String.class);
         verify(dao).insertModel(id.capture(), eq("m"), modelType.capture(), version.capture(),
-                any(), any(), eq("active"), cm.capture(), supersedes.capture());
+                any(), any(), eq("active"), cm.capture(), supersedes.capture(),
+                any(), any(), any(Integer.class), any(), any(), any(), any());
         assertEquals(4, version.getValue(), "version 必须 = max+1");
         assertEquals("FORECAST", modelType.getValue(), "旧列大写形态保持 PMO-51 原行为");
         assertEquals("CM-03", cm.getValue(), "FORECAST→CM-03 映射与 V261 补形段一致");

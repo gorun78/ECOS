@@ -84,8 +84,10 @@ class MigrationVersionUniquenessTest {
      *  勘误：V293（#146f td_audit_log 注册）本批锚定时漏数（已入库既有脚本，非本批产出）⇒
      *  初值 243 系漏数，按实测订正 243→244（= V293 存量 1 枚 + V294 本批 1 枚，242 基线之上 2 枚）。
      *  2026-10-29 #146ab：V295（public.ecos_audit_log 单源锚定，附录A 第 6 条数据面断链补登）落地
-     *  ⇒ 按实测订正 244→245（与 DrBaseline/Mc02/Mc03 同批改）。 */
-    private static final int SCRIPT_COUNT_FLOOR = 245;
+     *  ⇒ 按实测订正 244→245（与 DrBaseline/Mc02/Mc03 同批改）。
+     *  2026-10-31 #146ay：V296（§8.4.2 model/hypo R4 分类与承参字段）落地
+     *  ⇒ 按实测订正 245→246（与 DrBaseline/Mc02/Mc03 同批改）。 */
+    private static final int SCRIPT_COUNT_FLOOR = 247;
 
     /**
      * 锁④：台账锚——基线最大版本与下一号（新增脚本必须用 {@code > } 本值的主版本号）。
@@ -99,9 +101,11 @@ class MigrationVersionUniquenessTest {
      * 按实测订正 292→294 / 下一号 293→295。V288 仍空置：《数据库访问规范》§十 预留给 #144-c，不占。
      * 2026-10-29 #146ab：V295（public.ecos_audit_log 单源锚定，附录A 第 6 条 prevHash/currentHash
      * 唯一数据面首次进单源；已 dev PG 实跑）落地 ⇒ 按实测订正 294→295 / 下一号 295→296。
+     * 2026-10-31 #146ay：V296（§8.4.2 model 九类分类缺列 + hypothesis 承参/信心面缺列，
+     * dev PG 实跑）落地 ⇒ 按实测订正 295→296 / 下一号 296→297。
      */
-    private static final int MAX_BASELINE_VERSION = 295;
-    private static final int NEXT_FREE_VERSION = 296;
+    private static final int MAX_BASELINE_VERSION = 297;
+    private static final int NEXT_FREE_VERSION = 298;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

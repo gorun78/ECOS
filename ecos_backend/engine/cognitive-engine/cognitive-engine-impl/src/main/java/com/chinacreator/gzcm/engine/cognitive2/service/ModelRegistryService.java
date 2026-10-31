@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.cognitive2.service;
 import com.chinacreator.gzcm.common.exception.BusinessException;
 import com.chinacreator.gzcm.engine.cognitive.api.CognitiveErrorCode;
 import com.chinacreator.gzcm.engine.cognitive.api.CognitiveModelType;
+import com.chinacreator.gzcm.engine.cognitive.api.CognitiveR4ModelCategory;
 import com.chinacreator.gzcm.engine.cognitive.api.GateOutcome;
 import com.chinacreator.gzcm.engine.cognitive.api.RegistryState;
 import com.chinacreator.gzcm.engine.cognitive2.dao.ModelRegistryDao;
@@ -287,10 +288,60 @@ public class ModelRegistryService {
         BigDecimal backtest = body.get("backtestScore") instanceof Number n
                 ? BigDecimal.valueOf(n.doubleValue()) : null;
 
+        // V296 R4 九类分类面（§8.4.2）：词表/档位校验在此 fail-loud，DAO 只读写
+        String[] r4 = r4FieldsOrReject(body);
         modelRegistryDao.insertModel(id, modelId, legacyModelColumn, nextVer, featuresJson, backtest,
-                status.toLowerCase(), cmType.code(), supersedesId);
-        log.info("注册认知模型 {} v{} type={} cmType={} supersedes={}",
-                modelId, nextVer, legacyModelColumn, cmType.code(), supersedesId);
+                status.toLowerCase(), cmType.code(), supersedesId,
+                r4[0], r4[1], Integer.valueOf(r4[2]), r4[3], r4[4], r4[5], r4[6]);
+        log.info("注册认知模型 {} v{} type={} cmType={} supersedes={} category={}",
+                modelId, nextVer, legacyModelColumn, cmType.code(), supersedesId, r4[6]);
+    }
+
+    /**
+     * V296 R4 分类面七值解析（order: modelKey / description / phase / computeOwner /
+     * ioContractJson / limitsJson / modelCategory）：省略全 null（行为与旧面等价）；
+     * 显式 {@code modelCategory} 必须可解析为 {@link CognitiveR4ModelCategory}（未知字面量 400，
+     * 禁静默忽略新字段）；{@code phase} 省略时走分类的 {@code routePhase()} 派生单源，
+     * 显式且与分类派生冲突 ⇒ 400（禁静默取任意值）。
+     */
+    private String[] r4FieldsOrReject(Map<String, Object> body) {
+        String modelKey = trimToNull(body.get("modelKey"));
+        String description = trimToNull(body.get("description"));
+        String computeOwner = trimToNull(body.get("computeOwner"));
+        String ioContractJson = trimToNull(body.get("ioContractJson"));
+        String limitsJson = trimToNull(body.get("limitsJson"));
+        String rawCategory = trimToNull(body.get("modelCategory"));
+        Integer rawPhase = body.get("phase") instanceof Number n ? (int) n.doubleValue() : null;
+
+        String category = null;
+        int phase = 1;
+        if (rawCategory != null) {
+            CognitiveR4ModelCategory parsed = CognitiveR4ModelCategory.fromCode(rawCategory)
+                    .orElseThrow(() -> new BusinessException(400, "CORM-400: 非法 modelCategory（九值，见 CognitiveR4ModelCategory）: " + rawCategory));
+            category = parsed.code();
+            if (rawPhase == null) {
+                phase = parsed.routePhase();
+            }
+        }
+        if (rawPhase == null) {
+            rawPhase = 1;   // 列 DDL 默认 1（V296）；落库显式赋值与库默认同值
+        }
+        if (rawPhase < 1 || rawPhase > 3) {
+            throw new BusinessException(400, "CORM-400: 非法 phase（1/2/3 三期分期）: " + rawPhase);
+        }
+        if (category != null && rawPhase != null
+                && rawPhase != CognitiveR4ModelCategory.fromCode(category).orElseThrow().routePhase()) {
+            throw new BusinessException(400, "CORM-400: phase=" + rawPhase + " 与 modelCategory=" + category
+                    + " 的三期路线派生档位冲突（禁静默默认）");
+        }
+        return new String[]{modelKey, description, String.valueOf(rawPhase),
+                computeOwner, ioContractJson, limitsJson, category};
+    }
+
+    private static String trimToNull(Object o) {
+        if (o == null) return null;
+        String v = o.toString();
+        return v == null || v.isBlank() ? null : v.trim();
     }
 
     private Map<String, Object> buildRegisteredRow(String modelId, Map<String, Object> body,
@@ -309,6 +360,14 @@ public class ModelRegistryService {
         row.put("registryState", fresh != null ? fresh.get("registry_state") : null);
         row.put("supersedesId", fresh != null ? fresh.get("supersedes_id") : null);
         row.put("contentHash", fresh != null ? fresh.get("content_hash") : null);
+        // 只增不改的新键（V296 R4 九类分类面）：
+        row.put("modelKey", fresh != null ? fresh.get("model_key") : null);
+        row.put("description", fresh != null ? fresh.get("description") : null);
+        row.put("phase", fresh != null ? fresh.get("phase") : null);
+        row.put("computeOwner", fresh != null ? fresh.get("compute_owner") : null);
+        row.put("ioContractJson", fresh != null ? fresh.get("io_contract_json") : null);
+        row.put("limitsJson", fresh != null ? fresh.get("limits_json") : null);
+        row.put("modelCategory", fresh != null ? fresh.get("model_category") : null);
         return row;
     }
 
