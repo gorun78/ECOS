@@ -37,10 +37,14 @@ public class OntologyRuleRepository {
         return dao.insert(rule);
     }
 
+    /** #147B：update 扩承载双维路由（ruleCarrier/ruleLayer）+ 发布就绪件套（scope/versionNo/gitRef）+ status，null=COALESCE 不更新。 */
     public int update(String id, String code, String name, String ruleType,
                        String expression, String action, Integer priority,
-                       Integer enabled, String description) {
-        return dao.update(id, code, name, ruleType, expression, action, priority, enabled, description);
+                       Integer enabled, String description,
+                       String ruleCarrier, String ruleLayer, String scope,
+                       String versionNo, String gitRef, String status) {
+        return dao.update(id, code, name, ruleType, expression, action, priority, enabled, description,
+            ruleCarrier, ruleLayer, scope, versionNo, gitRef, status);
     }
 
     /** 逻辑删除 rule (T17)：原 DELETE → UPDATE SET is_deleted=1, status='ARCHIVED'。 */

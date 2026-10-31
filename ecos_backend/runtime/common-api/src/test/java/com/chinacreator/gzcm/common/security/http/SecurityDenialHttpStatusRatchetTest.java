@@ -175,8 +175,16 @@ class SecurityDenialHttpStatusRatchetTest {
      * 本判据带 {@code return} 前缀，需「直接返回」形态才命中，这些文件的非 return 前缀
      * 行（局部变量／helper 返回）不入本面。读数取自本批 common-api 全模块实跑失败报文
      * 「非安全裁决线的裸回面已扩张到 860 处（登记上限 853）」，非由旧值做算术推出。</p>
+     *
+     * <p><b>#147B 重设＝860→862（+2）</b>：{@code OntologyRuleController}
+     * createRule/updateRule 新增两枚 {@code catch (IllegalArgumentException)}
+     * 腿，形态为 {@code return ApiResponse.badRequest(e.getMessage())}（ONT-030
+     * 值域／ONT-031 发布门拒绝归 400，机读码在 message 起始位；§2.1 零新增端点
+     * 裁决下挂既有 POST/PUT）。两枚均为判据 B 的「return 前缀直接返回」裸回形态
+     * 命中。读数取自本批 {@code -pl runtime/common-api} 全量实跑失败报文
+     * 「非安全裁决线的裸回面已扩张到 862 处（登记上限 860）」，非由旧值做算术推出。</p>
      */
-    private static final int OTHER_LEG_CEILING = 860;
+    private static final int OTHER_LEG_CEILING = 862;
 
     /**
      * 判据 A 的合法承载态识别（#142/B4-3e-34，收口差距 <b>D-B4-69</b>「判据对

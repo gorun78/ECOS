@@ -42,9 +42,30 @@ public class OntologyRuleVO {
     /** 规则描述 */
     private String description;
 
-    /** 创建时间 ISO 字符串 */
+    /** 规则载体（I-4 消歧名；闭集 ONTOLOGY_ELEMENT/RULE_OBJECT/KNOWLEDGE_ASSET） */
+    private String ruleCarrier;
+
+    /** 规则层（闭集 STRUCTURAL/VALIDATION/BUSINESS/POLICY/COGNITIVE，与 ruleType 正交） */
+    private String ruleLayer;
+
+    /** 作用域（租户/组织/领域；发布就绪件套之一） */
+    private String scope;
+
+    /** 版本号（发布就绪件套之一） */
+    private String versionNo;
+
+    /** Git 归档引用（发布就绪件套之一） */
+    private String gitRef;
+
+    /** 生命周期状态（ACTIVE/PUBLISHED/ARCHIVED；16 态单源属 #147D） */
+    private String status;
+
+    /** 领域归属 */
+    private String domain;
+
+    /** 创建时间 ISO 字符串（live 列 create_time） */
     private String createdAt;
 
-    /** 更新时间 ISO 字符串 */
+    /** 更新时间 ISO 字符串（live 列 update_time） */
     private String updatedAt;
 }

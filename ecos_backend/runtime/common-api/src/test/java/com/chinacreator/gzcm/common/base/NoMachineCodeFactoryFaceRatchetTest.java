@@ -158,13 +158,21 @@ class NoMachineCodeFactoryFaceRatchetTest {
      * {@code 151→153}＝两枚新入判据面文件各贡献 1。读数取自本批门禁会话内
      * {@code -pl runtime/common-api} 单条实跑的失败报文（{@code sites=943, files=153}），
      * 非由旧值做算术推出。</p>
+     *
+     * <p><b>#147B 上调（+2 处，badRequest 331→333，合计 943→945）</b>：
+     * {@code OntologyRuleController} createRule/updateRule 两枚 {@code catch
+     * (IllegalArgumentException)} 腿按本域 ONT-0xx 消息起始位承载惯例走
+     * {@code ApiResponse.badRequest(e.getMessage())}（ONT-030 值域／ONT-031
+     * 发布门的机读码在 message 前缀，不带码重载），该文件此前已在判据面内，
+     * 文件数不变。读数取自本批 {@code -pl runtime/common-api} 全量实跑失败
+     * 报文（{@code sites=945}，分枚 333/12/24/270/306），非由旧值做算术推出。</p>
      */
-    private static final int BASELINE_SITES = 943;
+    private static final int BASELINE_SITES = 945;
     private static final int BASELINE_FILES = 153;
 
     /** 分枚基线：只减不增，且合计必须等于 {@link #BASELINE_SITES}（防「拆细了但总数对不上」）。 */
     private static final Map<String, Integer> BASELINE_BY_FACTORY = new TreeMap<>(Map.of(
-            "badRequest", 331,
+            "badRequest", 333,
             "unauthorized", 12,
             "forbidden", 24,
             "notFound", 270,

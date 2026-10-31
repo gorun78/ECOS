@@ -30,6 +30,12 @@ import com.chinacreator.gzcm.engine.ontology.service.OntologyRuleService;
  * <p>T16-1 (2026-09-12)：方法入/出参由 {@code Map<String,Object>} 改为强类型 DTO/VO
  * （{@code OntologyRuleSaveDTO} / {@code OntologyRuleVO} / {@code OntologyRuleEvaluateQuery} /
  * {@code OntologyRuleEvaluationVO}）。
+ *
+ * <p>#147B (2026-10-31)：双维承载（rule_carrier × rule_layer，册 I-3 闭集）值域校验与
+ * 发布门在 {@code OntologyRuleService} 内以 {@code IllegalArgumentException} 上抛，本机读码
+ * ONT-030（值域违例）/ ONT-031（发布门拒绝）由本 Controller 归入 400（沿用 testRule 腿的
+ * badRequest 先例）。发布门<b>不新开路由</b>（册 §2.1「R7~R11 未新增 REST 端点」）——
+ * 经 {@code PUT /rules/{ruleId}} 携带 {@code status="PUBLISHED"} 触发。
  */
 @RestController
 @RequestMapping("/api/v1/ecos")
@@ -49,14 +55,23 @@ public class OntologyRuleController {
         return ApiResponse.success(ruleService.listRulesByEntityVO(entityId));
     }
 
-    /** 创建规则 — 接收 {@code OntologyRuleSaveDTO}。 */
+    /**
+     * 创建规则 — 接收 {@code OntologyRuleSaveDTO}。
+     *
+     * <p>#147B：双维值域违例（ONT-030）与 {@code status=PUBLISHED} 创建即发布被门拒
+     * （ONT-031）均归 400。
+     */
     @PostMapping("/entities/{entityId}/rules")
     public ApiResponse<OntologyRuleVO> createRule(
             @PathVariable String entityId,
             @RequestBody OntologyRuleSaveDTO dto) {
-        OntologyRuleVO rule = ruleService.createRule(entityId, dto);
-        log.info("Rule created: {} [{}] type={}", rule.getId(), rule.getCode(), rule.getRuleType());
-        return ApiResponse.success(rule);
+        try {
+            OntologyRuleVO rule = ruleService.createRule(entityId, dto);
+            log.info("Rule created: {} [{}] type={}", rule.getId(), rule.getCode(), rule.getRuleType());
+            return ApiResponse.success(rule);
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.badRequest(e.getMessage());
+        }
     }
 
     /** 列出全部规则（强类型版本）。 */
@@ -75,14 +90,24 @@ public class OntologyRuleController {
         return ApiResponse.success(rule);
     }
 
-    /** 更新规则 — 接收 {@code OntologyRuleSaveDTO}。 */
+    /**
+     * 更新规则 — 接收 {@code OntologyRuleSaveDTO}。
+     *
+     * <p>#147B：本端点同时是发布门承流腿（册 §2.1 零新增端点裁决）——{@code status="PUBLISHED"}
+     * 时先做合并态五字段+正交+L1 可解析判定，缺 {@code version_no}/{@code git_ref} 等违例
+     * （ONT-031，册 §6.2.6⑧/DF-5/C-9）与双维值域违例（ONT-030）归 400，不落库。
+     */
     @PutMapping("/rules/{ruleId}")
     public ApiResponse<OntologyRuleVO> updateRule(
             @PathVariable String ruleId,
             @RequestBody OntologyRuleSaveDTO dto) {
-        return ruleService.updateRule(ruleId, dto)
-            .map(ApiResponse::success)
-            .orElseGet(() -> ApiResponse.notFound("ONT-001: Rule '" + ruleId + "' not found"));
+        try {
+            return ruleService.updateRule(ruleId, dto)
+                .map(ApiResponse::success)
+                .orElseGet(() -> ApiResponse.notFound("ONT-001: Rule '" + ruleId + "' not found"));
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.badRequest(e.getMessage());
+        }
     }
 
     /** 删除规则（强类型未对 boolean 引入新 VO，保留 String 简返，与现有动作删除路径一致）。 */
