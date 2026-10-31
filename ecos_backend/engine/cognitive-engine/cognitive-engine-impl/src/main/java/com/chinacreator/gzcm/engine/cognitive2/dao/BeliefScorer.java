@@ -27,11 +27,17 @@ import java.util.function.Function;
  * <p>数据源：{@code ecos_cognitive.ecos_cognitive_belief}（V191 权威载体 + V262 补 probability，R-13 ① 归位）。
  * 载体切换刻意早于写侧（{@code BeliefDao} 仍在双写期 public 面）：{@code probability} 只存在于新载体，
  * 读端不切换就没有真值来源；迁移未执行时按 C.1 前置门回 503 {@code ECOS-COG-501}（禁 fail-open 空列表）。</p>
+ *
+ * <p><b>承参过滤面（V298 / #146az 方案 A）</b>：权威载体无 scenario_id 列（详设 §8.4.2 只承
+ * {@code mind_id/subject_type/subject_id}），场景维度经绑表 {@code ecos_cognitive.ecos_cognitive_scenario_mind}
+ * 子查询推导（{@code mind_id IS NULL OR mind_id IN (场景绑表)}）；带 mind 参时先 {@code mind_id = ?}
+ * 严格等值再与场景绑表取交，禁静默兜底。</p>
  */
 @Repository
 public class BeliefScorer extends JdbcTemplateDaoSupport {
 
     private static final String TABLE = "ecos_cognitive.ecos_cognitive_belief";
+    private static final String SCENARIO_MIND_TABLE = "ecos_cognitive.ecos_cognitive_scenario_mind";
 
     /**
      * 一条待评分 belief 的读端投影。
@@ -48,7 +54,10 @@ public class BeliefScorer extends JdbcTemplateDaoSupport {
                 "  FROM " + TABLE +
                 " WHERE is_deleted = 0 AND status = 'ACTIVE'"
                 + (mindId == null || mindId.isBlank() ? "" : " AND mind_id = ?")
-                + (scenarioId == null || scenarioId.isBlank() ? "" : " AND scenario_id = ?")
+                + (scenarioId == null || scenarioId.isBlank() ? ""
+                        : " AND (mind_id IS NULL OR mind_id IN ("
+                          + "SELECT mind_id FROM " + SCENARIO_MIND_TABLE
+                          + " WHERE scenario_id = ? AND is_deleted = 0))")
                 + " ORDER BY update_time DESC NULLS LAST LIMIT 500";
         Object[] args = buildArgs(mindId, scenarioId);
         List<Map<String, Object>> rows;

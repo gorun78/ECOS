@@ -86,8 +86,11 @@ class MigrationVersionUniquenessTest {
      *  2026-10-29 #146ab：V295（public.ecos_audit_log 单源锚定，附录A 第 6 条数据面断链补登）落地
      *  ⇒ 按实测订正 244→245（与 DrBaseline/Mc02/Mc03 同批改）。
      *  2026-10-31 #146ay：V296（§8.4.2 model/hypo R4 分类与承参字段）落地
-     *  ⇒ 按实测订正 245→246（与 DrBaseline/Mc02/Mc03 同批改）。 */
-    private static final int SCRIPT_COUNT_FLOOR = 247;
+     *  ⇒ 按实测订正 245→246（与 DrBaseline/Mc02/Mc03 同批改）。
+     *  2026-10-31 #146ay：V297（hypothesis 承参过滤两列）落地 ⇒ 246→247。
+     *  2026-10-31 #146az：V298（belief 归属三列 mind_id/subject_type/subject_id，dev PG 实跑）
+     *  落地 ⇒ 按实测订正 247→248（四枚同批锚）。 */
+    private static final int SCRIPT_COUNT_FLOOR = 248;
 
     /**
      * 锁④：台账锚——基线最大版本与下一号（新增脚本必须用 {@code > } 本值的主版本号）。
@@ -103,9 +106,12 @@ class MigrationVersionUniquenessTest {
      * 唯一数据面首次进单源；已 dev PG 实跑）落地 ⇒ 按实测订正 294→295 / 下一号 295→296。
      * 2026-10-31 #146ay：V296（§8.4.2 model 九类分类缺列 + hypothesis 承参/信心面缺列，
      * dev PG 实跑）落地 ⇒ 按实测订正 295→296 / 下一号 296→297。
+     * 2026-10-31 #146ay：V297（hypothesis 承参过滤两列）落地 ⇒ 296→297 / 下一号 297→298。
+     * 2026-10-31 #146az：V298（belief 归属三列，dev PG 实跑＋幂等复跑）落地 ⇒
+     * 按实测订正 297→298 / 下一号 298→299。
      */
-    private static final int MAX_BASELINE_VERSION = 297;
-    private static final int NEXT_FREE_VERSION = 298;
+    private static final int MAX_BASELINE_VERSION = 298;
+    private static final int NEXT_FREE_VERSION = 299;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。
@@ -255,7 +261,7 @@ class MigrationVersionUniquenessTest {
     // ────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("台账锚：主版本号连续性与下一号（实测最大 295 ⇒ 新脚本自 296 顺延，禁回填占号；V288 预留未占）")
+    @DisplayName("台账锚：主版本号连续性与下一号（实测最大 298 ⇒ 新脚本自 299 顺延，禁回填占号；V288 预留未占）")
     void baselineSequenceIsAddressableAndNextSlotIsKnown() throws IOException {
         Set<Integer> majors = new TreeSet<>(parseAll().stream()
                 .map(ScriptEntry::majorVersion).toList());

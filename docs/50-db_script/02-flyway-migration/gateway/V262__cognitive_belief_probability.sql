@@ -8,6 +8,10 @@
 -- 需求依据: PRD-05 §1.1 E2 规格 1（算式冻结）+ 规格 3（score 由 Java 算术、LLM 零参与，入口单一 `CognitiveEvalCalculator`）
 --           REQ-COG-09 规格 4（**无来源数值判 FAIL**，禁 0 替真值）⇒ 本列是本项数值的唯一库侧来源
 -- 批准: 需求检视报告 §十四 14.1（2026-09-29）之 R-13 ①（认知族归位 ecos_cognitive）；执行边界 §14.4 = **仅落迁移脚本文件，未对 ecos-postgres 实跑**（实跑属未授权项，需逐项再确认）
+-- 实跑凭证: 2026-10-31 #146az 批内补落地（用户增量迁移实跑授权口径，见 #146g/#146ar 先例）：
+--          dev PG（sys_man / ecos-postgres）全脚本实跑零错（ALTER TABLE / CREATE INDEX /
+--          COMMENT 三语句成功），information_schema 回读 probability NUMERIC(6,5) 在位、
+--          idx_cv262_belief_prob 在位、存量 6 行 probability 全 NULL（=未标定，禁补 0）。
 -- 纪律: DR01~DR08 / MC01~MC03 / ST03-A（登记行见 docs/40-实现/列级加密豁免登记表）/ ST07（控制域认知引擎 schema）/ IR02(手动 psql) / IR03(旧表只停写、不加列)
 --
 -- ── 落点选择（为什么只 ALTER ecos_cognitive，不给 public 旧表加列）──────────
