@@ -17,6 +17,7 @@ import com.chinacreator.gzcm.engine.ontology.OntologyGitService;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveRequest;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveResult;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyGitHistoryVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionPreviousDiffVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionVO;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyEntity;
@@ -483,6 +484,40 @@ public class OntologyVersionService {
      */
     public OntologyVersionVO getVersionVOById(String id) {
         return versionRepository.findById(id).map(this::toVO).orElse(null);
+    }
+
+    /**
+     * F6-07 规范前缀 git/history 只读读面（#146av additive）：
+     * 已发布且 git_ref 非空的版本，即真实 Git 归档历史。
+     *
+     * @param ontologyId 本体 ID（空/null = 全量）
+     * @return 发布时间倒序的归档历史行（不含 snapshot）
+     */
+    public List<OntologyGitHistoryVO> gitHistoryVO(String ontologyId) {
+        List<OntologyVersion> source = (ontologyId == null || ontologyId.isBlank())
+            ? versionRepository.findAll()
+            : versionRepository.findByOntology(ontologyId);
+        return source.stream()
+            .filter(v -> "Published".equals(v.getStatus()))
+            .filter(v -> v.getGitRef() != null && !v.getGitRef().isBlank())
+            .sorted((a, b) -> {
+                if (b.getPublishedAt() == null) return -1;
+                if (a.getPublishedAt() == null) return 1;
+                return b.getPublishedAt().compareTo(a.getPublishedAt());
+            })
+            .map(v -> {
+                OntologyGitHistoryVO vo = new OntologyGitHistoryVO();
+                vo.setId(v.getId());
+                vo.setOntologyId(v.getOntologyId());
+                vo.setVersionNo(v.getVersionNo());
+                vo.setStatus(v.getStatus());
+                vo.setGitRef(v.getGitRef());
+                vo.setPublisher(v.getPublisher());
+                vo.setPublishedAt(v.getPublishedAt() != null ? v.getPublishedAt().toString() : null);
+                vo.setCreatedAt(v.getCreatedAt() != null ? v.getCreatedAt().toString() : null);
+                return vo;
+            })
+            .collect(Collectors.toList());
     }
 
     /**
