@@ -727,6 +727,30 @@ public class OntologyVersionService {
     }
 
     /**
+     * 快照内容来源单源（#147R；§2.9.6④/DQ-6「历史只从 Git 取」的读侧切换）：
+     * 已归档版本（git_ref 非空）优先按 ref 从对象库读回；读不到才退回 DB {@code snapshot} 列，
+     * 并把退回落日志（禁静默把 DB 快照当 Git 历史）。
+     * 未归档（Draft/旧行）直接回 DB 快照。
+     */
+    private String resolveSnapshotContent(OntologyVersion ver) {
+        if (ver == null) {
+            return null;
+        }
+        if (ver.getGitRef() == null || ver.getGitRef().isBlank() || gitService.isEmpty()) {
+            return ver.getSnapshot();
+        }
+        OntologyGitReadResult r = gitService.get().readVersionAtRef(
+                GIT_REPO_ONTOLOGY, GIT_ASSET_TYPE, ver.getOntologyId(), ver.getVersionNo(), ver.getGitRef());
+        if (r != null && r.isFound()) {
+            return r.getContent();
+        }
+        String why = r == null ? "null result" : r.getReason();
+        log.warn("历史版本按 git ref 读回失败，退回 DB 快照（content 源已标注）: id={} ref={} reason={}",
+                ver.getId(), ver.getGitRef(), why);
+        return ver.getSnapshot();
+    }
+
+    /**
      * Diff 两个版本
      */
     public Map<String, Object> diff(String ontologyId, String v1, String v2) {
@@ -738,8 +762,8 @@ public class OntologyVersionService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("version1", ver1.getVersionNo());
         result.put("version2", ver2.getVersionNo());
-        result.put("snapshot1", safeParseJson(ver1.getSnapshot()));
-        result.put("snapshot2", safeParseJson(ver2.getSnapshot()));
+        result.put("snapshot1", safeParseJson(resolveSnapshotContent(ver1)));
+        result.put("snapshot2", safeParseJson(resolveSnapshotContent(ver2)));
         return result;
     }
 
@@ -757,8 +781,8 @@ public class OntologyVersionService {
         OntologyVersionVO vo = new OntologyVersionVO();
         vo.setVersion1(ver1.getVersionNo());
         vo.setVersion2(ver2.getVersionNo());
-        vo.setSnapshot1(safeParseJson(ver1.getSnapshot()));
-        vo.setSnapshot2(safeParseJson(ver2.getSnapshot()));
+        vo.setSnapshot1(safeParseJson(resolveSnapshotContent(ver1)));
+        vo.setSnapshot2(safeParseJson(resolveSnapshotContent(ver2)));
         return vo;
     }
 

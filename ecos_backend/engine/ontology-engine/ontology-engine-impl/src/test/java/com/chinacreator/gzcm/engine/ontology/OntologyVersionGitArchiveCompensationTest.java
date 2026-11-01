@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -316,5 +317,48 @@ class OntologyVersionGitArchiveCompensationTest {
 
         assertEquals("PARTIAL_FAILURE", result.get("publishState"));
         assertTrue(String.valueOf(result.get("publishStateReason")).contains("audit=UNKNOWN"));
+    }
+
+    // ── #147R：历史内容读切 Git 单通道（diff 面）──────────────────────────────
+
+    @Test
+    void diff_readsSnapshotFromGitRefWhenArchived() {
+        OntologyVersion a = version("v1", "onto-1", "1.0.0");
+        a.setStatus("Published");
+        a.setGitRef("ref-a");
+        OntologyVersion b = version("v2", "onto-1", "1.0.1");
+        b.setStatus("Published");
+        b.setGitRef("ref-b");
+        when(versionRepo.findById("v1")).thenReturn(java.util.Optional.of(a));
+        when(versionRepo.findById("v2")).thenReturn(java.util.Optional.of(b));
+
+        com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult ra =
+                new com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult();
+        ra.setStatus(com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult.STATUS_FOUND);
+        ra.setContent("{\"from\":\"git-a\"}");
+        com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult rb =
+                new com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult();
+        rb.setStatus(com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult.STATUS_FOUND);
+        rb.setContent("{\"from\":\"git-b\"}");
+        when(gitService.readVersionAtRef("ontology-model", "ontology", "onto-1", "1.0.0", "ref-a")).thenReturn(ra);
+        when(gitService.readVersionAtRef("ontology-model", "ontology", "onto-1", "1.0.1", "ref-b")).thenReturn(rb);
+
+        java.util.Map<String, Object> diff = svc.diff("onto-1", "v1", "v2");
+        assertEquals(Map.of("from", "git-a"), diff.get("snapshot1"),
+                "已归档版本的 diff 内容必须取自 Git 对象库");
+        assertEquals(Map.of("from", "git-b"), diff.get("snapshot2"));
+    }
+
+    @Test
+    void diff_fallsBackToDbSnapshotWhenNotArchived() {
+        OntologyVersion a = version("v1", "onto-1", "1.0.0");  // 无 git_ref
+        OntologyVersion b = version("v2", "onto-1", "1.0.1");  // 无 git_ref
+        when(versionRepo.findById("v1")).thenReturn(java.util.Optional.of(a));
+        when(versionRepo.findById("v2")).thenReturn(java.util.Optional.of(b));
+
+        java.util.Map<String, Object> diff = svc.diff("onto-1", "v1", "v2");
+        assertEquals("{snapshot:'1.0.0'}", diff.get("snapshot1"),
+                "未归档版本回 DB 快照（不臆造 git 内容；非法 JSON 按原文返回）");
+        verify(gitService, never()).readVersionAtRef(any(), any(), any(), any(), any());
     }
 }
