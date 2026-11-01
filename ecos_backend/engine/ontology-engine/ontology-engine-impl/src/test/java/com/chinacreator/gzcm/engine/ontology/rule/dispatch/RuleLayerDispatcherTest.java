@@ -34,7 +34,7 @@ class RuleLayerDispatcherTest {
     @Test
     void fiveLayersMapToExactlyFiveTargetsAndOnlyPolicyUsesOpa() {
         assertEquals(5, RuleLayerTarget.values().length);
-        assertEquals("OPA_PDP", RuleLayerTarget.POLICY.targetCode());
+        assertEquals("OPA_POLICY_ENGINE", RuleLayerTarget.POLICY.targetCode());
         long opa = java.util.Arrays.stream(RuleLayerTarget.values())
                 .filter(RuleLayerTarget::opaBound).count();
         assertEquals(1, opa, "OPA 只能承接 Policy 层（§4.2.6）");
@@ -84,7 +84,7 @@ class RuleLayerDispatcherTest {
                 dispatcher.dispatch(rule("POLICY", "", null)).status());
         RuleDispatchResult routed = dispatcher.dispatch(rule("POLICY", "allow if role == 'admin'", null));
         assertEquals(RuleDispatchResult.Status.ROUTED, routed.status());
-        assertEquals("OPA_PDP", routed.target().targetCode());
+        assertEquals("OPA_POLICY_ENGINE", routed.target().targetCode());
     }
 
     @Test

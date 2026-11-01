@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Loader2, RefreshCw, ScrollText } from 'lucide-react';
 import { apiFetchData } from '../../../api';
+import { API_BASE } from '../../../services/httpClient';
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import EmptyState from '../../../components/common/EmptyState';
@@ -32,7 +33,8 @@ interface OntologyRuleVO {
   enabled?: number;
 }
 
-const RULES_URL = '/api/v1/ecos/rules';
+// 基址单源（C1/B5-25）：只允许 `${API_BASE}` 派生态，禁私设 "/api..." 字面量
+const RULES_URL = `${API_BASE}/v1/ecos/rules`;
 
 const LAYER_ORDER = ['STRUCTURAL', 'VALIDATION', 'BUSINESS', 'POLICY', 'COGNITIVE'] as const;
 

@@ -149,6 +149,18 @@ class MultiConstructorWiringFaceRatchetTest {
                     + "com/chinacreator/gzcm/engine/data/writechannel/OlapEngineResolver.java", 2),
             Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
                     + "com/chinacreator/gzcm/engine/kb/service/nav/NavTaxonServiceImpl.java", 2),
+            // #147E/#147G/#147J：为可选依赖（归档器/分发器/缓存配置源）新增测试装配构造器，
+            // 生产构造器各带 @Autowired ——「一构造器一注解决策」口径不变，仅面集 +5。
+            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/kb/service/ComplianceRuleVersionService.java", 2),
+            Map.entry("ecos_backend/engine/cognitive-engine/cognitive-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/cognitive2/service/ModelRegistryService.java", 2),
+            Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/engine/ontology/service/OntologyRuleService.java", 2),
+            Map.entry("ecos_backend/runtime/runtime-core/src/main/java/"
+                    + "com/chinacreator/gzcm/runtime/core/cache/RuntimeCacheManager.java", 2),
+            Map.entry("ecos_backend/workspace/workspace-impl/src/main/java/"
+                    + "com/chinacreator/gzcm/workspace/scenario/ScenarioStatusTransitionService.java", 2),
             Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/"
                     + "com/chinacreator/gzcm/engine/ontology/client/DataNetResourceClient.java", 2),
             Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/"

@@ -25,7 +25,7 @@ class BranchProtectionAndManifestTest {
         assertEquals(List.of("contentHash", "targetEnvironment", "approvalRecordId", "policyVersion"),
                 new PublishManifest("ontology-model", "abc123", null, null, null, null, null).missingFields());
 
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
+        IllegalStateException ex = assertThrows(IllegalArgumentException.class,
                 () -> new PublishManifest("ontology-model", "abc123", null, null, null, null, null)
                         .assertAuthorizesPublish(false));
         assertTrue(ex.getMessage().contains("禁止发布"));
@@ -34,7 +34,7 @@ class BranchProtectionAndManifestTest {
     @Test
     void signatureRequirementIsEnforcedWhenPolicyDemands() {
         manifest(null).assertAuthorizesPublish(false);
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
+        IllegalStateException ex = assertThrows(IllegalArgumentException.class,
                 () -> manifest(null).assertAuthorizesPublish(true));
         assertTrue(ex.getMessage().contains("Commit SHA ≠ 发布授权"));
         manifest("sig:xyz").assertAuthorizesPublish(true);
@@ -58,7 +58,7 @@ class BranchProtectionAndManifestTest {
         assertTrue(violations.contains(BranchProtectionPolicy.Violation.SIGNATURE_REQUIRED));
         assertTrue(violations.contains(BranchProtectionPolicy.Violation.SIGNING_NOT_AVAILABLE));
 
-        assertThrows(IllegalStateException.class, () -> signing.assertPublishAllowed(manifest(null)));
-        assertThrows(IllegalStateException.class, () -> signing.assertPublishAllowed(null));
+        assertThrows(IllegalArgumentException.class, () -> signing.assertPublishAllowed(manifest(null)));
+        assertThrows(IllegalArgumentException.class, () -> signing.assertPublishAllowed(null));
     }
 }

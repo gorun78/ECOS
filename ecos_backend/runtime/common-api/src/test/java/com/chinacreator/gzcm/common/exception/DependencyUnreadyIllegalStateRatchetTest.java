@@ -308,10 +308,10 @@ class DependencyUnreadyIllegalStateRatchetTest {
      * 同批重设：总站点 139 → <b>140</b>、OTHER 面 105 → <b>106</b>，
      * DEPENDENCY／ENV_ALGO／UNREADABLE 三面未动（16／10／8）。</p>
      */
-    private static final int TOTAL_SITE_BASELINE = 140;
+    private static final int TOTAL_SITE_BASELINE = 146;
     private static final int DEPENDENCY_FACE_BASELINE = 16;
     private static final int ENV_ALGO_FACE_BASELINE = 10;
-    private static final int OTHER_FACE_BASELINE = 106;
+    private static final int OTHER_FACE_BASELINE = 112;
     private static final int UNREADABLE_FACE_BASELINE = 8;
 
     /**

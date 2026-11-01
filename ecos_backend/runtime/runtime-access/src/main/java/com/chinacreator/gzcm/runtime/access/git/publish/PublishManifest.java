@@ -76,15 +76,15 @@ public record PublishManifest(String repositoryId, String commitSha, String cont
      * 发布授权判定：完整清单 <b>且</b> 审批记录非空（冗余但可读的第二道）+ 若策略要求签名则必须有签名。
      *
      * @param signatureRequired 目标环境/分支是否强制签名
-     * @throws IllegalStateException 不满足时携带缺项/缺签原因（禁返回 false 让调用方猜）
+     * @throws IllegalArgumentException 不满足时携带缺项/缺签原因（禁返回 false 让调用方猜）
      */
     public void assertAuthorizesPublish(boolean signatureRequired) {
         List<String> missing = missingFields();
         if (!missing.isEmpty()) {
-            throw new IllegalStateException("发布清单不完整，禁止发布（§2.9.9④）：缺 " + missing);
+            throw new IllegalArgumentException("发布清单不完整，禁止发布（§2.9.9④）：缺 " + missing);
         }
         if (signatureRequired && !hasSignature()) {
-            throw new IllegalStateException("目标环境要求签名发布，但清单无签名（Commit SHA ≠ 发布授权）");
+            throw new IllegalArgumentException("目标环境要求签名发布，但清单无签名（Commit SHA ≠ 发布授权）");
         }
     }
 }

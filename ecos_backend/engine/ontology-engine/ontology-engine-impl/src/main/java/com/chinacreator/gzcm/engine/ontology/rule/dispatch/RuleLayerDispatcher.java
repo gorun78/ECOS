@@ -110,7 +110,7 @@ public class RuleLayerDispatcher {
                     "POLICY 规则缺 expression：OPA 只能承接 allow/deny 类策略，无判定表达即拒绝");
         }
         return RuleDispatchResult.routed(target,
-                "已路由 OPA（PDP，仅 Policy 层）；业务/校验/认知规则不得转 Rego");
+                "已路由 OPA（仅 Policy 层）；业务/校验/认知规则不得转 Rego");
     }
 
     /** 认知规则：证据→假设→信念；在线执行由认知引擎承接，未接入时如实不可用。 */

@@ -95,15 +95,15 @@ public final class BranchProtectionPolicy {
     public void assertPublishAllowed(PublishManifest manifest) {
         if (manifestRequired) {
             if (manifest == null) {
-                throw new IllegalStateException("发布必须携带签名清单（§2.9.9④）：缺 manifest");
+                throw new IllegalArgumentException("发布必须携带签名清单（§2.9.9④）：缺 manifest");
             }
             List<String> missing = manifest.missingFields();
             if (!missing.isEmpty()) {
-                throw new IllegalStateException("发布清单不完整：缺 " + missing);
+                throw new IllegalArgumentException("发布清单不完整：缺 " + missing);
             }
         }
         if (signingRequired && (manifest == null || !manifest.hasSignature())) {
-            throw new IllegalStateException("环境要求签名发布，但签名基础设施未接入/清单无签名"
+            throw new IllegalArgumentException("环境要求签名发布，但签名基础设施未接入/清单无签名"
                     + "（" + Violation.SIGNING_NOT_AVAILABLE + "）");
         }
     }

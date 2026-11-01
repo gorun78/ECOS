@@ -93,8 +93,11 @@ const CANONICAL = 'services/httpClient.ts';
  * `src/config/route-manifest.ts` + `src/theme/index.ts`，全量 run 实走面值 682→685，只增；
  * 三枚文件代码面恰一条 `export * from` 再导出、零私设基址／零派生态，
  * e6Placements 门钉值判据见 `src/__tests__/e6Placements.test.ts`）。
+ * 2026-11-01 #147I 新增知识工作台「规则」页（`src/pages/knowledge/pages/RulesPage.tsx`，
+ * 全量 run 实走面值 685→686，只增；该页只读既有 `/api/v1/ecos/rules`，走统一 apiFetchData，
+ * 零私设基址字面量）。
  */
-const PROD_FILES = 685;
+const PROD_FILES = 686;
 
 /** 本批 15 文件：rel →（导入腿相对路径、本批派生点数）。 */
 const FILES: ReadonlyArray<{ rel: string; importPath: string; sites: number }> = [
