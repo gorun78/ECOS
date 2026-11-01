@@ -1,12 +1,19 @@
 package com.chinacreator.gzcm.workspace.scenario;
 
 import com.chinacreator.gzcm.workspace.dao.WorkspaceDataDao;
+import com.chinacreator.gzcm.runtime.access.git.archive.ArchiveOutcome;
+import com.chinacreator.gzcm.runtime.access.git.archive.DesignAssetArchiver;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Map;
@@ -28,18 +35,38 @@ public class ScenarioStatusTransitionService {
     private final WorkspaceSecurityAudit audit;
     private final WorkspaceDataDao dao;
 
+    /** 设计资产归档器（#147E；{@code scenario-def} 属主通道）。未装配时归档腿显式跳过。 */
+    private final ObjectProvider<DesignAssetArchiver> archiverProvider;
+
+    /** 注册表 repositoryId（V300 种子）。 */
+    static final String GIT_REPO_SCENARIO = "scenario-def";
+
+    private static final ObjectMapper ARCHIVE_MAPPER = new ObjectMapper();
+
     public ScenarioStatusTransitionService(ScenarioService scenarioService,
                                            ScenarioStatusMachine statusMachine,
                                            CompletenessDataLoader loader,
                                            ScenarioCompletenessService completenessService,
                                            WorkspaceSecurityAudit audit,
                                            WorkspaceDataDao dao) {
+        this(scenarioService, statusMachine, loader, completenessService, audit, dao, null);
+    }
+
+    @Autowired
+    public ScenarioStatusTransitionService(ScenarioService scenarioService,
+                                           ScenarioStatusMachine statusMachine,
+                                           CompletenessDataLoader loader,
+                                           ScenarioCompletenessService completenessService,
+                                           WorkspaceSecurityAudit audit,
+                                           WorkspaceDataDao dao,
+                                           ObjectProvider<DesignAssetArchiver> archiverProvider) {
         this.scenarioService = scenarioService;
         this.statusMachine = statusMachine;
         this.loader = loader;
         this.completenessService = completenessService;
         this.audit = audit;
         this.dao = dao;
+        this.archiverProvider = archiverProvider;
     }
 
     /** 执行迁移；返回迁移后状态 + allowedTransitions（前端按钮态）。 */
@@ -59,8 +86,48 @@ public class ScenarioStatusTransitionService {
 
         List<ScenarioStatus> allowed = statusMachine.allowedTransitions(to, buildContext(scenarioId, to));
         audit.record("scenario:transition:" + to.name(), scenarioId, "OK");
+        archiveScenarioAfterCommit(scenarioId, to);
         log.info("场景状态迁移 scenario={} {}->{} by={}", scenarioId, str(from), to, ctx.getSubject());
         return new TransitionResult(to.name(), statusNames(allowed));
+    }
+
+    /**
+     * 状态迁移后归档场景定义到 {@code scenario-def}（#147E；§2.9.7 全域接入）。
+     *
+     * <p><b>为什么放在 {@code afterCommit}</b>：本方法 {@code @Transactional}，若在提交前归档，
+     * 事务回滚会留下一个指向「从未落库的状态」的 Git 提交。Git 与 DB 非原子（§2.9.6①），
+     * 但我们至少让顺序正确：先落库提交，再归档；归档失败只记分态，不回滚业务事务。</p>
+     */
+    private void archiveScenarioAfterCommit(String scenarioId, ScenarioStatus to) {
+        DesignAssetArchiver archiver = archiverProvider != null ? archiverProvider.getIfAvailable() : null;
+        if (archiver == null) {
+            log.debug("DesignAssetArchiver 未装配，跳过 scenario 归档 id={}", scenarioId);
+            return;
+        }
+        Runnable task = () -> {
+            try {
+                ScenarioVO vo = scenarioService.get(scenarioId);
+                ArchiveOutcome outcome = archiver.archive(GIT_REPO_SCENARIO, "scenarios", scenarioId,
+                        null, ARCHIVE_MAPPER.writeValueAsString(vo),
+                        "Scenario transition to " + to.name() + " (" + scenarioId + ")", null);
+                if (outcome.status() != ArchiveOutcome.Status.ARCHIVED) {
+                    log.info("scenario 归档未完成 id={} status={} reason={}",
+                            scenarioId, outcome.status(), outcome.reason());
+                }
+            } catch (Exception e) {
+                log.warn("scenario 归档异常 id={}: {}", scenarioId, e.getMessage());
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    task.run();
+                }
+            });
+        } else {
+            task.run();
+        }
     }
 
     /** 详情响应的 allowedTransitions（结构可达态，服务端计算，前端按钮态唯一来源）。 */

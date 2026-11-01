@@ -47,7 +47,12 @@ public class GitRepositoryServiceImpl implements GitRepositoryService {
     @Autowired
     public GitRepositoryServiceImpl(GitRepoRegistry registry,
                                     ObjectProvider<GitRepoPathResolver> pathResolverProvider) {
-        this(registry, pathResolverProvider != null ? pathResolverProvider.getIfAvailable() : null);
+        // #147E：宿主未扫到 data-engine 的属主适配 Bean 时（kb/cognitive/ai），
+        // 用最后一跳解析器兜底，避免「注册行存在但永远 NOT_AVAILABLE」；
+        // 属主适配 Bean 在场时永不启用兜底（单一事实源仍为 sys_config 根）。
+        this(registry, pathResolverProvider != null && pathResolverProvider.getIfAvailable() != null
+                ? pathResolverProvider.getIfAvailable()
+                : new DefaultGitRepoPathResolver());
     }
 
     /** 显式装配接缝（测试 / 非 Spring 场景）；{@code registry}/{@code pathResolver} 传 null 即该面缺位。 */

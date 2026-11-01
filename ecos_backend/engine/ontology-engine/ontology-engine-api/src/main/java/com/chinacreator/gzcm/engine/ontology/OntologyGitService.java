@@ -4,6 +4,7 @@ import java.util.Map;
 
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveRequest;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveResult;
+import com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult;
 
 public interface OntologyGitService {
 
@@ -26,4 +27,14 @@ public interface OntologyGitService {
      * runtime 不可用、git 不可用时返回 {@code not_available} + reason，禁止伪成功。
      */
     OntologyGitArchiveResult archiveVersion(OntologyGitArchiveRequest request);
+
+    /**
+     * 按 git ref 读回某版本归档内容（#147E；§2.9.6② 回滚 / §2.9.6③ 对账的取证腿）。
+     *
+     * <p>只从对象库按引用读取，<b>不</b>读工作树当前文件——否则历史版本被后续发布覆盖时
+     * 会把新内容当成旧版本，回滚与对账都变成假证据。不可用（未注册/引用缺失/该 ref 下
+     * 无此文件）一律 {@code STATUS_NOT_AVAILABLE} + 原因，禁返回空内容冒充"版本为空"。</p>
+     */
+    OntologyGitReadResult readVersionAtRef(String repositoryId, String assetType,
+                                           String assetId, String versionNo, String ref);
 }

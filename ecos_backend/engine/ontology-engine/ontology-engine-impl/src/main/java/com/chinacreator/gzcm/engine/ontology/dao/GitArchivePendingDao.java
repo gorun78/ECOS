@@ -104,7 +104,7 @@ public class GitArchivePendingDao extends JdbcTemplateDaoSupport {
             ontologyId == null ? "" : ontologyId,
             versionId == null ? "" : versionId,
             targetVersionNo == null ? "" : targetVersionNo,
-            repositoryId == null ? "ontology" : repositoryId,
+            repositoryId == null ? "ontology-model" : repositoryId,
             commitMessage == null ? "" : commitMessage,
             authorName == null ? "system" : authorName,
             payload == null ? "" : payload,

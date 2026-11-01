@@ -28,6 +28,8 @@ import com.chinacreator.gzcm.engine.ai.service.AgentStudioService;
 import com.chinacreator.gzcm.engine.ai.service.AgentStudioService.AgentTestResult;
 import com.chinacreator.gzcm.engine.ai.service.AgentTemplateService;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
+import com.chinacreator.gzcm.runtime.access.git.archive.ArchiveOutcome;
+import com.chinacreator.gzcm.runtime.access.git.archive.DesignAssetArchiver;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -61,6 +63,13 @@ public class AIPAgentController {
 
     @Autowired(required = false)
     private AgentStudioService studioService;
+
+    /** 设计资产归档器（#147E；{@code agent-collab} 属主通道）。未装配时归档腿显式跳过。 */
+    @Autowired(required = false)
+    private DesignAssetArchiver designAssetArchiver;
+
+    /** 注册表 repositoryId（V300 种子）。 */
+    private static final String GIT_REPO_AGENT = "agent-collab";
 
     // ═══════════════ 列表 ═══════════════════
 
@@ -117,6 +126,7 @@ public class AIPAgentController {
 
         agentRepo.insert(entity);
         log.info("AIP Agent created: {} [{}]", id, name);
+        archiveAgent(entity, "Create agent " + id);
         return ApiResponse.success(toDetailMap(entity));
     }
 
@@ -149,7 +159,31 @@ public class AIPAgentController {
 
         agentRepo.update(existing);
         log.info("AIP Agent updated: {}", id);
+        archiveAgent(existing, "Update agent " + id);
         return ApiResponse.success(toDetailMap(existing));
+    }
+
+    /**
+     * 归档 Agent 定义到 {@code agent-collab}（#147E；§2.9.7 全域接入）。
+     *
+     * <p>失败不反噬写入（三腿非原子），仅按分态落日志；未装配归档器时显式跳过，
+     * 不把「没归档」写成「已归档」。</p>
+     */
+    private void archiveAgent(AgentRegistryEntity entity, String message) {
+        if (designAssetArchiver == null) {
+            log.debug("DesignAssetArchiver 未装配，跳过 agent 归档 id={}", entity.getId());
+            return;
+        }
+        try {
+            ArchiveOutcome outcome = designAssetArchiver.archive(GIT_REPO_AGENT, "agents", entity.getId(),
+                    null, mapper.writeValueAsString(entity), message, null);
+            if (outcome.status() != ArchiveOutcome.Status.ARCHIVED) {
+                log.info("agent 归档未完成 id={} status={} reason={}",
+                        entity.getId(), outcome.status(), outcome.reason());
+            }
+        } catch (JsonProcessingException e) {
+            log.warn("agent 归档序列化失败 id={}: {}", entity.getId(), e.getMessage());
+        }
     }
 
     // ═══════════════ 删除 ═══════════════════

@@ -117,7 +117,7 @@ class OntologyVersionGitArchiveCompensationTest {
         // 入队一次，字段对齐（payload = 版本 snapshot 原文；commit message 含 onto+ver；author=publisher）
         verify(pendingRepo, times(1)).enqueue(
             eq("onto-1"), eq("ver1"), eq("1.0.1"),
-            eq("ontology"),
+            eq("ontology-model"),
             org.mockito.ArgumentMatchers.contains("onto-1"),
             eq("alice"),
             eq("{snapshot:'1.0.1'}"),
@@ -139,7 +139,7 @@ class OntologyVersionGitArchiveCompensationTest {
 
         verify(pendingRepo, times(1)).enqueue(
             eq("onto-1"), eq("ver1"), eq("1.0.2"),
-            eq("ontology"),
+            eq("ontology-model"),
             org.mockito.ArgumentMatchers.contains("onto-1"),
             eq("alice"),
             eq("{snapshot:'1.0.2'}"),
@@ -165,5 +165,105 @@ class OntologyVersionGitArchiveCompensationTest {
         svc.publishVersionById("ver1");
         // 无 setGitRef（未 commit），发布已被 fanOut 完成 —— 此处判定以 verify 全符：主流程 3 步 touch
         verify(versionRepo, never()).setGitRef(anyString(), anyString());
+    }
+
+    // ── #147D：发布/双写状态面（§2.9.6①③；DF-1/DF-2）────────────────────────
+
+    @Test
+    void committed_reportsVerifyingNotFullSuccess() {
+        OntologyGitArchiveResult ok = new OntologyGitArchiveResult();
+        ok.setStatus(OntologyGitArchiveResult.STATUS_COMMITTED);
+        ok.setCommitId("abc123");
+        when(gitService.archiveVersion(any(OntologyGitArchiveRequest.class))).thenReturn(ok);
+
+        OntologyVersion v = version("ver1", "onto-1", "2.0.0");
+        when(versionRepo.findById("ver1")).thenReturn(java.util.Optional.of(v));
+        when(versionRepo.updateStatus("ver1", "Published")).thenReturn(1);
+
+        java.util.Map<String, Object> result = svc.publishVersionById("ver1");
+
+        // 三腿成套但未经对账（仓库侧 read-at-ref 尚缺）⇒ 只能 VERIFYING，禁报 SUCCEEDED
+        assertEquals("VERIFYING", result.get("publishState"));
+        assertTrue(String.valueOf(result.get("publishStateReason")).contains("对账"));
+        assertTrue(String.valueOf(result.get("publishStateReason")).contains("UNVERIFIABLE"));
+    }
+
+    @Test
+    void notAvailable_reportsPartialFailure() {
+        OntologyGitArchiveResult na = new OntologyGitArchiveResult();
+        na.setStatus(OntologyGitArchiveResult.STATUS_NOT_AVAILABLE);
+        na.setReason("repo missing");
+        when(gitService.archiveVersion(any(OntologyGitArchiveRequest.class))).thenReturn(na);
+        when(pendingRepo.enqueue(any(), any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn("q-9");
+
+        OntologyVersion v = version("ver1", "onto-1", "2.0.1");
+        when(versionRepo.findById("ver1")).thenReturn(java.util.Optional.of(v));
+        when(versionRepo.updateStatus("ver1", "Published")).thenReturn(1);
+
+        java.util.Map<String, Object> result = svc.publishVersionById("ver1");
+
+        // 权威库腿成功而归档腿失败 ⇒ PARTIAL_FAILURE（DF-2：禁把部分成功报完全成功）
+        assertEquals("PARTIAL_FAILURE", result.get("publishState"));
+        assertTrue(String.valueOf(result.get("publishStateReason")).contains("git=FAILED"));
+    }
+
+    @Test
+    void dbStatusZero_reportsPartialFailureEvenIfGitCommitted() {
+        OntologyGitArchiveResult ok = new OntologyGitArchiveResult();
+        ok.setStatus(OntologyGitArchiveResult.STATUS_COMMITTED);
+        ok.setCommitId("abc123");
+        when(gitService.archiveVersion(any(OntologyGitArchiveRequest.class))).thenReturn(ok);
+
+        OntologyVersion v = version("ver1", "onto-1", "2.0.2");
+        when(versionRepo.findById("ver1")).thenReturn(java.util.Optional.of(v));
+        when(versionRepo.updateStatus("ver1", "Published")).thenReturn(0);
+
+        java.util.Map<String, Object> result = svc.publishVersionById("ver1");
+
+        assertEquals("PARTIAL_FAILURE", result.get("publishState"));
+        assertTrue(String.valueOf(result.get("publishStateReason")).contains("db=FAILED"));
+    }
+
+    @Test
+    void rollback_reportsRollbackPendingWithTypedPlan() {
+        OntologyVersion v = version("ver1", "onto-1", "3.0.0");
+        v.setGitRef("abc123");
+        when(versionRepo.findById("ver1")).thenReturn(java.util.Optional.of(v));
+
+        java.util.Map<String, Object> result = svc.rollback("onto-1", "ver1");
+
+        assertEquals("ROLLBACK_PENDING", result.get("publishState"));
+        String reason = String.valueOf(result.get("publishStateReason"));
+        assertTrue(reason.contains("REPUBLISH_KNOWN_VERSION_FROM_GIT_REF"));
+        assertTrue(reason.contains("abc123"));
+    }
+
+    @Test
+    void rollback_sourcesContentFromGitRefWhenReadAtRefSucceeds() {
+        com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult found =
+                new com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult();
+        found.setStatus(com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult.STATUS_FOUND);
+        found.setContent("{history:'from-git'}");
+        when(gitService.readVersionAtRef("ontology-model", "ontology", "onto-1", "3.0.1", "abc123"))
+                .thenReturn(found);
+
+        OntologyVersion v = version("ver1", "onto-1", "3.0.1");
+        v.setGitRef("abc123");
+        when(versionRepo.findById("ver1")).thenReturn(java.util.Optional.of(v));
+
+        com.chinacreator.gzcm.engine.ontology.model.OntologyVersion[] inserted =
+                new com.chinacreator.gzcm.engine.ontology.model.OntologyVersion[1];
+        when(versionRepo.insert(any())).thenAnswer(inv -> {
+            inserted[0] = inv.getArgument(0);
+            return 1;
+        });
+
+        java.util.Map<String, Object> result = svc.rollback("onto-1", "ver1");
+
+        assertEquals("ROLLBACK_PENDING", result.get("publishState"));
+        assertEquals("{history:'from-git'}", inserted[0].getSnapshot(),
+                "内容必须按 git ref 读回，而不是取权威库 snapshot 列");
+        assertTrue(String.valueOf(result.get("publishStateReason")).contains("内容取自 git ref abc123"));
     }
 }

@@ -32,6 +32,10 @@ public class OntologyVersionDao extends JdbcTemplateDaoSupport {
         v.setPublisher(rs.getString("publisher"));
         v.setPublishedAt(ts(rs.getTimestamp("published_at")));
         v.setCreatedAt(ts(rs.getTimestamp("created_at")));
+        // #147D：补 git_ref 读腿。V170.1 起 setGitRef 一直在写该列，但行映射从未读回——
+        // 「写了却读不到」使回滚计划（§2.9.6②／DF-3 需按 git ref 检出）无 ref 可取，
+        // 也让 UI 无从区分"已归档"与"待归档"。列由 setGitRef 的同一 UPDATE 语句证实存在。
+        v.setGitRef(rs.getString("git_ref"));
         return v;
     };
 

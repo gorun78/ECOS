@@ -93,6 +93,27 @@ public interface GitService {
      */
     List<String> listCommitShasForPath(String localPath, String relativePath, int limit) throws GitException;
 
+    /**
+     * 按引用读回「某相对路径」的文件内容（#147E：read-at-ref，回滚/对账的取证腿）。
+     *
+     * <p><b>为什么必须由属主提供</b>：§2.9.6② 要求回滚走「发布已知历史版本（git ref 检出重应用）」，
+     * §2.9.6③ 对账要求把仓库侧内容读回与权威库比对。缺本腿时这两件事都只能报
+     * {@code UNVERIFIABLE}/{@code ROLLBACK_PENDING}（#147D 的诚实降级）；本腿到位后，
+     * 「按 ref 取证」成为真实能力，不再依赖工作树当前内容（那会把「已被后续发布覆盖」
+     * 误当成历史版本内容）。</p>
+     *
+     * <p><b>三态语义</b>：引用可解析且路径存在 → 返回内容；引用可解析但路径在该 ref 下不存在
+     * → 返回 {@link java.util.Optional#empty()}（真值：该版本未归档此文件）；引用解析失败/
+     * 仓库打不开/IO 故障 → 显式 {@link GitException}（禁把故障折叠成"文件不存在"）。</p>
+     *
+     * @param repository   注册表行（{@code localPath} 必须已解析）
+     * @param ref          提交号 / 标签 / 分支等可解析引用（空值显式拒绝）
+     * @param relativePath 仓库内相对路径（如 {@code ontologies/ont001/1.0.2.json}；空值显式拒绝）
+     * @return 文件文本内容；路径在 ref 下不存在时为空
+     */
+    java.util.Optional<String> readFileAtRef(GitRepository repository, String ref, String relativePath)
+            throws GitException;
+
     class GitException extends Exception {
         private static final long serialVersionUID = 1L;
 

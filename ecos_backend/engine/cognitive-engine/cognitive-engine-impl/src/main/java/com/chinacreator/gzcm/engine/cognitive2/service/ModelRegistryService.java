@@ -9,8 +9,13 @@ import com.chinacreator.gzcm.engine.cognitive.api.RegistryState;
 import com.chinacreator.gzcm.engine.cognitive2.dao.ModelRegistryDao;
 import com.chinacreator.gzcm.engine.cognitive2.service.calc.ModelContentHasher;
 import com.chinacreator.gzcm.engine.cognitive2.service.scenario.CognitiveGuardException;
+import com.chinacreator.gzcm.runtime.access.git.archive.ArchiveOutcome;
+import com.chinacreator.gzcm.runtime.access.git.archive.DesignAssetArchiver;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -56,10 +61,27 @@ public class ModelRegistryService {
     private final ModelRegistryDao modelRegistryDao;
     private final ModelPublishGateEvaluator gateEvaluator;
 
+    /** 设计资产归档器（#147E；{@code cognitive-model} 属主通道）。未装配时归档腿显式跳过。 */
+    private final ObjectProvider<DesignAssetArchiver> archiverProvider;
+
+    private static final ObjectMapper ARCHIVE_MAPPER = new ObjectMapper();
+
+    /** 注册表 repositoryId（V300 种子）。 */
+    static final String GIT_REPO_COGNITIVE = "cognitive-model";
+
+    /** 测试/非 Spring 装配（归档腿缺省）。 */
     public ModelRegistryService(ModelRegistryDao modelRegistryDao,
                                 ModelPublishGateEvaluator gateEvaluator) {
+        this(modelRegistryDao, gateEvaluator, null);
+    }
+
+    @Autowired
+    public ModelRegistryService(ModelRegistryDao modelRegistryDao,
+                                ModelPublishGateEvaluator gateEvaluator,
+                                ObjectProvider<DesignAssetArchiver> archiverProvider) {
         this.modelRegistryDao = modelRegistryDao;
         this.gateEvaluator = gateEvaluator;
+        this.archiverProvider = archiverProvider;
     }
 
     /** 模型列表（按 modelType 可选过滤，未删除，按 model_id/version 排序）。 */
@@ -260,7 +282,41 @@ public class ModelRegistryService {
                     CognitiveErrorCode.MSG_MODEL_IMMUTABLE, rowId);
         }
         log.info("认知模型版本升格 PUBLISHED rowId={} by={}", rowId, publishedBy);
-        return requireRow(rowId);
+        Map<String, Object> published = requireRow(rowId);
+        archivePublishedModel(rowId, publishedBy, published);
+        return published;
+    }
+
+    /**
+     * 发布即归档（#147E；{@code cognitive-model} 通道，§2.9.7「全域接入」）。
+     *
+     * <p>内容 = 升格后的注册行全字段 JSON（含 {@code content_hash} 与四门禁结果）；
+     * 归档失败<b>不回滚发布</b>（三腿非原子，§2.9.6①），仅按 {@code NOT_AVAILABLE}/{@code FAILED}
+     * 分态记录——禁止把「库内已升格」写成「已归档」。</p>
+     */
+    private void archivePublishedModel(String rowId, String publishedBy, Map<String, Object> row) {
+        DesignAssetArchiver archiver = archiverProvider != null ? archiverProvider.getIfAvailable() : null;
+        if (archiver == null) {
+            log.info("设计资产归档器未装配，跳过 cognitive 归档 rowId={}", rowId);
+            return;
+        }
+        String version = asString(row.get("version_no"));
+        if (version == null || version.isBlank()) {
+            version = asString(row.get("version"));
+        }
+        String json;
+        try {
+            json = ARCHIVE_MAPPER.writeValueAsString(row);
+        } catch (Exception e) {
+            log.warn("认知模型归档序列化失败 rowId={}: {}", rowId, e.getMessage());
+            return;
+        }
+        ArchiveOutcome outcome = archiver.archive(GIT_REPO_COGNITIVE, "models", rowId,
+                version, json, "Publish cognitive model " + rowId, publishedBy);
+        if (outcome.status() != ArchiveOutcome.Status.ARCHIVED) {
+            log.info("认知模型归档未完成 rowId={} status={} reason={}",
+                    rowId, outcome.status(), outcome.reason());
+        }
     }
 
     // ── internals ──────────────────────────────────────────

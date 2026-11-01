@@ -362,8 +362,53 @@ public class GitServiceImpl implements GitService {
         }
     }
 
-    private static String stripHeadPrefix(String refName) {
-        return refName != null && refName.startsWith("refs/heads/")
+    /**
+     * 按引用读回文件内容（#147E read-at-ref）。
+     *
+     * <p>走 JGit 对象库（{@code RevWalk} + {@code TreeWalk}），不依赖工作树当前内容——
+     * 否则「历史版本已被后续发布覆盖」会被读成历史内容，对账与回滚都变成假证据。</p>
+     */
+    @Override
+    public java.util.Optional<String> readFileAtRef(GitRepository repository, String ref, String relativePath)
+            throws GitException {
+        String localPath = requireLocalPath(repository);
+        if (isBlank(ref)) {
+            throw new GitException("readFileAtRef 失败：ref 为空（历史取证必须有可解析引用）");
+        }
+        if (isBlank(relativePath)) {
+            throw new GitException("readFileAtRef 失败：relativePath 为空（取证必须有明确路径）");
+        }
+        String rel = relativePath.trim().replace('\\', '/');
+        if (rel.startsWith("/") || rel.contains("..")) {
+            throw new GitException("readFileAtRef 失败：非法相对路径 " + relativePath);
+        }
+        try (Git git = Git.open(new File(localPath))) {
+            Repository repo = git.getRepository();
+            ObjectId refId = repo.resolve(ref.trim());
+            if (refId == null) {
+                throw new GitException("readFileAtRef 引用无法解析: " + ref);
+            }
+            try (RevWalk walk = new RevWalk(repo)) {
+                RevCommit commit = walk.parseCommit(refId);
+                try (org.eclipse.jgit.treewalk.TreeWalk treeWalk =
+                             org.eclipse.jgit.treewalk.TreeWalk.forPath(repo, rel, commit.getTree())) {
+                    if (treeWalk == null) {
+                        return java.util.Optional.empty();
+                    }
+                    ObjectId blobId = treeWalk.getObjectId(0);
+                    try (org.eclipse.jgit.lib.ObjectReader reader = repo.newObjectReader()) {
+                        org.eclipse.jgit.lib.ObjectLoader loader = reader.open(blobId);
+                        byte[] bytes = loader.getBytes();
+                        return java.util.Optional.of(new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
+                    }
+                }
+            }
+        } catch (IOException e) {
+            throw new GitException("readFileAtRef 失败: " + localPath + " ref=" + ref + " path=" + rel, e);
+        }
+    }
+
+    private static String stripHeadPrefix(String refName) {        return refName != null && refName.startsWith("refs/heads/")
                 ? refName.substring("refs/heads/".length())
                 : refName;
     }

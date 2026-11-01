@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.engine.ontology.service;
 import com.chinacreator.gzcm.engine.ontology.OntologyGitService;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveRequest;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveResult;
+import com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult;
 import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
 import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
@@ -157,6 +158,63 @@ public class OntologyGitServiceImpl implements OntologyGitService {
         result.setCommitId(commitId);
         result.setTag(tag);
         log.info("Git 归档成功 repositoryId={} commitId={} tag={}", repositoryId, commitId, tag);
+        return result;
+    }
+
+    // ═══════════════ #147E：read-at-ref 取证腿 ═══════════════
+
+    @Override
+    public OntologyGitReadResult readVersionAtRef(String repositoryId, String assetType,
+                                                  String assetId, String versionNo, String ref) {
+        OntologyGitReadResult result = new OntologyGitReadResult();
+        result.setTimestamp(System.currentTimeMillis());
+        result.setRepositoryId(repositoryId);
+        result.setRef(ref);
+        String repoId = trimToNull(repositoryId);
+        String type = orDefault(trimToNull(assetType), DEFAULT_ASSET_TYPE);
+        String id = trimToNull(assetId);
+        String ver = trimToNull(versionNo);
+        String rev = trimToNull(ref);
+        if (repoId == null || id == null || ver == null || rev == null) {
+            return readNotAvailable(result,
+                    "read-at-ref 需要 repositoryId/assetId/versionNo/ref 四元齐备（禁以缺参推断历史内容）");
+        }
+        try {
+            requireSafeSegment(type);
+            requireSafeSegment(id);
+            requireSafeSegment(ver);
+        } catch (IllegalArgumentException e) {
+            return readNotAvailable(result, "非法资产路径段（path-traversal 校验拒绝）: " + e.getMessage());
+        }
+        GitRepository repository;
+        try {
+            repository = gitRepositoryService.getRepositoryById(repoId);
+        } catch (GitRepositoryService.GitRepositoryException e) {
+            return readNotAvailable(result, "仓库未在 runtime 注册表注册: repositoryId=" + repoId);
+        }
+        if (repository == null || isBlank(repository.getLocalPath()) || !repository.isEnabled()) {
+            return readNotAvailable(result, "仓库定位失败/未解析/已禁用: repositoryId=" + repoId);
+        }
+        String relativePath = "ontologies/" + id + "/" + ver + ".json";
+        try {
+            java.util.Optional<String> content = gitService.readFileAtRef(repository, rev, relativePath);
+            if (content.isEmpty()) {
+                return readNotAvailable(result, "该 ref 下不存在归档文件: " + relativePath + "@" + rev);
+            }
+            result.setStatus(OntologyGitReadResult.STATUS_FOUND);
+            result.setContent(content.get());
+            result.setReason(null);
+            return result;
+        } catch (GitService.GitException e) {
+            log.error("read-at-ref 失败 repositoryId={} assetId={} ver={} ref={}", repoId, id, ver, rev, e);
+            return readNotAvailable(result, "按 ref 读取失败: " + e.getMessage());
+        }
+    }
+
+    private static OntologyGitReadResult readNotAvailable(OntologyGitReadResult result, String reason) {
+        result.setStatus(OntologyGitReadResult.STATUS_NOT_AVAILABLE);
+        result.setContent(null);
+        result.setReason(reason);
         return result;
     }
 

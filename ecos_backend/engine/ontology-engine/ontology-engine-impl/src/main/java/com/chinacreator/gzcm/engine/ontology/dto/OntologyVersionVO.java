@@ -60,4 +60,22 @@ public class OntologyVersionVO {
 
     /** 版本对比 — 第二版本快照（仅 diffVO 返回；动态 JSON 子集，保持 Object 与既有契约一致）。 */
     private Object snapshot2;
+
+    // ── #147D：发布 / 双写状态面（additive，与 status 列两套口径）────────
+
+    /**
+     * 发布执行态（§2.9.6① 的 16 态词表名，单源在 runtime-access 的 {@code PublishState}）。
+     *
+     * <p><b>与 {@link #status} 的区别（不可混用）</b>：{@code status} 是权威库行的存储态
+     * （Draft/Published/Deprecated），本字段是"这次发布三腿跑到哪、对账成不成"的执行态。
+     * 二者允许不一致，且不一致正是要暴露的形态——行已 Published 而归档腿失败，
+     * 本字段为 {@code PARTIAL_FAILURE}（§2.9.6① 红线：禁把部分成功报完全成功）。
+     *
+     * <p><b>只增不改</b>：{@code NON_NULL} 序列化，读端点（list/get/diff）不填即不出键，
+     * 既有消费方零感知；仅发布/回滚路径填充。
+     */
+    private String publishState;
+
+    /** 发布态原因（三腿摘要 + 对账判定；{@code publishState} 的可读佐证，禁为空谈）。 */
+    private String publishStateReason;
 }

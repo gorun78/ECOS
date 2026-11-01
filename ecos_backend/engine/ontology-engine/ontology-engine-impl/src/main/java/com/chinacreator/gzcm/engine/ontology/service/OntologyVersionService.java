@@ -13,9 +13,18 @@ import org.springframework.stereotype.Service;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.event.OntologyPublishedEvent;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
+import com.chinacreator.gzcm.runtime.access.git.publish.DualWriteOutcome;
+import com.chinacreator.gzcm.runtime.access.git.publish.LegOutcome;
+import com.chinacreator.gzcm.runtime.access.git.publish.PublishReconciler;
+import com.chinacreator.gzcm.runtime.access.git.publish.PublishState;
+import com.chinacreator.gzcm.runtime.access.git.publish.PublishStateMachine;
+import com.chinacreator.gzcm.runtime.access.git.publish.ReconciliationInput;
+import com.chinacreator.gzcm.runtime.access.git.publish.ReconciliationVerdict;
+import com.chinacreator.gzcm.runtime.access.git.publish.RollbackPlan;
 import com.chinacreator.gzcm.engine.ontology.OntologyGitService;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveRequest;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveResult;
+import com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionSaveDTO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyGitHistoryVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionPreviousDiffVO;
@@ -95,7 +104,18 @@ public class OntologyVersionService {
         this.gitArchivePending = gitArchivePending != null ? gitArchivePending : Optional.empty();
     }
 
-    private static final String GIT_REPO_ONTOLOGY = "ontology";
+    /**
+     * 注册表 repositoryId（V300 种子 {@code ontology-model}，DQ-2 定名单源）。
+     *
+     * <p><b>#147E 订正</b>：本常量收口前为 {@code "ontology"}——那是仓库<b>目录名</b>
+     * （{@code ecos_git_repo.repo_root}），不是注册表主键。{@code GitRepoRegistryDao.findByRepositoryId}
+     * 按 {@code repository_id} 精确匹配，故每次发布归档都 404→{@code not_available}→入补偿队列，
+     * 台账却按「归档已接」记账。目录名 ≠ repositoryId 的分叉由
+     * {@code GitNamingAndOwnerSurfaceGateTest}（#147C 门）在路径层钉住，本常量在消费层订正。</p>
+     */
+    static final String GIT_REPO_ONTOLOGY = "ontology-model";
+
+    /** 资产类型（仓内目录/标签前缀），与 repositoryId 语义不同，保持 {@code ontology}。 */
     private static final String GIT_ASSET_TYPE = "ontology";
 
     /**
@@ -114,10 +134,18 @@ public class OntologyVersionService {
      *   <li>compensation 队列本身写入失败 → 仅记 error 日志，不反噬发布（可用性优先，SLA 归分册 00 C20 底座）。</li>
      * </ol>
      * Git 通道未装配（monolith 早期 / 测试）时纯 no-op，与 Wave31 五参构造向后兼容。
+     *
+     * <p><b>#147D 起的返回语义变化</b>：本方法不再只是"发一趟归档"，而是把<b>归档腿</b>的执行结果
+     * 作为三腿记录的一腿交回调用方（§2.9.6①「三者分别记录」）。返回的 {@link GitLegRecord}
+     * 携带腿态、真实 {@code gitRef}、补偿队列句柄与人读原因；<b>本方法的异常仍不上抛</b>
+     * （发布可用性优先，API 只增不改），但"上抛与否"与"如实记账与否"是两件事——
+     * 收口前的形态是失败只落一条 warn 且对外照报已发布，自本批起该腿的结果必须进入
+     * {@link PublishState}，{@code PARTIAL_FAILURE} 可被外部读出。
      */
-    private void archiveToGit(OntologyVersion ver, String actor) {
+    private GitLegRecord archiveToGit(OntologyVersion ver, String actor) {
         if (gitService.isEmpty()) {
-            return;
+            return new GitLegRecord(LegOutcome.NOT_APPLICABLE, null, null,
+                    "Git 归档通道未装配（禁按已归档理解，§2.9.5② 全域接入未完项）");
         }
         String actorNorm = (actor == null || actor.isBlank()) ? "system" : actor;
         String commitMessage = "Publish ontology " + ver.getOntologyId() + " " + ver.getVersionNo();
@@ -135,20 +163,27 @@ public class OntologyVersionService {
                 String ref = r.getCommitId() != null ? r.getCommitId() : r.getTag();
                 if (ref != null && !ref.isBlank()) {
                     versionRepository.setGitRef(ver.getId(), ref);
+                    return new GitLegRecord(LegOutcome.SUCCEEDED, ref, null, "已提交并回填 git_ref");
                 }
-                return;
+                // COMMITTED 却无 ref：回执无可指向实物＝伪成功，按不成套记（§2.9.6①）
+                return new GitLegRecord(LegOutcome.UNKNOWN, null, null,
+                        "归档回报 COMMITTED 但无 commitId/tag 可回填");
             }
+            String why = r == null ? "null result" : r.getStatus() + "/" + r.getReason();
             log.warn("Git 归档未 COMMITTED，入补偿队列: ontologyId={} version={} status={} reason={}",
                     ver.getOntologyId(), ver.getVersionNo(),
                     r == null ? "null" : r.getStatus(),
                     r == null ? "null result" : r.getReason());
-            enqueueArchivePending(ver, commitMessage, actorNorm,
-                    r == null ? "null result" : r.getReason());
+            return new GitLegRecord(LegOutcome.FAILED, null,
+                    enqueueArchivePending(ver, commitMessage, actorNorm, why),
+                    "归档腿未成功（" + why + "）" );
         } catch (Exception e) {
             log.warn("Git 归档异常，入补偿队列: ontologyId={} version={} err={}",
                     ver.getOntologyId(), ver.getVersionNo(), e.getMessage());
-            enqueueArchivePending(ver, commitMessage, actorNorm,
-                    e.getClass().getSimpleName() + ":" + e.getMessage());
+            return new GitLegRecord(LegOutcome.FAILED, null,
+                    enqueueArchivePending(ver, commitMessage, actorNorm,
+                            e.getClass().getSimpleName() + ":" + e.getMessage()),
+                    "归档腿异常（" + e.getClass().getSimpleName() + "）");
         }
     }
 
@@ -157,13 +192,20 @@ public class OntologyVersionService {
      *
      * <p>队列表未装配或入队异常都仅记日志——补偿是<b>增强</b>而非发布前置，
      * 缺补偿不影响发布正确性（版本行依然 Published），仅"历史内容走 Git"这一 SLA 需人工补归档。
+     *
+     * <p>#147D 起返回<b>补偿队列行 ID</b>（可能为 {@code null}＝未受理），供三腿记录把它写成
+     * 恢复腿句柄。注意该句柄是引擎自有补偿队列的 ID，<b>不是</b> runtime-task 的 {@code taskId}
+     * ——句柄种类由 {@link DualWriteOutcome#KIND_COMPENSATION_QUEUE} 显式声明，
+     * 台账登记为余项（§2.9.6② 要求的是 runtime-task 真实任务号）。
+     *
+     * @return 补偿队列行 ID；未装配或入队失败时为 {@code null}
      */
-    private void enqueueArchivePending(OntologyVersion ver, String commitMessage,
-                                       String actor, String reason) {
+    private String enqueueArchivePending(OntologyVersion ver, String commitMessage,
+                                        String actor, String reason) {
         if (gitArchivePending.isEmpty()) {
             log.error("Git 归档失败但补偿队列未装配（跳过）: ontologyId={} version={} reason={}",
                     ver.getOntologyId(), ver.getVersionNo(), reason);
-            return;
+            return null;
         }
         try {
             String queueId = gitArchivePending.get().enqueue(
@@ -171,10 +213,112 @@ public class OntologyVersionService {
                     GIT_REPO_ONTOLOGY, commitMessage, actor, ver.getSnapshot(), null);
             log.info("Git 归档已入补偿队列: queueId={} ontologyId={} version={} reason={}",
                     queueId, ver.getOntologyId(), ver.getVersionNo(), reason);
+            return queueId;
         } catch (Exception e) {
             log.error("Git 归档入补偿队列失败（不阻断发布）: ontologyId={} version={} err={}",
                     ver.getOntologyId(), ver.getVersionNo(), e.getMessage());
+            return null;
         }
+    }
+
+    // ── #147D：发布 / 双写三腿记录与状态推导（§2.9.6①③；词表单源在 runtime-access）──
+
+    /**
+     * 归档腿执行记录（{@link #archiveToGit} 的回执；三腿之一）。
+     *
+     * @param outcome 腿态（禁与「发布是否成功」折叠）
+     * @param gitRef  真实提交号 / tag（{@code SUCCEEDED} 而无 ref＝伪成功，由状态机判不成套）
+     * @param taskId  补偿队列行 ID（可为 {@code null}＝未受理）
+     * @param reason  人读原因
+     */
+    private record GitLegRecord(LegOutcome outcome, String gitRef, String taskId, String reason) {
+    }
+
+    /**
+     * 一次发布的状态记录（对外只增两枚键：{@code publishState} / {@code publishStateReason}）。
+     *
+     * <p>{@code publishState} 取 §2.9.6① 的 16 态词表名，<b>与既有 {@code status} 列
+     * （Draft/Published/Deprecated）是两套口径</b>：{@code status} 是权威库行的存储态，
+     * {@code publishState} 是"这次发布三腿跑到哪、对账成不成"的执行态。二者可以不一致，
+     * 且不一致正是本批要暴露的形态（行已 Published 而归档腿败 ＝ {@code PARTIAL_FAILURE}）。
+     * 铁律「API 只增不改」下既有 {@code status} 语义与取值一律不动。</p>
+     */
+    private record PublishRecording(String publishState, String publishStateReason) {
+    }
+
+    /**
+     * 由「权威库行数 ＋ 归档腿」组装三腿记录，推出发布态并对账（§2.9.6①③）。
+     *
+     * <p><b>审计腿恒 {@code NOT_APPLICABLE}</b>：本体发布路径今天不写安全审计腿，
+     * 这是既成事实而非本批裁决——把它记成 {@code SUCCEEDED} 就是凭空造出"三腿均成"，
+     * 记成 {@code NOT_APPLICABLE + 原因} 才是如实登记（台账余项「本体发布审计腿未接」）。
+     * 因 {@link PublishStateMachine#deriveState} 的上界是 {@code APPLIED}，
+     * 本路径<b>没有任何一条腿组合能直接得出 {@code SUCCEEDED}</b>：报成功必须先过
+     * {@link PublishReconciler}，而对账所需的仓库侧读回能力尚缺（read-at-ref 缺失，#147E 补），
+     * 故真实结果恒落在 {@code VERIFYING} 或失败族。</p>
+     *
+     * <p><b>控制流不变</b>：本方法只读不算，不改写权威库、不上抛异常、不回滚已成功写入
+     * （§2.9.6② 的回滚须经 {@link PublishStateMachine#planRollback}，禁在此现场反向写）。</p>
+     */
+    private PublishRecording recordPublishState(OntologyVersion ver, int dbRows, GitLegRecord gitLeg) {
+        LegOutcome dbLeg = switch (dbRows) {
+            case 1 -> LegOutcome.SUCCEEDED;
+            case 0 -> LegOutcome.FAILED;
+            default -> LegOutcome.UNKNOWN;
+        };
+        String versionRef = dbRows == 1 ? ver.getVersionNo() : null;
+        DualWriteOutcome dual = DualWriteOutcome
+                .builder(gitLeg.outcome(), dbLeg, LegOutcome.NOT_APPLICABLE)
+                .gitRef(gitLeg.gitRef())
+                .versionRef(versionRef)
+                .task(gitLeg.taskId(), DualWriteOutcome.KIND_COMPENSATION_QUEUE)
+                .reason("审计腿不适用（本体发布路径未接安全审计，台账余项）；" + gitLeg.reason())
+                .securityCritical(false)
+                .build();
+
+        PublishState state = PublishStateMachine.deriveState(dual);
+        StringBuilder why = new StringBuilder(dual.legSummary());
+
+        if (state == PublishState.APPLIED) {
+            // 权威库已应用 ⇒ 进对账（主链推进唯一合法走法：APPLIED → VERIFYING）
+            PublishStateMachine.assertTransition(state, PublishState.VERIFYING);
+            state = PublishState.VERIFYING;
+            ReconciliationInput input = ReconciliationInput.builder()
+                    .outcome(dual)
+                    .versionRefMatched(null)
+                    .dependencyMatched(null)
+                    .build();
+            PublishReconciler.Result verdict = PublishReconciler.reconcile(input);
+            state = PublishStateMachine.stateAfterVerification(state, verdict.verdict());
+            why.append(" | 对账=").append(verdict.verdict())
+                    .append('(').append(verdict.reason()).append(')');
+            if (verdict.verdict() != ReconciliationVerdict.CONSISTENT) {
+                why.append(" | 禁报完全成功");
+            }
+        }
+        return new PublishRecording(state.name(), why.toString());
+    }
+
+    /** 把状态记录并入 Map 形态返回（只增键，不改既有键）。 */
+    private static Map<String, Object> attachPublishState(Map<String, Object> body,
+                                                          PublishRecording recording) {
+        if (body == null || recording == null) {
+            return body;
+        }
+        body.put("publishState", recording.publishState());
+        body.put("publishStateReason", recording.publishStateReason());
+        return body;
+    }
+
+    /** 把状态记录并入强类型 VO（{@code NON_NULL} 序列化，未填即不出键）。 */
+    private static OntologyVersionVO attachPublishState(OntologyVersionVO vo,
+                                                        PublishRecording recording) {
+        if (vo == null || recording == null) {
+            return vo;
+        }
+        vo.setPublishState(recording.publishState());
+        vo.setPublishStateReason(recording.publishStateReason());
+        return vo;
     }
 
     /** 版本主键：库内最大后缀自增（重启安全）；方法级加锁避免并发取到同一序号。 */
@@ -258,10 +402,12 @@ public class OntologyVersionService {
         if ("Published".equals(ver.getStatus())) {
             throw new IllegalStateException("ONT-006: Version '" + versionId + "' is already Published");
         }
-        versionRepository.updateStatus(versionId, "Published");
+        int dbRows = versionRepository.updateStatus(versionId, "Published");
         fanOutOntologyPublished(ontologyId, ver.getVersionNo(), ver.getPublisher());
-        archiveToGit(ver, ver.getPublisher());
-        return versionRepository.findById(versionId).map(this::toMap).orElse(null);
+        GitLegRecord gitLeg = archiveToGit(ver, ver.getPublisher());
+        PublishRecording recording = recordPublishState(ver, dbRows, gitLeg);
+        return attachPublishState(
+                versionRepository.findById(versionId).map(this::toMap).orElse(null), recording);
     }
 
     /**
@@ -273,10 +419,12 @@ public class OntologyVersionService {
         if ("Published".equals(ver.getStatus())) {
             throw new IllegalStateException("ONT-006: Version '" + versionId + "' is already Published");
         }
-        versionRepository.updateStatus(versionId, "Published");
+        int dbRows = versionRepository.updateStatus(versionId, "Published");
         fanOutOntologyPublished(ontologyId, ver.getVersionNo(), ver.getPublisher());
-        archiveToGit(ver, ver.getPublisher());
-        return versionRepository.findById(versionId).map(this::toVO).orElse(null);
+        GitLegRecord gitLeg = archiveToGit(ver, ver.getPublisher());
+        PublishRecording recording = recordPublishState(ver, dbRows, gitLeg);
+        return attachPublishState(
+                versionRepository.findById(versionId).map(this::toVO).orElse(null), recording);
     }
 
     /**
@@ -363,23 +511,27 @@ public class OntologyVersionService {
 
     /**
      * 回滚：将 published version 状态设为 Deprecated，并创建新 Draft 作为回滚目标
+     *
+     * <p><b>#147D 加入的回滚计划面（§2.9.6②／DF-3）</b>：回滚的唯一合法机制是
+     * 「发布已知历史版本（git ref 检出重应用）」，<b>不是</b>现场拼一段反向写操作把数据抹回去。
+     * 本方法据此产出 {@link RollbackPlan} 并如实记入返回的 {@code publishState}
+     * （恒为 {@code ROLLBACK_PENDING}——意图已登记、计划已成形，但"按 ref 检出重应用"这条腿
+     * 在 {@code OntologyGitService} 面上尚不存在，属 #147E 的活，禁在此冒充已执行）。
+     *
+     * <p><b>本批未改的行为（须知情）</b>：新 Draft 的内容仍取自权威库的 {@code snapshot} 列
+     * ——这是收口前的既有机制，且该列正是 DQ-6 判定「过渡期后随 4 张废弃版本表一并下线」的对象。
+     * 把内容来源切到 git ref 属 #147E，本批只做计划与状态面。</p>
      */
     public Map<String, Object> rollback(String ontologyId, String versionId) {
         OntologyVersion ver = versionRepository.findById(versionId)
             .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + versionId + "' not found"));
         versionRepository.updateStatus(versionId, "Deprecated");
-        // 基于此版本的 snapshot 创建新 Draft
-        OntologyVersion rollback = new OntologyVersion();
-        String nextVersion = computeNextVersion(ontologyId);
-        rollback.setId(nextId());
-        rollback.setOntologyId(ontologyId);
-        rollback.setVersionNo(nextVersion + "-rollback");
-        rollback.setStatus("Draft");
-        rollback.setSnapshot(ver.getSnapshot());
-        rollback.setChangeLog("Rollback from v" + ver.getVersionNo());
-        versionRepository.insert(rollback);
-        log.info("Rollback: {} → {} (new draft)", versionId, rollback.getId());
-        return toMap(rollback);
+        RollbackContent content = rollbackContent(ver);
+        OntologyVersion rollback = newRollbackDraft(ontologyId, ver, content);
+        RollbackPlan plan = rollbackPlanFor(ver);
+        log.info("Rollback: {} → {} (new draft) 计划={} 内容来源={}",
+                versionId, rollback.getId(), plan.describe(), content.reason());
+        return attachPublishState(toMap(rollback), rollbackRecording(plan, ver, content));
     }
 
     /**
@@ -389,17 +541,79 @@ public class OntologyVersionService {
         OntologyVersion ver = versionRepository.findById(versionId)
             .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + versionId + "' not found"));
         versionRepository.updateStatus(versionId, "Deprecated");
-        OntologyVersion rollback = new OntologyVersion();
+        RollbackContent content = rollbackContent(ver);
+        OntologyVersion rollback = newRollbackDraft(ontologyId, ver, content);
+        RollbackPlan plan = rollbackPlanFor(ver);
+        log.info("Rollback (VO): {} → {} (new draft) 计划={} 内容来源={}",
+                versionId, rollback.getId(), plan.describe(), content.reason());
+        return attachPublishState(toVO(rollback), rollbackRecording(plan, ver, content));
+    }
+
+    /** 回滚 Draft 的内容来源记录（#147E：优先 git ref 读回，读不到才退回快照并写明原因）。 */
+    private record RollbackContent(String snapshot, boolean fromGit, String reason) {
+    }
+
+    /**
+     * 取回滚内容：<b>优先按 {@code git_ref} 从对象库读回</b>（§2.9.6②「发布已知历史版本」），
+     * 读不到才退回权威库 {@code snapshot} 列，并把原因写进状态说明（禁静默降级）。
+     *
+     * <p>退回分支是<b>诚实的过渡态</b>：该版本未归档（{@code git_ref} 空）或仓库/引用不可用时，
+     * 按 ref 检出本就不可能；此时用快照生成 Draft，同时 {@link #rollbackRecording} 明示
+     * 「非按 ref 检出」，DF-3 的端到端成立仍以 ref 分支为准（台账逐次登记命中率）。</p>
+     */
+    private RollbackContent rollbackContent(OntologyVersion ver) {
+        if (gitService.isEmpty()) {
+            return new RollbackContent(ver.getSnapshot(), false,
+                    "Git 归档通道未装配，退回权威库快照（非按 ref 检出）");
+        }
+        if (ver.getGitRef() == null || ver.getGitRef().isBlank()) {
+            return new RollbackContent(ver.getSnapshot(), false,
+                    "该版本缺 git_ref（未归档或归档失败），退回权威库快照（非按 ref 检出，DF-5）");
+        }
+        OntologyGitReadResult r = gitService.get().readVersionAtRef(
+                GIT_REPO_ONTOLOGY, GIT_ASSET_TYPE, ver.getOntologyId(), ver.getVersionNo(), ver.getGitRef());
+        if (r != null && r.isFound()) {
+            return new RollbackContent(r.getContent(), true, "内容取自 git ref " + ver.getGitRef());
+        }
+        String why = r == null ? "null result" : r.getReason();
+        log.warn("按 ref 读回失败，退回快照: versionId={} ref={} reason={}",
+                ver.getId(), ver.getGitRef(), why);
+        return new RollbackContent(ver.getSnapshot(), false,
+                "read-at-ref 不可用（" + why + "），退回权威库快照（非按 ref 检出）");
+    }
+
+    private OntologyVersion newRollbackDraft(String ontologyId, OntologyVersion ver, RollbackContent content) {
         String nextVersion = computeNextVersion(ontologyId);
+        OntologyVersion rollback = new OntologyVersion();
         rollback.setId(nextId());
         rollback.setOntologyId(ontologyId);
         rollback.setVersionNo(nextVersion + "-rollback");
         rollback.setStatus("Draft");
-        rollback.setSnapshot(ver.getSnapshot());
-        rollback.setChangeLog("Rollback from v" + ver.getVersionNo());
+        rollback.setSnapshot(content.snapshot());
+        rollback.setChangeLog("Rollback from v" + ver.getVersionNo()
+                + (content.fromGit() ? "（content from git ref）" : "（content from db snapshot）"));
         versionRepository.insert(rollback);
-        log.info("Rollback (VO): {} → {} (new draft)", versionId, rollback.getId());
-        return toVO(rollback);
+        return rollback;
+    }
+
+    /**
+     * 由被回滚版本的真实 {@code git_ref} 与 {@code version_no} 产出回滚计划（DF-3／DF-5 同形门）。
+     *
+     * <p>引用缺失即降级为 {@link RollbackPlan.Mode#UNAVAILABLE} 并附原因——
+     * 「没有 ref 就没有计划」是设计要求的处置（待人工），不是错误；
+     * 需要"必须可执行才继续"的调用方用 {@link PublishStateMachine#assertRollbackExecutable}。</p>
+     */
+    private RollbackPlan rollbackPlanFor(OntologyVersion ver) {
+        return RollbackPlan.republishKnownVersion(GIT_REPO_ONTOLOGY, ver.getGitRef(), ver.getVersionNo());
+    }
+
+    /** 回滚侧的状态记录：意图已登记（待回滚），计划与内容来源一并写进原因。 */
+    private static PublishRecording rollbackRecording(RollbackPlan plan, OntologyVersion ver,
+                                                      RollbackContent content) {
+        return new PublishRecording(PublishState.ROLLBACK_PENDING.name(),
+                "回滚意图已登记（目标版本 " + ver.getVersionNo() + "）；计划=" + plan.describe()
+                        + "；内容来源=" + content.reason()
+                        + "；新 Draft 的发布（应用腿）由既有发布流程承接");
     }
 
     /**
@@ -575,10 +789,12 @@ public class OntologyVersionService {
         if ("Published".equals(ver.getStatus())) {
             throw new IllegalStateException("ONT-006: Version '" + versionId + "' is already Published");
         }
-        versionRepository.updateStatus(versionId, "Published");
+        int dbRows = versionRepository.updateStatus(versionId, "Published");
         fanOutOntologyPublished(ver.getOntologyId(), ver.getVersionNo(), ver.getPublisher());
-        archiveToGit(ver, ver.getPublisher());
-        return versionRepository.findById(versionId).map(this::toMap).orElse(null);
+        GitLegRecord gitLeg = archiveToGit(ver, ver.getPublisher());
+        PublishRecording recording = recordPublishState(ver, dbRows, gitLeg);
+        return attachPublishState(
+                versionRepository.findById(versionId).map(this::toMap).orElse(null), recording);
     }
 
     /**
@@ -590,10 +806,12 @@ public class OntologyVersionService {
         if ("Published".equals(ver.getStatus())) {
             throw new IllegalStateException("ONT-006: Version '" + versionId + "' is already Published");
         }
-        versionRepository.updateStatus(versionId, "Published");
+        int dbRows = versionRepository.updateStatus(versionId, "Published");
         fanOutOntologyPublished(ver.getOntologyId(), ver.getVersionNo(), ver.getPublisher());
-        archiveToGit(ver, ver.getPublisher());
-        return versionRepository.findById(versionId).map(this::toVO).orElse(null);
+        GitLegRecord gitLeg = archiveToGit(ver, ver.getPublisher());
+        PublishRecording recording = recordPublishState(ver, dbRows, gitLeg);
+        return attachPublishState(
+                versionRepository.findById(versionId).map(this::toVO).orElse(null), recording);
     }
 
     // ── PMO-28 提案联动: 审批通过→自动创建版本并发布 ─────────
