@@ -344,6 +344,53 @@ public class GitController {
         return ok(ApiResponse.success(data));
     }
 
+    /**
+     * 推送（#147P）：<b>能力未接，显式 not_available</b>。
+     *
+     * <p>§2.9.9④ 要求推送受「签名发布清单 + 分支保护」约束，而服务端凭据通道与签名基础设施尚未接入；
+     * 前端此前调本路径得网关 404（能力缺失冒充"接口不存在"）。现改为：仓库定位照常分态
+     * （未注册 404 / 未装配 503），定位成功后 200 + {@code status=not_available} + 原因，
+     * <b>禁把未推送报成推送成功</b>。真实推送落地时换实现、响应键面保持 additive。</p>
+     */
+    @PostMapping("/push")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> push(
+            @RequestParam String repoId,
+            @RequestBody(required = false) Map<String, Object> body) {
+        GitRepository repo;
+        try {
+            repo = resolveRepo(repoId);
+        } catch (GitRepositoryService.GitRepositoryException e) {
+            return repoUnavailable("push", repoId, e);
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("repoId", repo.getRepositoryId());
+        data.put("status", "not_available");
+        data.put("reason", "推送通道未接：需服务端凭据与签名发布清单（PublishManifest/BranchProtectionPolicy），"
+                + "禁止伪成功；真实推送通道落地前本端点只做能力分态回报");
+        log.info("Git push requested (not_available): repoId={}", repoId);
+        return ok(ApiResponse.success(data));
+    }
+
+    /** 拉取（#147P）：同 {@link #push} 的诚实不可用口径（远端与凭据通道未接）。 */
+    @PostMapping("/pull")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> pull(
+            @RequestParam String repoId,
+            @RequestBody(required = false) Map<String, Object> body) {
+        GitRepository repo;
+        try {
+            repo = resolveRepo(repoId);
+        } catch (GitRepositoryService.GitRepositoryException e) {
+            return repoUnavailable("pull", repoId, e);
+        }
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("repoId", repo.getRepositoryId());
+        data.put("status", "not_available");
+        data.put("reason", "拉取通道未接：远端地址与凭据由服务端统一配置（禁客户端传 remote/token），"
+                + "通道落地前如实回报不可用");
+        log.info("Git pull requested (not_available): repoId={}", repoId);
+        return ok(ApiResponse.success(data));
+    }
+
     /** 成功面：状态行 200（显式承载，禁 {@code return ApiResponse} 裸回形态）。 */
     private static ResponseEntity<ApiResponse<Map<String, Object>>> ok(ApiResponse<Map<String, Object>> body) {
         return ResponseEntity.ok(body);

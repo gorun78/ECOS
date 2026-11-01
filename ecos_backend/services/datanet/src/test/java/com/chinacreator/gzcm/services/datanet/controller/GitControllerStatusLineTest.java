@@ -307,6 +307,19 @@ class GitControllerStatusLineTest {
                     .getBody().getData();
             assertEquals("not_available", br.get("status"));
             assertNotNull(br.get("reason"));
+
+            // #147P：push/pull 端点从「网关 404」改为本层显式能力分态
+            ResponseEntity<ApiResponse<Map<String, Object>>> push =
+                    controller.push("pipeline-core", Map.of("message", "x"));
+            assertEquals(200, push.getStatusCode().value());
+            assertEquals("not_available", push.getBody().getData().get("status"));
+            assertNotNull(push.getBody().getData().get("reason"));
+
+            ResponseEntity<ApiResponse<Map<String, Object>>> pull =
+                    controller.pull("pipeline-core", null);
+            assertEquals(200, pull.getStatusCode().value());
+            assertEquals("not_available", pull.getBody().getData().get("status"));
+            assertNotNull(pull.getBody().getData().get("reason"));
         }
 
         @Test
