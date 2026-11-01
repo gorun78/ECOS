@@ -97,6 +97,35 @@ public class AuditDao extends JdbcTemplateDaoSupport {
     }
 
     /**
+     * 补写治理审计列（R7 §2.9.4③；#147M）。
+     *
+     * <p><b>列名单固定</b>（与 V303 的 20 列逐一同名），仅接受
+     * {@link com.chinacreator.gzcm.common.audit.AuditGovernancePayload#extract} 的白名单结果；
+     * 空 Map 直接返回 0，不打无谓 UPDATE。参数化 UPDATE，无字符串拼值。</p>
+     */
+    public int fillGovernanceColumns(String id, java.util.Map<String, Object> cols) {
+        if (id == null || id.isBlank() || cols == null || cols.isEmpty()) {
+            return 0;
+        }
+        return jdbcTemplate.update(
+            "UPDATE " + AUDIT_LOG + " SET "
+                + "audit_event_id = ?, change_request_id = ?, actor_id = ?, approver_ids = ?, "
+                + "domain = ?, object_type = ?, object_id = ?, risk_level = ?, "
+                + "git_repository = ?, git_commit_sha = ?, git_parent_sha = ?, content_hash = ?, "
+                + "target_environment = ?, approval_policy_version = ?, deployment_id = ?, "
+                + "before_hash = ?, after_hash = ?, apply_status = ?, verification_status = ?, "
+                + "trace_id = ? WHERE id = ?",
+            cols.get("audit_event_id"), cols.get("change_request_id"), cols.get("actor_id"),
+            cols.get("approver_ids"), cols.get("domain"), cols.get("object_type"),
+            cols.get("object_id"), cols.get("risk_level"), cols.get("git_repository"),
+            cols.get("git_commit_sha"), cols.get("git_parent_sha"), cols.get("content_hash"),
+            cols.get("target_environment"), cols.get("approval_policy_version"),
+            cols.get("deployment_id"), cols.get("before_hash"), cols.get("after_hash"),
+            cols.get("apply_status"), cols.get("verification_status"), cols.get("trace_id"),
+            id);
+    }
+
+    /**
      * #146ab 附录A 第 6 条 getAuditLogDetail 契约载荷读面：按 bigint 主键 id 读整行。
      *
      * <p>列清单 = 契约 data 载荷 13 具名列（prev_hash/curr_hash 链三元组、username

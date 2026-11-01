@@ -109,6 +109,7 @@ public class AuditKafkaConsumer {
             } else {
                 log.debug("AuditKafkaConsumer: 落库 id={} action={}", id, action);
             }
+            fillGovernance(id, evt);
         } catch (org.springframework.dao.DataAccessException e) {
             // 非 PG 或 ON CONFLICT 不支持时退化路径：先查后插（幂等语义等价，性能略降）
             try {
@@ -118,9 +119,27 @@ public class AuditKafkaConsumer {
                 } else {
                     auditDao.insertAuditLog(id, userId, username, action, resource, result, detail, ip);
                 }
+                fillGovernance(id, evt);
             } catch (Exception inner) {
                 log.error("AuditKafkaConsumer 落库失败(退化) id={}: {}", id, inner.getMessage());
             }
+        }
+    }
+
+    /**
+     * 补写治理审计列（§2.9.4③；#147M）。白名单提取后参数化 UPDATE；失败只记日志，
+     * 不回滚已落库的基础行（治理列缺失 ≠ 审计事件丢失）。
+     */
+    private void fillGovernance(String id, Map<String, Object> evt) {
+        try {
+            Map<String, Object> cols = com.chinacreator.gzcm.common.audit.AuditGovernancePayload.extract(evt);
+            if (cols.isEmpty()) {
+                return;
+            }
+            int updated = auditDao.fillGovernanceColumns(id, cols);
+            log.debug("AuditKafkaConsumer: 治理列补写 id={} 列数={} 影响行={}", id, cols.size(), updated);
+        } catch (Exception e) {
+            log.warn("AuditKafkaConsumer: 治理列补写失败 id={}: {}", id, e.getMessage());
         }
     }
 

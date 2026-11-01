@@ -430,26 +430,61 @@ public class SecurityEngineClient {
      * 一律收敛于 runtime-event {@link EventBusService}，源码级门禁见
      * {@code ReflectiveKafkaBypassArchTest}。</p>
      */
-    public void audit(String action, Object result) {
+    public boolean audit(String action, Object result) {
+        return publishAudit(action, result == null ? "OK" : String.valueOf(result), null);
+    }
+
+    /**
+     * 治理审计事件投递（§2.9.4③；#147M）：把 {@link com.chinacreator.gzcm.common.audit.AuditEventContract}
+     * 的治理列随事件发出，由 security 侧 {@code AuditKafkaConsumer} 补写到 {@code ecos_audit_log}。
+     *
+     * <p><b>返回语义</b>：true = 事件已被事件总线受理（异步，不等于已落库）；false = 总线未装配或投递失败。
+     * 调用方不得把 true 当成「审计已持久化」（故发布三腿仍应记为 UNKNOWN/待对账）。</p>
+     */
+    public boolean auditGovernance(String action,
+                                   com.chinacreator.gzcm.common.audit.AuditEventContract contract) {
+        if (contract == null) {
+            return false;
+        }
+        return publishAudit(action,
+                contract.applyStatus() != null ? contract.applyStatus() : contract.verificationStatus(),
+                contract.toColumns());
+    }
+
+    /**
+     * 审计事件投递单源。
+     *
+     * <p><b>#147M 缺陷修复</b>：原实现只放 {@code eventId}（UUID），而 consumer 以 {@code id}
+     * 判重并要求可落 bigint 主键 ⇒ 全部事件被「缺 id」丢弃。现补数字型 {@code id}
+     * （毫秒×1000 + 随机后缀，进程内不碰撞）并保留 eventId 供链路追踪。</p>
+     */
+    private boolean publishAudit(String action, String result, Map<String, Object> governanceColumns) {
         try {
             long ts = System.currentTimeMillis();
             Map<String, Object> event = new LinkedHashMap<>();
+            event.put("id", String.valueOf(ts * 1000L + java.util.concurrent.ThreadLocalRandom.current().nextInt(1000)));
             event.put("eventId", UUID.randomUUID().toString());
             event.put("timestamp", Instant.ofEpochMilli(ts)
                     .atZone(ZoneId.systemDefault()).format(ISO_DATE));
             event.put("userId", currentUserIdOrAnonymous());
             event.put("action", action);
             event.put("resource", "ontology");
-            event.put("result", result == null ? "OK" : String.valueOf(result));
+            event.put("result", result == null ? "OK" : result);
+            if (governanceColumns != null) {
+                event.putAll(governanceColumns);
+                event.put("domain", governanceColumns.getOrDefault("domain", "ontology"));
+            }
             if (eventBus == null) {
                 log.error("SecurityEngineClient.audit: EventBusService 未装配（runtime-event 缺失），审计事件仅记日志(数据丢失风险): action={} userId={}",
                         action, currentUserIdOrAnonymous());
-                return;
+                return false;
             }
             eventBus.publish(KafkaTopics.AUDIT, event);
+            return true;
         } catch (Exception e) {
             log.error("SecurityEngineClient.audit: 发布审计事件失败: action={} reason={}",
                     action, e.getMessage(), e);
+            return false;
         }
     }
 
