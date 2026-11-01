@@ -34,6 +34,10 @@ public class OntologyVersionVO {
     /** 变更日志 */
     private String changeLog;
 
+    /** Git 归档引用（#147R 读切 Git 的判定键；未归档为 null）。 */
+    private String gitRef;
+
+
     /** 发布人 */
     private String publisher;
 

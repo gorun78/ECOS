@@ -361,4 +361,22 @@ class OntologyVersionGitArchiveCompensationTest {
                 "未归档版本回 DB 快照（不臆造 git 内容；非法 JSON 按原文返回）");
         verify(gitService, never()).readVersionAtRef(any(), any(), any(), any(), any());
     }
+
+    @Test
+    void getVersion_returnsGitContentWhenArchived() {
+        OntologyVersion v = version("ver1", "onto-1", "2.0.0");
+        v.setStatus("Published");
+        v.setGitRef("ref-x");
+        when(versionRepo.findById("ver1")).thenReturn(java.util.Optional.of(v));
+
+        com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult r =
+                new com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult();
+        r.setStatus(com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult.STATUS_FOUND);
+        r.setContent("{\"from\":\"git-x\"}");
+        when(gitService.readVersionAtRef("ontology-model", "ontology", "onto-1", "2.0.0", "ref-x")).thenReturn(r);
+
+        java.util.Map<String, Object> got = svc.getVersion("onto-1", "ver1");
+        assertEquals(Map.of("from", "git-x"), got.get("snapshot"));
+        assertEquals("ref-x", got.get("gitRef"), "gitRef 需对外可读以区分已归档/待归档");
+    }
 }

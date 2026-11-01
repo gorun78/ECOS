@@ -431,14 +431,14 @@ public class OntologyVersionService {
     }
 
     public Map<String, Object> getVersion(String ontologyId, String versionId) {
-        return versionRepository.findById(versionId).map(this::toMap).orElse(null);
+        return versionRepository.findById(versionId).map(this::toMap).map(this::withResolvedSnapshot).orElse(null);
     }
 
     /**
      * 强类型 VO 版（T16-2）；不存在返回 null。
      */
     public OntologyVersionVO getVersionVO(String ontologyId, String versionId) {
-        return versionRepository.findById(versionId).map(this::toVO).orElse(null);
+        return versionRepository.findById(versionId).map(this::toVO).map(this::withResolvedSnapshot).orElse(null);
     }
 
     /**
@@ -808,14 +808,47 @@ public class OntologyVersionService {
      * 按 ID 获取版本（不依赖 ontologyId）
      */
     public Map<String, Object> getVersionById(String id) {
-        return versionRepository.findById(id).map(this::toMap).orElse(null);
+        return versionRepository.findById(id).map(this::toMap).map(this::withResolvedSnapshot).orElse(null);
     }
 
     /**
      * 强类型 VO 版（T16-5，简化端点 get）；不存在返回 null。
      */
     public OntologyVersionVO getVersionVOById(String id) {
-        return versionRepository.findById(id).map(this::toVO).orElse(null);
+        return versionRepository.findById(id).map(this::toVO).map(this::withResolvedSnapshot).orElse(null);
+    }
+
+    /** 单行读面：已归档版本内容按 git_ref 读回（#147R）；否则原样。 */
+    private Map<String, Object> withResolvedSnapshot(Map<String, Object> body) {
+        if (body == null) {
+            return null;
+        }
+        Object id = body.get("id");
+        Object gitRef = body.get("gitRef");
+        if (id == null || gitRef == null || String.valueOf(gitRef).isBlank() || gitService.isEmpty()) {
+            return body;
+        }
+        versionRepository.findById(String.valueOf(id)).ifPresent(ver -> {
+            String content = resolveSnapshotContent(ver);
+            if (content != null && !content.equals(ver.getSnapshot())) {
+                body.put("snapshot", safeParseJson(content));
+            }
+        });
+        return body;
+    }
+
+    /** VO 同行（单行读面）。 */
+    private OntologyVersionVO withResolvedSnapshot(OntologyVersionVO vo) {
+        if (vo == null || vo.getGitRef() == null || vo.getGitRef().isBlank() || gitService.isEmpty()) {
+            return vo;
+        }
+        versionRepository.findById(vo.getId()).ifPresent(ver -> {
+            String content = resolveSnapshotContent(ver);
+            if (content != null && !content.equals(ver.getSnapshot())) {
+                vo.setSnapshot(safeParseJson(content));
+            }
+        });
+        return vo;
     }
 
     /**
@@ -1080,6 +1113,7 @@ public class OntologyVersionService {
         m.put("versionNo", v.getVersionNo());
         m.put("status", v.getStatus());
         m.put("snapshot", safeParseJson(v.getSnapshot()));
+        m.put("gitRef", v.getGitRef());
         m.put("changeLog", v.getChangeLog());
         m.put("publisher", v.getPublisher());
         m.put("publishedAt", v.getPublishedAt() != null ? v.getPublishedAt().toString() : null);
@@ -1098,6 +1132,7 @@ public class OntologyVersionService {
         vo.setVersionNo(v.getVersionNo());
         vo.setStatus(v.getStatus());
         vo.setSnapshot(safeParseJson(v.getSnapshot()));
+        vo.setGitRef(v.getGitRef());
         vo.setChangeLog(v.getChangeLog());
         vo.setPublisher(v.getPublisher());
         vo.setPublishedAt(v.getPublishedAt() != null ? v.getPublishedAt().toString() : null);
