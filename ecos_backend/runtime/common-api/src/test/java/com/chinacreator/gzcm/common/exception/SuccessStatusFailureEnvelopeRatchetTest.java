@@ -231,6 +231,17 @@ class SuccessStatusFailureEnvelopeRatchetTest {
      *       0+38+101+17+34 = 190 = 总数，对账成立。
      *       只重设被突破的 {@link #BARE_RETURN_CEILING}，其余三面按实测保持；
      *       该枚裸回归 D-B4-59 族门管账。</li>
+     *   <li>#147C 重设（Git 仓库注册面 HTTP 状态行保真批，common-api 全模块<b>红跑</b>实跑产出）＝
+     *       总数 <b>189</b>／折叠 0／状态行承载 <b>38</b>（未漂移）／裸回 <b>89</b>（上限 101→89）／
+     *       属主 helper <b>28</b>（上限 17→28）／纯信封 <b>34</b>（未漂移）。
+     *       0＋38＋89＋28＋34 = 189 = 总数，对账成立。
+     *       唯一漂移源＝{@code services/datanet/.../GitController}：该文件 HEAD 面有 12 枚
+     *       {@code return ApiResponse.error(500, "…")} 裸回腿（状态行恒 200＝D-B4-59 族违例，
+     *       且无机读码），本批全部改走属主 {@code failure(ApiResponse.error(status, CODE, msg))}
+     *       单源 helper ⇒ 裸回面 −12、helper 面 +11；两数之差 1 枚＝{@code createTag} 原
+     *       「catch 内两枚同义 500 创建标签失败腿」（HEAD 行 198／201）合流为一枚，
+     *       <b>不是失败面消失</b>（该端点失败仍显式落 500，由
+     *       {@code GitControllerStatusLineTest} 逐枚钉住）。</li>
      * </ul>
      *
      * <p><b>本批（#146p）在判据面上零新增</b>：{@code KnowledgeExtractRunsController} 的 503 腿
@@ -249,9 +260,16 @@ class SuccessStatusFailureEnvelopeRatchetTest {
     // #146s：37→38，归因见上方「#146s 重设」条（AgentToolController#describe 404 腿一封）
     // #146l-前置：99→100，归因见上方「#146l-前置 重设」条（CaliberConflictCountMetricSource 一枚）
     // #146ap：100→101，归因见上方「#146ap 重设」条（CaliberController#addVersion 409 幂等腿一枚）
-    private static final int BARE_RETURN_CEILING = 101;
+    // #147C：101→89，归因见上方「#147C 重设」条（GitController 12 枚裸回腿改走单源 helper）。
+    // 读数取自本批「四枚上限置 0 探测」实跑报文（_win_tasks 之外的一次性 stdout 抓取）：
+    // 「裸回 89」，非 101−12 算式推出。该族每收口一枚，本上限随批下调。
+    private static final int BARE_RETURN_CEILING = 89;
     // #146ab：13→17，归因见上方「#146ab 重设」条（AuditDetailController 四枚 failure(...) 单源腿）
-    private static final int OWNER_HELPER_CEILING = 17;
+    // #147C：17→28，归因见上方沿革（datanet 属主端点 GitController 的 11 枚
+    // failure(ApiResponse.error(…)) 单源腿＝D-B4-59 族正解形态在 Git 注册面的落地；
+    // 读数取自本批「四枚上限置 0 探测」实跑报文「属主 helper 承载 28」，非算式推出。
+    // 该 11 枚的形态片段同批挂进 OWNER_SIDE_CARRIERS：摘腿＝本门红，禁以「上限下调」冒充收口）
+    private static final int OWNER_HELPER_CEILING = 28;
     // #146ab：35→34，补账半＝#146x(49cfb4d6) 把 AgentProviderController 一枚纯信封赋值腿
     // 改写成 AiResponseSupport.classified(...) 属主工厂腿，出现点不再匹配本门判据
     private static final int ENVELOPE_ONLY_CEILING = 34;
@@ -315,7 +333,19 @@ class SuccessStatusFailureEnvelopeRatchetTest {
                     "int status = DataBridgeException.resolveHttpStatus(body.getCode())",
                     "return failure(ApiResponse.<Void>error(403, ERR_PERMISSION,",
                     "static final String CODE_UNAVAILABLE = SystemErrorCode.ECOS_SYS_503;",
-                    "throw new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,"));
+                    "throw new DataBridgeException(RlsExecutionContract.SEC_UNAVAILABLE_HTTP,"),
+            // #147C（Git 仓库注册面状态行保真）：helper 面 +11 的全部来源。这里钉的是「状态行由
+            // 单源 helper 从信封码推导」这条正解链的三段——helper 声明、状态行推导、分态判定权在
+            // 属主异常。摘任一＝该族违例被折回恒 200 或 404/503 分态被抹平，两者都不算收口；
+            // 上限下调不得冒充收口，故取证分立于此。
+            "ecos_backend/services/datanet/src/main/java/com/chinacreator/gzcm/services/datanet/"
+                    + "controller/GitController.java",
+            List.of("private static ResponseEntity<ApiResponse<Map<String, Object>>> failure(ApiResponse<Map<String, Object>> body)",
+                    "return ResponseEntity.status(body.getCode()).body(body);",
+                    "private static ResponseEntity<ApiResponse<Map<String, Object>>> ok(ApiResponse<Map<String, Object>> body)",
+                    "int status = e.getHttpStatus() == 404 ? 404 : 503;",
+                    "return failure(ApiResponse.error(status, machineCode, e.getMessage()));",
+                    "return failure(ApiResponse.error(503, CODE_GIT_UNAVAILABLE,"));
 
     // ── 判据 1：违例面 = 基线逐文件同数 ──────────────────────────────────────
 

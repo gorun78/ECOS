@@ -89,7 +89,10 @@ class MultiConstructorWiringFaceRatchetTest {
      * 沿革：#142/B4-3e-79（D-B4-36 收口）+{@code DeclaredScopeResolutionService}=2 ⇒ <b>19/39</b>；
      * #142/B4-3e-80（D-B4-23 主体域腿收口）+{@code SubjectDepartmentResolutionService}=2 ⇒
      * 20 文件／41 处；#142/B4-3e-81（D-B4-23 主体域密级腿收口）
-     * +{@code SubjectClearanceResolutionService}=2 ⇒ <b>21 文件 / 43 处</b>（现值，三枚均为
+     * +{@code SubjectClearanceResolutionService}=2 ⇒ <b>21 文件 / 43 处</b>；
+     * <b>#147C</b>（Git 仓库注册门面持久化改造：给 {@code GitRepositoryServiceImpl} 加测试／非 Spring
+     * 显式装配腿，生产腿已钉 {@code @Autowired}）+{@code GitRepositoryServiceImpl}=2 ⇒
+     * <b>22 文件 / 45 处</b>（现值，读数取自实跑红字面集，非算式推出；上述各枚均为
      * 「生产腿钉 {@code @Autowired}＋测试缝腿」的良性档，入表是为钉名防迁，不是豁免）。
      * 初版 5/8 手工基线凭逐枚备忘录推算，实跑判据因内部类构造器误计+非法正则歇工到本批修完，
      * 现基线＝判据自证后实跑读数，双向锁；逐枚盯面分型如下：</p>
@@ -123,7 +126,14 @@ class MultiConstructorWiringFaceRatchetTest {
      *       {@code @Autowired} 生产腿＝{@code Optional<ISubjectClearanceQueryService>}，包私有
      *       1 参腿仅供测试直给属主门面（可为 {@code null}＝取证「未装配形态」）。同因钉名：
      *       摘掉生产腿的 {@code @Autowired} 即两腿无标注＋无公共无参候选＝三宿主 context 起不来，
-     *       而密级真值源失效在运行期只会表现为「整链不可用」，比装配失败更难取证）。</li>
+     *       而密级真值源失效在运行期只会表现为「整链不可用」，比装配失败更难取证）、
+     *       {@code GitRepositoryServiceImpl}（#147C 新增：公共 2 参 {@code @Autowired} 生产腿＝
+     *       {@code (GitRepoRegistry, ObjectProvider<GitRepoPathResolver>)}，另一枚 2 参显式装配腿
+     *       {@code (GitRepoRegistry, GitRepoPathResolver)} 仅供测试／非 Spring 场景直给缺位面。
+     *       两腿参数位类型相邻（{@code ObjectProvider} 与 {@code GitRepoPathResolver}）⇒ 裸 {@code null}
+     *       实参会造成编译期构造器歧义，同型风险即 #142/B4-3e-75 的选腿歧义族；生产腿的
+     *       {@code @Autowired} 摘除即「两腿无标注＋无公共无参候选」＝宿主 context 起不来，
+     *       故入表钉名防迁，不是豁免）。</li>
      * </ul>
      * <p>双向：新增文件＝同期 regressed D-B4-97/97b（context 起不来或静默丢配置）直红；
      * 收口批须同步下调此表并在台账留痕。</p>
@@ -157,6 +167,8 @@ class MultiConstructorWiringFaceRatchetTest {
                     + "com/chinacreator/gzcm/engine/security/decision/SubjectDepartmentResolutionService.java", 2),
             Map.entry("ecos_backend/runtime/llm-gateway/src/main/java/"
                     + "com/chinacreator/gzcm/runtime/llm/session/SessionManagerImpl.java", 2),
+            Map.entry("ecos_backend/runtime/runtime-access/src/main/java/"
+                    + "com/chinacreator/gzcm/runtime/access/git/GitRepositoryServiceImpl.java", 2),
             Map.entry("ecos_backend/runtime/runtime-core/src/main/java/"
                     + "com/chinacreator/gzcm/runtime/core/database/impl/SystemDatabaseAccessImpl.java", 2),
             Map.entry("ecos_backend/runtime/runtime-event/src/main/java/"
@@ -262,6 +274,43 @@ class MultiConstructorWiringFaceRatchetTest {
     }
 
     // ── 3. 扫描实现 ────────────────────────────────────
+
+    @Test
+    @DisplayName("锚点：GitRepositoryServiceImpl 生产构造器（ObjectProvider 腿）必须仍带构造器级 @Autowired（#147C）")
+    void anchorGitRepositoryServiceImplKeepsCtorLevelAutowired() throws IOException {
+        Path file = locateRepoRoot().resolve(
+                "ecos_backend/runtime/runtime-access/src/main/java/"
+                        + "com/chinacreator/gzcm/runtime/access/git/GitRepositoryServiceImpl.java");
+        assertTrue(Files.exists(file), "锚点文件不在位：" + file);
+        String src = SourceCommentStripper.strip(Files.readString(file, StandardCharsets.UTF_8));
+        int ctors = countConstructors(src, "GitRepositoryServiceImpl");
+        assertTrue(ctors >= 2,
+                "锚点骨架变化：GitRepositoryServiceImpl 构造器声明格数 " + ctors
+                        + " < 2（生产 ObjectProvider 腿＋测试/非 Spring 显式装配腿），骨架被拆改须同批重设本锚");
+        // 生产腿钉在 ObjectProvider 参数位上（该位类型是 Spring 装配面，测试缝腿用属主解析面类型）
+        Matcher prod = Pattern.compile("ObjectProvider\\s*<\\s*GitRepoPathResolver\\s*>")
+                .matcher(src);
+        assertTrue(prod.find(), "锚点：生产构造器（ObjectProvider<GitRepoPathResolver> 腿）不在位，判据锚点失效");
+        String head = src.substring(Math.max(0, prod.start() - 260), prod.start());
+        assertTrue(head.contains("GitRepositoryServiceImpl("),
+                "锚点结构异常：ObjectProvider 参数出现点前 260 字符内找不到 GitRepositoryServiceImpl(——"
+                        + "构造器骨架被移动，判据窗口须随订正");
+        assertTrue(CTDOR_LEVEL_WIRING.matcher(head).find(),
+                "锚点回归：生产构造器摘掉构造器级 @Autowired。双构造器且无标注⇒Spring6 "
+                        + "SimpleInstantiationStrategy 选腿歧义（D-B4-97 同因，gateway/datanet 双宿主 context 起不来）");
+        // 显式装配腿（第二参＝GitRepoPathResolver 直给类型）不得持 @Autowired——标注挪过去即生产腿失标
+        Matcher seam = Pattern.compile("(?:^|\\n)\\s*(?:(?:public|private|protected)\\s+)*"
+                + "GitRepositoryServiceImpl\\s*\\(\\s*GitRepoRegistry[^)]*GitRepoPathResolver\\s+pathResolver\\s*\\)")
+                .matcher(src);
+        assertTrue(seam.find(), "锚点：测试/非 Spring 显式装配腿（GitRepoPathResolver 直给）不在位");
+        // 只取「上一枚构造器收尾」到本腿声明之间的窗口——按固定长度往前取会把生产腿的 @Autowired 也吞进来，
+        // 那是判据自身造成的假红（同族教训见 D-B4-97 锚点窗口须随骨架订正）。
+        int prevLegEnd = src.lastIndexOf('}', seam.start());
+        assertTrue(prevLegEnd >= 0, "锚点结构异常：显式装配腿之前找不到任何构造器收尾花括号");
+        String seamHead = src.substring(prevLegEnd + 1, seam.start());
+        assertFalse(CTDOR_LEVEL_WIRING.matcher(seamHead).find(),
+                "标注迁移：@Autowired 挪到了显式装配腿上——生产 ObjectProvider 腿失标，与 #142/B4-3e-75 事故同形");
+    }
 
     /** 构造器名与括号间只允许空白⇒实为构造器而非同名方法；用于锚点计数（简单形态）。 */
     static int countConstructors(String strippedSrc, String className) {

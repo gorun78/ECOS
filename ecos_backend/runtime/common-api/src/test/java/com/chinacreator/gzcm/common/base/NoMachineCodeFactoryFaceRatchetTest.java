@@ -166,13 +166,22 @@ class NoMachineCodeFactoryFaceRatchetTest {
      * 发布门的机读码在 message 前缀，不带码重载），该文件此前已在判据面内，
      * 文件数不变。读数取自本批 {@code -pl runtime/common-api} 全量实跑失败
      * 报文（{@code sites=945}，分枚 333/12/24/270/306），非由旧值做算术推出。</p>
+     *
+     * <p><b>#147C 下调（−1 处／−1 文件，无机读码出口收敛）</b>：datanet 属主端点
+     * {@code GitController} 原有一枚 {@code ApiResponse.badRequest(e.getMessage())}
+     * （HEAD 面第 117 行，实存单参工厂）随本批「状态行真实＋分态机读码」改造改走
+     * {@code ApiResponse.error(400, CODE_…, msg)} 三参带码形态⇒该文件对本判据零命中、
+     * 退出判据面。读数取自本批 {@code -pl runtime/common-api} 全量实跑失败报文
+     * （{@code sites=944, files=152}，分枚 332/12/24/270/306），非由旧值做算术推出；
+     * 该枚的可换参数重试语义（400）与机读码面由新增门
+     * {@code GitControllerStatusLineTest} 逐枚钉住。</p>
      */
-    private static final int BASELINE_SITES = 945;
-    private static final int BASELINE_FILES = 153;
+    private static final int BASELINE_SITES = 944;
+    private static final int BASELINE_FILES = 152;
 
     /** 分枚基线：只减不增，且合计必须等于 {@link #BASELINE_SITES}（防「拆细了但总数对不上」）。 */
     private static final Map<String, Integer> BASELINE_BY_FACTORY = new TreeMap<>(Map.of(
-            "badRequest", 333,
+            "badRequest", 332,
             "unauthorized", 12,
             "forbidden", 24,
             "notFound", 270,

@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** PipelineGitService H4-T1/T3 — repositoryId 解析、localPath 拒绝、gitUrl 允许域注册表。 */
@@ -80,15 +81,34 @@ class PipelineGitServiceH4Test {
     }
 
     @Test
-    @DisplayName("repositoryId 未注册 → sys_config 单源根路径兜底解析")
-    void repositoryIdFallsBackToRootResolver() throws Exception {
+    @DisplayName("#147C repositoryId 未注册 → 显式 not_available，禁按命名约定推导第二套路径")
+    void unregisteredRepositoryIdIsExplicitlyUnavailable() throws Exception {
         when(gitRepositoryService.getRepositoryById("p-2"))
                 .thenThrow(new GitRepositoryService.GitRepositoryException("not found"));
-        when(repoRootResolver.resolveRepoPath("p-2")).thenReturn("/root/p-2");
 
         PipelineGitService.LocalPathResolution res = service.resolveLocalPath("t1", "p-2", null);
-        assertFalse(res.unavailable());
-        assertEquals("/root/p-2", res.localPath());
+
+        assertTrue(res.unavailable());
+        assertNull(res.localPath());
+        assertEquals("not_available", res.status());
+        assertTrue(res.reason().contains("ecos_git_repo"));
+        // 关键：绝不回落 root/{repositoryId} 约定（与注册表 repo_root 分叉＝双套路径源）
+        verifyNoInteractions(repoRootResolver);
+    }
+
+    @Test
+    @DisplayName("#147C 注册行命中但 localPath 未解析 → 同样显式不可用（禁伪造路径）")
+    void registeredRowWithoutResolvedPathIsUnavailable() throws Exception {
+        GitRepository unresolved = new GitRepository();
+        unresolved.setRepositoryId("dw-pipeline");
+        unresolved.setLocalPath(null);
+        when(gitRepositoryService.getRepositoryById("dw-pipeline")).thenReturn(unresolved);
+
+        PipelineGitService.LocalPathResolution res = service.resolveLocalPath("t1", "dw-pipeline", null);
+
+        assertTrue(res.unavailable());
+        assertNull(res.localPath());
+        verifyNoInteractions(repoRootResolver);
     }
 
     @Test

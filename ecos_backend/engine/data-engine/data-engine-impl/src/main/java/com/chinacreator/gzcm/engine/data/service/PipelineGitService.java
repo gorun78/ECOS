@@ -47,6 +47,9 @@ public class PipelineGitService {
     private static final String KEY_GIT_PASSWORD = "git_access_password";
     private static final String LOCALPATH_DEPRECATED_REASON =
             "localPath 入参已废弃：请改传 repositoryId（服务端经仓库注册表/sys_config 根路径解析实际路径）";
+    private static final String REPO_NOT_RESOLVED_REASON =
+            "repositoryId 未在 ecos_control.ecos_git_repo 注册或未解析出本地路径：请先注册仓库"
+                    + "（路径单源 = 注册表 repo_root + sys_config ecos_git_repo_root，禁按命名约定推导第二套路径）";
 
     private final GitService gitService;
     private final PipelineGitDao gitDao;
@@ -77,7 +80,11 @@ public class PipelineGitService {
     }
 
     /**
-     * 解析仓库本地路径：repositoryId 优先（runtime 注册表 → sys_config 单源根路径兜底）；
+     * 解析仓库本地路径：repositoryId <b>只认 runtime 注册表</b>（{@code ecos_control.ecos_git_repo}
+     * 行 + {@code repo_root} 相对目录，经属主接缝 {@code GitRepoPathResolver} 拼单源根）；
+     * 未注册/未解析 ⇒ 显式不可用，<b>禁</b>按「root/{repositoryId}」命名约定另起一套路径源
+     * （#147C 路径单源收口：原兜底与注册表 {@code repo_root} 会分叉，如 {@code dw-pipeline}
+     * 实际工作树是 {@code {root}/pipeline} 而非 {@code {root}/dw-pipeline}）；
      * 仅传已废弃 localPath 时拒绝执行并返回指引。
      */
     public LocalPathResolution resolveLocalPath(String taskId, String repositoryId, String legacyLocalPath) {
@@ -89,9 +96,9 @@ public class PipelineGitService {
                     return new LocalPathResolution(registered.getLocalPath(), null, null);
                 }
             } catch (GitRepositoryService.GitRepositoryException e) {
-                log.debug("仓库未在 runtime 注册表命中，按单源根路径解析: repoId={}", repoId);
+                log.debug("仓库未在 runtime 注册表命中: repoId={}", repoId);
             }
-            return new LocalPathResolution(repoRootResolver.resolveRepoPath(repoId), null, null);
+            return new LocalPathResolution(null, STATUS_NOT_AVAILABLE, REPO_NOT_RESOLVED_REASON);
         }
         if (legacyLocalPath != null && !legacyLocalPath.trim().isEmpty()) {
             return new LocalPathResolution(null, STATUS_NOT_AVAILABLE, LOCALPATH_DEPRECATED_REASON);
@@ -426,18 +433,16 @@ public class PipelineGitService {
         throw new IllegalArgumentException("repositoryId 不能为空（localPath 入参已废弃，请改传 repositoryId）");
     }
 
+    /**
+     * 分支枚举改由 runtime 属主承流（#147C DD-3：本类原自带 {@code org.eclipse.jgit} 分支枚举腿
+     * = main 面第二套 Git 接口，现删除）。目录不存在仍按「本地无仓库」显式拒绝。
+     */
     private List<String> listBranchesAtLocalPath(String localPath) throws GitException {
         File gitDir = new File(localPath);
         if (!gitDir.exists()) {
             throw new IllegalArgumentException("本地仓库不存在: " + localPath);
         }
-        try (org.eclipse.jgit.api.Git git = org.eclipse.jgit.api.Git.open(gitDir)) {
-            return git.branchList().call().stream()
-                .map(ref -> ref.getName().replace("refs/heads/", ""))
-                .toList();
-        } catch (Exception e) {
-            throw new GitException("读取分支列表失败: " + localPath, e);
-        }
+        return gitService.listBranches(localPath);
     }
 
     // ==================== 5. switchBranch ====================
@@ -488,6 +493,12 @@ public class PipelineGitService {
 
     // ==================== 6. versions ====================
 
+    /**
+     * Pipeline 版本列表（#147C DD-3：原 jgit {@code log().addPath()} 腿删除，改由属主
+     * {@code GitService.listCommitShasForPath} 承流）。
+     * <p>工作树不存在 = 尚未归档 ⇒ 真空列表；工作树存在但读取失败 ⇒ 显式 {@link GitException}
+     * （禁把故障折叠成空历史）。</p>
+     */
     public List<String> versions(String id) throws GitException {
         File gitDir = new File(repoRootResolver.resolveUnderRoot("pipeline", id));
 
@@ -495,21 +506,8 @@ public class PipelineGitService {
             return new ArrayList<>();
         }
 
-        try (org.eclipse.jgit.api.Git git = org.eclipse.jgit.api.Git.open(gitDir)) {
-            String gitRelative = "pipelines/" + id + "/pipeline.yaml";
-            Iterable<org.eclipse.jgit.revwalk.RevCommit> commits =
-                git.log().addPath(gitRelative).call();
-            List<String> shas = new ArrayList<>();
-            for (org.eclipse.jgit.revwalk.RevCommit c : commits) {
-                shas.add(c.getName().substring(0, 7));
-            }
-            if (!shas.isEmpty()) {
-                return shas;
-            }
-            return List.of();
-        } catch (Exception e) {
-            throw new GitException("读取 Git 版本历史失败: " + id, e);
-        }
+        return gitService.listCommitShasForPath(
+                gitDir.getAbsolutePath(), "pipelines/" + id + "/pipeline.yaml", GitService.MAX_COMMIT_LOG_LIMIT);
     }
 
     // ==================== 安全校验 / 凭据解析 ====================

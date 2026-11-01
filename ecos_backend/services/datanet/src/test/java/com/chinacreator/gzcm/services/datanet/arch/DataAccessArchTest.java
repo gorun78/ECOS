@@ -14,8 +14,11 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  * {@code com.chinacreator.gzcm.services.datanet.dao} 下的
  * {@code XxxDao extends
  * com.chinacreator.gzcm.runtime.core.database.support.JdbcTemplateDaoSupport}
- * （SQL / 参数原样搬运，门面 {@code DqDashboardService}/{@code GitQueryService} 保留 public API
- * 原样委托；{@code DataLakeExportService} 直接拆除死代码 {@code pgJdbc}）。</p>
+ * （SQL / 参数原样搬运，门面 {@code DqDashboardService} 保留 public API
+ * 原样委托；{@code DataLakeExportService} 直接拆除死代码 {@code pgJdbc}）。
+ * {@code GitQueryService}/{@code GitQueryDao} 已于 #147C 整族拆除——Git 提交史的唯一属主读面是
+ * runtime {@code GitService.listCommits}（读 Git 对象库），不存在「Git 提交记录表」，
+ * 原门面去查从未存在的 {@code td_git_repository} 提交表属幻影载体，不是合规 DAO。</p>
  *
  * <p>落点 / 范围说明（与 B1 data-engine ground-truth、agent-service、ontology-engine、buszhi
  * 同款）：
@@ -23,7 +26,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  *   <li>规则 1（按类名）：名为 {@code *Service}/{@code *ServiceImpl}/{@code *Repository}/
  *       {@code *Task}/{@code *Consumer}/{@code *Store}/{@code *Filter}/{@code *Interceptor}/
  *       {@code *Aspect}/{@code *Aggregator} 的类不得依赖 JdbcTemplate。类名断言<b>后缀锚定</b>
- *       （{@code .*Service} 等），以免误判 {@code GitQueryDao}/{@code DqDashboardDao} 等
+ *       （{@code .*Service} 等），以免误判 {@code DqDashboardDao} 等
  *       合规数据落点。</li>
  *   <li>规则 2（按包）：{@code ...datanet.service} 与 {@code ...datanet.controller} 的类不得依赖
  *       JdbcTemplate。规则 2 刻意只覆盖部署于域内生产持 JdbcTemplate 的<b>非 DAO</b> 站点

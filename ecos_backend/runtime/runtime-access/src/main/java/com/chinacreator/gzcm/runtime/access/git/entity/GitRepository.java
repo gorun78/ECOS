@@ -3,61 +3,60 @@ package com.chinacreator.gzcm.runtime.access.git.entity;
 import java.util.Date;
 
 /**
- * Git 娴犳挸绨辩€圭偘缍嬮敍鍦ntime 閸忣剙鍙″Ο鈥崇€烽敍?
+ * Git 仓库注册行（runtime 统一底座 · 横切「器」层）。
  * <p>
- * 娴ｆ粈璐熼崗顒€鍙￠弨顖涙嫼閼宠棄濮忛敍灞肩返 AIMod-Ming閵嗕竻us-Zhi閵嗕笍c-Cheng 缁涘膩閸?
- * 闁俺绻?Runtime 閻?Git 閻楀牊婀伴幒褍鍩楅懗钘夊鏉╂稖顢戝鏇犳暏閵?
+ * 单一事实源 = {@code ecos_control.ecos_git_repo}（V300 建表 + repositoryId 种子；
+ * 补充设计册 §2.9.5①/DQ-2 裁决定名，原 {@code td_git_repository} 命名作废）。
+ * 供 data-engine Pipeline 归档 / ontology 本体资产归档 / kb 知识资产归档共用，
+ * 各域只是信息组织形式不同，仓库定位一律只认 {@code repositoryId}。
+ * <p>
+ * 字段口径（#147C 订正，注释乱码勘定 + 单源对齐）：
+ * <ul>
+ *   <li>{@code repoRoot} = 仓库根<b>下的相对目录名</b>（注册表列 {@code repo_root}）；
+ *       绝对仓库根仍是 sys_config {@code ecos_git_repo_root} 单源，由属主侧
+ *       {@link com.chinacreator.gzcm.runtime.access.git.GitRepoPathResolver} 拼接解析；</li>
+ *   <li>{@code localPath} 是<b>解析产物</b>而非登记事实：只由注册表属主侧填充
+ *       （见 {@link GitRepositoryServiceImpl}），消费方不得自行按命名约定推导，
+ *       解析不出即为 null（调用方显式拒绝，禁伪造路径）；</li>
+ *   <li>{@code remoteUrl} 无注册表列，注册面不承载远程地址与任何凭据
+ *       （DI-1：客户端只传 repositoryId，禁 localPath / 凭据入参）。</li>
+ * </ul>
+ *
+ * @author CDRC Runtime Team
  */
 public class GitRepository {
 
-    /**
-     * 娴犳挸绨盜D閿涘牓鈧槒绶稉濠氭暛閿涘奔绶电化鑽ょ埠閸愬懘鍎村鏇犳暏閿?
-     */
+    /** 注册标识（= 注册表主键与 {@code repository_id} 字面值，语义键非随机 UUID） */
     private String repositoryId;
 
-    /**
-     * 娴犳挸绨遍崥宥囆為敍鍫㈡暏娴滃骸鐫嶇粈鐚寸礆
-     */
+    /** 仓库显示名 */
     private String name;
 
-    /**
-     * 閺堫剙婀寸捄顖氱窞閿涘牆浼愭担婊冨閺堫剚澧嶉崷銊ф窗瑜版洩绱?
-     */
+    /** 解析后的本地绝对路径（属主侧填充，未解析为 null） */
     private String localPath;
 
-    /**
-     * 鏉╂粎鈻兼禒鎾崇氨閸︽澘娼冮敍鍫濐洤閿涙ttps:// 閹?ssh://閿?
-     */
+    /** 远程地址（注册表不承载，恒 null；仅 clone 等显式入参场景使用） */
     private String remoteUrl;
 
-    /**
-     * 姒涙顓婚崚鍡樻暜閸氬秶袨閿涘牆顩ч敍姝產in閵嗕沟aster閿?
-     */
+    /** 仓库根下相对目录名（注册表 {@code repo_root} 列） */
+    private String repoRoot;
+
+    /** 默认分支（如 main） */
     private String defaultBranch;
 
-    /**
-     * 閺勵垰鎯侀崥顖滄暏
-     */
+    /** 是否启用（注册表 {@code status = 'ACTIVE'}） */
     private boolean enabled;
 
-    /**
-     * 閸掓稑缂撻弮鍫曟？
-     */
+    /** 创建时间 */
     private Date createdTime;
 
-    /**
-     * 閸掓稑缂撴禍?
-     */
+    /** 创建人 */
     private String createdBy;
 
-    /**
-     * 閺堚偓鏉╂垶娲块弬鐗堟闂?
-     */
+    /** 最近更新时间 */
     private Date updatedTime;
 
-    /**
-     * 閺堚偓鏉╂垶娲块弬棰佹眽
-     */
+    /** 最近更新人 */
     private String updatedBy;
 
     public String getRepositoryId() {
@@ -90,6 +89,14 @@ public class GitRepository {
 
     public void setRemoteUrl(String remoteUrl) {
         this.remoteUrl = remoteUrl;
+    }
+
+    public String getRepoRoot() {
+        return repoRoot;
+    }
+
+    public void setRepoRoot(String repoRoot) {
+        this.repoRoot = repoRoot;
     }
 
     public String getDefaultBranch() {
@@ -140,5 +147,3 @@ public class GitRepository {
         this.updatedBy = updatedBy;
     }
 }
-
-

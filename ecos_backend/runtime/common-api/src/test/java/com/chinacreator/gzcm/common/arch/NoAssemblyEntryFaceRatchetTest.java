@@ -102,8 +102,15 @@ class NoAssemblyEntryFaceRatchetTest {
      * 一枚 <tt>ISchemaRegistryService</tt> 是接口、本就不在「*Impl.java」候选面内故不入账。删除两枚
      * 候选⇒死面集从 46 减到 44；<b>候选面下限</b> {@link #MAIN_IMPL_FILE_FLOOR}=150 仍有余量
      * （候选面从 174→172 枚，不触下限）。</p>
+     *
+     * <p><b>44→43 的订正（#147C 命名与违例收口批）</b>：{@code td_git_repository} 清零的改名清理范围
+     * （详设 §2.9.5④）把 sysman 配置面死腿 {@code ConfigGitSyncServiceImpl.java}（连同其接口
+     * {@code IConfigGitSyncService}）一并下线——该文件位于候选面内且判死，删除一枚候选⇒死面集
+     * 44 减到 43。这是<b>只减不增方向的正向收敛</b>（死面被真实移除，不是判据失明）：本门另一枚
+     * 判据 {@link #MAIN_IMPL_FILE_FLOOR}=150 未触，且 {@link #derivedDeadFaceSetIsNailedDownAndOnlyShrinks}
+     * 的红字名单（43 枚）已不含该文件，读数取自实跑失败报文而非算式。</p>
      */
-    private static final int DERIVED_DEAD_FACE_BASELINE = 44;
+    private static final int DERIVED_DEAD_FACE_BASELINE = 43;
 
     /**
      * 主源码 {@code *Impl.java} 候选面下限（防扫描器失明的假绿；只设下限，新增合法）。
