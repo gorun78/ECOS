@@ -310,7 +310,7 @@ class GitControllerStatusLineTest {
 
             // #147P：push/pull 端点从「网关 404」改为本层显式能力分态
             ResponseEntity<ApiResponse<Map<String, Object>>> push =
-                    controller.push("pipeline-core", Map.of("message", "x"));
+                    controller.push("pipeline-core", null);
             assertEquals(200, push.getStatusCode().value());
             assertEquals("not_available", push.getBody().getData().get("status"));
             assertNotNull(push.getBody().getData().get("reason"));

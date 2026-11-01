@@ -344,6 +344,19 @@ public class GitController {
         return ok(ApiResponse.success(data));
     }
 
+    /** push/pull 入参（强类型，禁裸 Map；当前仅 message 备注，禁 localPath/凭据）。 */
+    public static final class GitPushPullRequest {
+        private String message;
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+    }
+
     /**
      * 推送（#147P）：<b>能力未接，显式 not_available</b>。
      *
@@ -355,7 +368,7 @@ public class GitController {
     @PostMapping("/push")
     public ResponseEntity<ApiResponse<Map<String, Object>>> push(
             @RequestParam String repoId,
-            @RequestBody(required = false) Map<String, Object> body) {
+            @RequestBody(required = false) GitPushPullRequest body) {
         GitRepository repo;
         try {
             repo = resolveRepo(repoId);
@@ -375,7 +388,7 @@ public class GitController {
     @PostMapping("/pull")
     public ResponseEntity<ApiResponse<Map<String, Object>>> pull(
             @RequestParam String repoId,
-            @RequestBody(required = false) Map<String, Object> body) {
+            @RequestBody(required = false) GitPushPullRequest body) {
         GitRepository repo;
         try {
             repo = resolveRepo(repoId);
