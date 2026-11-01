@@ -1,15 +1,31 @@
 -- =============================================================================
--- V302 — R7 / DQ-6 废弃版本表清退（#147K）
+-- V302 — R7 / DQ-6 废弃版本表清退守卫（#147K 修订版）
 -- 单源目录：docs/50-db_script/02-flyway-migration/gateway/
 --
--- 处置口径（§2.9.6④ / DQ-6：停写 → 切 git 归档 → 备份后 DROP）：
---   * ecos_agent_version：全仓零读写（AgentVersionService/Dao/Mapper 已随本批删除），
---     且 dev PG 各 schema 均不存在该表 → DROP IF EXISTS 幂等清退（唯一已满足前置的一张）。
---   * ecos_ontology_version / ecos_object_version / sys_rule_version：仍被各域
---     版本读写腿使用（计数见台账 §十六），<b>前置未满足，本批不 DROP</b>；
---     禁以"空表"为由提前删除（空表 ≠ 无人依赖：读腿仍按表取历史）。
+-- 修订说明（2026-11-01）：首版直接写 DROP TABLE，被 db-migration-lint 的 IR03
+--   「只加不删」判为 FAIL（3 条 DROP）——该脚本的红线是 _win_tasks 只增不改，
+--   本批无权为 DROP 开白名单。且 dev PG 各 schema 实查 ecos_agent_version 均不存在
+--   （pg_class 0 行），DROP 本无对象。故改为**清退守卫**：
+--     * 表不存在 → NOTICE 通过（零对象可删，清退=代码删除 + 缺席证据）；
+--     * 表存在   → 显式 EXCEPTION 阻断，要求按 DQ-6 先在部署窗口 pg_dump 备份后人工 DROP。
+--   这是 fail-closed：禁在无备份证据时由自动迁移删表。
+--
+-- 其余三张（ecos_ontology_version / ecos_object_version / sys_rule_version）
+--   仍有版本读写腿消费，前置未满足，本批不触碰（见 DDL 台账 §十六）。
 -- =============================================================================
 
-DROP TABLE IF EXISTS ecos_control.ecos_agent_version;
-DROP TABLE IF EXISTS ecos_ai.ecos_agent_version;
-DROP TABLE IF EXISTS public.ecos_agent_version;
+DO $$
+DECLARE
+    target_schema TEXT;
+BEGIN
+    SELECT n.nspname INTO target_schema
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relname = 'ecos_agent_version'
+    LIMIT 1;
+
+    IF target_schema IS NULL THEN
+        RAISE NOTICE 'ecos_agent_version 不存在：零对象可删，清退以代码删除与缺席证据为准';
+    ELSE
+        RAISE EXCEPTION 'ecos_agent_version 仍存在于 schema %：请按 DQ-6 在部署窗口 pg_dump 备份后人工 DROP（禁自动迁移删表）', target_schema;
+    END IF;
+END $$;
