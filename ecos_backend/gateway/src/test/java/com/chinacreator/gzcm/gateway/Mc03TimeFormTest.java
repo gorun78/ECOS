@@ -144,7 +144,7 @@ class Mc03TimeFormTest {
      *  落地 ⇒ 按实测订正 248→249（四枚同批锚）。
      *  2026-10-31 #147A：V300（rule 补 4 列 + ecos_git_repo 建表＋种子）落地
      *  ⇒ 按实测订正 249→250（四枚同批锚）。 */
-    private static final int SCRIPT_FLOOR = 253;
+    private static final int SCRIPT_FLOOR = 254;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc02/
     // MigrationVersionUniquenessTest 同批改锚）。本枚对 GOVERNED_PG_SYNTAX_PIN <b>零贡献</b>：
     // 实测 V295 正文＋注释对 ::/ON CONFLICT/RETURNING/gen_random_uuid/JSON 运算符五类判据

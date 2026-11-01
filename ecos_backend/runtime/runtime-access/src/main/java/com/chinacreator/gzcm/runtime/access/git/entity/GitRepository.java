@@ -47,6 +47,12 @@ public class GitRepository {
     /** 是否启用（注册表 {@code status = 'ACTIVE'}） */
     private boolean enabled;
 
+    /** 纳入清单（V304 新增，逗号分隔相对路径前缀；非空时仅允许命中前缀，空=全量） */
+    private java.util.List<String> includePaths = java.util.List.of();
+
+    /** 排除清单（V304 新增；命中即拒，优先级高于纳入） */
+    private java.util.List<String> excludePaths = java.util.List.of();
+
     /** 创建时间 */
     private Date createdTime;
 
@@ -141,6 +147,60 @@ public class GitRepository {
 
     public String getUpdatedBy() {
         return updatedBy;
+    }
+
+    public java.util.List<String> getIncludePaths() {
+        return includePaths;
+    }
+
+    public void setIncludePaths(java.util.List<String> includePaths) {
+        this.includePaths = includePaths == null ? java.util.List.of() : java.util.List.copyOf(includePaths);
+    }
+
+    public java.util.List<String> getExcludePaths() {
+        return excludePaths;
+    }
+
+    public void setExcludePaths(java.util.List<String> excludePaths) {
+        this.excludePaths = excludePaths == null ? java.util.List.of() : java.util.List.copyOf(excludePaths);
+    }
+
+    /**
+     * 路径是否允许纳入归档（§2.9.5③；V304）。
+     *
+     * <p>判据：命中 {@code excludePaths} 任前缀 ⇒ 拒；{@code includePaths} 非空且不命中任前缀 ⇒ 拒；
+     * 其余 ⇒ 允许。排除优先于纳入——敏感目录在 include 之外仍可被 exclude 明确拒绝。</p>
+     */
+    public boolean allows(String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) {
+            return false;
+        }
+        String p = relativePath.replace('\\', '/');
+        for (String ex : excludePaths) {
+            if (p.startsWith(ex)) {
+                return false;
+            }
+        }
+        if (includePaths.isEmpty()) {
+            return true;
+        }
+        for (String in : includePaths) {
+            if (p.startsWith(in)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 逗号分隔串 → 列表（去空白段；空串/纯空白 ⇒ 空列表）。 */
+    public static java.util.List<String> splitCsv(String csv) {
+        if (csv == null || csv.isBlank()) {
+            return java.util.List.of();
+        }
+        return java.util.Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
     }
 
     public void setUpdatedBy(String updatedBy) {

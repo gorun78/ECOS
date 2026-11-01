@@ -223,4 +223,26 @@ class DesignAssetArchiverTest {
         assertEquals(Optional.of("{\"v\":1}"),
                 archiver.readAtRef("kb-asset-tree", "rules", "r1", "1.0", "abc"));
     }
+
+    @Test
+    void includeExcludeListsGateArchive(@TempDir Path root) {
+        GitRepository restricted = repo("kb-asset-tree", "kb", true);
+        // include 清单非空 ⇒ 只放行命中前缀；exclude 前缀即使也在 include 内也被拒（排除优先）
+        restricted.setIncludePaths(java.util.List.of("rules", "models"));
+        restricted.setExcludePaths(java.util.List.of("rules"));
+        FakeRegistry registry = new FakeRegistry().add(restricted);
+        DesignAssetArchiver archiver = archiver(registry, root, new RecordingGit());
+
+        ArchiveOutcome excluded = archiver.archive("kb-asset-tree", "rules", "r1", "1.0", "{}", null, null);
+        assertEquals(ArchiveOutcome.Status.FAILED, excluded.status(), "排除优先于纳入");
+        assertTrue(excluded.reason().contains("排除"));
+
+        assertEquals(ArchiveOutcome.Status.ARCHIVED,
+                archiver.archive("kb-asset-tree", "models", "m1", "1.0", "{}", null, null).status(),
+                "纳入前缀命中");
+
+        ArchiveOutcome notIncluded = archiver.archive("kb-asset-tree", "agents", "a1", "1.0", "{}", null, null);
+        assertEquals(ArchiveOutcome.Status.FAILED, notIncluded.status(),
+                "纳入清单非空且不命中即拒");
+    }
 }

@@ -135,7 +135,7 @@ class Mc02TypeWhitelistTest {
      *  落地 ⇒ 按实测订正 248→249（四枚同批锚）。
      *  2026-10-31 #147A：V300（rule 补 4 列 + ecos_git_repo 建表＋种子）落地
      *  ⇒ 按实测订正 249→250（四枚同批锚）。 */
-    private static final int SCRIPT_FLOOR = 253;
+    private static final int SCRIPT_FLOOR = 254;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc03/
     // MigrationVersionUniquenessTest 同批改锚；单源最大版本 295 ⇒ 下一号 V296）。
     // #146ay：245→246（V296__cognitive_model_hypo_r4_fields.sql 纯 ALTER 加列，

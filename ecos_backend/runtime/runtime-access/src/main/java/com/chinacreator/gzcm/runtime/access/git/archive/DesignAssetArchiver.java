@@ -105,6 +105,11 @@ public class DesignAssetArchiver {
                     + "（检查 sys_config:ecos_git_repo_root 与 GitRepoPathResolver 装配）");
         }
 
+        String relPath = relativePath(type, id, ver != null ? ver : "latest");
+        if (!repository.allows(relPath)) {
+            return ArchiveOutcome.failed("路径被注册表纳入/排除清单拒绝（§2.9.5③）：" + relPath);
+        }
+
         String msg = trimToNull(message) == null
                 ? "Archive " + type + " " + id + (ver != null ? " " + ver : "")
                 : message;
