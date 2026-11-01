@@ -65,6 +65,9 @@ public class OntologyVersionService {
     /** Git 归档补偿队列入口（W83 新增）；未装配时空 = 归档失败仅日志不补偿。 */
     private final Optional<GitArchivePendingRepository> gitArchivePending;
 
+    /** 安全引擎审计通道（#147N）；未装配时审计腿显式 NOT_APPLICABLE（禁伪成功）。 */
+    private final Optional<com.chinacreator.gzcm.engine.ontology.security.SecurityEngineClient> securityClient;
+
     /** 旧 5 参构造保留（Wave31 单测直接 new；Git 归档 + 补偿均默认关闭）。 */
     public OntologyVersionService(OntologyVersionRepository versionRepository,
                                    OntologyRepository ontologyRepository,
@@ -94,7 +97,8 @@ public class OntologyVersionService {
                                    ApplicationEventPublisher appEventPublisher,
                                    Optional<EventBusService> eventBus,
                                    Optional<OntologyGitService> gitService,
-                                   Optional<GitArchivePendingRepository> gitArchivePending) {
+                                   Optional<GitArchivePendingRepository> gitArchivePending,
+                                   Optional<com.chinacreator.gzcm.engine.ontology.security.SecurityEngineClient> securityClient) {
         this.versionRepository = versionRepository;
         this.ontologyRepository = ontologyRepository;
         this.proposalService = proposalService;
@@ -102,6 +106,19 @@ public class OntologyVersionService {
         this.eventBus = eventBus;
         this.gitService = gitService != null ? gitService : Optional.empty();
         this.gitArchivePending = gitArchivePending != null ? gitArchivePending : Optional.empty();
+        this.securityClient = securityClient != null ? securityClient : Optional.empty();
+    }
+
+    /** 7 参数过渡构造（#147N 审计腿接入前的装配面；API 只增不改）。 */
+    public OntologyVersionService(OntologyVersionRepository versionRepository,
+                                   OntologyRepository ontologyRepository,
+                                   OntologyProposalService proposalService,
+                                   ApplicationEventPublisher appEventPublisher,
+                                   Optional<EventBusService> eventBus,
+                                   Optional<OntologyGitService> gitService,
+                                   Optional<GitArchivePendingRepository> gitArchivePending) {
+        this(versionRepository, ontologyRepository, proposalService, appEventPublisher, eventBus,
+                gitService, gitArchivePending, Optional.empty());
     }
 
     /**
@@ -234,6 +251,77 @@ public class OntologyVersionService {
     private record GitLegRecord(LegOutcome outcome, String gitRef, String taskId, String reason) {
     }
 
+    /** 审计腿记录（#147N；三腿之一）。 */
+    private record AuditLegRecord(LegOutcome outcome, String reason) {
+    }
+
+    /**
+     * 投递发布治理审计事件（§2.9.4③ / §2.9.6① 第三腿；#147N）。
+     *
+     * <p><b>诚实口径</b>：{@code auditGovernance} 返回 true 只代表事件<b>已被事件总线受理</b>
+     * （异步落库），故把腿记为 {@link LegOutcome#SUCCEEDED} 并在原因写明「待对账」；
+     * 总线未装配/投递失败记 {@link LegOutcome#UNKNOWN}（不记失败、更不记成功——UNKNOWN 会
+     * 让发布态落 PARTIAL_FAILURE，禁按完全成功报）。通道未装配时记 NOT_APPLICABLE。</p>
+     */
+    private AuditLegRecord auditPublish(OntologyVersion ver, GitLegRecord gitLeg, int dbRows) {
+        if (securityClient.isEmpty()) {
+            return new AuditLegRecord(LegOutcome.NOT_APPLICABLE,
+                    "安全审计通道未装配（禁按已审计理解，§2.9.6① 第三腿）");
+        }
+        try {
+            com.chinacreator.gzcm.common.audit.AuditEventContract contract =
+                    new com.chinacreator.gzcm.common.audit.AuditEventContract(
+                            "ont-pub-" + ver.getId() + "-" + ver.getVersionNo(),
+                            ver.getId(),
+                            ver.getPublisher(),
+                            List.of(),
+                            "ontology",
+                            "ontology_version",
+                            ver.getId(),
+                            com.chinacreator.gzcm.common.audit.AuditLevel.L3_HIGH_RISK.name(),
+                            GIT_REPO_ONTOLOGY,
+                            gitLeg.gitRef(),
+                            null,
+                            sha256Hex(ver.getSnapshot()),
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            dbRows == 1 ? "APPLIED" : "FAILED",
+                            "PUBLISH_" + gitLeg.outcome().name(),
+                            java.time.Instant.now(),
+                            java.util.UUID.randomUUID().toString());
+            boolean accepted = securityClient.get().auditGovernance("ontology.publish", contract);
+            return accepted
+                    ? new AuditLegRecord(LegOutcome.SUCCEEDED,
+                            "治理审计事件已投递 ecos.audit（异步落库，待对账）")
+                    : new AuditLegRecord(LegOutcome.UNKNOWN,
+                            "治理审计事件投递失败/总线未装配（审计腿未确证）");
+        } catch (RuntimeException e) {
+            return new AuditLegRecord(LegOutcome.UNKNOWN,
+                    "治理审计事件投递异常：" + e.getClass().getSimpleName());
+        }
+    }
+
+    /** 内容摘要（审计 content_hash）；无快照返回 null（不伪造空串）。 */
+    private static String sha256Hex(String content) {
+        if (content == null) {
+            return null;
+        }
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return "sha256:" + sb;
+        } catch (java.security.NoSuchAlgorithmException e) {
+            return null;
+        }
+    }
+
     /**
      * 一次发布的状态记录（对外只增两枚键：{@code publishState} / {@code publishStateReason}）。
      *
@@ -260,7 +348,8 @@ public class OntologyVersionService {
      * <p><b>控制流不变</b>：本方法只读不算，不改写权威库、不上抛异常、不回滚已成功写入
      * （§2.9.6② 的回滚须经 {@link PublishStateMachine#planRollback}，禁在此现场反向写）。</p>
      */
-    private PublishRecording recordPublishState(OntologyVersion ver, int dbRows, GitLegRecord gitLeg) {
+    private PublishRecording recordPublishState(OntologyVersion ver, int dbRows, GitLegRecord gitLeg,
+                                                AuditLegRecord auditLeg) {
         LegOutcome dbLeg = switch (dbRows) {
             case 1 -> LegOutcome.SUCCEEDED;
             case 0 -> LegOutcome.FAILED;
@@ -268,16 +357,19 @@ public class OntologyVersionService {
         };
         String versionRef = dbRows == 1 ? ver.getVersionNo() : null;
         DualWriteOutcome dual = DualWriteOutcome
-                .builder(gitLeg.outcome(), dbLeg, LegOutcome.NOT_APPLICABLE)
+                .builder(gitLeg.outcome(), dbLeg, auditLeg.outcome())
                 .gitRef(gitLeg.gitRef())
                 .versionRef(versionRef)
                 .task(gitLeg.taskId(), DualWriteOutcome.KIND_COMPENSATION_QUEUE)
-                .reason("审计腿不适用（本体发布路径未接安全审计，台账余项）；" + gitLeg.reason())
+                .reason("审计腿：" + auditLeg.reason() + "；" + gitLeg.reason())
                 .securityCritical(false)
                 .build();
 
         PublishState state = PublishStateMachine.deriveState(dual);
         StringBuilder why = new StringBuilder(dual.legSummary());
+        if (dual.reason() != null) {
+            why.append(" | ").append(dual.reason());
+        }
 
         if (state == PublishState.APPLIED) {
             // 权威库已应用 ⇒ 进对账（主链推进唯一合法走法：APPLIED → VERIFYING）
@@ -405,7 +497,8 @@ public class OntologyVersionService {
         int dbRows = versionRepository.updateStatus(versionId, "Published");
         fanOutOntologyPublished(ontologyId, ver.getVersionNo(), ver.getPublisher());
         GitLegRecord gitLeg = archiveToGit(ver, ver.getPublisher());
-        PublishRecording recording = recordPublishState(ver, dbRows, gitLeg);
+        AuditLegRecord auditLeg = auditPublish(ver, gitLeg, dbRows);
+        PublishRecording recording = recordPublishState(ver, dbRows, gitLeg, auditLeg);
         return attachPublishState(
                 versionRepository.findById(versionId).map(this::toMap).orElse(null), recording);
     }
@@ -422,7 +515,8 @@ public class OntologyVersionService {
         int dbRows = versionRepository.updateStatus(versionId, "Published");
         fanOutOntologyPublished(ontologyId, ver.getVersionNo(), ver.getPublisher());
         GitLegRecord gitLeg = archiveToGit(ver, ver.getPublisher());
-        PublishRecording recording = recordPublishState(ver, dbRows, gitLeg);
+        AuditLegRecord auditLeg = auditPublish(ver, gitLeg, dbRows);
+        PublishRecording recording = recordPublishState(ver, dbRows, gitLeg, auditLeg);
         return attachPublishState(
                 versionRepository.findById(versionId).map(this::toVO).orElse(null), recording);
     }
@@ -792,7 +886,8 @@ public class OntologyVersionService {
         int dbRows = versionRepository.updateStatus(versionId, "Published");
         fanOutOntologyPublished(ver.getOntologyId(), ver.getVersionNo(), ver.getPublisher());
         GitLegRecord gitLeg = archiveToGit(ver, ver.getPublisher());
-        PublishRecording recording = recordPublishState(ver, dbRows, gitLeg);
+        AuditLegRecord auditLeg = auditPublish(ver, gitLeg, dbRows);
+        PublishRecording recording = recordPublishState(ver, dbRows, gitLeg, auditLeg);
         return attachPublishState(
                 versionRepository.findById(versionId).map(this::toMap).orElse(null), recording);
     }
@@ -809,7 +904,8 @@ public class OntologyVersionService {
         int dbRows = versionRepository.updateStatus(versionId, "Published");
         fanOutOntologyPublished(ver.getOntologyId(), ver.getVersionNo(), ver.getPublisher());
         GitLegRecord gitLeg = archiveToGit(ver, ver.getPublisher());
-        PublishRecording recording = recordPublishState(ver, dbRows, gitLeg);
+        AuditLegRecord auditLeg = auditPublish(ver, gitLeg, dbRows);
+        PublishRecording recording = recordPublishState(ver, dbRows, gitLeg, auditLeg);
         return attachPublishState(
                 versionRepository.findById(versionId).map(this::toVO).orElse(null), recording);
     }

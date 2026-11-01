@@ -168,7 +168,7 @@ class MultiConstructorWiringFaceRatchetTest {
             Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/"
                     + "com/chinacreator/gzcm/engine/ontology/service/CaliberService.java", 2),
             Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/"
-                    + "com/chinacreator/gzcm/engine/ontology/service/OntologyVersionService.java", 3),
+                    + "com/chinacreator/gzcm/engine/ontology/service/OntologyVersionService.java", 4),
             Map.entry("ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/java/"
                     + "com/chinacreator/gzcm/engine/ontology/service/PublishGateService.java", 2),
             Map.entry("ecos_backend/engine/security-engine/security-engine-impl/src/main/java/"

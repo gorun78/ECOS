@@ -240,8 +240,7 @@ class OntologyVersionGitArchiveCompensationTest {
     }
 
     @Test
-    void rollback_sourcesContentFromGitRefWhenReadAtRefSucceeds() {
-        com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult found =
+    void rollback_sourcesContentFromGitRefWhenReadAtRefSucceeds() {        com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult found =
                 new com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult();
         found.setStatus(com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult.STATUS_FOUND);
         found.setContent("{history:'from-git'}");
@@ -265,5 +264,57 @@ class OntologyVersionGitArchiveCompensationTest {
         assertEquals("{history:'from-git'}", inserted[0].getSnapshot(),
                 "内容必须按 git ref 读回，而不是取权威库 snapshot 列");
         assertTrue(String.valueOf(result.get("publishStateReason")).contains("内容取自 git ref abc123"));
+    }
+
+    // ── #147N：审计腿（第三腿）真接入 ──────────────────────────────
+
+    private OntologyVersionService serviceWithAudit(boolean accepted) {
+        com.chinacreator.gzcm.engine.ontology.security.SecurityEngineClient stub =
+                new com.chinacreator.gzcm.engine.ontology.security.SecurityEngineClient(
+                        "http://localhost:18081", 100) {
+                    @Override
+                    public boolean auditGovernance(String action,
+                                                   com.chinacreator.gzcm.common.audit.AuditEventContract contract) {
+                        return accepted;
+                    }
+                };
+        return new OntologyVersionService(versionRepo, ontRepo, proposal, pub,
+                Optional.<EventBusService>empty(), Optional.of(gitService), Optional.of(pendingRepo),
+                Optional.of(stub));
+    }
+
+    @Test
+    void auditLegAccepted_reportsVerifyingWithAuditEvidence() {
+        OntologyGitArchiveResult ok = new OntologyGitArchiveResult();
+        ok.setStatus(OntologyGitArchiveResult.STATUS_COMMITTED);
+        ok.setCommitId("abc123");
+        when(gitService.archiveVersion(any(OntologyGitArchiveRequest.class))).thenReturn(ok);
+
+        OntologyVersion v = version("ver1", "onto-1", "4.0.0");
+        when(versionRepo.findById("ver1")).thenReturn(java.util.Optional.of(v));
+        when(versionRepo.updateStatus("ver1", "Published")).thenReturn(1);
+
+        java.util.Map<String, Object> result = serviceWithAudit(true).publishVersionById("ver1");
+
+        assertEquals("VERIFYING", result.get("publishState"));
+        assertTrue(String.valueOf(result.get("publishStateReason")).contains("已投递 ecos.audit"));
+        assertTrue(String.valueOf(result.get("publishStateReason")).contains("audit=SUCCEEDED"));
+    }
+
+    @Test
+    void auditLegUnknown_reportsPartialFailureNotSuccess() {
+        OntologyGitArchiveResult ok = new OntologyGitArchiveResult();
+        ok.setStatus(OntologyGitArchiveResult.STATUS_COMMITTED);
+        ok.setCommitId("abc123");
+        when(gitService.archiveVersion(any(OntologyGitArchiveRequest.class))).thenReturn(ok);
+
+        OntologyVersion v = version("ver1", "onto-1", "4.0.1");
+        when(versionRepo.findById("ver1")).thenReturn(java.util.Optional.of(v));
+        when(versionRepo.updateStatus("ver1", "Published")).thenReturn(1);
+
+        java.util.Map<String, Object> result = serviceWithAudit(false).publishVersionById("ver1");
+
+        assertEquals("PARTIAL_FAILURE", result.get("publishState"));
+        assertTrue(String.valueOf(result.get("publishStateReason")).contains("audit=UNKNOWN"));
     }
 }
