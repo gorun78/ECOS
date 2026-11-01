@@ -94,7 +94,7 @@ class MigrationVersionUniquenessTest {
      *  落地 ⇒ 按实测订正 248→249（四枚同批锚）。
      *  2026-10-31 #147A：V300（ecos_ontology_rule 补 4 列 + ecos_control.ecos_git_repo 建表
      *  + 6 枚 repositoryId 种子，dev PG 实跑）落地 ⇒ 按实测订正 249→250（四枚同批锚）。 */
-    private static final int SCRIPT_COUNT_FLOOR = 250;
+    private static final int SCRIPT_COUNT_FLOOR = 253;
 
     /**
      * 锁④：台账锚——基线最大版本与下一号（新增脚本必须用 {@code > } 本值的主版本号）。
@@ -120,8 +120,8 @@ class MigrationVersionUniquenessTest {
      * + repositoryId 种子 6 枚；dev PG 实跑＋MC03 形态订正后复跑零 ERROR，见 V300 尾注）落地 ⇒
      * 按实测订正 299→300 / 下一号 300→301。
      */
-    private static final int MAX_BASELINE_VERSION = 300;
-    private static final int NEXT_FREE_VERSION = 301;
+    private static final int MAX_BASELINE_VERSION = 303;
+    private static final int NEXT_FREE_VERSION = 304;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。
