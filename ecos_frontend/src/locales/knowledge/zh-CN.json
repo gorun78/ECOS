@@ -1932,5 +1932,22 @@
   "knowledge.graph.relationshipPlaceholder": "选择关系类型",
   "knowledge.graph.weight": "权重",
   "knowledge.graph.noNodeSelected": "未选择节点",
-  "knowledge.nav.tree_new_node": "新建节点"
+  "knowledge.nav.tree_new_node": "新建节点",
+  "knowledge.nav.page_rules": "规则",
+  "knowledge.rules.title": "规则中心",
+  "knowledge.rules.subtitle": "规则单一事实源为本体规则表（rule_carrier × rule_layer 双维路由）；产品入口合入知识工作台，不新增独立模块。",
+  "knowledge.rules.refresh": "刷新",
+  "knowledge.rules.loading": "加载规则中…",
+  "knowledge.rules.empty_title": "暂无规则",
+  "knowledge.rules.empty_desc": "尚未登记规则；规则建模入口随本体/规则对象演进开放。",
+  "knowledge.rules.not_available_title": "规则通道不可用",
+  "knowledge.rules.not_available_desc": "规则服务暂不可用或未装配；本页不展示伪造数据。",
+  "knowledge.rules.trace_not_available": "不可用",
+  "knowledge.rules.col_code": "编码",
+  "knowledge.rules.col_layer": "规则层",
+  "knowledge.rules.col_carrier": "载体",
+  "knowledge.rules.col_scope": "作用域",
+  "knowledge.rules.col_version": "版本",
+  "knowledge.rules.col_git_ref": "Git 引用",
+  "knowledge.rules.col_status": "状态"
 }

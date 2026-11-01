@@ -1932,5 +1932,22 @@
   "knowledge.graph.relationshipPlaceholder": "Select relationship type",
   "knowledge.graph.weight": "Weight",
   "knowledge.graph.noNodeSelected": "No node selected",
-  "knowledge.nav.tree_new_node": "New Node"
+  "knowledge.nav.tree_new_node": "New Node",
+  "knowledge.nav.page_rules": "Rules",
+  "knowledge.rules.title": "Rule Center",
+  "knowledge.rules.subtitle": "Single source of truth is the ontology rule table (rule_carrier × rule_layer); the product entry lives in the knowledge workbench without a new module.",
+  "knowledge.rules.refresh": "Refresh",
+  "knowledge.rules.loading": "Loading rules…",
+  "knowledge.rules.empty_title": "No rules yet",
+  "knowledge.rules.empty_desc": "No rules have been registered; authoring opens with the ontology/rule-object lifecycle.",
+  "knowledge.rules.not_available_title": "Rule channel unavailable",
+  "knowledge.rules.not_available_desc": "The rule service is unavailable or not wired; this page never fabricates data.",
+  "knowledge.rules.trace_not_available": "not available",
+  "knowledge.rules.col_code": "Code",
+  "knowledge.rules.col_layer": "Layer",
+  "knowledge.rules.col_carrier": "Carrier",
+  "knowledge.rules.col_scope": "Scope",
+  "knowledge.rules.col_version": "Version",
+  "knowledge.rules.col_git_ref": "Git ref",
+  "knowledge.rules.col_status": "Status"
 }

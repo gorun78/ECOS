@@ -8,6 +8,7 @@ import {
   BookOpen,
   ShieldCheck,
   BrainCircuit,
+  ScrollText,
 } from 'lucide-react';
 
 export type { KGNode, KGEdge, GlossaryTerm, GlossaryFilter, Domain };
@@ -378,8 +379,8 @@ export type AnyKnowledgeTabId = KnowledgeTabId | DeprecatedTabId;
 
 // ── PMO-D Batch 1 — 6 平铺页面侧栏数据源 ─────────────────────────────────────
 
-/** PMO-D Batch 1 — 6 平铺页面（F1）侧栏数据源 */
-export const ACTIVE_PAGES = ['overview', 'assets', 'extract', 'graph', 'wiki', 'govern', 'cognitive_asset'] as const;
+/** PMO-D Batch 1 — 6 平铺页面（F1）侧栏数据源；R11 追加 rules（Rule Center 产品入口，七 Tab） */
+export const ACTIVE_PAGES = ['overview', 'assets', 'extract', 'graph', 'wiki', 'govern', 'rules', 'cognitive_asset'] as const;
 export type ActivePage = (typeof ACTIVE_PAGES)[number];
 
 /** PMO-D Batch 1 — i18n 前缀（zh-CN: knowledge.nav.page_overview 等） */
@@ -390,6 +391,7 @@ export const ACTIVE_PAGE_I18N_KEYS: Record<ActivePage, string> = {
   graph: 'knowledge.nav.page_graph',
   wiki: 'knowledge.nav.page_wiki',
   govern: 'knowledge.nav.page_govern',
+  rules: 'knowledge.nav.page_rules',
   cognitive_asset: 'knowledge.nav.page_cognitive_asset',
 };
 
@@ -404,6 +406,7 @@ export const ACTIVE_PAGE_ICONS: Record<ActivePage, LucideIcon> = {
   graph: Network,
   wiki: BookOpen,
   govern: ShieldCheck,
+  rules: ScrollText,
   cognitive_asset: BrainCircuit,
 };
 

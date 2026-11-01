@@ -73,8 +73,18 @@ public class OntologyRuleService {
 
     private final OntologyRuleRepository repository;
 
+    /** 五层分发（#147G）；测试/非 Spring 装配缺省时不参与发布门（发布门其余判据不变）。 */
+    private final com.chinacreator.gzcm.engine.ontology.rule.dispatch.RuleLayerDispatcher layerDispatcher;
+
     public OntologyRuleService(OntologyRuleRepository repository) {
+        this(repository, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OntologyRuleService(OntologyRuleRepository repository,
+                               com.chinacreator.gzcm.engine.ontology.rule.dispatch.RuleLayerDispatcher layerDispatcher) {
         this.repository = repository;
+        this.layerDispatcher = layerDispatcher;
     }
 
     private String nextId() { return "rule" + ID_SEQ.incrementAndGet(); }
@@ -335,6 +345,15 @@ public class OntologyRuleService {
         if (blankToNull(merged.getGitRef()) == null) violations.add("git_ref missing (DF-5)");
         if (blankToNull(merged.getRuleType()) == null) violations.add("rule_type missing (orthogonality: rule_type x rule_layer)");
         if (!tryParseExpression(merged.getExpression())) violations.add("expression not parsable (L1 baseline)");
+        if (violations.isEmpty() && layerDispatcher != null) {
+            // #147G：按 rule_layer 走五层分发门（VALIDATION 真进 FunctionValidator 沙箱；
+            // 各层缺前置即拒发布）。分发器缺席（旧装配）不改变既有判据。
+            com.chinacreator.gzcm.engine.ontology.rule.dispatch.RuleDispatchResult dispatch =
+                    layerDispatcher.dispatch(merged);
+            if (dispatch.status() == com.chinacreator.gzcm.engine.ontology.rule.dispatch.RuleDispatchResult.Status.REJECTED) {
+                violations.add("layer dispatch rejected (" + dispatch.target() + "): " + dispatch.reason());
+            }
+        }
         if (!violations.isEmpty()) {
             String detail = String.join("; ", violations);
             log.warn("Rule publish rejected: {} [{}] violations: {}", ruleId, merged.getRuleType(), detail);

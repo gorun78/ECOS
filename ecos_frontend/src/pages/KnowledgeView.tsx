@@ -53,6 +53,7 @@ import ExtractionPage from './knowledge/pages/ExtractionPage';
 import GraphPage from './knowledge/pages/GraphPage';
 import WikiPage from './knowledge/pages/WikiPage';
 import GovernPage from './knowledge/pages/GovernPage';
+import RulesPage from './knowledge/pages/RulesPage';
 import CognitiveAssetPage from './knowledge/pages/CognitiveAssetPage';
 import OverviewDashboard from './knowledge/tabs/OverviewDashboard';
 import DataWorkbenchImportTab from './knowledge/tabs/DataWorkbenchImportTab';
@@ -106,6 +107,7 @@ const PAGE_COMPONENTS: Record<ActivePage, PageOrTabComponent> = {
   graph: GraphPage,
   wiki: WikiPage,
   govern: GovernPage,
+  rules: RulesPage,
   cognitive_asset: CognitiveAssetPage,
 };
 

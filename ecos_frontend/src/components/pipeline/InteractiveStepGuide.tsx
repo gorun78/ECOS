@@ -71,8 +71,9 @@ export default function InteractiveStepGuide({
         onCommitToGit(message, filesChanged);
         return;
       }
-      // 对接后端 Git commit 端点；失败时 stub 降级
-      gitCommit(repoId, { message, files: filesChanged }).catch((err: unknown) => {
+      // 对接后端 Git commit 端点（契约只收 message/author，提交范围=工作树全量；
+      // filesChanged 仅用于回调展示，禁塞进 body 造出后端不认的字段）；失败时 stub 降级
+      gitCommit(repoId, { message }).catch((err: unknown) => {
         // 后端端点未就绪 —— stub 降级，仅记录日志，演示继续
         console.warn(
           '[InteractiveStepGuide] git commit 端点不可用，已降级为 stub：',

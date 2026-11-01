@@ -127,12 +127,16 @@ export default function GitPanel({ repoId }: GitPanelProps) {
     setLoadingBranches(true);
     setError(null);
     try {
-      const data = await fetchGitBranches<GitBranch[]>(repoId);
-      setBranches(Array.isArray(data) ? data : []);
-      const current = Array.isArray(data)
-        ? data.find((b) => b.current)?.name ?? data[0]?.name ?? ''
-        : '';
-      if (current) setSelectedBranch(current);
+      // 后端契约（datanet GitController）：{ repoId, current, branches[], status? }
+      const data = await fetchGitBranches(repoId);
+      if (data.status === 'not_available') {
+        setError(data.reason ?? 'Git repository not available');
+        setBranches([]);
+        return;
+      }
+      const names = Array.isArray(data.branches) ? data.branches : [];
+      setBranches(names.map((name) => ({ name, current: name === data.current })));
+      if (data.current) setSelectedBranch(data.current);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to fetch branches';
       setError(msg);
@@ -145,8 +149,15 @@ export default function GitPanel({ repoId }: GitPanelProps) {
     setLoadingStatus(true);
     setError(null);
     try {
-      const data = await fetchGitStatus<GitStatusResponse>(repoId);
-      setStatus(data);
+      // 后端 status 腿只给 { repoId, repoName, currentCommit, branch }；文件级状态无承载面，
+      // 不得用空数组冒充「工作树干净」——保留 files 结构性空位并如实显示分支/提交号。
+      const data = await fetchGitStatus(repoId);
+      setStatus({
+        branch: data.branch ?? '',
+        files: [],
+        ahead: 0,
+        behind: 0,
+      });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to fetch status';
       setError(msg);
@@ -159,8 +170,16 @@ export default function GitPanel({ repoId }: GitPanelProps) {
     setLoadingCommits(true);
     setError(null);
     try {
-      const data = await fetchGitCommits<GitCommit[]>(repoId, undefined, 10);
-      setCommits(Array.isArray(data) ? data : []);
+      const page = await fetchGitCommits(repoId, 0, 10);
+      const items = Array.isArray(page.items) ? page.items : [];
+      setCommits(items.map((c) => ({
+        hash: c.commitId,
+        shortHash: c.commitId ? c.commitId.slice(0, 7) : '',
+        author: c.author ?? '',
+        email: '',
+        message: c.message,
+        timestamp: c.committedAt ?? '',
+      })));
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to fetch commits';
       setError(msg);

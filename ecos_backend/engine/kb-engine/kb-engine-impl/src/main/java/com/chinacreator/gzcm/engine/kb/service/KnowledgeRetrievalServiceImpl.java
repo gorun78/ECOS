@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.engine.kb.KnowledgeRetrievalService;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeArticle;
+import com.chinacreator.gzcm.engine.kb.model.KnowledgeCategoryPolicy;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEmbedding;
 import com.chinacreator.gzcm.engine.kb.dao.KnowledgeRetrievalServiceImplDao;
 import com.chinacreator.gzcm.engine.kb.repo.PgVectorSupport;
@@ -487,11 +488,15 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
     @Override
     public KnowledgeArticle createArticle(KnowledgeArticle article) {
         if (article.getId() == null) article.setId(UUID.randomUUID().toString());
+        // F-KB-18（#147H）：七分类封闭枚举 + Rule 类须携带语义根 rule_ref
+        article.setKnowledgeCategory(KnowledgeCategoryPolicy.validate(
+                article.getKnowledgeCategory(), article.getRuleRef()));
         article.setCreatedAt(System.currentTimeMillis());
         article.setUpdatedAt(System.currentTimeMillis());
         if (article.getStatus() == null) article.setStatus("draft");
         articleMapper.insert(article);
-        log.info("Created knowledge article: {} [{}]", article.getId(), article.getTitle());
+        log.info("Created knowledge article: {} [{}] category={}", article.getId(), article.getTitle(),
+                article.getKnowledgeCategory());
         return article;
     }
 
