@@ -338,9 +338,13 @@ public class OntologyVersionService {
     /**
      * 由「权威库行数 ＋ 归档腿」组装三腿记录，推出发布态并对账（§2.9.6①③）。
      *
-     * <p><b>审计腿恒 {@code NOT_APPLICABLE}</b>：本体发布路径今天不写安全审计腿，
-     * 这是既成事实而非本批裁决——把它记成 {@code SUCCEEDED} 就是凭空造出"三腿均成"，
-     * 记成 {@code NOT_APPLICABLE + 原因} 才是如实登记（台账余项「本体发布审计腿未接」）。
+     * <p><b>审计腿的真实形态</b>（#147AB 订正旧注释）：本体发布<b>确实写</b>安全审计事件——
+     * {@link #auditPublish} 经 {@code securityClient.auditGovernance} 投递 ecos.audit，事件带
+     * {@code git_ref} 与内容哈希。但「总线受理」≠「异步已落库」，故腿记
+     * {@code SUCCEEDED}+原因「待对账」；投递失败记 {@code UNKNOWN}（发布态随之落
+     * {@code PARTIAL_FAILURE}）；通道未装配记 {@code NOT_APPLICABLE}。
+     * 旧注释「本体发布路径今天不写安全审计腿」已被实证否定（该方法有 4 处调用点），
+     * 保留会误导复核者把已存在的治理审计当作缺口。
      * 因 {@link PublishStateMachine#deriveState} 的上界是 {@code APPLIED}，
      * 本路径<b>没有任何一条腿组合能直接得出 {@code SUCCEEDED}</b>：报成功必须先过
      * {@link PublishReconciler}，而对账所需的仓库侧读回能力尚缺（read-at-ref 缺失，#147E 补），

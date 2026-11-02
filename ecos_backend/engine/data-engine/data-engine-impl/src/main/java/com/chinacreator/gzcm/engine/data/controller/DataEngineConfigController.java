@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.data.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
 import org.slf4j.Logger;
@@ -317,6 +318,7 @@ public class DataEngineConfigController {
      * PUT /api/v1/engine/data/config
      * 批量更新配置 [{config_key, config_value}, ...]
      */
+    @RequirePermission(permission = "system:config:manage")
     @PutMapping
     public ApiResponse<Map<String, Object>> updateConfig(@RequestBody List<Map<String, String>> updates) {
         try {
@@ -335,6 +337,7 @@ public class DataEngineConfigController {
      * POST /api/v1/engine/data/config/refresh
      * 刷新 sys_config 缓存。
      */
+    @RequirePermission(permission = "system:config:manage")
     @PostMapping("/refresh")
     public ApiResponse<Map<String, Object>> refreshCache() {
         try {

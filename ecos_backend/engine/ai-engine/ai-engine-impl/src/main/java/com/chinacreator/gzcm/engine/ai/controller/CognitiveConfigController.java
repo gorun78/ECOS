@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
 import jakarta.annotation.PostConstruct;
@@ -58,12 +59,14 @@ public class CognitiveConfigController {
         return ApiResponse.success(defaults);
     }
 
+    @RequirePermission(permission = "system:config:manage")
     @PutMapping
     public ApiResponse<Map<String, Object>> batchUpdate(@RequestBody List<Map<String, String>> updates) {
         int count = sysConfigService.updateBatch(updates);
         return ApiResponse.success(Map.of("updated", count));
     }
 
+    @RequirePermission(permission = "system:config:manage")
     @PostMapping("/refresh")
     public ApiResponse<Map<String, Object>> refresh() {
         sysConfigService.refreshCache();

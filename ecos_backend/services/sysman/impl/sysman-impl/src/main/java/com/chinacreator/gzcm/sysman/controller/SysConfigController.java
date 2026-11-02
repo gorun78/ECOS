@@ -1,11 +1,11 @@
 package com.chinacreator.gzcm.sysman.controller;
 
-import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.error.AuthErrorCode;
 import com.chinacreator.gzcm.common.error.SystemErrorCode;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.sysman.security.MinimumClearance;
+import com.chinacreator.gzcm.sysman.security.RequirePermission;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -295,6 +295,7 @@ public class SysConfigController {
     }
 
     /** PUT /api/v1/system/config/{configKey} → 更新单个配置值 */
+    @RequirePermission({"config:WRITE"})
     @PutMapping("/{configKey}")
     public ApiResponse<?> update(@PathVariable String configKey, @RequestBody Map<String, String> body) {
         SysConfigQueryService sysConfigQueryService = queryProvider.getIfAvailable();

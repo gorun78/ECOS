@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.gateway.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.gateway.service.GatewaySysConfigService;
@@ -56,6 +57,7 @@ public class SysConfigController {
      * PUT /api/v1/sysconfig/{key}/reset
      * 重置指定配置项为 default_value。
      */
+    @RequirePermission(permission = "system:config:manage")
     @PutMapping("/{key}/reset")
     public ApiResponse<Map<String, Object>> reset(@PathVariable String key) {
         try {

@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.common.exception.BusinessException;
@@ -102,6 +103,7 @@ public class CognitiveConfigController {
      * <p>Body 为强类型 {@link CognitiveConfigSaveDTO} 数组：
      * {@code [{configKey, configValue}, ...]}。任一 configKey 缺失抛 {@link BusinessException}。</p>
      */
+    @RequirePermission(permission = "system:config:manage")
     @PutMapping
     public ApiResponse<CognitiveConfigSaveResult> save(@RequestBody List<CognitiveConfigSaveDTO> items) {
         if (items == null || items.isEmpty()) {

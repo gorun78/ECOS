@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
+import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyConfigDefaultVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyConfigItem;
@@ -100,6 +101,7 @@ public class OntologyConfigController {
      * Controller 层组装 Service 期望的 {@code List<Map<String,String>>}
      * 透传，避免改 sysman-impl 横切底座方法签名（C1 兼容）。
      */
+    @RequirePermission(permission = "system:config:manage")
     @PutMapping
     public ApiResponse<Map<String, Object>> batchUpdate(@RequestBody OntologyConfigSaveDTO dto) {
         List<Map<String, String>> updates = new ArrayList<>();
@@ -119,6 +121,7 @@ public class OntologyConfigController {
     }
 
     /** POST /refresh — 刷新配置缓存，返回刷新后的缓存规模。 */
+    @RequirePermission(permission = "system:config:manage")
     @PostMapping("/refresh")
     public ApiResponse<OntologyConfigRefreshVO> refresh() {
         sysConfigService.refreshCache();
