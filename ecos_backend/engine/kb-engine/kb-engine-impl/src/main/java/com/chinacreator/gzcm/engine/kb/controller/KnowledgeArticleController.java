@@ -69,11 +69,16 @@ public class KnowledgeArticleController {
     /**
      * 按七分类列知识资产（#147U：知识工作台分类筛选面的读端）。
      *
+     * <p><b>为何带显式子路径</b>：本控制器类级映射同时覆盖 {@code /articles} 与 {@code /assets}，
+     * 而 {@code GET /api/v1/knowledge/assets} 已属生命周期资产列表（{@code AssetListPage} 在调）。
+     * 若在此处写裸 {@code @GetMapping}，会同时生成 {@code /assets} 的读映射并劫持那条读面
+     * （既有调用方不带 {@code category} ⇒ 400）。故固定为 {@code /by-category}，绕开路径冲突。</p>
+     *
      * <p>分类<b>必填</b>：不给缺省「全部分类」支路，避免出现无界全量列表；
      * 未知分类由服务层抛 {@code ValidationException} ⇒ 400（禁静默回落全量）。
      * {@code limit} 缺省 20、实现方夹紧到 [1,100]。</p>
      */
-    @GetMapping
+    @GetMapping("/by-category")
     public ApiResponse<List<KnowledgeArticle>> listByCategory(
             @RequestParam String category, @RequestParam(defaultValue = "20") int limit) {
         return ApiResponse.success(knowledgeRetrievalService.listByCategory(category, limit));
