@@ -70,7 +70,7 @@ class RuntimeCacheManagerTest {
     void ttlExpiryAndVersionIsolation() {
         AtomicLong now = new AtomicLong(1_000_000L);
         RuntimeCacheManager cache = new RuntimeCacheManager(
-                provider(() -> new CacheSettings(true, 60, 60, false)), now::get);
+                provider(() -> new CacheSettings(true, 60, 60, false, "dev")), now::get);
 
         cache.put(key("tenant-a", "1"), "v1");
         assertEquals(Optional.of("v1"), cache.get(key("tenant-a", "1"), String.class));
@@ -83,7 +83,7 @@ class RuntimeCacheManagerTest {
     @Test
     void domainInvalidationOnlyTouchesThatDomain() {
         RuntimeCacheManager cache = new RuntimeCacheManager(
-                provider(() -> new CacheSettings(true, 600, 600, false)));
+                provider(() -> new CacheSettings(true, 600, 600, false, "dev")));
         cache.put(key("tenant-a", "1"), "a");
         cache.put(key("tenant-b", "1"), "b");
         cache.put(new CacheKey("dev", "cognitive", "model", "tenant-a", "m1", "1"), "c");
@@ -97,8 +97,82 @@ class RuntimeCacheManagerTest {
     @Test
     void typeMismatchIsMissNotClassCast() {
         RuntimeCacheManager cache = new RuntimeCacheManager(
-                provider(() -> new CacheSettings(true, 600, 600, false)));
+                provider(() -> new CacheSettings(true, 600, 600, false, "dev")));
         cache.put(key("tenant-a", "1"), "string");
         assertTrue(cache.get(key("tenant-a", "1"), Integer.class).isEmpty());
+    }
+
+    /** 环境段单源（#147AA）：键的 env 来自 CacheSettings，调用方无从自备。 */
+    @Test
+    void keyBuilderTakesEnvFromSettingsSingleSource() {
+        RuntimeCacheManager cache = new RuntimeCacheManager(
+                provider(() -> new CacheSettings(true, 600, 120, false, "prod")));
+        assertEquals("prod", cache.env());
+        CacheKey k = cache.key("sysman", "permission", "tenant-a", "u1", "3");
+        assertEquals("ecos:prod:sysman:permission:tenant-a:u1:v3", k.toString());
+        assertEquals(120L, cache.stalenessCeilingSeconds(), "陈旧上限须由配置面给出");
+    }
+
+    /** 陈旧上限钳制：显式 TTL 也压不过 maxStaleSeconds——权限类对象的天花板由底座保证。 */
+    @Test
+    void explicitTtlIsClampedByMaxStaleCeiling() {
+        AtomicLong now = new AtomicLong(500_000L);
+        RuntimeCacheManager cache = new RuntimeCacheManager(
+                provider(() -> new CacheSettings(true, 600, 30, false, "dev")), now::get);
+
+        cache.put(key("tenant-a", "1"), "v1", 600L);
+        now.addAndGet(29_000L);
+        assertEquals(Optional.of("v1"), cache.get(key("tenant-a", "1"), String.class));
+
+        now.addAndGet(2_000L);
+        assertTrue(cache.get(key("tenant-a", "1"), String.class).isEmpty(),
+                "显式 600s TTL 必须被 30s 陈旧上限钳制，否则权限陈旧时间失控");
+    }
+
+    /** 缺省 TTL 同样受钳制；上限未给出（≤0）时消费方须自行拒绝缓存权限类对象。 */
+    @Test
+    void defaultTtlIsClampedAndMissingCeilingIsReported() {
+        AtomicLong now = new AtomicLong(1_000L);
+        RuntimeCacheManager clamped = new RuntimeCacheManager(
+                provider(() -> new CacheSettings(true, 600, 10, false, "dev")), now::get);
+        clamped.put(key("tenant-a", "1"), "v1");
+        now.addAndGet(11_000L);
+        assertTrue(clamped.get(key("tenant-a", "1"), String.class).isEmpty());
+
+        RuntimeCacheManager unbounded = new RuntimeCacheManager(
+                provider(() -> new CacheSettings(true, 600, 0, false, "dev")));
+        assertEquals(0L, unbounded.stalenessCeilingSeconds(),
+                "上限缺席须以 ≤0 暴露给消费方（权限类对象据此不缓存，never fail-open）");
+    }
+
+    /** 按对象失效跨所有 scope（同一用户多租户视图），且不误伤他人。 */
+    @Test
+    void evictObjectRemovesEveryScopeOfThatObjectOnly() {
+        RuntimeCacheManager cache = new RuntimeCacheManager(
+                provider(() -> new CacheSettings(true, 600, 600, false, "dev")));
+        cache.put(cache.key("sysman", "permission", "tenant-a", "u1", "1"), "a");
+        cache.put(cache.key("sysman", "permission", "tenant-b", "u1", "1"), "b");
+        cache.put(cache.key("sysman", "permission", "tenant-a", "u2", "1"), "c");
+        cache.put(cache.key("sysman", "decision", "tenant-a", "u1", "1"), "d");
+
+        assertEquals(2, cache.evictObject("sysman", "permission", "u1"));
+        assertTrue(cache.get(cache.key("sysman", "permission", "tenant-a", "u1", "1"), String.class).isEmpty());
+        assertTrue(cache.get(cache.key("sysman", "permission", "tenant-b", "u1", "1"), String.class).isEmpty());
+        assertEquals(Optional.of("c"),
+                cache.get(cache.key("sysman", "permission", "tenant-a", "u2", "1"), String.class), "不得误伤他人权限");
+        assertEquals(Optional.of("d"),
+                cache.get(cache.key("sysman", "decision", "tenant-a", "u1", "1"), String.class), "不得跨类型误伤");
+        assertEquals(0, cache.evictObject("sysman", "permission", "u9"), "无命中须返回 0 而非异常");
+    }
+
+    /** 缓存配置 env 段本身的可证伪面（夹具）。 */
+    @Test
+    void settingsEnvSegmentIsNormalizedOrRejected() {
+        assertEquals(CacheSettings.DEFAULT_ENV, new CacheSettings(true, 1, 1, false, "  ").env());
+        assertEquals(CacheSettings.DEFAULT_ENV, new CacheSettings(true, 1, 1, false, null).env());
+        assertEquals("dev", new CacheSettings(true, 1, 1, false, " dev ").env());
+        assertThrows(IllegalArgumentException.class,
+                () -> new CacheSettings(true, 1, 1, false, "dev:eu"), "env 含冒号会串环境");
+        assertEquals(CacheSettings.DISABLED, CacheSettings.DISABLED.normalized());
     }
 }

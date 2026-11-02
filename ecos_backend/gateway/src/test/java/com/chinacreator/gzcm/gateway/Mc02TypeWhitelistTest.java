@@ -136,8 +136,11 @@ class Mc02TypeWhitelistTest {
      *  2026-10-31 #147A：V300（rule 补 4 列 + ecos_git_repo 建表＋种子）落地
      *  ⇒ 按实测订正 249→250（四枚同批锚）。
      *  2026-11-02 #147V：V305（sys_rule_version 补 git_ref）落地只加脚本未改本锚
-     *  ⇒ 按实测订正 254→255（四枚同批锚）。 */
-    private static final int SCRIPT_FLOOR = 255;
+     *  ⇒ 按实测订正 254→255（四枚同批锚）。
+     *  2026-11-02 #147AA：V306（sys_config 补 config_group=cache 四行种子）落地
+     *  ⇒ 按实测订正 255→256（四枚同批锚）。本枚对类型白名单<b>零新增</b>：
+     *  脚本只有 INSERT/SELECT 字面量与既有列引用，无 CREATE/ALTER 类型头。 */
+    private static final int SCRIPT_FLOOR = 256;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc03/
     // MigrationVersionUniquenessTest 同批改锚；单源最大版本 295 ⇒ 下一号 V296）。
     // #146ay：245→246（V296__cognitive_model_hypo_r4_fields.sql 纯 ALTER 加列，

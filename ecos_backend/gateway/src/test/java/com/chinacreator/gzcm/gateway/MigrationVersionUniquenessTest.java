@@ -127,9 +127,12 @@ class MigrationVersionUniquenessTest {
      * 2026-11-02 #147V：V305（sys_rule_version 补 git_ref，DS-4 rule 域历史读切 Git 的引用持久化前置，
      * dev PG 实跑 + information_schema 回查 8 列含可空 git_ref）落地 ⇒
      * 按实测订正 304→305 / 下一号 305→306。
+     * 2026-11-02 #147AA：V306（sys_config 补 config_group=cache 四行——runtime 缓存配置单源的数据面，
+     * 键 ecos.cache.enabled/default_ttl_seconds/max_stale_seconds/redis_enabled，enabled 播种为 false 保守基线；
+     * 有意不播种 ecos.cache.env，环境段属部署事实）落地 ⇒ 按实测订正 305→306 / 下一号 306→307。
      */
-    private static final int MAX_BASELINE_VERSION = 305;
-    private static final int NEXT_FREE_VERSION = 306;
+    private static final int MAX_BASELINE_VERSION = 306;
+    private static final int NEXT_FREE_VERSION = 307;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。
@@ -279,7 +282,7 @@ class MigrationVersionUniquenessTest {
     // ────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("台账锚：主版本号连续性与下一号（实测最大 305 ⇒ 新脚本自 306 顺延，禁回填占号；V288 预留未占）")
+    @DisplayName("台账锚：主版本号连续性与下一号（实测最大 306 ⇒ 新脚本自 307 顺延，禁回填占号；V288 预留未占）")
     void baselineSequenceIsAddressableAndNextSlotIsKnown() throws IOException {
         Set<Integer> majors = new TreeSet<>(parseAll().stream()
                 .map(ScriptEntry::majorVersion).toList());

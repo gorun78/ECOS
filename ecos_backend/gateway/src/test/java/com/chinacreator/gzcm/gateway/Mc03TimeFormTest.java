@@ -145,8 +145,13 @@ class Mc03TimeFormTest {
      *  2026-10-31 #147A：V300（rule 补 4 列 + ecos_git_repo 建表＋种子）落地
      *  ⇒ 按实测订正 249→250（四枚同批锚）。
      *  2026-11-02 #147V：V305（sys_rule_version 补 git_ref）落地只加脚本未改本锚
-     *  ⇒ 按实测订正 254→255（四枚同批锚）。 */
-    private static final int SCRIPT_FLOOR = 255;
+     *  ⇒ 按实测订正 254→255（四枚同批锚）。
+     *  2026-11-02 #147AA：V306（sys_config 补 config_group=cache 四行种子）落地
+     *  ⇒ 按实测订正 255→256（四枚同批锚）。本枚对 GOVERNED_PG_SYNTAX_PIN <b>零贡献</b>：
+     *  初稿用 `ON CONFLICT DO NOTHING` 曾使名录多一枚（本门当批判红），已改写为
+     *  逐行 `INSERT ... SELECT ... WHERE NOT EXISTS`——幂等且不覆盖运维已改值，
+     *  同时**不增长**「V200+ 段 PG 方言待清退」债务。 */
+    private static final int SCRIPT_FLOOR = 256;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc02/
     // MigrationVersionUniquenessTest 同批改锚）。本枚对 GOVERNED_PG_SYNTAX_PIN <b>零贡献</b>：
     // 实测 V295 正文＋注释对 ::/ON CONFLICT/RETURNING/gen_random_uuid/JSON 运算符五类判据

@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.sysman.security;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import com.chinacreator.gzcm.common.error.AuthErrorCode;
+import com.chinacreator.gzcm.sysman.iam.context.TenantContext;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -59,6 +60,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain chain) throws IOException, ServletException {
+        // 请求起点清零：容器线程被复用，本请求的身份/租户只能来自本次解析，
+        // 不得继承同线程上一请求的残留（跨租户上下文泄漏，Q-4 同族）。
+        TenantContextHolder.clear();
+        UserContext.clear();
+        TenantContext.clear();
+
         String path = request.getRequestURI();
         String authHeader = request.getHeader("Authorization");
 
@@ -187,7 +194,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         log.debug("JWT authenticated: userId={}, tenant={} (source={}), authorities={}",
                 userId, tenantId, tenantSource, allAuthorities);
 
-        chain.doFilter(request, response);
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            // 容器线程被复用：不清理就会让**下一个无令牌请求**读到上一个请求的租户/身份
+            // （跨租户上下文泄漏；缓存键 scope 也取自该上下文，故必须请求级收敛，Q-4 同族）。
+            TenantContextHolder.clear();
+            UserContext.clear();
+            TenantContext.clear();
+        }
     }
 
     /** 写响应并附带 ApiResponse.traceId（W09）——过滤链 4xx/5xx 也是一等公民的 traceId 载体。 */

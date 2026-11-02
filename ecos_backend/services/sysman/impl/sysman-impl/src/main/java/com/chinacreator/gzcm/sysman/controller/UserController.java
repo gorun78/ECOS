@@ -40,6 +40,7 @@ import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import com.chinacreator.gzcm.sysman.dto.UserBatchSaveDTO;
 import com.chinacreator.gzcm.sysman.dto.UserSaveDTO;
 import com.chinacreator.gzcm.sysman.iam.entity.UserAccount;
+import com.chinacreator.gzcm.sysman.iam.cache.PermissionCacheService;
 import com.chinacreator.gzcm.sysman.iam.service.IUserService;
 import com.chinacreator.gzcm.sysman.service.UserQueryService;
 import org.slf4j.Logger;
@@ -56,10 +57,13 @@ public class UserController {
 	private final UserQueryService userQueryService;
 	private static final Logger log = LoggerFactory.getLogger(UserController.class);
 	private final IUserService userService;
+	private final PermissionCacheService permissionCacheService;
 
-	public UserController(IUserService userService, UserQueryService userQueryService) {
+	public UserController(IUserService userService, UserQueryService userQueryService,
+			PermissionCacheService permissionCacheService) {
 		this.userService = userService;
 		this.userQueryService = userQueryService;
+		this.permissionCacheService = permissionCacheService;
 	}
 
 	@GetMapping
@@ -282,6 +286,9 @@ public class UserController {
 			for (String roleId : roleIds) {
 				userQueryService.update("INSERT INTO TD_USER_ROLE (user_id, role_id, created_by) VALUES (?, ?, 'admin')", id, roleId);
 			}
+			// 授权关系是权限缓存的权威数据源：提交后必须立即失效该用户的全部缓存视图，
+			// 否则撤权要等 TTL 才生效（§2.9.8④「先提交权威数据、再失效缓存」+ ⑥「证明撤权生效」；#147AA）。
+			permissionCacheService.evictUser(id);
 			return ApiResponse.success();
 		} catch (Exception e) {
 			log.error("分配用户角色失败", e);
