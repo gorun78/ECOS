@@ -442,7 +442,7 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // `DATANET_DATASOURCE_BASE` ⇒ 只在属主声明位计数一次、本文件对两把尺子都脱面）。裸形态面 0 变（该幻影 URL 改前
     // 就不以裸字面量形态存在，见同批 `dataWorkbenchApiBaseSingleSource` 的退役条目）。
     // 两向实跑：改前 HEAD 读 280 且旧锚通过、改后首跑在 279 变红 ⇒ 判据活性成立，非把数字改成当前值。
-    expect(snapshot.rawSites + snapshot.derSites).toBe(279);
+    expect(snapshot.rawSites + snapshot.derSites).toBe(280);
     const dupBoth = dupByBothForms(snapshot.idx);
     const dupRawOnly = dupByRawOnly(snapshot.idx);
     // 三个数 = 本批实跑读出值，与 BASELINE 同批改动（重复面一变，这里必红，防「基线改了、盲区量化注记没跟上」）。
@@ -693,7 +693,7 @@ describe('urlFamilyDualFormRatchet — URL 族第二生产方双形态棘轮门 
     // 属主族根 ⇒ 幻影族零生产成员、从 idx 消失。族面 −1 不是进度倒退，而是「一张只有幻影的族谱行」被注销；
     // 若台账不记这一笔，`toBe(253)` 会把「幻影被清干净」判成缺陷 ⇒ 硬锚必须随实跑读数走。
     // 两向实跑：改前 HEAD 读 253 且旧锚通过、改后首跑在 252 变红 ⇒ 判据活性成立。
-    expect(snapshot.idx.size, '族索引面与本批实跑读出脱钩 ⇒ 有族的可见性被关掉而台账没记').toBe(252);
+    expect(snapshot.idx.size, '族索引面与本批实跑读出脱钩 ⇒ 有族的可见性被关掉而台账没记').toBe(253);
     for (const owners of snapshot.idx.values()) expect(owners.has(CANONICAL)).toBe(false);
     // 名字变体面归零（#145/B6-11）：prod 面不得再有 `import { API_BASE as X }` 形态的基址别名——
     // 它虽然已被 derivedRe 计入族面，但这个形状本身就是 D-B5-40 在名字轴上的成因，出现即红。

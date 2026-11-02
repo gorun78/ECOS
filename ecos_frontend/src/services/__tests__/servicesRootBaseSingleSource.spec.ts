@@ -204,10 +204,13 @@ const RAW_PRE_BATCH_URL_LITERALS: readonly string[] = [
   "'/api/v1/knowledge/nav'",
   '`/api/v1/knowledge/assets/status${qs}`',
   '`/api/v1/ecos/git/status${q(repoId)}`',
-  '`/api/v1/ecos/git/commits${q(repoId, { path, limit })}`',
+  // #147I（R7~R11 DI-3）：gitService 强类型化顺带订正两枚参数面值——commits 由后端不支持的
+  // `{ path, limit }` 改为 `{ offset, limit }`，diff 由 `{ commit1, commit2, path }` 改为 `{ from, to }`
+  // （与 datanet GitController 实签名一致；面值仍 50 条不动，属主与基址单源不变）
+  '`/api/v1/ecos/git/commits${q(repoId, { offset, limit })}`',
   '`/api/v1/ecos/git/commit${q(repoId)}`',
   '`/api/v1/ecos/git/branches${q(repoId)}`',
-  '`/api/v1/ecos/git/diff${q(repoId, { commit1, commit2, path })}`',
+  '`/api/v1/ecos/git/diff${q(repoId, { from, to })}`',
   '`/api/v1/ecos/git/tag${q(repoId)}`',
   '`/api/v1/ecos/git/rollback${q(repoId)}`',
   '`/api/v1/ecos/git/branch${q(repoId)}`',
