@@ -67,6 +67,19 @@ public class KnowledgeArticleController {
     }
 
     /**
+     * 按七分类列知识资产（#147U：知识工作台分类筛选面的读端）。
+     *
+     * <p>分类<b>必填</b>：不给缺省「全部分类」支路，避免出现无界全量列表；
+     * 未知分类由服务层抛 {@code ValidationException} ⇒ 400（禁静默回落全量）。
+     * {@code limit} 缺省 20、实现方夹紧到 [1,100]。</p>
+     */
+    @GetMapping
+    public ApiResponse<List<KnowledgeArticle>> listByCategory(
+            @RequestParam String category, @RequestParam(defaultValue = "20") int limit) {
+        return ApiResponse.success(knowledgeRetrievalService.listByCategory(category, limit));
+    }
+
+    /**
      * F10: 批量查询知识资产的图谱/向量双写状态。
      *
      * <p>F04-14 调度/并发收敛：原 {@code CompletableFuture.supplyAsync × 2 + allOf}

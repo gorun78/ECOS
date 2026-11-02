@@ -19,6 +19,14 @@ public interface KnowledgeArticleMapper {
     @Select("SELECT " + COLS + " FROM ecos_knowledge.knowledge_article WHERE domain = #{domain}")
     List<KnowledgeArticle> findByDomain(@Param("domain") String domain);
 
+    /**
+     * 按七分类过滤（#147U）：分类闭集由 {@code KnowledgeCategory} 在服务层校验，
+     * SQL 只做等值匹配；{@code limit} 已由调用方夹紧，避免无界列表。
+     */
+    @Select("SELECT " + COLS + " FROM ecos_knowledge.knowledge_article "
+            + "WHERE knowledge_category = #{category} ORDER BY created_at DESC LIMIT #{limit}")
+    List<KnowledgeArticle> findByCategory(@Param("category") String category, @Param("limit") int limit);
+
     @Select("SELECT " + COLS + " FROM ecos_knowledge.knowledge_article WHERE title ILIKE CONCAT('%', #{query}, '%') OR content ILIKE CONCAT('%', #{query}, '%') LIMIT #{limit}")
     List<KnowledgeArticle> search(@Param("query") String query, @Param("limit") int limit);
 

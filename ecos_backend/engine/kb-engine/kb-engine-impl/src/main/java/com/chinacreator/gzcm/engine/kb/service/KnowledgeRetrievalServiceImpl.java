@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.engine.kb.KnowledgeRetrievalService;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeArticle;
+import com.chinacreator.gzcm.engine.kb.model.KnowledgeCategory;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeCategoryPolicy;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEmbedding;
 import com.chinacreator.gzcm.engine.kb.dao.KnowledgeRetrievalServiceImplDao;
@@ -508,5 +509,24 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
     @Override
     public List<KnowledgeArticle> searchArticles(String queryText, int limit) {
         return articleMapper.search(queryText, limit);
+    }
+
+    /**
+     * 按七分类列知识资产（#147U）。
+     *
+     * <p>未知/空分类直接抛 {@code ValidationException}（400）：筛选面宁可不给结果，
+     * 也不做「非法值回落全量」——后者会让前端筛选静默失效却显示成功（假绿）。
+     * 存量行可能尚无分类（V301 只加列未回填），故合法分类也可能返回空集，属如实形态。</p>
+     */
+    @Override
+    public List<KnowledgeArticle> listByCategory(String category, int limit) {
+        KnowledgeCategory parsed = KnowledgeCategory.fromCode(category);
+        if (parsed == null) {
+            throw new com.chinacreator.gzcm.common.exception.ValidationException(
+                    "未知知识分类: " + category
+                            + "（闭集 Fact/Concept/Procedure/Rule/Case/Evidence/Pattern）");
+        }
+        int bounded = Math.max(1, Math.min(limit, 100));
+        return articleMapper.findByCategory(parsed.code(), bounded);
     }
 }

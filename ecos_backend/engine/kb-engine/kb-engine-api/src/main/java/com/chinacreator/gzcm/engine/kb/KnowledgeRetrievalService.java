@@ -58,4 +58,14 @@ public interface KnowledgeRetrievalService {
     KnowledgeArticle getArticle(String articleId);
 
     List<KnowledgeArticle> searchArticles(String queryText, int limit);
+
+    /**
+     * 按七分类列知识资产（#147U；供知识工作台分类筛选面消费）。
+     *
+     * <p>{@code category} 取值闭集见 {@code KnowledgeCategory}
+     * （Fact/Concept/Procedure/Rule/Case/Evidence/Pattern，大小写不敏感）；
+     * 未知值抛 {@code ValidationException}（HTTP 400），不做「忽略非法值返回全量」的宽容——
+     * 那会让前端筛选失效却显示成功。{@code limit} 由实现方夹紧到 [1,100]。</p>
+     */
+    List<KnowledgeArticle> listByCategory(String category, int limit);
 }
