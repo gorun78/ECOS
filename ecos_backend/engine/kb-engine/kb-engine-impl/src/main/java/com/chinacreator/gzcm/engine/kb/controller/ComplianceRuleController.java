@@ -145,6 +145,10 @@ public class ComplianceRuleController {
             vo.setChangedBy(asString(row.get("changed_by")));
             vo.setChangedAt(asLong(row.get("changed_at")));
             vo.setChangeNote(asString(row.get("change_note")));
+            // #147V 只增三键：归档引用 + 内容来源 + 退回缘由（来源由 Service 判定，Controller 不复判）
+            vo.setGitRef(asString(row.get("git_ref")));
+            vo.setContentSource(asString(row.get("content_source")));
+            vo.setContentReason(asString(row.get("content_reason")));
             versions.add(vo);
         }
         return ApiResponse.success(versions);
