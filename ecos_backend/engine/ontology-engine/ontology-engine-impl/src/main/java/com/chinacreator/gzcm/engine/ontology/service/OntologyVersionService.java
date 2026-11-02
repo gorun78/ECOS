@@ -29,6 +29,7 @@ import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionSaveDTO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyGitHistoryVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionPreviousDiffVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyVersionVO;
+import com.chinacreator.gzcm.engine.ontology.dto.VersionContentSource;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyEntity;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyProperty;
 import com.chinacreator.gzcm.engine.ontology.model.OntologyRelationship;
@@ -418,27 +419,30 @@ public class OntologyVersionService {
 
     public List<Map<String, Object>> listVersions(String ontologyId) {
         return versionRepository.findByOntology(ontologyId).stream()
-            .map(this::toMap).collect(Collectors.toList());
+            .map(this::toIndexMap).collect(Collectors.toList());
     }
 
     /**
      * 强类型 VO 版（T16-2）。
      * <p>旧 {@link #listVersions(String)} 签名保留（Wave31 C1 mock 兼容）。
+     * <p>#147T：本门面按分态裁决输出<b>版本索引视图</b>（不内联快照），见 {@link #toIndexVO}。
      */
     public List<OntologyVersionVO> listVersionsVO(String ontologyId) {
         return versionRepository.findByOntology(ontologyId).stream()
-            .map(this::toVO).collect(Collectors.toList());
+            .map(this::toIndexVO).collect(Collectors.toList());
     }
 
     public Map<String, Object> getVersion(String ontologyId, String versionId) {
-        return versionRepository.findById(versionId).map(this::toMap).map(this::withResolvedSnapshot).orElse(null);
+        return versionRepository.findById(versionId)
+            .map(ver -> withResolvedSnapshot(toMap(ver), ver)).orElse(null);
     }
 
     /**
      * 强类型 VO 版（T16-2）；不存在返回 null。
      */
     public OntologyVersionVO getVersionVO(String ontologyId, String versionId) {
-        return versionRepository.findById(versionId).map(this::toVO).map(this::withResolvedSnapshot).orElse(null);
+        return versionRepository.findById(versionId)
+            .map(ver -> withResolvedSnapshot(toVO(ver), ver)).orElse(null);
     }
 
     /**
@@ -727,27 +731,51 @@ public class OntologyVersionService {
     }
 
     /**
-     * 快照内容来源单源（#147R；§2.9.6④/DQ-6「历史只从 Git 取」的读侧切换）：
-     * 已归档版本（git_ref 非空）优先按 ref 从对象库读回；读不到才退回 DB {@code snapshot} 列，
-     * 并把退回落日志（禁静默把 DB 快照当 Git 历史）。
-     * 未归档（Draft/旧行）直接回 DB 快照。
+     * 快照内容解析结果（#147T）：内容 + <b>实际来源</b> + 回退原因。
+     *
+     * <p>来源必须与内容同批产出——只有内容没有来源，消费方就分不出「Git 读回」与「DB 兜底」，
+     * 「历史只从 Git 取」这条就只能凭服务日志自证。</p>
      */
-    private String resolveSnapshotContent(OntologyVersion ver) {
+    private record SnapshotResolution(String content, VersionContentSource source, String reason) {
+    }
+
+    /**
+     * 快照内容来源单源（#147R 建立，#147T 起同时给出来源）：
+     * 已归档版本（git_ref 非空）优先按 ref 从对象库读回；读不到才退回 DB {@code snapshot} 列，
+     * 并把退回落日志<b>且落进契约面</b>（{@link VersionContentSource#DB_FALLBACK} + 原因），
+     * 禁静默把 DB 快照当 Git 历史。未归档（Draft/旧行）直接回 DB 快照。
+     */
+    private SnapshotResolution resolveSnapshot(OntologyVersion ver) {
         if (ver == null) {
-            return null;
+            return new SnapshotResolution(null, VersionContentSource.DB_IN_USE, null);
         }
-        if (ver.getGitRef() == null || ver.getGitRef().isBlank() || gitService.isEmpty()) {
-            return ver.getSnapshot();
+        if (!isGitSourced(ver)) {
+            return new SnapshotResolution(ver.getSnapshot(), VersionContentSource.DB_IN_USE, null);
         }
         OntologyGitReadResult r = gitService.get().readVersionAtRef(
                 GIT_REPO_ONTOLOGY, GIT_ASSET_TYPE, ver.getOntologyId(), ver.getVersionNo(), ver.getGitRef());
         if (r != null && r.isFound()) {
-            return r.getContent();
+            return new SnapshotResolution(r.getContent(), VersionContentSource.GIT, null);
         }
         String why = r == null ? "null result" : r.getReason();
-        log.warn("历史版本按 git ref 读回失败，退回 DB 快照（content 源已标注）: id={} ref={} reason={}",
+        log.warn("历史版本按 git ref 读回失败，退回 DB 快照（来源已标注）: id={} ref={} reason={}",
                 ver.getId(), ver.getGitRef(), why);
-        return ver.getSnapshot();
+        return new SnapshotResolution(ver.getSnapshot(), VersionContentSource.DB_FALLBACK, why);
+    }
+
+    /**
+     * 该版本的快照内容是否「应当」取自 Git（#147T 判定谓词单源）。
+     *
+     * <p>谓词只有一处定义：{@code git_ref} 非空 <b>且</b> Git 通道已装配。列表索引面与单行解析面
+     * 共用它，避免「列表说内容在 Git、详情说取不到」两面分叉。</p>
+     */
+    private boolean isGitSourced(OntologyVersion ver) {
+        return ver != null && ver.getGitRef() != null && !ver.getGitRef().isBlank() && !gitService.isEmpty();
+    }
+
+    /** 内容来源（未经实际读回时的指针态，用于列表/创建等不内联内容的门面）。 */
+    private VersionContentSource expectedSourceOf(OntologyVersion ver) {
+        return isGitSourced(ver) ? VersionContentSource.GIT : VersionContentSource.DB_IN_USE;
     }
 
     /**
@@ -762,8 +790,9 @@ public class OntologyVersionService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("version1", ver1.getVersionNo());
         result.put("version2", ver2.getVersionNo());
-        result.put("snapshot1", safeParseJson(resolveSnapshotContent(ver1)));
-        result.put("snapshot2", safeParseJson(resolveSnapshotContent(ver2)));
+        // 每侧只解析一次：#147R 前两侧各调 2 次读，diff 端点会打 4 趟 Git 对象库。
+        result.put("snapshot1", safeParseJson(resolveSnapshot(ver1).content()));
+        result.put("snapshot2", safeParseJson(resolveSnapshot(ver2).content()));
         return result;
     }
 
@@ -778,11 +807,13 @@ public class OntologyVersionService {
             .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + v1 + "' not found"));
         OntologyVersion ver2 = versionRepository.findById(v2)
             .orElseThrow(() -> new IllegalArgumentException("ONT-001: Version '" + v2 + "' not found"));
+        SnapshotResolution r1 = resolveSnapshot(ver1);
+        SnapshotResolution r2 = resolveSnapshot(ver2);
         OntologyVersionVO vo = new OntologyVersionVO();
         vo.setVersion1(ver1.getVersionNo());
         vo.setVersion2(ver2.getVersionNo());
-        vo.setSnapshot1(safeParseJson(resolveSnapshotContent(ver1)));
-        vo.setSnapshot2(safeParseJson(resolveSnapshotContent(ver2)));
+        vo.setSnapshot1(safeParseJson(r1.content()));
+        vo.setSnapshot2(safeParseJson(r2.content()));
         return vo;
     }
 
@@ -793,62 +824,79 @@ public class OntologyVersionService {
      */
     public List<Map<String, Object>> listAllVersions() {
         return versionRepository.findAll().stream()
-            .map(this::toMap).collect(Collectors.toList());
+            .map(this::toIndexMap).collect(Collectors.toList());
     }
 
     /**
      * 强类型 VO 版（T16-5，简化端点 listAll）；旧 {@link #listAllVersions()} 签名保留（Wave31 C1 mock 兼容）。
+     * <p>#147T：同 {@link #listVersionsVO(String)}，输出索引视图；本面跨全部本体、行数无上界，
+     * 是「列表面逐行读 Git」成本裁决的主要对象。
      */
     public List<OntologyVersionVO> listAllVersionsVO() {
         return versionRepository.findAll().stream()
-            .map(this::toVO).collect(Collectors.toList());
+            .map(this::toIndexVO).collect(Collectors.toList());
     }
 
     /**
      * 按 ID 获取版本（不依赖 ontologyId）
      */
     public Map<String, Object> getVersionById(String id) {
-        return versionRepository.findById(id).map(this::toMap).map(this::withResolvedSnapshot).orElse(null);
+        return versionRepository.findById(id)
+            .map(ver -> withResolvedSnapshot(toMap(ver), ver)).orElse(null);
     }
 
     /**
      * 强类型 VO 版（T16-5，简化端点 get）；不存在返回 null。
      */
     public OntologyVersionVO getVersionVOById(String id) {
-        return versionRepository.findById(id).map(this::toVO).map(this::withResolvedSnapshot).orElse(null);
+        return versionRepository.findById(id)
+            .map(ver -> withResolvedSnapshot(toVO(ver), ver)).orElse(null);
     }
 
-    /** 单行读面：已归档版本内容按 git_ref 读回（#147R）；否则原样。 */
-    private Map<String, Object> withResolvedSnapshot(Map<String, Object> body) {
-        if (body == null) {
-            return null;
+    /** 单行读面：已归档版本内容按 git_ref 读回（#147R），来源与回退原因同批标注（#147T）。 */
+    private Map<String, Object> withResolvedSnapshot(Map<String, Object> body, OntologyVersion ver) {
+        SnapshotResolution r = resolveSnapshot(ver);
+        body.put("snapshot", safeParseJson(r.content()));
+        body.put("contentSource", r.source().name());
+        if (r.reason() != null) {
+            body.put("contentReason", r.reason());
         }
-        Object id = body.get("id");
-        Object gitRef = body.get("gitRef");
-        if (id == null || gitRef == null || String.valueOf(gitRef).isBlank() || gitService.isEmpty()) {
-            return body;
-        }
-        versionRepository.findById(String.valueOf(id)).ifPresent(ver -> {
-            String content = resolveSnapshotContent(ver);
-            if (content != null && !content.equals(ver.getSnapshot())) {
-                body.put("snapshot", safeParseJson(content));
-            }
-        });
         return body;
     }
 
     /** VO 同行（单行读面）。 */
-    private OntologyVersionVO withResolvedSnapshot(OntologyVersionVO vo) {
-        if (vo == null || vo.getGitRef() == null || vo.getGitRef().isBlank() || gitService.isEmpty()) {
-            return vo;
-        }
-        versionRepository.findById(vo.getId()).ifPresent(ver -> {
-            String content = resolveSnapshotContent(ver);
-            if (content != null && !content.equals(ver.getSnapshot())) {
-                vo.setSnapshot(safeParseJson(content));
-            }
-        });
+    private OntologyVersionVO withResolvedSnapshot(OntologyVersionVO vo, OntologyVersion ver) {
+        SnapshotResolution r = resolveSnapshot(ver);
+        vo.setSnapshot(safeParseJson(r.content()));
+        vo.setContentSource(r.source());
+        vo.setContentReason(r.reason());
         return vo;
+    }
+
+    /**
+     * 列表行 → <b>版本索引视图</b>（#147T 分态裁决，§2.9.6④/DQ-6 与铁律 #8「版本表降级为版本索引」）。
+     *
+     * <p>裁决内容：列表门面<b>不内联快照内容</b>，只出索引列（版本指针 + 归档引用 + 内容所在地）。
+     * 三条依据——① 成本：列表面若带内容，已归档行须逐行读 Git 对象库，一次列表 = N 次 Git 往返，
+     * 且 N 无上界（{@code findAll} 面跨全部本体）；② 语义：§2.9.5② 四版本概念里列表属
+     * 「运行态/索引」面，历史内容只在「按 ref 检回」的单行面出现，二者本不同源；③ 消费面实证：
+     * 前端列表契约 {@code ontologyVersionApi.VersionItem} 从无 {@code snapshot} 字段，
+     * 内容一律走 {@code fetchVersionDetail}（单行面），故索引化不削减任何既有能力。</p>
+     *
+     * <p>由此 {@code snapshot} 列在读侧只服务单行面/diff 面，列表面零消费——这是 DS-4
+     * 「停写 → 读写切 Git → 备份后 DROP」里读侧的最后一块列表面。</p>
+     */
+    private OntologyVersionVO toIndexVO(OntologyVersion v) {
+        OntologyVersionVO vo = toVO(v);
+        vo.setSnapshot(null);
+        return vo;
+    }
+
+    /** Map 轨同行；保留 {@code snapshot} 键置空（键集只增不改，禁结构性删除）。 */
+    private Map<String, Object> toIndexMap(OntologyVersion v) {
+        Map<String, Object> m = toMap(v);
+        m.put("snapshot", null);
+        return m;
     }
 
     /**
@@ -1114,6 +1162,7 @@ public class OntologyVersionService {
         m.put("status", v.getStatus());
         m.put("snapshot", safeParseJson(v.getSnapshot()));
         m.put("gitRef", v.getGitRef());
+        m.put("contentSource", expectedSourceOf(v).name());
         m.put("changeLog", v.getChangeLog());
         m.put("publisher", v.getPublisher());
         m.put("publishedAt", v.getPublishedAt() != null ? v.getPublishedAt().toString() : null);
@@ -1133,6 +1182,7 @@ public class OntologyVersionService {
         vo.setStatus(v.getStatus());
         vo.setSnapshot(safeParseJson(v.getSnapshot()));
         vo.setGitRef(v.getGitRef());
+        vo.setContentSource(expectedSourceOf(v));
         vo.setChangeLog(v.getChangeLog());
         vo.setPublisher(v.getPublisher());
         vo.setPublishedAt(v.getPublishedAt() != null ? v.getPublishedAt().toString() : null);

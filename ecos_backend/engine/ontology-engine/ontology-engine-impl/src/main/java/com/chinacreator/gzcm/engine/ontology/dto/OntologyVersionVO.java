@@ -37,6 +37,22 @@ public class OntologyVersionVO {
     /** Git 归档引用（#147R 读切 Git 的判定键；未归档为 null）。 */
     private String gitRef;
 
+    /**
+     * 快照内容来源（#147T 只增键）。
+     *
+     * <p>单行读面（详情/diff）= <b>本次返回内容的实际来源</b>；
+     * 列表读面（{@code /{ontologyId}/versions}、{@code GET /api/v1/ecos/versions}）=
+     * <b>内容所在地指针</b>，列表按裁决不内联内容（见 {@code toIndexVO} javadoc），
+     * 消费方要内容须走单行读面。</p>
+     */
+    private VersionContentSource contentSource;
+
+    /**
+     * {@code contentSource = DB_FALLBACK} 时的失败原因（#147T）。
+     * <p>禁静默退回：Git 读回失败必须把原因带出契约面，供对账与人工处置定位。</p>
+     */
+    private String contentReason;
+
 
     /** 发布人 */
     private String publisher;
