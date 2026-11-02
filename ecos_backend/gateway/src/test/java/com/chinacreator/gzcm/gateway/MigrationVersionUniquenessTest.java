@@ -93,8 +93,11 @@ class MigrationVersionUniquenessTest {
      *  2026-10-31 #146bd：V299（cognitive hypothesis status 默认值 VALID→PROPOSED，纯 ALTER）
      *  落地 ⇒ 按实测订正 248→249（四枚同批锚）。
      *  2026-10-31 #147A：V300（ecos_ontology_rule 补 4 列 + ecos_control.ecos_git_repo 建表
-     *  + 6 枚 repositoryId 种子，dev PG 实跑）落地 ⇒ 按实测订正 249→250（四枚同批锚）。 */
-    private static final int SCRIPT_COUNT_FLOOR = 254;
+     *  + 6 枚 repositoryId 种子，dev PG 实跑）落地 ⇒ 按实测订正 249→250（四枚同批锚）。
+     *  2026-11-02 #147V：V301~V305 五枚陆续落地（七分类/清退守卫/审计契约列/注册表名录列/
+     *  sys_rule_version.git_ref），本锚前四枚已随各自批次订正至 254，V305 落地未改本锚
+     *  ⇒ 按实测订正 254→255（四枚同批锚）。 */
+    private static final int SCRIPT_COUNT_FLOOR = 255;
 
     /**
      * 锁④：台账锚——基线最大版本与下一号（新增脚本必须用 {@code > } 本值的主版本号）。
@@ -119,9 +122,14 @@ class MigrationVersionUniquenessTest {
      * 2026-10-31 #147A：V300（rule 补 4 列 + CHECK 二枚 + ecos_control.ecos_git_repo 建表
      * + repositoryId 种子 6 枚；dev PG 实跑＋MC03 形态订正后复跑零 ERROR，见 V300 尾注）落地 ⇒
      * 按实测订正 299→300 / 下一号 300→301。
+     * 2026-11-01~02 #147H/#147K/#147J/#147R 各批：V301（kb 七分类两列）· V302（agent_version 清退守卫）
+     * · V303（审计事件契约 20 列）· V304（注册表纳入/排除清单列）陆续落地 ⇒ 台账锚随批推进至 304 / 下一号 305。
+     * 2026-11-02 #147V：V305（sys_rule_version 补 git_ref，DS-4 rule 域历史读切 Git 的引用持久化前置，
+     * dev PG 实跑 + information_schema 回查 8 列含可空 git_ref）落地 ⇒
+     * 按实测订正 304→305 / 下一号 305→306。
      */
-    private static final int MAX_BASELINE_VERSION = 304;
-    private static final int NEXT_FREE_VERSION = 305;
+    private static final int MAX_BASELINE_VERSION = 305;
+    private static final int NEXT_FREE_VERSION = 306;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。
@@ -271,7 +279,7 @@ class MigrationVersionUniquenessTest {
     // ────────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("台账锚：主版本号连续性与下一号（实测最大 298 ⇒ 新脚本自 299 顺延，禁回填占号；V288 预留未占）")
+    @DisplayName("台账锚：主版本号连续性与下一号（实测最大 305 ⇒ 新脚本自 306 顺延，禁回填占号；V288 预留未占）")
     void baselineSequenceIsAddressableAndNextSlotIsKnown() throws IOException {
         Set<Integer> majors = new TreeSet<>(parseAll().stream()
                 .map(ScriptEntry::majorVersion).toList());

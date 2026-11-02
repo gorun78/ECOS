@@ -143,8 +143,10 @@ class Mc03TimeFormTest {
      *  2026-10-31 #146bd：V299（cognitive hypothesis status 默认值归一，纯 ALTER）
      *  落地 ⇒ 按实测订正 248→249（四枚同批锚）。
      *  2026-10-31 #147A：V300（rule 补 4 列 + ecos_git_repo 建表＋种子）落地
-     *  ⇒ 按实测订正 249→250（四枚同批锚）。 */
-    private static final int SCRIPT_FLOOR = 254;
+     *  ⇒ 按实测订正 249→250（四枚同批锚）。
+     *  2026-11-02 #147V：V305（sys_rule_version 补 git_ref）落地只加脚本未改本锚
+     *  ⇒ 按实测订正 254→255（四枚同批锚）。 */
+    private static final int SCRIPT_FLOOR = 255;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc02/
     // MigrationVersionUniquenessTest 同批改锚）。本枚对 GOVERNED_PG_SYNTAX_PIN <b>零贡献</b>：
     // 实测 V295 正文＋注释对 ::/ON CONFLICT/RETURNING/gen_random_uuid/JSON 运算符五类判据
@@ -156,6 +158,8 @@ class Mc03TimeFormTest {
     // #147A：249→250（V300 首版正文曾用 regclass 显式 cast 与 upsert 冲突短语两枚命中本判据
     // ⇒ 本批按成员级零新增纪律改写为三表联查守卫 + VALUES 派生表反查守卫（见 V300 A.2/B.2
     // 订正注与尾注⑦复跑取证），对 GOVERNED_PG_SYNTAX_PIN 终态零贡献，名录保持 10 枚不扩面）。
+    // #147V：254→255（V305__rule_version_git_ref.sql = 一枚 ALTER ADD COLUMN + 一枚 COMMENT ON
+    // COLUMN（单字面量 IS，禁 `||` 拼接：PG 语法面实测报 mismatched input），对五类判据零贡献）。
 
     @Test
     @DisplayName("锁①：扫描面非空——242 枚脚本全部可读，正文为空者只允许登记在册的作废脚本")

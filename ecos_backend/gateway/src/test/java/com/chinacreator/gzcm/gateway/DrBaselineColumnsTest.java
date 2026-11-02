@@ -142,8 +142,11 @@ class DrBaselineColumnsTest {
      *  knownLegacy 语义冻结、不入本名录计口）落地。勘误：V293（#146f td_audit_log 登记，基线列不全）
      *  本批锚定时漏数（已入库既有脚本）⇒ 初值 243 系漏数，按实测订正 243→244（四枚同批改）。
      *  2026-10-31 #147A：V300（rule 补 4 列 + ecos_git_repo 建表＋种子）落地
-     *  ⇒ 按实测订正 249→250（四枚同批锚）。 */
-    private static final int SCRIPT_FLOOR = 254;
+     *  ⇒ 按实测订正 249→250（四枚同批锚）。
+     *  2026-11-02 #147V：V305（sys_rule_version 补 git_ref，DS-4 rule 域历史读切 Git 的引用持久化前置）
+     *  落地只加脚本未改本锚 ⇒ 模块全量 test 红（本类 + Mc02/Mc03/MigrationVersionUniquenessTest 四枚），
+     *  按实测订正 254→255（四枚同批锚）。 */
+    private static final int SCRIPT_FLOOR = 255;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，按实测订正四枚同批锚）。
     // 该表属「存量真身锚定」＝七枚基线列全缺，按 V293 同族入待收口名录，不假装合规。
     // #146ay：245→246（V296__cognitive_model_hypo_r4_fields.sql 纯 ALTER 加列，零建表，
@@ -153,6 +156,8 @@ class DrBaselineColumnsTest {
     // #146bd：248→249（V299 hypothesis status 默认值归一，纯 ALTER 默认值，零建表四枚同批锚）。
     // #147A：249→250（V300 建表 ecos_control.ecos_git_repo 七枚基线列齐建（DR06~08），
     // 对 PENDING_CLOSURE_GOVERNED_TABLES 零贡献；rule 四新列为 ALTER 不属建表面）。
+    // #147V：254→255（V305__rule_version_git_ref.sql 对 sys_rule_version 纯 ALTER 补 git_ref，
+    // 零建表 ⇒ 对 PENDING_CLOSURE_GOVERNED_TABLES 零贡献，名录不扩面）。
 
     @Test
     @DisplayName("锁①：扫描面非空——脚本数、建表数、V200+ 建表数均达下限（空扫描面=假绿）")
