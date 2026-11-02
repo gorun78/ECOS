@@ -101,6 +101,26 @@ class GitNamingAndOwnerSurfaceGateTest {
     private static final Pattern JGIT_IMPORT =
             Pattern.compile("(?m)^\\s*import\\s+org\\.eclipse\\.jgit\\.");
 
+    /**
+     * DI-1 补面判据（#147S）：控制器把客户端查询参数绑成 {@code localPath} 的形态。
+     * <p>{@code [^)]*\)} 只吃注解自身的括号，不吃方法体。</p>
+     */
+    private static final Pattern LOCALPATH_REQUEST_BINDING =
+            Pattern.compile("@RequestParam[^)]*\\)\\s*(?:final\\s+)?String\\s+localPath\\b");
+
+    /**
+     * DI-1 补面判据（#147S）：请求体侧读客户端 localPath 的两形态
+     * （裸 Map 键 {@code "localPath"} 与强类型 DTO 的 {@code req.getLocalPath()}）。
+     * <p>注册表实体 {@code repository.getLocalPath()}（服务端解析面，合规）不以 {@code req.} 起头，
+     * 故不入本判据——把两类混成一条正则会误伤属主面（详见用例 Javadoc「口径为什么这样切」）。</p>
+     */
+    private static final Pattern LOCALPATH_REQUEST_CONSUME =
+            Pattern.compile("\\breq\\.getLocalPath\\(\\)|\"localPath\"");
+
+    /** 唯一登记在册的废弃入参承流文件（只进拒绝路径，见用例断言）。 */
+    private static final String PIPELINE_GIT_SERVICE =
+            "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/com/chinacreator/gzcm/engine/data/service/PipelineGitService.java";
+
     /** JGit 唯一属主文件（runtime-access）。新增成员须先按 DD-3 裁决，禁默认放行。 */
     private static final String GIT_SERVICE_IMPL =
             "ecos_backend/runtime/runtime-access/src/main/java/com/chinacreator/gzcm/runtime/access/git/GitServiceImpl.java";
@@ -178,6 +198,82 @@ class GitNamingAndOwnerSurfaceGateTest {
         String ownerStripped = SourceCommentStripper.strip(readRequired(root, GIT_SERVICE_IMPL));
         assertTrue(JGIT_IMPORT.matcher(ownerStripped).find(),
                 "属主 GitServiceImpl 已无 JGit import 锚点：底座被架空或改道，本门须同批改判据，禁静默失配");
+    }
+
+    /**
+     * DI-1 补面（#147S）：客户端 {@code localPath} 入参<b>零生效面</b>——绑定面与消费面各钉一枚白名单，
+     * 并回读「拒绝腿」真在位。
+     *
+     * <p><b>口径为什么不是「grep 字面量命中 0」</b>：补充设计册 §2.1 I-1 把兼容性判成
+     * <b>破坏性</b>，处置手段写死为「旧入参由 {@code PipelineGitService} <b>拒绝</b>并返
+     * {@code not_available}」，而不是「从签名里抹掉该参数」（根 {@code AGENTS.md}「API 只增不改」＋
+     * 铁律 §2.5 第 8 项「接口禁止接收客户端传入的 localPath」的<b>语义</b>是禁止其参与寻址，
+     * 不是禁止出现该形参）。因此本腿的判据是三条可复算的量：</p>
+     * <ol>
+     *   <li>请求绑定形态（{@code @RequestParam … String localPath}）＝<b>恰 1 处</b>，且只在
+     *       {@code PipelineGitController#listBranches}（兼容外壳）；多一枚＝新端点又把客户端路径当寻址入参；</li>
+     *   <li>请求体消费形态（{@code req.getLocalPath()} 与裸 Map 键 {@code "localPath"}）＝
+     *       <b>恰 6 处且全部落在 {@code PipelineGitService} 一枚文件</b>；</li>
+     *   <li>该文件必须同时持有拒绝锚点（{@code LOCALPATH_DEPRECATED_REASON} 抛出腿 +
+     *       {@code resolveLocalPath} 的 not_available 分支），控制器侧必须把兼容形参<b>只</b>交给
+     *       {@code listBranchesByLegacyLocalPath(localPath)}——三处任一被摘掉，白名单里的入参就变成
+     *       「真能寻址」，本腿同批变红（禁「白名单还在、拒绝腿已空」的假绿）。</li>
+     * </ol>
+     *
+     * <p><b>行为面不在本腿重复取证</b>：{@code PipelineGitControllerTest}／
+     * {@code PipelineGitServiceH4Test} 已对「只传 localPath ⇒ 400 指引」与
+     * 「只传 localPath ⇒ status=not_available」逐枚实跑；本腿只补静态面，防新增承流点绕过它们。</p>
+     */
+    @Test
+    @DisplayName("客户端 localPath 入参零生效面：绑定恰 1 处／消费恰 6 处且拒绝腿在位（DI-1）")
+    void legacyLocalPathInputIsBoundOnlyForRejection() throws IOException {
+        Path root = locateRepoRoot();
+        List<Path> javaFiles = new ArrayList<>();
+        collectJavaUnder(root.resolve("ecos_backend"), javaFiles);
+        assertScanFaceTrustworthy(javaFiles);
+
+        Set<String> bindingFiles = new TreeSet<>();
+        int bindingSites = 0;
+        Set<String> consumeFiles = new TreeSet<>();
+        int consumeSites = 0;
+        for (Path f : javaFiles) {
+            String rel = relativize(root, f);
+            String stripped = SourceCommentStripper.strip(Files.readString(f, StandardCharsets.UTF_8));
+            int b = count(LOCALPATH_REQUEST_BINDING, stripped);
+            if (b > 0) {
+                bindingFiles.add(rel);
+                bindingSites += b;
+            }
+            int c = count(LOCALPATH_REQUEST_CONSUME, stripped);
+            if (c > 0) {
+                consumeFiles.add(rel);
+                consumeSites += c;
+            }
+        }
+
+        assertEquals(Set.of("ecos_backend/engine/data-engine/data-engine-impl/src/main/java/"
+                        + "com/chinacreator/gzcm/engine/data/controller/PipelineGitController.java"),
+                bindingFiles,
+                "main 面把客户端 localPath 绑成请求参数的文件集与登记面不等：多出的枚＝新端点重新接收"
+                        + "客户端路径（铁律 §2.5 第 8 项／DI-1）；缺失＝兼容外壳已撤而本腿台账未同批改");
+        assertEquals(1, bindingSites, "废弃入参绑定面应恰 1 处，实跑=" + bindingSites);
+        assertEquals(Set.of(PIPELINE_GIT_SERVICE), consumeFiles,
+                "请求体侧读客户端 localPath 的文件集与登记面不等（实跑=" + consumeFiles + "）："
+                        + "该面只允许存在于 PipelineGitService 的拒绝分支，任何第二文件＝第二套寻址");
+        assertEquals(6, consumeSites, "请求体侧 localPath 消费面应恰 6 处，实跑=" + consumeSites);
+
+        String svc = SourceCommentStripper.strip(readRequired(root, PIPELINE_GIT_SERVICE));
+        assertTrue(svc.contains("LOCALPATH_DEPRECATED_REASON"),
+                "PipelineGitService 不再持有 LOCALPATH_DEPRECATED_REASON：白名单里的入参已成无拒绝腿的空壳");
+        assertTrue(svc.contains("legacyLocalPath != null && !legacyLocalPath.trim().isEmpty()"),
+                "resolveLocalPath 的废弃入参分支被改写：客户端路径可能已参与真实寻址");
+        assertTrue(svc.contains("throw new IllegalArgumentException(LOCALPATH_DEPRECATED_REASON)"),
+                "listBranchesByLegacyLocalPath 的显式拒绝腿缺失：废弃入参被静默放行");
+        String ctrl = SourceCommentStripper.strip(readRequired(root,
+                "ecos_backend/engine/data-engine/data-engine-impl/src/main/java/"
+                        + "com/chinacreator/gzcm/engine/data/controller/PipelineGitController.java"));
+        assertTrue(ctrl.contains("listBranchesByLegacyLocalPath(localPath)"),
+                "控制器兼容形参不再只交给拒绝腿：绑定面与消费面之间的路由被改道（DI-1）");
     }
 
     @Test

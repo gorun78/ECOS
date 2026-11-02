@@ -128,7 +128,7 @@ public class OntologyRuleService {
             rejectPublishIfNotReady(rule.getId(), rule);
         }
         repository.insert(rule);
-        log.info("Rule created: {} [{}] type={} carrier={} layer={} for entity {}",
+        log.info("Rule created: {} [{}] type={} rule_carrier={} rule_layer={} for entity {}",
             rule.getId(), rule.getCode(), rule.getRuleType(), rule.getRuleCarrier(), rule.getRuleLayer(), entityId);
         return toVO(rule);
     }
@@ -303,11 +303,11 @@ public class OntologyRuleService {
 
     /** I-3 闭集校验：非空即须落值域（大小写敏感，与 V300 CHECK 约束同词表），非法拒 ONT-030。 */
     private static void validateDualDimension(String ruleCarrier, String ruleLayer) {
-        String carrier = blankToNull(ruleCarrier);
+        String carrierDim = blankToNull(ruleCarrier);
         String layer = blankToNull(ruleLayer);
-        if (carrier != null && !RULE_CARRIER_VALUES.contains(carrier)) {
+        if (carrierDim != null && !RULE_CARRIER_VALUES.contains(carrierDim)) {
             throw new IllegalArgumentException(CODE_VALUE_DOMAIN
-                + ": rule_carrier '" + carrier + "' not in closed set " + RULE_CARRIER_VALUES);
+                + ": rule_carrier '" + carrierDim + "' not in closed set " + RULE_CARRIER_VALUES);
         }
         if (layer != null && !RULE_LAYER_VALUES.contains(layer)) {
             throw new IllegalArgumentException(CODE_VALUE_DOMAIN
