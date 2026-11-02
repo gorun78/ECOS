@@ -161,14 +161,39 @@ export interface RuleRepository {
 export const RULE_STATUS_VALUES = ['DRAFT', 'IN_REVIEW', 'ACTIVE', 'DEPRECATED'] as const;
 export type RuleStatus = (typeof RULE_STATUS_VALUES)[number];
 
+/**
+ * 内容来源三态（后端单源 = kb-engine `RuleContentSource`）。
+ *
+ * 为什么来源必须上前端契约而不止在后端日志里：Git 读回失败会退回权威库快照列，
+ * 只看 `git_ref` 有值就宣称「历史已切 Git」是假绿（#147V 的判定口径）。
+ */
+export const RULE_CONTENT_SOURCE_VALUES = ['GIT', 'DB_IN_USE', 'DB_FALLBACK'] as const;
+export type RuleContentSource = (typeof RULE_CONTENT_SOURCE_VALUES)[number];
+
+/**
+ * 合规规则版本历史行 — wire 键一律 snake_case。
+ *
+ * 单源 = 后端 `kb-engine-impl` 的 `RuleVersionVO`（`@JsonProperty` 逐键钉住列名）
+ * 与 `ComplianceRuleVersionService#getVersions` 的 `queryForList` 行 Map。改前本类型写成
+ * camelCase（`ruleId/version/changeLog/content/createdBy/createdAt`）⇒ 与后端键集**零交集**
+ * （除 `id`），任何消费方按本类型取值得 `undefined` 而不报错＝静默空态（#147X）。
+ */
 export interface RuleVersion {
   id: string;
-  ruleId: string;
-  version: number;
-  changeLog: string;
-  content?: string;
-  createdBy?: string;
-  createdAt: string;
+  rule_id: string;
+  version_number: number;
+  /** 规则快照原文（后端不解析；`content_source=GIT` 时为对象库原字节） */
+  snapshot?: string;
+  changed_by?: string;
+  /** BIGINT epoch 毫秒，非 ISO 字符串（V100 列型） */
+  changed_at?: number;
+  change_note?: string;
+  /** Git 归档引用（commit SHA，V305 列）；空 = 本行从未归档或归档失败 */
+  git_ref?: string;
+  /** 本行 `snapshot` 的实际来源；禁凭 `git_ref` 有值推断 */
+  content_source?: RuleContentSource;
+  /** 退回缘由（仅 `content_source=DB_FALLBACK` 时非空） */
+  content_reason?: string;
 }
 
 // ── PMO-54 — knowledge ingestion queue ────────────────────────────────────────
