@@ -19,8 +19,8 @@ public interface KnowledgeArticleMapper {
      */
     String COLS = "id, title, content, domain, category, knowledge_category as knowledgeCategory, "
             + "rule_ref as ruleRef, source as sourceType, status, "
-            + "(extract(epoch from created_at) * 1000)::bigint as createdAt, "
-            + "(extract(epoch from updated_at) * 1000)::bigint as updatedAt";
+            + "CAST(extract(epoch from created_at) * 1000 AS BIGINT) as createdAt, "
+            + "CAST(extract(epoch from updated_at) * 1000 AS BIGINT) as updatedAt";
 
     @Select("SELECT " + COLS + " FROM ecos_knowledge.knowledge_article WHERE id = #{id}")
     KnowledgeArticle findById(@Param("id") String id);
