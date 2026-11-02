@@ -159,7 +159,9 @@ class SqlDialectDerivationTest {
             Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/doc/mapper/KbDocChunkMapper.java", Map.of( "C_UPSERT", 8)),
             Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/doc/mapper/KbDocMapper.java", Map.of( "C_UPSERT", 10)),
             Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/repo/QueryEmbeddingHelper.java", Map.of( "B_ILIKE", 2)),
-            Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/repository/ComplianceRuleMapper.java", Map.of( "A_SQL_CAST", 16)),
+            // ComplianceRuleMapper.java 的 A_SQL_CAST=16 已随 #147Y 收口（对 BIGINT 列的
+            // `* 1000::BIGINT` 16 处强转整族删除，SQL 改按列型直传 epoch 毫秒），名录同批剪除该条目。
+            // 同目录 ExpertRuleMapper 的 6 处**保留**：那张表列型确为 TIMESTAMP，强转无害且必要（禁一刀切）。
             Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/repository/ExpertRuleMapper.java", Map.of( "A_SQL_CAST", 6)),
             Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/repository/KnowledgeArticleMapper.java", Map.of( "B_ILIKE", 2)),
             Map.entry("ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/repository/KnowledgeEmbeddingMapper.java", Map.of( "C_UPSERT", 15,  "B_ILIKE", 1)),
