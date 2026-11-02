@@ -24,6 +24,7 @@ import { Search, RefreshCw, Check, Loader2, Minus, AlertCircle } from 'lucide-re
 import { useLanguage } from '../../../components/LanguageContext';
 import { useTheme } from '../../../components/ThemeContext';
 import { fetchNavDomains, fetchNavProducts, fetchAssetStatuses, type NavProductItemVO, type AssetStatusItem } from '../../../services/knowledgeNavApi';
+import KnowledgeCategoryFilter from '../components/KnowledgeCategoryFilter';
 
 /** 资产列表分页大小 */
 const PAGE_SIZE = 20;
@@ -314,6 +315,9 @@ export default function AssetListPage() {
           <span>{t('knowledge.asset.filter_page_only_hint')}</span>
         </div>
       )}
+
+      {/* 七分类筛选（#147U）：独立读端 /articles/by-category，不复用本页客户端过滤 */}
+      <KnowledgeCategoryFilter />
 
       {/* 主区：左列表 + 右详情（≥1280px 视图） */}
       <div className="flex flex-col xl:flex-row gap-3">

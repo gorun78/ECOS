@@ -1949,5 +1949,20 @@
   "knowledge.rules.col_scope": "作用域",
   "knowledge.rules.col_version": "版本",
   "knowledge.rules.col_git_ref": "Git 引用",
-  "knowledge.rules.col_status": "状态"
+  "knowledge.rules.col_status": "状态",
+  "knowledge.categoryFilterTitle": "按七分类筛选",
+  "knowledge.categoryFilterHint": "分类为必填（后端不提供全量兜底）",
+  "knowledge.categoryFilterIdle": "请选择一个分类查看知识资产",
+  "knowledge.categoryFilterLoading": "加载中…",
+  "knowledge.categoryFilterError": "分类查询失败",
+  "knowledge.categoryFilterRetry": "重试",
+  "knowledge.categoryFilterEmpty": "该分类暂无知识资产",
+  "knowledge.categoryFilterEmptyHint": "存量资产尚未回填分类，回填后才会出现在这里",
+  "knowledge.categoryFact": "事实",
+  "knowledge.categoryConcept": "概念",
+  "knowledge.categoryProcedure": "过程",
+  "knowledge.categoryRule": "规则",
+  "knowledge.categoryCase": "案例",
+  "knowledge.categoryEvidence": "证据",
+  "knowledge.categoryPattern": "模式"
 }

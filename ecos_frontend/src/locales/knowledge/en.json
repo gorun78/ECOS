@@ -1949,5 +1949,20 @@
   "knowledge.rules.col_scope": "Scope",
   "knowledge.rules.col_version": "Version",
   "knowledge.rules.col_git_ref": "Git ref",
-  "knowledge.rules.col_status": "Status"
+  "knowledge.rules.col_status": "Status",
+  "knowledge.categoryFilterTitle": "Filter by knowledge category",
+  "knowledge.categoryFilterHint": "Category is required (no catch-all fallback)",
+  "knowledge.categoryFilterIdle": "Pick a category to list knowledge assets",
+  "knowledge.categoryFilterLoading": "Loading…",
+  "knowledge.categoryFilterError": "Category query failed",
+  "knowledge.categoryFilterRetry": "Retry",
+  "knowledge.categoryFilterEmpty": "No knowledge assets in this category",
+  "knowledge.categoryFilterEmptyHint": "Existing assets have no category yet; they appear after backfill",
+  "knowledge.categoryFact": "Fact",
+  "knowledge.categoryConcept": "Concept",
+  "knowledge.categoryProcedure": "Procedure",
+  "knowledge.categoryRule": "Rule",
+  "knowledge.categoryCase": "Case",
+  "knowledge.categoryEvidence": "Evidence",
+  "knowledge.categoryPattern": "Pattern"
 }
