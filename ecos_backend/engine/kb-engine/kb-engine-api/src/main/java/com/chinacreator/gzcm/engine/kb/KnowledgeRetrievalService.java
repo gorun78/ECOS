@@ -55,6 +55,17 @@ public interface KnowledgeRetrievalService {
 
     KnowledgeArticle createArticle(KnowledgeArticle article);
 
+    /**
+     * 修改既有知识条目的分类（#147U 编辑腿）。
+     *
+     * <p>校验与 {@code createArticle} 同口径（{@code KnowledgeCategoryPolicy}）：分类必须落在七类闭集内、
+     * Rule 类必须带 {@code ruleRef}、非 Rule 类禁带。分类必填（本方法不提供「清空分类」语义）。
+     * 条目不存在抛 {@code NotFoundException}；非法分类抛 {@code ValidationException}。</p>
+     *
+     * @return 更新后的条目（回读一次，供调用方回显真实落库值）
+     */
+    KnowledgeArticle updateArticleCategory(String articleId, String category, String ruleRef);
+
     KnowledgeArticle getArticle(String articleId);
 
     List<KnowledgeArticle> searchArticles(String queryText, int limit);

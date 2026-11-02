@@ -529,4 +529,35 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
         int bounded = Math.max(1, Math.min(limit, 100));
         return articleMapper.findByCategory(parsed.code(), bounded);
     }
+
+    /**
+     * 修改既有条目分类（#147U 编辑腿）。
+     *
+     * <p>与 {@code createArticle} 共用 {@link KnowledgeCategoryPolicy}：Rule 必带 {@code ruleRef}、
+     * 非 Rule 禁带。非 Rule 时显式写 NULL——只改分类不回填 rule_ref 会留下「降级前的影子规则引用」。
+     * 分类必填（本方法不提供清空语义）；条目不存在抛 NotFound（禁假成功）。</p>
+     */
+    @Override
+    public KnowledgeArticle updateArticleCategory(String articleId, String category, String ruleRef) {
+        if (articleId == null || articleId.isBlank()) {
+            throw new com.chinacreator.gzcm.common.exception.ValidationException("articleId 不能为空");
+        }
+        String normalized;
+        try {
+            normalized = KnowledgeCategoryPolicy.validate(category, ruleRef);
+        } catch (IllegalArgumentException e) {
+            throw new com.chinacreator.gzcm.common.exception.ValidationException(e.getMessage());
+        }
+        if (normalized == null) {
+            throw new com.chinacreator.gzcm.common.exception.ValidationException(
+                    "知识分类必填（七类闭集 Fact/Concept/Procedure/Rule/Case/Evidence/Pattern）");
+        }
+        String effectiveRuleRef = "Rule".equals(normalized) ? ruleRef.trim() : null;
+        int rows = articleMapper.updateCategory(articleId.trim(), normalized, effectiveRuleRef);
+        if (rows == 0) {
+            throw new com.chinacreator.gzcm.common.exception.NotFoundException(
+                    "知识条目不存在: " + articleId);
+        }
+        return articleMapper.findById(articleId.trim());
+    }
 }

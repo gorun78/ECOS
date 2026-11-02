@@ -33,6 +33,15 @@ public interface KnowledgeArticleMapper {
     @Select("SELECT " + COLS + " FROM ecos_knowledge.knowledge_article")
     List<KnowledgeArticle> findAll();
 
+    /**
+     * 改分类（#147U 编辑腿）：分类与 {@code rule_ref} 同批写——非 Rule 类必须写 NULL，
+     * 否则会留下降级前的影子规则引用。返回值 0 表示条目不存在（由服务层转 404）。
+     */
+    @Update("UPDATE ecos_knowledge.knowledge_article SET knowledge_category = #{category}, "
+            + "rule_ref = #{ruleRef}, updated_at = CURRENT_TIMESTAMP WHERE id = #{id}")
+    int updateCategory(@Param("id") String id, @Param("category") String category,
+                       @Param("ruleRef") String ruleRef);
+
     @Insert("INSERT INTO ecos_knowledge.knowledge_article "
             + "(id, title, content, domain, category, knowledge_category, rule_ref, source, status, created_at, updated_at) "
             + "VALUES (#{id}, #{title}, #{content}, #{domain, jdbcType=VARCHAR}, #{category, jdbcType=VARCHAR}, "

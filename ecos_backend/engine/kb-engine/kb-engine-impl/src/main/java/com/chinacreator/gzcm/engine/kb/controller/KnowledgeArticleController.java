@@ -85,6 +85,24 @@ public class KnowledgeArticleController {
     }
 
     /**
+     * 修改既有条目分类（#147U 编辑腿；`PUT /{articleId}/category`）。
+     *
+     * <p>强类型请求体 {@link com.chinacreator.gzcm.engine.kb.model.KnowledgeCategoryUpdateDTO}；
+     * Rule 类必须带 {@code ruleRef}、非 Rule 禁带（服务端 KnowledgeCategoryPolicy 强制）；
+     * 条目不存在 → 404，分类非法 → 400，均不吞成 200。</p>
+     */
+    @PutMapping("/{articleId}/category")
+    public ApiResponse<KnowledgeArticle> updateCategory(
+            @PathVariable String articleId,
+            @RequestBody com.chinacreator.gzcm.engine.kb.model.KnowledgeCategoryUpdateDTO body) {
+        if (body == null) {
+            throw new ValidationException("请求体不能为空");
+        }
+        return ApiResponse.success(knowledgeRetrievalService.updateArticleCategory(
+                articleId, body.getCategory(), body.getRuleRef()));
+    }
+
+    /**
      * F10: 批量查询知识资产的图谱/向量双写状态。
      *
      * <p>F04-14 调度/并发收敛：原 {@code CompletableFuture.supplyAsync × 2 + allOf}
