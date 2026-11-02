@@ -98,4 +98,33 @@ public class OntologyVersionVO {
 
     /** 发布态原因（三腿摘要 + 对账判定；{@code publishState} 的可读佐证，禁为空谈）。 */
     private String publishStateReason;
+
+    /**
+     * 审计对账结论（§2.9.4④ L95 读回；#147AD）：{@code NOT_AVAILABLE} / {@code MISSING} /
+     * {@code PERSISTED} / {@code UNKNOWN}。
+     *
+     * <p>发布侧投递审计只拿到「总线已受理」，故 {@code publishState} 只能记「待对账」；
+     * 本字段是对那条悬空记录的**读回结论**。只增不改：仅在版本详情读面且该版本已走发布/归档时填充，
+     * 其余读面不出现该键（{@code NON_NULL}），既有消费方零感知。</p>
+     */
+    private String auditReconciliation;
+
+    /** 对账结论的可读原因（为何不是 {@code PERSISTED}，或落库行的 apply/verification 值）。 */
+    private String auditReconciliationReason;
+
+    public String getAuditReconciliation() {
+        return auditReconciliation;
+    }
+
+    public void setAuditReconciliation(String auditReconciliation) {
+        this.auditReconciliation = auditReconciliation;
+    }
+
+    public String getAuditReconciliationReason() {
+        return auditReconciliationReason;
+    }
+
+    public void setAuditReconciliationReason(String auditReconciliationReason) {
+        this.auditReconciliationReason = auditReconciliationReason;
+    }
 }

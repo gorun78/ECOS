@@ -22,6 +22,7 @@ import com.chinacreator.gzcm.runtime.access.git.publish.ReconciliationInput;
 import com.chinacreator.gzcm.runtime.access.git.publish.ReconciliationVerdict;
 import com.chinacreator.gzcm.runtime.access.git.publish.RollbackPlan;
 import com.chinacreator.gzcm.engine.ontology.OntologyGitService;
+import com.chinacreator.gzcm.engine.ontology.audit.PublishAuditReconciler;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveRequest;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveResult;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult;
@@ -68,6 +69,14 @@ public class OntologyVersionService {
 
     /** 安全引擎审计通道（#147N）；未装配时审计腿显式 NOT_APPLICABLE（禁伪成功）。 */
     private final Optional<com.chinacreator.gzcm.engine.ontology.security.SecurityEngineClient> securityClient;
+
+    /**
+     * 审计对账读回口（§2.9.4④ L95；#147AD）。可选装配：缺席时详情读面不出对账键，
+     * 与「审计腿记 NOT_APPLICABLE」同口径——禁把「没装」写成「已落库」。
+     * 用字段注入而非构造器参数，避免改动既有 2 个构造器的全部调用点。
+     */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<com.chinacreator.gzcm.engine.ontology.audit.PublishAuditReconciler> auditReconcilerProvider;
 
     /** 旧 5 参构造保留（Wave31 单测直接 new；Git 归档 + 补偿均默认关闭）。 */
     public OntologyVersionService(OntologyVersionRepository versionRepository,
@@ -446,7 +455,34 @@ public class OntologyVersionService {
      */
     public OntologyVersionVO getVersionVO(String ontologyId, String versionId) {
         return versionRepository.findById(versionId)
-            .map(ver -> withResolvedSnapshot(toVO(ver), ver)).orElse(null);
+            .map(ver -> withResolvedSnapshot(toVO(ver), ver))
+            .map(this::withAuditReconciliation)
+            .orElse(null);
+    }
+
+    /**
+     * 版本详情读面补审计对账结论（§2.9.4④ L95；#147AD）。
+     *
+     * <p>只在「已走发布/归档」的版本上填充（{@code gitRef} 或 {@code publishState} 非空），
+     * 草稿不打扰读面；对账器缺席/查询失败时按 {@code NOT_AVAILABLE}/{@code UNKNOWN} 如实写，
+     * 绝不把不确定写成已落库。</p>
+     */
+    private OntologyVersionVO withAuditReconciliation(OntologyVersionVO vo) {
+        boolean published = (vo.getGitRef() != null && !vo.getGitRef().isBlank())
+                || (vo.getPublishState() != null && !vo.getPublishState().isBlank());
+        if (!published) {
+            return vo;
+        }
+        PublishAuditReconciler reconciler =
+                auditReconcilerProvider == null ? null : auditReconcilerProvider.getIfAvailable();
+        if (reconciler == null) {
+            return vo;
+        }
+        PublishAuditReconciler.Reconciliation r =
+                reconciler.reconcile("ont-pub-" + vo.getId() + "-" + vo.getVersionNo());
+        vo.setAuditReconciliation(r.verdict().name());
+        vo.setAuditReconciliationReason(r.detail());
+        return vo;
     }
 
     /**
@@ -854,7 +890,9 @@ public class OntologyVersionService {
      */
     public OntologyVersionVO getVersionVOById(String id) {
         return versionRepository.findById(id)
-            .map(ver -> withResolvedSnapshot(toVO(ver), ver)).orElse(null);
+            .map(ver -> withResolvedSnapshot(toVO(ver), ver))
+            .map(this::withAuditReconciliation)
+            .orElse(null);
     }
 
     /** 单行读面：已归档版本内容按 git_ref 读回（#147R），来源与回退原因同批标注（#147T）。 */
