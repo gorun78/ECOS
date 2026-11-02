@@ -1964,5 +1964,20 @@
   "knowledge.categoryRule": "Rule",
   "knowledge.categoryCase": "Case",
   "knowledge.categoryEvidence": "Evidence",
-  "knowledge.categoryPattern": "Pattern"
+  "knowledge.categoryPattern": "Pattern",
+  "knowledge.articleForm.open": "New knowledge entry",
+  "knowledge.articleForm.title": "New knowledge entry (with category)",
+  "knowledge.articleForm.close": "Close",
+  "knowledge.articleForm.titlePlaceholder": "Title (required)",
+  "knowledge.articleForm.contentPlaceholder": "Content (required)",
+  "knowledge.articleForm.category": "Category",
+  "knowledge.articleForm.ruleRefPlaceholder": "rule_ref semantic root (required for Rule)",
+  "knowledge.articleForm.submit": "Create",
+  "knowledge.articleForm.submitting": "Submitting…",
+  "knowledge.articleForm.created": "Created, ID:",
+  "knowledge.articleForm.error": "Create failed",
+  "knowledge.articleForm.errorTitleRequired": "Title is required",
+  "knowledge.articleForm.errorContentRequired": "Content is required",
+  "knowledge.articleForm.errorRuleRefRequired": "Rule category requires rule_ref (ecos_ontology_rule)",
+  "knowledge.articleForm.errorRuleRefForbidden": "rule_ref is only allowed for Rule category"
 }
