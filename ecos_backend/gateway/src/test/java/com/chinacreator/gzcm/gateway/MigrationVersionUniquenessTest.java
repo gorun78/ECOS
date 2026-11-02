@@ -130,9 +130,11 @@ class MigrationVersionUniquenessTest {
      * 2026-11-02 #147AA：V306（sys_config 补 config_group=cache 四行——runtime 缓存配置单源的数据面，
      * 键 ecos.cache.enabled/default_ttl_seconds/max_stale_seconds/redis_enabled，enabled 播种为 false 保守基线；
      * 有意不播种 ecos.cache.env，环境段属部署事实）落地 ⇒ 按实测订正 305→306 / 下一号 306→307。
+     * 2026-11-02 #147AE：V307（ecos_git_repo 六枚仓库播种 exclude_paths——§2.9.5③ 敏感路径排除的
+     * 数据面；只播排除、不播纳入，纳入清单写错会让归档腿 FAILED）落地 ⇒ 按实测订正 306→307 / 下一号 307→308。
      */
-    private static final int MAX_BASELINE_VERSION = 306;
-    private static final int NEXT_FREE_VERSION = 307;
+    private static final int MAX_BASELINE_VERSION = 307;
+    private static final int NEXT_FREE_VERSION = 308;
 
     /**
      * 登记式历史违例（裁决 D-#140E-2：存量重复<b>不返工改名</b>，只钉死不扩散）。

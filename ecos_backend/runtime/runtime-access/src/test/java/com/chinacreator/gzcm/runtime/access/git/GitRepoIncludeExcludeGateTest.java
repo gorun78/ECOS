@@ -77,4 +77,43 @@ class GitRepoIncludeExcludeGateTest {
         assertTrue(sql.contains("ADD COLUMN IF NOT EXISTS include_paths"));
         assertTrue(sql.contains("ADD COLUMN IF NOT EXISTS exclude_paths"));
     }
+
+    /**
+     * 数据面五件事（§2.9.5③；#147AE）：V307 必须为六枚仓库播种排除清单、
+     * 不得改写纳入清单、必须保留「运维已填不覆盖」的 NULL 守卫，
+     * 且播种值喂给 {@code allows()} 后确实拦得住敏感路径。载体存在而数据为空
+     * （V304 之后的真实状态）等于没有这条红线。
+     */
+    @Test
+    void v307SeedsExcludePathsForAllSixRepositoriesAndItActuallyFilters() throws IOException {
+        Path seed = repoRoot().resolve("docs/50-db_script/02-flyway-migration/gateway/"
+                + "V307__git_repo_exclude_paths_seed.sql");
+        assertTrue(Files.isRegularFile(seed), "V307 数据面脚本不在位（列有载体、数据为空＝红线无载体）");
+        String sql = Files.readString(seed, StandardCharsets.UTF_8);
+
+        List<String> pinned = List.of("agent-collab", "cognitive-model", "dw-pipeline",
+                "kb-asset-tree", "ontology-model", "scenario-def");
+        java.util.Set<String> seeded = new java.util.TreeSet<>();
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("WHERE repository_id = '([a-z-]+)'").matcher(sql);
+        while (m.find()) {
+            seeded.add(m.group(1));
+        }
+        assertEquals(new java.util.TreeSet<>(pinned), seeded,
+                "V307 必须且只能播种 §2.9.5③ 的六枚仓库；实测=" + seeded);
+
+        assertTrue(sql.contains("exclude_paths IS NULL"),
+                "缺 NULL 守卫 ⇒ 重跑会覆盖运维已自定义的排除清单");
+        assertFalse(sql.contains("include_paths ="),
+                "V307 不得改纳入清单：纳入非空即「未命中即拒」，写错会让归档腿整域 FAILED（本批裁决只播排除）");
+
+        GitRepository seededRepo = new GitRepository();
+        seededRepo.setExcludePaths(GitRepository.splitCsv(
+                ".env,credential,secrets,private-key,session"));
+        assertFalse(seededRepo.allows("secrets/token.json"), "播种后敏感目录必须被消费面拦住");
+        assertFalse(seededRepo.allows("credential/db.yml"));
+        assertFalse(seededRepo.allows(".env"));
+        assertTrue(seededRepo.allows("rules/r1.json"), "业务归档路径不得被误伤");
+        assertTrue(seededRepo.allows("cognitive-models/m1.json"));
+    }
 }
