@@ -1979,5 +1979,14 @@
   "knowledge.articleForm.errorTitleRequired": "Title is required",
   "knowledge.articleForm.errorContentRequired": "Content is required",
   "knowledge.articleForm.errorRuleRefRequired": "Rule category requires rule_ref (ecos_ontology_rule)",
-  "knowledge.articleForm.errorRuleRefForbidden": "rule_ref is only allowed for Rule category"
+  "knowledge.articleForm.errorRuleRefForbidden": "rule_ref is only allowed for Rule category",
+  "knowledge.articleEdit.open": "Change category",
+  "knowledge.articleEdit.title": "Change knowledge entry category",
+  "knowledge.articleEdit.close": "Close",
+  "knowledge.articleEdit.idPlaceholder": "Knowledge entry ID (required)",
+  "knowledge.articleEdit.save": "Save category",
+  "knowledge.articleEdit.saving": "Saving…",
+  "knowledge.articleEdit.ok": "Updated, ID:",
+  "knowledge.articleEdit.error": "Update failed",
+  "knowledge.articleEdit.errorIdRequired": "Entry ID is required"
 }

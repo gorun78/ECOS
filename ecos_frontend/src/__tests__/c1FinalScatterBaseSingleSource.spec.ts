@@ -96,8 +96,13 @@ const CANONICAL = 'services/httpClient.ts';
  * 2026-11-01 #147I 新增知识工作台「规则」页（`src/pages/knowledge/pages/RulesPage.tsx`，
  * 全量 run 实走面值 685→686，只增；该页只读既有 `/api/v1/ecos/rules`，走统一 apiFetchData，
  * 零私设基址字面量）。
+ * 2026-11-02 #147U 新增五枚生产文件（`src/pages/knowledge/services/categoryFilter.ts`、
+ * `.../services/articleWrite.ts`、`.../components/KnowledgeCategoryFilter.tsx`、
+ * `.../components/KnowledgeArticleCreateForm.tsx`、`.../components/KnowledgeArticleCategoryEditor.tsx`），
+ * 全量 run 实走面值 686→**691**，只增；五枚均经 `KNOWLEDGE_BASE`/服务层取址，
+ * 代码面零 `/api` 字面量与零 `${API_BASE}` 派生。
  */
-const PROD_FILES = 686;
+const PROD_FILES = 691;
 
 /** 本批 15 文件：rel →（导入腿相对路径、本批派生点数）。 */
 const FILES: ReadonlyArray<{ rel: string; importPath: string; sites: number }> = [

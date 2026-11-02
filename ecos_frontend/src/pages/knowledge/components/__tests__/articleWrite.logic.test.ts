@@ -5,7 +5,7 @@
  * 前端只做前置拦截，不本地放宽（非法组合仍由后端 400 兜底）。
  */
 import { describe, it, expect } from 'vitest';
-import { validateArticleInput } from '../../services/articleWrite';
+import { validateArticleInput, validateCategoryChange } from '../../services/articleWrite';
 import { categoryFilterPath } from '../../services/categoryFilter';
 
 describe('validateArticleInput', () => {
@@ -29,6 +29,22 @@ describe('validateArticleInput', () => {
     expect(validateArticleInput({ title: 't', content: 'c', category: 'Fact', ruleRef: 'rule-1' }))
       .toBe('knowledge.articleForm.errorRuleRefForbidden');
     expect(validateArticleInput({ title: 't', content: 'c', category: 'Fact' })).toBeNull();
+  });
+});
+
+describe('validateCategoryChange', () => {
+  it('条目 ID 必填', () => {
+    expect(validateCategoryChange({ articleId: '  ', category: 'Fact' }))
+      .toBe('knowledge.articleEdit.errorIdRequired');
+  });
+
+  it('Rule 必带 rule_ref、非 Rule 禁带（与新建同口径）', () => {
+    expect(validateCategoryChange({ articleId: 'a-1', category: 'Rule' }))
+      .toBe('knowledge.articleForm.errorRuleRefRequired');
+    expect(validateCategoryChange({ articleId: 'a-1', category: 'Rule', ruleRef: 'rule-1' })).toBeNull();
+    expect(validateCategoryChange({ articleId: 'a-1', category: 'Case', ruleRef: 'rule-1' }))
+      .toBe('knowledge.articleForm.errorRuleRefForbidden');
+    expect(validateCategoryChange({ articleId: 'a-1', category: 'Case' })).toBeNull();
   });
 });
 

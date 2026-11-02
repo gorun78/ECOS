@@ -1979,5 +1979,14 @@
   "knowledge.articleForm.errorTitleRequired": "标题不能为空",
   "knowledge.articleForm.errorContentRequired": "正文不能为空",
   "knowledge.articleForm.errorRuleRefRequired": "Rule 类必须提供 rule_ref（指向 ecos_ontology_rule）",
-  "knowledge.articleForm.errorRuleRefForbidden": "非 Rule 类不得携带 rule_ref"
+  "knowledge.articleForm.errorRuleRefForbidden": "非 Rule 类不得携带 rule_ref",
+  "knowledge.articleEdit.open": "修改分类",
+  "knowledge.articleEdit.title": "修改知识条目分类",
+  "knowledge.articleEdit.close": "关闭",
+  "knowledge.articleEdit.idPlaceholder": "知识条目 ID（必填）",
+  "knowledge.articleEdit.save": "保存分类",
+  "knowledge.articleEdit.saving": "保存中…",
+  "knowledge.articleEdit.ok": "已更新，ID：",
+  "knowledge.articleEdit.error": "更新失败",
+  "knowledge.articleEdit.errorIdRequired": "条目 ID 不能为空"
 }

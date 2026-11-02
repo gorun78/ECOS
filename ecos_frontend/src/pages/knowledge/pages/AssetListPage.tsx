@@ -26,6 +26,7 @@ import { useTheme } from '../../../components/ThemeContext';
 import { fetchNavDomains, fetchNavProducts, fetchAssetStatuses, type NavProductItemVO, type AssetStatusItem } from '../../../services/knowledgeNavApi';
 import KnowledgeCategoryFilter from '../components/KnowledgeCategoryFilter';
 import KnowledgeArticleCreateForm from '../components/KnowledgeArticleCreateForm';
+import KnowledgeArticleCategoryEditor from '../components/KnowledgeArticleCategoryEditor';
 
 /** 资产列表分页大小 */
 const PAGE_SIZE = 20;
@@ -321,6 +322,8 @@ export default function AssetListPage() {
       <KnowledgeCategoryFilter />
       {/* 新建知识条目（含七分类 + Rule 必带 rule_ref）（#147U 写腿） */}
       <KnowledgeArticleCreateForm />
+      {/* 修改既有条目分类（#147U 编辑腿） */}
+      <KnowledgeArticleCategoryEditor />
 
       {/* 主区：左列表 + 右详情（≥1280px 视图） */}
       <div className="flex flex-col xl:flex-row gap-3">

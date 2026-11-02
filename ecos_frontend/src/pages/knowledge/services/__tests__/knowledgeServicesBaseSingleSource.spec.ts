@@ -184,8 +184,10 @@ describe('pages/knowledge/services 域基址单源 — 私设基址清零 (#143/
     expect(API_BASE).toBe('/api');
   });
 
-  it('整域九文件代码行零私设基址（含本批未动的 govern/cognitiveAsset/kbFetch/knowledgeApi），注释里的端点说明不计', () => {
-    expect(TS_FILES.length).toBe(9);
+  it('整域十一文件代码行零私设基址（含本批未动的 govern/cognitiveAsset/kbFetch/knowledgeApi），注释里的端点说明不计', () => {
+    // #147U：新增 categoryFilter.ts / articleWrite.ts 两枚读/写端契约文件（均 import
+    // KNOWLEDGE_BASE，零 `/api` 字面量）⇒ 名册 9→11，属"新文件入册"而非扫描根漂移。
+    expect(TS_FILES.length).toBe(11);
     for (const rel of TS_FILES) {
       const hits = codeLines(read(rel)).filter((l) => HARDCODED_RE.test(l));
       expect(hits, `${rel} 仍有 ${hits.length} 处代码行 "/api 字面量`).toEqual([]);

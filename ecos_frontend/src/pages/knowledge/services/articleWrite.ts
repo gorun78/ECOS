@@ -64,3 +64,46 @@ export async function createArticle(input: CreateArticleInput): Promise<CreatedA
     title: String(data?.title ?? input.title.trim()),
   };
 }
+
+export interface CategoryChangeInput {
+  articleId: string;
+  category: KnowledgeCategoryCode;
+  ruleRef?: string;
+}
+
+/** 改分类的前置校验（与新建同口径；条目 ID 必填）。 */
+export function validateCategoryChange(input: CategoryChangeInput): string | null {
+  if (!input.articleId || !input.articleId.trim()) {
+    return 'knowledge.articleEdit.errorIdRequired';
+  }
+  const isRule = input.category === 'Rule';
+  const ruleRef = (input.ruleRef ?? '').trim();
+  if (isRule && !ruleRef) {
+    return 'knowledge.articleForm.errorRuleRefRequired';
+  }
+  if (!isRule && ruleRef) {
+    return 'knowledge.articleForm.errorRuleRefForbidden';
+  }
+  return null;
+}
+
+/**
+ * 修改既有条目分类（`PUT /articles/{id}/category`）。
+ *
+ * @throws KbApiError 400（分类非法/组合非法）或 404（条目不存在）——调用方须显式展示，禁当成功
+ */
+export async function updateArticleCategory(input: CategoryChangeInput): Promise<CreatedArticle> {
+  const isRule = input.category === 'Rule';
+  const body: Record<string, unknown> = { category: input.category };
+  if (isRule) {
+    body.ruleRef = (input.ruleRef ?? '').trim();
+  }
+  const data = await kbFetchData<Record<string, unknown>>(
+    `${KNOWLEDGE_BASE}/articles/${encodeURIComponent(input.articleId.trim())}/category`,
+    { method: 'PUT', body: JSON.stringify(body) },
+  );
+  return {
+    id: String(data?.id ?? input.articleId.trim()),
+    title: String(data?.title ?? ''),
+  };
+}
