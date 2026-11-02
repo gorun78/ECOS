@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import com.chinacreator.gzcm.sysman.iam.cache.PermissionCacheService;
 import com.chinacreator.gzcm.sysman.iam.dao.PermissionDao;
 import com.chinacreator.gzcm.sysman.iam.dao.RolePermissionDao;
@@ -28,6 +29,9 @@ import com.chinacreator.gzcm.sysman.iam.service.IUserService.UserException;
  */
 @Service
 public class PermissionCheckServiceImpl implements IPermissionCheckService {
+
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(PermissionCheckServiceImpl.class);
 
     private final IUserService userService;
     private final IRoleService roleService;
@@ -157,7 +161,12 @@ public class PermissionCheckServiceImpl implements IPermissionCheckService {
         // 先合并父角色的权限
         try {
             com.chinacreator.gzcm.sysman.iam.entity.Role role = roleService.getRole(roleId);
-            if (role != null && role.getParentRoleId() != null) {
+            if (!visibleInCurrentTenant(role)) {
+                // 跨租户角色或缺角色行：整条链都不并入（父链同样走本判定）。
+                log.debug("跳过不可见角色: roleId={}, tenant={}", roleId, currentTenantId());
+                return;
+            }
+            if (role.getParentRoleId() != null) {
                 mergeRolePermissions(role.getParentRoleId(), permissionMap, visited);
             }
         } catch (Exception e) {
@@ -195,8 +204,41 @@ public class PermissionCheckServiceImpl implements IPermissionCheckService {
     }
 
     private List<String> fetchUserRoleIds(String userId) throws Exception {
+        String tenantId = currentTenantId();
+        if (tenantId == null) {
+            // 无服务端租户上下文 ⇒ 不授权（fail-closed）。旧实现按 userId 平铺全部角色，
+            // 会让 A 租户的角色在 B 租户视图生效（#147AG 根因）。
+            log.warn("无租户上下文，权限决策返回空集（fail-closed）: userId={}", userId);
+            return List.of();
+        }
         List<UserRole> links = userRoleDao.listByUserId(userId);
         return links.stream().map(UserRole::getRoleId).collect(Collectors.toList());
+    }
+
+    /**
+     * 角色可见性：本租户角色 ∪ 全局角色（{@code tenant_id} 空）。
+     *
+     * <p>跨租户角色一律不并入（含父角色链上的跨租户父角色）：角色归属由
+     * {@code Role.tenantId} 承载，而 {@code td_user_role} 只有 (user, role) 两列、
+     * 不带租户，故隔离必须在此处按角色归属判定。全局角色（本装置库内 9/14 行）是
+     * 「跨租户通用角色」的既成形态（例如 {@code ADMIN}），若一并拒绝会锁死管理员。</p>
+     */
+    private boolean visibleInCurrentTenant(com.chinacreator.gzcm.sysman.iam.entity.Role role) {
+        if (role == null) {
+            return false;
+        }
+        String roleTenant = role.getTenantId();
+        if (roleTenant == null || roleTenant.isBlank()) {
+            return true;
+        }
+        String current = currentTenantId();
+        return current != null && roleTenant.trim().equals(current);
+    }
+
+    /** 服务端权威租户（令牌侧写入，客户端不可控）。 */
+    private String currentTenantId() {
+        String tenant = TenantContextHolder.getTenantId();
+        return tenant == null || tenant.isBlank() ? null : tenant.trim();
     }
 
     private boolean resourceEquals(String permResource, String target) {

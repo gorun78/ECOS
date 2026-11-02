@@ -1,12 +1,10 @@
 package com.chinacreator.gzcm.sysman.abac;
 
+import com.chinacreator.gzcm.common.context.TenantContextHolder;
 import com.chinacreator.gzcm.sysman.abac.model.AbacContext;
 import com.chinacreator.gzcm.sysman.abac.model.AbacPolicy;
 import com.chinacreator.gzcm.sysman.abac.service.IAbacPolicyService;
-import com.chinacreator.gzcm.sysman.iam.context.TenantContext;
 import com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +12,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -42,32 +39,27 @@ public class AbacPepService {
 
     private final IPermissionCheckService permissionCheckService;
 
-    /** ABAC 策略服务（可选 — 未实现时使用纯 RBAC 回退） */
+    /**
+     * ABAC 策略服务（可选 — 未实现时使用纯 RBAC 回退）
+     */
     @Autowired(required = false)
     private IAbacPolicyService policyService;
 
     /**
-     * ABAC 策略缓存：policyId → AbacPolicy。
-     * <p>M0 改造 (2026-09): ConcurrentHashMap → Caffeine，上限 10 万 (策略量上限)。
-     * 策略变更调用 {@link #invalidateAllCaches()} 主动失效。TTL 不设 (策略常驻)。
-     * <p>POV: PMO-B2 第 3 项 (AbacPepService 政策缓存)
+     * <b>本类不自持缓存</b>（#147AG 清退，§2.9.8⑤/DC-3）：原先两枚 Caffeine
+     * （策略常驻 + 决策 5 分钟硬编码 TTL、键为 {@code subject|resource|action} 无租户维度）
+     * 已删除，理由有三：
+     * <ol>
+     *   <li>缓存配置必须由 Runtime 单源供给，{@code DECISION_CACHE_TTL_MINUTES} 属服务自建配置；</li>
+     *   <li>决策键无租户/密级维度 ⇒ 多租户下可能跨域命中（与 #147AA 同族越权形态）；</li>
+     *   <li>策略加载失败时「回退到内存里的旧策略」是 <b>fail-open</b>（撤权/新增 DENY 不生效），
+     *       与 §2.9.8⑥⑦「不可用 fail-closed（DENY）」相反。</li>
+     * </ol>
+     * <p>本类当前<b>无任何调用方</b>（PEP 未承流）。后续接线时若需缓存，必须经
+     * {@code RuntimeCacheManager}：决策键
+     * {@code ecos:{env}:sysman:abac-decision:{租户}:{subject|resource|action}:v{版本}}，
+     * 策略列表键 {@code ...:abac-policy:{租户}:list:v{版本}}，陈旧上限由配置钳制。
      */
-    private final Cache<String, AbacPolicy> policyCache = Caffeine.newBuilder()
-        .maximumSize(100_000)
-        .build();
-
-    /**
-     * ABAC 评估结果缓存：cacheKey → Boolean。
-     * <p>M0 改造 (2026-09): ConcurrentHashMap (max 1000) → Caffeine (max 100,000 / TTL 5 min)。
-     * <p>POV: PMO-B2 第 4 项 (AbacPepService 决策缓存)
-     */
-    private final Cache<String, Boolean> decisionCache = Caffeine.newBuilder()
-        .maximumSize(100_000)
-        .expireAfterWrite(DECISION_CACHE_TTL_MINUTES, TimeUnit.MINUTES)
-        .build();
-
-    /** 决策缓存 TTL（分钟）：MPV 阶段 5 分钟足够，后续可配到 sys_config 表 */
-    private static final long DECISION_CACHE_TTL_MINUTES = 5;
 
     @Autowired
     public AbacPepService(IPermissionCheckService permissionCheckService) {
@@ -90,14 +82,8 @@ public class AbacPepService {
             return false;
         }
 
-        // 1. 短期缓存命中直接返回
-        String cacheKey = subject + "|" + resource + "|" + action;
-        Boolean cached = decisionCache.getIfPresent(cacheKey);
-        if (cached != null) {
-            log.debug("ABAC 决策缓存命中: key={}, result={}", cacheKey, cached);
-            return cached;
-        }
-
+        // 1. 不再有进程内决策缓存：每次评估都走权威面（策略表 + RBAC），
+        //    避免无租户维度的键与不可证明的陈旧窗口（#147AG）。
         boolean permitted;
 
         try {
@@ -118,10 +104,7 @@ public class AbacPepService {
             permitted = false;
         }
 
-        // 4. 写入决策缓存 (Caffeine 自动按 LRU/TTL 淘汰, 不需要手动 clear)
-        // M0 改造 (2026-09): Caffeine 已启用 `maximumSize(100_000) + expireAfterWrite(5 min)`,
-        // 原 ConcurrentHashMap 的"超过上限 clear 全部"逻辑不再需要。
-        decisionCache.put(cacheKey, permitted);
+        // 4. 不写决策缓存（见字段处说明）；缓存接入须经 RuntimeCacheManager 且键带租户段。
 
         log.debug("ABAC evaluate: subject={}, resource={}, action={} → {}",
                 subject, resource, action, permitted ? "PERMIT" : "DENY");
@@ -155,7 +138,8 @@ public class AbacPepService {
      *
      * @return "ALLOW" / "DENY" / null (NOT_APPLICABLE)
      */
-    private String evaluateAbacPolicies(String subject, String resource, String action) {
+    private String evaluateAbacPolicies(String subject, String resource, String action)
+            throws IAbacPolicyService.AbacException {
         List<AbacPolicy> policies = loadPolicies();
         if (policies == null || policies.isEmpty()) {
             return null; // NOT_APPLICABLE — 回退 RBAC
@@ -223,37 +207,31 @@ public class AbacPepService {
     // ── 策略加载 ──────────────────────────────────────────────
 
     /**
-     * 从缓存或数据库加载 ABAC 策略列表。
+     * 从权威面加载 ABAC 策略列表。
+     *
+     * <p><b>加载失败一律抛出</b>：{@code evaluate} 的 catch 会把异常落成 DENY（fail-closed）。
+     * 旧实现「失败时回退到内存里的旧策略」是 fail-open——撤销/新增 DENY 策略在 DB 故障期间不生效，
+     * 且以陈旧策略继续放行（#147AG）。</p>
      */
-    private List<AbacPolicy> loadPolicies() {
+    private List<AbacPolicy> loadPolicies() throws IAbacPolicyService.AbacException {
         if (policyService == null) {
             return List.of();
         }
-        try {
-            List<AbacPolicy> policies = policyService.listPolicies();
-            // 刷新内存缓存
-            for (AbacPolicy p : policies) {
-                policyCache.put(p.getPolicyId(), p);
-            }
+        List<AbacPolicy> policies = policyService.listPolicies();
 
-            // 作用域过滤：根据当前租户过滤策略
-            String currentTenantId = getCurrentTenantId();
-            if (currentTenantId != null) {
-                int beforeCount = policies.size();
-                policies = policies.stream()
-                    .filter(p -> "GLOBAL".equals(p.getScopeType())
-                        || ("TENANT".equals(p.getScopeType()) && currentTenantId.equals(p.getScopeId())))
-                    .collect(Collectors.toList());
-                log.debug("ABAC 作用域过滤: tenant={}, before={}, after={}",
-                        currentTenantId, beforeCount, policies.size());
-            }
-
-            return policies;
-        } catch (Exception e) {
-            log.warn("加载ABAC策略失败，使用内存缓存: {}", e.getMessage());
-            // M0 改造 (2026-09): Caffeine 没有 values() 直接 API, 用 asMap() 视图
-            return List.copyOf(policyCache.asMap().values());
+        // 作用域过滤：根据当前租户过滤策略
+        String currentTenantId = getCurrentTenantId();
+        if (currentTenantId != null) {
+            int beforeCount = policies.size();
+            policies = policies.stream()
+                .filter(p -> "GLOBAL".equals(p.getScopeType())
+                    || ("TENANT".equals(p.getScopeType()) && currentTenantId.equals(p.getScopeId())))
+                .collect(Collectors.toList());
+            log.debug("ABAC 作用域过滤: tenant={}, before={}, after={}",
+                    currentTenantId, beforeCount, policies.size());
         }
+
+        return policies;
     }
 
     // ── 工具方法 ──────────────────────────────────────────────
@@ -266,32 +244,20 @@ public class AbacPepService {
 
     /**
      * 获取当前租户ID，用于作用域过滤。
-     * 如果无法获取租户上下文（非多租户环境或未设置），返回 null 表示不过滤。
+     *
+     * <p>与权限缓存/权限检查同源（{@link TenantContextHolder}，由 JWT 过滤器从令牌侧写入），
+     * 不再读另一套 {@code sysman.iam.context.TenantContext}——两套 ThreadLocal 并存时
+     * 过滤口径可能分叉（#147AG）。取不到租户返回 null 表示不过滤（策略表仍受
+     * {@code GLOBAL}/{@code TENANT} 作用域列约束）。</p>
      */
     private String getCurrentTenantId() {
-        try {
-            return TenantContext.getTenantId();
-        } catch (Exception e) {
-            log.debug("无法获取当前租户ID，跳过作用域过滤: {}", e.getMessage());
-            return null;
-        }
+        String tenant = TenantContextHolder.getTenantId();
+        return tenant == null || tenant.isBlank() ? null : tenant.trim();
     }
 
     /**
-     * 清空决策缓存（供策略变更后调用）。
-     * M0 改造 (2026-09): Caffeine Cache 用 invalidateAll() 而非 clear()
+     * 缓存失效入口已随自持缓存一并删除（#147AG）：本类无缓存可供失效。
+     * 后续接入 {@code RuntimeCacheManager} 后，策略变更应调
+     * {@code invalidateDomain(env, "sysman")} 或按对象 {@code evictObject}，不得回到服务私有失效。
      */
-    public void invalidateDecisionCache() {
-        decisionCache.invalidateAll();
-        log.info("ABAC 决策缓存已清空");
-    }
-
-    /**
-     * 清空策略 + 决策缓存，强制下次重新加载（供策略 CRUD 后调用）。
-     */
-    public void invalidateAllCaches() {
-        policyCache.invalidateAll();
-        decisionCache.invalidateAll();
-        log.info("ABAC 全部缓存已清空");
-    }
 }
