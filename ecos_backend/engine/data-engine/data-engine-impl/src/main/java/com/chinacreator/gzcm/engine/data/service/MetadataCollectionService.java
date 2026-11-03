@@ -8,14 +8,16 @@ import com.chinacreator.gzcm.engine.data.repository.DataResourceRepository;
 import com.chinacreator.gzcm.engine.data.repository.DataSourceRepository;
 import com.chinacreator.gzcm.engine.data.MetadataService;
 import com.chinacreator.gzcm.engine.data.datasource.entity.DataSourceEntity;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
+import com.chinacreator.gzcm.runtime.core.cache.CacheJson;
+import com.chinacreator.gzcm.runtime.core.cache.CacheKey;
+import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
+import com.fasterxml.jackson.core.type.TypeReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class MetadataCollectionService {
@@ -26,25 +28,30 @@ public class MetadataCollectionService {
     private final DataSourceRepository dsRepository;
     private final DataResourceRepository resourceRepository;
     private final ConnectorFactory connectorFactory;
+    private final ObjectProvider<RuntimeCacheManager> cacheProvider;
 
-    private final Cache<String, List<DataResource>> resourcesCache = Caffeine.newBuilder()
-            .expireAfterWrite(5, TimeUnit.MINUTES)
-            .maximumSize(50)
-            .build();
+    /** 14 类矩阵 #4「接入元数据」的缓存域（domain 单源；失效按本域收敛，不波及 data-engine 其他对象）。 */
+    static final String CACHE_DOMAIN = "data-engine-metadata";
+    static final String TYPE_RESOURCES = "metadata-resources";
+    static final String TYPE_BULK = "metadata-bulk";
+    static final String SCOPE_GLOBAL = "global";
+    static final long CACHE_TTL_SECONDS = 300L;
 
-    private final Cache<String, List<Map<String, Object>>> bulkResourcesCache = Caffeine.newBuilder()
-            .expireAfterWrite(5, TimeUnit.MINUTES)
-            .maximumSize(2)
-            .build();
+    private static final TypeReference<List<DataResource>> RESOURCES_TYPE = new TypeReference<>() {
+    };
+    private static final TypeReference<List<Map<String, Object>>> BULK_TYPE = new TypeReference<>() {
+    };
 
     public MetadataCollectionService(MetadataService metadataService,
                                       DataSourceRepository dsRepository,
                                       DataResourceRepository resourceRepository,
-                                      ConnectorFactory connectorFactory) {
+                                      ConnectorFactory connectorFactory,
+                                      ObjectProvider<RuntimeCacheManager> cacheProvider) {
         this.metadataService = metadataService;
         this.dsRepository = dsRepository;
         this.resourceRepository = resourceRepository;
         this.connectorFactory = connectorFactory;
+        this.cacheProvider = cacheProvider;
     }
 
     public Map<String, Object> collect(String datasourceId) {
@@ -57,8 +64,8 @@ public class MetadataCollectionService {
         int count = metadataService.collectAll(datasourceId);
         long elapsed = System.currentTimeMillis() - start;
 
-        resourcesCache.invalidate(datasourceId);
-        bulkResourcesCache.invalidate("ALL");
+        resourcesEvict(datasourceId);
+        bulkEvict();
         log.info("Cache invalidated for datasource={} after collection", datasourceId);
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -89,7 +96,7 @@ public class MetadataCollectionService {
                 r.put("elapsedMs", elapsed);
                 r.put("success", true);
                 results.add(r);
-                resourcesCache.invalidate(ds.getDatasourceId());
+                resourcesEvict(ds.getDatasourceId());
                 log.info("Collected '{}': {} resources in {}ms", ds.getDatasourceName(), count, elapsed);
             } catch (Exception e) {
                 log.error("Failed to collect '{}': {}", ds.getDatasourceName(), e.getMessage());
@@ -102,8 +109,8 @@ public class MetadataCollectionService {
             }
         }
 
-        resourcesCache.invalidateAll();
-        bulkResourcesCache.invalidateAll();
+        resourcesCacheEvictAll();
+        bulkEvict();
 
         long totalResources = results.stream()
                 .filter(r -> Boolean.TRUE.equals(r.get("success")))
@@ -114,7 +121,17 @@ public class MetadataCollectionService {
     }
 
     public List<DataResource> getResources(String datasourceId) {
-        return resourcesCache.get(datasourceId, id -> resourceRepository.findByDatasource(id));
+        CacheKey key = cacheKey(TYPE_RESOURCES, datasourceId);
+        List<DataResource> cached = CacheJson.read(stringOf(key), RESOURCES_TYPE);
+        if (cached != null) {
+            return cached;
+        }
+        List<DataResource> loaded = resourceRepository.findByDatasource(datasourceId);
+        if (loaded == null) {
+            loaded = Collections.emptyList();
+        }
+        store(key, loaded);
+        return loaded;
     }
 
     /**
@@ -156,27 +173,36 @@ public class MetadataCollectionService {
     }
 
     public List<Map<String, Object>> getAllResources() {
-        return bulkResourcesCache.get("ALL", key -> {
-            List<DataSourceEntity> sources = dsRepository.findAll();
-            List<Map<String, Object>> result = new ArrayList<>();
-            for (DataSourceEntity ds : sources) {
-                List<DataResource> resources = resourceRepository.findByDatasource(ds.getDatasourceId());
-                for (DataResource r : resources) {
-                    Map<String, Object> item = new LinkedHashMap<>();
-                    item.put("resourceId", r.getResourceId());
-                    item.put("resourceName", r.getResourceName());
-                    item.put("resourceType", r.getResourceType());
-                    item.put("sourcePath", r.getSourcePath());
-                    item.put("fieldCount", r.getFieldCount());
-                    item.put("datasourceId", ds.getDatasourceId());
-                    item.put("datasourceName", ds.getDatasourceName());
-                    item.put("datasourceType", ds.getDatasourceType());
-                    result.add(item);
-                }
+        CacheKey key = cacheKey(TYPE_BULK, "all");
+        List<Map<String, Object>> cached = CacheJson.read(stringOf(key), BULK_TYPE);
+        if (cached != null) {
+            return cached;
+        }
+        List<Map<String, Object>> loaded = buildAllResources();
+        store(key, loaded);
+        return loaded;
+    }
+
+    private List<Map<String, Object>> buildAllResources() {
+        List<DataSourceEntity> sources = dsRepository.findAll();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (DataSourceEntity ds : sources) {
+            List<DataResource> resources = resourceRepository.findByDatasource(ds.getDatasourceId());
+            for (DataResource r : resources) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("resourceId", r.getResourceId());
+                item.put("resourceName", r.getResourceName());
+                item.put("resourceType", r.getResourceType());
+                item.put("sourcePath", r.getSourcePath());
+                item.put("fieldCount", r.getFieldCount());
+                item.put("datasourceId", ds.getDatasourceId());
+                item.put("datasourceName", ds.getDatasourceName());
+                item.put("datasourceType", ds.getDatasourceType());
+                result.add(item);
             }
-            log.info("Bulk resources cache built: {} resources from {} datasources", result.size(), sources.size());
-            return result;
-        });
+        }
+        log.info("Bulk resources cache built: {} resources from {} datasources", result.size(), sources.size());
+        return result;
     }
 
     public Map<String, Object> preview(String resourceId, int limit) {
@@ -207,11 +233,64 @@ public class MetadataCollectionService {
     }
 
     public void invalidateCache(String datasourceId) {
-        resourcesCache.invalidate(datasourceId);
+        resourcesEvict(datasourceId);
     }
 
     public void invalidateAllCaches() {
-        resourcesCache.invalidateAll();
-        bulkResourcesCache.invalidateAll();
+        resourcesCacheEvictAll();
+        bulkEvict();
+    }
+
+    // ── Runtime 缓存接线（14 类矩阵 #4；#147AH）────────────────────────────
+    // 权威源 = 业务 DB；缓存只是加速副本，关闭/未命中/任何异常都回源。
+
+    private RuntimeCacheManager cache() {
+        return cacheProvider == null ? null : cacheProvider.getIfAvailable();
+    }
+
+    private CacheKey cacheKey(String objectType, String objectId) {
+        RuntimeCacheManager manager = cache();
+        if (manager == null) {
+            return null;
+        }
+        try {
+            return manager.key(CACHE_DOMAIN, objectType, SCOPE_GLOBAL, objectId, "1");
+        } catch (IllegalArgumentException e) {
+            return null; // 键段非法（含冒号/空白）不缓存，直接回源
+        }
+    }
+
+    private String stringOf(CacheKey key) {
+        RuntimeCacheManager manager = cache();
+        return key == null || manager == null ? null : manager.getString(key).orElse(null);
+    }
+
+    private void store(CacheKey key, Object value) {
+        RuntimeCacheManager manager = cache();
+        if (key == null || manager == null) {
+            return;
+        }
+        manager.putString(key, CacheJson.write(value), CACHE_TTL_SECONDS);
+    }
+
+    private void resourcesEvict(String datasourceId) {
+        RuntimeCacheManager manager = cache();
+        if (manager != null && datasourceId != null) {
+            manager.evictObject(CACHE_DOMAIN, TYPE_RESOURCES, datasourceId);
+        }
+    }
+
+    private void bulkEvict() {
+        RuntimeCacheManager manager = cache();
+        if (manager != null) {
+            manager.evictObject(CACHE_DOMAIN, TYPE_BULK, "all");
+        }
+    }
+
+    private void resourcesCacheEvictAll() {
+        RuntimeCacheManager manager = cache();
+        if (manager != null) {
+            manager.invalidateDomain(manager.env(), CACHE_DOMAIN);
+        }
     }
 }
