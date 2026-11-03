@@ -144,6 +144,28 @@ public class UserController {
 		}
 	}
 
+	/**
+	 * 当前登录用户的<b>基础信息投影</b>（14 类矩阵「用户基础信息」读面；§2.9.8⑥；#147AF/D）。
+	 *
+	 * <p>只返回白名单字段（userId/username/realName/orgId/status/locked/userType），
+	 * 口令、身份证、手机、邮箱、地址、证书序列一律不出现在响应与缓存中。自读面不加权限注解。</p>
+	 */
+	@GetMapping("/me/profile")
+	public ApiResponse<com.chinacreator.gzcm.sysman.iam.service.IUserService.UserBasicProfile> myProfile() {
+		try {
+			var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+			String userId = auth == null ? null : auth.getName();
+			if (userId == null || userId.isBlank()) {
+				return ApiResponse.unauthorized("未登录或Token已过期");
+			}
+			var profile = userService.getUserBasicProfile(userId);
+			return profile == null ? ApiResponse.notFound("用户不存在") : ApiResponse.success(profile);
+		} catch (Exception e) {
+			log.error("读取用户基础信息失败", e);
+			return ApiResponse.internalError("读取用户基础信息失败（详情见服务端日志）");
+		}
+	}
+
 	@GetMapping("/{id}")
 	public ApiResponse<Map<String, Object>> get(@PathVariable String id) {
 		try {

@@ -32,6 +32,21 @@ public class UserServiceImpl implements IUserService {
     private final UserLookupDao userLookupDao;
     private final PasswordHasher passwordHasher = new PasswordHasher();
 
+    /**
+     * 用户基础信息投影缓存（14 类矩阵「用户基础信息」；#147AF/D）。
+     * 只缓存白名单字段（见 {@link IUserService.UserBasicProfile}），敏感列一律不入缓存。
+     */
+    @Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<
+            com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager> profileCacheProvider;
+
+    static final String PROFILE_DOMAIN = "sysman";
+    static final String PROFILE_TYPE = "user-profile";
+    static final String PROFILE_VERSION = "1";
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper PROFILE_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
     // 简单失败计数（可替换为Redis）
     private final Map<String, Integer> failedAttempts = new HashMap<>();
 
@@ -63,6 +78,7 @@ public class UserServiceImpl implements IUserService {
             user.setCreatedBy(operator);
             user.setUpdatedBy(operator);
             userDao.insert(user);
+            evictProfileCache(user.getUserId());
             return userDao.findById(user.getUserId());
         } catch (UserException e) {
             throw e;
@@ -90,6 +106,7 @@ public class UserServiceImpl implements IUserService {
             existing.setUpdatedBy(operator);
             existing.setUpdatedTime(LocalDateTime.now());
             userDao.update(existing);
+            evictProfileCache(existing.getUserId());
 
             // 更新用户-组织关联（td_user_organization）
             if (user.getOrgId() != null) {
@@ -119,6 +136,7 @@ public class UserServiceImpl implements IUserService {
                 throw new UserException("用户不存在");
             }
             userDao.delete(userId);
+            evictProfileCache(userId);
         } catch (UserException e) {
             throw e;
         } catch (Exception e) {
@@ -132,6 +150,62 @@ public class UserServiceImpl implements IUserService {
             return userDao.findById(userId);
         } catch (Exception e) {
             throw new UserException("获取用户失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 用户基础信息投影（缓存就近读；白名单字段）。
+     *
+     * <p>缓存键 {@code ecos:{env}:sysman:user-profile:{租户}:{userId}:v1}；无租户上下文不缓存
+     * （权限先于缓存）。写路径（新增/更新/删除/锁定）提交后按对象失效。</p>
+     */
+    @Override
+    public UserBasicProfile getUserBasicProfile(String userId) throws UserException {
+        var manager = profileCacheProvider == null ? null : profileCacheProvider.getIfAvailable();
+        com.chinacreator.gzcm.runtime.core.cache.CacheKey key = null;
+        if (manager != null && userId != null && !userId.isBlank()) {
+            String tenant = com.chinacreator.gzcm.common.context.TenantContextHolder.getTenantId();
+            if (tenant != null && !tenant.isBlank()) {
+                try {
+                    key = manager.key(PROFILE_DOMAIN, PROFILE_TYPE, tenant.trim(), userId.trim(), PROFILE_VERSION);
+                    var hit = manager.getString(key);
+                    if (hit.isPresent()) {
+                        UserBasicProfile parsed = PROFILE_MAPPER.readValue(hit.get(), UserBasicProfile.class);
+                        if (parsed != null) {
+                            return parsed;
+                        }
+                    }
+                } catch (Exception ignore) {
+                    // 缓存异常/脏值一律回源（缓存是加速层）
+                }
+            }
+        }
+        UserAccount user;
+        try {
+            user = userDao.findById(userId);
+        } catch (Exception e) {
+            throw new UserException("获取用户失败: " + e.getMessage(), e);
+        }
+        if (user == null) {
+            return null;
+        }
+        UserBasicProfile profile = new UserBasicProfile(user.getUserId(), user.getUsername(),
+                user.getRealName(), user.getOrgId(), user.getStatus(), user.getLocked(), user.getUserType());
+        if (manager != null && key != null) {
+            try {
+                manager.putString(key, PROFILE_MAPPER.writeValueAsString(profile), 0L);
+            } catch (Exception ignore) {
+                // 序列化失败只是不缓存
+            }
+        }
+        return profile;
+    }
+
+    /** 写后失效：用户基础信息投影按对象整域作废（跨租户视图）。 */
+    private void evictProfileCache(String userId) {
+        var manager = profileCacheProvider == null ? null : profileCacheProvider.getIfAvailable();
+        if (manager != null && userId != null && !userId.isBlank()) {
+            manager.evictObject(PROFILE_DOMAIN, PROFILE_TYPE, userId.trim());
         }
     }
 
@@ -189,6 +263,7 @@ public class UserServiceImpl implements IUserService {
             user.setUpdatedBy(operator);
             user.setUpdatedTime(LocalDateTime.now());
             userDao.update(user);
+            evictProfileCache(user.getUserId());
         } catch (UserException e) {
             throw e;
         } catch (Exception e) {
@@ -207,6 +282,7 @@ public class UserServiceImpl implements IUserService {
             user.setUpdatedTime(LocalDateTime.now());
             failedAttempts.remove(userId);
             userDao.update(user);
+            evictProfileCache(user.getUserId());
         } catch (UserException e) {
             throw e;
         } catch (Exception e) {
@@ -224,6 +300,7 @@ public class UserServiceImpl implements IUserService {
             user.setUpdatedBy(operator);
             user.setUpdatedTime(LocalDateTime.now());
             userDao.update(user);
+            evictProfileCache(user.getUserId());
         } catch (UserException e) {
             throw e;
         } catch (Exception e) {
@@ -250,6 +327,7 @@ public class UserServiceImpl implements IUserService {
                 failedAttempts.remove(userId);
                 user.setLastLoginTime(LocalDateTime.now());
                 userDao.update(user);
+                evictProfileCache(user.getUserId());
             }
             return ok;
         } catch (UserException e) {
@@ -267,6 +345,7 @@ public class UserServiceImpl implements IUserService {
             user.setUpdatedBy(operator);
             user.setUpdatedTime(LocalDateTime.now());
             userDao.update(user);
+            evictProfileCache(user.getUserId());
         } catch (UserException e) {
             throw e;
         } catch (Exception e) {
