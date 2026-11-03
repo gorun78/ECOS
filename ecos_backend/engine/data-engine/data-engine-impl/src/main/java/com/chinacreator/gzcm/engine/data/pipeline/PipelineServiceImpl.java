@@ -6,12 +6,17 @@ import com.chinacreator.gzcm.common.exception.NotFoundException;
 import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.data.governance.SecurityDenyException;
+import com.chinacreator.gzcm.runtime.core.cache.CacheJson;
+import com.chinacreator.gzcm.runtime.core.cache.CacheKey;
+import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
 import com.chinacreator.gzcm.runtime.core.task.model.TaskDescription;
 import com.chinacreator.gzcm.runtime.core.task.scheduling.TaskSchedulerService;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,9 +57,69 @@ public class PipelineServiceImpl implements PipelineService {
     @Autowired(required = false)
     private TaskSchedulerService taskSchedulerService;
 
+    /** Runtime 缓存（14 类矩阵 #5；缺席时逐次回源，不影响正确性）。 */
+    @Autowired(required = false)
+    private ObjectProvider<RuntimeCacheManager> cacheProvider;
+
+    /** 14 类矩阵 #5「Pipeline」缓存域（失效只收敛本域）。 */
+    static final String CACHE_DOMAIN = "data-engine-pipeline";
+    static final String TYPE_DEFINITION = "pipeline-definition";
+    static final String TYPE_LIST = "pipeline-definition-list";
+    static final String SCOPE_GLOBAL = "global";
+    static final long CACHE_TTL_SECONDS = 300L;
+
+    private static final TypeReference<List<PipelineDefinition>> DEFINITIONS_TYPE = new TypeReference<>() {
+    };
+
     public PipelineServiceImpl(PipelineRepository repository, PipelineSecurityService securityService) {
         this.repository = repository;
         this.securityService = securityService;
+    }
+
+    // ── Runtime 缓存接线（14 类矩阵 #5；#147AI）────────────────────────────
+    // 权威源 = 业务 DB / 已发布 Git 版本；缓存只是加速副本，关闭/未命中/异常一律回源。
+
+    private RuntimeCacheManager cache() {
+        return cacheProvider == null ? null : cacheProvider.getIfAvailable();
+    }
+
+    private CacheKey cacheKey(String objectType, String objectId) {
+        RuntimeCacheManager manager = cache();
+        if (manager == null) {
+            return null;
+        }
+        try {
+            return manager.key(CACHE_DOMAIN, objectType, SCOPE_GLOBAL, objectId, "1");
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private String stringOf(CacheKey key) {
+        RuntimeCacheManager manager = cache();
+        return key == null || manager == null ? null : manager.getString(key).orElse(null);
+    }
+
+    private void store(CacheKey key, Object value) {
+        RuntimeCacheManager manager = cache();
+        if (key == null || manager == null) {
+            return;
+        }
+        manager.putString(key, CacheJson.write(value), CACHE_TTL_SECONDS);
+    }
+
+    private void evictDefinition(String id) {
+        RuntimeCacheManager manager = cache();
+        if (manager != null && id != null) {
+            manager.evictObject(CACHE_DOMAIN, TYPE_DEFINITION, id);
+        }
+    }
+
+    private void evictList() {
+        RuntimeCacheManager manager = cache();
+        if (manager != null) {
+            manager.evictObject(CACHE_DOMAIN, TYPE_LIST, "all");
+        }
     }
 
     // ==================== CRUD ====================
@@ -85,6 +150,7 @@ public class PipelineServiceImpl implements PipelineService {
 
         // 异步审计（不阻塞）
         securityService.auditWrite("PIPELINE_CREATE", created.getId(), "system");
+        evictList();
 
         return created;
     }
@@ -113,6 +179,8 @@ public class PipelineServiceImpl implements PipelineService {
 
         log.info("Updated pipeline definition: id={}", id);
         securityService.auditWrite("PIPELINE_UPDATE", id, "system");
+        evictDefinition(id);
+        evictList();
         return updated;
     }
 
@@ -128,20 +196,38 @@ public class PipelineServiceImpl implements PipelineService {
         repository.deleteDefinition(id);
         log.info("Deleted pipeline definition (soft-delete → ARCHIVED): id={}", id);
         securityService.auditWrite("PIPELINE_DELETE", id, "system");
+        evictDefinition(id);
+        evictList();
     }
 
     @Override
     public PipelineDefinition getDefinition(String id) {
+        CacheKey key = cacheKey(TYPE_DEFINITION, id);
+        PipelineDefinition cached = CacheJson.read(stringOf(key), PipelineDefinition.class);
+        if (cached != null) {
+            return cached;
+        }
         PipelineDefinition def = repository.findDefinitionById(id);
         if (def == null) {
             throw NotFoundException.entity("Pipeline 定义", id);
         }
+        store(key, def);
         return def;
     }
 
     @Override
     public List<PipelineDefinition> listDefinitions() {
-        return repository.findAllDefinitions();
+        CacheKey key = cacheKey(TYPE_LIST, "all");
+        List<PipelineDefinition> cached = CacheJson.read(stringOf(key), DEFINITIONS_TYPE);
+        if (cached != null) {
+            return cached;
+        }
+        List<PipelineDefinition> loaded = repository.findAllDefinitions();
+        if (loaded == null) {
+            loaded = Collections.emptyList();
+        }
+        store(key, loaded);
+        return loaded;
     }
 
     @Override

@@ -9,6 +9,8 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,8 +23,12 @@ import com.chinacreator.gzcm.engine.data.quality.model.DqRuleDTO;
 import com.chinacreator.gzcm.engine.data.quality.model.DqRuleVO;
 import com.chinacreator.gzcm.engine.data.quality.model.DqRuleVersionVO;
 import com.chinacreator.gzcm.engine.data.quality.model.LogicDeleteResult;
+import com.chinacreator.gzcm.runtime.core.cache.CacheJson;
+import com.chinacreator.gzcm.runtime.core.cache.CacheKey;
+import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -59,6 +65,19 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
     private static final Logger log = LoggerFactory.getLogger(DqRuleLifecycleServiceImpl.class);
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    /** 14 类矩阵 #6「质量规则」缓存域（版本清单读多写少；失效只收敛本域）。 */
+    static final String CACHE_DOMAIN = "data-engine-dq-rule";
+    static final String TYPE_VERSIONS = "dq-rule-versions";
+    static final String SCOPE_GLOBAL = "global";
+    static final long CACHE_TTL_SECONDS = 300L;
+
+    private static final TypeReference<List<DqRuleVersionVO>> VERSIONS_TYPE = new TypeReference<>() {
+    };
+
+    /** Runtime 缓存（缺席时逐次回源，不影响正确性）。 */
+    @Autowired(required = false)
+    private ObjectProvider<RuntimeCacheManager> cacheProvider;
 
     // ==================== 状态机转换表 ====================
     // key = 当前状态, value = 允许的目标状态集合
@@ -222,6 +241,7 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
         }
         securityService.auditWrite("DQ_RULE_APPROVE", ruleId, "SUCCESS");
         log.info("DQ rule approved: id={}, approver={}, version={}", ruleId, approver, newVersion);
+        evictVersions(ruleId);
         return "ACTIVE";
     }
 
@@ -286,7 +306,7 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
     @Override
     public DqRuleVersionVO getVersion(String ruleId, int versionNumber) {
         loadAndAssertExists(ruleId);
-        List<DqRuleVersionVO> all = ruleMapper.listVersionsByRuleId(ruleId);
+        List<DqRuleVersionVO> all = cachedVersions(ruleId);
         securityService.auditRead("DQ_RULE_VERSION_GET", ruleId);
         return all.stream()
                 .filter(v -> v.getVersionNumber() != null && v.getVersionNumber() == versionNumber)
@@ -297,9 +317,62 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
     @Override
     public List<DqRuleVersionVO> listVersions(String ruleId) {
         loadAndAssertExists(ruleId);
-        List<DqRuleVersionVO> versions = ruleMapper.listVersionsByRuleId(ruleId);
+        List<DqRuleVersionVO> versions = cachedVersions(ruleId);
         securityService.auditRead("DQ_RULE_VERSION_LIST", ruleId);
         return versions;
+    }
+
+    // ── Runtime 缓存接线（14 类矩阵 #6；#147AI）────────────────────────────
+    // 版本快照只在 approve 时新增，失效点与写入点一一对应；缓存关闭/异常一律回源。
+
+    private List<DqRuleVersionVO> cachedVersions(String ruleId) {
+        CacheKey key = cacheKey(ruleId);
+        List<DqRuleVersionVO> cached = CacheJson.read(stringOf(key), VERSIONS_TYPE);
+        if (cached != null) {
+            return cached;
+        }
+        List<DqRuleVersionVO> loaded = ruleMapper.listVersionsByRuleId(ruleId);
+        if (loaded == null) {
+            loaded = List.of();
+        }
+        store(key, loaded);
+        return loaded;
+    }
+
+    private RuntimeCacheManager cache() {
+        return cacheProvider == null ? null : cacheProvider.getIfAvailable();
+    }
+
+    private CacheKey cacheKey(String ruleId) {
+        RuntimeCacheManager manager = cache();
+        if (manager == null || ruleId == null) {
+            return null;
+        }
+        try {
+            return manager.key(CACHE_DOMAIN, TYPE_VERSIONS, SCOPE_GLOBAL, ruleId, "1");
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private String stringOf(CacheKey key) {
+        RuntimeCacheManager manager = cache();
+        return key == null || manager == null ? null : manager.getString(key).orElse(null);
+    }
+
+    private void store(CacheKey key, Object value) {
+        RuntimeCacheManager manager = cache();
+        if (key == null || manager == null) {
+            return;
+        }
+        manager.putString(key, CacheJson.write(value), CACHE_TTL_SECONDS);
+    }
+
+    private void evictVersions(String ruleId) {
+        RuntimeCacheManager manager = cache();
+        if (manager != null && ruleId != null) {
+            manager.evictObject(CACHE_DOMAIN, TYPE_VERSIONS, ruleId);
+        }
     }
 
     // ==================== 私有工具方法 ====================
