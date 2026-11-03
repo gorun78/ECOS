@@ -6,6 +6,7 @@ import org.springframework.cache.Cache;
 import org.springframework.cache.support.SimpleValueWrapper;
 
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.runtime.core.cache.CacheJson;
 import com.chinacreator.gzcm.runtime.core.cache.CacheKey;
 import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -31,7 +32,7 @@ public class RuntimeSpringCache implements Cache {
     static final String OBJECT_TYPE = "spring-cache";
     static final String VERSION = "1";
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = CacheJson.mapper();
 
     /** 反序列化白名单前缀（禁任意类，防反序列化面被滥用）。 */
     static final String TYPE_WHITELIST_PREFIX = "com.chinacreator.gzcm.";

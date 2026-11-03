@@ -14,8 +14,9 @@ import java.util.function.LongSupplier;
  * Runtime 统一缓存门面（§2.9.8④⑤；#147J）。
  *
  * <p><b>定位</b>：受控加速层——权威数据源唯一、可重建、权限先于缓存、fail-closed。
- * 当前运行时实现为进程内 TTL 缓存（Redis 未接入运行链路为<b>既成事实</b>，不得写成已接入）；
- * 后续接 Redis 只替换本类内部存储，键规范/{@code CacheSettings} 单一事实源不变。</p>
+ * 对象通道为进程内 TTL；字符串通道在 {@code ecos.cache.redis_enabled=true} 且
+ * {@link RedisStringCache} 可用时走 Redis（跨进程共享），否则退回进程内——
+ * 两条路径语义一致，Redis 只替换存储，键规范/{@code CacheSettings} 单一事实源不变。</p>
  *
  * <p><b>五条硬口径</b>：</p>
  * <ol>
