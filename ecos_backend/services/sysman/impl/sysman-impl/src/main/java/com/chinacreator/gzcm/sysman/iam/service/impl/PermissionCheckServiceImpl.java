@@ -56,6 +56,30 @@ public class PermissionCheckServiceImpl implements IPermissionCheckService {
     }
 
     @Override
+    public Set<String> getUserDeniedCodes(String userId) throws Exception {
+        Map<String, PermissionDecision> decisions = getUserPermissionDecisions(userId);
+        if (decisions.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> deniedIds = new HashSet<>();
+        for (Map.Entry<String, PermissionDecision> e : decisions.entrySet()) {
+            if ("DENY".equalsIgnoreCase(e.getValue().effect)) {
+                deniedIds.add(e.getKey());
+            }
+        }
+        if (deniedIds.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> codes = new HashSet<>();
+        for (Permission p : permissionDao.listAll()) {
+            if (p != null && deniedIds.contains(p.getPermissionId()) && p.getResource() != null) {
+                codes.add(p.getResource() + ':' + (p.getAction() == null ? "" : p.getAction()));
+            }
+        }
+        return codes;
+    }
+
+    @Override
     public Map<String, String> getUserEffectiveDecisions(String userId) throws Exception {
         Map<String, PermissionDecision> decisions = getUserPermissionDecisions(userId);
         Map<String, String> flat = new java.util.LinkedHashMap<>();

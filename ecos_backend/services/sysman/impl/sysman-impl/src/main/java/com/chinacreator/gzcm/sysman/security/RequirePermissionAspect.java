@@ -77,6 +77,14 @@ public class RequirePermissionAspect {
     private IAbacPolicyService abacPolicyService;
 
     /**
+     * 有效权限决策（权限缓存读路径）来源：**仅**用于额外 DENY 判定（裁决 A · #147AF/D）。
+     * 可选装配——缺席或判定异常时不改变既有鉴权结论（缓存不是授权权威）。
+     */
+    @Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<
+            com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService> permissionCheckProvider;
+
+    /**
      * 环绕通知：拦截带有 @RequirePermission 注解的方法。
      *
      * @param joinPoint 切入点
@@ -121,6 +129,32 @@ public class RequirePermissionAspect {
                     auth.getName(), required, Arrays.toString(requiredPermissions));
                 rbacPassed = true;
                 break;
+            }
+        }
+
+        // 4.5 缓存决策只作**额外 DENY 源**（§2.9.8③ 执法侧；裁决 A · #147AF/D）：
+        //     缓存命中显式 DENY ⇒ 直接 403，即便 authorities 放行（deny-overrides）。
+        //     **绝不**用缓存决策放行——本腿只收紧、不拓宽，避免「缓存成为授权权威」。
+        if (permissionCheckProvider != null) {
+            com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService checker =
+                    permissionCheckProvider.getIfAvailable();
+            if (checker != null) {
+                try {
+                    Set<String> denied = checker.getUserDeniedCodes(auth.getName());
+                    for (String required : requiredPermissions) {
+                        if (denied.contains(required)) {
+                            log.warn("缓存决策 DENY 命中（deny-overrides）: userId={}, required={}",
+                                    auth.getName(), required);
+                            throw new ForbiddenException("访问被安全策略拒绝");
+                        }
+                    }
+                } catch (ForbiddenException fe) {
+                    throw fe;
+                } catch (Exception e) {
+                    // 判断不可用时不放行、也不误拒：按 authority 既有结论继续（缓存不是权威，
+                    // 其不可用不应改变鉴权结论；真正的鉴权权威仍是 authorities + 策略面）。
+                    log.warn("缓存 DENY 判定不可用，跳过该腿（不影响既有裁决）: {}", e.getMessage());
+                }
             }
         }
 

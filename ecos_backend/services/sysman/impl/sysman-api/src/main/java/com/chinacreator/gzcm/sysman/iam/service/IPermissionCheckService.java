@@ -29,6 +29,18 @@ public interface IPermissionCheckService {
      * @throws Exception 取数异常（调用方须显式报错，禁当空集处理）
      */
     java.util.Map<String, String> getUserEffectiveDecisions(String userId) throws Exception;
+
+    /**
+     * 用户被<b>显式拒绝</b>的权限码集合（{@code resource:action}；执法侧 DENY 源，additive）。
+     *
+     * <p>供 {@code RequirePermissionAspect} 作**额外 DENY 源**（裁决 A）：命中即 403，
+     * 即使 authorities 放行（deny-overrides）。本方法只返回 DENY，<b>不得</b>被用于放行判定——
+     * 缓存不是授权权威，放宽方向一律禁止。</p>
+     *
+     * @return 被拒权限码集合；无租户上下文/无缓存时按实际算出（缓存未命中即回源计算）
+     * @throws Exception 取数异常（调用方按「跳过 DENY 腿」处置，不得据此放行或误拒）
+     */
+    java.util.Set<String> getUserDeniedCodes(String userId) throws Exception;
     
     /**
      * 权限检查异常
