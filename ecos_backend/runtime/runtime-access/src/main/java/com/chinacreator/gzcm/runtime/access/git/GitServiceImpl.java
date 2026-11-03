@@ -45,11 +45,41 @@ public class GitServiceImpl implements GitService {
     /** 短 sha 位数（沿用 pipeline 版本列表既有 7 位口径，改由属主单源承载）。 */
     private static final int SHORT_SHA_LENGTH = 7;
 
+    /** 签名能力缺失机读码（§2.9.9 G2；与 {@code BranchProtectionPolicy} 同名同义）。 */
+    static final String SIGNING_NOT_AVAILABLE = "SIGNING_NOT_AVAILABLE";
+
+    /**
+     * 签名能力闸（§2.9.9 G2）：<b>要求签名但签名器未配置 ⇒ 显式拒绝</b>，
+     * 禁「静默产出未签名提交/标签，再在上层报成功」——那正是 G2「零签名」变成假绿的路径。
+     *
+     * <p>开关走部署级 System 属性/环境变量（runtime 底座不读 sys_config，铁律「配置只经 sysman 门面」）：
+     * {@code ecos.git.signing.required} / {@code ECOS_GIT_SIGNING_REQUIRED} 与
+     * {@code ecos.git.signing.enabled} / {@code ECOS_GIT_SIGNING_ENABLED}。真实 GPG/SSH 签名器
+     * 接入须另行授权（密钥材料属凭据治理面，禁在仓库内生成/提交）。</p>
+     */
+    void assertSignatureCapability(String action) throws GitException {
+        if (boolProp("ecos.git.signing.required", "ECOS_GIT_SIGNING_REQUIRED")
+                && !boolProp("ecos.git.signing.enabled", "ECOS_GIT_SIGNING_ENABLED")) {
+            throw new GitException(SIGNING_NOT_AVAILABLE + ": " + action
+                    + " 要求签名，但签名器未配置（GPG/SSH keyring 未接入）；拒绝产出未签名制品");
+        }
+    }
+
+    private static boolean boolProp(String sysProp, String envName) {
+        String sys = System.getProperty(sysProp);
+        if (sys != null && !sys.isBlank()) {
+            return "true".equalsIgnoreCase(sys.trim()) || "1".equals(sys.trim());
+        }
+        String env = System.getenv(envName);
+        return env != null && ("true".equalsIgnoreCase(env.trim()) || "1".equals(env.trim()));
+    }
+
     // ── Runtime 原有方法 (JGit 实现) ──
 
     @Override
     public String commitAllChanges(GitRepository repository, String commitMessage,
                                     String authorName, String authorEmail) throws GitException {
+        assertSignatureCapability("commitAllChanges");
         String localPath = requireLocalPath(repository);
         log.info("JGit commitAll: path={}, msg='{}', author={}", localPath, commitMessage, authorName);
         try (Git git = Git.open(new File(localPath))) {
@@ -80,6 +110,7 @@ public class GitServiceImpl implements GitService {
 
     @Override
     public String createTag(GitRepository repository, String tagName, String message) throws GitException {
+        assertSignatureCapability("createTag");
         String localPath = requireLocalPath(repository);
         log.info("JGit createTag: path={}, tag={}", localPath, tagName);
         try (Git git = Git.open(new File(localPath))) {
@@ -261,6 +292,7 @@ public class GitServiceImpl implements GitService {
 
     @Override
     public void commit(String localPath, String message, List<String> filePaths) throws GitException {
+        assertSignatureCapability("commit");
         localPath = requirePath(localPath, "commit");
         log.info("JGit commit: path={}, msg='{}', files={}", localPath, message, filePaths);
         try (Git git = Git.open(new File(localPath))) {
