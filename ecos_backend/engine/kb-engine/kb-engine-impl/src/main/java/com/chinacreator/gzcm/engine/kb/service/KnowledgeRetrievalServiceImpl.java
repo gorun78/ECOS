@@ -13,13 +13,22 @@ import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEmbeddingMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeNodeMapper;
 import com.chinacreator.gzcm.engine.kb.repository.KnowledgeEdgeMapper;
 import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
+import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.runtime.core.cache.CacheJson;
+import com.chinacreator.gzcm.runtime.core.cache.CacheKey;
+import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
+import com.fasterxml.jackson.core.type.TypeReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.*;
 
 @Service
@@ -44,6 +53,19 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
     private final String llmGatewayBase;
 
     private volatile boolean pgVectorAvailable = false;
+
+    /** 14 类矩阵 #8「知识库索引」检索结果缓存域（短 TTL，键 = 规范化查询摘要）。 */
+    static final String SEARCH_CACHE_DOMAIN = "kb-search";
+    static final String SEARCH_CACHE_TYPE = "knowledge-search";
+    static final String SEARCH_CACHE_VERSION = "1";
+    static final long SEARCH_CACHE_TTL_SECONDS = 30L;
+
+    private static final TypeReference<List<KnowledgeArticle>> ARTICLE_LIST_TYPE = new TypeReference<>() {
+    };
+
+    /** Runtime 缓存（缺席时逐次回源，不影响正确性）。 */
+    @Autowired(required = false)
+    private ObjectProvider<RuntimeCacheManager> cacheProvider;
 
     public KnowledgeRetrievalServiceImpl(KnowledgeArticleMapper articleMapper,
                                          KnowledgeEmbeddingMapper embeddingMapper,
@@ -498,6 +520,7 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
         articleMapper.insert(article);
         log.info("Created knowledge article: {} [{}] category={}", article.getId(), article.getTitle(),
                 article.getKnowledgeCategory());
+        evictSearchCache();
         return article;
     }
 
@@ -508,7 +531,14 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
 
     @Override
     public List<KnowledgeArticle> searchArticles(String queryText, int limit) {
-        return articleMapper.search(queryText, limit);
+        CacheKey key = searchCacheKey(queryText, limit);
+        List<KnowledgeArticle> cached = CacheJson.read(stringOf(key), ARTICLE_LIST_TYPE);
+        if (cached != null) {
+            return cached;
+        }
+        List<KnowledgeArticle> loaded = articleMapper.search(queryText, limit);
+        store(key, loaded);
+        return loaded;
     }
 
     /**
@@ -558,6 +588,70 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
             throw new com.chinacreator.gzcm.common.exception.NotFoundException(
                     "知识条目不存在: " + articleId);
         }
+        evictSearchCache();
         return articleMapper.findById(articleId.trim());
+    }
+
+    // ── Runtime 缓存接线（14 类矩阵 #8；#147AL）────────────────────────────
+    // 检索结果高基数：只按「规范化查询摘要 + 短 TTL」缓存，键内禁原始查询串；
+    // 无租户上下文不缓存（权限先于缓存），写入后整域失效。
+
+    private CacheKey searchCacheKey(String queryText, int limit) {
+        RuntimeCacheManager manager = cache();
+        if (manager == null) {
+            return null;
+        }
+        String tenant = TenantContextHolder.getTenantId();
+        if (tenant == null || tenant.isBlank()) {
+            return null;
+        }
+        try {
+            return manager.key(SEARCH_CACHE_DOMAIN, SEARCH_CACHE_TYPE, tenant.trim(),
+                    canonicalQueryDigest(queryText, limit), SEARCH_CACHE_VERSION);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /** 规范化查询摘要（小写 + 去首尾空白 + limit），SHA-256 hex；原始串不进键。 */
+    static String canonicalQueryDigest(String queryText, int limit) {
+        String canonical = (queryText == null ? "" : queryText.trim().toLowerCase(Locale.ROOT))
+                + "|limit=" + limit;
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(canonical.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(64);
+            for (byte b : digest) {
+                hex.append(Character.forDigit((b >> 4) & 0xF, 16));
+                hex.append(Character.forDigit(b & 0xF, 16));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            return null; // 摘要不可得 ⇒ 不缓存（键缺失）
+        }
+    }
+
+    private RuntimeCacheManager cache() {
+        return cacheProvider == null ? null : cacheProvider.getIfAvailable();
+    }
+
+    private String stringOf(CacheKey key) {
+        RuntimeCacheManager manager = cache();
+        return key == null || manager == null ? null : manager.getString(key).orElse(null);
+    }
+
+    private void store(CacheKey key, Object value) {
+        RuntimeCacheManager manager = cache();
+        if (key == null || manager == null || value == null) {
+            return;
+        }
+        manager.putString(key, CacheJson.write(value), SEARCH_CACHE_TTL_SECONDS);
+    }
+
+    private void evictSearchCache() {
+        RuntimeCacheManager manager = cache();
+        if (manager != null) {
+            manager.invalidateDomain(manager.env(), SEARCH_CACHE_DOMAIN);
+        }
     }
 }
