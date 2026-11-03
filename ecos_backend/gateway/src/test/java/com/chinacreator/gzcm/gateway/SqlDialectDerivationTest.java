@@ -45,7 +45,7 @@ import org.junit.jupiter.api.Timeout;
  * XML 注释内，必须剥，否则把文档当违例）。</p>
  *
  * <p><b>现处置形态实测（2026-10-30，本批取证，主源树）</b>：全仓 databaseId 零使用
- * 表示 MC03 要求的 databaseId 方言片段或 Adapter 层不存在，故下列八族全部按
+ * 表示 MC03 要求的 databaseId 方言片段或 Adapter 层不存在，故下列九族全部按
  * 「未处置违例存量」登记，判据 = <b>文件级名录双向相等</b>（出现新文件即红；
  * 已登记文件被收口也必须同批收缩名录；同文件内增减也红）：</p>
  * <pre>
@@ -55,9 +55,22 @@ import org.junit.jupiter.api.Timeout;
  *   D_RETURNING 裸 RETURNING（无 databaseId 分支）
  *   E_GEN_UUID  gen_random_uuid()
  *   F_JSON_FB   指针解析 / jsonb 函数（dry-run 实测有命中面，判据自检活）
- *   G_REGCLASS  to_regclass()（dry-run 实测有命中面，同纪律）
+ *   G_REGCLASS  to_regclass()（dry-run 实测有命中面，判据自检活）
  *   H_DIST_ON   DISTINCT ON
+ *   I_VAR_CONCAT CONCAT('%',&lt;占位符&gt;,...)（PG VARIADIC "any" 推不出参数类型 ⇒ 扩展协议预编译必 500）
  * </pre>
+ * <p><b>I 族的由来（#147AM live 取证）</b>：{@code GET /api/v1/knowledge/articles/search} 实测 500
+ * = {@code ECOS-KB-050 … could not determine data type of parameter $1}，psql {@code PREPARE} 逐字复现。
+ * 根因不是数据、不是权限，而是 PostgreSQL 的 {@code CONCAT} 声明为 {@code VARIADIC "any"}——
+ * 扩展查询协议（JDBC 默认）下无法为其中未声明类型的占位符推断类型，预编译期即失败；
+ * 等值匹配（{@code col = ?}）可由列类型反推所以侥幸可用。本仓 kb-engine 早在 Wave-4.2 P0-3
+ * 就撞过同一坑并在 {@code KnowledgeNodeMapperTest} 立了单文件判据，但判据只护住那一枚 Mapper，
+ * 于是同类写法在 kb / data-engine 三处复活。本族把判据升级为全源棘轮：
+ * PG 原生引擎面（engine / services / gateway / runtime 的 {@code @Select}/{@code @Update} 注解与
+ * JdbcTemplate 常量）命中数必须为 0，改 ANSI {@code '%' || #{} || '%'}；
+ * sysman legacy {@code *-sql.xml}（TD_* 表，同文还依赖 {@code ifnull} 等非 PG 函数，
+ * 属整文件方言移植而非单点修补）按存量登记，禁新增。</p>
+ *
  * <p><b>防挂死超时</b>：同属仓扫形门禁，超时基线对齐 ErrorCodeMachineCodeSingleSourceTest /
  * ServerDefectExceptionStatusTest 的 {@code @Timeout(120)}（10s 档在本机全仓冷盘扫描
  * 2~3 轮下超时误红，2026-10-31 实测 16~24s/轮）。</p>
@@ -85,11 +98,19 @@ class SqlDialectDerivationTest {
     private static final Pattern JSON_FB = Pattern.compile("->>|jsonb_[a-z0-9_]+\\s*\\(");
     private static final Pattern REGCLASS = Pattern.compile("to_regclass\\s*\\(", Pattern.CASE_INSENSITIVE);
     private static final Pattern DIST_ON = Pattern.compile("\\bDISTINCT\\s+ON\\b", Pattern.CASE_INSENSITIVE);
+    /**
+     * I 族：PG 的 CONCAT 声明为 VARIADIC "any"，首参是通配字面量、次参是未声明类型占位符时，
+     * 扩展查询协议（JDBC 默认）预编译期推不出参数类型 ⇒
+     * {@code could not determine data type of parameter $1}（#147AM live 复现）。
+     * 只判这一形——纯字面量拼接与列间拼接都不参，避免把种子串/文档当违例。
+     */
+    private static final Pattern VARIADIC_CONCAT =
+            Pattern.compile("\\bconcat\\s*\\(\\s*'%'\\s*,\\s*[#$?]", Pattern.CASE_INSENSITIVE);
 
-    /** 八族规则名（顺序即断言遍历顺序）。 */
+    /** 九族规则名（顺序即断言遍历顺序）。 */
     private static final List<String> RULE_NAMES =
             List.of("A_SQL_CAST", "C_UPSERT", "B_ILIKE", "D_RETURNING",
-                    "E_GEN_UUID", "F_JSON_FB", "G_REGCLASS", "H_DIST_ON");
+                    "E_GEN_UUID", "F_JSON_FB", "G_REGCLASS", "H_DIST_ON", "I_VAR_CONCAT");
 
     // 文件级名录（双向相等；键 = repo-relative 路径，斜杠型；值 = 该文件命中数）。
     // 2026-10-30 dry-run diff 全量回读回填：Java 面百文件存量登记为棘轮基线；
@@ -215,6 +236,19 @@ class SqlDialectDerivationTest {
             Map.entry("ecos_backend/engine/data-engine/data-engine-impl/src/main/resources/mapper/DataResourceMapper.xml",
                     Map.of("A_SQL_CAST", 1, "B_ILIKE", 3))
     ));
+    /**
+     * sysman legacy 内嵌 {@code *-sql.xml}（{@code src/main/java} 下，随代码打包的 SQL 配置）整文判据名录。
+     * 实测基线（2026-11-03 #147AM 回读，全部为首参 {@code '%'} + 次参占位符形）：
+     * User 2 / Role 2 / Tenant 2 / Config 2 / AuditLog 4 = 12 枚。
+     */
+    static final Map<String, Map<String, Integer>> EMBEDDED_SQL_XML_PIN = build(RULE_NAMES, Map.ofEntries(
+            Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/iam/dao/impl/User-sql.xml", Map.of("I_VAR_CONCAT", 2)),
+            Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/iam/dao/impl/Role-sql.xml", Map.of("I_VAR_CONCAT", 2)),
+            Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/iam/dao/impl/Tenant-sql.xml", Map.of("I_VAR_CONCAT", 2)),
+            Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/config/dao/impl/Config-sql.xml", Map.of("I_VAR_CONCAT", 2)),
+            Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/audit/dao/impl/AuditLog-sql.xml", Map.of("I_VAR_CONCAT", 4))
+    ));
+
     private static Map<String, Map<String, Integer>> build(List<String> ruleNames, Map<String, Map<String, Integer>> raw) {
         Map<String, Map<String, Integer>> out = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, Integer>> e : raw.entrySet()) {
@@ -245,6 +279,15 @@ class SqlDialectDerivationTest {
     }
 
     @Test
+    @DisplayName("内嵌 -sql.xml 元素文本：I 族独立判（字面量提取看不到元素文本，必须整文判）")
+    void embeddedSqlXmlConcatSurfaceIsPinned() throws IOException {
+        assertPinned(EMBEDDED_SQL_XML_PIN, scanEmbeddedSqlXml(),
+                "sysman legacy 内嵌 *-sql.xml 的 CONCAT 占位符面必须双向相等。"
+                        + "这批文件跑在 TD_* 遗留表、同文还依赖 ifnull 等非 PG 函数，"
+                        + "属整文件方言移植而非单点修补，故按存量登记；新增命中或擅自裁剪都先红。");
+    }
+
+    @Test
     @DisplayName("反向对照：台账指名违例点必须被本门看见（防谓词空转把零命中当真绿）")
     void designatedOffendersMustBeSeen() throws IOException {
         Map<String, Map<String, Integer>> js = scanJava();
@@ -272,7 +315,7 @@ class SqlDialectDerivationTest {
     }
 
     @Test
-    @DisplayName("谓词自检：八族判据都必须能判非法串，且不判合法串（恒 0 命中 = 谓词死的假绿形态）")
+    @DisplayName("谓词自检：九族判据都必须能判非法串，且不判合法串（恒 0 命中 = 谓词死的假绿形态）")
     void predicatesBiteOnSyntheticStrings() {
         // A 族：cast 闭集
         assertTrue(count(CANNED_CASTS, "?::jsonb") == 1, "A: ::jsonb 非法串未命中");
@@ -300,6 +343,37 @@ class SqlDialectDerivationTest {
         assertTrue(count(JSON_FB, "payload->>'name'") == 1, "F: 指针操作符未命中");
         assertTrue(count(REGCLASS, "WHERE to_regclass(oid) IS NOT NULL") == 1, "G: to_regclass 未命中");
         assertTrue(count(DIST_ON, "SELECT DISTINCT ON (a) a, b FROM t") == 1, "H: DISTINCT ON 未命中");
+
+        // I 族：CONCAT 首参通配 + 次参占位符（#147AM 的 live 500 形）
+        assertTrue(count(VARIADIC_CONCAT, "WHERE title ILIKE CONCAT('%', #{query}, '%')") == 1,
+                "I: MyBatis 井号花括号形未命中");
+        assertTrue(count(VARIADIC_CONCAT, "AND name LIKE concat('%', #[keyword], '%')") == 1,
+                "I: sysman 井号方括号形未命中");
+        assertTrue(count(VARIADIC_CONCAT, "WHERE c ILIKE CONCAT('%', ?, '%')") == 1,
+                "I: 裸 JDBC 问号形未命中");
+        assertTrue(count(VARIADIC_CONCAT, "LIMIT ${limit}") == 0, "I: 无 CONCAT 不参");
+        assertEquals(0, count(VARIADIC_CONCAT, "concat('%', 'abc', '%')"),
+                "I: 纯字面量拼接可预编译，必须不参（否则把合法串当违例）");
+        assertEquals(0, count(VARIADIC_CONCAT, "concat(#{resource}, ':', #{action})"),
+                "I: 列间拼接首参不是通配字面量，必须不参");
+        assertEquals(0, count(VARIADIC_CONCAT, "AND rule_name LIKE '%' || #{q.keyword} || '%'"),
+                "I: ANSI 双竖线修法是本族要推的合法形，必须不参");
+    }
+
+    /** I 族收口核验：PG 原生引擎/服务/底座面（Java 字面量）命中必须为 0（#147AM 三处修复的常驻门）。 */
+    @Test
+    @DisplayName("I 族：PG 原生引擎面（Java 字面量/文本块）CONCAT 占位符必须零命中，且本门能变红")
+    void variadicConcatIsZeroOnPgNativeSurface() throws IOException {
+        Map<String, Map<String, Integer>> js = scanJava();
+        Map<String, Integer> knowledgeArticle = js.get(
+                "ecos_backend/engine/kb-engine/kb-engine-impl/src/main/java/com/chinacreator/gzcm/engine/kb/repository/KnowledgeArticleMapper.java");
+        assertTrue(knowledgeArticle == null || knowledgeArticle.getOrDefault("I_VAR_CONCAT", 0) == 0,
+                "KnowledgeArticleMapper.search 的 CONCAT 占位符形必须为 0（改回即 live 500 回潮）");
+
+        int total = js.values().stream()
+                .mapToInt(m -> m.getOrDefault("I_VAR_CONCAT", 0))
+                .sum();
+        assertEquals(0, total, "PG 原生运行期 SQL 面（注解 Mapper / JdbcTemplate / SqlProvider）零容忍");
     }
 
     // ==================== 扫描与工具 ====================
@@ -350,7 +424,33 @@ class SqlDialectDerivationTest {
         return out;
     }
 
-    /** 共同计数：八族判据对 text 各自计数（零命中不入库，保持名录紧凑）。 */
+    /**
+     * 内嵌 {@code *-sql.xml}：整文判（剥 XML 注释）。
+     *
+     * <p>这批发在 {@code src/main/java} 下，{@link #scanJava()} 只取引号内内容 ⇒ 元素文本里的
+     * SQL 对该族是<b>盲区</b>；{@link #scanXml()} 又只走 {@code src/main/resources} ⇒ 同样看不到。
+     * 本腿专门补这个缝，且只补 I 族（其余八族沿用既有基线，避免同批把盲区当成新违例潮）。</p>
+     */
+    static Map<String, Map<String, Integer>> scanEmbeddedSqlXml() throws IOException {
+        Map<String, Map<String, Integer>> out = new LinkedHashMap<>();
+        for (Path f : walkDir("java")) {
+            String s = f.toString().replace('\\', '/');
+            if (!s.contains("/src/main/java/") || !s.endsWith("-sql.xml")) {
+                continue;
+            }
+            if (s.contains("/archive/") || s.contains("/target/")) {
+                continue;
+            }
+            String rel = s.substring(s.indexOf("ecos_backend"));
+            int n = count(VARIADIC_CONCAT, stripXmlComments(read(f)));
+            if (n > 0) {
+                out.put(rel, Map.of("I_VAR_CONCAT", n));
+            }
+        }
+        return out;
+    }
+
+    /** 共同计数：九族判据对 text 各自计数（零命中不入库，保持名录紧凑）。 */
     private static Map<String, Integer> countAll(String text) {
         Map<String, Integer> m = new LinkedHashMap<>();
         putIfPositive(m, "A_SQL_CAST", count(CANNED_CASTS, text));
@@ -361,6 +461,7 @@ class SqlDialectDerivationTest {
         putIfPositive(m, "F_JSON_FB", count(JSON_FB, text));
         putIfPositive(m, "G_REGCLASS", count(REGCLASS, text));
         putIfPositive(m, "H_DIST_ON", count(DIST_ON, text));
+        putIfPositive(m, "I_VAR_CONCAT", count(VARIADIC_CONCAT, text));
         return m;
     }
 

@@ -36,7 +36,16 @@ public interface KnowledgeArticleMapper {
             + "WHERE knowledge_category = #{category} ORDER BY created_at DESC LIMIT #{limit}")
     List<KnowledgeArticle> findByCategory(@Param("category") String category, @Param("limit") int limit);
 
-    @Select("SELECT " + COLS + " FROM ecos_knowledge.knowledge_article WHERE title ILIKE CONCAT('%', #{query}, '%') OR content ILIKE CONCAT('%', #{query}, '%') LIMIT #{limit}")
+    /**
+     * 全文式检索（#147AM 实测修复）：模糊匹配用 ANSI {@code '%' || #{query} || '%'}，
+     * <b>不得</b>写 {@code CONCAT('%', #{query}, '%')}。{@code CONCAT} 是 {@code VARIADIC "any"}
+     * 函数，PG 无法为其中未声明类型的占位符推断类型 ⇒ 预编译期即
+     * {@code ERROR: could not determine data type of parameter $1}（该错误在扩展查询协议下必然复现，
+     * 与是否命中数据无关；同类写法只因走简单协议而侥幸通过）。
+     */
+    @Select("SELECT " + COLS + " FROM ecos_knowledge.knowledge_article "
+            + "WHERE title ILIKE '%' || #{query} || '%' OR content ILIKE '%' || #{query} || '%' "
+            + "LIMIT #{limit}")
     List<KnowledgeArticle> search(@Param("query") String query, @Param("limit") int limit);
 
     @Select("SELECT " + COLS + " FROM ecos_knowledge.knowledge_article")

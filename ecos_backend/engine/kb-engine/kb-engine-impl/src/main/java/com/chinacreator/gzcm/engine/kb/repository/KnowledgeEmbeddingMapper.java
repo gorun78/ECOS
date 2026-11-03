@@ -80,7 +80,7 @@ public interface KnowledgeEmbeddingMapper {
     @Select("SELECT id, document_id AS articleId, content AS chunkText, " +
             "token_count AS tokenCount, embedding_model AS model, created_at AS createdAt " +
             "FROM ecos_knowledge.knowledge_embedding " +
-            "WHERE content ILIKE CONCAT('%', #{keyword}, '%') " +
+            "WHERE content ILIKE '%' || #{keyword} || '%' " +
             "ORDER BY created_at DESC " +
             "LIMIT #{limit}")
     List<KnowledgeEmbedding> searchByKeyword(@Param("keyword") String keyword, @Param("limit") int limit);

@@ -53,7 +53,9 @@ public final class DqRuleSqlProvider {
                 sb.append(" AND target_kind = #{q.targetKind}");
             }
             if (isNotBlank(q.getKeyword())) {
-                sb.append(" AND rule_name LIKE CONCAT('%', #{q.keyword}, '%')");
+                // PostgreSQL 的 CONCAT 是 VARIADIC "any"，扩展查询协议下无法为其中的
+                // 未声明类型占位符推断参数类型 ⇒ 必须用 ANSI || 拼接。
+                sb.append(" AND rule_name LIKE '%' || #{q.keyword} || '%'");
             }
         }
         return sb.toString();
