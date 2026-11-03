@@ -1,11 +1,14 @@
 package com.chinacreator.gzcm.gateway;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Field;
 import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -47,6 +50,11 @@ import com.chinacreator.gzcm.runtime.core.cache.outbox.CacheInvalidationRelay;
  *
  * <p><b>它不证明什么（如实）</b>：这里的失效入口是直调 {@code evictObject}，不是经 HTTP 写面
  * （如 {@code PUT /users/{id}/roles}）触发；HTTP 那一腿要 gateway 上下文起来才能跑。</p>
+ *
+ * <p><b>清退那一腿的副作用（不是笔误）</b>：{@code purgePublished} 按表清、不按 nonce 清，
+ * 所以 {@code purgeRemovesOnlyExpiredPublishedRows} 会真的带走开发库里其它<b>超保留期的 PUBLISHED 行</b>
+ * （PENDING/FAILED 一律不碰）。这张表按 V310 定义只存中继工件、禁携带业务内容，带走它们正是生产语义；
+ * 断言因此判「带走的条数 == 清理前的过期集合」并把本轮四行不同寿命的行逐个点名验回。</p>
  *
  * <p>两个 manager 实例都装了投递口（与生产一致：订阅端所在节点的缓存管理器同样有这个 Bean），
  * 所以「广播处理不再入队」这条断言是在真实装配形状上做的，不是靠缺席蒙过的。
@@ -106,7 +114,7 @@ class CacheInvalidationOutboxLiveTest {
         nodeA = cache(redis);
         nodeB = cache(redis);
         relay = new CacheInvalidationRelay(new CacheInvalidationOutboxDao(jdbc),
-                provider(redis), provider(nodeA));
+                provider(redis), provider(nodeA), 1440);
         // 两个节点都装投递口：生产里订阅端节点的管理器同样有这个 Bean
         CacheInvalidationNotifier notifier = relay;
         inject(nodeA, "outboxProvider", provider(notifier));
@@ -195,7 +203,58 @@ class CacheInvalidationOutboxLiveTest {
         assertEquals(received, broadcastsAtNodeB.get(), "已发布行不得再产生广播");
     }
 
+    @Test
+    @DisplayName("保留期清退（真 SQL 语义）：只删过期 PUBLISHED，PENDING/FAILED/新鲜行一律留下")
+    void purgeRemovesOnlyExpiredPublishedRows() {
+        // 四行不同寿命，一次性把清退的四条边界都压在同一张表上
+        nodeA.evictObject(DOMAIN, OBJECT_TYPE, "p-pending-" + nonce);
+        String pendingId = singleRowIdLike("p-pending-" + nonce);
+
+        nodeA.evictObject(DOMAIN, OBJECT_TYPE, "p-fresh-" + nonce);
+        String freshId = singleRowIdLike("p-fresh-" + nonce);
+        relay.relay();
+        assertEquals("PUBLISHED", statusOf(freshId), "先确认新鲜行的 published_at 已落值");
+
+        nodeA.evictObject(DOMAIN, OBJECT_TYPE, "p-stale-" + nonce);
+        String staleId = singleRowIdLike("p-stale-" + nonce);
+        relay.relay();
+        assertEquals("PUBLISHED", statusOf(staleId));
+        jdbc.update("UPDATE " + TABLE + " SET published_at = CURRENT_TIMESTAMP - INTERVAL '7 days' WHERE id = ?",
+                staleId);
+
+        nodeA.evictObject(DOMAIN, OBJECT_TYPE, "p-failed-" + nonce);
+        String failedId = singleRowIdLike("p-failed-" + nonce);
+        jdbc.update("UPDATE " + TABLE + " SET status = 'FAILED', last_error = 'live-leg 造失败行' WHERE id = ?",
+                failedId);
+
+        Timestamp cutoff = Timestamp.from(Instant.now().minus(Duration.ofDays(1)));
+        int expiredBefore = expiredPublished(cutoff);
+
+        int deleted = new CacheInvalidationOutboxDao(jdbc).purgePublished(cutoff, 500);
+
+        // 清退按表不按 nonce：本腿真的会带走别的过期 PUBLISHED 行（表里只有已投递的中继工件，
+        // 无业务内容 — V310 列注释已钉），所以这里判「带走的就是过期的那一集合」而不是「只带本轮行」。
+        assertEquals(expiredBefore, deleted, "删除条数必须等于清理前的过期 PUBLISHED 数（单轮上限 500 未触发）");
+        assertFalse(exists(staleId), "过期 PUBLISHED 必须清走，否则表无界增长");
+        assertTrue(exists(pendingId), "PENDING 是待投递，清退不得碰");
+        assertTrue(exists(freshId), "保留期内的 PUBLISHED 不得清走（清早了=失败重放窗口消失）");
+        assertTrue(exists(failedId), "FAILED 是「广播没成功」的唯一线索，清退必须留下");
+        assertEquals(0, expiredPublished(cutoff), "清退后不得残留过期 PUBLISHED");
+    }
+
     // ── 支撑 ────────────────────────────────────────────────────────────
+
+    private static int expiredPublished(Timestamp cutoff) {
+        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM " + TABLE
+                + " WHERE status = 'PUBLISHED' AND published_at < ?", Integer.class, cutoff);
+        return n == null ? 0 : n;
+    }
+
+    private static boolean exists(String id) {
+        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM " + TABLE + " WHERE id = ?",
+                Integer.class, id);
+        return n != null && n > 0;
+    }
 
     private static RuntimeCacheManager cache(RedisStringCache redis) {
         CacheSettings settings = new CacheSettings(true, 30L, 60L, true, ENV);

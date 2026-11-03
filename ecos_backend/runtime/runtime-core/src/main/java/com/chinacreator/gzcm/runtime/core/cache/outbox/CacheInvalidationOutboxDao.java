@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.runtime.core.cache.outbox;
 
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -56,5 +57,24 @@ public class CacheInvalidationOutboxDao {
         Integer n = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + TABLE
                 + " WHERE is_deleted = 0 AND status = 'PENDING'", Integer.class);
         return n == null ? 0 : n;
+    }
+
+    /**
+     * 删除保留期之外的已发布行；返回删除条数。
+     *
+     * <p><b>只清 {@code PUBLISHED}</b>：PENDING 是待投递，FAILED 是「广播没成功就被忘掉」的
+     * 假绿源头，两者必须留在表里供运维重放与观测。Outbox 行本身不携带业务内容（V310 列注释已钉），
+     * 因此这里是物理清退而非逻辑删除——逻辑删除只会让这张纯基础设施表无界增长。</p>
+     *
+     * <p>截止时刻由调用侧算好传入 {@code timestamp} 参数：PG 的 {@code INTERVAL} 字面量乘参数
+     * 会让占位符类型不可推断（同 {@code CONCAT} 那族缺陷），禁在此写 {@code ? * INTERVAL ...}。</p>
+     *
+     * @param cutoff 早于此时刻的 PUBLISHED 行才可删
+     * @param limit  单轮上限，避免长事务锁住整表
+     */
+    public int purgePublished(Timestamp cutoff, int limit) {
+        return jdbcTemplate.update("DELETE FROM " + TABLE + " WHERE id IN (SELECT id FROM " + TABLE
+                + " WHERE status = 'PUBLISHED' AND published_at < ? ORDER BY published_at ASC LIMIT ?)",
+                cutoff, limit);
     }
 }

@@ -1,11 +1,15 @@
 package com.chinacreator.gzcm.runtime.core.cache.outbox;
 
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +28,9 @@ import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
  * <p><b>为什么 Redis 不可用时不置 PUBLISHED</b>：置了就是假成功——其他节点不会失效，
  * 陈旧窗口无界。此处按失败累加，超次转 FAILED 让人看见。</p>
  *
+ * <p><b>第三段=清退</b>：{@link #purge()} 只删超保留期的 PUBLISHED 行；PENDING/FAILED 永不清退，
+ * 否则「投递失败」这条线索会被自己的清理抹掉。</p>
+ *
  * @author ECOS Runtime #147AF
  */
 @Component
@@ -35,17 +42,22 @@ public class CacheInvalidationRelay implements CacheInvalidationNotifier {
     public static final String CHANNEL = "ecos:cache:invalidate";
     static final int BATCH = 50;
     static final int MAX_ATTEMPTS = 5;
+    /** 单轮清退上限：一次删太多会把这张写得很勤的表锁住。 */
+    static final int PURGE_BATCH = 500;
 
     private final CacheInvalidationOutboxDao outboxDao;
     private final ObjectProvider<RedisStringCache> redis;
     private final ObjectProvider<RuntimeCacheManager> cache;
+    private final int retentionMinutes;
 
     public CacheInvalidationRelay(CacheInvalidationOutboxDao outboxDao,
                                   ObjectProvider<RedisStringCache> redis,
-                                  ObjectProvider<RuntimeCacheManager> cache) {
+                                  ObjectProvider<RuntimeCacheManager> cache,
+                                  @Value("${ecos.cache.outbox.retention-minutes:1440}") int retentionMinutes) {
         this.outboxDao = outboxDao;
         this.redis = redis;
         this.cache = cache;
+        this.retentionMinutes = retentionMinutes;
     }
 
     /**
@@ -98,6 +110,33 @@ public class CacheInvalidationRelay implements CacheInvalidationNotifier {
             }
         }
         return published;
+    }
+
+    /**
+     * 保留期清退（默认 10 分钟一轮）。
+     *
+     * <p><b>为什么必须有这一条</b>：#147AN 把生产端接通后，每一次写路径失效都会落一行；
+     * 没有清退就等于把「跨节点失效」的实现代价转成一张无界增长的表。清退只碰 PUBLISHED，
+     * PENDING/FAILED 一律留（后者是重放与观测的唯一线索）。</p>
+     */
+    @Scheduled(initialDelayString = "${ecos.cache.outbox.purge-initial-delay-ms:60000}",
+            fixedDelayString = "${ecos.cache.outbox.purge-ms:600000}")
+    public void purge() {
+        try {
+            int removed = purgeOnce();
+            if (removed > 0) {
+                log.info("Outbox 保留期清退：删除 {} 条 PUBLISHED 行（保留 {} 分钟）",
+                        removed, retentionMinutes);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Outbox 保留期清退异常（下轮重试）: {}", e.getMessage());
+        }
+    }
+
+    /** 单轮清退；返回删除条数（供单测与活体腿直调）。 */
+    int purgeOnce() {
+        Timestamp cutoff = Timestamp.from(Instant.now().minus(Duration.ofMinutes(retentionMinutes)));
+        return outboxDao.purgePublished(cutoff, PURGE_BATCH);
     }
 
     private static String escape(String value) {
