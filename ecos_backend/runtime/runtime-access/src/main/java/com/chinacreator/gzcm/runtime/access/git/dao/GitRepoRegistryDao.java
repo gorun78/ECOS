@@ -34,7 +34,7 @@ public class GitRepoRegistryDao extends JdbcTemplateDaoSupport implements GitRep
 
     private static final String SELECT_COLUMNS =
             "SELECT repository_id, repo_name, repo_root, branch_default, status, "
-          + "       include_paths, exclude_paths, "
+          + "       include_paths, exclude_paths, owner_org_id, "
           + "       create_time, update_time, create_by, update_by ";
 
     private static final String ACTIVE_LIST_SQL =
@@ -58,6 +58,7 @@ public class GitRepoRegistryDao extends JdbcTemplateDaoSupport implements GitRep
         repo.setEnabled(STATUS_ACTIVE.equals(rs.getString("status")));
         repo.setIncludePaths(GitRepository.splitCsv(rs.getString("include_paths")));
         repo.setExcludePaths(GitRepository.splitCsv(rs.getString("exclude_paths")));
+        repo.setOwnerOrgId(rs.getString("owner_org_id"));
         repo.setCreatedTime(toDate(rs.getTimestamp("create_time")));
         repo.setUpdatedTime(toDate(rs.getTimestamp("update_time")));
         repo.setCreatedBy(rs.getString("create_by"));

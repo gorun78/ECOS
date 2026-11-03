@@ -53,6 +53,9 @@ public class GitRepository {
     /** 排除清单（V304 新增；命中即拒，优先级高于纳入） */
     private java.util.List<String> excludePaths = java.util.List.of();
 
+    /** §2.9.9 G8：仓库属主机构；null = 全局仓库（不按机构限制）。 */
+    private String ownerOrgId;
+
     /** 创建时间 */
     private Date createdTime;
 
@@ -163,6 +166,19 @@ public class GitRepository {
 
     public void setExcludePaths(java.util.List<String> excludePaths) {
         this.excludePaths = excludePaths == null ? java.util.List.of() : java.util.List.copyOf(excludePaths);
+    }
+
+    /**
+     * 仓库属主机构（§2.9.9 G8；V308）。{@code null}/空白 = <b>全局仓库</b>（不按机构限制，
+     * 是 V308 之前的既有语义）；非空时只有该机构（或超管）可操作，判定在 gateway
+     * {@code GitRepoOrgGuard}，机构值一律取服务端解析结果、不采信客户端头。
+     */
+    public String getOwnerOrgId() {
+        return ownerOrgId;
+    }
+
+    public void setOwnerOrgId(String ownerOrgId) {
+        this.ownerOrgId = ownerOrgId == null || ownerOrgId.isBlank() ? null : ownerOrgId.trim();
     }
 
     /**
