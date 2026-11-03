@@ -9,8 +9,11 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
+import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -21,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.ObjectProvider;
 
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.runtime.core.cache.CacheInvalidationNotifier;
 import com.chinacreator.gzcm.runtime.core.cache.CacheKey;
 import com.chinacreator.gzcm.runtime.core.cache.CacheSettings;
 import com.chinacreator.gzcm.runtime.core.cache.CacheSettingsSource;
@@ -32,7 +36,8 @@ import com.chinacreator.gzcm.sysman.iam.entity.Permission;
  *
  * <p>覆盖六条腿：键段完整（含 env/租户/类型/版本）、跨租户不串、无租户上下文不缓存、
  * 无陈旧上限不缓存、关闭态不缓存、撤权跨视图即时失效；每条正向断言都配一枚
- * 「能变红」反证（旧裸 {@code userId} 键形态必须判不合格），防止改动被无声回退。</p>
+ * 「能变红」反证（旧裸 {@code userId} 键形态必须判不合格），防止改动被无声回退。
+ * 第七条腿 {@link #evictAllAnnouncesExactlyOnce()} 钉「跨节点失效宣告口唯一在底座」（#147AO）。</p>
  *
  * @author ECOS Sysman #147AA
  */
@@ -77,6 +82,41 @@ class PermissionCacheIsolationGateTest {
     private static RuntimeCacheManager enabled() {
         return new RuntimeCacheManager(provider(
                 new CacheSettings(true, 600L, 120L, false, ENV)));
+    }
+
+    private static <T> ObjectProvider<T> anyProvider(T value) {
+        return new ObjectProvider<>() {
+            @Override
+            public T getObject(Object... args) {
+                return value;
+            }
+
+            @Override
+            public T getObject() {
+                return value;
+            }
+
+            @Override
+            public T getIfAvailable() {
+                return value;
+            }
+
+            @Override
+            public T getIfUnique() {
+                return value;
+            }
+        };
+    }
+
+    /** 把底座视为「已装配 Outbox 投递口」——生产形态就是 relay bean 在场。 */
+    private static void injectOutbox(RuntimeCacheManager manager, CacheInvalidationNotifier notifier) {
+        try {
+            Field field = RuntimeCacheManager.class.getDeclaredField("outboxProvider");
+            field.setAccessible(true);
+            field.set(manager, anyProvider(notifier));
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("注入 outboxProvider 失败（字段改名须同步本门）", e);
+        }
     }
 
     private static Map<String, Object> decisions(String effect) {
@@ -227,6 +267,30 @@ class PermissionCacheIsolationGateTest {
         service.putUserPermissionDecisions(USER, decisions("DENY"), -1);
         assertEquals("DENY", effects(service.getUserPermissionDecisions(USER)).get("perm-1"));
         assertNotEquals(1L, service.currentVersion());
+    }
+
+    @Test
+    @DisplayName("宣告口唯一：evictAll 恰好递一条 Outbox 意图（调用方不得再直连中继）")
+    void evictAllAnnouncesExactlyOnce() {
+        RuntimeCacheManager manager = enabled();
+        List<String> announced = new ArrayList<>();
+        injectOutbox(manager, (env, domain, reason) -> {
+            announced.add(env + "|" + domain + "|" + reason);
+            return "row-" + announced.size();
+        });
+        PermissionCacheServiceImpl service = new PermissionCacheServiceImpl(manager);
+        TenantContextHolder.setTenantId(TENANT_A);
+
+        service.evictAll();
+
+        assertEquals(List.of(ENV + "|sysman|domain"), announced,
+                "底座 invalidateDomain 自带宣告，调用方再直连 relay 即双份 Outbox 行（#147AO）");
+
+        announced.clear();
+        service.evictUser(USER);
+        assertEquals(List.of(ENV + "|sysman|object=permission-set/" + USER,
+                ENV + "|sysman|object=permission-decision/" + USER), announced,
+                "evictUser 走底座 evictObject：两种 objectType 各递一条，域级广播粒度由底座决定");
     }
 
     @Test
