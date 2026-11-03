@@ -151,7 +151,7 @@ class DrBaselineColumnsTest {
      *  本类 + Mc02 + Mc03 + MigrationVersionUniquenessTest）。
      *  2026-11-02 #147AE：V307（ecos_git_repo 六枚仓库播种 exclude_paths，纯 UPDATE 无 DDL）落地
      *  ⇒ 按实测订正 256→257（四枚同批锚）。 */
-    private static final int SCRIPT_FLOOR = 258;
+    private static final int SCRIPT_FLOOR = 259;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，按实测订正四枚同批锚）。
     // 该表属「存量真身锚定」＝七枚基线列全缺，按 V293 同族入待收口名录，不假装合规。
     // #146ay：245→246（V296__cognitive_model_hypo_r4_fields.sql 纯 ALTER 加列，零建表，
