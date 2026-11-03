@@ -18,10 +18,11 @@ import com.chinacreator.gzcm.runtime.core.cache.outbox.CacheInvalidationRelay;
 /**
  * 失效广播生产半的门禁（§2.9.8④；#147AN）。
  *
- * <p><b>差距来源</b>：Outbox 表、中继、订阅端在 #147AF 就落地了，但没有任何写路径向
- * {@code enqueueDomainInvalidation} 递料——中继每轮 poll 到 0 行，链路只有消费端。
- * 本类钉住「底座确实递料」与「广播处理端不再递料（防环）」，两条都是能变红的断言：
- * 摘掉 {@code notifyDomain} 前两枚即红，把订阅端改回 {@code invalidateDomain} 第二枚即红。</p>
+ * <p><b>差距来源</b>：Outbox 表、中继、订阅端在 #147AF 就落地了，生产端却只有
+ * {@code PermissionCacheServiceImpl.evictAll} 一条腿直连中继——其余已接缓存的 9 个域的写路径
+ * 一律不递料，他节点副本只能等 TTL 收敛。本类钉住「底座确实递料」与「广播处理端不再递料（防环）」，
+ * 两条都是能变红的断言：摘掉 {@code notifyDomain} 前两枚即红，把订阅端改回 {@code invalidateDomain}
+ * 第二枚即红。</p>
  *
  * @author ECOS Runtime #147AN
  */
