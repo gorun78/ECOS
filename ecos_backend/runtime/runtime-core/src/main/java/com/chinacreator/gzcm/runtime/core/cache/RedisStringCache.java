@@ -132,6 +132,21 @@ public class RedisStringCache {
         return removed;
     }
 
+    /** 频道发布（Outbox 中继用）；不可用返回 -1。 */
+    public long publish(String channel, String message) {
+        StringRedisTemplate t = template();
+        if (t == null || !available()) {
+            return -1L;
+        }
+        try {
+            Long n = t.convertAndSend(channel, message);
+            return n == null ? -1L : n;
+        } catch (RuntimeException e) {
+            log.warn("Redis PUBLISH 失败(channel={}): {}", channel, e.getMessage());
+            return -1L;
+        }
+    }
+
     /** 供运维/门禁观测：真实存在的键数（按前缀 SCAN 计数，不可用返回 -1）。 */
     public long countPrefix(String prefix) {
         StringRedisTemplate template = template();

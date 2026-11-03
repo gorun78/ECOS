@@ -59,6 +59,14 @@ public class PermissionCacheServiceImpl implements PermissionCacheService {
 
     private final RuntimeCacheManager cache;
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(PermissionCacheServiceImpl.class);
+
+    /** 失效广播 Outbox（可选装配；缺席时只清本节点）。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<
+            com.chinacreator.gzcm.runtime.core.cache.outbox.CacheInvalidationRelay> invalidationRelay;
+
     /** 权限域版本号：权威数据整体变更时推进，旧版本键自然失配。 */
     private final AtomicLong version = new AtomicLong(1L);
 
@@ -138,6 +146,16 @@ public class PermissionCacheServiceImpl implements PermissionCacheService {
     public void evictAll() {
         version.incrementAndGet();
         cache.invalidateDomain(cache.env(), DOMAIN);
+        // §2.9.8④ Outbox：域失效意图与写事务同批落行，由后台中继广播到其他节点（#147AF/D）。
+        // 本节点已在上一行直接清除；此处失败不影响本地语义（中继会重试）。
+        try {
+            var relay = invalidationRelay == null ? null : invalidationRelay.getIfAvailable();
+            if (relay != null) {
+                relay.enqueueDomainInvalidation(cache.env(), DOMAIN, "permission-evict-all");
+            }
+        } catch (RuntimeException e) {
+            log.warn("缓存失效 Outbox 入队失败（本节点已清，跨节点靠 TTL 兜底）: {}", e.getMessage());
+        }
     }
 
     /** 当前权限域版本段（门禁取证用）。 */

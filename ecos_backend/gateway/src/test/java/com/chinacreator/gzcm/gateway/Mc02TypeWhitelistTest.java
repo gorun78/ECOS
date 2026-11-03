@@ -141,7 +141,7 @@ class Mc02TypeWhitelistTest {
      *  ⇒ 按实测订正 255→256（四枚同批锚）。本枚对类型白名单<b>零新增</b>：
      *  脚本只有 INSERT/SELECT 字面量与既有列引用，无 CREATE/ALTER 类型头。
      *  2026-11-02 #147AE：V307（注册表 exclude_paths 播种，纯 UPDATE）落地 ⇒ 按实测订正 256→257。 */
-    private static final int SCRIPT_FLOOR = 259;
+    private static final int SCRIPT_FLOOR = 260;
     // #146ab：244→245（V295__ecos_audit_log_anchor.sql 落地，与 DrBaseline/Mc03/
     // MigrationVersionUniquenessTest 同批改锚；单源最大版本 295 ⇒ 下一号 V296）。
     // #146ay：245→246（V296__cognitive_model_hypo_r4_fields.sql 纯 ALTER 加列，
