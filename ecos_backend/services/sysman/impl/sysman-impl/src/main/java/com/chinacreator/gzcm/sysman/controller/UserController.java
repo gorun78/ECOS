@@ -58,12 +58,15 @@ public class UserController {
 	private static final Logger log = LoggerFactory.getLogger(UserController.class);
 	private final IUserService userService;
 	private final PermissionCacheService permissionCacheService;
+	private final com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService permissionCheckService;
 
 	public UserController(IUserService userService, UserQueryService userQueryService,
-			PermissionCacheService permissionCacheService) {
+			PermissionCacheService permissionCacheService,
+			com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService permissionCheckService) {
 		this.userService = userService;
 		this.userQueryService = userQueryService;
 		this.permissionCacheService = permissionCacheService;
+		this.permissionCheckService = permissionCheckService;
 	}
 
 	@GetMapping
@@ -115,6 +118,29 @@ public class UserController {
 		} catch (Exception e) {
 			log.error("Failed to list users", e);
 			return ApiResponse.internalError("查询用户列表失败（详情见服务端日志）");
+		}
+	}
+
+	/**
+	 * 当前登录用户的<b>有效权限决策</b>（PEP 读面；§2.9.8③ 缓存消费点 · #147AF/D）。
+	 *
+	 * <p>为什么不加 {@code @RequirePermission}：这是"我看我自己"的自读面——任何已认证用户都应能
+	 * 读到自己的有效授权，否则前端无法在无超管权限时解释"为什么这个按钮不可见"。读取走
+	 * {@code IPermissionCheckService#getUserEffectiveDecisions}，即权限缓存的真实读路径
+	 * （命中即回放、未命中现算回写）；<b>不改变任何鉴权结论</b>（缓存不是授权权威）。</p>
+	 */
+	@GetMapping("/me/permission-decisions")
+	public ApiResponse<Map<String, String>> myPermissionDecisions() {
+		try {
+			var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+			String userId = auth == null ? null : auth.getName();
+			if (userId == null || userId.isBlank()) {
+				return ApiResponse.unauthorized("未登录或Token已过期");
+			}
+			return ApiResponse.success(permissionCheckService.getUserEffectiveDecisions(userId));
+		} catch (Exception e) {
+			log.error("读取有效权限决策失败", e);
+			return ApiResponse.internalError("读取有效权限决策失败（详情见服务端日志）");
 		}
 	}
 

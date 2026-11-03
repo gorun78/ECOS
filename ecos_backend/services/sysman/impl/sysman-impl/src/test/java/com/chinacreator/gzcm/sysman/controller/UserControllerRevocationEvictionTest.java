@@ -47,7 +47,7 @@ class UserControllerRevocationEvictionTest {
     void evictsUserCacheAfterCommittingRoleChanges() {
         UserQueryService queries = mock(UserQueryService.class);
         PermissionCacheService cache = mock(PermissionCacheService.class);
-        UserController controller = new UserController(mock(IUserService.class), queries, cache);
+        UserController controller = new UserController(mock(IUserService.class), queries, cache, mock(com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService.class));
 
         ApiResponse<Void> response = controller.assignRoles("u-1", body("r-1", "r-2"));
 
@@ -66,7 +66,7 @@ class UserControllerRevocationEvictionTest {
     void missingRoleIdsWritesNothingAndEvictsNothing() {
         UserQueryService queries = mock(UserQueryService.class);
         PermissionCacheService cache = mock(PermissionCacheService.class);
-        UserController controller = new UserController(mock(IUserService.class), queries, cache);
+        UserController controller = new UserController(mock(IUserService.class), queries, cache, mock(com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService.class));
 
         ApiResponse<Void> response = controller.assignRoles("u-1", new LinkedHashMap<>());
 
@@ -82,7 +82,7 @@ class UserControllerRevocationEvictionTest {
         when(queries.update(contains("INSERT INTO TD_USER_ROLE"), eq("u-1"), eq("r-1")))
                 .thenThrow(new RuntimeException("db down"));
         PermissionCacheService cache = mock(PermissionCacheService.class);
-        UserController controller = new UserController(mock(IUserService.class), queries, cache);
+        UserController controller = new UserController(mock(IUserService.class), queries, cache, mock(com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService.class));
 
         ApiResponse<Void> response = controller.assignRoles("u-1", body("r-1"));
 

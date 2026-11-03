@@ -694,8 +694,16 @@ public class SystemDatabaseAccessImpl implements ISystemDatabaseAccess {
             
             // 判断文件格式
             if (sqlConfigPath.endsWith(".xml")) {
-                // 解析 iBATIS 格式
-                sqlMap = parseIbatisSqlMap(inputStream, sqlConfigPath);
+                // #147AF/D：`.xml` 后缀不足以判定方言——本仓同时存在 iBATIS `<sqlMap>`/`<mapper>`
+                // 与 `<properties><property>` 两种 XML。原实现按后缀一律走 iBATIS 解析，
+                // 使 `<properties>` 文件解析出空表、报「SQL not found in config」。
+                // 现按**根元素**分派：先把字节读入内存（配置文件很小），再分别以独立流解析——
+                // 注意 JAXP 的 parse 会关闭入参流，故不能用 mark/reset 复流。
+                byte[] bytes = inputStream.readAllBytes();
+                boolean propertiesRoot = isPropertiesRootXml(new java.io.ByteArrayInputStream(bytes));
+                sqlMap = propertiesRoot
+                        ? parsePropertiesSqlMap(new java.io.ByteArrayInputStream(bytes), sqlConfigPath)
+                        : parseIbatisSqlMap(new java.io.ByteArrayInputStream(bytes), sqlConfigPath);
             } else {
                 // 解析 Properties 格式
                 sqlMap = parsePropertiesSqlMap(inputStream, sqlConfigPath);
@@ -724,8 +732,24 @@ public class SystemDatabaseAccessImpl implements ISystemDatabaseAccess {
     /**
      * 解析 iBATIS 格式的 SQL Map
      */
-    private Map<String, String> parseIbatisSqlMap(InputStream inputStream, String sqlConfigPath) throws Exception {
-        Map<String, String> sqlMap = new HashMap<>();
+    /**
+     * 判断 XML 根元素是否为 {@code properties}（#147AF/D：`.xml` 后缀的方言分派依据）。
+     * 包内可见以便单测直接覆盖；解析失败按 iBATIS 处理（失败仍会在后续解析报出明确错误）。
+     */
+    static boolean isPropertiesRootXml(InputStream in) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            // 解析本仓自有配置，禁外部实体（XXE 面）
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            org.w3c.dom.Document doc = builder.parse(in);
+            return "properties".equals(doc.getDocumentElement().getTagName());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private Map<String, String> parseIbatisSqlMap(InputStream inputStream, String sqlConfigPath) throws Exception {        Map<String, String> sqlMap = new HashMap<>();
         
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();

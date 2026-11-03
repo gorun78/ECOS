@@ -56,6 +56,19 @@ public class PermissionCheckServiceImpl implements IPermissionCheckService {
     }
 
     @Override
+    public Map<String, String> getUserEffectiveDecisions(String userId) throws Exception {
+        Map<String, PermissionDecision> decisions = getUserPermissionDecisions(userId);
+        Map<String, String> flat = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, PermissionDecision> e : decisions.entrySet()) {
+            PermissionDecision d = e.getValue();
+            String effect = d.effect == null ? "ALLOW" : d.effect;
+            int priority = d.priority == null ? 0 : d.priority;
+            flat.put(e.getKey(), effect + ':' + priority);
+        }
+        return flat;
+    }
+
+    @Override
     public boolean checkPermission(String userId, String resource, String action) throws PermissionCheckException {
         try {
             // 获取用户的所有角色权限（包括继承的权限）
