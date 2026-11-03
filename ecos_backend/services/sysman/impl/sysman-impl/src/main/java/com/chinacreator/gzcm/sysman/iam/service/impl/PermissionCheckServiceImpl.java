@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -11,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.chinacreator.gzcm.common.context.TenantContextHolder;
+import com.chinacreator.gzcm.runtime.core.cache.CacheKey;
+import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
 import com.chinacreator.gzcm.sysman.iam.cache.PermissionCacheService;
 import com.chinacreator.gzcm.sysman.iam.dao.PermissionDao;
 import com.chinacreator.gzcm.sysman.iam.dao.RolePermissionDao;
@@ -40,6 +43,26 @@ public class PermissionCheckServiceImpl implements IPermissionCheckService {
     private final UserRoleDao userRoleDao;
     private final PermissionCacheService permissionCacheService;
 
+    /**
+     * 权限目录缓存（14 类矩阵之「角色·权限·授权关系」的目录面；#147AF/D）。
+     * 可选装配：缺席时每次回源（行为与旧版一致），装配后经 Runtime 字符串通道。
+     */
+    @Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<RuntimeCacheManager> catalogCacheProvider;
+
+    /** 权限目录缓存键段（domain/objectType/scope/objectId 单源）。 */
+    static final String CATALOG_DOMAIN = "sysman";
+    static final String CATALOG_TYPE = "permission-catalog";
+    static final String CATALOG_SCOPE = "global";
+    static final String CATALOG_OBJECT = "all";
+    static final String CATALOG_VERSION = "1";
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper CATALOG_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+    private static final com.fasterxml.jackson.core.type.TypeReference<List<Permission>> PERMISSION_LIST_TYPE =
+            new com.fasterxml.jackson.core.type.TypeReference<>() {
+            };
+
     @Autowired
     public PermissionCheckServiceImpl(IUserService userService,
                                       IRoleService roleService,
@@ -53,6 +76,45 @@ public class PermissionCheckServiceImpl implements IPermissionCheckService {
         this.rolePermissionDao = rolePermissionDao;
         this.userRoleDao = userRoleDao;
         this.permissionCacheService = permissionCacheService;
+    }
+
+    /**
+     * 权限目录（resource/action 元数据）的<b>单一读缝</b>：经 Runtime 缓存，命中免库。
+     *
+     * <p>缓存键固定 {@code ecos:{env}:sysman:permission-catalog:global:all:v1}——目录是
+     * 全租户共享的元数据（scope=global 表示"非租户私有"，与权限先于缓存不冲突：真正的
+     * 用户授权仍按 tenant scope 缓存）。写面（{@code PermissionServiceImpl} 增删改）负责失效。
+     * 任何异常都回落直读（缓存是加速层，不是权威）。</p>
+     */
+    List<Permission> catalog() throws Exception {
+        RuntimeCacheManager manager = catalogCacheProvider == null ? null : catalogCacheProvider.getIfAvailable();
+        if (manager == null) {
+            return permissionDao.listAll();
+        }
+        CacheKey key;
+        try {
+            key = manager.key(CATALOG_DOMAIN, CATALOG_TYPE, CATALOG_SCOPE, CATALOG_OBJECT, CATALOG_VERSION);
+        } catch (IllegalArgumentException e) {
+            return permissionDao.listAll();
+        }
+        Optional<String> hit = manager.getString(key);
+        if (hit.isPresent()) {
+            try {
+                List<Permission> parsed = CATALOG_MAPPER.readValue(hit.get(), PERMISSION_LIST_TYPE);
+                if (parsed != null) {
+                    return parsed;
+                }
+            } catch (Exception ignore) {
+                // 脏值按未命中处理：回源并覆盖
+            }
+        }
+        List<Permission> fresh = permissionDao.listAll();
+        try {
+            manager.putString(key, CATALOG_MAPPER.writeValueAsString(fresh), 0L);
+        } catch (Exception ignore) {
+            // 序列化失败只是不缓存，不影响本次返回
+        }
+        return fresh;
     }
 
     @Override
@@ -71,7 +133,7 @@ public class PermissionCheckServiceImpl implements IPermissionCheckService {
             return Set.of();
         }
         Set<String> codes = new HashSet<>();
-        for (Permission p : permissionDao.listAll()) {
+        for (Permission p : catalog()) {
             if (p != null && deniedIds.contains(p.getPermissionId()) && p.getResource() != null) {
                 codes.add(p.getResource() + ':' + (p.getAction() == null ? "" : p.getAction()));
             }
@@ -99,7 +161,7 @@ public class PermissionCheckServiceImpl implements IPermissionCheckService {
             Map<String, PermissionDecision> permissionMap = getUserPermissionDecisions(userId);
             
             // 查找匹配的权限
-            List<Permission> all = permissionDao.listAll();
+            List<Permission> all = catalog();
             List<PermissionDecision> matchingDecisions = all.stream()
                     .filter(p -> resourceEquals(p.getResource(), resource) && actionEquals(p.getAction(), action))
                     .map(p -> permissionMap.get(p.getPermissionId()))
