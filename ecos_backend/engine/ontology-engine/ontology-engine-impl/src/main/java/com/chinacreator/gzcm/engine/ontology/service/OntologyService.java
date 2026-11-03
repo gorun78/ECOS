@@ -8,6 +8,8 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyEntityDependenciesVO;
@@ -34,6 +36,10 @@ import com.chinacreator.gzcm.engine.ontology.repository.OntologyRuleRepository;
 import com.chinacreator.gzcm.engine.ontology.repository.OntologyDomainRepository;
 import com.chinacreator.gzcm.engine.ontology.repository.OntologyVersionRepository;
 import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
+import com.chinacreator.gzcm.runtime.core.cache.CacheJson;
+import com.chinacreator.gzcm.runtime.core.cache.CacheKey;
+import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 /**
  * 本体业务服务 — 将 Entity/Property/Relationship 转为 Map 返回给 Controller
@@ -42,6 +48,23 @@ import com.chinacreator.gzcm.engine.ontology.repository.OntologyMappingStore;
 public class OntologyService {
 
     private static final Logger log = LoggerFactory.getLogger(OntologyService.class);
+
+    /** 14 类矩阵 #7「本体映射」缓存域（权威源 = 业务 DB + 已发布 Git 版本）。 */
+    static final String CACHE_DOMAIN = "ontology";
+    static final String TYPE_ONTOLOGY_LIST = "ontology-list";
+    static final String TYPE_RELATION_LIST = "ontology-relationship-list";
+    static final String TYPE_RELATION_GRAPH = "ontology-relationship-graph";
+    static final String SCOPE_GLOBAL = "global";
+    static final long CACHE_TTL_SECONDS = 300L;
+
+    private static final TypeReference<List<OntologyVO>> ONTOLOGY_LIST_TYPE = new TypeReference<>() {
+    };
+    private static final TypeReference<List<OntologyRelationshipVO>> RELATION_LIST_TYPE = new TypeReference<>() {
+    };
+
+    /** Runtime 缓存（缺席时逐次回源，不影响正确性）。 */
+    @Autowired(required = false)
+    private ObjectProvider<RuntimeCacheManager> cacheProvider;
 
     private final OntologyRepository repository;
     private final OntologyMappingStore mappingStore;
@@ -197,9 +220,16 @@ public class OntologyService {
     }
 
     public List<OntologyRelationshipVO> listAllRelationshipsVO() {
-        return repository.findAllRelationships().stream()
-            .map(this::relToVO)
-            .collect(Collectors.toList());
+        CacheKey key = cacheKey(TYPE_RELATION_LIST, "all");
+        List<OntologyRelationshipVO> cached = CacheJson.read(stringOf(key), RELATION_LIST_TYPE);
+        if (cached != null) {
+            return cached;
+        }
+        List<OntologyRelationshipVO> loaded = repository.findAllRelationships().stream()
+                .map(this::relToVO)
+                .collect(Collectors.toList());
+        store(key, loaded);
+        return loaded;
     }
 
     public OntologyRelationshipVO createRelationship(String sourceEntityId, OntologyRelationshipSaveDTO dto) {
@@ -219,6 +249,7 @@ public class OntologyService {
             throw e;
         }
         log.info("Relationship created: {} [{}] {}→{}", id, rel.getCode(), sourceEntityId, rel.getTargetEntityId());
+        evictRelationshipCaches();
         return relToVO(rel);
     }
 
@@ -233,6 +264,11 @@ public class OntologyService {
 
     /** 关系图谱（强类型版）。 */
     public OntologyRelationshipGraphVO getRelationshipGraphVO() {
+        CacheKey key = cacheKey(TYPE_RELATION_GRAPH, "all");
+        OntologyRelationshipGraphVO cached = CacheJson.read(stringOf(key), OntologyRelationshipGraphVO.class);
+        if (cached != null) {
+            return cached;
+        }
         List<Map<String, Object>> edges = repository.findAllRelationshipEdges();
         java.util.Set<String> nodeIds = new java.util.LinkedHashSet<>();
         for (Map<String, Object> e : edges) {
@@ -254,15 +290,23 @@ public class OntologyService {
         }).collect(Collectors.toList());
         vo.setNodes(nodes);
         vo.setEdges(edgeVos);
+        store(key, vo);
         return vo;
     }
 
     // ═══════════════ Ontology (强类型路径) ═══════════════════
 
     public List<OntologyVO> listOntologiesVO() {
-        return repository.findAllOntologies().stream()
-            .map(this::ontologyToVO)
-            .collect(Collectors.toList());
+        CacheKey key = cacheKey(TYPE_ONTOLOGY_LIST, "all");
+        List<OntologyVO> cached = CacheJson.read(stringOf(key), ONTOLOGY_LIST_TYPE);
+        if (cached != null) {
+            return cached;
+        }
+        List<OntologyVO> loaded = repository.findAllOntologies().stream()
+                .map(this::ontologyToVO)
+                .collect(Collectors.toList());
+        store(key, loaded);
+        return loaded;
     }
 
     public OntologyVO createOntology(OntologySaveDTO dto) {
@@ -272,6 +316,7 @@ public class OntologyService {
         String description = dto.getDescription() != null ? dto.getDescription() : "";
         repository.insertOntology(id, code, name, description);
         log.info("Ontology created: {} [{}]", id, code);
+        evictOntologyCaches();
         return ontologyToVO(repository.findOntologyById(id));
     }
 
@@ -279,6 +324,7 @@ public class OntologyService {
         Map<String, Object> existing = repository.findOntologyById(id);
         if (existing == null) return Optional.empty();
         repository.updateOntology(id, dto.getName(), dto.getDescription(), dto.getStatus());
+        evictOntologyCaches();
         return Optional.ofNullable(ontologyToVO(repository.findOntologyById(id)));
     }
 
@@ -537,11 +583,16 @@ public class OntologyService {
             throw e;
         }
         log.info("Relationship created: {} [{}] {}→{}", id, rel.getCode(), sourceEntityId, rel.getTargetEntityId());
+        evictRelationshipCaches();
         return relToMap(rel);
     }
 
     public boolean deleteRelationship(String relId) {
-        return repository.deleteRelationship(relId) > 0;
+        boolean removed = repository.deleteRelationship(relId) > 0;
+        if (removed) {
+            evictRelationshipCaches();
+        }
+        return removed;
     }
 
     // ═══════════════ Map Converters ═══════════════════
@@ -721,6 +772,7 @@ public class OntologyService {
         String description = String.valueOf(body.getOrDefault("description", ""));
         repository.insertOntology(id, code, name, description);
         log.info("Ontology created: {} [{}]", id, code);
+        evictOntologyCaches();
         return repository.findOntologyById(id);
     }
 
@@ -731,16 +783,69 @@ public class OntologyService {
         String description = body.containsKey("description") ? String.valueOf(body.get("description")) : null;
         String status = body.containsKey("status") ? String.valueOf(body.get("status")) : null;
         repository.updateOntology(id, name, description, status);
+        evictOntologyCaches();
         return Optional.ofNullable(repository.findOntologyById(id));
     }
 
     public boolean deleteOntology(String id) {
-        return repository.deleteOntology(id) > 0;
+        boolean removed = repository.deleteOntology(id) > 0;
+        if (removed) {
+            evictOntologyCaches();
+            evictRelationshipCaches();
+        }
+        return removed;
     }
 
     // ═══════════════ Ontology-scoped relationships ═══════════════════
 
     public List<Map<String, Object>> listRelationshipsByOntology(String ontologyId) {
         return repository.findRelationshipsByOntology(ontologyId);
+    }
+
+    // ── Runtime 缓存接线（14 类矩阵 #7；#147AJ）────────────────────────────
+    // 权威源 = 业务 DB + 已发布 Git 版本；缓存只是加速副本，关闭/未命中/异常一律回源。
+
+    private RuntimeCacheManager cache() {
+        return cacheProvider == null ? null : cacheProvider.getIfAvailable();
+    }
+
+    private CacheKey cacheKey(String objectType, String objectId) {
+        RuntimeCacheManager manager = cache();
+        if (manager == null) {
+            return null;
+        }
+        try {
+            return manager.key(CACHE_DOMAIN, objectType, SCOPE_GLOBAL, objectId, "1");
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private String stringOf(CacheKey key) {
+        RuntimeCacheManager manager = cache();
+        return key == null || manager == null ? null : manager.getString(key).orElse(null);
+    }
+
+    private void store(CacheKey key, Object value) {
+        RuntimeCacheManager manager = cache();
+        if (key == null || manager == null) {
+            return;
+        }
+        manager.putString(key, CacheJson.write(value), CACHE_TTL_SECONDS);
+    }
+
+    private void evictOntologyCaches() {
+        RuntimeCacheManager manager = cache();
+        if (manager != null) {
+            manager.evictObject(CACHE_DOMAIN, TYPE_ONTOLOGY_LIST, "all");
+        }
+    }
+
+    private void evictRelationshipCaches() {
+        RuntimeCacheManager manager = cache();
+        if (manager != null) {
+            manager.evictObject(CACHE_DOMAIN, TYPE_RELATION_LIST, "all");
+            manager.evictObject(CACHE_DOMAIN, TYPE_RELATION_GRAPH, "all");
+        }
     }
 }
