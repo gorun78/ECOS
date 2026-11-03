@@ -26,7 +26,29 @@ import com.chinacreator.gzcm.sysman.iam.service.IOrganizationService;
 public class OrganizationServiceImpl implements IOrganizationService {
     
     private OrganizationDao organizationDao;
-    
+
+    /**
+     * 机构归属读缓存（14 类矩阵之「机构与组织基础信息」；#147AF/D）。
+     *
+     * <p>为什么值得缓存：{@code ClearanceInterceptor} 在**每个受保护请求**上都会解析主机构
+     * （{@code organizationService.getUserOrganizationAffiliations}），是该域最热的读。
+     * 键含租户 scope；无租户上下文即不缓存（权限先于缓存）。写面（分配/移除/设主机构）
+     * 提交后按对象失效。可选装配；缺席时行为与旧版一致。</p>
+     */
+    @Autowired(required = false)
+    private org.springframework.beans.factory.ObjectProvider<
+            com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager> affiliationCacheProvider;
+
+    static final String AFFILIATION_DOMAIN = "sysman";
+    static final String AFFILIATION_TYPE = "org-affiliations";
+    static final String AFFILIATION_VERSION = "1";
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper AFFILIATION_MAPPER =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+    private static final com.fasterxml.jackson.core.type.TypeReference<List<UserOrganization>>
+            AFFILIATION_LIST_TYPE = new com.fasterxml.jackson.core.type.TypeReference<>() {
+            };
+
     /**
      * 构造函数
      * 
@@ -35,6 +57,32 @@ public class OrganizationServiceImpl implements IOrganizationService {
     @Autowired
     public OrganizationServiceImpl(OrganizationDao organizationDao) {
         this.organizationDao = organizationDao;
+    }
+
+    /** 归属缓存的键（tenant 段取服务端上下文；拿不到返回 null＝不缓存）。 */
+    private com.chinacreator.gzcm.runtime.core.cache.CacheKey affiliationKey(String userId) {
+        var manager = affiliationCacheProvider == null ? null : affiliationCacheProvider.getIfAvailable();
+        if (manager == null || userId == null || userId.isBlank()) {
+            return null;
+        }
+        String tenant = com.chinacreator.gzcm.common.context.TenantContextHolder.getTenantId();
+        if (tenant == null || tenant.isBlank()) {
+            return null;
+        }
+        try {
+            return manager.key(AFFILIATION_DOMAIN, AFFILIATION_TYPE, tenant.trim(), userId.trim(),
+                    AFFILIATION_VERSION);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /** 写后失效：同一用户跨所有租户视图的归属缓存立即作废。 */
+    private void evictAffiliations(String userId) {
+        var manager = affiliationCacheProvider == null ? null : affiliationCacheProvider.getIfAvailable();
+        if (manager != null && userId != null && !userId.isBlank()) {
+            manager.evictObject(AFFILIATION_DOMAIN, AFFILIATION_TYPE, userId.trim());
+        }
     }
     
     @Override
@@ -286,6 +334,7 @@ public class OrganizationServiceImpl implements IOrganizationService {
             userOrg.setCreatedBy(createdBy);
             
             organizationDao.assignUserToOrg(userOrg);
+            evictAffiliations(userId);
             
         } catch (OrganizationException e) {
             throw e;
@@ -298,6 +347,7 @@ public class OrganizationServiceImpl implements IOrganizationService {
     public void removeUserFromOrg(String userId, String orgId) throws OrganizationException {
         try {
             organizationDao.removeUserFromOrg(userId, orgId);
+            evictAffiliations(userId);
         } catch (Exception e) {
             throw new OrganizationException("REMOVE_FAILED", "移除用户机构关联失败: " + e.getMessage(), e);
         }
@@ -321,8 +371,31 @@ public class OrganizationServiceImpl implements IOrganizationService {
     @Override
     public List<UserOrganization> getUserOrganizationAffiliations(String userId)
             throws OrganizationException {
+        var manager = affiliationCacheProvider == null ? null : affiliationCacheProvider.getIfAvailable();
+        com.chinacreator.gzcm.runtime.core.cache.CacheKey key = affiliationKey(userId);
+        if (manager != null && key != null) {
+            java.util.Optional<String> hit = manager.getString(key);
+            if (hit.isPresent()) {
+                try {
+                    List<UserOrganization> parsed = AFFILIATION_MAPPER.readValue(hit.get(), AFFILIATION_LIST_TYPE);
+                    if (parsed != null) {
+                        return parsed;
+                    }
+                } catch (Exception ignore) {
+                    // 脏值按未命中处理，回源覆盖
+                }
+            }
+        }
         try {
-            return organizationDao.getUserOrganizationAffiliations(userId);
+            List<UserOrganization> fresh = organizationDao.getUserOrganizationAffiliations(userId);
+            if (manager != null && key != null) {
+                try {
+                    manager.putString(key, AFFILIATION_MAPPER.writeValueAsString(fresh), 0L);
+                } catch (Exception ignore) {
+                    // 序列化失败只是不缓存
+                }
+            }
+            return fresh;
         } catch (Exception e) {
             throw new OrganizationException("QUERY_FAILED", "查询用户机构关联行失败: " + e.getMessage(), e);
         }
@@ -332,6 +405,7 @@ public class OrganizationServiceImpl implements IOrganizationService {
     public void setPrimaryOrg(String userId, String orgId) throws OrganizationException {
         try {
             organizationDao.setPrimaryOrg(userId, orgId);
+            evictAffiliations(userId);
         } catch (Exception e) {
             throw new OrganizationException("SET_PRIMARY_FAILED", "设置主机构失败: " + e.getMessage(), e);
         }
