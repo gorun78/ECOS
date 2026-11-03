@@ -24,7 +24,8 @@ import java.util.function.LongSupplier;
  *       （调用方必须回源，绝不把"没有缓存"当"没有数据"）；</li>
  *   <li><b>版本化</b>：键含 {@code v{version}}，写新版本即天然隔离旧值；</li>
  *   <li><b>先提交权威数据、再失效缓存</b>：失效只能由写路径在提交后调用
- *       {@link #invalidateDomain} / {@link #evict} / {@link #evictObject}，缓存层不反向改权威数据；</li>
+ *       {@link #invalidateDomain} / {@link #evict} / {@link #evictObject}，缓存层不反向改权威数据；
+ *       {@link #invalidateDomainLocal} 是广播处理端的专用入口（执行失效但不宣告失效，防回环）；</li>
  *   <li><b>环境段单源</b>：{@link CacheKey} 的 {@code env} 只能由 {@link #env()} / {@link #key} 从
  *       {@code CacheSettings} 给出，各服务不得自备 env 拼键；</li>
  *   <li><b>陈旧上限由底座钳制</b>：{@code maxStaleSeconds} &gt;0 时是所有写入的 TTL 天花板；
@@ -50,6 +51,17 @@ public class RuntimeCacheManager {
      */
     @Autowired(required = false)
     private ObjectProvider<RedisStringCache> redisProvider;
+
+    /**
+     * 失效广播投递口（可选装配；§2.9.8④ 跨节点失效的<b>生产</b>半，实现 = Outbox 中继）。
+     *
+     * <p>缺席或缓存关闭时不投递——本节点直删共享 Redis 键已覆盖远程面，Outbox 只补两件事：
+     * Redis 短暂不可用时其它节点退回的进程内副本要被告知清、以及失效意图的持久重试。
+     * 广播粒度是<b>域</b>：粗粒度只会多清不会少清（多清=回源，绝不返回陈旧值），
+     * 换来的是不必为每种对象形态另设事件。</p>
+     */
+    @Autowired(required = false)
+    private ObjectProvider<CacheInvalidationNotifier> outboxProvider;
 
     @Autowired
     public RuntimeCacheManager(ObjectProvider<CacheSettingsSource> settingsSource) {
@@ -258,11 +270,31 @@ public class RuntimeCacheManager {
             // 跨全部 scope：ecos:{env}:{domain}:{objectType}:*:{objectId}:v*
             redis.evictPrefix("ecos:" + env() + ":" + domain + ':' + objectType + ":*:" + objectId + ":v");
         }
+        notifyDomain(domain, "object=" + objectType + '/' + objectId);
         return (before - store.size()) + (beforeStrings - stringStore.size());
     }
 
-    /** 域级失效（如权限变更后整域失效）；只删该前缀，不做通配 SQL/脚本。 */
+    /**
+     * 域级失效（写路径提交后调用）：清本节点 + 共享 Redis 键，并投递跨节点失效意图。
+     *
+     * <p>广播走 Outbox（{@link CacheInvalidationNotifier}），投递失败不影响本节点已完成的
+     * 直删——最坏情形是他节点副本留到 TTL 上限，而不是本节点留脏。</p>
+     *
+     * @return 被删除的键数（本节点 + Redis，不含他节点尚未收到的广播）
+     */
     public int invalidateDomain(String env, String domain) {
+        int removed = invalidateDomainLocal(env, domain);
+        notifyDomain(domain, "domain");
+        return removed;
+    }
+
+    /**
+     * 只做失效、不投递广播的域级清退——<b>订阅端专用</b>。
+     *
+     * <p>广播处理若再走 {@link #invalidateDomain} 会再次入队 ⇒ Outbox→发布→订阅→入队 成环。
+     * 底座把「执行失效」与「宣告失效」分成两个入口，环就在这一层断开，而不是靠运行时标志位。</p>
+     */
+    public int invalidateDomainLocal(String env, String domain) {
         CacheKey probe;
         try {
             probe = new CacheKey(env, domain, "any", "any", "any", "0");
@@ -281,6 +313,29 @@ public class RuntimeCacheManager {
             removed += redis.evictPrefix(prefix);
         }
         return removed;
+    }
+
+    /**
+     * 投递域级失效意图（关闭缓存 / 未装配投递口 / 投递异常都只记日志，不影响调用方）。
+     *
+     * <p>意图落库失败＝这次失效不会广播出去，其它节点副本留到 TTL 收敛，
+     * 因此必须 {@code warn} 让人可见，禁静默。</p>
+     */
+    private void notifyDomain(String domain, String reason) {
+        CacheInvalidationNotifier outbox = outbox();
+        if (outbox == null || !enabled() || domain == null || domain.isBlank()) {
+            return;
+        }
+        try {
+            outbox.enqueueDomainInvalidation(env(), domain, reason);
+        } catch (RuntimeException e) {
+            log.warn("缓存失效意图投递失败（其它节点副本将留到 TTL 收敛）: domain={} cause={}",
+                    domain, e.getMessage());
+        }
+    }
+
+    private CacheInvalidationNotifier outbox() {
+        return outboxProvider == null ? null : outboxProvider.getIfAvailable();
     }
 
     /** 清空（仅运维/测试；生产由 TTL 自然收敛）。**不**清 Redis（跨节点共享面须显式运维处理）。 */

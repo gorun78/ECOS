@@ -9,6 +9,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import com.chinacreator.gzcm.runtime.core.cache.CacheInvalidationNotifier;
 import com.chinacreator.gzcm.runtime.core.cache.RedisStringCache;
 import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
 
@@ -26,7 +27,7 @@ import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
  * @author ECOS Runtime #147AF
  */
 @Component
-public class CacheInvalidationRelay {
+public class CacheInvalidationRelay implements CacheInvalidationNotifier {
 
     private static final Logger log = LoggerFactory.getLogger(CacheInvalidationRelay.class);
 
@@ -48,10 +49,12 @@ public class CacheInvalidationRelay {
     }
 
     /**
-     * 入队一次「域失效」意图（业务写路径提交后调用）。
+     * 入队一次「域失效」意图（由 {@code RuntimeCacheManager.evictObject / invalidateDomain}
+     * 在权威数据提交后的失效动作里调用；#147AN 接通生产半）。
      *
      * @return Outbox 行 id
      */
+    @Override
     public String enqueueDomainInvalidation(String env, String domain, String reason) {
         String safeEnv = env == null || env.isBlank() ? "default" : env;
         String safeDomain = domain == null ? "" : domain;
