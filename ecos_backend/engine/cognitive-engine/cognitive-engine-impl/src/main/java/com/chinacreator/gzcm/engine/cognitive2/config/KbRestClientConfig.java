@@ -357,6 +357,39 @@ public class KbRestClientConfig {
                 log.warn("KB REST searchArticles 暂无对应端点，降级返回空列表: query={}", queryText);
                 return Collections.emptyList();
             }
+
+            /**
+             * 七分类筛选 REST 代理（F-KB-18 读面，对应
+             * {@code GET /api/v1/knowledge/articles/by-category}）。
+             *
+             * <p>只读腿按本类惯例降级为空列表：分类不合法由 kb-impl 侧 400 兜底，
+             * 代理进程不做枚举校验的第二份事实源。</p>
+             */
+            @Override
+            @SuppressWarnings("unchecked")
+            public List<KnowledgeArticle> listByCategory(String category, int limit) {
+                try {
+                    String url = kbBase + "/knowledge/articles/by-category?category=" + enc(category)
+                            + "&limit=" + limit;
+                    Map<String, Object> resp = rt.getForObject(url, Map.class);
+                    if (resp == null || !(resp.get("data") instanceof List)) {
+                        return Collections.emptyList();
+                    }
+                    return objectMapper.convertValue(resp.get("data"),
+                            new TypeReference<List<KnowledgeArticle>>() {
+                            });
+                } catch (Exception e) {
+                    log.warn("KB REST listByCategory 失败: category={}, error={}", category, e.getMessage());
+                    return Collections.emptyList();
+                }
+            }
+
+            /** 分类编辑腿在只读代理进程不承载（与 {@code createArticle} 同惯例：warn + null）。 */
+            @Override
+            public KnowledgeArticle updateArticleCategory(String articleId, String category, String ruleRef) {
+                log.warn("KB REST updateArticleCategory 不支持（aiming 进程只读），降级返回 null: id={}", articleId);
+                return null;
+            }
         };
     }
 

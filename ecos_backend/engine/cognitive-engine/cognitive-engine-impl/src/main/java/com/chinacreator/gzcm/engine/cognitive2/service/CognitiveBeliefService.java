@@ -11,11 +11,16 @@ import com.chinacreator.gzcm.engine.cognitive2.service.asset.BeliefLifecycleGate
 import com.chinacreator.gzcm.engine.cognitive2.service.mental.BayesianUpdater;
 import com.chinacreator.gzcm.engine.cognitive2.service.mental.MentalEventPublisher;
 import com.chinacreator.gzcm.runtime.eventbus.EventBusService;
+import com.chinacreator.gzcm.runtime.core.cache.CacheJson;
+import com.chinacreator.gzcm.runtime.core.cache.CacheKey;
+import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -60,6 +65,21 @@ public class CognitiveBeliefService {
     @Autowired(required = false)
     private EventBusService eventBusService;
 
+    /** 14 类矩阵 #10「心智模型」缓存域（权威源 = {@code ecos_cognitive.ecos_cognitive_belief}；写入整域失效）。 */
+    static final String CACHE_DOMAIN = "cognitive-belief";
+    static final String TYPE_LATEST = "belief-latest";
+    static final String TYPE_LIST = "belief-list";
+    static final String TYPE_DETAIL = "belief-detail";
+    static final String SCOPE_GLOBAL = "global";
+    static final long CACHE_TTL_SECONDS = 300L;
+
+    private static final TypeReference<List<BeliefDistributionVO>> LIST_TYPE = new TypeReference<>() {
+    };
+
+    /** Runtime 缓存（缺席时逐次回源，不影响正确性）。 */
+    @Autowired(required = false)
+    private ObjectProvider<RuntimeCacheManager> cacheProvider;
+
     /**
      * 注册/初始化不确定性判断：同一 variableName+domain 已存在时作为下一 version 落库（max+1），
      * 否则首版 version=1。分布 prob 和=1 强校验。
@@ -83,13 +103,23 @@ public class CognitiveBeliefService {
             trimToNull(dto.getLastEvidenceId()), false, null, "ACTIVE");
         audit("belief.create", "ecos_cognitive_belief", "success",
             "variable=" + variableName + ", domain=" + domain + ", version=" + version);
+        evictBeliefCaches();
         return getLatest(variableName, domain);
     }
 
     /** 某变量某域当前生效版本（domain 必填——跨域重名变量隔离）；无记录返回 null。 */
     public BeliefDistributionVO getLatest(String variableName, String domain) {
-        Map<String, Object> row = store.findLatest(require(variableName, "variableName"), require(domain, "domain"));
-        return toVo(row == null ? null : store.toNormalizedRow(row, evidenceStore));
+        String variable = require(variableName, "variableName");
+        String requiredDomain = require(domain, "domain");
+        CacheKey key = cacheKey(TYPE_LATEST, requiredDomain + "|" + variable);
+        BeliefDistributionVO cached = CacheJson.read(stringOf(key), BeliefDistributionVO.class);
+        if (cached != null) {
+            return cached;
+        }
+        Map<String, Object> row = store.findLatest(variable, requiredDomain);
+        BeliefDistributionVO vo = toVo(row == null ? null : store.toNormalizedRow(row, evidenceStore));
+        store(key, vo);
+        return vo;
     }
 
     /** 列表（domain 必填强制过滤，Phase 1 残留风险 4；status 可选）。 */
@@ -99,15 +129,29 @@ public class CognitiveBeliefService {
             && !BeliefStore.STATUSES.contains(status.toUpperCase())) {
             throw new BusinessException(400, "COG-400: 非法 status（" + String.join("/", BeliefStore.STATUSES) + "）");
         }
-        return store.list(requiredDomain, status).stream()
+        CacheKey key = cacheKey(TYPE_LIST, requiredDomain + "|" + (status == null ? "" : status));
+        List<BeliefDistributionVO> cached = CacheJson.read(stringOf(key), LIST_TYPE);
+        if (cached != null) {
+            return cached;
+        }
+        List<BeliefDistributionVO> loaded = store.list(requiredDomain, status).stream()
             .map(row -> store.toNormalizedRow(row, evidenceStore))
             .map(this::toVo).toList();
+        store(key, loaded);
+        return loaded;
     }
 
     /** 按主键查询；无记录返回 null（由 Controller 转 404）。 */
     public BeliefDistributionVO getDetail(String id) {
+        CacheKey key = cacheKey(TYPE_DETAIL, id);
+        BeliefDistributionVO cached = CacheJson.read(stringOf(key), BeliefDistributionVO.class);
+        if (cached != null) {
+            return cached;
+        }
         Map<String, Object> row = store.findById(id);
-        return row == null ? null : toVo(store.toNormalizedRow(row, evidenceStore));
+        BeliefDistributionVO vo = row == null ? null : toVo(store.toNormalizedRow(row, evidenceStore));
+        store(key, vo);
+        return vo;
     }
 
     /**
@@ -167,6 +211,7 @@ public class CognitiveBeliefService {
         eventPublisher.publishBeliefUpdated(variable, domain, version, evidenceId, false);
         audit("belief.update-by-evidence", "ecos_cognitive_belief", "success",
             "variable=" + variable + ", domain=" + domain + ", version=" + version + ", evidence=" + evidenceId);
+        evictBeliefCaches();
         return getLatest(variable, domain);
     }
 
@@ -197,6 +242,7 @@ public class CognitiveBeliefService {
         audit("belief.override", "ecos_cognitive_belief", "success",
             "variable=" + variable + ", domain=" + domain + ", version=" + version
                 + ", evidence=" + trimToNull(dto.getLastEvidenceId()));
+        evictBeliefCaches();
         return getLatest(variable, domain);
     }
 
@@ -320,6 +366,46 @@ public class CognitiveBeliefService {
             eventBusService.publish(KafkaTopics.AUDIT, event);
         } catch (Exception e) {
             log.warn("不确定性判断审计 (EventBus) failed (ignored): {}", e.getMessage());
+        }
+    }
+
+    // ── Runtime 缓存接线（14 类矩阵 #10；#147AK）────────────────────────────
+    // 权威源 = {@code ecos_cognitive.ecos_cognitive_belief}；写入（注册/证据更新/覆写）整域失效，
+    // 并随 Outbox 向 ecos:cache:invalidate 广播，其他节点收到后清理本地同域。
+
+    private RuntimeCacheManager cache() {
+        return cacheProvider == null ? null : cacheProvider.getIfAvailable();
+    }
+
+    private CacheKey cacheKey(String objectType, String objectId) {
+        RuntimeCacheManager manager = cache();
+        if (manager == null || objectId == null) {
+            return null;
+        }
+        try {
+            return manager.key(CACHE_DOMAIN, objectType, SCOPE_GLOBAL, objectId, "1");
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private String stringOf(CacheKey key) {
+        RuntimeCacheManager manager = cache();
+        return key == null || manager == null ? null : manager.getString(key).orElse(null);
+    }
+
+    private void store(CacheKey key, Object value) {
+        RuntimeCacheManager manager = cache();
+        if (key == null || manager == null || value == null) {
+            return;
+        }
+        manager.putString(key, CacheJson.write(value), CACHE_TTL_SECONDS);
+    }
+
+    private void evictBeliefCaches() {
+        RuntimeCacheManager manager = cache();
+        if (manager != null) {
+            manager.invalidateDomain(manager.env(), CACHE_DOMAIN);
         }
     }
 }

@@ -11,6 +11,10 @@ import com.chinacreator.gzcm.engine.cognitive2.service.calc.ModelContentHasher;
 import com.chinacreator.gzcm.engine.cognitive2.service.scenario.CognitiveGuardException;
 import com.chinacreator.gzcm.runtime.access.git.archive.ArchiveOutcome;
 import com.chinacreator.gzcm.runtime.access.git.archive.DesignAssetArchiver;
+import com.chinacreator.gzcm.runtime.core.cache.CacheJson;
+import com.chinacreator.gzcm.runtime.core.cache.CacheKey;
+import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +73,20 @@ public class ModelRegistryService {
     /** 注册表 repositoryId（V300 种子）。 */
     static final String GIT_REPO_COGNITIVE = "cognitive-model";
 
+    /** 14 类矩阵 #9「认知资产模型」缓存域（权威源 = {@code ecos_cognitive.ecos_cognitive_model}；写入整域失效）。 */
+    static final String CACHE_DOMAIN = "cognitive-model";
+    static final String TYPE_MODEL_VERSIONS = "cognitive-model-versions";
+    static final String TYPE_MODEL_LIST = "cognitive-model-list";
+    static final String SCOPE_GLOBAL = "global";
+    static final long CACHE_TTL_SECONDS = 300L;
+
+    private static final TypeReference<List<Map<String, Object>>> ROWS_TYPE = new TypeReference<>() {
+    };
+
+    /** Runtime 缓存（缺席时逐次回源，不影响正确性）。 */
+    @Autowired(required = false)
+    private ObjectProvider<RuntimeCacheManager> cacheProvider;
+
     /** 测试/非 Spring 装配（归档腿缺省）。 */
     public ModelRegistryService(ModelRegistryDao modelRegistryDao,
                                 ModelPublishGateEvaluator gateEvaluator) {
@@ -86,7 +104,14 @@ public class ModelRegistryService {
 
     /** 模型列表（按 modelType 可选过滤，未删除，按 model_id/version 排序）。 */
     public List<Map<String, Object>> listModels(String modelType) {
-        return decorateRows(modelRegistryDao.listModels(modelType));
+        CacheKey key = cacheKey(TYPE_MODEL_LIST, modelType == null || modelType.isBlank() ? "all" : modelType);
+        List<Map<String, Object>> cached = CacheJson.read(stringOf(key), ROWS_TYPE);
+        if (cached != null) {
+            return cached;
+        }
+        List<Map<String, Object>> loaded = decorateRows(modelRegistryDao.listModels(modelType));
+        store(key, loaded);
+        return loaded;
     }
 
     /**
@@ -107,7 +132,16 @@ public class ModelRegistryService {
         String cmFilter = validatedFilter(cognitiveModelType, "cognitiveModelType",
                 raw -> CognitiveModelType.fromCode(raw).isPresent(),
                 raw -> raw.trim());
-        return decorateRows(modelRegistryDao.listByTypeAndState(modelType, stateFilter, cmFilter));
+        CacheKey key = cacheKey(TYPE_MODEL_LIST,
+                String.join("|", String.valueOf(modelType), String.valueOf(stateFilter), String.valueOf(cmFilter)));
+        List<Map<String, Object>> cached = CacheJson.read(stringOf(key), ROWS_TYPE);
+        if (cached != null) {
+            return cached;
+        }
+        List<Map<String, Object>> loaded = decorateRows(
+                modelRegistryDao.listByTypeAndState(modelType, stateFilter, cmFilter));
+        store(key, loaded);
+        return loaded;
     }
 
     /** {@code GET /models} 响应行加键（additive，只增不改既有 snake_case 列名键）： */
@@ -138,7 +172,14 @@ public class ModelRegistryService {
 
     /** 某 model_id 的全部版本（未删除，version 倒序；读面加键与列表同源）。 */
     public List<Map<String, Object>> getModel(String modelId) {
-        return decorateRows(modelRegistryDao.getModel(modelId));
+        CacheKey key = cacheKey(TYPE_MODEL_VERSIONS, modelId);
+        List<Map<String, Object>> cached = CacheJson.read(stringOf(key), ROWS_TYPE);
+        if (cached != null) {
+            return cached;
+        }
+        List<Map<String, Object>> loaded = decorateRows(modelRegistryDao.getModel(modelId));
+        store(key, loaded);
+        return loaded;
     }
 
     /**
@@ -167,6 +208,7 @@ public class ModelRegistryService {
                 : CognitiveModelType.fromLegacyModelType(modelType).orElseThrow(() -> new BusinessException(
                         400, "CORM-400: 非法 modelType（FORECAST/CAUSAL/SIMULATION/DECISION）"));
         insertVersion(modelId, modelType.toUpperCase(), cmType, body, /*legacyStatusError=*/true);
+        evictModelCaches();
         return buildRegisteredRow(modelId, body, cmType);
     }
 
@@ -202,6 +244,7 @@ public class ModelRegistryService {
         String legacyColumn = modelType == null || modelType.isBlank()
                 ? cm.get().code() : modelType.toUpperCase();
         insertVersion(modelId, legacyColumn, cm.get(), body, false);
+        evictModelCaches();
         return buildRegisteredRow(modelId, body, cm.get());
     }
 
@@ -215,6 +258,7 @@ public class ModelRegistryService {
             throw immutable(rowId);
         }
         log.info("冻结认知模型版本内容哈希 rowId={} hash={}", rowId, hash);
+        evictModelCaches();
         return requireRow(rowId);
     }
 
@@ -242,6 +286,7 @@ public class ModelRegistryService {
         });
         payload.put("gates", gates);
         payload.put("allPassed", ModelPublishGateEvaluator.allPassed(results));
+        evictModelCaches();
         return payload;
     }
 
@@ -284,6 +329,7 @@ public class ModelRegistryService {
         log.info("认知模型版本升格 PUBLISHED rowId={} by={}", rowId, publishedBy);
         Map<String, Object> published = requireRow(rowId);
         archivePublishedModel(rowId, publishedBy, published);
+        evictModelCaches();
         return published;
     }
 
@@ -475,5 +521,44 @@ public class ModelRegistryService {
 
     private String asString(Object o) {
         return o == null ? null : o.toString();
+    }
+
+    // ── Runtime 缓存接线（14 类矩阵 #9；#147AK）────────────────────────────
+    // 权威源 = {@code ecos_cognitive.ecos_cognitive_model}；写路径行级 ID 与 model_id 非一一对应，故写入整域失效。
+
+    private RuntimeCacheManager cache() {
+        return cacheProvider == null ? null : cacheProvider.getIfAvailable();
+    }
+
+    private CacheKey cacheKey(String objectType, String objectId) {
+        RuntimeCacheManager manager = cache();
+        if (manager == null || objectId == null) {
+            return null;
+        }
+        try {
+            return manager.key(CACHE_DOMAIN, objectType, SCOPE_GLOBAL, objectId, "1");
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private String stringOf(CacheKey key) {
+        RuntimeCacheManager manager = cache();
+        return key == null || manager == null ? null : manager.getString(key).orElse(null);
+    }
+
+    private void store(CacheKey key, Object value) {
+        RuntimeCacheManager manager = cache();
+        if (key == null || manager == null) {
+            return;
+        }
+        manager.putString(key, CacheJson.write(value), CACHE_TTL_SECONDS);
+    }
+
+    private void evictModelCaches() {
+        RuntimeCacheManager manager = cache();
+        if (manager != null) {
+            manager.invalidateDomain(manager.env(), CACHE_DOMAIN);
+        }
     }
 }
