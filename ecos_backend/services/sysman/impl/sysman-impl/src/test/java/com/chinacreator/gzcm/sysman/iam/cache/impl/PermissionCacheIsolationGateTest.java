@@ -119,13 +119,13 @@ class PermissionCacheIsolationGateTest {
 
         service.putUserPermissionDecisions(USER, decisions("ALLOW"), -1);
         ArgumentCaptor<CacheKey> decisionsKey = ArgumentCaptor.forClass(CacheKey.class);
-        verify(manager).put(decisionsKey.capture(), any(), anyLong());
+        verify(manager).putString(decisionsKey.capture(), any(), anyLong());
         assertEquals("ecos:" + ENV + ":sysman:permission-decision:" + TENANT_A + ":u-1:v1",
                 decisionsKey.getValue().toString());
 
         service.putUserPermissions(USER, Set.of(permission("perm-1")), -1);
         ArgumentCaptor<CacheKey> permissionsKey = ArgumentCaptor.forClass(CacheKey.class);
-        verify(manager, org.mockito.Mockito.atLeastOnce()).put(permissionsKey.capture(), any(), anyLong());
+        verify(manager, org.mockito.Mockito.atLeastOnce()).putString(permissionsKey.capture(), any(), anyLong());
         assertEquals("ecos:" + ENV + ":sysman:permission-set:" + TENANT_A + ":u-1:v1",
                 permissionsKey.getAllValues().get(permissionsKey.getAllValues().size() - 1).toString());
 

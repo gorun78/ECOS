@@ -40,6 +40,15 @@ public class RuntimeCacheManager {
     private final ObjectProvider<CacheSettingsSource> settingsSource;
     private final LongSupplier clock;
     private final ConcurrentHashMap<String, Entry> store = new ConcurrentHashMap<>();
+    /** 字符串通道的进程内兜底（未启用 Redis 或 Redis 不可用时的同语义存储）。 */
+    private final ConcurrentHashMap<String, StringEntry> stringStore = new ConcurrentHashMap<>();
+
+    /**
+     * Redis 远程通道（可选装配；§2.9.8 远程共享层）。字段注入以避免改动既有两参构造器
+     * 的全部测试调用点；缺席时字符串通道退回进程内。
+     */
+    @Autowired(required = false)
+    private ObjectProvider<RedisStringCache> redisProvider;
 
     @Autowired
     public RuntimeCacheManager(ObjectProvider<CacheSettingsSource> settingsSource) {
@@ -143,7 +152,77 @@ public class RuntimeCacheManager {
     public void evict(CacheKey key) {
         if (key != null) {
             store.remove(key.toString());
+            stringStore.remove(key.toString());
+            RedisStringCache redis = redis();
+            if (redis != null) {
+                redis.evict(key.toString());
+            }
         }
+    }
+
+    // ── 字符串通道（对象编解码留给消费方；#147AF）────────────────────────
+
+    /**
+     * 写字符串缓存；TTL 规则与对象通道一致（显式 TTL → 缺省 TTL → 陈旧上限钳制）。
+     *
+     * <p>声明 {@code redis_enabled=true} 且 Redis 可用时<b>只写 Redis</b>（避免本地/远程双写分裂）；
+     * 否则退回进程内。两条路径失败都只会让调用方后续回源，不影响正确性。</p>
+     */
+    public void putString(CacheKey key, String value, long ttlSeconds) {
+        CacheSettings s = settings();
+        if (key == null || value == null || !s.enabled()) {
+            return;
+        }
+        long ttl = ttlSeconds > 0 ? ttlSeconds : s.defaultTtlSeconds();
+        if (s.maxStaleSeconds() > 0) {
+            ttl = Math.min(ttl, s.maxStaleSeconds());
+        }
+        if (ttl <= 0) {
+            return;
+        }
+        RedisStringCache redis = redis();
+        if (s.redisEnabled() && redis != null && redis.available()) {
+            redis.put(key.toString(), value, ttl);
+            return;
+        }
+        stringStore.put(key.toString(), new StringEntry(value, clock.getAsLong() + ttl * 1000L));
+    }
+
+    /** 读字符串缓存；关闭/过期/不可用一律空（调用方回源）。 */
+    public Optional<String> getString(CacheKey key) {
+        if (key == null || !enabled()) {
+            return Optional.empty();
+        }
+        CacheSettings s = settings();
+        RedisStringCache redis = redis();
+        if (s.redisEnabled() && redis != null && redis.available()) {
+            return redis.get(key.toString());
+        }
+        StringEntry e = stringStore.get(key.toString());
+        if (e == null) {
+            return Optional.empty();
+        }
+        if (e.expiresAt() <= clock.getAsLong()) {
+            stringStore.remove(key.toString(), e);
+            return Optional.empty();
+        }
+        return Optional.of(e.value());
+    }
+
+    /** 观测面：当前是否真正走 Redis（配置开启且通道可用）。 */
+    public boolean remoteEnabled() {
+        CacheSettings s = settings();
+        RedisStringCache redis = redis();
+        return s.enabled() && s.redisEnabled() && redis != null && redis.available();
+    }
+
+    /** 观测面：进程内字符串通道条目数（不含 Redis）。 */
+    public int localStringSize() {
+        return stringStore.size();
+    }
+
+    private RedisStringCache redis() {
+        return redisProvider == null ? null : redisProvider.getIfAvailable();
     }
 
     /**
@@ -166,7 +245,19 @@ public class RuntimeCacheManager {
                     && objectType.equals(k.objectType())
                     && objectId.equals(k.objectId());
         });
-        return before - store.size();
+        int beforeStrings = stringStore.size();
+        stringStore.keySet().removeIf(raw -> {
+            CacheKey k = CacheKey.parse(raw);
+            return k != null && domain.equals(k.domain())
+                    && objectType.equals(k.objectType())
+                    && objectId.equals(k.objectId());
+        });
+        RedisStringCache redis = redis();
+        if (redis != null) {
+            // 跨全部 scope：ecos:{env}:{domain}:{objectType}:*:{objectId}:v*
+            redis.evictPrefix("ecos:" + env() + ":" + domain + ':' + objectType + ":*:" + objectId + ":v");
+        }
+        return (before - store.size()) + (beforeStrings - stringStore.size());
     }
 
     /** 域级失效（如权限变更后整域失效）；只删该前缀，不做通配 SQL/脚本。 */
@@ -181,18 +272,30 @@ public class RuntimeCacheManager {
         String prefix = "ecos:" + probe.env() + ':' + probe.domain() + ':';
         int before = store.size();
         store.keySet().removeIf(k -> k.startsWith(prefix));
-        return before - store.size();
+        int beforeStrings = stringStore.size();
+        stringStore.keySet().removeIf(k -> k.startsWith(prefix));
+        int removed = (before - store.size()) + (beforeStrings - stringStore.size());
+        RedisStringCache redis = redis();
+        if (redis != null) {
+            removed += redis.evictPrefix(prefix);
+        }
+        return removed;
     }
 
-    /** 清空（仅运维/测试；生产由 TTL 自然收敛）。 */
+    /** 清空（仅运维/测试；生产由 TTL 自然收敛）。**不**清 Redis（跨节点共享面须显式运维处理）。 */
     public void clear() {
         store.clear();
+        stringStore.clear();
     }
 
+    /** 进程内条目数（对象通道 + 字符串通道；不含 Redis，Redis 规模须用 countPrefix 观测）。 */
     public int size() {
-        return store.size();
+        return store.size() + stringStore.size();
     }
 
     private record Entry(Object value, long expiresAt) {
+    }
+
+    private record StringEntry(String value, long expiresAt) {
     }
 }

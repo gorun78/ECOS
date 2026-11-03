@@ -2,7 +2,6 @@ package com.chinacreator.gzcm.sysman.iam.cache.impl;
 
 import java.util.Collections;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -13,6 +12,9 @@ import com.chinacreator.gzcm.runtime.core.cache.CacheKey;
 import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
 import com.chinacreator.gzcm.sysman.iam.cache.PermissionCacheService;
 import com.chinacreator.gzcm.sysman.iam.entity.Permission;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * 权限缓存：Runtime 统一缓存门面的消费方（§2.9.8③④⑥；Q-4 处置 · #147AA）。
@@ -48,6 +50,13 @@ public class PermissionCacheServiceImpl implements PermissionCacheService {
     static final String TYPE_PERMISSIONS = "permission-set";
     static final String TYPE_DECISIONS = "permission-decision";
 
+    /** 字符串通道编解码（#147AF）：缓存值落 JSON，进程内与 Redis 两条路径共用同一编码。 */
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final TypeReference<Set<Permission>> PERMISSION_SET_TYPE = new TypeReference<>() {
+    };
+    private static final TypeReference<Map<String, Object>> DECISION_MAP_TYPE = new TypeReference<>() {
+    };
+
     private final RuntimeCacheManager cache;
 
     /** 权限域版本号：权威数据整体变更时推进，旧版本键自然失配。 */
@@ -63,19 +72,19 @@ public class PermissionCacheServiceImpl implements PermissionCacheService {
         if (key == null || permissions == null) {
             return;
         }
-        cache.put(key, Collections.unmodifiableSet(permissions), ttlSeconds(ttlMillis));
+        // 字符串通道（#147AF）：对象编解码由本类承担，键/TTL/失效仍由 Runtime 单源决定，
+        // 从而同一份实现既能落进程内也能落 Redis（跨节点共享的前提）。
+        cache.putString(key, toJson(permissions), ttlSeconds(ttlMillis));
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Set<Permission> getUserPermissions(String userId) {
         CacheKey key = key(TYPE_PERMISSIONS, userId);
         if (key == null) {
             return Collections.emptySet();
         }
-        Optional<Object> hit = cache.get(key, Object.class);
-        return hit.filter(Set.class::isInstance)
-                .map(raw -> (Set<Permission>) raw)
+        return cache.getString(key)
+                .map(json -> fromJson(json, PERMISSION_SET_TYPE))
                 .orElseGet(Collections::emptySet);
     }
 
@@ -85,20 +94,35 @@ public class PermissionCacheServiceImpl implements PermissionCacheService {
         if (key == null || decisions == null) {
             return;
         }
-        cache.put(key, Collections.unmodifiableMap(decisions), ttlSeconds(ttlMillis));
+        cache.putString(key, toJson(decisions), ttlSeconds(ttlMillis));
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Map<String, Object> getUserPermissionDecisions(String userId) {
         CacheKey key = key(TYPE_DECISIONS, userId);
         if (key == null) {
             return Collections.emptyMap();
         }
-        Optional<Object> hit = cache.get(key, Object.class);
-        return hit.filter(Map.class::isInstance)
-                .map(raw -> (Map<String, Object>) raw)
+        return cache.getString(key)
+                .map(json -> fromJson(json, DECISION_MAP_TYPE))
                 .orElseGet(Collections::emptyMap);
+    }
+
+    private static String toJson(Object value) {
+        try {
+            return MAPPER.writeValueAsString(value);
+        } catch (JsonProcessingException e) {
+            // 序列化失败＝不可缓存；返回 null 由 putString 判空跳过（caller 仍会回源，不产生错值）
+            return null;
+        }
+    }
+
+    private static <T> T fromJson(String json, TypeReference<T> type) {
+        try {
+            return MAPPER.readValue(json, type);
+        } catch (JsonProcessingException e) {
+            return null;
+        }
     }
 
     @Override

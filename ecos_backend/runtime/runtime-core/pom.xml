@@ -202,6 +202,15 @@
             <artifactId>org.eclipse.jgit</artifactId>
             <version>6.8.0.202311291450-r</version>
         </dependency>
+
+        <!-- §2.9.8 Redis 缓存远程层（#147AF/D 批；容器 ecos-redis 已就位）。
+             仅提供 StringRedisTemplate 自动装配，缓存语义仍由 RuntimeCacheManager 收口；
+             Redis 未启用/不可达时按缺省回退，禁绕过认证与授权。 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+            <version>${spring-boot.version}</version>
+        </dependency>
     </dependencies>
 
 </project>
