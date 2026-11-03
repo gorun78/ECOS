@@ -48,6 +48,41 @@ public class GitServiceImpl implements GitService {
     /** 签名能力缺失机读码（§2.9.9 G2；与 {@code BranchProtectionPolicy} 同名同义）。 */
     static final String SIGNING_NOT_AVAILABLE = "SIGNING_NOT_AVAILABLE";
 
+    /** 模拟签名的形态标识（**禁**写成 gpg/ssh；真实签名器接入前只允许此值）。 */
+    static final String SIGNING_KIND_SIMULATED = "simulated";
+
+    /** 签名尾注前缀（提交/标签消息尾部，可被下游解析且不破坏正文）。 */
+    static final String SIGNATURE_TRAILER = "Ecos-Signature: ";
+
+    /**
+     * 模拟签名（§2.9.9 G2；裁决「先模拟签名，功能过」）。
+     *
+     * <p><b>诚实口径</b>：本方法的产物是 {@code simulated:<sha256(内容)>}，<b>不是</b>
+     * GPG/SSH 签名，也不构成任何密码学不可否认性——它的作用是让「已签名」这条链路与
+     * 载体（提交/标签消息尾注）先行可运行，并在任何读取面都带着 {@code simulated} 字样，
+     * 使「没签名」不被误解为「已真签」。真实签名器接入后须另立 kind 并同步本门禁。</p>
+     */
+    String attachSignature(String message) {
+        if (!boolProp("ecos.git.signing.enabled", "ECOS_GIT_SIGNING_ENABLED")) {
+            return message;
+        }
+        return message + "\n\n" + SIGNATURE_TRAILER + SIGNING_KIND_SIMULATED + ":" + sha256Hex(message);
+    }
+
+    private static String sha256Hex(String text) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
+        }
+    }
+
     /**
      * 签名能力闸（§2.9.9 G2）：<b>要求签名但签名器未配置 ⇒ 显式拒绝</b>，
      * 禁「静默产出未签名提交/标签，再在上层报成功」——那正是 G2「零签名」变成假绿的路径。
@@ -85,7 +120,7 @@ public class GitServiceImpl implements GitService {
         try (Git git = Git.open(new File(localPath))) {
             git.add().addFilepattern(".").call();
             var commit = git.commit()
-                .setMessage(commitMessage)
+                .setMessage(attachSignature(commitMessage))
                 .setAuthor(authorName, authorEmail)
                 .call();
             String commitId = commit.getName();
@@ -114,7 +149,7 @@ public class GitServiceImpl implements GitService {
         String localPath = requireLocalPath(repository);
         log.info("JGit createTag: path={}, tag={}", localPath, tagName);
         try (Git git = Git.open(new File(localPath))) {
-            git.tag().setName(tagName).setMessage(message).call();
+            git.tag().setName(tagName).setMessage(attachSignature(message)).call();
             log.info("JGit tag 创建完成: {}", tagName);
             return tagName;
         } catch (IOException | GitAPIException e) {
@@ -301,7 +336,7 @@ public class GitServiceImpl implements GitService {
             } else {
                 git.add().addFilepattern(".").call();
             }
-            git.commit().setMessage(message).call();
+            git.commit().setMessage(attachSignature(message)).call();
             log.info("Git commit 完成: {}", localPath);
         } catch (IOException | GitAPIException e) {
             throw new GitException("commit 失败: " + localPath, e);
