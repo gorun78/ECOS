@@ -3,6 +3,7 @@ package com.chinacreator.gzcm.runtime.access.git.archive;
 import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
 import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
+import com.chinacreator.gzcm.runtime.access.git.publish.PublishFreezeGuard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -80,6 +81,12 @@ public class DesignAssetArchiver {
         }
         if (content == null || content.isBlank()) {
             return ArchiveOutcome.notAvailable("缺少已序列化内容，拒绝归档（禁伪成功）");
+        }
+        // §2.9.9 G7 发布冻结：冻结期一律拒写（读面不受影响），且按既有 notAvailable 分态返回，
+        // 不抛异常打断调用方事务；解冻后继续。
+        if (PublishFreezeGuard.isFrozen()) {
+            return ArchiveOutcome.notAvailable(PublishFreezeGuard.CODE_FROZEN
+                    + ": 发布冻结期，拒绝归档（解冻后重试）");
         }
         try {
             requireSafeSegment(type);
