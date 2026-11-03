@@ -99,7 +99,7 @@ docker exec ecos-postgres psql -U postgres -d sys_man -c "SELECT 1"  # 验证 PG
 ```
 
 compose 文件：
-- `ecos-docker/docker-compose.yml` —— 仅基础设施，8 个 container_name（`grep -c container_name` 实测）：`ecos-postgres` (5432) / `ecos-zookeeper` (2181) / `ecos-kafka` (9092) / `ecos-kafka-init`（一次性容器，建 `ecos.*` 8 个 topic：identity/catalog/ontology/object/workflow/agent/knowledge/audit）/ `ecos-neo4j` (7474,7687) / `ecos-minio` (9000) / `ecos-opa` (8181) / `ecos-grafana` (3001)。**微服务 v2 不在容器里跑**（Windows 本机 7 JAR）。
+- `ecos-docker/docker-compose.yml` —— 仅基础设施，**9 个容器**（2026-11-03 授权新增 `ecos-redis`；`grep -c container_name` 实测）：`ecos-postgres` (5432) / `ecos-zookeeper` (2181) / `ecos-kafka` (9092) / `ecos-kafka-init`（一次性容器，建 `ecos.*` 8 个 topic：identity/catalog/ontology/object/workflow/agent/knowledge/audit）/ `ecos-neo4j` (7474,7687) / `ecos-minio` (9000) / `ecos-opa` (8181) / `ecos-grafana` (3001) / **`ecos-redis` (6379)**。**微服务 v2 不在容器里跑**（Windows 本机 7 JAR）。
 - `ecos-docker/docker-compose.app-v1-legacy.yml` —— v1 legacy 应用容器（api-gateway + 9 服务），2026-09-28 拆离，默认不启用；恢复方式见文件头注释。
 
 ## Windows 迁移注意事项（2026-09-09 起）
@@ -132,7 +132,7 @@ compose 文件：
 ## What Not To Do
 
 - Don't create new Maven modules (baseline = 7 个部署 JAR + 49 个根 reactor 构建模块，见「工程结构」Q5 裁决口径枚举)
-- Don't add new Docker containers (compose image count is baselined)
+- Don't add new Docker containers without explicit authorization (baseline was 8; **2026-11-03 授权新增 `ecos-redis` ⇒ 9**)
 - Don't change existing API paths or signatures — only additive changes
 - Don't bypass `@Autowired` with `new` — always use constructor injection
 - Don't delete columns/tables from the database schema — exception (铁律 v2.0 §3.1): design-asset history version tables may be DROPped after backup and code has switched to the Git archive path

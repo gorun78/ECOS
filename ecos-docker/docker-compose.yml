@@ -185,6 +185,25 @@ services:
       - grafanadata:/var/lib/grafana
     mem_limit: 512m
 
+  # ── #147G-Redis（R7~R11 补充设计册 §2.9.8 ⑤/⑧ 裁决；2026-11-03 用户授权「本轮不受禁新容器限制」）──
+  # 定位：runtime 缓存的**远程共享层**（跨节点失效的前提）；无密码仅限内网/本机开发，
+  # 生产须启用 AUTH + TLS + 受控网络（§2.9.8 ⑥）。持久化用 AOF（缓存可重建，掉电不需强一致）。
+  ecos-redis:
+    image: redis:7-alpine
+    container_name: ecos-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    mem_limit: 320m
+
 volumes:
   pgdata:
     name: ecos_pgdata
@@ -198,3 +217,5 @@ volumes:
     name: ecos_miniodata
   grafanadata:
     name: ecos_grafanadata
+  redisdata:
+    name: ecos_redisdata
