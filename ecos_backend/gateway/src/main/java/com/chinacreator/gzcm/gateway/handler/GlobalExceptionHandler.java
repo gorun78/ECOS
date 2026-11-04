@@ -218,6 +218,39 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 缺少必填请求参数 → 400（#147AS；R7~R11 补册 §2.9.8 挂账 ⑥）。
+     *
+     * <p><b>为什么原先落 500</b>：gateway 组合面排除了 sysman-boot 的同名 advice（`GatewayApplication`
+     * excludeFilters），生效的本类<b>没有</b>这条腿 ⇒ {@code @RequestParam String q} 不给值时一路落到
+     * {@link #handleAny(Exception)}。实测（18080 独立实例，2026-11-04）：
+     * {@code GET /api/v1/knowledge/articles/search} 返回 <b>500 {@code ECOS-SYS-500}</b>，而同端点带
+     * {@code q} 是 200。少传参数是调用方错误，状态行必须指向 4xx——否则客户端按 5xx 重试/告警，
+     * 真实语义被状态行写反。</p>
+     */
+    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleMissingRequestParameter(
+            org.springframework.web.bind.MissingServletRequestParameterException ex) {
+        log.warn("Missing required parameter: {}", ex.getParameterName());
+        return ApiResponse.badRequest(SystemErrorCode.ECOS_SYS_400, "缺少必填参数: " + ex.getParameterName());
+    }
+
+    /**
+     * 请求参数类型不匹配 → 400（#147AS；与上一条同族）。
+     *
+     * <p>{@code ?limit=xyz} 这类<b>绑定阶段</b>的转换失败原先同样落 500。与
+     * {@link #handleNumberFormat(NumberFormatException)} 同一口径——那条是方法体内的转换，
+     * 本条是参数绑定阶段的转换，都属客户端错误。</p>
+     */
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<Void> handleArgumentTypeMismatch(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+        log.warn("Argument type mismatch: name={} value={}", ex.getName(), ex.getValue());
+        return ApiResponse.badRequest(SystemErrorCode.ECOS_SYS_400, "参数类型不正确: " + ex.getName());
+    }
+
+    /**
      * NullPointerException → 500 未分类内部错误（{@code ECOS-SYS-500}）＋ traceId。
      *
      * <p><b>#142/B4-3e-26（差距 D-B4-58）</b>：收口前声明 {@code @ResponseStatus(BAD_REQUEST)}
