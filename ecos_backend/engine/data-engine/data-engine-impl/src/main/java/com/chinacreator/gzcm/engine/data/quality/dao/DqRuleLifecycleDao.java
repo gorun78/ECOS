@@ -33,7 +33,7 @@ public class DqRuleLifecycleDao extends JdbcTemplateDaoSupport {
                 " severity, target_kind, target_id, target_table, target_field, target_pipeline_id," +
                 " parameters, status, version, approved_by, source_type, source_ref," +
                 " description, created_by, updated_by, created_at, updated_at, is_deleted)" +
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'DRAFT', 1, ?,?,?,?, ?,?,?,NOW(),NOW(),FALSE)",
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'DRAFT', 1, ?,?,?,?,?,?,NOW(),NOW(),FALSE)",
                 ruleId, ruleName, ruleCode, category, domain, ruleType,
                 severity, targetKind, targetId, targetTable,
                 targetField, targetPipelineId, parameters,

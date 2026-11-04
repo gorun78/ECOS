@@ -236,6 +236,25 @@ class DqRuleLifecycleTest {
     }
 
     @Test
+    @DisplayName("1b) createDraft — 未给 sourceType 时取 DDL 默认值 MANUAL（禁把 NOT NULL 列绑成显式 NULL）")
+    void createDraft_defaultsSourceTypeToManual() {
+        reset(null);
+        DqRuleDTO dto = validDraftDto();
+        dto.setSourceType(null);
+        svc.createDraft(dto);
+
+        org.mockito.ArgumentCaptor<String> cap = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(ruleLifecycleDao).insertRule(cap.capture(), cap.capture(), cap.capture(), cap.capture(),
+                cap.capture(), cap.capture(), cap.capture(), cap.capture(), cap.capture(), cap.capture(),
+                cap.capture(), cap.capture(), cap.capture(), cap.capture(), cap.capture(), cap.capture(),
+                cap.capture(), cap.capture());
+        List<String> args = cap.getAllValues();
+        assertEquals(18, args.size(), "insertRule 参数个数须与 DAO 签名一致");
+        assertEquals("MANUAL", args.get(14),
+                "source_type 未给时须取 DDL 默认值 MANUAL：显式 NULL 绕开列默认值会撞 NOT NULL（#147AU）");
+    }
+
+    @Test
     @DisplayName("2) updateDraft — DRAFT 状态可编辑；audit DQ_RULE_UPDATE 计 1；1 次 UPDATE")
     void updateDraft_draftCanEdit_DRAFTStatusStays() {
         reset(validRow("DRAFT", 1, null));

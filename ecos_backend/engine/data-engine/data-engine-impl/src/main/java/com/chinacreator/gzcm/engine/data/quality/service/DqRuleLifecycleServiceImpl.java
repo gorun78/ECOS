@@ -132,11 +132,15 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
         String severity = dto.getSeverity() != null ? dto.getSeverity() : "MEDIUM";
         String targetKind = dto.getTargetKind() != null ? dto.getTargetKind() : "TABLE";
         String parameters = dto.getParameters() != null ? dto.getParameters() : "{}";
+        // #147AU：source_type 是 NOT NULL 列（DDL 默认 'MANUAL'），而 DAO 会把 null 绑成**显式 NULL**，
+        // 显式 NULL 不会被列默认值兜住 ⇒ 创建规则必然 409「null value in column source_type」。
+        // 与 parameters 同口径：在服务层取与 DDL 一致的默认值。
+        String sourceType = dto.getSourceType() != null ? dto.getSourceType() : "MANUAL";
 
         ruleLifecycleDao.insertRule(ruleId, ruleName, ruleCode, category, dto.getDomain(), ruleType,
                 severity, targetKind, dto.getTargetId(), dto.getTargetTable(),
                 dto.getTargetField(), dto.getTargetPipelineId(), parameters,
-                dto.getApprovedBy(), dto.getSourceType(), dto.getSourceRef(),
+                dto.getApprovedBy(), sourceType, dto.getSourceRef(),
                 dto.getDescription(), operator);
 
         securityService.auditWrite("DQ_RULE_CREATE", ruleId, "SUCCESS");
