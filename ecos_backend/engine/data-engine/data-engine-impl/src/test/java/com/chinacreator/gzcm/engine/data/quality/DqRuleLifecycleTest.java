@@ -255,6 +255,27 @@ class DqRuleLifecycleTest {
     }
 
     @Test
+    @DisplayName("11) deleteRule — 成功删除后必须失效版本缓存（#147AW：原先只在 approve 后失效）")
+    @SuppressWarnings("unchecked")
+    void deleteRule_evictsVersionsCache() throws Exception {
+        reset(validRow("DRAFT", 1, null));
+        setWriteAffected(1);
+
+        com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager manager =
+                mock(com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager.class);
+        org.springframework.beans.factory.ObjectProvider<com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager> provider =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(manager);
+        java.lang.reflect.Field field = DqRuleLifecycleServiceImpl.class.getDeclaredField("cacheProvider");
+        field.setAccessible(true);
+        field.set(svc, provider);
+
+        svc.deleteRule("r-rule-001");
+
+        verify(manager).evictObject("data-engine-dq-rule", "dq-rule-versions", "r-rule-001");
+    }
+
+    @Test
     @DisplayName("2) updateDraft — DRAFT 状态可编辑；audit DQ_RULE_UPDATE 计 1；1 次 UPDATE")
     void updateDraft_draftCanEdit_DRAFTStatusStays() {
         reset(validRow("DRAFT", 1, null));

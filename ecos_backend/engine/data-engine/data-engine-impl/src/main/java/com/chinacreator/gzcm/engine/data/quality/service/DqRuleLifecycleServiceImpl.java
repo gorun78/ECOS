@@ -205,6 +205,9 @@ public class DqRuleLifecycleServiceImpl implements DqRuleLifecycleService {
             result.setAlreadyDeleted(true);
             return result;
         }
+        // #147AW：删除也是版本视图的写路径。原先只在 approve 后失效，删除后缓存里的版本清单
+        // 仍会活到 TTL 上限（实测：删除返回 200 后键仍在、TTL 38s，已删规则仍可被读到旧清单）。
+        evictVersions(ruleId);
         securityService.auditWrite("DQ_RULE_DELETE", ruleId, "SUCCESS");
         log.info("DQ rule logically deleted: id={}", ruleId);
         return result;
