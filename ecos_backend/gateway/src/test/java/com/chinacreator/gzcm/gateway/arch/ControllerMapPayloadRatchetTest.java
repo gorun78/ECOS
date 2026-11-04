@@ -26,12 +26,29 @@ import org.junit.jupiter.api.Test;
  * {@code Map<String,\s*Object>}（与核定时的 {@code grep -rn | wc -l} 同尺），排除
  * {@code target/} 与 {@code archive/}。基线变更必须同批给出清退证据（改小）或明确理由（改大=不许）。</p>
  *
+ * <p><b>基线台账（改小必须留这一行的来源）</b>：
+ * <ul>
+ *   <li>2302 ＝ #147AC（2026-11-02）核定值；</li>
+ *   <li>2297 ＝ #147Z（2026-11-04）HEAD 面复测值，差额 −5 行<b>全部</b>来自
+ *       {@code OntologyGitController}（6→1，commit {@code 279bd553}「[§2.9.9 VG-2] 本体 Git
+ *       服务契约去 Map」），其余 6 枚自核定以来改过的 Controller 计数未变——即本次下调
+ *       <b>是真实清退，不是把判据放松</b>。</li>
+ * </ul>
+ *
+ * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
+ * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
+ * DoD DI-2 的违例本体，<b>上调基线一律不许</b>；共享工作树里若红差来自<b>他人未提交</b>的在途
+ * 新增面，归因写进本报告即可，禁代改他人文件、更禁为其放宽基线。</p>
+ *
  * @author ECOS Gateway #147AC/DI-2
  */
 class ControllerMapPayloadRatchetTest {
 
-    /** 2026-11-02 实扫基线（行级命中）。只允许下调。 */
-    private static final int BASELINE_LINES = 2302;
+    /**
+     * HEAD 面实扫基线（行级命中）。只允许下调。
+     * <p>#147Z 下调依据见类注释「基线台账」：2302 → 2297，−5 行来自 VG-2 的真清退腿。</p>
+     */
+    private static final int BASELINE_LINES = 2297;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -40,7 +57,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 2302（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 2297（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;
