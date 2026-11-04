@@ -4,12 +4,12 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ontology.OntologyGitService;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyGitResultVO;
 import com.chinacreator.gzcm.engine.ontology.dto.OntologyGitSaveDTO;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveRequest;
+import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveResult;
+import com.chinacreator.gzcm.engine.ontology.git.OntologyGitSyncResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * 本体 Git 协同 REST API — T16-5 强类型入出参。
@@ -21,23 +21,19 @@ import java.util.Map;
  *   <li>POST /api/v1/engine/ontology/git/load                — 按 URL 加载</li>
  * </ul>
  *
- * <p>T16-5：入参由 {@code Map} 改 {@link OntologyGitSaveDTO}，返回由 {@code Map} 改
- * {@link OntologyGitResultVO}。底层 {@code OntologyGitService} 为 ontology-engine-api
- * 契约（只增不改），旧 Map 方法签名保留（Wave31 C1 mock 兼容）；本控制器仅在
- * Controller 层做 DTO → Map 入参组装与 Jackson Map → VO 转换
- * （POJO 序列化 == Map 序列化，API 输出契约严格等价）。
+ * <p><b>VG-2 收口（2026-11-04）</b>：原先控制器把 DTO 摊成 {@code Map} 交给服务的「Wave31 兼容垫片」、
+ * 再 {@code convertValue} 回 VO——服务契约因此仍带 {@code Map<String,Object>}。现在服务侧为强类型
+ * （{@code pullVersion/loadVersion} + {@code archiveVersion}），控制器直接组装请求与结果；
+ * <b>wire 字段逐字不变</b>（VO 带 {@code @JsonInclude(NON_NULL)}，空值行为与旧 Map 一致）。</p>
  *
- * <p>T16-5: Git 提交记录动态结构豁免 — commit/pull/load 当前仅返回
- * ontologyId/url/commitMessage/status/timestamp 五个标量字段；
- * 未来扩展 commit hash/author/files 等动态 Git 元数据可在 VO 追加 Object 豁免字段。
+ * <p><b>安全（P0 红线）</b>：客户端 {@code url} 一律不作为 clone 依据——仓库只由服务端
+ * {@code repositoryId} 注册表定位；{@code /load} 收到 {@code url} 只记 WARN 后丢弃。</p>
  */
 @RestController
 @RequestMapping("/api/v1/engine/ontology/git")
 public class OntologyGitController {
 
-    /** Controller 层 Map → VO 转换用的 Jackson Mapper（static 单例，零开销）。 */
-    private static final ObjectMapper MAPPER = new ObjectMapper()
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+    private static final Logger log = LoggerFactory.getLogger(OntologyGitController.class);
 
     private final OntologyGitService gitService;
 
@@ -45,65 +41,75 @@ public class OntologyGitController {
         this.gitService = gitService;
     }
 
-    /** Git 提交（强类型入出参）。 */
+    /** Git 提交（强类型入出参；直连 archiveVersion，不再经 Map 垫片）。 */
     @PostMapping("/commit/{ontologyId}")
     public ApiResponse<OntologyGitResultVO> commit(@PathVariable String ontologyId,
                                                     @RequestBody OntologyGitSaveDTO dto) {
-        Map<String, Object> result = gitService.commit(ontologyId, toBody(dto));
-        return ApiResponse.success(toVO(result));
+        OntologyGitArchiveRequest req = new OntologyGitArchiveRequest();
+        if (dto != null) {
+            req.setRepositoryId(dto.getRepositoryId());
+            req.setAssetType(dto.getAssetType());
+            req.setVersionNo(dto.getVersionNo());
+            req.setContent(dto.getContent());
+            req.setCommitMessage(dto.getMessage());
+        }
+        req.setAssetId(ontologyId);
+        OntologyGitArchiveResult archived = gitService.archiveVersion(req);
+        return ApiResponse.success(toVO(ontologyId, dto == null ? null : dto.getMessage(), archived));
     }
 
     /** Git 拉取（强类型入出参）。 */
     @PostMapping("/pull/{ontologyId}")
     public ApiResponse<OntologyGitResultVO> pull(@PathVariable String ontologyId,
-                                                  @RequestBody OntologyGitSaveDTO dto) {
-        Map<String, Object> result = gitService.pull(ontologyId, toBody(dto));
+                                                  @RequestBody(required = false) OntologyGitSaveDTO dto) {
+        OntologyGitSyncResult result = gitService.pullVersion(ontologyId,
+                dto == null ? null : dto.getRepositoryId());
         return ApiResponse.success(toVO(result));
     }
 
-    /** Git 加载（强类型入出参）。 */
+    /** Git 加载（强类型入出参）：只认服务端 repositoryId，客户端 url 忽略。 */
     @PostMapping("/load")
-    public ApiResponse<OntologyGitResultVO> load(@RequestBody OntologyGitSaveDTO dto) {
-        Map<String, Object> result = gitService.load(toBody(dto));
+    public ApiResponse<OntologyGitResultVO> load(@RequestBody(required = false) OntologyGitSaveDTO dto) {
+        if (dto != null && dto.getUrl() != null && !dto.getUrl().isBlank()) {
+            log.warn("Git load 忽略客户端传入的 url（禁止 remote gitUrl 入参），仅接受 repositoryId");
+        }
+        OntologyGitSyncResult result = gitService.loadVersion(dto == null ? null : dto.getRepositoryId());
         return ApiResponse.success(toVO(result));
     }
 
-    // ═══════════════ 内部转换（强类型 ↔ service 旧 Map 契约）═══════════════
+    // ═══════════════ 内部转换（强类型 ↔ VO）═══════════════
 
-    /**
-     * DTO → service 旧 Map 入参：透传 commit 归档所需的强类型键
-     * （repositoryId 服务端仓库定位 / assetType / versionNo / content 版本快照内容 / message）。
-     *
-     * <p>安全（P0 红线）：客户端 {@code url} 不再作为 clone 依据透传；仓库仅由服务端
-     * {@code repositoryId} 注册表定位。{@code url} 字段保留仅为兼容既有请求契约。
-     */
-    private Map<String, Object> toBody(OntologyGitSaveDTO dto) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        if (dto != null) {
-            if (dto.getMessage() != null) {
-                body.put("message", dto.getMessage());
-            }
-            if (dto.getRepositoryId() != null) {
-                body.put("repositoryId", dto.getRepositoryId());
-            }
-            if (dto.getAssetType() != null) {
-                body.put("assetType", dto.getAssetType());
-            }
-            if (dto.getVersionNo() != null) {
-                body.put("versionNo", dto.getVersionNo());
-            }
-            if (dto.getContent() != null) {
-                body.put("content", dto.getContent());
-            }
+    /** 归档结果 → VO（字段集与此前 Map→VO 转换一致；null 由 VO 的 NON_NULL 序列化策略省略）。 */
+    private OntologyGitResultVO toVO(String ontologyId, String commitMessage, OntologyGitArchiveResult r) {
+        OntologyGitResultVO vo = new OntologyGitResultVO();
+        if (r == null) {
+            return vo;
         }
-        return body;
+        vo.setStatus(r.getStatus());
+        vo.setOntologyId(ontologyId);
+        vo.setCommitMessage(commitMessage);
+        vo.setTimestamp(r.getTimestamp() != null ? r.getTimestamp() : System.currentTimeMillis());
+        vo.setRepositoryId(r.getRepositoryId());
+        vo.setCommitId(r.getCommitId());
+        vo.setTag(r.getTag());
+        vo.setAssetType(r.getAssetType());
+        vo.setVersionNo(r.getVersionNo());
+        vo.setReason(r.getReason());
+        return vo;
     }
 
-    /** service 旧 Map 返回 → OntologyGitResultVO（字段名等价，NON_NULL）。 */
-    private OntologyGitResultVO toVO(Map<String, Object> row) {
-        if (row == null) {
-            return new OntologyGitResultVO();
+    /** 同步结果 → VO。 */
+    private OntologyGitResultVO toVO(OntologyGitSyncResult r) {
+        OntologyGitResultVO vo = new OntologyGitResultVO();
+        if (r == null) {
+            return vo;
         }
-        return MAPPER.convertValue(row, OntologyGitResultVO.class);
+        vo.setStatus(r.getStatus());
+        vo.setReason(r.getReason());
+        vo.setOntologyId(r.getOntologyId());
+        vo.setRepositoryId(r.getRepositoryId());
+        vo.setRemote(r.getRemote());
+        vo.setTimestamp(r.getTimestamp());
+        return vo;
     }
 }

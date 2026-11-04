@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.ontology.service;
 
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveRequest;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveResult;
+import com.chinacreator.gzcm.engine.ontology.git.OntologyGitSyncResult;
 import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
 import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
@@ -122,47 +123,42 @@ class OntologyGitServiceImplTest {
     }
 
     @Test
-    @DisplayName("commit(Map): 委托 archiveVersion；缺 repositoryId → not_available（禁伪成功）")
-    void commitMap_missingRepositoryId_returnsNotAvailable() throws Exception {
+    @DisplayName("pullVersion: 缺 repositoryId → not_available（禁伪成功，且不触碰 git）")
+    void pullVersion_missingRepositoryId_returnsNotAvailable() throws Exception {
         OntologyGitServiceImpl svc = new OntologyGitServiceImpl(gitService, gitRepositoryService);
 
-        Map<String, Object> r = svc.commit("ont001", Map.of(
-            "content", "{\"a\":1}", "versionNo", "1.0.0", "message", "m"));
+        OntologyGitSyncResult r = svc.pullVersion("ont001", null);
 
-        assertEquals("not_available", r.get("status"));
-        assertTrue(String.valueOf(r.get("reason")).contains("repositoryId"));
-        verify(gitService, never()).commitAllChanges(any(), any(), any(), any());
+        assertEquals(OntologyGitSyncResult.STATUS_NOT_AVAILABLE, r.getStatus());
+        assertTrue(String.valueOf(r.getReason()).contains("repositoryId"));
+        verify(gitService, never()).pull(any(GitRepository.class), any(), any());
     }
 
     @Test
-    @DisplayName("commit(Map): 委托成功路径返回 committed + 真实 commitId + tag")
-    void commitMap_delegatesCommitted(@TempDir Path workingTree) throws Exception {
+    @DisplayName("pullVersion: 已注册仓库 → origin + 缺省分支，返回 pulled 与定位信息")
+    void pullVersion_pullsFromRegisteredRepository(@TempDir Path workingTree) throws Exception {
         GitRepository repo = registeredRepo(workingTree);
         when(gitRepositoryService.getRepositoryById("ontology")).thenReturn(repo);
-        when(gitService.getCurrentCommitId(repo)).thenReturn("beef0001");
 
         OntologyGitServiceImpl svc = new OntologyGitServiceImpl(gitService, gitRepositoryService);
-        Map<String, Object> r = svc.commit("ont777", Map.of(
-            "repositoryId", "ontology",
-            "assetType", "ontology",
-            "versionNo", "2.1.0",
-            "content", "{\"b\":2}"));
+        OntologyGitSyncResult r = svc.pullVersion("ont777", "ontology");
 
-        assertEquals("committed", r.get("status"));
-        assertEquals("beef0001", r.get("commitId"));
-        assertEquals("ontology/ont777/2.1.0", r.get("tag"));
-        verify(gitService, times(1)).createTag(eq(repo), eq("ontology/ont777/2.1.0"), any());
+        assertEquals(OntologyGitSyncResult.STATUS_PULLED, r.getStatus());
+        assertEquals("ont777", r.getOntologyId());
+        assertEquals("ontology", r.getRepositoryId());
+        assertEquals("origin", r.getRemote());
+        assertNotNull(r.getBranch());
+        verify(gitService, times(1)).pull(eq(repo), eq("origin"), any());
     }
 
     @Test
-    @DisplayName("load(Map): 客户端 url 被忽略；缺 repositoryId → not_available（禁 SSRF/gitUrl 注入）")
-    void load_neverTrustedClientUrl_returnsNotAvailable() throws Exception {
+    @DisplayName("loadVersion: 缺 repositoryId → not_available（禁客户端 gitUrl/localPath 入参，绝不触发 clone/pull）")
+    void loadVersion_requiresRepositoryId_neverPulls() throws Exception {
         OntologyGitServiceImpl svc = new OntologyGitServiceImpl(gitService, gitRepositoryService);
 
-        Map<String, Object> r = svc.load(Map.of("url", "http://evil.internal/repo.git"));
+        OntologyGitSyncResult r = svc.loadVersion(null);
 
-        assertEquals("not_available", r.get("status"));
-        // 绝不因客户端 url 触发任何 clone / pull
+        assertEquals(OntologyGitSyncResult.STATUS_NOT_AVAILABLE, r.getStatus());
         verify(gitService, never()).clone(any(), any(), any(), any());
         verify(gitService, never()).pull(any(GitRepository.class), any(), any());
     }

@@ -4,6 +4,7 @@ import com.chinacreator.gzcm.engine.ontology.OntologyGitService;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveRequest;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveResult;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult;
+import com.chinacreator.gzcm.engine.ontology.git.OntologyGitSyncResult;
 import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
 import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
@@ -218,110 +219,55 @@ public class OntologyGitServiceImpl implements OntologyGitService {
         return result;
     }
 
-    // ═══════════════ 旧 Map 契约（委托至 archiveVersion；仅透传服务端可解析键）═══════════════
+    // ═══════════════ 强类型同步契约（VG-2 收口：Map 垫片已删）═══════════════
 
     @Override
-    public Map<String, Object> commit(String ontologyId, Map<String, Object> body) {
-        Map<String, Object> b = body != null ? body : Map.of();
-        OntologyGitArchiveRequest req = new OntologyGitArchiveRequest();
-        req.setRepositoryId(asString(b.get("repositoryId")));
-        req.setAssetType(orDefault(asString(b.get("assetType")), DEFAULT_ASSET_TYPE));
-        req.setAssetId(ontologyId);
-        req.setVersionNo(asString(b.get("versionNo")));
-        req.setContent(asString(b.get("content")));
-        req.setCommitMessage(asString(b.get("message")));
-        req.setAuthorName(asString(b.get("authorName")));
-        req.setAuthorEmail(asString(b.get("authorEmail")));
-
-        OntologyGitArchiveResult archived = archiveVersion(req);
-        return toCommitMap(ontologyId, req.getCommitMessage(), archived);
-    }
-
-    @Override
-    public Map<String, Object> pull(String ontologyId, Map<String, Object> body) {
-        Map<String, Object> b = body != null ? body : Map.of();
-        String repositoryId = trimToNull(asString(b.get("repositoryId")));
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("ontologyId", ontologyId);
-        result.put("timestamp", System.currentTimeMillis());
-        if (repositoryId == null) {
+    public OntologyGitSyncResult pullVersion(String ontologyId, String repositoryId) {
+        OntologyGitSyncResult result = new OntologyGitSyncResult();
+        result.setOntologyId(ontologyId);
+        result.setTimestamp(System.currentTimeMillis());
+        String repoId = trimToNull(repositoryId);
+        if (repoId == null) {
             return pullNotAvailable(result,
                 "缺少 repositoryId：pull 仅由服务端注册表定位仓库，禁止客户端传入 remote/gitUrl");
         }
         GitRepository repository;
         try {
-            repository = gitRepositoryService.getRepositoryById(repositoryId);
+            repository = gitRepositoryService.getRepositoryById(repoId);
         } catch (GitRepositoryService.GitRepositoryException e) {
-            return pullNotAvailable(result, "仓库未在 runtime 注册表注册: repositoryId=" + repositoryId);
+            return pullNotAvailable(result, "仓库未在 runtime 注册表注册: repositoryId=" + repoId);
         }
         if (repository == null || isBlank(repository.getLocalPath()) || !repository.isEnabled()) {
-            return pullNotAvailable(result, "仓库定位失败或缺少配置: repositoryId=" + repositoryId);
+            return pullNotAvailable(result, "仓库定位失败或缺少配置: repositoryId=" + repoId);
         }
         String remote = "origin";
         String branch = orDefault(trimToNull(repository.getDefaultBranch()), "main");
         try {
             gitService.pull(repository, remote, branch);
         } catch (GitService.GitException e) {
-            log.error("Git pull 失败 repositoryId={}（禁伪成功）", repositoryId, e);
+            log.error("Git pull 失败 repositoryId={}（禁伪成功）", repoId, e);
             return pullNotAvailable(result, "Git 拉取失败: " + e.getMessage());
         }
-        result.put("status", "pulled");
-        result.put("repositoryId", repositoryId);
-        result.put("remote", remote);
-        result.put("branch", branch);
+        result.setStatus(OntologyGitSyncResult.STATUS_PULLED);
+        result.setRepositoryId(repoId);
+        result.setRemote(remote);
+        result.setBranch(branch);
         return result;
     }
 
     @Override
-    public Map<String, Object> load(Map<String, Object> body) {
-        Map<String, Object> b = body != null ? body : Map.of();
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("timestamp", System.currentTimeMillis());
-        // 安全：客户端 url 一律忽略，绝不据此 clone（P0 红线）；load 只认服务端 repositoryId。
-        if (b.get("url") != null && !asString(b.get("url")).isBlank()) {
-            log.warn("Git load 忽略客户端传入的 url（禁止 remote gitUrl 入参），仅接受 repositoryId");
-        }
-        String repositoryId = trimToNull(asString(b.get("repositoryId")));
-        if (repositoryId == null) {
-            result.put("status", STATUS_NOT_AVAILABLE);
-            result.put("reason", "load 仅接受服务端 repositoryId，禁止客户端 gitUrl/localPath 入参");
-            return result;
+    public OntologyGitSyncResult loadVersion(String repositoryId) {
+        OntologyGitSyncResult result = new OntologyGitSyncResult();
+        result.setTimestamp(System.currentTimeMillis());
+        String repoId = trimToNull(repositoryId);
+        if (repoId == null) {
+            return pullNotAvailable(result, "load 仅接受服务端 repositoryId，禁止客户端 gitUrl/localPath 入参");
         }
         // 语义等价 pull：从服务端注册的 remote 拉取到工作树。
-        return pull(repositoryId, Map.of("repositoryId", repositoryId));
+        return pullVersion(null, repoId);
     }
 
     // ═══════════════ 内部工具 ═══════════════
-
-    private Map<String, Object> toCommitMap(String ontologyId, String commitMessage,
-                                            OntologyGitArchiveResult r) {
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("status", r.getStatus());
-        map.put("ontologyId", ontologyId);
-        if (commitMessage != null) {
-            map.put("commitMessage", commitMessage);
-        }
-        map.put("timestamp", r.getTimestamp() != null ? r.getTimestamp() : System.currentTimeMillis());
-        if (r.getRepositoryId() != null) {
-            map.put("repositoryId", r.getRepositoryId());
-        }
-        if (r.getCommitId() != null) {
-            map.put("commitId", r.getCommitId());
-        }
-        if (r.getTag() != null) {
-            map.put("tag", r.getTag());
-        }
-        if (r.getAssetType() != null) {
-            map.put("assetType", r.getAssetType());
-        }
-        if (r.getVersionNo() != null) {
-            map.put("versionNo", r.getVersionNo());
-        }
-        if (r.getReason() != null) {
-            map.put("reason", r.getReason());
-        }
-        return map;
-    }
 
     private OntologyGitArchiveResult notAvailable(OntologyGitArchiveResult result, String reason) {
         result.setStatus(STATUS_NOT_AVAILABLE);
@@ -330,9 +276,9 @@ public class OntologyGitServiceImpl implements OntologyGitService {
         return result;
     }
 
-    private Map<String, Object> pullNotAvailable(Map<String, Object> result, String reason) {
-        result.put("status", STATUS_NOT_AVAILABLE);
-        result.put("reason", reason);
+    private OntologyGitSyncResult pullNotAvailable(OntologyGitSyncResult result, String reason) {
+        result.setStatus(OntologyGitSyncResult.STATUS_NOT_AVAILABLE);
+        result.setReason(reason);
         log.warn("Git 拉取不可用: {}", reason);
         return result;
     }

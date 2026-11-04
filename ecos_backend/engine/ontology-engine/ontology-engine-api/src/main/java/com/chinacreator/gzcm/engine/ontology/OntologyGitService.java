@@ -1,20 +1,28 @@
 package com.chinacreator.gzcm.engine.ontology;
 
-import java.util.Map;
-
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveRequest;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitArchiveResult;
 import com.chinacreator.gzcm.engine.ontology.git.OntologyGitReadResult;
+import com.chinacreator.gzcm.engine.ontology.git.OntologyGitSyncResult;
 
 public interface OntologyGitService {
 
-    // ── 旧 Map 契约（API 只增不改，Wave31 mock 兼容；内部委托至下方强类型 archive）──
+    // ── 强类型契约（VG-2 收口：Map 垫片已删，服务契约不再有 Map 出入参）──
 
-    Map<String, Object> commit(String ontologyId, Map<String, Object> body);
+    /**
+     * 从服务端注册的 remote 拉取到工作树（{@code origin} + 仓库缺省分支）。
+     *
+     * <p>仓库只由服务端 {@code repositoryId} 定位；缺 id / 未注册 / 禁用 / git 不可用一律
+     * {@code not_available} + reason，<b>禁伪成功</b>。</p>
+     */
+    OntologyGitSyncResult pullVersion(String ontologyId, String repositoryId);
 
-    Map<String, Object> pull(String ontologyId, Map<String, Object> body);
-
-    Map<String, Object> load(Map<String, Object> body);
+    /**
+     * 按服务端 {@code repositoryId} 拉取（{@code /load} 语义，等价 pull）。
+     *
+     * <p>客户端 {@code url}/远端地址不入参；缺 id 直接 {@code not_available}。</p>
+     */
+    OntologyGitSyncResult loadVersion(String repositoryId);
 
     // ── 强类型契约（VG-7，H4-T4 真实 Git 归档落地入口）──
 
