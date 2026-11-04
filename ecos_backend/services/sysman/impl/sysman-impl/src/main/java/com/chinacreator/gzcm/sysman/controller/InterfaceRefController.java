@@ -5,7 +5,6 @@ import com.chinacreator.gzcm.sysman.dto.InterfaceRefUpsertDTO;
 import com.chinacreator.gzcm.sysman.service.InterfaceRefQueryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -37,18 +36,18 @@ public class InterfaceRefController {
     private static final Logger log = LoggerFactory.getLogger(InterfaceRefController.class);
 
     private final InterfaceRefQueryService interfaceRefService;
-    private final ObjectProvider<Object> eventBusProvider;
+    private final com.chinacreator.gzcm.sysman.audit.EventBusAuditPublisher eventBusAuditPublisher;
 
     /**
      * 构造器注入。
      *
-     * @param interfaceRefService 接口引用数据访问服务（SQL 已下沉，PMO-74 H9-T4）
-     * @param eventBusProvider    事件总线可选注入，不可用时为 empty
+     * @param interfaceRefService    接口引用数据访问服务（SQL 已下沉，PMO-74 H9-T4）
+     * @param eventBusAuditPublisher 审计事件可选投递口（按类名解析 EventBusService，不可用时仅落日志）
      */
     public InterfaceRefController(InterfaceRefQueryService interfaceRefService,
-                                  ObjectProvider<Object> eventBusProvider) {
+                                  com.chinacreator.gzcm.sysman.audit.EventBusAuditPublisher eventBusAuditPublisher) {
         this.interfaceRefService = interfaceRefService;
-        this.eventBusProvider = eventBusProvider;
+        this.eventBusAuditPublisher = eventBusAuditPublisher;
     }
 
     // ── GET / — 列表 ─────────────────────────────────────────────
@@ -210,34 +209,29 @@ public class InterfaceRefController {
     /**
      * 发布审计事件到 ecos.audit topic。
      * <p>
-     * 通过 ObjectProvider 可选注入 EventBusService，发送失败或不可用时仅 WARN 日志，
-     * 不阻塞主流程（铁律 §2.4-5 审计不阻塞主流程）。
+     * 经 {@code EventBusAuditPublisher} 按接口类名可选解析 EventBusService（避免编译期硬依赖
+     * runtime-event / Kafka）；总线缺席或投递失败只落日志，不阻塞主流程（铁律 §2.4-5）。
+     * <p>
+     * #147AQ 订正：本方法原先声明 {@code ObjectProvider<Object>}，Spring 按 {@code Object} 解析候选
+     * 必然失败（多枚 {@code @Primary} ⇒ NoUniqueBeanDefinition），审计从未真正送达。
      *
      * @param eventType 事件类型（interface_ref_create / update / delete）
      * @param id        接口引用 ID
      * @param name      接口引用名称
      */
     private void publishAuditEvent(String eventType, String id, String name) {
-        try {
-            Object eventBus = eventBusProvider.getIfAvailable();
-            if (eventBus == null) {
-                log.debug("[audit] EventBusService 不可用，跳过审计事件: {}", eventType);
-                return;
-            }
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("eventType", eventType);
-            payload.put("source", "sysman-interface-ref");
-            payload.put("aggregateType", "interfaceRef");
-            payload.put("aggregateId", id);
-            payload.put("name", name);
-            payload.put("timestamp", System.currentTimeMillis());
-
-            eventBus.getClass().getMethod("publish", String.class, Object.class)
-                    .invoke(eventBus, "ecos.audit", payload);
-            log.debug("[audit] 审计事件已发布: {} id={}", eventType, id);
-        } catch (Exception e) {
-            log.warn("[audit] 审计事件发布失败（不阻塞主流程）: eventType={}, id={}, {}",
-                    eventType, id, e.getMessage());
+        if (eventBusAuditPublisher == null) {
+            log.debug("[audit] EventBusService 不可用，跳过审计事件: {}", eventType);
+            return;
         }
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("eventType", eventType);
+        payload.put("source", "sysman-interface-ref");
+        payload.put("aggregateType", "interfaceRef");
+        payload.put("aggregateId", id);
+        payload.put("name", name);
+        payload.put("timestamp", System.currentTimeMillis());
+        eventBusAuditPublisher.publish(payload);
+        log.debug("[audit] 审计事件已递交: {} id={}", eventType, id);
     }
 }

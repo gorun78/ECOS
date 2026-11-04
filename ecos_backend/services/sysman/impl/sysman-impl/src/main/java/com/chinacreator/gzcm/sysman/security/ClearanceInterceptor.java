@@ -41,8 +41,8 @@ public class ClearanceInterceptor implements HandlerInterceptor {
     private final com.chinacreator.gzcm.sysman.dao.ClearanceLookupDao clearanceLookupDao;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /** 可选注入 EventBusService（避免编译期硬依赖 runtime-event / Kafka；不可用时跳过审计）。 */
-    private final org.springframework.beans.factory.ObjectProvider<Object> eventBusProvider;
+    /** 可选投递口：按类名解析 EventBusService（避免编译期硬依赖 runtime-event / Kafka；不可用即跳过审计）。 */
+    private final com.chinacreator.gzcm.sysman.audit.EventBusAuditPublisher eventBusAuditPublisher;
 
     /**
      * 五档密级链的单源读面（#142/B4-3e-81，收口 D-B4-23 余项腿）。
@@ -70,11 +70,11 @@ public class ClearanceInterceptor implements HandlerInterceptor {
 
     @Autowired
     public ClearanceInterceptor(com.chinacreator.gzcm.sysman.dao.ClearanceLookupDao clearanceLookupDao,
-                                org.springframework.beans.factory.ObjectProvider<Object> eventBusProvider,
+                                com.chinacreator.gzcm.sysman.audit.EventBusAuditPublisher eventBusAuditPublisher,
                                 com.chinacreator.gzcm.sysman.security.clearance.service.ISubjectClearanceQueryService clearanceQueryService,
                                 com.chinacreator.gzcm.sysman.iam.service.IOrganizationService organizationService) {
         this.clearanceLookupDao = clearanceLookupDao;
-        this.eventBusProvider = eventBusProvider;
+        this.eventBusAuditPublisher = eventBusAuditPublisher;
         this.clearanceQueryService = clearanceQueryService;
         this.organizationService = organizationService;
     }
@@ -88,7 +88,7 @@ public class ClearanceInterceptor implements HandlerInterceptor {
                                 com.chinacreator.gzcm.sysman.security.clearance.service.ISubjectClearanceQueryService clearanceQueryService,
                                 com.chinacreator.gzcm.sysman.iam.service.IOrganizationService organizationService) {
         this.clearanceLookupDao = clearanceLookupDao;
-        this.eventBusProvider = null;
+        this.eventBusAuditPublisher = null;
         this.clearanceQueryService = clearanceQueryService;
         this.organizationService = organizationService;
     }
@@ -283,33 +283,27 @@ public class ClearanceInterceptor implements HandlerInterceptor {
     }
 
     // ── 超管旁路强审计（详细设计-01 W40 / F01-08）────────────────────
-    // 保留旁路业务能力，但每次旁路必须留痕到 ecos.audit（可选注入 EventBusService，
-    // 不可用仅 WARN 不阻断；反射调用避免编译期硬依赖 runtime-event，同 SecurityPolicyController 口径）。
+    // 保留旁路业务能力，但每次旁路必须留痕到 ecos.audit（经 EventBusAuditPublisher 可选投递，
+    // 总线不可用仅落日志，不阻断旁路）。#147AQ：原先的 ObjectProvider<Object> 按声明类型解析，
+    // 容器按 Object 找候选必然失败 ⇒ 留痕从未送达，此处已换成按接口类名解析的投递口。
 
     private void publishSuperAdminBypassAudit(String operator, String roles, String path, int requiredLevel) {
-        try {
-            Object eventBus = eventBusProvider == null ? null : eventBusProvider.getIfAvailable();
-            if (eventBus == null) {
-                log.debug("[audit] EventBusService 不可用，超管旁路留痕仅走日志: operator={}, path={}", operator, path);
-                return;
-            }
-            Map<String, Object> payload = new java.util.LinkedHashMap<>();
-            payload.put("eventType", "super_admin_bypass");
-            payload.put("action", "clearance.bypass.superAdmin");
-            payload.put("userId", operator);
-            payload.put("username", operator);
-            payload.put("resource", path);
-            payload.put("result", "BYPASSED");
-            payload.put("roles", roles);
-            payload.put("requiredLevel", requiredLevel);
-            payload.put("source", "sysman-clearance-interceptor");
-            payload.put("timestamp", System.currentTimeMillis());
-            eventBus.getClass().getMethod("publish", String.class, Object.class)
-                    .invoke(eventBus, "ecos.audit", payload);
-        } catch (Exception e) {
-            log.warn("[audit] 超管旁路审计发布失败（不阻断旁路）: operator={}, path={}, {}",
-                    operator, path, e.getMessage());
+        if (eventBusAuditPublisher == null) {
+            log.debug("[audit] EventBusService 不可用，超管旁路留痕仅走日志: operator={}, path={}", operator, path);
+            return;
         }
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("eventType", "super_admin_bypass");
+        payload.put("action", "clearance.bypass.superAdmin");
+        payload.put("userId", operator);
+        payload.put("username", operator);
+        payload.put("resource", path);
+        payload.put("result", "BYPASSED");
+        payload.put("roles", roles);
+        payload.put("requiredLevel", requiredLevel);
+        payload.put("source", "sysman-clearance-interceptor");
+        payload.put("timestamp", System.currentTimeMillis());
+        eventBusAuditPublisher.publish(payload);
     }
 
     // ── 响应 ──────────────────────────────────────────

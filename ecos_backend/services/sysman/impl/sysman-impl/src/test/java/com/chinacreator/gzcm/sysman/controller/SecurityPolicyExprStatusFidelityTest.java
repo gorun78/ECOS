@@ -5,7 +5,6 @@ import com.chinacreator.gzcm.common.exception.DataBridgeException;
 import com.chinacreator.gzcm.sysman.service.SecurityPolicyQueryService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -30,11 +29,11 @@ import static org.mockito.Mockito.when;
  */
 class SecurityPolicyExprStatusFidelityTest {
 
-    @SuppressWarnings("unchecked")
-    private final ObjectProvider<Object> eventBusProvider = mock(ObjectProvider.class);
+    private final com.chinacreator.gzcm.sysman.audit.EventBusAuditPublisher eventBusAuditPublisher =
+            mock(com.chinacreator.gzcm.sysman.audit.EventBusAuditPublisher.class);
     private final SecurityPolicyQueryService policyService = mock(SecurityPolicyQueryService.class);
     private final SecurityPolicyController controller =
-            new SecurityPolicyController(policyService, eventBusProvider);
+            new SecurityPolicyController(policyService, eventBusAuditPublisher);
 
     private ApiResponse<Map<String, Object>> envelope(
             ResponseEntity<ApiResponse<Map<String, Object>>> resp) {
