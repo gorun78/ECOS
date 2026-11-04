@@ -171,7 +171,8 @@ public class AIPAgentController {
      */
     private void archiveAgent(AgentRegistryEntity entity, String message) {
         if (designAssetArchiver == null) {
-            log.debug("DesignAssetArchiver 未装配，跳过 agent 归档 id={}", entity.getId());
+            // VG-5（§2.9.9）：未装配是**如实降级**，必须可见——debug 级等于静默跳过。
+            log.warn("agent 归档腿 NOT_AVAILABLE（DesignAssetArchiver 未装配，禁读成已归档）id={}", entity.getId());
             return;
         }
         try {

@@ -101,7 +101,8 @@ public class ScenarioStatusTransitionService {
     void archiveScenarioAfterCommit(String scenarioId, ScenarioStatus to) {
         DesignAssetArchiver archiver = archiverProvider != null ? archiverProvider.getIfAvailable() : null;
         if (archiver == null) {
-            log.debug("DesignAssetArchiver 未装配，跳过 scenario 归档 id={}", scenarioId);
+            // VG-5（§2.9.9）：未装配是**如实降级**，必须可见——debug 级等于静默跳过。
+            log.warn("scenario 归档腿 NOT_AVAILABLE（DesignAssetArchiver 未装配，禁读成已归档）id={}", scenarioId);
             return;
         }
         Runnable task = () -> {

@@ -343,7 +343,8 @@ public class ModelRegistryService {
     private void archivePublishedModel(String rowId, String publishedBy, Map<String, Object> row) {
         DesignAssetArchiver archiver = archiverProvider != null ? archiverProvider.getIfAvailable() : null;
         if (archiver == null) {
-            log.info("设计资产归档器未装配，跳过 cognitive 归档 rowId={}", rowId);
+            // VG-5（§2.9.9）：未装配是**如实降级**，必须可见——info 级在默认日志下等于静默。
+            log.warn("cognitive 归档腿 NOT_AVAILABLE（DesignAssetArchiver 未装配，禁读成已归档）rowId={}", rowId);
             return;
         }
         String version = asString(row.get("version_no"));
