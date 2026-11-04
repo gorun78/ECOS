@@ -31,10 +31,31 @@ public interface KnowledgeArticleMapper {
     /**
      * 按七分类过滤（#147U）：分类闭集由 {@code KnowledgeCategory} 在服务层校验，
      * SQL 只做等值匹配；{@code limit} 已由调用方夹紧，避免无界列表。
+     *
+     * <p><b>同刻并列的次序（#147BA）</b>：只按 {@code created_at DESC} 排序时，同一毫秒写入的
+     * 多行次序由数据库决定，翻页会漏行或重复行。补 {@code id DESC} 作次级键，使排序<b>全序</b>，
+     * 游标才能稳定推进。</p>
      */
     @Select("SELECT " + COLS + " FROM ecos_knowledge.knowledge_article "
-            + "WHERE knowledge_category = #{category} ORDER BY created_at DESC LIMIT #{limit}")
+            + "WHERE knowledge_category = #{category} ORDER BY created_at DESC, id DESC LIMIT #{limit}")
     List<KnowledgeArticle> findByCategory(@Param("category") String category, @Param("limit") int limit);
+
+    /**
+     * 游标翻页（#147BA）：建在 {@code (created_at, id)} 的全序上做 keyset 比较，
+     * 不用 {@code OFFSET}（深翻页 O(n) 且并发插入会漂移）。
+     *
+     * <p>行值比较 {@code (a,b) < (x,y)} 是 PG 原生有序元组语义，等价于
+     * {@code a < x OR (a = x AND b < y)}，一次索引条件即可；{@code cursorTs} 是游标行的
+     * {@code created_at} 换算出的 epoch 毫秒，{@code to_timestamp(double)} 转回 timestamp。</p>
+     */
+    @Select("SELECT " + COLS + " FROM ecos_knowledge.knowledge_article "
+            + "WHERE knowledge_category = #{category} "
+            + "AND (created_at, id) < (to_timestamp(CAST(#{cursorTs} AS DOUBLE PRECISION) / 1000), #{cursorId}) "
+            + "ORDER BY created_at DESC, id DESC LIMIT #{limit}")
+    List<KnowledgeArticle> findByCategoryAfter(@Param("category") String category,
+                                               @Param("cursorTs") long cursorTsMillis,
+                                               @Param("cursorId") String cursorId,
+                                               @Param("limit") int limit);
 
     /**
      * 全文式检索（#147AM 实测修复）：模糊匹配用 ANSI {@code '%' || #{query} || '%'}，

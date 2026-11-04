@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.kb.service;
 
 import com.chinacreator.gzcm.engine.kb.KnowledgeRetrievalService;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeArticle;
+import com.chinacreator.gzcm.engine.kb.model.KnowledgeArticlePage;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeCategory;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeCategoryPolicy;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEmbedding;
@@ -558,6 +559,59 @@ public class KnowledgeRetrievalServiceImpl implements KnowledgeRetrievalService 
         }
         int bounded = Math.max(1, Math.min(limit, 100));
         return articleMapper.findByCategory(parsed.code(), bounded);
+    }
+
+    /**
+     * 按七分类的游标分页（#147BA；补 §7.1.2 未做项）。
+     *
+     * <p>排序与游标都建在 {@code (created_at DESC, id DESC)} 全序上：只按时间排时同毫秒多行的次序
+     * 由库决定，翻页会漏行或重复行。游标是<b>不透明</b> base64url("{epochMillis}:{id}")，
+     * 调用方只回传不解析；非法游标抛 {@code ValidationException}（400），不做「当第一页」的宽容。</p>
+     */
+    @Override
+    public KnowledgeArticlePage listByCategoryPage(String category, int limit, String cursor) {
+        KnowledgeCategory parsed = KnowledgeCategory.fromCode(category);
+        if (parsed == null) {
+            throw new com.chinacreator.gzcm.common.exception.ValidationException(
+                    "未知知识分类: " + category
+                            + "（闭集 Fact/Concept/Procedure/Rule/Case/Evidence/Pattern）");
+        }
+        int bounded = Math.max(1, Math.min(limit, 100));
+        String trimmed = cursor == null ? "" : cursor.trim();
+
+        List<KnowledgeArticle> items;
+        if (trimmed.isEmpty()) {
+            items = articleMapper.findByCategory(parsed.code(), bounded);
+        } else {
+            Cursor decoded = Cursor.decode(trimmed);
+            items = articleMapper.findByCategoryAfter(parsed.code(), decoded.tsMillis(), decoded.id(), bounded);
+        }
+        String nextCursor = items.size() < bounded ? null : Cursor.encode(items.get(items.size() - 1));
+        return new KnowledgeArticlePage(items, nextCursor);
+    }
+
+    /** 不透明游标编解码（#147BA）。 */
+    record Cursor(long tsMillis, String id) {
+
+        static Cursor decode(String raw) {
+            try {
+                String text = new String(java.util.Base64.getUrlDecoder().decode(raw),
+                        java.nio.charset.StandardCharsets.UTF_8);
+                int sep = text.indexOf(':');
+                if (sep <= 0 || sep == text.length() - 1) {
+                    throw new IllegalArgumentException("缺少时间或 id 段");
+                }
+                return new Cursor(Long.parseLong(text.substring(0, sep)), text.substring(sep + 1));
+            } catch (RuntimeException e) {
+                throw new com.chinacreator.gzcm.common.exception.ValidationException("无效的分页游标");
+            }
+        }
+
+        static String encode(KnowledgeArticle last) {
+            String text = last.getCreatedAt() + ":" + last.getId();
+            return java.util.Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
     }
 
     /**

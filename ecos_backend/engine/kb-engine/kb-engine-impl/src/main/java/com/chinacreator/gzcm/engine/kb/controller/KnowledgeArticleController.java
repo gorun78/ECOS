@@ -85,6 +85,22 @@ public class KnowledgeArticleController {
     }
 
     /**
+     * 七分类<b>游标分页</b>（#147BA；补 §7.1.2 未做项「列表游标分页」）。
+     *
+     * <p>与 {@code /by-category} 并行存在：后者是「前 N 条」便利面（既有前端在用），本端点返回
+     * {@code {items, nextCursor}}，末页 {@code nextCursor=null}。游标不透明、调用方只回传不解析；
+     * 非法游标 → 400（不静默回第一页，否则翻页会无声重头开始）。分类必填且落七类闭集，
+     * {@code limit} 夹紧 [1,100]。</p>
+     */
+    @GetMapping("/by-category/page")
+    public ApiResponse<com.chinacreator.gzcm.engine.kb.model.KnowledgeArticlePage> listByCategoryPage(
+            @RequestParam String category,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(required = false) String cursor) {
+        return ApiResponse.success(knowledgeRetrievalService.listByCategoryPage(category, limit, cursor));
+    }
+
+    /**
      * 修改既有条目分类（#147U 编辑腿；`PUT /{articleId}/category`）。
      *
      * <p>强类型请求体 {@link com.chinacreator.gzcm.engine.kb.model.KnowledgeCategoryUpdateDTO}；

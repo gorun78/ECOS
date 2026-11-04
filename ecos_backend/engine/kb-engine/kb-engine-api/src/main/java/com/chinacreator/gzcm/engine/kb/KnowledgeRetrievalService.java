@@ -1,6 +1,7 @@
 package com.chinacreator.gzcm.engine.kb;
 
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeArticle;
+import com.chinacreator.gzcm.engine.kb.model.KnowledgeArticlePage;
 
 import java.util.List;
 import java.util.Map;
@@ -79,4 +80,19 @@ public interface KnowledgeRetrievalService {
      * 那会让前端筛选失效却显示成功。{@code limit} 由实现方夹紧到 [1,100]。</p>
      */
     List<KnowledgeArticle> listByCategory(String category, int limit);
+
+    /**
+     * 按七分类的<b>游标分页</b>读面（#147BA；补 §7.1.2 未做项「列表游标分页」）。
+     *
+     * <p>与 {@link #listByCategory(String, int)} 的分工：后者是「取前 N 条」的便利面（既有前端在用），
+     * 本方法是<b>可稳定翻页</b>的形态——排序键为 {@code (created_at DESC, id DESC)} 全序，
+     * 用 keyset 比较推进，不用 {@code OFFSET}（深翻页 O(n)，且并发插入会漏行/重复行）。</p>
+     *
+     * <p>{@code cursor} 为不透明串，首次调用传 {@code null}/空白取第一页；非法游标抛
+     * {@code ValidationException}（400），<b>禁</b>「非法游标当第一页」——那会让翻页静默回到开头。
+     * 分类校验与 limit 夹紧同 {@link #listByCategory(String, int)}。</p>
+     *
+     * @return 本页条目 + 下一页游标（末页为 {@code null}）
+     */
+    KnowledgeArticlePage listByCategoryPage(String category, int limit, String cursor);
 }
