@@ -98,7 +98,7 @@ public class ScenarioStatusTransitionService {
      * 事务回滚会留下一个指向「从未落库的状态」的 Git 提交。Git 与 DB 非原子（§2.9.6①），
      * 但我们至少让顺序正确：先落库提交，再归档；归档失败只记分态，不回滚业务事务。</p>
      */
-    private void archiveScenarioAfterCommit(String scenarioId, ScenarioStatus to) {
+    void archiveScenarioAfterCommit(String scenarioId, ScenarioStatus to) {
         DesignAssetArchiver archiver = archiverProvider != null ? archiverProvider.getIfAvailable() : null;
         if (archiver == null) {
             log.debug("DesignAssetArchiver 未装配，跳过 scenario 归档 id={}", scenarioId);
@@ -107,12 +107,15 @@ public class ScenarioStatusTransitionService {
         Runnable task = () -> {
             try {
                 ScenarioVO vo = scenarioService.get(scenarioId);
+                String json = ARCHIVE_MAPPER.writeValueAsString(vo);
                 ArchiveOutcome outcome = archiver.archive(GIT_REPO_SCENARIO, "scenarios", scenarioId,
-                        null, ARCHIVE_MAPPER.writeValueAsString(vo),
+                        null, json,
                         "Scenario transition to " + to.name() + " (" + scenarioId + ")", null);
                 if (outcome.status() != ArchiveOutcome.Status.ARCHIVED) {
                     log.info("scenario 归档未完成 id={} status={} reason={}",
                             scenarioId, outcome.status(), outcome.reason());
+                } else {
+                    auditScenarioArchive(scenarioId, to, json, outcome.commitId());
                 }
             } catch (Exception e) {
                 log.warn("scenario 归档异常 id={}: {}", scenarioId, e.getMessage());
@@ -127,6 +130,63 @@ public class ScenarioStatusTransitionService {
             });
         } else {
             task.run();
+        }
+    }
+
+    /**
+     * scenario 归档成功后的治理审计（§2.9.9 G5「其余发布域的 `git_commit_sha`」的 scenario 腿；#147BE）。
+     *
+     * <p>只在归档成功时调用：事件携 {@code git_repository=scenario-def} /
+     * {@code git_commit_sha=<真实提交号>} / {@code content_hash}，与 ontology、kb-rule 同口径；
+     * 归档未成功不发，免得「没归档」被读成「已发布」。投递失败只记日志，不影响业务事务
+     * （它跑在 afterCommit 里，业务已提交）。</p>
+     */
+    private void auditScenarioArchive(String scenarioId, ScenarioStatus to, String json, String commitId) {
+        try {
+            com.chinacreator.gzcm.common.audit.AuditEventContract contract =
+                    new com.chinacreator.gzcm.common.audit.AuditEventContract(
+                            "scenario-arc-" + scenarioId + "-" + to.name(),
+                            null,
+                            null,
+                            java.util.List.of(),
+                            "scenario",
+                            "scenario",
+                            scenarioId,
+                            com.chinacreator.gzcm.common.audit.AuditLevel.L3_HIGH_RISK.name(),
+                            GIT_REPO_SCENARIO,
+                            commitId,
+                            null,
+                            sha256Hex(json),
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            "APPLIED",
+                            "PUBLISH_ARCHIVED",
+                            java.time.Instant.now(),
+                            java.util.UUID.randomUUID().toString());
+            audit.recordGovernance("scenario.status.archive", scenarioId, "SUCCESS", contract.toColumns());
+        } catch (Exception e) {
+            log.warn("scenario 归档审计投递失败 id={} reason={}", scenarioId, e.getMessage());
+        }
+    }
+
+    /** 内容摘要（审计 content_hash）；无内容返回 {@code null}（不伪造空串）。 */
+    private static String sha256Hex(String content) {
+        if (content == null || content.isEmpty()) {
+            return null;
+        }
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return "sha256:" + sb;
+        } catch (java.security.NoSuchAlgorithmException e) {
+            return null;
         }
     }
 

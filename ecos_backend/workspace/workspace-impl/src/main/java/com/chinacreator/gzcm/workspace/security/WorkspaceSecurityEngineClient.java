@@ -312,6 +312,9 @@ public class WorkspaceSecurityEngineClient {
     public void audit(String action, String resource, Object result) {
         try {
             Map<String, Object> event = new LinkedHashMap<>();
+            // #147BD：消费端以 id 作主键判重（缺 id 原会整条丢弃）；这里与 ontology/kb 同口径补 id。
+            event.put("id", String.valueOf(System.currentTimeMillis() * 1000L
+                    + java.util.concurrent.ThreadLocalRandom.current().nextInt(1000)));
             event.put("eventId", UUID.randomUUID().toString());
             event.put("timestamp", Instant.now().toString());
             event.put("module", "workspace");
@@ -322,6 +325,36 @@ public class WorkspaceSecurityEngineClient {
             publishAuditEvent(event);
         } catch (Exception e) {
             log.warn("WorkspaceSecurityEngineClient.audit failed: action={} reason={}",
+                    action, e.getMessage());
+        }
+    }
+
+    /**
+     * 带治理列的审计（§2.9.9 G5 scenario 域腿；#147BE）。
+     *
+     * <p>{@code governanceColumns} 用 {@code AuditEventContract#toColumns()} 的蛇形键
+     * （git_repository/git_commit_sha/content_hash/object_type…）；消费端按白名单再筛。
+     * 基础键后写，防止治理列里的同名键改写 action/resource。</p>
+     */
+    public void auditGovernance(String action, String resource, Object result,
+                                Map<String, Object> governanceColumns) {
+        try {
+            Map<String, Object> event = new LinkedHashMap<>();
+            event.put("id", String.valueOf(System.currentTimeMillis() * 1000L
+                    + java.util.concurrent.ThreadLocalRandom.current().nextInt(1000)));
+            if (governanceColumns != null) {
+                event.putAll(governanceColumns);
+            }
+            event.put("eventId", UUID.randomUUID().toString());
+            event.put("timestamp", Instant.now().toString());
+            event.put("module", "workspace");
+            event.put("userId", currentUserId());
+            event.put("action", action);
+            event.put("resource", resource);
+            event.put("result", result == null ? "OK" : String.valueOf(result));
+            publishAuditEvent(event);
+        } catch (Exception e) {
+            log.warn("WorkspaceSecurityEngineClient.auditGovernance failed: action={} reason={}",
                     action, e.getMessage());
         }
     }

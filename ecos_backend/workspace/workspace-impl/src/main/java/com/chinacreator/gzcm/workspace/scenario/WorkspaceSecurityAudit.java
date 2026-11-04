@@ -19,4 +19,14 @@ public class WorkspaceSecurityAudit {
     public void record(String action, String resourceId, Object result) {
         securityClient.audit(action, resourceId, result);
     }
+
+    /**
+     * 带治理列的审计（§2.9.9 G5 scenario 域腿；#147BE）：发布/归档成功后把
+     * {@code git_repository}/{@code git_commit_sha}/{@code content_hash} 一并投递，
+     * 让发布证据可被对账面关联。
+     */
+    public void recordGovernance(String action, String resourceId, Object result,
+                                 java.util.Map<String, Object> governanceColumns) {
+        securityClient.auditGovernance(action, resourceId, result, governanceColumns);
+    }
 }
