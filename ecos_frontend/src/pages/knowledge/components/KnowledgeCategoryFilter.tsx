@@ -14,7 +14,7 @@ import { useTheme } from '../../../components/ThemeContext';
 import { useLanguage } from '../../../components/LanguageContext';
 import {
   KNOWLEDGE_CATEGORIES,
-  fetchArticlesByCategory,
+  fetchArticlesByCategoryPage,
   type KnowledgeArticleRow,
   type KnowledgeCategoryCode,
 } from '../services/categoryFilter';
@@ -39,13 +39,20 @@ export default function KnowledgeCategoryFilter() {
   const [rows, setRows] = useState<KnowledgeArticleRow[]>([]);
   const [state, setState] = useState<LoadState>('idle');
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  // 游标分页（#147BG）：nextCursor 为 null 表示已到末页；loadingMore 只影响「加载更多」按钮
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(false);
 
   const load = useCallback(async (category: KnowledgeCategoryCode) => {
     setState('loading');
     setErrorCode(null);
+    setNextCursor(null);
+    setLoadMoreError(false);
     try {
-      const data = await fetchArticlesByCategory(category);
-      setRows(data);
+      const page = await fetchArticlesByCategoryPage(category);
+      setRows(page.items);
+      setNextCursor(page.nextCursor);
       setState('ready');
     } catch (err) {
       setRows([]);
@@ -53,6 +60,24 @@ export default function KnowledgeCategoryFilter() {
       setState('error');
     }
   }, []);
+
+  /** 追加下一页；失败不清空已加载行（把已看到的数据一并洗掉等于倒退）。 */
+  const loadMore = useCallback(async () => {
+    if (!selected || !nextCursor || loadingMore) {
+      return;
+    }
+    setLoadingMore(true);
+    setLoadMoreError(false);
+    try {
+      const page = await fetchArticlesByCategoryPage(selected, undefined, nextCursor);
+      setRows((prev) => [...prev, ...page.items]);
+      setNextCursor(page.nextCursor);
+    } catch {
+      setLoadMoreError(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [selected, nextCursor, loadingMore]);
 
   useEffect(() => {
     if (selected) {
@@ -150,6 +175,27 @@ export default function KnowledgeCategoryFilter() {
             </li>
           ))}
         </ul>
+      )}
+
+      {state === 'ready' && rows.length > 0 && nextCursor && (
+        <div className="flex items-center gap-2 text-xs">
+          <button
+            type="button"
+            data-testid="knowledge-category-load-more"
+            disabled={loadingMore}
+            onClick={() => void loadMore()}
+            className="px-2 py-0.5 rounded border inline-flex items-center gap-1 disabled:opacity-60"
+            style={{ borderColor: styles.cardBorder, color: styles.cardText }}
+          >
+            {loadingMore ? <Loader2 className="w-3 h-3 animate-spin" /> : <Tags className="w-3 h-3" />}
+            {loadingMore ? t('knowledge.categoryLoadingMore') : t('knowledge.categoryLoadMore')}
+          </button>
+          {loadMoreError && (
+            <span data-testid="knowledge-category-load-more-error" style={{ color: styles.warningText }}>
+              {t('knowledge.categoryLoadMoreError')}
+            </span>
+          )}
+        </div>
       )}
     </section>
   );

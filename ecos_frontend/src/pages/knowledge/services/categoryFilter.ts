@@ -70,3 +70,69 @@ export async function fetchArticlesByCategory(
   const items = Array.isArray(data) ? data : (data as { data?: unknown })?.data;
   return Array.isArray(items) ? items.map((r) => toRow(r as Record<string, unknown>)) : [];
 }
+
+// ═══════════════ 游标分页（#147BA 后端 / #147BG 前端消费） ═══════════════
+
+/** 游标分页结果（与后端 `{items, nextCursor}` 逐字对齐；游标不透明，前端只回传不解析）。 */
+export interface KnowledgeArticlePage {
+  items: KnowledgeArticleRow[];
+  nextCursor: string | null;
+}
+
+/**
+ * 分页读端路径（`/by-category/page`）。
+ *
+ * <p>与 {@link categoryFilterPath} 并列而非替换：旧端点仍在用，分页只在需要「继续加载」的面生效。
+ * 空分类返回 null（后端分类必填，前端不得发无分类请求）；`limit` 夹紧 [1,100]；
+ * 游标为空白时**不带** `cursor` 参数（首屏语义）。</p>
+ */
+export function categoryPagePath(
+  category: string | null | undefined,
+  limit = DEFAULT_LIMIT,
+  cursor?: string | null,
+): string | null {
+  if (!category || !category.trim()) {
+    return null;
+  }
+  const bounded = Math.max(1, Math.min(Math.trunc(limit) || DEFAULT_LIMIT, 100));
+  const cursorPart = cursor && cursor.trim() ? `&cursor=${encodeURIComponent(cursor.trim())}` : '';
+  return `${KNOWLEDGE_BASE}/articles/by-category/page?category=${encodeURIComponent(category.trim())}&limit=${bounded}${cursorPart}`;
+}
+
+function extractPage(data: unknown): { items?: unknown; nextCursor?: unknown } {
+  if (data && typeof data === 'object') {
+    const direct = data as { items?: unknown; nextCursor?: unknown };
+    if (Array.isArray(direct.items)) {
+      return direct;
+    }
+    const wrapped = (data as { data?: { items?: unknown; nextCursor?: unknown } }).data;
+    if (wrapped && typeof wrapped === 'object') {
+      return wrapped;
+    }
+  }
+  return {};
+}
+
+/**
+ * 按分类拉取一页（游标分页）。
+ *
+ * @param cursor 上一页返回的 `nextCursor`；首屏传 null/undefined
+ * @throws KbApiError 4xx/5xx（含非法游标 400、未知分类 400）——调用方须切错误态而非空态
+ */
+export async function fetchArticlesByCategoryPage(
+  category: string,
+  limit = DEFAULT_LIMIT,
+  cursor?: string | null,
+): Promise<KnowledgeArticlePage> {
+  const path = categoryPagePath(category, limit, cursor);
+  if (!path) {
+    return { items: [], nextCursor: null };
+  }
+  const data = await kbFetchData<unknown>(path);
+  const page = extractPage(data);
+  const items = Array.isArray(page.items)
+    ? page.items.map((r) => toRow(r as Record<string, unknown>))
+    : [];
+  const rawNext = page.nextCursor == null ? '' : String(page.nextCursor).trim();
+  return { items, nextCursor: rawNext ? rawNext : null };
+}

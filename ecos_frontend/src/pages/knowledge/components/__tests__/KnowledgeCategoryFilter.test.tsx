@@ -12,16 +12,16 @@ import userEvent from '@testing-library/user-event';
 import { ThemeProvider } from '../../../../components/ThemeContext';
 import { LanguageProvider } from '../../../../components/LanguageContext';
 import KnowledgeCategoryFilter from '../KnowledgeCategoryFilter';
-import { categoryFilterPath } from '../../services/categoryFilter';
+import { categoryFilterPath, categoryPagePath } from '../../services/categoryFilter';
 import { KbApiError } from '../../services/kbFetch';
 
-const mockFetchByCategory = vi.fn();
+const mockFetchPage = vi.fn();
 
 vi.mock('../../services/categoryFilter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../services/categoryFilter')>();
   return {
     ...actual,
-    fetchArticlesByCategory: (...args: unknown[]) => mockFetchByCategory(...args),
+    fetchArticlesByCategoryPage: (...args: unknown[]) => mockFetchPage(...args),
   };
 });
 
@@ -61,32 +61,32 @@ describe('categoryFilterPath', () => {
 
 describe('KnowledgeCategoryFilter', () => {
   beforeEach(() => {
-    mockFetchByCategory.mockReset();
+    mockFetchPage.mockReset();
   });
 
   afterEach(() => {
     cleanup();
-    mockFetchByCategory.mockReset();
+    mockFetchPage.mockReset();
   });
 
   it('初始 idle：不发请求，提示先选分类', () => {
     renderPanel();
     expect(screen.getByTestId('knowledge-category-idle')).toBeTruthy();
-    expect(mockFetchByCategory).not.toHaveBeenCalled();
+    expect(mockFetchPage).not.toHaveBeenCalled();
   });
 
   it('选「规则」按闭集码 Rule 请求一次', async () => {
-    mockFetchByCategory.mockResolvedValue([]);
+    mockFetchPage.mockResolvedValue({ items: [], nextCursor: null });
     renderPanel();
 
     await userEvent.click(screen.getByRole('button', { name: '规则' }));
 
-    await waitFor(() => expect(mockFetchByCategory).toHaveBeenCalledTimes(1));
-    expect(mockFetchByCategory).toHaveBeenCalledWith('Rule');
+    await waitFor(() => expect(mockFetchPage).toHaveBeenCalledTimes(1));
+    expect(mockFetchPage).toHaveBeenCalledWith('Rule');
   });
 
   it('空结果 → 空态 + 存量未分类说明（不显示错误）', async () => {
-    mockFetchByCategory.mockResolvedValue([]);
+    mockFetchPage.mockResolvedValue({ items: [], nextCursor: null });
     renderPanel();
 
     await userEvent.click(screen.getByRole('button', { name: '规则' }));
@@ -98,7 +98,7 @@ describe('KnowledgeCategoryFilter', () => {
   });
 
   it('4xx → 错误态显示业务码并可重试（禁渲染成空态）', async () => {
-    mockFetchByCategory.mockRejectedValueOnce(new KbApiError(400, 'ECOS-KB-040', 'bad category'));
+    mockFetchPage.mockRejectedValueOnce(new KbApiError(400, 'ECOS-KB-040', 'bad category'));
     renderPanel();
 
     await userEvent.click(screen.getByRole('button', { name: '证据' }));
@@ -107,19 +107,88 @@ describe('KnowledgeCategoryFilter', () => {
     expect(err.textContent).toContain('ECOS-KB-040');
     expect(screen.queryByTestId('knowledge-category-empty')).toBeNull();
 
-    mockFetchByCategory.mockResolvedValueOnce([]);
+    mockFetchPage.mockResolvedValueOnce({ items: [], nextCursor: null });
     await userEvent.click(screen.getByRole('button', { name: '重试' }));
     await screen.findByTestId('knowledge-category-empty');
-    expect(mockFetchByCategory).toHaveBeenCalledTimes(2);
+    expect(mockFetchPage).toHaveBeenCalledTimes(2);
   });
 
   it('有数据 → 渲染列表行标题', async () => {
-    mockFetchByCategory.mockResolvedValue([{ id: 'a-1', title: '审批规则说明', status: 'active' }]);
+    mockFetchPage.mockResolvedValue({
+      items: [{ id: 'a-1', title: '审批规则说明', status: 'active' }],
+      nextCursor: null,
+    });
     renderPanel();
 
     await userEvent.click(screen.getByRole('button', { name: '规则' }));
 
     const list = await screen.findByTestId('knowledge-category-list');
     expect(list.textContent).toContain('审批规则说明');
+  });
+});
+
+describe('categoryPagePath', () => {
+  it('分类必填；走 /page 子路径；首屏不带 cursor', () => {
+    expect(categoryPagePath(null)).toBeNull();
+    expect(categoryPagePath('   ')).toBeNull();
+    const path = categoryPagePath('Rule', 20);
+    expect(path).toContain('/knowledge/articles/by-category/page');
+    expect(path).toContain('category=Rule');
+    expect(path).not.toContain('cursor=');
+  });
+
+  it('游标编码回传；空白游标视为首屏', () => {
+    expect(categoryPagePath('Fact', 20, 'abc+/=')).toContain('cursor=abc%2B%2F%3D');
+    expect(categoryPagePath('Fact', 20, '  ')).not.toContain('cursor=');
+    expect(categoryPagePath('Fact', 500)).toContain('limit=100');
+  });
+});
+
+describe('KnowledgeCategoryFilter 游标分页（#147BG）', () => {
+  beforeEach(() => {
+    mockFetchPage.mockReset();
+  });
+
+  afterEach(() => {
+    cleanup();
+    mockFetchPage.mockReset();
+  });
+
+  it('满页给游标 → 显示加载更多；点击按游标追加，到底后隐藏按钮', async () => {
+    mockFetchPage.mockResolvedValueOnce({ items: [{ id: 'a-1', title: '第一条' }], nextCursor: 'c-1' });
+    mockFetchPage.mockResolvedValueOnce({ items: [{ id: 'a-2', title: '第二条' }], nextCursor: null });
+    renderPanel();
+
+    await userEvent.click(screen.getByRole('button', { name: '规则' }));
+    const more = await screen.findByTestId('knowledge-category-load-more');
+    await userEvent.click(more);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('knowledge-category-list').textContent).toContain('第二条'));
+    expect(screen.getByTestId('knowledge-category-list').textContent).toContain('第一条');
+    expect(mockFetchPage).toHaveBeenLastCalledWith('Rule', undefined, 'c-1');
+    expect(screen.queryByTestId('knowledge-category-load-more')).toBeNull();
+  });
+
+  it('末页（nextCursor=null）→ 不显示加载更多', async () => {
+    mockFetchPage.mockResolvedValue({ items: [{ id: 'a-1', title: '唯一一条' }], nextCursor: null });
+    renderPanel();
+
+    await userEvent.click(screen.getByRole('button', { name: '规则' }));
+    await screen.findByTestId('knowledge-category-list');
+
+    expect(screen.queryByTestId('knowledge-category-load-more')).toBeNull();
+  });
+
+  it('加载更多失败 → 保留已加载行并显示错误提示（不清空列表）', async () => {
+    mockFetchPage.mockResolvedValueOnce({ items: [{ id: 'a-1', title: '第一条' }], nextCursor: 'c-1' });
+    mockFetchPage.mockRejectedValueOnce(new KbApiError(500, 'ECOS-KB-050', 'boom'));
+    renderPanel();
+
+    await userEvent.click(screen.getByRole('button', { name: '规则' }));
+    await userEvent.click(await screen.findByTestId('knowledge-category-load-more'));
+
+    await screen.findByTestId('knowledge-category-load-more-error');
+    expect(screen.getByTestId('knowledge-category-list').textContent).toContain('第一条');
   });
 });
