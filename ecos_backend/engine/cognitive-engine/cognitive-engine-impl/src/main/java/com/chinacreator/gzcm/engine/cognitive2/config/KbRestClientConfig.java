@@ -7,6 +7,7 @@ import com.chinacreator.gzcm.engine.kb.KnowledgeGraphService;
 import com.chinacreator.gzcm.engine.kb.KnowledgeRetrievalService;
 import com.chinacreator.gzcm.engine.kb.model.ComplianceRule;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeArticle;
+import com.chinacreator.gzcm.engine.kb.model.KnowledgeArticlePage;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeEdge;
 import com.chinacreator.gzcm.engine.kb.model.KnowledgeNode;
 import com.chinacreator.gzcm.runtime.access.endpoint.ServiceEndpointResolver;
@@ -389,6 +390,33 @@ public class KbRestClientConfig {
             public KnowledgeArticle updateArticleCategory(String articleId, String category, String ruleRef) {
                 log.warn("KB REST updateArticleCategory 不支持（aiming 进程只读），降级返回 null: id={}", articleId);
                 return null;
+            }
+
+            /** 游标分页代理（#147BF）：转发 kb 的 {@code /by-category/page}，原样透出 items/nextCursor。 */
+            @Override
+            public KnowledgeArticlePage listByCategoryPage(String category, int limit, String cursor) {
+                try {
+                    String url = kbBase + "/knowledge/articles/by-category/page?category=" + enc(category)
+                            + "&limit=" + limit
+                            + (cursor == null || cursor.isBlank() ? "" : "&cursor=" + enc(cursor));
+                    Map<String, Object> resp = rt.getForObject(url, Map.class);
+                    Object data = resp == null ? null : resp.get("data");
+                    if (!(data instanceof Map)) {
+                        return new KnowledgeArticlePage(Collections.emptyList(), null);
+                    }
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> page = (Map<String, Object>) data;
+                    List<KnowledgeArticle> items = page.get("items") instanceof List
+                            ? objectMapper.convertValue(page.get("items"),
+                                    new TypeReference<List<KnowledgeArticle>>() {
+                                    })
+                            : Collections.emptyList();
+                    Object next = page.get("nextCursor");
+                    return new KnowledgeArticlePage(items, next == null ? null : String.valueOf(next));
+                } catch (Exception e) {
+                    log.warn("KB REST listByCategoryPage 失败: category={}, error={}", category, e.getMessage());
+                    return new KnowledgeArticlePage(Collections.emptyList(), null);
+                }
             }
         };
     }
