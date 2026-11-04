@@ -99,17 +99,14 @@ public class ScenarioStatusTransitionService {
      * 但我们至少让顺序正确：先落库提交，再归档；归档失败只记分态，不回滚业务事务。</p>
      */
     void archiveScenarioAfterCommit(String scenarioId, ScenarioStatus to) {
-        DesignAssetArchiver archiver = archiverProvider != null ? archiverProvider.getIfAvailable() : null;
-        if (archiver == null) {
-            // VG-5（§2.9.9）：未装配是**如实降级**，必须可见——debug 级等于静默跳过。
-            log.warn("scenario 归档腿 NOT_AVAILABLE（DesignAssetArchiver 未装配，禁读成已归档）id={}", scenarioId);
-            return;
-        }
+        // VG-5（#147BL）：归档器缺席由 OptionalArchiver 统一转成 not_available + WARN。
+        com.chinacreator.gzcm.runtime.access.git.archive.OptionalArchiver gate =
+                com.chinacreator.gzcm.runtime.access.git.archive.OptionalArchiver.of(archiverProvider);
         Runnable task = () -> {
             try {
                 ScenarioVO vo = scenarioService.get(scenarioId);
                 String json = ARCHIVE_MAPPER.writeValueAsString(vo);
-                ArchiveOutcome outcome = archiver.archive(GIT_REPO_SCENARIO, "scenarios", scenarioId,
+                ArchiveOutcome outcome = gate.archive(GIT_REPO_SCENARIO, "scenarios", scenarioId,
                         null, json,
                         "Scenario transition to " + to.name() + " (" + scenarioId + ")", null);
                 if (outcome.status() != ArchiveOutcome.Status.ARCHIVED) {

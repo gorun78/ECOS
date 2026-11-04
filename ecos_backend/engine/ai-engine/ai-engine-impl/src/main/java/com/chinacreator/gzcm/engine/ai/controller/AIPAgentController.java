@@ -30,6 +30,7 @@ import com.chinacreator.gzcm.engine.ai.service.AgentTemplateService;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.entity.AgentRegistryEntity;
 import com.chinacreator.gzcm.runtime.access.git.archive.ArchiveOutcome;
 import com.chinacreator.gzcm.runtime.access.git.archive.DesignAssetArchiver;
+import com.chinacreator.gzcm.runtime.access.git.archive.OptionalArchiver;
 import com.chinacreator.gzcm.engine.ai.agent.mesh.repository.AgentRegistryRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -170,14 +171,12 @@ public class AIPAgentController {
      * 不把「没归档」写成「已归档」。</p>
      */
     private void archiveAgent(AgentRegistryEntity entity, String message) {
-        if (designAssetArchiver == null) {
-            // VG-5（§2.9.9）：未装配是**如实降级**，必须可见——debug 级等于静默跳过。
-            log.warn("agent 归档腿 NOT_AVAILABLE（DesignAssetArchiver 未装配，禁读成已归档）id={}", entity.getId());
-            return;
-        }
         try {
-            ArchiveOutcome outcome = designAssetArchiver.archive(GIT_REPO_AGENT, "agents", entity.getId(),
-                    null, mapper.writeValueAsString(entity), message, null);
+            // VG-5（#147BL）：归档器缺席由 OptionalArchiver 统一转成 not_available + WARN，
+            // 不再各写一段「取不到就跳过」——跳过没有返回值，调用链上看不见。
+            ArchiveOutcome outcome = OptionalArchiver.ofNullable(designAssetArchiver)
+                    .archive(GIT_REPO_AGENT, "agents", entity.getId(), null,
+                            mapper.writeValueAsString(entity), message, null);
             if (outcome.status() != ArchiveOutcome.Status.ARCHIVED) {
                 log.info("agent 归档未完成 id={} status={} reason={}",
                         entity.getId(), outcome.status(), outcome.reason());

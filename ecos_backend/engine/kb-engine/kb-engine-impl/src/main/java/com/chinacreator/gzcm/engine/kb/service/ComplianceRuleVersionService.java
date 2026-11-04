@@ -116,14 +116,11 @@ public class ComplianceRuleVersionService {
 
     /** 归档规则快照（KB 属主的 {@code kb-asset-tree} 通道）；{@code versionNo} 与版本行的 {@code version_number} 同值。 */
     private ArchiveOutcome archive(ComplianceRule rule, String json, int versionNo, String approvedBy) {
-        DesignAssetArchiver archiver = availableArchiver();
-        if (archiver == null) {
-            log.info("设计资产归档器未装配，跳过 kb 归档（kb-asset-tree）ruleId={}", rule.getId());
-            return ArchiveOutcome.notAvailable("DesignAssetArchiver 未装配");
-        }
-        ArchiveOutcome outcome = archiver.archive(GIT_REPO_KB, GIT_ASSET_TYPE_RULES, rule.getId(),
-                String.valueOf(versionNo), json,
-                "Snapshot compliance rule " + rule.getId() + " v" + versionNo, approvedBy);
+        // VG-5（#147BL）：统一经 OptionalArchiver——归档器缺席即 not_available + WARN，
+        // 不再各域各写一段「取不到就跳过」（跳过没有返回值，调用链上看不见）。
+        ArchiveOutcome outcome = com.chinacreator.gzcm.runtime.access.git.archive.OptionalArchiver.of(archiverProvider)
+                .archive(GIT_REPO_KB, GIT_ASSET_TYPE_RULES, rule.getId(), String.valueOf(versionNo), json,
+                        "Snapshot compliance rule " + rule.getId() + " v" + versionNo, approvedBy);
         if (outcome.status() == ArchiveOutcome.Status.FAILED) {
             log.warn("kb 规则归档失败 ruleId={} reason={}", rule.getId(), outcome.reason());
         }

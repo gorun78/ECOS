@@ -11,6 +11,7 @@ import com.chinacreator.gzcm.engine.cognitive2.service.calc.ModelContentHasher;
 import com.chinacreator.gzcm.engine.cognitive2.service.scenario.CognitiveGuardException;
 import com.chinacreator.gzcm.runtime.access.git.archive.ArchiveOutcome;
 import com.chinacreator.gzcm.runtime.access.git.archive.DesignAssetArchiver;
+import com.chinacreator.gzcm.runtime.access.git.archive.OptionalArchiver;
 import com.chinacreator.gzcm.runtime.core.cache.CacheJson;
 import com.chinacreator.gzcm.runtime.core.cache.CacheKey;
 import com.chinacreator.gzcm.runtime.core.cache.RuntimeCacheManager;
@@ -341,12 +342,6 @@ public class ModelRegistryService {
      * 分态记录——禁止把「库内已升格」写成「已归档」。</p>
      */
     private void archivePublishedModel(String rowId, String publishedBy, Map<String, Object> row) {
-        DesignAssetArchiver archiver = archiverProvider != null ? archiverProvider.getIfAvailable() : null;
-        if (archiver == null) {
-            // VG-5（§2.9.9）：未装配是**如实降级**，必须可见——info 级在默认日志下等于静默。
-            log.warn("cognitive 归档腿 NOT_AVAILABLE（DesignAssetArchiver 未装配，禁读成已归档）rowId={}", rowId);
-            return;
-        }
         String version = asString(row.get("version_no"));
         if (version == null || version.isBlank()) {
             version = asString(row.get("version"));
@@ -358,8 +353,10 @@ public class ModelRegistryService {
             log.warn("认知模型归档序列化失败 rowId={}: {}", rowId, e.getMessage());
             return;
         }
-        ArchiveOutcome outcome = archiver.archive(GIT_REPO_COGNITIVE, "models", rowId,
-                version, json, "Publish cognitive model " + rowId, publishedBy);
+        // VG-5（#147BL）：归档器缺席由 OptionalArchiver 统一转成 not_available + WARN。
+        ArchiveOutcome outcome = OptionalArchiver.of(archiverProvider)
+                .archive(GIT_REPO_COGNITIVE, "models", rowId, version, json,
+                        "Publish cognitive model " + rowId, publishedBy);
         if (outcome.status() != ArchiveOutcome.Status.ARCHIVED) {
             log.info("认知模型归档未完成 rowId={} status={} reason={}",
                     rowId, outcome.status(), outcome.reason());
