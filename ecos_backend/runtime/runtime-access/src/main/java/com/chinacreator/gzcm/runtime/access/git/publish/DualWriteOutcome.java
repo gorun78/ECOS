@@ -123,7 +123,13 @@ public final class DualWriteOutcome {
         return gitLeg.isIndeterminate() || dbLeg.isIndeterminate() || auditLeg.isIndeterminate();
     }
 
-    /** 是否<b>至少一条</b>腿确认成功（全腿皆败时不是「部分」，是「全败」）。 */
+    /**
+     * 是否<b>至少一条写入腿</b>（归档腿或权威库腿）确认成功。
+     *
+     * <p>审计腿单独成功<b>不</b>算「有进展」：一条只写了审计、权威库与仓库都没动的记录
+     * 不构成「发布成功了一半」，也不构成「部分失败」，它对应的结论是「什么都没应用」＝
+     * {@link PublishState#FAILED}。全写入腿皆败/皆不适用时同理。</p>
+     */
     public boolean anyLegSucceeded() {
         return gitLeg.isSuccess() || dbLeg.isSuccess();
     }
