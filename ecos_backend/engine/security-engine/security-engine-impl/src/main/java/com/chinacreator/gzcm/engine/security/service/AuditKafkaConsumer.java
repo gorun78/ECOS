@@ -89,10 +89,20 @@ public class AuditKafkaConsumer {
      * 幂等落库。PG 使用 {@code ON CONFLICT (id) DO NOTHING}；非 PG 部署形态退化为先 SELECT 再 INSERT。
      */
     private void insertAuditLog(Map<String, Object> evt) {
-        String id = String.valueOf(evt.get("id"));
+        String id = asStr(evt.get("id"));
         if (id == null || id.isBlank() || "null".equals(id)) {
-            log.warn("AuditKafkaConsumer: 审计事件缺 id, 丢弃 payload keys={}", evt.keySet());
-            return;
+            // #147BD：原实现缺 id 即整条丢弃。全仓多处 AUDIT 发布器只放 eventId（kb/workspace 等），
+            // 于是这些域的证据从未落库且无人察觉（#147BB 只在 kb 现身，实为同族）。
+            // 现在：有 eventId 就派生**确定性**主键（同 eventId ⇒ 同 id，重放幂等），
+            // 只有 id 与 eventId 双缺才丢弃——丢证据是最高代价，宁可在消费端兜住并告警。
+            String eventId = asStr(evt.get("eventId"));
+            if (eventId == null || eventId.isBlank()) {
+                log.warn("AuditKafkaConsumer: 审计事件缺 id 且缺 eventId, 丢弃 payload keys={}", evt.keySet());
+                return;
+            }
+            id = deriveIdFromEventId(eventId);
+            log.warn("AuditKafkaConsumer: 审计事件缺 id，按 eventId 派生确定性主键 id={} action={}（请让发布端补 id）",
+                    id, evt.get("action"));
         }
         String userId = asStr(evt.get("userId"));
         String username = asStr(evt.get("username"));
@@ -145,6 +155,21 @@ public class AuditKafkaConsumer {
 
     private static String asStr(Object o) {
         return o == null ? null : o.toString();
+    }
+
+    /**
+     * 由 {@code eventId} 派生确定性主键（#147BD）。
+     *
+     * <p>FNV-1a 64 位散列取 17 位十进制、前缀 {@code 9}：同 eventId 恒得同 id ⇒ 重放幂等；
+     * 前缀 9 与发布端「毫秒×1000 + 随机」型 id（首位为 1）不相撞。</p>
+     */
+    static String deriveIdFromEventId(String eventId) {
+        long h = 0xcbf29ce484222325L;
+        for (int i = 0; i < eventId.length(); i++) {
+            h ^= eventId.charAt(i);
+            h *= 0x100000001b3L;
+        }
+        return "9" + String.format("%017d", (h & Long.MAX_VALUE) % 100_000_000_000_000_000L);
     }
 
     /** 暴露给单元测试（@VisibleForTesting）。 */
