@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.kb.support;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.exception.DataBridgeException;
+import com.chinacreator.gzcm.common.exception.ValidationException;
 import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes.DomainException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.core.annotation.Order;
@@ -54,6 +55,22 @@ public class KbErrorAdvice {
         String code = ex.getCode() == null ? "ECOS-KB-500" : ex.getCode();
         return ResponseEntity.status(status)
                 .body(ApiResponse.error(status, code, ex.getMessage()));
+    }
+
+    /**
+     * 入参校验失败 → 400 + {@code ECOS-KB-010}（#147BS）。
+     *
+     * <p>此前 {@code ValidationException} 落 {@link #onBridge}：状态行 400 是对的，但机读码是
+     * {@code ECOS-KB-501}「数据桥域异常」——把「调用方参数错」标成「别家领域异常」，
+     * 前端按码分派会走错分支（活体实测：非法游标 → 400 + {@code ECOS-KB-501}）。本腿更具体
+     * （{@code ValidationException} 是 {@code DataBridgeException} 子类），按类型精确度优先命中；
+     * 状态值仍走 common-api 单源。</p>
+     */
+    @ExceptionHandler(ValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> onValidation(ValidationException ex) {
+        int status = DataBridgeException.resolveHttpStatus(ex.getHttpStatus());
+        return ResponseEntity.status(status)
+                .body(ApiResponse.error(status, KbErrorCodes.REQUEST_INVALID.code(), ex.getMessage()));
     }
 
     /**

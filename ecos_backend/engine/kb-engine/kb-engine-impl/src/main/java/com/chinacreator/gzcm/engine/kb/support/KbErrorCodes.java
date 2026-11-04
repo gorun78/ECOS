@@ -19,6 +19,16 @@ public final class KbErrorCodes {
     private KbErrorCodes() {
     }
 
+    // ── 入参 ───────────────────────────────────────────────────
+    /**
+     * 请求参数不合法（校验失败、游标非法等）→ 400 + 本域机读码。
+     *
+     * <p><b>#147BS</b>：此前 {@code ValidationException} 落 {@link KbErrorAdvice} 的
+     * {@code onBridge} 兜底，状态行 400 正确、但机读码是 {@code ECOS-KB-501}（「数据桥域异常」）——
+     * 把「调用方参数错」标成了「别家领域异常」，前端按码分派会走错分支。故单列一码。</p>
+     */
+    public static final KbError REQUEST_INVALID = new KbError(400, "ECOS-KB-010");
+
     // ── 快照 / 映射 ─────────────────────────────────────────────
     /** C.1 ① 本体快照缺失/版本不可用（拒绝抽取，禁无约束自由抽取）。 */
     public static final KbError SNAPSHOT_MISSING = new KbError(409, "ECOS-KB-011");
