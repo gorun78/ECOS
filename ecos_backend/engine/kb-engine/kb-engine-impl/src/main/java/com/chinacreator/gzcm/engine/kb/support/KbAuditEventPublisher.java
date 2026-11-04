@@ -54,13 +54,35 @@ public class KbAuditEventPublisher {
      * @throws KbErrorCodes.DomainException eventBus 缺失或 publish 抛异常时（ECOS-KB-022）
      */
     public void audit(String action, Object attr, String resource) {
+        audit(action, attr, resource, null, null);
+    }
+
+    /**
+     * 带结果与治理列的审计事件（#147BB / §2.9.9 G5 收口腿）。
+     *
+     * <p>{@code governanceColumns} 用 {@code AuditEventContract#toColumns()} 的蛇形键
+     * （如 {@code git_repository}/{@code git_commit_sha}/{@code object_type}）；消费端
+     * {@code AuditGovernancePayload} 会按白名单再筛一次，这里不做取舍、不拼列名。</p>
+     */
+    public void audit(String action, Object attr, String resource, String result,
+                      Map<String, Object> governanceColumns) {
         Map<String, Object> event = new LinkedHashMap<>();
+        // #147BB：消费端 AuditKafkaConsumer 以 id 作主键判重，缺 id 的事件整条丢弃。
+        // 本类原先只放 eventId ⇒ kb 六个调用点的审计证据从未落库（ontology 侧 #147M 修过同一缺陷）。
+        event.put("id", String.valueOf(System.currentTimeMillis() * 1000L
+                + java.util.concurrent.ThreadLocalRandom.current().nextInt(1000)));
+        if (governanceColumns != null) {
+            event.putAll(governanceColumns);
+        }
         event.put("eventId", UUID.randomUUID().toString());
         event.put("timestamp", System.currentTimeMillis());
         event.put("userId", currentUserIdOrAnonymous());
         event.put("tenantId", currentTenantIdOrDefault());
         event.put("action", action);
         event.put("resource", resource);
+        if (result != null) {
+            event.put("result", result);
+        }
         event.put("attr", attr == null ? Map.of() : attr);
 
         if (eventBus == null) {

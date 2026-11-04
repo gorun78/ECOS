@@ -42,6 +42,10 @@ public class ComplianceRuleVersionService {
     /** 设计资产归档器（#147E）；未装配时归档腿显式 NOT_APPLICABLE，不影响版本入库。 */
     private final ObjectProvider<DesignAssetArchiver> archiverProvider;
 
+    /** 治理审计发布器（§2.9.9 G5 rule 域收口腿）；未装配时本地 log 兜底，不阻断版本入库。 */
+    @Autowired(required = false)
+    private com.chinacreator.gzcm.engine.kb.support.KbAuditEventPublisher auditPublisher;
+
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule());
 
@@ -106,6 +110,7 @@ public class ComplianceRuleVersionService {
         }
         log.info("kb 规则版本归档引用已落 versionId={} ruleId={} version={} git_ref={}",
                 versionId, existing.getId(), archivedVersion, outcome.commitId());
+        auditRuleVersionPublish(existing, archivedVersion, outcome.commitId(), approvedBy, json);
         return outcome;
     }
 
@@ -194,6 +199,74 @@ public class ComplianceRuleVersionService {
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize ComplianceRule to JSON: id={}", rule.getId(), e);
             return "{}";
+        }
+    }
+
+    /**
+     * 规则版本发布的治理审计（§2.9.9 G5「其余发布域的 `git_commit_sha`」的 rule 域腿）。
+     *
+     * <p>只在<b>归档成功且 git_ref 已落</b>之后调用：审计事件携带
+     * {@code git_repository=kb-asset-tree} / {@code git_commit_sha=实际提交号} /
+     * {@code content_hash}，使发布证据可被 {@code PublishAuditLookup} 关联；归档没成就不发，
+     * 免得「没归档」被读成「已发布」。</p>
+     *
+     * <p>投递失败按 kb 先例降级 {@code log.error}、不阻断版本入库（审计是证据腿，不是业务前置）。</p>
+     */
+    private void auditRuleVersionPublish(ComplianceRule rule, int versionNo, String commitId,
+                                        String approvedBy, String json) {
+        if (auditPublisher == null) {
+            log.warn("[AUDIT-LOCAL-FALLBACK] 治理审计发布器未装配（rule.version.publish 未投递）"
+                    + " ruleId={} version={} git_ref={}", rule.getId(), versionNo, commitId);
+            return;
+        }
+        try {
+            com.chinacreator.gzcm.common.audit.AuditEventContract contract =
+                    new com.chinacreator.gzcm.common.audit.AuditEventContract(
+                            "rule-ver-" + rule.getId() + "-" + versionNo,
+                            null,
+                            approvedBy,
+                            List.of(),
+                            "knowledge",
+                            "rule_version",
+                            rule.getId(),
+                            com.chinacreator.gzcm.common.audit.AuditLevel.L3_HIGH_RISK.name(),
+                            GIT_REPO_KB,
+                            commitId,
+                            null,
+                            sha256Hex(json),
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            "APPLIED",
+                            "PUBLISH_ARCHIVED",
+                            java.time.Instant.now(),
+                            UUID.randomUUID().toString());
+            auditPublisher.audit("rule.version.publish",
+                    Map.of("ruleId", rule.getId(), "version", versionNo),
+                    "kb-rule-version", "SUCCESS", contract.toColumns());
+        } catch (RuntimeException e) {
+            log.error("规则版本发布审计投递失败（版本已入库、git_ref 已落；证据见本地兜底 log）"
+                    + " ruleId={} version={} reason={}", rule.getId(), versionNo, e.getMessage());
+        }
+    }
+
+    /** 内容摘要（审计 content_hash）；无内容返回 {@code null}（不伪造空串）。 */
+    private static String sha256Hex(String content) {
+        if (content == null || content.isEmpty()) {
+            return null;
+        }
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return "sha256:" + sb;
+        } catch (java.security.NoSuchAlgorithmException e) {
+            return null;
         }
     }
 }
