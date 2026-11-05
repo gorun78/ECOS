@@ -1,5 +1,7 @@
 package com.chinacreator.gzcm.buszhi.workflow;
 
+import com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowTaskStatisticsVO;
+import com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowTaskVO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -35,15 +37,15 @@ public class WorkflowTaskService {
 
     // ── 我的任务列表 ──
 
-    public List<Map<String, Object>> listTasks(String assignee, int limit) {
+    public List<WorkflowTaskVO> listTasks(String assignee, int limit) {
         if (assignee != null && !assignee.isBlank()) {
-            return taskRepo.findByAssignee(assignee, limit).stream().map(this::toMap).collect(Collectors.toList());
+            return taskRepo.findByAssignee(assignee, limit).stream().map(this::toVO).collect(Collectors.toList());
         }
-        return taskRepo.findUnassigned(limit).stream().map(this::toMap).collect(Collectors.toList());
+        return taskRepo.findUnassigned(limit).stream().map(this::toVO).collect(Collectors.toList());
     }
 
-    public Optional<Map<String, Object>> getTask(String taskId) {
-        return taskRepo.findById(taskId).map(this::toMap);
+    public Optional<WorkflowTaskVO> getTask(String taskId) {
+        return taskRepo.findById(taskId).map(this::toVO);
     }
 
     // ── 创建任务（引擎内部调用） ──
@@ -72,7 +74,7 @@ public class WorkflowTaskService {
 
     // ── 签收 ──
 
-    public Optional<Map<String, Object>> claimTask(String taskId, String userId) {
+    public Optional<WorkflowTaskVO> claimTask(String taskId, String userId) {
         Optional<WorkflowTaskEntity> taskOpt = taskRepo.findById(taskId);
         if (taskOpt.isEmpty()) return Optional.empty();
         if (!"New".equals(taskOpt.get().getStatus())) return Optional.empty();
@@ -80,12 +82,12 @@ public class WorkflowTaskService {
         taskRepo.claim(taskId, userId);
         logRepo.log(taskOpt.get().getInstanceId(), taskOpt.get().getNodeId(), "userTask",
             "TaskClaimed", "任务被签收: " + taskOpt.get().getTitle(), toJson(Map.of("userId", userId)), null, null);
-        return taskRepo.findById(taskId).map(this::toMap);
+        return taskRepo.findById(taskId).map(this::toVO);
     }
 
     // ── 完成 ──
 
-    public Optional<Map<String, Object>> completeTask(String taskId, Map<String, Object> body) {
+    public Optional<WorkflowTaskVO> completeTask(String taskId, Map<String, Object> body) {
         Optional<WorkflowTaskEntity> taskOpt = taskRepo.findById(taskId);
         if (taskOpt.isEmpty()) return Optional.empty();
 
@@ -97,61 +99,55 @@ public class WorkflowTaskService {
         taskRepo.complete(taskId, result, completedBy);
         logRepo.log(task.getInstanceId(), task.getNodeId(), "userTask",
             "TaskCompleted", "任务完成: " + task.getTitle(), result, null, null);
-        return taskRepo.findById(taskId).map(this::toMap);
+        return taskRepo.findById(taskId).map(this::toVO);
     }
 
     // ── 转签 ──
 
-    public Optional<Map<String, Object>> transferTask(String taskId, String newAssignee) {
+    public Optional<WorkflowTaskVO> transferTask(String taskId, String newAssignee) {
         Optional<WorkflowTaskEntity> taskOpt = taskRepo.findById(taskId);
         if (taskOpt.isEmpty()) return Optional.empty();
 
         taskRepo.transfer(taskId, newAssignee);
         logRepo.log(taskOpt.get().getInstanceId(), taskOpt.get().getNodeId(), "userTask",
             "TaskTransferred", "任务转签 → " + newAssignee, null, null, null);
-        return taskRepo.findById(taskId).map(this::toMap);
+        return taskRepo.findById(taskId).map(this::toVO);
     }
 
     // ── 驳回 ──
 
-    public Optional<Map<String, Object>> rejectTask(String taskId, String reason) {
+    public Optional<WorkflowTaskVO> rejectTask(String taskId, String reason) {
         Optional<WorkflowTaskEntity> taskOpt = taskRepo.findById(taskId);
         if (taskOpt.isEmpty()) return Optional.empty();
 
         taskRepo.reject(taskId, toJson(Map.of("reason", reason != null ? reason : "")));
         logRepo.log(taskOpt.get().getInstanceId(), taskOpt.get().getNodeId(), "userTask",
             "TaskRejected", "任务被驳回: " + reason, null, null, null);
-        return taskRepo.findById(taskId).map(this::toMap);
+        return taskRepo.findById(taskId).map(this::toVO);
     }
 
     // ── 统计 ──
 
-    public Map<String, Object> getStatistics(String userId) {
-        Map<String, Object> stats = new LinkedHashMap<>();
+    public WorkflowTaskStatisticsVO getStatistics(String userId) {
         // 简化统计
-        stats.put("total", 0);
-        stats.put("pending", 0);
-        stats.put("inProgress", 0);
-        stats.put("completed", 0);
-        return stats;
+        return new WorkflowTaskStatisticsVO(0, 0, 0, 0);
     }
 
     // ── helpers ──
 
-    private Map<String, Object> toMap(WorkflowTaskEntity entity) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", entity.getId());
-        m.put("instanceId", entity.getInstanceId());
-        m.put("nodeId", entity.getNodeId());
-        m.put("taskType", entity.getTaskType());
-        m.put("title", entity.getTitle());
-        m.put("assignee", entity.getAssignee());
-        m.put("status", entity.getStatus());
-        m.put("priority", entity.getPriority());
-        m.put("dueDate", entity.getDueDate() != null ? entity.getDueDate().toString() : null);
-        m.put("completedAt", entity.getCompletedAt() != null ? entity.getCompletedAt().toString() : null);
-        m.put("createdAt", entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null);
-        return m;
+    private WorkflowTaskVO toVO(WorkflowTaskEntity entity) {
+        return new WorkflowTaskVO(
+                entity.getId(),
+                entity.getInstanceId(),
+                entity.getNodeId(),
+                entity.getTaskType(),
+                entity.getTitle(),
+                entity.getAssignee(),
+                entity.getStatus(),
+                entity.getPriority(),
+                entity.getDueDate() != null ? entity.getDueDate().toString() : null,
+                entity.getCompletedAt() != null ? entity.getCompletedAt().toString() : null,
+                entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null);
     }
 
     private String toJson(Object obj) {

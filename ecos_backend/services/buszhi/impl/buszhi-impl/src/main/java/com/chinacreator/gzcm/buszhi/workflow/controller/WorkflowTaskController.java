@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.buszhi.workflow.WorkflowTaskService;
+import com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowTaskListVO;
+import com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowTaskStatisticsVO;
+import com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowTaskVO;
 
 /**
  * 任务中心 REST API — 我的任务/签收/完成/转签/驳回。
@@ -37,25 +40,22 @@ public class WorkflowTaskController {
     }
 
     @GetMapping
-    public ApiResponse<Map<String, Object>> listTasks(
+    public ApiResponse<WorkflowTaskListVO> listTasks(
             @RequestParam(required = false) String assignee,
             @RequestParam(defaultValue = "50") int limit) {
-        List<Map<String, Object>> tasks = taskService.listTasks(assignee, limit);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("data", tasks);
-        result.put("total", tasks.size());
-        return ApiResponse.success(result);
+        List<WorkflowTaskVO> tasks = taskService.listTasks(assignee, limit);
+        return ApiResponse.success(new WorkflowTaskListVO(tasks, tasks.size()));
     }
 
     @GetMapping("/{taskId}")
-    public ApiResponse<Map<String, Object>> getTask(@PathVariable String taskId) {
+    public ApiResponse<WorkflowTaskVO> getTask(@PathVariable String taskId) {
         return taskService.getTask(taskId)
             .map(ApiResponse::success)
             .orElseGet(() -> ApiResponse.notFound("WF-009: 任务 " + taskId + " 不存在"));
     }
 
     @PostMapping("/{taskId}/claim")
-    public ApiResponse<Map<String, Object>> claimTask(
+    public ApiResponse<WorkflowTaskVO> claimTask(
             @PathVariable String taskId,
             @RequestBody Map<String, Object> body) {
         String userId = String.valueOf(body.getOrDefault("userId", "system"));
@@ -68,7 +68,7 @@ public class WorkflowTaskController {
     }
 
     @PostMapping("/{taskId}/complete")
-    public ApiResponse<Map<String, Object>> completeTask(
+    public ApiResponse<WorkflowTaskVO> completeTask(
             @PathVariable String taskId,
             @RequestBody Map<String, Object> body) {
         return taskService.completeTask(taskId, body)
@@ -80,7 +80,7 @@ public class WorkflowTaskController {
     }
 
     @PostMapping("/{taskId}/transfer")
-    public ApiResponse<Map<String, Object>> transferTask(
+    public ApiResponse<WorkflowTaskVO> transferTask(
             @PathVariable String taskId,
             @RequestBody Map<String, Object> body) {
         String targetUserId = String.valueOf(body.getOrDefault("targetUserId", ""));
@@ -96,7 +96,7 @@ public class WorkflowTaskController {
     }
 
     @PostMapping("/{taskId}/reject")
-    public ApiResponse<Map<String, Object>> rejectTask(
+    public ApiResponse<WorkflowTaskVO> rejectTask(
             @PathVariable String taskId,
             @RequestBody(required = false) Map<String, Object> body) {
         String reason = body != null ? String.valueOf(body.getOrDefault("reason", "")) : "用户驳回";
@@ -109,9 +109,8 @@ public class WorkflowTaskController {
     }
 
     @GetMapping("/statistics")
-    public ApiResponse<Map<String, Object>> getStatistics(
+    public ApiResponse<WorkflowTaskStatisticsVO> getStatistics(
             @RequestParam(required = false) String userId) {
-        Map<String, Object> stats = taskService.getStatistics(userId);
-        return ApiResponse.success(stats);
+        return ApiResponse.success(taskService.getStatistics(userId));
     }
 }
