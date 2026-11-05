@@ -18,6 +18,7 @@ import com.chinacreator.gzcm.engine.ai.wagent.event.WAgentEvent;
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentBudgetService.BudgetSnapshot;
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentBudgetService.Consumption;
 import com.chinacreator.gzcm.engine.ai.wagent.readiness.ReadinessService;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -389,37 +390,46 @@ public class WAgentOrchestrator {
         return run;
     }
 
+    /** 时间线事件行（4 键，旧 Map 逐键同名同序）。 */
+    public record TimelineEventVO(@JsonProperty("event_type") String eventType,
+                                  @JsonProperty("step_id") String stepId,
+                                  @JsonProperty("occur_time") String occurTime,
+                                  @JsonProperty("payload_ref") String payloadRef) {
+    }
+
+    /** 时间线 Step 摘要行（8 键，旧 Map 逐键同名同序）。 */
+    public record TimelineStepVO(@JsonProperty("step_key") String stepKey,
+                                 @JsonProperty("attempt") Integer attempt,
+                                 @JsonProperty("step_type") String stepType,
+                                 @JsonProperty("status") String status,
+                                 @JsonProperty("automation_level") Integer automationLevel,
+                                 @JsonProperty("input_hash") String inputHash,
+                                 @JsonProperty("output_hash") String outputHash,
+                                 @JsonProperty("error_code") String errorCode) {
+    }
+
+    /** 时间线视图（run_id/status/events/steps 四键）。 */
+    public record RunTimelineVO(@JsonProperty("run_id") String runId,
+                                @JsonProperty("status") String status,
+                                @JsonProperty("events") List<TimelineEventVO> events,
+                                @JsonProperty("steps") List<TimelineStepVO> steps) {
+    }
+
     /** 时间线（run_event 正序 + step 行摘要；GET /runs/{runId} 消费）。 */
-    public Map<String, Object> timeline(String runId) {
+    public RunTimelineVO timeline(String runId) {
         WAgentRunDO run = requireRun(runId);
-        List<Map<String, Object>> events = new java.util.ArrayList<>();
+        List<TimelineEventVO> events = new java.util.ArrayList<>();
         for (WAgentRunEventDO e : runEventDao.findByRunId(runId)) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("event_type", e.getEventType());
-            m.put("step_id", e.getStepId());
-            m.put("occur_time", e.getOccurTime() == null ? null : e.getOccurTime().toString());
-            m.put("payload_ref", e.getPayloadRefText());
-            events.add(m);
+            events.add(new TimelineEventVO(e.getEventType(), e.getStepId(),
+                    e.getOccurTime() == null ? null : e.getOccurTime().toString(),
+                    e.getPayloadRefText()));
         }
-        List<Map<String, Object>> steps = new java.util.ArrayList<>();
+        List<TimelineStepVO> steps = new java.util.ArrayList<>();
         for (WAgentRunStepDO s : stepDao.findByRunId(runId)) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("step_key", s.getStepKey());
-            m.put("attempt", s.getAttempt());
-            m.put("step_type", s.getStepType());
-            m.put("status", s.getStatus());
-            m.put("automation_level", s.getAutomationLevel());
-            m.put("input_hash", s.getInputHash());
-            m.put("output_hash", s.getOutputHash());
-            m.put("error_code", s.getErrorCode());
-            steps.add(m);
+            steps.add(new TimelineStepVO(s.getStepKey(), s.getAttempt(), s.getStepType(), s.getStatus(),
+                    s.getAutomationLevel(), s.getInputHash(), s.getOutputHash(), s.getErrorCode()));
         }
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("run_id", run.getId());
-        out.put("status", run.getStatus());
-        out.put("events", events);
-        out.put("steps", steps);
-        return out;
+        return new RunTimelineVO(run.getId(), run.getStatus(), events, steps);
     }
 
     // ══════════════════════════ 内部：计划阶段 ══════════════════════════

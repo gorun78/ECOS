@@ -149,6 +149,14 @@ import org.junit.jupiter.api.Test;
  *       3→0、{@code WAgentToolContractController} 去掉 1 行签名。键面由
  *       {@code WAgentCandidateWireShapeTest} 4 例按集合相等＋键序钉住，变异实红
  *       （去 {@code basis_json} 注解 ⇒ {@code basisJson} 冒到首位且键集不等）。</li>
+ *   <li>1962 ＝ #147CQ（2026-11-05）HEAD 面复测值，差额 −15 行来自 ai 域 wagent run 面：
+ *       {@code WAgentRunController} 17→2（Run 8/进度能力位 4/详情 9/异步建 Run 11/SSE 降级 5 键；
+ *       剩 2 枚为 {@code RunInputRequest.input} 自由映射入参与 {@code ok(Map)} 历史重载——前者键面由
+ *       调用方定义、后者待 ToolContract 批次一并清退），同批把属主
+ *       {@code WAgentOrchestrator#timeline} 由 Map 改 {@code RunTimelineVO}（事件 4/步骤 8 键）。
+ *       键面由 {@code WAgentRunWireShapeTest} 6 例按集合相等＋键序钉住；**变异实红**：把
+ *       {@code execution_dispatch}/{@code progress_channel} 的属性级 NON_NULL 改 ALWAYS ⇒
+ *       同步通道多出两键、9 键断言红。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -160,7 +168,7 @@ import org.junit.jupiter.api.Test;
  * 2240 = 2229 + 11、2226 = 2215 + 11、2204 = 2193 + 11、2194 = 2183 + 11、
  * 2188 = 2177 + 11、2180 = 2169 + 11、2163 = 2152 + 11、2155 = 2144 + 11、
  * 2149 = 2138 + 11、2132 = 2121 + 11、2104 = 2093 + 11、2068 = 2057 + 11、
- * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11（同一批在途文件，未代改）。</p>
+ * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -175,7 +183,7 @@ class ControllerMapPayloadRatchetTest {
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
      */
-    private static final int BASELINE_LINES = 1977;
+    private static final int BASELINE_LINES = 1962;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -184,7 +192,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1977（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1962（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;
