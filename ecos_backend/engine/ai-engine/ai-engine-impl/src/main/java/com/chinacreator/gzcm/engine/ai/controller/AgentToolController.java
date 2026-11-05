@@ -11,16 +11,30 @@ import com.chinacreator.gzcm.engine.ai.service.ToolRegistry;
 import com.chinacreator.gzcm.engine.ai.service.ToolSchema;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
 import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentToolContractController;
+import com.chinacreator.gzcm.engine.ai.wagent.controller.WAgentToolContractController.ToolContractVO;
 import com.chinacreator.gzcm.engine.ai.wagent.dao.WAgentToolContractDao;
 import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentToolContractDO;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -35,6 +49,11 @@ import java.util.stream.Collectors;
  *   <li>{@code POST /api/v1/agent/tools/{name}/dry-run} — 场景工具干跑（开发期验收，
  *       <b>不进产品路径</b>，详设-06 §5.2 #10 / 详设说明书 §9.3.1 第 10 条）</li>
  * </ul>
+ *
+ * <p><b>#147CX 载体</b>：执行面/校验/干跑/描述四类载荷改 record（键名与旧 {@code Map} 逐键一致，
+ * {@code functionCallSchema} 等 JSON 文档字段保持结构化 Map）。仍保留的 {@code Map} 是
+ * <b>自由 JSON 面</b>：工具参数 {@code arguments}（键面由注册方定义）、
+ * {@code obligations} 摘要（属主 {@code ToolDecision#obligationSummary()} 的契约）。</p>
  */
 @RestController
 @RequestMapping("/api/v1/agent/tools")
@@ -61,6 +80,75 @@ public class AgentToolController {
         this.environment = environment;
     }
 
+    /** 参数条目（{@code default}/{@code enum} 仅声明时出现——属性级 NON_NULL）。 */
+    public record ToolParamVO(@JsonProperty("name") String name,
+                              @JsonProperty("type") String type,
+                              @JsonProperty("required") boolean required,
+                              @JsonProperty("description") String description,
+                              @JsonInclude(JsonInclude.Include.NON_NULL)
+                              @JsonProperty("default") Object defaultValue,
+                              @JsonInclude(JsonInclude.Include.NON_NULL)
+                              @JsonProperty("enum") List<String> enumValues) {
+    }
+
+    /** 执行面视图（name/description/parameters/functionCallSchema 四键）。 */
+    public record ToolExecutionVO(@JsonProperty("name") String name,
+                                  @JsonProperty("description") String description,
+                                  @JsonProperty("parameters") List<ToolParamVO> parameters,
+                                  @JsonProperty("functionCallSchema") Map<String, Object> functionCallSchema) {
+    }
+
+    /** 真值面来源（execution/contract 两键）。 */
+    public record SourcesVO(@JsonProperty("execution") String execution,
+                            @JsonProperty("contract") String contract) {
+    }
+
+    /** 单工具描述（6 键；缺席面如实 null，禁合成空对象）。 */
+    public record AgentToolDescribeVO(@JsonProperty("name") String name,
+                                      @JsonProperty("registered") boolean registered,
+                                      @JsonProperty("executionSchema") ToolExecutionVO executionSchema,
+                                      @JsonProperty("contract") ToolContractVO contract,
+                                      @JsonProperty("version") String version,
+                                      @JsonProperty("sources") SourcesVO sources) {
+    }
+
+    /** 类型告警条目（param/expected/actual/message 四键）。 */
+    public record ToolTypeWarningVO(@JsonProperty("param") String param,
+                                    @JsonProperty("expected") String expected,
+                                    @JsonProperty("actual") String actual,
+                                    @JsonProperty("message") String message) {
+    }
+
+    /** 参数校验结果（valid/toolName/[missingRequired]/[typeWarnings]/message）。 */
+    public record ToolValidateVO(@JsonProperty("valid") boolean valid,
+                                 @JsonProperty("toolName") String toolName,
+                                 @JsonInclude(JsonInclude.Include.NON_NULL)
+                                 @JsonProperty("missingRequired") List<String> missingRequired,
+                                 @JsonInclude(JsonInclude.Include.NON_NULL)
+                                 @JsonProperty("typeWarnings") List<ToolTypeWarningVO> typeWarnings,
+                                 @JsonProperty("message") String message) {
+    }
+
+    /** 干跑裁决摘要（6 键；dry-run 不评估高危沙盒，故不放 highRisk 假值）。 */
+    public record AdjudicationVO(@JsonProperty("verdict") String verdict,
+                                 @JsonProperty("policyId") String policyId,
+                                 @JsonProperty("reason") String reason,
+                                 @JsonProperty("operation") String operation,
+                                 @JsonProperty("subject") String subject,
+                                 @JsonProperty("source") String source) {
+    }
+
+    /** 干跑载荷（name/arguments/asOfTime/dryRun/executed/adjudication/obligations）。 */
+    public record DryRunVO(@JsonProperty("name") String name,
+                           @JsonProperty("arguments") Map<String, Object> arguments,
+                           @JsonProperty("asOfTime") Object asOfTime,
+                           @JsonProperty("dryRun") boolean dryRun,
+                           @JsonProperty("executed") boolean executed,
+                           @JsonProperty("adjudication") AdjudicationVO adjudication,
+                           @JsonProperty(GuardrailDecisionContract.KEY_OBLIGATIONS)
+                           List<Map<String, Object>> obligations) {
+    }
+
     /**
      * 列出所有已注册工具。
      *
@@ -69,9 +157,9 @@ public class AgentToolController {
      * @return 工具列表，每项包含 name, description, parameters, functionCallSchema
      */
     @GetMapping
-    public ApiResponse<List<Map<String, Object>>> listAll() {
+    public ApiResponse<List<ToolExecutionVO>> listAll() {
         List<ToolSchema> schemas = toolRegistry.listAll();
-        List<Map<String, Object>> result = schemas.stream()
+        List<ToolExecutionVO> result = schemas.stream()
                 .map(AgentToolController::executionView)
                 .collect(Collectors.toList());
 
@@ -99,7 +187,7 @@ public class AgentToolController {
      * 认证由 {@code /api/v1/agent/**} JWT 面承载（与 {@code GET /tools} 同口径）。</p>
      */
     @GetMapping("/{name}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> describe(
+    public ResponseEntity<ApiResponse<AgentToolDescribeVO>> describe(
             @PathVariable String name,
             @RequestParam(value = "version", required = false) String version) {
         String toolName = name == null ? "" : name.trim();
@@ -111,16 +199,12 @@ public class AgentToolController {
                             AiErrorClass.NOT_FOUND.errorCode(),
                             "工具未注册且无工具契约登记: " + toolName));
         }
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("name", toolName);
-        data.put("registered", schema != null);
-        data.put("executionSchema", schema == null ? null : executionView(schema));
-        data.put("contract", contract == null ? null
-                : WAgentToolContractController.ToolContractVO.of(contract));
-        data.put("version", contract == null ? null : contract.getVersion());
-        data.put("sources", Map.of(
-                "execution", "engine.ai.service.ToolRegistry",
-                "contract", "ecos_ai.ecos_wagent_tool_contract#V236"));
+        AgentToolDescribeVO data = new AgentToolDescribeVO(toolName, schema != null,
+                schema == null ? null : executionView(schema),
+                contract == null ? null : ToolContractVO.of(contract),
+                contract == null ? null : contract.getVersion(),
+                new SourcesVO("engine.ai.service.ToolRegistry",
+                        "ecos_ai.ecos_wagent_tool_contract#V236"));
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 
@@ -140,7 +224,7 @@ public class AgentToolController {
      * @return 校验结果：valid=true/false，附带缺失必填项和类型提示
      */
     @GetMapping("/{name}/validate")
-    public ApiResponse<Map<String, Object>> validate(
+    public ApiResponse<ToolValidateVO> validate(
             @PathVariable String name,
             @RequestParam(required = false, defaultValue = "{}") String args) {
 
@@ -158,7 +242,7 @@ public class AgentToolController {
         }
 
         List<String> missingRequired = new ArrayList<>();
-        List<Map<String, Object>> typeWarnings = new ArrayList<>();
+        List<ToolTypeWarningVO> typeWarnings = new ArrayList<>();
 
         if (schema.getParameters() != null) {
             for (Map.Entry<String, ToolSchema.ParamDef> entry : schema.getParameters().entrySet()) {
@@ -176,31 +260,18 @@ public class AgentToolController {
                 if (value != null && def.getType() != null) {
                     String typeMismatch = checkType(paramName, value, def.getType());
                     if (typeMismatch != null) {
-                        Map<String, Object> warning = new LinkedHashMap<>();
-                        warning.put("param", paramName);
-                        warning.put("expected", def.getType());
-                        warning.put("actual", value.getClass().getSimpleName().toLowerCase());
-                        warning.put("message", typeMismatch);
-                        typeWarnings.add(warning);
+                        typeWarnings.add(new ToolTypeWarningVO(paramName, def.getType(),
+                                value.getClass().getSimpleName().toLowerCase(), typeMismatch));
                     }
                 }
             }
         }
 
         boolean valid = missingRequired.isEmpty();
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("valid", valid);
-        result.put("toolName", name);
-        if (!missingRequired.isEmpty()) {
-            result.put("missingRequired", missingRequired);
-        }
-        if (!typeWarnings.isEmpty()) {
-            result.put("typeWarnings", typeWarnings);
-        }
-        result.put("message", valid ? "参数校验通过" : "缺少必填参数: " + String.join(", ", missingRequired));
-
-        return ApiResponse.success(result);
+        return ApiResponse.success(new ToolValidateVO(valid, name,
+                missingRequired.isEmpty() ? null : missingRequired,
+                typeWarnings.isEmpty() ? null : typeWarnings,
+                valid ? "参数校验通过" : "缺少必填参数: " + String.join(", ", missingRequired)));
     }
 
     /**
@@ -238,7 +309,7 @@ public class AgentToolController {
      * 400（{@code BusinessException} → 400 映射），无裸异常上浮。</p>
      */
     @PostMapping("/{name}/dry-run")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> dryRun(
+    public ResponseEntity<ApiResponse<DryRunVO>> dryRun(
             @PathVariable String name,
             @RequestBody(required = false) Map<String, Object> body) {
         // ① 生产 profile 禁干跑（设计面明示：不进产品路径；先于任何其它解析）
@@ -288,24 +359,13 @@ public class AgentToolController {
             return failClosedResponse("安全引擎不可用，无法给出裁决（fail-closed）");
         }
         // ALLOW ⇒ 组装干跑载荷（executed=false：本端点禁触发任何 dispatch/副作用）
-        Map<String, Object> adjudication = new LinkedHashMap<>();
-        adjudication.put("verdict", decision.verdict().name());
-        adjudication.put("policyId", decision.policyId());
-        adjudication.put("reason", decision.reason());
-        adjudication.put("operation", "read");                 // dry-run 一律按 read 面强判
-        // 高危沙盒属执行腿（阶段 2）——干跑不走 dispatch 与沙盒，故此处不评估；
-        // 不放一个看似"已评估=低风险"的假 true/false（NON_NULL 使缺位天然不落 JSON）
-        adjudication.put("subject", subject.userId());
-        adjudication.put("source", AiTraceSupport.currentTraceId());
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("name", name);
-        data.put("arguments", arguments);
-        data.put("asOfTime", body == null ? null : body.get("asOfTime"));
-        data.put("dryRun", true);
-        data.put("executed", false);                                   // dry-run 永不执行副作用
-        data.put("adjudication", adjudication);
-        data.put(GuardrailDecisionContract.KEY_OBLIGATIONS,
-                decision.obligationSummary());                          // 列名/规则名摘要，禁数据值
+        AdjudicationVO adjudication = new AdjudicationVO(decision.verdict().name(),
+                decision.policyId(), decision.reason(), "read", subject.userId(),
+                AiTraceSupport.currentTraceId());
+        DryRunVO data = new DryRunVO(name, arguments,
+                body == null ? null : body.get("asOfTime"), true, false,
+                adjudication,
+                decision.obligationSummary());   // 列名/规则名摘要，禁数据值
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 
@@ -320,45 +380,29 @@ public class AgentToolController {
     }
 
     /** 执行面视图（{@code GET /tools} 列表项与 {@code GET /tools/{name}} 共用同一投影）。 */
-    private static Map<String, Object> executionView(ToolSchema schema) {
-        Map<String, Object> item = new LinkedHashMap<>();
-        item.put("name", schema.getName());
-        item.put("description", schema.getDescription());
-
+    private static ToolExecutionVO executionView(ToolSchema schema) {
         // 扁平化参数为 list（前端更易用）
-        List<Map<String, Object>> params = new ArrayList<>();
+        List<ToolParamVO> params = new ArrayList<>();
         if (schema.getParameters() != null) {
             for (Map.Entry<String, ToolSchema.ParamDef> e : schema.getParameters().entrySet()) {
-                Map<String, Object> param = new LinkedHashMap<>();
-                param.put("name", e.getKey());
-                param.put("type", e.getValue().getType());
-                param.put("required", e.getValue().isRequired());
-                param.put("description", e.getValue().getDescription());
-                if (e.getValue().getDefaultValue() != null) {
-                    param.put("default", e.getValue().getDefaultValue());
-                }
-                if (e.getValue().getEnumValues() != null) {
-                    param.put("enum", e.getValue().getEnumValues());
-                }
-                params.add(param);
+                params.add(new ToolParamVO(e.getKey(), e.getValue().getType(),
+                        e.getValue().isRequired(), e.getValue().getDescription(),
+                        e.getValue().getDefaultValue(), e.getValue().getEnumValues()));
             }
         }
-        item.put("parameters", params);
-
-        // 附上完整的 function-calling schema
-        item.put("functionCallSchema", schema.toFunctionCallSchema());
-        return item;
+        return new ToolExecutionVO(schema.getName(), schema.getDescription(), params,
+                schema.toFunctionCallSchema());
     }
 
-    private ResponseEntity<ApiResponse<Map<String, Object>>> forbiddenResponse(String message) {
+    private static <T> ResponseEntity<ApiResponse<T>> forbiddenResponse(String message) {
         return ResponseEntity.status(AiErrorClass.GUARDRAIL_DENIED.httpStatus()).body(
-                ApiResponse.forbidden(AiErrorClass.GUARDRAIL_DENIED.errorCode(),
+                ApiResponse.<T>forbidden(AiErrorClass.GUARDRAIL_DENIED.errorCode(),
                         message == null ? AiErrorClass.GUARDRAIL_DENIED.renderMessage(null) : message));
     }
 
-    private ResponseEntity<ApiResponse<Map<String, Object>>> failClosedResponse(String message) {
+    private static <T> ResponseEntity<ApiResponse<T>> failClosedResponse(String message) {
         return ResponseEntity.status(AiErrorClass.GUARDRAIL_FAIL_CLOSED.httpStatus()).body(
-                ApiResponse.error(AiErrorClass.GUARDRAIL_FAIL_CLOSED.httpStatus(),
+                ApiResponse.<T>error(AiErrorClass.GUARDRAIL_FAIL_CLOSED.httpStatus(),
                         AiErrorClass.GUARDRAIL_FAIL_CLOSED.errorCode(),
                         message == null ? AiErrorClass.GUARDRAIL_FAIL_CLOSED.renderMessage(null) : message));
     }
