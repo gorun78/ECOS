@@ -1,36 +1,29 @@
 /**
- * 用户控制器 — 薄增强版（通过 {@link AuthService} 编排系统能力，不直接访问 SecurityManager）。
+ * 用户控制器 — 薄增强版（通过 {@link com.chinacreator.gzcm.sysman.iam.service.IUserService}
+ * 编排系统能力，不直接访问 SecurityManager）。
  *
- * <p>路由前缀: /api/v1/users
+ * <p>路由前缀: /api/v1/system/users
  *
  * <h3>覆盖的四类接口</h3>
- *
- * <p><b>① 标准 CRUD</b>
  * <ul>
- *   <li>GET    /api/v1/users — 用户列表（分页 + 关键字过滤）</li>
- *   <li>GET    /api/v1/users/{id} — 用户详情</li>
- *   <li>POST   /api/v1/users — 创建用户</li>
- *   <li>PUT    /api/v1/users/{id} — 更新用户</li>
- *   <li>DELETE /api/v1/users/{id} — 删除用户</li>
+ *   <li>标准 CRUD：列表 / 详情 / 创建 / 更新 / 删除；</li>
+ *   <li>扩展能力：重置密码、状态切换、角色查询与绑定；</li>
+ *   <li>自读面：{@code /me/permission-decisions}、{@code /me/profile}（不加权限注解）；</li>
+ *   <li>P0 运维：强制下线、一次性随机密码、批量创建。</li>
  * </ul>
- *
- * <p><b>② 扩展能力</b>
- * <ul>
- *   <li>PUT /api/v1/users/{id}/password — 重置密码（重新生成 + 取回）</li>
- *   <li>PUT /api/v1/users/{id}/status — 状态切换（locked/unlocked/frozen）</li>
- *   <li>GET /api/v1/users/{id}/roles — 用户角色查询</li>
- *   <li>PUT /api/v1/users/{id}/roles — 角色绑定/解绑</li>
- * </ul>
- *
- * <h3>权限模型</h3>
- * <p>所有写操作要求 {@code system:user:update} 权限；
- * 读操作要求 {@code system:user:read}。权限校验 happens 在 {@link RequirePermission} AOP 切面。
  *
  * <h3>安全</h3>
  * <ul>
- *   <li>密码存 BCrypt SHA-256，不可逆</li>
- *   <li>列表/详情响应不暴露 passwordHash 字段</li>
+ *   <li>密码存 BCrypt，不可逆；</li>
+ *   <li>列表/详情响应不暴露 passwordHash 字段。</li>
  * </ul>
+ *
+ * <p><b>#147CI（DoD DI-2 第十三批）</b>：出入参强类型化——列表 SQL 收回
+ * {@code UserQueryService#listUsers}（行面 record 11 键，时间列仍为 JDBC Timestamp 由同一
+ * ObjectMapper 渲染）、角色查询收回 {@code listUserRoles}；详情/创建/更新改 {@link UserVO}；
+ * 创建/更新/角色绑定请求改 DTO（更新用 {@code xxxPresent} 保留旧 {@code containsKey}
+ * 「显式 null 写空」语义）；强制下线/随机密码/批量创建回执改 VO（批量 {@code errors}
+ * 仍只在非空时出现）。</p>
  */
 package com.chinacreator.gzcm.sysman.controller;
 
@@ -43,11 +36,13 @@ import com.chinacreator.gzcm.sysman.iam.entity.UserAccount;
 import com.chinacreator.gzcm.sysman.iam.cache.PermissionCacheService;
 import com.chinacreator.gzcm.sysman.iam.service.IUserService;
 import com.chinacreator.gzcm.sysman.service.UserQueryService;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @RestController
@@ -70,51 +65,13 @@ public class UserController {
 	}
 
 	@GetMapping
-	public ApiResponse<Map<String, Object>> list(
+	public ApiResponse<UserQueryService.UserPage> list(
 			@RequestParam(required = false) String keyword,
 			@RequestParam(required = false) String status,
 			@RequestParam(defaultValue = "1") int page,
 			@RequestParam(defaultValue = "20") int pageSize) {
 		try {
-			StringBuilder sql = new StringBuilder(
-				"SELECT u.user_id as \"userId\", u.username as username, u.real_name as \"realName\", " +
-				"u.email as email, u.mobile_tel1 as phone, u.status as status, " +
-				"u.locked as locked, u.last_login_time as \"lastLoginTime\", " +
-				"u.created_time as \"createdTime\", " +
-				"o.org_id as \"orgId\", o.org_name as \"orgName\" " +
-				"FROM TD_USER u " +
-				"LEFT JOIN td_user_organization uo ON u.user_id = uo.user_id AND uo.is_primary = '1' " +
-				"LEFT JOIN td_organization o ON uo.org_id = o.org_id " +
-				"WHERE 1=1 ");
-			List<Object> params = new ArrayList<>();
-			if (keyword != null && !keyword.isEmpty()) {
-				sql.append("AND (u.username ILIKE ? OR u.email ILIKE ?) ");
-				String kw = "%" + keyword + "%";
-				params.add(kw); params.add(kw);
-			}
-			if (status != null && !status.isEmpty()) {
-				sql.append("AND u.status = ? ");
-				params.add(status);
-			} else {
-				sql.append("AND u.status != 'DELETED' ");
-			}
-			sql.append("ORDER BY u.created_time DESC ");
-
-			String countSql = "SELECT COUNT(*) FROM (" + sql.toString() + ") t";
-			int total = userQueryService.queryForObject(countSql, Integer.class, params.toArray());
-
-			int offset = (page - 1) * pageSize;
-			sql.append("LIMIT ? OFFSET ?");
-			params.add(pageSize); params.add(offset);
-
-			List<Map<String, Object>> rows = userQueryService.queryForList(sql.toString(), params.toArray());
-
-			Map<String, Object> result = new LinkedHashMap<>();
-			result.put("page", page);
-			result.put("pageSize", pageSize);
-			result.put("total", total);
-			result.put("data", rows);
-			return ApiResponse.success(result);
+			return ApiResponse.success(userQueryService.listUsers(keyword, status, page, pageSize));
 		} catch (Exception e) {
 			log.error("Failed to list users", e);
 			return ApiResponse.internalError("查询用户列表失败（详情见服务端日志）");
@@ -167,11 +124,11 @@ public class UserController {
 	}
 
 	@GetMapping("/{id}")
-	public ApiResponse<Map<String, Object>> get(@PathVariable String id) {
+	public ApiResponse<UserVO> get(@PathVariable String id) {
 		try {
 			UserAccount user = userService.getUser(id);
 			if (user == null) return ApiResponse.notFound("用户不存在");
-			return ApiResponse.success(toMap(user));
+			return ApiResponse.success(toVO(user));
 		} catch (Exception e) {
 			log.error("查询用户详情失败", e);
 			return ApiResponse.internalError("查询用户详情失败（详情见服务端日志）");
@@ -180,10 +137,10 @@ public class UserController {
 
 	@PostMapping
 	@RequirePermission(permission = "system:user:create")
-	public ApiResponse<Map<String, Object>> create(@RequestBody Map<String, Object> body) {
+	public ApiResponse<UserVO> create(@RequestBody UserCreateRequest body) {
 		try {
-			String username = (String) body.get("username");
-			String password = (String) body.get("password");
+			String username = body.getUsername();
+			String password = body.getPassword();
 			if (username == null || username.isEmpty()) return ApiResponse.badRequest("用户名不能为空");
 			if (password == null || password.isEmpty()) return ApiResponse.badRequest("密码不能为空");
 
@@ -225,15 +182,15 @@ public class UserController {
 			UserAccount user = new UserAccount();
 			user.setUserId(UUID.randomUUID().toString().replace("-", ""));
 			user.setUsername(username);
-			user.setRealName((String) body.getOrDefault("realName", username));
-			user.setEmail((String) body.get("email"));
-			user.setPhone((String) body.get("phone"));
-			user.setOrgId((String) body.get("orgId"));
+			user.setRealName(body.getRealName() != null ? body.getRealName() : username);
+			user.setEmail(body.getEmail());
+			user.setPhone(body.getPhone());
+			user.setOrgId(body.getOrgId());
 			user.setStatus("ACTIVE");
 			user.setLocked("0");
 
 			UserAccount created = userService.createUser(user, password, "admin");
-			return ApiResponse.success(toMap(created));
+			return ApiResponse.success(toVO(created));
 		} catch (Exception e) {
 			log.error("创建用户失败", e);
 			return ApiResponse.internalError("创建用户失败（详情见服务端日志）");
@@ -242,21 +199,21 @@ public class UserController {
 
 	@PutMapping("/{id}")
 	@RequirePermission(permission = "system:user:update")
-	public ApiResponse<Map<String, Object>> update(@PathVariable String id, @RequestBody Map<String, Object> body) {
+	public ApiResponse<UserVO> update(@PathVariable String id, @RequestBody UserUpdateRequest body) {
 		try {
 			UserAccount existing = userService.getUser(id);
 			if (existing == null) return ApiResponse.notFound("用户不存在");
 
-			if (body.containsKey("realName")) existing.setRealName((String) body.get("realName"));
-			if (body.containsKey("email")) existing.setEmail((String) body.get("email"));
-			if (body.containsKey("phone")) existing.setPhone((String) body.get("phone"));
-			if (body.containsKey("orgId")) existing.setOrgId((String) body.get("orgId"));
+			if (body.isRealNamePresent()) existing.setRealName(body.getRealName());
+			if (body.isEmailPresent()) existing.setEmail(body.getEmail());
+			if (body.isPhonePresent()) existing.setPhone(body.getPhone());
+			if (body.isOrgIdPresent()) existing.setOrgId(body.getOrgId());
 
 			// 不更新密码时清空，避免 updateUser 对已哈希的密码重复校验
 			existing.setPassword(null);
 
 			UserAccount updated = userService.updateUser(existing, "admin");
-			return ApiResponse.success(toMap(updated));
+			return ApiResponse.success(toVO(updated));
 		} catch (Exception e) {
 			log.error("更新用户失败", e);
 			return ApiResponse.internalError("更新用户失败（详情见服务端日志）");
@@ -308,12 +265,9 @@ public class UserController {
 
 	@GetMapping("/{id}/roles")
 	@RequirePermission(permission = "system:user:query")
-	public ApiResponse<List<Map<String, Object>>> getRoles(@PathVariable String id) {
+	public ApiResponse<List<UserQueryService.UserRoleRow>> getRoles(@PathVariable String id) {
 		try {
-			String sql = "SELECT r.role_id as \"roleId\", r.role_name as \"roleName\", r.role_code as \"roleCode\" FROM TD_ROLE r " +
-						"INNER JOIN TD_USER_ROLE ur ON r.role_id = ur.role_id WHERE ur.user_id = ?";
-			List<Map<String, Object>> roles = userQueryService.queryForList(sql, id);
-			return ApiResponse.success(roles);
+			return ApiResponse.success(userQueryService.listUserRoles(id));
 		} catch (Exception e) {
 			log.error("查询用户角色失败", e);
 			return ApiResponse.internalError("查询用户角色失败（详情见服务端日志）");
@@ -322,10 +276,9 @@ public class UserController {
 
 	@PutMapping("/{id}/roles")
 	@RequirePermission(permission = "system:user:update")
-	public ApiResponse<Void> assignRoles(@PathVariable String id, @RequestBody Map<String, Object> body) {
+	public ApiResponse<Void> assignRoles(@PathVariable String id, @RequestBody RoleIdsRequest body) {
 		try {
-			@SuppressWarnings("unchecked")
-			List<String> roleIds = (List<String>) body.get("roleIds");
+			List<String> roleIds = body.getRoleIds();
 			if (roleIds == null) {
 				return ApiResponse.badRequest("roleIds 不能为空");
 			}
@@ -357,7 +310,7 @@ public class UserController {
 	 */
 	@PostMapping("/{id}/force-logout")
 	@RequirePermission(permission = "system:user:manage")
-	public ApiResponse<Map<String, Object>> forceLogout(@PathVariable String id) {
+	public ApiResponse<ForceLogoutResultVO> forceLogout(@PathVariable String id) {
 		try {
 			log.info("[force-logout] userId={}", id);
 			int sessionsCleared = 0;
@@ -368,11 +321,8 @@ public class UserController {
 			} catch (Exception e) {
 				log.debug("[force-logout] refresh-token 清理降级(表不存在?): {}", e.getMessage());
 			}
-			Map<String, Object> resp = new LinkedHashMap<>();
-			resp.put("userId", id);
-			resp.put("sessionsCleared", sessionsCleared);
-			resp.put("msg", "强制下线已执行，该用户需重新登录");
-			return ApiResponse.success(resp);
+			return ApiResponse.success(new ForceLogoutResultVO(id, sessionsCleared,
+					"强制下线已执行，该用户需重新登录"));
 		} catch (Exception e) {
 			log.error("[force-logout] 失败 id={}", id, e);
 			return ApiResponse.internalError("强制下线失败（详情见服务端日志）");
@@ -385,16 +335,13 @@ public class UserController {
 	 */
 	@PostMapping("/{id}/reset-password")
 	@RequirePermission(permission = "system:user:manage")
-	public ApiResponse<Map<String, Object>> resetPasswordT1(@PathVariable String id) {
+	public ApiResponse<ResetPasswordResultVO> resetPasswordT1(@PathVariable String id) {
 		try {
 			log.info("[reset-password] userId={}", id);
 			String tempPwd = genTempPassword();
 			userService.resetPassword(id, tempPwd, "admin");
-			Map<String, Object> resp = new LinkedHashMap<>();
-			resp.put("userId", id);
-			resp.put("tempPassword", tempPwd);
-			resp.put("msg", "密码已重置，请立即通知用户使用新密码");
-			return ApiResponse.success(resp);
+			return ApiResponse.success(new ResetPasswordResultVO(id, tempPwd,
+					"密码已重置，请立即通知用户使用新密码"));
 		} catch (Exception e) {
 			log.error("[reset-password] 失败 id={}", id, e);
 			return ApiResponse.internalError("重置密码失败（详情见服务端日志）");
@@ -407,7 +354,7 @@ public class UserController {
 	 */
 	@PostMapping("/batch")
 	@RequirePermission(permission = "system:user:manage")
-	public ApiResponse<Map<String, Object>> batchCreate(@RequestBody UserBatchSaveDTO dto) {
+	public ApiResponse<BatchCreateResultVO> batchCreate(@RequestBody UserBatchSaveDTO dto) {
 		try {
 			List<UserSaveDTO> users = dto == null ? null : dto.getUsers();
 			int requested = (users == null) ? 0 : users.size();
@@ -446,11 +393,8 @@ public class UserController {
 					failed++;
 				}
 			}
-			Map<String, Object> resp = new LinkedHashMap<>();
-			resp.put("created", created);
-			resp.put("failed", failed);
-			if (!errors.isEmpty()) resp.put("errors", errors);
-			return ApiResponse.success(resp);
+			return ApiResponse.success(new BatchCreateResultVO(created, failed,
+					errors.isEmpty() ? null : errors));
 		} catch (Exception e) {
 			log.error("[batch-create] 失败", e);
 			return ApiResponse.internalError("批量创建失败（详情见服务端日志）");
@@ -463,18 +407,164 @@ public class UserController {
 		return sb.toString();
 	}
 
-	private Map<String, Object> toMap(UserAccount u) {
-		Map<String, Object> m = new LinkedHashMap<>();
-		m.put("userId", u.getUserId());
-		m.put("username", u.getUsername());
-		m.put("realName", u.getRealName());
-		m.put("email", u.getEmail());
-		m.put("phone", u.getPhone());
-		m.put("orgId", u.getOrgId());
-		m.put("status", u.getStatus());
-		m.put("locked", u.getLocked());
-		m.put("lastLoginTime", u.getLastLoginTime());
-		m.put("createdTime", u.getCreatedTime());
-		return m;
+	static UserVO toVO(UserAccount u) {
+		return new UserVO(u.getUserId(), u.getUsername(), u.getRealName(), u.getEmail(), u.getPhone(),
+				u.getOrgId(), u.getStatus(), u.getLocked(), u.getLastLoginTime(), u.getCreatedTime());
+	}
+
+	// ── 请求 DTO / 响应 VO（#147CI） ─────────────────────────────
+
+	/** 建用户请求（realName 缺省回退 username，与旧 getOrDefault 一致）。 */
+	public static final class UserCreateRequest {
+		private String username;
+		private String password;
+		private String realName;
+		private String email;
+		private String phone;
+		private String orgId;
+
+		public String getUsername() {
+			return username;
+		}
+
+		public void setUsername(String username) {
+			this.username = username;
+		}
+
+		public String getPassword() {
+			return password;
+		}
+
+		public void setPassword(String password) {
+			this.password = password;
+		}
+
+		public String getRealName() {
+			return realName;
+		}
+
+		public void setRealName(String realName) {
+			this.realName = realName;
+		}
+
+		public String getEmail() {
+			return email;
+		}
+
+		public void setEmail(String email) {
+			this.email = email;
+		}
+
+		public String getPhone() {
+			return phone;
+		}
+
+		public void setPhone(String phone) {
+			this.phone = phone;
+		}
+
+		public String getOrgId() {
+			return orgId;
+		}
+
+		public void setOrgId(String orgId) {
+			this.orgId = orgId;
+		}
+	}
+
+	/** 改用户请求（{@code xxxPresent} 保留旧 containsKey「显式 null 写空」语义）。 */
+	public static final class UserUpdateRequest {
+		private String realName;
+		private String email;
+		private String phone;
+		private String orgId;
+		private boolean realNamePresent;
+		private boolean emailPresent;
+		private boolean phonePresent;
+		private boolean orgIdPresent;
+
+		public String getRealName() {
+			return realName;
+		}
+
+		public void setRealName(String realName) {
+			this.realName = realName;
+			this.realNamePresent = true;
+		}
+
+		public String getEmail() {
+			return email;
+		}
+
+		public void setEmail(String email) {
+			this.email = email;
+			this.emailPresent = true;
+		}
+
+		public String getPhone() {
+			return phone;
+		}
+
+		public void setPhone(String phone) {
+			this.phone = phone;
+			this.phonePresent = true;
+		}
+
+		public String getOrgId() {
+			return orgId;
+		}
+
+		public void setOrgId(String orgId) {
+			this.orgId = orgId;
+			this.orgIdPresent = true;
+		}
+
+		public boolean isRealNamePresent() {
+			return realNamePresent;
+		}
+
+		public boolean isEmailPresent() {
+			return emailPresent;
+		}
+
+		public boolean isPhonePresent() {
+			return phonePresent;
+		}
+
+		public boolean isOrgIdPresent() {
+			return orgIdPresent;
+		}
+	}
+
+	/** 角色绑定请求。 */
+	public static final class RoleIdsRequest {
+		private List<String> roleIds;
+
+		public List<String> getRoleIds() {
+			return roleIds;
+		}
+
+		public void setRoleIds(List<String> roleIds) {
+			this.roleIds = roleIds;
+		}
+	}
+
+	/** 用户视图（10 键，键序与旧 toMap 一致；口令/哈希永不出现）。 */
+	public record UserVO(String userId, String username, String realName, String email, String phone,
+						 String orgId, String status, String locked, LocalDateTime lastLoginTime,
+						 LocalDateTime createdTime) {
+	}
+
+	/** 强制下线回执（3 键）。 */
+	public record ForceLogoutResultVO(String userId, int sessionsCleared, String msg) {
+	}
+
+	/** 随机密码回执（3 键；明文一次性返回，不落库/日志）。 */
+	public record ResetPasswordResultVO(String userId, String tempPassword, String msg) {
+	}
+
+	/** 批量创建回执（errors 仅非空时出现）。 */
+	public record BatchCreateResultVO(int created, int failed,
+									  @JsonInclude(JsonInclude.Include.NON_NULL) List<String> errors) {
 	}
 }

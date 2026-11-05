@@ -36,10 +36,10 @@ import com.chinacreator.gzcm.sysman.service.UserQueryService;
  */
 class UserControllerRevocationEvictionTest {
 
-    private static Map<String, Object> body(String... roleIds) {
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("roleIds", List.of(roleIds));
-        return map;
+    private static UserController.RoleIdsRequest body(String... roleIds) {
+        UserController.RoleIdsRequest req = new UserController.RoleIdsRequest();
+        req.setRoleIds(List.of(roleIds));
+        return req;
     }
 
     @Test
@@ -68,7 +68,7 @@ class UserControllerRevocationEvictionTest {
         PermissionCacheService cache = mock(PermissionCacheService.class);
         UserController controller = new UserController(mock(IUserService.class), queries, cache, mock(com.chinacreator.gzcm.sysman.iam.service.IPermissionCheckService.class));
 
-        ApiResponse<Void> response = controller.assignRoles("u-1", new LinkedHashMap<>());
+        ApiResponse<Void> response = controller.assignRoles("u-1", new UserController.RoleIdsRequest());
 
         assertFalse(response.isSuccess());
         verify(queries, never()).update(anyString(), org.mockito.ArgumentMatchers.<Object>any());
