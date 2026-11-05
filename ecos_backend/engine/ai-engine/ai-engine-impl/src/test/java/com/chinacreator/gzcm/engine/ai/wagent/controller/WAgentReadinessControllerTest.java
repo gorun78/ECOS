@@ -187,6 +187,76 @@ class WAgentReadinessControllerTest {
     }
 
     @Test
+    @DisplayName("#12 响应键面：评估 14 键平铺 + items/gaps（16 键）；layers D/I/K/C；缺项 7 / 缺口 12 键")
+    void readinessWireKeysAreFlatAndSnake() throws Exception {
+        WAgentReadinessDO a = new WAgentReadinessDO();
+        a.setId("ra10");
+        a.setQuestionId("q10");
+        a.setTenantId("t1");
+        a.setGrade("B");
+        a.setLayerD("pass");
+        a.setLayerI("fail");
+        a.setLayerK("pass");
+        a.setLayerC("pass");
+        a.setIsPinned(1);
+        when(readinessDao.findCurrentByQuestionId("q10")).thenReturn(Optional.of(a));
+
+        com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentReadinessItemDO item =
+                new com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentReadinessItemDO();
+        item.setId("ri-1");
+        item.setLayer("D");
+        item.setStatus("PASS");
+        when(itemDao.findByAssessmentId("ra10")).thenReturn(List.of(item));
+
+        com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentReadinessGapDO gap =
+                new com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentReadinessGapDO();
+        gap.setId("rg-1");
+        gap.setStatus("OPEN");
+        when(gapDao.findByAssessmentId("ra10")).thenReturn(List.of(gap));
+
+        MvcResult r = mockMvc.perform(get("/api/v1/wagent/readiness/q10")).andReturn();
+        JsonNode data = new ObjectMapper().readTree(
+                r.getResponse().getContentAsString(StandardCharsets.UTF_8)).path("data");
+
+        assertEquals(java.util.Set.of("assessment_id", "question_id", "run_id", "profile_id",
+                "profile_version", "grade", "layers", "layer_summary_json", "degradations_json",
+                "computed_time", "valid_until", "expired", "is_pinned", "superseded_by",
+                "items", "gaps"), fieldNames(data), "评估面必须平铺（旧实现即平铺后追加 items/gaps）");
+        assertEquals(java.util.Set.of("D", "I", "K", "C"), fieldNames(data.path("layers")));
+        assertEquals(java.util.Set.of("item_id", "layer", "check_code", "status", "measured_json",
+                "threshold_json", "evidence_ids_json"), fieldNames(data.path("items").get(0)));
+        assertEquals(java.util.Set.of("gap_id", "layer", "severity", "description_text",
+                "impact_text", "suggested_action_text", "suggested_owner", "effort_estimate",
+                "unlock_from", "unlock_to", "status", "resolved_time"),
+                fieldNames(data.path("gaps").get(0)));
+    }
+
+    @Test
+    @DisplayName("#13 响应键面：10 个 snake 键（含 deferred_actions）")
+    void refillWireKeys() throws Exception {
+        WAgentReadinessDO a = new WAgentReadinessDO();
+        a.setId("ra11");
+        a.setTenantId("t1");
+        when(readinessDao.findCurrentByQuestionId("q11")).thenReturn(Optional.of(a));
+        when(readinessService.refill(any(), eq(a), eq(List.of()), isNull(), eq("u1")))
+                .thenReturn(new ReadinessService.RefillResult("ra11", "C", "B", 1, 3, false,
+                        List.of(), List.of(), List.of()));
+
+        MvcResult r = mockMvc.perform(post("/api/v1/wagent/readiness/q11/refill")).andReturn();
+        JsonNode data = new ObjectMapper().readTree(
+                r.getResponse().getContentAsString(StandardCharsets.UTF_8)).path("data");
+        assertEquals(java.util.Set.of("assessment_id", "question_id", "previous_grade", "new_grade",
+                "refill_round", "max_refill_rounds", "awaiting_input", "task_ids",
+                "deferred_actions", "gaps"), fieldNames(data));
+    }
+
+    private static java.util.Set<String> fieldNames(JsonNode node) {
+        java.util.Set<String> names = new java.util.LinkedHashSet<>();
+        node.fieldNames().forEachRemaining(names::add);
+        return names;
+    }
+
+    @Test
     @DisplayName("循环上限口径冻结（§5.2 表：循环 ≤3）")
     void refillRoundCapFrozen() {
         assertEquals(3, WAgentReadinessController.MAX_REFILL_ROUNDS);

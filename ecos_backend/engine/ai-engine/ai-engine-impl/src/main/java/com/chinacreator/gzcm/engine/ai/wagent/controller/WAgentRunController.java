@@ -206,4 +206,9 @@ public class WAgentRunController {
     static ApiResponse<Map<String, Object>> ok(Map<String, Object> data) {
         return ApiResponse.success(data).withTraceId(AiTraceSupport.currentTraceId());
     }
+
+    /** 强类型载荷版（#147CN）：与 Map 版同语义（仅多带 traceId），供已去 Map 的端点复用。 */
+    static <T> ApiResponse<T> ok(T data) {
+        return ApiResponse.success(data).withTraceId(AiTraceSupport.currentTraceId());
+    }
 }
