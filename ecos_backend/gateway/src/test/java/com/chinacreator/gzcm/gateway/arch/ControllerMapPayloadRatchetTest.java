@@ -595,6 +595,18 @@ import org.junit.jupiter.api.Test;
  *       {@code Object}/{@code List<Object>}，状态行与文案逐字不变。孪生键面由
  *       {@code TwinWireShapeTest} 1 例钉住，变异实红（{@code total_devices}→totalDevices，
  *       键名与键序双变）后还原零残留。</li>
+ *   <li><b>存量面分档快照（2026-11-05 · #147EX · 不产代码）</b>：HEAD 实扫 **1239 行 / 196 命中文件**
+ *       （工作树 1250/199；差 11 行 / 3 文件为并发会话在途面）。分布（HEAD 计）：≥20 行 **5** 文件、
+ *       10~19 行 **30**、1~9 行 **161**。≥20 的 5 枚为 {@code ObjectController}(58)、
+ *       {@code MetadataController}(49)、{@code OntologyProposalController}(36)、
+ *       {@code ClassificationController}(23)、{@code QueryController}(20)，逐枚复核均属
+ *       「{@code SELECT *}+ABAC 列裁剪 / 元数据动态列 / LLM 自由 JSON / SQL 结果动态列」。
+ *       次档代表：{@code AgentStudioController}(18，服务 {@code toMap} 属主载体)、
+ *       {@code OntologyDataController}/{@code DataGovernanceCandidateController}/
+ *       {@code AIPAgentController}(各 17，DB 行 + payload JSONB)、
+ *       {@code SecurityConfigController}(16，属主 {@code SysConfigService} 返回面)。
+ *       1~9 行档多为已 VO 化的文件里残留的 JSONB/内存 store/请求体转换行。
+ *       结论不变：**无 schema 裁决即无可机械清退面**，禁为降数字冻结动态 payload。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
