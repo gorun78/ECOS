@@ -464,6 +464,14 @@ import org.junit.jupiter.api.Test;
  *       剩 2 枚为建/改自由请求体。键面由 {@code AipPipelineWireShapeTest} 3 例钉住，
  *       变异实红（{@code lastExecutedAt}→last_executed_at）；{@code ai-engine-impl} 全量
  *       **670/0/0/0**；源码面基线按增面 272 → 275。</li>
+ *   <li>1364 ＝ #147ED（2026-11-05）HEAD 面复测值，差额 −6 行来自 workspace 域
+ *       {@code ObjectStateMachineController}（14→8）：状态机视图 4 键（entityCode/states/
+ *       transitions/totalTransitions）与转换规则 8 键改 record（{@code sortOrder} 保持 DB 原值），
+ *       循环内逐键建 Map 收口 {@code StateTransitionVO.of}；剩 8 枚为引擎/服务契约行
+ *       （{@code StateMachineEngine.getTransitionsInfo/executeTransition/listDefinitions/
+ *       createDefinition} 与 demo 表状态查询，属 runtime 引擎契约，另批裁决）。键面由
+ *       {@code StateMachineWireShapeTest} 2 例钉住，变异实红（{@code from}→from_status）；
+ *       {@code workspace-impl} 全量 **389/0/0/3**（3 例既有 skip）。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -475,7 +483,7 @@ import org.junit.jupiter.api.Test;
  * 2240 = 2229 + 11、2226 = 2215 + 11、2204 = 2193 + 11、2194 = 2183 + 11、
  * 2188 = 2177 + 11、2180 = 2169 + 11、2163 = 2152 + 11、2155 = 2144 + 11、
  * 2149 = 2138 + 11、2132 = 2121 + 11、2104 = 2093 + 11、2068 = 2057 + 11、
- * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11、1867 = 1856 + 11、1821 = 1810 + 11、1799 = 1788 + 11、1777 = 1766 + 11、1769 = 1758 + 11、1764 = 1753 + 11、1734 = 1723 + 11、1710 = 1699 + 11、1700 = 1689 + 11、1690 = 1679 + 11、1670 = 1659 + 11、1651 = 1640 + 11、1640 = 1629 + 11、1621 = 1610 + 11、1613 = 1602 + 11、1597 = 1586 + 11、1582 = 1571 + 11、1572 = 1561 + 11、1564 = 1553 + 11、1553 = 1542 + 11、1528 = 1517 + 11、1510 = 1499 + 11、1473 = 1462 + 11、1468 = 1457 + 11、1455 = 1444 + 11、1438 = 1427 + 11、1424 = 1413 + 11、1410 = 1399 + 11、1397 = 1386 + 11、1381 = 1370 + 11（同一批在途文件，未代改）。</p>
+ * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11、1867 = 1856 + 11、1821 = 1810 + 11、1799 = 1788 + 11、1777 = 1766 + 11、1769 = 1758 + 11、1764 = 1753 + 11、1734 = 1723 + 11、1710 = 1699 + 11、1700 = 1689 + 11、1690 = 1679 + 11、1670 = 1659 + 11、1651 = 1640 + 11、1640 = 1629 + 11、1621 = 1610 + 11、1613 = 1602 + 11、1597 = 1586 + 11、1582 = 1571 + 11、1572 = 1561 + 11、1564 = 1553 + 11、1553 = 1542 + 11、1528 = 1517 + 11、1510 = 1499 + 11、1473 = 1462 + 11、1468 = 1457 + 11、1455 = 1444 + 11、1438 = 1427 + 11、1424 = 1413 + 11、1410 = 1399 + 11、1397 = 1386 + 11、1381 = 1370 + 11、1375 = 1364 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -490,7 +498,7 @@ class ControllerMapPayloadRatchetTest {
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
      */
-    private static final int BASELINE_LINES = 1370;
+    private static final int BASELINE_LINES = 1364;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -500,7 +508,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1370（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1364（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;

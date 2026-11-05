@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.*;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.engine.StateMachineEngine;
+import com.chinacreator.gzcm.workspace.dto.StateMachineVO;
+import com.chinacreator.gzcm.workspace.dto.StateTransitionVO;
 import com.chinacreator.gzcm.workspace.service.ObjectStateMachineService;
 
 /**
@@ -103,38 +105,24 @@ public class ObjectStateMachineController {
      * 返回指定实体的完整状态机定义（所有状态和转换规则）。
      */
     @GetMapping("/state-machine/{entityCode}")
-    public ApiResponse<Map<String, Object>> getStateMachine(@PathVariable String entityCode) {
+    public ApiResponse<StateMachineVO> getStateMachine(@PathVariable String entityCode) {
         try {
-            List<Map<String, Object>> defs = engine.listDefinitions(entityCode);
+            var defs = engine.listDefinitions(entityCode);
 
             // Build state machine model: states + transitions
             Set<String> states = new LinkedHashSet<>();
-            List<Map<String, Object>> transitions = new ArrayList<>();
+            List<StateTransitionVO> transitions = new ArrayList<>();
 
-            for (Map<String, Object> def : defs) {
+            for (var def : defs) {
                 String fromStatus = (String) def.get("from_status");
                 String toStatus = (String) def.get("to_status");
                 if (fromStatus != null) states.add(fromStatus);
                 if (toStatus != null) states.add(toStatus);
-
-                Map<String, Object> t = new LinkedHashMap<>();
-                t.put("from", fromStatus);
-                t.put("to", toStatus);
-                t.put("transitionCode", def.get("transition_code"));
-                t.put("transitionName", def.get("transition_name"));
-                t.put("requireRole", def.get("require_role"));
-                t.put("guardRule", def.get("guard_rule"));
-                t.put("sideEffect", def.get("side_effect"));
-                t.put("sortOrder", def.get("sort_order"));
-                transitions.add(t);
+                transitions.add(StateTransitionVO.of(def));
             }
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("entityCode", entityCode);
-            result.put("states", new ArrayList<>(states));
-            result.put("transitions", transitions);
-            result.put("totalTransitions", transitions.size());
-            return ApiResponse.success(result);
+            return ApiResponse.success(new StateMachineVO(
+                    entityCode, new ArrayList<>(states), transitions, transitions.size()));
         } catch (Exception e) {
             log.error("Failed to get state machine for {}: {}", entityCode, e.getMessage());
             return ApiResponse.internalError("获取状态机定义失败");
