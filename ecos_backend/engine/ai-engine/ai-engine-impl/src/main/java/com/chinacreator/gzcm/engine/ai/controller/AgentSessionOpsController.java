@@ -16,6 +16,7 @@ import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway;
 import com.chinacreator.gzcm.runtime.llm.gateway.LLMGateway.ModelLimit;
 import com.chinacreator.gzcm.runtime.llm.metrics.AgentMetrics;
 import com.chinacreator.gzcm.runtime.llm.model.AgentCallLog;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -67,6 +68,10 @@ import java.util.Set;
  * {@code AgentProviderController} 共用 {@code /api/v1/agent} 前缀（均已在
  * {@code VersionPrefixRewriteFilter} 反向重写面覆盖，{@code ClearanceInterceptor}
  * L1 兜底按 {@code /api/v1/} 全放行）。只增不改：不改既有的相同前缀映射。</p>
+ *
+ * <p><b>#147DB 载体</b>：四个端点载荷改 record（键名与旧 Map 逐键一致；{@code keptKeyRefs}/
+ * {@code droppedKeyRefs}/{@code costRatio} 等「恒 null 但仍出键」的字段用普通可空组件保持）。
+ * 仍余 {@code Map} 的是属主 {@link GuardrailDecisionLedgerDao#listFiltered} 的台账行。</p>
  */
 @RestController
 @RequestMapping("/api/v1/agent")
@@ -99,6 +104,98 @@ public class AgentSessionOpsController {
         this.toolSubjectResolver = toolSubjectResolver;
     }
 
+    /** #12 上下文面（13 键；limit/threshold/配额三数在不可得时保持 null 出键）。 */
+    public record SessionContextVO(@JsonProperty("sessionId") String sessionId,
+                                   @JsonProperty("estimatedTokens") int estimatedTokens,
+                                   @JsonProperty("estimated") boolean estimated,
+                                   @JsonProperty("promptTokens") int promptTokens,
+                                   @JsonProperty("completionTokens") int completionTokens,
+                                   @JsonProperty("limit") Integer limit,
+                                   @JsonProperty("threshold") Integer threshold,
+                                   @JsonProperty("compressedTurns") int compressedTurns,
+                                   @JsonProperty("compressionMode") Object compressionMode,
+                                   @JsonProperty("quotaEnforced") boolean quotaEnforced,
+                                   @JsonProperty("quotaRemaining") Long quotaRemaining,
+                                   @JsonProperty("quotaLimit") Long quotaLimit,
+                                   @JsonProperty("quotaUsed") Long quotaUsed) {
+    }
+
+    /** #13 压缩回执（13 键；keyRefs 两键恒 null 出键——摘要原文不入本响应）。 */
+    public record CompressVO(@JsonProperty("sessionId") String sessionId,
+                             @JsonProperty("model") String model,
+                             @JsonProperty("status") String status,
+                             @JsonProperty("compressSkipped") boolean compressSkipped,
+                             @JsonProperty("mode") String mode,
+                             @JsonProperty("compressedTurns") int compressedTurns,
+                             @JsonProperty("estimatedTokensBefore") int estimatedTokensBefore,
+                             @JsonProperty("estimatedTokensAfter") int estimatedTokensAfter,
+                             @JsonProperty("threshold") int threshold,
+                             @JsonProperty("batchId") String batchId,
+                             @JsonProperty("reason") String reason,
+                             @JsonProperty("keptKeyRefs") Object keptKeyRefs,
+                             @JsonProperty("droppedKeyRefs") Object droppedKeyRefs) {
+    }
+
+    /** #15 聚合桶（5 键；costRatio 无价目面故恒 null 出键）。 */
+    public record UsageBucketVO(@JsonProperty("period") String period,
+                                @JsonProperty("promptTokens") int promptTokens,
+                                @JsonProperty("completionTokens") int completionTokens,
+                                @JsonProperty("estimated") boolean estimated,
+                                @JsonProperty("costRatio") Object costRatio) {
+    }
+
+    /** #15 合计（2 键）。 */
+    public record UsageTotalsVO(@JsonProperty("promptTokens") long promptTokens,
+                                @JsonProperty("completionTokens") long completionTokens) {
+    }
+
+    /** #15 响应（9 键）。 */
+    public record UsageVO(@JsonProperty("subsystem") String subsystem,
+                          @JsonProperty("period") String period,
+                          @JsonProperty("agentId") String agentId,
+                          @JsonProperty("modelKey") String modelKey,
+                          @JsonProperty("itemCount") int itemCount,
+                          @JsonProperty("items") List<UsageBucketVO> items,
+                          @JsonProperty("totals") UsageTotalsVO totals,
+                          @JsonProperty("windowCallCount") int windowCallCount,
+                          @JsonProperty("windowLimit") int windowLimit) {
+    }
+
+    /** #14 台账条目（7 键；{@code policyRef} 键名取契约常量）。 */
+    public record GuardrailDecisionVO(@JsonProperty("traceId") Object traceId,
+                                      @JsonProperty("sessionId") Object sessionId,
+                                      @JsonProperty("toolKey") Object toolKey,
+                                      @JsonProperty("decision") Object decision,
+                                      @JsonProperty(GuardrailDecisionContract.KEY_POLICY_REF) Object policyRef,
+                                      @JsonProperty("latencyMs") Integer latencyMs,
+                                      @JsonProperty("createTime") String createTime) {
+    }
+
+    /** #14 过滤回显（5 键，未给的键保持 null 出键）。 */
+    public record GuardrailFiltersVO(@JsonProperty("traceId") String traceId,
+                                     @JsonProperty("toolKey") String toolKey,
+                                     @JsonProperty("decision") String decision,
+                                     @JsonProperty("from") String from,
+                                     @JsonProperty("to") String to) {
+    }
+
+    /** #14 响应（4 键）。 */
+    public record GuardrailListVO(@JsonProperty("itemCount") int itemCount,
+                                  @JsonProperty("items") List<GuardrailDecisionVO> items,
+                                  @JsonProperty("limit") int limit,
+                                  @JsonProperty("filters") GuardrailFiltersVO filters) {
+    }
+
+    /** 依赖不可得载荷（3 键）。 */
+    public record DependencyUnavailableVO(@JsonProperty("scope") String scope,
+                                          @JsonProperty("service") String service,
+                                          @JsonProperty("reason") String reason) {
+    }
+
+    /** #13 请求体（{@code model}/{@code keepRecent} 保持宽松类型，非法形态按"缺位"处理）。 */
+    public record CompressRequest(Object model, Object keepRecent) {
+    }
+
     // ═══════════════════════════════════════════════════════════════
     //  #12 GET /api/v1/agent/sessions/{sessionId}/context
     // ═══════════════════════════════════════════════════════════════
@@ -109,7 +206,7 @@ public class AgentSessionOpsController {
      * @param sessionId 会话 ID；空 ⇒ 404（真实不存在，禁伪默认预算）
      */
     @GetMapping("/sessions/{sessionId}/context")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getSessionContext(
+    public ResponseEntity<ApiResponse<SessionContextVO>> getSessionContext(
             @PathVariable("sessionId") String sessionId) {
         AgentSessionService.AgentSession session = sessionService.getSession(sessionId);
         if (session == null) {
@@ -123,7 +220,6 @@ public class AgentSessionOpsController {
         Object completionTokensRaw = stats[1];
         Object compressionModeRaw = stats[2];
 
-        List<AgentSessionService.AgentMessage> activeMessages = null;
         // 估算仅作字典/门槛不可得时的最终兜底（否则一律用真实计量，禁估算当实测 X-39）
         int promptTokens = promptTokensRaw instanceof Number n ? n.intValue() : estimateActiveMessages(sessionId);
         int completionTokens = completionTokensRaw instanceof Number n ? n.intValue() : 0;
@@ -140,20 +236,15 @@ public class AgentSessionOpsController {
                 ? sessionDao.countCompressedMessages(sessionId) : 0;
         SessionTokenQuotaService.QuotaState quota = checkQuota(sessionId);
 
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("sessionId", sessionId);
-        data.put("estimatedTokens", estimatedTokens);
-        data.put("estimated", usageEstimated);
-        data.put("promptTokens", promptTokens);
-        data.put("completionTokens", completionTokens);
-        data.put("limit", modelLimit > 0 ? modelLimit : null);
-        data.put("threshold", thresholdTokens > 0 ? thresholdTokens : null);
-        data.put("compressedTurns", compressedTurns);
-        data.put("compressionMode", compressionModeRaw);
-        data.put("quotaEnforced", quota != null && quota.enforced());
-        data.put("quotaRemaining", quota != null && quota.enforced() ? quota.remaining() : null);
-        data.put("quotaLimit", quota != null ? quota.limit() : null);
-        data.put("quotaUsed", quota != null && quota.enforced() ? quota.used() : null);
+        SessionContextVO data = new SessionContextVO(sessionId, estimatedTokens, usageEstimated,
+                promptTokens, completionTokens,
+                modelLimit > 0 ? modelLimit : null,
+                thresholdTokens > 0 ? thresholdTokens : null,
+                compressedTurns, compressionModeRaw,
+                quota != null && quota.enforced(),
+                quota != null && quota.enforced() ? quota.remaining() : null,
+                quota != null ? quota.limit() : null,
+                quota != null && quota.enforced() ? quota.used() : null);
 
         return ResponseEntity.ok(ApiResponse.success(data));
     }
@@ -176,35 +267,23 @@ public class AgentSessionOpsController {
     //  #13 POST /api/v1/agent/sessions/{sessionId}/compress
     // ═══════════════════════════════════════════════════════════════
 
-    /**
-     * 显式触发压缩。
-     *
-     * <p>请求体（可选段）：
-     * <ul>
-     *   <li>{@code model} — 上下文上限查询的模型名（缺失时回落会话面回落，最差
-     *       时以会话面 agentId 字面 作为默认模型名作查询键，<b>非伪造</b>：
-     *       该查询键在目录{@code llm.models.*}不存在时 {@code MODEL_LIMIT_UNAVAILABLE}
-     *       不判定返回，不静默按"无需压缩"。）</li>
-     *   <li>{@code keepRecent} — 保留窗口最近 K 轮（仅 positive 生效）</li>
-     * </ul>
-     */
     @PostMapping("/sessions/{sessionId}/compress")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> compressSession(
+    public ResponseEntity<ApiResponse<CompressVO>> compressSession(
             @PathVariable("sessionId") String sessionId,
-            @RequestBody(required = false) Map<String, Object> body) {
+            @RequestBody(required = false) CompressRequest body) {
         AgentSessionService.AgentSession session = sessionService.getSession(sessionId);
         if (session == null) {
             return ResponseEntity.status(404).body(ApiResponse.error(
                     404, AiErrorClass.NOT_FOUND.errorCode(),
                     "会话 " + sessionId + " 不存在（" + AiErrorClass.NOT_FOUND.renderMessage(null) + "）"));
         }
-        String model = readString(body, "model");
+        String model = readString(body == null ? null : body.model());
         if (model == null) {
             // 会话面下的字典回落；未登记时以会话 profileName 兜底作为查询键（禁硬编码模型名）
             model = session.getAgentId() != null && !session.getAgentId().isBlank()
                     ? session.getAgentId() : "default";
         }
-        Integer keepRecent = readPositiveInt(body, "keepRecent");
+        Integer keepRecent = readPositiveInt(body == null ? null : body.keepRecent());
         String traceId = com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport.currentTraceId();
         Outcome outcome;
         outcome = compressionService.compress(sessionId, model, traceId, keepRecent);
@@ -224,8 +303,7 @@ public class AgentSessionOpsController {
                     AiErrorClass.CONTEXT_OVERFLOW.errorCode(),
                     AiErrorClass.CONTEXT_OVERFLOW.renderMessage(traceId)));
         }
-        Map<String, Object> data = compressView(sessionId, model, outcome);
-        return ResponseEntity.ok(ApiResponse.success(data));
+        return ResponseEntity.ok(ApiResponse.success(compressView(sessionId, model, outcome)));
     }
 
     private static int resolvedLimitAfter(Outcome outcome) {
@@ -237,40 +315,20 @@ public class AgentSessionOpsController {
         return ratio > 0 && ratio <= 1 ? outcome.thresholdTokens() : outcome.modelLimit();
     }
 
-    private static Map<String, Object> compressView(String sessionId, String model, Outcome outcome) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("sessionId", sessionId);
-        data.put("model", model);
-        data.put("status", outcome.status().name());
-        data.put("compressSkipped", outcome.compressSkipped());
-        data.put("mode", outcome.compressionMode());
-        data.put("compressedTurns", outcome.compressedTurns());
-        data.put("estimatedTokensBefore", outcome.estimatedTokensBefore());
-        data.put("estimatedTokensAfter", outcome.estimatedTokensAfter());
-        data.put("threshold", outcome.thresholdTokens());
-        data.put("batchId", outcome.batchId());
-        data.put("reason", outcome.reason());
+    private static CompressVO compressView(String sessionId, String model, Outcome outcome) {
         // keyRefs 不在此视图承载（摘要原文在 V203 批次台账与消息体，本响应只承载面签名）
-        data.put("keptKeyRefs", null);
-        data.put("droppedKeyRefs", null);
-        return data;
+        return new CompressVO(sessionId, model, outcome.status().name(), outcome.compressSkipped(),
+                outcome.compressionMode(), outcome.compressedTurns(), outcome.estimatedTokensBefore(),
+                outcome.estimatedTokensAfter(), outcome.thresholdTokens(), outcome.batchId(),
+                outcome.reason(), null, null);
     }
 
     // ═══════════════════════════════════════════════════════════════
     //  #15 GET /api/v1/agent/usage
     // ═══════════════════════════════════════════════════════════════
 
-    /**
-     * token 与成本聚合（period 维度）。
-     *
-     * @param period   可选：{@code YYYY-MM}（月桶）或 {@code YYYY-MM-DD}（日桶）；
-     *                 缺省 = 当期日
-     * @param agentId  可选：按会话-agent 过滤（profileName 字段承载，见 F06-05 meter 落库面）
-     * @param modelKey 可选：按模型 key 过滤（本表列面 {@code profile_name} 未拆模型子键，
-     *                 过滤在应用侧对 profile_name 前缀命中）
-     */
     @GetMapping("/usage")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getAgentUsage(
+    public ResponseEntity<ApiResponse<UsageVO>> getAgentUsage(
             @RequestParam(name = "period", required = false) String period,
             @RequestParam(name = "agentId", required = false) String agentId,
             @RequestParam(name = "modelKey", required = false) String modelKey) {
@@ -301,7 +359,7 @@ public class AgentSessionOpsController {
         String modelFilter = blankToNull(modelKey);
 
         // 聚合键：period_label（月桶或日桶或原始 createdTime 月度）
-        Map<String, Map<String, Object>> byBucket = new LinkedHashMap<>();
+        Map<String, Bucket> byBucket = new LinkedHashMap<>();
         DateTimeFormatter dayFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         DateTimeFormatter monthFmt = DateTimeFormatter.ofPattern("yyyy-MM");
         long totalPrompt = 0;
@@ -340,39 +398,39 @@ public class AgentSessionOpsController {
             }
             String bucketKey = (dayFilter != null || period != null && period.trim().length() == 10)
                     ? dayLabel : monthLabel;
-            Map<String, Object> row = byBucket.computeIfAbsent(bucketKey, k -> {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("period", k);
-                m.put("promptTokens", 0);
-                m.put("completionTokens", 0);
-                // 本表数据为真实计量（LlmUsageMeter 单源落库），estimated 一律 false
-                m.put("estimated", false);
-                // 成本比率缺显式价目面（详设 16 编号的 cost），且不属本腿 P1.3 收切片
-                // 故不在此伪造：只承载 prompt/completion，接口层面供需两侧以 -1 占位显式表"不可得"
-                m.put("costRatio", null);
-                return m;
-            });
+            Bucket row = byBucket.computeIfAbsent(bucketKey, Bucket::new);
             int p = Math.max(0, c.getTokensInput());
             int comp = Math.max(0, c.getTokensOutput());
-            row.put("promptTokens", (Number) row.get("promptTokens") instanceof Integer i ? i + p : p);
-            row.put("completionTokens",
-                    (Number) row.get("completionTokens") instanceof Integer i ? i + comp : comp);
+            row.promptTokens += p;
+            row.completionTokens += comp;
             totalPrompt += p;
             totalCompletion += comp;
             counted++;
         }
 
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("subsystem", effSubsystem);
-        data.put("period", period == null || period.isBlank() ? "current-day" : period);
-        data.put("agentId", agentFilter);
-        data.put("modelKey", modelFilter);
-        data.put("itemCount", byBucket.size());
-        data.put("items", new java.util.ArrayList<>(byBucket.values()));
-        data.put("totals", Map.of("promptTokens", totalPrompt, "completionTokens", totalCompletion));
-        data.put("windowCallCount", counted);
-        data.put("windowLimit", 500);
+        List<UsageBucketVO> items = new ArrayList<>(byBucket.size());
+        for (Bucket b : byBucket.values()) {
+            // 本表数据为真实计量（LlmUsageMeter 单源落库），estimated 一律 false；
+            // 成本比率缺显式价目面，故 costRatio 恒 null（不伪造）
+            items.add(new UsageBucketVO(b.period, b.promptTokens, b.completionTokens, false, null));
+        }
+
+        UsageVO data = new UsageVO(effSubsystem,
+                period == null || period.isBlank() ? "current-day" : period,
+                agentFilter, modelFilter, byBucket.size(), items,
+                new UsageTotalsVO(totalPrompt, totalCompletion), counted, 500);
         return ResponseEntity.ok(ApiResponse.success(data));
+    }
+
+    /** 聚合桶累加器（内部可变载体；仅作聚合，不外发）。 */
+    private static final class Bucket {
+        final String period;
+        int promptTokens;
+        int completionTokens;
+
+        Bucket(String period) {
+            this.period = period;
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -383,18 +441,8 @@ public class AgentSessionOpsController {
      * 大小写不敏感，含 {@code ROLE_} 前缀形态；与 F10-21 admin 判据同口径）。 */
     private static final Set<String> GUARDRAIL_ROLES = Set.of("ai_guardian", "role_ai_guardian");
 
-    /**
-     * 裁决台账查询（对账面，详设说明书 line 6058 {@code listGuardrailDecisions}）。
-     *
-     * @param traceId  可选：按链路 traceId 精确过滤
-     * @param toolKey  可选：按工具 code 精确过滤
-     * @param decision 可选：ALLOW / DENY / FAIL_CLOSED 三态字面过滤
-     * @param from     可选：ISO-8601 起始（含）
-     * @param to       可选：ISO-8601 截止（不含）
-     * @param limit    可选：正整数，缺省 100 上限 500（契约单 Ceiling）
-     */
     @GetMapping("/guardrail-decisions")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> listGuardrailDecisions(
+    public ResponseEntity<ApiResponse<GuardrailListVO>> listGuardrailDecisions(
             @RequestParam(name = "traceId", required = false) String traceId,
             @RequestParam(name = "toolKey", required = false) String toolKey,
             @RequestParam(name = "decision", required = false) String decision,
@@ -414,36 +462,22 @@ public class AgentSessionOpsController {
                 blankToNull(traceId), blankToNull(toolKey), blankToNull(decision),
                 blankToNull(from), blankToNull(to), effLimit);
 
-        List<Map<String, Object>> items = new ArrayList<>(rows.size());
+        List<GuardrailDecisionVO> items = new ArrayList<>(rows.size());
         for (Map<String, Object> row : rows) {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("traceId", row.get("trace_id"));
-            item.put("sessionId", row.get("session_id"));
-            item.put("toolKey", row.get("tool_key"));
-            item.put("decision", row.get("decision"));
-            item.put(GuardrailDecisionContract.KEY_POLICY_REF, row.get("policy_id"));
             Object latency = row.get("latency_ms");
-            item.put("latencyMs", latency instanceof Number n ? n.intValue() : null);
-            item.put("createTime", formatTimestamp(row.get("create_time")));
-            items.add(item);
+            items.add(new GuardrailDecisionVO(row.get("trace_id"), row.get("session_id"),
+                    row.get("tool_key"), row.get("decision"), row.get("policy_id"),
+                    latency instanceof Number n ? n.intValue() : null,
+                    formatTimestamp(row.get("create_time"))));
         }
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("itemCount", items.size());
-        data.put("items", items);
-        data.put("limit", effLimit);
-        // 本端点过滤限定 traceId/toolKey/decision/from/to 五键；未命中时由响应面空集如实表达，
-        // 禁合成"空即全量"伪聚合。回显面用 LinkedHashMap（Map.of 拒 null，空过滤即 NPE）
-        Map<String, Object> filters = new LinkedHashMap<>();
-        filters.put("traceId", blankToNull(traceId));
-        filters.put("toolKey", blankToNull(toolKey));
-        filters.put("decision", blankToNull(decision));
-        filters.put("from", blankToNull(from));
-        filters.put("to", blankToNull(to));
-        data.put("filters", filters);
-        return ResponseEntity.ok(ApiResponse.success(data));
+        // 过滤回显：未命中时由响应面空集如实表达，禁合成"空即全量"伪聚合
+        GuardrailFiltersVO filters = new GuardrailFiltersVO(blankToNull(traceId),
+                blankToNull(toolKey), blankToNull(decision), blankToNull(from), blankToNull(to));
+        return ResponseEntity.ok(ApiResponse.success(
+                new GuardrailListVO(items.size(), items, effLimit, filters)));
     }
 
-    private ResponseEntity<ApiResponse<Map<String, Object>>> guardrailDeniedResponse(String message) {
+    private ResponseEntity<ApiResponse<GuardrailListVO>> guardrailDeniedResponse(String message) {
         return ResponseEntity.status(AiErrorClass.GUARDRAIL_DENIED.httpStatus()).body(
                 ApiResponse.forbidden(AiErrorClass.GUARDRAIL_DENIED.errorCode(),
                         message == null ? AiErrorClass.GUARDRAIL_DENIED.renderMessage(null) : message));
@@ -497,25 +531,22 @@ public class AgentSessionOpsController {
         return llmGateway.modelContextLimit(key);
     }
 
-    /** 请求体可选字段读取：缺位 ⇒ null（服务层回落字典），非法类型拒（禁 toString 伪造）。 */
-    private static String readString(Map<String, Object> body, String key) {
-        if (body == null) return null;
-        Object v = body.get(key);
-        if (v == null) return null;
-        if (!(v instanceof String s)) {
+    /** 可选字段读取：缺位/非法类型 ⇒ null（服务层回落字典），禁 toString 伪造。 */
+    private static String readString(Object value) {
+        if (value == null) return null;
+        if (!(value instanceof String s)) {
             return null;
         }
         return s.isBlank() ? null : s.trim();
     }
 
-    private static Integer readPositiveInt(Map<String, Object> body, String key) {
-        if (body == null) return null;
-        Object v = body.get(key);
-        if (v instanceof Number n) {
+    private static Integer readPositiveInt(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number n) {
             int i = n.intValue();
             return i > 0 ? i : null;
         }
-        if (v instanceof String s) {
+        if (value instanceof String s) {
             try {
                 int i = Integer.parseInt(s.trim());
                 return i > 0 ? i : null;
@@ -531,13 +562,11 @@ public class AgentSessionOpsController {
     }
 
     /** 版本化依赖不可得的显式承载：使用 503 + D.5 分类 stub 码（依赖未就绪，非 200 伪成功）。 */
-    private ResponseEntity<ApiResponse<Map<String, Object>>> dependencyUnavailableResponse(
+    private <T> ResponseEntity<ApiResponse<T>> dependencyUnavailableResponse(
             String scope, String service, String reason) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("scope", scope);
-        data.put("service", service);
-        data.put("reason", reason == null ? "-" : reason);
-        return ResponseEntity.status(AiErrorClass.GUARDRAIL_FAIL_CLOSED.httpStatus()).body(ApiResponse.error(
+        DependencyUnavailableVO data = new DependencyUnavailableVO(scope, service,
+                reason == null ? "-" : reason);
+        return ResponseEntity.status(AiErrorClass.GUARDRAIL_FAIL_CLOSED.httpStatus()).body(ApiResponse.<T>error(
                 AiErrorClass.GUARDRAIL_FAIL_CLOSED.httpStatus(),
                 AiErrorClass.GUARDRAIL_FAIL_CLOSED.errorCode(),
                 AiErrorClass.GUARDRAIL_FAIL_CLOSED.renderMessage(null, service)));
