@@ -28,19 +28,19 @@ public class AlertController {
 
     /** GET /api/v1/alerts — 告警列表 (转发至 workspace 结果) */
     @GetMapping
-    public ApiResponse<List<Map<String, Object>>> listAlerts() {
+    public ApiResponse<List<Object>> listAlerts() {
         return ApiResponse.success(Collections.emptyList());
     }
 
     /** GET /api/v1/alerts/{id} — 告警详情 */
     @GetMapping("/{id}")
-    public ApiResponse<Map<String, Object>> getAlert(@PathVariable String id) {
+    public ApiResponse<Object> getAlert(@PathVariable String id) {
         return ApiResponse.notFound("Alert 详情由 workspace-service 提供 (端口:18090): " + id);
     }
 
     /** POST /api/v1/alerts/{id}/ack — 确认告警 */
     @PostMapping("/{id}/ack")
-    public ApiResponse<Map<String, Object>> ackAlert(@PathVariable String id) {
+    public ApiResponse<Object> ackAlert(@PathVariable String id) {
         return ApiResponse.notFound("告警确认由 runtime-task 维持 (参见 workspace ITaskManagementService)");
     }
 }

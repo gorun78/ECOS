@@ -2,6 +2,8 @@ package com.chinacreator.gzcm.gateway.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.gateway.twin.DigitalTwinService;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
@@ -37,20 +39,15 @@ public class TwinController {
 
     @Operation(summary = "聚合状态", description = "获取所有设备聚合状态概览")
     @GetMapping("/status")
-    public ApiResponse<Map<String, Object>> aggregateStatus() {
+    public ApiResponse<TwinAggregateVO> aggregateStatus() {
         log.debug("P3-4 aggregate status request");
-        Map<String, Object> result = new java.util.LinkedHashMap<>();
-        result.put("mqtt_up", twinService.getHealth().get("mqtt"));
-        java.util.List<Map<String, Object>> devices = twinService.getDeviceList();
+        List<Map<String, Object>> devices = twinService.getDeviceList();
         long onlineCount = devices.stream()
                 .filter(d -> "online".equals(d.get("status")))
                 .count();
         long offlineCount = devices.size() - onlineCount;
-        result.put("total_devices", devices.size());
-        result.put("online_devices", onlineCount);
-        result.put("offline_devices", offlineCount);
-        result.put("devices", devices);
-        return ApiResponse.success(result);
+        return ApiResponse.success(new TwinAggregateVO(twinService.getHealth().get("mqtt"),
+                devices.size(), onlineCount, offlineCount, devices));
     }
 
     @Operation(summary = "设备列表", description = "获取所有注册设备的信息")
@@ -99,5 +96,14 @@ public class TwinController {
         log.info("P3-4 command: deviceId={}, command={}, params={}", deviceId, command, params);
         Map<String, Object> result = twinService.sendCommand(deviceId, command, params);
         return ApiResponse.success(result);
+    }
+
+    /** 设备聚合视图（5 键，DI-2 #147EW）：mqtt_up/total_devices/online_devices/offline_devices/devices。 */
+    @JsonPropertyOrder({"mqtt_up", "total_devices", "online_devices", "offline_devices", "devices"})
+    public record TwinAggregateVO(@JsonProperty("mqtt_up") Object mqttUp,
+                                  @JsonProperty("total_devices") int totalDevices,
+                                  @JsonProperty("online_devices") long onlineDevices,
+                                  @JsonProperty("offline_devices") long offlineDevices,
+                                  @JsonProperty("devices") Object devices) {
     }
 }
