@@ -2,27 +2,27 @@ package com.chinacreator.gzcm.sysman.service;
 
 import com.chinacreator.gzcm.sysman.dao.SysConfigDao;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
 /**
  * 系统配置查询服务 — 从 SysConfigController 下沉的 JdbcTemplate 访问。
- * <p>铁律 §2.5：SQL 与数据访问下沉到 DAO（{@link SysConfigDao}），本类保留 JSONB 反序列化与
- * 行→强类型记录映射。</p>
+ * <p>铁律 §2.5：SQL 与数据访问下沉到 DAO（{@link SysConfigDao}），本类保留行→强类型记录映射。</p>
  *
  * <p><b>#147CA（DoD DI-2 第六批）</b>：行面由 {@code List<Map<String,Object>>} 改强类型 record
  * （{@link ConfigGroupRow}/{@link ConfigMetaRow}/{@link ConfigAuditRow}/{@link ConfigContractRow}），
  * 使 Controller 不再持有弱类型 Map；SQL 亦从 Controller 收回本类（原 metadata/audit/update 三条
  * 腿在 Controller 里拼 SQL，违「SQL 下沉 DAO」口径）。record 组件用 {@code @JsonProperty} 钉住
  * 旧列名（snake_case），保证 wire 键面逐字不变。</p>
+ *
+ * <p><b>#147CC（活体缺陷修复）</b>：根列表与元数据两条腿原 SELECT 的两个列
+ * （{@code config_options}/{@code impact_scope}）在 DDL 单源零载体，dev PG 实查 13 列无此二者
+ * ⇒ 活体恒 500。现只选实存列，两个键置 null 保留键位（禁补空数组冒充「已配置但为空」）。</p>
  */
 @Service
 public class SysConfigQueryService {
 
-    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private final SysConfigDao dao;
 
@@ -35,7 +35,12 @@ public class SysConfigQueryService {
         return dao != null;
     }
 
-    /** 列表行（GET /api/v1/system/config 的 data 元素；键面＝旧原始列名）。 */
+    /**
+     * 列表行（GET /api/v1/system/config 的 data 元素；键面＝旧原始列名）。
+     *
+     * <p>{@code configOptions}/{@code impactScope} 两键<b>恒为 null</b>：对应列在 DDL 单源不存在
+     * （#147CC 活体缺陷的根因），保留键位只为不破坏既有键面。</p>
+     */
     public record ConfigGroupRow(
             @JsonProperty("id") String id,
             @JsonProperty("config_group") String configGroup,
@@ -68,7 +73,16 @@ public class SysConfigQueryService {
     }
 
     /**
-     * 按分组/edition 列出配置项；{@code config_options} JSONB 已解析为 List。
+     * 按分组/edition 列出配置项。
+     *
+     * <p><b>#147CC（活体缺陷修复）</b>：原 SELECT 含 {@code config_options}/{@code impact_scope}
+     * 两列，而 dev PG 实查 {@code ecos_control.sys_config} 只有 13 列
+     * （id/config_group/config_key/config_value/config_type/config_label/config_label_en/
+     * description/sort_order/status/created_at/updated_at/edition）——两列在 DDL 单源里
+     * <b>零 CREATE 载体</b>，导致 {@code GET /api/v1/system/config} 与 {@code /metadata}
+     * 在活体上恒 500「查询配置失败」。现只选实存列；两个缺口键<b>保留键位但置 null</b>
+     * （前端按 {@code || undefined}/{@code || ''} 消费，null 与「列不存在」同义，禁补空数组
+     * 冒充「已配置但为空」）。</p>
      *
      * @param group   配置分组，可为空
      * @param edition 版本过滤，可为空
@@ -77,8 +91,7 @@ public class SysConfigQueryService {
     public List<ConfigGroupRow> listByGroup(String group, String edition, String currentEdition) {
         StringBuilder sqlBuilder = new StringBuilder(
             "SELECT id, config_group, config_key, config_value, config_type, " +
-            "config_label, config_label_en, description, sort_order, " +
-            "config_options, impact_scope, edition " +
+            "config_label, config_label_en, description, sort_order, edition " +
             "FROM sys_config WHERE 1=1");
         List<Object> params = new ArrayList<>();
 
@@ -112,8 +125,8 @@ public class SysConfigQueryService {
                     asString(row.get("config_label_en")),
                     asString(row.get("description")),
                     asInt(row.get("sort_order")),
-                    parseOptions(row.get("config_options")),
-                    asString(row.get("impact_scope")),
+                    null,
+                    null,
                     asString(row.get("edition"))));
         }
         return result;
@@ -128,8 +141,9 @@ public class SysConfigQueryService {
 
     /** 查询配置元数据（带定义、影响范围） */
     public List<ConfigMetaRow> queryMetadata() {
+        // #147CC：impact_scope 在 DDL 单源零载体（活体 13 列无此列），禁再选；键位保留为 null。
         String sql = "SELECT id, config_group, config_key, config_value, config_type, " +
-                     "config_label, config_label_en, description, impact_scope, edition " +
+                     "config_label, config_label_en, description, edition " +
                      "FROM sys_config ORDER BY config_group, sort_order";
         List<ConfigMetaRow> result = new ArrayList<>();
         for (Map<String, Object> row : dao.queryForList(sql)) {
@@ -142,7 +156,7 @@ public class SysConfigQueryService {
                     asString(row.get("config_label")),
                     asString(row.get("config_label_en")),
                     asString(row.get("description")),
-                    asString(row.get("impact_scope")),
+                    null,
                     asString(row.get("edition"))));
         }
         return result;
@@ -226,17 +240,6 @@ public class SysConfigQueryService {
             return number.intValue();
         }
         return null;
-    }
-
-    private static List<String> parseOptions(Object opts) {
-        if (opts instanceof String text && !text.isBlank()) {
-            try {
-                return objectMapper.readValue(text, new TypeReference<List<String>>() { });
-            } catch (Exception e) {
-                return List.of();
-            }
-        }
-        return List.of();
     }
 
     /** 时间列 → ISO-8601 文本；空值保持 null（不写 1970 之类的占位值）。 */

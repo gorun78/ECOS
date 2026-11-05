@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.sysman.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -79,19 +80,21 @@ class SysConfigWireShapeTest {
     }
 
     @Test
-    @DisplayName("根列表 data 元素＝原始列名 12 键（键序）；config_options 是数组")
+    @DisplayName("根列表 data 元素＝原始列名 12 键（键序）；两个幻影列键保留但为 null")
     void listRowsKeepLegacyColumnNames() {
         SysConfigQueryService service = mock(SysConfigQueryService.class);
         when(service.listByGroup(any(), any(), any())).thenReturn(List.of(
                 new SysConfigQueryService.ConfigGroupRow("1", "general", "k", "v", "string",
-                        "标签", "label", "desc", 3, List.of("a", "b"), "core", "all")));
+                        "标签", "label", "desc", 3, null, null, "all")));
         SysConfigController controller = new SysConfigController(provider(service));
 
         ApiResponse<SysConfigController.ConfigListVO> resp = controller.listByGroup("", "");
         assertEquals(List.of("data", "total"), keysOf(resp.getData()));
         Map<String, Object> row = asMap(resp.getData().data().get(0));
         assertEquals(ROW_KEYS, new ArrayList<>(row.keySet()));
-        assertEquals(List.of("a", "b"), row.get("config_options"));
+        assertTrue(row.containsKey("config_options"), "键位保留（不破坏前端 || 回落）");
+        assertNull(row.get("config_options"), "列不存在 ⇒ 恒 null，禁补空数组冒充已配置");
+        assertNull(row.get("impact_scope"));
     }
 
     @Test
