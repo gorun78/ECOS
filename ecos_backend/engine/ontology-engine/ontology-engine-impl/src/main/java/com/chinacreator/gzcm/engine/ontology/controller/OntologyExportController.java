@@ -48,9 +48,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  * <p><b>T16-4 说明</b>：入参/出参由 Map 改强类型（Query / SaveDTO / VO），
  * 跟随 T16-1/2/3 命名先例，复用 T16-4 已有的 {@link OntologyExportTaskSaveDTO} /
- * {@link OntologyExportTaskVO}。存储层内部记录仍为 {@code Map<String, Object>}
- * （T16-4: 导出 payload 动态结构豁免 Map），响应前统一
- * {@link ObjectMapper#convertValue} 转 VO，JSON 输出契约等价。
+ * {@link OntologyExportTaskVO}。存储层内部记录亦以 {@link OntologyExportTaskVO} 承载
+ * （DI-2 #147EL；导出 payload 仍为动态结构豁免，字段保持 {@code Object}），
+ * JSON 输出契约等价。
  */
 @RestController
 @RequestMapping("/api/v1/ontology/export")
@@ -60,8 +60,8 @@ public class OntologyExportController {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /** 内存存储：exportId → 导出任务记录（内部存储结构，响应前转 VO） */
-    private final Map<String, Map<String, Object>> store = new ConcurrentHashMap<>();
+    /** 内存存储：exportId → 导出任务记录（强类型 VO；payload 字段动态结构） */
+    private final Map<String, OntologyExportTaskVO> store = new ConcurrentHashMap<>();
 
     private final OntologyService ontologyService;
 
@@ -82,10 +82,9 @@ public class OntologyExportController {
         OntologyExportTaskQuery q = query == null ? new OntologyExportTaskQuery() : query;
         // 列表接口不返回 payload，避免响应过大；详情/下载接口才返回
         List<OntologyExportTaskVO> result = store.values().stream()
-            .filter(m -> q.getOntologyId() == null || q.getOntologyId().equals(m.get("ontologyId")))
-            .filter(m -> q.getFormat() == null || q.getFormat().equals(m.get("format")))
-            .filter(m -> q.getStatus() == null || q.getStatus().equals(m.get("status")))
-            .map(this::toSummaryVO)
+            .filter(m -> q.getOntologyId() == null || q.getOntologyId().equals(m.getOntologyId()))
+            .filter(m -> q.getFormat() == null || q.getFormat().equals(m.getFormat()))
+            .filter(m -> q.getStatus() == null || q.getStatus().equals(m.getStatus()))
             .collect(Collectors.toList());
         return ApiResponse.success(result);
     }
@@ -95,9 +94,9 @@ public class OntologyExportController {
      */
     @GetMapping("/{id}")
     public ApiResponse<OntologyExportTaskVO> getExport(@PathVariable String id) {
-        Map<String, Object> record = store.get(id);
+        OntologyExportTaskVO record = store.get(id);
         if (record == null) return ApiResponse.notFound("导出任务 " + id + " 不存在");
-        return ApiResponse.success(toTaskVO(record));
+        return ApiResponse.success(record);
     }
 
     // ═══════════════ 创建导出 ═══════════════════
@@ -119,29 +118,29 @@ public class OntologyExportController {
             ? "FULL" : body.getScope()).toUpperCase();
 
         String id = "exp_" + UUID.randomUUID().toString().substring(0, 8);
-        Map<String, Object> record = new LinkedHashMap<>();
-        record.put("id", id);
-        record.put("ontologyId", ontologyId);
-        record.put("format", format);
-        record.put("scope", scope);
-        record.put("status", "COMPLETED");
-        record.put("createdAt", Instant.now().toString());
+        OntologyExportTaskVO record = new OntologyExportTaskVO();
+        record.setId(id);
+        record.setOntologyId(ontologyId);
+        record.setFormat(format);
+        record.setScope(scope);
+        record.setStatus("COMPLETED");
+        record.setCreatedAt(Instant.now().toString());
 
         try {
             Object payload = buildPayload(ontologyId, format, scope);
-            record.put("payload", payload);
-            record.put("objectCount", countObjects(payload));
+            record.setPayload(payload);
+            record.setObjectCount(countObjects(payload));
         } catch (Exception e) {
             log.error("Export failed: {} — {}", id, e.getMessage(), e);
-            record.put("status", "FAILED");
-            record.put("error", e.getMessage());
-            record.put("payload", null);
-            record.put("objectCount", 0);
+            record.setStatus("FAILED");
+            record.setError(e.getMessage());
+            record.setPayload(null);
+            record.setObjectCount(0);
         }
         store.put(id, record);
         log.info("Ontology export created: {} ontologyId={} format={} status={}",
-                id, ontologyId, format, record.get("status"));
-        return ApiResponse.success(toTaskVO(record));
+                id, ontologyId, format, record.getStatus());
+        return ApiResponse.success(record);
     }
 
     // ═══════════════ 下载与删除 ═══════════════════
@@ -152,12 +151,12 @@ public class OntologyExportController {
      */
     @GetMapping("/{id}/download")
     public ApiResponse<Object> downloadExport(@PathVariable String id) {
-        Map<String, Object> record = store.get(id);
+        OntologyExportTaskVO record = store.get(id);
         if (record == null) return ApiResponse.notFound("导出任务 " + id + " 不存在");
-        if (!"COMPLETED".equals(record.get("status"))) {
+        if (!"COMPLETED".equals(record.getStatus())) {
             return ApiResponse.badRequest("ONT-EXP-002: 导出任务未完成，无法下载");
         }
-        return ApiResponse.success(record.get("payload"));
+        return ApiResponse.success(record.getPayload());
     }
 
     /**
@@ -173,16 +172,6 @@ public class OntologyExportController {
     }
 
     // ═══════════════ 内部方法 ═══════════════════
-
-    /** 去除 payload 的摘要 VO，用于列表接口（NON_NULL 保证与既有 Map 输出一致） */
-    private OntologyExportTaskVO toSummaryVO(Map<String, Object> record) {
-        return MAPPER.convertValue(record, OntologyExportTaskVO.class);
-    }
-
-    /** 完整记录 VO（含 payload / error） */
-    private OntologyExportTaskVO toTaskVO(Map<String, Object> record) {
-        return MAPPER.convertValue(record, OntologyExportTaskVO.class);
-    }
 
     /** 根据格式与范围构建导出载荷 */
     private Object buildPayload(String ontologyId, String format, String scope) {
