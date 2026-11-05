@@ -2,6 +2,9 @@ package com.chinacreator.gzcm.gateway.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.security.filter.RowFilterVerdictContract;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +27,7 @@ public class SecurityController {
     private static final Logger log = LoggerFactory.getLogger(SecurityController.class);
 
     /** 内存审计日志 */
-    private final List<Map<String, Object>> auditLogs = new CopyOnWriteArrayList<>();
+    private final List<AuditLogVO> auditLogs = new CopyOnWriteArrayList<>();
 
     public SecurityController() {
         // 种子审计日志
@@ -36,11 +39,10 @@ public class SecurityController {
     // ═══════════════════════════════════════════════════════════
 
     @PostMapping("/mask")
-    public ApiResponse<Map<String, Object>> mask(@RequestBody Map<String, Object> body) {
+    public ApiResponse<MaskResultVO> mask(@RequestBody Map<String, Object> body) {
         String value = (String) body.getOrDefault("value", "");
         String maskType = (String) body.getOrDefault("maskType", "SHA256");
 
-        Map<String, Object> result = new LinkedHashMap<>();
         try {
             String masked;
             String engine;
@@ -68,20 +70,14 @@ public class SecurityController {
                 }
             }
 
-            result.put("masked_value", masked);
-            result.put("engine", engine);
-            result.put("original_length", value.length());
-
             auditLog("DATA_MASK", "SUCCESS",
                     "Masked value with " + maskType + ", engine=" + engine);
+            return ApiResponse.success(new MaskResultVO(masked, engine, value.length()));
         } catch (Exception e) {
             log.error("数据遮蔽失败: maskType={}", maskType, e);
-            result.put("masked_value", "ERROR");
-            result.put("engine", "Java-fallback-failed");
             auditLog("DATA_MASK", "ERROR", "Mask failed");
+            return ApiResponse.success(new MaskResultVO("ERROR", "Java-fallback-failed", null));
         }
-
-        return ApiResponse.success(result);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -143,12 +139,11 @@ public class SecurityController {
     // ═══════════════════════════════════════════════════════════
 
     @PostMapping("/decrypt")
-    public ApiResponse<Map<String, Object>> decrypt(@RequestBody Map<String, Object> body) {
+    public ApiResponse<DecryptResultVO> decrypt(@RequestBody Map<String, Object> body) {
         String userId = (String) body.getOrDefault("userId", "unknown");
         String orgId = (String) body.getOrDefault("orgId", "");
         String datasetId = (String) body.getOrDefault("datasetId", "");
 
-        Map<String, Object> result = new LinkedHashMap<>();
         List<String> traces = new ArrayList<>();
 
         traces.add("[1] 初始化零信任解密链路: 用户 " + userId + " → 数据集 " + datasetId);
@@ -178,15 +173,11 @@ public class SecurityController {
 
         traces.add("[4] 解密操作完成, verdict=" + verdict);
 
-        result.put("success", success);
-        result.put("verdict", verdict);
-        result.put("traces", traces);
-        result.put("engine", "Zero-Trust Decryption Gateway (simulated)");
-
         auditLog("DECRYPT", success ? "GRANTED" : "DENIED",
                 "User=" + userId + " Dataset=" + datasetId + " → " + verdict);
 
-        return ApiResponse.success(result);
+        return ApiResponse.success(new DecryptResultVO(success, verdict, traces,
+                "Zero-Trust Decryption Gateway (simulated)"));
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -194,7 +185,7 @@ public class SecurityController {
     // ═══════════════════════════════════════════════════════════
 
     @GetMapping("/audit-logs")
-    public ApiResponse<List<Map<String, Object>>> getAuditLogs() {
+    public ApiResponse<List<AuditLogVO>> getAuditLogs() {
         return ApiResponse.success(new ArrayList<>(auditLogs));
     }
 
@@ -203,9 +194,8 @@ public class SecurityController {
     // ═══════════════════════════════════════════════════════════
 
     @GetMapping("/audit")
-    public ApiResponse<Map<String, Object>> getDiagnosticReport() {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("diagnosticReport",
+    public ApiResponse<DiagnosticReportVO> getDiagnosticReport() {
+        String report =
                 """
                 ╔══════════════════════════════════════════╗
                 ║   ECOS 安全中心 — 自适应安全诊断书      ║
@@ -227,9 +217,9 @@ public class SecurityController {
                 ║  • 建议部署 Rust 原生引擎以获得            ║
                 ║    <1ms 级延迟和硬件级安全隔离             ║
                 ╚══════════════════════════════════════════╝
-                """.formatted(Instant.now().toString()));
+                """.formatted(Instant.now().toString());
 
-        return ApiResponse.success(result);
+        return ApiResponse.success(new DiagnosticReportVO(report));
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -237,13 +227,8 @@ public class SecurityController {
     // ═══════════════════════════════════════════════════════════
 
     private void auditLog(String event, String status, String detail) {
-        Map<String, Object> entry = new LinkedHashMap<>();
-        entry.put("id", UUID.randomUUID().toString().substring(0, 8));
-        entry.put("timestamp", Instant.now().toString());
-        entry.put("event", event);
-        entry.put("status", status);
-        entry.put("detail", detail);
-        auditLogs.add(0, entry);
+        auditLogs.add(0, new AuditLogVO(UUID.randomUUID().toString().substring(0, 8),
+                Instant.now().toString(), event, status, detail));
 
         // 最多保留 100 条
         while (auditLogs.size() > 100) {
@@ -264,13 +249,31 @@ public class SecurityController {
         };
 
         for (int i = seeds.length - 1; i >= 0; i--) {
-            Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("id", "seed-" + i);
-            entry.put("timestamp", Instant.now().minusSeconds(i * 300L).toString());
-            entry.put("event", seeds[i][0]);
-            entry.put("status", seeds[i][1]);
-            entry.put("detail", seeds[i][2]);
-            auditLogs.add(entry);
+            auditLogs.add(new AuditLogVO("seed-" + i,
+                    Instant.now().minusSeconds(i * 300L).toString(),
+                    seeds[i][0], seeds[i][1], seeds[i][2]));
         }
+    }
+
+    /** 遮蔽回执（成功 3 键 / 失败省略 original_length，键序与旧 Map 一致）。 */
+    @JsonPropertyOrder({"masked_value", "engine", "original_length"})
+    public record MaskResultVO(@JsonProperty("masked_value") String maskedValue,
+                               @JsonProperty("engine") String engine,
+                               @JsonInclude(JsonInclude.Include.NON_NULL)
+                               @JsonProperty("original_length") Integer originalLength) {
+    }
+
+    /** 解密回执（4 键）：success/verdict/traces/engine。 */
+    public record DecryptResultVO(boolean success, String verdict, List<String> traces,
+                                  String engine) {
+    }
+
+    /** 审计日志行（5 键）：id/timestamp/event/status/detail。 */
+    public record AuditLogVO(String id, String timestamp, String event, String status,
+                             String detail) {
+    }
+
+    /** 安全诊断报告（1 键）：diagnosticReport。 */
+    public record DiagnosticReportVO(String diagnosticReport) {
     }
 }
