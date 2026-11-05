@@ -213,7 +213,7 @@ class SqlDialectDerivationTest {
             Map.entry("ecos_backend/services/datanet/src/main/java/com/chinacreator/gzcm/services/datanet/controller/DqDashboardController.java", Map.of( "A_SQL_CAST", 1)),
             Map.entry("ecos_backend/services/sysman/impl/sysman-boot/src/main/java/com/chinacreator/gzcm/sysman/boot/dao/AuthDao.java", Map.of( "D_RETURNING", 1)),
             Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/controller/EntityTableMappingController.java", Map.of( "A_SQL_CAST", 1)),
-            Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/controller/UserController.java", Map.of( "B_ILIKE", 2)),
+            Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/service/UserQueryService.java", Map.of( "B_ILIKE", 2)),
             Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/dao/AuditLogDao.java", Map.of( "D_RETURNING", 1)),
             Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/dao/BlacklistDao.java", Map.of( "C_UPSERT", 2)),
             Map.entry("ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/dao/DictTableDao.java", Map.of( "B_ILIKE", 3)),
