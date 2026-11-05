@@ -346,7 +346,11 @@ class WAgentEvidenceChainComplianceTest {
         Object instance = doType.getDeclaredConstructor().newInstance();
         Object result = method.invoke(null, instance);
         assertNotNull(result, methodName + " 返回空（视图方法已不被调用 = 门禁空转）");
-        return (Map<String, Object>) result;
+        if (result instanceof Map<?, ?>) {
+            return (Map<String, Object>) result;
+        }
+        // #147CO：视图已改 record（强类型载体）——按 JSON 序列化键面判等，与旧 Map 判据同尺
+        return new com.fasterxml.jackson.databind.ObjectMapper().convertValue(result, Map.class);
     }
 
     private static String toSnake(String name) {

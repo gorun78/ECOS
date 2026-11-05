@@ -133,6 +133,13 @@ import org.junit.jupiter.api.Test;
  *       {@code DispatchResult} 定义，属主契约另批）。本批新增两条键面断言（平铺 16 键、
  *       layers 4 键、缺项 7、缺口 12、补齐 10）——原 MockMvc 用例只断言了取值，键改名漏网，
  *       补断言后变异（去 {@code superseded_by} 注解）实红。</li>
+ *   <li>1996 ＝ #147CO（2026-11-05）HEAD 面复测值，差额 −16 行<b>全部</b>来自 ai 域
+ *       {@code WAgentEvidenceTraceController}（16→0）：claim/evidence/关联/反向索引四视图改
+ *       record，两处条件键用属性级 NON_NULL（{@code evidence} 仅跨租户过滤后仍可取时出现、
+ *       {@code run_id} 仅 Claim 可取时出现）；{@code claimView} 仍出 10 键基视图（与既有
+ *       {@code WAgentEvidenceChainComplianceTest} 钉死名录一致），端点再追加
+ *       {@code evidence_links}。**该门禁的 {@code invokeView} 同步支持 record 载体**（序列化后
+ *       键面判等，与旧 Map 判据同尺）；变异实红（去 {@code content_hash} 注解 ⇒ 键集红）。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -140,11 +147,11 @@ import org.junit.jupiter.api.Test;
  * 以及未跟踪新文件 {@code CognitiveFrameworkController}(4)／{@code CognitiveExecutionController}(4)／
  * {@code CognitiveMethodController}(2)）。按本门「上调基线一律不许」的铁口径，基线取
  * HEAD 面 2265，<b>不</b>为在途面放宽；工作树红在未提交面是门在按其判据正常工作。
- * <b>#147BW~#147CN 时该偏移不变</b>：工作树实读依次 2272 = 2261 + 11、2260 = 2249 + 11、
+ * <b>#147BW~#147CO 时该偏移不变</b>：工作树实读依次 2272 = 2261 + 11、2260 = 2249 + 11、
  * 2240 = 2229 + 11、2226 = 2215 + 11、2204 = 2193 + 11、2194 = 2183 + 11、
  * 2188 = 2177 + 11、2180 = 2169 + 11、2163 = 2152 + 11、2155 = 2144 + 11、
  * 2149 = 2138 + 11、2132 = 2121 + 11、2104 = 2093 + 11、2068 = 2057 + 11、
- * 2038 = 2027 + 11、2023 = 2012 + 11（同一批在途文件，未代改）。</p>
+ * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -159,7 +166,7 @@ class ControllerMapPayloadRatchetTest {
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
      */
-    private static final int BASELINE_LINES = 2012;
+    private static final int BASELINE_LINES = 1996;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -168,7 +175,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 2012（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1996（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;
