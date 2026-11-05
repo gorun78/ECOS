@@ -32,12 +32,10 @@ public class EcosKnowledgeGraphController {
      * 图谱快照 — 从PostgreSQL本体实体构建内存图
      */
     @GetMapping
-    public ApiResponse<Map<String, Object>> getGraph() {
+    public ApiResponse<KgGraphVO> getGraph() {
         try {
-            Map<String, Object> graph = new LinkedHashMap<>();
-
             // 节点: 11个本体实体 → Neo4j节点
-            List<Map<String, Object>> nodes = List.of(
+            List<KgNodeVO> nodes = List.of(
                 node("Supplier", "供应商", "dom_proc", "采购域"),
                 node("Order", "订单", "dom_proc", "采购域"),
                 node("Product", "产品", "dom_proc", "采购域"),
@@ -50,10 +48,9 @@ public class EcosKnowledgeGraphController {
                 node("Alert", "告警事件", "dom_fin", "财务域"),
                 node("FinanceTarget", "财务目标", "dom_fin", "财务域")
             );
-            graph.put("nodes", nodes);
 
             // 边: 语义关系
-            List<Map<String, Object>> edges = List.of(
+            List<KgEdgeVO> edges = List.of(
                 edge("Supplier", "Project", "SUPPLIES", "供应材料至"),
                 edge("Project", "Invoice", "ISSUES", "开具发票"),
                 edge("Project", "Equipment", "USES", "使用设备"),
@@ -66,16 +63,10 @@ public class EcosKnowledgeGraphController {
                 edge("Alert", "Project", "RAISED_ON", "项目告警"),
                 edge("Alert", "Equipment", "RELATED_TO", "关联设备")
             );
-            graph.put("edges", edges);
 
-            // 统计
-            Map<String, Object> stats = new LinkedHashMap<>();
-            stats.put("nodeCount", nodes.size());
-            stats.put("edgeCount", edges.size());
-            stats.put("domains", List.of("采购域", "项目域", "资产域", "财务域"));
-            graph.put("stats", stats);
-
-            return ApiResponse.success(graph);
+            KgStatsVO stats = new KgStatsVO(nodes.size(), edges.size(),
+                    List.of("采购域", "项目域", "资产域", "财务域"));
+            return ApiResponse.success(new KgGraphVO(nodes, edges, stats));
         } catch (Exception e) {
             log.error("Knowledge graph query failed", e);
             return ApiResponse.internalError("知识图谱查询失败");
@@ -86,37 +77,44 @@ public class EcosKnowledgeGraphController {
      * 同步到Neo4j — 将本体实体作为节点写入图数据库
      */
     @PostMapping("/sync")
-    public ApiResponse<Map<String, Object>> syncToNeo4j() {
-        Map<String, Object> result = new LinkedHashMap<>();
+    public ApiResponse<KgSyncVO> syncToNeo4j() {
         try {
             // Neo4j sync is async — return instructions
-            result.put("status", "ready_to_sync");
-            result.put("message", "请执行 Cypher 脚本同步到 Neo4j: docker exec ecos-neo4j cypher-shell -u neo4j -p password < /path/to/seed.cypher");
-            result.put("nodesAvailable", 11);
-            result.put("edgesAvailable", 11);
-            return ApiResponse.success(result);
+            return ApiResponse.success(new KgSyncVO("ready_to_sync",
+                    "请执行 Cypher 脚本同步到 Neo4j: docker exec ecos-neo4j cypher-shell -u neo4j -p password < /path/to/seed.cypher",
+                    11, 11));
         } catch (Exception e) {
             log.error("Knowledge graph sync failed", e);
             return ApiResponse.internalError("同步失败");
         }
     }
 
-    private Map<String, Object> node(String code, String name, String domain, String domainName) {
-        Map<String, Object> n = new LinkedHashMap<>();
-        n.put("code", code);
-        n.put("name", name);
-        n.put("domainId", domain);
-        n.put("domainName", domainName);
-        n.put("type", "OntologyEntity");
-        return n;
+    private static KgNodeVO node(String code, String name, String domain, String domainName) {
+        return new KgNodeVO(code, name, domain, domainName, "OntologyEntity");
     }
 
-    private Map<String, Object> edge(String source, String target, String relType, String label) {
-        Map<String, Object> e = new LinkedHashMap<>();
-        e.put("source", source);
-        e.put("target", target);
-        e.put("relationshipType", relType);
-        e.put("label", label);
-        return e;
+    private static KgEdgeVO edge(String source, String target, String relType, String label) {
+        return new KgEdgeVO(source, target, relType, label);
+    }
+
+    /** 图谱节点（5 键）：code/name/domainId/domainName/type（type 恒 OntologyEntity）。 */
+    public record KgNodeVO(String code, String name, String domainId, String domainName,
+                           String type) {
+    }
+
+    /** 图谱边（4 键）：source/target/relationshipType/label。 */
+    public record KgEdgeVO(String source, String target, String relationshipType, String label) {
+    }
+
+    /** 图谱统计（3 键）：nodeCount/edgeCount/domains。 */
+    public record KgStatsVO(int nodeCount, int edgeCount, List<String> domains) {
+    }
+
+    /** 图谱快照（3 键）：nodes/edges/stats。 */
+    public record KgGraphVO(List<KgNodeVO> nodes, List<KgEdgeVO> edges, KgStatsVO stats) {
+    }
+
+    /** 同步回执（4 键）：status/message/nodesAvailable/edgesAvailable。 */
+    public record KgSyncVO(String status, String message, int nodesAvailable, int edgesAvailable) {
     }
 }
