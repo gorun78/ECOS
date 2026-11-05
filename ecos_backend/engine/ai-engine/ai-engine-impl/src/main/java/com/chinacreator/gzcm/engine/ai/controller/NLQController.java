@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.*;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
 import com.chinacreator.gzcm.runtime.llm.scheduler.AgentResult;
+import com.chinacreator.gzcm.engine.ai.dto.NlqResultVO;
+import com.chinacreator.gzcm.engine.ai.dto.ObjectQlText;
 import com.chinacreator.gzcm.engine.ai.nlq.SemanticQueryService;
 import com.chinacreator.gzcm.engine.ai.nlq.ObjectQLParser;
 import com.chinacreator.gzcm.engine.ai.service.NLQService;
@@ -37,6 +39,10 @@ import com.chinacreator.gzcm.engine.ai.service.NLQService;
  *   <li>{@link ObjectQLParser#parse(String)} → SQL → JDBC 执行</li>
  *   <li>返回翻译结果 + 数据</li>
  * </ol>
+ *
+ * <p>DI-2 #147EA：回执改 {@link NlqResultVO}（{@code translated/results[/agent_answer][/message]}，
+ * 结果列名转小写）；ObjectQL 的规范化与 JSON 文本化收口 {@link ObjectQlText}
+ * （DSL 动态形态不冻结）。</p>
  */
 @RestController
 @RequestMapping("/api/v1/query")
@@ -60,7 +66,7 @@ public class NLQController {
      * @return 翻译后的 ObjectQL + 查询结果
      */
     @PostMapping("/nlq")
-    public ApiResponse<Map<String, Object>> nlq(@RequestBody Map<String, Object> body) {
+    public ApiResponse<NlqResultVO> nlq(@RequestBody Map<String, Object> body) {
         // F06-15：控制器禁 catch(Exception) —— 未预期异常交由 AiErrorAdvice 分类渲染（errorCode + traceId）；
         // 表缺失/SQL 失败一律 5xx，绝不回落 200 伪装成功（X-50）
         // 1. 提取问题
@@ -72,149 +78,38 @@ public class NLQController {
         log.info("NLQ 查询: {}", question);
 
         // 2. 语义翻译 → ObjectQL
-        Map<String, Object> objectQL = semanticQueryService.translate(question);
+        var objectQL = semanticQueryService.translate(question);
 
         // 3. 词典无匹配 → Agent Runtime fallback（调用 LLMGatewayService）
         if (objectQL == null) {
             log.warn("NLQ 词典无匹配: {}，进入 Agent Runtime fallback", question);
             AgentResult agentResult = llmGatewayService.execute("sysman", "nlq-fallback", question);
-            Map<String, Object> fallbackResult = new LinkedHashMap<>();
             if (agentResult.isSuccess()) {
                 log.info("Agent Runtime fallback 成功: session={}, duration={}ms",
                         agentResult.getSessionId(), agentResult.getDurationMs());
-                fallbackResult.put("translated", null);
-                fallbackResult.put("results", Collections.emptyList());
-                fallbackResult.put("agent_answer", agentResult.getContent());
-                fallbackResult.put("message", "词典无匹配，已通过 Agent Runtime 解析。");
-            } else {
-                log.warn("Agent Runtime fallback 失败: {}", agentResult.getErrorMsg());
-                fallbackResult.put("translated", null);
-                fallbackResult.put("results", Collections.emptyList());
-                fallbackResult.put("message", "词典无匹配，Agent Runtime 解析失败");
+                return ApiResponse.success(new NlqResultVO(
+                        null, List.of(), agentResult.getContent(),
+                        "词典无匹配，已通过 Agent Runtime 解析。"));
             }
-            return ApiResponse.success(fallbackResult);
+            log.warn("Agent Runtime fallback 失败: {}", agentResult.getErrorMsg());
+            return ApiResponse.success(new NlqResultVO(
+                    null, List.of(), null, "词典无匹配，Agent Runtime 解析失败"));
         }
 
         // 4. 规范化 ObjectQL 格式（复合 filter → filters 数组）
-        Map<String, Object> normalizedQL = normalizeObjectQL(objectQL);
+        var normalizedQL = ObjectQlText.normalize(objectQL);
         log.info("NLQ normalized QL: {}", normalizedQL);
-        String objectQLJson = toJson(normalizedQL);
+        String objectQLJson = ObjectQlText.toJson(normalizedQL);
         log.info("NLQ ObjectQL JSON: {}", objectQLJson);
         ObjectQLParser.ParsedQuery pq = ObjectQLParser.parse(objectQLJson);
         log.info("NLQ → ObjectQL: {} | SQL: {} | params={}", objectQLJson, pq.getSql(), pq.getParams());
 
         // 5. 执行 SQL（表不存在等故障交由 AiErrorAdvice 渲染 5xx，不再 200 掩蔽）
-        List<Map<String, Object>> rows;
-        if (pq.getParams().isEmpty()) {
-            rows = nlqService.queryForList(pq.getSql());
-        } else {
-            rows = nlqService.queryForList(pq.getSql(), pq.getParamsArray());
-        }
+        var rows = pq.getParams().isEmpty()
+                ? nlqService.queryForList(pq.getSql())
+                : nlqService.queryForList(pq.getSql(), pq.getParamsArray());
 
-        // 6. 字段名转小写
-        List<Map<String, Object>> normalized = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            for (Map.Entry<String, Object> entry : row.entrySet()) {
-                m.put(entry.getKey() != null ? entry.getKey().toLowerCase() : null, entry.getValue());
-            }
-            normalized.add(m);
-        }
-
-        // 7. 组装响应
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("translated", objectQLJson);
-        result.put("results", normalized);
-        return ApiResponse.success(result);
-    }
-
-    // ═══════════════════════════════════════════════════════
-    // 工具方法 — ObjectQL 格式规范化
-    // ═══════════════════════════════════════════════════════
-
-    /**
-     * 将 SemanticQueryService 的复合 filter 格式转换为 ObjectQLParser 支持的格式。
-     * <ul>
-     *   <li>SemanticQueryService 生成: {"entity":..., "filter":{"operator":"AND","conditions":[...]}}</li>
-     *   <li>ObjectQLParser 需要:   {"entity":..., "filters":[...]}</li>
-     * </ul>
-     */
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> normalizeObjectQL(Map<String, Object> ql) {
-        // 检查 filter 是否为复合格式 (operator + conditions)
-        Object filter = ql.get("filter");
-        if (filter instanceof Map) {
-            Map<String, Object> fMap = (Map<String, Object>) filter;
-            if (fMap.containsKey("operator") && fMap.containsKey("conditions")) {
-                Map<String, Object> result = new LinkedHashMap<>(ql);
-                result.remove("filter");
-                result.put("filters", fMap.get("conditions"));
-                return result;
-            }
-        }
-
-        // 跨 entity 的复合查询 — 取第一个子查询
-        if (ql.containsKey("composite") && ql.containsKey("queries")) {
-            Object queries = ql.get("queries");
-            if (queries instanceof List && !((List<?>) queries).isEmpty()) {
-                return normalizeObjectQL((Map<String, Object>) ((List<?>) queries).get(0));
-            }
-        }
-
-        return ql;
-    }
-
-    // ═══════════════════════════════════════════════════════
-    // 工具方法 — Map → JSON 字符串
-    // ═══════════════════════════════════════════════════════
-
-    /**
-     * 将 Map 序列化为 JSON 字符串（无外部依赖）。
-     */
-    private String toJson(Map<String, Object> map) {
-        StringBuilder sb = new StringBuilder("{");
-        boolean first = true;
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            if (!first) sb.append(", ");
-            sb.append("\"").append(entry.getKey()).append("\": ");
-            appendValue(sb, entry.getValue());
-            first = false;
-        }
-        sb.append("}");
-        return sb.toString();
-    }
-
-    @SuppressWarnings("unchecked")
-    private void appendValue(StringBuilder sb, Object value) {
-        if (value == null) {
-            sb.append("null");
-        } else if (value instanceof String) {
-            sb.append("\"").append(escapeJson((String) value)).append("\"");
-        } else if (value instanceof Number) {
-            sb.append(value);
-        } else if (value instanceof Boolean) {
-            sb.append(value);
-        } else if (value instanceof Map) {
-            sb.append(toJson((Map<String, Object>) value));
-        } else if (value instanceof List) {
-            sb.append("[");
-            boolean first = true;
-            for (Object item : (List<?>) value) {
-                if (!first) sb.append(", ");
-                appendValue(sb, item);
-                first = false;
-            }
-            sb.append("]");
-        } else {
-            sb.append("\"").append(escapeJson(value.toString())).append("\"");
-        }
-    }
-
-    private String escapeJson(String s) {
-        return s.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
+        // 6. 字段名转小写并组装响应
+        return ApiResponse.success(NlqResultVO.of(objectQLJson, rows));
     }
 }
