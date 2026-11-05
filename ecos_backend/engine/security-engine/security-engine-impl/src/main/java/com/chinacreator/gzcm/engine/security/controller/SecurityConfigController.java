@@ -39,8 +39,69 @@ public class SecurityConfigController {
         this.service = service;
     }
 
+    /** 配置读数（source + 视图 11 键；后 5 键仅档案列非空时出现）。 */
+    public record ProfileViewVO(@com.fasterxml.jackson.annotation.JsonProperty("source") String source,
+                                @com.fasterxml.jackson.annotation.JsonProperty("clearanceLevel") Integer clearanceLevel,
+                                @com.fasterxml.jackson.annotation.JsonProperty("level") Integer level,
+                                @com.fasterxml.jackson.annotation.JsonProperty("levelName") String levelName,
+                                @com.fasterxml.jackson.annotation.JsonProperty("linkedWorkstation") String linkedWorkstation,
+                                @com.fasterxml.jackson.annotation.JsonProperty("auditMode") String auditMode,
+                                @com.fasterxml.jackson.annotation.JsonProperty("sandboxMandatory") boolean sandboxMandatory,
+                                @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                @com.fasterxml.jackson.annotation.JsonProperty("userId") String userId,
+                                @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                @com.fasterxml.jackson.annotation.JsonProperty("roleId") String roleId,
+                                @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                @com.fasterxml.jackson.annotation.JsonProperty("scopeType") String scopeType,
+                                @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                @com.fasterxml.jackson.annotation.JsonProperty("tenantId") String tenantId,
+                                @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                @com.fasterxml.jackson.annotation.JsonProperty("orgId") String orgId) {
+
+        static ProfileViewVO of(String source, SecurityConfigService.SecurityProfileView v) {
+            return new ProfileViewVO(source, v.clearanceLevel(), v.level(), v.levelName(),
+                    v.linkedWorkstation(), v.auditMode(), v.sandboxMandatory(),
+                    v.userId(), v.roleId(), v.scopeType(), v.tenantId(), v.orgId());
+        }
+    }
+
+    /** 更新回执（success/table/动态 id 列 + 条件字段；动态列名保持 {@code user_id}/{@code role_id}）。 */
+    public record ProfileUpdateResultVO(@com.fasterxml.jackson.annotation.JsonProperty("success") boolean success,
+                                        @com.fasterxml.jackson.annotation.JsonProperty("table") String table,
+                                        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                        @com.fasterxml.jackson.annotation.JsonProperty("user_id") String userId,
+                                        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                        @com.fasterxml.jackson.annotation.JsonProperty("role_id") String roleId,
+                                        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                        @com.fasterxml.jackson.annotation.JsonProperty("clearanceLevel") Integer clearanceLevel,
+                                        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                        @com.fasterxml.jackson.annotation.JsonProperty("linkedWorkstation") String linkedWorkstation,
+                                        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                        @com.fasterxml.jackson.annotation.JsonProperty("auditMode") String auditMode,
+                                        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                        @com.fasterxml.jackson.annotation.JsonProperty("sandboxMandatory") Boolean sandboxMandatory,
+                                        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                        @com.fasterxml.jackson.annotation.JsonProperty("scopeType") String scopeType,
+                                        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                        @com.fasterxml.jackson.annotation.JsonProperty("tenantId") String tenantId,
+                                        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                        @com.fasterxml.jackson.annotation.JsonProperty("orgId") String orgId) {
+    }
+
+    /** 配置分页（data/total/page/pageSize 四键）。 */
+    public record ProfilePageVO(@com.fasterxml.jackson.annotation.JsonProperty("data") List<SecurityProfile> data,
+                                @com.fasterxml.jackson.annotation.JsonProperty("total") int total,
+                                @com.fasterxml.jackson.annotation.JsonProperty("page") int page,
+                                @com.fasterxml.jackson.annotation.JsonProperty("pageSize") int pageSize) {
+    }
+
+    /** 删除回执（success/id 两键）。 */
+    public record DeleteResultVO(@com.fasterxml.jackson.annotation.JsonProperty("success") boolean success,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("id") String id) {
+    }
+
     @GetMapping("/profile")
-    public ApiResponse<Map<String, Object>> getProfile(
+    public ApiResponse<ProfileViewVO> getProfile(
             @RequestParam(required = false) String userId,
             @RequestParam(required = false) String roleId,
             @RequestParam(required = false) String scopeType,
@@ -48,10 +109,8 @@ public class SecurityConfigController {
         try {
             if (scopeType != null && !scopeType.isBlank()) {
                 SecurityProfile profile = service.queryProfileByScope(scopeType.toUpperCase(), scopeId);
-                Map<String, Object> result = new LinkedHashMap<>();
-                result.put("source", "scope_" + scopeType.toLowerCase());
-                result.putAll(service.populateProfileResult(profile));
-                return ApiResponse.success(result);
+                return ApiResponse.success(ProfileViewVO.of("scope_" + scopeType.toLowerCase(),
+                        service.populateProfileResult(profile)));
             }
 
             String effectiveUserId = userId != null ? userId : UserContext.getCurrentUserId();
@@ -84,10 +143,8 @@ public class SecurityConfigController {
                 profile = service.queryGlobalDefaultProfile();
             }
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("source", source);
-            result.putAll(service.populateProfileResult(profile));
-            return ApiResponse.success(result);
+            return ApiResponse.success(ProfileViewVO.of(source,
+                    service.populateProfileResult(profile)));
         } catch (Exception e) {
             log.error("获取安全配置失败", e);
             return ApiResponse.internalError("获取安全配置失败");
@@ -96,7 +153,7 @@ public class SecurityConfigController {
 
     @PutMapping("/profile")
     @RequirePermission(permission = "security:config:update")
-    public ApiResponse<Map<String, Object>> updateProfile(
+    public ApiResponse<ProfileUpdateResultVO> updateProfile(
             @RequestBody Map<String, Object> body,
             @RequestParam(required = false) String userId,
             @RequestParam(required = false) String roleId) {
@@ -154,18 +211,11 @@ public class SecurityConfigController {
             publishAudit("security_profile_upsert", idValue, operator,
                     null, describeFields(clearanceLevel, auditMode, sandboxMandatory, scopeType), extra);
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("success", true);
-            result.put("table", targetTable);
-            result.put(idColumn, idValue);
-            if (clearanceLevel != null) result.put("clearanceLevel", clearanceLevel);
-            if (linkedWorkstation != null) result.put("linkedWorkstation", linkedWorkstation);
-            if (auditMode != null) result.put("auditMode", auditMode);
-            if (sandboxMandatory != null) result.put("sandboxMandatory", sandboxMandatory);
-            if (scopeType != null) result.put("scopeType", scopeType);
-            if (bodyTenantId != null) result.put("tenantId", bodyTenantId);
-            if (orgId != null) result.put("orgId", orgId);
-            return ApiResponse.success(result);
+            return ApiResponse.success(new ProfileUpdateResultVO(true, targetTable,
+                    "user_id".equals(idColumn) ? idValue : null,
+                    "role_id".equals(idColumn) ? idValue : null,
+                    clearanceLevel, linkedWorkstation, auditMode, sandboxMandatory,
+                    scopeType, bodyTenantId, orgId));
         } catch (Exception e) {
             log.error("更新安全配置失败", e);
             return ApiResponse.internalError("更新安全配置失败");
@@ -299,7 +349,7 @@ public class SecurityConfigController {
     }
 
     @GetMapping("/profiles")
-    public ApiResponse<Map<String, Object>> list(
+    public ApiResponse<ProfilePageVO> list(
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize,
@@ -330,12 +380,7 @@ public class SecurityConfigController {
                     ? all.subList(from, to)
                     : Collections.emptyList();
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("data", pageList);
-            result.put("total", all.size());
-            result.put("page", page);
-            result.put("pageSize", pageSize);
-            return ApiResponse.success(result);
+            return ApiResponse.success(new ProfilePageVO(pageList, all.size(), page, pageSize));
         } catch (Exception e) {
             log.error("查询安全配置列表失败", e);
             return ApiResponse.internalError("查询失败");
@@ -473,10 +518,7 @@ public class SecurityConfigController {
             extra.put("deletedRows", rows);
             publishAudit("security_profile_delete", id, operator, oldValue, "deleted", extra);
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("success", true);
-            result.put("id", id);
-            return ApiResponse.success(result);
+            return ApiResponse.success(new DeleteResultVO(true, id));
         } catch (Exception e) {
             log.error("删除安全配置失败, id={}", id, e);
             return ApiResponse.internalError("删除失败");

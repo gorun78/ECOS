@@ -65,10 +65,10 @@ class AbacTenantNullBypassTest {
         when(service.queryAllUserProfiles()).thenReturn(List.of(p));
         when(service.queryAllRoleProfiles()).thenReturn(List.of());
 
-        ApiResponse<Map<String, Object>> resp = controller.list(null, 1, 20, null, null);
+        ApiResponse<SecurityConfigController.ProfilePageVO> resp = controller.list(null, 1, 20, null, null);
         assertTrue(resp.isSuccess());
-        assertNotNull(resp.getData().get("data"));
-        assertEquals(1, (int) resp.getData().get("total"));
+        assertNotNull(resp.getData().data());
+        assertEquals(1, resp.getData().total());
     }
 
     @Test

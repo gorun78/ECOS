@@ -129,29 +129,48 @@ public class SecurityConfigService {
         }
     }
 
-    public Map<String, Object> populateProfileResult(SecurityProfile profile) {
-        Map<String, Object> result = new LinkedHashMap<>();
+    /**
+     * 安全配置视图（11 键；旧 Map 逐键同名同序）。
+     *
+     * <p>前 6 键恒在（缺省取 {@link ClearanceLevel} 单源常量）；后 5 键仅档案列非空时出现
+     * ——属性级 NON_NULL 保持旧 {@code if (x != null) put} 语义。</p>
+     */
+    public record SecurityProfileView(
+            @com.fasterxml.jackson.annotation.JsonProperty("clearanceLevel") Integer clearanceLevel,
+            @com.fasterxml.jackson.annotation.JsonProperty("level") Integer level,
+            @com.fasterxml.jackson.annotation.JsonProperty("levelName") String levelName,
+            @com.fasterxml.jackson.annotation.JsonProperty("linkedWorkstation") String linkedWorkstation,
+            @com.fasterxml.jackson.annotation.JsonProperty("auditMode") String auditMode,
+            @com.fasterxml.jackson.annotation.JsonProperty("sandboxMandatory") boolean sandboxMandatory,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            @com.fasterxml.jackson.annotation.JsonProperty("userId") String userId,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            @com.fasterxml.jackson.annotation.JsonProperty("roleId") String roleId,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            @com.fasterxml.jackson.annotation.JsonProperty("scopeType") String scopeType,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            @com.fasterxml.jackson.annotation.JsonProperty("tenantId") String tenantId,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            @com.fasterxml.jackson.annotation.JsonProperty("orgId") String orgId) {
+    }
+
+    public SecurityProfileView populateProfileResult(SecurityProfile profile) {
         if (profile != null) {
-            result.put("clearanceLevel", profile.getClearanceLevel() != null ? profile.getClearanceLevel() : ClearanceLevel.NO_PROFILE_FALLBACK);
-            result.put("level", profile.getLevel() != null ? profile.getLevel() : ClearanceLevel.NO_PROFILE_FALLBACK);
-            result.put("levelName", profile.getLevelName() != null ? profile.getLevelName() : ClearanceLevel.nameOf(ClearanceLevel.NO_PROFILE_FALLBACK));
-            result.put("linkedWorkstation", profile.getLinkedWorkstation() != null ? profile.getLinkedWorkstation() : "");
-            result.put("auditMode", profile.getAuditMode() != null ? profile.getAuditMode() : "basic");
-            result.put("sandboxMandatory", Boolean.TRUE.equals(profile.getSandboxMandatory()));
-            if (profile.getUserId() != null) result.put("userId", profile.getUserId());
-            if (profile.getRoleId() != null) result.put("roleId", profile.getRoleId());
-            if (profile.getScopeType() != null) result.put("scopeType", profile.getScopeType());
-            if (profile.getTenantId() != null) result.put("tenantId", profile.getTenantId());
-            if (profile.getOrgId() != null) result.put("orgId", profile.getOrgId());
-        } else {
-            result.put("clearanceLevel", ClearanceLevel.NO_PROFILE_FALLBACK);
-            result.put("level", ClearanceLevel.NO_PROFILE_FALLBACK);
-            result.put("levelName", ClearanceLevel.nameOf(ClearanceLevel.NO_PROFILE_FALLBACK));
-            result.put("linkedWorkstation", "");
-            result.put("auditMode", "basic");
-            result.put("sandboxMandatory", false);
+            return new SecurityProfileView(
+                    profile.getClearanceLevel() != null ? profile.getClearanceLevel() : ClearanceLevel.NO_PROFILE_FALLBACK,
+                    profile.getLevel() != null ? profile.getLevel() : ClearanceLevel.NO_PROFILE_FALLBACK,
+                    profile.getLevelName() != null ? profile.getLevelName() : ClearanceLevel.nameOf(ClearanceLevel.NO_PROFILE_FALLBACK),
+                    profile.getLinkedWorkstation() != null ? profile.getLinkedWorkstation() : "",
+                    profile.getAuditMode() != null ? profile.getAuditMode() : "basic",
+                    Boolean.TRUE.equals(profile.getSandboxMandatory()),
+                    profile.getUserId(), profile.getRoleId(), profile.getScopeType(),
+                    profile.getTenantId(), profile.getOrgId());
         }
-        return result;
+        return new SecurityProfileView(
+                ClearanceLevel.NO_PROFILE_FALLBACK,
+                ClearanceLevel.NO_PROFILE_FALLBACK,
+                ClearanceLevel.nameOf(ClearanceLevel.NO_PROFILE_FALLBACK),
+                "", "basic", false, null, null, null, null, null);
     }
 
     public void upsertUserProfile(String userId, Integer clearanceLevel, String linkedWorkstation,

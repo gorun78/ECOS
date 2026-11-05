@@ -123,7 +123,7 @@ class SecurityConfigControllerAuditEgressTest {
     void profileUpdateSeparatesTokenOperatorFromClaimedTarget() {
         authenticate("u-42", "alice");
 
-        ApiResponse<Map<String, Object>> resp = controller.updateProfile(profileBody(), "victim-9", null);
+        ApiResponse<SecurityConfigController.ProfileUpdateResultVO> resp = controller.updateProfile(profileBody(), "victim-9", null);
 
         assertTrue(resp.isSuccess());
         verify(service).upsertProfile(eq("td_user_security_profile"), eq("user_id"), eq("victim-9"),
@@ -159,7 +159,7 @@ class SecurityConfigControllerAuditEgressTest {
     @Test
     @DisplayName("roleId 参数路由到角色表，操作者仍为 token 主体")
     void roleParameterRoutesToRoleTable() {
-        ApiResponse<Map<String, Object>> resp = controller.updateProfile(profileBody(), null, "role-7");
+        ApiResponse<SecurityConfigController.ProfileUpdateResultVO> resp = controller.updateProfile(profileBody(), null, "role-7");
 
         assertTrue(resp.isSuccess());
         verify(service).upsertProfile(eq("td_role_security_profile"), eq("role_id"), eq("role-7"),
@@ -175,7 +175,7 @@ class SecurityConfigControllerAuditEgressTest {
     @Test
     @DisplayName("无 userId/roleId 时写全局默认行并以 isDefault=true 下沉")
     void neitherParameterFallsBackToGlobalDefaultRow() {
-        ApiResponse<Map<String, Object>> resp = controller.updateProfile(profileBody(), null, null);
+        ApiResponse<SecurityConfigController.ProfileUpdateResultVO> resp = controller.updateProfile(profileBody(), null, null);
 
         assertTrue(resp.isSuccess());
         verify(service).upsertProfile(eq("td_user_security_profile"), eq("user_id"), eq("_global_default_"),
@@ -339,7 +339,7 @@ class SecurityConfigControllerAuditEgressTest {
 
         assertFalse(controller.publishAudit("security_profile_delete", "p-1", "u-42", null, "x", null));
 
-        ApiResponse<Map<String, Object>> resp = controller.updateProfile(profileBody(), "victim-9", null);
+        ApiResponse<SecurityConfigController.ProfileUpdateResultVO> resp = controller.updateProfile(profileBody(), "victim-9", null);
         assertTrue(resp.isSuccess());
     }
 
@@ -358,7 +358,7 @@ class SecurityConfigControllerAuditEgressTest {
                 .when(service).upsertProfile(anyString(), anyString(), anyString(), any(), any(),
                         any(), any(), anyBoolean(), any(), any(), any());
 
-        ApiResponse<Map<String, Object>> resp = controller.updateProfile(profileBody(), "victim-9", null);
+        ApiResponse<SecurityConfigController.ProfileUpdateResultVO> resp = controller.updateProfile(profileBody(), "victim-9", null);
 
         assertFalse(resp.isSuccess());
         assertNotNull(resp.getMessage());

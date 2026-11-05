@@ -241,6 +241,15 @@ import org.junit.jupiter.api.Test;
  *       剩 2 枚为属主 {@code GuardrailDecisionLedgerDao#listFiltered} 台账行。既有 12 例随签名
  *       改写全绿；键面由 {@code AgentSessionOpsWireShapeTest} 4 例钉住，变异实红
  *       （{@code quotaRemaining}→quota_remaining）。</li>
+ *   <li>1758 ＝ #147DC（2026-11-05）HEAD 面复测值，差额 −8 行来自 security 域
+ *       {@code SecurityConfigController}（24→16）：读数 12 键（source 首键 + 视图 11 键、
+ *       档案空列 NON_NULL 不出键）、更新回执（动态 {@code user_id}/{@code role_id} 列 +
+ *       条件字段）、分页 4 键、删除回执 2 键改 record；属主
+ *       {@code SecurityConfigService#populateProfileResult} 同步改 {@code SecurityProfileView}
+ *       （缺省三键仍取 {@link com.chinacreator.gzcm.sysman.security.clearance.model.ClearanceLevel}
+ *       单源常量，D-B4-99 棘轮面未放宽）。剩 16 枚为请求体自由 Map（三处 upsert 入口）与
+ *       审计事件载荷（{@code buildAuditPayload}/{@code publishAudit} 的动态 extra 契约）。
+ *       键面由 {@code SecurityConfigWireShapeTest} 4 例钉住，变异实红（source→source_）。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -252,7 +261,7 @@ import org.junit.jupiter.api.Test;
  * 2240 = 2229 + 11、2226 = 2215 + 11、2204 = 2193 + 11、2194 = 2183 + 11、
  * 2188 = 2177 + 11、2180 = 2169 + 11、2163 = 2152 + 11、2155 = 2144 + 11、
  * 2149 = 2138 + 11、2132 = 2121 + 11、2104 = 2093 + 11、2068 = 2057 + 11、
- * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11、1867 = 1856 + 11、1821 = 1810 + 11、1799 = 1788 + 11、1777 = 1766 + 11（同一批在途文件，未代改）。</p>
+ * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11、1867 = 1856 + 11、1821 = 1810 + 11、1799 = 1788 + 11、1777 = 1766 + 11、1769 = 1758 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -267,7 +276,7 @@ class ControllerMapPayloadRatchetTest {
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
      */
-    private static final int BASELINE_LINES = 1766;
+    private static final int BASELINE_LINES = 1758;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -277,7 +286,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1766（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1758（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;
