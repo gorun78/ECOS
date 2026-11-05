@@ -21,6 +21,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyDataCreateVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyDataPageVO;
+import com.chinacreator.gzcm.engine.ontology.dto.OntologyDataRecordVO;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyDataService;
 import com.chinacreator.gzcm.engine.ontology.service.OntologyService;
 
@@ -87,7 +90,7 @@ public class OntologyDataController {
      * @param size         每页大小，默认 20
      */
     @GetMapping
-    public ApiResponse<Map<String, Object>> listData(
+    public ApiResponse<OntologyDataPageVO> listData(
             @RequestParam(value = "type", required = false) String type,
             @RequestParam(value = "objectTypeId", required = false) String objectTypeId,
             @RequestParam(defaultValue = "1") int page,
@@ -105,17 +108,13 @@ public class OntologyDataController {
         int offset = (safePage - 1) * safeSize;
         List<Map<String, Object>> rows = dataService.listRecords(filterType, safeSize, offset);
 
-        List<Map<String, Object>> pageData = rows.stream()
+        List<OntologyDataRecordVO> pageData = rows.stream()
                 .map(this::rowToRecord)
                 .collect(Collectors.toList());
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("data", pageData);
-        result.put("total", totalSafe);
-        result.put("page", safePage);
-        result.put("size", safeSize);
-        result.put("totalPages", (int) Math.ceil((double) totalSafe / safeSize));
-        return ApiResponse.success(result);
+        return ApiResponse.success(new OntologyDataPageVO(
+                pageData, totalSafe, safePage, safeSize,
+                (int) Math.ceil((double) totalSafe / safeSize)));
     }
 
     /**
@@ -131,7 +130,7 @@ public class OntologyDataController {
      * GET /api/v1/ontology/data/{id} — 数据记录详情（is_deleted=0 过滤）。
      */
     @GetMapping("/{id}")
-    public ApiResponse<Map<String, Object>> getData(@PathVariable String id) {
+    public ApiResponse<OntologyDataRecordVO> getData(@PathVariable String id) {
         List<Map<String, Object>> rows = dataService.findRecordById(id);
         if (rows.isEmpty()) {
             return ApiResponse.notFound("ONT-001: Data record '" + id + "' not found");
@@ -151,7 +150,7 @@ public class OntologyDataController {
      * </ul>
      */
     @PostMapping
-    public ApiResponse<Map<String, Object>> createData(@RequestBody Map<String, Object> body) {
+    public ApiResponse<OntologyDataCreateVO> createData(@RequestBody Map<String, Object> body) {
         String objectTypeId = String.valueOf(body.getOrDefault("objectTypeId", "")).trim();
         if (objectTypeId.isEmpty()) {
             return ApiResponse.badRequest("ONT-002: 'objectTypeId' is required");
@@ -171,22 +170,23 @@ public class OntologyDataController {
                 : new LinkedHashMap<>();
 
         // record JSON 落 payload（包装层只读防护：拷贝避免外部持有可变引用）
+        String createdAt = LocalDateTime.now().toString();
         Map<String, Object> payloadMap = new LinkedHashMap<>();
         payloadMap.put("id", id);
         payloadMap.put("objectTypeId", objectTypeId);
         payloadMap.put("objectTypeName", objectTypeName);
         payloadMap.put("properties", new LinkedHashMap<>(properties));
         payloadMap.put("createdBy", createdBy);
-        payloadMap.put("createdAt", LocalDateTime.now().toString());
+        payloadMap.put("createdAt", createdAt);
 
         String payloadJson = toPayloadJson(payloadMap);
 
         int rows = dataService.insertRecord(id, objectTypeId, objectTypeName, recordKey, payloadJson, createdBy);
         log.info("Ontology data created: {} [objectType={}] rows={}", id, objectTypeId, rows);
 
-        Map<String, Object> rec = new LinkedHashMap<>(payloadMap);
-        rec.put("status", "ACTIVE");
-        return ApiResponse.success(rec);
+        return ApiResponse.success(new OntologyDataCreateVO(
+                id, objectTypeId, objectTypeName, new LinkedHashMap<>(properties),
+                createdBy, createdAt, "ACTIVE"));
     }
 
     /**
@@ -194,38 +194,41 @@ public class OntologyDataController {
      * <p>支持更新 objectTypeName、properties、createdBy；objectTypeId 不可变更。
      */
     @PutMapping("/{id}")
-    public ApiResponse<Map<String, Object>> updateData(
+    public ApiResponse<OntologyDataRecordVO> updateData(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
         List<Map<String, Object>> existingRows = dataService.findRecordById(id);
         if (existingRows.isEmpty()) {
             return ApiResponse.notFound("ONT-001: Data record '" + id + "' not found");
         }
-        Map<String, Object> existing = rowToRecord(existingRows.get(0));
+        OntologyDataRecordVO existing = rowToRecord(existingRows.get(0));
 
         String newObjectName = body.containsKey("objectTypeName")
                 ? String.valueOf(body.get("objectTypeName"))
-                : String.valueOf(existing.getOrDefault("objectTypeName", ""));
+                : String.valueOf(existing.objectTypeName() != null ? existing.objectTypeName() : "");
         String newCreatedBy = body.containsKey("createdBy")
                 ? String.valueOf(body.get("createdBy"))
-                : String.valueOf(existing.getOrDefault("createdBy", "system"));
+                : (existing.createdBy() != null ? existing.createdBy() : "system");
         @SuppressWarnings("unchecked")
         Map<String, Object> newProperties = body.containsKey("properties")
                 ? new LinkedHashMap<>((Map<String, Object>) body.get("properties"))
-                : new LinkedHashMap<>((Map<String, Object>) existing.getOrDefault("properties", new LinkedHashMap<>()));
+                : new LinkedHashMap<>(existing.properties());
 
+        String updatedAt = LocalDateTime.now().toString();
         Map<String, Object> updated = new LinkedHashMap<>();
         updated.put("id", id);
-        updated.put("objectTypeId", existing.get("objectTypeId"));
+        updated.put("objectTypeId", existing.objectTypeId());
         updated.put("objectTypeName", newObjectName);
         updated.put("properties", newProperties);
         updated.put("createdBy", newCreatedBy);
-        updated.put("createdAt", existing.get("createdAt"));
-        updated.put("updatedAt", LocalDateTime.now().toString());
+        updated.put("createdAt", existing.createdAt());
+        updated.put("updatedAt", updatedAt);
 
         int rows = dataService.updateRecord(id, newObjectName, newCreatedBy, toPayloadJson(updated));
         log.info("Ontology data updated: {} rows={}", id, rows);
-        return ApiResponse.success(updated);
+        return ApiResponse.success(new OntologyDataRecordVO(
+                id, existing.objectTypeId(), newObjectName, null, null,
+                newProperties, newCreatedBy, existing.createdAt(), updatedAt));
     }
 
     /**
@@ -267,36 +270,37 @@ public class OntologyDataController {
     // ═══════════════ Row 映射 + JSON 序列化 ═══════════════════
 
     /**
-     * PG 行 → 前端契约 Map（保持 id/objectTypeId/objectTypeName/properties/createdBy/createdAt/updatedAt 字段名不变）。
+     * PG 行 → 前端契约记录（键面：id/objectTypeId/objectTypeName/[recordKey]/status/properties/
+     * [createdBy][/createdAt][/updatedAt]，条件键由 record 的 NON_NULL 省略）。
      */
-    private Map<String, Object> rowToRecord(Map<String, Object> row) {
-        Map<String, Object> rec = new LinkedHashMap<>();
-        rec.put("id", row.get("id"));
+    private OntologyDataRecordVO rowToRecord(Map<String, Object> row) {
+        String id = asString(row.get("id"));
         // ontology_id 列承载 objectTypeId（T15 映射决策，见类 JSDoc）
-        Object ontologyId = row.get("ontology_id");
-        rec.put("objectTypeId", ontologyId != null ? ontologyId.toString() : "");
-        Object objectTypeName = row.get("object_type");
-        rec.put("objectTypeName", objectTypeName != null ? objectTypeName.toString() : "");
-        Object recordKey = row.get("record_key");
-        if (recordKey != null) {
-            rec.put("recordKey", recordKey.toString());
-        }
-        rec.put("status", row.getOrDefault("status", "ACTIVE"));
-        rec.put("properties", new LinkedHashMap<String, Object>());
+        String objectTypeId = asStringOrEmpty(row.get("ontology_id"));
+        String objectTypeName = asStringOrEmpty(row.get("object_type"));
+        String recordKey = asString(row.get("record_key"));
+        String status = asString(row.getOrDefault("status", "ACTIVE"));
+
+        Map<String, Object> properties = new LinkedHashMap<>();
+        String createdBy = null;
+        String createdAt = null;
+        String updatedAt = null;
         try {
             if (row.get("payload") != null) {
-                Map<String, Object> payload = JSON_MAPPER.readValue(row.get("payload").toString(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+                Map<String, Object> payload = JSON_MAPPER.readValue(row.get("payload").toString(),
+                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
+                        });
                 Object props = payload.get("properties");
                 if (props instanceof Map<?, ?> pm) {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> pmap = (Map<String, Object>) pm;
-                    rec.put("properties", new LinkedHashMap<>(pmap));
+                    properties = new LinkedHashMap<>(pmap);
                 }
                 if (payload.get("createdBy") != null) {
-                    rec.put("createdBy", payload.get("createdBy"));
+                    createdBy = payload.get("createdBy").toString();
                 }
                 if (payload.get("createdAt") != null) {
-                    rec.put("createdAt", payload.get("createdAt").toString());
+                    createdAt = payload.get("createdAt").toString();
                 }
             }
         } catch (Exception e) {
@@ -304,16 +308,24 @@ public class OntologyDataController {
         }
         // create_time / update_time 兜底 → createdAt / updatedAt
         if (row.get("create_time") instanceof Timestamp ts) {
-            rec.put("createdAt", ts.toLocalDateTime().toString());
+            createdAt = ts.toLocalDateTime().toString();
         }
         if (row.get("update_time") instanceof Timestamp tsu) {
-            rec.put("updatedAt", tsu.toLocalDateTime().toString());
+            updatedAt = tsu.toLocalDateTime().toString();
         }
-        Object createdBy = row.get("create_by");
-        if (createdBy != null) {
-            rec.putIfAbsent("createdBy", createdBy.toString());
+        if (createdBy == null && row.get("create_by") != null) {
+            createdBy = row.get("create_by").toString();
         }
-        return rec;
+        return new OntologyDataRecordVO(id, objectTypeId, objectTypeName, recordKey, status,
+                properties, createdBy, createdAt, updatedAt);
+    }
+
+    private static String asString(Object o) {
+        return o == null ? null : o.toString();
+    }
+
+    private static String asStringOrEmpty(Object o) {
+        return o == null ? "" : o.toString();
     }
 
     /** record Map → payload JSON 字符串（静态单例 ObjectMapper 复用，避免每次 new）。 */

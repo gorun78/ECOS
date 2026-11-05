@@ -324,6 +324,15 @@ import org.junit.jupiter.api.Test;
  *       {@code DataEngineConfigWireShapeTest} 3 例钉住（四段顺序、空 semantic 段、未知键落
  *       global/general、缺省补插），变异实红（{@code cache_size}→cacheSize）；
  *       {@code data-engine-impl} 全量 **590/0/0/1**。</li>
+ *   <li>1602 ＝ #147DM（2026-11-05）HEAD 面复测值，差额 −8 行来自 ontology 域
+ *       {@code OntologyDataController}（25→17）：读面记录 9 键（{@code recordKey/status} 在前、
+ *       {@code properties} 居中、{@code createdBy/createdAt/updatedAt} 条件键 NON_NULL）、
+ *       分页 5 键、创建回执 7 键（{@code status} 尾键，独立 record 保序）、更新回执 7 键
+ *       （{@code updatedAt} 尾键）改 record；{@code properties} 属对象类型 EAV 自定义属性，
+ *       原样透传不冻结。剩 17 枚为自由请求体（{@code properties} 用户自定义）与
+ *       {@code payload} JSON 存取（DB 列契约）。键面由 {@code OntologyDataWireShapeTest} 3 例
+ *       钉住（三腿三种落键形态 + 条件键省略），变异实红（{@code recordKey}→record_key）；
+ *       {@code ontology-engine-impl} 全量 **301/0/0/0**。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -335,7 +344,7 @@ import org.junit.jupiter.api.Test;
  * 2240 = 2229 + 11、2226 = 2215 + 11、2204 = 2193 + 11、2194 = 2183 + 11、
  * 2188 = 2177 + 11、2180 = 2169 + 11、2163 = 2152 + 11、2155 = 2144 + 11、
  * 2149 = 2138 + 11、2132 = 2121 + 11、2104 = 2093 + 11、2068 = 2057 + 11、
- * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11、1867 = 1856 + 11、1821 = 1810 + 11、1799 = 1788 + 11、1777 = 1766 + 11、1769 = 1758 + 11、1764 = 1753 + 11、1734 = 1723 + 11、1710 = 1699 + 11、1700 = 1689 + 11、1690 = 1679 + 11、1670 = 1659 + 11、1651 = 1640 + 11、1640 = 1629 + 11、1621 = 1610 + 11（同一批在途文件，未代改）。</p>
+ * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11、1867 = 1856 + 11、1821 = 1810 + 11、1799 = 1788 + 11、1777 = 1766 + 11、1769 = 1758 + 11、1764 = 1753 + 11、1734 = 1723 + 11、1710 = 1699 + 11、1700 = 1689 + 11、1690 = 1679 + 11、1670 = 1659 + 11、1651 = 1640 + 11、1640 = 1629 + 11、1621 = 1610 + 11、1613 = 1602 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -350,7 +359,7 @@ class ControllerMapPayloadRatchetTest {
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
      */
-    private static final int BASELINE_LINES = 1610;
+    private static final int BASELINE_LINES = 1602;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -360,7 +369,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1610（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1602（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;
