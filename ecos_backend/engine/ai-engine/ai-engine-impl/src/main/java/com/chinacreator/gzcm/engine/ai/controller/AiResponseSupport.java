@@ -40,6 +40,26 @@ public final class AiResponseSupport {
     }
 
     /**
+     * 强类型载荷同源渲染（DI-2 #147DW，只增）：成功 200 / 失败按 D.5 分类状态行，
+     * 信封与 {@link #fromLoopResult(AgentLoopResult, Map)} 逐字段同源；{@code Map} 调用仍走上面的
+     * 具体重载（Java 重载决议），强类型 VO 调用走本泛型重载。
+     */
+    public static <T> ResponseEntity<ApiResponse<T>> fromLoopResult(
+            AgentLoopResult result, T data) {
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(ApiResponse.success(data));
+        }
+        AiErrorClass errorClass = resolveClass(result);
+        ApiResponse<T> body = ApiResponse.error(
+                errorClass.httpStatus(),
+                result.getErrorCode() == null ? errorClass.errorCode() : result.getErrorCode(),
+                result.getErrorMsg() == null
+                        ? errorClass.renderMessage(result.getTraceId()) : result.getErrorMsg());
+        body.setData(data);
+        return ResponseEntity.status(HttpStatus.valueOf(errorClass.httpStatus())).body(body);
+    }
+
+    /**
      * 非 Loop 的失败态（studio 测试/对比/编排等）→ 带 D.5 状态的响应。
      *
      * <p>与 {@link #fromLoopResult} 同一渲染单源：失败绝不回落 200 伪成功（用户裁定 A3），

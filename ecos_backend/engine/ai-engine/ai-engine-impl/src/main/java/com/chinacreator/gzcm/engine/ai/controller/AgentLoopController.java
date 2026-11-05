@@ -5,6 +5,7 @@ import com.chinacreator.gzcm.common.error.AiError;
 import com.chinacreator.gzcm.common.error.AiErrorClass;
 import com.chinacreator.gzcm.common.stream.SseFrameContract;
 import com.chinacreator.gzcm.common.trace.AgentLoopTrace;
+import com.chinacreator.gzcm.engine.ai.dto.AgentChatResultVO;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopConfig;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopResult;
 import com.chinacreator.gzcm.engine.ai.service.AgentLoopService;
@@ -81,7 +82,7 @@ public class AgentLoopController {
      * @param thread 会话线程标识，默认 "main"，支持同一会话下多线程对话
      */
     @PostMapping("/chat")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> chat(@RequestBody Map<String, Object> body,
+    public ResponseEntity<ApiResponse<AgentChatResultVO>> chat(@RequestBody Map<String, Object> body,
                                                   @RequestParam(name = "thread", defaultValue = "main") String thread) {
         // F06-15：控制器不 catch(Exception) —— 未预期异常交由 AiErrorAdvice 分类渲染（errorCode + traceId）
         String message = (String) body.get("message");
@@ -113,7 +114,11 @@ public class AgentLoopController {
             circuitBreaker.recordFailure(agentId);
         }
 
-        return AiResponseSupport.fromLoopResult(result, resultToMap(result));
+        return AiResponseSupport.fromLoopResult(result, AgentChatResultVO.of(
+                result, result.getSessionId(),
+                result.isSuccess() ? null : AiResponseSupport.resolveClass(result).retryable(),
+                result.getToolCalls() == null || result.getToolCalls().isEmpty()
+                        ? null : result.getToolCalls()));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -382,7 +387,7 @@ public class AgentLoopController {
      * @param thread 会话线程标识，默认 "main"
      */
     @PostMapping("/sessions/{id}/chat")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> chatInSession(@PathVariable String id,
+    public ResponseEntity<ApiResponse<AgentChatResultVO>> chatInSession(@PathVariable String id,
                                                            @RequestBody Map<String, Object> body,
                                                            @RequestParam(name = "thread", defaultValue = "main") String thread) {
         // 校验会话存在
@@ -423,17 +428,16 @@ public class AgentLoopController {
 
         // 持久化消息（非流式场景简化：仅记录用户消息 + 最终回复），使用指定线程
         sessionService.appendMessage(id, "user", message, null, null, thread);
+        var toolCallRecords = (result.getToolCalls() != null && !result.getToolCalls().isEmpty())
+                ? result.getToolCalls() : null;
         if (result.isSuccess() && result.getContent() != null) {
-            List<Map<String, Object>> tcJsons = null;
-            if (result.getToolCalls() != null && !result.getToolCalls().isEmpty()) {
-                tcJsons = result.getToolCalls();
-            }
-            sessionService.appendMessage(id, "assistant", result.getContent(), tcJsons, null, thread);
+            sessionService.appendMessage(id, "assistant", result.getContent(), toolCallRecords, null, thread);
         }
 
-        Map<String, Object> data = resultToMap(result);
-        data.put("sessionId", id);
-        return AiResponseSupport.fromLoopResult(result, data);
+        return AiResponseSupport.fromLoopResult(result, AgentChatResultVO.of(
+                result, id,
+                result.isSuccess() ? null : AiResponseSupport.resolveClass(result).retryable(),
+                toolCallRecords));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -467,36 +471,6 @@ public class AgentLoopController {
         session.setSystemPrompt(systemPrompt);
         session.setStatus("active");
         return session;
-    }
-
-    /**
-     * 将 {@link AgentLoopResult} 转为响应 Map。
-     */
-    private Map<String, Object> resultToMap(AgentLoopResult result) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("sessionId", result.getSessionId());
-        data.put("traceId", result.getTraceId());
-        data.put("content", result.getContent());
-        data.put("turns", result.getTurns());
-        data.put("totalTokens", result.getTotalTokens());
-        data.put("success", result.isSuccess());
-        if (result.getErrorMsg() != null) {
-            // F06-14：该文本恒为 D.5 模板渲染结果（含诊断码），异常原文已在 Service 层止步于日志
-            data.put("errorMsg", result.getErrorMsg());
-        }
-        if (result.getErrorCode() != null) {
-            data.put("errorCode", result.getErrorCode());
-        }
-        if (result.getErrorClass() != null) {
-            data.put("errorClass", result.getErrorClass());
-        }
-        if (!result.isSuccess()) {
-            data.put("retryable", AiResponseSupport.resolveClass(result).retryable());
-        }
-        if (result.getToolCalls() != null && !result.getToolCalls().isEmpty()) {
-            data.put("toolCalls", result.getToolCalls());
-        }
-        return data;
     }
 
     /**
