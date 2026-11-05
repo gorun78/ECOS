@@ -32,7 +32,7 @@ public class SystemParamController {
     }
 
     @GetMapping
-    public ApiResponse<Map<String, Object>> list(
+    public ApiResponse<SystemParamPageVO> list(
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
@@ -42,13 +42,15 @@ public class SystemParamController {
             throw ConfigController.unavailability("系统参数服务 ISystemParamService");
         }
         try {
-            Map<String, Object> r = new LinkedHashMap<>();
             Map<String, Object> cond = new HashMap<>();
             if (keyword != null) cond.put("keyword", keyword);
             List<SystemParam> all = service.listParams(cond);
             int from = (page - 1) * pageSize, to = Math.min(from + pageSize, all.size());
-            r.put("data", from < all.size() ? all.subList(from, to) : Collections.emptyList());
-            r.put("total", all.size()); r.put("page", page); r.put("pageSize", pageSize);
+            SystemParamPageVO r = new SystemParamPageVO();
+            r.setData(from < all.size() ? all.subList(from, to) : Collections.emptyList());
+            r.setTotal(all.size());
+            r.setPage(page);
+            r.setPageSize(pageSize);
             return ApiResponse.success(r);
         } catch (DataBridgeException e) {
             throw e;
@@ -126,6 +128,46 @@ public class SystemParamController {
         } catch (Throwable e) {
             log.error("删除系统参数失败", e);
             return ApiResponse.internalError("删除失败");
+        }
+    }
+
+    /** 系统参数分页面（#147BW：原弱类型 Map 四键强类型化，键面逐字不变）。 */
+    public static final class SystemParamPageVO {
+        private List<SystemParam> data;
+        private int total;
+        private int page;
+        private int pageSize;
+
+        public List<SystemParam> getData() {
+            return data;
+        }
+
+        public void setData(List<SystemParam> data) {
+            this.data = data;
+        }
+
+        public int getTotal() {
+            return total;
+        }
+
+        public void setTotal(int total) {
+            this.total = total;
+        }
+
+        public int getPage() {
+            return page;
+        }
+
+        public void setPage(int page) {
+            this.page = page;
+        }
+
+        public int getPageSize() {
+            return pageSize;
+        }
+
+        public void setPageSize(int pageSize) {
+            this.pageSize = pageSize;
         }
     }
 }

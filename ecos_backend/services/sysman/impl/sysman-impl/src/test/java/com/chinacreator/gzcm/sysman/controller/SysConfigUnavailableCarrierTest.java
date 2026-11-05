@@ -175,18 +175,18 @@ class SysConfigUnavailableCarrierTest {
     void realEmptyResultStillReturnsSuccessWithEmptyData() throws Exception {
         IConfigService configService = mock(IConfigService.class);
         when(configService.listConfigs(any())).thenReturn(List.of());
-        ApiResponse<Map<String, Object>> resp = new ConfigController(
+        ApiResponse<ConfigController.ConfigPageVO> resp = new ConfigController(
                 availableProvider(configService), absentProvider()).list(null, null, 1, 20);
         assertEquals(ApiResponse.CODE_SUCCESS, resp.getCode(), "真实空结果不得被 fail-closed 折成不可用");
-        assertEquals(List.of(), resp.getData().get("data"));
-        assertEquals(0, resp.getData().get("total"));
+        assertEquals(List.of(), resp.getData().getData());
+        assertEquals(0, resp.getData().getTotal());
 
         ISystemParamService paramService = mock(ISystemParamService.class);
         when(paramService.listParams(any())).thenReturn(List.of());
-        ApiResponse<Map<String, Object>> paramResp = new SystemParamController(
+        ApiResponse<SystemParamController.SystemParamPageVO> paramResp = new SystemParamController(
                 availableProvider(paramService)).list(null, 1, 20);
         assertEquals(ApiResponse.CODE_SUCCESS, paramResp.getCode());
-        assertEquals(0, paramResp.getData().get("total"));
+        assertEquals(0, paramResp.getData().getTotal());
 
         SysConfigQueryService queryService = mock(SysConfigQueryService.class);
         when(queryService.queryForList(anyString())).thenReturn(List.of());
@@ -205,10 +205,10 @@ class SysConfigUnavailableCarrierTest {
         row.setConfigId("c-1");
         IConfigService configService = mock(IConfigService.class);
         when(configService.listConfigs(any())).thenReturn(List.of(row));
-        ApiResponse<Map<String, Object>> resp = new ConfigController(
+        ApiResponse<ConfigController.ConfigPageVO> resp = new ConfigController(
                 availableProvider(configService), absentProvider()).list(null, null, 1, 20);
         assertEquals(ApiResponse.CODE_SUCCESS, resp.getCode());
-        assertEquals(1, resp.getData().get("total"), "对照 A 的 0 必须来自空集而非恒 0");
+        assertEquals(1, resp.getData().getTotal(), "对照 A 的 0 必须来自空集而非恒 0");
 
         SysConfigQueryService queryService = mock(SysConfigQueryService.class);
         when(queryService.queryForList(anyString())).thenReturn(List.of(Map.of("config_key", "k-1")));

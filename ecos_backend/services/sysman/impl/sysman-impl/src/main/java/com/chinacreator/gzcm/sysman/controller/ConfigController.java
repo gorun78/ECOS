@@ -54,7 +54,7 @@ public class ConfigController {
 
     @GetMapping("/items")
     @RequirePermission("config:READ")
-    public ApiResponse<Map<String, Object>> list(
+    public ApiResponse<ConfigPageVO> list(
             @RequestParam(required = false) String configType,
             @RequestParam(required = false) String environment,
             @RequestParam(defaultValue = "1") int page,
@@ -65,14 +65,16 @@ public class ConfigController {
             throw unavailability("配置服务 IConfigService");
         }
         try {
-            Map<String, Object> result = new LinkedHashMap<>();
             Map<String, Object> cond = new HashMap<>();
             if (configType != null) cond.put("configType", configType);
             if (environment != null) cond.put("environment", environment);
             List<Config> all = service.listConfigs(cond);
             int from = (page - 1) * pageSize, to = Math.min(from + pageSize, all.size());
-            result.put("data", from < all.size() ? all.subList(from, to) : Collections.emptyList());
-            result.put("total", all.size()); result.put("page", page); result.put("pageSize", pageSize);
+            ConfigPageVO result = new ConfigPageVO();
+            result.setData(from < all.size() ? all.subList(from, to) : Collections.emptyList());
+            result.setTotal(all.size());
+            result.setPage(page);
+            result.setPageSize(pageSize);
             return ApiResponse.success(result);
         } catch (DataBridgeException e) {
             throw e;
@@ -172,6 +174,46 @@ public class ConfigController {
         } catch (Throwable e) {
             log.error("查询版本历史失败", e);
             return ApiResponse.internalError("查询失败");
+        }
+    }
+
+    /** 配置项分页面（#147BW：原弱类型 Map 四键强类型化，键面逐字不变）。 */
+    public static final class ConfigPageVO {
+        private List<Config> data;
+        private int total;
+        private int page;
+        private int pageSize;
+
+        public List<Config> getData() {
+            return data;
+        }
+
+        public void setData(List<Config> data) {
+            this.data = data;
+        }
+
+        public int getTotal() {
+            return total;
+        }
+
+        public void setTotal(int total) {
+            this.total = total;
+        }
+
+        public int getPage() {
+            return page;
+        }
+
+        public void setPage(int page) {
+            this.page = page;
+        }
+
+        public int getPageSize() {
+            return pageSize;
+        }
+
+        public void setPageSize(int pageSize) {
+            this.pageSize = pageSize;
         }
     }
 }
