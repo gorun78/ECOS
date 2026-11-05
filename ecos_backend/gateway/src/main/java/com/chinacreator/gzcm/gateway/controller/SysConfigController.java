@@ -59,7 +59,7 @@ public class SysConfigController {
      */
     @RequirePermission(permission = "system:config:manage")
     @PutMapping("/{key}/reset")
-    public ApiResponse<Map<String, Object>> reset(@PathVariable String key) {
+    public ApiResponse<ResetResultVO> reset(@PathVariable String key) {
         try {
             // 1. 查当前值 + default_value
             List<Map<String, Object>> rows = gatewaySysConfigService.queryForList(
@@ -87,12 +87,8 @@ public class SysConfigController {
 
             log.info("配置重置: key={} oldValue={} newValue={}", key, currentVal, defaultVal);
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("configKey", key);
-            result.put("resetValue", String.valueOf(defaultVal));
-            result.put("previousValue", currentVal != null ? String.valueOf(currentVal) : null);
-            result.put("updated", true);
-            return ApiResponse.success(result);
+            return ApiResponse.success(new ResetResultVO(key, String.valueOf(defaultVal),
+                    currentVal != null ? String.valueOf(currentVal) : null, true));
         } catch (Exception e) {
             log.error("配置重置失败: key={}", key, e);
             return ApiResponse.internalError("配置重置失败: " + e.getMessage());
@@ -158,5 +154,10 @@ public class SysConfigController {
             log.debug("[audit] EventBusService bean 查找失败: {}", e.getMessage());
         }
         return null;
+    }
+
+    /** 重置回执（DI-2 #147EQ）：configKey / resetValue / previousValue / updated 四键，previousValue 可为 null。 */
+    public record ResetResultVO(String configKey, String resetValue, String previousValue,
+                                boolean updated) {
     }
 }
