@@ -33,7 +33,7 @@ public class EngineTaskController {
 
     /** 提交引擎任务 (V6) */
     @PostMapping("/{engineType}/tasks")
-    public ApiResponse<Map<String, Object>> submitEngineTask(
+    public ApiResponse<EngineTaskSubmitVO> submitEngineTask(
             @PathVariable String engineType,
             @RequestBody Map<String, Object> body) {
         TaskDescription taskDesc = new TaskDescription();
@@ -47,11 +47,7 @@ public class EngineTaskController {
 
         try {
             String taskId = taskManagementService.submitTask(taskDesc);
-            return ApiResponse.success(Map.of(
-                "taskId", taskId,
-                "engine", engineType,
-                "status", "SUBMITTED"
-            ));
+            return ApiResponse.success(new EngineTaskSubmitVO(taskId, engineType, "SUBMITTED"));
         } catch (Exception e) {
             log.error("引擎任务提交失败", e);
             return ApiResponse.error(-1, "任务提交失败");
@@ -60,23 +56,17 @@ public class EngineTaskController {
 
     /** 查询引擎任务状态 (V6) */
     @GetMapping("/{engineType}/tasks/{taskId}")
-    public ApiResponse<Map<String, Object>> getEngineTask(
+    public ApiResponse<EngineTaskDetailVO> getEngineTask(
             @PathVariable String engineType,
             @PathVariable String taskId) {
         try {
             TaskDescription task = taskManagementService.getTaskDescription(taskId);
             TaskStatus status = taskManagementService.getTaskStatus(taskId);
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("taskId", task.getTaskId());
-            result.put("taskName", task.getTaskName());
-            result.put("taskType", task.getTaskType());
-            result.put("engine", engineType);
-            result.put("status", status.getStatus() != null ? status.getStatus().name() : "UNKNOWN");
-            result.put("progress", status.getProgress());
-            result.put("startedAt", status.getStartTime());
-            result.put("completedAt", status.getEndTime());
-            return ApiResponse.success(result);
+            return ApiResponse.success(new EngineTaskDetailVO(task.getTaskId(), task.getTaskName(),
+                    task.getTaskType(), engineType,
+                    status.getStatus() != null ? status.getStatus().name() : "UNKNOWN",
+                    status.getProgress(), status.getStartTime(), status.getEndTime()));
         } catch (Exception e) {
             log.error("引擎任务查询失败 taskId={}", taskId, e);
             return ApiResponse.error(-1, "查询任务失败");
@@ -85,24 +75,20 @@ public class EngineTaskController {
 
     /** 汇聚全部引擎任务 (V7) */
     @GetMapping("/tasks")
-    public ApiResponse<List<Map<String, Object>>> aggregateEngineTasks() {
+    public ApiResponse<List<EngineTaskRowVO>> aggregateEngineTasks() {
         try {
             List<TaskDescription> tasks = taskManagementService.queryTasks(Map.of(), 0, 100);
-            List<Map<String, Object>> result = tasks.stream()
+            List<EngineTaskRowVO> result = tasks.stream()
                 .map(t -> {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("taskId", t.getTaskId());
-                    m.put("taskName", t.getTaskName());
-                    m.put("taskType", t.getTaskType());
                     try {
                         TaskStatus s = taskManagementService.getTaskStatus(t.getTaskId());
-                        m.put("status", s.getStatus() != null ? s.getStatus().name() : "UNKNOWN");
-                        m.put("progress", s.getProgress());
+                        return new EngineTaskRowVO(t.getTaskId(), t.getTaskName(), t.getTaskType(),
+                                s.getStatus() != null ? s.getStatus().name() : "UNKNOWN",
+                                s.getProgress());
                     } catch (Exception ignored) {
-                        m.put("status", "UNKNOWN");
-                        m.put("progress", 0);
+                        return new EngineTaskRowVO(t.getTaskId(), t.getTaskName(), t.getTaskType(),
+                                "UNKNOWN", 0);
                     }
-                    return m;
                 })
                 .collect(Collectors.toList());
             return ApiResponse.success(result);
@@ -110,5 +96,20 @@ public class EngineTaskController {
             log.error("引擎任务汇聚失败", e);
             return ApiResponse.error(-1, "汇聚任务失败");
         }
+    }
+
+    /** 提交回执（3 键）：taskId/engine/status（status 恒 SUBMITTED）。 */
+    public record EngineTaskSubmitVO(String taskId, String engine, String status) {
+    }
+
+    /** 任务详情（8 键）：taskId/taskName/taskType/engine/status/progress/startedAt/completedAt。 */
+    public record EngineTaskDetailVO(String taskId, String taskName, String taskType, String engine,
+                                     String status, Object progress, Object startedAt,
+                                     Object completedAt) {
+    }
+
+    /** 汇聚行（5 键）：taskId/taskName/taskType/status/progress（取状态失败时 UNKNOWN/0）。 */
+    public record EngineTaskRowVO(String taskId, String taskName, String taskType, String status,
+                                  Object progress) {
     }
 }
