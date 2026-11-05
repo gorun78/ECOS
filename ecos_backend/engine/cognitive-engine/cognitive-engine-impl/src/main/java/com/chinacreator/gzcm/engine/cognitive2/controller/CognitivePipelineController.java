@@ -1,6 +1,12 @@
 package com.chinacreator.gzcm.engine.cognitive2.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.cognitive2.dto.CognitivePipelineCreateDTO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.CognitivePipelineCreateVO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.CognitivePipelineDetailVO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.CognitivePipelineExecutionStatusVO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.CognitivePipelineExecutionVO;
+import com.chinacreator.gzcm.engine.cognitive2.dto.CognitivePipelineSummaryVO;
 import com.chinacreator.gzcm.engine.cognitive2.model.CognitivePipeline;
 import com.chinacreator.gzcm.engine.cognitive2.model.CognitivePipelineNode;
 import com.chinacreator.gzcm.engine.cognitive2.model.NodeType;
@@ -13,7 +19,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.sql.Timestamp;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * 认知管线编排 REST API — 前缀 /api/v1/cognitive/pipeline
@@ -23,6 +31,9 @@ import java.util.*;
  * <p>管线定义已持久化到 PostgreSQL（kb_cognitive_pipeline 表），
  * 由 {@link CognitivePipelineRepository} 管理 CRUD。
  * 执行记录（PipelineExecution）仍为进程内状态（实时状态机，不持久化）。</p>
+ *
+ * <p>DI-2 #147EJ：五个响应面与创建请求体由泛型 Map 载荷改为强类型 VO/DTO
+ * （wire 键序与条件键由 {@code CognitivePipelineWireShapeTest} 锁定）。</p>
  */
 @RestController
 @RequestMapping("/api/v1/cognitive/pipeline")
@@ -38,36 +49,34 @@ public class CognitivePipelineController {
 
     /** POST / — 创建认知管线定义 */
     @PostMapping
-    public ApiResponse<Map<String, Object>> create(@RequestBody Map<String, Object> body) {
+    public ApiResponse<CognitivePipelineCreateVO> create(@RequestBody CognitivePipelineCreateDTO body) {
         try {
-            String name = (String) body.get("name");
-            String description = (String) body.getOrDefault("description", "");
+            String name = body.getName();
+            String description = body.getDescription() != null ? body.getDescription() : "";
 
             if (name == null || name.isEmpty()) {
                 return ApiResponse.badRequest("name is required");
             }
 
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> nodeMaps = (List<Map<String, Object>>) body.get("nodes");
+            List<CognitivePipelineCreateDTO.NodeSpec> nodeMaps = body.getNodes();
             if (nodeMaps == null || nodeMaps.isEmpty()) {
                 return ApiResponse.badRequest("nodes is required and must not be empty");
             }
 
             List<CognitivePipelineNode> nodes = new ArrayList<>();
-            for (Map<String, Object> nm : nodeMaps) {
-                String nodeId = (String) nm.get("nodeId");
-                String nodeTypeStr = (String) nm.get("nodeType");
+            for (CognitivePipelineCreateDTO.NodeSpec nm : nodeMaps) {
+                String nodeId = nm.getNodeId();
+                String nodeTypeStr = nm.getNodeType();
                 NodeType nodeType = NodeType.fromString(nodeTypeStr);
 
                 if (nodeId == null || nodeType == null) {
                     return ApiResponse.badRequest("Invalid node: nodeId=" + nodeId + " nodeType=" + nodeTypeStr);
                 }
 
-                Object configObj = nm.get("config");
+                Object configObj = nm.getConfig();
                 String config = configObj != null ? configObj.toString() : "{}";
 
-                @SuppressWarnings("unchecked")
-                List<String> dependsOn = (List<String>) nm.get("dependsOn");
+                List<String> dependsOn = nm.getDependsOn();
 
                 nodes.add(new CognitivePipelineNode(nodeId, nodeType, config, dependsOn));
             }
@@ -85,11 +94,8 @@ public class CognitivePipelineController {
             // 持久化到 PostgreSQL（替代原 ConcurrentHashMap 内存存储）
             pipelineRepository.save(pipeline);
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("pipelineId", pipelineId);
-            result.put("name", name);
-            result.put("nodeCount", nodes.size());
-            return ApiResponse.success(result);
+            return ApiResponse.success(
+                    new CognitivePipelineCreateVO(pipelineId, name, nodes.size()));
         } catch (Exception e) {
             log.error("Failed to create pipeline", e);
             return ApiResponse.internalError("Failed to create pipeline");
@@ -98,39 +104,28 @@ public class CognitivePipelineController {
 
     /** GET / — 列管线定义（从 PostgreSQL 查询） */
     @GetMapping
-    public ApiResponse<List<Map<String, Object>>> list() {
+    public ApiResponse<List<CognitivePipelineSummaryVO>> list() {
         List<CognitivePipeline> pipelines = pipelineRepository.findAll();
-        List<Map<String, Object>> result = new ArrayList<>();
+        List<CognitivePipelineSummaryVO> result = new ArrayList<>();
         for (CognitivePipeline p : pipelines) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", p.getId());
-            m.put("name", p.getName());
-            m.put("description", p.getDescription());
-            m.put("nodeCount", p.getNodes() != null ? p.getNodes().size() : 0);
-            m.put("createdAt", p.getCreatedAt());
-            result.add(m);
+            result.add(new CognitivePipelineSummaryVO(p.getId(), p.getName(), p.getDescription(),
+                    p.getNodes() != null ? p.getNodes().size() : 0, p.getCreatedAt()));
         }
         return ApiResponse.success(result);
     }
 
     /** GET /{id} — 查询管线详情（从 PostgreSQL 查询） */
     @GetMapping("/{id}")
-    public ApiResponse<Map<String, Object>> get(@PathVariable String id) {
+    public ApiResponse<CognitivePipelineDetailVO> get(@PathVariable String id) {
         try {
             CognitivePipeline pipeline = pipelineRepository.findById(id).orElse(null);
             if (pipeline == null) {
                 return ApiResponse.notFound("Pipeline not found: " + id);
             }
 
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put("id", pipeline.getId());
-            map.put("name", pipeline.getName());
-            map.put("description", pipeline.getDescription());
-            map.put("status", pipeline.getStatus());
-            map.put("createdBy", pipeline.getCreatedBy());
-            map.put("nodes", pipeline.getNodes());
-            map.put("createdAt", pipeline.getCreatedAt());
-            return ApiResponse.success(map);
+            return ApiResponse.success(new CognitivePipelineDetailVO(pipeline.getId(), pipeline.getName(),
+                    pipeline.getDescription(), pipeline.getStatus(), pipeline.getCreatedBy(),
+                    pipeline.getNodes(), pipeline.getCreatedAt()));
         } catch (Exception e) {
             log.error("Failed to get pipeline: {}", id, e);
             return ApiResponse.internalError("Failed to get pipeline");
@@ -139,7 +134,7 @@ public class CognitivePipelineController {
 
     /** POST /{id}/execute — 执行管线（从 PostgreSQL 加载管线定义） */
     @PostMapping("/{id}/execute")
-    public ApiResponse<Map<String, Object>> execute(@PathVariable String id) {
+    public ApiResponse<CognitivePipelineExecutionVO> execute(@PathVariable String id) {
         try {
             CognitivePipeline pipeline = pipelineRepository.findById(id).orElse(null);
             if (pipeline == null) {
@@ -148,12 +143,8 @@ public class CognitivePipelineController {
 
             PipelineExecution exec = executor.execute(pipeline);
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("execId", exec.getExecId());
-            result.put("pipelineId", exec.getPipelineId());
-            result.put("status", exec.getStatus());
-            result.put("startTime", exec.getStartTime());
-            return ApiResponse.success(result);
+            return ApiResponse.success(new CognitivePipelineExecutionVO(exec.getExecId(),
+                    exec.getPipelineId(), exec.getStatus(), exec.getStartTime()));
         } catch (Exception e) {
             log.error("Failed to execute pipeline", e);
             return ApiResponse.internalError("Failed to execute");
@@ -176,21 +167,15 @@ public class CognitivePipelineController {
 
     /** GET /{id}/execution/{execId} — 查询执行状态 */
     @GetMapping("/{id}/execution/{execId}")
-    public ApiResponse<Map<String, Object>> getExecution(@PathVariable String id,
-                                                          @PathVariable String execId) {
+    public ApiResponse<CognitivePipelineExecutionStatusVO> getExecution(@PathVariable String id,
+                                                                        @PathVariable String execId) {
         PipelineExecution exec = executor.getExecution(execId);
         if (exec == null) {
             return ApiResponse.notFound("Execution not found: " + execId);
         }
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("execId", exec.getExecId());
-        result.put("pipelineId", exec.getPipelineId());
-        result.put("status", exec.getStatus());
-        result.put("nodeStatuses", exec.getNodeStatuses());
-        result.put("startTime", exec.getStartTime());
-        result.put("endTime", exec.getEndTime());
-        result.put("logs", exec.getLogs());
-        return ApiResponse.success(result);
+        return ApiResponse.success(new CognitivePipelineExecutionStatusVO(exec.getExecId(),
+                exec.getPipelineId(), exec.getStatus(), exec.getNodeStatuses(),
+                exec.getStartTime(), exec.getEndTime(), exec.getLogs()));
     }
 }
