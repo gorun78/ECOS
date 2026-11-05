@@ -24,16 +24,16 @@ public class DictController {
      * GET /api/v1/system/dict → 列出所有字典类型（含条目）
      */
     @GetMapping
-    public ApiResponse<List<Map<String, Object>>> listDictTypes() {
+    public ApiResponse<List<DictTypeEntryVO>> listDictTypes() {
         try {
             List<String> types = dictService.listDictTypes();
-            List<Map<String, Object>> result = new ArrayList<>();
+            List<DictTypeEntryVO> result = new ArrayList<>();
             for (String type : types) {
-                Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("dictType", type);
                 List<SysDict> items = dictService.getDictItems(type);
-                entry.put("itemCount", items.size());
-                entry.put("items", items);
+                DictTypeEntryVO entry = new DictTypeEntryVO();
+                entry.setDictType(type);
+                entry.setItemCount(items.size());
+                entry.setItems(items);
                 result.add(entry);
             }
             return ApiResponse.success(result);
@@ -47,16 +47,16 @@ public class DictController {
      * GET /api/v1/system/dict/types → 字典类型汇总（不含条目详情）
      */
     @GetMapping("/types")
-    public ApiResponse<List<Map<String, Object>>> listTypes() {
+    public ApiResponse<List<DictTypeSummaryVO>> listTypes() {
         try {
             List<String> types = dictService.listDictTypes();
-            List<Map<String, Object>> result = new ArrayList<>();
+            List<DictTypeSummaryVO> result = new ArrayList<>();
             for (String type : types) {
-                Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("dictType", type);
                 List<SysDict> items = dictService.getDictItems(type);
-                entry.put("itemCount", items.size());
-                entry.put("subsystem", items.isEmpty() ? null : items.get(0).getSubsystem());
+                DictTypeSummaryVO entry = new DictTypeSummaryVO();
+                entry.setDictType(type);
+                entry.setItemCount(items.size());
+                entry.setSubsystem(items.isEmpty() ? null : items.get(0).getSubsystem());
                 result.add(entry);
             }
             return ApiResponse.success(result);
@@ -70,18 +70,18 @@ public class DictController {
      * GET /api/v1/system/dict/subsystems → 按子系统(G1-G5)分组
      */
     @GetMapping("/subsystems")
-    public ApiResponse<Map<String, List<Map<String, Object>>>> listBySubsystem() {
+    public ApiResponse<Map<String, List<DictTypeEntryVO>>> listBySubsystem() {
         try {
             List<String> types = dictService.listDictTypes();
-            Map<String, List<Map<String, Object>>> grouped = new LinkedHashMap<>();
+            Map<String, List<DictTypeEntryVO>> grouped = new LinkedHashMap<>();
             for (String type : types) {
                 List<SysDict> items = dictService.getDictItems(type);
-                String sub = items.isEmpty() ? "G0" : 
+                String sub = items.isEmpty() ? "G0" :
                     (items.get(0).getSubsystem() != null ? items.get(0).getSubsystem() : "G0");
-                Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("dictType", type);
-                entry.put("itemCount", items.size());
-                entry.put("items", items);
+                DictTypeEntryVO entry = new DictTypeEntryVO();
+                entry.setDictType(type);
+                entry.setItemCount(items.size());
+                entry.setItems(items);
                 grouped.computeIfAbsent(sub, k -> new ArrayList<>()).add(entry);
             }
             return ApiResponse.success(grouped);
@@ -178,7 +178,7 @@ public class DictController {
      */
     @DeleteMapping("/{type}/{code}")
     @RequirePermission(permission = "system:dict:manage")
-    public ApiResponse<Map<String, Object>> deleteDictItem(@PathVariable String type, @PathVariable String code) {
+    public ApiResponse<DictDeleteResultVO> deleteDictItem(@PathVariable String type, @PathVariable String code) {
         try {
             SysDict existing = dictService.getDictItem(type, code);
             if (existing == null) {
@@ -186,7 +186,11 @@ public class DictController {
             }
 
             dictService.deleteDictItem(type, code);
-            return ApiResponse.success(Map.of("success", true, "dictType", type, "dictCode", code));
+            DictDeleteResultVO result = new DictDeleteResultVO();
+            result.setSuccess(true);
+            result.setDictType(type);
+            result.setDictCode(code);
+            return ApiResponse.success(result);
         } catch (Exception e) {
             log.error("删除字典项失败: type={}, code={}", type, code, e);
             return ApiResponse.internalError("删除失败");
@@ -195,13 +199,15 @@ public class DictController {
 
     /**
      * POST /api/v1/system/dict/refresh → 刷新缓存
+     *
+     * <p>返回面仍是属主 {@code IDictService#refreshCache()} 的 Map（types/items/elapsedMs），
+     * 本层不复制键面、原样透传；强类型化须连同属主契约一并改，另批处理。</p>
      */
     @PostMapping("/refresh")
     @RequirePermission(permission = "system:dict:manage")
     public ApiResponse<Map<String, Object>> refreshCache() {
         try {
-            Map<String, Object> result = dictService.refreshCache();
-            return ApiResponse.success(result);
+            return ApiResponse.success(dictService.refreshCache());
         } catch (Exception e) {
             log.error("刷新字典缓存失败", e);
             return ApiResponse.internalError("刷新失败");
@@ -210,15 +216,110 @@ public class DictController {
 
     /**
      * GET /api/v1/system/dict/{type}/usage → 字典审计：哪些模块用到了该字典
+     *
+     * <p>返回面同 {@link #refreshCache()}：属主 Map 原样透传（dictType/itemCount/
+     * usedByModules/usedByCount），强类型化须连同属主契约一并改。</p>
      */
     @GetMapping("/{type}/usage")
     public ApiResponse<Map<String, Object>> getDictUsage(@PathVariable String type) {
         try {
-            Map<String, Object> usage = dictService.getDictUsage(type);
-            return ApiResponse.success(usage);
+            return ApiResponse.success(dictService.getDictUsage(type));
         } catch (Exception e) {
             log.error("查询字典审计失败: type={}", type, e);
             return ApiResponse.internalError("查询失败");
+        }
+    }
+
+    /** 字典类型条目（#147BX：原弱类型 Map 三键强类型化，键面逐字不变）。 */
+    public static final class DictTypeEntryVO {
+        private String dictType;
+        private int itemCount;
+        private List<SysDict> items;
+
+        public String getDictType() {
+            return dictType;
+        }
+
+        public void setDictType(String dictType) {
+            this.dictType = dictType;
+        }
+
+        public int getItemCount() {
+            return itemCount;
+        }
+
+        public void setItemCount(int itemCount) {
+            this.itemCount = itemCount;
+        }
+
+        public List<SysDict> getItems() {
+            return items;
+        }
+
+        public void setItems(List<SysDict> items) {
+            this.items = items;
+        }
+    }
+
+    /** 字典类型汇总（#147BX：原弱类型 Map 三键强类型化，subsystem 为 null 时仍出键）。 */
+    public static final class DictTypeSummaryVO {
+        private String dictType;
+        private int itemCount;
+        private String subsystem;
+
+        public String getDictType() {
+            return dictType;
+        }
+
+        public void setDictType(String dictType) {
+            this.dictType = dictType;
+        }
+
+        public int getItemCount() {
+            return itemCount;
+        }
+
+        public void setItemCount(int itemCount) {
+            this.itemCount = itemCount;
+        }
+
+        public String getSubsystem() {
+            return subsystem;
+        }
+
+        public void setSubsystem(String subsystem) {
+            this.subsystem = subsystem;
+        }
+    }
+
+    /** 字典项删除回执（#147BX：原 Map.of 三键强类型化，键面逐字不变）。 */
+    public static final class DictDeleteResultVO {
+        private boolean success;
+        private String dictType;
+        private String dictCode;
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public void setSuccess(boolean success) {
+            this.success = success;
+        }
+
+        public String getDictType() {
+            return dictType;
+        }
+
+        public void setDictType(String dictType) {
+            this.dictType = dictType;
+        }
+
+        public String getDictCode() {
+            return dictCode;
+        }
+
+        public void setDictCode(String dictCode) {
+            this.dictCode = dictCode;
         }
     }
 }
