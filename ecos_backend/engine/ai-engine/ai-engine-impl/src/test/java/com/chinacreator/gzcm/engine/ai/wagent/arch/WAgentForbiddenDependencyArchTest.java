@@ -151,8 +151,10 @@ class WAgentForbiddenDependencyArchTest {
      * <p>2026-11-05 +3（265→268）＝ #147DX DI-2 护栏面强类型化批：新增
      * {@code ai.dto.AipGuardrailVO}／{@code AipAuditLogVO}／{@code AipDeleteResultVO}
      * （同属"增面"登记）。</p>
+     * <p>2026-11-05 +2（268→270）＝ #147DZ DI-2 模型目录面强类型化批：新增
+     * {@code ai.dto.AipModelVO}／{@code AipModelHealthVO}。</p>
      */
-    private static final int AI_SOURCE_FILE_FLOOR = 268;
+    private static final int AI_SOURCE_FILE_FLOOR = 270;
 
     /** 反空集锁④：跨引擎门面引用单源（详设-06 F06-11 forecast.explain 走 cognitive api 常量；
      *  #146b 后 = 3 条，新增两枚同属 cognitive.api 契约枚举/门禁值消费，形态仍是 api 门面）。 */

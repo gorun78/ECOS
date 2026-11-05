@@ -1,7 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -20,6 +19,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.ai.dto.AipDeleteResultVO;
+import com.chinacreator.gzcm.engine.ai.dto.AipModelHealthVO;
+import com.chinacreator.gzcm.engine.ai.dto.AipModelVO;
 
 /**
  * AIP Model Catalog REST API — AI 模型目录管理。
@@ -33,6 +35,9 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
  *   <li>DELETE /api/v1/aip/models/{id}         — 删除模型</li>
  *   <li>GET    /api/v1/aip/models/{id}/health  — 健康检查</li>
  * </ul>
+ *
+ * <p>DI-2 #147DZ：内存行为 {@link AipModelVO}（内置腿无 {@code endpoint/apiKeyRef}，条件键 NON_NULL）；
+ * 健康检查回执 {@link AipModelHealthVO}；建/改为自由请求体。</p>
  */
 @RestController
 @RequestMapping("/api/v1/aip/models")
@@ -40,7 +45,7 @@ public class AIPModelController {
 
     private static final Logger log = LoggerFactory.getLogger(AIPModelController.class);
 
-    private final Map<String, Map<String, Object>> store = new ConcurrentHashMap<>();
+    private final Map<String, AipModelVO> store = new ConcurrentHashMap<>();
 
     public AIPModelController() {
         // 预置一些默认模型
@@ -52,40 +57,33 @@ public class AIPModelController {
     }
 
     private void addDefault(String id, String name, String provider, String modelType) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", id);
-        m.put("name", name);
-        m.put("provider", provider);
-        m.put("modelType", modelType);
-        m.put("description", "Built-in " + provider + " model");
-        m.put("status", "active");
-        m.put("createdAt", Instant.now().toString());
-        m.put("updatedAt", Instant.now().toString());
-        store.put(id, m);
+        String now = Instant.now().toString();
+        store.put(id, new AipModelVO(id, name, provider, modelType,
+                "Built-in " + provider + " model", null, null, "active", now, now));
     }
 
-    // ═══════════════ 列表 ═══════════════════
+    // ═══════════════ 列表 ═══════════════
 
     @GetMapping
-    public ApiResponse<List<Map<String, Object>>> listModels() {
-        List<Map<String, Object>> result = store.values().stream()
+    public ApiResponse<List<AipModelVO>> listModels() {
+        List<AipModelVO> result = store.values().stream()
             .collect(Collectors.toList());
         return ApiResponse.success(result);
     }
 
-    // ═══════════════ 详情 ═══════════════════
+    // ═══════════════ 详情 ═══════════════
 
     @GetMapping("/{id}")
-    public ApiResponse<Map<String, Object>> getModel(@PathVariable String id) {
-        Map<String, Object> m = store.get(id);
+    public ApiResponse<AipModelVO> getModel(@PathVariable String id) {
+        AipModelVO m = store.get(id);
         if (m == null) return ApiResponse.notFound("Model " + id + " 不存在");
         return ApiResponse.success(m);
     }
 
-    // ═══════════════ 创建 ═══════════════════
+    // ═══════════════ 创建 ═══════════════
 
     @PostMapping
-    public ApiResponse<Map<String, Object>> createModel(@RequestBody Map<String, Object> body) {
+    public ApiResponse<AipModelVO> createModel(@RequestBody Map<String, Object> body) {
         String name = String.valueOf(body.getOrDefault("name", "")).trim();
         if (name.isEmpty()) {
             return ApiResponse.badRequest("AIP-001: 'name' is required");
@@ -94,69 +92,66 @@ public class AIPModelController {
             ? String.valueOf(body.get("id")).trim()
             : "model_" + UUID.randomUUID().toString().substring(0, 8);
 
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", id);
-        m.put("name", name);
-        m.put("provider", String.valueOf(body.getOrDefault("provider", "custom")));
-        m.put("modelType", String.valueOf(body.getOrDefault("modelType", "chat")));
-        m.put("description", String.valueOf(body.getOrDefault("description", "")));
-        m.put("endpoint", String.valueOf(body.getOrDefault("endpoint", "")));
-        m.put("apiKeyRef", String.valueOf(body.getOrDefault("apiKeyRef", "")));
-        m.put("status", "active");
-        m.put("createdAt", Instant.now().toString());
-        m.put("updatedAt", Instant.now().toString());
+        String now = Instant.now().toString();
+        AipModelVO m = new AipModelVO(
+                id,
+                name,
+                String.valueOf(body.getOrDefault("provider", "custom")),
+                String.valueOf(body.getOrDefault("modelType", "chat")),
+                String.valueOf(body.getOrDefault("description", "")),
+                String.valueOf(body.getOrDefault("endpoint", "")),
+                String.valueOf(body.getOrDefault("apiKeyRef", "")),
+                "active",
+                now,
+                now);
         store.put(id, m);
         log.info("AIP Model registered: {} [{}]", id, name);
         return ApiResponse.success(m);
     }
 
-    // ═══════════════ 更新 ═══════════════════
+    // ═══════════════ 更新 ═══════════════
 
     @PutMapping("/{id}")
-    public ApiResponse<Map<String, Object>> updateModel(
+    public ApiResponse<AipModelVO> updateModel(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
-        Map<String, Object> existing = store.get(id);
+        AipModelVO existing = store.get(id);
         if (existing == null) return ApiResponse.notFound("Model " + id + " 不存在");
 
-        Map<String, Object> updated = new LinkedHashMap<>(existing);
-        if (body.containsKey("name")) updated.put("name", body.get("name"));
-        if (body.containsKey("provider")) updated.put("provider", body.get("provider"));
-        if (body.containsKey("modelType")) updated.put("modelType", body.get("modelType"));
-        if (body.containsKey("description")) updated.put("description", body.get("description"));
-        if (body.containsKey("endpoint")) updated.put("endpoint", body.get("endpoint"));
-        if (body.containsKey("apiKeyRef")) updated.put("apiKeyRef", body.get("apiKeyRef"));
-        if (body.containsKey("status")) updated.put("status", body.get("status"));
-        updated.put("updatedAt", Instant.now().toString());
+        AipModelVO updated = existing.withUpdated(
+                body.containsKey("name") ? String.valueOf(body.get("name")) : null,
+                body.containsKey("provider") ? String.valueOf(body.get("provider")) : null,
+                body.containsKey("modelType") ? String.valueOf(body.get("modelType")) : null,
+                body.containsKey("description") ? String.valueOf(body.get("description")) : null,
+                body.containsKey("endpoint") ? String.valueOf(body.get("endpoint")) : null,
+                body.containsKey("apiKeyRef") ? String.valueOf(body.get("apiKeyRef")) : null,
+                body.containsKey("status") ? String.valueOf(body.get("status")) : null,
+                Instant.now().toString());
         store.put(id, updated);
         log.info("AIP Model updated: {}", id);
         return ApiResponse.success(updated);
     }
 
-    // ═══════════════ 删除 ═══════════════════
+    // ═══════════════ 删除 ═══════════════
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Map<String, Object>> deleteModel(@PathVariable String id) {
+    public ApiResponse<AipDeleteResultVO> deleteModel(@PathVariable String id) {
         if (store.remove(id) != null) {
             log.info("AIP Model deleted: {}", id);
-            return ApiResponse.success(Map.of("deleted", true, "id", id));
+            return ApiResponse.success(new AipDeleteResultVO(true, id));
         }
         return ApiResponse.notFound("Model " + id + " 不存在");
     }
 
-    // ═══════════════ 健康检查 ═══════════════════
+    // ═══════════════ 健康检查 ═══════════════
 
     @GetMapping("/{id}/health")
-    public ApiResponse<Map<String, Object>> healthCheck(@PathVariable String id) {
-        Map<String, Object> m = store.get(id);
+    public ApiResponse<AipModelHealthVO> healthCheck(@PathVariable String id) {
+        AipModelVO m = store.get(id);
         if (m == null) return ApiResponse.notFound("Model " + id + " 不存在");
 
-        Map<String, Object> health = new LinkedHashMap<>();
-        health.put("modelId", id);
-        health.put("status", "healthy");
-        health.put("latencyMs", 120);
-        health.put("checkedAt", Instant.now().toString());
         log.info("AIP Model health check: {} -> healthy", id);
-        return ApiResponse.success(health);
+        return ApiResponse.success(new AipModelHealthVO(
+                id, "healthy", 120, Instant.now().toString()));
     }
 }
