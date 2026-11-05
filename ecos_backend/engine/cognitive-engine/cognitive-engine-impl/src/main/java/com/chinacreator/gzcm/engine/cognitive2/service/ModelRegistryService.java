@@ -88,6 +88,10 @@ public class ModelRegistryService {
     @Autowired(required = false)
     private ObjectProvider<RuntimeCacheManager> cacheProvider;
 
+    /** 治理审计统一发布口（§2.9.9 G5；#147BV）。未装配时只记 WARN，不翻转发布结果。 */
+    @Autowired(required = false)
+    private com.chinacreator.gzcm.runtime.eventbus.audit.GovernanceAuditPublisher governanceAuditPublisher;
+
     /** 测试/非 Spring 装配（归档腿缺省）。 */
     public ModelRegistryService(ModelRegistryDao modelRegistryDao,
                                 ModelPublishGateEvaluator gateEvaluator) {
@@ -360,6 +364,73 @@ public class ModelRegistryService {
         if (outcome.status() != ArchiveOutcome.Status.ARCHIVED) {
             log.info("认知模型归档未完成 rowId={} status={} reason={}",
                     rowId, outcome.status(), outcome.reason());
+            return;
+        }
+        auditModelArchive(rowId, publishedBy, row, json, outcome.commitId());
+    }
+
+    /**
+     * 认知模型归档成功后的治理审计（§2.9.9 G5「其余发布域的 {@code git_commit_sha}」的 cognitive 腿；#147BV）。
+     *
+     * <p>只在 {@code ARCHIVED} 时调用；{@code content_hash} 优先取行内已冻结的权威值
+     * （发布门禁冻结的那一枚），缺位才退回归档 JSON 的摘要——两枚都代表「同一内容」的不同编码，
+     * 但门禁面可比对的是行内值。投递失败只记 WARN，不翻转发布（三腿非原子）。</p>
+     */
+    private void auditModelArchive(String rowId, String publishedBy, Map<String, Object> row,
+                                   String json, String commitId) {
+        if (governanceAuditPublisher == null) {
+            log.warn("治理审计发布器未装配，认知模型归档证据未上总线 rowId={} commitId={}", rowId, commitId);
+            return;
+        }
+        try {
+            String contentHash = asString(row.get("content_hash"));
+            if (contentHash == null || contentHash.isBlank()) {
+                contentHash = sha256Hex(json);
+            }
+            com.chinacreator.gzcm.common.audit.AuditEventContract contract =
+                    new com.chinacreator.gzcm.common.audit.AuditEventContract(
+                            "model-arc-" + rowId,
+                            null,
+                            publishedBy,
+                            List.of(),
+                            "cognitive",
+                            "cognitive_model",
+                            rowId,
+                            com.chinacreator.gzcm.common.audit.AuditLevel.L3_HIGH_RISK.name(),
+                            GIT_REPO_COGNITIVE,
+                            commitId,
+                            null,
+                            contentHash,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            "APPLIED",
+                            "PUBLISH_ARCHIVED",
+                            java.time.Instant.now(),
+                            UUID.randomUUID().toString());
+            boolean sent = governanceAuditPublisher.publish("model.archive", "cognitive-model",
+                    "SUCCESS", contract.toColumns(), Map.of("rowId", rowId));
+            if (!sent) {
+                log.warn("认知模型归档审计未上总线（本地兜底日志已留证）rowId={} commitId={}", rowId, commitId);
+            }
+        } catch (Exception e) {
+            log.warn("认知模型归档审计投递失败 rowId={} reason={}", rowId, e.getMessage());
+        }
+    }
+
+    private static String sha256Hex(String content) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
         }
     }
 

@@ -69,6 +69,10 @@ public class AIPAgentController {
     @Autowired(required = false)
     private DesignAssetArchiver designAssetArchiver;
 
+    /** 治理审计统一发布口（§2.9.9 G5；#147BV）。未装配时只记 WARN，不翻转业务结果。 */
+    @Autowired(required = false)
+    private com.chinacreator.gzcm.runtime.eventbus.audit.GovernanceAuditPublisher governanceAuditPublisher;
+
     /** 注册表 repositoryId（V300 种子）。 */
     private static final String GIT_REPO_AGENT = "agent-collab";
 
@@ -172,17 +176,79 @@ public class AIPAgentController {
      */
     private void archiveAgent(AgentRegistryEntity entity, String message) {
         try {
+            String json = mapper.writeValueAsString(entity);
             // VG-5（#147BL）：归档器缺席由 OptionalArchiver 统一转成 not_available + WARN，
             // 不再各写一段「取不到就跳过」——跳过没有返回值，调用链上看不见。
             ArchiveOutcome outcome = OptionalArchiver.ofNullable(designAssetArchiver)
-                    .archive(GIT_REPO_AGENT, "agents", entity.getId(), null,
-                            mapper.writeValueAsString(entity), message, null);
+                    .archive(GIT_REPO_AGENT, "agents", entity.getId(), null, json, message, null);
             if (outcome.status() != ArchiveOutcome.Status.ARCHIVED) {
                 log.info("agent 归档未完成 id={} status={} reason={}",
                         entity.getId(), outcome.status(), outcome.reason());
+                return;
             }
+            auditAgentArchive(entity, json, outcome.commitId());
         } catch (JsonProcessingException e) {
             log.warn("agent 归档序列化失败 id={}: {}", entity.getId(), e.getMessage());
+        }
+    }
+
+    /**
+     * agent 归档成功后的治理审计（§2.9.9 G5「其余发布域的 {@code git_commit_sha}」的 ai 腿；#147BV）。
+     *
+     * <p>只在 {@code ARCHIVED} 时调用：事件携 {@code git_repository=agent-collab} /
+     * {@code git_commit_sha=<真实提交号>} / {@code content_hash}，与 ontology、kb-rule、scenario
+     * 同口径；归档未成功不发，免得「没归档」被读成「已发布」。投递失败由发布口返回 false 并留
+     * 本地兜底日志（发布口自身不抛），本腿**不写兜底捕获**（F06-15：控制器异常一律上浮
+     * {@code AiErrorAdvice}）。</p>
+     */
+    private void auditAgentArchive(AgentRegistryEntity entity, String json, String commitId) {
+        if (governanceAuditPublisher == null) {
+            log.warn("治理审计发布器未装配，agent 归档证据未上总线 id={} commitId={}",
+                    entity.getId(), commitId);
+            return;
+        }
+        com.chinacreator.gzcm.common.audit.AuditEventContract contract =
+                new com.chinacreator.gzcm.common.audit.AuditEventContract(
+                        "agent-arc-" + entity.getId() + "-" + commitId,
+                        null,
+                        null,
+                        List.of(),
+                        "ai",
+                        "agent",
+                        entity.getId(),
+                        com.chinacreator.gzcm.common.audit.AuditLevel.L3_HIGH_RISK.name(),
+                        GIT_REPO_AGENT,
+                        commitId,
+                        null,
+                        sha256Hex(json),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "APPLIED",
+                        "PUBLISH_ARCHIVED",
+                        java.time.Instant.now(),
+                        UUID.randomUUID().toString());
+        boolean sent = governanceAuditPublisher.publish("agent.archive", "ai-agent", "SUCCESS",
+                contract.toColumns(), Map.of("agentId", entity.getId()));
+        if (!sent) {
+            log.warn("agent 归档审计未上总线（本地兜底日志已留证）id={} commitId={}",
+                    entity.getId(), commitId);
+        }
+    }
+
+    private static String sha256Hex(String content) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
         }
     }
 
