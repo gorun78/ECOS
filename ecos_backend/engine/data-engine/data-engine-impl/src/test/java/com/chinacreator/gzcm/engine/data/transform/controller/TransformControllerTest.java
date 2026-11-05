@@ -83,9 +83,9 @@ public class TransformControllerTest {
     @Test
     @DisplayName("GET /meta — 应返回 6 类步骤清单且字段完整")
     void metaReturnsSixSteps() {
-        ApiResponse<Map<String, Object>> resp = controller.meta();
+        ApiResponse<?> resp = controller.meta();
         assertTrue(resp.isSuccess(), "meta 应成功");
-        Map<String, Object> data = resp.getData();
+        Map<String, Object> data = asMap(resp.getData());
         assertNotNull(data, "data 非空");
         assertEquals(6, data.get("totalSteps"), "共 6 类步骤");
 
@@ -115,7 +115,7 @@ public class TransformControllerTest {
     @Test
     @DisplayName("POST /execute — 请求体 null 应返回 400")
     void executeNullBodyReturnsBadRequest() {
-        ApiResponse<Map<String, Object>> resp = controller.execute(null);
+        ApiResponse<?> resp = controller.execute(null);
         assertEquals(ApiResponse.CODE_BAD_REQUEST, resp.getCode());
         assertFalse(resp.isSuccess());
     }
@@ -128,7 +128,7 @@ public class TransformControllerTest {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("input", "should-be-map"); // 非法
         body.put("chain", List.of());
-        ApiResponse<Map<String, Object>> resp = controller.execute(body);
+        ApiResponse<?> resp = controller.execute(body);
         assertEquals(ApiResponse.CODE_BAD_REQUEST, resp.getCode());
         assertTrue(resp.getMessage().contains("input"), "错误信息应提及 input");
     }
@@ -144,7 +144,7 @@ public class TransformControllerTest {
         input.put("rows", new ArrayList<Map<String, Object>>());
         body.put("input", input);
         body.put("chain", List.of(Map.of("type", "notExist")));
-        ApiResponse<Map<String, Object>> resp = controller.execute(body);
+        ApiResponse<?> resp = controller.execute(body);
         assertEquals(ApiResponse.CODE_BAD_REQUEST, resp.getCode());
         assertTrue(resp.getMessage().contains("notExist"), "错误信息应提及未知 type");
     }
@@ -168,11 +168,11 @@ public class TransformControllerTest {
         body.put("input", input);
         body.put("chain", List.of(cleansingStep));
 
-        ApiResponse<Map<String, Object>> resp = controller.execute(body);
+        ApiResponse<?> resp = controller.execute(body);
         assertNotNull(resp);
         assertEquals(ApiResponse.CODE_SUCCESS, resp.getCode(), "合法 cleansing 链路应 success (code=0)");
 
-        Map<String, Object> data = resp.getData();
+        Map<String, Object> data = asMap(resp.getData());
         assertNotNull(data);
         Boolean success = (Boolean) data.get("success");
         assertEquals(Boolean.TRUE, success, "success 应为 true");
@@ -199,7 +199,7 @@ public class TransformControllerTest {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("input", Map.of("rows", new ArrayList<Map<String, Object>>()));
         body.put("chain", "not-a-list");
-        ApiResponse<Map<String, Object>> resp = controller.execute(body);
+        ApiResponse<?> resp = controller.execute(body);
         assertEquals(ApiResponse.CODE_BAD_REQUEST, resp.getCode());
         assertTrue(resp.getMessage().contains("chain"), "错误信息应提及 chain");
     }
@@ -214,10 +214,10 @@ public class TransformControllerTest {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("input", input);
         body.put("chain", List.of());
-        ApiResponse<Map<String, Object>> resp = controller.execute(body);
+        ApiResponse<?> resp = controller.execute(body);
         assertEquals(ApiResponse.CODE_SUCCESS, resp.getCode());
         @SuppressWarnings("unchecked")
-        Map<String, Object> out = (Map<String, Object>) resp.getData().get("output");
+        Map<String, Object> out = asMap(asMap(resp.getData()).get("output"));
         assertNotNull(out);
         // data 兼容格式：toDataFrame 设 data 字段；DataFrame.getRows() 与 getData() 同源于 data 列表，
         // 空 chain 直通 → output 原样回传，data 内容应保留
@@ -235,7 +235,7 @@ public class TransformControllerTest {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("input", Map.of("rows", new ArrayList<Map<String, Object>>()));
         body.put("chain", List.of(Map.of("params", Map.of("k", "v"))));
-        ApiResponse<Map<String, Object>> resp = controller.execute(body);
+        ApiResponse<?> resp = controller.execute(body);
         assertEquals(ApiResponse.CODE_BAD_REQUEST, resp.getCode());
         assertTrue(resp.getMessage().contains("type"), "错误信息应提及 type");
     }
@@ -258,7 +258,7 @@ public class TransformControllerTest {
                 Map.of("type", "validation", "params", new LinkedHashMap<String, Object>()),
                 Map.of("type", "aggregation", "params", new LinkedHashMap<String, Object>()),
                 Map.of("type", "calculator", "params", new LinkedHashMap<String, Object>())));
-        ApiResponse<Map<String, Object>> resp = controller.execute(body);
+        ApiResponse<?> resp = controller.execute(body);
         // step 执行错误被 chain 捕获转成 TransformException — 控制器应返回 400 并携带 exception 原因
         assertEquals(ApiResponse.CODE_BAD_REQUEST, resp.getCode());
         assertNull(resp.getData(), "执行失败不应有 data");
@@ -287,8 +287,17 @@ public class TransformControllerTest {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("input", new LinkedHashMap<>(Map.of("rows", new ArrayList<Map<String, Object>>())));
         body.put("chain", List.of(Map.of("type", "cleansing")));
-        ApiResponse<Map<String, Object>> resp = failingController.execute(body);
+        ApiResponse<?> resp = failingController.execute(body);
         assertEquals(ApiResponse.CODE_BAD_REQUEST, resp.getCode());
         assertTrue(resp.getMessage().contains("boom"), "错误信息应携带异常原因");
+    }
+
+    /** 强类型载荷 → 旧 Map 形态（本类判据沿用 Map 断言，转换后同尺对照）。 */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> asMap(Object payload) {
+        if (payload == null) {
+            return null;
+        }
+        return new com.fasterxml.jackson.databind.ObjectMapper().convertValue(payload, Map.class);
     }
 }

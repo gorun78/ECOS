@@ -15,6 +15,8 @@ import com.chinacreator.gzcm.engine.data.transform.step.DataCleansingStep;
 import com.chinacreator.gzcm.engine.data.transform.step.DataValidationStep;
 import com.chinacreator.gzcm.engine.data.transform.step.FieldMappingStep;
 import com.chinacreator.gzcm.engine.data.transform.step.TypeConversionStep;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -45,6 +47,9 @@ import java.util.Map;
  * 因此 Controller 内按 type 字符串 {@code new} 创建（架构铁律允许的
  * 同模块 internal 实例化，不跨引擎）。
  *
+ * <p><b>#147DG 载体</b>：步骤清单/元数据/转换结果改 record；请求体 {@code {input, chain}}
+ * 与 DataFrame {@code rows}/{@code data} 仍为自由 JSON（管道 DSL 与行数据形状由调用方定义）。</p>
+ *
  * @author ECOS Wave-2B ge D→I 收口
  */
 @RestController
@@ -57,18 +62,50 @@ public class TransformController {
         this.transformService = transformService;
     }
 
+    /** 步骤条目（3 键）。 */
+    public record StepMetaVO(@JsonProperty("type") String type,
+                             @JsonProperty("name") String name,
+                             @JsonProperty("description") String description) {
+    }
+
+    /** 元数据响应（2 键）。 */
+    public record TransformMetaVO(@JsonProperty("availableSteps") List<StepMetaVO> availableSteps,
+                                  @JsonProperty("totalSteps") int totalSteps) {
+    }
+
+    /** 输出面（{@code columns}/{@code rows} 仅输出非空时出现；空输出为 {@code {}}）。 */
+    public record TransformOutputVO(
+            @JsonInclude(JsonInclude.Include.NON_NULL)
+            @JsonProperty("columns") List<String> columns,
+            @JsonInclude(JsonInclude.Include.NON_NULL)
+            @JsonProperty("rows") List<Map<String, Object>> rows) {
+    }
+
+    /** 统计（4 键）。 */
+    public record TransformStatisticsVO(@JsonProperty("inputCount") long inputCount,
+                                        @JsonProperty("outputCount") long outputCount,
+                                        @JsonProperty("filteredCount") long filteredCount,
+                                        @JsonProperty("errorCount") long errorCount) {
+    }
+
+    /** 转换结果（output/success/errors/warnings/[statistics]）。 */
+    public record TransformResultVO(@JsonProperty("output") TransformOutputVO output,
+                                    @JsonProperty("success") boolean success,
+                                    @JsonProperty("errors") List<String> errors,
+                                    @JsonProperty("warnings") List<String> warnings,
+                                    @JsonInclude(JsonInclude.Include.NON_NULL)
+                                    @JsonProperty("statistics") TransformStatisticsVO statistics) {
+    }
+
     /**
      * 元数据端点 — 当前可用的转换步骤清单（type → name → 描述）。
      *
      * @return 步骤清单
      */
     @GetMapping("/meta")
-    public ApiResponse<Map<String, Object>> meta() {
-        List<Map<String, Object>> steps = buildStepRegistry();
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("availableSteps", steps);
-        payload.put("totalSteps", steps.size());
-        return ApiResponse.success(payload);
+    public ApiResponse<TransformMetaVO> meta() {
+        List<StepMetaVO> steps = buildStepRegistry();
+        return ApiResponse.success(new TransformMetaVO(steps, steps.size()));
     }
 
     /**
@@ -78,8 +115,9 @@ public class TransformController {
      * @param body 请求体
      * @return 转换结果（含 output/statistics/errors/warnings）
      */
+    @SuppressWarnings("unchecked")
     @PostMapping("/execute")
-    public ApiResponse<Map<String, Object>> execute(@RequestBody Map<String, Object> body) {
+    public ApiResponse<TransformResultVO> execute(@RequestBody Map<String, Object> body) {
         // ── 参数校验 ──
         if (body == null) {
             return ApiResponse.badRequest("请求体不能为空");
@@ -128,8 +166,8 @@ public class TransformController {
     /**
      * 6 类 step 注册表（与 G2 文档 §3.5 一一对应）。
      */
-    private List<Map<String, Object>> buildStepRegistry() {
-        List<Map<String, Object>> steps = new ArrayList<>();
+    private List<StepMetaVO> buildStepRegistry() {
+        List<StepMetaVO> steps = new ArrayList<>();
         steps.add(stepMeta("cleansing", "DataCleansing", "数据清洗：trim / 去重 / 空值处理"));
         steps.add(stepMeta("mapping", "FieldMapping", "字段映射：源字段 → 目标字段重命名"));
         steps.add(stepMeta("typeConversion", "TypeConversion", "类型转换：string/integer/long/double/boolean/date"));
@@ -139,12 +177,8 @@ public class TransformController {
         return steps;
     }
 
-    private Map<String, Object> stepMeta(String type, String name, String desc) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("type", type);
-        m.put("name", name);
-        m.put("description", desc);
-        return m;
+    private StepMetaVO stepMeta(String type, String name, String desc) {
+        return new StepMetaVO(type, name, desc);
     }
 
     /**
@@ -213,27 +247,17 @@ public class TransformController {
     /**
      * {@link TransformResult} → JSON 视图（避免把 DataFrame 整个 dump 给前端）。
      */
-    private Map<String, Object> toResultView(TransformResult result) {
-        Map<String, Object> view = new LinkedHashMap<>();
+    private TransformResultVO toResultView(TransformResult result) {
         DataFrame output = result.getOutput();
-        Map<String, Object> outMap = new LinkedHashMap<>();
-        if (output != null) {
-            outMap.put("columns", output.getColumns());
-            outMap.put("rows", output.getRows());
-        }
-        view.put("output", outMap);
-        view.put("success", result.isSuccess());
-        view.put("errors", result.getErrors());
-        view.put("warnings", result.getWarnings());
+        TransformOutputVO outView = output != null
+                ? new TransformOutputVO(output.getColumns(), output.getRows())
+                : new TransformOutputVO(null, null);
         TransformResult.TransformStatistics stats = result.getStatistics();
-        if (stats != null) {
-            Map<String, Object> statMap = new LinkedHashMap<>();
-            statMap.put("inputCount", stats.getInputCount());
-            statMap.put("outputCount", stats.getOutputCount());
-            statMap.put("filteredCount", stats.getFilteredCount());
-            statMap.put("errorCount", stats.getErrorCount());
-            view.put("statistics", statMap);
-        }
-        return view;
+        TransformStatisticsVO statView = stats != null
+                ? new TransformStatisticsVO(stats.getInputCount(), stats.getOutputCount(),
+                        stats.getFilteredCount(), stats.getErrorCount())
+                : null;
+        return new TransformResultVO(outView, result.isSuccess(), result.getErrors(),
+                result.getWarnings(), statView);
     }
 }
