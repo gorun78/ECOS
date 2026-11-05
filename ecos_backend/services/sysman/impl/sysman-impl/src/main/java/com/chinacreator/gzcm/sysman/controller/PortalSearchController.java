@@ -1,6 +1,9 @@
 package com.chinacreator.gzcm.sysman.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.sysman.dto.PortalSearchHitVO;
+import com.chinacreator.gzcm.sysman.dto.PortalSearchItemVO;
+import com.chinacreator.gzcm.sysman.dto.PortalSearchResultVO;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import com.chinacreator.gzcm.sysman.service.PortalSearchQueryService;
 import org.slf4j.Logger;
@@ -11,10 +14,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -52,7 +53,7 @@ public class PortalSearchController {
     }
 
     @GetMapping("/search")
-    public ApiResponse<Map<String, Object>> search(
+    public ApiResponse<PortalSearchResultVO> search(
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "all") String type) {
 
@@ -70,86 +71,40 @@ public class PortalSearchController {
         String userId = safeUserId();
         log.info("Portal 搜索: q={}, type={}, userId={}", keyword, type, userId);
 
-        List<Map<String, Object>> items = new ArrayList<>();
+        List<PortalSearchItemVO> items = new ArrayList<>();
         if (type.equals("all") || type.equals("agent")) {
-            items.addAll(segments(searchService.searchAgents(keyword), keyword, "agent", "/app/agent_studio"));
+            items.addAll(PortalSearchItemVO.segments(
+                    searchService.searchAgents(keyword), keyword, "agent", "/app/agent_studio"));
         }
         if (type.equals("all") || type.equals("workflow")) {
-            items.addAll(segments(searchService.searchWorkflows(keyword), keyword, "workflow", "/app/pipeline"));
+            items.addAll(PortalSearchItemVO.segments(
+                    searchService.searchWorkflows(keyword), keyword, "workflow", "/app/pipeline"));
         }
         if (type.equals("all") || type.equals("glossary")) {
-            items.addAll(segments(searchService.searchGlossary(keyword), keyword, "glossary", "/app/knowledge_graph"));
+            items.addAll(PortalSearchItemVO.segments(
+                    searchService.searchGlossary(keyword), keyword, "glossary", "/app/knowledge_graph"));
         }
         if (type.equals("all") || type.equals("scenario")) {
-            items.addAll(segments(searchService.searchScenarios(keyword), keyword, "scenario", "/app/mission_control"));
+            items.addAll(PortalSearchItemVO.segments(
+                    searchService.searchScenarios(keyword), keyword, "scenario", "/app/mission_control"));
         }
 
-        items.sort((a, b) -> Double.compare(doubleVal(b.get("score")), doubleVal(a.get("score"))));
-        List<Map<String, Object>> top = items.size() > MAX_RESULTS ? items.subList(0, MAX_RESULTS) : items;
+        items.sort((a, b) -> Double.compare(b.score(), a.score()));
+        List<PortalSearchItemVO> top = items.size() > MAX_RESULTS ? items.subList(0, MAX_RESULTS) : items;
 
         // 去掉内部 score 字段，对齐前端 SearchHit {type,id,name,url}
-        List<Map<String, Object>> hits = new ArrayList<>();
+        List<PortalSearchHitVO> hits = new ArrayList<>();
         Set<String> seenIds = new LinkedHashSet<>();
-        for (Map<String, Object> it : top) {
-            String idKey = it.get("type") + ":" + it.get("id");
+        for (PortalSearchItemVO it : top) {
+            String idKey = it.type() + ":" + it.id();
             if (!seenIds.add(idKey)) {
                 continue;
             }
-            Map<String, Object> hit = new LinkedHashMap<>();
-            hit.put("type", it.get("type"));
-            hit.put("id", it.get("id"));
-            hit.put("name", it.get("name"));
-            hit.put("url", it.get("url"));
-            hits.add(hit);
+            hits.add(new PortalSearchHitVO(it.type(), it.id(), it.name(), it.url()));
         }
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("q", keyword);
-        result.put("type", type);
-        result.put("total", hits.size());
-        result.put("items", hits);
-        result.put("rlsApplied", userId != null);
-        return ApiResponse.success(result);
-    }
-
-    /** 原始行 → 前端 SearchHit 条目（仅保留关键词命中的行） */
-    private static List<Map<String, Object>> segments(List<Map<String, Object>> rows,
-                                                      String keyword, String type, String url) {
-        List<Map<String, Object>> out = new ArrayList<>();
-        for (Map<String, Object> r : rows) {
-            Object name = r.get("name") != null ? r.get("name") : r.get("term");
-            Object desc = r.get("description") != null ? r.get("description") : r.get("definition");
-            double s = score(name, desc, keyword);
-            if (s <= 0) {
-                continue;
-            }
-            Object id = r.get("id");
-            if (id == null || (id instanceof String s2 && s2.isBlank())) {
-                continue;
-            }
-            Map<String, Object> it = new LinkedHashMap<>();
-            it.put("type", type);
-            it.put("id", id);
-            it.put("name", name);
-            it.put("url", url);
-            it.put("score", s);
-            out.add(it);
-        }
-        return out;
-    }
-
-    /** 实体级打分：标题命中 2.0，描述命中 1.0 */
-    private static double score(Object nameObj, Object descObj, String keyword) {
-        double s = 0.0;
-        String kw = keyword.toLowerCase();
-        // name 为 null 的行（如 workflow 仅有 description）不能因 name=null 被一档判 0
-        if (nameObj != null && nameObj.toString().toLowerCase().contains(kw)) s += 2.0;
-        if (descObj != null && descObj.toString().toLowerCase().contains(kw)) s += 1.0;
-        return s;
-    }
-
-    private static double doubleVal(Object o) {
-        return o instanceof Number n ? n.doubleValue() : 0.0;
+        return ApiResponse.success(new PortalSearchResultVO(
+                keyword, type, hits.size(), hits, userId != null));
     }
 
     private static String safeUserId() {
