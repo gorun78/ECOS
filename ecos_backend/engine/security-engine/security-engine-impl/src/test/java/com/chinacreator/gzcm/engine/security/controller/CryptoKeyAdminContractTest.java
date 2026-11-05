@@ -8,6 +8,7 @@ import com.chinacreator.gzcm.engine.security.crypto.service.CryptoKeyRegistrySer
 import com.chinacreator.gzcm.engine.security.crypto.service.impl.KeyManagementServiceFullImpl;
 import com.chinacreator.gzcm.engine.security.service.SecurityAuditService;
 import com.chinacreator.gzcm.sysman.security.MinimumClearance;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -51,22 +52,21 @@ import static org.mockito.Mockito.when;
  *       （端点与投影层不得出现 {@code getKey(} / {@code getKeyBytes(}）；</li>
  *   <li>轮换 <b>L4 且二次确认</b>：缺 {@code confirm} → 428 + errorCode + 审计，
  *       <b>且底座 {@code rotateKey} 一次都不许被调</b>（否则「确认门禁」只是响应码装饰）；</li>
- *   <li><b>主密钥缺失 → 500 {@code ECOS-SEC-430}</b>（§4.3.3「禁静默建钥」）：
- *       同样要断言 {@code rotateKey} 未被调用——底座本身不看 {@code ECOS_MASTER_KEY}，
- *       若只断言响应码，「先建钥再报错」也能骗过；</li>
+ *   <li><b>主密钥缺失 → 500 {@code ECOS-SEC-430}</b>（§4.3.3「禁静默建钥」）：</li>
  *   <li>成功形态 = 契约三键 {@code {keyId,newKeyVersion,retiredVersion}}，
- *       且轮换后同 keyId <b>只剩一个 ACTIVE</b>（底座原生行为是两个都 ACTIVE，
- *       {@code retiredVersion} 因此恒无值可取）；</li>
+ *       且轮换后同 keyId <b>只剩一个 ACTIVE</b>；</li>
  *   <li>未登记 keyId → 404；底座异常 → 503 {@code ECOS-SEC-501}（DENY，不返回空清单冒充成功）；</li>
  *   <li>档位与双路径映射在位。</li>
  * </ol>
  *
- * <p>轮换主链路用<b>真实的</b> {@link KeyManagementServiceFullImpl}（内存底座）而非替身，
- * 这样「两个版本都留 ACTIVE」的底座缺陷、「退役后仍可解密旧版本」的矩阵纪律才是在真实行为上被验证的。</p>
+ * <p><b>#147CF</b>：投影/回执由 Map 改 record（{@link CryptoKeyRegistryService.KeyRegistration} /
+ * {@link CryptoKeyRegistryService.KeyRotation}），本类断言改为「序列化后键集仍恰等于契约键」——
+ * 判据只换读取方式（record 访问器 / Jackson 序列化键集），未放宽任何一条。</p>
  */
 class CryptoKeyAdminContractTest {
 
     private static final String KEY_ID = "dek.contract.test";
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final SecurityAuditService audit = mock(SecurityAuditService.class);
 
@@ -85,8 +85,16 @@ class CryptoKeyAdminContractTest {
         }
     }
 
-    private CryptoKeyAdminController controllerWithRealBackend(boolean masterPresent) {
-        return new CryptoKeyAdminController(new SeamedRegistry(new KeyManagementServiceFullImpl(), masterPresent), audit);
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> asMap(Object value) {
+        return MAPPER.convertValue(value, Map.class);
+    }
+
+    private static CryptoKeyAdminController.RotateRequest rotateRequest(String reason, Object confirm) {
+        CryptoKeyAdminController.RotateRequest req = new CryptoKeyAdminController.RotateRequest();
+        req.setReason(reason);
+        req.setConfirm(confirm);
+        return req;
     }
 
     /** 底座里预置一把 v1 ACTIVE 的 DEK（模拟「已登记密钥」的真实状态）。 */
@@ -96,6 +104,14 @@ class CryptoKeyAdminContractTest {
         return backend;
     }
 
+    private static KeyMetadata activeMetadata() {
+        KeyMetadata m = new KeyMetadata();
+        m.setKeyId(KEY_ID);
+        m.setStatus("ACTIVE");
+        m.setVersion(1);
+        return m;
+    }
+
     @Test
     @DisplayName("GET /keys：item 键集合恰为契约七键，值不得是密钥材料")
     void listKeysProjectsExactlySevenContractFields() throws Exception {
@@ -103,26 +119,26 @@ class CryptoKeyAdminContractTest {
         CryptoKeyAdminController controller =
                 new CryptoKeyAdminController(new SeamedRegistry(backend, true), audit);
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller.listKeys(null);
+        ResponseEntity<ApiResponse<CryptoKeyAdminController.KeyListVO>> resp = controller.listKeys(null);
         assertEquals(HttpStatus.OK, resp.getStatusCode());
-        Map<String, Object> data = resp.getBody().getData();
+        CryptoKeyAdminController.KeyListVO data = resp.getBody().getData();
         assertNotNull(data);
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> items = (List<Map<String, Object>>) data.get("items");
-        assertFalse(items.isEmpty(), "底座已建钥时清单不得为空（为空即投影失效）");
-        for (Map<String, Object> item : items) {
+        assertFalse(data.items().isEmpty(), "底座已建钥时清单不得为空（为空即投影失效）");
+        for (CryptoKeyRegistryService.KeyRegistration item : data.items()) {
+            Map<String, Object> wire = asMap(item);
             assertEquals(Set.of("keyId", "algorithm", "keyVersion", "status",
                             "masterKeyRef", "rotateAt", "retiredAt"),
-                    item.keySet(), "item 键集合必须恰等于契约 L2585 的七键");
-            for (Map.Entry<String, Object> e : item.entrySet()) {
+                    wire.keySet(), "item 键集合必须恰等于契约 L2585 的七键");
+            for (Map.Entry<String, Object> e : wire.entrySet()) {
                 Object v = e.getValue();
                 assertFalse(v instanceof byte[], "字段 " + e.getKey() + " 不得是密钥字节");
                 assertFalse(v instanceof Key, "字段 " + e.getKey() + " 不得是 Key 对象");
             }
         }
-        assertEquals(items.size(), data.get("total"));
-        assertEquals("IN_MEMORY_KEY_MANAGEMENT_SERVICE", data.get("registrySource"),
+        assertEquals(data.items().size(), data.total());
+        assertEquals("IN_MEMORY_KEY_MANAGEMENT_SERVICE", data.registrySource(),
                 "台账数据面必须自我标注，防止空清单被读成「平台无密钥治理」");
+        assertEquals(Set.of("items", "total", "statusFilter", "registrySource"), asMap(data).keySet());
     }
 
     @Test
@@ -147,7 +163,7 @@ class CryptoKeyAdminContractTest {
         active.setKeyId(KEY_ID);
         active.setStatus("ACTIVE");
         active.setUpdatedTime(new java.util.Date());
-        assertNull(CryptoKeyRegistryService.project(active).get("retiredAt"),
+        assertNull(CryptoKeyRegistryService.project(active).retiredAt(),
                 "ACTIVE 钥匙的 retiredAt 必须是 null（用更新时间冒充即假数据）");
 
         KeyMetadata retired = new KeyMetadata();
@@ -155,7 +171,7 @@ class CryptoKeyAdminContractTest {
         retired.setStatus("RETIRED");
         java.util.Date at = new java.util.Date(1_700_000_000_000L);
         retired.setUpdatedTime(at);
-        assertEquals(at, CryptoKeyRegistryService.project(retired).get("retiredAt"));
+        assertEquals(at, CryptoKeyRegistryService.project(retired).retiredAt());
     }
 
     @Test
@@ -165,11 +181,11 @@ class CryptoKeyAdminContractTest {
         CryptoKeyAdminController controller =
                 new CryptoKeyAdminController(new SeamedRegistry(backend, true), audit);
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller.rotate(
-                KEY_ID, Map.of("reason", "季度轮换"));
+        ResponseEntity<ApiResponse<CryptoKeyRegistryService.KeyRotation>> resp = controller.rotate(
+                KEY_ID, rotateRequest("季度轮换", null));
 
         assertEquals(HttpStatus.PRECONDITION_REQUIRED, resp.getStatusCode());
-        ApiResponse<Map<String, Object>> body = resp.getBody();
+        ApiResponse<CryptoKeyRegistryService.KeyRotation> body = resp.getBody();
         assertEquals(428, body.getCode());
         assertEquals(CryptoKeyAdminController.ERROR_ROTATE_CONFIRM_REQUIRED, body.getErrorCode());
         assertNotNull(body.getTraceId());
@@ -185,8 +201,8 @@ class CryptoKeyAdminContractTest {
         CryptoKeyAdminController controller =
                 new CryptoKeyAdminController(new SeamedRegistry(backend, true), audit);
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp =
-                controller.rotate(KEY_ID, Map.of("confirm", true));
+        ResponseEntity<ApiResponse<CryptoKeyRegistryService.KeyRotation>> resp =
+                controller.rotate(KEY_ID, rotateRequest(null, Boolean.TRUE));
 
         assertEquals(HttpStatus.BAD_REQUEST, resp.getStatusCode());
         assertEquals(400, resp.getBody().getCode());
@@ -200,11 +216,11 @@ class CryptoKeyAdminContractTest {
         CryptoKeyAdminController controller =
                 new CryptoKeyAdminController(new SeamedRegistry(backend, false), audit);
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller.rotate(
-                KEY_ID, Map.of("reason", "轮换", "confirm", true));
+        ResponseEntity<ApiResponse<CryptoKeyRegistryService.KeyRotation>> resp = controller.rotate(
+                KEY_ID, rotateRequest("轮换", Boolean.TRUE));
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, resp.getStatusCode());
-        ApiResponse<Map<String, Object>> body = resp.getBody();
+        ApiResponse<CryptoKeyRegistryService.KeyRotation> body = resp.getBody();
         assertEquals(CryptoKeyAdminController.ERROR_MASTER_KEY_MISSING, body.getErrorCode());
         assertEquals("ECOS-SEC-430", CryptoKeyAdminController.ERROR_MASTER_KEY_MISSING,
                 "错误码单源必须与 §4.3.3 一致");
@@ -222,11 +238,11 @@ class CryptoKeyAdminContractTest {
         CryptoKeyAdminController controller =
                 new CryptoKeyAdminController(new SeamedRegistry(backend, true), audit);
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller.rotate(
-                KEY_ID, Map.of("reason", "季度轮换", "confirm", "true"));
+        ResponseEntity<ApiResponse<CryptoKeyRegistryService.KeyRotation>> resp = controller.rotate(
+                KEY_ID, rotateRequest("季度轮换", "true"));
 
         assertEquals(HttpStatus.OK, resp.getStatusCode());
-        Map<String, Object> data = resp.getBody().getData();
+        Map<String, Object> data = asMap(resp.getBody().getData());
         assertEquals(Set.of("keyId", "newKeyVersion", "retiredVersion"), data.keySet(),
                 "响应必须恰为契约 L2586 三键");
         assertEquals(KEY_ID, data.get("keyId"));
@@ -251,8 +267,8 @@ class CryptoKeyAdminContractTest {
         CryptoKeyAdminController controller =
                 new CryptoKeyAdminController(new SeamedRegistry(backend, true), audit);
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> resp = controller.rotate(
-                "key.never.registered", Map.of("reason", "轮换", "confirm", true));
+        ResponseEntity<ApiResponse<CryptoKeyRegistryService.KeyRotation>> resp = controller.rotate(
+                "key.never.registered", rotateRequest("轮换", Boolean.TRUE));
 
         assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
         assertTrue(backend.queryKeys(null, null).isEmpty(), "404 分支不得留下任何密钥版本");
@@ -266,7 +282,7 @@ class CryptoKeyAdminContractTest {
         CryptoKeyAdminController controller =
                 new CryptoKeyAdminController(new SeamedRegistry(backend, true), audit);
 
-        ResponseEntity<ApiResponse<Map<String, Object>>> list = controller.listKeys(null);
+        ResponseEntity<ApiResponse<CryptoKeyAdminController.KeyListVO>> list = controller.listKeys(null);
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, list.getStatusCode());
         assertEquals(CryptoKeyAdminController.ERROR_SEC_UNAVAILABLE, list.getBody().getErrorCode());
         assertNull(list.getBody().getData(), "DENY 面禁带 items 空列表冒充「无密钥」");
@@ -277,8 +293,8 @@ class CryptoKeyAdminContractTest {
                 .thenThrow(new KeyManagementException("rotation failed"));
         CryptoKeyAdminController c2 =
                 new CryptoKeyAdminController(new SeamedRegistry(rotateBackend, true), audit);
-        ResponseEntity<ApiResponse<Map<String, Object>>> rot = c2.rotate(
-                KEY_ID, Map.of("reason", "轮换", "confirm", true));
+        ResponseEntity<ApiResponse<CryptoKeyRegistryService.KeyRotation>> rot = c2.rotate(
+                KEY_ID, rotateRequest("轮换", Boolean.TRUE));
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, rot.getStatusCode());
         assertEquals(CryptoKeyAdminController.ERROR_SEC_UNAVAILABLE, rot.getBody().getErrorCode());
     }
@@ -288,7 +304,7 @@ class CryptoKeyAdminContractTest {
     void clearanceL4AndDualPathMapping() throws Exception {
         Method list = CryptoKeyAdminController.class.getMethod("listKeys", String.class);
         Method rotate = CryptoKeyAdminController.class.getMethod(
-                "rotate", String.class, Map.class);
+                "rotate", String.class, CryptoKeyAdminController.RotateRequest.class);
         for (Method m : List.of(list, rotate)) {
             MinimumClearance mc = m.getAnnotation(MinimumClearance.class);
             assertNotNull(mc, m.getName() + " 缺 @MinimumClearance ⇒ 落 /api/v1/security/ 默认 L2，低于契约 L4");
@@ -299,13 +315,5 @@ class CryptoKeyAdminContractTest {
         RequestMapping rm = CryptoKeyAdminController.class.getAnnotation(RequestMapping.class);
         assertTrue(List.of(rm.value()).contains("/api/v1/security/crypto"));
         assertTrue(List.of(rm.value()).contains("/api/security/crypto"));
-    }
-
-    private static KeyMetadata activeMetadata() {
-        KeyMetadata m = new KeyMetadata();
-        m.setKeyId(KEY_ID);
-        m.setVersion(1);
-        m.setStatus("ACTIVE");
-        return m;
     }
 }

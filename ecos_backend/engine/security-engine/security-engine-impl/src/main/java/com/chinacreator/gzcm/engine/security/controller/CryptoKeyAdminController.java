@@ -4,6 +4,8 @@ import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.security.rls.RlsExecutionContract;
 import com.chinacreator.gzcm.engine.security.crypto.KeyManagementService.KeyManagementException;
 import com.chinacreator.gzcm.engine.security.crypto.service.CryptoKeyRegistryService;
+import com.chinacreator.gzcm.engine.security.crypto.service.CryptoKeyRegistryService.KeyRegistration;
+import com.chinacreator.gzcm.engine.security.crypto.service.CryptoKeyRegistryService.KeyRotation;
 import com.chinacreator.gzcm.engine.security.service.SecurityAuditService;
 import com.chinacreator.gzcm.sysman.iam.context.UserContext;
 import com.chinacreator.gzcm.sysman.security.MinimumClearance;
@@ -19,9 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -61,6 +61,10 @@ import java.util.UUID;
  * {@code KeyManagementServiceFullImpl}（纯内存），{@code ecos_security_crypto_key}（V165）
  * 无 DAO/Mapper。因此未建钥的干净 JVM 上 {@code GET /keys} 返回<b>空清单</b>属真实状态；
  * 「密钥台账落库」登记为差距文档 B4-1 后续收口项，本批不用假数据填充。</p>
+ *
+ * <p><b>#147CF（DoD DI-2 第十批）</b>：清单/轮换两条腿的载荷位由弱类型 Map 改
+ * {@link KeyListVO}/{@link KeyRotation}（键集与键序不变），请求体改 {@link RotateRequest}
+ * （{@code confirm} 保留布尔/字符串双形态）；同批删除 428 分支里从未使用的局部 Map（死代码）。</p>
  */
 @RestController
 @RequestMapping({"/api/security/crypto", "/api/v1/security/crypto"})
@@ -78,8 +82,8 @@ public class CryptoKeyAdminController {
     public static final String ERROR_MASTER_KEY_MISSING =
             CryptoKeyRegistryService.ERROR_MASTER_KEY_MISSING;
 
-    /** 审计动作名（单测与查询面 {@code action} 过滤共用同一常量）。 */
-    public static final String AUDIT_ACTION = "CRYPTO_KEY_ROTATE";
+    /** 审计动作名（与既有口径一致）。 */
+    private static final String AUDIT_ACTION = "CRYPTO_KEY_ROTATE";
 
     private final CryptoKeyRegistryService registryService;
     private final SecurityAuditService securityAuditService;
@@ -91,31 +95,27 @@ public class CryptoKeyAdminController {
     }
 
     /**
-     * GET /api/v1/security/crypto/keys —— L4，只出登记元数据，永不出密钥材料。
+     * GET /api/v1/security/crypto/keys —— 登记元数据清单（七键投影，永不含材料）。
      *
      * <p>契约返回形态是 {@code {items[...]}}；此处并列给出 {@code total} 供分页消费方核对，
      * 属「只增」字段，不改变 items 语义。</p>
      */
     @GetMapping("/keys")
     @MinimumClearance(level = 4)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> listKeys(
+    public ResponseEntity<ApiResponse<KeyListVO>> listKeys(
             @RequestParam(required = false) String status) {
         String traceId = resolveTraceId();
         try {
-            List<Map<String, Object>> items = registryService.listKeyRegistrations(status);
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("items", items);
-            out.put("total", items.size());
-            out.put("statusFilter", status);
+            List<KeyRegistration> items = registryService.listKeyRegistrations(status);
             // 诚实标注台账面：底座是内存实现，清单为空不等于「平台无密钥治理」，
             // 而是「当前 JVM 未建钥/台账未落库」，避免空列表被误读成收口完成。
-            out.put("registrySource", "IN_MEMORY_KEY_MANAGEMENT_SERVICE");
-            return ResponseEntity.ok(ApiResponse.<Map<String, Object>>success(out)
-                    .withTraceId(traceId));
+            KeyListVO out = new KeyListVO(items, items.size(), status,
+                    "IN_MEMORY_KEY_MANAGEMENT_SERVICE");
+            return ResponseEntity.ok(ApiResponse.<KeyListVO>success(out).withTraceId(traceId));
         } catch (KeyManagementException | RuntimeException e) {
             log.warn("密钥清单查询失败（fail-closed，不返回空清单冒充成功）: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(ApiResponse.<Map<String, Object>>error(
+                    .body(ApiResponse.<KeyListVO>error(
                             HttpStatus.SERVICE_UNAVAILABLE.value(), ERROR_SEC_UNAVAILABLE,
                             "密钥登记面不可用，操作已拒绝")
                             .withTraceId(traceId));
@@ -132,29 +132,28 @@ public class CryptoKeyAdminController {
      */
     @PostMapping("/keys/{keyId}/rotate")
     @MinimumClearance(level = 4)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> rotate(
+    public ResponseEntity<ApiResponse<KeyRotation>> rotate(
             @PathVariable String keyId,
-            @RequestBody(required = false) Map<String, Object> body) {
+            @RequestBody(required = false) RotateRequest body) {
 
-        Map<String, Object> req = body != null ? body : Map.of();
-        String reason = asString(req.get("reason"));
-        boolean confirmed = Boolean.TRUE.equals(req.get("confirm"))
-                || "true".equalsIgnoreCase(asString(req.get("confirm")));
+        RotateRequest req = body != null ? body : new RotateRequest();
+        String reason = req.getReason();
+        boolean confirmed = Boolean.TRUE.equals(req.getConfirm())
+                || (req.getConfirm() != null && "true".equalsIgnoreCase(String.valueOf(req.getConfirm())));
         String actor = resolveActor();
         String traceId = resolveTraceId();
 
         if (keyId == null || keyId.isBlank()) {
             audit(actor, keyId, "REJECTED_BAD_REQUEST", "missing keyId");
             return ResponseEntity.badRequest()
-                    .body(ApiResponse.<Map<String, Object>>badRequest("keyId 必填")
-                            .withTraceId(traceId));
+                    .body(ApiResponse.<KeyRotation>badRequest("keyId 必填").withTraceId(traceId));
         }
 
         // 契约 body 明确要求 reason（轮换属 L4 高危操作，无因由不留痕即拒）
         if (reason == null || reason.isBlank()) {
             audit(actor, keyId, "REJECTED_BAD_REQUEST", "missing reason");
             return ResponseEntity.badRequest()
-                    .body(ApiResponse.<Map<String, Object>>badRequest("reason 必填：密钥轮换必须登记原因")
+                    .body(ApiResponse.<KeyRotation>badRequest("reason 必填：密钥轮换必须登记原因")
                             .withTraceId(traceId));
         }
 
@@ -162,12 +161,8 @@ public class CryptoKeyAdminController {
             // ① 二次确认缺失 → 428（对齐 ImpersonateController 范式；未执行任何轮换）
             audit(actor, keyId, "REJECTED_CONFIRM_REQUIRED", reason);
             log.warn("密钥轮换拒绝（缺二次确认）: actor={} keyId={} traceId={}", actor, keyId, traceId);
-            Map<String, Object> hint = new LinkedHashMap<>();
-            hint.put("requiredFlag", "confirm=true");
-            hint.put("keyId", keyId);
-            hint.put("message", "密钥轮换属 L4 高危操作，必须显式携带 confirm=true（二次确认）");
             return ResponseEntity.status(HttpStatus.PRECONDITION_REQUIRED)
-                    .body(ApiResponse.<Map<String, Object>>error(
+                    .body(ApiResponse.<KeyRotation>error(
                             HttpStatus.PRECONDITION_REQUIRED.value(),
                             ERROR_ROTATE_CONFIRM_REQUIRED,
                             "密钥轮换需要二次确认：请显式携带 confirm=true")
@@ -176,21 +171,20 @@ public class CryptoKeyAdminController {
 
         try {
             // ② 已确认：真轮换（缺主密钥时 service 先抛，底座 rotateKey 根本不会被调用）
-            Map<String, Object> rotated = registryService.rotate(keyId, actor, reason);
+            KeyRotation rotated = registryService.rotate(keyId, actor, reason);
             audit(actor, keyId, "SUCCESS",
-                    "reason=" + reason + " newKeyVersion=" + rotated.get("newKeyVersion")
-                            + " retiredVersion=" + rotated.get("retiredVersion"));
+                    "reason=" + reason + " newKeyVersion=" + rotated.newKeyVersion()
+                            + " retiredVersion=" + rotated.retiredVersion());
             log.info("密钥轮换执行: actor={} keyId={} newKeyVersion={} retiredVersion={}",
-                    actor, keyId, rotated.get("newKeyVersion"), rotated.get("retiredVersion"));
-            return ResponseEntity.ok(ApiResponse.<Map<String, Object>>success(rotated)
-                    .withTraceId(traceId));
+                    actor, keyId, rotated.newKeyVersion(), rotated.retiredVersion());
+            return ResponseEntity.ok(ApiResponse.<KeyRotation>success(rotated).withTraceId(traceId));
         } catch (CryptoKeyRegistryService.MasterKeyMissingException e) {
             // ③ §4.3.3 ECOS-SEC-430 = 500「加密主密钥缺失，禁静默建钥」
             audit(actor, keyId, "REJECTED_MASTER_KEY_MISSING", reason);
             log.error("密钥轮换拒绝（主密钥缺失，未建钥）: actor={} keyId={} traceId={}",
                     actor, keyId, traceId);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<Map<String, Object>>error(
+                    .body(ApiResponse.<KeyRotation>error(
                             HttpStatus.INTERNAL_SERVER_ERROR.value(), ERROR_MASTER_KEY_MISSING,
                             "加密主密钥缺失，已拒绝静默建钥（平台侧 critical）")
                             .withTraceId(traceId));
@@ -200,14 +194,14 @@ public class CryptoKeyAdminController {
             // 故此处不私造码：沿用 ApiResponse.notFound 的裸 404 形态，
             // 「errorCode 统一包络（含 404 是否补码）」属 B4-2 错误码族统一批的裁决面，已在差距文档登记。
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ApiResponse.<Map<String, Object>>notFound(
+                    .body(ApiResponse.<KeyRotation>notFound(
                             "密钥未登记，无可轮换版本: " + keyId)
                             .withTraceId(traceId));
         } catch (KeyManagementException e) {
             audit(actor, keyId, "FAILED_ENGINE_UNAVAILABLE", reason);
             log.warn("密钥轮换失败（底座异常）: keyId={} error={}", keyId, e.getMessage());
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(ApiResponse.<Map<String, Object>>error(
+                    .body(ApiResponse.<KeyRotation>error(
                             HttpStatus.SERVICE_UNAVAILABLE.value(), ERROR_SEC_UNAVAILABLE,
                             "密钥引擎不可用，轮换已拒绝")
                             .withTraceId(traceId));
@@ -245,7 +239,30 @@ public class CryptoKeyAdminController {
         return "t-" + UUID.randomUUID();
     }
 
-    private static String asString(Object o) {
-        return o == null ? null : String.valueOf(o);
+    /** 密钥清单（4 键，键序与旧 Map 一致）。 */
+    public record KeyListVO(List<KeyRegistration> items, int total, String statusFilter,
+                            String registrySource) {
+    }
+
+    /** 轮换请求（{@code confirm} 兼容布尔/字符串两种形态）。 */
+    public static final class RotateRequest {
+        private String reason;
+        private Object confirm;
+
+        public String getReason() {
+            return reason;
+        }
+
+        public void setReason(String reason) {
+            this.reason = reason;
+        }
+
+        public Object getConfirm() {
+            return confirm;
+        }
+
+        public void setConfirm(Object confirm) {
+            this.confirm = confirm;
+        }
     }
 }

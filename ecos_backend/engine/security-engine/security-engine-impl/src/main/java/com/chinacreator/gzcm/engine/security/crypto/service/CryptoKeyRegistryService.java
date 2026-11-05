@@ -98,10 +98,13 @@ public class CryptoKeyRegistryService {
      * {@code rotateAt ← nextRotationTime}（底座仅有下次轮换时间，无独立 rotateAt 列）、
      * {@code retiredAt ← updatedTime} 且<b>仅当</b>状态属 {@code RETIRED/DELETED/INACTIVE}
      * 时才给值（在用钥匙不存在退役时刻，禁把更新时间冒充退役时间）。</p>
+     *
+     * <p><b>#147CF（DoD DI-2 第十批）</b>：投影由弱类型 Map 改 {@link KeyRegistration} record，
+     * 键与值逐字不变（组件名即旧 Map 键名），使 Controller 不再持弱类型。</p>
      */
-    public List<Map<String, Object>> listKeyRegistrations(String status) throws KeyManagementException {
+    public List<KeyRegistration> listKeyRegistrations(String status) throws KeyManagementException {
         List<KeyMetadata> all = keyManagementService.queryKeys(null, blankToNull(status));
-        List<Map<String, Object>> items = new ArrayList<>();
+        List<KeyRegistration> items = new ArrayList<>();
         for (KeyMetadata m : all) {
             items.add(project(m));
         }
@@ -109,16 +112,10 @@ public class CryptoKeyRegistryService {
     }
 
     /** 单条投影（public 便于契约门禁直接钉死键集合）。 */
-    public static Map<String, Object> project(KeyMetadata m) {
-        Map<String, Object> item = new LinkedHashMap<>();
-        item.put("keyId", m.getKeyId());
-        item.put("algorithm", m.getAlgorithm());
-        item.put("keyVersion", m.getVersion());
-        item.put("status", m.getStatus());
-        item.put("masterKeyRef", m.getMasterKeyId());
-        item.put("rotateAt", m.getNextRotationTime());
-        item.put("retiredAt", isNonActive(m.getStatus()) ? m.getUpdatedTime() : null);
-        return item;
+    public static KeyRegistration project(KeyMetadata m) {
+        return new KeyRegistration(m.getKeyId(), m.getAlgorithm(), m.getVersion(), m.getStatus(),
+                m.getMasterKeyId(), m.getNextRotationTime(),
+                isNonActive(m.getStatus()) ? m.getUpdatedTime() : null);
     }
 
     /**
@@ -129,7 +126,7 @@ public class CryptoKeyRegistryService {
      * @throws KeyNotRegisteredException   该 {@code keyId} 无任何已登记版本 ⇒ 端点 404
      * @throws KeyManagementException      底座异常 ⇒ 端点 500
      */
-    public Map<String, Object> rotate(String keyId, String operator, String reason)
+    public KeyRotation rotate(String keyId, String operator, String reason)
             throws MasterKeyMissingException, KeyNotRegisteredException, KeyManagementException {
         if (!masterKeyPresent()) {
             throw new MasterKeyMissingException(
@@ -147,11 +144,16 @@ public class CryptoKeyRegistryService {
         log.info("密钥轮换完成: keyId={} newVersion={} retiredVersion={} operator={} reasonLen={}",
                 keyId, newVersion, retired, operator, reason == null ? 0 : reason.length());
 
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("keyId", keyId);
-        out.put("newKeyVersion", newVersion);
-        out.put("retiredVersion", retired < 0 ? null : retired);
-        return out;
+        return new KeyRotation(keyId, newVersion, retired < 0 ? null : retired);
+    }
+
+    /** 登记行投影（#147CF：组件顺序＝旧 Map 键序，7 键）。 */
+    public record KeyRegistration(String keyId, String algorithm, Integer keyVersion, String status,
+                                  String masterKeyRef, Date rotateAt, Date retiredAt) {
+    }
+
+    /** 轮换回执（#147CF：契约三键，{@code retiredVersion} 无退役时为 null）。 */
+    public record KeyRotation(String keyId, Integer newKeyVersion, Integer retiredVersion) {
     }
 
     /** 主密钥在场判定——{@code protected} 接缝，单测用子类覆写（禁为测试改生产装配）。 */
