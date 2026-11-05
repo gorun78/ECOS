@@ -2,11 +2,14 @@ package com.chinacreator.gzcm.engine.security.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.security.service.DataMaskingService;
+import com.chinacreator.gzcm.engine.security.service.DataMaskingService.MaskResult;
+import com.chinacreator.gzcm.engine.security.service.DataMaskingService.MaskSample;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 数据脱敏端点（安全域「护」）。
@@ -21,6 +24,11 @@ import java.util.*;
  *
  * <p>限流：{@code POST /api/v1/security/mask/apply} 已登记 gateway {@code RateLimitFilter}（10 次/分钟），
  * 与既有两前缀同档，防新别名成为绕过限流的旁路。</p>
+ *
+ * <p><b>#147CG（DoD DI-2 第十一批）</b>：出入参强类型化——请求体改 {@link MaskApplyRequest}
+ * （{@code data}/{@code rules} 仍按「字符串数组」校验，非字符串元素 → 400 同旧码），
+ * 响应改 {@link MaskDemoVO}/{@link MaskApplyResultVO}；属主 {@link DataMaskingService}
+ * 的样例/结果同步改 record（{@code error} 仍只在未知规则时出现）。键面逐字不变。</p>
  */
 @RestController
 @RequestMapping({"/api/v1/data-masking", "/api/v1/security/masking", "/api/v1/security/mask"})
@@ -35,21 +43,17 @@ public class DataMaskingController {
     }
 
     @GetMapping("/demo")
-    public ApiResponse<Map<String, Object>> demo() {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("samples", service.getDemoSamples());
-        result.put("supportedRules", service.getSupportedRules());
-        result.put("description", "数据脱敏示例：展示三种内置规则的原始值与脱敏值对照");
-        return ApiResponse.success(result);
+    public ApiResponse<MaskDemoVO> demo() {
+        return ApiResponse.success(new MaskDemoVO(service.getDemoSamples(),
+                service.getSupportedRules(),
+                "数据脱敏示例：展示三种内置规则的原始值与脱敏值对照"));
     }
 
     @PostMapping("/apply")
-    public ApiResponse<?> apply(@RequestBody Map<String, Object> body) {
+    public ApiResponse<MaskApplyResultVO> apply(@RequestBody MaskApplyRequest body) {
         try {
-            @SuppressWarnings("unchecked")
-            List<String> data = (List<String>) body.get("data");
-            @SuppressWarnings("unchecked")
-            List<String> rules = (List<String>) body.get("rules");
+            List<String> data = asStringList(body.getData(), "data");
+            List<String> rules = asStringList(body.getRules(), "rules");
 
             if (data == null || data.isEmpty()) {
                 return ApiResponse.badRequest("data 不能为空");
@@ -64,19 +68,59 @@ public class DataMaskingController {
                                 + data.size() + ", rules=" + rules.size());
             }
 
-            List<Map<String, Object>> results = service.applyMasking(data, rules);
-
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("total", results.size());
-            result.put("results", results);
-            return ApiResponse.success(result);
-
-        } catch (ClassCastException e) {
+            List<MaskResult> results = service.applyMasking(data, rules);
+            return ApiResponse.success(new MaskApplyResultVO(results.size(), results));
+        } catch (IllegalArgumentException e) {
             log.error("数据脱敏请求格式错误", e);
             return ApiResponse.badRequest("请求格式错误: data 和 rules 必须为字符串数组");
         } catch (Exception e) {
             log.error("数据脱敏处理异常", e);
             return ApiResponse.internalError("脱敏处理失败");
+        }
+    }
+
+    /** 字符串数组校验（保留旧「非字符串元素 ⇒ 400」口径；null 表示未提供）。 */
+    private static List<String> asStringList(List<Object> raw, String field) {
+        if (raw == null) {
+            return null;
+        }
+        List<String> out = new ArrayList<>(raw.size());
+        for (Object value : raw) {
+            if (!(value instanceof String text)) {
+                throw new IllegalArgumentException(field + " 必须是字符串数组");
+            }
+            out.add(text);
+        }
+        return out;
+    }
+
+    /** 脱敏示例回执（3 键，键序不变）。 */
+    public record MaskDemoVO(List<MaskSample> samples, List<String> supportedRules, String description) {
+    }
+
+    /** 批量脱敏回执（2 键）。 */
+    public record MaskApplyResultVO(int total, List<MaskResult> results) {
+    }
+
+    /** 批量脱敏请求（{@code data}/{@code rules} 为字符串数组，元素类型在此显式校验）。 */
+    public static final class MaskApplyRequest {
+        private List<Object> data;
+        private List<Object> rules;
+
+        public List<Object> getData() {
+            return data;
+        }
+
+        public void setData(List<Object> data) {
+            this.data = data;
+        }
+
+        public List<Object> getRules() {
+            return rules;
+        }
+
+        public void setRules(List<Object> rules) {
+            this.rules = rules;
         }
     }
 }

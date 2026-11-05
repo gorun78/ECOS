@@ -106,14 +106,14 @@ class DataMaskingServiceTest {
     @Test
     @DisplayName("applyMasking — unknown 规则兜底为 *** ( gelombang 5.1 SEC-P0-4)")
     void applyMaskingUnknownRuleFallback() {
-        List<Map<String, Object>> results = service.applyMasking(
+        List<DataMaskingService.MaskResult> results = service.applyMasking(
                 List.of("13812345678", "a@b.com", "unknown"),
                 List.of("phone", "email", "nope"));
         assertEquals(3, results.size());
-        assertEquals("138****5678", results.get(0).get("masked"));
-        assertEquals("a***@b.com", results.get(1).get("masked"));
-        assertEquals("***", results.get(2).get("masked"));
-        assertTrue(((String) results.get(2).get("error")).contains("nope"));
+        assertEquals("138****5678", results.get(0).masked());
+        assertEquals("a***@b.com", results.get(1).masked());
+        assertEquals("***", results.get(2).masked());
+        assertTrue(results.get(2).error().contains("nope"));
     }
 
     @Test

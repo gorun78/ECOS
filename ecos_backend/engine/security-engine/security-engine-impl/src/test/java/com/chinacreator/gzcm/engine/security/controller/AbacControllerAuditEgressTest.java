@@ -56,6 +56,23 @@ class AbacControllerAuditEgressTest {
         ReflectionTestUtils.setField(controller, "eventBus", eventBus);
     }
 
+    @Test
+    @DisplayName("策略列表键面 = data/total/page/pageSize（#147CG 强类型化后仍集合相等）")
+    void policyListKeepsFourKeys() throws Exception {
+        AbacPolicy p = new AbacPolicy();
+        p.setPolicyId("p-1");
+        p.setPolicyName("读权限");
+        when(policyService.listPolicies()).thenReturn(java.util.List.of(p));
+
+        AbacController.AbacPolicyPageVO vo = controller.list(null, 1, 20).getData();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> wire = new com.fasterxml.jackson.databind.ObjectMapper()
+                .convertValue(vo, Map.class);
+        assertEquals(java.util.Set.of("data", "total", "page", "pageSize"), wire.keySet());
+        assertEquals(1, vo.total());
+        assertEquals(1, vo.data().size());
+    }
+
     @AfterEach
     void tearDown() {
         UserContext.clear();

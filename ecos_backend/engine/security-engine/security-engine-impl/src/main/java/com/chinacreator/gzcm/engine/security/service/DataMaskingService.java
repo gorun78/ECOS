@@ -41,8 +41,9 @@ public class DataMaskingService {
         return List.of("email", "phone", "idCard", "bankCard", "amount", "address");
     }
 
-    public List<Map<String, Object>> getDemoSamples() {
-        List<Map<String, Object>> samples = new ArrayList<>();
+    /** 演示样例（#147CG：rule/input/masked 三键改 record，键面逐字不变）。 */
+    public List<MaskSample> getDemoSamples() {
+        List<MaskSample> samples = new ArrayList<>();
         samples.add(buildSample("email", "john@example.com", maskEmail("john@example.com")));
         samples.add(buildSample("email", "alice.smith@company.cn", maskEmail("alice.smith@company.cn")));
         samples.add(buildSample("phone", "13812345678", maskPhone("13812345678")));
@@ -140,25 +141,20 @@ public class DataMaskingService {
         return raw;
     }
 
-    public List<Map<String, Object>> applyMasking(List<String> data, List<String> rules) {
+    /** 批量脱敏（#147CG：index/masked/rule[/error] 改 record；error 仅在未知规则时出现）。 */
+    public List<MaskResult> applyMasking(List<String> data, List<String> rules) {
         boolean singleRule = rules.size() == 1;
-        List<Map<String, Object>> results = new ArrayList<>();
+        List<MaskResult> results = new ArrayList<>();
         for (int i = 0; i < data.size(); i++) {
             String raw = data.get(i);
             String rule = singleRule ? rules.get(0) : rules.get(i);
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("index", i);
             // SEC-P0-4: 不返回原始明文，仅返回脱敏结果
             MaskFunction fn = maskFunctions.get(rule);
             if (fn == null) {
-                item.put("masked", "***");  // 未知规则也不回传原文
-                item.put("rule", rule);
-                item.put("error", "不支持的脱敏规则: " + rule);
+                results.add(new MaskResult(i, "***", rule, "不支持的脱敏规则: " + rule));
             } else {
-                item.put("masked", fn.apply(raw));
-                item.put("rule", rule);
+                results.add(new MaskResult(i, fn.apply(raw), rule, null));
             }
-            results.add(item);
         }
         return results;
     }
@@ -209,13 +205,20 @@ public class DataMaskingService {
         return raw;
     }
 
-    private Map<String, Object> buildSample(String rule, String raw, String masked) {
-        Map<String, Object> sample = new LinkedHashMap<>();
-        sample.put("rule", rule);
+    private static MaskSample buildSample(String rule, String raw, String masked) {
         // SEC-P0-4: demo 样例也移除明文原始值
-        sample.put("input", "****");
-        sample.put("masked", masked);
-        return sample;
+        return new MaskSample(rule, "****", masked);
+    }
+
+    /** 演示样例（3 键，键序 rule/input/masked）。 */
+    public record MaskSample(String rule, String input, String masked) {
+    }
+
+    /** 脱敏结果（{@code error} 仅未知规则时出现，属性级 NON_NULL）。 */
+    public record MaskResult(int index, String masked, String rule,
+                             @com.fasterxml.jackson.annotation.JsonInclude(
+                                     com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                             String error) {
     }
 
     @FunctionalInterface

@@ -36,18 +36,13 @@ public class AbacController {
     private com.chinacreator.gzcm.engine.security.service.OpaPolicyService opaPolicyService;
 
     @GetMapping("/policies")
-    public ApiResponse<Map<String, Object>> list(
+    public ApiResponse<AbacPolicyPageVO> list(
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
         try {
             if (policyService == null) {
-                Map<String, Object> empty = new LinkedHashMap<>();
-                empty.put("data", Collections.emptyList());
-                empty.put("total", 0);
-                empty.put("page", page);
-                empty.put("pageSize", pageSize);
-                return ApiResponse.success(empty);
+                return ApiResponse.success(new AbacPolicyPageVO(Collections.emptyList(), 0, page, pageSize));
             }
             List<AbacPolicy> all = policyService.listPolicies();
             // filter
@@ -61,16 +56,15 @@ public class AbacController {
             int to = Math.min(from + pageSize, all.size());
             List<AbacPolicy> pageList = from < all.size() ? all.subList(from, to) : Collections.emptyList();
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("data", pageList);
-            result.put("total", all.size());
-            result.put("page", page);
-            result.put("pageSize", pageSize);
-            return ApiResponse.success(result);
+            return ApiResponse.success(new AbacPolicyPageVO(pageList, all.size(), page, pageSize));
         } catch (Exception e) {
             log.error("查询ABAC策略列表失败", e);
             return ApiResponse.internalError("查询ABAC策略列表失败");
         }
+    }
+
+    /** 策略分页（#147CG：4 键，键序 data/total/page/pageSize 与旧 Map 一致）。 */
+    public record AbacPolicyPageVO(List<AbacPolicy> data, int total, int page, int pageSize) {
     }
 
     @GetMapping("/policies/{id}")
