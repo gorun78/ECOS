@@ -104,7 +104,7 @@ public class WAgentToolContractController {
 
     /** #16 契约测试五关——执行器未实现：存在性校验先行，随后如实 501。 */
     @PostMapping(WAgentApiPaths.TOOL_VALIDATE)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> validateToolContract(
+    public ResponseEntity<ApiResponse<WAgentDegradation.NotImplementedVO>> validateToolContract(
             @PathVariable(WAgentApiPaths.P_NAME) String name,
             @RequestParam(value = "version", required = false) String version) {
         identityResolver.require();

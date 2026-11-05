@@ -2,10 +2,8 @@ package com.chinacreator.gzcm.engine.ai.wagent.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.trace.AiTraceSupport;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.http.ResponseEntity;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * W 域控制面"明确降级"出口单源（详细设计-10 §5.2 补债，无假真理 P0 纪律）。
@@ -19,10 +17,15 @@ import java.util.Map;
  * （code/errorCode/message/data/traceId），data 内标注 {@code pending} 指向欠账条目，
  * 供调用方与验收对账。</p>
  */
-final class WAgentDegradation {
+public final class WAgentDegradation {
 
     /** 上线冻结的降级码字面量（非 §5.3 业务错误码，仅表达"端点在位、语义未接线"）。 */
-    static final String NOT_IMPLEMENTED = "NOT_IMPLEMENTED";
+    public static final String NOT_IMPLEMENTED = "NOT_IMPLEMENTED";
+
+    /** 501 降级载荷（旧 Map 两键：implemented=false + pending=欠账条目）。 */
+    public record NotImplementedVO(@JsonProperty("implemented") boolean implemented,
+                                    @JsonProperty("pending") String pending) {
+    }
 
     private WAgentDegradation() {}
 
@@ -31,16 +34,13 @@ final class WAgentDegradation {
      *
      * @param feature 欠账条目单源标识（如 {@code F10-21 kill-switch 标志位存储(sysman config 未接)}}
      */
-    static ResponseEntity<ApiResponse<Map<String, Object>>> notImplemented(String feature) {
+    static ResponseEntity<ApiResponse<NotImplementedVO>> notImplemented(String feature) {
         String traceId = AiTraceSupport.currentTraceId();
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("implemented", false);
-        data.put("pending", feature);
-        ApiResponse<Map<String, Object>> body = ApiResponse
-                .<Map<String, Object>>error(501, NOT_IMPLEMENTED,
+        ApiResponse<NotImplementedVO> body = ApiResponse
+                .<NotImplementedVO>error(501, NOT_IMPLEMENTED,
                         "该端点已落位，但实现依赖未接线（" + feature + "），禁伪造结果（诊断码 " + traceId + "）")
                 .withTraceId(traceId);
-        body.setData(data);
+        body.setData(new NotImplementedVO(false, feature));
         return ResponseEntity.status(501).body(body);
     }
 }

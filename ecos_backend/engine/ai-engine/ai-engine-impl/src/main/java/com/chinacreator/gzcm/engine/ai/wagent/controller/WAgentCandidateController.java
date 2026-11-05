@@ -13,6 +13,7 @@ import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentCandidateReviewDO
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentOrchestrationException;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver.Identity;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,9 +22,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -68,9 +69,104 @@ public class WAgentCandidateController {
     public record CandidatePublishRequest(String approvalToken) {
     }
 
+    /** 五段校验视图（旧 Map 内嵌 {@code validation}，键序不变）。 */
+    public record CandidateValidationVO(@JsonProperty("structure") String structure,
+                                        @JsonProperty("reference") String reference,
+                                        @JsonProperty("conflict") String conflict,
+                                        @JsonProperty("impact") String impact,
+                                        @JsonProperty("regression") String regression) {
+    }
+
+    /** 候选视图（19 键；#17 列表项 / #18 #19 详情基底共用）。 */
+    public record CandidateViewVO(@JsonProperty("candidate_id") String candidateId,
+                                  @JsonProperty("candidate_type") String candidateType,
+                                  @JsonProperty("target_engine") String targetEngine,
+                                  @JsonProperty("target_object_ref_json") String targetObjectRefJson,
+                                  @JsonProperty("payload_hash") String payloadHash,
+                                  @JsonProperty("generated_by_run") String generatedByRun,
+                                  @JsonProperty("generated_by_step") String generatedByStep,
+                                  @JsonProperty("confidence") BigDecimal confidence,
+                                  @JsonProperty("basis_json") String basisJson,
+                                  @JsonProperty("validation") CandidateValidationVO validation,
+                                  @JsonProperty("status") String status,
+                                  @JsonProperty("batch_id") String batchId,
+                                  @JsonProperty("engine_draft_ref_text") String engineDraftRefText,
+                                  @JsonProperty("published_ref_text") String publishedRefText,
+                                  @JsonProperty("published_git_ref") String publishedGitRef,
+                                  @JsonProperty("expire_time") String expireTime,
+                                  @JsonProperty("expired") boolean expired,
+                                  @JsonProperty("version_no") String versionNo,
+                                  @JsonProperty("create_time") String createTime) {
+
+        static CandidateViewVO of(WAgentCandidateDO c) {
+            return new CandidateViewVO(c.getId(), c.getCandidateType(), c.getTargetEngine(),
+                    c.getTargetObjectRefJson(), c.getPayloadHash(), c.getGeneratedByRun(),
+                    c.getGeneratedByStep(), c.getConfidence(), c.getBasisJson(),
+                    new CandidateValidationVO(c.getValidationStructure(), c.getValidationReference(),
+                            c.getValidationConflict(), c.getValidationImpact(), c.getValidationRegression()),
+                    c.getStatus(), c.getBatchId(), c.getEngineDraftRefText(), c.getPublishedRefText(),
+                    c.getPublishedGitRef(), c.getExpireTime() == null ? null : c.getExpireTime().toString(),
+                    isExpired(c), c.getVersionNo(),
+                    c.getCreateTime() == null ? null : c.getCreateTime().toString());
+        }
+
+        CandidateViewVO withStatus(String newStatus) {
+            return new CandidateViewVO(candidateId, candidateType, targetEngine, targetObjectRefJson,
+                    payloadHash, generatedByRun, generatedByStep, confidence, basisJson, validation,
+                    newStatus, batchId, engineDraftRefText, publishedRefText, publishedGitRef,
+                    expireTime, expired, versionNo, createTime);
+        }
+    }
+
+    /** 评审视图（7 键；approval_token 只出存在位，凭证不外泄）。 */
+    public record CandidateReviewVO(@JsonProperty("review_id") String reviewId,
+                                    @JsonProperty("reviewer_id") String reviewerId,
+                                    @JsonProperty("decision") String decision,
+                                    @JsonProperty("comment_text") String commentText,
+                                    @JsonProperty("changes_json") String changesJson,
+                                    @JsonProperty("approval_token_present") boolean approvalTokenPresent,
+                                    @JsonProperty("review_time") String reviewTime) {
+    }
+
+    /** #17 列表响应（candidates + total）。 */
+    public record CandidateListVO(@JsonProperty("candidates") List<CandidateViewVO> candidates,
+                                  @JsonProperty("total") int total) {
+    }
+
+    /** #18/#19 详情响应（候选 19 键平铺后追加 reviews）。 */
+    public record CandidateDetailVO(@JsonProperty("candidate_id") String candidateId,
+                                    @JsonProperty("candidate_type") String candidateType,
+                                    @JsonProperty("target_engine") String targetEngine,
+                                    @JsonProperty("target_object_ref_json") String targetObjectRefJson,
+                                    @JsonProperty("payload_hash") String payloadHash,
+                                    @JsonProperty("generated_by_run") String generatedByRun,
+                                    @JsonProperty("generated_by_step") String generatedByStep,
+                                    @JsonProperty("confidence") BigDecimal confidence,
+                                    @JsonProperty("basis_json") String basisJson,
+                                    @JsonProperty("validation") CandidateValidationVO validation,
+                                    @JsonProperty("status") String status,
+                                    @JsonProperty("batch_id") String batchId,
+                                    @JsonProperty("engine_draft_ref_text") String engineDraftRefText,
+                                    @JsonProperty("published_ref_text") String publishedRefText,
+                                    @JsonProperty("published_git_ref") String publishedGitRef,
+                                    @JsonProperty("expire_time") String expireTime,
+                                    @JsonProperty("expired") boolean expired,
+                                    @JsonProperty("version_no") String versionNo,
+                                    @JsonProperty("create_time") String createTime,
+                                    @JsonProperty("reviews") List<CandidateReviewVO> reviews) {
+
+        static CandidateDetailVO of(CandidateViewVO v, List<CandidateReviewVO> reviews) {
+            return new CandidateDetailVO(v.candidateId(), v.candidateType(), v.targetEngine(),
+                    v.targetObjectRefJson(), v.payloadHash(), v.generatedByRun(), v.generatedByStep(),
+                    v.confidence(), v.basisJson(), v.validation(), v.status(), v.batchId(),
+                    v.engineDraftRefText(), v.publishedRefText(), v.publishedGitRef(), v.expireTime(),
+                    v.expired(), v.versionNo(), v.createTime(), reviews);
+        }
+    }
+
     /** #17 列表：租户隔离 DAO 收口，类型/状态/批次/Run 为受控内存过滤（词表越界 400）。 */
     @GetMapping(WAgentApiPaths.CANDIDATES_COLLECTION)
-    public ApiResponse<Map<String, Object>> listCandidates(
+    public ApiResponse<CandidateListVO> listCandidates(
             @RequestParam(value = "candidateType", required = false) String candidateType,
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "batchId", required = false) String batchId,
@@ -79,7 +175,7 @@ public class WAgentCandidateController {
         String type = validateEnum(candidateType, CandidateType.ALL::contains, "candidate_type 越界（CandidateType 十二类单源）");
         String st = validateEnum(status, CandidateStatus.ALL::contains, "status 越界（CandidateStatus 十值单源）");
 
-        List<Map<String, Object>> items = new ArrayList<>();
+        List<CandidateViewVO> items = new ArrayList<>();
         for (WAgentCandidateDO c : candidateDao.findByTenant(identity.tenantId())) {
             if (type != null && !type.equals(c.getCandidateType())) {
                 continue;
@@ -93,28 +189,24 @@ public class WAgentCandidateController {
             if (runId != null && !runId.isBlank() && !runId.trim().equals(c.getGeneratedByRun())) {
                 continue;
             }
-            items.add(candidateView(c));
+            items.add(CandidateViewVO.of(c));
         }
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("candidates", items);
-        data.put("total", items.size());
-        return WAgentRunController.ok(data);
+        return WAgentRunController.ok(new CandidateListVO(items, items.size()));
     }
 
     /** #18 详情：含 basis/五段校验 + 评审链（跨租户掩 404，§5.3 防枚举）。 */
     @GetMapping(WAgentApiPaths.CANDIDATE_BY_ID)
-    public ApiResponse<Map<String, Object>> getCandidate(
+    public ApiResponse<CandidateDetailVO> getCandidate(
             @PathVariable(WAgentApiPaths.P_CANDIDATE_ID) String candidateId) {
         Identity identity = identityResolver.require();
         WAgentCandidateDO candidate = loadForTenant(candidateId, identity.tenantId());
-        Map<String, Object> data = candidateView(candidate);
-        data.put("reviews", reviewView(reviewDao.findByCandidateId(candidate.getId())));
-        return WAgentRunController.ok(data);
+        return WAgentRunController.ok(CandidateDetailVO.of(CandidateViewVO.of(candidate),
+                reviewView(reviewDao.findByCandidateId(candidate.getId()))));
     }
 
     /** #19 四眼评审（在位实装，见类注释）。 */
     @PostMapping(WAgentApiPaths.CANDIDATE_REVIEW)
-    public ApiResponse<Map<String, Object>> reviewCandidate(
+    public ApiResponse<CandidateDetailVO> reviewCandidate(
             @PathVariable(WAgentApiPaths.P_CANDIDATE_ID) String candidateId,
             @RequestBody CandidateReviewRequest req) {
         Identity identity = identityResolver.require();
@@ -176,15 +268,13 @@ public class WAgentCandidateController {
         };
         candidateDao.updateStatus(candidate.getId(), next, identity.operator());
 
-        Map<String, Object> data = candidateView(candidate);
-        data.put("status", next);
-        data.put("reviews", reviewView(reviewDao.findByCandidateId(candidate.getId())));
-        return WAgentRunController.ok(data);
+        return WAgentRunController.ok(CandidateDetailVO.of(CandidateViewVO.of(candidate).withStatus(next),
+                reviewView(reviewDao.findByCandidateId(candidate.getId()))));
     }
 
     /** #20 发布（L3）：凭证/状态闸在位；pre-commit 裁决 + Git 归档未接线 ⇒ 如实 501。 */
     @PostMapping(WAgentApiPaths.CANDIDATE_PUBLISH)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> publishCandidate(
+    public ResponseEntity<ApiResponse<WAgentDegradation.NotImplementedVO>> publishCandidate(
             @PathVariable(WAgentApiPaths.P_CANDIDATE_ID) String candidateId,
             @RequestBody(required = false) CandidatePublishRequest req) {
         Identity identity = identityResolver.require();
@@ -237,49 +327,13 @@ public class WAgentCandidateController {
         return v;
     }
 
-    static Map<String, Object> candidateView(WAgentCandidateDO c) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("candidate_id", c.getId());
-        m.put("candidate_type", c.getCandidateType());
-        m.put("target_engine", c.getTargetEngine());
-        m.put("target_object_ref_json", c.getTargetObjectRefJson());
-        m.put("payload_hash", c.getPayloadHash());
-        m.put("generated_by_run", c.getGeneratedByRun());
-        m.put("generated_by_step", c.getGeneratedByStep());
-        m.put("confidence", c.getConfidence());
-        m.put("basis_json", c.getBasisJson());
-        Map<String, Object> validation = new LinkedHashMap<>();
-        validation.put("structure", c.getValidationStructure());
-        validation.put("reference", c.getValidationReference());
-        validation.put("conflict", c.getValidationConflict());
-        validation.put("impact", c.getValidationImpact());
-        validation.put("regression", c.getValidationRegression());
-        m.put("validation", validation);
-        m.put("status", c.getStatus());
-        m.put("batch_id", c.getBatchId());
-        m.put("engine_draft_ref_text", c.getEngineDraftRefText());
-        m.put("published_ref_text", c.getPublishedRefText());
-        m.put("published_git_ref", c.getPublishedGitRef());
-        m.put("expire_time", c.getExpireTime() == null ? null : c.getExpireTime().toString());
-        m.put("expired", isExpired(c));
-        m.put("version_no", c.getVersionNo());
-        m.put("create_time", c.getCreateTime() == null ? null : c.getCreateTime().toString());
-        return m;
-    }
-
-    private static List<Map<String, Object>> reviewView(List<WAgentCandidateReviewDO> reviews) {
-        List<Map<String, Object>> list = new ArrayList<>();
+    private static List<CandidateReviewVO> reviewView(List<WAgentCandidateReviewDO> reviews) {
+        List<CandidateReviewVO> list = new ArrayList<>();
         for (WAgentCandidateReviewDO r : reviews) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("review_id", r.getId());
-            m.put("reviewer_id", r.getReviewerId());
-            m.put("decision", r.getDecision());
-            m.put("comment_text", r.getCommentText());
-            m.put("changes_json", r.getChangesJson());
-            // approval_token 只出存在位（凭证不外泄）
-            m.put("approval_token_present", r.getApprovalToken() != null && !r.getApprovalToken().isBlank());
-            m.put("review_time", r.getReviewTime() == null ? null : r.getReviewTime().toString());
-            list.add(m);
+            list.add(new CandidateReviewVO(r.getId(), r.getReviewerId(), r.getDecision(),
+                    r.getCommentText(), r.getChangesJson(),
+                    r.getApprovalToken() != null && !r.getApprovalToken().isBlank(),
+                    r.getReviewTime() == null ? null : r.getReviewTime().toString()));
         }
         return list;
     }

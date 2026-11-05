@@ -11,8 +11,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
-
 /**
  * Decision / Action 端点（详细设计-10 §5.2 #23 recordDecision / #24 draftAction +
  * commitAction，附件 §9.2 双端点对齐）。
@@ -51,7 +49,7 @@ public class WAgentDecisionActionController {
 
     /** #23 决策记录（引用 pinned 评估）——V241 决策表未落地 ⇒ 501。 */
     @PostMapping(WAgentApiPaths.DECISIONS_COLLECTION)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> recordDecision(
+    public ResponseEntity<ApiResponse<WAgentDegradation.NotImplementedVO>> recordDecision(
             @RequestBody DecisionRecordRequest req) {
         identityResolver.require(); // 认证闸先行（fail-closed 401）
         if (req == null || isBlank(req.questionId())) {
@@ -69,7 +67,7 @@ public class WAgentDecisionActionController {
 
     /** #24a 行动草稿——V241 行动表未落地 ⇒ 501。 */
     @PostMapping(WAgentApiPaths.ACTIONS_COLLECTION)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> draftAction(
+    public ResponseEntity<ApiResponse<WAgentDegradation.NotImplementedVO>> draftAction(
             @RequestBody ActionDraftRequest req) {
         identityResolver.require();
         if (req == null || isBlank(req.title())) {
@@ -84,7 +82,7 @@ public class WAgentDecisionActionController {
 
     /** #24b 行动提交（L3，经属主 Engine 写端点）——提交通道与凭证校验未接线 ⇒ 501。 */
     @PostMapping(WAgentApiPaths.ACTION_COMMIT)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> commitAction(
+    public ResponseEntity<ApiResponse<WAgentDegradation.NotImplementedVO>> commitAction(
             @PathVariable(WAgentApiPaths.P_ACTION_ID) String actionId,
             @RequestBody(required = false) ActionCommitRequest req) {
         identityResolver.require();

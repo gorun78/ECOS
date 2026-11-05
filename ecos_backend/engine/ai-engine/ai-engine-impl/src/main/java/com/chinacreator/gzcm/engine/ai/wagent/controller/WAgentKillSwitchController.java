@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -44,7 +43,7 @@ public class WAgentKillSwitchController {
     }
 
     @PostMapping(WAgentApiPaths.FLAGS_KILL_SWITCH)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> setKillSwitch(
+    public ResponseEntity<ApiResponse<WAgentDegradation.NotImplementedVO>> setKillSwitch(
             @RequestBody KillSwitchRequest req) {
         if (req == null || req.scope() == null || req.scope().isBlank()) {
             throw WAgentOrchestrationException.validation("scope 必填（tenant|system）");
