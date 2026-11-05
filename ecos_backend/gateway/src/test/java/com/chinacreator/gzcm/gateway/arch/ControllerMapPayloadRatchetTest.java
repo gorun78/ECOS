@@ -373,6 +373,17 @@ import org.junit.jupiter.api.Test;
  *       {@code id/name} 保持 {@code Object}（四表主键/名称列类型不一）。键面与顺序由
  *       {@code PortalSearchWireShapeTest} 3 例钉住（去重、type 过滤单腿、空 q 400），
  *       变异实红（{@code rlsApplied}→rls_applied）；{@code sysman-impl} 全量 **241/0/0/0**。</li>
+ *   <li><b>存量面分档快照（2026-11-05 · #147DS · 不产代码）</b>：HEAD 实扫 **1542 行 / 202 命中文件**
+ *       （工作树 1553/205；差 11 行 / 3 文件为并发会话在途面）。分布（工作树计）：≥20 行 **9** 文件、
+ *       10~19 行 **47**、1~9 行 **149**。≥20 的 9 枚全部落在既有分档②「先裁模型 schema 再定型」：
+ *       {@code ObjectController}(58，他人未提交在途)、{@code MetadataController}(49，元数据动态列)、
+ *       {@code LineageController}(39，内存双形行)、{@code OntologyProposalController}(36，{@code SELECT *}+payload)、
+ *       {@code WorldModelGraphController}(25，两源同键不同型)、{@code CognitivePlannerController}(25，链节点任意对象)、
+ *       {@code ClassificationController}(23，LLM 自由 JSON)、{@code AgentLoopController}(21，SSE 帧/工具记录)、
+ *       {@code QueryController}(20，SQL 结果动态列＋RLS 四态)。1~9 行档多数是「对外已 VO、剩余为
+ *       JSONB / 内存 store」的内部转换行（如 {@code OntologyMappingController}、{@code OntologyExportController}、
+ *       {@code VersionDiffController}）。结论：<b>无 schema 裁决即无可机械清退面</b>，后续批次须先裁对应域模型，
+ *       禁为降数字冻结动态 payload / 反向改 wire。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
