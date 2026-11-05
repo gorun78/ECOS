@@ -2,6 +2,10 @@ package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.annotation.RequirePermission;
 import com.chinacreator.gzcm.common.base.ApiResponse;
+import com.chinacreator.gzcm.engine.data.dto.DataEngineConfigRefreshVO;
+import com.chinacreator.gzcm.engine.data.dto.DataEngineConfigRow;
+import com.chinacreator.gzcm.engine.data.dto.DataEngineConfigSegmentsVO;
+import com.chinacreator.gzcm.engine.data.dto.DataEngineConfigUpdateVO;
 import com.chinacreator.gzcm.sysman.config.service.impl.SysConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -229,7 +233,7 @@ public class DataEngineConfigController {
      * <p>响应结构：{@code data.segments[].id}（段）+ {@code data.segments[].subgroups[].id/configs}（子分区与配置）。
      */
     @GetMapping("/groups")
-    public ApiResponse<Map<String, Object>> getConfigBySegment() {
+    public ApiResponse<DataEngineConfigSegmentsVO> getConfigBySegment() {
         try {
             return ApiResponse.success(groupBySegment(loadConfigRows()));
         } catch (Exception e) {
@@ -241,8 +245,8 @@ public class DataEngineConfigController {
     /**
      * 加载 data-engine 配置行；首次访问自动插入默认值，并补齐版本迭代新增的 key（幂等）。
      */
-    private List<Map<String, Object>> loadConfigRows() {
-        List<Map<String, Object>> rows = sysConfigService.getByGroup("data-engine");
+    private List<DataEngineConfigRow> loadConfigRows() {
+        List<DataEngineConfigRow> rows = DataEngineConfigRow.fromRows(sysConfigService.getByGroup("data-engine"));
         if (rows.isEmpty()) {
             // lazy init — 首次访问自动插入默认配置
             initDefaultRows();
@@ -250,7 +254,7 @@ public class DataEngineConfigController {
             // 补插缺失的默认配置项（版本迭代新增 key 时自动补齐，幂等）
             ensureMissingDefaults(rows);
         }
-        return sysConfigService.getByGroup("data-engine");
+        return DataEngineConfigRow.fromRows(sysConfigService.getByGroup("data-engine"));
     }
 
     /** 插入默认配置行 (SysConfigService.ensureDefaultConfigs 可能在 schema 就绪前执行) */
@@ -266,14 +270,11 @@ public class DataEngineConfigController {
     }
 
     /** 补插 DEFAULTS 中已定义但库里缺失的配置项（如新增的 dw.metadata.history_versions） */
-    private void ensureMissingDefaults(List<Map<String, Object>> rows) {
+    private void ensureMissingDefaults(List<DataEngineConfigRow> rows) {
         try {
             Set<String> existing = new HashSet<>();
-            for (Map<String, Object> row : rows) {
-                Object k = row.get("config_key");
-                if (k != null) {
-                    existing.add(k.toString());
-                }
+            for (DataEngineConfigRow row : rows) {
+                existing.add(row.key());
             }
             int added = 0;
             for (Map.Entry<String, String> e : DEFAULTS.entrySet()) {
@@ -306,7 +307,8 @@ public class DataEngineConfigController {
     @GetMapping("/{group}")
     public ApiResponse<Map<String, Map<String, String>>> getConfigByGroup(@PathVariable String group) {
         try {
-            List<Map<String, Object>> rows = sysConfigService.getByGroup(group);
+            List<DataEngineConfigRow> rows =
+                    DataEngineConfigRow.fromRows(sysConfigService.getByGroup(group));
             return ApiResponse.success(groupBySubGroup(rows));
         } catch (Exception e) {
             log.error("获取配置组 {} 失败", group, e);
@@ -320,13 +322,10 @@ public class DataEngineConfigController {
      */
     @RequirePermission(permission = "system:config:manage")
     @PutMapping
-    public ApiResponse<Map<String, Object>> updateConfig(@RequestBody List<Map<String, String>> updates) {
+    public ApiResponse<DataEngineConfigUpdateVO> updateConfig(@RequestBody List<Map<String, String>> updates) {
         try {
             int count = sysConfigService.updateBatch(updates);
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("updated", count);
-            result.put("total", updates.size());
-            return ApiResponse.success(result);
+            return ApiResponse.success(new DataEngineConfigUpdateVO(count, updates.size()));
         } catch (Exception e) {
             log.error("批量更新配置失败", e);
             return ApiResponse.internalError("更新失败");
@@ -339,13 +338,11 @@ public class DataEngineConfigController {
      */
     @RequirePermission(permission = "system:config:manage")
     @PostMapping("/refresh")
-    public ApiResponse<Map<String, Object>> refreshCache() {
+    public ApiResponse<DataEngineConfigRefreshVO> refreshCache() {
         try {
             sysConfigService.refreshCache();
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("refreshed", true);
-            result.put("cache_size", sysConfigService.cacheSize());
-            return ApiResponse.success(result);
+            return ApiResponse.success(
+                    new DataEngineConfigRefreshVO(true, sysConfigService.cacheSize()));
         } catch (Exception e) {
             log.error("刷新配置缓存失败", e);
             return ApiResponse.internalError("刷新失败");
@@ -359,13 +356,12 @@ public class DataEngineConfigController {
      * 将配置行按 config_key 前缀分子组。
      * 例如 dw.execution.mode → execution: {mode: "memory"}
      */
-    private Map<String, Map<String, String>> groupBySubGroup(List<Map<String, Object>> rows) {
+    private Map<String, Map<String, String>> groupBySubGroup(List<DataEngineConfigRow> rows) {
         Map<String, Map<String, String>> groups = new LinkedHashMap<>();
 
-        for (Map<String, Object> row : rows) {
-            String key = (String) row.get("config_key");
-            String value = (String) row.get("config_value");
-            if (key == null) continue;
+        for (DataEngineConfigRow row : rows) {
+            String key = row.key();
+            String value = row.value();
 
             // 确定子组名
             String subGroup = "general";
@@ -383,7 +379,7 @@ public class DataEngineConfigController {
             }
 
             groups.computeIfAbsent(subGroup, k -> new LinkedHashMap<>())
-                  .put(shortKey, value != null ? value : "");
+                  .put(shortKey, value);
         }
         return groups;
     }
@@ -396,15 +392,12 @@ public class DataEngineConfigController {
      * @param rows 配置行（含 config_key / config_value）
      * @return {@code {"segments": [{"id": 段, "subgroups": [{"id": 子分区, "configs": {key: value}}]}]}}
      */
-    private Map<String, Object> groupBySegment(List<Map<String, Object>> rows) {
+    private DataEngineConfigSegmentsVO groupBySegment(List<DataEngineConfigRow> rows) {
         Map<String, Map<String, LinkedHashMap<String, String>>> bySegment = new LinkedHashMap<>();
 
-        for (Map<String, Object> row : rows) {
-            String key = (String) row.get("config_key");
-            if (key == null) {
-                continue;
-            }
-            String value = (String) row.get("config_value");
+        for (DataEngineConfigRow row : rows) {
+            String key = row.key();
+            String value = row.value();
 
             String subgroup = resolveSegmentSubgroup(key);
             String segment = subgroup != null ? SUBGROUP_TO_SEGMENT.get(subgroup) : null;
@@ -415,12 +408,12 @@ public class DataEngineConfigController {
 
             bySegment.computeIfAbsent(segment, k -> new LinkedHashMap<>())
                      .computeIfAbsent(subgroup, k -> new LinkedHashMap<>())
-                     .put(key, value != null ? value : "");
+                     .put(key, value);
         }
 
-        List<Map<String, Object>> segments = new ArrayList<>();
+        List<DataEngineConfigSegmentsVO.Segment> segments = new ArrayList<>();
         for (String segmentId : SEGMENT_ORDER) {
-            List<Map<String, Object>> subgroupList = new ArrayList<>();
+            List<DataEngineConfigSegmentsVO.Subgroup> subgroupList = new ArrayList<>();
             Map<String, LinkedHashMap<String, String>> subgroups = bySegment.get(segmentId);
             if (subgroups != null) {
                 List<String> orderedIds = new ArrayList<>(subgroups.keySet());
@@ -431,21 +424,14 @@ public class DataEngineConfigController {
                             return idx < 0 ? Integer.MAX_VALUE : idx;
                         }));
                 for (String subgroupId : orderedIds) {
-                    Map<String, Object> subgroup = new LinkedHashMap<>();
-                    subgroup.put("id", subgroupId);
-                    subgroup.put("configs", subgroups.get(subgroupId));
-                    subgroupList.add(subgroup);
+                    subgroupList.add(new DataEngineConfigSegmentsVO.Subgroup(
+                            subgroupId, subgroups.get(subgroupId)));
                 }
             }
-            Map<String, Object> segment = new LinkedHashMap<>();
-            segment.put("id", segmentId);
-            segment.put("subgroups", subgroupList);
-            segments.add(segment);
+            segments.add(new DataEngineConfigSegmentsVO.Segment(segmentId, subgroupList));
         }
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("segments", segments);
-        return result;
+        return new DataEngineConfigSegmentsVO(segments);
     }
 
     /**
