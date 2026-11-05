@@ -214,19 +214,27 @@ class WorkflowInstanceApprovalContractTest {
                 .thenReturn(new com.chinacreator.gzcm.buszhi.workflow.dto.WorkflowApprovalResultVO("appr-7", "Approved"));
         when(approvalRepo.findById("appr-7")).thenReturn(Optional.of(row("appr-7", "task-1", "lisi")));
 
-        ApiResponse<Map<String, Object>> resp =
+        ApiResponse<WorkflowInstanceApprovalController.WorkflowApprovalRowVO> resp =
                 controller.approveWorkflowInstance("inst-1", Map.of("opinion", "同意"));
 
         assertEquals(0, resp.getCode(), "成功腿 code=0，禁把审批动作写成业务失败信封");
-        Map<String, Object> data = resp.getData();
-        assertEquals("appr-7", data.get("id"));
-        assertEquals("task-1", data.get("taskId"));
-        assertEquals("inst-1", data.get("instanceId"));
-        assertEquals("lisi", data.get("approver"));
-        assertEquals("Approved", data.get("decision"));
+        WorkflowInstanceApprovalController.WorkflowApprovalRowVO data = resp.getData();
+        assertEquals("appr-7", data.id());
+        assertEquals("task-1", data.taskId());
+        assertEquals("inst-1", data.instanceId());
+        assertEquals("lisi", data.approver());
+        assertEquals("Approved", data.decision());
         assertEquals(List.of("id", "taskId", "instanceId", "approver", "decision", "opinion",
-                        "formData", "createdAt"), List.copyOf(data.keySet()),
+                        "formData", "createdAt"),
+                recordComponentNames(WorkflowInstanceApprovalController.WorkflowApprovalRowVO.class),
                 "审批行字段面须与实体列同名且顺序稳定（前端渲染与契约对账共用）");
+    }
+
+    /** record 组件名与声明顺序（Jackson 对 record 的 wire 键序即组件声明序）。 */
+    private static List<String> recordComponentNames(Class<?> type) {
+        return java.util.Arrays.stream(type.getRecordComponents())
+                .map(java.lang.reflect.RecordComponent::getName)
+                .toList();
     }
 
     // ── 夹具 ──────────────────────────────────────────

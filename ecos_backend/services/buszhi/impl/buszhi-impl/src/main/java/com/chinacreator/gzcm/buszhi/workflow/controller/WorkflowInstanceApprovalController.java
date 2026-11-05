@@ -1,5 +1,6 @@
 package com.chinacreator.gzcm.buszhi.workflow.controller;
 
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -116,7 +117,7 @@ public class WorkflowInstanceApprovalController {
      * @return 审批行（{@code {id,taskId,instanceId,approver,decision,opinion,formData,createdAt}}）
      */
     @PostMapping("/{instanceId}/approvals")
-    public ApiResponse<Map<String, Object>> approveWorkflowInstance(
+    public ApiResponse<WorkflowApprovalRowVO> approveWorkflowInstance(
             @PathVariable("instanceId") String instanceId,
             @RequestBody(required = false) Map<String, Object> body) {
 
@@ -184,17 +185,16 @@ public class WorkflowInstanceApprovalController {
                 : new DataBridgeException(500, 500, APPROVAL_TABLE_UNREACHABLE, cause);
     }
 
-    /** 审批行 → 响应体（字段名与实体列同名，不额外造词）。 */
-    private static Map<String, Object> toApprovalRow(WorkflowApprovalEntity row) {
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("id", row.getId());
-        out.put("taskId", row.getTaskId());
-        out.put("instanceId", row.getInstanceId());
-        out.put("approver", row.getApprover());
-        out.put("decision", row.getDecision());
-        out.put("opinion", row.getOpinion());
-        out.put("formData", row.getFormData());
-        out.put("createdAt", row.getCreatedAt());
-        return out;
+    /** 审批行 → 响应体（字段名与实体列同名，不额外造词；DI-2 #147EO 改 record，键序不变）。 */
+    private static WorkflowApprovalRowVO toApprovalRow(WorkflowApprovalEntity row) {
+        return new WorkflowApprovalRowVO(row.getId(), row.getTaskId(), row.getInstanceId(),
+                row.getApprover(), row.getDecision(), row.getOpinion(),
+                row.getFormData(), row.getCreatedAt());
+    }
+
+    /** 审批行响应（8 键：id/taskId/instanceId/approver/decision/opinion/formData/createdAt）。 */
+    public record WorkflowApprovalRowVO(String id, String taskId, String instanceId,
+                                        String approver, String decision, String opinion,
+                                        String formData, LocalDateTime createdAt) {
     }
 }
