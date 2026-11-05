@@ -28,6 +28,10 @@ import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
  * 现改 {@code ResponseEntity} 承载，本门把「状态行值 = body.code = 语义分档」钉成行为断言，
  * 静态棘轮门（{@code SuccessStatusFailureEnvelopeRatchetTest}）只数得到腿，判不了档。</p>
  *
+ * <p>#147BT 出入参强类型化后，本门断言面从 {@code Map.get(键)} 改为 VO getter——
+ * <b>判定语义零放宽</b>（分档、同号、机读码、not_available 不吞定位失败四件套全部保留）；
+ * 键面是否逐字不变由同批新增的 {@code GitControllerWireShapeFidelityTest} 独立取证。</p>
+ *
  * <p>变异取证：把 {@code GitController.failure(body)} 改回 {@code ResponseEntity.ok(body)} ⇒
  * 本门全部失败用例红；把 {@code repoUnavailable} 的 404 判定删掉（一律 503）⇒
  * 「未注册=404」用例红；把 {@code branches} 的 {@code localPath} 未解析腿改回 404 ⇒
@@ -134,16 +138,42 @@ class GitControllerStatusLineTest {
         return new GitRepositoryException("GitRepoRegistry 未装配：禁止以内存 Map 或空注册面替代（按显式不可用处理）");
     }
 
+    // ── 强类型请求体夹具（#147BT）──
+
+    private static GitController.GitCommitRequest commitRequest(String message) {
+        GitController.GitCommitRequest r = new GitController.GitCommitRequest();
+        r.setMessage(message);
+        return r;
+    }
+
+    private static GitController.GitTagRequest tagRequest(String name) {
+        GitController.GitTagRequest r = new GitController.GitTagRequest();
+        r.setName(name);
+        return r;
+    }
+
+    private static GitController.GitRollbackRequest rollbackRequest(String commitId) {
+        GitController.GitRollbackRequest r = new GitController.GitRollbackRequest();
+        r.setCommitId(commitId);
+        return r;
+    }
+
+    private static GitController.GitBranchSwitchRequest branchRequest(String branch) {
+        GitController.GitBranchSwitchRequest r = new GitController.GitBranchSwitchRequest();
+        r.setBranch(branch);
+        return r;
+    }
+
     /**
      * 状态行 + 信封同号 + 机读码三件一起判。
      * <p>成功面口径：{@code ApiResponse.CODE_SUCCESS = 0}（业务码位）配 HTTP 200，
      * <b>不</b>要求同号；同号性只约束失败面（400/404/500/503 的 body.code 与状态行一致，
      * 承 D-B4-56 口径）。把成功面 0 也当成违例会是本门的假违例，故在此显式分档。</p>
      */
-    private static void assertStatusAndSameCode(ResponseEntity<ApiResponse<Map<String, Object>>> response,
+    private static void assertStatusAndSameCode(ResponseEntity<?> response,
                                                 int expectedStatus, String expectedErrorCode) {
         assertEquals(expectedStatus, response.getStatusCode().value(), "HTTP 状态行");
-        ApiResponse<Map<String, Object>> body = response.getBody();
+        ApiResponse<?> body = (ApiResponse<?>) response.getBody();
         assertNotNull(body, "响应体不得为空");
         if (expectedStatus >= 400) {
             assertEquals(expectedStatus, body.getCode(), "失败态：状态行与信封 code 必须同号（D-B4-56 口径）");
@@ -166,9 +196,10 @@ class GitControllerStatusLineTest {
                     fakeGitService(Set.of(), Map.of("getCurrentCommitId", "deadbeef1", "diff", Map.of("files", List.of()))),
                     registry);
 
-            ResponseEntity<ApiResponse<Map<String, Object>>> response = controller.status("pipeline-core");
+            ResponseEntity<ApiResponse<GitController.GitStatusVO>> response = controller.status("pipeline-core");
             assertStatusAndSameCode(response, 200, null);
-            assertEquals("deadbeef1", response.getBody().getData().get("currentCommit"));
+            assertEquals("deadbeef1", response.getBody().getData().getCurrentCommit());
+            assertEquals("Pipeline Core", response.getBody().getData().getRepoName());
         }
 
         @Test
@@ -183,13 +214,13 @@ class GitControllerStatusLineTest {
             GitController controller = new GitController(
                     fakeGitService(Set.of(), Map.of("listCommits", six)), registry);
 
-            ResponseEntity<ApiResponse<Map<String, Object>>> response =
+            ResponseEntity<ApiResponse<GitController.GitCommitsVO>> response =
                     controller.commits("pipeline-core", 0, 5);
-            Map<String, Object> data = response.getBody().getData();
+            GitController.GitCommitsVO data = response.getBody().getData();
             assertEquals(200, response.getStatusCode().value());
-            assertEquals(5, ((List<?>) data.get("items")).size(), "多取的一条只用于判位，不外泄");
-            assertEquals(Boolean.TRUE, data.get("hasMore"));
-            assertFalse(data.containsKey("total"), "未读到尽头时不得伪造总数（原腿的 total 来自不存在的表）");
+            assertEquals(5, data.getItems().size(), "多取的一条只用于判位，不外泄");
+            assertEquals(Boolean.TRUE, data.getHasMore());
+            assertNull(data.getTotal(), "未读到尽头时不得伪造总数（原腿的 total 来自不存在的表）");
         }
 
         @Test
@@ -203,9 +234,9 @@ class GitControllerStatusLineTest {
             GitController controller = new GitController(
                     fakeGitService(Set.of(), Map.of("listCommits", two)), registry);
 
-            Map<String, Object> data = controller.commits("pipeline-core", 0, 20).getBody().getData();
-            assertEquals(Boolean.FALSE, data.get("hasMore"));
-            assertEquals(2, data.get("total"));
+            GitController.GitCommitsVO data = controller.commits("pipeline-core", 0, 20).getBody().getData();
+            assertEquals(Boolean.FALSE, data.getHasMore());
+            assertEquals(Integer.valueOf(2), data.getTotal());
         }
     }
 
@@ -221,13 +252,13 @@ class GitControllerStatusLineTest {
             registry.thrown = notRegistered();
             GitController controller = new GitController(fakeGitService(Set.of(), Map.of()), registry);
 
-            for (ResponseEntity<ApiResponse<Map<String, Object>>> r : List.of(
+            for (ResponseEntity<?> r : List.of(
                     controller.status("pipeline-core"),
                     controller.commits("pipeline-core", 0, 20),
                     controller.diff("pipeline-core", null, null),
                     controller.branches("pipeline-core"),
-                    controller.rollback("pipeline-core", Map.of("commitId", "sha1")),
-                    controller.switchBranch("pipeline-core", Map.of("branch", "dev")))) {
+                    controller.rollback("pipeline-core", rollbackRequest("sha1")),
+                    controller.switchBranch("pipeline-core", branchRequest("dev")))) {
                 assertStatusAndSameCode(r, 404, "ECOS_GIT_REPO_UNAVAILABLE");
             }
         }
@@ -265,11 +296,11 @@ class GitControllerStatusLineTest {
             registry.row = registeredRepo("/data/ecos-git-repos/pipeline-core");
             GitController controller = new GitController(fakeGitService(Set.of(), Map.of()), registry);
 
-            assertStatusAndSameCode(controller.commit("pipeline-core", Map.of("message", "   ")),
+            assertStatusAndSameCode(controller.commit("pipeline-core", commitRequest("   ")),
                     400, "ECOS_GIT_COMMIT_MESSAGE_REQUIRED");
-            assertStatusAndSameCode(controller.tag("pipeline-core", Map.of()),
+            assertStatusAndSameCode(controller.tag("pipeline-core", tagRequest(null)),
                     400, "ECOS_GIT_TAG_NAME_REQUIRED");
-            assertStatusAndSameCode(controller.rollback("pipeline-core", Map.of("commitId", "")),
+            assertStatusAndSameCode(controller.rollback("pipeline-core", rollbackRequest("")),
                     400, "ECOS_GIT_ROLLBACK_TARGET_REQUIRED");
         }
 
@@ -296,30 +327,31 @@ class GitControllerStatusLineTest {
             registry.row = registeredRepo("/data/ecos-git-repos/pipeline-core");
             GitController controller = new GitController(fakeGitService(Set.of(), Map.of()), registry);
 
-            ResponseEntity<ApiResponse<Map<String, Object>>> rollback =
-                    controller.rollback("pipeline-core", Map.of("commitId", "sha123"));
+            ResponseEntity<ApiResponse<GitController.GitRollbackResultVO>> rollback =
+                    controller.rollback("pipeline-core", rollbackRequest("sha123"));
             assertEquals(200, rollback.getStatusCode().value());
-            Map<String, Object> rb = rollback.getBody().getData();
-            assertEquals("not_available", rb.get("status"));
-            assertNotNull(rb.get("reason"), "未实现必须给出原因，禁空面冒充");
+            assertEquals("not_available", rollback.getBody().getData().getStatus());
+            assertNotNull(rollback.getBody().getData().getReason(), "未实现必须给出原因，禁空面冒充");
+            assertEquals("sha123", rollback.getBody().getData().getRollbackTo(), "目标 commit 必须回显，禁静默丢位");
 
-            Map<String, Object> br = controller.switchBranch("pipeline-core", Map.of("branch", "dev"))
-                    .getBody().getData();
-            assertEquals("not_available", br.get("status"));
-            assertNotNull(br.get("reason"));
+            GitController.GitBranchSwitchResultVO branch =
+                    controller.switchBranch("pipeline-core", branchRequest("dev")).getBody().getData();
+            assertEquals("not_available", branch.getStatus());
+            assertNotNull(branch.getReason());
+            assertEquals("dev", branch.getRequestedBranch());
 
             // #147P：push/pull 端点从「网关 404」改为本层显式能力分态
-            ResponseEntity<ApiResponse<Map<String, Object>>> push =
+            ResponseEntity<ApiResponse<GitController.GitSyncResultVO>> push =
                     controller.push("pipeline-core", null);
             assertEquals(200, push.getStatusCode().value());
-            assertEquals("not_available", push.getBody().getData().get("status"));
-            assertNotNull(push.getBody().getData().get("reason"));
+            assertEquals("not_available", push.getBody().getData().getStatus());
+            assertNotNull(push.getBody().getData().getReason());
 
-            ResponseEntity<ApiResponse<Map<String, Object>>> pull =
+            ResponseEntity<ApiResponse<GitController.GitSyncResultVO>> pull =
                     controller.pull("pipeline-core", null);
             assertEquals(200, pull.getStatusCode().value());
-            assertEquals("not_available", pull.getBody().getData().get("status"));
-            assertNotNull(pull.getBody().getData().get("reason"));
+            assertEquals("not_available", pull.getBody().getData().getStatus());
+            assertNotNull(pull.getBody().getData().getReason());
         }
 
         @Test
@@ -329,13 +361,13 @@ class GitControllerStatusLineTest {
             registry.thrown = notRegistered();
             GitController controller = new GitController(fakeGitService(Set.of(), Map.of()), registry);
 
-            ResponseEntity<ApiResponse<Map<String, Object>>> rollback =
-                    controller.rollback("pipeline-core", Map.of("commitId", "sha123"));
+            ResponseEntity<ApiResponse<GitController.GitRollbackResultVO>> rollback =
+                    controller.rollback("pipeline-core", rollbackRequest("sha123"));
             assertEquals(404, rollback.getStatusCode().value(),
                     "未注册 ⇒ 404；若把 not_available 声明包进同一段 try，这里会红着 200 回来");
 
-            ResponseEntity<ApiResponse<Map<String, Object>>> branch =
-                    controller.switchBranch("pipeline-core", Map.of("branch", "dev"));
+            ResponseEntity<ApiResponse<GitController.GitBranchSwitchResultVO>> branch =
+                    controller.switchBranch("pipeline-core", branchRequest("dev"));
             assertEquals(404, branch.getStatusCode().value());
         }
     }

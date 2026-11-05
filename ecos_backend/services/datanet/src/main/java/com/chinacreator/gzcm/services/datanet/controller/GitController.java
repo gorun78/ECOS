@@ -1,7 +1,10 @@
 package com.chinacreator.gzcm.services.datanet.controller;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +16,7 @@ import com.chinacreator.gzcm.runtime.access.git.GitRepositoryService;
 import com.chinacreator.gzcm.runtime.access.git.GitService;
 import com.chinacreator.gzcm.runtime.access.git.entity.GitCommitView;
 import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
  * ECOS 数据工作台 — Git 版本管理 API (P3-A 从 gateway 迁至 datanet)。
@@ -36,12 +40,19 @@ import com.chinacreator.gzcm.runtime.access.git.entity.GitRepository;
  *       裸回形态下 HTTP 状态行恒 200，调用方按状态行判成败即读到假绿。</li>
  * </ol>
  *
- * <p>能力未实现面（rollback / branch 切换）保持既有
+ * <p>能力未实现面（rollback / branch 切换 / push / pull）保持既有
  * {@code status=not_available + reason} 显式声明，禁伪成功；该声明是<b>业务体</b>字段，
  * 状态行仍为 200（请求确实被处理并如实回报「不可用」），与「失败冒充成功」不同态。
- * 分支枚举已在 #147C 接上属主 {@link GitService#listBranches}（读真实 ref，不再回硬编码假列表）。
- * 响应键面（{@code repoId}/{@code items}/{@code offset}/{@code limit}）保持不变，
- * 出入参强类型（DI-2）另批收口。</p>
+ * 分支枚举已在 #147C 接上属主 {@link GitService#listBranches}（读真实 ref，不再回硬编码假列表）。</p>
+ *
+ * <p><b>#147BT 出入参强类型化（DoD DI-2 第一批清退 + §2.9.9 G3「datanet GitController 仍收
+ * {@code Map}」）</b>：8 个响应体改为 {@code Git*VO}、4 个请求体改为 {@code Git*Request}，
+ * 键名/可空性逐字保真（VO 统一 {@code @JsonInclude(NON_NULL)}，与旧 {@code Map} 的
+ * 「未 put 即不出现」同形——旧 {@code commits} 腿只在读到尽头时 put {@code total}，现由
+ * {@code total==null} 省略同位键）。属主 {@link GitService#diff} 仍返回动态
+ * {@code Map}（runtime-access 契约，只增不改），本层按<b>已登记的固定键集</b>
+ * （{@code repository/from/to/filesChanged/changedCount}）逐键映射进 VO；
+ * 该映射是显式白名单，未来属主加键需同批改 VO（禁静默丢键冒充「diff 无变化」）。</p>
  *
  * @author ECOS Data Workbench Phase 2
  * @since PMO-49 P3-A
@@ -90,7 +101,7 @@ public class GitController {
      * 空注册表）＝503＋{@link #CODE_GIT_UNAVAILABLE}（服务端侧未就绪，换参数无用）。
      * 两态混记成一枚 404 会把「底座没起来」说成「你没注册」，是 D-B4-71 承流门定的错账形态。</p>
      */
-    private ResponseEntity<ApiResponse<Map<String, Object>>> repoUnavailable(
+    private <T> ResponseEntity<ApiResponse<T>> repoUnavailable(
             String leg, String repoId, GitRepositoryService.GitRepositoryException e) {
         int status = e.getHttpStatus() == 404 ? 404 : 503;
         String machineCode = status == 404 ? CODE_REPO_UNAVAILABLE : CODE_GIT_UNAVAILABLE;
@@ -100,7 +111,7 @@ public class GitController {
     }
 
     @GetMapping("/status")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> status(@RequestParam String repoId) {
+    public ResponseEntity<ApiResponse<GitStatusVO>> status(@RequestParam String repoId) {
         GitRepository repo;
         try {
             repo = resolveRepo(repoId);
@@ -108,12 +119,11 @@ public class GitController {
             return repoUnavailable("status", repoId, e);
         }
         try {
-            String commitId = gitService.getCurrentCommitId(repo);
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("repoId", repo.getRepositoryId());
-            data.put("repoName", repo.getName());
-            data.put("currentCommit", commitId);
-            data.put("branch", repo.getDefaultBranch() != null ? repo.getDefaultBranch() : "main");
+            GitStatusVO data = new GitStatusVO();
+            data.setRepoId(repo.getRepositoryId());
+            data.setRepoName(repo.getName());
+            data.setCurrentCommit(gitService.getCurrentCommitId(repo));
+            data.setBranch(repo.getDefaultBranch() != null ? repo.getDefaultBranch() : "main");
             return ok(ApiResponse.success(data));
         } catch (GitService.GitException e) {
             log.error("获取仓库状态失败: repoId={}", repoId, e);
@@ -129,7 +139,7 @@ public class GitController {
      * 未读到尽头时<b>不伪造</b>总数（原腿的 total 来自不存在的表，恒为假）。</p>
      */
     @GetMapping("/commits")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> commits(
+    public ResponseEntity<ApiResponse<GitCommitsVO>> commits(
             @RequestParam String repoId,
             @RequestParam(defaultValue = "0") int offset,
             @RequestParam(defaultValue = "20") int limit) {
@@ -147,24 +157,24 @@ public class GitController {
             List<GitCommitView> fetched = gitService.listCommits(repo, safeOffset, safeLimit + 1);
             boolean hasMore = fetched.size() > safeLimit;
             List<GitCommitView> page = hasMore ? fetched.subList(0, safeLimit) : fetched;
-            List<Map<String, Object>> items = new ArrayList<>(page.size());
+            List<GitCommitItemVO> items = new ArrayList<>(page.size());
             for (GitCommitView commit : page) {
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("id", commit.getCommitId());
-                item.put("commitId", commit.getCommitId());
-                item.put("message", commit.getMessage());
-                item.put("author", commit.getAuthorName());
-                item.put("committedAt", commit.getCommittedAt());
+                GitCommitItemVO item = new GitCommitItemVO();
+                item.setId(commit.getCommitId());
+                item.setCommitId(commit.getCommitId());
+                item.setMessage(commit.getMessage());
+                item.setAuthor(commit.getAuthorName());
+                item.setCommittedAt(commit.getCommittedAt());
                 items.add(item);
             }
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("repoId", repo.getRepositoryId());
-            data.put("items", items);
-            data.put("offset", safeOffset);
-            data.put("limit", safeLimit);
-            data.put("hasMore", hasMore);
+            GitCommitsVO data = new GitCommitsVO();
+            data.setRepoId(repo.getRepositoryId());
+            data.setItems(items);
+            data.setOffset(safeOffset);
+            data.setLimit(safeLimit);
+            data.setHasMore(hasMore);
             if (!hasMore) {
-                data.put("total", safeOffset + items.size());
+                data.setTotal(safeOffset + items.size());
             }
             return ok(ApiResponse.success(data));
         } catch (GitService.GitException e) {
@@ -174,7 +184,7 @@ public class GitController {
     }
 
     @GetMapping("/diff")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> diff(
+    public ResponseEntity<ApiResponse<GitDiffVO>> diff(
             @RequestParam String repoId,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
@@ -187,11 +197,8 @@ public class GitController {
         String fromRef = (from != null && !from.isEmpty()) ? from : "HEAD~1";
         String toRef = (to != null && !to.isEmpty()) ? to : "HEAD";
         try {
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("repoId", repo.getRepositoryId());
-            data.put("from", fromRef);
-            data.put("to", toRef);
-            data.putAll(gitService.diff(repo, fromRef, toRef));
+            GitDiffVO data = toDiffVO(repo.getRepositoryId(), fromRef, toRef,
+                    gitService.diff(repo, fromRef, toRef));
             return ok(ApiResponse.success(data));
         } catch (GitService.GitException e) {
             log.error("获取差异失败: repoId={}", repoId, e);
@@ -200,29 +207,29 @@ public class GitController {
     }
 
     @PostMapping("/commit")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> commit(
+    public ResponseEntity<ApiResponse<GitCommitResultVO>> commit(
             @RequestParam String repoId,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody GitCommitRequest body) {
         GitRepository repo;
         try {
             repo = resolveRepo(repoId);
         } catch (GitRepositoryService.GitRepositoryException e) {
             return repoUnavailable("commit", repoId, e);
         }
-        Map<String, Object> b = body != null ? body : Map.of();
-        String message = (String) b.getOrDefault("message", "");
-        if (message == null || message.trim().isEmpty()) {
+        String message = body == null ? "" : blankToEmpty(body.getMessage());
+        if (message.trim().isEmpty()) {
             return failure(ApiResponse.error(400, CODE_COMMIT_MESSAGE_REQUIRED, "提交信息不能为空"));
         }
-        String authorName = (String) b.getOrDefault("authorName", "system");
-        String authorEmail = (String) b.getOrDefault("authorEmail", "system@ecos.local");
+        String authorName = body != null && body.getAuthorName() != null ? body.getAuthorName() : "system";
+        String authorEmail = body != null && body.getAuthorEmail() != null
+                ? body.getAuthorEmail() : "system@ecos.local";
         try {
             String commitId = gitService.commitAllChanges(repo, message, authorName, authorEmail);
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("repoId", repo.getRepositoryId());
-            data.put("commitId", commitId);
-            data.put("message", message);
-            data.put("committedAt", Instant.now().toString());
+            GitCommitResultVO data = new GitCommitResultVO();
+            data.setRepoId(repo.getRepositoryId());
+            data.setCommitId(commitId);
+            data.setMessage(message);
+            data.setCommittedAt(Instant.now().toString());
             return ok(ApiResponse.success(data));
         } catch (GitService.GitException e) {
             log.error("提交失败: repoId={}", repoId, e);
@@ -231,29 +238,28 @@ public class GitController {
     }
 
     @PostMapping("/tag")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> tag(
+    public ResponseEntity<ApiResponse<GitTagResultVO>> tag(
             @RequestParam String repoId,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody GitTagRequest body) {
         GitRepository repo;
         try {
             repo = resolveRepo(repoId);
         } catch (GitRepositoryService.GitRepositoryException e) {
             return repoUnavailable("tag", repoId, e);
         }
-        Map<String, Object> b = body != null ? body : Map.of();
-        String tagName = (String) b.getOrDefault("name", "");
-        String message = (String) b.getOrDefault("message", "");
-        if (tagName == null || tagName.trim().isEmpty()) {
+        String tagName = body == null ? "" : blankToEmpty(body.getName());
+        String message = body == null ? "" : blankToEmpty(body.getMessage());
+        if (tagName.trim().isEmpty()) {
             return failure(ApiResponse.error(400, CODE_TAG_NAME_REQUIRED, "标签名不能为空"));
         }
         try {
             String createdTag = gitService.createTag(repo, tagName,
-                    (message != null && !message.isEmpty()) ? message : "Tag " + tagName);
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("repoId", repo.getRepositoryId());
-            data.put("tag", createdTag);
-            data.put("message", message);
-            data.put("createdAt", Instant.now().toString());
+                    message.isEmpty() ? "Tag " + tagName : message);
+            GitTagResultVO data = new GitTagResultVO();
+            data.setRepoId(repo.getRepositoryId());
+            data.setTag(createdTag);
+            data.setMessage(message);
+            data.setCreatedAt(Instant.now().toString());
             return ok(ApiResponse.success(data));
         } catch (GitService.GitException e) {
             log.error("创建标签失败: repoId={}", repoId, e);
@@ -262,26 +268,25 @@ public class GitController {
     }
 
     @PostMapping("/rollback")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> rollback(
+    public ResponseEntity<ApiResponse<GitRollbackResultVO>> rollback(
             @RequestParam String repoId,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody GitRollbackRequest body) {
         GitRepository repo;
         try {
             repo = resolveRepo(repoId);
         } catch (GitRepositoryService.GitRepositoryException e) {
             return repoUnavailable("rollback", repoId, e);
         }
-        Map<String, Object> b = body != null ? body : Map.of();
-        String targetCommitId = (String) b.getOrDefault("commitId", "");
-        if (targetCommitId == null || targetCommitId.trim().isEmpty()) {
+        String targetCommitId = body == null ? "" : blankToEmpty(body.getCommitId());
+        if (targetCommitId.trim().isEmpty()) {
             return failure(ApiResponse.error(400, CODE_ROLLBACK_TARGET_REQUIRED, "目标 commitId 不能为空"));
         }
         log.info("Rollback requested (not_available): repoId={}, targetCommit={}", repoId, targetCommitId);
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("repoId", repo.getRepositoryId());
-        data.put("rollbackTo", targetCommitId);
-        data.put("status", "not_available");
-        data.put("reason", "回滚能力未实现（runtime GitService 无 revert 操作），禁止伪成功；待 Git 归档真实落地批次（H4-T4）开放");
+        GitRollbackResultVO data = new GitRollbackResultVO();
+        data.setRepoId(repo.getRepositoryId());
+        data.setRollbackTo(targetCommitId);
+        data.setStatus(STATUS_NOT_AVAILABLE);
+        data.setReason("回滚能力未实现（runtime GitService 无 revert 操作），禁止伪成功；待 Git 归档真实落地批次（H4-T4）开放");
         return ok(ApiResponse.success(data));
     }
 
@@ -296,7 +301,7 @@ public class GitController {
      * 原记 404 是把「配置没配」说成「仓库没注册」，本批改 503＋{@link #CODE_GIT_UNAVAILABLE}。</p>
      */
     @GetMapping("/branches")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> branches(@RequestParam String repoId) {
+    public ResponseEntity<ApiResponse<GitBranchesVO>> branches(@RequestParam String repoId) {
         GitRepository repo;
         try {
             repo = resolveRepo(repoId);
@@ -310,12 +315,11 @@ public class GitController {
         }
         String defaultBranch = repo.getDefaultBranch() != null ? repo.getDefaultBranch() : "main";
         try {
-            List<String> branches = gitService.listBranches(repo.getLocalPath());
-            Map<String, Object> data = new LinkedHashMap<>();
-            data.put("repoId", repo.getRepositoryId());
-            data.put("current", defaultBranch);
-            data.put("branches", branches);
-            data.put("status", "ok");
+            GitBranchesVO data = new GitBranchesVO();
+            data.setRepoId(repo.getRepositoryId());
+            data.setCurrent(defaultBranch);
+            data.setBranches(gitService.listBranches(repo.getLocalPath()));
+            data.setStatus(STATUS_OK);
             return ok(ApiResponse.success(data));
         } catch (GitService.GitException e) {
             log.error("枚举分支失败: repoId={}", repoId, e);
@@ -324,27 +328,206 @@ public class GitController {
     }
 
     @PostMapping("/branch")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> switchBranch(
+    public ResponseEntity<ApiResponse<GitBranchSwitchResultVO>> switchBranch(
             @RequestParam String repoId,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody GitBranchSwitchRequest body) {
         GitRepository repo;
         try {
             repo = resolveRepo(repoId);
         } catch (GitRepositoryService.GitRepositoryException e) {
             return repoUnavailable("branch", repoId, e);
         }
-        Map<String, Object> b = body != null ? body : Map.of();
-        String targetBranch = (String) b.getOrDefault("branch", "main");
+        String targetBranch = body != null && body.getBranch() != null ? body.getBranch() : "main";
         log.info("Branch switch requested (not_available): repoId={}, to={}", repoId, targetBranch);
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("repoId", repo.getRepositoryId());
-        data.put("requestedBranch", targetBranch);
-        data.put("status", "not_available");
-        data.put("reason", "分支切换能力未实现（runtime GitService 无面向仓库注册的 checkout 操作），禁止伪成功；待 Git 归档真实落地批次（H4-T4）开放");
+        GitBranchSwitchResultVO data = new GitBranchSwitchResultVO();
+        data.setRepoId(repo.getRepositoryId());
+        data.setRequestedBranch(targetBranch);
+        data.setStatus(STATUS_NOT_AVAILABLE);
+        data.setReason("分支切换能力未实现（runtime GitService 无面向仓库注册的 checkout 操作），禁止伪成功；待 Git 归档真实落地批次（H4-T4）开放");
         return ok(ApiResponse.success(data));
     }
 
-    /** push/pull 入参（强类型，禁裸 Map；当前仅 message 备注，禁 localPath/凭据）。 */
+    /**
+     * 推送（#147P）：<b>能力未接，显式 not_available</b>。
+     *
+     * <p>§2.9.9④ 要求推送受「签名发布清单 + 分支保护」约束，而服务端凭据通道与签名基础设施尚未接入；
+     * 前端此前调本路径得网关 404（能力缺失冒充"接口不存在"）。现改为：仓库定位照常分态
+     * （未注册 404 / 未装配 503），定位成功后 200 + {@code status=not_available} + 原因，
+     * <b>禁把未推送报成推送成功</b>。真实推送落地时换实现、响应键面保持 additive。</p>
+     */
+    @PostMapping("/push")
+    public ResponseEntity<ApiResponse<GitSyncResultVO>> push(
+            @RequestParam String repoId,
+            @RequestBody(required = false) GitPushPullRequest body) {
+        GitRepository repo;
+        try {
+            repo = resolveRepo(repoId);
+        } catch (GitRepositoryService.GitRepositoryException e) {
+            return repoUnavailable("push", repoId, e);
+        }
+        GitSyncResultVO data = new GitSyncResultVO();
+        data.setRepoId(repo.getRepositoryId());
+        data.setStatus(STATUS_NOT_AVAILABLE);
+        data.setReason("推送通道未接：需服务端凭据与签名发布清单（PublishManifest/BranchProtectionPolicy），"
+                + "禁止伪成功；真实推送通道落地前本端点只做能力分态回报");
+        log.info("Git push requested (not_available): repoId={}", repoId);
+        return ok(ApiResponse.success(data));
+    }
+
+    /** 拉取（#147P）：同 {@link #push} 的诚实不可用口径（远端与凭据通道未接）。 */
+    @PostMapping("/pull")
+    public ResponseEntity<ApiResponse<GitSyncResultVO>> pull(
+            @RequestParam String repoId,
+            @RequestBody(required = false) GitPushPullRequest body) {
+        GitRepository repo;
+        try {
+            repo = resolveRepo(repoId);
+        } catch (GitRepositoryService.GitRepositoryException e) {
+            return repoUnavailable("pull", repoId, e);
+        }
+        GitSyncResultVO data = new GitSyncResultVO();
+        data.setRepoId(repo.getRepositoryId());
+        data.setStatus(STATUS_NOT_AVAILABLE);
+        data.setReason("拉取通道未接：远端地址与凭据由服务端统一配置（禁客户端传 remote/token），"
+                + "通道落地前如实回报不可用");
+        log.info("Git pull requested (not_available): repoId={}", repoId);
+        return ok(ApiResponse.success(data));
+    }
+
+    /** 成功面：状态行 200（显式承载，禁 {@code return ApiResponse} 裸回形态）。 */
+    private static <T> ResponseEntity<ApiResponse<T>> ok(ApiResponse<T> body) {
+        return ResponseEntity.ok(body);
+    }
+
+    /**
+     * 失败面：状态行取信封 code（400/404/500/503），与 body 同源单值。
+     * <p>本文件唯一失败出口；body 已是 error 信封，这里只负责把状态行写实。</p>
+     */
+    private static <T> ResponseEntity<ApiResponse<T>> failure(ApiResponse<T> body) {
+        return ResponseEntity.status(body.getCode()).body(body);
+    }
+
+    /** 属主 diff 的动态 Map → 固定键 VO（白名单映射，禁静默丢键）。 */
+    private static GitDiffVO toDiffVO(String repoId, String fromRef, String toRef,
+                                      Map<String, Object> raw) {
+        GitDiffVO data = new GitDiffVO();
+        data.setRepoId(repoId);
+        data.setFrom(fromRef);
+        data.setTo(toRef);
+        if (raw != null) {
+            data.setRepository(asString(raw.get("repository")));
+            List<GitDiffFileVO> files = new ArrayList<>();
+            if (raw.get("filesChanged") instanceof List<?> rows) {
+                for (Object row : rows) {
+                    if (row instanceof Map<?, ?> cell) {
+                        GitDiffFileVO file = new GitDiffFileVO();
+                        file.setChangeType(asString(cell.get("changeType")));
+                        file.setOldPath(asString(cell.get("oldPath")));
+                        file.setNewPath(asString(cell.get("newPath")));
+                        files.add(file);
+                    }
+                }
+            }
+            data.setFilesChanged(files);
+            data.setChangedCount(raw.get("changedCount") instanceof Number n ? n.intValue() : files.size());
+        }
+        return data;
+    }
+
+    private static String asString(Object value) {
+        return value == null ? null : value.toString();
+    }
+
+    private static String blankToEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
+    /** 能力未实现面的业务体状态值（状态行仍 200，与失败面分档）。 */
+    private static final String STATUS_NOT_AVAILABLE = "not_available";
+    private static final String STATUS_OK = "ok";
+
+    // ═══════════════════════════ 请求体（强类型，禁裸 Map）═══════════════════════════
+
+    /** 提交请求：仅 message/作者两枚可选键；<b>禁</b> localPath/remote/凭据（铁律 §2.5 第 8 项）。 */
+    public static final class GitCommitRequest {
+        private String message;
+        private String authorName;
+        private String authorEmail;
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+
+        public String getAuthorName() {
+            return authorName;
+        }
+
+        public void setAuthorName(String authorName) {
+            this.authorName = authorName;
+        }
+
+        public String getAuthorEmail() {
+            return authorEmail;
+        }
+
+        public void setAuthorEmail(String authorEmail) {
+            this.authorEmail = authorEmail;
+        }
+    }
+
+    /** 打标签请求（{@code name} 必填，空/空白 ⇒ 400）。 */
+    public static final class GitTagRequest {
+        private String name;
+        private String message;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+    }
+
+    /** 回滚请求（{@code commitId} 必填；当前能力未接，如实回 not_available）。 */
+    public static final class GitRollbackRequest {
+        private String commitId;
+
+        public String getCommitId() {
+            return commitId;
+        }
+
+        public void setCommitId(String commitId) {
+            this.commitId = commitId;
+        }
+    }
+
+    /** 分支切换请求（能力未接，只回显请求值）。 */
+    public static final class GitBranchSwitchRequest {
+        private String branch;
+
+        public String getBranch() {
+            return branch;
+        }
+
+        public void setBranch(String branch) {
+            this.branch = branch;
+        }
+    }
+
+    /** push/pull 入参（当前仅 message 备注，禁 localPath/凭据/remote/token）。 */
     public static final class GitPushPullRequest {
         private String message;
 
@@ -357,63 +540,483 @@ public class GitController {
         }
     }
 
-    /**
-     * 推送（#147P）：<b>能力未接，显式 not_available</b>。
-     *
-     * <p>§2.9.9④ 要求推送受「签名发布清单 + 分支保护」约束，而服务端凭据通道与签名基础设施尚未接入；
-     * 前端此前调本路径得网关 404（能力缺失冒充"接口不存在"）。现改为：仓库定位照常分态
-     * （未注册 404 / 未装配 503），定位成功后 200 + {@code status=not_available} + 原因，
-     * <b>禁把未推送报成推送成功</b>。真实推送落地时换实现、响应键面保持 additive。</p>
-     */
-    @PostMapping("/push")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> push(
-            @RequestParam String repoId,
-            @RequestBody(required = false) GitPushPullRequest body) {
-        GitRepository repo;
-        try {
-            repo = resolveRepo(repoId);
-        } catch (GitRepositoryService.GitRepositoryException e) {
-            return repoUnavailable("push", repoId, e);
+    // ═══════════════════════════ 响应体（键面与旧 Map 逐字一致）═══════════════════════════
+
+    /** {@code GET /status}。 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static final class GitStatusVO {
+        private String repoId;
+        private String repoName;
+        private String currentCommit;
+        private String branch;
+
+        public String getRepoId() {
+            return repoId;
         }
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("repoId", repo.getRepositoryId());
-        data.put("status", "not_available");
-        data.put("reason", "推送通道未接：需服务端凭据与签名发布清单（PublishManifest/BranchProtectionPolicy），"
-                + "禁止伪成功；真实推送通道落地前本端点只做能力分态回报");
-        log.info("Git push requested (not_available): repoId={}", repoId);
-        return ok(ApiResponse.success(data));
-    }
 
-    /** 拉取（#147P）：同 {@link #push} 的诚实不可用口径（远端与凭据通道未接）。 */
-    @PostMapping("/pull")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> pull(
-            @RequestParam String repoId,
-            @RequestBody(required = false) GitPushPullRequest body) {
-        GitRepository repo;
-        try {
-            repo = resolveRepo(repoId);
-        } catch (GitRepositoryService.GitRepositoryException e) {
-            return repoUnavailable("pull", repoId, e);
+        public void setRepoId(String repoId) {
+            this.repoId = repoId;
         }
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("repoId", repo.getRepositoryId());
-        data.put("status", "not_available");
-        data.put("reason", "拉取通道未接：远端地址与凭据由服务端统一配置（禁客户端传 remote/token），"
-                + "通道落地前如实回报不可用");
-        log.info("Git pull requested (not_available): repoId={}", repoId);
-        return ok(ApiResponse.success(data));
+
+        public String getRepoName() {
+            return repoName;
+        }
+
+        public void setRepoName(String repoName) {
+            this.repoName = repoName;
+        }
+
+        public String getCurrentCommit() {
+            return currentCommit;
+        }
+
+        public void setCurrentCommit(String currentCommit) {
+            this.currentCommit = currentCommit;
+        }
+
+        public String getBranch() {
+            return branch;
+        }
+
+        public void setBranch(String branch) {
+            this.branch = branch;
+        }
     }
 
-    /** 成功面：状态行 200（显式承载，禁 {@code return ApiResponse} 裸回形态）。 */
-    private static ResponseEntity<ApiResponse<Map<String, Object>>> ok(ApiResponse<Map<String, Object>> body) {
-        return ResponseEntity.ok(body);
+    /** {@code GET /commits} 的单条提交（{@code id} 与 {@code commitId} 同值，兼容两枚旧键）。 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static final class GitCommitItemVO {
+        private String id;
+        private String commitId;
+        private String message;
+        private String author;
+        private Date committedAt;
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getCommitId() {
+            return commitId;
+        }
+
+        public void setCommitId(String commitId) {
+            this.commitId = commitId;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+
+        public String getAuthor() {
+            return author;
+        }
+
+        public void setAuthor(String author) {
+            this.author = author;
+        }
+
+        public Date getCommittedAt() {
+            return committedAt;
+        }
+
+        public void setCommittedAt(Date committedAt) {
+            this.committedAt = committedAt;
+        }
     }
 
-    /**
-     * 失败面：状态行取信封 code（400/404/500/503），与 body 同源单值。
-     * <p>本文件唯一失败出口；body 已是 error 信封，这里只负责把状态行写实。</p>
-     */
-    private static ResponseEntity<ApiResponse<Map<String, Object>>> failure(ApiResponse<Map<String, Object>> body) {
-        return ResponseEntity.status(body.getCode()).body(body);
+    /** {@code GET /commits}：{@code total} 仅在读到尽头时出现（未读到尽头禁伪造总数）。 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static final class GitCommitsVO {
+        private String repoId;
+        private List<GitCommitItemVO> items;
+        private Integer offset;
+        private Integer limit;
+        private Boolean hasMore;
+        private Integer total;
+
+        public String getRepoId() {
+            return repoId;
+        }
+
+        public void setRepoId(String repoId) {
+            this.repoId = repoId;
+        }
+
+        public List<GitCommitItemVO> getItems() {
+            return items;
+        }
+
+        public void setItems(List<GitCommitItemVO> items) {
+            this.items = items;
+        }
+
+        public Integer getOffset() {
+            return offset;
+        }
+
+        public void setOffset(Integer offset) {
+            this.offset = offset;
+        }
+
+        public Integer getLimit() {
+            return limit;
+        }
+
+        public void setLimit(Integer limit) {
+            this.limit = limit;
+        }
+
+        public Boolean getHasMore() {
+            return hasMore;
+        }
+
+        public void setHasMore(Boolean hasMore) {
+            this.hasMore = hasMore;
+        }
+
+        public Integer getTotal() {
+            return total;
+        }
+
+        public void setTotal(Integer total) {
+            this.total = total;
+        }
+    }
+
+    /** {@code GET /diff} 的单文件变更行（属主 JGit DiffEntry 三键）。 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static final class GitDiffFileVO {
+        private String changeType;
+        private String oldPath;
+        private String newPath;
+
+        public String getChangeType() {
+            return changeType;
+        }
+
+        public void setChangeType(String changeType) {
+            this.changeType = changeType;
+        }
+
+        public String getOldPath() {
+            return oldPath;
+        }
+
+        public void setOldPath(String oldPath) {
+            this.oldPath = oldPath;
+        }
+
+        public String getNewPath() {
+            return newPath;
+        }
+
+        public void setNewPath(String newPath) {
+            this.newPath = newPath;
+        }
+    }
+
+    /** {@code GET /diff}：属主动态 Map 的固定键面（映射口径见类注释）。 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static final class GitDiffVO {
+        private String repoId;
+        private String repository;
+        private String from;
+        private String to;
+        private List<GitDiffFileVO> filesChanged;
+        private Integer changedCount;
+
+        public String getRepoId() {
+            return repoId;
+        }
+
+        public void setRepoId(String repoId) {
+            this.repoId = repoId;
+        }
+
+        public String getRepository() {
+            return repository;
+        }
+
+        public void setRepository(String repository) {
+            this.repository = repository;
+        }
+
+        public String getFrom() {
+            return from;
+        }
+
+        public void setFrom(String from) {
+            this.from = from;
+        }
+
+        public String getTo() {
+            return to;
+        }
+
+        public void setTo(String to) {
+            this.to = to;
+        }
+
+        public List<GitDiffFileVO> getFilesChanged() {
+            return filesChanged;
+        }
+
+        public void setFilesChanged(List<GitDiffFileVO> filesChanged) {
+            this.filesChanged = filesChanged;
+        }
+
+        public Integer getChangedCount() {
+            return changedCount;
+        }
+
+        public void setChangedCount(Integer changedCount) {
+            this.changedCount = changedCount;
+        }
+    }
+
+    /** {@code POST /commit} 成功回执（commitId 为属主真实返回，禁本地拼造）。 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static final class GitCommitResultVO {
+        private String repoId;
+        private String commitId;
+        private String message;
+        private String committedAt;
+
+        public String getRepoId() {
+            return repoId;
+        }
+
+        public void setRepoId(String repoId) {
+            this.repoId = repoId;
+        }
+
+        public String getCommitId() {
+            return commitId;
+        }
+
+        public void setCommitId(String commitId) {
+            this.commitId = commitId;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+
+        public String getCommittedAt() {
+            return committedAt;
+        }
+
+        public void setCommittedAt(String committedAt) {
+            this.committedAt = committedAt;
+        }
+    }
+
+    /** {@code POST /tag} 成功回执。 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static final class GitTagResultVO {
+        private String repoId;
+        private String tag;
+        private String message;
+        private String createdAt;
+
+        public String getRepoId() {
+            return repoId;
+        }
+
+        public void setRepoId(String repoId) {
+            this.repoId = repoId;
+        }
+
+        public String getTag() {
+            return tag;
+        }
+
+        public void setTag(String tag) {
+            this.tag = tag;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+
+        public String getCreatedAt() {
+            return createdAt;
+        }
+
+        public void setCreatedAt(String createdAt) {
+            this.createdAt = createdAt;
+        }
+    }
+
+    /** {@code POST /rollback}：能力未接，恒 {@code status=not_available} + 原因。 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static final class GitRollbackResultVO {
+        private String repoId;
+        private String rollbackTo;
+        private String status;
+        private String reason;
+
+        public String getRepoId() {
+            return repoId;
+        }
+
+        public void setRepoId(String repoId) {
+            this.repoId = repoId;
+        }
+
+        public String getRollbackTo() {
+            return rollbackTo;
+        }
+
+        public void setRollbackTo(String rollbackTo) {
+            this.rollbackTo = rollbackTo;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+
+        public String getReason() {
+            return reason;
+        }
+
+        public void setReason(String reason) {
+            this.reason = reason;
+        }
+    }
+
+    /** {@code GET /branches}：{@code branches} 为属主真实 ref 列表。 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static final class GitBranchesVO {
+        private String repoId;
+        private String current;
+        private List<String> branches;
+        private String status;
+
+        public String getRepoId() {
+            return repoId;
+        }
+
+        public void setRepoId(String repoId) {
+            this.repoId = repoId;
+        }
+
+        public String getCurrent() {
+            return current;
+        }
+
+        public void setCurrent(String current) {
+            this.current = current;
+        }
+
+        public List<String> getBranches() {
+            return branches;
+        }
+
+        public void setBranches(List<String> branches) {
+            this.branches = branches;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+    }
+
+    /** {@code POST /branch}：能力未接，回显请求分支。 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static final class GitBranchSwitchResultVO {
+        private String repoId;
+        private String requestedBranch;
+        private String status;
+        private String reason;
+
+        public String getRepoId() {
+            return repoId;
+        }
+
+        public void setRepoId(String repoId) {
+            this.repoId = repoId;
+        }
+
+        public String getRequestedBranch() {
+            return requestedBranch;
+        }
+
+        public void setRequestedBranch(String requestedBranch) {
+            this.requestedBranch = requestedBranch;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+
+        public String getReason() {
+            return reason;
+        }
+
+        public void setReason(String reason) {
+            this.reason = reason;
+        }
+    }
+
+    /** {@code POST /push}／{@code POST /pull}：能力未接，同形回执。 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static final class GitSyncResultVO {
+        private String repoId;
+        private String status;
+        private String reason;
+
+        public String getRepoId() {
+            return repoId;
+        }
+
+        public void setRepoId(String repoId) {
+            this.repoId = repoId;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+
+        public String getReason() {
+            return reason;
+        }
+
+        public void setReason(String reason) {
+            this.reason = reason;
+        }
     }
 }

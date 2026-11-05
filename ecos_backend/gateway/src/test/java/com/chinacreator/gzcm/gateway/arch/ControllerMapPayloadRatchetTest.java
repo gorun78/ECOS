@@ -33,7 +33,18 @@ import org.junit.jupiter.api.Test;
  *       {@code OntologyGitController}（6→1，commit {@code 279bd553}「[§2.9.9 VG-2] 本体 Git
  *       服务契约去 Map」），其余 6 枚自核定以来改过的 Controller 计数未变——即本次下调
  *       <b>是真实清退，不是把判据放松</b>。</li>
+ *   <li>2265 ＝ #147BT（2026-11-05）HEAD 面复测值，差额 −32 行<b>全部</b>来自
+ *       {@code services/datanet/GitController}（33→1）：请求体 {@code Map} 改 DTO
+ *       （commit/tag/rollback/branch），八条响应改 VO；剩余 1 枚是 {@code toDiffVO} 承接属主
+ *       {@link com.chinacreator.gzcm.runtime.access.git.GitService#diff} 返回值
+ *       {@code Map<String,Object>} 的形参（属主契约未改，不在本批范围）。</li>
  * </ul>
+ *
+ * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
+ * 这 11 行<b>全部</b>是并发会话未提交的在途面（{@code ScenarioBlueprintController} 6→7，
+ * 以及未跟踪新文件 {@code CognitiveFrameworkController}(4)／{@code CognitiveExecutionController}(4)／
+ * {@code CognitiveMethodController}(2)）。按本门「上调基线一律不许」的铁口径，基线取
+ * HEAD 面 2265，<b>不</b>为在途面放宽；工作树红在未提交面是门在按其判据正常工作。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -46,9 +57,10 @@ class ControllerMapPayloadRatchetTest {
 
     /**
      * HEAD 面实扫基线（行级命中）。只允许下调。
-     * <p>#147Z 下调依据见类注释「基线台账」：2302 → 2297，−5 行来自 VG-2 的真清退腿。</p>
+     * <p>#147BT 下调依据见类注释「基线台账」：2297 → 2265，−32 行来自 datanet
+     * {@code GitController} 的真实强类型化（33→1）。</p>
      */
-    private static final int BASELINE_LINES = 2297;
+    private static final int BASELINE_LINES = 2265;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -57,7 +69,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 2297（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 2265（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;
