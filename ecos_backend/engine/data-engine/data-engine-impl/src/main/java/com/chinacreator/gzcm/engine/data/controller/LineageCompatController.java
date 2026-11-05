@@ -2,6 +2,7 @@ package com.chinacreator.gzcm.engine.data.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.data.service.DataLineageService;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,10 +12,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * LineageCompatController — 血缘兼容端点（T3: 替换 CeosCompatController 内存 mock）。
@@ -27,6 +32,11 @@ import java.util.Map;
  *
  * <p>DataLineageService 已有 JSqlParser 字段级血缘，getLineage(datasourceId, tableName)
  * 返回真实血缘解析结果。若 startNode 格式不匹配或无法解析，返回空 nodes/edges。</p>
+ *
+ * <p><b>#147DI 载体</b>：影响/解析/血缘视图改 record；血缘行本身由
+ * {@link DataLineageService} 按解析结果动态产出（节点可有 {@code id} 或 {@code table}，
+ * 边可有 {@code source/target} 或 {@code source_node_id/target_node_id}），故节点/边集合
+ * 仍以 {@code Object} 承载原样 JSON——**不冻结动态 schema**，这是属主契约而非本类欠账。</p>
  */
 @RestController
 @RequestMapping("/api/lineage")
@@ -40,11 +50,47 @@ public class LineageCompatController {
         this.lineageService = lineageService;
     }
 
+    /** 影响节点（6 键；id/label/type 取原行原值，可能是字符串或数字）。 */
+    public record ImpactNodeVO(@JsonProperty("id") Object id,
+                               @JsonProperty("label") Object label,
+                               @JsonProperty("type") Object type,
+                               @JsonProperty("hopCount") int hopCount,
+                               @JsonProperty("path") List<String> path,
+                               @JsonProperty("riskScore") int riskScore) {
+    }
+
+    /** 影响分析响应（7 键）。 */
+    public record ImpactVO(@JsonProperty("success") boolean success,
+                           @JsonProperty("startNode") String startNode,
+                           @JsonProperty("impactedNodes") List<ImpactNodeVO> impactedNodes,
+                           @JsonProperty("totalRisk") int totalRisk,
+                           @JsonProperty("severity") String severity,
+                           @JsonProperty("nodes") Object nodes,
+                           @JsonProperty("edges") Object edges) {
+    }
+
+    /** 解析结果内的血缘视图（2 键：nodes/links，形状由解析器定义）。 */
+    public record LineageViewVO(@JsonProperty("nodes") Object nodes,
+                                @JsonProperty("links") Object links) {
+    }
+
+    /** 解析响应（5 键）。 */
+    public record ParseResultVO(@JsonProperty("success") boolean success,
+                                @JsonProperty("message") String message,
+                                @JsonProperty("addedNodes") int addedNodes,
+                                @JsonProperty("addedLinks") int addedLinks,
+                                @JsonProperty("lineage") LineageViewVO lineage) {
+    }
+
+    /** BFS 队列条目（内部载体，不外发）。 */
+    private record BfsItem(String id, int hop, List<String> path) {
+    }
+
     // ════════════════════════════════════════════
     // API: GET /api/lineage/impact?startNode=X
     // ════════════════════════════════════════════
     @GetMapping("/impact")
-    public ApiResponse lineageImpact(@RequestParam("startNode") String startNode) {
+    public ApiResponse<ImpactVO> lineageImpact(@RequestParam("startNode") String startNode) {
         if (startNode == null || startNode.isEmpty()) {
             return ApiResponse.error(400, "Missing startNode query parameter");
         }
@@ -63,7 +109,7 @@ public class LineageCompatController {
                 // 若 tail 仍含 "."，取最后一段作为 tableName，前面合并为 datasourceId
                 int lastDot = tail.lastIndexOf('.');
                 if (lastDot >= 0) {
-                    datasourceId = head + "." + tail.substring(0, lastDot);
+                    datasourceId = head + "." + tail.substring(0, tail.lastIndexOf('.'));
                     tableName = tail.substring(lastDot + 1);
                 } else {
                     datasourceId = head;
@@ -71,45 +117,28 @@ public class LineageCompatController {
                 }
             }
 
-            Map<String, Object> lineage = lineageService.getLineage(datasourceId, tableName);
-
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> nodes = (List<Map<String, Object>>) lineage.getOrDefault("nodes", new ArrayList<>());
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> edges = (List<Map<String, Object>>) lineage.getOrDefault("edges", new ArrayList<>());
+            Map<String, Object> lineage = asMap(lineageService.getLineage(datasourceId, tableName));
+            List<?> nodes = lineage == null ? List.of()
+                    : (List<?>) lineage.getOrDefault("nodes", new ArrayList<>());
+            List<?> edges = lineage == null ? List.of()
+                    : (List<?>) lineage.getOrDefault("edges", new ArrayList<>());
 
             // 计算下游影响：从 startNode 出发沿 edges 做 BFS，计算 hop 与风险评分
-            List<Map<String, Object>> impacted = computeImpact(startNode, nodes, edges);
+            List<ImpactNodeVO> impacted = computeImpact(startNode, nodes, edges);
 
-            int maxRisk = impacted.stream()
-                    .mapToInt(r -> ((Number) r.getOrDefault("riskScore", 0)).intValue())
-                    .max().orElse(0);
+            int maxRisk = impacted.stream().mapToInt(ImpactNodeVO::riskScore).max().orElse(0);
             String severity = "LOW";
             if (maxRisk > 80) severity = "CRITICAL";
             else if (maxRisk > 55) severity = "HIGH";
             else if (maxRisk > 30) severity = "MEDIUM";
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("success", true);
-            result.put("startNode", startNode);
-            result.put("impactedNodes", impacted);
-            result.put("totalRisk", maxRisk);
-            result.put("severity", severity);
-            result.put("nodes", nodes);
-            result.put("edges", edges);
-            return ApiResponse.success(result);
+            return ApiResponse.success(new ImpactVO(true, startNode, impacted, maxRisk,
+                    severity, nodes, edges));
         } catch (Exception e) {
             log.error("Impact analysis failed for startNode={}", startNode, e);
             // 格式不匹配或解析失败：返回空结果（非错误）
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("success", true);
-            result.put("startNode", startNode);
-            result.put("impactedNodes", new ArrayList<>());
-            result.put("totalRisk", 0);
-            result.put("severity", "LOW");
-            result.put("nodes", new ArrayList<>());
-            result.put("edges", new ArrayList<>());
-            return ApiResponse.success(result);
+            return ApiResponse.success(new ImpactVO(true, startNode, new ArrayList<>(), 0,
+                    "LOW", new ArrayList<>(), new ArrayList<>()));
         }
     }
 
@@ -117,7 +146,7 @@ public class LineageCompatController {
     // API: POST /api/lineage/parse
     // ════════════════════════════════════════════
     @PostMapping("/parse")
-    public ApiResponse parseLineage(@RequestBody Map<String, Object> body) {
+    public ApiResponse<ParseResultVO> parseLineage(@RequestBody Map<String, Object> body) {
         if (body == null) {
             return ApiResponse.error(400, "Missing request body");
         }
@@ -134,33 +163,25 @@ public class LineageCompatController {
                 return emptyParseResult("无法从 payload 提取表名，返回空血缘。");
             }
 
-            List<Map<String, Object>> allNodes = new ArrayList<>();
-            List<Map<String, Object>> allEdges = new ArrayList<>();
+            List<Object> allNodes = new ArrayList<>();
+            List<Object> allEdges = new ArrayList<>();
             int addedNodes = 0;
             int addedEdges = 0;
 
             for (String tableName : tableNames) {
-                Map<String, Object> lineage = lineageService.getLineage(null, tableName);
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> nodes = (List<Map<String, Object>>) lineage.getOrDefault("nodes", new ArrayList<>());
-                @SuppressWarnings("unchecked")
-                List<Map<String, Object>> edges = (List<Map<String, Object>>) lineage.getOrDefault("edges", new ArrayList<>());
+                Map<String, Object> lineage = asMap(lineageService.getLineage(null, tableName));
+                List<?> nodes = lineage == null ? List.of()
+                        : (List<?>) lineage.getOrDefault("nodes", new ArrayList<>());
+                List<?> edges = lineage == null ? List.of()
+                        : (List<?>) lineage.getOrDefault("edges", new ArrayList<>());
                 allNodes.addAll(nodes);
                 allEdges.addAll(edges);
                 addedNodes += nodes.size();
                 addedEdges += edges.size();
             }
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("success", true);
-            result.put("message", "血缘解析完成");
-            result.put("addedNodes", addedNodes);
-            result.put("addedLinks", addedEdges);
-            Map<String, Object> lineageView = new LinkedHashMap<>();
-            lineageView.put("nodes", allNodes);
-            lineageView.put("links", allEdges);
-            result.put("lineage", lineageView);
-            return ApiResponse.success(result);
+            return ApiResponse.success(new ParseResultVO(true, "血缘解析完成", addedNodes,
+                    addedEdges, new LineageViewVO(allNodes, allEdges)));
         } catch (Exception e) {
             log.error("Lineage parse failed", e);
             // 无法解析：返回空结果（非错误）
@@ -173,30 +194,31 @@ public class LineageCompatController {
     // ════════════════════════════════════════════
 
     /** 从 OpenLineage/Atlas payload 提取涉及的表名。 */
-    @SuppressWarnings("unchecked")
     private List<String> extractTableNames(Object payload) {
         List<String> names = new ArrayList<>();
-        if (payload instanceof Map) {
-            Map<String, Object> map = (Map<String, Object>) payload;
-            // OpenLineage: inputs + outputs
-            for (String key : new String[]{"inputs", "outputs"}) {
-                Object listObj = map.get(key);
-                if (listObj instanceof List) {
-                    for (Object item : (List<Object>) listObj) {
-                        if (item instanceof Map) {
-                            Object name = ((Map<String, Object>) item).get("name");
-                            if (name != null) {
-                                names.add(simpleName(name.toString()));
-                            }
+        Map<String, Object> map = asMap(payload);
+        if (map == null) {
+            return names;
+        }
+        // OpenLineage: inputs + outputs
+        for (String key : new String[]{"inputs", "outputs"}) {
+            Object listObj = map.get(key);
+            if (listObj instanceof List<?> list) {
+                for (Object item : list) {
+                    Map<String, Object> itemMap = asMap(item);
+                    if (itemMap != null) {
+                        Object name = itemMap.get("name");
+                        if (name != null) {
+                            names.add(simpleName(name.toString()));
                         }
                     }
                 }
             }
-            // 兼容：直接含 tableName/table 字段
-            Object tn = map.get("tableName");
-            if (tn == null) tn = map.get("table");
-            if (tn instanceof String) names.add(simpleName((String) tn));
         }
+        // 兼容：直接含 tableName/table 字段
+        Object tn = map.get("tableName");
+        if (tn == null) tn = map.get("table");
+        if (tn instanceof String s) names.add(simpleName(s));
         return names;
     }
 
@@ -208,25 +230,18 @@ public class LineageCompatController {
     }
 
     /** BFS 计算从 startNodeId 出发的下游影响节点与风险评分。 */
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> computeImpact(String startNodeId,
-                                                     List<Map<String, Object>> nodes,
-                                                     List<Map<String, Object>> edges) {
-        List<Map<String, Object>> results = new ArrayList<>();
-        java.util.Set<String> visited = new java.util.HashSet<>();
-        java.util.Deque<Map<String, Object>> queue = new java.util.LinkedList<>();
+    private List<ImpactNodeVO> computeImpact(String startNodeId, List<?> nodes, List<?> edges) {
+        List<ImpactNodeVO> results = new ArrayList<>();
+        Set<String> visited = new HashSet<>();
+        Deque<BfsItem> queue = new ArrayDeque<>();
 
-        List<String> initialPath = new ArrayList<>();
-        initialPath.add(startNodeId);
-        Map<String, Object> startItem = new LinkedHashMap<>();
-        startItem.put("id", startNodeId);
-        startItem.put("hop", 0);
-        startItem.put("path", initialPath);
-        queue.add(startItem);
+        queue.add(new BfsItem(startNodeId, 0, new ArrayList<>(List.of(startNodeId))));
 
         // 构建 source->targets 邻接表（兼容 edges 字段名 source/target 与 lineage edges）
         Map<String, List<String>> adj = new LinkedHashMap<>();
-        for (Map<String, Object> e : edges) {
+        for (Object edgeObj : edges) {
+            Map<String, Object> e = asMap(edgeObj);
+            if (e == null) continue;
             Object src = e.get("source");
             Object tgt = e.get("target");
             if (src == null) src = e.get("source_node_id");
@@ -237,61 +252,51 @@ public class LineageCompatController {
 
         // 节点 id -> node 信息（兼容 nodes 中 id/table 字段）
         Map<String, Map<String, Object>> nodeIndex = new LinkedHashMap<>();
-        for (Map<String, Object> n : nodes) {
+        for (Object nodeObj : nodes) {
+            Map<String, Object> n = asMap(nodeObj);
+            if (n == null) continue;
             Object id = n.get("id");
             if (id == null) id = n.get("table");
             if (id != null) nodeIndex.put(id.toString(), n);
         }
 
         while (!queue.isEmpty()) {
-            Map<String, Object> current = queue.poll();
-            String currentId = (String) current.get("id");
-            int currentHop = ((Number) current.get("hop")).intValue();
-            if (visited.contains(currentId)) continue;
-            visited.add(currentId);
+            BfsItem current = queue.poll();
+            if (visited.contains(current.id())) continue;
+            visited.add(current.id());
 
-            if (!currentId.equals(startNodeId)) {
-                Map<String, Object> nodeInfo = nodeIndex.get(currentId);
+            if (!current.id().equals(startNodeId)) {
+                Map<String, Object> nodeInfo = nodeIndex.get(current.id());
                 if (nodeInfo != null) {
-                    int rawScore = (int) Math.round(100 * Math.pow(0.80, currentHop));
+                    int rawScore = (int) Math.round(100 * Math.pow(0.80, current.hop()));
                     int riskScore = Math.min(100, Math.max(15, rawScore));
-                    Map<String, Object> item = new LinkedHashMap<>();
-                    item.put("id", nodeInfo.getOrDefault("id", currentId));
-                    item.put("label", nodeInfo.getOrDefault("label", nodeInfo.getOrDefault("name", currentId)));
-                    item.put("type", nodeInfo.getOrDefault("type", "unknown"));
-                    item.put("hopCount", currentHop);
-                    item.put("path", current.get("path"));
-                    item.put("riskScore", riskScore);
-                    results.add(item);
+                    results.add(new ImpactNodeVO(nodeInfo.getOrDefault("id", current.id()),
+                            nodeInfo.getOrDefault("label", nodeInfo.getOrDefault("name", current.id())),
+                            nodeInfo.getOrDefault("type", "unknown"),
+                            current.hop(), current.path(), riskScore));
                 }
             }
 
-            List<String> targets = adj.getOrDefault(currentId, new ArrayList<>());
+            List<String> targets = adj.getOrDefault(current.id(), new ArrayList<>());
             for (String target : targets) {
                 if (!visited.contains(target)) {
-                    List<String> newPath = new ArrayList<>((List<String>) current.get("path"));
+                    List<String> newPath = new ArrayList<>(current.path());
                     newPath.add(target);
-                    Map<String, Object> next = new LinkedHashMap<>();
-                    next.put("id", target);
-                    next.put("hop", currentHop + 1);
-                    next.put("path", newPath);
-                    queue.add(next);
+                    queue.add(new BfsItem(target, current.hop() + 1, newPath));
                 }
             }
         }
         return results;
     }
 
-    private ApiResponse emptyParseResult(String message) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("success", true);
-        result.put("message", message);
-        result.put("addedNodes", 0);
-        result.put("addedLinks", 0);
-        Map<String, Object> lineageView = new LinkedHashMap<>();
-        lineageView.put("nodes", new ArrayList<>());
-        lineageView.put("links", new ArrayList<>());
-        result.put("lineage", lineageView);
-        return ApiResponse.success(result);
+    private ApiResponse<ParseResultVO> emptyParseResult(String message) {
+        return ApiResponse.success(new ParseResultVO(true, message, 0, 0,
+                new LineageViewVO(new ArrayList<>(), new ArrayList<>())));
+    }
+
+    /** 动态 JSON 对象 → 键值视图（形状由解析器/调用方定义，不为定型伪造列）。 */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> asMap(Object o) {
+        return o instanceof Map<?, ?> m ? new LinkedHashMap<>((Map<String, Object>) m) : null;
     }
 }
