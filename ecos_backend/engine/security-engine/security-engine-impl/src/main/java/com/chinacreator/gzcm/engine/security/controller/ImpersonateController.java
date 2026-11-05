@@ -14,8 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.servlet.http.HttpServletRequest;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -37,10 +35,11 @@ import java.util.UUID;
  * 两个分支均写审计事件（action=IMPERSONATE_REQUEST，含服务端已认证主体与
  * 自报目标主体），满足 F01-08 "二次确认 + 强审计" 的强审计面。</p>
  *
- * <p>三滤波器：前缀 {@code /api/v1/security/} 已被 ClearanceInterceptor PATH_RULES
- * 与 AnonymousEndpointRegistry CLEARANCE_EXEMPT 通配覆盖（需认证、不匿名），
- * VersionPrefixRewriteFilter 无需登记（Controller 直接映射 v1 正典双路径，
- * 与 RlsController 同风格）。</p>
+ * <p><b>#147CE（DoD DI-2 第九批）</b>：请求体由弱类型 Map 改 {@link ImpersonateRequest}
+ * （{@code confirm} 保留「布尔 true 或字符串 "true"」双形态宽容解析）；响应信封的载荷位
+ * 由 Map 改 {@code Void}（三条腿都只回错误信封，不携 data）。同批删除两段**从未使用**的
+ * 局部 Map（428 的 {@code hint}、501 的 {@code detail}）——它们不参与响应也不影响审计，
+ * 属死代码。wire 键面（code/message/errorCode/traceId）与状态行逐字不变。</p>
  */
 @RestController
 @RequestMapping({"/api/security/impersonate", "/api/v1/security/impersonate"})
@@ -63,23 +62,22 @@ public class ImpersonateController {
      * POST /api/v1/security/impersonate  body: {targetUserId, reason, confirm}
      */
     @PostMapping
-    public ResponseEntity<ApiResponse<Map<String, Object>>> impersonate(
-            @RequestBody(required = false) Map<String, Object> body,
+    public ResponseEntity<ApiResponse<Void>> impersonate(
+            @RequestBody(required = false) ImpersonateRequest body,
             HttpServletRequest request) {
 
-        Map<String, Object> req = body != null ? body : Map.of();
-        String targetUserId = asString(req.get("targetUserId"));
-        String reason = asString(req.get("reason"));
-        boolean confirmed = Boolean.TRUE.equals(req.get("confirm"))
-                || "true".equalsIgnoreCase(asString(req.get("confirm")));
+        ImpersonateRequest req = body != null ? body : new ImpersonateRequest();
+        String targetUserId = req.getTargetUserId();
+        String reason = req.getReason();
+        boolean confirmed = Boolean.TRUE.equals(req.getConfirm())
+                || (req.getConfirm() != null && "true".equalsIgnoreCase(String.valueOf(req.getConfirm())));
         String actor = resolveActor();
         String traceId = resolveTraceId();
 
         if (targetUserId == null || targetUserId.isBlank()) {
             audit(actor, targetUserId, "REJECTED_BAD_REQUEST", "missing targetUserId");
             return ResponseEntity.badRequest()
-                    .body(ApiResponse.<Map<String, Object>>badRequest("targetUserId 必填")
-                            .withTraceId(traceId));
+                    .body(ApiResponse.<Void>badRequest("targetUserId 必填").withTraceId(traceId));
         }
 
         if (!confirmed) {
@@ -87,11 +85,8 @@ public class ImpersonateController {
             audit(actor, targetUserId, "REJECTED_CONFIRM_REQUIRED", reason);
             log.warn("impersonate 拒绝（缺二次确认）: actor={} target={} traceId={}",
                     actor, targetUserId, traceId);
-            Map<String, Object> hint = new LinkedHashMap<>();
-            hint.put("requiredFlag", "confirm=true");
-            hint.put("message", "以他人身份发起会话必须显式携带 confirm=true（二次确认）");
             return ResponseEntity.status(HttpStatus.PRECONDITION_REQUIRED)
-                    .body(ApiResponse.<Map<String, Object>>error(
+                    .body(ApiResponse.<Void>error(
                             HttpStatus.PRECONDITION_REQUIRED.value(),
                             ERROR_CONFIRM_REQUIRED,
                             "impersonate 需要二次确认：请显式携带 confirm=true")
@@ -102,11 +97,8 @@ public class ImpersonateController {
         audit(actor, targetUserId, "NOT_IMPLEMENTED", reason);
         log.warn("impersonate 能力未实现（已确认仍拒发）: actor={} target={} traceId={}",
                 actor, targetUserId, traceId);
-        Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("capability", "session-impersonation");
-        detail.put("reason", "后端无冒充会话签发底座（复盘报告 2026-10-12 详设-01 F01-08 认定）");
         return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-                .body(ApiResponse.<Map<String, Object>>error(
+                .body(ApiResponse.<Void>error(
                         HttpStatus.NOT_IMPLEMENTED.value(),
                         ERROR_CAPABILITY_NOT_AVAILABLE,
                         "impersonate 会话签发能力尚未实现（二次确认门禁已生效，不返回伪造身份会话）")
@@ -142,7 +134,34 @@ public class ImpersonateController {
         return "t-" + UUID.randomUUID();
     }
 
-    private static String asString(Object o) {
-        return o == null ? null : String.valueOf(o);
+    /** 冒充请求（3 字段；{@code confirm} 兼容布尔与字符串两种形态，与旧 Map 读取口径一致）。 */
+    public static final class ImpersonateRequest {
+        private String targetUserId;
+        private String reason;
+        private Object confirm;
+
+        public String getTargetUserId() {
+            return targetUserId;
+        }
+
+        public void setTargetUserId(String targetUserId) {
+            this.targetUserId = targetUserId;
+        }
+
+        public String getReason() {
+            return reason;
+        }
+
+        public void setReason(String reason) {
+            this.reason = reason;
+        }
+
+        public Object getConfirm() {
+            return confirm;
+        }
+
+        public void setConfirm(Object confirm) {
+            this.confirm = confirm;
+        }
     }
 }
