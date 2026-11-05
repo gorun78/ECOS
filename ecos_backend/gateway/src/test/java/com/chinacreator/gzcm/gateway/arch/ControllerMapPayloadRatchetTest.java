@@ -307,6 +307,13 @@ import org.junit.jupiter.api.Test;
  *       {@code of(Map)}（与 #147DI 同口径），控制器内以 {@code var} 承接属主行。
  *       键面由 {@code CaliberWireShapeTest} 6 例钉住（顺序敏感；含 null 键与退休腿三键），
  *       变异实红（{@code version_status}→versionStatus）。</li>
+ *   <li>1629 ＝ #147DK（2026-11-05）HEAD 面复测值，差额 −11 行来自 datanet 域
+ *       {@code DqController}（20→9）：10 个 F02-08 停用写端点 + {@code legacyWriteBlocked}
+ *       改 {@code ApiResponse<Void>}（停用腿从不读请求体，入参一并删除；HTTP 语义不变），
+ *       错误信封 wire 不变（{@code data} 恒 null + NON_NULL）。剩 9 枚为 legacy 只读行
+ *       （旧表 {@code ecos_dq_rule_v2}/{@code ecos_quality_rule} 由 {@code DqService} 以 Map 出，
+ *       属主契约未改）。新增 {@code DqLegacyWriteGateTest} 2 例（十腿 409 + 信封无 data 键），
+ *       变异实红（409→410）；{@code data-engine-impl} 全量 **587/0/0/1**。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -318,7 +325,7 @@ import org.junit.jupiter.api.Test;
  * 2240 = 2229 + 11、2226 = 2215 + 11、2204 = 2193 + 11、2194 = 2183 + 11、
  * 2188 = 2177 + 11、2180 = 2169 + 11、2163 = 2152 + 11、2155 = 2144 + 11、
  * 2149 = 2138 + 11、2132 = 2121 + 11、2104 = 2093 + 11、2068 = 2057 + 11、
- * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11、1867 = 1856 + 11、1821 = 1810 + 11、1799 = 1788 + 11、1777 = 1766 + 11、1769 = 1758 + 11、1764 = 1753 + 11、1734 = 1723 + 11、1710 = 1699 + 11、1700 = 1689 + 11、1690 = 1679 + 11、1670 = 1659 + 11、1651 = 1640 + 11（同一批在途文件，未代改）。</p>
+ * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11、1867 = 1856 + 11、1821 = 1810 + 11、1799 = 1788 + 11、1777 = 1766 + 11、1769 = 1758 + 11、1764 = 1753 + 11、1734 = 1723 + 11、1710 = 1699 + 11、1700 = 1689 + 11、1690 = 1679 + 11、1670 = 1659 + 11、1651 = 1640 + 11、1640 = 1629 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -333,7 +340,7 @@ class ControllerMapPayloadRatchetTest {
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
      */
-    private static final int BASELINE_LINES = 1640;
+    private static final int BASELINE_LINES = 1629;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -343,7 +350,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1640（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1629（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;

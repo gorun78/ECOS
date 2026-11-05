@@ -81,7 +81,7 @@ public class DqController {
      */
     private static final String DEPRECATED_MSG = "该端点已停用，请使用 /api/v1/dq/** 治理端点";
 
-    private static ApiResponse<Map<String, Object>> legacyWriteBlocked(String hint) {
+    private static <T> ApiResponse<T> legacyWriteBlocked(String hint) {
         log.warn("DQ legacy write blocked: {}", hint);
         return ApiResponse.error(409, DataDomainErrorCode.ECOS_DATA_011, DEPRECATED_MSG);
     }
@@ -89,21 +89,21 @@ public class DqController {
     /** @deprecated F02-08 规格 5：写端点已停用，使用 {@code POST /api/v1/dq/rules} 创建规则。 */
     @Deprecated
     @PostMapping("/rules")
-    public ApiResponse<Map<String, Object>> createRule(@RequestBody Map<String, Object> body) {
+    public ApiResponse<Void> createRule() {
         return legacyWriteBlocked("createRule");
     }
 
     /** @deprecated F02-08 规格 5：写端点已停用，使用 {@code PUT /api/v1/dq/rules/{id}} 更新规则。 */
     @Deprecated
     @PutMapping("/rules/{id}")
-    public ApiResponse<Map<String, Object>> updateRule(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+    public ApiResponse<Void> updateRule(@PathVariable Long id) {
         return legacyWriteBlocked("updateRule id=" + id);
     }
 
     /** @deprecated F02-08 规格 5：写端点已停用，使用 {@code DELETE /api/v1/dq/rules/{id}} 删除规则。 */
     @Deprecated
     @DeleteMapping("/rules/{id}")
-    public ApiResponse<Map<String, Object>> deleteRule(@PathVariable Long id) {
+    public ApiResponse<Void> deleteRule(@PathVariable Long id) {
         return legacyWriteBlocked("deleteRule id=" + id);
     }
 
@@ -132,28 +132,28 @@ public class DqController {
     /** @deprecated F02-08 规格 5：写端点已停用，DQ 工单自动化走告警→工单联动 {@code /api/v1/dq/work-orders}。 */
     @Deprecated
     @PostMapping("/issues")
-    public ApiResponse<Map<String, Object>> createIssue(@RequestBody Map<String, Object> body) {
+    public ApiResponse<Void> createIssue() {
         return legacyWriteBlocked("createIssue");
     }
 
     /** @deprecated F02-08 规格 5：写端点已停用。 */
     @Deprecated
     @PutMapping("/issues/{id}")
-    public ApiResponse<Map<String, Object>> updateIssue(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+    public ApiResponse<Void> updateIssue(@PathVariable Long id) {
         return legacyWriteBlocked("updateIssue id=" + id);
     }
 
     /** @deprecated F02-08 规格 5：写端点已停用。 */
     @Deprecated
     @PostMapping("/issues/{id}/resolve")
-    public ApiResponse<Map<String, Object>> resolveIssue(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+    public ApiResponse<Void> resolveIssue(@PathVariable Long id) {
         return legacyWriteBlocked("resolveIssue id=" + id);
     }
 
     /** @deprecated F02-08 规格 5：写端点已停用。 */
     @Deprecated
     @DeleteMapping("/issues/{id}")
-    public ApiResponse<Map<String, Object>> deleteIssue(@PathVariable Long id) {
+    public ApiResponse<Void> deleteIssue(@PathVariable Long id) {
         return legacyWriteBlocked("deleteIssue id=" + id);
     }
 
@@ -171,7 +171,7 @@ public class DqController {
     /** @deprecated F02-08 规格 5：写端点已停用，DQ 检查执行走治理端点 {@code /api/v1/dq/rules|work-orders|scores/recompute}。 */
     @Deprecated
     @PostMapping("/check")
-    public ApiResponse<Map<String, Object>> runCheck() {
+    public ApiResponse<Void> runCheck() {
         return legacyWriteBlocked("runCheck");
     }
 
@@ -184,7 +184,7 @@ public class DqController {
      */
     @Deprecated
     @PostMapping("/{type}")
-    public ApiResponse<Map<String, Object>> createLegacy(@PathVariable String type, @RequestBody Map<String, Object> body) {
+    public ApiResponse<Void> createLegacy(@PathVariable String type) {
         return legacyWriteBlocked("createLegacy type=" + type);
     }
 
@@ -195,7 +195,7 @@ public class DqController {
      */
     @Deprecated
     @DeleteMapping("/{type}/{id}")
-    public ApiResponse<Map<String, Object>> deleteLegacy(@PathVariable String type, @PathVariable Long id) {
+    public ApiResponse<Void> deleteLegacy(@PathVariable String type, @PathVariable Long id) {
         return legacyWriteBlocked("deleteLegacy type=" + type + " id=" + id);
     }
 }
