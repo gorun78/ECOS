@@ -3,6 +3,10 @@ package com.chinacreator.gzcm.engine.kb.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.event.KafkaTopics;
 import com.chinacreator.gzcm.engine.kb.KgSyncService;
+import com.chinacreator.gzcm.engine.kb.dto.KgSyncPreviewVO;
+import com.chinacreator.gzcm.engine.kb.dto.KgSyncRollbackVO;
+import com.chinacreator.gzcm.engine.kb.dto.KgSyncStatusVO;
+import com.chinacreator.gzcm.engine.kb.dto.KgSyncTriggerVO;
 import com.chinacreator.gzcm.engine.kb.service.KgMapperService;
 import com.chinacreator.gzcm.engine.kb.support.KbAuditEventPublisher;
 import com.chinacreator.gzcm.engine.kb.support.KbErrorCodes;
@@ -51,34 +55,23 @@ public class GraphSyncController {
     }
 
     @GetMapping("/status")
-    public ApiResponse<Map<String, Object>> getSyncStatus() {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("objectTypes", kgSyncService.getSyncStatus());
-        result.put("overallStatus", kgSyncService.getOverallStatus());
-        return ApiResponse.success(result);
+    public ApiResponse<KgSyncStatusVO> getSyncStatus() {
+        return ApiResponse.success(new KgSyncStatusVO(
+                kgSyncService.getSyncStatus(), kgSyncService.getOverallStatus()));
     }
 
     @PostMapping("/trigger")
-    public ApiResponse<Map<String, Object>> triggerFullSync() {
+    public ApiResponse<KgSyncTriggerVO> triggerFullSync() {
         String syncId = "sync-" + System.currentTimeMillis();
         kgSyncService.triggerFullSync(syncId);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("syncId", syncId);
-        result.put("jobId", syncId);
-        result.put("status", "started");
-        return ApiResponse.success(result);
+        return ApiResponse.success(new KgSyncTriggerVO(syncId, syncId, null, "started"));
     }
 
     @PostMapping("/object/{objectType}")
-    public ApiResponse<Map<String, Object>> triggerObjectSync(@PathVariable String objectType) {
+    public ApiResponse<KgSyncTriggerVO> triggerObjectSync(@PathVariable String objectType) {
         String syncId = "sync-" + System.currentTimeMillis();
         kgSyncService.triggerObjectSync(syncId, objectType);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("syncId", syncId);
-        result.put("jobId", syncId);
-        result.put("objectType", objectType);
-        result.put("status", "started");
-        return ApiResponse.success(result);
+        return ApiResponse.success(new KgSyncTriggerVO(syncId, syncId, objectType, "started"));
     }
 
     @GetMapping("/logs")
@@ -101,12 +94,12 @@ public class GraphSyncController {
      * dry-run：返回本次 dry-run 将 create/update/skip 的对象计数（不落库）。
      */
     @PostMapping("/jobs/{jobId}/preview")
-    public ApiResponse<Map<String, Object>> previewJob(@PathVariable String jobId,
-                                                       @RequestParam(defaultValue = "ALL") String type) {
+    public ApiResponse<KgSyncPreviewVO> previewJob(@PathVariable String jobId,
+                                                   @RequestParam(defaultValue = "ALL") String type) {
         log.info("KG sync preview: jobId={} type={}", jobId, type);
-        Map<String, Object> result = kgMapper.previewDryRun(type);
+        var result = kgMapper.previewDryRun(type);
         audit("kg_sync_preview", "jobId=" + jobId + " type=" + type + " " + result);
-        return ApiResponse.success(result);
+        return ApiResponse.success(KgSyncPreviewVO.of(result));
     }
 
     /**
@@ -114,11 +107,11 @@ public class GraphSyncController {
      * 回滚：按 jobId 前缀删除本 job 创建的 graph_node/graph_edge（V115 行反向计数）。
      */
     @PostMapping("/jobs/{jobId}/rollback")
-    public ApiResponse<Map<String, Object>> rollbackJob(@PathVariable String jobId) {
+    public ApiResponse<KgSyncRollbackVO> rollbackJob(@PathVariable String jobId) {
         log.info("KG sync rollback: jobId={}", jobId);
-        Map<String, Object> result = kgMapper.rollback(jobId);
+        var result = kgMapper.rollback(jobId);
         audit("kg_sync_rollback", "jobId=" + jobId + " " + result);
-        return ApiResponse.success(result);
+        return ApiResponse.success(KgSyncRollbackVO.of(result));
     }
 
     /**
