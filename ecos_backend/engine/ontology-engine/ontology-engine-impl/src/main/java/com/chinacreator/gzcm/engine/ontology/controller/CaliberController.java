@@ -1,7 +1,7 @@
 package com.chinacreator.gzcm.engine.ontology.controller;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,11 +16,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.error.OntologyErrorCode;
+import com.chinacreator.gzcm.engine.ontology.dto.CaliberBindingVO;
+import com.chinacreator.gzcm.engine.ontology.dto.CaliberConflictCountVO;
+import com.chinacreator.gzcm.engine.ontology.dto.CaliberCurrentVO;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberFormulaValidateDTO;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberFormulaValidationVO;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.CaliberStateChangeVO;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberVO;
+import com.chinacreator.gzcm.engine.ontology.dto.CaliberVersionHistoryVO;
 import com.chinacreator.gzcm.engine.ontology.dto.CaliberVersionSaveDTO;
+import com.chinacreator.gzcm.engine.ontology.dto.CaliberVersionVO;
 import com.chinacreator.gzcm.engine.ontology.dto.MetricBindingDTO;
 import com.chinacreator.gzcm.engine.ontology.service.CaliberFormulaDslService;
 import com.chinacreator.gzcm.engine.ontology.service.CaliberService;
@@ -116,20 +122,17 @@ public class CaliberController {
     @GetMapping("/{code}")
     public ApiResponse<CaliberVO> detail(@PathVariable String code) {
         try {
-            Map<String, Object> row = caliberService.findByCode(code)
-                    .orElseGet(() -> null);
+            var row = caliberService.findByCode(code).orElse(null);
             if (row == null) {
                 return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, CODE_NOT_FOUND,
                         "caliber '" + code + "' not found");
             }
             CaliberVO vo = CaliberVO.of(row);
-            if (vo.getVersions() == null) {
-                vo.setVersions(new java.util.ArrayList<>());
+            List<CaliberVersionHistoryVO> versions = new ArrayList<>();
+            for (var v : caliberService.listVersionsByCaliberId(String.valueOf(row.get("id")), null)) {
+                versions.add(CaliberVersionHistoryVO.of(v));
             }
-            for (Map<String, Object> v : caliberService.listVersionsByCaliberId(
-                    String.valueOf(row.get("id")), null)) {
-                vo.getVersions().add(v);
-            }
+            vo.setVersions(versions);
             return ApiResponse.success(vo);
         } catch (Exception e) {
             log.error("caliber detail failed code={}", code, e);
@@ -141,15 +144,14 @@ public class CaliberController {
      * 当前生效版本行 = 跨引擎（cognitive/workspace/kb）只读消费面。
      */
     @GetMapping("/{code}/current")
-    public ApiResponse<Map<String, Object>> current(@PathVariable String code) {
+    public ApiResponse<CaliberCurrentVO> current(@PathVariable String code) {
         try {
-            Map<String, Object> row = caliberService.getByCaliberCodeAndCurrentVersion(code)
-                    .orElseGet(() -> null);
+            var row = caliberService.getByCaliberCodeAndCurrentVersion(code).orElse(null);
             if (row == null) {
                 return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, CODE_NOT_FOUND,
                         "no current APPROVED caliber version for '" + code + "'");
             }
-            return ApiResponse.success(row);
+            return ApiResponse.success(CaliberCurrentVO.of(row));
         } catch (Exception e) {
             log.error("caliber current failed code={}", code, e);
             return ApiResponse.error(500, CODE_INTERNAL, "caliber current failed");
@@ -160,7 +162,7 @@ public class CaliberController {
     @PostMapping
     public ApiResponse<CaliberVO> create(@RequestBody CaliberSaveDTO dto) {
         try {
-            Map<String, Object> row = caliberService.insertCaliber(
+            var row = caliberService.insertCaliber(
                     dto.getCode(), dto.getName(), dto.getUnit(), dto.getCurrency(),
                     dto.getOwnerRole(), dto.getDimensionJson(), dto.getStatus());
             return ApiResponse.success(CaliberVO.of(row));
@@ -177,11 +179,10 @@ public class CaliberController {
      * {@code ECOS-ONTO-070/071/072/073}（逐条违反项在 message 内定位到符号），<b>不落库</b>。</p>
      */
     @PostMapping("/{code}/versions")
-    public ApiResponse<Map<String, Object>> addVersion(
+    public ApiResponse<CaliberVersionVO> addVersion(
             @PathVariable String code, @RequestBody CaliberVersionSaveDTO dto) {
         try {
-            Map<String, Object> caliber = caliberService.findByCode(code)
-                    .orElseGet(() -> null);
+            var caliber = caliberService.findByCode(code).orElse(null);
             if (caliber == null) {
                 return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, CODE_NOT_FOUND,
                         "caliber '" + code + "' not found");
@@ -189,10 +190,10 @@ public class CaliberController {
             String versionNo = (dto.getVersionNo() == null || dto.getVersionNo().isBlank())
                     ? nextVersionNo(String.valueOf(caliber.get("id")))
                     : dto.getVersionNo();
-            Map<String, Object> ver = caliberService.insertVersion(
+            var ver = caliberService.insertVersion(
                     String.valueOf(caliber.get("id")), versionNo, dto.getFormula(),
                     dto.getAdditive(), dto.getPeriodGranularity(), dto.getStatus());
-            return ApiResponse.success(ver);
+            return ApiResponse.success(CaliberVersionVO.of(ver));
         } catch (CaliberService.CaliberFormulaRejectedException e) {
             return ApiResponse.error(ApiResponse.CODE_BAD_REQUEST, e.getCode(), e.getMessage());
         } catch (DuplicateKeyException e) {
@@ -215,7 +216,7 @@ public class CaliberController {
      * （库里可能存有四关生效前写入的坏公式，审批是坏公式进入计算面的最后一道闸）。</p>
      */
     @PostMapping("/{code}/versions/{versionNo}/approve")
-    public ApiResponse<Map<String, Object>> approve(
+    public ApiResponse<CaliberStateChangeVO> approve(
             @PathVariable String code, @PathVariable String versionNo) {
         String approver = UserContext.getCurrentUsername();
         if (approver == null || approver.isBlank()) {
@@ -223,8 +224,7 @@ public class CaliberController {
                     "approver identity missing (身份缺失)");
         }
         try {
-            Map<String, Object> caliber = caliberService.findByCode(code)
-                    .orElseGet(() -> null);
+            var caliber = caliberService.findByCode(code).orElse(null);
             if (caliber == null) {
                 return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, CODE_NOT_FOUND,
                         "caliber '" + code + "' not found");
@@ -236,8 +236,7 @@ public class CaliberController {
                 return ApiResponse.error(ApiResponse.CODE_BAD_REQUEST, CODE_BAD,
                         "caliber version '" + versionNo + "' is not approvable from its current state");
             }
-            return ApiResponse.success(Map.of("code", code, "versionNo", versionNo, "status", "APPROVED",
-                    "approvedBy", approver));
+            return ApiResponse.success(CaliberStateChangeVO.approved(code, versionNo, approver));
         } catch (CaliberService.CaliberFormulaRejectedException e) {
             return ApiResponse.error(ApiResponse.CODE_BAD_REQUEST, e.getCode(), e.getMessage());
         } catch (Exception e) {
@@ -248,12 +247,11 @@ public class CaliberController {
 
     /** 退休：APPROVED→RETIRED。 */
     @PostMapping("/{code}/versions/{versionNo}/retire")
-    public ApiResponse<Map<String, Object>> retire(
+    public ApiResponse<CaliberStateChangeVO> retire(
             @PathVariable String code, @PathVariable String versionNo) {
         String actor = UserContext.getCurrentUsername();
         try {
-            Map<String, Object> caliber = caliberService.findByCode(code)
-                    .orElseGet(() -> null);
+            var caliber = caliberService.findByCode(code).orElse(null);
             if (caliber == null) {
                 return ApiResponse.error(ApiResponse.CODE_NOT_FOUND, CODE_NOT_FOUND,
                         "caliber '" + code + "' not found");
@@ -264,7 +262,7 @@ public class CaliberController {
                 return ApiResponse.error(ApiResponse.CODE_BAD_REQUEST, CODE_BAD,
                         "caliber version '" + versionNo + "' is not RETIRE-able (already terminal)");
             }
-            return ApiResponse.success(Map.of("code", code, "versionNo", versionNo, "status", "RETIRED"));
+            return ApiResponse.success(CaliberStateChangeVO.retired(code, versionNo));
         } catch (Exception e) {
             log.error("retire caliber version failed code={} v={}", code, versionNo, e);
             return ApiResponse.error(500, CODE_INTERNAL, "retire caliber version failed");
@@ -273,18 +271,17 @@ public class CaliberController {
 
     /** 绑定口径 + 冻结快照（规则 3 冻结 → 409 ECOS-ONTO-041）。 */
     @PostMapping("/metrics/{metricCode}/binding")
-    public ApiResponse<Map<String, Object>> bindMetric(
+    public ApiResponse<CaliberBindingVO> bindMetric(
             @PathVariable String metricCode, @RequestBody MetricBindingDTO dto) {
         try {
-            Map<String, Object> caliber = caliberService.findByCode(dto.getCaliberCode())
-                    .orElseGet(() -> null);
+            var caliber = caliberService.findByCode(dto.getCaliberCode()).orElse(null);
             if (caliber == null) {
                 return ApiResponse.error(ApiResponse.CODE_BAD_REQUEST, CODE_BAD,
                         "caliber '" + dto.getCaliberCode() + "' not found");
             }
-            Map<String, Object> result = caliberService.bindMetricCaliber(
+            var result = caliberService.bindMetricCaliber(
                     metricCode, String.valueOf(caliber.get("id")), dto.getFormulaVersion());
-            return ApiResponse.success(result);
+            return ApiResponse.success(CaliberBindingVO.of(result));
         } catch (CaliberService.SnapshotFrozenException e) {
             return ApiResponse.error(409, CODE_FROZEN, e.getMessage());
         } catch (CaliberService.CaliberMissingException e) {
@@ -330,13 +327,10 @@ public class CaliberController {
      * 字面路径 {@code /conflict-count} 优先于 {@code /{code}} 匹配（Spring 字面段优先）。</p>
      */
     @GetMapping("/conflict-count")
-    public ApiResponse<Map<String, Object>> conflictCount() {
+    public ApiResponse<CaliberConflictCountVO> conflictCount() {
         try {
             int count = caliberService.countConflictedCaliberCodes();
-            Map<String, Object> data = new java.util.LinkedHashMap<>();
-            data.put("count", count);
-            data.put("evidence", Map.of("criterion", "multi-APPROVED-versions-per-code"));
-            return ApiResponse.success(data);
+            return ApiResponse.success(CaliberConflictCountVO.of(count));
         } catch (Exception e) {
             log.error("caliber conflict-count failed", e);
             return ApiResponse.error(500, CODE_INTERNAL, "caliber conflict-count failed");
@@ -345,9 +339,9 @@ public class CaliberController {
 
     /** 现版号 +1（版本号序列，字符串形态 "1"→"2"）。 */
     private String nextVersionNo(String caliberId) {
-        List<Map<String, Object>> versions = caliberService.listVersionsByCaliberId(caliberId, null);
+        var versions = caliberService.listVersionsByCaliberId(caliberId, null);
         int max = 0;
-        for (Map<String, Object> v : versions) {
+        for (var v : versions) {
             try {
                 max = Math.max(max, Integer.parseInt(String.valueOf(v.get("version_no")).trim()));
             } catch (NumberFormatException ignored) {

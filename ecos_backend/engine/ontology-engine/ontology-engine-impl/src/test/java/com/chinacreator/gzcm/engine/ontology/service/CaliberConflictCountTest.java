@@ -74,7 +74,7 @@ class CaliberConflictCountTest {
                 new com.chinacreator.gzcm.engine.ontology.controller.CaliberController(
                         service, null);
 
-        com.chinacreator.gzcm.common.base.ApiResponse<java.util.Map<String, Object>> resp =
+        com.chinacreator.gzcm.common.base.ApiResponse<?> resp =
                 controller.conflictCount();
 
         assertEquals(500, resp.getCode());

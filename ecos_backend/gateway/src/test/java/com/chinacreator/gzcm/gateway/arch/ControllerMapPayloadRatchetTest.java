@@ -298,6 +298,15 @@ import org.junit.jupiter.api.Test;
  *       属主 {@code DataLineageService#getLineage} 的 Map 行与动态 JSON 同化辅助。
  *       键面由 {@code LineageCompatWireShapeTest} 3 例钉住（hop=1 风险 80、空 payload
  *       空结果），变异实红（{@code impactedNodes}→impacted_nodes）。</li>
+ *   <li>1640 ＝ #147DJ（2026-11-05）HEAD 面复测值，差额 −19 行来自 ontology 域
+ *       {@code CaliberController}（19→0）：当前生效行 18 键（别名列序冻结、null 值照常出现）、
+ *       版本读回 10 键、版本历史 16 键、审批 4 键 / 退休 3 键（{@code approvedBy} 仅审批腿）、
+ *       绑定回执 4 键、冲突计数 {@code count + evidence.criterion} 改 record；
+ *       {@code detail.versions[]} 同步由 {@code List<Map>} 改 {@code CaliberVersionHistoryVO}。
+ *       **属主 {@code CaliberService} 行 Map 未改**（DAO 显式列清单契约），转换在 dto 的
+ *       {@code of(Map)}（与 #147DI 同口径），控制器内以 {@code var} 承接属主行。
+ *       键面由 {@code CaliberWireShapeTest} 6 例钉住（顺序敏感；含 null 键与退休腿三键），
+ *       变异实红（{@code version_status}→versionStatus）。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -309,7 +318,7 @@ import org.junit.jupiter.api.Test;
  * 2240 = 2229 + 11、2226 = 2215 + 11、2204 = 2193 + 11、2194 = 2183 + 11、
  * 2188 = 2177 + 11、2180 = 2169 + 11、2163 = 2152 + 11、2155 = 2144 + 11、
  * 2149 = 2138 + 11、2132 = 2121 + 11、2104 = 2093 + 11、2068 = 2057 + 11、
- * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11、1867 = 1856 + 11、1821 = 1810 + 11、1799 = 1788 + 11、1777 = 1766 + 11、1769 = 1758 + 11、1764 = 1753 + 11、1734 = 1723 + 11、1710 = 1699 + 11、1700 = 1689 + 11、1690 = 1679 + 11、1670 = 1659 + 11（同一批在途文件，未代改）。</p>
+ * 2038 = 2027 + 11、2023 = 2012 + 11、2007 = 1996 + 11、1988 = 1977 + 11、1973 = 1962 + 11、1963 = 1952 + 11、1958 = 1947 + 11、1949 = 1938 + 11、1930 = 1919 + 11、1912 = 1901 + 11、1890 = 1879 + 11、1876 = 1865 + 11、1867 = 1856 + 11、1821 = 1810 + 11、1799 = 1788 + 11、1777 = 1766 + 11、1769 = 1758 + 11、1764 = 1753 + 11、1734 = 1723 + 11、1710 = 1699 + 11、1700 = 1689 + 11、1690 = 1679 + 11、1670 = 1659 + 11、1651 = 1640 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -324,7 +333,7 @@ class ControllerMapPayloadRatchetTest {
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
      */
-    private static final int BASELINE_LINES = 1659;
+    private static final int BASELINE_LINES = 1640;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -334,7 +343,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1659（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 1640（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;

@@ -9,9 +9,9 @@ import java.util.Map;
 /**
  * F03-01 — 口径列表/详情 VO。
  *
- * <p>字段对齐 {@code CaliberService} 显式列清单输出（{@link java.util.Map} 直传，
- * 避免引入实体类）；{@code versions} 仅在
- * {@code GET /api/v1/ontology/calibers/{code}} 详情端点填充（升版历史）。</p>
+ * <p>字段对齐 {@code CaliberService} 显式列清单输出；{@code versions} 仅在
+ * {@code GET /api/v1/ontology/calibers/{code}} 详情端点填充（升版历史，强类型行见
+ * {@link CaliberVersionHistoryVO}）。</p>
  */
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -38,7 +38,7 @@ public class CaliberVO {
     /** 创建时间。 */
     private Object createTime;
     /** 版本历史（仅详情端点填充）。 */
-    private List<Map<String, Object>> versions;
+    private List<CaliberVersionHistoryVO> versions;
 
     /** 便捷构造：主表行 → VO。 */
     public static CaliberVO of(Map<String, Object> row) {

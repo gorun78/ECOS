@@ -86,7 +86,7 @@ class CaliberVersionOutcomeCodeTest {
         when(caliberService.getByCaliberCodeAndCurrentVersion(CODE))
                 .thenReturn(java.util.Optional.empty());
 
-        ApiResponse<Map<String, Object>> resp = controller.current(CODE);
+        ApiResponse<?> resp = controller.current(CODE);
 
         assertEquals(404, resp.getCode());
         assertEquals(OntologyErrorCode.ECOS_ONTO_080, resp.getErrorCode());
@@ -99,7 +99,7 @@ class CaliberVersionOutcomeCodeTest {
         CaliberVersionSaveDTO dto = new CaliberVersionSaveDTO();
         dto.setVersionNo("1");
 
-        ApiResponse<Map<String, Object>> resp = controller.addVersion(CODE, dto);
+        ApiResponse<?> resp = controller.addVersion(CODE, dto);
 
         assertEquals(404, resp.getCode());
         assertEquals(OntologyErrorCode.ECOS_ONTO_080, resp.getErrorCode());
@@ -118,7 +118,7 @@ class CaliberVersionOutcomeCodeTest {
         CaliberVersionSaveDTO dto = new CaliberVersionSaveDTO();
         dto.setVersionNo("2");
 
-        ApiResponse<Map<String, Object>> resp = controller.addVersion(CODE, dto);
+        ApiResponse<?> resp = controller.addVersion(CODE, dto);
 
         assertEquals(409, resp.getCode());
         assertEquals(OntologyErrorCode.ECOS_ONTO_011, resp.getErrorCode());
@@ -149,7 +149,7 @@ class CaliberVersionOutcomeCodeTest {
         CaliberVersionSaveDTO dto = new CaliberVersionSaveDTO();
         dto.setVersionNo("2");
 
-        ApiResponse<Map<String, Object>> resp = controller.addVersion(CODE, dto);
+        ApiResponse<?> resp = controller.addVersion(CODE, dto);
 
         assertEquals(0, resp.getCode(), "首发版本必须成功，禁被幂等腿误伤");
         // 成功信封：success 工厂把 "ok" 落进 message 槽（errorCode 键 @JsonInclude(NON_NULL) 不序列化），

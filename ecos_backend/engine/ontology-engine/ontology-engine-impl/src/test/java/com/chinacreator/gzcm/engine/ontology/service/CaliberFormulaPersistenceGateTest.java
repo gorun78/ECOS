@@ -237,7 +237,7 @@ class CaliberFormulaPersistenceGateTest {
                         "DSL_V1 syntax: expected factor after '=' — unexpected '<eof>'"
                                 + " (line 1, column 11, offset 10)"));
 
-        ApiResponse<Map<String, Object>> rejected = controller.addVersion("CAL_X", versionDto("revenue = "));
+        ApiResponse<?> rejected = controller.addVersion("CAL_X", versionDto("revenue = "));
         assertEquals(400, rejected.getCode(), "四关不过应 400，不得被 catch-all 兜成 500");
         assertEquals("ECOS-ONTO-070", rejected.getErrorCode());
         assertTrue(rejected.getMessage().contains("DSL_V1_SYNTAX"),
@@ -265,7 +265,7 @@ class CaliberFormulaPersistenceGateTest {
                         "DSL_V4 dependency graph is cyclic (topological order impossible):"
                                 + " M_FC_PROFIT -> M_FC_PROFIT"));
 
-        ApiResponse<Map<String, Object>> rejected = controller.approve("CAL_X", V);
+        ApiResponse<?> rejected = controller.approve("CAL_X", V);
         assertEquals(400, rejected.getCode());
         assertEquals("ECOS-ONTO-073", rejected.getErrorCode());
         assertTrue(rejected.getMessage().contains("cyclic"), "400 消息应含环路径: " + rejected.getMessage());
