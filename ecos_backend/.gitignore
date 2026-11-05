@@ -3,7 +3,10 @@ target/
 *.jar
 *.war
 *.ear
-*target*
+# ⚠ 2026-11-04 订正：旧规则 `*target*`（本行原址）在 Windows core.ignorecase=true 下按文件名不区分大小写
+# 匹配，把源码 RuleLayerTarget.java 整体吞掉 ⇒ commit 787edc34 的引用缺文件、干净 checkout 编不过。
+# 构建目录由上方 `target/` 覆盖（任意层级），无需宽匹配；同类事故先例见根 .gitignore 的 `*win_tasks*` 订正。
+# 复发防线：gateway/arch/SourceNotIgnoredGateTest（src 下源码/资源不得出现在 git 忽略面）。
 
 # IDE
 .idea/
