@@ -189,25 +189,71 @@ public class AgentLoopController {
      * }
      * </pre>
      */
+    /** 会话视图（8 键）。 */
+    public record AgentSessionVO(@com.fasterxml.jackson.annotation.JsonProperty("id") String id,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("agentId") String agentId,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("userId") String userId,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("tenantId") String tenantId,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("status") String status,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("messageCount") int messageCount,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("createdAt") Long createdAt,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("lastActiveAt") Long lastActiveAt) {
+
+        static AgentSessionVO of(AgentSessionService.AgentSession s) {
+            return new AgentSessionVO(s.getId(), s.getAgentId(), s.getUserId(), s.getTenantId(),
+                    s.getStatus(), s.getMessageCount(), s.getCreatedAt(), s.getLastActiveAt());
+        }
+    }
+
+    /** 消息视图（8 键；{@code toolCalls} 条目形状由调用方定义）。 */
+    public record AgentMessageVO(@com.fasterxml.jackson.annotation.JsonProperty("id") Long id,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("role") String role,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("content") String content,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("toolCalls") List<Map<String, Object>> toolCalls,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("toolResults") Object toolResults,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("tokens") Integer tokens,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("threadId") String threadId,
+                                 @com.fasterxml.jackson.annotation.JsonProperty("createdAt") Long createdAt) {
+
+        static AgentMessageVO of(AgentSessionService.AgentMessage m) {
+            return new AgentMessageVO(m.getId(), m.getRole(), m.getContent(), m.getToolCalls(),
+                    m.getToolResults(), m.getTokens(), m.getThreadId(), m.getCreatedAt());
+        }
+    }
+
+    /** 会话列表（2 键）。 */
+    public record AgentSessionListVO(@com.fasterxml.jackson.annotation.JsonProperty("total") int total,
+                                     @com.fasterxml.jackson.annotation.JsonProperty("sessions") List<AgentSessionVO> sessions) {
+    }
+
+    /** 会话详情（8 键 + 条件 messages）。 */
+    public record AgentSessionDetailVO(@com.fasterxml.jackson.annotation.JsonProperty("id") String id,
+                                       @com.fasterxml.jackson.annotation.JsonProperty("agentId") String agentId,
+                                       @com.fasterxml.jackson.annotation.JsonProperty("userId") String userId,
+                                       @com.fasterxml.jackson.annotation.JsonProperty("tenantId") String tenantId,
+                                       @com.fasterxml.jackson.annotation.JsonProperty("status") String status,
+                                       @com.fasterxml.jackson.annotation.JsonProperty("messageCount") int messageCount,
+                                       @com.fasterxml.jackson.annotation.JsonProperty("createdAt") Long createdAt,
+                                       @com.fasterxml.jackson.annotation.JsonProperty("lastActiveAt") Long lastActiveAt,
+                                       @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                                       @com.fasterxml.jackson.annotation.JsonProperty("messages") List<AgentMessageVO> messages) {
+    }
+
+    /** 消息分页（4 键）。 */
+    public record AgentSessionMessagesVO(@com.fasterxml.jackson.annotation.JsonProperty("total") int total,
+                                         @com.fasterxml.jackson.annotation.JsonProperty("page") int page,
+                                         @com.fasterxml.jackson.annotation.JsonProperty("size") int size,
+                                         @com.fasterxml.jackson.annotation.JsonProperty("items") List<AgentMessageVO> items) {
+    }
+
     @PostMapping("/sessions")
-    public ApiResponse<Map<String, Object>> createSession(@RequestBody Map<String, Object> body) {
+    public ApiResponse<AgentSessionVO> createSession(@RequestBody Map<String, Object> body) {
         String agentId = (String) body.getOrDefault("agentId", "default");
         String userId = (String) body.getOrDefault("userId", "anonymous");
         String tenantId = (String) body.getOrDefault("tenantId", "default");
 
         AgentSessionService.AgentSession session = sessionService.createSession(agentId, userId, tenantId);
-
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("id", session.getId());
-        data.put("agentId", session.getAgentId());
-        data.put("userId", session.getUserId());
-        data.put("tenantId", session.getTenantId());
-        data.put("status", session.getStatus());
-        data.put("messageCount", session.getMessageCount());
-        data.put("createdAt", session.getCreatedAt());
-        data.put("lastActiveAt", session.getLastActiveAt());
-
-        return ApiResponse.success(data);
+        return ApiResponse.success(AgentSessionVO.of(session));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -230,27 +276,13 @@ public class AgentLoopController {
      * 命中"不重复 SQL / 单源节点"约束。
      */
     @GetMapping("/sessions")
-    public ApiResponse<Map<String, Object>> listSessions(
+    public ApiResponse<AgentSessionListVO> listSessions(
             @RequestParam(name = "agentId", required = false) String agentId,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "limit", defaultValue = "50") int limit) {
         List<AgentSessionService.AgentSession> rows = sessionService.listSessions(agentId, status, limit);
-
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("total", rows.size());
-        data.put("sessions", rows.stream().map(s -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", s.getId());
-            m.put("agentId", s.getAgentId());
-            m.put("userId", s.getUserId());
-            m.put("tenantId", s.getTenantId());
-            m.put("status", s.getStatus());
-            m.put("messageCount", s.getMessageCount());
-            m.put("createdAt", s.getCreatedAt());
-            m.put("lastActiveAt", s.getLastActiveAt());
-            return m;
-        }).toList());
-        return ApiResponse.success(data);
+        return ApiResponse.success(new AgentSessionListVO(rows.size(),
+                rows.stream().map(AgentSessionVO::of).toList()));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -263,7 +295,7 @@ public class AgentLoopController {
      * @param thread 可选：按线程过滤消息，默认 "main"；传 "*" 返回所有线程消息
      */
     @GetMapping("/sessions/{id}")
-    public ApiResponse<Map<String, Object>> getSession(@PathVariable String id,
+    public ApiResponse<AgentSessionDetailVO> getSession(@PathVariable String id,
                                                         @RequestParam(name = "thread", defaultValue = "main") String thread) {
         AgentSessionService.AgentSession session = sessionService.getSession(id);
 
@@ -281,33 +313,12 @@ public class AgentLoopController {
         }
         session.setMessages(messages);
 
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("id", session.getId());
-        data.put("agentId", session.getAgentId());
-        data.put("userId", session.getUserId());
-        data.put("tenantId", session.getTenantId());
-        data.put("status", session.getStatus());
-        data.put("messageCount", session.getMessageCount());
-        data.put("createdAt", session.getCreatedAt());
-        data.put("lastActiveAt", session.getLastActiveAt());
-
-        // 消息列表
-        if (session.getMessages() != null) {
-            data.put("messages", session.getMessages().stream().map(m -> {
-                Map<String, Object> msgMap = new LinkedHashMap<>();
-                msgMap.put("id", m.getId());
-                msgMap.put("role", m.getRole());
-                msgMap.put("content", m.getContent());
-                msgMap.put("toolCalls", m.getToolCalls());
-                msgMap.put("toolResults", m.getToolResults());
-                msgMap.put("tokens", m.getTokens());
-                msgMap.put("threadId", m.getThreadId());
-                msgMap.put("createdAt", m.getCreatedAt());
-                return msgMap;
-            }).toList());
-        }
-
-        return ApiResponse.success(data);
+        List<AgentMessageVO> messageViews = session.getMessages() == null ? null
+                : session.getMessages().stream().map(AgentMessageVO::of).toList();
+        return ApiResponse.success(new AgentSessionDetailVO(session.getId(), session.getAgentId(),
+                session.getUserId(), session.getTenantId(), session.getStatus(),
+                session.getMessageCount(), session.getCreatedAt(), session.getLastActiveAt(),
+                messageViews));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -329,7 +340,7 @@ public class AgentLoopController {
      * @param size 每页条数，默认 50（默认值与 §9.3.2 分页口径一致；上限 500）
      */
     @GetMapping("/sessions/{id}/messages")
-    public ApiResponse<Map<String, Object>> listSessionMessages(@PathVariable String id,
+    public ApiResponse<AgentSessionMessagesVO> listSessionMessages(@PathVariable String id,
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "size", defaultValue = "50") int size) {
         AgentSessionService.AgentSession session = sessionService.getSession(id);
@@ -346,24 +357,8 @@ public class AgentLoopController {
         List<AgentSessionService.AgentMessage> slice = (fromIndex >= all.size())
                 ? java.util.Collections.emptyList()
                 : all.subList(fromIndex, Math.min(all.size(), fromIndex + safeSize));
-        List<Map<String, Object>> items = slice.stream().map(m -> {
-            Map<String, Object> msgMap = new LinkedHashMap<>();
-            msgMap.put("id", m.getId());
-            msgMap.put("role", m.getRole());
-            msgMap.put("content", m.getContent());
-            msgMap.put("toolCalls", m.getToolCalls());
-            msgMap.put("toolResults", m.getToolResults());
-            msgMap.put("tokens", m.getTokens());
-            msgMap.put("threadId", m.getThreadId());
-            msgMap.put("createdAt", m.getCreatedAt());
-            return msgMap;
-        }).toList();
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("total", all.size());
-        data.put("page", safePage);
-        data.put("size", safeSize);
-        data.put("items", items);
-        return ApiResponse.success(data);
+        List<AgentMessageVO> items = slice.stream().map(AgentMessageVO::of).toList();
+        return ApiResponse.success(new AgentSessionMessagesVO(all.size(), safePage, safeSize, items));
     }
 
     // ═══════════════════════════════════════════════════════════════
