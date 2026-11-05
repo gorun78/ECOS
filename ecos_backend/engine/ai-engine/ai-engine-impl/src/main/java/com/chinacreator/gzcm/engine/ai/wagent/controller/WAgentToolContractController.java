@@ -9,6 +9,7 @@ import com.chinacreator.gzcm.engine.ai.wagent.dataobject.WAgentToolContractDO;
 import com.chinacreator.gzcm.engine.ai.wagent.orchestrator.WAgentOrchestrationException;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver;
 import com.chinacreator.gzcm.engine.ai.wagent.web.WAgentIdentityResolver.IdentityWithRoles;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,10 +18,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 /**
  * 工具契约端点（详细设计-10 §5.2 #14 searchTools / #15 describeTool / #16 validateToolContract，
@@ -50,9 +49,119 @@ public class WAgentToolContractController {
         this.identityResolver = identityResolver;
     }
 
+    /** #14 摘要视图（10 键；渐进披露：列表只出 L1 摘要字段，完整契约走 #15）。 */
+    public record ToolSummaryVO(@JsonProperty("name") String name,
+                                @JsonProperty("version") String version,
+                                @JsonProperty("engine") String engine,
+                                @JsonProperty("category") String category,
+                                @JsonProperty("side_effect") String sideEffect,
+                                @JsonProperty("disclosure") String disclosure,
+                                @JsonProperty("toolset") String toolset,
+                                @JsonProperty("summary") String summary,
+                                @JsonProperty("status") String status,
+                                @JsonProperty("cost_class") String costClass) {
+
+        static ToolSummaryVO of(WAgentToolContractDO t) {
+            return new ToolSummaryVO(t.getName(), t.getVersion(), t.getEngine(), t.getCategory(),
+                    t.getSideEffect(), t.getDisclosure(), t.getToolset(), t.getSummary(),
+                    t.getStatus(), t.getCostClass());
+        }
+    }
+
+    /** #15 完整契约视图（28 键 = 摘要 10 + V236 受控列 18）。 */
+    public record ToolContractVO(@JsonProperty("name") String name,
+                                 @JsonProperty("version") String version,
+                                 @JsonProperty("engine") String engine,
+                                 @JsonProperty("category") String category,
+                                 @JsonProperty("side_effect") String sideEffect,
+                                 @JsonProperty("disclosure") String disclosure,
+                                 @JsonProperty("toolset") String toolset,
+                                 @JsonProperty("summary") String summary,
+                                 @JsonProperty("status") String status,
+                                 @JsonProperty("cost_class") String costClass,
+                                 @JsonProperty("tool_id") String toolId,
+                                 @JsonProperty("min_level") Integer minLevel,
+                                 @JsonProperty("required_permission") String requiredPermission,
+                                 @JsonProperty("input_schema_json") String inputSchemaJson,
+                                 @JsonProperty("output_schema_json") String outputSchemaJson,
+                                 @JsonProperty("timeout_ms") Integer timeoutMs,
+                                 @JsonProperty("retry_text") String retryText,
+                                 @JsonProperty("is_idempotent") Integer isIdempotent,
+                                 @JsonProperty("is_evidence_output") Integer isEvidenceOutput,
+                                 @JsonProperty("data_classification_text") String dataClassificationText,
+                                 @JsonProperty("rollback_plan_text") String rollbackPlanText,
+                                 @JsonProperty("endpoint_kind") String endpointKind,
+                                 @JsonProperty("endpoint_url") String endpointUrl,
+                                 @JsonProperty("endpoint_method") String endpointMethod,
+                                 @JsonProperty("owner") String owner,
+                                 @JsonProperty("sla_text") String slaText,
+                                 @JsonProperty("deprecated_by") String deprecatedBy,
+                                 @JsonProperty("capability_deps_text") String capabilityDepsText) {
+
+        public static ToolContractVO of(WAgentToolContractDO t) {
+            return new ToolContractVO(t.getName(), t.getVersion(), t.getEngine(), t.getCategory(),
+                    t.getSideEffect(), t.getDisclosure(), t.getToolset(), t.getSummary(),
+                    t.getStatus(), t.getCostClass(), t.getId(), t.getMinLevel(),
+                    t.getRequiredPermission(), t.getInputSchemaJson(), t.getOutputSchemaJson(),
+                    t.getTimeoutMs(), t.getRetryText(), t.getIsIdempotent(), t.getIsEvidenceOutput(),
+                    t.getDataClassificationText(), t.getRollbackPlanText(), t.getEndpointKind(),
+                    t.getEndpointUrl(), t.getEndpointMethod(), t.getOwner(), t.getSlaText(),
+                    t.getDeprecatedBy(), t.getCapabilityDepsText());
+        }
+
+        ToolDescriptionVO withPermissionFilter(String permissionFilter) {
+            return new ToolDescriptionVO(name, version, engine, category, sideEffect, disclosure,
+                    toolset, summary, status, costClass, toolId, minLevel, requiredPermission,
+                    inputSchemaJson, outputSchemaJson, timeoutMs, retryText, isIdempotent,
+                    isEvidenceOutput, dataClassificationText, rollbackPlanText, endpointKind,
+                    endpointUrl, endpointMethod, owner, slaText, deprecatedBy, capabilityDepsText,
+                    permissionFilter);
+        }
+    }
+
+    /** #14 列表响应（5 键）。 */
+    public record ToolSearchVO(@JsonProperty("tools") List<ToolSummaryVO> tools,
+                               @JsonProperty("total") int total,
+                               @JsonProperty("filtered_by_permission") int filteredByPermission,
+                               @JsonProperty("permission_filter") String permissionFilter,
+                               @JsonProperty("status_used") String statusUsed) {
+    }
+
+    /** #15 完整契约响应（28 键 + 尾部 permission_filter）。 */
+    public record ToolDescriptionVO(@JsonProperty("name") String name,
+                                    @JsonProperty("version") String version,
+                                    @JsonProperty("engine") String engine,
+                                    @JsonProperty("category") String category,
+                                    @JsonProperty("side_effect") String sideEffect,
+                                    @JsonProperty("disclosure") String disclosure,
+                                    @JsonProperty("toolset") String toolset,
+                                    @JsonProperty("summary") String summary,
+                                    @JsonProperty("status") String status,
+                                    @JsonProperty("cost_class") String costClass,
+                                    @JsonProperty("tool_id") String toolId,
+                                    @JsonProperty("min_level") Integer minLevel,
+                                    @JsonProperty("required_permission") String requiredPermission,
+                                    @JsonProperty("input_schema_json") String inputSchemaJson,
+                                    @JsonProperty("output_schema_json") String outputSchemaJson,
+                                    @JsonProperty("timeout_ms") Integer timeoutMs,
+                                    @JsonProperty("retry_text") String retryText,
+                                    @JsonProperty("is_idempotent") Integer isIdempotent,
+                                    @JsonProperty("is_evidence_output") Integer isEvidenceOutput,
+                                    @JsonProperty("data_classification_text") String dataClassificationText,
+                                    @JsonProperty("rollback_plan_text") String rollbackPlanText,
+                                    @JsonProperty("endpoint_kind") String endpointKind,
+                                    @JsonProperty("endpoint_url") String endpointUrl,
+                                    @JsonProperty("endpoint_method") String endpointMethod,
+                                    @JsonProperty("owner") String owner,
+                                    @JsonProperty("sla_text") String slaText,
+                                    @JsonProperty("deprecated_by") String deprecatedBy,
+                                    @JsonProperty("capability_deps_text") String capabilityDepsText,
+                                    @JsonProperty("permission_filter") String permissionFilter) {
+    }
+
     /** #14 列表（渐进披露入口：状态/披露形态/engine/toolset/keyword 收窄 + 本地权限地板过滤）。 */
     @GetMapping(WAgentApiPaths.TOOLS_COLLECTION)
-    public ApiResponse<Map<String, Object>> searchTools(
+    public ApiResponse<ToolSearchVO> searchTools(
             @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "engine", required = false) String engine,
             @RequestParam(value = "toolset", required = false) String toolset,
@@ -63,7 +172,7 @@ public class WAgentToolContractController {
         List<WAgentToolContractDO> base = selectBase(engine, toolset, disclosure, effectiveStatus);
 
         String kw = keyword == null ? null : keyword.trim().toLowerCase(Locale.ROOT);
-        List<Map<String, Object>> tools = new ArrayList<>();
+        List<ToolSummaryVO> tools = new ArrayList<>();
         int filteredByPermission = 0;
         for (WAgentToolContractDO t : base) {
             if (!effectiveStatus.equals(t.getStatus())) {
@@ -76,20 +185,15 @@ public class WAgentToolContractController {
                 filteredByPermission++;
                 continue;
             }
-            tools.add(summaryView(t));
+            tools.add(ToolSummaryVO.of(t));
         }
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("tools", tools);
-        data.put("total", tools.size());
-        data.put("filtered_by_permission", filteredByPermission);
-        data.put("permission_filter", PERMISSION_FILTER);
-        data.put("status_used", effectiveStatus);
-        return WAgentRunController.ok(data);
+        return WAgentRunController.ok(new ToolSearchVO(tools, tools.size(), filteredByPermission,
+                PERMISSION_FILTER, effectiveStatus));
     }
 
     /** #15 完整契约（name + version 闭合定位，uniq(name,version)）。 */
     @GetMapping(WAgentApiPaths.TOOL_BY_NAME)
-    public ApiResponse<Map<String, Object>> describeTool(
+    public ApiResponse<ToolDescriptionVO> describeTool(
             @PathVariable(WAgentApiPaths.P_NAME) String name,
             @RequestParam(value = "version", required = false) String version) {
         identityResolver.require();
@@ -97,9 +201,7 @@ public class WAgentToolContractController {
             throw WAgentOrchestrationException.validation("version 必填（契约按 name+version 闭合定位）");
         }
         WAgentToolContractDO tool = loadTool(name.trim(), version.trim());
-        Map<String, Object> data = contractView(tool);
-        data.put("permission_filter", PERMISSION_FILTER);
-        return WAgentRunController.ok(data);
+        return WAgentRunController.ok(ToolContractVO.of(tool).withPermissionFilter(PERMISSION_FILTER));
     }
 
     /** #16 契约测试五关——执行器未实现：存在性校验先行，随后如实 501。 */
@@ -167,51 +269,5 @@ public class WAgentToolContractController {
 
     private static boolean contains(String value, String kwLower) {
         return value != null && value.toLowerCase(Locale.ROOT).contains(kwLower);
-    }
-
-    /** #14 摘要视图（渐进披露：列表只出 L1 摘要字段，完整契约走 #15）。 */
-    static Map<String, Object> summaryView(WAgentToolContractDO t) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("name", t.getName());
-        m.put("version", t.getVersion());
-        m.put("engine", t.getEngine());
-        m.put("category", t.getCategory());
-        m.put("side_effect", t.getSideEffect());
-        m.put("disclosure", t.getDisclosure());
-        m.put("toolset", t.getToolset());
-        m.put("summary", t.getSummary());
-        m.put("status", t.getStatus());
-        m.put("cost_class", t.getCostClass());
-        return m;
-    }
-
-    /**
-     * #15 完整契约视图（V236 全受控列）。
-     *
-     * <p>公开投影单源：{@code GET /api/v1/wagent/tools/{name}} 与
-     * {@code GET /api/v1/agent/tools/{name}}（附录 A 第 21 条）共用本方法，
-     * 禁在旁路另写一套 17 要素字段表。</p>
-     */
-    public static Map<String, Object> contractView(WAgentToolContractDO t) {
-        Map<String, Object> m = new LinkedHashMap<>(summaryView(t));
-        m.put("tool_id", t.getId());
-        m.put("min_level", t.getMinLevel());
-        m.put("required_permission", t.getRequiredPermission());
-        m.put("input_schema_json", t.getInputSchemaJson());
-        m.put("output_schema_json", t.getOutputSchemaJson());
-        m.put("timeout_ms", t.getTimeoutMs());
-        m.put("retry_text", t.getRetryText());
-        m.put("is_idempotent", t.getIsIdempotent());
-        m.put("is_evidence_output", t.getIsEvidenceOutput());
-        m.put("data_classification_text", t.getDataClassificationText());
-        m.put("rollback_plan_text", t.getRollbackPlanText());
-        m.put("endpoint_kind", t.getEndpointKind());
-        m.put("endpoint_url", t.getEndpointUrl());
-        m.put("endpoint_method", t.getEndpointMethod());
-        m.put("owner", t.getOwner());
-        m.put("sla_text", t.getSlaText());
-        m.put("deprecated_by", t.getDeprecatedBy());
-        m.put("capability_deps_text", t.getCapabilityDepsText());
-        return m;
     }
 }

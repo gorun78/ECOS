@@ -86,7 +86,7 @@ public class AgentToolController {
      *   <li>执行面 {@code executionSchema} ← {@link ToolRegistry#get}（与 {@code GET /tools}、
      *       {@code /{name}/validate} 同一单源，决定该工具当前能否被派发）；</li>
      *   <li>契约面 {@code contract} ← {@code ecos_ai.ecos_wagent_tool_contract}（V236）。
-     *       17 要素投影复用 {@link WAgentToolContractController#contractView}，
+     *       17 要素投影复用 {@link WAgentToolContractController.ToolContractVO}，
      *       与 {@code GET /api/v1/wagent/tools/{name}} 同源；<b>禁</b>由 {@link ToolSchema}
      *       反推 17 要素——超时/幂等/回滚/密级等列在 Schema 上无载体，补全是编造。</li>
      * </ul>
@@ -115,7 +115,8 @@ public class AgentToolController {
         data.put("name", toolName);
         data.put("registered", schema != null);
         data.put("executionSchema", schema == null ? null : executionView(schema));
-        data.put("contract", contract == null ? null : WAgentToolContractController.contractView(contract));
+        data.put("contract", contract == null ? null
+                : WAgentToolContractController.ToolContractVO.of(contract));
         data.put("version", contract == null ? null : contract.getVersion());
         data.put("sources", Map.of(
                 "execution", "engine.ai.service.ToolRegistry",

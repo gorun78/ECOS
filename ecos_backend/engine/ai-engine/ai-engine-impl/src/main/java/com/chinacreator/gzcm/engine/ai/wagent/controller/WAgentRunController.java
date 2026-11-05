@@ -261,12 +261,7 @@ public class WAgentRunController {
         return prefer != null && prefer.toLowerCase(Locale.ROOT).contains(PREFER_RESPOND_ASYNC);
     }
 
-    /** 弱类型载荷版（历史入口，供尚未强类型化的端点如 ToolContract 复用；随其分批一并清退）。 */
-    static ApiResponse<Map<String, Object>> ok(Map<String, Object> data) {
-        return ApiResponse.success(data).withTraceId(AiTraceSupport.currentTraceId());
-    }
-
-    /** 强类型载荷版（#147CN）：与 Map 版同语义（仅多带 traceId），供已去 Map 的端点复用。 */
+    /** 强类型载荷版（#147CN）：与 Map 版同语义（仅多带 traceId），供各端点复用。 */
     static <T> ApiResponse<T> ok(T data) {
         return ApiResponse.success(data).withTraceId(AiTraceSupport.currentTraceId());
     }
