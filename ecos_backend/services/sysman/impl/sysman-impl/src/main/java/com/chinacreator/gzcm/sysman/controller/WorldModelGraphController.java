@@ -3,6 +3,13 @@ package com.chinacreator.gzcm.sysman.controller;
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.sysman.controller.model.CausalLinkEntity;
 import com.chinacreator.gzcm.sysman.controller.model.GoalEntity;
+import com.chinacreator.gzcm.sysman.controller.model.WorldModelCausalEdgeVO;
+import com.chinacreator.gzcm.sysman.controller.model.WorldModelCausalGraphVO;
+import com.chinacreator.gzcm.sysman.controller.model.WorldModelCausalNodeVO;
+import com.chinacreator.gzcm.sysman.controller.model.WorldModelDeleteGoalVO;
+import com.chinacreator.gzcm.sysman.controller.model.WorldModelDeleteLinkVO;
+import com.chinacreator.gzcm.sysman.controller.model.WorldModelGoalVO;
+import com.chinacreator.gzcm.sysman.controller.model.WorldModelListVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -89,20 +96,10 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
 
     /** 从 DB 读取目标列表，DB 不可用时回退内存 */
     @GetMapping("/goals")
-    public ApiResponse<Map<String, Object>> listGoals() {
+    public ApiResponse<WorldModelListVO<WorldModelGoalVO>> listGoals() {
         try {
-            List<Map<String, Object>> data;
-            if (dbAvailable()) {
-                data = queryGoalsFromDB();
-            } else {
-                data = goalStore.values().stream()
-                    .map(this::goalToMap)
-                    .collect(Collectors.toList());
-            }
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("data", data);
-            result.put("total", data.size());
-            return ApiResponse.success(result);
+            List<WorldModelGoalVO> data = loadGoals();
+            return ApiResponse.success(new WorldModelListVO<>(data, data.size()));
         } catch (Exception e) {
             log.error("查询目标列表失败", e);
             return ApiResponse.internalError("查询失败");
@@ -110,25 +107,17 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
     }
 
     @GetMapping("/goals/tree")
-    public ApiResponse<List<Map<String, Object>>> goalTree() {
+    public ApiResponse<List<WorldModelGoalVO>> goalTree() {
         try {
-            List<Map<String, Object>> all;
-            if (dbAvailable()) {
-                all = queryGoalsFromDB();
-            } else {
-                all = goalStore.values().stream()
-                    .map(this::goalToMap)
-                    .collect(Collectors.toList());
+            List<WorldModelGoalVO> all = loadGoals();
+            // 构建树形结构（父键与 id 均为两源原始值，Long / String 各自相等即挂接）
+            Map<Object, List<WorldModelGoalVO>> childrenMap = new LinkedHashMap<>();
+            for (WorldModelGoalVO g : all) {
+                childrenMap.computeIfAbsent(g.parentId(), k -> new ArrayList<>()).add(g);
             }
-            // 构建树形结构
-            Map<Object, List<Map<String, Object>>> childrenMap = new LinkedHashMap<>();
-            for (Map<String, Object> g : all) {
-                Object parentId = g.get("parentId");
-                childrenMap.computeIfAbsent(parentId, k -> new ArrayList<>()).add(g);
-            }
-            List<Map<String, Object>> roots = childrenMap.getOrDefault(null, List.of());
-            for (Map<String, Object> root : roots) {
-                attachChildren(root, childrenMap);
+            List<WorldModelGoalVO> roots = new ArrayList<>();
+            for (WorldModelGoalVO root : childrenMap.getOrDefault(null, List.of())) {
+                roots.add(attachChildren(root, childrenMap));
             }
             return ApiResponse.success(roots);
         } catch (Exception e) {
@@ -137,46 +126,33 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
         }
     }
 
-    private void attachChildren(Map<String, Object> node, Map<Object, List<Map<String, Object>>> childrenMap) {
-        Object nodeId = node.get("id");
-        List<Map<String, Object>> children = childrenMap.get(nodeId);
-        if (children != null) {
-            node.put("children", new ArrayList<>(children));
-            for (Map<String, Object> child : children) {
-                attachChildren(child, childrenMap);
-            }
+    private WorldModelGoalVO attachChildren(WorldModelGoalVO node,
+                                            Map<Object, List<WorldModelGoalVO>> childrenMap) {
+        List<WorldModelGoalVO> children = childrenMap.get(node.id());
+        if (children == null || children.isEmpty()) {
+            return node;
         }
+        List<WorldModelGoalVO> attached = new ArrayList<>(children.size());
+        for (WorldModelGoalVO child : children) {
+            attached.add(attachChildren(child, childrenMap));
+        }
+        return node.withChildren(attached);
     }
 
-    private List<Map<String, Object>> queryGoalsFromDB() {
-        return worldModelGraphQueryService.listGoals();
+    /** DB 行 → 强类型目标行（行值为两源原始类型，见 {@link WorldModelGoalVO} 头注）。 */
+    private List<WorldModelGoalVO> queryGoalsAsVo() {
+        return worldModelGraphQueryService.listGoals().stream()
+                .map(WorldModelGoalVO::ofRow)
+                .collect(Collectors.toList());
     }
 
-    private Map<String, Object> goalToMap(GoalEntity g) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", g.getId());
-        m.put("name", g.getName());
-        m.put("description", g.getDescription());
-        m.put("parentId", g.getParentId());
-        m.put("progress", g.getProgress());
-        m.put("status", g.getStatus());
-        m.put("goalType", g.getGoalType());
-        m.put("weight", g.getWeight());
-        m.put("orgId", g.getOrgId());
-        m.put("ownerUserId", g.getOwnerUserId());
-        m.put("startDate", g.getStartDate());
-        m.put("endDate", g.getEndDate());
-        m.put("targetValue", g.getTargetValue());
-        m.put("currentValue", g.getCurrentValue());
-        m.put("unit", g.getUnit());
-        m.put("linkedWorkflowId", g.getLinkedWorkflowId());
-        m.put("kpiFormula", g.getKpiFormula());
-        m.put("measureFrequency", g.getMeasureFrequency());
-        m.put("alertThresholdWarn", g.getAlertThresholdWarn());
-        m.put("alertThresholdCritical", g.getAlertThresholdCritical());
-        m.put("createdAt", g.getCreatedAt());
-        m.put("updatedAt", g.getUpdatedAt());
-        return m;
+    private List<WorldModelGoalVO> loadGoals() {
+        if (dbAvailable()) {
+            return queryGoalsAsVo();
+        }
+        return goalStore.values().stream()
+                .map(WorldModelGoalVO::ofEntity)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/goals/{id}")
@@ -248,7 +224,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
     }
 
     @DeleteMapping("/goals/{id}")
-    public ApiResponse<?> deleteGoal(@PathVariable String id) {
+    public ApiResponse<WorldModelDeleteGoalVO> deleteGoal(@PathVariable String id) {
         try {
             GoalEntity removed = goalStore.remove(id);
             if (removed == null) {
@@ -261,11 +237,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
             linksToRemove.forEach(linkStore::remove);
             log.info("目标删除成功, id={}, name={}, 级联删除 {} 条因果链",
                     id, removed.getName(), linksToRemove.size());
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("success", true);
-            result.put("id", id);
-            result.put("cascadedLinksRemoved", linksToRemove.size());
-            return ApiResponse.success(result);
+            return ApiResponse.success(new WorldModelDeleteGoalVO(true, id, linksToRemove.size()));
         } catch (Exception e) {
             log.error("删除目标失败, id={}", id, e);
             return ApiResponse.internalError("删除失败");
@@ -277,13 +249,10 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
     // ═══════════════════════════════════════════════════════
 
     @GetMapping("/links")
-    public ApiResponse<Map<String, Object>> listLinks() {
+    public ApiResponse<WorldModelListVO<CausalLinkEntity>> listLinks() {
         try {
             List<CausalLinkEntity> all = new ArrayList<>(linkStore.values());
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("data", all);
-            result.put("total", all.size());
-            return ApiResponse.success(result);
+            return ApiResponse.success(new WorldModelListVO<>(all, all.size()));
         } catch (Exception e) {
             log.error("查询因果链列表失败", e);
             return ApiResponse.internalError("查询失败");
@@ -294,37 +263,29 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
      * 因果图 — 从 PostgreSQL 构建 nodes + edges
      */
     @GetMapping("/causal-graph")
-    public ApiResponse<Map<String, Object>> causalGraph() {
+    public ApiResponse<WorldModelCausalGraphVO> causalGraph() {
         try {
-            List<Map<String, Object>> nodes;
-            List<Map<String, Object>> edges;
+            List<WorldModelCausalNodeVO> nodes;
+            List<WorldModelCausalEdgeVO> edges;
             if (dbAvailable()) {
-                nodes = worldModelGraphQueryService.listCausalGraphNodes();
-                edges = worldModelGraphQueryService.listCausalGraphEdges();
+                nodes = worldModelGraphQueryService.listCausalGraphNodes().stream()
+                        .map(WorldModelCausalNodeVO::ofRow)
+                        .collect(Collectors.toList());
+                edges = worldModelGraphQueryService.listCausalGraphEdges().stream()
+                        .map(WorldModelCausalEdgeVO::ofRow)
+                        .collect(Collectors.toList());
             } else {
-                nodes = goalStore.values().stream().map(g -> {
-                    Map<String, Object> n = new LinkedHashMap<>();
-                    n.put("id", g.getId());
-                    n.put("label", g.getName());
-                    n.put("description", g.getDescription());
-                    n.put("status", g.getStatus());
-                    return n;
-                }).collect(Collectors.toList());
-                edges = linkStore.values().stream().map(l -> {
-                    Map<String, Object> e = new LinkedHashMap<>();
-                    e.put("id", l.getId());
-                    e.put("source", l.getSourceGoalId());
-                    e.put("target", l.getTargetGoalId());
-                    e.put("label", l.getLabel());
-                    return e;
-                }).collect(Collectors.toList());
+                nodes = goalStore.values().stream()
+                        .map(g -> new WorldModelCausalNodeVO(
+                                g.getId(), g.getName(), g.getDescription(), g.getStatus(), null))
+                        .collect(Collectors.toList());
+                edges = linkStore.values().stream()
+                        .map(l -> new WorldModelCausalEdgeVO(
+                                l.getId(), l.getSourceGoalId(), l.getTargetGoalId(), l.getLabel(), null))
+                        .collect(Collectors.toList());
             }
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("nodes", nodes);
-            result.put("edges", edges);
-            result.put("nodeCount", nodes.size());
-            result.put("edgeCount", edges.size());
-            return ApiResponse.success(result);
+            return ApiResponse.success(new WorldModelCausalGraphVO(
+                    nodes, edges, nodes.size(), edges.size()));
         } catch (Exception e) {
             log.error("构建因果图失败", e);
             return ApiResponse.internalError("构建因果图失败");
@@ -384,7 +345,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
     }
 
     @DeleteMapping("/links/{id}")
-    public ApiResponse<?> deleteLink(@PathVariable String id) {
+    public ApiResponse<WorldModelDeleteLinkVO> deleteLink(@PathVariable String id) {
         try {
             CausalLinkEntity removed = linkStore.remove(id);
             if (removed == null) {
@@ -392,10 +353,7 @@ private static final Logger log = LoggerFactory.getLogger(WorldModelGraphControl
             }
             log.info("因果链删除成功, id={}, {} → {}",
                     id, removed.getSourceGoalId(), removed.getTargetGoalId());
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("success", true);
-            result.put("id", id);
-            return ApiResponse.success(result);
+            return ApiResponse.success(new WorldModelDeleteLinkVO(true, id));
         } catch (Exception e) {
             log.error("删除因果链失败, id={}", id, e);
             return ApiResponse.internalError("删除失败");
