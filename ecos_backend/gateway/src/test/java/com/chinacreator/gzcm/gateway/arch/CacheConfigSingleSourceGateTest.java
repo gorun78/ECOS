@@ -63,8 +63,8 @@ class CacheConfigSingleSourceGateTest {
     /** 合法配置键形态：点分或下划线，无空格。 */
     private static final Pattern KEY_SHAPE = Pattern.compile("[A-Za-z0-9_.\\-]+");
 
-    /** 资源面命中下限（防扫描根漂移把门变成空转）。#147EM 清退两枚幻影键后 HEAD 实测 = 9。 */
-    private static final int MIN_RESOURCE_HITS = 9;
+    /** 资源面命中下限（防扫描根漂移把门变成空转）。#147EU 清退 ontology-defaults 后 HEAD 实测 = 8。 */
+    private static final int MIN_RESOURCE_HITS = 8;
     /** main java 文件扫描下限。#147Z-2 HEAD 实测 = 2483 枚。 */
     private static final int MIN_MAIN_JAVA_FILES = 2000;
     /** 底座属主去重命中数（只减不增）。#147Z-2 HEAD 实测 = 9。 */
@@ -111,11 +111,12 @@ class CacheConfigSingleSourceGateTest {
                 "DC-3 违例存量：sysman 字典种子里的同一键（与上两条同族）。清退=随引擎侧一并删行。");
         m.put("B|ecos_backend/services/sysman/impl/sysman-impl/src/main/java/com/chinacreator/gzcm/sysman/config/service/impl/SysConfigService.java|dw.lineage.cache_ttl_minutes",
                 "DC-3 违例存量：同上。");
-        m.put("A|ecos_backend/engine/ontology-engine/ontology-engine-impl/src/main/resources/ontology-defaults.yml|ontology.cache.ttl_seconds|300",
-                "DC-3 违例存量 + 原判据盲区实锤：非 application*.yml，#147BN 的扫描面从未包含本文件。");
         // —— 自建缓存直读环境变量/系统属性：已清退（DC-3 #147EP 删除 security 两个
         //    内存缓存的 System property/环境变量 TTL 自读，改由装配方注入；该链未承流，
         //    无运行时消费方受影响，白名单同步 −4）——
+        // —— ontology-defaults.yml 的 cache.ttl_seconds：已清退（DC-3 #147EU）。该文件
+        //    全仓无 spring.config.import / @PropertySource / 属主绑定，键本身零读取方；
+        //    删除后引擎缓存 TTL 不存在第二来源，白名单同步 −1、资源面下限 9 → 8）——
         // —— 幻影键：已清退（DC-3 #147EM 删除网关 `profile.cache-enabled/cache-ttl-minutes`，
         //    全仓无 profile 前缀绑定、属主默认值在 LLMGatewayProperties(llm.*)，删后白名单同步 −2）——
         // —— ORM 二级缓存开关：框架自身开关，不属 R8 知识缓存底座作用域，但必须同值同批 ——
