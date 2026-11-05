@@ -1,7 +1,6 @@
 package com.chinacreator.gzcm.engine.ai.controller;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +18,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.engine.ai.config.AgentConfigService;
+import com.chinacreator.gzcm.engine.ai.config.AgentConfigService.AgentRow;
+import com.chinacreator.gzcm.engine.ai.config.AgentConfigService.AgentTestResponse;
+import com.chinacreator.gzcm.engine.ai.config.AgentConfigService.PromptVersionRow;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Agent Builder REST API — Agent 配置 CRUD + 工具/知识库绑定 + 测试
@@ -34,6 +38,9 @@ import com.chinacreator.gzcm.engine.ai.config.AgentConfigService;
  * GET    /api/v1/agents/{id}/prompts   — Prompt 版本列表
  * POST   /api/v1/agents/{id}/test      — 测试 Agent 对话
  * </pre>
+ *
+ * <p><b>#147DA 载体</b>：列表/详情/回执/模型/Prompt 模板全部改 record；请求体仍为自由 Map
+ * （创建/更新字段按 {@code containsKey}/{@code getOrDefault} 语义透传）。</p>
  */
 @RestController
 @RequestMapping("/api/v1/agents")
@@ -47,40 +54,63 @@ public class AgentConfigController {
         this.agentConfigService = agentConfigService;
     }
 
-    // ═══════════════ 列表 ═══════════════════
-
-    @GetMapping
-    public ApiResponse<Map<String, Object>> listAgents(
-            @RequestParam(defaultValue = "100") int pageSize) {
-        List<Map<String, Object>> list = agentConfigService.listAgents(pageSize);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("data", list);
-        result.put("total", agentConfigService.totalCount());
-        return ApiResponse.success(result);
+    /** 列表响应（2 键：data/total）。 */
+    public record AgentListVO(@JsonProperty("data") List<AgentRow> data,
+                              @JsonProperty("total") long total) {
     }
 
-    // ═══════════════ 详情 ═══════════════════
+    /** 删除回执（1 键）。 */
+    public record DeleteResultVO(@JsonProperty("success") boolean success) {
+    }
+
+    /** 模型条目（3 键）。 */
+    public record ModelVO(@JsonProperty("id") String id,
+                          @JsonProperty("name") String name,
+                          @JsonProperty("provider") String provider) {
+    }
+
+    /** Prompt 模板条目（{@code agentId} 仅来自 Agent 汇总时出现）。 */
+    public record PromptTemplateVO(@JsonProperty("id") String id,
+                                   @JsonProperty("title") String title,
+                                   @JsonProperty("filename") String filename,
+                                   @JsonProperty("content") String content,
+                                   @JsonProperty("version") String version,
+                                   @JsonProperty("category") String category,
+                                   @JsonInclude(JsonInclude.Include.NON_NULL)
+                                   @JsonProperty("agentId") String agentId) {
+    }
+
+    // ═══════════════ 列表 ═══════════════
+
+    @GetMapping
+    public ApiResponse<AgentListVO> listAgents(
+            @RequestParam(defaultValue = "100") int pageSize) {
+        List<AgentRow> list = agentConfigService.listAgents(pageSize);
+        return ApiResponse.success(new AgentListVO(list, agentConfigService.totalCount()));
+    }
+
+    // ═══════════════ 详情 ═══════════════
 
     @GetMapping("/{id}")
-    public ApiResponse<Map<String, Object>> getAgent(@PathVariable String id) {
+    public ApiResponse<AgentRow> getAgent(@PathVariable String id) {
         return agentConfigService.getAgent(id)
             .map(ApiResponse::success)
             .orElseGet(() -> ApiResponse.notFound("Agent " + id + " 不存在"));
     }
 
-    // ═══════════════ 创建 ═══════════════════
+    // ═══════════════ 创建 ═══════════════
 
     @PostMapping
-    public ApiResponse<Map<String, Object>> createAgent(@RequestBody Map<String, Object> body) {
-        Map<String, Object> agent = agentConfigService.createAgent(body);
-        log.info("Agent created via DB: {} [{}]", agent.get("id"), agent.get("name"));
+    public ApiResponse<AgentRow> createAgent(@RequestBody Map<String, Object> body) {
+        AgentRow agent = agentConfigService.createAgent(body);
+        log.info("Agent created via DB: {} [{}]", agent.id(), agent.name());
         return ApiResponse.success(agent);
     }
 
-    // ═══════════════ 更新 ═══════════════════
+    // ═══════════════ 更新 ═══════════════
 
     @PutMapping("/{id}")
-    public ApiResponse<Map<String, Object>> updateAgent(
+    public ApiResponse<AgentRow> updateAgent(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
         return agentConfigService.updateAgent(id, body)
@@ -88,23 +118,21 @@ public class AgentConfigController {
             .orElseGet(() -> ApiResponse.notFound("Agent " + id + " 不存在"));
     }
 
-    // ═══════════════ 删除 ═══════════════════
+    // ═══════════════ 删除 ═══════════════
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Map<String, Object>> deleteAgent(@PathVariable String id) {
+    public ApiResponse<DeleteResultVO> deleteAgent(@PathVariable String id) {
         if (agentConfigService.deleteAgent(id)) {
             log.info("Agent deleted: {}", id);
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("success", true);
-            return ApiResponse.success(result);
+            return ApiResponse.success(new DeleteResultVO(true));
         }
         return ApiResponse.notFound("Agent " + id + " 不存在");
     }
 
-    // ═══════════════ 工具绑定 ═══════════════════
+    // ═══════════════ 工具绑定 ═══════════════
 
     @PutMapping("/{id}/tools")
-    public ApiResponse<Map<String, Object>> bindTools(
+    public ApiResponse<AgentRow> bindTools(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
         return agentConfigService.bindTools(id, body.getOrDefault("tools", List.of()))
@@ -112,10 +140,10 @@ public class AgentConfigController {
             .orElseGet(() -> ApiResponse.notFound("Agent " + id + " 不存在"));
     }
 
-    // ═══════════════ 知识库绑定 ═══════════════════
+    // ═══════════════ 知识库绑定 ═══════════════
 
     @PutMapping("/{id}/knowledge")
-    public ApiResponse<Map<String, Object>> bindKnowledge(
+    public ApiResponse<AgentRow> bindKnowledge(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
         return agentConfigService.bindKnowledge(id, body.getOrDefault("knowledge", List.of()))
@@ -123,84 +151,69 @@ public class AgentConfigController {
             .orElseGet(() -> ApiResponse.notFound("Agent " + id + " 不存在"));
     }
 
-    // ═══════════════ Prompt 版本列表 ═══════════════════
+    // ═══════════════ Prompt 版本列表 ═══════════════
 
     @GetMapping("/{id}/prompts")
-    public ApiResponse<List<Map<String, Object>>> listPromptVersions(@PathVariable String id) {
+    public ApiResponse<List<PromptVersionRow>> listPromptVersions(@PathVariable String id) {
         if (agentConfigService.getAgent(id).isEmpty()) {
             return ApiResponse.notFound("Agent " + id + " 不存在");
         }
         return ApiResponse.success(agentConfigService.listPromptVersions(id));
     }
 
-    // ═══════════════ 测试 ═══════════════════
+    // ═══════════════ 测试 ═══════════════
 
     @PostMapping("/{id}/test")
-    public ApiResponse<Map<String, Object>> testAgent(
+    public ApiResponse<AgentTestResponse> testAgent(
             @PathVariable String id,
             @RequestBody Map<String, Object> body) {
         if (agentConfigService.getAgent(id).isEmpty()) {
             return ApiResponse.notFound("Agent " + id + " 不存在");
         }
-        Map<String, Object> result = agentConfigService.testAgent(id, body);
+        AgentTestResponse result = agentConfigService.testAgent(id, body);
         log.info("Agent test completed: {}", id);
         return ApiResponse.success(result);
     }
 
-    // ═══════════════ 模型列表 ═══════════════════
+    // ═══════════════ 模型列表 ═══════════════
 
     /** GET /api/v1/agents/models — 返回可用 LLM 模型列表 */
     @GetMapping("/models")
-    public ApiResponse<List<Map<String, Object>>> listModels() {
-        List<Map<String, Object>> models = new ArrayList<>();
-        models.add(Map.of("id", "deepseek-v4-pro", "name", "DeepSeek V4 Pro", "provider", "deepseek"));
-        models.add(Map.of("id", "deepseek-v4-flash", "name", "DeepSeek V4 Flash", "provider", "deepseek"));
-        models.add(Map.of("id", "gpt-4o", "name", "GPT-4o", "provider", "openai"));
-        models.add(Map.of("id", "claude-sonnet-4", "name", "Claude Sonnet 4", "provider", "anthropic"));
+    public ApiResponse<List<ModelVO>> listModels() {
+        List<ModelVO> models = new ArrayList<>();
+        models.add(new ModelVO("deepseek-v4-pro", "DeepSeek V4 Pro", "deepseek"));
+        models.add(new ModelVO("deepseek-v4-flash", "DeepSeek V4 Flash", "deepseek"));
+        models.add(new ModelVO("gpt-4o", "GPT-4o", "openai"));
+        models.add(new ModelVO("claude-sonnet-4", "Claude Sonnet 4", "anthropic"));
         return ApiResponse.success(models);
     }
 
-    // ═══════════════ 全局 Prompt 列表 ═══════════════════
+    // ═══════════════ 全局 Prompt 列表 ═══════════════
 
     /** GET /api/v1/agents/prompts — 返回所有 Agent 的 Prompt 模板汇总 */
     @GetMapping("/prompts")
-    public ApiResponse<List<Map<String, Object>>> listAllPrompts() {
-        List<Map<String, Object>> prompts = new ArrayList<>();
+    public ApiResponse<List<PromptTemplateVO>> listAllPrompts() {
+        List<PromptTemplateVO> prompts = new ArrayList<>();
         // 从所有 agent 收集 prompt 版本
-        List<Map<String, Object>> agents = agentConfigService.listAgents(100);
-        for (Map<String, Object> agent : agents) {
-            String agentId = (String) agent.get("id");
-            List<Map<String, Object>> versions = agentConfigService.listPromptVersions(agentId);
-            for (Map<String, Object> v : versions) {
-                Map<String, Object> p = new LinkedHashMap<>();
-                p.put("id", v.getOrDefault("id", ""));
-                p.put("title", v.getOrDefault("name", v.getOrDefault("title", "")));
-                p.put("filename", agent.get("name") + "-v" + v.getOrDefault("version", "1.0") + ".md");
-                p.put("content", v.getOrDefault("template", v.getOrDefault("content", "")));
-                p.put("version", v.getOrDefault("version", "1.0"));
-                p.put("category", v.getOrDefault("category", "planning"));
-                p.put("agentId", agentId);
-                prompts.add(p);
+        List<AgentRow> agents = agentConfigService.listAgents(100);
+        for (AgentRow agent : agents) {
+            List<PromptVersionRow> versions = agentConfigService.listPromptVersions(agent.id());
+            for (PromptVersionRow v : versions) {
+                prompts.add(new PromptTemplateVO("", "",
+                        agent.name() + "-v" + v.version() + ".md",
+                        v.content(), v.version(), "planning", agent.id()));
             }
         }
         // 如果没有 Prompt，返回硬编码默认值
         if (prompts.isEmpty()) {
-            prompts.add(Map.of(
-                "id", "default-planning",
-                "title", "Planning Prompt",
-                "filename", "planning-v1.0.md",
-                "content", "You are an enterprise AI agent. Analyze the following situation and provide a structured plan.",
-                "version", "1.0",
-                "category", "planning"
-            ));
-            prompts.add(Map.of(
-                "id", "default-diagnostic",
-                "title", "Diagnostic Prompt",
-                "filename", "diagnostic-v1.0.md",
-                "content", "You are a diagnostic expert. Identify root causes and recommend actionable solutions.",
-                "version", "1.0",
-                "category", "diagnostic"
-            ));
+            prompts.add(new PromptTemplateVO("default-planning", "Planning Prompt",
+                    "planning-v1.0.md",
+                    "You are an enterprise AI agent. Analyze the following situation and provide a structured plan.",
+                    "1.0", "planning", null));
+            prompts.add(new PromptTemplateVO("default-diagnostic", "Diagnostic Prompt",
+                    "diagnostic-v1.0.md",
+                    "You are a diagnostic expert. Identify root causes and recommend actionable solutions.",
+                    "1.0", "diagnostic", null));
         }
         return ApiResponse.success(prompts);
     }

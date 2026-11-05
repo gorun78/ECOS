@@ -19,14 +19,17 @@ import com.chinacreator.gzcm.runtime.llm.LLMGatewayService;
 import com.chinacreator.gzcm.runtime.llm.model.ProfileConfig;
 import com.chinacreator.gzcm.runtime.llm.repository.ProfileConfigRepository;
 import com.chinacreator.gzcm.runtime.llm.scheduler.AgentResult;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * Agent 配置业务服务 — 将 Entity 转为 Map 返回给 Controller
- * <p>
- * 遵循 WorkflowService / OntologyService 模式，提供 Agent 配置 CRUD 业务逻辑。
- * </p>
+ * Agent 配置业务服务 — 将 Entity 转为强类型行/回执返回给 Controller。
+ *
+ * <p><b>#147DA 行面强类型</b>：列表行 10 键、Prompt 版本行 3 键、测试回执（三种分态并集，
+ * 条件键由属性级 NON_NULL 保持）改 record。请求体仍为自由 Map——创建/更新字段按
+ * {@code containsKey}/{@code getOrDefault} 语义透传，属调用方定义面。</p>
  */
 @Service
 public class AgentConfigService {
@@ -51,6 +54,47 @@ public class AgentConfigService {
         this.objectMapper = objectMapper;
     }
 
+    /** Agent 行（10 键；tools/knowledge 为 JSON 数组还原后的字符串列表）。 */
+    public record AgentRow(@JsonProperty("id") String id,
+                           @JsonProperty("name") String name,
+                           @JsonProperty("modelProvider") String modelProvider,
+                           @JsonProperty("modelName") String modelName,
+                           @JsonProperty("systemPrompt") String systemPrompt,
+                           @JsonProperty("tools") List<String> tools,
+                           @JsonProperty("knowledge") List<String> knowledge,
+                           @JsonProperty("status") String status,
+                           @JsonProperty("createdAt") String createdAt,
+                           @JsonProperty("updatedAt") String updatedAt) {
+    }
+
+    /** Prompt 版本行（3 键）。 */
+    public record PromptVersionRow(@JsonProperty("version") String version,
+                                   @JsonProperty("content") String content,
+                                   @JsonProperty("createdAt") String createdAt) {
+    }
+
+    /**
+     * Agent 测试回执（三态并集：成功 9~10 键 / 依赖不可用 4 键 / 执行失败 5 键；
+     * 条件键由属性级 NON_NULL 省略，键序与旧 Map 各分态一致）。
+     */
+    public record AgentTestResponse(@JsonProperty("agentId") String agentId,
+                                    @JsonInclude(JsonInclude.Include.NON_NULL)
+                                    @JsonProperty("sessionId") String sessionId,
+                                    @JsonProperty("status") String status,
+                                    @JsonInclude(JsonInclude.Include.NON_NULL)
+                                    @JsonProperty("success") Boolean success,
+                                    @JsonProperty("message") String message,
+                                    @JsonProperty("response") String response,
+                                    @JsonInclude(JsonInclude.Include.NON_NULL)
+                                    @JsonProperty("tokensInput") Integer tokensInput,
+                                    @JsonInclude(JsonInclude.Include.NON_NULL)
+                                    @JsonProperty("tokensOutput") Integer tokensOutput,
+                                    @JsonInclude(JsonInclude.Include.NON_NULL)
+                                    @JsonProperty("durationMs") Long durationMs,
+                                    @JsonInclude(JsonInclude.Include.NON_NULL)
+                                    @JsonProperty("errorMsg") String errorMsg) {
+    }
+
     private String nextId() {
         return "agent-" + ID_SEQ.incrementAndGet();
     }
@@ -58,9 +102,9 @@ public class AgentConfigService {
     /**
      * 列出所有 Agent（默认 100 条）
      */
-    public List<Map<String, Object>> listAgents(int pageSize) {
+    public List<AgentRow> listAgents(int pageSize) {
         return repository.findAll(pageSize).stream()
-            .map(this::toMap)
+            .map(this::toRow)
             .toList();
     }
 
@@ -71,14 +115,14 @@ public class AgentConfigService {
     /**
      * 按 ID 获取 Agent 详情
      */
-    public Optional<Map<String, Object>> getAgent(String id) {
-        return repository.findById(id).map(this::toMap);
+    public Optional<AgentRow> getAgent(String id) {
+        return repository.findById(id).map(this::toRow);
     }
 
     /**
      * 创建 Agent
      */
-    public Map<String, Object> createAgent(Map<String, Object> body) {
+    public AgentRow createAgent(Map<String, Object> body) {
         AgentEntity entity = new AgentEntity();
         String id = nextId();
         entity.setId(id);
@@ -91,13 +135,13 @@ public class AgentConfigService {
         entity.setStatus("draft");
         repository.insert(entity);
         log.info("Agent created: {} [{}]", id, entity.getName());
-        return toMap(entity);
+        return toRow(entity);
     }
 
     /**
      * 更新 Agent
      */
-    public Optional<Map<String, Object>> updateAgent(String id, Map<String, Object> body) {
+    public Optional<AgentRow> updateAgent(String id, Map<String, Object> body) {
         Optional<AgentEntity> existing = repository.findById(id);
         if (existing.isEmpty()) return Optional.empty();
 
@@ -110,40 +154,40 @@ public class AgentConfigService {
         String status = body.containsKey("status") ? String.valueOf(body.get("status")) : null;
 
         repository.update(id, name, modelProvider, modelName, systemPrompt, tools, knowledge, status);
-        return repository.findById(id).map(this::toMap);
+        return repository.findById(id).map(this::toRow);
     }
 
     /**
      * 绑定工具列表
      */
-    public Optional<Map<String, Object>> bindTools(String id, Object toolsObj) {
+    public Optional<AgentRow> bindTools(String id, Object toolsObj) {
         Optional<AgentEntity> existing = repository.findById(id);
         if (existing.isEmpty()) return Optional.empty();
         String toolsJson = toJsonString(toolsObj);
         repository.updateTools(id, toolsJson);
-        return repository.findById(id).map(this::toMap);
+        return repository.findById(id).map(this::toRow);
     }
 
     /**
      * 绑定知识库
      */
-    public Optional<Map<String, Object>> bindKnowledge(String id, Object knowledgeObj) {
+    public Optional<AgentRow> bindKnowledge(String id, Object knowledgeObj) {
         Optional<AgentEntity> existing = repository.findById(id);
         if (existing.isEmpty()) return Optional.empty();
         String knowledgeJson = toJsonString(knowledgeObj);
         repository.updateKnowledge(id, knowledgeJson);
-        return repository.findById(id).map(this::toMap);
+        return repository.findById(id).map(this::toRow);
     }
 
     /**
      * 发布 Agent
      */
-    public Optional<Map<String, Object>> publishAgent(String id) {
+    public Optional<AgentRow> publishAgent(String id) {
         Optional<AgentEntity> existing = repository.findById(id);
         if (existing.isEmpty()) return Optional.empty();
         repository.publish(id);
         log.info("Agent published: {}", id);
-        return repository.findById(id).map(this::toMap);
+        return repository.findById(id).map(this::toRow);
     }
 
     /**
@@ -162,7 +206,7 @@ public class AgentConfigService {
      * 4. 清理临时 Profile
      * </p>
      */
-    public Map<String, Object> testAgent(String id, Map<String, Object> body) {
+    public AgentTestResponse testAgent(String id, Map<String, Object> body) {
         // 1. 获取 Agent 实体
         AgentEntity agent = repository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Agent " + id + " 不存在"));
@@ -172,12 +216,9 @@ public class AgentConfigService {
 
         // 2. 如果 LLMGatewayService 不可用，返回降级信息
         if (llmGatewayService == null || profileConfigRepository == null) {
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("agentId", id);
-            result.put("status", "unavailable");
-            result.put("message", message);
-            result.put("response", "Hermes 引擎未就绪，无法执行测试。请确认 hermes-engine 服务已正确配置。");
-            return result;
+            return new AgentTestResponse(id, null, "unavailable", null, message,
+                    "Hermes 引擎未就绪，无法执行测试。请确认 hermes-engine 服务已正确配置。",
+                    null, null, null, null);
         }
 
         try {
@@ -194,19 +235,10 @@ public class AgentConfigService {
             AgentResult result = llmGatewayService.execute(TEST_SUBSYSTEM, tempProfileName, message);
 
             // 7. 映射返回值
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("agentId", id);
-            response.put("sessionId", result.getSessionId());
-            response.put("status", result.isSuccess() ? "completed" : "failed");
-            response.put("success", result.isSuccess());
-            response.put("message", message);
-            response.put("response", result.getContent());
-            response.put("tokensInput", result.getTokensInput());
-            response.put("tokensOutput", result.getTokensOutput());
-            response.put("durationMs", result.getDurationMs());
-            if (!result.isSuccess()) {
-                response.put("errorMsg", result.getErrorMsg());
-            }
+            AgentTestResponse response = new AgentTestResponse(id, result.getSessionId(),
+                    result.isSuccess() ? "completed" : "failed", result.isSuccess(), message,
+                    result.getContent(), result.getTokensInput(), result.getTokensOutput(),
+                    result.getDurationMs(), result.isSuccess() ? null : result.getErrorMsg());
 
             log.info("Agent test execution completed: id={}, success={}, duration={}ms",
                     id, result.isSuccess(), result.getDurationMs());
@@ -214,13 +246,8 @@ public class AgentConfigService {
 
         } catch (Exception e) {
             log.error("Agent test execution failed: id={}", id, e);
-            Map<String, Object> errorResult = new LinkedHashMap<>();
-            errorResult.put("agentId", id);
-            errorResult.put("status", "error");
-            errorResult.put("message", message);
-            errorResult.put("response", "Agent 测试执行失败: " + e.getMessage());
-            errorResult.put("durationMs", 0);
-            return errorResult;
+            return new AgentTestResponse(id, null, "error", null, message,
+                    "Agent 测试执行失败: " + e.getMessage(), null, null, 0L, null);
         } finally {
             // 8. 清理临时 Profile
             try {
@@ -256,29 +283,19 @@ public class AgentConfigService {
     /**
      * 获取 Prompt 版本列表 — 模拟数据
      */
-    public List<Map<String, Object>> listPromptVersions(String agentId) {
-        List<Map<String, Object>> versions = new ArrayList<>();
-        Map<String, Object> v1 = new LinkedHashMap<>();
-        v1.put("version", "v1.0");
-        v1.put("content", "当前使用的系统提示词");
-        v1.put("createdAt", LocalDateTime.now().toString());
-        versions.add(v1);
+    public List<PromptVersionRow> listPromptVersions(String agentId) {
+        List<PromptVersionRow> versions = new ArrayList<>();
+        versions.add(new PromptVersionRow("v1.0", "当前使用的系统提示词", LocalDateTime.now().toString()));
         return versions;
     }
 
-    private Map<String, Object> toMap(AgentEntity entity) {
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", entity.getId());
-        map.put("name", entity.getName());
-        map.put("modelProvider", entity.getModelProvider());
-        map.put("modelName", entity.getModelName());
-        map.put("systemPrompt", entity.getSystemPrompt());
-        map.put("tools", parseJsonArray(entity.getTools()));
-        map.put("knowledge", parseJsonArray(entity.getKnowledge()));
-        map.put("status", entity.getStatus());
-        map.put("createdAt", entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null);
-        map.put("updatedAt", entity.getUpdatedAt() != null ? entity.getUpdatedAt().toString() : null);
-        return map;
+    private AgentRow toRow(AgentEntity entity) {
+        return new AgentRow(entity.getId(), entity.getName(), entity.getModelProvider(),
+                entity.getModelName(), entity.getSystemPrompt(),
+                parseJsonArray(entity.getTools()), parseJsonArray(entity.getKnowledge()),
+                entity.getStatus(),
+                entity.getCreatedAt() != null ? entity.getCreatedAt().toString() : null,
+                entity.getUpdatedAt() != null ? entity.getUpdatedAt().toString() : null);
     }
 
     @SuppressWarnings("unchecked")
