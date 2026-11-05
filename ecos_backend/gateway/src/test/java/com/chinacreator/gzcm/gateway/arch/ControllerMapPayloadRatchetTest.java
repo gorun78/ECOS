@@ -49,6 +49,12 @@ import org.junit.jupiter.api.Test;
  *       {@code refreshCache}/{@code getDictUsage} 两条透传腿的签名（属主 {@code IDictService}
  *       仍返 Map，改契约须连属主一并改，另批处理）。键面由 {@code DictControllerWireShapeTest}
  *       5 例按集合相等钉住（含「空类型 {@code subsystem} 键仍在、值为 null」的 null 语义）。</li>
+ *   <li>2229 ＝ #147BY（2026-11-05）HEAD 面复测值，差额 −20 行<b>全部</b>来自 sysman
+ *       {@code DictTableController}（20→0）：请求体改 record（{@code DictTableRequest}/
+ *       {@code DictColumnRequest}/{@code ReorderRequest}），响应改 record VO；建表/改表回执
+ *       <b>不含 {@code columns} 键</b>（旧 Map 即无，另立 {@code DictTableBaseVO}，避免用可空
+ *       columns 造出多余键）。键面由 {@code DictTableWireShapeTest} 6 例按集合相等钉住
+ *       （含键序、ISO 时间串、tags 数组、缺省字段不落值、400 校验不丢）。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -56,8 +62,8 @@ import org.junit.jupiter.api.Test;
  * 以及未跟踪新文件 {@code CognitiveFrameworkController}(4)／{@code CognitiveExecutionController}(4)／
  * {@code CognitiveMethodController}(2)）。按本门「上调基线一律不许」的铁口径，基线取
  * HEAD 面 2265，<b>不</b>为在途面放宽；工作树红在未提交面是门在按其判据正常工作。
- * <b>#147BW/#147BX 时该偏移不变</b>：工作树实读依次 2272 = 2261 + 11、2260 = 2249 + 11
- * （同一批在途文件，未代改）。</p>
+ * <b>#147BW/#147BX/#147BY 时该偏移不变</b>：工作树实读依次 2272 = 2261 + 11、2260 = 2249 + 11、
+ * 2240 = 2229 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -70,9 +76,9 @@ class ControllerMapPayloadRatchetTest {
 
     /**
      * HEAD 面实扫基线（行级命中）。只允许下调。
-     * <p>#147BX 下调依据见类注释「基线台账」：2261 → 2249，−12 行来自 sysman 字典读面。</p>
+     * <p>#147BY 下调依据见类注释「基线台账」：2249 → 2229，−20 行来自 sysman 字典表/字段面。</p>
      */
-    private static final int BASELINE_LINES = 2249;
+    private static final int BASELINE_LINES = 2229;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -81,7 +87,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 2249（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 2229（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;

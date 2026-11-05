@@ -11,6 +11,18 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+/**
+ * 数据字典「表/字段」REST API（{@code /api/v1/dict}）。
+ *
+ * <p><b>#147BY（DoD DI-2 第四批）</b>：出入参强类型化——请求体由弱类型 Map 改
+ * {@link DictTableRequest}/{@link DictColumnRequest}/{@link ReorderRequest}（record），
+ * 响应由 {@code tableToMap}/{@code columnToMap} 改 {@link DictTableVO}/{@link DictColumnVO}。
+ * <b>wire 键面逐字不变</b>（含键序）：列表/详情＝表 15 键 + {@code columns} 追加在尾；
+ * 建表/改表＝表 15 键（旧 Map 本来就<b>没有</b> columns 键，故另立 {@link DictTableBaseVO}，
+ * 禁用一个带可空 columns 的 VO 造出多余键）；字段 14 键；{@code createdAt/updatedAt} 仍是
+ * ISO 字符串（旧 Map 用 {@code LocalDateTime#toString()}），{@code tags} 仍是逗号串拆成的数组。
+ * 绑定面等价：缺省字段保持「未设值」而非被强转成空串。</p>
+ */
 @RestController
 @RequestMapping("/api/v1/dict")
 public class DictTableController {
@@ -21,18 +33,15 @@ public class DictTableController {
     private IDictTableService dictTableService;
 
     @GetMapping("/tables")
-    public ApiResponse<List<Map<String, Object>>> listTables(
+    public ApiResponse<List<DictTableVO>> listTables(
             @RequestParam(required = false) String schema,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search) {
         try {
-            List<DictTable> tables = dictTableService.listTables(schema, status, search);
-            List<Map<String, Object>> result = new ArrayList<>();
-            for (DictTable t : tables) {
-                Map<String, Object> m = tableToMap(t);
-                List<DictColumn> cols = dictTableService.listColumns(t.getId());
-                m.put("columns", cols.stream().map(this::columnToMap).toList());
-                result.add(m);
+            List<DictTableVO> result = new ArrayList<>();
+            for (DictTable t : dictTableService.listTables(schema, status, search)) {
+                result.add(toTableVO(t, dictTableService.listColumns(t.getId()).stream()
+                        .map(DictTableController::toColumnVO).toList()));
             }
             return ApiResponse.success(result);
         } catch (Exception e) {
@@ -42,17 +51,14 @@ public class DictTableController {
     }
 
     @GetMapping("/tables/{id}")
-    public ApiResponse<Map<String, Object>> getTable(@PathVariable String id) {
+    public ApiResponse<DictTableVO> getTable(@PathVariable String id) {
         try {
             DictTable table = dictTableService.getTable(id);
             if (table == null) {
                 return ApiResponse.notFound("数据表不存在: " + id);
             }
-            List<DictColumn> columns = dictTableService.listColumns(id);
-
-            Map<String, Object> result = tableToMap(table);
-            result.put("columns", columns.stream().map(this::columnToMap).toList());
-            return ApiResponse.success(result);
+            return ApiResponse.success(toTableVO(table, dictTableService.listColumns(id).stream()
+                    .map(DictTableController::toColumnVO).toList()));
         } catch (Exception e) {
             log.error("查询数据字典表详情失败: id={}", id, e);
             return ApiResponse.internalError("查询失败");
@@ -60,26 +66,25 @@ public class DictTableController {
     }
 
     @PostMapping("/tables")
-    public ApiResponse<Map<String, Object>> createTable(@RequestBody Map<String, Object> body) {
+    public ApiResponse<DictTableBaseVO> createTable(@RequestBody DictTableRequest body) {
         try {
             DictTable table = new DictTable();
-            table.setName((String) body.get("name"));
-            table.setNameZh((String) body.get("nameZh"));
-            table.setSchema((String) body.get("schema"));
-            table.setDescription((String) body.get("description"));
-            table.setSource((String) body.get("source"));
-            table.setCode((String) body.get("code"));
-            table.setOwner((String) body.get("owner"));
-            if (body.get("tags") instanceof List<?> tagList) {
-                table.setTags(String.join(",", tagList.stream().map(Object::toString).toList()));
+            table.setName(body.name());
+            table.setNameZh(body.nameZh());
+            table.setSchema(body.schema());
+            table.setDescription(body.description());
+            table.setSource(body.source());
+            table.setCode(body.code());
+            table.setOwner(body.owner());
+            if (body.tags() != null) {
+                table.setTags(String.join(",", body.tags()));
             }
 
             if (table.getName() == null || table.getName().isEmpty()) {
                 return ApiResponse.badRequest("name 不能为空");
             }
 
-            DictTable created = dictTableService.createTable(table);
-            return ApiResponse.success(tableToMap(created));
+            return ApiResponse.success(toTableBaseVO(dictTableService.createTable(table)));
         } catch (Exception e) {
             log.error("创建数据字典表失败", e);
             return ApiResponse.internalError("创建失败");
@@ -87,28 +92,26 @@ public class DictTableController {
     }
 
     @PutMapping("/tables/{id}")
-    public ApiResponse<Map<String, Object>> updateTable(
-            @PathVariable String id, @RequestBody Map<String, Object> body) {
+    public ApiResponse<DictTableBaseVO> updateTable(
+            @PathVariable String id, @RequestBody DictTableRequest body) {
         try {
-            DictTable existing = dictTableService.getTable(id);
-            if (existing == null) {
+            if (dictTableService.getTable(id) == null) {
                 return ApiResponse.notFound("数据表不存在: " + id);
             }
 
             DictTable table = new DictTable();
-            table.setName((String) body.get("name"));
-            table.setNameZh((String) body.get("nameZh"));
-            table.setDescription((String) body.get("description"));
-            table.setStatus((String) body.get("status"));
-            table.setSource((String) body.get("source"));
-            table.setCode((String) body.get("code"));
-            table.setOwner((String) body.get("owner"));
-            if (body.get("tags") instanceof List<?> tagList) {
-                table.setTags(String.join(",", tagList.stream().map(Object::toString).toList()));
+            table.setName(body.name());
+            table.setNameZh(body.nameZh());
+            table.setDescription(body.description());
+            table.setStatus(body.status());
+            table.setSource(body.source());
+            table.setCode(body.code());
+            table.setOwner(body.owner());
+            if (body.tags() != null) {
+                table.setTags(String.join(",", body.tags()));
             }
 
-            DictTable updated = dictTableService.updateTable(id, table);
-            return ApiResponse.success(tableToMap(updated));
+            return ApiResponse.success(toTableBaseVO(dictTableService.updateTable(id, table)));
         } catch (Exception e) {
             log.error("更新数据字典表失败: id={}", id, e);
             return ApiResponse.internalError("更新失败");
@@ -116,14 +119,13 @@ public class DictTableController {
     }
 
     @DeleteMapping("/tables/{id}")
-    public ApiResponse<Map<String, Object>> deleteTable(@PathVariable String id) {
+    public ApiResponse<DeleteTableResultVO> deleteTable(@PathVariable String id) {
         try {
-            DictTable existing = dictTableService.getTable(id);
-            if (existing == null) {
+            if (dictTableService.getTable(id) == null) {
                 return ApiResponse.notFound("数据表不存在: " + id);
             }
             dictTableService.deleteTable(id);
-            return ApiResponse.success(Map.of("success", true, "id", id));
+            return ApiResponse.success(new DeleteTableResultVO(true, id));
         } catch (Exception e) {
             log.error("删除数据字典表失败: id={}", id, e);
             return ApiResponse.internalError("删除失败");
@@ -131,26 +133,14 @@ public class DictTableController {
     }
 
     @PostMapping("/tables/{tableId}/columns")
-    public ApiResponse<Map<String, Object>> createColumn(
-            @PathVariable String tableId, @RequestBody Map<String, Object> body) {
+    public ApiResponse<DictColumnVO> createColumn(
+            @PathVariable String tableId, @RequestBody DictColumnRequest body) {
         try {
-            DictTable table = dictTableService.getTable(tableId);
-            if (table == null) {
+            if (dictTableService.getTable(tableId) == null) {
                 return ApiResponse.notFound("数据表不存在: " + tableId);
             }
 
-            DictColumn column = new DictColumn();
-            column.setName((String) body.get("name"));
-            column.setType((String) body.get("type"));
-            if (body.get("length") instanceof Number n) column.setLength(n.intValue());
-            if (body.get("precision") instanceof Number n) column.setPrecision(n.intValue());
-            if (body.get("scale") instanceof Number n) column.setScale(n.intValue());
-            if (body.get("nullable") instanceof Boolean b) column.setNullable(b);
-            if (body.get("primaryKey") instanceof Boolean b) column.setPrimaryKey(b);
-            column.setDefaultValue((String) body.get("defaultValue"));
-            column.setDescription((String) body.get("description"));
-            if (body.get("sortOrder") instanceof Number n) column.setSortOrder(n.intValue());
-
+            DictColumn column = toColumn(body);
             if (column.getName() == null || column.getName().isEmpty()) {
                 return ApiResponse.badRequest("name 不能为空");
             }
@@ -158,8 +148,7 @@ public class DictTableController {
                 return ApiResponse.badRequest("type 不能为空");
             }
 
-            DictColumn created = dictTableService.createColumn(tableId, column);
-            return ApiResponse.success(columnToMap(created));
+            return ApiResponse.success(toColumnVO(dictTableService.createColumn(tableId, column)));
         } catch (Exception e) {
             log.error("创建字段失败: tableId={}", tableId, e);
             return ApiResponse.internalError("创建失败");
@@ -167,27 +156,15 @@ public class DictTableController {
     }
 
     @PutMapping("/tables/{tableId}/columns/{columnId}")
-    public ApiResponse<Map<String, Object>> updateColumn(
+    public ApiResponse<DictColumnVO> updateColumn(
             @PathVariable String tableId, @PathVariable String columnId,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody DictColumnRequest body) {
         try {
-            DictColumn column = new DictColumn();
-            column.setName((String) body.get("name"));
-            column.setType((String) body.get("type"));
-            if (body.get("length") instanceof Number n) column.setLength(n.intValue());
-            if (body.get("precision") instanceof Number n) column.setPrecision(n.intValue());
-            if (body.get("scale") instanceof Number n) column.setScale(n.intValue());
-            if (body.get("nullable") instanceof Boolean b) column.setNullable(b);
-            if (body.get("primaryKey") instanceof Boolean b) column.setPrimaryKey(b);
-            column.setDefaultValue((String) body.get("defaultValue"));
-            column.setDescription((String) body.get("description"));
-            if (body.get("sortOrder") instanceof Number n) column.setSortOrder(n.intValue());
-
-            DictColumn updated = dictTableService.updateColumn(tableId, columnId, column);
+            DictColumn updated = dictTableService.updateColumn(tableId, columnId, toColumn(body));
             if (updated == null) {
                 return ApiResponse.notFound("字段不存在: " + columnId);
             }
-            return ApiResponse.success(columnToMap(updated));
+            return ApiResponse.success(toColumnVO(updated));
         } catch (Exception e) {
             log.error("更新字段失败: tableId={}, columnId={}", tableId, columnId, e);
             return ApiResponse.internalError("更新失败");
@@ -195,11 +172,11 @@ public class DictTableController {
     }
 
     @DeleteMapping("/tables/{tableId}/columns/{columnId}")
-    public ApiResponse<Map<String, Object>> deleteColumn(
+    public ApiResponse<DeleteColumnResultVO> deleteColumn(
             @PathVariable String tableId, @PathVariable String columnId) {
         try {
             dictTableService.deleteColumn(tableId, columnId);
-            return ApiResponse.success(Map.of("success", true, "columnId", columnId));
+            return ApiResponse.success(new DeleteColumnResultVO(true, columnId));
         } catch (Exception e) {
             log.error("删除字段失败: tableId={}, columnId={}", tableId, columnId, e);
             return ApiResponse.internalError("删除失败");
@@ -207,60 +184,118 @@ public class DictTableController {
     }
 
     @PutMapping("/tables/{tableId}/columns/reorder")
-    public ApiResponse<Map<String, Object>> reorderColumns(
-            @PathVariable String tableId, @RequestBody Map<String, Object> body) {
+    public ApiResponse<ReorderResultVO> reorderColumns(
+            @PathVariable String tableId, @RequestBody ReorderRequest body) {
         try {
-            @SuppressWarnings("unchecked")
-            List<String> columnIds = (List<String>) body.get("columnIds");
+            List<String> columnIds = body.columnIds();
             if (columnIds == null || columnIds.isEmpty()) {
                 return ApiResponse.badRequest("columnIds 不能为空");
             }
             dictTableService.reorderColumns(tableId, columnIds);
-            return ApiResponse.success(Map.of("success", true, "reordered", columnIds.size()));
+            return ApiResponse.success(new ReorderResultVO(true, columnIds.size()));
         } catch (Exception e) {
             log.error("重排字段失败: tableId={}", tableId, e);
             return ApiResponse.internalError("重排失败");
         }
     }
 
-    private Map<String, Object> tableToMap(DictTable t) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", t.getId());
-        m.put("code", t.getCode());
-        m.put("name", t.getName());
-        m.put("nameZh", t.getNameZh());
-        m.put("schema", t.getSchema());
-        m.put("description", t.getDescription());
-        m.put("status", t.getStatus());
-        m.put("source", t.getSource());
-        m.put("rowCount", t.getRowCount());
-        m.put("storageSize", t.getStorageSize());
-        m.put("owner", t.getOwner());
-        m.put("tags", t.getTags() != null && !t.getTags().isEmpty()
-            ? Arrays.stream(t.getTags().split(",")).filter(s -> !s.isEmpty()).toList()
-            : Collections.emptyList());
-        m.put("createdBy", t.getCreatedBy());
-        m.put("createdAt", t.getCreatedAt() != null ? t.getCreatedAt().toString() : null);
-        m.put("updatedAt", t.getUpdatedAt() != null ? t.getUpdatedAt().toString() : null);
-        return m;
+    /** 字段请求 → 实体（#147BY：与旧 Map 读取逐字段等价，缺省字段不落值）。 */
+    private static DictColumn toColumn(DictColumnRequest body) {
+        DictColumn column = new DictColumn();
+        column.setName(body.name());
+        column.setType(body.type());
+        if (body.length() != null) column.setLength(body.length());
+        if (body.precision() != null) column.setPrecision(body.precision());
+        if (body.scale() != null) column.setScale(body.scale());
+        if (body.nullable() != null) column.setNullable(body.nullable());
+        if (body.primaryKey() != null) column.setPrimaryKey(body.primaryKey());
+        column.setDefaultValue(body.defaultValue());
+        column.setDescription(body.description());
+        if (body.sortOrder() != null) column.setSortOrder(body.sortOrder());
+        return column;
     }
 
-    private Map<String, Object> columnToMap(DictColumn c) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", c.getId());
-        m.put("tableId", c.getTableId());
-        m.put("name", c.getName());
-        m.put("type", c.getType());
-        m.put("length", c.getLength());
-        m.put("precision", c.getPrecision());
-        m.put("scale", c.getScale());
-        m.put("nullable", c.isNullable());
-        m.put("primaryKey", c.isPrimaryKey());
-        m.put("defaultValue", c.getDefaultValue());
-        m.put("description", c.getDescription());
-        m.put("sortOrder", c.getSortOrder());
-        m.put("createdAt", c.getCreatedAt() != null ? c.getCreatedAt().toString() : null);
-        m.put("updatedAt", c.getUpdatedAt() != null ? c.getUpdatedAt().toString() : null);
-        return m;
+    static DictTableBaseVO toTableBaseVO(DictTable t) {
+        return new DictTableBaseVO(
+                t.getId(), t.getCode(), t.getName(), t.getNameZh(), t.getSchema(), t.getDescription(),
+                t.getStatus(), t.getSource(), t.getRowCount(), t.getStorageSize(), t.getOwner(),
+                tagsOf(t), t.getCreatedBy(), isoOf(t.getCreatedAt()), isoOf(t.getUpdatedAt()));
+    }
+
+    static DictTableVO toTableVO(DictTable t, List<DictColumnVO> columns) {
+        DictTableBaseVO base = toTableBaseVO(t);
+        return new DictTableVO(base.id(), base.code(), base.name(), base.nameZh(), base.schema(),
+                base.description(), base.status(), base.source(), base.rowCount(), base.storageSize(),
+                base.owner(), base.tags(), base.createdBy(), base.createdAt(), base.updatedAt(), columns);
+    }
+
+    static DictColumnVO toColumnVO(DictColumn c) {
+        return new DictColumnVO(
+                c.getId(), c.getTableId(), c.getName(), c.getType(), c.getLength(), c.getPrecision(),
+                c.getScale(), c.isNullable(), c.isPrimaryKey(), c.getDefaultValue(), c.getDescription(),
+                c.getSortOrder(), isoOf(c.getCreatedAt()), isoOf(c.getUpdatedAt()));
+    }
+
+    private static List<String> tagsOf(DictTable t) {
+        return t.getTags() != null && !t.getTags().isEmpty()
+                ? Arrays.stream(t.getTags().split(",")).filter(s -> !s.isEmpty()).toList()
+                : Collections.emptyList();
+    }
+
+    private static String isoOf(java.time.LocalDateTime value) {
+        return value != null ? value.toString() : null;
+    }
+
+    // ── 请求 DTO（#147BY，record：Jackson 按组件名绑定） ─────────
+
+    /** 建表/改表请求（create 读 schema、update 读 status，与旧 Map 读取口径一致）。 */
+    public record DictTableRequest(String name, String nameZh, String schema, String description,
+                                   String status, String source, String code, String owner,
+                                   List<String> tags) {
+    }
+
+    /** 字段建/改请求（数值与布尔字段可缺省，缺省＝不覆盖实体默认值）。 */
+    public record DictColumnRequest(String name, String type, Integer length, Integer precision,
+                                    Integer scale, Boolean nullable, Boolean primaryKey,
+                                    String defaultValue, String description, Integer sortOrder) {
+    }
+
+    /** 字段重排请求。 */
+    public record ReorderRequest(List<String> columnIds) {
+    }
+
+    // ── 响应 VO（#147BY：组件顺序＝旧 Map 的键序） ─────────────
+
+    /** 建表/改表回执：15 键、无 {@code columns}（旧 Map 即无此键）。 */
+    public record DictTableBaseVO(String id, String code, String name, String nameZh, String schema,
+                                  String description, String status, String source, Long rowCount,
+                                  String storageSize, String owner, List<String> tags, String createdBy,
+                                  String createdAt, String updatedAt) {
+    }
+
+    /** 列表/详情：15 键 + {@code columns} 追加在尾。 */
+    public record DictTableVO(String id, String code, String name, String nameZh, String schema,
+                              String description, String status, String source, Long rowCount,
+                              String storageSize, String owner, List<String> tags, String createdBy,
+                              String createdAt, String updatedAt, List<DictColumnVO> columns) {
+    }
+
+    /** 数据字典字段（14 键）。 */
+    public record DictColumnVO(String id, String tableId, String name, String type, Integer length,
+                               Integer precision, Integer scale, boolean nullable, boolean primaryKey,
+                               String defaultValue, String description, int sortOrder,
+                               String createdAt, String updatedAt) {
+    }
+
+    /** 删表回执。 */
+    public record DeleteTableResultVO(boolean success, String id) {
+    }
+
+    /** 删字段回执。 */
+    public record DeleteColumnResultVO(boolean success, String columnId) {
+    }
+
+    /** 重排回执。 */
+    public record ReorderResultVO(boolean success, int reordered) {
     }
 }
