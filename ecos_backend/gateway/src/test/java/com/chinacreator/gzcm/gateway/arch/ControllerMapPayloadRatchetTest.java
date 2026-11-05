@@ -108,6 +108,12 @@ import org.junit.jupiter.api.Test;
  *       {@code UserVO}、请求改 DTO（更新用 {@code xxxPresent} 保 containsKey 语义）、
  *       强制下线/随机密码/批量创建回执改 VO（批量 {@code errors} 仅非空时出现——初版发空数组
  *       被 {@code UserControllerWireShapeTest} 当场判红后修正）。</li>
+ *   <li>2093 ＝ #147CJ（2026-11-05）HEAD 面复测值，差额 −28 行<b>全部</b>来自 sysman
+ *       {@code TenantController}（28→0）：SQL/行映射全部收回 {@code TenantService}
+ *       （行面 record 12/7/2/3/2/3 键用 {@code @JsonProperty} 钉住旧列名，时间列保留 JDBC 类型）、
+ *       建/改请求改 DTO（改租户 {@code xxxPresent} 保 containsKey 语义）、配额/用量/账单响应改 VO；
+ *       键面与「¥ 计费公式」由 {@code TenantControllerWireShapeTest} 5 例钉住
+ *       （变异实红：去 {@code tenant_name} 注解 ⇒ 键名与键序同漂）。</li>
  * </ul>
  *
  * <p><b>记账时必须打折的一枚读数</b>：#147BT 提交时工作树实读 <b>2276</b> = 2265 + 11，
@@ -115,10 +121,10 @@ import org.junit.jupiter.api.Test;
  * 以及未跟踪新文件 {@code CognitiveFrameworkController}(4)／{@code CognitiveExecutionController}(4)／
  * {@code CognitiveMethodController}(2)）。按本门「上调基线一律不许」的铁口径，基线取
  * HEAD 面 2265，<b>不</b>为在途面放宽；工作树红在未提交面是门在按其判据正常工作。
- * <b>#147BW~#147CI 时该偏移不变</b>：工作树实读依次 2272 = 2261 + 11、2260 = 2249 + 11、
+ * <b>#147BW~#147CJ 时该偏移不变</b>：工作树实读依次 2272 = 2261 + 11、2260 = 2249 + 11、
  * 2240 = 2229 + 11、2226 = 2215 + 11、2204 = 2193 + 11、2194 = 2183 + 11、
  * 2188 = 2177 + 11、2180 = 2169 + 11、2163 = 2152 + 11、2155 = 2144 + 11、
- * 2149 = 2138 + 11、2132 = 2121 + 11（同一批在途文件，未代改）。</p>
+ * 2149 = 2138 + 11、2132 = 2121 + 11、2104 = 2093 + 11（同一批在途文件，未代改）。</p>
  *
  * <p><b>本门红了的正确处置</b>：只允许「把新增的 {@code Map<String,Object>} 改成 DTO/VO」或
  * 「同批给出净清退并把 {@link #BASELINE_LINES} 调低」。{@code Map<String,Object>} 出入参是
@@ -133,7 +139,7 @@ class ControllerMapPayloadRatchetTest {
      * HEAD 面实扫基线（行级命中）。只允许下调。
      * <p>#147CA 下调依据见类注释「基线台账」：2215 → 2193，−22 行来自 sysman 系统配置面。</p>
      */
-    private static final int BASELINE_LINES = 2121;
+    private static final int BASELINE_LINES = 2093;
 
     /** 扫描面下限（防扫描根漂移把门变成空转）。 */
     private static final int MIN_FILES = 200;
@@ -142,7 +148,7 @@ class ControllerMapPayloadRatchetTest {
     private static final Pattern MAP_PAYLOAD = Pattern.compile("Map<String,\\s*Object>");
 
     @Test
-    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 2121（只减不增）")
+    @DisplayName("Controller 的 Map<String,Object> 行数不得超过基线 2093（只减不增）")
     void controllerMapPayloadDoesNotGrow() throws IOException {
         List<String> offenders = new ArrayList<>();
         int lines = 0;

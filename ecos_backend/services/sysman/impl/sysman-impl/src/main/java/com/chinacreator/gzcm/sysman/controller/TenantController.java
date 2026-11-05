@@ -2,6 +2,8 @@ package com.chinacreator.gzcm.sysman.controller;
 
 import com.chinacreator.gzcm.common.base.ApiResponse;
 import com.chinacreator.gzcm.common.annotation.RequirePermission;
+import com.chinacreator.gzcm.sysman.service.TenantService;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -11,13 +13,17 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
-import com.chinacreator.gzcm.sysman.service.TenantService;
 
 /**
  * P0-1 统一租户控制器。
  * <p>
  * 操作统一后的 ecos_tenant 表（小写列名），
  * 并合并了原 TenantBillingController 的配额/用量/账单端点。
+ *
+ * <p><b>#147CJ（DoD DI-2 第十四批）</b>：出入参强类型化——SQL 与行映射全部收回
+ * {@link TenantService}（行面 record 用 {@code @JsonProperty} 钉住旧列名），请求改 DTO
+ * （更新用 {@code xxxPresent} 保 {@code containsKey} 语义），响应改 VO（用量/账单的混合
+ * snake_case 键由属性注解保持）。wire 键面与键序不变。</p>
  */
 @RestController
 @RequestMapping("/api/v1/system/tenants")
@@ -31,48 +37,15 @@ public class TenantController {
         this.tenantService = tenantService;
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  基础 CRUD
-    // ═══════════════════════════════════════════════════════════
-
     // ── 1. 租户列表 ──────────────────────────────────────
 
     @GetMapping
-    public ApiResponse<Map<String, Object>> list(
+    public ApiResponse<TenantService.TenantPage> list(
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         try {
-            StringBuilder where = new StringBuilder(" WHERE 1=1 ");
-            List<Object> params = new ArrayList<>();
-
-            if (status != null && !status.isEmpty()) {
-                where.append("AND status = ? ");
-                params.add(status);
-            }
-
-            // Count
-            String countSql = "SELECT COUNT(*) FROM ecos_tenant" + where;
-            int total = tenantService.queryForObject(countSql, Integer.class, params.toArray());
-
-            // Paginate
-            String sql = "SELECT id, tenant_name, tenant_code, status, max_users, " +
-                    "max_storage_mb, max_api_per_day, isolation_mode, schema_name, database_url, " +
-                    "created_at, updated_at " +
-                    "FROM ecos_tenant" + where + " ORDER BY created_at DESC NULLS LAST " +
-                    "LIMIT ? OFFSET ?";
-            List<Object> pagedParams = new ArrayList<>(params);
-            pagedParams.add(size);
-            pagedParams.add((page - 1) * size);
-
-            List<Map<String, Object>> rows = tenantService.queryForList(sql, pagedParams.toArray());
-
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("page", page);
-            result.put("size", size);
-            result.put("total", total);
-            result.put("data", rows);
-            return ApiResponse.success(result);
+            return ApiResponse.success(tenantService.listTenants(status, page, size));
         } catch (Exception e) {
             log.error("查询租户列表失败", e);
             return ApiResponse.internalError("查询租户列表失败");
@@ -82,17 +55,10 @@ public class TenantController {
     // ── 2. 租户详情 ──────────────────────────────────────
 
     @GetMapping("/{id}")
-    public ApiResponse<Map<String, Object>> get(@PathVariable String id) {
+    public ApiResponse<TenantService.TenantRow> get(@PathVariable String id) {
         try {
-            String sql = "SELECT id, tenant_name, tenant_code, status, max_users, " +
-                    "max_storage_mb, max_api_per_day, isolation_mode, schema_name, database_url, " +
-                    "created_at, updated_at " +
-                    "FROM ecos_tenant WHERE id = ?";
-            List<Map<String, Object>> rows = tenantService.queryForList(sql, id);
-            if (rows.isEmpty()) {
-                return ApiResponse.notFound("租户不存在: " + id);
-            }
-            return ApiResponse.success(rows.get(0));
+            TenantService.TenantRow row = tenantService.getTenant(id);
+            return row == null ? ApiResponse.notFound("租户不存在: " + id) : ApiResponse.success(row);
         } catch (Exception e) {
             log.error("查询租户详情失败: id={}", id, e);
             return ApiResponse.internalError("查询租户详情失败");
@@ -102,36 +68,27 @@ public class TenantController {
     // ── 3. 创建租户 ──────────────────────────────────────
 
     @PostMapping
-    public ApiResponse<Map<String, Object>> create(@RequestBody Map<String, Object> body) {
+    public ApiResponse<CreateResultVO> create(@RequestBody TenantCreateRequest body) {
         try {
-            String id = (String) body.getOrDefault("id", "T-" + UUID.randomUUID().toString().substring(0, 8));
-            String tenantName = (String) body.get("tenantName");
-            String tenantCode = (String) body.getOrDefault("tenantCode", id.toLowerCase());
-            String status = (String) body.getOrDefault("status", "ACTIVE");
-            int maxUsers = body.containsKey("maxUsers") ? ((Number) body.get("maxUsers")).intValue() : 0;
-            long maxStorageMb = body.containsKey("maxStorageMb") ? ((Number) body.get("maxStorageMb")).longValue() : 0;
-            long maxApiPerDay = body.containsKey("maxApiPerDay") ? ((Number) body.get("maxApiPerDay")).longValue() : 0;
-            String isolationMode = (String) body.getOrDefault("isolationMode", "ROW_FILTER");
-            String schemaName = (String) body.getOrDefault("schemaName", null);
-            String databaseUrl = (String) body.getOrDefault("databaseUrl", null);
+            String id = body.getId() != null ? body.getId()
+                    : "T-" + UUID.randomUUID().toString().substring(0, 8);
+            String tenantName = body.getTenantName();
+            String tenantCode = body.getTenantCode() != null ? body.getTenantCode() : id.toLowerCase();
+            String status = body.getStatus() != null ? body.getStatus() : "ACTIVE";
+            int maxUsers = body.getMaxUsers() != null ? body.getMaxUsers() : 0;
+            long maxStorageMb = body.getMaxStorageMb() != null ? body.getMaxStorageMb() : 0L;
+            long maxApiPerDay = body.getMaxApiPerDay() != null ? body.getMaxApiPerDay() : 0L;
+            String isolationMode = body.getIsolationMode() != null ? body.getIsolationMode() : "ROW_FILTER";
 
             if (tenantName == null || tenantName.isEmpty()) {
                 return ApiResponse.badRequest("tenantName 不能为空");
             }
 
-            String sql = "INSERT INTO ecos_tenant (id, tenant_name, tenant_code, status, " +
-                    "max_users, max_storage_mb, max_api_per_day, isolation_mode, schema_name, database_url, " +
-                    "created_at, updated_at) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
-            tenantService.update(sql, id, tenantName, tenantCode, status,
-                    maxUsers, maxStorageMb, maxApiPerDay, isolationMode, schemaName, databaseUrl);
+            tenantService.createTenant(id, tenantName, tenantCode, status, maxUsers, maxStorageMb,
+                    maxApiPerDay, isolationMode, body.getSchemaName(), body.getDatabaseUrl());
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("id", id);
-            result.put("tenantName", tenantName);
-            result.put("tenantCode", tenantCode);
-            result.put("status", status);
-            return ApiResponse.success("租户创建成功", result);
+            return ApiResponse.success("租户创建成功",
+                    new CreateResultVO(id, tenantName, tenantCode, status));
         } catch (Exception e) {
             log.error("创建租户失败", e);
             return ApiResponse.internalError("创建租户失败");
@@ -141,65 +98,58 @@ public class TenantController {
     // ── 4. 更新租户 ──────────────────────────────────────
 
     @PutMapping("/{id}")
-    public ApiResponse<Map<String, Object>> update(@PathVariable String id,
-                                                    @RequestBody Map<String, Object> body) {
+    public ApiResponse<TenantService.TenantRow> update(@PathVariable String id,
+                                                       @RequestBody TenantUpdateRequest body) {
         try {
-            String checkSql = "SELECT COUNT(*) FROM ecos_tenant WHERE id = ?";
-            int count = tenantService.queryForObject(checkSql, Integer.class, id);
-            if (count == 0) {
+            if (tenantService.countTenant(id) == 0) {
                 return ApiResponse.notFound("租户不存在: " + id);
             }
 
             StringBuilder set = new StringBuilder();
             List<Object> params = new ArrayList<>();
 
-            if (body.containsKey("tenantName")) {
+            if (body.isTenantNamePresent()) {
                 set.append("tenant_name = ?, ");
-                params.add(body.get("tenantName"));
+                params.add(body.getTenantName());
             }
-            if (body.containsKey("tenantCode")) {
+            if (body.isTenantCodePresent()) {
                 set.append("tenant_code = ?, ");
-                params.add(body.get("tenantCode"));
+                params.add(body.getTenantCode());
             }
-            if (body.containsKey("status")) {
+            if (body.isStatusPresent()) {
                 set.append("status = ?, ");
-                params.add(body.get("status"));
+                params.add(body.getStatus());
             }
-            if (body.containsKey("maxUsers")) {
+            if (body.isMaxUsersPresent()) {
                 set.append("max_users = ?, ");
-                params.add(((Number) body.get("maxUsers")).intValue());
+                params.add(body.getMaxUsers());
             }
-            if (body.containsKey("maxStorageMb")) {
+            if (body.isMaxStorageMbPresent()) {
                 set.append("max_storage_mb = ?, ");
-                params.add(((Number) body.get("maxStorageMb")).longValue());
+                params.add(body.getMaxStorageMb());
             }
-            if (body.containsKey("maxApiPerDay")) {
+            if (body.isMaxApiPerDayPresent()) {
                 set.append("max_api_per_day = ?, ");
-                params.add(((Number) body.get("maxApiPerDay")).longValue());
+                params.add(body.getMaxApiPerDay());
             }
-            if (body.containsKey("isolationMode")) {
+            if (body.isIsolationModePresent()) {
                 set.append("isolation_mode = ?, ");
-                params.add(body.get("isolationMode"));
+                params.add(body.getIsolationMode());
             }
-            if (body.containsKey("schemaName")) {
+            if (body.isSchemaNamePresent()) {
                 set.append("schema_name = ?, ");
-                params.add(body.get("schemaName"));
+                params.add(body.getSchemaName());
             }
-            if (body.containsKey("databaseUrl")) {
+            if (body.isDatabaseUrlPresent()) {
                 set.append("database_url = ?, ");
-                params.add(body.get("databaseUrl"));
+                params.add(body.getDatabaseUrl());
             }
 
             if (set.isEmpty()) {
                 return ApiResponse.badRequest("没有要更新的字段");
             }
 
-            set.append("updated_at = NOW()");
-            params.add(id);
-
-            String sql = "UPDATE ecos_tenant SET " + set + " WHERE id = ?";
-            tenantService.update(sql, params.toArray());
-
+            tenantService.updateTenant(id, set, params);
             return get(id);
         } catch (Exception e) {
             log.error("更新租户失败: id={}", id, e);
@@ -210,14 +160,13 @@ public class TenantController {
     // ── 5. 软删除 ──────────────────────────────────────
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Map<String, Object>> delete(@PathVariable String id) {
+    public ApiResponse<Void> delete(@PathVariable String id) {
         try {
-            String sql = "UPDATE ecos_tenant SET status = 'DELETED', updated_at = NOW() WHERE id = ?";
-            int rows = tenantService.update(sql, id);
+            int rows = tenantService.deleteTenant(id);
             if (rows == 0) {
                 return ApiResponse.notFound("租户不存在: " + id);
             }
-            return ApiResponse.success("租户已删除", null);
+            return ApiResponse.<Void>success("租户已删除", null);
         } catch (Exception e) {
             log.error("删除租户失败: id={}", id, e);
             return ApiResponse.internalError("删除租户失败");
@@ -231,34 +180,21 @@ public class TenantController {
     // ── 6. 租户配额信息 ──────────────────────────────
 
     @GetMapping("/{id}/quota")
-    public ApiResponse<Map<String, Object>> getQuota(@PathVariable String id) {
+    public ApiResponse<QuotaResultVO> getQuota(@PathVariable String id) {
         try {
-            // Verify tenant exists
-            String checkSql = "SELECT COUNT(*) FROM ecos_tenant WHERE id = ?";
-            int count = tenantService.queryForObject(checkSql, Integer.class, id);
-            if (count == 0) {
+            if (tenantService.countTenant(id) == 0) {
                 return ApiResponse.notFound("租户不存在: " + id);
             }
 
-            List<Map<String, Object>> quotas = tenantService.queryForList(
-                    "SELECT id, tenant_id, quota_type, daily_limit, monthly_limit, created_at, updated_at " +
-                    "FROM ecos_tenant_quota WHERE tenant_id = ?", id);
+            List<TenantService.QuotaRow> quotas = tenantService.queryTenantQuotas(id);
 
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("tenantId", id);
-            result.put("quotas", quotas);
-
-            // Fetch usage from ecos_tenant_usage
+            List<TenantService.UsageMaxRow> usage;
             try {
-                String usageSql = "SELECT quota_type, MAX(used_count) AS used_count " +
-                        "FROM ecos_tenant_usage WHERE tenant_id = ? GROUP BY quota_type";
-                List<Map<String, Object>> usageRows = tenantService.queryForList(usageSql, id);
-                result.put("usage", usageRows);
+                usage = tenantService.queryTenantUsageSummary(id);
             } catch (Exception ex) {
-                result.put("usage", Collections.emptyList());
+                usage = Collections.emptyList();
             }
-
-            return ApiResponse.success(result);
+            return ApiResponse.success(new QuotaResultVO(id, quotas, usage));
         } catch (Exception e) {
             log.error("查询租户配额失败: id={}", id, e);
             return ApiResponse.internalError("查询租户配额失败");
@@ -268,58 +204,43 @@ public class TenantController {
     // ── 7. 更新租户配额 ──────────────────────────────
 
     @PutMapping("/{id}/quota")
-    public ApiResponse<Map<String, Object>> updateQuota(
+    public ApiResponse<TenantService.QuotaRow> updateQuota(
             @PathVariable String id,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody QuotaUpdateRequest body) {
         try {
-            // Verify tenant exists
-            String checkSql = "SELECT COUNT(*) FROM ecos_tenant WHERE id = ?";
-            int count = tenantService.queryForObject(checkSql, Integer.class, id);
-            if (count == 0) {
+            if (tenantService.countTenant(id) == 0) {
                 return ApiResponse.notFound("租户不存在: " + id);
             }
 
-            String quotaType = (String) body.get("quota_type");
-            Object dailyLimitObj = body.get("daily_limit");
-            Object monthlyLimitObj = body.get("monthly_limit");
+            String quotaType = body.getQuotaType();
+            Long dailyLimitObj = body.getDailyLimit();
+            Long monthlyLimitObj = body.getMonthlyLimit();
 
             if (quotaType == null || quotaType.isBlank()) {
                 return ApiResponse.badRequest("quota_type 为必填项");
             }
 
-            List<Map<String, Object>> existing = tenantService.queryForList(
-                    "SELECT id FROM ecos_tenant_quota WHERE tenant_id = ? AND quota_type = ?",
-                    id, quotaType);
-
-            if (existing.isEmpty()) {
-                long dailyLimit = dailyLimitObj != null ? ((Number) dailyLimitObj).longValue() : 0L;
-                long monthlyLimit = monthlyLimitObj != null ? ((Number) monthlyLimitObj).longValue() : 0L;
-                tenantService.update(
-                        "INSERT INTO ecos_tenant_quota (tenant_id, quota_type, daily_limit, monthly_limit) " +
-                        "VALUES (?, ?, ?, ?)", id, quotaType, dailyLimit, monthlyLimit);
+            if (!tenantService.quotaExists(id, quotaType)) {
+                long dailyLimit = dailyLimitObj != null ? dailyLimitObj : 0L;
+                long monthlyLimit = monthlyLimitObj != null ? monthlyLimitObj : 0L;
+                tenantService.insertQuota(id, quotaType, dailyLimit, monthlyLimit);
             } else {
                 StringBuilder sql = new StringBuilder("UPDATE ecos_tenant_quota SET updated_at = NOW()");
                 List<Object> params = new ArrayList<>();
 
                 if (dailyLimitObj != null) {
                     sql.append(", daily_limit = ?");
-                    params.add(((Number) dailyLimitObj).longValue());
+                    params.add(dailyLimitObj);
                 }
                 if (monthlyLimitObj != null) {
                     sql.append(", monthly_limit = ?");
-                    params.add(((Number) monthlyLimitObj).longValue());
+                    params.add(monthlyLimitObj);
                 }
 
-                sql.append(" WHERE tenant_id = ? AND quota_type = ?");
-                params.add(id);
-                params.add(quotaType);
-
-                tenantService.update(sql.toString(), params.toArray());
+                tenantService.updateQuota(id, quotaType, sql, params);
             }
 
-            Map<String, Object> updated = tenantService.queryForMap(
-                    "SELECT id, tenant_id, quota_type, daily_limit, monthly_limit, created_at, updated_at " +
-                    "FROM ecos_tenant_quota WHERE tenant_id = ? AND quota_type = ?", id, quotaType);
+            TenantService.QuotaRow updated = tenantService.queryQuotaRow(id, quotaType);
 
             log.info("Quota updated: tenantId={}, quotaType={}", id, quotaType);
             return ApiResponse.success("配额已更新", updated);
@@ -332,14 +253,11 @@ public class TenantController {
     // ── 8. 用量统计 ──────────────────────────────────
 
     @GetMapping("/{id}/usage")
-    public ApiResponse<Map<String, Object>> getUsage(
+    public ApiResponse<UsageResultVO> getUsage(
             @PathVariable String id,
             @RequestParam(defaultValue = "30d") String range) {
         try {
-            // Verify tenant exists
-            String checkSql = "SELECT COUNT(*) FROM ecos_tenant WHERE id = ?";
-            int count = tenantService.queryForObject(checkSql, Integer.class, id);
-            if (count == 0) {
+            if (tenantService.countTenant(id) == 0) {
                 return ApiResponse.notFound("租户不存在: " + id);
             }
 
@@ -351,28 +269,16 @@ public class TenantController {
             }
 
             LocalDate startDate = LocalDate.now().minusDays(days - 1);
-
-            List<Map<String, Object>> dailyUsage = tenantService.queryForList(
-                    "SELECT usage_date, quota_type, used_count " +
-                    "FROM ecos_tenant_usage " +
-                    "WHERE tenant_id = ? AND usage_date >= ? " +
-                    "ORDER BY usage_date DESC, quota_type",
-                    id, startDate);
-
-            Map<String, Object> summary = new LinkedHashMap<>();
-            summary.put("tenant_id", id);
-            summary.put("range_days", days);
-            summary.put("daily_usage", dailyUsage);
+            List<TenantService.DailyUsageRow> dailyUsage = tenantService.queryDailyUsage(id, startDate);
 
             Map<String, Long> totals = dailyUsage.stream()
                     .collect(Collectors.groupingBy(
-                            row -> (String) row.get("quota_type"),
+                            TenantService.DailyUsageRow::quotaType,
                             LinkedHashMap::new,
-                            Collectors.summingLong(row -> ((Number) row.get("used_count")).longValue())
+                            Collectors.summingLong(row -> row.usedCount() == null ? 0L : row.usedCount())
                     ));
-            summary.put("totals_by_type", totals);
 
-            return ApiResponse.success(summary);
+            return ApiResponse.success(new UsageResultVO(id, days, dailyUsage, totals));
         } catch (Exception e) {
             log.error("查询用量失败: id={}", id, e);
             return ApiResponse.internalError("查询用量失败");
@@ -382,46 +288,28 @@ public class TenantController {
     // ── 9. 模拟账单 ──────────────────────────────────
 
     @GetMapping("/{id}/invoice")
-    public ApiResponse<Map<String, Object>> getInvoice(
+    public ApiResponse<InvoiceResultVO> getInvoice(
             @PathVariable String id,
             @RequestParam(defaultValue = "") String month) {
         try {
-            // Verify tenant exists
-            String checkSql = "SELECT COUNT(*) FROM ecos_tenant WHERE id = ?";
-            int count = tenantService.queryForObject(checkSql, Integer.class, id);
-            if (count == 0) {
+            if (tenantService.countTenant(id) == 0) {
                 return ApiResponse.notFound("租户不存在: " + id);
             }
 
-            YearMonth ym;
-            if (month.isBlank()) {
-                ym = YearMonth.now();
-            } else {
-                ym = YearMonth.parse(month, MONTH_FMT);
-            }
+            YearMonth ym = month.isBlank() ? YearMonth.now() : YearMonth.parse(month, MONTH_FMT);
 
             LocalDate start = ym.atDay(1);
             LocalDate end = ym.atEndOfMonth();
 
-            List<Map<String, Object>> monthlyUsage = tenantService.queryForList(
-                    "SELECT quota_type, SUM(used_count) AS total_used " +
-                    "FROM ecos_tenant_usage " +
-                    "WHERE tenant_id = ? AND usage_date BETWEEN ? AND ? " +
-                    "GROUP BY quota_type",
-                    id, start, end);
+            List<TenantService.MonthlyUsageRow> monthlyUsage = tenantService.queryMonthlyUsage(id, start, end);
+            List<TenantService.QuotaDefRow> quotas = tenantService.queryQuotaDefinitions(id);
 
-            List<Map<String, Object>> quotas = tenantService.queryForList(
-                    "SELECT quota_type, daily_limit, monthly_limit " +
-                    "FROM ecos_tenant_quota WHERE tenant_id = ?", id);
-
-            Map<String, Long> usageMap = new LinkedHashMap<>();
             long totalCostCents = 0;
-            List<Map<String, Object>> lineItems = new ArrayList<>();
+            List<InvoiceLineVO> lineItems = new ArrayList<>();
 
-            for (Map<String, Object> row : monthlyUsage) {
-                String type = (String) row.get("quota_type");
-                long totalUsed = ((Number) row.get("total_used")).longValue();
-                usageMap.put(type, totalUsed);
+            for (TenantService.MonthlyUsageRow row : monthlyUsage) {
+                String type = row.quotaType();
+                long totalUsed = row.totalUsed() == null ? 0L : row.totalUsed();
 
                 long costCents = 0;
                 if ("API_CALLS".equals(type)) {
@@ -431,28 +319,322 @@ public class TenantController {
                 }
 
                 totalCostCents += costCents;
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("quota_type", type);
-                item.put("usage", totalUsed);
-                item.put("unit_price", "API_CALLS".equals(type) ? "¥0.10/千次" : "¥0.05/GB");
-                item.put("cost_cents", costCents);
-                item.put("cost_display", String.format("¥%.2f", costCents / 100.0));
-                lineItems.add(item);
+                lineItems.add(new InvoiceLineVO(type, totalUsed,
+                        "API_CALLS".equals(type) ? "¥0.10/千次" : "¥0.05/GB",
+                        costCents, String.format("¥%.2f", costCents / 100.0)));
             }
 
-            Map<String, Object> invoice = new LinkedHashMap<>();
-            invoice.put("tenant_id", id);
-            invoice.put("month", ym.toString());
-            invoice.put("quota_definitions", quotas);
-            invoice.put("line_items", lineItems);
-            invoice.put("total_cost_cents", totalCostCents);
-            invoice.put("total_cost_display", String.format("¥%.2f", totalCostCents / 100.0));
-            invoice.put("generated_at", java.time.Instant.now().toString());
-
-            return ApiResponse.success(invoice);
+            return ApiResponse.success(new InvoiceResultVO(id, ym.toString(), quotas, lineItems,
+                    totalCostCents, String.format("¥%.2f", totalCostCents / 100.0),
+                    java.time.Instant.now().toString()));
         } catch (Exception e) {
             log.error("生成账单失败: id={}", id, e);
             return ApiResponse.internalError("生成账单失败");
         }
+    }
+
+    // ── 请求 DTO（#147CJ） ─────────────────────────────────────
+
+    /** 建租户请求（缺省值口径与旧 Map 读取一致）。 */
+    public static final class TenantCreateRequest {
+        private String id;
+        private String tenantName;
+        private String tenantCode;
+        private String status;
+        private Integer maxUsers;
+        private Long maxStorageMb;
+        private Long maxApiPerDay;
+        private String isolationMode;
+        private String schemaName;
+        private String databaseUrl;
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getTenantName() {
+            return tenantName;
+        }
+
+        public void setTenantName(String tenantName) {
+            this.tenantName = tenantName;
+        }
+
+        public String getTenantCode() {
+            return tenantCode;
+        }
+
+        public void setTenantCode(String tenantCode) {
+            this.tenantCode = tenantCode;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+
+        public Integer getMaxUsers() {
+            return maxUsers;
+        }
+
+        public void setMaxUsers(Integer maxUsers) {
+            this.maxUsers = maxUsers;
+        }
+
+        public Long getMaxStorageMb() {
+            return maxStorageMb;
+        }
+
+        public void setMaxStorageMb(Long maxStorageMb) {
+            this.maxStorageMb = maxStorageMb;
+        }
+
+        public Long getMaxApiPerDay() {
+            return maxApiPerDay;
+        }
+
+        public void setMaxApiPerDay(Long maxApiPerDay) {
+            this.maxApiPerDay = maxApiPerDay;
+        }
+
+        public String getIsolationMode() {
+            return isolationMode;
+        }
+
+        public void setIsolationMode(String isolationMode) {
+            this.isolationMode = isolationMode;
+        }
+
+        public String getSchemaName() {
+            return schemaName;
+        }
+
+        public void setSchemaName(String schemaName) {
+            this.schemaName = schemaName;
+        }
+
+        public String getDatabaseUrl() {
+            return databaseUrl;
+        }
+
+        public void setDatabaseUrl(String databaseUrl) {
+            this.databaseUrl = databaseUrl;
+        }
+    }
+
+    /** 改租户请求（{@code xxxPresent} 保留旧 containsKey 语义）。 */
+    public static final class TenantUpdateRequest {
+        private String tenantName;
+        private String tenantCode;
+        private String status;
+        private Integer maxUsers;
+        private Long maxStorageMb;
+        private Long maxApiPerDay;
+        private String isolationMode;
+        private String schemaName;
+        private String databaseUrl;
+        private boolean tenantNamePresent;
+        private boolean tenantCodePresent;
+        private boolean statusPresent;
+        private boolean maxUsersPresent;
+        private boolean maxStorageMbPresent;
+        private boolean maxApiPerDayPresent;
+        private boolean isolationModePresent;
+        private boolean schemaNamePresent;
+        private boolean databaseUrlPresent;
+
+        public String getTenantName() {
+            return tenantName;
+        }
+
+        public void setTenantName(String tenantName) {
+            this.tenantName = tenantName;
+            this.tenantNamePresent = true;
+        }
+
+        public String getTenantCode() {
+            return tenantCode;
+        }
+
+        public void setTenantCode(String tenantCode) {
+            this.tenantCode = tenantCode;
+            this.tenantCodePresent = true;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+            this.statusPresent = true;
+        }
+
+        public Integer getMaxUsers() {
+            return maxUsers;
+        }
+
+        public void setMaxUsers(Integer maxUsers) {
+            this.maxUsers = maxUsers;
+            this.maxUsersPresent = true;
+        }
+
+        public Long getMaxStorageMb() {
+            return maxStorageMb;
+        }
+
+        public void setMaxStorageMb(Long maxStorageMb) {
+            this.maxStorageMb = maxStorageMb;
+            this.maxStorageMbPresent = true;
+        }
+
+        public Long getMaxApiPerDay() {
+            return maxApiPerDay;
+        }
+
+        public void setMaxApiPerDay(Long maxApiPerDay) {
+            this.maxApiPerDay = maxApiPerDay;
+            this.maxApiPerDayPresent = true;
+        }
+
+        public String getIsolationMode() {
+            return isolationMode;
+        }
+
+        public void setIsolationMode(String isolationMode) {
+            this.isolationMode = isolationMode;
+            this.isolationModePresent = true;
+        }
+
+        public String getSchemaName() {
+            return schemaName;
+        }
+
+        public void setSchemaName(String schemaName) {
+            this.schemaName = schemaName;
+            this.schemaNamePresent = true;
+        }
+
+        public String getDatabaseUrl() {
+            return databaseUrl;
+        }
+
+        public void setDatabaseUrl(String databaseUrl) {
+            this.databaseUrl = databaseUrl;
+            this.databaseUrlPresent = true;
+        }
+
+        public boolean isTenantNamePresent() {
+            return tenantNamePresent;
+        }
+
+        public boolean isTenantCodePresent() {
+            return tenantCodePresent;
+        }
+
+        public boolean isStatusPresent() {
+            return statusPresent;
+        }
+
+        public boolean isMaxUsersPresent() {
+            return maxUsersPresent;
+        }
+
+        public boolean isMaxStorageMbPresent() {
+            return maxStorageMbPresent;
+        }
+
+        public boolean isMaxApiPerDayPresent() {
+            return maxApiPerDayPresent;
+        }
+
+        public boolean isIsolationModePresent() {
+            return isolationModePresent;
+        }
+
+        public boolean isSchemaNamePresent() {
+            return schemaNamePresent;
+        }
+
+        public boolean isDatabaseUrlPresent() {
+            return databaseUrlPresent;
+        }
+    }
+
+    /** 改配额请求（JSON 键保持旧 snake_case）。 */
+    public static final class QuotaUpdateRequest {
+        @JsonProperty("quota_type")
+        private String quotaType;
+        @JsonProperty("daily_limit")
+        private Long dailyLimit;
+        @JsonProperty("monthly_limit")
+        private Long monthlyLimit;
+
+        public String getQuotaType() {
+            return quotaType;
+        }
+
+        public void setQuotaType(String quotaType) {
+            this.quotaType = quotaType;
+        }
+
+        public Long getDailyLimit() {
+            return dailyLimit;
+        }
+
+        public void setDailyLimit(Long dailyLimit) {
+            this.dailyLimit = dailyLimit;
+        }
+
+        public Long getMonthlyLimit() {
+            return monthlyLimit;
+        }
+
+        public void setMonthlyLimit(Long monthlyLimit) {
+            this.monthlyLimit = monthlyLimit;
+        }
+    }
+
+    // ── 响应 VO（#147CJ） ─────────────────────────────────────
+
+    /** 建租户回执（4 键）。 */
+    public record CreateResultVO(String id, String tenantName, String tenantCode, String status) {
+    }
+
+    /** 配额视图（3 键）。 */
+    public record QuotaResultVO(String tenantId, List<TenantService.QuotaRow> quotas,
+                                List<TenantService.UsageMaxRow> usage) {
+    }
+
+    /** 用量视图（4 键；snake_case 由属性注解保持）。 */
+    public record UsageResultVO(@JsonProperty("tenant_id") String tenantId,
+                                @JsonProperty("range_days") int rangeDays,
+                                @JsonProperty("daily_usage") List<TenantService.DailyUsageRow> dailyUsage,
+                                @JsonProperty("totals_by_type") Map<String, Long> totalsByType) {
+    }
+
+    /** 账单视图（7 键；snake_case 由属性注解保持）。 */
+    public record InvoiceResultVO(@JsonProperty("tenant_id") String tenantId,
+                                  @JsonProperty("month") String month,
+                                  @JsonProperty("quota_definitions") List<TenantService.QuotaDefRow> quotaDefinitions,
+                                  @JsonProperty("line_items") List<InvoiceLineVO> lineItems,
+                                  @JsonProperty("total_cost_cents") long totalCostCents,
+                                  @JsonProperty("total_cost_display") String totalCostDisplay,
+                                  @JsonProperty("generated_at") String generatedAt) {
+    }
+
+    /** 账单行（5 键）。 */
+    public record InvoiceLineVO(@JsonProperty("quota_type") String quotaType,
+                                @JsonProperty("usage") long usage,
+                                @JsonProperty("unit_price") String unitPrice,
+                                @JsonProperty("cost_cents") long costCents,
+                                @JsonProperty("cost_display") String costDisplay) {
     }
 }
